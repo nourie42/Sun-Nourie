@@ -10,44 +10,30 @@
 <style>
   :root{
     --bg:#0f172a; --panel:#0b1224; --border:#1f2937; --muted:#94a3b8; --text:#e5e7eb;
-    --accent:#60a5fa; --good:#22c55e; --warn:#f59e0b; --brand-blue:#002f6c; --brand-red:#d61f26; --brand-yellow:#ffd200;
+    --accent:#60a5fa; --good:#22c55e; --warn:#f59e0b;
   }
-  *{box-sizing:border-box}
   body{margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif; background:var(--bg); color:var(--text);}
-  /* Header */
-  .brandbar{position:sticky; top:0; z-index:1000; background:linear-gradient(180deg,#0b1224 0%, #081020 100%); border-bottom:1px solid var(--border); padding:10px 14px; display:flex; align-items:center; justify-content:space-between;}
-  .brand{display:flex; align-items:center; gap:10px;}
+  .brandbar{position:sticky; top:0; background:#0b1224; border-bottom:1px solid var(--border); padding:10px 14px; display:flex; align-items:center; justify-content:space-between;}
   .brand img{height:32px; width:auto;}
-  .brand .text-logo{font-weight:900; letter-spacing:.6px; font-size:18px; background:linear-gradient(90deg,var(--brand-yellow), var(--brand-red)); -webkit-background-clip:text; background-clip:text; color:transparent; text-transform:uppercase;}
   .brand-sub{font-size:12px; color:var(--muted);}
-  .accent-strip{height:3px; background:linear-gradient(90deg,var(--brand-yellow),var(--brand-red),var(--brand-blue));}
-  /* Layout */
   .container{padding:18px; max-width:680px; margin:auto;}
   h1{font-size:20px; margin:0 0 12px;}
-  label{display:block; margin:12px 0 6px; color:#cbd5e1; font-size:14px;}
+  label{display:block; margin:12px 0 6px; color:#cbd5e1;}
   input,button{width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--panel); color:var(--text); font-size:16px;}
-  input::placeholder{color:#64748b}
-  button{background:var(--accent); color:#0b1224; font-weight:800; cursor:pointer;}
-  #export{background:#34d399; display:none}
-  #reset{background:#fbbf24; color:#0f172a; display:none}
-  #status{margin-top:12px; font-size:14px; background:#1e293b; border:1px solid var(--border); border-radius:8px; padding:10px; height:140px; overflow-y:auto; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; white-space:pre-line;}
+  button{background:var(--accent); color:#0b1224; font-weight:700; cursor:pointer;}
+  #status{margin-top:12px; font-size:14px; background:#1e293b; border:1px solid var(--border); border-radius:8px; padding:10px; height:140px; overflow-y:auto; font-family:monospace; white-space:pre-line;}
   #result{margin-top:16px; font-size:20px; font-weight:900; color:var(--good);}
-  #summary,#competitors,#developments{margin-top:10px; font-size:14px; color:#e2e8f0;}
+  #summary,#competitors,#developments{margin-top:10px;}
   #map{height:58vh; margin:18px auto; border:1px solid var(--border); border-radius:12px; max-width:1200px;}
-  .hint{font-size:12px; color:#94a3b8; margin-top:6px;}
-  @media (min-width:768px){ #map{height:62vh} .brand img{height:36px} }
 </style>
 </head>
 <body>
 <header class="brandbar">
   <div class="brand">
-    <img id="sunocoLogo" src="sunoco-logo.svg" alt="Sunoco LP logo"
-      onerror="this.style.display='none'; document.getElementById('textLogo').style.display='inline-block';"/>
-    <span id="textLogo" class="text-logo" style="display:none;">Sunoco LP</span>
+    <img src="sunoco-logo.svg" alt="Sunoco LP logo" onerror="this.style.display='none';"/>
   </div>
   <div class="brand-sub">Fuel Volume Estimator</div>
 </header>
-<div class="accent-strip"></div>
 
 <div class="container">
   <h1>Monthly Volume Estimate</h1>
@@ -62,29 +48,21 @@
   <div id="summary"></div>
   <div id="competitors"></div>
   <div id="developments"></div>
-  <button id="export">📄 Export to PDF</button>
-  <button id="reset">🔄 Run Another Search</button>
-
-  <div class="hint">
-    Uses Nominatim (geocode), NCDOT AADT, and OSM Overpass (competitors & developments). Brand-weighted demand, big-box penalties, and MPD throughput caps included.
-  </div>
+  <button id="export" style="display:none;">📄 Export to PDF</button>
+  <button id="reset" style="display:none;">🔄 Run Another Search</button>
 </div>
 
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-// ===== Tunables =====
+// === Basic math ===
 const CAPTURE_RATE=0.02, GALLONS_PER_STOP=9.2, DAYS_PER_MONTH=30.4;
 const POSITIONS_PER_MPD=2, CYCLE_MIN=6.5, HOURS_OPEN=18, AVG_OCCUPANCY=0.20;
 const COMP_RADIUS_M=5000, HUFF_BETA=1.2;
-
-// Derived MPD capacity (~18.5k gal/mpd/mo)
 const TRANS_PER_POS_PER_DAY=(60/CYCLE_MIN)*HOURS_OPEN*AVG_OCCUPANCY;
 const GPD_PER_POS=TRANS_PER_POS_PER_DAY*GALLONS_PER_STOP;
 const MONTHLY_PER_MPD_CAP=GPD_PER_POS*POSITIONS_PER_MPD*DAYS_PER_MONTH;
-
-// ===== Helpers =====
 const fmt=n=>Number.isFinite(n)?Math.round(n).toLocaleString():"–";
 const rad=d=>d*Math.PI/180;
 function hav(a,b){const R=3958.8,dLat=rad(b.lat-a.lat),dLng=rad(b.lng-a.lng);
@@ -92,232 +70,100 @@ function hav(a,b){const R=3958.8,dLat=rad(b.lat-a.lat),dLng=rad(b.lng-a.lng);
   return 2*R*Math.asin(Math.sqrt(s));}
 function clamp(x,lo,hi){return Math.max(lo,Math.min(hi,x));}
 
-// ===== Map =====
+// === Map ===
 const map=L.map('map').setView([35.7796,-78.6382],11);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
-let siteMarker=null,compLayer=null,devLayer=null,radiusCircle=null;
+let siteMarker=null,compLayer=null,devLayer=null;
 
-// ===== Logger =====
+// === Logger ===
 function logger(el){el.textContent="";return(msg,ok=false)=>{el.textContent+=(ok?"✅ ":"⏳ ")+msg+"\n";el.scrollTop=el.scrollHeight;}}
 
-// ===== Overpass with fallback =====
-const OVERPASS=["https://overpass-api.de/api/interpreter","https://overpass.kumi.systems/api/interpreter"];
+// === Overpass helper ===
 async function overpassQuery(q){
-  for(const ep of OVERPASS){
-    try{
-      const r=await fetch(ep,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded; charset=UTF-8"},body:"data="+encodeURIComponent(q)});
-      if(r.ok) return await r.json();
-    }catch(e){}
-  }
-  throw new Error("Overpass unavailable");
+  const ep="https://overpass-api.de/api/interpreter";
+  const r=await fetch(ep,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded; charset=UTF-8"},body:"data="+encodeURIComponent(q)});
+  return await r.json();
 }
 
-// ===== Brand rules (weights + proximity penalties) =====
-const BRAND_RULES=[
-  {re:/\b(costco|sam'?s club|bj'?s)\b/i,cat:"club",w:2.5,mpd:8,color:"#ef4444",penalties:[{mi:1.5,p:0.25},{mi:3.1,p:0.15}]},
-  {re:/\b(buc-?ee?s?)\b/i,cat:"hyper_cstore",w:3.0,mpd:20,color:"#f97316",penalties:[{mi:5,p:0.25}]},
-  {re:/\b(wawa|sheetz|quik\s?trip|^qt\b|qt\s|racetrac|race\s?trac|getgo|casey'?s)\b/i,cat:"large_cstore",w:2.0,mpd:6,color:"#fb923c",penalties:[{mi:1.5,p:0.10},{mi:3.1,p:0.06}]},
-  {re:/\b(love'?s|pilot|flying\s?j|ta|petro)\b/i,cat:"travel_center",w:2.0,mpd:10,color:"#f59e0b",penalties:[{mi:2.5,p:0.10}]},
-  {re:/\b(murphy|speedway)\b/i,cat:"discount",w:1.5,mpd:6,color:"#facc15",penalties:[{mi:2.5,p:0.06}]},
-  {re:/\b(circle\s?k|7-?eleven|7 eleven|exxon|mobil|bp|chevron|shell|sunoco|valero|phillips|76|citgo)\b/i,cat:"major_brand",w:1.3,mpd:6,color:"#fcd34d",penalties:[{mi:2.0,p:0.04}]},
-  {re:/./,cat:"other",w:1.0,mpd:4,color:"#fbbf24",penalties:[]}
-];
-function classifyBrand(name){return BRAND_RULES.find(r=>r.re.test((name||"").toString()))||BRAND_RULES[BRAND_RULES.length-1];}
-
-// ===== AADT (NCDOT; nearest station) =====
+// === Fetch AADT (NCDOT, fallback to 20k) ===
 async function fetchAADT(lat,lng){
-  const url="https://services.arcgis.com/NuWFvHYDMVmmxMeM/ArcGIS/rest/services/NCDOT_AADT_Stations/FeatureServer/0/query";
-  const params={where:"1=1",geometry:`${lng},${lat}`,geometryType:"esriGeometryPoint",inSR:"4326",spatialRel:"esriSpatialRelIntersects",distance:"1000",units:"esriSRUnit_Meter",outFields:"*",outSR:"4326",f:"json"};
-  const r=await fetch(url+"?"+new URLSearchParams(params)); const j=await r.json();
-  if(!j.features?.length) return null;
-  let best=null,bestD=1e9; for(const f of j.features){const d=hav({lat,lng},{lat:f.geometry.y,lng:f.geometry.x}); if(d<bestD){bestD=d;best=f;}}
-  const attrs=best.attributes||{}; const aadt=Number.isFinite(attrs.AADT)?attrs.AADT:Object.values(attrs).find(v=>typeof v==="number"&&v>0)||null;
-  return aadt?{aadt,dist:bestD}:null;
+  try{
+    const url="https://services.arcgis.com/NuWFvHYDMVmmxMeM/ArcGIS/rest/services/NCDOT_AADT_Stations/FeatureServer/0/query";
+    const params={where:"1=1",geometry:`${lng},${lat}`,geometryType:"esriGeometryPoint",inSR:"4326",spatialRel:"esriSpatialRelIntersects",distance:"1000",units:"esriSRUnit_Meter",outFields:"*",outSR:"4326",f:"json"};
+    const r=await fetch(url+"?"+new URLSearchParams(params)); const j=await r.json();
+    if(!j.features?.length) return 20000;
+    return j.features[0].attributes.AADT||20000;
+  }catch{return 20000;}
 }
 
-// ===== Competitors & Developments (OSM) =====
+// === Fetch competitors ===
 async function fetchCompetitors(lat,lng){
-  const q=`[out:json][timeout:25];
-    (node["amenity"="fuel"](around:${COMP_RADIUS_M},${lat},${lng});
-     way["amenity"="fuel"](around:${COMP_RADIUS_M},${lat},${lng});
-     relation["amenity"="fuel"](around:${COMP_RADIUS_M},${lat},${lng});); out center tags;`;
+  const q=`[out:json][timeout:25];node["amenity"="fuel"](around:${COMP_RADIUS_M},${lat},${lng});out center;`;
   const j=await overpassQuery(q);
-  const rows=(j.elements||[]).map(e=>{
-    const c=e.type==="node"?{lat:e.lat,lng:e.lon}:(e.center||null); if(!c) return null;
-    const name=e.tags?.brand||e.tags?.name||"Fuel station";
-    const pumps=parseInt(e.tags?.pumps);
-    const dist=hav({lat,lng},{lat:c.lat,lng:c.lon});
-    const brand=classifyBrand(name);
-    const mpdGuess=Number.isFinite(pumps)?Math.max(1,Math.round(pumps/2)):brand.mpd;
-    const attr=brand.w*mpdGuess;
-    return {lat:c.lat,lng:c.lon,name,dist,brand,mpdGuess,attr};
-  }).filter(Boolean).sort((a,b)=>a.dist-b.dist);
-  const dedup=[]; rows.forEach(s=>{ if(!dedup.some(t=>hav(s,t)<0.05)) dedup.push(s); });
-  return dedup;
-}
-async function fetchDevelopments(lat,lng){
-  const q=`[out:json][timeout:25];
-    (node["amenity"="fuel"]["proposed"](around:${COMP_RADIUS_M},${lat},${lng});
-     way["amenity"="fuel"]["proposed"](around:${COMP_RADIUS_M},${lat},${lng});
-     relation["amenity"="fuel"]["proposed"](around:${COMP_RADIUS_M},${lat},${lng});
-     node["amenity"="fuel"]["construction"](around:${COMP_RADIUS_M},${lat},${lng});
-     way["amenity"="fuel"]["construction"](around:${COMP_RADIUS_M},${lat},${lng});
-     relation["amenity"="fuel"]["construction"](around:${COMP_RADIUS_M},${lat},${lng});); out center tags;`;
-  const j=await overpassQuery(q);
-  return (j.elements||[]).map(e=>{
-    const c=e.type==="node"?{lat:e.lat,lng:e.lon}:(e.center||null); if(!c) return null;
-    const name=e.tags?.brand||e.tags?.name||"New fuel development";
-    const stage=e.tags?.proposed?"proposed":(e.tags?.construction?"construction":"planned");
-    const dist=hav({lat,lng},{lat:c.lat,lng:c.lon});
-    return {lat:c.lat,lng:c.lon,name,stage,dist};
-  }).filter(Boolean).sort((a,b)=>a.dist-b.dist);
+  return j.elements.map(e=>({lat:e.lat,lng:e.lon,name:e.tags?.brand||e.tags?.name||"Station",dist:hav({lat,lng},{lat:e.lat,lng:e.lon})}));
 }
 
-// ===== Demand share & capacity =====
-function siteAttrFromMPDs(mpds){return Math.max(1,mpds);}
-function huffShare(siteAttr, comps, beta=HUFF_BETA){
-  const eps=0.1, siteD=0.1;
-  let denom=siteAttr/Math.pow(siteD,beta);
-  comps.forEach(c=>denom+=c.attr/Math.pow(Math.max(eps,c.dist),beta));
-  return clamp((siteAttr/Math.pow(siteD,beta))/denom,0,1);
-}
-function demandGallons(aadt,share){return aadt*CAPTURE_RATE*GALLONS_PER_STOP*DAYS_PER_MONTH*share;}
-function capacityCapGallons(mpds){return mpds*MONTHLY_PER_MPD_CAP;}
-function applyBlockingWhenOverloaded(gal,cap){
-  if(gal<=cap) return {g:gal, penaltyPct:0};
-  const overload=gal/cap, penalty=clamp(1-0.25*(overload-1),0.80,1.0);
-  return {g:cap*penalty, penaltyPct:Math.round((1-penalty)*100)};
-}
-
-// ===== Competitive penalties (proximity, brand) =====
-function competitivePenalties(comps){
-  const items=[]; comps.forEach(c=>{
-    for(const r of c.brand.penalties){ if(c.dist<=r.mi){ items.push({name:c.name,cat:c.brand.cat,dist:c.dist,pct:Math.round(r.p*100)}); break; } }
-  });
-  let factor=1.0; items.forEach(x=>factor*=(1-x.pct/100));
-  return {items,factor};
-}
-
-// ===== Main flow =====
+// === Main button ===
 document.getElementById('estimate').onclick=async()=>{
   const status=document.getElementById('status'); const log=logger(status);
   const result=document.getElementById('result'); const summary=document.getElementById('summary');
-  const compDiv=document.getElementById('competitors'); const devDiv=document.getElementById('developments');
-  const exportBtn=document.getElementById('export'); const resetBtn=document.getElementById('reset');
+  const compDiv=document.getElementById('competitors'); const exportBtn=document.getElementById('export'); const resetBtn=document.getElementById('reset');
 
-  result.textContent=""; summary.textContent=""; compDiv.textContent=""; devDiv.textContent="";
+  result.textContent=""; summary.textContent=""; compDiv.textContent="";
   exportBtn.style.display="none"; resetBtn.style.display="none";
-  if(compLayer){map.removeLayer(compLayer); compLayer=null;} if(devLayer){map.removeLayer(devLayer); devLayer=null;}
-  if(radiusCircle){map.removeLayer(radiusCircle); radiusCircle=null;}
+  if(compLayer){map.removeLayer(compLayer);} if(siteMarker){map.removeLayer(siteMarker);}
 
   try{
     const addr=document.getElementById('address').value.trim();
     const mpds=Math.max(1,parseInt(document.getElementById('mpds').value)||6);
     if(!addr) throw new Error("Please enter an address.");
-
     log("Geocoding address…");
     const g=await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(addr)}`);
     const gj=await g.json(); if(!gj.length) throw new Error("Address not found.");
-    const lat=+gj[0].lat, lng=+gj[0].lon; log(`Found location at (${lat.toFixed(4)}, ${lng.toFixed(4)})`,true);
-
-    if(siteMarker) map.removeLayer(siteMarker);
+    const lat=+gj[0].lat, lng=+gj[0].lon; log("Found location.",true);
     siteMarker=L.marker([lat,lng]).addTo(map).bindPopup("Your site").openPopup();
     map.setView([lat,lng],13);
-    radiusCircle=L.circle([lat,lng],{radius:COMP_RADIUS_M,color:"#f59e0b",weight:1}).addTo(map);
 
-    log("Fetching AADT (nearest station)…");
-    let aadt=20000;
-    try{ const info=await fetchAADT(lat,lng); if(info?.aadt){aadt=info.aadt; log(`AADT found: ${fmt(aadt)}`,true);} else {log("No AADT nearby — using 20,000 fallback.",true);} }catch{ log("AADT service unavailable — using 20,000 fallback.",true); }
+    log("Fetching AADT…");
+    const aadt=await fetchAADT(lat,lng); log("AADT="+aadt,true);
 
-    log("Searching competitors (~3.1 mi)…");
-    let comps=[]; try{ comps=await fetchCompetitors(lat,lng); log(`Found ${comps.length} fuel stations.`,true);}catch{ log("Competitor lookup unavailable.",true); }
-    if(compLayer) map.removeLayer(compLayer);
-    compLayer=L.layerGroup(comps.map(c=>L.circleMarker([c.lat,c.lng],{radius:6,color:c.brand.color})
-      .bindPopup(`${c.name}<br>${c.brand.cat.replace("_"," ")}<br>${c.dist.toFixed(1)} mi`))).addTo(map);
+    log("Fetching competitors…");
+    const comps=await fetchCompetitors(lat,lng); log(`Found ${comps.length}`,true);
+    compLayer=L.layerGroup(comps.map(c=>L.circleMarker([c.lat,c.lng],{radius:6,color:"#f59e0b"}).bindPopup(`${c.name}<br>${c.dist.toFixed(1)} mi`))).addTo(map);
 
-    log("Checking new developments (proposed / construction)…");
-    let devs=[]; try{ devs=await fetchDevelopments(lat,lng); log(`Found ${devs.length} development sites.`,true);}catch{ log("Development lookup unavailable.",true); }
-    if(devLayer) map.removeLayer(devLayer);
-    devLayer=L.layerGroup(devs.map(d=>L.circleMarker([d.lat,d.lng],{radius:6,color:"#a78bfa"})
-      .bindPopup(`${d.name} (${d.stage})<br>${d.dist.toFixed(1)} mi`))).addTo(map);
+    // Estimate
+    const share=1.0; // simple (no Huff for this trimmed version)
+    const demand=aadt*CAPTURE_RATE*GALLONS_PER_STOP*DAYS_PER_MONTH*share;
+    const cap=mpds*MONTHLY_PER_MPD_CAP;
+    const est=Math.min(demand,cap);
 
-    log("Allocating demand (brand-weighted Huff)…");
-    const siteAttr=siteAttrFromMPDs(mpds);
-    const neutralShare=huffShare(siteAttr, comps.map(c=>({dist:c.dist,attr:4})), HUFF_BETA);
-    const brandShare=huffShare(siteAttr, comps, HUFF_BETA);
-    const brandImpactFactor=brandShare/Math.max(1e-6,neutralShare);
+    result.textContent=`Estimated Monthly Gallons: ${fmt(est)}`;
+    summary.textContent=`AADT ${fmt(aadt)} · MPDs ${mpds} · Competitors ${comps.length}`;
 
-    const {items:penItems,factor:penFactor}=competitivePenalties(comps);
-
-    const demand= demandGallons(aadt, brandShare) * penFactor;
-    const capacity= capacityCapGallons(mpds);
-    const capped= applyBlockingWhenOverloaded(demand, capacity);
-
-    result.textContent=`Estimated Monthly Gallons: ${fmt(capped.g)}`;
-
-    const adjBits=[];
-    if(brandImpactFactor<0.999) adjBits.push(`brand-weighted share −${Math.round((1-brandImpactFactor)*100)}%`);
-    if(penItems.length){
-      const line=penItems.slice(0,4).map(x=>`${x.name} ${x.dist.toFixed(1)} mi (−${x.pct}%)`).join("; ");
-      adjBits.push(line);
-    }
-    if(capped.penaltyPct>0) adjBits.push(`capacity/queuing penalty −${capped.penaltyPct}%`);
-
-    summary.textContent=`AADT ${fmt(aadt)} · MPDs ${mpds} · competitors ${comps.length} · developments ${devs.length}` + (adjBits.length?` · Competitive adjustments: ${adjBits.join(" · ")}`:"");
-
-    if(comps.length){
-      let list="<b>Competitors considered (top 6):</b><ul>";
-      comps.slice(0,6).forEach(c=>list+=`<li>${c.name} — ${c.brand.cat.replace("_"," ")} — ${c.dist.toFixed(1)} mi</li>`);
-      list+="</ul>"; compDiv.innerHTML=list;
-    }
-    if(devs.length){
-      let dl="<b>New developments:</b><ul>";
-      devs.slice(0,6).forEach(d=>dl+=`<li>${d.name} — ${d.stage} — ${d.dist.toFixed(1)} mi</li>`);
-      dl+="</ul>"; devDiv.innerHTML=dl;
-    }
-
-    log("⚡ Estimate complete!",true);
-    status.textContent += "\n❓ Do you want me to run another search?\n";
     exportBtn.style.display="block"; resetBtn.style.display="block";
+    log("✅ Estimate complete!",true);
 
-    // PDF export with map snapshot
     exportBtn.onclick=async()=>{
       const {jsPDF}=window.jspdf; const doc=new jsPDF();
       doc.text("Fuel Volume Estimate",20,20);
-      doc.text(`Address: ${addr}`,20,30);
-      doc.text(`MPDs: ${mpds}`,20,40);
+      doc.text(`Address: ${addr}`,20,30); doc.text(`MPDs: ${mpds}`,20,40);
       doc.text(`AADT: ${fmt(aadt)}`,20,50);
-      doc.text(`Competitors: ${comps.length}  Developments: ${devs.length}`,20,60);
-      let y=70; comps.slice(0,6).forEach(c=>{doc.text(`${c.name} — ${c.brand.cat.replace("_"," ")} — ${c.dist.toFixed(1)} mi`,20,y); y+=7;});
-      if(adjBits.length){y+=4; doc.text(`Adjustments: ${adjBits.join(" | ")}`,20,y); y+=10;}
-      doc.text(result.textContent,20,y); y+=6;
+      doc.text(result.textContent,20,70);
       const canvas=await html2canvas(document.getElementById("map")); const img=canvas.toDataURL("image/png");
-      doc.addImage(img,"PNG",20,y,170,90); doc.save("fuel_estimate.pdf");
+      doc.addImage(img,"PNG",20,80,170,90); doc.save("fuel_estimate.pdf");
     };
 
-    // Reset
     resetBtn.onclick=()=>{
       document.getElementById('address').value=""; document.getElementById('mpds').value="6";
       status.textContent=""; result.textContent=""; summary.textContent="";
-      compDiv.textContent=""; devDiv.textContent="";
-      exportBtn.style.display="none"; resetBtn.style.display="none";
+      compDiv.textContent=""; exportBtn.style.display="none"; resetBtn.style.display="none";
       if(siteMarker){map.removeLayer(siteMarker); siteMarker=null;}
       if(compLayer){map.removeLayer(compLayer); compLayer=null;}
-      if(devLayer){map.removeLayer(devLayer); devLayer=null;}
-      if(radiusCircle){map.removeLayer(radiusCircle); radiusCircle=null;}
       map.setView([35.7796,-78.6382],11);
-      document.getElementById('address').focus();
     };
 
-  }catch(e){
-    status.textContent += "❌ Error: "+e.message+"\n";
-  }
+  }catch(e){status.textContent+="❌ Error: "+e.message;}
 };
-
-// Enter in address field to run
-document.getElementById('address').addEventListener('keydown',e=>{
-  if(e.key==="Enter"){ document.getElementById('estimate').click(); }
-});
 </script>
 </body>
 </html>
