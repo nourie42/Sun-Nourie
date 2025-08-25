@@ -12,19 +12,42 @@
     --bg:#0f172a; --panel:#0b1224; --border:#1f2937; --muted:#94a3b8; --text:#e5e7eb;
     --accent:#60a5fa; --good:#22c55e; --warn:#f59e0b;
   }
+  *{box-sizing:border-box}
   body{margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif; background:var(--bg); color:var(--text);}
-  .brandbar{position:sticky; top:0; background:#0b1224; border-bottom:1px solid var(--border); padding:10px 14px; display:flex; align-items:center; justify-content:space-between;}
+  /* Header */
+  .brandbar{position:sticky; top:0; z-index:1000; background:linear-gradient(180deg,#0b1224, #081020); border-bottom:1px solid var(--border); padding:10px 14px; display:flex; align-items:center; justify-content:space-between;}
   .brand img{height:32px; width:auto;}
   .brand-sub{font-size:12px; color:var(--muted);}
-  .container{padding:18px; max-width:680px; margin:auto;}
+  .container{padding:18px; max-width:760px; margin:auto;}
   h1{font-size:20px; margin:0 0 12px;}
-  label{display:block; margin:12px 0 6px; color:#cbd5e1;}
+  label{display:block; margin:12px 0 6px; color:#cbd5e1; font-size:14px;}
   input,button{width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--panel); color:var(--text); font-size:16px;}
-  button{background:var(--accent); color:#0b1224; font-weight:700; cursor:pointer;}
-  #status{margin-top:12px; font-size:14px; background:#1e293b; border:1px solid var(--border); border-radius:8px; padding:10px; height:140px; overflow-y:auto; font-family:monospace; white-space:pre-line;}
+  input::placeholder{color:#64748b}
+  button{background:var(--accent); color:#0b1224; font-weight:800; cursor:pointer;}
+  #export{background:#34d399; display:none}
+  #reset{background:#fbbf24; color:#0f172a; display:none}
+  #status{margin-top:12px; font-size:14px; background:#1e293b; border:1px solid var(--border); border-radius:8px; padding:10px; height:140px; overflow-y:auto; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; white-space:pre-line;}
   #result{margin-top:16px; font-size:20px; font-weight:900; color:var(--good);}
-  #summary,#competitors,#developments{margin-top:10px;}
+  #summary,#competitors,#developments,#insights{margin-top:10px; font-size:14px; color:#e2e8f0;}
   #map{height:58vh; margin:18px auto; border:1px solid var(--border); border-radius:12px; max-width:1200px;}
+  .row{display:grid; grid-template-columns:1fr; gap:10px}
+  .media{display:grid; grid-template-columns:1fr; gap:10px; margin-top:10px}
+  .card{background:#0c142a; border:1px solid var(--border); border-radius:12px; padding:12px;}
+  .media img{width:100%; height:auto; border-radius:10px; border:1px solid var(--border)}
+  .badge{display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; background:#1f2937; color:#e5e7eb; border:1px solid #334155}
+  @media(min-width:820px){
+    .row{grid-template-columns:2fr 1fr}
+    .media{grid-template-columns:1fr 1fr}
+    #map{height:62vh}
+  }
+
+  /* Leaflet competitor icons via DivIcon */
+  .pin{display:flex; align-items:center; justify-content:center; border-radius:999px; border:2px solid #fff; box-shadow:0 2px 8px rgba(0,0,0,.45); font-weight:900; line-height:1}
+  .pin.big{width:30px; height:30px; font-size:16px;}
+  .pin.med{width:22px; height:22px; font-size:13px;}
+  .pin.small{width:18px; height:18px; font-size:12px;}
+  .legend{display:flex; gap:10px; align-items:center; margin-top:8px; color:#cbd5e1; font-size:12px}
+  .legend .swatch{width:14px; height:14px; border-radius:999px; border:2px solid #fff; display:inline-block; margin-right:5px}
 </style>
 </head>
 <body>
@@ -37,32 +60,62 @@
 
 <div class="container">
   <h1>Monthly Volume Estimate</h1>
-  <label for="address">Address</label>
-  <input id="address" placeholder="4173 Knightdale Blvd, Knightdale, NC" />
-  <label for="mpds">MPDs</label>
-  <input id="mpds" type="number" min="1" value="6" />
-  <button id="estimate">Calculate Estimate</button>
 
-  <div id="status"></div>
-  <div id="result"></div>
-  <div id="summary"></div>
-  <div id="competitors"></div>
-  <div id="developments"></div>
-  <button id="export" style="display:none;">📄 Export to PDF</button>
-  <button id="reset" style="display:none;">🔄 Run Another Search</button>
+  <div class="row">
+    <div class="card">
+      <label for="address">Address</label>
+      <input id="address" placeholder="4173 Knightdale Blvd, Knightdale, NC" />
+      <label for="mpds">MPDs</label>
+      <input id="mpds" type="number" min="1" value="6" />
+      <label for="gkey">Google API key (optional — enables Street View & reviews)</label>
+      <input id="gkey" placeholder="Paste restricted Google Maps key (optional)" />
+      <button id="estimate">Calculate Estimate</button>
+      <div id="status"></div>
+      <div id="result"></div>
+      <div id="summary"></div>
+      <div id="insights"></div>
+      <div class="media">
+        <div class="card">
+          <div class="badge">Street View</div>
+          <img id="streetImg" alt="Street View preview" />
+        </div>
+        <div class="card">
+          <div class="badge">Reviews & Assessment</div>
+          <div id="reviews"></div>
+        </div>
+      </div>
+      <button id="export">📄 Export to PDF</button>
+      <button id="reset">🔄 Run Another Search</button>
+    </div>
+
+    <div class="card">
+      <div class="badge">Competition & Developments</div>
+      <div id="competitors"></div>
+      <div id="developments"></div>
+      <div class="legend">
+        <span class="swatch" style="background:#ef4444"></span>Club (⭐ big)
+        <span class="swatch" style="background:#f97316"></span>Hyper c-store (⭐)
+        <span class="swatch" style="background:#fb923c"></span>Large c-store (⭐)
+        <span class="swatch" style="background:#f59e0b"></span>Travel center (⭐)
+        <span class="swatch" style="background:#facc15"></span>Discount
+        <span class="swatch" style="background:#fcd34d"></span>Major brand
+      </div>
+    </div>
+  </div>
 </div>
 
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-// === Basic math ===
+/* ================== Core constants ================== */
 const CAPTURE_RATE=0.02, GALLONS_PER_STOP=9.2, DAYS_PER_MONTH=30.4;
 const POSITIONS_PER_MPD=2, CYCLE_MIN=6.5, HOURS_OPEN=18, AVG_OCCUPANCY=0.20;
 const COMP_RADIUS_M=5000, HUFF_BETA=1.2;
 const TRANS_PER_POS_PER_DAY=(60/CYCLE_MIN)*HOURS_OPEN*AVG_OCCUPANCY;
 const GPD_PER_POS=TRANS_PER_POS_PER_DAY*GALLONS_PER_STOP;
 const MONTHLY_PER_MPD_CAP=GPD_PER_POS*POSITIONS_PER_MPD*DAYS_PER_MONTH;
+
 const fmt=n=>Number.isFinite(n)?Math.round(n).toLocaleString():"–";
 const rad=d=>d*Math.PI/180;
 function hav(a,b){const R=3958.8,dLat=rad(b.lat-a.lat),dLng=rad(b.lng-a.lng);
@@ -70,100 +123,316 @@ function hav(a,b){const R=3958.8,dLat=rad(b.lat-a.lat),dLng=rad(b.lng-a.lng);
   return 2*R*Math.asin(Math.sqrt(s));}
 function clamp(x,lo,hi){return Math.max(lo,Math.min(hi,x));}
 
-// === Map ===
+/* ================== Leaflet map ================== */
 const map=L.map('map').setView([35.7796,-78.6382],11);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
-let siteMarker=null,compLayer=null,devLayer=null;
+let siteMarker=null, compLayer=null, devLayer=null, radiusCircle=null;
 
-// === Logger ===
+/* ================== Logger ================== */
 function logger(el){el.textContent="";return(msg,ok=false)=>{el.textContent+=(ok?"✅ ":"⏳ ")+msg+"\n";el.scrollTop=el.scrollHeight;}}
 
-// === Overpass helper ===
+/* ================== Overpass (with fallback) ================== */
+const OVERPASS=["https://overpass-api.de/api/interpreter","https://overpass.kumi.systems/api/interpreter"];
 async function overpassQuery(q){
-  const ep="https://overpass-api.de/api/interpreter";
-  const r=await fetch(ep,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded; charset=UTF-8"},body:"data="+encodeURIComponent(q)});
-  return await r.json();
+  for(const ep of OVERPASS){
+    try{
+      const r=await fetch(ep,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded; charset=UTF-8"},body:"data="+encodeURIComponent(q)});
+      if(r.ok) return await r.json();
+    }catch(e){}
+  }
+  throw new Error("Overpass unavailable");
 }
 
-// === Fetch AADT (NCDOT, fallback to 20k) ===
+/* ================== AADT (NCDOT demo) ================== */
 async function fetchAADT(lat,lng){
   try{
     const url="https://services.arcgis.com/NuWFvHYDMVmmxMeM/ArcGIS/rest/services/NCDOT_AADT_Stations/FeatureServer/0/query";
     const params={where:"1=1",geometry:`${lng},${lat}`,geometryType:"esriGeometryPoint",inSR:"4326",spatialRel:"esriSpatialRelIntersects",distance:"1000",units:"esriSRUnit_Meter",outFields:"*",outSR:"4326",f:"json"};
     const r=await fetch(url+"?"+new URLSearchParams(params)); const j=await r.json();
-    if(!j.features?.length) return 20000;
-    return j.features[0].attributes.AADT||20000;
-  }catch{return 20000;}
+    if(!j.features?.length) return null;
+    let best=null,bestD=1e9; for(const f of j.features){const d=hav({lat,lng},{lat:f.geometry.y,lng:f.geometry.x}); if(d<bestD){bestD=d;best=f;}}
+    const aadt=Number.isFinite(best.attributes.AADT)?best.attributes.AADT:null;
+    return aadt;
+  }catch(e){return null;}
 }
 
-// === Fetch competitors ===
+/* ================== Brand rules, icons, penalties ================== */
+const BRAND_RULES=[
+  {re:/\b(costco|sam'?s club|bj'?s)\b/i,cat:"club",w:2.5,mpd:8,color:"#ef4444",penalties:[{mi:1.5,p:0.25},{mi:3.1,p:0.15}],star:true,size:"big"},
+  {re:/\b(buc-?ee?s?)\b/i,cat:"hyper_cstore",w:3.0,mpd:20,color:"#f97316",penalties:[{mi:5,p:0.25}],star:true,size:"big"},
+  {re:/\b(wawa|sheetz|quik\s?trip|^qt\b|qt\s|racetrac|race\s?trac|getgo|casey'?s)\b/i,cat:"large_cstore",w:2.0,mpd:6,color:"#fb923c",penalties:[{mi:1.5,p:0.10},{mi:3.1,p:0.06}],star:true,size:"med"},
+  {re:/\b(love'?s|pilot|flying\s?j|ta|petro)\b/i,cat:"travel_center",w:2.0,mpd:10,color:"#f59e0b",penalties:[{mi:2.5,p:0.10}],star:true,size:"med"},
+  {re:/\b(murphy|speedway)\b/i,cat:"discount",w:1.5,mpd:6,color:"#facc15",penalties:[{mi:2.5,p:0.06}],star:false,size:"med"},
+  {re:/\b(circle\s?k|7-?eleven|7 eleven|exxon|mobil|bp|chevron|shell|sunoco|valero|phillips|76|citgo)\b/i,cat:"major_brand",w:1.3,mpd:6,color:"#fcd34d",penalties:[{mi:2.0,p:0.04}],star:false,size:"med"},
+  {re:/./,cat:"other",w:1.0,mpd:4,color:"#fbbf24",penalties:[],star:false,size:"small"}
+];
+function classifyBrand(name){
+  const s=(name||"").toString();
+  return BRAND_RULES.find(r=>r.re.test(s))||BRAND_RULES[BRAND_RULES.length-1];
+}
+function compIcon(rule){
+  const sizeClass=rule.size||"med";
+  const star = rule.star ? "★" : "";
+  return L.divIcon({
+    className:"div-pin",
+    html:`<div class="pin ${sizeClass}" style="background:${rule.color}">${star}</div>`,
+    iconSize:null, iconAnchor:[15,15]
+  });
+}
+
+/* ================== Competitors & Developments ================== */
 async function fetchCompetitors(lat,lng){
-  const q=`[out:json][timeout:25];node["amenity"="fuel"](around:${COMP_RADIUS_M},${lat},${lng});out center;`;
+  const q=`[out:json][timeout:25];
+    (node["amenity"="fuel"](around:${COMP_RADIUS_M},${lat},${lng});
+     way["amenity"="fuel"](around:${COMP_RADIUS_M},${lat},${lng});
+     relation["amenity"="fuel"](around:${COMP_RADIUS_M},${lat},${lng});); out center tags;`;
   const j=await overpassQuery(q);
-  return j.elements.map(e=>({lat:e.lat,lng:e.lon,name:e.tags?.brand||e.tags?.name||"Station",dist:hav({lat,lng},{lat:e.lat,lng:e.lon})}));
+  const rows=(j.elements||[]).map(e=>{
+    const c=e.type==="node"?{lat:e.lat,lng:e.lon}:(e.center||null); if(!c) return null;
+    const name=e.tags?.brand||e.tags?.name||"Fuel station";
+    const pumps=parseInt(e.tags?.pumps);
+    const dist=hav({lat,lng},{lat:c.lat,lng:c.lon});
+    const brand=classifyBrand(name);
+    const mpdGuess=Number.isFinite(pumps)?Math.max(1,Math.round(pumps/2)):brand.mpd;
+    const attr=brand.w*mpdGuess;
+    return {lat:c.lat,lng:c.lon,name,dist,brand,mpdGuess,attr};
+  }).filter(Boolean).sort((a,b)=>a.dist-b.dist);
+  const dedup=[]; rows.forEach(s=>{ if(!dedup.some(t=>hav(s,t)<0.05)) dedup.push(s); });
+  return dedup;
+}
+async function fetchDevelopments(lat,lng){
+  const q=`[out:json][timeout:25];
+    (node["amenity"="fuel"]["proposed"](around:${COMP_RADIUS_M},${lat},${lng});
+     way["amenity"="fuel"]["proposed"](around:${COMP_RADIUS_M},${lat},${lng});
+     relation["amenity"="fuel"]["proposed"](around:${COMP_RADIUS_M},${lat},${lng});
+     node["amenity"="fuel"]["construction"](around:${COMP_RADIUS_M},${lat},${lng});
+     way["amenity"="fuel"]["construction"](around:${COMP_RADIUS_M},${lat},${lng});
+     relation["amenity"="fuel"]["construction"](around:${COMP_RADIUS_M},${lat},${lng});); out center tags;`;
+  const j=await overpassQuery(q);
+  return (j.elements||[]).map(e=>{
+    const c=e.type==="node"?{lat:e.lat,lng:e.lon}:(e.center||null); if(!c) return null;
+    const name=e.tags?.brand||e.tags?.name||"New fuel development";
+    const stage=e.tags?.proposed?"proposed":(e.tags?.construction?"construction":"planned");
+    const dist=hav({lat,lng},{lat:c.lat,lng:c.lon});
+    return {lat:c.lat,lng:c.lon,name,stage,dist};
+  }).filter(Boolean).sort((a,b)=>a.dist-b.dist);
 }
 
-// === Main button ===
+/* ================== Demand, capacity, penalties ================== */
+function siteAttrFromMPDs(mpds){return Math.max(1,mpds);}
+function huffShare(siteAttr, comps, beta=HUFF_BETA){
+  const eps=0.1, siteD=0.1;
+  let denom=siteAttr/Math.pow(siteD,beta);
+  comps.forEach(c=>denom+=c.attr/Math.pow(Math.max(eps,c.dist),beta));
+  return Math.max(0, Math.min(1, (siteAttr/Math.pow(siteD,beta))/denom ));
+}
+function demandGallons(aadt,share){return aadt*CAPTURE_RATE*GALLONS_PER_STOP*DAYS_PER_MONTH*share;}
+function capacityCapGallons(mpds){return mpds*MONTHLY_PER_MPD_CAP;}
+function applyBlockingWhenOverloaded(gal,cap){
+  if(gal<=cap) return {g:gal, penaltyPct:0};
+  const overload=gal/cap, penalty=Math.max(0.8, 1-0.25*(overload-1)); // up to 20% penalty
+  return {g:cap*penalty, penaltyPct:Math.round((1-penalty)*100)};
+}
+function competitivePenalties(comps){
+  const items=[];
+  comps.forEach(c=>{
+    for(const r of c.brand.penalties){ if(c.dist<=r.mi){ items.push({name:c.name,dist:c.dist,pct:Math.round(r.p*100)}); break; } }
+  });
+  let factor=1.0; items.forEach(x=>factor*=(1-x.pct/100));
+  return {items,factor};
+}
+
+/* ================== Google: dynamic loader + helpers ================== */
+function loadGoogle(key){
+  return new Promise((res,rej)=>{
+    if(window.google?.maps?.places) return res();
+    const s=document.createElement("script");
+    s.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&libraries=places`;
+    s.async=true; s.defer=true; s.onload=()=>res(); s.onerror=()=>rej(new Error("Google JS failed"));
+    document.head.appendChild(s);
+  });
+}
+async function fetchStreetViewImgURL(lat,lng,key){
+  const base="https://maps.googleapis.com/maps/api/streetview";
+  const params=new URLSearchParams({size:"640x360",location:`${lat},${lng}`,key});
+  return `${base}?${params.toString()}`;
+}
+async function fetchPlaceReviews(lat,lng,key){
+  try{
+    await loadGoogle(key);
+    const svc=new google.maps.places.PlacesService(document.createElement('div'));
+    const nearby=await new Promise((res,rej)=>svc.nearbySearch({location:{lat,lng},radius:120, type:['gas_station','convenience_store','store']},(r,st)=>st==='OK'?res(r):res([])));
+    if(!nearby || !nearby.length) return null;
+    const best=nearby.sort((a,b)=>(b.user_ratings_total||0)-(a.user_ratings_total||0))[0];
+    const details=await new Promise((res)=>svc.getDetails({placeId:best.place_id, fields:['name','rating','user_ratings_total','reviews','types','formatted_address']},(r,st)=>res(st==='OK'?r:null)));
+    return details;
+  }catch{ return null; }
+}
+function assessFromReviews(details){
+  if(!details) return {brandGuess:"Unknown", canopy:"Unknown", pumps:"Unknown", notes:"No Google details."};
+  const name=(details.name||"").toLowerCase();
+  const brandGuess = (()=>{
+    const b=BRAND_RULES.find(r=>r.re.test(name));
+    return b ? b.cat.replace("_"," ") : "Unknown";
+  })();
+  const text=(details.reviews||[]).map(r=>(r.text||"").toLowerCase()).join(" ");
+  const pos=/new pump|brand new|renovat|updated|modern|replac|install(ed)?|bright light|well-lit/.test(text);
+  const neg=/old|outdated|broken pump|slow pump|dim light|dark|leak|maintenance/.test(text);
+  const canopyGood=/canopy|lighting|lights/.test(text)&&/bright|new|good|well-lit/.test(text);
+  const canopyBad=/canopy|lighting|lights/.test(text)&&/(dim|dark|poor|broken)/.test(text);
+
+  const pumps = pos ? "Likely newer" : (neg ? "Likely older" : "Unknown");
+  const canopy = canopyGood ? "Good / bright" : (canopyBad ? "Needs work" : "Unknown");
+  const notes = `Google rating ${details.rating||"–"} from ${details.user_ratings_total||0} reviews.`;
+  return {brandGuess, canopy, pumps, notes};
+}
+
+/* ================== Main click ================== */
 document.getElementById('estimate').onclick=async()=>{
   const status=document.getElementById('status'); const log=logger(status);
   const result=document.getElementById('result'); const summary=document.getElementById('summary');
-  const compDiv=document.getElementById('competitors'); const exportBtn=document.getElementById('export'); const resetBtn=document.getElementById('reset');
+  const compDiv=document.getElementById('competitors'); const devDiv=document.getElementById('developments');
+  const reviewsDiv=document.getElementById('reviews'); const streetImg=document.getElementById('streetImg');
+  const insights=document.getElementById('insights');
+  const exportBtn=document.getElementById('export'); const resetBtn=document.getElementById('reset');
 
-  result.textContent=""; summary.textContent=""; compDiv.textContent="";
+  result.textContent=""; summary.textContent=""; compDiv.textContent=""; devDiv.textContent="";
+  reviewsDiv.innerHTML=""; streetImg.src=""; insights.textContent="";
   exportBtn.style.display="none"; resetBtn.style.display="none";
-  if(compLayer){map.removeLayer(compLayer);} if(siteMarker){map.removeLayer(siteMarker);}
+  if(compLayer){map.removeLayer(compLayer); compLayer=null;}
+  if(devLayer){map.removeLayer(devLayer); devLayer=null;}
+  if(radiusCircle){map.removeLayer(radiusCircle); radiusCircle=null;}
 
   try{
     const addr=document.getElementById('address').value.trim();
     const mpds=Math.max(1,parseInt(document.getElementById('mpds').value)||6);
+    const gkey=(document.getElementById('gkey').value||"").trim();
     if(!addr) throw new Error("Please enter an address.");
+
     log("Geocoding address…");
     const g=await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(addr)}`);
     const gj=await g.json(); if(!gj.length) throw new Error("Address not found.");
-    const lat=+gj[0].lat, lng=+gj[0].lon; log("Found location.",true);
+    const lat=+gj[0].lat, lng=+gj[0].lon;
+    log(`Found location at (${lat.toFixed(4)}, ${lng.toFixed(4)})`,true);
+
+    if(siteMarker) map.removeLayer(siteMarker);
     siteMarker=L.marker([lat,lng]).addTo(map).bindPopup("Your site").openPopup();
     map.setView([lat,lng],13);
+    radiusCircle=L.circle([lat,lng],{radius:COMP_RADIUS_M,color:"#94a3b8",weight:1}).addTo(map);
+
+    // Optional: Street View + reviews
+    if(gkey){
+      log("Loading Street View…");
+      const svURL=await fetchStreetViewImgURL(lat,lng,gkey);
+      streetImg.src=svURL;
+      log("Fetching Google reviews…");
+      const details=await fetchPlaceReviews(lat,lng,gkey);
+      if(details?.reviews?.length){
+        reviewsDiv.innerHTML = details.reviews.slice(0,5).map(r=>`<p><b>${r.author_name||"Reviewer"}</b> – ${"★".repeat(Math.round(r.rating||0))}<br>${(r.text||"").slice(0,240)}${(r.text||"").length>240?"…":""}</p>`).join("");
+      }else{
+        reviewsDiv.textContent="No nearby place details/reviews found at this address.";
+      }
+      const assess=assessFromReviews(details);
+      insights.textContent=`Assessment → Brand: ${assess.brandGuess}; Dispensers: ${assess.pumps}; Canopy: ${assess.canopy}. ${assess.notes}`;
+    }else{
+      insights.textContent="(Add a Google API key to show Street View, live reviews, and an on-site assessment.)";
+    }
 
     log("Fetching AADT…");
-    const aadt=await fetchAADT(lat,lng); log("AADT="+aadt,true);
+    let aadt=await fetchAADT(lat,lng);
+    if(!aadt){ aadt=20000; log("No station nearby — using fallback 20,000.",true); }
+    else { log(`AADT found: ${fmt(aadt)}`,true); }
 
-    log("Fetching competitors…");
-    const comps=await fetchCompetitors(lat,lng); log(`Found ${comps.length}`,true);
-    compLayer=L.layerGroup(comps.map(c=>L.circleMarker([c.lat,c.lng],{radius:6,color:"#f59e0b"}).bindPopup(`${c.name}<br>${c.dist.toFixed(1)} mi`))).addTo(map);
+    log("Searching competitors (~3.1 mi)…");
+    let comps=[]; try{ comps=await fetchCompetitors(lat,lng); log(`Found ${comps.length} fuel stations.`,true);}catch{ log("Competitor lookup unavailable.",true); }
+
+    if(compLayer) map.removeLayer(compLayer);
+    compLayer=L.layerGroup(comps.map(c=>{
+      const ic=compIcon(c.brand);
+      return L.marker([c.lat,c.lng],{icon:ic}).bindPopup(`${c.name}<br>${c.brand.cat.replace("_"," ")}<br>${c.dist.toFixed(1)} mi`);
+    })).addTo(map);
+
+    log("Checking new developments (proposed/construction)…");
+    let devs=[]; try{ devs=await fetchDevelopments(lat,lng); log(`Found ${devs.length} development sites.`,true);}catch{ log("Development lookup unavailable.",true); }
+
+    // Demand share
+    log("Allocating demand (brand-weighted) …");
+    const siteAttr=siteAttrFromMPDs(mpds);
+    const neutralShare=huffShare(siteAttr, comps.map(c=>({dist:c.dist,attr:4})), HUFF_BETA);
+    const brandShare=huffShare(siteAttr, comps, HUFF_BETA);
+    const brandImpactFactor=brandShare/Math.max(1e-6,neutralShare);
+
+    // Penalties for nearby big competitors
+    const {items:penItems,factor:penFactor}=competitivePenalties(comps);
 
     // Estimate
-    const share=1.0; // simple (no Huff for this trimmed version)
-    const demand=aadt*CAPTURE_RATE*GALLONS_PER_STOP*DAYS_PER_MONTH*share;
-    const cap=mpds*MONTHLY_PER_MPD_CAP;
-    const est=Math.min(demand,cap);
+    const demand = demandGallons(aadt, brandShare) * penFactor;
+    const capacity = capacityCapGallons(mpds);
+    const capped = applyBlockingWhenOverloaded(demand, capacity);
 
-    result.textContent=`Estimated Monthly Gallons: ${fmt(est)}`;
-    summary.textContent=`AADT ${fmt(aadt)} · MPDs ${mpds} · Competitors ${comps.length}`;
+    result.textContent=`Estimated Monthly Gallons: ${fmt(capped.g)}`;
 
+    // Summary + lists
+    const adjBits=[];
+    if(brandImpactFactor<0.999) adjBits.push(`brand-weighted share −${Math.round((1-brandImpactFactor)*100)}%`);
+    if(penItems.length){
+      const line=penItems.slice(0,4).map(x=>`${x.name} ${x.dist.toFixed(1)} mi (−${x.pct}%)`).join("; ");
+      adjBits.push(line);
+    }
+    if(capped.penaltyPct>0) adjBits.push(`capacity/queuing penalty −${capped.penaltyPct}%`);
+
+    summary.textContent=`AADT ${fmt(aadt)} · MPDs ${mpds} · competitors ${comps.length} · developments ${devs.length}` + (adjBits.length?` · Competitive adjustments: ${adjBits.join(" · ")}`:"");
+
+    if(comps.length){
+      let list="<b>Competitors considered (top 6):</b><ul>";
+      comps.slice(0,6).forEach(c=>list+=`<li>${c.name} — ${c.brand.cat.replace("_"," ")} — ${c.dist.toFixed(1)} mi</li>`);
+      list+="</ul>"; compDiv.innerHTML=list;
+    }
+    if(devs.length){
+      let dl="<b>New developments:</b><ul>";
+      devs.slice(0,6).forEach(d=>dl+=`<li>${d.name} — ${d.stage} — ${d.dist.toFixed(1)} mi</li>`);
+      dl+="</ul>"; devDiv.innerHTML=dl;
+    }
+
+    log("⚡ Estimate complete!",true);
+    status.textContent += "\n❓ Do you want me to run another search?\n";
     exportBtn.style.display="block"; resetBtn.style.display="block";
-    log("✅ Estimate complete!",true);
 
+    // Export PDF (map + snapshot of Street View)
     exportBtn.onclick=async()=>{
       const {jsPDF}=window.jspdf; const doc=new jsPDF();
       doc.text("Fuel Volume Estimate",20,20);
-      doc.text(`Address: ${addr}`,20,30); doc.text(`MPDs: ${mpds}`,20,40);
+      doc.text(`Address: ${addr}`,20,30);
+      doc.text(`MPDs: ${mpds}`,20,40);
       doc.text(`AADT: ${fmt(aadt)}`,20,50);
-      doc.text(result.textContent,20,70);
+      doc.text(`Competitors: ${comps.length}  Developments: ${devs.length}`,20,60);
+      if(insights.textContent) doc.text(insights.textContent.slice(0,90)+"…",20,70);
       const canvas=await html2canvas(document.getElementById("map")); const img=canvas.toDataURL("image/png");
-      doc.addImage(img,"PNG",20,80,170,90); doc.save("fuel_estimate.pdf");
+      doc.addImage(img,"PNG",20,80,170,90);
+      if(streetImg.src){ const i2=await html2canvas(streetImg.parentElement); const img2=i2.toDataURL("image/png"); doc.addPage(); doc.text("Street View & Reviews",20,20); doc.addImage(img2,"PNG",20,30,170,90); }
+      doc.save("fuel_estimate.pdf");
     };
 
     resetBtn.onclick=()=>{
-      document.getElementById('address').value=""; document.getElementById('mpds').value="6";
-      status.textContent=""; result.textContent=""; summary.textContent="";
-      compDiv.textContent=""; exportBtn.style.display="none"; resetBtn.style.display="none";
+      document.getElementById('address').value=""; document.getElementById('mpds').value="6"; document.getElementById('gkey').value=document.getElementById('gkey').value;
+      status.textContent=""; result.textContent=""; summary.textContent=""; reviewsDiv.innerHTML=""; streetImg.src=""; insights.textContent="";
+      compDiv.textContent=""; devDiv.textContent="";
+      exportBtn.style.display="none"; resetBtn.style.display="none";
       if(siteMarker){map.removeLayer(siteMarker); siteMarker=null;}
       if(compLayer){map.removeLayer(compLayer); compLayer=null;}
+      if(devLayer){map.removeLayer(devLayer); devLayer=null;}
+      if(radiusCircle){map.removeLayer(radiusCircle); radiusCircle=null;}
       map.setView([35.7796,-78.6382],11);
+      document.getElementById('address').focus();
     };
 
-  }catch(e){status.textContent+="❌ Error: "+e.message;}
+  }catch(e){
+    status.textContent+="❌ Error: "+e.message+"\n";
+  }
 };
+
+// Enter to run
+document.getElementById('address').addEventListener('keydown',e=>{ if(e.key==="Enter"){ document.getElementById('estimate').click(); }});
 </script>
 </body>
 </html>
