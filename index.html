@@ -11,31 +11,39 @@
 <script src="https://unpkg.com/leaflet-image@latest/leaflet-image.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
+<!-- Google Maps SDK (optional: leave key blank to skip reviews) -->
+<script>
+  const GOOGLE_KEY = "YOUR_GOOGLE_API_KEY_HERE"; // <-- put key or leave ""
+  if (GOOGLE_KEY) {
+    const s = document.createElement("script");
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(GOOGLE_KEY)}&libraries=places`;
+    s.async = true; s.defer = true;
+    document.head.appendChild(s);
+  }
+</script>
+
 <style>
   :root{
     --bg:#0f172a; --panel:#0b1224; --border:#1f2937; --text:#e5e7eb; --muted:#94a3b8;
     --accent:#60a5fa; --good:#22c55e; --warn:#f59e0b; --lav:#a78bfa;
   }
   *{box-sizing:border-box}
-  body{margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif; background:var(--bg); color:var(--text);}
-  header{position:sticky; top:0; z-index:10; display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:linear-gradient(180deg,#0b1224,#081020); border-bottom:1px solid var(--border);}
-  header img{height:34px; width:auto}
-  .container{max-width:980px; margin:auto; padding:16px}
-  h1{margin:0 0 12px; font-size:20px}
-  label{margin-top:12px; display:block; font-size:14px; color:#cbd5e1}
-  input,button{width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--panel); color:var(--text); font-size:16px}
-  button{background:var(--accent); color:#0b1224; font-weight:800; cursor:pointer}
-  button[disabled]{opacity:.6; cursor:not-allowed}
-  #status{margin-top:12px; font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; background:#0c162b; border:1px solid var(--border); border-radius:10px; padding:10px; height:160px; overflow:auto; white-space:pre-line}
-  #result{margin-top:14px; font-size:20px; font-weight:900; color:var(--good)}
-  #summary,#reviewsBox,#competitors,#developments{margin-top:10px; font-size:14px}
-  #map{height:62vh; margin-top:16px; border:1px solid var(--border); border-radius:12px}
-  .pin{display:flex; align-items:center; justify-content:center; border-radius:999px; border:2px solid #fff; box-shadow:0 2px 8px rgba(0,0,0,.45); font-weight:900; line-height:1}
-  .pin.big{width:30px; height:30px; font-size:16px}
-  .pin.med{width:22px; height:22px; font-size:13px}
-  .pill{display:inline-block; border:1px solid var(--border); padding:2px 8px; border-radius:999px; background:#122035; color:#e5e7eb; font-size:12px;}
-  .small{font-size:12px; color:var(--muted); margin-top:6px}
-  @media(min-width:900px){ header img{height:38px} }
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;background:var(--bg);color:var(--text)}
+  header{position:sticky;top:0;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:linear-gradient(180deg,#0b1224,#081020);border-bottom:1px solid var(--border)}
+  header img{height:34px}
+  .container{max-width:980px;margin:auto;padding:16px}
+  h1{margin:0 0 12px;font-size:20px}
+  label{margin-top:12px;display:block;font-size:14px;color:#cbd5e1}
+  input,button{width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--border);background:var(--panel);color:var(--text);font-size:16px}
+  button{background:var(--accent);color:#0b1224;font-weight:800;cursor:pointer}
+  #status{margin-top:12px;font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:#0c162b;border:1px solid var(--border);border-radius:10px;padding:10px;height:160px;overflow:auto;white-space:pre-line}
+  #result{margin-top:14px;font-size:20px;font-weight:900;color:var(--good)}
+  #summary,#reviewsBox,#competitors,#developments{margin-top:10px;font-size:14px}
+  #map{height:62vh;margin-top:16px;border:1px solid var(--border);border-radius:12px}
+  .pin{display:flex;align-items:center;justify-content:center;border-radius:999px;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.45);font-weight:900;line-height:1}
+  .pin.big{width:30px;height:30px;font-size:16px}
+  .pin.med{width:22px;height:22px;font-size:13px}
+  .small{font-size:12px;color:var(--muted);margin-top:6px}
 </style>
 </head>
 <body>
@@ -65,11 +73,6 @@
   <div id="competitors"></div>
   <div id="developments"></div>
 
-  <div class="small">
-    <span class="pill">Competitors ≤ 1.0 mile (driving)</span>
-    <span class="pill">Developments ≤ 5 miles (driving)</span>
-  </div>
-
   <button id="export" style="display:none">📄 Export to PDF</button>
 
   <div class="small" style="margin-top:10px">
@@ -82,28 +85,12 @@
 <div id="map" role="region" aria-label="Map"></div>
 
 <script>
-/* ================== CONFIG (put your Google key ONCE here) ================== */
-const GOOGLE_KEY = "YOUR_GOOGLE_API_KEY_HERE"; // <--- REPLACE with your restricted key
-// Recommended restrictions: HTTP referrer https://nourie42.github.io/* and APIs: Places API, Street View Static API
-
-/* ================== CONSTANTS & ASSUMPTIONS ================== */
+/* ================== CONSTANTS ================== */
 const CAPTURE_RATE=0.02, GALLONS_PER_STOP=9.2, DAYS_PER_MONTH=30.4;
-const MONTHLY_PER_MPD_CAP=8500;           // conservative cap per MPD/month
-const ONE_MILE=1.0;                        // competitor cutoff by driving distance
-const DEV_SEARCH_MI=5;                     // development cutoff by driving distance
+const MONTHLY_PER_MPD_CAP=8500;       // conservative cap per MPD/month
+const ONE_MILE=1.0;                    // competitors cutoff (driving)
+const DEV_SEARCH_MI=5;                 // developments cutoff (driving)
 const HUFF_BETA=1.2;
-
-/* ===== Brand weights & penalties (bigger formats => stronger competitive pull) ===== */
-const BRAND_RULES=[
-  {re:/\b(costco|sam'?s club|bj'?s)\b/i,cat:"club",w:2.6,pen:[{mi:1.5,p:0.25},{mi:3.1,p:0.15}],star:true,color:"#ef4444"},
-  {re:/\b(buc-?ee?s?)\b/i,cat:"hyper",w:3.0,pen:[{mi:5,p:0.25}],star:true,color:"#f97316"},
-  {re:/\b(wawa|sheetz|quik\s?trip|^qt\b|racetrac|getgo|casey'?s)\b/i,cat:"large",w:2.0,pen:[{mi:1.5,p:0.10},{mi:3.1,p:0.06}],star:true,color:"#fb923c"},
-  {re:/\b(love'?s|pilot|flying\s?j|ta|petro)\b/i,cat:"travel",w:2.0,pen:[{mi:2.5,p:0.10}],star:true,color:"#f59e0b"},
-  {re:/\b(murphy|speedway)\b/i,cat:"discount",w:1.5,pen:[{mi:2.5,p:0.06}],star:false,color:"#facc15"},
-  {re:/\b(circle\s?k|7-?eleven|exxon|mobil|bp|chevron|shell|sunoco|valero|phillips|76|citgo)\b/i,cat:"major",w:1.3,pen:[{mi:2.0,p:0.04}],star:false,color:"#fcd34d"},
-  {re:/./,cat:"other",w:1.0,pen:[],star:false,color:"#60a5fa"}
-];
-function brandOf(name){ return BRAND_RULES.find(r=>r.re.test(name||""))||BRAND_RULES[BRAND_RULES.length-1]; }
 
 /* ================== HELPERS ================== */
 const fmt=n=>Number.isFinite(n)?Math.round(n).toLocaleString():"–";
@@ -113,14 +100,15 @@ function hav(a,b){const R=3958.8,dLat=rad(b.lat-a.lat),dLng=rad(b.lng-a.lng);
   return 2*R*Math.asin(Math.sqrt(s));}
 function logger(el){el.textContent="";return(m,ok=false)=>{el.textContent+=(ok?"✅ ":"⏳ ")+m+"\\n";el.scrollTop=el.scrollHeight;};}
 function clamp(x,lo,hi){return Math.max(lo,Math.min(hi,x));}
+function withTimeout(promise, ms, label){ return Promise.race([promise, new Promise((_,rej)=>setTimeout(()=>rej(new Error(label+" timed out")), ms))]); }
 
-/* ================== MAP (CORS‑safe tiles for PDF) ================== */
+/* ================== MAP (CORS-safe tiles for PDF) ================== */
 const map=L.map('map').setView([35.7796,-78.6382],12);
 L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{attribution:'&copy; OSM & CARTO',subdomains:'abcd',maxZoom:20,crossOrigin:true}).addTo(map);
 let siteMarker=null, compLayer=null, devLayer=null;
 
-/* ================== OVERPASS with fallbacks ================== */
-const OVERPASS=[
+/* ================== NETWORK HELPERS ================== */
+const OVERPASS = [
   "https://overpass-api.de/api/interpreter",
   "https://overpass.kumi.systems/api/interpreter",
   "https://overpass.openstreetmap.ru/api/interpreter"
@@ -128,18 +116,16 @@ const OVERPASS=[
 async function overpassQuery(q){
   for(const ep of OVERPASS){
     try{
-      const r=await fetch(ep,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded; charset=UTF-8"},body:"data="+encodeURIComponent(q)});
+      const r=await withTimeout(fetch(ep,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded; charset=UTF-8"},body:"data="+encodeURIComponent(q)}), 20000, "Overpass");
       if(r.ok) return await r.json();
     }catch(e){}
   }
-  throw new Error("Overpass servers unavailable");
+  throw new Error("Overpass unavailable");
 }
-
-/* ================== OSRM driving distance (route + table) ================== */
 async function driveMiles(a,b){
   try{
     const url=`https://router.project-osrm.org/route/v1/driving/${a.lng},${a.lat};${b.lng},${b.lat}?overview=false&alternatives=false`;
-    const r=await fetch(url); const j=await r.json();
+    const r=await withTimeout(fetch(url), 15000, "OSRM route"); const j=await r.json();
     const m=j?.routes?.[0]?.distance; return m? m/1609.344 : hav(a,b);
   }catch(e){ return hav(a,b); }
 }
@@ -147,18 +133,17 @@ async function osrmTableMiles(origin, pts){
   try{
     const coords=[[origin.lng,origin.lat],...pts.map(p=>[p.lng,p.lat])].map(x=>x.join(",")).join(";");
     const url=`https://router.project-osrm.org/table/v1/driving/${coords}?sources=0&annotations=distance`;
-    const r=await fetch(url); const j=await r.json();
-    const d=j?.distances?.[0];
-    if(Array.isArray(d)&&d.length===pts.length+1) return d.slice(1).map(m=>m/1609.344);
+    const r=await withTimeout(fetch(url), 15000, "OSRM table"); const j=await r.json();
+    const d=j?.distances?.[0]; if(Array.isArray(d)&&d.length===pts.length+1) return d.slice(1).map(m=>m/1609.344);
   }catch(e){}
   const out=[]; for(const p of pts){ out.push(await driveMiles(origin,p)); } return out;
 }
 
-/* ================== AADT (ArcGIS) ================== */
+/* ================== AADT (ArcGIS + Heuristic) ================== */
 async function queryArcGISAADT(url,lat,lng,distM){
   const p={where:"1=1",geometry:`${lng},${lat}`,geometryType:"esriGeometryPoint",inSR:"4326",
   spatialRel:"esriSpatialRelIntersects",distance:String(distM),units:"esriSRUnit_Meter",outFields:"*",outSR:"4326",f:"json"};
-  const r=await fetch(url+"?"+new URLSearchParams(p)); if(!r.ok) return null; const j=await r.json();
+  const r=await withTimeout(fetch(url+"?"+new URLSearchParams(p)), 15000, "ArcGIS AADT"); if(!r.ok) return null; const j=await r.json();
   if(!j.features?.length) return null;
   let best=null,bestD=1e9; for(const f of j.features){const d=hav({lat,lng},{lat:f.geometry.y,lng:f.geometry.x}); if(d<bestD){bestD=d;best=f;}}
   const a=best.attributes||{}; const val=[a.AADT,a.aadt,a.Avg_Daily_Traffic,a.TrafficCount,a.AADT_2022,a.AADT_2021,a.AADT_2020,a.AADT_2019].find(v=>typeof v==="number"&&v>0)||null;
@@ -168,12 +153,10 @@ async function queryArcGISAADT(url,lat,lng,distM){
 const NC_AADT="https://services.arcgis.com/NuWFvHYDMVmmxMeM/ArcGIS/rest/services/NCDOT_AADT_Stations/FeatureServer/0/query";
 const USA_AADT="https://services.arcgis.com/P3ePLMYs2RVChkJx/ArcGIS/rest/services/USA_Traffic_Counts/FeatureServer/0/query";
 async function robustAADT(lat,lng,isNC){
-  if(isNC){ for(const d of [500,1000,2000,3000,5000,10000,15000]){const h=await queryArcGISAADT(NC_AADT,lat,lng,d); if(h) return {source:"NCDOT",...h};} }
-  for(const d of [500,1000,2000,3000,5000,10000,15000]){const h=await queryArcGISAADT(USA_AADT,lat,lng,d); if(h) return {source:"Esri USA Traffic Counts",...h};}
+  if(isNC){ for(const d of [500,1000,2000,3000,5000,10000,15000]){ const h=await queryArcGISAADT(NC_AADT,lat,lng,d); if(h) return {source:"NCDOT",...h}; } }
+  for(const d of [500,1000,2000,3000,5000,10000,15000]){ const h=await queryArcGISAADT(USA_AADT,lat,lng,d); if(h) return {source:"Esri USA Traffic Counts",...h}; }
   return null;
 }
-
-/* ================== Heuristic AADT (OSM road class/lanes/speed) ================== */
 async function heuristicAADT(lat,lng){
   const q=`[out:json][timeout:25];way(around:900,${lat},${lng})["highway"];out tags center;`;
   const j=await overpassQuery(q);
@@ -194,9 +177,8 @@ async function heuristicAADT(lat,lng){
   return {value:Math.round(num/Math.max(den,1)),source:"Heuristic (OSM road class/lanes/speed)",link:`https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=16/${lat}/${lng}`};
 }
 
-/* ================== Competitors (≤1.0 mi driving) ================== */
+/* ================== Competitors (≤1 mi driving) ================== */
 async function fetchCompetitorsDriving1mi(lat,lng){
-  // Query wide (10 km), then OSRM-table to keep ≤1 mi driving
   const q=`[out:json][timeout:25];
     (node["amenity"="fuel"](around:10000,${lat},${lng});
      way["amenity"="fuel"](around:10000,${lat},${lng});
@@ -205,23 +187,19 @@ async function fetchCompetitorsDriving1mi(lat,lng){
   const j=await overpassQuery(q);
   const cand=(j.elements||[]).map(e=>{
     const c=e.type==='node'?{lat:e.lat,lng:e.lon}:(e.center||null); if(!c) return null;
-    const name=e.tags?.brand||e.tags?.name||"Fuel station";
-    return {lat:c.lat,lng:c.lon,name};
+    return {lat:c.lat,lng:c.lon,name:(e.tags?.brand||e.tags?.name||"Fuel station")};
   }).filter(Boolean);
   if(!cand.length) return [];
-  const dists=await osrmTableMiles({lat,lng},cand);
-  return cand.map((r,i)=>({...r,drive:dists[i]}))
-             .filter(r=>Number.isFinite(r.drive)&&r.drive<=ONE_MILE)
-             .sort((a,b)=>a.drive-b.drive);
+  const d=await osrmTableMiles({lat,lng},cand);
+  return cand.map((r,i)=>({...r,drive:d[i]})).filter(r=>Number.isFinite(r.drive)&&r.drive<=ONE_MILE).sort((a,b)=>a.drive-b.drive);
 }
 
-/* ================== Universal developments ================== */
+/* ================== Developments (universal) ================== */
 async function arcgisSearch(query){
   const url=`https://www.arcgis.com/sharing/rest/search?f=json&q=${encodeURIComponent(query)}&num=10`;
-  try{ const r=await fetch(url); const j=await r.json(); return j.results||[]; }catch(e){ return []; }
+  try{ const r=await withTimeout(fetch(url), 12000, "ArcGIS search"); const j=await r.json(); return j.results||[]; }catch(e){ return []; }
 }
 async function tryLayerAround(url,lat,lng){
-  // Try indices 0..4 if none specified
   const idxs=[]; const m=url.match(/\/(FeatureServer|MapServer)(?:\/(\d+))?$/i);
   if(m && m[2]) idxs.push(parseInt(m[2],10)); else idxs.push(0,1,2,3,4);
   const out=[];
@@ -231,10 +209,11 @@ async function tryLayerAround(url,lat,lng){
       spatialRel:"esriSpatialRelIntersects",distance:"20000",units:"esriSRUnit_Meter",
       outFields:"*",outSR:"4326",f:"json"};
     try{
-      const r=await fetch(endpoint+"?"+new URLSearchParams(p)); if(!r.ok) continue; const j=await r.json();
+      const r=await withTimeout(fetch(endpoint+"?"+new URLSearchParams(p)), 15000, "ArcGIS FS"); if(!r.ok) continue; const j=await r.json();
       for(const f of (j.features||[])){
         const a=f.attributes||{};
-        const blob=[a.ProjectName,a.PROJECTNAME,a.Name,a.TITLE,a.Description,a.DESCRIPTION,a.Type,a.TYPE,a.Category,a.CATEGORY].map(x=>String(x||"")).join(" ").toLowerCase();
+        const blob=[a.ProjectName,a.PROJECTNAME,a.Name,a.TITLE,a.Description,a.DESCRIPTION,a.Type,a.TYPE,a.Category,a.CATEGORY]
+          .map(x=>String(x||"")).join(" ").toLowerCase();
         if(/\b(gas|fuel|convenience|c[-\s]?store|station|mart)\b/.test(blob)){
           out.push({lat:f.geometry?.y,lng:f.geometry?.x,name:a.ProjectName||a.PROJECTNAME||a.Name||a.TITLE||"Fuel-related development",stage:a.Status||a.STATUS||a.Type||a.TYPE||"proposed"});
         }
@@ -244,7 +223,6 @@ async function tryLayerAround(url,lat,lng){
   return out.filter(x=>x.lat&&x.lng);
 }
 async function findDevelopments(city,state,lat,lng){
-  // 1) City feature servers
   const queries=[
     `${city} development FeatureServer`,
     `${city} permits FeatureServer`,
@@ -262,7 +240,7 @@ async function findDevelopments(city,state,lat,lng){
       }
     }
   }
-  // 2) OSM proposed/construction fallback
+  // OSM fallback
   const q = `[out:json][timeout:25];
     (node["amenity"="fuel"]["proposed"](around:10000,${lat},${lng});
      way["amenity"="fuel"]["proposed"](around:10000,${lat},${lng});
@@ -283,39 +261,42 @@ async function findDevelopments(city,state,lat,lng){
   return rows.map((r,i)=>({...r,drive:d[i]})).filter(r=>r.drive<=DEV_SEARCH_MI).sort((a,b)=>a.drive-b.drive);
 }
 
-/* ================== Demand share & penalties ================== */
+/* ================== Huff & penalties ================== */
 function huffShare(siteAttr, comps){
   const eps=0.1, siteD=0.1;
   let denom=siteAttr/Math.pow(siteD,HUFF_BETA);
-  comps.forEach(c=>{
-    const dist=Math.max(eps,c.drive||1);
-    denom += c.attr/Math.pow(dist,HUFF_BETA);
-  });
+  comps.forEach(c=>denom+= (c.attr)/Math.pow(Math.max(eps,c.drive||1), HUFF_BETA));
   return clamp((siteAttr/Math.pow(siteD,HUFF_BETA))/denom, 0, 1);
 }
+const BRAND_RULES=[
+  {re:/\b(costco|sam'?s club|bj'?s)\b/i, w:2.6, star:true, color:"#ef4444", pen:[{mi:1.5,p:0.25},{mi:3.1,p:0.15}]},
+  {re:/\b(buc-?ee?s?)\b/i,              w:3.0, star:true, color:"#f97316", pen:[{mi:5,p:0.25}]},
+  {re:/\b(wawa|sheetz|quik\s?trip|^qt\b|racetrac|getgo|casey'?s)\b/i, w:2.0, star:true, color:"#fb923c", pen:[{mi:1.5,p:0.10},{mi:3.1,p:0.06}]},
+  {re:/\b(love'?s|pilot|flying\s?j|ta|petro)\b/i, w:2.0, star:true, color:"#f59e0b", pen:[{mi:2.5,p:0.10}]},
+  {re:/\b(murphy|speedway)\b/i,          w:1.5, star:false,color:"#facc15", pen:[{mi:2.5,p:0.06}]},
+  {re:/\b(circle\s?k|7-?eleven|exxon|mobil|bp|chevron|shell|sunoco|valero|phillips|76|citgo)\b/i, w:1.3, star:false,color:"#fcd34d", pen:[{mi:2.0,p:0.04}]},
+  {re:/./,                               w:1.0, star:false,color:"#60a5fa", pen:[]}
+];
+function brandRule(name){ return BRAND_RULES.find(r=>r.re.test(name||""))||BRAND_RULES[BRAND_RULES.length-1]; }
 function competitivePenalties(comps){
-  const items=[]; let factor=1.0;
+  let factor=1.0; const items=[];
   comps.forEach(c=>{
-    for(const rule of c.rule.pen){ if(c.drive<=rule.mi){ items.push({name:c.name,dist:c.drive,pct:Math.round(rule.p*100)}); factor*=(1-rule.p); break; } }
+    const rule=brandRule(c.name); c.rule=rule;
+    for(const p of rule.pen){ if((c.drive||9)<=p.mi){ factor*= (1-p.p); items.push({name:c.name,dist:c.drive,pct:Math.round(p.p*100)}); break; } }
   });
-  return {items,factor};
+  return {factor, items};
 }
 
-/* ================== Google SDK loader + reviews ================== */
-function loadGoogle(){
-  if(!GOOGLE_KEY) return Promise.resolve(false);
-  if(window.google?.maps?.places) return Promise.resolve(true);
-  return new Promise(resolve=>{
-    const s=document.createElement('script');
-    s.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(GOOGLE_KEY)}&libraries=places`;
-    s.async=true; s.defer=true;
-    s.onload=()=>resolve(true); s.onerror=()=>resolve(false);
-    document.head.appendChild(s);
-  });
-}
-function streetViewURL(lat,lng){ return `https://maps.googleapis.com/maps/api/streetview?size=640x360&location=${lat},${lng}&key=${GOOGLE_KEY}`; }
+/* ================== Reviews (built-in fallback links) ================== */
+function streetViewURL(lat,lng){ return GOOGLE_KEY ? `https://maps.googleapis.com/maps/api/streetview?size=640x360&location=${lat},${lng}&key=${GOOGLE_KEY}` : ""; }
 async function googlePlaceDetails(lat,lng){
-  const ok=await loadGoogle(); if(!ok) return null;
+  if(!GOOGLE_KEY) return null;
+  await new Promise(resolve=>{
+    if (window.google?.maps?.places) return resolve();
+    const iv=setInterval(()=>{ if(window.google?.maps?.places){clearInterval(iv); resolve();} },300);
+    setTimeout(()=>{clearInterval(iv); resolve();},6000);
+  });
+  if(!window.google?.maps?.places) return null;
   return new Promise(res=>{
     const svc=new google.maps.places.PlacesService(document.createElement('div'));
     svc.nearbySearch({location:{lat,lng},radius:150,type:['gas_station','convenience_store']},(rs,st)=>{
@@ -326,148 +307,157 @@ async function googlePlaceDetails(lat,lng){
   });
 }
 
-/* ================== MAIN CLICK ================== */
+/* ================== MAIN ================== */
 document.getElementById('estimate').onclick=async()=>{
   const status=document.getElementById('status'); const log=logger(status);
   const result=document.getElementById('result'); const summary=document.getElementById('summary');
   const reviewsBox=document.getElementById('reviewsBox'); const compsDiv=document.getElementById('competitors'); const devDiv=document.getElementById('developments');
-  const exportBtn=document.getElementById('export'); const addrEl=document.getElementById('address');
-  const mpds=Math.max(1,parseInt(document.getElementById('mpds').value)||1);
-  const aadtOverride=parseInt(document.getElementById('aadtOverride').value)||null;
+  const exportBtn=document.getElementById('export');
 
-  // reset UI
-  status.textContent="Calculating estimate…\n";
-  result.textContent=""; summary.textContent=""; reviewsBox.innerHTML=""; compsDiv.innerHTML=""; devDiv.innerHTML="";
-  exportBtn.style.display="none"; if(compLayer){map.removeLayer(compLayer); compLayer=null;} if(devLayer){map.removeLayer(devLayer); devLayer=null;} if(siteMarker){map.removeLayer(siteMarker); siteMarker=null;}
+  // reset
+  result.textContent=""; summary.textContent=""; reviewsBox.innerHTML=""; compsDiv.textContent=""; devDiv.textContent="";
+  exportBtn.style.display="none"; if(compLayer){map.removeLayer(compLayer);} if(devLayer){map.removeLayer(devLayer);} if(siteMarker){map.removeLayer(siteMarker);}
 
   try{
-    const addr=addrEl.value.trim(); if(!addr) throw new Error("Please enter an address.");
+    const addr=document.getElementById('address').value.trim(); if(!addr) throw new Error("Please enter an address.");
+    const mpds=Math.max(1, parseInt(document.getElementById('mpds').value)||1);
+    const aadtOverride=parseInt(document.getElementById('aadtOverride').value)||null;
 
     // Geocode
     log("Geocoding address…");
-    const g=await fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=1&q=${encodeURIComponent(addr)}`);
+    const g=await withTimeout(fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=1&q=${encodeURIComponent(addr)}`),12000,"Geocoding");
     const gj=await g.json(); if(!gj.length) throw new Error("Address not found.");
-    const lat=+gj[0].lat, lng=+gj[0].lon;
-    const state=gj[0].address?.state||""; const city=gj[0].address?.city||gj[0].address?.town||gj[0].address?.village||"";
+    const lat=+gj[0].lat,lng=+gj[0].lon; const state=gj[0].address?.state||""; const city=gj[0].address?.city||gj[0].address?.town||gj[0].address?.village||"";
     log(`Found (${lat.toFixed(4)}, ${lng.toFixed(4)}) in ${city||"—"}, ${state||"—"}`,true);
-    siteMarker=L.marker([lat,lng]).addTo(map).bindPopup("Your site").openPopup();
-    map.setView([lat,lng],14);
+    siteMarker=L.marker([lat,lng]).addTo(map).bindPopup("Site").openPopup(); map.setView([lat,lng],14);
 
-    // Manual AADT viewers, centered
+    // Manual AADT viewers
     document.getElementById('ncLink').href=`https://ncdot.maps.arcgis.com/apps/webappviewer/index.html?id=ae42f4ac534a46458c9cf60a98d2bc1d&find=${lat},${lng}`;
     document.getElementById('usaLink').href=`https://www.arcgis.com/apps/mapviewer/index.html?url=${encodeURIComponent("https://services.arcgis.com/P3ePLMYs2RVChkJx/ArcGIS/rest/services/USA_Traffic_Counts/FeatureServer/0")}&center=${lng},${lat}&level=15`;
 
-    // AADT: override → DOT ArcGIS → heuristic
-    let aadt=null, aadtSource="", aadtLink="";
-    if(aadtOverride){ aadt=aadtOverride; aadtSource="User override"; log(`Using override AADT ${aadt}`,true); }
-    else{
-      log("Finding AADT (DOT/ArcGIS)…");
-      const isNC=/north carolina/i.test(state)||/\bNC\b/.test(state);
-      const hit=await robustAADT(lat,lng,isNC);
-      if(hit){ aadt=hit.value; aadtSource=hit.source; aadtLink=hit.link; log(`AADT ${aadt} (${aadtSource})`,true); }
-      else{ log("No ArcGIS record found — estimating heuristically from OSM road class/lanes/speed…");
-            const h=await heuristicAADT(lat,lng); aadt=h.value; aadtSource=h.source; aadtLink=h.link; log(`Heuristic AADT ${aadt}`,true); }
+    // AADT (fast path) — show preliminary estimate ASAP
+    let aadt=null, aadtLabel=""; let aadtLink="";
+    if(aadtOverride){ aadt=aadtOverride; aadtLabel="User override"; log(`Using override AADT ${aadt}`,true); }
+    else {
+      try{
+        log("Finding AADT (DOT/ArcGIS)…");
+        const isNC=/north carolina/i.test(state)||/\bNC\b/.test(state);
+        const hit=await robustAADT(lat,lng,isNC);
+        if(hit){ aadt=hit.value; aadtLabel=hit.source; aadtLink=hit.link; log(`AADT ${aadt} (${aadtLabel})`,true); }
+        else { throw new Error("No ArcGIS AADT"); }
+      }catch(e){
+        log("No ArcGIS record. Estimating AADT heuristically…");
+        const h=await heuristicAADT(lat,lng); aadt=h.value; aadtLabel=h.source; aadtLink=h.link; log(`Heuristic AADT ${aadt}`,true);
+      }
     }
 
-    // Competitors (≤1.0 mi driving)
-    log("Finding competitors (driving distance ≤ 1.0 mi)…");
-    const compsRaw=await fetchCompetitorsDriving1mi(lat,lng);
-    // add brand rules and attributes for share calculation
-    const comps=compsRaw.map(c=>{const rule=brandOf(c.name||"");const mpdGuess=rule.cat==="other"?4:6; const attr=rule.w*mpdGuess; return {...c,rule,attr};});
-    log(`Using ${comps.length} competitor(s).`,true);
-
-    // Draw competitors on map
-    if(compLayer) map.removeLayer(compLayer);
-    compLayer=L.layerGroup(comps.map(c=>{
-      const star=c.rule.star?"★":""; const color=c.rule.color; const size=c.rule.star?"big":"med";
-      const icon=L.divIcon({className:"div-pin",html:`<div class="pin ${size}" style="background:${color}">${star}</div>`,iconSize:null,iconAnchor:[15,15]});
-      return L.marker([c.lat,c.lng],{icon}).bindPopup(`${c.name}<br>${c.drive.toFixed(1)} mi drive`);
-    })).addTo(map);
-
-    // Developments (universal)
-    log(`Searching developments for ${city||"this town"} (ArcGIS city/county → OSM fallback)…`);
-    const devs=await findDevelopments(city,state,lat,lng);
-    if(devLayer) map.removeLayer(devLayer);
-    if(devs.length){
-      log(`Found ${devs.length} development(s) ≤ ${DEV_SEARCH_MI} mi.`,true);
-      devLayer=L.layerGroup(devs.map(d=>{
-        const icon=L.divIcon({className:"div-pin",html:`<div class="pin med" style="background:${'#a78bfa'}"></div>`,iconSize:null,iconAnchor:[11,11]});
-        return L.marker([d.lat,d.lng],{icon}).bindPopup(`${d.name} — ${d.stage}<br>${d.drive.toFixed(1)} mi drive`);
-      })).addTo(map);
-      devDiv.innerHTML="<b>New developments nearby:</b><ul>"+devs.slice(0,12).map(d=>`<li>${d.name} — ${d.stage} — ${d.drive.toFixed(1)} mi</li>`).join("")+"</ul>";
-    }else{
-      const arcCity=`https://www.arcgis.com/sharing/rest/search?q=${encodeURIComponent(city+" development permits")}`;
-      const gCity=`https://www.google.com/search?q=${encodeURIComponent(city+" development permits portal")}`;
-      devDiv.innerHTML=`No developments found. <b>Please use the link to search this town's database:</b> `+
-        `<a href="${arcCity}" target="_blank" rel="noopener">ArcGIS search for ${city||"your town"}</a> · `+
-        `<a href="${gCity}" target="_blank" rel="noopener">Google: ${city||"town"} permits portal</a>`;
-      log("No developments found via ArcGIS or OSM.",true);
-    }
-
-    // Demand share using Huff with brand weights; penalties for nearby big comps
-    const siteAttr=mpds*1.0; // base attraction ~ MPDs
-    const share=huffShare(siteAttr,comps,HUFF_BETA);
-    const {items:penItems,factor:penFactor}=competitivePenalties(comps);
-
-    // Base & adjusted demand
+    // Show PRELIM estimate immediately (no competition yet)
     const baseDemand=aadt*CAPTURE_RATE*GALLONS_PER_STOP*DAYS_PER_MONTH;
-    const compAdjusted=baseDemand*share*penFactor;
+    const prelim=Math.min(baseDemand, mpds*MONTHLY_PER_MPD_CAP);
+    result.textContent=`Preliminary Monthly Gallons: ${fmt(prelim)}`;
+    summary.innerHTML=`AADT <b>${fmt(aadt)}</b> (${aadtLink?`<a href="${aadtLink}" target="_blank" rel="noopener">source</a>`:aadtLabel}) · MPDs ${mpds} · (refining with competition & developments…)`;
 
-    // Capacity & blocking
-    const capacity=mpds*MONTHLY_PER_MPD_CAP;
-    let finalGallons=compAdjusted, capPenalty=0;
-    if(finalGallons>capacity){
-      const overload=finalGallons/capacity;
-      const penalty=Math.max(0.8,1-0.25*(overload-1)); // up to 20% reduction
-      finalGallons=capacity*penalty; capPenalty=Math.round((1-penalty)*100);
+    // Reviews (non-blocking)
+    (async ()=>{
+      const sv = GOOGLE_KEY ? `<img alt="Street View" style="max-width:100%;border:1px solid #3b4a66;border-radius:8px" src="${streetViewURL(lat,lng)}" />` : "";
+      let reviewHTML="";
+      try{
+        const place = await withTimeout(googlePlaceDetails(lat,lng), 8000, "Google reviews");
+        if(place){
+          const revs=(place.reviews||[]).slice(0,4).map(r=>`<p><b>${r.author_name||"Reviewer"}</b> – ${"★".repeat(Math.round(r.rating||0))}<br>${(r.text||"").slice(0,240)}${(r.text||"").length>240?"…":""}</p>`).join("");
+          reviewHTML = `<div><b>${place.name}</b> — ★${place.rating||"–"} (${place.user_ratings_total||0})</div>${revs||"<i>No review text.</i>"}`;
+        }else{
+          reviewHTML = `No reviews found automatically. <a target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}">Search Google Maps</a>`;
+        }
+      }catch(e){
+        reviewHTML = `Reviews lookup skipped. <a target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}">Search Google Maps</a>`;
+      }
+      document.getElementById('reviewsBox').innerHTML = (sv? sv+"<br>":"") + reviewHTML;
+    })();
+
+    // Competitors (≤1 mi) – tolerant to failures
+    let comps=[];
+    try{
+      log("Finding competitors (≤ 1 mi driving)…");
+      comps = await withTimeout(fetchCompetitorsDriving1mi(lat,lng), 20000, "Competitors");
+      log(`Using ${comps.length} competitor(s).`,true);
+      if(compLayer) map.removeLayer(compLayer);
+      compLayer=L.layerGroup(comps.map(c=>{
+        const rule = brandRule(c.name||"");
+        c.rule=rule; c.attr = rule.w * 6; // assume ~6 MPDs if unknown
+        const star=rule.star?"★":""; const size=rule.star?"big":"med";
+        const icon=L.divIcon({className:"div-pin",html:`<div class="pin ${size}" style="background:${rule.color}">${star}</div>`,iconSize:null,iconAnchor:[15,15]});
+        return L.marker([c.lat,c.lng],{icon}).bindPopup(`${c.name}<br>${c.drive.toFixed(1)} mi drive`);
+      })).addTo(map);
+      document.getElementById('competitors').innerHTML = comps.length
+        ? "<b>Competitors considered (≤ 1.0 mi drive):</b><ul>"+comps.slice(0,12).map(c=>`<li>${c.name} — ${c.drive.toFixed(1)} mi</li>`).join("")+"</ul>"
+        : "No stations within 1.0 mile drive.";
+    }catch(e){ log("Competitors lookup failed/skipped.",true); comps=[]; }
+
+    // Developments (universal) – tolerant to failures
+    try{
+      log(`Searching developments for ${city||"this town"}…`);
+      const devs = await withTimeout(findDevelopments(city,state,lat,lng), 25000, "Developments");
+      if(devLayer) map.removeLayer(devLayer);
+      if(devs.length){
+        log(`Found ${devs.length} development(s) ≤ ${DEV_SEARCH_MI} mi.`,true);
+        devLayer=L.layerGroup(devs.map(d=>{
+          const icon=L.divIcon({className:"div-pin",html:`<div class="pin med" style="background:${'#a78bfa'}"></div>`,iconSize:null,iconAnchor:[11,11]});
+          return L.marker([d.lat,d.lng],{icon}).bindPopup(`${d.name} — ${d.stage}<br>${d.drive.toFixed(1)} mi drive`);
+        })).addTo(map);
+        document.getElementById('developments').innerHTML="<b>New developments nearby:</b><ul>"+devs.slice(0,12).map(d=>`<li>${d.name} — ${d.stage} — ${d.drive.toFixed(1)} mi</li>`).join("")+"</ul>";
+      }else{
+        const arcCity=`https://www.arcgis.com/sharing/rest/search?q=${encodeURIComponent(city+" development permits")}`;
+        const gCity =`https://www.google.com/search?q=${encodeURIComponent(city+" development permits portal")}`;
+        document.getElementById('developments').innerHTML=`No developments found. <b>Please use the link to search this town's database:</b> <a href="${arcCity}" target="_blank" rel="noopener">ArcGIS search for ${city||"your town"}</a> · <a href="${gCity}" target="_blank" rel="noopener">Google: ${city||"town"} permits portal</a>`;
+        log("No developments found via ArcGIS or OSM.",true);
+      }
+    }catch(e){
+      const arcCity=`https://www.arcgis.com/sharing/rest/search?q=${encodeURIComponent(city+" development permits")}`;
+      const gCity =`https://www.google.com/search?q=${encodeURIComponent(city+" development permits portal")}`;
+      document.getElementById('developments').innerHTML=`No developments found. <b>Please use the link to search this town's database:</b> <a href="${arcCity}" target="_blank" rel="noopener">ArcGIS search for ${city||"your town"}</a> · <a href="${gCity}" target="_blank" rel="noopener">Google: ${city||"town"} permits portal</a>`;
+      log("Developments lookup failed/skipped.",true);
     }
 
-    // Reviews & Street View
-    const sv = `<img alt="Street View" style="max-width:100%;border:1px solid #3b4a66;border-radius:8px" src="${streetViewURL(lat,lng)}" />`;
-    let reviewHTML="";
-    const place=await googlePlaceDetails(lat,lng);
-    if(place){
-      const revs=(place.reviews||[]).slice(0,4).map(r=>`<p><b>${r.author_name||"Reviewer"}</b> – ${"★".repeat(Math.round(r.rating||0))}<br>${(r.text||"").slice(0,240)}${(r.text||"").length>240?"…":""}</p>`).join("");
-      reviewHTML = `<div><b>${place.name}</b> — ★${place.rating||"–"} (${place.user_ratings_total||0})</div>${revs||"<i>No review text available.</i>"}`;
-    }else{
-      reviewHTML = `No reviews found automatically. `+
-        `<a target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}">Search Google Maps</a>`;
-    }
-    document.getElementById('reviewsBox').innerHTML = sv + "<div style='margin-top:8px'>" + reviewHTML + "</div>";
+    // REFINED estimate with competition & penalties
+    const siteAttr = mpds * 1.0;
+    const share = comps.length ? huffShare(siteAttr, comps) : 1.0;
+    const {factor:penFactor, items:penItems} = competitivePenalties(comps);
+    const compAdjusted = baseDemand * share * penFactor;
 
-    // Output summary & result
+    const capacity = mpds * MONTHLY_PER_MPD_CAP;
+    let finalGallons = compAdjusted, capPenalty=0;
+    if(finalGallons > capacity){
+      const overload = finalGallons / capacity;
+      const penalty = Math.max(0.8, 1 - 0.25*(overload-1)); // up to 20% cut
+      finalGallons = capacity * penalty; capPenalty = Math.round((1-penalty)*100);
+    }
+
+    // Output
     const compAdjText = penItems.length ? ` · Competitive adjustments: ${penItems.slice(0,5).map(x=>`${x.name} ${x.dist.toFixed(1)} mi (−${x.pct}%)`).join("; ")}` : "";
     const capText = capPenalty>0 ? ` · capacity/queuing penalty −${capPenalty}%` : "";
-    document.getElementById('result').textContent = `Estimated Monthly Gallons: ${fmt(finalGallons)}`;
-    document.getElementById('summary').innerHTML =
-      `AADT <b>${fmt(aadt)}</b> (${aadtLink?`<a href="${aadtLink}" target="_blank" rel="noopener">source</a>`:aadtSource}) · MPDs ${mpds} · `
-      + `competitors ≤1.0 mi: ${comps.length} · developments: ${devs.length}${compAdjText}${capText}`;
+    result.textContent = `Estimated Monthly Gallons: ${fmt(finalGallons)}`;
+    summary.innerHTML = `AADT <b>${fmt(aadt)}</b> · MPDs ${mpds} · competitors ≤1.0 mi: ${comps.length}${compAdjText}${capText}`;
 
-    // Competitor list
-    document.getElementById('competitors').innerHTML = comps.length
-      ? "<b>Competitors considered (≤ 1.0 mi drive):</b><ul>"+comps.slice(0,12).map(c=>`<li>${c.name} — ${c.drive.toFixed(1)} mi</li>`).join("")+"</ul>"
-      : "No stations within 1.0 mile drive.";
-
-    // Map layers already drawn; enable PDF export
-    const {jsPDF}=window.jspdf;
-    document.getElementById('export').style.display="block";
-    document.getElementById('export').onclick=()=>{
+    // PDF
+    exportBtn.style.display="block";
+    exportBtn.onclick=()=>{
+      const {jsPDF}=window.jspdf;
       leafletImage(map,(err,canvas)=>{
         const doc=new jsPDF({unit:"pt",format:"a4"});
         doc.setFontSize(14); doc.text("Fuel Volume Estimate",40,40);
         doc.setFontSize(11);
         doc.text(`Address: ${addr}`,40,60);
         doc.text(`MPDs: ${mpds}`,40,76);
-        doc.text(`AADT: ${fmt(aadt)} ${aadtLink?"(DOT/ArcGIS)":`(${aadtSource})`}`,40,92);
-        if(aadtLink) doc.textWithLink("Open AADT source",40,108,{url:aadtLink});
-        doc.text(`Estimate: ${fmt(finalGallons)} gal/mo`,40,130);
+        doc.text(`AADT: ${fmt(aadt)}`,40,92);
+        doc.text(`Estimate: ${fmt(finalGallons)} gal/mo`,40,108);
         const img=canvas.toDataURL("image/png");
-        doc.addImage(img,"PNG",40,150,515,300);
+        doc.addImage(img,"PNG",40,130,515,300);
         doc.save("fuel_estimate.pdf");
       });
     };
 
-    log("⚡ Estimate complete!",true);
+    log("⚡ Estimate complete!", true);
     status.textContent += "\n❓ Do you want me to run another search?\n";
 
   }catch(e){
@@ -477,11 +467,6 @@ document.getElementById('estimate').onclick=async()=>{
 
 // Enter to run
 document.getElementById('address').addEventListener('keydown',e=>{ if(e.key==="Enter") document.getElementById('estimate').click(); });
-</script>
-</body>
-</html>
-
-};
 </script>
 </body>
 </html>
