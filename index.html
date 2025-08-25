@@ -3,8 +3,10 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Fuel Volume Quick Estimator</title>
+<title>Fuel Volume Estimator</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
 body {margin:0; font-family:sans-serif; background:#0f172a; color:#f1f5f9;}
 .container {padding:20px; max-width:600px; margin:auto;}
@@ -12,8 +14,12 @@ h1 {font-size:20px; margin-bottom:10px;}
 label {display:block; margin:12px 0 4px;}
 input, button {width:100%; padding:12px; border-radius:8px; border:1px solid #334155; font-size:16px;}
 button {background:#60a5fa; color:#0f172a; font-weight:700; cursor:pointer;}
+#status {margin-top:12px; font-size:14px; color:#fbbf24;}
 #result {margin-top:20px; font-size:18px; font-weight:bold; color:#22c55e;}
-#map {height:60vh; margin-top:20px; border:1px solid #334155; border-radius:8px;}
+#summary {margin-top:8px; font-size:14px; color:#e2e8f0;}
+#competitors {margin-top:12px; font-size:14px; color:#e2e8f0;}
+#map {height:55vh; margin-top:20px; border:1px solid #334155; border-radius:8px;}
+#export {margin-top:15px; background:#34d399; color:#0f172a;}
 </style>
 </head>
 <body>
@@ -21,76 +27,63 @@ button {background:#60a5fa; color:#0f172a; font-weight:700; cursor:pointer;}
   <h1>Fuel Volume Estimator</h1>
   <label>Address</label>
   <input id="address" placeholder="123 Main St, Knightdale, NC" />
-  <label>MPDs (multi-product dispensers)</label>
+  <label>MPDs</label>
   <input id="mpds" type="number" value="6" />
   <button id="estimate">Calculate Estimate</button>
+  <div id="status"></div>
   <div id="result"></div>
+  <div id="summary"></div>
+  <div id="competitors"></div>
+  <button id="export" style="display:none;">📄 Export to PDF</button>
 </div>
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-// Simple Haversine
-function hav(a,b){const R=3958.8;const dLat=(b.lat-a.lat)*Math.PI/180;const dLng=(b.lng-a.lng)*Math.PI/180;
+// ===== Utilities
+function hav(a,b){const R=3958.8,dLat=(b.lat-a.lat)*Math.PI/180,dLng=(b.lng-a.lng)*Math.PI/180;
 const s=Math.sin(dLat/2)**2+Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLng/2)**2;
 return 2*R*Math.asin(Math.sqrt(s));}
+function fmt(n){return Number.isFinite(n)?Math.round(n).toLocaleString():"–";}
+
+// ===== Map
 const map=L.map('map').setView([35.7796,-78.6382],11);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
 let siteMarker=null, compLayer=null;
 
-// Fake AADT for now (you can replace with DOT API)
-async function getAADT(lat,lng){
-  return 20000; // fallback
+// ===== Fetch AADT (NCDOT demo service)
+async function fetchAADT(lat,lng){
+  const url="https://services.arcgis.com/NuWFvHYDMVmmxMeM/ArcGIS/rest/services/NCDOT_AADT_Stations/FeatureServer/0/query";
+  const params={where:"1=1",geometry:`${lng},${lat}`,geometryType:"esriGeometryPoint",inSR:"4326",
+                spatialRel:"esriSpatialRelIntersects",distance:"1000",units:"esriSRUnit_Meter",
+                outFields:"*",outSR:"4326",f:"json"};
+  const r=await fetch(url+"?"+new URLSearchParams(params));
+  const j=await r.json();
+  if(!j.features?.length) return null;
+  let best=null,dist=1e9;
+  for(const f of j.features){
+    const d=hav({lat,lng},{lat:f.geometry.y,lng:f.geometry.x});
+    if(d<dist){dist=d;best=f;}
+  }
+  const attrs=best.attributes;
+  const aadt=attrs.AADT||Object.values(attrs).find(v=>typeof v==="number"&&v>0);
+  return {aadt,dist};
 }
 
-// Fetch competitors from OSM
+// ===== Fetch competitors from OSM
 async function fetchCompetitors(lat,lng){
   const query=`[out:json][timeout:25];node["amenity"="fuel"](around:5000,${lat},${lng});out center;`;
   const r=await fetch("https://overpass-api.de/api/interpreter",{method:"POST",body:"data="+encodeURIComponent(query)});
   const j=await r.json();
-  return j.elements.map(e=>({lat:e.lat,lng:e.lon,name:e.tags?.name||"Station"}));
+  return j.elements.map(e=>({
+    lat:e.lat,lng:e.lon,
+    name:e.tags?.brand||e.tags?.name||"Station",
+    dist:hav({lat,lng},{lat:e.lat,lng:e.lon})
+  })).sort((a,b)=>a.dist-b.dist);
 }
 
+// ===== Main button
 document.getElementById('estimate').onclick=async()=>{
-  const btn=document.getElementById('estimate');
+  const status=document.getElementById('status');
   const result=document.getElementById('result');
-  result.textContent="";
-  btn.textContent="⏳ Waiting for estimate…";
-  btn.disabled=true;
-
-  try{
-    const addr=document.getElementById('address').value;
-    const mpds=parseInt(document.getElementById('mpds').value)||6;
-    // Geocode
-    const geo=await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addr)}`);
-    const gj=await geo.json();
-    if(!gj.length) throw new Error("Address not found");
-    const lat=+gj[0].lat, lng=+gj[0].lon;
-
-    // AADT
-    const aadt=await getAADT(lat,lng);
-    // Base calc
-    const capture=0.02, gps=8, dpm=30.4;
-    const base=aadt*capture*gps*dpm;
-    const est=base*(mpds/6); // simple MPD scaling
-
-    // Map update
-    if(siteMarker){map.removeLayer(siteMarker);}
-    siteMarker=L.marker([lat,lng]).addTo(map).bindPopup("Your site").openPopup();
-    map.setView([lat,lng],13);
-
-    // Competitors
-    const comps=await fetchCompetitors(lat,lng);
-    if(compLayer) map.removeLayer(compLayer);
-    compLayer=L.layerGroup(comps.map(c=>L.circleMarker([c.lat,c.lng],{radius:6,color:"#f59e0b"}).bindPopup(c.name))).addTo(map);
-
-    result.textContent=`Estimated Monthly Gallons: ${Math.round(est).toLocaleString()}`;
-  }catch(e){
-    result.textContent="❌ Error: "+e.message;
-  }
-  btn.textContent="Calculate Estimate";
-  btn.disabled=false;
-};
-</script>
-</body>
-</html>
+  const summary=document.getElementById('summary');
