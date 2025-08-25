@@ -11,9 +11,9 @@
 <script src="https://unpkg.com/leaflet-image@latest/leaflet-image.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
-<!-- Google Maps SDK (optional: leave key blank to skip reviews) -->
+<!-- If you put a Google key below, this loader will fetch Places SDK automatically -->
 <script>
-  const GOOGLE_KEY = "YOUR_GOOGLE_API_KEY_HERE"; // <-- put key or leave ""
+  const GOOGLE_KEY = "YOUR_GOOGLE_API_KEY_HERE"; // <-- put your restricted key or leave ""
   if (GOOGLE_KEY) {
     const s = document.createElement("script");
     s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(GOOGLE_KEY)}&libraries=places`;
@@ -30,7 +30,7 @@
   *{box-sizing:border-box}
   body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;background:var(--bg);color:var(--text)}
   header{position:sticky;top:0;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:linear-gradient(180deg,#0b1224,#081020);border-bottom:1px solid var(--border)}
-  header img{height:34px}
+  header img{height:34px;width:auto}
   .container{max-width:980px;margin:auto;padding:16px}
   h1{margin:0 0 12px;font-size:20px}
   label{margin-top:12px;display:block;font-size:14px;color:#cbd5e1}
@@ -66,7 +66,7 @@
 
   <button id="estimate">Calculate Estimate</button>
 
-  <div id="status" aria-live="polite">Calculating estimate will appear here…</div>
+  <div id="status" aria-live="polite">Status will appear here…</div>
   <div id="result"></div>
   <div id="summary"></div>
   <div id="reviewsBox"></div>
@@ -86,11 +86,25 @@
 
 <script>
 /* ================== CONSTANTS ================== */
-const CAPTURE_RATE=0.02, GALLONS_PER_STOP=9.2, DAYS_PER_MONTH=30.4;
-const MONTHLY_PER_MPD_CAP=8500;       // conservative cap per MPD/month
-const ONE_MILE=1.0;                    // competitors cutoff (driving)
-const DEV_SEARCH_MI=5;                 // developments cutoff (driving)
-const HUFF_BETA=1.2;
+/* Base gallons MUST start with: AADT × 0.08 × 2 × 30 */
+const BASE_GAL = (aadt)=> aadt * 0.08 * 2 * 30;
+
+const MONTHLY_PER_MPD_CAP=8500;     // conservative cap per MPD/month
+const ONE_MILE_METERS = 1609;       // competitors radius
+const DEV_SEARCH_MI=5;              // developments cutoff (driving for list text if available)
+const HUFF_BETA=1.2;                // distance-decay exponent (straight-line miles)
+
+/* Brand weights & proximity penalties */
+const BRAND_RULES=[
+  {re:/\b(costco|sam'?s club|bj'?s)\b/i, w:2.6, star:true, color:"#ef4444", pen:[{mi:1.5,p:0.25},{mi:3.1,p:0.15}]},
+  {re:/\b(buc-?ee?s?)\b/i,              w:3.0, star:true, color:"#f97316", pen:[{mi:5,p:0.25}]},
+  {re:/\b(wawa|sheetz|quik\s?trip|^qt\b|racetrac|getgo|casey'?s)\b/i, w:2.0, star:true, color:"#fb923c", pen:[{mi:1.5,p:0.10},{mi:3.1,p:0.06}]},
+  {re:/\b(love'?s|pilot|flying\s?j|ta|petro)\b/i, w:2.0, star:true, color:"#f59e0b", pen:[{mi:2.5,p:0.10}]},
+  {re:/\b(murphy|speedway)\b/i,          w:1.5, star:false,color:"#facc15", pen:[{mi:2.5,p:0.06}]},
+  {re:/\b(circle\s?k|7-?eleven|exxon|mobil|bp|chevron|shell|sunoco|valero|phillips|76|citgo)\b/i, w:1.3, star:false,color:"#fcd34d", pen:[{mi:2.0,p:0.04}]},
+  {re:/./,                               w:1.0, star:false,color:"#60a5fa", pen:[]}
+];
+function brandRule(name){ return BRAND_RULES.find(r=>r.re.test(name||""))||BRAND_RULES[BRAND_RULES.length-1]; }
 
 /* ================== HELPERS ================== */
 const fmt=n=>Number.isFinite(n)?Math.round(n).toLocaleString():"–";
@@ -98,9 +112,8 @@ const rad=d=>d*Math.PI/180;
 function hav(a,b){const R=3958.8,dLat=rad(b.lat-a.lat),dLng=rad(b.lng-a.lng);
   const s=Math.sin(dLat/2)**2+Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dLng/2)**2;
   return 2*R*Math.asin(Math.sqrt(s));}
-function logger(el){el.textContent="";return(m,ok=false)=>{el.textContent+=(ok?"✅ ":"⏳ ")+m+"\\n";el.scrollTop=el.scrollHeight;};}
 function clamp(x,lo,hi){return Math.max(lo,Math.min(hi,x));}
-function withTimeout(promise, ms, label){ return Promise.race([promise, new Promise((_,rej)=>setTimeout(()=>rej(new Error(label+" timed out")), ms))]); }
+function logger(el){el.textContent="";return(m,ok=false)=>{el.textContent+=(ok?"✅ ":"⏳ ")+m+"\\n";el.scrollTop=el.scrollHeight;};}
 
 /* ================== MAP (CORS-safe tiles for PDF) ================== */
 const map=L.map('map').setView([35.7796,-78.6382],12);
@@ -108,6 +121,7 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{at
 let siteMarker=null, compLayer=null, devLayer=null;
 
 /* ================== NETWORK HELPERS ================== */
+async function withTimeout(promise, ms, label){ return Promise.race([promise, new Promise((_,rej)=>setTimeout(()=>rej(new Error(label+" timed out")), ms))]); }
 const OVERPASS = [
   "https://overpass-api.de/api/interpreter",
   "https://overpass.kumi.systems/api/interpreter",
@@ -121,22 +135,6 @@ async function overpassQuery(q){
     }catch(e){}
   }
   throw new Error("Overpass unavailable");
-}
-async function driveMiles(a,b){
-  try{
-    const url=`https://router.project-osrm.org/route/v1/driving/${a.lng},${a.lat};${b.lng},${b.lat}?overview=false&alternatives=false`;
-    const r=await withTimeout(fetch(url), 15000, "OSRM route"); const j=await r.json();
-    const m=j?.routes?.[0]?.distance; return m? m/1609.344 : hav(a,b);
-  }catch(e){ return hav(a,b); }
-}
-async function osrmTableMiles(origin, pts){
-  try{
-    const coords=[[origin.lng,origin.lat],...pts.map(p=>[p.lng,p.lat])].map(x=>x.join(",")).join(";");
-    const url=`https://router.project-osrm.org/table/v1/driving/${coords}?sources=0&annotations=distance`;
-    const r=await withTimeout(fetch(url), 15000, "OSRM table"); const j=await r.json();
-    const d=j?.distances?.[0]; if(Array.isArray(d)&&d.length===pts.length+1) return d.slice(1).map(m=>m/1609.344);
-  }catch(e){}
-  const out=[]; for(const p of pts){ out.push(await driveMiles(origin,p)); } return out;
 }
 
 /* ================== AADT (ArcGIS + Heuristic) ================== */
@@ -177,27 +175,27 @@ async function heuristicAADT(lat,lng){
   return {value:Math.round(num/Math.max(den,1)),source:"Heuristic (OSM road class/lanes/speed)",link:`https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=16/${lat}/${lng}`};
 }
 
-/* ================== Competitors (≤1 mi driving) ================== */
-async function fetchCompetitorsDriving1mi(lat,lng){
+/* ================== COMPETITORS (radius 1 mile) ================== */
+async function fetchCompetitorsRadius1mi(lat,lng){
   const q=`[out:json][timeout:25];
-    (node["amenity"="fuel"](around:10000,${lat},${lng});
-     way["amenity"="fuel"](around:10000,${lat},${lng});
-     relation["amenity"="fuel"](around:10000,${lat},${lng}););
+    (node["amenity"="fuel"](around:${ONE_MILE_METERS},${lat},${lng});
+     way["amenity"="fuel"](around:${ONE_MILE_METERS},${lat},${lng});
+     relation["amenity"="fuel"](around:${ONE_MILE_METERS},${lat},${lng}););
     out center tags;`;
   const j=await overpassQuery(q);
-  const cand=(j.elements||[]).map(e=>{
-    const c=e.type==='node'?{lat:e.lat,lng:e.lon}:(e.center||null); if(!c) return null;
-    return {lat:c.lat,lng:c.lon,name:(e.tags?.brand||e.tags?.name||"Fuel station")};
-  }).filter(Boolean);
-  if(!cand.length) return [];
-  const d=await osrmTableMiles({lat,lng},cand);
-  return cand.map((r,i)=>({...r,drive:d[i]})).filter(r=>Number.isFinite(r.drive)&&r.drive<=ONE_MILE).sort((a,b)=>a.drive-b.drive);
+  return (j.elements||[]).map(e=>{
+    const c=e.type==='node'?{lat:e.lat,lng:e.lon}:(e.center||null);
+    if(!c) return null;
+    const name=e.tags?.brand||e.tags?.name||"Fuel station";
+    const dist=hav({lat,lng},c); // straight-line miles
+    return {lat:c.lat,lng:c.lon,name,dist};
+  }).filter(Boolean).sort((a,b)=>a.dist-b.dist);
 }
 
-/* ================== Developments (universal) ================== */
+/* ================== DEVELOPMENTS (universal ArcGIS → OSM fallback) ================== */
 async function arcgisSearch(query){
   const url=`https://www.arcgis.com/sharing/rest/search?f=json&q=${encodeURIComponent(query)}&num=10`;
-  try{ const r=await withTimeout(fetch(url), 12000, "ArcGIS search"); const j=await r.json(); return j.results||[]; }catch(e){ return []; }
+  try{ const r=await withTimeout(fetch(url),12000,"ArcGIS search"); const j=await r.json(); return j.results||[]; }catch(e){ return []; }
 }
 async function tryLayerAround(url,lat,lng){
   const idxs=[]; const m=url.match(/\/(FeatureServer|MapServer)(?:\/(\d+))?$/i);
@@ -206,14 +204,13 @@ async function tryLayerAround(url,lat,lng){
   for(const idx of idxs){
     const endpoint=url.replace(/\/(FeatureServer|MapServer)(?:\/\d+)?$/i,`/$1/${idx}/query`);
     const p={where:"1=1",geometry:`${lng},${lat}`,geometryType:"esriGeometryPoint",inSR:"4326",
-      spatialRel:"esriSpatialRelIntersects",distance:"20000",units:"esriSRUnit_Meter",
-      outFields:"*",outSR:"4326",f:"json"};
+      spatialRel:"esriSpatialRelIntersects",distance:"20000",units:"esriSRUnit_Meter",outFields:"*",outSR:"4326",f:"json"};
     try{
-      const r=await withTimeout(fetch(endpoint+"?"+new URLSearchParams(p)), 15000, "ArcGIS FS"); if(!r.ok) continue; const j=await r.json();
+      const r=await withTimeout(fetch(endpoint+"?"+new URLSearchParams(p)), 15000, "ArcGIS FS");
+      if(!r.ok) continue; const j=await r.json();
       for(const f of (j.features||[])){
         const a=f.attributes||{};
-        const blob=[a.ProjectName,a.PROJECTNAME,a.Name,a.TITLE,a.Description,a.DESCRIPTION,a.Type,a.TYPE,a.Category,a.CATEGORY]
-          .map(x=>String(x||"")).join(" ").toLowerCase();
+        const blob=[a.ProjectName,a.PROJECTNAME,a.Name,a.TITLE,a.Description,a.DESCRIPTION,a.Type,a.TYPE,a.Category,a.CATEGORY].map(x=>String(x||"")).join(" ").toLowerCase();
         if(/\b(gas|fuel|convenience|c[-\s]?store|station|mart)\b/.test(blob)){
           out.push({lat:f.geometry?.y,lng:f.geometry?.x,name:a.ProjectName||a.PROJECTNAME||a.Name||a.TITLE||"Fuel-related development",stage:a.Status||a.STATUS||a.Type||a.TYPE||"proposed"});
         }
@@ -234,13 +231,10 @@ async function findDevelopments(city,state,lat,lng){
     for(const it of items){
       if(!it.url || !/FeatureServer|MapServer/i.test(it.url)) continue;
       const hits=await tryLayerAround(it.url,lat,lng);
-      if(hits.length){
-        const d=await osrmTableMiles({lat,lng},hits);
-        return hits.map((h,i)=>({...h,drive:d[i]})).filter(h=>h.drive<=DEV_SEARCH_MI).sort((a,b)=>a.drive-b.drive);
-      }
+      if(hits.length) return hits.sort((a,b)=>hav({lat,lng},a)-hav({lat,lng},b)); // sort by crow distance
     }
   }
-  // OSM fallback
+  // fallback to OSM proposed / construction
   const q = `[out:json][timeout:25];
     (node["amenity"="fuel"]["proposed"](around:10000,${lat},${lng});
      way["amenity"="fuel"]["proposed"](around:10000,${lat},${lng});
@@ -250,45 +244,15 @@ async function findDevelopments(city,state,lat,lng){
      relation["amenity"="fuel"]["construction"](around:10000,${lat},${lng}););
     out center tags;`;
   const j=await overpassQuery(q);
-  const rows=(j.elements||[]).map(e=>{
+  return (j.elements||[]).map(e=>{
     const c=e.type==='node'?{lat:e.lat,lng:e.lon}:(e.center||null); if(!c) return null;
     const name=e.tags?.brand||e.tags?.name||"New fuel development";
     const stage=e.tags?.proposed?"proposed":(e.tags?.construction?"construction":"planned");
     return {lat:c.lat,lng:c.lon,name,stage};
-  }).filter(Boolean);
-  if(!rows.length) return [];
-  const d=await osrmTableMiles({lat,lng},rows);
-  return rows.map((r,i)=>({...r,drive:d[i]})).filter(r=>r.drive<=DEV_SEARCH_MI).sort((a,b)=>a.drive-b.drive);
+  }).filter(Boolean).sort((a,b)=>hav({lat,lng},a)-hav({lat,lng},b));
 }
 
-/* ================== Huff & penalties ================== */
-function huffShare(siteAttr, comps){
-  const eps=0.1, siteD=0.1;
-  let denom=siteAttr/Math.pow(siteD,HUFF_BETA);
-  comps.forEach(c=>denom+= (c.attr)/Math.pow(Math.max(eps,c.drive||1), HUFF_BETA));
-  return clamp((siteAttr/Math.pow(siteD,HUFF_BETA))/denom, 0, 1);
-}
-const BRAND_RULES=[
-  {re:/\b(costco|sam'?s club|bj'?s)\b/i, w:2.6, star:true, color:"#ef4444", pen:[{mi:1.5,p:0.25},{mi:3.1,p:0.15}]},
-  {re:/\b(buc-?ee?s?)\b/i,              w:3.0, star:true, color:"#f97316", pen:[{mi:5,p:0.25}]},
-  {re:/\b(wawa|sheetz|quik\s?trip|^qt\b|racetrac|getgo|casey'?s)\b/i, w:2.0, star:true, color:"#fb923c", pen:[{mi:1.5,p:0.10},{mi:3.1,p:0.06}]},
-  {re:/\b(love'?s|pilot|flying\s?j|ta|petro)\b/i, w:2.0, star:true, color:"#f59e0b", pen:[{mi:2.5,p:0.10}]},
-  {re:/\b(murphy|speedway)\b/i,          w:1.5, star:false,color:"#facc15", pen:[{mi:2.5,p:0.06}]},
-  {re:/\b(circle\s?k|7-?eleven|exxon|mobil|bp|chevron|shell|sunoco|valero|phillips|76|citgo)\b/i, w:1.3, star:false,color:"#fcd34d", pen:[{mi:2.0,p:0.04}]},
-  {re:/./,                               w:1.0, star:false,color:"#60a5fa", pen:[]}
-];
-function brandRule(name){ return BRAND_RULES.find(r=>r.re.test(name||""))||BRAND_RULES[BRAND_RULES.length-1]; }
-function competitivePenalties(comps){
-  let factor=1.0; const items=[];
-  comps.forEach(c=>{
-    const rule=brandRule(c.name); c.rule=rule;
-    for(const p of rule.pen){ if((c.drive||9)<=p.mi){ factor*= (1-p.p); items.push({name:c.name,dist:c.drive,pct:Math.round(p.p*100)}); break; } }
-  });
-  return {factor, items};
-}
-
-/* ================== Reviews (built-in fallback links) ================== */
-function streetViewURL(lat,lng){ return GOOGLE_KEY ? `https://maps.googleapis.com/maps/api/streetview?size=640x360&location=${lat},${lng}&key=${GOOGLE_KEY}` : ""; }
+/* ================== Google Reviews helpers ================== */
 async function googlePlaceDetails(lat,lng){
   if(!GOOGLE_KEY) return null;
   await new Promise(resolve=>{
@@ -306,15 +270,35 @@ async function googlePlaceDetails(lat,lng){
     });
   });
 }
+function streetViewURL(lat,lng){ return GOOGLE_KEY ? `https://maps.googleapis.com/maps/api/streetview?size=640x360&location=${lat},${lng}&key=${GOOGLE_KEY}` : ""; }
 
-/* ================== MAIN ================== */
+/* ================== Huff & penalties (radius version) ================== */
+function huffShare(siteAttr, comps){
+  const eps=0.1, siteD=0.1;
+  let denom = siteAttr/Math.pow(siteD, HUFF_BETA);
+  comps.forEach(c=>{
+    const dist = Math.max(eps, c.dist||0.1); // straight-line miles
+    denom += c.attr / Math.pow(dist, HUFF_BETA);
+  });
+  return clamp((siteAttr/Math.pow(siteD,HUFF_BETA))/denom, 0, 1);
+}
+function competitivePenalties(comps){
+  let factor=1.0; const items=[];
+  comps.forEach(c=>{
+    const rule = brandRule(c.name); c.rule=rule;
+    for(const pen of rule.pen){ if((c.dist||9)<=pen.mi){ factor *= (1-pen.p); items.push({name:c.name,dist:c.dist,pct:Math.round(pen.p*100)}); break; } }
+  });
+  return {factor, items};
+}
+
+/* ================== MAIN CLICK ================== */
 document.getElementById('estimate').onclick=async()=>{
   const status=document.getElementById('status'); const log=logger(status);
   const result=document.getElementById('result'); const summary=document.getElementById('summary');
   const reviewsBox=document.getElementById('reviewsBox'); const compsDiv=document.getElementById('competitors'); const devDiv=document.getElementById('developments');
   const exportBtn=document.getElementById('export');
 
-  // reset
+  // reset UI
   result.textContent=""; summary.textContent=""; reviewsBox.innerHTML=""; compsDiv.textContent=""; devDiv.textContent="";
   exportBtn.style.display="none"; if(compLayer){map.removeLayer(compLayer);} if(devLayer){map.removeLayer(devLayer);} if(siteMarker){map.removeLayer(siteMarker);}
 
@@ -335,7 +319,7 @@ document.getElementById('estimate').onclick=async()=>{
     document.getElementById('ncLink').href=`https://ncdot.maps.arcgis.com/apps/webappviewer/index.html?id=ae42f4ac534a46458c9cf60a98d2bc1d&find=${lat},${lng}`;
     document.getElementById('usaLink').href=`https://www.arcgis.com/apps/mapviewer/index.html?url=${encodeURIComponent("https://services.arcgis.com/P3ePLMYs2RVChkJx/ArcGIS/rest/services/USA_Traffic_Counts/FeatureServer/0")}&center=${lng},${lat}&level=15`;
 
-    // AADT (fast path) — show preliminary estimate ASAP
+    // AADT: override → DOT ArcGIS → heuristic; then base gallons from *your* formula
     let aadt=null, aadtLabel=""; let aadtLink="";
     if(aadtOverride){ aadt=aadtOverride; aadtLabel="User override"; log(`Using override AADT ${aadt}`,true); }
     else {
@@ -351,61 +335,62 @@ document.getElementById('estimate').onclick=async()=>{
       }
     }
 
-    // Show PRELIM estimate immediately (no competition yet)
-    const baseDemand=aadt*CAPTURE_RATE*GALLONS_PER_STOP*DAYS_PER_MONTH;
-    const prelim=Math.min(baseDemand, mpds*MONTHLY_PER_MPD_CAP);
-    result.textContent=`Preliminary Monthly Gallons: ${fmt(prelim)}`;
-    summary.innerHTML=`AADT <b>${fmt(aadt)}</b> (${aadtLink?`<a href="${aadtLink}" target="_blank" rel="noopener">source</a>`:aadtLabel}) · MPDs ${mpds} · (refining with competition & developments…)`;
+    // BASE GALLONS (always start here)
+    let gallons = BASE_GAL(aadt); // AADT × 0.08 × 2 × 30
+    result.textContent=`Base (pre-competition) Gallons: ${fmt(gallons)}`;
+    summary.innerHTML=`AADT <b>${fmt(aadt)}</b> (${aadtLink?`<a href="${aadtLink}" target="_blank" rel="noopener">source</a>`:aadtLabel}) · MPDs ${mpds} · (refining with competition & capacity…)`;
 
-    // Reviews (non-blocking)
+    // REVIEWS (parallel, non-blocking)
     (async ()=>{
-      const sv = GOOGLE_KEY ? `<img alt="Street View" style="max-width:100%;border:1px solid #3b4a66;border-radius:8px" src="${streetViewURL(lat,lng)}" />` : "";
-      let reviewHTML="";
+      let html="";
       try{
+        const sv = streetViewURL(lat,lng);
+        if(sv) html += `<img alt="Street View" style="max-width:100%;border:1px solid #3b4a66;border-radius:8px" src="${sv}"><br>`;
         const place = await withTimeout(googlePlaceDetails(lat,lng), 8000, "Google reviews");
         if(place){
           const revs=(place.reviews||[]).slice(0,4).map(r=>`<p><b>${r.author_name||"Reviewer"}</b> – ${"★".repeat(Math.round(r.rating||0))}<br>${(r.text||"").slice(0,240)}${(r.text||"").length>240?"…":""}</p>`).join("");
-          reviewHTML = `<div><b>${place.name}</b> — ★${place.rating||"–"} (${place.user_ratings_total||0})</div>${revs||"<i>No review text.</i>"}`;
+          html += `<div><b>${place.name}</b> — ★${place.rating||"–"} (${place.user_ratings_total||0})</div>${revs||"<i>No review text.</i>"}`;
         }else{
-          reviewHTML = `No reviews found automatically. <a target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}">Search Google Maps</a>`;
+          html += `No reviews found automatically. <a target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}">Search Google Maps</a>`;
         }
       }catch(e){
-        reviewHTML = `Reviews lookup skipped. <a target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}">Search Google Maps</a>`;
+        html = `Reviews lookup skipped. <a target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}">Search Google Maps</a>`;
       }
-      document.getElementById('reviewsBox').innerHTML = (sv? sv+"<br>":"") + reviewHTML;
+      document.getElementById('reviewsBox').innerHTML = html;
     })();
 
-    // Competitors (≤1 mi) – tolerant to failures
+    // COMPETITORS (radius 1 mile)
+    log("Finding competitors by radius (1 mile)…");
     let comps=[];
     try{
-      log("Finding competitors (≤ 1 mi driving)…");
-      comps = await withTimeout(fetchCompetitorsDriving1mi(lat,lng), 20000, "Competitors");
-      log(`Using ${comps.length} competitor(s).`,true);
+      comps = await withTimeout(fetchCompetitorsRadius1mi(lat,lng), 20000, "Competitors radius");
+      // add brand rule + attraction (assume ~6 MPDs if unknown)
+      comps = comps.map(c=>{const rule=brandRule(c.name||""); const attr=rule.w*6; return {...c, rule, attr};});
+      // draw
       if(compLayer) map.removeLayer(compLayer);
       compLayer=L.layerGroup(comps.map(c=>{
-        const rule = brandRule(c.name||"");
-        c.rule=rule; c.attr = rule.w * 6; // assume ~6 MPDs if unknown
-        const star=rule.star?"★":""; const size=rule.star?"big":"med";
-        const icon=L.divIcon({className:"div-pin",html:`<div class="pin ${size}" style="background:${rule.color}">${star}</div>`,iconSize:null,iconAnchor:[15,15]});
-        return L.marker([c.lat,c.lng],{icon}).bindPopup(`${c.name}<br>${c.drive.toFixed(1)} mi drive`);
+        const star=c.rule.star?"★":""; const color=c.rule.color; const size=c.rule.star?"big":"med";
+        const icon=L.divIcon({className:"div-pin",html:`<div class="pin ${size}" style="background:${color}">${star}</div>`,iconSize:null,iconAnchor:[15,15]});
+        return L.marker([c.lat,c.lng],{icon}).bindPopup(`${c.name}<br>${c.dist.toFixed(2)} mi radius`);
       })).addTo(map);
       document.getElementById('competitors').innerHTML = comps.length
-        ? "<b>Competitors considered (≤ 1.0 mi drive):</b><ul>"+comps.slice(0,12).map(c=>`<li>${c.name} — ${c.drive.toFixed(1)} mi</li>`).join("")+"</ul>"
-        : "No stations within 1.0 mile drive.";
-    }catch(e){ log("Competitors lookup failed/skipped.",true); comps=[]; }
+        ? "<b>Competitors considered (≤ 1.0 mi radius):</b><ul>"+comps.slice(0,12).map(c=>`<li>${c.name} — ${c.dist.toFixed(2)} mi</li>`).join("")+"</ul>"
+        : "No stations within 1.0 mile radius.";
+      log(`Using ${comps.length} competitor(s).`,true);
+    }catch(e){ log("Competitor lookup failed/skipped.",true); comps=[]; }
 
-    // Developments (universal) – tolerant to failures
+    // DEVELOPMENTS (universal ArcGIS → OSM)
     try{
       log(`Searching developments for ${city||"this town"}…`);
       const devs = await withTimeout(findDevelopments(city,state,lat,lng), 25000, "Developments");
       if(devLayer) map.removeLayer(devLayer);
       if(devs.length){
-        log(`Found ${devs.length} development(s) ≤ ${DEV_SEARCH_MI} mi.`,true);
         devLayer=L.layerGroup(devs.map(d=>{
           const icon=L.divIcon({className:"div-pin",html:`<div class="pin med" style="background:${'#a78bfa'}"></div>`,iconSize:null,iconAnchor:[11,11]});
-          return L.marker([d.lat,d.lng],{icon}).bindPopup(`${d.name} — ${d.stage}<br>${d.drive.toFixed(1)} mi drive`);
+          return L.marker([d.lat,d.lng],{icon}).bindPopup(`${d.name} — ${d.stage}`);
         })).addTo(map);
-        document.getElementById('developments').innerHTML="<b>New developments nearby:</b><ul>"+devs.slice(0,12).map(d=>`<li>${d.name} — ${d.stage} — ${d.drive.toFixed(1)} mi</li>`).join("")+"</ul>";
+        document.getElementById('developments').innerHTML="<b>New developments nearby:</b><ul>"+devs.slice(0,12).map(d=>`<li>${d.name} — ${d.stage}</li>`).join("")+"</ul>";
+        log(`Found ${devs.length} development(s).`,true);
       }else{
         const arcCity=`https://www.arcgis.com/sharing/rest/search?q=${encodeURIComponent(city+" development permits")}`;
         const gCity =`https://www.google.com/search?q=${encodeURIComponent(city+" development permits portal")}`;
@@ -419,29 +404,31 @@ document.getElementById('estimate').onclick=async()=>{
       log("Developments lookup failed/skipped.",true);
     }
 
-    // REFINED estimate with competition & penalties
-    const siteAttr = mpds * 1.0;
+    // REFINED ESTIMATE: apply competition (radius) & penalties, then capacity cap
+    const siteAttr = mpds * 1.0; // simple site attractiveness ~ MPDs
     const share = comps.length ? huffShare(siteAttr, comps) : 1.0;
     const {factor:penFactor, items:penItems} = competitivePenalties(comps);
-    const compAdjusted = baseDemand * share * penFactor;
+    let refined = gallons * share * penFactor;
 
+    // Capacity cap & blocking
     const capacity = mpds * MONTHLY_PER_MPD_CAP;
-    let finalGallons = compAdjusted, capPenalty=0;
-    if(finalGallons > capacity){
-      const overload = finalGallons / capacity;
-      const penalty = Math.max(0.8, 1 - 0.25*(overload-1)); // up to 20% cut
-      finalGallons = capacity * penalty; capPenalty = Math.round((1-penalty)*100);
+    let capPenalty=0;
+    if(refined > capacity){
+      const overload = refined / capacity;
+      const penalty = Math.max(0.8, 1 - 0.25*(overload-1)); // up to 20% reduction
+      refined = capacity * penalty;
+      capPenalty = Math.round((1-penalty)*100);
     }
 
     // Output
-    const compAdjText = penItems.length ? ` · Competitive adjustments: ${penItems.slice(0,5).map(x=>`${x.name} ${x.dist.toFixed(1)} mi (−${x.pct}%)`).join("; ")}` : "";
+    const compAdjText = penItems.length ? ` · Competitive adjustments: ${penItems.slice(0,5).map(x=>`${x.name} ${x.dist.toFixed(2)} mi (−${x.pct}%)`).join("; ")}` : "";
     const capText = capPenalty>0 ? ` · capacity/queuing penalty −${capPenalty}%` : "";
-    result.textContent = `Estimated Monthly Gallons: ${fmt(finalGallons)}`;
-    summary.innerHTML = `AADT <b>${fmt(aadt)}</b> · MPDs ${mpds} · competitors ≤1.0 mi: ${comps.length}${compAdjText}${capText}`;
+    result.textContent = `Estimated Monthly Gallons: ${fmt(refined)}`;
+    summary.innerHTML = `Base: ${fmt(gallons)} · share: ${(share*100).toFixed(1)}% · comps: ${comps.length}${compAdjText}${capText}`;
 
     // PDF
-    exportBtn.style.display="block";
-    exportBtn.onclick=()=>{
+    document.getElementById('export').style.display="block";
+    document.getElementById('export').onclick=()=>{
       const {jsPDF}=window.jspdf;
       leafletImage(map,(err,canvas)=>{
         const doc=new jsPDF({unit:"pt",format:"a4"});
@@ -449,8 +436,8 @@ document.getElementById('estimate').onclick=async()=>{
         doc.setFontSize(11);
         doc.text(`Address: ${addr}`,40,60);
         doc.text(`MPDs: ${mpds}`,40,76);
-        doc.text(`AADT: ${fmt(aadt)}`,40,92);
-        doc.text(`Estimate: ${fmt(finalGallons)} gal/mo`,40,108);
+        doc.text(`Base (AADT×0.08×2×30): ${fmt(gallons)}`,40,92);
+        doc.text(`Estimate (after comps/cap): ${fmt(refined)} gal/mo`,40,108);
         const img=canvas.toDataURL("image/png");
         doc.addImage(img,"PNG",40,130,515,300);
         doc.save("fuel_estimate.pdf");
@@ -470,3 +457,4 @@ document.getElementById('address').addEventListener('keydown',e=>{ if(e.key==="E
 </script>
 </body>
 </html>
+
