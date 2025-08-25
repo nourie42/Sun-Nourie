@@ -10,30 +10,31 @@
 <script src="https://unpkg.com/leaflet-image@latest/leaflet-image.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
+<!-- ✅ Load Google Maps SDK with your key -->
+<script src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_API_KEY_HERE&libraries=places" async defer></script>
+
 <style>
   :root{
     --bg:#0f172a; --panel:#0b1224; --border:#1f2937; --muted:#94a3b8; --text:#e5e7eb;
     --accent:#60a5fa; --good:#22c55e; --warn:#fbbf24;
   }
-  *{box-sizing:border-box}
-  body{margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif; background:var(--bg); color:var(--text);}
-  header{position:sticky; top:0; z-index:10; display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:linear-gradient(180deg,#0b1224,#081020); border-bottom:1px solid var(--border);}
-  header img{height:32px; width:auto;}
-  .container{max-width:880px; margin:auto; padding:16px;}
+  body{margin:0; font-family:system-ui,sans-serif; background:var(--bg); color:var(--text);}
+  header{background:#0b1224; padding:10px 14px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border);}
+  header img{height:32px;}
+  .container{max-width:900px; margin:auto; padding:16px;}
   h1{margin:0 0 12px; font-size:20px;}
-  label{margin-top:12px; display:block; font-size:14px; color:#cbd5e1;}
-  input,button{width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--panel); color:var(--text); font-size:16px;}
-  button{background:var(--accent); color:#0b1224; font-weight:800; cursor:pointer;}
-  #status{margin-top:12px; font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; background:#1e293b; border:1px solid var(--border); border-radius:8px; padding:10px; height:150px; overflow:auto; white-space:pre-line;}
-  #result{margin-top:14px; font-size:20px; font-weight:900; color:var(--good);}
-  #summary,#competitors,#developments,#reviewsBox{margin-top:10px; font-size:14px;}
-  #map{height:62vh; margin-top:16px; border:1px solid var(--border); border-radius:12px;}
-  .small{font-size:12px; color:#94a3b8; margin-top:6px;}
+  label{margin-top:12px; display:block;}
+  input,button{width:100%; padding:12px; border-radius:10px; border:1px solid var(--border); background:var(--panel); color:var(--text);}
+  button{background:var(--accent); color:#0b1224; font-weight:bold; cursor:pointer;}
+  #status{margin-top:12px; font:13px/1.45 monospace; background:#1e293b; border:1px solid var(--border); border-radius:8px; padding:10px; height:150px; overflow:auto; white-space:pre-line;}
+  #result{margin-top:14px; font-size:20px; font-weight:bold; color:var(--good);}
+  #summary,#competitors,#developments,#reviewsBox{margin-top:10px;}
+  #map{height:60vh; margin-top:16px; border:1px solid var(--border); border-radius:12px;}
 </style>
 </head>
 <body>
 <header>
-  <img src="sunoco-logo.svg" alt="Sunoco LP logo" onerror="this.style.display='none'">
+  <img src="sunoco-logo.svg" alt="Sunoco LP">
   <div>Fuel Volume Estimator</div>
 </header>
 
@@ -41,17 +42,17 @@
   <h1>Monthly Volume Estimate</h1>
 
   <label>Address</label>
-  <input id="address" placeholder="4173 Knightdale Blvd, Knightdale, NC" />
+  <input id="address" placeholder="4173 Knightdale Blvd, Knightdale, NC">
 
   <label>MPDs</label>
-  <input id="mpds" type="number" min="1" value="6" />
+  <input id="mpds" type="number" value="6">
 
   <label>AADT override (optional)</label>
-  <input id="aadtOverride" type="number" min="1" placeholder="Enter DOT AADT manually if known" />
+  <input id="aadtOverride" type="number" placeholder="Enter DOT AADT manually">
 
   <button id="estimate">Calculate Estimate</button>
 
-  <div id="status" aria-live="polite">Waiting…</div>
+  <div id="status">Waiting…</div>
   <div id="result"></div>
   <div id="summary"></div>
   <div id="reviewsBox"></div>
@@ -61,50 +62,86 @@
   <button id="export" style="display:none">📄 Export to PDF</button>
 </div>
 
-<div id="map" role="region" aria-label="Map"></div>
+<div id="map"></div>
 
 <script>
-/* ================== Hard-coded Google API key ================== */
-const gkey = "YOUR_GOOGLE_API_KEY_HERE";  // <--- replace this with your key
+/* ================== Config ================== */
+const gkey = "YOUR_GOOGLE_API_KEY_HERE";   // <--- replace this once
+const CAPTURE_RATE=0.02, GALLONS_PER_STOP=9.2, DAYS_PER_MONTH=30.4;
+const MONTHLY_PER_MPD_CAP=8500;
 
-/* ================== Example Google usage ================== */
+/* ================== Helpers ================== */
+const fmt=n=>Number.isFinite(n)?Math.round(n).toLocaleString():"–";
+const rad=d=>d*Math.PI/180;
+function hav(a,b){const R=3958.8,dLat=rad(b.lat-a.lat),dLng=rad(b.lng-a.lng);
+ const s=Math.sin(dLat/2)**2+Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dLng/2)**2;
+ return 2*R*Math.asin(Math.sqrt(s));}
+
+/* ================== Map ================== */
+const map=L.map('map').setView([35.77,-78.63],12);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
+let siteMarker=null;
+
+/* ================== Reviews ================== */
 function streetViewURL(lat,lng){
-  const base="https://maps.googleapis.com/maps/api/streetview";
-  const p=new URLSearchParams({size:"640x360",location:`${lat},${lng}`,key:gkey});
-  return `${base}?${p.toString()}`;
+  return `https://maps.googleapis.com/maps/api/streetview?size=640x360&location=${lat},${lng}&key=${gkey}`;
 }
-async function fetchPlaceDetails(lat,lng){
-  if(!gkey) return null;
-  const svc=new google.maps.places.PlacesService(document.createElement('div'));
-  const nearby=await new Promise(res=>svc.nearbySearch({location:{lat,lng},radius:120,type:['gas_station']},(r,st)=>res(st==='OK'?r:[])));
-  if(!nearby.length) return null;
-  const best=nearby[0];
-  return await new Promise(res=>svc.getDetails({placeId:best.place_id,fields:['name','rating','user_ratings_total','reviews']},(r,st)=>res(st==='OK'?r:null)));
+function fetchPlaceDetails(lat,lng){
+  return new Promise(res=>{
+    if(!window.google||!google.maps||!google.maps.places) return res(null);
+    const svc=new google.maps.places.PlacesService(document.createElement('div'));
+    svc.nearbySearch({location:{lat,lng},radius:120,type:['gas_station']},(results,status)=>{
+      if(status!=='OK'||!results.length) return res(null);
+      svc.getDetails({placeId:results[0].place_id,fields:['name','rating','user_ratings_total','reviews']},(place,st)=>{
+        if(st==='OK') res(place); else res(null);
+      });
+    });
+  });
 }
 
-/* ================== Main Click ================== */
-document.getElementById('estimate').onclick = async () => {
-  const status=document.getElementById('status'); status.textContent="Calculating…\n";
-  const reviewsBox=document.getElementById('reviewsBox'); reviewsBox.textContent="";
-  try {
-    const addr=document.getElementById('address').value.trim();
-    if(!addr) throw new Error("Enter an address first.");
-    status.textContent+="Looking up reviews…\n";
+/* ================== Main Button ================== */
+document.getElementById('estimate').onclick=async()=>{
+  const addr=document.getElementById('address').value.trim();
+  const mpds=parseInt(document.getElementById('mpds').value)||1;
+  const override=parseInt(document.getElementById('aadtOverride').value)||null;
+  const status=document.getElementById('status'); status.textContent="⏳ Geocoding…\n";
+
+  try{
+    const g=await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(addr)}`);
+    const gj=await g.json(); if(!gj.length) throw new Error("Address not found.");
+    const lat=+gj[0].lat,lng=+gj[0].lon;
+    if(siteMarker) map.removeLayer(siteMarker);
+    siteMarker=L.marker([lat,lng]).addTo(map).bindPopup("Site").openPopup();
+    map.setView([lat,lng],14);
+
+    // Dummy AADT (replace with robust logic if needed)
+    const aadt=override||20000;
+
+    // Estimate
+    const demand=aadt*CAPTURE_RATE*GALLONS_PER_STOP*DAYS_PER_MONTH;
+    const capacity=mpds*MONTHLY_PER_MPD_CAP;
+    const est=Math.min(demand,capacity);
+    document.getElementById('result').textContent=`Estimated Monthly Gallons: ${fmt(est)}`;
+    document.getElementById('summary').textContent=`AADT ${fmt(aadt)} · MPDs ${mpds}`;
+
+    // Reviews
+    const reviewsBox=document.getElementById('reviewsBox');
     if(gkey){
-      const details = await fetchPlaceDetails(35.79,-78.62); // sample coords; you’d use geocode results here
+      const details=await fetchPlaceDetails(lat,lng);
       if(details){
-        reviewsBox.innerHTML = `<b>${details.name}</b> — ★${details.rating||"–"} (${details.user_ratings_total||0})<br>`+
+        reviewsBox.innerHTML=`<b>${details.name}</b> — ★${details.rating||"–"} (${details.user_ratings_total||0})<br>`+
           (details.reviews||[]).slice(0,3).map(r=>`<p>${r.text}</p>`).join("");
       } else {
-        reviewsBox.innerHTML = "No reviews found automatically.<br>"+
-          `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}" target="_blank">Search Google Maps</a>`;
+        reviewsBox.innerHTML=`No reviews found automatically.<br>
+          <a target="_blank" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}">Search Google Maps manually</a>`;
       }
     } else {
-      reviewsBox.innerHTML = "Google API key not provided. Cannot fetch reviews.<br>"+
-        `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}" target="_blank">Search Google Maps</a>`;
+      reviewsBox.innerHTML=`Google key not set.<br>
+        <a target="_blank" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}">Search Google Maps manually</a>`;
     }
-  } catch(e){
-    status.textContent+="Error: "+e.message;
+
+  }catch(e){
+    status.textContent+="❌ "+e.message;
   }
 };
 </script>
