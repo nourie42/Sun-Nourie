@@ -14,12 +14,17 @@ h1 {font-size:20px; margin-bottom:10px;}
 label {display:block; margin:12px 0 4px;}
 input, button {width:100%; padding:12px; border-radius:8px; border:1px solid #334155; font-size:16px;}
 button {background:#60a5fa; color:#0f172a; font-weight:700; cursor:pointer;}
-#status {margin-top:12px; font-size:14px; color:#fbbf24;}
+#status {
+  margin-top:12px; font-size:14px; background:#1e293b; border:1px solid #334155;
+  border-radius:6px; padding:8px; height:140px; overflow-y:auto; font-family:monospace;
+  white-space:pre-line;
+}
 #result {margin-top:20px; font-size:18px; font-weight:bold; color:#22c55e;}
 #summary {margin-top:8px; font-size:14px; color:#e2e8f0;}
 #competitors {margin-top:12px; font-size:14px; color:#e2e8f0;}
 #map {height:55vh; margin-top:20px; border:1px solid #334155; border-radius:8px;}
 #export {margin-top:15px; background:#34d399; color:#0f172a;}
+#reset {margin-top:10px; background:#fbbf24; color:#0f172a; display:none;}
 </style>
 </head>
 <body>
@@ -35,6 +40,7 @@ button {background:#60a5fa; color:#0f172a; font-weight:700; cursor:pointer;}
   <div id="summary"></div>
   <div id="competitors"></div>
   <button id="export" style="display:none;">📄 Export to PDF</button>
+  <button id="reset">🔄 Run Another Search</button>
 </div>
 <div id="map"></div>
 
@@ -82,8 +88,116 @@ async function fetchCompetitors(lat,lng){
   })).sort((a,b)=>a.dist-b.dist);
 }
 
-// ===== Main button
+// ===== Main button with status logging
 document.getElementById('estimate').onclick=async()=>{
   const status=document.getElementById('status');
   const result=document.getElementById('result');
   const summary=document.getElementById('summary');
+  const compDiv=document.getElementById('competitors');
+  const exportBtn=document.getElementById('export');
+  const resetBtn=document.getElementById('reset');
+
+  // reset outputs every run
+  status.textContent=""; result.textContent=""; summary.textContent=""; compDiv.textContent="";
+  exportBtn.style.display="none"; resetBtn.style.display="none";
+
+  function log(msg, ok=false){
+    const icon = ok ? "✅" : "⏳";
+    status.textContent += icon+" "+msg+"\n";
+    status.scrollTop = status.scrollHeight;
+  }
+
+  try {
+    const addr=document.getElementById('address').value.trim();
+    const mpds=parseInt(document.getElementById('mpds').value)||6;
+    if(!addr) throw new Error("Please enter an address.");
+
+    log("Geocoding address…");
+    const geo=await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addr)}`);
+    const gj=await geo.json();
+    if(!gj.length) throw new Error("Address not found.");
+    const lat=+gj[0].lat, lng=+gj[0].lon;
+    log(`Found location at (${lat.toFixed(4)}, ${lng.toFixed(4)})`,true);
+
+    if(siteMarker) map.removeLayer(siteMarker);
+    siteMarker=L.marker([lat,lng]).addTo(map).bindPopup("Your site").openPopup();
+    map.setView([lat,lng],13);
+
+    log("Fetching AADT…");
+    let aadt=20000;
+    try {
+      const aadtInfo=await fetchAADT(lat,lng);
+      if(aadtInfo?.aadt){ aadt=aadtInfo.aadt; log(`AADT found: ${aadt}`,true);}
+      else log("Using fallback AADT value (20,000)",true);
+    } catch { log("AADT fetch failed, using fallback",true); }
+
+    log("Checking competitors…");
+    let comps=[];
+    try {
+      comps=await fetchCompetitors(lat,lng);
+      log(`Found ${comps.length} nearby fuel stations`,true);
+    } catch { log("Competitor fetch failed",true); }
+    if(compLayer) map.removeLayer(compLayer);
+    compLayer=L.layerGroup(comps.map(c=>
+      L.circleMarker([c.lat,c.lng],{radius:6,color:"#f59e0b"}).bindPopup(c.name)
+    )).addTo(map);
+
+    log("Calculating estimate…");
+    const capture=0.02,gps=8,dpm=30.4;
+    const base=aadt*capture*gps*dpm;
+    const est=base*(mpds/6);
+
+    result.textContent=`Estimated Monthly Gallons: ${fmt(est)}`;
+    summary.textContent=`Based on AADT ${fmt(aadt)}, ${mpds} MPDs, and ${comps.length} competitors.`;
+    if(comps.length){
+      let list="<b>Competitors considered:</b><ul>";
+      comps.slice(0,5).forEach(c=>list+=`<li>${c.name} – ${c.dist.toFixed(1)} mi</li>`);
+      list+="</ul>";
+      compDiv.innerHTML=list;
+    }
+
+    log("⚡ Estimate complete!",true);
+    status.textContent += "\n❓ Do you want me to run another search?\n";
+
+    exportBtn.style.display="block";
+    resetBtn.style.display="block";
+
+    // Export to PDF (with map snapshot)
+    exportBtn.onclick=async()=>{
+      const { jsPDF } = window.jspdf;
+      const doc=new jsPDF();
+      doc.text("Fuel Volume Estimate",20,20);
+      doc.text(`Address: ${addr}`,20,30);
+      doc.text(`MPDs: ${mpds}`,20,40);
+      doc.text(`AADT: ${fmt(aadt)}`,20,50);
+      doc.text(`Competitors: ${comps.length}`,20,60);
+      comps.slice(0,5).forEach((c,i)=>doc.text(`${c.name} – ${c.dist.toFixed(1)} mi`,20,70+i*10));
+      doc.text(result.textContent,20,120);
+
+      const canvas=await html2canvas(document.getElementById("map"));
+      const img=canvas.toDataURL("image/png");
+      doc.addImage(img,"PNG",20,130,170,90);
+
+      doc.save("fuel_estimate.pdf");
+    };
+
+    // Reset for new search
+    resetBtn.onclick=()=>{
+      document.getElementById('address').value="";
+      document.getElementById('mpds').value="6";
+      status.textContent=""; result.textContent=""; summary.textContent="";
+      compDiv.textContent=""; exportBtn.style.display="none"; resetBtn.style.display="none";
+      if(siteMarker) map.removeLayer(siteMarker);
+      if(compLayer) map.removeLayer(compLayer);
+      map.setView([35.7796,-78.6382],11);
+      // focus back on address box
+      document.getElementById('address').focus();
+    };
+
+  } catch(e){
+    status.textContent+="❌ Error: "+e.message+"\n";
+  }
+};
+</script>
+</body>
+</html>
