@@ -1,38 +1,69 @@
-<!doctype html>
+# Create a downloadable HTML file for the user
+html_content = """<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Ask Dan’s Assistant</title>
   <style>
-    body { font: 16px/1.4 system-ui, sans-serif; margin: 0; background:#0b0c10; color:#e8e8e8; }
+    :root { --bg:#0b0c10; --card:#13151a; --text:#e8e8e8; --muted:#9aa0a6; --accent:#3a82f7; --border:#2a2f3a; }
+    * { box-sizing: border-box; }
+    body { font: 16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; background: var(--bg); color: var(--text); }
     .wrap { max-width: 900px; margin: 0 auto; padding: 16px; }
     h1 { font-size: 18px; margin: 0 0 12px; }
-    .chat { background:#13151a; border-radius: 12px; padding: 12px; height: 70vh; overflow:auto; }
+    .settings { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-bottom: 10px; align-items: center; }
+    .settings input[type="text"] { background:#1b1f2a; color:var(--text); border:1px solid var(--border); border-radius:10px; padding:10px; width:100%; }
+    .settings button { background:var(--accent); border:0; color:white; border-radius:10px; padding:10px 14px; font-weight:600; }
+    .sys { font-size:12px; opacity:.85; margin:8px 0 12px; }
+    .sys input { width:100%; background:#1b1f2a; color:var(--text); border:1px solid var(--border); border-radius:10px; padding:8px; }
+    .chat { background:var(--card); border:1px solid var(--border); border-radius: 12px; padding: 12px; height: 62vh; overflow:auto; }
     .row { margin: 10px 0; display:flex; gap:10px; }
     .role { font-weight:600; min-width:72px; opacity:.8 }
     .msg { white-space: pre-wrap; }
     form { display:flex; gap:8px; margin-top:12px; }
-    input, textarea { flex:1; background:#1b1f2a; color:#e8e8e8; border:1px solid #2a2f3a; border-radius:10px; padding:10px; }
-    button { background:#3a82f7; border:0; color:white; border-radius:10px; padding:10px 14px; font-weight:600; }
-    .sys { font-size:12px; opacity:.8; margin-bottom:8px }
+    input[type="text"].q { flex:1; background:#1b1f2a; color:var(--text); border:1px solid var(--border); border-radius:10px; padding:10px; }
+    button.send { background:var(--accent); border:0; color:white; border-radius:10px; padding:10px 14px; font-weight:600; }
+    .foot { margin-top:8px; color:var(--muted); font-size:12px; }
+    .error { color:#ff8c8c }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>Ask Dan’s Gas-Station Assistant</h1>
-    <div class="sys">
-      System behavior (optional): <input id="system" value="You are Dan’s gas-station expert. Be concise and numeric when estimating AADT→Gallons.">
+    <h1>Ask Dan’s Assistant</h1>
+
+    <div class="settings">
+      <input id="proxyUrl" type="text" placeholder="Paste your proxy URL (e.g., https://your-worker.workers.dev)" />
+      <button id="saveProxy">Save</button>
     </div>
+
+    <div class="sys">
+      System behavior (optional). Tweak how the assistant responds:
+      <input id="system" value="You are Dan’s gas-station expert. Start gallons as AADT × 8% × 2 × 30; be concise and numeric; adjust for competition within 1 mile.">
+    </div>
+
     <div id="chat" class="chat"></div>
     <form id="f">
-      <input id="q" placeholder="Type a question… e.g., ‘Estimate gallons for 1500 Hodge Rd Knightdale NC’" />
-      <button>Send</button>
+      <input id="q" class="q" type="text" placeholder="Type a question… e.g., ‘Estimate gallons for 1500 Hodge Rd Knightdale NC’" />
+      <button class="send">Send</button>
     </form>
+    <div class="foot">Tip: Click the field above to set your proxy URL one time. It is saved in your browser.</div>
   </div>
 
   <script>
-    const PROXY = "YOUR_PROXY_URL"; // e.g., https://your-worker.workers.dev
+    // Load saved proxy URL if available
+    const proxyInput = document.getElementById('proxyUrl');
+    const savedProxy = localStorage.getItem('proxyUrl') || '';
+    if (savedProxy) proxyInput.value = savedProxy;
+    document.getElementById('saveProxy').onclick = () => {
+      const v = proxyInput.value.trim();
+      if (!/^https?:\\/\\//.test(v)) {
+        alert('Please paste a valid URL starting with http(s)://');
+        return;
+      }
+      localStorage.setItem('proxyUrl', v);
+      alert('Saved!');
+    };
+
     const chatEl = document.getElementById('chat');
     const form = document.getElementById('f');
     const q = document.getElementById('q');
@@ -47,57 +78,72 @@
       e.preventDefault();
       const userText = q.value.trim();
       if (!userText) return;
-      messages.push({ role: "user", content: userText });
       q.value = "";
+      messages.push({ role: "user", content: userText });
       render();
 
-      // Create a new assistant message placeholder
-      const placeholder = { role: "assistant", content: "" };
+      // Show a placeholder while we fetch
+      const placeholder = { role: "assistant", content: "…" };
       messages.push(placeholder);
-      render();
+      render(true);
 
-      // Call proxy and stream
-      const resp = await fetch(PROXY, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          system: sys.value || undefined,
-          messages
-        })
-      });
+      const PROXY = (localStorage.getItem('proxyUrl') || '').trim();
+      if (!PROXY) {
+        placeholder.content = "⚠️ Set your proxy URL first (top of page).";
+        render(true);
+        return;
+      }
 
-      const reader = resp.body
-        .pipeThrough(new TextDecoderStream())
-        .getReader();
+      try {
+        const resp = await fetch(PROXY, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            system: sys.value || undefined,
+            messages,
+            stream: false
+          })
+        });
 
-      let buffer = "";
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += value;
-        // SSE lines start with "data:"
-        for (const line of buffer.split("\n")) {
-          if (!line.startsWith("data:")) continue;
-          const payload = line.slice(5).trim();
-          if (payload === "[DONE]") continue;
-          try {
-            const json = JSON.parse(payload);
-            // Responses API streams deltas — normalize to text
-            // Many SDKs expose output_text; here we just grab any text delta
-            const chunks = (json.output || json.response || json).content || json.output_text || "";
-            // Fallback: try "delta" for token streams
-            const delta = json.delta?.content?.[0]?.text ?? json.output_text ?? "";
-            if (typeof chunks === "string") {
-              placeholder.content = chunks; // full text
-            } else if (delta) {
-              placeholder.content += delta;
-            }
-            render(true);
-          } catch (_) { /* ignore keepalives */ }
+        let data;
+        let text;
+        const ct = resp.headers.get('content-type') || '';
+        if (ct.includes('application/json')) {
+          data = await resp.json();
+        } else {
+          // some proxies return text on error; try to parse later
+          const raw = await resp.text();
+          try { data = JSON.parse(raw); } catch { data = { raw }; }
+        }
+
+        text = extractText(data) || data?.raw || "[No text in response]";
+        placeholder.content = text;
+        render(true);
+      } catch (err) {
+        placeholder.content = "Error: " + String(err);
+        render(true);
+      }
+    });
+
+    function extractText(j){
+      if (!j) return "";
+      if (j.output_text) return j.output_text;
+      // Responses API: output can contain a message with content array where items have type 'output_text'
+      if (Array.isArray(j.output)) {
+        const msg = j.output.find(o => o.type === "message");
+        if (msg && Array.isArray(msg.content)) {
+          const parts = msg.content.filter(p => p.type === "output_text").map(p => p.text).join("");
+          if (parts) return parts;
+          // sometimes content has just {type:'text', text:'...'}
+          const alt = msg.content.filter(p => p.type === "text").map(p => p.text).join("");
+          if (alt) return alt;
         }
       }
-      scrollToBottom();
-    });
+      // Some SDKs shape the response differently; try common fallbacks
+      if (j.response && typeof j.response === 'string') return j.response;
+      if (j.choices && j.choices[0]?.message?.content) return j.choices[0].message.content;
+      return "";
+    }
 
     function render(scroll=false) {
       chatEl.innerHTML = messages.map(m => `
@@ -106,10 +152,14 @@
           <div class="msg">${escapeHtml(m.content)}</div>
         </div>
       `).join("");
-      if (scroll) scrollToBottom();
+      if (scroll) chatEl.scrollTop = chatEl.scrollHeight;
     }
-    function scrollToBottom() { chatEl.scrollTop = chatEl.scrollHeight; }
-    function escapeHtml(s) { return s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+    function escapeHtml(s) { return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
   </script>
 </body>
 </html>
+"""
+with open('/mnt/data/index.html', 'w', encoding='utf-8') as f:
+    f.write(html_content)
+
+'/mnt/data/index.html'
