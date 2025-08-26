@@ -4,32 +4,29 @@ import express from "express";
 const app = express();
 app.use(express.json());
 
-// --- CORS: explicit allow for your static sites + safe fallback (handles OPTIONS) ---
+// ---------- CORS ----------
 const ALLOWED_ORIGINS = new Set([
-  "https://sun-nourie-1.onrender.com",
-  "https://sun-nourie-v2.onrender.com",  // <- your v2 static site in the screenshot
-  "https://nourie42.github.io"           // optional GH Pages testing
+  "https://sun-nourie-v2.onrender.com",  // your static site
+  "https://sun-nourie-live.onrender.com" // optional self-calls
 ]);
-
 app.use((req, res, next) => {
   const origin = req.headers.origin || "";
   if (origin && ALLOWED_ORIGINS.has(origin)) {
     res.header("Access-Control-Allow-Origin", origin);
   } else {
-    // fallback so direct browser/cURL tests don't fail; tighten later if you want
     res.header("Access-Control-Allow-Origin", "*");
   }
   res.header("Vary", "Origin");
   res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  if (req.method === "OPTIONS") return res.sendStatus(204); // preflight OK
+  if (req.method === "OPTIONS") return res.sendStatus(204);
   next();
 });
 
-// Health
+// ---------- Health ----------
 app.get("/", (_req, res) => res.send("OK"));
 
-// ---------- OpenAI (optional chat) ----------
+// ---------- Chat (OpenAI Responses API) ----------
 app.post("/chat", async (req, res) => {
   try {
     const { messages = [], system = "You are helpful." } = req.body;
@@ -45,14 +42,11 @@ app.post("/chat", async (req, res) => {
         stream: false
       })
     });
-    const body = await r.json().catch(async () => ({ raw: await r.text() }));
-    if (!r.ok) return res.status(r.status).json({ error: body?.error?.message || JSON.stringify(body) });
+    const body = await r.json();
+    if (!r.ok) return res.status(r.status).json({ error: body.error?.message || "OpenAI error" });
 
-    const text =
-      body.output_text ||
-      (Array.isArray(body.output)
-        ? body.output.map(o => (o.content || []).map(p => p.text || "").join("")).join("")
-        : "") ||
+    const text = body.output_text ||
+      (Array.isArray(body.output) ? body.output.map(o => (o.content||[]).map(p=>p.text||"").join("")).join("") : "") ||
       body.choices?.[0]?.message?.content || "[No text from model]";
 
     res.json({ output_text: text });
@@ -64,7 +58,7 @@ app.post("/chat", async (req, res) => {
 // ---------- Google Geocoding ----------
 app.get("/geocode", async (req, res) => {
   const { address } = req.query;
-  if (!address) return res.status(400).json({ error: "Missing address parameter" });
+  if (!address) return res.status(400).json({ error: "Missing address" });
   try {
     const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${process.env.GOOGLE_MAPS_API_KEY}`;
     const r = await fetch(url);
@@ -74,10 +68,10 @@ app.get("/geocode", async (req, res) => {
   }
 });
 
-// ---------- Google Places Nearby (gas stations) ----------
+// ---------- Google Places Nearby (competitors) ----------
 app.get("/places", async (req, res) => {
-  const { lat, lng, radius = 1609 } = req.query; // ~1 mile
-  if (!lat || !lng) return res.status(400).json({ error: "Missing lat/lng parameters" });
+  const { lat, lng, radius = 1609 } = req.query;
+  if (!lat || !lng) return res.status(400).json({ error: "Missing lat/lng" });
   try {
     const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&type=gas_station&key=${process.env.GOOGLE_MAPS_API_KEY}`;
     const r = await fetch(url);
@@ -89,10 +83,10 @@ app.get("/places", async (req, res) => {
 
 // ---------- Google Places Text Search (developments) ----------
 app.get("/developments", async (req, res) => {
-  const { lat, lng, radius = 5000 } = req.query; // meters
+  const { lat, lng, radius = 5000 } = req.query;
   if (!lat || !lng) return res.status(400).json({ error: "Missing lat/lng" });
   try {
-    const query = "planned gas station OR gas station construction OR new gas station OR fuel station permit";
+    const query = "planned gas station OR gas station permit OR proposed gas station OR coming soon gas station OR gas station construction";
     const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&location=${lat},${lng}&radius=${radius}&key=${process.env.GOOGLE_MAPS_API_KEY}`;
     const r = await fetch(url);
     res.status(r.ok ? 200 : r.status).json(await r.json());
@@ -101,5 +95,61 @@ app.get("/developments", async (req, res) => {
   }
 });
 
+// ---------- AADT (ArcGIS traffic counts) ----------
+app.get("/aadt", async (req, res) => {
+  const { lat, lng } = req.query;
+  if (!lat || !lng) return res.status(400).json({ error: "Missing lat/lng" });
+
+  const layers = [
+    {
+      name: "NCDOT",
+      url: "https://services.ncdot.gov/arcgis/rest/services/Traffic_Safety/TrafficVolumeMap/MapServer/0/query",
+      field: "AADT"
+    },
+    {
+      name: "SCDOT",
+      url: "https://scdotgis.online/arcgis/rest/services/Traffic/Traffic_Counts/MapServer/0/query",
+      field: "AADT"
+    },
+    {
+      name: "GDOT",
+      url: "https://gdotapp.gdot.ga.gov/arcgis/rest/services/Traffic/TrafficCounts/MapServer/0/query",
+      field: "AADT"
+    }
+  ];
+  const SEARCH_M = 150;
+
+  async function queryLayer(layer) {
+    const params = new URLSearchParams({
+      f: "json", where: "1=1", outFields: "*",
+      geometry: `${lng},${lat}`, geometryType: "esriGeometryPoint", inSR: "4326",
+      spatialRel: "esriSpatialRelIntersects", distance: SEARCH_M, units: "esriSRUnit_Meter", returnGeometry: "false"
+    });
+    const r = await fetch(`${layer.url}?${params.toString()}`);
+    if (!r.ok) return null;
+    const j = await r.json();
+    const feats = Array.isArray(j.features) ? j.features : [];
+    let best = null;
+    for (const f of feats) {
+      const val = Number(f.attributes?.[layer.field]);
+      if (isFinite(val)) {
+        if (!best || val > best.aadt) best = { aadt: val, source: layer.name, distance_m: SEARCH_M };
+      }
+    }
+    return best;
+  }
+
+  try {
+    for (const layer of layers) {
+      const ans = await queryLayer(layer);
+      if (ans && ans.aadt) return res.json(ans);
+    }
+    return res.json({ aadt: null });
+  } catch (e) {
+    return res.status(500).json({ error: String(e) });
+  }
+});
+
+// ---------- Start ----------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
