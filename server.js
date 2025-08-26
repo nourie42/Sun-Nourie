@@ -65,3 +65,59 @@ async function queryNearestAADT(lat, lon) {
   });
 
   // Try common AADT field names
+  const AADT_FIELD_CANDIDATES = [
+    "AADT", "AADT_2023", "AADT_2022", "AADT_VALUE", "aadt", "aadt_yr", "AADT_ADJ", "TOT_AADT"
+  ];
+
+  for (const f of feats) {
+    const attrs = f.attributes || {};
+    for (const name of AADT_FIELD_CANDIDATES) {
+      if (attrs[name] != null && isFinite(Number(attrs[name]))) {
+        return {
+          aadt: Number(attrs[name]),
+          segmentId: attrs.OBJECTID ?? attrs.OBJECTID_1 ?? null,
+          raw: attrs
+        };
+      }
+    }
+  }
+  throw new Error("Found segments but no recognizable AADT field.");
+}
+
+// haversine (meters)
+function distanceMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const toRad = d => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+// === API: /aadt?address=... ===
+app.get("/aadt", async (req, res) => {
+  try {
+    const address = (req.query.address || "").toString().trim();
+    if (!address) return res.status(400).json({ error: "Missing ?address" });
+
+    const { lat, lng } = await geocodeAddress(address);
+    const hit = await queryNearestAADT(lat, lng);
+
+    res.json({
+      ok: true,
+      address,
+      location: { lat, lng },
+      aadt: hit.aadt,
+      segmentId: hit.segmentId,
+      provider: AADT_LAYER_URL
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`API listening on :${PORT}`));
