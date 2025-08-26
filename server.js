@@ -31,7 +31,7 @@ app.get("/geocode", async (req, res) => {
 
 // ---------- Google Places Nearby (competitors) ----------
 app.get("/places", async (req, res) => {
-  const { lat, lng, radius = 1609 } = req.query;
+  const { lat, lng, radius = 1609 } = req.query; // default ~1 mile
   if (!lat || !lng) return res.status(400).json({ error: "Missing lat/lng" });
   try {
     const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&type=gas_station&key=${process.env.GOOGLE_MAPS_API_KEY}`;
@@ -44,11 +44,14 @@ app.get("/places", async (req, res) => {
 
 // ---------- Google Places Text Search (planned developments) ----------
 app.get("/developments", async (req, res) => {
-  const { lat, lng, radius = 5000 } = req.query;
+  const { lat, lng, radius = 5000 } = req.query; // meters
   if (!lat || !lng) return res.status(400).json({ error: "Missing lat/lng" });
   try {
-    const query = "planned gas station OR gas station permit OR proposed gas station OR coming soon gas station OR gas station construction";
-    const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&location=${lat},${lng}&radius=${radius}&key=${process.env.GOOGLE_MAPS_API_KEY}`;
+    const query =
+      "planned gas station OR gas station permit OR proposed gas station OR coming soon gas station OR gas station construction";
+    const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(
+      query
+    )}&location=${lat},${lng}&radius=${radius}&key=${process.env.GOOGLE_MAPS_API_KEY}`;
     const r = await fetch(url);
     res.status(r.ok ? 200 : r.status).json(await r.json());
   } catch (err) {
@@ -56,40 +59,63 @@ app.get("/developments", async (req, res) => {
   }
 });
 
-// ---------- AADT (NCDOT ArcGIS FeatureServer) ----------
+// ---------- AADT (NCDOT ArcGIS FeatureServer) with progressive radius ----------
+/*
+  Tries increasing search radii around the point until a station is found.
+  Returns nearest station's AADT + year and the radius that hit.
+*/
 app.get("/aadt", async (req, res) => {
   const { lat, lng } = req.query;
   if (!lat || !lng) return res.status(400).json({ error: "Missing lat/lng" });
 
-  const serviceUrl = "https://services.arcgis.com/NuWFvHYDMVmmxMeM/ArcGIS/rest/services/NCDOT_AADT_Stations/FeatureServer/0/query";
-  const params = new URLSearchParams({
-    f: "json",
-    where: "1=1",
-    outFields: "AADT,YEAR_",
-    geometry: `${lng},${lat}`,
-    geometryType: "esriGeometryPoint",
-    inSR: "4326",
-    spatialRel: "esriSpatialRelIntersects",
-    distance: "150",
-    units: "esriSRUnit_Meter",
-    returnGeometry: "false",
-    orderByFields: "YEAR_ DESC, AADT DESC",
-    resultRecordCount: "1"
-  });
+  // NCDOT AADT Stations (points)
+  const serviceUrl =
+    "https://services.arcgis.com/NuWFvHYDMVmmxMeM/ArcGIS/rest/services/NCDOT_AADT_Stations/FeatureServer/0/query";
 
-  try {
-    const r = await fetch(`${serviceUrl}?${params}`);
+  // meters — try tight first, then widen
+  const RADII = [150, 500, 1000];
+
+  async function queryOnce(distanceM) {
+    const params = new URLSearchParams({
+      f: "json",
+      where: "1=1",
+      outFields: "AADT,YEAR_",
+      geometry: `${lng},${lat}`,
+      geometryType: "esriGeometryPoint",
+      inSR: "4326",
+      spatialRel: "esriSpatialRelIntersects",
+      distance: String(distanceM),
+      units: "esriSRUnit_Meter",
+      returnGeometry: "false",
+      orderByFields: "YEAR_ DESC, AADT DESC",
+      resultRecordCount: "1"
+    });
+
+    const r = await fetch(`${serviceUrl}?${params.toString()}`);
+    if (!r.ok) return null;
     const j = await r.json();
     const feats = Array.isArray(j.features) ? j.features : [];
-    if (feats.length) {
-      const attrs = feats[0].attributes || {};
-      const val = Number(attrs.AADT);
-      const yr  = attrs.YEAR_;
-      if (isFinite(val) && val > 0) {
-        return res.json({ aadt: val, year: yr, source: "NCDOT AADT Stations" });
+    if (!feats.length) return null;
+
+    const attrs = feats[0].attributes || {};
+    const aadt = Number(attrs.AADT);
+    const year = attrs.YEAR_;
+    return isFinite(aadt) && aadt > 0 ? { aadt, year } : null;
+  }
+
+  try {
+    for (const d of RADII) {
+      const hit = await queryOnce(d);
+      if (hit) {
+        return res.json({
+          aadt: hit.aadt,
+          year: hit.year,
+          distance_m: d,
+          source: "NCDOT AADT Stations"
+        });
       }
     }
-    return res.json({ error: "No AADT found nearby" });
+    return res.json({ error: "No AADT found nearby", tried_meters: RADII });
   } catch (err) {
     res.status(500).json({ error: String(err) });
   }
@@ -98,4 +124,3 @@ app.get("/aadt", async (req, res) => {
 // ---------- Start ----------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ Backend running on port ${PORT}`));
-
