@@ -10,27 +10,98 @@
   *{box-sizing:border-box}
   body{margin:0;font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text)}
   .wrap{display:flex;gap:16px;height:100vh;padding:16px}
-  .left{width:520px;min-width:360px}
+  .left{width:520px;min-width:360px;display:flex;flex-direction:column;gap:12px}
   .right{flex:1}
   h1{margin:0 0 12px;font-size:22px}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:12px}
-  .badge{display:inline-block;min-width:120px;padding:4px 10px;border-radius:999px;border:1px solid var(--border);background:#1b1f2a;margin-right:6px}
-  .ok{color:#9ef5b3}.fail{color:#ff9a9a}.pending{color:#e8e8e8;opacity:.7}
-  #map{height:calc(100vh - 32px);width:100%;border-radius:12px;border:1px solid var(--border)}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px}
   label{display:block;font-weight:600;margin:10px 0 4px}
   input[type="text"],input[type="number"]{width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:#1b1f2a;color:var(--text)}
+  .row{display:flex;gap:8px}
+  .col{flex:1}
   button{padding:10px 14px;border-radius:10px;border:0;background:var(--accent);color:#fff;font-weight:600;cursor:pointer}
   button[disabled]{opacity:.6;cursor:not-allowed}
   .muted{color:var(--muted);font-size:12px}
   .err{color:#ff9a9a}
+  #map{height:calc(100vh - 32px);width:100%;border-radius:12px;border:1px solid var(--border)}
+  .num{font-variant-numeric:tabular-nums}
+  table{width:100%;border-collapse:collapse}
+  td{padding:4px 0;border-bottom:1px dashed #2a2f3a}
+  .badge{display:inline-block;min-width:120px;padding:4px 10px;border-radius:999px;border:1px solid var(--border);background:#1b1f2a;margin-right:6px}
+  .ok{color:#9ef5b3}.fail{color:#ff9a9a}.pending{color:#e8e8e8;opacity:.7}
 </style>
 </head>
 <body>
   <div class="wrap">
     <div class="left">
-      <h1>Prospect Estimator</h1>
+      <div class="card">
+        <h1 style="margin:0">Prospect Estimator</h1>
+      </div>
 
-      <!-- Live Data Status -->
+      <!-- Inputs -->
+      <div class="card">
+        <div><b>Step 1: Enter address</b></div>
+        <label>Prospect site address</label>
+        <input id="addr" type="text" placeholder="e.g., 4173 Knightdale BLVD, Knightdale NC">
+        <div class="row" style="margin-top:8px">
+          <div class="col">
+            <label>Step 2: Gasoline MPDs</label>
+            <input id="mpd" type="number" min="0" value="6">
+          </div>
+          <div class="col">
+            <label>Diesel positions (optional)</label>
+            <input id="dieselpos" type="number" min="0" value="8">
+          </div>
+        </div>
+        <div style="margin-top:8px;display:flex;align-items:center;gap:10px">
+          <input id="autoAADT" type="checkbox" checked>
+          <label for="autoAADT" style="margin:0;font-weight:600">Try to auto-estimate AADT if not provided</label>
+        </div>
+        <div style="margin-top:10px;display:flex;gap:8px">
+          <button id="run">Search & Estimate</button>
+          <span id="status" class="muted"></span>
+        </div>
+      </div>
+
+      <!-- Results (gallons) -->
+      <div class="card" id="resultsCard">
+        <div><b>Results</b></div>
+        <div id="results" class="muted">Enter address + MPDs and click <b>Search & Estimate</b>.</div>
+      </div>
+
+      <!-- Advanced -->
+      <details class="card">
+        <summary><b>Advanced inputs (optional)</b></summary>
+        <div class="row">
+          <div class="col"><label>Total VPD (AADT)</label><input id="VPD" type="number" value="18024"></div>
+          <div class="col"><label>Truck share (%)</label><input id="truckShare" type="number" value="5.5"></div>
+        </div>
+        <div class="row">
+          <div class="col"><label>Frontage F</label><input id="frontShare" type="number" step="0.01" value="0.59"></div>
+          <div class="col"><label>Turn T</label><input id="turnShare" type="number" step="0.01" value="0.41"></div>
+        </div>
+        <div class="row">
+          <div class="col"><label>Turn friction f<sub>T</sub> (0–1)</label><input id="turnFric" type="number" step="0.05" min="0" max="1" value="0.70"></div>
+          <div class="col"><label>Speed (mph)</label><input id="speed" type="number" value="35"></div>
+        </div>
+        <div class="row">
+          <div class="col"><label>Access points</label><input id="accessPts" type="number" value="4"></div>
+          <div class="col"><label>LED price sign? (0/1)</label><input id="ledSign" type="number" min="0" max="1" value="1"></div>
+        </div>
+        <div class="row">
+          <div class="col"><label>Price delta (market − your) $/gal</label><input id="priceDelta" type="number" step="0.01" value="0.00"></div>
+          <div class="col"><label>CPR avg index</label><input id="cpr" type="number" value="104"></div>
+        </div>
+        <div class="row">
+          <div class="col"><label>Gasoline score</label><input id="gasScore" type="number" step="0.5" value="105.5"></div>
+          <div class="col"><label>Diesel score</label><input id="dieselScore" type="number" step="0.5" value="22.5"></div>
+        </div>
+        <div class="row">
+          <div class="col"><label>Competition radius (mi)</label><input id="radiusMi" type="number" step="0.5" min="0.5" value="2"></div>
+          <div class="col"><label>Dev. radius (mi)</label><input id="devRadiusMi" type="number" step="0.5" min="1" value="3"></div>
+        </div>
+      </details>
+
+      <!-- Live Data Status (moved to bottom) -->
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <b>Live Data Status</b>
@@ -44,32 +115,17 @@
         </div>
         <div class="muted" style="margin-top:6px">Backend: <code id="backendUrl">https://sun-nourie-live.onrender.com</code></div>
       </div>
-
-      <!-- Inputs -->
-      <div class="card">
-        <label>Address</label>
-        <input id="addr" type="text" placeholder="e.g., 4173 Knightdale BLVD Knightdale NC">
-        <div style="display:flex;gap:8px">
-          <div style="flex:1"><label>Gasoline MPDs</label><input id="mpd" type="number" value="6" min="0"></div>
-          <div style="flex:1"><label>Diesel positions</label><input id="dieselpos" type="number" value="8" min="0"></div>
-        </div>
-        <button id="run">Search & Estimate</button>
-        <div id="status" class="muted"></div>
-      </div>
-
-      <!-- Results -->
-      <div class="card">
-        <b>Results</b>
-        <div id="results" class="muted">Enter address and MPDs, then click Search & Estimate.</div>
-      </div>
     </div>
 
-    <div class="right"><div id="map"></div></div>
+    <div class="right">
+      <div id="map"></div>
+    </div>
   </div>
 
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
-  const API_BASE = "https://sun-nourie-live.onrender.com"; // change if needed
+  // ---------- CONFIG ----------
+  const API_BASE = "https://sun-nourie-live.onrender.com"; // change if backend URL differs
   document.getElementById('backendUrl').textContent = API_BASE;
   const ENDPOINT = {
     backend: API_BASE + "/",
@@ -78,74 +134,28 @@
     developments: API_BASE + "/developments"
   };
 
-  // Robust fetch (CORS + retry)
+  // robust fetch with CORS + retry
   async function apiFetch(url, opts = {}) {
     const options = Object.assign({ mode: "cors", cache: "no-store", referrerPolicy: "no-referrer" }, opts);
-    for (let i = 0; i < 2; i++) {
-      try { return await fetch(url, options); }
-      catch (e) { if (i === 1) throw e; await new Promise(r => setTimeout(r, 700)); }
-    }
+    for (let i=0;i<2;i++){ try { return await fetch(url, options); } catch(e){ if(i===1) throw e; await new Promise(r=>setTimeout(r,700)); } }
   }
 
-  // Status panel
-  const set = (el, ok, ms, extra="") => { el.className = ok ? "ok" : "fail"; el.textContent = (ok ? "OK" : "Fail") + (ms ? ` (${ms}ms)` : "") + (extra ? ` — ${extra}` : ""); };
-  async function timed(url) { const t0=performance.now(); const r = await apiFetch(url); return { r, ms:Math.round(performance.now()-t0) }; }
-  async function checkAll() {
-    const sBackend = document.getElementById("s-backend");
-    const sGeo = document.getElementById("s-geocode");
-    const sPlaces = document.getElementById("s-places");
-    const sDev = document.getElementById("s-dev");
-    try { const {r,ms} = await timed(ENDPOINT.backend); const text = await r.text(); set(sBackend, r.ok && text.includes("OK"), ms); } catch(e){ set(sBackend,false,0,"network"); }
-    try { const {r,ms} = await timed(ENDPOINT.geocode + "?address=Raleigh,NC"); set(sGeo, r.ok, ms); } catch(e){ set(sGeo,false,0,"network"); }
-    try { const {r,ms} = await timed(ENDPOINT.places + "?lat=35.79&lng=-78.52&radius=1609"); set(sPlaces, r.ok, ms); } catch(e){ set(sPlaces,false,0,"network"); }
-    try { const {r,ms} = await timed(ENDPOINT.developments + "?lat=35.79&lng=-78.52&radius=5000"); set(sDev, r.ok, ms); } catch(e){ set(sDev,false,0,"network"); }
+  // ---------- STATUS PANEL ----------
+  const sBackend = document.getElementById("s-backend");
+  const sGeo = document.getElementById("s-geocode");
+  const sPlaces = document.getElementById("s-places");
+  const sDev = document.getElementById("s-dev");
+  const setStatus = (el, ok, ms, extra="") => { el.className = ok ? "ok" : "fail"; el.textContent = (ok ? "OK" : "Fail") + (ms ? ` (${ms}ms)` : "") + (extra ? ` — ${extra}` : ""); };
+  async function timed(url){ const t0=performance.now(); const r=await apiFetch(url); return {r,ms:Math.round(performance.now()-t0)}; }
+  async function checkAll(){
+    try{ const {r,ms}=await timed(ENDPOINT.backend); const text=await r.text(); setStatus(sBackend, r.ok && text.includes("OK"), ms); }catch{ setStatus(sBackend,false); }
+    try{ const {r,ms}=await timed(ENDPOINT.geocode+"?address=Raleigh,NC"); setStatus(sGeo, r.ok, ms); }catch{ setStatus(sGeo,false); }
+    try{ const {r,ms}=await timed(ENDPOINT.places+"?lat=35.79&lng=-78.52&radius=1609"); setStatus(sPlaces, r.ok, ms); }catch{ setStatus(sPlaces,false); }
+    try{ const {r,ms}=await timed(ENDPOINT.developments+"?lat=35.79&lng=-78.52&radius=5000"); setStatus(sDev, r.ok, ms); }catch{ setStatus(sDev,false); }
   }
   document.getElementById("recheck").addEventListener("click", checkAll);
   document.addEventListener("DOMContentLoaded", checkAll);
 
-  // Map
-  const map = L.map('map').setView([35.7796,-78.6382],12);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; OpenStreetMap'}).addTo(map);
-  let siteMarker=null; const compLayer=L.layerGroup().addTo(map); const devLayer=L.layerGroup().addTo(map);
-
-  // Run flow
-  const statusEl = document.getElementById("status");
-  const resultsEl = document.getElementById("results");
-  document.getElementById("run").addEventListener("click", async ()=>{
-    try{
-      const addr = document.getElementById("addr").value.trim();
-      if(!addr) throw new Error("Enter an address");
-      statusEl.textContent="Geocoding…";
-      const g = await apiFetch(`${ENDPOINT.geocode}?address=${encodeURIComponent(addr)}`);
-      if(!g.ok){ const raw=await g.text(); throw new Error(`Geocode HTTP ${g.status}: ${raw.slice(0,180)}`); }
-      const gj = await g.json(); if(!gj.results?.length) throw new Error("Address not found");
-      const { lat, lng } = gj.results[0].geometry.location;
-      if(siteMarker) siteMarker.remove(); siteMarker = L.marker([lat,lng]).addTo(map).bindPopup("Prospect").openPopup(); map.setView([lat,lng],14);
-
-      statusEl.textContent="Finding competition…";
-      const p = await apiFetch(`${ENDPOINT.places}?lat=${lat}&lng=${lng}&radius=${Math.round(1609*2)}`);
-      if(!p.ok){ const raw=await p.text(); throw new Error(`Places HTTP ${p.status}: ${raw.slice(0,180)}`); }
-      const pj = await p.json(); compLayer.clearLayers();
-      pj.results?.forEach(r => L.marker([r.geometry.location.lat,r.geometry.location.lng]).addTo(compLayer).bindPopup(r.name));
-
-      statusEl.textContent="Searching developments…";
-      let devs = [];
-      try {
-        const d = await apiFetch(`${ENDPOINT.developments}?lat=${lat}&lng=${lng}&radius=5000`);
-        if(d.ok){ const dj = await d.json(); devs = dj.results || []; }
-      } catch(_) {}
-      devLayer.clearLayers();
-      devs.forEach(r => r.geometry?.location && L.circleMarker([r.geometry.location.lat,r.geometry.location.lng],{radius:6,color:'orange'}).addTo(devLayer).bindPopup(r.name));
-
-      const mpds = +document.getElementById("mpd").value || 0;
-      const diesel = +document.getElementById("dieselpos").value || 0;
-      resultsEl.textContent = `Found ${pj.results?.length||0} competitors and ${devs.length} developments. (MPDs=${mpds}, Diesel positions=${diesel}).`;
-      statusEl.textContent="Done.";
-    }catch(e){
-      statusEl.innerHTML = `<span class="err">${(e && e.message) ? e.message : String(e)}</span>`;
-      resultsEl.innerHTML = `<span class="err">${(e && e.message) ? e.message : String(e)}</span>`;
-    }
-  });
-  </script>
-</body>
-</html>
+  // ---------- MAP ----------
+  const map=L.map('map').setView([35.7796,-78.6382],12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.
