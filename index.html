@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Ask Dan’s Assistant + Local Competition Map</title>
+  <title>Ask Dan’s Assistant + Competition Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <style>
     body { margin:0; font:16px/1.5 system-ui, -apple-system,Segoe UI,Roboto,sans-serif; background:#0b0c10; color:#e8e8e8; }
     .wrap { display:flex; flex-direction:row; height:100vh; gap:16px; }
@@ -20,13 +21,13 @@
     #map { height:80vh; width:100%; border-radius:12px; border:1px solid #2a2f3a; }
     #address { width:70%; padding:8px; border-radius:8px; border:1px solid #2a2f3a; background:#1b1f2a; color:#e8e8e8; }
     #search { padding:8px 12px; border-radius:8px; background:#3a82f7; color:#fff; border:0; }
-    #status { margin-top:8px; font-size:12px; color:#9aa0a6; }
+    #mapStatus { margin-top:8px; color:#9aa0a6; font-size:12px; }
     .err { color:#ff9a9a }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <!-- Left: Chat -->
+    <!-- Chat -->
     <div class="left">
       <h1>Ask Dan’s Assistant</h1>
       <div id="chat" class="chat"></div>
@@ -34,10 +35,10 @@
         <input id="q" type="text" placeholder="Type your question…" autocomplete="off">
         <button id="send">Send</button>
       </form>
-      <div id="status" class="foot">Backend: <code>https://sun-nourie-live.onrender.com</code></div>
+      <div class="foot">Backend: <code>https://sun-nourie-live.onrender.com</code></div>
     </div>
 
-    <!-- Right: Map -->
+    <!-- Map -->
     <div class="right">
       <h1>Competition Map</h1>
       <div>
@@ -49,18 +50,32 @@
     </div>
   </div>
 
-  <!-- Chat Script -->
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
   <script>
-    const PROXY = "https://sun-nourie-live.onrender.com/chat";
+    // Backend endpoints (Render)
+    const API_BASE = "https://sun-nourie-live.onrender.com"; // change if your backend URL differs
+    const PROXY_CHAT = API_BASE + "/chat";
+    const PROXY_GEOCODE = API_BASE + "/geocode";
+    const PROXY_PLACES = API_BASE + "/places";
+
     const SYSTEM_PROMPT = "You are Dan’s gas-station expert. Start gallons as AADT × 8% × 2 × 30; be concise and numeric; adjust for competition within 1 mile.";
 
+    // Chat UI
     const chatEl = document.getElementById('chat');
     const form = document.getElementById('f');
     const q = document.getElementById('q');
     const sendBtn = document.getElementById('send');
-    const statusEl = document.getElementById('status');
-
     const messages = [{ role: "assistant", content: "Hi! Ask me anything." }];
+
+    function render(scroll=false) {
+      chatEl.innerHTML = messages.map(m => `
+        <div class="row"><div class="role">${m.role === "user" ? "You" : "Assistant"}</div><div class="msg">${escapeHtml(m.content)}</div></div>
+      `).join("");
+      if (scroll) chatEl.scrollTop = chatEl.scrollHeight;
+    }
+    function escapeHtml(s) { return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
     render(true);
 
     form.addEventListener('submit', async (e) => {
@@ -76,111 +91,76 @@
       render(true);
 
       try {
-        const resp = await fetch(PROXY, {
+        const resp = await fetch(PROXY_CHAT, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ system: SYSTEM_PROMPT, messages, stream: false })
         });
 
-        let payloadText = "";
-        try {
-          const data = await resp.json();
-          if (!resp.ok || data.error) {
-            payloadText = data && data.error ? String(data.error) : JSON.stringify(data);
-            placeholder.content = "Backend error (" + resp.status + "): " + payloadText;
-          } else {
-            placeholder.content = data.output_text || "[No text]";
-          }
-        } catch (jsonErr) {
-          const raw = await resp.text();
-          placeholder.content = "Backend raw (" + resp.status + "): " + raw.slice(0, 300);
+        let data, text;
+        try { data = await resp.json(); } catch { data = null; }
+        if (!resp.ok || (data && data.error)) {
+          const errMsg = data?.error || (`HTTP ${resp.status}`);
+          placeholder.content = "Backend error: " + errMsg;
+        } else {
+          text = data?.output_text || "[No text]";
+          placeholder.content = text;
         }
-        render(true);
       } catch (err) {
         placeholder.content = "Network error: " + String(err);
-        render(true);
       } finally {
         sendBtn.disabled = false;
+        render(true);
         q.focus();
       }
     });
 
-    function render(scroll=false) {
-      chatEl.innerHTML = messages.map(m => `
-        <div class="row"><div class="role">${m.role === "user" ? "You" : "Assistant"}</div><div class="msg">${escapeHtml(m.content)}</div></div>
-      `).join("");
-      if (scroll) chatEl.scrollTop = chatEl.scrollHeight;
-    }
-    function escapeHtml(s) { return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
-  </script>
+    // Map (Leaflet) + Places flow
+    const map = L.map('map').setView([35.7796, -78.6382], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
 
-  <!-- Map + Competition Script -->
-  <script>
-    let map;
-
-    function initMap() {
-      if (!window.google || !google.maps) {
-        document.getElementById("mapStatus").innerHTML = '<span class="err">Map failed to load. Check your browser Maps API key in the script tag.</span>';
-        return;
-      }
-      map = new google.maps.Map(document.getElementById("map"), {
-        center: { lat: 35.7796, lng: -78.6382 },
-        zoom: 12,
-      });
-      document.getElementById("mapStatus").textContent = "Map ready.";
-    }
-
+    const mapStatus = document.getElementById("mapStatus");
     document.getElementById("search").addEventListener("click", async () => {
       const addr = document.getElementById("address").value.trim();
-      const mapStatus = document.getElementById("mapStatus");
       if (!addr) { alert("Enter an address"); return; }
 
-      // Geocode via backend
       try {
         mapStatus.textContent = "Geocoding…";
-        const geo = await fetch(`https://sun-nourie-live.onrender.com/geocode?address=${encodeURIComponent(addr)}`);
+        const geo = await fetch(`${PROXY_GEOCODE}?address=${encodeURIComponent(addr)}`);
         const geoData = await geo.json();
         if (!geo.ok || geoData.error) {
-          mapStatus.innerHTML = '<span class="err">Geocode error (' + geo.status + '): ' + (geoData.error || JSON.stringify(geoData)) + '</span>';
+          mapStatus.textContent = "Geocode error: " + (geoData.error || geo.status);
           return;
         }
-        if (!geoData.results?.length) { mapStatus.innerHTML = '<span class="err">Address not found.</span>'; return; }
-
+        if (!geoData.results?.length) { mapStatus.textContent = "Address not found."; return; }
         const { lat, lng } = geoData.results[0].geometry.location;
-        map.setCenter({ lat, lng });
-        map.setZoom(14);
+        map.setView([lat, lng], 14);
 
-        // Places via backend
         mapStatus.textContent = "Searching nearby gas stations…";
-        const places = await fetch(`https://sun-nourie-live.onrender.com/places?lat=${lat}&lng=${lng}&radius=1609`);
+        const places = await fetch(`${PROXY_PLACES}?lat=${lat}&lng=${lng}&radius=1609`);
         const placeData = await places.json();
         if (!places.ok || placeData.error) {
-          mapStatus.innerHTML = '<span class="err">Places error (' + places.status + '): ' + (placeData.error || JSON.stringify(placeData)) + '</span>';
+          mapStatus.textContent = "Places error: " + (placeData.error || places.status);
           return;
         }
+        if (!placeData.results?.length) { mapStatus.textContent = "No stations found."; return; }
 
-        if (!placeData.results?.length) {
-          mapStatus.textContent = "No stations found within 1 mile.";
-          return;
-        }
-
+        // Clear old markers by re-creating tile layer (simple approach), or track markers in an array
+        // Here we just add new markers:
         placeData.results.forEach(place => {
           if (!place.geometry?.location) return;
-          new google.maps.Marker({
-            position: place.geometry.location,
-            map,
-            title: place.name
-          });
+          L.marker([place.geometry.location.lat, place.geometry.location.lng])
+            .addTo(map)
+            .bindPopup(`<b>${escapeHtml(place.name)}</b>`);
         });
-        mapStatus.textContent = "Plotted " + placeData.results.length + " stations.";
+        mapStatus.textContent = `Plotted ${placeData.results.length} stations.`;
       } catch (e) {
-        mapStatus.innerHTML = '<span class="err">Network error: ' + String(e) + '</span>';
+        mapStatus.textContent = "Network error: " + String(e);
       }
     });
   </script>
-
-  <!-- Google Maps JS SDK (REPLACE WITH YOUR BROWSER-RESTRICTED KEY) -->
-  <script async defer src="https://maps.googleapis.com/maps/api/js?key=YOUR_BROWSER_RESTRICTED_KEY&callback=initMap"></script>
 </body>
 </html>
 
