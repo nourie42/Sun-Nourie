@@ -3,36 +3,52 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Ask Dan’s Assistant</title>
+  <title>Ask Dan’s Assistant + Local Competition Map</title>
   <style>
-    :root { --bg:#0b0c10; --card:#13151a; --text:#e8e8e8; --muted:#9aa0a6; --accent:#3a82f7; --border:#2a2f3a; }
-    * { box-sizing:border-box; }
-    body { margin:0; font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--text); }
-    .wrap { max-width:900px; margin:0 auto; padding:16px; }
+    body { margin:0; font:16px/1.5 system-ui, -apple-system,Segoe UI,Roboto,sans-serif; background:#0b0c10; color:#e8e8e8; }
+    .wrap { display:flex; flex-direction:row; height:100vh; }
+    .left, .right { flex:1; padding:16px; box-sizing:border-box; }
     h1 { margin:0 0 12px; font-size:22px; }
-    .chat { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:12px; height:65vh; overflow:auto; }
+    .chat { background:#13151a; border:1px solid #2a2f3a; border-radius:12px; padding:12px; height:80vh; overflow:auto; }
     .row { display:flex; gap:10px; margin:8px 0; align-items:flex-start; }
     .role { font-weight:600; min-width:78px; opacity:.85; }
     .msg { white-space:pre-wrap; }
     form { display:flex; gap:8px; margin-top:12px; }
-    #q { flex:1; background:#1b1f2a; color:var(--text); border:1px solid var(--border); border-radius:10px; padding:12px; }
-    #send { background:var(--accent); border:0; color:white; border-radius:10px; padding:12px 16px; font-weight:600; }
-    .foot { margin-top:8px; color:var(--muted); font-size:12px; }
+    #q { flex:1; background:#1b1f2a; color:#e8e8e8; border:1px solid #2a2f3a; border-radius:10px; padding:12px; }
+    #send { background:#3a82f7; border:0; color:white; border-radius:10px; padding:12px 16px; font-weight:600; }
+    .foot { margin-top:8px; color:#9aa0a6; font-size:12px; }
+    #map { height:80vh; width:100%; border-radius:12px; border:1px solid #2a2f3a; }
+    #address { width:70%; padding:8px; border-radius:8px; border:1px solid #2a2f3a; }
+    #search { padding:8px 12px; border-radius:8px; background:#3a82f7; color:#fff; border:0; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>Ask Dan’s Assistant</h1>
-    <div id="chat" class="chat"></div>
-    <form id="f">
-      <input id="q" type="text" placeholder="Type your question…" autocomplete="off">
-      <button id="send">Send</button>
-    </form>
-    <div class="foot">Backend: <code>https://sun-nourie-live.onrender.com/chat</code></div>
+    <!-- Left side: Chat -->
+    <div class="left">
+      <h1>Ask Dan’s Assistant</h1>
+      <div id="chat" class="chat"></div>
+      <form id="f">
+        <input id="q" type="text" placeholder="Type your question…" autocomplete="off">
+        <button id="send">Send</button>
+      </form>
+      <div class="foot">Backend: <code>https://sun-nourie-live.onrender.com/chat</code></div>
+    </div>
+
+    <!-- Right side: Map -->
+    <div class="right">
+      <h1>Competition Map</h1>
+      <div>
+        <input id="address" type="text" placeholder="Enter address…">
+        <button id="search">Search</button>
+      </div>
+      <div id="map"></div>
+    </div>
   </div>
 
+  <!-- Chat Script -->
   <script>
-    const PROXY = "https://sun-nourie-live.onrender.com/chat";  // change if your backend URL is different
+    const PROXY = "https://sun-nourie-live.onrender.com/chat";
     const SYSTEM_PROMPT = "You are Dan’s gas-station expert. Start gallons as AADT × 8% × 2 × 30; be concise and numeric; adjust for competition within 1 mile.";
 
     const chatEl = document.getElementById('chat');
@@ -62,20 +78,15 @@
           body: JSON.stringify({ system: SYSTEM_PROMPT, messages, stream: false })
         });
 
-        let data;
-        const ct = resp.headers.get('content-type') || '';
-        if (ct.includes('application/json')) {
-          data = await resp.json();
+        const data = await resp.json();
+        if (data.error) {
+          placeholder.content = "Backend error: " + data.error;
         } else {
-          const raw = await resp.text();
-          try { data = JSON.parse(raw); } catch { data = { raw }; }
+          placeholder.content = data.output_text || "[No text]";
         }
-
-        const text = extractText(data) || data.raw || "[No text in response]";
-        placeholder.content = text;
         render(true);
       } catch (err) {
-        placeholder.content = "Error: " + String(err);
+        placeholder.content = "Network error: " + String(err);
         render(true);
       } finally {
         sendBtn.disabled = false;
@@ -83,34 +94,53 @@
       }
     });
 
-    function extractText(j){
-      if (!j) return "";
-      if (j.output_text) return j.output_text;
-      if (Array.isArray(j.output)) {
-        const msg = j.output.find(o => o.type === "message");
-        if (msg && Array.isArray(msg.content)) {
-          const parts = msg.content.filter(p => p.type === "output_text").map(p => p.text).join("");
-          if (parts) return parts;
-          const alt = msg.content.filter(p => p.type === "text").map(p => p.text).join("");
-          if (alt) return alt;
-        }
-      }
-      if (j.response && typeof j.response === "string") return j.response;
-      if (j.choices && j.choices[0]?.message?.content) return j.choices[0].message.content;
-      return "";
-    }
-
     function render(scroll=false) {
       chatEl.innerHTML = messages.map(m => `
-        <div class="row">
-          <div class="role">${m.role === "user" ? "You" : "Assistant"}</div>
-          <div class="msg">${escapeHtml(m.content)}</div>
-        </div>
+        <div class="row"><div class="role">${m.role === "user" ? "You" : "Assistant"}</div><div class="msg">${escapeHtml(m.content)}</div></div>
       `).join("");
       if (scroll) chatEl.scrollTop = chatEl.scrollHeight;
     }
     function escapeHtml(s) { return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
   </script>
+
+  <!-- Map + Competition Script -->
+  <script>
+    let map;
+
+    function initMap() {
+      map = new google.maps.Map(document.getElementById("map"), {
+        center: { lat: 35.7796, lng: -78.6382 }, // Raleigh default
+        zoom: 12,
+      });
+    }
+
+    document.getElementById("search").addEventListener("click", async () => {
+      const addr = document.getElementById("address").value.trim();
+      if (!addr) return alert("Enter an address");
+      const geo = await fetch(`https://sun-nourie-live.onrender.com/geocode?address=${encodeURIComponent(addr)}`);
+      const geoData = await geo.json();
+      if (!geoData.results?.length) return alert("Address not found");
+
+      const { lat, lng } = geoData.results[0].geometry.location;
+      map.setCenter({ lat, lng });
+      map.setZoom(14);
+
+      const places = await fetch(`https://sun-nourie-live.onrender.com/places?lat=${lat}&lng=${lng}&radius=1609`);
+      const placeData = await places.json();
+
+      placeData.results.forEach(place => {
+        new google.maps.Marker({
+          position: place.geometry.location,
+          map,
+          title: place.name
+        });
+      });
+    });
+  </script>
+
+  <!-- Google Maps JS SDK (Browser key with referrer restrictions!) -->
+  <script async defer src="https://maps.googleapis.com/maps/api/js?key=YOUR_BROWSER_RESTRICTED_KEY&callback=initMap"></script>
 </body>
 </html>
+
 
