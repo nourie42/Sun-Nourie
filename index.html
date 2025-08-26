@@ -1,460 +1,115 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Fuel Volume Estimator • Sunoco LP</title>
-
-<!-- Leaflet + helpers -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet-image@latest/leaflet-image.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-
-<!-- If you put a Google key below, this loader will fetch Places SDK automatically -->
-<script>
-  const GOOGLE_KEY = "YOUR_GOOGLE_API_KEY_HERE"; // <-- put your restricted key or leave ""
-  if (GOOGLE_KEY) {
-    const s = document.createElement("script");
-    s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(GOOGLE_KEY)}&libraries=places`;
-    s.async = true; s.defer = true;
-    document.head.appendChild(s);
-  }
-</script>
-
-<style>
-  :root{
-    --bg:#0f172a; --panel:#0b1224; --border:#1f2937; --text:#e5e7eb; --muted:#94a3b8;
-    --accent:#60a5fa; --good:#22c55e; --warn:#f59e0b; --lav:#a78bfa;
-  }
-  *{box-sizing:border-box}
-  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;background:var(--bg);color:var(--text)}
-  header{position:sticky;top:0;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:linear-gradient(180deg,#0b1224,#081020);border-bottom:1px solid var(--border)}
-  header img{height:34px;width:auto}
-  .container{max-width:980px;margin:auto;padding:16px}
-  h1{margin:0 0 12px;font-size:20px}
-  label{margin-top:12px;display:block;font-size:14px;color:#cbd5e1}
-  input,button{width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--border);background:var(--panel);color:var(--text);font-size:16px}
-  button{background:var(--accent);color:#0b1224;font-weight:800;cursor:pointer}
-  #status{margin-top:12px;font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:#0c162b;border:1px solid var(--border);border-radius:10px;padding:10px;height:160px;overflow:auto;white-space:pre-line}
-  #result{margin-top:14px;font-size:20px;font-weight:900;color:var(--good)}
-  #summary,#reviewsBox,#competitors,#developments{margin-top:10px;font-size:14px}
-  #map{height:62vh;margin-top:16px;border:1px solid var(--border);border-radius:12px}
-  .pin{display:flex;align-items:center;justify-content:center;border-radius:999px;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.45);font-weight:900;line-height:1}
-  .pin.big{width:30px;height:30px;font-size:16px}
-  .pin.med{width:22px;height:22px;font-size:13px}
-  .small{font-size:12px;color:var(--muted);margin-top:6px}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Ask Dan’s Assistant</title>
+  <style>
+    body { font: 16px/1.4 system-ui, sans-serif; margin: 0; background:#0b0c10; color:#e8e8e8; }
+    .wrap { max-width: 900px; margin: 0 auto; padding: 16px; }
+    h1 { font-size: 18px; margin: 0 0 12px; }
+    .chat { background:#13151a; border-radius: 12px; padding: 12px; height: 70vh; overflow:auto; }
+    .row { margin: 10px 0; display:flex; gap:10px; }
+    .role { font-weight:600; min-width:72px; opacity:.8 }
+    .msg { white-space: pre-wrap; }
+    form { display:flex; gap:8px; margin-top:12px; }
+    input, textarea { flex:1; background:#1b1f2a; color:#e8e8e8; border:1px solid #2a2f3a; border-radius:10px; padding:10px; }
+    button { background:#3a82f7; border:0; color:white; border-radius:10px; padding:10px 14px; font-weight:600; }
+    .sys { font-size:12px; opacity:.8; margin-bottom:8px }
+  </style>
 </head>
 <body>
-<header>
-  <img src="sunoco-logo.svg" alt="Sunoco LP" onerror="this.style.display='none'">
-  <div>Fuel Volume Estimator</div>
-</header>
-
-<div class="container">
-  <h1>Monthly Volume Estimate</h1>
-
-  <label>Address</label>
-  <input id="address" placeholder="4173 Knightdale Blvd, Knightdale, NC" />
-
-  <label>MPDs</label>
-  <input id="mpds" type="number" min="1" value="6" />
-
-  <label>AADT override (optional)</label>
-  <input id="aadtOverride" type="number" min="1" placeholder="Enter DOT AADT manually if known" />
-
-  <button id="estimate">Calculate Estimate</button>
-
-  <div id="status" aria-live="polite">Status will appear here…</div>
-  <div id="result"></div>
-  <div id="summary"></div>
-  <div id="reviewsBox"></div>
-  <div id="competitors"></div>
-  <div id="developments"></div>
-
-  <button id="export" style="display:none">📄 Export to PDF</button>
-
-  <div class="small" style="margin-top:10px">
-    AADT manual viewers: 
-    • NC: <a id="ncLink" href="#" target="_blank" rel="noopener">NCDOT AADT</a> ·
-    • USA: <a id="usaLink" href="#" target="_blank" rel="noopener">Esri USA Traffic Counts</a>
+  <div class="wrap">
+    <h1>Ask Dan’s Gas-Station Assistant</h1>
+    <div class="sys">
+      System behavior (optional): <input id="system" value="You are Dan’s gas-station expert. Be concise and numeric when estimating AADT→Gallons.">
+    </div>
+    <div id="chat" class="chat"></div>
+    <form id="f">
+      <input id="q" placeholder="Type a question… e.g., ‘Estimate gallons for 1500 Hodge Rd Knightdale NC’" />
+      <button>Send</button>
+    </form>
   </div>
-</div>
 
-<div id="map" role="region" aria-label="Map"></div>
+  <script>
+    const PROXY = "YOUR_PROXY_URL"; // e.g., https://your-worker.workers.dev
+    const chatEl = document.getElementById('chat');
+    const form = document.getElementById('f');
+    const q = document.getElementById('q');
+    const sys = document.getElementById('system');
 
-<script>
-/* ================== CONSTANTS ================== */
-/* Base gallons MUST start with: AADT × 0.08 × 2 × 30 */
-const BASE_GAL = (aadt)=> aadt * 0.08 * 2 * 30;
+    const messages = [
+      { role: "assistant", content: "Hi! Ask me anything about sites, AADT→gallons, competition impact, or permits." }
+    ];
+    render();
 
-const MONTHLY_PER_MPD_CAP=8500;     // conservative cap per MPD/month
-const ONE_MILE_METERS = 1609;       // competitors radius
-const DEV_SEARCH_MI=5;              // developments cutoff (driving for list text if available)
-const HUFF_BETA=1.2;                // distance-decay exponent (straight-line miles)
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const userText = q.value.trim();
+      if (!userText) return;
+      messages.push({ role: "user", content: userText });
+      q.value = "";
+      render();
 
-/* Brand weights & proximity penalties */
-const BRAND_RULES=[
-  {re:/\b(costco|sam'?s club|bj'?s)\b/i, w:2.6, star:true, color:"#ef4444", pen:[{mi:1.5,p:0.25},{mi:3.1,p:0.15}]},
-  {re:/\b(buc-?ee?s?)\b/i,              w:3.0, star:true, color:"#f97316", pen:[{mi:5,p:0.25}]},
-  {re:/\b(wawa|sheetz|quik\s?trip|^qt\b|racetrac|getgo|casey'?s)\b/i, w:2.0, star:true, color:"#fb923c", pen:[{mi:1.5,p:0.10},{mi:3.1,p:0.06}]},
-  {re:/\b(love'?s|pilot|flying\s?j|ta|petro)\b/i, w:2.0, star:true, color:"#f59e0b", pen:[{mi:2.5,p:0.10}]},
-  {re:/\b(murphy|speedway)\b/i,          w:1.5, star:false,color:"#facc15", pen:[{mi:2.5,p:0.06}]},
-  {re:/\b(circle\s?k|7-?eleven|exxon|mobil|bp|chevron|shell|sunoco|valero|phillips|76|citgo)\b/i, w:1.3, star:false,color:"#fcd34d", pen:[{mi:2.0,p:0.04}]},
-  {re:/./,                               w:1.0, star:false,color:"#60a5fa", pen:[]}
-];
-function brandRule(name){ return BRAND_RULES.find(r=>r.re.test(name||""))||BRAND_RULES[BRAND_RULES.length-1]; }
+      // Create a new assistant message placeholder
+      const placeholder = { role: "assistant", content: "" };
+      messages.push(placeholder);
+      render();
 
-/* ================== HELPERS ================== */
-const fmt=n=>Number.isFinite(n)?Math.round(n).toLocaleString():"–";
-const rad=d=>d*Math.PI/180;
-function hav(a,b){const R=3958.8,dLat=rad(b.lat-a.lat),dLng=rad(b.lng-a.lng);
-  const s=Math.sin(dLat/2)**2+Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dLng/2)**2;
-  return 2*R*Math.asin(Math.sqrt(s));}
-function clamp(x,lo,hi){return Math.max(lo,Math.min(hi,x));}
-function logger(el){el.textContent="";return(m,ok=false)=>{el.textContent+=(ok?"✅ ":"⏳ ")+m+"\\n";el.scrollTop=el.scrollHeight;};}
-
-/* ================== MAP (CORS-safe tiles for PDF) ================== */
-const map=L.map('map').setView([35.7796,-78.6382],12);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{attribution:'&copy; OSM & CARTO',subdomains:'abcd',maxZoom:20,crossOrigin:true}).addTo(map);
-let siteMarker=null, compLayer=null, devLayer=null;
-
-/* ================== NETWORK HELPERS ================== */
-async function withTimeout(promise, ms, label){ return Promise.race([promise, new Promise((_,rej)=>setTimeout(()=>rej(new Error(label+" timed out")), ms))]); }
-const OVERPASS = [
-  "https://overpass-api.de/api/interpreter",
-  "https://overpass.kumi.systems/api/interpreter",
-  "https://overpass.openstreetmap.ru/api/interpreter"
-];
-async function overpassQuery(q){
-  for(const ep of OVERPASS){
-    try{
-      const r=await withTimeout(fetch(ep,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded; charset=UTF-8"},body:"data="+encodeURIComponent(q)}), 20000, "Overpass");
-      if(r.ok) return await r.json();
-    }catch(e){}
-  }
-  throw new Error("Overpass unavailable");
-}
-
-/* ================== AADT (ArcGIS + Heuristic) ================== */
-async function queryArcGISAADT(url,lat,lng,distM){
-  const p={where:"1=1",geometry:`${lng},${lat}`,geometryType:"esriGeometryPoint",inSR:"4326",
-  spatialRel:"esriSpatialRelIntersects",distance:String(distM),units:"esriSRUnit_Meter",outFields:"*",outSR:"4326",f:"json"};
-  const r=await withTimeout(fetch(url+"?"+new URLSearchParams(p)), 15000, "ArcGIS AADT"); if(!r.ok) return null; const j=await r.json();
-  if(!j.features?.length) return null;
-  let best=null,bestD=1e9; for(const f of j.features){const d=hav({lat,lng},{lat:f.geometry.y,lng:f.geometry.x}); if(d<bestD){bestD=d;best=f;}}
-  const a=best.attributes||{}; const val=[a.AADT,a.aadt,a.Avg_Daily_Traffic,a.TrafficCount,a.AADT_2022,a.AADT_2021,a.AADT_2020,a.AADT_2019].find(v=>typeof v==="number"&&v>0)||null;
-  if(!val) return null;
-  const link=url+"?"+new URLSearchParams({...p,f:"html"}); return {value:val,link};
-}
-const NC_AADT="https://services.arcgis.com/NuWFvHYDMVmmxMeM/ArcGIS/rest/services/NCDOT_AADT_Stations/FeatureServer/0/query";
-const USA_AADT="https://services.arcgis.com/P3ePLMYs2RVChkJx/ArcGIS/rest/services/USA_Traffic_Counts/FeatureServer/0/query";
-async function robustAADT(lat,lng,isNC){
-  if(isNC){ for(const d of [500,1000,2000,3000,5000,10000,15000]){ const h=await queryArcGISAADT(NC_AADT,lat,lng,d); if(h) return {source:"NCDOT",...h}; } }
-  for(const d of [500,1000,2000,3000,5000,10000,15000]){ const h=await queryArcGISAADT(USA_AADT,lat,lng,d); if(h) return {source:"Esri USA Traffic Counts",...h}; }
-  return null;
-}
-async function heuristicAADT(lat,lng){
-  const q=`[out:json][timeout:25];way(around:900,${lat},${lng})["highway"];out tags center;`;
-  const j=await overpassQuery(q);
-  const ways=(j.elements||[]).map(w=>{
-    const c=w.center||null; if(!c) return null;
-    const hw=(w.tags?.highway||"").toLowerCase();
-    const lanes=parseInt(w.tags?.lanes);
-    const maxs=(w.tags?.maxspeed||"").toString(); let mph=null;
-    if(/\b\d+\s*mph\b/i.test(maxs)) mph=parseInt(maxs); else if(/\b\d+\b/.test(maxs)){const n=parseInt(maxs); mph=n>70?Math.round(n*0.621):n;}
-    return {lat:c.lat,lng:c.lon,highway:hw,lanes:isFinite(lanes)?lanes:null,mph};
-  }).filter(Boolean);
-  if(!ways.length) return {value:15000,source:"Heuristic (no roads found)",link:`https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=16/${lat}/${lng}`};
-  const BASE={motorway:65000,trunk:45000,primary:25000,secondary:14000,tertiary:8000,primary_link:20000,secondary_link:12000,tertiary_link:7000,residential:2500,unclassified:3000,service:1200,living_street:800};
-  function base(hw){return BASE[hw]??5000} function laneF(l){if(!l)return 1; return clamp(l/2,0.6,2.0)} function speedF(m){if(!m)return 1; if(m>=55)return 1.15; if(m>=45)return 1.08; if(m<=25)return .9; return 1}
-  ways.forEach(w=>w.d=hav({lat,lng},{lat:w.lat,lng:w.lng})); ways.sort((a,b)=>a.d-b.d);
-  const top=ways.slice(0,3); let num=0,den=0;
-  top.forEach(w=>{const est=base(w.highway)*laneF(w.lanes)*speedF(w.mph); const wt=1/(w.d+0.05); num+=est*wt; den+=wt;});
-  return {value:Math.round(num/Math.max(den,1)),source:"Heuristic (OSM road class/lanes/speed)",link:`https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=16/${lat}/${lng}`};
-}
-
-/* ================== COMPETITORS (radius 1 mile) ================== */
-async function fetchCompetitorsRadius1mi(lat,lng){
-  const q=`[out:json][timeout:25];
-    (node["amenity"="fuel"](around:${ONE_MILE_METERS},${lat},${lng});
-     way["amenity"="fuel"](around:${ONE_MILE_METERS},${lat},${lng});
-     relation["amenity"="fuel"](around:${ONE_MILE_METERS},${lat},${lng}););
-    out center tags;`;
-  const j=await overpassQuery(q);
-  return (j.elements||[]).map(e=>{
-    const c=e.type==='node'?{lat:e.lat,lng:e.lon}:(e.center||null);
-    if(!c) return null;
-    const name=e.tags?.brand||e.tags?.name||"Fuel station";
-    const dist=hav({lat,lng},c); // straight-line miles
-    return {lat:c.lat,lng:c.lon,name,dist};
-  }).filter(Boolean).sort((a,b)=>a.dist-b.dist);
-}
-
-/* ================== DEVELOPMENTS (universal ArcGIS → OSM fallback) ================== */
-async function arcgisSearch(query){
-  const url=`https://www.arcgis.com/sharing/rest/search?f=json&q=${encodeURIComponent(query)}&num=10`;
-  try{ const r=await withTimeout(fetch(url),12000,"ArcGIS search"); const j=await r.json(); return j.results||[]; }catch(e){ return []; }
-}
-async function tryLayerAround(url,lat,lng){
-  const idxs=[]; const m=url.match(/\/(FeatureServer|MapServer)(?:\/(\d+))?$/i);
-  if(m && m[2]) idxs.push(parseInt(m[2],10)); else idxs.push(0,1,2,3,4);
-  const out=[];
-  for(const idx of idxs){
-    const endpoint=url.replace(/\/(FeatureServer|MapServer)(?:\/\d+)?$/i,`/$1/${idx}/query`);
-    const p={where:"1=1",geometry:`${lng},${lat}`,geometryType:"esriGeometryPoint",inSR:"4326",
-      spatialRel:"esriSpatialRelIntersects",distance:"20000",units:"esriSRUnit_Meter",outFields:"*",outSR:"4326",f:"json"};
-    try{
-      const r=await withTimeout(fetch(endpoint+"?"+new URLSearchParams(p)), 15000, "ArcGIS FS");
-      if(!r.ok) continue; const j=await r.json();
-      for(const f of (j.features||[])){
-        const a=f.attributes||{};
-        const blob=[a.ProjectName,a.PROJECTNAME,a.Name,a.TITLE,a.Description,a.DESCRIPTION,a.Type,a.TYPE,a.Category,a.CATEGORY].map(x=>String(x||"")).join(" ").toLowerCase();
-        if(/\b(gas|fuel|convenience|c[-\s]?store|station|mart)\b/.test(blob)){
-          out.push({lat:f.geometry?.y,lng:f.geometry?.x,name:a.ProjectName||a.PROJECTNAME||a.Name||a.TITLE||"Fuel-related development",stage:a.Status||a.STATUS||a.Type||a.TYPE||"proposed"});
-        }
-      }
-    }catch(e){}
-  }
-  return out.filter(x=>x.lat&&x.lng);
-}
-async function findDevelopments(city,state,lat,lng){
-  const queries=[
-    `${city} development FeatureServer`,
-    `${city} permits FeatureServer`,
-    `${city} planning projects FeatureServer`,
-    `${state} county permits FeatureServer ${city}`
-  ];
-  for(const q of queries){
-    const items=await arcgisSearch(q);
-    for(const it of items){
-      if(!it.url || !/FeatureServer|MapServer/i.test(it.url)) continue;
-      const hits=await tryLayerAround(it.url,lat,lng);
-      if(hits.length) return hits.sort((a,b)=>hav({lat,lng},a)-hav({lat,lng},b)); // sort by crow distance
-    }
-  }
-  // fallback to OSM proposed / construction
-  const q = `[out:json][timeout:25];
-    (node["amenity"="fuel"]["proposed"](around:10000,${lat},${lng});
-     way["amenity"="fuel"]["proposed"](around:10000,${lat},${lng});
-     relation["amenity"="fuel"]["proposed"](around:10000,${lat},${lng});
-     node["amenity"="fuel"]["construction"](around:10000,${lat},${lng});
-     way["amenity"="fuel"]["construction"](around:10000,${lat},${lng});
-     relation["amenity"="fuel"]["construction"](around:10000,${lat},${lng}););
-    out center tags;`;
-  const j=await overpassQuery(q);
-  return (j.elements||[]).map(e=>{
-    const c=e.type==='node'?{lat:e.lat,lng:e.lon}:(e.center||null); if(!c) return null;
-    const name=e.tags?.brand||e.tags?.name||"New fuel development";
-    const stage=e.tags?.proposed?"proposed":(e.tags?.construction?"construction":"planned");
-    return {lat:c.lat,lng:c.lon,name,stage};
-  }).filter(Boolean).sort((a,b)=>hav({lat,lng},a)-hav({lat,lng},b));
-}
-
-/* ================== Google Reviews helpers ================== */
-async function googlePlaceDetails(lat,lng){
-  if(!GOOGLE_KEY) return null;
-  await new Promise(resolve=>{
-    if (window.google?.maps?.places) return resolve();
-    const iv=setInterval(()=>{ if(window.google?.maps?.places){clearInterval(iv); resolve();} },300);
-    setTimeout(()=>{clearInterval(iv); resolve();},6000);
-  });
-  if(!window.google?.maps?.places) return null;
-  return new Promise(res=>{
-    const svc=new google.maps.places.PlacesService(document.createElement('div'));
-    svc.nearbySearch({location:{lat,lng},radius:150,type:['gas_station','convenience_store']},(rs,st)=>{
-      if(st!=='OK'||!rs?.length) return res(null);
-      const best=rs.sort((a,b)=>(b.user_ratings_total||0)-(a.user_ratings_total||0))[0];
-      svc.getDetails({placeId:best.place_id,fields:['name','rating','user_ratings_total','reviews']},(place,st2)=>res(st2==='OK'?place:null));
-    });
-  });
-}
-function streetViewURL(lat,lng){ return GOOGLE_KEY ? `https://maps.googleapis.com/maps/api/streetview?size=640x360&location=${lat},${lng}&key=${GOOGLE_KEY}` : ""; }
-
-/* ================== Huff & penalties (radius version) ================== */
-function huffShare(siteAttr, comps){
-  const eps=0.1, siteD=0.1;
-  let denom = siteAttr/Math.pow(siteD, HUFF_BETA);
-  comps.forEach(c=>{
-    const dist = Math.max(eps, c.dist||0.1); // straight-line miles
-    denom += c.attr / Math.pow(dist, HUFF_BETA);
-  });
-  return clamp((siteAttr/Math.pow(siteD,HUFF_BETA))/denom, 0, 1);
-}
-function competitivePenalties(comps){
-  let factor=1.0; const items=[];
-  comps.forEach(c=>{
-    const rule = brandRule(c.name); c.rule=rule;
-    for(const pen of rule.pen){ if((c.dist||9)<=pen.mi){ factor *= (1-pen.p); items.push({name:c.name,dist:c.dist,pct:Math.round(pen.p*100)}); break; } }
-  });
-  return {factor, items};
-}
-
-/* ================== MAIN CLICK ================== */
-document.getElementById('estimate').onclick=async()=>{
-  const status=document.getElementById('status'); const log=logger(status);
-  const result=document.getElementById('result'); const summary=document.getElementById('summary');
-  const reviewsBox=document.getElementById('reviewsBox'); const compsDiv=document.getElementById('competitors'); const devDiv=document.getElementById('developments');
-  const exportBtn=document.getElementById('export');
-
-  // reset UI
-  result.textContent=""; summary.textContent=""; reviewsBox.innerHTML=""; compsDiv.textContent=""; devDiv.textContent="";
-  exportBtn.style.display="none"; if(compLayer){map.removeLayer(compLayer);} if(devLayer){map.removeLayer(devLayer);} if(siteMarker){map.removeLayer(siteMarker);}
-
-  try{
-    const addr=document.getElementById('address').value.trim(); if(!addr) throw new Error("Please enter an address.");
-    const mpds=Math.max(1, parseInt(document.getElementById('mpds').value)||1);
-    const aadtOverride=parseInt(document.getElementById('aadtOverride').value)||null;
-
-    // Geocode
-    log("Geocoding address…");
-    const g=await withTimeout(fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=1&q=${encodeURIComponent(addr)}`),12000,"Geocoding");
-    const gj=await g.json(); if(!gj.length) throw new Error("Address not found.");
-    const lat=+gj[0].lat,lng=+gj[0].lon; const state=gj[0].address?.state||""; const city=gj[0].address?.city||gj[0].address?.town||gj[0].address?.village||"";
-    log(`Found (${lat.toFixed(4)}, ${lng.toFixed(4)}) in ${city||"—"}, ${state||"—"}`,true);
-    siteMarker=L.marker([lat,lng]).addTo(map).bindPopup("Site").openPopup(); map.setView([lat,lng],14);
-
-    // Manual AADT viewers
-    document.getElementById('ncLink').href=`https://ncdot.maps.arcgis.com/apps/webappviewer/index.html?id=ae42f4ac534a46458c9cf60a98d2bc1d&find=${lat},${lng}`;
-    document.getElementById('usaLink').href=`https://www.arcgis.com/apps/mapviewer/index.html?url=${encodeURIComponent("https://services.arcgis.com/P3ePLMYs2RVChkJx/ArcGIS/rest/services/USA_Traffic_Counts/FeatureServer/0")}&center=${lng},${lat}&level=15`;
-
-    // AADT: override → DOT ArcGIS → heuristic; then base gallons from *your* formula
-    let aadt=null, aadtLabel=""; let aadtLink="";
-    if(aadtOverride){ aadt=aadtOverride; aadtLabel="User override"; log(`Using override AADT ${aadt}`,true); }
-    else {
-      try{
-        log("Finding AADT (DOT/ArcGIS)…");
-        const isNC=/north carolina/i.test(state)||/\bNC\b/.test(state);
-        const hit=await robustAADT(lat,lng,isNC);
-        if(hit){ aadt=hit.value; aadtLabel=hit.source; aadtLink=hit.link; log(`AADT ${aadt} (${aadtLabel})`,true); }
-        else { throw new Error("No ArcGIS AADT"); }
-      }catch(e){
-        log("No ArcGIS record. Estimating AADT heuristically…");
-        const h=await heuristicAADT(lat,lng); aadt=h.value; aadtLabel=h.source; aadtLink=h.link; log(`Heuristic AADT ${aadt}`,true);
-      }
-    }
-
-    // BASE GALLONS (always start here)
-    let gallons = BASE_GAL(aadt); // AADT × 0.08 × 2 × 30
-    result.textContent=`Base (pre-competition) Gallons: ${fmt(gallons)}`;
-    summary.innerHTML=`AADT <b>${fmt(aadt)}</b> (${aadtLink?`<a href="${aadtLink}" target="_blank" rel="noopener">source</a>`:aadtLabel}) · MPDs ${mpds} · (refining with competition & capacity…)`;
-
-    // REVIEWS (parallel, non-blocking)
-    (async ()=>{
-      let html="";
-      try{
-        const sv = streetViewURL(lat,lng);
-        if(sv) html += `<img alt="Street View" style="max-width:100%;border:1px solid #3b4a66;border-radius:8px" src="${sv}"><br>`;
-        const place = await withTimeout(googlePlaceDetails(lat,lng), 8000, "Google reviews");
-        if(place){
-          const revs=(place.reviews||[]).slice(0,4).map(r=>`<p><b>${r.author_name||"Reviewer"}</b> – ${"★".repeat(Math.round(r.rating||0))}<br>${(r.text||"").slice(0,240)}${(r.text||"").length>240?"…":""}</p>`).join("");
-          html += `<div><b>${place.name}</b> — ★${place.rating||"–"} (${place.user_ratings_total||0})</div>${revs||"<i>No review text.</i>"}`;
-        }else{
-          html += `No reviews found automatically. <a target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}">Search Google Maps</a>`;
-        }
-      }catch(e){
-        html = `Reviews lookup skipped. <a target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}">Search Google Maps</a>`;
-      }
-      document.getElementById('reviewsBox').innerHTML = html;
-    })();
-
-    // COMPETITORS (radius 1 mile)
-    log("Finding competitors by radius (1 mile)…");
-    let comps=[];
-    try{
-      comps = await withTimeout(fetchCompetitorsRadius1mi(lat,lng), 20000, "Competitors radius");
-      // add brand rule + attraction (assume ~6 MPDs if unknown)
-      comps = comps.map(c=>{const rule=brandRule(c.name||""); const attr=rule.w*6; return {...c, rule, attr};});
-      // draw
-      if(compLayer) map.removeLayer(compLayer);
-      compLayer=L.layerGroup(comps.map(c=>{
-        const star=c.rule.star?"★":""; const color=c.rule.color; const size=c.rule.star?"big":"med";
-        const icon=L.divIcon({className:"div-pin",html:`<div class="pin ${size}" style="background:${color}">${star}</div>`,iconSize:null,iconAnchor:[15,15]});
-        return L.marker([c.lat,c.lng],{icon}).bindPopup(`${c.name}<br>${c.dist.toFixed(2)} mi radius`);
-      })).addTo(map);
-      document.getElementById('competitors').innerHTML = comps.length
-        ? "<b>Competitors considered (≤ 1.0 mi radius):</b><ul>"+comps.slice(0,12).map(c=>`<li>${c.name} — ${c.dist.toFixed(2)} mi</li>`).join("")+"</ul>"
-        : "No stations within 1.0 mile radius.";
-      log(`Using ${comps.length} competitor(s).`,true);
-    }catch(e){ log("Competitor lookup failed/skipped.",true); comps=[]; }
-
-    // DEVELOPMENTS (universal ArcGIS → OSM)
-    try{
-      log(`Searching developments for ${city||"this town"}…`);
-      const devs = await withTimeout(findDevelopments(city,state,lat,lng), 25000, "Developments");
-      if(devLayer) map.removeLayer(devLayer);
-      if(devs.length){
-        devLayer=L.layerGroup(devs.map(d=>{
-          const icon=L.divIcon({className:"div-pin",html:`<div class="pin med" style="background:${'#a78bfa'}"></div>`,iconSize:null,iconAnchor:[11,11]});
-          return L.marker([d.lat,d.lng],{icon}).bindPopup(`${d.name} — ${d.stage}`);
-        })).addTo(map);
-        document.getElementById('developments').innerHTML="<b>New developments nearby:</b><ul>"+devs.slice(0,12).map(d=>`<li>${d.name} — ${d.stage}</li>`).join("")+"</ul>";
-        log(`Found ${devs.length} development(s).`,true);
-      }else{
-        const arcCity=`https://www.arcgis.com/sharing/rest/search?q=${encodeURIComponent(city+" development permits")}`;
-        const gCity =`https://www.google.com/search?q=${encodeURIComponent(city+" development permits portal")}`;
-        document.getElementById('developments').innerHTML=`No developments found. <b>Please use the link to search this town's database:</b> <a href="${arcCity}" target="_blank" rel="noopener">ArcGIS search for ${city||"your town"}</a> · <a href="${gCity}" target="_blank" rel="noopener">Google: ${city||"town"} permits portal</a>`;
-        log("No developments found via ArcGIS or OSM.",true);
-      }
-    }catch(e){
-      const arcCity=`https://www.arcgis.com/sharing/rest/search?q=${encodeURIComponent(city+" development permits")}`;
-      const gCity =`https://www.google.com/search?q=${encodeURIComponent(city+" development permits portal")}`;
-      document.getElementById('developments').innerHTML=`No developments found. <b>Please use the link to search this town's database:</b> <a href="${arcCity}" target="_blank" rel="noopener">ArcGIS search for ${city||"your town"}</a> · <a href="${gCity}" target="_blank" rel="noopener">Google: ${city||"town"} permits portal</a>`;
-      log("Developments lookup failed/skipped.",true);
-    }
-
-    // REFINED ESTIMATE: apply competition (radius) & penalties, then capacity cap
-    const siteAttr = mpds * 1.0; // simple site attractiveness ~ MPDs
-    const share = comps.length ? huffShare(siteAttr, comps) : 1.0;
-    const {factor:penFactor, items:penItems} = competitivePenalties(comps);
-    let refined = gallons * share * penFactor;
-
-    // Capacity cap & blocking
-    const capacity = mpds * MONTHLY_PER_MPD_CAP;
-    let capPenalty=0;
-    if(refined > capacity){
-      const overload = refined / capacity;
-      const penalty = Math.max(0.8, 1 - 0.25*(overload-1)); // up to 20% reduction
-      refined = capacity * penalty;
-      capPenalty = Math.round((1-penalty)*100);
-    }
-
-    // Output
-    const compAdjText = penItems.length ? ` · Competitive adjustments: ${penItems.slice(0,5).map(x=>`${x.name} ${x.dist.toFixed(2)} mi (−${x.pct}%)`).join("; ")}` : "";
-    const capText = capPenalty>0 ? ` · capacity/queuing penalty −${capPenalty}%` : "";
-    result.textContent = `Estimated Monthly Gallons: ${fmt(refined)}`;
-    summary.innerHTML = `Base: ${fmt(gallons)} · share: ${(share*100).toFixed(1)}% · comps: ${comps.length}${compAdjText}${capText}`;
-
-    // PDF
-    document.getElementById('export').style.display="block";
-    document.getElementById('export').onclick=()=>{
-      const {jsPDF}=window.jspdf;
-      leafletImage(map,(err,canvas)=>{
-        const doc=new jsPDF({unit:"pt",format:"a4"});
-        doc.setFontSize(14); doc.text("Fuel Volume Estimate",40,40);
-        doc.setFontSize(11);
-        doc.text(`Address: ${addr}`,40,60);
-        doc.text(`MPDs: ${mpds}`,40,76);
-        doc.text(`Base (AADT×0.08×2×30): ${fmt(gallons)}`,40,92);
-        doc.text(`Estimate (after comps/cap): ${fmt(refined)} gal/mo`,40,108);
-        const img=canvas.toDataURL("image/png");
-        doc.addImage(img,"PNG",40,130,515,300);
-        doc.save("fuel_estimate.pdf");
+      // Call proxy and stream
+      const resp = await fetch(PROXY, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          system: sys.value || undefined,
+          messages
+        })
       });
-    };
 
-    log("⚡ Estimate complete!", true);
-    status.textContent += "\n❓ Do you want me to run another search?\n";
+      const reader = resp.body
+        .pipeThrough(new TextDecoderStream())
+        .getReader();
 
-  }catch(e){
-    status.textContent += "❌ " + (e.message||e) + "\n";
-  }
-};
+      let buffer = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += value;
+        // SSE lines start with "data:"
+        for (const line of buffer.split("\n")) {
+          if (!line.startsWith("data:")) continue;
+          const payload = line.slice(5).trim();
+          if (payload === "[DONE]") continue;
+          try {
+            const json = JSON.parse(payload);
+            // Responses API streams deltas — normalize to text
+            // Many SDKs expose output_text; here we just grab any text delta
+            const chunks = (json.output || json.response || json).content || json.output_text || "";
+            // Fallback: try "delta" for token streams
+            const delta = json.delta?.content?.[0]?.text ?? json.output_text ?? "";
+            if (typeof chunks === "string") {
+              placeholder.content = chunks; // full text
+            } else if (delta) {
+              placeholder.content += delta;
+            }
+            render(true);
+          } catch (_) { /* ignore keepalives */ }
+        }
+      }
+      scrollToBottom();
+    });
 
-// Enter to run
-document.getElementById('address').addEventListener('keydown',e=>{ if(e.key==="Enter") document.getElementById('estimate').click(); });
-</script>
+    function render(scroll=false) {
+      chatEl.innerHTML = messages.map(m => `
+        <div class="row">
+          <div class="role">${m.role === 'user' ? 'You' : 'Assistant'}</div>
+          <div class="msg">${escapeHtml(m.content)}</div>
+        </div>
+      `).join("");
+      if (scroll) scrollToBottom();
+    }
+    function scrollToBottom() { chatEl.scrollTop = chatEl.scrollHeight; }
+    function escapeHtml(s) { return s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+  </script>
 </body>
 </html>
-
