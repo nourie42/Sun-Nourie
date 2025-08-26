@@ -14,20 +14,11 @@
     .right { flex:1; }
     h1 { margin:0 0 12px; font-size:22px; }
     .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:12px; }
-    label { display:block; font-weight:600; margin:10px 0 4px; }
-    input[type="text"], input[type="number"] { width:100%; padding:10px; border-radius:10px; border:1px solid var(--border); background:#1b1f2a; color:var(--text); }
-    button { padding:10px 14px; border-radius:10px; border:0; background:var(--accent); color:#fff; font-weight:600; cursor:pointer; }
-    button[disabled]{ opacity:.6; cursor:not-allowed; }
-    .row { display:flex; gap:8px; }
-    .col { flex:1; }
-    #map { height:calc(100vh - 32px); width:100%; border-radius:12px; border:1px solid var(--border); }
-    .muted { color:var(--muted); font-size:12px; }
-    .err { color:#ff9a9a }
-    .num { font-variant-numeric:tabular-nums; }
-    table { width:100%; border-collapse:collapse; }
-    td { padding:4px 0; border-bottom:1px dashed #2a2f3a; }
     .badge { display:inline-block; min-width:120px; padding:4px 10px; border-radius:999px; border:1px solid var(--border); background:#1b1f2a; margin-right:6px; }
     .ok { color:#9ef5b3; } .fail { color:#ff9a9a; } .pending { color:#e8e8e8; opacity:.7; }
+    #map { height:calc(100vh - 32px); width:100%; border-radius:12px; border:1px solid var(--border); }
+    input,button{margin-top:6px}
+    button { padding:10px 14px; border-radius:10px; border:0; background:var(--accent); color:#fff; font-weight:600; cursor:pointer; }
   </style>
 </head>
 <body>
@@ -35,15 +26,13 @@
     <div class="left">
       <h1>Prospect Estimator</h1>
 
-      <!-- Live Data Status -->
+      <!-- Status -->
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <b>Live Data Status</b>
-          <div>
-            <button id="recheck">Recheck</button>
-          </div>
+          <button id="recheck">Recheck</button>
         </div>
-        <div id="statusGrid" class="muted" style="margin-top:8px; line-height:1.8;">
+        <div style="line-height:1.8;margin-top:8px;">
           <span class="badge"><b>Backend</b></span> <span id="s-backend" class="pending">checking…</span><br>
           <span class="badge"><b>Geocode</b></span> <span id="s-geocode" class="pending">checking…</span><br>
           <span class="badge"><b>Places</b></span> <span id="s-places" class="pending">checking…</span><br>
@@ -54,73 +43,28 @@
 
       <!-- Inputs -->
       <div class="card">
-        <div><b>Step 1: Enter address</b></div>
-        <label for="addr">Prospect site address</label>
-        <input id="addr" type="text" placeholder="e.g., 1500 Hodge Rd, Knightdale, NC">
-        <div class="row" style="margin-top:8px;">
-          <div class="col">
-            <label for="mpd">Step 2: Gasoline MPDs</label>
-            <input id="mpd" type="number" min="1" step="1" value="6">
-          </div>
-          <div class="col">
-            <label for="dieselpos">Diesel positions (optional)</label>
-            <input id="dieselpos" type="number" min="0" step="1" value="8">
-          </div>
-        </div>
-        <div style="margin-top:10px;">
-          <button id="run">Search & Estimate</button>
-          <span id="status" class="muted"></span>
-        </div>
+        <label>Address</label>
+        <input id="addr" type="text" placeholder="1500 Hodge Rd, Knightdale NC">
+        <label>Gasoline MPDs</label>
+        <input id="mpd" type="number" value="6">
+        <label>Diesel positions</label>
+        <input id="dieselpos" type="number" value="8">
+        <button id="run">Search & Estimate</button>
+        <div id="status" class="muted"></div>
       </div>
 
       <!-- Results -->
       <div class="card">
-        <div><b>Results</b></div>
-        <div id="results" class="muted">Enter address + MPDs and click <b>Search & Estimate</b>.</div>
+        <b>Results</b>
+        <div id="results" class="muted">Enter address and MPDs, then click Search & Estimate.</div>
       </div>
-
-      <!-- Advanced -->
-      <details class="card">
-        <summary><b>Advanced inputs (optional)</b></summary>
-        <div class="row">
-          <div class="col"><label>Total VPD</label><input id="VPD" type="number" value="18024"></div>
-          <div class="col"><label>Truck share (%)</label><input id="truckShare" type="number" value="5.5"></div>
-        </div>
-        <div class="row">
-          <div class="col"><label>Frontage F</label><input id="frontShare" type="number" value="0.59" step="0.01"></div>
-          <div class="col"><label>Turn T</label><input id="turnShare" type="number" value="0.41" step="0.01"></div>
-        </div>
-        <div class="row">
-          <div class="col"><label>Turn friction f<sub>T</sub></label><input id="turnFric" type="number" value="0.70" step="0.05" min="0" max="1"></div>
-          <div class="col"><label>Speed (mph)</label><input id="speed" type="number" value="35"></div>
-        </div>
-        <div class="row">
-          <div class="col"><label>Access points</label><input id="accessPts" type="number" value="4" step="1" min="1"></div>
-          <div class="col"><label>LED price sign? (0/1)</label><input id="ledSign" type="number" value="1" step="1" min="0" max="1"></div>
-        </div>
-        <div class="row">
-          <div class="col"><label>Price delta (market − your) $/gal</label><input id="priceDelta" type="number" value="0.00" step="0.01"></div>
-          <div class="col"><label>CPR avg index</label><input id="cpr" type="number" value="104" step="1"></div>
-        </div>
-        <div class="row">
-          <div class="col"><label>Gasoline score</label><input id="gasScore" type="number" value="105.5" step="0.5"></div>
-          <div class="col"><label>Diesel score</label><input id="dieselScore" type="number" value="22.5" step="0.5"></div>
-        </div>
-        <div class="row">
-          <div class="col"><label>Competition radius (mi)</label><input id="radiusMi" type="number" value="2" step="0.5" min="0.5"></div>
-          <div class="col"><label>Dev. radius (mi)</label><input id="devRadiusMi" type="number" value="3" step="0.5" min="1"></div>
-        </div>
-      </details>
     </div>
 
-    <div class="right">
-      <div id="map"></div>
-    </div>
+    <div class="right"><div id="map"></div></div>
   </div>
 
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
-    // --------- CONFIG ---------
     const API_BASE = "https://sun-nourie-live.onrender.com";
     const ENDPOINT = {
       backend: API_BASE + "/",
@@ -129,144 +73,42 @@
       developments: API_BASE + "/developments"
     };
 
-    const KNOBS = { s_a0:0.020, s_t0:0.012, sigmaPrice:0.11, g_a:10.2, g_t:16, kappa:0.25, monthDays:365/12 };
-
-    // --------- STATUS PANEL ---------
-    const sBackend = document.getElementById("s-backend");
-    const sGeo = document.getElementById("s-geocode");
-    const sPlaces = document.getElementById("s-places");
-    const sDev = document.getElementById("s-dev");
-    const recheckBtn = document.getElementById("recheck");
-
-    function setStatus(el, ok, ms, extra="") {
-      el.className = ok ? "ok" : "fail";
-      el.textContent = (ok ? "OK" : "Fail") + (ms ? ` (${ms} ms)` : "") + (extra ? ` — ${extra}` : "");
+    // Status check
+    const sBackend=document.getElementById("s-backend"),sGeo=document.getElementById("s-geocode"),sPlaces=document.getElementById("s-places"),sDev=document.getElementById("s-dev");
+    function set(el,ok,ms){ el.className=ok?"ok":"fail"; el.textContent=(ok?"OK":"Fail")+(ms?` (${ms}ms)`:""); }
+    async function ping(url){const t0=performance.now();const r=await fetch(url);return{ok:r.ok,ms:Math.round(performance.now()-t0)};}
+    async function checkAll(){
+      try{const {ok,ms}=await ping(ENDPOINT.backend);set(sBackend,ok,ms);}catch{set(sBackend,false);}
+      try{const {ok,ms}=await ping(ENDPOINT.geocode+"?address=Raleigh,NC");set(sGeo,ok,ms);}catch{set(sGeo,false);}
+      try{const {ok,ms}=await ping(ENDPOINT.places+"?lat=35.79&lng=-78.52&radius=1609");set(sPlaces,ok,ms);}catch{set(sPlaces,false);}
+      try{const {ok,ms}=await ping(ENDPOINT.developments+"?lat=35.79&lng=-78.52&radius=5000");set(sDev,ok,ms);}catch{set(sDev,false);}
     }
-    function setPending(el) { el.className = "pending"; el.textContent = "checking…"; }
+    document.getElementById("recheck").addEventListener("click",checkAll);
+    checkAll();
 
-    async function timeFetch(url) {
-      const t0 = performance.now();
-      const r = await fetch(url);
-      const t1 = performance.now();
-      return { r, ms: Math.round(t1 - t0) };
-    }
+    // Map
+    const map=L.map('map').setView([35.7796,-78.6382],12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; OpenStreetMap'}).addTo(map);
+    let siteMarker=null, compLayer=L.layerGroup().addTo(map), devLayer=L.layerGroup().addTo(map);
 
-    async function checkAll() {
-      setPending(sBackend); setPending(sGeo); setPending(sPlaces); setPending(sDev);
+    // Run flow
+    document.getElementById("run").addEventListener("click", async()=>{
+      const addr=document.getElementById("addr").value, mpds=+document.getElementById("mpd").value||0, dieselPos=+document.getElementById("dieselpos").value||0;
+      const statusEl=document.getElementById("status"),resultsEl=document.getElementById("results"); statusEl.textContent="Working…";
+      try{
+        const g=await fetch(`${ENDPOINT.geocode}?address=${encodeURIComponent(addr)}`); const gj=await g.json(); const loc=gj.results[0].geometry.location;
+        if(siteMarker)siteMarker.remove(); siteMarker=L.marker([loc.lat,loc.lng]).addTo(map).bindPopup("Prospect").openPopup(); map.setView([loc.lat,loc.lng],14);
 
-      try {
-        const { r, ms } = await timeFetch(ENDPOINT.backend);
-        const ok = r.ok && (await r.text()).includes("OK");
-        setStatus(sBackend, ok, ms);
-      } catch (e) { setStatus(sBackend, false, 0, "network"); }
+        const p=await fetch(`${ENDPOINT.places}?lat=${loc.lat}&lng=${loc.lng}&radius=1609*2`); const pj=await p.json(); compLayer.clearLayers();
+        pj.results.forEach(r=>L.marker([r.geometry.location.lat,r.geometry.location.lng]).addTo(compLayer).bindPopup(r.name));
 
-      try {
-        const { r, ms } = await timeFetch(ENDPOINT.geocode + "?address=Raleigh,NC");
-        const ok = r.ok;
-        setStatus(sGeo, ok, ms);
-      } catch (e) { setStatus(sGeo, false, 0, "network"); }
+        const d=await fetch(`${ENDPOINT.developments}?lat=${loc.lat}&lng=${loc.lng}&radius=5000`); const dj=await d.json(); devLayer.clearLayers();
+        dj.results.forEach(r=>L.circleMarker([r.geometry.location.lat,r.geometry.location.lng],{radius:6,color:'orange'}).addTo(devLayer).bindPopup(r.name));
 
-      try {
-        const { r, ms } = await timeFetch(ENDPOINT.places + "?lat=35.79&lng=-78.52&radius=1609");
-        const ok = r.ok;
-        setStatus(sPlaces, ok, ms);
-      } catch (e) { setStatus(sPlaces, false, 0, "network"); }
-
-      try {
-        const { r, ms } = await timeFetch(ENDPOINT.developments + "?lat=35.79&lng=-78.52&radius=5000");
-        const ok = r.ok;
-        setStatus(sDev, ok, ms);
-      } catch (e) { setStatus(sDev, false, 0, "network"); }
-    }
-
-    recheckBtn.addEventListener("click", checkAll);
-    checkAll(); // run on load
-
-    // --------- MAP ---------
-    const map = L.map('map').setView([35.7796, -78.6382], 12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
-    let siteMarker = null; const compLayer = L.layerGroup().addTo(map); const devLayer = L.layerGroup().addTo(map);
-
-    // --------- APP FLOW ---------
-    const qs = id => document.getElementById(id);
-    const runBtn = qs('run'); const statusEl = qs('status'); const resultsEl = qs('results');
-    runBtn.addEventListener('click', runAll);
-
-    async function runAll(){
-      statusEl.textContent = "Geocoding…";
-      resultsEl.textContent = "Working…";
-      runBtn.disabled = true;
-
-      const addr = qs('addr').value.trim();
-      if(!addr){ alert("Enter an address"); runBtn.disabled=false; return; }
-      const mpds = +qs('mpd').value || 0; const dieselPos = +qs('dieselpos').value || 0;
-
-      try {
-        // 1) Geocode
-        const g = await fetch(`${ENDPOINT.geocode}?address=${encodeURIComponent(addr)}`);
-        if(!g.ok){ const raw = await g.text(); throw new Error(`Geocode HTTP ${g.status}: ${raw.slice(0,200)}`); }
-        const gj = await g.json();
-        if (!gj.results?.length) throw new Error("Address not found");
-        const loc = gj.results[0].geometry.location;
-        centerMap(loc.lat, loc.lng, addr);
-
-        // 2) Places (competition)
-        statusEl.textContent = "Finding nearby competition…";
-        compLayer.clearLayers();
-        const radiusMeters = (+qs('radiusMi').value || 2)*1609.344;
-        const p = await fetch(`${ENDPOINT.places}?lat=${loc.lat}&lng=${loc.lng}&radius=${Math.round(radiusMeters)}`);
-        if(!p.ok){ const raw = await p.text(); throw new Error(`Places HTTP ${p.status}: ${raw.slice(0,200)}`); }
-        const pj = await p.json();
-        const comps = (pj.results||[]).map(r => ({ name:r.name, lat:r.geometry?.location?.lat, lng:r.geometry?.location?.lng })).filter(c=>c.lat&&c.lng);
-
-        // 3) Developments (soft-fail)
-        statusEl.textContent = "Searching developments…";
-        devLayer.clearLayers();
-        const devRadiusMeters = (+qs('devRadiusMi').value || 3)*1609.344;
-        let devs = [];
-        try {
-          const d = await fetch(`${ENDPOINT.developments}?lat=${loc.lat}&lng=${loc.lng}&radius=${Math.round(devRadiusMeters)}`);
-          if (d.ok) {
-            const dj = await d.json();
-            devs = (dj.results||[]).map(r => ({ name:r.name, lat:r.geometry?.location?.lat, lng:r.geometry?.location?.lng })).filter(x=>x.lat&&x.lng);
-          }
-        } catch(_) {}
-
-        // Pin
-        comps.forEach(c => L.marker([c.lat,c.lng], {title:c.name}).addTo(compLayer).bindPopup(`<b>${escapeHtml(c.name)}</b>`));
-        devs.forEach(d => L.circleMarker([d.lat,d.lng], {radius:7,color:'#ff9900',fillColor:'#ff9900',fillOpacity:.85}).addTo(devLayer).bindPopup(`<b>${escapeHtml(d.name)}</b><br><i>Development</i>`));
-
-        // 4) Estimate gallons
-        statusEl.textContent = "Estimating gallons…";
-        const est = estimate(loc, comps, {
-          VPD:+qs('VPD').value||18024, truckSharePct:+qs('truckShare').value||5.5, F:+qs('frontShare').value||0.59, T:+qs('turnShare').value||0.41,
-          fT:+qs('turnFric').value||0.70, speed:+qs('speed').value||35, accessPts:+qs('accessPts').value||4, ledSign:(+qs('ledSign').value||0)?true:false,
-          priceDelta:+qs('priceDelta').value||0, cpr:+qs('cpr').value||104, gasScore:+qs('gasScore').value||105.5, dieselScore:+qs('dieselScore').value||22.5,
-          mpds, dieselPos
-        });
-
-        const fmt = n => Number(n).toLocaleString(undefined,{maximumFractionDigits:0});
-        const fmt1= n => Number(n).toLocaleString(undefined,{maximumFractionDigits:1});
-        resultsEl.innerHTML = `
-          <table>
-            <tr><td><b>Competitors within ${fmt1(radiusMeters/1609.344)} mi</b></td><td class="num">${comps.length}</td></tr>
-            <tr><td>Developments found</td><td class="num">${devs.length}</td></tr>
-            <tr><td style="padding-top:8px;"><b>Year-1 gallons/mo</b></td><td class="num" style="padding-top:8px;"><b>${fmt(est.year1)}</b></td></tr>
-            <tr><td>Low / High band</td><td class="num">${fmt(est.low)} – ${fmt(est.high)}</td></tr>
-            <tr><td>Year-2</td><td class="num">${fmt(est.year2)}</td></tr>
-            <tr><td>Year-3</td><td class="num">${fmt(est.year3)}</td></tr>
-            <tr><td>Capacity cap (approx)</td><td class="num">${fmt(est.capacityCap)}</td></tr>
-          </table>
-          <div class="muted" style="margin-top:8px;">IMST-style capture: frontage/turn, site multipliers, competition decay, gallons/stop, capacity check.</div>
-        `;
-        statusEl.textContent = "Done.";
-      } catch(err) {
-        statusEl.innerHTML = `<span class="err">Error: ${escapeHtml(String(err))}</span>`;
-        resultsEl.innerHTML = `<span class="err">${escapeHtml(String(err))}</span>`;
-      } finally {
-        runBtn.disabled = false;
-      }
-    }
-
-    function centerMap(lat,lng,label){
-      map.setView([lat,lng], 14
+        resultsEl.textContent=`Found ${pj.results.length} competitors and ${dj.results.length} developments. Estimation logic would go here (MPDs=${mpds}, Diesel=${dieselPos}).`;
+        statusEl.textContent="Done.";
+      }catch(e){statusEl.textContent="Error: "+e;}
+    });
+  </script>
+</body>
+</html>
