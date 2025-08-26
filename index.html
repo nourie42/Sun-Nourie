@@ -1,51 +1,68 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Prospect Estimator + Competition Map</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-<style>
-  :root { --bg:#0b0c10; --card:#13151a; --text:#e8e8e8; --muted:#9aa0a6; --accent:#3a82f7; --border:#2a2f3a; }
-  *{box-sizing:border-box}
-  body{margin:0;font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text)}
-  .wrap{display:flex;gap:16px;height:100vh;padding:16px}
-  .left{width:520px;min-width:360px;display:flex;flex-direction:column;gap:12px}
-  .right{flex:1}
-  h1{margin:0 0 12px;font-size:22px}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px}
-  label{display:block;font-weight:600;margin:10px 0 4px}
-  input[type="text"],input[type="number"]{width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:#1b1f2a;color:var(--text)}
-  .row{display:flex;gap:8px}
-  .col{flex:1}
-  button{padding:10px 14px;border-radius:10px;border:0;background:var(--accent);color:#fff;font-weight:600;cursor:pointer}
-  button[disabled]{opacity:.6;cursor:not-allowed}
-  .muted{color:var(--muted);font-size:12px}
-  .err{color:#ff9a9a}
-  #map{height:calc(100vh - 32px);width:100%;border-radius:12px;border:1px solid var(--border);background:#0f1116}
-  .num{font-variant-numeric:tabular-nums}
-  table{width:100%;border-collapse:collapse}
-  td{padding:4px 0;border-bottom:1px dashed #2a2f3a}
-  .badge{display:inline-block;min-width:120px;padding:4px 10px;border-radius:999px;border:1px solid var(--border);background:#1b1f2a;margin-right:6px}
-  .ok{color:#9ef5b3}.fail{color:#ff9a9a}.pending{color:#e8e8e8;opacity:.7}
-  #pageError{display:none;background:#3a0f0f;border:1px solid #5c1b1b;color:#ffd3d3;padding:8px 10px;border-radius:8px;font-size:12px;white-space:pre-wrap}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Prospect Estimator + Competition Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <style>
+    :root {
+      --bg:#0b0c10; --card:#13151a; --text:#e8e8e8;
+      --muted:#9aa0a6; --accent:#3a82f7; --border:#2a2f3a;
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+      background:var(--bg); color:var(--text); }
+    .wrap { display:flex; gap:16px; height:100vh; padding:16px; }
+    .left { width:520px; min-width:360px; display:flex; flex-direction:column; gap:12px; }
+    .right { flex:1; }
+    h1 { margin:0 0 12px; font-size:22px; }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:12px; }
+    label { display:block; font-weight:600; margin:10px 0 4px; }
+    input[type="text"], input[type="number"] {
+      width:100%; padding:10px; border-radius:10px; border:1px solid var(--border);
+      background:#1b1f2a; color:var(--text);
+    }
+    .row { display:flex; gap:8px; }
+    .col { flex:1; }
+    button {
+      padding:10px 14px; border-radius:10px; border:0;
+      background:var(--accent); color:#fff; font-weight:600; cursor:pointer;
+    }
+    button[disabled] { opacity:.6; cursor:not-allowed; }
+    .muted { color:var(--muted); font-size:12px; }
+    .err { color:#ff9a9a; }
+    #map {
+      height:calc(100vh - 32px); width:100%; border-radius:12px;
+      border:1px solid var(--border); background:#0f1116;
+    }
+    .badge {
+      display:inline-block; min-width:120px; padding:4px 10px;
+      border-radius:999px; border:1px solid var(--border); background:#1b1f2a;
+      margin-right:6px;
+    }
+    .ok { color:#9ef5b3; }
+    .fail { color:#ff9a9a; }
+    .pending { color:#e8e8e8; opacity:.7; }
+  </style>
 </head>
 <body>
   <div class="wrap">
     <div class="left">
+
       <div class="card"><h1 style="margin:0">Prospect Estimator</h1></div>
 
-      <div id="pageError"></div>
+      <div id="pageError" class="card" style="display:none; background:#3a0f0f; color:#ffdad6;">
+        Error loading map — check console or disable ad blockers.
+      </div>
 
-      <!-- Inputs -->
       <div class="card">
         <div><b>Step 1: Enter address</b></div>
         <label>Prospect site address</label>
         <input id="addr" type="text" placeholder="e.g., 4173 Knightdale BLVD, Knightdale NC">
         <div class="row" style="margin-top:8px">
           <div class="col">
-            <label>Step 2: Gasoline MPDs</label>
+            <label>Gasoline MPDs</label>
             <input id="mpd" type="number" min="0" value="6">
           </div>
           <div class="col">
@@ -53,56 +70,57 @@
             <input id="dieselpos" type="number" min="0" value="8">
           </div>
         </div>
-        <div style="margin-top:8px;display:flex;align-items:center;gap:10px">
+        <div style="margin-top:8px;">
           <input id="autoAADT" type="checkbox" checked>
-          <label for="autoAADT" style="margin:0;font-weight:600">Try to auto-estimate AADT if not provided</label>
+          <label for="autoAADT" style="margin-left:5px; font-weight:600">
+            Auto-estimate AADT if not typed
+          </label>
         </div>
-        <div style="margin-top:10px;display:flex;gap:8px">
+        <div style="margin-top:10px;">
           <button id="run">Search & Estimate</button>
           <span id="status" class="muted"></span>
         </div>
       </div>
 
-      <!-- Results -->
       <div class="card" id="resultsCard">
         <div><b>Results</b></div>
-        <div id="results" class="muted">Enter address + MPDs and click <b>Search & Estimate</b>.</div>
+        <div id="results" class="muted">
+          Enter address + MPDs and click <b>Search & Estimate</b> to see gallons estimates.
+        </div>
       </div>
 
-      <!-- Advanced -->
       <details class="card">
         <summary><b>Advanced inputs (optional)</b></summary>
         <div class="row">
-          <div class="col"><label>Total VPD (AADT)</label><input id="VPD" type="number" value="18024"></div>
+          <div class="col"><label>AADT (VPD)</label><input id="VPD" type="number" value="18024"></div>
           <div class="col"><label>Truck share (%)</label><input id="truckShare" type="number" value="5.5"></div>
         </div>
         <div class="row">
-          <div class="col"><label>Frontage F</label><input id="frontShare" type="number" step="0.01" value="0.59"></div>
-          <div class="col"><label>Turn T</label><input id="turnShare" type="number" step="0.01" value="0.41"></div>
+          <div class="col"><label>F (frontage)</label><input id="frontShare" type="number" step="0.01" value="0.59"></div>
+          <div class="col"><label>T (turn)</label><input id="turnShare" type="number" step="0.01" value="0.41"></div>
         </div>
         <div class="row">
-          <div class="col"><label>Turn friction f<sub>T</sub> (0–1)</label><input id="turnFric" type="number" step="0.05" min="0" max="1" value="0.70"></div>
+          <div class="col"><label>f<sub>T</sub> (turn friction)</label><input id="turnFric" type="number" step="0.05" min="0" max="1" value="0.70"></div>
           <div class="col"><label>Speed (mph)</label><input id="speed" type="number" value="35"></div>
         </div>
         <div class="row">
           <div class="col"><label>Access points</label><input id="accessPts" type="number" value="4"></div>
-          <div class="col"><label>LED price sign? (0/1)</label><input id="ledSign" type="number" min="0" max="1" value="1"></div>
+          <div class="col"><label>LED sign? (0/1)</label><input id="ledSign" type="number" min="0" max="1" value="1"></div>
         </div>
         <div class="row">
-          <div class="col"><label>Price delta (market − your) $/gal</label><input id="priceDelta" type="number" step="0.01" value="0.00"></div>
-          <div class="col"><label>CPR avg index</label><input id="cpr" type="number" value="104"></div>
+          <div class="col"><label>Δ price ($/gal)</label><input id="priceDelta" type="number" step="0.01" value="0.00"></div>
+          <div class="col"><label>CPR index</label><input id="cpr" type="number" value="104"></div>
         </div>
         <div class="row">
-          <div class="col"><label>Gasoline score</label><input id="gasScore" type="number" step="0.5" value="105.5"></div>
+          <div class="col"><label>Gas score</label><input id="gasScore" type="number" step="0.5" value="105.5"></div>
           <div class="col"><label>Diesel score</label><input id="dieselScore" type="number" step="0.5" value="22.5"></div>
         </div>
         <div class="row">
-          <div class="col"><label>Competition radius (mi)</label><input id="radiusMi" type="number" step="0.5" min="0.5" value="2"></div>
-          <div class="col"><label>Dev. radius (mi)</label><input id="devRadiusMi" type="number" step="0.5" min="1" value="3"></div>
+          <div class="col"><label>Comp radius (mi)</label><input id="radiusMi" type="number" step="0.5" min="0.5" value="2"></div>
+          <div class="col"><label>Dev radius (mi)</label><input id="devRadiusMi" type="number" step="0.5" min="1" value="3"></div>
         </div>
       </details>
 
-      <!-- Live Data Status (BOTTOM) -->
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <b>Live Data Status</b>
@@ -118,12 +136,167 @@
       </div>
     </div>
 
-    <div class="right"><div id="map"></div></div>
+    <div class="right">
+      <div id="map"></div>
+    </div>
   </div>
 
-  <!-- Leaflet JS with load/ error handlers -->
   <script>
-    function showBanner(msg){ const el=document.getElementById('pageError'); el.textContent=msg; el.style.display='block'; }
-    window.addEventListener('error', e => { if(String(e.message||e.error||'').includes('L is not defined')) showBanner('Map library failed to load. Check network/ad-blockers.'); });
+    // Show error banner if Leaflet doesn't load
+    window.addEventListener('error', e=>{
+      if(e.message && (e.message.includes('L is not defined') || e.message.includes('Leaflet'))) {
+        document.getElementById('pageError').style.display = 'block';
+      }
+    });
   </script>
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js" onload="
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+  <script>
+  // Config
+  const API_BASE = "https://sun-nourie-live.onrender.com";
+  document.getElementById('backendUrl').textContent = API_BASE;
+  const ENDPOINT = {
+    backend: API_BASE + "/",
+    geocode: API_BASE + "/geocode",
+    places: API_BASE + "/places",
+    developments: API_BASE + "/developments"
+  };
+
+  async function apiFetch(url, opts={}) {
+    const opt = Object.assign({ mode: "cors", cache: "no-store", referrerPolicy: "no-referrer" }, opts);
+    for(let i=0;i<2;i++){
+      try { return await fetch(url, opt); }
+      catch (e) { if (i===1) throw e; await new Promise(r=>setTimeout(r,700)); }
+    }
+  }
+
+  function setStatus(el, ok, ms, extra='') {
+    el.className = ok ? "ok" : "fail";
+    el.textContent = (ok ? "OK" : "Fail") + (ms ? ` (${ms}ms)` : '') + (extra ? ` — ${extra}` : '');
+  }
+
+  async function timed(url) {
+    const t0 = performance.now();
+    const r = await apiFetch(url);
+    return { r, ms: Math.round(performance.now() - t0) };
+  }
+
+  async function checkAll() {
+    const sB = document.getElementById("s-backend");
+    const sG = document.getElementById("s-geocode");
+    const sP = document.getElementById("s-places");
+    const sD = document.getElementById("s-dev");
+    try { const {r,ms} = await timed(ENDPOINT.backend); const t = await r.text(); setStatus(sB, r.ok && t.includes("OK"), ms); } catch { setStatus(sB,false); }
+    try { const {r,ms} = await timed(ENDPOINT.geocode+"?address=Raleigh,NC"); setStatus(sG, r.ok, ms); } catch { setStatus(sG,false); }
+    try { const {r,ms} = await timed(ENDPOINT.places+"?lat=35.79&lng=-78.52&radius=1609"); setStatus(sP, r.ok, ms); } catch { setStatus(sP,false); }
+    try { const {r,ms} = await timed(ENDPOINT.developments+"?lat=35.79&lng=-78.52&radius=5000"); setStatus(sD, r.ok, ms); } catch { setStatus(sD,false); }
+  }
+  document.getElementById("recheck").addEventListener("click", checkAll);
+  document.addEventListener("DOMContentLoaded", checkAll);
+
+  // Initialize map
+  const map = L.map('map').setView([35.7796,-78.6382],12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap'
+  }).addTo(map);
+
+  // Estimate logic
+  document.getElementById("run").addEventListener("click", async () => {
+    const statusEl = document.getElementById("status");
+    const resultsEl = document.getElementById("results");
+    try {
+      statusEl.textContent = "Geocoding...";
+      const addr = document.getElementById("addr").value.trim();
+      if (!addr) throw new Error("Address is required");
+      const g = await apiFetch(`${ENDPOINT.geocode}?address=${encodeURIComponent(addr)}`);
+      if (!g.ok) throw new Error(`Geocode error: ${g.status}`);
+      const gj = await g.json();
+      if (!gj.results?.length) throw new Error("No results for that address");
+      const { lat, lng } = gj.results[0].geometry.location;
+      L.marker([lat,lng]).addTo(map).bindPopup("Site").openPopup();
+      map.setView([lat,lng],14);
+
+      statusEl.textContent = "Finding competition...";
+      const radius = Number(document.getElementById("radiusMi").value) * 1609;
+      const p = await apiFetch(`${ENDPOINT.places}?lat=${lat}&lng=${lng}&radius=${radius}`);
+      if (!p.ok) throw new Error(`Places error: ${p.status}`);
+      const pj = await p.json();
+
+      statusEl.textContent = "Finding developments...";
+      const dradius = Number(document.getElementById("devRadiusMi").value) * 1609;
+      const d = await apiFetch(`${ENDPOINT.developments}?lat=${lat}&lng=${lng}&radius=${dradius}`);
+      const dj = d && d.ok ? await d.json() : { results: [] };
+
+      // Add markers
+      pj.results.forEach(r => L.marker([r.geometry.location.lat, r.geometry.location.lng]).addTo(map).bindPopup(r.name));
+      dj.results.forEach(r => L.circleMarker([r.geometry.location.lat, r.geometry.location.lng], { radius:6, color:'orange' }).addTo(map).bindPopup(r.name));
+
+      statusEl.textContent = "Calculating gallons...";
+
+      // Data inputs
+      let V = Number(document.getElementById("VPD").value);
+      if (document.getElementById("autoAADT").checked) {
+        // Rough proxy: nearest comp count × 2. Replace with real logic as desired.
+        V = pj.results.length > 0 ? pj.results.length * 1000 : V;
+      }
+      const T = (Number(document.getElementById("truckShare").value) || 0) / 100;
+      const Va = V * (1 - T), Vt = V * T;
+
+      const F = Number(document.getElementById("frontShare").value);
+      const TT = Number(document.getElementById("turnShare").value);
+      const fT = Number(document.getElementById("turnFric").value);
+      const Maecc = F + fT * TT;
+
+      const sa0 = 0.02, st0 = 0.012;
+      const mpgDelta = Number(document.getElementById("priceDelta").value);
+      const cpr = Number(document.getElementById("cpr").value) / 100;
+      const Mprice = 1 + 0.2 * (mpgDelta / 0.11);
+
+      const MfacA = Number(document.getElementById("gasScore").value) / 100;
+      const MfacT = Number(document.getElementById("dieselScore").value) / 25;
+
+      const cf = 0.25, kappa = cf;
+      const losses = pj.results.reduce((sum, r) => {
+        const dx = r.geometry.location;
+        // dummy uniform w=0.2
+        return sum + 0.2;
+      }, 0);
+      const Mcomp = 1 / (1 + kappa * losses);
+
+      const sa = sa0 * Maecc * Mprice * MfacA * Mcomp * cpr;
+      const st = st0 * Maecc * Mprice * MfacT * Mcomp * cpr;
+
+      const ga = 10.2, gt = 16;
+      const GPD = Va * sa * ga + Vt * st * gt;
+      const GPM = GPD * (365 / 12);
+
+      const posGas = Number(document.getElementById("mpd").value) || 0;
+      const posDiesel = Number(document.getElementById("dieselpos").value) || 0;
+      const cycles = 25, galCycleAuto = 10, galCycleDiesel = 16;
+      const cap = (posGas * cycles * galCycleAuto + posDiesel * cycles * galCycleDiesel) * (365 / 12);
+
+      const G1 = GPM.toFixed(0);
+      const low = Math.round(GPM * 0.86);
+      const high = Math.round(GPM * 1.06);
+      const g2 = Math.round(GPM * 1.027);
+      const g3 = Math.round(g2 * 1.0125);
+
+      resultsEl.innerHTML = `
+        <table>
+          <tr><td><b>Year-1 est. (gal/mo)</b></td><td class="num">${G1}</td></tr>
+          <tr><td>Low / High range</td><td class="num">${low} – ${high}</td></tr>
+          <tr><td>Year-2 projection</td><td class="num">${g2}</td></tr>
+          <tr><td>Year-3 projection</td><td class="num">${g3}</td></tr>
+          <tr><td>Capacity cap</td><td class="num">${Math.round(cap)}</td></tr>
+        </table>
+      `;
+      statusEl.textContent = "Done.";
+    } catch(e) {
+      document.getElementById("results").innerHTML = `<span class="err">${e.message || e}</span>`;
+      document.getElementById("status").textContent = "";
+    }
+  });
+  </script>
+</body>
+</html>
