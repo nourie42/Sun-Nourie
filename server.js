@@ -22,20 +22,25 @@ app.post("/chat", async (req, res) => {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "gpt-4.1-mini",
+        model: "gpt-4.1-mini",   // safe model for Q&A
         input: [{ role: "system", content: system }, ...messages],
         stream: false
       })
     });
 
     const contentType = oai.headers.get("content-type") || "";
-    const body = contentType.includes("application/json") ? await oai.json() : await oai.text();
+    const body = contentType.includes("application/json")
+      ? await oai.json()
+      : await oai.text();
+
     if (!oai.ok) {
-      const errMsg = typeof body === "string" ? body : (body.error?.message || JSON.stringify(body));
+      const errMsg = typeof body === "string"
+        ? body
+        : (body.error?.message || JSON.stringify(body));
       return res.status(oai.status).json({ error: errMsg });
     }
 
-    // Normalize text output
+    // Normalize output to always send { output_text: "..." }
     let text = "";
     if (typeof body === "string") text = body;
     else if (body.output_text) text = body.output_text;
@@ -50,8 +55,8 @@ app.post("/chat", async (req, res) => {
     } else if (body.choices?.[0]?.message?.content) {
       text = body.choices[0].message.content;
     }
-    if (!text) text = "[No text from model]";
 
+    if (!text) text = "[No text from model]";
     return res.json({ output_text: text });
   } catch (err) {
     return res.status(500).json({ error: String(err) });
@@ -59,11 +64,12 @@ app.post("/chat", async (req, res) => {
 });
 
 /**
- * 2) Google Geocoding (address -> lat/lng) via server key
+ * 2) Google Geocoding (address -> lat/lng)
  */
 app.get("/geocode", async (req, res) => {
   const { address } = req.query;
   if (!address) return res.status(400).json({ error: "Missing address parameter" });
+
   try {
     const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${process.env.GOOGLE_MAPS_API_KEY}`;
     const r = await fetch(url);
@@ -75,11 +81,12 @@ app.get("/geocode", async (req, res) => {
 });
 
 /**
- * 3) Google Places Nearby Search (gas stations near lat/lng) via server key
+ * 3) Google Places Nearby Search (gas stations)
  */
 app.get("/places", async (req, res) => {
   const { lat, lng, radius = 1609 } = req.query; // default 1 mile
   if (!lat || !lng) return res.status(400).json({ error: "Missing lat/lng parameters" });
+
   try {
     const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&type=gas_station&key=${process.env.GOOGLE_MAPS_API_KEY}`;
     const r = await fetch(url);
@@ -90,5 +97,6 @@ app.get("/places", async (req, res) => {
   }
 });
 
+// Start server
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on ${PORT}`));
+app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
