@@ -14,13 +14,13 @@
   .right{flex:1}
   h1{margin:0 0 12px;font-size:22px}
   .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:12px}
+  .badge{display:inline-block;min-width:120px;padding:4px 10px;border-radius:999px;border:1px solid var(--border);background:#1b1f2a;margin-right:6px}
+  .ok{color:#9ef5b3}.fail{color:#ff9a9a}.pending{color:#e8e8e8;opacity:.7}
+  #map{height:calc(100vh - 32px);width:100%;border-radius:12px;border:1px solid var(--border)}
   label{display:block;font-weight:600;margin:10px 0 4px}
   input[type="text"],input[type="number"]{width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:#1b1f2a;color:var(--text)}
   button{padding:10px 14px;border-radius:10px;border:0;background:var(--accent);color:#fff;font-weight:600;cursor:pointer}
   button[disabled]{opacity:.6;cursor:not-allowed}
-  .badge{display:inline-block;min-width:120px;padding:4px 10px;border-radius:999px;border:1px solid var(--border);background:#1b1f2a;margin-right:6px}
-  .ok{color:#9ef5b3}.fail{color:#ff9a9a}.pending{color:#e8e8e8;opacity:.7}
-  #map{height:calc(100vh - 32px);width:100%;border-radius:12px;border:1px solid var(--border)}
   .muted{color:var(--muted);font-size:12px}
   .err{color:#ff9a9a}
 </style>
@@ -50,14 +50,8 @@
         <label>Address</label>
         <input id="addr" type="text" placeholder="e.g., 4173 Knightdale BLVD Knightdale NC">
         <div style="display:flex;gap:8px">
-          <div style="flex:1">
-            <label>Gasoline MPDs</label>
-            <input id="mpd" type="number" value="6" min="0">
-          </div>
-          <div style="flex:1">
-            <label>Diesel positions</label>
-            <input id="dieselpos" type="number" value="8" min="0">
-          </div>
+          <div style="flex:1"><label>Gasoline MPDs</label><input id="mpd" type="number" value="6" min="0"></div>
+          <div style="flex:1"><label>Diesel positions</label><input id="dieselpos" type="number" value="8" min="0"></div>
         </div>
         <button id="run">Search & Estimate</button>
         <div id="status" class="muted"></div>
@@ -75,42 +69,83 @@
 
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
-  // ---------- CONFIG ----------
-  const API_BASE = "https://sun-nourie-live.onrender.com"; // change if backend URL differs
+  const API_BASE = "https://sun-nourie-live.onrender.com"; // change if needed
   document.getElementById('backendUrl').textContent = API_BASE;
   const ENDPOINT = {
-    backend:        API_BASE + "/",
-    geocode:        API_BASE + "/geocode",
-    places:         API_BASE + "/places",
-    developments:   API_BASE + "/developments"
+    backend: API_BASE + "/",
+    geocode: API_BASE + "/geocode",
+    places: API_BASE + "/places",
+    developments: API_BASE + "/developments"
   };
 
-  // reliable fetch with CORS + retry (fixes "Failed to fetch")
+  // Robust fetch (CORS + retry)
   async function apiFetch(url, opts = {}) {
-    const baseOpts = { mode: "cors", cache: "no-store", referrerPolicy: "no-referrer" };
-    const options = Object.assign(baseOpts, opts);
+    const options = Object.assign({ mode: "cors", cache: "no-store", referrerPolicy: "no-referrer" }, opts);
     for (let i = 0; i < 2; i++) {
-      try {
-        const r = await fetch(url, options);
-        return r;
-      } catch (e) {
-        if (i === 1) throw e;
-        await new Promise(res => setTimeout(res, 700)); // retry once
-      }
+      try { return await fetch(url, options); }
+      catch (e) { if (i === 1) throw e; await new Promise(r => setTimeout(r, 700)); }
     }
   }
 
-  // ---------- STATUS PANEL ----------
-  const sBackend = document.getElementById("s-backend");
-  const sGeo     = document.getElementById("s-geocode");
-  const sPlaces  = document.getElementById("s-places");
-  const sDev     = document.getElementById("s-dev");
-  const set = (el, ok, ms) => { el.className = ok ? "ok" : "fail"; el.textContent = (ok ? "OK" : "Fail") + (ms ? ` (${ms}ms)` : ""); };
-  async function ping(url){ const t0=performance.now(); const r=await apiFetch(url); return { ok:r.ok, ms:Math.round(performance.now()-t0) }; }
-  async function checkAll(){
-    try{ const {ok,ms}=await ping(ENDPOINT.backend); set(sBackend, ok, ms);}catch{ set(sBackend,false); }
-    try{ const {ok,ms}=await ping(ENDPOINT.geocode + "?address=Raleigh,NC"); set(sGeo, ok, ms);}catch{ set(sGeo,false); }
-    try{ const {ok,ms}=await ping(ENDPOINT.places + "?lat=35.79&lng=-78.52&radius=1609"); set(sPlaces, ok, ms);}catch{ set(sPlaces,false); }
-    try{ const {ok,ms}=await ping(ENDPOINT.developments + "?lat=35.79&lng=-78.52&radius=5000"); set(sDev, ok, ms);}catch{ set(sDev,false); }
+  // Status panel
+  const set = (el, ok, ms, extra="") => { el.className = ok ? "ok" : "fail"; el.textContent = (ok ? "OK" : "Fail") + (ms ? ` (${ms}ms)` : "") + (extra ? ` — ${extra}` : ""); };
+  async function timed(url) { const t0=performance.now(); const r = await apiFetch(url); return { r, ms:Math.round(performance.now()-t0) }; }
+  async function checkAll() {
+    const sBackend = document.getElementById("s-backend");
+    const sGeo = document.getElementById("s-geocode");
+    const sPlaces = document.getElementById("s-places");
+    const sDev = document.getElementById("s-dev");
+    try { const {r,ms} = await timed(ENDPOINT.backend); const text = await r.text(); set(sBackend, r.ok && text.includes("OK"), ms); } catch(e){ set(sBackend,false,0,"network"); }
+    try { const {r,ms} = await timed(ENDPOINT.geocode + "?address=Raleigh,NC"); set(sGeo, r.ok, ms); } catch(e){ set(sGeo,false,0,"network"); }
+    try { const {r,ms} = await timed(ENDPOINT.places + "?lat=35.79&lng=-78.52&radius=1609"); set(sPlaces, r.ok, ms); } catch(e){ set(sPlaces,false,0,"network"); }
+    try { const {r,ms} = await timed(ENDPOINT.developments + "?lat=35.79&lng=-78.52&radius=5000"); set(sDev, r.ok, ms); } catch(e){ set(sDev,false,0,"network"); }
   }
-  document.getElementById("recheck").addEventListener("click", checkAll
+  document.getElementById("recheck").addEventListener("click", checkAll);
+  document.addEventListener("DOMContentLoaded", checkAll);
+
+  // Map
+  const map = L.map('map').setView([35.7796,-78.6382],12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; OpenStreetMap'}).addTo(map);
+  let siteMarker=null; const compLayer=L.layerGroup().addTo(map); const devLayer=L.layerGroup().addTo(map);
+
+  // Run flow
+  const statusEl = document.getElementById("status");
+  const resultsEl = document.getElementById("results");
+  document.getElementById("run").addEventListener("click", async ()=>{
+    try{
+      const addr = document.getElementById("addr").value.trim();
+      if(!addr) throw new Error("Enter an address");
+      statusEl.textContent="Geocoding…";
+      const g = await apiFetch(`${ENDPOINT.geocode}?address=${encodeURIComponent(addr)}`);
+      if(!g.ok){ const raw=await g.text(); throw new Error(`Geocode HTTP ${g.status}: ${raw.slice(0,180)}`); }
+      const gj = await g.json(); if(!gj.results?.length) throw new Error("Address not found");
+      const { lat, lng } = gj.results[0].geometry.location;
+      if(siteMarker) siteMarker.remove(); siteMarker = L.marker([lat,lng]).addTo(map).bindPopup("Prospect").openPopup(); map.setView([lat,lng],14);
+
+      statusEl.textContent="Finding competition…";
+      const p = await apiFetch(`${ENDPOINT.places}?lat=${lat}&lng=${lng}&radius=${Math.round(1609*2)}`);
+      if(!p.ok){ const raw=await p.text(); throw new Error(`Places HTTP ${p.status}: ${raw.slice(0,180)}`); }
+      const pj = await p.json(); compLayer.clearLayers();
+      pj.results?.forEach(r => L.marker([r.geometry.location.lat,r.geometry.location.lng]).addTo(compLayer).bindPopup(r.name));
+
+      statusEl.textContent="Searching developments…";
+      let devs = [];
+      try {
+        const d = await apiFetch(`${ENDPOINT.developments}?lat=${lat}&lng=${lng}&radius=5000`);
+        if(d.ok){ const dj = await d.json(); devs = dj.results || []; }
+      } catch(_) {}
+      devLayer.clearLayers();
+      devs.forEach(r => r.geometry?.location && L.circleMarker([r.geometry.location.lat,r.geometry.location.lng],{radius:6,color:'orange'}).addTo(devLayer).bindPopup(r.name));
+
+      const mpds = +document.getElementById("mpd").value || 0;
+      const diesel = +document.getElementById("dieselpos").value || 0;
+      resultsEl.textContent = `Found ${pj.results?.length||0} competitors and ${devs.length} developments. (MPDs=${mpds}, Diesel positions=${diesel}).`;
+      statusEl.textContent="Done.";
+    }catch(e){
+      statusEl.innerHTML = `<span class="err">${(e && e.message) ? e.message : String(e)}</span>`;
+      resultsEl.innerHTML = `<span class="err">${(e && e.message) ? e.message : String(e)}</span>`;
+    }
+  });
+  </script>
+</body>
+</html>
