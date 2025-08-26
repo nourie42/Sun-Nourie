@@ -1,34 +1,26 @@
-import express from "express";
-import cors from "cors";
+<script>
+let map;
 
-const app = express();
-app.use(express.json());
-app.use(cors({ origin: true }));
+function initMap() {
+  map = new google.maps.Map(document.getElementById("map"), {
+    center: { lat: 35.7796, lng: -78.6382 }, // default Raleigh, NC
+    zoom: 12,
+  });
+}
 
-// Proxy Google Places Nearby Search
-app.get("/places", async (req, res) => {
-  const { lat, lng, radius = 1609 } = req.query; // radius default 1 mile in meters
-  try {
-    const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&type=gas_station&key=${process.env.GOOGLE_MAPS_API_KEY}`;
-    const r = await fetch(url);
-    const data = await r.json();
-    res.json(data);
-  } catch (err) {
-    res.status(500).json({ error: String(err) });
-  }
-});
+// Example: search nearby gas stations
+async function searchNearby(lat, lng) {
+  const resp = await fetch(`/places?lat=${lat}&lng=${lng}&radius=1609`);
+  const data = await resp.json();
 
-// Proxy Geocoding API (address → lat/lng)
-app.get("/geocode", async (req, res) => {
-  const { address } = req.query;
-  try {
-    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${process.env.GOOGLE_MAPS_API_KEY}`;
-    const r = await fetch(url);
-    const data = await r.json();
-    res.json(data);
-  } catch (err) {
-    res.status(500).json({ error: String(err) });
-  }
-});
+  data.results.forEach(place => {
+    new google.maps.Marker({
+      position: place.geometry.location,
+      map,
+      title: place.name
+    });
+  });
+}
+</script>
 
 
