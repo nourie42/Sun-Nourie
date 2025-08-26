@@ -87,6 +87,7 @@
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script>
+/* ---------- CONFIG ---------- */
 const API_BASE="https://sun-nourie-live.onrender.com";
 const ENDPOINT={backend:API_BASE+"/",geocode:API_BASE+"/geocode",places:API_BASE+"/places",developments:API_BASE+"/developments",aadt:API_BASE+"/aadt"};
 document.getElementById("backendUrl").textContent=API_BASE;
@@ -97,77 +98,125 @@ function setStatus(el,ok,ms){el.className=ok?"ok":"fail";el.textContent=(ok?"OK"
 async function timed(url){const t0=performance.now();const r=await apiFetch(url);return{r,ok:r.ok,ms:Math.round(performance.now()-t0)};}
 
 async function checkAll(){
-  try{const {r,ok,ms}=await timed(ENDPOINT.backend);const txt=await r.text();setStatus(document.getElementById("s-backend"),ok&&txt.includes("OK"),ms);}catch{setStatus(document.getElementById("s-backend"),false);}
-  try{const {r,ms}=await timed(ENDPOINT.geocode+"?address=Raleigh,NC");const j=await r.json();setStatus(document.getElementById("s-geocode"),r.ok&&j.status==="OK",ms);}catch{setStatus(document.getElementById("s-geocode"),false);}
-  try{const {r,ms}=await timed(ENDPOINT.places+"?lat=35.79&lng=-78.52&radius=1609");const j=await r.json();setStatus(document.getElementById("s-places"),r.ok&&Array.isArray(j.results),ms);}catch{setStatus(document.getElementById("s-places"),false);}
-  try{const {r,ms}=await timed(ENDPOINT.developments+"?lat=35.79&lng=-78.52&radius=5000");const j=await r.json();setStatus(document.getElementById("s-dev"),r.ok&&Array.isArray(j.results),ms);}catch{setStatus(document.getElementById("s-dev"),false);}
+  const sb=document.getElementById("s-backend"),sg=document.getElementById("s-geocode"),sp=document.getElementById("s-places"),sd=document.getElementById("s-dev");
+  try{const {r,ok,ms}=await timed(ENDPOINT.backend);const txt=await r.text();setStatus(sb,ok&&txt.includes("OK"),ms);}catch{setStatus(sb,false);}
+  try{const {r,ms}=await timed(ENDPOINT.geocode+"?address=Raleigh,NC");const j=await r.json();setStatus(sg,r.ok&&j.status==="OK",ms);}catch{setStatus(sg,false);}
+  try{const {r,ms}=await timed(ENDPOINT.places+"?lat=35.79&lng=-78.52&radius=1609");const j=await r.json();setStatus(sp,r.ok&&Array.isArray(j.results),ms);}catch{setStatus(sp,false);}
+  try{const {r,ms}=await timed(ENDPOINT.developments+"?lat=35.79&lng=-78.52&radius=5000");const j=await r.json();setStatus(sd,r.ok&&Array.isArray(j.results),ms);}catch{setStatus(sd,false);}
 }
 document.getElementById("recheck").addEventListener("click",checkAll);document.addEventListener("DOMContentLoaded",checkAll);
 
+/* ---------- MAP ---------- */
 const map=L.map("map").setView([35.7796,-78.6382],12);
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map);
 
+/* ---------- RUN ---------- */
 document.getElementById("run").addEventListener("click",async()=>{
- const statusEl=document.getElementById("status"),resultsEl=document.getElementById("results");
- try{
-   statusEl.textContent="Geocoding…";
-   const addr=document.getElementById("addr").value.trim();if(!addr)throw new Error("Enter an address");
-   const g=await apiFetch(`${ENDPOINT.geocode}?address=${encodeURIComponent(addr)}`);const gj=await g.json();const {lat,lng}=gj.results[0].geometry.location;
-   L.marker([lat,lng]).addTo(map).bindPopup("Site").openPopup();map.setView([lat,lng],14);
+  const statusEl=document.getElementById("status"),resultsEl=document.getElementById("results");
+  try{
+    statusEl.textContent="Geocoding…";
+    const addr=document.getElementById("addr").value.trim();if(!addr)throw new Error("Enter an address");
+    const g=await apiFetch(`${ENDPOINT.geocode}?address=${encodeURIComponent(addr)}`);const gj=await g.json();if(!gj.results?.length)throw new Error("No geocode result");
+    const {lat,lng}=gj.results[0].geometry.location;
+    L.marker([lat,lng]).addTo(map).bindPopup("Site").openPopup();map.setView([lat,lng],14);
 
-   // AADT
-   let V=Number(document.getElementById("VPD").value)||0;
-   if(document.getElementById("autoAADT").checked){try{const a=await apiFetch(`${ENDPOINT.aadt}?lat=${lat}&lng=${lng}`);if(a.ok){const aj=await a.json();if(aj.aadt){V=aj.aadt;document.getElementById("VPD").value=V;}}}catch{}}
+    // AADT auto-fetch: clear the field first; only fill if we get a real value
+    let V = Number(document.getElementById("VPD").value)||0;
+    if (document.getElementById("autoAADT").checked) {
+      document.getElementById("VPD").value = "";
+      try {
+        const a = await apiFetch(`${ENDPOINT.aadt}?lat=${lat}&lng=${lng}`);
+        if (a.ok) {
+          const aj = await a.json();
+          if (aj && aj.aadt) {
+            V = Number(aj.aadt);
+            document.getElementById("VPD").value = V;
+            resultsEl.insertAdjacentHTML("afterbegin",
+              `<div class="muted">AADT ${V.toLocaleString()}${aj.year?` (${aj.year})`:""} • ~${Math.round((aj.distance_m||0)/16.0934)/100} mi • ${aj.layer||"NCDOT"}</div>`);
+          } else {
+            resultsEl.insertAdjacentHTML("afterbegin",
+              `<div class="muted err">No AADT found near this point (enter manually in Advanced).</div>`);
+          }
+        }
+      } catch {}
+    }
 
-   // Places
-   statusEl.textContent="Competition…";
-   const radiusMi=Number(document.getElementById("radiusMi").value||1);
-   const p=await apiFetch(`${ENDPOINT.places}?lat=${lat}&lng=${lng}&radius=${Math.round(radiusMi*1609)}`);
-   const pj=p.ok?await p.json():{results:[]};
+    // Places (competition)
+    statusEl.textContent="Competition…";
+    const radiusMi=Number(document.getElementById("radiusMi").value||1);
+    const p=await apiFetch(`${ENDPOINT.places}?lat=${lat}&lng=${lng}&radius=${Math.round(radiusMi*1609)}`);
+    const pj=p.ok?await p.json():{results:[]};
 
-   // Developments
-   statusEl.textContent="Developments…";
-   let devs=[];try{const d=await apiFetch(`${ENDPOINT.developments}?lat=${lat}&lng=${lng}&radius=${Number(document.getElementById("devRadiusMi").value)*1609}`);if(d.ok){const dj=await d.json();const WANT=/(planned|permit|site plan|coming soon|construction|proposed)/i;const AVOID=/(closed|permanently)/i;devs=(dj.results||[]).filter(r=>WANT.test(r.name||"")&&!AVOID.test(r.name||""));}}catch{}
+    // Developments (planned/proposed/etc) — frontend filter just in case
+    statusEl.textContent="Developments…";
+    const dr=Number(document.getElementById("devRadiusMi").value||3)*1609;
+    let devs=[];try{const d=await apiFetch(`${ENDPOINT.developments}?lat=${lat}&lng=${lng}&radius=${Math.round(dr)}`);if(d.ok){const dj=await d.json();const WANT=/(planned|permit|site plan|coming soon|construction|proposed)/i;const AVOID=/(permanently closed|closed)/i;devs=(dj.results||[]).filter(r=>WANT.test(r.name||"")&&!AVOID.test(r.name||""));}}catch{}
 
-   pj.results.forEach(r=>L.marker([r.geometry.location.lat,r.geometry.location.lng]).addTo(map).bindPopup(r.name));
-   devs.forEach(r=>L.circleMarker([r.geometry.location.lat,r.geometry.location.lng],{radius:6,color:"orange"}).addTo(map).bindPopup(r.name));
+    // Map pins
+    pj.results.forEach(r=>L.marker([r.geometry.location.lat,r.geometry.location.lng]).addTo(map).bindPopup(r.name));
+    devs.forEach(r=>L.circleMarker([r.geometry.location.lat,r.geometry.location.lng],{radius:6,color:"orange"}).addTo(map).bindPopup(r.name));
 
-   // Estimate gallons
-   statusEl.textContent="Estimating gallons…";
-   const truckShare=(Number(document.getElementById("truckShare").value)||0)/100;
-   const Va=V*(1-truckShare),Vt=V*truckShare;
-   const F=Number(document.getElementById("frontShare").value),T=Number(document.getElementById("turnShare").value),fT=Number(document.getElementById("turnFric").value);
-   const avail=F+fT*T;const Aa=Va*avail,At=Vt*avail;
-   const speed=Number(document.getElementById("speed").value)||35;
-   const Mspd=speed<=30?1.08:speed<=35?1.05:speed<=40?1.01:speed<=45?0.98:0.95;
-   const Macc=Mspd*(1+0.03*((Number(document.getElementById("accessPts").value)||2)-2))*((Number(document.getElementById("ledSign").value)||0)?1.05:1);
-   const Mprice=(d=>Math.min(1.15,Math.max(0.85,1+0.20*(d/0.11))))(Number(document.getElementById("priceDelta").value)||0);
-   const Mcpr=(Number(document.getElementById("cpr").value)||100)/100;
-   const MfacA=(Number(document.getElementById("gasScore").value)||100)/100;
-   const MfacT=(Number(document.getElementById("dieselScore").value)||25)/25;
+    // ---- Estimation ----
+    statusEl.textContent="Estimating gallons…";
 
-   let P=0;for(const c of pj.results){const dmi=miles(lat,lng,c.geometry.location.lat,c.geometry.location.lng);if(dmi>radiusMi)continue;let w=0.9/(dmi+0.05);if(dmi<=0.03)w*=4;const strong=/(wawa|sheetz|buc|race|trac|quiktrip|qt|costco|sam|bj's)/i.test(c.name||"");const q=strong?1.1:0.8;P+=w*q;}
-   const Mcomp=1/(1+0.35*P);
+    // Use the auto-fetched AADT if present; otherwise keep typed value V
+    if (!V) V = Number(document.getElementById("VPD").value)||0;
 
-   const sa=0.020*Macc*Mprice*MfacA*Mcomp*Mcpr;
-   const st=0.012*Macc*Mprice*MfacT*Mcomp*Mcpr*((Number(document.getElementById("dieselpos").value)||0)>=4?1.2:1);
-   const ga=10.2,gt=16;
-   const GPD=Aa*sa*ga+At*st*gt;let GPM=GPD*(365/12);
-   const posGas=(Number(document.getElementById("mpd").value)||0)*2,posDies=Number(document.getElementById("dieselpos").value)||0;
-   const cap=(posGas*25*10.5+posDies*25*16)*(365/12);GPM=Math.min(GPM,cap);
+    const truckShare=(Number(document.getElementById("truckShare").value)||0)/100;
+    const Va=V*(1-truckShare), Vt=V*truckShare;
 
-   const y1=Math.round(GPM),y2=Math.round(y1*1.027),y3=Math.round(y2*1.0125),low=Math.round(y1*0.86),high=Math.round(y1*1.06);
-   resultsEl.innerHTML=`<table>
-     <tr><td><b>Year-1 est. (gal/mo)</b></td><td class="num">${y1.toLocaleString()}</td></tr>
-     <tr><td>Low / High</td><td class="num">${low.toLocaleString()} – ${high.toLocaleString()}</td></tr>
-     <tr><td>Year-2</td><td class="num">${y2.toLocaleString()}</td></tr>
-     <tr><td>Year-3</td><td class="num">${y3.toLocaleString()}</td></tr>
-     <tr><td>Capacity cap</td><td class="num">${Math.round(cap).toLocaleString()}</td></tr>
-   </table>`;
-   statusEl.textContent="Done.";
- }catch(e){resultsEl.innerHTML=`<span class="err">${e.message||e}</span>`;statusEl.textContent="";}
+    const F=Number(document.getElementById("frontShare").value), T=Number(document.getElementById("turnShare").value), fT=Number(document.getElementById("turnFric").value);
+    const avail=F+fT*T; const Aa=Va*avail, At=Vt*avail;
+
+    const speed=Number(document.getElementById("speed").value)||35;
+    const Mspd=speed<=30?1.08:speed<=35?1.05:speed<=40?1.01:speed<=45?0.98:0.95;
+    const Macc=Mspd*(1+0.03*((Number(document.getElementById("accessPts").value)||2)-2))*((Number(document.getElementById("ledSign").value)||0)?1.05:1);
+    const Mprice=(d=>Math.min(1.15,Math.max(0.85,1+0.20*(d/0.11))))(Number(document.getElementById("priceDelta").value)||0);
+    const Mcpr=(Number(document.getElementById("cpr").value)||100)/100;
+    const MfacA=(Number(document.getElementById("gasScore").value)||100)/100;
+    const MfacT=(Number(document.getElementById("dieselScore").value)||25)/25;
+
+    // Distance-decay with heavy penalty ≤ 0.03 mi and 1-mile window cap
+    let P=0;
+    for (const c of pj.results) {
+      const dmi = miles(lat,lng,c.geometry.location.lat,c.geometry.location.lng);
+      if (dmi>radiusMi) continue;
+      let w = 0.9/(dmi+0.05);
+      if (dmi<=0.03) w*=4;
+      const strong=/(wawa|sheetz|buc|race|trac|quiktrip|qt|costco|sam|bj's)/i.test(c.name||"");
+      const q = strong ? 1.1 : 0.8;
+      P += w*q;
+    }
+    const Mcomp = 1/(1+0.35*P);
+
+    const sa=0.020*Macc*Mprice*MfacA*Mcomp*Mcpr;
+    const st=0.012*Macc*Mprice*MfacT*Mcomp*Mcpr*((Number(document.getElementById("dieselpos").value)||0)>=4?1.2:1);
+    const ga=10.2, gt=16;
+    const GPD = Aa*sa*ga + At*st*gt;
+    let   GPM = GPD*(365/12);
+
+    // Capacity cap
+    const posGas=(Number(document.getElementById("mpd").value)||0)*2, posDies=Number(document.getElementById("dieselpos").value)||0;
+    const cap=(posGas*25*10.5 + posDies*25*16)*(365/12);
+    GPM = Math.min(GPM, cap);
+
+    // Projections
+    const y1=Math.round(GPM), y2=Math.round(y1*1.027), y3=Math.round(y2*1.0125),
+          low=Math.round(y1*0.86), high=Math.round(y1*1.06);
+
+    resultsEl.innerHTML=`<table>
+      <tr><td><b>Year-1 est. (gal/mo)</b></td><td class="num">${y1.toLocaleString()}</td></tr>
+      <tr><td>Low / High</td><td class="num">${low.toLocaleString()} – ${high.toLocaleString()}</td></tr>
+      <tr><td>Year-2</td><td class="num">${y2.toLocaleString()}</td></tr>
+      <tr><td>Year-3</td><td class="num">${y3.toLocaleString()}</td></tr>
+      <tr><td>Capacity cap</td><td class="num">${Math.round(cap).toLocaleString()}</td></tr>
+    </table>`;
+    statusEl.textContent="Done.";
+  }catch(e){
+    document.getElementById("results").innerHTML=`<span class="err">${e.message||e}</span>`;
+    document.getElementById("status").textContent="";
+  }
 });
 </script>
 </body>
-</html>
-
+</html> 
