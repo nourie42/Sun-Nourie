@@ -7,165 +7,158 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <style>
   :root { --bg:#0b0c10; --card:#13151a; --text:#e8e8e8; --muted:#9aa0a6; --accent:#3a82f7; --border:#2a2f3a; }
-  *{box-sizing:border-box}
   body{margin:0;font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text)}
   .wrap{display:flex;gap:16px;height:100vh;padding:16px}
   .left{width:520px;min-width:360px;display:flex;flex-direction:column;gap:12px}
   .right{flex:1}
-  h1{margin:0 0 12px;font-size:22px}
   .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px}
+  h1{margin:0 0 12px;font-size:22px}
   label{display:block;font-weight:600;margin:10px 0 4px}
-  input[type="text"],input[type="number"]{width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:#1b1f2a;color:var(--text)}
-  .row{display:flex;gap:8px}
-  .col{flex:1}
+  input,button{font:inherit}
+  input[type="text"],input[type="number"]{width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:#1b1f2a;color:#e8e8e8}
   button{padding:10px 14px;border-radius:10px;border:0;background:var(--accent);color:#fff;font-weight:600;cursor:pointer}
-  button[disabled]{opacity:.6;cursor:not-allowed}
   .muted{color:var(--muted);font-size:12px}
   .err{color:#ff9a9a}
   #map{height:calc(100vh - 32px);width:100%;border-radius:12px;border:1px solid var(--border);background:#0f1116}
-  .num{font-variant-numeric:tabular-nums}
-  table{width:100%;border-collapse:collapse}
-  td{padding:4px 0;border-bottom:1px dashed #2a2f3a}
   .badge{display:inline-block;min-width:120px;padding:4px 10px;border-radius:999px;border:1px solid var(--border);background:#1b1f2a;margin-right:6px}
   .ok{color:#9ef5b3}.fail{color:#ff9a9a}.pending{color:#e8e8e8;opacity:.7}
+  table{width:100%;border-collapse:collapse}.num{font-variant-numeric:tabular-nums}
+  td{padding:4px 0;border-bottom:1px dashed #2a2f3a}
 </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="left">
-      <div class="card"><h1 style="margin:0">Prospect Estimator</h1></div>
+<div class="wrap">
+  <div class="left">
+    <div class="card"><h1>Prospect Estimator</h1></div>
 
-      <div class="card">
-        <div><b>Step 1: Enter address</b></div>
-        <label>Prospect site address</label>
-        <input id="addr" type="text" placeholder="e.g., 4173 Knightdale BLVD, Knightdale NC">
-        <div class="row" style="margin-top:8px">
-          <div class="col">
-            <label>Gasoline MPDs</label>
-            <input id="mpd" type="number" min="0" value="6">
-          </div>
-          <div class="col">
-            <label>Diesel positions</label>
-            <input id="dieselpos" type="number" min="0" value="8">
-          </div>
-        </div>
-        <div style="margin-top:8px;">
-          <input id="autoAADT" type="checkbox" checked>
-          <label for="autoAADT" style="margin-left:5px;font-weight:600">Auto-fetch AADT per site</label>
-        </div>
-        <div style="margin-top:10px;">
-          <button id="run">Search & Estimate</button>
-          <span id="status" class="muted"></span>
-        </div>
+    <!-- Inputs -->
+    <div class="card">
+      <label>Prospect site address</label>
+      <input id="addr" type="text" placeholder="4173 Knightdale BLVD, Knightdale NC">
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <div style="flex:1"><label>Gasoline MPDs</label><input id="mpd" type="number" value="6"></div>
+        <div style="flex:1"><label>Diesel positions</label><input id="dieselpos" type="number" value="8"></div>
       </div>
-
-      <div class="card"><b>Results</b><div id="results" class="muted">Enter address + MPDs and click Search.</div></div>
-
-      <details class="card">
-        <summary><b>Advanced inputs (optional)</b></summary>
-        <div class="row"><div class="col"><label>AADT (VPD)</label><input id="VPD" type="number" value="18024"></div><div class="col"><label>Truck share (%)</label><input id="truckShare" type="number" value="5.5"></div></div>
-        <div class="row"><div class="col"><label>F (frontage)</label><input id="frontShare" type="number" step="0.01" value="0.59"></div><div class="col"><label>T (turn)</label><input id="turnShare" type="number" step="0.01" value="0.41"></div></div>
-        <div class="row"><div class="col"><label>f<sub>T</sub></label><input id="turnFric" type="number" step="0.05" min="0" max="1" value="0.70"></div><div class="col"><label>Speed (mph)</label><input id="speed" type="number" value="35"></div></div>
-        <div class="row"><div class="col"><label>Access points</label><input id="accessPts" type="number" value="4"></div><div class="col"><label>LED sign? (0/1)</label><input id="ledSign" type="number" min="0" max="1" value="1"></div></div>
-        <div class="row"><div class="col"><label>Δ price ($/gal)</label><input id="priceDelta" type="number" step="0.01" value="0.00"></div><div class="col"><label>CPR index</label><input id="cpr" type="number" value="104"></div></div>
-        <div class="row"><div class="col"><label>Gas score</label><input id="gasScore" type="number" step="0.5" value="105.5"></div><div class="col"><label>Diesel score</label><input id="dieselScore" type="number" step="0.5" value="22.5"></div></div>
-        <div class="row"><div class="col"><label>Comp radius (mi)</label><input id="radiusMi" type="number" step="0.25" min="0.25" value="1"></div><div class="col"><label>Dev radius (mi)</label><input id="devRadiusMi" type="number" step="0.5" min="1" value="3"></div></div>
-      </details>
-
-      <div class="card">
-        <div style="display:flex;justify-content:space-between;align-items:center"><b>Live Data Status</b><button id="recheck">Recheck</button></div>
-        <div style="line-height:1.8;margin-top:8px">
-          <span class="badge"><b>Backend</b></span> <span id="s-backend" class="pending">checking…</span><br>
-          <span class="badge"><b>Geocode</b></span> <span id="s-geocode" class="pending">checking…</span><br>
-          <span class="badge"><b>Places</b></span> <span id="s-places" class="pending">checking…</span><br>
-          <span class="badge"><b>Developments</b></span> <span id="s-dev" class="pending">checking…</span>
-        </div>
-        <div class="muted" style="margin-top:6px">Backend: <code id="backendUrl">https://sun-nourie-live.onrender.com</code></div>
+      <div style="margin-top:8px"><input id="autoAADT" type="checkbox" checked>
+        <label for="autoAADT" style="margin-left:6px;font-weight:600">Auto-fetch AADT</label>
       </div>
+      <button id="run" style="margin-top:10px">Search & Estimate</button>
+      <span id="status" class="muted"></span>
     </div>
-    <div class="right"><div id="map"></div></div>
+
+    <!-- Results -->
+    <div class="card"><b>Results</b><div id="results" class="muted">Enter address & click Search.</div></div>
+
+    <!-- Advanced -->
+    <details class="card">
+      <summary><b>Advanced inputs</b></summary>
+      <label>AADT (VPD)</label><input id="VPD" type="number" value="18024">
+      <label>Truck share (%)</label><input id="truckShare" type="number" value="5.5">
+      <label>Frontage F</label><input id="frontShare" type="number" value="0.59">
+      <label>Turn T</label><input id="turnShare" type="number" value="0.41">
+      <label>fT (0–1)</label><input id="turnFric" type="number" value="0.70">
+      <label>Speed (mph)</label><input id="speed" type="number" value="35">
+      <label>Access points</label><input id="accessPts" type="number" value="4">
+      <label>LED sign? (0/1)</label><input id="ledSign" type="number" value="1">
+      <label>Δ price ($/gal)</label><input id="priceDelta" type="number" value="0.00">
+      <label>CPR index</label><input id="cpr" type="number" value="104">
+      <label>Gas score</label><input id="gasScore" type="number" value="105.5">
+      <label>Diesel score</label><input id="dieselScore" type="number" value="22.5">
+      <label>Comp radius (mi)</label><input id="radiusMi" type="number" value="1">
+      <label>Dev radius (mi)</label><input id="devRadiusMi" type="number" value="3">
+    </details>
+
+    <!-- Status -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <b>Live Data Status</b><button id="recheck">Recheck</button>
+      </div>
+      <div style="margin-top:8px;line-height:1.8">
+        <span class="badge"><b>Backend</b></span> <span id="s-backend" class="pending">checking…</span><br>
+        <span class="badge"><b>Geocode</b></span> <span id="s-geocode" class="pending">checking…</span><br>
+        <span class="badge"><b>Places</b></span> <span id="s-places" class="pending">checking…</span><br>
+        <span class="badge"><b>Developments</b></span> <span id="s-dev" class="pending">checking…</span>
+      </div>
+      <div class="muted" style="margin-top:6px">Backend: <code id="backendUrl">https://sun-nourie-live.onrender.com</code></div>
+    </div>
   </div>
+  <div class="right"><div id="map"></div></div>
+</div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script>
-const API_BASE = "https://sun-nourie-live.onrender.com";
-document.getElementById('backendUrl').textContent = API_BASE;
-const ENDPOINT = {
-  backend: API_BASE+"/",
-  geocode: API_BASE+"/geocode",
-  places: API_BASE+"/places",
-  developments: API_BASE+"/developments",
-  aadt: API_BASE+"/aadt"
-};
-
-async function apiFetch(url,opts={}) {
-  const opt = Object.assign({mode:"cors",cache:"no-store"},opts);
-  for (let i=0;i<2;i++){try{return await fetch(url,opt);}catch(e){if(i===1)throw e;await new Promise(r=>setTimeout(r,600));}}
-}
-
+const API_BASE="https://sun-nourie-live.onrender.com";
+const ENDPOINT={backend:API_BASE+"/",geocode:API_BASE+"/geocode",places:API_BASE+"/places",developments:API_BASE+"/developments",aadt:API_BASE+"/aadt"};
+document.getElementById("backendUrl").textContent=API_BASE;
+async function apiFetch(url,opt={}){for(let i=0;i<2;i++){try{return await fetch(url,opt);}catch(e){if(i===1)throw e;await new Promise(r=>setTimeout(r,600));}}}
+function miles(a,b,c,d){const R=3958.8;const toRad=x=>x*Math.PI/180;const dA=toRad(c-a),dO=toRad(d-b);const A=Math.sin(dA/2)**2+Math.cos(toRad(a))*Math.cos(toRad(c))*Math.sin(dO/2)**2;return 2*R*Math.asin(Math.sqrt(A));}
 function setStatus(el,ok,ms){el.className=ok?"ok":"fail";el.textContent=(ok?"OK":"Fail")+(ms?` (${ms}ms)`:"");}
-async function timed(url){const t0=performance.now();const r=await apiFetch(url);return{r,ms:Math.round(performance.now()-t0)};}
-async function checkAll(){
-  try{const {r,ms}=await timed(ENDPOINT.backend);const t=await r.text();setStatus(document.getElementById("s-backend"),r.ok&&t.includes("OK"),ms);}catch{setStatus(document.getElementById("s-backend"),false);}
-  try{const {r,ms}=await timed(ENDPOINT.geocode+"?address=Raleigh,NC");setStatus(document.getElementById("s-geocode"),r.ok,ms);}catch{setStatus(document.getElementById("s-geocode"),false);}
-  try{const {r,ms}=await timed(ENDPOINT.places+"?lat=35.79&lng=-78.52&radius=1609");setStatus(document.getElementById("s-places"),r.ok,ms);}catch{setStatus(document.getElementById("s-places"),false);}
-  try{const {r,ms}=await timed(ENDPOINT.developments+"?lat=35.79&lng=-78.52&radius=5000");setStatus(document.getElementById("s-dev"),r.ok,ms);}catch{setStatus(document.getElementById("s-dev"),false);}
-}
-document.getElementById("recheck").addEventListener("click",checkAll);
-document.addEventListener("DOMContentLoaded",checkAll);
-
-const map=L.map('map').setView([35.7796,-78.6382],12);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; OpenStreetMap'}).addTo(map);
+async function timed(url){const t0=performance.now();const r=await apiFetch(url);return{r,ok:r.ok,ms:Math.round(performance.now()-t0)};}
+async function checkAll(){try{const {r,ok,ms}=await timed(ENDPOINT.backend);const txt=await r.text();setStatus(document.getElementById("s-backend"),ok&&txt.includes("OK"),ms);}catch{setStatus(document.getElementById("s-backend"),false);}}
+document.getElementById("recheck").addEventListener("click",checkAll);document.addEventListener("DOMContentLoaded",checkAll);
+const map=L.map("map").setView([35.7796,-78.6382],12);L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 
 document.getElementById("run").addEventListener("click",async()=>{
-  const statusEl=document.getElementById("status"),resultsEl=document.getElementById("results");
-  try{
-    statusEl.textContent="Geocoding…";
-    const addr=document.getElementById("addr").value.trim();if(!addr)throw new Error("Enter an address");
-    const g=await apiFetch(`${ENDPOINT.geocode}?address=${encodeURIComponent(addr)}`);if(!g.ok)throw new Error("Geocode failed");
-    const gj=await g.json();if(!gj.results?.length)throw new Error("No geocode result");
-    const {lat,lng}=gj.results[0].geometry.location;
-    L.marker([lat,lng]).addTo(map).bindPopup("Site").openPopup();map.setView([lat,lng],14);
+ const statusEl=document.getElementById("status"),resultsEl=document.getElementById("results");
+ try{
+   statusEl.textContent="Geocoding…";
+   const addr=document.getElementById("addr").value.trim();if(!addr)throw new Error("Enter an address");
+   const g=await apiFetch(`${ENDPOINT.geocode}?address=${encodeURIComponent(addr)}`);const gj=await g.json();const {lat,lng}=gj.results[0].geometry.location;
+   L.marker([lat,lng]).addTo(map).bindPopup("Site").openPopup();map.setView([lat,lng],14);
 
-    // AADT fetch
-    let V=Number(document.getElementById("VPD").value)||0;
-    if(document.getElementById("autoAADT").checked){try{const a=await apiFetch(`${ENDPOINT.aadt}?lat=${lat}&lng=${lng}`);if(a.ok){const aj=await a.json();if(aj.aadt){V=Number(aj.aadt);document.getElementById("VPD").value=V;}}}catch{}}
+   // AADT
+   let V=Number(document.getElementById("VPD").value)||0;
+   if(document.getElementById("autoAADT").checked){try{const a=await apiFetch(`${ENDPOINT.aadt}?lat=${lat}&lng=${lng}`);if(a.ok){const aj=await a.json();if(aj.aadt){V=aj.aadt;document.getElementById("VPD").value=V;}}}catch{}}
 
-    statusEl.textContent="Competition…";
-    const radius=Number(document.getElementById("radiusMi").value||1)*1609;
-    const p=await apiFetch(`${ENDPOINT.places}?lat=${lat}&lng=${lng}&radius=${radius}`);const pj=p.ok?await p.json():{results:[]};
+   // Places
+   statusEl.textContent="Competition…";
+   const radiusMi=Number(document.getElementById("radiusMi").value||1);
+   const p=await apiFetch(`${ENDPOINT.places}?lat=${lat}&lng=${lng}&radius=${Math.round(radiusMi*1609)}`);
+   const pj=p.ok?await p.json():{results:[]};
 
-    statusEl.textContent="Developments…";
-    const dr=Number(document.getElementById("devRadiusMi").value||3)*1609;
-    let devs=[];try{const d=await apiFetch(`${ENDPOINT.developments}?lat=${lat}&lng=${lng}&radius=${dr}`);if(d.ok){const dj=await d.json();const WANT=/(planned|permit|site plan|coming soon|construction|proposed)/i;const AVOID=/(closed|permanently)/i;devs=(dj.results||[]).filter(r=>WANT.test(r.name||"")&&!AVOID.test(r.name||""));}}catch{}
-    pj.results.forEach(r=>L.marker([r.geometry.location.lat,r.geometry.location.lng]).addTo(map).bindPopup(r.name));
-    devs.forEach(r=>L.circleMarker([r.geometry.location.lat,r.geometry.location.lng],{radius:6,color:'orange'}).addTo(map).bindPopup(r.name));
+   // Developments
+   statusEl.textContent="Developments…";
+   let devs=[];try{const d=await apiFetch(`${ENDPOINT.developments}?lat=${lat}&lng=${lng}&radius=${Number(document.getElementById("devRadiusMi").value)*1609}`);if(d.ok){const dj=await d.json();const WANT=/(planned|permit|site plan|coming soon|construction|proposed)/i;const AVOID=/(closed|permanently)/i;devs=(dj.results||[]).filter(r=>WANT.test(r.name||"")&&!AVOID.test(r.name||""));}}catch{}
 
-    statusEl.textContent="Estimating…";
-    const truckShare=(Number(document.getElementById("truckShare").value)||0)/100;
-    const Va=V*(1-truckShare),Vt=V*truckShare;
-    const F=Number(document.getElementById("frontShare").value),T=Number(document.getElementById("turnShare").value),fT=Number(document.getElementById("turnFric").value);
-    const avail=F+fT*T;const Aa=Va*avail,At=Vt*avail;
-    const Mspd=(s=>s<=30?1.08:s<=35?1.05:s<=40?1.01:s<=45?0.98:0.95)(Number(document.getElementById("speed").value)||35);
-    const Macc=Mspd*(1+0.03*((Number(document.getElementById("accessPts").value)||2)-2))*((Number(document.getElementById("ledSign").value)||0)?1.05:1);
-    const Mprice=(d=>Math.min(1.15,Math.max(0.85,1+0.20*(d/0.11))))(Number(document.getElementById("priceDelta").value)||0);
-    const Mcpr=(Number(document.getElementById("cpr").value)||100)/100;
-    const MfacA=(Number(document.getElementById("gasScore").value)||100)/100;
-    const MfacT=(Number(document.getElementById("dieselScore").value)||25)/25;
+   pj.results.forEach(r=>L.marker([r.geometry.location.lat,r.geometry.location.lng]).addTo(map).bindPopup(r.name));
+   devs.forEach(r=>L.circleMarker([r.geometry.location.lat,r.geometry.location.lng],{radius:6,color:"orange"}).addTo(map).bindPopup(r.name));
 
-    // distance-decay
-    function miles(a,b,c,d){const R=3958.761,toRad=x=>x*Math.PI/180;const dA=toRad(c-a),dO=toRad(d-b);const A=Math.sin(dA/2)**2+Math.cos(toRad(a))*Math.cos(toRad(c))*Math.sin(dO/2)**2;return 2*R*Math.asin(Math.sqrt(A));}
-    let P=0;for(const c of pj.results){const dmi=miles(lat,lng,c.geometry.location.lat,c.geometry.location.lng);if(dmi>(Number(document.getElementById("radiusMi").value)||1))continue;let w=0.9/(dmi+0.05);if(dmi<=0.03)w*=4;const strong=/(wawa|sheetz|buc|race|trac|quiktrip|qt|costco|sam|bj's)/i.test(c.name||"");const q=strong?1.1:0.8;P+=w*q;}
-    const Mcomp=1/(1+0.35*P);
+   // Estimate gallons
+   const truckShare=(Number(document.getElementById("truckShare").value)||0)/100;
+   const Va=V*(1-truckShare),Vt=V*truckShare;
+   const F=Number(document.getElementById("frontShare").value),T=Number(document.getElementById("turnShare").value),fT=Number(document.getElementById("turnFric").value);
+   const avail=F+fT*T;const Aa=Va*avail,At=Vt*avail;
+   const Mspd=(s=>s<=30?1.08:s<=35?1.05:s<=40?1.01:s<=45?0.98:0.95)(Number(document.getElementById("speed").value)||35);
+   const Macc=Mspd*(1+0.03*((Number(document.getElementById("accessPts").value)||2)-2))*((Number(document.getElementById("ledSign").value)||0)?1.05:1);
+   const Mprice=(d=>Math.min(1.15,Math.max(0.85,1+0.20*(d/0.11))))(Number(document.getElementById("priceDelta").value)||0);
+   const Mcpr=(Number(document.getElementById("cpr").value)||100)/100;
+   const MfacA=(Number(document.getElementById("gasScore").value)||100)/100;
+   const MfacT=(Number(document.getElementById("dieselScore").value)||25)/25;
 
-    const sa=0.020*Macc*Mprice*MfacA*Mcomp*Mcpr;
-    const st=0.012*Macc*Mprice*MfacT*Mcomp*Mcpr*((Number(document.getElementById("dieselpos").value)||0)>=4?1.2:1);
-    const ga=10.2,gt=16;const GPD=Aa*sa*ga+At*st*gt;let GPM=GPD*(365/12);
+   let P=0;for(const c of pj.results){const dmi=miles(lat,lng,c.geometry.location.lat,c.geometry.location.lng);if(dmi>radiusMi)continue;let w=0.9/(dmi+0.05);if(dmi<=0.03)w*=4;const strong=/(wawa|sheetz|buc|race|trac|quiktrip|qt|costco|sam|bj's)/i.test(c.name||"");const q=strong?1.1:0.8;P+=w*q;}
+   const Mcomp=1/(1+0.35*P);
 
-    const posGas=(Number(document.getElementById("mpd").value)||0)*2,posDies=Number(document.getElementById("dieselpos").value)||0;
-    const cap=(posGas*25*10.5+posDies*25*16)*(365/12);GPM=Math.min(GPM,cap);
+   const sa=0.020*Macc*Mprice*MfacA*Mcomp*Mcpr;
+   const st=0.012*Macc*Mprice*MfacT*Mcomp*Mcpr*((Number(document.getElementById("dieselpos").value)||0)>=4?1.2:1);
+   const ga=10.2,gt=16;
+   const GPD=Aa*sa*ga+At*st*gt;
+   let GPM=GPD*(365/12);
+   const posGas=(Number(document.getElementById("mpd").value)||0)*2;
+   const posDies=Number(document.getElementById("dieselpos").value)||0;
+   const cap=(posGas*25*10.5+posDies*25*16)*(365/12);
+   GPM=Math.min(GPM,cap);
 
-    const y1=Math.round(GPM),y2=Math.round(y1*1.027),y3=Math.round(y2*1.0125),low=Math.round(y1*0.86),high=Math.round(y1*1.06);
-    resultsEl.innerHTML=`<table>
-      <tr><td><b>Year
-
+   const y1=Math.round(GPM),y2=Math.round(y1*1.027),y3=Math.round(y2*1.0125),low=Math.round(y1*0.86),high=Math.round(y1*1.06);
+   resultsEl.innerHTML=`<table>
+     <tr><td><b>Year-1 est. (gal/mo)</b></td><td class="num">${y1.toLocaleString()}</td></tr>
+     <tr><td>Low / High</td><td class="num">${low.toLocaleString()} – ${high.toLocaleString()}</td></tr>
+     <tr><td>Year-2</td><td class="num">${y2.toLocaleString()}</td></tr>
+     <tr><td>Year-3</td><td class="num">${y3.toLocaleString()}</td></tr>
+     <tr><td>Capacity cap</td><td class="num">${Math.round(cap).toLocaleString()}</td></tr>
+   </table>`;
+   statusEl.textContent="Done.";
+ }catch(e){resultsEl.innerHTML=`<span class="err">${e.message||e}</span>`;statusEl.textContent="";}
+});
+</script>
+</body>
+</html>
