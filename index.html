@@ -90,13 +90,23 @@
 const API_BASE="https://sun-nourie-live.onrender.com";
 const ENDPOINT={backend:API_BASE+"/",geocode:API_BASE+"/geocode",places:API_BASE+"/places",developments:API_BASE+"/developments",aadt:API_BASE+"/aadt"};
 document.getElementById("backendUrl").textContent=API_BASE;
+
 async function apiFetch(url,opt={}){for(let i=0;i<2;i++){try{return await fetch(url,opt);}catch(e){if(i===1)throw e;await new Promise(r=>setTimeout(r,600));}}}
-function miles(a,b,c,d){const R=3958.8;const toRad=x=>x*Math.PI/180;const dA=toRad(c-a),dO=toRad(d-b);const A=Math.sin(dA/2)**2+Math.cos(toRad(a))*Math.cos(toRad(c))*Math.sin(dO/2)**2;return 2*R*Math.asin(Math.sqrt(A));}
+function miles(a,b,c,d){const R=3958.8,toRad=x=>x*Math.PI/180;const dA=toRad(c-a),dO=toRad(d-b);const A=Math.sin(dA/2)**2+Math.cos(toRad(a))*Math.cos(toRad(c))*Math.sin(dO/2)**2;return 2*R*Math.asin(Math.sqrt(A));}
 function setStatus(el,ok,ms){el.className=ok?"ok":"fail";el.textContent=(ok?"OK":"Fail")+(ms?` (${ms}ms)`:"");}
 async function timed(url){const t0=performance.now();const r=await apiFetch(url);return{r,ok:r.ok,ms:Math.round(performance.now()-t0)};}
-async function checkAll(){try{const {r,ok,ms}=await timed(ENDPOINT.backend);const txt=await r.text();setStatus(document.getElementById("s-backend"),ok&&txt.includes("OK"),ms);}catch{setStatus(document.getElementById("s-backend"),false);}}
+
+async function checkAll(){
+  const sb=document.getElementById("s-backend"), sg=document.getElementById("s-geocode"), sp=document.getElementById("s-places"), sd=document.getElementById("s-dev");
+  try{const {r,ok,ms}=await timed(ENDPOINT.backend);const txt=await r.text();setStatus(sb,ok&&txt.includes("OK"),ms);}catch{setStatus(sb,false);}
+  try{const {r,ms}=await timed(ENDPOINT.geocode+"?address=Raleigh,NC");const j=await r.json();setStatus(sg,r.ok&&j.status==="OK",ms);}catch{setStatus(sg,false);}
+  try{const {r,ms}=await timed(ENDPOINT.places+"?lat=35.79&lng=-78.52&radius=1609");const j=await r.json();setStatus(sp,r.ok&&Array.isArray(j.results),ms);}catch{setStatus(sp,false);}
+  try{const {r,ms}=await timed(ENDPOINT.developments+"?lat=35.79&lng=-78.52&radius=5000");const j=await r.json();setStatus(sd,r.ok&&Array.isArray(j.results),ms);}catch{setStatus(sd,false);}
+}
 document.getElementById("recheck").addEventListener("click",checkAll);document.addEventListener("DOMContentLoaded",checkAll);
-const map=L.map("map").setView([35.7796,-78.6382],12);L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+
+const map=L.map("map").setView([35.7796,-78.6382],12);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 
 document.getElementById("run").addEventListener("click",async()=>{
  const statusEl=document.getElementById("status"),resultsEl=document.getElementById("results");
@@ -123,12 +133,14 @@ document.getElementById("run").addEventListener("click",async()=>{
    pj.results.forEach(r=>L.marker([r.geometry.location.lat,r.geometry.location.lng]).addTo(map).bindPopup(r.name));
    devs.forEach(r=>L.circleMarker([r.geometry.location.lat,r.geometry.location.lng],{radius:6,color:"orange"}).addTo(map).bindPopup(r.name));
 
-   // Estimate gallons
+   // Estimation
+   statusEl.textContent="Estimating gallons…";
    const truckShare=(Number(document.getElementById("truckShare").value)||0)/100;
    const Va=V*(1-truckShare),Vt=V*truckShare;
    const F=Number(document.getElementById("frontShare").value),T=Number(document.getElementById("turnShare").value),fT=Number(document.getElementById("turnFric").value);
    const avail=F+fT*T;const Aa=Va*avail,At=Vt*avail;
-   const Mspd=(s=>s<=30?1.08:s<=35?1.05:s<=40?1.01:s<=45?0.98:0.95)(Number(document.getElementById("speed").value)||35);
+   const speed=Number(document.getElementById("speed").value)||35;
+   const Mspd=speed<=30?1.08:speed<=35?1.05:speed<=40?1.01:speed<=45?0.98:0.95;
    const Macc=Mspd*(1+0.03*((Number(document.getElementById("accessPts").value)||2)-2))*((Number(document.getElementById("ledSign").value)||0)?1.05:1);
    const Mprice=(d=>Math.min(1.15,Math.max(0.85,1+0.20*(d/0.11))))(Number(document.getElementById("priceDelta").value)||0);
    const Mcpr=(Number(document.getElementById("cpr").value)||100)/100;
@@ -140,13 +152,9 @@ document.getElementById("run").addEventListener("click",async()=>{
 
    const sa=0.020*Macc*Mprice*MfacA*Mcomp*Mcpr;
    const st=0.012*Macc*Mprice*MfacT*Mcomp*Mcpr*((Number(document.getElementById("dieselpos").value)||0)>=4?1.2:1);
-   const ga=10.2,gt=16;
-   const GPD=Aa*sa*ga+At*st*gt;
-   let GPM=GPD*(365/12);
-   const posGas=(Number(document.getElementById("mpd").value)||0)*2;
-   const posDies=Number(document.getElementById("dieselpos").value)||0;
-   const cap=(posGas*25*10.5+posDies*25*16)*(365/12);
-   GPM=Math.min(GPM,cap);
+   const ga=10.2,gt=16;const GPD=Aa*sa*ga+At*st*gt;let GPM=GPD*(365/12);
+   const posGas=(Number(document.getElementById("mpd").value)||0)*2,posDies=Number(document.getElementById("dieselpos").value)||0;
+   const cap=(posGas*25*10.5+posDies*25*16)*(365/12);GPM=Math.min(GPM,cap);
 
    const y1=Math.round(GPM),y2=Math.round(y1*1.027),y3=Math.round(y2*1.0125),low=Math.round(y1*0.86),high=Math.round(y1*1.06);
    resultsEl.innerHTML=`<table>
@@ -162,3 +170,4 @@ document.getElementById("run").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
+
