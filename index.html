@@ -1,165 +1,131 @@
-# Create a downloadable HTML file for the user
-html_content = """<!doctype html>
+# Create a final, zero-config HTML that points directly to the Render backend
+render_backend_url = "https://sun-nourie-live.onrender.com/chat"  # change this line if your Render URL differs
+
+html = f"""<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Ask Dan’s Assistant</title>
   <style>
-    :root { --bg:#0b0c10; --card:#13151a; --text:#e8e8e8; --muted:#9aa0a6; --accent:#3a82f7; --border:#2a2f3a; }
-    * { box-sizing: border-box; }
-    body { font: 16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; background: var(--bg); color: var(--text); }
-    .wrap { max-width: 900px; margin: 0 auto; padding: 16px; }
-    h1 { font-size: 18px; margin: 0 0 12px; }
-    .settings { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-bottom: 10px; align-items: center; }
-    .settings input[type="text"] { background:#1b1f2a; color:var(--text); border:1px solid var(--border); border-radius:10px; padding:10px; width:100%; }
-    .settings button { background:var(--accent); border:0; color:white; border-radius:10px; padding:10px 14px; font-weight:600; }
-    .sys { font-size:12px; opacity:.85; margin:8px 0 12px; }
-    .sys input { width:100%; background:#1b1f2a; color:var(--text); border:1px solid var(--border); border-radius:10px; padding:8px; }
-    .chat { background:var(--card); border:1px solid var(--border); border-radius: 12px; padding: 12px; height: 62vh; overflow:auto; }
-    .row { margin: 10px 0; display:flex; gap:10px; }
-    .role { font-weight:600; min-width:72px; opacity:.8 }
-    .msg { white-space: pre-wrap; }
-    form { display:flex; gap:8px; margin-top:12px; }
-    input[type="text"].q { flex:1; background:#1b1f2a; color:var(--text); border:1px solid var(--border); border-radius:10px; padding:10px; }
-    button.send { background:var(--accent); border:0; color:white; border-radius:10px; padding:10px 14px; font-weight:600; }
-    .foot { margin-top:8px; color:var(--muted); font-size:12px; }
-    .error { color:#ff8c8c }
+    :root {{ --bg:#0b0c10; --card:#13151a; --text:#e8e8e8; --muted:#9aa0a6; --accent:#3a82f7; --border:#2a2f3a; }}
+    * {{ box-sizing: border-box; }}
+    body {{ font: 16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin:0; background:var(--bg); color:var(--text); }}
+    .wrap {{ max-width: 900px; margin: 0 auto; padding: 16px; }}
+    h1 {{ font-size: 20px; margin: 0 0 12px; }}
+    .chat {{ background:var(--card); border:1px solid var(--border); border-radius: 12px; padding: 12px; height: 65vh; overflow:auto; }}
+    .row {{ margin: 8px 0; display:flex; gap:10px; align-items:flex-start; }}
+    .role {{ font-weight:600; min-width:78px; opacity:.85 }}
+    .msg {{ white-space: pre-wrap; }}
+    form {{ display:flex; gap:8px; margin-top:12px; }}
+    input#q {{ flex:1; background:#1b1f2a; color:var(--text); border:1px solid var(--border); border-radius:10px; padding:12px; }}
+    button#send {{ background:var(--accent); border:0; color:white; border-radius:10px; padding:12px 16px; font-weight:600; }}
+    .foot {{ margin-top:8px; color:var(--muted); font-size:12px; }}
   </style>
 </head>
 <body>
   <div class="wrap">
     <h1>Ask Dan’s Assistant</h1>
-
-    <div class="settings">
-      <input id="proxyUrl" type="text" placeholder="Paste your proxy URL (e.g., https://your-worker.workers.dev)" />
-      <button id="saveProxy">Save</button>
-    </div>
-
-    <div class="sys">
-      System behavior (optional). Tweak how the assistant responds:
-      <input id="system" value="You are Dan’s gas-station expert. Start gallons as AADT × 8% × 2 × 30; be concise and numeric; adjust for competition within 1 mile.">
-    </div>
-
     <div id="chat" class="chat"></div>
     <form id="f">
-      <input id="q" class="q" type="text" placeholder="Type a question… e.g., ‘Estimate gallons for 1500 Hodge Rd Knightdale NC’" />
-      <button class="send">Send</button>
+      <input id="q" type="text" placeholder="Type a question… e.g., ‘Estimate gallons for 1500 Hodge Rd Knightdale NC’" autocomplete="off" />
+      <button id="send">Send</button>
     </form>
-    <div class="foot">Tip: Click the field above to set your proxy URL one time. It is saved in your browser.</div>
+    <div class="foot">Powered by your Render backend at <code>{render_backend_url}</code>.</div>
   </div>
 
   <script>
-    // Load saved proxy URL if available
-    const proxyInput = document.getElementById('proxyUrl');
-    const savedProxy = localStorage.getItem('proxyUrl') || '';
-    if (savedProxy) proxyInput.value = savedProxy;
-    document.getElementById('saveProxy').onclick = () => {
-      const v = proxyInput.value.trim();
-      if (!/^https?:\\/\\//.test(v)) {
-        alert('Please paste a valid URL starting with http(s)://');
-        return;
-      }
-      localStorage.setItem('proxyUrl', v);
-      alert('Saved!');
-    };
+    // Fixed backend endpoint on Render:
+    const PROXY = "{render_backend_url}";
+
+    // System behavior: tuned for Dan's estimator; change if you want general Q&A
+    const SYSTEM_PROMPT = "You are Dan’s gas-station expert. Start gallons as AADT × 8% × 2 × 30; be concise and numeric; adjust for competition within 1 mile.";
 
     const chatEl = document.getElementById('chat');
     const form = document.getElementById('f');
     const q = document.getElementById('q');
-    const sys = document.getElementById('system');
+    const sendBtn = document.getElementById('send');
 
     const messages = [
-      { role: "assistant", content: "Hi! Ask me anything about sites, AADT→gallons, competition impact, or permits." }
+      {{ role: "assistant", content: "Hi! Ask me anything about sites, AADT→gallons, competition impact, or permits." }}
     ];
-    render();
+    render(true);
 
-    form.addEventListener('submit', async (e) => {
+    form.addEventListener('submit', async (e) => {{
       e.preventDefault();
       const userText = q.value.trim();
       if (!userText) return;
       q.value = "";
-      messages.push({ role: "user", content: userText });
-      render();
-
-      // Show a placeholder while we fetch
-      const placeholder = { role: "assistant", content: "…" };
+      sendBtn.disabled = true;
+      messages.push({{ role: "user", content: userText }});
+      const placeholder = {{ role: "assistant", content: "…" }};
       messages.push(placeholder);
       render(true);
 
-      const PROXY = (localStorage.getItem('proxyUrl') || '').trim();
-      if (!PROXY) {
-        placeholder.content = "⚠️ Set your proxy URL first (top of page).";
-        render(true);
-        return;
-      }
-
-      try {
-        const resp = await fetch(PROXY, {
+      try {{
+        const resp = await fetch(PROXY, {{
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            system: sys.value || undefined,
+          headers: {{ "Content-Type": "application/json" }},
+          body: JSON.stringify({{
+            system: SYSTEM_PROMPT,
             messages,
             stream: false
-          })
-        });
+          }})
+        }});
 
-        let data;
-        let text;
+        let data; 
         const ct = resp.headers.get('content-type') || '';
-        if (ct.includes('application/json')) {
+        if (ct.includes('application/json')) {{
           data = await resp.json();
-        } else {
-          // some proxies return text on error; try to parse later
+        }} else {{
           const raw = await resp.text();
-          try { data = JSON.parse(raw); } catch { data = { raw }; }
-        }
+          try {{ data = JSON.parse(raw); }} catch {{ data = {{ raw }}; }}
+        }}
 
-        text = extractText(data) || data?.raw || "[No text in response]";
+        const text = extractText(data) || data?.raw || "[No text in response]";
         placeholder.content = text;
         render(true);
-      } catch (err) {
+      }} catch (err) {{
         placeholder.content = "Error: " + String(err);
         render(true);
-      }
-    });
+      }} finally {{
+        sendBtn.disabled = false;
+        q.focus();
+      }}
+    }});
 
-    function extractText(j){
+    function extractText(j){{
       if (!j) return "";
       if (j.output_text) return j.output_text;
-      // Responses API: output can contain a message with content array where items have type 'output_text'
-      if (Array.isArray(j.output)) {
+      if (Array.isArray(j.output)) {{
         const msg = j.output.find(o => o.type === "message");
-        if (msg && Array.isArray(msg.content)) {
+        if (msg && Array.isArray(msg.content)) {{
           const parts = msg.content.filter(p => p.type === "output_text").map(p => p.text).join("");
           if (parts) return parts;
-          // sometimes content has just {type:'text', text:'...'}
           const alt = msg.content.filter(p => p.type === "text").map(p => p.text).join("");
           if (alt) return alt;
-        }
-      }
-      // Some SDKs shape the response differently; try common fallbacks
+        }}
+      }}
       if (j.response && typeof j.response === 'string') return j.response;
       if (j.choices && j.choices[0]?.message?.content) return j.choices[0].message.content;
       return "";
-    }
+    }}
 
-    function render(scroll=false) {
+    function render(scroll=false) {{
       chatEl.innerHTML = messages.map(m => `
         <div class="row">
-          <div class="role">${m.role === 'user' ? 'You' : 'Assistant'}</div>
-          <div class="msg">${escapeHtml(m.content)}</div>
+          <div class="role">${{m.role === 'user' ? 'You' : 'Assistant'}}</div>
+          <div class="msg">${{escapeHtml(m.content)}}</div>
         </div>
       `).join("");
       if (scroll) chatEl.scrollTop = chatEl.scrollHeight;
-    }
-    function escapeHtml(s) { return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+    }}
+    function escapeHtml(s) {{ return String(s).replace(/[&<>"]/g, c => ({{'&':'&amp;','<':'&lt;','>':'&gt;'}}[c])); }}
   </script>
 </body>
 </html>
 """
-with open('/mnt/data/index.html', 'w', encoding='utf-8') as f:
-    f.write(html_content)
+with open('/mnt/data/index_render_chat.html', 'w', encoding='utf-8') as f:
+    f.write(html)
 
-'/mnt/data/index.html'
+'/mnt/data/index_render_chat.html'
