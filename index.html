@@ -6,7 +6,7 @@
   <title>Ask Dan’s Assistant + Local Competition Map</title>
   <style>
     body { margin:0; font:16px/1.5 system-ui, -apple-system,Segoe UI,Roboto,sans-serif; background:#0b0c10; color:#e8e8e8; }
-    .wrap { display:flex; flex-direction:row; height:100vh; }
+    .wrap { display:flex; flex-direction:row; height:100vh; gap:16px; }
     .left, .right { flex:1; padding:16px; box-sizing:border-box; }
     h1 { margin:0 0 12px; font-size:22px; }
     .chat { background:#13151a; border:1px solid #2a2f3a; border-radius:12px; padding:12px; height:80vh; overflow:auto; }
@@ -18,13 +18,15 @@
     #send { background:#3a82f7; border:0; color:white; border-radius:10px; padding:12px 16px; font-weight:600; }
     .foot { margin-top:8px; color:#9aa0a6; font-size:12px; }
     #map { height:80vh; width:100%; border-radius:12px; border:1px solid #2a2f3a; }
-    #address { width:70%; padding:8px; border-radius:8px; border:1px solid #2a2f3a; }
+    #address { width:70%; padding:8px; border-radius:8px; border:1px solid #2a2f3a; background:#1b1f2a; color:#e8e8e8; }
     #search { padding:8px 12px; border-radius:8px; background:#3a82f7; color:#fff; border:0; }
+    #status { margin-top:8px; font-size:12px; color:#9aa0a6; }
+    .err { color:#ff9a9a }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <!-- Left side: Chat -->
+    <!-- Left: Chat -->
     <div class="left">
       <h1>Ask Dan’s Assistant</h1>
       <div id="chat" class="chat"></div>
@@ -32,10 +34,10 @@
         <input id="q" type="text" placeholder="Type your question…" autocomplete="off">
         <button id="send">Send</button>
       </form>
-      <div class="foot">Backend: <code>https://sun-nourie-live.onrender.com/chat</code></div>
+      <div id="status" class="foot">Backend: <code>https://sun-nourie-live.onrender.com</code></div>
     </div>
 
-    <!-- Right side: Map -->
+    <!-- Right: Map -->
     <div class="right">
       <h1>Competition Map</h1>
       <div>
@@ -43,6 +45,7 @@
         <button id="search">Search</button>
       </div>
       <div id="map"></div>
+      <div id="mapStatus" class="foot"></div>
     </div>
   </div>
 
@@ -55,6 +58,7 @@
     const form = document.getElementById('f');
     const q = document.getElementById('q');
     const sendBtn = document.getElementById('send');
+    const statusEl = document.getElementById('status');
 
     const messages = [{ role: "assistant", content: "Hi! Ask me anything." }];
     render(true);
@@ -78,11 +82,18 @@
           body: JSON.stringify({ system: SYSTEM_PROMPT, messages, stream: false })
         });
 
-        const data = await resp.json();
-        if (data.error) {
-          placeholder.content = "Backend error: " + data.error;
-        } else {
-          placeholder.content = data.output_text || "[No text]";
+        let payloadText = "";
+        try {
+          const data = await resp.json();
+          if (!resp.ok || data.error) {
+            payloadText = data && data.error ? String(data.error) : JSON.stringify(data);
+            placeholder.content = "Backend error (" + resp.status + "): " + payloadText;
+          } else {
+            placeholder.content = data.output_text || "[No text]";
+          }
+        } catch (jsonErr) {
+          const raw = await resp.text();
+          placeholder.content = "Backend raw (" + resp.status + "): " + raw.slice(0, 300);
         }
         render(true);
       } catch (err) {
@@ -108,37 +119,67 @@
     let map;
 
     function initMap() {
+      if (!window.google || !google.maps) {
+        document.getElementById("mapStatus").innerHTML = '<span class="err">Map failed to load. Check your browser Maps API key in the script tag.</span>';
+        return;
+      }
       map = new google.maps.Map(document.getElementById("map"), {
-        center: { lat: 35.7796, lng: -78.6382 }, // Raleigh default
+        center: { lat: 35.7796, lng: -78.6382 },
         zoom: 12,
       });
+      document.getElementById("mapStatus").textContent = "Map ready.";
     }
 
     document.getElementById("search").addEventListener("click", async () => {
       const addr = document.getElementById("address").value.trim();
-      if (!addr) return alert("Enter an address");
-      const geo = await fetch(`https://sun-nourie-live.onrender.com/geocode?address=${encodeURIComponent(addr)}`);
-      const geoData = await geo.json();
-      if (!geoData.results?.length) return alert("Address not found");
+      const mapStatus = document.getElementById("mapStatus");
+      if (!addr) { alert("Enter an address"); return; }
 
-      const { lat, lng } = geoData.results[0].geometry.location;
-      map.setCenter({ lat, lng });
-      map.setZoom(14);
+      // Geocode via backend
+      try {
+        mapStatus.textContent = "Geocoding…";
+        const geo = await fetch(`https://sun-nourie-live.onrender.com/geocode?address=${encodeURIComponent(addr)}`);
+        const geoData = await geo.json();
+        if (!geo.ok || geoData.error) {
+          mapStatus.innerHTML = '<span class="err">Geocode error (' + geo.status + '): ' + (geoData.error || JSON.stringify(geoData)) + '</span>';
+          return;
+        }
+        if (!geoData.results?.length) { mapStatus.innerHTML = '<span class="err">Address not found.</span>'; return; }
 
-      const places = await fetch(`https://sun-nourie-live.onrender.com/places?lat=${lat}&lng=${lng}&radius=1609`);
-      const placeData = await places.json();
+        const { lat, lng } = geoData.results[0].geometry.location;
+        map.setCenter({ lat, lng });
+        map.setZoom(14);
 
-      placeData.results.forEach(place => {
-        new google.maps.Marker({
-          position: place.geometry.location,
-          map,
-          title: place.name
+        // Places via backend
+        mapStatus.textContent = "Searching nearby gas stations…";
+        const places = await fetch(`https://sun-nourie-live.onrender.com/places?lat=${lat}&lng=${lng}&radius=1609`);
+        const placeData = await places.json();
+        if (!places.ok || placeData.error) {
+          mapStatus.innerHTML = '<span class="err">Places error (' + places.status + '): ' + (placeData.error || JSON.stringify(placeData)) + '</span>';
+          return;
+        }
+
+        if (!placeData.results?.length) {
+          mapStatus.textContent = "No stations found within 1 mile.";
+          return;
+        }
+
+        placeData.results.forEach(place => {
+          if (!place.geometry?.location) return;
+          new google.maps.Marker({
+            position: place.geometry.location,
+            map,
+            title: place.name
+          });
         });
-      });
+        mapStatus.textContent = "Plotted " + placeData.results.length + " stations.";
+      } catch (e) {
+        mapStatus.innerHTML = '<span class="err">Network error: ' + String(e) + '</span>';
+      }
     });
   </script>
 
-  <!-- Google Maps JS SDK (Browser key with referrer restrictions!) -->
+  <!-- Google Maps JS SDK (REPLACE WITH YOUR BROWSER-RESTRICTED KEY) -->
   <script async defer src="https://maps.googleapis.com/maps/api/js?key=YOUR_BROWSER_RESTRICTED_KEY&callback=initMap"></script>
 </body>
 </html>
