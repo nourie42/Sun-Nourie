@@ -22,20 +22,21 @@
   button[disabled]{opacity:.6;cursor:not-allowed}
   .muted{color:var(--muted);font-size:12px}
   .err{color:#ff9a9a}
-  #map{height:calc(100vh - 32px);width:100%;border-radius:12px;border:1px solid var(--border)}
+  #map{height:calc(100vh - 32px);width:100%;border-radius:12px;border:1px solid var(--border);background:#0f1116}
   .num{font-variant-numeric:tabular-nums}
   table{width:100%;border-collapse:collapse}
   td{padding:4px 0;border-bottom:1px dashed #2a2f3a}
   .badge{display:inline-block;min-width:120px;padding:4px 10px;border-radius:999px;border:1px solid var(--border);background:#1b1f2a;margin-right:6px}
   .ok{color:#9ef5b3}.fail{color:#ff9a9a}.pending{color:#e8e8e8;opacity:.7}
+  #pageError{display:none;background:#3a0f0f;border:1px solid #5c1b1b;color:#ffd3d3;padding:8px 10px;border-radius:8px;font-size:12px;white-space:pre-wrap}
 </style>
 </head>
 <body>
   <div class="wrap">
     <div class="left">
-      <div class="card">
-        <h1 style="margin:0">Prospect Estimator</h1>
-      </div>
+      <div class="card"><h1 style="margin:0">Prospect Estimator</h1></div>
+
+      <div id="pageError"></div>
 
       <!-- Inputs -->
       <div class="card">
@@ -62,7 +63,7 @@
         </div>
       </div>
 
-      <!-- Results (gallons) -->
+      <!-- Results -->
       <div class="card" id="resultsCard">
         <div><b>Results</b></div>
         <div id="results" class="muted">Enter address + MPDs and click <b>Search & Estimate</b>.</div>
@@ -101,7 +102,7 @@
         </div>
       </details>
 
-      <!-- Live Data Status (moved to bottom) -->
+      <!-- Live Data Status (BOTTOM) -->
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <b>Live Data Status</b>
@@ -117,45 +118,12 @@
       </div>
     </div>
 
-    <div class="right">
-      <div id="map"></div>
-    </div>
+    <div class="right"><div id="map"></div></div>
   </div>
 
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <!-- Leaflet JS with load/ error handlers -->
   <script>
-  // ---------- CONFIG ----------
-  const API_BASE = "https://sun-nourie-live.onrender.com"; // change if backend URL differs
-  document.getElementById('backendUrl').textContent = API_BASE;
-  const ENDPOINT = {
-    backend: API_BASE + "/",
-    geocode: API_BASE + "/geocode",
-    places: API_BASE + "/places",
-    developments: API_BASE + "/developments"
-  };
-
-  // robust fetch with CORS + retry
-  async function apiFetch(url, opts = {}) {
-    const options = Object.assign({ mode: "cors", cache: "no-store", referrerPolicy: "no-referrer" }, opts);
-    for (let i=0;i<2;i++){ try { return await fetch(url, options); } catch(e){ if(i===1) throw e; await new Promise(r=>setTimeout(r,700)); } }
-  }
-
-  // ---------- STATUS PANEL ----------
-  const sBackend = document.getElementById("s-backend");
-  const sGeo = document.getElementById("s-geocode");
-  const sPlaces = document.getElementById("s-places");
-  const sDev = document.getElementById("s-dev");
-  const setStatus = (el, ok, ms, extra="") => { el.className = ok ? "ok" : "fail"; el.textContent = (ok ? "OK" : "Fail") + (ms ? ` (${ms}ms)` : "") + (extra ? ` — ${extra}` : ""); };
-  async function timed(url){ const t0=performance.now(); const r=await apiFetch(url); return {r,ms:Math.round(performance.now()-t0)}; }
-  async function checkAll(){
-    try{ const {r,ms}=await timed(ENDPOINT.backend); const text=await r.text(); setStatus(sBackend, r.ok && text.includes("OK"), ms); }catch{ setStatus(sBackend,false); }
-    try{ const {r,ms}=await timed(ENDPOINT.geocode+"?address=Raleigh,NC"); setStatus(sGeo, r.ok, ms); }catch{ setStatus(sGeo,false); }
-    try{ const {r,ms}=await timed(ENDPOINT.places+"?lat=35.79&lng=-78.52&radius=1609"); setStatus(sPlaces, r.ok, ms); }catch{ setStatus(sPlaces,false); }
-    try{ const {r,ms}=await timed(ENDPOINT.developments+"?lat=35.79&lng=-78.52&radius=5000"); setStatus(sDev, r.ok, ms); }catch{ setStatus(sDev,false); }
-  }
-  document.getElementById("recheck").addEventListener("click", checkAll);
-  document.addEventListener("DOMContentLoaded", checkAll);
-
-  // ---------- MAP ----------
-  const map=L.map('map').setView([35.7796,-78.6382],12);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.
+    function showBanner(msg){ const el=document.getElementById('pageError'); el.textContent=msg; el.style.display='block'; }
+    window.addEventListener('error', e => { if(String(e.message||e.error||'').includes('L is not defined')) showBanner('Map library failed to load. Check network/ad-blockers.'); });
+  </script>
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js" onload="
