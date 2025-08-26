@@ -4,30 +4,32 @@ import express from "express";
 const app = express();
 app.use(express.json());
 
-// --- CORS: allow your static site to call this API (handles preflight) ---
+// --- CORS: explicit allow for your static sites + safe fallback (handles OPTIONS) ---
 const ALLOWED_ORIGINS = new Set([
-  "https://sun-nourie-1.onrender.com",   // your Render Static Site
-  "https://nourie42.github.io"           // (optional) if you test via GH Pages
+  "https://sun-nourie-1.onrender.com",
+  "https://sun-nourie-v2.onrender.com",  // <- your v2 static site in the screenshot
+  "https://nourie42.github.io"           // optional GH Pages testing
 ]);
+
 app.use((req, res, next) => {
   const origin = req.headers.origin || "";
-  if (ALLOWED_ORIGINS.has(origin)) {
+  if (origin && ALLOWED_ORIGINS.has(origin)) {
     res.header("Access-Control-Allow-Origin", origin);
   } else {
-    // fallback so cURL or manual tests still work
+    // fallback so direct browser/cURL tests don't fail; tighten later if you want
     res.header("Access-Control-Allow-Origin", "*");
   }
   res.header("Vary", "Origin");
   res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  if (req.method === "OPTIONS") return res.sendStatus(204);
+  if (req.method === "OPTIONS") return res.sendStatus(204); // preflight OK
   next();
 });
 
 // Health
 app.get("/", (_req, res) => res.send("OK"));
 
-// -------- Chat (OpenAI) --------
+// ---------- OpenAI (optional chat) ----------
 app.post("/chat", async (req, res) => {
   try {
     const { messages = [], system = "You are helpful." } = req.body;
@@ -49,12 +51,9 @@ app.post("/chat", async (req, res) => {
     const text =
       body.output_text ||
       (Array.isArray(body.output)
-        ? body.output
-            .map(o => (o.content || []).map(p => p.text || "").join(""))
-            .join("")
+        ? body.output.map(o => (o.content || []).map(p => p.text || "").join("")).join("")
         : "") ||
-      body.choices?.[0]?.message?.content ||
-      "[No text from model]";
+      body.choices?.[0]?.message?.content || "[No text from model]";
 
     res.json({ output_text: text });
   } catch (err) {
@@ -62,7 +61,7 @@ app.post("/chat", async (req, res) => {
   }
 });
 
-// -------- Google: Geocode --------
+// ---------- Google Geocoding ----------
 app.get("/geocode", async (req, res) => {
   const { address } = req.query;
   if (!address) return res.status(400).json({ error: "Missing address parameter" });
@@ -75,7 +74,7 @@ app.get("/geocode", async (req, res) => {
   }
 });
 
-// -------- Google: Places Nearby (gas stations) --------
+// ---------- Google Places Nearby (gas stations) ----------
 app.get("/places", async (req, res) => {
   const { lat, lng, radius = 1609 } = req.query; // ~1 mile
   if (!lat || !lng) return res.status(400).json({ error: "Missing lat/lng parameters" });
@@ -88,7 +87,7 @@ app.get("/places", async (req, res) => {
   }
 });
 
-// -------- Google: Places Text Search ("developments") --------
+// ---------- Google Places Text Search (developments) ----------
 app.get("/developments", async (req, res) => {
   const { lat, lng, radius = 5000 } = req.query; // meters
   if (!lat || !lng) return res.status(400).json({ error: "Missing lat/lng" });
@@ -104,4 +103,3 @@ app.get("/developments", async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
-
