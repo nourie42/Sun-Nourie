@@ -1,54 +1,64 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Prospect Estimator + Competition Map</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-  <style>
-    :root { --bg:#0b0c10; --card:#13151a; --text:#e8e8e8; --muted:#9aa0a6; --accent:#3a82f7; --border:#2a2f3a; }
-    * { box-sizing:border-box; }
-    body { margin:0; font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--text); }
-    .wrap { display:flex; gap:16px; height:100vh; padding:16px; }
-    .left { width:520px; min-width:360px; }
-    .right { flex:1; }
-    h1 { margin:0 0 12px; font-size:22px; }
-    .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:12px; }
-    .badge { display:inline-block; min-width:120px; padding:4px 10px; border-radius:999px; border:1px solid var(--border); background:#1b1f2a; margin-right:6px; }
-    .ok { color:#9ef5b3; } .fail { color:#ff9a9a; } .pending { color:#e8e8e8; opacity:.7; }
-    #map { height:calc(100vh - 32px); width:100%; border-radius:12px; border:1px solid var(--border); }
-    input,button{margin-top:6px}
-    button { padding:10px 14px; border-radius:10px; border:0; background:var(--accent); color:#fff; font-weight:600; cursor:pointer; }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Prospect Estimator + Competition Map</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<style>
+  :root { --bg:#0b0c10; --card:#13151a; --text:#e8e8e8; --muted:#9aa0a6; --accent:#3a82f7; --border:#2a2f3a; }
+  *{box-sizing:border-box}
+  body{margin:0;font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text)}
+  .wrap{display:flex;gap:16px;height:100vh;padding:16px}
+  .left{width:520px;min-width:360px}
+  .right{flex:1}
+  h1{margin:0 0 12px;font-size:22px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:12px}
+  label{display:block;font-weight:600;margin:10px 0 4px}
+  input[type="text"],input[type="number"]{width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:#1b1f2a;color:var(--text)}
+  button{padding:10px 14px;border-radius:10px;border:0;background:var(--accent);color:#fff;font-weight:600;cursor:pointer}
+  button[disabled]{opacity:.6;cursor:not-allowed}
+  .badge{display:inline-block;min-width:120px;padding:4px 10px;border-radius:999px;border:1px solid var(--border);background:#1b1f2a;margin-right:6px}
+  .ok{color:#9ef5b3}.fail{color:#ff9a9a}.pending{color:#e8e8e8;opacity:.7}
+  #map{height:calc(100vh - 32px);width:100%;border-radius:12px;border:1px solid var(--border)}
+  .muted{color:var(--muted);font-size:12px}
+  .err{color:#ff9a9a}
+</style>
 </head>
 <body>
   <div class="wrap">
     <div class="left">
       <h1>Prospect Estimator</h1>
 
-      <!-- Status -->
+      <!-- Live Data Status -->
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <b>Live Data Status</b>
           <button id="recheck">Recheck</button>
         </div>
-        <div style="line-height:1.8;margin-top:8px;">
+        <div style="line-height:1.8;margin-top:8px">
           <span class="badge"><b>Backend</b></span> <span id="s-backend" class="pending">checking…</span><br>
           <span class="badge"><b>Geocode</b></span> <span id="s-geocode" class="pending">checking…</span><br>
           <span class="badge"><b>Places</b></span> <span id="s-places" class="pending">checking…</span><br>
           <span class="badge"><b>Developments</b></span> <span id="s-dev" class="pending">checking…</span>
         </div>
-        <div class="muted" style="margin-top:6px;">Backend: <code>https://sun-nourie-live.onrender.com</code></div>
+        <div class="muted" style="margin-top:6px">Backend: <code id="backendUrl">https://sun-nourie-live.onrender.com</code></div>
       </div>
 
       <!-- Inputs -->
       <div class="card">
         <label>Address</label>
-        <input id="addr" type="text" placeholder="1500 Hodge Rd, Knightdale NC">
-        <label>Gasoline MPDs</label>
-        <input id="mpd" type="number" value="6">
-        <label>Diesel positions</label>
-        <input id="dieselpos" type="number" value="8">
+        <input id="addr" type="text" placeholder="e.g., 4173 Knightdale BLVD Knightdale NC">
+        <div style="display:flex;gap:8px">
+          <div style="flex:1">
+            <label>Gasoline MPDs</label>
+            <input id="mpd" type="number" value="6" min="0">
+          </div>
+          <div style="flex:1">
+            <label>Diesel positions</label>
+            <input id="dieselpos" type="number" value="8" min="0">
+          </div>
+        </div>
         <button id="run">Search & Estimate</button>
         <div id="status" class="muted"></div>
       </div>
@@ -65,50 +75,42 @@
 
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
-    const API_BASE = "https://sun-nourie-live.onrender.com";
-    const ENDPOINT = {
-      backend: API_BASE + "/",
-      geocode: API_BASE + "/geocode",
-      places: API_BASE + "/places",
-      developments: API_BASE + "/developments"
-    };
+  // ---------- CONFIG ----------
+  const API_BASE = "https://sun-nourie-live.onrender.com"; // change if backend URL differs
+  document.getElementById('backendUrl').textContent = API_BASE;
+  const ENDPOINT = {
+    backend:        API_BASE + "/",
+    geocode:        API_BASE + "/geocode",
+    places:         API_BASE + "/places",
+    developments:   API_BASE + "/developments"
+  };
 
-    // Status check
-    const sBackend=document.getElementById("s-backend"),sGeo=document.getElementById("s-geocode"),sPlaces=document.getElementById("s-places"),sDev=document.getElementById("s-dev");
-    function set(el,ok,ms){ el.className=ok?"ok":"fail"; el.textContent=(ok?"OK":"Fail")+(ms?` (${ms}ms)`:""); }
-    async function ping(url){const t0=performance.now();const r=await fetch(url);return{ok:r.ok,ms:Math.round(performance.now()-t0)};}
-    async function checkAll(){
-      try{const {ok,ms}=await ping(ENDPOINT.backend);set(sBackend,ok,ms);}catch{set(sBackend,false);}
-      try{const {ok,ms}=await ping(ENDPOINT.geocode+"?address=Raleigh,NC");set(sGeo,ok,ms);}catch{set(sGeo,false);}
-      try{const {ok,ms}=await ping(ENDPOINT.places+"?lat=35.79&lng=-78.52&radius=1609");set(sPlaces,ok,ms);}catch{set(sPlaces,false);}
-      try{const {ok,ms}=await ping(ENDPOINT.developments+"?lat=35.79&lng=-78.52&radius=5000");set(sDev,ok,ms);}catch{set(sDev,false);}
+  // reliable fetch with CORS + retry (fixes "Failed to fetch")
+  async function apiFetch(url, opts = {}) {
+    const baseOpts = { mode: "cors", cache: "no-store", referrerPolicy: "no-referrer" };
+    const options = Object.assign(baseOpts, opts);
+    for (let i = 0; i < 2; i++) {
+      try {
+        const r = await fetch(url, options);
+        return r;
+      } catch (e) {
+        if (i === 1) throw e;
+        await new Promise(res => setTimeout(res, 700)); // retry once
+      }
     }
-    document.getElementById("recheck").addEventListener("click",checkAll);
-    checkAll();
+  }
 
-    // Map
-    const map=L.map('map').setView([35.7796,-78.6382],12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; OpenStreetMap'}).addTo(map);
-    let siteMarker=null, compLayer=L.layerGroup().addTo(map), devLayer=L.layerGroup().addTo(map);
-
-    // Run flow
-    document.getElementById("run").addEventListener("click", async()=>{
-      const addr=document.getElementById("addr").value, mpds=+document.getElementById("mpd").value||0, dieselPos=+document.getElementById("dieselpos").value||0;
-      const statusEl=document.getElementById("status"),resultsEl=document.getElementById("results"); statusEl.textContent="Working…";
-      try{
-        const g=await fetch(`${ENDPOINT.geocode}?address=${encodeURIComponent(addr)}`); const gj=await g.json(); const loc=gj.results[0].geometry.location;
-        if(siteMarker)siteMarker.remove(); siteMarker=L.marker([loc.lat,loc.lng]).addTo(map).bindPopup("Prospect").openPopup(); map.setView([loc.lat,loc.lng],14);
-
-        const p=await fetch(`${ENDPOINT.places}?lat=${loc.lat}&lng=${loc.lng}&radius=1609*2`); const pj=await p.json(); compLayer.clearLayers();
-        pj.results.forEach(r=>L.marker([r.geometry.location.lat,r.geometry.location.lng]).addTo(compLayer).bindPopup(r.name));
-
-        const d=await fetch(`${ENDPOINT.developments}?lat=${loc.lat}&lng=${loc.lng}&radius=5000`); const dj=await d.json(); devLayer.clearLayers();
-        dj.results.forEach(r=>L.circleMarker([r.geometry.location.lat,r.geometry.location.lng],{radius:6,color:'orange'}).addTo(devLayer).bindPopup(r.name));
-
-        resultsEl.textContent=`Found ${pj.results.length} competitors and ${dj.results.length} developments. Estimation logic would go here (MPDs=${mpds}, Diesel=${dieselPos}).`;
-        statusEl.textContent="Done.";
-      }catch(e){statusEl.textContent="Error: "+e;}
-    });
-  </script>
-</body>
-</html>
+  // ---------- STATUS PANEL ----------
+  const sBackend = document.getElementById("s-backend");
+  const sGeo     = document.getElementById("s-geocode");
+  const sPlaces  = document.getElementById("s-places");
+  const sDev     = document.getElementById("s-dev");
+  const set = (el, ok, ms) => { el.className = ok ? "ok" : "fail"; el.textContent = (ok ? "OK" : "Fail") + (ms ? ` (${ms}ms)` : ""); };
+  async function ping(url){ const t0=performance.now(); const r=await apiFetch(url); return { ok:r.ok, ms:Math.round(performance.now()-t0) }; }
+  async function checkAll(){
+    try{ const {ok,ms}=await ping(ENDPOINT.backend); set(sBackend, ok, ms);}catch{ set(sBackend,false); }
+    try{ const {ok,ms}=await ping(ENDPOINT.geocode + "?address=Raleigh,NC"); set(sGeo, ok, ms);}catch{ set(sGeo,false); }
+    try{ const {ok,ms}=await ping(ENDPOINT.places + "?lat=35.79&lng=-78.52&radius=1609"); set(sPlaces, ok, ms);}catch{ set(sPlaces,false); }
+    try{ const {ok,ms}=await ping(ENDPOINT.developments + "?lat=35.79&lng=-78.52&radius=5000"); set(sDev, ok, ms);}catch{ set(sDev,false); }
+  }
+  document.getElementById("recheck").addEventListener("click", checkAll
