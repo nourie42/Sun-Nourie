@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Gas Station Gallons Estimator (GPT)</title>
+  <title>Gas Station Gallons Estimator</title>
   <style>
     body { background:#0e1117; color:#e6e6e6; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
     .wrap { max-width: 900px; margin: 24px auto; padding: 0 16px; }
@@ -22,12 +22,12 @@
 </head>
 <body>
   <div class="wrap">
-    <h1>Gas Station Gallons Estimator (GPT)</h1>
-    <p class="muted">Enter the address and regular MPDs. The model will pull traffic, competition, and planned sites (via the server), then estimate monthly gallons with a short numeric rationale.</p>
+    <h1>Gas Station Gallons Estimator</h1>
+    <p class="muted">Enter the address and regular MPDs. The server geocodes, finds road class and competitors from OpenStreetMap, estimates AADT, then computes monthly gallons with clear adjustments.</p>
 
     <div class="card">
       <label>Prospect address</label>
-      <input id="addr" placeholder="4173 Knightdale Blvd Knightdale NC" />
+      <input id="addr" placeholder="4173 Knightdale Blvd, Knightdale NC" />
 
       <div class="row">
         <div>
@@ -72,8 +72,8 @@ async function safeFetchJSON(url, opts) {
   const res = await fetch(url, opts);
   const ct = res.headers.get("content-type") || "";
   const text = await res.text();
-  if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}\n` + text.slice(0, 400));
-  if (!ct.includes("application/json")) throw new Error(`Expected JSON but got "${ct}"\n` + text.slice(0, 400));
+  if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}\n` + text.slice(0, 600));
+  if (!ct.includes("application/json")) throw new Error(`Expected JSON but got "${ct}"\n` + text.slice(0, 600));
   return JSON.parse(text);
 }
 
@@ -86,15 +86,14 @@ async function estimate() {
     const diesel = Number(document.getElementById("diesel").value || 0);
 
     const body = { address, mpds, diesel };
-    setDebug({ request: body });
-
     const data = await safeFetchJSON("/estimate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body)
     });
 
-    setOut(`${data.monthly_gallons?.toLocaleString?.() ?? data.monthly_gallons} gal/mo\n\n${data.rationale || ""}`);
+    const g = data.monthly_gallons;
+    setOut(`${(g ?? 0).toLocaleString()} gal/mo\n\n${data.rationale || ""}`);
     setDebug({ request: body, response: data });
   } catch (e) {
     setOut("Network error:\n" + e.message);
@@ -107,6 +106,7 @@ async function testAADT() {
   try {
     pingBtn.disabled = true;
     setOut("Testing /aadt …");
+    // Knightdale approx
     const test = await safeFetchJSON(`/aadt?lat=35.786&lng=-78.49`);
     setOut(`AADT test OK: ${JSON.stringify(test)}`);
   } catch (e) {
