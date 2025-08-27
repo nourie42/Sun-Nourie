@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Fuel Gallons Estimator — Chat</title>
 
+  <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 
@@ -18,20 +19,18 @@
     label { display:block; font-weight:600; margin:10px 0 6px; }
     input { width:100%; padding:12px; border-radius:8px; border:1px solid var(--line); background:#0f1320; color:var(--text); }
     .row { display:flex; gap:12px; flex-wrap:wrap; }
-    .row>div { flex:1; min-width:220px; position:relative; }
+    .row>div { flex:1; min-width:260px; }
     button { background:var(--primary); color:#fff; border:0; padding:12px 16px; border-radius:10px; font-weight:700; cursor:pointer; }
     button:disabled { opacity:.5; cursor:not-allowed; }
     .muted { color:var(--muted); }
     .grid { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
     .right { text-align:right; }
-    #map { height:420px; border-radius:12px; border:1px solid var(--line); display:flex; align-items:center; justify-content:center; color:var(--muted); }
-    .inputs-inline { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    #map { height:420px; border-radius:12px; border:1px solid var(--line); position: relative; }
+    #mapOverlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(14,17,23,0.6); border-radius:12px; font-weight:700; }
+    ul { margin: 8px 0 0 18px; }
     .mono { font-family: ui-monospace, Menlo, Consolas, monospace; }
-    /* Autocomplete dropdown */
-    .ac { position:absolute; top:100%; left:0; right:0; background:#0f1320; border:1px solid var(--line); border-radius:10px; z-index:10; display:none; max-height:240px; overflow:auto; }
-    .ac div { padding:10px 12px; cursor:pointer; border-bottom:1px solid #1f2530; }
-    .ac div:last-child { border-bottom:0; }
-    .ac div:hover { background:#162034; }
+    .summary { white-space: pre-wrap; }
+    datalist option { color:#000; }
   </style>
 </head>
 <body>
@@ -40,10 +39,10 @@
 
     <div class="card">
       <div class="row">
-        <div id="addrWrap">
-          <label>Site address (or lat,lon)</label>
-          <input id="addr" autocomplete="off" placeholder="4173 Knightdale Blvd, Knightdale NC — or — 35.7872,-78.49" />
-          <div id="addrAC" class="ac"></div>
+        <div>
+          <label>Site address (autocomplete)</label>
+          <input id="addr" list="addr_suggest" placeholder="4173 Knightdale Blvd, Knightdale NC" autocomplete="off" />
+          <datalist id="addr_suggest"></datalist>
         </div>
         <div>
           <label>Regular MPDs</label>
@@ -54,40 +53,31 @@
           <input id="diesel" type="number" value="0" />
         </div>
       </div>
-      <div class="inputs-inline" style="margin-top:12px;">
-        <div style="flex:1;min-width:240px;">
-          <label>AADT override (optional)</label>
-          <input id="aadtOverride" type="number" placeholder="enter AADT to force (e.g., 10449)" />
-        </div>
+      <div style="margin-top:12px; display:flex; gap:10px; align-items:center;">
         <button id="go">Estimate</button>
-        <span class="muted">Baseline floor uses AADT×2%×8×30; your override wins.</span>
+        <span class="muted">Results include AADT sanity, competition, developments, capacity cap, and a detailed summary.</span>
       </div>
     </div>
 
     <div class="card">
       <div id="out" class="muted">—</div>
-      <div class="inputs-inline" style="margin-top:12px;">
-        <div style="flex:1;min-width:240px;">
-          <label>Adjust AADT and re-run</label>
-          <input id="rerunAadt" type="number" placeholder="type a new AADT and click Re-run" />
-        </div>
-        <button id="rerunBtn">Re-run</button>
-      </div>
     </div>
 
     <div class="card">
       <div class="muted" style="margin-bottom:6px;">Map: site & competition (1 mile)</div>
-      <div id="map">Loading</div>
+      <div id="map">
+        <div id="mapOverlay" class="muted">—</div>
+      </div>
     </div>
 
     <div class="card">
-      <div class="muted"><b>Developments (planned / proposed / permit / coming-soon / construction)</b></div>
+      <b>Developments (planned/proposed/permit/coming-soon/construction)</b>
       <div id="devs" class="muted">—</div>
     </div>
 
     <div class="card">
-      <div class="muted"><b>Detailed explanation</b></div>
-      <div id="summary" class="muted">—</div>
+      <b>Summary</b>
+      <div id="summary" class="summary muted">—</div>
     </div>
 
     <div class="card">
@@ -100,90 +90,135 @@
 
 <script>
 const $ = id => document.getElementById(id);
-const out = $("out"), debug = $("debug"), goBtn = $("go"), rerunBtn = $("rerunBtn");
-const mapDiv = $("map"), devsDiv = $("devs"), summaryDiv = $("summary");
-
+const out = $("out"), debug = $("debug"), goBtn = $("go");
+const mapBox = $("map"), overlay = $("mapOverlay");
 let map, markersLayer, mapInited=false;
 
 function setOut(html){ out.innerHTML = html; }
 function setDebug(obj){ debug.textContent = typeof obj === "string" ? obj : JSON.stringify(obj, null, 2); }
 function fmt(n){ return (n ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 }); }
-function esc(s){ return (s ?? "").toString().replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;"," >":"&gt;",'"':"&quot;","'":"&#39;" }[m])); }
+function esc(s){ return (s ?? "").toString().replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m])); }
 
-async function callEstimate({overrideValue}={}){
-  const body={
+function setOverlay(msg){ overlay.textContent = msg; overlay.style.display = "flex"; }
+function clearOverlay(){ overlay.style.display = "none"; }
+
+async function callEstimate(){
+  const body = {
     address: $("addr").value.trim(),
-    mpds: Number($("mpds").value||0),
-    diesel: Number($("diesel").value||0),
-    aadtOverride: overrideValue ?? $("aadtOverride").value.trim()
+    mpds: Number($("mpds").value || 0),
+    diesel: Number($("diesel").value || 0)
   };
   const r=await fetch("/estimate",{ method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
-  const t=await r.text(); if(!r.ok) throw new Error(`HTTP ${r.status}\n${t.slice(0,1400)}`); return JSON.parse(t);
+  const t=await r.text(); if(!r.ok) throw new Error(`HTTP ${r.status}\n${t.slice(0,1200)}`); return JSON.parse(t);
+}
+
+async function estimate(){
+  try{
+    goBtn.disabled = true;
+    setOut("<span class='muted'>Working…</span>");
+    // Show the longer research message only AFTER the user clicks Estimate:
+    setOverlay("Loading, this can take up to 3 minutes to research");
+    const d = await callEstimate();
+    renderReport(d);
+    renderMap(d.map);
+    renderDevs(d.developments);
+    renderSummary(d.summary);
+    setDebug(d);
+  }catch(e){
+    setOut(`<pre class="mono">${esc(e.message)}</pre>`);
+    setOverlay("Error — see details above");
+  }finally{
+    goBtn.disabled = false;
+  }
 }
 
 function renderReport(d){
   const i=d.inputs||{}, c=d.competition||{};
   const html = `
     <div class="grid">
-      <div><b>Base Estimate (gal/mo)</b><div style="font-size:28px;font-weight:800;">${fmt(d.base)}</div></div>
+      <div>
+        <b>Base Estimate (gal/mo)</b>
+        <div style="font-size:28px;font-weight:800;">${fmt(d.base)}</div>
+        <div class="muted">Low–High: ${fmt(d.low)} – ${fmt(d.high)}</div>
+      </div>
       <div class="right">
-        <div>Low: <b>${fmt(d.low)}</b></div>
-        <div>High: <b>${fmt(d.high)}</b></div>
         <div>Year-2: <b>${fmt(d.year2)}</b></div>
-        <div>Year-3: <b>${fmt(d.year3)}</b></div>
+        <div style="margin-top:6px;">Year-3: <b>${fmt(d.year3)}</b></div>
       </div>
     </div>
     <hr>
-    <div>Inputs: AADT used ${fmt(i.aadt_used)} (${esc(i.aadt_note||"")}); MPDs ${i.mpds}${i.diesel ? " + diesel "+i.diesel : ""}</div>
+    <div>Inputs: AADT used <b>${fmt(i.aadt_used)}</b>; MPDs ${i.mpds}${i.diesel ? " + diesel "+i.diesel : ""}</div>
     <div>Competition (Overpass): ${c.count ?? 0} within 1 mi${c.nearest_mi != null ? "; nearest "+c.nearest_mi.toFixed(3)+" mi" : ""}${(c.notable_brands||[]).length ? "; notable: "+c.notable_brands.join(", ") : ""}; impact ${(Number(c.impact_score||0)*100|0)}%</div>
     <div style="margin-top:8px">${esc(d.rationale||"")}</div>
   `;
   setOut(html);
-  $("rerunAadt").value = i.aadt_used ?? "";
-  setDebug(d);
-  summaryDiv.textContent = d.detailed_summary || "—";
 }
 
 function renderDevs(list){
-  if(!Array.isArray(list)||!list.length){ devsDiv.innerHTML="<span class='muted'>none found</span>"; return; }
-  devsDiv.innerHTML = "<ul>"+list.map(d=>`<li>${esc(d.name)} • ${esc(d.status)} • ${d.miles} mi</li>`).join("")+"</ul>";
+  const el=$("devs");
+  if(!Array.isArray(list)||!list.length){ el.innerHTML="<span class='muted'>none found</span>"; return; }
+  el.innerHTML = "<ul>"+list.map(d=>`<li>${esc(d.name)} • ${esc(d.status)} • ${d.miles} mi</li>`).join("")+"</ul>";
+}
+
+function renderSummary(s){
+  $("summary").textContent = s && s.trim().length ? s : "—";
+}
+
+function ensureLeaflet(){
+  if(mapInited) return;
+  map = L.map("map",{zoomControl:true});
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map);
+  mapInited = true;
 }
 
 function renderMap(m){
-  if(!m||!m.site){ mapDiv.textContent="Loading"; return; }
-  if(!mapInited){
-    map = L.map(mapDiv, { zoomControl:true });
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution:"© OpenStreetMap" }).addTo(map);
-    mapInited=true;
-  }
+  ensureLeaflet();
   if(markersLayer) markersLayer.remove();
-  markersLayer=L.layerGroup().addTo(map);
+  markersLayer = L.layerGroup().addTo(map);
 
-  const site=[m.site.lat,m.site.lon];
-  map.setView(site,15);
-  L.marker(site,{title:"Site"}).addTo(markersLayer).bindPopup("<b>Site</b>");
+  if(!m || !m.site){
+    overlay.textContent = "—";
+    return;
+  }
 
-  const comps=Array.isArray(m.competitors)?m.competitors:[];
+  // site marker (NOT draggable)
+  const site = [m.site.lat, m.site.lon];
+  const siteMarker = L.marker(site, { title: "Site" }).addTo(markersLayer).bindPopup("<b>Site</b>");
+  const comps = Array.isArray(m.competitors) ? m.competitors : [];
   for(const c of comps){
     L.circleMarker([c.lat,c.lon],{radius:6,weight:1,color:c.heavy?"#ff7f50":"#4ade80",fillOpacity:.85})
       .addTo(markersLayer).bindPopup(`<b>${esc(c.name||"Fuel station")}</b><br>${c.miles} mi`);
   }
   const bounds=L.latLngBounds([site, ...comps.map(c=>[c.lat,c.lon])]);
   map.fitBounds(bounds.pad(0.25));
+
+  // hide overlay once drawn
+  clearOverlay();
 }
 
-// -------- Autocomplete (Nominatim) --------
-const addr = $("addr");
-const ac = $("addrAC");
+/* ---------- Address Autocomplete (Nominatim) ---------- */
 let acTimer=null;
-
-addr.addEventListener("input", () => {
-  const q = addr.value.trim();
-  if (!q) { ac.style.display="none"; return; }
-  clearTimeout(acTimer);
-  acTimer = setTimeout(async () => {
-    try {
-      const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&countrycodes=us&limit=5&q=${encodeURIComponent(q)}`;
+$("addr").addEventListener("input", ()=>{
+  const q = $("addr").value.trim();
+  if(acTimer) clearTimeout(acTimer);
+  if(!q || q.length < 4){ $("addr_suggest").innerHTML=""; return; }
+  acTimer = setTimeout(async ()=>{
+    try{
+      const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=8&countrycodes=us&q=${encodeURIComponent(q)}`;
       const r = await fetch(url);
+      if(!r.ok) return;
       const arr = await r.json();
-      ac.innerHTML = arr.map(it => `<div data-full="${esc(it.display
+      const dl = $("addr_suggest");
+      dl.innerHTML = arr.map(x=>`<option value="${esc(x.display_name)}"></option>`).join("");
+    }catch(_){}
+  }, 300);
+});
+
+$("go").addEventListener("click", estimate);
+
+/* Initial map overlay state */
+setOverlay("—"); // neutral until the first run
+</script>
+</body>
+</html>
+
