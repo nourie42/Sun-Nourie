@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Fuel Gallons Estimator — Chat</title>
 
-  <!-- Leaflet map -->
+  <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
@@ -63,7 +63,7 @@
           <input id="aadtOverride" type="number" placeholder="enter AADT to force (e.g., 10449)" />
         </div>
         <button id="go">Estimate</button>
-        <span class="muted">Will average DOT + GPT when both exist; override wins if entered.</span>
+        <span class="muted">Averages DOT + GPT when both exist; your override wins. Floor uses AADT×2%×8×30.</span>
       </div>
     </div>
 
@@ -83,13 +83,18 @@
           <input id="rerunAadt" type="number" placeholder="type a new AADT and click Re-run" />
         </div>
         <button id="rerunBtn">Re-run</button>
-        <span class="muted">This will re-estimate using only your override.</span>
+        <span class="muted">Re-estimates using your override only.</span>
       </div>
     </div>
 
     <div class="card">
       <div class="heading">Map: site & competition (1 mile)</div>
       <div id="map">Loading…</div>
+    </div>
+
+    <div class="card">
+      <div class="heading">Developments (planned/proposed/permit/coming-soon/construction)</div>
+      <div id="devs" class="muted">—</div>
     </div>
 
     <div class="card">
@@ -103,8 +108,7 @@
 <script>
 const $ = (id) => document.getElementById(id);
 const out = $("out"), debug = $("debug"), goBtn = $("go"), rerunBtn = $("rerunBtn");
-
-let map, markersLayer;
+let map, markersLayer, mapInited = false;
 
 function setOut(html){ out.innerHTML = html; }
 function setDebug(obj){ debug.textContent = typeof obj === "string" ? obj : JSON.stringify(obj, null, 2); }
@@ -129,13 +133,13 @@ async function callEstimate(overrideValue){
 async function estimate(){
   try {
     goBtn.disabled = true;
-    setOut(`<span class="muted">Working… pulling AADT, getting GPT estimate, averaging when applicable, then computing gallons.</span>`);
+    setOut(`<span class="muted">Working…</span>`);
     $("cmp").style.display = "none";
     const data = await callEstimate();
-
     setDebug(data);
     renderReport(data);
     renderMap(data.map);
+    renderDevs(data.developments);
   } catch (e) {
     setOut(`<div class="muted">Error:<br><pre class="mono">${esc(e.message)}</pre></div>`);
   } finally {
@@ -153,6 +157,7 @@ async function rerun(){
     setDebug(data);
     renderReport(data);
     renderMap(data.map);
+    renderDevs(data.developments);
   } catch (e) {
     setOut(`<div class="muted">Error:<br><pre class="mono">${esc(e.message)}</pre></div>`);
   } finally {
@@ -190,66 +195,46 @@ function renderReport(d){
     </div>
   `;
 
-  const assumptions = Array.isArray(d.assumptions) && d.assumptions.length
-    ? `<ul>${d.assumptions.map(a => `<li>${esc(a)}</li>`).join("")}</ul>`
-    : `<div class="muted">defaults applied where unknown; cap = positions × 25 × gal/cycle × 365/12.</div>`;
-
   const rationale = esc(d.rationale || "");
-
-  setOut(`
-    ${sectionTop}
-    <hr>
-    <div class="heading">Inputs used</div>
-    <div class="muted">AADT used ${fmt(i.aadt_used)}; MPDs ${esc(i.mpds)}${i.diesel ? " + diesel " + esc(i.diesel) : ""}; truck share ${Math.round((i.truck_share_assumed ?? 0)*100)}% (assumed)</div>
-    ${comp}
-    <div class="heading" style="margin-top:12px;">One-paragraph rationale</div>
-    <div>${rationale || "<span class='muted'>—</span>"}</div>
-  `);
-
-  // Pre-fill the rerun box with the used AADT so user can tweak
+  setOut(`${sectionTop}<hr><div class="heading">Inputs used</div><div class="muted">AADT used ${fmt(i.aadt_used)}; MPDs ${esc(i.mpds)}${i.diesel ? " + diesel " + esc(i.diesel) : ""}; truck share ${Math.round((i.truck_share_assumed ?? 0)*100)}% (assumed)</div>${comp}<div class="heading" style="margin-top:12px;">One-paragraph rationale</div><div>${rationale || "<span class='muted'>—</span>"}</div>`);
   $("rerunAadt").value = i.aadt_used ?? "";
 }
 
-let mapInited = false;
+function renderDevs(devs){
+  const el = $("devs");
+  if (!Array.isArray(devs) || !devs.length) { el.innerHTML = "<span class='muted'>none found</span>"; return; }
+  el.innerHTML = "<ul>" + devs.map(d => `<li>${esc(d.name)} • ${esc(d.status)} • ${esc(d.miles)} mi</li>`).join("") + "</ul>";
+}
+
 function renderMap(m){
   if (!m || !m.site) return;
   if (!mapInited) {
     map = L.map('map', { zoomControl: true });
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "&copy; OpenStreetMap" }).addTo(map);
     mapInited = true;
   }
-  const site = m.site;
-  const comps = Array.isArray(m.competitors) ? m.competitors : [];
-
-  // Reset layers
   if (markersLayer) markersLayer.remove();
   markersLayer = L.layerGroup().addTo(map);
 
+  const site = m.site;
+  const comps = Array.isArray(m.competitors) ? m.competitors : [];
   const siteLatLng = [site.lat, site.lon];
+
   map.setView(siteLatLng, 14);
+  L.marker(siteLatLng, { title: "Site" }).addTo(markersLayer).bindPopup(`<b>Site</b><br>${esc(site.label || "")}`);
 
-  // Base tiles
-  if (!window._tileLayer) {
-    window._tileLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "&copy; OpenStreetMap"
-    }).addTo(map);
+  if (!comps.length) {
+    const note = L.popup({ closeButton:false }).setLatLng(siteLatLng).setContent("<span class='muted'>No competitors found within 1 mi (Overpass)</span>");
+    markersLayer.addLayer(note);
+  } else {
+    for (const c of comps) {
+      L.circleMarker([c.lat, c.lon], { radius: 6, weight: 1, color: c.heavy ? "#ff7f50" : "#4ade80", fillOpacity: 0.85 })
+        .addTo(markersLayer)
+        .bindPopup(`<b>${esc(c.name || "Fuel station")}</b><br>${c.miles} mi`);
+    }
+    const bounds = L.latLngBounds([siteLatLng, ...comps.map(c => [c.lat, c.lon])]);
+    map.fitBounds(bounds.pad(0.25));
   }
-
-  // Site marker
-  L.marker(siteLatLng, { title: "Site" }).addTo(markersLayer)
-    .bindPopup(`<b>Site</b><br>${esc(site.label || "")}`);
-
-  // Competitors
-  for (const c of comps) {
-    const mk = L.circleMarker([c.lat, c.lon], {
-      radius: 6, weight: 1, color: c.heavy ? "#ff7f50" : "#4ade80", fillOpacity: 0.8
-    }).addTo(markersLayer);
-    mk.bindPopup(`<b>${esc(c.name || "Fuel station")}</b><br>${c.miles} mi`);
-  }
-
-  // Fit bounds
-  const allPts = [siteLatLng, ...comps.map(c => [c.lat, c.lon])];
-  const bounds = L.latLngBounds(allPts);
-  map.fitBounds(bounds.pad(0.25));
 }
 
 $("go").addEventListener("click", estimate);
