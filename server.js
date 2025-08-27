@@ -25,7 +25,7 @@ app.get("/aadt", async (req, res) => {
     const { lat, lng } = req.query;
     if (!lat || !lng) return jerr(res, 400, "Missing lat/lng");
 
-    // Temporary heuristic so the app runs while you wire the real API:
+    // Temporary heuristic so the app runs while you wire a real AADT source:
     const approx = Math.round(
       8000 + (Math.abs(Number(lat) * 1000 + Number(lng) * 500) % 22000)
     );
@@ -35,7 +35,7 @@ app.get("/aadt", async (req, res) => {
   }
 });
 
-// Gallons estimate via GPT (server-side proxy to OpenAI)
+// Gallons estimate via OpenAI (server-side, never from browser)
 app.post("/estimate", async (req, res) => {
   try {
     const { address, mpds, diesel } = req.body || {};
@@ -45,31 +45,40 @@ app.post("/estimate", async (req, res) => {
     const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
     if (!OPENAI_API_KEY) return jerr(res, 500, "Missing OPENAI_API_KEY");
 
-    const prompt = `
-You are an analyst. Estimate monthly gasoline gallons for:
-- Address: ${address}
-- Regular MPDs: ${mpds}
-- Diesel positions: ${diesel ?? 0}
+    // Compose prompt
+    const userPrompt = `
+Address: ${address}
+Regular MPDs: ${mpds}
+Diesel positions: ${diesel ?? 0}
 
-Rule of thumb baseline: Gallons = AADT × 8% × 2 × 30.
-Then adjust down for heavy close competition within 1 mile (Sheetz, Wawa, Buc-ee's, RaceTrac, etc.) and up for limited competition.
-Return ONLY a JSON object with:
+Baseline rule: Gallons = AADT × 8% × 2 × 30.
+Adjust down for heavy close competition within 1 mile (Sheetz, Wawa, Buc-ee's, RaceTrac, etc.) and up for limited competition.
+
+Return ONLY a JSON object:
 {"monthly_gallons": <number>, "rationale": "<one short sentence>"}
-`;
+`.trim();
 
-    // OpenAI Responses API (new JSON mode)
-    const r = await fetch("https://api.openai.com/v1/responses", {
+    // Use Chat Completions (stable) with JSON mode
+    const r = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${OPENAI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-5.1-mini",
-        input: prompt,
-        modalities: ["text"],
-        text: { format: "json" },
-        max_output_tokens: 300,
+        // You may switch models later; 4o-mini supports JSON mode reliably.
+        model: "gpt-4o-mini",
+        response_format: { type: "json_object" },
+        temperature: 0.2,
+        max_tokens: 300,
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are a precise analyst. Only output valid JSON when asked. Do not include markdown.",
+          },
+          { role: "user", content: userPrompt },
+        ],
       }),
     });
 
@@ -86,22 +95,14 @@ Return ONLY a JSON object with:
       return jerr(res, 502, "OpenAI JSON parse error", bodyText);
     }
 
-    const outputItem = data.output?.[0]?.content?.find?.(
-      (c) => c.type === "output_text"
-    );
-    if (!outputItem?.text)
-      return jerr(
-        res,
-        502,
-        "Unexpected OpenAI shape",
-        JSON.stringify(data).slice(0, 400)
-      );
+    const txt = data.choices?.[0]?.message?.content;
+    if (!txt) return jerr(res, 502, "No content from OpenAI", bodyText);
 
     let gptJson;
     try {
-      gptJson = JSON.parse(outputItem.text);
+      gptJson = JSON.parse(txt);
     } catch (e) {
-      return jerr(res, 502, "Model did not return valid JSON", outputItem.text);
+      return jerr(res, 502, "Model did not return valid JSON", txt);
     }
 
     return res.json(gptJson);
