@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Gas Station Gallons Estimator (GPT)</title>
+  <style>
+    body { background:#0e1117; color:#e6e6e6; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+    .wrap { max-width: 900px; margin: 24px auto; padding: 0 16px; }
+    h1 { font-size: 40px; margin: 0 0 8px; }
+    .card { background:#161a22; border:1px solid #2a2f3a; border-radius:12px; padding:16px; margin:12px 0; }
+    label { display:block; font-weight:600; margin:10px 0 6px; }
+    input { width:100%; padding:12px; border-radius:8px; border:1px solid #2a2f3a; background:#0f1320; color:#e6e6e6; }
+    .row { display:flex; gap:12px; }
+    .row > div { flex:1; }
+    button { background:#3b82f6; color:white; border:0; padding:12px 16px; border-radius:10px; font-weight:700; cursor:pointer; }
+    button:disabled { opacity:.5; cursor:not-allowed; }
+    pre { white-space:pre-wrap; word-break:break-word; }
+    .muted { color:#9aa4b2; font-size: 0.9rem; }
+    details { border-top:1px solid #2a2f3a; padding-top:10px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Gas Station Gallons Estimator (GPT)</h1>
+    <p class="muted">Enter the address and regular MPDs. The model will pull traffic, competition, and planned sites (via the server), then estimate monthly gallons with a short numeric rationale.</p>
+
+    <div class="card">
+      <label>Prospect address</label>
+      <input id="addr" placeholder="4173 Knightdale Blvd Knightdale NC" />
+
+      <div class="row">
+        <div>
+          <label>Regular MPDs</label>
+          <input id="mpds" type="number" value="3" />
+        </div>
+        <div>
+          <label>Diesel positions (optional)</label>
+          <input id="diesel" type="number" value="0" />
+        </div>
+      </div>
+
+      <div style="margin-top:12px">
+        <button id="go">Estimate Gallons</button>
+        <button id="ping" style="margin-left:8px; background:#64748b">Test AADT</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>GPT Estimate</h3>
+      <pre id="out" class="muted">–</pre>
+    </div>
+
+    <div class="card">
+      <details>
+        <summary>Data used (debug)</summary>
+        <pre id="debug">/ waiting…</pre>
+      </details>
+    </div>
+  </div>
+
+<script>
+const out = document.getElementById("out");
+const debug = document.getElementById("debug");
+const goBtn = document.getElementById("go");
+const pingBtn = document.getElementById("ping");
+
+function setOut(msg){ out.textContent = msg; }
+function setDebug(obj){ debug.textContent = typeof obj === "string" ? obj : JSON.stringify(obj, null, 2); }
+
+// Robust JSON fetch that shows HTML error pages clearly
+async function safeFetchJSON(url, opts) {
+  const res = await fetch(url, opts);
+  const ct = res.headers.get("content-type") || "";
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status} ${res.statusText}\n` + text.slice(0, 1200));
+  }
+  if (!ct.includes("application/json")) {
+    throw new Error(`Expected JSON but got "${ct}". Body:\n` + text.slice(0, 1200));
+  }
+  try { return JSON.parse(text); }
+  catch (e) { throw new Error("JSON parse failed:\n" + text.slice(0, 1200)); }
+}
+
+async function estimate() {
+  try {
+    goBtn.disabled = true;
+    setOut("…working");
+    const address = document.getElementById("addr").value.trim();
+    const mpds = Number(document.getElementById("mpds").value || 0);
+    const diesel = Number(document.getElementById("diesel").value || 0);
+
+    const body = { address, mpds, diesel };
+    setDebug({ request: body });
+
+    const data = await safeFetchJSON("/estimate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+
+    setOut(`${data.monthly_gallons?.toLocaleString?.() ?? data.monthly_gallons} gal/mo\n\n${data.rationale || ""}`);
+    setDebug({ request: body, response: data });
+  } catch (e) {
+    setOut("Network error:\n" + e.message);
+  } finally {
+    goBtn.disabled = false;
+  }
+}
+
+async function testAADT() {
+  try {
+    pingBtn.disabled = true;
+    setOut("Testing /aadt …");
+    // Knightdale approx coords
+    const test = await safeFetchJSON(`/aadt?lat=35.786&lng=-78.49`);
+    setOut(`AADT test OK: ${JSON.stringify(test)}`);
+  } catch (e) {
+    setOut("AADT test failed:\n" + e.message);
+  } finally {
+    pingBtn.disabled = false;
+  }
+}
+
+goBtn.addEventListener("click", estimate);
+pingBtn.addEventListener("click", testAADT);
+</script>
+</body>
+</html>
