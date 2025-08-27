@@ -1,223 +1,281 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Prospect Estimator</title>
-  <style>
-    :root{
-      --bg:#0f1115; --panel:#1a1f29; --muted:#8ea0b7; --text:#e8eef8; --accent:#3b82f6; --ok:#16a34a; --warn:#f59e0b;
-      --radius:16px;
-    }
-    *{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
-    body{margin:0;background:var(--bg);color:var(--text)}
-    .wrap{max-width:920px;margin:24px auto;padding:12px}
-    .card{background:var(--panel);border-radius:var(--radius);padding:18px;margin-bottom:16px;box-shadow:0 6px 20px rgba(0,0,0,.25)}
-    h1{margin:0 0 8px;font-weight:800;letter-spacing:.2px}
-    h2{margin:0 0 12px;font-weight:700;font-size:18px}
-    label{display:block;font-size:14px;color:var(--muted);margin:8px 0 6px}
-    input[type="text"],input[type="number"]{
-      width:100%;padding:14px 12px;border-radius:12px;border:1px solid #2b3443;background:#11151d;color:var(--text);
-      outline:none
-    }
-    .grid{display:grid;gap:12px}
-    @media(min-width:720px){.grid-2{grid-template-columns:1fr 1fr}}
-    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-    .checkbox{display:flex;gap:10px;align-items:center;margin-top:6px}
-    .btn{
-      appearance:none;border:0;border-radius:12px;background:var(--accent);color:#fff;padding:12px 16px;
-      font-weight:700;cursor:pointer;transition:transform .03s ease;box-shadow:0 4px 16px rgba(59,130,246,.35)
-    }
-    .btn:active{transform:translateY(1px)}
-    .muted{color:var(--muted)}
-    .pill{display:inline-block;padding:4px 10px;border-radius:999px;background:#0e1625;color:var(--muted);font-size:12px}
-    .result-row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px dashed #2a3343}
-    .result-row:last-child{border-bottom:0}
-    .mono{font-variant-numeric:tabular-nums}
-    details{margin-top:6px}
-    summary{cursor:pointer;color:#c9d7ee}
-    .small{font-size:12px}
-    .status{min-height:20px;margin-left:10px}
-    .status.ok{color:var(--ok)}
-    .status.err{color:#ef4444}
-    .foot{margin-top:8px;font-size:12px;color:#8aa1be}
-  </style>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Prospect Estimator + Competition Map</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<style>
+  :root{--bg:#0b0c10;--card:#13151a;--text:#e8e8e8;--muted:#9aa0a6;--accent:#3a82f7;--border:#2a2f3a}
+  body{margin:0;font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text)}
+  .wrap{display:flex;gap:16px;min-height:100vh;padding:16px}
+  .left{width:560px;min-width:360px;display:flex;flex-direction:column;gap:12px}
+  .right{flex:1}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px}
+  h1{margin:0 0 12px;font-size:22px}
+  label{display:block;font-weight:600;margin:10px 0 4px}
+  input,button{font:inherit}
+  input[type="text"],input[type="number"]{width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:#1b1f2a;color:#e8e8e8}
+  button{padding:10px 14px;border-radius:10px;border:0;background:var(--accent);color:#fff;font-weight:600;cursor:pointer}
+  .muted{color:var(--muted);font-size:12px}
+  .err{color:#ff9a9a}
+  #map{height:calc(100vh - 32px);width:100%;border-radius:12px;border:1px solid var(--border);background:#0f1116}
+  .badge{display:inline-block;min-width:120px;padding:4px 10px;border-radius:999px;border:1px solid var(--border);background:#1b1f2a;margin-right:6px}
+  .ok{color:#9ef5b3}.fail{color:#ff9a9a}.pending{color:#e8e8e8;opacity:.7}
+  table{width:100%;border-collapse:collapse}.num{font-variant-numeric:tabular-nums}
+  td{padding:4px 0;border-bottom:1px dashed #2a2f3a}
+  pre{background:#11151f;border:1px solid #2a2f3a;border-radius:8px;padding:8px;max-height:200px;overflow:auto;color:#cfe3ff;font-size:12px}
+  .row{display:flex;gap:8px}
+  .col{flex:1}
+</style>
 </head>
 <body>
-  <div class="wrap">
+<div class="wrap">
+  <div class="left">
+    <div class="card"><h1>Prospect Estimator</h1></div>
+
+    <!-- Inputs -->
     <div class="card">
-      <h1>Prospect Estimator</h1>
+      <label>Prospect site address</label>
+      <input id="addr" type="text" placeholder="4173 Knightdale BLVD, Knightdale NC">
+      <div class="row" style="margin-top:8px">
+        <div class="col"><label>Gasoline MPDs</label><input id="mpd" type="number" value="6"></div>
+        <div class="col"><label>Diesel positions</label><input id="dieselpos" type="number" value="8"></div>
+      </div>
+      <div style="margin-top:8px"><input id="autoAADT" type="checkbox" checked>
+        <label for="autoAADT" style="margin-left:6px;font-weight:600">Auto-fetch AADT</label>
+      </div>
+      <button id="run" style="margin-top:10px">Search & Estimate</button>
+      <span id="status" class="muted"></span>
     </div>
 
+    <!-- Results -->
     <div class="card">
-      <h2>Prospect site address</h2>
-      <label for="address">Enter full address</label>
-      <input id="address" type="text" placeholder="500 Main St Nashua NH" />
+      <b>Results</b>
+      <div id="results" class="muted">Enter address & click Search.</div>
+    </div>
 
-      <div class="grid grid-2" style="margin-top:12px">
-        <div>
-          <label for="mpds">Gasoline MPDs</label>
-          <input id="mpds" type="number" min="0" step="1" value="6" />
+    <!-- Advanced -->
+    <details class="card">
+      <summary><b>Advanced inputs</b></summary>
+      <div class="row"><div class="col"><label>AADT (VPD)</label><input id="VPD" type="number" value="18024"></div><div class="col"><label>Truck share (%)</label><input id="truckShare" type="number" value="5.5"></div></div>
+      <div class="row"><div class="col"><label>Frontage F</label><input id="frontShare" type="number" value="0.59"></div><div class="col"><label>Turn T</label><input id="turnShare" type="number" value="0.41"></div></div>
+      <div class="row"><div class="col"><label>fT (0–1)</label><input id="turnFric" type="number" value="0.70"></div><div class="col"><label>Speed (mph)</label><input id="speed" type="number" value="35"></div></div>
+      <div class="row"><div class="col"><label>Access points</label><input id="accessPts" type="number" value="4"></div><div class="col"><label>LED sign? (0/1)</label><input id="ledSign" type="number" value="1"></div></div>
+      <div class="row"><div class="col"><label>Δ price ($/gal)</label><input id="priceDelta" type="number" value="0.00"></div><div class="col"><label>CPR index</label><input id="cpr" type="number" value="104"></div></div>
+      <div class="row"><div class="col"><label>Gas score</label><input id="gasScore" type="number" value="105.5"></div><div class="col"><label>Diesel score</label><input id="dieselScore" type="number" value="22.5"></div></div>
+      <div class="row"><div class="col"><label>Comp radius (mi)</label><input id="radiusMi" type="number" value="1"></div><div class="col"><label>Dev radius (mi)</label><input id="devRadiusMi" type="number" value="3"></div></div>
+    </details>
+
+    <!-- Diagnostics -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <b>Diagnostics</b>
+        <div class="row">
+          <button id="btnDiagGeocode">Check Geocode</button>
+          <button id="btnDiagPlaces">Check Places</button>
+          <button id="btnDiagDev">Check Developments</button>
+          <button id="btnDiagAADT">Check AADT</button>
         </div>
-        <div>
-          <label for="diesel">Diesel positions</label>
-          <input id="diesel" type="number" min="0" step="1" value="8" />
-        </div>
       </div>
-
-      <div class="checkbox">
-        <input id="autoFetch" type="checkbox" checked />
-        <label for="autoFetch" class="muted">Auto-fetch AADT</label>
-      </div>
-
-      <div class="row" style="margin-top:12px">
-        <button id="go" class="btn">Search &amp; Estimate</button>
-        <span id="status" class="status muted">Ready.</span>
-      </div>
+      <div class="muted" style="margin:6px 0">Backend: <code id="backendUrl">https://sun-nourie-live.onrender.com</code></div>
+      <div id="diagNote" class="muted">Use a test lat/lng for Places/Dev/AADT: <span id="diagLatLng">35.7796, -78.6382</span></div>
+      <pre id="diagOut">// diagnostics output will appear here</pre>
     </div>
 
-    <div class="card" id="resultsCard" style="display:none">
-      <h2>Results</h2>
-      <div class="result-row">
-        <div>Year-1 est. (gal/mo)</div>
-        <div class="mono" id="y1">—</div>
-      </div>
-      <div class="result-row">
-        <div>Low / High</div>
-        <div class="mono" id="lowHigh">—</div>
-      </div>
-      <div class="result-row">
-        <div>Year-2</div>
-        <div class="mono" id="y2">—</div>
-      </div>
-      <div class="result-row">
-        <div>Year-3</div>
-        <div class="mono" id="y3">—</div>
-      </div>
-      <div class="result-row">
-        <div>Capacity cap</div>
-        <div class="mono" id="cap">—</div>
-      </div>
-      <div class="foot small">
-        <span class="pill" id="aadtBadge">AADT: —</span>
-        <span class="pill" id="latlngBadge" style="margin-left:6px">loc: —</span>
-      </div>
-    </div>
-
+    <!-- Status (bottom) -->
     <div class="card">
-      <details>
-        <summary>▼ Advanced inputs</summary>
-        <div class="grid grid-2" style="margin-top:10px">
-          <div>
-            <label for="aadt">AADT (VPD)</label>
-            <input id="aadt" type="number" step="1" value="0" />
-          </div>
-          <div>
-            <label for="truckShare">Truck share (%)</label>
-            <input id="truckShare" type="number" step="0.1" value="5.5" />
-          </div>
-        </div>
-        <p class="small muted" style="margin-top:8px">
-          You can manually override AADT here (auto-fetch can be toggled above).
-        </p>
-      </details>
-    </div>
-
-    <div class="card">
-      <div class="small muted">
-        Formula: <strong>Gallons = AADT × 8% × 2 × 30</strong> (then capped by MPD capacity).<br/>
-        Capacity cap uses 45 gph per MPD × 24 h × 30 d.
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <b>Live Data Status</b>
+        <button id="recheck">Recheck</button>
+      </div>
+      <div style="margin-top:8px;line-height:1.8">
+        <span class="badge"><b>Backend</b></span> <span id="s-backend" class="pending">checking…</span><br>
+        <span class="badge"><b>Geocode</b></span> <span id="s-geocode" class="pending">checking…</span><br>
+        <span class="badge"><b>Places</b></span> <span id="s-places" class="pending">checking…</span><br>
+        <span class="badge"><b>Developments</b></span> <span id="s-dev" class="pending">checking…</span>
       </div>
     </div>
   </div>
 
-  <script>
-    // ---- Helpers
-    const $ = sel => document.querySelector(sel);
-    const fmt = n => Number.isFinite(n) ? n.toLocaleString() : "—";
+  <div class="right">
+    <div id="map"></div>
+  </div>
+</div>
 
-    async function fetchAADTForAddress(address) {
-      // Calls your backend /aadt endpoint (from server.js you deployed)
-      const res = await fetch(`/aadt?address=${encodeURIComponent(address)}`);
-      const j = await res.json().catch(() => ({}));
-      if (!res.ok || !j.ok) throw new Error(j.error || "AADT fetch failed");
-      return j; // { ok:true, aadt, address, location:{lat,lng}, ... }
-    }
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+/* ---------- CONFIG ---------- */
+const API_BASE = "https://sun-nourie-live.onrender.com";
+document.getElementById("backendUrl").textContent = API_BASE;
+const ENDPOINT = {
+  backend:      API_BASE + "/",
+  geocode:      API_BASE + "/geocode",
+  places:       API_BASE + "/places",
+  developments: API_BASE + "/developments",
+  aadt:         API_BASE + "/aadt"
+};
 
-    function computeCapacityCap(mpds) {
-      // 45 gallons/hour × 24 × 30 ≈ 32,400 gal/mo per MPD
-      const perMPD = 45 * 24 * 30;
-      return mpds * perMPD;
-    }
+/* ---------- HELPERS ---------- */
+async function apiFetch(url, opts = {}) {
+  const base = { mode:"cors", cache:"no-store", referrerPolicy:"no-referrer" };
+  for (let i=0;i<2;i++) {
+    try { return await fetch(url, {...base, ...opts}); }
+    catch (e) { if (i===1) throw e; await new Promise(r=>setTimeout(r,600)); }
+  }
+}
+function miles(a,b,c,d){const R=3958.8,toRad=x=>x*Math.PI/180,dA=toRad(c-a),dO=toRad(d-b);const A=Math.sin(dA/2)**2+Math.cos(toRad(a))*Math.cos(toRad(c))*Math.sin(dO/2)**2;return 2*R*Math.asin(Math.sqrt(A));}
+function setStatus(el,ok,ms){el.className=ok?"ok":"fail";el.textContent=(ok?"OK":"Fail")+(ms?` (${ms}ms)`:"");}
+async function timed(url){const t0=performance.now();const r=await apiFetch(url);return{r,ok:r.ok,ms:Math.round(performance.now()-t0)};}
+function jstr(obj){try{return JSON.stringify(obj,null,2)}catch{return String(obj)}}
 
-    function computeEstimate(aadt, mpds) {
-      // Base rule from user: AADT × 0.08 × 2 × 30
-      const y1Raw = aadt * 0.08 * 2 * 30; // monthly gallons
-      const cap = computeCapacityCap(mpds);
-      const y1 = Math.min(y1Raw, cap);
+/* ---------- STATUS PANEL ---------- */
+async function checkAll(){
+  const sb=document.getElementById("s-backend"), sg=document.getElementById("s-geocode"),
+        sp=document.getElementById("s-places"), sd=document.getElementById("s-dev");
+  try{const {r,ok,ms}=await timed(ENDPOINT.backend);const txt=await r.text();setStatus(sb,ok&&txt.includes("OK"),ms);}catch{setStatus(sb,false);}
+  try{const {r,ms}=await timed(ENDPOINT.geocode+"?address=Raleigh,NC");const j=await r.json();setStatus(sg,r.ok&&j.status==="OK",ms);}catch{setStatus(sg,false);}
+  try{const {r,ms}=await timed(ENDPOINT.places+"?lat=35.7796&lng=-78.6382&radius=1609");const j=await r.json();setStatus(sp,r.ok&&Array.isArray(j.results),ms);}catch{setStatus(sp,false);}
+  try{const {r,ms}=await timed(ENDPOINT.developments+"?lat=35.7796&lng=-78.6382&radius=5000");const j=await r.json();setStatus(sd,r.ok&&Array.isArray(j.results),ms);}catch{setStatus(sd,false);}
+}
+document.getElementById("recheck").addEventListener("click",checkAll);
+document.addEventListener("DOMContentLoaded",checkAll);
 
-      // Ranges & forward years (simple deltas for now)
-      const low = y1 * 0.86;   // -14%
-      const high = y1 * 1.06;  // +6%
+/* ---------- MAP ---------- */
+const map=L.map("map").setView([35.7796,-78.6382],12);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map);
 
-      const y2 = y1 * 1.027;   // +2.7%
-      const y3 = y2 * 1.0125;  // +1.25%
+/* ---------- MAIN FLOW ---------- */
+document.getElementById("run").addEventListener("click", async () => {
+  const statusEl=document.getElementById("status"), resultsEl=document.getElementById("results");
+  resultsEl.innerHTML = ""; // clear prior
+  try{
+    statusEl.textContent="Geocoding…";
+    const addr=document.getElementById("addr").value.trim(); if(!addr) throw new Error("Enter an address");
+    const g=await apiFetch(`${ENDPOINT.geocode}?address=${encodeURIComponent(addr)}`);
+    const gj=await g.json(); if(!gj.results?.length) throw new Error("No geocode result");
+    const {lat,lng}=gj.results[0].geometry.location;
+    L.marker([lat,lng]).addTo(map).bindPopup("Site").openPopup(); map.setView([lat,lng],14);
 
-      return { y1, low, high, y2, y3, cap };
-    }
-
-    async function runEstimate() {
-      const status = $("#status");
-      status.className = "status muted";
-      status.textContent = "Working…";
-
-      const address = $("#address").value.trim();
-      const mpds = Number($("#mpds").value) || 0;
-      const auto = $("#autoFetch").checked;
-
-      let aadt = Number($("#aadt").value) || 0;
-      let locBadge = "loc: —";
-
+    // AADT (clear first; only fill if real)
+    let V = Number(document.getElementById("VPD").value)||0;
+    if (document.getElementById("autoAADT").checked) {
+      document.getElementById("VPD").value = "";
       try {
-        if (auto) {
-          const data = await fetchAADTForAddress(address);
-          aadt = Number(data.aadt) || 0;
-          $("#aadt").value = aadt; // reflect in advanced input
-          $("#aadtBadge").textContent = `AADT: ${fmt(aadt)}`;
-          if (data.location) {
-            const {lat, lng} = data.location;
-            locBadge = `loc: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-          }
-          status.className = "status ok";
-          status.textContent = "Done.";
+        const a = await apiFetch(`${ENDPOINT.aadt}?lat=${lat}&lng=${lng}`);
+        const aj = a.ok ? await a.json() : null;
+        if (aj?.aadt) {
+          V = Number(aj.aadt);
+          document.getElementById("VPD").value = V;
+          resultsEl.insertAdjacentHTML("beforeend",
+            `<div class="muted">AADT ${V.toLocaleString()}${aj.year?` (${aj.year})`:""} • ~${Math.round((aj.distance_m||0)/16.0934)/100} mi • ${aj.layer||"NCDOT"}</div>`);
         } else {
-          $("#aadtBadge").textContent = `AADT: ${fmt(aadt)} (manual)`;
-          status.className = "status ok";
-          status.textContent = "Done (manual AADT).";
+          resultsEl.insertAdjacentHTML("beforeend",
+            `<div class="muted err">No AADT found nearby (enter AADT in Advanced)</div>`);
         }
-      } catch (err) {
-        status.className = "status err";
-        status.textContent = `Error: ${err.message}`;
-        // keep going with whatever AADT is in the box (if any)
-      }
-
-      $("#latlngBadge").textContent = locBadge;
-
-      const { y1, low, high, y2, y3, cap } = computeEstimate(aadt, mpds);
-
-      $("#y1").textContent = fmt(Math.round(y1));
-      $("#lowHigh").textContent = `${fmt(Math.round(low))} – ${fmt(Math.round(high))}`;
-      $("#y2").textContent = fmt(Math.round(y2));
-      $("#y3").textContent = fmt(Math.round(y3));
-      $("#cap").textContent = fmt(Math.round(cap));
-
-      $("#resultsCard").style.display = "block";
+      } catch { resultsEl.insertAdjacentHTML("beforeend", `<div class="muted err">AADT request failed</div>`); }
     }
 
-    // Wire up events
-    $("#go").addEventListener("click", runEstimate);
-    // Enter key convenience
-    $("#address").addEventListener("keydown", (e)=>{ if(e.key==="Enter"){ runEstimate(); }});
-  </script>
+    // Competition (1 mile default)
+    statusEl.textContent="Competition…";
+    const radiusMi=Number(document.getElementById("radiusMi").value||1);
+    const p=await apiFetch(`${ENDPOINT.places}?lat=${lat}&lng=${lng}&radius=${Math.round(radiusMi*1609.344)}`);
+    const pj=p.ok?await p.json():{results:[]};
+
+    // Developments (planned/proposed)
+    statusEl.textContent="Developments…";
+    const dr=Number(document.getElementById("devRadiusMi").value||3)*1609.344;
+    let devs=[]; try{
+      const d=await apiFetch(`${ENDPOINT.developments}?lat=${lat}&lng=${lng}&radius=${Math.round(dr)}`);
+      const dj=d.ok?await d.json():{results:[]};
+      const WANT=/(planned|permit|site plan|coming soon|construction|proposed)/i, AVOID=/(permanently closed|closed)/i;
+      devs=(dj.results||[]).filter(r=>WANT.test(r.name||"")&&!AVOID.test(r.name||""));
+    }catch{}
+
+    // Pins
+    pj.results.forEach(r=>L.marker([r.geometry.location.lat,r.geometry.location.lng]).addTo(map).bindPopup(r.name));
+    devs.forEach(r=>L.circleMarker([r.geometry.location.lat,r.geometry.location.lng],{radius:6,color:"orange"}).addTo(map).bindPopup(r.name));
+
+    // Estimation
+    statusEl.textContent="Estimating gallons…";
+    if (!V) V = Number(document.getElementById("VPD").value)||0;
+    const truckShare=(Number(document.getElementById("truckShare").value)||0)/100;
+    const Va=V*(1-truckShare), Vt=V*truckShare;
+
+    const F=Number(document.getElementById("frontShare").value), T=Number(document.getElementById("turnShare").value), fT=Number(document.getElementById("turnFric").value);
+    const avail=F+fT*T; const Aa=Va*avail, At=Vt*avail;
+
+    const speed=Number(document.getElementById("speed").value)||35;
+    const Mspd=speed<=30?1.08:speed<=35?1.05:speed<=40?1.01:speed<=45?0.98:0.95;
+    const Macc=Mspd*(1+0.03*((Number(document.getElementById("accessPts").value)||2)-2))*((Number(document.getElementById("ledSign").value)||0)?1.05:1);
+    const Mprice=(d=>Math.min(1.15,Math.max(0.85,1+0.20*(d/0.11))))(Number(document.getElementById("priceDelta").value)||0);
+    const Mcpr=(Number(document.getElementById("cpr").value)||100)/100;
+    const MfacA=(Number(document.getElementById("gasScore").value)||100)/100;
+    const MfacT=(Number(document.getElementById("dieselScore").value)||25)/25;
+
+    // Distance-decay with strong near-site penalty
+    let P=0;
+    for (const c of pj.results) {
+      const dmi=miles(lat,lng,c.geometry.location.lat,c.geometry.location.lng);
+      if (dmi>radiusMi) continue;
+      let w=0.9/(dmi+0.05);
+      if (dmi<=0.03) w*=4;
+      const strong=/(wawa|sheetz|buc|race|trac|quiktrip|qt|costco|sam|bj's)/i.test(c.name||"");
+      const q=strong?1.1:0.8;
+      P+=w*q;
+    }
+    const Mcomp=1/(1+0.35*P);
+
+    const sa=0.020*Macc*Mprice*MfacA*Mcomp*Mcpr;
+    const st=0.012*Macc*Mprice*MfacT*Mcomp*Mcpr*((Number(document.getElementById("dieselpos").value)||0)>=4?1.2:1);
+    const ga=10.2,gt=16;
+    const GPD=Aa*sa*ga + At*st*gt;
+    let   GPM=GPD*(365/12);
+
+    // Capacity cap
+    const posGas=(Number(document.getElementById("mpd").value)||0)*2, posDies=Number(document.getElementById("dieselpos").value)||0;
+    const cap=(posGas*25*10.5 + posDies*25*16)*(365/12);
+    GPM=Math.min(GPM,cap);
+
+    const y1=Math.round(GPM), y2=Math.round(y1*1.027), y3=Math.round(y2*1.0125),
+          low=Math.round(y1*0.86), high=Math.round(y1*1.06);
+
+    resultsEl.insertAdjacentHTML("beforeend", `
+      <table>
+        <tr><td><b>Year-1 est. (gal/mo)</b></td><td class="num">${y1.toLocaleString()}</td></tr>
+        <tr><td>Low / High</td><td class="num">${low.toLocaleString()} – ${high.toLocaleString()}</td></tr>
+        <tr><td>Year-2</td><td class="num">${y2.toLocaleString()}</td></tr>
+        <tr><td>Year-3</td><td class="num">${y3.toLocaleString()}</td></tr>
+        <tr><td>Capacity cap</td><td class="num">${Math.round(cap).toLocaleString()}</td></tr>
+      </table>
+    `);
+    statusEl.textContent="Done.";
+  } catch(e) {
+    document.getElementById("results").innerHTML = `<span class="err">${e.message||e}</span>`;
+    document.getElementById("status").textContent = "";
+  }
+});
+
+/* ---------- DIAGNOSTICS ---------- */
+const diagOut=document.getElementById("diagOut");
+function setDiag(obj){diagOut.textContent=jstr(obj);}
+
+document.getElementById("btnDiagGeocode").addEventListener("click", async ()=>{
+  const url=ENDPOINT.geocode+"?address=Raleigh,NC";
+  try{const r=await apiFetch(url);setDiag({endpoint:url,status:r.status,ok:r.ok,body:await r.json()});}catch(e){setDiag({endpoint:url,error:String(e)})}
+});
+document.getElementById("btnDiagPlaces").addEventListener("click", async ()=>{
+  const [lat,lng]=[35.7796,-78.6382];const url=`${ENDPOINT.places}?lat=${lat}&lng=${lng}&radius=1609`;
+  try{const r=await apiFetch(url);setDiag({endpoint:url,status:r.status,ok:r.ok,body:await r.json()});}catch(e){setDiag({endpoint:url,error:String(e)})}
+});
+document.getElementById("btnDiagDev").addEventListener("click", async ()=>{
+  const [lat,lng]=[35.7796,-78.6382];const url=`${ENDPOINT.developments}?lat=${lat}&lng=${lng}&radius=5000`;
+  try{const r=await apiFetch(url);setDiag({endpoint:url,status:r.status,ok:r.ok,body:await r.json()});}catch(e){setDiag({endpoint:url,error:String(e)})}
+});
+document.getElementById("btnDiagAADT").addEventListener("click", async ()=>{
+  const [lat,lng]=[35.7796,-78.6382];const url=`${ENDPOINT.aadt}?lat=${lat}&lng=${lng}`;
+  try{const r=await apiFetch(url);setDiag({endpoint:url,status:r.status,ok:r.ok,body:await r.json()});}catch(e){setDiag({endpoint:url,error:String(e)})}
+});
+</script>
 </body>
 </html>
