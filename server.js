@@ -26,7 +26,9 @@ app.get("/aadt", async (req, res) => {
     if (!lat || !lng) return jerr(res, 400, "Missing lat/lng");
 
     // Temporary heuristic so the app runs while you wire the real API:
-    const approx = Math.round(8000 + (Math.abs(Number(lat) * 1000 + Number(lng) * 500) % 22000));
+    const approx = Math.round(
+      8000 + (Math.abs(Number(lat) * 1000 + Number(lng) * 500) % 22000)
+    );
     return res.json({ aadt: approx, source: "placeholder" });
   } catch (e) {
     return jerr(res, 500, "AADT fetch failed", String(e));
@@ -37,7 +39,8 @@ app.get("/aadt", async (req, res) => {
 app.post("/estimate", async (req, res) => {
   try {
     const { address, mpds, diesel } = req.body || {};
-    if (!address || mpds === undefined) return jerr(res, 400, "Missing address or mpds");
+    if (!address || mpds === undefined)
+      return jerr(res, 400, "Missing address or mpds");
 
     const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
     if (!OPENAI_API_KEY) return jerr(res, 500, "Missing OPENAI_API_KEY");
@@ -54,36 +57,52 @@ Return ONLY a JSON object with:
 {"monthly_gallons": <number>, "rationale": "<one short sentence>"}
 `;
 
-    // OpenAI Responses API
+    // OpenAI Responses API (new JSON mode)
     const r = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${OPENAI_API_KEY}`,
-        "Content-Type": "application/json"
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         model: "gpt-5.1-mini",
         input: prompt,
-        response_format: { type: "json_object" },
-        max_output_tokens: 300
-      })
+        modalities: ["text"],
+        text: { format: "json" },
+        max_output_tokens: 300,
+      }),
     });
 
     const ct = r.headers.get("content-type") || "";
     const bodyText = await r.text();
     if (!r.ok) return jerr(res, r.status, "OpenAI error", bodyText);
-    if (!ct.includes("application/json")) return jerr(res, 502, "OpenAI returned non-JSON", bodyText);
+    if (!ct.includes("application/json"))
+      return jerr(res, 502, "OpenAI returned non-JSON", bodyText);
 
     let data;
-    try { data = JSON.parse(bodyText); }
-    catch (e) { return jerr(res, 502, "OpenAI JSON parse error", bodyText); }
+    try {
+      data = JSON.parse(bodyText);
+    } catch (e) {
+      return jerr(res, 502, "OpenAI JSON parse error", bodyText);
+    }
 
-    const outputItem = data.output?.[0]?.content?.find?.(c => c.type === "output_text");
-    if (!outputItem?.text) return jerr(res, 502, "Unexpected OpenAI shape", JSON.stringify(data).slice(0, 400));
+    const outputItem = data.output?.[0]?.content?.find?.(
+      (c) => c.type === "output_text"
+    );
+    if (!outputItem?.text)
+      return jerr(
+        res,
+        502,
+        "Unexpected OpenAI shape",
+        JSON.stringify(data).slice(0, 400)
+      );
 
     let gptJson;
-    try { gptJson = JSON.parse(outputItem.text); }
-    catch (e) { return jerr(res, 502, "Model did not return valid JSON", outputItem.text); }
+    try {
+      gptJson = JSON.parse(outputItem.text);
+    } catch (e) {
+      return jerr(res, 502, "Model did not return valid JSON", outputItem.text);
+    }
 
     return res.json(gptJson);
   } catch (e) {
@@ -92,7 +111,9 @@ Return ONLY a JSON object with:
 });
 
 // global error handler
-app.use((err, _req, res, _next) => jerr(res, 500, "Unhandled error", String(err)));
+app.use((err, _req, res, _next) =>
+  jerr(res, 500, "Unhandled error", String(err))
+);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server listening on :${PORT}`));
