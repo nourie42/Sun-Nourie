@@ -15,7 +15,7 @@ function jerr(res, code, msg, detail) {
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
-// Main estimator — use GPT to do the whole flow
+// Main estimator — delegates the full flow to GPT
 app.post("/estimate", async (req, res) => {
   try {
     const { address, mpds, diesel } = req.body || {};
@@ -81,7 +81,7 @@ Output JSON only, with keys:
           { role: "user", content: userPrompt },
         ],
         temperature: 0.3,
-        max_tokens: 800,
+        max_tokens: 900,
       }),
     });
 
