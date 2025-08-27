@@ -6,8 +6,8 @@
   <title>Fuel Gallons Estimator — Chat</title>
 
   <!-- Leaflet -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 
   <style>
     :root { --bg:#0e1117; --panel:#161a22; --line:#2a2f3a; --text:#e6e6e6; --muted:#9aa4b2; --primary:#3b82f6; }
@@ -28,14 +28,9 @@
     .right { text-align:right; }
     .heading { font-size:18px; font-weight:700; margin: 0 0 8px; }
     .pill { display:inline-block; background:#0f1320; border:1px solid var(--line); border-radius:999px; padding:4px 10px; margin-right:6px; font-size:12px; }
-    details { border-top: 1px solid var(--line); padding-top: 10px; }
-    #out b { font-weight:800; }
-    .cmp { display:flex; gap:10px; flex-wrap:wrap; margin-top:8px; }
-    .cmp .box { background:#0f1320; border:1px solid var(--line); border-radius:10px; padding:10px 12px; }
-    .cmp .label { font-size:12px; color:var(--muted); }
-    .cmp .value { font-size:18px; font-weight:800; }
     #map { height: 420px; border-radius:12px; border:1px solid var(--line); }
     .inputs-inline { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .notice { font-size:12px; color: var(--muted); }
   </style>
 </head>
 <body>
@@ -45,8 +40,8 @@
     <div class="card">
       <div class="row">
         <div>
-          <label>Site address (one line)</label>
-          <input id="addr" placeholder="4173 Knightdale Blvd, Knightdale NC" />
+          <label>Site address (one line) or lat,lon</label>
+          <input id="addr" placeholder="4173 Knightdale Blvd, Knightdale NC 27545  — OR — 35.7872,-78.49" />
         </div>
         <div>
           <label>Regular MPDs</label>
@@ -63,7 +58,7 @@
           <input id="aadtOverride" type="number" placeholder="enter AADT to force (e.g., 10449)" />
         </div>
         <button id="go">Estimate</button>
-        <span class="muted">Averages DOT + GPT when both exist; your override wins. Floor uses AADT×2%×8×30.</span>
+        <span class="muted">Drag the site pin and click “Use marker & Re-run” to compute from the exact point.</span>
       </div>
     </div>
 
@@ -71,13 +66,7 @@
       <div class="heading">Result</div>
       <div id="out" class="muted">—</div>
 
-      <div id="cmp" class="cmp" style="display:none;">
-        <div class="box"><div class="label">Actual AADT (DOT)</div><div class="value" id="valActual">—</div><div class="muted" id="valActualMeta"></div></div>
-        <div class="box"><div class="label">GPT AADT estimate</div><div class="value" id="valGpt">—</div><div class="muted" id="valGptMeta"></div></div>
-        <div class="box"><div class="label">AADT used</div><div class="value" id="valUsed">—</div></div>
-      </div>
-
-      <div style="margin-top:12px;" class="inputs-inline">
+      <div style="margin-top:12px" class="inputs-inline">
         <div style="flex:1; min-width:240px;">
           <label>Adjust AADT and re-run</label>
           <input id="rerunAadt" type="number" placeholder="type a new AADT and click Re-run" />
@@ -90,6 +79,11 @@
     <div class="card">
       <div class="heading">Map: site & competition (1 mile)</div>
       <div id="map">Loading…</div>
+      <div class="inputs-inline" style="margin-top:8px;">
+        <span class="muted">Move the blue site pin if needed.</span>
+        <button id="usePin">Use marker & Re-run</button>
+        <span id="pinPos" class="notice"></span>
+      </div>
     </div>
 
     <div class="card">
@@ -107,23 +101,31 @@
 
 <script>
 const $ = (id) => document.getElementById(id);
-const out = $("out"), debug = $("debug"), goBtn = $("go"), rerunBtn = $("rerunBtn");
-let map, markersLayer, mapInited = false;
+const out = $("out"), debug = $("debug"), goBtn = $("go"), rerunBtn = $("rerunBtn"), usePinBtn = $("usePin");
+
+let map, markersLayer, mapInited = false, siteMarker = null, pendingPin = null;
 
 function setOut(html){ out.innerHTML = html; }
 function setDebug(obj){ debug.textContent = typeof obj === "string" ? obj : JSON.stringify(obj, null, 2); }
 function fmt(n){ return (n ?? 0).toLocaleString(undefined, {maximumFractionDigits: 0}); }
 function esc(s){ return (s ?? "").toString().replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m])); }
 
-async function callEstimate(overrideValue){
+async function callEstimate({ overrideValue, usePin=false } = {}){
   const address = $("addr").value.trim();
   const mpds = Number($("mpds").value || 0);
   const diesel = Number($("diesel").value || 0);
   const aadtOverride = overrideValue ?? $("aadtOverride").value.trim();
+  const body = { address, mpds, diesel, aadtOverride };
+
+  if (usePin && pendingPin) {
+    body.siteLat = pendingPin.lat;
+    body.siteLon = pendingPin.lon;
+  }
+
   const res = await fetch("/estimate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ address, mpds, diesel, aadtOverride })
+    body: JSON.stringify(body)
   });
   const text = await res.text();
   if (!res.ok) throw new Error(`HTTP ${res.status}\n` + text.slice(0,1200));
@@ -134,7 +136,6 @@ async function estimate(){
   try {
     goBtn.disabled = true;
     setOut(`<span class="muted">Working…</span>`);
-    $("cmp").style.display = "none";
     const data = await callEstimate();
     setDebug(data);
     renderReport(data);
@@ -153,7 +154,7 @@ async function rerun(){
     const v = $("rerunAadt").value.trim();
     if (!v) { alert("Enter an AADT override first."); return; }
     setOut(`<span class="muted">Re-running with override AADT ${fmt(Number(v))}…</span>`);
-    const data = await callEstimate(v);
+    const data = await callEstimate({ overrideValue: v });
     setDebug(data);
     renderReport(data);
     renderMap(data.map);
@@ -165,7 +166,25 @@ async function rerun(){
   }
 }
 
+async function rerunUsePin(){
+  try {
+    if (!pendingPin) { alert("Drag the site pin first."); return; }
+    usePinBtn.disabled = true;
+    setOut(`<span class="muted">Re-running from marker location…</span>`);
+    const data = await callEstimate({ usePin: true });
+    setDebug(data);
+    renderReport(data);
+    renderMap(data.map);
+    renderDevs(data.developments);
+  } catch (e) {
+    setOut(`<div class="muted">Error:<br><pre class="mono">${esc(e.message)}</pre></div>`);
+  } finally {
+    usePinBtn.disabled = false;
+  }
+}
+
 function renderReport(d){
+  const i = d.inputs || {};
   const sectionTop = `
     <div class="grid">
       <div><b>Base Estimate (gal/mo)</b><br><div style="font-size:28px; font-weight:800;">${fmt(d.base)}</div></div>
@@ -176,27 +195,13 @@ function renderReport(d){
         <div style="margin-top:6px;">Year-3: <b>${fmt(d.year3)}</b></div>
       </div>
     </div>
+    <hr>
+    <div class="heading">Inputs used</div>
+    <div class="muted">AADT used ${fmt(i.aadt_used)}; MPDs ${esc(i.mpds)}${i.diesel ? " + diesel " + esc(i.diesel) : ""}; truck share ${Math.round((i.truck_share_assumed ?? 0)*100)}% (assumed)</div>
+    <div class="heading" style="margin-top:12px;">One-paragraph rationale</div>
+    <div>${esc(d.rationale || "") || "<span class='muted'>—</span>"}</div>
   `;
-
-  const i = d.inputs || {};
-  $("cmp").style.display = "flex";
-  $("valUsed").textContent = fmt(i.aadt_used);
-  $("valActual").textContent = i.aadt_actual?.value != null ? fmt(i.aadt_actual.value) : "—";
-  $("valActualMeta").textContent = i.aadt_actual?.value != null ? `${i.aadt_actual.source || "DOT"}${i.aadt_actual.year ? " • " + i.aadt_actual.year : ""}${i.aadt_actual.distance_mi != null ? " • ~" + i.aadt_actual.distance_mi + " mi" : ""}` : "";
-  $("valGpt").textContent = i.aadt_gpt?.value != null ? fmt(i.aadt_gpt.value) : "—";
-  $("valGptMeta").textContent = i.aadt_gpt?.value != null ? `${i.aadt_gpt.class_used || ""}${i.aadt_gpt.low ? " • " + fmt(i.aadt_gpt.low) + "–" + fmt(i.aadt_gpt.high) : ""}` : "";
-
-  const c = d.competition || {};
-  const notable = (c.notable_brands || []).join(", ");
-  const comp = `
-    <div class="heading" style="margin-top:12px;">Competition summary</div>
-    <div class="muted">
-      ${c.count ?? 0} within 1 mi${c.nearest_mi != null ? `; nearest ${Number(c.nearest_mi).toFixed(3)} mi` : ""}${notable ? `; notable: ${esc(notable)}` : ""}; impact ${(Number(c.impact_score||0)*100|0)}%
-    </div>
-  `;
-
-  const rationale = esc(d.rationale || "");
-  setOut(`${sectionTop}<hr><div class="heading">Inputs used</div><div class="muted">AADT used ${fmt(i.aadt_used)}; MPDs ${esc(i.mpds)}${i.diesel ? " + diesel " + esc(i.diesel) : ""}; truck share ${Math.round((i.truck_share_assumed ?? 0)*100)}% (assumed)</div>${comp}<div class="heading" style="margin-top:12px;">One-paragraph rationale</div><div>${rationale || "<span class='muted'>—</span>"}</div>`);
+  setOut(sectionTop);
   $("rerunAadt").value = i.aadt_used ?? "";
 }
 
@@ -220,13 +225,19 @@ function renderMap(m){
   const comps = Array.isArray(m.competitors) ? m.competitors : [];
   const siteLatLng = [site.lat, site.lon];
 
-  map.setView(siteLatLng, 14);
-  L.marker(siteLatLng, { title: "Site" }).addTo(markersLayer).bindPopup(`<b>Site</b><br>${esc(site.label || "")}`);
+  map.setView(siteLatLng, 15);
 
-  if (!comps.length) {
-    const note = L.popup({ closeButton:false }).setLatLng(siteLatLng).setContent("<span class='muted'>No competitors found within 1 mi (Overpass)</span>");
-    markersLayer.addLayer(note);
-  } else {
+  // Draggable site marker
+  siteMarker = L.marker(siteLatLng, { title: "Site", draggable: true }).addTo(markersLayer)
+    .bindPopup(`<b>Site</b><br>${esc(site.label || "")}`);
+  siteMarker.on("dragend", (e) => {
+    const p = e.target.getLatLng();
+    pendingPin = { lat: p.lat, lon: p.lng };
+    $("pinPos").textContent = `marker: ${p.lat.toFixed(6)}, ${p.lng.toFixed(6)} (ready to re-run)`;
+  });
+
+  // Competitors
+  if (comps.length) {
     for (const c of comps) {
       L.circleMarker([c.lat, c.lon], { radius: 6, weight: 1, color: c.heavy ? "#ff7f50" : "#4ade80", fillOpacity: 0.85 })
         .addTo(markersLayer)
@@ -239,6 +250,7 @@ function renderMap(m){
 
 $("go").addEventListener("click", estimate);
 $("rerunBtn").addEventListener("click", rerun);
+$("usePin").addEventListener("click", rerunUsePin);
 </script>
 </body>
 </html>
