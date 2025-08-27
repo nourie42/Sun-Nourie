@@ -54,7 +54,7 @@
     .ac-list {
       position:absolute; top:100%; left:0; right:0; z-index:30; margin-top:6px;
       background:#0b1220; border:1px solid var(--line); border-radius:12px;
-      max-height:280px; overflow:auto; box-shadow: 0 18px 36px rgba(0,0,0,.35);
+      max-height:320px; overflow:auto; box-shadow: 0 18px 36px rgba(0,0,0,.35);
     }
     .ac-item { padding:10px 12px; cursor:pointer; border-bottom:1px solid rgba(255,255,255,.04); }
     .ac-item:last-child { border-bottom:0; }
@@ -91,7 +91,7 @@
       </div>
       <div style="margin-top:12px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
         <button id="go">Estimate</button>
-        <span class="muted">Returns AADT (bounded), competition (rules you requested), multi-source developments, capacity cap, and a detailed explanation.</span>
+        <span class="muted">Results include AADT sanity, competition (your rules), multi-source developments, capacity cap, and a detailed summary.</span>
       </div>
     </div>
 
@@ -123,13 +123,13 @@
   </div>
 
 <script>
+/* ===== Globals & helpers ===== */
 const $ = id => document.getElementById(id);
 const out = $("out"), debug = $("debug"), goBtn = $("go");
 const acBox = $("ac"), addrInput = $("addr");
 const mapOverlay = $("mapOverlay");
 let map, markersLayer, mapInited=false, selectedCoords=null; // {lat, lon}
 
-/* ---------- helpers ---------- */
 function setOut(html){ out.innerHTML = html; }
 function setDebug(obj){ debug.textContent = typeof obj === "string" ? obj : JSON.stringify(obj, null, 2); }
 function fmt(n){ return (n ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 }); }
@@ -137,10 +137,105 @@ function esc(s){ return (s ?? "").toString().replace(/[&<>"']/g, m=>({ "&":"&amp
 function setOverlay(msg){ mapOverlay.textContent = msg; mapOverlay.style.display = "flex"; }
 function clearOverlay(){ mapOverlay.style.display = "none"; }
 
-/* ---------- Autocomplete: address + business ---------- */
+/* ===== Hybrid Autocomplete (Nominatim + Overpass fuel POIs) ===== */
 let acTimer=null, acItems=[], acIndex=-1;
 
-addrInput.addEventListener("input", ()=>{
+/** Query Nominatim for addresses/POIs */
+async function nominatimSearch(q){
+  const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=8&countrycodes=us&q=${encodeURIComponent(q)}`;
+  const r = await fetch(url);
+  if (!r.ok) return [];
+  const arr = await r.json();
+  return arr.map(row=>{
+    const a=row.address||{};
+    const line = [
+      row.namedetails?.name || a.house_number,
+      a.road || a.pedestrian || a.residential || a.footway,
+      a.city || a.town || a.village || a.hamlet || a.county,
+      a.state, a.postcode
+    ].filter(Boolean).join(", ") || row.display_name;
+    return { type:"Address", display: line, lat:+row.lat, lon:+row.lon };
+  });
+}
+
+/** Get a coarse center for the query so Overpass can search nearby fuel POIs */
+async function geocodeCenter(q){
+  try{
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&q=${encodeURIComponent(q)}`;
+    const r = await fetch(url);
+    if(!r.ok) return null;
+    const a = await r.json();
+    if(!a?.length) return null;
+    return { lat:+a[0].lat, lon:+a[0].lon };
+  }catch{ return null; }
+}
+
+/** Query Overpass for fuel businesses near a center, then filter by the user's query tokens */
+async function overpassFuelPOIsNear(center, q){
+  if(!center) return [];
+  const radiusM = 15000; // 15km for generous catchment during typing
+  const data = `
+    [out:json][timeout:25];
+    (
+      node(around:${radiusM},${center.lat},${center.lon})["amenity"="fuel"];
+      way(around:${radiusM},${center.lat},${center.lon})["amenity"="fuel"];
+    );
+    out center tags;
+  `;
+  try{
+    const ep = "https://overpass-api.de/api/interpreter";
+    const r = await fetch(ep, {
+      method:"POST",
+      headers:{ "Content-Type":"application/x-www-form-urlencoded" },
+      body: "data="+encodeURIComponent(data)
+    });
+    if(!r.ok) return [];
+    const json = await r.json();
+    let items = [];
+    const toks = q.toLowerCase().split(/\s+/).filter(Boolean);
+    for(const el of json.elements||[]){
+      const t = el.tags||{};
+      const name = t.brand || t.name || "";
+      if(!name) continue;
+      const hay = (name + " " + (t["addr:street"]||"") + " " + (t["addr:city"]||"")).toLowerCase();
+      // keep only if all tokens appear somewhere
+      const ok = toks.every(tok => hay.includes(tok));
+      if(!ok) continue;
+      const lat = el.lat ?? el.center?.lat;
+      const lon = el.lon ?? el.center?.lon;
+      if(lat==null || lon==null) continue;
+      items.push({ type:"Station", display:name, lat:+lat, lon:+lon });
+    }
+    // de-dupe by name+coords
+    const seen = new Set();
+    items = items.filter(it => {
+      const k = `${it.display}|${it.lat.toFixed(5)}|${it.lon.toFixed(5)}`;
+      if(seen.has(k)) return false; seen.add(k); return true;
+    });
+    // trim to 10
+    return items.slice(0,10);
+  }catch{ return []; }
+}
+
+/** Render the merged suggestion list */
+function renderAcList(list){
+  if (!list.length){ hideAc(); return; }
+  acIndex = -1;
+  acBox.innerHTML = list.map((it,i)=>`
+    <div class="ac-item" data-i="${i}">
+      ${esc(it.display)} <span class="badge">${it.type}</span>
+      <div class="muted" style="font-size:12px">${it.lat.toFixed(5)}, ${it.lon.toFixed(5)}</div>
+    </div>
+  `).join("");
+  [...acBox.children].forEach(el=>{
+    el.addEventListener("mouseenter",()=> setActive(+el.dataset.i));
+    el.addEventListener("click",()=> chooseAc(+el.dataset.i));
+  });
+  acBox.style.display = "block";
+}
+
+/* events */
+addrInput.addEventListener("input", async ()=>{
   const q = addrInput.value.trim();
   selectedCoords = null;
   hideAc();
@@ -149,35 +244,18 @@ addrInput.addEventListener("input", ()=>{
   if (acTimer) clearTimeout(acTimer);
   acTimer = setTimeout(async ()=>{
     try{
-      // We query Nominatim twice: general address + business (amenity) bias
-      const urlAddr = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&countrycodes=us&q=${encodeURIComponent(q)}`;
-      const urlBiz  = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&countrycodes=us&namedetails=1&q=${encodeURIComponent(q + " fuel OR gas station OR Sheetz OR Wawa OR QuikTrip OR RaceTrac OR Costco")}`;
-      const [ra, rb] = await Promise.all([fetch(urlAddr), fetch(urlBiz)]);
-      const [arrA, arrB] = [await ra.json(), await rb.json()];
-      const rows = [...arrA, ...arrB];
-
-      acItems = rows.map(row=>{
-        const a=row.address||{};
-        const kind = (row.type||row.class||"").toLowerCase().includes("amenity") ? "Business" :
-                     row.type ? row.type[0].toUpperCase()+row.type.slice(1) : "Address";
-        const line = [
-          row.namedetails?.name || a.house_number,
-          a.road || a.pedestrian || a.residential || a.footway,
-          a.city || a.town || a.village || a.hamlet || a.county,
-          a.state, a.postcode
-        ].filter(Boolean).join(", ");
-        return { display: line || row.display_name, lat:+row.lat, lon:+row.lon, kind };
-      })
-      // dedupe by display+coords
-      .filter(x=>x.display)
-      .reduce((acc,it)=>{
-        const key = `${it.display}|${it.lat.toFixed(5)}|${it.lon.toFixed(5)}`;
-        if(!acc._seen){ acc._seen=new Set(); }
-        if(!acc._seen.has(key)){ acc._seen.add(key); acc.push(it); }
-        return acc;
-      }, []);
-
-      renderAc();
+      const [addrList, center] = await Promise.all([nominatimSearch(q), geocodeCenter(q)]);
+      const fuelList = await overpassFuelPOIsNear(center, q);
+      // merge + de-dupe (prefer Station first, then Address)
+      const merged = [...fuelList, ...addrList];
+      // unique by display+coords
+      const seen = new Set(); const final=[];
+      for(const it of merged){
+        const k = `${it.display}|${it.lat.toFixed(5)}|${it.lon.toFixed(5)}`;
+        if(!seen.has(k)){ seen.add(k); final.push(it); }
+      }
+      acItems = final.slice(0, 12);
+      renderAcList(acItems);
     }catch(_){}
   }, 250);
 });
@@ -194,21 +272,6 @@ document.addEventListener("click",(e)=>{
   if (!acBox.contains(e.target) && e.target !== addrInput) hideAc();
 });
 
-function renderAc(){
-  if (!acItems.length){ hideAc(); return; }
-  acIndex = -1;
-  acBox.innerHTML = acItems.map((it,i)=>`
-    <div class="ac-item" data-i="${i}">
-      ${esc(it.display)} <span class="badge">${esc(it.kind)}</span>
-      <div class="muted" style="font-size:12px">${it.lat.toFixed(5)}, ${it.lon.toFixed(5)}</div>
-    </div>
-  `).join("");
-  [...acBox.children].forEach(el=>{
-    el.addEventListener("mouseenter",()=> setActive(+el.dataset.i));
-    el.addEventListener("click",()=> chooseAc(+el.dataset.i));
-  });
-  acBox.style.display = "block";
-}
 function hideAc(){ acBox.style.display = "none"; acIndex = -1; }
 function setActive(i){
   acIndex = i;
@@ -227,7 +290,7 @@ function chooseAc(i){
   hideAc();
 }
 
-/* ---------- API ---------- */
+/* ===== API & Rendering ===== */
 async function callEstimate(){
   const body = {
     address: $("addr").value.trim(),
@@ -239,7 +302,6 @@ async function callEstimate(){
   const t=await r.text(); if(!r.ok) throw new Error(`HTTP ${r.status}\n${t.slice(0,1200)}`); return JSON.parse(t);
 }
 
-/* ---------- Renderers ---------- */
 async function estimate(){
   try{
     goBtn.disabled = true;
@@ -319,7 +381,7 @@ function renderDevs(osm, ai){
 
 /* Init */
 $("go").addEventListener("click", estimate);
-setOverlay("—");
+setOverlay("—"); // neutral until the first run
 </script>
 </body>
 </html>
