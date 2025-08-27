@@ -1,9 +1,8 @@
 {
   "name": "sun-nourie-backend",
   "version": "1.0.0",
-  "description": "Backend service for Sun-Nourie Prospect Estimator (geocode, places, developments, aadt)",
+  "description": "Backend for Prospect Estimator",
   "main": "server.js",
-  "type": "module",
   "scripts": {
     "start": "node server.js"
   },
