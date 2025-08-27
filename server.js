@@ -6,115 +6,67 @@ import fetch from "node-fetch";
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
+app.use(express.static("public")); // serve /public
 
-// serve the front-end from /public
-app.use(express.static("public"));
-
-// --- helpers ---
+// ---------- helpers ----------
 function jerr(res, code, msg, detail) {
   console.error("[ERROR]", code, msg, detail || "");
   return res.status(code).json({ error: msg, detail });
 }
 
-// HEALTH
-app.get("/health", (_req, res) => res.json({ ok: true }));
+function ua() {
+  return {
+    "User-Agent": "SunNourie-Gallons-Estimator/1.0 (+contact: app@sun-estimator.example)",
+    "Accept": "application/json"
+  };
+}
 
-// AADT endpoint (placeholder logic for now)
-app.get("/aadt", async (req, res) => {
-  try {
-    const { lat, lng } = req.query;
-    if (!lat || !lng) return jerr(res, 400, "Missing lat/lng");
+async function safeJSON(r) {
+  const text = await r.text();
+  let data;
+  try { data = JSON.parse(text); }
+  catch { throw new Error(`JSON parse failed: ${text.slice(0,400)}`); }
+  return data;
+}
 
-    // Temporary heuristic so the app runs while you wire a real AADT source:
-    const approx = Math.round(
-      8000 + (Math.abs(Number(lat) * 1000 + Number(lng) * 500) % 22000)
-    );
-    return res.json({ aadt: approx, source: "placeholder" });
-  } catch (e) {
-    return jerr(res, 500, "AADT fetch failed", String(e));
-  }
-});
+// ---------- geocode (OSM Nominatim; no key required) ----------
+async function geocode(address) {
+  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`;
+  const r = await fetch(url, { headers: ua() });
+  if (!r.ok) throw new Error(`Nominatim ${r.status}: ${await r.text()}`);
+  const arr = await safeJSON(r);
+  if (!arr?.length) throw new Error("No geocode result");
+  const { lat, lon, display_name } = arr[0];
+  return { lat: Number(lat), lng: Number(lon), label: display_name };
+}
 
-// Gallons estimate via OpenAI (server-side, never from browser)
-app.post("/estimate", async (req, res) => {
-  try {
-    const { address, mpds, diesel } = req.body || {};
-    if (!address || mpds === undefined)
-      return jerr(res, 400, "Missing address or mpds");
+// ---------- Overpass helpers ----------
+const OVERPASS_ENDPOINTS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter"
+];
 
-    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-    if (!OPENAI_API_KEY) return jerr(res, 500, "Missing OPENAI_API_KEY");
-
-    // Compose prompt
-    const userPrompt = `
-Address: ${address}
-Regular MPDs: ${mpds}
-Diesel positions: ${diesel ?? 0}
-
-Baseline rule: Gallons = AADT × 8% × 2 × 30.
-Adjust down for heavy close competition within 1 mile (Sheetz, Wawa, Buc-ee's, RaceTrac, etc.) and up for limited competition.
-
-Return ONLY a JSON object:
-{"monthly_gallons": <number>, "rationale": "<one short sentence>"}
-`.trim();
-
-    // Use Chat Completions (stable) with JSON mode
-    const r = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        // You may switch models later; 4o-mini supports JSON mode reliably.
-        model: "gpt-4o-mini",
-        response_format: { type: "json_object" },
-        temperature: 0.2,
-        max_tokens: 300,
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are a precise analyst. Only output valid JSON when asked. Do not include markdown.",
-          },
-          { role: "user", content: userPrompt },
-        ],
-      }),
-    });
-
-    const ct = r.headers.get("content-type") || "";
-    const bodyText = await r.text();
-    if (!r.ok) return jerr(res, r.status, "OpenAI error", bodyText);
-    if (!ct.includes("application/json"))
-      return jerr(res, 502, "OpenAI returned non-JSON", bodyText);
-
-    let data;
+async function overpass(query) {
+  let lastErr;
+  for (const ep of OVERPASS_ENDPOINTS) {
     try {
-      data = JSON.parse(bodyText);
+      const r = await fetch(ep, {
+        method: "POST",
+        headers: {
+          ...ua(),
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: "data=" + encodeURIComponent(query)
+      });
+      if (!r.ok) throw new Error(`Overpass ${r.status}: ${await r.text()}`);
+      return await safeJSON(r);
     } catch (e) {
-      return jerr(res, 502, "OpenAI JSON parse error", bodyText);
+      lastErr = e;
     }
-
-    const txt = data.choices?.[0]?.message?.content;
-    if (!txt) return jerr(res, 502, "No content from OpenAI", bodyText);
-
-    let gptJson;
-    try {
-      gptJson = JSON.parse(txt);
-    } catch (e) {
-      return jerr(res, 502, "Model did not return valid JSON", txt);
-    }
-
-    return res.json(gptJson);
-  } catch (e) {
-    return jerr(res, 500, "Estimate failed", String(e));
   }
-});
+  throw lastErr;
+}
 
-// global error handler
-app.use((err, _req, res, _next) =>
-  jerr(res, 500, "Unhandled error", String(err))
-);
+// ---------- AADT estimate from nearest highway ----------
+const HIGHWAY_AADT_TABLE =
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server listening on :${PORT}`));
