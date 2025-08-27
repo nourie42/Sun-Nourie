@@ -6,7 +6,7 @@
   <title>Fuel Gallons Estimator — Chat</title>
   <style>
     :root { --bg:#0e1117; --panel:#161a22; --line:#2a2f3a; --text:#e6e6e6; --muted:#9aa4b2; --primary:#3b82f6; }
-    *{ box-sizing:border-box; }
+    *{ box-sizing: border-box; }
     body { background:var(--bg); color:var(--text); font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
     .wrap { max-width: 980px; margin: 24px auto; padding: 0 16px; }
     h1 { font-size: 40px; margin: 0 0 12px; }
@@ -19,15 +19,16 @@
     button:disabled { opacity:.5; cursor:not-allowed; }
     .muted { color:var(--muted); }
     .grid { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
-    .k { color:#9FC2FF; }
-    hr { border:0; border-top:1px solid var(--line); margin:12px 0; }
-    ul { margin: 6px 0 0 18px; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
     .right { text-align:right; }
     .heading { font-size:18px; font-weight:700; margin: 0 0 8px; }
     .pill { display:inline-block; background:#0f1320; border:1px solid var(--line); border-radius:999px; padding:4px 10px; margin-right:6px; font-size:12px; }
     details { border-top: 1px solid var(--line); padding-top: 10px; }
     #out b { font-weight:800; }
+    .cmp { display:flex; gap:10px; flex-wrap:wrap; margin-top:8px; }
+    .cmp .box { background:#0f1320; border:1px solid var(--line); border-radius:10px; padding:10px 12px; }
+    .cmp .label { font-size:12px; color:var(--muted); }
+    .cmp .value { font-size:18px; font-weight:800; }
   </style>
 </head>
 <body>
@@ -49,15 +50,41 @@
           <input id="diesel" type="number" value="0" />
         </div>
       </div>
+      <div class="row" style="margin-top:12px;">
+        <div>
+          <label>AADT override (optional)</label>
+          <input id="aadtOverride" type="number" placeholder="enter AADT to force (e.g., 10449)" />
+        </div>
+      </div>
       <div style="margin-top:12px; display:flex; gap:8px; align-items:center;">
         <button id="go">Estimate</button>
-        <span class="muted">I’ll hand these to GPT with your full flow (AADT, competition, developments, capacity).</span>
+        <span class="muted">Pulls NCDOT actual AADT, gets GPT’s AADT estimate, lets you override, then computes gallons & comparison.</span>
       </div>
     </div>
 
     <div class="card" id="report">
       <div class="heading">Result</div>
       <div id="out" class="muted">—</div>
+      <div id="cmp" class="cmp" style="display:none;">
+        <div class="box">
+          <div class="label">Actual AADT (DOT)</div>
+          <div class="value" id="valActual">—</div>
+          <div class="muted" id="valActualMeta"></div>
+        </div>
+        <div class="box">
+          <div class="label">GPT AADT estimate</div>
+          <div class="value" id="valGpt">—</div>
+          <div class="muted" id="valGptMeta"></div>
+        </div>
+        <div class="box">
+          <div class="label">Override (used if entered)</div>
+          <div class="value" id="valOver">—</div>
+        </div>
+        <div class="box">
+          <div class="label">AADT used for gallons</div>
+          <div class="value" id="valUsed">—</div>
+        </div>
+      </div>
     </div>
 
     <div class="card">
@@ -70,9 +97,7 @@
 
 <script>
 const $ = (id) => document.getElementById(id);
-const out = $("out");
-const debug = $("debug");
-const goBtn = $("go");
+const out = $("out"), debug = $("debug"), goBtn = $("go");
 
 function setOut(html){ out.innerHTML = html; }
 function setDebug(obj){ debug.textContent = typeof obj === "string" ? obj : JSON.stringify(obj, null, 2); }
@@ -82,15 +107,18 @@ function esc(s){ return (s ?? "").toString().replace(/[&<>"']/g, m=>({ "&":"&amp
 async function estimate() {
   try {
     goBtn.disabled = true;
-    setOut(`<span class="muted">Working… asking GPT to search AADT, competition, developments, and compute the estimate.</span>`);
+    setOut(`<span class="muted">Working… pulling NCDOT AADT, asking GPT for its AADT estimate, applying override if present, then computing gallons.</span>`);
+    $("cmp").style.display = "none";
+
     const address = $("addr").value.trim();
     const mpds = Number($("mpds").value || 0);
     const diesel = Number($("diesel").value || 0);
+    const aadtOverride = $("aadtOverride").value.trim();
 
     const res = await fetch("/estimate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ address, mpds, diesel })
+      body: JSON.stringify({ address, mpds, diesel, aadtOverride })
     });
 
     const text = await res.text();
@@ -100,16 +128,15 @@ async function estimate() {
       return;
     }
 
-    let data;
-    try { data = JSON.parse(text); }
-    catch(e){
+    let d;
+    try { d = JSON.parse(text); } catch(e){
       setOut(`<div class="muted">Parse error\n<pre class="mono">${esc(text).slice(0,1200)}</pre></div>`);
       setDebug(text);
       return;
     }
 
-    setDebug(data);
-    renderReport(data);
+    setDebug(d);
+    renderReport(d);
   } catch (e) {
     setOut(`<div class="muted">Network error:<br><pre class="mono">${esc(e.message)}</pre></div>`);
   } finally {
@@ -118,34 +145,36 @@ async function estimate() {
 }
 
 function renderReport(d){
-  // expected keys from server/GPT:
-  // base, low, high, year2, year3, inputs{}, competition{}, developments[], assumptions[], rationale
-  const base = d.base ?? d.base_monthly_gallons;
-  const low  = d.low ?? d.low_high?.low;
-  const high = d.high ?? d.low_high?.high;
-
   const sectionTop = `
     <div class="grid">
-      <div><b>Base Estimate (gal/mo)</b><br><div style="font-size:28px; font-weight:800;">${fmt(base)}</div></div>
+      <div><b>Base Estimate (gal/mo)</b><br><div style="font-size:28px; font-weight:800;">${fmt(d.base)}</div></div>
       <div class="right">
-        <div><span class="pill">Low</span> <b>${fmt(low)}</b></div>
-        <div style="margin-top:6px;"><span class="pill">High</span> <b>${fmt(high)}</b></div>
+        <div><span class="pill">Low</span> <b>${fmt(d.low)}</b></div>
+        <div style="margin-top:6px;"><span class="pill">High</span> <b>${fmt(d.high)}</b></div>
         <div style="margin-top:6px;">Year-2: <b>${fmt(d.year2)}</b></div>
         <div style="margin-top:6px;">Year-3: <b>${fmt(d.year3)}</b></div>
       </div>
     </div>
   `;
 
-  const a = d.inputs?.aadt || {};
-  const inputs = `
-    <div class="heading">Inputs used</div>
-    <div class="muted">
-      AADT ${fmt(a.value)}${a.source ? ` (source: ${esc(a.source)}` : ""}${a.year ? `, ${esc(a.year)}` : ""}${(a.distance_mi ?? null) !== null ? `, ~${a.distance_mi} mi` : ""}${a.source ? ")" : ""};
-      MPDs ${esc(d.inputs?.mpds)};
-      ${d.inputs?.diesel ? `+ diesel ${esc(d.inputs.diesel)};` : ""}
-      truck share ${Math.round((d.inputs?.truck_share_assumed ?? 0) * 100)}% (assumed)
-    </div>
-  `;
+  const i = d.inputs || {};
+  const aUsed = i.aadt_used;
+  const aActual = i.aadt_actual || {};
+  const aGpt = i.aadt_gpt || {};
+  const aOver = i.aadt_override;
+
+  // Comparison pills
+  $("cmp").style.display = "flex";
+  $("valActual").textContent = aActual.value != null ? fmt(aActual.value) : "—";
+  $("valActualMeta").textContent = aActual.value != null ? `${aActual.source || "DOT"}${aActual.year ? " • " + aActual.year : ""}${aActual.distance_mi != null ? " • ~" + aActual.distance_mi + " mi" : ""}` : "";
+  $("valGpt").textContent = aGpt.value != null ? fmt(aGpt.value) : "—";
+  $("valGptMeta").textContent = aGpt.value != null ? `${aGpt.class_used || ""}${aGpt.low ? " • " + fmt(aGpt.low) + "–" + fmt(aGpt.high) : ""}` : "";
+  $("valOver").textContent = aOver != null ? fmt(aOver) : "—";
+  $("valUsed").textContent = aUsed != null ? fmt(aUsed) : "—";
+
+  const assumptions = Array.isArray(d.assumptions) && d.assumptions.length
+    ? `<ul>${d.assumptions.map(a => `<li>${esc(a)}</li>`).join("")}</ul>`
+    : `<div class="muted">defaults applied where unknown; cap = positions × 25 × gal/cycle × 365/12.</div>`;
 
   const c = d.competition || {};
   const notable = (c.notable_brands || []).join(", ");
@@ -159,18 +188,17 @@ function renderReport(d){
   const devs = Array.isArray(d.developments) ? d.developments : [];
   const devHtml = devs.length
     ? `<ul>${devs.map(x => `<li>${esc(x.name)} • ${esc(x.status)} • ${esc(x.miles)} mi</li>`).join("")}</ul>`
-    : `<div class="muted">none found (planned/proposed/permit/coming-soon/construction only)</div>`;
-
-  const assumptions = Array.isArray(d.assumptions) && d.assumptions.length
-    ? `<ul>${d.assumptions.map(a => `<li>${esc(a)}</li>`).join("")}</ul>`
-    : `<div class="muted">defaults applied where unknown (stop rates autos 2.0%, trucks 1.2%; gallons/stop 10.2/16; availability 1.00; capacity cap = positions × 25 × gal/cycle × 365/12)</div>`;
+    : `<div class="muted">developments not found (planned/proposed/permit/coming-soon/construction only)</div>`;
 
   const rationale = esc(d.rationale || "");
 
   setOut(`
     ${sectionTop}
     <hr>
-    ${inputs}
+    <div class="heading">Inputs used</div>
+    <div class="muted">
+      AADT used ${fmt(aUsed)}; MPDs ${esc(i.mpds)}${i.diesel ? " + diesel " + esc(i.diesel) : ""}; truck share ${Math.round((i.truck_share_assumed ?? 0)*100)}% (assumed)
+    </div>
     ${comp}
     <div class="heading" style="margin-top:12px;">Developments</div>
     ${devHtml}
