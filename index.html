@@ -2,162 +2,82 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Gas Station Gallons Estimator</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<title>Gas Station Gallons Estimator (GPT)</title>
 <style>
-  :root{--bg:#0b0c10;--card:#13151a;--text:#e8e8e8;--muted:#9aa0a6;--accent:#3a82f7;--border:#2a2f3a}
+  :root{--bg:#0b0c10;--card:#141821;--text:#e8e8e8;--muted:#97a3b6;--accent:#3a82f7;--border:#2a2f3a}
   body{margin:0;font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text)}
-  .wrap{display:flex;gap:16px;min-height:100vh;padding:16px}
-  .left{width:520px;display:flex;flex-direction:column;gap:12px}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px}
-  h1{margin:0 0 12px;font-size:22px}
+  .wrap{max-width:900px;margin:0 auto;padding:16px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin:12px 0}
+  h1{margin:0 0 8px}
   label{display:block;font-weight:600;margin:10px 0 4px}
   input,button{font:inherit}
-  input[type="text"],input[type="number"]{width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:#1b1f2a;color:#e8e8e8}
+  input[type="text"],input[type="number"]{width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:#1b2130;color:#e8e8e8}
   button{padding:10px 14px;border-radius:10px;border:0;background:var(--accent);color:#fff;font-weight:600;cursor:pointer}
   .muted{color:var(--muted);font-size:12px}
-  .err{color:#ff9a9a}
-  #map{height:calc(100vh - 32px);width:100%;border-radius:12px;border:1px solid var(--border);background:#0f1116}
-  table{width:100%;border-collapse:collapse}.num{font-variant-numeric:tabular-nums}
-  td{padding:4px 0;border-bottom:1px dashed #2a2f3a}
+  .result{white-space:pre-wrap;line-height:1.55}
+  .facts{font-size:12px;background:#101520;border:1px solid #233047;border-radius:8px;padding:8px;overflow:auto;max-height:200px}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="left">
-    <div class="card"><h1>Gas Station Gallons Estimator</h1>
-      <div class="muted">Enter an address and regular MPDs. We’ll pull traffic, competition, and planned sites to estimate monthly gallons.</div>
-    </div>
-
-    <div class="card">
-      <label>Prospect address</label>
-      <input id="addr" type="text" placeholder="e.g., 4173 Knightdale Blvd, Knightdale NC">
-      <label style="margin-top:8px">Regular MPDs</label>
-      <input id="mpd" type="number" min="0" value="6">
-      <label style="margin-top:8px">Diesel positions (optional)</label>
-      <input id="diesel" type="number" min="0" value="0">
-      <div style="margin-top:8px"><input id="autoAADT" type="checkbox" checked>
-        <label for="autoAADT" style="margin-left:6px">Auto-fetch AADT</label>
-      </div>
-      <button id="run" style="margin-top:10px">Estimate Gallons</button>
-      <div id="status" class="muted"></div>
-    </div>
-
-    <div class="card" id="outCard">
-      <b>Estimate</b>
-      <div id="out" class="muted">Results will appear here.</div>
-    </div>
-
-    <details class="card">
-      <summary><b>Assumptions (defaults)</b></summary>
-      <ul class="muted">
-        <li>Autos stop rate ≈ 2.0%, Trucks ≈ 1.2%</li>
-        <li>Gallons/stop: autos ≈ 10.2, trucks ≈ 16</li>
-        <li>Comp radius: 1 mile; heavy penalty if ≤ 0.03 mi</li>
-        <li>Capacity cap: positions × 25 cycles/day × 365/12</li>
-        <li>Low/High band: −14% / +6%; Y2 +2.7%; Y3 +1.25%</li>
-      </ul>
-    </details>
+  <div class="card"><h1>Gas Station Gallons Estimator (GPT)</h1>
+    <div class="muted">Enter the address and regular MPDs. The model will pull traffic, competition, and planned sites, then estimate monthly gallons with a short numeric rationale.</div>
   </div>
 
-  <div style="flex:1"><div id="map"></div></div>
+  <div class="card">
+    <label>Prospect address</label>
+    <input id="addr" type="text" placeholder="e.g., 4173 Knightdale Blvd, Knightdale NC">
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <div style="flex:1"><label>Regular MPDs</label><input id="mpd" type="number" value="6" min="0"></div>
+      <div style="flex:1"><label>Diesel positions (optional)</label><input id="diesel" type="number" value="0" min="0"></div>
+    </div>
+    <button id="go" style="margin-top:10px">Estimate Gallons</button>
+    <div id="status" class="muted"></div>
+  </div>
+
+  <div class="card">
+    <b>GPT Estimate</b>
+    <div id="result" class="result muted">Results will appear here.</div>
+  </div>
+
+  <details class="card">
+    <summary><b>Data used (debug)</b></summary>
+    <div id="facts" class="facts">// waiting…</div>
+  </details>
 </div>
 
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script>
-const API_BASE = "https://YOUR-BACKEND.onrender.com"; // <-- set to your Render Web Service URL
-const EP = { geocode:API_BASE+"/geocode", places:API_BASE+"/places", dev:API_BASE+"/developments", aadt:API_BASE+"/aadt" };
+const API_BASE = "https://YOUR-BACKEND.onrender.com"; // <-- set to your Web Service URL
+document.getElementById('go').addEventListener('click', run);
 
-async function apiFetch(url){ for(let i=0;i<2;i++){ try{ return await fetch(url,{cache:'no-store'}); }catch(e){ if(i===1) throw e; await new Promise(r=>setTimeout(r,600)); } } }
-function toRad(x){return x*Math.PI/180} function miles(a,b,c,d){const R=3958.8, dA=toRad(c-a), dO=toRad(d-b);const A=Math.sin(dA/2)**2+Math.cos(toRad(a))*Math.cos(toRad(c))*Math.sin(dO/2)**2;return 2*R*Math.asin(Math.sqrt(A))}
-const map=L.map("map").setView([35.7796,-78.6382],12); L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap"}).addTo(map);
+async function run(){
+  const status = document.getElementById('status');
+  const result = document.getElementById('result');
+  const factsBox = document.getElementById('facts');
+  result.textContent = ""; factsBox.textContent = "// waiting…";
+  status.textContent = "Thinking…";
 
-document.getElementById('run').addEventListener('click', async ()=>{
-  const out=document.getElementById('out'), status=document.getElementById('status');
-  out.innerHTML=""; status.textContent="Working…";
+  const address = document.getElementById('addr').value.trim();
+  const mpds = Number(document.getElementById('mpd').value || 0);
+  const diesel = Number(document.getElementById('diesel').value || 0);
+  if (!address || !Number.isFinite(mpds)) { status.textContent = "Enter a valid address and MPDs"; return; }
 
   try{
-    const addr=document.getElementById('addr').value.trim(); if(!addr) throw new Error("Enter an address");
-    const mpd = Number(document.getElementById('mpd').value||0);
-    const dieselPos = Number(document.getElementById('diesel').value||0);
-
-    // Geocode
-    const g = await apiFetch(`${EP.geocode}?address=${encodeURIComponent(addr)}`); const gj = await g.json();
-    if (!gj.results?.length) throw new Error("Address not found");
-    const { lat,lng } = gj.results[0].geometry.location; L.marker([lat,lng]).addTo(map).bindPopup('Site').openPopup(); map.setView([lat,lng],14);
-
-    // AADT
-    let V=0; if (document.getElementById('autoAADT').checked){
-      try{ const a=await apiFetch(`${EP.aadt}?lat=${lat}&lng=${lng}`); const aj= a.ok? await a.json():null;
-        if (aj?.aadt){ V=Number(aj.aadt); out.insertAdjacentHTML("beforeend",`<div class="muted">AADT ${V.toLocaleString()}${aj.year?` (${aj.year})`:""} • ~${Math.round((aj.distance_m||0)/16.0934)/100} mi • ${aj.layer||"NCDOT"}</div>`); }
-        else out.insertAdjacentHTML("beforeend",`<div class="muted err">No AADT found nearby</div>`);
-      }catch{ out.insertAdjacentHTML("beforeend",`<div class="muted err">AADT request failed</div>`); }
-    }
-
-    // Competition (1 mile)
-    const p = await apiFetch(`${EP.places}?lat=${lat}&lng=${lng}&radius=${Math.round(1609)}`); const pj = p.ok? await p.json():{results:[]};
-
-    // Developments (planned/proposed)
-    let devs=[]; try{ const d=await apiFetch(`${EP.dev}?lat=${lat}&lng=${lng}&radius=${Math.round(4828)}`); const dj = d.ok? await d.json():{results:[]};
-      const WANT=/(planned|permit|site plan|coming soon|construction|proposed)/i, AVOID=/(permanently closed|closed)/i;
-      devs = (dj.results||[]).filter(r=>WANT.test(r.name||"")&&!AVOID.test(r.name||""));
-    }catch{}
-
-    // Pins
-    pj.results?.forEach(r=>L.marker([r.geometry.location.lat,r.geometry.location.lng]).addTo(map).bindPopup(r.name));
-    devs.forEach(r=>L.circleMarker([r.geometry.location.lat,r.geometry.location.lng],{radius:6,color:'orange'}).addTo(map).bindPopup(r.name));
-
-    // ---- Gallons estimation ----
-    // Defaults
-    const truckShare=0.055; const F=0.59, T=0.41, fT=0.70;
-    const ga=10.2, gt=16, sa0=0.020, st0=0.012;
-    const Mspd=1.05, accessPts=4, Macc=Mspd*(1+0.03*(accessPts-2))*1.05; // assume LED sign
-    const Mprice=1.00, Mcpr=1.04, MfacA=1.055, MfacT=22.5/25;
-
-    // If AADT missing, infer: comps count × 1000 (very rough) — user sees we inferred
-    if (!V) { V = (pj.results?.length||0)*1000; out.insertAdjacentHTML("beforeend",`<div class="muted">AADT inferred: ${V.toLocaleString()} (rough)</div>`); }
-
-    const Va=V*(1-truckShare), Vt=V*truckShare;
-    const avail=F+fT*T; const Aa=Va*avail, At=Vt*avail;
-
-    // Competition distance-decay with heavy penalty ≤ 0.03 mi
-    let P=0; for (const c of (pj.results||[])){
-      const dmi=miles(lat,lng,c.geometry.location.lat,c.geometry.location.lng); if (dmi>1) continue;
-      let w=0.9/(dmi+0.05); if (dmi<=0.03) w*=4;
-      const strong=/(wawa|sheetz|buc|race|trac|quiktrip|qt|costco|sam|bj's)/i.test(c.name||"");
-      const q=strong?1.1:0.8; P+=w*q;
-    }
-    const Mcomp=1/(1+0.35*P);
-
-    const sa=sa0*Macc*Mprice*MfacA*Mcomp*Mcpr;
-    const st=st0*Macc*Mprice*MfacT*Mcomp*Mcpr*(dieselPos>=4?1.2:1);
-    const GPD = Aa*sa*ga + At*st*gt;
-    let   GPM = GPD*(365/12);
-
-    // Capacity cap
-    const posGas=mpd*2, posDies=dieselPos;
-    const cap=(posGas*25*10.5 + posDies*25*16)*(365/12);
-    GPM=Math.min(GPM,cap);
-
-    const y1=Math.round(GPM), y2=Math.round(y1*1.027), y3=Math.round(y2*1.0125), low=Math.round(y1*0.86), high=Math.round(y1*1.06);
-
-    out.insertAdjacentHTML("beforeend", `
-      <table>
-        <tr><td><b>Base (gal/mo)</b></td><td class="num">${y1.toLocaleString()}</td></tr>
-        <tr><td>Low / High</td><td class="num">${low.toLocaleString()} – ${high.toLocaleString()}</td></tr>
-        <tr><td>Year-2</td><td class="num">${y2.toLocaleString()}</td></tr>
-        <tr><td>Year-3</td><td class="num">${y3.toLocaleString()}</td></tr>
-        <tr><td>Capacity cap</td><td class="num">${Math.round(cap).toLocaleString()}</td></tr>
-      </table>
-      <div class="muted"><b>Competition</b>: ${pj.results?.length||0} within 1 mi; nearest penalty increases sharply ≤0.03 mi; premium brands weighted.</div>
-      <div class="muted"><b>Developments</b>: ${devs.length} planned/proposed in ~3 mi.</div>
-      <div class="muted"><b>Assumptions</b>: defaults for truck share, access/LED, price, CPR, facility quality; AADT ${document.getElementById('autoAADT').checked?'auto-fetched or inferred':'manual'}.</div>
-      <div class="muted"><b>Rationale</b>: Capture from traffic split autos/trucks × availability × multipliers (access, price, quality, consumer, competition). Distance-decay and near-site penalty reduce capture; capacity caps throughput. Projections apply modest ramp/growth.</div>
-    `);
-
-    status.textContent="Done.";
-  }catch(e){ document.getElementById('out').innerHTML=`<span class="err">${e.message||e}</span>`; status.textContent=""; }
-});
+    const r = await fetch(API_BASE + "/estimate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ address, mpds, diesel })
+    });
+    const j = await r.json();
+    if (!j.ok) { result.textContent = "Error: " + (j.error || r.status); status.textContent=""; return; }
+    result.textContent = j.text || "[No text returned]";
+    factsBox.textContent = JSON.stringify(j.facts, null, 2);
+    status.textContent = "Done.";
+  }catch(e){
+    result.textContent = "Network error: " + String(e);
+    status.textContent = "";
+  }
+}
 </script>
 </body>
 </html>
