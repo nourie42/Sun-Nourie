@@ -5,63 +5,80 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Sunoco LP Gas Station Analyzer</title>
 
-  <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 
   <style>
-    :root { --bg:#0e1117; --panel:#161a22; --line:#2a2f3a; --text:#e6e6e6; --muted:#9aa4b2; --primary:#3b82f6; }
+    :root { --bg:#0b0e15; --panel:#111725; --panel2:#0f1421; --line:#263145; --text:#eaeef7; --muted:#97a3b8; --brand:#0ea5e9; --brand2:#22d3ee; --pill:#0f1929; }
     *{ box-sizing:border-box; }
-    body { background:var(--bg); color:var(--text); font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
-    .wrap { max-width: 980px; margin: 24px auto; padding: 0 16px; }
-    h1 { font-size: 40px; margin: 0 0 12px; }
-    .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px; margin:12px 0; }
-    label { display:block; font-weight:600; margin:10px 0 6px; }
-    input, select { width:100%; padding:12px; border-radius:8px; border:1px solid var(--line); background:#0f1320; color:var(--text); }
-    .row { display:flex; gap:12px; flex-wrap:wrap; }
-    .row>div { flex:1; min-width:260px; }
-    button { background:var(--primary); color:#fff; border:0; padding:12px 16px; border-radius:10px; font-weight:700; cursor:pointer; }
-    button:disabled { opacity:.5; cursor:not-allowed; }
-    .muted { color:var(--muted); }
-    .grid { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
-    .right { text-align:right; }
-    #map { height:420px; border-radius:12px; border:1px solid var(--line); position: relative; }
-    #mapOverlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(14,17,23,0.6); border-radius:12px; font-weight:700; }
-    ul { margin: 8px 0 0 18px; }
-    .mono { font-family: ui-monospace, Menlo, Consolas, monospace; }
-    .summary { white-space: pre-wrap; }
-    datalist option { color:#000; }
-    .pill { display:inline-flex; align-items:center; gap:8px; background:#0f1320; border:1px solid var(--line); padding:8px 10px; border-radius:999px;}
+    body{ background:var(--bg); color:var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+    .wrap{ max-width: 1120px; margin:24px auto; padding:0 16px; }
+    header{ display:flex; align-items:center; gap:14px; margin-bottom:16px; }
+    header .logo{ width:46px; height:46px; border-radius:10px;
+      background: radial-gradient(60% 60% at 30% 30%, var(--brand2), transparent 60%),
+                  linear-gradient(145deg, var(--brand), var(--panel2));
+      box-shadow: 0 10px 30px rgba(14,165,233,.25), inset 0 0 12px rgba(34,211,238,.2); }
+    header h1{ font-size:28px; margin:0; }
+
+    .card{ background:linear-gradient(180deg,var(--panel),var(--panel2)); border:1px solid var(--line); border-radius:12px; padding:16px; margin:12px 0; }
+    label{ display:block; font-weight:600; margin:8px 0 6px; color:#d8e3f6; }
+    input{ width:100%; padding:12px; border-radius:10px; border:1px solid var(--line); background:#0b1220; color:var(--text); }
+    button{ background:linear-gradient(135deg,var(--brand),var(--brand2)); color:#fff; border:0; padding:12px 16px; border-radius:12px; font-weight:700; cursor:pointer; }
+    button:disabled{ opacity:.6; cursor:not-allowed; }
+
+    .row{ display:grid; grid-template-columns: 1.8fr 0.8fr 0.8fr; gap:12px; }
+    @media (max-width:900px){ .row{ grid-template-columns:1fr; } }
+
+    .grid{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    @media (max-width:900px){ .grid{ grid-template-columns:1fr; } }
+    .right{ text-align:right; }
+    .muted{ color:var(--muted); }
+    .mono{ font-family: ui-monospace, Menlo, Consolas, monospace; white-space:pre-wrap; }
+
+    #map{ height:420px; border-radius:12px; border:1px solid var(--line); position: relative; }
+    #overlay{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+      background:rgba(11,14,21,.55); border-radius:12px; font-weight:700; color:#cde9ff; }
+
+    /* Autocomplete dropdown */
+    .ac-wrap{ position:relative; }
+    .ac-list{ position:absolute; top:100%; left:0; right:0; z-index:30; margin-top:6px;
+      background:#0b1220; border:1px solid var(--line); border-radius:12px; max-height:320px; overflow:auto;
+      box-shadow: 0 18px 36px rgba(0,0,0,.35); }
+    .ac-item{ padding:10px 12px; cursor:pointer; border-bottom:1px solid rgba(255,255,255,.04); }
+    .ac-item:last-child{ border-bottom:0; }
+    .ac-item:hover, .ac-item.active{ background:#101a2b; }
+    .badge{ display:inline-block; font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); background:var(--pill); color:#a9c5ff; margin-left:8px; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>Sunoco LP Gas Station Analyzer</h1>
+    <header>
+      <div class="logo"></div>
+      <h1>Sunoco LP Gas Station Analyzer</h1>
+    </header>
 
     <div class="card">
       <div class="row">
         <div>
-          <label>Search by <span class="muted">address, city+state, lat,lng, or station name</span></label>
-          <input id="addr" list="addr_suggest" placeholder="6132 Knightdale Blvd, Knightdale NC 27545 or 'Sheetz Knightdale'" autocomplete="off" />
-          <datalist id="addr_suggest"></datalist>
-          <div class="muted" style="margin-top:6px;font-size:12px;">
-            Tip: you can paste a Google Maps URL or raw <span class="mono">lat,lon</span>.
+          <label>Site search (address or business name)</label>
+          <div class="ac-wrap">
+            <input id="addr" placeholder="6132 Knightdale Blvd, Knightdale, NC — or — Sheetz Knightdale" autocomplete="off"/>
+            <div id="ac" class="ac-list" style="display:none;"></div>
           </div>
         </div>
         <div>
           <label>Regular MPDs</label>
-          <input id="mpds" type="number" value="3" />
+          <input id="mpds" type="number" value="3"/>
         </div>
         <div>
           <label>Diesel positions (optional)</label>
-          <input id="diesel" type="number" value="0" />
+          <input id="diesel" type="number" value="0"/>
         </div>
       </div>
-      <div style="margin-top:12px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+      <div style="margin-top:12px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
         <button id="go">Estimate</button>
-        <span class="muted">Results include AADT sanity, competition, developments, capacity cap, and a detailed summary.</span>
+        <span class="muted">Multi-source AADT, competition by rule, developments (OSM + GPT), capacity cap, and detailed summary.</span>
       </div>
-      <div id="chips" style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;"></div>
     </div>
 
     <div class="card">
@@ -70,80 +87,181 @@
 
     <div class="card">
       <div class="muted" style="margin-bottom:6px;">Map: site & competition (1 mile)</div>
-      <div id="map">
-        <div id="mapOverlay" class="muted">—</div>
-      </div>
+      <div id="map"><div id="overlay" class="muted">—</div></div>
     </div>
 
     <div class="card">
-      <b>Developments (planned/proposed/permit/coming-soon/construction)</b>
+      <b>Developments (multi-source)</b>
       <div id="devs" class="muted">—</div>
     </div>
 
     <div class="card">
       <b>Summary</b>
-      <div id="summary" class="summary muted">—</div>
+      <div id="summary" class="muted">—</div>
     </div>
 
     <div class="card">
-      <details>
-        <summary>Debug JSON</summary>
-        <pre id="debug" class="mono muted">/ waiting…</pre>
-      </details>
+      <details><summary>Debug</summary><pre id="debug" class="mono muted">/ waiting…</pre></details>
     </div>
   </div>
 
 <script>
+/* ========== Helpers & globals ========== */
 const $ = id => document.getElementById(id);
-const out = $("out"), debug = $("debug"), goBtn = $("go");
-const mapBox = $("map"), overlay = $("mapOverlay");
-let map, markersLayer, mapInited=false;
+const out=$("out"), devs=$("devs"), summary=$("summary"), dbg=$("debug"), goBtn=$("go");
+const acBox=$("ac"), addrInput=$("addr");
+const overlay=$("overlay");
+let map, layer, mapReady=false, selectedCoords=null;
 
-function setOut(html){ out.innerHTML = html; }
-function setDebug(obj){ debug.textContent = typeof obj === "string" ? obj : JSON.stringify(obj, null, 2); }
-function fmt(n){ return (n ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 }); }
-function esc(s){ return (s ?? "").toString().replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m])); }
-function setOverlay(msg){ overlay.textContent = msg; overlay.style.display = "flex"; }
-function clearOverlay(){ overlay.style.display = "none"; }
+function setOut(html){ out.innerHTML=html; }
+function setDbg(o){ dbg.textContent = typeof o==="string" ? o : JSON.stringify(o,null,2); }
+function fmt(n){ return (n??0).toLocaleString(undefined,{maximumFractionDigits:0}); }
+function esc(s){ return (s??"").toString().replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
+function setOverlay(msg){ overlay.textContent=msg; overlay.style.display="flex"; }
+function clearOverlay(){ overlay.style.display="none"; }
+function initMap(){ if(mapReady) return; map=L.map("map",{zoomControl:true});
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map);
+  layer=L.layerGroup().addTo(map); mapReady=true; }
 
-async function callEstimate(){
-  const body = {
-    address: $("addr").value.trim(),
-    mpds: Number($("mpds").value || 0),
-    diesel: Number($("diesel").value || 0)
-  };
-  const r=await fetch("/estimate",{ method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
-  const t=await r.text(); if(!r.ok) throw new Error(`HTTP ${r.status}\n${t.slice(0,1200)}`);
+/* ========== Hybrid autocomplete with safe fallback ========== */
+let acTimer=null, acItems=[], acIndex=-1;
+
+async function censusSearch(q){
+  try{
+    const url=`https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?address=${encodeURIComponent(q)}&benchmark=Public_AR_Current&format=json`;
+    const r=await fetch(url); if(!r.ok) return [];
+    const d=await r.json(); const m=d?.result?.addressMatches||[];
+    return m.map(x=>({ type:"Address", display:x.matchedAddress, lat:+x.coordinates.y, lon:+x.coordinates.x, score:1 }));
+  }catch{return [];}
+}
+async function nominatimSearch(q){
+  try{
+    const url=`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=us&q=${encodeURIComponent(q)}`;
+    const r=await fetch(url); if(!r.ok) return [];
+    const a=await r.json();
+    return a.map(row=>{
+      const ad=row.address||{};
+      const line=[row.namedetails?.name||ad.house_number,ad.road||ad.pedestrian||ad.residential||ad.footway,ad.city||ad.town||ad.village||ad.hamlet||ad.county,ad.state,ad.postcode].filter(Boolean).join(", ")||row.display_name;
+      return { type:"Address", display:line, lat:+row.lat, lon:+row.lon, score:0.6 };
+    });
+  }catch{return [];}
+}
+async function geocodeCenter(q){
+  try{
+    const url=`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&q=${encodeURIComponent(q)}`;
+    const r=await fetch(url); if(!r.ok) return null;
+    const a=await r.json(); if(!a?.length) return null;
+    return { lat:+a[0].lat, lon:+a[0].lon };
+  }catch{return null;}
+}
+async function overpassStations(center, q){
+  if(!center) return [];
+  try{
+    const rad=15000;
+    const data=`[out:json][timeout:25];(node(around:${rad},${center.lat},${center.lon})["amenity"="fuel"];way(around:${rad},${center.lat},${center.lon})["amenity"="fuel"];);out center tags;`;
+    const ep="https://overpass-api.de/api/interpreter";
+    const r=await fetch(ep,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:"data="+encodeURIComponent(data)});
+    if(!r.ok) return [];
+    const j=await r.json(); const toks=q.toLowerCase().split(/\s+/).filter(Boolean);
+    let items=[];
+    for(const el of j.elements||[]){
+      const t=el.tags||{}; const name=t.brand||t.name||""; if(!name) continue;
+      const hay=(name+" "+(t["addr:street"]||"")+" "+(t["addr:city"]||"")).toLowerCase();
+      const ok=toks.every(tok=>hay.includes(tok)); if(!ok) continue;
+      const lat=el.lat??el.center?.lat, lon=el.lon??el.center?.lon; if(lat==null||lon==null) continue;
+      items.push({ type:"Station", display:name, lat:+lat, lon:+lon, score:0.8 });
+    }
+    // dedupe
+    const seen=new Set(); items=items.filter(it=>{ const k=`${it.display}|${it.lat.toFixed(5)}|${it.lon.toFixed(5)}`; if(seen.has(k)) return false; seen.add(k); return true; });
+    return items.slice(0,10);
+  }catch{return [];}
+}
+function rankMerge(census, stations, nomi, q){
+  const hasNum=/\d/.test(q);
+  const list=[...census,...stations,...nomi];
+  for(const it of list){
+    if(it.type==="Station") it.score+=0.2;
+    if(it.type==="Address" && hasNum && /^\d+/.test(it.display)) it.score+=0.3;
+    const toks=q.toLowerCase().split(/\s+/).filter(Boolean), hay=it.display.toLowerCase();
+    const cover=toks.filter(tok=>hay.includes(tok)).length/Math.max(1,toks.length);
+    it.score+=(cover*0.2);
+  }
+  // “Use exactly …” first option
+  const useExact = { type:"Use exactly", display:q, lat:null, lon:null, score:2 };
+  const combined=[useExact, ...list].sort((a,b)=>(b.score||0)-(a.score||0));
+  // dedupe by display+coords
+  const seen=new Set(), out=[];
+  for(const it of combined){
+    const k=`${it.display}|${it.lat?.toFixed?.(5)||"x"}|${it.lon?.toFixed?.(5)||"x"}`;
+    if(seen.has(k)) continue; seen.add(k); out.push(it); if(out.length>=12) break;
+  }
+  return out;
+}
+function renderAc(list){
+  if(!list.length){ acBox.style.display="none"; return; }
+  acBox.innerHTML=list.map((it,i)=>`
+    <div class="ac-item" data-i="${i}">
+      ${esc(it.display)} <span class="badge">${it.type}</span>
+      ${it.lat!=null?`<div class="muted" style="font-size:12px">${it.lat.toFixed(5)}, ${it.lon.toFixed(5)}</div>`:""}
+    </div>`).join("");
+  [...acBox.children].forEach(el=>{
+    el.addEventListener("mouseenter",()=> setActive(+el.dataset.i));
+    el.addEventListener("click",()=> chooseAc(+el.dataset.i));
+  });
+  acBox.style.display="block";
+}
+function hideAc(){ acBox.style.display="none"; acIndex=-1; }
+function setActive(i){ acIndex=i; [...acBox.children].forEach((el,idx)=> el.classList.toggle("active", idx===i)); }
+function moveAc(step){ if(!acItems.length) return; acIndex = ((acIndex+step)%acItems.length + acItems.length)%acItems.length; setActive(acIndex); acBox.children[acIndex].scrollIntoView({block:"nearest"}); }
+function chooseAc(i){
+  const it=acItems[i]; if(!it) return;
+  addrInput.value = it.display;
+  selectedCoords = (it.lat!=null && it.lon!=null) ? { lat: it.lat, lon: it.lon } : null;
+  hideAc();
+}
+
+addrInput.addEventListener("input", ()=>{
+  const q=addrInput.value.trim(); selectedCoords=null; hideAc();
+  if(q.length<3) return;
+  if(acTimer) clearTimeout(acTimer);
+  acTimer=setTimeout(async()=>{
+    try{
+      const [census, nomi, center] = await Promise.all([censusSearch(q), nominatimSearch(q), geocodeCenter(q)]);
+      const stations = await overpassStations(center, q); // non-blocking-ish
+      acItems = rankMerge(census, stations, nomi, q);
+      renderAc(acItems);
+    }catch{ /* ignore */ }
+  },220);
+});
+addrInput.addEventListener("keydown",(e)=>{
+  if(acBox.style.display==="none") return;
+  if(e.key==="ArrowDown"){ e.preventDefault(); moveAc(1); }
+  else if(e.key==="ArrowUp"){ e.preventDefault(); moveAc(-1); }
+  else if(e.key==="Enter"){ if(acIndex>=0){ e.preventDefault(); chooseAc(acIndex); } }
+  else if(e.key==="Escape"){ hideAc(); }
+});
+document.addEventListener("click",(e)=>{ if(!acBox.contains(e.target) && e.target!==addrInput) hideAc(); });
+
+/* ========== Client → server ========== */
+async function safeJSON(url, opts){
+  const r=await fetch(url, opts); const t=await r.text();
+  if(!r.ok) throw new Error(`HTTP ${r.status}\n${t.slice(0,1200)}`);
   return JSON.parse(t);
 }
-
-async function estimate(){
-  try{
-    goBtn.disabled = true;
-    setOut("<span class='muted'>Working…</span>");
-    setOverlay("Loading, this can take up to 3 minutes to research");
-    const d = await callEstimate();
-    renderReport(d);
-    renderMap(d.map);
-    renderDevs(d.developments);
-    renderSummary(d.summary);
-    setDebug(d);
-    renderChips(d);
-  }catch(e){
-    setOut(`<pre class="mono">${esc(e.message)}</pre>`);
-    setOverlay("Error — see details above");
-  }finally{
-    goBtn.disabled = false;
-  }
+async function callEstimate(){
+  const body={ address: $("addr").value.trim(), mpds:+$("mpds").value||0, diesel:+$("diesel").value||0 };
+  if(selectedCoords){ body.siteLat=selectedCoords.lat; body.siteLon=selectedCoords.lon; }
+  return await safeJSON("/estimate",{ method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
 }
 
+/* ========== Renderers ========== */
 function renderReport(d){
   const i=d.inputs||{}, c=d.competition||{};
-  const html = `
+  setOut(`
     <div class="grid">
       <div>
-        <b>Base Estimate (gal/mo)</b>
-        <div style="font-size:28px;font-weight:800;">${fmt(d.base)}</div>
+        <div style="font-weight:700;margin-bottom:6px;">Base Estimate (gal/mo)</div>
+        <div style="font-size:30px;font-weight:800;">${fmt(d.base)}</div>
         <div class="muted">Low–High: ${fmt(d.low)} – ${fmt(d.high)}</div>
       </div>
       <div class="right">
@@ -151,85 +269,56 @@ function renderReport(d){
         <div style="margin-top:6px;">Year-3: <b>${fmt(d.year3)}</b></div>
       </div>
     </div>
-    <hr>
-    <div>Inputs: AADT used <b>${fmt(i.aadt_used)}</b>; MPDs ${i.mpds}${i.diesel ? " + diesel "+i.diesel : ""}</div>
-    <div>Competition (Overpass): ${c.count ?? 0} within 1 mi${c.nearest_mi != null ? "; nearest "+c.nearest_mi.toFixed(3)+" mi" : ""}${(c.notable_brands||[]).length ? "; notable: "+c.notable_brands.join(", ") : ""}; multiplier <b>${(c.multiplier||1).toFixed(2)}×</b></div>
-    <div style="margin-top:8px">${esc(d.rationale||"")}</div>
-  `;
-  setOut(html);
+    <hr/>
+    <div>Inputs: AADT used <b>${fmt(i.aadt_used)}</b>; MPDs ${i.mpds}${i.diesel? " + diesel "+i.diesel:""}</div>
+    <div>Competition: ${c.count ?? 0} within 1 mi${c.nearest_mi!=null? "; nearest "+c.nearest_mi.toFixed(3)+" mi":""}${(c.notable_brands||[]).length ? "; notable: "+c.notable_brands.join(", ") : ""}</div>
+    <div class="muted" style="margin-top:8px">${esc(d.rationale||"")}</div>
+  `);
 }
-
-function renderDevs(list){
-  const el=$("devs");
-  if(!Array.isArray(list)||!list.length){ el.innerHTML="<span class='muted'>none found</span>"; return; }
-  el.innerHTML = "<ul>"+list.map(d=>`<li>${esc(d.name)} • ${esc(d.status)} • ${d.miles} mi</li>`).join("")+"</ul>";
+function renderDevs(osm, ai){
+  const left = (Array.isArray(osm)&&osm.length)
+    ? "<ul>"+osm.map(d=>`<li>${esc(d.name)} • ${esc(d.status)} • ${d.miles} mi</li>`).join("")+"</ul>"
+    : "<span class='muted'>OSM/Overpass: none found</span>";
+  const right = (ai && Array.isArray(ai.items) && ai.items.length)
+    ? "<ul>"+ai.items.map(x=>`<li>${esc(x.name)} • ${esc(x.status||"planned")} • ~${x.approx_miles ?? "?"} mi</li>`).join("")+"</ul><div class='muted'>GPT confidence: ${(ai.confidence*100|0)}%</div>"
+    : "<span class='muted'>GPT: none reported</span>";
+  devs.innerHTML = `<div class="grid"><div>${left}</div><div>${right}</div></div>`;
 }
-
-function renderSummary(s){
-  $("summary").textContent = s && s.trim().length ? s : "—";
-}
-
-function ensureLeaflet(){
-  if(mapInited) return;
-  map = L.map("map",{zoomControl:true});
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map);
-  mapInited = true;
-}
-
 function renderMap(m){
-  ensureLeaflet();
-  if(markersLayer) markersLayer.remove();
-  markersLayer = L.layerGroup().addTo(map);
-
-  if(!m || !m.site){ overlay.textContent = "—"; return; }
-
-  const site = [m.site.lat, m.site.lon];
-  L.marker(site, { title: "Site" }).addTo(markersLayer).bindPopup(`<b>Site</b><br>${esc(m.site.label||"")}`);
-  const comps = Array.isArray(m.competitors) ? m.competitors : [];
-  for(const c of comps){
-    L.circleMarker([c.lat,c.lon],{radius:6,weight:1,color:c.heavy?"#ff7f50":"#4ade80",fillOpacity:.85})
-      .addTo(markersLayer).bindPopup(`<b>${esc(c.name||"Fuel station")}</b><br>${c.miles} mi`);
-  }
-  const bounds=L.latLngBounds([site, ...comps.map(c=>[c.lat,c.lon])]);
-  map.fitBounds(bounds.pad(0.25));
-  clearOverlay();
+  initMap(); layer.clearLayers();
+  if(!m || !m.site){ overlay.textContent="—"; return; }
+  const site=[m.site.lat,m.site.lon];
+  L.marker(site,{title:"Site"}).addTo(layer).bindPopup("<b>Site</b>");
+  const comps = Array.isArray(m.competitors)?m.competitors:[];
+  const pts=[site];
+  for(const c of comps){ pts.push([c.lat,c.lon]); L.circleMarker([c.lat,c.lon],{radius:6,weight:1,color:c.heavy?"#ff7f50":"#4ade80",fillOpacity:.85}).addTo(layer).bindPopup(`${esc(c.name||"Fuel")} • ${c.miles} mi`); }
+  const bounds=L.latLngBounds(pts); map.fitBounds(bounds.pad(0.25)); clearOverlay();
 }
 
-/* ---------- Address/Name Autocomplete (backend aggregator) ---------- */
-let acTimer=null;
-$("addr").addEventListener("input", ()=>{
-  const q = $("addr").value.trim();
-  if(acTimer) clearTimeout(acTimer);
-  if(!q || q.length < 3){ $("addr_suggest").innerHTML=""; return; }
-  acTimer = setTimeout(async ()=>{
-    try{
-      const r = await fetch(`/suggest?q=${encodeURIComponent(q)}`);
-      if(!r.ok) return;
-      const arr = await r.json();
-      const dl = $("addr_suggest");
-      dl.innerHTML = arr.map(x=>`<option value="${esc(x.label)}"></option>`).join("");
-    }catch(_){}
-  }, 250);
-});
-
-function renderChips(d){
-  const chips=$("chips");
-  chips.innerHTML="";
-  const items=[];
-  if(d.inputs?.class_bucket) items.push({k:"Road",v:d.inputs.class_bucket});
-  if(d.inputs?.aadt_note) items.push({k:"AADT",v:d.inputs.aadt_note});
-  if(d.competition?.count!=null) items.push({k:"Competitors",v:String(d.competition.count)});
-  if(d.competition?.multiplier) items.push({k:"Comp ×",v:d.competition.multiplier.toFixed(2)});
-  if(d.inputs?.aadt_actual?.value) items.push({k:"DOT",v:String(d.inputs.aadt_actual.value)});
-  for(const it of items){
-    const el=document.createElement("div"); el.className="pill";
-    el.innerHTML=`<b>${esc(it.k)}</b><span class="muted">${esc(it.v)}</span>`;
-    chips.appendChild(el);
+/* ========== Main flow ========== */
+async function estimate(){
+  try{
+    goBtn.disabled=true;
+    setOut("<span class='muted'>Working…</span>");
+    setOverlay("Loading, this can take up to 3 minutes to research");
+    const d=await callEstimate();
+    renderReport(d);
+    renderMap(d.map);
+    renderDevs(d.developments, d.developments_ai);
+    summary.textContent = (d.summary && d.summary.trim()) ? d.summary : "—";
+    setDbg(d);
+  }catch(e){
+    setOut(`<pre class="mono">${esc(e.message)}</pre>`);
+    overlay.textContent="Error — see details above";
+  }finally{
+    goBtn.disabled=false;
   }
 }
-
 $("go").addEventListener("click", estimate);
-setOverlay("—");
+addrInput.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); estimate(); } });
+
+/* initial state */
+overlay.textContent="—";
 </script>
 </body>
 </html>
