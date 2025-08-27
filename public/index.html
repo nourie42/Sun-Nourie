@@ -4,6 +4,11 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Fuel Gallons Estimator — Chat</title>
+
+  <!-- Leaflet map -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
   <style>
     :root { --bg:#0e1117; --panel:#161a22; --line:#2a2f3a; --text:#e6e6e6; --muted:#9aa4b2; --primary:#3b82f6; }
     *{ box-sizing: border-box; }
@@ -29,6 +34,8 @@
     .cmp .box { background:#0f1320; border:1px solid var(--line); border-radius:10px; padding:10px 12px; }
     .cmp .label { font-size:12px; color:var(--muted); }
     .cmp .value { font-size:18px; font-weight:800; }
+    #map { height: 420px; border-radius:12px; border:1px solid var(--line); }
+    .inputs-inline { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
   </style>
 </head>
 <body>
@@ -50,41 +57,39 @@
           <input id="diesel" type="number" value="0" />
         </div>
       </div>
-      <div class="row" style="margin-top:12px;">
-        <div>
+      <div class="inputs-inline" style="margin-top:12px;">
+        <div style="flex:1; min-width:240px;">
           <label>AADT override (optional)</label>
           <input id="aadtOverride" type="number" placeholder="enter AADT to force (e.g., 10449)" />
         </div>
-      </div>
-      <div style="margin-top:12px; display:flex; gap:8px; align-items:center;">
         <button id="go">Estimate</button>
-        <span class="muted">Pulls NCDOT actual AADT, gets GPT’s AADT estimate, lets you override, then computes gallons & comparison.</span>
+        <span class="muted">Will average DOT + GPT when both exist; override wins if entered.</span>
       </div>
     </div>
 
     <div class="card" id="report">
       <div class="heading">Result</div>
       <div id="out" class="muted">—</div>
+
       <div id="cmp" class="cmp" style="display:none;">
-        <div class="box">
-          <div class="label">Actual AADT (DOT)</div>
-          <div class="value" id="valActual">—</div>
-          <div class="muted" id="valActualMeta"></div>
-        </div>
-        <div class="box">
-          <div class="label">GPT AADT estimate</div>
-          <div class="value" id="valGpt">—</div>
-          <div class="muted" id="valGptMeta"></div>
-        </div>
-        <div class="box">
-          <div class="label">Override (used if entered)</div>
-          <div class="value" id="valOver">—</div>
-        </div>
-        <div class="box">
-          <div class="label">AADT used for gallons</div>
-          <div class="value" id="valUsed">—</div>
-        </div>
+        <div class="box"><div class="label">Actual AADT (DOT)</div><div class="value" id="valActual">—</div><div class="muted" id="valActualMeta"></div></div>
+        <div class="box"><div class="label">GPT AADT estimate</div><div class="value" id="valGpt">—</div><div class="muted" id="valGptMeta"></div></div>
+        <div class="box"><div class="label">AADT used</div><div class="value" id="valUsed">—</div></div>
       </div>
+
+      <div style="margin-top:12px;" class="inputs-inline">
+        <div style="flex:1; min-width:240px;">
+          <label>Adjust AADT and re-run</label>
+          <input id="rerunAadt" type="number" placeholder="type a new AADT and click Re-run" />
+        </div>
+        <button id="rerunBtn">Re-run</button>
+        <span class="muted">This will re-estimate using only your override.</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="heading">Map: site & competition (1 mile)</div>
+      <div id="map">Loading…</div>
     </div>
 
     <div class="card">
@@ -97,50 +102,61 @@
 
 <script>
 const $ = (id) => document.getElementById(id);
-const out = $("out"), debug = $("debug"), goBtn = $("go");
+const out = $("out"), debug = $("debug"), goBtn = $("go"), rerunBtn = $("rerunBtn");
+
+let map, markersLayer;
 
 function setOut(html){ out.innerHTML = html; }
 function setDebug(obj){ debug.textContent = typeof obj === "string" ? obj : JSON.stringify(obj, null, 2); }
 function fmt(n){ return (n ?? 0).toLocaleString(undefined, {maximumFractionDigits: 0}); }
 function esc(s){ return (s ?? "").toString().replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m])); }
 
-async function estimate() {
+async function callEstimate(overrideValue){
+  const address = $("addr").value.trim();
+  const mpds = Number($("mpds").value || 0);
+  const diesel = Number($("diesel").value || 0);
+  const aadtOverride = overrideValue ?? $("aadtOverride").value.trim();
+  const res = await fetch("/estimate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ address, mpds, diesel, aadtOverride })
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`HTTP ${res.status}\n` + text.slice(0,1200));
+  return JSON.parse(text);
+}
+
+async function estimate(){
   try {
     goBtn.disabled = true;
-    setOut(`<span class="muted">Working… pulling NCDOT AADT, asking GPT for its AADT estimate, applying override if present, then computing gallons.</span>`);
+    setOut(`<span class="muted">Working… pulling AADT, getting GPT estimate, averaging when applicable, then computing gallons.</span>`);
     $("cmp").style.display = "none";
+    const data = await callEstimate();
 
-    const address = $("addr").value.trim();
-    const mpds = Number($("mpds").value || 0);
-    const diesel = Number($("diesel").value || 0);
-    const aadtOverride = $("aadtOverride").value.trim();
-
-    const res = await fetch("/estimate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ address, mpds, diesel, aadtOverride })
-    });
-
-    const text = await res.text();
-    if (!res.ok) {
-      setOut(`<div class="muted">HTTP ${res.status}<br><pre class="mono">${esc(text).slice(0,1200)}</pre></div>`);
-      setDebug(text);
-      return;
-    }
-
-    let d;
-    try { d = JSON.parse(text); } catch(e){
-      setOut(`<div class="muted">Parse error\n<pre class="mono">${esc(text).slice(0,1200)}</pre></div>`);
-      setDebug(text);
-      return;
-    }
-
-    setDebug(d);
-    renderReport(d);
+    setDebug(data);
+    renderReport(data);
+    renderMap(data.map);
   } catch (e) {
-    setOut(`<div class="muted">Network error:<br><pre class="mono">${esc(e.message)}</pre></div>`);
+    setOut(`<div class="muted">Error:<br><pre class="mono">${esc(e.message)}</pre></div>`);
   } finally {
     goBtn.disabled = false;
+  }
+}
+
+async function rerun(){
+  try {
+    rerunBtn.disabled = true;
+    const v = $("rerunAadt").value.trim();
+    if (!v) { alert("Enter an AADT override first."); return; }
+    setOut(`<span class="muted">Re-running with override AADT ${fmt(Number(v))}…</span>`);
+    const data = await callEstimate(v);
+    setDebug(data);
+    renderReport(data);
+    renderMap(data.map);
+  } catch (e) {
+    setOut(`<div class="muted">Error:<br><pre class="mono">${esc(e.message)}</pre></div>`);
+  } finally {
+    rerunBtn.disabled = false;
   }
 }
 
@@ -158,23 +174,12 @@ function renderReport(d){
   `;
 
   const i = d.inputs || {};
-  const aUsed = i.aadt_used;
-  const aActual = i.aadt_actual || {};
-  const aGpt = i.aadt_gpt || {};
-  const aOver = i.aadt_override;
-
-  // Comparison pills
   $("cmp").style.display = "flex";
-  $("valActual").textContent = aActual.value != null ? fmt(aActual.value) : "—";
-  $("valActualMeta").textContent = aActual.value != null ? `${aActual.source || "DOT"}${aActual.year ? " • " + aActual.year : ""}${aActual.distance_mi != null ? " • ~" + aActual.distance_mi + " mi" : ""}` : "";
-  $("valGpt").textContent = aGpt.value != null ? fmt(aGpt.value) : "—";
-  $("valGptMeta").textContent = aGpt.value != null ? `${aGpt.class_used || ""}${aGpt.low ? " • " + fmt(aGpt.low) + "–" + fmt(aGpt.high) : ""}` : "";
-  $("valOver").textContent = aOver != null ? fmt(aOver) : "—";
-  $("valUsed").textContent = aUsed != null ? fmt(aUsed) : "—";
-
-  const assumptions = Array.isArray(d.assumptions) && d.assumptions.length
-    ? `<ul>${d.assumptions.map(a => `<li>${esc(a)}</li>`).join("")}</ul>`
-    : `<div class="muted">defaults applied where unknown; cap = positions × 25 × gal/cycle × 365/12.</div>`;
+  $("valUsed").textContent = fmt(i.aadt_used);
+  $("valActual").textContent = i.aadt_actual?.value != null ? fmt(i.aadt_actual.value) : "—";
+  $("valActualMeta").textContent = i.aadt_actual?.value != null ? `${i.aadt_actual.source || "DOT"}${i.aadt_actual.year ? " • " + i.aadt_actual.year : ""}${i.aadt_actual.distance_mi != null ? " • ~" + i.aadt_actual.distance_mi + " mi" : ""}` : "";
+  $("valGpt").textContent = i.aadt_gpt?.value != null ? fmt(i.aadt_gpt.value) : "—";
+  $("valGptMeta").textContent = i.aadt_gpt?.value != null ? `${i.aadt_gpt.class_used || ""}${i.aadt_gpt.low ? " • " + fmt(i.aadt_gpt.low) + "–" + fmt(i.aadt_gpt.high) : ""}` : "";
 
   const c = d.competition || {};
   const notable = (c.notable_brands || []).join(", ");
@@ -185,10 +190,9 @@ function renderReport(d){
     </div>
   `;
 
-  const devs = Array.isArray(d.developments) ? d.developments : [];
-  const devHtml = devs.length
-    ? `<ul>${devs.map(x => `<li>${esc(x.name)} • ${esc(x.status)} • ${esc(x.miles)} mi</li>`).join("")}</ul>`
-    : `<div class="muted">developments not found (planned/proposed/permit/coming-soon/construction only)</div>`;
+  const assumptions = Array.isArray(d.assumptions) && d.assumptions.length
+    ? `<ul>${d.assumptions.map(a => `<li>${esc(a)}</li>`).join("")}</ul>`
+    : `<div class="muted">defaults applied where unknown; cap = positions × 25 × gal/cycle × 365/12.</div>`;
 
   const rationale = esc(d.rationale || "");
 
@@ -196,20 +200,60 @@ function renderReport(d){
     ${sectionTop}
     <hr>
     <div class="heading">Inputs used</div>
-    <div class="muted">
-      AADT used ${fmt(aUsed)}; MPDs ${esc(i.mpds)}${i.diesel ? " + diesel " + esc(i.diesel) : ""}; truck share ${Math.round((i.truck_share_assumed ?? 0)*100)}% (assumed)
-    </div>
+    <div class="muted">AADT used ${fmt(i.aadt_used)}; MPDs ${esc(i.mpds)}${i.diesel ? " + diesel " + esc(i.diesel) : ""}; truck share ${Math.round((i.truck_share_assumed ?? 0)*100)}% (assumed)</div>
     ${comp}
-    <div class="heading" style="margin-top:12px;">Developments</div>
-    ${devHtml}
-    <div class="heading" style="margin-top:12px;">Assumptions</div>
-    ${assumptions}
     <div class="heading" style="margin-top:12px;">One-paragraph rationale</div>
     <div>${rationale || "<span class='muted'>—</span>"}</div>
   `);
+
+  // Pre-fill the rerun box with the used AADT so user can tweak
+  $("rerunAadt").value = i.aadt_used ?? "";
+}
+
+let mapInited = false;
+function renderMap(m){
+  if (!m || !m.site) return;
+  if (!mapInited) {
+    map = L.map('map', { zoomControl: true });
+    mapInited = true;
+  }
+  const site = m.site;
+  const comps = Array.isArray(m.competitors) ? m.competitors : [];
+
+  // Reset layers
+  if (markersLayer) markersLayer.remove();
+  markersLayer = L.layerGroup().addTo(map);
+
+  const siteLatLng = [site.lat, site.lon];
+  map.setView(siteLatLng, 14);
+
+  // Base tiles
+  if (!window._tileLayer) {
+    window._tileLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "&copy; OpenStreetMap"
+    }).addTo(map);
+  }
+
+  // Site marker
+  L.marker(siteLatLng, { title: "Site" }).addTo(markersLayer)
+    .bindPopup(`<b>Site</b><br>${esc(site.label || "")}`);
+
+  // Competitors
+  for (const c of comps) {
+    const mk = L.circleMarker([c.lat, c.lon], {
+      radius: 6, weight: 1, color: c.heavy ? "#ff7f50" : "#4ade80", fillOpacity: 0.8
+    }).addTo(markersLayer);
+    mk.bindPopup(`<b>${esc(c.name || "Fuel station")}</b><br>${c.miles} mi`);
+  }
+
+  // Fit bounds
+  const allPts = [siteLatLng, ...comps.map(c => [c.lat, c.lon])];
+  const bounds = L.latLngBounds(allPts);
+  map.fitBounds(bounds.pad(0.25));
 }
 
 $("go").addEventListener("click", estimate);
+$("rerunBtn").addEventListener("click", rerun);
 </script>
 </body>
 </html>
