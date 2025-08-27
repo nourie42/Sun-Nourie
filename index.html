@@ -24,9 +24,8 @@
   .ok{color:#9ef5b3}.fail{color:#ff9a9a}.pending{color:#e8e8e8;opacity:.7}
   table{width:100%;border-collapse:collapse}.num{font-variant-numeric:tabular-nums}
   td{padding:4px 0;border-bottom:1px dashed #2a2f3a}
-  pre{background:#11151f;border:1px solid #2a2f3a;border-radius:8px;padding:8px;max-height:200px;overflow:auto;color:#cfe3ff;font-size:12px}
-  .row{display:flex;gap:8px}
-  .col{flex:1}
+  pre{background:#11151f;border:1px solid #2a2f3a;border-radius:8px;padding:8px;max-height:220px;overflow:auto;color:#cfe3ff;font-size:12px}
+  .row{display:flex;gap:8px}.col{flex:1}
 </style>
 </head>
 <body>
@@ -78,8 +77,8 @@
           <button id="btnDiagAADT">Check AADT</button>
         </div>
       </div>
-      <div class="muted" style="margin:6px 0">Backend: <code id="backendUrl">https://sun-nourie-live.onrender.com</code></div>
-      <div id="diagNote" class="muted">Use a test lat/lng for Places/Dev/AADT: <span id="diagLatLng">35.7796, -78.6382</span></div>
+      <div class="muted" style="margin:6px 0">Backend: <code id="backendUrl"></code></div>
+      <div class="muted">Sample coords: <span id="diagLatLng">35.7796, -78.6382</span></div>
       <pre id="diagOut">// diagnostics output will appear here</pre>
     </div>
 
@@ -106,7 +105,7 @@
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script>
 /* ---------- CONFIG ---------- */
-const API_BASE = "https://sun-nourie-live.onrender.com";
+const API_BASE = "https://sun-nourie-live.onrender.com";   // <- backend base
 document.getElementById("backendUrl").textContent = API_BASE;
 const ENDPOINT = {
   backend:      API_BASE + "/",
@@ -118,16 +117,17 @@ const ENDPOINT = {
 
 /* ---------- HELPERS ---------- */
 async function apiFetch(url, opts = {}) {
-  const base = { mode:"cors", cache:"no-store", referrerPolicy:"no-referrer" };
-  for (let i=0;i<2;i++) {
-    try { return await fetch(url, {...base, ...opts}); }
-    catch (e) { if (i===1) throw e; await new Promise(r=>setTimeout(r,600)); }
+  const base = { mode: "cors", cache: "no-store", referrerPolicy: "no-referrer" };
+  for (let i = 0; i < 2; i++) {
+    try { return await fetch(url, { ...base, ...opts }); }
+    catch (e) { if (i === 1) throw e; await new Promise(r => setTimeout(r, 600)); }
   }
 }
-function miles(a,b,c,d){const R=3958.8,toRad=x=>x*Math.PI/180,dA=toRad(c-a),dO=toRad(d-b);const A=Math.sin(dA/2)**2+Math.cos(toRad(a))*Math.cos(toRad(c))*Math.sin(dO/2)**2;return 2*R*Math.asin(Math.sqrt(A));}
+function miles(a,b,c,d){const R=3958.8,toRad=x=>x*Math.PI/180,dA=toRad(c-a),dO=toRad(d-b);
+  const A=Math.sin(dA/2)**2+Math.cos(toRad(a))*Math.cos(toRad(c))*Math.sin(dO/2)**2;return 2*R*Math.asin(Math.sqrt(A));}
 function setStatus(el,ok,ms){el.className=ok?"ok":"fail";el.textContent=(ok?"OK":"Fail")+(ms?` (${ms}ms)`:"");}
 async function timed(url){const t0=performance.now();const r=await apiFetch(url);return{r,ok:r.ok,ms:Math.round(performance.now()-t0)};}
-function jstr(obj){try{return JSON.stringify(obj,null,2)}catch{return String(obj)}}
+function jstr(x){try{return JSON.stringify(x,null,2)}catch{return String(x)}}
 
 /* ---------- STATUS PANEL ---------- */
 async function checkAll(){
@@ -148,16 +148,16 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&
 /* ---------- MAIN FLOW ---------- */
 document.getElementById("run").addEventListener("click", async () => {
   const statusEl=document.getElementById("status"), resultsEl=document.getElementById("results");
-  resultsEl.innerHTML = ""; // clear prior
+  resultsEl.innerHTML = "";
   try{
     statusEl.textContent="Geocoding…";
     const addr=document.getElementById("addr").value.trim(); if(!addr) throw new Error("Enter an address");
-    const g=await apiFetch(`${ENDPOINT.geocode}?address=${encodeURIComponent(addr)}`);
-    const gj=await g.json(); if(!gj.results?.length) throw new Error("No geocode result");
+    const g=await apiFetch(`${ENDPOINT.geocode}?address=${encodeURIComponent(addr)}`); const gj=await g.json();
+    if(!gj.results?.length) throw new Error("No geocode result");
     const {lat,lng}=gj.results[0].geometry.location;
     L.marker([lat,lng]).addTo(map).bindPopup("Site").openPopup(); map.setView([lat,lng],14);
 
-    // AADT (clear first; only fill if real)
+    // AADT: clear field first; fill only if real; show provenance
     let V = Number(document.getElementById("VPD").value)||0;
     if (document.getElementById("autoAADT").checked) {
       document.getElementById("VPD").value = "";
@@ -167,38 +167,39 @@ document.getElementById("run").addEventListener("click", async () => {
         if (aj?.aadt) {
           V = Number(aj.aadt);
           document.getElementById("VPD").value = V;
+          const mi = Math.round((aj.distance_m||0)/16.0934)/100; // m -> mi, 2dp
           resultsEl.insertAdjacentHTML("beforeend",
-            `<div class="muted">AADT ${V.toLocaleString()}${aj.year?` (${aj.year})`:""} • ~${Math.round((aj.distance_m||0)/16.0934)/100} mi • ${aj.layer||"NCDOT"}</div>`);
+            `<div class="muted">AADT ${V.toLocaleString()}${aj.year?` (${aj.year})`:""} • ~${mi} mi • ${aj.layer||"NCDOT"}</div>`);
         } else {
-          resultsEl.insertAdjacentHTML("beforeend",
-            `<div class="muted err">No AADT found nearby (enter AADT in Advanced)</div>`);
+          resultsEl.insertAdjacentHTML("beforeend", `<div class="muted err">No AADT found nearby</div>`);
         }
       } catch { resultsEl.insertAdjacentHTML("beforeend", `<div class="muted err">AADT request failed</div>`); }
     }
 
-    // Competition (1 mile default)
+    // Places (competition, 1 mile)
     statusEl.textContent="Competition…";
     const radiusMi=Number(document.getElementById("radiusMi").value||1);
     const p=await apiFetch(`${ENDPOINT.places}?lat=${lat}&lng=${lng}&radius=${Math.round(radiusMi*1609.344)}`);
     const pj=p.ok?await p.json():{results:[]};
 
-    // Developments (planned/proposed)
+    // Developments (planned/proposed filter)
     statusEl.textContent="Developments…";
     const dr=Number(document.getElementById("devRadiusMi").value||3)*1609.344;
-    let devs=[]; try{
+    let devs=[];try{
       const d=await apiFetch(`${ENDPOINT.developments}?lat=${lat}&lng=${lng}&radius=${Math.round(dr)}`);
       const dj=d.ok?await d.json():{results:[]};
       const WANT=/(planned|permit|site plan|coming soon|construction|proposed)/i, AVOID=/(permanently closed|closed)/i;
       devs=(dj.results||[]).filter(r=>WANT.test(r.name||"")&&!AVOID.test(r.name||""));
     }catch{}
 
-    // Pins
+    // Map pins
     pj.results.forEach(r=>L.marker([r.geometry.location.lat,r.geometry.location.lng]).addTo(map).bindPopup(r.name));
     devs.forEach(r=>L.circleMarker([r.geometry.location.lat,r.geometry.location.lng],{radius:6,color:"orange"}).addTo(map).bindPopup(r.name));
 
-    // Estimation
+    // ---- Estimation ----
     statusEl.textContent="Estimating gallons…";
     if (!V) V = Number(document.getElementById("VPD").value)||0;
+
     const truckShare=(Number(document.getElementById("truckShare").value)||0)/100;
     const Va=V*(1-truckShare), Vt=V*truckShare;
 
@@ -213,7 +214,7 @@ document.getElementById("run").addEventListener("click", async () => {
     const MfacA=(Number(document.getElementById("gasScore").value)||100)/100;
     const MfacT=(Number(document.getElementById("dieselScore").value)||25)/25;
 
-    // Distance-decay with strong near-site penalty
+    // Distance-decay with strong near-site penalty (≤ 0.03 mi)
     let P=0;
     for (const c of pj.results) {
       const dmi=miles(lat,lng,c.geometry.location.lat,c.geometry.location.lng);
@@ -237,9 +238,7 @@ document.getElementById("run").addEventListener("click", async () => {
     const cap=(posGas*25*10.5 + posDies*25*16)*(365/12);
     GPM=Math.min(GPM,cap);
 
-    const y1=Math.round(GPM), y2=Math.round(y1*1.027), y3=Math.round(y2*1.0125),
-          low=Math.round(y1*0.86), high=Math.round(y1*1.06);
-
+    const y1=Math.round(GPM), y2=Math.round(y1*1.027), y3=Math.round(y2*1.0125), low=Math.round(y1*0.86), high=Math.round(y1*1.06);
     resultsEl.insertAdjacentHTML("beforeend", `
       <table>
         <tr><td><b>Year-1 est. (gal/mo)</b></td><td class="num">${y1.toLocaleString()}</td></tr>
@@ -259,7 +258,6 @@ document.getElementById("run").addEventListener("click", async () => {
 /* ---------- DIAGNOSTICS ---------- */
 const diagOut=document.getElementById("diagOut");
 function setDiag(obj){diagOut.textContent=jstr(obj);}
-
 document.getElementById("btnDiagGeocode").addEventListener("click", async ()=>{
   const url=ENDPOINT.geocode+"?address=Raleigh,NC";
   try{const r=await apiFetch(url);setDiag({endpoint:url,status:r.status,ok:r.ok,body:await r.json()});}catch(e){setDiag({endpoint:url,error:String(e)})}
@@ -274,7 +272,8 @@ document.getElementById("btnDiagDev").addEventListener("click", async ()=>{
 });
 document.getElementById("btnDiagAADT").addEventListener("click", async ()=>{
   const [lat,lng]=[35.7796,-78.6382];const url=`${ENDPOINT.aadt}?lat=${lat}&lng=${lng}`;
-  try{const r=await apiFetch(url);setDiag({endpoint:url,status:r.status,ok:r.ok,body:await r.json()});}catch(e){setDiag({endpoint:url,error:String(e)})}
+  try{const r=await apiFetch(url);let body;try{body=await r.json()}catch{body=await r.text()}
+      setDiag({endpoint:url,status:r.status,ok:r.ok,body});}catch(e){setDiag({endpoint:url,error:String(e)})}
 });
 </script>
 </body>
