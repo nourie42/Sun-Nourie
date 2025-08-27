@@ -16,12 +16,11 @@ function jerr(res, code, msg, detail) {
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
 // ---------- utils ----------
-const CONTACT = process.env.OVERPASS_CONTACT || "FuelEstimator/1.8 (contact: you@example.com)";
-const UA = "FuelEstimator/1.8 (+contact: you@example.com)";
+const CONTACT = process.env.OVERPASS_CONTACT || "FuelEstimator/1.9 (contact: you@example.com)";
+const UA = "FuelEstimator/1.9 (+contact: you@example.com)";
 
 const sleep = (ms)=>new Promise(r=>setTimeout(r,ms));
 const toMiles = (m)=> m / 1609.344;
-
 function haversine(lat1, lon1, lat2, lon2) {
   const R = 6371000, t=(d)=>d*Math.PI/180;
   const dLat=t(lat2-lat1), dLon=t(lon2-lon1);
@@ -29,15 +28,15 @@ function haversine(lat1, lon1, lat2, lon2) {
   return 2*R*Math.asin(Math.sqrt(a));
 }
 function distMiles(lat1,lon1,lat2,lon2){ return toMiles(haversine(lat1,lon1,lat2,lon2)); }
-
 async function fetchWithTimeout(url, opts={}, timeoutMs=20000){
   const controller=new AbortController();
   const t=setTimeout(()=>controller.abort(), timeoutMs);
   try { return await fetch(url,{...opts,signal:controller.signal}); }
   finally { clearTimeout(t); }
 }
+const clamp=(n,lo,hi)=>Math.min(hi,Math.max(lo,n));
 
-// ---------------- Geocoding (addr | lat,lon) ----------------
+// ---------------- Geocoding (addr | lat,lon | fallback) ----------------
 function tryParseLatLng(address){
   const m=String(address||"").trim().match(/^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/);
   if(!m) return null;
@@ -71,7 +70,6 @@ async function geocode(address){
 
 // ---------------- NCDOT AADT ----------------
 const NCDOT_AADT_FS = "https://services.arcgis.com/NuWFvHYDMVmmxMeM/ArcGIS/rest/services/NCDOT_AADT_Stations/FeatureServer/0";
-
 async function queryNCDOTNearestAADT(lat, lon, radiusMeters=1609){
   const params=new URLSearchParams({
     f:"json", where:"1=1", outFields:"*", returnGeometry:"true",
@@ -110,18 +108,13 @@ async function queryNCDOTNearestAADT(lat, lon, radiusMeters=1609){
   return rows[0];
 }
 
-// ---------------- Overpass (robust) ----------------
+// ---------------- Overpass helpers ----------------
 const OVERPASS = [
   "https://overpass-api.de/api/interpreter",
   "https://overpass.kumi.systems/api/interpreter",
   "https://overpass.openstreetmap.fr/api/interpreter",
   "https://overpass.openstreetmap.ru/api/interpreter"
 ];
-
-function bboxFromCenter(lat, lon, meters){
-  const d=meters/111320;
-  return { s:lat-d, n:lat+d, w:lon-d/Math.cos(lat*Math.PI/180), e:lon+d/Math.cos(lat*Math.PI/180) };
-}
 async function overpassQuery(data){
   let lastErr=new Error("no tries");
   for(const ep of OVERPASS){
@@ -142,98 +135,39 @@ async function overpassQuery(data){
   throw lastErr;
 }
 
-async function fetchCompetitors(lat, lon){
-  const r=1609;
-  const q1=`[out:json][timeout:25];node(around:${r},${lat},${lon})["amenity"="fuel"];out center tags;`;
-  const q2=`[out:json][timeout:25];way(around:${r},${lat},${lon})["amenity"="fuel"];out center tags;`;
-  let elements=[];
-  let source="around";
-  try{
-    const n=await overpassQuery(q1);
-    const w=await overpassQuery(q2);
-    elements=[...(n.elements||[]), ...(w.elements||[])];
-  }catch(_){
-    const b=bboxFromCenter(lat,lon,r);
-    source="bbox";
-    const qb=`[out:json][timeout:25];(node["amenity"="fuel"](${b.s},${b.w},${b.n},${b.e});way["amenity"="fuel"](${b.s},${b.w},${b.n},${b.e}););out center tags;`;
-    const d=await overpassQuery(qb);
-    elements=d.elements||[];
-  }
-  const heavy=/sheetz|wawa|quik.?trip|(^|\b)qt\b|racetrac|buc-?ee|costco|sam's|bj's|pilot|love's|circle k|speedway|murphy|exxon|shell|bp|chevron|marathon|7-?eleven/i;
-  const list=[];
-  for(const el of elements){
-    const t=el.tags||{};
-    const name=t.brand||t.name||"";
-    const latc=el.lat??el.center?.lat; const lonc=el.lon??el.center?.lon;
-    if(latc==null||lonc==null) continue;
-    list.push({ name, lat:latc, lon:lonc, miles:+distMiles(lat,lon,latc,lonc).toFixed(3), heavy:heavy.test(name) });
-  }
-  list.sort((a,b)=>a.miles-b.miles);
-  return { list, source };
+// Nearest OSM road & class near point
+async function nearestOSMRoad(lat, lon){
+  const q=(rad)=>`[out:json][timeout:25];way(around:${rad},${lat},${lon})[highway];out tags center 20;`;
+  let data=null;
+  try{ data=await overpassQuery(q(120)); } catch{ try{ data=await overpassQuery(q(250)); } catch(e){ return null; } }
+  const els=(data?.elements||[]).filter(e=>e.tags?.highway);
+  if(!els.length) return null;
+  const order=["motorway","trunk","primary","secondary","tertiary","unclassified","residential","service"];
+  els.sort((a,b)=> order.indexOf(a.tags.highway) - order.indexOf(b.tags.highway));
+  const best=els[0];
+  return { highway: best.tags.highway, name: best.tags.name || best.tags.ref || null };
 }
 
-async function fetchDevelopments(lat, lon){
-  const r=1609;
-  const q1=`[out:json][timeout:25];(
-    node(around:${r},${lat},${lon})["amenity"="fuel"]["construction"];
-    way(around:${r},${lat},${lon})["amenity"="fuel"]["construction"];
-    node(around:${r},${lat},${lon})["proposed:amenity"="fuel"];
-    way(around:${r},${lat},${lon})["proposed:amenity"="fuel"];
-    node(around:${r},${lat},${lon})["opening_date"];
-    way(around:${r},${lat},${lon})["opening_date"];
-    node(around:${r},${lat},${lon})["description"~"(?i)(coming soon|proposed|permit|construction|planned)"];
-    way(around:${r},${lat},${lon})["description"~"(?i)(coming soon|proposed|permit|construction|planned)"];
-  );out center tags;`;
-  let elements=[]; let source="around";
-  try{
-    const d=await overpassQuery(q1); elements=d.elements||[];
-  }catch(_){
-    const b=bboxFromCenter(lat,lon,r); source="bbox";
-    const qb=`[out:json][timeout:25];(
-      node["amenity"="fuel"]["construction"](${b.s},${b.w},${b.n},${b.e});
-      way["amenity"="fuel"]["construction"](${b.s},${b.w},${b.n},${b.e});
-      node["proposed:amenity"="fuel"](${b.s},${b.w},${b.n},${b.e});
-      way["proposed:amenity"="fuel"](${b.s},${b.w},${b.n},${b.e});
-      node["opening_date"](${b.s},${b.w},${b.n},${b.e});
-      way["opening_date"](${b.s},${b.w},${b.n},${b.e});
-      node["description"~"(?i)(coming soon|proposed|permit|construction|planned)"](${b.s},${b.w},${b.n},${b.e});
-      way["description"~"(?i)(coming soon|proposed|permit|construction|planned)"](${b.s},${b.w},${b.n},${b.e});
-    );out center tags;`;
-    const d=await overpassQuery(qb); elements=d.elements||[];
-  }
-  const out=[];
-  for(const el of elements){
-    const t=el.tags||{};
-    const name=t.brand||t.name||"(unnamed)";
-    const status = t.construction ? "construction" :
-                   t["proposed:amenity"] ? "proposed" :
-                   t.opening_date ? `opening ${t.opening_date}` :
-                   t.description ? t.description : "planned?";
-    const latc=el.lat??el.center?.lat; const lonc=el.lon??el.center?.lon;
-    if(latc==null||lonc==null) continue;
-    out.push({ name, status, miles:+distMiles(lat,lon,latc,lonc).toFixed(3) });
-  }
-  out.sort((a,b)=>a.miles-b.miles);
-  const seen=new Set(), uniq=[];
-  for(const d of out){ const k=`${d.name}|${Math.round(d.miles*100)}`; if(!seen.has(k)){ seen.add(k); uniq.push(d); } }
-  return { list: uniq.slice(0,20), source };
-}
-
-// ---------------- GPT helpers ----------------
-function inferClass(address) {
+// ---------------- GPT helper (for AADT “second opinion”) ----------------
+function inferClassFromAddress(address) {
   const s=String(address||"").toLowerCase();
-  if(/(^|\b)(i[- ]\d+|interstate)\b/.test(s)) return "freeway";
-  if(/\b(us[- ]?\d+|us hwy|u\.s\.)\b/.test(s)) return "primary arterial";
-  if(/\b(nc[- ]?\d+|state rt|state hwy|sr[- ]?\d+)\b/.test(s)) return "primary arterial";
-  if(/\b(hwy|highway|blvd|pkwy|parkway|bypass)\b/.test(s)) return "arterial";
-  return "collector";
+  if(/(^|\b)(i[- ]\d+|interstate)\b/.test(s)) return "motorway";
+  if(/\b(us[- ]?\d+|us hwy|u\.s\.)\b/.test(s)) return "primary";
+  if(/\b(nc[- ]?\d+|state rt|state hwy|sr[- ]?\d+)\b/.test(s)) return "primary";
+  if(/\b(hwy|highway|blvd|pkwy|parkway|bypass)\b/.test(s)) return "secondary";
+  return "residential";
 }
-const AADT_BOUNDS = {
-  freeway: "40,000–120,000",
-  "primary arterial": "12,000–60,000",
-  arterial: "8,000–35,000",
-  collector: "3,000–12,000",
+const CLASS_BOUNDS = {
+  motorway: [40000,120000],
+  trunk: [20000,80000],
+  primary: [12000,60000],
+  secondary: [8000,35000],
+  tertiary: [5000,20000],
+  unclassified: [3000,12000],
+  residential: [1000,7000],
+  service: [500,5000]
 };
+const CLASS_FALLBACK = { freeway:"motorway", "primary arterial":"primary", arterial:"secondary", collector:"tertiary" };
 
 async function gptJSON(prompt){
   const OPENAI_API_KEY=process.env.OPENAI_API_KEY;
@@ -245,7 +179,7 @@ async function gptJSON(prompt){
       model:"gpt-4o-mini",
       response_format:{type:"json_object"},
       temperature:0.2,
-      max_tokens:900,
+      max_tokens:600,
       messages:[
         {role:"system", content:"You are a precise fuel volume analyst. Always return valid JSON (no markdown)."},
         {role:"user", content:prompt}
@@ -257,6 +191,79 @@ async function gptJSON(prompt){
   const data=JSON.parse(txt); const content=data.choices?.[0]?.message?.content;
   if(!content) throw new Error("No GPT content");
   return JSON.parse(content);
+}
+
+// ---------------- Competition / Developments (unchanged from your last working) ----------------
+async function competitorsWithin1Mile(lat, lon){
+  const r=1609;
+  const q1=`[out:json][timeout:25];node(around:${r},${lat},${lon})["amenity"="fuel"];out center tags;`;
+  const q2=`[out:json][timeout:25];way(around:${r},${lat},${lon})["amenity"="fuel"];out center tags;`;
+  let elements=[];
+  try{
+    const n=await overpassQuery(q1);
+    const w=await overpassQuery(q2);
+    elements=[...(n.elements||[]), ...(w.elements||[])];
+  }catch{
+    // bbox fallback
+    const d=0.0145; // ~1 mi degrees lat
+    const qb=`[out:json][timeout:25];(node["amenity"="fuel"](${lat-d},${lon-d},${lat+d},${lon+d});way["amenity"="fuel"](${lat-d},${lon-d},${lat+d},${lon+d}););out center tags;`;
+    const b=await overpassQuery(qb);
+    elements=b.elements||[];
+  }
+  const heavy=/sheetz|wawa|quik.?trip|(^|\b)qt\b|racetrac|buc-?ee|costco|sam's|bj's|pilot|love's|circle k|speedway|murphy|exxon|shell|bp|chevron|marathon|7-?eleven/i;
+  const list=[];
+  for(const el of elements){
+    const t=el.tags||{}; const name=t.brand||t.name||"";
+    const latc=el.lat??el.center?.lat; const lonc=el.lon??el.center?.lon;
+    if(latc==null||lonc==null) continue;
+    list.push({ name, lat:latc, lon:lonc, miles:+distMiles(lat,lon,latc,lonc).toFixed(3), heavy:heavy.test(name) });
+  }
+  list.sort((a,b)=>a.miles-b.miles);
+  return list;
+}
+async function developments1Mile(lat, lon){
+  const r=1609;
+  const q=`[out:json][timeout:25];(
+    node(around:${r},${lat},${lon})["amenity"="fuel"]["construction"];
+    way(around:${r},${lat},${lon})["amenity"="fuel"]["construction"];
+    node(around:${r},${lat},${lon})["proposed:amenity"="fuel"];
+    way(around:${r},${lat},${lon})["proposed:amenity"="fuel"];
+    node(around:${r},${lat},${lon})["opening_date"];
+    way(around:${r},${lat},${lon})["opening_date"];
+    node(around:${r},${lat},${lon})["description"~"(?i)(coming soon|proposed|permit|construction|planned)"];
+    way(around:${r},${lat},${lon})["description"~"(?i)(coming soon|proposed|permit|construction|planned)"];
+  );out center tags;`;
+  let elements=[];
+  try{ const d=await overpassQuery(q); elements=d.elements||[]; }
+  catch{
+    const d=0.0145;
+    const qb=`[out:json][timeout:25];(
+      node["amenity"="fuel"]["construction"](${lat-d},${lon-d},${lat+d},${lon+d});
+      way["amenity"="fuel"]["construction"](${lat-d},${lon-d},${lat+d},${lon+d});
+      node["proposed:amenity"="fuel"](${lat-d},${lon-d},${lat+d},${lon+d});
+      way["proposed:amenity"="fuel"](${lat-d},${lon-d},${lat+d},${lon+d});
+      node["opening_date"](${lat-d},${lon-d},${lat+d},${lon+d});
+      way["opening_date"](${lat-d},${lon-d},${lat+d},${lon+d});
+      node["description"~"(?i)(coming soon|proposed|permit|construction|planned)"](${lat-d},${lon-d},${lat+d},${lon+d});
+      way["description"~"(?i)(coming soon|proposed|permit|construction|planned)"](${lat-d},${lon-d},${lat+d},${lon+d});
+    );out center tags;`;
+    const b=await overpassQuery(qb); elements=b.elements||[];
+  }
+  const out=[];
+  for(const el of elements){
+    const t=el.tags||{}; const name=t.brand||t.name||"(unnamed)";
+    const status = t.construction ? "construction" :
+                   t["proposed:amenity"] ? "proposed" :
+                   t.opening_date ? `opening ${t.opening_date}` :
+                   t.description ? t.description : "planned?";
+    const latc=el.lat??el.center?.lat; const lonc=el.lon??el.center?.lon;
+    if(latc==null||lonc==null) continue;
+    out.push({ name, status, miles:+distMiles(lat,lon,latc,lonc).toFixed(3) });
+  }
+  out.sort((a,b)=>a.miles-b.miles);
+  const seen=new Set(), uniq=[];
+  for(const d of out){ const k=`${d.name}|${Math.round(d.miles*100)}`; if(!seen.has(k)){ seen.add(k); uniq.push(d); } }
+  return uniq.slice(0,20);
 }
 
 // ---------------- Gallons model (floor + gentle comp) ----------------
@@ -290,51 +297,57 @@ app.post("/estimate", async (req, res) => {
     else if(address) geo=await geocode(address);
     else return jerr(res,400,"Address or site coordinates required");
 
+    // OSM road near the point -> class bounds
+    let road = await nearestOSMRoad(geo.lat, geo.lon).catch(()=>null);
+    let classKey = road?.highway || inferClassFromAddress(address||"");
+    // map OSM classes to bounds bucket
+    const bucket = (()=>{
+      if(["motorway"].includes(classKey)) return "motorway";
+      if(["trunk"].includes(classKey)) return "trunk";
+      if(["primary"].includes(classKey)) return "primary";
+      if(["secondary"].includes(classKey)) return "secondary";
+      if(["tertiary"].includes(classKey)) return "tertiary";
+      if(["residential"].includes(classKey)) return "residential";
+      if(["service"].includes(classKey)) return "service";
+      return "unclassified";
+    })();
+    const [MIN_AADT, MAX_AADT] = CLASS_BOUNDS[bucket] || [3000,12000];
+
     // DOT AADT
     const station = await queryNCDOTNearestAADT(geo.lat, geo.lon, 1609).catch(()=>null);
-    const actualAADT = station ? {
+    let dot = station ? {
       value: station.aadt, year: station.year,
       distance_mi: +toMiles(station.distM).toFixed(3),
-      source: "NCDOT AADT Stations (best nearby)"
+      distM: station.distM
     } : null;
 
-    // GPT AADT estimate (bounded)
-    const roadClass = inferClass(address||"");
+    // Accept DOT only if (close) or (not-too-far and plausible for class)
+    let dotAccepted = null, dotRejectReason = null;
+    if(dot){
+      if (dot.distM <= 400) { // ≤ 0.25 mi
+        dotAccepted = dot;
+      } else if (dot.distM <= 1000 && dot.value <= MAX_AADT * 1.2) { // ≤ 0.62 mi and plausible
+        dotAccepted = dot;
+      } else {
+        dotRejectReason = `DOT ${dot.value} too far (${dot.distance_mi} mi) or out-of-class (> ${Math.round(MAX_AADT*1.2)}) for ${bucket}`;
+      }
+    }
+
+    // GPT AADT (bounded & clamped to class)
     let gptAADT=null;
     try{
-      const est=await gptJSON(`Estimate AADT for: ${address||"(coords)"}; class hint: ${roadClass}; bounds — freeway ${AADT_BOUNDS.freeway}; primary ${AADT_BOUNDS["primary arterial"]}; arterial ${AADT_BOUNDS.arterial}; collector ${AADT_BOUNDS.collector}. Return {"aadt_estimate":<num>,"low":<num>,"high":<num>,"class_used":"<str>"}`);
+      const est=await gptJSON(`Estimate an AADT *within the following absolute bounds* unless you cite an official DOT segment at this exact location.
+Address (hint): ${address||"(coords provided)"}; Nearby road class: ${bucket}; Bounds: [${MIN_AADT}, ${MAX_AADT}]
+Return JSON: {"aadt_estimate": <number>}`);
       if(Number.isFinite(est.aadt_estimate)){
-        gptAADT={ value:Math.round(est.aadt_estimate), low:est.low?Math.round(est.low):null, high:est.high?Math.round(est.high):null, class_used:est.class_used||roadClass };
+        gptAADT={ value: clamp(Math.round(est.aadt_estimate), MIN_AADT, MAX_AADT) };
       }
-    }catch(e){ console.warn("[WARN] GPT AADT failed:", e.message); }
+    }catch(e){ /* keep null */ }
 
-    // OSM/Overpass competition & developments
-    let compDbg={}, devDbg={};
+    // Competition & developments (for map and impact)
     let competitors=[], developments=[];
-    try{ const {list, source} = await fetchCompetitors(geo.lat, geo.lon); competitors=list; compDbg.source=source; }catch(e){ compDbg.error=e.message; }
-    try{ const {list, source} = await fetchDevelopments(geo.lat, geo.lon); developments=list; devDbg.source=source; }catch(e){ devDbg.error=e.message; }
-
-    // GPT “desk research” for competition & developments
-    let aiComp = { items: [], confidence: 0.0 }, aiDevs = { items: [], confidence: 0.0 };
-    try {
-      const compJson = await gptJSON(`
-List fuel stations within ~1 mile of "${address||`${geo.lat},${geo.lon}`}".
-Return JSON only:
-{"items":[{"name":"<string>","approx_miles":<number>,"brand":"<string|null>"}], "confidence": <0.0-1.0>}
-      `);
-      if (Array.isArray(compJson.items)) aiComp = { items: compJson.items.slice(0,20), confidence: +(compJson.confidence ?? 0) };
-    } catch(e){ aiComp = { items: [], confidence: 0.0 }; }
-
-    try {
-      const devJson = await gptJSON(`
-List planned/proposed/permit/coming-soon/construction gas stations within ~1 mile of "${address||`${geo.lat},${geo.lon}`}".
-Exclude closed/archived. Return JSON only:
-{"items":[{"name":"<string>","status":"<string>","approx_miles":<number>}], "confidence": <0.0-1.0>}
-      `);
-      if (Array.isArray(devJson.items)) aiDevs = { items: devJson.items.slice(0,20), confidence: +(devJson.confidence ?? 0) };
-    } catch(e){ aiDevs = { items: [], confidence: 0.0 }; }
-
-    // impact from Overpass list
+    try{ competitors=await competitorsWithin1Mile(geo.lat, geo.lon); }catch{}
+    try{ developments=await developments1Mile(geo.lat, geo.lon); }catch{}
     const impact = (() => {
       let weighted=0, near=0;
       for(const c of competitors){
@@ -342,45 +355,60 @@ Exclude closed/archived. Return JSON only:
         weighted += (1/d)*boost;
         if(c.miles<=0.03) near += 0.10*boost;
       }
-      const cut = Math.min(0.6, Math.max(0, 0.02*weighted + near));
-      return cut;
+      return Math.min(0.6, Math.max(0, 0.02*weighted + near));
     })();
 
-    // choose aadt: override > avg(actual,gpt) > one
-    let usedAADT=null;
-    if(Number.isFinite(AADT_OVERRIDE) && AADT_OVERRIDE>0) usedAADT=AADT_OVERRIDE;
-    else if(actualAADT?.value && gptAADT?.value) usedAADT=Math.round((actualAADT.value+gptAADT.value)/2);
-    else usedAADT = actualAADT?.value ?? gptAADT?.value ?? null;
-    if(!Number.isFinite(usedAADT)) return jerr(res,500,"AADT unavailable","No override, no DOT, no GPT");
+    // Choose AADT: override > weighted avg(DOTaccepted, GPT) > one > class midpoint
+    let usedAADT=null, aadtNote=null;
+    if(Number.isFinite(AADT_OVERRIDE) && AADT_OVERRIDE>0){
+      usedAADT = AADT_OVERRIDE;
+      aadtNote = "override";
+    } else {
+      const vDot = dotAccepted?.value ?? null;
+      const vGpt = gptAADT?.value ?? null;
+      if (vDot && vGpt){
+        const wDot = dotAccepted.distM <= 160 ? 2.0 : 1.0; // heavier weight if within ~525 ft
+        const wGpt = 1.0;
+        usedAADT = Math.round((vDot*wDot + vGpt*wGpt)/(wDot+wGpt));
+        aadtNote = `weighted avg (DOT ${vDot} @ ${dotAccepted.distance_mi} mi, GPT ${vGpt})`;
+      } else if (vDot){
+        usedAADT = vDot; aadtNote = "DOT accepted";
+      } else if (vGpt){
+        usedAADT = vGpt; aadtNote = "GPT bounded";
+      } else {
+        usedAADT = Math.round((MIN_AADT+MAX_AADT)/2);
+        aadtNote = `class midpoint (${bucket})`;
+      }
+    }
 
-    const calc = gallonsModel({ aadt:usedAADT, mpds:MPDS, diesel:DIESEL, compImpact:impact });
+    // Server-side gallons
+    const calc = gallonsModel({ aadt: usedAADT, mpds: MPDS, diesel: DIESEL, compImpact: impact });
 
+    // Build response
     const nearest = competitors[0]?.miles ?? null;
     const notable = competitors.filter(c=>c.heavy).slice(0,6).map(c=>c.name);
-    const rationale=`AADT used ${usedAADT.toLocaleString()} (floor=${calc.floor.toLocaleString()}). Overpass shows ${competitors.length} station(s) within 1 mi (nearest ${nearest!=null?nearest.toFixed(3)+' mi':'n/a'}); GPT found ${aiComp.items.length} candidates (confidence ${(aiComp.confidence*100|0)}%). Competition impact ${(impact*100).toFixed(0)}%. Cap applied by MPDs.`;
+    const rationale=`AADT used ${usedAADT.toLocaleString()} (${aadtNote}); class=${bucket} bounds [${MIN_AADT}-${MAX_AADT}]. Floor=${calc.floor.toLocaleString()}. Competition impact ${(impact*100).toFixed(0)}% (nearest ${nearest!=null?nearest.toFixed(3)+' mi':'n/a'}${notable.length?'; notable '+notable.join(', '):''}). Capacity cap applied.`;
 
     return res.json({
       base: calc.base, low: calc.low, high: calc.high, year2: calc.year2, year3: calc.year3,
       inputs: {
         aadt_used: usedAADT, mpds: MPDS, diesel: DIESEL, truck_share_assumed: 0.10,
-        aadt_actual: actualAADT || { value:null, year:null, distance_mi:null, source:null },
-        aadt_gpt: gptAADT || { value:null, low:null, high:null, class_used:roadClass },
-        aadt_override: Number.isFinite(AADT_OVERRIDE)?AADT_OVERRIDE:null
+        aadt_actual: dot ? { value: dot.value, year: dot.year, distance_mi: dot.distance_mi, accepted: !!dotAccepted, reject_reason: dotRejectReason } : { value:null, year:null, distance_mi:null, accepted:false },
+        aadt_gpt: gptAADT || { value:null },
+        class_bucket: bucket,
+        class_bounds: { min: MIN_AADT, max: MAX_AADT },
+        nearest_road: road || null,
+        aadt_note: aadtNote
       },
-      // Overpass results (used for map/impact)
       competition: { count: competitors.length, nearest_mi: nearest, notable_brands: notable, impact_score: +(impact.toFixed(3)) },
       developments,
-      // GPT “second opinion”
-      competition_ai: aiComp,
-      developments_ai: aiDevs,
       rationale,
       assumptions: [
-        "Floor: AADT × 2% × 8 × 30",
-        "Competition reduction capped at 15%",
+        "AADT sanity: DOT must be close or class-plausible; GPT clamped to class bounds",
+        "Floor: AADT × 2% × 8 × 30; competition reduction capped at 15%",
         "Capacity cap: positions × 25 × gal/cycle × 365/12"
       ],
-      map: { site:{lat:geo.lat, lon:geo.lon, label:geo.label}, competitors },
-      debug: { overpass_comp: compDbg, overpass_dev: devDbg }
+      map: { site:{lat:geo.lat, lon:geo.lon, label:road?.name || geo.label}, competitors }
     });
   } catch (e) {
     return jerr(res, 500, "Estimate failed", String(e));
