@@ -7,6 +7,9 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
 
+// serve the front-end from /public
+app.use(express.static("public"));
+
 // --- helpers ---
 function jerr(res, code, msg, detail) {
   console.error("[ERROR]", code, msg, detail || "");
@@ -16,22 +19,14 @@ function jerr(res, code, msg, detail) {
 // HEALTH
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
-// AADT endpoint (replace the inside with your real provider)
-// For now we return a safe placeholder so the UI never crashes.
+// AADT endpoint (placeholder logic for now)
 app.get("/aadt", async (req, res) => {
   try {
     const { lat, lng } = req.query;
     if (!lat || !lng) return jerr(res, 400, "Missing lat/lng");
 
-    // TODO: Replace with your real source call. For example:
-    // const url = `https://YOUR_AADT_PROVIDER/nearby?lat=${lat}&lng=${lng}&key=${process.env.AADT_KEY}`;
-    // const r = await fetch(url, { timeout: 15000 });
-    // if (!r.ok) return jerr(res, r.status, "AADT provider error", await r.text());
-    // const data = await r.json();
-    // return res.json({ aadt: data.aadt });
-
     // Temporary heuristic so the app runs while you wire the real API:
-    const approx = Math.round(8000 + (Math.abs(Number(lat)*1000 + Number(lng)*500) % 22000));
+    const approx = Math.round(8000 + (Math.abs(Number(lat) * 1000 + Number(lng) * 500) % 22000));
     return res.json({ aadt: approx, source: "placeholder" });
   } catch (e) {
     return jerr(res, 500, "AADT fetch failed", String(e));
@@ -47,11 +42,6 @@ app.post("/estimate", async (req, res) => {
     const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
     if (!OPENAI_API_KEY) return jerr(res, 500, "Missing OPENAI_API_KEY");
 
-    // (Optional) You can also call your /aadt from here to include numeric AADT in the prompt
-    // const geo = await geocode(address) // if you have it
-    // const aadtResp = await fetch(`${process.env.PUBLIC_URL || ""}/aadt?lat=${geo.lat}&lng=${geo.lng}`);
-    // ...
-
     const prompt = `
 You are an analyst. Estimate monthly gasoline gallons for:
 - Address: ${address}
@@ -64,7 +54,7 @@ Return ONLY a JSON object with:
 {"monthly_gallons": <number>, "rationale": "<one short sentence>"}
 `;
 
-    // OpenAI Responses API (JSON mode)
+    // OpenAI Responses API
     const r = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
@@ -88,7 +78,6 @@ Return ONLY a JSON object with:
     try { data = JSON.parse(bodyText); }
     catch (e) { return jerr(res, 502, "OpenAI JSON parse error", bodyText); }
 
-    // Responses API returns { output: [{content:[{type:"output_text", text:"{...}"}]}], ... }
     const outputItem = data.output?.[0]?.content?.find?.(c => c.type === "output_text");
     if (!outputItem?.text) return jerr(res, 502, "Unexpected OpenAI shape", JSON.stringify(data).slice(0, 400));
 
@@ -102,7 +91,7 @@ Return ONLY a JSON object with:
   }
 });
 
-// global error safety net -> always JSON
+// global error handler
 app.use((err, _req, res, _next) => jerr(res, 500, "Unhandled error", String(err)));
 
 const PORT = process.env.PORT || 3000;
