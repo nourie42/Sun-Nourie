@@ -12,12 +12,11 @@ function jerr(res, code, msg, detail) {
   console.error("[ERROR]", code, msg, detail || "");
   return res.status(code).json({ error: msg, detail });
 }
-
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
-// ---------- utils ----------
-const CONTACT = process.env.OVERPASS_CONTACT || "FuelEstimator/2.0 (contact: you@example.com)";
-const UA = "FuelEstimator/2.0 (+contact: you@example.com)";
+/* ---------- utils ---------- */
+const CONTACT = process.env.OVERPASS_CONTACT || "SunocoAnalyzer/2.0 (contact: you@example.com)";
+const UA = "SunocoAnalyzer/2.0 (+contact: you@example.com)";
 const sleep = (ms)=>new Promise(r=>setTimeout(r,ms));
 const toMiles = (m)=> m / 1609.344;
 function haversine(lat1, lon1, lat2, lon2) {
@@ -26,16 +25,14 @@ function haversine(lat1, lon1, lat2, lon2) {
   const a=Math.sin(dLat/2)**2+Math.cos(t(lat1))*Math.cos(t(lat2))*Math.sin(dLon/2)**2;
   return 2*R*Math.asin(Math.sqrt(a));
 }
-function distMiles(lat1,lon1,lat2,lon2){ return toMiles(haversine(lat1,lon1,lat2,lon2)); }
 async function fetchWithTimeout(url, opts={}, timeoutMs=20000){
   const controller=new AbortController();
   const t=setTimeout(()=>controller.abort(), timeoutMs);
   try { return await fetch(url,{...opts,signal:controller.signal}); }
   finally { clearTimeout(t); }
 }
-const clamp=(n,lo,hi)=>Math.min(hi,Math.max(lo,n));
 
-// ---------------- Geocoding (addr | lat,lon | fallback) ----------------
+/* ---------- geocoding: supports either address or supplied coords ---------- */
 function tryParseLatLng(address){
   const m=String(address||"").trim().match(/^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/);
   if(!m) return null;
@@ -67,7 +64,7 @@ async function geocode(address){
   catch(e1){ try { return await geocodeCensus(address); } catch(e2){ throw e2; } }
 }
 
-// ---------------- NCDOT AADT ----------------
+/* ---------- AADT (NCDOT stations) ---------- */
 const NCDOT_AADT_FS = "https://services.arcgis.com/NuWFvHYDMVmmxMeM/ArcGIS/rest/services/NCDOT_AADT_Stations/FeatureServer/0";
 async function queryNCDOTNearestAADT(lat, lon, radiusMeters=1609){
   const params=new URLSearchParams({
@@ -107,7 +104,7 @@ async function queryNCDOTNearestAADT(lat, lon, radiusMeters=1609){
   return rows[0];
 }
 
-// ---------------- Overpass helpers ----------------
+/* ---------- Overpass: competitors & developments ---------- */
 const OVERPASS = [
   "https://overpass-api.de/api/interpreter",
   "https://overpass.kumi.systems/api/interpreter",
@@ -133,10 +130,8 @@ async function overpassQuery(data){
   }
   throw lastErr;
 }
-function bboxFromCenter(lat, lon, meters){
-  const d=meters/111320;
-  return { s:lat-d, n:lat+d, w:lon-d/Math.cos(lat*Math.PI/180), e:lon+d/Math.cos(lat*Math.PI/180) };
-}
+function distMiles(lat1, lon1, lat2, lon2){ return toMiles(haversine(lat1, lon1, lat2, lon2)); }
+
 async function competitorsWithin1Mile(lat, lon){
   const r=1609;
   const q1=`[out:json][timeout:25];node(around:${r},${lat},${lon})["amenity"="fuel"];out center tags;`;
@@ -147,10 +142,10 @@ async function competitorsWithin1Mile(lat, lon){
     const w=await overpassQuery(q2);
     elements=[...(n.elements||[]), ...(w.elements||[])];
   }catch(_){
-    const b=bboxFromCenter(lat,lon,r);
-    const qb=`[out:json][timeout:25];(node["amenity"="fuel"](${b.s},${b.w},${b.n},${b.e});way["amenity"="fuel"](${b.s},${b.w},${b.n},${b.e}););out center tags;`;
-    const d=await overpassQuery(qb);
-    elements=d.elements||[];
+    const d=0.0145;
+    const qb=`[out:json][timeout:25];(node["amenity"="fuel"](${lat-d},${lon-d},${lat+d},${lon+d});way["amenity"="fuel"](${lat-d},${lon-d},${lat+d},${lon+d}););out center tags;`;
+    const b=await overpassQuery(qb);
+    elements=b.elements||[];
   }
   const heavy=/sheetz|wawa|quik.?trip|(^|\b)qt\b|racetrac|buc-?ee|costco|sam's|bj's|pilot|love's|circle k|speedway|murphy|exxon|shell|bp|chevron|marathon|7-?eleven/i;
   const list=[];
@@ -163,6 +158,7 @@ async function competitorsWithin1Mile(lat, lon){
   list.sort((a,b)=>a.miles-b.miles);
   return list;
 }
+
 async function developments1Mile(lat, lon){
   const r=1609;
   const q=`[out:json][timeout:25];(
@@ -177,19 +173,19 @@ async function developments1Mile(lat, lon){
   );out center tags;`;
   let elements=[];
   try{ const d=await overpassQuery(q); elements=d.elements||[]; }
-  catch(_){
-    const b=bboxFromCenter(lat,lon,r);
+  catch{
+    const d=0.0145;
     const qb=`[out:json][timeout:25];(
-      node["amenity"="fuel"]["construction"](${b.s},${b.w},${b.n},${b.e});
-      way["amenity"="fuel"]["construction"](${b.s},${b.w},${b.n},${b.e});
-      node["proposed:amenity"="fuel"](${b.s},${b.w},${b.n},${b.e});
-      way["proposed:amenity"="fuel"](${b.s},${b.w},${b.n},${b.e});
-      node["opening_date"](${b.s},${b.w},${b.n},${b.e});
-      way["opening_date"](${b.s},${b.w},${b.n},${b.e});
-      node["description"~"(?i)(coming soon|proposed|permit|construction|planned)"](${b.s},${b.w},${b.n},${b.e});
-      way["description"~"(?i)(coming soon|proposed|permit|construction|planned)"](${b.s},${b.w},${b.n},${b.e});
+      node["amenity"="fuel"]["construction"](${lat-d},${lon-d},${lat+d},${lon+d});
+      way["amenity"="fuel"]["construction"](${lat-d},${lon-d},${lat+d},${lon+d});
+      node["proposed:amenity"="fuel"](${lat-d},${lon-d},${lat+d},${lon+d});
+      way["proposed:amenity"="fuel"](${lat-d},${lon-d},${lat+d},${lon+d});
+      node["opening_date"](${lat-d},${lon-d},${lat+d},${lon+d});
+      way["opening_date"](${lat-d},${lon-d},${lat+d},${lon+d});
+      node["description"~"(?i)(coming soon|proposed|permit|construction|planned)"](${lat-d},${lon-d},${lat+d},${lon+d});
+      way["description"~"(?i)(coming soon|proposed|permit|construction|planned)"](${lat-d},${lon-d},${lat+d},${lon+d});
     );out center tags;`;
-    const d=await overpassQuery(qb); elements=d.elements||[];
+    const b=await overpassQuery(qb); elements=b.elements||[];
   }
   const out=[];
   for(const el of elements){
@@ -208,7 +204,7 @@ async function developments1Mile(lat, lon){
   return uniq.slice(0,20);
 }
 
-// ---------------- Leaflet map info + GPT (summary) ----------------
+/* ---------- GPT helper (for developments second opinion & summary) ---------- */
 async function gptJSON(prompt){
   const OPENAI_API_KEY=process.env.OPENAI_API_KEY;
   if(!OPENAI_API_KEY) throw new Error("Missing OPENAI_API_KEY");
@@ -219,7 +215,7 @@ async function gptJSON(prompt){
       model:"gpt-4o-mini",
       response_format:{type:"json_object"},
       temperature:0.2,
-      max_tokens:900,
+      max_tokens:1000,
       messages:[
         {role:"system", content:"You are a precise fuel volume analyst. Always return valid JSON (no markdown)."},
         {role:"user", content:prompt}
@@ -233,31 +229,55 @@ async function gptJSON(prompt){
   return JSON.parse(content);
 }
 
-function gallonsModel({ aadt, mpds, diesel=0, compImpact=0 }) {
-  const floor = aadt * 0.02 * 8 * 30;           // required floor
-  const compMult = Math.max(0.85, 1 - compImpact); // limit reduction to 15%
+/* ---------- gallons model (with new competition rules applied) ---------- */
+function gallonsWithRules({ aadt, mpds, diesel, compCount, heavyCount }) {
+  // Base rule floor
+  const floor = aadt * 0.02 * 8 * 30;
+
+  // Your rule: base multiplier by competitor count
+  let baseMult = 1.0;
+  if (compCount >= 3) baseMult = 0.60;
+  else if (compCount === 2) baseMult = 0.75;
+  else /* 0 or 1 */ baseMult = 1.00;
+
+  // Heavy (QSR/national) additional −20% (one heavy) to −35% (≥2 heavy)
+  let extraPenalty = 0.0;
+  if (heavyCount === 1) extraPenalty = 0.20;
+  else if (heavyCount >= 2) extraPenalty = 0.35;
+
+  const compMult = Math.max(0.20, baseMult - extraPenalty); // never below 20%
+
+  // Simple autos/trucks blend
   const truckShare = 0.10;
-  const autos=aadt*(1-truckShare), trucks=aadt*truckShare;
-  const gpd = autos*0.02*10.2*compMult + trucks*0.012*16*compMult;
-  let monthly = Math.max(gpd*(365/12), floor);
-  const cap = (mpds*25*10.5 + diesel*25*16)*(365/12);
-  const base=Math.round(Math.min(monthly, cap));
+  const autos = aadt * (1 - truckShare);
+  const trucks = aadt * truckShare;
+  const gpd = (autos * 0.020 * 10.2 + trucks * 0.012 * 16.0) * compMult;
+  const monthly = Math.max(gpd * (365/12), floor);
+
+  // Capacity cap
+  const cap = (mpds * 25 * 10.5 + (diesel||0) * 25 * 16) * (365/12);
+  const base = Math.round(Math.min(monthly, cap));
   return {
-    base, low:Math.round(base*0.86), high:Math.round(base*1.06),
-    year2:Math.round(base*1.027), year3:Math.round(base*1.027*1.0125),
-    cap:Math.round(cap), floor:Math.round(floor), compMult
+    base,
+    low: Math.round(base * 0.86),
+    high: Math.round(base * 1.06),
+    year2: Math.round(base * 1.027),
+    year3: Math.round(base * 1.027 * 1.0125),
+    cap: Math.round(cap),
+    floor: Math.round(floor),
+    compMult
   };
 }
 
-// ---------------- /estimate (now accepts siteLat/siteLon) ----------------
+/* ---------- /estimate ---------- */
 app.post("/estimate", async (req, res) => {
   try {
     const { address, mpds, diesel, siteLat, siteLon } = req.body || {};
-    const MPDS=Number(mpds), DIESEL=Number(diesel||0);
-    if(!Number.isFinite(MPDS) || MPDS<=0) return jerr(res,400,"Regular MPDs required (>0)");
-    if(!address && !(Number.isFinite(siteLat)&&Number.isFinite(siteLon))) return jerr(res,400,"Address or coordinates required");
+    const MPDS = Number(mpds), DIESEL = Number(diesel || 0);
+    if (!Number.isFinite(MPDS) || MPDS <= 0) return jerr(res, 400, "Regular MPDs required (>0)");
+    if (!address && !(Number.isFinite(siteLat) && Number.isFinite(siteLon))) return jerr(res, 400, "Address or coordinates required");
 
-    // geocode or use supplied coords from autocomplete
+    // geocode or use supplied coords (from autocomplete selection)
     let geo;
     if (Number.isFinite(siteLat) && Number.isFinite(siteLon)) {
       geo = { lat:Number(siteLat), lon:Number(siteLon), label: address || `${siteLat}, ${siteLon}` };
@@ -265,64 +285,65 @@ app.post("/estimate", async (req, res) => {
       geo = await geocode(address);
     }
 
-    // AADT (DOT best nearby or fallback midpoint by road class)
-    const station = await queryNCDOTNearestAADT(geo.lat, geo.lon, 1609).catch(()=>null);
-    const actualAADT = station ? {
-      value: station.aadt, year: station.year, distance_mi: +toMiles(station.distM).toFixed(3)
-    } : null;
+    // AADT (real if near a station; else conservative default)
+    const sta = await queryNCDOTNearestAADT(geo.lat, geo.lon, 1609).catch(()=>null);
+    const aadtActual = sta ? { value: sta.aadt, year: sta.year, distance_mi: +toMiles(sta.distM).toFixed(3) } : null;
+    const usedAADT = aadtActual?.value ?? 10000;
 
-    // competition + developments
-    let competitors=[], developments=[];
-    try{ competitors=await competitorsWithin1Mile(geo.lat, geo.lon); }catch{}
-    try{ developments=await developments1Mile(geo.lat, geo.lon); }catch{}
-    const impact = (() => {
-      let weighted=0, near=0;
-      for(const c of competitors){
-        const d=Math.max(c.miles,0.05), boost=c.heavy?1.6:1.0;
-        weighted += (1/d)*boost;
-        if(c.miles<=0.03) near += 0.10*boost;
-      }
-      return Math.min(0.6, Math.max(0, 0.02*weighted + near));
-    })();
+    // Competition and heavy count
+    let competitors = [];
+    try { competitors = await competitorsWithin1Mile(geo.lat, geo.lon); } catch {}
+    const compCount = competitors.length;
+    const heavyCount = competitors.filter(c=>c.heavy).length;
 
-    // choose AADT (prefer DOT if present; otherwise conservative default 10,000)
-    const usedAADT = actualAADT?.value ?? 10000;
-    const calc = gallonsModel({ aadt: usedAADT, mpds: MPDS, diesel: DIESEL, compImpact: impact });
+    // Developments (Overpass + GPT second opinion)
+    let devs = [];
+    try { devs = await developments1Mile(geo.lat, geo.lon); } catch {}
+    let devsAI = { items: [], confidence: 0.0 };
+    try {
+      const djson = await gptJSON(`List planned/proposed/permit/coming-soon/construction gas stations within ~1 mile of "${address || (geo.lat+', '+geo.lon)}". Return JSON only: {"items":[{"name":"<string>","status":"<string>","approx_miles":<number>}], "confidence": <0.0-1.0>}`);
+      if (Array.isArray(djson.items)) devsAI = { items: djson.items.slice(0,20), confidence: +(djson.confidence ?? 0) };
+    } catch {}
 
-    // detailed GPT summary
+    // Gallons with your competition rule
+    const calc = gallonsWithRules({ aadt: usedAADT, mpds: MPDS, diesel: DIESEL, compCount, heavyCount });
+
+    // Summary (detailed narrative)
     let summary = "";
     try {
-      const devText = developments.slice(0,8).map(x=>`${x.name} (${x.status}, ~${x.miles} mi)`).join("; ") || "none found";
-      const compText = competitors.slice(0,8).map(x=>`${x.name||"fuel"} ~${x.miles} mi${x.heavy?" (heavy)":""}`).join("; ") || "none";
-      const sys = `Create a concise but detailed explanation (6-10 sentences) of why the monthly gallon estimates make sense. Be numeric. No markdown. Return JSON {"summary":"<paragraph>"} only.`;
+      const devTextOSM = devs.slice(0,6).map(x=>`${x.name} (${x.status}, ~${x.miles} mi)`).join("; ") || "none";
+      const devTextAI  = devsAI.items.slice(0,6).map(x=>`${x.name} (${x.status||"planned"}, ~${x.approx_miles ?? "?"} mi)`).join("; ") || "none";
+      const brands = competitors.filter(c=>c.heavy).slice(0,6).map(c=>c.name).join(", ") || "none";
+      const sys = `Write a detailed 6–10 sentence explanation of the estimate. Be numeric. Cover: AADT source, competition rule (counts & heavy penalty), developments (OSM + GPT), the floor rule (AADT×2%×8×30), and the capacity cap. No markdown. JSON: {"summary":"<text>"}.`;
       const prompt = `
 Inputs:
 - Address: ${address || geo.label}
-- AADT used: ${usedAADT}${actualAADT ? ` (DOT ${actualAADT.value}, ~${actualAADT.distance_mi} mi)` : ""}
-- Competition: ${competitors.length} in 1 mi; nearest ${competitors[0]?.miles ?? "n/a"} mi; notable ${competitors.filter(c=>c.heavy).slice(0,6).map(c=>c.name).join(", ")||"none"}
-- Developments: ${devText}
-- Floor rule: AADT × 2% × 8 × 30 = ${calc.floor}
-- Competition impact (cap 15%): ${(impact*100).toFixed(0)}%
-- Capacity cap: ${calc.cap} gal/mo
-- Final base: ${calc.base} gal/mo; Low–High: ${calc.low}–${calc.high}; Y2: ${calc.year2}; Y3: ${calc.year3}
-      `.trim();
+- AADT used: ${usedAADT}${aadtActual ? ` (NCDOT ~${aadtActual.distance_mi} mi, year ${aadtActual.year||"n/a"})` : ""}
+- Competition count: ${compCount}; Heavy-count: ${heavyCount}; Rule applied -> base multiplier ${compCount>=3?0.60:compCount===2?0.75:1.00}, heavy penalty ${heavyCount===0?0:heavyCount===1?0.20:0.35}
+- Notable heavy brands: ${brands}
+- Developments OSM: ${devTextOSM}
+- Developments GPT: ${devTextAI} (confidence ${(devsAI.confidence*100|0)}%)
+- Floor gallons: ${calc.floor}
+- Capacity cap: ${calc.cap}
+- Final gallons: base ${calc.base}, low ${calc.low}, high ${calc.high}, Y2 ${calc.year2}, Y3 ${calc.year3}
+      `;
       const s = await gptJSON(`${sys}\n${prompt}`);
-      if (s.summary) summary = s.summary;
+      summary = s.summary || "";
     } catch {}
 
-    // response
+    // Basic rationale line
     const nearest = competitors[0]?.miles ?? null;
-    const notable = competitors.filter(c=>c.heavy).slice(0,6).map(c=>c.name);
-    const rationale=`Base uses AADT ${usedAADT.toLocaleString()}; floor=${calc.floor.toLocaleString()}; competition impact ${(impact*100).toFixed(0)}% (nearest ${nearest!=null?nearest.toFixed(3)+' mi':'n/a'}${notable.length?'; notable '+notable.join(', '):''}); capacity cap applied.`;
+    const rationale = `Applied competition rule: ${compCount} comps (heavy=${heavyCount}) → multiplier ${(calc.compMult*100|0)}%. Floor=${calc.floor.toLocaleString()} gal/mo. Capacity cap=${calc.cap.toLocaleString()} gal/mo.`;
 
     return res.json({
       base: calc.base, low: calc.low, high: calc.high, year2: calc.year2, year3: calc.year3,
       inputs: {
         aadt_used: usedAADT, mpds: MPDS, diesel: DIESEL, truck_share_assumed: 0.10,
-        aadt_actual: actualAADT || { value:null, year:null, distance_mi:null },
+        aadt_actual: aadtActual || { value:null, year:null, distance_mi:null }
       },
-      competition: { count: competitors.length, nearest_mi: nearest, notable_brands: notable, impact_score: +impact.toFixed(3) },
-      developments,
+      competition: { count: compCount, nearest_mi: nearest, notable_brands: competitors.filter(c=>c.heavy).slice(0,6).map(c=>c.name), impact_score: +(1-calc.compMult).toFixed(3) },
+      developments: devs,
+      developments_ai: devsAI,
       rationale,
       summary,
       map: { site:{lat:geo.lat, lon:geo.lon, label: geo.label}, competitors }
