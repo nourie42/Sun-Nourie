@@ -18,18 +18,20 @@
     label { display:block; font-weight:600; margin:10px 0 6px; }
     input { width:100%; padding:12px; border-radius:8px; border:1px solid var(--line); background:#0f1320; color:var(--text); }
     .row { display:flex; gap:12px; flex-wrap:wrap; }
-    .row>div { flex:1; min-width:220px; }
+    .row>div { flex:1; min-width:220px; position:relative; }
     button { background:var(--primary); color:#fff; border:0; padding:12px 16px; border-radius:10px; font-weight:700; cursor:pointer; }
     button:disabled { opacity:.5; cursor:not-allowed; }
     .muted { color:var(--muted); }
     .grid { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
-    .grid2 { display:grid; grid-template-columns: 1fr 1fr; gap:16px; }
     .right { text-align:right; }
-    #map { height:420px; border-radius:12px; border:1px solid var(--line); }
+    #map { height:420px; border-radius:12px; border:1px solid var(--line); display:flex; align-items:center; justify-content:center; color:var(--muted); }
     .inputs-inline { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
     .mono { font-family: ui-monospace, Menlo, Consolas, monospace; }
-    .pill { display:inline-block; background:#0f1320; border:1px solid var(--line); border-radius:999px; padding:4px 10px; margin-right:6px; font-size:12px; }
-    ul { margin: 8px 0 0 18px; }
+    /* Autocomplete dropdown */
+    .ac { position:absolute; top:100%; left:0; right:0; background:#0f1320; border:1px solid var(--line); border-radius:10px; z-index:10; display:none; max-height:240px; overflow:auto; }
+    .ac div { padding:10px 12px; cursor:pointer; border-bottom:1px solid #1f2530; }
+    .ac div:last-child { border-bottom:0; }
+    .ac div:hover { background:#162034; }
   </style>
 </head>
 <body>
@@ -38,9 +40,10 @@
 
     <div class="card">
       <div class="row">
-        <div>
+        <div id="addrWrap">
           <label>Site address (or lat,lon)</label>
-          <input id="addr" placeholder="4173 Knightdale Blvd, Knightdale NC — or — 35.7872,-78.49" />
+          <input id="addr" autocomplete="off" placeholder="4173 Knightdale Blvd, Knightdale NC — or — 35.7872,-78.49" />
+          <div id="addrAC" class="ac"></div>
         </div>
         <div>
           <label>Regular MPDs</label>
@@ -57,7 +60,7 @@
           <input id="aadtOverride" type="number" placeholder="enter AADT to force (e.g., 10449)" />
         </div>
         <button id="go">Estimate</button>
-        <span class="muted">Averages DOT + GPT; your override wins. Floor uses AADT×2%×8×30.</span>
+        <span class="muted">Baseline floor uses AADT×2%×8×30; your override wins.</span>
       </div>
     </div>
 
@@ -73,33 +76,18 @@
     </div>
 
     <div class="card">
-      <div class="muted" style="margin-bottom:6px;">Map: site & competition (1 mile). Move the blue site pin and re-run if needed.</div>
-      <div id="map">Loading…</div>
-      <div class="inputs-inline" style="margin-top:8px;">
-        <button id="usePin">Use marker & Re-run</button>
-        <span id="pinPos" class="muted"></span>
-      </div>
+      <div class="muted" style="margin-bottom:6px;">Map: site & competition (1 mile)</div>
+      <div id="map">Loading</div>
     </div>
 
     <div class="card">
-      <div class="grid2">
-        <div>
-          <b>Competition (OSM/Overpass)</b>
-          <div id="comp_osm" class="muted">—</div>
-        </div>
-        <div>
-          <b>Competition (GPT estimate)</b> <span id="comp_ai_conf" class="muted"></span>
-          <div id="comp_ai" class="muted">—</div>
-        </div>
-        <div>
-          <b>Developments (OSM/Overpass)</b>
-          <div id="devs_osm" class="muted">—</div>
-        </div>
-        <div>
-          <b>Developments (GPT estimate)</b> <span id="devs_ai_conf" class="muted"></span>
-          <div id="devs_ai" class="muted">—</div>
-        </div>
-      </div>
+      <div class="muted"><b>Developments (planned / proposed / permit / coming-soon / construction)</b></div>
+      <div id="devs" class="muted">—</div>
+    </div>
+
+    <div class="card">
+      <div class="muted"><b>Detailed explanation</b></div>
+      <div id="summary" class="muted">—</div>
     </div>
 
     <div class="card">
@@ -112,24 +100,25 @@
 
 <script>
 const $ = id => document.getElementById(id);
-const out = $("out"), debug = $("debug"), goBtn = $("go"), rerunBtn = $("rerunBtn"), usePinBtn = $("usePin");
-let map, markersLayer, siteMarker, mapInited=false, pendingPin=null;
+const out = $("out"), debug = $("debug"), goBtn = $("go"), rerunBtn = $("rerunBtn");
+const mapDiv = $("map"), devsDiv = $("devs"), summaryDiv = $("summary");
+
+let map, markersLayer, mapInited=false;
 
 function setOut(html){ out.innerHTML = html; }
 function setDebug(obj){ debug.textContent = typeof obj === "string" ? obj : JSON.stringify(obj, null, 2); }
 function fmt(n){ return (n ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 }); }
-function esc(s){ return (s ?? "").toString().replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m])); }
+function esc(s){ return (s ?? "").toString().replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;"," >":"&gt;",'"':"&quot;","'":"&#39;" }[m])); }
 
-async function callEstimate({overrideValue,usePin}={}){
+async function callEstimate({overrideValue}={}){
   const body={
     address: $("addr").value.trim(),
     mpds: Number($("mpds").value||0),
     diesel: Number($("diesel").value||0),
     aadtOverride: overrideValue ?? $("aadtOverride").value.trim()
   };
-  if(usePin && pendingPin){ body.siteLat=pendingPin.lat; body.siteLon=pendingPin.lon; }
   const r=await fetch("/estimate",{ method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
-  const t=await r.text(); if(!r.ok) throw new Error(`HTTP ${r.status}\n${t.slice(0,1200)}`); return JSON.parse(t);
+  const t=await r.text(); if(!r.ok) throw new Error(`HTTP ${r.status}\n${t.slice(0,1400)}`); return JSON.parse(t);
 }
 
 function renderReport(d){
@@ -145,98 +134,56 @@ function renderReport(d){
       </div>
     </div>
     <hr>
-    <div>Inputs: AADT used ${fmt(i.aadt_used)}; MPDs ${i.mpds}${i.diesel ? " + diesel "+i.diesel : ""}</div>
+    <div>Inputs: AADT used ${fmt(i.aadt_used)} (${esc(i.aadt_note||"")}); MPDs ${i.mpds}${i.diesel ? " + diesel "+i.diesel : ""}</div>
     <div>Competition (Overpass): ${c.count ?? 0} within 1 mi${c.nearest_mi != null ? "; nearest "+c.nearest_mi.toFixed(3)+" mi" : ""}${(c.notable_brands||[]).length ? "; notable: "+c.notable_brands.join(", ") : ""}; impact ${(Number(c.impact_score||0)*100|0)}%</div>
     <div style="margin-top:8px">${esc(d.rationale||"")}</div>
   `;
   setOut(html);
   $("rerunAadt").value = i.aadt_used ?? "";
-  setDebug(d.debug || {});
+  setDebug(d);
+  summaryDiv.textContent = d.detailed_summary || "—";
 }
 
-function renderLists(d){
-  // Overpass lists
-  const devs_osm = $("devs_osm");
-  devs_osm.innerHTML = (Array.isArray(d.developments) && d.developments.length)
-    ? "<ul>"+d.developments.map(x=>`<li>${esc(x.name)} • ${esc(x.status)} • ${x.miles} mi</li>`).join("")+"</ul>"
-    : "<span class='muted'>none found</span>";
-
-  const comp_osm = $("comp_osm");
-  const comps = d.map?.competitors || [];
-  comp_osm.innerHTML = comps.length
-    ? "<ul>"+comps.slice(0,20).map(x=>`<li>${esc(x.name||"Fuel station")} • ${x.miles} mi${x.heavy?" • heavy":""}</li>`).join("")+"</ul>"
-    : "<span class='muted'>none found</span>";
-
-  // GPT lists
-  $("comp_ai_conf").textContent = d.competition_ai ? `(confidence ${(d.competition_ai.confidence*100|0)}%)` : "";
-  $("devs_ai_conf").textContent = d.developments_ai ? `(confidence ${(d.developments_ai.confidence*100|0)}%)` : "";
-
-  const comp_ai = $("comp_ai");
-  comp_ai.innerHTML = (d.competition_ai && Array.isArray(d.competition_ai.items) && d.competition_ai.items.length)
-    ? "<ul>"+d.competition_ai.items.map(x=>`<li>${esc(x.name)} • ~${x.approx_miles} mi${x.brand? " • "+esc(x.brand):""}</li>`).join("")+"</ul>"
-    : "<span class='muted'>none reported</span>";
-
-  const devs_ai = $("devs_ai");
-  devs_ai.innerHTML = (d.developments_ai && Array.isArray(d.developments_ai.items) && d.developments_ai.items.length)
-    ? "<ul>"+d.developments_ai.items.map(x=>`<li>${esc(x.name)} • ${esc(x.status)} • ~${x.approx_miles} mi</li>`).join("")+"</ul>"
-    : "<span class='muted'>none reported</span>";
+function renderDevs(list){
+  if(!Array.isArray(list)||!list.length){ devsDiv.innerHTML="<span class='muted'>none found</span>"; return; }
+  devsDiv.innerHTML = "<ul>"+list.map(d=>`<li>${esc(d.name)} • ${esc(d.status)} • ${d.miles} mi</li>`).join("")+"</ul>";
 }
 
 function renderMap(m){
-  if(!m||!m.site) return;
+  if(!m||!m.site){ mapDiv.textContent="Loading"; return; }
   if(!mapInited){
-    map=L.map("map",{zoomControl:true});
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map);
+    map = L.map(mapDiv, { zoomControl:true });
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution:"© OpenStreetMap" }).addTo(map);
     mapInited=true;
   }
   if(markersLayer) markersLayer.remove();
   markersLayer=L.layerGroup().addTo(map);
+
   const site=[m.site.lat,m.site.lon];
   map.setView(site,15);
-  siteMarker=L.marker(site,{draggable:true,title:"Site"}).addTo(markersLayer).bindPopup("<b>Site</b>");
-  siteMarker.on("dragend",e=>{ const p=e.target.getLatLng(); pendingPin={lat:p.lat,lon:p.lng}; $("pinPos").textContent=`marker: ${p.lat.toFixed(6)}, ${p.lng.toFixed(6)} (ready)`; });
+  L.marker(site,{title:"Site"}).addTo(markersLayer).bindPopup("<b>Site</b>");
 
   const comps=Array.isArray(m.competitors)?m.competitors:[];
   for(const c of comps){
     L.circleMarker([c.lat,c.lon],{radius:6,weight:1,color:c.heavy?"#ff7f50":"#4ade80",fillOpacity:.85})
       .addTo(markersLayer).bindPopup(`<b>${esc(c.name||"Fuel station")}</b><br>${c.miles} mi`);
   }
-  const bounds=L.latLngBounds([site, ...comps.map(c=>[c.lat,c.lon])]); map.fitBounds(bounds.pad(0.25));
+  const bounds=L.latLngBounds([site, ...comps.map(c=>[c.lat,c.lon])]);
+  map.fitBounds(bounds.pad(0.25));
 }
 
-async function estimate(){
-  try{
-    goBtn.disabled=true;
-    setOut("<span class='muted'>Working…</span>");
-    const d=await callEstimate();
-    renderReport(d); renderMap(d.map); renderLists(d);
-  }catch(e){ setOut(`<pre class="mono">${esc(e.message)}</pre>`);}
-  finally{ goBtn.disabled=false; }
-}
-async function rerun(){
-  try{
-    rerunBtn.disabled=true;
-    const v=$("rerunAadt").value.trim();
-    if(!v) return alert("Enter an AADT first.");
-    const d=await callEstimate({overrideValue:v});
-    renderReport(d); renderMap(d.map); renderLists(d);
-  }catch(e){ setOut(`<pre class="mono">${esc(e.message)}</pre>`);}
-  finally{ rerunBtn.disabled=false; }
-}
-async function usePin(){
-  try{
-    usePinBtn.disabled=true;
-    if(!pendingPin) return alert("Drag the site pin first.");
-    const d=await callEstimate({usePin:true});
-    renderReport(d); renderMap(d.map); renderLists(d);
-  }catch(e){ setOut(`<pre class="mono">${esc(e.message)}</pre>`);}
-  finally{ usePinBtn.disabled=false; }
-}
+// -------- Autocomplete (Nominatim) --------
+const addr = $("addr");
+const ac = $("addrAC");
+let acTimer=null;
 
-$("go").addEventListener("click", estimate);
-$("rerunBtn").addEventListener("click", rerun);
-$("usePin").addEventListener("click", usePin);
-</script>
-</body>
-</html>
-
+addr.addEventListener("input", () => {
+  const q = addr.value.trim();
+  if (!q) { ac.style.display="none"; return; }
+  clearTimeout(acTimer);
+  acTimer = setTimeout(async () => {
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&countrycodes=us&limit=5&q=${encodeURIComponent(q)}`;
+      const r = await fetch(url);
+      const arr = await r.json();
+      ac.innerHTML = arr.map(it => `<div data-full="${esc(it.display
