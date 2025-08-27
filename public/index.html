@@ -5,25 +5,35 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Fuel Gallons Estimator — Chat</title>
   <style>
-    body { background:#0e1117; color:#e6e6e6; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
-    .wrap { max-width: 900px; margin: 24px auto; padding: 0 16px; }
-    h1 { font-size: 40px; margin: 0 0 8px; }
-    .card { background:#161a22; border:1px solid #2a2f3a; border-radius:12px; padding:16px; margin:12px 0; }
+    :root { --bg:#0e1117; --panel:#161a22; --line:#2a2f3a; --text:#e6e6e6; --muted:#9aa4b2; --primary:#3b82f6; }
+    *{ box-sizing:border-box; }
+    body { background:var(--bg); color:var(--text); font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+    .wrap { max-width: 980px; margin: 24px auto; padding: 0 16px; }
+    h1 { font-size: 40px; margin: 0 0 12px; }
+    .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px; margin:12px 0; }
     label { display:block; font-weight:600; margin:10px 0 6px; }
-    input { width:100%; padding:12px; border-radius:8px; border:1px solid #2a2f3a; background:#0f1320; color:#e6e6e6; }
-    .row { display:flex; gap:12px; }
-    .row > div { flex:1; }
-    button { background:#3b82f6; color:white; border:0; padding:12px 16px; border-radius:10px; font-weight:700; cursor:pointer; }
+    input { width:100%; padding:12px; border-radius:8px; border:1px solid var(--line); background:#0f1320; color:var(--text); }
+    .row { display:flex; gap:12px; flex-wrap:wrap; }
+    .row > div { flex:1; min-width: 220px; }
+    button { background:var(--primary); color:white; border:0; padding:12px 16px; border-radius:10px; font-weight:700; cursor:pointer; }
     button:disabled { opacity:.5; cursor:not-allowed; }
-    pre { white-space:pre-wrap; word-break:break-word; }
-    .muted { color:#9aa4b2; font-size: 0.92rem; }
-    details { border-top:1px solid #2a2f3a; padding-top:10px; }
-    .pill { display:inline-block; background:#0f1320; border:1px solid #2a2f3a; border-radius:999px; padding:4px 10px; margin-right:6px; font-size:12px; }
+    .muted { color:var(--muted); }
+    .grid { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+    .k { color:#9FC2FF; }
+    hr { border:0; border-top:1px solid var(--line); margin:12px 0; }
+    ul { margin: 6px 0 0 18px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .right { text-align:right; }
+    .heading { font-size:18px; font-weight:700; margin: 0 0 8px; }
+    .pill { display:inline-block; background:#0f1320; border:1px solid var(--line); border-radius:999px; padding:4px 10px; margin-right:6px; font-size:12px; }
+    details { border-top: 1px solid var(--line); padding-top: 10px; }
+    #out b { font-weight:800; }
   </style>
 </head>
 <body>
   <div class="wrap">
     <h1>Fuel Gallons Estimator — Chat</h1>
+
     <div class="card">
       <div class="row">
         <div>
@@ -39,101 +49,139 @@
           <input id="diesel" type="number" value="0" />
         </div>
       </div>
-      <div style="margin-top:12px">
+      <div style="margin-top:12px; display:flex; gap:8px; align-items:center;">
         <button id="go">Estimate</button>
-        <button id="ping" style="margin-left:8px; background:#64748b">Test AADT</button>
+        <span class="muted">I’ll hand these to GPT with your full flow (AADT, competition, developments, capacity).</span>
       </div>
-      <p class="muted" style="margin-top:8px">
-        I’ll search DOT layers for AADT, pull stations & planned developments from OSM (1 mi),
-        compute gallons with competition and capacity checks, then format the report.
-      </p>
     </div>
 
-    <div class="card">
-      <h3>Result</h3>
-      <pre id="out" class="muted">—</pre>
+    <div class="card" id="report">
+      <div class="heading">Result</div>
+      <div id="out" class="muted">—</div>
     </div>
 
     <div class="card">
       <details>
-        <summary>Data used (debug)</summary>
-        <pre id="debug">/ waiting…</pre>
+        <summary>Debug JSON</summary>
+        <pre id="debug" class="mono muted">/ waiting…</pre>
       </details>
     </div>
   </div>
 
 <script>
-const out = document.getElementById("out");
-const debug = document.getElementById("debug");
-const goBtn = document.getElementById("go");
-const pingBtn = document.getElementById("ping");
+const $ = (id) => document.getElementById(id);
+const out = $("out");
+const debug = $("debug");
+const goBtn = $("go");
 
-function setOut(msg){ out.textContent = msg; }
+function setOut(html){ out.innerHTML = html; }
 function setDebug(obj){ debug.textContent = typeof obj === "string" ? obj : JSON.stringify(obj, null, 2); }
-
-async function safeFetchJSON(url, opts) {
-  const res = await fetch(url, opts);
-  const ct = res.headers.get("content-type") || "";
-  const text = await res.text();
-  if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}\n` + text.slice(0, 800));
-  if (!ct.includes("application/json")) throw new Error(`Expected JSON but got "${ct}"\n` + text.slice(0, 800));
-  return JSON.parse(text);
-}
-
 function fmt(n){ return (n ?? 0).toLocaleString(undefined, {maximumFractionDigits: 0}); }
+function esc(s){ return (s ?? "").toString().replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m])); }
 
 async function estimate() {
   try {
     goBtn.disabled = true;
-    setOut("Thinking… searching AADT, competition, and developments.");
-    const address = document.getElementById("addr").value.trim();
-    const mpds = Number(document.getElementById("mpds").value || 0);
-    const diesel = Number(document.getElementById("diesel").value || 0);
+    setOut(`<span class="muted">Working… asking GPT to search AADT, competition, developments, and compute the estimate.</span>`);
+    const address = $("addr").value.trim();
+    const mpds = Number($("mpds").value || 0);
+    const diesel = Number($("diesel").value || 0);
 
-    const body = { address, mpds, diesel };
-    const data = await safeFetchJSON("/estimate", {
+    const res = await fetch("/estimate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
+      body: JSON.stringify({ address, mpds, diesel })
     });
 
-    const lines = [];
-    lines.push(`**Base Estimate (gal/mo)** ${fmt(data.base_monthly_gallons)}, **Low–High** ${fmt(data.low_high.low)}–${fmt(data.low_high.high)}, **Year-2** ${fmt(data.year2)}, **Year-3** ${fmt(data.year3)}`);
-    lines.push("");
-    const i = data.inputs || {};
-    const a = i.aadt || {};
-    lines.push(`**Inputs used**: AADT ${fmt(a.value)} (source: ${a.source}${a.year ? ", " + a.year : ""}${a.distance_mi != null ? ", ~" + a.distance_mi + " mi" : ""}), MPDs ${i.mpds}${i.diesel ? " + diesel " + i.diesel : ""}, truck share ${Math.round((i.truck_share_assumed || 0) * 100)}% (assumed)`);
-    const c = data.competition || {};
-    lines.push(`**Competition summary**: ${c.count ?? 0} within 1 mi${c.nearest_mi != null ? "; nearest " + c.nearest_mi.toFixed(3) + " mi" : ""}${(c.notable_brands || []).length ? "; notable: " + c.notable_brands.join(", ") : ""}; impact ${(c.impact_score*100|0)}%`);
-    lines.push(`**Developments**: ${(data.developments || []).length ? data.developments.map(d => `${d.name} • ${d.status} • ${d.miles} mi`).join(" · ") : "none found (OSM/planning tags)"}`);
-    lines.push(`**Assumptions**: auto stop 2.0%, truck stop 1.2%; gallons/stop auto 10.2, truck 16.0; availability 1.00; competition 1/d decay + ≤0.03 mi heavy penalty; capacity cap = positions × 25 × gal/cycle × 365/12.`);
-    lines.push(data.rationale || "");
-    setOut(lines.join("\n"));
+    const text = await res.text();
+    if (!res.ok) {
+      setOut(`<div class="muted">HTTP ${res.status}<br><pre class="mono">${esc(text).slice(0,1200)}</pre></div>`);
+      setDebug(text);
+      return;
+    }
 
-    setDebug({ request: body, response: data });
+    let data;
+    try { data = JSON.parse(text); }
+    catch(e){
+      setOut(`<div class="muted">Parse error\n<pre class="mono">${esc(text).slice(0,1200)}</pre></div>`);
+      setDebug(text);
+      return;
+    }
+
+    setDebug(data);
+    renderReport(data);
   } catch (e) {
-    setOut("Network error:\n" + e.message);
+    setOut(`<div class="muted">Network error:<br><pre class="mono">${esc(e.message)}</pre></div>`);
   } finally {
     goBtn.disabled = false;
   }
 }
 
-async function testAADT() {
-  try {
-    pingBtn.disabled = true;
-    setOut("Testing AADT lookup…");
-    // Knightdale approx
-    const test = await safeFetchJSON(`/aadt?lat=35.786&lon=-78.49`);
-    setOut(`AADT test: ${JSON.stringify(test)}`);
-  } catch (e) {
-    setOut("AADT test failed:\n" + e.message);
-  } finally {
-    pingBtn.disabled = false;
-  }
+function renderReport(d){
+  // expected keys from server/GPT:
+  // base, low, high, year2, year3, inputs{}, competition{}, developments[], assumptions[], rationale
+  const base = d.base ?? d.base_monthly_gallons;
+  const low  = d.low ?? d.low_high?.low;
+  const high = d.high ?? d.low_high?.high;
+
+  const sectionTop = `
+    <div class="grid">
+      <div><b>Base Estimate (gal/mo)</b><br><div style="font-size:28px; font-weight:800;">${fmt(base)}</div></div>
+      <div class="right">
+        <div><span class="pill">Low</span> <b>${fmt(low)}</b></div>
+        <div style="margin-top:6px;"><span class="pill">High</span> <b>${fmt(high)}</b></div>
+        <div style="margin-top:6px;">Year-2: <b>${fmt(d.year2)}</b></div>
+        <div style="margin-top:6px;">Year-3: <b>${fmt(d.year3)}</b></div>
+      </div>
+    </div>
+  `;
+
+  const a = d.inputs?.aadt || {};
+  const inputs = `
+    <div class="heading">Inputs used</div>
+    <div class="muted">
+      AADT ${fmt(a.value)}${a.source ? ` (source: ${esc(a.source)}` : ""}${a.year ? `, ${esc(a.year)}` : ""}${(a.distance_mi ?? null) !== null ? `, ~${a.distance_mi} mi` : ""}${a.source ? ")" : ""};
+      MPDs ${esc(d.inputs?.mpds)};
+      ${d.inputs?.diesel ? `+ diesel ${esc(d.inputs.diesel)};` : ""}
+      truck share ${Math.round((d.inputs?.truck_share_assumed ?? 0) * 100)}% (assumed)
+    </div>
+  `;
+
+  const c = d.competition || {};
+  const notable = (c.notable_brands || []).join(", ");
+  const comp = `
+    <div class="heading" style="margin-top:12px;">Competition summary</div>
+    <div class="muted">
+      ${c.count ?? 0} within 1 mi${c.nearest_mi != null ? `; nearest ${Number(c.nearest_mi).toFixed(3)} mi` : ""}${notable ? `; notable: ${esc(notable)}` : ""}; impact ${(Number(c.impact_score||0)*100|0)}%
+    </div>
+  `;
+
+  const devs = Array.isArray(d.developments) ? d.developments : [];
+  const devHtml = devs.length
+    ? `<ul>${devs.map(x => `<li>${esc(x.name)} • ${esc(x.status)} • ${esc(x.miles)} mi</li>`).join("")}</ul>`
+    : `<div class="muted">none found (planned/proposed/permit/coming-soon/construction only)</div>`;
+
+  const assumptions = Array.isArray(d.assumptions) && d.assumptions.length
+    ? `<ul>${d.assumptions.map(a => `<li>${esc(a)}</li>`).join("")}</ul>`
+    : `<div class="muted">defaults applied where unknown (stop rates autos 2.0%, trucks 1.2%; gallons/stop 10.2/16; availability 1.00; capacity cap = positions × 25 × gal/cycle × 365/12)</div>`;
+
+  const rationale = esc(d.rationale || "");
+
+  setOut(`
+    ${sectionTop}
+    <hr>
+    ${inputs}
+    ${comp}
+    <div class="heading" style="margin-top:12px;">Developments</div>
+    ${devHtml}
+    <div class="heading" style="margin-top:12px;">Assumptions</div>
+    ${assumptions}
+    <div class="heading" style="margin-top:12px;">One-paragraph rationale</div>
+    <div>${rationale || "<span class='muted'>—</span>"}</div>
+  `);
 }
 
-goBtn.addEventListener("click", estimate);
-pingBtn.addEventListener("click", testAADT);
+$("go").addEventListener("click", estimate);
 </script>
 </body>
 </html>
