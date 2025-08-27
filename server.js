@@ -1,431 +1,256 @@
-// server.js
-import express from "express";
-import cors from "cors";
-import fetch from "node-fetch";
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Fuel Gallons Estimator — Chat</title>
 
-const app = express();
-app.use(cors());
-app.use(express.json({ limit: "1mb" }));
-app.use(express.static("public")); // serve /public
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 
-function jerr(res, code, msg, detail) {
-  console.error("[ERROR]", code, msg, detail || "");
-  return res.status(code).json({ error: msg, detail });
+  <style>
+    :root { --bg:#0e1117; --panel:#161a22; --line:#2a2f3a; --text:#e6e6e6; --muted:#9aa4b2; --primary:#3b82f6; }
+    *{ box-sizing: border-box; }
+    body { background:var(--bg); color:var(--text); font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+    .wrap { max-width: 980px; margin: 24px auto; padding: 0 16px; }
+    h1 { font-size: 40px; margin: 0 0 12px; }
+    .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px; margin:12px 0; }
+    label { display:block; font-weight:600; margin:10px 0 6px; }
+    input { width:100%; padding:12px; border-radius:8px; border:1px solid var(--line); background:#0f1320; color:var(--text); }
+    .row { display:flex; gap:12px; flex-wrap:wrap; }
+    .row > div { flex:1; min-width: 220px; }
+    button { background:var(--primary); color:white; border:0; padding:12px 16px; border-radius:10px; font-weight:700; cursor:pointer; }
+    button:disabled { opacity:.5; cursor:not-allowed; }
+    .muted { color:var(--muted); }
+    .grid { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .right { text-align:right; }
+    .heading { font-size:18px; font-weight:700; margin: 0 0 8px; }
+    .pill { display:inline-block; background:#0f1320; border:1px solid var(--line); border-radius:999px; padding:4px 10px; margin-right:6px; font-size:12px; }
+    #map { height: 420px; border-radius:12px; border:1px solid var(--line); }
+    .inputs-inline { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .notice { font-size:12px; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Fuel Gallons Estimator — Chat</h1>
+
+    <div class="card">
+      <div class="row">
+        <div>
+          <label>Site address (one line) or lat,lon</label>
+          <input id="addr" placeholder="4173 Knightdale Blvd, Knightdale NC 27545  — OR — 35.7872,-78.49" />
+        </div>
+        <div>
+          <label>Regular MPDs</label>
+          <input id="mpds" type="number" value="3" />
+        </div>
+        <div>
+          <label>Diesel positions (optional)</label>
+          <input id="diesel" type="number" value="0" />
+        </div>
+      </div>
+      <div class="inputs-inline" style="margin-top:12px;">
+        <div style="flex:1; min-width:240px;">
+          <label>AADT override (optional)</label>
+          <input id="aadtOverride" type="number" placeholder="enter AADT to force (e.g., 10449)" />
+        </div>
+        <button id="go">Estimate</button>
+        <span class="muted">Drag the site pin and click “Use marker & Re-run” to compute from the exact point.</span>
+      </div>
+    </div>
+
+    <div class="card" id="report">
+      <div class="heading">Result</div>
+      <div id="out" class="muted">—</div>
+
+      <div style="margin-top:12px" class="inputs-inline">
+        <div style="flex:1; min-width:240px;">
+          <label>Adjust AADT and re-run</label>
+          <input id="rerunAadt" type="number" placeholder="type a new AADT and click Re-run" />
+        </div>
+        <button id="rerunBtn">Re-run</button>
+        <span class="muted">Re-estimates using your override only.</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="heading">Map: site & competition (1 mile)</div>
+      <div id="map">Loading…</div>
+      <div class="inputs-inline" style="margin-top:8px;">
+        <span class="muted">Move the blue site pin if needed.</span>
+        <button id="usePin">Use marker & Re-run</button>
+        <span id="pinPos" class="notice"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="heading">Developments (planned/proposed/permit/coming-soon/construction)</div>
+      <div id="devs" class="muted">—</div>
+    </div>
+
+    <div class="card">
+      <details>
+        <summary>Debug JSON</summary>
+        <pre id="debug" class="mono muted">/ waiting…</pre>
+      </details>
+    </div>
+  </div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const out = $("out"), debug = $("debug"), goBtn = $("go"), rerunBtn = $("rerunBtn"), usePinBtn = $("usePin");
+
+let map, markersLayer, mapInited = false, siteMarker = null, pendingPin = null;
+
+function setOut(html){ out.innerHTML = html; }
+function setDebug(obj){ debug.textContent = typeof obj === "string" ? obj : JSON.stringify(obj, null, 2); }
+function fmt(n){ return (n ?? 0).toLocaleString(undefined, {maximumFractionDigits: 0}); }
+function esc(s){ return (s ?? "").toString().replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m])); }
+
+async function callEstimate({ overrideValue, usePin=false } = {}){
+  const address = $("addr").value.trim();
+  const mpds = Number($("mpds").value || 0);
+  const diesel = Number($("diesel").value || 0);
+  const aadtOverride = overrideValue ?? $("aadtOverride").value.trim();
+  const body = { address, mpds, diesel, aadtOverride };
+
+  if (usePin && pendingPin) {
+    body.siteLat = pendingPin.lat;
+    body.siteLon = pendingPin.lon;
+  }
+
+  const res = await fetch("/estimate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`HTTP ${res.status}\n` + text.slice(0,1200));
+  return JSON.parse(text);
 }
 
-app.get("/health", (_req, res) => res.json({ ok: true }));
-
-// ---------- utilities ----------
-const CONTACT = process.env.OVERPASS_CONTACT || "FuelEstimator/1.5 (contact: noreply@example.com)";
-const UA = "FuelEstimator/1.5 (+contact:noreply@example.com)";
-
-function toMiles(m) { return m / 1609.344; }
-function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
-
-function haversine(lat1, lon1, lat2, lon2) {
-  const R = 6371000, toRad = d => d*Math.PI/180;
-  const dLat = toRad(lat2-lat1), dLon = toRad(lon2-lon1);
-  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
-  return 2*R*Math.asin(Math.sqrt(a));
-}
-function distMiles(lat1, lon1, lat2, lon2) { return toMiles(haversine(lat1, lon1, lat2, lon2)); }
-
-// ---------- robust fetch with timeout ----------
-async function fetchWithTimeout(url, opts = {}, timeoutMs = 12000) {
-  const controller = new AbortController();
-  const t = setTimeout(() => controller.abort(), timeoutMs);
+async function estimate(){
   try {
-    return await fetch(url, { ...opts, signal: controller.signal });
+    goBtn.disabled = true;
+    setOut(`<span class="muted">Working…</span>`);
+    const data = await callEstimate();
+    setDebug(data);
+    renderReport(data);
+    renderMap(data.map);
+    renderDevs(data.developments);
+  } catch (e) {
+    setOut(`<div class="muted">Error:<br><pre class="mono">${esc(e.message)}</pre></div>`);
   } finally {
-    clearTimeout(t);
+    goBtn.disabled = false;
   }
 }
 
-// ---------------- Geocode (Nominatim -> Census fallback, lat,lng direct) ----------------
-function tryParseLatLng(address) {
-  const m = String(address).trim().match(/^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/);
-  if (!m) return null;
-  const lat = Number(m[1]), lon = Number(m[2]);
-  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-  if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
-  return { lat, lon, label: `${lat}, ${lon}` };
-}
-
-async function geocodeNominatim(q) {
-  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`;
-  const r = await fetchWithTimeout(url, {
-    headers: { "User-Agent": UA, "Accept":"application/json" }
-  }, 10000);
-  if (!r.ok) throw new Error(`Nominatim ${r.status}: ${await r.text().then(t=>t.slice(0,300))}`);
-  const arr = JSON.parse(await r.text());
-  if (!arr?.length) throw new Error("Nominatim: no results");
-  const { lat, lon, display_name } = arr[0];
-  return { lat: Number(lat), lon: Number(lon), label: display_name };
-}
-
-async function geocodeCensus(q) {
-  const url = `https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?address=${encodeURIComponent(q)}&benchmark=Public_AR_Current&format=json`;
-  const r = await fetchWithTimeout(url, {
-    headers: { "User-Agent": UA, "Accept":"application/json" }
-  }, 10000);
-  if (!r.ok) throw new Error(`Census ${r.status}: ${await r.text().then(t=>t.slice(0,300))}`);
-  const data = JSON.parse(await r.text());
-  const m = data?.result?.addressMatches?.[0];
-  if (!m?.coordinates) throw new Error("Census: no matches");
-  return { lat: Number(m.coordinates.y), lon: Number(m.coordinates.x), label: m.matchedAddress || q };
-}
-
-async function geocode(address) {
-  // 0) direct lat,lng accepted
-  const direct = tryParseLatLng(address);
-  if (direct) return direct;
-
-  // 1) Nominatim with one retry
-  try { return await geocodeNominatim(address); }
-  catch (e1) {
-    console.warn("[WARN] Nominatim failed:", e1.message);
-    await sleep(600);
-    try { return await geocodeNominatim(address); }
-    catch (e2) {
-      console.warn("[WARN] Nominatim retry failed:", e2.message);
-      // 2) US Census fallback
-      try { return await geocodeCensus(address); }
-      catch (e3) {
-        console.warn("[WARN] Census geocoder failed:", e3.message);
-        throw new Error("All geocoders failed for this address");
-      }
-    }
+async function rerun(){
+  try {
+    rerunBtn.disabled = true;
+    const v = $("rerunAadt").value.trim();
+    if (!v) { alert("Enter an AADT override first."); return; }
+    setOut(`<span class="muted">Re-running with override AADT ${fmt(Number(v))}…</span>`);
+    const data = await callEstimate({ overrideValue: v });
+    setDebug(data);
+    renderReport(data);
+    renderMap(data.map);
+    renderDevs(data.developments);
+  } catch (e) {
+    setOut(`<div class="muted">Error:<br><pre class="mono">${esc(e.message)}</pre></div>`);
+  } finally {
+    rerunBtn.disabled = false;
   }
 }
 
-// --------------- NCDOT AADT stations (ArcGIS) ---------------
-const NCDOT_AADT_FS =
-  "https://services.arcgis.com/NuWFvHYDMVmmxMeM/ArcGIS/rest/services/NCDOT_AADT_Stations/FeatureServer/0";
+async function rerunUsePin(){
+  try {
+    if (!pendingPin) { alert("Drag the site pin first."); return; }
+    usePinBtn.disabled = true;
+    setOut(`<span class="muted">Re-running from marker location…</span>`);
+    const data = await callEstimate({ usePin: true });
+    setDebug(data);
+    renderReport(data);
+    renderMap(data.map);
+    renderDevs(data.developments);
+  } catch (e) {
+    setOut(`<div class="muted">Error:<br><pre class="mono">${esc(e.message)}</pre></div>`);
+  } finally {
+    usePinBtn.disabled = false;
+  }
+}
 
-async function queryNCDOTNearestAADT(lat, lon, radiusMeters = 1609) {
-  const params = new URLSearchParams({
-    f: "json",
-    where: "1=1",
-    outFields: "*",
-    returnGeometry: "true",
-    geometry: `${lon},${lat}`,
-    geometryType: "esriGeometryPoint",
-    inSR: "4326",
-    spatialRel: "esriSpatialRelIntersects",
-    distance: String(radiusMeters),
-    units: "esriSRUnit_Meter",
-    outSR: "4326",
-    resultRecordCount: "200",
+function renderReport(d){
+  const i = d.inputs || {};
+  const sectionTop = `
+    <div class="grid">
+      <div><b>Base Estimate (gal/mo)</b><br><div style="font-size:28px; font-weight:800;">${fmt(d.base)}</div></div>
+      <div class="right">
+        <div><span class="pill">Low</span> <b>${fmt(d.low)}</b></div>
+        <div style="margin-top:6px;"><span class="pill">High</span> <b>${fmt(d.high)}</b></div>
+        <div style="margin-top:6px;">Year-2: <b>${fmt(d.year2)}</b></div>
+        <div style="margin-top:6px;">Year-3: <b>${fmt(d.year3)}</b></div>
+      </div>
+    </div>
+    <hr>
+    <div class="heading">Inputs used</div>
+    <div class="muted">AADT used ${fmt(i.aadt_used)}; MPDs ${esc(i.mpds)}${i.diesel ? " + diesel " + esc(i.diesel) : ""}; truck share ${Math.round((i.truck_share_assumed ?? 0)*100)}% (assumed)</div>
+    <div class="heading" style="margin-top:12px;">One-paragraph rationale</div>
+    <div>${esc(d.rationale || "") || "<span class='muted'>—</span>"}</div>
+  `;
+  setOut(sectionTop);
+  $("rerunAadt").value = i.aadt_used ?? "";
+}
+
+function renderDevs(devs){
+  const el = $("devs");
+  if (!Array.isArray(devs) || !devs.length) { el.innerHTML = "<span class='muted'>none found</span>"; return; }
+  el.innerHTML = "<ul>" + devs.map(d => `<li>${esc(d.name)} • ${esc(d.status)} • ${esc(d.miles)} mi</li>`).join("") + "</ul>";
+}
+
+function renderMap(m){
+  if (!m || !m.site) return;
+  if (!mapInited) {
+    map = L.map('map', { zoomControl: true });
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "&copy; OpenStreetMap" }).addTo(map);
+    mapInited = true;
+  }
+  if (markersLayer) markersLayer.remove();
+  markersLayer = L.layerGroup().addTo(map);
+
+  const site = m.site;
+  const comps = Array.isArray(m.competitors) ? m.competitors : [];
+  const siteLatLng = [site.lat, site.lon];
+
+  map.setView(siteLatLng, 15);
+
+  // Draggable site marker
+  siteMarker = L.marker(siteLatLng, { title: "Site", draggable: true }).addTo(markersLayer)
+    .bindPopup(`<b>Site</b><br>${esc(site.label || "")}`);
+  siteMarker.on("dragend", (e) => {
+    const p = e.target.getLatLng();
+    pendingPin = { lat: p.lat, lon: p.lng };
+    $("pinPos").textContent = `marker: ${p.lat.toFixed(6)}, ${p.lng.toFixed(6)} (ready to re-run)`;
   });
 
-  const r = await fetchWithTimeout(`${NCDOT_AADT_FS}/query?${params.toString()}`, {
-    headers: { "User-Agent": UA, "Accept":"application/json" }
-  }, 12000);
-  if (!r.ok) throw new Error(`NCDOT ${r.status}: ${await r.text().then(t=>t.slice(0,300))}`);
-  const data = JSON.parse(await r.text());
-  const feats = data.features || [];
-  if (!feats.length) return null;
-
-  function extractAADT(attrs) {
-    const candidates = [];
-    for (const [k, v] of Object.entries(attrs || {})) {
-      if (!String(k).toLowerCase().includes("aadt")) continue;
-      const n = Number(v);
-      if (!Number.isFinite(n) || n <= 0) continue;
-      let year = null;
-      for (const yk of ["YEAR","AADT_YEAR","COUNT_YEAR","TRAFFICYEAR","YEAR_","YR","YR_"]) {
-        if (attrs[yk] != null) {
-          const yy = String(attrs[yk]).match(/20\d{2}/)?.[0];
-          if (yy) { year = Number(yy); break; }
-        }
-      }
-      if (!year) { const m = k.match(/20\d{2}/); if (m) year = Number(m[0]); }
-      candidates.push({ value: n, year });
+  // Competitors
+  if (comps.length) {
+    for (const c of comps) {
+      L.circleMarker([c.lat, c.lon], { radius: 6, weight: 1, color: c.heavy ? "#ff7f50" : "#4ade80", fillOpacity: 0.85 })
+        .addTo(markersLayer)
+        .bindPopup(`<b>${esc(c.name || "Fuel station")}</b><br>${c.miles} mi`);
     }
-    if (!candidates.length) return null;
-    candidates.sort((a,b)=> (b.year||0)-(a.year||0) || b.value-a.value);
-    return candidates[0];
+    const bounds = L.latLngBounds([siteLatLng, ...comps.map(c => [c.lat, c.lon])]);
+    map.fitBounds(bounds.pad(0.25));
   }
-
-  const rows = [];
-  for (const f of feats) {
-    const a = extractAADT(f.attributes);
-    if (!a) continue;
-    const gx = f.geometry?.x ?? f.geometry?.longitude;
-    const gy = f.geometry?.y ?? f.geometry?.latitude;
-    if (gx == null || gy == null) continue;
-    rows.push({ aadt: a.value, year: a.year || null, distM: haversine(lat, lon, gy, gx) });
-  }
-  if (!rows.length) return null;
-  rows.sort((A,B)=> (B.year||0)-(A.year||0) || B.aadt-A.aadt || A.distM-B.distM);
-  return rows[0];
 }
 
-// ---------------- Overpass (competition + developments) ----------------
-const OVERPASS_ENDPOINTS = [
-  "https://overpass-api.de/api/interpreter",
-  "https://overpass.kumi.systems/api/interpreter",
-  "https://overpass.openstreetmap.ru/api/interpreter",
-];
-
-async function queryOverpass(q, triesPerMirror = 2, delayMs = 900) {
-  let lastErr = new Error("No attempt");
-  for (const ep of OVERPASS_ENDPOINTS) {
-    for (let i = 0; i < triesPerMirror; i++) {
-      try {
-        const r = await fetchWithTimeout(ep, {
-          method: "POST",
-          headers: { "User-Agent": CONTACT, "Content-Type":"application/x-www-form-urlencoded", "Accept":"application/json" },
-          body: "data=" + encodeURIComponent(q)
-        }, 20000);
-        const ct = r.headers.get("content-type") || "";
-        const text = await r.text();
-        if (!r.ok || !ct.includes("application/json")) throw new Error(`Overpass ${r.status}: ${text.slice(0,300)}`);
-        return JSON.parse(text);
-      } catch (e) {
-        lastErr = e; await sleep(delayMs);
-      }
-    }
-  }
-  throw lastErr;
-}
-
-async function competitorsWithin1Mile(lat, lon) {
-  const r = 1609;
-  const q = `
-  [out:json][timeout:25];
-  (
-    node(around:${r},${lat},${lon})["amenity"="fuel"];
-    way(around:${r},${lat},${lon})["amenity"="fuel"];
-  );
-  out center tags;`;
-  const data = await queryOverpass(q, 2, 1000);
-  const heavyRegex = /sheetz|wawa|quik.?trip|(^|\b)qt\b|racetrac|buc-?ee|costco|sam's|bj's|pilot|love's|circle k|speedway|murphy|exxon|shell|bp|chevron|marathon|7-?eleven/i;
-  const out = [];
-  for (const el of data.elements || []) {
-    const t = el.tags || {};
-    const name = t.brand || t.name || "";
-    const latc = el.lat ?? el.center?.lat;
-    const lonc = el.lon ?? el.center?.lon;
-    if (latc == null || lonc == null) continue;
-    out.push({ name, lat: latc, lon: lonc, miles: +distMiles(lat, lon, latc, lonc).toFixed(3), heavy: heavyRegex.test(name) });
-  }
-  out.sort((a,b)=> a.miles - b.miles);
-  return out;
-}
-
-async function developments1Mile(lat, lon) {
-  const r = 1609;
-  const q = `
-  [out:json][timeout:25];
-  (
-    node(around:${r},${lat},${lon})["amenity"="fuel"]["construction"];
-    way(around:${r},${lat},${lon})["amenity"="fuel"]["construction"];
-    node(around:${r},${lat},${lon})["proposed:amenity"="fuel"];
-    way(around:${r},${lat},${lon})["proposed:amenity"="fuel"];
-    node(around:${r},${lat},${lon})["opening_date"];
-    way(around:${r},${lat},${lon})["opening_date"];
-    node(around:${r},${lat},${lon})["description"~"(?i)(coming soon|proposed|permit|construction|planned)"];
-    way(around:${r},${lat},${lon})["description"~"(?i)(coming soon|proposed|permit|construction|planned)"];
-  );
-  out center tags;`;
-  const data = await queryOverpass(q, 2, 1000);
-  const out = [];
-  for (const el of data.elements || []) {
-    const t = el.tags || {};
-    const name = t.brand || t.name || "(unnamed)";
-    const status =
-      t.construction ? "construction" :
-      t["proposed:amenity"] ? "proposed" :
-      t.opening_date ? `opening ${t.opening_date}` :
-      t.description ? t.description : "planned?";
-    const latc = el.lat ?? el.center?.lat;
-    const lonc = el.lon ?? el.center?.lon;
-    if (latc == null || lonc == null) continue;
-    out.push({ name, status, miles: +distMiles(lat, lon, latc, lonc).toFixed(3) });
-  }
-  // Dedupe & sort
-  out.sort((a,b)=> a.miles - b.miles);
-  const seen = new Set(); const uniq = [];
-  for (const d of out) { const key = `${d.name}|${Math.round(d.miles*100)}`; if (!seen.has(key)) { seen.add(key); uniq.push(d); } }
-  return uniq.slice(0, 20);
-}
-
-// ---------------- GPT helpers ----------------
-function inferClass(address) {
-  const s = String(address).toLowerCase();
-  if (/(^|\b)(i[- ]\d+|interstate)\b/.test(s)) return "freeway";
-  if (/\b(us[- ]?\d+|us hwy|u\.s\.)\b/.test(s)) return "primary arterial";
-  if (/\b(nc[- ]?\d+|state rt|state hwy|sr[- ]?\d+)\b/.test(s)) return "primary arterial";
-  if (/\b(hwy|highway|blvd|pkwy|parkway|bypass)\b/.test(s)) return "arterial";
-  return "collector";
-}
-const AADT_BOUNDS = {
-  freeway: "40,000–120,000",
-  "primary arterial": "12,000–60,000",
-  arterial: "8,000–35,000",
-  collector: "3,000–12,000",
-};
-
-async function gptJSON(prompt) {
-  const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-  if (!OPENAI_API_KEY) throw new Error("Missing OPENAI_API_KEY");
-  const r = await fetchWithTimeout("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "gpt-4o-mini",
-      response_format: { type: "json_object" },
-      temperature: 0.2,
-      max_tokens: 800,
-      messages: [
-        { role: "system", content: "You are a precise fuel volume analyst. Always return valid JSON (no markdown)." },
-        { role: "user", content: prompt },
-      ],
-    }),
-  }, 20000);
-  const txt = await r.text();
-  if (!r.ok) throw new Error(`OpenAI ${r.status}: ${txt}`);
-  const data = JSON.parse(txt);
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) throw new Error("No GPT content");
-  return JSON.parse(content);
-}
-
-// ---------------- Gallons model (floor + gentle comp) ----------------
-function gallonsModel({ aadt, mpds, diesel = 0, compImpact = 0 }) {
-  const floor = aadt * 0.02 * 8 * 30;
-  const compMult = Math.max(0.85, 1 - compImpact); // cap reduction at 15%
-  const truckShare = 0.10;
-  const autos = aadt * (1 - truckShare);
-  const trucks = aadt * truckShare;
-  const gpd = autos * 0.020 * 10.2 * compMult + trucks * 0.012 * 16.0 * compMult;
-  let monthly = gpd * (365 / 12);
-  monthly = Math.max(monthly, floor);
-  const cycles = 25;
-  const cap = (mpds * cycles * 10.5 + diesel * cycles * 16) * (365 / 12);
-  const base = Math.round(Math.min(monthly, cap));
-  const low = Math.round(base * 0.86);
-  const high = Math.round(base * 1.06);
-  const year2 = Math.round(base * 1.027);
-  const year3 = Math.round(year2 * 1.0125);
-  return { base, low, high, year2, year3, cap: Math.round(cap), floor: Math.round(floor), compMult };
-}
-
-// ---------------- /estimate ----------------
-app.post("/estimate", async (req, res) => {
-  try {
-    const { address, mpds, diesel, aadtOverride } = req.body || {};
-    const MPDS = Number(mpds);
-    const DIESEL = Number(diesel || 0);
-    const AADT_OVERRIDE = aadtOverride !== undefined && aadtOverride !== "" ? Number(aadtOverride) : null;
-
-    if (!address) return jerr(res, 400, "Address required");
-    if (!Number.isFinite(MPDS) || MPDS <= 0) return jerr(res, 400, "Regular MPDs required (>0)");
-
-    // Geocode with robust fallback
-    let geo;
-    try { geo = await geocode(address); }
-    catch (e) { return jerr(res, 400, "Geocoding failed", e.message); }
-
-    // Actual AADT
-    const station = await queryNCDOTNearestAADT(geo.lat, geo.lon, 1609).catch(() => null);
-    const actualAADT = station ? {
-      value: station.aadt,
-      year: station.year,
-      distance_mi: +toMiles(station.distM).toFixed(3),
-      source: "NCDOT AADT Stations (best nearby)"
-    } : null;
-
-    // GPT AADT estimate (bounded)
-    const roadClass = inferClass(address);
-    let gptAADT = null;
-    try {
-      const est = await gptJSON(`
-Estimate a plausible AADT for this address, staying within bounds unless clearly justified.
-Address: ${address}
-Street class hint: ${roadClass}
-Bounds: Freeway ${AADT_BOUNDS.freeway}; Primary arterial ${AADT_BOUNDS["primary arterial"]}; Arterial ${AADT_BOUNDS.arterial}; Collector ${AADT_BOUNDS.collector}
-Return JSON: {"aadt_estimate": <number>, "low": <number>, "high": <number>, "class_used": "<string>"}
-      `.trim());
-      if (Number.isFinite(est.aadt_estimate)) {
-        gptAADT = {
-          value: Math.round(est.aadt_estimate),
-          low: Number.isFinite(est.low) ? Math.round(est.low) : null,
-          high: Number.isFinite(est.high) ? Math.round(est.high) : null,
-          class_used: est.class_used || roadClass
-        };
-      }
-    } catch (e) { console.warn("[WARN] GPT AADT estimate failed:", e.message); }
-
-    // Competition & developments
-    let competitors = [], devs = [];
-    try { competitors = await competitorsWithin1Mile(geo.lat, geo.lon); } catch (e) { competitors = []; }
-    try { devs = await developments1Mile(geo.lat, geo.lon); } catch (e) { devs = []; }
-
-    // Impact (gentle)
-    const impact = (() => {
-      let weighted = 0, nearPenalty = 0;
-      for (const c of competitors) {
-        const d = Math.max(c.miles, 0.05);
-        const boost = c.heavy ? 1.6 : 1.0;
-        weighted += (1 / d) * boost;
-        if (c.miles <= 0.03) nearPenalty += 0.10 * boost;
-      }
-      const cut = 0.02 * weighted + nearPenalty;
-      return Math.max(0, Math.min(0.6, cut));
-    })();
-
-    // Choose AADT: override > average(actual,gpt) > one of them
-    let usedAADT = null;
-    if (Number.isFinite(AADT_OVERRIDE) && AADT_OVERRIDE > 0) usedAADT = AADT_OVERRIDE;
-    else if (actualAADT?.value && gptAADT?.value) usedAADT = Math.round((actualAADT.value + gptAADT.value) / 2);
-    else usedAADT = actualAADT?.value ?? gptAADT?.value ?? null;
-
-    if (!Number.isFinite(usedAADT))
-      return jerr(res, 500, "AADT unavailable", "No override, no NCDOT station nearby, and GPT estimate failed");
-
-    // Server-side gallons calc (floor + gentle comp)
-    const calc = gallonsModel({ aadt: usedAADT, mpds: MPDS, diesel: DIESEL, compImpact: impact });
-
-    const notable = competitors.filter(c => c.heavy).slice(0,6).map(c => c.name);
-    const nearest = competitors[0]?.miles ?? null;
-    const rationale = `Base uses AADT ${usedAADT.toLocaleString()} with floor (AADT×2%×8×30=${calc.floor.toLocaleString()}), competition impact ${(impact*100).toFixed(0)}% (nearest ${nearest != null ? nearest.toFixed(3)+' mi' : 'n/a'}${notable.length ? '; notable '+notable.join(', ') : ''}), capped by MPD capacity.`;
-
-    return res.json({
-      base: calc.base,
-      low: calc.low,
-      high: calc.high,
-      year2: calc.year2,
-      year3: calc.year3,
-      inputs: {
-        aadt_used: usedAADT,
-        mpds: MPDS,
-        diesel: DIESEL,
-        truck_share_assumed: 0.10,
-        aadt_actual: actualAADT || { value: null, year: null, distance_mi: null, source: null },
-        aadt_gpt: gptAADT || { value: null, low: null, high: null, class_used: roadClass },
-        aadt_override: Number.isFinite(AADT_OVERRIDE) ? AADT_OVERRIDE : null
-      },
-      competition: {
-        count: competitors.length,
-        nearest_mi: nearest,
-        notable_brands: notable,
-        impact_score: +impact.toFixed(3)
-      },
-      developments: devs,
-      assumptions: [
-        "Floor enforced: AADT × 2% × 8 × 30",
-        "Competition reduction capped at 15%",
-        "Capacity cap: positions × 25 × gal/cycle × 365/12",
-      ],
-      rationale,
-      map: { site: { lat: geo.lat, lon: geo.lon, label: geo.label }, competitors }
-    });
-  } catch (e) {
-    return jerr(res, 500, "Estimate failed", String(e));
-  }
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server listening on :${PORT}`));
+$("go").addEventListener("click", estimate);
+$("rerunBtn").addEventListener("click", rerun);
+$("usePin").addEventListener("click", rerunUsePin);
+</script>
+</body>
+</html>
