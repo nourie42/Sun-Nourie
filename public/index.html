@@ -76,7 +76,7 @@
         <div>
           <label>Site search (address or business name)</label>
           <div class="ac-wrap">
-            <input id="addr" placeholder="e.g., 4173 Knightdale Blvd, Knightdale NC  — or — Sheetz Knightdale" autocomplete="off" />
+            <input id="addr" placeholder="e.g., 6132 Knightdale Blvd, Knightdale NC — or — Sheetz Knightdale" autocomplete="off" />
             <div id="ac" class="ac-list" style="display:none;"></div>
           </div>
         </div>
@@ -91,7 +91,7 @@
       </div>
       <div style="margin-top:12px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
         <button id="go">Estimate</button>
-        <span class="muted">Results include AADT sanity, competition (your rules), multi-source developments, capacity cap, and a detailed summary.</span>
+        <span class="muted">Multi-source: DOT AADT, competition, developments, capacity cap, and a detailed summary.</span>
       </div>
     </div>
 
@@ -137,10 +137,26 @@ function esc(s){ return (s ?? "").toString().replace(/[&<>"']/g, m=>({ "&":"&amp
 function setOverlay(msg){ mapOverlay.textContent = msg; mapOverlay.style.display = "flex"; }
 function clearOverlay(){ mapOverlay.style.display = "none"; }
 
-/* ===== Hybrid Autocomplete (Nominatim + Overpass fuel POIs) ===== */
+/* ===== Hybrid Autocomplete (Census + Nominatim + Overpass fuel POIs) ===== */
 let acTimer=null, acItems=[], acIndex=-1;
 
-/** Query Nominatim for addresses/POIs */
+/** US Census single-line address */
+async function censusSearch(q){
+  const url = `https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?address=${encodeURIComponent(q)}&benchmark=Public_AR_Current&format=json`;
+  const r = await fetch(url);
+  if (!r.ok) return [];
+  const data = await r.json();
+  const matches = data?.result?.addressMatches || [];
+  return matches.map(m => ({
+    type: "Address",
+    display: m.matchedAddress || q,
+    lat: +m.coordinates.y,
+    lon: +m.coordinates.x,
+    score: m.matchQuality || 0
+  }));
+}
+
+/** Nominatim address/POI */
 async function nominatimSearch(q){
   const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=8&countrycodes=us&q=${encodeURIComponent(q)}`;
   const r = await fetch(url);
@@ -154,11 +170,11 @@ async function nominatimSearch(q){
       a.city || a.town || a.village || a.hamlet || a.county,
       a.state, a.postcode
     ].filter(Boolean).join(", ") || row.display_name;
-    return { type:"Address", display: line, lat:+row.lat, lon:+row.lon };
+    return { type:"Address", display: line, lat:+row.lat, lon:+row.lon, score: 0.5 };
   });
 }
 
-/** Get a coarse center for the query so Overpass can search nearby fuel POIs */
+/** Find coarse center for Overpass */
 async function geocodeCenter(q){
   try{
     const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&q=${encodeURIComponent(q)}`;
@@ -170,10 +186,10 @@ async function geocodeCenter(q){
   }catch{ return null; }
 }
 
-/** Query Overpass for fuel businesses near a center, then filter by the user's query tokens */
+/** Overpass fuel stations near center, filtered by tokens */
 async function overpassFuelPOIsNear(center, q){
   if(!center) return [];
-  const radiusM = 15000; // 15km for generous catchment during typing
+  const radiusM = 15000; // 15 km radius for broad POI catchment
   const data = `
     [out:json][timeout:25];
     (
@@ -185,26 +201,24 @@ async function overpassFuelPOIsNear(center, q){
   try{
     const ep = "https://overpass-api.de/api/interpreter";
     const r = await fetch(ep, {
-      method:"POST",
-      headers:{ "Content-Type":"application/x-www-form-urlencoded" },
+      method:"POST", headers:{ "Content-Type":"application/x-www-form-urlencoded" },
       body: "data="+encodeURIComponent(data)
     });
     if(!r.ok) return [];
     const json = await r.json();
-    let items = [];
     const toks = q.toLowerCase().split(/\s+/).filter(Boolean);
+    let items = [];
     for(const el of json.elements||[]){
       const t = el.tags||{};
       const name = t.brand || t.name || "";
       if(!name) continue;
       const hay = (name + " " + (t["addr:street"]||"") + " " + (t["addr:city"]||"")).toLowerCase();
-      // keep only if all tokens appear somewhere
       const ok = toks.every(tok => hay.includes(tok));
       if(!ok) continue;
       const lat = el.lat ?? el.center?.lat;
       const lon = el.lon ?? el.center?.lon;
       if(lat==null || lon==null) continue;
-      items.push({ type:"Station", display:name, lat:+lat, lon:+lon });
+      items.push({ type:"Station", display:name, lat:+lat, lon:+lon, score: 0.6 });
     }
     // de-dupe by name+coords
     const seen = new Set();
@@ -212,12 +226,39 @@ async function overpassFuelPOIsNear(center, q){
       const k = `${it.display}|${it.lat.toFixed(5)}|${it.lon.toFixed(5)}`;
       if(seen.has(k)) return false; seen.add(k); return true;
     });
-    // trim to 10
-    return items.slice(0,10);
+    return items.slice(0,12);
   }catch{ return []; }
 }
 
-/** Render the merged suggestion list */
+/** Merge & rank: prioritize Census exact matches w/ house numbers, then Stations, then Nominatim */
+function rankAndMerge(census, stations, nominatim, query){
+  const hasNumber = /\d/.test(query);
+  const list = [...census, ...stations, ...nominatim];
+
+  // basic score boost
+  for (const it of list){
+    if (it.type === "Station") it.score += 0.3;
+    if (it.type === "Address" && hasNumber && /^\d+/.test(it.display)) it.score += 0.5; // house-number first
+    // exact token coverage boost
+    const toks = query.toLowerCase().split(/\s+/).filter(Boolean);
+    const hay = it.display.toLowerCase();
+    const cover = toks.filter(tok => hay.includes(tok)).length / Math.max(1, toks.length);
+    it.score += cover * 0.3;
+  }
+
+  // dedupe by display+coords
+  const seen = new Set(); const out = [];
+  for (const it of list.sort((a,b)=> (b.score||0) - (a.score||0))){
+    const k = `${it.display}|${it.lat.toFixed(5)}|${it.lon.toFixed(5)}`;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(it);
+    if (out.length >= 12) break;
+  }
+  return out;
+}
+
+/** Render list */
 function renderAcList(list){
   if (!list.length){ hideAc(); return; }
   acIndex = -1;
@@ -244,20 +285,13 @@ addrInput.addEventListener("input", async ()=>{
   if (acTimer) clearTimeout(acTimer);
   acTimer = setTimeout(async ()=>{
     try{
-      const [addrList, center] = await Promise.all([nominatimSearch(q), geocodeCenter(q)]);
-      const fuelList = await overpassFuelPOIsNear(center, q);
-      // merge + de-dupe (prefer Station first, then Address)
-      const merged = [...fuelList, ...addrList];
-      // unique by display+coords
-      const seen = new Set(); const final=[];
-      for(const it of merged){
-        const k = `${it.display}|${it.lat.toFixed(5)}|${it.lon.toFixed(5)}`;
-        if(!seen.has(k)){ seen.add(k); final.push(it); }
-      }
-      acItems = final.slice(0, 12);
+      // run all in parallel
+      const [census, nomi, center] = await Promise.all([censusSearch(q), nominatimSearch(q), geocodeCenter(q)]);
+      const stations = await overpassFuelPOIsNear(center, q);
+      acItems = rankAndMerge(census, stations, nomi, q);
       renderAcList(acItems);
     }catch(_){}
-  }, 250);
+  }, 220);
 });
 
 addrInput.addEventListener("keydown",(e)=>{
@@ -381,7 +415,7 @@ function renderDevs(osm, ai){
 
 /* Init */
 $("go").addEventListener("click", estimate);
-setOverlay("—"); // neutral until the first run
+setOverlay("—"); // neutral until first run
 </script>
 </body>
 </html>
