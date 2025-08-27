@@ -3,59 +3,80 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Fuel Gallons Estimator — Chat</title>
+  <title>Sunoco LP Gas Station Analyzer</title>
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 
   <style>
-    :root { --bg:#0e1117; --panel:#161a22; --line:#2a2f3a; --text:#e6e6e6; --muted:#9aa4b2; --primary:#3b82f6; }
+    :root {
+      --bg:#0b0e15; --panel:#111725; --panel2:#0f1421; --line:#263145;
+      --text:#eaeef7; --muted:#97a3b8; --brand:#0ea5e9; --brand2:#22d3ee; --pill:#0f1929;
+    }
     *{ box-sizing:border-box; }
-    body { background:var(--bg); color:var(--text); font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
-    .wrap { max-width: 980px; margin: 24px auto; padding: 0 16px; }
-    h1 { font-size: 40px; margin: 0 0 12px; }
-    .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px; margin:12px 0; }
-    label { display:block; font-weight:600; margin:10px 0 6px; }
-    input { width:100%; padding:12px; border-radius:8px; border:1px solid var(--line); background:#0f1320; color:var(--text); }
-    .row { display:flex; gap:12px; flex-wrap:wrap; }
-    .row>div { flex:1; min-width:260px; }
-    button { background:var(--primary); color:#fff; border:0; padding:12px 16px; border-radius:10px; font-weight:700; cursor:pointer; }
-    button:disabled { opacity:.5; cursor:not-allowed; }
+    body { background:var(--bg); color:var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+    .wrap { max-width: 1120px; margin: 24px auto; padding: 0 16px; }
+    header { display:flex; align-items:center; gap:14px; margin-bottom:16px; }
+    header .logo { width:46px; height:46px; border-radius:10px;
+      background: radial-gradient(60% 60% at 30% 30%, var(--brand2), transparent 60%),
+                  linear-gradient(145deg, var(--brand), var(--panel2));
+      box-shadow: 0 10px 30px rgba(14,165,233,.25), inset 0 0 12px rgba(34,211,238,.2);
+    }
+    header h1 { font-size: 28px; margin:0; letter-spacing:.3px; }
+    .card { background:linear-gradient(180deg, var(--panel), var(--panel2));
+      border:1px solid var(--line); border-radius:14px; padding:16px; margin:14px 0;
+      box-shadow: 0 12px 30px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.02); }
+    label { display:block; font-weight:600; margin:8px 0 6px; color:#d8e3f6; }
+    input {
+      width:100%; padding:12px 12px; border-radius:10px; border:1px solid var(--line);
+      background:#0b1220; color:var(--text); outline:none;
+    }
+    .row { display:grid; grid-template-columns: 1.8fr 0.8fr 0.8fr; gap:12px; }
+    @media (max-width: 900px){ .row{ grid-template-columns:1fr; } }
+    button {
+      background: linear-gradient(135deg, var(--brand), var(--brand2));
+      color:white; border:0; padding:12px 18px; border-radius:12px; font-weight:700; cursor:pointer;
+      box-shadow: 0 10px 24px rgba(14,165,233,.35);
+    }
+    button:disabled { opacity:.6; cursor:not-allowed; }
     .muted { color:var(--muted); }
-    .grid { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+    .grid { display:grid; grid-template-columns: 1fr 1fr; gap:14px; }
+    @media (max-width: 900px){ .grid{ grid-template-columns:1fr; } }
     .right { text-align:right; }
     #map { height:420px; border-radius:12px; border:1px solid var(--line); position: relative; }
-    #mapOverlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(14,17,23,0.6); border-radius:12px; font-weight:700; }
-    ul { margin: 8px 0 0 18px; }
+    #mapOverlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+      background:rgba(11,14,21,.55); border-radius:12px; font-weight:700; color:#cde9ff; }
     .mono { font-family: ui-monospace, Menlo, Consolas, monospace; }
     .summary { white-space: pre-wrap; }
-
-    /* Autocomplete */
+    /* Autocomplete dropdown */
     .ac-wrap { position:relative; }
     .ac-list {
-      position:absolute; top:100%; left:0; right:0; z-index:20;
-      background:#0f1320; border:1px solid var(--line); border-radius:10px; margin-top:6px;
-      max-height:260px; overflow:auto;
-      box-shadow: 0 10px 30px rgba(0,0,0,.35);
+      position:absolute; top:100%; left:0; right:0; z-index:30; margin-top:6px;
+      background:#0b1220; border:1px solid var(--line); border-radius:12px;
+      max-height:280px; overflow:auto; box-shadow: 0 18px 36px rgba(0,0,0,.35);
     }
-    .ac-item {
-      padding:10px 12px; cursor:pointer; border-bottom:1px solid rgba(255,255,255,.05);
-    }
+    .ac-item { padding:10px 12px; cursor:pointer; border-bottom:1px solid rgba(255,255,255,.04); }
     .ac-item:last-child { border-bottom:0; }
-    .ac-item:hover, .ac-item.active { background:#182032; }
-    .ac-note { font-size:12px; color:var(--muted); }
+    .ac-item:hover, .ac-item.active { background:#101a2b; }
+    .badge { display:inline-block; font-size:11px; padding:2px 8px; border-radius:999px;
+      border:1px solid var(--line); background:var(--pill); color:#a9c5ff; margin-left:8px; }
+    .h3 { font-weight:700; font-size:16px; margin:0 0 6px; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>Fuel Gallons Estimator — Chat</h1>
+    <header>
+      <div class="logo"></div>
+      <h1>Sunoco LP Gas Station Analyzer</h1>
+    </header>
 
     <div class="card">
       <div class="row">
         <div>
-          <label>Site address (autocomplete)</label>
+          <label>Site search (address or business name)</label>
           <div class="ac-wrap">
-            <input id="addr" placeholder="4173 Knightdale Blvd, Knightdale NC" autocomplete="off" />
+            <input id="addr" placeholder="e.g., 4173 Knightdale Blvd, Knightdale NC  — or — Sheetz Knightdale" autocomplete="off" />
             <div id="ac" class="ac-list" style="display:none;"></div>
           </div>
         </div>
@@ -68,9 +89,9 @@
           <input id="diesel" type="number" value="0" />
         </div>
       </div>
-      <div style="margin-top:12px; display:flex; gap:10px; align-items:center;">
+      <div style="margin-top:12px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
         <button id="go">Estimate</button>
-        <span class="muted">Results include AADT sanity, competition, developments, capacity cap, and a detailed summary.</span>
+        <span class="muted">Returns AADT (bounded), competition (rules you requested), multi-source developments, capacity cap, and a detailed explanation.</span>
       </div>
     </div>
 
@@ -79,25 +100,23 @@
     </div>
 
     <div class="card">
-      <div class="muted" style="margin-bottom:6px;">Map: site & competition (1 mile)</div>
-      <div id="map">
-        <div id="mapOverlay" class="muted">—</div>
-      </div>
+      <div class="h3">Map: site & competition (1 mile) <span class="badge">read-only</span></div>
+      <div id="map"><div id="mapOverlay" class="muted">—</div></div>
     </div>
 
     <div class="card">
-      <b>Developments (planned/proposed/permit/coming-soon/construction)</b>
+      <div class="h3">Developments (multi-source)</div>
       <div id="devs" class="muted">—</div>
     </div>
 
     <div class="card">
-      <b>Summary</b>
+      <div class="h3">Summary</div>
       <div id="summary" class="summary muted">—</div>
     </div>
 
     <div class="card">
       <details>
-        <summary>Debug JSON</summary>
+        <summary>Debug</summary>
         <pre id="debug" class="mono muted">/ waiting…</pre>
       </details>
     </div>
@@ -107,49 +126,57 @@
 const $ = id => document.getElementById(id);
 const out = $("out"), debug = $("debug"), goBtn = $("go");
 const acBox = $("ac"), addrInput = $("addr");
-const mapBox = $("map"), overlay = $("mapOverlay");
-let map, markersLayer, mapInited=false;
+const mapOverlay = $("mapOverlay");
+let map, markersLayer, mapInited=false, selectedCoords=null; // {lat, lon}
 
-/* address selection cache */
-let selectedCoords = null; // {lat, lon} when a suggestion was chosen
-
+/* ---------- helpers ---------- */
 function setOut(html){ out.innerHTML = html; }
 function setDebug(obj){ debug.textContent = typeof obj === "string" ? obj : JSON.stringify(obj, null, 2); }
 function fmt(n){ return (n ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 }); }
 function esc(s){ return (s ?? "").toString().replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m])); }
+function setOverlay(msg){ mapOverlay.textContent = msg; mapOverlay.style.display = "flex"; }
+function clearOverlay(){ mapOverlay.style.display = "none"; }
 
-function setOverlay(msg){ overlay.textContent = msg; overlay.style.display = "flex"; }
-function clearOverlay(){ overlay.style.display = "none"; }
-
-/* ---------- Autocomplete (Nominatim) ---------- */
+/* ---------- Autocomplete: address + business ---------- */
 let acTimer=null, acItems=[], acIndex=-1;
 
 addrInput.addEventListener("input", ()=>{
   const q = addrInput.value.trim();
-  selectedCoords = null;     // user changed text → clear stored coords
+  selectedCoords = null;
   hideAc();
-  if (!q || q.length < 4) return;
+  if (!q || q.length < 3) return;
 
   if (acTimer) clearTimeout(acTimer);
   acTimer = setTimeout(async ()=>{
     try{
-      const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=8&countrycodes=us&q=${encodeURIComponent(q)}`;
-      const r = await fetch(url);
-      if (!r.ok) return;
-      const arr = await r.json();
-      acItems = arr.map(row => {
-        const a = row.address || {};
+      // We query Nominatim twice: general address + business (amenity) bias
+      const urlAddr = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&countrycodes=us&q=${encodeURIComponent(q)}`;
+      const urlBiz  = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&countrycodes=us&namedetails=1&q=${encodeURIComponent(q + " fuel OR gas station OR Sheetz OR Wawa OR QuikTrip OR RaceTrac OR Costco")}`;
+      const [ra, rb] = await Promise.all([fetch(urlAddr), fetch(urlBiz)]);
+      const [arrA, arrB] = [await ra.json(), await rb.json()];
+      const rows = [...arrA, ...arrB];
+
+      acItems = rows.map(row=>{
+        const a=row.address||{};
+        const kind = (row.type||row.class||"").toLowerCase().includes("amenity") ? "Business" :
+                     row.type ? row.type[0].toUpperCase()+row.type.slice(1) : "Address";
         const line = [
-          a.house_number, a.road || a.pedestrian || a.footway || a.residential,
+          row.namedetails?.name || a.house_number,
+          a.road || a.pedestrian || a.residential || a.footway,
           a.city || a.town || a.village || a.hamlet || a.county,
           a.state, a.postcode
         ].filter(Boolean).join(", ");
-        return {
-          display: line || row.display_name,
-          lat: Number(row.lat),
-          lon: Number(row.lon)
-        };
-      }).filter(x => x.display);
+        return { display: line || row.display_name, lat:+row.lat, lon:+row.lon, kind };
+      })
+      // dedupe by display+coords
+      .filter(x=>x.display)
+      .reduce((acc,it)=>{
+        const key = `${it.display}|${it.lat.toFixed(5)}|${it.lon.toFixed(5)}`;
+        if(!acc._seen){ acc._seen=new Set(); }
+        if(!acc._seen.has(key)){ acc._seen.add(key); acc.push(it); }
+        return acc;
+      }, []);
+
       renderAc();
     }catch(_){}
   }, 250);
@@ -172,8 +199,8 @@ function renderAc(){
   acIndex = -1;
   acBox.innerHTML = acItems.map((it,i)=>`
     <div class="ac-item" data-i="${i}">
-      ${esc(it.display)}
-      <div class="ac-note">${it.lat.toFixed(5)}, ${it.lon.toFixed(5)}</div>
+      ${esc(it.display)} <span class="badge">${esc(it.kind)}</span>
+      <div class="muted" style="font-size:12px">${it.lat.toFixed(5)}, ${it.lon.toFixed(5)}</div>
     </div>
   `).join("");
   [...acBox.children].forEach(el=>{
@@ -200,23 +227,19 @@ function chooseAc(i){
   hideAc();
 }
 
-/* ---------- API call ---------- */
+/* ---------- API ---------- */
 async function callEstimate(){
   const body = {
     address: $("addr").value.trim(),
     mpds: Number($("mpds").value || 0),
     diesel: Number($("diesel").value || 0)
   };
-  // if user selected a suggestion, send coords so server skips geocoding
-  if (selectedCoords) {
-    body.siteLat = selectedCoords.lat;
-    body.siteLon = selectedCoords.lon;
-  }
+  if (selectedCoords) { body.siteLat = selectedCoords.lat; body.siteLon = selectedCoords.lon; }
   const r=await fetch("/estimate",{ method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
   const t=await r.text(); if(!r.ok) throw new Error(`HTTP ${r.status}\n${t.slice(0,1200)}`); return JSON.parse(t);
 }
 
-/* ---------- UI renderers ---------- */
+/* ---------- Renderers ---------- */
 async function estimate(){
   try{
     goBtn.disabled = true;
@@ -225,8 +248,8 @@ async function estimate(){
     const d = await callEstimate();
     renderReport(d);
     renderMap(d.map);
-    renderDevs(d.developments);
-    renderSummary(d.summary);
+    renderDevs(d.developments, d.developments_ai);
+    $("summary").textContent = d.summary && d.summary.trim().length ? d.summary : "—";
     setDebug(d);
   }catch(e){
     setOut(`<pre class="mono">${esc(e.message)}</pre>`);
@@ -241,8 +264,8 @@ function renderReport(d){
   const html = `
     <div class="grid">
       <div>
-        <b>Base Estimate (gal/mo)</b>
-        <div style="font-size:28px;font-weight:800;">${fmt(d.base)}</div>
+        <div class="h3" style="margin-bottom:6px;">Base Estimate (gal/mo)</div>
+        <div style="font-size:30px;font-weight:800;">${fmt(d.base)}</div>
         <div class="muted">Low–High: ${fmt(d.low)} – ${fmt(d.high)}</div>
       </div>
       <div class="right">
@@ -252,19 +275,10 @@ function renderReport(d){
     </div>
     <hr>
     <div>Inputs: AADT used <b>${fmt(i.aadt_used)}</b>; MPDs ${i.mpds}${i.diesel ? " + diesel "+i.diesel : ""}</div>
-    <div>Competition (Overpass): ${c.count ?? 0} within 1 mi${c.nearest_mi != null ? "; nearest "+c.nearest_mi.toFixed(3)+" mi" : ""}${(c.notable_brands||[]).length ? "; notable: "+c.notable_brands.join(", ") : ""}; impact ${(Number(c.impact_score||0)*100|0)}%</div>
-    <div style="margin-top:8px">${esc(d.rationale||"")}</div>
+    <div>Competition: ${c.count ?? 0} within 1 mi${c.nearest_mi != null ? "; nearest "+c.nearest_mi.toFixed(3)+" mi" : ""}${(c.notable_brands||[]).length ? "; notable: "+c.notable_brands.join(", ") : ""}; impact ${(Number(c.impact_score||0)*100|0)}%</div>
+    <div class="muted" style="margin-top:8px">${esc(d.rationale||"")}</div>
   `;
   setOut(html);
-}
-
-function renderDevs(list){
-  const el=$("devs");
-  if(!Array.isArray(list)||!list.length){ el.innerHTML="<span class='muted'>none found</span>"; return; }
-  el.innerHTML = "<ul>"+list.map(d=>`<li>${esc(d.name)} • ${esc(d.status)} • ${d.miles} mi</li>`).join("")+"</ul>";
-}
-function renderSummary(s){
-  $("summary").textContent = s && s.trim().length ? s : "—";
 }
 
 function ensureLeaflet(){
@@ -273,16 +287,13 @@ function ensureLeaflet(){
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map);
   mapInited = true;
 }
-
 function renderMap(m){
   ensureLeaflet();
   if(markersLayer) markersLayer.remove();
   markersLayer = L.layerGroup().addTo(map);
 
-  if(!m || !m.site){
-    overlay.textContent = "—";
-    return;
-  }
+  if(!m || !m.site){ mapOverlay.textContent = "—"; return; }
+
   const site = [m.site.lat, m.site.lon];
   L.marker(site, { title: "Site" }).addTo(markersLayer).bindPopup("<b>Site</b>");
   const comps = Array.isArray(m.competitors) ? m.competitors : [];
@@ -295,10 +306,20 @@ function renderMap(m){
   clearOverlay();
 }
 
-$("go").addEventListener("click", estimate);
+function renderDevs(osm, ai){
+  const el=$("devs");
+  const left = (Array.isArray(osm)&&osm.length)
+    ? "<ul>"+osm.map(d=>`<li>${esc(d.name)} • ${esc(d.status)} • ${d.miles} mi</li>`).join("")+"</ul>"
+    : "<span class='muted'>OSM/Overpass: none found</span>";
+  const right = (ai && Array.isArray(ai.items) && ai.items.length)
+    ? "<ul>"+ai.items.map(x=>`<li>${esc(x.name)} • ${esc(x.status||"planned")} • ~${x.approx_miles ?? "?"} mi</li>`).join("")+"</ul><div class='muted'>GPT confidence: ${(ai.confidence*100|0)}%</div>"
+    : "<span class='muted'>GPT: none reported</span>";
+  el.innerHTML = `<div class="grid"><div>${left}</div><div>${right}</div></div>`;
+}
 
-/* Initial map overlay state */
-setOverlay("—"); // neutral until the first run
+/* Init */
+$("go").addEventListener("click", estimate);
+setOverlay("—");
 </script>
 </body>
 </html>
