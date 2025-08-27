@@ -5,13 +5,12 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Fuel Gallons Estimator — Chat</title>
 
-  <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 
   <style>
     :root { --bg:#0e1117; --panel:#161a22; --line:#2a2f3a; --text:#e6e6e6; --muted:#9aa4b2; --primary:#3b82f6; }
-    *{ box-sizing: border-box; }
+    *{ box-sizing:border-box; }
     body { background:var(--bg); color:var(--text); font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
     .wrap { max-width: 980px; margin: 24px auto; padding: 0 16px; }
     h1 { font-size: 40px; margin: 0 0 12px; }
@@ -19,18 +18,18 @@
     label { display:block; font-weight:600; margin:10px 0 6px; }
     input { width:100%; padding:12px; border-radius:8px; border:1px solid var(--line); background:#0f1320; color:var(--text); }
     .row { display:flex; gap:12px; flex-wrap:wrap; }
-    .row > div { flex:1; min-width: 220px; }
-    button { background:var(--primary); color:white; border:0; padding:12px 16px; border-radius:10px; font-weight:700; cursor:pointer; }
+    .row>div { flex:1; min-width:220px; }
+    button { background:var(--primary); color:#fff; border:0; padding:12px 16px; border-radius:10px; font-weight:700; cursor:pointer; }
     button:disabled { opacity:.5; cursor:not-allowed; }
     .muted { color:var(--muted); }
     .grid { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .grid2 { display:grid; grid-template-columns: 1fr 1fr; gap:16px; }
     .right { text-align:right; }
-    .heading { font-size:18px; font-weight:700; margin: 0 0 8px; }
-    .pill { display:inline-block; background:#0f1320; border:1px solid var(--line); border-radius:999px; padding:4px 10px; margin-right:6px; font-size:12px; }
-    #map { height: 420px; border-radius:12px; border:1px solid var(--line); }
+    #map { height:420px; border-radius:12px; border:1px solid var(--line); }
     .inputs-inline { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-    .notice { font-size:12px; color: var(--muted); }
+    .mono { font-family: ui-monospace, Menlo, Consolas, monospace; }
+    .pill { display:inline-block; background:#0f1320; border:1px solid var(--line); border-radius:999px; padding:4px 10px; margin-right:6px; font-size:12px; }
+    ul { margin: 8px 0 0 18px; }
   </style>
 </head>
 <body>
@@ -40,8 +39,8 @@
     <div class="card">
       <div class="row">
         <div>
-          <label>Site address (one line) or lat,lon</label>
-          <input id="addr" placeholder="4173 Knightdale Blvd, Knightdale NC 27545  — OR — 35.7872,-78.49" />
+          <label>Site address (or lat,lon)</label>
+          <input id="addr" placeholder="4173 Knightdale Blvd, Knightdale NC — or — 35.7872,-78.49" />
         </div>
         <div>
           <label>Regular MPDs</label>
@@ -53,42 +52,54 @@
         </div>
       </div>
       <div class="inputs-inline" style="margin-top:12px;">
-        <div style="flex:1; min-width:240px;">
+        <div style="flex:1;min-width:240px;">
           <label>AADT override (optional)</label>
           <input id="aadtOverride" type="number" placeholder="enter AADT to force (e.g., 10449)" />
         </div>
         <button id="go">Estimate</button>
-        <span class="muted">Drag the site pin and click “Use marker & Re-run” to compute from the exact point.</span>
+        <span class="muted">Averages DOT + GPT; your override wins. Floor uses AADT×2%×8×30.</span>
       </div>
     </div>
 
-    <div class="card" id="report">
-      <div class="heading">Result</div>
+    <div class="card">
       <div id="out" class="muted">—</div>
-
-      <div style="margin-top:12px" class="inputs-inline">
-        <div style="flex:1; min-width:240px;">
+      <div class="inputs-inline" style="margin-top:12px;">
+        <div style="flex:1;min-width:240px;">
           <label>Adjust AADT and re-run</label>
           <input id="rerunAadt" type="number" placeholder="type a new AADT and click Re-run" />
         </div>
         <button id="rerunBtn">Re-run</button>
-        <span class="muted">Re-estimates using your override only.</span>
       </div>
     </div>
 
     <div class="card">
-      <div class="heading">Map: site & competition (1 mile)</div>
+      <div class="muted" style="margin-bottom:6px;">Map: site & competition (1 mile). Move the blue site pin and re-run if needed.</div>
       <div id="map">Loading…</div>
       <div class="inputs-inline" style="margin-top:8px;">
-        <span class="muted">Move the blue site pin if needed.</span>
         <button id="usePin">Use marker & Re-run</button>
-        <span id="pinPos" class="notice"></span>
+        <span id="pinPos" class="muted"></span>
       </div>
     </div>
 
     <div class="card">
-      <div class="heading">Developments (planned/proposed/permit/coming-soon/construction)</div>
-      <div id="devs" class="muted">—</div>
+      <div class="grid2">
+        <div>
+          <b>Competition (OSM/Overpass)</b>
+          <div id="comp_osm" class="muted">—</div>
+        </div>
+        <div>
+          <b>Competition (GPT estimate)</b> <span id="comp_ai_conf" class="muted"></span>
+          <div id="comp_ai" class="muted">—</div>
+        </div>
+        <div>
+          <b>Developments (OSM/Overpass)</b>
+          <div id="devs_osm" class="muted">—</div>
+        </div>
+        <div>
+          <b>Developments (GPT estimate)</b> <span id="devs_ai_conf" class="muted"></span>
+          <div id="devs_ai" class="muted">—</div>
+        </div>
+      </div>
     </div>
 
     <div class="card">
@@ -100,157 +111,132 @@
   </div>
 
 <script>
-const $ = (id) => document.getElementById(id);
+const $ = id => document.getElementById(id);
 const out = $("out"), debug = $("debug"), goBtn = $("go"), rerunBtn = $("rerunBtn"), usePinBtn = $("usePin");
-
-let map, markersLayer, mapInited = false, siteMarker = null, pendingPin = null;
+let map, markersLayer, siteMarker, mapInited=false, pendingPin=null;
 
 function setOut(html){ out.innerHTML = html; }
 function setDebug(obj){ debug.textContent = typeof obj === "string" ? obj : JSON.stringify(obj, null, 2); }
-function fmt(n){ return (n ?? 0).toLocaleString(undefined, {maximumFractionDigits: 0}); }
+function fmt(n){ return (n ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 }); }
 function esc(s){ return (s ?? "").toString().replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m])); }
 
-async function callEstimate({ overrideValue, usePin=false } = {}){
-  const address = $("addr").value.trim();
-  const mpds = Number($("mpds").value || 0);
-  const diesel = Number($("diesel").value || 0);
-  const aadtOverride = overrideValue ?? $("aadtOverride").value.trim();
-  const body = { address, mpds, diesel, aadtOverride };
-
-  if (usePin && pendingPin) {
-    body.siteLat = pendingPin.lat;
-    body.siteLon = pendingPin.lon;
-  }
-
-  const res = await fetch("/estimate", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body)
-  });
-  const text = await res.text();
-  if (!res.ok) throw new Error(`HTTP ${res.status}\n` + text.slice(0,1200));
-  return JSON.parse(text);
-}
-
-async function estimate(){
-  try {
-    goBtn.disabled = true;
-    setOut(`<span class="muted">Working…</span>`);
-    const data = await callEstimate();
-    setDebug(data);
-    renderReport(data);
-    renderMap(data.map);
-    renderDevs(data.developments);
-  } catch (e) {
-    setOut(`<div class="muted">Error:<br><pre class="mono">${esc(e.message)}</pre></div>`);
-  } finally {
-    goBtn.disabled = false;
-  }
-}
-
-async function rerun(){
-  try {
-    rerunBtn.disabled = true;
-    const v = $("rerunAadt").value.trim();
-    if (!v) { alert("Enter an AADT override first."); return; }
-    setOut(`<span class="muted">Re-running with override AADT ${fmt(Number(v))}…</span>`);
-    const data = await callEstimate({ overrideValue: v });
-    setDebug(data);
-    renderReport(data);
-    renderMap(data.map);
-    renderDevs(data.developments);
-  } catch (e) {
-    setOut(`<div class="muted">Error:<br><pre class="mono">${esc(e.message)}</pre></div>`);
-  } finally {
-    rerunBtn.disabled = false;
-  }
-}
-
-async function rerunUsePin(){
-  try {
-    if (!pendingPin) { alert("Drag the site pin first."); return; }
-    usePinBtn.disabled = true;
-    setOut(`<span class="muted">Re-running from marker location…</span>`);
-    const data = await callEstimate({ usePin: true });
-    setDebug(data);
-    renderReport(data);
-    renderMap(data.map);
-    renderDevs(data.developments);
-  } catch (e) {
-    setOut(`<div class="muted">Error:<br><pre class="mono">${esc(e.message)}</pre></div>`);
-  } finally {
-    usePinBtn.disabled = false;
-  }
+async function callEstimate({overrideValue,usePin}={}){
+  const body={
+    address: $("addr").value.trim(),
+    mpds: Number($("mpds").value||0),
+    diesel: Number($("diesel").value||0),
+    aadtOverride: overrideValue ?? $("aadtOverride").value.trim()
+  };
+  if(usePin && pendingPin){ body.siteLat=pendingPin.lat; body.siteLon=pendingPin.lon; }
+  const r=await fetch("/estimate",{ method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
+  const t=await r.text(); if(!r.ok) throw new Error(`HTTP ${r.status}\n${t.slice(0,1200)}`); return JSON.parse(t);
 }
 
 function renderReport(d){
-  const i = d.inputs || {};
-  const sectionTop = `
+  const i=d.inputs||{}, c=d.competition||{};
+  const html = `
     <div class="grid">
-      <div><b>Base Estimate (gal/mo)</b><br><div style="font-size:28px; font-weight:800;">${fmt(d.base)}</div></div>
+      <div><b>Base Estimate (gal/mo)</b><div style="font-size:28px;font-weight:800;">${fmt(d.base)}</div></div>
       <div class="right">
-        <div><span class="pill">Low</span> <b>${fmt(d.low)}</b></div>
-        <div style="margin-top:6px;"><span class="pill">High</span> <b>${fmt(d.high)}</b></div>
-        <div style="margin-top:6px;">Year-2: <b>${fmt(d.year2)}</b></div>
-        <div style="margin-top:6px;">Year-3: <b>${fmt(d.year3)}</b></div>
+        <div>Low: <b>${fmt(d.low)}</b></div>
+        <div>High: <b>${fmt(d.high)}</b></div>
+        <div>Year-2: <b>${fmt(d.year2)}</b></div>
+        <div>Year-3: <b>${fmt(d.year3)}</b></div>
       </div>
     </div>
     <hr>
-    <div class="heading">Inputs used</div>
-    <div class="muted">AADT used ${fmt(i.aadt_used)}; MPDs ${esc(i.mpds)}${i.diesel ? " + diesel " + esc(i.diesel) : ""}; truck share ${Math.round((i.truck_share_assumed ?? 0)*100)}% (assumed)</div>
-    <div class="heading" style="margin-top:12px;">One-paragraph rationale</div>
-    <div>${esc(d.rationale || "") || "<span class='muted'>—</span>"}</div>
+    <div>Inputs: AADT used ${fmt(i.aadt_used)}; MPDs ${i.mpds}${i.diesel ? " + diesel "+i.diesel : ""}</div>
+    <div>Competition (Overpass): ${c.count ?? 0} within 1 mi${c.nearest_mi != null ? "; nearest "+c.nearest_mi.toFixed(3)+" mi" : ""}${(c.notable_brands||[]).length ? "; notable: "+c.notable_brands.join(", ") : ""}; impact ${(Number(c.impact_score||0)*100|0)}%</div>
+    <div style="margin-top:8px">${esc(d.rationale||"")}</div>
   `;
-  setOut(sectionTop);
+  setOut(html);
   $("rerunAadt").value = i.aadt_used ?? "";
+  setDebug(d.debug || {});
 }
 
-function renderDevs(devs){
-  const el = $("devs");
-  if (!Array.isArray(devs) || !devs.length) { el.innerHTML = "<span class='muted'>none found</span>"; return; }
-  el.innerHTML = "<ul>" + devs.map(d => `<li>${esc(d.name)} • ${esc(d.status)} • ${esc(d.miles)} mi</li>`).join("") + "</ul>";
+function renderLists(d){
+  // Overpass lists
+  const devs_osm = $("devs_osm");
+  devs_osm.innerHTML = (Array.isArray(d.developments) && d.developments.length)
+    ? "<ul>"+d.developments.map(x=>`<li>${esc(x.name)} • ${esc(x.status)} • ${x.miles} mi</li>`).join("")+"</ul>"
+    : "<span class='muted'>none found</span>";
+
+  const comp_osm = $("comp_osm");
+  const comps = d.map?.competitors || [];
+  comp_osm.innerHTML = comps.length
+    ? "<ul>"+comps.slice(0,20).map(x=>`<li>${esc(x.name||"Fuel station")} • ${x.miles} mi${x.heavy?" • heavy":""}</li>`).join("")+"</ul>"
+    : "<span class='muted'>none found</span>";
+
+  // GPT lists
+  $("comp_ai_conf").textContent = d.competition_ai ? `(confidence ${(d.competition_ai.confidence*100|0)}%)` : "";
+  $("devs_ai_conf").textContent = d.developments_ai ? `(confidence ${(d.developments_ai.confidence*100|0)}%)` : "";
+
+  const comp_ai = $("comp_ai");
+  comp_ai.innerHTML = (d.competition_ai && Array.isArray(d.competition_ai.items) && d.competition_ai.items.length)
+    ? "<ul>"+d.competition_ai.items.map(x=>`<li>${esc(x.name)} • ~${x.approx_miles} mi${x.brand? " • "+esc(x.brand):""}</li>`).join("")+"</ul>"
+    : "<span class='muted'>none reported</span>";
+
+  const devs_ai = $("devs_ai");
+  devs_ai.innerHTML = (d.developments_ai && Array.isArray(d.developments_ai.items) && d.developments_ai.items.length)
+    ? "<ul>"+d.developments_ai.items.map(x=>`<li>${esc(x.name)} • ${esc(x.status)} • ~${x.approx_miles} mi</li>`).join("")+"</ul>"
+    : "<span class='muted'>none reported</span>";
 }
 
 function renderMap(m){
-  if (!m || !m.site) return;
-  if (!mapInited) {
-    map = L.map('map', { zoomControl: true });
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "&copy; OpenStreetMap" }).addTo(map);
-    mapInited = true;
+  if(!m||!m.site) return;
+  if(!mapInited){
+    map=L.map("map",{zoomControl:true});
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map);
+    mapInited=true;
   }
-  if (markersLayer) markersLayer.remove();
-  markersLayer = L.layerGroup().addTo(map);
+  if(markersLayer) markersLayer.remove();
+  markersLayer=L.layerGroup().addTo(map);
+  const site=[m.site.lat,m.site.lon];
+  map.setView(site,15);
+  siteMarker=L.marker(site,{draggable:true,title:"Site"}).addTo(markersLayer).bindPopup("<b>Site</b>");
+  siteMarker.on("dragend",e=>{ const p=e.target.getLatLng(); pendingPin={lat:p.lat,lon:p.lng}; $("pinPos").textContent=`marker: ${p.lat.toFixed(6)}, ${p.lng.toFixed(6)} (ready)`; });
 
-  const site = m.site;
-  const comps = Array.isArray(m.competitors) ? m.competitors : [];
-  const siteLatLng = [site.lat, site.lon];
-
-  map.setView(siteLatLng, 15);
-
-  // Draggable site marker
-  siteMarker = L.marker(siteLatLng, { title: "Site", draggable: true }).addTo(markersLayer)
-    .bindPopup(`<b>Site</b><br>${esc(site.label || "")}`);
-  siteMarker.on("dragend", (e) => {
-    const p = e.target.getLatLng();
-    pendingPin = { lat: p.lat, lon: p.lng };
-    $("pinPos").textContent = `marker: ${p.lat.toFixed(6)}, ${p.lng.toFixed(6)} (ready to re-run)`;
-  });
-
-  // Competitors
-  if (comps.length) {
-    for (const c of comps) {
-      L.circleMarker([c.lat, c.lon], { radius: 6, weight: 1, color: c.heavy ? "#ff7f50" : "#4ade80", fillOpacity: 0.85 })
-        .addTo(markersLayer)
-        .bindPopup(`<b>${esc(c.name || "Fuel station")}</b><br>${c.miles} mi`);
-    }
-    const bounds = L.latLngBounds([siteLatLng, ...comps.map(c => [c.lat, c.lon])]);
-    map.fitBounds(bounds.pad(0.25));
+  const comps=Array.isArray(m.competitors)?m.competitors:[];
+  for(const c of comps){
+    L.circleMarker([c.lat,c.lon],{radius:6,weight:1,color:c.heavy?"#ff7f50":"#4ade80",fillOpacity:.85})
+      .addTo(markersLayer).bindPopup(`<b>${esc(c.name||"Fuel station")}</b><br>${c.miles} mi`);
   }
+  const bounds=L.latLngBounds([site, ...comps.map(c=>[c.lat,c.lon])]); map.fitBounds(bounds.pad(0.25));
+}
+
+async function estimate(){
+  try{
+    goBtn.disabled=true;
+    setOut("<span class='muted'>Working…</span>");
+    const d=await callEstimate();
+    renderReport(d); renderMap(d.map); renderLists(d);
+  }catch(e){ setOut(`<pre class="mono">${esc(e.message)}</pre>`);}
+  finally{ goBtn.disabled=false; }
+}
+async function rerun(){
+  try{
+    rerunBtn.disabled=true;
+    const v=$("rerunAadt").value.trim();
+    if(!v) return alert("Enter an AADT first.");
+    const d=await callEstimate({overrideValue:v});
+    renderReport(d); renderMap(d.map); renderLists(d);
+  }catch(e){ setOut(`<pre class="mono">${esc(e.message)}</pre>`);}
+  finally{ rerunBtn.disabled=false; }
+}
+async function usePin(){
+  try{
+    usePinBtn.disabled=true;
+    if(!pendingPin) return alert("Drag the site pin first.");
+    const d=await callEstimate({usePin:true});
+    renderReport(d); renderMap(d.map); renderLists(d);
+  }catch(e){ setOut(`<pre class="mono">${esc(e.message)}</pre>`);}
+  finally{ usePinBtn.disabled=false; }
 }
 
 $("go").addEventListener("click", estimate);
 $("rerunBtn").addEventListener("click", rerun);
-$("usePin").addEventListener("click", rerunUsePin);
+$("usePin").addEventListener("click", usePin);
 </script>
 </body>
 </html>
+
