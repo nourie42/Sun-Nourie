@@ -1,14 +1,10 @@
 {
-  "name": "gallons-estimator-backend",
+  "name": "gpt-gallons-estimator-backend",
   "version": "1.0.0",
-  "description": "Backend for Gas Station Gallons Estimator",
+  "description": "ChatGPT-powered gallons estimator backend",
   "main": "server.js",
-  "scripts": {
-    "start": "node server.js"
-  },
-  "engines": {
-    "node": ">=18"
-  },
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=18" },
   "dependencies": {
     "express": "^4.19.2",
     "node-fetch": "^3.3.2"
