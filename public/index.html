@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Fuel Gallons Estimator — Chat</title>
 
-  <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 
@@ -30,7 +29,21 @@
     ul { margin: 8px 0 0 18px; }
     .mono { font-family: ui-monospace, Menlo, Consolas, monospace; }
     .summary { white-space: pre-wrap; }
-    datalist option { color:#000; }
+
+    /* Autocomplete */
+    .ac-wrap { position:relative; }
+    .ac-list {
+      position:absolute; top:100%; left:0; right:0; z-index:20;
+      background:#0f1320; border:1px solid var(--line); border-radius:10px; margin-top:6px;
+      max-height:260px; overflow:auto;
+      box-shadow: 0 10px 30px rgba(0,0,0,.35);
+    }
+    .ac-item {
+      padding:10px 12px; cursor:pointer; border-bottom:1px solid rgba(255,255,255,.05);
+    }
+    .ac-item:last-child { border-bottom:0; }
+    .ac-item:hover, .ac-item.active { background:#182032; }
+    .ac-note { font-size:12px; color:var(--muted); }
   </style>
 </head>
 <body>
@@ -41,8 +54,10 @@
       <div class="row">
         <div>
           <label>Site address (autocomplete)</label>
-          <input id="addr" list="addr_suggest" placeholder="4173 Knightdale Blvd, Knightdale NC" autocomplete="off" />
-          <datalist id="addr_suggest"></datalist>
+          <div class="ac-wrap">
+            <input id="addr" placeholder="4173 Knightdale Blvd, Knightdale NC" autocomplete="off" />
+            <div id="ac" class="ac-list" style="display:none;"></div>
+          </div>
         </div>
         <div>
           <label>Regular MPDs</label>
@@ -91,8 +106,12 @@
 <script>
 const $ = id => document.getElementById(id);
 const out = $("out"), debug = $("debug"), goBtn = $("go");
+const acBox = $("ac"), addrInput = $("addr");
 const mapBox = $("map"), overlay = $("mapOverlay");
 let map, markersLayer, mapInited=false;
+
+/* address selection cache */
+let selectedCoords = null; // {lat, lon} when a suggestion was chosen
 
 function setOut(html){ out.innerHTML = html; }
 function setDebug(obj){ debug.textContent = typeof obj === "string" ? obj : JSON.stringify(obj, null, 2); }
@@ -102,21 +121,106 @@ function esc(s){ return (s ?? "").toString().replace(/[&<>"']/g, m=>({ "&":"&amp
 function setOverlay(msg){ overlay.textContent = msg; overlay.style.display = "flex"; }
 function clearOverlay(){ overlay.style.display = "none"; }
 
+/* ---------- Autocomplete (Nominatim) ---------- */
+let acTimer=null, acItems=[], acIndex=-1;
+
+addrInput.addEventListener("input", ()=>{
+  const q = addrInput.value.trim();
+  selectedCoords = null;     // user changed text → clear stored coords
+  hideAc();
+  if (!q || q.length < 4) return;
+
+  if (acTimer) clearTimeout(acTimer);
+  acTimer = setTimeout(async ()=>{
+    try{
+      const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=8&countrycodes=us&q=${encodeURIComponent(q)}`;
+      const r = await fetch(url);
+      if (!r.ok) return;
+      const arr = await r.json();
+      acItems = arr.map(row => {
+        const a = row.address || {};
+        const line = [
+          a.house_number, a.road || a.pedestrian || a.footway || a.residential,
+          a.city || a.town || a.village || a.hamlet || a.county,
+          a.state, a.postcode
+        ].filter(Boolean).join(", ");
+        return {
+          display: line || row.display_name,
+          lat: Number(row.lat),
+          lon: Number(row.lon)
+        };
+      }).filter(x => x.display);
+      renderAc();
+    }catch(_){}
+  }, 250);
+});
+
+addrInput.addEventListener("keydown",(e)=>{
+  if (acBox.style.display === "none") return;
+  if (e.key === "ArrowDown"){ e.preventDefault(); moveAc(1); }
+  else if (e.key === "ArrowUp"){ e.preventDefault(); moveAc(-1); }
+  else if (e.key === "Enter"){ if (acIndex >=0){ e.preventDefault(); chooseAc(acIndex); } }
+  else if (e.key === "Escape"){ hideAc(); }
+});
+
+document.addEventListener("click",(e)=>{
+  if (!acBox.contains(e.target) && e.target !== addrInput) hideAc();
+});
+
+function renderAc(){
+  if (!acItems.length){ hideAc(); return; }
+  acIndex = -1;
+  acBox.innerHTML = acItems.map((it,i)=>`
+    <div class="ac-item" data-i="${i}">
+      ${esc(it.display)}
+      <div class="ac-note">${it.lat.toFixed(5)}, ${it.lon.toFixed(5)}</div>
+    </div>
+  `).join("");
+  [...acBox.children].forEach(el=>{
+    el.addEventListener("mouseenter",()=> setActive(+el.dataset.i));
+    el.addEventListener("click",()=> chooseAc(+el.dataset.i));
+  });
+  acBox.style.display = "block";
+}
+function hideAc(){ acBox.style.display = "none"; acIndex = -1; }
+function setActive(i){
+  acIndex = i;
+  [...acBox.children].forEach((el,idx)=> el.classList.toggle("active", idx===i));
+}
+function moveAc(step){
+  if (!acItems.length) return;
+  acIndex = ( (acIndex + step) % acItems.length + acItems.length ) % acItems.length;
+  setActive(acIndex);
+  acBox.children[acIndex].scrollIntoView({ block:"nearest" });
+}
+function chooseAc(i){
+  const it = acItems[i]; if (!it) return;
+  addrInput.value = it.display;
+  selectedCoords = { lat: it.lat, lon: it.lon };
+  hideAc();
+}
+
+/* ---------- API call ---------- */
 async function callEstimate(){
   const body = {
     address: $("addr").value.trim(),
     mpds: Number($("mpds").value || 0),
     diesel: Number($("diesel").value || 0)
   };
+  // if user selected a suggestion, send coords so server skips geocoding
+  if (selectedCoords) {
+    body.siteLat = selectedCoords.lat;
+    body.siteLon = selectedCoords.lon;
+  }
   const r=await fetch("/estimate",{ method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
   const t=await r.text(); if(!r.ok) throw new Error(`HTTP ${r.status}\n${t.slice(0,1200)}`); return JSON.parse(t);
 }
 
+/* ---------- UI renderers ---------- */
 async function estimate(){
   try{
     goBtn.disabled = true;
     setOut("<span class='muted'>Working…</span>");
-    // Show the longer research message only AFTER the user clicks Estimate:
     setOverlay("Loading, this can take up to 3 minutes to research");
     const d = await callEstimate();
     renderReport(d);
@@ -159,7 +263,6 @@ function renderDevs(list){
   if(!Array.isArray(list)||!list.length){ el.innerHTML="<span class='muted'>none found</span>"; return; }
   el.innerHTML = "<ul>"+list.map(d=>`<li>${esc(d.name)} • ${esc(d.status)} • ${d.miles} mi</li>`).join("")+"</ul>";
 }
-
 function renderSummary(s){
   $("summary").textContent = s && s.trim().length ? s : "—";
 }
@@ -180,10 +283,8 @@ function renderMap(m){
     overlay.textContent = "—";
     return;
   }
-
-  // site marker (NOT draggable)
   const site = [m.site.lat, m.site.lon];
-  const siteMarker = L.marker(site, { title: "Site" }).addTo(markersLayer).bindPopup("<b>Site</b>");
+  L.marker(site, { title: "Site" }).addTo(markersLayer).bindPopup("<b>Site</b>");
   const comps = Array.isArray(m.competitors) ? m.competitors : [];
   for(const c of comps){
     L.circleMarker([c.lat,c.lon],{radius:6,weight:1,color:c.heavy?"#ff7f50":"#4ade80",fillOpacity:.85})
@@ -191,28 +292,8 @@ function renderMap(m){
   }
   const bounds=L.latLngBounds([site, ...comps.map(c=>[c.lat,c.lon])]);
   map.fitBounds(bounds.pad(0.25));
-
-  // hide overlay once drawn
   clearOverlay();
 }
-
-/* ---------- Address Autocomplete (Nominatim) ---------- */
-let acTimer=null;
-$("addr").addEventListener("input", ()=>{
-  const q = $("addr").value.trim();
-  if(acTimer) clearTimeout(acTimer);
-  if(!q || q.length < 4){ $("addr_suggest").innerHTML=""; return; }
-  acTimer = setTimeout(async ()=>{
-    try{
-      const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=8&countrycodes=us&q=${encodeURIComponent(q)}`;
-      const r = await fetch(url);
-      if(!r.ok) return;
-      const arr = await r.json();
-      const dl = $("addr_suggest");
-      dl.innerHTML = arr.map(x=>`<option value="${esc(x.display_name)}"></option>`).join("");
-    }catch(_){}
-  }, 300);
-});
 
 $("go").addEventListener("click", estimate);
 
