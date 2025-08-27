@@ -5,28 +5,46 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Sunoco LP Gas Station Analyzer</title>
 
+  <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 
   <style>
-    :root { --bg:#0b0e15; --panel:#111725; --panel2:#0f1421; --line:#263145; --text:#eaeef7; --muted:#97a3b8; --brand:#0ea5e9; --brand2:#22d3ee; --pill:#0f1929; }
+    :root {
+      --bg:#0b0e15; --panel:#111725; --panel2:#0f1421; --line:#263145;
+      --text:#eaeef7; --muted:#97a3b8; --brand:#0ea5e9; --brand2:#22d3ee; --pill:#0f1929;
+    }
     *{ box-sizing:border-box; }
-    body{ background:var(--bg); color:var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
-    .wrap{ max-width: 1120px; margin:24px auto; padding:0 16px; }
+    body{
+      background:var(--bg); color:var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    }
+    .wrap{ max-width:1120px; margin:24px auto; padding:0 16px; }
     header{ display:flex; align-items:center; gap:14px; margin-bottom:16px; }
-    header .logo{ width:46px; height:46px; border-radius:10px;
+    header .logo{
+      width:46px; height:46px; border-radius:10px;
       background: radial-gradient(60% 60% at 30% 30%, var(--brand2), transparent 60%),
                   linear-gradient(145deg, var(--brand), var(--panel2));
-      box-shadow: 0 10px 30px rgba(14,165,233,.25), inset 0 0 12px rgba(34,211,238,.2); }
+      box-shadow: 0 10px 30px rgba(14,165,233,.25), inset 0 0 12px rgba(34,211,238,.2);
+    }
     header h1{ font-size:28px; margin:0; }
 
-    .card{ background:linear-gradient(180deg,var(--panel),var(--panel2)); border:1px solid var(--line); border-radius:12px; padding:16px; margin:12px 0; }
+    .card{
+      background:linear-gradient(180deg,var(--panel),var(--panel2));
+      border:1px solid var(--line); border-radius:12px; padding:16px; margin:12px 0;
+    }
     label{ display:block; font-weight:600; margin:8px 0 6px; color:#d8e3f6; }
-    input{ width:100%; padding:12px; border-radius:10px; border:1px solid var(--line); background:#0b1220; color:var(--text); }
-    button{ background:linear-gradient(135deg,var(--brand),var(--brand2)); color:#fff; border:0; padding:12px 16px; border-radius:12px; font-weight:700; cursor:pointer; }
+    input{
+      width:100%; padding:12px; border-radius:10px;
+      border:1px solid var(--line); background:#0b1220; color:var(--text);
+    }
+    button{
+      background:linear-gradient(135deg,var(--brand),var(--brand2));
+      color:#fff; border:0; padding:12px 16px; border-radius:12px; font-weight:700; cursor:pointer;
+    }
     button:disabled{ opacity:.6; cursor:not-allowed; }
 
-    .row{ display:grid; grid-template-columns: 1.8fr 0.8fr 0.8fr; gap:12px; }
+    .row{ display:grid; grid-template-columns:1.8fr 0.8fr 0.8fr; gap:12px; }
     @media (max-width:900px){ .row{ grid-template-columns:1fr; } }
 
     .grid{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
@@ -36,18 +54,29 @@
     .mono{ font-family: ui-monospace, Menlo, Consolas, monospace; white-space:pre-wrap; }
 
     #map{ height:420px; border-radius:12px; border:1px solid var(--line); position: relative; }
-    #overlay{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-      background:rgba(11,14,21,.55); border-radius:12px; font-weight:700; color:#cde9ff; }
+    #overlay{
+      position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+      background:rgba(11,14,21,.55); border-radius:12px; font-weight:700; color:#cde9ff;
+    }
 
-    /* Autocomplete dropdown */
+    /* Autocomplete */
     .ac-wrap{ position:relative; }
-    .ac-list{ position:absolute; top:100%; left:0; right:0; z-index:30; margin-top:6px;
+    .ac-list{
+      position:absolute; top:100%; left:0; right:0; z-index:30; margin-top:6px;
       background:#0b1220; border:1px solid var(--line); border-radius:12px; max-height:320px; overflow:auto;
-      box-shadow: 0 18px 36px rgba(0,0,0,.35); }
+      box-shadow: 0 18px 36px rgba(0,0,0,.35);
+    }
     .ac-item{ padding:10px 12px; cursor:pointer; border-bottom:1px solid rgba(255,255,255,.04); }
     .ac-item:last-child{ border-bottom:0; }
     .ac-item:hover, .ac-item.active{ background:#101a2b; }
-    .badge{ display:inline-block; font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); background:var(--pill); color:#a9c5ff; margin-left:8px; }
+    .badge{
+      display:inline-block; font-size:11px; padding:2px 8px; border-radius:999px;
+      border:1px solid var(--line); background:var(--pill); color:#a9c5ff; margin-left:8px;
+    }
+
+    .toolbar{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+    .checkbox{ display:inline-flex; align-items:center; gap:8px; font-size:14px; }
+    .subtle{ font-size:12px; opacity:.9; }
   </style>
 </head>
 <body>
@@ -75,9 +104,15 @@
           <input id="diesel" type="number" value="0"/>
         </div>
       </div>
-      <div style="margin-top:12px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+      <div style="margin-top:12px;" class="toolbar">
         <button id="go">Estimate</button>
-        <span class="muted">Multi-source AADT, competition by rule, developments (OSM + GPT), capacity cap, and detailed summary.</span>
+        <button id="copySummary" title="Copy summary">Copy Summary</button>
+        <label class="checkbox">
+          <input type="checkbox" id="includeAI"/>
+          Include AI (unverified) developments
+          <span class="subtle muted">(off by default)</span>
+        </label>
+        <span class="muted">Multi-source AADT, competition-by-rule, OSM + GPT (verified), capacity cap, and road-layout analysis.</span>
       </div>
     </div>
 
@@ -86,7 +121,12 @@
     </div>
 
     <div class="card">
-      <div class="muted" style="margin-bottom:6px;">Map: site & competition (1 mile)</div>
+      <div id="aadtBanner" class="muted" style="margin-bottom:6px;">—</div>
+      <div class="muted" style="margin-bottom:6px;">
+        Map: Site & competitors (1 mile)
+        <span class="badge">Legend</span>
+        <span class="muted" id="legend">Site marker • Heavy competitor ● • Regular competitor ●</span>
+      </div>
       <div id="map"><div id="overlay" class="muted">—</div></div>
     </div>
 
@@ -108,7 +148,9 @@
 <script>
 /* ========== Helpers & globals ========== */
 const $ = id => document.getElementById(id);
-const out=$("out"), devs=$("devs"), summary=$("summary"), dbg=$("debug"), goBtn=$("go");
+const out=$("out"), devs=$("devs"), summary=$("summary"), dbg=$("debug"),
+      goBtn=$("go"), includeAI=$("includeAI"), copyBtn=$("copySummary"),
+      aadtBanner=$("aadtBanner");
 const acBox=$("ac"), addrInput=$("addr");
 const overlay=$("overlay");
 let map, layer, mapReady=false, selectedCoords=null;
@@ -123,7 +165,7 @@ function initMap(){ if(mapReady) return; map=L.map("map",{zoomControl:true});
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map);
   layer=L.layerGroup().addTo(map); mapReady=true; }
 
-/* ========== Hybrid autocomplete with safe fallback ========== */
+/* ========== Autocomplete (hybrid) ========== */
 let acTimer=null, acItems=[], acIndex=-1;
 
 async function censusSearch(q){
@@ -157,8 +199,12 @@ async function geocodeCenter(q){
 async function overpassStations(center, q){
   if(!center) return [];
   try{
-    const rad=15000;
-    const data=`[out:json][timeout:25];(node(around:${rad},${center.lat},${center.lon})["amenity"="fuel"];way(around:${rad},${center.lat},${center.lon})["amenity"="fuel"];);out center tags;`;
+    const rad=15000; // 15km to find possible brand/business matches
+    const data=`[out:json][timeout:25];
+      (
+        node(around:${rad},${center.lat},${center.lon})["amenity"="fuel"];
+        way(around:${rad},${center.lat},${center.lon})["amenity"="fuel"];
+      );out center tags;`;
     const ep="https://overpass-api.de/api/interpreter";
     const r=await fetch(ep,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:"data="+encodeURIComponent(data)});
     if(!r.ok) return [];
@@ -173,9 +219,38 @@ async function overpassStations(center, q){
     }
     // dedupe
     const seen=new Set(); items=items.filter(it=>{ const k=`${it.display}|${it.lat.toFixed(5)}|${it.lon.toFixed(5)}`; if(seen.has(k)) return false; seen.add(k); return true; });
-    return items.slice(0,10);
+    return items.slice(0,12);
   }catch{return [];}
 }
+
+/* Boost exact street numbers & brand/business names */
+function boostExactNumberAndBusiness(item, q){
+  const ql = q.toLowerCase().trim();
+  const il = (item.display||"").toLowerCase();
+
+  // Exact leading number at start of query & item
+  const m = ql.match(/^\s*(\d+)\b/);
+  if(m){
+    const num = m[1];
+    if(/^\s*\d+\b/.test(il) && il.startsWith(num)) item.score += 0.6;
+  }
+
+  // Sequential token containment (ordered)
+  const toks = ql.split(/\s+/).filter(Boolean);
+  let idx = 0, okSeq = true;
+  for(const t of toks){
+    const pos = il.indexOf(t, idx);
+    if(pos < 0){ okSeq = false; break; }
+    idx = pos + t.length;
+  }
+  if(okSeq) item.score += 0.25;
+
+  // Known brands boost
+  if(/(sheetz|wawa|costco|racetrac|buc-?ee|quik.?trip|^qt\b|murphy|exxon|shell|bp|chevron|marathon|circle k|speedway|7-?eleven)/i.test(item.display||"")){
+    item.score += 0.35;
+  }
+}
+
 function rankMerge(census, stations, nomi, q){
   const hasNum=/\d/.test(q);
   const list=[...census,...stations,...nomi];
@@ -185,6 +260,7 @@ function rankMerge(census, stations, nomi, q){
     const toks=q.toLowerCase().split(/\s+/).filter(Boolean), hay=it.display.toLowerCase();
     const cover=toks.filter(tok=>hay.includes(tok)).length/Math.max(1,toks.length);
     it.score+=(cover*0.2);
+    boostExactNumberAndBusiness(it, q);
   }
   // “Use exactly …” first option
   const useExact = { type:"Use exactly", display:q, lat:null, lon:null, score:2 };
@@ -197,6 +273,7 @@ function rankMerge(census, stations, nomi, q){
   }
   return out;
 }
+
 function renderAc(list){
   if(!list.length){ acBox.style.display="none"; return; }
   acBox.innerHTML=list.map((it,i)=>`
@@ -227,7 +304,7 @@ addrInput.addEventListener("input", ()=>{
   acTimer=setTimeout(async()=>{
     try{
       const [census, nomi, center] = await Promise.all([censusSearch(q), nominatimSearch(q), geocodeCenter(q)]);
-      const stations = await overpassStations(center, q); // non-blocking-ish
+      const stations = await overpassStations(center, q);
       acItems = rankMerge(census, stations, nomi, q);
       renderAc(acItems);
     }catch{ /* ignore */ }
@@ -255,8 +332,25 @@ async function callEstimate(){
 }
 
 /* ========== Renderers ========== */
+function copySummary(){
+  try{
+    const t = summary.textContent || '';
+    navigator.clipboard.writeText(t);
+    alert('Summary copied.');
+  }catch(e){ alert('Copy failed: '+e.message); }
+}
+copyBtn && copyBtn.addEventListener('click', copySummary);
+
 function renderReport(d){
   const i=d.inputs||{}, c=d.competition||{};
+  // AADT banner w/ source
+  try{
+    const a = d.inputs?.aadt_actual;
+    aadtBanner.textContent = a?.value
+      ? `AADT used: ${fmt(d.inputs.aadt_used)} (${a.source==='custom'?'Custom':'NCDOT'} ${a.year || "n/a"}${a.source==='custom'?'':`, ~${a.distance_mi} mi`})`
+      : `AADT used: ${fmt(d.inputs.aadt_used)} (fallback)`;
+  }catch{}
+
   setOut(`
     <div class="grid">
       <div>
@@ -272,27 +366,57 @@ function renderReport(d){
     <hr/>
     <div>Inputs: AADT used <b>${fmt(i.aadt_used)}</b>; MPDs ${i.mpds}${i.diesel? " + diesel "+i.diesel:""}</div>
     <div>Competition: ${c.count ?? 0} within 1 mi${c.nearest_mi!=null? "; nearest "+c.nearest_mi.toFixed(3)+" mi":""}${(c.notable_brands||[]).length ? "; notable: "+c.notable_brands.join(", ") : ""}</div>
-    <div class="muted" style="margin-top:8px">${esc(d.rationale||"")}</div>
+    <div class="muted" style="margin-top:8px">
+      ${esc(d.rationale||"")} — <i>Rule:</i> 0–1=100%, 2=75%, 3+=60%; Heavy: −20% / −35%.
+    </div>
   `);
 }
+
 function renderDevs(osm, ai){
+  // Only show verified GPT items unless user explicitly includes unverified
+  const showUnverified = includeAI ? includeAI.checked : false;
+  const verified = (ai && Array.isArray(ai.verified)) ? ai.verified : [];
+  const unverified = (ai && Array.isArray(ai.unverified)) ? ai.unverified : [];
+
   const left = (Array.isArray(osm)&&osm.length)
     ? "<ul>"+osm.map(d=>`<li>${esc(d.name)} • ${esc(d.status)} • ${d.miles} mi</li>`).join("")+"</ul>"
     : "<span class='muted'>OSM/Overpass: none found</span>";
-  const right = (ai && Array.isArray(ai.items) && ai.items.length)
-    ? "<ul>"+ai.items.map(x=>`<li>${esc(x.name)} • ${esc(x.status||"planned")} • ~${x.approx_miles ?? "?"} mi</li>`).join("")+"</ul><div class='muted'>GPT confidence: ${(ai.confidence*100|0)}%</div>"
+
+  const right = (verified.length || (showUnverified && unverified.length))
+    ? `<div><div><b>GPT (verified)</b></div><ul>`+
+        verified.map(x=>`<li>${esc(x.name)} • ${esc(x.status||"planned")} • ~${x.approx_miles ?? "?"} mi</li>`).join("")+
+      `</ul>`+
+      (showUnverified && unverified.length
+        ? `<div class='muted' style='margin-top:6px'><b>GPT (unverified)</b></div><ul>`+
+          unverified.map(x=>`<li>${esc(x.name)} • ${esc(x.status||"planned")} • ~${x.approx_miles ?? "?"} mi</li>`).join("")+
+         `</ul><div class='muted'>GPT confidence: ${(ai.confidence*100|0)}%</div>`
+        : `<div class='muted'>GPT confidence: ${(ai?.confidence*100|0)}%</div>`)
     : "<span class='muted'>GPT: none reported</span>";
+
   devs.innerHTML = `<div class="grid"><div>${left}</div><div>${right}</div></div>`;
 }
+
 function renderMap(m){
   initMap(); layer.clearLayers();
   if(!m || !m.site){ overlay.textContent="—"; return; }
+
   const site=[m.site.lat,m.site.lon];
   L.marker(site,{title:"Site"}).addTo(layer).bindPopup("<b>Site</b>");
+
   const comps = Array.isArray(m.competitors)?m.competitors:[];
   const pts=[site];
-  for(const c of comps){ pts.push([c.lat,c.lon]); L.circleMarker([c.lat,c.lon],{radius:6,weight:1,color:c.heavy?"#ff7f50":"#4ade80",fillOpacity:.85}).addTo(layer).bindPopup(`${esc(c.name||"Fuel")} • ${c.miles} mi`); }
-  const bounds=L.latLngBounds(pts); map.fitBounds(bounds.pad(0.25)); clearOverlay();
+
+  // Heavy brands get warm color; regular competitors get greenish
+  for(const c of comps){
+    pts.push([c.lat,c.lon]);
+    L.circleMarker([c.lat,c.lon],{
+      radius:6, weight:1, color:c.heavy?"#ff7f50":"#4ade80", fillOpacity:.85
+    }).addTo(layer).bindPopup(`${esc(c.name||"Fuel")} • ${c.miles} mi`);
+  }
+
+  const bounds=L.latLngBounds(pts);
+  map.fitBounds(bounds.pad(0.25));
+  clearOverlay();
 }
 
 /* ========== Main flow ========== */
@@ -316,6 +440,7 @@ async function estimate(){
 }
 $("go").addEventListener("click", estimate);
 addrInput.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); estimate(); } });
+includeAI && includeAI.addEventListener("change", ()=>{ /* re-render devs from last result if needed */ });
 
 /* initial state */
 overlay.textContent="—";
