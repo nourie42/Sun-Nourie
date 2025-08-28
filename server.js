@@ -23,7 +23,7 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const STRICT_AI_DEVS = process.env.STRICT_AI_DEVS ? String(process.env.STRICT_AI_DEVS).toLowerCase() === "true" : true;
 const AI_DEVS_MIN_CONF = Number.isFinite(+process.env.AI_DEVS_MIN_CONF) ? +process.env.AI_DEVS_MIN_CONF : 0.85;
 
-/* Optional external sources (news/planning JSON endpoints; templated with {address},{lat},{lon}) */
+/* Optional external sources (templated with {address},{lat},{lon}) */
 const NEWS_URL = process.env.NEWS_URL || "";
 const PLANNING_URL = process.env.PLANNING_URL || "";
 
@@ -126,7 +126,7 @@ async function queryCustomTraffic(lat, lon, address) {
       if (year == null && /(year|date)/.test(lk)) { const mt = String(j[k]).match(/20\d{2}/)?.[0]; if (mt) year = +mt; }
     }
     if (value) return { aadt: value, year: year || null, distM: 0, source: "custom" };
-  } catch { }
+  } catch {}
   return null;
 }
 
@@ -343,7 +343,7 @@ async function queryExternalJSON(tpl, { address, lat, lon }) {
   } catch { return []; }
 }
 
-/* ========== Google Places proxy (for autocomplete) ========== */
+/* ========== Google Places: autocomplete status ========== */
 async function googleAutocomplete(input) {
   if (!GOOGLE_API_KEY) return { ok: false, status: "MISSING_KEY", error: "GOOGLE_API_KEY not set", items: [] };
   const au = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}&components=country:us&key=${GOOGLE_API_KEY}`;
@@ -383,12 +383,63 @@ app.get("/google/autocomplete", async (req, res) => {
   } catch (e) { return res.json({ ok: false, status: "EXCEPTION", error: String(e), items: [] }); }
 });
 
+/* ========== Google Place: Find Place (text→place_id) ========== */
+app.get("/google/findplace", async (req, res) => {
+  try {
+    const input = String(req.query.input || "").trim();
+    if (!GOOGLE_API_KEY) return res.status(500).json({ ok:false, status:"MISSING_KEY", error:"GOOGLE_API_KEY not set" });
+    if (!input) return res.status(400).json({ ok:false, status:"BAD_REQUEST", error:"missing input" });
+
+    const url = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(input)}&inputtype=textquery&fields=place_id,name,formatted_address,geometry&key=${GOOGLE_API_KEY}`;
+    const r = await fetchWithTimeout(url, { headers: { "User-Agent": UA, Accept: "application/json" }}, 15000);
+    const txt = await r.text();
+    if (!r.ok) return res.json({ ok:false, status:`HTTP_${r.status}`, error:txt.slice(0,200) });
+    let j; try { j = JSON.parse(txt); } catch { return res.json({ ok:false, status:"PARSE_ERROR", error:txt.slice(0,200) }); }
+    const cand = (j.candidates||[])[0];
+    if (!cand?.place_id) return res.json({ ok:false, status:j.status||"ZERO_RESULTS", candidates:[] });
+    return res.json({ ok:true, status:"OK", place_id:cand.place_id, name:cand.name, address:cand.formatted_address, location:cand.geometry?.location||null });
+  } catch(e) {
+    return res.json({ ok:false, status:"EXCEPTION", error:String(e) });
+  }
+});
+
+/* ========== Google Place: Rating Only (stars + count) ========== */
+app.get("/google/rating", async (req, res) => {
+  try {
+    const place_id = String(req.query.place_id || "").trim();
+    if (!GOOGLE_API_KEY) return res.status(500).json({ ok:false, status:"MISSING_KEY", error:"GOOGLE_API_KEY not set" });
+    if (!place_id) return res.status(400).json({ ok:false, status:"BAD_REQUEST", error:"missing place_id" });
+
+    const fields = ["name","formatted_address","rating","user_ratings_total","url"].join(",");
+    const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(place_id)}&fields=${encodeURIComponent(fields)}&key=${GOOGLE_API_KEY}`;
+    const r = await fetchWithTimeout(url, { headers: { "User-Agent": UA, Accept: "application/json" } }, 15000);
+    const txt = await r.text();
+    if (!r.ok) return res.json({ ok:false, status:`HTTP_${r.status}`, error:txt.slice(0,200) });
+
+    let j; try { j = JSON.parse(txt); } catch { return res.json({ ok:false, status:"PARSE_ERROR", error:txt.slice(0,200) }); }
+    if (j.status !== "OK") return res.json({ ok:false, status:j.status||"ERROR", error:j.error_message||null });
+
+    const resu = j.result || {};
+    return res.json({
+      ok:true,
+      status:"OK",
+      name: resu.name || null,
+      address: resu.formatted_address || null,
+      rating: resu.rating || null,
+      total: resu.user_ratings_total || 0,
+      url: resu.url || null
+    });
+  } catch(e) {
+    return res.json({ ok:false, status:"EXCEPTION", error:String(e) });
+  }
+});
+
 /* ========== Gallons model (HARD ceiling at baseline unless user opts in) ========== */
 function gallonsWithRules({ aadt, mpds, diesel, compCount, heavyCount, allowAboveBaseline, userMult = 1.0 }) {
   // Baseline monthly ceiling
   const baselineMonthly = aadt * 0.02 * 8 * 30;
 
-  // Competition — 0=100%, 1=75%, 2–4=60% (no increase above baseline)
+  // Competition — 0=100%, 1=75%, 2–4=60%
   let baseMult = 1.0;
   if (compCount === 1) baseMult = 0.75;
   else if (compCount >= 2 && compCount <= 4) baseMult = 0.60;
@@ -409,7 +460,7 @@ function gallonsWithRules({ aadt, mpds, diesel, compCount, heavyCount, allowAbov
   // Apply competition (only lowers or keeps the same)
   let afterComp = preComp * compMult;
 
-  // Equipment/Policy caps (again only cap further)
+  // Equipment/Policy caps
   const capEquip = (mpds * 25 * 10.5 * 24) * (365 / 12) + ((diesel || 0) * 25 * 16 * 24) * (365 / 12);
   const HARD = 28000, SOFT = 22000;
   const capHardTotal = mpds * HARD;
@@ -485,14 +536,14 @@ app.post("/estimate", async (req, res) => {
       }
     }
 
-    // User extras (affect only downward unless > baseline is enabled; we’ll clamp after applying)
+    // User extras multiplier (applied but clamped by baseline if not allowed above)
     let userMult = 1.0; const breakdown = {};
     const extras = (advanced && Array.isArray(advanced.extra) ? advanced.extra : [])
       .map(e => ({ pct: Number(e?.pct), note: String(e?.note || "").slice(0, 180) }))
       .filter(e => Number.isFinite(e.pct));
     if (extras.length) { userMult *= extras.reduce((m, e) => m * (1 + e.pct / 100), 1.0); breakdown.extras = extras; }
 
-    // Gallons with HARD baseline ceiling (unless user opted in)
+    // Gallons with HARD baseline ceiling
     const calcBase = gallonsWithRules({ aadt: usedAADT, mpds: MPDS, diesel: DIESEL, compCount, heavyCount, allowAboveBaseline, userMult });
 
     // External leads (optional endpoints)
@@ -501,7 +552,7 @@ app.post("/estimate", async (req, res) => {
       planning: await queryExternalJSON(PLANNING_URL, { address: address || geo.label, lat: geo.lat, lon: geo.lon }).catch(() => [])
     };
 
-    // GPT developments + verification to OSM ONLY (no brand-name auto-verify)
+    // GPT developments + verification (OSM corroboration only)
     let devsAI = { items: [], confidence: 0.0, verified: [], unverified: [] };
     try {
       const djson = await gptJSON(`List planned/proposed/permit/coming-soon/construction gas stations within ~1 mile of "${address || geo.label}". Return {"items":[{"name":"<string>","status":"<string>","approx_miles":<number>}], "confidence": <0.0-1.0>}`);
@@ -523,7 +574,7 @@ app.post("/estimate", async (req, res) => {
     if (STRICT_AI_DEVS && (devsAI.confidence ?? 0) < AI_DEVS_MIN_CONF) { devsAI.items = []; devsAI.unverified = []; }
     if (STRICT_AI_DEVS) devsAI.items = [];
 
-    // Rationale + GPT summary (ALWAYS non-empty due to fallback below)
+    // Rationale + GPT summary (guaranteed non-empty via fallback)
     const nearest = competitors[0]?.miles ?? null;
     const rationale = `Method=${method}; comps=${compCount} (heavy=${heavyCount}) ⇒ compMult ${(calcBase.compMult * 100 | 0)}%. Floor=${calcBase.floor.toLocaleString()} gal/mo. Caps: soft ${calcBase.caps.soft_per_mpd}/MPD (−10% if exceeded), hard ${calcBase.caps.hard_per_mpd}/MPD. User multiplier=${+userMult.toFixed(4)}; allowAboveBaseline=${allowAboveBaseline}.`;
 
