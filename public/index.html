@@ -26,7 +26,7 @@
     button{ background:linear-gradient(135deg,var(--brand),var(--brand2)); color:#fff; border:0; padding:12px 16px; border-radius:10px; font-weight:700; cursor:pointer; }
     button:disabled{ opacity:.6; cursor:not-allowed; }
 
-    .row{ display:grid; grid-template-columns:1.6fr 0.7fr 0.7fr 0.8fr; gap:12px; }
+    .row{ display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:12px; }
     @media (max-width:980px){ .row{ grid-template-columns:1fr; } }
 
     .toolbar{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:12px; }
@@ -49,20 +49,23 @@
     .ac-item:hover, .ac-item.active{ background:#101a2b; }
     .badge{ display:inline-block; font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); background:var(--pill); color:#a9c5ff; margin-left:8px; }
 
-    /* Advanced options */
+    /* Advanced */
     details summary{ cursor:pointer; }
     .adv-line{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-top:12px; }
     .chip{ display:inline-flex; align-items:center; gap:8px; background:#0f1929; border:1px solid var(--line); padding:8px 10px; border-radius:999px; font-size:13px; }
     .chip input{ width:auto; accent-color:#22d3ee; }
     .dash{ color:#50607a; opacity:.9; }
-    .radio-row{ display:flex; flex-wrap:wrap; gap:10px; margin-top:8px; }
 
     /* Estimate hero */
     .hero{ display:flex; justify-content:space-between; align-items:flex-end; gap:12px; }
     .hero .num{ font-size:44px; font-weight:900; letter-spacing:.5px; }
     .hero .sub{ font-size:13px; color:#a9b6d0; }
 
+    /* Sticky footer for Export */
     .footerbar{ position:fixed; left:0; right:0; bottom:0; background:linear-gradient(180deg,#0c1220,#0a0f1a); border-top:1px solid var(--line); padding:10px 16px; display:flex; justify-content:center; gap:12px; z-index:50; }
+    .footerbar > *{ margin:0 6px; }
+
+    #debugCard{ display:none; }
   </style>
 </head>
 <body>
@@ -96,7 +99,7 @@
       </div>
       <div class="toolbar">
         <button id="go">Estimate</button>
-        <span class="muted">Baseline ceiling AADT×2%×8×30 (unless “Allow &gt; baseline”) • competition rule • pricing effect • caps • road layout.</span>
+        <span class="muted">Baseline ceiling: AADT×2%×8×30 (unless Advanced “Allow &gt; baseline” is enabled) • competition rule • caps • road layout.</span>
       </div>
     </div>
 
@@ -108,16 +111,6 @@
           <label class="chip"><input type="checkbox" id="ex_hours18"> Operating hours 18h <span class="dash">(−7.5%)</span></label>
           <label class="chip"><input type="checkbox" id="ex_highincome"> Higher-income trade area <span class="dash">(+2.5%)</span></label>
           <label class="chip"><input type="checkbox" id="ex_lowrating"> Ratings below 4.0 / Poorly Run Site <span class="dash">(−30%)</span></label>
-        </div>
-        <div style="margin-top:8px;">
-          <label style="font-weight:700;">Gas pricing vs area (2 mi heuristic)</label>
-          <div class="radio-row">
-            <label class="chip"><input type="radio" name="pricepos" value="below" id="price_below"> Below competition <span class="dash">(+10%)</span></label>
-            <label class="chip"><input type="radio" name="pricepos" value="inline" id="price_inline" checked> In line <span class="dash">(0%)</span></label>
-            <label class="chip"><input type="radio" name="pricepos" value="above" id="price_above"> Above competition <span class="dash">(−10%)</span></label>
-          </div>
-        </div>
-        <div class="adv-line">
           <label class="chip"><input type="checkbox" id="ex_elastic"> Allow &gt; baseline (elastic demand)</label>
           <span class="chip" id="addExtra" style="cursor:pointer;">+ Add adj. (%)</span>
           <span id="activeExtras" class="subtle"></span>
@@ -141,13 +134,13 @@
       <hr/>
       <div id="aadtBanner" class="muted" style="margin-bottom:6px;">—</div>
       <div id="compLine" class="muted">—</div>
-      <div class="muted subtle" style="margin-top:6px;">
-        Capacity guidance: <b>caps peak gallons at ~22–28k gal/MPD/month</b>; exceeding soft cap ⇒ <b>−10%</b> queue.
+      <div id="capacityLine" class="muted subtle" style="margin-top:6px;">
+        Capacity guidance: <b>caps peak gallons at ~22–28k gal/MPD/month</b>. Too few pumps ⇒ queuing & <b>≥10% lost volume</b> at peaks.
       </div>
     </div>
 
     <div class="card">
-      <div class="muted" style="margin-bottom:6px;">Map: Site & competitors (1.5 miles)</div>
+      <div class="muted" style="margin-bottom:6px;">Map: Site & competitors (1 mile)</div>
       <div id="map"><div id="overlay" class="muted">—</div></div>
       <div id="svWrap">
         <div class="muted" style="margin:10px 0 6px;"><b>Street View</b></div>
@@ -156,29 +149,19 @@
     </div>
 
     <div class="card"><b>Computation Details</b><div id="details" class="muted">—</div></div>
-
-    <div class="card">
-      <b>Developments — OSM</b>
+    <div class="card"><b>Developments (multi-source)</b>
       <div id="devs" class="muted">—</div>
+      <div id="devsExternal" class="muted" style="margin-top:8px;">—</div>
     </div>
 
-    <div class="card">
-      <b>Developments — News & Permits</b>
-      <div id="devsExternalNews" class="muted">—</div>
-      <div id="devsExternalPermits" class="muted" style="margin-top:6px;">—</div>
-    </div>
-
-    <div class="card">
-      <b>Developments — GPT (verified)</b>
-      <div id="devsAI" class="muted">—</div>
-    </div>
-
-    <div class="card">
+    <div class="card" id="ratingCard">
       <b>Google Rating</b>
-      <div id="ratingLine" class="muted">—</div>
+      <div id="ratingLine" class="muted" style="margin-top:6px;">—</div>
     </div>
 
     <div class="card"><b>Summary (GPT)</b><div id="summary" class="muted">—</div></div>
+
+    <div class="card" id="debugCard"><details open><summary>Debug</summary><pre id="debug" class="mono muted">/ waiting…</pre></details></div>
   </div>
 
   <div class="footerbar"><button id="exportPDF">Export to PDF</button></div>
@@ -187,10 +170,11 @@
 const $=id=>document.getElementById(id);
 const apiStatus=$("apiStatus"), aadtBanner=$("aadtBanner"), compLine=$("compLine"), overlay=$("overlay"), svFrame=$("sv");
 const outNum=$("estNum"), outRange=$("estRange"), outY2=$("y2"), outY3=$("y3");
-const detailsBox=$("details"), devsBox=$("devs"), devsExtNews=$("devsExternalNews"), devsExtPermits=$("devsExternalPermits"), devsAIBox=$("devsAI"), summaryBox=$("summary"), ratingLine=$("ratingLine");
+const detailsBox=$("details"), devsBox=$("devs"), devsExtBox=$("devsExternal"), summaryBox=$("summary"), ratingLine=$("ratingLine");
 const addrInput=$("addr"), acBox=$("ac"), goBtn=$("go");
 const addExtraBtn=$("addExtra"), extraList=$("extraList"), activeExtras=$("activeExtras");
 const ex_worksites=$("ex_worksites"), ex_hours18=$("ex_hours18"), ex_highincome=$("ex_highincome"), ex_lowrating=$("ex_lowrating"), ex_elastic=$("ex_elastic");
+
 let map, layer, mapReady=false, selectedCoords=null, selectedPlaceId=null;
 
 /* Helpers */
@@ -209,16 +193,16 @@ async function checkGoogleStatus(){
 }
 document.addEventListener("DOMContentLoaded", checkGoogleStatus);
 
-/* Advanced pills */
-function pills(){
-  const p=[];
+/* Adjustments (pills) */
+function pills(){ const p=[];
   if(ex_worksites.checked)p.push("+7.5% Worksites");
   if(ex_hours18.checked)p.push("−7.5% 18h ops");
   if(ex_highincome.checked)p.push("+2.5% Higher-income");
   if(ex_lowrating.checked)p.push("−30% Low rating");
+  if(ex_elastic.checked)p.push("> baseline allowed");
   activeExtras.innerHTML=p.map(x=>`<span class="badge">${esc(x)}</span>`).join(" ");
 }
-[ex_worksites,ex_hours18,ex_highincome,ex_lowrating].forEach(el=>el.addEventListener("change",pills));
+[ex_worksites,ex_hours18,ex_highincome,ex_lowrating,ex_elastic].forEach(el=>el.addEventListener("change",pills));
 function addExtraRow(pct="",note=""){
   const row=document.createElement("div");
   row.style.marginTop="6px";
@@ -227,8 +211,21 @@ function addExtraRow(pct="",note=""){
   extraList.appendChild(row);
 }
 addExtraBtn.addEventListener("click",()=>addExtraRow());
+function collectExtras(){
+  const out=[];
+  if(ex_worksites.checked) out.push({pct:7.5, note:"Worksites nearby add 7.5% fueling, especially AM/PM peaks"});
+  if(ex_hours18.checked) out.push({pct:-7.5, note:"Operating hours 18 hours (−7.5% vs 24h)"});
+  if(ex_highincome.checked) out.push({pct:2.5, note:"Higher income area leads to more travel & higher discretionary spending"});
+  if(ex_lowrating.checked) out.push({pct:-30, note:"Ratings below 4.0 / Poorly run site (−30%)"});
+  for(const chip of extraList.querySelectorAll(".chip")){
+    const pct=+chip.querySelector(".extraPct").value;
+    const note=chip.querySelector(".extraNote").value.trim();
+    if(Number.isFinite(pct)) out.push({pct, note});
+  }
+  return out;
+}
 
-/* Autocomplete */
+/* Autocomplete (Google + Nominatim) */
 let acTimer=null, acItems=[];
 async function googleSearch(q){ try{ const r=await fetch(`/google/autocomplete?input=${encodeURIComponent(q)}`); const j=await r.json(); if(!j.ok){ apiStatus.textContent=`API Status: Google — Error (${j.status}${j.error?": "+j.error:""})`; return []; } apiStatus.textContent="API Status: Google — Working"; return (j.items||[]).map(it=>({ ...it, type:"Google", score:1.3 })); }catch{ apiStatus.textContent="API Status: Google — failed to fetch"; return []; } }
 async function nominatimSearch(q){ try{ const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=us&q=${encodeURIComponent(q)}`); const a=await r.json(); return a.map(row=>({ type:"Address", display:row.display_name, lat:+row.lat, lon:+row.lon, score:0.6 })); }catch{return [];} }
@@ -239,70 +236,45 @@ function chooseAc(i){
   if(!it) return;
   addrInput.value=it.display;
   selectedCoords=(it.lat!=null&&it.lon!=null)?{lat:it.lat,lon:it.lon}:null;
-  selectedPlaceId = it.place_id || null;
+  selectedPlaceId = it.place_id || null; // capture Google place_id if available
   hideAc();
 }
-addrInput.addEventListener("input",()=>{
-  const q=addrInput.value.trim(); selectedCoords=null; selectedPlaceId=null; hideAc();
-  if(q.length<3)return; if(acTimer)clearTimeout(acTimer);
-  acTimer=setTimeout(async()=>{ const [g,n]=await Promise.all([googleSearch(q),nominatimSearch(q)]); acItems=[...g,...n]; renderAc(acItems); },250);
-});
+addrInput.addEventListener("input",()=>{ const q=addrInput.value.trim(); selectedCoords=null; selectedPlaceId=null; hideAc(); if(q.length<3)return; if(acTimer)clearTimeout(acTimer); acTimer=setTimeout(async()=>{ const [g,n]=await Promise.all([googleSearch(q),nominatimSearch(q)]); acItems=[...g,...n]; renderAc(acItems); },250); });
 document.addEventListener("click",(e)=>{ if(!acBox.contains(e.target)&&e.target!==addrInput) hideAc(); });
 
+/* Resolve place_id if user typed a non-Google address */
 async function resolvePlaceIdIfNeeded(address){
   if (selectedPlaceId) return selectedPlaceId;
-  try{ const r=await fetch(`/google/findplace?input=${encodeURIComponent(address)}`); const j=await r.json(); if(j.ok && j.place_id) return j.place_id; }catch{}
+  try{
+    const r = await fetch(`/google/findplace?input=${encodeURIComponent(address)}`);
+    const j = await r.json();
+    if (j.ok && j.place_id) return j.place_id;
+  }catch{}
   return null;
 }
+
+/* Show Google rating */
 async function showRating(address){
-  const pid=await resolvePlaceIdIfNeeded(address);
-  if(!pid){ ratingLine.innerHTML="—"; return; }
-  try{ const r=await fetch(`/google/rating?place_id=${encodeURIComponent(pid)}`); const j=await r.json(); if(!j.ok){ ratingLine.innerHTML="—"; return; }
-    ratingLine.innerHTML = `⭐ ${j.rating ?? "—"} (${j.total||0} reviews)`; }catch{ ratingLine.innerHTML="—"; }
+  const pid = await resolvePlaceIdIfNeeded(address);
+  if (!pid){ ratingLine.innerHTML="—"; return; }
+  try{
+    const r = await fetch(`/google/rating?place_id=${encodeURIComponent(pid)}`);
+    const j = await r.json();
+    if (!j.ok){ ratingLine.innerHTML="—"; return; }
+    ratingLine.innerHTML = `⭐ ${j.rating ?? "—"} (${j.total||0} reviews)`;
+  }catch{ ratingLine.innerHTML="—"; }
 }
 
 /* Client → server */
 async function safeJSON(url,opts){ const r=await fetch(url,opts); const t=await r.text(); if(!r.ok) throw new Error(`HTTP ${r.status}\n${t.slice(0,1200)}`); try{ return JSON.parse(t);}catch{ throw new Error("Bad JSON"); } }
-function collectExtras(){
-  const out=[];
-  if(ex_worksites.checked) out.push({pct:7.5, note:"Worksites nearby"});
-  if(ex_hours18.checked) out.push({pct:-7.5, note:"18h ops"});
-  if(ex_highincome.checked) out.push({pct:2.5, note:"Higher income"});
-  if(ex_lowrating.checked) out.push({pct:-30, note:"Rating < 4.0"});
-  for(const chip of extraList.querySelectorAll(".chip")){
-    const pct=+chip.querySelector(".extraPct").value;
-    const note=chip.querySelector(".extraNote").value.trim();
-    if(Number.isFinite(pct)) out.push({pct, note});
-  }
-  return out;
-}
-function getPricePosition(){
-  const r=document.querySelector('input[name="pricepos"]:checked');
-  return r ? r.value : "inline";
-}
 async function callEstimate(){
-  const body={
-    address: addrInput.value.trim(),
-    mpds:+$("mpds").value||0,
-    diesel:+$("diesel").value||0,
-    advanced:{
-      extra: collectExtras(),
-      price_position: getPricePosition(),
-      flags:{ allow_above_baseline: !!ex_elastic.checked }
-    }
-  };
+  const body={ address:addrInput.value.trim(), mpds:+$("mpds").value||0, diesel:+$("diesel").value||0, advanced:{ extra: collectExtras(), flags:{ allow_above_baseline: !!ex_elastic.checked } } };
   if(selectedCoords){ body.siteLat=selectedCoords.lat; body.siteLon=selectedCoords.lon; }
   const ov=+($("aadtOverride").value||""); if(Number.isFinite(ov)&&ov>0) body.aadtOverride=ov;
   return await safeJSON("/estimate",{ method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
 }
 
-/* Map + render */
-let layer, mapReady=false;
-function initMap(){ if(mapReady) return; map=L.map("map",{zoomControl:true}); L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map); layer=L.layerGroup().addTo(map); mapReady=true; }
-function clearOverlay(){ overlay.style.display="none"; }
-function setOverlayWorking(){ overlay.textContent="Working, this may take up to 5 minutes to research"; overlay.style.display="flex"; }
-function updateStreetView(lat, lon){ svFrame.src=`https://maps.google.com/maps?q=&layer=c&cbll=${lat},${lon}&cbp=12,0,,0,0&output=svembed`; }
-
+/* Renderers */
 function initOrUpdateMap(m){
   if(!mapReady) initMap();
   layer.clearLayers();
@@ -329,36 +301,35 @@ function renderAll(d){
   if(heur!=null) parts.push(`Heur ${fmt(heur)} (road type)`);
   aadtBanner.textContent="AADT → "+parts.join(" | ");
 
-  // Hero shows LOW
+  // SHOW LOW AS BIG NUMBER; range beneath
   outNum.textContent = fmt(d.low);
   outRange.textContent = `Full range: ${fmt(d.low)} – ${fmt(d.high)}`;
   outY2.textContent=fmt(d.year2); outY3.textContent=fmt(d.year3);
-
-  compLine.textContent = `Competition: ${c.count??0} within 1.5 mi${c.nearest_mi!=null?"; nearest "+c.nearest_mi.toFixed(3)+" mi":""}${(c.notable_brands||[]).length?"; notable: "+c.notable_brands.join(", "):""}`;
+  compLine.textContent = `Competition: ${c.count??0} within 1 mi${c.nearest_mi!=null?"; nearest "+c.nearest_mi.toFixed(3)+" mi":""}${(c.notable_brands||[]).length?"; notable: "+c.notable_brands.join(", "):""}`;
 
   detailsBox.innerHTML = `
     <div><b>Inputs</b> — MPDs ${i.mpds}${i.diesel? " + diesel "+i.diesel:""}; AADT used <b>${fmt(i.aadt_used)}</b></div>
-    <div class="subtle">Rules: 0=100%, 1=75%, 2–4=60%; Heavy: −20% / −35% • Pricing: ${esc(i.price_position||"inline")}</div>
+    <div class="subtle">Rule: 0=100%, 1=75%, 2–4=60%; Heavy: −20% / −35%</div>
     <div class="subtle">Baseline ceiling: AADT×2%×8×30 ${i.allow_above_baseline?"(user allowed higher)":"(default ceiling)"}</div>
+    <div class="subtle">Floor: ${fmt(d.floor)} • Capacity cap: ${fmt(d.cap)} • Competition multiplier shown above</div>
   `;
 
-  const osmLeft = (Array.isArray(d.developments)&&d.developments.length) ? ("<ul>"+d.developments.map(x=>`<li>${esc(x.name)} • ${esc(x.status)} • ${x.miles} mi</li>`).join("")+"</ul>") : "<em>none</em>";
-  devsBox.innerHTML = osmLeft;
+  const ai=d.developments_ai||{}; const verified=Array.isArray(ai.verified)?ai.verified:[];
+  const left=(Array.isArray(d.developments)&&d.developments.length)?("<ul>"+d.developments.map(x=>`<li>${esc(x.name)} • ${esc(x.status)} • ${x.miles} mi</li>`).join("")+"</ul>"):"<span class='muted'>OSM/Overpass: none found</span>";
+  const right=(verified.length)?`<div><div><b>GPT (verified)</b></div><ul>${verified.map(x=>`<li>${esc(x.name)} • ${esc(x.status||"planned")} • ~${x.approx_miles??"?"} mi</li>`).join("")}</ul><div class='muted'>GPT confidence: ${((ai.confidence||0)*100|0)}%</div></div>`:"<span class='muted'>GPT: none verified</span>";
+  devsBox.innerHTML = `<div class="grid"><div>${left}</div><div>${right}</div></div>`;
 
-  const newsList = (d.developments_external?.news||[]).map(x=>`<li>${esc(x.name)} • ${esc(x.status)}${x.approx_miles!=null?` • ~${x.approx_miles} mi`:''}${x.link?` • <a href="${x.link}" target="_blank">source</a>`:''}</li>`).join("") || "<em>none</em>";
-  devsExtNews.innerHTML = `<b>News</b><ul>${newsList}</ul>`;
+  // External leads (if any)
+  // (This card is separate; you can wire it similarly if you later show them)
 
-  const permitList = (d.developments_external?.permits||[]).map(x=>`<li>${esc(x.name)} • ${esc(x.status)}${x.approx_miles!=null?` • ~${x.approx_miles} mi`:''}${x.link?` • <a href="${x.link}" target="_blank">source</a>`:''}</li>`).join("") || "<em>none</em>";
-  devsExtPermits.innerHTML = `<b>Permits</b><ul>${permitList}</ul>`;
+  // Google rating (stars + count)
+  showRating(addrInput.value.trim());
 
-  const ai=(d.developments_ai||{}).verified||[];
-  devsAIBox.innerHTML = ai.length ? "<ul>"+ai.map(x=>`<li>${esc(x.name)} • ${esc(x.status||"planned")} • ~${x.approx_miles??"?"} mi</li>`).join("")+"</ul>" : "<em>none</em>";
-
-  const s = typeof d.summary==="string" ? d.summary : (d.summary?.summary||"—");
-  summaryBox.textContent = s && s.trim ? s.trim() : "—";
+  // Summary (server guarantees non-empty)
+  let s=""; if(typeof d.summary==="string") s=d.summary; else if(d.summary&&typeof d.summary.summary==="string") s=d.summary.summary;
+  $("summary").textContent = (s && s.trim) ? s.trim() : (s || "—");
 
   initOrUpdateMap(d.map);
-  showRating(addrInput.value.trim());
 }
 
 /* Main */
@@ -378,16 +349,16 @@ document.getElementById("exportPDF").addEventListener("click", ()=>{
   doc.setFont("helvetica","normal"); doc.setFontSize(11);
   y=L(40,y,`Address: ${addrInput.value||"-"}`);
   y=L(40,y,`MPDs: ${$("mpds").value}   Diesel: ${$("diesel").value}`);
-  y=L(40,y,aadtBanner.innerText); y+=8;
+  y=L(40,y, aadtBanner.innerText); y+=8;
   doc.setFont("helvetica","bold"); doc.setFontSize(22); doc.text(`${$("estNum").innerText} gal/mo`,40,y); y+=22;
   doc.setFont("helvetica","normal"); doc.setFontSize(11);
-  y=L(40,y,$("estRange").innerText);
-  y=L(40,y,$("compLine").innerText);
-  y=L(40,y,$("details").innerText); y+=8;
-  doc.setFont("helvetica","bold"); doc.text("Developments — News & Permits",40,y); y+=16;
-  y=L(40,y, $("devsExternalNews").innerText + " | " + $("devsExternalPermits").innerText);
-  doc.setFont("helvetica","bold"); y+=16; doc.text("Summary",40,y); y+=16;
-  y=L(40,y,$("summary").innerText);
+  y=L(40,y, $("estRange").innerText);
+  y=L(40,y, $("compLine").innerText);
+  y=L(40,y, $("details").innerText); y+=8;
+  doc.setFont("helvetica","bold"); doc.text("Google Rating",40,y); y+=16;
+  y=L(40,y, $("ratingLine").innerText); y+=8;
+  doc.setFont("helvetica","bold"); doc.text("Summary",40,y); y+=16;
+  y=L(40,y, $("summary").innerText);
   doc.save("FuelIQ_Site_Analyzer.pdf");
 });
 
