@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 
-  <!-- jsPDF for PDF export -->
+  <!-- jsPDF -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous"></script>
 
   <style>
@@ -26,7 +26,7 @@
     button{ background:linear-gradient(135deg,var(--brand),var(--brand2)); color:#fff; border:0; padding:12px 16px; border-radius:10px; font-weight:700; cursor:pointer; }
     button:disabled{ opacity:.6; cursor:not-allowed; }
 
-    .row{ display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:12px; }
+    .row{ display:grid; grid-template-columns:1.6fr 0.7fr 0.7fr 0.8fr; gap:12px; }
     @media (max-width:980px){ .row{ grid-template-columns:1fr; } }
 
     .toolbar{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:12px; }
@@ -37,11 +37,9 @@
     #map{ height:420px; border-radius:12px; border:1px solid var(--line); position: relative; }
     #overlay{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(11,14,21,.55); border-radius:12px; font-weight:800; color:#cde9ff; font-size:18px; padding:20px; text-align:center; }
 
-    /* Street View */
     #svWrap{ margin-top:10px; }
     #sv{ width:100%; height:380px; border:0; border-radius:12px; border:1px solid var(--line); background:#0b1220; }
 
-    /* Autocomplete */
     .ac-wrap{ position:relative; }
     .ac-list{ position:absolute; top:100%; left:0; right:0; z-index:30; margin-top:6px; background:#0b1220; border:1px solid var(--line); border-radius:12px; max-height:320px; overflow:auto; box-shadow: 0 18px 36px rgba(0,0,0,.35); }
     .ac-item{ padding:10px 12px; cursor:pointer; border-bottom:1px solid rgba(255,255,255,.04); }
@@ -49,71 +47,65 @@
     .ac-item:hover, .ac-item.active{ background:#101a2b; }
     .badge{ display:inline-block; font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); background:var(--pill); color:#a9c5ff; margin-left:8px; }
 
-    /* Advanced */
     details summary{ cursor:pointer; }
     .adv-line{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-top:12px; }
     .chip{ display:inline-flex; align-items:center; gap:8px; background:#0f1929; border:1px solid var(--line); padding:8px 10px; border-radius:999px; font-size:13px; }
     .chip input{ width:auto; accent-color:#22d3ee; }
     .dash{ color:#50607a; opacity:.9; }
+    .radio-row{ display:flex; flex-wrap:wrap; gap:10px; margin-top:8px; }
 
-    /* Estimate hero */
     .hero{ display:flex; justify-content:space-between; align-items:flex-end; gap:12px; }
     .hero .num{ font-size:44px; font-weight:900; letter-spacing:.5px; }
     .hero .sub{ font-size:13px; color:#a9b6d0; }
 
-    /* Sticky footer for Export */
     .footerbar{ position:fixed; left:0; right:0; bottom:0; background:linear-gradient(180deg,#0c1220,#0a0f1a); border-top:1px solid var(--line); padding:10px 16px; display:flex; justify-content:center; gap:12px; z-index:50; }
-    .footerbar > *{ margin:0 6px; }
-
-    #debugCard{ display:none; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <header>
-      <h1>Sunoco, LP Fuel IQ - Fuel Site Analyzer</h1>
-    </header>
+    <header><h1>Sunoco, LP Fuel IQ - Fuel Site Analyzer</h1></header>
 
+    <!-- Input -->
     <div class="card">
       <div class="row">
         <div>
           <label>Site search</label>
           <div class="ac-wrap">
-            <input id="addr" placeholder="Enter Business Name or Address and wait a moment to load" autocomplete="off"/>
+            <input id="addr" placeholder="Enter business or address" autocomplete="off"/>
             <div id="ac" class="ac-list" style="display:none;"></div>
           </div>
           <div class="muted subtle" style="margin-top:6px" id="apiStatus">API Status: checking…</div>
         </div>
-        <div>
-          <label>Regular MPDs</label>
-          <input id="mpds" type="number" value="3" min="1"/>
-        </div>
-        <div>
-          <label>Diesel positions (optional)</label>
-          <input id="diesel" type="number" value="0" min="0"/>
-        </div>
-        <div>
-          <label>AADT override (optional)</label>
-          <input id="aadtOverride" type="number" placeholder="e.g., 14500"/>
-        </div>
+        <div><label>Regular MPDs</label><input id="mpds" type="number" value="3" min="1"/></div>
+        <div><label>Diesel positions</label><input id="diesel" type="number" value="0" min="0"/></div>
+        <div><label>AADT override</label><input id="aadtOverride" type="number"/></div>
       </div>
       <div class="toolbar">
         <button id="go">Estimate</button>
-        <span class="muted">Baseline ceiling: AADT×2%×8×30 (unless Advanced “Allow &gt; baseline” is enabled) • competition rule • caps • road layout.</span>
+        <span class="muted">Baseline ceiling AADT×2%×8×30 unless opt-in • comp rule • pricing effect • caps • road layout</span>
       </div>
     </div>
 
+    <!-- Advanced -->
     <div class="card">
       <details>
-        <summary><b>Advanced options (optional)</b></summary>
+        <summary><b>Advanced options</b></summary>
         <div class="adv-line">
-          <label class="chip"><input type="checkbox" id="ex_worksites"> Worksites nearby <span class="dash">(+7.5%)</span></label>
-          <label class="chip"><input type="checkbox" id="ex_hours18"> Operating hours 18h <span class="dash">(−7.5%)</span></label>
-          <label class="chip"><input type="checkbox" id="ex_highincome"> Higher-income trade area <span class="dash">(+2.5%)</span></label>
-          <label class="chip"><input type="checkbox" id="ex_lowrating"> Ratings below 4.0 / Poorly Run Site <span class="dash">(−30%)</span></label>
-          <label class="chip"><input type="checkbox" id="ex_elastic"> Allow &gt; baseline (elastic demand)</label>
-          <label class="chip"><input type="checkbox" id="ex_priceHigh"> Site pricing above competition <span class="dash">(−10%)</span></label>
-          <label class="chip"><input type="checkbox" id="ex_priceLow"> Site pricing below competition <span class="dash">(+10%)</span></label>
+          <label class="chip"><input type="checkbox" id="ex_worksites"> Worksites (+7.5%)</label>
+          <label class="chip"><input type="checkbox" id="ex_hours18"> Hours 18h (−7.5%)</label>
+          <label class="chip"><input type="checkbox" id="ex_highincome"> Higher-income (+2.5%)</label>
+          <label class="chip"><input type="checkbox" id="ex_lowrating"> Rating < 4.0 (−30%)</label>
+        </div>
+        <div style="margin-top:8px;">
+          <label><b>Gas pricing vs area</b></label>
+          <div class="radio-row">
+            <label class="chip"><input type="radio" name="pricepos" value="below"> Below comp (+10%)</label>
+            <label class="chip"><input type="radio" name="pricepos" value="inline" checked> Inline (0%)</label>
+            <label class="chip"><input type="radio" name="pricepos" value="above"> Above comp (−10%)</label>
+          </div>
+        </div>
+        <div class="adv-line">
+          <label class="chip"><input type="checkbox" id="ex_elastic"> Allow > baseline</label>
           <span class="chip" id="addExtra" style="cursor:pointer;">+ Add adj. (%)</span>
           <span id="activeExtras" class="subtle"></span>
         </div>
@@ -121,71 +113,92 @@
       </details>
     </div>
 
+    <!-- Estimate -->
     <div class="card" id="estimateCard">
       <div class="hero">
         <div>
-          <div style="font-weight:700;margin-bottom:6px;">Adjusted Base Estimate (gal/mo — showing LOW)</div>
+          <div>Adjusted Base Estimate (LOW)</div>
           <div class="num" id="estNum">—</div>
           <div class="sub" id="estRange">Full range: —</div>
         </div>
         <div class="right sub">
           <div>Year-2: <b id="y2">—</b></div>
-          <div style="margin-top:6px;">Year-3: <b id="y3">—</b></div>
+          <div>Year-3: <b id="y3">—</b></div>
         </div>
       </div>
       <hr/>
-      <div id="aadtBanner" class="muted" style="margin-bottom:6px;">—</div>
+      <div id="aadtBanner" class="muted">—</div>
       <div id="compLine" class="muted">—</div>
-      <div id="capacityLine" class="muted subtle" style="margin-top:6px;">
-        Capacity guidance: <b>caps peak gallons at ~22–28k gal/MPD/month</b>. Too few pumps ⇒ queuing & <b>≥10% lost volume</b> at peaks.
-      </div>
     </div>
 
+    <!-- Map -->
     <div class="card">
-      <div class="muted" style="margin-bottom:6px;">Map: Site & competitors (1.5 miles)</div>
+      <div class="muted">Map: Site & competitors (1.5 mi)</div>
       <div id="map"><div id="overlay" class="muted">—</div></div>
-      <div id="svWrap">
-        <div class="muted" style="margin:10px 0 6px;"><b>Street View</b></div>
-        <iframe id="sv" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
-      </div>
+      <div id="svWrap"><div class="muted">Street View</div><iframe id="sv"></iframe></div>
     </div>
 
-    <div class="card"><b>Computation Details</b><div id="details" class="muted">—</div></div>
-    <div class="card"><b>Developments (multi-source)</b>
-      <div id="devs" class="muted">—</div>
-      <div id="devsExternal" class="muted" style="margin-top:8px;">—</div>
-    </div>
+    <!-- Developments -->
+    <div class="card"><b>Developments — OSM</b><div id="devs" class="muted">—</div></div>
+    <div class="card"><b>Developments — News</b><div id="devsExternalNews" class="muted">—</div></div>
+    <div class="card"><b>Developments — Permits</b><div id="devsExternalPermits" class="muted">—</div></div>
+    <div class="card"><b>Developments — GPT (verified)</b><div id="devsAI" class="muted">—</div></div>
 
-    <div class="card" id="ratingCard">
-      <b>Google Rating</b>
-      <div id="ratingLine" class="muted" style="margin-top:6px;">—</div>
-    </div>
-
+    <!-- Rating & Summary -->
+    <div class="card"><b>Google Rating</b><div id="ratingLine" class="muted">—</div></div>
     <div class="card"><b>Summary (GPT)</b><div id="summary" class="muted">—</div></div>
-
-    <div class="card" id="debugCard"><details open><summary>Debug</summary><pre id="debug" class="mono muted">/ waiting…</pre></details></div>
   </div>
 
   <div class="footerbar"><button id="exportPDF">Export to PDF</button></div>
 
 <script>
-// JS is similar to previous version – but now also watches ex_priceHigh and ex_priceLow
-// In collectExtras() add conditions:
-function collectExtras(){
-  const out=[];
-  if(ex_worksites.checked) out.push({pct:7.5, note:"Worksites nearby"});
-  if(ex_hours18.checked) out.push({pct:-7.5, note:"18h ops"});
-  if(ex_highincome.checked) out.push({pct:2.5, note:"Higher income"});
-  if(ex_lowrating.checked) out.push({pct:-30, note:"Ratings below 4.0"});
-  if(ex_priceHigh.checked) out.push({pct:-10, note:"Pricing above competition"});
-  if(ex_priceLow.checked) out.push({pct:+10, note:"Pricing below competition"});
-  for(const chip of extraList.querySelectorAll(".chip")){
-    const pct=+chip.querySelector(".extraPct").value;
-    const note=chip.querySelector(".extraNote").value.trim();
-    if(Number.isFinite(pct)) out.push({pct, note});
-  }
-  return out;
+const $=id=>document.getElementById(id);
+let selectedCoords=null, selectedPlaceId=null;
+
+// Helpers
+function fmt(n){return (n??0).toLocaleString();}
+function esc(s){return (s??"").toString().replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;"," >":"&gt;","\"":"&quot;","'":"&#39;"}[m]));}
+
+// Google status & autocomplete
+let GOOGLE_OK=false;let acItems=[];let acActiveIndex=-1;
+async function checkGoogleStatus(){
+  try{const r=await fetch("/google/status");const j=await r.json();GOOGLE_OK=!!j.ok;apiStatus.textContent=j.ok?"API: Google — Working":`API: Google — ${j.status}`;}
+  catch{GOOGLE_OK=false;apiStatus.textContent="API: Google — unavailable";}
 }
+document.addEventListener("DOMContentLoaded",checkGoogleStatus);
+
+async function googleSearch(q){if(!GOOGLE_OK)return[];try{const r=await fetch(`/google/autocomplete?input=${encodeURIComponent(q)}`);const j=await r.json();return j.ok?(j.items||[]).map(it=>({...it,type:"Google",score:1.3})):[];}catch{return[];}}
+async function nominatimSearch(q){try{const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=6&countrycodes=us&q=${encodeURIComponent(q)}`);const a=await r.json();return a.map(row=>({type:"OSM",display:row.display_name,lat:+row.lat,lon:+row.lon,score:0.6}));}catch{return[];}}
+function renderAc(list){if(!list.length){ac.style.display="none";return;}ac.innerHTML=list.map((it,i)=>`<div class="ac-item${i===acActiveIndex?" active":""}" data-i="${i}">${esc(it.display)} <span class="badge">${it.type}</span></div>`).join("");[...ac.children].forEach(el=>el.onclick=()=>chooseAc(+el.dataset.i));ac.style.display="block";}
+function chooseAc(i){const it=acItems[i];if(!it)return;addr.value=it.display;selectedCoords={lat:it.lat,lon:it.lon};selectedPlaceId=it.place_id||null;ac.style.display="none";}
+addr.oninput=()=>{const q=addr.value.trim();if(q.length<3)return;Promise.all([googleSearch(q),nominatimSearch(q)]).then(([g,n])=>{acItems=[...g,...n].slice(0,8);renderAc(acItems);});};
+
+// Call estimate
+async function callEstimate(){
+  const body={address:addr.value.trim(),mpds:+mpds.value||0,diesel:+diesel.value||0,
+    advanced:{extra:[],price_position:document.querySelector('input[name="pricepos"]:checked').value,
+    flags:{allow_above_baseline:ex_elastic.checked}}};
+  if(selectedCoords){body.siteLat=selectedCoords.lat;body.siteLon=selectedCoords.lon;}
+  if(+aadtOverride.value) body.aadtOverride=+aadtOverride.value;
+  const r=await fetch("/estimate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});return await r.json();
+}
+
+// Render
+function renderAll(d){
+  estNum.textContent=fmt(d.low);
+  estRange.textContent=`Full range: ${fmt(d.low)} – ${fmt(d.high)}`;
+  y2.textContent=fmt(d.year2); y3.textContent=fmt(d.year3);
+  aadtBanner.textContent=`AADT used ${fmt(d.inputs.aadt_used)} (${d.inputs.aadt_components.method})`;
+  compLine.textContent=`Competition: ${d.competition.count} within 1.5 mi`;
+  devs.textContent=d.developments.length?d.developments.map(x=>`${x.name} • ${x.status}`).join("; "):"—";
+  devsExternalNews.textContent=(d.developments_external.news||[]).map(x=>`${x.name} • ${x.status}`).join("; ")||"—";
+  devsExternalPermits.textContent=(d.developments_external.permits||[]).map(x=>`${x.name} • ${x.status}`).join("; ")||"—";
+  devsAI.textContent=(d.developments_ai.verified||[]).map(x=>`${x.name} • ${x.status}`).join("; ")||"—";
+  ratingLine.textContent=d.rating?`⭐ ${d.rating} (${d.rating_total} reviews)`:"—";
+  summary.textContent=d.summary||"—";
+}
+
+go.onclick=async()=>{const d=await callEstimate();renderAll(d);}
 </script>
 </body>
 </html>
