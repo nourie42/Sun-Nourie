@@ -1,3 +1,6 @@
+# server.js (full, corrected)
+
+```javascript
 // server.js
 import express from "express";
 import cors from "cors";
@@ -16,14 +19,14 @@ app.use(express.static(path.join(__dirname, "public")));
 app.get("/", (_req, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
-/* ========== Config ========== */
+/* ========== Config =========== */
 const CONTACT = process.env.OVERPASS_CONTACT || "FuelEstimator/2.0 (contact: you@example.com)";
 const UA = "FuelEstimator/2.0 (+contact: you@example.com)";
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || "";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const STRICT_AI_DEVS = process.env.STRICT_AI_DEVS ? String(process.env.STRICT_AI_DEVS).toLowerCase() === "true" : true;
 
-/* ========== Utils ========== */
+/* ========== Utils ============ */
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const toMiles = (m) => m / 1609.344;
 function haversine(lat1, lon1, lat2, lon2){
@@ -104,7 +107,7 @@ async function queryNCDOTNearestAADT(lat, lon, radiusMeters=1609){
     rows.push({ aadt:pairs[0].val, year:pairs[0].year||null, distM });
   }
   if(!rows.length) return null;
-  rows.sort((A,B) => (B.year||0)-(A.year||0)||B.aadt-A.aadt||A.distM-B.distM);
+  rows.sort((A,B)=>(B.year||0)-(A.year||0)||B.aadt-A.aadt||A.distM-B.distM);
   return rows[0];
 }
 async function queryCustomTraffic(lat, lon, address){
@@ -233,7 +236,7 @@ async function roadContext(lat, lon){
   const intersections=nodes.filter(n=>/(junction|crossing)/.test(n.tags?.highway||"") || n.tags?.junction).length;
   const rankOrder={motorway:6,trunk:5,primary:4,secondary:3,tertiary:2,residential:1,service:0};
   const dominant=main.slice().sort((a,b)=>(rankOrder[b.highway]||0)-(rankOrder[a.highway]||0) || (b.lanes||0)-(a.lanes||0))[0];
-  const summary=dominant?`${dominant.highway}${dominant.lanes?` ${dominant.lanes} lanes`:""}${dominant.oneway?" oneway":""}${dominant.maxspeed?` @ ${dominant.maxspeed}`:""}`:"local roads";
+  const summary=dominant?`${dominant.highway}${dominant.lanes?` ${dominant.lanes} lanes`:""}${dominant.oneway?" oneway":''}${dominant.maxspeed?` @ ${dominant.maxspeed}`:""}`:"local roads";
   return { summary, main:main.slice(0,6), side:side.slice(0,6), signals, intersections };
 }
 
@@ -345,23 +348,28 @@ app.get("/google/autocomplete", async (req,res)=>{
   }catch(e){ return res.json({ ok:false, status:"EXCEPTION", error:String(e), items:[] }); }
 });
 
-/* ========== Gallons model with policy caps (FIXED) ========== */
+/* ========== Gallons model with policy caps (UPDATED COMP RULE) ========== */
 function gallonsWithRules({ aadt, mpds, diesel, compCount, heavyCount }){
-  // Floor based on your baseline
+  // Floor based on baseline
   const floor = aadt * 0.02 * 8 * 30; // AADT×2%×8gal×30days
 
-  // Competition
-  let baseMult=1.0; if(compCount>=3) baseMult=0.60; else if(compCount===2) baseMult=0.75;
-  let extraPenalty=0.0; if(heavyCount===1) extraPenalty=0.20; else if(heavyCount>=2) extraPenalty=0.35;
-  const compMult=Math.max(0.20, baseMult - extraPenalty);
+  // Competition — UPDATED to: 0=100%, 1=75%, 2–4=60%
+  let baseMult = 1.0;
+  if (compCount === 1) baseMult = 0.75;
+  else if (compCount >= 2 && compCount <= 4) baseMult = 0.60;
+  else if (compCount === 0) baseMult = 1.0;
+
+  // Heavy-brand penalties unchanged
+  let extraPenalty = 0.0; if (heavyCount === 1) extraPenalty = 0.20; else if (heavyCount >= 2) extraPenalty = 0.35;
+  const compMult = Math.max(0.20, baseMult - extraPenalty);
 
   // Demand (daily→monthly) * competition
   const truckShare=0.10, autos=aadt*(1-truckShare), trucks=aadt*truckShare;
   const gpd = autos*0.020*10.2 + trucks*0.012*16.0;         // gallons per day
   const monthlyUncapped = Math.max(gpd*(365/12), floor) * compMult;
 
-  // Equipment cap (per MPD throughput) — FIXED: include ×24 hours
-  // approx 25 cars/hr × 10.5 gal × 24 hr × (365/12) ≈ 19,162 per MPD
+  // Equipment cap (per MPD throughput) — include ×24 hours
+  // ~25 cars/hr × 10.5 gal × 24 hr × (365/12) ≈ 19,162 per MPD
   const capEquip = (mpds * 25 * 10.5 * 24) * (365/12) + ((diesel||0) * 25 * 16 * 24) * (365/12);
 
   // Policy caps: soft 22k/MPD (apply −10% queuing if demand exceeds), hard 28k/MPD
@@ -435,7 +443,7 @@ app.post("/estimate", async (req,res)=>{
       }
     }
 
-    // Gallons baseline with fixed capacity math
+    // Gallons baseline with capacity
     const calcBase=gallonsWithRules({ aadt:usedAADT, mpds:MPDS, diesel:DIESEL, compCount, heavyCount });
 
     // User extras (%)
@@ -460,7 +468,7 @@ app.post("/estimate", async (req,res)=>{
       user_multiplier_breakdown:breakdown
     };
 
-    // Developments via GPT, verified to OSM (hide unverified by default)
+    // GPT developments (verified to OSM)
     let devsAI={ items:[], confidence:0.0, verified:[], unverified:[] };
     try{
       const djson=await gptJSON(`List planned/proposed/permit/coming-soon/construction gas stations within ~1 mile of "${address || geo.label}". Return {"items":[{"name":"<string>","status":"<string>","approx_miles":<number>}], "confidence": <0.0-1.0>}`);
