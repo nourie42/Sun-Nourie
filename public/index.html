@@ -26,7 +26,7 @@
     button{ background:linear-gradient(135deg,var(--brand),var(--brand2)); color:#fff; border:0; padding:12px 16px; border-radius:10px; font-weight:700; cursor:pointer; }
     button:disabled{ opacity:.6; cursor:not-allowed; }
 
-    .row{ display:grid; grid-template-columns:1.6fr 0.7fr 0.7fr 0.8fr; gap:12px; }
+    .row{ display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:12px; }
     @media (max-width:980px){ .row{ grid-template-columns:1fr; } }
 
     .toolbar{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:12px; }
@@ -111,6 +111,7 @@
           <label class="chip"><input type="checkbox" id="ex_worksites"> Worksites nearby <span class="dash">(+7.5%)</span></label>
           <label class="chip"><input type="checkbox" id="ex_hours18"> Operating hours 18h <span class="dash">(−7.5%)</span></label>
           <label class="chip"><input type="checkbox" id="ex_highincome"> Higher-income trade area <span class="dash">(+2.5%)</span></label>
+          <label class="chip"><input type="checkbox" id="ex_lowrating"> Ratings below 4.0 / Poorly Run Site <span class="dash">(−30%)</span></label>
           <span class="chip" id="addExtra" style="cursor:pointer;">+ Add adj. (%)</span>
           <span id="activeExtras" class="subtle"></span>
         </div>
@@ -163,7 +164,7 @@ const outNum=$("estNum"), outRange=$("estRange"), outY2=$("y2"), outY3=$("y3"), 
 const detailsBox=$("details"), devsBox=$("devs"), summaryBox=$("summary"), exportBtn=$("exportPDF");
 const addrInput=$("addr"), acBox=$("ac"), goBtn=$("go");
 const addExtraBtn=$("addExtra"), extraList=$("extraList"), activeExtras=$("activeExtras");
-const ex_worksites=$("ex_worksites"), ex_hours18=$("ex_hours18"), ex_highincome=$("ex_highincome");
+const ex_worksites=$("ex_worksites"), ex_hours18=$("ex_hours18"), ex_highincome=$("ex_highincome"), ex_lowrating=$("ex_lowrating");
 let map, layer, mapReady=false, selectedCoords=null, lastEstimate=null, lastInputs=null;
 
 /* Helpers */
@@ -183,17 +184,16 @@ async function checkGoogleStatus(){
 document.addEventListener("DOMContentLoaded", checkGoogleStatus);
 
 /* Adjustments */
-function pills(){ const p=[]; if(ex_worksites.checked)p.push("+7.5% Worksites"); if(ex_hours18.checked)p.push("−7.5% 18h ops"); if(ex_highincome.checked)p.push("+2.5% Higher-income"); activeExtras.innerHTML=p.map(x=>`<span class="badge">${esc(x)}</span>`).join(" "); }
-[ex_worksites,ex_hours18,ex_highincome].forEach(el=>el.addEventListener("change",pills));
+function pills(){ const p=[]; if(ex_worksites.checked)p.push("+7.5% Worksites"); if(ex_hours18.checked)p.push("−7.5% 18h ops"); if(ex_highincome.checked)p.push("+2.5% Higher-income"); if(ex_lowrating.checked)p.push("−30% Low rating"); activeExtras.innerHTML=p.map(x=>`<span class="badge">${esc(x)}</span>`).join(" "); }
+[ex_worksites,ex_hours18,ex_highincome,ex_lowrating].forEach(el=>el.addEventListener("change",pills));
 function addExtraRow(pct="",note=""){ const row=document.createElement("div"); row.style.marginTop="6px"; row.innerHTML=`<span class="chip"><input class="extraPct" type="number" step="0.1" style="width:90px" placeholder="% e.g. 5 or -3" value="${pct}"> <input class="extraNote" style="width:320px" placeholder="Comment" value="${esc(note)}"> <button class="rm" type="button">×</button></span>`; row.querySelector(".rm").addEventListener("click",()=>row.remove()); extraList.appendChild(row); }
 addExtraBtn.addEventListener("click",()=>addExtraRow());
-function collectExtras(){ const out=[]; if(ex_worksites.checked) out.push({pct:7.5, note:"Worksites nearby add 7.5% fueling, especially AM/PM peaks"}); if(ex_hours18.checked) out.push({pct:-7.5, note:"Operating hours 18 hours (−7.5% vs 24h)"}); if(ex_highincome.checked) out.push({pct:2.5, note:"Higher income area leads to more travel & higher discretionary spending"}); for(const chip of extraList.querySelectorAll(".chip")){ const pct=+chip.querySelector(".extraPct").value; const note=chip.querySelector(".extraNote").value.trim(); if(Number.isFinite(pct)) out.push({pct, note}); } return out; }
+function collectExtras(){ const out=[]; if(ex_worksites.checked) out.push({pct:7.5, note:"Worksites nearby add 7.5% fueling, especially AM/PM peaks"}); if(ex_hours18.checked) out.push({pct:-7.5, note:"Operating hours 18 hours (−7.5% vs 24h)"}); if(ex_highincome.checked) out.push({pct:2.5, note:"Higher income area leads to more travel & higher discretionary spending"}); if(ex_lowrating.checked) out.push({pct:-30, note:"Ratings below 4.0 / Poorly run site (−30%)"}); for(const chip of extraList.querySelectorAll(".chip")){ const pct=+chip.querySelector(".extraPct").value; const note=chip.querySelector(".extraNote").value.trim(); if(Number.isFinite(pct)) out.push({pct, note}); } return out; }
 
 /* Autocomplete (Google + Nominatim) */
 let acTimer=null, acItems=[];
 async function googleSearch(q){ try{ const r=await fetch(`/google/autocomplete?input=${encodeURIComponent(q)}`); const j=await r.json(); if(!j.ok){ apiStatus.textContent=`API Status: Google — Error (${j.status}${j.error?": "+j.error:""})`; return []; } apiStatus.textContent="API Status: Google — Working"; return (j.items||[]).map(it=>({ ...it, type:"Google", score:1.3 })); }catch{ apiStatus.textContent="API Status: Google — failed to fetch"; return []; } }
-async function nominatimSearch(q){ try{ const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=us&q=${encodeURIComponent(q)}`); const a=await r.json(); return a.map(row=>({ type:"Address", display:row.display_name, lat:+row.lat, lon:+row.lon, score:0.6 })); }catch{return [];}
-}
+async function nominatimSearch(q){ try{ const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=us&q=${encodeURIComponent(q)}`); const a=await r.json(); return a.map(row=>({ type:"Address", display:row.display_name, lat:+row.lat, lon:+row.lon, score:0.6 })); }catch{return [];} }
 function renderAc(list){ if(!list.length){ acBox.style.display="none"; return; } acBox.innerHTML=list.map((it,i)=>`<div class="ac-item" data-i="${i}">${esc(it.display)} <span class="badge">${it.type}</span></div>`).join(""); [...acBox.children].forEach(el=>el.addEventListener("click",()=>chooseAc(+el.dataset.i))); acBox.style.display="block"; }
 function hideAc(){ acBox.style.display="none"; }
 function chooseAc(i){ const it=acItems[i]; if(!it) return; addrInput.value=it.display; selectedCoords=(it.lat!=null&&it.lon!=null)?{lat:it.lat,lon:it.lon}:null; hideAc(); }
@@ -236,7 +236,7 @@ function renderAll(d){
 
   detailsBox.innerHTML = `
     <div><b>Inputs</b> — MPDs ${i.mpds}${i.diesel? " + diesel "+i.diesel:""}; AADT used <b>${fmt(i.aadt_used)}</b></div>
-    <div class="subtle">Rule: 0–1=100%, 2=75%, 3+=60%; Heavy: −20% / −35%</div>
+    <div class="subtle">Rule: 0=100%, 1=75%, 2–4=60%; Heavy: −20% / −35%</div>
     <div class="subtle">Floor: ${fmt(d.floor)} • Capacity cap: ${fmt(d.cap)} • Competition multiplier: ${(Math.round((d.compMult||i.compMult||1)*100))}%</div>
     <div class="subtle">User adjustments: ${esc(JSON.stringify(i.user_multiplier_breakdown||{},null,0) || "none")}</div>
     <div class="subtle">Method: ${esc(comp?.method || "n/a")}</div>
