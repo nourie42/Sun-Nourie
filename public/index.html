@@ -3,51 +3,43 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Sunoco LP Gas Station Analyzer</title>
+  <title>Fuel IQ - Fuel Site Analyzer</title>
 
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 
+  <!-- jsPDF (for Export to PDF) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
   <style>
     :root { --bg:#0b0e15; --panel:#111725; --panel2:#0f1421; --line:#263145; --text:#eaeef7; --muted:#97a3b8; --brand:#0ea5e9; --brand2:#22d3ee; --pill:#0f1929; }
     *{ box-sizing:border-box; }
-    body{ background:var(--bg); color:var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+    body{ background:var(--bg); color:var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin:0; padding-bottom:72px; }
     .wrap{ max-width:1120px; margin:24px auto; padding:0 16px; }
     header{ display:flex; align-items:center; gap:14px; margin-bottom:16px; }
-    header .logo{
-      width:46px; height:46px; border-radius:10px;
-      background: radial-gradient(60% 60% at 30% 30%, var(--brand2), transparent 60%), linear-gradient(145deg, var(--brand), var(--panel2));
-      box-shadow: 0 10px 30px rgba(14,165,233,.25), inset 0 0 12px rgba(34,211,238,.2);
-    }
+    header .logo{ width:48px; height:48px; border-radius:8px; background:#0b1220; display:flex; align-items:center; justify-content:center; }
+    header .logo img{ max-height:42px; max-width:120px; display:block; }
     header h1{ font-size:28px; margin:0; letter-spacing:.2px; }
 
     .card{ background:linear-gradient(180deg,var(--panel),var(--panel2)); border:1px solid var(--line);
            border-radius:12px; padding:16px; margin:12px 0; }
     label{ display:block; font-weight:600; margin:8px 0 6px; color:#d8e3f6; }
-    input, select, textarea{
-      width:100%; padding:12px; border-radius:10px; border:1px solid var(--line);
-      background:#0b1220; color:#eaeef7;
-    }
-    textarea{ min-height:70px; }
-    button{
-      background:linear-gradient(135deg,var(--brand),var(--brand2)); color:#fff; border:0; padding:12px 16px;
-      border-radius:10px; font-weight:700; cursor:pointer;
-    }
+    input, select{ width:100%; padding:12px; border-radius:10px; border:1px solid var(--line); background:#0b1220; color:#eaeef7; }
+    button{ background:linear-gradient(135deg,var(--brand),var(--brand2)); color:#fff; border:0; padding:12px 16px; border-radius:10px; font-weight:700; cursor:pointer; }
     button:disabled{ opacity:.6; cursor:not-allowed; }
 
-    .row{ display:grid; grid-template-columns:1.8fr 0.8fr 0.8fr; gap:12px; }
-    @media (max-width:900px){ .row{ grid-template-columns:1fr; } }
-    .grid{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
-    @media (max-width:900px){ .grid{ grid-template-columns:1fr; } }
-    .right{ text-align:right; }
+    .row{ display:grid; grid-template-columns:1.6fr 0.7fr 0.7fr 0.8fr; gap:12px; }
+    @media (max-width:980px){ .row{ grid-template-columns:1fr; } }
+
+    .toolbar{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:12px; }
     .muted{ color:var(--muted); }
-    .mono{ font-family: ui-monospace, Menlo, Consolas, monospace; white-space:pre-wrap; }
     .subtle{ font-size:12px; opacity:.9; }
+    .mono{ font-family: ui-monospace, Menlo, Consolas, monospace; white-space:pre-wrap; }
 
     #map{ height:420px; border-radius:12px; border:1px solid var(--line); position: relative; }
     #overlay{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-      background:rgba(11,14,21,.55); border-radius:12px; font-weight:700; color:#cde9ff; }
+      background:rgba(11,14,21,.55); border-radius:12px; font-weight:800; color:#cde9ff; font-size:18px; padding:20px; text-align:center; }
 
     /* Street View */
     #svWrap{ margin-top:10px; }
@@ -64,16 +56,32 @@
     .badge{ display:inline-block; font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid var(--line);
             background:var(--pill); color:#a9c5ff; margin-left:8px; }
 
-    .toolbar{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
-    .checkbox{ display:inline-flex; align-items:center; gap:8px; font-size:14px; }
-    .pill{ display:inline-block; padding:4px 8px; border-radius:999px; border:1px solid var(--line); background:#0f1929; margin-right:6px; font-size:12px; }
+    /* Advanced options – single straight line */
+    details summary{ cursor:pointer; }
+    .adv-line{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-top:12px; }
+    .chip{ display:inline-flex; align-items:center; gap:8px; background:#0f1929; border:1px solid var(--line); padding:8px 10px; border-radius:999px; font-size:13px; }
+    .chip input{ width:auto; accent-color:#22d3ee; }
+    .dash{ color:#50607a; opacity:.9; }
+
+    /* Estimate hero */
+    .hero{ display:flex; justify-content:space-between; align-items:flex-end; gap:12px; }
+    .hero .num{ font-size:44px; font-weight:900; letter-spacing:.5px; }
+    .hero .sub{ font-size:13px; color:#a9b6d0; }
+
+    /* Sticky footer for Export */
+    .footerbar{ position:fixed; left:0; right:0; bottom:0; background:linear-gradient(180deg,#0c1220,#0a0f1a);
+      border-top:1px solid var(--line); padding:10px 16px; display:flex; justify-content:center; gap:12px; z-index:50; }
+    .footerbar > * { margin:0 6px; }
+
+    /* Hide debug by default */
+    #debugCard{ display:none; }
   </style>
 </head>
 <body>
   <div class="wrap">
     <header>
-      <div class="logo"></div>
-      <h1>Sunoco LP Gas Station Analyzer</h1>
+      <div class="logo"><img src="logo.png" alt="Fuel IQ logo"></div>
+      <h1>Fuel IQ - Fuel Site Analyzer</h1>
     </header>
 
     <div class="card">
@@ -88,51 +96,61 @@
         </div>
         <div>
           <label>Regular MPDs</label>
-          <input id="mpds" type="number" value="3"/>
+          <input id="mpds" type="number" value="3" min="1"/>
         </div>
         <div>
           <label>Diesel positions (optional)</label>
-          <input id="diesel" type="number" value="0"/>
+          <input id="diesel" type="number" value="0" min="0"/>
+        </div>
+        <div>
+          <label>AADT override (optional)</label>
+          <input id="aadtOverride" type="number" placeholder="e.g., 14500"/>
         </div>
       </div>
-      <div style="margin-top:12px;" class="toolbar">
+      <div class="toolbar">
         <button id="go">Estimate</button>
-        <button id="copySummary" title="Copy summary">Copy Summary</button>
-        <label class="checkbox"><input type="checkbox" id="includeAI"/>Include AI (unverified) developments</label>
-        <button id="checkGoogle">Check Google API</button>
+        <span class="muted">AADT = avg(DOT, GPT) unless overridden • competition rule • capacity caps • road layout.</span>
       </div>
     </div>
 
+    <!-- Advanced (collapsed) -->
     <div class="card">
       <details>
         <summary><b>Advanced options (optional)</b> — collapsed by default</summary>
-        <div style="margin-top:12px" class="grid">
-          <div>
-            <label>Scenario toggles</label>
-            <div class="checkbox"><input type="checkbox" id="ex_worksites"> Worksites nearby <span class="muted subtle">(+7.5% fueling, esp. AM/PM peaks)</span></div>
-            <div class="checkbox"><input type="checkbox" id="ex_hours18"> Operating hours 18h <span class="muted subtle">(−7.5% vs 24h)</span></div>
-            <div class="checkbox"><input type="checkbox" id="ex_highincome"> Higher-income trade area <span class="muted subtle">(+2.5% — “more travel & higher discretionary spending”)</span></div>
-            <div id="activeExtras" style="margin-top:6px" class="muted subtle"></div>
-          </div>
-          <div>
-            <label>Additional percentage adjustments (with comments)</label>
-            <div id="extraList"></div>
-            <button id="addExtra" type="button" style="margin-top:8px;">+ Add adjustment</button>
-            <div class="muted subtle" style="margin-top:6px">Example: +5% (new signage), −3% (restricted left turns)</div>
-          </div>
+        <div class="adv-line">
+          <label class="chip"><input type="checkbox" id="ex_worksites"> Worksites nearby <span class="dash">(+7.5%)</span></label>
+          <label class="chip"><input type="checkbox" id="ex_hours18"> Operating hours 18h <span class="dash">(−7.5%)</span></label>
+          <label class="chip"><input type="checkbox" id="ex_highincome"> Higher‑income trade area <span class="dash">(+2.5%)</span></label>
+          <span class="chip" id="addExtra" style="cursor:pointer;">+ Add adj. (%)</span>
+          <span id="activeExtras" class="subtle"></span>
         </div>
+        <div id="extraList" style="margin-top:8px;"></div>
       </details>
     </div>
 
-    <div class="card">
-      <div id="out" class="muted">—</div>
-    </div>
-
-    <div class="card">
+    <!-- Estimate -->
+    <div class="card" id="estimateCard">
+      <div class="hero">
+        <div>
+          <div style="font-weight:700;margin-bottom:6px;">Adjusted Base Estimate (gal/mo)<span id="userMult"></span></div>
+          <div class="num" id="estNum">—</div>
+          <div class="sub" id="estRange">Low–High: —</div>
+        </div>
+        <div class="right sub">
+          <div>Year‑2: <b id="y2">—</b></div>
+          <div style="margin-top:6px;">Year‑3: <b id="y3">—</b></div>
+        </div>
+      </div>
+      <hr/>
       <div id="aadtBanner" class="muted" style="margin-bottom:6px;">—</div>
-      <div class="muted subtle" id="capNote" style="margin-bottom:6px;">
+      <div id="compLine" class="muted">—</div>
+      <div id="capacityLine" class="muted subtle" style="margin-top:6px;">
         Capacity guidance: <b>caps peak gallons at ~22–28k gal/MPD/month</b>. Too few pumps ⇒ queuing & <b>≥10% lost volume</b> at peaks.
       </div>
+    </div>
+
+    <!-- Map + Street View -->
+    <div class="card">
       <div class="muted" style="margin-bottom:6px;">
         Map: Site & competitors (1 mile) <span class="badge">Legend</span> Site marker • Heavy ● • Regular ●
       </div>
@@ -140,10 +158,10 @@
       <div id="svWrap">
         <div class="muted" style="margin:10px 0 6px;"><b>Street View</b> (best effort)</div>
         <iframe id="sv" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
-        <div id="svNote" class="muted subtle">If exact imagery is unavailable, Google shows the nearest panorama.</div>
       </div>
     </div>
 
+    <!-- Details + Devs + Summary -->
     <div class="card">
       <b>Computation Details</b>
       <div id="details" class="muted">—</div>
@@ -159,262 +177,237 @@
       <div id="summary" class="muted">—</div>
     </div>
 
-    <div class="card">
-      <details><summary>Debug</summary><pre id="debug" class="mono muted">/ waiting…</pre></details>
+    <div class="card" id="debugCard">
+      <details open><summary>Debug</summary><pre id="debug" class="mono muted">/ waiting…</pre></details>
     </div>
+  </div>
+
+  <!-- Sticky footer -->
+  <div class="footerbar">
+    <button id="exportPDF">Export to PDF</button>
   </div>
 
 <script>
 /* ========= Globals & helpers ========= */
 const $ = id => document.getElementById(id);
-const out=$("out"), devs=$("devs"), summary=$("summary"), dbg=$("debug"),
-      goBtn=$("go"), includeAI=$("includeAI"),
-      aadtBanner=$("aadtBanner"), apiStatus=$("apiStatus"), checkGoogleBtn=$("checkGoogle");
-const acBox=$("ac"), addrInput=$("addr"), overlay=$("overlay"), detailsBox=$("details");
+const outNum=$("estNum"), outRange=$("estRange"), outY2=$("y2"), outY3=$("y3"), userMultEl=$("userMult");
+const detailsBox=$("details"), devsBox=$("devs"), summaryBox=$("summary"), apiStatus=$("apiStatus");
+const aadtBanner=$("aadtBanner"), compLine=$("compLine"), overlay=$("overlay"), svFrame=$("sv");
+const addrInput=$("addr"), acBox=$("ac"), goBtn=$("go"), exportBtn=$("exportPDF");
 const addExtraBtn=$("addExtra"), extraList=$("extraList"), activeExtras=$("activeExtras");
 const ex_worksites=$("ex_worksites"), ex_hours18=$("ex_hours18"), ex_highincome=$("ex_highincome");
-const svFrame=$("sv");
-let map, layer, mapReady=false, selectedCoords=null;
+let map, layer, mapReady=false, selectedCoords=null, lastEstimate=null, lastInputs=null;
 
-/* Base helpers */
-function setOut(html){ out.innerHTML=html; }
-function setDbg(o){ dbg.textContent=typeof o==="string"?o:JSON.stringify(o,null,2); }
+/* Helpers */
 function fmt(n){ return (n??0).toLocaleString(undefined,{maximumFractionDigits:0}); }
 function esc(s){ return (s??"").toString().replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
-function setOverlay(msg){ overlay.textContent=msg; overlay.style.display="flex"; }
+function setOverlayWorking(){ overlay.textContent="Working, this may take up to 5 minutes to research"; overlay.style.display="flex"; overlay.style.fontSize="18px"; overlay.style.fontWeight="800"; }
 function clearOverlay(){ overlay.style.display="none"; }
 function initMap(){ if(mapReady) return; map=L.map("map",{zoomControl:true});
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map);
   layer=L.layerGroup().addTo(map); mapReady=true; }
+function updateStreetView(lat, lon){ const url=`https://maps.google.com/maps?q=&layer=c&cbll=${lat},${lon}&cbp=12,0,,0,0&output=svembed`; svFrame.src=url; }
 
-/* ========= Google API status (never hangs) ========= */
+/* ========= Google status (auto) ========= */
 async function checkGoogleStatus(){
-  const controller=new AbortController(); const timer=setTimeout(()=>controller.abort(),9000);
-  apiStatus.textContent="API Status: checking…";
+  const controller=new AbortController(); const t=setTimeout(()=>controller.abort(),9000);
   try{
-    const res=await fetch("/google/status",{signal:controller.signal});
-    const text=await res.text();
-    let j; try{ j=JSON.parse(text);}catch{ j={ok:false,status:"PARSE_ERROR",error:text.slice(0,200)}; }
-    if(j.ok){ apiStatus.textContent="API Status: Google — Working"; }
-    else{ apiStatus.textContent=`API Status: Google — Error (${j.status}${j.error?": "+j.error:""})`; }
-  }catch(e){ apiStatus.textContent="API Status: Google — failed to fetch (server down, CORS, or timeout)"; }
-  finally{ clearTimeout(timer); }
+    const r=await fetch("/google/status",{signal:controller.signal});
+    const txt=await r.text(); let j; try{ j=JSON.parse(txt);}catch{ j={ok:false,status:"PARSE_ERROR",error:txt.slice(0,120)};}
+    apiStatus.textContent = j.ok ? "API Status: Google — Working" : `API Status: Google — Error (${j.status}${j.error?": "+j.error:""})`;
+  }catch{ apiStatus.textContent="API Status: Google — failed to fetch"; } finally{ clearTimeout(t); }
 }
-checkGoogleBtn?.addEventListener("click", checkGoogleStatus);
 document.addEventListener("DOMContentLoaded", checkGoogleStatus);
 
-/* ========= Advanced options UI ========= */
+/* ========= Advanced options (straight line) ========= */
 function addExtraRow(pct="", note=""){
-  const div=document.createElement("div"); div.className="adj-row";
-  div.innerHTML=`
-    <input class="extraPct" type="number" step="0.1" placeholder="% e.g. 5 or -3" value="${pct}">
-    <input class="extraNote" placeholder="Comment (e.g. signage, access limits)" value="${esc(note)}">
-    <button type="button" class="rm">Remove</button>`;
-  div.querySelector(".rm").addEventListener("click",()=>div.remove());
-  extraList.appendChild(div);
+  const row=document.createElement("div"); row.style.marginTop="6px";
+  row.innerHTML=`<span class="chip"><input class="extraPct" type="number" step="0.1" style="width:90px" placeholder="% e.g. 5 or -3" value="${pct}"> <input class="extraNote" style="width:340px" placeholder="Comment" value="${esc(note)}"> <button class="rm" type="button">×</button></span>`;
+  row.querySelector(".rm").addEventListener("click",()=>row.remove());
+  extraList.appendChild(row);
 }
-addExtraBtn?.addEventListener("click",()=> addExtraRow());
+addExtraBtn.addEventListener("click",()=>addExtraRow());
+function pills(){ const p=[]; if(ex_worksites.checked)p.push("+7.5% Worksites"); if(ex_hours18.checked)p.push("−7.5% 18h ops"); if(ex_highincome.checked)p.push("+2.5% Higher‑income"); activeExtras.innerHTML=p.map(x=>`<span class="badge">${esc(x)}</span>`).join(" "); }
+[ex_worksites,ex_hours18,ex_highincome].forEach(el=>el.addEventListener("change",pills));
 
-function listActiveExtrasPills(){
-  const pills=[];
-  if(ex_worksites.checked) pills.push("+7.5% Worksites nearby");
-  if(ex_hours18.checked) pills.push("−7.5% 18h operations");
-  if(ex_highincome.checked) pills.push("+2.5% Higher-income area");
-  activeExtras.innerHTML = pills.length ? pills.map(p=>`<span class="pill">${esc(p)}</span>`).join("") : "";
-}
-[ex_worksites, ex_hours18, ex_highincome].forEach(el=> el?.addEventListener("change", listActiveExtrasPills));
-
-function readAdvanced(){
-  const extras=[...document.querySelectorAll("#extraList .adj-row")].map(row=>{
-    const pct=+row.querySelector(".extraPct").value;
-    const note=row.querySelector(".extraNote").value.trim();
-    return Number.isFinite(pct) ? { pct, note } : null;
-  }).filter(Boolean);
-  if(ex_worksites?.checked) extras.push({ pct: 7.5, note: "Worksites nearby add 7.5% fueling, especially AM/PM peaks" });
-  if(ex_hours18?.checked)  extras.push({ pct:-7.5, note: "Operating hours 18 hours (−7.5% vs 24h)" });
-  if(ex_highincome?.checked) extras.push({ pct: 2.5, note: "Higher income area leads to more travel & higher discretionary spending" });
-  return extras.length ? { extra: extras } : null;
+function collectExtras(){
+  const out=[];
+  // toggles
+  if(ex_worksites.checked) out.push({pct:7.5, note:"Worksites nearby add 7.5% fueling, especially AM/PM peaks"});
+  if(ex_hours18.checked)  out.push({pct:-7.5, note:"Operating hours 18 hours (−7.5% vs 24h)"});
+  if(ex_highincome.checked) out.push({pct:2.5, note:"Higher‑income area leads to more travel & higher discretionary spending"});
+  // custom rows
+  for(const row of extraList.querySelectorAll(".chip")){
+    const pct = +row.querySelector(".extraPct").value;
+    const note = String(row.querySelector(".extraNote").value||"").trim();
+    if(Number.isFinite(pct)) out.push({pct, note});
+  }
+  return out;
 }
 
 /* ========= Autocomplete (Google + Nominatim fallback) ========= */
 let acTimer=null, acItems=[], acIndex=-1;
-
 async function googleSearch(q){
   try{
-    const r=await fetch(`/google/autocomplete?input=${encodeURIComponent(q)}`);
-    const j=await r.json();
-    if(!j.ok){
-      apiStatus.textContent = `API Status: Google — Error (${j.status}${j.error?": "+j.error:""})`;
-      return [];
-    }
-    apiStatus.textContent = "API Status: Google — Working";
+    const r=await fetch(`/google/autocomplete?input=${encodeURIComponent(q)}`); const j=await r.json();
+    if(!j.ok){ apiStatus.textContent = `API Status: Google — Error (${j.status}${j.error?": "+j.error:""})`; return []; }
+    apiStatus.textContent="API Status: Google — Working";
     return (j.items||[]).map(it=>({ ...it, type:"Google", score:1.3 }));
-  }catch(_){
-    apiStatus.textContent = "API Status: Google — failed to fetch (server down, CORS, or network)";
-    return [];
-  }
+  }catch{ apiStatus.textContent="API Status: Google — failed to fetch"; return []; }
 }
-async function nominatimSearch(q){
-  try{
-    const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=us&q=${encodeURIComponent(q)}`);
-    const a=await r.json();
-    return a.map(row=>({ type:"Address", display:row.display_name, lat:+row.lat, lon:+row.lon, score:0.6 }));
-  }catch{return [];}
-}
-function renderAc(list){
-  if(!list.length){ acBox.style.display="none"; return; }
-  acBox.innerHTML=list.map((it,i)=>`<div class="ac-item" data-i="${i}">${esc(it.display)} <span class="badge">${it.type}</span></div>`).join("");
-  [...acBox.children].forEach(el=> el.addEventListener("click",()=> chooseAc(+el.dataset.i)));
-  acBox.style.display="block";
-}
+async function nominatimSearch(q){ try{ const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=us&q=${encodeURIComponent(q)}`); const a=await r.json(); return a.map(row=>({type:"Address",display:row.display_name,lat:+row.lat,lon:+row.lon,score:0.6})); }catch{return [];} }
+function renderAc(list){ if(!list.length){ acBox.style.display="none"; return; } acBox.innerHTML=list.map((it,i)=>`<div class="ac-item" data-i="${i}">${esc(it.display)} <span class="badge">${it.type}</span></div>`).join(""); [...acBox.children].forEach(el=>el.addEventListener("click",()=>chooseAc(+el.dataset.i))); acBox.style.display="block"; }
 function hideAc(){ acBox.style.display="none"; acIndex=-1; }
-function chooseAc(i){
-  const it=acItems[i]; if(!it) return;
-  addrInput.value=it.display;
-  selectedCoords = (it.lat!=null && it.lon!=null) ? { lat: it.lat, lon: it.lon } : null;
-  hideAc();
-}
-addrInput.addEventListener("input", ()=>{
-  const q=addrInput.value.trim(); selectedCoords=null; hideAc();
-  if(q.length<3) return;
-  if(acTimer) clearTimeout(acTimer);
-  acTimer=setTimeout(async()=>{
-    try{
-      const [g, n] = await Promise.all([googleSearch(q), nominatimSearch(q)]);
-      acItems = [...g, ...n];
-      renderAc(acItems);
-    }catch{}
-  },250);
-});
-
-/* ========= Copy Summary ========= */
-document.getElementById("copySummary")?.addEventListener("click",()=>{
-  try{ navigator.clipboard.writeText(summary.textContent||""); alert("Summary copied."); }
-  catch(e){ alert("Copy failed: "+e.message); }
-});
+function chooseAc(i){ const it=acItems[i]; if(!it)return; addrInput.value=it.display; selectedCoords=(it.lat!=null&&it.lon!=null)?{lat:it.lat,lon:it.lon}:null; hideAc(); }
+addrInput.addEventListener("input",()=>{ const q=addrInput.value.trim(); selectedCoords=null; hideAc(); if(q.length<3)return; if(acTimer)clearTimeout(acTimer); acTimer=setTimeout(async()=>{ const [g,n]=await Promise.all([googleSearch(q),nominatimSearch(q)]); acItems=[...g,...n]; renderAc(acItems);},250);});
+document.addEventListener("click",(e)=>{ if(!acBox.contains(e.target) && e.target!==addrInput) hideAc(); });
 
 /* ========= Client → server ========= */
-async function safeJSON(url, opts){
-  const r=await fetch(url, opts); const t=await r.text();
-  if(!r.ok) throw new Error(`HTTP ${r.status}\n${t.slice(0,1200)}`);
-  try{ return JSON.parse(t); }catch{ throw new Error("Bad JSON from server: "+t.slice(0,200)); }
-}
+async function safeJSON(url, opts){ const r=await fetch(url,opts); const t=await r.text(); if(!r.ok) throw new Error(`HTTP ${r.status}\n${t.slice(0,1000)}`); try{ return JSON.parse(t);}catch{ throw new Error("Bad JSON from server: "+t.slice(0,200)); } }
 async function callEstimate(){
-  const body={ address: addrInput.value.trim(), mpds:+$("mpds").value||0, diesel:+$("diesel").value||0 };
+  const body={ address: addrInput.value.trim(), mpds:+$("mpds").value||0, diesel:+$("diesel").value||0, advanced:{ extra: collectExtras() } };
   if(selectedCoords){ body.siteLat=selectedCoords.lat; body.siteLon=selectedCoords.lon; }
-  const adv = readAdvanced(); if(adv) body.advanced = adv;
+  const ov = +($("aadtOverride").value||"");
+  if(Number.isFinite(ov) && ov>0){ body.aadtOverride = ov; } // server may support; client will also recalc if not
   return await safeJSON("/estimate",{ method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
 }
 
-/* ========= Renderers ========= */
-function updateStreetView(lat, lon){
-  const url = `https://maps.google.com/maps?q=&layer=c&cbll=${lat},${lon}&cbp=12,0,,0,0&output=svembed`;
-  if(svFrame) svFrame.src = url;
+/* ========= Client-side gallons model (mirrors server policy) ========= */
+function gallonsWithRulesClient({ aadt, mpds, diesel, compCount, heavyCount }){
+  const floor = aadt * 0.02 * 8 * 30;
+  let baseMult=1.0; if(compCount>=3) baseMult=0.6; else if(compCount===2) baseMult=0.75;
+  let extraPenalty=0; if(heavyCount===1) extraPenalty=0.2; else if(heavyCount>=2) extraPenalty=0.35;
+  const compMult=Math.max(0.2, baseMult - extraPenalty);
+  const truckShare=0.10, autos=aadt*(1-truckShare), trucks=aadt*truckShare;
+  const gpd=autos*0.020*10.2 + trucks*0.012*16.0;
+  const monthlyUncapped=Math.max(gpd*(365/12)*compMult, floor);
+  const capEquip=(mpds*25*10.5 + (diesel||0)*25*16)*(365/12);
+  const HARD=28000, SOFT=22000;
+  const capPolicyHard=mpds*HARD;
+  let capped=Math.min(monthlyUncapped, capEquip, capPolicyHard);
+  if(monthlyUncapped>mpds*SOFT) capped = Math.round(capped*0.90);
+  const base=Math.round(capped);
+  return { base, low:Math.round(base*0.86), high:Math.round(base*1.06), year2:Math.round(base*1.027), year3:Math.round(base*1.027*1.0125), cap:Math.round(Math.min(capEquip,capPolicyHard)), floor:Math.round(floor), compMult, caps:{hard_per_mpd:HARD,soft_per_mpd:SOFT}};
 }
+
+/* ========= Renderers ========= */
 function renderMap(m){
   initMap(); layer.clearLayers();
-  if(!m || !m.site){ overlay.textContent="—"; return; }
+  if(!m || !m.site){ setOverlayWorking(); return; }
   const site=[m.site.lat,m.site.lon];
   L.marker(site,{title:"Site"}).addTo(layer).bindPopup("<b>Site</b>");
-  const comps = Array.isArray(m.competitors)?m.competitors:[];
   const pts=[site];
-  for(const c of comps){
-    if(!(Number.isFinite(c.lat) && Number.isFinite(c.lon))) continue;
+  for(const c of (m.competitors||[])){
+    if(!Number.isFinite(c.lat)||!Number.isFinite(c.lon)) continue;
     pts.push([c.lat,c.lon]);
-    L.circleMarker([c.lat,c.lon],{
-      radius:6, weight:1, color:c.heavy?"#ff7f50":"#4ade80", fillColor:c.heavy?"#ff7f50":"#4ade80", fillOpacity:.85
-    }).addTo(layer).bindPopup(`${esc(c.name||"Fuel")} • ${c.miles} mi`);
+    L.circleMarker([c.lat,c.lon],{radius:6,weight:1,color:c.heavy?"#ff7f50":"#4ade80",fillColor:c.heavy?"#ff7f50":"#4ade80",fillOpacity:.85}).addTo(layer).bindPopup(`${esc(c.name||"Fuel")} • ${c.miles} mi`);
   }
-  map.fitBounds(L.latLngBounds(pts).pad(0.25)); clearOverlay();
+  map.fitBounds(L.latLngBounds(pts).pad(0.25));
+  clearOverlay();
   updateStreetView(site[0], site[1]);
 }
-function renderReport(d){
+
+function renderAll(d, applyOverride=false, overrideVal=null){
   const i=d.inputs||{}, c=d.competition||{}, comp=i?.aadt_components||{};
-  const dot=comp.dot, gpt=comp.gpt;
-  const parts=[];
-  parts.push(`USED (AVG): ${fmt(i.aadt_used)}`);
-  if(dot?.value) parts.push(`DOT ${fmt(dot.value)} (${dot.source||"DOT"} ${dot.year||"n/a"}${dot.source==='custom'?'':`, ~${dot.distance_mi} mi`})`);
-  if(gpt?.value) parts.push(`GPT ${fmt(gpt.value)} (conf ${((gpt.confidence||0)*100|0)}%)`);
-  aadtBanner.textContent = "AADT → " + parts.join(" | ");
+  const dot=comp?.dot, gpt=comp?.gpt;
+  const gptNote = comp?.gpt?.note ? ` — GPT note: ${comp.gpt.note}` : "";
+  aadtBanner.textContent = `AADT → USED ${fmt(i.aadt_used)} (AVG of DOT ${fmt(dot?.value||0)}${dot?.year? " "+dot.year:""}${dot?.distance_mi!=null?`, ~${dot.distance_mi} mi`:""} and GPT ${fmt(gpt?.value||0)}${gptNote})`;
 
-  const userMult = i.user_multiplier ? ` (user mult ×${i.user_multiplier.toFixed(3)})` : "";
-  setOut(`
-    <div class="grid">
-      <div>
-        <div style="font-weight:700;margin-bottom:6px;">Adjusted Base Estimate (gal/mo)${userMult}</div>
-        <div style="font-size:30px;font-weight:800;">${fmt(d.base)}</div>
-        <div class="muted">Low–High: ${fmt(d.low)} – ${fmt(d.high)}</div>
-      </div>
-      <div class="right">
-        <div>Year-2: <b>${fmt(d.year2)}</b></div>
-        <div style="margin-top:6px;">Year-3: <b>${fmt(d.year3)}</b></div>
-      </div>
-    </div>
-  `);
+  userMultEl.textContent = i.user_multiplier ? ` (user mult ×${i.user_multiplier.toFixed(3)})` : "";
 
-  // Always show the reasoning details
-  const rule = "0–1=100%, 2=75%, 3+=60%; Heavy: −20% / −35%";
-  const userAdj = (i.user_multiplier_breakdown && Object.keys(i.user_multiplier_breakdown).length)
-    ? JSON.stringify(i.user_multiplier_breakdown)
-    : "none";
+  // If user supplied an override and server didn't use it, recompute client-side
+  let est = { base:d.base, low:d.low, high:d.high, year2:d.year2, year3:d.year3, cap:d.cap, floor:d.floor, compMult:d.compMult };
+  if(applyOverride){
+    const mpds=+$("mpds").value||0, diesel=+$("diesel").value||0;
+    const recalc=gallonsWithRulesClient({ aadt: overrideVal, mpds, diesel, compCount: c.count||0, heavyCount:(c.notable_brands||[]).length });
+    est=recalc;
+  }
+
+  outNum.textContent = fmt(est.base);
+  outRange.textContent = `Low–High: ${fmt(est.low)} – ${fmt(est.high)}`;
+  outY2.textContent = fmt(est.year2);
+  outY3.textContent = fmt(est.year3);
+
+  compLine.textContent = `Competition: ${c.count??0} within 1 mi${c.nearest_mi!=null?"; nearest "+c.nearest_mi.toFixed(3)+" mi":""}${(c.notable_brands||[]).length ? "; notable: "+c.notable_brands.join(", ") : ""}`;
+
   detailsBox.innerHTML = `
-    <div><b>Inputs</b> — MPDs ${i.mpds}${i.diesel? " + diesel "+i.diesel:""}; AADT used <b>${fmt(i.aadt_used)}</b></div>
-    <div><b>Competition</b> — ${c.count ?? 0} within 1 mi${c.nearest_mi!=null? "; nearest "+c.nearest_mi.toFixed(3)+" mi":""}${(c.notable_brands||[]).length ? "; notable: "+c.notable_brands.join(", ") : ""}</div>
-    <div class="muted subtle" style="margin-top:4px"><b>Rule</b>: ${rule}</div>
-    <div class="muted subtle">Floor: ${fmt(d.floor)} • Capacity cap: ${fmt(d.cap)} • Comp multiplier: ${(d.compMult*100|0)}%</div>
-    <div class="muted subtle">User adjustments: ${esc(userAdj)}</div>
+    <div><b>Inputs</b> — MPDs ${i.mpds}${i.diesel? " + diesel "+i.diesel:""}; ${overrideVal?`AADT <b>OVERRIDE</b> ${fmt(overrideVal)} (client‑applied)`:`AADT used <b>${fmt(i.aadt_used)}</b>`}</div>
+    <div class="subtle">Competition rule: 0–1=100%, 2=75%, 3+=60%; Heavy: −20% / −35%</div>
+    <div class="subtle">Floor: ${fmt(est.floor)} • Capacity cap: ${fmt(est.cap)} • Competition multiplier: ${(Math.round((est.compMult||d.compMult)*100))}%</div>
+    <div class="subtle">User adjustments: ${esc(JSON.stringify(i.user_multiplier_breakdown||{},null,0) || "none")}</div>
   `;
-}
-function renderDevs(osm, ai){
-  const showUnverified = includeAI ? includeAI.checked : false;
-  const verified = (ai && Array.isArray(ai.verified)) ? ai.verified : [];
-  const unverified = (ai && Array.isArray(ai.unverified)) ? ai.unverified : [];
-  const left = (Array.isArray(osm)&&osm.length)
-    ? "<ul>"+osm.map(d=>`<li>${esc(d.name)} • ${esc(d.status)} • ${d.miles} mi</li>`).join("")+"</ul>"
-    : "<span class='muted'>OSM/Overpass: none found</span>";
-  const right = (verified.length || (showUnverified && unverified.length))
-    ? `<div><div><b>GPT (verified)</b></div><ul>`+
-        verified.map(x=>`<li>${esc(x.name)} • ${esc(x.status||"planned")} • ~${x.approx_miles ?? "?"} mi</li>`).join("")+
-      `</ul>`+
-      (showUnverified && unverified.length
-        ? `<div class='muted' style='margin-top:6px'><b>GPT (unverified)</b></div><ul>`+
-          unverified.map(x=>`<li>${esc(x.name)} • ${esc(x.status||"planned")} • ~${x.approx_miles ?? "?"} mi</li>`).join("")+
-         `</ul><div class='muted'>GPT confidence: ${((ai.confidence||0)*100|0)}%</div>`
-        : `<div class='muted'>GPT confidence: ${((ai?.confidence||0)*100|0)}%</div>`)
-    : "<span class='muted'>GPT: none reported</span>";
-  devs.innerHTML = `<div class="grid"><div>${left}</div><div>${right}</div></div>`;
+
+  // Developments
+  const ai=d.developments_ai||{};
+  const verified=Array.isArray(ai.verified)?ai.verified:[];
+  const unverified=Array.isArray(ai.unverified)?ai.unverified:[];
+  const left=(Array.isArray(d.developments)&&d.developments.length)?("<ul>"+d.developments.map(x=>`<li>${esc(x.name)} • ${esc(x.status)} • ${x.miles} mi</li>`).join("")+"</ul>"):"<span class='muted'>OSM/Overpass: none found</span>";
+  const right=(verified.length||unverified.length)?`<div><div><b>GPT (verified)</b></div><ul>${verified.map(x=>`<li>${esc(x.name)} • ${esc(x.status||"planned")} • ~${x.approx_miles??"?"} mi</li>`).join("")}</ul>${unverified.length?`<div class='muted' style='margin-top:6px'><b>GPT (unverified)</b></div><ul>${unverified.map(x=>`<li>${esc(x.name)} • ${esc(x.status||"planned")} • ~${x.approx_miles??"?"} mi</li>`).join("")}</ul>`:""}<div class='muted'>GPT confidence: ${((ai.confidence||0)*100|0)}%</div></div>`:"<span class='muted'>GPT: none reported</span>";
+  devsBox.innerHTML = `<div class="grid"><div>${left}</div><div>${right}</div></div>`;
+
+  // Summary (safe)
+  let s=""; if(typeof d.summary==="string") s=d.summary; else if(d.summary && typeof d.summary.summary==="string") s=d.summary.summary;
+  if(overrideVal){ s += (s? " ":"") + `(User AADT override applied: ${fmt(overrideVal)}.)`; }
+  summaryBox.textContent = s && s.trim ? s.trim() : (s || "—");
+
+  // Map
+  renderMap(d.map);
+
+  // Save for PDF
+  lastEstimate = { est, details: detailsBox.innerText, aadt: aadtBanner.innerText, devs: devsBox.innerText, summary: summaryBox.innerText, competition: compLine.innerText };
+  lastInputs = { address: addrInput.value.trim(), mpds: i.mpds, diesel: i.diesel, aadt_used: overrideVal||i.aadt_used };
 }
 
 /* ========= Main flow ========= */
 async function estimate(){
   try{
-    goBtn.disabled=true;
-    setOut("<span class='muted'>Working…</span>");
-    setOverlay("Researching (geocode, AADT sources, competition, GPT)...");
+    goBtn.disabled=true; setOverlayWorking();
     const d=await callEstimate();
-    renderReport(d);
-    renderMap(d.map);
-    renderDevs(d.developments, d.developments_ai);
-
-    // Robust summary handling (prevents trim errors)
-    let s = "";
-    if (typeof d.summary === "string") s = d.summary;
-    else if (d.summary && typeof d.summary.summary === "string") s = d.summary.summary;
-    summary.textContent = (s && s.trim) ? s.trim() : (s || "—");
-
-    setDbg(d);
+    const overrideVal = +($("aadtOverride").value||"");
+    const useOverride = Number.isFinite(overrideVal) && overrideVal>0 && overrideVal !== d?.inputs?.aadt_used;
+    renderAll(d, useOverride, overrideVal);
   }catch(e){
-    setOut(`<pre class="mono">${esc(e.message||String(e))}</pre>`);
-    overlay.textContent="Error — see details above";
+    alert("Error: "+(e.message||e)); console.error(e);
+    overlay.textContent="Error — see page";
   }finally{
     goBtn.disabled=false;
   }
 }
-
 $("go").addEventListener("click", estimate);
-addrInput.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); estimate(); } });
+addrInput.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); estimate(); }});
 
-/* Initial state */
+/* ========= Export to PDF ========= */
+exportBtn.addEventListener("click", async ()=>{
+  const { jsPDF } = window.jspdf || {};
+  if(!jsPDF){ alert("PDF library failed to load."); return; }
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+  const L = (x,y,t)=>{ const lines = doc.splitTextToSize(String(t||""), 520); doc.text(lines, x, y); return y + lines.length*14; };
+
+  let y=48;
+  doc.setFont("helvetica","bold"); doc.setFontSize(16);
+  doc.text("Fuel IQ — Fuel Site Analyzer", 40, y); y+=24;
+  doc.setFontSize(11); doc.setFont("helvetica","normal");
+  y = L(40,y, `Address: ${lastInputs?.address||addrInput.value||"-"}`);
+  y = L(40,y, `MPDs: ${lastInputs?.mpds??$("mpds").value}   Diesel: ${lastInputs?.diesel??$("diesel").value}`);
+  y = L(40,y, lastEstimate?.aadt ? lastEstimate.aadt : aadtBanner.innerText); y += 8;
+
+  doc.setFont("helvetica","bold"); doc.setFontSize(24);
+  doc.text((lastEstimate?.est?.base!=null)? `${fmt(lastEstimate.est.base)} gal/mo`:"—", 40, y); y+=24;
+  doc.setFontSize(11); doc.setFont("helvetica","normal");
+  y = L(40,y, `Low–High: ${lastEstimate?.est? `${fmt(lastEstimate.est.low)} – ${fmt(lastEstimate.est.high)}`:"—"}`);
+  y = L(40,y, lastEstimate?.competition || compLine.innerText);
+  y = L(40,y, lastEstimate?.details || detailsBox.innerText); y += 8;
+
+  doc.setFont("helvetica","bold"); doc.text("Developments", 40, y); y+=16;
+  doc.setFont("helvetica","normal"); y = L(40,y, lastEstimate?.devs || devsBox.innerText); y+=8;
+
+  doc.setFont("helvetica","bold"); doc.text("Summary", 40, y); y+=16;
+  y = L(40,y, lastEstimate?.summary || summaryBox.innerText);
+
+  doc.save("FuelIQ_Site_Analyzer.pdf");
+});
+
+/* ========= Initial overlay text ========= */
 overlay.textContent="—";
 </script>
 </body>
