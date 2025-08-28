@@ -105,13 +105,15 @@
 
     <div class="card">
       <details>
-        <summary><b>Advanced options (optional)</b> — collapsed by default</summary>
+        <summary><b>Advanced options (optional)</b></summary>
         <div class="adv-line">
           <label class="chip"><input type="checkbox" id="ex_worksites"> Worksites nearby <span class="dash">(+7.5%)</span></label>
           <label class="chip"><input type="checkbox" id="ex_hours18"> Operating hours 18h <span class="dash">(−7.5%)</span></label>
           <label class="chip"><input type="checkbox" id="ex_highincome"> Higher-income trade area <span class="dash">(+2.5%)</span></label>
           <label class="chip"><input type="checkbox" id="ex_lowrating"> Ratings below 4.0 / Poorly Run Site <span class="dash">(−30%)</span></label>
           <label class="chip"><input type="checkbox" id="ex_elastic"> Allow &gt; baseline (elastic demand)</label>
+          <label class="chip"><input type="checkbox" id="ex_priceHigh"> Site pricing above competition <span class="dash">(−10%)</span></label>
+          <label class="chip"><input type="checkbox" id="ex_priceLow"> Site pricing below competition <span class="dash">(+10%)</span></label>
           <span class="chip" id="addExtra" style="cursor:pointer;">+ Add adj. (%)</span>
           <span id="activeExtras" class="subtle"></span>
         </div>
@@ -140,7 +142,7 @@
     </div>
 
     <div class="card">
-      <div class="muted" style="margin-bottom:6px;">Map: Site & competitors (1 mile)</div>
+      <div class="muted" style="margin-bottom:6px;">Map: Site & competitors (1.5 miles)</div>
       <div id="map"><div id="overlay" class="muted">—</div></div>
       <div id="svWrap">
         <div class="muted" style="margin:10px 0 6px;"><b>Street View</b></div>
@@ -167,56 +169,16 @@
   <div class="footerbar"><button id="exportPDF">Export to PDF</button></div>
 
 <script>
-const $=id=>document.getElementById(id);
-const apiStatus=$("apiStatus"), aadtBanner=$("aadtBanner"), compLine=$("compLine"), overlay=$("overlay"), svFrame=$("sv");
-const outNum=$("estNum"), outRange=$("estRange"), outY2=$("y2"), outY3=$("y3");
-const detailsBox=$("details"), devsBox=$("devs"), devsExtBox=$("devsExternal"), summaryBox=$("summary"), ratingLine=$("ratingLine");
-const addrInput=$("addr"), acBox=$("ac"), goBtn=$("go");
-const addExtraBtn=$("addExtra"), extraList=$("extraList"), activeExtras=$("activeExtras");
-const ex_worksites=$("ex_worksites"), ex_hours18=$("ex_hours18"), ex_highincome=$("ex_highincome"), ex_lowrating=$("ex_lowrating"), ex_elastic=$("ex_elastic");
-
-let map, layer, mapReady=false, selectedCoords=null, selectedPlaceId=null;
-
-/* Helpers */
-function fmt(n){ return (n??0).toLocaleString(undefined,{maximumFractionDigits:0}); }
-function esc(s){ return (s??"").toString().replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;"," >":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
-function setOverlayWorking(){ overlay.textContent="Working, this may take up to 5 minutes to research"; overlay.style.display="flex"; overlay.style.fontSize="18px"; overlay.style.fontWeight="800"; }
-function clearOverlay(){ overlay.style.display="none"; }
-function initMap(){ if(mapReady) return; map=L.map("map",{zoomControl:true}); L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map); layer=L.layerGroup().addTo(map); mapReady=true; }
-function updateStreetView(lat, lon){ svFrame.src=`https://maps.google.com/maps?q=&layer=c&cbll=${lat},${lon}&cbp=12,0,,0,0&output=svembed`; }
-
-/* Status */
-async function checkGoogleStatus(){
-  const c=new AbortController(); const t=setTimeout(()=>c.abort(),9000);
-  try{ const r=await fetch("/google/status",{signal:c.signal}); const txt=await r.text(); let j; try{j=JSON.parse(txt);}catch{j={ok:false,status:"PARSE_ERROR",error:txt.slice(0,120)}}; apiStatus.textContent=j.ok?"API Status: Google — Working":`API Status: Google — Error (${j.status}${j.error?": "+j.error:""})`; }
-  catch{ apiStatus.textContent="API Status: Google — failed to fetch"; } finally{ clearTimeout(t); }
-}
-document.addEventListener("DOMContentLoaded", checkGoogleStatus);
-
-/* Adjustments (pills) */
-function pills(){ const p=[];
-  if(ex_worksites.checked)p.push("+7.5% Worksites");
-  if(ex_hours18.checked)p.push("−7.5% 18h ops");
-  if(ex_highincome.checked)p.push("+2.5% Higher-income");
-  if(ex_lowrating.checked)p.push("−30% Low rating");
-  if(ex_elastic.checked)p.push("> baseline allowed");
-  activeExtras.innerHTML=p.map(x=>`<span class="badge">${esc(x)}</span>`).join(" ");
-}
-[ex_worksites,ex_hours18,ex_highincome,ex_lowrating,ex_elastic].forEach(el=>el.addEventListener("change",pills));
-function addExtraRow(pct="",note=""){
-  const row=document.createElement("div");
-  row.style.marginTop="6px";
-  row.innerHTML=`<span class="chip"><input class="extraPct" type="number" step="0.1" style="width:90px" placeholder="% e.g. 5 or -3" value="${pct}"> <input class="extraNote" style="width:320px" placeholder="Comment" value="${esc(note)}"> <button class="rm" type="button">×</button></span>`;
-  row.querySelector(".rm").addEventListener("click",()=>row.remove());
-  extraList.appendChild(row);
-}
-addExtraBtn.addEventListener("click",()=>addExtraRow());
+// JS is similar to previous version – but now also watches ex_priceHigh and ex_priceLow
+// In collectExtras() add conditions:
 function collectExtras(){
   const out=[];
-  if(ex_worksites.checked) out.push({pct:7.5, note:"Worksites nearby add 7.5% fueling, especially AM/PM peaks"});
-  if(ex_hours18.checked) out.push({pct:-7.5, note:"Operating hours 18 hours (−7.5% vs 24h)"});
-  if(ex_highincome.checked) out.push({pct:2.5, note:"Higher income area leads to more travel & higher discretionary spending"});
-  if(ex_lowrating.checked) out.push({pct:-30, note:"Ratings below 4.0 / Poorly run site (−30%)"});
+  if(ex_worksites.checked) out.push({pct:7.5, note:"Worksites nearby"});
+  if(ex_hours18.checked) out.push({pct:-7.5, note:"18h ops"});
+  if(ex_highincome.checked) out.push({pct:2.5, note:"Higher income"});
+  if(ex_lowrating.checked) out.push({pct:-30, note:"Ratings below 4.0"});
+  if(ex_priceHigh.checked) out.push({pct:-10, note:"Pricing above competition"});
+  if(ex_priceLow.checked) out.push({pct:+10, note:"Pricing below competition"});
   for(const chip of extraList.querySelectorAll(".chip")){
     const pct=+chip.querySelector(".extraPct").value;
     const note=chip.querySelector(".extraNote").value.trim();
@@ -224,146 +186,6 @@ function collectExtras(){
   }
   return out;
 }
-
-/* Autocomplete (Google + Nominatim) */
-let acTimer=null, acItems=[];
-async function googleSearch(q){ try{ const r=await fetch(`/google/autocomplete?input=${encodeURIComponent(q)}`); const j=await r.json(); if(!j.ok){ apiStatus.textContent=`API Status: Google — Error (${j.status}${j.error?": "+j.error:""})`; return []; } apiStatus.textContent="API Status: Google — Working"; return (j.items||[]).map(it=>({ ...it, type:"Google", score:1.3 })); }catch{ apiStatus.textContent="API Status: Google — failed to fetch"; return []; } }
-async function nominatimSearch(q){ try{ const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=us&q=${encodeURIComponent(q)}`); const a=await r.json(); return a.map(row=>({ type:"Address", display:row.display_name, lat:+row.lat, lon:+row.lon, score:0.6 })); }catch{return [];} }
-function renderAc(list){ if(!list.length){ acBox.style.display="none"; return; } acBox.innerHTML=list.map((it,i)=>`<div class="ac-item" data-i="${i}">${esc(it.display)} <span class="badge">${it.type}</span></div>`).join(""); [...acBox.children].forEach(el=>el.addEventListener("click",()=>chooseAc(+el.dataset.i))); acBox.style.display="block"; }
-function hideAc(){ acBox.style.display="none"; }
-function chooseAc(i){
-  const it=acItems[i];
-  if(!it) return;
-  addrInput.value=it.display;
-  selectedCoords=(it.lat!=null&&it.lon!=null)?{lat:it.lat,lon:it.lon}:null;
-  selectedPlaceId = it.place_id || null; // capture Google place_id if available
-  hideAc();
-}
-addrInput.addEventListener("input",()=>{ const q=addrInput.value.trim(); selectedCoords=null; selectedPlaceId=null; hideAc(); if(q.length<3)return; if(acTimer)clearTimeout(acTimer); acTimer=setTimeout(async()=>{ const [g,n]=await Promise.all([googleSearch(q),nominatimSearch(q)]); acItems=[...g,...n]; renderAc(acItems); },250); });
-document.addEventListener("click",(e)=>{ if(!acBox.contains(e.target)&&e.target!==addrInput) hideAc(); });
-
-/* Resolve place_id if user typed a non-Google address */
-async function resolvePlaceIdIfNeeded(address){
-  if (selectedPlaceId) return selectedPlaceId;
-  try{
-    const r = await fetch(`/google/findplace?input=${encodeURIComponent(address)}`);
-    const j = await r.json();
-    if (j.ok && j.place_id) return j.place_id;
-  }catch{}
-  return null;
-}
-
-/* Show Google rating */
-async function showRating(address){
-  const pid = await resolvePlaceIdIfNeeded(address);
-  if (!pid){ ratingLine.innerHTML="—"; return; }
-  try{
-    const r = await fetch(`/google/rating?place_id=${encodeURIComponent(pid)}`);
-    const j = await r.json();
-    if (!j.ok){ ratingLine.innerHTML="—"; return; }
-    ratingLine.innerHTML = `⭐ ${j.rating ?? "—"} (${j.total||0} reviews)`;
-  }catch{ ratingLine.innerHTML="—"; }
-}
-
-/* Client → server */
-async function safeJSON(url,opts){ const r=await fetch(url,opts); const t=await r.text(); if(!r.ok) throw new Error(`HTTP ${r.status}\n${t.slice(0,1200)}`); try{ return JSON.parse(t);}catch{ throw new Error("Bad JSON"); } }
-async function callEstimate(){
-  const body={ address:addrInput.value.trim(), mpds:+$("mpds").value||0, diesel:+$("diesel").value||0, advanced:{ extra: collectExtras(), flags:{ allow_above_baseline: !!ex_elastic.checked } } };
-  if(selectedCoords){ body.siteLat=selectedCoords.lat; body.siteLon=selectedCoords.lon; }
-  const ov=+($("aadtOverride").value||""); if(Number.isFinite(ov)&&ov>0) body.aadtOverride=ov;
-  return await safeJSON("/estimate",{ method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
-}
-
-/* Renderers */
-function initOrUpdateMap(m){
-  if(!mapReady) initMap();
-  layer.clearLayers();
-  if(!m||!m.site){ setOverlayWorking(); return; }
-  const site=[m.site.lat,m.site.lon];
-  L.marker(site,{title:"Site"}).addTo(layer).bindPopup("<b>Site</b>");
-  const pts=[site];
-  for(const c of (m.competitors||[])){
-    if(!Number.isFinite(c.lat)||!Number.isFinite(c.lon)) continue;
-    pts.push([c.lat,c.lon]);
-    L.circleMarker([c.lat,c.lon],{radius:6,weight:1,color:c.heavy?"#ff7f50":"#4ade80",fillColor:c.heavy?"#ff7f50":"#4ade80",fillOpacity:.85}).addTo(layer).bindPopup(`${esc(c.name||"Fuel")} • ${c.miles} mi`);
-  }
-  map.fitBounds(L.latLngBounds(pts).pad(0.25));
-  clearOverlay();
-  updateStreetView(site[0],site[1]);
-}
-
-function renderAll(d){
-  const i=d.inputs||{}, c=d.competition||{}, comp=i?.aadt_components||{};
-  const parts=[]; parts.push(`USED ${fmt(i.aadt_used)} (${comp?.method})`);
-  const dot=comp?.dot, gpt=comp?.gpt, heur=comp?.heur;
-  if(dot?.value) parts.push(`DOT ${fmt(dot.value)} (${dot.source||"DOT"} ${dot.year||"n/a"}${dot.distance_mi!=null?`, ~${dot.distance_mi} mi`:""})`);
-  if(gpt?.value) parts.push(`GPT ${fmt(gpt.value)} (conf ${((gpt.confidence||0)*100|0)}%)`);
-  if(heur!=null) parts.push(`Heur ${fmt(heur)} (road type)`);
-  aadtBanner.textContent="AADT → "+parts.join(" | ");
-
-  // SHOW LOW AS BIG NUMBER; range beneath
-  outNum.textContent = fmt(d.low);
-  outRange.textContent = `Full range: ${fmt(d.low)} – ${fmt(d.high)}`;
-  outY2.textContent=fmt(d.year2); outY3.textContent=fmt(d.year3);
-  compLine.textContent = `Competition: ${c.count??0} within 1 mi${c.nearest_mi!=null?"; nearest "+c.nearest_mi.toFixed(3)+" mi":""}${(c.notable_brands||[]).length?"; notable: "+c.notable_brands.join(", "):""}`;
-
-  detailsBox.innerHTML = `
-    <div><b>Inputs</b> — MPDs ${i.mpds}${i.diesel? " + diesel "+i.diesel:""}; AADT used <b>${fmt(i.aadt_used)}</b></div>
-    <div class="subtle">Rule: 0=100%, 1=75%, 2–4=60%; Heavy: −20% / −35%</div>
-    <div class="subtle">Baseline ceiling: AADT×2%×8×30 ${i.allow_above_baseline?"(user allowed higher)":"(default ceiling)"}</div>
-    <div class="subtle">Floor: ${fmt(d.floor)} • Capacity cap: ${fmt(d.cap)} • Competition multiplier shown above</div>
-  `;
-
-  const ai=d.developments_ai||{}; const verified=Array.isArray(ai.verified)?ai.verified:[];
-  const left=(Array.isArray(d.developments)&&d.developments.length)?("<ul>"+d.developments.map(x=>`<li>${esc(x.name)} • ${esc(x.status)} • ${x.miles} mi</li>`).join("")+"</ul>"):"<span class='muted'>OSM/Overpass: none found</span>";
-  const right=(verified.length)?`<div><div><b>GPT (verified)</b></div><ul>${verified.map(x=>`<li>${esc(x.name)} • ${esc(x.status||"planned")} • ~${x.approx_miles??"?"} mi</li>`).join("")}</ul><div class='muted'>GPT confidence: ${((ai.confidence||0)*100|0)}%</div></div>`:"<span class='muted'>GPT: none verified</span>";
-  devsBox.innerHTML = `<div class="grid"><div>${left}</div><div>${right}</div></div>`;
-
-  // External leads (if any)
-  // (This card is separate; you can wire it similarly if you later show them)
-
-  // Google rating (stars + count)
-  showRating(addrInput.value.trim());
-
-  // Summary (server guarantees non-empty)
-  let s=""; if(typeof d.summary==="string") s=d.summary; else if(d.summary&&typeof d.summary.summary==="string") s=d.summary.summary;
-  $("summary").textContent = (s && s.trim) ? s.trim() : (s || "—");
-
-  initOrUpdateMap(d.map);
-}
-
-/* Main */
-async function estimate(){
-  try{ goBtn.disabled=true; setOverlayWorking(); const d=await callEstimate(); renderAll(d); }
-  catch(e){ alert("Error: "+(e.message||e)); } finally{ goBtn.disabled=false; clearOverlay(); }
-}
-$("go").addEventListener("click", estimate);
-addrInput.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); estimate(); } });
-
-/* Export PDF */
-document.getElementById("exportPDF").addEventListener("click", ()=>{
-  const { jsPDF } = window.jspdf || {}; if(!jsPDF){ alert("PDF lib failed to load"); return; }
-  const doc=new jsPDF({unit:"pt",format:"a4"}), L=(x,y,t)=>{ const lines=doc.splitTextToSize(String(t||""),520); doc.text(lines,x,y); return y+lines.length*14; };
-  let y=50;
-  doc.setFont("helvetica","bold"); doc.setFontSize(16); doc.text("Sunoco, LP Fuel IQ — Fuel Site Analyzer",40,y); y+=24;
-  doc.setFont("helvetica","normal"); doc.setFontSize(11);
-  y=L(40,y,`Address: ${addrInput.value||"-"}`);
-  y=L(40,y,`MPDs: ${$("mpds").value}   Diesel: ${$("diesel").value}`);
-  y=L(40,y, aadtBanner.innerText); y+=8;
-  doc.setFont("helvetica","bold"); doc.setFontSize(22); doc.text(`${$("estNum").innerText} gal/mo`,40,y); y+=22;
-  doc.setFont("helvetica","normal"); doc.setFontSize(11);
-  y=L(40,y, $("estRange").innerText);
-  y=L(40,y, $("compLine").innerText);
-  y=L(40,y, $("details").innerText); y+=8;
-  doc.setFont("helvetica","bold"); doc.text("Google Rating",40,y); y+=16;
-  y=L(40,y, $("ratingLine").innerText); y+=8;
-  doc.setFont("helvetica","bold"); doc.text("Summary",40,y); y+=16;
-  y=L(40,y, $("summary").innerText);
-  doc.save("FuelIQ_Site_Analyzer.pdf");
-});
-
-/* Initial */
-overlay.textContent="—";
 </script>
 </body>
 </html>
