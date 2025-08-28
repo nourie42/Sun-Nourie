@@ -17,11 +17,11 @@ app.get("/", (req, res) => res.sendFile(path.join(__dirname, "public", "index.ht
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
 /* ========== Config ========== */
-const CONTACT = process.env.OVERPASS_CONTACT || "FuelEstimator/1.7 (contact: you@example.com)";
-const UA = "FuelEstimator/1.7 (+contact: you@example.com)";
-const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || ""; // required for Google endpoints
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || ""; // required for GPT
-const STRICT_AI_DEVS = String(process.env.STRICT_AI_DEVS || "false").toLowerCase() === "true";
+const CONTACT = process.env.OVERPASS_CONTACT || "FuelIQ/2.0 (contact: you@example.com)";
+const UA = "FuelIQ/2.0 (+contact: you@example.com)";
+const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || ""; // server-side proxy for Places
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || ""; // GPT AADT + summary
+const STRICT_AI_DEVS = true; // default: hide unverified GPT developments
 
 /* ========== Utils ========== */
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -35,7 +35,6 @@ function haversine(lat1, lon1, lat2, lon2) {
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 function distMiles(lat1, lon1, lat2, lon2) { return toMiles(haversine(lat1, lon1, lat2, lon2)); }
-
 async function fetchWithTimeout(url, opts = {}, timeoutMs = 25000) {
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), timeoutMs);
@@ -233,19 +232,12 @@ async function developments1Mile(lat, lon) {
   return uniq.slice(0, 20);
 }
 async function roadContext(lat, lon) {
-  const r = 300; // meters
+  const r = 120; // smaller radius to get nearest primary way
   const q = `[out:json][timeout:25];
-    (
-      way(around:${r},${lat},${lon})["highway"];
-      node(around:${r},${lat},${lon})["highway"="traffic_signals"];
-      node(around:${r},${lat},${lon})["crossing"];
-      node(around:${r},${lat},${lon})["junction"];
-    ); out tags center qt;`;
+    way(around:${r},${lat},${lon})["highway"]; out tags center qt;`;
   let items = [];
   try { items = (await overpassQuery(q)).elements || []; }
-  catch { return { summary: "no data", main: [], side: [], signals: 0, intersections: 0 }; }
-  const ways = items.filter(e => e.type === "way");
-  const nodes = items.filter(e => e.type === "node");
+  catch { items = []; }
   const classify = (w) => {
     const t = w.tags || {};
     return {
@@ -254,20 +246,50 @@ async function roadContext(lat, lon) {
       lanes: t.lanes ? +t.lanes : null,
       oneway: t.oneway === "yes",
       maxspeed: t.maxspeed || null,
+      lat: w.center?.lat, lon: w.center?.lon
     };
   };
-  const main = ways.filter(w => /^(motorway|trunk|primary|secondary|tertiary)$/.test(w.tags?.highway || "")).map(classify);
-  const side = ways.filter(w => /^(residential|service|unclassified)$/.test(w.tags?.highway || "")).map(classify);
-  const signals = nodes.filter(n => n.tags?.highway === "traffic_signals").length;
-  const intersections = nodes.filter(n => /(junction|crossing)/.test(n.tags?.highway || "") || n.tags?.junction).length;
-  const rankOrder = { motorway: 6, trunk: 5, primary: 4, secondary: 3, tertiary: 2, residential: 1, service: 0 };
-  const dominant = main.slice().sort((a, b) =>
-    (rankOrder[b.highway] || 0) - (rankOrder[a.highway] || 0) || (b.lanes || 0) - (a.lanes || 0)
-  )[0];
+  const ways = items.map(classify);
+  // choose dominant by highway rank then lanes
+  const rank = { motorway: 6, trunk: 5, primary: 4, secondary: 3, tertiary: 2, unclassified: 1, residential: 1, service: 0 };
+  const dominant = ways.slice().sort((a,b)=>(rank[b.highway]||0)-(rank[a.highway]||0)||(b.lanes||0)-(a.lanes||0))[0] || null;
+
+  // build summary + counts around a bit wider radius (300m) for signals/intersections
+  const q2 = `[out:json][timeout:25];
+    (node(around:300,${lat},${lon})["highway"="traffic_signals"];
+     node(around:300,${lat},${lon})["crossing"];
+     node(around:300,${lat},${lon})["junction"];); out tags center qt;`;
+  let nodes = [];
+  try { nodes = (await overpassQuery(q2)).elements || []; } catch {}
+  const signals = nodes.filter(n=>n.tags?.highway==="traffic_signals").length;
+  const intersections = nodes.filter(n=>/(junction|crossing)/.test(n.tags?.highway||"") || n.tags?.junction).length;
+
+  // OSM-modeled AADT based on class/lanes/speed
+  let modeled = null;
+  if (dominant) {
+    const baseByClass = {
+      motorway:[40000,120000], trunk:[20000,80000], primary:[10000,40000],
+      secondary:[6000,20000], tertiary:[3000,12000], unclassified:[1000,7000],
+      residential:[500,5000], service:[100,2000]
+    };
+    const span = baseByClass[dominant.highway] || [800,4000];
+    // lane & speed modifiers
+    const lanes = dominant.lanes || 2;
+    let laneFactor = 1 + (lanes-2)*0.18;  // ~18% per lane above 2
+    if (lanes<=1) laneFactor = 0.7;
+    const speed = parseInt(String(dominant.maxspeed||"").replace(/\D/g,"")||"0",10);
+    const speedFactor = speed ? Math.min(1.3, Math.max(0.7, speed/45)) : 1.0;
+    // signal/intersection dampener
+    const jam = Math.min(0.15, (signals + intersections*0.5) * 0.02);
+    const mid = (span[0]+span[1])/2 * laneFactor * speedFactor * (1 - jam);
+    modeled = Math.round(mid);
+  }
+
   const summary = dominant
-    ? `${dominant.highway}${dominant.lanes ? ` ${dominant.lanes} lanes` : ""}${dominant.oneway ? " oneway" : ""}${dominant.maxspeed ? ` @ ${dominant.maxspeed}` : ""}`
+    ? `${dominant.highway}${dominant.lanes?` ${dominant.lanes} lanes`:''}${dominant.oneway?' oneway':''}${dominant.maxspeed?` @ ${dominant.maxspeed}`:''}`
     : "local roads";
-  return { summary, main: main.slice(0, 6), side: side.slice(0, 6), signals, intersections };
+
+  return { summary, main: dominant? [dominant] : [], side: ways.filter(w=>w!==dominant).slice(0,5), signals, intersections, modeled_aadt: modeled };
 }
 
 /* ========== GPT helpers ========== */
@@ -283,9 +305,9 @@ async function gptJSON(prompt) {
       max_tokens: 1200,
       messages: [
         { role: "system", content: "You are a precise fuel/traffic analyst. Always reply with STRICT JSON (no markdown). Use numeric reasoning and ranges." },
-        { role: "user", content: prompt },
-      ],
-    }),
+        { role: "user", content: prompt }
+      ]
+    })
   }, 30000);
   const txt = await r.text();
   if (!r.ok) throw new Error(`OpenAI ${r.status}: ${txt}`);
@@ -294,6 +316,7 @@ async function gptJSON(prompt) {
   if (!content) throw new Error("No GPT content");
   return JSON.parse(content);
 }
+
 async function gptEstimateAADT(ctx) {
   try {
     const prompt = `
@@ -304,10 +327,10 @@ Context:
 - Address: ${ctx.address}
 - Coords: ${ctx.lat}, ${ctx.lon}
 - Road layout: ${ctx.roads.summary}; signals ${ctx.roads.signals}, intersections ${ctx.roads.intersections}
-- Main roads: ${ctx.roads.main.map(r => `${r.name || "?"} (${r.highway}${r.lanes ? ` ${r.lanes} lanes` : ""})`).join("; ")}
-- Side roads: ${ctx.roads.side.map(r => `${r.name || "?"} (${r.highway})`).join("; ")}
+- Main road: ${ctx.roads.main.map(r => `${r.name || "?"} (${r.highway}${r.lanes ? ` ${r.lanes} lanes` : ""}${r.maxspeed?` @ ${r.maxspeed}`:""})`).join("; ")}
 - Competitors in 1 mi: ${ctx.compCount} (heavy: ${ctx.heavyCount})
 - MPDs: ${ctx.mpds}${ctx.diesel ? " + diesel " + ctx.diesel : ""}
+- OSM modeled AADT: ${ctx.roads.modeled_aadt ?? "null"}
 `.trim();
     const j = await gptJSON(prompt);
     const aadt = Math.max(0, Math.round(+j.aadt || 0));
@@ -321,7 +344,6 @@ Context:
 /* ========== Google Places proxy ========== */
 async function googleAutocomplete(input) {
   if (!GOOGLE_API_KEY) return { ok: false, status: "MISSING_KEY", error: "GOOGLE_API_KEY not set", items: [] };
-
   // 1) predictions
   const au = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}&components=country:us&key=${GOOGLE_API_KEY}`;
   const ar = await fetchWithTimeout(au, { headers: { "User-Agent": UA, Accept: "application/json" } }, 15000);
@@ -330,7 +352,7 @@ async function googleAutocomplete(input) {
   let aj; try { aj = JSON.parse(atxt); } catch { return { ok: false, status: "PARSE_ERROR", error: atxt.slice(0, 200), items: [] }; }
   if (aj.status !== "OK" && aj.status !== "ZERO_RESULTS") return { ok: false, status: aj.status, error: aj.error_message || "No details", items: [] };
 
-  // 2) details (to lat/lon)
+  // 2) details
   const preds = aj.predictions || [];
   const n = Math.min(preds.length, 6);
   const items = [];
@@ -361,6 +383,7 @@ app.get("/google/status", async (_req, res) => {
     return res.json({ ok: false, status: probe.status || "ERROR", error: probe.error || "Unknown" });
   } catch (e) { return res.json({ ok: false, status: "EXCEPTION", error: String(e) }); }
 });
+
 app.get("/google/autocomplete", async (req, res) => {
   try {
     const q = String(req.query.input || "").trim();
@@ -386,17 +409,17 @@ function gallonsWithRules({ aadt, mpds, diesel, compCount, heavyCount }) {
   const gpd = autos * 0.020 * 10.2 + trucks * 0.012 * 16.0;
   const monthlyUncapped = Math.max(gpd * (365 / 12) * compMult, floor);
 
-  // Equipment cap (legacy) + policy caps
+  // Equipment cap + policy caps
   const capEquip = (mpds * 25 * 10.5 + (diesel || 0) * 25 * 16) * (365 / 12);
 
-  // Policy: hard 28k/MPD/mo; soft 22k/MPD/mo -> 10% queuing penalty
+  // Policy: hard 28k/MPD; soft 22k/MPD -> 10% queuing penalty
   const HARD_CAP_PER_MPD = 28000;
   const SOFT_BAND_PER_MPD = 22000;
   const capHard = mpds * HARD_CAP_PER_MPD;
   const softTotal = mpds * SOFT_BAND_PER_MPD;
 
   let capped = Math.min(monthlyUncapped, capEquip, capHard);
-  if (monthlyUncapped > softTotal) capped = Math.round(capped * 0.90); // 10% loss at peaks
+  if (monthlyUncapped > softTotal) capped = Math.round(capped * 0.90);
 
   const base = Math.round(capped);
   return {
@@ -426,133 +449,130 @@ app.post("/estimate", async (req, res) => {
     else geo = await geocode(address);
 
     // context
-    const roads = await roadContext(geo.lat, geo.lon).catch(() => ({ summary: "", main: [], side: [], signals: 0, intersections: 0 }));
+    const roads = await roadContext(geo.lat, geo.lon).catch(() => ({ summary: "", main: [], side: [], signals: 0, intersections: 0, modeled_aadt: null }));
     const competitors = await competitorsWithin1Mile(geo.lat, geo.lon).catch(() => []);
     const compCount = competitors.length;
     const heavyCount = competitors.filter(c => c.heavy).length;
     const devs = await developments1Mile(geo.lat, geo.lon).catch(() => []);
 
     // AADT sources
-    let dotAADT = null, gptAADT = null, usedAADT = 10000, method = "fallback_default";
-    // if aadtOverride provided, we prioritize it
-    const overrideVal = Number(aadtOverride);
-    if (Number.isFinite(overrideVal) && overrideVal > 0) {
-      usedAADT = Math.round(overrideVal);
-      method = "override";
+    let dot = null, gpt = null, osmModel = roads.modeled_aadt || null;
+    const ovr = Number(aadtOverride);
+
+    if (Number.isFinite(ovr) && ovr > 0) {
+      // Use override outright
+      dot = null; gpt = null;
     } else {
       let sta = await queryCustomTraffic(geo.lat, geo.lon, address).catch(() => null);
       if (!sta) sta = await queryNCDOTNearestAADT(geo.lat, geo.lon, 1609).catch(() => null);
-      dotAADT = sta ? { value: sta.aadt, year: sta.year, distance_mi: sta.source === "custom" ? 0 : +toMiles(sta.distM).toFixed(3), source: sta.source || "ncdot" } : null;
+      if (sta) dot = { value: sta.aadt, year: sta.year, distance_mi: sta.source === "custom" ? 0 : +toMiles(sta.distM).toFixed(3), source: sta.source || "ncdot" };
 
-      gptAADT = await gptEstimateAADT({
-        address: address || geo.label, lat: geo.lat, lon: geo.lon,
-        roads, compCount, heavyCount, mpds: MPDS, diesel: DIESEL,
-      });
+      const g = await gptEstimateAADT({ address: address || geo.label, lat: geo.lat, lon: geo.lon, roads, compCount, heavyCount, mpds: MPDS, diesel: DIESEL });
+      if (g.value) gpt = g;
+    }
 
-      const haveDot = Number.isFinite(dotAADT?.value);
-      const haveGpt = Number.isFinite(gptAADT?.value);
-      if (haveDot || haveGpt) {
-        usedAADT = Math.round(((haveDot ? dotAADT.value : 0) + (haveGpt ? gptAADT.value : 0)) / ((haveDot ? 1 : 0) + (haveGpt ? 1 : 0)));
-        method = haveDot && haveGpt ? "average_of_dot_and_gpt" : haveDot ? "dot_only" : "gpt_only";
+    // choose used AADT
+    let usedAADT = 10000, method = "fallback_default";
+    let weights = { dot: 0, gpt: 0, osm: 0, override: 0 };
+
+    if (Number.isFinite(ovr) && ovr > 0) {
+      usedAADT = Math.round(ovr);
+      method = "override";
+      weights.override = 1.0;
+    } else {
+      // weighted average of available sources
+      let wDot = 0.5, wGpt = 0.3, wOsm = 0.2;
+      if (!dot) wGpt += 0.3; // shift if missing
+      if (!gpt) wDot += 0.2;
+      if (!osmModel) { wDot += 0.1; wGpt += 0.1; }
+
+      // if DOT station is far, down-weight DOT
+      if (dot && typeof dot.distance_mi === "number" && dot.distance_mi > 0.5) { wDot *= 0.6; wGpt *= 1.2; }
+
+      const comps = [];
+      if (dot?.value) comps.push({ v: dot.value, w: wDot, k: "dot" });
+      if (gpt?.value) comps.push({ v: gpt.value, w: wGpt, k: "gpt" });
+      if (osmModel) comps.push({ v: osmModel, w: wOsm, k: "osm" });
+
+      if (comps.length) {
+        const sumW = comps.reduce((s,c)=>s+c.w,0);
+        usedAADT = Math.round(comps.reduce((s,c)=>s + c.v*c.w,0) / sumW);
+        comps.forEach(c=>weights[c.k]=+(c.w/sumW).toFixed(3));
+        method = "weighted_avg(dot,gpt,osm)";
       }
     }
 
     // baseline gallons
-    const calcBase = gallonsWithRules({ aadt: usedAADT, mpds: MPDS, diesel: DIESEL, compCount, heavyCount });
+    const baseCalc = gallonsWithRules({ aadt: usedAADT, mpds: MPDS, diesel: DIESEL, compCount, heavyCount });
 
-    // user extras (% adjustments)
+    // user extras
     let userMult = 1.0;
     const breakdown = {};
     const extras = (advanced && Array.isArray(advanced.extra) ? advanced.extra : [])
       .map(e => ({ pct: Number(e?.pct), note: String(e?.note || "").slice(0, 180) }))
       .filter(e => Number.isFinite(e.pct));
+    if (extras.length) { userMult *= extras.reduce((m,e)=>m*(1+e.pct/100),1.0); breakdown.extras = extras; }
 
-    if (extras.length) {
-      userMult *= extras.reduce((m, e) => m * (1 + e.pct / 100), 1.0);
-      breakdown.extras = extras;
-    }
-
-    const apply = (n) => Math.round(n * userMult);
+    const apply = (n)=>Math.round(n*userMult);
     const calc = {
-      base: apply(calcBase.base),
-      low: apply(calcBase.low),
-      high: apply(calcBase.high),
-      year2: apply(calcBase.year2),
-      year3: apply(calcBase.year3),
-      cap: calcBase.cap,
-      floor: calcBase.floor,
-      compMult: calcBase.compMult,
-      caps: calcBase.caps,
+      base: apply(baseCalc.base),
+      low: apply(baseCalc.low),
+      high: apply(baseCalc.high),
+      year2: apply(baseCalc.year2),
+      year3: apply(baseCalc.year3),
+      cap: baseCalc.cap,
+      floor: baseCalc.floor,
+      compMult: baseCalc.compMult,
+      caps: baseCalc.caps,
       user_multiplier: +userMult.toFixed(4),
-      user_multiplier_breakdown: breakdown,
+      user_multiplier_breakdown: breakdown
     };
 
-    // GPT developments
+    // GPT developments (verified only)
     let devsAI = { items: [], confidence: 0.0, verified: [], unverified: [] };
     try {
       const djson = await gptJSON(
         `List planned/proposed/permit/coming-soon/construction gas stations within ~1 mile of "${address || geo.label}". Return JSON only: {"items":[{"name":"<string>","status":"<string>","approx_miles":<number>}], "confidence": <0.0-1.0>}`
       );
-      if (Array.isArray(djson.items)) devsAI = { items: djson.items.slice(0, 20), confidence: +(djson.confidence ?? 0), verified: [], unverified: [] };
+      if (Array.isArray(djson.items)) devsAI.items = djson.items.slice(0,20), devsAI.confidence=+(djson.confidence ?? 0);
     } catch {}
     try {
       const BRAND_HINT = /gas|fuel|station|convenience|market|mart|travel|truck|sheetz|wawa|racetrac|buc-?ee|costco|sam'?s|bj'?s|pilot|love'?s|circle\s?k|speedway|murphy|exxon|shell|bp|chevron|marathon|7-?eleven|quik.?trip|(^|\b)qt\b/i;
-      const norm = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-      const similar = (a, b) => { a = norm(a); b = norm(b); return a && b && (a === b || a.includes(b) || b.includes(a)); };
-      const verified = [], unverified = [];
-      for (const it of devsAI.items || []) {
-        const name = it.name || "", miles = Number(it.approx_miles);
+      const norm = s => String(s||"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+      const similar = (a,b)=>{a=norm(a);b=norm(b);return a&&b&&(a===b||a.includes(b)||b.includes(a));};
+      const verified=[], unverified=[];
+      for(const it of devsAI.items||[]){
+        const name=it.name||"", miles=Number(it.approx_miles);
         let ok = BRAND_HINT.test(name);
-        for (const os of devs) {
-          if (similar(os.name, name) && (Math.abs(os.miles - (miles || os.miles)) <= 1.0 || os.miles <= 2.0)) { ok = true; break; }
-        }
-        const item = { name, status: it.status || "planned", approx_miles: Number.isFinite(miles) ? +miles : null };
-        (ok ? verified : unverified).push(item);
+        for(const os of devs){ if(similar(os.name,name) && (Math.abs(os.miles-(miles||os.miles))<=1.0 || os.miles<=2.0)){ ok=true; break; } }
+        (ok?verified:unverified).push({ name, status: it.status||"planned", approx_miles: Number.isFinite(miles)? +miles : null });
       }
-      devsAI.verified = verified.slice(0, 20);
-      devsAI.unverified = unverified.slice(0, 20);
+      devsAI.verified = verified.slice(0,20);
+      devsAI.unverified = unverified.slice(0,20);
+      if (STRICT_AI_DEVS) devsAI.items=[], devsAI.unverified=[]; // present only verified
     } catch {}
-    if (STRICT_AI_DEVS && devsAI.confidence < 0.6) { devsAI.items = []; devsAI.unverified = []; }
 
-    const nearest = competitors[0]?.miles ?? null;
-    const rationale = `Competition rule: comps=${compCount}, heavy=${heavyCount} ⇒ multiplier ${(calcBase.compMult * 100) | 0}%. Floor=${calcBase.floor.toLocaleString()} gal/mo. Capacity cap=${calcBase.cap.toLocaleString()} gal/mo. Caps policy: soft ~${calcBase.caps.soft_per_mpd}/MPD (−10% queuing if exceeded), hard ~${calcBase.caps.hard_per_mpd}/MPD. User multiplier=${calc.user_multiplier}.`;
+    // Rationale + summary
+    const near = competitors[0]?.miles ?? null;
+    const rationale = `Method=${method}${method==="override" ? ` (AADT override ${usedAADT})` : ""}. Weights: ${JSON.stringify(weights)}. Floor=${baseCalc.floor.toLocaleString()} gal/mo. Caps: soft ~${baseCalc.caps.soft_per_mpd}/MPD (−10% if exceeded), hard ~${baseCalc.caps.hard_per_mpd}/MPD. Comp=${compCount} (heavy=${heavyCount}) ⇒ mult ${(baseCalc.compMult*100|0)}%.`;
 
-    // GPT summary (document override, method, extras, caps, roads)
     let summary = "";
     try {
-      const devTextOSM = devs.slice(0, 6).map(x => `${x.name} (${x.status}, ~${x.miles} mi)`).join("; ") || "none";
-      const devTextAI = (devsAI.verified || []).slice(0, 6).map(x => `${x.name} (${x.status || "planned"}, ~${x.approx_miles ?? "?"} mi)`).join("; ") || "none";
-      const brands = competitors.filter(c => c.heavy).slice(0, 6).map(c => c.name).join(", ") || "none";
+      const brands = competitors.filter(c=>c.heavy).slice(0,6).map(c=>c.name).join(", ") || "none";
       const userAdjList = Object.entries(calc.user_multiplier_breakdown || {})
         .map(([k, v]) => k === "extras" ? `extras: ${v.map(e => `${e.pct}% (${e.note || "no note"})`).join("; ")}` : `${k}: ×${v}`)
         .join("; ") || "none";
-
-      const sys = `Write 8–12 numeric sentences. Cover:
-- AADT components and method (override / DOT+GPT average)
-- Competition rule (0/1=100%, 2=75%, 3+=60%; heavy −20%/−35%)
-- Road layout (signals/intersections; main vs side roads)
-- Developments (OSM + GPT-verified only)
-- Floor (AADT×2%×8×30) and capacity caps policy (soft 22k ⇒ −10% queuing; hard 28k)
-- Document ALL user extras (% and notes)
-Return JSON: {"summary":"<text>"} (no markdown).`;
+      const sys = `Write 8–12 numeric sentences. Explain AADT method (override or weighted avg with weights), competition rules, caps, road layout impacts, and document user extras. JSON only: {"summary":"<text>"}.`;
       const prompt = `
 Inputs:
 - Address: ${address || geo.label}
-- Method: ${method}${method==="override" ? ` (AADT OVERRIDE used: ${usedAADT})` : ""}
-- DOT AADT: ${dotAADT?.value ?? "null"} (${dotAADT?.source || "n/a"} ${dotAADT?.year || "n/a"}, ~${dotAADT?.distance_mi ?? "?"} mi)
-- GPT AADT: ${gptAADT?.value ?? "null"} (conf ${((gptAADT?.confidence || 0) * 100) | 0}% ; note: ${gptAADT?.note || "none"})
+- AADT method: ${method}; weights: ${JSON.stringify(weights)}; DOT=${dot?.value ?? "null"} (dist ${dot?.distance_mi ?? "?"} mi), GPT=${gpt?.value ?? "null"} (conf ${((gpt?.confidence||0)*100|0)}%), OSM modeled=${osmModel ?? "null"}
 - USED AADT: ${usedAADT}
-- Competition count: ${compCount}; Heavy-count: ${heavyCount}; Heavy brands near: ${brands}
+- Competition: ${compCount} (heavy ${heavyCount}); heavy brands: ${brands}
 - Road layout: ${roads.summary}; signals ${roads.signals}, intersections ${roads.intersections}
-- Main roads: ${roads.main.map(r => `${r.name || "?"} (${r.highway}${r.lanes ? ` ${r.lanes} lanes` : ""})`).join("; ")}
-- Side roads: ${roads.side.map(r => `${r.name || "?"} (${r.highway})`).join("; ")}
-- Developments OSM: ${devTextOSM}
-- Developments GPT (verified): ${devTextAI}
-- Floor gallons: ${calcBase.floor}
-- Caps policy: soft ${calcBase.caps.soft_per_mpd}/MPD, hard ${calcBase.caps.hard_per_mpd}/MPD
-- Baseline: base ${calcBase.base}, low ${calcBase.low}, high ${calcBase.high}
-- User adjustments: ${userAdjList}
-- Final: base ${calc.base}, low ${calc.low}, high ${calc.high}, Y2 ${calc.year2}, Y3 ${calc.year3}
+- Floor: ${baseCalc.floor}; Caps: soft ${baseCalc.caps.soft_per_mpd}/MPD (−10% if exceeded), hard ${baseCalc.caps.hard_per_mpd}/MPD
+- User extras: ${userAdjList}
+- Result: base ${calc.base}, low ${calc.low}, high ${calc.high}, Y2 ${calc.year2}, Y3 ${calc.year3}
 `;
       const s = await gptJSON(`${sys}\n${prompt}`);
       summary = s.summary || "";
@@ -563,22 +583,18 @@ Inputs:
       inputs: {
         mpds: MPDS, diesel: DIESEL, truck_share_assumed: 0.10,
         aadt_used: usedAADT,
-        aadt_components: {
-          dot: dotAADT || null,
-          gpt: gptAADT || null,
-          method,
-        },
+        aadt_components: { dot, gpt, osm_modeled: osmModel, method, weights },
         user_multiplier: calc.user_multiplier,
         user_multiplier_breakdown: calc.user_multiplier_breakdown,
       },
       competition: {
         count: compCount,
-        nearest_mi: nearest,
-        notable_brands: competitors.filter(c => c.heavy).slice(0, 6).map(c => c.name),
-        impact_score: +(1 - calcBase.compMult).toFixed(3),
+        nearest_mi: near,
+        notable_brands: competitors.filter(c => c.heavy).slice(0,6).map(c=>c.name),
+        impact_score: +(1 - baseCalc.compMult).toFixed(3),
       },
       developments: devs,
-      developments_ai: devsAI,
+      developments_ai: { verified: devsAI.verified, confidence: devsAI.confidence }, // verified only
       roads,
       rationale,
       summary,
@@ -589,6 +605,6 @@ Inputs:
   }
 });
 
-/* ========== Start server ========== */
+/* ========== Start ========== */
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, "0.0.0.0", () => console.log(`Server listening on :${PORT}`));
