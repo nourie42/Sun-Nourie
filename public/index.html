@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Fuel IQ - Fuel Site Analyzer</title>
+  <title>Sunoco, LP Fuel IQ - Fuel Site Analyzer</title>
 
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 
   <!-- jsPDF for PDF export -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous"></script>
 
   <style>
     :root { --bg:#0b0e15; --panel:#111725; --panel2:#0f1421; --line:#263145; --text:#eaeef7; --muted:#97a3b8; --brand:#0ea5e9; --brand2:#22d3ee; --pill:#0f1929; }
@@ -18,8 +18,6 @@
     body{ background:var(--bg); color:var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin:0; padding-bottom:72px; }
     .wrap{ max-width:1120px; margin:24px auto; padding:0 16px; }
     header{ display:flex; align-items:center; gap:14px; margin-bottom:16px; }
-    header .logo{ width:52px; height:52px; border-radius:8px; background:#0b1220; display:flex; align-items:center; justify-content:center; }
-    header .logo img{ max-height:46px; max-width:120px; display:block; }
     header h1{ font-size:28px; margin:0; letter-spacing:.2px; }
 
     .card{ background:linear-gradient(180deg,var(--panel),var(--panel2)); border:1px solid var(--line); border-radius:12px; padding:16px; margin:12px 0; }
@@ -74,8 +72,7 @@
 <body>
   <div class="wrap">
     <header>
-      <div class="logo"><img src="logo.png" alt="Fuel IQ logo"></div>
-      <h1>Fuel IQ - Fuel Site Analyzer</h1>
+      <h1>Sunoco, LP Fuel IQ - Fuel Site Analyzer</h1>
     </header>
 
     <div class="card">
@@ -142,10 +139,10 @@
     </div>
 
     <div class="card">
-      <div class="muted" style="margin-bottom:6px;">Map: Site & competitors (1 mile) <span class="badge">Legend</span> Site marker • Heavy ● • Regular ●</div>
+      <div class="muted" style="margin-bottom:6px;">Map: Site & competitors (1 mile)</div>
       <div id="map"><div id="overlay" class="muted">—</div></div>
       <div id="svWrap">
-        <div class="muted" style="margin:10px 0 6px;"><b>Street View</b> (best effort)</div>
+        <div class="muted" style="margin:10px 0 6px;"><b>Street View</b></div>
         <iframe id="sv" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
       </div>
     </div>
@@ -171,7 +168,7 @@ let map, layer, mapReady=false, selectedCoords=null, lastEstimate=null, lastInpu
 
 /* Helpers */
 function fmt(n){ return (n??0).toLocaleString(undefined,{maximumFractionDigits:0}); }
-function esc(s){ return (s??"").toString().replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
+function esc(s){ return (s??"").toString().replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;"," >":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
 function setOverlayWorking(){ overlay.textContent="Working, this may take up to 5 minutes to research"; overlay.style.display="flex"; overlay.style.fontSize="18px"; overlay.style.fontWeight="800"; }
 function clearOverlay(){ overlay.style.display="none"; }
 function initMap(){ if(mapReady) return; map=L.map("map",{zoomControl:true}); L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map); layer=L.layerGroup().addTo(map); mapReady=true; }
@@ -185,14 +182,14 @@ async function checkGoogleStatus(){
 }
 document.addEventListener("DOMContentLoaded", checkGoogleStatus);
 
-/* Adjustments collection */
+/* Adjustments */
 function pills(){ const p=[]; if(ex_worksites.checked)p.push("+7.5% Worksites"); if(ex_hours18.checked)p.push("−7.5% 18h ops"); if(ex_highincome.checked)p.push("+2.5% Higher-income"); activeExtras.innerHTML=p.map(x=>`<span class="badge">${esc(x)}</span>`).join(" "); }
 [ex_worksites,ex_hours18,ex_highincome].forEach(el=>el.addEventListener("change",pills));
 function addExtraRow(pct="",note=""){ const row=document.createElement("div"); row.style.marginTop="6px"; row.innerHTML=`<span class="chip"><input class="extraPct" type="number" step="0.1" style="width:90px" placeholder="% e.g. 5 or -3" value="${pct}"> <input class="extraNote" style="width:320px" placeholder="Comment" value="${esc(note)}"> <button class="rm" type="button">×</button></span>`; row.querySelector(".rm").addEventListener("click",()=>row.remove()); extraList.appendChild(row); }
 addExtraBtn.addEventListener("click",()=>addExtraRow());
 function collectExtras(){ const out=[]; if(ex_worksites.checked) out.push({pct:7.5, note:"Worksites nearby add 7.5% fueling, especially AM/PM peaks"}); if(ex_hours18.checked) out.push({pct:-7.5, note:"Operating hours 18 hours (−7.5% vs 24h)"}); if(ex_highincome.checked) out.push({pct:2.5, note:"Higher income area leads to more travel & higher discretionary spending"}); for(const chip of extraList.querySelectorAll(".chip")){ const pct=+chip.querySelector(".extraPct").value; const note=chip.querySelector(".extraNote").value.trim(); if(Number.isFinite(pct)) out.push({pct, note}); } return out; }
 
-/* Autocomplete (Google + Nominatim fallback) */
+/* Autocomplete (Google + Nominatim) */
 let acTimer=null, acItems=[];
 async function googleSearch(q){ try{ const r=await fetch(`/google/autocomplete?input=${encodeURIComponent(q)}`); const j=await r.json(); if(!j.ok){ apiStatus.textContent=`API Status: Google — Error (${j.status}${j.error?": "+j.error:""})`; return []; } apiStatus.textContent="API Status: Google — Working"; return (j.items||[]).map(it=>({ ...it, type:"Google", score:1.3 })); }catch{ apiStatus.textContent="API Status: Google — failed to fetch"; return []; } }
 async function nominatimSearch(q){ try{ const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=us&q=${encodeURIComponent(q)}`); const a=await r.json(); return a.map(row=>({ type:"Address", display:row.display_name, lat:+row.lat, lon:+row.lon, score:0.6 })); }catch{return [];} }
@@ -207,12 +204,30 @@ async function safeJSON(url,opts){ const r=await fetch(url,opts); const t=await 
 async function callEstimate(){ const body={ address:addrInput.value.trim(), mpds:+$("mpds").value||0, diesel:+$("diesel").value||0, advanced:{ extra: collectExtras() } }; if(selectedCoords){ body.siteLat=selectedCoords.lat; body.siteLon=selectedCoords.lon; } const ov=+($("aadtOverride").value||""); if(Number.isFinite(ov)&&ov>0) body.aadtOverride=ov; return await safeJSON("/estimate",{ method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) }); }
 
 /* Renderers */
-function renderMap(m){ initMap(); layer.clearLayers(); if(!m||!m.site){ setOverlayWorking(); return; } const site=[m.site.lat,m.site.lon]; L.marker(site,{title:"Site"}).addTo(layer).bindPopup("<b>Site</b>"); const pts=[site]; for(const c of (m.competitors||[])){ if(!Number.isFinite(c.lat)||!Number.isFinite(c.lon)) continue; pts.push([c.lat,c.lon]); L.circleMarker([c.lat,c.lon],{radius:6,weight:1,color:c.heavy?"#ff7f50":"#4ade80",fillColor:c.heavy?"#ff7f50":"#4ade80",fillOpacity:.85}).addTo(layer).bindPopup(`${esc(c.name||"Fuel")} • ${c.miles} mi`); } map.fitBounds(L.latLngBounds(pts).pad(0.25)); clearOverlay(); updateStreetView(site[0],site[1]); }
-
+function initOrUpdateMap(m){
+  if(!mapReady) initMap();
+  layer.clearLayers();
+  if(!m||!m.site){ setOverlayWorking(); return; }
+  const site=[m.site.lat,m.site.lon];
+  L.marker(site,{title:"Site"}).addTo(layer).bindPopup("<b>Site</b>");
+  const pts=[site];
+  for(const c of (m.competitors||[])){
+    if(!Number.isFinite(c.lat)||!Number.isFinite(c.lon)) continue;
+    pts.push([c.lat,c.lon]);
+    L.circleMarker([c.lat,c.lon],{radius:6,weight:1,color:c.heavy?"#ff7f50":"#4ade80",fillColor:c.heavy?"#ff7f50":"#4ade80",fillOpacity:.85}).addTo(layer).bindPopup(`${esc(c.name||"Fuel")} • ${c.miles} mi`);
+  }
+  map.fitBounds(L.latLngBounds(pts).pad(0.25));
+  clearOverlay();
+  updateStreetView(site[0],site[1]);
+}
 function renderAll(d){
   const i=d.inputs||{}, c=d.competition||{}, comp=i?.aadt_components||{};
+  const parts=[]; parts.push(`USED ${fmt(i.aadt_used)} (${comp?.method})`);
   const dot=comp?.dot, gpt=comp?.gpt, heur=comp?.heur;
-  const parts=[]; parts.push(`USED ${fmt(i.aadt_used)} (${comp?.method})`); if(dot?.value) parts.push(`DOT ${fmt(dot.value)} (${dot.source||"DOT"} ${dot.year||"n/a"}${dot.distance_mi!=null?`, ~${dot.distance_mi} mi`:""})`); if(gpt?.value) parts.push(`GPT ${fmt(gpt.value)} (conf ${((gpt.confidence||0)*100|0)}%)`); if(heur!=null) parts.push(`Heur ${fmt(heur)} (from road type)`); aadtBanner.textContent="AADT → "+parts.join(" | ");
+  if(dot?.value) parts.push(`DOT ${fmt(dot.value)} (${dot.source||"DOT"} ${dot.year||"n/a"}${dot.distance_mi!=null?`, ~${dot.distance_mi} mi`:""})`);
+  if(gpt?.value) parts.push(`GPT ${fmt(gpt.value)} (conf ${((gpt.confidence||0)*100|0)}%)`);
+  if(heur!=null) parts.push(`Heur ${fmt(heur)} (road type)`);
+  aadtBanner.textContent="AADT → "+parts.join(" | ");
 
   userMultEl.textContent = i.user_multiplier ? ` (user mult ×${i.user_multiplier.toFixed(3)})` : "";
   outNum.textContent = fmt(d.base); outRange.textContent=`Low–High: ${fmt(d.low)} – ${fmt(d.high)}`; outY2.textContent=fmt(d.year2); outY3.textContent=fmt(d.year3);
@@ -226,18 +241,15 @@ function renderAll(d){
     <div class="subtle">Method: ${esc(comp?.method || "n/a")}</div>
   `;
 
-  // Developments
-  const ai=d.developments_ai||{}; const verified=Array.isArray(ai.verified)?ai.verified:[]; const unverified=[]; // default hide unverified
+  const ai=d.developments_ai||{}; const verified=Array.isArray(ai.verified)?ai.verified:[];
   const left=(Array.isArray(d.developments)&&d.developments.length)?("<ul>"+d.developments.map(x=>`<li>${esc(x.name)} • ${esc(x.status)} • ${x.miles} mi</li>`).join("")+"</ul>"):"<span class='muted'>OSM/Overpass: none found</span>";
   const right=(verified.length)?`<div><div><b>GPT (verified)</b></div><ul>${verified.map(x=>`<li>${esc(x.name)} • ${esc(x.status||"planned")} • ~${x.approx_miles??"?"} mi</li>`).join("")}</ul><div class='muted'>GPT confidence: ${((ai.confidence||0)*100|0)}%</div></div>`:"<span class='muted'>GPT: none reported</span>";
   devsBox.innerHTML = `<div class="grid"><div>${left}</div><div>${right}</div></div>`;
 
-  // Summary (safe)
   let s=""; if(typeof d.summary==="string") s=d.summary; else if(d.summary&&typeof d.summary.summary==="string") s=d.summary.summary;
   summaryBox.textContent = (s && s.trim) ? s.trim() : (s || "—");
 
-  // map
-  renderMap(d.map);
+  initOrUpdateMap(d.map);
 
   lastEstimate = { aadtBanner: aadtBanner.innerText, comp: compLine.innerText, details: detailsBox.innerText, devs: devsBox.innerText, summary: summaryBox.innerText, est: { base:d.base, low:d.low, high:d.high } };
   lastInputs = { address: addrInput.value.trim(), mpds: i.mpds, diesel: i.diesel, aadt_used: i.aadt_used };
@@ -245,11 +257,8 @@ function renderAll(d){
 
 /* Main */
 async function estimate(){
-  try{
-    goBtn.disabled=true; setOverlayWorking();
-    const d=await callEstimate();
-    renderAll(d);
-  }catch(e){ alert("Error: "+(e.message||e)); } finally{ goBtn.disabled=false; }
+  try{ goBtn.disabled=true; setOverlayWorking(); const d=await callEstimate(); renderAll(d); }
+  catch(e){ alert("Error: "+(e.message||e)); } finally{ goBtn.disabled=false; }
 }
 $("go").addEventListener("click", estimate);
 addrInput.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); estimate(); } });
@@ -257,9 +266,9 @@ addrInput.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefaul
 /* Export PDF */
 document.getElementById("exportPDF").addEventListener("click", ()=>{
   const { jsPDF } = window.jspdf || {}; if(!jsPDF){ alert("PDF lib failed to load"); return; }
-  const doc=new jsPDF({unit:"pt",format:"a4"}); const L=(x,y,t)=>{ const lines=doc.splitTextToSize(String(t||""),520); doc.text(lines,x,y); return y+lines.length*14; };
+  const doc=new jsPDF({unit:"pt",format:"a4"}), L=(x,y,t)=>{ const lines=doc.splitTextToSize(String(t||""),520); doc.text(lines,x,y); return y+lines.length*14; };
   let y=50;
-  doc.setFont("helvetica","bold"); doc.setFontSize(16); doc.text("Fuel IQ — Fuel Site Analyzer",40,y); y+=24;
+  doc.setFont("helvetica","bold"); doc.setFontSize(16); doc.text("Sunoco, LP Fuel IQ — Fuel Site Analyzer",40,y); y+=24;
   doc.setFont("helvetica","normal"); doc.setFontSize(11);
   y=L(40,y,`Address: ${lastInputs?.address||addrInput.value||"-"}`);
   y=L(40,y,`MPDs: ${lastInputs?.mpds??$("mpds").value}   Diesel: ${lastInputs?.diesel??$("diesel").value}`);
