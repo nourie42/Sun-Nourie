@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 
-  <!-- jsPDF (for Export to PDF) -->
+  <!-- jsPDF for PDF export -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
   <style>
@@ -18,12 +18,11 @@
     body{ background:var(--bg); color:var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin:0; padding-bottom:72px; }
     .wrap{ max-width:1120px; margin:24px auto; padding:0 16px; }
     header{ display:flex; align-items:center; gap:14px; margin-bottom:16px; }
-    header .logo{ width:48px; height:48px; border-radius:8px; background:#0b1220; display:flex; align-items:center; justify-content:center; }
-    header .logo img{ max-height:42px; max-width:120px; display:block; }
+    header .logo{ width:52px; height:52px; border-radius:8px; background:#0b1220; display:flex; align-items:center; justify-content:center; }
+    header .logo img{ max-height:46px; max-width:120px; display:block; }
     header h1{ font-size:28px; margin:0; letter-spacing:.2px; }
 
-    .card{ background:linear-gradient(180deg,var(--panel),var(--panel2)); border:1px solid var(--line);
-           border-radius:12px; padding:16px; margin:12px 0; }
+    .card{ background:linear-gradient(180deg,var(--panel),var(--panel2)); border:1px solid var(--line); border-radius:12px; padding:16px; margin:12px 0; }
     label{ display:block; font-weight:600; margin:8px 0 6px; color:#d8e3f6; }
     input, select{ width:100%; padding:12px; border-radius:10px; border:1px solid var(--line); background:#0b1220; color:#eaeef7; }
     button{ background:linear-gradient(135deg,var(--brand),var(--brand2)); color:#fff; border:0; padding:12px 16px; border-radius:10px; font-weight:700; cursor:pointer; }
@@ -38,25 +37,21 @@
     .mono{ font-family: ui-monospace, Menlo, Consolas, monospace; white-space:pre-wrap; }
 
     #map{ height:420px; border-radius:12px; border:1px solid var(--line); position: relative; }
-    #overlay{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-      background:rgba(11,14,21,.55); border-radius:12px; font-weight:800; color:#cde9ff; font-size:18px; padding:20px; text-align:center; }
+    #overlay{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(11,14,21,.55); border-radius:12px; font-weight:800; color:#cde9ff; font-size:18px; padding:20px; text-align:center; }
 
     /* Street View */
     #svWrap{ margin-top:10px; }
     #sv{ width:100%; height:380px; border:0; border-radius:12px; border:1px solid var(--line); background:#0b1220; }
 
-    /* Autocomplete dropdown */
+    /* Autocomplete */
     .ac-wrap{ position:relative; }
-    .ac-list{ position:absolute; top:100%; left:0; right:0; z-index:30; margin-top:6px;
-      background:#0b1220; border:1px solid var(--line); border-radius:12px; max-height:320px; overflow:auto;
-      box-shadow: 0 18px 36px rgba(0,0,0,.35); }
+    .ac-list{ position:absolute; top:100%; left:0; right:0; z-index:30; margin-top:6px; background:#0b1220; border:1px solid var(--line); border-radius:12px; max-height:320px; overflow:auto; box-shadow: 0 18px 36px rgba(0,0,0,.35); }
     .ac-item{ padding:10px 12px; cursor:pointer; border-bottom:1px solid rgba(255,255,255,.04); }
     .ac-item:last-child{ border-bottom:0; }
     .ac-item:hover, .ac-item.active{ background:#101a2b; }
-    .badge{ display:inline-block; font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid var(--line);
-            background:var(--pill); color:#a9c5ff; margin-left:8px; }
+    .badge{ display:inline-block; font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); background:var(--pill); color:#a9c5ff; margin-left:8px; }
 
-    /* Advanced options – single straight line */
+    /* Advanced options – straight line */
     details summary{ cursor:pointer; }
     .adv-line{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-top:12px; }
     .chip{ display:inline-flex; align-items:center; gap:8px; background:#0f1929; border:1px solid var(--line); padding:8px 10px; border-radius:999px; font-size:13px; }
@@ -69,9 +64,8 @@
     .hero .sub{ font-size:13px; color:#a9b6d0; }
 
     /* Sticky footer for Export */
-    .footerbar{ position:fixed; left:0; right:0; bottom:0; background:linear-gradient(180deg,#0c1220,#0a0f1a);
-      border-top:1px solid var(--line); padding:10px 16px; display:flex; justify-content:center; gap:12px; z-index:50; }
-    .footerbar > * { margin:0 6px; }
+    .footerbar{ position:fixed; left:0; right:0; bottom:0; background:linear-gradient(180deg,#0c1220,#0a0f1a); border-top:1px solid var(--line); padding:10px 16px; display:flex; justify-content:center; gap:12px; z-index:50; }
+    .footerbar > *{ margin:0 6px; }
 
     /* Hide debug by default */
     #debugCard{ display:none; }
@@ -109,18 +103,17 @@
       </div>
       <div class="toolbar">
         <button id="go">Estimate</button>
-        <span class="muted">AADT = avg(DOT, GPT) unless overridden • competition rule • capacity caps • road layout.</span>
+        <span class="muted">AADT = blend(DOT, GPT, Road-Heuristic) unless overridden • competition rule • policy caps • road layout.</span>
       </div>
     </div>
 
-    <!-- Advanced (collapsed) -->
     <div class="card">
       <details>
         <summary><b>Advanced options (optional)</b> — collapsed by default</summary>
         <div class="adv-line">
           <label class="chip"><input type="checkbox" id="ex_worksites"> Worksites nearby <span class="dash">(+7.5%)</span></label>
           <label class="chip"><input type="checkbox" id="ex_hours18"> Operating hours 18h <span class="dash">(−7.5%)</span></label>
-          <label class="chip"><input type="checkbox" id="ex_highincome"> Higher‑income trade area <span class="dash">(+2.5%)</span></label>
+          <label class="chip"><input type="checkbox" id="ex_highincome"> Higher-income trade area <span class="dash">(+2.5%)</span></label>
           <span class="chip" id="addExtra" style="cursor:pointer;">+ Add adj. (%)</span>
           <span id="activeExtras" class="subtle"></span>
         </div>
@@ -128,7 +121,6 @@
       </details>
     </div>
 
-    <!-- Estimate -->
     <div class="card" id="estimateCard">
       <div class="hero">
         <div>
@@ -137,8 +129,8 @@
           <div class="sub" id="estRange">Low–High: —</div>
         </div>
         <div class="right sub">
-          <div>Year‑2: <b id="y2">—</b></div>
-          <div style="margin-top:6px;">Year‑3: <b id="y3">—</b></div>
+          <div>Year-2: <b id="y2">—</b></div>
+          <div style="margin-top:6px;">Year-3: <b id="y3">—</b></div>
         </div>
       </div>
       <hr/>
@@ -149,11 +141,8 @@
       </div>
     </div>
 
-    <!-- Map + Street View -->
     <div class="card">
-      <div class="muted" style="margin-bottom:6px;">
-        Map: Site & competitors (1 mile) <span class="badge">Legend</span> Site marker • Heavy ● • Regular ●
-      </div>
+      <div class="muted" style="margin-bottom:6px;">Map: Site & competitors (1 mile) <span class="badge">Legend</span> Site marker • Heavy ● • Regular ●</div>
       <div id="map"><div id="overlay" class="muted">—</div></div>
       <div id="svWrap">
         <div class="muted" style="margin:10px 0 6px;"><b>Street View</b> (best effort)</div>
@@ -161,39 +150,21 @@
       </div>
     </div>
 
-    <!-- Details + Devs + Summary -->
-    <div class="card">
-      <b>Computation Details</b>
-      <div id="details" class="muted">—</div>
-    </div>
+    <div class="card"><b>Computation Details</b><div id="details" class="muted">—</div></div>
+    <div class="card"><b>Developments (multi-source)</b><div id="devs" class="muted">—</div></div>
+    <div class="card"><b>Summary (GPT)</b><div id="summary" class="muted">—</div></div>
 
-    <div class="card">
-      <b>Developments (multi-source)</b>
-      <div id="devs" class="muted">—</div>
-    </div>
-
-    <div class="card">
-      <b>Summary (GPT)</b>
-      <div id="summary" class="muted">—</div>
-    </div>
-
-    <div class="card" id="debugCard">
-      <details open><summary>Debug</summary><pre id="debug" class="mono muted">/ waiting…</pre></details>
-    </div>
+    <div class="card" id="debugCard"><details open><summary>Debug</summary><pre id="debug" class="mono muted">/ waiting…</pre></details></div>
   </div>
 
-  <!-- Sticky footer -->
-  <div class="footerbar">
-    <button id="exportPDF">Export to PDF</button>
-  </div>
+  <div class="footerbar"><button id="exportPDF">Export to PDF</button></div>
 
 <script>
-/* ========= Globals & helpers ========= */
-const $ = id => document.getElementById(id);
+const $=id=>document.getElementById(id);
+const apiStatus=$("apiStatus"), aadtBanner=$("aadtBanner"), compLine=$("compLine"), overlay=$("overlay"), svFrame=$("sv");
 const outNum=$("estNum"), outRange=$("estRange"), outY2=$("y2"), outY3=$("y3"), userMultEl=$("userMult");
-const detailsBox=$("details"), devsBox=$("devs"), summaryBox=$("summary"), apiStatus=$("apiStatus");
-const aadtBanner=$("aadtBanner"), compLine=$("compLine"), overlay=$("overlay"), svFrame=$("sv");
-const addrInput=$("addr"), acBox=$("ac"), goBtn=$("go"), exportBtn=$("exportPDF");
+const detailsBox=$("details"), devsBox=$("devs"), summaryBox=$("summary"), exportBtn=$("exportPDF");
+const addrInput=$("addr"), acBox=$("ac"), goBtn=$("go");
 const addExtraBtn=$("addExtra"), extraList=$("extraList"), activeExtras=$("activeExtras");
 const ex_worksites=$("ex_worksites"), ex_hours18=$("ex_hours18"), ex_highincome=$("ex_highincome");
 let map, layer, mapReady=false, selectedCoords=null, lastEstimate=null, lastInputs=null;
@@ -203,211 +174,109 @@ function fmt(n){ return (n??0).toLocaleString(undefined,{maximumFractionDigits:0
 function esc(s){ return (s??"").toString().replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
 function setOverlayWorking(){ overlay.textContent="Working, this may take up to 5 minutes to research"; overlay.style.display="flex"; overlay.style.fontSize="18px"; overlay.style.fontWeight="800"; }
 function clearOverlay(){ overlay.style.display="none"; }
-function initMap(){ if(mapReady) return; map=L.map("map",{zoomControl:true});
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map);
-  layer=L.layerGroup().addTo(map); mapReady=true; }
-function updateStreetView(lat, lon){ const url=`https://maps.google.com/maps?q=&layer=c&cbll=${lat},${lon}&cbp=12,0,,0,0&output=svembed`; svFrame.src=url; }
+function initMap(){ if(mapReady) return; map=L.map("map",{zoomControl:true}); L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map); layer=L.layerGroup().addTo(map); mapReady=true; }
+function updateStreetView(lat, lon){ svFrame.src=`https://maps.google.com/maps?q=&layer=c&cbll=${lat},${lon}&cbp=12,0,,0,0&output=svembed`; }
 
-/* ========= Google status (auto) ========= */
+/* Google status */
 async function checkGoogleStatus(){
-  const controller=new AbortController(); const t=setTimeout(()=>controller.abort(),9000);
-  try{
-    const r=await fetch("/google/status",{signal:controller.signal});
-    const txt=await r.text(); let j; try{ j=JSON.parse(txt);}catch{ j={ok:false,status:"PARSE_ERROR",error:txt.slice(0,120)};}
-    apiStatus.textContent = j.ok ? "API Status: Google — Working" : `API Status: Google — Error (${j.status}${j.error?": "+j.error:""})`;
-  }catch{ apiStatus.textContent="API Status: Google — failed to fetch"; } finally{ clearTimeout(t); }
+  const c=new AbortController(); const t=setTimeout(()=>c.abort(),9000);
+  try{ const r=await fetch("/google/status",{signal:c.signal}); const txt=await r.text(); let j; try{j=JSON.parse(txt);}catch{j={ok:false,status:"PARSE_ERROR",error:txt.slice(0,120)}}; apiStatus.textContent=j.ok?"API Status: Google — Working":`API Status: Google — Error (${j.status}${j.error?": "+j.error:""})`; }
+  catch{ apiStatus.textContent="API Status: Google — failed to fetch"; } finally{ clearTimeout(t); }
 }
 document.addEventListener("DOMContentLoaded", checkGoogleStatus);
 
-/* ========= Advanced options (straight line) ========= */
-function addExtraRow(pct="", note=""){
-  const row=document.createElement("div"); row.style.marginTop="6px";
-  row.innerHTML=`<span class="chip"><input class="extraPct" type="number" step="0.1" style="width:90px" placeholder="% e.g. 5 or -3" value="${pct}"> <input class="extraNote" style="width:340px" placeholder="Comment" value="${esc(note)}"> <button class="rm" type="button">×</button></span>`;
-  row.querySelector(".rm").addEventListener("click",()=>row.remove());
-  extraList.appendChild(row);
-}
-addExtraBtn.addEventListener("click",()=>addExtraRow());
-function pills(){ const p=[]; if(ex_worksites.checked)p.push("+7.5% Worksites"); if(ex_hours18.checked)p.push("−7.5% 18h ops"); if(ex_highincome.checked)p.push("+2.5% Higher‑income"); activeExtras.innerHTML=p.map(x=>`<span class="badge">${esc(x)}</span>`).join(" "); }
+/* Adjustments collection */
+function pills(){ const p=[]; if(ex_worksites.checked)p.push("+7.5% Worksites"); if(ex_hours18.checked)p.push("−7.5% 18h ops"); if(ex_highincome.checked)p.push("+2.5% Higher-income"); activeExtras.innerHTML=p.map(x=>`<span class="badge">${esc(x)}</span>`).join(" "); }
 [ex_worksites,ex_hours18,ex_highincome].forEach(el=>el.addEventListener("change",pills));
+function addExtraRow(pct="",note=""){ const row=document.createElement("div"); row.style.marginTop="6px"; row.innerHTML=`<span class="chip"><input class="extraPct" type="number" step="0.1" style="width:90px" placeholder="% e.g. 5 or -3" value="${pct}"> <input class="extraNote" style="width:320px" placeholder="Comment" value="${esc(note)}"> <button class="rm" type="button">×</button></span>`; row.querySelector(".rm").addEventListener("click",()=>row.remove()); extraList.appendChild(row); }
+addExtraBtn.addEventListener("click",()=>addExtraRow());
+function collectExtras(){ const out=[]; if(ex_worksites.checked) out.push({pct:7.5, note:"Worksites nearby add 7.5% fueling, especially AM/PM peaks"}); if(ex_hours18.checked) out.push({pct:-7.5, note:"Operating hours 18 hours (−7.5% vs 24h)"}); if(ex_highincome.checked) out.push({pct:2.5, note:"Higher income area leads to more travel & higher discretionary spending"}); for(const chip of extraList.querySelectorAll(".chip")){ const pct=+chip.querySelector(".extraPct").value; const note=chip.querySelector(".extraNote").value.trim(); if(Number.isFinite(pct)) out.push({pct, note}); } return out; }
 
-function collectExtras(){
-  const out=[];
-  // toggles
-  if(ex_worksites.checked) out.push({pct:7.5, note:"Worksites nearby add 7.5% fueling, especially AM/PM peaks"});
-  if(ex_hours18.checked)  out.push({pct:-7.5, note:"Operating hours 18 hours (−7.5% vs 24h)"});
-  if(ex_highincome.checked) out.push({pct:2.5, note:"Higher‑income area leads to more travel & higher discretionary spending"});
-  // custom rows
-  for(const row of extraList.querySelectorAll(".chip")){
-    const pct = +row.querySelector(".extraPct").value;
-    const note = String(row.querySelector(".extraNote").value||"").trim();
-    if(Number.isFinite(pct)) out.push({pct, note});
-  }
-  return out;
-}
-
-/* ========= Autocomplete (Google + Nominatim fallback) ========= */
-let acTimer=null, acItems=[], acIndex=-1;
-async function googleSearch(q){
-  try{
-    const r=await fetch(`/google/autocomplete?input=${encodeURIComponent(q)}`); const j=await r.json();
-    if(!j.ok){ apiStatus.textContent = `API Status: Google — Error (${j.status}${j.error?": "+j.error:""})`; return []; }
-    apiStatus.textContent="API Status: Google — Working";
-    return (j.items||[]).map(it=>({ ...it, type:"Google", score:1.3 }));
-  }catch{ apiStatus.textContent="API Status: Google — failed to fetch"; return []; }
-}
-async function nominatimSearch(q){ try{ const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=us&q=${encodeURIComponent(q)}`); const a=await r.json(); return a.map(row=>({type:"Address",display:row.display_name,lat:+row.lat,lon:+row.lon,score:0.6})); }catch{return [];} }
+/* Autocomplete (Google + Nominatim fallback) */
+let acTimer=null, acItems=[];
+async function googleSearch(q){ try{ const r=await fetch(`/google/autocomplete?input=${encodeURIComponent(q)}`); const j=await r.json(); if(!j.ok){ apiStatus.textContent=`API Status: Google — Error (${j.status}${j.error?": "+j.error:""})`; return []; } apiStatus.textContent="API Status: Google — Working"; return (j.items||[]).map(it=>({ ...it, type:"Google", score:1.3 })); }catch{ apiStatus.textContent="API Status: Google — failed to fetch"; return []; } }
+async function nominatimSearch(q){ try{ const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=us&q=${encodeURIComponent(q)}`); const a=await r.json(); return a.map(row=>({ type:"Address", display:row.display_name, lat:+row.lat, lon:+row.lon, score:0.6 })); }catch{return [];} }
 function renderAc(list){ if(!list.length){ acBox.style.display="none"; return; } acBox.innerHTML=list.map((it,i)=>`<div class="ac-item" data-i="${i}">${esc(it.display)} <span class="badge">${it.type}</span></div>`).join(""); [...acBox.children].forEach(el=>el.addEventListener("click",()=>chooseAc(+el.dataset.i))); acBox.style.display="block"; }
-function hideAc(){ acBox.style.display="none"; acIndex=-1; }
-function chooseAc(i){ const it=acItems[i]; if(!it)return; addrInput.value=it.display; selectedCoords=(it.lat!=null&&it.lon!=null)?{lat:it.lat,lon:it.lon}:null; hideAc(); }
-addrInput.addEventListener("input",()=>{ const q=addrInput.value.trim(); selectedCoords=null; hideAc(); if(q.length<3)return; if(acTimer)clearTimeout(acTimer); acTimer=setTimeout(async()=>{ const [g,n]=await Promise.all([googleSearch(q),nominatimSearch(q)]); acItems=[...g,...n]; renderAc(acItems);},250);});
-document.addEventListener("click",(e)=>{ if(!acBox.contains(e.target) && e.target!==addrInput) hideAc(); });
+function hideAc(){ acBox.style.display="none"; }
+function chooseAc(i){ const it=acItems[i]; if(!it) return; addrInput.value=it.display; selectedCoords=(it.lat!=null&&it.lon!=null)?{lat:it.lat,lon:it.lon}:null; hideAc(); }
+addrInput.addEventListener("input",()=>{ const q=addrInput.value.trim(); selectedCoords=null; hideAc(); if(q.length<3)return; if(acTimer)clearTimeout(acTimer); acTimer=setTimeout(async()=>{ const [g,n]=await Promise.all([googleSearch(q),nominatimSearch(q)]); acItems=[...g,...n]; renderAc(acItems); },250); });
+document.addEventListener("click",(e)=>{ if(!acBox.contains(e.target)&&e.target!==addrInput) hideAc(); });
 
-/* ========= Client → server ========= */
-async function safeJSON(url, opts){ const r=await fetch(url,opts); const t=await r.text(); if(!r.ok) throw new Error(`HTTP ${r.status}\n${t.slice(0,1000)}`); try{ return JSON.parse(t);}catch{ throw new Error("Bad JSON from server: "+t.slice(0,200)); } }
-async function callEstimate(){
-  const body={ address: addrInput.value.trim(), mpds:+$("mpds").value||0, diesel:+$("diesel").value||0, advanced:{ extra: collectExtras() } };
-  if(selectedCoords){ body.siteLat=selectedCoords.lat; body.siteLon=selectedCoords.lon; }
-  const ov = +($("aadtOverride").value||"");
-  if(Number.isFinite(ov) && ov>0){ body.aadtOverride = ov; } // server may support; client will also recalc if not
-  return await safeJSON("/estimate",{ method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
-}
+/* Client → server */
+async function safeJSON(url,opts){ const r=await fetch(url,opts); const t=await r.text(); if(!r.ok) throw new Error(`HTTP ${r.status}\n${t.slice(0,1200)}`); try{ return JSON.parse(t);}catch{ throw new Error("Bad JSON"); } }
+async function callEstimate(){ const body={ address:addrInput.value.trim(), mpds:+$("mpds").value||0, diesel:+$("diesel").value||0, advanced:{ extra: collectExtras() } }; if(selectedCoords){ body.siteLat=selectedCoords.lat; body.siteLon=selectedCoords.lon; } const ov=+($("aadtOverride").value||""); if(Number.isFinite(ov)&&ov>0) body.aadtOverride=ov; return await safeJSON("/estimate",{ method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) }); }
 
-/* ========= Client-side gallons model (mirrors server policy) ========= */
-function gallonsWithRulesClient({ aadt, mpds, diesel, compCount, heavyCount }){
-  const floor = aadt * 0.02 * 8 * 30;
-  let baseMult=1.0; if(compCount>=3) baseMult=0.6; else if(compCount===2) baseMult=0.75;
-  let extraPenalty=0; if(heavyCount===1) extraPenalty=0.2; else if(heavyCount>=2) extraPenalty=0.35;
-  const compMult=Math.max(0.2, baseMult - extraPenalty);
-  const truckShare=0.10, autos=aadt*(1-truckShare), trucks=aadt*truckShare;
-  const gpd=autos*0.020*10.2 + trucks*0.012*16.0;
-  const monthlyUncapped=Math.max(gpd*(365/12)*compMult, floor);
-  const capEquip=(mpds*25*10.5 + (diesel||0)*25*16)*(365/12);
-  const HARD=28000, SOFT=22000;
-  const capPolicyHard=mpds*HARD;
-  let capped=Math.min(monthlyUncapped, capEquip, capPolicyHard);
-  if(monthlyUncapped>mpds*SOFT) capped = Math.round(capped*0.90);
-  const base=Math.round(capped);
-  return { base, low:Math.round(base*0.86), high:Math.round(base*1.06), year2:Math.round(base*1.027), year3:Math.round(base*1.027*1.0125), cap:Math.round(Math.min(capEquip,capPolicyHard)), floor:Math.round(floor), compMult, caps:{hard_per_mpd:HARD,soft_per_mpd:SOFT}};
-}
+/* Renderers */
+function renderMap(m){ initMap(); layer.clearLayers(); if(!m||!m.site){ setOverlayWorking(); return; } const site=[m.site.lat,m.site.lon]; L.marker(site,{title:"Site"}).addTo(layer).bindPopup("<b>Site</b>"); const pts=[site]; for(const c of (m.competitors||[])){ if(!Number.isFinite(c.lat)||!Number.isFinite(c.lon)) continue; pts.push([c.lat,c.lon]); L.circleMarker([c.lat,c.lon],{radius:6,weight:1,color:c.heavy?"#ff7f50":"#4ade80",fillColor:c.heavy?"#ff7f50":"#4ade80",fillOpacity:.85}).addTo(layer).bindPopup(`${esc(c.name||"Fuel")} • ${c.miles} mi`); } map.fitBounds(L.latLngBounds(pts).pad(0.25)); clearOverlay(); updateStreetView(site[0],site[1]); }
 
-/* ========= Renderers ========= */
-function renderMap(m){
-  initMap(); layer.clearLayers();
-  if(!m || !m.site){ setOverlayWorking(); return; }
-  const site=[m.site.lat,m.site.lon];
-  L.marker(site,{title:"Site"}).addTo(layer).bindPopup("<b>Site</b>");
-  const pts=[site];
-  for(const c of (m.competitors||[])){
-    if(!Number.isFinite(c.lat)||!Number.isFinite(c.lon)) continue;
-    pts.push([c.lat,c.lon]);
-    L.circleMarker([c.lat,c.lon],{radius:6,weight:1,color:c.heavy?"#ff7f50":"#4ade80",fillColor:c.heavy?"#ff7f50":"#4ade80",fillOpacity:.85}).addTo(layer).bindPopup(`${esc(c.name||"Fuel")} • ${c.miles} mi`);
-  }
-  map.fitBounds(L.latLngBounds(pts).pad(0.25));
-  clearOverlay();
-  updateStreetView(site[0], site[1]);
-}
-
-function renderAll(d, applyOverride=false, overrideVal=null){
+function renderAll(d){
   const i=d.inputs||{}, c=d.competition||{}, comp=i?.aadt_components||{};
-  const dot=comp?.dot, gpt=comp?.gpt;
-  const gptNote = comp?.gpt?.note ? ` — GPT note: ${comp.gpt.note}` : "";
-  aadtBanner.textContent = `AADT → USED ${fmt(i.aadt_used)} (AVG of DOT ${fmt(dot?.value||0)}${dot?.year? " "+dot.year:""}${dot?.distance_mi!=null?`, ~${dot.distance_mi} mi`:""} and GPT ${fmt(gpt?.value||0)}${gptNote})`;
+  const dot=comp?.dot, gpt=comp?.gpt, heur=comp?.heur;
+  const parts=[]; parts.push(`USED ${fmt(i.aadt_used)} (${comp?.method})`); if(dot?.value) parts.push(`DOT ${fmt(dot.value)} (${dot.source||"DOT"} ${dot.year||"n/a"}${dot.distance_mi!=null?`, ~${dot.distance_mi} mi`:""})`); if(gpt?.value) parts.push(`GPT ${fmt(gpt.value)} (conf ${((gpt.confidence||0)*100|0)}%)`); if(heur!=null) parts.push(`Heur ${fmt(heur)} (from road type)`); aadtBanner.textContent="AADT → "+parts.join(" | ");
 
   userMultEl.textContent = i.user_multiplier ? ` (user mult ×${i.user_multiplier.toFixed(3)})` : "";
-
-  // If user supplied an override and server didn't use it, recompute client-side
-  let est = { base:d.base, low:d.low, high:d.high, year2:d.year2, year3:d.year3, cap:d.cap, floor:d.floor, compMult:d.compMult };
-  if(applyOverride){
-    const mpds=+$("mpds").value||0, diesel=+$("diesel").value||0;
-    const recalc=gallonsWithRulesClient({ aadt: overrideVal, mpds, diesel, compCount: c.count||0, heavyCount:(c.notable_brands||[]).length });
-    est=recalc;
-  }
-
-  outNum.textContent = fmt(est.base);
-  outRange.textContent = `Low–High: ${fmt(est.low)} – ${fmt(est.high)}`;
-  outY2.textContent = fmt(est.year2);
-  outY3.textContent = fmt(est.year3);
-
-  compLine.textContent = `Competition: ${c.count??0} within 1 mi${c.nearest_mi!=null?"; nearest "+c.nearest_mi.toFixed(3)+" mi":""}${(c.notable_brands||[]).length ? "; notable: "+c.notable_brands.join(", ") : ""}`;
+  outNum.textContent = fmt(d.base); outRange.textContent=`Low–High: ${fmt(d.low)} – ${fmt(d.high)}`; outY2.textContent=fmt(d.year2); outY3.textContent=fmt(d.year3);
+  compLine.textContent = `Competition: ${c.count??0} within 1 mi${c.nearest_mi!=null?"; nearest "+c.nearest_mi.toFixed(3)+" mi":""}${(c.notable_brands||[]).length?"; notable: "+c.notable_brands.join(", "):""}`;
 
   detailsBox.innerHTML = `
-    <div><b>Inputs</b> — MPDs ${i.mpds}${i.diesel? " + diesel "+i.diesel:""}; ${overrideVal?`AADT <b>OVERRIDE</b> ${fmt(overrideVal)} (client‑applied)`:`AADT used <b>${fmt(i.aadt_used)}</b>`}</div>
-    <div class="subtle">Competition rule: 0–1=100%, 2=75%, 3+=60%; Heavy: −20% / −35%</div>
-    <div class="subtle">Floor: ${fmt(est.floor)} • Capacity cap: ${fmt(est.cap)} • Competition multiplier: ${(Math.round((est.compMult||d.compMult)*100))}%</div>
+    <div><b>Inputs</b> — MPDs ${i.mpds}${i.diesel? " + diesel "+i.diesel:""}; AADT used <b>${fmt(i.aadt_used)}</b></div>
+    <div class="subtle">Rule: 0–1=100%, 2=75%, 3+=60%; Heavy: −20% / −35%</div>
+    <div class="subtle">Floor: ${fmt(d.floor)} • Capacity cap: ${fmt(d.cap)} • Competition multiplier: ${(Math.round((d.compMult||i.compMult||1)*100))}%</div>
     <div class="subtle">User adjustments: ${esc(JSON.stringify(i.user_multiplier_breakdown||{},null,0) || "none")}</div>
+    <div class="subtle">Method: ${esc(comp?.method || "n/a")}</div>
   `;
 
   // Developments
-  const ai=d.developments_ai||{};
-  const verified=Array.isArray(ai.verified)?ai.verified:[];
-  const unverified=Array.isArray(ai.unverified)?ai.unverified:[];
+  const ai=d.developments_ai||{}; const verified=Array.isArray(ai.verified)?ai.verified:[]; const unverified=[]; // default hide unverified
   const left=(Array.isArray(d.developments)&&d.developments.length)?("<ul>"+d.developments.map(x=>`<li>${esc(x.name)} • ${esc(x.status)} • ${x.miles} mi</li>`).join("")+"</ul>"):"<span class='muted'>OSM/Overpass: none found</span>";
-  const right=(verified.length||unverified.length)?`<div><div><b>GPT (verified)</b></div><ul>${verified.map(x=>`<li>${esc(x.name)} • ${esc(x.status||"planned")} • ~${x.approx_miles??"?"} mi</li>`).join("")}</ul>${unverified.length?`<div class='muted' style='margin-top:6px'><b>GPT (unverified)</b></div><ul>${unverified.map(x=>`<li>${esc(x.name)} • ${esc(x.status||"planned")} • ~${x.approx_miles??"?"} mi</li>`).join("")}</ul>`:""}<div class='muted'>GPT confidence: ${((ai.confidence||0)*100|0)}%</div></div>`:"<span class='muted'>GPT: none reported</span>";
+  const right=(verified.length)?`<div><div><b>GPT (verified)</b></div><ul>${verified.map(x=>`<li>${esc(x.name)} • ${esc(x.status||"planned")} • ~${x.approx_miles??"?"} mi</li>`).join("")}</ul><div class='muted'>GPT confidence: ${((ai.confidence||0)*100|0)}%</div></div>`:"<span class='muted'>GPT: none reported</span>";
   devsBox.innerHTML = `<div class="grid"><div>${left}</div><div>${right}</div></div>`;
 
   // Summary (safe)
-  let s=""; if(typeof d.summary==="string") s=d.summary; else if(d.summary && typeof d.summary.summary==="string") s=d.summary.summary;
-  if(overrideVal){ s += (s? " ":"") + `(User AADT override applied: ${fmt(overrideVal)}.)`; }
-  summaryBox.textContent = s && s.trim ? s.trim() : (s || "—");
+  let s=""; if(typeof d.summary==="string") s=d.summary; else if(d.summary&&typeof d.summary.summary==="string") s=d.summary.summary;
+  summaryBox.textContent = (s && s.trim) ? s.trim() : (s || "—");
 
-  // Map
+  // map
   renderMap(d.map);
 
-  // Save for PDF
-  lastEstimate = { est, details: detailsBox.innerText, aadt: aadtBanner.innerText, devs: devsBox.innerText, summary: summaryBox.innerText, competition: compLine.innerText };
-  lastInputs = { address: addrInput.value.trim(), mpds: i.mpds, diesel: i.diesel, aadt_used: overrideVal||i.aadt_used };
+  lastEstimate = { aadtBanner: aadtBanner.innerText, comp: compLine.innerText, details: detailsBox.innerText, devs: devsBox.innerText, summary: summaryBox.innerText, est: { base:d.base, low:d.low, high:d.high } };
+  lastInputs = { address: addrInput.value.trim(), mpds: i.mpds, diesel: i.diesel, aadt_used: i.aadt_used };
 }
 
-/* ========= Main flow ========= */
+/* Main */
 async function estimate(){
   try{
     goBtn.disabled=true; setOverlayWorking();
     const d=await callEstimate();
-    const overrideVal = +($("aadtOverride").value||"");
-    const useOverride = Number.isFinite(overrideVal) && overrideVal>0 && overrideVal !== d?.inputs?.aadt_used;
-    renderAll(d, useOverride, overrideVal);
-  }catch(e){
-    alert("Error: "+(e.message||e)); console.error(e);
-    overlay.textContent="Error — see page";
-  }finally{
-    goBtn.disabled=false;
-  }
+    renderAll(d);
+  }catch(e){ alert("Error: "+(e.message||e)); } finally{ goBtn.disabled=false; }
 }
 $("go").addEventListener("click", estimate);
-addrInput.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); estimate(); }});
+addrInput.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); estimate(); } });
 
-/* ========= Export to PDF ========= */
-exportBtn.addEventListener("click", async ()=>{
-  const { jsPDF } = window.jspdf || {};
-  if(!jsPDF){ alert("PDF library failed to load."); return; }
-  const doc = new jsPDF({ unit: "pt", format: "a4" });
-  const L = (x,y,t)=>{ const lines = doc.splitTextToSize(String(t||""), 520); doc.text(lines, x, y); return y + lines.length*14; };
-
-  let y=48;
-  doc.setFont("helvetica","bold"); doc.setFontSize(16);
-  doc.text("Fuel IQ — Fuel Site Analyzer", 40, y); y+=24;
-  doc.setFontSize(11); doc.setFont("helvetica","normal");
-  y = L(40,y, `Address: ${lastInputs?.address||addrInput.value||"-"}`);
-  y = L(40,y, `MPDs: ${lastInputs?.mpds??$("mpds").value}   Diesel: ${lastInputs?.diesel??$("diesel").value}`);
-  y = L(40,y, lastEstimate?.aadt ? lastEstimate.aadt : aadtBanner.innerText); y += 8;
-
-  doc.setFont("helvetica","bold"); doc.setFontSize(24);
-  doc.text((lastEstimate?.est?.base!=null)? `${fmt(lastEstimate.est.base)} gal/mo`:"—", 40, y); y+=24;
-  doc.setFontSize(11); doc.setFont("helvetica","normal");
-  y = L(40,y, `Low–High: ${lastEstimate?.est? `${fmt(lastEstimate.est.low)} – ${fmt(lastEstimate.est.high)}`:"—"}`);
-  y = L(40,y, lastEstimate?.competition || compLine.innerText);
-  y = L(40,y, lastEstimate?.details || detailsBox.innerText); y += 8;
-
-  doc.setFont("helvetica","bold"); doc.text("Developments", 40, y); y+=16;
-  doc.setFont("helvetica","normal"); y = L(40,y, lastEstimate?.devs || devsBox.innerText); y+=8;
-
-  doc.setFont("helvetica","bold"); doc.text("Summary", 40, y); y+=16;
-  y = L(40,y, lastEstimate?.summary || summaryBox.innerText);
-
+/* Export PDF */
+document.getElementById("exportPDF").addEventListener("click", ()=>{
+  const { jsPDF } = window.jspdf || {}; if(!jsPDF){ alert("PDF lib failed to load"); return; }
+  const doc=new jsPDF({unit:"pt",format:"a4"}); const L=(x,y,t)=>{ const lines=doc.splitTextToSize(String(t||""),520); doc.text(lines,x,y); return y+lines.length*14; };
+  let y=50;
+  doc.setFont("helvetica","bold"); doc.setFontSize(16); doc.text("Fuel IQ — Fuel Site Analyzer",40,y); y+=24;
+  doc.setFont("helvetica","normal"); doc.setFontSize(11);
+  y=L(40,y,`Address: ${lastInputs?.address||addrInput.value||"-"}`);
+  y=L(40,y,`MPDs: ${lastInputs?.mpds??$("mpds").value}   Diesel: ${lastInputs?.diesel??$("diesel").value}`);
+  y=L(40,y,lastEstimate?.aadtBanner||aadtBanner.innerText); y+=8;
+  doc.setFont("helvetica","bold"); doc.setFontSize(22); doc.text((lastEstimate?.est?.base!=null)?`${fmt(lastEstimate.est.base)} gal/mo`:"—",40,y); y+=22;
+  doc.setFont("helvetica","normal"); doc.setFontSize(11);
+  y=L(40,y, `Low–High: ${(lastEstimate?.est? `${fmt(lastEstimate.est.low)} – ${fmt(lastEstimate.est.high)}` : "—")}`);
+  y=L(40,y,lastEstimate?.comp||compLine.innerText);
+  y=L(40,y,lastEstimate?.details||detailsBox.innerText); y+=8;
+  doc.setFont("helvetica","bold"); doc.text("Developments",40,y); y+=16;
+  doc.setFont("helvetica","normal"); y=L(40,y,lastEstimate?.devs||devsBox.innerText); y+=8;
+  doc.setFont("helvetica","bold"); doc.text("Summary",40,y); y+=16;
+  y=L(40,y,lastEstimate?.summary||summaryBox.innerText);
   doc.save("FuelIQ_Site_Analyzer.pdf");
 });
 
-/* ========= Initial overlay text ========= */
+/* Initial */
 overlay.textContent="—";
 </script>
 </body>
