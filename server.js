@@ -17,8 +17,8 @@ app.get("/", (_req, res) => res.sendFile(path.join(__dirname, "public", "index.h
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
 /* ========== Config ========== */
-const CONTACT = process.env.OVERPASS_CONTACT || "FuelEstimator/1.9 (contact: you@example.com)";
-const UA = "FuelEstimator/1.9 (+contact: you@example.com)";
+const CONTACT = process.env.OVERPASS_CONTACT || "FuelEstimator/2.0 (contact: you@example.com)";
+const UA = "FuelEstimator/2.0 (+contact: you@example.com)";
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || "";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const STRICT_AI_DEVS = process.env.STRICT_AI_DEVS ? String(process.env.STRICT_AI_DEVS).toLowerCase() === "true" : true;
@@ -262,7 +262,7 @@ function heuristicAADT(roads){
   return Math.round(est);
 }
 
-/* ========== GPT ========== */
+/* ========== GPT helpers ========== */
 async function gptJSON(prompt){
   if(!OPENAI_API_KEY) throw new Error("Missing OPENAI_API_KEY");
   const r=await fetchWithTimeout("https://api.openai.com/v1/chat/completions",{
@@ -345,42 +345,44 @@ app.get("/google/autocomplete", async (req,res)=>{
   }catch(e){ return res.json({ ok:false, status:"EXCEPTION", error:String(e), items:[] }); }
 });
 
-/* ========== Gallons model with policy caps (FIXED capEquip × 24) ========== */
+/* ========== Gallons model with policy caps (FIXED) ========== */
 function gallonsWithRules({ aadt, mpds, diesel, compCount, heavyCount }){
-  const floor=aadt*0.02*8*30;
+  // Floor based on your baseline
+  const floor = aadt * 0.02 * 8 * 30; // AADT×2%×8gal×30days
 
   // Competition
   let baseMult=1.0; if(compCount>=3) baseMult=0.60; else if(compCount===2) baseMult=0.75;
   let extraPenalty=0.0; if(heavyCount===1) extraPenalty=0.20; else if(heavyCount>=2) extraPenalty=0.35;
   const compMult=Math.max(0.20, baseMult - extraPenalty);
 
-  // Demand (daily→monthly)
+  // Demand (daily→monthly) * competition
   const truckShare=0.10, autos=aadt*(1-truckShare), trucks=aadt*truckShare;
-  const gpd=autos*0.020*10.2 + trucks*0.012*16.0;
-  const monthlyUncapped=Math.max(gpd*(365/12), floor) * compMult;
+  const gpd = autos*0.020*10.2 + trucks*0.012*16.0;         // gallons per day
+  const monthlyUncapped = Math.max(gpd*(365/12), floor) * compMult;
 
-  // **FIX** equipment cap: 25 cars/hr * 10.5 gal * 24 hr/day * (365/12) ≈ 19,162 gal/MPD/month
-  const capEquip=(mpds * 25 * 10.5 * 24) * (365/12) + ((diesel||0) * 25 * 16 * 24) * (365/12);
+  // Equipment cap (per MPD throughput) — FIXED: include ×24 hours
+  // approx 25 cars/hr × 10.5 gal × 24 hr × (365/12) ≈ 19,162 per MPD
+  const capEquip = (mpds * 25 * 10.5 * 24) * (365/12) + ((diesel||0) * 25 * 16 * 24) * (365/12);
 
-  // Policy caps
-  const HARD=28000, SOFT=22000;
-  const capHard=mpds*HARD;
-  const softTotal=mpds*SOFT;
+  // Policy caps: soft 22k/MPD (apply −10% queuing if demand exceeds), hard 28k/MPD
+  const HARD = 28000, SOFT = 22000;
+  const capHardTotal = mpds * HARD;
+  const capSoftTotal = mpds * SOFT;
 
-  let capped=Math.min(monthlyUncapped, capEquip, capHard);
-  if(monthlyUncapped>softTotal) capped=Math.round(capped*0.90); // −10% queuing at peaks
+  let capped = Math.min(monthlyUncapped, capEquip, capHardTotal);
+  if (monthlyUncapped > capSoftTotal) capped = Math.round(capped * 0.90); // −10% queue
 
-  const base=Math.round(capped);
+  const base = Math.round(capped);
   return {
     base,
-    low:Math.round(base*0.86),
-    high:Math.round(base*1.06),
-    year2:Math.round(base*1.027),
-    year3:Math.round(base*1.027*1.0125),
-    cap:Math.round(Math.min(capEquip, capHard)),
-    floor:Math.round(floor),
+    low: Math.round(base * 0.86),
+    high: Math.round(base * 1.06),
+    year2: Math.round(base * 1.027),
+    year3: Math.round(base * 1.027 * 1.0125),
+    cap: Math.round(Math.min(capEquip, capHardTotal)),
+    floor: Math.round(floor),
     compMult,
-    caps:{ hard_per_mpd:HARD, soft_per_mpd:SOFT }
+    caps: { soft_per_mpd: SOFT, hard_per_mpd: HARD }
   };
 }
 
@@ -392,18 +394,18 @@ app.post("/estimate", async (req,res)=>{
     if(!Number.isFinite(MPDS)||MPDS<=0) return res.status(400).json({ error:"Regular MPDs required (>0)" });
     if(!address && !(Number.isFinite(siteLat)&&Number.isFinite(siteLon))) return res.status(400).json({ error:"Address or coordinates required" });
 
-    // location
+    // Location
     let geo;
     if(Number.isFinite(siteLat)&&Number.isFinite(siteLon)) geo={ lat:+siteLat, lon:+siteLon, label: address || `${siteLat}, ${siteLon}` };
     else geo=await geocode(address);
 
-    // context
+    // Context
     const roads=await roadContext(geo.lat, geo.lon).catch(()=>({summary:"", main:[], side:[], signals:0, intersections:0}));
     const competitors=await competitorsWithin1Mile(geo.lat, geo.lon).catch(()=>[]);
     const compCount=competitors.length, heavyCount=competitors.filter(c=>c.heavy).length;
     const devs=await developments1Mile(geo.lat, geo.lon).catch(()=>[]);
 
-    // AADT components / method
+    // AADT components/method
     let dotAADT=null, gptAADT=null, heurAADT=null, usedAADT=10000, method="fallback_default";
     const overrideVal=Number(aadtOverride);
     if(Number.isFinite(overrideVal) && overrideVal>0){
@@ -433,10 +435,10 @@ app.post("/estimate", async (req,res)=>{
       }
     }
 
-    // gallons baseline (FIXED cap)
+    // Gallons baseline with fixed capacity math
     const calcBase=gallonsWithRules({ aadt:usedAADT, mpds:MPDS, diesel:DIESEL, compCount, heavyCount });
 
-    // user extras (%)
+    // User extras (%)
     let userMult=1.0; const breakdown={};
     const extras=(advanced && Array.isArray(advanced.extra)?advanced.extra:[])
       .map(e=>({ pct:Number(e?.pct), note:String(e?.note||"").slice(0,180) }))
@@ -458,7 +460,7 @@ app.post("/estimate", async (req,res)=>{
       user_multiplier_breakdown:breakdown
     };
 
-    // developments via GPT, verify to OSM
+    // Developments via GPT, verified to OSM (hide unverified by default)
     let devsAI={ items:[], confidence:0.0, verified:[], unverified:[] };
     try{
       const djson=await gptJSON(`List planned/proposed/permit/coming-soon/construction gas stations within ~1 mile of "${address || geo.label}". Return {"items":[{"name":"<string>","status":"<string>","approx_miles":<number>}], "confidence": <0.0-1.0>}`);
@@ -481,10 +483,10 @@ app.post("/estimate", async (req,res)=>{
     }catch{}
     if(STRICT_AI_DEVS && devsAI.confidence<0.6){ devsAI.items=[]; devsAI.unverified=[]; }
 
+    // Rationale + GPT summary
     const nearest=competitors[0]?.miles??null;
     const rationale=`Method=${method}; comps=${compCount} (heavy=${heavyCount}) ⇒ compMult ${(calcBase.compMult*100|0)}%. Floor=${calcBase.floor.toLocaleString()} gal/mo. Caps: soft ${calcBase.caps.soft_per_mpd}/MPD (−10% if exceeded), hard ${calcBase.caps.hard_per_mpd}/MPD. User multiplier=${calc.user_multiplier}.`;
 
-    // GPT summary
     let summary="";
     try{
       const devOSM=devs.slice(0,6).map(x=>`${x.name} (${x.status}, ~${x.miles} mi)`).join("; ")||"none";
@@ -496,7 +498,7 @@ app.post("/estimate", async (req,res)=>{
 Inputs:
 - Address: ${address || geo.label}
 - Method: ${method} ${method==="override"?`(AADT OVERRIDE ${usedAADT})`:""}
-- DOT: ${dotAADT?.value??"null"} (${dotAADT?.source||"n/a"} ${dotAADT?.year||"n/a"}, ~${dotAADT?.distance_mi??"?"} mi)
+- DOT: ${dotAADT?.value??"null"} (${dotAADT?.source||"ncdot"} ${dotAADT?.year||"n/a"}, ~${dotAADT?.distance_mi??"?"} mi)
 - GPT: ${gptAADT?.value??"null"} (conf ${((gptAADT?.confidence||0)*100|0)}%; note: ${gptAADT?.note||"none"})
 - Heuristic: ${heurAADT??"null"} (from ${roads.summary})
 - USED AADT: ${usedAADT}
