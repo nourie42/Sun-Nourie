@@ -17,8 +17,8 @@ app.get("/", (_req, res) => res.sendFile(path.join(__dirname, "public", "index.h
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
 /* ========== Config ========== */
-const CONTACT = process.env.OVERPASS_CONTACT || "FuelEstimator/2.1 (contact: you@example.com)";
-const UA = "FuelEstimator/2.1 (+contact: you@example.com)";
+const CONTACT = process.env.OVERPASS_CONTACT || "FuelEstimator/2.0 (contact: you@example.com)";
+const UA = "FuelEstimator/2.0 (+contact: you@example.com)";
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || "";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const STRICT_AI_DEVS = process.env.STRICT_AI_DEVS ? String(process.env.STRICT_AI_DEVS).toLowerCase() === "true" : true;
@@ -34,8 +34,10 @@ function haversine(lat1, lon1, lat2, lon2){
 }
 function distMiles(a,b,c,d){ return toMiles(haversine(a,b,c,d)); }
 async function fetchWithTimeout(url, opts={}, timeoutMs=25000){
-  const controller=new AbortController(); const t=setTimeout(()=>controller.abort(), timeoutMs);
-  try{ return await fetch(url, { ...opts, signal: controller.signal }); } finally{ clearTimeout(t); }
+  const controller = new AbortController();
+  const t = setTimeout(()=>controller.abort(), timeoutMs);
+  try { return await fetch(url, { ...opts, signal: controller.signal }); }
+  finally { clearTimeout(t); }
 }
 
 /* ========== Geocoding ========== */
@@ -102,7 +104,7 @@ async function queryNCDOTNearestAADT(lat, lon, radiusMeters=1609){
     rows.push({ aadt:pairs[0].val, year:pairs[0].year||null, distM });
   }
   if(!rows.length) return null;
-  rows.sort((A,B)=>(B.year||0)-(A.year||0)||B.aadt-A.aadt||A.distM-B.distM);
+  rows.sort((A,B) => (B.year||0)-(A.year||0)||B.aadt-A.aadt||A.distM-B.distM);
   return rows[0];
 }
 async function queryCustomTraffic(lat, lon, address){
@@ -235,7 +237,7 @@ async function roadContext(lat, lon){
   return { summary, main:main.slice(0,6), side:side.slice(0,6), signals, intersections };
 }
 
-/* ========== Heuristic AADT ========== */
+/* ========== Heuristic AADT (from road type) ========== */
 function parseMaxspeed(ms){ const m=String(ms||"").match(/(\d+)\s*(mph)?/i); return m?+m[1]:null; }
 function heuristicAADT(roads){
   const dom=roads?.main?.[0]?.highway || roads?.side?.[0]?.highway || "";
@@ -251,8 +253,8 @@ function heuristicAADT(roads){
     case "residential": case "service": case "unclassified": basePerDir=1500; break;
     default: basePerDir=4000;
   }
-  const lanesTotal=Math.max(1,lanes);
-  const dirFactor=Math.max(1,lanesTotal/2);
+  const lanesTotal=Math.max(1, lanes);
+  const dirFactor=Math.max(1, lanesTotal/2);
   let est=basePerDir*dirFactor;
   if(speed){ if(speed>=55) est*=1.15; else if(speed<=30) est*=0.8; }
   if((roads?.signals||0)>=5) est*=0.9;
@@ -345,35 +347,30 @@ app.get("/google/autocomplete", async (req,res)=>{
 
 /* ========== Gallons model with policy caps (FIXED) ========== */
 function gallonsWithRules({ aadt, mpds, diesel, compCount, heavyCount }){
-  // Floor based on baseline
-  const floor = aadt * 0.02 * 8 * 30;
+  // Floor based on your baseline
+  const floor = aadt * 0.02 * 8 * 30; // AADT×2%×8gal×30days
 
-  // NEW competition rule: 0=100%, 1=75%, 2=60%, 3+=60%
-  let baseMult = 1.0;
-  if (compCount === 1) baseMult = 0.75;
-  else if (compCount >= 2) baseMult = 0.60;
-
-  let extraPenalty = 0.0;
-  if (heavyCount === 1) extraPenalty = 0.20;
-  else if (heavyCount >= 2) extraPenalty = 0.35;
-
-  const compMult = Math.max(0.20, baseMult - extraPenalty);
+  // Competition
+  let baseMult=1.0; if(compCount>=3) baseMult=0.60; else if(compCount===2) baseMult=0.75;
+  let extraPenalty=0.0; if(heavyCount===1) extraPenalty=0.20; else if(heavyCount>=2) extraPenalty=0.35;
+  const compMult=Math.max(0.20, baseMult - extraPenalty);
 
   // Demand (daily→monthly) * competition
   const truckShare=0.10, autos=aadt*(1-truckShare), trucks=aadt*truckShare;
-  const gpd = autos*0.020*10.2 + trucks*0.012*16.0;
+  const gpd = autos*0.020*10.2 + trucks*0.012*16.0;         // gallons per day
   const monthlyUncapped = Math.max(gpd*(365/12), floor) * compMult;
 
-  // Equipment cap (per MPD throughput) — include ×24 hours
+  // Equipment cap (per MPD throughput) — FIXED: include ×24 hours
+  // approx 25 cars/hr × 10.5 gal × 24 hr × (365/12) ≈ 19,162 per MPD
   const capEquip = (mpds * 25 * 10.5 * 24) * (365/12) + ((diesel||0) * 25 * 16 * 24) * (365/12);
 
-  // Policy caps: soft 22k/MPD (−10% if exceeded), hard 28k/MPD
+  // Policy caps: soft 22k/MPD (apply −10% queuing if demand exceeds), hard 28k/MPD
   const HARD = 28000, SOFT = 22000;
   const capHardTotal = mpds * HARD;
   const capSoftTotal = mpds * SOFT;
 
   let capped = Math.min(monthlyUncapped, capEquip, capHardTotal);
-  if (monthlyUncapped > capSoftTotal) capped = Math.round(capped * 0.90);
+  if (monthlyUncapped > capSoftTotal) capped = Math.round(capped * 0.90); // −10% queue
 
   const base = Math.round(capped);
   return {
@@ -438,10 +435,10 @@ app.post("/estimate", async (req,res)=>{
       }
     }
 
-    // Gallons baseline
+    // Gallons baseline with fixed capacity math
     const calcBase=gallonsWithRules({ aadt:usedAADT, mpds:MPDS, diesel:DIESEL, compCount, heavyCount });
 
-    // User extras (%), including “Adjust lower for ratings below 4.0 (−30%)” from UI chip
+    // User extras (%)
     let userMult=1.0; const breakdown={};
     const extras=(advanced && Array.isArray(advanced.extra)?advanced.extra:[])
       .map(e=>({ pct:Number(e?.pct), note:String(e?.note||"").slice(0,180) }))
@@ -488,7 +485,7 @@ app.post("/estimate", async (req,res)=>{
 
     // Rationale + GPT summary
     const nearest=competitors[0]?.miles??null;
-    const rationale=`Method=${method}; comps=${compCount} (heavy=${heavyCount}) ⇒ compMult ${(calcBase.compMult*100|0)}%. Floor=${calcBase.floor.toLocaleString()} gal/mo. Caps: soft ${calcBase.caps.soft_per_mpd}/MPD (−30% chip comes via extras if enabled), hard ${calcBase.caps.hard_per_mpd}/MPD. User multiplier=${calc.user_multiplier}.`;
+    const rationale=`Method=${method}; comps=${compCount} (heavy=${heavyCount}) ⇒ compMult ${(calcBase.compMult*100|0)}%. Floor=${calcBase.floor.toLocaleString()} gal/mo. Caps: soft ${calcBase.caps.soft_per_mpd}/MPD (−10% if exceeded), hard ${calcBase.caps.hard_per_mpd}/MPD. User multiplier=${calc.user_multiplier}.`;
 
     let summary="";
     try{
@@ -496,7 +493,7 @@ app.post("/estimate", async (req,res)=>{
       const devAI=(devsAI.verified||[]).slice(0,6).map(x=>`${x.name} (${x.status||"planned"}, ~${x.approx_miles??"?"} mi)`).join("; ")||"none";
       const brands=competitors.filter(c=>c.heavy).slice(0,6).map(c=>c.name).join(", ")||"none";
       const userAdj=Object.entries(calc.user_multiplier_breakdown||{}).map(([k,v])=>k==="extras"?`extras: ${v.map(e=>`${e.pct}% (${e.note||"no note"})`).join("; ")}`:`${k}: ×${v}`).join("; ")||"none";
-      const sys=`Write 8–12 numeric sentences. Cover: AADT method (override or blend of DOT+GPT+Heur), road layout effect, NEW competition rule (0=100%, 1=75%, 2=60%, 3+=60% with heavy −20/−35), policy caps (22k soft −10%, 28k hard), developments (OSM + GPT-verified), and user adjustments including “ratings below 4.0 (−30%)” if present. Return {"summary":"<text>"}.`;
+      const sys=`Write 8–12 numeric sentences. Cover: AADT components & method (override or blend of DOT+GPT+Heur), road layout influence, competition rule, caps policy (22k soft with −10%, 28k hard), developments (OSM + GPT-verified), and user adjustments. Return {"summary":"<text>"}.`;
       const prompt=`
 Inputs:
 - Address: ${address || geo.label}
