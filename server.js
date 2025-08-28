@@ -17,11 +17,12 @@ app.get("/", (req, res) => res.sendFile(path.join(__dirname, "public", "index.ht
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
 /* ---------- shared utils ---------- */
-const CONTACT = process.env.OVERPASS_CONTACT || "SunocoAnalyzer/2.4 (contact: you@example.com)";
-const UA = "SunocoAnalyzer/2.4 (+contact: you@example.com)";
-const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || ""; // <— set this to enable Google checks & autocomplete
+const CONTACT = process.env.OVERPASS_CONTACT || "SunocoAnalyzer/2.5 (contact: you@example.com)";
+const UA = "SunocoAnalyzer/2.5 (+contact: you@example.com)";
+const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || ""; // set this in your env for Google features
 const sleep = (ms)=>new Promise(r=>setTimeout(r,ms));
 const toMiles = (m)=> m / 1609.344;
+
 function haversine(lat1, lon1, lat2, lon2) {
   const R = 6371000, t=(d)=>d*Math.PI/180;
   const dLat=t(lat2-lat1), dLon=t(lon2-lon1);
@@ -88,8 +89,7 @@ async function queryNCDOTNearestAADT(lat, lon, radiusMeters=1609){
     const pairs=Object.keys(attrs).filter(k=>k.toLowerCase().includes("aadt")).map(k=>{
       const val=+attrs[k]; if(!(val>0)) return null;
       let year=null;
-      const inKey=String(k).match(/20\d{2}/)?.[0];
-      if(inKey) year=+inKey;
+      const inKey=String(k).match(/20\d{2}/)?.[0]; if(inKey) year=+inKey;
       for(const yk of ["YEAR","AADT_YEAR","COUNT_YEAR","TRAFFICYEAR","YEAR_","YR","YR_"]){
         const yv=attrs[yk]; if(yv){ const mt=String(yv).match(/20\d{2}/)?.[0]; if(mt){ year=+mt; break; } }
       }
@@ -103,7 +103,7 @@ async function queryNCDOTNearestAADT(lat, lon, radiusMeters=1609){
     rows.push({ aadt:pairs[0].val, year:pairs[0].year||null, distM });
   }
   if(!rows.length) return null;
-  rows.sort((A,B)=>(B.year||0)-(A.year||0)||B.aadt-A.aadt||A.distM-B.DistM);
+  rows.sort((A,B)=>(B.year||0)-(A.year||0)||B.aadt-A.aadt||A.distM-B.distM);
   return rows[0];
 }
 
@@ -135,20 +135,12 @@ async function overpassQuery(data){
 }
 async function competitorsWithin1Mile(lat, lon){
   const r=1609;
-  const q=`[out:json][timeout:25];(
-    node(around:${r},${lat},${lon})["amenity"="fuel"];
-    way(around:${r},${lat},${lon})["amenity"="fuel"];
-  );out center tags;`;
+  const q=`[out:json][timeout:25];(node(around:${r},${lat},${lon})["amenity"="fuel"];way(around:${r},${lat},${lon})["amenity"="fuel"];);out center tags;`;
   let elements=[];
-  try{
-    const d=await overpassQuery(q);
-    elements=d.elements||[];
-  }catch{
+  try{ const d=await overpassQuery(q); elements=d.elements||[]; }
+  catch{
     const d=0.0145;
-    const qb=`[out:json][timeout:25];(
-      node["amenity"="fuel"](${lat-d},${lon-d},${lat+d},${lon+d});
-      way["amenity"="fuel"](${lat-d},${lon-d},${lat+d},${lon+d});
-    );out center tags;`;
+    const qb=`[out:json][timeout:25];(node["amenity"="fuel"](${lat-d},${lon-d},${lat+d},${lon+d});way["amenity"="fuel"](${lat-d},${lon-d},${lat+d},${lon+d}););out center tags;`;
     const b=await overpassQuery(qb); elements=b.elements||[];
   }
   const heavy=/sheetz|wawa|quik.?trip|(^|\b)qt\b|racetrac|buc-?ee|costco|sam's|bj's|pilot|love's|circle k|speedway|murphy|exxon|shell|bp|chevron|marathon|7-?eleven/i;
@@ -276,7 +268,6 @@ async function queryCustomTraffic(lat, lon, address){
     const txt = await r.text();
     if(!r.ok) throw new Error(`Custom traffic ${r.status}: ${txt.slice(0,200)}`);
     const j = JSON.parse(txt);
-    // Try common field names
     let value = null, year = null;
     for(const k of Object.keys(j)){
       const lk = k.toLowerCase();
@@ -291,68 +282,85 @@ async function queryCustomTraffic(lat, lon, address){
   return null;
 }
 
-/* ---------- Google API utilities + endpoints ---------- */
-async function googleFindPlace(input){
-  if(!GOOGLE_API_KEY) return { status:"MISSING_KEY", error_message:"GOOGLE_API_KEY not set" };
-  const url=`https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(input)}&inputtype=textquery&fields=formatted_address,geometry,name,place_id&key=${GOOGLE_API_KEY}`;
-  const r=await fetchWithTimeout(url,{headers:{ "User-Agent":UA, Accept:"application/json" }},15000);
-  const txt=await r.text();
-  if(!r.ok) return { status:`HTTP_${r.status}`, error_message:txt.slice(0,200) };
-  try { return JSON.parse(txt); } catch { return { status:"PARSE_ERROR", error_message:txt.slice(0,200) }; }
+/* ---------- Google Places: status + autocomplete proxy ---------- */
+async function googleAutocomplete(input){
+  if(!GOOGLE_API_KEY) return { ok:false, status:"MISSING_KEY", error:"GOOGLE_API_KEY not set", items:[] };
+
+  // 1) get predictions
+  const au = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}&components=country:us&key=${GOOGLE_API_KEY}`;
+  const ar = await fetchWithTimeout(au, { headers:{ "User-Agent": UA, Accept:"application/json" } }, 15000);
+  const atxt = await ar.text();
+  if(!ar.ok) return { ok:false, status:`HTTP_${ar.status}`, error:atxt.slice(0,200), items:[] };
+  let aj; try { aj=JSON.parse(atxt); } catch { return { ok:false, status:"PARSE_ERROR", error:atxt.slice(0,200), items:[] }; }
+  if(aj.status!=="OK" && aj.status!=="ZERO_RESULTS") return { ok:false, status:aj.status, error:aj.error_message||"No details", items:[] };
+
+  // 2) resolve top predictions to geometry
+  const preds = aj.predictions || [];
+  const n = Math.min(preds.length, 6);
+  const items=[];
+  for(let i=0;i<n;i++){
+    const pid = preds[i].place_id;
+    if(!pid) continue;
+    const du = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${pid}&fields=formatted_address,geometry,name,place_id,types&key=${GOOGLE_API_KEY}`;
+    try{
+      const dr = await fetchWithTimeout(du, { headers:{ "User-Agent": UA, Accept:"application/json" } }, 15000);
+      const dt = await dr.text();
+      if(!dr.ok) continue;
+      const dj = JSON.parse(dt);
+      if(dj.status!=="OK") continue;
+      const res = dj.result;
+      const loc = res.geometry?.location;
+      if(loc && Number.isFinite(loc.lat) && Number.isFinite(loc.lng)){
+        items.push({
+          type:"Google",
+          display: res.formatted_address || res.name || preds[i].description,
+          lat:+loc.lat, lon:+loc.lng,
+          place_id: res.place_id || pid,
+          score: 1.3
+        });
+      }
+    }catch{ /* skip bad detail */ }
+  }
+  return { ok:true, status:"OK", items };
 }
-app.get("/google/status", async (_req, res)=>{
-  try{
-    const probe = await googleFindPlace("1600 Amphitheatre Parkway, Mountain View, CA");
-    if(probe.status==="OK") return res.json({ ok:true, status:probe.status, candidates: probe.candidates?.length||0 });
-    return res.json({ ok:false, status:probe.status||"UNKNOWN", error:probe.error_message||"No details" });
-  }catch(e){
-    res.json({ ok:false, status:"EXCEPTION", error:String(e) });
+
+app.get("/google/status", async (_req, res) => {
+  try {
+    const probe = await googleAutocomplete("1600 Amphitheatre Parkway, Mountain View, CA");
+    if (probe.ok) return res.json({ ok:true, status:"WORKING", items: probe.items.length });
+    return res.json({ ok:false, status:probe.status || "ERROR", error:probe.error || "Unknown" });
+  } catch (e) {
+    return res.json({ ok:false, status:"EXCEPTION", error:String(e) });
   }
 });
-app.get("/google/places", async (req, res)=>{
+
+app.get("/google/autocomplete", async (req, res) => {
   try{
     const q=String(req.query.input||"").trim();
-    if(!q) return res.status(400).json({ error:"missing input" });
-    const data=await googleFindPlace(q);
-    if(data.status!=="OK") return res.json({ ok:false, status:data.status, error:data.error_message||"No details", items:[] });
-    const items=(data.candidates||[]).map(c=>{
-      const loc=c.geometry?.location;
-      return (loc && Number.isFinite(loc.lat) && Number.isFinite(loc.lng))
-        ? { type:"Google", display:c.formatted_address || c.name, lat:+loc.lat, lon:+loc.lng, place_id:c.place_id||null, score:1.2 }
-        : null;
-    }).filter(Boolean);
-    res.json({ ok:true, items });
+    if(!q) return res.status(400).json({ ok:false, status:"BAD_REQUEST", error:"missing input", items:[] });
+    const data = await googleAutocomplete(q);
+    return res.json(data);
   }catch(e){
-    res.json({ ok:false, status:"EXCEPTION", error:String(e), items:[] });
+    return res.json({ ok:false, status:"EXCEPTION", error:String(e), items:[] });
   }
 });
 
-/* ---------- gallons model with competition rules ---------- */
+/* ---------- gallons model (competition rules) ---------- */
 function gallonsWithRules({ aadt, mpds, diesel, compCount, heavyCount }) {
-  // Floor
   const floor = aadt * 0.02 * 8 * 30;
-
-  // Base by competitor count
   let baseMult = 1.0;
   if (compCount >= 3) baseMult = 0.60;
-  else if (compCount === 2) baseMult = 0.75; // 2 → 75%
-  else baseMult = 1.00;                      // 0–1 → 100%
-
-  // Heavy penalty
+  else if (compCount === 2) baseMult = 0.75;
+  else baseMult = 1.00;
   let extraPenalty = 0.0;
   if (heavyCount === 1) extraPenalty = 0.20;
   else if (heavyCount >= 2) extraPenalty = 0.35;
-
-  const compMult = Math.max(0.20, baseMult - extraPenalty); // never below 20%
-
-  // Blend
+  const compMult = Math.max(0.20, baseMult - extraPenalty);
   const truckShare = 0.10;
   const autos = aadt * (1 - truckShare);
   const trucks = aadt * truckShare;
   const gpd = (autos * 0.020 * 10.2 + trucks * 0.012 * 16.0) * compMult;
   const monthly = Math.max(gpd * (365/12), floor);
-
-  // Capacity cap
   const cap = (mpds * 25 * 10.5 + (diesel||0) * 25 * 16) * (365/12);
   const base = Math.round(Math.min(monthly, cap));
   return {
@@ -368,42 +376,25 @@ function advancedMultiplier(adv){
   const clamp15=(x)=>Math.max(1, Math.min(5, +x|0));
   let mult = 1.0;
   const bd = {};
-  if(adv.rural_level){
-    const lvl=clamp15(adv.rural_level);
-    const m = {1:1.10, 2:1.05, 3:1.00, 4:0.93, 5:0.85}[lvl];
-    mult *= m; bd.rural = m;
+  if(adv.rural_level){ const lvl=clamp15(adv.rural_level); const m={1:1.10,2:1.05,3:1.00,4:0.93,5:0.85}[lvl]; mult*=m; bd.rural=m; }
+  if(adv.competition_level){ const lvl=clamp15(adv.competition_level); const m={1:1.10,2:1.05,3:1.00,4:0.93,5:0.85}[lvl]; mult*=m; bd.competition=m; }
+  if(adv.operations_level){ const lvl=clamp15(adv.operations_level); const m={1:0.90,2:0.95,3:1.00,4:1.05,5:1.10}[lvl]; mult*=m; bd.operations=m; }
+  let extra=1.0; const cleanExtras=[];
+  for(const e of (Array.isArray(adv.extra)?adv.extra:[])){
+    const pct=Number(e?.pct); if(!Number.isFinite(pct)) continue;
+    const note=String(e?.note||"").slice(0,180);
+    extra *= (1 + pct/100); cleanExtras.push({ pct, note });
   }
-  if(adv.competition_level){
-    const lvl=clamp15(adv.competition_level);
-    const m = {1:1.10, 2:1.05, 3:1.00, 4:0.93, 5:0.85}[lvl];
-    mult *= m; bd.competition = m;
-  }
-  if(adv.operations_level){
-    const lvl=clamp15(adv.operations_level);
-    const m = {1:0.90, 2:0.95, 3:1.00, 4:1.05, 5:1.10}[lvl];
-    mult *= m; bd.operations = m;
-  }
-  let extra=1.0;
-  const extras = Array.isArray(adv.extra)||[];
-  const cleanExtras = [];
-  for(const e of extras){
-    const pct = Number(e?.pct);
-    if(!Number.isFinite(pct)) continue;
-    const note = String(e?.note||"").slice(0,180);
-    extra *= (1 + pct/100);
-    cleanExtras.push({ pct, note });
-  }
-  mult *= extra;
-  if(cleanExtras.length) bd.extras = cleanExtras;
+  mult *= extra; if(cleanExtras.length) bd.extras = cleanExtras;
   return { mult, breakdown: bd };
 }
 
-/* ---------- GPT AADT estimate ("try very hard") ---------- */
+/* ---------- GPT AADT estimate ("try hard") ---------- */
 async function gptEstimateAADT(ctx){
   try{
     const prompt = `
-Estimate AADT for the described site very carefully. Use U.S. norms by highway class, lanes, speed, signals density, and nearby network context. 
-Return JSON: {"aadt": <number>, "confidence": <0..1>, "explanation": "<1-3 sentences>"} (no markdown).
+Estimate AADT for the described site carefully. Use U.S. norms by highway class, lanes, maxspeed, signals density, and nearby network context.
+Return JSON only: {"aadt": <number>, "confidence": <0..1>, "explanation": "<1-3 sentences>"}.
 
 Context:
 - Address: ${ctx.address}
@@ -413,7 +404,7 @@ Context:
 - Side roads: ${ctx.roads.side.map(r=>`${r.name||"?"} (${r.highway})`).join('; ')}
 - Competitors in 1 mi: ${ctx.compCount} (heavy: ${ctx.heavyCount})
 - MPDs: ${ctx.mpds}${ctx.diesel? " + diesel "+ctx.diesel:""}
-    `.trim();
+`.trim();
     const j = await gptJSON(prompt);
     const aadt = Math.max(0, Math.round(+j.aadt||0));
     const confidence = Math.max(0, Math.min(1, +j.confidence||0));
@@ -439,7 +430,7 @@ app.post("/estimate", async (req, res) => {
       geo = await geocode(address);
     }
 
-    // Road context + competition (needed for GPT AADT too)
+    // Context first (used by GPT too)
     const roads = await roadContext(geo.lat, geo.lon).catch(()=>({summary:"",main:[],side:[],signals:0,intersections:0}));
     const competitors = await competitorsWithin1Mile(geo.lat, geo.lon).catch(()=>[]);
     const compCount = competitors.length;
@@ -453,30 +444,24 @@ app.post("/estimate", async (req, res) => {
     if(!sta) sta = await queryNCDOTNearestAADT(geo.lat, geo.lon, 1609).catch(()=>null);
     const dotAADT = sta ? { value: sta.aadt, year: sta.year, distance_mi: sta.source==='custom'?0:+toMiles(sta.distM).toFixed(3), source: sta.source||'ncdot' } : null;
 
-    // GPT AADT (tries hard)
-    let gptAADT = { value:null, confidence:0, note:"" };
-    try{
-      gptAADT = await gptEstimateAADT({
-        address: address || geo.label, lat: geo.lat, lon: geo.lon,
-        roads, compCount, heavyCount, mpds: MPDS, diesel: DIESEL
-      });
-    }catch{}
+    // GPT AADT ("try hard")
+    const gptAADT = await gptEstimateAADT({
+      address: address || geo.label, lat: geo.lat, lon: geo.lon,
+      roads, compCount, heavyCount, mpds: MPDS, diesel: DIESEL
+    });
 
-    // Required: AADT used = average of DOT and GPT (when both exist)
+    // AADT used = average of available components (DOT + GPT); if both missing, fallback 10000
     const haveDot = Number.isFinite(dotAADT?.value);
     const haveGpt = Number.isFinite(gptAADT?.value);
-    let usedAADT;
-    if(haveDot && haveGpt) usedAADT = Math.round((dotAADT.value + gptAADT.value) / 2);
-    else if(haveDot) usedAADT = dotAADT.value;
-    else if(haveGpt) usedAADT = gptAADT.value;
-    else usedAADT = 10000; // conservative fallback
+    const usedAADT = (haveDot || haveGpt)
+      ? Math.round(((haveDot?dotAADT.value:0) + (haveGpt?gptAADT.value:0)) / ((haveDot?1:0) + (haveGpt?1:0)))
+      : 10000;
 
-    // Gallons (baseline, before advanced adjustments)
+    // Gallons baseline
     const calcBase = gallonsWithRules({ aadt: usedAADT, mpds: MPDS, diesel: DIESEL, compCount, heavyCount });
 
     // Advanced options multiplier
-    const adv = advanced && typeof advanced==="object" ? advanced : null;
-    const advMul = advancedMultiplier(adv);
+    const advMul = advancedMultiplier(advanced && typeof advanced==="object" ? advanced : null);
     const apply = (n)=> Math.round(n * advMul.mult);
     const calc = {
       base_unadjusted: calcBase.base,
@@ -485,14 +470,14 @@ app.post("/estimate", async (req, res) => {
       high: apply(calcBase.high),
       year2: apply(calcBase.year2),
       year3: apply(calcBase.year3),
-      cap: calcBase.cap,           // cap is a capacity property; keep original for reference
+      cap: calcBase.cap,
       floor: calcBase.floor,
       compMult: calcBase.compMult,
       user_multiplier: +advMul.mult.toFixed(4),
       user_multiplier_breakdown: advMul.breakdown
     };
 
-    // GPT developments (verified vs unverified against OSM)
+    // GPT developments (verified vs unverified)
     let devsAI = { items: [], confidence: 0.0, verified: [], unverified: [] };
     try {
       const djson = await gptJSON(
@@ -517,14 +502,13 @@ app.post("/estimate", async (req, res) => {
       devsAI.verified = verified.slice(0,20);
       devsAI.unverified = unverified.slice(0,20);
     } catch {}
-
     const STRICT_AI = String(process.env.STRICT_AI_DEVS||'false').toLowerCase() === 'true';
     if (STRICT_AI && devsAI.confidence < 0.6) { devsAI.items = []; devsAI.unverified = []; }
 
-    // Rationale and GPT summary (document all user changes)
     const nearest = competitors[0]?.miles ?? null;
     const rationale = `Competition rule: comps=${compCount}, heavy=${heavyCount} ⇒ multiplier ${(calcBase.compMult*100|0)}%. Floor=${calcBase.floor.toLocaleString()} gal/mo. Capacity cap=${calcBase.cap.toLocaleString()} gal/mo. User multiplier=${calc.user_multiplier}.`;
 
+    // GPT summary documenting user changes
     let summary = "";
     try {
       const devTextOSM = devs.slice(0,6).map(x=>`${x.name} (${x.status}, ~${x.miles} mi)`).join("; ") || "none";
@@ -534,14 +518,14 @@ app.post("/estimate", async (req, res) => {
         .map(([k,v])=> k==="extras"
           ? `extras: ${v.map(e=>`${e.pct}% (${e.note||"no note"})`).join("; ")}`
           : `${k}: ×${v}`).join("; ") || "none";
-      const sys = `Write a 8–12 sentence numeric explanation. Cover: 
+      const sys = `Write 8–12 numeric sentences. Cover:
 - AADT components (DOT and GPT) and that the final AADT is their AVERAGE
 - Competition rule (0/1=100%, 2=75%, 3+=60%; heavy −20%/−35%)
-- Road layout (signals/intersections; main vs side roads)
+- Road layout (signals/intersections, main vs side roads)
 - Developments (OSM + GPT-verified only)
-- Floor gallons (AADT×2%×8×30), capacity cap
-- Document ALL user-provided advanced options and extra percentages (with comments)
-Return JSON: {"summary":"<text>"} (no markdown).`;
+- Floor (AADT×2%×8×30), capacity cap
+- Document ALL advanced options + extra percentages (with comments)
+Return JSON: {"summary":"<text>"}.`;
       const prompt = `
 Inputs:
 - Address: ${address || geo.label}
@@ -556,7 +540,7 @@ Inputs:
 - Developments GPT (verified): ${devTextAI}
 - Floor gallons: ${calcBase.floor}
 - Capacity cap: ${calcBase.cap}
-- Baseline result (pre-user): base ${calcBase.base}, low ${calcBase.low}, high ${calcBase.high}
+- Baseline result: base ${calcBase.base}, low ${calcBase.low}, high ${calcBase.high}
 - User adjustments applied: ${userAdjList}
 - Final result: base ${calc.base}, low ${calc.low}, high ${calc.high}, Y2 ${calc.year2}, Y3 ${calc.year3}
 `;
@@ -577,7 +561,7 @@ Inputs:
         user_multiplier: calc.user_multiplier,
         user_multiplier_breakdown: calc.user_multiplier_breakdown
       },
-      competition: { count: compCount, nearest_mi: nearest, notable_brands: competitors.filter(c=>c.heavy).slice(0,6).map(c=>c.name), impact_score: +(1-calcBase.compMult).toFixed(3) },
+      competition: { count: compCount, nearest_mi: nearest, notable_brands: competitors.filter(c=>c.heavy).slice(0,6).map(c=>c.name), impact_score: +(1+(-calcBase.compMult)).toFixed(3) },
       developments: devs,
       developments_ai: devsAI,
       roads,
@@ -591,4 +575,4 @@ Inputs:
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, "0.0.0.0", () => console.log(`Server listening on :${PORT}`)); 
+app.listen(PORT, "0.0.0.0", () => console.log(`Server listening on :${PORT}`));
