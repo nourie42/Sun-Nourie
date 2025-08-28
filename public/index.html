@@ -15,10 +15,7 @@
       --text:#eaeef7; --muted:#97a3b8; --brand:#0ea5e9; --brand2:#22d3ee; --pill:#0f1929;
     }
     *{ box-sizing:border-box; }
-    body{
-      background:var(--bg); color:var(--text);
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-    }
+    body{ background:var(--bg); color:var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
     .wrap{ max-width:1120px; margin:24px auto; padding:0 16px; }
     header{ display:flex; align-items:center; gap:14px; margin-bottom:16px; }
     header .logo{
@@ -29,24 +26,19 @@
     }
     header h1{ font-size:28px; margin:0; }
 
-    .card{
-      background:linear-gradient(180deg,var(--panel),var(--panel2));
-      border:1px solid var(--line); border-radius:12px; padding:16px; margin:12px 0;
-    }
+    .card{ background:linear-gradient(180deg,var(--panel),var(--panel2)); border:1px solid var(--line); border-radius:12px; padding:16px; margin:12px 0; }
     label{ display:block; font-weight:600; margin:8px 0 6px; color:#d8e3f6; }
-    input{
-      width:100%; padding:12px; border-radius:10px;
-      border:1px solid var(--line); background:#0b1220; color:var(--text);
+    input, select, textarea{
+      width:100%; padding:12px; border-radius:10px; border:1px solid var(--line); background:#0b1220; color:var(--text);
     }
+    textarea{ min-height:70px; }
     button{
-      background:linear-gradient(135deg,var(--brand),var(--brand2));
-      color:#fff; border:0; padding:12px 16px; border-radius:12px; font-weight:700; cursor:pointer;
+      background:linear-gradient(135deg,var(--brand),var(--brand2)); color:#fff; border:0; padding:12px 16px; border-radius:12px; font-weight:700; cursor:pointer;
     }
     button:disabled{ opacity:.6; cursor:not-allowed; }
 
     .row{ display:grid; grid-template-columns:1.8fr 0.8fr 0.8fr; gap:12px; }
     @media (max-width:900px){ .row{ grid-template-columns:1fr; } }
-
     .grid{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
     @media (max-width:900px){ .grid{ grid-template-columns:1fr; } }
     .right{ text-align:right; }
@@ -54,10 +46,7 @@
     .mono{ font-family: ui-monospace, Menlo, Consolas, monospace; white-space:pre-wrap; }
 
     #map{ height:420px; border-radius:12px; border:1px solid var(--line); position: relative; }
-    #overlay{
-      position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-      background:rgba(11,14,21,.55); border-radius:12px; font-weight:700; color:#cde9ff;
-    }
+    #overlay{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(11,14,21,.55); border-radius:12px; font-weight:700; color:#cde9ff; }
 
     /* Autocomplete */
     .ac-wrap{ position:relative; }
@@ -69,14 +58,15 @@
     .ac-item{ padding:10px 12px; cursor:pointer; border-bottom:1px solid rgba(255,255,255,.04); }
     .ac-item:last-child{ border-bottom:0; }
     .ac-item:hover, .ac-item.active{ background:#101a2b; }
-    .badge{
-      display:inline-block; font-size:11px; padding:2px 8px; border-radius:999px;
-      border:1px solid var(--line); background:var(--pill); color:#a9c5ff; margin-left:8px;
-    }
+    .badge{ display:inline-block; font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); background:var(--pill); color:#a9c5ff; margin-left:8px; }
 
     .toolbar{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
     .checkbox{ display:inline-flex; align-items:center; gap:8px; font-size:14px; }
     .subtle{ font-size:12px; opacity:.9; }
+
+    .cols-3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
+    @media (max-width:900px){ .cols-3{ grid-template-columns:1fr; } }
+    .adj-row{ display:grid; grid-template-columns: 0.5fr 2.5fr auto; gap:8px; align-items:center; margin-top:8px; }
   </style>
 </head>
 <body>
@@ -94,6 +84,7 @@
             <input id="addr" placeholder="6132 Knightdale Blvd, Knightdale, NC — or — Sheetz Knightdale" autocomplete="off"/>
             <div id="ac" class="ac-list" style="display:none;"></div>
           </div>
+          <div class="muted" style="margin-top:6px" id="apiStatus">API Status: —</div>
         </div>
         <div>
           <label>Regular MPDs</label>
@@ -112,8 +103,45 @@
           Include AI (unverified) developments
           <span class="subtle muted">(off by default)</span>
         </label>
-        <span class="muted">Multi-source AADT, competition-by-rule, OSM + GPT (verified), capacity cap, and road-layout analysis.</span>
+        <button id="checkGoogle">Check Google API</button>
+        <span class="muted">AADT = average of DOT and GPT; competition-by-rule; OSM + GPT (verified); capacity cap; road-layout analysis.</span>
       </div>
+    </div>
+
+    <div class="card">
+      <details>
+        <summary><b>Advanced options (optional)</b> — blank by default</summary>
+        <div style="margin-top:12px" class="cols-3">
+          <div>
+            <label>Rural road (1–5)</label>
+            <select id="adv_rural">
+              <option value="">—</option><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option>
+            </select>
+            <div class="muted subtle">1 urban/arterial → +10%; 5 rural remote → −15%</div>
+          </div>
+          <div>
+            <label>Competition (1–5)</label>
+            <select id="adv_comp">
+              <option value="">—</option><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option>
+            </select>
+            <div class="muted subtle">1 light → +10%; 5 intense → −15%</div>
+          </div>
+          <div>
+            <label>Store operations (1–5)</label>
+            <select id="adv_ops">
+              <option value="">—</option><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option>
+            </select>
+            <div class="muted subtle">1 weak → −10%; 5 excellent → +10%</div>
+          </div>
+        </div>
+
+        <div style="margin-top:12px">
+          <label>Additional percentage adjustments (with comments)</label>
+          <div id="extraList"></div>
+          <button id="addExtra" type="button" style="margin-top:8px;">+ Add adjustment</button>
+          <div class="muted subtle" style="margin-top:6px">Example: +5% (new signage), −3% (restricted left turns)</div>
+        </div>
+      </details>
     </div>
 
     <div class="card">
@@ -150,10 +178,11 @@
 const $ = id => document.getElementById(id);
 const out=$("out"), devs=$("devs"), summary=$("summary"), dbg=$("debug"),
       goBtn=$("go"), includeAI=$("includeAI"), copyBtn=$("copySummary"),
-      aadtBanner=$("aadtBanner");
+      aadtBanner=$("aadtBanner"), apiStatus=$("apiStatus"), checkGoogleBtn=$("checkGoogle");
 const acBox=$("ac"), addrInput=$("addr");
 const overlay=$("overlay");
 let map, layer, mapReady=false, selectedCoords=null;
+let googleOK=false;
 
 function setOut(html){ out.innerHTML=html; }
 function setDbg(o){ dbg.textContent = typeof o==="string" ? o : JSON.stringify(o,null,2); }
@@ -165,7 +194,21 @@ function initMap(){ if(mapReady) return; map=L.map("map",{zoomControl:true});
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map);
   layer=L.layerGroup().addTo(map); mapReady=true; }
 
-/* ========== Autocomplete (hybrid) ========== */
+/* ========== API status (Google) ========== */
+async function checkGoogleStatus(){
+  try{
+    const r=await fetch("/google/status"); const j=await r.json();
+    googleOK = !!j.ok;
+    apiStatus.textContent = j.ok ? `API Status: Google OK (status ${j.status})`
+                                 : `API Status: Google error — ${j.status}${j.error?": "+j.error:""}`;
+  }catch(e){
+    googleOK=false; apiStatus.textContent = "API Status: Google check failed";
+  }
+}
+checkGoogleBtn.addEventListener("click", checkGoogleStatus);
+checkGoogleStatus();
+
+/* ========== Autocomplete (Census + Nominatim + Overpass + Google) ========== */
 let acTimer=null, acItems=[], acIndex=-1;
 
 async function censusSearch(q){
@@ -199,12 +242,10 @@ async function geocodeCenter(q){
 async function overpassStations(center, q){
   if(!center) return [];
   try{
-    const rad=15000; // 15km to find possible brand/business matches
+    const rad=15000;
     const data=`[out:json][timeout:25];
-      (
-        node(around:${rad},${center.lat},${center.lon})["amenity"="fuel"];
-        way(around:${rad},${center.lat},${center.lon})["amenity"="fuel"];
-      );out center tags;`;
+      (node(around:${rad},${center.lat},${center.lon})["amenity"="fuel"];
+       way(around:${rad},${center.lat},${center.lon})["amenity"="fuel"];);out center tags;`;
     const ep="https://overpass-api.de/api/interpreter";
     const r=await fetch(ep,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:"data="+encodeURIComponent(data)});
     if(!r.ok) return [];
@@ -217,43 +258,35 @@ async function overpassStations(center, q){
       const lat=el.lat??el.center?.lat, lon=el.lon??el.center?.lon; if(lat==null||lon==null) continue;
       items.push({ type:"Station", display:name, lat:+lat, lon:+lon, score:0.8 });
     }
-    // dedupe
     const seen=new Set(); items=items.filter(it=>{ const k=`${it.display}|${it.lat.toFixed(5)}|${it.lon.toFixed(5)}`; if(seen.has(k)) return false; seen.add(k); return true; });
     return items.slice(0,12);
   }catch{return [];}
 }
+async function googleSearch(q){
+  if(!googleOK) return [];
+  try{
+    const r=await fetch(`/google/places?input=${encodeURIComponent(q)}`);
+    const j=await r.json();
+    if(!j.ok) { apiStatus.textContent = `Google error — ${j.status}${j.error?": "+j.error:""}`; return []; }
+    return (j.items||[]).map(it=>({ ...it, type:"Google", score:1.2 }));
+  }catch{return [];}
+}
 
-/* Boost exact street numbers & brand/business names */
+/* Boost exact number & brand/business */
 function boostExactNumberAndBusiness(item, q){
   const ql = q.toLowerCase().trim();
   const il = (item.display||"").toLowerCase();
-
-  // Exact leading number at start of query & item
   const m = ql.match(/^\s*(\d+)\b/);
-  if(m){
-    const num = m[1];
-    if(/^\s*\d+\b/.test(il) && il.startsWith(num)) item.score += 0.6;
-  }
-
-  // Sequential token containment (ordered)
+  if(m){ const num=m[1]; if(/^\s*\d+\b/.test(il) && il.startsWith(num)) item.score += 0.6; }
   const toks = ql.split(/\s+/).filter(Boolean);
   let idx = 0, okSeq = true;
-  for(const t of toks){
-    const pos = il.indexOf(t, idx);
-    if(pos < 0){ okSeq = false; break; }
-    idx = pos + t.length;
-  }
+  for(const t of toks){ const pos = il.indexOf(t, idx); if(pos < 0){ okSeq=false; break; } idx = pos + t.length; }
   if(okSeq) item.score += 0.25;
-
-  // Known brands boost
-  if(/(sheetz|wawa|costco|racetrac|buc-?ee|quik.?trip|^qt\b|murphy|exxon|shell|bp|chevron|marathon|circle k|speedway|7-?eleven)/i.test(item.display||"")){
-    item.score += 0.35;
-  }
+  if(/(sheetz|wawa|costco|racetrac|buc-?ee|quik.?trip|^qt\b|murphy|exxon|shell|bp|chevron|marathon|circle k|speedway|7-?eleven)/i.test(item.display||"")) item.score += 0.35;
 }
-
-function rankMerge(census, stations, nomi, q){
+function rankMerge(census, stations, nomi, google, q){
   const hasNum=/\d/.test(q);
-  const list=[...census,...stations,...nomi];
+  const list=[...census,...stations,...nomi,...google];
   for(const it of list){
     if(it.type==="Station") it.score+=0.2;
     if(it.type==="Address" && hasNum && /^\d+/.test(it.display)) it.score+=0.3;
@@ -261,11 +294,10 @@ function rankMerge(census, stations, nomi, q){
     const cover=toks.filter(tok=>hay.includes(tok)).length/Math.max(1,toks.length);
     it.score+=(cover*0.2);
     boostExactNumberAndBusiness(it, q);
+    if(it.type==="Google") it.score += 0.25; // prefer Google when available
   }
-  // “Use exactly …” first option
   const useExact = { type:"Use exactly", display:q, lat:null, lon:null, score:2 };
   const combined=[useExact, ...list].sort((a,b)=>(b.score||0)-(a.score||0));
-  // dedupe by display+coords
   const seen=new Set(), out=[];
   for(const it of combined){
     const k=`${it.display}|${it.lat?.toFixed?.(5)||"x"}|${it.lon?.toFixed?.(5)||"x"}`;
@@ -273,7 +305,6 @@ function rankMerge(census, stations, nomi, q){
   }
   return out;
 }
-
 function renderAc(list){
   if(!list.length){ acBox.style.display="none"; return; }
   acBox.innerHTML=list.map((it,i)=>`
@@ -296,7 +327,6 @@ function chooseAc(i){
   selectedCoords = (it.lat!=null && it.lon!=null) ? { lat: it.lat, lon: it.lon } : null;
   hideAc();
 }
-
 addrInput.addEventListener("input", ()=>{
   const q=addrInput.value.trim(); selectedCoords=null; hideAc();
   if(q.length<3) return;
@@ -304,10 +334,10 @@ addrInput.addEventListener("input", ()=>{
   acTimer=setTimeout(async()=>{
     try{
       const [census, nomi, center] = await Promise.all([censusSearch(q), nominatimSearch(q), geocodeCenter(q)]);
-      const stations = await overpassStations(center, q);
-      acItems = rankMerge(census, stations, nomi, q);
+      const [stations, g] = await Promise.all([overpassStations(center, q), googleSearch(q)]);
+      acItems = rankMerge(census, stations, nomi, g, q);
       renderAc(acItems);
-    }catch{ /* ignore */ }
+    }catch{}
   },220);
 });
 addrInput.addEventListener("keydown",(e)=>{
@@ -319,42 +349,77 @@ addrInput.addEventListener("keydown",(e)=>{
 });
 document.addEventListener("click",(e)=>{ if(!acBox.contains(e.target) && e.target!==addrInput) hideAc(); });
 
+/* ========== Advanced options UI ========== */
+const adv_rural = $("adv_rural"), adv_comp=$("adv_comp"), adv_ops=$("adv_ops"), extraList=$("extraList"), addExtraBtn=$("addExtra");
+function addExtraRow(pct="", note=""){
+  const div=document.createElement("div"); div.className="adj-row";
+  div.innerHTML = `
+    <input class="extraPct" type="number" step="0.1" placeholder="% e.g. 5 or -3" value="${pct}">
+    <input class="extraNote" placeholder="Comment (e.g. new signage, access limits)" value="${esc(note)}">
+    <button type="button" class="rm">Remove</button>`;
+  div.querySelector(".rm").addEventListener("click",()=> div.remove());
+  extraList.appendChild(div);
+}
+addExtraBtn.addEventListener("click", ()=> addExtraRow());
+
 /* ========== Client → server ========== */
 async function safeJSON(url, opts){
   const r=await fetch(url, opts); const t=await r.text();
   if(!r.ok) throw new Error(`HTTP ${r.status}\n${t.slice(0,1200)}`);
   return JSON.parse(t);
 }
+function readAdvanced(){
+  const get = sel => { const v=$(sel).value.trim(); return v===""? null : +v; };
+  const extras=[...document.querySelectorAll("#extraList .adj-row")].map(row=>{
+    const pct = +row.querySelector(".extraPct").value;
+    const note = row.querySelector(".extraNote").value.trim();
+    return Number.isFinite(pct) ? { pct, note } : null;
+  }).filter(Boolean);
+  const adv={
+    rural_level: get("adv_rural"),
+    competition_level: get("adv_comp"),
+    operations_level: get("adv_ops"),
+    extra: extras
+  };
+  // if everything empty, return null
+  if(!adv.rural_level && !adv.competition_level && !adv.operations_level && extras.length===0) return null;
+  return adv;
+}
 async function callEstimate(){
   const body={ address: $("addr").value.trim(), mpds:+$("mpds").value||0, diesel:+$("diesel").value||0 };
   if(selectedCoords){ body.siteLat=selectedCoords.lat; body.siteLon=selectedCoords.lon; }
+  const adv = readAdvanced();
+  if(adv) body.advanced = adv;
   return await safeJSON("/estimate",{ method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
 }
 
 /* ========== Renderers ========== */
 function copySummary(){
-  try{
-    const t = summary.textContent || '';
-    navigator.clipboard.writeText(t);
-    alert('Summary copied.');
-  }catch(e){ alert('Copy failed: '+e.message); }
+  try{ const t = summary.textContent || ''; navigator.clipboard.writeText(t); alert('Summary copied.'); }
+  catch(e){ alert('Copy failed: '+e.message); }
 }
 copyBtn && copyBtn.addEventListener('click', copySummary);
 
 function renderReport(d){
   const i=d.inputs||{}, c=d.competition||{};
-  // AADT banner w/ source
+  // AADT banner with components and average
   try{
-    const a = d.inputs?.aadt_actual;
-    aadtBanner.textContent = a?.value
-      ? `AADT used: ${fmt(d.inputs.aadt_used)} (${a.source==='custom'?'Custom':'NCDOT'} ${a.year || "n/a"}${a.source==='custom'?'':`, ~${a.distance_mi} mi`})`
-      : `AADT used: ${fmt(d.inputs.aadt_used)} (fallback)`;
+    const comp = d.inputs?.aadt_components||{};
+    const dot = comp.dot, gpt = comp.gpt;
+    const parts = [];
+    parts.push(`USED (AVG): ${fmt(d.inputs.aadt_used)}`);
+    if(dot?.value) parts.push(`DOT ${fmt(dot.value)} (${dot.source||"DOT"} ${dot.year||"n/a"}${dot.source==='custom'?'':`, ~${dot.distance_mi} mi`})`);
+    if(gpt?.value) parts.push(`GPT ${fmt(gpt.value)} (conf ${(gpt.confidence*100|0)}%)`);
+    aadtBanner.textContent = "AADT → " + parts.join(" | ");
   }catch{}
+
+  // If user multiplier present, show it
+  const mult = i.user_multiplier ? ` (user mult ×${i.user_multiplier.toFixed(3)})` : "";
 
   setOut(`
     <div class="grid">
       <div>
-        <div style="font-weight:700;margin-bottom:6px;">Base Estimate (gal/mo)</div>
+        <div style="font-weight:700;margin-bottom:6px;">Adjusted Base Estimate (gal/mo)${mult}</div>
         <div style="font-size:30px;font-weight:800;">${fmt(d.base)}</div>
         <div class="muted">Low–High: ${fmt(d.low)} – ${fmt(d.high)}</div>
       </div>
@@ -373,7 +438,6 @@ function renderReport(d){
 }
 
 function renderDevs(osm, ai){
-  // Only show verified GPT items unless user explicitly includes unverified
   const showUnverified = includeAI ? includeAI.checked : false;
   const verified = (ai && Array.isArray(ai.verified)) ? ai.verified : [];
   const unverified = (ai && Array.isArray(ai.unverified)) ? ai.unverified : [];
@@ -409,9 +473,8 @@ function renderMap(m){
   // Heavy brands get warm color; regular competitors get greenish
   for(const c of comps){
     pts.push([c.lat,c.lon]);
-    L.circleMarker([c.lat,c.lon],{
-      radius:6, weight:1, color:c.heavy?"#ff7f50":"#4ade80", fillOpacity:.85
-    }).addTo(layer).bindPopup(`${esc(c.name||"Fuel")} • ${c.miles} mi`);
+    L.circleMarker([c.lat,c.lon],{ radius:6, weight:1, color:c.heavy?"#ff7f50":"#4ade80", fillOpacity:.85 })
+      .addTo(layer).bindPopup(`${esc(c.name||"Fuel")} • ${c.miles} mi`);
   }
 
   const bounds=L.latLngBounds(pts);
@@ -424,7 +487,7 @@ async function estimate(){
   try{
     goBtn.disabled=true;
     setOut("<span class='muted'>Working…</span>");
-    setOverlay("Loading, this can take up to 3 minutes to research");
+    setOverlay("Researching (geocode, AADT sources, Overpass, GPT)...");
     const d=await callEstimate();
     renderReport(d);
     renderMap(d.map);
@@ -440,10 +503,10 @@ async function estimate(){
 }
 $("go").addEventListener("click", estimate);
 addrInput.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); estimate(); } });
-includeAI && includeAI.addEventListener("change", ()=>{ /* re-render devs from last result if needed */ });
+includeAI && includeAI.addEventListener("change", ()=>{ /* re-render on next run */ });
 
 /* initial state */
 overlay.textContent="—";
 </script>
 </body>
-</html>
+</html> 
