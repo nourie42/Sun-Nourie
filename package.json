@@ -1,15 +1,18 @@
 {
-  "name": "sunoco-analyzer",
+  "name": "fuel-iq-analyzer",
   "version": "1.0.0",
+  "description": "Sunoco, LP Fuel IQ - Fuel Site Analyzer",
   "type": "module",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "express": "^4.19.2",
     "cors": "^2.8.5",
+    "express": "^4.18.2",
     "node-fetch": "^3.3.2"
+  },
+  "engines": {
+    "node": ">=18.x"
   }
 }
-
