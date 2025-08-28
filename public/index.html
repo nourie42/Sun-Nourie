@@ -48,10 +48,6 @@
 
     .toolbar{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
     .checkbox{ display:inline-flex; align-items:center; gap:8px; font-size:14px; }
-
-    .cols-3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
-    @media (max-width:900px){ .cols-3{ grid-template-columns:1fr; } }
-    .adj-row{ display:grid; grid-template-columns: 0.5fr 2.5fr auto; gap:8px; align-items:center; margin-top:8px; }
   </style>
 </head>
 <body>
@@ -83,18 +79,12 @@
       <div style="margin-top:12px;" class="toolbar">
         <button id="go">Estimate</button>
         <button id="copySummary" title="Copy summary">Copy Summary</button>
-        <label class="checkbox">
-          <input type="checkbox" id="includeAI"/>
-          Include AI (unverified) developments
-        </label>
+        <label class="checkbox"><input type="checkbox" id="includeAI"/>Include AI (unverified) developments</label>
         <button id="checkGoogle">Check Google API</button>
-        <span class="muted">AADT = avg(DOT, GPT) • competition rule • OSM + GPT (verified) • capacity cap • road layout.</span>
       </div>
     </div>
 
-    <div class="card">
-      <div id="out" class="muted">—</div>
-    </div>
+    <div class="card"><div id="out" class="muted">—</div></div>
 
     <div class="card">
       <div id="aadtBanner" class="muted" style="margin-bottom:6px;">—</div>
@@ -102,49 +92,73 @@
       <div id="map"><div id="overlay" class="muted">—</div></div>
     </div>
 
-    <div class="card">
-      <b>Developments (multi-source)</b>
-      <div id="devs" class="muted">—</div>
-    </div>
-
-    <div class="card">
-      <b>Summary</b>
-      <div id="summary" class="muted">—</div>
-    </div>
-
-    <div class="card">
-      <details><summary>Debug</summary><pre id="debug" class="mono muted">/ waiting…</pre></details>
-    </div>
+    <div class="card"><b>Developments (multi-source)</b><div id="devs" class="muted">—</div></div>
+    <div class="card"><b>Summary</b><div id="summary" class="muted">—</div></div>
+    <div class="card"><details><summary>Debug</summary><pre id="debug" class="mono muted">/ waiting…</pre></details></div>
   </div>
 
 <script>
-/* ========== Helpers & globals ========== */
 const $ = id => document.getElementById(id);
-const apiStatus=$("apiStatus"), checkGoogleBtn=$("checkGoogle");
+const out=$("out"), devs=$("devs"), summary=$("summary"), dbg=$("debug"),
+      goBtn=$("go"), includeAI=$("includeAI"), copyBtn=$("copySummary"),
+      aadtBanner=$("aadtBanner"), apiStatus=$("apiStatus"), checkGoogleBtn=$("checkGoogle");
+const acBox=$("ac"), addrInput=$("addr"), overlay=$("overlay");
+let map, layer, mapReady=false, selectedCoords=null;
 
-/* ========== Fixed Google API check ========== */
+/* Google API Status */
 async function checkGoogleStatus(){
   const controller = new AbortController();
   const timer = setTimeout(()=>controller.abort(), 9000);
-  if(apiStatus) apiStatus.textContent = "API Status: checking…";
-  try {
-    const r = await fetch("/google/status", { signal: controller.signal });
-    const text = await r.text();
+  apiStatus.textContent = "API Status: checking…";
+  try{
+    const r=await fetch("/google/status",{signal:controller.signal});
+    const text=await r.text();
     let j;
-    try { j = JSON.parse(text); } catch { j = { ok:false, status:"PARSE_ERROR", error:text.slice(0,200) }; }
-    if(j.ok){
-      apiStatus.textContent = "API Status: Google — Working";
-    } else {
-      apiStatus.textContent = `API Status: Google — Error (${j.status}${j.error?": "+j.error:""})`;
-    }
-  } catch(e){
-    apiStatus.textContent = "API Status: Google — failed to fetch (server down, CORS, or timeout)";
-  } finally {
-    clearTimeout(timer);
-  }
+    try{ j=JSON.parse(text);}catch{ j={ok:false,status:"PARSE_ERROR",error:text.slice(0,200)};}
+    if(j.ok){ apiStatus.textContent="API Status: Google — Working"; }
+    else{ apiStatus.textContent=`API Status: Google — Error (${j.status}${j.error?": "+j.error:""})`; }
+  }catch(e){
+    apiStatus.textContent="API Status: Google — failed to fetch (server down, CORS, or timeout)";
+  }finally{ clearTimeout(timer);}
 }
 checkGoogleBtn?.addEventListener("click", checkGoogleStatus);
 document.addEventListener("DOMContentLoaded", checkGoogleStatus);
+
+/* Helpers */
+function setOut(html){ out.innerHTML=html; }
+function setDbg(o){ dbg.textContent=typeof o==="string"?o:JSON.stringify(o,null,2);}
+function fmt(n){ return (n??0).toLocaleString(undefined,{maximumFractionDigits:0}); }
+function esc(s){ return (s??"").toString().replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
+function setOverlay(msg){ overlay.textContent=msg; overlay.style.display="flex"; }
+function clearOverlay(){ overlay.style.display="none"; }
+function initMap(){ if(mapReady) return; map=L.map("map",{zoomControl:true});
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map);
+  layer=L.layerGroup().addTo(map); mapReady=true; }
+
+/* Autocomplete simplified (Google + Nominatim fallback) */
+let acTimer=null, acItems=[], acIndex=-1;
+async function googleSearch(q){ try{ const r=await fetch(`/google/autocomplete?input=${encodeURIComponent(q)}`); const j=await r.json(); return j.ok?j.items:[];}catch{return [];} }
+async function nominatimSearch(q){ try{ const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=us&q=${encodeURIComponent(q)}`); const a=await r.json(); return a.map(row=>({type:"Address",display:row.display_name,lat:+row.lat,lon:+row.lon,score:0.6}));}catch{return [];} }
+function renderAc(list){ if(!list.length){ acBox.style.display="none"; return;} acBox.innerHTML=list.map((it,i)=>`<div class="ac-item" data-i="${i}">${esc(it.display)}<span class="badge">${it.type}</span></div>`).join(""); [...acBox.children].forEach(el=>{ el.addEventListener("click",()=>chooseAc(+el.dataset.i)); }); acBox.style.display="block"; }
+function hideAc(){ acBox.style.display="none"; acIndex=-1; }
+function chooseAc(i){ const it=acItems[i]; if(!it) return; addrInput.value=it.display; selectedCoords=(it.lat&&it.lon)?{lat:it.lat,lon:it.lon}:null; hideAc();}
+addrInput.addEventListener("input",()=>{ const q=addrInput.value.trim(); selectedCoords=null; hideAc(); if(q.length<3)return; if(acTimer)clearTimeout(acTimer); acTimer=setTimeout(async()=>{ const [g,n]=await Promise.all([googleSearch(q),nominatimSearch(q)]); acItems=[...g,...n]; renderAc(acItems);},250);});
+
+/* Copy Summary */
+copyBtn?.addEventListener("click",()=>{ try{navigator.clipboard.writeText(summary.textContent||""); alert("Summary copied.");}catch{alert("Copy failed.");}});
+
+/* Call Estimate */
+async function callEstimate(){ const body={ address:$("addr").value.trim(), mpds:+$("mpds").value||0, diesel:+$("diesel").value||0}; if(selectedCoords){ body.siteLat=selectedCoords.lat; body.siteLon=selectedCoords.lon;} const r=await fetch("/estimate",{method:"POST",headers:{ "Content-Type":"application/json"},body:JSON.stringify(body)}); if(!r.ok) throw new Error(await r.text()); return await r.json(); }
+
+/* Renderers */
+function renderReport(d){ const i=d.inputs||{}, c=d.competition||{}; aadtBanner.textContent=`AADT used: ${fmt(i.aadt_used)} (DOT+GPT avg)`; setOut(`<div class="grid"><div><div>Base Estimate</div><div style="font-size:30px;">${fmt(d.base)}</div><div class="muted">Low–High: ${fmt(d.low)} – ${fmt(d.high)}</div></div><div class="right"><div>Year-2: <b>${fmt(d.year2)}</b></div><div>Year-3: <b>${fmt(d.year3)}</b></div></div></div><hr/><div>Inputs: MPDs ${i.mpds}</div><div>Competition: ${c.count??0} within 1 mi</div><div class="muted">${esc(d.rationale||"")}</div>`); }
+function renderMap(m){ initMap(); layer.clearLayers(); if(!m||!m.site){ overlay.textContent="—"; return;} const site=[m.site.lat,m.site.lon]; L.marker(site).addTo(layer).bindPopup("Site"); const pts=[site]; for(const c of m.competitors||[]){ pts.push([c.lat,c.lon]); L.circleMarker([c.lat,c.lon],{radius:6,color:c.heavy?"#ff7f50":"#4ade80"}).addTo(layer).bindPopup(`${esc(c.name||"Fuel")} • ${c.miles} mi`);} map.fitBounds(L.latLngBounds(pts).pad(0.25)); clearOverlay();}
+function renderDevs(osm, ai){ devs.innerHTML="<pre>"+JSON.stringify({osm,ai},null,2)+"</pre>"; }
+
+/* Main flow */
+async function estimate(){ try{ goBtn.disabled=true; setOut("Working…"); setOverlay("Loading..."); const d=await callEstimate(); renderReport(d); renderMap(d.map); renderDevs(d.developments,d.developments_ai); summary.textContent=d.summary||"—"; setDbg(d);}catch(e){ setOut("Error: "+e.message); overlay.textContent="Error";}finally{ goBtn.disabled=false;} }
+goBtn.addEventListener("click",estimate);
+addrInput.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); estimate(); }});
 </script>
 </body>
 </html>
