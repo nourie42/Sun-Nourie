@@ -1,4 +1,4 @@
-// Fuel IQ API v2025-08-29t — fast address, 5+ competitor rule, auto low-rating, cleaner breakdown, stronger dev search
+// Fuel IQ API v2025-08-29y — competition ≥5 -> 50%, rating_by_location fallback, GPT summary always
 import express from "express";
 import cors from "cors";
 import path from "path";
@@ -11,7 +11,7 @@ app.use(express.json({ limit: "1mb" }));
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// always serve fresh UI
+// ---------- Static UI ----------
 app.use(
   express.static(path.join(__dirname, "public"), {
     etag: false, lastModified: false, cacheControl: true, maxAge: 0,
@@ -24,8 +24,8 @@ app.get("/", (_req, res) => {
 });
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
-/* ───────────────── config ───────────────── */
-const UA = "FuelEstimator/3.5 (+your-app)";
+// ---------- Config ----------
+const UA = "FuelEstimator/3.4 (+your-app)";
 const CONTACT = process.env.OVERPASS_CONTACT || UA;
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || "";
@@ -41,7 +41,7 @@ const PERMIT_HTML_URLS = (process.env.PERMIT_HTML_URLS || "").split(",").map(s=>
 
 const TRAFFIC_URL = process.env.TRAFFIC_URL || "";
 
-/* ───────────────── utils ───────────────── */
+// ---------- Utils ----------
 const sleep = (ms) => new Promise(r=>setTimeout(r,ms));
 const toMiles = (m) => m / 1609.344;
 function haversine(lat1, lon1, lat2, lon2) {
@@ -51,13 +51,12 @@ function haversine(lat1, lon1, lat2, lon2) {
   return 2*R*Math.asin(Math.sqrt(a));
 }
 function distMiles(a,b,c,d){ return toMiles(haversine(a,b,c,d)); }
-async function fetchWithTimeout(url, opts={}, timeoutMs=45000){
+async function fetchWithTimeout(url, opts={}, timeoutMs=25000){
   const ctl = new AbortController(); const id=setTimeout(()=>ctl.abort(), timeoutMs);
-  try{ return await fetch(url, { ...opts, signal: ctl.signal }); }
-  finally{ clearTimeout(id); }
+  try{ return await fetch(url, { ...opts, signal: ctl.signal }); } finally{ clearTimeout(id); }
 }
 
-/* ───────────────── geocoding ───────────────── */
+// ---------- Geocoding ----------
 function tryParseLatLng(address){
   const m = String(address||"").trim().match(/^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/);
   if(!m) return null; const lat=+m[1], lon=+m[2];
@@ -94,7 +93,7 @@ async function geocode(address){
   else      { try{ return await geocodeNominatim(address); } catch { return await geocodeCensus(address); } }
 }
 
-/* ───────────────── AADT ───────────────── */
+// ---------- AADT ----------
 const NCDOT_AADT_FS="https://services.arcgis.com/NuWFvHYDMVmmxMeM/ArcGIS/rest/services/NCDOT_AADT_Stations/FeatureServer/0";
 async function queryNCDOTNearestAADT(lat,lon,rM=1609){
   const p=new URLSearchParams({
@@ -103,7 +102,7 @@ async function queryNCDOTNearestAADT(lat,lon,rM=1609){
     spatialRel:"esriSpatialRelIntersects", distance:String(rM), units:"esriSRUnit_Meter",
     outSR:"4326", resultRecordCount:"200"
   });
-  const r=await fetchWithTimeout(`${NCDOT_AADT_FS}/query?${p}`,{headers:{ "User-Agent":UA, Accept:"application/json"}},30000);
+  const r=await fetchWithTimeout(`${NCDOT_AADT_FS}/query?${p}`,{headers:{ "User-Agent":UA, Accept:"application/json"}},20000);
   if(!r.ok) return null;
   const data=await r.json(); const feats=data.features||[];
   const rows=[];
@@ -136,7 +135,7 @@ async function queryCustomTraffic(lat,lon,address){
   return null;
 }
 
-/* ───────────────── competition ───────────────── */
+// ---------- Overpass / competition ----------
 const OVERPASS=[
   "https://overpass-api.de/api/interpreter",
   "https://overpass.kumi.systems/api/interpreter",
@@ -148,7 +147,7 @@ async function overpassQuery(data){
   for(const ep of OVERPASS){
     for(let i=0;i<3;i++){
       try{
-        const r=await fetchWithTimeout(ep,{method:"POST",headers:{ "User-Agent":CONTACT,"Content-Type":"application/x-www-form-urlencoded",Accept:"application/json"},body:"data="+encodeURIComponent(data)},35000);
+        const r=await fetchWithTimeout(ep,{method:"POST",headers:{ "User-Agent":CONTACT,"Content-Type":"application/x-www-form-urlencoded",Accept:"application/json"},body:"data="+encodeURIComponent(data)},25000);
         const ct=r.headers.get("content-type")||""; const txt=await r.text();
         if(!r.ok || !ct.includes("application/json")) throw new Error(`Overpass ${r.status}: ${txt.slice(0,200)}`);
         return JSON.parse(txt);
@@ -206,7 +205,7 @@ async function competitorsWithinRadiusMiles(lat,lon,rMi=1.5){
   return out.filter(s=>s.miles<=rMi);
 }
 
-/* ───────────────── developments ───────────────── */
+// ---------- Developments ----------
 async function overpassDevelopments(lat,lon){
   const rM=Math.round(5*1609.344);
   const q=`[out:json][timeout:25];
@@ -235,17 +234,17 @@ function fillTemplate(tpl,ctx){
 }
 async function queryExternalJSON(tpl,ctx){
   try{
-    const r=await fetchWithTimeout(fillTemplate(tpl,ctx),{headers:{ "User-Agent":UA, Accept:"application/json"}},30000);
+    const r=await fetchWithTimeout(fillTemplate(tpl,ctx),{headers:{ "User-Agent":UA, Accept:"application/json"}},20000);
     const j=await r.json(); const arr=Array.isArray(j)?j:(Array.isArray(j.items)?j.items:[]);
     return arr.map(it=>({ name:String(it.name||it.title||it.project||"Fuel development").slice(0,160), status:String(it.status||it.stage||it.note||"planned").slice(0,100), approx_miles:null, link:it.url||it.link||null, source:it.source||"custom" }));
   }catch{ return []; }
 }
 async function scrapePermitHTML(url){
   try{
-    const r=await fetchWithTimeout(url,{headers:{ "User-Agent":UA, Accept:"text/html"}},30000);
+    const r=await fetchWithTimeout(url,{headers:{ "User-Agent":UA, Accept:"text/html"}},20000);
     const html=await r.text();
     const lines=html.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
-    const hits=lines.filter(L=>/(gas|fuel|convenience|c-store|station|EP\s?Mart)/i.test(L)).slice(0,60);
+    const hits=lines.filter(L=>/(gas|fuel|convenience|c-store|station|EP\s?Mart)/i.test(L)).slice(0,50);
     return hits.map(h=>({ name:h.slice(0,160), status:"permit/agenda", approx_miles:null, link:url, source:url }));
   }catch{ return []; }
 }
@@ -262,12 +261,12 @@ async function bingNewsCityCounty(city,county,state){
     for(const q of terms){
       try{
         const nu=`${BING_NEWS_ENDPOINT}?q=${encodeURIComponent(q)}&count=20&freshness=Year`;
-        const nr=await fetchWithTimeout(nu,{headers},30000); const nj=await nr.json(); const nv=Array.isArray(nj.value)?nj.value:[];
+        const nr=await fetchWithTimeout(nu,{headers},20000); const nj=await nr.json(); const nv=Array.isArray(nj.value)?nj.value:[];
         nv.forEach(it=>newsOut.push({ name:(it.name||"").slice(0,160), status:"news", approx_miles:null, link:it.url||null, source:"bing-news" }));
       }catch{}
       try{
         const wu=`${BING_WEB_ENDPOINT}?q=${encodeURIComponent(q)}&count=20`;
-        const wr=await fetchWithTimeout(wu,{headers},30000); const wj=await wr.json(); const wv=wj.webPages?.value||[];
+        const wr=await fetchWithTimeout(wu,{headers},20000); const wj=await wr.json(); const wv=wj.webPages?.value||[];
         wv.forEach(it=>webOut.push({ name:(it.name||"").slice(0,160), status:"permit/search", approx_miles:null, link:it.url||null, source:"bing-web" }));
       }catch{}
     }
@@ -301,7 +300,7 @@ async function exhaustiveDevelopments(addrLabel, lat, lon){
   };
 }
 
-/* ───────────────── Google proxy ───────────────── */
+// ---------- Google proxy ----------
 app.get("/google/status", async (_req,res)=>{
   try{
     if(!GOOGLE_API_KEY) return res.json({ ok:false, status:"MISSING_KEY" });
@@ -366,8 +365,22 @@ app.get("/google/rating", async (req,res)=>{
     res.json({ ok:true, status:"OK", rating:g.rating||null, total:g.user_ratings_total||0, name:g.name||null, address:g.formatted_address||null });
   }catch(e){ res.json({ ok:false, status:"EXCEPTION", error:String(e) }); }
 });
+// fallback: nearest gas station rating by lat/lon
+app.get("/google/rating_by_location", async (req,res)=>{
+  try{
+    if(!GOOGLE_API_KEY) return res.json({ ok:false, status:"MISSING_KEY" });
+    const lat=+req.query.lat, lon=+req.query.lon;
+    if(!Number.isFinite(lat)||!Number.isFinite(lon)) return res.json({ ok:false, status:"BAD_REQUEST" });
+    const r=await fetchWithTimeout(`https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lon}&radius=300&type=gas_station&key=${GOOGLE_API_KEY}`,{},15000);
+    const j=await r.json(); const it=(j.results||[])[0];
+    if(!it?.place_id) return res.json({ ok:false, status:"ZERO_RESULTS" });
+    const d=await fetchWithTimeout(`https://maps.googleapis.com/maps/api/place/details/json?place_id=${it.place_id}&fields=rating,user_ratings_total&key=${GOOGLE_API_KEY}`,{},15000);
+    const dj=await d.json(); if(dj.status!=="OK") return res.json({ ok:false, status:dj.status });
+    res.json({ ok:true, status:"OK", rating:dj.result?.rating||null, total:dj.result?.user_ratings_total||0 });
+  }catch(e){ res.json({ ok:false, status:"EXCEPTION", error:String(e) }); }
+});
 
-/* ───────────────── roads (heuristic) ───────────────── */
+// ---------- Roads / heuristic ----------
 function parseMaxspeed(ms){ const m=String(ms||"").match(/(\d+)\s*(mph)?/i); return m?+m[1]:null; }
 function roadWeight(hw){ const order={ motorway:6, trunk:5, primary:4, secondary:3, tertiary:2, unclassified:1, residential:1 }; return order[(hw||"").replace("_link","")] || 0; }
 async function roadContext(lat, lon){
@@ -397,40 +410,45 @@ async function roadContext(lat, lon){
   const intersections=Math.max(0, Math.round(rows.length/3));
   return { summary:[mainLabel,sideLabel].filter(Boolean).join(" — "), main, side, signals, intersections };
 }
+function heuristicAADT(roads){
+  const dom=roads?.main?.[0]?.highway || roads?.side?.[0]?.highway || "";
+  const lanes=roads?.main?.[0]?.lanes || roads?.side?.[0]?.lanes || 2;
+  const speed=roads?.main?.[0]?.maxspeed || roads?.side?.[0]?.maxspeed || null;
+  let base=0; switch(dom){ case"motorway":base=30000;break; case"trunk":base=22000;break; case"primary":base=14000;break; case"secondary":base=9000;break; case"tertiary":base=6000;break; default:base=4000; }
+  let est=base*Math.max(1, lanes/2);
+  if(speed){ if(speed>=55) est*=1.15; else if(speed<=30) est*=0.8; }
+  if((roads?.signals||0)>=5) est*=0.9;
+  return Math.round(Math.max(800, Math.min(120000, est)));
+}
 
-/* ───────────────── gallons calc ───────────────── */
+// ---------- Gallons calc (competition rule fixed) ----------
 function gallonsWithRules({ aadt, mpds, diesel, compCount, heavyCount, pricePosition, userExtrasMult=1 }){
   const baseline = aadt * 0.02 * 8 * 30;
 
-  // competition rule (now includes 5+ => 50%)
   let baseMult=1.0;
   if (compCount === 1) baseMult = 0.75;
   else if (compCount >= 2 && compCount <= 4) baseMult = 0.60;
-  else if (compCount >= 5) baseMult = 0.50;
+  else if (compCount >= 5) baseMult = 0.50; // NEW: 5+ competitors -> 50%
 
-  // heavy brand penalty
   let heavyPenalty=0;
   if (heavyCount === 1) heavyPenalty = 0.20;
   else if (heavyCount >= 2) heavyPenalty = 0.35;
 
-  // allow stronger suppression; clamp at 10%
-  const compMult = Math.max(0.10, +(baseMult - heavyPenalty).toFixed(2));
+  const compMult = Math.max(0.20, baseMult - heavyPenalty);
   const afterComp = baseline * compMult;
 
-  // equipment caps
   const capEquip = (mpds * 25 * 10.5 * 24) * (365/12) + ((diesel||0) * 25 * 16 * 24) * (365/12);
-  const SOFT=22000, HARD=28000; // per MPD
+  const SOFT=22000, HARD=28000;
   const capSoftTotal=mpds*SOFT, capHardTotal=mpds*HARD;
   let capped = Math.min(afterComp, capEquip, capHardTotal);
   if (afterComp > capSoftTotal) capped = Math.round(capped * 0.90);
 
-  // pricing position
   let priceMult = 1.0;
   if (pricePosition === "below") priceMult = 1.10;
   else if (pricePosition === "above") priceMult = 0.90;
 
   const preClamp = Math.round(capped * priceMult * userExtrasMult);
-  const base = Math.min(preClamp, Math.round(baseline)); // never exceed baseline ceiling
+  const base = Math.min(preClamp, Math.round(baseline));
 
   const low = Math.round(base * 0.86);
   const high= Math.round(base * 1.06);
@@ -449,7 +467,7 @@ function gallonsWithRules({ aadt, mpds, diesel, compCount, heavyCount, pricePosi
   };
 }
 
-/* ───────────────── GPT summary ───────────────── */
+// ---------- GPT summary ----------
 async function gptJSONCore(model, prompt){
   const r=await fetchWithTimeout("https://api.openai.com/v1/chat/completions",{
     method:"POST",
@@ -461,39 +479,36 @@ async function gptJSONCore(model, prompt){
         {role:"user", content: prompt}
       ]
     })
-  },50000);
+  },35000);
   const txt=await r.text(); if(!r.ok) throw new Error(`OpenAI ${r.status}: ${txt}`);
   const data=JSON.parse(txt); const content=data.choices?.[0]?.message?.content;
   if(!content) throw new Error("No GPT content"); return JSON.parse(content);
 }
 async function gptJSONWithRetry(prompt){
   const models=["gpt-4o-mini","gpt-4o"]; let last=null;
-  for(const m of models){ for(let i=0;i<2;i++){ try{ return await gptJSONCore(m,prompt); }catch(e){ last=e; await sleep(500);} } }
+  for(const m of models){ for(let i=0;i<2;i++){ try{ return await gptJSONCore(m,prompt); }catch(e){ last=e; await sleep(400);} } }
   throw last||new Error("GPT failed");
 }
 async function gptSummary(ctx){
-  const sys='Return {"summary":"<text>"} ~8–12 sentences. Include method & AADT, baseline ceiling, competition rule & heavy penalties, pricing, user adjustments, caps, LOW/BASE/HIGH, road context, and notable developments.';
+  const sys='Return {"summary":"<text>"} ~8–12 sentences. Include AADT method, baseline ceiling, competition rule & heavy penalties, pricing, user adjustments, caps, LOW/BASE/HIGH, road context, and notable developments.';
   const prompt = `
-Inputs:
-- Address: ${ctx.address}
-- USED AADT: ${ctx.aadt} (${ctx.method})
-- Roads: ${ctx.roads.summary}; signals ${ctx.roads.signals}; intersections ${ctx.roads.intersections}
-- Competition: count ${ctx.compCount}, heavy ${ctx.heavyCount}, notable ${ctx.notable}
-- Pricing: ${ctx.pricePosition}
-- User adjustments: ${ctx.userAdj || "none"}
-- Baseline ceiling: AADT×2%×8×30
-- Developments (news): ${ctx.devNews || "none"}
-- Developments (permits): ${ctx.devPermits || "none"}
-- Result gallons (LOW/BASE/HIGH): ${ctx.low}/${ctx.base}/${ctx.high}
+Address: ${ctx.address}
+AADT used: ${ctx.aadt} (${ctx.method})
+Roads: ${ctx.roads.summary}
+Competition: ${ctx.compCount} (heavy ${ctx.heavyCount}) — notable: ${ctx.notable}
+Pricing: ${ctx.pricePosition}; User adjustments: ${ctx.userAdj || "none"}
+Developments (news): ${ctx.devNews || "none"}
+Developments (permits): ${ctx.devPermits || "none"}
+Result gallons LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
 `.trim();
   try{
     const j=await gptJSONWithRetry(`${sys}\n${prompt}`); const s=(j&&j.summary)?String(j.summary).trim():"";
     if(s) return s;
   }catch{}
-  return `AADT ${ctx.aadt} (${ctx.method}); competition ${ctx.compCount} (heavy=${ctx.heavyCount}); pricing ${ctx.pricePosition}; adjustments ${ctx.userAdj||"none"}; result ${ctx.low}–${ctx.high} (base ${ctx.base}).`;
+  return `AADT ${ctx.aadt} (${ctx.method}); competition ${ctx.compCount} (heavy=${ctx.heavyCount}); pricing ${ctx.pricePosition}; adjustments ${ctx.userAdj||"none"}; result ${ctx.low}–${ctx.high} with base ${ctx.base}.`;
 }
 
-/* ───────────────── estimate ───────────────── */
+// ---------- Estimate ----------
 app.post("/estimate", async (req,res)=>{
   try{
     const { address, mpds, diesel, siteLat, siteLon, aadtOverride, advanced, client_rating, auto_low_rating } = req.body||{};
@@ -516,7 +531,7 @@ app.post("/estimate", async (req,res)=>{
     const sunocoNearby=compAll3.some(c=>c.sunoco && c.miles<=1.0);
     const ruralEligible = compAll3.length===0;
 
-    // Developments (wait for everything before returning)
+    // Developments
     const dev=await exhaustiveDevelopments(address||geo.label, geo.lat, geo.lon);
     const devNews=dev.news, devPermits=dev.permits, devOSM=dev.osm;
 
@@ -541,14 +556,14 @@ app.post("/estimate", async (req,res)=>{
     const ruralApplied   = ruralRequested && ruralEligible;
     if(ruralApplied) userExtrasMult *= 1.30;
 
-    // Auto low-rating penalty if client provided < 4.0
+    // Auto low-rating penalty (UI also toggles but this enforces it server-side)
     const autoLow = (auto_low_rating === true) || (Number.isFinite(client_rating) && client_rating < 4.0);
     if (autoLow) userExtrasMult *= 0.70;
 
     // Gallons
     const calc=gallonsWithRules({ aadt:usedAADT, mpds:MPDS, diesel:DIESEL, compCount, heavyCount, pricePosition, userExtrasMult });
 
-    // Summary
+    // Summary last (after all data)
     const adjBits=[];
     if(pricePosition==="below") adjBits.push("+10% below-market pricing");
     if(pricePosition==="above") adjBits.push("−10% above-market pricing");
@@ -580,16 +595,6 @@ app.post("/estimate", async (req,res)=>{
   }
 });
 
-function heuristicAADT(roads){
-  const dom=roads?.main?.[0]?.highway || roads?.side?.[0]?.highway || "";
-  const lanes=roads?.main?.[0]?.lanes || roads?.side?.[0]?.lanes || 2;
-  const speed=roads?.main?.[0]?.maxspeed || roads?.side?.[0]?.maxspeed || null;
-  let base=0; switch(dom){ case"motorway":base=30000;break; case"trunk":base=22000;break; case"primary":base=14000;break; case"secondary":base=9000;break; case"tertiary":base=6000;break; default:base=4000; }
-  let est=base*Math.max(1, lanes/2);
-  if(speed){ if(speed>=55) est*=1.15; else if(speed<=30) est*=0.8; }
-  if((roads?.signals||0)>=5) est*=0.9;
-  return Math.round(Math.max(800, Math.min(120000, est)));
-}
-
+// ---------- Start ----------
 const PORT=process.env.PORT||3000;
 app.listen(PORT,"0.0.0.0",()=>console.log(`Server listening on :${PORT}`));
