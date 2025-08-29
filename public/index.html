@@ -1,3 +1,4 @@
+<!-- Fuel IQ UI v2025-08-29b -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -19,8 +20,9 @@
     *{ box-sizing:border-box; }
     body{ background:var(--bg); color:var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin:0; padding-bottom:72px; }
     .wrap{ max-width:1120px; margin:24px auto; padding:0 16px; }
-    header{ display:flex; align-items:center; gap:14px; margin-bottom:16px; }
+    header{ display:flex; align-items:center; gap:14px; margin-bottom:8px; }
     header h1{ font-size:28px; margin:0; letter-spacing:.2px; }
+    .build{ margin-left:auto; font-size:12px; color:#8aa2c0; }
 
     .card{ background:linear-gradient(180deg,var(--panel),var(--panel2)); border:1px solid var(--line); border-radius:12px; padding:16px; margin:12px 0; }
     label{ display:block; font-weight:600; margin:8px 0 6px; color:#d8e3f6; }
@@ -63,7 +65,10 @@
 </head>
 <body>
   <div class="wrap">
-    <header><h1>Sunoco, LP Fuel IQ - Fuel Site Analyzer</h1></header>
+    <header>
+      <h1>Sunoco, LP Fuel IQ - Fuel Site Analyzer</h1>
+      <span class="build">UI v2025-08-29b</span>
+    </header>
 
     <!-- Inputs -->
     <div class="card">
@@ -88,13 +93,13 @@
 
     <!-- Advanced -->
     <div class="card">
-      <details open>
+      <details>
         <summary><b>Advanced options</b></summary>
         <div class="adv-line">
           <label class="chip"><input type="checkbox" id="ex_large_dev"> Large residential or commercial developments being built (+7.5%)</label>
-          <label class="chip"><input type="checkbox" id="ex_hours18"> Hours 18h (−7.5%)</label>
-          <label class="chip"><input type="checkbox" id="ex_highincome"> Higher-income (+2.5%)</label>
-          <label class="chip"><input type="checkbox" id="ex_lowrating"> Rating < 4.0 (−30%)</label>
+          <label class="chip"><input type="checkbox" id="ex_hours18"> Operating hours 18h (−7.5%)</label>
+          <label class="chip"><input type="checkbox" id="ex_highincome"> Higher-income trade area (+2.5%)</label>
+          <label class="chip"><input type="checkbox" id="ex_lowrating"> Ratings below 4.0 / Poorly run site (−30%)</label>
           <label class="chip"><input type="checkbox" id="ex_competitive_pricing"> Competitive site gas pricing (+10%)</label>
         </div>
         <div style="margin-top:8px;">
@@ -165,7 +170,7 @@ function fmt(n){ return (n??0).toLocaleString(undefined,{maximumFractionDigits:0
 function esc(s){ return (s??"").toString().replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;"," >":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
 function setOverlayWorking(){ overlay.textContent="Working…"; overlay.style.display="flex"; }
 function clearOverlay(){ overlay.style.display="none"; }
-function initMap(){ if(mapReady) return; map=L.map("map",{zoomControl:true}); window._leafletMap=map; L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map); layer=L.layerGroup().addTo(map); mapReady=true; }
+function initMap(){ if(mapReady) return; map=L.map("map",{zoomControl:true}); window.map=map; L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map); layer=L.layerGroup().addTo(map); mapReady=true; }
 function updateStreetView(lat, lon){ svFrame.src=`https://maps.google.com/maps?q=&layer=c&cbll=${lat},${lon}&cbp=12,0,,0,0&output=svembed`; }
 
 /* Google status + autocomplete */
@@ -272,7 +277,6 @@ function renderAll(d){
   devsExtNews.innerHTML = (d.developments_external?.news||[]).length ? "<ul>"+d.developments_external.news.map(x=>`<li>${esc(x.name)} • ${esc(x.status)}${x.link?` • <a href="${x.link}" target="_blank">source</a>`:''}</li>`).join("")+"</ul>" : "<em>none</em>";
   devsExtPermits.innerHTML = (d.developments_external?.permits||[]).length ? "<ul>"+d.developments_external.permits.map(x=>`<li>${esc(x.name)} • ${esc(x.status)}${x.link?` • <a href="${x.link}" target="_blank">source</a>`:''}</li>`).join("")+"</ul>" : "<em>none</em>";
 
-  // Summary: ALWAYS non-empty from server
   summaryBox.textContent = (d.summary||"—").trim();
 
   initOrUpdateMap(d.map);
@@ -300,45 +304,40 @@ $("go").addEventListener("click", async ()=>{
 });
 addrInput.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); $("go").click(); } });
 
-/* PDF Export (pro look with Map & optional SV) */
+/* PDF Export */
 document.getElementById("exportPDF").addEventListener("click", async ()=>{
   const { jsPDF } = window.jspdf || {}; if(!jsPDF){ alert("PDF lib failed to load"); return; }
   const doc=new jsPDF({unit:"pt",format:"a4"}); // 595x842
   const pageW=595, pageH=842, margin=36, contentW=pageW - margin*2;
 
-  // Title
   doc.setFont("helvetica","bold"); doc.setFontSize(18);
   doc.text("Sunoco, LP Fuel IQ — Fuel Site Analyzer", margin, margin+6);
 
-  // Summary block
   doc.setFont("helvetica","normal"); doc.setFontSize(11);
-  const lines = doc.splitTextToSize(summaryBox.innerText || "", contentW);
+  const lines = doc.splitTextToSize(document.getElementById("summary").innerText || "", contentW);
   doc.text(lines, margin, margin+28);
 
   let cursorY = margin + 28 + lines.length*14 + 16;
 
-  // Key stats
   const key = [
-    `Address: ${addrInput.value || "-"}`,
-    `MPDs: ${$("mpds").value}   Diesel: ${$("diesel").value}`,
-    aadtBanner.innerText,
-    `Estimate (LOW): ${$("estNum").innerText}  |  Range: ${$("estRange").innerText.replace("Full range: ","")}`,
-    compLine.innerText
+    `Address: ${document.getElementById("addr").value || "-"}`,
+    `MPDs: ${document.getElementById("mpds").value}   Diesel: ${document.getElementById("diesel").value}`,
+    document.getElementById("aadtBanner").innerText,
+    `Estimate (LOW): ${document.getElementById("estNum").innerText}  |  Range: ${document.getElementById("estRange").innerText.replace("Full range: ","")}`,
+    document.getElementById("compLine").innerText
   ].join("\n");
   const keyLines = doc.splitTextToSize(key, contentW);
   doc.text(keyLines, margin, cursorY);
   cursorY += keyLines.length*14 + 12;
 
-  // Snap map via leaflet-image
   const mapImg = await new Promise(resolve=>{
-    if(!window.leafletImage || !map){ resolve(null); return; }
-    leafletImage(map, function(err, canvas){
+    if(!window.leafletImage || !window.map){ resolve(null); return; }
+    leafletImage(window.map, function(err, canvas){
       if(err){ resolve(null); return; }
       resolve(canvas.toDataURL("image/png"));
     });
   });
 
-  // Place images
   const imgW = contentW, imgH = 260;
   if (mapImg) {
     if (cursorY + imgH > pageH - margin) { doc.addPage(); cursorY = margin; }
@@ -346,15 +345,8 @@ document.getElementById("exportPDF").addEventListener("click", async ()=>{
     cursorY += 12;
     doc.addImage(mapImg, "PNG", margin, cursorY, imgW, imgH);
     cursorY += imgH + 12;
-  } else {
-    if (cursorY + 24 > pageH - margin) { doc.addPage(); cursorY = margin; }
-    doc.setFont("helvetica","bold"); doc.text("Map & Competitors (1.5 mi)", margin, cursorY);
-    cursorY += 14;
-    doc.setFont("helvetica","normal"); doc.text("Map shown live on page.", margin, cursorY);
-    cursorY += 18;
   }
 
-  // Developments blocks
   const devText = "Developments — News:\n" + (devsExtNews.innerText || "—") + "\n\nDevelopments — Permits:\n" + (devsExtPermits.innerText || "—");
   const devLines = doc.splitTextToSize(devText, contentW);
   if (cursorY + devLines.length*14 > pageH - margin) { doc.addPage(); cursorY = margin; }
