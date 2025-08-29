@@ -1,4 +1,4 @@
-<!-- Fuel IQ UI v2025-08-29b -->
+<!-- Fuel IQ UI v2025-08-29d -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -20,9 +20,10 @@
     *{ box-sizing:border-box; }
     body{ background:var(--bg); color:var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin:0; padding-bottom:72px; }
     .wrap{ max-width:1120px; margin:24px auto; padding:0 16px; }
-    header{ display:flex; align-items:center; gap:14px; margin-bottom:8px; }
+    header{ display:flex; align-items:center; gap:14px; margin-bottom:6px; }
     header h1{ font-size:28px; margin:0; letter-spacing:.2px; }
     .build{ margin-left:auto; font-size:12px; color:#8aa2c0; }
+    .instructions{ margin:4px 0 12px; color:#cfe3ff; font-size:13px; }
 
     .card{ background:linear-gradient(180deg,var(--panel),var(--panel2)); border:1px solid var(--line); border-radius:12px; padding:16px; margin:12px 0; }
     label{ display:block; font-weight:600; margin:8px 0 6px; color:#d8e3f6; }
@@ -67,8 +68,11 @@
   <div class="wrap">
     <header>
       <h1>Sunoco, LP Fuel IQ - Fuel Site Analyzer</h1>
-      <span class="build">UI v2025-08-29b</span>
+      <span class="build">UI v2025-08-29d</span>
     </header>
+    <div class="instructions">
+      <b>Instructions:</b> Enter Address, Click <i>Estimate</i>. Do not exit your browser or let your phone screen shut off until results are ready or you will encounter errors. Click <i>Advanced Options</i> to make changes.
+    </div>
 
     <!-- Inputs -->
     <div class="card">
@@ -101,6 +105,7 @@
           <label class="chip"><input type="checkbox" id="ex_highincome"> Higher-income trade area (+2.5%)</label>
           <label class="chip"><input type="checkbox" id="ex_lowrating"> Ratings below 4.0 / Poorly run site (−30%)</label>
           <label class="chip"><input type="checkbox" id="ex_competitive_pricing"> Competitive site gas pricing (+10%)</label>
+          <label class="chip"><input type="checkbox" id="ex_rural"> Rural Location Bonus (No competition within 3 miles) (+30%)</label>
         </div>
         <div style="margin-top:8px;">
           <label><b>Gas pricing vs area</b></label>
@@ -161,7 +166,7 @@ const outNum=$("estNum"), outRange=$("estRange"), outY2=$("y2"), outY3=$("y3");
 const devsBox=$("devs"), devsExtNews=$("devsExternalNews"), devsExtPermits=$("devsExternalPermits"), summaryBox=$("summary"), ratingLine=$("ratingLine");
 const addrInput=$("addr"), acBox=$("ac"), goBtn=$("go");
 const addExtraBtn=$("addExtra"), extraList=$("extraList"), activeExtras=$("activeExtras");
-const ex_large_dev=$("ex_large_dev"), ex_hours18=$("ex_hours18"), ex_highincome=$("ex_highincome"), ex_lowrating=$("ex_lowrating"), ex_competitive_pricing=$("ex_competitive_pricing");
+const ex_large_dev=$("ex_large_dev"), ex_hours18=$("ex_hours18"), ex_highincome=$("ex_highincome"), ex_lowrating=$("ex_lowrating"), ex_competitive_pricing=$("ex_competitive_pricing"), ex_rural=$("ex_rural");
 
 let map, layer, mapReady=false, selectedCoords=null, selectedPlaceId=null;
 
@@ -195,9 +200,10 @@ function pills(){
   if(ex_highincome.checked)p.push("+2.5% Higher-income");
   if(ex_lowrating.checked)p.push("−30% Rating < 4.0");
   if(ex_competitive_pricing.checked)p.push("+10% Competitive site gas pricing");
+  if(ex_rural.checked)p.push("+30% Rural bonus (0 comps within 3 mi)");
   activeExtras.innerHTML=p.map(x=>`<span class="badge">${esc(x)}</span>`).join(" ");
 }
-[ex_large_dev,ex_hours18,ex_highincome,ex_lowrating,ex_competitive_pricing].forEach(el=>el.addEventListener("change",pills));
+[ex_large_dev,ex_hours18,ex_highincome,ex_lowrating,ex_competitive_pricing,ex_rural].forEach(el=>el.addEventListener("change",pills));
 
 function addExtraRow(pct="",note=""){
   const row=document.createElement("div");
@@ -223,6 +229,9 @@ function collectExtras(){
   }
   return out;
 }
+function getFlags(){
+  return { rural: ex_rural.checked === true };
+}
 function getPricePosition(){
   const r=document.querySelector('input[name="pricepos"]:checked');
   return r ? r.value : "inline";
@@ -237,6 +246,7 @@ async function callEstimate(){
     diesel:+$("diesel").value||0,
     advanced:{
       extra: collectExtras(),
+      flags: getFlags(),
       price_position: getPricePosition()
     }
   };
@@ -269,15 +279,25 @@ function renderAll(d){
   outRange.textContent = `Full range: ${fmt(d.low)} – ${fmt(d.high)}`;
   outY2.textContent=fmt(d.year2); outY3.textContent=fmt(d.year3);
 
-  const comp=d.inputs?.aadt_components||{};
-  aadtBanner.textContent=`AADT used ${fmt(d.inputs.aadt_used)} (${comp.method||"model"})`;
-  compLine.textContent=`Competition: ${d.competition.count} within 1.5 mi${d.competition.nearest_mi!=null?"; nearest "+d.competition.nearest_mi.toFixed(3)+" mi":""}${(d.competition.notable_brands||[]).length?"; heavy: "+d.competition.notable_brands.join(", "):""}`;
+  const method = d.inputs?.aadt_components?.method || "model";
+  aadtBanner.textContent=`AADT used ${fmt(d.inputs.aadt_used)} (${method})`;
+
+  let compTxt=`Competition: ${d.competition.count} within 1.5 mi`;
+  if(d.competition.nearest_mi!=null) compTxt += `; nearest ${(+d.competition.nearest_mi).toFixed(3)} mi`;
+  if((d.competition.notable_brands||[]).length) compTxt += `; heavy: ${d.competition.notable_brands.join(", ")}`;
+  if(d.flags?.rural_bonus_applied) compTxt += `; rural bonus +30% applied`;
+  compLine.textContent = compTxt;
 
   devsBox.innerHTML = (d.developments||[]).length ? "<ul>"+d.developments.map(x=>`<li>${esc(x.name)} • ${esc(x.status)}${x.approx_miles!=null?` • ~${x.approx_miles} mi`:''}</li>`).join("")+"</ul>" : "<em>none</em>";
   devsExtNews.innerHTML = (d.developments_external?.news||[]).length ? "<ul>"+d.developments_external.news.map(x=>`<li>${esc(x.name)} • ${esc(x.status)}${x.link?` • <a href="${x.link}" target="_blank">source</a>`:''}</li>`).join("")+"</ul>" : "<em>none</em>";
   devsExtPermits.innerHTML = (d.developments_external?.permits||[]).length ? "<ul>"+d.developments_external.permits.map(x=>`<li>${esc(x.name)} • ${esc(x.status)}${x.link?` • <a href="${x.link}" target="_blank">source</a>`:''}</li>`).join("")+"</ul>" : "<em>none</em>";
 
-  summaryBox.textContent = (d.summary||"—").trim();
+  // Summary: hard fallback if server ever returns empty
+  let s = (d.summary||"").trim();
+  if(!s){
+    s = `AADT used ${fmt(d.inputs?.aadt_used)} (${method}). Baseline ceiling active. Competition ${d.competition?.count ?? 0} within 1.5 mi. Est. LOW ${fmt(d.low)} gal/mo (range ${fmt(d.low)}–${fmt(d.high)}).`;
+  }
+  summaryBox.textContent = s;
 
   initOrUpdateMap(d.map);
   showRating(addrInput.value.trim());
@@ -347,7 +367,8 @@ document.getElementById("exportPDF").addEventListener("click", async ()=>{
     cursorY += imgH + 12;
   }
 
-  const devText = "Developments — News:\n" + (devsExtNews.innerText || "—") + "\n\nDevelopments — Permits:\n" + (devsExtPermits.innerText || "—");
+  const devText = "Developments — News:\n" + (document.getElementById("devsExternalNews").innerText || "—")
+               + "\n\nDevelopments — Permits:\n" + (document.getElementById("devsExternalPermits").innerText || "—");
   const devLines = doc.splitTextToSize(devText, contentW);
   if (cursorY + devLines.length*14 > pageH - margin) { doc.addPage(); cursorY = margin; }
   doc.setFont("helvetica","bold"); doc.text("Developments", margin, cursorY); cursorY += 14;
