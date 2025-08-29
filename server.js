@@ -1,4 +1,4 @@
-// server.js — Fuel IQ API v2025-08-29m
+// Fuel IQ API v2025-08-29m
 import express from "express";
 import cors from "cors";
 import path from "path";
@@ -11,13 +11,11 @@ app.use(express.json({ limit: "1mb" }));
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// always serve fresh UI
 app.use(
   express.static(path.join(__dirname, "public"), {
-    etag: false,
-    lastModified: false,
-    cacheControl: true,
-    maxAge: 0,
-    setHeaders: (res) => res.setHeader("Cache-Control", "no-store"),
+    etag: false, lastModified: false, cacheControl: true, maxAge: 0,
+    setHeaders: (res) => res.setHeader("Cache-Control", "no-store")
   })
 );
 app.get("/", (_req, res) => {
@@ -26,12 +24,13 @@ app.get("/", (_req, res) => {
 });
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
-/* ───────────────── Config ───────────────── */
-const UA = "FuelEstimator/3.3 (+fuel-iq)";
+/* ───────────────── config ───────────────── */
+const UA = "FuelEstimator/3.3 (+your-app)";
 const CONTACT = process.env.OVERPASS_CONTACT || UA;
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || "";
 const OPENAI_API_KEY  = process.env.OPENAI_API_KEY  || "";
+
 const BING_NEWS_KEY   = process.env.BING_NEWS_KEY   || "";
 const BING_NEWS_ENDPOINT = process.env.BING_NEWS_ENDPOINT || "https://api.bing.microsoft.com/v7.0/news/search";
 const BING_WEB_ENDPOINT  = process.env.BING_WEB_ENDPOINT  || "https://api.bing.microsoft.com/v7.0/search";
@@ -39,12 +38,12 @@ const BING_WEB_ENDPOINT  = process.env.BING_WEB_ENDPOINT  || "https://api.bing.m
 const NEWS_URLS = (process.env.NEWS_URLS || "").split(",").map(s=>s.trim()).filter(Boolean);
 const PERMIT_URLS = (process.env.PERMIT_URLS || "").split(",").map(s=>s.trim()).filter(Boolean);
 const PERMIT_HTML_URLS = (process.env.PERMIT_HTML_URLS || "").split(",").map(s=>s.trim()).filter(Boolean);
+
 const TRAFFIC_URL = process.env.TRAFFIC_URL || "";
 
-/* ─────────────── Helpers ─────────────── */
+/* ───────────────── utils ───────────────── */
 const sleep = (ms) => new Promise(r=>setTimeout(r,ms));
 const toMiles = (m) => m / 1609.344;
-
 function haversine(lat1, lon1, lat2, lon2) {
   const R=6371000, t=(d)=>d*Math.PI/180;
   const dLat=t(lat2-lat1), dLon=t(lon2-lon1);
@@ -52,14 +51,13 @@ function haversine(lat1, lon1, lat2, lon2) {
   return 2*R*Math.asin(Math.sqrt(a));
 }
 function distMiles(a,b,c,d){ return toMiles(haversine(a,b,c,d)); }
-
-async function fetchWithTimeout(url, opts={}, timeoutMs=20000){
+async function fetchWithTimeout(url, opts={}, timeoutMs=25000){
   const ctl = new AbortController(); const id=setTimeout(()=>ctl.abort(), timeoutMs);
   try{ return await fetch(url, { ...opts, signal: ctl.signal }); }
   finally{ clearTimeout(id); }
 }
 
-/* ─────────────── Geocoding ─────────────── */
+/* ───────────────── geocoding ───────────────── */
 function tryParseLatLng(address){
   const m = String(address||"").trim().match(/^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/);
   if(!m) return null; const lat=+m[1], lon=+m[2];
@@ -68,7 +66,7 @@ function tryParseLatLng(address){
 }
 async function geocodeCensus(q){
   const url=`https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?address=${encodeURIComponent(q)}&benchmark=Public_AR_Current&format=json`;
-  const r=await fetchWithTimeout(url,{headers:{ "User-Agent":UA, Accept:"application/json"}},12000);
+  const r=await fetchWithTimeout(url,{headers:{ "User-Agent":UA, Accept:"application/json"}},15000);
   if(!r.ok) throw new Error(`Census ${r.status}`);
   const d=await r.json(); const m=d?.result?.addressMatches?.[0];
   if(!m?.coordinates) throw new Error("Census: no match");
@@ -76,7 +74,7 @@ async function geocodeCensus(q){
 }
 async function geocodeNominatim(q){
   const url=`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&q=${encodeURIComponent(q)}`;
-  const r=await fetchWithTimeout(url,{headers:{ "User-Agent":UA, Accept:"application/json"}},12000);
+  const r=await fetchWithTimeout(url,{headers:{ "User-Agent":UA, Accept:"application/json"}},15000);
   if(!r.ok) throw new Error(`Nominatim ${r.status}`);
   const a=await r.json(); if(!a?.length) throw new Error("Nominatim: no result");
   return { lat:+a[0].lat, lon:+a[0].lon, label:a[0].display_name };
@@ -84,13 +82,9 @@ async function geocodeNominatim(q){
 async function reverseAdmin(lat, lon){
   try{
     const url=`https://nominatim.openstreetmap.org/reverse?format=json&zoom=10&addressdetails=1&lat=${lat}&lon=${lon}`;
-    const r=await fetchWithTimeout(url,{headers:{ "User-Agent":UA, Accept:"application/json"}},10000);
+    const r=await fetchWithTimeout(url,{headers:{ "User-Agent":UA, Accept:"application/json"}},15000);
     const j=await r.json(); const a=j?.address||{};
-    return {
-      city: a.city || a.town || a.village || a.hamlet || "",
-      county: a.county || "",
-      state: a.state || a.region || ""
-    };
+    return { city: a.city||a.town||a.village||a.hamlet||"", county:a.county||"", state:a.state||a.region||"" };
   }catch{ return { city:"", county:"", state:"" }; }
 }
 async function geocode(address){
@@ -100,7 +94,7 @@ async function geocode(address){
   else      { try{ return await geocodeNominatim(address); } catch { return await geocodeCensus(address); } }
 }
 
-/* ─────────── AADT (DOT / custom / heuristic) ─────────── */
+/* ───────────────── AADT (NC DOT + custom + heuristic) ───────────────── */
 const NCDOT_AADT_FS="https://services.arcgis.com/NuWFvHYDMVmmxMeM/ArcGIS/rest/services/NCDOT_AADT_Stations/FeatureServer/0";
 async function queryNCDOTNearestAADT(lat,lon,rM=1609){
   const p=new URLSearchParams({
@@ -109,7 +103,7 @@ async function queryNCDOTNearestAADT(lat,lon,rM=1609){
     spatialRel:"esriSpatialRelIntersects", distance:String(rM), units:"esriSRUnit_Meter",
     outSR:"4326", resultRecordCount:"200"
   });
-  const r=await fetchWithTimeout(`${NCDOT_AADT_FS}/query?${p}`,{headers:{ "User-Agent":UA, Accept:"application/json"}},15000);
+  const r=await fetchWithTimeout(`${NCDOT_AADT_FS}/query?${p}`,{headers:{ "User-Agent":UA, Accept:"application/json"}},20000);
   if(!r.ok) return null;
   const data=await r.json(); const feats=data.features||[];
   const rows=[];
@@ -135,35 +129,34 @@ async function queryCustomTraffic(lat,lon,address){
   if(!TRAFFIC_URL) return null;
   const url=TRAFFIC_URL.replace("{lat}",encodeURIComponent(lat)).replace("{lon}",encodeURIComponent(lon)).replace("{address}",encodeURIComponent(address||""));
   try{
-    const r=await fetchWithTimeout(url,{headers:{ "User-Agent":UA, Accept:"application/json"}},12000);
+    const r=await fetchWithTimeout(url,{headers:{ "User-Agent":UA, Accept:"application/json"}},20000);
     const j=await r.json(); const aadt=+j.aadt||+j.volume||+j.count; const year=j.year?+String(j.year).match(/20\d{2}/)?.[0]:null;
     if(aadt>0) return { aadt, year, distM:0, source:"custom" };
   }catch{}
   return null;
 }
 
-/* ───────── Overpass / competition / developments ───────── */
+/* ───────────────── competition (OSM + Google) ───────────────── */
 const OVERPASS=[
   "https://overpass-api.de/api/interpreter",
   "https://overpass.kumi.systems/api/interpreter",
   "https://overpass.openstreetmap.fr/api/interpreter",
   "https://overpass.openstreetmap.ru/api/interpreter",
 ];
-async function overpassQuery(data, timeoutMs=15000){
+async function overpassQuery(data){
   let last=new Error("no tries");
   for(const ep of OVERPASS){
-    for(let i=0;i<2;i++){
+    for(let i=0;i<3;i++){
       try{
-        const r=await fetchWithTimeout(ep,{method:"POST",headers:{ "User-Agent":CONTACT,"Content-Type":"application/x-www-form-urlencoded",Accept:"application/json"},body:"data="+encodeURIComponent(data)},timeoutMs);
+        const r=await fetchWithTimeout(ep,{method:"POST",headers:{ "User-Agent":CONTACT,"Content-Type":"application/x-www-form-urlencoded",Accept:"application/json"},body:"data="+encodeURIComponent(data)},25000);
         const ct=r.headers.get("content-type")||""; const txt=await r.text();
-        if(!r.ok || !ct.includes("application/json")) throw new Error(`Overpass ${r.status}: ${txt.slice(0,120)}`);
+        if(!r.ok || !ct.includes("application/json")) throw new Error(`Overpass ${r.status}: ${txt.slice(0,200)}`);
         return JSON.parse(txt);
-      }catch(e){ last=e; await sleep(500*(i+1)); }
+      }catch(e){ last=e; await sleep(900*(i+1)); }
     }
   }
   throw last;
 }
-
 const HEAVY_BRANDS=/(sheetz|wawa|race\s?trac|racetrac|buc-?ee'?s|royal\s?farms|quik.?trip|\bqt\b)/i;
 const IS_SUNOCO=/\bsunoco\b/i;
 
@@ -171,9 +164,9 @@ async function googleNearbyGasStations(lat,lon,rM=2414){
   if(!GOOGLE_API_KEY) return [];
   const base=`https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lon}&radius=${rM}&type=gas_station&key=${GOOGLE_API_KEY}`;
   const out=[]; let url=base; let tries=0;
-  while(url && tries<2){ // limit to keep things snappy
+  while(url && tries<3){
     tries++;
-    const r=await fetchWithTimeout(url,{headers:{ "User-Agent":UA, Accept:"application/json"}},12000);
+    const r=await fetchWithTimeout(url,{headers:{ "User-Agent":UA, Accept:"application/json"}},20000);
     const txt=await r.text(); if(!r.ok) break; let j; try{ j=JSON.parse(txt);}catch{break;}
     const items=j.results||[];
     for(const it of items){
@@ -181,33 +174,29 @@ async function googleNearbyGasStations(lat,lon,rM=2414){
       if(!Number.isFinite(latc)||!Number.isFinite(lonc)) continue;
       out.push({ name, lat:+latc, lon:+lonc, miles:+distMiles(lat,lon,latc,lonc).toFixed(3), heavy:HEAVY_BRANDS.test(name), sunoco: IS_SUNOCO.test(name) });
     }
-    if(j.next_page_token){ await sleep(1400); url=`${base}&pagetoken=${j.next_page_token}`; } else url=null;
+    if(j.next_page_token){ await sleep(1700); url=`${base}&pagetoken=${j.next_page_token}`; } else url=null;
   }
   return out;
 }
-async function overpassFuel(lat,lon,rMi){
+async function competitorsWithinRadiusMiles(lat,lon,rMi=1.5){
   const rM=Math.round(rMi*1609.344);
   const q=`[out:json][timeout:25];
     ( node(around:${rM},${lat},${lon})["amenity"="fuel"];
       way(around:${rM},${lat},${lon})["amenity"="fuel"]; );
     out center tags;`;
-  try{
-    const j=await overpassQuery(q,12000);
-    return (j.elements||[]).map(el=>{
-      const t=el.tags||{}; const name=t.brand||t.name||"Fuel";
-      const latc=el.lat ?? el.center?.lat, lonc=el.lon ?? el.center?.lon;
-      if(latc==null||lonc==null) return null;
-      return { name, lat:+latc, lon:+lonc, miles:+distMiles(lat,lon,latc,lonc).toFixed(3), heavy:HEAVY_BRANDS.test(name), sunoco: IS_SUNOCO.test(name) };
-    }).filter(Boolean);
-  }catch{ return []; }
-}
-async function competitorsWithinRadiusMiles(lat,lon,rMi=1.5){
-  // Do fast OSM first; merge in Google if available
   const [op,g]=await Promise.all([
-    overpassFuel(lat,lon, rMi),
-    googleNearbyGasStations(lat,lon, Math.round(rMi*1609.344)).catch(()=>[])
+    overpassQuery(q).then(j=>j.elements||[]).catch(()=>[]),
+    googleNearbyGasStations(lat,lon,rM).catch(()=>[])
   ]);
-  const merged=[...op,...g];
+
+  const opList=op.map(el=>{
+    const t=el.tags||{}; const name=t.brand||t.name||"Fuel";
+    const latc=el.lat ?? el.center?.lat, lonc=el.lon ?? el.center?.lon;
+    if(latc==null||lonc==null) return null;
+    return { name, lat:+latc, lon:+lonc, miles:+distMiles(lat,lon,latc,lonc).toFixed(3), heavy:HEAVY_BRANDS.test(name), sunoco: IS_SUNOCO.test(name) };
+  }).filter(Boolean);
+
+  const merged=[...opList,...g];
   const seen=new Set(), out=[];
   for(const s of merged){
     const k=`${Math.round(s.lat*1e5)}|${Math.round(s.lon*1e5)}`;
@@ -217,7 +206,7 @@ async function competitorsWithinRadiusMiles(lat,lon,rMi=1.5){
   return out.filter(s=>s.miles<=rMi);
 }
 
-/* Developments */
+/* ───────────────── developments ───────────────── */
 async function overpassDevelopments(lat,lon){
   const rM=Math.round(5*1609.344);
   const q=`[out:json][timeout:25];
@@ -227,7 +216,7 @@ async function overpassDevelopments(lat,lon){
       way(around:${rM},${lat},${lon})["amenity"="fuel"]["construction"]; );
     out center tags;`;
   try{
-    const j=await overpassQuery(q,15000); const els=j.elements||[];
+    const j=await overpassQuery(q); const els=j.elements||[];
     return els.map(e=>{
       const t=e.tags||{}; const n=t.name||t.brand||"Fuel (proposed/construction)";
       const latc=e.lat ?? e.center?.lat, lonc=e.lon ?? e.center?.lon;
@@ -246,14 +235,14 @@ function fillTemplate(tpl,ctx){
 }
 async function queryExternalJSON(tpl,ctx){
   try{
-    const r=await fetchWithTimeout(fillTemplate(tpl,ctx),{headers:{ "User-Agent":UA, Accept:"application/json"}},15000);
+    const r=await fetchWithTimeout(fillTemplate(tpl,ctx),{headers:{ "User-Agent":UA, Accept:"application/json"}},20000);
     const j=await r.json(); const arr=Array.isArray(j)?j:(Array.isArray(j.items)?j.items:[]);
     return arr.map(it=>({ name:String(it.name||it.title||it.project||"Fuel development").slice(0,160), status:String(it.status||it.stage||it.note||"planned").slice(0,100), approx_miles:null, link:it.url||it.link||null, source:it.source||"custom" }));
   }catch{ return []; }
 }
 async function scrapePermitHTML(url){
   try{
-    const r=await fetchWithTimeout(url,{headers:{ "User-Agent":UA, Accept:"text/html"}},15000);
+    const r=await fetchWithTimeout(url,{headers:{ "User-Agent":UA, Accept:"text/html"}},20000);
     const html=await r.text();
     const lines=html.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
     const hits=lines.filter(L=>/(gas|fuel|convenience|c-store|station|EP\s?Mart)/i.test(L)).slice(0,50);
@@ -261,7 +250,7 @@ async function scrapePermitHTML(url){
   }catch{ return []; }
 }
 async function bingNewsCityCounty(city,county,state){
-  if(!BING_NEWS_KEY) return { news:[], web:[], message:"BING_NEWS_KEY not set" };
+  if(!BING_NEWS_KEY) return { news:[], web:[], message:"BING_NEWS_KEY missing" };
   const termSets=[
     [`${city} ${state} gas station`, `${city} ${state} EP Mart`, `${city} ${state} convenience store`],
     [`${city} ${state} planning board gas station`, `${city} ${state} site plan gas station`, `${city} ${state} zoning gas station`],
@@ -273,12 +262,12 @@ async function bingNewsCityCounty(city,county,state){
     for(const q of terms){
       try{
         const nu=`${BING_NEWS_ENDPOINT}?q=${encodeURIComponent(q)}&count=20&freshness=Year`;
-        const nr=await fetchWithTimeout(nu,{headers},15000); const nj=await nr.json(); const nv=Array.isArray(nj.value)?nj.value:[];
+        const nr=await fetchWithTimeout(nu,{headers},20000); const nj=await nr.json(); const nv=Array.isArray(nj.value)?nj.value:[];
         nv.forEach(it=>newsOut.push({ name:(it.name||"").slice(0,160), status:"news", approx_miles:null, link:it.url||null, source:"bing-news" }));
       }catch{}
       try{
         const wu=`${BING_WEB_ENDPOINT}?q=${encodeURIComponent(q)}&count=20`;
-        const wr=await fetchWithTimeout(wu,{headers},15000); const wj=await wr.json(); const wv=wj.webPages?.value||[];
+        const wr=await fetchWithTimeout(wu,{headers},20000); const wj=await wr.json(); const wv=wj.webPages?.value||[];
         wv.forEach(it=>webOut.push({ name:(it.name||"").slice(0,160), status:"permit/search", approx_miles:null, link:it.url||null, source:"bing-web" }));
       }catch{}
     }
@@ -312,12 +301,12 @@ async function exhaustiveDevelopments(addrLabel, lat, lon){
   };
 }
 
-/* ───────────── Google helpers & endpoints ───────────── */
+/* ───────────────── Google proxy ───────────────── */
 app.get("/google/status", async (_req,res)=>{
   try{
     if(!GOOGLE_API_KEY) return res.json({ ok:false, status:"MISSING_KEY" });
     const au=`https://maps.googleapis.com/maps/api/place/autocomplete/json?input=Test&components=country:us&key=${GOOGLE_API_KEY}`;
-    const r=await fetchWithTimeout(au,{headers:{ "User-Agent":UA }},8000);
+    const r=await fetchWithTimeout(au,{headers:{ "User-Agent":UA }},10000);
     res.json({ ok:r.ok, status:r.ok?"WORKING":`HTTP_${r.status}` });
   }catch{ res.json({ ok:false, status:"EXCEPTION" }); }
 });
@@ -326,14 +315,14 @@ app.get("/google/autocomplete", async (req,res)=>{
   if(!GOOGLE_API_KEY) return res.json({ ok:false, status:"MISSING_KEY", items:[] });
   try{
     const au=`https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(q)}&components=country:us&key=${GOOGLE_API_KEY}`;
-    const ar=await fetchWithTimeout(au,{headers:{ "User-Agent":UA }},10000);
+    const ar=await fetchWithTimeout(au,{headers:{ "User-Agent":UA }},15000);
     const aj=await ar.json();
     if(aj.status!=="OK" && aj.status!=="ZERO_RESULTS") return res.json({ ok:false, status:aj.status, items:[] });
     const items=[];
     for(const p of (aj.predictions||[]).slice(0,6)){
       const pid=p.place_id; if(!pid) continue;
-      const du=`https://maps.googleapis.com/maps/api/place/details/json?place_id=${pid}&fields=formatted_address,geometry,name,place_id&key=${GOOGLE_API_KEY}`;
-      const dr=await fetchWithTimeout(du,{headers:{ "User-Agent":UA }},10000);
+      const du=`https://maps.googleapis.com/maps/api/place/details/json?place_id=${pid}&fields=formatted_address,geometry,name,place_id,types&key=${GOOGLE_API_KEY}`;
+      const dr=await fetchWithTimeout(du,{headers:{ "User-Agent":UA }},15000);
       const dj=await dr.json(); if(dj.status!=="OK") continue;
       const loc=dj.result?.geometry?.location;
       if(loc && Number.isFinite(loc.lat) && Number.isFinite(loc.lng)){
@@ -343,26 +332,26 @@ app.get("/google/autocomplete", async (req,res)=>{
     return res.json({ ok:true, status:"OK", items });
   }catch(e){ return res.json({ ok:false, status:"ERROR", items:[], error:String(e) }); }
 });
-app.get("/google/findplace", async (req,res)=>{
-  try{
-    if(!GOOGLE_API_KEY) return res.json({ ok:false, status:"MISSING_KEY" });
-    const input=String(req.query.input||"").trim(); if(!input) return res.json({ ok:false, status:"BAD_REQUEST" });
-    const url=`https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(input)}&inputtype=textquery&fields=place_id,name,formatted_address,geometry&key=${GOOGLE_API_KEY}`;
-    const r=await fetchWithTimeout(url,{headers:{ "User-Agent":UA }},10000);
-    const j=await r.json(); const cand=(j.candidates||[])[0];
-    if(!cand?.place_id) return res.json({ ok:false, status:j.status||"ZERO_RESULTS" });
-    res.json({ ok:true, status:"OK", place_id:cand.place_id, name:cand.name, address:cand.formatted_address, location:cand.geometry?.location||null });
-  }catch(e){ res.json({ ok:false, status:"EXCEPTION", error:String(e) }); }
-});
 app.get("/google/searchplace", async (req,res)=>{
   try{
     if(!GOOGLE_API_KEY) return res.json({ ok:false, status:"MISSING_KEY" });
     const q=String(req.query.q||"").trim(); if(!q) return res.json({ ok:false, status:"BAD_REQUEST" });
     const url=`https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(q)}&type=gas_station&key=${GOOGLE_API_KEY}`;
-    const r=await fetchWithTimeout(url,{headers:{ "User-Agent":UA }},10000);
+    const r=await fetchWithTimeout(url,{headers:{ "User-Agent":UA }},15000);
     const j=await r.json(); const it=(j.results||[])[0];
     if(!it?.place_id) return res.json({ ok:false, status:j.status||"ZERO_RESULTS" });
     res.json({ ok:true, status:"OK", place_id:it.place_id, location:it.geometry?.location||null });
+  }catch(e){ res.json({ ok:false, status:"EXCEPTION", error:String(e) }); }
+});
+app.get("/google/findplace", async (req,res)=>{
+  try{
+    if(!GOOGLE_API_KEY) return res.json({ ok:false, status:"MISSING_KEY" });
+    const input=String(req.query.input||"").trim(); if(!input) return res.json({ ok:false, status:"BAD_REQUEST" });
+    const url=`https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(input)}&inputtype=textquery&fields=place_id,name,formatted_address,geometry&key=${GOOGLE_API_KEY}`;
+    const r=await fetchWithTimeout(url,{headers:{ "User-Agent":UA }},15000);
+    const j=await r.json(); const cand=(j.candidates||[])[0];
+    if(!cand?.place_id) return res.json({ ok:false, status:j.status||"ZERO_RESULTS" });
+    res.json({ ok:true, status:"OK", place_id:cand.place_id, name:cand.name, address:cand.formatted_address, location:cand.geometry?.location||null });
   }catch(e){ res.json({ ok:false, status:"EXCEPTION", error:String(e) }); }
 });
 app.get("/google/rating", async (req,res)=>{
@@ -371,101 +360,74 @@ app.get("/google/rating", async (req,res)=>{
     const place_id=String(req.query.place_id||"").trim(); if(!place_id) return res.json({ ok:false, status:"BAD_REQUEST" });
     const fields=["name","formatted_address","rating","user_ratings_total"].join(",");
     const url=`https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(place_id)}&fields=${encodeURIComponent(fields)}&key=${GOOGLE_API_KEY}`;
-    const r=await fetchWithTimeout(url,{headers:{ "User-Agent":UA }},10000);
+    const r=await fetchWithTimeout(url,{headers:{ "User-Agent":UA }},15000);
     const j=await r.json(); if(j.status!=="OK") return res.json({ ok:false, status:j.status||"ERROR", error:j.error_message||null });
     const g=j.result||{};
     res.json({ ok:true, status:"OK", rating:g.rating||null, total:g.user_ratings_total||0, name:g.name||null, address:g.formatted_address||null });
   }catch(e){ res.json({ ok:false, status:"EXCEPTION", error:String(e) }); }
 });
-// NEW: rating by coords (more robust if place_id is tricky)
-app.get("/google/rating_by_coords", async (req,res)=>{
-  try{
-    if(!GOOGLE_API_KEY) return res.json({ ok:false, status:"MISSING_KEY" });
-    const lat=+req.query.lat, lon=+req.query.lon;
-    if(!Number.isFinite(lat)||!Number.isFinite(lon)) return res.json({ ok:false, status:"BAD_REQUEST" });
-    const near=`https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lon}&radius=150&type=gas_station&key=${GOOGLE_API_KEY}`;
-    const nr=await fetchWithTimeout(near,{headers:{ "User-Agent":UA }},10000);
-    const nj=await nr.json(); const first=(nj.results||[]).sort((a,b)=>{
-      const da=haversine(lat,lon,a.geometry?.location?.lat||lat,a.geometry?.location?.lng||lon);
-      const db=haversine(lat,lon,b.geometry?.location?.lat||lat,b.geometry?.location?.lng||lon);
-      return da-db;
-    })[0];
-    if(!first?.place_id) return res.json({ ok:false, status:"ZERO_RESULTS" });
-    const det=`https://maps.googleapis.com/maps/api/place/details/json?place_id=${first.place_id}&fields=rating,user_ratings_total,name,formatted_address&key=${GOOGLE_API_KEY}`;
-    const dr=await fetchWithTimeout(det,{headers:{ "User-Agent":UA }},10000);
-    const dj=await dr.json(); if(dj.status!=="OK") return res.json({ ok:false, status:dj.status||"ERROR" });
-    const g=dj.result||{};
-    res.json({ ok:true, status:"OK", rating:g.rating||null, total:g.user_ratings_total||0, name:g.name||null, address:g.formatted_address||null });
-  }catch(e){ res.json({ ok:false, status:"EXCEPTION", error:String(e) }); }
-});
 
-/* ─────────── Road context (for heuristics) ─────────── */
+/* ───────────────── road context (used by heuristic) ───────────────── */
 function parseMaxspeed(ms){ const m=String(ms||"").match(/(\d+)\s*(mph)?/i); return m?+m[1]:null; }
 function roadWeight(hw){ const order={ motorway:6, trunk:5, primary:4, secondary:3, tertiary:2, unclassified:1, residential:1 }; return order[(hw||"").replace("_link","")] || 0; }
 async function roadContext(lat, lon){
-  const rM = Math.round(1609 * 1.2);
-  const qWays = `[out:json][timeout:25];
+  const rM=Math.round(1609*1.2);
+  const qWays=`[out:json][timeout:25];
     ( way(around:${rM},${lat},${lon})["highway"~"motorway|trunk|primary|secondary|tertiary|primary_link|secondary_link|tertiary_link"]; );
     out center tags;`;
-  const qSignals = `[out:json][timeout:25]; node(around:${rM},${lat},${lon})["highway"="traffic_signals"]; out;`;
+  const qSig=`[out:json][timeout:25]; node(around:${rM},${lat},${lon})["highway"="traffic_signals"]; out;`;
   let ways=[], signals=0;
-  try{ const wj = await overpassQuery(qWays,12000); ways = wj.elements || []; } catch {}
-  try{ const sj = await overpassQuery(qSignals,10000); signals = (sj.elements||[]).length; } catch {}
-
-  const rows = ways.map(w=>{
+  try{ const wj=await overpassQuery(qWays); ways=wj.elements||[]; }catch{}
+  try{ const sj=await overpassQuery(qSig); signals=(sj.elements||[]).length; }catch{}
+  const rows=ways.map(w=>{
     const t=w.tags||{};
-    const name = t.ref || t.name || "";
-    const hw = (t.highway||"").replace("_link","");
-    const lanes = +t.lanes || +t["lanes:forward"] || +t["lanes:backward"] || null;
-    const speed = parseMaxspeed(t.maxspeed);
-    const latc = w.center?.lat, lonc = w.center?.lon;
-    const d = (Number.isFinite(latc)&&Number.isFinite(lonc)) ? haversine(lat,lon,latc,lonc) : null;
+    const name=t.ref||t.name||"";
+    const hw=(t.highway||"").replace("_link","");
+    const lanes=+t.lanes||+t["lanes:forward"]||+t["lanes:backward"]||null;
+    const speed=parseMaxspeed(t.maxspeed);
+    const latc=w.center?.lat, lonc=w.center?.lon;
+    const d=(Number.isFinite(latc)&&Number.isFinite(lonc))?haversine(lat,lon,latc,lonc):null;
     return { name, highway:hw, lanes, maxspeed:speed, distM:d, weight:roadWeight(hw) };
   }).filter(r=>r.weight>0);
-
   rows.sort((a,b)=> (b.weight-a.weight) || ((b.lanes||0)-(a.lanes||0)) || ((b.maxspeed||0)-(a.maxspeed||0)) || ((a.distM||1e12)-(b.distM||1e12)));
-  const main = rows.slice(0,3);
-  const side = rows.slice(3,8);
-
-  const nice = (r)=>[r.name || r.highway, r.maxspeed?`${r.maxspeed} mph`:null, r.lanes?`${r.lanes} lanes`:null].filter(Boolean).join(" • ");
-  const mainLabel = main.map(nice).filter(Boolean).slice(0,3).join(" | ");
-  const sideLabel = side.map(nice).filter(Boolean).slice(0,3).join(" | ");
-  const summary = [mainLabel, sideLabel].filter(Boolean).join(" — ");
-  const intersections = Math.max(0, Math.round(rows.length / 3));
-  return { summary, main, side, signals, intersections };
+  const main=rows.slice(0,3), side=rows.slice(3,8);
+  const nice=(r)=>[r.name||r.highway, r.maxspeed?`${r.maxspeed} mph`:null, r.lanes?`${r.lanes} lanes`:null].filter(Boolean).join(" • ");
+  const mainLabel=main.map(nice).filter(Boolean).slice(0,3).join(" | ");
+  const sideLabel=side.map(nice).filter(Boolean).slice(0,3).join(" | ");
+  const intersections=Math.max(0, Math.round(rows.length/3));
+  return { summary:[mainLabel,sideLabel].filter(Boolean).join(" — "), main, side, signals, intersections };
 }
 
-/* ─────────── Gallons calc (competition respected) ─────────── */
+/* ───────────────── gallons calc (rule) ───────────────── */
 function gallonsWithRules({ aadt, mpds, diesel, compCount, heavyCount, pricePosition, userExtrasMult=1 }){
-  const baseline = aadt * 0.02 * 8 * 30;
+  const baseline = aadt * 0.02 * 8 * 30; // AADT ceiling
 
-  // 0 = 100%, 1 = 75%, 2-4 = 60%
+  // competition rule
   let baseMult=1.0;
   if (compCount === 1) baseMult = 0.75;
   else if (compCount >= 2 && compCount <= 4) baseMult = 0.60;
 
-  // Heavy: −20% / −35%
-  let heavyPenalty=0;
+  let heavyPenalty=0;             // heavy brand penalty
   if (heavyCount === 1) heavyPenalty = 0.20;
   else if (heavyCount >= 2) heavyPenalty = 0.35;
 
   const compMult = Math.max(0.20, baseMult - heavyPenalty);
   const afterComp = baseline * compMult;
 
-  // caps
+  // equipment caps
   const capEquip = (mpds * 25 * 10.5 * 24) * (365/12) + ((diesel||0) * 25 * 16 * 24) * (365/12);
-  const SOFT=22000, HARD=28000;
+  const SOFT=22000, HARD=28000; // per MPD
   const capSoftTotal=mpds*SOFT, capHardTotal=mpds*HARD;
   let capped = Math.min(afterComp, capEquip, capHardTotal);
   if (afterComp > capSoftTotal) capped = Math.round(capped * 0.90);
 
-  // pricing vs competition
+  // pricing position
   let priceMult = 1.0;
   if (pricePosition === "below") priceMult = 1.10;
   else if (pricePosition === "above") priceMult = 0.90;
 
   const preClamp = Math.round(capped * priceMult * userExtrasMult);
-  const base = Math.min(preClamp, Math.round(baseline));
+  const base = Math.min(preClamp, Math.round(baseline)); // never exceed baseline ceiling
 
   const low = Math.round(base * 0.86);
   const high= Math.round(base * 1.06);
@@ -484,48 +446,51 @@ function gallonsWithRules({ aadt, mpds, diesel, compCount, heavyCount, pricePosi
   };
 }
 
-/* ─────────── GPT summary (always) ─────────── */
+/* ───────────────── GPT summary (always) ───────────────── */
 async function gptJSONCore(model, prompt){
   const r=await fetchWithTimeout("https://api.openai.com/v1/chat/completions",{
     method:"POST",
     headers:{ Authorization:`Bearer ${OPENAI_API_KEY}`, "Content-Type":"application/json" },
     body: JSON.stringify({
-      model, response_format:{type:"json_object"}, temperature:0.2, max_tokens:1100,
+      model, response_format:{type:"json_object"}, temperature:0.2, max_tokens:1200,
       messages:[
         {role:"system", content:"You are a precise fuel/traffic analyst. Always reply with STRICT JSON (no markdown)."},
         {role:"user", content: prompt}
       ]
     })
-  },20000);
+  },35000);
   const txt=await r.text(); if(!r.ok) throw new Error(`OpenAI ${r.status}: ${txt}`);
   const data=JSON.parse(txt); const content=data.choices?.[0]?.message?.content;
   if(!content) throw new Error("No GPT content"); return JSON.parse(content);
 }
 async function gptJSONWithRetry(prompt){
   const models=["gpt-4o-mini","gpt-4o"]; let last=null;
-  for(const m of models){ for(let i=0;i<2;i++){ try{ return await gptJSONCore(m,prompt); }catch(e){ last=e; await sleep(300);} } }
+  for(const m of models){ for(let i=0;i<2;i++){ try{ return await gptJSONCore(m,prompt); }catch(e){ last=e; await sleep(400);} } }
   throw last||new Error("GPT failed");
 }
 async function gptSummary(ctx){
-  const sys='Return {"summary":"<text>"} with ~8–12 sentences. Include: AADT method/value; baseline ceiling; competition rule & heavy penalties; pricing; user adjustments; caps; low/base/high; road context; notable developments.';
+  const sys='Return {"summary":"<text>"} ~8–12 sentences. Include method & AADT, baseline ceiling, competition rule & heavy penalties, pricing, user adjustments, caps, LOW/BASE/HIGH, road context, and notable developments.';
   const prompt = `
-Address: ${ctx.address}
-AADT used: ${ctx.aadt} (${ctx.method}); Baseline: AADT×2%×8×30.
-Roads: ${ctx.roads.summary} • signals ${ctx.roads.signals} • intersections ${ctx.roads.intersections}
-Competition: ${ctx.compCount} total, heavy ${ctx.heavyCount} (${ctx.notable})
-Pricing: ${ctx.pricePosition}
-User adjustments: ${ctx.userAdj || "none"}
-Developments: news(${ctx.devNews || "none"}), permits(${ctx.devPermits || "none"})
-Result (low/base/high): ${ctx.low}/${ctx.base}/${ctx.high}
+Inputs:
+- Address: ${ctx.address}
+- USED AADT: ${ctx.aadt} (${ctx.method})
+- Roads: ${ctx.roads.summary}; signals ${ctx.roads.signals}; intersections ${ctx.roads.intersections}
+- Competition: count ${ctx.compCount}, heavy ${ctx.heavyCount}, notable ${ctx.notable}
+- Pricing: ${ctx.pricePosition}
+- User adjustments: ${ctx.userAdj || "none"}
+- Baseline ceiling: AADT×2%×8×30
+- Developments (news): ${ctx.devNews || "none"}
+- Developments (permits): ${ctx.devPermits || "none"}
+- Result gallons (LOW/BASE/HIGH): ${ctx.low}/${ctx.base}/${ctx.high}
 `.trim();
   try{
     const j=await gptJSONWithRetry(`${sys}\n${prompt}`); const s=(j&&j.summary)?String(j.summary).trim():"";
     if(s) return s;
   }catch{}
-  return `AADT ${ctx.aadt} (${ctx.method}); competition ${ctx.compCount} (heavy ${ctx.heavyCount}); result ${ctx.base.toLocaleString()} (range ${ctx.low.toLocaleString()}–${ctx.high.toLocaleString()}).`;
+  return `AADT ${ctx.aadt} (${ctx.method}); competition ${ctx.compCount} (heavy=${ctx.heavyCount}); pricing ${ctx.pricePosition}; adjustments ${ctx.userAdj||"none"}; result ${ctx.low}–${ctx.high} with base ${ctx.base}.`;
 }
 
-/* ─────────── /estimate ─────────── */
+/* ───────────────── estimate endpoint ───────────────── */
 app.post("/estimate", async (req,res)=>{
   try{
     const { address, mpds, diesel, siteLat, siteLon, aadtOverride, advanced } = req.body||{};
@@ -535,23 +500,24 @@ app.post("/estimate", async (req,res)=>{
 
     const pricePosition=String(advanced?.price_position||"inline");
 
-    // Geocode + admin
+    // geocode/admin
     let geo;
     if(Number.isFinite(siteLat)&&Number.isFinite(siteLon)) geo={ lat:+siteLat, lon:+siteLon, label: address||`${siteLat}, ${siteLon}` };
     else geo=await geocode(address);
     const admin=await reverseAdmin(geo.lat, geo.lon);
 
-    // Competition (strict 1.5 mi, robust)
-    const competitors=await competitorsWithinRadiusMiles(geo.lat, geo.lon, 1.5).catch(()=>[]);
+    // competitors
+    const compAll3=await competitorsWithinRadiusMiles(geo.lat, geo.lon, 3.0).catch(()=>[]);
+    const competitors=compAll3.filter(c=>c.miles<=1.5);
     const compCount=competitors.length, heavyCount=competitors.filter(c=>c.heavy).length;
-    const sunocoNearby=competitors.some(c=>c.sunoco && c.miles<=1.0);
-    const ruralEligible = compCount===0;
+    const sunocoNearby=compAll3.some(c=>c.sunoco && c.miles<=1.0);
+    const ruralEligible = compAll3.length===0;
 
-    // Developments
+    // developments
     const dev=await exhaustiveDevelopments(address||geo.label, geo.lat, geo.lon);
     const devNews=dev.news, devPermits=dev.permits, devOSM=dev.osm;
 
-    // Roads & AADT
+    // roads & AADT
     const roads=await roadContext(geo.lat, geo.lon).catch(()=>({summary:"",main:[],side:[],signals:0,intersections:0}));
     let usedAADT=10000, method="fallback_default";
     const overrideVal=Number(aadtOverride);
@@ -559,29 +525,30 @@ app.post("/estimate", async (req,res)=>{
     else{
       let sta=await queryCustomTraffic(geo.lat, geo.lon, address).catch(()=>null);
       if(!sta) sta=await queryNCDOTNearestAADT(geo.lat, geo.lon, 1609).catch(()=>null);
-      const dotAADT=sta?sta.aadt:null;
+      let dotAADT=sta?sta.aadt:null;
       const heur=heuristicAADT(roads);
       const comps=[]; if(Number.isFinite(dotAADT)) comps.push({v:dotAADT,w:1.0,l:"DOT"}); if(Number.isFinite(heur)) comps.push({v:heur,w:0.7,l:"HEUR"});
       if(comps.length){ const sumW=comps.reduce((s,c)=>s+c.w,0); usedAADT=Math.round(comps.reduce((s,c)=>s+c.v*c.w,0)/Math.max(0.0001,sumW)); method="blend_"+comps.map(c=>c.l).join("+").toLowerCase(); }
     }
 
-    // User adjustments & rural flag (only if requested and eligible)
+    // extras & flags (UI + rural auto check)
     let userExtrasMult=1.0; const extras=(advanced?.extra||[]).map(e=>({ pct:+e?.pct, note:String(e?.note||"").slice(0,180) })).filter(e=>Number.isFinite(e.pct));
     if(extras.length) userExtrasMult *= extras.reduce((m,e)=>m*(1+e.pct/100),1.0);
     const ruralRequested = !!(advanced && advanced.flags && advanced.flags.rural===true);
     const ruralApplied   = ruralRequested && ruralEligible;
     if(ruralApplied) userExtrasMult *= 1.30;
 
-    // Gallons (competition respected here)
+    // gallons
     const calc=gallonsWithRules({ aadt:usedAADT, mpds:MPDS, diesel:DIESEL, compCount, heavyCount, pricePosition, userExtrasMult });
 
-    // Summary text
+    // summary
     const adjBits=[];
     if(pricePosition==="below") adjBits.push("+10% below-market pricing");
     if(pricePosition==="above") adjBits.push("−10% above-market pricing");
     if(ruralApplied) adjBits.push("+30% rural bonus (0 comps within 3 mi)");
     extras.forEach(e=>adjBits.push(`${e.pct>0?"+":""}${e.pct}% ${e.note||"adj."}`));
     const userAdjText = adjBits.join("; ");
+
     const notable=competitors.filter(c=>c.heavy).slice(0,6).map(c=>c.name).join(", ") || "none";
     const summary=await gptSummary({
       address: address||geo.label, aadt:usedAADT, method, roads,
@@ -596,11 +563,8 @@ app.post("/estimate", async (req,res)=>{
       inputs:{ mpds:MPDS, diesel:DIESEL, aadt_used:usedAADT, price_position:pricePosition, aadt_components:{ method } },
       flags:{ rural_bonus_applied:ruralApplied, rural_eligible:ruralEligible, sunoco_within_1mi: sunocoNearby },
       competition:{ count:compCount, nearest_mi: competitors[0]?.miles ?? null, notable_brands: competitors.filter(c=>c.heavy).slice(0,6).map(c=>c.name) },
-      developments: devOSM,
-      developments_external:{ news: devNews, permits: devPermits, note: dev.note },
-      roads,
-      summary,
-      calc_breakdown: calc.breakdown,
+      developments: devOSM, developments_external:{ news: devNews, permits: devPermits, note: dev.note },
+      roads, summary, calc_breakdown: calc.breakdown,
       map:{ site:{ lat:geo.lat, lon:geo.lon, label:geo.label }, competitors }
     });
   }catch(e){
@@ -608,7 +572,6 @@ app.post("/estimate", async (req,res)=>{
   }
 });
 
-/* Heuristic AADT from roads */
 function heuristicAADT(roads){
   const dom=roads?.main?.[0]?.highway || roads?.side?.[0]?.highway || "";
   const lanes=roads?.main?.[0]?.lanes || roads?.side?.[0]?.lanes || 2;
@@ -622,3 +585,4 @@ function heuristicAADT(roads){
 
 const PORT=process.env.PORT||3000;
 app.listen(PORT,"0.0.0.0",()=>console.log(`Server listening on :${PORT}`));
+
