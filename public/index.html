@@ -8,6 +8,8 @@
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <!-- Leaflet image export -->
+  <script src="https://unpkg.com/leaflet-image/leaflet-image.js"></script>
 
   <!-- jsPDF for PDF export -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous"></script>
@@ -32,16 +34,13 @@
     .toolbar{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:12px; }
     .muted{ color:var(--muted); }
     .subtle{ font-size:12px; opacity:.9; }
-    .mono{ font-family: ui-monospace, Menlo, Consolas, monospace; white-space:pre-wrap; }
 
     #map{ height:420px; border-radius:12px; border:1px solid var(--line); position: relative; }
     #overlay{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(11,14,21,.55); border-radius:12px; font-weight:800; color:#cde9ff; font-size:18px; padding:20px; text-align:center; }
 
-    /* Street View */
     #svWrap{ margin-top:10px; }
     #sv{ width:100%; height:380px; border:0; border-radius:12px; border:1px solid var(--line); background:#0b1220; }
 
-    /* Autocomplete */
     .ac-wrap{ position:relative; }
     .ac-list{ position:absolute; top:100%; left:0; right:0; z-index:30; margin-top:6px; background:#0b1220; border:1px solid var(--line); border-radius:12px; max-height:320px; overflow:auto; box-shadow: 0 18px 36px rgba(0,0,0,.35); }
     .ac-item{ padding:10px 12px; cursor:pointer; border-bottom:1px solid rgba(255,255,255,.04); }
@@ -49,68 +48,65 @@
     .ac-item:hover, .ac-item.active{ background:#101a2b; }
     .badge{ display:inline-block; font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); background:var(--pill); color:#a9c5ff; margin-left:8px; }
 
-    /* Advanced options – straight line */
     details summary{ cursor:pointer; }
     .adv-line{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-top:12px; }
     .chip{ display:inline-flex; align-items:center; gap:8px; background:#0f1929; border:1px solid var(--line); padding:8px 10px; border-radius:999px; font-size:13px; }
     .chip input{ width:auto; accent-color:#22d3ee; }
     .dash{ color:#50607a; opacity:.9; }
+    .radio-row{ display:flex; flex-wrap:wrap; gap:10px; margin-top:8px; }
 
-    /* Estimate hero */
     .hero{ display:flex; justify-content:space-between; align-items:flex-end; gap:12px; }
     .hero .num{ font-size:44px; font-weight:900; letter-spacing:.5px; }
     .hero .sub{ font-size:13px; color:#a9b6d0; }
 
-    /* Sticky footer for Export */
     .footerbar{ position:fixed; left:0; right:0; bottom:0; background:linear-gradient(180deg,#0c1220,#0a0f1a); border-top:1px solid var(--line); padding:10px 16px; display:flex; justify-content:center; gap:12px; z-index:50; }
-    .footerbar > *{ margin:0 6px; }
-
-    /* Hide debug by default */
-    #debugCard{ display:none; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <header>
-      <h1>Sunoco, LP Fuel IQ - Fuel Site Analyzer</h1>
-    </header>
+    <header><h1>Sunoco, LP Fuel IQ - Fuel Site Analyzer</h1></header>
 
+    <!-- Inputs -->
     <div class="card">
       <div class="row">
         <div>
           <label>Site search</label>
           <div class="ac-wrap">
-            <input id="addr" placeholder="Enter Business Name or Address and wait a moment to load" autocomplete="off"/>
+            <input id="addr" placeholder="Enter business or address" autocomplete="off"/>
             <div id="ac" class="ac-list" style="display:none;"></div>
           </div>
           <div class="muted subtle" style="margin-top:6px" id="apiStatus">API Status: checking…</div>
         </div>
-        <div>
-          <label>Regular MPDs</label>
-          <input id="mpds" type="number" value="3" min="1"/>
-        </div>
-        <div>
-          <label>Diesel positions (optional)</label>
-          <input id="diesel" type="number" value="0" min="0"/>
-        </div>
-        <div>
-          <label>AADT override (optional)</label>
-          <input id="aadtOverride" type="number" placeholder="e.g., 14500"/>
-        </div>
+        <div><label>Regular MPDs</label><input id="mpds" type="number" value="3" min="1"/></div>
+        <div><label>Diesel positions</label><input id="diesel" type="number" value="0" min="0"/></div>
+        <div><label>AADT override</label><input id="aadtOverride" type="number"/></div>
       </div>
       <div class="toolbar">
         <button id="go">Estimate</button>
-        <span class="muted">AADT = blend(DOT, GPT, Road-Heuristic) unless overridden • competition rule • policy caps • road layout.</span>
+        <span class="muted">Baseline ceiling (AADT×2%×8×30) • competition rule • pricing effect • caps • road layout</span>
       </div>
     </div>
 
+    <!-- Advanced -->
     <div class="card">
       <details>
-        <summary><b>Advanced options (optional)</b> — collapsed by default</summary>
+        <summary><b>Advanced options</b></summary>
         <div class="adv-line">
-          <label class="chip"><input type="checkbox" id="ex_worksites"> Worksites nearby <span class="dash">(+7.5%)</span></label>
-          <label class="chip"><input type="checkbox" id="ex_hours18"> Operating hours 18h <span class="dash">(−7.5%)</span></label>
-          <label class="chip"><input type="checkbox" id="ex_highincome"> Higher-income trade area <span class="dash">(+2.5%)</span></label>
+          <label class="chip"><input type="checkbox" id="ex_worksites"> Worksites (+7.5%)</label>
+          <label class="chip"><input type="checkbox" id="ex_hours18"> Hours 18h (−7.5%)</label>
+          <label class="chip"><input type="checkbox" id="ex_highincome"> Higher-income (+2.5%)</label>
+          <label class="chip"><input type="checkbox" id="ex_lowrating"> Rating < 4.0 (−30%)</label>
+          <label class="chip"><input type="checkbox" id="ex_competitive_ops"> Competitive site ops (+10%)</label>
+        </div>
+        <div style="margin-top:8px;">
+          <label><b>Gas pricing vs area</b></label>
+          <div class="radio-row">
+            <label class="chip"><input type="radio" name="pricepos" value="below"> Below competition (+10%)</label>
+            <label class="chip"><input type="radio" name="pricepos" value="inline" checked> In line (0%)</label>
+            <label class="chip"><input type="radio" name="pricepos" value="above"> Above competition (−10%)</label>
+          </div>
+        </div>
+        <div class="adv-line">
           <span class="chip" id="addExtra" style="cursor:pointer;">+ Add adj. (%)</span>
           <span id="activeExtras" class="subtle"></span>
         </div>
@@ -118,40 +114,38 @@
       </details>
     </div>
 
+    <!-- Estimate -->
     <div class="card" id="estimateCard">
       <div class="hero">
         <div>
-          <div style="font-weight:700;margin-bottom:6px;">Adjusted Base Estimate (gal/mo)<span id="userMult"></span></div>
+          <div>Adjusted Base Estimate (LOW)</div>
           <div class="num" id="estNum">—</div>
-          <div class="sub" id="estRange">Low–High: —</div>
+          <div class="sub" id="estRange">Full range: —</div>
         </div>
         <div class="right sub">
           <div>Year-2: <b id="y2">—</b></div>
-          <div style="margin-top:6px;">Year-3: <b id="y3">—</b></div>
+          <div>Year-3: <b id="y3">—</b></div>
         </div>
       </div>
       <hr/>
-      <div id="aadtBanner" class="muted" style="margin-bottom:6px;">—</div>
+      <div id="aadtBanner" class="muted">—</div>
       <div id="compLine" class="muted">—</div>
-      <div id="capacityLine" class="muted subtle" style="margin-top:6px;">
-        Capacity guidance: <b>caps peak gallons at ~22–28k gal/MPD/month</b>. Too few pumps ⇒ queuing & <b>≥10% lost volume</b> at peaks.
-      </div>
     </div>
 
+    <!-- Map & SV -->
     <div class="card">
-      <div class="muted" style="margin-bottom:6px;">Map: Site & competitors (1 mile)</div>
+      <div class="muted">Map: Site & competitors (1.5 mi)</div>
       <div id="map"><div id="overlay" class="muted">—</div></div>
-      <div id="svWrap">
-        <div class="muted" style="margin:10px 0 6px;"><b>Street View</b></div>
-        <iframe id="sv" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
-      </div>
+      <div id="svWrap"><div class="muted" style="margin-top:10px;">Street View</div><iframe id="sv" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div>
     </div>
 
-    <div class="card"><b>Computation Details</b><div id="details" class="muted">—</div></div>
-    <div class="card"><b>Developments (multi-source)</b><div id="devs" class="muted">—</div></div>
-    <div class="card"><b>Summary (GPT)</b><div id="summary" class="muted">—</div></div>
+    <!-- Developments -->
+    <div class="card"><b>Developments — OSM</b><div id="devs" class="muted">—</div></div>
+    <div class="card"><b>Developments — News</b><div id="devsExternalNews" class="muted">—</div></div>
+    <div class="card"><b>Developments — Permits</b><div id="devsExternalPermits" class="muted">—</div></div>
 
-    <div class="card" id="debugCard"><details open><summary>Debug</summary><pre id="debug" class="mono muted">/ waiting…</pre></details></div>
+    <div class="card"><b>Google Rating</b><div id="ratingLine" class="muted">—</div></div>
+    <div class="card"><b>Summary (GPT)</b><div id="summary" class="muted">—</div></div>
   </div>
 
   <div class="footerbar"><button id="exportPDF">Export to PDF</button></div>
@@ -159,53 +153,97 @@
 <script>
 const $=id=>document.getElementById(id);
 const apiStatus=$("apiStatus"), aadtBanner=$("aadtBanner"), compLine=$("compLine"), overlay=$("overlay"), svFrame=$("sv");
-const outNum=$("estNum"), outRange=$("estRange"), outY2=$("y2"), outY3=$("y3"), userMultEl=$("userMult");
-const detailsBox=$("details"), devsBox=$("devs"), summaryBox=$("summary"), exportBtn=$("exportPDF");
+const outNum=$("estNum"), outRange=$("estRange"), outY2=$("y2"), outY3=$("y3");
+const devsBox=$("devs"), devsExtNews=$("devsExternalNews"), devsExtPermits=$("devsExternalPermits"), summaryBox=$("summary"), ratingLine=$("ratingLine");
 const addrInput=$("addr"), acBox=$("ac"), goBtn=$("go");
 const addExtraBtn=$("addExtra"), extraList=$("extraList"), activeExtras=$("activeExtras");
-const ex_worksites=$("ex_worksites"), ex_hours18=$("ex_hours18"), ex_highincome=$("ex_highincome");
-let map, layer, mapReady=false, selectedCoords=null, lastEstimate=null, lastInputs=null;
+const ex_worksites=$("ex_worksites"), ex_hours18=$("ex_hours18"), ex_highincome=$("ex_highincome"), ex_lowrating=$("ex_lowrating"), ex_competitive_ops=$("ex_competitive_ops");
+
+let map, layer, mapReady=false, selectedCoords=null, selectedPlaceId=null;
 
 /* Helpers */
 function fmt(n){ return (n??0).toLocaleString(undefined,{maximumFractionDigits:0}); }
-function esc(s){ return (s??"").toString().replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;"," >":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
-function setOverlayWorking(){ overlay.textContent="Working, this may take up to 5 minutes to research"; overlay.style.display="flex"; overlay.style.fontSize="18px"; overlay.style.fontWeight="800"; }
+function esc(s){ return (s??"").toString().replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;"," >":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
+function setOverlayWorking(){ overlay.textContent="Working…"; overlay.style.display="flex"; }
 function clearOverlay(){ overlay.style.display="none"; }
 function initMap(){ if(mapReady) return; map=L.map("map",{zoomControl:true}); L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map); layer=L.layerGroup().addTo(map); mapReady=true; }
 function updateStreetView(lat, lon){ svFrame.src=`https://maps.google.com/maps?q=&layer=c&cbll=${lat},${lon}&cbp=12,0,,0,0&output=svembed`; }
 
-/* Google status */
+/* Google status + autocomplete */
+let GOOGLE_OK=false; let acItems=[]; let acActive=-1;
 async function checkGoogleStatus(){
-  const c=new AbortController(); const t=setTimeout(()=>c.abort(),9000);
-  try{ const r=await fetch("/google/status",{signal:c.signal}); const txt=await r.text(); let j; try{j=JSON.parse(txt);}catch{j={ok:false,status:"PARSE_ERROR",error:txt.slice(0,120)}}; apiStatus.textContent=j.ok?"API Status: Google — Working":`API Status: Google — Error (${j.status}${j.error?": "+j.error:""})`; }
-  catch{ apiStatus.textContent="API Status: Google — failed to fetch"; } finally{ clearTimeout(t); }
+  try{ const r=await fetch("/google/status"); const j=await r.json(); GOOGLE_OK=!!j.ok; apiStatus.textContent=j.ok?"API: Google — Working":`API: Google — ${j.status}`; }
+  catch{ GOOGLE_OK=false; apiStatus.textContent="API: Google — unavailable"; }
 }
 document.addEventListener("DOMContentLoaded", checkGoogleStatus);
 
-/* Adjustments */
-function pills(){ const p=[]; if(ex_worksites.checked)p.push("+7.5% Worksites"); if(ex_hours18.checked)p.push("−7.5% 18h ops"); if(ex_highincome.checked)p.push("+2.5% Higher-income"); activeExtras.innerHTML=p.map(x=>`<span class="badge">${esc(x)}</span>`).join(" "); }
-[ex_worksites,ex_hours18,ex_highincome].forEach(el=>el.addEventListener("change",pills));
-function addExtraRow(pct="",note=""){ const row=document.createElement("div"); row.style.marginTop="6px"; row.innerHTML=`<span class="chip"><input class="extraPct" type="number" step="0.1" style="width:90px" placeholder="% e.g. 5 or -3" value="${pct}"> <input class="extraNote" style="width:320px" placeholder="Comment" value="${esc(note)}"> <button class="rm" type="button">×</button></span>`; row.querySelector(".rm").addEventListener("click",()=>row.remove()); extraList.appendChild(row); }
+async function googleSearch(q){ if(!GOOGLE_OK) return []; try{ const r=await fetch(`/google/autocomplete?input=${encodeURIComponent(q)}`); const j=await r.json(); if(!j.ok) return []; return (j.items||[]).map(it=>({...it,type:"Google",score:1.3})); }catch{return[];} }
+async function nominatimSearch(q){ try{ const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=us&q=${encodeURIComponent(q)}`); const a=await r.json(); return a.map(row=>({ type:"OSM", display:row.display_name, lat:+row.lat, lon:+row.lon, score:0.6 })); }catch{return[];} }
+function renderAc(list){ if(!list.length){ acBox.style.display="none"; return; } acBox.innerHTML=list.map((it,i)=>`<div class="ac-item${i===acActive?" active":""}" data-i="${i}">${esc(it.display)} <span class="badge">${it.type}</span></div>`).join(""); [...acBox.children].forEach(el=>el.onclick=()=>chooseAc(+el.dataset.i)); acBox.style.display="block"; }
+function chooseAc(i){ const it=acItems[i]; if(!it) return; addrInput.value=it.display; selectedCoords=(Number.isFinite(it.lat)&&Number.isFinite(it.lon))?{lat:it.lat,lon:it.lon}:null; selectedPlaceId=it.place_id||null; acBox.style.display="none"; }
+addrInput.addEventListener("input",()=>{ const q=addrInput.value.trim(); if(q.length<3) return; Promise.all([googleSearch(q),nominatimSearch(q)]).then(([g,n])=>{ acItems=[...g,...n].slice(0,8); renderAc(acItems); }); });
+
+/* Advanced badges */
+function pills(){
+  const p=[];
+  if(ex_worksites.checked)p.push("+7.5% Worksites");
+  if(ex_hours18.checked)p.push("−7.5% 18h ops");
+  if(ex_highincome.checked)p.push("+2.5% Higher-income");
+  if(ex_lowrating.checked)p.push("−30% Rating < 4.0");
+  if(ex_competitive_ops.checked)p.push("+10% Competitive ops");
+  activeExtras.innerHTML=p.map(x=>`<span class="badge">${esc(x)}</span>`).join(" ");
+}
+[ex_worksites,ex_hours18,ex_highincome,ex_lowrating,ex_competitive_ops].forEach(el=>el.addEventListener("change",pills));
+
+function addExtraRow(pct="",note=""){
+  const row=document.createElement("div");
+  row.style.marginTop="6px";
+  row.innerHTML=`<span class="chip"><input class="extraPct" type="number" step="0.1" style="width:90px" placeholder="% e.g. 5 or -3" value="${pct}"> <input class="extraNote" style="width:320px" placeholder="Comment" value="${esc(note)}"> <button class="rm" type="button">×</button></span>`;
+  row.querySelector(".rm").addEventListener("click",()=>row.remove());
+  extraList.appendChild(row);
+}
 addExtraBtn.addEventListener("click",()=>addExtraRow());
-function collectExtras(){ const out=[]; if(ex_worksites.checked) out.push({pct:7.5, note:"Worksites nearby add 7.5% fueling, especially AM/PM peaks"}); if(ex_hours18.checked) out.push({pct:-7.5, note:"Operating hours 18 hours (−7.5% vs 24h)"}); if(ex_highincome.checked) out.push({pct:2.5, note:"Higher income area leads to more travel & higher discretionary spending"}); for(const chip of extraList.querySelectorAll(".chip")){ const pct=+chip.querySelector(".extraPct").value; const note=chip.querySelector(".extraNote").value.trim(); if(Number.isFinite(pct)) out.push({pct, note}); } return out; }
 
-/* Autocomplete (Google + Nominatim) */
-let acTimer=null, acItems=[];
-async function googleSearch(q){ try{ const r=await fetch(`/google/autocomplete?input=${encodeURIComponent(q)}`); const j=await r.json(); if(!j.ok){ apiStatus.textContent=`API Status: Google — Error (${j.status}${j.error?": "+j.error:""})`; return []; } apiStatus.textContent="API Status: Google — Working"; return (j.items||[]).map(it=>({ ...it, type:"Google", score:1.3 })); }catch{ apiStatus.textContent="API Status: Google — failed to fetch"; return []; } }
-async function nominatimSearch(q){ try{ const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=us&q=${encodeURIComponent(q)}`); const a=await r.json(); return a.map(row=>({ type:"Address", display:row.display_name, lat:+row.lat, lon:+row.lon, score:0.6 })); }catch{return [];} }
-function renderAc(list){ if(!list.length){ acBox.style.display="none"; return; } acBox.innerHTML=list.map((it,i)=>`<div class="ac-item" data-i="${i}">${esc(it.display)} <span class="badge">${it.type}</span></div>`).join(""); [...acBox.children].forEach(el=>el.addEventListener("click",()=>chooseAc(+el.dataset.i))); acBox.style.display="block"; }
-function hideAc(){ acBox.style.display="none"; }
-function chooseAc(i){ const it=acItems[i]; if(!it) return; addrInput.value=it.display; selectedCoords=(it.lat!=null&&it.lon!=null)?{lat:it.lat,lon:it.lon}:null; hideAc(); }
-addrInput.addEventListener("input",()=>{ const q=addrInput.value.trim(); selectedCoords=null; hideAc(); if(q.length<3)return; if(acTimer)clearTimeout(acTimer); acTimer=setTimeout(async()=>{ const [g,n]=await Promise.all([googleSearch(q),nominatimSearch(q)]); acItems=[...g,...n]; renderAc(acItems); },250); });
-document.addEventListener("click",(e)=>{ if(!acBox.contains(e.target)&&e.target!==addrInput) hideAc(); });
+/* Collect */
+function collectExtras(){
+  const out=[];
+  if(ex_worksites.checked) out.push({pct:7.5, note:"Worksites"});
+  if(ex_hours18.checked) out.push({pct:-7.5, note:"18h ops"});
+  if(ex_highincome.checked) out.push({pct:2.5, note:"Higher income"});
+  if(ex_lowrating.checked) out.push({pct:-30, note:"Rating <4.0"});
+  if(ex_competitive_ops.checked) out.push({pct:10, note:"Competitive site ops"});
+  for(const chip of extraList.querySelectorAll(".chip")){
+    const pct=+chip.querySelector(".extraPct").value;
+    const note=chip.querySelector(".extraNote").value.trim();
+    if(Number.isFinite(pct)) out.push({pct, note});
+  }
+  return out;
+}
+function getPricePosition(){
+  const r=document.querySelector('input[name="pricepos"]:checked');
+  return r ? r.value : "inline";
+}
 
-/* Client → server */
+/* API calls */
 async function safeJSON(url,opts){ const r=await fetch(url,opts); const t=await r.text(); if(!r.ok) throw new Error(`HTTP ${r.status}\n${t.slice(0,1200)}`); try{ return JSON.parse(t);}catch{ throw new Error("Bad JSON"); } }
-async function callEstimate(){ const body={ address:addrInput.value.trim(), mpds:+$("mpds").value||0, diesel:+$("diesel").value||0, advanced:{ extra: collectExtras() } }; if(selectedCoords){ body.siteLat=selectedCoords.lat; body.siteLon=selectedCoords.lon; } const ov=+($("aadtOverride").value||""); if(Number.isFinite(ov)&&ov>0) body.aadtOverride=ov; return await safeJSON("/estimate",{ method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) }); }
+async function callEstimate(){
+  const body={
+    address: addrInput.value.trim(),
+    mpds:+$("mpds").value||0,
+    diesel:+$("diesel").value||0,
+    advanced:{
+      extra: collectExtras(),
+      price_position: getPricePosition()
+    }
+  };
+  if(selectedCoords){ body.siteLat=selectedCoords.lat; body.siteLon=selectedCoords.lon; }
+  const ov=+($("aadtOverride").value||""); if(Number.isFinite(ov)&&ov>0) body.aadtOverride=ov;
+  return await safeJSON("/estimate",{ method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
+}
 
-/* Renderers */
+/* Map */
 function initOrUpdateMap(m){
-  if(!mapReady) initMap();
+  if(!mapReady){ initMap(); }
   layer.clearLayers();
   if(!m||!m.site){ setOverlayWorking(); return; }
   const site=[m.site.lat,m.site.lon];
@@ -214,74 +252,142 @@ function initOrUpdateMap(m){
   for(const c of (m.competitors||[])){
     if(!Number.isFinite(c.lat)||!Number.isFinite(c.lon)) continue;
     pts.push([c.lat,c.lon]);
-    L.circleMarker([c.lat,c.lon],{radius:6,weight:1,color:c.heavy?"#ff7f50":"#4ade80",fillColor:c.heavy?"#ff7f50":"#4ade80",fillOpacity:.85}).addTo(layer).bindPopup(`${esc(c.name||"Fuel")} • ${c.miles} mi`);
+    L.circleMarker([c.lat,c.lon],{radius:6,weight:1,color:c.heavy?"#ff7f50":"#4ade80",fillColor:c.heavy?"#ff7f50":"#4ade80",fillOpacity:.9}).addTo(layer).bindPopup(`${esc(c.name||"Fuel")} • ${c.miles} mi`);
   }
   map.fitBounds(L.latLngBounds(pts).pad(0.25));
   clearOverlay();
   updateStreetView(site[0],site[1]);
 }
+
+/* Render */
 function renderAll(d){
-  const i=d.inputs||{}, c=d.competition||{}, comp=i?.aadt_components||{};
-  const parts=[]; parts.push(`USED ${fmt(i.aadt_used)} (${comp?.method})`);
-  const dot=comp?.dot, gpt=comp?.gpt, heur=comp?.heur;
-  if(dot?.value) parts.push(`DOT ${fmt(dot.value)} (${dot.source||"DOT"} ${dot.year||"n/a"}${dot.distance_mi!=null?`, ~${dot.distance_mi} mi`:""})`);
-  if(gpt?.value) parts.push(`GPT ${fmt(gpt.value)} (conf ${((gpt.confidence||0)*100|0)}%)`);
-  if(heur!=null) parts.push(`Heur ${fmt(heur)} (road type)`);
-  aadtBanner.textContent="AADT → "+parts.join(" | ");
+  outNum.textContent = fmt(d.low);
+  outRange.textContent = `Full range: ${fmt(d.low)} – ${fmt(d.high)}`;
+  outY2.textContent=fmt(d.year2); outY3.textContent=fmt(d.year3);
 
-  userMultEl.textContent = i.user_multiplier ? ` (user mult ×${i.user_multiplier.toFixed(3)})` : "";
-  outNum.textContent = fmt(d.base); outRange.textContent=`Low–High: ${fmt(d.low)} – ${fmt(d.high)}`; outY2.textContent=fmt(d.year2); outY3.textContent=fmt(d.year3);
-  compLine.textContent = `Competition: ${c.count??0} within 1 mi${c.nearest_mi!=null?"; nearest "+c.nearest_mi.toFixed(3)+" mi":""}${(c.notable_brands||[]).length?"; notable: "+c.notable_brands.join(", "):""}`;
+  const comp=d.inputs?.aadt_components||{};
+  aadtBanner.textContent=`AADT used ${fmt(d.inputs.aadt_used)} (${comp.method})`;
+  compLine.textContent=`Competition: ${d.competition.count} within 1.5 mi${d.competition.nearest_mi!=null?"; nearest "+d.competition.nearest_mi.toFixed(3)+" mi":""}${(d.competition.notable_brands||[]).length?"; heavy: "+d.competition.notable_brands.join(", "):""}`;
 
-  detailsBox.innerHTML = `
-    <div><b>Inputs</b> — MPDs ${i.mpds}${i.diesel? " + diesel "+i.diesel:""}; AADT used <b>${fmt(i.aadt_used)}</b></div>
-    <div class="subtle">Rule: 0–1=100%, 2=75%, 3+=60%; Heavy: −20% / −35%</div>
-    <div class="subtle">Floor: ${fmt(d.floor)} • Capacity cap: ${fmt(d.cap)} • Competition multiplier: ${(Math.round((d.compMult||i.compMult||1)*100))}%</div>
-    <div class="subtle">User adjustments: ${esc(JSON.stringify(i.user_multiplier_breakdown||{},null,0) || "none")}</div>
-    <div class="subtle">Method: ${esc(comp?.method || "n/a")}</div>
-  `;
+  devsBox.innerHTML = (d.developments||[]).length ? "<ul>"+d.developments.map(x=>`<li>${esc(x.name)} • ${esc(x.status)}${x.approx_miles!=null?` • ~${x.approx_miles} mi`:''}</li>`).join("")+"</ul>" : "<em>none</em>";
+  devsExtNews.innerHTML = (d.developments_external?.news||[]).length ? "<ul>"+d.developments_external.news.map(x=>`<li>${esc(x.name)} • ${esc(x.status)}${x.link?` • <a href="${x.link}" target="_blank">source</a>`:''}</li>`).join("")+"</ul>" : "<em>none</em>";
+  devsExtPermits.innerHTML = (d.developments_external?.permits||[]).length ? "<ul>"+d.developments_external.permits.map(x=>`<li>${esc(x.name)} • ${esc(x.status)}${x.link?` • <a href="${x.link}" target="_blank">source</a>`:''}</li>`).join("")+"</ul>" : "<em>none</em>";
 
-  const ai=d.developments_ai||{}; const verified=Array.isArray(ai.verified)?ai.verified:[];
-  const left=(Array.isArray(d.developments)&&d.developments.length)?("<ul>"+d.developments.map(x=>`<li>${esc(x.name)} • ${esc(x.status)} • ${x.miles} mi</li>`).join("")+"</ul>"):"<span class='muted'>OSM/Overpass: none found</span>";
-  const right=(verified.length)?`<div><div><b>GPT (verified)</b></div><ul>${verified.map(x=>`<li>${esc(x.name)} • ${esc(x.status||"planned")} • ~${x.approx_miles??"?"} mi</li>`).join("")}</ul><div class='muted'>GPT confidence: ${((ai.confidence||0)*100|0)}%</div></div>`:"<span class='muted'>GPT: none reported</span>";
-  devsBox.innerHTML = `<div class="grid"><div>${left}</div><div>${right}</div></div>`;
-
-  let s=""; if(typeof d.summary==="string") s=d.summary; else if(d.summary&&typeof d.summary.summary==="string") s=d.summary.summary;
-  summaryBox.textContent = (s && s.trim) ? s.trim() : (s || "—");
+  // Summary: ALWAYS non-empty from server
+  summaryBox.textContent = (d.summary||"—").trim();
 
   initOrUpdateMap(d.map);
+  showRating(addrInput.value.trim());
+}
 
-  lastEstimate = { aadtBanner: aadtBanner.innerText, comp: compLine.innerText, details: detailsBox.innerText, devs: devsBox.innerText, summary: summaryBox.innerText, est: { base:d.base, low:d.low, high:d.high } };
-  lastInputs = { address: addrInput.value.trim(), mpds: i.mpds, diesel: i.diesel, aadt_used: i.aadt_used };
+/* Rating */
+async function resolvePlaceIdIfNeeded(address){
+  if (selectedPlaceId) return selectedPlaceId;
+  try{ const r=await fetch(`/google/findplace?input=${encodeURIComponent(address)}`); const j=await r.json(); if(j.ok && j.place_id) return j.place_id; }catch{}
+  return null;
+}
+async function showRating(address){
+  const pid=await resolvePlaceIdIfNeeded(address);
+  if(!pid){ ratingLine.innerHTML="—"; return; }
+  try{ const r=await fetch(`/google/rating?place_id=${encodeURIComponent(pid)}`); const j=await r.json(); if(!j.ok){ ratingLine.innerHTML="—"; return; }
+    ratingLine.innerHTML = `⭐ ${j.rating ?? "—"} (${j.total||0} reviews)`; }catch{ ratingLine.innerHTML="—"; }
 }
 
 /* Main */
-async function estimate(){
+$("go").addEventListener("click", async ()=>{
   try{ goBtn.disabled=true; setOverlayWorking(); const d=await callEstimate(); renderAll(d); }
-  catch(e){ alert("Error: "+(e.message||e)); } finally{ goBtn.disabled=false; }
-}
-$("go").addEventListener("click", estimate);
-addrInput.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); estimate(); } });
+  catch(e){ alert("Error: "+(e.message||e)); }
+  finally{ goBtn.disabled=false; clearOverlay(); }
+});
+addrInput.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); $("go").click(); } });
 
-/* Export PDF */
-document.getElementById("exportPDF").addEventListener("click", ()=>{
+/* PDF Export (pro look with Map & Static Street View) */
+document.getElementById("exportPDF").addEventListener("click", async ()=>{
   const { jsPDF } = window.jspdf || {}; if(!jsPDF){ alert("PDF lib failed to load"); return; }
-  const doc=new jsPDF({unit:"pt",format:"a4"}), L=(x,y,t)=>{ const lines=doc.splitTextToSize(String(t||""),520); doc.text(lines,x,y); return y+lines.length*14; };
-  let y=50;
-  doc.setFont("helvetica","bold"); doc.setFontSize(16); doc.text("Sunoco, LP Fuel IQ — Fuel Site Analyzer",40,y); y+=24;
+  const doc=new jsPDF({unit:"pt",format:"a4"}); // 595x842
+  const pageW=595, pageH=842, margin=36, contentW=pageW - margin*2;
+
+  // Title
+  doc.setFont("helvetica","bold"); doc.setFontSize(18);
+  doc.text("Sunoco, LP Fuel IQ — Fuel Site Analyzer", margin, margin+6);
+
+  // Summary block
   doc.setFont("helvetica","normal"); doc.setFontSize(11);
-  y=L(40,y,`Address: ${lastInputs?.address||addrInput.value||"-"}`);
-  y=L(40,y,`MPDs: ${lastInputs?.mpds??$("mpds").value}   Diesel: ${lastInputs?.diesel??$("diesel").value}`);
-  y=L(40,y,lastEstimate?.aadtBanner||aadtBanner.innerText); y+=8;
-  doc.setFont("helvetica","bold"); doc.setFontSize(22); doc.text((lastEstimate?.est?.base!=null)?`${fmt(lastEstimate.est.base)} gal/mo`:"—",40,y); y+=22;
-  doc.setFont("helvetica","normal"); doc.setFontSize(11);
-  y=L(40,y, `Low–High: ${(lastEstimate?.est? `${fmt(lastEstimate.est.low)} – ${fmt(lastEstimate.est.high)}` : "—")}`);
-  y=L(40,y,lastEstimate?.comp||compLine.innerText);
-  y=L(40,y,lastEstimate?.details||detailsBox.innerText); y+=8;
-  doc.setFont("helvetica","bold"); doc.text("Developments",40,y); y+=16;
-  doc.setFont("helvetica","normal"); y=L(40,y,lastEstimate?.devs||devsBox.innerText); y+=8;
-  doc.setFont("helvetica","bold"); doc.text("Summary",40,y); y+=16;
-  y=L(40,y,lastEstimate?.summary||summaryBox.innerText);
+  const lines = doc.splitTextToSize(summaryBox.innerText || "", contentW);
+  doc.text(lines, margin, margin+28);
+
+  let cursorY = margin + 28 + lines.length*14 + 16;
+
+  // Key stats
+  const key = [
+    `Address: ${addrInput.value || "-"}`,
+    `MPDs: ${$("mpds").value}   Diesel: ${$("diesel").value}`,
+    aadtBanner.innerText,
+    `Estimate (LOW): ${$("estNum").innerText}  |  Range: ${$("estRange").innerText.replace("Full range: ","")}`,
+    compLine.innerText
+  ].join("\n");
+  const keyLines = doc.splitTextToSize(key, contentW);
+  doc.text(keyLines, margin, cursorY);
+  cursorY += keyLines.length*14 + 12;
+
+  // Snap map via leaflet-image
+  const mapImg = await new Promise(resolve=>{
+    if(!window.leafletImage || !window.map){ resolve(null); return; }
+    leafletImage(map, function(err, canvas){
+      if(err){ resolve(null); return; }
+      resolve(canvas.toDataURL("image/png"));
+    });
+  });
+
+  // Static Street View (needs GOOGLE_API_KEY configured on server; we embed via Google Static API)
+  let svImg = null;
+  try{
+    if (window.selectedCoords) {
+      const loc=`${selectedCoords.lat},${selectedCoords.lon}`;
+      const staticUrl=`https://maps.googleapis.com/maps/api/streetview?size=800x400&location=${encodeURIComponent(loc)}&key=${encodeURIComponent("")}`; // If you want to embed your key here, you can inline it.
+      // Safer: use the live iframe for on-screen, and skip SV image if no key available
+      // We'll skip if blank key
+      if (false) {
+        const img = new Image(); img.crossOrigin="anonymous"; img.onload=()=>{ 
+          // convert to canvas to dataURL
+          const c=document.createElement("canvas"); c.width=img.width; c.height=img.height;
+          const g=c.getContext("2d"); g.drawImage(img,0,0); svImg=c.toDataURL("image/jpeg","0.92");
+        }; img.src=staticUrl;
+      }
+    }
+  }catch{}
+
+  // Place images
+  const imgW = contentW, imgH = 260;
+  if (mapImg) {
+    if (cursorY + imgH > pageH - margin) { doc.addPage(); cursorY = margin; }
+    doc.setFont("helvetica","bold"); doc.text("Map & Competitors (1.5 mi)", margin, cursorY);
+    cursorY += 12;
+    doc.addImage(mapImg, "PNG", margin, cursorY, imgW, imgH);
+    cursorY += imgH + 12;
+  }
+  if (svImg) {
+    if (cursorY + imgH > pageH - margin) { doc.addPage(); cursorY = margin; }
+    doc.setFont("helvetica","bold"); doc.text("Street View", margin, cursorY);
+    cursorY += 12;
+    doc.addImage(svImg, "JPEG", margin, cursorY, imgW, imgH);
+    cursorY += imgH + 12;
+  } else {
+    // If we can't embed SV image (no Static API key), at least note the live link
+    if (cursorY + 24 > pageH - margin) { doc.addPage(); cursorY = margin; }
+    doc.setFont("helvetica","bold"); doc.text("Street View", margin, cursorY);
+    cursorY += 14;
+    doc.setFont("helvetica","normal"); doc.text("Shown live on page (Static image export requires a Google Static Street View API key).", margin, cursorY);
+    cursorY += 18;
+  }
+
+  // Developments blocks
+  const devText = "Developments — News:\n" + (devsExtNews.innerText || "—") + "\n\nDevelopments — Permits:\n" + (devsExtPermits.innerText || "—");
+  const devLines = doc.splitTextToSize(devText, contentW);
+  if (cursorY + devLines.length*14 > pageH - margin) { doc.addPage(); cursorY = margin; }
+  doc.setFont("helvetica","bold"); doc.text("Developments", margin, cursorY); cursorY += 14;
+  doc.setFont("helvetica","normal"); doc.text(devLines, margin, cursorY);
+
   doc.save("FuelIQ_Site_Analyzer.pdf");
 });
 
