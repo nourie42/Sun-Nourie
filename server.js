@@ -1,4 +1,4 @@
-// server.js — Fuel IQ API v2025-08-29e
+// server.js — Fuel IQ API v2025-08-29j (fix: add roadContext)
 import express from "express";
 import cors from "cors";
 import path from "path";
@@ -146,10 +146,7 @@ async function queryCustomTraffic(lat,lon,address){
   return null;
 }
 
-/* ───────────────────────────── Competition & Develop ──────────────────── */
-const HEAVY_BRANDS=/(sheetz|wawa|race\s?trac|racetrac|buc-?ee'?s|royal\s?farms|quik.?trip|\bqt\b)/i;
-const IS_SUNOCO=/\bsunoco\b/i;
-
+/* ─────────────────────── Overpass & competition helpers ───────────────── */
 const OVERPASS=[
   "https://overpass-api.de/api/interpreter",
   "https://overpass.kumi.systems/api/interpreter",
@@ -170,6 +167,10 @@ async function overpassQuery(data){
   }
   throw last;
 }
+
+const HEAVY_BRANDS=/(sheetz|wawa|race\s?trac|racetrac|buc-?ee'?s|royal\s?farms|quik.?trip|\bqt\b)/i;
+const IS_SUNOCO=/\bsunoco\b/i;
+
 async function googleNearbyGasStations(lat,lon,rM=2414){
   if(!GOOGLE_API_KEY) return [];
   const base=`https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lon}&radius=${rM}&type=gas_station&key=${GOOGLE_API_KEY}`;
@@ -216,7 +217,7 @@ async function competitorsWithinRadiusMiles(lat,lon,rMi=1.5){
   return out.filter(s=>s.miles<=rMi);
 }
 
-/* Developments */
+/* ───────────────────────────── Developments ───────────────────────────── */
 async function overpassDevelopments(lat,lon){
   const rM=Math.round(5*1609.344);
   const q=`[out:json][timeout:25];
@@ -282,7 +283,6 @@ async function bingNewsCityCounty(city,county,state){
       }catch{}
     }
   }
-  // dedupe
   const ded=(arr)=>{ const seen=new Set(), out=[]; for(const i of arr){ const k=`${(i.name||"").toLowerCase()}|${i.link||""}|${i.status||""}`; if(seen.has(k)) continue; seen.add(k); out.push(i);} return out; };
   return { news: ded(newsOut).slice(0,80), web: ded(webOut).slice(0,80), message: "ok" };
 }
@@ -312,47 +312,44 @@ async function exhaustiveDevelopments(addrLabel, lat, lon){
   };
 }
 
-/* ───────────────────────────── Google endpoints ───────────────────────── */
-async function googleAutocomplete(input){
-  if(!GOOGLE_API_KEY) return { ok:false, status:"MISSING_KEY", items:[] };
-  const au=`https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}&components=country:us&key=${GOOGLE_API_KEY}`;
-  const ar=await fetchWithTimeout(au,{headers:{ "User-Agent":UA, Accept:"application/json"}},15000);
-  const at=await ar.text(); if(!ar.ok) return { ok:false, status:`HTTP_${ar.status}`, items:[] };
-  let aj; try{ aj=JSON.parse(at);}catch{ return { ok:false, status:"PARSE_ERROR", items:[] }; }
-  if(aj.status!=="OK" && aj.status!=="ZERO_RESULTS") return { ok:false, status:aj.status, items:[] };
-
-  const items=[];
-  for(const p of (aj.predictions||[]).slice(0,6)){
-    const pid=p.place_id; if(!pid) continue;
-    const du=`https://maps.googleapis.com/maps/api/place/details/json?place_id=${pid}&fields=formatted_address,geometry,name,place_id,types&key=${GOOGLE_API_KEY}`;
-    try{
-      const dr=await fetchWithTimeout(du,{headers:{ "User-Agent":UA, Accept:"application/json"}},15000);
+/* ───────────────────────── Google endpoints ───────────────────────────── */
+app.get("/google/status", async (_req,res)=>{
+  try{
+    if(!GOOGLE_API_KEY) return res.json({ ok:false, status:"MISSING_KEY" });
+    // quick autocomplete probe
+    const au=`https://maps.googleapis.com/maps/api/place/autocomplete/json?input=Test&components=country:us&key=${GOOGLE_API_KEY}`;
+    const r=await fetchWithTimeout(au,{headers:{ "User-Agent":UA }},10000);
+    res.json({ ok:r.ok, status:r.ok?"WORKING":`HTTP_${r.status}` });
+  }catch{ res.json({ ok:false, status:"EXCEPTION" }); }
+});
+app.get("/google/autocomplete", async (req,res)=>{
+  const q=String(req.query.input||"").trim(); if(!q) return res.json({ ok:false, status:"BAD_REQUEST", items:[] });
+  if(!GOOGLE_API_KEY) return res.json({ ok:false, status:"MISSING_KEY", items:[] });
+  try{
+    const au=`https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(q)}&components=country:us&key=${GOOGLE_API_KEY}`;
+    const ar=await fetchWithTimeout(au,{headers:{ "User-Agent":UA }},15000);
+    const aj=await ar.json();
+    if(aj.status!=="OK" && aj.status!=="ZERO_RESULTS") return res.json({ ok:false, status:aj.status, items:[] });
+    const items=[];
+    for(const p of (aj.predictions||[]).slice(0,6)){
+      const pid=p.place_id; if(!pid) continue;
+      const du=`https://maps.googleapis.com/maps/api/place/details/json?place_id=${pid}&fields=formatted_address,geometry,name,place_id,types&key=${GOOGLE_API_KEY}`;
+      const dr=await fetchWithTimeout(du,{headers:{ "User-Agent":UA }},15000);
       const dj=await dr.json(); if(dj.status!=="OK") continue;
       const loc=dj.result?.geometry?.location;
       if(loc && Number.isFinite(loc.lat) && Number.isFinite(loc.lng)){
         items.push({ type:"Google", display:dj.result.formatted_address || dj.result.name || p.description, lat:+loc.lat, lon:+loc.lng, place_id:dj.result.place_id || pid, score:1.3 });
       }
-    }catch{}
-  }
-  return { ok:true, status:"OK", items };
-}
-app.get("/google/status", async (_req,res)=>{
-  try{
-    const probe=await googleAutocomplete("1600 Amphitheatre Parkway, Mountain View, CA");
-    res.json({ ok:!!probe.ok, status: probe.ok ? "WORKING":"ERROR" });
-  }catch{ res.json({ ok:false, status:"EXCEPTION" }); }
+    }
+    return res.json({ ok:true, status:"OK", items });
+  }catch(e){ return res.json({ ok:false, status:"ERROR", items:[], error:String(e) }); }
 });
-app.get("/google/autocomplete", async (req,res)=>{
-  const q=String(req.query.input||"").trim(); if(!q) return res.json({ ok:false, status:"BAD_REQUEST", items:[] });
-  res.json(await googleAutocomplete(q));
-});
-// Fallback text search endpoint (improves ratings reliability)
 app.get("/google/searchplace", async (req,res)=>{
   try{
     if(!GOOGLE_API_KEY) return res.json({ ok:false, status:"MISSING_KEY" });
     const q=String(req.query.q||"").trim(); if(!q) return res.json({ ok:false, status:"BAD_REQUEST" });
     const url=`https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(q)}&type=gas_station&key=${GOOGLE_API_KEY}`;
-    const r=await fetchWithTimeout(url,{headers:{ "User-Agent":UA, Accept:"application/json"}},15000);
+    const r=await fetchWithTimeout(url,{headers:{ "User-Agent":UA }},15000);
     const j=await r.json(); const it=(j.results||[])[0];
     if(!it?.place_id) return res.json({ ok:false, status:j.status||"ZERO_RESULTS" });
     res.json({ ok:true, status:"OK", place_id:it.place_id, location:it.geometry?.location||null });
@@ -363,7 +360,7 @@ app.get("/google/findplace", async (req,res)=>{
     if(!GOOGLE_API_KEY) return res.json({ ok:false, status:"MISSING_KEY" });
     const input=String(req.query.input||"").trim(); if(!input) return res.json({ ok:false, status:"BAD_REQUEST" });
     const url=`https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(input)}&inputtype=textquery&fields=place_id,name,formatted_address,geometry&key=${GOOGLE_API_KEY}`;
-    const r=await fetchWithTimeout(url,{headers:{ "User-Agent":UA, Accept:"application/json"}},15000);
+    const r=await fetchWithTimeout(url,{headers:{ "User-Agent":UA }},15000);
     const j=await r.json(); const cand=(j.candidates||[])[0];
     if(!cand?.place_id) return res.json({ ok:false, status:j.status||"ZERO_RESULTS" });
     res.json({ ok:true, status:"OK", place_id:cand.place_id, name:cand.name, address:cand.formatted_address, location:cand.geometry?.location||null });
@@ -375,12 +372,57 @@ app.get("/google/rating", async (req,res)=>{
     const place_id=String(req.query.place_id||"").trim(); if(!place_id) return res.json({ ok:false, status:"BAD_REQUEST" });
     const fields=["name","formatted_address","rating","user_ratings_total"].join(",");
     const url=`https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(place_id)}&fields=${encodeURIComponent(fields)}&key=${GOOGLE_API_KEY}`;
-    const r=await fetchWithTimeout(url,{headers:{ "User-Agent":UA, Accept:"application/json"}},15000);
+    const r=await fetchWithTimeout(url,{headers:{ "User-Agent":UA }},15000);
     const j=await r.json(); if(j.status!=="OK") return res.json({ ok:false, status:j.status||"ERROR", error:j.error_message||null });
     const g=j.result||{};
     res.json({ ok:true, status:"OK", rating:g.rating||null, total:g.user_ratings_total||0, name:g.name||null, address:g.formatted_address||null });
   }catch(e){ res.json({ ok:false, status:"EXCEPTION", error:String(e) }); }
 });
+
+/* ───────────────────────────── Road context (FIX) ─────────────────────── */
+function parseMaxspeed(ms){ const m=String(ms||"").match(/(\d+)\s*(mph)?/i); return m?+m[1]:null; }
+function roadWeight(hw){
+  const order={ motorway:6, trunk:5, primary:4, secondary:3, tertiary:2, unclassified:1, residential:1 };
+  return order[hw] || 0;
+}
+async function roadContext(lat, lon){
+  const rM = Math.round(1609 * 1.2); // ~1.2 mi scan
+  // Ways
+  const qWays = `[out:json][timeout:25];
+    ( way(around:${rM},${lat},${lon})["highway"~"motorway|trunk|primary|secondary|tertiary|primary_link|secondary_link|tertiary_link"]; );
+    out center tags;`;
+  // Signals
+  const qSignals = `[out:json][timeout:25];
+    node(around:${rM},${lat},${lon})["highway"="traffic_signals"]; out;`;
+  let ways=[], signals=0;
+  try{ const wj = await overpassQuery(qWays); ways = wj.elements || []; } catch {}
+  try{ const sj = await overpassQuery(qSignals); signals = (sj.elements||[]).length; } catch {}
+
+  const rows = ways.map(w=>{
+    const t=w.tags||{};
+    const name = t.ref || t.name || "";
+    const hw = (t.highway||"").replace("_link","");
+    const lanes = +t.lanes || +t["lanes:forward"] || +t["lanes:backward"] || null;
+    const speed = parseMaxspeed(t.maxspeed);
+    const latc = w.center?.lat, lonc = w.center?.lon;
+    const d = (Number.isFinite(latc)&&Number.isFinite(lonc)) ? haversine(lat,lon,latc,lonc) : null;
+    return { name, highway:hw, lanes, maxspeed:speed, distM:d, weight:roadWeight(hw) };
+  }).filter(r=>r.weight>0);
+
+  rows.sort((a,b)=> (b.weight-a.weight) || ((b.lanes||0)-(a.lanes||0)) || ((b.maxspeed||0)-(a.maxspeed||0)) || ((a.distM||1e12)-(b.distM||1e12)));
+  const main = rows.slice(0,3);
+  const side = rows.slice(3,8);
+
+  const nice = (r)=>[r.name || r.highway, r.maxspeed?`${r.maxspeed} mph`:null, r.lanes?`${r.lanes} lanes`:null].filter(Boolean).join(" • ");
+  const mainLabel = main.map(nice).filter(Boolean).slice(0,3).join(" | ");
+  const sideLabel = side.map(nice).filter(Boolean).slice(0,3).join(" | ");
+  const summary = [mainLabel, sideLabel].filter(Boolean).join(" — ");
+
+  // crude intersections estimate: number of high-class ways in radius / 3
+  const intersections = Math.max(0, Math.round(rows.length / 3));
+
+  return { summary, main, side, signals, intersections };
+}
 
 /* ───────────────────────────── Gallons calc (rules) ───────────────────── */
 function gallonsWithRules({ aadt, mpds, diesel, compCount, heavyCount, pricePosition, userExtrasMult=1 }){
@@ -456,7 +498,7 @@ async function gptJSONWithRetry(prompt){
   throw last||new Error("GPT failed");
 }
 async function gptSummary(ctx){
-  const sys='Return {"summary":"<text>"} with 8–12 clear sentences. Include: AADT method/value; baseline ceiling; competition rule result; heavy penalties; pricing position; applied user adjustments (extras/flags); caps; result low/base/high; notable road context; and found developments.';
+  const sys='Return {"summary":"<text>"} with 8–12 clear sentences. Include: AADT method/value; baseline ceiling; competition rule result; heavy penalties; pricing position; applied user adjustments; caps; result low/base/high; road context; and notable developments.';
   const prompt = `
 Inputs:
 - Address: ${ctx.address}
@@ -563,12 +605,11 @@ app.post("/estimate", async (req,res)=>{
   }
 });
 
-/* ───────────────────────────── Heuristics for AADT ───────────────────── */
-function parseMaxspeed(ms){ const m=String(ms||"").match(/(\d+)\s*(mph)?/i); return m?+m[1]:null; }
+/* ───────────────────────── Heuristics for AADT ───────────────────────── */
 function heuristicAADT(roads){
   const dom=roads?.main?.[0]?.highway || roads?.side?.[0]?.highway || "";
   const lanes=roads?.main?.[0]?.lanes || roads?.side?.[0]?.lanes || 2;
-  const speed=parseMaxspeed(roads?.main?.[0]?.maxspeed || roads?.side?.[0]?.maxspeed);
+  const speed=roads?.main?.[0]?.maxspeed || roads?.side?.[0]?.maxspeed || null;
   let base=0; switch(dom){ case"motorway":base=30000;break; case"trunk":base=22000;break; case"primary":base=14000;break; case"secondary":base=9000;break; case"tertiary":base=6000;break; default:base=4000; }
   let est=base*Math.max(1, lanes/2);
   if(speed){ if(speed>=55) est*=1.15; else if(speed<=30) est*=0.8; }
