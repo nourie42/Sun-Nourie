@@ -1,4 +1,4 @@
-<!-- Fuel IQ UI v2025-08-29r — fixes: street view nav, red LOW on <4.0, tidy advanced row, better PDF, clearer math -->
+<!-- Fuel IQ UI v2025-08-29x -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -12,59 +12,65 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous"></script>
 
 <style>
-:root{ --bg:#0b0e15; --panel:#111725; --panel2:#0f1421; --line:#263145; --text:#eaeef7; --muted:#97a3b8; --brand:#0ea5e9; --brand2:#22d3ee; --pill:#0f1929; --warn:#ff6b6b; }
-*{ box-sizing:border-box; } body{ background:var(--bg); color:var(--text); font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; margin:0; padding-bottom:72px; }
-.wrap{ max-width:1120px; margin:24px auto; padding:0 16px; }
-header{ display:flex; align-items:center; gap:14px; margin-bottom:6px; }
-header h1{ font-size:28px; margin:0; } .build{ margin-left:auto; font-size:12px; color:#8aa2c0; }
-.instructions{ margin:4px 0 12px; color:#cfe3ff; font-size:13px; }
+:root{
+  --bg:#0b0e15; --panel:#111725; --panel2:#0f1421; --line:#263145;
+  --text:#eaeef7; --muted:#97a3b8; --brand:#0ea5e9; --brand2:#22d3ee; --warn:#ff6b6b;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;padding-bottom:72px}
+.wrap{max-width:1120px;margin:24px auto;padding:0 16px}
+header{display:flex;align-items:center;gap:14px;margin-bottom:6px}
+header h1{font-size:28px;margin:0}
+.build{margin-left:auto;font-size:12px;color:#8aa2c0}
+.instructions{margin:4px 0 12px;color:#cfe3ff;font-size:13px}
 
-.card{ background:linear-gradient(180deg,var(--panel),var(--panel2)); border:1px solid var(--line); border-radius:12px; padding:16px; margin:12px 0; }
-label{ display:block; font-weight:600; margin:8px 0 6px; color:#d8e3f6; }
-input, select{ width:100%; padding:12px; border-radius:10px; border:1px solid var(--line); background:#0b1220; color:#eaeef7; }
-button{ background:linear-gradient(135deg,var(--brand),var(--brand2)); color:#fff; border:0; padding:12px 16px; border-radius:10px; font-weight:700; cursor:pointer; }
-button:disabled{ opacity:.6; cursor:not-allowed; }
+.card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}
+label{display:block;font-weight:600;margin:8px 0 6px;color:#d8e3f6}
+input,select{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:#0b1220;color:#eaeef7}
+button{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;border:0;padding:12px 16px;border-radius:10px;font-weight:700;cursor:pointer}
+button:disabled{opacity:.6;cursor:not-allowed}
 
-.row{ display:grid; grid-template-columns:1.6fr 0.7fr 0.7fr 0.8fr; gap:12px; align-items:start; }
-@media (max-width:980px){ .row{ grid-template-columns:1fr; } }
+.row{display:grid;grid-template-columns:1.6fr 0.7fr 0.7fr 0.8fr;gap:12px;align-items:start}
+@media (max-width:980px){.row{grid-template-columns:1fr}}
 
-.toolbar{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:12px; }
-.muted{ color:var(--muted); } .subtle{ font-size:12px; opacity:.9; }
-.spinner{ display:inline-block; width:14px; height:14px; border:2px solid rgba(255,255,255,.25); border-top-color:#fff; border-radius:50%; animation:spin .9s linear infinite; margin-right:6px; }
-@keyframes spin{ to{ transform: rotate(360deg); } }
+.toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.muted{color:var(--muted)} .subtle{font-size:12px;opacity:.9}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:spin .9s linear infinite;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
 
-#map{ height:420px; border-radius:12px; border:1px solid var(--line); position:relative; }
-#overlay{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(11,14,21,.55); border-radius:12px; font-weight:800; color:#cde9ff; font-size:18px; padding:20px; text-align:center; }
+#map{height:420px;border-radius:12px;border:1px solid var(--line);position:relative}
+#overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(11,14,21,.55);border-radius:12px;font-weight:800;color:#cde9ff;font-size:18px;padding:20px;text-align:center}
 
-#svWrap{ margin-top:10px; }
-#sv{ width:100%; height:380px; border:0; border-radius:12px; border:1px solid var(--line); background:#0b1220; pointer-events:auto; }
+#svWrap{margin-top:10px}
+#sv{width:100%;height:380px;border:0;border-radius:12px;border:1px solid var(--line);background:#0b1220;pointer-events:auto}
 
-.ac-wrap{ position:relative; }
-.ac-list{ position:absolute; top:100%; left:0; right:0; z-index:30; margin-top:6px; background:#0b1220; border:1px solid var(--line); border-radius:12px; max-height:320px; overflow:auto; box-shadow:0 18px 36px rgba(0,0,0,.35); }
-.ac-item{ padding:10px 12px; cursor:pointer; border-bottom:1px solid rgba(255,255,255,.04); } .ac-item:last-child{ border-bottom:0; }
-.ac-item:hover{ background:#101a2b; } .badge{ display:inline-block; font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); background:var(--pill); color:#a9c5ff; margin-left:8px; }
+.ac-wrap{position:relative}
+.ac-list{position:absolute;top:100%;left:0;right:0;z-index:30;margin-top:6px;background:#0b1220;border:1px solid var(--line);border-radius:12px;max-height:320px;overflow:auto;box-shadow:0 18px 36px rgba(0,0,0,.35)}
+.ac-item{padding:10px 12px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.04)} .ac-item:last-child{border-bottom:0}
+.ac-item:hover{background:#101a2b}
+.badge{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);background:#0f1929;color:#a9c5ff;margin-left:8px}
 
-details summary{ cursor:pointer; }
-.adv-line{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-.chip{ display:inline-flex; align-items:center; gap:8px; background:#0f1929; border:1px solid var(--line); padding:8px 10px; border-radius:999px; font-size:13px; }
-.chip input{ width:auto; accent-color:#22d3ee; }
-.radio-row{ display:inline-flex; gap:10px; flex-wrap:wrap; }
+details summary{cursor:pointer}
+.adv-line{display:flex;gap:8px;align-items:center;flex-wrap:nowrap;overflow:auto;padding-bottom:6px}
+.chip{display:inline-flex;align-items:center;gap:8px;background:#0f1929;border:1px solid var(--line);padding:8px 10px;border-radius:999px;font-size:13px;white-space:nowrap}
+.chip input{width:auto;accent-color:#22d3ee}
+.radio-row{display:inline-flex;gap:10px;flex-wrap:nowrap;overflow:auto}
 
-.hero{ display:flex; justify-content:space-between; align-items:flex-end; gap:12px; }
-.hero .num{ font-size:44px; font-weight:900; letter-spacing:.5px; }
-.hero .num.red{ color:var(--warn); }
-.hero .sub{ font-size:13px; color:#a9b6d0; }
-.stop-flag{ display:none; align-items:center; gap:10px; color:#ff6b6b; font-weight:800; margin-top:6px; }
-.stop-flag .icon{ font-size:22px; background:#ff3b30; color:#fff; border-radius:6px; padding:2px 6px; }
+.hero{display:flex;justify-content:space-between;align-items:flex-end;gap:12px}
+.hero .num{font-size:44px;font-weight:900;letter-spacing:.5px}
+.hero .num.red{color:var(--warn)}
+.hero .sub{font-size:13px;color:#a9b6d0}
+.stop-flag{display:none;align-items:center;gap:10px;color:#ff6b6b;font-weight:800;margin-top:6px}
+.stop-flag .icon{font-size:22px;background:#ff3b30;color:#fff;border-radius:6px;padding:2px 6px}
 
-.footerbar{ position:fixed; left:0; right:0; bottom:0; background:linear-gradient(180deg,#0c1220,#0a0f1a); border-top:1px solid var(--line); padding:10px 16px; display:flex; justify-content:center; gap:12px; z-index:50; }
+.footerbar{position:fixed;left:0;right:0;bottom:0;background:linear-gradient(180deg,#0c1220,#0a0f1a);border-top:1px solid var(--line);padding:10px 16px;display:flex;justify-content:center;gap:12px;z-index:50}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
     <h1>Sunoco, LP Fuel IQ - Fuel Site Analyzer</h1>
-    <span class="build">UI v2025-08-29r</span>
+    <span class="build">UI v2025-08-29x</span>
   </header>
   <div class="instructions">
     <b>Instructions:</b> Enter Address, click <i>Estimate</i>. Do not exit your browser or let your phone screen shut off until results are ready or you will encounter errors. Click <i>Advanced Options</i> to make changes.
@@ -79,7 +85,7 @@ details summary{ cursor:pointer; }
           <input id="addr" placeholder="Enter business or address" autocomplete="off"/>
           <div id="ac" class="ac-list" style="display:none;"></div>
         </div>
-        <div class="muted subtle" id="acHint" style="margin-top:6px; display:none;">Searching suggestions…</div>
+        <div class="muted subtle" id="acHint" style="margin-top:6px;display:none;">Searching suggestions…</div>
         <div class="muted subtle" id="apiStatus" style="margin-top:6px">API Status: checking…</div>
       </div>
       <div><label>Regular MPDs</label><input id="mpds" type="number" value="3" min="1"/></div>
@@ -95,8 +101,8 @@ details summary{ cursor:pointer; }
 
   <!-- Advanced -->
   <div class="card">
-    <details open>
-      <summary><b>Advanced options</b></summary>
+    <details>
+      <summary><b>Advanced options</b> — collapsed by default</summary>
       <div class="adv-line" id="advRow" style="margin-top:8px">
         <label class="chip"><input type="checkbox" id="ex_large_dev"> Large residential/commercial dev. (+7.5%)</label>
         <label class="chip"><input type="checkbox" id="ex_hours18"> Operating hours 18h (−7.5%)</label>
@@ -105,6 +111,14 @@ details summary{ cursor:pointer; }
         <label class="chip"><input type="checkbox" id="ex_rural"> Rural bonus (0 comps within 3 mi) (+30%)</label>
         <label class="chip"><input type="checkbox" id="ex_lowrating"> Ratings below 4.0 (−30%)</label>
         <span class="chip" id="addExtra" style="cursor:pointer;">+ Add adj. (%)</span>
+      </div>
+      <div style="margin-top:8px;">
+        <label><b>Gas pricing vs area</b></label>
+        <div class="radio-row">
+          <label class="chip"><input type="radio" name="pricepos" value="below"> Below competition (+10%)</label>
+          <label class="chip"><input type="radio" name="pricepos" value="inline" checked> In line (0%)</label>
+          <label class="chip"><input type="radio" name="pricepos" value="above"> Above competition (−10%)</label>
+        </div>
       </div>
       <div id="extraList" style="margin-top:8px;"></div>
     </details>
@@ -117,7 +131,7 @@ details summary{ cursor:pointer; }
         <div>Adjusted Base Estimate (LOW)</div>
         <div class="num" id="estNum">—</div>
         <div class="sub" id="estRange">Full range: —</div>
-        <div id="lowReviewMsg" class="sub" style="color:#ff8a80; display:none;">Estimate lowered due to low reviews per NACS estimates.</div>
+        <div id="lowReviewMsg" class="sub" style="color:#ff8a80;display:none;">Estimate lowered due to low reviews per NACS estimates.</div>
         <div id="sunocoStop" class="stop-flag"><span class="icon">🛑</span> Sunoco station within 1 mile — verify brand conflict.</div>
       </div>
       <div class="right sub">
@@ -154,6 +168,7 @@ details summary{ cursor:pointer; }
 <div class="footerbar"><button id="exportPDF">Export to PDF</button></div>
 
 <script>
+/* ====== helpers ====== */
 const $=id=>document.getElementById(id);
 const apiStatus=$("apiStatus"), aadtBanner=$("aadtBanner"), compLine=$("compLine"), overlay=$("overlay"), svFrame=$("sv"), calcBox=$("calcBox"), stopFlag=$("sunocoStop");
 const outNum=$("estNum"), outRange=$("estRange"), outY2=$("y2"), outY3=$("y3"), lowReviewMsg=$("lowReviewMsg");
@@ -163,10 +178,12 @@ const ex_large_dev=$("ex_large_dev"), ex_hours18=$("ex_hours18"), ex_highincome=
 
 let map, layer, mapReady=false, selectedCoords=null, selectedPlaceId=null, lastRating=null;
 
-/* helpers */
-function fmt(n){ return (n??0).toLocaleString(undefined,{maximumFractionDigits:0}); }
-function esc(s){ return (s??"").toString().replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;"," >":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
-function initMap(){ if(mapReady) return; map=L.map("map",{zoomControl:true}); window.map=map; L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map); layer=L.layerGroup().addTo(map); mapReady=true; }
+/* formatters */
+function fmt(n){return (n??0).toLocaleString(undefined,{maximumFractionDigits:0})}
+function esc(s){return (s??"").toString().replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]))}
+
+/* map / street view */
+function initMap(){if(mapReady) return; map=L.map("map",{zoomControl:true}); window.map=map; L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map); layer=L.layerGroup().addTo(map); mapReady=true;}
 function updateStreetView(lat,lon){ svFrame.src=`https://maps.google.com/maps?q=&layer=c&cbll=${lat},${lon}&cbp=12,0,,0,0&output=svembed&hl=en`; }
 
 /* Google status */
@@ -174,32 +191,34 @@ let GOOGLE_OK=false;
 async function checkGoogleStatus(){
   try{ const r=await fetch("/google/status"); const j=await r.json(); GOOGLE_OK=!!j.ok; apiStatus.textContent=j.ok?"API: Google — Working":`API: Google — ${j.status}`; }
   catch{ GOOGLE_OK=false; apiStatus.textContent="API: Google — unavailable"; }
-} document.addEventListener("DOMContentLoaded", checkGoogleStatus);
+}
+document.addEventListener("DOMContentLoaded", checkGoogleStatus);
 
-/* suggestions (250ms debounce + cancellation) */
+/* ====== FAST suggestions (150ms + cancel) ====== */
 let acItems=[], acTimer=null, acController=null;
 function renderAc(list){ if(!list.length){ acBox.style.display="none"; return; } acBox.innerHTML=list.map((it,i)=>`<div class="ac-item" data-i="${i}">${esc(it.display)} <span class="badge">${it.type}</span></div>`).join(""); [...acBox.children].forEach(el=>el.onclick=()=>chooseAc(+el.dataset.i)); acBox.style.display="block"; }
 function chooseAc(i){ const it=acItems[i]; if(!it) return; addrInput.value=it.display; selectedCoords=(Number.isFinite(it.lat)&&Number.isFinite(it.lon))?{lat:it.lat,lon:it.lon}:null; selectedPlaceId=it.place_id||null; acBox.style.display="none"; acHint.style.display="none"; fetchRating(addrInput.value); }
 async function googleSearch(q,signal){ if(!GOOGLE_OK) return []; try{ const r=await fetch(`/google/autocomplete?input=${encodeURIComponent(q)}`,{signal}); const j=await r.json(); if(!j.ok) return []; return (j.items||[]).map(it=>({...it,type:"Google",score:1.3})); }catch{return[];} }
-async function nominatimSearch(q,signal){ try{ const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=us&q=${encodeURIComponent(q)}`,{signal}); const a=await r.json(); return a.map(row=>({ type:"OSM", display:row.display_name, lat:+row.lat, lon:+row.lon, score:0.6 })); }catch{return[];} }
+async function nominatimSearch(q,signal){ try{ const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=us&q=${encodeURIComponent(q)}`,{signal}); const a=await r.json(); return a.map(row=>({type:"OSM",display:row.display_name,lat:+row.lat,lon:+row.lon,score:0.6})); }catch{return[];} }
 addrInput.addEventListener("input", ()=>{
   const q=addrInput.value.trim();
   acBox.style.display="none"; selectedCoords=null; selectedPlaceId=null; lastRating=null; ratingLine.innerHTML="—";
-  if(acTimer){ clearTimeout(acTimer); acTimer=null; }
-  if(acController){ acController.abort(); acController=null; }
+  if(acTimer){clearTimeout(acTimer); acTimer=null;}
+  if(acController){acController.abort(); acController=null;}
   if(q.length<3){ acHint.style.display="none"; return; }
   acHint.style.display="block"; acHint.textContent="Searching suggestions…";
   acTimer=setTimeout(async ()=>{
     acController=new AbortController();
     try{
+      // prioritize Google, fallback to OSM
       const [g,n]=await Promise.all([googleSearch(q,acController.signal), nominatimSearch(q,acController.signal)]);
       acItems=[...g,...n].slice(0,8);
       renderAc(acItems);
-    }catch{} finally{ acHint.style.display="none"; }
-  }, 250);
+    }catch{}finally{ acHint.style.display="none"; }
+  },150);
 });
 
-/* rating */
+/* ====== ratings ====== */
 async function resolvePlaceIdIfNeeded(address){
   if (selectedPlaceId) return selectedPlaceId;
   try{ const r=await fetch(`/google/findplace?input=${encodeURIComponent(address)}`); const j=await r.json(); if(j.ok && j.place_id) return j.place_id; }catch{}
@@ -209,14 +228,17 @@ async function resolvePlaceIdIfNeeded(address){
 async function fetchRating(address){
   const pid=await resolvePlaceIdIfNeeded(address);
   if(!pid){ ratingLine.innerHTML="—"; lastRating=null; return; }
-  try{ const r=await fetch(`/google/rating?place_id=${encodeURIComponent(pid)}`); const j=await r.json(); if(!j.ok){ ratingLine.innerHTML="—"; lastRating=null; return; }
-    lastRating = (j.rating!=null)? +j.rating : null;
-    ratingLine.innerHTML = `⭐ ${j.rating ?? "—"} (${j.total||0} reviews)`;
-    if(lastRating!=null && lastRating < 4.0){ ex_lowrating.checked = true; }
+  try{
+    const r=await fetch(`/google/rating?place_id=${encodeURIComponent(pid)}`); const j=await r.json();
+    if(!j.ok){ ratingLine.innerHTML="—"; lastRating=null; return; }
+    lastRating=(j.rating!=null)?+j.rating:null;
+    ratingLine.innerHTML=`⭐ ${j.rating ?? "—"} (${j.total||0} reviews)`;
+    // auto apply penalty UI toggle
+    if(lastRating!=null && lastRating<4.0){ ex_lowrating.checked=true; }
   }catch{ ratingLine.innerHTML="—"; lastRating=null; }
 }
 
-/* add extra chip row */
+/* ====== advanced extras ====== */
 function addExtraRow(pct="",note=""){
   const row=document.createElement("div");
   row.style.marginTop="6px";
@@ -226,45 +248,45 @@ function addExtraRow(pct="",note=""){
 }
 $("addExtra").addEventListener("click",()=>addExtraRow());
 
+function getPricePosition(){ const r=document.querySelector('input[name="pricepos"]:checked'); return r? r.value : "inline"; }
+function getFlags(){ return { rural: ex_rural.checked === true }; }
 function collectExtras(){
-  const out=[];
-  if(ex_large_dev.checked) out.push({pct:7.5, note:"Large residential/commercial developments"});
-  if(ex_hours18.checked) out.push({pct:-7.5, note:"18h ops"});
-  if(ex_highincome.checked) out.push({pct:2.5, note:"Higher income"});
-  if(ex_competitive_pricing.checked) out.push({pct:10, note:"Competitive site gas pricing"});
-  if(ex_lowrating.checked) out.push({pct:-30, note:"Rating <4.0"});
+  const extras=[];
+  if(ex_large_dev.checked) extras.push({pct:7.5, note:"Large residential/commercial developments"});
+  if(ex_hours18.checked) extras.push({pct:-7.5, note:"18h ops"});
+  if(ex_highincome.checked) extras.push({pct:2.5, note:"Higher income"});
+  // Only add +10% chip if user didn't already pick "below" pricing to avoid double-counting.
+  if(ex_competitive_pricing.checked && getPricePosition()!=="below") extras.push({pct:10, note:"Competitive pricing"});
+  if(ex_lowrating.checked) extras.push({pct:-30, note:"Rating <4.0"});
   for(const chip of document.querySelectorAll("#extraList .chip")){
     const pct=+chip.querySelector(".extraPct").value;
     const note=chip.querySelector(".extraNote").value.trim();
-    if(Number.isFinite(pct)) out.push({pct, note});
+    if(Number.isFinite(pct)) extras.push({pct, note});
   }
-  return out;
+  return extras;
 }
-function getFlags(){ return { rural: ex_rural.checked === true }; }
-function getPricePosition(){ const r=document.querySelector('input[name="pricepos"]:checked'); return r? r.value : "inline"; }
 
-/* API helpers */
+/* ====== API helpers ====== */
 async function safeJSON(url,opts){
-  const r=await fetch(url,opts);
-  const t=await r.text();
-  let j=null; try{ j=JSON.parse(t);}catch{}
-  if(!r.ok){
-    const msg = (j && (j.error || j.detail)) ? `${j.error}${j.detail?": "+j.detail:""}` : `HTTP ${r.status}`;
-    throw new Error(msg);
-  }
+  const r=await fetch(url,opts); const t=await r.text(); let j=null; try{ j=JSON.parse(t);}catch{}
+  if(!r.ok){ const msg=(j&&(j.error||j.detail))?`${j.error}${j.detail?": "+j.detail:""}`:`HTTP ${r.status}`; throw new Error(msg); }
   return j;
 }
 async function callEstimate(){
-  const body={ address: addrInput.value.trim(), mpds:+$("mpds").value||0, diesel:+$("diesel").value||0,
+  const body={
+    address: addrInput.value.trim(),
+    mpds:+$("mpds").value||0,
+    diesel:+$("diesel").value||0,
     advanced:{ extra: collectExtras(), flags: getFlags(), price_position: getPricePosition() },
-    client_rating: lastRating, auto_low_rating: (lastRating!=null && lastRating<4.0)
+    client_rating:lastRating,
+    auto_low_rating: (lastRating!=null && lastRating<4.0)
   };
   if(selectedCoords){ body.siteLat=selectedCoords.lat; body.siteLon=selectedCoords.lon; }
   const ov=+($("aadtOverride").value||""); if(Number.isFinite(ov)&&ov>0) body.aadtOverride=ov;
-  return await safeJSON("/estimate",{ method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
+  return await safeJSON("/estimate",{method:"POST",headers:{ "Content-Type":"application/json" },body:JSON.stringify(body)});
 }
 
-/* map */
+/* ====== map render ====== */
 function initOrUpdateMap(m){
   if(!mapReady){ initMap(); }
   layer.clearLayers();
@@ -275,17 +297,18 @@ function initOrUpdateMap(m){
   for(const c of (m.competitors||[])){
     if(!Number.isFinite(c.lat)||!Number.isFinite(c.lon)) continue;
     pts.push([c.lat,c.lon]);
-    L.circleMarker([c.lat,c.lon],{radius:6,weight:1,color:c.heavy?"#ff7f50":"#4ade80",fillColor:c.heavy?"#ff7f50":"#4ade80",fillOpacity:.9}).addTo(layer).bindPopup(`${esc(c.name||"Fuel")} • ${c.miles} mi`);
+    L.circleMarker([c.lat,c.lon],{radius:6,weight:1,color:c.heavy?"#ff7f50":"#4ade80",fillColor:c.heavy?"#ff7f50":"#4ade80",fillOpacity:.9})
+      .addTo(layer).bindPopup(`${esc(c.name||"Fuel")} • ${c.miles} mi`);
   }
   map.fitBounds(L.latLngBounds(pts).pad(0.25));
   overlay.style.display="none";
   updateStreetView(site[0],site[1]);
 }
 
-/* render */
+/* ====== calculated breakdown ====== */
 function renderCalc(bk, low, base, high){
   const rows=[
-    `LOW estimate (shown): ${fmt(low)}  •  BASE: ${fmt(base)}  •  HIGH: ${fmt(high)}`,
+    `LOW estimate (shown): ${fmt(low)} • BASE: ${fmt(base)} • HIGH: ${fmt(high)}`,
     `Baseline ceiling: AADT×2%×8×30 = ${fmt(bk.baseline)} (AADT used: ${fmt(bk.aadt)})`,
     `Competition rule: count=${bk.compRule.compCount} → baseMult=${bk.compRule.baseMult.toFixed(2)} − heavyPenalty=${bk.compRule.heavyPenalty.toFixed(2)} → compMult=${bk.compRule.compMult.toFixed(2)} → afterComp=${fmt(bk.compRule.afterComp)}`,
     `Caps: equipment=${fmt(bk.caps.capEquip)}, soft=${fmt(bk.caps.capSoftTotal)}, hard=${fmt(bk.caps.capHardTotal)}`,
@@ -293,121 +316,123 @@ function renderCalc(bk, low, base, high){
     `Pre-clamp: ${fmt(bk.preClamp)} → Final base (clamped to baseline if needed): ${fmt(bk.finalClampedToBaseline)}`,
     `LOW/HIGH bands: base×0.86 / base×1.06`
   ];
-  calcBox.innerHTML = "<ul style='margin:6px 0 0 18px'>" + rows.map(r=>`<li>${esc(r)}</li>`).join("") + "</ul>";
+  calcBox.innerHTML="<ul style='margin:6px 0 0 18px'>"+rows.map(r=>`<li>${esc(r)}</li>`).join("")+"</ul>";
 }
+
+/* ====== result render ====== */
 function renderAll(d){
-  const ratingLow = (d.flags && d.flags.auto_low_rating) || (lastRating!=null && lastRating < 4.0);
-  outNum.textContent = fmt(d.low);
+  const ratingLow=(d.flags && d.flags.auto_low_rating) || (lastRating!=null && lastRating<4.0);
+  outNum.textContent=fmt(d.low);
   outNum.classList.toggle("red", !!ratingLow);
-  lowReviewMsg.style.display = ratingLow ? "block" : "none";
-  outRange.textContent = `Full range: ${fmt(d.low)} – ${fmt(d.high)}`;
+  lowReviewMsg.style.display=ratingLow?"block":"none";
+  outRange.textContent=`Full range: ${fmt(d.low)} – ${fmt(d.high)}`;
   outY2.textContent=fmt(d.year2); outY3.textContent=fmt(d.year3);
 
-  const method = d.inputs?.aadt_components?.method || "model";
+  const method=d.inputs?.aadt_components?.method || "model";
   aadtBanner.textContent=`AADT used ${fmt(d.inputs.aadt_used)} (${method})`;
 
   let compTxt=`Competition: ${d.competition.count} within 1.5 mi`;
-  if(d.competition.nearest_mi!=null) compTxt += `; nearest ${(+d.competition.nearest_mi).toFixed(3)} mi`;
-  if((d.competition.notable_brands||[]).length) compTxt += `; heavy: ${d.competition.notable_brands.join(", ")}`;
-  if(d.flags?.rural_bonus_applied) compTxt += `; rural bonus +30% applied`;
-  compLine.textContent = compTxt;
+  if(d.competition.nearest_mi!=null) compTxt+=`; nearest ${(+d.competition.nearest_mi).toFixed(3)} mi`;
+  if((d.competition.notable_brands||[]).length) compTxt+=`; heavy: ${d.competition.notable_brands.join(", ")}`;
+  if(d.flags?.rural_bonus_applied) compTxt+=`; rural bonus +30% applied`;
+  compLine.textContent=compTxt;
 
-  stopFlag.style.display = d.flags?.sunoco_within_1mi ? "flex" : "none";
+  stopFlag.style.display=d.flags?.sunoco_within_1mi?"flex":"none";
 
   const osm=d.developments||[], news=d.developments_external?.news||[], perm=d.developments_external?.permits||[];
-  devsBox.innerHTML = osm.length ? "<ul>"+osm.map(x=>`<li>${esc(x.name)} • ${esc(x.status)}${x.approx_miles!=null?` • ~${x.approx_miles} mi`:''}</li>`).join("")+"</ul>" : "<em>none</em>";
-  devsExtNews.innerHTML = news.length ? "<ul>"+news.map(x=>`<li>${esc(x.name)}${x.link?` • <a href="${x.link}" target="_blank">source</a>`:''}</li>`).join("")+"</ul>" : "<em>none</em>";
-  devsExtPermits.innerHTML = perm.length ? "<ul>"+perm.map(x=>`<li>${esc(x.name)}${x.link?` • <a href="${x.link}" target="_blank">source</a>`:''}</li>`).join("")+"</ul>" : "<em>none</em>";
+  devsBox.innerHTML=osm.length ? "<ul>"+osm.map(x=>`<li>${esc(x.name)} • ${esc(x.status)}${x.approx_miles!=null?` • ~${x.approx_miles} mi`:''}</li>`).join("")+"</ul>" : "<em>none</em>";
+  devsExtNews.innerHTML=news.length ? "<ul>"+news.map(x=>`<li>${esc(x.name)}${x.link?` • <a href="${x.link}" target="_blank">source</a>`:''}</li>`).join("")+"</ul>" : "<em>none</em>";
+  devsExtPermits.innerHTML=perm.length ? "<ul>"+perm.map(x=>`<li>${esc(x.name)}${x.link?` • <a href="${x.link}" target="_blank">source</a>`:''}</li>`).join("")+"</ul>" : "<em>none</em>";
   if(!news.length && !perm.length){ devsExtNews.innerHTML="<em>none found via news</em>"; devsExtPermits.innerHTML="<em>none found via permits/boards</em>"; }
 
-  summaryBox.textContent = (d.summary||"").trim() || `AADT ${fmt(d.inputs?.aadt_used)} (${method}); comp ${d.competition?.count??0}; est LOW ${fmt(d.low)} (range ${fmt(d.low)}–${fmt(d.high)}).`;
+  summaryBox.textContent=(d.summary||"").trim() || `AADT ${fmt(d.inputs?.aadt_used)} (${method}); comp ${d.competition?.count??0}; est LOW ${fmt(d.low)} (range ${fmt(d.low)}–${fmt(d.high)}).`;
 
   renderCalc(d.calc_breakdown, d.low, d.base, d.high);
   initOrUpdateMap(d.map);
 }
 
-/* main */
-$("go").addEventListener("click", async ()=>{
+/* ====== main ====== */
+$("go").addEventListener("click", async()=>{
   try{
     $("ac").style.display="none";
     goBtn.disabled=true; goStatus.style.display="inline";
+    // fetch rating first so server can auto-apply low-rating penalty
     if(!lastRating){ await fetchRating(addrInput.value.trim()); }
     const d=await callEstimate();
     renderAll(d);
-  }catch(e){
-    alert("Estimate failed: " + (e.message||e));
-  }finally{
-    goBtn.disabled=false; goStatus.style.display="none";
-  }
+  }catch(e){ alert("Estimate failed: " + (e.message||e)); }
+  finally{ goBtn.disabled=false; goStatus.style.display="none"; }
 });
 addrInput.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); $("go").click(); } });
 
-/* PDF export (clean layout) */
-document.getElementById("exportPDF").addEventListener("click", async ()=>{
+/* ====== PDF (white professional theme) ====== */
+document.getElementById("exportPDF").addEventListener("click", async()=>{
   const { jsPDF } = window.jspdf || {}; if(!jsPDF){ alert("PDF lib failed to load"); return; }
-  const doc=new jsPDF({unit:"pt",format:"a4"}); const W=595, H=842, M=36, CW=W-2*M;
+  const doc=new jsPDF({unit:"pt",format:"a4"});
+  const W=595,H=842,M=40,CW=W-2*M;
 
-  // Title
+  doc.setFillColor(255,255,255); doc.rect(0,0,W,H,"F"); // white bg
+  doc.setTextColor(0,0,0);
+
+  // Title & date
   doc.setFont("helvetica","bold"); doc.setFontSize(18);
-  doc.text("Sunoco, LP Fuel IQ — Fuel Site Analyzer", M, M+6);
+  doc.text("Sunoco, LP Fuel IQ — Fuel Site Analyzer", M, M);
+  doc.setFont("helvetica","normal"); doc.setFontSize(10);
+  doc.text(new Date().toLocaleString(), W-M, M, {align:"right"});
 
-  // Big LOW estimate banner
-  const lowTxt = document.getElementById("estNum").innerText || "—";
-  doc.setFillColor(15,25,41); doc.setDrawColor(38,49,69);
-  doc.roundedRect(M, M+16, CW, 48, 6, 6, "FD");
-  doc.setFontSize(12); doc.setTextColor(200,210,230);
-  doc.text("Adjusted Base Estimate (LOW)", M+12, M+36);
-  doc.setFont("helvetica","bold"); doc.setFontSize(24); doc.setTextColor(255,255,255);
-  doc.text(lowTxt, M+12, M+58);
+  // LOW banner
+  const lowTxt=document.getElementById("estNum").innerText || "—";
+  doc.setDrawColor(20); doc.setFillColor(245); doc.roundedRect(M, M+14, CW, 48, 6, 6, "FD");
+  doc.setFont("helvetica","bold"); doc.setFontSize(12); doc.text("Adjusted Base Estimate (LOW)", M+12, M+32);
+  doc.setFont("helvetica","bold"); doc.setFontSize(26); doc.text(lowTxt, M+12, M+58);
 
-  let y = M + 16 + 48 + 14;
+  let y=M+14+48+16;
 
   // Key metrics
-  const lines = doc.splitTextToSize([
+  const key=[
     `Address: ${document.getElementById("addr").value || "-"}`,
     `MPDs: ${document.getElementById("mpds").value}   Diesel: ${document.getElementById("diesel").value}`,
     document.getElementById("aadtBanner").innerText,
     document.getElementById("estRange").innerText.replace("Full range: ","Range: "),
     document.getElementById("compLine").innerText,
     `Rating: ${document.getElementById("ratingLine").innerText || "—"}`
-  ].join("\n"), CW);
-  doc.setFont("helvetica","normal"); doc.setFontSize(12); doc.setTextColor(230,235,245);
-  doc.text(lines, M, y); y += lines.length*14 + 10;
+  ].join("\n");
+  doc.setFont("helvetica","normal"); doc.setFontSize(11);
+  const keyLines=doc.splitTextToSize(key,CW);
+  doc.text(keyLines,M,y); y+=keyLines.length*14+10;
 
   // How calculated
-  const calc = "How this estimate was calculated:\n" + (document.getElementById("calcBox").innerText || "");
-  const calcLines = doc.splitTextToSize(calc, CW);
-  doc.text(calcLines, M, y); y += calcLines.length*14 + 10;
+  const calc="How this estimate was calculated:\n"+(document.getElementById("calcBox").innerText||"—");
+  const calcLines=doc.splitTextToSize(calc,CW);
+  doc.text(calcLines,M,y); y+=calcLines.length*14+10;
 
   // Summary
-  const summary = "Summary (GPT):\n" + (document.getElementById("summary").innerText || "");
-  const sumLines = doc.splitTextToSize(summary, CW);
-  doc.text(sumLines, M, y); y += sumLines.length*14 + 10;
+  const summary="Summary (GPT):\n"+(document.getElementById("summary").innerText||"—");
+  const sumLines=doc.splitTextToSize(summary,CW);
+  doc.text(sumLines,M,y); y+=sumLines.length*14+10;
 
-  // Map image
-  const mapImg = await new Promise(resolve=>{
-    if(!window.leafletImage || !window.map){ resolve(null); return; }
-    leafletImage(window.map, (err, canvas)=> resolve(err?null:canvas.toDataURL("image/png")));
+  // Map snapshot
+  const mapImg=await new Promise(resolve=>{
+    if(!window.leafletImage||!window.map){ resolve(null); return; }
+    leafletImage(window.map,(err,canvas)=>resolve(err?null:canvas.toDataURL("image/png")));
   });
   const imgH=250;
-  if (mapImg) {
-    if (y + imgH > H - M) { doc.addPage(); y = M; }
-    doc.setFont("helvetica","bold"); doc.setFontSize(12); doc.text("Map & Competitors (1.5 mi)", M, y); y += 12;
-    doc.addImage(mapImg, "PNG", M, y, CW, imgH); y += imgH + 10;
+  if(mapImg){
+    if(y+imgH>H-M){ doc.addPage(); y=M; }
+    doc.setFont("helvetica","bold"); doc.text("Map & Competitors (1.5 mi)",M,y); y+=12;
+    doc.addImage(mapImg,"PNG",M,y,CW,imgH); y+=imgH+10;
   }
 
-  // Developments
-  const devText = "Developments — News:\n" + (document.getElementById("devsExternalNews").innerText || "—")
-               + "\n\nDevelopments — Permits / Boards:\n" + (document.getElementById("devsExternalPermits").innerText || "—");
-  const devLines = doc.splitTextToSize(devText, CW);
-  if (y + devLines.length*14 > H - M) { doc.addPage(); y = M; }
-  doc.setFont("helvetica","bold"); doc.text("Developments", M, y); y += 14;
-  doc.setFont("helvetica","normal"); doc.text(devLines, M, y);
+  // Devs
+  const devText="Developments — News:\n"+(document.getElementById("devsExternalNews").innerText||"—")
+              +"\n\nDevelopments — Permits / Boards:\n"+(document.getElementById("devsExternalPermits").innerText||"—");
+  const devLines=doc.splitTextToSize(devText,CW);
+  if(y+devLines.length*14>H-M){ doc.addPage(); y=M; }
+  doc.setFont("helvetica","bold"); doc.text("Developments",M,y); y+=14;
+  doc.setFont("helvetica","normal"); doc.text(devLines,M,y);
 
   doc.save("FuelIQ_Site_Analyzer.pdf");
 });
-
-/* init */
 </script>
 </body>
 </html>
