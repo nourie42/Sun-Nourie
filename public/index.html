@@ -1,4 +1,4 @@
-<!-- Fuel IQ UI v2025-08-29m -->
+<!-- Fuel IQ UI v2025-08-29r — fixes: street view nav, red LOW on <4.0, tidy advanced row, better PDF, clearer math -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -30,12 +30,14 @@ button:disabled{ opacity:.6; cursor:not-allowed; }
 
 .toolbar{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:12px; }
 .muted{ color:var(--muted); } .subtle{ font-size:12px; opacity:.9; }
+.spinner{ display:inline-block; width:14px; height:14px; border:2px solid rgba(255,255,255,.25); border-top-color:#fff; border-radius:50%; animation:spin .9s linear infinite; margin-right:6px; }
+@keyframes spin{ to{ transform: rotate(360deg); } }
 
 #map{ height:420px; border-radius:12px; border:1px solid var(--line); position:relative; }
 #overlay{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(11,14,21,.55); border-radius:12px; font-weight:800; color:#cde9ff; font-size:18px; padding:20px; text-align:center; }
 
-#svWrap{ margin-top:10px; } /* allow navigation */ 
-#sv{ width:100%; height:380px; border:0; border-radius:12px; border:1px solid var(--line); background:#0b1220; }
+#svWrap{ margin-top:10px; }
+#sv{ width:100%; height:380px; border:0; border-radius:12px; border:1px solid var(--line); background:#0b1220; pointer-events:auto; }
 
 .ac-wrap{ position:relative; }
 .ac-list{ position:absolute; top:100%; left:0; right:0; z-index:30; margin-top:6px; background:#0b1220; border:1px solid var(--line); border-radius:12px; max-height:320px; overflow:auto; box-shadow:0 18px 36px rgba(0,0,0,.35); }
@@ -43,10 +45,10 @@ button:disabled{ opacity:.6; cursor:not-allowed; }
 .ac-item:hover{ background:#101a2b; } .badge{ display:inline-block; font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); background:var(--pill); color:#a9c5ff; margin-left:8px; }
 
 details summary{ cursor:pointer; }
-.adv-line{ display:flex; align-items:center; gap:10px; overflow-x:auto; white-space:nowrap; padding-bottom:6px; }
+.adv-line{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
 .chip{ display:inline-flex; align-items:center; gap:8px; background:#0f1929; border:1px solid var(--line); padding:8px 10px; border-radius:999px; font-size:13px; }
 .chip input{ width:auto; accent-color:#22d3ee; }
-.radio-row{ display:inline-flex; gap:10px; white-space:nowrap; }
+.radio-row{ display:inline-flex; gap:10px; flex-wrap:wrap; }
 
 .hero{ display:flex; justify-content:space-between; align-items:flex-end; gap:12px; }
 .hero .num{ font-size:44px; font-weight:900; letter-spacing:.5px; }
@@ -62,7 +64,7 @@ details summary{ cursor:pointer; }
 <div class="wrap">
   <header>
     <h1>Sunoco, LP Fuel IQ - Fuel Site Analyzer</h1>
-    <span class="build">UI v2025-08-29m</span>
+    <span class="build">UI v2025-08-29r</span>
   </header>
   <div class="instructions">
     <b>Instructions:</b> Enter Address, click <i>Estimate</i>. Do not exit your browser or let your phone screen shut off until results are ready or you will encounter errors. Click <i>Advanced Options</i> to make changes.
@@ -86,34 +88,23 @@ details summary{ cursor:pointer; }
     </div>
     <div class="toolbar">
       <button id="go">Estimate</button>
-      <span id="goStatus" class="muted" style="display:none;">Estimating, please wait…</span>
+      <span id="goStatus" class="muted" style="display:none;"><span class="spinner"></span>Estimating, please wait…</span>
       <span class="muted">Please click Estimate again if you change address, Advanced Options or AADT.</span>
     </div>
   </div>
 
   <!-- Advanced -->
   <div class="card">
-    <details>
+    <details open>
       <summary><b>Advanced options</b></summary>
-      <div class="adv-line" id="advRow">
-        <label class="chip"><input type="checkbox" id="ex_large_dev"> Large residential or commercial developments (+7.5%)</label>
+      <div class="adv-line" id="advRow" style="margin-top:8px">
+        <label class="chip"><input type="checkbox" id="ex_large_dev"> Large residential/commercial dev. (+7.5%)</label>
         <label class="chip"><input type="checkbox" id="ex_hours18"> Operating hours 18h (−7.5%)</label>
         <label class="chip"><input type="checkbox" id="ex_highincome"> Higher-income trade area (+2.5%)</label>
         <label class="chip"><input type="checkbox" id="ex_competitive_pricing"> Competitive site gas pricing (+10%)</label>
         <label class="chip"><input type="checkbox" id="ex_rural"> Rural bonus (0 comps within 3 mi) (+30%)</label>
         <label class="chip"><input type="checkbox" id="ex_lowrating"> Ratings below 4.0 (−30%)</label>
-      </div>
-      <div style="margin-top:8px;">
-        <label><b>Gas pricing vs area</b></label>
-        <div class="radio-row">
-          <label class="chip"><input type="radio" name="pricepos" value="below"> Below competition (+10%)</label>
-          <label class="chip"><input type="radio" name="pricepos" value="inline" checked> In line (0%)</label>
-          <label class="chip"><input type="radio" name="pricepos" value="above"> Above competition (−10%)</label>
-        </div>
-      </div>
-      <div class="adv-line" style="margin-top:8px;">
         <span class="chip" id="addExtra" style="cursor:pointer;">+ Add adj. (%)</span>
-        <span id="activeExtras" class="subtle"></span>
       </div>
       <div id="extraList" style="margin-top:8px;"></div>
     </details>
@@ -147,7 +138,9 @@ details summary{ cursor:pointer; }
   <div class="card">
     <div class="muted">Map: Site & competitors (1.5 mi)</div>
     <div id="map"><div id="overlay" class="muted">—</div></div>
-    <div id="svWrap"><div class="muted" style="margin-top:10px;">Street View</div><iframe id="sv" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div>
+    <div id="svWrap"><div class="muted" style="margin-top:10px;">Street View</div>
+      <iframe id="sv" loading="lazy" allowfullscreen allow="fullscreen" referrerpolicy="no-referrer-when-downgrade"></iframe>
+    </div>
   </div>
 
   <div class="card"><b>Developments — OSM</b><div id="devs" class="muted">—</div></div>
@@ -166,7 +159,6 @@ const apiStatus=$("apiStatus"), aadtBanner=$("aadtBanner"), compLine=$("compLine
 const outNum=$("estNum"), outRange=$("estRange"), outY2=$("y2"), outY3=$("y3"), lowReviewMsg=$("lowReviewMsg");
 const devsBox=$("devs"), devsExtNews=$("devsExternalNews"), devsExtPermits=$("devsExternalPermits"), summaryBox=$("summary"), ratingLine=$("ratingLine");
 const addrInput=$("addr"), acBox=$("ac"), acHint=$("acHint"), goBtn=$("go"), goStatus=$("goStatus");
-const addExtraBtn=$("addExtra"), extraList=$("extraList"), activeExtras=$("activeExtras");
 const ex_large_dev=$("ex_large_dev"), ex_hours18=$("ex_hours18"), ex_highincome=$("ex_highincome"), ex_lowrating=$("ex_lowrating"), ex_competitive_pricing=$("ex_competitive_pricing"), ex_rural=$("ex_rural");
 
 let map, layer, mapReady=false, selectedCoords=null, selectedPlaceId=null, lastRating=null;
@@ -174,17 +166,8 @@ let map, layer, mapReady=false, selectedCoords=null, selectedPlaceId=null, lastR
 /* helpers */
 function fmt(n){ return (n??0).toLocaleString(undefined,{maximumFractionDigits:0}); }
 function esc(s){ return (s??"").toString().replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;"," >":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
-let dotsTimer=null, dotsState=0;
-function setOverlay(text){
-  overlay.textContent=text;
-  overlay.style.display="flex";
-  if(dotsTimer) clearInterval(dotsTimer);
-  dotsState=0;
-  dotsTimer=setInterval(()=>{ dotsState=(dotsState+1)%4; overlay.textContent=text + ".".repeat(dotsState); }, 500);
-}
-function clearOverlay(){ overlay.style.display="none"; if(dotsTimer){ clearInterval(dotsTimer); dotsTimer=null; } }
 function initMap(){ if(mapReady) return; map=L.map("map",{zoomControl:true}); window.map=map; L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map); layer=L.layerGroup().addTo(map); mapReady=true; }
-function updateStreetView(lat,lon){ svFrame.src=`https://maps.google.com/maps?q=&layer=c&cbll=${lat},${lon}&cbp=12,0,,0,0&output=svembed`; }
+function updateStreetView(lat,lon){ svFrame.src=`https://maps.google.com/maps?q=&layer=c&cbll=${lat},${lon}&cbp=12,0,,0,0&output=svembed&hl=en`; }
 
 /* Google status */
 let GOOGLE_OK=false;
@@ -193,7 +176,7 @@ async function checkGoogleStatus(){
   catch{ GOOGLE_OK=false; apiStatus.textContent="API: Google — unavailable"; }
 } document.addEventListener("DOMContentLoaded", checkGoogleStatus);
 
-/* ultra-fast suggestions (300ms debounce + cancellation) */
+/* suggestions (250ms debounce + cancellation) */
 let acItems=[], acTimer=null, acController=null;
 function renderAc(list){ if(!list.length){ acBox.style.display="none"; return; } acBox.innerHTML=list.map((it,i)=>`<div class="ac-item" data-i="${i}">${esc(it.display)} <span class="badge">${it.type}</span></div>`).join(""); [...acBox.children].forEach(el=>el.onclick=()=>chooseAc(+el.dataset.i)); acBox.style.display="block"; }
 function chooseAc(i){ const it=acItems[i]; if(!it) return; addrInput.value=it.display; selectedCoords=(Number.isFinite(it.lat)&&Number.isFinite(it.lon))?{lat:it.lat,lon:it.lon}:null; selectedPlaceId=it.place_id||null; acBox.style.display="none"; acHint.style.display="none"; fetchRating(addrInput.value); }
@@ -201,8 +184,7 @@ async function googleSearch(q,signal){ if(!GOOGLE_OK) return []; try{ const r=aw
 async function nominatimSearch(q,signal){ try{ const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=us&q=${encodeURIComponent(q)}`,{signal}); const a=await r.json(); return a.map(row=>({ type:"OSM", display:row.display_name, lat:+row.lat, lon:+row.lon, score:0.6 })); }catch{return[];} }
 addrInput.addEventListener("input", ()=>{
   const q=addrInput.value.trim();
-  acBox.style.display="none";
-  selectedCoords=null; selectedPlaceId=null; lastRating=null; ratingLine.innerHTML="—";
+  acBox.style.display="none"; selectedCoords=null; selectedPlaceId=null; lastRating=null; ratingLine.innerHTML="—";
   if(acTimer){ clearTimeout(acTimer); acTimer=null; }
   if(acController){ acController.abort(); acController=null; }
   if(q.length<3){ acHint.style.display="none"; return; }
@@ -214,47 +196,8 @@ addrInput.addEventListener("input", ()=>{
       acItems=[...g,...n].slice(0,8);
       renderAc(acItems);
     }catch{} finally{ acHint.style.display="none"; }
-  }, 300);
+  }, 250);
 });
-
-/* advanced pills */
-function pills(){
-  const p=[];
-  if(ex_large_dev.checked)p.push("+7.5% Large development");
-  if(ex_hours18.checked)p.push("−7.5% 18h ops");
-  if(ex_highincome.checked)p.push("+2.5% Higher-income");
-  if(ex_competitive_pricing.checked)p.push("+10% Competitive pricing");
-  if(ex_rural.checked)p.push("+30% Rural bonus");
-  if(ex_lowrating.checked)p.push("−30% Rating <4.0");
-  activeExtras.innerHTML=p.map(x=>`<span class="badge">${esc(x)}</span>`).join(" ");
-}
-[ex_large_dev,ex_hours18,ex_highincome,ex_lowrating,ex_competitive_pricing,ex_rural].forEach(el=>el.addEventListener("change",pills));
-
-function addExtraRow(pct="",note=""){
-  const row=document.createElement("div");
-  row.style.marginTop="6px";
-  row.innerHTML=`<span class="chip"><input class="extraPct" type="number" step="0.1" style="width:90px" placeholder="% e.g. 5 or -3" value="${pct}"> <input class="extraNote" style="width:320px" placeholder="Comment" value="${esc(note)}"> <button class="rm" type="button">×</button></span>`;
-  row.querySelector(".rm").addEventListener("click",()=>row.remove());
-  extraList.appendChild(row);
-}
-$("addExtra").addEventListener("click",()=>addExtraRow());
-
-function collectExtras(){
-  const out=[];
-  if(ex_large_dev.checked) out.push({pct:7.5, note:"Large residential/commercial developments"});
-  if(ex_hours18.checked) out.push({pct:-7.5, note:"18h ops"});
-  if(ex_highincome.checked) out.push({pct:2.5, note:"Higher income"});
-  if(ex_competitive_pricing.checked) out.push({pct:10, note:"Competitive site gas pricing"});
-  if(ex_lowrating.checked) out.push({pct:-30, note:"Rating <4.0 (auto)"});  // can be set automatically by rating
-  for(const chip of extraList.querySelectorAll(".chip")){
-    const pct=+chip.querySelector(".extraPct").value;
-    const note=chip.querySelector(".extraNote").value.trim();
-    if(Number.isFinite(pct)) out.push({pct, note});
-  }
-  return out;
-}
-function getFlags(){ return { rural: ex_rural.checked === true }; }
-function getPricePosition(){ const r=document.querySelector('input[name="pricepos"]:checked'); return r? r.value : "inline"; }
 
 /* rating */
 async function resolvePlaceIdIfNeeded(address){
@@ -269,10 +212,36 @@ async function fetchRating(address){
   try{ const r=await fetch(`/google/rating?place_id=${encodeURIComponent(pid)}`); const j=await r.json(); if(!j.ok){ ratingLine.innerHTML="—"; lastRating=null; return; }
     lastRating = (j.rating!=null)? +j.rating : null;
     ratingLine.innerHTML = `⭐ ${j.rating ?? "—"} (${j.total||0} reviews)`;
-    // auto apply low-rating toggle if <4.0
-    if(lastRating!=null && lastRating < 4.0){ ex_lowrating.checked = true; pills(); }
+    if(lastRating!=null && lastRating < 4.0){ ex_lowrating.checked = true; }
   }catch{ ratingLine.innerHTML="—"; lastRating=null; }
 }
+
+/* add extra chip row */
+function addExtraRow(pct="",note=""){
+  const row=document.createElement("div");
+  row.style.marginTop="6px";
+  row.innerHTML=`<span class="chip"><input class="extraPct" type="number" step="0.1" style="width:90px" placeholder="% e.g. 5 or -3" value="${pct}"> <input class="extraNote" style="width:320px" placeholder="Comment" value="${esc(note)}"> <button class="rm" type="button">×</button></span>`;
+  row.querySelector(".rm").addEventListener("click",()=>row.remove());
+  $("extraList").appendChild(row);
+}
+$("addExtra").addEventListener("click",()=>addExtraRow());
+
+function collectExtras(){
+  const out=[];
+  if(ex_large_dev.checked) out.push({pct:7.5, note:"Large residential/commercial developments"});
+  if(ex_hours18.checked) out.push({pct:-7.5, note:"18h ops"});
+  if(ex_highincome.checked) out.push({pct:2.5, note:"Higher income"});
+  if(ex_competitive_pricing.checked) out.push({pct:10, note:"Competitive site gas pricing"});
+  if(ex_lowrating.checked) out.push({pct:-30, note:"Rating <4.0"});
+  for(const chip of document.querySelectorAll("#extraList .chip")){
+    const pct=+chip.querySelector(".extraPct").value;
+    const note=chip.querySelector(".extraNote").value.trim();
+    if(Number.isFinite(pct)) out.push({pct, note});
+  }
+  return out;
+}
+function getFlags(){ return { rural: ex_rural.checked === true }; }
+function getPricePosition(){ const r=document.querySelector('input[name="pricepos"]:checked'); return r? r.value : "inline"; }
 
 /* API helpers */
 async function safeJSON(url,opts){
@@ -287,7 +256,9 @@ async function safeJSON(url,opts){
 }
 async function callEstimate(){
   const body={ address: addrInput.value.trim(), mpds:+$("mpds").value||0, diesel:+$("diesel").value||0,
-    advanced:{ extra: collectExtras(), flags: getFlags(), price_position: getPricePosition() } };
+    advanced:{ extra: collectExtras(), flags: getFlags(), price_position: getPricePosition() },
+    client_rating: lastRating, auto_low_rating: (lastRating!=null && lastRating<4.0)
+  };
   if(selectedCoords){ body.siteLat=selectedCoords.lat; body.siteLon=selectedCoords.lon; }
   const ov=+($("aadtOverride").value||""); if(Number.isFinite(ov)&&ov>0) body.aadtOverride=ov;
   return await safeJSON("/estimate",{ method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
@@ -297,7 +268,7 @@ async function callEstimate(){
 function initOrUpdateMap(m){
   if(!mapReady){ initMap(); }
   layer.clearLayers();
-  if(!m||!m.site){ setOverlay("Working"); return; }
+  if(!m||!m.site){ overlay.style.display="flex"; overlay.textContent="Working…"; return; }
   const site=[m.site.lat,m.site.lon];
   L.marker(site,{title:"Site"}).addTo(layer).bindPopup("<b>Site</b>");
   const pts=[site];
@@ -307,7 +278,7 @@ function initOrUpdateMap(m){
     L.circleMarker([c.lat,c.lon],{radius:6,weight:1,color:c.heavy?"#ff7f50":"#4ade80",fillColor:c.heavy?"#ff7f50":"#4ade80",fillOpacity:.9}).addTo(layer).bindPopup(`${esc(c.name||"Fuel")} • ${c.miles} mi`);
   }
   map.fitBounds(L.latLngBounds(pts).pad(0.25));
-  clearOverlay();
+  overlay.style.display="none";
   updateStreetView(site[0],site[1]);
 }
 
@@ -319,15 +290,15 @@ function renderCalc(bk, low, base, high){
     `Competition rule: count=${bk.compRule.compCount} → baseMult=${bk.compRule.baseMult.toFixed(2)} − heavyPenalty=${bk.compRule.heavyPenalty.toFixed(2)} → compMult=${bk.compRule.compMult.toFixed(2)} → afterComp=${fmt(bk.compRule.afterComp)}`,
     `Caps: equipment=${fmt(bk.caps.capEquip)}, soft=${fmt(bk.caps.capSoftTotal)}, hard=${fmt(bk.caps.capHardTotal)}`,
     `Pricing multiplier: ${bk.priceMult.toFixed(2)} • User extras multiplier: ${bk.extrasMult.toFixed(3)}`,
-    `Pre-clamp result: ${fmt(bk.preClamp)} → Final base (clamped to baseline if needed): ${fmt(bk.finalClampedToBaseline)}`,
+    `Pre-clamp: ${fmt(bk.preClamp)} → Final base (clamped to baseline if needed): ${fmt(bk.finalClampedToBaseline)}`,
     `LOW/HIGH bands: base×0.86 / base×1.06`
   ];
   calcBox.innerHTML = "<ul style='margin:6px 0 0 18px'>" + rows.map(r=>`<li>${esc(r)}</li>`).join("") + "</ul>";
 }
 function renderAll(d){
-  const ratingLow = (lastRating!=null && lastRating < 4.0);
+  const ratingLow = (d.flags && d.flags.auto_low_rating) || (lastRating!=null && lastRating < 4.0);
   outNum.textContent = fmt(d.low);
-  outNum.classList.toggle("red", ratingLow);
+  outNum.classList.toggle("red", !!ratingLow);
   lowReviewMsg.style.display = ratingLow ? "block" : "none";
   outRange.textContent = `Full range: ${fmt(d.low)} – ${fmt(d.high)}`;
   outY2.textContent=fmt(d.year2); outY3.textContent=fmt(d.year3);
@@ -360,16 +331,13 @@ $("go").addEventListener("click", async ()=>{
   try{
     $("ac").style.display="none";
     goBtn.disabled=true; goStatus.style.display="inline";
-    setOverlay("Searching for address… please wait");
-    // ensure rating is fetched before estimating so auto-penalty applies
     if(!lastRating){ await fetchRating(addrInput.value.trim()); }
     const d=await callEstimate();
-    renderAll(d); pills();
+    renderAll(d);
   }catch(e){
     alert("Estimate failed: " + (e.message||e));
   }finally{
     goBtn.disabled=false; goStatus.style.display="none";
-    clearOverlay();
   }
 });
 addrInput.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); $("go").click(); } });
@@ -377,53 +345,62 @@ addrInput.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefaul
 /* PDF export (clean layout) */
 document.getElementById("exportPDF").addEventListener("click", async ()=>{
   const { jsPDF } = window.jspdf || {}; if(!jsPDF){ alert("PDF lib failed to load"); return; }
-  const doc=new jsPDF({unit:"pt",format:"a4"}); const pageW=595, pageH=842, M=36, W=pageW-M*2;
+  const doc=new jsPDF({unit:"pt",format:"a4"}); const W=595, H=842, M=36, CW=W-2*M;
 
+  // Title
   doc.setFont("helvetica","bold"); doc.setFontSize(18);
   doc.text("Sunoco, LP Fuel IQ — Fuel Site Analyzer", M, M+6);
 
-  doc.setFont("helvetica","normal"); doc.setFontSize(12);
-  const summary = document.getElementById("summary").innerText || "";
-  const sumLines = doc.splitTextToSize(summary, W);
-  doc.text(sumLines, M, M+30);
+  // Big LOW estimate banner
+  const lowTxt = document.getElementById("estNum").innerText || "—";
+  doc.setFillColor(15,25,41); doc.setDrawColor(38,49,69);
+  doc.roundedRect(M, M+16, CW, 48, 6, 6, "FD");
+  doc.setFontSize(12); doc.setTextColor(200,210,230);
+  doc.text("Adjusted Base Estimate (LOW)", M+12, M+36);
+  doc.setFont("helvetica","bold"); doc.setFontSize(24); doc.setTextColor(255,255,255);
+  doc.text(lowTxt, M+12, M+58);
 
-  let y = M + 30 + sumLines.length*14 + 12;
+  let y = M + 16 + 48 + 14;
 
-  // key metrics
-  const key = [
+  // Key metrics
+  const lines = doc.splitTextToSize([
     `Address: ${document.getElementById("addr").value || "-"}`,
     `MPDs: ${document.getElementById("mpds").value}   Diesel: ${document.getElementById("diesel").value}`,
     document.getElementById("aadtBanner").innerText,
-    `Estimate (LOW): ${document.getElementById("estNum").innerText}`,
     document.getElementById("estRange").innerText.replace("Full range: ","Range: "),
     document.getElementById("compLine").innerText,
-    document.getElementById("ratingLine").innerText
-  ].join("\n");
-  const keyLines = doc.splitTextToSize(key, W);
-  doc.text(keyLines, M, y); y += keyLines.length*14 + 12;
+    `Rating: ${document.getElementById("ratingLine").innerText || "—"}`
+  ].join("\n"), CW);
+  doc.setFont("helvetica","normal"); doc.setFontSize(12); doc.setTextColor(230,235,245);
+  doc.text(lines, M, y); y += lines.length*14 + 10;
 
-  // calculation
-  const calc = "How calculated:\n" + (document.getElementById("calcBox").innerText || "");
-  const calcLines = doc.splitTextToSize(calc, W);
-  doc.text(calcLines, M, y); y += calcLines.length*14 + 12;
+  // How calculated
+  const calc = "How this estimate was calculated:\n" + (document.getElementById("calcBox").innerText || "");
+  const calcLines = doc.splitTextToSize(calc, CW);
+  doc.text(calcLines, M, y); y += calcLines.length*14 + 10;
 
-  // map image
+  // Summary
+  const summary = "Summary (GPT):\n" + (document.getElementById("summary").innerText || "");
+  const sumLines = doc.splitTextToSize(summary, CW);
+  doc.text(sumLines, M, y); y += sumLines.length*14 + 10;
+
+  // Map image
   const mapImg = await new Promise(resolve=>{
     if(!window.leafletImage || !window.map){ resolve(null); return; }
     leafletImage(window.map, (err, canvas)=> resolve(err?null:canvas.toDataURL("image/png")));
   });
   const imgH=250;
   if (mapImg) {
-    if (y + imgH > pageH - M) { doc.addPage(); y = M; }
-    doc.setFont("helvetica","bold"); doc.text("Map & Competitors (1.5 mi)", M, y); y += 12;
-    doc.addImage(mapImg, "PNG", M, y, W, imgH); y += imgH + 12;
+    if (y + imgH > H - M) { doc.addPage(); y = M; }
+    doc.setFont("helvetica","bold"); doc.setFontSize(12); doc.text("Map & Competitors (1.5 mi)", M, y); y += 12;
+    doc.addImage(mapImg, "PNG", M, y, CW, imgH); y += imgH + 10;
   }
 
-  // developments
+  // Developments
   const devText = "Developments — News:\n" + (document.getElementById("devsExternalNews").innerText || "—")
                + "\n\nDevelopments — Permits / Boards:\n" + (document.getElementById("devsExternalPermits").innerText || "—");
-  const devLines = doc.splitTextToSize(devText, W);
-  if (y + devLines.length*14 > pageH - M) { doc.addPage(); y = M; }
+  const devLines = doc.splitTextToSize(devText, CW);
+  if (y + devLines.length*14 > H - M) { doc.addPage(); y = M; }
   doc.setFont("helvetica","bold"); doc.text("Developments", M, y); y += 14;
   doc.setFont("helvetica","normal"); doc.text(devLines, M, y);
 
@@ -431,7 +408,6 @@ document.getElementById("exportPDF").addEventListener("click", async ()=>{
 });
 
 /* init */
-overlay.textContent="—";
 </script>
 </body>
 </html>
