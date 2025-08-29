@@ -1,4 +1,4 @@
-// Fuel IQ API v2025-08-29m
+// Fuel IQ API v2025-08-29r — fixes: rating penalty, consistent competition, robust AADT blend
 import express from "express";
 import cors from "cors";
 import path from "path";
@@ -11,7 +11,7 @@ app.use(express.json({ limit: "1mb" }));
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// always serve fresh UI
+// Serve UI fresh
 app.use(
   express.static(path.join(__dirname, "public"), {
     etag: false, lastModified: false, cacheControl: true, maxAge: 0,
@@ -24,8 +24,8 @@ app.get("/", (_req, res) => {
 });
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
-/* ───────────────── config ───────────────── */
-const UA = "FuelEstimator/3.3 (+your-app)";
+/* ───────────── config ───────────── */
+const UA = "FuelEstimator/3.4 (+your-app)";
 const CONTACT = process.env.OVERPASS_CONTACT || UA;
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || "";
@@ -41,7 +41,7 @@ const PERMIT_HTML_URLS = (process.env.PERMIT_HTML_URLS || "").split(",").map(s=>
 
 const TRAFFIC_URL = process.env.TRAFFIC_URL || "";
 
-/* ───────────────── utils ───────────────── */
+/* ───────────── utils ───────────── */
 const sleep = (ms) => new Promise(r=>setTimeout(r,ms));
 const toMiles = (m) => m / 1609.344;
 function haversine(lat1, lon1, lat2, lon2) {
@@ -57,7 +57,7 @@ async function fetchWithTimeout(url, opts={}, timeoutMs=25000){
   finally{ clearTimeout(id); }
 }
 
-/* ───────────────── geocoding ───────────────── */
+/* ───────────── geocoding ───────────── */
 function tryParseLatLng(address){
   const m = String(address||"").trim().match(/^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/);
   if(!m) return null; const lat=+m[1], lon=+m[2];
@@ -94,7 +94,7 @@ async function geocode(address){
   else      { try{ return await geocodeNominatim(address); } catch { return await geocodeCensus(address); } }
 }
 
-/* ───────────────── AADT (NC DOT + custom + heuristic) ───────────────── */
+/* ───────────── AADT (NC DOT + custom + heuristic) ───────────── */
 const NCDOT_AADT_FS="https://services.arcgis.com/NuWFvHYDMVmmxMeM/ArcGIS/rest/services/NCDOT_AADT_Stations/FeatureServer/0";
 async function queryNCDOTNearestAADT(lat,lon,rM=1609){
   const p=new URLSearchParams({
@@ -136,7 +136,7 @@ async function queryCustomTraffic(lat,lon,address){
   return null;
 }
 
-/* ───────────────── competition (OSM + Google) ───────────────── */
+/* ───────────── Overpass / competition ───────────── */
 const OVERPASS=[
   "https://overpass-api.de/api/interpreter",
   "https://overpass.kumi.systems/api/interpreter",
@@ -206,7 +206,7 @@ async function competitorsWithinRadiusMiles(lat,lon,rMi=1.5){
   return out.filter(s=>s.miles<=rMi);
 }
 
-/* ───────────────── developments ───────────────── */
+/* ───────────── Developments ───────────── */
 async function overpassDevelopments(lat,lon){
   const rM=Math.round(5*1609.344);
   const q=`[out:json][timeout:25];
@@ -301,7 +301,7 @@ async function exhaustiveDevelopments(addrLabel, lat, lon){
   };
 }
 
-/* ───────────────── Google proxy ───────────────── */
+/* ───────────── Google proxy ───────────── */
 app.get("/google/status", async (_req,res)=>{
   try{
     if(!GOOGLE_API_KEY) return res.json({ ok:false, status:"MISSING_KEY" });
@@ -367,7 +367,7 @@ app.get("/google/rating", async (req,res)=>{
   }catch(e){ res.json({ ok:false, status:"EXCEPTION", error:String(e) }); }
 });
 
-/* ───────────────── road context (used by heuristic) ───────────────── */
+/* ───────────── roads (for heuristic) ───────────── */
 function parseMaxspeed(ms){ const m=String(ms||"").match(/(\d+)\s*(mph)?/i); return m?+m[1]:null; }
 function roadWeight(hw){ const order={ motorway:6, trunk:5, primary:4, secondary:3, tertiary:2, unclassified:1, residential:1 }; return order[(hw||"").replace("_link","")] || 0; }
 async function roadContext(lat, lon){
@@ -398,36 +398,33 @@ async function roadContext(lat, lon){
   return { summary:[mainLabel,sideLabel].filter(Boolean).join(" — "), main, side, signals, intersections };
 }
 
-/* ───────────────── gallons calc (rule) ───────────────── */
+/* ───────────── gallons calc ───────────── */
 function gallonsWithRules({ aadt, mpds, diesel, compCount, heavyCount, pricePosition, userExtrasMult=1 }){
-  const baseline = aadt * 0.02 * 8 * 30; // AADT ceiling
+  const baseline = aadt * 0.02 * 8 * 30;
 
-  // competition rule
   let baseMult=1.0;
   if (compCount === 1) baseMult = 0.75;
   else if (compCount >= 2 && compCount <= 4) baseMult = 0.60;
 
-  let heavyPenalty=0;             // heavy brand penalty
+  let heavyPenalty=0;
   if (heavyCount === 1) heavyPenalty = 0.20;
   else if (heavyCount >= 2) heavyPenalty = 0.35;
 
   const compMult = Math.max(0.20, baseMult - heavyPenalty);
   const afterComp = baseline * compMult;
 
-  // equipment caps
   const capEquip = (mpds * 25 * 10.5 * 24) * (365/12) + ((diesel||0) * 25 * 16 * 24) * (365/12);
-  const SOFT=22000, HARD=28000; // per MPD
+  const SOFT=22000, HARD=28000;
   const capSoftTotal=mpds*SOFT, capHardTotal=mpds*HARD;
   let capped = Math.min(afterComp, capEquip, capHardTotal);
   if (afterComp > capSoftTotal) capped = Math.round(capped * 0.90);
 
-  // pricing position
   let priceMult = 1.0;
   if (pricePosition === "below") priceMult = 1.10;
   else if (pricePosition === "above") priceMult = 0.90;
 
   const preClamp = Math.round(capped * priceMult * userExtrasMult);
-  const base = Math.min(preClamp, Math.round(baseline)); // never exceed baseline ceiling
+  const base = Math.min(preClamp, Math.round(baseline));
 
   const low = Math.round(base * 0.86);
   const high= Math.round(base * 1.06);
@@ -446,7 +443,7 @@ function gallonsWithRules({ aadt, mpds, diesel, compCount, heavyCount, pricePosi
   };
 }
 
-/* ───────────────── GPT summary (always) ───────────────── */
+/* ───────────── GPT summary ───────────── */
 async function gptJSONCore(model, prompt){
   const r=await fetchWithTimeout("https://api.openai.com/v1/chat/completions",{
     method:"POST",
@@ -490,34 +487,34 @@ Inputs:
   return `AADT ${ctx.aadt} (${ctx.method}); competition ${ctx.compCount} (heavy=${ctx.heavyCount}); pricing ${ctx.pricePosition}; adjustments ${ctx.userAdj||"none"}; result ${ctx.low}–${ctx.high} with base ${ctx.base}.`;
 }
 
-/* ───────────────── estimate endpoint ───────────────── */
+/* ───────────── estimate ───────────── */
 app.post("/estimate", async (req,res)=>{
   try{
-    const { address, mpds, diesel, siteLat, siteLon, aadtOverride, advanced } = req.body||{};
+    const { address, mpds, diesel, siteLat, siteLon, aadtOverride, advanced, client_rating, auto_low_rating } = req.body||{};
     const MPDS=+mpds, DIESEL=+(diesel||0);
     if(!(Number.isFinite(MPDS) && MPDS>0)) return res.status(400).json({ error:"Regular MPDs required (>0)" });
     if(!address && !(Number.isFinite(siteLat)&&Number.isFinite(siteLon))) return res.status(400).json({ error:"Address or coordinates required" });
 
     const pricePosition=String(advanced?.price_position||"inline");
 
-    // geocode/admin
+    // Geocode/admin
     let geo;
     if(Number.isFinite(siteLat)&&Number.isFinite(siteLon)) geo={ lat:+siteLat, lon:+siteLon, label: address||`${siteLat}, ${siteLon}` };
     else geo=await geocode(address);
     const admin=await reverseAdmin(geo.lat, geo.lon);
 
-    // competitors
+    // Competition
     const compAll3=await competitorsWithinRadiusMiles(geo.lat, geo.lon, 3.0).catch(()=>[]);
     const competitors=compAll3.filter(c=>c.miles<=1.5);
     const compCount=competitors.length, heavyCount=competitors.filter(c=>c.heavy).length;
     const sunocoNearby=compAll3.some(c=>c.sunoco && c.miles<=1.0);
     const ruralEligible = compAll3.length===0;
 
-    // developments
+    // Developments
     const dev=await exhaustiveDevelopments(address||geo.label, geo.lat, geo.lon);
     const devNews=dev.news, devPermits=dev.permits, devOSM=dev.osm;
 
-    // roads & AADT
+    // Roads & AADT
     const roads=await roadContext(geo.lat, geo.lon).catch(()=>({summary:"",main:[],side:[],signals:0,intersections:0}));
     let usedAADT=10000, method="fallback_default";
     const overrideVal=Number(aadtOverride);
@@ -531,21 +528,26 @@ app.post("/estimate", async (req,res)=>{
       if(comps.length){ const sumW=comps.reduce((s,c)=>s+c.w,0); usedAADT=Math.round(comps.reduce((s,c)=>s+c.v*c.w,0)/Math.max(0.0001,sumW)); method="blend_"+comps.map(c=>c.l).join("+").toLowerCase(); }
     }
 
-    // extras & flags (UI + rural auto check)
+    // Extras & flags
     let userExtrasMult=1.0; const extras=(advanced?.extra||[]).map(e=>({ pct:+e?.pct, note:String(e?.note||"").slice(0,180) })).filter(e=>Number.isFinite(e.pct));
     if(extras.length) userExtrasMult *= extras.reduce((m,e)=>m*(1+e.pct/100),1.0);
     const ruralRequested = !!(advanced && advanced.flags && advanced.flags.rural===true);
     const ruralApplied   = ruralRequested && ruralEligible;
     if(ruralApplied) userExtrasMult *= 1.30;
 
-    // gallons
+    // Automatic low-rating penalty (even if UI chip not ticked)
+    const autoLow = (auto_low_rating === true) || (Number.isFinite(client_rating) && client_rating < 4.0);
+    if (autoLow) userExtrasMult *= 0.70;
+
+    // Gallons
     const calc=gallonsWithRules({ aadt:usedAADT, mpds:MPDS, diesel:DIESEL, compCount, heavyCount, pricePosition, userExtrasMult });
 
-    // summary
+    // Summary
     const adjBits=[];
     if(pricePosition==="below") adjBits.push("+10% below-market pricing");
     if(pricePosition==="above") adjBits.push("−10% above-market pricing");
     if(ruralApplied) adjBits.push("+30% rural bonus (0 comps within 3 mi)");
+    if(autoLow) adjBits.push("−30% low reviews (<4.0)");
     extras.forEach(e=>adjBits.push(`${e.pct>0?"+":""}${e.pct}% ${e.note||"adj."}`));
     const userAdjText = adjBits.join("; ");
 
@@ -561,7 +563,7 @@ app.post("/estimate", async (req,res)=>{
     res.json({
       base:calc.base, low:calc.low, high:calc.high, year2:calc.year2, year3:calc.year3,
       inputs:{ mpds:MPDS, diesel:DIESEL, aadt_used:usedAADT, price_position:pricePosition, aadt_components:{ method } },
-      flags:{ rural_bonus_applied:ruralApplied, rural_eligible:ruralEligible, sunoco_within_1mi: sunocoNearby },
+      flags:{ rural_bonus_applied:ruralApplied, rural_eligible:ruralEligible, sunoco_within_1mi: sunocoNearby, auto_low_rating:autoLow },
       competition:{ count:compCount, nearest_mi: competitors[0]?.miles ?? null, notable_brands: competitors.filter(c=>c.heavy).slice(0,6).map(c=>c.name) },
       developments: devOSM, developments_external:{ news: devNews, permits: devPermits, note: dev.note },
       roads, summary, calc_breakdown: calc.breakdown,
@@ -585,4 +587,3 @@ function heuristicAADT(roads){
 
 const PORT=process.env.PORT||3000;
 app.listen(PORT,"0.0.0.0",()=>console.log(`Server listening on :${PORT}`));
-
