@@ -28,7 +28,7 @@
     button{ background:linear-gradient(135deg,var(--brand),var(--brand2)); color:#fff; border:0; padding:12px 16px; border-radius:10px; font-weight:700; cursor:pointer; }
     button:disabled{ opacity:.6; cursor:not-allowed; }
 
-    .row{ display:grid; grid-template-columns:1.6fr 0.7fr 0.7fr 0.8fr; gap:12px; }
+    .row{ display:grid; grid-template-columns:1.6fr 0.7fr 0.7fr 0.8fr; gap:12px; align-items:end; }
     @media (max-width:980px){ .row{ grid-template-columns:1fr; } }
 
     .toolbar{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:12px; }
@@ -52,7 +52,6 @@
     .adv-line{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-top:12px; }
     .chip{ display:inline-flex; align-items:center; gap:8px; background:#0f1929; border:1px solid var(--line); padding:8px 10px; border-radius:999px; font-size:13px; }
     .chip input{ width:auto; accent-color:#22d3ee; }
-    .dash{ color:#50607a; opacity:.9; }
     .radio-row{ display:flex; flex-wrap:wrap; gap:10px; margin-top:8px; }
 
     .hero{ display:flex; justify-content:space-between; align-items:flex-end; gap:12px; }
@@ -89,14 +88,14 @@
 
     <!-- Advanced -->
     <div class="card">
-      <details>
+      <details open>
         <summary><b>Advanced options</b></summary>
         <div class="adv-line">
-          <label class="chip"><input type="checkbox" id="ex_worksites"> Worksites (+7.5%)</label>
+          <label class="chip"><input type="checkbox" id="ex_large_dev"> Large residential or commercial developments being built (+7.5%)</label>
           <label class="chip"><input type="checkbox" id="ex_hours18"> Hours 18h (−7.5%)</label>
           <label class="chip"><input type="checkbox" id="ex_highincome"> Higher-income (+2.5%)</label>
           <label class="chip"><input type="checkbox" id="ex_lowrating"> Rating < 4.0 (−30%)</label>
-          <label class="chip"><input type="checkbox" id="ex_competitive_ops"> Competitive site ops (+10%)</label>
+          <label class="chip"><input type="checkbox" id="ex_competitive_pricing"> Competitive site gas pricing (+10%)</label>
         </div>
         <div style="margin-top:8px;">
           <label><b>Gas pricing vs area</b></label>
@@ -157,7 +156,7 @@ const outNum=$("estNum"), outRange=$("estRange"), outY2=$("y2"), outY3=$("y3");
 const devsBox=$("devs"), devsExtNews=$("devsExternalNews"), devsExtPermits=$("devsExternalPermits"), summaryBox=$("summary"), ratingLine=$("ratingLine");
 const addrInput=$("addr"), acBox=$("ac"), goBtn=$("go");
 const addExtraBtn=$("addExtra"), extraList=$("extraList"), activeExtras=$("activeExtras");
-const ex_worksites=$("ex_worksites"), ex_hours18=$("ex_hours18"), ex_highincome=$("ex_highincome"), ex_lowrating=$("ex_lowrating"), ex_competitive_ops=$("ex_competitive_ops");
+const ex_large_dev=$("ex_large_dev"), ex_hours18=$("ex_hours18"), ex_highincome=$("ex_highincome"), ex_lowrating=$("ex_lowrating"), ex_competitive_pricing=$("ex_competitive_pricing");
 
 let map, layer, mapReady=false, selectedCoords=null, selectedPlaceId=null;
 
@@ -166,7 +165,7 @@ function fmt(n){ return (n??0).toLocaleString(undefined,{maximumFractionDigits:0
 function esc(s){ return (s??"").toString().replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;"," >":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
 function setOverlayWorking(){ overlay.textContent="Working…"; overlay.style.display="flex"; }
 function clearOverlay(){ overlay.style.display="none"; }
-function initMap(){ if(mapReady) return; map=L.map("map",{zoomControl:true}); L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map); layer=L.layerGroup().addTo(map); mapReady=true; }
+function initMap(){ if(mapReady) return; map=L.map("map",{zoomControl:true}); window._leafletMap=map; L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map); layer=L.layerGroup().addTo(map); mapReady=true; }
 function updateStreetView(lat, lon){ svFrame.src=`https://maps.google.com/maps?q=&layer=c&cbll=${lat},${lon}&cbp=12,0,,0,0&output=svembed`; }
 
 /* Google status + autocomplete */
@@ -186,14 +185,14 @@ addrInput.addEventListener("input",()=>{ const q=addrInput.value.trim(); if(q.le
 /* Advanced badges */
 function pills(){
   const p=[];
-  if(ex_worksites.checked)p.push("+7.5% Worksites");
+  if(ex_large_dev.checked)p.push("+7.5% Large development nearby");
   if(ex_hours18.checked)p.push("−7.5% 18h ops");
   if(ex_highincome.checked)p.push("+2.5% Higher-income");
   if(ex_lowrating.checked)p.push("−30% Rating < 4.0");
-  if(ex_competitive_ops.checked)p.push("+10% Competitive ops");
+  if(ex_competitive_pricing.checked)p.push("+10% Competitive site gas pricing");
   activeExtras.innerHTML=p.map(x=>`<span class="badge">${esc(x)}</span>`).join(" ");
 }
-[ex_worksites,ex_hours18,ex_highincome,ex_lowrating,ex_competitive_ops].forEach(el=>el.addEventListener("change",pills));
+[ex_large_dev,ex_hours18,ex_highincome,ex_lowrating,ex_competitive_pricing].forEach(el=>el.addEventListener("change",pills));
 
 function addExtraRow(pct="",note=""){
   const row=document.createElement("div");
@@ -202,16 +201,16 @@ function addExtraRow(pct="",note=""){
   row.querySelector(".rm").addEventListener("click",()=>row.remove());
   extraList.appendChild(row);
 }
-addExtraBtn.addEventListener("click",()=>addExtraRow());
+$("addExtra").addEventListener("click",()=>addExtraRow());
 
 /* Collect */
 function collectExtras(){
   const out=[];
-  if(ex_worksites.checked) out.push({pct:7.5, note:"Worksites"});
+  if(ex_large_dev.checked) out.push({pct:7.5, note:"Large residential/commercial developments"});
   if(ex_hours18.checked) out.push({pct:-7.5, note:"18h ops"});
   if(ex_highincome.checked) out.push({pct:2.5, note:"Higher income"});
   if(ex_lowrating.checked) out.push({pct:-30, note:"Rating <4.0"});
-  if(ex_competitive_ops.checked) out.push({pct:10, note:"Competitive site ops"});
+  if(ex_competitive_pricing.checked) out.push({pct:10, note:"Competitive site gas pricing"});
   for(const chip of extraList.querySelectorAll(".chip")){
     const pct=+chip.querySelector(".extraPct").value;
     const note=chip.querySelector(".extraNote").value.trim();
@@ -266,7 +265,7 @@ function renderAll(d){
   outY2.textContent=fmt(d.year2); outY3.textContent=fmt(d.year3);
 
   const comp=d.inputs?.aadt_components||{};
-  aadtBanner.textContent=`AADT used ${fmt(d.inputs.aadt_used)} (${comp.method})`;
+  aadtBanner.textContent=`AADT used ${fmt(d.inputs.aadt_used)} (${comp.method||"model"})`;
   compLine.textContent=`Competition: ${d.competition.count} within 1.5 mi${d.competition.nearest_mi!=null?"; nearest "+d.competition.nearest_mi.toFixed(3)+" mi":""}${(d.competition.notable_brands||[]).length?"; heavy: "+d.competition.notable_brands.join(", "):""}`;
 
   devsBox.innerHTML = (d.developments||[]).length ? "<ul>"+d.developments.map(x=>`<li>${esc(x.name)} • ${esc(x.status)}${x.approx_miles!=null?` • ~${x.approx_miles} mi`:''}</li>`).join("")+"</ul>" : "<em>none</em>";
@@ -295,13 +294,13 @@ async function showRating(address){
 
 /* Main */
 $("go").addEventListener("click", async ()=>{
-  try{ goBtn.disabled=true; setOverlayWorking(); const d=await callEstimate(); renderAll(d); }
+  try{ goBtn.disabled=true; setOverlayWorking(); const d=await callEstimate(); renderAll(d); pills(); }
   catch(e){ alert("Error: "+(e.message||e)); }
   finally{ goBtn.disabled=false; clearOverlay(); }
 });
 addrInput.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); $("go").click(); } });
 
-/* PDF Export (pro look with Map & Static Street View) */
+/* PDF Export (pro look with Map & optional SV) */
 document.getElementById("exportPDF").addEventListener("click", async ()=>{
   const { jsPDF } = window.jspdf || {}; if(!jsPDF){ alert("PDF lib failed to load"); return; }
   const doc=new jsPDF({unit:"pt",format:"a4"}); // 595x842
@@ -332,30 +331,12 @@ document.getElementById("exportPDF").addEventListener("click", async ()=>{
 
   // Snap map via leaflet-image
   const mapImg = await new Promise(resolve=>{
-    if(!window.leafletImage || !window.map){ resolve(null); return; }
+    if(!window.leafletImage || !map){ resolve(null); return; }
     leafletImage(map, function(err, canvas){
       if(err){ resolve(null); return; }
       resolve(canvas.toDataURL("image/png"));
     });
   });
-
-  // Static Street View (needs GOOGLE_API_KEY configured on server; we embed via Google Static API)
-  let svImg = null;
-  try{
-    if (window.selectedCoords) {
-      const loc=`${selectedCoords.lat},${selectedCoords.lon}`;
-      const staticUrl=`https://maps.googleapis.com/maps/api/streetview?size=800x400&location=${encodeURIComponent(loc)}&key=${encodeURIComponent("")}`; // If you want to embed your key here, you can inline it.
-      // Safer: use the live iframe for on-screen, and skip SV image if no key available
-      // We'll skip if blank key
-      if (false) {
-        const img = new Image(); img.crossOrigin="anonymous"; img.onload=()=>{ 
-          // convert to canvas to dataURL
-          const c=document.createElement("canvas"); c.width=img.width; c.height=img.height;
-          const g=c.getContext("2d"); g.drawImage(img,0,0); svImg=c.toDataURL("image/jpeg","0.92");
-        }; img.src=staticUrl;
-      }
-    }
-  }catch{}
 
   // Place images
   const imgW = contentW, imgH = 260;
@@ -365,19 +346,11 @@ document.getElementById("exportPDF").addEventListener("click", async ()=>{
     cursorY += 12;
     doc.addImage(mapImg, "PNG", margin, cursorY, imgW, imgH);
     cursorY += imgH + 12;
-  }
-  if (svImg) {
-    if (cursorY + imgH > pageH - margin) { doc.addPage(); cursorY = margin; }
-    doc.setFont("helvetica","bold"); doc.text("Street View", margin, cursorY);
-    cursorY += 12;
-    doc.addImage(svImg, "JPEG", margin, cursorY, imgW, imgH);
-    cursorY += imgH + 12;
   } else {
-    // If we can't embed SV image (no Static API key), at least note the live link
     if (cursorY + 24 > pageH - margin) { doc.addPage(); cursorY = margin; }
-    doc.setFont("helvetica","bold"); doc.text("Street View", margin, cursorY);
+    doc.setFont("helvetica","bold"); doc.text("Map & Competitors (1.5 mi)", margin, cursorY);
     cursorY += 14;
-    doc.setFont("helvetica","normal"); doc.text("Shown live on page (Static image export requires a Google Static Street View API key).", margin, cursorY);
+    doc.setFont("helvetica","normal"); doc.text("Map shown live on page.", margin, cursorY);
     cursorY += 18;
   }
 
