@@ -1,4 +1,4 @@
-<!-- Fuel IQ UI v2025-08-29e -->
+<!-- Fuel IQ UI v2025-08-29g (5s debounced address suggestions) -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -25,7 +25,7 @@
     button{ background:linear-gradient(135deg,var(--brand),var(--brand2)); color:#fff; border:0; padding:12px 16px; border-radius:10px; font-weight:700; cursor:pointer; }
     button:disabled{ opacity:.6; cursor:not-allowed; }
 
-    .row{ display:grid; grid-template-columns:1.6fr 0.7fr 0.7fr 0.8fr; gap:12px; align-items:start; }   /* align fields with Site search */
+    .row{ display:grid; grid-template-columns:1.6fr 0.7fr 0.7fr 0.8fr; gap:12px; align-items:start; }
     @media (max-width:980px){ .row{ grid-template-columns:1fr; } }
 
     .toolbar{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:12px; }
@@ -34,12 +34,12 @@
     #map{ height:420px; border-radius:12px; border:1px solid var(--line); position:relative; }
     #overlay{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(11,14,21,.55); border-radius:12px; font-weight:800; color:#cde9ff; font-size:18px; padding:20px; text-align:center; }
 
-    #svWrap{ margin-top:10px; } #sv{ width:100%; height:380px; border:0; border-radius:12px; border:1px solid var(--line); background:#0b1220; pointer-events:none; } /* no accidental Google Maps */
+    #svWrap{ margin-top:10px; } #sv{ width:100%; height:380px; border:0; border-radius:12px; border:1px solid var(--line); background:#0b1220; pointer-events:none; }
 
     .ac-wrap{ position:relative; }
     .ac-list{ position:absolute; top:100%; left:0; right:0; z-index:30; margin-top:6px; background:#0b1220; border:1px solid var(--line); border-radius:12px; max-height:320px; overflow:auto; box-shadow:0 18px 36px rgba(0,0,0,.35); }
     .ac-item{ padding:10px 12px; cursor:pointer; border-bottom:1px solid rgba(255,255,255,.04); } .ac-item:last-child{ border-bottom:0; }
-    .ac-item:hover,.ac-item.active{ background:#101a2b; } .badge{ display:inline-block; font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); background:var(--pill); color:#a9c5ff; margin-left:8px; }
+    .ac-item:hover{ background:#101a2b; } .badge{ display:inline-block; font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); background:var(--pill); color:#a9c5ff; margin-left:8px; }
 
     details summary{ cursor:pointer; }
     .adv-line{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-top:12px; }
@@ -60,7 +60,7 @@
   <div class="wrap">
     <header>
       <h1>Sunoco, LP Fuel IQ - Fuel Site Analyzer</h1>
-      <span class="build">UI v2025-08-29e</span>
+      <span class="build">UI v2025-08-29g</span>
     </header>
     <div class="instructions">
       <b>Instructions:</b> Enter Address, click <i>Estimate</i>. Do not exit your browser or let your phone screen shut off until results are ready or you will encounter errors. Click <i>Advanced Options</i> to make changes.
@@ -75,7 +75,8 @@
             <input id="addr" placeholder="Enter business or address" autocomplete="off"/>
             <div id="ac" class="ac-list" style="display:none;"></div>
           </div>
-          <div class="muted subtle" style="margin-top:6px" id="apiStatus">API Status: checking…</div>
+          <div class="muted subtle" id="acHint" style="margin-top:6px; display:none;">Suggesting addresses in <span id="acCountdown">5</span>s…</div>
+          <div class="muted subtle" id="apiStatus" style="margin-top:6px">API Status: checking…</div>
         </div>
         <div><label>Regular MPDs</label><input id="mpds" type="number" value="3" min="1"/></div>
         <div><label>Diesel positions</label><input id="diesel" type="number" value="0" min="0"/></div>
@@ -87,7 +88,7 @@
       </div>
     </div>
 
-    <!-- Advanced -->
+    <!-- Advanced (unchanged from last version) -->
     <div class="card">
       <details>
         <summary><b>Advanced options</b></summary>
@@ -134,20 +135,17 @@
       <div id="compLine" class="muted">—</div>
     </div>
 
-    <!-- How calculated -->
     <div class="card">
       <b>How this estimate was calculated</b>
       <div id="calcBox" class="muted">—</div>
     </div>
 
-    <!-- Map & SV -->
     <div class="card">
       <div class="muted">Map: Site & competitors (1.5 mi)</div>
       <div id="map"><div id="overlay" class="muted">—</div></div>
       <div id="svWrap"><div class="muted" style="margin-top:10px;">Street View (view-only)</div><iframe id="sv" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div>
     </div>
 
-    <!-- Developments -->
     <div class="card"><b>Developments — OSM</b><div id="devs" class="muted">—</div></div>
     <div class="card"><b>Developments — News</b><div id="devsExternalNews" class="muted">—</div></div>
     <div class="card"><b>Developments — Permits / Boards</b><div id="devsExternalPermits" class="muted">—</div></div>
@@ -163,13 +161,13 @@ const $=id=>document.getElementById(id);
 const apiStatus=$("apiStatus"), aadtBanner=$("aadtBanner"), compLine=$("compLine"), overlay=$("overlay"), svFrame=$("sv"), calcBox=$("calcBox"), stopFlag=$("sunocoStop");
 const outNum=$("estNum"), outRange=$("estRange"), outY2=$("y2"), outY3=$("y3");
 const devsBox=$("devs"), devsExtNews=$("devsExternalNews"), devsExtPermits=$("devsExternalPermits"), summaryBox=$("summary"), ratingLine=$("ratingLine");
-const addrInput=$("addr"), acBox=$("ac"), goBtn=$("go");
+const addrInput=$("addr"), acBox=$("ac"), acHint=$("acHint"), acCountdown=$("acCountdown"), goBtn=$("go");
 const addExtraBtn=$("addExtra"), extraList=$("extraList"), activeExtras=$("activeExtras");
 const ex_large_dev=$("ex_large_dev"), ex_hours18=$("ex_hours18"), ex_highincome=$("ex_highincome"), ex_lowrating=$("ex_lowrating"), ex_competitive_pricing=$("ex_competitive_pricing"), ex_rural=$("ex_rural");
 
 let map, layer, mapReady=false, selectedCoords=null, selectedPlaceId=null;
 
-/* Helpers */
+/* Small helpers */
 function fmt(n){ return (n??0).toLocaleString(undefined,{maximumFractionDigits:0}); }
 function esc(s){ return (s??"").toString().replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;"," >":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
 function setOverlayWorking(){ overlay.textContent="Working…"; overlay.style.display="flex"; }
@@ -177,20 +175,48 @@ function clearOverlay(){ overlay.style.display="none"; }
 function initMap(){ if(mapReady) return; map=L.map("map",{zoomControl:true}); window.map=map; L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map); layer=L.layerGroup().addTo(map); mapReady=true; }
 function updateStreetView(lat,lon){ svFrame.src=`https://maps.google.com/maps?q=&layer=c&cbll=${lat},${lon}&cbp=12,0,,0,0&output=svembed`; }
 
-/* Google status + autocomplete */
-let GOOGLE_OK=false; let acItems=[];
+/* Google status */
+let GOOGLE_OK=false;
 async function checkGoogleStatus(){
   try{ const r=await fetch("/google/status"); const j=await r.json(); GOOGLE_OK=!!j.ok; apiStatus.textContent=j.ok?"API: Google — Working":`API: Google — ${j.status}`; }
   catch{ GOOGLE_OK=false; apiStatus.textContent="API: Google — unavailable"; }
 } document.addEventListener("DOMContentLoaded", checkGoogleStatus);
 
+/* Suggestion sources */
 async function googleSearch(q){ if(!GOOGLE_OK) return []; try{ const r=await fetch(`/google/autocomplete?input=${encodeURIComponent(q)}`); const j=await r.json(); if(!j.ok) return []; return (j.items||[]).map(it=>({...it,type:"Google",score:1.3})); }catch{return[];} }
 async function nominatimSearch(q){ try{ const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=us&q=${encodeURIComponent(q)}`); const a=await r.json(); return a.map(row=>({ type:"OSM", display:row.display_name, lat:+row.lat, lon:+row.lon, score:0.6 })); }catch{return[];} }
 function renderAc(list){ if(!list.length){ acBox.style.display="none"; return; } acBox.innerHTML=list.map((it,i)=>`<div class="ac-item" data-i="${i}">${esc(it.display)} <span class="badge">${it.type}</span></div>`).join(""); [...acBox.children].forEach(el=>el.onclick=()=>chooseAc(+el.dataset.i)); acBox.style.display="block"; }
-function chooseAc(i){ const it=acItems[i]; if(!it) return; addrInput.value=it.display; selectedCoords=(Number.isFinite(it.lat)&&Number.isFinite(it.lon))?{lat:it.lat,lon:it.lon}:null; selectedPlaceId=it.place_id||null; acBox.style.display="none"; }
-addrInput.addEventListener("input",()=>{ const q=addrInput.value.trim(); if(q.length<3) return; Promise.all([googleSearch(q),nominatimSearch(q)]).then(([g,n])=>{ acItems=[...g,...n].slice(0,8); renderAc(acItems); }); });
+function chooseAc(i){ const it=acItems[i]; if(!it) return; addrInput.value=it.display; selectedCoords=(Number.isFinite(it.lat)&&Number.isFinite(it.lon))?{lat:it.lat,lon:it.lon}:null; selectedPlaceId=it.place_id||null; acBox.style.display="none"; acHint.style.display="none"; }
 
-/* Advanced badges */
+/* NEW: 5s debounced suggestions */
+let acItems=[], acTimer=null, acTickTimer=null, acEpoch=0;
+function startCountdown(seconds){
+  let left = seconds; acCountdown.textContent = left;
+  acHint.style.display = "block";
+  if (acTickTimer) clearInterval(acTickTimer);
+  acTickTimer = setInterval(()=>{ left -= 1; if(left<=0){ clearInterval(acTickTimer); } acCountdown.textContent = Math.max(0,left); }, 1000);
+}
+addrInput.addEventListener("input", ()=>{
+  const q=addrInput.value.trim();
+  acBox.style.display="none";
+  selectedCoords=null; selectedPlaceId=null;
+  if (acTimer) { clearTimeout(acTimer); acTimer=null; }
+  if (acTickTimer) { clearInterval(acTickTimer); acTickTimer=null; }
+  if (q.length < 3) { acHint.style.display="none"; return; }
+  const myEpoch = ++acEpoch;
+  startCountdown(5);
+  acTimer = setTimeout(async ()=>{
+    try{
+      const [g,n] = await Promise.all([googleSearch(q), nominatimSearch(q)]);
+      if (myEpoch !== acEpoch) return; // cancelled by further typing
+      acItems = [...g, ...n].slice(0,8);
+      renderAc(acItems);
+    }catch{}
+    finally{ acHint.style.display="none"; }
+  }, 5000);
+});
+
+/* Advanced chips (unchanged) */
 function pills(){
   const p=[];
   if(ex_large_dev.checked)p.push("+7.5% Large development nearby");
@@ -229,8 +255,17 @@ function collectExtras(){
 function getFlags(){ return { rural: ex_rural.checked === true }; }
 function getPricePosition(){ const r=document.querySelector('input[name="pricepos"]:checked'); return r? r.value : "inline"; }
 
-/* API calls */
-async function safeJSON(url,opts){ const r=await fetch(url,opts); const t=await r.text(); if(!r.ok) throw new Error(`HTTP ${r.status}\n${t.slice(0,1200)}`); try{ return JSON.parse(t);}catch{ throw new Error("Bad JSON"); } }
+/* API helpers */
+async function safeJSON(url,opts){
+  const r=await fetch(url,opts);
+  const t=await r.text();
+  let j=null; try{ j=JSON.parse(t);}catch{}
+  if(!r.ok){
+    const msg = (j && (j.error || j.detail)) ? `${j.error}${j.detail?": "+j.detail:""}` : `HTTP ${r.status}`;
+    throw new Error(msg);
+  }
+  return j;
+}
 async function callEstimate(){
   const body={ address: addrInput.value.trim(), mpds:+$("mpds").value||0, diesel:+$("diesel").value||0,
     advanced:{ extra: collectExtras(), flags: getFlags(), price_position: getPricePosition() } };
@@ -268,7 +303,6 @@ function renderCalc(bk){
   ];
   calcBox.innerHTML = "<ul style='margin:6px 0 0 18px'>" + rows.map(r=>`<li>${esc(r)}</li>`).join("") + "</ul>";
 }
-
 function renderAll(d){
   outNum.textContent = fmt(d.low);
   outRange.textContent = `Full range: ${fmt(d.low)} – ${fmt(d.high)}`;
@@ -283,17 +317,14 @@ function renderAll(d){
   if(d.flags?.rural_bonus_applied) compTxt += `; rural bonus +30% applied`;
   compLine.textContent = compTxt;
 
-  // STOP sign for Sunoco within 1 mile
   stopFlag.style.display = d.flags?.sunoco_within_1mi ? "flex" : "none";
 
-  // Developments
   const osm=d.developments||[], news=d.developments_external?.news||[], perm=d.developments_external?.permits||[];
   devsBox.innerHTML = osm.length ? "<ul>"+osm.map(x=>`<li>${esc(x.name)} • ${esc(x.status)}${x.approx_miles!=null?` • ~${x.approx_miles} mi`:''}</li>`).join("")+"</ul>" : "<em>none</em>";
   devsExtNews.innerHTML = news.length ? "<ul>"+news.map(x=>`<li>${esc(x.name)}${x.link?` • <a href="${x.link}" target="_blank">source</a>`:''}</li>`).join("")+"</ul>" : "<em>none</em>";
   devsExtPermits.innerHTML = perm.length ? "<ul>"+perm.map(x=>`<li>${esc(x.name)}${x.link?` • <a href="${x.link}" target="_blank">source</a>`:''}</li>`).join("")+"</ul>" : "<em>none</em>";
   if(!news.length && !perm.length){ devsExtNews.innerHTML="<em>none found via news</em>"; devsExtPermits.innerHTML="<em>none found via permits/boards</em>"; }
 
-  // Summary: never empty
   summaryBox.textContent = (d.summary||"").trim() || `AADT ${fmt(d.inputs?.aadt_used)} (${method}); comp ${d.competition?.count??0}; est LOW ${fmt(d.low)} (range ${fmt(d.low)}–${fmt(d.high)}).`;
 
   renderCalc(d.calc_breakdown||{ aadt: d.inputs?.aadt_used, baseline: 0, compRule:{compCount:0,baseMult:1,heavyPenalty:0,compMult:1,afterComp:0}, caps:{capEquip:0,capSoftTotal:0,capHardTotal:0}, priceMult:1, extrasMult:1, preClamp:0, finalClampedToBaseline: d.base });
@@ -302,7 +333,7 @@ function renderAll(d){
   showRating(addrInput.value.trim());
 }
 
-/* Rating (with fallback search) */
+/* Rating with fallback */
 async function resolvePlaceIdIfNeeded(address){
   if (selectedPlaceId) return selectedPlaceId;
   try{ const r=await fetch(`/google/findplace?input=${encodeURIComponent(address)}`); const j=await r.json(); if(j.ok && j.place_id) return j.place_id; }catch{}
@@ -319,12 +350,12 @@ async function showRating(address){
 /* Main */
 $("go").addEventListener("click", async ()=>{
   try{ goBtn.disabled=true; setOverlayWorking(); const d=await callEstimate(); renderAll(d); pills(); }
-  catch(e){ alert("Error: "+(e.message||e)); }
+  catch(e){ alert("Estimate failed: " + (e.message||e)); }
   finally{ goBtn.disabled=false; clearOverlay(); }
 });
 addrInput.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); $("go").click(); } });
 
-/* PDF Export (unchanged) */
+/* PDF export (unchanged) */
 document.getElementById("exportPDF").addEventListener("click", async ()=>{
   const { jsPDF } = window.jspdf || {}; if(!jsPDF){ alert("PDF lib failed to load"); return; }
   const doc=new jsPDF({unit:"pt",format:"a4"}); const pageW=595, pageH=842, margin=36, contentW=pageW - margin*2;
@@ -337,7 +368,6 @@ document.getElementById("exportPDF").addEventListener("click", async ()=>{
   doc.text(lines, margin, margin+28);
 
   let y = margin + 28 + lines.length*14 + 16;
-
   const key = [
     `Address: ${document.getElementById("addr").value || "-"}`,
     `MPDs: ${document.getElementById("mpds").value}   Diesel: ${document.getElementById("diesel").value}`,
@@ -345,8 +375,7 @@ document.getElementById("exportPDF").addEventListener("click", async ()=>{
     `Estimate (LOW): ${document.getElementById("estNum").innerText}  |  Range: ${document.getElementById("estRange").innerText.replace("Full range: ","")}`,
     document.getElementById("compLine").innerText
   ].join("\n");
-  const keyLines = doc.splitTextToSize(key, contentW);
-  doc.text(keyLines, margin, y); y += keyLines.length*14 + 12;
+  const keyLines = doc.splitTextToSize(key, contentW); doc.text(keyLines, margin, y); y += keyLines.length*14 + 12;
 
   const calcText = document.getElementById("calcBox").innerText || "";
   const cLines = doc.splitTextToSize("Calculation:\n"+calcText, contentW);
@@ -373,7 +402,8 @@ document.getElementById("exportPDF").addEventListener("click", async ()=>{
   doc.save("FuelIQ_Site_Analyzer.pdf");
 });
 
-/* Initial */
+/* Init */
+function initOrUpdateFromHash(){} // placeholder to keep scope clean
 overlay.textContent="—";
 </script>
 </body>
