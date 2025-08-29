@@ -1,4 +1,4 @@
-<!-- Fuel IQ UI v2025-08-29g (5s debounced address suggestions) -->
+<!-- Fuel IQ UI v2025-08-29h (2s debounced suggestions + clear resolving status) -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -60,7 +60,7 @@
   <div class="wrap">
     <header>
       <h1>Sunoco, LP Fuel IQ - Fuel Site Analyzer</h1>
-      <span class="build">UI v2025-08-29g</span>
+      <span class="build">UI v2025-08-29h</span>
     </header>
     <div class="instructions">
       <b>Instructions:</b> Enter Address, click <i>Estimate</i>. Do not exit your browser or let your phone screen shut off until results are ready or you will encounter errors. Click <i>Advanced Options</i> to make changes.
@@ -75,7 +75,7 @@
             <input id="addr" placeholder="Enter business or address" autocomplete="off"/>
             <div id="ac" class="ac-list" style="display:none;"></div>
           </div>
-          <div class="muted subtle" id="acHint" style="margin-top:6px; display:none;">Suggesting addresses in <span id="acCountdown">5</span>s…</div>
+          <div class="muted subtle" id="acHint" style="margin-top:6px; display:none;">Suggesting addresses in <span id="acCountdown">2</span>s…</div>
           <div class="muted subtle" id="apiStatus" style="margin-top:6px">API Status: checking…</div>
         </div>
         <div><label>Regular MPDs</label><input id="mpds" type="number" value="3" min="1"/></div>
@@ -88,7 +88,7 @@
       </div>
     </div>
 
-    <!-- Advanced (unchanged from last version) -->
+    <!-- Advanced -->
     <div class="card">
       <details>
         <summary><b>Advanced options</b></summary>
@@ -167,11 +167,18 @@ const ex_large_dev=$("ex_large_dev"), ex_hours18=$("ex_hours18"), ex_highincome=
 
 let map, layer, mapReady=false, selectedCoords=null, selectedPlaceId=null;
 
-/* Small helpers */
+/* Helpers */
 function fmt(n){ return (n??0).toLocaleString(undefined,{maximumFractionDigits:0}); }
 function esc(s){ return (s??"").toString().replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;"," >":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
-function setOverlayWorking(){ overlay.textContent="Working…"; overlay.style.display="flex"; }
-function clearOverlay(){ overlay.style.display="none"; }
+let dotsTimer=null, dotsState=0;
+function setOverlay(text){
+  overlay.textContent=text;
+  overlay.style.display="flex";
+  if(dotsTimer) clearInterval(dotsTimer);
+  dotsState=0;
+  dotsTimer=setInterval(()=>{ dotsState=(dotsState+1)%4; overlay.textContent=text + ".".repeat(dotsState); }, 500);
+}
+function clearOverlay(){ overlay.style.display="none"; if(dotsTimer){ clearInterval(dotsTimer); dotsTimer=null; } }
 function initMap(){ if(mapReady) return; map=L.map("map",{zoomControl:true}); window.map=map; L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map); layer=L.layerGroup().addTo(map); mapReady=true; }
 function updateStreetView(lat,lon){ svFrame.src=`https://maps.google.com/maps?q=&layer=c&cbll=${lat},${lon}&cbp=12,0,,0,0&output=svembed`; }
 
@@ -182,13 +189,11 @@ async function checkGoogleStatus(){
   catch{ GOOGLE_OK=false; apiStatus.textContent="API: Google — unavailable"; }
 } document.addEventListener("DOMContentLoaded", checkGoogleStatus);
 
-/* Suggestion sources */
+/* Suggestions (2s debounce + cancel) */
 async function googleSearch(q){ if(!GOOGLE_OK) return []; try{ const r=await fetch(`/google/autocomplete?input=${encodeURIComponent(q)}`); const j=await r.json(); if(!j.ok) return []; return (j.items||[]).map(it=>({...it,type:"Google",score:1.3})); }catch{return[];} }
 async function nominatimSearch(q){ try{ const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=us&q=${encodeURIComponent(q)}`); const a=await r.json(); return a.map(row=>({ type:"OSM", display:row.display_name, lat:+row.lat, lon:+row.lon, score:0.6 })); }catch{return[];} }
 function renderAc(list){ if(!list.length){ acBox.style.display="none"; return; } acBox.innerHTML=list.map((it,i)=>`<div class="ac-item" data-i="${i}">${esc(it.display)} <span class="badge">${it.type}</span></div>`).join(""); [...acBox.children].forEach(el=>el.onclick=()=>chooseAc(+el.dataset.i)); acBox.style.display="block"; }
 function chooseAc(i){ const it=acItems[i]; if(!it) return; addrInput.value=it.display; selectedCoords=(Number.isFinite(it.lat)&&Number.isFinite(it.lon))?{lat:it.lat,lon:it.lon}:null; selectedPlaceId=it.place_id||null; acBox.style.display="none"; acHint.style.display="none"; }
-
-/* NEW: 5s debounced suggestions */
 let acItems=[], acTimer=null, acTickTimer=null, acEpoch=0;
 function startCountdown(seconds){
   let left = seconds; acCountdown.textContent = left;
@@ -204,7 +209,7 @@ addrInput.addEventListener("input", ()=>{
   if (acTickTimer) { clearInterval(acTickTimer); acTickTimer=null; }
   if (q.length < 3) { acHint.style.display="none"; return; }
   const myEpoch = ++acEpoch;
-  startCountdown(5);
+  startCountdown(2);
   acTimer = setTimeout(async ()=>{
     try{
       const [g,n] = await Promise.all([googleSearch(q), nominatimSearch(q)]);
@@ -213,10 +218,10 @@ addrInput.addEventListener("input", ()=>{
       renderAc(acItems);
     }catch{}
     finally{ acHint.style.display="none"; }
-  }, 5000);
+  }, 2000);
 });
 
-/* Advanced chips (unchanged) */
+/* Advanced chips */
 function pills(){
   const p=[];
   if(ex_large_dev.checked)p.push("+7.5% Large development nearby");
@@ -278,7 +283,7 @@ async function callEstimate(){
 function initOrUpdateMap(m){
   if(!mapReady){ initMap(); }
   layer.clearLayers();
-  if(!m||!m.site){ setOverlayWorking(); return; }
+  if(!m||!m.site){ setOverlay("Working"); return; }
   const site=[m.site.lat,m.site.lon];
   L.marker(site,{title:"Site"}).addTo(layer).bindPopup("<b>Site</b>");
   const pts=[site];
@@ -349,13 +354,20 @@ async function showRating(address){
 
 /* Main */
 $("go").addEventListener("click", async ()=>{
-  try{ goBtn.disabled=true; setOverlayWorking(); const d=await callEstimate(); renderAll(d); pills(); }
-  catch(e){ alert("Estimate failed: " + (e.message||e)); }
-  finally{ goBtn.disabled=false; clearOverlay(); }
+  try{
+    $("ac").style.display="none";
+    setOverlay("Searching for address… please wait");
+    const d=await callEstimate();
+    renderAll(d); pills();
+  }catch(e){
+    alert("Estimate failed: " + (e.message||e));
+  }finally{
+    clearOverlay();
+  }
 });
 addrInput.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); $("go").click(); } });
 
-/* PDF export (unchanged) */
+/* PDF export */
 document.getElementById("exportPDF").addEventListener("click", async ()=>{
   const { jsPDF } = window.jspdf || {}; if(!jsPDF){ alert("PDF lib failed to load"); return; }
   const doc=new jsPDF({unit:"pt",format:"a4"}); const pageW=595, pageH=842, margin=36, contentW=pageW - margin*2;
@@ -403,7 +415,6 @@ document.getElementById("exportPDF").addEventListener("click", async ()=>{
 });
 
 /* Init */
-function initOrUpdateFromHash(){} // placeholder to keep scope clean
 overlay.textContent="—";
 </script>
 </body>
