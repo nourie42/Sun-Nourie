@@ -1,5 +1,4 @@
 <!doctype html>
-
 <html lang="en">  
 <head>  
 <meta charset="utf-8"/>  
@@ -10,8 +9,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>  
 <script src="https://unpkg.com/leaflet-image/leaflet-image.js"></script>  
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous"></script>  
-
-<!-- Added for robust CSV parsing on the AADT tab -->
+<!-- Robust CSV parsing for AADT tab -->
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js" crossorigin="anonymous"></script>
 
 <style>  
@@ -75,32 +73,32 @@ details summary{cursor:pointer}
 .footerbar .left{display:flex;gap:12px;align-items:center}  
 .footerbar small{color:#a9b6d0}  
 
-/* ===== AADT tab styles (added) ===== */
+/* ===== AADT tab styles (PA enhanced) ===== */
 #AadtMap{height:520px;border-radius:12px;border:1px solid var(--line);margin-top:10px}
 #AadtSidebar{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 #AadtResults{max-height:360px;overflow:auto;border:1px solid var(--line);border-radius:10px;background:#0b1220;padding:8px}
 #AadtResults .item{padding:6px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer}
 #AadtResults .item:hover{background:#101a2b}
 #AadtStatus{font-size:12px;color:#a9b6d0}
+#AadtTotals{margin-top:8px;font-size:12px;color:#cfe3ff}
 </style>  
 </head>  
 
 <body>  
 
-<!-- ======================= ANALYZER PAGE (YOUR ORIGINAL) ======================= -->
+<!-- ======================= ANALYZER PAGE ======================= -->
 <div class="wrap" id="analyzerWrap">  
   <header>  
     <h1>Sunoco, LP Fuel IQ — Fuel Site Analyzer</h1>
-    <!-- NEW: two tabs as requested -->
     <nav class="nav">
       <a href="#analyzer">Home</a>
-      <a href="#aadt" target="_blank">AADT Map</a>
+      <a href="#aadt">AADT Map</a>
     </nav>
-    <span class="build">UI v2025-08-29z</span>  
+    <span class="build">UI v2025-09-11 (PA)</span>  
   </header>    
 
   <div class="instructions">  
-    <b>Instructions:</b> Enter Address, click <i>Estimate</i>. Do not exit your browser or let your phone screen shut off until results are ready or you will encounter errors. Click <i>Advanced Options</i> to make changes.  
+    <b>Instructions:</b> Enter Address, click <i>Estimate</i>. Do not exit your browser or let your phone screen shut off until results are ready. Click <i>Advanced Options</i> to adjust assumptions.  
   </div>    
 
   <!-- Inputs -->    
@@ -198,32 +196,32 @@ details summary{cursor:pointer}
 <div class="footerbar">
   <div class="left">
     <button id="exportPDF">Export to PDF</button>
-    <small id="buildStamp">Build: UI v2025-08-29z • Built: <span id="builtAt">—</span></small>
+    <small id="buildStamp">Build: UI v2025-09-11 (PA) • Built: <span id="builtAt">—</span></small>
   </div>
   <small id="apiNote" class="muted"></small>
 </div>
 
-<!-- ======================= AADT PAGE (NEW, IN SAME FILE) ======================= -->
+<!-- ======================= AADT PAGE (PA) ======================= -->
 <div class="wrap" id="aadtWrap" style="display:none; padding-bottom:110px;">
   <header>
-    <h1>AADT Map — Traffic Counts Near an Address</h1>
+    <h1>AADT Map — Pennsylvania Traffic Volumes (PennDOT)</h1>
     <nav class="nav">
       <a href="#analyzer">Home</a>
       <a href="#aadt">AADT Map</a>
     </nav>
-    <span class="build">UI v2025-08-29z</span>
+    <span class="build">UI v2025-09-11 (PA)</span>
   </header>
 
   <div class="card">
-    <div class="muted">Enter an address and radius. The map will show AADT points/segments near that address from your CSV.</div>
+    <div class="muted">Enter a PA address and radius. The map will show PennDOT AADT points/segments near that address from your CSV.</div>
     <div id="AadtSidebar">
       <div>
         <label>Address</label>
-        <input id="AadtAddress" placeholder="e.g. 4173 Knightdale Blvd, Knightdale NC"/>
+        <input id="AadtAddress" placeholder="e.g. 4371 Knightdale Blvd, Knightdale NC (or any PA address)"/>
       </div>
       <div>
         <label>Radius (miles)</label>
-        <input id="AadtRadius" type="number" step="0.1" min="0.1" value="1.0"/>
+        <input id="AadtRadius" type="number" step="0.1" min="0.1" value="2.0"/>
       </div>
     </div>
     <div class="toolbar">
@@ -235,12 +233,13 @@ details summary{cursor:pointer}
       <div class="card" style="margin:12px 0 0 0;">
         <b>Results</b>
         <div id="AadtResults" class="muted">—</div>
+        <div id="AadtTotals" class="muted">—</div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ======================= ORIGINAL SCRIPT (UNCHANGED) ======================= -->
+<!-- ======================= ANALYZER SCRIPT ======================= -->
 <script>  
 /* ===== DOM shortcuts ===== */  
 const $=id=>document.getElementById(id);  
@@ -250,7 +249,7 @@ const devsBox=$("devs"), devsExtNews=$("devsExternalNews"), devsExtPermits=$("de
 const addrInput=$("addr"), acBox=$("ac"), acHint=$("acHint"), goBtn=$("go"), goStatus=$("goStatus");  
 const ex_large_dev=$("ex_large_dev"), ex_hours18=$("ex_hours18"), ex_highincome=$("ex_highincome"), ex_lowrating=$("ex_lowrating"), ex_competitive_pricing=$("ex_competitive_pricing"), ex_rural=$("ex_rural");  
 
-/* ===== Build stamp at bottom ===== */  
+/* ===== Build stamp ===== */  
 (function(){  
   const ts = new Date(document.lastModified);  
   const builtAtSpan = document.querySelector("#buildStamp span#builtAt") || document.getElementById("builtAt");
@@ -529,15 +528,15 @@ document.getElementById("exportPDF").addEventListener("click", async()=>{
 
   const built = document.getElementById("builtAt")?.textContent || new Date(document.lastModified).toUTCString();  
   doc.setFont("helvetica","italic"); doc.setFontSize(9);  
-  doc.text(`Build: UI v2025-08-29z • Built: ${built}`, M, H-M);  
+  doc.text(`Build: UI v2025-09-11 (PA) • Built: ${built}`, M, H-M);  
 
   doc.save("FuelIQ_Site_Analyzer.pdf");  
 });  
 </script>
 
-<!-- ======================= AADT PAGE SCRIPT (NEW) ======================= -->
+<!-- ======================= AADT PAGE SCRIPT (PA enhancements) ======================= -->
 <script>
-/* SPA-style routing between #analyzer and #aadt */
+/* SPA routing */
 function showPage(which){
   const ana = document.getElementById('analyzerWrap');
   const aadt = document.getElementById('aadtWrap');
@@ -551,13 +550,14 @@ function route(){
 window.addEventListener('hashchange', route);
 document.addEventListener('DOMContentLoaded', route);
 
-/* AADT map + data */
+/* ===== AADT map + data (PA) ===== */
 let AADT = { rows: [], loaded: false };
 let aadtMap, aadtLayer, aadtInited = false;
 
 function initAadtMapOnce(){
   if (aadtInited) return;
-  aadtMap = L.map('AadtMap').setView([40.0,-77.0], 6);
+  // Center over Pennsylvania
+  aadtMap = L.map('AadtMap').setView([41.2,-77.6], 7);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19, attribution: '© OpenStreetMap contributors'
   }).addTo(aadtMap);
@@ -567,63 +567,101 @@ function initAadtMapOnce(){
 }
 
 function setAadtStatus(msg){ const el = document.getElementById('AadtStatus'); if (el) el.textContent = msg; }
+const setAadtTotals = (html)=>{ const el=document.getElementById('AadtTotals'); if (el) el.innerHTML = html||'&nbsp;'; };
 
-/* Try two CSV paths; else fallback to embedded sample. */
+/* Where to look for your CSV (PennDOT RMSTRAFFIC export) */
 const AADT_CSV_PATHS = [
-  'data/RMSTRAFFIC_(Traffic_Volumes).csv',
-  'data/traffic.csv'
+  'RMSTRAFFIC_with_latlon_full.csv'   // your uploaded file in the same folder
 ];
 
-/* CSV column detection */
-function detectCols(sampleRow){
-  const keys = Object.keys(sampleRow || {}).map(k=>k.trim());
-  const findKey = (cands) => keys.find(k => cands.includes(k.toLowerCase()));
-  const lower = k => k ? k.toLowerCase() : k;
-
-  const latKey = keys.find(k => ['lat','latitude','y','y_coord','ycoord','geom_lat'].includes(lower(k)));
-  const lonKey = keys.find(k => ['lon','lng','long','longitude','x','x_coord','xcoord','geom_lon'].includes(lower(k)));
-  const wktKey = keys.find(k => ['wkt','geometry','geom','shape'].includes(lower(k)));
-  // Find any AADT-like column (prefer exact 'aadt' else first that contains aadt)
-  let aadtKey = keys.find(k => lower(k)==='aadt');
-  if (!aadtKey) aadtKey = keys.find(k => lower(k).includes('aadt'));
-  const trkKey = keys.find(k => ['truckpct','truck_%','truckpercent','pcttruck','truck_pct','truck'].includes(lower(k)));
-  const rteKey = keys.find(k => ['route','rte','rt','road','roadname','name','sr','route_id','route_no'].includes(lower(k)));
-  const dateKey = keys.find(k => ['date','year','countdate','aadt_year','aa_date'].includes(lower(k)));
-  return { latKey, lonKey, wktKey, aadtKey, trkKey, rteKey, dateKey };
-}
-
-function parseWKTLinestring(wkt){
-  // LINESTRING(lon lat, lon lat, ...)
-  const m = /LINESTRING\s*\(\s*([^)]+)\s*\)/i.exec(wkt || '');
+/* ===== WKT parsing helpers (handles LINESTRING & MULTILINESTRING & Z/M/ZM) ===== */
+function stripDimTokens(s){ return (s||'').replace(/\bZ+M?\b|\bM\b/ig,'').trim(); }
+function parseWKTPoint(w){
+  const m = /POINT\s*\(\s*([^\s]+)\s+([^\s]+)\s*\)/i.exec(stripDimTokens(w));
   if (!m) return null;
-  const parts = m[1].split(',');
+  const lon = +m[1], lat = +m[2];
+  if (Number.isFinite(lat) && Number.isFinite(lon)) return { lat, lon };
+  return null;
+}
+function parseWKTLineString(w){
+  const m = /LINESTRING\s*\(\s*([^)]+)\s*\)/i.exec(stripDimTokens(w));
+  if (!m) return null;
   const coords = [];
-  for (const p of parts){
+  for (const p of m[1].split(',')){
     const nums = p.trim().split(/\s+/).map(Number);
     if (nums.length >= 2 && Number.isFinite(nums[0]) && Number.isFinite(nums[1])){
-      const lon = nums[0], lat = nums[1];
-      coords.push([lat, lon]);
+      coords.push([ +nums[1], +nums[0] ]); // [lat,lon]
     }
   }
   return coords.length ? coords : null;
 }
-
-function pointDistanceMeters(lat,lon, lat2,lon2){
-  const a = L.latLng(lat,lon); const b = L.latLng(lat2,lon2);
-  return a.distanceTo(b);
+function parseWKTMultiLineString(w){
+  const s = stripDimTokens(w);
+  const m = /MULTILINESTRING\s*\(\s*(.+)\s*\)\s*$/i.exec(s);
+  if (!m) return null;
+  const inner = m[1];
+  const parts = [];
+  let level=0, buf='';
+  for (let i=0;i<inner.length;i++){
+    const ch = inner[i];
+    if (ch==='('){ level++; if (level===1) continue; }
+    if (ch===')'){ level--; if (level===0){ parts.push(buf); buf=''; continue; } }
+    if (level>0) buf+=ch;
+  }
+  const lines = [];
+  for (const seg of parts){
+    const ls = parseWKTLineString('LINESTRING('+seg+')');
+    if (ls && ls.length) lines.push(ls);
+  }
+  if (lines.length===1) return lines[0];
+  if (lines.length>1) return lines.flat();
+  return null;
 }
 
-function nearestDistanceToGeom(center, geom){
-  // geom can be {lat,lon} or array of [lat,lon] for polyline
+/* ===== Column detection tuned for PennDOT ===== */
+function detectCols(sampleRow){
+  const keys = Object.keys(sampleRow || {});
+  const lower = (k)=> (k||'').toString().trim().toLowerCase();
+  const has = (cands)=> keys.find(k => cands.includes(lower(k)));
+
+  const latKey = has(['lat','latitude','y','y_coord','ycoord','geom_lat','latitude_dd','lat_dd']);
+  const lonKey = has(['lon','lng','long','longitude','x','x_coord','xcoord','geom_lon','longitude_dd','long_dd']);
+  const wktKey = has(['wkt','geometry','geom','shape','the_geom','geom_wkt']);
+
+  // AADT: prefer newest year if columns like AADT_2023 exist
+  const aadtCandidates = keys
+    .map(k => ({ k, lk: lower(k), y: (lower(k).match(/aadt[^0-9]*([12][0-9]{3})/)||[])[1] }))
+    .filter(o => o.lk.includes('aadt'));
+  let aadtKey = null, aadtYear = null;
+  if (aadtCandidates.length){
+    const exact = aadtCandidates.find(o => o.lk === 'aadt');
+    if (exact) { aadtKey = exact.k; }
+    else {
+      const withYear = aadtCandidates.filter(o=>o.y).sort((a,b)=>(+b.y)-(+a.y));
+      if (withYear.length){ aadtKey = withYear[0].k; aadtYear = +withYear[0].y; }
+      else { aadtKey = aadtCandidates[0].k; }
+    }
+  }
+
+  const trkKey = has(['truckpct','truck_%','truckpercent','pcttruck','truck_pct','pct_trucks','trucks_pct','aadt_truck','truck']);
+  const rteKey = has(['route','rte','rt','road','roadname','name','sr','route_id','route_no','st_rt_no','rte_nm','roadway_name']);
+  const dateKey = has(['date','year','countdate','aadt_year','aa_date','year_record','rec_year']);
+
+  return { latKey, lonKey, wktKey, aadtKey, aadtYear, trkKey, rteKey, dateKey };
+}
+
+/* ===== Geometry helpers ===== */
+function nearestDistanceToGeom(centerLL, geom){
   if (Array.isArray(geom)) {
     let best = Infinity;
-    for (const [lat,lon] of geom) best = Math.min(best, center.distanceTo([lat,lon]));
+    for (const [lat,lon] of geom) best = Math.min(best, centerLL.distanceTo([lat,lon]));
     return best;
   } else {
-    return center.distanceTo([geom.lat, geom.lon]);
+    return centerLL.distanceTo([geom.lat, geom.lon]);
   }
 }
 
+/* ===== CSV loader ===== */
 async function fetchCsvAt(path){
   const res = await fetch(path, { cache: 'no-store' });
   if (!res.ok) throw new Error('HTTP '+res.status);
@@ -642,7 +680,6 @@ async function loadAadtData(){
   if (AADT.loaded) return;
   setAadtStatus('Data: loading…');
 
-  // Try the CSV paths in order
   for (const p of AADT_CSV_PATHS){
     try{
       const rows = await fetchCsvAt(p);
@@ -655,59 +692,88 @@ async function loadAadtData(){
     }catch(e){}
   }
 
-  // Fallback to embedded sample (still works out of the box)
+  // Fallback sample (runs even if CSV missing)
   AADT.rows = [
-    { lat: 39.9526, lon: -75.1652, route: "4021", AADT: 622, TruckPct: 8, Date: "2020" },
-    { lat: 40.4406, lon: -79.9959, route: "0376", AADT: 67890, TruckPct: 12, Date: "2023" },
+    { lat: 39.9526, lon: -75.1652, ROUTE: "4021", AADT_2020: 622, PCT_TRUCKS: 8, YEAR: "2020", geometry: "POINT(-75.1652 39.9526)" },
+    { geometry: "MULTILINESTRING((-79.9959 40.4406,-79.991 40.4425))", SR: "0376", AADT_2023: 67890, TRUCK_PCT: 12, AADT_YEAR: "2023" },
     { lat: 40.2732, lon: -76.8867, route: "0152", AADT: 1460, TruckPct: 5, Date: "2023" }
   ];
   AADT.loaded = true;
-  setAadtStatus('Data: sample embedded (place CSV at public/data/RMSTRAFFIC_(Traffic_Volumes).csv for full data)');
+  setAadtStatus('Data: sample embedded (place CSV named RMSTRAFFIC_with_latlon_full.csv next to this file for full data)');
 }
 
+/* ===== Geocoding with PA bias ===== */
 async function geocode(addr){
-  const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(addr);
+  const want = addr.trim();
+  const q = /\b(PA|Pennsylvania)\b/i.test(want) ? want : (want + ' Pennsylvania');
+  const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&q=' + encodeURIComponent(q);
   const res = await fetch(url);
   const j = await res.json();
   if (j && j.length) return L.latLng(parseFloat(j[0].lat), parseFloat(j[0].lon));
   return null;
 }
 
+/* ===== Row normalization (PennDOT aware) ===== */
 function normalizeRow(row, cols){
-  const out = { route: '', aadt: null, truck: null, date: '' };
-  if (cols.rteKey && row[cols.rteKey] != null) out.route = String(row[cols.rteKey]);
-  if (cols.aadtKey && row[cols.aadtKey] != null) out.aadt = +row[cols.aadtKey];
-  if (cols.trkKey && row[cols.trkKey] != null) out.truck = +row[cols.trkKey];
-  if (cols.dateKey && row[cols.dateKey] != null) out.date = String(row[cols.dateKey]);
+  const out = { route: '', aadt: null, truck: null, date: '', geom: null };
 
-  // Geometry
-  if (cols.latKey && cols.lonKey && Number.isFinite(+row[cols.latKey]) && Number.isFinite(+row[cols.lonKey])){
-    out.geom = { lat: +row[cols.latKey], lon: +row[cols.lonKey] };
-  } else if (cols.wktKey && typeof row[cols.wktKey] === 'string'){
-    const w = row[cols.wktKey];
-    if (/^point/i.test(w)) {
-      const m = /POINT\s*\(\s*([^\s]+)\s+([^\s]+)\s*\)/i.exec(w);
-      if (m){ out.geom = { lat: +m[2], lon: +m[1] }; }
-    } else if (/^linestring/i.test(w)){
-      const coords = parseWKTLinestring(w);
-      if (coords && coords.length) out.geom = coords; // polyline
+  if (cols.rteKey && row[cols.rteKey] != null) out.route = String(row[cols.rteKey]);
+
+  if (cols.aadtKey && row[cols.aadtKey] != null) {
+    out.aadt = +row[cols.aadtKey];
+    if (!out.date && cols.aadtYear) out.date = String(cols.aadtYear);
+  } else {
+    for (const k of Object.keys(row)) {
+      if (/^aadt$/i.test(k)) { out.aadt = +row[k]; break; }
     }
   }
+
+  if (cols.trkKey && row[cols.trkKey] != null) out.truck = +row[cols.trkKey];
+  if (cols.dateKey && row[cols.dateKey] != null && !out.date) out.date = String(row[cols.dateKey]);
+
+  const wktRaw = cols.wktKey ? row[cols.wktKey] : null;
+  if (wktRaw && typeof wktRaw === 'string') {
+    const w = wktRaw.trim();
+    if (/^point/i.test(w)) out.geom = parseWKTPoint(w);
+    else if (/^linestring/i.test(w)) out.geom = parseWKTLineString(w);
+    else if (/^multilinestring/i.test(w)) out.geom = parseWKTMultiLineString(w);
+  }
+
+  if (!out.geom && cols.latKey && cols.lonKey &&
+      Number.isFinite(+row[cols.latKey]) && Number.isFinite(+row[cols.lonKey])){
+    out.geom = { lat: +row[cols.latKey], lon: +row[cols.lonKey] };
+  }
+
   return out;
 }
 
-function clearAadtLayer(){ aadtLayer.clearLayers(); document.getElementById('AadtResults').innerHTML = '—'; }
+/* ===== Rendering ===== */
+function clearAadtLayer(){ aadtLayer.clearLayers(); document.getElementById('AadtResults').innerHTML = '—'; setAadtTotals('—'); }
+
+function gallonsPerMonthFromAADT(aadt){
+  // 2% stop rate, 8 gallons, 30 days
+  const g = (aadt||0) * 0.02 * 8 * 30;
+  return Math.round(g);
+}
+
+function colorForAADT(a){
+  if (!Number.isFinite(a)) return '#22d3ee';
+  if (a >= 50000) return '#ff4d4d';
+  if (a >= 20000) return '#ffa64d';
+  if (a >= 10000) return '#ffd24d';
+  return '#22d3ee';
+}
 
 function renderAadt(centerLL, radiusMiles){
   clearAadtLayer();
   if (!AADT.rows || !AADT.rows.length) return;
 
-  const sample = AADT.rows.find(r => r && typeof r === 'object');
-  const cols = detectCols(sample || {});
+  const sample = AADT.rows.find(r => r && typeof r === 'object') || {};
+  const cols = detectCols(sample);
 
   const radMeters = radiusMiles * 1609.34;
   const items = [];
-  let added = 0;
+  let added = 0, totalGallons = 0;
 
   for (const r of AADT.rows){
     const n = normalizeRow(r, cols);
@@ -715,20 +781,25 @@ function renderAadt(centerLL, radiusMiles){
 
     const dist = nearestDistanceToGeom(centerLL, n.geom);
     if (dist <= radMeters){
+      const col = colorForAADT(n.aadt);
       let layer;
       if (Array.isArray(n.geom)) { // polyline
-        layer = L.polyline(n.geom, { weight: 4, color: '#22d3ee' }).addTo(aadtLayer);
+        layer = L.polyline(n.geom, { weight: 4, color: col, opacity: 0.9 }).addTo(aadtLayer);
       } else {
-        layer = L.circleMarker([n.geom.lat, n.geom.lon], { radius: 5, color: '#22d3ee', weight: 2, fillOpacity: 0.9 }).addTo(aadtLayer);
+        layer = L.circleMarker([n.geom.lat, n.geom.lon], { radius: 5, color: col, weight: 2, fillOpacity: 0.9 }).addTo(aadtLayer);
       }
+
+      const galMo = gallonsPerMonthFromAADT(n.aadt);
+      totalGallons += galMo;
+
       const popupHtml =
         `<b>Route:</b> ${esc(n.route||'—')}<br>`+
-        `<b>AADT:</b> ${n.aadt!=null?fmt(n.aadt):'—'}<br>`+
+        `<b>AADT${n.date?(' ('+esc(n.date)+')'):''}:</b> ${n.aadt!=null?fmt(n.aadt):'—'}<br>`+
         `<b>Truck %:</b> ${n.truck!=null?esc(n.truck):'—'}<br>`+
-        `<b>Date:</b> ${esc(n.date||'—')}`;
+        `<b>≈ Gallons / month:</b> ${fmt(galMo)}`;
       layer.bindPopup(popupHtml);
 
-      items.push({ dist, layer, text: `Route ${n.route||'—'} — AADT ${n.aadt!=null?fmt(n.aadt):'—'}` });
+      items.push({ dist, layer, text: `Route ${n.route||'—'} — AADT ${n.aadt!=null?fmt(n.aadt):'—'} — ≈ ${fmt(galMo)} gal/mo` });
       added++;
     }
   }
@@ -740,13 +811,18 @@ function renderAadt(centerLL, radiusMiles){
     const div = document.createElement('div');
     div.className = 'item';
     div.textContent = `${it.text} (${(it.dist/1609.34).toFixed(2)} mi)`;
-    div.onclick = ()=> { const b = it.layer.getBounds?.() || L.latLngBounds(it.layer.getLatLng(), it.layer.getLatLng()); aadtMap.fitBounds(b.pad(0.5)); it.layer.openPopup?.(); };
+    div.onclick = ()=> {
+      const b = it.layer.getBounds?.() || L.latLngBounds(it.layer.getLatLng(), it.layer.getLatLng());
+      aadtMap.fitBounds(b.pad(0.5));
+      it.layer.openPopup?.();
+    };
     list.appendChild(div);
   }
 
   setAadtStatus(`Found ${added.toLocaleString()} segment(s) within ${radiusMiles} mi`);
+  setAadtTotals(added ? `<b>Total ≈ gallons/month in radius:</b> ${fmt(totalGallons)}` : '—');
+
   if (added){
-    // Fit map to center + first result area
     const first = items[0];
     try{
       const bounds = first.layer.getBounds?.() || L.latLngBounds(first.layer.getLatLng(), first.layer.getLatLng());
@@ -762,6 +838,7 @@ function renderAadt(centerLL, radiusMiles){
     .addTo(aadtLayer).bindPopup('<b>Search center</b>');
 }
 
+/* ===== UI actions ===== */
 document.getElementById('AadtSearch').addEventListener('click', async ()=>{
   const addr = document.getElementById('AadtAddress').value.trim();
   const rad = parseFloat(document.getElementById('AadtRadius').value);
@@ -775,6 +852,7 @@ document.getElementById('AadtSearch').addEventListener('click', async ()=>{
   setAadtStatus('Rendering…');
   renderAadt(center, rad);
 });
+document.getElementById('AadtAddress').addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ e.preventDefault(); document.getElementById('AadtSearch').click(); }});
 </script>
 
 </body>
