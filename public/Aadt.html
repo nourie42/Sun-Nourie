@@ -5,113 +5,281 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>AADT Map — Traffic Counts Near an Address</title>
   <style>
-    body { font-family: Arial, sans-serif; margin:0; padding:0; background:#0f172a; color:#e5e7eb; }
-    #map { height: 560px; width: 100%; }
-    .controls { padding:10px; background:#111827; }
-    label { margin-right:5px; }
-    input, button { margin-right:10px; padding:6px; border-radius:6px; border:1px solid #333; }
-    button { background:#06b6d4; color:#fff; border:none; cursor:pointer; }
-    #status { padding:10px; font-size:.9em; color:#94a3b8; }
+    :root { --bg:#0f172a; --card:#111827; --text:#e5e7eb; --muted:#94a3b8; --accent:#06b6d4; }
+    html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif}
+    .wrap{max-width:1150px;margin:24px auto;padding:0 16px}
+    .card{background:var(--card);border-radius:14px;padding:18px 18px 14px 18px;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+    h1{margin:0 0 12px;font-weight:800;letter-spacing:.2px}
+    .row{display:grid;grid-template-columns:1fr 200px;gap:14px}
+    .row + .row{margin-top:10px}
+    label{font-size:.9rem;color:var(--muted);margin-bottom:6px;display:block}
+    input,button{font-size:1rem}
+    input[type=text],input[type=number]{width:100%;padding:12px 12px;border-radius:10px;border:1px solid #1f2937;background:#0b1220;color:var(--text)}
+    button{padding:11px 16px;border:0;border-radius:10px;background:var(--accent);color:#002b36;font-weight:700;cursor:pointer}
+    button:disabled{opacity:.5;cursor:not-allowed}
+    #map{height:560px;width:100%;border-radius:12px;border:1px solid #1f2937;overflow:hidden}
+    .toolbar{display:flex;justify-content:space-between;align-items:center;margin:10px 2px 14px}
+    .muted{color:var(--muted);font-size:.92rem}
+    .pill{background:#0b1220;border:1px solid #1f2937;border-radius:999px;padding:6px 10px;color:var(--muted)}
+    .right{display:flex;gap:10px;align-items:center}
+    a, a:visited{color:var(--accent);text-decoration:none}
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 </head>
 <body>
-  <div class="controls">
-    <label for="addr">Address:</label>
-    <input id="addr" type="text" size="50" placeholder="Enter address"/>
-    <label for="radius">Radius (miles):</label>
-    <input id="radius" type="number" value="5" step="0.5" min="0.1"/>
-    <button id="go">Find AADT</button>
+  <div class="wrap">
+    <h1>AADT Map — Traffic Counts Near an Address</h1>
+    <div class="card">
+      <div class="row">
+        <div>
+          <label for="addr">Address</label>
+          <input id="addr" type="text" placeholder="Enter an address (Google autocomplete)…"/>
+        </div>
+        <div>
+          <label for="radius">Radius (miles)</label>
+          <input id="radius" type="number" step="0.1" min="0.1" value="1.0"/>
+        </div>
+      </div>
+      <div class="row">
+        <div><button id="go">Find AADT</button> <span id="status" class="muted"></span></div>
+        <div class="right">
+          <span id="updated" class="pill">—</span>
+        </div>
+      </div>
+      <div id="map"></div>
+    </div>
   </div>
-  <div id="map"></div>
-  <div id="status">—</div>
+
+  <!-- Papa Parse for CSV -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
   <script>
-    let map, infoWindow, addressMarker=null, aadtMarkers=[];
-    let csvRows=[];
+    // ---------- Config ----------
+    const DEFAULT_CENTER = { lat: 40.864, lng: -77.797 }; // central-ish PA
+    const DEFAULT_ZOOM = 7;
+    const DEFAULT_RADIUS_MI = 1.0;
 
+    // CSV path (override with ?csv=/path.csv)
+    const CSV_PATH = (() => {
+      const u = new URL(location.href);
+      return u.searchParams.get('csv') || 'RMSTRAFFIC_(Traffic_Volumes).csv';
+    })();
+
+    // Globals
+    let map, places, addressMarker = null, aadtMarkers = [], radiusCircle = null;
+    let csvRows = null, latKey=null, lngKey=null, aadtKey=null;
+
+    // EST timestamp helper
     function nowEST() {
-      return new Date().toLocaleString("en-US", {
-        timeZone: "America/New_York",
-        dateStyle: "medium",
-        timeStyle: "short",
-        hour12: true,
-        timeZoneName: "short"
+      return new Intl.DateTimeFormat('en-US', {
+        timeZone:'America/New_York', dateStyle:'medium', timeStyle:'short', hour12:true, timeZoneName:'short'
+      }).format(new Date());
+    }
+    function setUpdated() { document.getElementById('updated').textContent = 'Updated: ' + nowEST(); }
+    function setStatus(msg) { document.getElementById('status').textContent = msg; }
+
+    // Load CSV and auto-detect columns
+    function loadCSV() {
+      return new Promise((resolve, reject) => {
+        Papa.parse(CSV_PATH, {
+          download: true, header: true, dynamicTyping: true, skipEmptyLines: true,
+          complete: (res) => {
+            csvRows = res.data;
+            detectColumns();
+            resolve();
+          },
+          error: (err) => reject(err)
+        });
       });
     }
 
-    function redStarIcon(){
-      return {
-        path:"M 0,-24 L 6,-6 L 24,0 L 6,6 L 0,24 L -6,6 L -24,0 L -6,-6 Z",
-        fillColor:"#ff3b3b", fillOpacity:1, strokeColor:"#fff", strokeWeight:2, scale:1
-      };
+    function detectColumns() {
+      if (!csvRows?.length) { setStatus('No CSV rows found.'); return; }
+      const sample = csvRows[0];
+      const keys = Object.keys(sample);
+
+      // AADT key candidates
+      const aadtCandidates = ['CUR_AADT','AADT','Aadt','ADT','Annual_Average_Daily_Traffic','AADT_TOTAL','Aadt_Total'];
+      aadtKey = keys.find(k => aadtCandidates.includes(k)) || keys.find(k => /aadt/i.test(k));
+
+      // Latitude/Longitude key candidates
+      const latCandidates = ['lat','latitude','Latitude','POINT_Y','point_y','y','Y'];
+      const lngCandidates = ['lng','lon','longitude','Longitude','POINT_X','point_x','x','X'];
+
+      // Prefer named columns first
+      latKey = keys.find(k => latCandidates.includes(k));
+      lngKey = keys.find(k => lngCandidates.includes(k));
+
+      // If still missing, try range-based detection on numeric fields
+      function looksLat(v){ return typeof v==='number' && isFinite(v) && v<=90 && v>=-90; }
+      function looksLng(v){ return typeof v==='number' && isFinite(v) && v<=180 && v>=-180; }
+      if (!latKey || !lngKey) {
+        for (const k of keys) {
+          const v = +sample[k];
+          if (!latKey && looksLat(v)) latKey = k;
+          else if (!lngKey && looksLng(v)) lngKey = k;
+        }
+      }
+
+      // Final check
+      if (!aadtKey) setStatus('WARNING: Could not find AADT column. Showing markers with unlabeled squares.');
+      if (!latKey || !lngKey) setStatus('WARNING: Could not find lat/lon columns. Add lat/lon to CSV or pass a different file with ?csv=…');
+
+      // Timestamp
+      setUpdated();
     }
-    function blueSquareIcon(){
+
+    // Build a red star icon (SVG path)
+    function redStarIcon() {
       return {
-        path:"M -10 -10 L 10 -10 L 10 10 L -10 10 z",
-        fillColor:"#1d4ed8", fillOpacity:1, strokeColor:"#fff", strokeWeight:1,
-        labelOrigin: new google.maps.Point(0,0), scale:1
+        path: "M 0,-24 L 6,-6 L 24,0 L 6,6 L 0,24 L -6,6 L -24,0 L -6,-6 Z",
+        fillColor: "#ff3b3b",
+        fillOpacity: 1,
+        strokeColor: "#ffffff",
+        strokeWeight: 2,
+        scale: 1
+        // anchor center is default (0,0)
       };
     }
 
-    function clearMarkers(){
-      aadtMarkers.forEach(m=>m.setMap(null));
-      aadtMarkers=[]; if(addressMarker){addressMarker.setMap(null);}
+    // Blue square icon (SVG path), label goes on top
+    function blueSquareIcon() {
+      return {
+        path: "M -10 -10 L 10 -10 L 10 10 L -10 10 z",
+        fillColor: "#1d4ed8",
+        fillOpacity: 1,
+        strokeColor: "#ffffff",
+        strokeWeight: 1,
+        labelOrigin: new google.maps.Point(0, 0), // center for label
+        scale: 1
+      };
+    }
+
+    function milesToMeters(mi){ return mi * 1609.344; }
+
+    function clearAADTMarkers(){
+      for (const m of aadtMarkers) m.setMap(null);
+      aadtMarkers = [];
+      if (radiusCircle) { radiusCircle.setMap(null); radiusCircle = null; }
     }
 
     function addAADTMarkers(center, radiusMiles){
-      clearMarkers();
-      const radiusMeters=radiusMiles*1609.34;
-      let count=0;
-      for(const row of csvRows){
-        const la=+row.latitude, lo=+row.longitude;
-        if(!isFinite(la)||!isFinite(lo)) continue;
-        const pt=new google.maps.LatLng(la,lo);
-        const d=google.maps.geometry.spherical.computeDistanceBetween(center,pt);
-        if(d>radiusMeters) continue;
-        const aadt=row.CUR_AADT||row.AADT||'';
-        const marker=new google.maps.Marker({
-          position:pt,map,icon:blueSquareIcon(),
-          label:aadt?{text:String(aadt),color:"#fff",fontSize:"10px",fontWeight:"700"}:undefined,
-          title:`AADT: ${aadt}`
+      if (!csvRows?.length || !latKey || !lngKey) return;
+      const radiusMeters = milesToMeters(radiusMiles);
+      const centerLL = new google.maps.LatLng(center.lat(), center.lng());
+      const added = [];
+
+      // Optional radius circle
+      radiusCircle = new google.maps.Circle({
+        map, center: centerLL, radius: radiusMeters,
+        fillColor: "#22d3ee33", strokeColor:"#22d3ee", strokeOpacity:.7, strokeWeight:1
+      });
+
+      for (const row of csvRows){
+        const la = +row[latKey], lo = +row[lngKey];
+        if (!isFinite(la) || !isFinite(lo)) continue;
+        const pt = new google.maps.LatLng(la, lo);
+        const d = google.maps.geometry.spherical.computeDistanceBetween(centerLL, pt);
+        if (d > radiusMeters) continue;
+
+        const aadtVal = row[aadtKey] != null ? String(row[aadtKey]) : '';
+        const marker = new google.maps.Marker({
+          position: pt,
+          map,
+          icon: blueSquareIcon(),
+          label: aadtVal ? {
+            text: aadtVal,
+            color: "#ffffff",
+            fontSize: "10px",
+            fontWeight: "700"
+          } : undefined,
+          title: aadtVal ? `AADT: ${aadtVal}` : 'AADT'
         });
-        marker.addListener("click",()=>{
-          infoWindow.setContent(
-            `<b>Route:</b> ${row.ST_RT_NO||'—'}<br>`+
-            `<b>AADT:</b> ${aadt}<br>`+
-            `<b>Truck %:</b> ${row.TRK_PCT||'—'}<br>`+
-            `<b>Year:</b> ${row.BASE_ADT_YR||'—'}`
-          );
-          infoWindow.open(map,marker);
-        });
-        aadtMarkers.push(marker); count++;
+        aadtMarkers.push(marker);
+        added.push({marker, dist:d});
       }
-      document.getElementById("status").textContent=`Found ${count} segment(s) within ${radiusMiles} mi • ${nowEST()}`;
+
+      // Fit map a bit if we added many
+      if (added.length){
+        const bounds = new google.maps.LatLngBounds(centerLL, centerLL);
+        for (const {marker} of added) bounds.extend(marker.getPosition());
+        map.fitBounds(bounds, 80);
+      }
+      setStatus(`Found ${added.length.toLocaleString()} segment(s) within ${radiusMiles} mi`);
+    }
+
+    function placeAddressMarker(loc){
+      if (addressMarker) addressMarker.setMap(null);
+      addressMarker = new google.maps.Marker({
+        position: loc,
+        map,
+        icon: redStarIcon(),
+        title: "Searched Address"
+      });
     }
 
     function handleSearch(loc){
-      map.setCenter(loc); map.setZoom(13);
-      if(addressMarker) addressMarker.setMap(null);
-      addressMarker=new google.maps.Marker({position:loc,map,icon:redStarIcon(),title:"Search Address"});
-      const miles=parseFloat(document.getElementById("radius").value)||5;
-      addAADTMarkers(loc,miles);
+      map.setCenter(loc);
+      map.setZoom(14);
+      placeAddressMarker(loc);
+      clearAADTMarkers();
+      const miles = Math.max(0.1, parseFloat(document.getElementById('radius').value) || DEFAULT_RADIUS_MI);
+      addAADTMarkers(loc, miles);
     }
 
-    function init(){
-      map=new google.maps.Map(document.getElementById("map"),{center:{lat:40.86,lng:-77.79},zoom:7});
-      infoWindow=new google.maps.InfoWindow();
-      Papa.parse("RMSTRAFFIC_with_latlon_full.csv",{download:true,header:true,dynamicTyping:true,complete:(res)=>{csvRows=res.data;}});
-      document.getElementById("go").addEventListener("click",()=>{
-        const geocoder=new google.maps.Geocoder();
-        const addr=document.getElementById("addr").value;
-        geocoder.geocode({address:addr},(results,status)=>{
-          if(status==='OK'&&results[0]){handleSearch(results[0].geometry.location);}
-          else{document.getElementById("status").textContent="Address not found";}
-        });
+    async function init() {
+      // Init map
+      map = new google.maps.Map(document.getElementById('map'), {
+        center: DEFAULT_CENTER, zoom: DEFAULT_ZOOM, mapTypeId: 'roadmap'
       });
+
+      // Places autocomplete
+      const input = document.getElementById('addr');
+      const autocomplete = new google.maps.places.Autocomplete(input, { types: ['address'] });
+      autocomplete.addListener('place_changed', () => {
+        const place = autocomplete.getPlace();
+        if (!place.geometry || !place.geometry.location) {
+          setStatus('No details for that address');
+          return;
+        }
+        handleSearch(place.geometry.location);
+      });
+
+      // Manual button
+      document.getElementById('go').addEventListener('click', async () => {
+        const p = autocomplete.getPlace();
+        if (p?.geometry?.location) { handleSearch(p.geometry.location); return; }
+        // Geocode raw text if user didn’t click a suggestion
+        const addr = input.value.trim();
+        if (!addr) { setStatus('Enter an address'); return; }
+        setStatus('Geocoding…');
+        try{
+          const gc = new google.maps.Geocoder();
+          gc.geocode({ address: addr }, (results, status) => {
+            if (status === 'OK' && results[0]) handleSearch(results[0].geometry.location);
+            else setStatus('Address not found');
+          });
+        }catch(e){ setStatus('Geocoding error'); }
+      });
+
+      // Load CSV
+      setStatus('Loading traffic CSV…');
+      try{
+        await loadCSV();
+        setStatus('CSV loaded. Enter an address and click Find AADT.');
+      }catch(e){
+        console.error(e);
+        setStatus('Failed to load CSV. Ensure the file exists at '+CSV_PATH);
+      }
     }
-    window.init=init;
+
+    // Expose for Google callback
+    window._aadti = { init };
+
   </script>
-  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBlm18rIsI1bhOwhx3bpHAX589EahvLbPc&libraries=places,geometry&callback=init" async defer></script>
+
+  <!-- Google Maps JS API (Maps + Places + Geometry). Replace the API key. -->
+  <script
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBlm18rIsI1bhOwhx3bpHAX589EahvLbPc&libraries=places,geometry&callback=_aadti.init"
+    async defer></script>
 </body>
 </html>
