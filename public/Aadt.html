@@ -1,314 +1,286 @@
-<script>
-/* SPA-style routing between #analyzer and #aadt */
-function showPage(which){
-  const ana = document.getElementById('analyzerWrap');
-  const aadt = document.getElementById('aadtWrap');
-  if (which === 'aadt') { ana.style.display='none'; aadt.style.display='block'; initAadtMapOnce(); }
-  else { ana.style.display='block'; aadt.style.display='none'; }
-}
-function route(){
-  const h = (location.hash || '#analyzer').toLowerCase();
-  if (h === '#aadt') showPage('aadt'); else showPage('analyzer');
-}
-window.addEventListener('hashchange', route);
-document.addEventListener('DOMContentLoaded', route);
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>AADT Map — Traffic Counts Near an Address</title>
+  <style>
+    :root { --bg:#0f172a; --card:#111827; --text:#e5e7eb; --muted:#94a3b8; --accent:#06b6d4; }
+    html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif}
+    .wrap{max-width:1150px;margin:24px auto;padding:0 16px}
+    .card{background:var(--card);border-radius:14px;padding:18px 18px 14px 18px;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+    h1{margin:0 0 12px;font-weight:800;letter-spacing:.2px}
+    .row{display:grid;grid-template-columns:1fr 200px;gap:14px}
+    .row + .row{margin-top:10px}
+    label{font-size:.9rem;color:var(--muted);margin-bottom:6px;display:block}
+    input,button{font-size:1rem}
+    input[type=text],input[type=number]{width:100%;padding:12px 12px;border-radius:10px;border:1px solid #1f2937;background:#0b1220;color:var(--text)}
+    button{padding:11px 16px;border:0;border-radius:10px;background:var(--accent);color:#002b36;font-weight:700;cursor:pointer}
+    button:disabled{opacity:.5;cursor:not-allowed}
+    #map{height:560px;width:100%;border-radius:12px;border:1px solid #1f2937;overflow:hidden}
+    .toolbar{display:flex;justify-content:space-between;align-items:center;margin:10px 2px 14px}
+    .muted{color:var(--muted);font-size:.92rem}
+    .pill{background:#0b1220;border:1px solid #1f2937;border-radius:999px;padding:6px 10px;color:var(--muted)}
+    .right{display:flex;gap:10px;align-items:center}
+    a, a:visited{color:var(--accent);text-decoration:none}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>AADT Map — Traffic Counts Near an Address</h1>
+    <div class="card">
+      <div class="row">
+        <div>
+          <label for="addr">Address</label>
+          <input id="addr" type="text" placeholder="Enter an address (Google autocomplete)…"/>
+        </div>
+        <div>
+          <label for="radius">Radius (miles)</label>
+          <input id="radius" type="number" step="0.1" min="0.1" value="1.0"/>
+        </div>
+      </div>
+      <div class="row">
+        <div><button id="go">Find AADT</button> <span id="status" class="muted"></span></div>
+        <div class="right">
+          <span id="updated" class="pill">—</span>
+        </div>
+      </div>
+      <div id="map"></div>
+    </div>
+  </div>
 
-/* ================= AADT map + data (robust CSV/WKT handling) ================= */
-let AADT = { rows: [], loaded: false, src: null, note: "" };
-let aadtMap, aadtLayer, aadtInited = false;
+  <!-- Papa Parse for CSV -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
-/* ---------- Eastern Time formatting ---------- */
-function nowET(){
-  return new Intl.DateTimeFormat('en-US',{
-    timeZone:'America/New_York', dateStyle:'medium', timeStyle:'short',
-    hour12:true, timeZoneName:'short'
-  }).format(new Date());
-}
-function setAadtStatus(msg){
-  const el = document.getElementById('AadtStatus'); if (!el) return;
-  el.textContent = `${msg} • ${nowET()}`;
-}
+  <script>
+    // ---------- Config ----------
+    const DEFAULT_CENTER = { lat: 40.864, lng: -77.797 }; // central-ish PA
+    const DEFAULT_ZOOM = 7;
+    const DEFAULT_RADIUS_MI = 1.0;
 
-function initAadtMapOnce(){
-  if (aadtInited) return;
-  aadtMap = L.map('AadtMap').setView([40.0,-77.0], 6);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19, attribution: '© OpenStreetMap contributors'
-  }).addTo(aadtMap);
-  aadtLayer = L.layerGroup().addTo(aadtMap);
-  aadtInited = true;
-  loadAadtData();
-}
+    // CSV path (override with ?csv=/path.csv)
+    const CSV_PATH = (() => {
+      const u = new URL(location.href);
+      return u.searchParams.get('csv') || 'RMSTRAFFIC_(Traffic_Volumes).csv';
+    })();
 
-/* Allow ?csv= override. Try several default paths (root and /public/data). */
-const AADT_CSV_PATHS = (() => {
-  const u = new URL(window.location.href);
-  const q = u.searchParams.get('csv');
-  if (q) return [q];
-  return [
-    'data/RMSTRAFFIC_(Traffic_Volumes).csv',
-    'RMSTRAFFIC_(Traffic_Volumes).csv',
-    'data/traffic.csv',
-    'traffic.csv'
-  ];
-})();
+    // Globals
+    let map, places, addressMarker = null, aadtMarkers = [], radiusCircle = null;
+    let csvRows = null, latKey=null, lngKey=null, aadtKey=null;
 
-/* ---- helpers to identify/convert geometry ---- */
-const R_MAJOR = 6378137;
-const toDeg = r => r * 180 / Math.PI;
-
-function looksLikeLat(v){ return Number.isFinite(v) && Math.abs(v) <= 90; }
-function looksLikeLon(v){ return Number.isFinite(v) && Math.abs(v) <= 180; }
-function looksLike3857(v){ return Number.isFinite(v) && Math.abs(v) > 180 && Math.abs(v) < 3e7; }
-
-function mercToLonLat(x, y){
-  const lon = toDeg(x / R_MAJOR);
-  const lat = toDeg(2 * Math.atan(Math.exp(y / R_MAJOR)) - Math.PI/2);
-  return { lat, lon };
-}
-
-/* Parse WKT: POINT, LINESTRING, MULTILINESTRING (lon lat order) */
-function parseWKT(w){
-  if (!w || typeof w !== 'string') return null;
-  const s = w.trim();
-  let m;
-  if ((m = /^point\s*\(\s*([^\s,]+)\s+([^\s,]+)\s*\)$/i.exec(s))) {
-    const lon = +m[1], lat = +m[2];
-    if (looksLikeLat(lat) && looksLikeLon(lon)) return { lat, lon };
-    return null;
-  }
-  if ((m = /^linestring\s*\(\s*([^)]+)\)$/i.exec(s))) {
-    const parts = m[1].split(',').map(p => p.trim().split(/\s+/).map(Number));
-    const coords = parts.map(([lon,lat]) => [lat,lon]).filter(([la,lo]) => looksLikeLat(la)&&looksLikeLon(lo));
-    return coords.length ? coords : null;
-  }
-  if ((m = /^multilinestring\s*\(\s*(.+)\s*\)$/i.exec(s))) {
-    const inner = m[1];
-    const groups = inner.match(/\(([^\)]+)\)/g) || [];
-    const lines = [];
-    for (const g of groups){
-      const pts = g.replace(/[()]/g,'').split(',').map(p => p.trim().split(/\s+/).map(Number));
-      const line = pts.map(([lon,lat]) => [lat,lon]).filter(([la,lo]) => looksLikeLat(la)&&looksLikeLon(lo));
-      if (line.length) lines.push(line);
+    // EST timestamp helper
+    function nowEST() {
+      return new Intl.DateTimeFormat('en-US', {
+        timeZone:'America/New_York', dateStyle:'medium', timeStyle:'short', hour12:true, timeZoneName:'short'
+      }).format(new Date());
     }
-    return lines.length ? lines : null;
-  }
-  return null;
-}
+    function setUpdated() { document.getElementById('updated').textContent = 'Updated: ' + nowEST(); }
+    function setStatus(msg) { document.getElementById('status').textContent = msg; }
 
-/* Detect columns for lat/lon OR x/y (Web Mercator); fallback WKT */
-function detectCols(rows){
-  const sample = rows.find(r => r && typeof r === 'object') || {};
-  const keys = Object.keys(sample);
-  const lower = k => k.toLowerCase();
-
-  const find = (cands) => keys.find(k => cands.includes(lower(k)));
-  const latK = find(['latitude','lat','point_y','y_coord','ycoord','y']);
-  const lonK = find(['longitude','lon','lng','point_x','x_coord','xcoord','x']);
-  const wktKey = keys.find(k => /^(wkt|geometry|geom|shape)$/i.test(k));
-
-  function degPairOK(a,b){
-    if (!a || !b) return false;
-    let ok=0, tot=0;
-    for (let i=0;i<Math.min(200,rows.length);i++){
-      const r=rows[i]; const la=+r[a], lo=+r[b];
-      if (Number.isFinite(la) && Number.isFinite(lo)){ tot++; if (looksLikeLat(la)&&looksLikeLon(lo)) ok++; }
+    // Load CSV and auto-detect columns
+    function loadCSV() {
+      return new Promise((resolve, reject) => {
+        Papa.parse(CSV_PATH, {
+          download: true, header: true, dynamicTyping: true, skipEmptyLines: true,
+          complete: (res) => {
+            csvRows = res.data;
+            detectColumns();
+            resolve();
+          },
+          error: (err) => reject(err)
+        });
+      });
     }
-    return tot && ok/tot>0.8;
-  }
-  function mercPairOK(x,y){
-    if (!x || !y) return false;
-    let ok=0, tot=0;
-    for (let i=0;i<Math.min(200,rows.length);i++){
-      const r=rows[i]; const X=+r[x], Y=+r[y];
-      if (Number.isFinite(X) && Number.isFinite(Y)){ tot++; if (looksLike3857(X)&&looksLike3857(Y)) ok++; }
-    }
-    return tot && ok/tot>0.8;
-  }
 
-  if (degPairOK(latK,lonK)) return { mode:'deg', latKey:latK, lonKey:lonK, wktKey };
-  const yCand = keys.find(k => /^(point_y|y_coord|y)$/i.test(k));
-  const xCand = keys.find(k => /^(point_x|x_coord|x)$/i.test(k));
-  if (mercPairOK(xCand,yCand)) return { mode:'merc', xKey:xCand, yKey:yCand, wktKey };
-  if (wktKey) return { mode:'wkt', wktKey };
-  return { mode:'none' };
-}
+    function detectColumns() {
+      if (!csvRows?.length) { setStatus('No CSV rows found.'); return; }
+      const sample = csvRows[0];
+      const keys = Object.keys(sample);
 
-function nearestDistanceToGeom(centerLL, geom){
-  if (Array.isArray(geom)) {
-    if (Array.isArray(geom[0])) {
-      let best=Infinity; for (const line of geom) for (const [la,lo] of line) best=Math.min(best,centerLL.distanceTo([la,lo]));
-      return best;
-    } else {
-      let best=Infinity; for (const [la,lo] of geom) best=Math.min(best,centerLL.distanceTo([la,lo]));
-      return best;
-    }
-  } else {
-    return centerLL.distanceTo([geom.lat,geom.lon]);
-  }
-}
+      // AADT key candidates
+      const aadtCandidates = ['CUR_AADT','AADT','Aadt','ADT','Annual_Average_Daily_Traffic','AADT_TOTAL','Aadt_Total'];
+      aadtKey = keys.find(k => aadtCandidates.includes(k)) || keys.find(k => /aadt/i.test(k));
 
-function normalizeRow(row, cols){
-  const out = { route:'', aadt:null, truck:null, date:'', geom:null };
-  const keys = Object.keys(row);
-  const getKey = (cands) => keys.find(k => cands.includes(k.toLowerCase()));
-  const val = (k) => k!=null ? row[k] : undefined;
+      // Latitude/Longitude key candidates
+      const latCandidates = ['lat','latitude','Latitude','POINT_Y','point_y','y','Y'];
+      const lngCandidates = ['lng','lon','longitude','Longitude','POINT_X','point_x','x','X'];
 
-  const routeK = getKey(['route','rte','rt','road','roadname','name','sr','route_id','route_no']);
-  const aadtK  = getKey(['aadt','aadt_total','aadtcount','adt','annual_average_daily_traffic','aadt_yr','aadt_val']);
-  const truckK = getKey(['truckpct','truck_%','truckpercent','pcttruck','truck_pct','truck']);
-  const dateK  = getKey(['date','year','countdate','aadt_year','aa_date']);
+      // Prefer named columns first
+      latKey = keys.find(k => latCandidates.includes(k));
+      lngKey = keys.find(k => lngCandidates.includes(k));
 
-  if (routeK) out.route = String(val(routeK));
-  if (aadtK != null && val(aadtK) != null) out.aadt = +val(aadtK);
-  if (truckK!= null && val(truckK)!= null) out.truck = +val(truckK);
-  if (dateK ) out.date = String(val(dateK));
-
-  if (cols.mode === 'deg' && cols.latKey && cols.lonKey) {
-    const la = +row[cols.latKey], lo = +row[cols.lonKey];
-    if (looksLikeLat(la) && looksLikeLon(lo)) out.geom = { lat: la, lon: lo };
-  } else if (cols.mode === 'merc' && cols.xKey && cols.yKey) {
-    const x = +row[cols.xKey], y = +row[cols.yKey];
-    if (looksLike3857(x) && looksLike3857(y)) out.geom = mercToLonLat(x, y);
-  } else if (cols.wktKey) {
-    const g = parseWKT(row[cols.wktKey]);
-    if (g) out.geom = g;
-  }
-  return out;
-}
-
-/* Fetch & parse CSV with PapaParse */
-async function fetchCsvAt(path){
-  const res = await fetch(path, { cache: 'no-store' });
-  if (!res.ok) throw new Error('HTTP '+res.status);
-  const text = await res.text();
-  return await new Promise((resolve)=>{
-    Papa.parse(text, { header:true, dynamicTyping:true, skipEmptyLines:true,
-      complete: (r) => resolve(r.data)
-    });
-  });
-}
-
-async function loadAadtData(){
-  if (AADT.loaded) {
-    setAadtStatus(`Data: loaded ${AADT.rows.length.toLocaleString()} rows from ${AADT.src}${AADT.note?` • ${AADT.note}`:''}`);
-    return;
-  }
-  setAadtStatus('Data: loading…');
-
-  for (const p of AADT_CSV_PATHS){
-    try{
-      const rows = await fetchCsvAt(p);
-      if (rows && rows.length){
-        AADT.rows = rows; AADT.loaded = true; AADT.src = p;
-        const cols = detectCols(rows);
-        if (cols.mode === 'none'){
-          AADT.note = 'WARNING: No geometry columns detected';
-        } else if (cols.mode === 'merc'){
-          AADT.note = `Web Mercator X/Y → lat/lon (columns: ${cols.yKey}, ${cols.xKey})`;
-        } else if (cols.mode === 'deg'){
-          AADT.note = `lat/lon columns (${cols.latKey}, ${cols.lonKey})`;
-        } else if (cols.mode === 'wkt'){
-          AADT.note = `WKT column (${cols.wktKey})`;
+      // If still missing, try range-based detection on numeric fields
+      function looksLat(v){ return typeof v==='number' && isFinite(v) && v<=90 && v>=-90; }
+      function looksLng(v){ return typeof v==='number' && isFinite(v) && v<=180 && v>=-180; }
+      if (!latKey || !lngKey) {
+        for (const k of keys) {
+          const v = +sample[k];
+          if (!latKey && looksLat(v)) latKey = k;
+          else if (!lngKey && looksLng(v)) lngKey = k;
         }
-        setAadtStatus(`Data: loaded ${rows.length.toLocaleString()} rows from ${p} • ${AADT.note}`);
-        return;
       }
-    }catch(e){}
-  }
 
-  // Fallback sample so UI still works
-  AADT.rows = [
-    { lat: 39.9526, lon: -75.1652, route: "4021", AADT: 622, TruckPct: 8, Date: "2020" },
-    { lat: 40.4406, lon: -79.9959, route: "0376", AADT: 67890, TruckPct: 12, Date: "2023" },
-    { lat: 40.2732, lon: -76.8867, route: "0152", AADT: 1460, TruckPct: 5, Date: "2023" }
-  ];
-  AADT.loaded = true; AADT.src = 'embedded-sample'; AADT.note = 'Using small embedded sample';
-  setAadtStatus('Data: using small embedded sample (place CSV at /public/data/…)');
-}
+      // Final check
+      if (!aadtKey) setStatus('WARNING: Could not find AADT column. Showing markers with unlabeled squares.');
+      if (!latKey || !lngKey) setStatus('WARNING: Could not find lat/lon columns. Add lat/lon to CSV or pass a different file with ?csv=…');
 
-/* Rendering */
-function clearAadtLayer(){ aadtLayer.clearLayers(); document.getElementById('AadtResults').innerHTML = '—'; }
-
-function renderAadt(centerLL, radiusMiles){
-  clearAadtLayer();
-  if (!AADT.rows || !AADT.rows.length) return;
-
-  const cols = detectCols(AADT.rows);
-  const radMeters = radiusMiles * 1609.34;
-  const items = [];
-  let added = 0;
-
-  for (const r of AADT.rows){
-    const n = normalizeRow(r, cols);
-    if (!n.geom) continue;
-
-    const dist = nearestDistanceToGeom(centerLL, n.geom);
-    if (dist <= radMeters){
-      let layer;
-      if (Array.isArray(n.geom)) {
-        if (Array.isArray(n.geom[0])) { for (const line of n.geom) layer = L.polyline(line, { weight: 4, color: '#22d3ee' }).addTo(aadtLayer); }
-        else { layer = L.polyline(n.geom, { weight: 4, color: '#22d3ee' }).addTo(aadtLayer); }
-      } else {
-        layer = L.circleMarker([n.geom.lat, n.geom.lon], { radius: 5, color: '#22d3ee', weight: 2, fillOpacity: 0.9 }).addTo(aadtLayer);
-      }
-      const popupHtml =
-        `<b>Route:</b> ${n.route||'—'}<br>`+
-        `<b>AADT:</b> ${n.aadt!=null? n.aadt.toLocaleString():'—'}<br>`+
-        `<b>Truck %:</b> ${n.truck!=null? n.truck:'—'}<br>`+
-        `<b>Date:</b> ${n.date||'—'}`;
-      layer.bindPopup(popupHtml);
-
-      items.push({ dist, layer, text: `Route ${n.route||'—'} — AADT ${n.aadt!=null? n.aadt.toLocaleString():'—'}` });
-      added++;
+      // Timestamp
+      setUpdated();
     }
-  }
 
-  items.sort((a,b)=>a.dist-b.dist);
-  const list = document.getElementById('AadtResults');
-  list.innerHTML = '';
-  for (const it of items){
-    const div = document.createElement('div');
-    div.className = 'item';
-    div.textContent = `${it.text} (${(it.dist/1609.34).toFixed(2)} mi)`;
-    div.onclick = ()=> {
-      const b = it.layer.getBounds?.() || L.latLngBounds(it.layer.getLatLng(), it.layer.getLatLng());
-      aadtMap.fitBounds(b.pad(0.5)); it.layer.openPopup?.();
-    };
-    list.appendChild(div);
-  }
+    // Build a red star icon (SVG path)
+    function redStarIcon() {
+      return {
+        path: "M 0,-24 L 6,-6 L 24,0 L 6,6 L 0,24 L -6,6 L -24,0 L -6,-6 Z",
+        fillColor: "#ff3b3b",
+        fillOpacity: 1,
+        strokeColor: "#ffffff",
+        strokeWeight: 2,
+        scale: 1
+        // anchor center is default (0,0)
+      };
+    }
 
-  setAadtStatus(`Found ${added.toLocaleString()} segment(s) within ${radiusMiles} mi • ${AADT.src}${AADT.note?` • ${AADT.note}`:''}`);
-  if (added){
-    const first = items[0];
-    try{
-      const bounds = first.layer.getBounds?.() || L.latLngBounds(first.layer.getLatLng(), first.layer.getLatLng());
-      const combo = bounds.extend(centerLL); aadtMap.fitBounds(combo.pad(0.5));
-    }catch{}
-  } else {
-    aadtMap.setView(centerLL, 13);
-  }
+    // Blue square icon (SVG path), label goes on top
+    function blueSquareIcon() {
+      return {
+        path: "M -10 -10 L 10 -10 L 10 10 L -10 10 z",
+        fillColor: "#1d4ed8",
+        fillOpacity: 1,
+        strokeColor: "#ffffff",
+        strokeWeight: 1,
+        labelOrigin: new google.maps.Point(0, 0), // center for label
+        scale: 1
+      };
+    }
 
-  // mark center
-  L.circleMarker(centerLL, { radius: 6, color: '#fff', weight: 2, fillColor: '#ff6b6b', fillOpacity: 0.9 })
-    .addTo(aadtLayer).bindPopup('<b>Search center</b>');
-}
+    function milesToMeters(mi){ return mi * 1609.344; }
 
-/* Geocode + search handler */
-async function geocode(addr){
-  const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(addr);
-  const res = await fetch(url); const j = await res.json();
-  if (j && j.length) return L.latLng(parseFloat(j[0].lat), parseFloat(j[0].lon));
-  return null;
-}
-document.getElementById('AadtSearch').addEventListener('click', async ()=>{
-  const addr = document.getElementById('AadtAddress').value.trim();
-  const rad = parseFloat(document.getElementById('AadtRadius').value);
-  if (!addr || !Number.isFinite(rad) || rad <= 0){ alert('Enter a valid address and radius.'); return; }
-  setAadtStatus('Geocoding…');
-  const center = await geocode(addr);
-  if (!center){ setAadtStatus('Address not found.'); return; }
-  setAadtStatus('Rendering…');
-  renderAadt(center, rad);
-});
-</script>
+    function clearAADTMarkers(){
+      for (const m of aadtMarkers) m.setMap(null);
+      aadtMarkers = [];
+      if (radiusCircle) { radiusCircle.setMap(null); radiusCircle = null; }
+    }
+
+    function addAADTMarkers(center, radiusMiles){
+      if (!csvRows?.length || !latKey || !lngKey) return;
+      const radiusMeters = milesToMeters(radiusMiles);
+      const centerLL = new google.maps.LatLng(center.lat(), center.lng());
+      const added = [];
+
+      // Optional radius circle
+      radiusCircle = new google.maps.Circle({
+        map, center: centerLL, radius: radiusMeters,
+        fillColor: "#22d3ee33", strokeColor:"#22d3ee", strokeOpacity:.7, strokeWeight:1
+      });
+
+      for (const row of csvRows){
+        const la = +row[latKey], lo = +row[lngKey];
+        if (!isFinite(la) || !isFinite(lo)) continue;
+        const pt = new google.maps.LatLng(la, lo);
+        const d = google.maps.geometry.spherical.computeDistanceBetween(centerLL, pt);
+        if (d > radiusMeters) continue;
+
+        const aadtVal = row[aadtKey] != null ? String(row[aadtKey]) : '';
+        const marker = new google.maps.Marker({
+          position: pt,
+          map,
+          icon: blueSquareIcon(),
+          label: aadtVal ? {
+            text: aadtVal,
+            color: "#ffffff",
+            fontSize: "10px",
+            fontWeight: "700"
+          } : undefined,
+          title: aadtVal ? `AADT: ${aadtVal}` : 'AADT'
+        });
+        aadtMarkers.push(marker);
+        added.push({marker, dist:d});
+      }
+
+      // Fit map a bit if we added many
+      if (added.length){
+        const bounds = new google.maps.LatLngBounds(centerLL, centerLL);
+        for (const {marker} of added) bounds.extend(marker.getPosition());
+        map.fitBounds(bounds, 80);
+      }
+      setStatus(`Found ${added.length.toLocaleString()} segment(s) within ${radiusMiles} mi`);
+    }
+
+    function placeAddressMarker(loc){
+      if (addressMarker) addressMarker.setMap(null);
+      addressMarker = new google.maps.Marker({
+        position: loc,
+        map,
+        icon: redStarIcon(),
+        title: "Searched Address"
+      });
+    }
+
+    function handleSearch(loc){
+      map.setCenter(loc);
+      map.setZoom(14);
+      placeAddressMarker(loc);
+      clearAADTMarkers();
+      const miles = Math.max(0.1, parseFloat(document.getElementById('radius').value) || DEFAULT_RADIUS_MI);
+      addAADTMarkers(loc, miles);
+    }
+
+    async function init() {
+      // Init map
+      map = new google.maps.Map(document.getElementById('map'), {
+        center: DEFAULT_CENTER, zoom: DEFAULT_ZOOM, mapTypeId: 'roadmap'
+      });
+
+      // Places autocomplete
+      const input = document.getElementById('addr');
+      const autocomplete = new google.maps.places.Autocomplete(input, { types: ['address'] });
+      autocomplete.addListener('place_changed', () => {
+        const place = autocomplete.getPlace();
+        if (!place.geometry || !place.geometry.location) {
+          setStatus('No details for that address');
+          return;
+        }
+        handleSearch(place.geometry.location);
+      });
+
+      // Manual button
+      document.getElementById('go').addEventListener('click', async () => {
+        const p = autocomplete.getPlace();
+        if (p?.geometry?.location) { handleSearch(p.geometry.location); return; }
+        // Geocode raw text if user didn’t click a suggestion
+        const addr = input.value.trim();
+        if (!addr) { setStatus('Enter an address'); return; }
+        setStatus('Geocoding…');
+        try{
+          const gc = new google.maps.Geocoder();
+          gc.geocode({ address: addr }, (results, status) => {
+            if (status === 'OK' && results[0]) handleSearch(results[0].geometry.location);
+            else setStatus('Address not found');
+          });
+        }catch(e){ setStatus('Geocoding error'); }
+      });
+
+      // Load CSV
+      setStatus('Loading traffic CSV…');
+      try{
+        await loadCSV();
+        setStatus('CSV loaded. Enter an address and click Find AADT.');
+      }catch(e){
+        console.error(e);
+        setStatus('Failed to load CSV. Ensure the file exists at '+CSV_PATH);
+      }
+    }
+
+    // Expose for Google callback
+    window._aadti = { init };
+
+  </script>
+
+  <!-- Google Maps JS API (Maps + Places + Geometry). Replace the API key. -->
+  <script
+    src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&libraries=places,geometry&callback=_aadti.init"
+    async defer></script>
+</body>
+</html>
+
