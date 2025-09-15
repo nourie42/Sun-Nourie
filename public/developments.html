@@ -3,129 +3,551 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Gas Station Developments — Town Radius Search</title>
+<title>Gas Station Developments — Town Search (≤ miles)</title>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="preconnect" href="https://unpkg.com" crossorigin>
 <style>
-  :root {
+  :root{
     --bg:#0b0e15; --panel:#111725; --panel2:#0e1626; --text:#e8eefc; --muted:#9fb0cf;
-    --accent:#5ec2ff; --line:#263145; --warn:#ffe08a;
+    --accent:#5ec2ff; --line:#263145; --warn:#ffe08a; --ok:#86efac; --bad:#fca5a5;
   }
-  body{margin:0;padding:0;background:var(--bg);color:var(--text);
-       font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;}
-  .wrap{max-width:1200px;margin:2rem auto;padding:0 1rem;}
-  h1{font-size:1.6rem;margin:0 0 1rem 0;}
-  .tabs{display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap;}
-  .tabbtn{background:var(--panel2);border:1px solid var(--line);color:var(--text);
-          border-radius:12px;padding:.6rem 1rem;cursor:pointer;}
-  .tabbtn.active{background:var(--accent);color:#062338;border-color:transparent;font-weight:700;}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:1rem;}
-  .row{display:flex;gap:1rem;align-items:flex-end;flex-wrap:wrap;}
-  .row>div{flex:1 1 260px;}
-  label{display:block;margin:.25rem 0 .35rem;color:var(--muted);}
-  input,button{padding:.7rem 1rem;border-radius:10px;}
-  input{width:100%;border:1px solid var(--line);background:#0f1421;color:var(--text);}
-  button{background:var(--accent);color:#00121e;border:0;font-weight:700;cursor:pointer;}
-  table{width:100%;border-collapse:collapse;margin-top:1rem;font-size:.95rem;}
-  th,td{text-align:left;border-bottom:1px solid var(--line);padding:.6rem .5rem;vertical-align:top;}
-  th{color:var(--muted);font-weight:600;}
-  a{color:#8cd1ff;}
-  .pill{display:inline-block;background:#0f2236;color:#bfe6ff;padding:.25rem .5rem;
-        border-radius:999px;font-size:.75rem;border:1px solid var(--line);}
-  .warn{color:var(--warn);}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+            font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:1250px;margin:20px auto;padding:0 14px;}
+  header{display:flex;gap:12px;align-items:center;margin-bottom:10px;}
+  h1{margin:0;font-size:1.6rem;letter-spacing:.2px;}
+  .spacer{flex:1}
+  .btn,button,input,select{font:inherit}
+  .btn{background:var(--accent);color:#00121e;border:0;border-radius:10px;padding:.6rem 1rem;font-weight:700;cursor:pointer}
+  .btn.ghost{background:#0f2236;border:1px solid var(--line);color:#bfe6ff}
+  .btn.small{padding:.45rem .75rem;font-weight:600}
+  a.btn{display:inline-block;text-decoration:none}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin:12px 0}
+  .tabs{display:flex;gap:.5rem;margin-bottom:12px;flex-wrap:wrap}
+  .tabbtn{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:12px;padding:.6rem 1rem;cursor:pointer}
+  .tabbtn.active{background:var(--accent);color:#062338;border-color:transparent;font-weight:700}
+  label{display:block;margin:.25rem 0 .35rem;color:var(--muted)}
+  input[type="text"], input[type="number"], input[type="file"], select{
+    width:100%;padding:.75rem;border-radius:10px;border:1px solid var(--line);
+    background:#0f1421;color:var(--text);
+  }
+  .grid{display:grid;gap:12px}
+  .grid.cols-3{grid-template-columns:1.4fr .7fr .6fr}
+  .grid.cols-2{grid-template-columns:1fr 1fr}
+  @media (max-width:900px){ .grid.cols-3,.grid.cols-2{grid-template-columns:1fr} }
+  .muted{color:var(--muted)}
+  .pill{display:inline-block;background:#0f2236;color:#bfe6ff;padding:.25rem .5rem;border-radius:999px;font-size:.75rem;border:1px solid var(--line)}
+  .warn{color:var(--warn)}
+  .ok{color:var(--ok)}
+  .bad{color:var(--bad)}
+  table{width:100%;border-collapse:collapse;margin-top:8px;font-size:.95rem}
+  th,td{border-bottom:1px solid var(--line);text-align:left;padding:.6rem .5rem;vertical-align:top}
+  th{color:var(--muted);font-weight:600}
+  a{color:#8cd1ff}
+  .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .right{margin-left:auto}
+  .hint{color:var(--muted);font-size:.9rem}
+  details{margin-top:8px}
+  .kbd{border:1px solid var(--line);padding:2px 6px;border-radius:6px;background:#0f1421}
 </style>
+
+<!-- File parsers -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 </head>
 <body>
 <div class="wrap">
-  <h1>Gas Station Developments — Town Search (≤20 miles)</h1>
+  <header>
+    <h1>Gas Station Developments — Town Search (≤ <span id="miLabel">20</span> miles)</h1>
+    <div class="spacer"></div>
+    <a class="btn small ghost" href="index.html">← Back to Analyzer</a>
+  </header>
 
   <div class="tabs">
     <button class="tabbtn active" data-tab="search">Search</button>
     <button class="tabbtn" data-tab="raw">Raw Data</button>
-    <button class="tabbtn" data-tab="upload">Upload</button>
+    <button class="tabbtn" data-tab="upload">Upload & Map Columns</button>
   </div>
 
-  <!-- SEARCH -->
-  <div id="tab-search" class="card">
-    <div class="row">
+  <!-- SEARCH TAB -->
+  <section id="tab-search" class="card">
+    <div class="grid cols-3">
       <div>
-        <label for="q">Town</label>
-        <input id="q" list="towns" placeholder="Start typing…"/>
+        <label for="q">Town (use “Town, ST” when possible)</label>
+        <input id="q" list="towns" type="text" placeholder="e.g., Knightdale, NC"/>
         <datalist id="towns"></datalist>
+        <div class="hint">Results show only if your town is in the dataset OR within the miles radius using coordinates.</div>
       </div>
-      <div style="flex:0 0 160px"><button id="go">Search</button></div>
-      <div style="flex:0 0 160px"><button id="clear">Clear</button></div>
+      <div>
+        <label for="miles">Miles radius (default 20)</label>
+        <input id="miles" type="number" min="1" value="20"/>
+      </div>
+      <div style="align-self:end;">
+        <button id="go" class="btn">Search</button>
+        <button id="clear" class="btn ghost">Clear</button>
+      </div>
     </div>
-    <div id="meta" style="margin-top:.5rem;"></div>
-    <div id="results"></div>
-  </div>
 
-  <!-- RAW -->
-  <div id="tab-raw" class="card" style="display:none;">
-    <label>Filter</label><input id="raw-q" placeholder="Type to filter all columns"/>
-    <div id="raw"></div>
-    <button id="raw-export">Download all as CSV</button>
-  </div>
+    <div class="toolbar">
+      <span id="meta" class="muted">Dataset rows: <b id="rowcount">0</b></span>
+      <span class="right">
+        <button id="dlResultsCsv" class="btn small ghost">Download results CSV</button>
+      </span>
+    </div>
 
-  <!-- UPLOAD -->
-  <div id="tab-upload" class="card" style="display:none;">
-    <p>Upload new data (.xlsx, .csv, .json)</p>
-    <input id="file" type="file" accept=".xlsx,.csv,.json"/>
-  </div>
+    <div id="results" style="margin-top:10px"></div>
+  </section>
+
+  <!-- RAW TAB -->
+  <section id="tab-raw" class="card" style="display:none;">
+    <label for="raw-q">Filter</label>
+    <input id="raw-q" type="text" placeholder="Type to filter all columns (e.g., FL, 2024, permit)…"/>
+    <div class="toolbar">
+      <button id="dlAllCsv" class="btn small">Download ALL CSV</button>
+      <button id="dlAllJson" class="btn small ghost">Download ALL JSON</button>
+    </div>
+    <div id="rawTable" style="margin-top:8px"></div>
+  </section>
+
+  <!-- UPLOAD & MAP TAB -->
+  <section id="tab-upload" class="card" style="display:none;">
+    <div class="grid cols-2">
+      <div>
+        <label>Upload new data (.xlsx / .csv / .json)</label>
+        <input id="file" type="file" accept=".xlsx,.csv,.json"/>
+        <details>
+          <summary><b>What this does</b></summary>
+          <div class="hint">
+            Parses your file in the browser, normalizes columns, rebuilds autocomplete, and refreshes the other tabs. Nothing is uploaded to a server.
+          </div>
+        </details>
+        <div class="toolbar" style="margin-top:8px">
+          <button id="saveCache" class="btn small">Save dataset in browser</button>
+          <button id="clearCache" class="btn small ghost">Clear browser dataset</button>
+          <span id="cacheMsg" class="muted"></span>
+        </div>
+      </div>
+      <div>
+        <label>Pick sheet (for Excel)</label>
+        <select id="sheetSel"><option value="">(auto)</option></select>
+
+        <label style="margin-top:10px">Column mapping (auto-detected — change if wrong)</label>
+        <div class="grid cols-2">
+          <div><label>Town</label><select id="mapTown"></select></div>
+          <div><label>State</label><select id="mapState"></select></div>
+          <div><label>Latitude</label><select id="mapLat"></select></div>
+          <div><label>Longitude</label><select id="mapLon"></select></div>
+          <div><label>Address</label><select id="mapAddress"></select></div>
+          <div><label>Name</label><select id="mapName"></select></div>
+          <div><label>Developer</label><select id="mapDeveloper"></select></div>
+          <div><label>Date</label><select id="mapDate"></select></div>
+          <div><label>Notes</label><select id="mapNotes"></select></div>
+          <div><label>URL</label><select id="mapUrl"></select></div>
+        </div>
+        <div class="toolbar" style="margin-top:8px">
+          <button id="applyMap" class="btn small">Apply mapping</button>
+          <span class="hint">Press <span class="kbd">Enter</span> in Search to run instantly.</span>
+        </div>
+      </div>
+    </div>
+  </section>
 </div>
 
 <script>
-let DATA=[];let RESULTS=[];
-const MILES=20;
-function esc(s){return (s??"").toString().replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]));}
-function toCSV(rows){if(!rows.length)return"";const cols=Object.keys(rows[0]);
- const escC=v=>('"'+String(v??"").replace(/"/g,'""')+'"');return [cols.map(escC).join(",")].concat(
- rows.map(r=>cols.map(c=>escC(r[c])).join(","))).join("\n");}
-function haversine(lat1,lon1,lat2,lon2){const R=3958.8,d2r=x=>x*Math.PI/180;
- const dLat=d2r(lat2-lat1),dLon=d2r(lon2-lon1);
- return 2*R*Math.asin(Math.sqrt(Math.sin(dLat/2)**2+Math.cos(d2r(lat1))*Math.cos(d2r(lat2))*Math.sin(dLon/2)**2));}
+/* ------------------------------ State ------------------------------ */
+let DATA = [];           // normalized array of rows
+let LAST_RAW_ROWS = [];  // rows from last upload before normalization
+let CURRENT_RESULTS = [];
+let XSLX_WB = null;      // last loaded workbook
+const DEFAULT_COLS = ["town","state","lat","lon","address","name","developer","date","notes","url"];
+const MAP_IDS = {town:"mapTown",state:"mapState",lat:"mapLat",lon:"mapLon",address:"mapAddress",name:"mapName",developer:"mapDeveloper",date:"mapDate",notes:"mapNotes",url:"mapUrl"};
+const MILES_INPUT = document.getElementById("miles");
+const MI_LABEL = document.getElementById("miLabel");
 
-function render(rows){if(!rows.length)return"<div>No results</div>";const cols=Object.keys(rows[0]);
- let h="<tr>"+cols.map(c=>"<th>"+esc(c)+"</th>").join("")+"</tr>";
- let b=rows.map(r=>"<tr>"+cols.map(c=>"<td>"+(c==="url"&&r[c]?`<a href='${esc(r[c])}' target=_blank>link</a>`:esc(r[c]))+"</td>").join("")+"</tr>").join("");
- return "<table>"+h+b+"</table>";}
+/* ------------------------------ Helpers ------------------------------ */
+const $ = sel => document.querySelector(sel);
+const esc = s => (s??"").toString().replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]));
+const numberOrNull = v => {
+  if (v===null || v===undefined || v==="") return null;
+  if (typeof v === "number") return Number.isFinite(v) ? v : null;
+  // pull first float-looking token from messy strings
+  const m = String(v).replace(",",".").match(/-?\d+(\.\d+)?/);
+  return m ? parseFloat(m[0]) : null;
+};
+const norm = s => (s??"").toString().trim();
+const normLower = s => norm(s).toLowerCase();
+const toCSV = rows => {
+  if (!rows.length) return "";
+  const cols = Object.keys(rows[0]);
+  const q = v => '"'+String(v??"").replace(/"/g,'""')+'"';
+  return [cols.map(q).join(",")].concat(rows.map(r => cols.map(c => q(r[c])).join(","))).join("\n");
+};
+function download(filename, text, mime) {
+  const blob = new Blob([text], {type:mime||"text/plain"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+}
+function haversineMiles(lat1, lon1, lat2, lon2){
+  const R = 3958.7613; const toRad = d => d*Math.PI/180;
+  const dLat = toRad(lat2-lat1), dLon = toRad(lon2-lon1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  return 2*R*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
 
-function rebuildList(){const towns=[...new Set(DATA.map(r=>r.town&&r.state?(r.town+", "+r.state):r.town).filter(Boolean))];
- document.getElementById("towns").innerHTML=towns.sort().map(t=>`<option value="${esc(t)}">`).join("");}
+/* ------------------ Column detection & normalization ------------------ */
+function cleanKey(k){
+  return k.toLowerCase()
+    .replace(/\s+/g," ")
+    .replace(/[_\-\/()]/g," ")
+    .replace(/\s+/g," ")
+    .trim();
+}
+// richer candidates (handle “CITY”, “MUNICIPALITY”, “POINT_X”, etc.)
+const CANDIDATES = {
+  town: ["town","city","municipality","village","place","locality","city town","town city","city (town)","loc_city","community"],
+  state: ["state","st","province","region","us state","postal","state abbreviation"],
+  lat: ["lat","latitude","y","ycoord","y coord","y coordinate","point_y","geom_y","centroid_y"],
+  lon: ["lon","lng","long","longitude","x","xcoord","x coord","x coordinate","point_x","geom_x","centroid_x"],
+  address: ["address","addr","site address","street","street address","location","full address","address1","addr_line"],
+  name: ["name","site name","station","location name","project","title","site","business","dev name"],
+  developer: ["developer","owner","applicant","proposer","builder","sponsor"],
+  date: ["date","submitted","filed","updated","last updated","hearing date","application date","report date"],
+  notes: ["notes","description","desc","details","summary","remarks","comment","scope"],
+  url: ["url","link","source","source url","website","href"]
+};
+function bestMapForColumns(cols){
+  const cleaned = cols.map(c => cleanKey(String(c)));
+  const pick = want => {
+    // exact match first
+    for (let i=0;i<cleaned.length;i++){
+      if (CANDIDATES[want].includes(cleaned[i])) return cols[i];
+    }
+    // substring & startswith scoring
+    let best = null, score = -1;
+    for (let i=0;i<cleaned.length;i++){
+      const ck = cleaned[i];
+      for (const cand of CANDIDATES[want]){
+        if (ck === cand) { best = cols[i]; score = 100; break; }
+        if (ck.startsWith(cand)) { if (80>score){ best=cols[i]; score=80; } }
+        if (ck.includes(cand))   { if (60>score){ best=cols[i]; score=60; } }
+      }
+      if (score===100) break;
+    }
+    return best;
+  };
+  const map = {};
+  for (const k of DEFAULT_COLS) map[k] = pick(k) || "";
+  return map;
+}
+function normalizeRows(rows, mapping){
+  const out = [];
+  for (const r of rows){
+    const row = {
+      town: r[mapping.town] ?? "",
+      state: r[mapping.state] ?? "",
+      lat: numberOrNull(r[mapping.lat]),
+      lon: numberOrNull(r[mapping.lon]),
+      address: r[mapping.address] ?? "",
+      name: r[mapping.name] ?? "",
+      developer: r[mapping.developer] ?? "",
+      date: r[mapping.date] ?? "",
+      notes: r[mapping.notes] ?? "",
+      url: r[mapping.url] ?? ""
+    };
+    // Clean strings
+    for (const k of ["town","state","address","name","developer","date","notes","url"])
+      row[k] = norm(row[k]);
+    // Skip fully empty
+    if (Object.values(row).some(v => v!=="" && v!==null && v!==undefined)) out.push(row);
+  }
+  return out;
+}
 
-async function search(){const q=document.getElementById("q").value.trim();if(!q)return;
- let res=DATA.filter(r=>(r.town+", "+r.state).toLowerCase()===q.toLowerCase()||r.town.toLowerCase()===q.toLowerCase());
- // 20mi radius
- let geo=null;try{const g=await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&q=${encodeURIComponent(q)}`);
- const j=await g.json();if(j.length)geo=[+j[0].lat,+j[0].lon];}catch{}
- if(geo){for(const r of DATA){if(r.lat&&r.lon){const d=haversine(geo[0],geo[1],+r.lat,+r.lon);if(d<=MILES&&!res.includes(r))res.push(r);}}}
- RESULTS=res;document.getElementById("meta").innerHTML=`<span class="pill">${res.length} results</span>`;
- document.getElementById("results").innerHTML=render(res);}
-function clearAll(){document.getElementById("q").value="";document.getElementById("results").innerHTML="";document.getElementById("meta").innerHTML="";}
-function renderRaw(){const q=document.getElementById("raw-q").value.toLowerCase();
- const rows=!q?DATA:DATA.filter(r=>Object.values(r).some(v=>(""+v).toLowerCase().includes(q)));
- document.getElementById("raw").innerHTML=render(rows);}
-document.getElementById("go").onclick=search;
-document.getElementById("clear").onclick=clearAll;
-document.getElementById("raw-q").oninput=renderRaw;
-document.getElementById("raw-export").onclick=()=>{const blob=new Blob([toCSV(DATA)],{type:"text/csv"});
- const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="all.csv";a.click();};
-document.querySelectorAll(".tabbtn").forEach(b=>b.onclick=()=>{["search","raw","upload"].forEach(t=>{
- document.getElementById("tab-"+t).style.display=b.dataset.tab===t?"":"none";
- b.parentElement.querySelectorAll(".tabbtn").forEach(x=>x.classList.remove("active"));
- b.classList.add("active");if(t==="raw")renderRaw();});});
-document.getElementById("file").onchange=async e=>{
- const f=e.target.files[0];if(!f)return;let rows=[];
- if(f.name.endsWith(".json"))rows=JSON.parse(await f.text());
- else if(f.name.endsWith(".csv"))rows=(await new Promise(res=>Papa.parse(f,{header:true,complete:res}))).data;
- else if(f.name.endsWith(".xlsx")){const wb=XLSX.read(await f.arrayBuffer(),{type:"array"});rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:""});}
- DATA=rows.map(r=>({town:r.town||r.City||"",state:r.state||r.State||"",lat:r.lat||r.Latitude||"",lon:r.lon||r.Longitude||"",address:r.address||"",name:r.name||"",developer:r.developer||"",date:r.date||"",notes:r.notes||"",url:r.url||""}));
- rebuildList();renderRaw();alert("Loaded "+DATA.length+" rows");};
-// ---- initial sample data ----
-DATA=[{town:"Knightdale",state:"NC",lat:35.79,lon:-78.49,address:"",name:"Sample Station",developer:"",date:"",notes:"",url:""}];
-rebuildList();renderRaw();
+/* --------------------------- UI Binding --------------------------- */
+function fillSelect(sel, cols, chosen){
+  sel.innerHTML = `<option value="">(none)</option>` + cols.map(c=>`<option ${c===chosen?"selected":""}>${esc(c)}</option>`).join("");
+}
+function updateMappingSelectors(cols, autoMap){
+  fillSelect(document.getElementById(MAP_IDS.town), cols, autoMap.town);
+  fillSelect(document.getElementById(MAP_IDS.state), cols, autoMap.state);
+  fillSelect(document.getElementById(MAP_IDS.lat), cols, autoMap.lat);
+  fillSelect(document.getElementById(MAP_IDS.lon), cols, autoMap.lon);
+  fillSelect(document.getElementById(MAP_IDS.address), cols, autoMap.address);
+  fillSelect(document.getElementById(MAP_IDS.name), cols, autoMap.name);
+  fillSelect(document.getElementById(MAP_IDS.developer), cols, autoMap.developer);
+  fillSelect(document.getElementById(MAP_IDS.date), cols, autoMap.date);
+  fillSelect(document.getElementById(MAP_IDS.notes), cols, autoMap.notes);
+  fillSelect(document.getElementById(MAP_IDS.url), cols, autoMap.url);
+}
+function currentMappingFromUI(){
+  const get = id => document.getElementById(id).value || "";
+  return {
+    town:get(MAP_IDS.town), state:get(MAP_IDS.state), lat:get(MAP_IDS.lat), lon:get(MAP_IDS.lon),
+    address:get(MAP_IDS.address), name:get(MAP_IDS.name), developer:get(MAP_IDS.developer),
+    date:get(MAP_IDS.date), notes:get(MAP_IDS.notes), url:get(MAP_IDS.url)
+  };
+}
+
+/* ---------------------------- Renderers ---------------------------- */
+function renderTable(rows, limited=true){
+  if (!rows.length) return "<div class='hint'>No rows.</div>";
+  const cols = DEFAULT_COLS;
+  const max = limited ? 800 : rows.length;
+  let thead = "<tr>" + cols.map(c=>`<th>${esc(c)}</th>`).join("") + "</tr>";
+  let body = "";
+  for (let i=0;i<Math.min(rows.length, max);i++){
+    const r = rows[i];
+    body += "<tr>" + cols.map(c=>{
+      let v = r[c];
+      if (v===null || v===undefined) v = "";
+      if (c==="url" && v) return `<td><a href="${esc(v)}" target="_blank" rel="noopener">source</a></td>`;
+      return `<td>${esc(v)}</td>`;
+    }).join("") + "</tr>";
+  }
+  let more = rows.length>max ? `<div class="hint">Showing first ${max} of ${rows.length} rows.</div>` : "";
+  return `<table><thead>${thead}</thead><tbody>${body}</tbody></table>${more}`;
+}
+function rebuildTownList(){
+  const set = new Set();
+  for (const r of DATA){
+    const t = norm(r.town), s = norm(r.state);
+    if (!t) continue;
+    set.add(s ? `${t}, ${s}` : t);
+  }
+  const list = Array.from(set).sort((a,b)=>a.localeCompare(b));
+  $("#towns").innerHTML = list.map(v=>`<option value="${esc(v)}"></option>`).join("");
+  $("#rowcount").textContent = DATA.length;
+}
+
+/* --------------------------- Geocoding --------------------------- */
+const geoCache = new Map();  // q -> [lat,lon]
+function cacheKey(q){ return "geo::"+q.toLowerCase().trim(); }
+function setGeoCache(q, val){
+  geoCache.set(q, val);
+  try{ localStorage.setItem(cacheKey(q), JSON.stringify(val)); }catch{}
+}
+function getGeoCache(q){
+  if (geoCache.has(q)) return geoCache.get(q);
+  try{
+    const raw = localStorage.getItem(cacheKey(q));
+    if (raw){ const v = JSON.parse(raw); geoCache.set(q, v); return v; }
+  }catch{}
+  return null;
+}
+async function geocodeTown(q){
+  const hit = getGeoCache(q); if (hit) return hit;
+  const url = new URL("https://nominatim.openstreetmap.org/search");
+  url.searchParams.set("q", q);
+  url.searchParams.set("format", "json");
+  url.searchParams.set("addressdetails", "1");
+  url.searchParams.set("limit", "1");
+  url.searchParams.set("countrycodes", "us");
+  const resp = await fetch(url.toString(), { headers: {"Accept":"application/json"} });
+  if (!resp.ok) return null;
+  const js = await resp.json();
+  if (!js.length) return null;
+  const out = [parseFloat(js[0].lat), parseFloat(js[0].lon)];
+  setGeoCache(q, out);
+  return out;
+}
+
+/* -------------------------- Search Logic -------------------------- */
+function buildTownIndexes(){
+  const idx = new Map();      // "town|state" -> rows
+  const centroids = new Map();// "town|state" -> [lat,lon]
+  for (const r of DATA){
+    const key = (normLower(r.town) + "|" + normLower(r.state));
+    if (!idx.has(key)) idx.set(key, []);
+    idx.get(key).push(r);
+  }
+  for (const [key, rows] of idx.entries()){
+    const pts = rows.map(r => [numberOrNull(r.lat), numberOrNull(r.lon)]).filter(p => Number.isFinite(p[0]) && Number.isFinite(p[1]));
+    if (pts.length){
+      const lat = pts.reduce((s,p)=>s+p[0],0)/pts.length;
+      const lon = pts.reduce((s,p)=>s+p[1],0)/pts.length;
+      centroids.set(key, [lat,lon]);
+    }
+  }
+  return {idx, centroids};
+}
+async function doSearch(){
+  const q = norm($("#q").value);
+  const miles = Math.max(1, +MILES_INPUT.value || 20);
+  MI_LABEL.textContent = miles;
+  $("#results").innerHTML = "";
+  if (!q){ $("#meta").innerHTML = `<span class="warn">Enter a town.</span>`; return; }
+  const parts = q.split(",");
+  const t = norm(parts[0]||"");
+  const s = norm((parts[1]||"").replace(/[^a-z]/gi,""));
+  const key1 = (t+"|"+s).toLowerCase();
+  const key2 = (t+"|").toLowerCase();
+
+  const {idx, centroids} = buildTownIndexes();
+
+  let results = [];
+  if (idx.has(key1)) results = results.concat(idx.get(key1));
+  else if (idx.has(key2)) results = results.concat(idx.get(key2));
+
+  // If not in dataset or to expand nearby, geocode searched town and add rows within miles
+  let qLatLon = centroids.get(key1) || centroids.get(key2) || null;
+  if (!qLatLon) {
+    try { qLatLon = await geocodeTown(q); } catch { qLatLon = null; }
+  }
+  if (qLatLon){
+    const [qlat, qlon] = qLatLon;
+    for (const rec of DATA){
+      if (results.includes(rec)) continue;
+      const la = numberOrNull(rec.lat), lo = numberOrNull(rec.lon);
+      if (!Number.isFinite(la) || !Number.isFinite(lo)) continue;
+      const d = haversineMiles(qlat, qlon, la, lo);
+      if (d <= miles) results.push(rec);
+    }
+  }
+
+  CURRENT_RESULTS = results;
+  $("#meta").innerHTML = `<span class="pill">${results.length} result(s)</span> within <b>${miles} mi</b> for <b>${esc(q)}</b>`;
+  $("#results").innerHTML = renderTable(results, true);
+}
+
+/* ---------------------------- Raw Table ---------------------------- */
+function renderRaw(){
+  const q = normLower($("#raw-q").value);
+  const rows = !q ? DATA : DATA.filter(r => Object.values(r).some(v => (""+(v??"")).toLowerCase().includes(q)));
+  $("#rawTable").innerHTML = renderTable(rows, true);
+}
+
+/* ------------------------- Upload & Mapping ------------------------- */
+function populateSheetList(wb){
+  const sel = $("#sheetSel");
+  sel.innerHTML = `<option value="">(auto)</option>` + wb.SheetNames.map(name=>`<option>${esc(name)}</option>`).join("");
+}
+function currentSheetName(wb){
+  const pick = $("#sheetSel").value;
+  if (pick && wb.SheetNames.includes(pick)) return pick;
+  // auto: choose the sheet with most rows
+  let best = wb.SheetNames[0], bestCount = -1;
+  for (const name of wb.SheetNames){
+    const ws = wb.Sheets[name];
+    const rows = XLSX.utils.sheet_to_json(ws, {defval:""});
+    if (rows.length > bestCount){ best = name; bestCount = rows.length; }
+  }
+  return best;
+}
+function setMappingFromColumns(cols){
+  const autoMap = bestMapForColumns(cols);
+  updateMappingSelectors(cols, autoMap);
+}
+function applyMappingToRows(){
+  if (!LAST_RAW_ROWS.length){ alert("No rows loaded yet."); return; }
+  const mapping = currentMappingFromUI();
+  DATA = normalizeRows(LAST_RAW_ROWS, mapping);
+  rebuildTownList();
+  renderRaw();
+  alert(`Applied mapping. Rows in dataset: ${DATA.length}`);
+}
+async function handleFile(file){
+  let rows = []; XSLX_WB = null;
+  if (file.name.toLowerCase().endsWith(".json")){
+    const js = JSON.parse(await file.text());
+    rows = Array.isArray(js) ? js : (js.data||[]);
+    LAST_RAW_ROWS = rows;
+    const cols = rows.length ? Object.keys(rows[0]) : [];
+    setMappingFromColumns(cols);
+    DATA = normalizeRows(rows, bestMapForColumns(cols));
+    rebuildTownList(); renderRaw();
+    alert(`Loaded JSON: ${DATA.length} rows`);
+  } else if (file.name.toLowerCase().endsWith(".csv")){
+    const parsed = await new Promise((res,rej)=>Papa.parse(file,{header:true,skipEmptyLines:true,complete:res,error:rej}));
+    rows = parsed.data;
+    LAST_RAW_ROWS = rows;
+    const cols = rows.length ? Object.keys(rows[0]) : [];
+    setMappingFromColumns(cols);
+    DATA = normalizeRows(rows, bestMapForColumns(cols));
+    rebuildTownList(); renderRaw();
+    alert(`Loaded CSV: ${DATA.length} rows`);
+  } else if (file.name.toLowerCase().endsWith(".xlsx")){
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, {type:"array"});
+    XSLX_WB = wb;
+    populateSheetList(wb);
+    const sheet = currentSheetName(wb);
+    const ws = wb.Sheets[sheet];
+    rows = XLSX.utils.sheet_to_json(ws, {defval:""});
+    LAST_RAW_ROWS = rows;
+    const cols = rows.length ? Object.keys(rows[0]) : [];
+    setMappingFromColumns(cols);
+    DATA = normalizeRows(rows, bestMapForColumns(cols));
+    rebuildTownList(); renderRaw();
+    alert(`Loaded Excel sheet “${sheet}”: ${DATA.length} rows`);
+  } else {
+    alert("Unsupported file type.");
+  }
+}
+
+/* ------------------------------ Tabs ------------------------------ */
+document.querySelectorAll(".tabbtn").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    document.querySelectorAll(".tabbtn").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+    const name = btn.dataset.tab;
+    document.querySelectorAll("section[id^='tab-']").forEach(s=>{
+      s.style.display = s.id === "tab-"+name ? "" : "none";
+    });
+    if (name==="raw") renderRaw();
+  });
+});
+
+/* ------------------------------ Events ------------------------------ */
+document.getElementById("go").addEventListener("click", doSearch);
+document.getElementById("clear").addEventListener("click", ()=>{
+  $("#q").value=""; $("#results").innerHTML=""; $("#meta").innerHTML=`Dataset rows: <b id="rowcount">${DATA.length}</b>`;
+});
+document.getElementById("q").addEventListener("keydown", e=>{ if(e.key==="Enter") doSearch(); });
+document.getElementById("raw-q").addEventListener("input", renderRaw);
+document.getElementById("dlResultsCsv").addEventListener("click", ()=> download("search_results.csv", toCSV(CURRENT_RESULTS||[]), "text/csv"));
+document.getElementById("dlAllCsv").addEventListener("click", ()=> download("developments_all.csv", toCSV(DATA), "text/csv"));
+document.getElementById("dlAllJson").addEventListener("click", ()=> download("developments_all.json", JSON.stringify(DATA), "application/json"));
+document.getElementById("file").addEventListener("change", e=>{ if(e.target.files && e.target.files[0]) handleFile(e.target.files[0]); });
+document.getElementById("sheetSel").addEventListener("change", ()=>{
+  if (!XSLX_WB) return;
+  const sheet = currentSheetName(XSLX_WB);
+  const ws = XSLX_WB.Sheets[sheet];
+  const rows = XLSX.utils.sheet_to_json(ws, {defval:""});
+  LAST_RAW_ROWS = rows;
+  const cols = rows.length ? Object.keys(rows[0]) : [];
+  setMappingFromColumns(cols);
+  DATA = normalizeRows(rows, bestMapForColumns(cols));
+  rebuildTownList(); renderRaw();
+});
+document.getElementById("applyMap").addEventListener("click", applyMappingToRows);
+document.getElementById("saveCache").addEventListener("click", ()=>{
+  try{ localStorage.setItem("devs::dataset", JSON.stringify(DATA)); $("#cacheMsg").textContent="Saved."; }catch(e){ $("#cacheMsg").textContent="Save failed."; }
+  setTimeout(()=>$("#cacheMsg").textContent="", 1800);
+});
+document.getElementById("clearCache").addEventListener("click", ()=>{
+  try{ localStorage.removeItem("devs::dataset"); $("#cacheMsg").textContent="Cleared."; }catch(e){}
+  setTimeout(()=>$("#cacheMsg").textContent="", 1800);
+});
+MILES_INPUT.addEventListener("input", ()=>{ const m=+MILES_INPUT.value||20; MI_LABEL.textContent=m; });
+
+/* --------------------------- Boot (empty) --------------------------- */
+/* Start with empty dataset so anyone can load their own file, but keep
+   support for restoring browser-cached data from a previous session. */
+try{
+  const cached = localStorage.getItem("devs::dataset");
+  if (cached){
+    DATA = JSON.parse(cached) || [];
+    rebuildTownList(); renderRaw();
+    $("#meta").innerHTML = `<span class="pill">${DATA.length} rows restored from cache</span>`;
+  } else {
+    rebuildTownList(); renderRaw();
+  }
+}catch{
+  rebuildTownList(); renderRaw();
+}
 </script>
 </body>
 </html>
+
