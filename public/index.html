@@ -1,158 +1,473 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>PA Roads with AADT (PennDOT + RMSS)</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Prospect Estimator + Competition Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <style>
-    html, body, #map { height: 100%; margin: 0; }
-    .legend { background: white; padding: 8px 10px; border-radius: 4px; line-height: 1.3; box-shadow: 0 1px 4px rgba(0,0,0,0.3); }
-    .legend h4 { margin: 0 0 6px; font: 14px/1.2 sans-serif; }
-    .legend div { font: 12px/1.2 sans-serif; }
-    .topbar { position: absolute; z-index: 1000; top: 10px; left: 50px; background: rgba(255,255,255,0.95); padding: 6px 10px; border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,0.3); }
-    .topbar label { font: 13px/1.2 sans-serif; margin-right: 6px; }
-    .topbar select { font: 13px/1.2 sans-serif; }
+    :root { --bg:#0b0c10; --card:#13151a; --text:#e8e8e8; --muted:#9aa0a6; --accent:#3a82f7; --border:#2a2f3a; }
+    * { box-sizing: border-box; }
+    body { margin:0; font:16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:var(--bg); color:var(--text); }
+    * { box-sizing:border-box; }
+    body { margin:0; font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--text); }
+    .wrap { display:flex; gap:16px; height:100vh; padding:16px; }
+    .left { width:480px; min-width:360px; }
+    .right { flex:1; }
+    h1 { margin:0 0 12px; font-size:22px; }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:12px; }
+    label { display:block; font-weight:600; margin:10px 0 4px; }
+    input[type="text"], input[type="number"] { width:100%; padding:10px; border-radius:10px; border:1px solid var(--border); background:#1b1f2a; color:var(--text); }
+    button { padding:10px 14px; border-radius:10px; border:0; background:var(--accent); color:white; font-weight:600; cursor:pointer; }
+    button { padding:10px 14px; border-radius:10px; border:0; background:var(--accent); color:#fff; font-weight:600; cursor:pointer; }
+    button[disabled]{ opacity:.6; cursor:not-allowed; }
+    .row { display:flex; gap:8px; }
+    .col { flex:1; }
+    #map { height:calc(100vh - 32px); width:100%; border-radius:12px; border:1px solid var(--border); }
+    .muted { color:var(--muted); font-size:12px; }
+    .err { color:#ff9a9a; }
+    .num { font-variant-numeric: tabular-nums; }
+    .err { color:#ff9a9a }
+    .num { font-variant-numeric:tabular-nums; }
+    table { width:100%; border-collapse:collapse; }
+    td { padding:4px 0; border-bottom:1px dashed #2a2f3a; }
   </style>
 </head>
 <body>
-<div id="map"></div>
-<div class="topbar">
-  <label for="metric">Color by:</label>
-  <select id="metric">
-    <option value="CUR_AADT">PennDOT AADT (CUR_AADT)</option>
-    <option value="RMSS_CUR_AADT_WAVG">RMSS AADT (weighted)</option>
-    <option value="RMSS_ADTT_WAVG">RMSS Trucks/day (weighted)</option>
-    <option value="RMSS_TRK_PCT_WAVG">RMSS Truck % (weighted)</option>
-  </select>
-</div>
+  <div class="wrap">
+    <div class="left">
+      <h1>Prospect Estimator</h1>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
-<script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
-<script>
-  // Basic map
-  const map = L.map('map').setView([40.9, -77.7], 7);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors'
-  }).addTo(map);
+      <!-- Step 1 -->
+      <div class="card">
+        <div><b>Step 1: Enter address</b></div>
+        <label for="addr">Prospect site address</label>
+        <input id="addr" type="text" placeholder="e.g., 1500 Hodge Rd, Knightdale, NC">
+        <div class="row" style="margin-top:8px;">
+          <div class="col">
+            <label for="mpd">Step 2: Gasoline MPDs</label>
+            <input id="mpd" type="number" min="1" step="1" value="6">
+          </div>
+          <div class="col">
+            <label for="dieselpos">Diesel positions (optional)</label>
+            <input id="dieselpos" type="number" min="0" step="1" value="8">
+          </div>
+        </div>
+        <div style="margin-top:10px;">
+          <button id="run">Search & Estimate</button>
+          <span id="status" class="muted"></span>
+        </div>
+      </div>
 
-  // Address search (Nominatim via leaflet-control-geocoder)
-  const geocoder = L.Control.geocoder({ defaultMarkGeocode: false }).on('markgeocode', function(e) {
-    const center = e.geocode.center;
-    L.marker(center).addTo(map);
-    map.setView(center, 15);
-    selectNearest(center.lat, center.lng);
-  }).addTo(map);
+      <!-- Results -->
+      <div class="card">
+        <div><b>Results</b></div>
+        <div id="results" class="muted">Enter address + MPDs and click <b>Search & Estimate</b>.</div>
+      </div>
 
-  // Legend
-  const legend = L.control({position:'bottomleft'});
-  legend.onAdd = function() {
-    const div = L.DomUtil.create('div', 'legend');
-    div.innerHTML = '<h4>Segment color</h4><div id="legend-bins"></div>';
-    return div;
-  };
-  legend.addTo(map);
+      <!-- Advanced knobs (optional, prefilled with sample-calibrated defaults) -->
+      <details class="card">
+        <summary><b>Advanced inputs (optional)</b></summary>
+        <div class="row">
+          <div class="col">
+            <label>Total VPD (intersection)</label>
+            <input id="VPD" type="number" value="18024">
+          </div>
+          <div class="col">
+            <label>Truck share (%)</label>
+            <input id="truckShare" type="number" value="5.5">
+          </div>
+          <div class="col"><label>Total VPD</label><input id="VPD" type="number" value="18024"></div>
+          <div class="col"><label>Truck share (%)</label><input id="truckShare" type="number" value="5.5"></div>
+        </div>
+        <div class="row">
+          <div class="col">
+            <label>Frontage share F</label>
+            <input id="frontShare" type="number" value="0.59" step="0.01">
+          </div>
+          <div class="col">
+            <label>Turn share T</label>
+            <input id="turnShare" type="number" value="0.41" step="0.01">
+          </div>
+          <div class="col"><label>Frontage F</label><input id="frontShare" type="number" value="0.59" step="0.01"></div>
+          <div class="col"><label>Turn T</label><input id="turnShare" type="number" value="0.41" step="0.01"></div>
+        </div>
+        <div class="row">
+          <div class="col">
+            <label>Turn friction f<sub>T</sub> (0–1)</label>
+            <input id="turnFric" type="number" value="0.70" step="0.05" min="0" max="1">
+          </div>
+          <div class="col">
+            <label>Speed (mph)</label>
+            <input id="speed" type="number" value="35">
+          </div>
+          <div class="col"><label>Turn friction f<sub>T</sub></label><input id="turnFric" type="number" value="0.70" step="0.05" min="0" max="1"></div>
+          <div class="col"><label>Speed (mph)</label><input id="speed" type="number" value="35"></div>
+        </div>
+        <div class="row">
+          <div class="col">
+            <label>Access points</label>
+            <input id="accessPts" type="number" value="4" step="1" min="1">
+          </div>
+          <div class="col">
+            <label>LED price sign? (0/1)</label>
+            <input id="ledSign" type="number" value="1" step="1" min="0" max="1">
+          </div>
+          <div class="col"><label>Access points</label><input id="accessPts" type="number" value="4" step="1" min="1"></div>
+          <div class="col"><label>LED price sign? (0/1)</label><input id="ledSign" type="number" value="1" step="1" min="0" max="1"></div>
+        </div>
+        <div class="row">
+          <div class="col">
+            <label>Price delta (market − your) $/gal</label>
+            <input id="priceDelta" type="number" value="0.00" step="0.01">
+          </div>
+          <div class="col">
+            <label>CPR average index</label>
+            <input id="cpr" type="number" value="104" step="1">
+          </div>
+          <div class="col"><label>Price delta (market − your) $/gal</label><input id="priceDelta" type="number" value="0.00" step="0.01"></div>
+          <div class="col"><label>CPR avg index</label><input id="cpr" type="number" value="104" step="1"></div>
+        </div>
+        <div class="row">
+          <div class="col">
+            <label>Gasoline score</label>
+            <input id="gasScore" type="number" value="105.5" step="0.5">
+          </div>
+          <div class="col">
+            <label>Diesel score</label>
+            <input id="dieselScore" type="number" value="22.5" step="0.5">
+          </div>
+          <div class="col"><label>Gasoline score</label><input id="gasScore" type="number" value="105.5" step="0.5"></div>
+          <div class="col"><label>Diesel score</label><input id="dieselScore" type="number" value="22.5" step="0.5"></div>
+        </div>
+        <div class="row">
+          <div class="col">
+            <label>Search radius (miles)</label>
+            <input id="radiusMi" type="number" value="2" step="0.5" min="0.5">
+          </div>
+          <div class="col">
+            <label>Dev. radius (miles)</label>
+            <input id="devRadiusMi" type="number" value="3" step="0.5" min="1">
+          </div>
+          <div class="col"><label>Competition radius (mi)</label><input id="radiusMi" type="number" value="2" step="0.5" min="0.5"></div>
+          <div class="col"><label>Dev. radius (mi)</label><input id="devRadiusMi" type="number" value="3" step="0.5" min="1"></div>
+        </div>
+      </details>
 
-  // Utility: color ramp
-  function getColor(v, breaks) {
-    if (v == null || isNaN(v)) return '#999999';
-    for (let i = 0; i < breaks.length; i++) {
-      if (v <= breaks[i]) return ['#f2f0f7','#cbc9e2','#9e9ac8','#756bb1','#54278f'][i];
-    }
-    return '#2c115f';
-  }
+      <div class="card muted">
+        Backend: <code>https://sun-nourie-live.onrender.com</code><br>
+        Map: Leaflet + OpenStreetMap (no browser API key).
+      </div>
+    </div>
 
-  function updateLegend(breaks, label) {
-    const el = document.getElementById('legend-bins');
-    const labels = [];
-    let prev = 0;
-    for (let i=0; i<breaks.length; i++) {
-      const from = i===0 ? 0 : breaks[i-1];
-      const to = breaks[i];
-      labels.push('<div><span style="display:inline-block;width:12px;height:12px;background:'+getColor(to,breaks)+';margin-right:6px;border:1px solid #888"></span>' +
-                  from.toLocaleString() + '–' + to.toLocaleString() + '</div>');
-    }
-    labels.push('<div><span style="display:inline-block;width:12px;height:12px;background:'+getColor(breaks[breaks.length-1]+1,breaks)+';margin-right:6px;border:1px solid #888"></span>' +
-                '>'+breaks[breaks.length-1].toLocaleString()+'</div>');
-    el.innerHTML = '<div style="margin-bottom:6px;font-weight:600">'+label+'</div>' + labels.join('');
-  }
+    <div class="right">
+      <div id="map"></div>
+    </div>
+  </div>
 
-  // Load GeoJSON (sample included; replace with full file when available)
-  const DATA_URL = 'data/PA_Roads_with_AADT_sample.geojson';
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script>
+    // ------------------ CONFIG ------------------
+    const API_BASE = "https://sun-nourie-live.onrender.com"; // change if your backend URL is different
+    const API_BASE = "https://sun-nourie-live.onrender.com";
+    const ENDPOINT = {
+      geocode: API_BASE + "/geocode",
+      places: API_BASE + "/places",
+      developments: API_BASE + "/developments", // requires server endpoint below
+      developments: API_BASE + "/developments"
+    };
 
-  const layer = L.geoJSON(null, {
-    style: { weight: 2, opacity: 1 },
-    onEachFeature: function(feat, lyr) {
-      const p = feat.properties || {};
-      const html = `<b>${p.STREET_NAM || 'Unnamed'}</b><br/>
-        PennDOT AADT: ${p.CUR_AADT ?? 'n/a'}<br/>
-        RMSS AADT (weighted): ${p.RMSS_CUR_AADT_WAVG ?? 'n/a'}<br/>
-        Trucks/day (weighted): ${p.RMSS_ADTT_WAVG ?? 'n/a'}<br/>
-        Truck % (weighted): ${p.RMSS_TRK_PCT_WAVG ?? 'n/a'}<br/>
-        Route: ${p.ST_RT_NO || ''}, County: ${p.CTY_CODE || ''}, NLF_ID: ${p.NLF_ID || ''}`;
-      lyr.bindPopup(html);
-    }
-  }).addTo(map);
+    // Sample-calibrated defaults (can be tuned)
+    const KNOBS = {
+      s_a0: 0.020, s_t0: 0.012,
+      sigmaPrice: 0.11,
+      g_a: 10.2, g_t: 16,
+      kappa: 0.25,
+      monthDays: 365/12
+    };
 
-  let features = null;
+    // ------------------ MAP ------------------
+    const map = L.map('map').setView([35.7796, -78.6382], 12);
+    const tiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap'
+    }).addTo(map);
+    const KNOBS = { s_a0:0.020, s_t0:0.012, sigmaPrice:0.11, g_a:10.2, g_t:16, kappa:0.25, monthDays:365/12 };
 
-  fetch(DATA_URL).then(r => r.json()).then(geo => {
-    features = geo;
-    layer.addData(geo);
-    try { map.fitBounds(layer.getBounds(), {padding:[20,20]}); } catch(e) {}
-    colorize(); // initial render
-  });
+    let siteMarker = null;
+    let compLayer = L.layerGroup().addTo(map);
+    let devLayer  = L.layerGroup().addTo(map);
+    const map = L.map('map').setView([35.7796,-78.6382], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'&copy; OpenStreetMap' }).addTo(map);
+    let siteMarker=null; const compLayer=L.layerGroup().addTo(map); const devLayer=L.layerGroup().addTo(map);
 
-  function computeBreaks(values) {
-    values = values.filter(v => v != null && !isNaN(v)).sort((a,b)=>a-b);
-    if (values.length === 0) return [0,1,2,3,4];
-    const quantiles = [0.5, 0.7, 0.85, 0.95, 0.99];
-    const breaks = quantiles.map(q => values[Math.floor(q * (values.length-1))]);
-    return breaks;
-  }
+    // ------------------ UI ------------------
+    const qs = id => document.getElementById(id);
+    const runBtn = qs('run');
+    const statusEl = qs('status');
+    const resultsEl = qs('results');
 
-  function colorize() {
-    const metric = document.getElementById('metric').value;
-    const vals = [];
-    layer.eachLayer(l => {
-      const v = l.feature?.properties?.[metric];
-      if (v != null && !isNaN(v)) vals.push(Number(v));
-    });
-    const breaks = computeBreaks(vals);
-    updateLegend(breaks, metric);
+    const runBtn = qs('run'); const statusEl = qs('status'); const resultsEl = qs('results');
+    runBtn.addEventListener('click', runAll);
 
-    layer.setStyle(f => {
-      const v = f.properties ? Number(f.properties[metric]) : null;
-      return { color: getColor(v, breaks), weight: 2, opacity: 0.9 };
-    });
-  }
+    async function runAll(){
+      statusEl.textContent = "Geocoding…";
+      resultsEl.innerHTML = "Working…";
+      resultsEl.textContent = "Working…";
+      runBtn.disabled = true;
 
-  document.getElementById('metric').addEventListener('change', colorize);
+      const addr = qs('addr').value.trim();
+      if(!addr){ alert("Enter an address"); runBtn.disabled=false; return; }
+      const mpds = +qs('mpd').value || 0; const dieselPos = +qs('dieselpos').value || 0;
 
-  // Snap to nearest road after geocoding
-  function selectNearest(lat, lng) {
-    if (!features) return;
-    const pt = turf.point([lng, lat]);
-    let best = {dist: Infinity, layer: null};
-    layer.eachLayer(lyr => {
-      const g = lyr.feature.geometry;
-      if (g.type === 'MultiLineString') {
-        for (const line of g.coordinates) {
-          const ln = { type:'LineString', coordinates: line };
-          const snap = turf.nearestPointOnLine(ln, pt);
-          if (snap.properties.dist < best.dist) {
-            best = {dist: snap.properties.dist, layer: lyr};
+      const mpds = +qs('mpd').value || 0;
+      const dieselPos = +qs('dieselpos').value || 0;
+
+      try {
+        // 1) Geocode
+      try{
+        const g = await fetch(`${ENDPOINT.geocode}?address=${encodeURIComponent(addr)}`);
+        const gj = await g.json();
+        if(!g.ok || gj.error){ throw new Error("Geocode: " + (gj.error || g.status)); }
+        if(!gj.results?.length){ throw new Error("Address not found"); }
+        const loc = gj.results[0].geometry.location;
+        centerMap(loc.lat, loc.lng, addr);
+        if(!g.ok){ const raw=await g.text(); throw new Error(`Geocode HTTP ${g.status}: ${raw.slice(0,200)}`); }
+        const gj = await g.json(); if(!gj.results?.length) throw new Error("Address not found");
+        const loc = gj.results[0].geometry.location; centerMap(loc.lat, loc.lng, addr);
+
+        // 2) Places (competition)
+        statusEl.textContent = "Finding nearby competition…";
+        compLayer.clearLayers();
+        const radiusMeters = (+qs('radiusMi').value || 2)*1609.344;
+        const radiusMeters = (+qs('radiusMi').value||2)*1609.344;
+        const p = await fetch(`${ENDPOINT.places}?lat=${loc.lat}&lng=${loc.lng}&radius=${Math.round(radiusMeters)}`);
+        if(!p.ok){ const raw=await p.text(); throw new Error(`Places HTTP ${p.status}: ${raw.slice(0,200)}`); }
+        const pj = await p.json();
+        if(!p.ok || pj.error){ throw new Error("Places: " + (pj.error || p.status)); }
+        const comps = (pj.results||[]).map(r => ({ name:r.name, lat:r.geometry?.location?.lat, lng:r.geometry?.location?.lng })).filter(c=>c.lat&&c.lng);
+
+        const comps = (pj.results || []).map(r => ({
+          name: r.name,
+          lat: r.geometry?.location?.lat,
+          lng: r.geometry?.location?.lng,
+          ref: r
+        })).filter(c => c.lat && c.lng);
+
+        // 3) Developments (Text Search)
+        statusEl.textContent = "Searching for local gas station developments…";
+        statusEl.textContent = "Searching developments…";
+        devLayer.clearLayers();
+        const devRadiusMeters = (+qs('devRadiusMi').value || 3)*1609.344;
+        const devRadiusMeters = (+qs('devRadiusMi').value||3)*1609.344;
+        let devs = [];
+        try {
+        try{
+          const d = await fetch(`${ENDPOINT.developments}?lat=${loc.lat}&lng=${loc.lng}&radius=${Math.round(devRadiusMeters)}`);
+          const dj = await d.json();
+          if(d.ok && !dj.error){
+            devs = (dj.results || []).map(r => ({
+              name: r.name,
+              lat: r.geometry?.location?.lat,
+              lng: r.geometry?.location?.lng,
+              ref: r
+            })).filter(x => x.lat && x.lng);
+          if(d.ok){
+            const dj = await d.json();
+            devs = (dj.results||[]).map(r => ({ name:r.name, lat:r.geometry?.location?.lat, lng:r.geometry?.location?.lng })).filter(x=>x.lat&&x.lng);
           }
-        }
+        } catch(e){ /* optional, ignore */ }
+        }catch(_){ /* soft fail */ }
+
+        // Pin comps & devs
+        comps.forEach(c => L.marker([c.lat, c.lng], {title:c.name}).addTo(compLayer).bindPopup(`<b>${escapeHtml(c.name)}</b>`));
+        devs.forEach(d => {
+          const m = L.circleMarker([d.lat, d.lng], {radius:7, color:'#ff9900', fillColor:'#ff9900', fillOpacity:.8});
+          m.addTo(devLayer).bindPopup(`<b>${escapeHtml(d.name)}</b><br><i>Development (text search)</i>`);
+        });
+        comps.forEach(c => L.marker([c.lat,c.lng],{title:c.name}).addTo(compLayer).bindPopup(`<b>${escapeHtml(c.name)}</b>`));
+        devs.forEach(d => L.circleMarker([d.lat,d.lng],{radius:7,color:'#ff9900',fillColor:'#ff9900',fillOpacity:.85}).addTo(devLayer).bindPopup(`<b>${escapeHtml(d.name)}</b><br><i>Development</i>`));
+
+        // 4) Estimate gallons
+        statusEl.textContent = "Estimating gallons…";
+        const est = estimate(loc, comps, {
+          VPD: +qs('VPD').value || 18024,
+          truckSharePct: +qs('truckShare').value || 5.5,
+          F: +qs('frontShare').value || 0.59,
+          T: +qs('turnShare').value || 0.41,
+          fT: +qs('turnFric').value || 0.70,
+          speed: +qs('speed').value || 35,
+          accessPts: +qs('accessPts').value || 4,
+          ledSign: (+qs('ledSign').value || 0) ? true : false,
+          priceDelta: +qs('priceDelta').value || 0,
+          cpr: +qs('cpr').value || 104,
+          gasScore: +qs('gasScore').value || 105.5,
+          dieselScore: +qs('dieselScore').value || 22.5,
+          VPD:+qs('VPD').value||18024, truckSharePct:+qs('truckShare').value||5.5, F:+qs('frontShare').value||0.59, T:+qs('turnShare').value||0.41,
+          fT:+qs('turnFric').value||0.70, speed:+qs('speed').value||35, accessPts:+qs('accessPts').value||4, ledSign:(+qs('ledSign').value||0)?true:false,
+          priceDelta:+qs('priceDelta').value||0, cpr:+qs('cpr').value||104, gasScore:+qs('gasScore').value||105.5, dieselScore:+qs('dieselScore').value||22.5,
+          mpds, dieselPos
+        });
+
+        // 5) Show results
+        const fmt = n => Number(n).toLocaleString(undefined, {maximumFractionDigits:0});
+        const fmt1 = n => Number(n).toLocaleString(undefined, {maximumFractionDigits:1});
+        const fmt = n => Number(n).toLocaleString(undefined,{maximumFractionDigits:0});
+        const fmt1= n => Number(n).toLocaleString(undefined,{maximumFractionDigits:1});
+        resultsEl.innerHTML = `
+          <table>
+            <tr><td><b>Competitors within ${fmt1(radiusMeters/1609.344)} mi</b></td><td class="num">${comps.length}</td></tr>
+            <tr><td>Developments found</td><td class="num">${devs.length}</td></tr>
+            <tr><td style="padding-top:8px;"><b>Year‑1 gallons/mo (base)</b></td><td class="num" style="padding-top:8px;"><b>${fmt(est.year1)}</b></td></tr>
+            <tr><td style="padding-top:8px;"><b>Year-1 gallons/mo</b></td><td class="num" style="padding-top:8px;"><b>${fmt(est.year1)}</b></td></tr>
+            <tr><td>Low / High band</td><td class="num">${fmt(est.low)} – ${fmt(est.high)}</td></tr>
+            <tr><td>Year‑2</td><td class="num">${fmt(est.year2)}</td></tr>
+            <tr><td>Year‑3</td><td class="num">${fmt(est.year3)}</td></tr>
+            <tr><td>Year-2</td><td class="num">${fmt(est.year2)}</td></tr>
+            <tr><td>Year-3</td><td class="num">${fmt(est.year3)}</td></tr>
+            <tr><td>Capacity cap (approx)</td><td class="num">${fmt(est.capacityCap)}</td></tr>
+          </table>
+          <div class="muted" style="margin-top:8px;">
+            Based on IMST‑style capture with frontage/turn weighting, site multipliers (access/visibility/price/quality/CPR),
+            competition distance‑strength decay, gallons/stop, and a capacity sanity check.
+          </div>
+          <div class="muted" style="margin-top:8px;">IMST-style capture with frontage/turn weighting, site multipliers, competition decay, gallons/stop, and capacity check.</div>
+        `;
+
+        statusEl.textContent = "Done.";
+      } catch(err){
+      }catch(err){
+        statusEl.innerHTML = `<span class="err">Error: ${escapeHtml(String(err))}</span>`;
+        resultsEl.innerHTML = `<span class="err">${escapeHtml(String(err))}</span>`;
+      } finally {
+        runBtn.disabled = false;
+      }finally{
+        runBtn.disabled=false;
       }
-    });
-    if (best.layer) {
-      best.layer.openPopup();
-      map.fitBounds(best.layer.getBounds(), {maxZoom: 17});
     }
-  }
-</script>
+
+    function centerMap(lat,lng,label){
+      map.setView([lat,lng], 14);
+      if(siteMarker) siteMarker.remove();
+      siteMarker = L.marker([lat,lng], {title:label}).addTo(map).bindPopup(`<b>${escapeHtml(label)}</b><br>Prospect site`).openPopup();
+      siteMarker = L.marker([lat,lng],{title:label}).addTo(map).bindPopup(`<b>${escapeHtml(label)}</b><br>Prospect site`).openPopup();
+    }
+
+    // ---------- Estimation model (IMST-style) ----------
+    function estimate(loc, comps, p){
+      // 1) Traffic available
+      const Va = (p.VPD * (1 - p.truckSharePct/100)); // autos/day raw
+      const Vt = (p.VPD * (p.truckSharePct/100));      // trucks/day raw
+      const availFactor = p.F + p.fT * p.T;
+      const A_a = Va * availFactor;
+      const A_t = Vt * availFactor;
+      const Va = (p.VPD * (1 - p.truckSharePct/100));
+      const Vt = (p.VPD * (p.truckSharePct/100));
+      const avail = p.F + p.fT * p.T;
+      const A_a = Va * avail, A_t = Vt * avail;
+
+      // 2) Site multipliers
+      const M_spd = spdToAcc(p.speed);
+      const M_acc = M_spd * (1 + 0.03 * (p.accessPts - 2)) * (p.ledSign ? 1.05 : 1.00);
+      let M_price = 1 + 0.20 * (p.priceDelta / KNOBS.sigmaPrice);
+      M_price = clamp(M_price, 0.85, 1.15);
+      const M_fac_a = (p.gasScore / 100);
+      const M_fac_t = (p.dieselScore / 25);
+      const M_cpr   = (p.cpr / 100);
+
+      // 3) Competition distance-strength
+      let P = 0;
+      comps.forEach(c => {
+        const dmi = haversineMiles(loc.lat, loc.lng, c.lat, c.lng);
+        const w = 0.287 / Math.max(dmi, 0.05); // avoid singularity
+        const guess = guessStrength(c.name);
+        const q = 0.6 * (guess.gasPos/12) + 0.3 * (guess.storeSF/5000) + 0.1 * (guess.hasDiesel?1:0);
+        P += w * q;
+      const M_acc = M_spd * (1 + 0.03*(p.accessPts-2)) * (p.ledSign?1.05:1.00);
+      let M_price = 1 + 0.20 * (p.priceDelta / KNOBS.sigmaPrice); M_price = clamp(M_price,0.85,1.15);
+      const M_fac_a = p.gasScore/100, M_fac_t = p.dieselScore/25, M_cpr = p.cpr/100;
+
+      let P=0;
+      comps.forEach(c=>{
+        const d=havMiles(loc.lat,loc.lng,c.lat,c.lng);
+        const w=0.287/Math.max(d,0.05);
+        const g=guessStrength(c.name);
+        const q=0.6*(g.gasPos/12)+0.3*(g.storeSF/5000)+0.1*(g.hasDiesel?1:0);
+        P+=w*q;
+      });
+      const M_comp = 1 / (1 + KNOBS.kappa * P);
+      const M_comp = 1/(1+KNOBS.kappa*P);
+
+      // 4) Final stop rates
+      let s_a = KNOBS.s_a0 * M_acc * M_price * M_fac_a * M_comp * M_cpr;
+      let s_t = KNOBS.s_t0 * M_acc * M_price * M_fac_t * M_comp * M_cpr * (p.dieselPos >= 4 ? 1.20 : 1.00);
+      let s_a = KNOBS.s_a0*M_acc*M_price*M_fac_a*M_comp*M_cpr;
+      let s_t = KNOBS.s_t0*M_acc*M_price*M_fac_t*M_comp*M_cpr*(p.dieselPos>=4?1.20:1.00);
+
+      // 5) Gallons/day and month
+      const GPD = A_a * s_a * KNOBS.g_a + A_t * s_t * KNOBS.g_t;
+      let GPM = GPD * KNOBS.monthDays;
+      const GPD = A_a*s_a*KNOBS.g_a + A_t*s_t*KNOBS.g_t;
+      let GPM = GPD*KNOBS.monthDays;
+
+      // 6) Capacity cap
+      const gasPos = Math.max(0, p.mpds) * 2;
+      const gasCap = gasPos * 25 * 10.5 * KNOBS.monthDays;   // cycles/day * gal/cycle
+      const dieselCap = Math.max(0, p.dieselPos) * 25 * 16 * KNOBS.monthDays;
+      const capacityCap = gasCap + dieselCap;
+      const gasPos = Math.max(0,p.mpds)*2;
+      const gasCap = gasPos*25*10.5*KNOBS.monthDays;
+      const dieselCap = Math.max(0,p.dieselPos)*25*16*KNOBS.monthDays;
+      const capacityCap = gasCap+dieselCap;
+      GPM = Math.min(GPM, capacityCap);
+
+      // 7) Years 2–3; band
+      const year1 = GPM;
+      const year2 = year1 * (1 + 0.027);
+      const year3 = year2 * (1 + 0.0125);
+
+      const compRisk = Math.min(1, comps.length / 8);          // crude risk proxy
+      const headroom = Math.max(0, (capacityCap - year1) / Math.max(1, capacityCap));
+      const low  = year1 * (1 - 0.12 - 0.02 * compRisk);
+      const high = year1 * (1 + 0.05 + 0.01 * headroom);
+
+      return { year1, year2, year3, low, high, capacityCap };
+      const year1=GPM, year2=year1*(1+0.027), year3=year2*(1+0.0125);
+      const compRisk=Math.min(1, comps.length/8), headroom=Math.max(0,(capacityCap-year1)/Math.max(1,capacityCap));
+      const low=year1*(1-0.12-0.02*compRisk), high=year1*(1+0.05+0.01*headroom);
+      return {year1,year2,year3,low,high,capacityCap};
+    }
+
+    // ---------- helpers ----------
+    function spdToAcc(spd){
+      if (spd <= 30) return 1.08;
+      if (spd <= 35) return 1.05;
+      if (spd <= 40) return 1.01;
+      if (spd <= 45) return 0.98;
+      return 0.95;
+    }
+    function clamp(x,a,b){ return Math.max(a, Math.min(b, x)); }
+    function toRad(x){ return x * Math.PI/180; }
+    function haversineMiles(lat1,lon1,lat2,lon2){
+      const R = 3958.761; // miles
+      const dLat = toRad(lat2-lat1), dLon = toRad(lon2-lon1);
+      const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+      return 2*R*Math.asin(Math.sqrt(a));
+    }
+    function guessStrength(name){
+      const s = (name||'').toLowerCase();
+      const bigTruck = /(travel|truck|ta |love|flying j|pilot|travelcenter)/.test(s);
+      const cstore = /(shell|bp |exxon|chevron|circle k|7-eleven|speedway|quiktrip|sheetz|wawa|murphy|casey)/.test(s);
+      if (bigTruck) return { gasPos:12, storeSF:6000, hasDiesel:true };
+      if (cstore)   return { gasPos:8,  storeSF:3000, hasDiesel:false };
+      return           { gasPos:6,  storeSF:2500, hasDiesel:false };
+    }
+    function escapeHtml(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+    function spdToAcc(s){ if(s<=30) return 1.08; if(s<=35) return 1.05; if(s<=40) return 1.01; if(s<=45) return 0.98; return 0.95; }
+    function clamp(x,a,b){ return Math.max(a,Math.min(b,x)); }
+    function toRad(x){ return x*Math.PI/180; }
+    function havMiles(a1,o1,a2,o2){ const R=3958.761; const dA=toRad(a2-a1), dO=toRad(o2-o1); const A=Math.sin(dA/2)**2+Math.cos(toRad(a1))*Math.cos(toRad(a2))*Math.sin(dO/2)**2; return 2*R*Math.asin(Math.sqrt(A)); }
+    function guessStrength(name){ const s=(name||'').toLowerCase(); const big=/(travel|truck|ta |love|flying j|pilot|travelcenter)/.test(s); const c=/(shell|bp |exxon|chevron|circle k|7-eleven|speedway|quiktrip|sheetz|wawa|murphy|casey)/.test(s); if(big) return {gasPos:12,storeSF:6000,hasDiesel:true}; if(c) return {gasPos:8,storeSF:3000,hasDiesel:false}; return {gasPos:6,storeSF:2500,hasDiesel:false}; }
+    function escapeHtml(s){ return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+  </script>
 </body>
 </html>
