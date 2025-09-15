@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Gas Station Developments — Town Radius Search</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="preconnect" href="https://unpkg.com" crossorigin>
+<style>
+  :root {
+    --bg:#0b0e15; --panel:#111725; --panel2:#0e1626; --text:#e8eefc; --muted:#9fb0cf;
+    --accent:#5ec2ff; --line:#263145; --warn:#ffe08a;
+  }
+  body{margin:0;padding:0;background:var(--bg);color:var(--text);
+       font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;}
+  .wrap{max-width:1200px;margin:2rem auto;padding:0 1rem;}
+  h1{font-size:1.6rem;margin:0 0 1rem 0;}
+  .tabs{display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap;}
+  .tabbtn{background:var(--panel2);border:1px solid var(--line);color:var(--text);
+          border-radius:12px;padding:.6rem 1rem;cursor:pointer;}
+  .tabbtn.active{background:var(--accent);color:#062338;border-color:transparent;font-weight:700;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:1rem;}
+  .row{display:flex;gap:1rem;align-items:flex-end;flex-wrap:wrap;}
+  .row>div{flex:1 1 260px;}
+  label{display:block;margin:.25rem 0 .35rem;color:var(--muted);}
+  input,button{padding:.7rem 1rem;border-radius:10px;}
+  input{width:100%;border:1px solid var(--line);background:#0f1421;color:var(--text);}
+  button{background:var(--accent);color:#00121e;border:0;font-weight:700;cursor:pointer;}
+  table{width:100%;border-collapse:collapse;margin-top:1rem;font-size:.95rem;}
+  th,td{text-align:left;border-bottom:1px solid var(--line);padding:.6rem .5rem;vertical-align:top;}
+  th{color:var(--muted);font-weight:600;}
+  a{color:#8cd1ff;}
+  .pill{display:inline-block;background:#0f2236;color:#bfe6ff;padding:.25rem .5rem;
+        border-radius:999px;font-size:.75rem;border:1px solid var(--line);}
+  .warn{color:var(--warn);}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <h1>Gas Station Developments — Town Search (≤20 miles)</h1>
+
+  <div class="tabs">
+    <button class="tabbtn active" data-tab="search">Search</button>
+    <button class="tabbtn" data-tab="raw">Raw Data</button>
+    <button class="tabbtn" data-tab="upload">Upload</button>
+  </div>
+
+  <!-- SEARCH -->
+  <div id="tab-search" class="card">
+    <div class="row">
+      <div>
+        <label for="q">Town</label>
+        <input id="q" list="towns" placeholder="Start typing…"/>
+        <datalist id="towns"></datalist>
+      </div>
+      <div style="flex:0 0 160px"><button id="go">Search</button></div>
+      <div style="flex:0 0 160px"><button id="clear">Clear</button></div>
+    </div>
+    <div id="meta" style="margin-top:.5rem;"></div>
+    <div id="results"></div>
+  </div>
+
+  <!-- RAW -->
+  <div id="tab-raw" class="card" style="display:none;">
+    <label>Filter</label><input id="raw-q" placeholder="Type to filter all columns"/>
+    <div id="raw"></div>
+    <button id="raw-export">Download all as CSV</button>
+  </div>
+
+  <!-- UPLOAD -->
+  <div id="tab-upload" class="card" style="display:none;">
+    <p>Upload new data (.xlsx, .csv, .json)</p>
+    <input id="file" type="file" accept=".xlsx,.csv,.json"/>
+  </div>
+</div>
+
+<script>
+let DATA=[];let RESULTS=[];
+const MILES=20;
+function esc(s){return (s??"").toString().replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]));}
+function toCSV(rows){if(!rows.length)return"";const cols=Object.keys(rows[0]);
+ const escC=v=>('"'+String(v??"").replace(/"/g,'""')+'"');return [cols.map(escC).join(",")].concat(
+ rows.map(r=>cols.map(c=>escC(r[c])).join(","))).join("\n");}
+function haversine(lat1,lon1,lat2,lon2){const R=3958.8,d2r=x=>x*Math.PI/180;
+ const dLat=d2r(lat2-lat1),dLon=d2r(lon2-lon1);
+ return 2*R*Math.asin(Math.sqrt(Math.sin(dLat/2)**2+Math.cos(d2r(lat1))*Math.cos(d2r(lat2))*Math.sin(dLon/2)**2));}
+
+function render(rows){if(!rows.length)return"<div>No results</div>";const cols=Object.keys(rows[0]);
+ let h="<tr>"+cols.map(c=>"<th>"+esc(c)+"</th>").join("")+"</tr>";
+ let b=rows.map(r=>"<tr>"+cols.map(c=>"<td>"+(c==="url"&&r[c]?`<a href='${esc(r[c])}' target=_blank>link</a>`:esc(r[c]))+"</td>").join("")+"</tr>").join("");
+ return "<table>"+h+b+"</table>";}
+
+function rebuildList(){const towns=[...new Set(DATA.map(r=>r.town&&r.state?(r.town+", "+r.state):r.town).filter(Boolean))];
+ document.getElementById("towns").innerHTML=towns.sort().map(t=>`<option value="${esc(t)}">`).join("");}
+
+async function search(){const q=document.getElementById("q").value.trim();if(!q)return;
+ let res=DATA.filter(r=>(r.town+", "+r.state).toLowerCase()===q.toLowerCase()||r.town.toLowerCase()===q.toLowerCase());
+ // 20mi radius
+ let geo=null;try{const g=await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&q=${encodeURIComponent(q)}`);
+ const j=await g.json();if(j.length)geo=[+j[0].lat,+j[0].lon];}catch{}
+ if(geo){for(const r of DATA){if(r.lat&&r.lon){const d=haversine(geo[0],geo[1],+r.lat,+r.lon);if(d<=MILES&&!res.includes(r))res.push(r);}}}
+ RESULTS=res;document.getElementById("meta").innerHTML=`<span class="pill">${res.length} results</span>`;
+ document.getElementById("results").innerHTML=render(res);}
+function clearAll(){document.getElementById("q").value="";document.getElementById("results").innerHTML="";document.getElementById("meta").innerHTML="";}
+function renderRaw(){const q=document.getElementById("raw-q").value.toLowerCase();
+ const rows=!q?DATA:DATA.filter(r=>Object.values(r).some(v=>(""+v).toLowerCase().includes(q)));
+ document.getElementById("raw").innerHTML=render(rows);}
+document.getElementById("go").onclick=search;
+document.getElementById("clear").onclick=clearAll;
+document.getElementById("raw-q").oninput=renderRaw;
+document.getElementById("raw-export").onclick=()=>{const blob=new Blob([toCSV(DATA)],{type:"text/csv"});
+ const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="all.csv";a.click();};
+document.querySelectorAll(".tabbtn").forEach(b=>b.onclick=()=>{["search","raw","upload"].forEach(t=>{
+ document.getElementById("tab-"+t).style.display=b.dataset.tab===t?"":"none";
+ b.parentElement.querySelectorAll(".tabbtn").forEach(x=>x.classList.remove("active"));
+ b.classList.add("active");if(t==="raw")renderRaw();});});
+document.getElementById("file").onchange=async e=>{
+ const f=e.target.files[0];if(!f)return;let rows=[];
+ if(f.name.endsWith(".json"))rows=JSON.parse(await f.text());
+ else if(f.name.endsWith(".csv"))rows=(await new Promise(res=>Papa.parse(f,{header:true,complete:res}))).data;
+ else if(f.name.endsWith(".xlsx")){const wb=XLSX.read(await f.arrayBuffer(),{type:"array"});rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:""});}
+ DATA=rows.map(r=>({town:r.town||r.City||"",state:r.state||r.State||"",lat:r.lat||r.Latitude||"",lon:r.lon||r.Longitude||"",address:r.address||"",name:r.name||"",developer:r.developer||"",date:r.date||"",notes:r.notes||"",url:r.url||""}));
+ rebuildList();renderRaw();alert("Loaded "+DATA.length+" rows");};
+// ---- initial sample data ----
+DATA=[{town:"Knightdale",state:"NC",lat:35.79,lon:-78.49,address:"",name:"Sample Station",developer:"",date:"",notes:"",url:""}];
+rebuildList();renderRaw();
+</script>
+</body>
+</html>
