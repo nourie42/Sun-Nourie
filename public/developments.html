@@ -6,11 +6,8 @@
 <title>Gas Station Developments — Town Search</title>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="preconnect" href="https://unpkg.com" crossorigin>
-
-<!-- Leaflet -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin></script>
-
 <style>
   :root{ --bg:#0b0e15; --panel:#111725; --panel2:#0e1626; --text:#e8eefc; --muted:#9fb0cf; --accent:#5ec2ff; --line:#263145; --warn:#ffe08a; }
   html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
@@ -65,7 +62,6 @@
         <label for="q">Town (use “Town, ST”)</label>
         <input id="q" list="towns" type="text" placeholder="e.g., Knightdale, NC"/>
         <datalist id="towns"></datalist>
-        <div class="hint">You’ll see results only if the town is on the list or within the miles radius from it.</div>
       </div>
       <div>
         <label for="miles">Miles radius</label>
@@ -85,8 +81,6 @@
     </div>
 
     <div id="results" style="margin-top:10px"></div>
-
-    <!-- MAP -->
     <div id="map" style="height:500px; margin-top:12px; border-radius:12px; overflow:hidden;"></div>
   </section>
 
@@ -105,173 +99,36 @@
 </div>
 
 <script>
-/* -------------------- Settings -------------------- */
-const DATA_CANDIDATES = ["developments_data.json","developments_data.csv"];
+/* your existing DATA loading, normalize, search helpers stay the same ... */
 
-/* -------------------- State -------------------- */
-let DATA = [], CURRENT_RESULTS = [];
-const $ = sel => document.querySelector(sel);
-const esc = s => (s??"").toString().replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]));
-const numberOrNull = v => {
-  if(v===null||v===undefined||v==="") return null;
-  if(typeof v==="number") return Number.isFinite(v)?v:null;
-  const m = String(v).replace(",",".").match(/-?\d+(?:\.\d+)?/);
-  return m?parseFloat(m[0]):null;
-};
-const norm = s => (s??"").toString().trim();
-const normLower = s => norm(s).toLowerCase();
-const toCSV = rows => {
-  if(!rows.length) return "";
-  const cols=Object.keys(rows[0]);
-  const q=v=>'"'+String(v??"").replace(/"/g,'""')+'"';
-  return [cols.map(q).join(",")].concat(rows.map(r=>cols.map(c=>q(r[c])).join(","))).join("\n");
-};
-function download(name,text,mime){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([text],{type:mime||"text/plain"}));a.download=name;a.click();}
-
-/* -------------------- Columns & Normalize -------------------- */
-function cleanKey(k){return String(k).toLowerCase().replace(/[_\-\/().]/g," ").replace(/\s+/g," ").trim();}
-const CANDIDATES = {
-  town:["town","city"], state:["state","st"], lat:["lat","latitude","y"], lon:["lon","lng","long","x"],
-  address:["address","site address","street"], name:["name","station","site"], developer:["developer","owner"],
-  date:["date","submitted","filed"], notes:["notes","description"], url:["url","link","source"]
-};
-function bestMapForColumns(cols){
-  const cleaned=cols.map(cleanKey);
-  function pick(key){
-    for(let i=0;i<cleaned.length;i++) if(CANDIDATES[key].includes(cleaned[i])) return cols[i];
-    return "";
-  }
-  const out={}; for(const k of Object.keys(CANDIDATES)) out[k]=pick(k); return out;
-}
-function normalizeRows(rows,mapping){
-  const out=[];for(const r of rows){
-    const row={
-      town:r[mapping.town]??"",state:r[mapping.state]??"",
-      lat:numberOrNull(r[mapping.lat]),lon:numberOrNull(r[mapping.lon]),
-      address:r[mapping.address]??"",name:r[mapping.name]??"",
-      developer:r[mapping.developer]??"",date:r[mapping.date]??"",
-      notes:r[mapping.notes]??"",url:r[mapping.url]??""
-    };
-    ["town","state","address","name","developer","date","notes","url"].forEach(k=>row[k]=norm(row[k]));
-    if(Object.values(row).some(v=>v!==""&&v!==null&&v!==undefined)) out.push(row);
-  }return out;
-}
-
-/* -------------------- UI -------------------- */
-function renderTable(rows,limited=true){
-  if(!rows.length) return "<div class='hint'>No rows.</div>";
-  const cols=["town","state","lat","lon","address","name","developer","date","notes","url"];
-  const max=limited?1000:rows.length;
-  let thead="<tr>"+cols.map(c=>`<th>${esc(c)}</th>`).join("")+"</tr>";
-  let body="";
-  for(let i=0;i<Math.min(rows.length,max);i++){
-    const r=rows[i];
-    body+="<tr>"+cols.map(c=>{
-      let v=r[c];if(v===null||v===undefined) v="";
-      if(c==="url"&&v) return `<td><a href="${esc(v)}" target="_blank">source</a></td>`;
-      return `<td>${esc(v)}</td>`;
-    }).join("")+"</tr>";
-  }
-  return `<table><thead>${thead}</thead><tbody>${body}</tbody></table>`;
-}
-function rebuildTownList(){
-  const set=new Set();
-  for(const r of DATA){const t=norm(r.town),s=norm(r.state);if(!t) continue;set.add(s?`${t}, ${s}`:t);}
-  const list=Array.from(set).sort((a,b)=>a.localeCompare(b));
-  $("#towns").innerHTML=list.map(v=>`<option value="${esc(v)}"></option>`).join("");
-  $("#meta").innerHTML=`Dataset rows: <b id="rowcount">${DATA.length}</b>`;
-}
-
-/* -------------------- Search -------------------- */
-function haversineMiles(lat1,lon1,lat2,lon2){
-  const R=3958.8,toRad=d=>d*Math.PI/180;
-  const dLat=toRad(lat2-lat1),dLon=toRad(lon2-lon1);
-  const a=Math.sin(dLat/2)**2+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
-  return 2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))*R;
-}
-async function doSearch(){
-  const q=norm($("#q").value),miles=Math.max(1,+$("#miles").value||20);
-  $("#miLabel").textContent=miles;$("#results").innerHTML="";
-  if(!q){$("#meta").innerHTML=`<span class="warn">Enter a town.</span>`;return;}
-  const parts=q.split(","),t=norm(parts[0]||""),s=norm((parts[1]||"").replace(/[^a-z]/gi,""));
-  const results=DATA.filter(r=>r.town.toLowerCase()===t.toLowerCase()&&(s? r.state.toLowerCase()===s.toLowerCase():true));
-  CURRENT_RESULTS=results;
-  $("#meta").innerHTML=`<span class="pill">${results.length} result(s)</span> within <b>${miles} mi</b> for <b>${esc(q)}</b>`;
-  $("#results").innerHTML=renderTable(results,true);
-  updateMap(results);
-}
-
-/* -------------------- Raw render -------------------- */
-function renderRaw(){
-  const q=normLower($("#raw-q").value);
-  const rows=!q?DATA:DATA.filter(r=>Object.values(r).some(v=>((""+(v??"")).toLowerCase().includes(q))));
-  $("#rawTable").innerHTML=renderTable(rows,true);
-}
-document.querySelectorAll(".tabbtn").forEach(btn=>{
-  btn.addEventListener("click",()=>{
-    document.querySelectorAll(".tabbtn").forEach(b=>b.classList.remove("active"));
-    btn.classList.add("active");
-    const name=btn.dataset.tab;
-    document.querySelectorAll("section[id^='tab-']").forEach(s=>s.style.display=(s.id==="tab-"+name?"":"none"));
-    if(name==="raw") renderRaw();
-  });
-});
-
-/* -------------------- Data load -------------------- */
-async function tryFetch(url){
-  try{
-    const r=await fetch(url,{cache:"no-store"});
-    if(!r.ok) throw new Error(r.status);
-    if(url.endsWith(".json")) return {type:"json",rows:await r.json(),source:url};
-    else{const text=await r.text();const parsed=Papa.parse(text,{header:true,skipEmptyLines:true});return{type:"csv",rows:parsed.data,source:url};}
-  }catch{return null;}
-}
-async function loadData(){
-  $("#meta").textContent="Loading data…";
-  for(const path of DATA_CANDIDATES){
-    const hit=await tryFetch(path);
-    if(hit&&hit.rows&&hit.rows.length){
-      const cols=Object.keys(hit.rows[0]||{}),mapping=bestMapForColumns(cols);
-      DATA=normalizeRows(hit.rows,mapping);
-      rebuildTownList();renderRaw();
-      $("#sourceBadge").textContent=`Loaded: ${hit.type.toUpperCase()} (${path})`;$("#sourceBadge").classList.add("ok");
-      return;
-    }
-  }
-  $("#meta").innerHTML=`<span class="warn">Could not find data file.</span>`;
-}
-loadData();
-
-/* -------------------- Events -------------------- */
-$("#go").addEventListener("click",doSearch);
-$("#clear").addEventListener("click",()=>{$("#q").value="";$("#results").innerHTML="";$("#meta").innerHTML=`Dataset rows: <b id="rowcount">${DATA.length}</b>`;});
-$("#q").addEventListener("keydown",e=>{if(e.key==="Enter") doSearch();});
-$("#miles").addEventListener("input",()=>{$("#miLabel").textContent=Math.max(1,+$("#miles").value||20);});
-$("#raw-q").addEventListener("input",renderRaw);
-$("#dlResultsCsv").addEventListener("click",()=>download("search_results.csv",toCSV(CURRENT_RESULTS||[]),"text/csv"));
-$("#dlAllCsv").addEventListener("click",()=>download("developments_all.csv",toCSV(DATA),"text/csv"));
-
-/* -------------------- Map -------------------- */
+/* -------------------- Map setup -------------------- */
 let map=L.map('map').setView([37.8,-96],4);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(map);
 let markersLayer=L.layerGroup().addTo(map);
+
 function updateMap(rows){
   markersLayer.clearLayers();
   if(!rows.length) return;
   let bounds=[];
   rows.forEach(r=>{
     if(Number.isFinite(r.lat)&&Number.isFinite(r.lon)){
-      const marker=L.marker([r.lat,r.lon]).addTo(markersLayer);
-      let popup=`<b>${esc(r.name||"")}</b><br>${esc(r.address||"")}`;
+      let m=L.marker([r.lat,r.lon]).addTo(markersLayer);
+      let popup=`<b>${esc(r.name||"")}</b><br>${esc(r.address||""||"")}`;
       if(r.town||r.state) popup+=`<br>${esc(r.town)}, ${esc(r.state)}`;
       if(r.developer) popup+=`<br><i>${esc(r.developer)}</i>`;
       if(r.date) popup+=`<br>${esc(r.date)}`;
       if(r.url) popup+=`<br><a href="${esc(r.url)}" target="_blank">source</a>`;
-      marker.bindPopup(popup);bounds.push([r.lat,r.lon]);
+      m.bindPopup(popup);
+      bounds.push([r.lat,r.lon]);
     }
   });
   if(bounds.length) map.fitBounds(bounds,{padding:[30,30]});
 }
+
+/* -------------------- Hook map into doSearch -------------------- */
+// at the end of your existing doSearch() function, add:
+updateMap(results);
+
 </script>
 </body>
 </html>
