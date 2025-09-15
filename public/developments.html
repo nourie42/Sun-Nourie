@@ -4,10 +4,14 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Gas Station Developments — Town Search</title>
+
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="preconnect" href="https://unpkg.com" crossorigin>
+
+<!-- Leaflet -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin></script>
+
 <style>
   :root{ --bg:#0b0e15; --panel:#111725; --panel2:#0e1626; --text:#e8eefc; --muted:#9fb0cf; --accent:#5ec2ff; --line:#263145; --warn:#ffe08a; }
   html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
@@ -40,6 +44,8 @@
   .ok{color:#86efac}
   .warn{color:var(--warn)}
 </style>
+
+<!-- CSV parser -->
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 </head>
 <body>
@@ -62,6 +68,7 @@
         <label for="q">Town (use “Town, ST”)</label>
         <input id="q" list="towns" type="text" placeholder="e.g., Knightdale, NC"/>
         <datalist id="towns"></datalist>
+        <div class="hint">You’ll see results only if the town is on the list or within the miles radius from it.</div>
       </div>
       <div>
         <label for="miles">Miles radius</label>
@@ -81,6 +88,8 @@
     </div>
 
     <div id="results" style="margin-top:10px"></div>
+
+    <!-- MAP -->
     <div id="map" style="height:500px; margin-top:12px; border-radius:12px; overflow:hidden;"></div>
   </section>
 
@@ -99,36 +108,295 @@
 </div>
 
 <script>
-/* your existing DATA loading, normalize, search helpers stay the same ... */
+/* -------------------- Settings (unchanged) -------------------- */
+const DATA_CANDIDATES = [
+  "developments_data.json",
+  "developments_data.csv"
+];
 
-/* -------------------- Map setup -------------------- */
-let map=L.map('map').setView([37.8,-96],4);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(map);
-let markersLayer=L.layerGroup().addTo(map);
+/* ------------------------------ State ------------------------------ */
+let DATA = [];           // normalized array
+let CURRENT_RESULTS = [];
+const $ = sel => document.querySelector(sel);
+const esc = s => (s??"").toString().replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]));
+const numberOrNull = v => {
+  if (v===null||v===undefined||v==="") return null;
+  if (typeof v==="number") return Number.isFinite(v) ? v : null;
+  const m = String(v).replace(",",".").match(/-?\d+(?:\.\d+)?/);
+  return m ? parseFloat(m[0]) : null;
+};
+const norm = s => (s??"").toString().trim();
+const normLower = s => norm(s).toLowerCase();
+const toCSV = rows => {
+  if (!rows.length) return "";
+  const cols = Object.keys(rows[0]);
+  const q = v => '"' + String(v??"").replace(/"/g,'""') + '"';
+  return [cols.map(q).join(",")].concat(rows.map(r => cols.map(c => q(r[c])).join(","))).join("\n");
+};
+function download(name, text, mime){ const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([text],{type:mime||"text/plain"})); a.download=name; a.click(); }
+
+/* --------------------------- Column detection --------------------------- */
+function cleanKey(k){ return String(k).toLowerCase().replace(/[_\-\/().]/g," ").replace(/\s+/g," ").trim(); }
+const CANDIDATES = {
+  town: ["town","city","municipality","village","place","locality","city town","community"],
+  state: ["state","st","province","region","postal"],
+  lat: ["lat","latitude","y","ycoord","y coord","point_y","centroid_y"],
+  lon: ["lon","lng","long","longitude","x","xcoord","x coord","point_x","centroid_x"],
+  address: ["address","addr","site address","street","street address","location","full address"],
+  name: ["name","site name","station","location name","project","title","site","business"],
+  developer: ["developer","owner","applicant","proposer","builder","sponsor"],
+  date: ["date","submitted","filed","updated","last updated","hearing date","application date","report date"],
+  notes: ["notes","description","desc","details","summary","remarks","comment","scope"],
+  url: ["url","link","source","source url","website","href"]
+};
+function bestMapForColumns(cols){
+  const cleaned = cols.map(cleanKey);
+  function pick(key){
+    for (let i=0;i<cleaned.length;i++) if (CANDIDATES[key].includes(cleaned[i])) return cols[i];
+    let best=null,score=-1;
+    for (let i=0;i<cleaned.length;i++){
+      const ck=cleaned[i];
+      for (const cand of CANDIDATES[key]){
+        if (ck===cand && score<100){ best=cols[i]; score=100; }
+        else if (ck.startsWith(cand) && score<80){ best=cols[i]; score=80; }
+        else if (ck.includes(cand) && score<60){ best=cols[i]; score=60; }
+      }
+    }
+    return best || "";
+  }
+  const out={}; for (const k of Object.keys(CANDIDATES)) out[k]=pick(k); return out;
+}
+function normalizeRows(rows, mapping){
+  const out=[];
+  for (const r of rows){
+    const row={
+      town: r[mapping.town] ?? "",
+      state: r[mapping.state] ?? "",
+      lat: numberOrNull(r[mapping.lat]),
+      lon: numberOrNull(r[mapping.lon]),
+      address: r[mapping.address] ?? "",
+      name: r[mapping.name] ?? "",
+      developer: r[mapping.developer] ?? "",
+      date: r[mapping.date] ?? "",
+      notes: r[mapping.notes] ?? "",
+      url: r[mapping.url] ?? ""
+    };
+    ["town","state","address","name","developer","date","notes","url"].forEach(k=>row[k]=norm(row[k]));
+    if (Object.values(row).some(v=>v!=="" && v!==null && v!==undefined)) out.push(row);
+  }
+  return out;
+}
+
+/* ------------------------------ UI Helpers ------------------------------ */
+function renderTable(rows, limited=true){
+  if (!rows.length) return "<div class='hint'>No rows.</div>";
+  const cols = ["town","state","lat","lon","address","name","developer","date","notes","url"];
+  const max = limited ? 1000 : rows.length;
+  let thead = "<tr>" + cols.map(c=>`<th>${esc(c)}</th>`).join("") + "</tr>";
+  let body = "";
+  for (let i=0;i<Math.min(rows.length,max);i++){
+    const r = rows[i];
+    body += "<tr>" + cols.map(c=>{
+      let v = r[c]; if (v===null||v===undefined) v="";
+      if (c==="url" && v) return `<td><a href="${esc(v)}" target="_blank" rel="noopener">source</a></td>`;
+      return `<td>${esc(v)}</td>`;
+    }).join("") + "</tr>";
+  }
+  const more = rows.length>max ? `<div class="hint">Showing first ${max} of ${rows.length} rows.</div>` : "";
+  return `<table><thead>${thead}</thead><tbody>${body}</tbody></table>${more}`;
+}
+function rebuildTownList(){
+  const set = new Set();
+  for (const r of DATA){
+    const t = norm(r.town), s = norm(r.state);
+    if (!t) continue;
+    set.add(s ? `${t}, ${s}` : t);
+  }
+  const list = Array.from(set).sort((a,b)=>a.localeCompare(b));
+  $("#towns").innerHTML = list.map(v=>`<option value="${esc(v)}"></option>`).join("");
+  $("#meta").innerHTML = `Dataset rows: <b id="rowcount">${DATA.length}</b>`;
+}
+
+/* ------------------------------ Geocoding ------------------------------ */
+const geoCache = new Map();
+function cacheKey(q){ return "geo::"+q.toLowerCase().trim(); }
+function setGeoCache(q,val){ geoCache.set(q,val); try{ localStorage.setItem(cacheKey(q), JSON.stringify(val)); }catch{} }
+function getGeoCache(q){
+  if (geoCache.has(q)) return geoCache.get(q);
+  try{ const raw=localStorage.getItem(cacheKey(q)); if(raw){ const v=JSON.parse(raw); geoCache.set(q,v); return v; } }catch{}
+  return null;
+}
+async function geocodeTown(q){
+  const hit=getGeoCache(q); if(hit) return hit;
+  const url = new URL("https://nominatim.openstreetmap.org/search");
+  url.searchParams.set("q", q);
+  url.searchParams.set("format", "json");
+  url.searchParams.set("addressdetails", "1");
+  url.searchParams.set("limit", "1");
+  url.searchParams.set("countrycodes", "us");
+  const resp = await fetch(url.toString(), { headers: {"Accept":"application/json"} });
+  if (!resp.ok) return null;
+  const js = await resp.json();
+  if (!js.length) return null;
+  const out = [parseFloat(js[0].lat), parseFloat(js[0].lon)];
+  setGeoCache(q,out);
+  return out;
+}
+
+/* ------------------------------- Search ------------------------------- */
+function haversineMiles(lat1,lon1,lat2,lon2){
+  const R=3958.7613, toRad=d=>d*Math.PI/180;
+  const dLat=toRad(lat2-lat1), dLon=toRad(lon2-lon1);
+  const a=Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  return 2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))*R;
+}
+function buildTownIndexes(){
+  const idx=new Map(), centroids=new Map();
+  for (const r of DATA){
+    const key=(normLower(r.town)+"|"+normLower(r.state));
+    if (!idx.has(key)) idx.set(key, []);
+    idx.get(key).push(r);
+  }
+  for (const [key, rows] of idx.entries()){
+    const pts = rows.map(r=>[numberOrNull(r.lat),numberOrNull(r.lon)]).filter(p=>Number.isFinite(p[0])&&Number.isFinite(p[1]));
+    if (pts.length){
+      const lat = pts.reduce((s,p)=>s+p[0],0)/pts.length;
+      const lon = pts.reduce((s,p)=>s+p[1],0)/pts.length;
+      centroids.set(key,[lat,lon]);
+    }
+  }
+  return {idx, centroids};
+}
+async function doSearch(){
+  const q = norm($("#q").value);
+  const miles = Math.max(1, +$("#miles").value || 20);
+  $("#miLabel").textContent = miles;
+  $("#results").innerHTML = "";
+  if (!q){ $("#meta").innerHTML = `<span class="warn">Enter a town.</span>`; return; }
+
+  const parts=q.split(","), t=norm(parts[0]||""), s=norm((parts[1]||"").replace(/[^a-z]/gi,""));
+  const key1=(t+"|"+s).toLowerCase(), key2=(t+"|").toLowerCase();
+
+  const {idx, centroids} = buildTownIndexes();
+  let results = [];
+  if (idx.has(key1)) results = results.concat(idx.get(key1));
+  else if (idx.has(key2)) results = results.concat(idx.get(key2));
+
+  let qLatLon = centroids.get(key1) || centroids.get(key2) || null;
+  if (!qLatLon){ try{ qLatLon = await geocodeTown(q); }catch{ qLatLon=null; } }
+  if (qLatLon){
+    const [qlat, qlon] = qLatLon;
+    for (const rec of DATA){
+      if (results.includes(rec)) continue;
+      const la=numberOrNull(rec.lat), lo=numberOrNull(rec.lon);
+      if (!Number.isFinite(la)||!Number.isFinite(lo)) continue;
+      const d = haversineMiles(qlat, qlon, la, lo);
+      if (d <= miles) results.push(rec);
+    }
+  }
+  CURRENT_RESULTS = results;
+  $("#meta").innerHTML = `<span class="pill">${results.length} result(s)</span> within <b>${miles} mi</b> for <b>${esc(q)}</b>`;
+  $("#results").innerHTML = renderTable(results, true);
+
+  // NEW: update the map with current results
+  updateMap(results);
+}
+
+/* --------------------------- Raw render & tabs --------------------------- */
+function renderRaw(){
+  const q = normLower($("#raw-q").value);
+  const rows = !q ? DATA : DATA.filter(r => Object.values(r).some(v => (""+(v??"")).toLowerCase().includes(q)));
+  $("#rawTable").innerHTML = renderTable(rows, true);
+}
+document.querySelectorAll(".tabbtn").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    document.querySelectorAll(".tabbtn").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+    const name = btn.dataset.tab;
+    document.querySelectorAll("section[id^='tab-']").forEach(s=> s.style.display = (s.id === "tab-"+name ? "" : "none"));
+    if (name==="raw") renderRaw();
+    // When returning to Search tab, ensure map resizes correctly
+    if (name==="search") setTimeout(()=>{ map.invalidateSize?.(); }, 50);
+  });
+});
+
+/* ------------------------------ Data loader ------------------------------ */
+async function tryFetch(url){
+  try{
+    const r = await fetch(url, {cache:"no-store"});
+    if (!r.ok) throw new Error(r.status);
+    if (url.endsWith(".json")){
+      return {type:"json", rows: await r.json(), source:url};
+    }else{
+      const text = await r.text();
+      const parsed = Papa.parse(text, {header:true, skipEmptyLines:true});
+      return {type:"csv", rows: parsed.data, source:url};
+    }
+  }catch(e){ return null; }
+}
+async function loadData(){
+  $("#meta").textContent = "Loading data…";
+  for (const path of DATA_CANDIDATES){
+    const hit = await tryFetch(path);
+    if (hit && hit.rows && hit.rows.length){
+      const cols = Object.keys(hit.rows[0]||{});
+      const mapping = bestMapForColumns(cols);
+      DATA = normalizeRows(hit.rows, mapping);
+      rebuildTownList();
+      renderRaw();
+      $("#sourceBadge").textContent = `Loaded: ${hit.type.toUpperCase()} (${path})`;
+      $("#sourceBadge").classList.add("ok");
+      return;
+    }
+  }
+  $("#meta").innerHTML = `<span class="warn">Could not find <b>developments_data.json</b> or <b>developments_data.csv</b> next to this page.</span>`;
+}
+loadData();
+
+/* ------------------------------ Events ------------------------------ */
+$("#go").addEventListener("click", doSearch);
+$("#clear").addEventListener("click", ()=>{
+  $("#q").value="";
+  $("#results").innerHTML="";
+  $("#meta").innerHTML=`Dataset rows: <b id="rowcount">${DATA.length}</b>`;
+  // also clear the map and reset view
+  markersLayer.clearLayers();
+  map.setView([37.8,-96],4);
+});
+$("#q").addEventListener("keydown", e=>{ if(e.key==="Enter") doSearch(); });
+$("#miles").addEventListener("input", ()=>{ $("#miLabel").textContent = Math.max(1,+$("#miles").value||20); });
+$("#raw-q").addEventListener("input", renderRaw);
+$("#dlResultsCsv").addEventListener("click", ()=> download("search_results.csv", toCSV(CURRENT_RESULTS||[]), "text/csv"));
+$("#dlAllCsv").addEventListener("click", ()=> download("developments_all.csv", toCSV(DATA), "text/csv"));
+
+/* ------------------------------ Map ------------------------------ */
+let map = L.map('map').setView([37.8, -96], 4); // USA
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19,
+  attribution: '&copy; OpenStreetMap'
+}).addTo(map);
+
+let markersLayer = L.layerGroup().addTo(map);
 
 function updateMap(rows){
   markersLayer.clearLayers();
-  if(!rows.length) return;
-  let bounds=[];
-  rows.forEach(r=>{
-    if(Number.isFinite(r.lat)&&Number.isFinite(r.lon)){
-      let m=L.marker([r.lat,r.lon]).addTo(markersLayer);
-      let popup=`<b>${esc(r.name||"")}</b><br>${esc(r.address||""||"")}`;
-      if(r.town||r.state) popup+=`<br>${esc(r.town)}, ${esc(r.state)}`;
-      if(r.developer) popup+=`<br><i>${esc(r.developer)}</i>`;
-      if(r.date) popup+=`<br>${esc(r.date)}`;
-      if(r.url) popup+=`<br><a href="${esc(r.url)}" target="_blank">source</a>`;
-      m.bindPopup(popup);
-      bounds.push([r.lat,r.lon]);
+  if(!rows || !rows.length) return;
+  let bounds = [];
+  for (const r of rows){
+    if(Number.isFinite(r.lat) && Number.isFinite(r.lon)){
+      const marker = L.marker([r.lat, r.lon]).addTo(markersLayer);
+      let popup = `<b>${esc(r.name||"")}</b>`;
+      if (r.address) popup += `<br>${esc(r.address)}`;
+      if (r.town || r.state) popup += `<br>${esc(r.town)}${r.town&&r.state?", ":""}${esc(r.state)}`;
+      if (r.developer) popup += `<br><i>${esc(r.developer)}</i>`;
+      if (r.date) popup += `<br>${esc(r.date)}`;
+      if (r.url) popup += `<br><a href="${esc(r.url)}" target="_blank" rel="noopener">source</a>`;
+      marker.bindPopup(popup);
+      bounds.push([r.lat, r.lon]);
     }
-  });
-  if(bounds.length) map.fitBounds(bounds,{padding:[30,30]});
+  }
+  if (bounds.length) map.fitBounds(bounds, {padding:[30,30]});
 }
-
-/* -------------------- Hook map into doSearch -------------------- */
-// at the end of your existing doSearch() function, add:
-updateMap(results);
-
 </script>
 </body>
 </html>
