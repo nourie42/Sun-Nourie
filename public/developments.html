@@ -12,7 +12,6 @@
       --muted: #9fb0cf;
       --accent: #5ec2ff;
       --line: #263145;
-      --warn: #ffe08a;
     }
     body {
       margin: 0;
@@ -47,7 +46,8 @@
       border: 1px solid var(--line);
       color: #bfe6ff;
     }
-    input[type="text"], input[type="number"] {
+    input[type="text"],
+    input[type="number"] {
       width: 200px;
       padding: 0.5rem;
       border-radius: 6px;
@@ -71,7 +71,8 @@
       margin-top: 8px;
       font-size: 0.9rem;
     }
-    th, td {
+    th,
+    td {
       border-bottom: 1px solid var(--line);
       text-align: left;
       padding: 0.5rem;
@@ -114,24 +115,17 @@
   </script>
 
   <script>
-    console.log("Starting Google Maps application...");
-
-    let map, geocoder, infoWindow;
-    let allData = [];
-    let currentResults = [];
-    let markers = [];
-
-    // Parse CSV file
+    // Parse CSV string into array of rows
     function parseCSV(csv) {
       const lines = csv.trim().split(/\\r?\\n/);
       const rows = [];
       for (const line of lines) {
-        const row = [];
-        let current = '';
         let inQuotes = false;
+        let current = '';
+        const row = [];
         for (let i = 0; i < line.length; i++) {
           const char = line[i];
-          if (char === '"' && line[i+1] === '"') {
+          if (char === '"' && line[i + 1] === '"') {
             current += '"';
             i++;
           } else if (char === '"') {
@@ -149,48 +143,64 @@
       return rows;
     }
 
-    // Convert rows into objects
+    // Convert rows into objects with standardized fields
     function transformData(rows) {
       if (!rows || rows.length === 0) return [];
       const headers = rows[0];
-      const result = [];
+      const data = [];
       for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
         const obj = {};
-        headers.forEach((h, idx) => obj[h] = row[idx]);
-        const town = obj['City/County'] || obj['City/County.1'] || obj['City/County.2'] || '';
+        headers.forEach((h, idx) => (obj[h] = row[idx]));
+        const town =
+          obj['City/County'] ||
+          obj['City/County.1'] ||
+          obj['City/County.2'] ||
+          '';
         const state = obj['State'] || '';
         const name = obj['Brand'] || '';
         const developer = obj['Brand.1'] || '';
         const date = obj['Date'] || obj['Date.1'] || obj['Date.2'] || '';
-        let notes = obj['Status'] || obj['Details.1'] || obj['Details.2'] || '';
-        result.push({ name, town, state, developer, date, notes });
+        const notes =
+          obj['Status'] || obj['Details.1'] || obj['Details.2'] || '';
+        data.push({ name, town, state, developer, date, notes });
       }
-      return result;
+      return data;
     }
 
+    let map, geocoder, infoWindow;
+    let allData = [];
+    let currentResults = [];
+    let markers = [];
+
+    // Load CSV data and initialize markers & table
     async function loadData() {
       try {
-        const response = await fetch('developments_data.csv');
+        // Use raw.githubusercontent.com link so it fetches from your repo
+        const response = await fetch(
+          'https://raw.githubusercontent.com/nourie42/Sun-Nourie/main/public/developments_data.csv'
+        );
         const csv = await response.text();
         const rows = parseCSV(csv);
         allData = transformData(rows);
         currentResults = allData;
         addMarkersToMap(allData);
         showResults(allData);
-        document.getElementById('status').textContent = 'Loaded ' + allData.length + ' locations';
+        document.getElementById('status').textContent =
+          'Loaded ' + allData.length + ' locations';
       } catch (err) {
         console.error('Failed to load CSV:', err);
-        document.getElementById('status').textContent = 'Error loading data';
+        document.getElementById('status').textContent =
+          'Error loading data';
       }
     }
 
     function initMap() {
       try {
-        map = new google.maps.Map(document.getElementById("map"), {
+        map = new google.maps.Map(document.getElementById('map'), {
           zoom: 6,
           center: { lat: 35.7596, lng: -79.0193 },
-          mapTypeId: 'roadmap'
+          mapTypeId: 'roadmap',
         });
         geocoder = new google.maps.Geocoder();
         infoWindow = new google.maps.InfoWindow();
@@ -198,12 +208,13 @@
         loadData();
       } catch (error) {
         console.error('Google Maps initialization failed:', error);
-        document.getElementById('status').textContent = 'Error: Google Maps failed to load. Check your API key.';
+        document.getElementById('status').textContent =
+          'Error: Google Maps failed to load. Check your API key.';
       }
     }
 
     function clearMarkers() {
-      markers.forEach(m => m.setMap(null));
+      markers.forEach((m) => m.setMap(null));
       markers = [];
     }
 
@@ -228,16 +239,41 @@
               map,
               title: item.name || 'Gas Station Development',
               icon: {
-                url: 'data:image/svg+xml;base64,' + btoa('<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\"><circle cx=\"12\" cy=\"12\" r=\"8\" fill=\"#FF4444\" stroke=\"white\" stroke-width=\"2\"/></svg>'),
-                scaledSize: new google.maps.Size(24, 24)
-              }
+                url:
+                  'data:image/svg+xml;base64,' +
+                  btoa(
+                    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="#FF4444" stroke="white" stroke-width="2"/></svg>'
+                  ),
+                scaledSize: new google.maps.Size(24, 24),
+              },
             });
-            let content = '<div style=\"color: #333; font-family: Arial; max-width: 250px;\">';
-            content += '<h3 style=\"margin: 0 0 8px 0;\">' + (item.name || 'Gas Station Development') + '</h3>';
-            content += '<p style=\"margin: 4px 0;\"><strong>Location:</strong> ' + item.town + ', ' + item.state + '</p>';
-            if (item.developer) content += '<p style=\"margin: 4px 0;\"><strong>Developer:</strong> ' + item.developer + '</p>';
-            if (item.date) content += '<p style=\"margin: 4px 0;\"><strong>Date:</strong> ' + item.date + '</p>';
-            if (item.notes) content += '<p style=\"margin: 4px 0;\"><strong>Notes:</strong> ' + item.notes + '</p>';
+            let content =
+              '<div style="color: #333; font-family: Arial; max-width: 250px;">';
+            content +=
+              '<h3 style="margin: 0 0 8px 0;">' +
+              (item.name || 'Gas Station Development') +
+              '</h3>';
+            content +=
+              '<p style="margin: 4px 0;"><strong>Location:</strong> ' +
+              item.town +
+              ', ' +
+              item.state +
+              '</p>';
+            if (item.developer)
+              content +=
+                '<p style="margin: 4px 0;"><strong>Developer:</strong> ' +
+                item.developer +
+                '</p>';
+            if (item.date)
+              content +=
+                '<p style="margin: 4px 0;"><strong>Date:</strong> ' +
+                item.date +
+                '</p>';
+            if (item.notes)
+              content +=
+                '<p style="margin: 4px 0;"><strong>Notes:</strong> ' +
+                item.notes +
+                '</p>';
             content += '</div>';
             marker.addListener('click', () => {
               infoWindow.setContent(content);
@@ -264,8 +300,9 @@
         document.getElementById('results').innerHTML = '<p>No results found.</p>';
         return;
       }
-      let html = '<table><thead><tr><th>Name</th><th>Town</th><th>State</th><th>Developer</th><th>Date</th><th>Notes</th></tr></thead><tbody>';
-      data.forEach(item => {
+      let html =
+        '<table><thead><tr><th>Name</th><th>Town</th><th>State</th><th>Developer</th><th>Date</th><th>Notes</th></tr></thead><tbody>';
+      data.forEach((item) => {
         html += '<tr>';
         html += '<td>' + (item.name || '') + '</td>';
         html += '<td>' + (item.town || '') + '</td>';
@@ -280,16 +317,25 @@
     }
 
     function doSearch() {
-      const query = document.getElementById('townInput').value.trim().toLowerCase();
-      currentResults = !query ? allData : allData.filter(item => {
-        const town = (item.town || '').toLowerCase();
-        const state = (item.state || '').toLowerCase();
-        const full = town + ', ' + state;
-        return town.includes(query) || full.includes(query) || query.includes(town);
-      });
+      const query = document.getElementById('townInput').value
+        .trim()
+        .toLowerCase();
+      currentResults = !query
+        ? allData
+        : allData.filter((item) => {
+            const town = (item.town || '').toLowerCase();
+            const state = (item.state || '').toLowerCase();
+            const full = town + ', ' + state;
+            return (
+              town.includes(query) ||
+              full.includes(query) ||
+              query.includes(town)
+            );
+          });
       addMarkersToMap(currentResults);
       showResults(currentResults);
-      document.getElementById('status').textContent = 'Found ' + currentResults.length + ' results';
+      document.getElementById('status').textContent =
+        'Found ' + currentResults.length + ' results';
     }
 
     function showAll() {
@@ -297,22 +343,31 @@
       currentResults = allData;
       addMarkersToMap(currentResults);
       showResults(currentResults);
-      document.getElementById('status').textContent = 'Showing all ' + allData.length + ' locations';
+      document.getElementById('status').textContent =
+        'Showing all ' + allData.length + ' locations';
     }
 
     function setupEventListeners() {
-      document.getElementById('searchBtn').addEventListener('click', doSearch);
-      document.getElementById('clearBtn').addEventListener('click', showAll);
-      document.getElementById('townInput').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') doSearch();
-      });
+      document
+        .getElementById('searchBtn')
+        .addEventListener('click', doSearch);
+      document
+        .getElementById('clearBtn')
+        .addEventListener('click', showAll);
+      document
+        .getElementById('townInput')
+        .addEventListener('keypress', function (e) {
+          if (e.key === 'Enter') doSearch();
+        });
     }
 
     // fallback if Google Maps doesn’t load
     setTimeout(() => {
       if (typeof google === 'undefined') {
-        document.getElementById('status').textContent = 'Error: Google Maps failed to load. Please check your API key and internet connection.';
-        document.getElementById('map').innerHTML = '<div style=\"padding: 50px; text-align: center; color: #666;\">Google Maps could not be loaded. Please add your API key.</div>';
+        document.getElementById('status').textContent =
+          'Error: Google Maps failed to load. Please check your API key and internet connection.';
+        document.getElementById('map').innerHTML =
+          '<div style="padding: 50px; text-align: center; color: #666;">Google Maps could not be loaded. Please add your API key.</div>';
       }
     }, 5000);
   </script>
