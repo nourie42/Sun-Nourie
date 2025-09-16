@@ -97,11 +97,19 @@
      * the map even if the parent container collapses. The height is also
      * set to 100% so that the grid row can expand to fill the viewport.
      */
-    #map {
-      min-height: 600px;
-      height: 100%;
-      width: 100%;
-    }
+        /*
+         * Ensure the map container always has a fixed height.  Using only
+         * percentage heights on flex/grid parents can collapse the map to
+         * zero height when the containing rows have no intrinsic size.  A
+         * minimum height keeps the map visible, and a viewport-based height
+         * lets it expand on taller screens.
+         */
+        #map {
+          min-height: 600px;
+          /* Fill the remaining viewport height minus a small margin */
+          height: calc(100vh - 120px);
+          width: 100%;
+        }
     .summary {
       margin: 12px 0 6px;
       font-size: 12px;
@@ -200,7 +208,13 @@
        * we attempt to evaluate the file to capture a global SIGNALS
        * variable. If all methods fail, we return an empty array.
        */
-      const url = 'signals.js';
+           // Use a relative path when fetching the signals dataset.  When this
+           // page is served from a subpath (e.g. on Render), requests like
+           // `/signals.js` may be routed back to the index page instead of
+           // returning the data file.  Prefixing the path with `./` forces
+           // the browser to resolve it relative to the current document,
+           // ensuring the correct file is requested.
+           const url = './signals.js';
       try {
         const resp = await fetch(url, { cache: 'no-store' });
         const text = await resp.text();
@@ -273,7 +287,7 @@
             fillOpacity: 0.8,
             weight: 1
           }).bindPopup(
-            `Signal ${s.id} AADT: ${fmt(s.aadt)} Truck %: ${fmt(s.truckPct)} Route: ${s.stateRoute || ''} District: ${s.district || ''} County: ${s.countyCode || ''}`
+                 `Signal ${s.id} AADT: ${fmt(s.aadt)} Truck %: ${fmt(s.truckPct)} Route: ${s.stateRoute || ''} District: ${s.district || ''} County: ${s.countyCode || ''}`
           );
           marker._data = s;
           cluster.addLayer(marker);

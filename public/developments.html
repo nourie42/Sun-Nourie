@@ -193,7 +193,21 @@
             lon: parseFloat(row.lon || row.lng || row.longitude || row.x || row.centroid_x || '') || null,
           };
         });
-        document.getElementById('results').innerHTML = `<div class="hint">Dataset rows: <b>${DATA.length}</b></div>`;
+        // Show basic dataset count in the results area
+        const resultsDiv = document.getElementById('results');
+        resultsDiv.innerHTML = `<div class="hint">Dataset rows: <b>${DATA.length}</b></div>`;
+
+        // Immediately render all markers on the map and list them in the table.  On the live
+        // site there are occasionally issues with geocoding and searching; by
+        // plotting everything up front users can see that the data loaded and the
+        // map is working.  If you prefer not to show all rows initially you can
+        // comment out the following two calls.
+        try {
+          renderResults(DATA);
+          updateMap(DATA);
+        } catch (e) {
+          console.error('Error rendering initial data:', e);
+        }
       } catch (e) {
         document.getElementById('results').innerHTML = `<div style="color: var(--warn)">Could not load <b>developments_data.csv</b>. Ensure it is placed next to this page.</div>`;
       }
