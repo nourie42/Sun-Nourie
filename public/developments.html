@@ -115,35 +115,46 @@
   </script>
 
   <script>
-    // Parse CSV string into array of rows
+    // Robust CSV parser that handles commas and newlines inside quoted fields
     function parseCSV(csv) {
-      const lines = csv.trim().split(/\\r?\\n/);
       const rows = [];
-      for (const line of lines) {
-        let inQuotes = false;
-        let current = '';
-        const row = [];
-        for (let i = 0; i < line.length; i++) {
-          const char = line[i];
-          if (char === '"' && line[i + 1] === '"') {
-            current += '"';
+      let row = [];
+      let value = '';
+      let inQuotes = false;
+      for (let i = 0; i < csv.length; i++) {
+        const char = csv[i];
+        if (char === '"' && csv[i + 1] === '"') {
+          value += '"';
+          i++;
+        } else if (char === '"') {
+          inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+          row.push(value);
+          value = '';
+        } else if ((char === '\n' || char === '\r') && !inQuotes) {
+          // Handle CR+LF or LF line endings
+          if (char === '\r' && csv[i + 1] === '\n') {
             i++;
-          } else if (char === '"') {
-            inQuotes = !inQuotes;
-          } else if (char === ',' && !inQuotes) {
-            row.push(current);
-            current = '';
-          } else {
-            current += char;
           }
+          row.push(value);
+          value = '';
+          if (row.length > 1 || row[0] !== '') {
+            rows.push(row);
+          }
+          row = [];
+        } else {
+          value += char;
         }
-        row.push(current);
+      }
+      // Push the last value/row if not empty
+      if (value !== '' || row.length > 0) {
+        row.push(value);
         rows.push(row);
       }
       return rows;
     }
 
-    // Convert rows into objects with standardized fields
+    // Convert rows into objects
     function transformData(rows) {
       if (!rows || rows.length === 0) return [];
       const headers = rows[0];
@@ -163,6 +174,8 @@
         const date = obj['Date'] || obj['Date.1'] || obj['Date.2'] || '';
         const notes =
           obj['Status'] || obj['Details.1'] || obj['Details.2'] || '';
+        // Skip if both town and state are empty
+        if (!town && !state) continue;
         data.push({ name, town, state, developer, date, notes });
       }
       return data;
@@ -173,13 +186,9 @@
     let currentResults = [];
     let markers = [];
 
-    // Load CSV data and initialize markers & table
     async function loadData() {
       try {
-        // Use raw.githubusercontent.com link so it fetches from your repo
-        const response = await fetch(
-          'https://raw.githubusercontent.com/nourie42/Sun-Nourie/main/public/developments_data.csv'
-        );
+        const response = await fetch('https://raw.githubusercontent.com/nourie42/Sun-Nourie/main/public/developments_data.csv');
         const csv = await response.text();
         const rows = parseCSV(csv);
         allData = transformData(rows);
