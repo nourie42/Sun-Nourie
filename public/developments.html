@@ -110,7 +110,7 @@
 
   <!-- Google Maps JavaScript API -->
   <script async defer
-    src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&callback=initMap">
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBlm18rIsI1bhOwhx3bpHAX589EahvLbPc&callback=initMap">
   </script>
 
   <script>
@@ -123,7 +123,7 @@
 
     // Parse CSV file
     function parseCSV(csv) {
-      const lines = csv.trim().split(/\r?\n/);
+      const lines = csv.trim().split(/\\r?\\n/);
       const rows = [];
       for (const line of lines) {
         const row = [];
@@ -228,16 +228,16 @@
               map,
               title: item.name || 'Gas Station Development',
               icon: {
-                url: 'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="#FF4444" stroke="white" stroke-width="2"/></svg>'),
+                url: 'data:image/svg+xml;base64,' + btoa('<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\"><circle cx=\"12\" cy=\"12\" r=\"8\" fill=\"#FF4444\" stroke=\"white\" stroke-width=\"2\"/></svg>'),
                 scaledSize: new google.maps.Size(24, 24)
               }
             });
-            let content = '<div style="color: #333; font-family: Arial; max-width: 250px;">';
-            content += '<h3 style="margin: 0 0 8px 0;">' + (item.name || 'Gas Station Development') + '</h3>';
-            content += '<p style="margin: 4px 0;"><strong>Location:</strong> ' + item.town + ', ' + item.state + '</p>';
-            if (item.developer) content += '<p style="margin: 4px 0;"><strong>Developer:</strong> ' + item.developer + '</p>';
-            if (item.date) content += '<p style="margin: 4px 0;"><strong>Date:</strong> ' + item.date + '</p>';
-            if (item.notes) content += '<p style="margin: 4px 0;"><strong>Notes:</strong> ' + item.notes + '</p>';
+            let content = '<div style=\"color: #333; font-family: Arial; max-width: 250px;\">';
+            content += '<h3 style=\"margin: 0 0 8px 0;\">' + (item.name || 'Gas Station Development') + '</h3>';
+            content += '<p style=\"margin: 4px 0;\"><strong>Location:</strong> ' + item.town + ', ' + item.state + '</p>';
+            if (item.developer) content += '<p style=\"margin: 4px 0;\"><strong>Developer:</strong> ' + item.developer + '</p>';
+            if (item.date) content += '<p style=\"margin: 4px 0;\"><strong>Date:</strong> ' + item.date + '</p>';
+            if (item.notes) content += '<p style=\"margin: 4px 0;\"><strong>Notes:</strong> ' + item.notes + '</p>';
             content += '</div>';
             marker.addListener('click', () => {
               infoWindow.setContent(content);
@@ -312,9 +312,10 @@
     setTimeout(() => {
       if (typeof google === 'undefined') {
         document.getElementById('status').textContent = 'Error: Google Maps failed to load. Please check your API key and internet connection.';
-        document.getElementById('map').innerHTML = '<div style="padding: 50px; text-align: center; color: #666;">Google Maps could not be loaded. Please add your API key.</div>';
+        document.getElementById('map').innerHTML = '<div style=\"padding: 50px; text-align: center; color: #666;\">Google Maps could not be loaded. Please add your API key.</div>';
       }
     }, 5000);
   </script>
 </body>
 </html>
+
