@@ -185,14 +185,52 @@
         if (!resp.ok) throw new Error(resp.status);
         const text = await resp.text();
         const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
-        DATA = parsed.data.map((row) => {
-          return {
-            ...row,
-            // normalize latitude/longitude fields if present
-            lat: parseFloat(row.lat || row.latitude || row.y || row.centroid_y || '') || null,
-            lon: parseFloat(row.lon || row.lng || row.longitude || row.x || row.centroid_x || '') || null,
-          };
-        });
+            DATA = parsed.data.map((row) => {
+              // Determine a reasonable town and state for each row.  The dataset
+              // has multiple possible fields for the locality (e.g. City/County,
+              // Town, City) and state.  We pick the first non-empty value.
+              const townCandidate =
+                row.town ||
+                row.Town ||
+                row["City/County"] ||
+                row["City/County.1"] ||
+                row["City/County.2"] ||
+                row.city ||
+                row.City ||
+                row.County ||
+                '';
+              const stateCandidate =
+                row.state ||
+                row.State ||
+                row.STATE ||
+                row.ST ||
+                row["City/County.2"] ||
+                '';
+              return {
+                ...row,
+                // attach town/state fields so the search/geocode logic can find them
+                town: (townCandidate || '').toString().trim(),
+                state: (stateCandidate || '').toString().trim(),
+                // normalize latitude/longitude fields if present
+                lat:
+                  parseFloat(
+                    row.lat ||
+                      row.latitude ||
+                      row.y ||
+                      row.centroid_y ||
+                      ''
+                  ) || null,
+                lon:
+                  parseFloat(
+                    row.lon ||
+                      row.lng ||
+                      row.longitude ||
+                      row.x ||
+                      row.centroid_x ||
+                      ''
+                  ) || null,
+              };
+            });
         // Show basic dataset count in the results area
         const resultsDiv = document.getElementById('results');
         resultsDiv.innerHTML = `<div class="hint">Dataset rows: <b>${DATA.length}</b></div>`;
