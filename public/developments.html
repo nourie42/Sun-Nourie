@@ -238,51 +238,91 @@
       });
       if (bounds.length) map.fitBounds(bounds, { padding: [30, 30] });
     }
+    // ------------------------------------------------------------------------
+    // Geocode cache and helper: resolve a town/state to lat/lon using Nominatim
+    //
+    // Many rows in the dataset do not include latitude/longitude.  To display
+    // these results on the map we approximate their location by geocoding
+    // the town and state.  Results are cached to avoid repeated API calls.
+    const __geocodeCache = {};
+    async function geocodeTownState(town, state) {
+      if (!town) return null;
+      const key = `${town}, ${state || ''}`.trim();
+      if (__geocodeCache[key]) return __geocodeCache[key];
+      try {
+        const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(key)}`;
+        const resp = await fetch(url, { headers: { Accept: 'application/json' } });
+        const data = await resp.json();
+        if (data && data.length) {
+          const coords = { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+          __geocodeCache[key] = coords;
+          return coords;
+        }
+      } catch (e) {
+        // ignore geocoding errors
+      }
+      __geocodeCache[key] = null;
+      return null;
+    }
+
     // Search handler
     async function doSearch() {
-      const town = document.getElementById('q').value.trim();
+      const townInput = document.getElementById('q').value.trim();
       const miles = Math.max(1, +document.getElementById('miles').value || 20);
-      if (!town) {
+      if (!townInput) {
         alert('Please enter a town (e.g., "Knightdale, NC").');
         return;
       }
-      // Geocode town
-      let lat, lon;
+      // Geocode the search town (centre point)
+      let centerLat, centerLon;
       try {
-        const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(town)}`;
+        const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(townInput)}`;
         const resp = await fetch(url, { headers: { Accept: 'application/json' } });
         const data = await resp.json();
         if (!data.length) throw new Error('No match');
-        lat = parseFloat(data[0].lat);
-        lon = parseFloat(data[0].lon);
+        centerLat = parseFloat(data[0].lat);
+        centerLon = parseFloat(data[0].lon);
       } catch (e) {
         alert('Could not geocode that town. Try a different query.');
         return;
       }
-      // Filter DATA by distance
-      const res = [];
-      DATA.forEach((row) => {
-        if (Number.isFinite(row.lat) && Number.isFinite(row.lon)) {
-          const dMi = haversineMi(lat, lon, row.lat, row.lon);
-          if (dMi <= miles) {
-            res.push({ ...row, dist: dMi });
-          }
-        } else if (row.town && row.state) {
-          // fallback: if town matches exactly and no coords
-          if (row.town.toLowerCase() === town.split(',')[0].trim().toLowerCase()) {
-            res.push({ ...row, dist: null });
+      // For each row, compute distance using either its own coords or a geocoded town
+      const results = [];
+      for (const row of DATA) {
+        let rowLat = Number.isFinite(row.lat) ? row.lat : null;
+        let rowLon = Number.isFinite(row.lon) ? row.lon : null;
+        // If lat/lon not provided, geocode the town/state
+        if (rowLat === null || rowLon === null) {
+          if (row.town) {
+            const coords = await geocodeTownState(row.town, row.state);
+            if (coords) {
+              rowLat = coords.lat;
+              rowLon = coords.lon;
+            }
           }
         }
-      });
-      // Sort by distance if available
-      res.sort((a, b) => {
+        if (rowLat !== null && rowLon !== null) {
+          const dMi = haversineMi(centerLat, centerLon, rowLat, rowLon);
+          if (dMi <= miles) {
+            results.push({ ...row, lat: rowLat, lon: rowLon, dist: dMi });
+          }
+        } else {
+          // As a last fallback, include rows with matching town even without coords
+          if (row.town && row.town.toLowerCase() === townInput.split(',')[0].trim().toLowerCase()) {
+            results.push({ ...row, dist: null });
+          }
+        }
+      }
+      // Sort results by distance (null distances at end)
+      results.sort((a, b) => {
+        if (a.dist === null && b.dist === null) return 0;
         if (a.dist === null) return 1;
         if (b.dist === null) return -1;
         return a.dist - b.dist;
       });
-      CURRENT_RESULTS = res;
-      renderResults(res);
-      updateMap(res);
+      CURRENT_RESULTS = results;
+      renderResults(results);
+      updateMap(results);
     }
     function renderResults(rows) {
       if (!rows || !rows.length) {
