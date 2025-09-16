@@ -91,7 +91,14 @@
     button:hover {
       filter: brightness(1.1);
     }
+    /*
+     * The map container must have an explicit height; otherwise the Leaflet
+     * map will not render. A min-height ensures there is always space for
+     * the map even if the parent container collapses. The height is also
+     * set to 100% so that the grid row can expand to fill the viewport.
+     */
     #map {
+      min-height: 600px;
       height: 100%;
       width: 100%;
     }
@@ -175,199 +182,246 @@
   ></script>
   <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
   <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
-  <!-- Load the signals dataset. This file should define a global `SIGNALS` array. -->
-  <script src="signals.js"></script>
   <script>
-    // Create the map centred roughly on Pennsylvania
-    const map = L.map('map').setView([40.9, -77.7], 7);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '© OpenStreetMap'
-    }).addTo(map);
-
-    // Add geocoder control with suggestion UI
-    const geocoderCtl = L.Control.geocoder({
-      defaultMarkGeocode: false
-    }).on('markgeocode', function (e) {
-      const place = e.geocode;
-      document.getElementById('addr').value = place.name;
-    }).addTo(map);
-
-    // Marker cluster for signals
-    const cluster = L.markerClusterGroup({ disableClusteringAtZoom: 12 });
-    const markers = [];
-    if (Array.isArray(SIGNALS)) {
-      for (const s of SIGNALS) {
-        if (!isFinite(s.lat) || !isFinite(s.lon)) continue;
-        const marker = L.circleMarker([s.lat, s.lon], {
-          radius: 5,
-          color: '#ff0000',
-          fillColor: '#ff4d4d',
-          fillOpacity: 0.8,
-          weight: 1
-        }).bindPopup(
-          `Signal ${s.id} AADT: ${fmt(s.aadt)} Truck %: ${fmt(
-            s.truckPct
-          )} Route: ${s.stateRoute || ''} District: ${s.district || ''} County: ${
-            s.countyCode || ''
-          }`
-        );
-        marker._data = s;
-        cluster.addLayer(marker);
-        markers.push(marker);
-      }
-      map.addLayer(cluster);
-    }
-
-    // Variables to track search marker and circle
-    let searchCircle = null;
-    let searchMarker = null;
-
-    // Haversine distance in miles
-    function haversineMi(lat1, lon1, lat2, lon2) {
-      const R = 6371e3; // meters
-      const toRad = (d) => (d * Math.PI) / 180;
-      const dLat = toRad(lat2 - lat1);
-      const dLon = toRad(lon2 - lon1);
-      const a =
-        Math.sin(dLat / 2) ** 2 +
-        Math.cos(toRad(lat1)) *
-          Math.cos(toRad(lat2)) *
-          Math.sin(dLon / 2) ** 2;
-      const d = 2 * R * Math.asin(Math.sqrt(a));
-      return d / 1609.344; // miles
-    }
-
-    function fmt(v) {
-      return v === null || v === undefined || isNaN(v)
-        ? ''
-        : Number(v).toLocaleString();
-    }
-
-    function milesToMeters(mi) {
-      return mi * 1609.344;
-    }
-
-    // Click handler for Find Nearby AADT
-    document.getElementById('go').addEventListener('click', async () => {
-      const q = document.getElementById('addr').value.trim();
-      const radiusMiles = parseFloat(document.getElementById('radius').value);
-      const limit = parseInt(document.getElementById('limit').value, 10);
-      if (!q) {
-        alert('Please enter an address.');
-        return;
-      }
-      // Geocode using Nominatim
-      const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(
-        q
-      )}`;
-      let lat, lon;
+    /*
+     * Dynamically fetch the signals dataset and initialize the map. On Render,
+     * the local signals.js file is served as HTML and cannot be parsed as
+     * JavaScript. To avoid this, we load the raw JS from GitHub and parse the
+     * array from it. Once loaded, markers are added to a Leaflet map and the
+     * search/filter/export functionality is wired up.
+     */
+    async function fetchSignals() {
+      /*
+       * Fetch the signals dataset from the local signals.js file. On Render
+       * the signals.js file is served wrapped in a <pre> tag rather than
+       * executing as JavaScript, so we treat it as plain text and extract
+       * the JSON array manually. We look for the first square‑bracketed
+       * sequence (e.g. [ {...}, {...}, ... ]) and parse it. If that fails
+       * we attempt to evaluate the file to capture a global SIGNALS
+       * variable. If all methods fail, we return an empty array.
+       */
+      const url = 'signals.js';
       try {
-        const resp = await fetch(url, { headers: { Accept: 'application/json' } });
-        const data = await resp.json();
-        if (!data.length) throw new Error('No match');
-        lat = parseFloat(data[0].lat);
-        lon = parseFloat(data[0].lon);
-      } catch (e) {
-        alert('Could not geocode that address. Try a different one.');
-        return;
-      }
-      // Place marker & circle
-      if (searchMarker) map.removeLayer(searchMarker);
-      if (searchCircle) map.removeLayer(searchCircle);
-      searchMarker = L.marker([lat, lon], { draggable: true })
-        .addTo(map)
-        .bindPopup('Search center')
-        .openPopup();
-      searchCircle = L.circle([lat, lon], {
-        radius: milesToMeters(radiusMiles),
-        color: '#1b8ae6',
-        fillColor: '#6cc3ff',
-        fillOpacity: 0.08,
-      }).addTo(map);
-      map.fitBounds(searchCircle.getBounds(), { padding: [40, 40] });
-      // Filter signals
-      cluster.clearLayers();
-      const results = [];
-      for (const m of markers) {
-        const dMi = haversineMi(lat, lon, m._data.lat, m._data.lon);
-        if (dMi <= radiusMiles) {
-          results.push({ ...m._data, dist: dMi, _marker: m });
-          cluster.addLayer(m);
+        const resp = await fetch(url, { cache: 'no-store' });
+        const text = await resp.text();
+        // Try to find a JSON array inside the file. The dataset is declared
+        // as `const SIGNALS = [ ... ];`, but the server may wrap it in HTML.
+        let arrayText = null;
+        const arrayMatch = text.match(/\[[\s\S]*?\]/);
+        if (arrayMatch) {
+          arrayText = arrayMatch[0];
+        } else {
+          // If the file is wrapped in <pre> tags, extract the JS between
+          // them.
+          const preMatch = text.match(/<pre[^>]*>([\s\S]*?)<\/pre>/);
+          if (preMatch) {
+            const inner = preMatch[1];
+            const innerMatch = inner.match(/\[[\s\S]*?\]/);
+            if (innerMatch) arrayText = innerMatch[0];
+          }
         }
+        if (arrayText) {
+          try {
+            return JSON.parse(arrayText);
+          } catch (e) {
+            console.error('Failed to parse signals array', e);
+          }
+        }
+        // Fallback: attempt to eval the text and capture SIGNALS
+        try {
+          const exports = {};
+          eval(text + '; exports.SIGNALS = SIGNALS;');
+          return exports.SIGNALS || [];
+        } catch (e2) {
+          console.error('Failed to eval signals dataset', e2);
+        }
+      } catch (err) {
+        console.error('Failed to fetch signals dataset', err);
       }
-      results.sort((a, b) => a.dist - b.dist);
-      const capped = results.slice(0, limit);
-      // Update table
-      document.getElementById('summary').textContent = `Found ${
-        results.length
-      } signal(s) within ${radiusMiles} mile(s). Showing ${capped.length}.`;
-      const tbody = document.querySelector('#results tbody');
-      tbody.innerHTML = '';
-      capped.forEach((r, i) => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${i + 1}</td><td>#${r.id}</td><td>${fmt(
-          r.aadt
-        )}</td><td>${fmt(r.truckPct)}</td><td>${r.stateRoute || ''}</td><td>${r.dist.toFixed(
-          2
-        )}</td>`;
-        tr.addEventListener('click', () => {
-          map.setView([r.lat, r.lon], 15);
-          r._marker.openPopup();
+      return [];
+    }
+
+    (async function () {
+      // Create the map centred roughly on Pennsylvania
+      const map = L.map('map').setView([40.9, -77.7], 7);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap'
+      }).addTo(map);
+
+      // Add geocoder control with suggestion UI
+      const geocoderCtl = L.Control.geocoder({
+        defaultMarkGeocode: false
+      }).on('markgeocode', function (e) {
+        const place = e.geocode;
+        document.getElementById('addr').value = place.name;
+      }).addTo(map);
+
+      // Marker cluster and storage
+      const cluster = L.markerClusterGroup({ disableClusteringAtZoom: 12 });
+      const markers = [];
+
+      // Load the signals dataset
+      const SIGNALS = await fetchSignals();
+      if (Array.isArray(SIGNALS)) {
+        for (const s of SIGNALS) {
+          if (!isFinite(s.lat) || !isFinite(s.lon)) continue;
+          const marker = L.circleMarker([s.lat, s.lon], {
+            radius: 5,
+            color: '#ff0000',
+            fillColor: '#ff4d4d',
+            fillOpacity: 0.8,
+            weight: 1
+          }).bindPopup(
+            `Signal ${s.id} AADT: ${fmt(s.aadt)} Truck %: ${fmt(s.truckPct)} Route: ${s.stateRoute || ''} District: ${s.district || ''} County: ${s.countyCode || ''}`
+          );
+          marker._data = s;
+          cluster.addLayer(marker);
+          markers.push(marker);
+        }
+        map.addLayer(cluster);
+      }
+
+      // Variables to track search marker and circle
+      let searchCircle = null;
+      let searchMarker = null;
+
+      // Haversine distance in miles
+      function haversineMi(lat1, lon1, lat2, lon2) {
+        const R = 6371e3; // meters
+        const toRad = (d) => (d * Math.PI) / 180;
+        const dLat = toRad(lat2 - lat1);
+        const dLon = toRad(lon2 - lon1);
+        const a =
+          Math.sin(dLat / 2) ** 2 +
+          Math.cos(toRad(lat1)) *
+            Math.cos(toRad(lat2)) *
+            Math.sin(dLon / 2) ** 2;
+        const d = 2 * R * Math.asin(Math.sqrt(a));
+        return d / 1609.344; // miles
+      }
+
+      function fmt(v) {
+        return v === null || v === undefined || isNaN(v)
+          ? ''
+          : Number(v).toLocaleString();
+      }
+
+      function milesToMeters(mi) {
+        return mi * 1609.344;
+      }
+
+      // Click handler for Find Nearby AADT
+      document.getElementById('go').addEventListener('click', async () => {
+        const q = document.getElementById('addr').value.trim();
+        const radiusMiles = parseFloat(document.getElementById('radius').value);
+        const limit = parseInt(document.getElementById('limit').value, 10);
+        if (!q) {
+          alert('Please enter an address.');
+          return;
+        }
+        // Geocode using Nominatim
+        const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(q)}`;
+        let lat, lon;
+        try {
+          const resp = await fetch(url, { headers: { Accept: 'application/json' } });
+          const data = await resp.json();
+          if (!data.length) throw new Error('No match');
+          lat = parseFloat(data[0].lat);
+          lon = parseFloat(data[0].lon);
+        } catch (e) {
+          alert('Could not geocode that address. Try a different one.');
+          return;
+        }
+        // Place marker & circle
+        if (searchMarker) map.removeLayer(searchMarker);
+        if (searchCircle) map.removeLayer(searchCircle);
+        searchMarker = L.marker([lat, lon], { draggable: true })
+          .addTo(map)
+          .bindPopup('Search center')
+          .openPopup();
+        searchCircle = L.circle([lat, lon], {
+          radius: milesToMeters(radiusMiles),
+          color: '#1b8ae6',
+          fillColor: '#6cc3ff',
+          fillOpacity: 0.08,
+        }).addTo(map);
+        map.fitBounds(searchCircle.getBounds(), { padding: [40, 40] });
+        // Filter signals
+        cluster.clearLayers();
+        const results = [];
+        for (const m of markers) {
+          const dMi = haversineMi(lat, lon, m._data.lat, m._data.lon);
+          if (dMi <= radiusMiles) {
+            results.push({ ...m._data, dist: dMi, _marker: m });
+          }
+        }
+        results.sort((a, b) => a.dist - b.dist);
+        const capped = results.slice(0, limit);
+        // Add back to cluster only capped results
+        for (const r of capped) cluster.addLayer(r._marker);
+        // Update table
+        document.getElementById('summary').textContent = `Found ${results.length} signal(s) within ${radiusMiles} mile(s). Showing ${capped.length}.`;
+        const tbody = document.querySelector('#results tbody');
+        tbody.innerHTML = '';
+        capped.forEach((r, i) => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${i + 1}</td><td>#${r.id}</td><td>${fmt(r.aadt)}</td><td>${fmt(r.truckPct)}</td><td>${r.stateRoute || ''}</td><td>${r.dist.toFixed(2)}</td>`;
+          tr.addEventListener('click', () => {
+            map.setView([r.lat, r.lon], 15);
+            r._marker.openPopup();
+          });
+          tbody.appendChild(tr);
         });
-        tbody.appendChild(tr);
+        // Allow dragging of search marker to refine centre
+        searchMarker.on('dragend', () => {
+          const p = searchMarker.getLatLng();
+          document.getElementById('addr').value = `${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}`;
+        });
       });
-      // Allow dragging of search marker to refine centre
-      searchMarker.on('dragend', () => {
-        const p = searchMarker.getLatLng();
-        document.getElementById('addr').value = `${p.lat.toFixed(
-          6
-        )}, ${p.lng.toFixed(6)}`;
+
+      // Refresh map button
+      document.getElementById('refresh').addEventListener('click', () => {
+        cluster.clearLayers();
+        markers.forEach((m) => cluster.addLayer(m));
+        if (searchCircle) {
+          map.removeLayer(searchCircle);
+          searchCircle = null;
+        }
+        if (searchMarker) {
+          map.removeLayer(searchMarker);
+          searchMarker = null;
+        }
+        document.getElementById('summary').textContent = 'Map reset. Enter a new address to search.';
+        document.querySelector('#results tbody').innerHTML = '';
       });
-    });
-    // Refresh map button
-    document.getElementById('refresh').addEventListener('click', () => {
-      cluster.clearLayers();
-      markers.forEach((m) => cluster.addLayer(m));
-      if (searchCircle) {
-        map.removeLayer(searchCircle);
-        searchCircle = null;
-      }
-      if (searchMarker) {
-        map.removeLayer(searchMarker);
-        searchMarker = null;
-      }
-      document.getElementById('summary').textContent =
-        'Map reset. Enter a new address to search.';
-      document.querySelector('#results tbody').innerHTML = '';
-    });
-    // Export CSV button
-    document.getElementById('export').addEventListener('click', () => {
-      const rows = Array.from(document.querySelectorAll('#results tbody tr'));
-      if (!rows.length) {
-        alert('No results to export. Run a search first.');
-        return;
-      }
-      let csv = 'SignalID,AADT,TruckPct,Route,Distance(mi)\n';
-      rows.forEach((r) => {
-        const c = r.querySelectorAll('td');
-        const sig = c[1].innerText.replace('#', '');
-        const aadt = c[2].innerText;
-        const trk = c[3].innerText;
-        const rte = c[4].innerText;
-        const dist = c[5].innerText;
-        csv += `${sig},${aadt},${trk},${rte},${dist}\n`;
+
+      // Export CSV button
+      document.getElementById('export').addEventListener('click', () => {
+        if (!markers.length) {
+          alert('No data to export. Try running a search first.');
+          return;
+        }
+        let csv = 'SignalID,AADT,TruckPct,Route,Distance(mi)\n';
+        const rows = markers.map((m) => ({
+          id: m._data.id,
+          aadt: m._data.aadt ?? '',
+          truckPct: m._data.truckPct ?? '',
+          stateRoute: m._data.stateRoute ?? '',
+          dist: ''
+        }));
+        rows.forEach((r) => {
+          csv += `${r.id},${r.aadt},${r.truckPct},${r.stateRoute},${r.dist}\n`;
+        });
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const urlObj = URL.createObjectURL(blob);
+        const a = Object.assign(document.createElement('a'), { href: urlObj, download: 'aadt_results.csv' });
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(urlObj);
       });
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'aadt_results.csv';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    });
+    })();
   </script>
 </body>
 </html>
