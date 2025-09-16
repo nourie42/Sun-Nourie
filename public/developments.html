@@ -226,8 +226,41 @@
                     row.centroid_x ||
                     ''
                 );
+              // Precompute fallback state centroid
               const stateKey = (stateCandidate || '').toString().trim().toUpperCase();
               const sc = STATE_CENTERS[stateKey] || null;
+              // Compute additional fields for display.  Many rows in the dataset
+              // use generic column names (e.g. Brand, Status, Details).  We
+              // derive name, developer, date and notes from the first non-empty
+              // candidate fields on the row.
+              const nameCandidate =
+                row.name ||
+                row.Name ||
+                row.brand ||
+                row.Brand ||
+                row['Brand'] ||
+                row['Brand.1'] ||
+                '';
+              const developerCandidate =
+                row.developer ||
+                row.Developer ||
+                row['Developer'] ||
+                '';
+              const dateCandidate =
+                row.date ||
+                row.Date ||
+                row['Date'] ||
+                row['Date.1'] ||
+                row['Date.2'] ||
+                '';
+              const statusCandidate = row.status || row.Status || '';
+              const detailsCandidate = row.details || row.Details || row['Details'] || row['Details.1'] || row['Details.2'] || '';
+              let notesVal = '';
+              if (statusCandidate) notesVal += statusCandidate;
+              if (detailsCandidate) {
+                if (notesVal) notesVal += ' — ';
+                notesVal += detailsCandidate;
+              }
               return {
                 ...row,
                 // attach town/state fields so the search/geocode logic can find them
@@ -236,6 +269,11 @@
                 // use parsed coordinates if valid; otherwise fall back to state center
                 lat: Number.isFinite(latVal) ? latVal : sc ? sc.lat : null,
                 lon: Number.isFinite(lonVal) ? lonVal : sc ? sc.lon : null,
+                // new descriptive fields for table
+                name: (nameCandidate || '').toString().trim(),
+                developer: (developerCandidate || '').toString().trim(),
+                date: (dateCandidate || '').toString().trim(),
+                notes: notesVal,
               };
             });
         // Show basic dataset count in the results area
