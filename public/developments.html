@@ -3,320 +3,322 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Gas Station Developments — Town Search (≤ 20 miles)</title>
-
+  <title>Gas Station Developments — Town Search (Fixed)</title>
   <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
-  <!-- PapaParse -->
-  <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
-
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    crossorigin=""
+  />
+  <!-- Leaflet marker cluster CSS -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"
+  />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"
+  />
+  <!-- Layout styles -->
   <style>
-    :root{ --bg:#0b0e15; --panel:#111725; --panel2:#0e1626; --text:#e8eefc; --muted:#9fb0cf; --accent:#5ec2ff; --line:#263145; }
-    html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
-    .wrap{max-width:1250px;margin:20px auto;padding:0 14px;}
-    header{display:flex;gap:12px;align-items:center;margin-bottom:10px;}
-    h1{margin:0;font-size:1.6rem;letter-spacing:.2px;}
-    .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin:12px 0;}
-    .tabs{display:flex;gap:.5rem;margin-bottom:12px;flex-wrap:wrap}
-    .tabbtn{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:12px;padding:.6rem 1rem;cursor:pointer}
-    .tabbtn.active{background:var(--accent);color:#062338;border-color:transparent;font-weight:700}
-    label{display:block;margin:.25rem 0 .35rem;color:var(--muted)}
-    input[type="text"], input[type="number"]{width:100%;padding:.75rem;border-radius:10px;border:1px solid var(--line);background:#0f1421;color:var(--text);}
-    table{width:100%;border-collapse:collapse;margin-top:8px;font-size:.95rem}
-    th,td{border-bottom:1px solid var(--line);text-align:left;padding:.6rem .5rem;vertical-align:top}
-    th{color:var(--muted);font-weight:600}
-    a{color:#8cd1ff}
-    #map{height:420px;border-radius:12px;border:1px solid var(--line)}
-    .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
-    .right{margin-left:auto}
-    .pill{display:inline-block;background:#0f2236;color:#bfe6ff;padding:.25rem .5rem;border-radius:999px;font-size:.75rem;border:1px solid var(--line)}
-    .ok{color:#86efac}
-    .warn{color:#ffe08a}
-    .muted{color:var(--muted)}
+    :root {
+      --bg: #0b0e15;
+      --panel: #111725;
+      --panel2: #0e1626;
+      --text: #e8eefc;
+      --muted: #9fb0cf;
+      --accent: #5ec2ff;
+      --line: #263145;
+      --warn: #ffe08a;
+    }
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      height: 100%;
+    }
+    .wrap {
+      max-width: 1250px;
+      margin: 20px auto;
+      padding: 0 14px;
+    }
+    header {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 1.6rem;
+      letter-spacing: 0.2px;
+    }
+    .spacer {
+      flex: 1;
+    }
+    .btn {
+      background: var(--accent);
+      color: #00121e;
+      border: 0;
+      border-radius: 10px;
+      padding: 0.6rem 1rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn.ghost {
+      background: #0f2236;
+      border: 1px solid var(--line);
+      color: #bfe6ff;
+    }
+    .btn.small {
+      padding: 0.45rem 0.75rem;
+      font-weight: 600;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+      margin: 12px 0;
+    }
+    label {
+      display: block;
+      margin: 0.25rem 0 0.35rem;
+      color: var(--muted);
+    }
+    input[type="text"],
+    input[type="number"] {
+      width: 100%;
+      padding: 0.75rem;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: #0f1421;
+      color: var(--text);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+      font-size: 0.95rem;
+    }
+    th,
+    td {
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      padding: 0.6rem 0.5rem;
+      vertical-align: top;
+    }
+    th {
+      color: var(--muted);
+      font-weight: 600;
+    }
+    #map {
+      height: 400px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      margin-top: 12px;
+    }
+    .hint {
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
   </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <h1>Gas Station Developments — Town Search (≤ 20 miles)</h1>
-    <span class="pill" id="sourceBadge">Loading…</span>
-  </header>
-
-  <div class="tabs">
-    <button class="tabbtn active" data-tab="search">Search</button>
-    <button class="tabbtn" data-tab="raw">Raw Data</button>
+  <div class="wrap">
+    <header>
+      <h1>Gas Station Developments — Town Search (≤ 20 miles)</h1>
+    </header>
+    <div class="card">
+      <label for="q">Town (use “Town, ST”)</label>
+      <input id="q" type="text" placeholder="e.g., Knightdale, NC" />
+      <div style="margin-top: 8px; display: flex; gap: 12px; align-items: flex-end;">
+        <div style="flex: 1;">
+          <label for="miles">Miles radius</label>
+          <input id="miles" type="number" min="1" max="50" value="20" />
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button id="go" class="btn">Search</button>
+          <button id="clear" class="btn ghost">Clear</button>
+        </div>
+      </div>
+      <div class="hint">You’ll see results only if the town is on the list or within the miles radius from it.</div>
+      <div id="results"></div>
+      <button id="dlResults" class="btn small" style="margin-top: 8px;">Download results CSV</button>
+    </div>
+    <div id="map"></div>
   </div>
-
-  <section id="tab-search" class="card">
-    <div class="toolbar">
-      <div style="flex:1;max-width:460px">
-        <label>Town (use “Town, ST”)</label>
-        <input id="q" type="text" placeholder="Knightdale, NC">
-        <div class="muted" style="font-size:.9rem">You’ll see results only if the town is on the list or within the miles radius from it.</div>
-      </div>
-      <div>
-        <label>Miles radius</label>
-        <input id="miles" type="number" value="20" min="1" step="1" style="width:120px">
-      </div>
-      <div class="right">
-        <button id="go" class="tabbtn">Search</button>
-        <button id="clear" class="tabbtn">Clear</button>
-        <button id="dlResultsCsv" class="tabbtn">Download results CSV</button>
-      </div>
-    </div>
-
-    <div id="meta" class="muted" style="margin-top:8px">Loading data…</div>
-
-    <table id="results">
-      <thead>
-      <tr>
-        <th>town</th><th>state</th><th>lat</th><th>lon</th>
-        <th>address</th><th>name</th><th>developer</th><th>date</th><th>notes</th><th>url</th>
-      </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
-
-    <div id="map" style="margin-top:12px"></div>
-
-    <div class="toolbar">
-      <div class="right">
-        <button id="dlAllCsv" class="tabbtn">Download ALL CSV</button>
-      </div>
-    </div>
-  </section>
-
-  <section id="tab-raw" class="card" style="display:none">
-    <label>Filter</label>
-    <input id="raw-q" type="text" placeholder="type to filter raw table">
-    <div id="rawTable" style="margin-top:8px"></div>
-  </section>
-</div>
-
-<!-- Leaflet JS (after DOM) -->
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
-
-<script>
-/* -------------------- Settings -------------------- */
-const DATA_CANDIDATES = ["developments_data.json", "developments_data.csv"];
-
-/* -------------------- State & helpers -------------------- */
-let DATA = [];           // normalized array
-let CURRENT_RESULTS = [];
-const $ = sel => document.querySelector(sel);
-const esc = s => (s??"").toString().replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]));
-const numberOrNull = v => {
-  if (v===null||v===undefined||v==="") return null;
-  if (typeof v==="number") return Number.isFinite(v) ? v : null;
-  const m = String(v).replace(",",".").match(/-?\d+(?:\.\d+)?/);
-  return m ? parseFloat(m[0]) : null;
-};
-const norm = s => (s??"").toString().trim();
-const normLower = s => norm(s).toLowerCase();
-const toCSV = rows => {
-  if (!rows.length) return "";
-  const cols = Object.keys(rows[0]);
-  const q = v => '"' + String(v??"").replace(/"/g,'""') + '"';
-  return [cols.map(q).join(",")].concat(rows.map(r => cols.map(c => q(r[c])).join(","))).join("\n");
-};
-function download(name, text, mime){ const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([text],{type:mime||"text/plain"})); a.download=name; a.click(); }
-
-function haversineMi(lat1, lon1, lat2, lon2){
-  const R = 6371e3; const toRad=d=>d*Math.PI/180;
-  const dLat=toRad(lat2-lat1), dLon=toRad(lon2-lon1);
-  const a=Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
-  return (2*R*Math.asin(Math.sqrt(a))) / 1609.344;
-}
-
-/* -------------------- Column detection -------------------- */
-function cleanKey(k){ return String(k).toLowerCase().replace(/[_\-\/().]/g," ").replace(/\s+/g," ").trim(); }
-const CANDIDATES = {
-  town: ["town","city","municipality","village","place","locality","city town","community"],
-  state: ["state","st","province","region","postal"],
-  lat: ["lat","latitude","y","ycoord","y coord","point_y","centroid_y"],
-  lon: ["lon","lng","long","longitude","x","xcoord","x coord","point_x","centroid_x"],
-  address: ["address","addr","site address","street","street address","location","full address"],
-  name: ["name","site name","station","location name","project","title","site","business"],
-  developer: ["developer","owner","applicant","proposer","builder","sponsor"],
-  date: ["date","submitted","filed","updated","last updated","hearing date","application date","report date"],
-  notes: ["notes","description","desc","details","summary","remarks","comment","scope"],
-  url: ["url","link","source","source url","website","href"]
-};
-function bestMapForColumns(cols){
-  const cleaned = cols.map(cleanKey);
-  function pick(key){
-    for (let i=0;i<cleaned.length;i++) if (CANDIDATES[key].includes(cleaned[i])) return cols[i];
-    let best=null,score=-1;
-    for (let i=0;i<cleaned.length;i++){
-      const c=cleaned[i]; const k=key; // soft match
-      const s = (c.includes(k) ? 2 : (c.startsWith(k[0]) ? 1 : 0));
-      if (s>score){ score=s; best=cols[i]; }
+  <!-- Leaflet JS and marker cluster -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <!-- Papa Parse for CSV parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script>
+    // Data array loaded from CSV
+    let DATA = [];
+    let CURRENT_RESULTS = [];
+    // Helper to escape HTML
+    function esc(s) {
+      return (s ?? '').toString().replace(/[&<>]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m]));
     }
-    return best;
-  }
-  return {
-    town: pick("town"), state: pick("state"), lat: pick("lat"), lon: pick("lon"),
-    address: pick("address"), name: pick("name"), developer: pick("developer"),
-    date: pick("date"), notes: pick("notes"), url: pick("url")
-  };
-}
-function normalizeRows(rows, map){
-  return rows.map(r=>({
-    town: norm(r[map.town]), state: norm(r[map.state]),
-    lat: numberOrNull(r[map.lat]), lon: numberOrNull(r[map.lon]),
-    address: norm(r[map.address]), name: norm(r[map.name]),
-    developer: norm(r[map.developer]), date: norm(r[map.date]),
-    notes: norm(r[map.notes]), url: norm(r[map.url]),
-  })).filter(x => x.town || x.name || x.address);
-}
-
-/* -------------------- Data loader -------------------- */
-async function tryFetch(url){
-  try{
-    const r = await fetch(url, {cache:"no-store"});
-    if (!r.ok) throw new Error(r.status);
-    if (url.endsWith(".json")){
-      return {type:"json", rows: await r.json(), source:url};
-    }else{
-      const text = await r.text();
-      const parsed = Papa.parse(text, {header:true, skipEmptyLines:true});
-      return {type:"csv", rows: parsed.data, source:url};
+    // Haversine distance in miles
+    function haversineMi(lat1, lon1, lat2, lon2) {
+      const R = 6371e3;
+      const toRad = (d) => (d * Math.PI) / 180;
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(toRad(lat1)) *
+          Math.cos(toRad(lat2)) *
+          Math.sin(dLon / 2) ** 2;
+      const d = 2 * R * Math.asin(Math.sqrt(a));
+      return d / 1609.344;
     }
-  }catch(e){ return null; }
-}
-async function loadData(){
-  $("#meta").textContent = "Loading data…";
-  for (const path of DATA_CANDIDATES){
-    const hit = await tryFetch(path);
-    if (hit && hit.rows && hit.rows.length){
-      const cols = Object.keys(hit.rows[0]||{});
-      const mapping = bestMapForColumns(cols);
-      DATA = normalizeRows(hit.rows, mapping);
-      rebuildTownList();
-      renderRaw();
-      $("#sourceBadge").textContent = `Loaded: ${hit.type.toUpperCase()} (${path})`;
-      $("#sourceBadge").classList.add("ok");
-      $("#meta").innerHTML = `Dataset rows: <b id="rowcount">${DATA.length}</b>`;
-      return;
+    // Load CSV dataset
+    async function loadData() {
+      try {
+        const resp = await fetch('developments_data.csv', { cache: 'no-store' });
+        if (!resp.ok) throw new Error(resp.status);
+        const text = await resp.text();
+        const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
+        DATA = parsed.data.map((row) => {
+          return {
+            ...row,
+            // normalize latitude/longitude fields if present
+            lat: parseFloat(row.lat || row.latitude || row.y || row.centroid_y || '') || null,
+            lon: parseFloat(row.lon || row.lng || row.longitude || row.x || row.centroid_x || '') || null,
+          };
+        });
+        document.getElementById('results').innerHTML = `<div class="hint">Dataset rows: <b>${DATA.length}</b></div>`;
+      } catch (e) {
+        document.getElementById('results').innerHTML = `<div style="color: var(--warn)">Could not load <b>developments_data.csv</b>. Ensure it is placed next to this page.</div>`;
+      }
     }
-  }
-  $("#meta").innerHTML = `<span class="warn">Could not find <b>developments_data.json</b> or <b>developments_data.csv</b> next to this page.</span>`;
-}
-loadData();
-
-/* -------------------- Town list -------------------- */
-function rebuildTownList(){
-  // (Optional: add autocomplete – for now just show count)
-}
-
-/* -------------------- Map -------------------- */
-let map = L.map('map').setView([37.8, -96], 4);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 19, attribution: '&copy; OpenStreetMap'}).addTo(map);
-let markersLayer = L.layerGroup().addTo(map);
-
-/* -------------------- Search -------------------- */
-function findTownCenter(q){
-  // Accept "Town, ST" or just "Town"
-  q = norm(q);
-  if (!q) return null;
-  let qTown = q, qState = "";
-  const m = q.match(/^(.*?),\s*([A-Za-z]{2})$/);
-  if (m){ qTown = norm(m[1]); qState = m[2].toUpperCase(); }
-
-  const matches = DATA.filter(r => r.town.toLowerCase()===qTown.toLowerCase() && (!qState || r.state.toUpperCase()===qState));
-  if (!matches.length) return null;
-  // take mean of coords for the town
-  const pts = matches.filter(r => Number.isFinite(r.lat) && Number.isFinite(r.lon));
-  if (!pts.length) return null;
-  const lat = pts.reduce((a,b)=>a+b.lat,0)/pts.length;
-  const lon = pts.reduce((a,b)=>a+b.lon,0)/pts.length;
-  return {lat, lon};
-}
-function renderResults(rows){
-  const tb = document.querySelector("#results tbody");
-  tb.innerHTML = rows.map(r => `<tr>
-    <td>${esc(r.town)}</td><td>${esc(r.state)}</td>
-    <td>${r.lat??""}</td><td>${r.lon??""}</td>
-    <td>${esc(r.address)}</td><td>${esc(r.name)}</td>
-    <td>${esc(r.developer)}</td><td>${esc(r.date)}</td>
-    <td>${esc(r.notes)}</td><td>${r.url?`<a href="${esc(r.url)}" target="_blank" rel="noopener">source</a>`:""}</td>
-  </tr>`).join("");
-}
-function updateMap(rows){
-  markersLayer.clearLayers();
-  if(!rows || !rows.length) return;
-  let bounds = [];
-  for (const r of rows){
-    if(Number.isFinite(r.lat) && Number.isFinite(r.lon)){
-      const marker = L.marker([r.lat, r.lon]).addTo(markersLayer);
-      let popup = `<b>${esc(r.name||"")}</b>`;
-      if (r.address) popup += `<br>${esc(r.address)}`;
-      if (r.town || r.state) popup += `<br>${esc(r.town)}${r.town&&r.state?", ":""}${esc(r.state)}`;
-      if (r.developer) popup += `<br><i>${esc(r.developer)}</i>`;
-      if (r.date) popup += `<br>${esc(r.date)}`;
-      if (r.url) popup += `<br><a href="${esc(r.url)}" target="_blank" rel="noopener">source</a>`;
-      marker.bindPopup(popup);
-      bounds.push([r.lat, r.lon]);
+    // Initialize map
+    const map = L.map('map').setView([37.8, -96], 4);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap',
+    }).addTo(map);
+    const markersLayer = L.layerGroup().addTo(map);
+    function updateMap(rows) {
+      markersLayer.clearLayers();
+      if (!rows || !rows.length) return;
+      const bounds = [];
+      rows.forEach((r) => {
+        if (Number.isFinite(r.lat) && Number.isFinite(r.lon)) {
+          const marker = L.marker([r.lat, r.lon]).addTo(markersLayer);
+          let popup = `<b>${esc(r.name || '')}</b>`;
+          if (r.address) popup += `<br>${esc(r.address)}`;
+          if (r.town || r.state) popup += `<br>${esc(r.town || '')}${r.town && r.state ? ', ' : ''}${esc(r.state || '')}`;
+          if (r.developer) popup += `<br><i>${esc(r.developer)}</i>`;
+          if (r.date) popup += `<br>${esc(r.date)}`;
+          if (r.url) popup += `<br><a href="${esc(r.url)}" target="_blank" rel="noopener">source</a>`;
+          marker.bindPopup(popup);
+          bounds.push([r.lat, r.lon]);
+        }
+      });
+      if (bounds.length) map.fitBounds(bounds, { padding: [30, 30] });
     }
-  }
-  if (bounds.length) map.fitBounds(bounds, {padding:[30,30]});
-}
-
-async function doSearch(){
-  const q = norm($("#q").value);
-  const miles = Math.max(1, +$("#miles").value || 20);
-
-  const center = findTownCenter(q);
-  if (!center){
-    $("#meta").innerHTML = `<span class="warn">“${esc(q)}” is not in the dataset. Only towns in the list are allowed.</span>`;
-    renderResults([]); updateMap([]); CURRENT_RESULTS = [];
-    return;
-  }
-  const {lat, lon} = center;
-
-  const inRadius = DATA.filter(r => Number.isFinite(r.lat) && Number.isFinite(r.lon))
-                       .filter(r => haversineMi(lat, lon, r.lat, r.lon) <= miles);
-  CURRENT_RESULTS = inRadius;
-  $("#meta").innerHTML = `Dataset rows: <b id="rowcount">${DATA.length}</b> — <span class="ok">${inRadius.length} result(s)</span> within ${miles} mi of ${esc(q)}.`;
-  renderResults(inRadius);
-  updateMap(inRadius);
-}
-
-/* -------------------- Events -------------------- */
-document.querySelectorAll(".tabbtn").forEach(btn=>{
-  btn.addEventListener("click", ()=>{
-    document.querySelectorAll(".tabbtn").forEach(b=>b.classList.remove("active"));
-    btn.classList.add("active");
-    const name = btn.dataset.tab;
-    document.querySelectorAll("section[id^='tab-']").forEach(s=> s.style.display = (s.id === "tab-"+name ? "" : "none"));
-    if (name==="raw") renderRaw();
-    if (name==="search") setTimeout(()=>{ map.invalidateSize?.(); }, 50);
-  });
-});
-$("#go").addEventListener("click", doSearch);
-$("#clear").addEventListener("click", ()=>{
-  $("#q").value=""; $("#results tbody").innerHTML=""; $("#meta").innerHTML=`Dataset rows: <b id="rowcount">${DATA.length}</b>`;
-  markersLayer.clearLayers(); map.setView([37.8,-96],4);
-});
-$("#raw-q").addEventListener("input", renderRaw);
-$("#dlResultsCsv").addEventListener("click", ()=> download("search_results.csv", toCSV(CURRENT_RESULTS||[]), "text/csv"));
-$("#dlAllCsv").addEventListener("click", ()=> download("developments_all.csv", toCSV(DATA), "text/csv"));
-
-/* -------------------- Raw tab -------------------- */
-function renderRaw(){
-  const q = normLower($("#raw-q").value);
-  const rows = !q ? DATA : DATA.filter(r => Object.values(r).some(v => (""+(v??"")).toLowerCase().includes(q)));
-  $("#rawTable").innerHTML = (() => {
-    if (!rows.length) return "<div class='muted'>No rows.</div>";
-    const cols = Object.keys(rows[0]);
-    const head = "<tr>" + cols.map(c=>`<th>${esc(c)}</th>`).join("") + "</tr>";
-    const body = rows.map(r=>"<tr>"+cols.map(c=>`<td>${esc(r[c])}</td>`).join("")+"</tr>").join("");
-    return `<table><thead>${head}</thead><tbody>${body}</tbody></table>`;
-  })();
-}
-</script>
+    // Search handler
+    async function doSearch() {
+      const town = document.getElementById('q').value.trim();
+      const miles = Math.max(1, +document.getElementById('miles').value || 20);
+      if (!town) {
+        alert('Please enter a town (e.g., "Knightdale, NC").');
+        return;
+      }
+      // Geocode town
+      let lat, lon;
+      try {
+        const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(town)}`;
+        const resp = await fetch(url, { headers: { Accept: 'application/json' } });
+        const data = await resp.json();
+        if (!data.length) throw new Error('No match');
+        lat = parseFloat(data[0].lat);
+        lon = parseFloat(data[0].lon);
+      } catch (e) {
+        alert('Could not geocode that town. Try a different query.');
+        return;
+      }
+      // Filter DATA by distance
+      const res = [];
+      DATA.forEach((row) => {
+        if (Number.isFinite(row.lat) && Number.isFinite(row.lon)) {
+          const dMi = haversineMi(lat, lon, row.lat, row.lon);
+          if (dMi <= miles) {
+            res.push({ ...row, dist: dMi });
+          }
+        } else if (row.town && row.state) {
+          // fallback: if town matches exactly and no coords
+          if (row.town.toLowerCase() === town.split(',')[0].trim().toLowerCase()) {
+            res.push({ ...row, dist: null });
+          }
+        }
+      });
+      // Sort by distance if available
+      res.sort((a, b) => {
+        if (a.dist === null) return 1;
+        if (b.dist === null) return -1;
+        return a.dist - b.dist;
+      });
+      CURRENT_RESULTS = res;
+      renderResults(res);
+      updateMap(res);
+    }
+    function renderResults(rows) {
+      if (!rows || !rows.length) {
+        document.getElementById('results').innerHTML = '<div class="hint">No results.</div>';
+        return;
+      }
+      let html = '<table><thead><tr><th>#</th><th>Town</th><th>State</th><th>Name</th><th>Developer</th><th>Date</th><th>Notes</th><th>Dist (mi)</th></tr></thead><tbody>';
+      rows.forEach((r, i) => {
+        html += `<tr><td>${i + 1}</td><td>${esc(r.town || '')}</td><td>${esc(
+          r.state || ''
+        )}</td><td>${esc(r.name || '')}</td><td>${esc(r.developer || '')}</td><td>${esc(
+          r.date || ''
+        )}</td><td>${esc(r.notes || '')}</td><td>${r.dist === null ? '' : r.dist.toFixed(2)}</td></tr>`;
+      });
+      html += '</tbody></table>';
+      document.getElementById('results').innerHTML = html;
+    }
+    // Download CSV of current results
+    function downloadResults() {
+      if (!CURRENT_RESULTS || !CURRENT_RESULTS.length) {
+        alert('No results to export. Run a search first.');
+        return;
+      }
+      const cols = Object.keys(CURRENT_RESULTS[0]);
+      const quote = (v) => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+      let csv = cols.map(quote).join(',') + '\n';
+      CURRENT_RESULTS.forEach((row) => {
+        csv += cols.map((c) => quote(row[c])).join(',') + '\n';
+      });
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'developments_results.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+    // Event listeners
+    document.getElementById('go').addEventListener('click', doSearch);
+    document.getElementById('clear').addEventListener('click', () => {
+      document.getElementById('q').value = '';
+      document.getElementById('results').innerHTML = `<div class="hint">Dataset rows: <b>${DATA.length}</b></div>`;
+      map.setView([37.8, -96], 4);
+      markersLayer.clearLayers();
+    });
+    document.getElementById('dlResults').addEventListener('click', downloadResults);
+    // Load data on startup
+    loadData();
+  </script>
 </body>
 </html>
