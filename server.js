@@ -1220,7 +1220,6 @@ const roads =
     intersections: 0,
   })))) || { summary: "", main: [], side: [], signals: 0, intersections: 0 };
 
-
     let usedAADT = 10000,
       method = "fallback_default";
     let mapStations = [];
