@@ -1219,7 +1219,6 @@ app.post("/estimate", async (req, res) => {
       signals: 0,
       intersections: 0,
     }));
-
     let usedAADT = 10000,
       method = "fallback_default";
     let mapStations = [];
