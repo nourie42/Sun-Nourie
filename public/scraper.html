@@ -947,5 +947,35 @@
             logContainer.scrollTop = logContainer.scrollHeight;
         }
     </script>
+    <script>
+  // Override functions to call Google APIs directly, bypassing backend
+  async function getCoordinates(address) {
+    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${API_KEY}`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error('Geocode request failed');
+    }
+    const data = await response.json();
+    if (data.status !== 'OK' || !data.results.length) {
+      throw new Error('Location not found: ' + address);
+    }
+    return data.results[0].geometry.location;
+  }
+
+  async function findGasStations(lat, lng) {
+    const radius = document.getElementById('searchRadius').value * 1609.34; // Convert miles to meters
+    const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&type=gas_station&key=${API_KEY}`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error('Places request failed');
+    }
+    const data = await response.json();
+    if (data.status !== 'OK') {
+      throw new Error('Places API error: ' + data.status);
+    }
+    return data.results || [];
+  }
+</script>
+
 </body>
 </html>
