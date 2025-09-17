@@ -30,6 +30,7 @@
             margin-bottom: 40px;
         }
 
+ 
         .header h1 {
             font-size: 3rem;
             margin-bottom: 10px;
@@ -666,7 +667,7 @@
         }
         
         // Your Render API URL
-        const BACKEND_URL = 'https://sun-nourie-live.onrender.com';
+        const BACKEND_URL = 'https://sunnourie-live.onrender.com';
         
         async function getCoordinates(address) {
             try {
@@ -701,6 +702,7 @@
                     'san francisco': { lat: 37.7749, lng: -122.4194 },
                     'seattle': { lat: 47.6062, lng: -122.3321 }
                 };
+                
                 
                 const city = address.toLowerCase().split(',')[0].trim();
                 const coords = cityCoords[city] || cityCoords['los angeles'];
@@ -757,6 +759,7 @@
                 return false;
             }
         }
+
         
         function showDeploymentInstructions() {
             const stationGrid = document.getElementById('stationGrid');
@@ -791,6 +794,7 @@
                 </div>
             `;
         }
+
 
         function processStations(stations) {
             const maxResults = parseInt(document.getElementById('maxResults').value);
