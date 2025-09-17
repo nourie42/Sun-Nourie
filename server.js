@@ -1211,14 +1211,14 @@ app.post("/estimate", async (req, res) => {
       devOSM = dev.osm;
 
 // Roads & AADT
-const roads =
-  (await roadContext(geo.lat, geo.lon).catch(() => ({
-    summary: "",
-    main: [],
-    side: [],
-    signals: 0,
-    intersections: 0,
-  })))) || { summary: "", main: [], side: [], signals: 0, intersections: 0 };
+    // Roads & AADT (fixed)
+    const roads = await roadContext(geo.lat, geo.lon).catch(() => ({
+      summary: "",
+      main: [],
+      side: [],
+      signals: 0,
+      intersections: 0,
+    }));
 
     let usedAADT = 10000,
       method = "fallback_default";
