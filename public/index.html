@@ -152,6 +152,19 @@
       <div id="svWrap"><div class="muted" style="margin-top:10px;">Street View</div><iframe id="sv" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div>
     </div>
 
+    <!-- AADT Map -->
+    <div class="card">
+      <div class="muted">AADT Map (nearest stations)</div>
+      <div id="aadt-map" style="height:280px;margin-top:8px;"></div>
+      <div class="aadt-tabs" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
+        <a href="https://www.arcgis.com/apps/webappviewer/index.html?id=35e4c06de0f84a9c9f3fe18e67cd2c92" target="_blank" style="padding:4px 10px;border:1px solid var(--line);background-color:var(--panel);color:var(--link);border-radius:4px;text-decoration:none;font-size:12px;">Virginia AADT</a>
+        <a href="https://scdottrafficdata.drakewell.com/publicmultinodemap.asp" target="_blank" style="padding:4px 10px;border:1px solid var(--line);background-color:var(--panel);color:var(--link);border-radius:4px;text-decoration:none;font-size:12px;">South Carolina AADT</a>
+        <a href="https://gis-fdot.opendata.arcgis.com/datasets/fdot::annual-average-daily-traffic-tda/explore?location=28.532676%2C-82.462485%2C6.09" target="_blank" style="padding:4px 10px;border:1px solid var(--line);background-color:var(--panel);color:var(--link);border-radius:4px;text-decoration:none;font-size:12px;">Florida AADT</a>
+        <a href="https://nysdottrafficdata.drakewell.com/publicmultinodemap.asp" target="_blank" style="padding:4px 10px;border:1px solid var(--line);background-color:var(--panel);color:var(--link);border-radius:4px;text-decoration:none;font-size:12px;">New York AADT</a>
+        <a href="https://gdottrafficdata.drakewell.com/publicmultinodemap.asp" target="_blank" style="padding:4px 10px;border:1px solid var(--line);background-color:var(--panel);color:var(--link);border-radius:4px;text-decoration:none;font-size:12px;">Georgia AADT</a>
+      </div>
+    </div>
+
     <!-- Developments -->
     <div class="card"><b>Developments — OSM</b><div id="devs" class="muted">—</div></div>
     <div class="card"><b>Developments — News</b><div id="devsExternalNews" class="muted">—</div></div>
@@ -173,6 +186,8 @@ const addExtraBtn=$("addExtra"), extraList=$("extraList"), activeExtras=$("activ
 const ex_large_dev=$("ex_large_dev"), ex_hours18=$("ex_hours18"), ex_highincome=$("ex_highincome"), ex_lowrating=$("ex_lowrating"), ex_competitive_pricing=$("ex_competitive_pricing"), ex_rural=$("ex_rural");
 
 let map, layer, mapReady=false, selectedCoords=null, selectedPlaceId=null;
+// Variables for the dedicated AADT map
+let aadtMap, aadtLayer, aadtReady=false;
 
 /* Helpers */
 function fmt(n){ return (n??0).toLocaleString(undefined,{maximumFractionDigits:0}); }
@@ -181,6 +196,33 @@ function setOverlayWorking(){ overlay.textContent="Working…"; overlay.style.di
 function clearOverlay(){ overlay.style.display="none"; }
 function initMap(){ if(mapReady) return; map=L.map("map",{zoomControl:true}); window.map=map; L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map); layer=L.layerGroup().addTo(map); mapReady=true; }
 function updateStreetView(lat, lon){ svFrame.src=`https://maps.google.com/maps?q=&layer=c&cbll=${lat},${lon}&cbp=12,0,,0,0&output=svembed`; }
+// Initialize the dedicated AADT map
+function initAadtMap(){
+  if(aadtReady) return;
+  aadtMap = L.map("aadt-map",{zoomControl:true});
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(aadtMap);
+  aadtLayer = L.layerGroup().addTo(aadtMap);
+  aadtReady = true;
+}
+// Update markers on the AADT map using returned station list
+function updateAadtMap(list){
+  initAadtMap();
+  aadtLayer.clearLayers();
+  if(!Array.isArray(list)) return;
+  const pts=[];
+  for(const rec of list){
+    if(!Number.isFinite(rec.lat) || !Number.isFinite(rec.lon) || !Number.isFinite(rec.aadt)) continue;
+    const val = rec.aadt;
+    let color;
+    if(val >= 30000) color = "#be123c";
+    else if(val >= 20000) color = "#f97316";
+    else if(val >= 10000) color = "#eab308";
+    else color = "#84cc16";
+    L.circleMarker([rec.lat, rec.lon], {radius:5, weight:1, color:color, fillColor:color, fillOpacity:0.8}).addTo(aadtLayer).bindPopup("AADT: "+fmt(val));
+    pts.push([rec.lat, rec.lon]);
+  }
+  if(pts.length){ aadtMap.fitBounds(L.latLngBounds(pts).pad(0.25)); }
+}
 
 /* Google status + autocomplete */
 let GOOGLE_OK=false; let acItems=[]; let acActive=-1;
@@ -275,7 +317,9 @@ function initOrUpdateMap(m){
     map.fitBounds(L.latLngBounds(pts).pad(0.25));
   if(m.aadt) renderAADTMarkers(m.aadt);
   clearOverlay();
-  updateStreetView(site[0], site[11]);
+  updateStreetView(site[0], site[1]);
+  // Update AADT map markers
+  if(m && m.aadt) updateAadtMap(m.aadt);
 
 
   function renderAADTMarkers(list) {
