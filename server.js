@@ -135,6 +135,115 @@ async function queryCustomTraffic(lat,lon,address){
   return null;
 }
 
+// Query NCDOT AADT stations along a given route and pick the nearest one
+async function queryNCDOTNearestAADTByRoute(lat, lon, route) {
+  if (!route) return null;
+  const p = new URLSearchParams({
+    f: "json",
+    where: `ROUTE='${route}'`,
+    outFields: "*",
+    returnGeometry: "true",
+    outSR: "4326"
+  });
+  try {
+    const resp = await fetchWithTimeout(
+      `${NCDOT_AADT_FS}/query?${p}`,
+      { headers: { "User-Agent": UA, Accept: "application/json" } },
+      20000
+    );
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    let best = null;
+    for (const f of data.features || []) {
+      const A = f.attributes || {};
+      const pairs = Object.keys(A)
+        .filter(k => k.toLowerCase().includes("aadt"))
+        .map(k => {
+          const val = +A[k];
+          if (!(val > 0)) return null;
+          let year = null;
+          const mt = String(k).match(/20\d{2}/)?.[0];
+          if (mt) year = +mt;
+          for (const yk of ["YEAR","AADT_YEAR","COUNT_YEAR","TRAFFICYEAR","YEAR_","YR","YR_"]) {
+            const yv = A[yk];
+            if (yv) {
+              const mty = String(yv).match(/20\d{2}/)?.[0];
+              if (mty) {
+                year = +mty;
+                break;
+              }
+            }
+          }
+          return { val, year };
+        })
+        .filter(Boolean);
+      if (!pairs.length) continue;
+      pairs.sort((a, b) => (b.year || 0) - (a.year || 0) || b.val - a.val);
+      const x = f.geometry?.x;
+      const y = f.geometry?.y;
+      if (x == null || y == null) continue;
+      const distM = haversine(lat, lon, y, x);
+      const rec = { aadt: pairs[0].val, year: pairs[0].year || null, distM };
+      if (!best || rec.distM < best.distM) best = rec;
+    }
+    return best;
+  } catch {
+    return null;
+  }
+}
+
+// Optionally return a list of nearby stations for map display (top 50 by proximity)
+async function queryNCDOTRouteStations(lat, lon, route) {
+  if (!route) return [];
+  const p = new URLSearchParams({
+    f: "json",
+    where: `ROUTE='${route}'`,
+    outFields: "*",
+    returnGeometry: "true",
+    outSR: "4326"
+  });
+  try {
+    const resp = await fetchWithTimeout(
+      `${NCDOT_AADT_FS}/query?${p}`,
+      { headers: { "User-Agent": UA, Accept: "application/json" } },
+      20000
+    );
+    const data = await resp.json();
+    const out = [];
+    for (const f of data.features || []) {
+      const A = f.attributes || {};
+      const pairs = Object.keys(A)
+        .filter(k => k.toLowerCase().includes("aadt"))
+        .map(k => {
+          const val = +A[k];
+          if (!(val > 0)) return null;
+          let year = null;
+          const mt = String(k).match(/20\d{2}/)?.[0];
+          if (mt) year = +mt;
+          return { val, year };
+        })
+        .filter(Boolean);
+      if (!pairs.length) continue;
+      pairs.sort((a, b) => (b.year || 0) - (a.year || 0) || b.val - a.val);
+      const x = f.geometry?.x;
+      const y = f.geometry?.y;
+      if (x == null || y == null) continue;
+      const rec = {
+        lat: y,
+        lon: x,
+        aadt: pairs[0].val,
+        year: pairs[0].year || null
+      };
+      rec.distM = haversine(lat, lon, y, x);
+      out.push(rec);
+    }
+    out.sort((a, b) => a.distM - b.distM);
+    return out.slice(0, 50);
+  } catch {
+    return [];
+  }
+}
+
 // ---------- Overpass / competition ----------
 const OVERPASS=[
   "https://overpass-api.de/api/interpreter",
@@ -538,15 +647,44 @@ app.post("/estimate", async (req,res)=>{
     // Roads & AADT
     const roads=await roadContext(geo.lat, geo.lon).catch(()=>({summary:"",main:[],side:[],signals:0,intersections:0}));
     let usedAADT=10000, method="fallback_default";
+      let mapStations = [];
+
     const overrideVal=Number(aadtOverride);
     if(Number.isFinite(overrideVal)&&overrideVal>0){ usedAADT=Math.round(overrideVal); method="override"; }
     else{
-      let sta=await queryCustomTraffic(geo.lat, geo.lon, address).catch(()=>null);
-      if(!sta) sta=await queryNCDOTNearestAADT(geo.lat, geo.lon, 1609).catch(()=>null);
-      let dotAADT=sta?sta.aadt:null;
-      const heur=heuristicAADT(roads);
-      const comps=[]; if(Number.isFinite(dotAADT)) comps.push({v:dotAADT,w:1.0,l:"DOT"}); if(Number.isFinite(heur)) comps.push({v:heur,w:0.7,l:"HEUR"});
-      if(comps.length){ const sumW=comps.reduce((s,c)=>s+c.w,0); usedAADT=Math.round(comps.reduce((s,c)=>s+c.v*c.w,0)/Math.max(0.0001,sumW)); method="blend_"+comps.map(c=>c.l).join("+").toLowerCase(); }
+else {
+
+    let dotAADT = null;
+    let stations = [];
+    const routeName = (roads && roads.main && roads.main[0] && roads.main[0].name) ? roads.main[0].name : null;
+    if (routeName) {
+      try {
+        const byRoute = await queryNCDOTNearestAADTByRoute(geo.lat, geo.lon, routeName);
+        if (byRoute) {
+          dotAADT = byRoute.aadt;
+          stations = await queryNCDOTRouteStations(geo.lat, geo.lon, routeName);
+        }
+      } catch (e) {}
+    }
+    if (!dotAADT) {
+      let sta = await queryCustomTraffic(geo.lat, geo.lon, address).catch(() => null);
+      if (!sta) sta = await queryNCDOTNearestAADT(geo.lat, geo.lon, 1609).catch(() => null);
+      if (sta) dotAADT = sta.aadt;
+    }
+    const heur = heuristicAADT(roads);
+    const comps = [];
+    if (Number.isFinite(dotAADT)) comps.push({ v: dotAADT, w: 1.0, l: "DOT" });
+    if (Number.isFinite(heur)) comps.push({ v: heur, w: 0.7, l: "HEUR" });
+    if (comps.length) {
+      const sumW = comps.reduce((s, c) => s + c.w, 0);
+      usedAADT = Math.round(comps.reduce((s, c) => s + c.v * c.w, 0) / Math.max(0.0001, sumW));
+      method = "blend_" + comps.map(c => c.l).join("+").toLowerCase();
+    }
+    mapStations = stations;
+    }
+
+  }
+ps.length){ const sumW=comps.reduce((s,c)=>s+c.w,0); usedAADT=Math.round(comps.reduce((s,c)=>s+c.v*c.w,0)/Math.max(0.0001,sumW)); method="blend_"+comps.map(c=>c.l).join("+").toLowerCase(); }
     }
 
     // Extras & flags
@@ -588,7 +726,9 @@ app.post("/estimate", async (req,res)=>{
       competition:{ count:compCount, nearest_mi: competitors[0]?.miles ?? null, notable_brands: competitors.filter(c=>c.heavy).slice(0,6).map(c=>c.name) },
       developments: devOSM, developments_external:{ news: devNews, permits: devPermits, note: dev.note },
       roads, summary, calc_breakdown: calc.breakdown,
-      map:{ site:{ lat:geo.lat, lon:geo.lon, label:geo.label }, competitors }
+      m//ap:{ site:{ lat:geo.lat, lon:geo.lon, aadt: mapStations, label:geo.label }, competitors }
+          map: { site: { lat: geo.lat, lon: geo.lon, label: geo.label }, competitors, aadt: mapStations },
+
     });
   }catch(e){
     res.status(500).json({ error:"Estimate failed", detail:String(e) });
