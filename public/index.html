@@ -272,11 +272,31 @@ function initOrUpdateMap(m){
     pts.push([c.lat,c.lon]);
     L.circleMarker([c.lat,c.lon],{radius:6,weight:1,color:c.heavy?"#ff7f50":"#4ade80",fillColor:c.heavy?"#ff7f50":"#4ade80",fillOpacity:.9}).addTo(layer).bindPopup(`${esc(c.name||"Fuel")} • ${c.miles} mi`);
   }
-  map.fitBounds(L.latLngBounds(pts).pad(0.25));
+    map.fitBounds(L.latLngBounds(pts).pad(0.25));
+  if(m.aadt) renderAADTMarkers(m.aadt);
   clearOverlay();
-  updateStreetView(site[0],site[1]);
-}
+  updateStreetView(site[0], site[11]);
 
+
+  function renderAADTMarkers(list) {
+  if (!Array.isArray(list)) return;
+  for (const rec of list) {
+    if (!Number.isFinite(rec.lat) || !Number.isFinite(rec.lon) || !Number.isFinite(rec.aadt)) continue;
+    const val = rec.aadt;
+    let color;
+    if (val >= 30000) color = "#be123c";
+    else if (val >= 20000) color = "#f97316";
+    else if (val >= 10000) color = "#eab308";
+    else color = "#84cc16";
+    L.circleMarker([rec.lat, rec.lon], {
+      radius: 5,
+      weight: 1,
+      color: color,
+      fillColor: color,
+      fillOpacity: 0.8
+    }).addTo(layer).bindPopup("AADT: " + fmt(val));
+  }
+}
 /* Render */
 function renderAll(d){
   outNum.textContent = fmt(d.low);
