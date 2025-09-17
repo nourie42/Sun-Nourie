@@ -471,6 +471,9 @@
             
             // Set up event listeners
             setupEventListeners();
+            
+            // Test backend connection
+            testBackendConnection();
         });
 
         function setupEventListeners() {
@@ -662,42 +665,32 @@
             }
         }
         
+        // Your Render API URL
+        const BACKEND_URL = 'https://sun-nourie-live.onrender.com';
+        
         async function getCoordinates(address) {
             try {
-                const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${API_KEY}`;
+                addLog('Calling backend for geocoding...', 'info');
+                const response = await fetch(`${BACKEND_URL}/api/geocode?address=${encodeURIComponent(address)}`);
                 
-                // Try multiple CORS proxy services
-                const corsProxies = [
-                    'https://cors-anywhere.herokuapp.com/',
-                    'https://api.codetabs.com/v1/proxy?quest=',
-                    'https://thingproxy.freeboard.io/fetch/'
-                ];
-                
-                for (const proxy of corsProxies) {
-                    try {
-                        console.log(`Trying proxy: ${proxy}`);
-                        const response = await fetch(proxy + url);
-                        
-                        if (response.ok) {
-                            const data = await response.json();
-                            if (data.status === 'OK' && data.results.length) {
-                                addLog(`Successfully used proxy: ${proxy}`, 'success');
-                                return data.results[0].geometry.location;
-                            }
-                        }
-                    } catch (proxyError) {
-                        console.log(`Proxy ${proxy} failed:`, proxyError);
-                        continue;
-                    }
+                if (!response.ok) {
+                    throw new Error(`Backend geocoding failed: ${response.status}`);
                 }
+
+                const data = await response.json();
                 
-                throw new Error('All CORS proxies failed');
+                if (data.status !== 'OK' || !data.results.length) {
+                    throw new Error('Location not found: ' + address);
+                }
+
+                addLog(`Successfully geocoded: ${address}`, 'success');
+                return data.results[0].geometry.location;
                 
             } catch (error) {
                 console.error('Geocoding error:', error);
-                addLog('API calls blocked - using demo data. Deploy to web server for real data.', 'warning');
+                addLog(`Geocoding failed: ${error.message}`, 'error');
                 
-                // Fallback coordinates
+                // Fallback coordinates for major cities
                 const cityCoords = {
                     'los angeles': { lat: 34.0522, lng: -118.2437 },
                     'new york': { lat: 40.7128, lng: -74.0060 },
@@ -710,48 +703,58 @@
                 };
                 
                 const city = address.toLowerCase().split(',')[0].trim();
-                return cityCoords[city] || cityCoords['los angeles'];
+                const coords = cityCoords[city] || cityCoords['los angeles'];
+                addLog(`Using fallback coordinates for ${city}`, 'warning');
+                return coords;
             }
         }
 
         async function findGasStations(lat, lng) {
             try {
-                const radius = document.getElementById('searchRadius').value * 1609.34;
-                const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&type=gas_station&key=${API_KEY}`;
+                const radius = document.getElementById('searchRadius').value * 1609.34; // Convert to meters
                 
-                const corsProxies = [
-                    'https://cors-anywhere.herokuapp.com/',
-                    'https://api.codetabs.com/v1/proxy?quest=',
-                    'https://thingproxy.freeboard.io/fetch/'
-                ];
+                addLog('Calling backend for gas stations...', 'info');
+                const response = await fetch(`${BACKEND_URL}/api/places/nearby?lat=${lat}&lng=${lng}&radius=${radius}&type=gas_station`);
                 
-                for (const proxy of corsProxies) {
-                    try {
-                        console.log(`Trying Places API with proxy: ${proxy}`);
-                        const response = await fetch(proxy + url);
-                        
-                        if (response.ok) {
-                            const data = await response.json();
-                            if (data.status === 'OK') {
-                                addLog(`Found ${data.results.length} REAL stations via ${proxy}`, 'success');
-                                return data.results || [];
-                            }
-                        }
-                    } catch (proxyError) {
-                        console.log(`Proxy ${proxy} failed for Places API:`, proxyError);
-                        continue;
-                    }
+                if (!response.ok) {
+                    throw new Error(`Backend Places API failed: ${response.status}`);
                 }
+
+                const data = await response.json();
                 
-                throw new Error('All CORS proxies failed for Places API');
+                if (data.status !== 'OK') {
+                    throw new Error('Places API error: ' + data.status);
+                }
+
+                addLog(`Found ${data.results.length} real gas stations from backend`, 'success');
+                return data.results || [];
                 
             } catch (error) {
                 console.error('Places API error:', error);
-                addLog('Cannot fetch real stations - browser security restrictions', 'error');
-                addLog('To get REAL stations: Deploy this file to a web server', 'warning');
+                addLog(`Backend API failed: ${error.message}`, 'error');
                 
-                // Return empty array to show error message
-                return [];
+                // Show error message instead of demo data
+                throw new Error('Cannot connect to backend API. Check that your Render service is running.');
+            }
+        }
+        
+        // Test backend connection on page load
+        async function testBackendConnection() {
+            try {
+                addLog('Testing backend connection...', 'info');
+                const response = await fetch(`${BACKEND_URL}/api/health`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addLog(`Backend connected successfully: ${data.status}`, 'success');
+                    return true;
+                } else {
+                    throw new Error(`Backend health check failed: ${response.status}`);
+                }
+            } catch (error) {
+                addLog(`Backend connection failed: ${error.message}`, 'error');
+                addLog('Please update BACKEND_URL with your Render API URL', 'warning');
+                return false;
             }
         }
         
@@ -759,29 +762,30 @@
             const stationGrid = document.getElementById('stationGrid');
             stationGrid.innerHTML = `
                 <div style="grid-column: 1/-1; background: #fff3cd; border: 2px solid #ffc107; border-radius: 15px; padding: 30px;">
-                    <h3 style="color: #856404; margin-bottom: 20px;">To Get REAL Gas Stations:</h3>
+                    <h3 style="color: #856404; margin-bottom: 20px;">Backend API Configuration Required</h3>
                     
                     <div style="margin-bottom: 25px;">
-                        <h4 style="color: #856404; margin-bottom: 10px;">Option 1: Free Web Hosting</h4>
-                        <ul style="color: #856404; margin-left: 20px; line-height: 1.6;">
-                            <li><strong>Netlify:</strong> Drag & drop your HTML file at netlify.com</li>
-                            <li><strong>Vercel:</strong> Upload at vercel.com - works with Google APIs</li>
-                            <li><strong>GitHub Pages:</strong> Free hosting via GitHub</li>
-                        </ul>
+                        <h4 style="color: #856404; margin-bottom: 10px;">Update Your Render Backend URL:</h4>
+                        <p style="color: #856404; margin-left: 20px; line-height: 1.6;">
+                            Replace <code>BACKEND_URL</code> at the top of the JavaScript with your actual Render API URL.<br>
+                            Example: <code>https://your-app-name.onrender.com</code>
+                        </p>
                     </div>
                     
                     <div style="margin-bottom: 25px;">
-                        <h4 style="color: #856404; margin-bottom: 10px;">Option 2: Backend Server</h4>
-                        <p style="color: #856404; margin-left: 20px;">
-                            Create a Node.js/Python backend to handle API calls server-side
-                        </p>
+                        <h4 style="color: #856404; margin-bottom: 10px;">Required Backend Endpoints:</h4>
+                        <ul style="color: #856404; margin-left: 20px; line-height: 1.6;">
+                            <li><code>GET /api/health</code> - Health check</li>
+                            <li><code>GET /api/geocode?address={address}</code> - Location coordinates</li>
+                            <li><code>GET /api/places/nearby?lat={lat}&lng={lng}&radius={radius}&type=gas_station</code> - Find gas stations</li>
+                        </ul>
                     </div>
                     
                     <div style="background: #e3f2fd; padding: 15px; border-radius: 8px;">
                         <p style="color: #1565c0; margin: 0;">
-                            <strong>Your API key is configured correctly</strong> - the issue is browser CORS restrictions 
-                            when running locally. Once deployed, you'll get real Google Places data with actual 
-                            gas station names, addresses, ratings, and Street View images.
+                            <strong>Your Google API key is configured</strong> - once your backend URL is updated, 
+                            you'll get real Google Places data with actual gas station names, addresses, ratings, 
+                            and Street View images.
                         </p>
                     </div>
                 </div>
