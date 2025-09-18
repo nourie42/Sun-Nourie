@@ -55,8 +55,9 @@ const PERMIT_HTML_URLS = (process.env.PERMIT_HTML_URLS || "")
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);
+const GOOGLE_API_KEY = "AIzaSyBKkUjhXbYeIA3jDMxvS8fExTlcPMIchs8"; // <-- hard-coded key
 
-  // ---------- Developments CSV ----------
+// ---------- Developments CSV ----------
 // Preload the developments_data.csv at server start. We parse the CSV file into
 // an array of objects for quick lookup by city/county and state. The CSV file
 // lives in the public directory alongside the UI. If the file cannot be
@@ -863,11 +864,8 @@ async function exhaustiveDevelopments(addrLabel, lat, lon) {
     csv: matchCsvDevelopments(admin.city, admin.county, admin.state),
     osm: ded(osm).slice(0, 40),
     note: bing.message
-    };
-  }
-
-  const GOOGLE_API_KEY = "AIzaSyBKkUjhXbYeIA3jDMxvS8fExTlcPMIchs8";  // <— hard-coded key
-  const UA = "Sunoco-FuelIQ/1.0";
+  };
+}
 
 // Simple fetchWithTimeout helper
 async function fetchWithTimeout(resource, options = {}, timeout = 10000) {
@@ -1346,14 +1344,14 @@ app.post("/estimate", async (req, res) => {
       devPermits = dev.permits,
       devOSM = dev.osm;
 
-// Roads & AADT (fixed)
-const roads = await roadContext(geo.lat, geo.lon).catch(() => ({
-  summary: "",
-  main: [],
-  side: [],
-  signals: 0,
-  intersections: 0,
-}));
+    // Roads & AADT (fixed)
+    const roads = await roadContext(geo.lat, geo.lon).catch(() => ({
+      summary: "",
+      main: [],
+      side: [],
+      signals: 0,
+      intersections: 0,
+    }));
     let usedAADT = 10000,
       method = "fallback_default";
     let mapStations = [];
