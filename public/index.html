@@ -391,9 +391,28 @@ function renderAll(d){
   if(d.flags?.rural_bonus_applied) compTxt += `; rural bonus +30% applied`;
   compLine.textContent = compTxt;
 
-  devsBox.innerHTML = (d.developments||[]).length ? "<ul>"+d.developments.map(x=>`<li>${esc(x.name)} • ${esc(x.status)}${x.approx_miles!=null?` • ~${x.approx_miles} mi`:''}</li>`).join("")+"</ul>" : "<em>none</em>";
-  devsExtNews.innerHTML = (d.developments_external?.news||[]).length ? "<ul>"+d.developments_external.news.map(x=>`<li>${esc(x.name)} • ${esc(x.status)}${x.link?` • <a href="${x.link}" target="_blank">source</a>`:''}</li>`).join("")+"</ul>" : "<em>none</em>";
-  devsExtPermits.innerHTML = (d.developments_external?.permits||[]).length ? "<ul>"+d.developments_external.permits.map(x=>`<li>${esc(x.name)} • ${esc(x.status)}${x.link?` • <a href="${x.link}" target="_blank">source</a>`:''}</li>`).join("")+"</ul>" : "<em>none</em>";
+   // Show CSV developments if available. When matches exist in the server‑side
+  // developments_data.csv for the entered town/state, we replace the three
+  // categories with a single card containing a red stop sign and the list of
+  // developments. Otherwise we fall back to the existing OSM/news/permits logic.
+  if (Array.isArray(d.csv) && d.csv.length) {
+    const listHtml = d.csv.map(x => {
+      const nm = esc(x.name || "");
+      const st = esc(x.status || "");
+      const dtl = x.details ? ` • ${esc(x.details)}` : "";
+      const dt = x.date ? ` • ${esc(x.date)}` : "";
+      return `<li>${nm}${st?` • ${st}`:''}${dtl}${dt}</li>`;
+    }).join("");
+    devsBox.innerHTML = `<div style="color:#ff4444;font-weight:700;font-size:1.1em;margin-bottom:4px;">\u26D4; Developments</div><ul>${listHtml}</ul>`;
+    devsExtNews.innerHTML = "";
+    devsExtPermits.innerHTML = "";
+  } else {
+    devsBox.innerHTML = (d.developments||[]).length ? "<ul>"+d.developments.map(x=>`<li>${esc(x.name)} • ${esc(x.status)}${x.approx_miles!=null?` • ~${x.approx_miles} mi`:''}</li>`).join("")+"</ul>" : "<em>none</em>";
+    devsExtNews.innerHTML = (d.developments_external?.news||[]).length ? 
+      "<ul>"+d.developments_external.news.map(x=>`<li>${esc(x.name)} • ${esc(x.status)}${x.link?` • <a href=\"${x.link}\" target=\"_blank\">source</a>`:''}</li>`).join("")+"</ul>" : "<em>none</em>";
+    devsExtPermits.innerHTML = (d.developments_external?.permits||[]).length ? 
+      "<ul>"+d.developments_external.permits.map(x=>`<li>${esc(x.name)} • ${esc(x.status)}${x.link?` • <a href=\"${x.link}\" target=\"_blank\">source</a>`:''}</li>`).join("")+"</ul>" : "<em>none</em>";
+  }map(x=>`<li>${esc(x.name)} • ${esc(x.status)}${x.link?` • <a href="${x.link}" target="_blank">source</a>`:''}</li>`).join("")+"</ul>" : "<em>none</em>";
 
   // Summary fallback
   let s = (d.summary||"").trim();
@@ -416,18 +435,39 @@ async function resolvePlaceIdIfNeeded(address){
   return null;
 }
 async function showRating(address){
-  const pid=await resolvePlaceIdIfNeeded(address);
-  if(!pid){ ratingLine.innerHTML="—"; return; }
-  try{
-    const r=await fetch(`/google/rating?place_id=${encodeURIComponent(pid)}`);
-    const j=await r.json();
-    if(!j.ok){ ratingLine.innerHTML="—"; return; }
-    ratingLine.innerHTML = `⭐ ${j.rating ?? "—"} (${j.total||0} reviews)`;
-  }catch{ ratingLine.innerHTML="—"; }
+   // Attempt to fetch rating by place ID first, then fall back to nearest gas station
+  let rating = null;
+  let total = null;
+  const pid = await resolvePlaceIdIfNeeded(address);
+  if (pid) {
+    try {
+      const r = await fetch(`/google/rating?place_id=${encodeURIComponent(pid)}`);
+      const j = await r.json();
+      if (j.ok) {
+        rating = j.rating ?? null;
+        total = j.total ?? null;
+      }
+    } catch {}
+  }
+  // Fallback: use current coordinates to lookup nearest station rating if none
+  if ((rating == null || rating === undefined) && selectedCoords) {
+    try {
+      const r2 = await fetch(`/google/rating_by_location?lat=${encodeURIComponent(selectedCoords.lat)}&lon=${encodeURIComponent(selectedCoords.lon)}`);
+      const j2 = await r2.json();
+      if (j2.ok) {
+        rating = j2.rating ?? null;
+        total = j2.total ?? null;
+      }
+    } catch {}
+  }
+  if (rating != null && rating !== undefined) {
+    ratingLine.innerHTML = `\u2B50 ${rating} (${total||0} reviews)`;
+  } else {
+    ratingLine.innerHTML = "—";
+  }
 }
-
 /* Main */
-$("go").addEventListener("click", async ()=>{
+$"go").addEventListener("click", async ()=>{
   try{
     goBtn.disabled=true; setOverlayWorking();
     const d=await callEstimate();
