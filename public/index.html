@@ -413,7 +413,6 @@ function renderAll(d){
       "<ul>"+d.developments_external.news.map(x=>`<li>${esc(x.name)} • ${esc(x.status)}${x.link?` • <a href=\"${x.link}\" target=\"_blank\">source</a>`:''}</li>`).join("")+"</ul>" : "<em>none</em>";
     devsExtPermits.innerHTML = (d.developments_external?.permits||[]).length ? 
       "<ul>"+d.developments_external.permits.map(x=>`<li>${esc(x.name)} • ${esc(x.status)}${x.link?` • <a href=\"${x.link}\" target=\"_blank\">source</a>`:''}</li>`).join("")+"</ul>" : "<em>none</em>";
-  }map(x=>`<li>${esc(x.name)} • ${esc(x.status)}${x.link?` • <a href="${x.link}" target="_blank">source</a>`:''}</li>`).join("")+"</ul>" : "<em>none</em>";
 
   // Summary fallback
   let s = (d.summary||"").trim();
@@ -468,7 +467,7 @@ async function showRating(address){
   }
 }
 /* Main */
-$"go").addEventListener("click", async ()=>{
+$("go").addEventListener("click", async ()=>{
   try{
     goBtn.disabled=true; setOverlayWorking();
     const d=await callEstimate();
