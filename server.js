@@ -57,7 +57,6 @@ const PERMIT_HTML_URLS = (process.env.PERMIT_HTML_URLS || "")
   .map((s) => s.trim())
   .filter(Boolean);
 
-c
   // ---------- Developments CSV ----------
 // Preload the developments_data.csv at server start. We parse the CSV file into
 // an array of objects for quick lookup by city/county and state. The CSV file
