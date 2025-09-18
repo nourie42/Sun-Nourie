@@ -1,1522 +1,560 @@
-// Fuel IQ API v2025-08-29y — competition ≥5 -> 50%, rating_by_location fallback, GPT summary always
-import express from "express";
-import cors from "cors";
-import fs from "fs/promises";
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Sunoco, LP Fuel IQ - Fuel Site Analyzer</title>
 
-import path from "path";
-import { fileURLToPath } from "url";
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <!-- Leaflet image export -->
+  <script src="https://unpkg.com/leaflet-image/leaflet-image.js"></script>
 
-const app = express();
-app.use(cors());
-app.use(express.json({ limit: "1mb" }));
+  <!-- jsPDF for PDF export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous"></script>
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+  <style>
+    :root { --bg:#0b0e15; --panel:#111725; --panel2:#0f1421; --line:#263145; --text:#eaeef7; --muted:#97a3b8; --brand:#0ea5e9; --brand2:#22d3ee; --pill:#0f1929; }
+    *{ box-sizing:border-box; }
+    body{ background:var(--bg); color:var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin:0; padding-bottom:72px; }
+    .wrap{ max-width:1120px; margin:24px auto; padding:0 16px; }
+    header{ display:flex; align-items:center; gap:14px; margin-bottom:6px; }
+    header h1{ font-size:28px; margin:0; letter-spacing:.2px; }
+    .build{ margin-left:auto; font-size:12px; color:#8aa2c0; }
+    .instructions{ margin:4px 0 12px; color:#cfe3ff; font-size:13px; }
 
-// ---------- Static UI ----------
-app.use(
-  express.static(path.join(__dirname, "public"), {
-    etag: false,
-    lastModified: false,
-    cacheControl: true,
-    maxAge: 0,
-    setHeaders: (res) => res.setHeader("Cache-Control", "no-store"),
-  })
-);
-app.get("/", (_req, res) => {
-  res.set("Cache-Control", "no-store");
-  res.sendFile(path.join(__dirname, "public", "index.html"));
+    .card{ background:linear-gradient(180deg,var(--panel),var(--panel2)); border:1px solid var(--line); border-radius:12px; padding:16px; margin:12px 0; }
+    label{ display:block; font-weight:600; margin:8px 0 6px; color:#d8e3f6; }
+    input, select{ width:100%; padding:12px; border-radius:10px; border:1px solid var(--line); background:#0b1220; color:#eaeef7; }
+    button{ background:linear-gradient(135deg,var(--brand),var(--brand2)); color:#fff; border:0; padding:12px 16px; border-radius:10px; font-weight:700; cursor:pointer; }
+    button:disabled{ opacity:.6; cursor:not-allowed; }
+
+    .row{ display:grid; grid-template-columns:1.6fr 0.7fr 0.7fr 0.8fr; gap:12px; align-items:end; }
+    @media (max-width:980px){ .row{ grid-template-columns:1fr; } }
+
+    .toolbar{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:12px; }
+    .muted{ color:var(--muted); }
+    .subtle{ font-size:12px; opacity:.9; }
+
+    #map{ height:420px; border-radius:12px; border:1px solid var(--line); position: relative; }
+    #overlay{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(11,14,21,.55); border-radius:12px; font-weight:800; color:#cde9ff; font-size:18px; padding:20px; text-align:center; }
+
+    #svWrap{ margin-top:10px; }
+    #sv{ width:100%; height:380px; border:0; border-radius:12px; border:1px solid var(--line); background:#0b1220; }
+
+    .ac-wrap{ position:relative; }
+    .ac-list{ position:absolute; top:100%; left:0; right:0; z-index:30; margin-top:6px; background:#0b1220; border:1px solid var(--line); border-radius:12px; max-height:320px; overflow:auto; box-shadow: 0 18px 36px rgba(0,0,0,.35); }
+    .ac-item{ padding:10px 12px; cursor:pointer; border-bottom:1px solid rgba(255,255,255,.04); }
+    .ac-item:last-child{ border-bottom:0; }
+    .ac-item:hover, .ac-item.active{ background:#101a2b; }
+    .badge{ display:inline-block; font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); background:var(--pill); color:#a9c5ff; margin-left:8px; }
+
+    details summary{ cursor:pointer; }
+    .adv-line{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-top:12px; }
+    .chip{ display:inline-flex; align-items:center; gap:8px; background:#0f1929; border:1px solid var(--line); padding:8px 10px; border-radius:999px; font-size:13px; }
+    .chip input{ width:auto; accent-color:#22d3ee; }
+    .radio-row{ display:flex; flex-wrap:wrap; gap:10px; margin-top:8px; }
+
+    .hero{ display:flex; justify-content:space-between; align-items:flex-end; gap:12px; }
+    .hero .num{ font-size:44px; font-weight:900; letter-spacing:.5px; }
+    .hero .sub{ font-size:13px; color:#a9b6d0; }
+
+    .footerbar{ position:fixed; left:0; right:0; bottom:0; background:linear-gradient(180deg,#0c1220,#0a0f1a); border-top:1px solid var(--line); padding:10px 16px; display:flex; justify-content:center; gap:12px; z-index:50; }
+
+    /* AADT tabs (NEW) */
+    .aadt-tabs {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 8px 0 12px;
+    }
+    .aadt-tab {
+      display: inline-block;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: var(--pill);
+      color: var(--text);
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 13px;
+      letter-spacing: .2px;
+    }
+    .aadt-tab:hover { background: #101a2b; }
+    @media (max-width: 680px) {
+      .aadt-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
+      .aadt-tab { white-space: nowrap; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Sunoco, LP Fuel IQ - Fuel Site Analyzer</h1>
+      <span class="build">UI v2025-08-29d</span>
+      <!-- Safe link to the standalone developments page -->
+      <a href="developments.html" style="padding:8px 14px; background:#22d3ee; border-radius:8px; color:#00121e; font-weight:600; text-decoration:none;">Developments Search</a>
+      <!-- PA AADT Map button -->
+      <a href="PA_Signals_AADT_Radius_Map_Final_Generated.html" style="padding:8px 14px; background:#f87171; border-radius:8px; color:#00121e; font-weight:600; text-decoration:none;">PA AADT Map</a>
+      <a href="Scraper.html" style="padding:8px 14px; background:#34d399; border-radius:8px; color:#00121e; font-weight:600; text-decoration:none;">Prospector</a>
+    </header>
+
+    <!-- AADT quick links (NEW) -->
+    <nav class="aadt-tabs" aria-label="State AADT Quick Links">
+      <span class="muted">State AADT Quick Links:</span>
+      <a class="aadt-tab" href="https://opendata.dc.gov/datasets/DCGIS::2023-traffic-volume/explore" target="_blank" rel="noopener noreferrer" title="District of Columbia AADT map">DC</a>
+      <a class="aadt-tab" href="https://gis-fdot.opendata.arcgis.com/datasets/fdot::annual-average-daily-traffic-tda/explore" target="_blank" rel="noopener noreferrer" title="Florida AADT map">FL</a>
+      <a class="aadt-tab" href="https://gdottrafficdata.drakewell.com/publicmultinodemap.asp" target="_blank" rel="noopener noreferrer" title="Georgia AADT map">GA</a>
+      <a class="aadt-tab" href="https://mhd.public.ms2soft.com/tcds/tsearch.asp?loc=Mhd&mod" target="_blank" rel="noopener noreferrer" title="Massachusetts AADT map">MA</a>
+      <a class="aadt-tab" href="https://nysdottrafficdata.drakewell.com/publicmultinodemap.asp" target="_blank" rel="noopener noreferrer" title="New York AADT map">NY</a>
+      <a class="aadt-tab" href="https://scdottrafficdata.drakewell.com/publicmultinodemap.asp" target="_blank" rel="noopener noreferrer" title="South Carolina AADT map">SC</a>
+      <a class="aadt-tab" href="https://www.arcgis.com/apps/webappviewer/index.html?id=35e4c06de0f84a9c9f3fe18e67cd2c92" target="_blank" rel="noopener noreferrer" title="Virginia AADT map">VA</a>
+      <a class="aadt-tab" href="https://ncdot.public.ms2soft.com/tdms.ui_core/trafficviewer" target="_blank" rel="noopener noreferrer" title="North Carolina AADT map">NC</a>
+    </nav>
+
+    <div class="instructions">
+      <b>Instructions:</b> Enter Address, Click <i>Estimate</i>. Do not exit your browser or let your phone screen shut off until results are ready or you will encounter errors. Click <i>Advanced Options</i> to make changes.
+    </div>
+
+    <!-- Inputs -->
+    <div class="card">
+      <div class="row">
+        <div>
+          <label>Site search</label>
+          <div class="ac-wrap">
+            <input id="addr" placeholder="Enter business or address" autocomplete="off"/>
+            <div id="ac" class="ac-list" style="display:none;"></div>
+          </div>
+          <div class="muted subtle" style="margin-top:6px" id="apiStatus">API Status: checking…</div>
+        </div>
+        <div><label>Regular MPDs</label><input id="mpds" type="number" value="3" min="1"/></div>
+        <div><label>Diesel MPDs</label><input id="diesel" type="number" value="0" min="0"/></div>
+        <div><label>AADT override</label><input id="aadtOverride" type="number"/></div>
+      </div>
+      <div class="toolbar">
+        <button id="go">Estimate</button>
+        <span class="muted">Baseline ceiling (AADT×2%×8×30) • competition rule • pricing effect • caps • road layout</span>
+      </div>
+    </div>
+
+    <!-- Advanced -->
+    <div class="card">
+      <details>
+        <summary><b>Advanced options</b></summary>
+        <div class="adv-line">
+          <label class="chip"><input type="checkbox" id="ex_large_dev"> Large residential or commercial developments being built (+7.5%)</label>
+          <label class="chip"><input type="checkbox" id="ex_hours18"> Operating hours 18h (−7.5%)</label>
+          <label class="chip"><input type="checkbox" id="ex_highincome"> Higher-income trade area (+2.5%)</label>
+          <label class="chip"><input type="checkbox" id="ex_lowrating"> Ratings below 4.0 / Poorly run site (−30%)</label>
+          <label class="chip"><input type="checkbox" id="ex_competitive_pricing"> Competitive site gas pricing (+10%)</label>
+          <label class="chip"><input type="checkbox" id="ex_rural"> Rural Location Bonus (No competition within 3 miles) (+30%)</label>
+        </div>
+        <div style="margin-top:8px;">
+          <label><b>Gas pricing vs area</b></label>
+          <div class="radio-row">
+            <label class="chip"><input type="radio" name="pricepos" value="below"> Below competition (+10%)</label>
+            <label class="chip"><input type="radio" name="pricepos" value="inline" checked> In line (0%)</label>
+            <label class="chip"><input type="radio" name="pricepos" value="above"> Above competition (−10%)</label>
+          </div>
+        </div>
+        <div class="adv-line">
+          <span class="chip" id="addExtra" style="cursor:pointer;">+ Add adj. (%)</span>
+          <span id="activeExtras" class="subtle"></span>
+        </div>
+        <div id="extraList" style="margin-top:8px;"></div>
+      </details>
+    </div>
+
+    <!-- Estimate -->
+    <div class="card" id="estimateCard">
+      <div class="hero">
+        <div>
+          <div>Adjusted Base Estimate (LOW)</div>
+          <div class="num" id="estNum">—</div>
+          <div class="sub" id="estRange">Full range: —</div>
+        </div>
+        <div class="right sub">
+          <div>Year-2: <b id="y2">—</b></div>
+          <div>Year-3: <b id="y3">—</b></div>
+        </div>
+      </div>
+      <hr/>
+      <div id="aadtBanner" class="muted">—</div>
+      <div id="compLine" class="muted">—</div>
+    </div>
+
+    <!-- Map & SV -->
+    <div class="card">
+      <div class="muted">Map: Site & competitors (1.5 mi)</div>
+      <div id="map"><div id="overlay" class="muted">—</div></div>
+      <div id="svWrap"><div class="muted" style="margin-top:10px;">Street View</div><iframe id="sv" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div>
+    </div>
+
+    <!-- Developments -->
+    <div class="card"><div id="devs" class="muted">—</div></div>
+    <div class="card"><div id="devsExternalNews" class="muted">—</div></div>
+    <div class="card"><div id="devsExternalPermits" class="muted">—</div></div>
+
+
+    <div class="card"><b>Google Rating</b><div id="ratingLine" class="muted">—</div></div>
+    <div class="card"><b>Summary (GPT)</b><div id="summary" class="muted">—</div></div>
+  </div>
+
+  <div class="footerbar"><button id="exportPDF">Export to PDF</button></div>
+
+<script>
+/* DOM helpers */
+const $=id=>document.getElementById(id);
+const apiStatus=$("apiStatus"), aadtBanner=$("aadtBanner"), compLine=$("compLine"), overlay=$("overlay"), svFrame=$("sv");
+const outNum=$("estNum"), outRange=$("estRange"), outY2=$("y2"), outY3=$("y3");
+const devsBox=$("devs"), devsExtNews=$("devsExternalNews"), devsExtPermits=$("devsExternalPermits"), summaryBox=$("summary"), ratingLine=$("ratingLine");
+const addrInput=$("addr"), acBox=$("ac"), goBtn=$("go");
+const addExtraBtn=$("addExtra"), extraList=$("extraList"), activeExtras=$("activeExtras");
+const ex_large_dev=$("ex_large_dev"), ex_hours18=$("ex_hours18"), ex_highincome=$("ex_highincome"), ex_lowrating=$("ex_lowrating"), ex_competitive_pricing=$("ex_competitive_pricing"), ex_rural=$("ex_rural");
+
+/* Map state */
+let map, layer, mapReady=false, selectedCoords=null, selectedPlaceId=null;
+
+/* Utils */
+function fmt(n){ return (n??0).toLocaleString(undefined,{maximumFractionDigits:0}); }
+function esc(s){ return (s??"").toString().replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
+function setOverlayWorking(){ overlay.textContent="Working…"; overlay.style.display="flex"; }
+function clearOverlay(){ overlay.style.display="none"; }
+
+/* Map + SV */
+function initMap(){ if(mapReady) return; map=L.map("map",{zoomControl:true}); window.map=map; L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map); layer=L.layerGroup().addTo(map); mapReady=true; }
+function updateStreetView(lat, lon){ svFrame.src=`https://maps.google.com/maps?q=&layer=c&cbll=${lat},${lon}&cbp=12,0,,0,0&output=svembed`; }
+
+function renderAADTMarkers(list) {
+  if (!Array.isArray(list)) return;
+  for (const rec of list) {
+    if (!Number.isFinite(rec.lat) || !Number.isFinite(rec.lon) || !Number.isFinite(rec.aadt)) continue;
+    const val = rec.aadt;
+    let color;
+    if (val >= 30000) color = "#be123c";
+    else if (val >= 20000) color = "#f97316";
+    else if (val >= 10000) color = "#eab308";
+    else color = "#84cc16";
+    L.circleMarker([rec.lat, rec.lon], {
+      radius: 5,
+      weight: 1,
+      color,
+      fillColor: color,
+      fillOpacity: 0.8
+    }).addTo(layer).bindPopup("AADT: " + fmt(val));
+  }
+}
+
+function initOrUpdateMap(m){
+  if(!mapReady){ initMap(); }
+  layer.clearLayers();
+  if(!m||!m.site){ setOverlayWorking(); return; }
+  const site=[m.site.lat,m.site.lon];
+  L.marker(site,{title:"Site"}).addTo(layer).bindPopup("<b>Site</b>");
+  const pts=[site];
+  for(const c of (m.competitors||[])){
+    if(!Number.isFinite(c.lat)||!Number.isFinite(c.lon)) continue;
+    pts.push([c.lat,c.lon]);
+    L.circleMarker([c.lat,c.lon],{radius:6,weight:1,color:c.heavy?"#ff7f50":"#4ade80",fillColor:c.heavy?"#ff7f50":"#4ade80",fillOpacity:.9}).addTo(layer).bindPopup(`${esc(c.name||"Fuel")} • ${c.miles} mi`);
+  }
+  map.fitBounds(L.latLngBounds(pts).pad(0.25));
+  if(m.aadt) renderAADTMarkers(m.aadt);
+  clearOverlay();
+  updateStreetView(site[0], site[1]);
+}
+
+/* Google status + autocomplete */
+let GOOGLE_OK=false; let acItems=[]; let acActive=-1;
+async function checkGoogleStatus(){
+  try {
+    const r = await fetch("/google/status");
+    const j = await r.json();
+    GOOGLE_OK = !!j.ok;
+    apiStatus.textContent = j.ok 
+      ? "API: Google — Working" 
+      : `API: Google — ${j.status}`;
+  } catch {
+    GOOGLE_OK = false; 
+    apiStatus.textContent = "API: Google — unavailable";
+  }
+}
+
+// Run once DOM is ready
+document.addEventListener("DOMContentLoaded", checkGoogleStatus);
+
+// Also call immediately in case DOM is already loaded
+checkGoogleStatus();
+
+async function googleSearch(q){
+  if(!GOOGLE_OK) return [];
+  try{
+    const r=await fetch(`/google/autocomplete?input=${encodeURIComponent(q)}`);
+    const j=await r.json(); if(!j.ok) return [];
+    return (j.items||[]).map(it=>({...it,type:"Google",score:1.3}));
+  }catch{return[];}
+}
+async function nominatimSearch(q){
+  try{
+    const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=us&q=${encodeURIComponent(q)}`);
+    const a=await r.json();
+    return a.map(row=>({ type:"OSM", display:row.display_name, lat:+row.lat, lon:+row.lon, score:0.6 }));
+  }catch{return[];}
+}
+function renderAc(list){
+  if(!list.length){ acBox.style.display="none"; return; }
+  acBox.innerHTML=list.map((it,i)=>`<div class="ac-item${i===acActive?" active":""}" data-i="${i}">${esc(it.display)} <span class="badge">${it.type}</span></div>`).join("");
+  [...acBox.children].forEach(el=>el.onclick=()=>chooseAc(+el.dataset.i));
+  acBox.style.display="block";
+}
+function chooseAc(i){
+  const it=acItems[i]; if(!it) return;
+  addrInput.value=it.display;
+  selectedCoords=(Number.isFinite(it.lat)&&Number.isFinite(it.lon))?{lat:it.lat,lon:it.lon}:null;
+  selectedPlaceId=it.place_id||null;
+  acBox.style.display="none";
+}
+addrInput.addEventListener("input",()=>{
+  const q=addrInput.value.trim(); if(q.length<3) return;
+  Promise.all([googleSearch(q),nominatimSearch(q)]).then(([g,n])=>{
+    acItems=[...g,...n].slice(0,8); renderAc(acItems);
+  });
 });
-app.get("/health", (_req, res) => res.json({ ok: true }));
 
-// ---------- Config ----------
-const UA = "FuelEstimator/3.4 (+your-app)";
-const CONTACT = process.env.OVERPASS_CONTACT || UA;
-
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
-
-const BING_NEWS_KEY = process.env.BING_NEWS_KEY || "";
-const BING_NEWS_ENDPOINT =
-  process.env.BING_NEWS_ENDPOINT ||
-  "https://api.bing.microsoft.com/v7.0/news/search";
-const BING_WEB_ENDPOINT =
-  process.env.BING_WEB_ENDPOINT ||
-  "https://api.bing.microsoft.com/v7.0/search";
-
-const NEWS_URLS = (process.env.NEWS_URLS || "")
-  .split(",")
-  .map((s) => s.trim())
-  .filter(Boolean);
-const PERMIT_URLS = (process.env.PERMIT_URLS || "")
-  .split(",")
-  .map((s) => s.trim())
-  .filter(Boolean);
-const PERMIT_HTML_URLS = (process.env.PERMIT_HTML_URLS || "")
-  .split(",")
-  .map((s) => s.trim())
-  .filter(Boolean);
-const GOOGLE_API_KEY = "AIzaSyBKkUjhXbYeIA3jDMxvS8fExTlcPMIchs8"; // <-- hard-coded key
-
-// ---------- Developments CSV ----------
-// Preload the developments_data.csv at server start. We parse the CSV file into
-// an array of objects for quick lookup by city/county and state. The CSV file
-// lives in the public directory alongside the UI. If the file cannot be
-// loaded or parsed, the csvDevData array will remain empty and no CSV
-// developments will be returned.
-
-let csvDevData = [];
-
-// Parse a CSV string into an array of rows. Handles quoted values and escaped
-// quotes. This implementation mirrors the client‑side parser in
-// public/developments.html to ensure consistency. It splits on commas when
-// outside of quoted fields and on newlines for row breaks.
-function parseCsvString(csv) {
-  const rows = [];
-  let row = [];
-  let value = '';
-  let inQuotes = false;
-  for (let i = 0; i < csv.length; i++) {
-    const char = csv[i];
-    if (char === '"' && csv[i + 1] === '"') {
-      value += '"';
-      i++;
-    } else if (char === '"') {
-      inQuotes = !inQuotes;
-    } else if (char === ',' && !inQuotes) {
-      row.push(value);
-      value = '';
-    } else if ((char === '\n' || char === '\r') && !inQuotes) {
-      // Handle CR+LF or LF line endings
-      if (char === '\r' && csv[i + 1] === '\n') {
-        i++;
-      }
-      row.push(value);
-      value = '';
-      // Skip completely empty rows
-      if (row.length > 1 || row[0] !== '') {
-        rows.push(row);
-      }
-      row = [];
-    } else {
-      value += char;
-    }
-  }
-  // Push the last value/row if not empty
-  if (value !== '' || row.length > 0) {
-    row.push(value);
-    rows.push(row);
-  }
-  return rows;
+/* Advanced badges */
+function pills(){
+  const p=[];
+  if(ex_large_dev.checked)p.push("+7.5% Large development nearby");
+  if(ex_hours18.checked)p.push("−7.5% 18h ops");
+  if(ex_highincome.checked)p.push("+2.5% Higher-income");
+  if(ex_lowrating.checked)p.push("−30% Rating < 4.0");
+  if(ex_competitive_pricing.checked)p.push("+10% Competitive site gas pricing");
+  if(ex_rural.checked)p.push("+30% Rural bonus (0 comps within 3 mi)");
+  activeExtras.innerHTML=p.map(x=>`<span class="badge">${esc(x)}</span>`).join(" ");
 }
+[ex_large_dev,ex_hours18,ex_highincome,ex_lowrating,ex_competitive_pricing,ex_rural].forEach(el=>el.addEventListener("change",pills));
 
-// Transform parsed CSV rows into a list of development objects. We extract
-// city/county, state, name (brand), status, details and date from the CSV
-// columns. Rows missing both town and state are ignored. See
-// public/developments_data.csv header for column names.
-function transformCsvData(rows) {
-  if (!rows || rows.length === 0) return [];
-  const headers = rows[0];
-  const data = [];
-  for (let i = 1; i < rows.length; i++) {
-    const row = rows[i];
-    const obj = {};
-    headers.forEach((h, idx) => {
-      obj[h] = row[idx];
-    });
-    const town =
-      obj['City/County'] || obj['City/County.1'] || obj['City/County.2'] || '';
-    const state = obj['State'] || '';
-    const name = obj['Brand'] || obj['Brand.1'] || '';
-    const status = obj['Status'] || '';
-    const details =
-      obj['Details'] || obj['Details.1'] || obj['Details.2'] || '';
-    const date = obj['Date'] || obj['Date.1'] || obj['Date.2'] || '';
-    if (!town && !state) continue;
-    data.push({ name, town, state, status, details, date });
-  }
-  return data;
+function addExtraRow(pct="",note=""){
+  const row=document.createElement("div");
+  row.style.marginTop="6px";
+  row.innerHTML=`<span class="chip"><input class="extraPct" type="number" step="0.1" style="width:90px" placeholder="% e.g. 5 or -3" value="${pct}"> <input class="extraNote" style="width:320px" placeholder="Comment" value="${esc(note)}"> <button class="rm" type="button">×</button></span>`;
+  row.querySelector(".rm").addEventListener("click",()=>row.remove());
+  extraList.appendChild(row);
 }
+$("addExtra").addEventListener("click",()=>addExtraRow());
 
-// Load and parse the CSV file into csvDevData. This function is executed on
-// startup. Errors are logged but not thrown so the server can continue.
-async function loadCsvDevData() {
-  try {
-    const csvPath = path.join(__dirname, 'public', 'developments_data.csv');
-    const file = await fs.readFile(csvPath, 'utf8');
-    const rows = parseCsvString(file);
-    csvDevData = transformCsvData(rows);
-    console.log(`Loaded ${csvDevData.length} development rows from CSV`);
-  } catch (err) {
-    console.error('Failed to load developments_data.csv', err);
-    csvDevData = [];
-  }
-}
-
-// Match CSV developments by city/county and state. We perform a case‑insensitive
-// comparison on the state and town fields. Either the city or the county may
-// match the CSV town field. Returns an array of matched development objects.
-function matchCsvDevelopments(city, county, state) {
-  if (!csvDevData || csvDevData.length === 0) return [];
-  const st = (state || '').trim().toLowerCase();
-  const cty = (city || '').trim().toLowerCase();
-  const cnty = (county || '').trim().toLowerCase();
-  return csvDevData.filter((r) => {
-    const rState = (r.state || '').trim().toLowerCase();
-    const rTown = (r.town || '').trim().toLowerCase();
-    if (!rState || !rTown) return false;
-    if (rState !== st) return false;
-    return rTown === cty || rTown === cnty;
-  });
-}
-
-// Kick off loading the CSV data. We call this without awaiting so the server
-// starts immediately. Any errors are logged above.
-loadCsvDevData().catch((err) => console.error('Error loading CSV', err));
-const TRAFFIC_URL = process.env.TRAFFIC_URL || "";
-const TRAFFIC_API_KEY = process.env.TRAFFIC_API_KEY || "";
-
-
-// ---------- Utils ----------
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const toMiles = (m) => m / 1609.344;
-function haversine(lat1, lon1, lat2, lon2) {
-  const R = 6371000,
-    t = (d) => (d * Math.PI) / 180;
-  const dLat = t(lat2 - lat1),
-    dLon = t(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(t(lat1)) *
-      Math.cos(t(lat2)) *
-      Math.sin(dLon / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(a));
-}
-function distMiles(a, b, c, d) {
-  return toMiles(haversine(a, b, c, d));
-}
-async function fetchWithTimeout(url, opts = {}, timeoutMs = 25000) {
-  const ctl = new AbortController();
-  const id = setTimeout(() => ctl.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...opts, signal: ctl.signal });
-  } finally {
-    clearTimeout(id);
-  }
-}
-
-// ---------- Geocoding ----------
-function tryParseLatLng(address) {
-  const m = String(address || "")
-    .trim()
-    .match(/^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/);
-  if (!m) return null;
-  const lat = +m[1],
-    lon = +m[2];
-  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-  return { lat, lon, label: `${lat}, ${lon}` };
-}
-async function geocodeCensus(q) {
-  const url = `https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?address=${encodeURIComponent(
-    q
-  )}&benchmark=Public_AR_Current&format=json`;
-  const r = await fetchWithTimeout(
-    url,
-    { headers: { "User-Agent": UA, Accept: "application/json" } },
-    15000
-  );
-  if (!r.ok) throw new Error(`Census ${r.status}`);
-  const d = await r.json();
-  const m = d?.result?.addressMatches?.[0];
-  if (!m?.coordinates) throw new Error("Census: no match");
-  return { lat: +m.coordinates.y, lon: +m.coordinates.x, label: m.matchedAddress || q };
-}
-async function geocodeNominatim(q) {
-  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&q=${encodeURIComponent(
-    q
-  )}`;
-  const r = await fetchWithTimeout(
-    url,
-    { headers: { "User-Agent": UA, Accept: "application/json" } },
-    15000
-  );
-  if (!r.ok) throw new Error(`Nominatim ${r.status}`);
-  const a = await r.json();
-  if (!a?.length) throw new Error("Nominatim: no result");
-  return { lat: +a[0].lat, lon: +a[0].lon, label: a[0].display_name };
-}
-async function reverseAdmin(lat, lon) {
-  try {
-    const url = `https://nominatim.openstreetmap.org/reverse?format=json&zoom=10&addressdetails=1&lat=${lat}&lon=${lon}`;
-    const r = await fetchWithTimeout(
-      url,
-      { headers: { "User-Agent": UA, Accept: "application/json" } },
-      15000
-    );
-    const j = await r.json();
-    const a = j?.address || {};
-    return {
-      city: a.city || a.town || a.village || a.hamlet || "",
-      county: a.county || "",
-      state: a.state || a.region || "",
-    };
-  } catch {
-    return { city: "", county: "", state: "" };
-  }
-}
-async function geocode(address) {
-  const direct = tryParseLatLng(address);
-  if (direct) return direct;
-  const hasNum = /\d/.test(address || "");
-  if (hasNum) {
-    try {
-      return await geocodeCensus(address);
-    } catch {
-      return await geocodeNominatim(address);
-    }
-  } else {
-    try {
-      return await geocodeNominatim(address);
-    } catch {
-      return await geocodeCensus(address);
-    }
-  }
-}
-
-// ---------- AADT (NC DOT + custom) ----------
-const NCDOT_AADT_FS =
-  "https://services.arcgis.com/NuWFvHYDMVmmxMeM/ArcGIS/rest/services/NCDOT_AADT_Stations/FeatureServer/0";
-
-async function queryNCDOTNearestAADT(lat, lon, rM = 1609) {
-  const p = new URLSearchParams({
-    f: "json",
-    where: "1=1",
-    outFields: "*",
-    returnGeometry: "true",
-    geometry: `${lon},${lat}`,
-    geometryType: "esriGeometryPoint",
-    inSR: "4326",
-    spatialRel: "esriSpatialRelIntersects",
-    distance: String(rM),
-    units: "esriSRUnit_Meter",
-    outSR: "4326",
-    resultRecordCount: "200",
-  });
-  const r = await fetchWithTimeout(
-    `${NCDOT_AADT_FS}/query?${p}`,
-    { headers: { "User-Agent": UA, Accept: "application/json" } },
-    20000
-  );
-  if (!r.ok) return null;
-  const data = await r.json();
-  const feats = data.features || [];
-  const rows = [];
-  for (const f of feats) {
-    const A = f.attributes || {};
-    const pairs = Object.keys(A)
-      .filter((k) => k.toLowerCase().includes("aadt"))
-      .map((k) => {
-        const val = +A[k];
-        if (!(val > 0)) return null;
-        let year = null;
-        const mt = String(k).match(/20\d{2}/)?.[0];
-        if (mt) year = +mt;
-        for (const yk of [
-          "YEAR",
-          "AADT_YEAR",
-          "COUNT_YEAR",
-          "TRAFFICYEAR",
-          "YEAR_",
-          "YR",
-          "YR_",
-        ]) {
-          const yv = A[yk];
-          if (yv) {
-            const mty = String(yv).match(/20\d{2}/)?.[0];
-            if (mty) {
-              year = +mty;
-              break;
-            }
-          }
-        }
-        return { val, year };
-      })
-      .filter(Boolean);
-    if (!pairs.length) continue;
-    pairs.sort(
-      (a, b) =>
-        (b.year || 0) - (a.year || 0) || b.val - a.val
-    );
-    const x = f.geometry?.x,
-      y = f.geometry?.y;
-    if (x == null || y == null) continue;
-    rows.push({
-      aadt: pairs[0].val,
-      year: pairs[0].year || null,
-      distM: haversine(lat, lon, y, x),
-    });
-  }
-  if (!rows.length) return null;
-  rows.sort(
-    (A, B) =>
-      (B.year || 0) - (A.year || 0) ||
-      B.aadt - A.aadt ||
-      A.distM - B.distM
-  );
-  return rows[0];
-}
-
-async function queryCustomTraffic(lat, lon, address) {
-  if (!TRAFFIC_URL) return null;
-  const url = TRAFFIC_URL.replace("{lat}", encodeURIComponent(lat))
-    .replace("{lon}", encodeURIComponent(lon))
-    .replace("{address}", encodeURIComponent(address || ""));
-  try {
-    const r = await fetchWithTimeout(
-      url,
-      { headers: { "User-Agent": UA, Accept: "application/json" } },
-      20000
-    );
-    const j = await r.json();
-    const aadt =
-      +j.aadt || +j.volume || +j.count;
-    const year = j.year
-      ? +String(j.year).match(/20\d{2}/)?.[0]
-      : null;
-    if (aadt > 0)
-      return { aadt, year, distM: 0, source: "custom" };
-  } catch {}
-  return null;
-}
-
-// Query NCDOT AADT stations along a given route and pick the nearest one
-async function queryNCDOTNearestAADTByRoute(lat, lon, route) {
-  if (!route) return null;
-  const p = new URLSearchParams({
-    f: "json",
-    where: `ROUTE='${route}'`,
-    outFields: "*",
-    returnGeometry: "true",
-    outSR: "4326",
-  });
-  try {
-    const resp = await fetchWithTimeout(
-      `${NCDOT_AADT_FS}/query?${p}`,
-      { headers: { "User-Agent": UA, Accept: "application/json" } },
-      20000
-    );
-    if (!resp.ok) return null;
-    const data = await resp.json();
-    let best = null;
-    for (const f of data.features || []) {
-      const A = f.attributes || {};
-      const pairs = Object.keys(A)
-        .filter((k) => k.toLowerCase().includes("aadt"))
-        .map((k) => {
-          const val = +A[k];
-          if (!(val > 0)) return null;
-          let year = null;
-          const mt = String(k).match(/20\d{2}/)?.[0];
-          if (mt) year = +mt;
-          for (const yk of [
-            "YEAR",
-            "AADT_YEAR",
-            "COUNT_YEAR",
-            "TRAFFICYEAR",
-            "YEAR_",
-            "YR",
-            "YR_",
-          ]) {
-            const yv = A[yk];
-            if (yv) {
-              const mty = String(yv).match(/20\d{2}/)?.[0];
-              if (mty) {
-                year = +mty;
-                break;
-              }
-            }
-          }
-          return { val, year };
-        })
-        .filter(Boolean);
-      if (!pairs.length) continue;
-      pairs.sort(
-        (a, b) =>
-          (b.year || 0) - (a.year || 0) || b.val - a.val
-      );
-      const x = f.geometry?.x;
-      const y = f.geometry?.y;
-      if (x == null || y == null) continue;
-      const distM = haversine(lat, lon, y, x);
-      const rec = {
-        aadt: pairs[0].val,
-        year: pairs[0].year || null,
-        distM,
-      };
-      if (!best || rec.distM < best.distM) best = rec;
-    }
-    return best;
-  } catch {
-    return null;
-  }
-}
-
-// Optionally return a list of nearby stations for map display (top 50 by proximity)
-async function queryNCDOTRouteStations(lat, lon, route) {
-  if (!route) return [];
-  const p = new URLSearchParams({
-    f: "json",
-    where: `ROUTE='${route}'`,
-    outFields: "*",
-    returnGeometry: "true",
-    outSR: "4326",
-  });
-  try {
-    const resp = await fetchWithTimeout(
-      `${NCDOT_AADT_FS}/query?${p}`,
-      { headers: { "User-Agent": UA, Accept: "application/json" } },
-      20000
-    );
-    const data = await resp.json();
-    const out = [];
-    for (const f of data.features || []) {
-      const A = f.attributes || {};
-      const pairs = Object.keys(A)
-        .filter((k) => k.toLowerCase().includes("aadt"))
-        .map((k) => {
-          const val = +A[k];
-          if (!(val > 0)) return null;
-          let year = null;
-          const mt = String(k).match(/20\d{2}/)?.[0];
-          if (mt) year = +mt;
-          return { val, year };
-        })
-        .filter(Boolean);
-      if (!pairs.length) continue;
-      pairs.sort(
-        (a, b) =>
-          (b.year || 0) - (a.year || 0) || b.val - a.val
-      );
-      const x = f.geometry?.x;
-      const y = f.geometry?.y;
-      if (x == null || y == null) continue;
-      const rec = {
-        lat: y,
-        lon: x,
-        aadt: pairs[0].val,
-        year: pairs[0].year || null,
-      };
-      rec.distM = haversine(lat, lon, y, x);
-      out.push(rec);
-    }
-    out.sort((a, b) => a.distM - b.distM);
-    return out.slice(0, 50);
-  } catch {
-    return [];
-  }
-}
-
-// ---------- Overpass / competition ----------
-const OVERPASS = [
-  "https://overpass-api.de/api/interpreter",
-  "https://overpass.kumi.systems/api/interpreter",
-  "https://overpass.openstreetmap.fr/api/interpreter",
-  "https://overpass.openstreetmap.ru/api/interpreter",
-];
-async function overpassQuery(data) {
-  let last = new Error("no tries");
-  for (const ep of OVERPASS) {
-    for (let i = 0; i < 3; i++) {
-      try {
-        const r = await fetchWithTimeout(
-          ep,
-          {
-            method: "POST",
-            headers: {
-              "User-Agent": CONTACT,
-              "Content-Type": "application/x-www-form-urlencoded",
-              Accept: "application/json",
-            },
-            body: "data=" + encodeURIComponent(data),
-          },
-          25000
-        );
-        const ct = r.headers.get("content-type") || "";
-        const txt = await r.text();
-        if (!r.ok || !ct.includes("application/json"))
-          throw new Error(`Overpass ${r.status}: ${txt.slice(0, 200)}`);
-        return JSON.parse(txt);
-      } catch (e) {
-        last = e;
-        await sleep(900 * (i + 1));
-      }
-    }
-  }
-  throw last;
-}
-const HEAVY_BRANDS =
-  /(sheetz|wawa|race\s?trac|racetrac|buc-?ee'?s|royal\s?farms|quik.?trip|\bqt\b)/i;
-const IS_SUNOCO = /\bsunoco\b/i;
-
-async function googleNearbyGasStations(lat, lon, rM = 2414) {
-  if (!GOOGLE_API_KEY) return [];
-  const base = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lon}&radius=${rM}&type=gas_station&key=${GOOGLE_API_KEY}`;
-  const out = [];
-  let url = base;
-  let tries = 0;
-  while (url && tries < 3) {
-    tries++;
-    const r = await fetchWithTimeout(
-      url,
-      { headers: { "User-Agent": UA, Accept: "application/json" } },
-      20000
-    );
-    const txt = await r.text();
-    if (!r.ok) break;
-    let j;
-    try {
-      j = JSON.parse(txt);
-    } catch {
-      break;
-    }
-    const items = j.results || [];
-    for (const it of items) {
-      const name = it.name || "Fuel",
-        latc = it.geometry?.location?.lat,
-        lonc = it.geometry?.location?.lng;
-      if (!Number.isFinite(latc) || !Number.isFinite(lonc)) continue;
-      out.push({
-        name,
-        lat: +latc,
-        lon: +lonc,
-        miles: +distMiles(lat, lon, latc, lonc).toFixed(3),
-        heavy: HEAVY_BRANDS.test(name),
-        sunoco: IS_SUNOCO.test(name),
-      });
-    }
-    if (j.next_page_token) {
-      await sleep(1700);
-      url = `${base}&pagetoken=${j.next_page_token}`;
-    } else url = null;
+function collectExtras(){
+  const out=[];
+  if(ex_large_dev.checked) out.push({pct:7.5, note:"Large residential/commercial developments"});
+  if(ex_hours18.checked) out.push({pct:-7.5, note:"18h ops"});
+  if(ex_highincome.checked) out.push({pct:2.5, note:"Higher income"});
+  if(ex_lowrating.checked) out.push({pct:-30, note:"Rating <4.0"});
+  if(ex_competitive_pricing.checked) out.push({pct:10, note:"Competitive site gas pricing"});
+  for(const chip of extraList.querySelectorAll(".chip")){
+    const pct=+chip.querySelector(".extraPct").value;
+    const note=chip.querySelector(".extraNote").value.trim();
+    if(Number.isFinite(pct)) out.push({pct, note});
   }
   return out;
 }
+function getFlags(){ return { rural: ex_rural.checked === true }; }
+function getPricePosition(){ const r=document.querySelector('input[name="pricepos"]:checked'); return r ? r.value : "inline"; }
 
-async function competitorsWithinRadiusMiles(lat, lon, rMi = 1.5) {
-  const rM = Math.round(rMi * 1609.344);
-  const q = `[out:json][timeout:25];
-    ( node(around:${rM},${lat},${lon})["amenity"="fuel"];
-      way(around:${rM},${lat},${lon})["amenity"="fuel"]; );
-    out center tags;`;
-  const [op, g] = await Promise.all([
-    overpassQuery(q)
-      .then((j) => j.elements || [])
-      .catch(() => []),
-    googleNearbyGasStations(lat, lon, rM).catch(() => []),
-  ]);
-
-  const opList = op
-    .map((el) => {
-      const t = el.tags || {};
-      const name = t.brand || t.name || "Fuel";
-      const latc = el.lat ?? el.center?.lat,
-        lonc = el.lon ?? el.center?.lon;
-      if (latc == null || lonc == null) return null;
-      return {
-        name,
-        lat: +latc,
-        lon: +lonc,
-        miles: +distMiles(lat, lon, latc, lonc).toFixed(3),
-        heavy: HEAVY_BRANDS.test(name),
-        sunoco: IS_SUNOCO.test(name),
-      };
-    })
-    .filter(Boolean);
-
-  const merged = [...opList, ...g];
-  const seen = new Set(),
-    out = [];
-  for (const s of merged) {
-    const k = `${Math.round(s.lat * 1e5)}|${Math.round(s.lon * 1e5)}`;
-    if (seen.has(k)) continue;
-    seen.add(k);
-    out.push(s);
-  }
-  out.sort((a, b) => a.miles - b.miles);
-  return out.filter((s) => s.miles <= rMi);
+/* API calls */
+async function safeJSON(url,opts){
+  const r=await fetch(url,opts);
+  const t=await r.text();
+  if(!r.ok) throw new Error(`HTTP ${r.status}\n${t.slice(0,1200)}`);
+  try{ return JSON.parse(t);}catch{ throw new Error("Bad JSON"); }
 }
-
-// ---------- Developments ----------
-async function overpassDevelopments(lat, lon) {
-  const rM = Math.round(5 * 1609.344);
-  const q = `[out:json][timeout:25];
-    ( node(around:${rM},${lat},${lon})["amenity"="fuel"]["proposed"];
-      way(around:${rM},${lat},${lon})["amenity"="fuel"]["proposed"];
-      node(around:${rM},${lat},${lon})["amenity"="fuel"]["construction"];
-      way(around:${rM},${lat},${lon})["amenity"="fuel"]["construction"]; );
-    out center tags;`;
-  try {
-    const j = await overpassQuery(q);
-    const els = j.elements || [];
-    return els.map((e) => {
-      const t = e.tags || {};
-      const n = t.name || t.brand || "Fuel (proposed/construction)";
-      const latc = e.lat ?? e.center?.lat,
-        lonc = e.lon ?? e.center?.lon;
-      const miles =
-        Number.isFinite(latc) && Number.isFinite(lonc)
-          ? +distMiles(lat, lon, latc, lonc).toFixed(3)
-          : null;
-      return {
-        name: n,
-        status: t.proposed ? "proposed" : "construction",
-        approx_miles: miles,
-        link: null,
-        source: "overpass",
-      };
-    });
-  } catch {
-    return [];
-  }
-}
-
-function fillTemplate(tpl, ctx) {
-  return tpl
-    .replace("{address}", encodeURIComponent(ctx.address || ""))
-    .replace("{lat}", encodeURIComponent(ctx.lat))
-    .replace("{lon}", encodeURIComponent(ctx.lon))
-    .replace("{city}", encodeURIComponent(ctx.city || ""))
-    .replace("{county}", encodeURIComponent(ctx.county || ""))
-    .replace("{state}", encodeURIComponent(ctx.state || ""));
-}
-async function queryExternalJSON(tpl, ctx) {
-  try {
-    const r = await fetchWithTimeout(
-      fillTemplate(tpl, ctx),
-      { headers: { "User-Agent": UA, Accept: "application/json" } },
-      20000
-    );
-    const j = await r.json();
-    const arr = Array.isArray(j)
-      ? j
-      : Array.isArray(j.items)
-      ? j.items
-      : [];
-    return arr.map((it) => ({
-      name: String(it.name || it.title || it.project || "Fuel development").slice(0, 160),
-      status: String(it.status || it.stage || it.note || "planned").slice(0, 100),
-      approx_miles: null,
-      link: it.url || it.link || null,
-      source: it.source || "custom",
-    }));
-  } catch {
-    return [];
-  }
-}
-async function scrapePermitHTML(url) {
-  try {
-    const r = await fetchWithTimeout(
-      url,
-      { headers: { "User-Agent": UA, Accept: "text/html" } },
-      20000
-    );
-    const html = await r.text();
-    const lines = html
-      .split(/\r?\n/)
-      .map((x) => x.trim())
-      .filter(Boolean);
-    const hits = lines
-      .filter((L) =>
-        /(gas|fuel|convenience|c-store|station|EP\s?Mart)/i.test(L)
-      )
-      .slice(0, 50);
-    return hits.map((h) => ({
-      name: h.slice(0, 160),
-      status: "permit/agenda",
-      approx_miles: null,
-      link: url,
-      source: url,
-    }));
-  } catch {
-    return [];
-  }
-}
-async function bingNewsCityCounty(city, county, state) {
-  if (!BING_NEWS_KEY)
-    return { news: [], web: [], message: "BING_NEWS_KEY missing" };
-  const termSets = [
-    [
-      `${city} ${state} gas station`,
-      `${city} ${state} EP Mart`,
-      `${city} ${state} convenience store`,
-    ],
-    [
-      `${city} ${state} planning board gas station`,
-      `${city} ${state} site plan gas station`,
-      `${city} ${state} zoning gas station`,
-    ],
-    [
-      `${county} ${state} planning commission gas station`,
-      `${county} ${state} permit gas station`,
-    ],
-  ];
-  const headers = {
-    "Ocp-Apim-Subscription-Key": BING_NEWS_KEY,
-    "User-Agent": UA,
-    Accept: "application/json",
-  };
-  const newsOut = [],
-    webOut = [];
-  for (const terms of termSets) {
-    for (const q of terms) {
-      try {
-        const nu = `${BING_NEWS_ENDPOINT}?q=${encodeURIComponent(
-          q
-        )}&count=20&freshness=Year`;
-        const nr = await fetchWithTimeout(nu, { headers }, 20000);
-        const nj = await nr.json();
-        const nv = Array.isArray(nj.value) ? nj.value : [];
-        nv.forEach((it) =>
-          newsOut.push({
-            name: (it.name || "").slice(0, 160),
-            status: "news",
-            approx_miles: null,
-            link: it.url || null,
-            source: "bing-news",
-          })
-        );
-      } catch {}
-      try {
-        const wu = `${BING_WEB_ENDPOINT}?q=${encodeURIComponent(q)}&count=20`;
-        const wr = await fetchWithTimeout(wu, { headers }, 20000);
-        const wj = await wr.json();
-        const wv = wj.webPages?.value || [];
-        wv.forEach((it) =>
-          webOut.push({
-            name: (it.name || "").slice(0, 160),
-            status: "permit/search",
-            approx_miles: null,
-            link: it.url || null,
-            source: "bing-web",
-          })
-        );
-      } catch {}
+async function callEstimate(){
+  const body={
+    address: addrInput.value.trim(),
+    mpds:+$("mpds").value||0,
+    diesel:+$("diesel").value||0,
+    advanced:{
+      extra: collectExtras(),
+      flags: getFlags(),
+      price_position: getPricePosition()
     }
-  }
-  const ded = (arr) => {
-    const seen = new Set(),
-      out = [];
-    for (const i of arr) {
-      const k = `${(i.name || "").toLowerCase()}|${i.link || ""}|${
-        i.status || ""
-      }`;
-      if (seen.has(k)) continue;
-      seen.add(k);
-      out.push(i);
-    }
-    return out;
   };
-  return {
-    news: ded(newsOut).slice(0, 80),
-    web: ded(webOut).slice(0, 80),
-    message: "ok",
-  };
-}
-async function exhaustiveDevelopments(addrLabel, lat, lon) {
-  const admin = await reverseAdmin(lat, lon);
-  const ctx = {
-    address: addrLabel,
-    lat,
-    lon,
-    city: admin.city,
-    county: admin.county,
-    state: admin.state,
-  };
-
-  const [jsonNews, jsonPermits] = await Promise.all([
-    Promise.all(NEWS_URLS.map((t) => queryExternalJSON(t, ctx).catch(() => []))).then((a) => a.flat()),
-    Promise.all(PERMIT_URLS.map((t) => queryExternalJSON(t, ctx).catch(() => []))).then((a) => a.flat()),
-  ]);
-  const [permHtml, bing, osm] = await Promise.all([
-    Promise.all(PERMIT_HTML_URLS.map((u) => scrapePermitHTML(u).catch(() => []))).then((a) => a.flat()),
-    bingNewsCityCounty(ctx.city, ctx.county, ctx.state).catch(() => ({ news: [], web: [], message: "error" })),
-    overpassDevelopments(lat, lon).catch(() => []),
-  ]);
-
-  const news = [...jsonNews, ...(bing.news || [])];
-  const permits = [...jsonPermits, ...permHtml, ...(bing.web || [])];
-  const ded = (arr) => {
-    const seen = new Set(),
-      out = [];
-    for (const i of arr) {
-      const k = `${(i.name || "").toLowerCase()}|${i.link || ""}|${
-        i.status || ""
-      }`;
-      if (seen.has(k)) continue;
-      seen.add(k);
-      out.push(i);
-    }
-    return out;
-  };
-
-  return {
-    news: ded(news).slice(0, 80),
-    permits: ded(permits).slice(0, 80),
-    csv: matchCsvDevelopments(admin.city, admin.county, admin.state),
-    osm: ded(osm).slice(0, 40),
-    note: bing.message
-  };
+  if(selectedCoords){ body.siteLat=selectedCoords.lat; body.siteLon=selectedCoords.lon; }
+  const ov=+($("aadtOverride").value||"");
+  if(Number.isFinite(ov)&&ov>0) body.aadtOverride=ov;
+  return await safeJSON("/estimate",{ method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
 }
 
-// ---------- Google proxy ----------
-app.get("/google/status", async (_req, res) => {
-  try {
-    if (!GOOGLE_API_KEY) return res.json({ ok: false, status: "MISSING_KEY" });
+function renderAll(d) {
+  // Show CSV developments if available. When matches exist in the server-side
+  // developments_data.csv for the entered town/state, we replace the three
+  // categories with a single card containing a red stop sign and the list of
+  // developments. Otherwise we fall back to the existing OSM/news/permits logic.
+  if (Array.isArray(d.csv) && d.csv.length) {
+    const listHtml = d.csv.map(x => {
+      const nm  = esc(x.name || "");
+      const st  = esc(x.status || "");
+      const dtl = x.details ? ` • ${esc(x.details)}` : "";
+      const dt  = x.date ?    ` • ${esc(x.date)}`    : "";
+      return `<li>${nm}${st ? ` • ${st}` : ''}${dtl}${dt}</li>`;
+    }).join("");
+    devsBox.innerHTML =
+      `<div style="color:#ff4444;font-weight:700;font-size:1.1em;margin-bottom:4px;">&#x26D4; Developments</div><ul>${listHtml}</ul>`;
+    devsExtNews.innerHTML    = "";
+    devsExtPermits.innerHTML = "";
+  } else {
+    devsBox.innerHTML = (d.developments||[]).length
+      ? "<ul>"+d.developments.map(x=>
+          `<li>${esc(x.name)} • ${esc(x.status)}${x.approx_miles!=null?` • ~${x.approx_miles} mi`:''}</li>`
+        ).join("")+"</ul>"
+      : "<em>none</em>";
 
-    const au = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=Test&components=country:us&key=${GOOGLE_API_KEY}`;
-    const r = await fetchWithTimeout(au, { headers: { "User-Agent": UA } }, 10000);
+    devsExtNews.innerHTML = (d.developments_external?.news||[]).length
+      ? "<ul>"+d.developments_external.news.map(x=>
+          `<li>${esc(x.name)} • ${esc(x.status)}${x.link?` • <a href=\"${x.link}\" target=\"_blank\">source</a>`:''}</li>`
+        ).join("")+"</ul>"
+      : "<em>none</em>";
 
-    res.json({ ok: r.ok, status: r.ok ? "WORKING" : `HTTP_${r.status}` });
-  } catch {
-    res.json({ ok: false, status: "EXCEPTION" });
+    devsExtPermits.innerHTML = (d.developments_external?.permits||[]).length
+      ? "<ul>"+d.developments_external.permits.map(x=>
+          `<li>${esc(x.name)} • ${esc(x.status)}${x.link?` • <a href=\"${x.link}\" target=\"_blank\">source</a>`:''}</li>`
+        ).join("")+"</ul>"
+      : "<em>none</em>";
   }
-});
+}
 
-app.get("/google/autocomplete", async (req, res) => {
-  const q = String(req.query.input || "").trim();
-  if (!q) return res.json({ ok: false, status: "BAD_REQUEST", items: [] });
-  if (!GOOGLE_API_KEY) return res.json({ ok: false, status: "MISSING_KEY", items: [] });
-  try {
-    const au = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(
-      q
-    )}&components=country:us&key=${GOOGLE_API_KEY}`;
-    const ar = await fetchWithTimeout(au, { headers: { "User-Agent": UA } }, 15000);
-    const aj = await ar.json();
-    if (aj.status !== "OK" && aj.status !== "ZERO_RESULTS")
-      return res.json({ ok: false, status: aj.status, items: [] });
-    const items = [];
-    for (const p of (aj.predictions || []).slice(0, 6)) {
-      const pid = p.place_id;
-      if (!pid) continue;
-      const du = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${pid}&fields=formatted_address,geometry,name,place_id,types&key=${GOOGLE_API_KEY}`;
-      const dr = await fetchWithTimeout(du, { headers: { "User-Agent": UA } }, 15000);
-      const dj = await dr.json();
-      if (dj.status !== "OK") continue;
-      const loc = dj.result?.geometry?.location;
-      if (loc && Number.isFinite(loc.lat) && Number.isFinite(loc.lng)) {
-        items.push({
-          type: "Google",
-          display: dj.result.formatted_address || dj.result.name || p.description,
-          lat: +loc.lat,
-          lon: +loc.lng,
-          place_id: dj.result.place_id || pid,
-          score: 1.3,
-        });
+  // Summary fallback
+  let s = (d.summary||"").trim();
+  if(!s){
+    s = `AADT used ${fmt(d.inputs?.aadt_used)} (${method}). Baseline ceiling active. Competition ${d.competition?.count ?? 0} within 1.5 mi. Est. LOW ${fmt(d.low)} gal/mo (range ${fmt(d.low)}–${fmt(d.high)}).`;
+  }
+  summaryBox.textContent = s;
+
+  initOrUpdateMap(d.map);
+  showRating(addrInput.value.trim());
+}
+
+/* Rating */
+async function resolvePlaceIdIfNeeded(address){
+  if (selectedPlaceId) return selectedPlaceId;
+  try{
+    const r=await fetch(`/google/findplace?input=${encodeURIComponent(address)}`);
+    const j=await r.json(); if(j.ok && j.place_id) return j.place_id;
+  }catch{}
+  return null;
+}
+async function showRating(address){
+   // Attempt to fetch rating by place ID first, then fall back to nearest gas station
+  let rating = null;
+  let total = null;
+  const pid = await resolvePlaceIdIfNeeded(address);
+  if (pid) {
+    try {
+      const r = await fetch(`/google/rating?place_id=${encodeURIComponent(pid)}`);
+      const j = await r.json();
+      if (j.ok) {
+        rating = j.rating ?? null;
+        total = j.total ?? null;
       }
-    }
-    return res.json({ ok: true, status: "OK", items });
-  } catch (e) {
-    return res.json({ ok: false, status: "ERROR", items: [], error: String(e) });
+    } catch {}
   }
-});
-app.get("/google/searchplace", async (req, res) => {
-  try {
-    if (!GOOGLE_API_KEY) return res.json({ ok: false, status: "MISSING_KEY" });
-    const q = String(req.query.q || "").trim();
-    if (!q) return res.json({ ok: false, status: "BAD_REQUEST" });
-    const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(
-      q
-    )}&type=gas_station&key=${GOOGLE_API_KEY}`;
-    const r = await fetchWithTimeout(url, { headers: { "User-Agent": UA } }, 15000);
-    const j = await r.json();
-    const it = (j.results || [])[0];
-    if (!it?.place_id) return res.json({ ok: false, status: j.status || "ZERO_RESULTS" });
-    res.json({ ok: true, status: "OK", place_id: it.place_id, location: it.geometry?.location || null });
-  } catch (e) {
-    res.json({ ok: false, status: "EXCEPTION", error: String(e) });
-  }
-});
-app.get("/google/findplace", async (req, res) => {
-  try {
-    if (!GOOGLE_API_KEY) return res.json({ ok: false, status: "MISSING_KEY" });
-    const input = String(req.query.input || "").trim();
-    if (!input) return res.json({ ok: false, status: "BAD_REQUEST" });
-    const url = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(
-      input
-    )}&inputtype=textquery&fields=place_id,name,formatted_address,geometry&key=${GOOGLE_API_KEY}`;
-    const r = await fetchWithTimeout(url, { headers: { "User-Agent": UA } }, 15000);
-    const j = await r.json();
-    const cand = (j.candidates || [])[0];
-    if (!cand?.place_id) return res.json({ ok: false, status: j.status || "ZERO_RESULTS" });
-    res.json({
-      ok: true,
-      status: "OK",
-      place_id: cand.place_id,
-      name: cand.name,
-      address: cand.formatted_address,
-      location: cand.geometry?.location || null,
-    });
-  } catch (e) {
-    res.json({ ok: false, status: "EXCEPTION", error: String(e) });
-  }
-});
-app.get("/google/rating", async (req, res) => {
-  try {
-    if (!GOOGLE_API_KEY) return res.json({ ok: false, status: "MISSING_KEY" });
-    const place_id = String(req.query.place_id || "").trim();
-    if (!place_id) return res.json({ ok: false, status: "BAD_REQUEST" });
-    const fields = ["name", "formatted_address", "rating", "user_ratings_total"].join(",");
-    const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(
-      place_id
-    )}&fields=${encodeURIComponent(fields)}&key=${GOOGLE_API_KEY}`;
-    const r = await fetchWithTimeout(url, { headers: { "User-Agent": UA } }, 15000);
-    const j = await r.json();
-    if (j.status !== "OK")
-      return res.json({ ok: false, status: j.status || "ERROR", error: j.error_message || null });
-    const g = j.result || {};
-    res.json({
-      ok: true,
-      status: "OK",
-      rating: g.rating || null,
-      total: g.user_ratings_total || 0,
-      name: g.name || null,
-      address: g.formatted_address || null,
-    });
-  } catch (e) {
-    res.json({ ok: false, status: "EXCEPTION", error: String(e) });
-  }
-});
-// fallback: nearest gas station rating by lat/lon
-app.get("/google/rating_by_location", async (req, res) => {
-  try {
-    if (!GOOGLE_API_KEY) return res.json({ ok: false, status: "MISSING_KEY" });
-    const lat = +req.query.lat,
-      lon = +req.query.lon;
-    if (!Number.isFinite(lat) || !Number.isFinite(lon))
-      return res.json({ ok: false, status: "BAD_REQUEST" });
-    const r = await fetchWithTimeout(
-      `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lon}&radius=300&type=gas_station&key=${GOOGLE_API_KEY}`,
-      {},
-      15000
-    );
-    const j = await r.json();
-    const it = (j.results || [])[0];
-    if (!it?.place_id) return res.json({ ok: false, status: "ZERO_RESULTS" });
-    const d = await fetchWithTimeout(
-      `https://maps.googleapis.com/maps/api/place/details/json?place_id=${it.place_id}&fields=rating,user_ratings_total&key=${GOOGLE_API_KEY}`,
-      {},
-      15000
-    );
-    const dj = await d.json();
-    if (dj.status !== "OK") return res.json({ ok: false, status: dj.status });
-    res.json({
-      ok: true,
-      status: "OK",
-      rating: dj.result?.rating || null,
-      total: dj.result?.user_ratings_total || 0,
-    });
-  } catch (e) {
-    res.json({ ok: false, status: "EXCEPTION", error: String(e) });
-  }
-});
-
-// ---------- Roads / heuristic ----------
-function parseMaxspeed(ms) {
-  const m = String(ms || "").match(/(\d+)\s*(mph)?/i);
-  return m ? +m[1] : null;
-}
-function roadWeight(hw) {
-  const order = {
-    motorway: 6,
-    trunk: 5,
-    primary: 4,
-    secondary: 3,
-    tertiary: 2,
-    unclassified: 1,
-    residential: 1,
-  };
-  return order[(hw || "").replace("_link", "")] || 0;
-}
-async function roadContext(lat, lon) {
-  const rM = Math.round(1609 * 1.2);
-  const qWays = `[out:json][timeout:25];
-    ( way(around:${rM},${lat},${lon})["highway"~"motorway|trunk|primary|secondary|tertiary|primary_link|secondary_link|tertiary_link"]; );
-    out center tags;`;
-  const qSig = `[out:json][timeout:25]; node(around:${rM},${lat},${lon})["highway"="traffic_signals"]; out;`;
-  let ways = [],
-    signals = 0;
-  try {
-    const wj = await overpassQuery(qWays);
-    ways = wj.elements || [];
-  } catch {}
-  try {
-    const sj = await overpassQuery(qSig);
-    signals = (sj.elements || []).length;
-  } catch {}
-  const rows = ways
-    .map((w) => {
-      const t = w.tags || {};
-      const name = t.ref || t.name || "";
-      const hw = (t.highway || "").replace("_link", "");
-      const lanes =
-        +t.lanes || +t["lanes:forward"] || +t["lanes:backward"] || null;
-      const speed = parseMaxspeed(t.maxspeed);
-      const latc = w.center?.lat,
-        lonc = w.center?.lon;
-      const d =
-        Number.isFinite(latc) && Number.isFinite(lonc)
-          ? haversine(lat, lon, latc, lonc)
-          : null;
-      return {
-        name,
-        highway: hw,
-        lanes,
-        maxspeed: speed,
-        distM: d,
-        weight: roadWeight(hw),
-      };
-    })
-    .filter((r) => r.weight > 0);
-  rows.sort(
-    (a, b) =>
-      b.weight - a.weight ||
-      (b.lanes || 0) - (a.lanes || 0) ||
-      (b.maxspeed || 0) - (a.maxspeed || 0) ||
-      (a.distM || 1e12) - (b.distM || 1e12)
-  );
-  const main = rows.slice(0, 3),
-    side = rows.slice(3, 8);
-  const nice = (r) =>
-    [r.name || r.highway, r.maxspeed ? `${r.maxspeed} mph` : null, r.lanes ? `${r.lanes} lanes` : null]
-      .filter(Boolean)
-      .join(" • ");
-  const mainLabel = main
-    .map(nice)
-    .filter(Boolean)
-    .slice(0, 3)
-    .join(" | ");
-  const sideLabel = side
-    .map(nice)
-    .filter(Boolean)
-    .slice(0, 3)
-    .join(" | ");
-  const intersections = Math.max(0, Math.round(rows.length / 3));
-  return {
-    summary: [mainLabel, sideLabel].filter(Boolean).join(" — "),
-    main,
-    side,
-    signals,
-    intersections,
-  };
-}
-function heuristicAADT(roads) {
-  const dom =
-    roads?.main?.[0]?.highway ||
-    roads?.side?.[0]?.highway ||
-    "";
-  const lanes = roads?.main?.[0]?.lanes || roads?.side?.[0]?.lanes || 2;
-  const speed =
-    roads?.main?.[0]?.maxspeed || roads?.side?.[0]?.maxspeed || null;
-  let base = 0;
-  switch (dom) {
-    case "motorway":
-      base = 30000;
-      break;
-    case "trunk":
-      base = 22000;
-      break;
-    case "primary":
-      base = 14000;
-      break;
-    case "secondary":
-      base = 9000;
-      break;
-    case "tertiary":
-      base = 6000;
-      break;
-    default:
-      base = 4000;
-  }
-  let est = base * Math.max(1, lanes / 2);
-  if (speed) {
-    if (speed >= 55) est *= 1.15;
-    else if (speed <= 30) est *= 0.8;
-  }
-  if ((roads?.signals || 0) >= 5) est *= 0.9;
-  return Math.round(Math.max(800, Math.min(120000, est)));
-}
-
-// ---------- Gallons calc (competition rule fixed) ----------
-function gallonsWithRules({
-  aadt,
-  mpds,
-  diesel,
-  compCount,
-  heavyCount,
-  pricePosition,
-  userExtrasMult = 1,
-}) {
-  const baseline = aadt * 0.02 * 8 * 30;
-
-  let baseMult = 1.0;
-  if (compCount === 1) baseMult = 0.75;
-  else if (compCount >= 2 && compCount <= 4) baseMult = 0.6;
-  else if (compCount >= 5) baseMult = 0.5; // NEW: 5+ competitors -> 50%
-
-  let heavyPenalty = 0;
-  if (heavyCount === 1) heavyPenalty = 0.2;
-  else if (heavyCount >= 2) heavyPenalty = 0.35;
-
-  const compMult = Math.max(0.2, baseMult - heavyPenalty);
-  const afterComp = baseline * compMult;
-
-  const capEquip =
-    mpds * 25 * 10.5 * 24 * (365 / 12) +
-    ((diesel || 0) * 25 * 16 * 24) * (365 / 12);
-  const SOFT = 22000,
-    HARD = 28000;
-  const capSoftTotal = mpds * SOFT,
-    capHardTotal = mpds * HARD;
-  let capped = Math.min(afterComp, capEquip, capHardTotal);
-  if (afterComp > capSoftTotal) capped = Math.round(capped * 0.9);
-
-  let priceMult = 1.0;
-  if (pricePosition === "below") priceMult = 1.1;
-  else if (pricePosition === "above") priceMult = 0.9;
-
-  const preClamp = Math.round(capped * priceMult * userExtrasMult);
-  const base = Math.min(preClamp, Math.round(baseline));
-
-  const low = Math.round(base * 0.86);
-  const high = Math.round(base * 1.06);
-
-  return {
-    base,
-    low,
-    high,
-    year2: Math.round(base * 1.027),
-    year3: Math.round(base * 1.027 * 1.0125),
-    breakdown: {
-      aadt,
-      baseline: Math.round(baseline),
-      compRule: {
-        compCount,
-        baseMult,
-        heavyPenalty,
-        compMult,
-        afterComp: Math.round(afterComp),
-      },
-      caps: { capEquip: Math.round(capEquip), capSoftTotal, capHardTotal },
-      priceMult,
-      extrasMult: userExtrasMult,
-      preClamp,
-      finalClampedToBaseline: base,
-    },
-  };
-}
-
-// ---------- GPT summary ----------
-async function gptJSONCore(model, prompt) {
-  const r = await fetchWithTimeout(
-    "https://api.openai.com/v1/chat/completions",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        response_format: { type: "json_object" },
-        temperature: 0.2,
-        max_tokens: 1200,
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are a precise fuel/traffic analyst. Always reply with STRICT JSON (no markdown).",
-          },
-          { role: "user", content: prompt },
-        ],
-      }),
-    },
-    35000
-  );
-  const txt = await r.text();
-  if (!r.ok) throw new Error(`OpenAI ${r.status}: ${txt}`);
-  const data = JSON.parse(txt);
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) throw new Error("No GPT content");
-  return JSON.parse(content);
-}
-async function gptJSONWithRetry(prompt) {
-  const models = ["gpt-4o-mini", "gpt-4o"];
-  let last = null;
-  for (const m of models) {
-    for (let i = 0; i < 2; i++) {
-      try {
-        return await gptJSONCore(m, prompt);
-      } catch (e) {
-        last = e;
-        await sleep(400);
+  // Fallback: use current coordinates to lookup nearest station rating if none
+  if ((rating == null || rating === undefined) && selectedCoords) {
+    try {
+      const r2 = await fetch(`/google/rating_by_location?lat=${encodeURIComponent(selectedCoords.lat)}&lon=${encodeURIComponent(selectedCoords.lon)}`);
+      const j2 = await r2.json();
+      if (j2.ok) {
+        rating = j2.rating ?? null;
+        total = j2.total ?? null;
       }
-    }
+    } catch {}
   }
-  throw last || new Error("GPT failed");
+  if (rating != null && rating !== undefined) {
+    ratingLine.innerHTML = `\u2B50 ${rating} (${total||0} reviews)`;
+  } else {
+    ratingLine.innerHTML = "—";
+  }
 }
-async function gptSummary(ctx) {
-  const sys =
-    'Return {"summary":"<text>"} ~8–12 sentences. Include AADT method, baseline ceiling, competition rule & heavy penalties, pricing, user adjustments, caps, LOW/BASE/HIGH, road context, and notable developments.';
-  const prompt = `
-Address: ${ctx.address}
-AADT used: ${ctx.aadt} (${ctx.method})
-Roads: ${ctx.roads.summary}
-Competition: ${ctx.compCount} (heavy ${ctx.heavyCount}) — notable: ${ctx.notable}
-Pricing: ${ctx.pricePosition}; User adjustments: ${ctx.userAdj || "none"}
-Developments (news): ${ctx.devNews || "none"}
-Developments (permits): ${ctx.devPermits || "none"}
-Result gallons LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
-`.trim();
+/* Main */
+/* Main */
+
+// This block is at the very bottom of public/index.html, after all the functions.
+// It's where the click handler for the Estimate button is defined.
+
+$("go").addEventListener("click", async ()=>{
   try {
-    const j = await gptJSONWithRetry(`${sys}\n${prompt}`);
-    const s = (j && j.summary) ? String(j.summary).trim() : "";
-    if (s) return s;
-  } catch {}
-  return `AADT ${ctx.aadt} (${ctx.method}); competition ${ctx.compCount} (heavy=${ctx.heavyCount}); pricing ${ctx.pricePosition}; adjustments ${ctx.userAdj ||
-    "none"}; result ${ctx.low}–${ctx.high} with base ${ctx.base}.`;
-}
+    goBtn.disabled = true;
+    setOverlayWorking();
 
-// ---------- Estimate ----------
-app.post("/estimate", async (req, res) => {
-  try {
-    const {
-      address,
-      mpds,
-      diesel,
-      siteLat,
-      siteLon,
-      aadtOverride,
-      advanced,
-      client_rating,
-      auto_low_rating,
-    } = req.body || {};
-    const MPDS = +mpds,
-      DIESEL = +(diesel || 0);
-    if (!(Number.isFinite(MPDS) && MPDS > 0))
-      return res.status(400).json({ error: "Regular MPDs required (>0)" });
-    if (!address && !(Number.isFinite(siteLat) && Number.isFinite(siteLon)))
-      return res.status(400).json({ error: "Address or coordinates required" });
-
-    const pricePosition = String(advanced?.price_position || "inline");
-
-    // Geocode/admin
-    let geo;
-    if (Number.isFinite(siteLat) && Number.isFinite(siteLon))
-      geo = {
-        lat: +siteLat,
-        lon: +siteLon,
-        label: address || `${siteLat}, ${siteLon}`,
-      };
-    else geo = await geocode(address);
-    const admin = await reverseAdmin(geo.lat, geo.lon);
-
-    // Competition
-    const compAll3 = await competitorsWithinRadiusMiles(geo.lat, geo.lon, 3.0).catch(() => []);
-    const competitors = compAll3.filter((c) => c.miles <= 1.5);
-    const compCount = competitors.length,
-      heavyCount = competitors.filter((c) => c.heavy).length;
-    const sunocoNearby = compAll3.some((c) => c.sunoco && c.miles <= 1.0);
-    const ruralEligible = compAll3.length === 0;
-
-    // Developments
-    const dev = await exhaustiveDevelopments(address || geo.label, geo.lat, geo.lon);
-    const devNews = dev.news,
-      devPermits = dev.permits,
-      devOSM = dev.osm;
-
-    // Roads & AADT (fixed)
-    const roads = await roadContext(geo.lat, geo.lon).catch(() => ({
-      summary: "",
-      main: [],
-      side: [],
-      signals: 0,
-      intersections: 0,
-    }));
-    let usedAADT = 10000,
-      method = "fallback_default";
-    let mapStations = [];
-
-    const overrideVal = Number(aadtOverride);
-    if (Number.isFinite(overrideVal) && overrideVal > 0) {
-      usedAADT = Math.round(overrideVal);
-      method = "override";
-    } else {
-      let dotAADT = null;
-      let stations = [];
-      const routeName =
-        roads && roads.main && roads.main[0] && roads.main[0].name
-          ? roads.main[0].name
-          : null;
-      if (routeName) {
-        try {
-          const byRoute = await queryNCDOTNearestAADTByRoute(
-            geo.lat,
-            geo.lon,
-            routeName
-          );
-          if (byRoute) {
-            dotAADT = byRoute.aadt;
-            stations = await queryNCDOTRouteStations(
-              geo.lat,
-              geo.lon,
-              routeName
-            );
-          }
-        } catch (e) {}
-      }
-      if (!dotAADT) {
-        let sta = await queryCustomTraffic(geo.lat, geo.lon, address).catch(
-          () => null
-        );
-        if (!sta)
-          sta = await queryNCDOTNearestAADT(geo.lat, geo.lon, 1609).catch(
-            () => null
-          );
-        if (sta) dotAADT = sta.aadt;
-      }
-      const heur = heuristicAADT(roads);
-      const comps = [];
-      if (Number.isFinite(dotAADT))
-        comps.push({ v: dotAADT, w: 1.0, l: "DOT" });
-      if (Number.isFinite(heur)) comps.push({ v: heur, w: 0.7, l: "HEUR" });
-      if (comps.length) {
-        const sumW = comps.reduce((s, c) => s + c.w, 0);
-        usedAADT = Math.round(
-          comps.reduce((s, c) => s + c.v * c.w, 0) /
-            Math.max(0.0001, sumW)
-        );
-        method = "blend_" + comps.map((c) => c.l).join("+").toLowerCase();
-      }
-      mapStations = stations;
-    }
-
-    // Extras & flags
-    let userExtrasMult = 1.0;
-    const extras = (advanced?.extra || [])
-      .map((e) => ({
-        pct: +e?.pct,
-        note: String(e?.note || "").slice(0, 180),
-      }))
-      .filter((e) => Number.isFinite(e.pct));
-    if (extras.length)
-      userExtrasMult *= extras.reduce(
-        (m, e) => m * (1 + e.pct / 100),
-        1.0
-      );
-    const ruralRequested = !!(advanced && advanced.flags && advanced.flags.rural === true);
-    const ruralApplied = ruralRequested && ruralEligible;
-    if (ruralApplied) userExtrasMult *= 1.30;
-
-    // Auto low-rating penalty
-    const autoLow =
-      auto_low_rating === true ||
-      (Number.isFinite(client_rating) && client_rating < 4.0);
-    if (autoLow) userExtrasMult *= 0.70;
-
-    // Gallons
-    const calc = gallonsWithRules({
-      aadt: usedAADT,
-      mpds: MPDS,
-      diesel: DIESEL,
-      compCount,
-      heavyCount,
-      pricePosition,
-      userExtrasMult,
-    });
-
-    // Summary last (after all data)
-    const adjBits = [];
-    if (pricePosition === "below") adjBits.push("+10% below-market pricing");
-    if (pricePosition === "above") adjBits.push("−10% above-market pricing");
-    if (ruralApplied) adjBits.push("+30% rural bonus (0 comps within 3 mi)");
-    if (autoLow) adjBits.push("−30% low reviews (<4.0)");
-    extras.forEach((e) =>
-      adjBits.push(`${e.pct > 0 ? "+" : ""}${e.pct}% ${e.note || "adj."}`)
-    );
-    const userAdjText = adjBits.join("; ");
-
-    const notable =
-      competitors
-        .filter((c) => c.heavy)
-        .slice(0, 6)
-        .map((c) => c.name)
-        .join(", ") || "none";
-
-    const summary = await gptSummary({
-      address: address || geo.label,
-      aadt: usedAADT,
-      method,
-      roads,
-      compCount,
-      heavyCount,
-      notable,
-      pricePosition,
-      userAdj: userAdjText,
-      base: calc.base,
-      low: calc.low,
-      high: calc.high,
-      devNews: devNews.slice(0, 4).map((x) => x.name).join("; "),
-      devPermits: devPermits.slice(0, 4).map((x) => x.name).join("; "),
-    });
-
-    res.json({
-      base: calc.base,
-      low: calc.low,
-      high: calc.high,
-      year2: calc.year2,
-      year3: calc.year3,
-      inputs: {
-        mpds: MPDS,
-        diesel: DIESEL,
-        aadt_used: usedAADT,
-        price_position: pricePosition,
-        aadt_components: { method },
-      },
-      flags: {
-        rural_bonus_applied: ruralApplied,
-        rural_eligible: ruralEligible,
-        sunoco_within_1mi: sunocoNearby,
-        auto_low_rating: autoLow,
-      },
-      competition: {
-        count: compCount,
-        nearest_mi: competitors[0]?.miles ?? null,
-        notable_brands: competitors
-          .filter((c) => c.heavy)
-          .slice(0, 6)
-          .map((c) => c.name),
-      },
-      developments: devOSM,
-      developments_external: {
-        news: devNews,
-        permits: devPermits,
-        note: dev.note,
-      },
-      roads,
-      summary,
-      calc_breakdown: calc.breakdown,
-      map: {
-        site: { lat: geo.lat, lon: geo.lon, label: geo.label },
-        competitors,
-        aadt: mapStations,
-      },
-    });
+    const d = await callEstimate();
+    renderAll(d);
+    pills();
   } catch (e) {
-    res.status(500).json({ error: "Estimate failed", detail: String(e) });
+    alert("Error: " + (e.message||e));
+  } finally {
+    goBtn.disabled = false;
+    clearOverlay();
   }
 });
 
-// ---------- Start ----------
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, "0.0.0.0", () =>
-  console.log(`Server listening on :${PORT}`)
-);
+addrInput.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); $("go").click(); } });
+
+/* PDF Export */
+document.getElementById("exportPDF").addEventListener("click", async ()=>{
+  const { jsPDF } = window.jspdf || {};
+  if(!jsPDF){ alert("PDF lib failed to load"); return; }
+  const doc=new jsPDF({unit:"pt",format:"a4"}); // 595x842
+  const pageW=595, pageH=842, margin=36, contentW=pageW - margin*2;
+
+  doc.setFont("helvetica","bold"); doc.setFontSize(18);
+  doc.text("Sunoco, LP Fuel IQ — Fuel Site Analyzer", margin, margin+6);
+
+  doc.setFont("helvetica","normal"); doc.setFontSize(11);
+  const lines = doc.splitTextToSize(document.getElementById("summary").innerText || "", contentW);
+  doc.text(lines, margin, margin+28);
+
+  let cursorY = margin + 28 + lines.length*14 + 16;
+
+  const key = [
+    `Address: ${document.getElementById("addr").value || "-"}`,
+    `MPDs: ${document.getElementById("mpds").value}   Diesel: ${document.getElementById("diesel").value}`,
+    document.getElementById("aadtBanner").innerText,
+    `Estimate (LOW): ${document.getElementById("estNum").innerText}  |  Range: ${document.getElementById("estRange").innerText.replace("Full range: ","")}`,
+    document.getElementById("compLine").innerText
+  ].join("\n");
+  const keyLines = doc.splitTextToSize(key, contentW);
+  doc.text(keyLines, margin, cursorY);
+  cursorY += keyLines.length*14 + 12;
+
+  const mapImg = await new Promise(resolve=>{
+    if(!window.leafletImage || !window.map){ resolve(null); return; }
+    leafletImage(window.map, function(err, canvas){
+      if(err){ resolve(null); return; }
+      resolve(canvas.toDataURL("image/png"));
+    });
+  });
+
+  const imgW = contentW, imgH = 260;
+  if (mapImg) {
+    if (cursorY + imgH > pageH - margin) { doc.addPage(); cursorY = margin; }
+    doc.setFont("helvetica","bold"); doc.text("Map & Competitors (1.5 mi)", margin, cursorY);
+    cursorY += 12;
+    doc.addImage(mapImg, "PNG", margin, cursorY, imgW, imgH);
+    cursorY += imgH + 12;
+  }
+
+  const devText = "Developments — News:\n" + (document.getElementById("devsExternalNews").innerText || "—")
+               + "\n\nDevelopments — Permits:\n" + (document.getElementById("devsExternalPermits").innerText || "—");
+  const devLines = doc.splitTextToSize(devText, contentW);
+  if (cursorY + devLines.length*14 > pageH - margin) { doc.addPage(); cursorY = margin; }
+  doc.setFont("helvetica","bold"); doc.text("Developments", margin, cursorY); cursorY += 14;
+  doc.setFont("helvetica","normal"); doc.text(devLines, margin, cursorY);
+
+  doc.save("FuelIQ_Site_Analyzer.pdf");
+});
+
+/* Initial */
+overlay.textContent="—";
+</script>
+</body>
+</html>
