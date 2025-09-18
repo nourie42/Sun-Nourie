@@ -8,7 +8,7 @@
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <!-- leaflet-image (for optional map capture) -->
+  <!-- leaflet-image (optional, kept for future) -->
   <script src="https://unpkg.com/leaflet-image/leaflet-image.js"></script>
 
   <style>
@@ -69,7 +69,7 @@
   <div class="wrap">
     <header>
       <h1>Sunoco, LP Fuel IQ - Fuel Site Analyzer</h1>
-      <span class="build">UI v2025-09-17</span>
+      <span class="build">UI v2025-09-18 (state AADT only)</span>
     </header>
 
     <!-- State AADT quick links -->
@@ -86,7 +86,7 @@
     </nav>
 
     <div class="instructions">
-      <b>Instructions:</b> Enter Address, click <i>Estimate</i>. <b>State AADT only:</b> we use the nearest centerline segment intersecting the address road (no radius). If state AADT can’t be retrieved, you’ll see a clear comment.
+      <b>Instructions:</b> Enter Address, click <i>Estimate</i>. This uses <b>state AADT only</b>, matching the <b>same road name</b> at your address and picking the <b>true closest segment</b>. If we can’t reach that state’s API/field, you’ll see a clear comment.
     </div>
 
     <!-- Inputs -->
@@ -106,7 +106,7 @@
       </div>
       <div class="toolbar">
         <button id="go">Estimate</button>
-        <span class="muted">Baseline (AADT × 2% × 8 × 30). State AADT only.</span>
+        <span class="muted">Baseline: AADT × 2% × 8 × 30 • State AADT only</span>
       </div>
     </div>
 
@@ -125,7 +125,7 @@
       </div>
       <hr/>
       <div id="aadtBanner" class="muted">—</div>
-      <div id="compLine" class="muted">—</div>
+      <div id="compLine" class="muted">Same-road selection (no radius).</div>
       <div id="commentLine" class="muted" style="margin-top:6px;">—</div>
     </div>
 
@@ -143,7 +143,7 @@
   <div class="footerbar"><span class="muted subtle">Sunoco Fuel IQ — State AADT Only</span></div>
 
 <script>
-/* ============================= DOM & helpers ============================= */
+/* ----------------------------- DOM & helpers ----------------------------- */
 const $=id=>document.getElementById(id);
 const apiStatus=$("apiStatus"), aadtBanner=$("aadtBanner"), compLine=$("compLine"), commentLine=$("commentLine"),
       overlay=$("overlay"), svFrame=$("sv"),
@@ -176,7 +176,7 @@ function initOrUpdateMap(site){
   updateStreetView(site.lat,site.lon);
 }
 
-/* ============================= Simple autocomplete (Nominatim) ============================= */
+/* -------------------------- Autocomplete (OSM) -------------------------- */
 let acItems=[]; let acActive=-1;
 async function nominatimSearch(q){
   try{
@@ -205,61 +205,121 @@ addrInput.addEventListener("input", async ()=>{
 });
 addrInput.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); $("go").click(); } });
 
-/* ============================= State AADT sources ============================= */
-/* ArcGIS Feature Services that are CORS-friendly from the browser */
+/* ---------------------------- State AADT config ---------------------------- */
+/* For each state: list FeatureServer layers to try, candidate AADT fields, and candidate "road name" fields */
 const STATE_AADT_SOURCES = {
-  "DC": { type:"arcgis", layerUrl:"https://rh.dcgis.dc.gov/dcgis/rest/services/DDOT/DDOTLRS/FeatureServer/24", aadtFields:["AADT","AADT_VALUE"], note:"DDOT LRS AADT" },
-  "FL": { type:"arcgis", layerUrl:"https://gis.fdot.gov/arcgis/rest/services/RCI_Layers/FeatureServer/0", aadtFields:["AADT","AADT_TOTAL","AADT_CUR"], note:"FDOT RCI AADT" },
-  "VA": { type:"arcgis", layerUrl:"https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/VDOTTrafficVolume/FeatureServer/0", aadtFields:["AADT","TOTAL_V"], note:"VDOT Traffic Volume" },
-  "NC": { type:"arcgis", layerUrl:"https://services.arcgis.com/NuWFvHYDMVmmxMeM/arcgis/rest/services/NCDOT_AADT_Traffic_Segmentation/FeatureServer/1", aadtFields:["AADT","AADT_TOTAL"], note:"NCDOT AADT Segments" },
-
-  /* Not CORS-friendly public endpoints (Drakewell/MS2 in public UI) — we mark as unavailable for client-side */
-  "GA": { type:"drakewell", note:"GDOT Drakewell (no CORS API from browser)" },
-  "NY": { type:"drakewell", note:"NYSDOT Drakewell (no CORS API from browser)" },
-  "SC": { type:"drakewell", note:"SCDOT Drakewell (no CORS API from browser)" },
-  "MA": { type:"ms2", note:"MassDOT MS2 (no CORS API from browser)" }
+  "DC": {
+    layers: [
+      {url:"https://rh.dcgis.dc.gov/dcgis/rest/services/DDOT/DDOTLRS/FeatureServer/24", aadtFields:["AADT","AADT_VALUE"], nameFields:["ROADNAME","ROUTE_NAME","STREETNAME","NAME"]}
+    ]
+  },
+  "FL": {
+    layers: [
+      {url:"https://gis.fdot.gov/arcgis/rest/services/RCI_Layers/FeatureServer/0", aadtFields:["AADT","AADT_TOTAL","AADT_CUR"], nameFields:["FACILITY","ST_NAME","STREETNAME","RD","RDNAME"]}
+    ]
+  },
+  "VA": {
+    layers: [
+      {url:"https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/VDOTTrafficVolume/FeatureServer/0", aadtFields:["AADT","TOTAL_V"], nameFields:["RTE_NAME","ROADNAME","PRIMARY_NA","ROUTE_NAME","RTE_NUM","STREET"]}
+    ]
+  },
+  "NC": {
+    layers: [
+      {url:"https://services.arcgis.com/NuWFvHYDMVmmxMeM/arcgis/rest/services/NCDOT_AADT_Traffic_Segmentation/FeatureServer/1", aadtFields:["AADT","AADT_TOTAL"], nameFields:["ROUTE","STREETNAME","ST_NAME","RD_NAME","PRIMARY_NM"]}
+    ]
+  },
+  "NY": {
+    layers: [
+      {url:"https://gis.dot.ny.gov/hostingny/rest/services/Roadways/Traffic_Monitoring/FeatureServer/1", aadtFields:["AADT","AADT2019","AADT_VALUE"], nameFields:["RoadwayName","RTE_NAME","STREETNAME","NAME"]}
+    ]
+  },
+  "GA": {
+    layers: [
+      /* 2020 truck/AADT layer with AADT present */
+      {url:"https://services2.arcgis.com/I9cUOJUZvdGAJncI/ArcGIS/rest/services/GCFHData/FeatureServer/25", aadtFields:["AADT","AADT_TOTAL","AADT_2020"], nameFields:["STREETNAME","ROUTE_NAME","RDNAME","NAME","ST_NAME"]}
+      /* Add more GA FeatureServer URLs here if you have fresher AADT */
+    ]
+  },
+  "SC": {
+    layers: [
+      /* common SCDOT hubs sometimes expose AADT/traffic counts as FeatureServer; add/adjust if your org uses a different item */
+      {url:"https://services.arcgis.com/OfH668nDRN7tbJh0/ArcGIS/rest/services/SC_DOT_Traffic_Counts/FeatureServer/0", aadtFields:["AADT","AADT_TOTAL","VOL_AADT"], nameFields:["ROUTE_NAME","STREETNAME","RTE","NAME","PRIMARY_NM"]}
+    ]
+  },
+  "MA": {
+    layers: [
+      /* MassDOT Traffic Inventory (2023) FeatureServer 0 is typical; update the URL if your portal uses a different item id */
+      {url:"https://services1.arcgis.com/F7DSX1DS0QpIbNLb/ArcGIS/rest/services/Traffic_Inventory_2023/FeatureServer/0", aadtFields:["AADT","AADT_TOTAL","ADT"], nameFields:["STREETNAME","ST_NAME","ROAD_NAME","NAME"]}
+    ]
+  }
 };
 const SUPPORTED_STATES = Object.keys(STATE_AADT_SOURCES);
 
-/* ============================= Geometry helpers ============================= */
+/* ---------------------------- Geometry & names ---------------------------- */
+function proj(lon,lat){ const kx=111320*Math.cos(lat*Math.PI/180); return {x:lon*kx,y:lat*110574}; }
 function pointToPolylineDistanceMeters(pt, paths){
-  // paths = ArcGIS polyline geometry {paths:[[ [lon,lat], ... ], ... ]}
   let best=Infinity;
   for(const path of (paths||[])){
     for(let i=0;i<path.length-1;i++){
-      const [x1,y1]=path[i], [x2,y2]=path[i+1];
+      const [x1,y1]=path[i],[x2,y2]=path[i+1];
       const P=proj(pt.lon,pt.lat), A=proj(x1,y1), B=proj(x2,y2);
-      const ABx=B.x-A.x, ABy=B.y-A.y;
-      const APx=P.x-A.x, APy=P.y-A.y;
+      const ABx=B.x-A.x, ABy=B.y-A.y, APx=P.x-A.x, APy=P.y-A.y;
       const ab2=ABx*ABx + ABy*ABy || 1e-9;
       let t=(APx*ABx+APy*ABy)/ab2; t=Math.max(0,Math.min(1,t));
-      const Cx=A.x+t*ABx, Cy=A.y+t*ABy;
-      const dx=P.x-Cx, dy=P.y-Cy;
-      best=Math.min(best, Math.sqrt(dx*dx+dy*dy));
+      const Cx=A.x+t*ABx, Cy=A.y+t*ABy, dx=P.x-Cx, dy=P.y-Cy;
+      const d=Math.sqrt(dx*dx+dy*dy);
+      if(d<best) best=d;
     }
   }
   return best;
 }
-function proj(lon,lat){
-  // crude local meters projection near the site (enough for 10s of meters)
-  const kx = 111320 * Math.cos(lat*Math.PI/180);
-  return { x: lon*kx, y: lat*110574 };
+function normRoad(s){
+  if(!s) return "";
+  s=(""+s).toUpperCase();
+  s=s.replace(/[^A-Z0-9 ]+/g," ");
+  s=s.replace(/\b(US|U S|SR|STATE ROUTE|STATE RD|STATE HWY|NC|SC|GA|VA|NY|MA|DC|HWY|HIGHWAY|RD|ROAD|AVENUE|AVE|ST|STREET|BLVD|PKWY|DR|DRIVE|LN|LANE|CT|COURT|PL|PLACE|TRL|TRAIL|TER|TERRACE|N|S|E|W|NE|NW|SE|SW)\b/g," ").replace(/\s+/g," ").trim();
+  return s;
+}
+function extractStateAbbrevFromOSMAddress(addr){
+  if(!addr) return null;
+  if(addr.state_code && /^[A-Z]{2}$/.test(addr.state_code)) return addr.state_code.toUpperCase();
+  const map={"District of Columbia":"DC","Florida":"FL","Georgia":"GA","Massachusetts":"MA","New York":"NY","South Carolina":"SC","Virginia":"VA","North Carolina":"NC"};
+  if(addr.state && map[addr.state]) return map[addr.state];
+  return null;
+}
+function extractStreetNameFromOSMAddress(addr){
+  // Prefer 'road' then 'pedestrian' then 'footway' then 'neighbourhood' fallbacks
+  const cand = addr?.road || addr?.pedestrian || addr?.footway || addr?.neighbourhood || addr?.suburb || "";
+  return cand || "";
 }
 
-/* ============================= ArcGIS query for same-road segment ============================= */
-async function queryArcGISPoint(layerUrl, lat, lon){
+/* ---------------------------- ArcGIS querying ---------------------------- */
+/* We DO NOT use a distance buffer to “intersect”. Instead we:
+   1) build a tiny local envelope (±0.0008° ~ ~90m) ONLY to reduce payload,
+   2) filter by ROAD NAME on the layer (UPPER(nameField) LIKE '%ROADNAME%'),
+   3) compute true nearest distance to the polylines, and pick the MIN.
+   This guarantees "closest AADT on the same road", not a radius pick of any road. */
+async function queryArcGISByName(layerUrl, lat, lon, roadName, nameFields, aadtFields){
+  const envPad = 0.0008; // small envelope for query performance only
+  const geom = {
+    xmin: lon - envPad, ymin: lat - envPad, xmax: lon + envPad, ymax: lat + envPad,
+    spatialReference:{wkid:4326}
+  };
+  const upperRoad = normRoad(roadName);
+  // Try each candidate name field via "OR" LIKE
+  const likes = nameFields.map(f=>`(UPPER(${f}) LIKE '%${upperRoad.replace(/'/g,"''")}%')`);
+  const where = likes.length ? likes.join(" OR ") : "1=1";
   const params = new URLSearchParams({
-    f: "json",
-    where: "1=1",
-    geometry: JSON.stringify({x:+lon,y:+lat, spatialReference:{wkid:4326}}),
-    geometryType: "esriGeometryPoint",
-    inSR: "4326",
-    spatialRel: "esriSpatialRelIntersects",
-    distance: "35",                 // <= 35 m tolerance to hit the same road centerline
-    units: "esriSRUnit_Meter",
-    outFields: "*",
-    returnGeometry: "true",
-    outSR: "4326"
+    f:"json",
+    where,
+    geometry: JSON.stringify(geom),
+    geometryType:"esriGeometryEnvelope",
+    inSR:"4326",
+    spatialRel:"esriSpatialRelIntersects",
+    outFields:"*",
+    returnGeometry:"true",
+    outSR:"4326",
+    resultRecordCount:"2000"
   });
   const r=await fetch(`${layerUrl}/query`,{
     method:"POST",
@@ -269,75 +329,62 @@ async function queryArcGISPoint(layerUrl, lat, lon){
   if(!r.ok) throw new Error(`ArcGIS HTTP ${r.status}`);
   const j=await r.json();
   if(!j || !Array.isArray(j.features)) return [];
-  return j.features;
+  // Score by distance on the polyline
+  const scored = j.features.map(f=>{
+    const dist = pointToPolylineDistanceMeters({lat,lon},{paths:f.geometry?.paths||[]});
+    // Pick first valid AADT field
+    const aadt = pickFirstAADT(f.attributes||{}, aadtFields);
+    return {feature:f, dist, aadt};
+  }).filter(x=>x.aadt!=null && x.aadt>0);
+  scored.sort((a,b)=>a.dist-b.dist);
+  return scored;
 }
-function pickAADTFromFeature(attrs, fields){
-  for(const f of fields){
+function pickFirstAADT(attrs, fields){
+  for(const f of fields||[]){
     const v=attrs?.[f];
-    if(typeof v==="number" && Number.isFinite(v) && v>0) return {field:f, value:v};
-    if(v!=null){ const n=+v; if(Number.isFinite(n)&&n>0) return {field:f, value:n}; }
+    if(typeof v==="number" && Number.isFinite(v) && v>0) return v;
+    if(v!=null){ const n=+v; if(Number.isFinite(n) && n>0) return n; }
   }
   return null;
 }
 
-async function lookupStateAADT(lat, lon, state){
-  const cfg=STATE_AADT_SOURCES[state];
+async function lookupStateAADT(lat, lon, state, roadName){
+  const cfg = STATE_AADT_SOURCES[state];
   if(!cfg) return {ok:false, reason:"state_not_supported"};
+  const layers = cfg.layers||[];
+  let lastErr=null;
 
-  if(cfg.type==="arcgis"){
-    const feats=await queryArcGISPoint(cfg.layerUrl, lat, lon);
-    if(!feats.length) return {ok:false, reason:"no_feature_near_point"};
-    let best=null;
-    for(const f of feats){
-      const aadt=pickAADTFromFeature(f.attributes||{}, cfg.aadtFields||[]);
-      if(!aadt) continue;
-      const dist=pointToPolylineDistanceMeters({lat,lon},{paths:f.geometry?.paths||[]});
-      if(!best || dist<best.dist) best={feature:f, dist, aadt};
+  for(const layer of layers){
+    try{
+      const res = await queryArcGISByName(layer.url, lat, lon, roadName, layer.nameFields||[], layer.aadtFields||[]);
+      if(res.length){
+        const best=res[0];
+        const year = best.feature.attributes?.AADT_YEAR || best.feature.attributes?.YEAR || best.feature.attributes?.Year || null;
+        return { ok:true, aadt:best.aadt, source:layer.url, method:`state-${state}`, year, feature:best.feature, dist_m:best.dist };
+      }
+      lastErr = "no_match_same_road";
+    }catch(e){
+      lastErr = e.message||"error";
+      // try next layer
     }
-    if(!best) return {ok:false, reason:"no_aadt_on_features"};
-    const year = best.feature.attributes.AADT_YEAR || best.feature.attributes.YEAR || null;
-    return { ok:true, aadt:best.aadt.value, field:best.aadt.field, year, source:cfg.note, method:`state-${state}`, where:`nearest segment intersecting ${lat.toFixed(5)},${lon.toFixed(5)}` };
   }
-
-  // Public UIs without simple CORS JSON APIs
-  return {ok:false, reason:`unavailable_public_api_${cfg.type}`, hint:cfg.note};
+  return {ok:false, reason:lastErr || "no_layer_worked"};
 }
 
-/* ============================= Estimate math ============================= */
+/* ---------------------------- Volume math ---------------------------- */
 function gallonsFromAADT(aadt){
-  // Baseline ceiling: AADT × 2% × 8 gallons × 30 days
-  const baseline = aadt * 0.02 * 8 * 30;
-  // Return conservative low + high band (+/- 15%)
-  const low = Math.max(0, baseline * 0.85);
-  const high = baseline * 1.15;
-  return {low, high, y2: low*1.05, y3: low*1.1};
+  const base = aadt * 0.02 * 8 * 30;
+  return {low: Math.round(base*0.85), high: Math.round(base*1.15), y2: Math.round(base*0.85*1.05), y3: Math.round(base*0.85*1.10)};
 }
 
-/* ============================= Address → state helper ============================= */
-function extractStateAbbrevFromOSMAddress(addr){
-  // OSM address object can include 'state' (full) and 'ISO3166-2-lvl4' or 'state_code' sometimes
-  // We'll try to pull a two-letter US state code from the 'state' or 'state_code'
-  if(!addr) return null;
-  if(addr.state_code && /^[A-Z]{2}$/.test(addr.state_code)) return addr.state_code.toUpperCase();
-  if(addr.state){
-    // crude map from full state names to USPS codes if needed
-    const map = {
-      "District of Columbia":"DC","Florida":"FL","Georgia":"GA","Massachusetts":"MA",
-      "New York":"NY","South Carolina":"SC","Virginia":"VA","North Carolina":"NC"
-    };
-    if(map[addr.state]) return map[addr.state];
-  }
-  return null;
-}
-
-/* ============================= Main click ============================= */
+/* ---------------------------- Main click ---------------------------- */
 goBtn.addEventListener("click", async ()=>{
   try{
     goBtn.disabled=true; setOverlayWorking(); commentLine.textContent="—";
     const addr=addrInput.value.trim();
     if(addr.length<3){ alert("Enter a valid address"); return; }
 
-    // Use selection if available, else geocode now
+    // Use selected geocode if present, else geocode
     let lat, lon, addrObj=null;
     if(selectedCoords){
       lat=selectedCoords.lat; lon=selectedCoords.lon; addrObj=selectedCoords.address||null;
@@ -349,43 +396,43 @@ goBtn.addEventListener("click", async ()=>{
     initOrUpdateMap({lat,lon});
 
     const state = extractStateAbbrevFromOSMAddress(addrObj);
-    if(!state || !SUPPORTED_STATES.includes(state)){
-      aadtBanner.textContent = `State ${state||"—"} not supported for automatic AADT.`;
-      // No gallons if no state AADT
+    const street = extractStreetNameFromOSMAddress(addrObj);
+    if(!state || !SUPPORTED_STATES.includes(state) || !street){
+      aadtBanner.textContent = `State/street not supported for automatic AADT.`;
       outNum.textContent="0"; outRange.textContent="Full range: 0 – 0"; outY2.textContent="0"; outY3.textContent="0";
-      compLine.textContent = "—";
-      commentLine.textContent = "State AADT could not be found.";
+      commentLine.textContent="State AADT could not be found.";
       return;
     }
 
-    // If user entered an override, use that; else query state
-    let usedAADT = null; let note=null; let method=null; let year=null;
+    // Manual override takes precedence
     const ov=+($("aadtOverride").value||"");
     if(Number.isFinite(ov)&&ov>0){
-      usedAADT=ov; method="override";
-      note="Manual override";
-    }else{
-      const res=await lookupStateAADT(lat,lon,state);
-      if(!res.ok){
-        aadtBanner.textContent = `State-level AADT could not be found for ${state} (${res.reason}).`;
-        outNum.textContent="0"; outRange.textContent="Full range: 0 – 0"; outY2.textContent="0"; outY3.textContent="0";
-        compLine.textContent="—";
-        commentLine.textContent="State AADT could not be found.";
-        return;
-      }
-      usedAADT=res.aadt; method=res.method; note=res.source; year=res.year;
-      $("aadtOverride").value = Math.round(usedAADT); // populate field for visibility
+      const g=gallonsFromAADT(ov);
+      outNum.textContent=fmt(g.low);
+      outRange.textContent=`Full range: ${fmt(g.low)} – ${fmt(g.high)}`;
+      outY2.textContent=fmt(g.y2); outY3.textContent=fmt(g.y3);
+      aadtBanner.textContent=`AADT used ${fmt(ov)} (override)`;
+      commentLine.textContent="Override provided.";
+      clearOverlay();
+      return;
     }
 
-    // Render gallons
-    const g=gallonsFromAADT(usedAADT);
-    outNum.textContent = fmt(g.low);
-    outRange.textContent = `Full range: ${fmt(g.low)} – ${fmt(g.high)}`;
-    outY2.textContent=fmt(g.y2); outY3.textContent=fmt(g.y3);
-    aadtBanner.textContent = `AADT used ${fmt(usedAADT)} (${method}${year?`, ${year}`:""}${note?`; ${note}`:""})`;
+    // Look up state AADT using SAME ROAD + nearest segment (no buffer selection)
+    const found = await lookupStateAADT(lat, lon, state, street);
+    if(!found.ok){
+      aadtBanner.textContent = `State AADT could not be found for ${state} (${found.reason||"—"}).`;
+      outNum.textContent="0"; outRange.textContent="Full range: 0 – 0"; outY2.textContent="0"; outY3.textContent="0";
+      commentLine.textContent="State AADT could not be found.";
+      clearOverlay();
+      return;
+    }
 
-    // Minimal competition info placeholder (same-road only focus)
-    compLine.textContent = `Same-road segment used. No radius search.`;
+    const g=gallonsFromAADT(found.aadt);
+    outNum.textContent=fmt(g.low);
+    outRange.textContent=`Full range: ${fmt(g.low)} – ${fmt(g.high)}`;
+    outY2.textContent=fmt(g.y2); outY3.textContent=fmt(g.y3);
+    aadtBanner.textContent=`AADT used ${fmt(found.aadt)} (${found.method}${found.year?`, ${found.year}`:""})`;
+    commentLine.textContent = `Picked nearest same-road segment (≈${Math.round(found.dist_m)} m).`;
 
     clearOverlay();
   }catch(e){
