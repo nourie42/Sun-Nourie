@@ -1,8 +1,6 @@
 // Fuel IQ API v2025-08-29y — competition ≥5 -> 50%, rating_by_location fallback, GPT summary always
 import express from "express";
 import cors from "cors";
-import fs from "fs/promises";
-
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -33,6 +31,7 @@ app.get("/health", (_req, res) => res.json({ ok: true }));
 const UA = "FuelEstimator/3.4 (+your-app)";
 const CONTACT = process.env.OVERPASS_CONTACT || UA;
 
+const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || "";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 
 const BING_NEWS_KEY = process.env.BING_NEWS_KEY || "";
@@ -55,126 +54,8 @@ const PERMIT_HTML_URLS = (process.env.PERMIT_HTML_URLS || "")
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);
-const GOOGLE_API_KEY = "AIzaSyBKkUjhXbYeIA3jDMxvS8fExTlcPMIchs8"; // <-- hard-coded key
 
-// ---------- Developments CSV ----------
-// Preload the developments_data.csv at server start. We parse the CSV file into
-// an array of objects for quick lookup by city/county and state. The CSV file
-// lives in the public directory alongside the UI. If the file cannot be
-// loaded or parsed, the csvDevData array will remain empty and no CSV
-// developments will be returned.
-
-let csvDevData = [];
-
-// Parse a CSV string into an array of rows. Handles quoted values and escaped
-// quotes. This implementation mirrors the client‑side parser in
-// public/developments.html to ensure consistency. It splits on commas when
-// outside of quoted fields and on newlines for row breaks.
-function parseCsvString(csv) {
-  const rows = [];
-  let row = [];
-  let value = '';
-  let inQuotes = false;
-  for (let i = 0; i < csv.length; i++) {
-    const char = csv[i];
-    if (char === '"' && csv[i + 1] === '"') {
-      value += '"';
-      i++;
-    } else if (char === '"') {
-      inQuotes = !inQuotes;
-    } else if (char === ',' && !inQuotes) {
-      row.push(value);
-      value = '';
-    } else if ((char === '\n' || char === '\r') && !inQuotes) {
-      // Handle CR+LF or LF line endings
-      if (char === '\r' && csv[i + 1] === '\n') {
-        i++;
-      }
-      row.push(value);
-      value = '';
-      // Skip completely empty rows
-      if (row.length > 1 || row[0] !== '') {
-        rows.push(row);
-      }
-      row = [];
-    } else {
-      value += char;
-    }
-  }
-  // Push the last value/row if not empty
-  if (value !== '' || row.length > 0) {
-    row.push(value);
-    rows.push(row);
-  }
-  return rows;
-}
-
-// Transform parsed CSV rows into a list of development objects. We extract
-// city/county, state, name (brand), status, details and date from the CSV
-// columns. Rows missing both town and state are ignored. See
-// public/developments_data.csv header for column names.
-function transformCsvData(rows) {
-  if (!rows || rows.length === 0) return [];
-  const headers = rows[0];
-  const data = [];
-  for (let i = 1; i < rows.length; i++) {
-    const row = rows[i];
-    const obj = {};
-    headers.forEach((h, idx) => {
-      obj[h] = row[idx];
-    });
-    const town =
-      obj['City/County'] || obj['City/County.1'] || obj['City/County.2'] || '';
-    const state = obj['State'] || '';
-    const name = obj['Brand'] || obj['Brand.1'] || '';
-    const status = obj['Status'] || '';
-    const details =
-      obj['Details'] || obj['Details.1'] || obj['Details.2'] || '';
-    const date = obj['Date'] || obj['Date.1'] || obj['Date.2'] || '';
-    if (!town && !state) continue;
-    data.push({ name, town, state, status, details, date });
-  }
-  return data;
-}
-
-// Load and parse the CSV file into csvDevData. This function is executed on
-// startup. Errors are logged but not thrown so the server can continue.
-async function loadCsvDevData() {
-  try {
-    const csvPath = path.join(__dirname, 'public', 'developments_data.csv');
-    const file = await fs.readFile(csvPath, 'utf8');
-    const rows = parseCsvString(file);
-    csvDevData = transformCsvData(rows);
-    console.log(`Loaded ${csvDevData.length} development rows from CSV`);
-  } catch (err) {
-    console.error('Failed to load developments_data.csv', err);
-    csvDevData = [];
-  }
-}
-
-// Match CSV developments by city/county and state. We perform a case‑insensitive
-// comparison on the state and town fields. Either the city or the county may
-// match the CSV town field. Returns an array of matched development objects.
-function matchCsvDevelopments(city, county, state) {
-  if (!csvDevData || csvDevData.length === 0) return [];
-  const st = (state || '').trim().toLowerCase();
-  const cty = (city || '').trim().toLowerCase();
-  const cnty = (county || '').trim().toLowerCase();
-  return csvDevData.filter((r) => {
-    const rState = (r.state || '').trim().toLowerCase();
-    const rTown = (r.town || '').trim().toLowerCase();
-    if (!rState || !rTown) return false;
-    if (rState !== st) return false;
-    return rTown === cty || rTown === cnty;
-  });
-}
-
-// Kick off loading the CSV data. We call this without awaiting so the server
-// starts immediately. Any errors are logged above.
-loadCsvDevData().catch((err) => console.error('Error loading CSV', err));
 const TRAFFIC_URL = process.env.TRAFFIC_URL || "";
-const TRAFFIC_API_KEY = process.env.TRAFFIC_API_KEY || "";
-
 
 // ---------- Utils ----------
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -861,9 +742,8 @@ async function exhaustiveDevelopments(addrLabel, lat, lon) {
   return {
     news: ded(news).slice(0, 80),
     permits: ded(permits).slice(0, 80),
-    csv: matchCsvDevelopments(admin.city, admin.county, admin.state),
     osm: ded(osm).slice(0, 40),
-    note: bing.message
+    note: bing.message,
   };
 }
 
@@ -871,16 +751,13 @@ async function exhaustiveDevelopments(addrLabel, lat, lon) {
 app.get("/google/status", async (_req, res) => {
   try {
     if (!GOOGLE_API_KEY) return res.json({ ok: false, status: "MISSING_KEY" });
-
     const au = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=Test&components=country:us&key=${GOOGLE_API_KEY}`;
     const r = await fetchWithTimeout(au, { headers: { "User-Agent": UA } }, 10000);
-
     res.json({ ok: r.ok, status: r.ok ? "WORKING" : `HTTP_${r.status}` });
   } catch {
     res.json({ ok: false, status: "EXCEPTION" });
   }
 });
-
 app.get("/google/autocomplete", async (req, res) => {
   const q = String(req.query.input || "").trim();
   if (!q) return res.json({ ok: false, status: "BAD_REQUEST", items: [] });
@@ -1333,14 +1210,14 @@ app.post("/estimate", async (req, res) => {
       devPermits = dev.permits,
       devOSM = dev.osm;
 
-    // Roads & AADT (fixed)
-    const roads = await roadContext(geo.lat, geo.lon).catch(() => ({
-      summary: "",
-      main: [],
-      side: [],
-      signals: 0,
-      intersections: 0,
-    }));
+// Roads & AADT (fixed)
+const roads = await roadContext(geo.lat, geo.lon).catch(() => ({
+  summary: "",
+  main: [],
+  side: [],
+  signals: 0,
+  intersections: 0,
+}));
     let usedAADT = 10000,
       method = "fallback_default";
     let mapStations = [];
