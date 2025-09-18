@@ -268,20 +268,24 @@ function initOrUpdateMap(m){
 /* Google status + autocomplete */
 let GOOGLE_OK=false; let acItems=[]; let acActive=-1;
 async function checkGoogleStatus(){
-  try{
-    const r=await fetch("/google/status");
-    const j=await r.json();
-    GOOGLE_OK=!!j.ok;
-    apiStatus.textContent=j.ok?"API: Google — Working":`API: Google — ${j.status}`;
+  try {
+    const r = await fetch("/google/status");
+    const j = await r.json();
+    GOOGLE_OK = !!j.ok;
+    apiStatus.textContent = j.ok 
+      ? "API: Google — Working" 
+      : `API: Google — ${j.status}`;
   } catch {
-    GOOGLE_OK=false; apiStatus.textContent="API: Google — unavailable";
-  checkGoogleStatus
+    GOOGLE_OK = false; 
+    apiStatus.textContent = "API: Google — unavailable";
+  }
 }
+
+// Run once DOM is ready
 document.addEventListener("DOMContentLoaded", checkGoogleStatus);
 
-                          // call checkGoogleStatus immediately to update API status even if DOMContentLoaded has already fired
+// Also call immediately in case DOM is already loaded
 checkGoogleStatus();
-
 
 async function googleSearch(q){
   if(!GOOGLE_OK) return [];
