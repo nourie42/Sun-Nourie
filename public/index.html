@@ -1,92 +1,121 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Sunoco, LP Fuel IQ - Fuel Site Analyzer</title>
 
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <!-- leaflet-image (optional, kept for future) -->
+  <!-- Leaflet image export -->
   <script src="https://unpkg.com/leaflet-image/leaflet-image.js"></script>
 
+  <!-- jsPDF for PDF export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous"></script>
+
   <style>
-    :root { --bg:#0b0e15; --panel:#111725; --panel2:#0f1421; --line:#263145; --text:#eaeef7; --muted:#97a3b8;
-            --brand:#0ea5e9; --brand2:#22d3ee; --pill:#0f1929; }
+    :root { --bg:#0b0e15; --panel:#111725; --panel2:#0f1421; --line:#263145; --text:#eaeef7; --muted:#97a3b8; --brand:#0ea5e9; --brand2:#22d3ee; --pill:#0f1929; }
     *{ box-sizing:border-box; }
-    body{ background:var(--bg); color:var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-          margin:0; padding-bottom:72px; }
+    body{ background:var(--bg); color:var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin:0; padding-bottom:72px; }
     .wrap{ max-width:1120px; margin:24px auto; padding:0 16px; }
     header{ display:flex; align-items:center; gap:14px; margin-bottom:6px; }
     header h1{ font-size:28px; margin:0; letter-spacing:.2px; }
     .build{ margin-left:auto; font-size:12px; color:#8aa2c0; }
-
-    .aadt-tabs{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:8px 0 12px; }
-    .aadt-tab{ display:inline-block; padding:8px 12px; border-radius:999px; border:1px solid var(--line);
-               background:var(--pill); color:var(--text); text-decoration:none; font-weight:700; font-size:13px; }
-    .aadt-tab:hover{ background:#101a2b; }
-    @media(max-width:680px){ .aadt-tabs{ overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:4px; }
-                              .aadt-tab{ white-space:nowrap; } }
-
     .instructions{ margin:4px 0 12px; color:#cfe3ff; font-size:13px; }
 
-    .card{ background:linear-gradient(180deg,var(--panel),var(--panel2)); border:1px solid var(--line);
-           border-radius:12px; padding:16px; margin:12px 0; }
+    .card{ background:linear-gradient(180deg,var(--panel),var(--panel2)); border:1px solid var(--line); border-radius:12px; padding:16px; margin:12px 0; }
     label{ display:block; font-weight:600; margin:8px 0 6px; color:#d8e3f6; }
     input, select{ width:100%; padding:12px; border-radius:10px; border:1px solid var(--line); background:#0b1220; color:#eaeef7; }
-    button{ background:linear-gradient(135deg,var(--brand),var(--brand2)); color:#fff; border:0; padding:12px 16px;
-            border-radius:10px; font-weight:700; cursor:pointer; }
+    button{ background:linear-gradient(135deg,var(--brand),var(--brand2)); color:#fff; border:0; padding:12px 16px; border-radius:10px; font-weight:700; cursor:pointer; }
     button:disabled{ opacity:.6; cursor:not-allowed; }
 
     .row{ display:grid; grid-template-columns:1.6fr 0.7fr 0.7fr 0.8fr; gap:12px; align-items:end; }
-    @media(max-width:980px){ .row{ grid-template-columns:1fr; } }
+    @media (max-width:980px){ .row{ grid-template-columns:1fr; } }
+
     .toolbar{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:12px; }
     .muted{ color:var(--muted); }
     .subtle{ font-size:12px; opacity:.9; }
-    .hero{ display:flex; justify-content:space-between; align-items:flex-end; gap:12px; }
-    .hero .num{ font-size:44px; font-weight:900; letter-spacing:.5px; }
-    .hero .sub{ font-size:13px; color:#a9b6d0; }
 
-    #map{ height:420px; border-radius:12px; border:1px solid var(--line); position:relative; }
-    #overlay{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(11,14,21,.55);
-              border-radius:12px; font-weight:800; color:#cde9ff; font-size:18px; padding:20px; text-align:center; }
+    #map{ height:420px; border-radius:12px; border:1px solid var(--line); position: relative; }
+    #overlay{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(11,14,21,.55); border-radius:12px; font-weight:800; color:#cde9ff; font-size:18px; padding:20px; text-align:center; }
+
     #svWrap{ margin-top:10px; }
     #sv{ width:100%; height:380px; border:0; border-radius:12px; border:1px solid var(--line); background:#0b1220; }
 
     .ac-wrap{ position:relative; }
-    .ac-list{ position:absolute; top:100%; left:0; right:0; z-index:30; margin-top:6px; background:#0b1220; border:1px solid var(--line);
-              border-radius:12px; max-height:320px; overflow:auto; box-shadow:0 18px 36px rgba(0,0,0,.35); }
+    .ac-list{ position:absolute; top:100%; left:0; right:0; z-index:30; margin-top:6px; background:#0b1220; border:1px solid var(--line); border-radius:12px; max-height:320px; overflow:auto; box-shadow: 0 18px 36px rgba(0,0,0,.35); }
     .ac-item{ padding:10px 12px; cursor:pointer; border-bottom:1px solid rgba(255,255,255,.04); }
     .ac-item:last-child{ border-bottom:0; }
     .ac-item:hover, .ac-item.active{ background:#101a2b; }
+    .badge{ display:inline-block; font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); background:var(--pill); color:#a9c5ff; margin-left:8px; }
 
-    .footerbar{ position:fixed; left:0; right:0; bottom:0; background:linear-gradient(180deg,#0c1220,#0a0f1a);
-                border-top:1px solid var(--line); padding:10px 16px; display:flex; justify-content:center; gap:12px; z-index:50; }
+    details summary{ cursor:pointer; }
+    .adv-line{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-top:12px; }
+    .chip{ display:inline-flex; align-items:center; gap:8px; background:#0f1929; border:1px solid var(--line); padding:8px 10px; border-radius:999px; font-size:13px; }
+    .chip input{ width:auto; accent-color:#22d3ee; }
+    .radio-row{ display:flex; flex-wrap:wrap; gap:10px; margin-top:8px; }
+
+    .hero{ display:flex; justify-content:space-between; align-items:flex-end; gap:12px; }
+    .hero .num{ font-size:44px; font-weight:900; letter-spacing:.5px; }
+    .hero .sub{ font-size:13px; color:#a9b6d0; }
+
+    .footerbar{ position:fixed; left:0; right:0; bottom:0; background:linear-gradient(180deg,#0c1220,#0a0f1a); border-top:1px solid var(--line); padding:10px 16px; display:flex; justify-content:center; gap:12px; z-index:50; }
+
+    /* AADT tabs (NEW) */
+    .aadt-tabs {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 8px 0 12px;
+    }
+    .aadt-tab {
+      display: inline-block;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: var(--pill);
+      color: var(--text);
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 13px;
+      letter-spacing: .2px;
+    }
+    .aadt-tab:hover { background: #101a2b; }
+    @media (max-width: 680px) {
+      .aadt-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
+      .aadt-tab { white-space: nowrap; }
+    }
   </style>
 </head>
 <body>
   <div class="wrap">
     <header>
       <h1>Sunoco, LP Fuel IQ - Fuel Site Analyzer</h1>
-      <span class="build">UI v2025-09-18 (state AADT only)</span>
+      <span class="build">UI v2025-08-29d</span>
+      <!-- Safe link to the standalone developments page -->
+      <a href="developments.html" style="padding:8px 14px; background:#22d3ee; border-radius:8px; color:#00121e; font-weight:600; text-decoration:none;">Developments Search</a>
+      <!-- PA AADT Map button -->
+      <a href="PA_Signals_AADT_Radius_Map_Final_Generated.html" style="padding:8px 14px; background:#f87171; border-radius:8px; color:#00121e; font-weight:600; text-decoration:none;">PA AADT Map</a>
+      <a href="Scraper.html" style="padding:8px 14px; background:#34d399; border-radius:8px; color:#00121e; font-weight:600; text-decoration:none;">Prospector</a>
     </header>
 
-    <!-- State AADT quick links -->
+    <!-- AADT quick links (NEW) -->
     <nav class="aadt-tabs" aria-label="State AADT Quick Links">
       <span class="muted">State AADT Quick Links:</span>
-      <a class="aadt-tab" href="https://opendata.dc.gov/datasets/DCGIS::2023-traffic-volume/explore" target="_blank" rel="noopener">DC</a>
-      <a class="aadt-tab" href="https://gis-fdot.opendata.arcgis.com/datasets/fdot::annual-average-daily-traffic-tda/explore" target="_blank" rel="noopener">FL</a>
-      <a class="aadt-tab" href="https://gdottrafficdata.drakewell.com/publicmultinodemap.asp" target="_blank" rel="noopener">GA</a>
-      <a class="aadt-tab" href="https://mhd.public.ms2soft.com/tcds/tsearch.asp?loc=Mhd&mod" target="_blank" rel="noopener">MA</a>
-      <a class="aadt-tab" href="https://nysdottrafficdata.drakewell.com/publicmultinodemap.asp" target="_blank" rel="noopener">NY</a>
-      <a class="aadt-tab" href="https://scdottrafficdata.drakewell.com/publicmultinodemap.asp" target="_blank" rel="noopener">SC</a>
-      <a class="aadt-tab" href="https://www.arcgis.com/apps/webappviewer/index.html?id=35e4c06de0f84a9c9f3fe18e67cd2c92" target="_blank" rel="noopener">VA</a>
-      <a class="aadt-tab" href="https://ncdot.public.ms2soft.com/tdms.ui_core/trafficviewer" target="_blank" rel="noopener">NC</a>
+      <a class="aadt-tab" href="https://opendata.dc.gov/datasets/DCGIS::2023-traffic-volume/explore" target="_blank" rel="noopener noreferrer" title="District of Columbia AADT map">DC</a>
+      <a class="aadt-tab" href="https://gis-fdot.opendata.arcgis.com/datasets/fdot::annual-average-daily-traffic-tda/explore" target="_blank" rel="noopener noreferrer" title="Florida AADT map">FL</a>
+      <a class="aadt-tab" href="https://gdottrafficdata.drakewell.com/publicmultinodemap.asp" target="_blank" rel="noopener noreferrer" title="Georgia AADT map">GA</a>
+      <a class="aadt-tab" href="https://mhd.public.ms2soft.com/tcds/tsearch.asp?loc=Mhd&mod" target="_blank" rel="noopener noreferrer" title="Massachusetts AADT map">MA</a>
+      <a class="aadt-tab" href="https://nysdottrafficdata.drakewell.com/publicmultinodemap.asp" target="_blank" rel="noopener noreferrer" title="New York AADT map">NY</a>
+      <a class="aadt-tab" href="https://scdottrafficdata.drakewell.com/publicmultinodemap.asp" target="_blank" rel="noopener noreferrer" title="South Carolina AADT map">SC</a>
+      <a class="aadt-tab" href="https://www.arcgis.com/apps/webappviewer/index.html?id=35e4c06de0f84a9c9f3fe18e67cd2c92" target="_blank" rel="noopener noreferrer" title="Virginia AADT map">VA</a>
+      <a class="aadt-tab" href="https://ncdot.public.ms2soft.com/tdms.ui_core/trafficviewer" target="_blank" rel="noopener noreferrer" title="North Carolina AADT map">NC</a>
     </nav>
 
     <div class="instructions">
-      <b>Instructions:</b> Enter Address, click <i>Estimate</i>. This uses <b>state AADT only</b>, matching the <b>same road name</b> at your address and picking the <b>true closest segment</b>. If we can’t reach that state’s API/field, you’ll see a clear comment.
+      <b>Instructions:</b> Enter Address, Click <i>Estimate</i>. Do not exit your browser or let your phone screen shut off until results are ready or you will encounter errors. Click <i>Advanced Options</i> to make changes.
     </div>
 
     <!-- Inputs -->
@@ -98,7 +127,7 @@
             <input id="addr" placeholder="Enter business or address" autocomplete="off"/>
             <div id="ac" class="ac-list" style="display:none;"></div>
           </div>
-          <div class="muted subtle" style="margin-top:6px" id="apiStatus">Geocoder: ready</div>
+          <div class="muted subtle" style="margin-top:6px" id="apiStatus">API Status: checking…</div>
         </div>
         <div><label>Regular MPDs</label><input id="mpds" type="number" value="3" min="1"/></div>
         <div><label>Diesel MPDs</label><input id="diesel" type="number" value="0" min="0"/></div>
@@ -106,8 +135,36 @@
       </div>
       <div class="toolbar">
         <button id="go">Estimate</button>
-        <span class="muted">Baseline: AADT × 2% × 8 × 30 • State AADT only</span>
+        <span class="muted">Baseline ceiling (AADT×2%×8×30) • competition rule • pricing effect • caps • road layout</span>
       </div>
+    </div>
+
+    <!-- Advanced -->
+    <div class="card">
+      <details>
+        <summary><b>Advanced options</b></summary>
+        <div class="adv-line">
+          <label class="chip"><input type="checkbox" id="ex_large_dev"> Large residential or commercial developments being built (+7.5%)</label>
+          <label class="chip"><input type="checkbox" id="ex_hours18"> Operating hours 18h (−7.5%)</label>
+          <label class="chip"><input type="checkbox" id="ex_highincome"> Higher-income trade area (+2.5%)</label>
+          <label class="chip"><input type="checkbox" id="ex_lowrating"> Ratings below 4.0 / Poorly run site (−30%)</label>
+          <label class="chip"><input type="checkbox" id="ex_competitive_pricing"> Competitive site gas pricing (+10%)</label>
+          <label class="chip"><input type="checkbox" id="ex_rural"> Rural Location Bonus (No competition within 3 miles) (+30%)</label>
+        </div>
+        <div style="margin-top:8px;">
+          <label><b>Gas pricing vs area</b></label>
+          <div class="radio-row">
+            <label class="chip"><input type="radio" name="pricepos" value="below"> Below competition (+10%)</label>
+            <label class="chip"><input type="radio" name="pricepos" value="inline" checked> In line (0%)</label>
+            <label class="chip"><input type="radio" name="pricepos" value="above"> Above competition (−10%)</label>
+          </div>
+        </div>
+        <div class="adv-line">
+          <span class="chip" id="addExtra" style="cursor:pointer;">+ Add adj. (%)</span>
+          <span id="activeExtras" class="subtle"></span>
+        </div>
+        <div id="extraList" style="margin-top:8px;"></div>
+      </details>
     </div>
 
     <!-- Estimate -->
@@ -125,323 +182,320 @@
       </div>
       <hr/>
       <div id="aadtBanner" class="muted">—</div>
-      <div id="compLine" class="muted">Same-road selection (no radius).</div>
-      <div id="commentLine" class="muted" style="margin-top:6px;">—</div>
+      <div id="compLine" class="muted">—</div>
     </div>
 
     <!-- Map & SV -->
     <div class="card">
-      <div class="muted">Map: Site</div>
+      <div class="muted">Map: Site & competitors (1.5 mi)</div>
       <div id="map"><div id="overlay" class="muted">—</div></div>
-      <div id="svWrap">
-        <div class="muted" style="margin-top:10px;">Street View</div>
-        <iframe id="sv" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
-      </div>
+      <div id="svWrap"><div class="muted" style="margin-top:10px;">Street View</div><iframe id="sv" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div>
     </div>
+
+    <!-- Developments -->
+    <div class="card"><b>Developments — OSM</b><div id="devs" class="muted">—</div></div>
+    <div class="card"><b>Developments — News</b><div id="devsExternalNews" class="muted">—</div></div>
+    <div class="card"><b>Developments — Permits</b><div id="devsExternalPermits" class="muted">—</div></div>
+
+    <div class="card"><b>Google Rating</b><div id="ratingLine" class="muted">—</div></div>
+    <div class="card"><b>Summary (GPT)</b><div id="summary" class="muted">—</div></div>
   </div>
 
-  <div class="footerbar"><span class="muted subtle">Sunoco Fuel IQ — State AADT Only</span></div>
+  <div class="footerbar"><button id="exportPDF">Export to PDF</button></div>
 
 <script>
-/* ----------------------------- DOM & helpers ----------------------------- */
+/* DOM helpers */
 const $=id=>document.getElementById(id);
-const apiStatus=$("apiStatus"), aadtBanner=$("aadtBanner"), compLine=$("compLine"), commentLine=$("commentLine"),
-      overlay=$("overlay"), svFrame=$("sv"),
-      outNum=$("estNum"), outRange=$("estRange"), outY2=$("y2"), outY3=$("y3"),
-      addrInput=$("addr"), acBox=$("ac"), goBtn=$("go");
+const apiStatus=$("apiStatus"), aadtBanner=$("aadtBanner"), compLine=$("compLine"), overlay=$("overlay"), svFrame=$("sv");
+const outNum=$("estNum"), outRange=$("estRange"), outY2=$("y2"), outY3=$("y3");
+const devsBox=$("devs"), devsExtNews=$("devsExternalNews"), devsExtPermits=$("devsExternalPermits"), summaryBox=$("summary"), ratingLine=$("ratingLine");
+const addrInput=$("addr"), acBox=$("ac"), goBtn=$("go");
+const addExtraBtn=$("addExtra"), extraList=$("extraList"), activeExtras=$("activeExtras");
+const ex_large_dev=$("ex_large_dev"), ex_hours18=$("ex_hours18"), ex_highincome=$("ex_highincome"), ex_lowrating=$("ex_lowrating"), ex_competitive_pricing=$("ex_competitive_pricing"), ex_rural=$("ex_rural");
 
-let map, layer, mapReady=false, selectedCoords=null;
+/* Map state */
+let map, layer, mapReady=false, selectedCoords=null, selectedPlaceId=null;
+
+/* Utils */
 function fmt(n){ return (n??0).toLocaleString(undefined,{maximumFractionDigits:0}); }
+function esc(s){ return (s??"").toString().replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
 function setOverlayWorking(){ overlay.textContent="Working…"; overlay.style.display="flex"; }
 function clearOverlay(){ overlay.style.display="none"; }
 
-function initMap(){
-  if(mapReady) return;
-  map=L.map("map",{zoomControl:true}); window.map=map;
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap"}).addTo(map);
-  layer=L.layerGroup().addTo(map);
-  mapReady=true;
-}
-function updateStreetView(lat, lon){
-  svFrame.src=`https://maps.google.com/maps?q=&layer=c&cbll=${lat},${lon}&cbp=12,0,,0,0&output=svembed`;
-}
-function initOrUpdateMap(site){
-  if(!mapReady) initMap();
-  layer.clearLayers();
-  if(!site){ setOverlayWorking(); return; }
-  const siteLatLng=[site.lat,site.lon];
-  L.marker(siteLatLng,{title:"Site"}).addTo(layer).bindPopup("<b>Site</b>");
-  map.setView(siteLatLng, 16);
-  clearOverlay();
-  updateStreetView(site.lat,site.lon);
+/* Map + SV */
+function initMap(){ if(mapReady) return; map=L.map("map",{zoomControl:true}); window.map=map; L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map); layer=L.layerGroup().addTo(map); mapReady=true; }
+function updateStreetView(lat, lon){ svFrame.src=`https://maps.google.com/maps?q=&layer=c&cbll=${lat},${lon}&cbp=12,0,,0,0&output=svembed`; }
+
+function renderAADTMarkers(list) {
+  if (!Array.isArray(list)) return;
+  for (const rec of list) {
+    if (!Number.isFinite(rec.lat) || !Number.isFinite(rec.lon) || !Number.isFinite(rec.aadt)) continue;
+    const val = rec.aadt;
+    let color;
+    if (val >= 30000) color = "#be123c";
+    else if (val >= 20000) color = "#f97316";
+    else if (val >= 10000) color = "#eab308";
+    else color = "#84cc16";
+    L.circleMarker([rec.lat, rec.lon], {
+      radius: 5,
+      weight: 1,
+      color,
+      fillColor: color,
+      fillOpacity: 0.8
+    }).addTo(layer).bindPopup("AADT: " + fmt(val));
+  }
 }
 
-/* -------------------------- Autocomplete (OSM) -------------------------- */
-let acItems=[]; let acActive=-1;
+function initOrUpdateMap(m){
+  if(!mapReady){ initMap(); }
+  layer.clearLayers();
+  if(!m||!m.site){ setOverlayWorking(); return; }
+  const site=[m.site.lat,m.site.lon];
+  L.marker(site,{title:"Site"}).addTo(layer).bindPopup("<b>Site</b>");
+  const pts=[site];
+  for(const c of (m.competitors||[])){
+    if(!Number.isFinite(c.lat)||!Number.isFinite(c.lon)) continue;
+    pts.push([c.lat,c.lon]);
+    L.circleMarker([c.lat,c.lon],{radius:6,weight:1,color:c.heavy?"#ff7f50":"#4ade80",fillColor:c.heavy?"#ff7f50":"#4ade80",fillOpacity:.9}).addTo(layer).bindPopup(`${esc(c.name||"Fuel")} • ${c.miles} mi`);
+  }
+  map.fitBounds(L.latLngBounds(pts).pad(0.25));
+  if(m.aadt) renderAADTMarkers(m.aadt);
+  clearOverlay();
+  updateStreetView(site[0], site[1]);
+}
+
+/* Google status + autocomplete */
+let GOOGLE_OK=false; let acItems=[]; let acActive=-1;
+async function checkGoogleStatus(){
+  try{
+    const r=await fetch("/google/status");
+    const j=await r.json();
+    GOOGLE_OK=!!j.ok;
+    apiStatus.textContent=j.ok?"API: Google — Working":`API: Google — ${j.status}`;
+  } catch {
+    GOOGLE_OK=false; apiStatus.textContent="API: Google — unavailable";
+  }
+}
+document.addEventListener("DOMContentLoaded", checkGoogleStatus);
+
+async function googleSearch(q){
+  if(!GOOGLE_OK) return [];
+  try{
+    const r=await fetch(`/google/autocomplete?input=${encodeURIComponent(q)}`);
+    const j=await r.json(); if(!j.ok) return [];
+    return (j.items||[]).map(it=>({...it,type:"Google",score:1.3}));
+  }catch{return[];}
+}
 async function nominatimSearch(q){
   try{
-    const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=us&q=${encodeURIComponent(q)}`,{
-      headers:{ "Accept-Language":"en-US" }
-    });
+    const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=us&q=${encodeURIComponent(q)}`);
     const a=await r.json();
-    return a.map(row=>({ type:"OSM", display:row.display_name, lat:+row.lat, lon:+row.lon, address:row.address }));
-  }catch{ return []; }
+    return a.map(row=>({ type:"OSM", display:row.display_name, lat:+row.lat, lon:+row.lon, score:0.6 }));
+  }catch{return[];}
 }
 function renderAc(list){
   if(!list.length){ acBox.style.display="none"; return; }
-  acBox.innerHTML=list.map((it,i)=>`<div class="ac-item${i===acActive?" active":""}" data-i="${i}">${it.display}</div>`).join("");
+  acBox.innerHTML=list.map((it,i)=>`<div class="ac-item${i===acActive?" active":""}" data-i="${i}">${esc(it.display)} <span class="badge">${it.type}</span></div>`).join("");
   [...acBox.children].forEach(el=>el.onclick=()=>chooseAc(+el.dataset.i));
   acBox.style.display="block";
 }
 function chooseAc(i){
   const it=acItems[i]; if(!it) return;
   addrInput.value=it.display;
-  selectedCoords={lat:it.lat,lon:it.lon, address:it.address};
+  selectedCoords=(Number.isFinite(it.lat)&&Number.isFinite(it.lon))?{lat:it.lat,lon:it.lon}:null;
+  selectedPlaceId=it.place_id||null;
   acBox.style.display="none";
 }
-addrInput.addEventListener("input", async ()=>{
-  const q=addrInput.value.trim(); if(q.length<3){ acBox.style.display="none"; return; }
-  const n=await nominatimSearch(q); acItems=n.slice(0,8); renderAc(acItems);
+addrInput.addEventListener("input",()=>{
+  const q=addrInput.value.trim(); if(q.length<3) return;
+  Promise.all([googleSearch(q),nominatimSearch(q)]).then(([g,n])=>{
+    acItems=[...g,...n].slice(0,8); renderAc(acItems);
+  });
+});
+
+/* Advanced badges */
+function pills(){
+  const p=[];
+  if(ex_large_dev.checked)p.push("+7.5% Large development nearby");
+  if(ex_hours18.checked)p.push("−7.5% 18h ops");
+  if(ex_highincome.checked)p.push("+2.5% Higher-income");
+  if(ex_lowrating.checked)p.push("−30% Rating < 4.0");
+  if(ex_competitive_pricing.checked)p.push("+10% Competitive site gas pricing");
+  if(ex_rural.checked)p.push("+30% Rural bonus (0 comps within 3 mi)");
+  activeExtras.innerHTML=p.map(x=>`<span class="badge">${esc(x)}</span>`).join(" ");
+}
+[ex_large_dev,ex_hours18,ex_highincome,ex_lowrating,ex_competitive_pricing,ex_rural].forEach(el=>el.addEventListener("change",pills));
+
+function addExtraRow(pct="",note=""){
+  const row=document.createElement("div");
+  row.style.marginTop="6px";
+  row.innerHTML=`<span class="chip"><input class="extraPct" type="number" step="0.1" style="width:90px" placeholder="% e.g. 5 or -3" value="${pct}"> <input class="extraNote" style="width:320px" placeholder="Comment" value="${esc(note)}"> <button class="rm" type="button">×</button></span>`;
+  row.querySelector(".rm").addEventListener("click",()=>row.remove());
+  extraList.appendChild(row);
+}
+$("addExtra").addEventListener("click",()=>addExtraRow());
+
+function collectExtras(){
+  const out=[];
+  if(ex_large_dev.checked) out.push({pct:7.5, note:"Large residential/commercial developments"});
+  if(ex_hours18.checked) out.push({pct:-7.5, note:"18h ops"});
+  if(ex_highincome.checked) out.push({pct:2.5, note:"Higher income"});
+  if(ex_lowrating.checked) out.push({pct:-30, note:"Rating <4.0"});
+  if(ex_competitive_pricing.checked) out.push({pct:10, note:"Competitive site gas pricing"});
+  for(const chip of extraList.querySelectorAll(".chip")){
+    const pct=+chip.querySelector(".extraPct").value;
+    const note=chip.querySelector(".extraNote").value.trim();
+    if(Number.isFinite(pct)) out.push({pct, note});
+  }
+  return out;
+}
+function getFlags(){ return { rural: ex_rural.checked === true }; }
+function getPricePosition(){ const r=document.querySelector('input[name="pricepos"]:checked'); return r ? r.value : "inline"; }
+
+/* API calls */
+async function safeJSON(url,opts){
+  const r=await fetch(url,opts);
+  const t=await r.text();
+  if(!r.ok) throw new Error(`HTTP ${r.status}\n${t.slice(0,1200)}`);
+  try{ return JSON.parse(t);}catch{ throw new Error("Bad JSON"); }
+}
+async function callEstimate(){
+  const body={
+    address: addrInput.value.trim(),
+    mpds:+$("mpds").value||0,
+    diesel:+$("diesel").value||0,
+    advanced:{
+      extra: collectExtras(),
+      flags: getFlags(),
+      price_position: getPricePosition()
+    }
+  };
+  if(selectedCoords){ body.siteLat=selectedCoords.lat; body.siteLon=selectedCoords.lon; }
+  const ov=+($("aadtOverride").value||"");
+  if(Number.isFinite(ov)&&ov>0) body.aadtOverride=ov;
+  return await safeJSON("/estimate",{ method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
+}
+
+/* Render */
+function renderAll(d){
+  outNum.textContent = fmt(d.low);
+  outRange.textContent = `Full range: ${fmt(d.low)} – ${fmt(d.high)}`;
+  outY2.textContent=fmt(d.year2); outY3.textContent=fmt(d.year3);
+
+  const method = d.inputs?.aadt_components?.method || "model";
+  aadtBanner.textContent=`AADT used ${fmt(d.inputs.aadt_used)} (${method})`;
+
+  let compTxt=`Competition: ${d.competition.count} within 1.5 mi`;
+  if(d.competition.nearest_mi!=null) compTxt += `; nearest ${(+d.competition.nearest_mi).toFixed(3)} mi`;
+  if((d.competition.notable_brands||[]).length) compTxt += `; heavy: ${d.competition.notable_brands.join(", ")}`;
+  if(d.flags?.rural_bonus_applied) compTxt += `; rural bonus +30% applied`;
+  compLine.textContent = compTxt;
+
+  devsBox.innerHTML = (d.developments||[]).length ? "<ul>"+d.developments.map(x=>`<li>${esc(x.name)} • ${esc(x.status)}${x.approx_miles!=null?` • ~${x.approx_miles} mi`:''}</li>`).join("")+"</ul>" : "<em>none</em>";
+  devsExtNews.innerHTML = (d.developments_external?.news||[]).length ? "<ul>"+d.developments_external.news.map(x=>`<li>${esc(x.name)} • ${esc(x.status)}${x.link?` • <a href="${x.link}" target="_blank">source</a>`:''}</li>`).join("")+"</ul>" : "<em>none</em>";
+  devsExtPermits.innerHTML = (d.developments_external?.permits||[]).length ? "<ul>"+d.developments_external.permits.map(x=>`<li>${esc(x.name)} • ${esc(x.status)}${x.link?` • <a href="${x.link}" target="_blank">source</a>`:''}</li>`).join("")+"</ul>" : "<em>none</em>";
+
+  // Summary fallback
+  let s = (d.summary||"").trim();
+  if(!s){
+    s = `AADT used ${fmt(d.inputs?.aadt_used)} (${method}). Baseline ceiling active. Competition ${d.competition?.count ?? 0} within 1.5 mi. Est. LOW ${fmt(d.low)} gal/mo (range ${fmt(d.low)}–${fmt(d.high)}).`;
+  }
+  summaryBox.textContent = s;
+
+  initOrUpdateMap(d.map);
+  showRating(addrInput.value.trim());
+}
+
+/* Rating */
+async function resolvePlaceIdIfNeeded(address){
+  if (selectedPlaceId) return selectedPlaceId;
+  try{
+    const r=await fetch(`/google/findplace?input=${encodeURIComponent(address)}`);
+    const j=await r.json(); if(j.ok && j.place_id) return j.place_id;
+  }catch{}
+  return null;
+}
+async function showRating(address){
+  const pid=await resolvePlaceIdIfNeeded(address);
+  if(!pid){ ratingLine.innerHTML="—"; return; }
+  try{
+    const r=await fetch(`/google/rating?place_id=${encodeURIComponent(pid)}`);
+    const j=await r.json();
+    if(!j.ok){ ratingLine.innerHTML="—"; return; }
+    ratingLine.innerHTML = `⭐ ${j.rating ?? "—"} (${j.total||0} reviews)`;
+  }catch{ ratingLine.innerHTML="—"; }
+}
+
+/* Main */
+$("go").addEventListener("click", async ()=>{
+  try{
+    goBtn.disabled=true; setOverlayWorking();
+    const d=await callEstimate();
+    renderAll(d); pills();
+  } catch(e){
+    alert("Error: "+(e.message||e));
+  } finally{
+    goBtn.disabled=false; clearOverlay();
+  }
 });
 addrInput.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); $("go").click(); } });
 
-/* ---------------------------- State AADT config ---------------------------- */
-/* For each state: list FeatureServer layers to try, candidate AADT fields, and candidate "road name" fields */
-const STATE_AADT_SOURCES = {
-  "DC": {
-    layers: [
-      {url:"https://rh.dcgis.dc.gov/dcgis/rest/services/DDOT/DDOTLRS/FeatureServer/24", aadtFields:["AADT","AADT_VALUE"], nameFields:["ROADNAME","ROUTE_NAME","STREETNAME","NAME"]}
-    ]
-  },
-  "FL": {
-    layers: [
-      {url:"https://gis.fdot.gov/arcgis/rest/services/RCI_Layers/FeatureServer/0", aadtFields:["AADT","AADT_TOTAL","AADT_CUR"], nameFields:["FACILITY","ST_NAME","STREETNAME","RD","RDNAME"]}
-    ]
-  },
-  "VA": {
-    layers: [
-      {url:"https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/VDOTTrafficVolume/FeatureServer/0", aadtFields:["AADT","TOTAL_V"], nameFields:["RTE_NAME","ROADNAME","PRIMARY_NA","ROUTE_NAME","RTE_NUM","STREET"]}
-    ]
-  },
-  "NC": {
-    layers: [
-      {url:"https://services.arcgis.com/NuWFvHYDMVmmxMeM/arcgis/rest/services/NCDOT_AADT_Traffic_Segmentation/FeatureServer/1", aadtFields:["AADT","AADT_TOTAL"], nameFields:["ROUTE","STREETNAME","ST_NAME","RD_NAME","PRIMARY_NM"]}
-    ]
-  },
-  "NY": {
-    layers: [
-      {url:"https://gis.dot.ny.gov/hostingny/rest/services/Roadways/Traffic_Monitoring/FeatureServer/1", aadtFields:["AADT","AADT2019","AADT_VALUE"], nameFields:["RoadwayName","RTE_NAME","STREETNAME","NAME"]}
-    ]
-  },
-  "GA": {
-    layers: [
-      /* 2020 truck/AADT layer with AADT present */
-      {url:"https://services2.arcgis.com/I9cUOJUZvdGAJncI/ArcGIS/rest/services/GCFHData/FeatureServer/25", aadtFields:["AADT","AADT_TOTAL","AADT_2020"], nameFields:["STREETNAME","ROUTE_NAME","RDNAME","NAME","ST_NAME"]}
-      /* Add more GA FeatureServer URLs here if you have fresher AADT */
-    ]
-  },
-  "SC": {
-    layers: [
-      /* common SCDOT hubs sometimes expose AADT/traffic counts as FeatureServer; add/adjust if your org uses a different item */
-      {url:"https://services.arcgis.com/OfH668nDRN7tbJh0/ArcGIS/rest/services/SC_DOT_Traffic_Counts/FeatureServer/0", aadtFields:["AADT","AADT_TOTAL","VOL_AADT"], nameFields:["ROUTE_NAME","STREETNAME","RTE","NAME","PRIMARY_NM"]}
-    ]
-  },
-  "MA": {
-    layers: [
-      /* MassDOT Traffic Inventory (2023) FeatureServer 0 is typical; update the URL if your portal uses a different item id */
-      {url:"https://services1.arcgis.com/F7DSX1DS0QpIbNLb/ArcGIS/rest/services/Traffic_Inventory_2023/FeatureServer/0", aadtFields:["AADT","AADT_TOTAL","ADT"], nameFields:["STREETNAME","ST_NAME","ROAD_NAME","NAME"]}
-    ]
-  }
-};
-const SUPPORTED_STATES = Object.keys(STATE_AADT_SOURCES);
+/* PDF Export */
+document.getElementById("exportPDF").addEventListener("click", async ()=>{
+  const { jsPDF } = window.jspdf || {};
+  if(!jsPDF){ alert("PDF lib failed to load"); return; }
+  const doc=new jsPDF({unit:"pt",format:"a4"}); // 595x842
+  const pageW=595, pageH=842, margin=36, contentW=pageW - margin*2;
 
-/* ---------------------------- Geometry & names ---------------------------- */
-function proj(lon,lat){ const kx=111320*Math.cos(lat*Math.PI/180); return {x:lon*kx,y:lat*110574}; }
-function pointToPolylineDistanceMeters(pt, paths){
-  let best=Infinity;
-  for(const path of (paths||[])){
-    for(let i=0;i<path.length-1;i++){
-      const [x1,y1]=path[i],[x2,y2]=path[i+1];
-      const P=proj(pt.lon,pt.lat), A=proj(x1,y1), B=proj(x2,y2);
-      const ABx=B.x-A.x, ABy=B.y-A.y, APx=P.x-A.x, APy=P.y-A.y;
-      const ab2=ABx*ABx + ABy*ABy || 1e-9;
-      let t=(APx*ABx+APy*ABy)/ab2; t=Math.max(0,Math.min(1,t));
-      const Cx=A.x+t*ABx, Cy=A.y+t*ABy, dx=P.x-Cx, dy=P.y-Cy;
-      const d=Math.sqrt(dx*dx+dy*dy);
-      if(d<best) best=d;
-    }
-  }
-  return best;
-}
-function normRoad(s){
-  if(!s) return "";
-  s=(""+s).toUpperCase();
-  s=s.replace(/[^A-Z0-9 ]+/g," ");
-  s=s.replace(/\b(US|U S|SR|STATE ROUTE|STATE RD|STATE HWY|NC|SC|GA|VA|NY|MA|DC|HWY|HIGHWAY|RD|ROAD|AVENUE|AVE|ST|STREET|BLVD|PKWY|DR|DRIVE|LN|LANE|CT|COURT|PL|PLACE|TRL|TRAIL|TER|TERRACE|N|S|E|W|NE|NW|SE|SW)\b/g," ").replace(/\s+/g," ").trim();
-  return s;
-}
-function extractStateAbbrevFromOSMAddress(addr){
-  if(!addr) return null;
-  if(addr.state_code && /^[A-Z]{2}$/.test(addr.state_code)) return addr.state_code.toUpperCase();
-  const map={"District of Columbia":"DC","Florida":"FL","Georgia":"GA","Massachusetts":"MA","New York":"NY","South Carolina":"SC","Virginia":"VA","North Carolina":"NC"};
-  if(addr.state && map[addr.state]) return map[addr.state];
-  return null;
-}
-function extractStreetNameFromOSMAddress(addr){
-  // Prefer 'road' then 'pedestrian' then 'footway' then 'neighbourhood' fallbacks
-  const cand = addr?.road || addr?.pedestrian || addr?.footway || addr?.neighbourhood || addr?.suburb || "";
-  return cand || "";
-}
+  doc.setFont("helvetica","bold"); doc.setFontSize(18);
+  doc.text("Sunoco, LP Fuel IQ — Fuel Site Analyzer", margin, margin+6);
 
-/* ---------------------------- ArcGIS querying ---------------------------- */
-/* We DO NOT use a distance buffer to “intersect”. Instead we:
-   1) build a tiny local envelope (±0.0008° ~ ~90m) ONLY to reduce payload,
-   2) filter by ROAD NAME on the layer (UPPER(nameField) LIKE '%ROADNAME%'),
-   3) compute true nearest distance to the polylines, and pick the MIN.
-   This guarantees "closest AADT on the same road", not a radius pick of any road. */
-async function queryArcGISByName(layerUrl, lat, lon, roadName, nameFields, aadtFields){
-  const envPad = 0.0008; // small envelope for query performance only
-  const geom = {
-    xmin: lon - envPad, ymin: lat - envPad, xmax: lon + envPad, ymax: lat + envPad,
-    spatialReference:{wkid:4326}
-  };
-  const upperRoad = normRoad(roadName);
-  // Try each candidate name field via "OR" LIKE
-  const likes = nameFields.map(f=>`(UPPER(${f}) LIKE '%${upperRoad.replace(/'/g,"''")}%')`);
-  const where = likes.length ? likes.join(" OR ") : "1=1";
-  const params = new URLSearchParams({
-    f:"json",
-    where,
-    geometry: JSON.stringify(geom),
-    geometryType:"esriGeometryEnvelope",
-    inSR:"4326",
-    spatialRel:"esriSpatialRelIntersects",
-    outFields:"*",
-    returnGeometry:"true",
-    outSR:"4326",
-    resultRecordCount:"2000"
+  doc.setFont("helvetica","normal"); doc.setFontSize(11);
+  const lines = doc.splitTextToSize(document.getElementById("summary").innerText || "", contentW);
+  doc.text(lines, margin, margin+28);
+
+  let cursorY = margin + 28 + lines.length*14 + 16;
+
+  const key = [
+    `Address: ${document.getElementById("addr").value || "-"}`,
+    `MPDs: ${document.getElementById("mpds").value}   Diesel: ${document.getElementById("diesel").value}`,
+    document.getElementById("aadtBanner").innerText,
+    `Estimate (LOW): ${document.getElementById("estNum").innerText}  |  Range: ${document.getElementById("estRange").innerText.replace("Full range: ","")}`,
+    document.getElementById("compLine").innerText
+  ].join("\n");
+  const keyLines = doc.splitTextToSize(key, contentW);
+  doc.text(keyLines, margin, cursorY);
+  cursorY += keyLines.length*14 + 12;
+
+  const mapImg = await new Promise(resolve=>{
+    if(!window.leafletImage || !window.map){ resolve(null); return; }
+    leafletImage(window.map, function(err, canvas){
+      if(err){ resolve(null); return; }
+      resolve(canvas.toDataURL("image/png"));
+    });
   });
-  const r=await fetch(`${layerUrl}/query`,{
-    method:"POST",
-    headers:{ "Content-Type":"application/x-www-form-urlencoded" },
-    body: params.toString()
-  });
-  if(!r.ok) throw new Error(`ArcGIS HTTP ${r.status}`);
-  const j=await r.json();
-  if(!j || !Array.isArray(j.features)) return [];
-  // Score by distance on the polyline
-  const scored = j.features.map(f=>{
-    const dist = pointToPolylineDistanceMeters({lat,lon},{paths:f.geometry?.paths||[]});
-    // Pick first valid AADT field
-    const aadt = pickFirstAADT(f.attributes||{}, aadtFields);
-    return {feature:f, dist, aadt};
-  }).filter(x=>x.aadt!=null && x.aadt>0);
-  scored.sort((a,b)=>a.dist-b.dist);
-  return scored;
-}
-function pickFirstAADT(attrs, fields){
-  for(const f of fields||[]){
-    const v=attrs?.[f];
-    if(typeof v==="number" && Number.isFinite(v) && v>0) return v;
-    if(v!=null){ const n=+v; if(Number.isFinite(n) && n>0) return n; }
+
+  const imgW = contentW, imgH = 260;
+  if (mapImg) {
+    if (cursorY + imgH > pageH - margin) { doc.addPage(); cursorY = margin; }
+    doc.setFont("helvetica","bold"); doc.text("Map & Competitors (1.5 mi)", margin, cursorY);
+    cursorY += 12;
+    doc.addImage(mapImg, "PNG", margin, cursorY, imgW, imgH);
+    cursorY += imgH + 12;
   }
-  return null;
-}
 
-async function lookupStateAADT(lat, lon, state, roadName){
-  const cfg = STATE_AADT_SOURCES[state];
-  if(!cfg) return {ok:false, reason:"state_not_supported"};
-  const layers = cfg.layers||[];
-  let lastErr=null;
+  const devText = "Developments — News:\n" + (document.getElementById("devsExternalNews").innerText || "—")
+               + "\n\nDevelopments — Permits:\n" + (document.getElementById("devsExternalPermits").innerText || "—");
+  const devLines = doc.splitTextToSize(devText, contentW);
+  if (cursorY + devLines.length*14 > pageH - margin) { doc.addPage(); cursorY = margin; }
+  doc.setFont("helvetica","bold"); doc.text("Developments", margin, cursorY); cursorY += 14;
+  doc.setFont("helvetica","normal"); doc.text(devLines, margin, cursorY);
 
-  for(const layer of layers){
-    try{
-      const res = await queryArcGISByName(layer.url, lat, lon, roadName, layer.nameFields||[], layer.aadtFields||[]);
-      if(res.length){
-        const best=res[0];
-        const year = best.feature.attributes?.AADT_YEAR || best.feature.attributes?.YEAR || best.feature.attributes?.Year || null;
-        return { ok:true, aadt:best.aadt, source:layer.url, method:`state-${state}`, year, feature:best.feature, dist_m:best.dist };
-      }
-      lastErr = "no_match_same_road";
-    }catch(e){
-      lastErr = e.message||"error";
-      // try next layer
-    }
-  }
-  return {ok:false, reason:lastErr || "no_layer_worked"};
-}
-
-/* ---------------------------- Volume math ---------------------------- */
-function gallonsFromAADT(aadt){
-  const base = aadt * 0.02 * 8 * 30;
-  return {low: Math.round(base*0.85), high: Math.round(base*1.15), y2: Math.round(base*0.85*1.05), y3: Math.round(base*0.85*1.10)};
-}
-
-/* ---------------------------- Main click ---------------------------- */
-goBtn.addEventListener("click", async ()=>{
-  try{
-    goBtn.disabled=true; setOverlayWorking(); commentLine.textContent="—";
-    const addr=addrInput.value.trim();
-    if(addr.length<3){ alert("Enter a valid address"); return; }
-
-    // Use selected geocode if present, else geocode
-    let lat, lon, addrObj=null;
-    if(selectedCoords){
-      lat=selectedCoords.lat; lon=selectedCoords.lon; addrObj=selectedCoords.address||null;
-    }else{
-      const n=await nominatimSearch(addr);
-      if(!n.length){ alert("Could not geocode address."); return; }
-      lat=n[0].lat; lon=n[0].lon; addrObj=n[0].address||null;
-    }
-    initOrUpdateMap({lat,lon});
-
-    const state = extractStateAbbrevFromOSMAddress(addrObj);
-    const street = extractStreetNameFromOSMAddress(addrObj);
-    if(!state || !SUPPORTED_STATES.includes(state) || !street){
-      aadtBanner.textContent = `State/street not supported for automatic AADT.`;
-      outNum.textContent="0"; outRange.textContent="Full range: 0 – 0"; outY2.textContent="0"; outY3.textContent="0";
-      commentLine.textContent="State AADT could not be found.";
-      return;
-    }
-
-    // Manual override takes precedence
-    const ov=+($("aadtOverride").value||"");
-    if(Number.isFinite(ov)&&ov>0){
-      const g=gallonsFromAADT(ov);
-      outNum.textContent=fmt(g.low);
-      outRange.textContent=`Full range: ${fmt(g.low)} – ${fmt(g.high)}`;
-      outY2.textContent=fmt(g.y2); outY3.textContent=fmt(g.y3);
-      aadtBanner.textContent=`AADT used ${fmt(ov)} (override)`;
-      commentLine.textContent="Override provided.";
-      clearOverlay();
-      return;
-    }
-
-    // Look up state AADT using SAME ROAD + nearest segment (no buffer selection)
-    const found = await lookupStateAADT(lat, lon, state, street);
-    if(!found.ok){
-      aadtBanner.textContent = `State AADT could not be found for ${state} (${found.reason||"—"}).`;
-      outNum.textContent="0"; outRange.textContent="Full range: 0 – 0"; outY2.textContent="0"; outY3.textContent="0";
-      commentLine.textContent="State AADT could not be found.";
-      clearOverlay();
-      return;
-    }
-
-    const g=gallonsFromAADT(found.aadt);
-    outNum.textContent=fmt(g.low);
-    outRange.textContent=`Full range: ${fmt(g.low)} – ${fmt(g.high)}`;
-    outY2.textContent=fmt(g.y2); outY3.textContent=fmt(g.y3);
-    aadtBanner.textContent=`AADT used ${fmt(found.aadt)} (${found.method}${found.year?`, ${found.year}`:""})`;
-    commentLine.textContent = `Picked nearest same-road segment (≈${Math.round(found.dist_m)} m).`;
-
-    clearOverlay();
-  }catch(e){
-    alert("Error: "+(e.message||e));
-  }finally{
-    goBtn.disabled=false;
-    clearOverlay();
-  }
+  doc.save("FuelIQ_Site_Analyzer.pdf");
 });
+
+/* Initial */
+overlay.textContent="—";
 </script>
 </body>
 </html>
