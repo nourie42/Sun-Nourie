@@ -867,10 +867,6 @@ async function exhaustiveDevelopments(addrLabel, lat, lon) {
     };
   }
 
-  const express = require("express");
-  const fetch = require("node-fetch"); // if you're not on Node 18+ with built-in fetch
-  const app = express();
-
   const GOOGLE_API_KEY = "AIzaSyBKkUjhXbYeIA3jDMxvS8fExTlcPMIchs8";  // <— hard-coded key
   const UA = "Sunoco-FuelIQ/1.0";
 
