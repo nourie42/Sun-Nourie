@@ -868,23 +868,38 @@ async function exhaustiveDevelopments(addrLabel, lat, lon) {
   };
 }
 
-const express = require("express");
-const fetch = require("node-fetch"); // if you're not on Node 18+ with built-in fetch
-const app = express();
+  const express = require("express");
+  const fetch = require("node-fetch"); // if you're not on Node 18+ with built-in fetch
+  const app = express();
 
-const GOOGLE_API_KEY = "AIzaSyBKkUjhXbYeIA3jDMxvS8fExTlcPMIchs8";  // <— hard-coded key
-const UA = "Sunoco-FuelIQ/1.0";
+  const GOOGLE_API_KEY = "AIzaSyBKkUjhXbYeIA3jDMxvS8fExTlcPMIchs8";  // <— hard-coded key
+  const UA = "Sunoco-FuelIQ/1.0";
+
+// Simple fetchWithTimeout helper
+async function fetchWithTimeout(resource, options = {}, timeout = 10000) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  try {
+    return await fetch(resource, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(id);
+  }
+}
+
 // ---------- Google proxy ----------
 app.get("/google/status", async (_req, res) => {
   try {
     if (!GOOGLE_API_KEY) return res.json({ ok: false, status: "MISSING_KEY" });
+
     const au = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=Test&components=country:us&key=${GOOGLE_API_KEY}`;
     const r = await fetchWithTimeout(au, { headers: { "User-Agent": UA } }, 10000);
+
     res.json({ ok: r.ok, status: r.ok ? "WORKING" : `HTTP_${r.status}` });
   } catch {
     res.json({ ok: false, status: "EXCEPTION" });
   }
 });
+
 app.get("/google/autocomplete", async (req, res) => {
   const q = String(req.query.input || "").trim();
   if (!q) return res.json({ ok: false, status: "BAD_REQUEST", items: [] });
