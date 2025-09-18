@@ -173,7 +173,9 @@ function matchCsvDevelopments(city, county, state) {
 // Kick off loading the CSV data. We call this without awaiting so the server
 // starts immediately. Any errors are logged above.
 loadCsvDevData().catch((err) => console.error('Error loading CSV', err));
-onst TRAFFIC_URL = process.env.TRAFFIC_URL || "";
+const TRAFFIC_URL = process.env.TRAFFIC_URL || "";
+const TRAFFIC_API_KEY = process.env.TRAFFIC_API_KEY || "";
+
 
 // ---------- Utils ----------
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
