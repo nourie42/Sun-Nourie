@@ -1,16 +1,12 @@
-# Build a complete, working index.html that calls the user's existing Node API (/estimate)
-# and restores the three nav buttons. No filler docs. Self-contained CSS + JS.
-# Save to /mnt/data/site-index.html and report path + line count.
 
-from textwrap import dedent
-
-html = dedent(r"""<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Sunoco, LP Fuel IQ – Fuel Site Analyzer</title>
   <meta name="description" content="Fuel IQ estimator using server-side /estimate (state AADT logic)">
+  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="anonymous">
   <style>
@@ -248,9 +244,11 @@ html = dedent(r"""<!DOCTYPE html>
     </div>
   </div>
 
+  <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="anonymous"></script>
   <script>
+    // Short helpers
     const $ = (s)=>document.querySelector(s);
     const $$ = (s)=>document.querySelectorAll(s);
     const fmt = (n)=> (n==null||!isFinite(n)) ? "—" : Number(n).toLocaleString();
@@ -268,7 +266,8 @@ html = dedent(r"""<!DOCTYPE html>
     }
 
     function renderTable(table, rows){
-      table.innerHTML = rows.join("");
+      table.innerHTML = rows.join("
+");
     }
 
     function ensureMap(){
@@ -310,6 +309,7 @@ html = dedent(r"""<!DOCTYPE html>
       })).filter(x => Number.isFinite(x.pct));
     }
 
+    // Add extra row
     $("#addExtra").addEventListener("click", ()=>{
       const pct = Number($("#extraPct").value||0);
       const note = $("#extraNote").value||"";
@@ -321,6 +321,7 @@ html = dedent(r"""<!DOCTYPE html>
       $("#extraPct").value = "0"; $("#extraNote").value = "";
     });
 
+    // Reset button
     $("#reset").addEventListener("click", ()=>{
       $("#addr").value = "";
       $("#mpds").value = "2";
@@ -344,6 +345,7 @@ html = dedent(r"""<!DOCTYPE html>
       mapMsg.textContent = "";
     });
 
+    // Estimate function
     async function estimate(){
       try {
         setOverlay(true);
@@ -419,8 +421,8 @@ html = dedent(r"""<!DOCTYPE html>
         const devOSM = Array.isArray(j.developments) ? j.developments : Array.isArray(j.developments?.osm) ? j.developments.osm : j.developments || [];
         const devExtNews = Array.isArray(j.developments_external?.news) ? j.developments_external.news : [];
         const devExtPerm = Array.isArray(j.developments_external?.permits) ? j.developments_external.permits : [];
-        const devRows = ["<tr><th>Name</th><th>Status</th><th>Approx mi</th></tr>"]
-            .concat(devOSM.slice(0,30).map(d=>`<tr><td>${d.name||"Fuel development"}</td><td>${d.status||""}</td><td>${d.approx_miles!=null?fmt(d.approx_miles):"—"}</td></tr>`));
+        const devRows = ["<tr><th>Name</th><th>Status</th><th>Approx mi</th></tr>"].
+            concat(devOSM.slice(0,30).map(d=>`<tr><td>${d.name||"Fuel development"}</td><td>${d.status||""}</td><td>${d.approx_miles!=null?fmt(d.approx_miles):"—"}</td></tr>`));
         renderTable($("#tblDev"), devRows);
         const devExtRows = ["<tr><th>Title</th><th>Source</th></tr>"]
             .concat(devExtNews.slice(0,15).map(d=>`<tr><td><a href="${d.link||"#"}" target="_blank" rel="noopener">${d.name||"News"}</a></td><td>News</td></tr>`))
@@ -447,11 +449,3 @@ html = dedent(r"""<!DOCTYPE html>
   </script>
 </body>
 </html>
-""")
-
-path = "/mnt/data/site-index.html"
-with open(path, "w", encoding="utf-8") as f:
-    f.write(html)
-
-line_count = sum(1 for _ in open(path, "r", encoding="utf-8"))
-line_count, path
