@@ -27,12 +27,6 @@ app.get("/", (_req, res) => {
 });
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
-// ---------- Gas Station Finder Routes ----------
-app.get("/gas-finder", (_req, res) => {
-  res.set("Cache-Control", "no-store");
-  res.sendFile(path.join(__dirname, "public", "gas-finder.html"));
-});
-
 // ---------- Config ----------
 const UA = "FuelEstimator/3.4 (+your-app)";
 const CONTACT = process.env.OVERPASS_CONTACT || UA;
@@ -531,6 +525,7 @@ async function competitorsWithinRadiusMiles(lat, lon, rMi = 1.5) {
   out.sort((a, b) => a.miles - b.miles);
   return out.filter((s) => s.miles <= rMi);
 }
+
 // ---------- Developments ----------
 async function overpassDevelopments(lat, lon) {
   const rM = Math.round(5 * 1609.344);
@@ -1215,14 +1210,17 @@ app.post("/estimate", async (req, res) => {
       devPermits = dev.permits,
       devOSM = dev.osm;
 
-// Roads & AADT (fixed)
-const roads = await roadContext(geo.lat, geo.lon).catch(() => ({
-  summary: "",
-  main: [],
-  side: [],
-  signals: 0,
-  intersections: 0,
-}));
+// Roads & AADT
+const roads =
+  (await roadContext(geo.lat, geo.lon).catch(() => ({
+    summary: "",
+    main: [],
+    side: [],
+    signals: 0,
+    intersections: 0,
+  })))) || { summary: "", main: [], side: [], signals: 0, intersections: 0 };
+
+
     let usedAADT = 10000,
       method = "fallback_default";
     let mapStations = [];
@@ -1397,6 +1395,11 @@ const roads = await roadContext(geo.lat, geo.lon).catch(() => ({
   }
 });
 
+// ---------- Start ----------
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, "0.0.0.0", () =>
+  console.log(`Server listening on :${PORT}`)
+);
 // ---------- Start ----------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, "0.0.0.0", () =>
