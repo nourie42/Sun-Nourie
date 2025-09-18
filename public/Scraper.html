@@ -1,988 +1,342 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Real Gas Station Finder</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            color: #333;
-        }
-
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-
-        .header {
-            text-align: center;
-            color: white;
-            margin-bottom: 40px;
-        }
-
- 
-        .header h1 {
-            font-size: 3rem;
-            margin-bottom: 10px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-        }
-
-        .header p {
-            font-size: 1.2rem;
-            opacity: 0.9;
-        }
-
-        .main-panel {
-            background: white;
-            border-radius: 20px;
-            padding: 30px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            margin-bottom: 30px;
-        }
-
-        .search-section {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 25px;
-            margin-bottom: 30px;
-        }
-
-        .search-group {
-            background: #f8f9fa;
-            padding: 25px;
-            border-radius: 15px;
-            border: 2px solid #e9ecef;
-        }
-
-        .search-group h3 {
-            color: #495057;
-            margin-bottom: 20px;
-            font-size: 1.3rem;
-        }
-
-        .input-group {
-            margin-bottom: 20px;
-        }
-
-        .input-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 600;
-            color: #495057;
-        }
-
-        .input-group input, .input-group select {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #dee2e6;
-            border-radius: 8px;
-            font-size: 16px;
-        }
-
-        .station-type-selector {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-
-        .type-card {
-            padding: 20px;
-            border: 2px solid #dee2e6;
-            border-radius: 10px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .type-card:hover {
-            border-color: #667eea;
-            transform: translateY(-2px);
-        }
-
-        .type-card.selected {
-            border-color: #667eea;
-            background: #667eea;
-            color: white;
-        }
-
-        .type-card-icon {
-            font-size: 2rem;
-            margin-bottom: 10px;
-        }
-
-        .type-card-title {
-            font-weight: 600;
-            margin-bottom: 5px;
-        }
-
-        .type-card-desc {
-            font-size: 12px;
-            opacity: 0.8;
-        }
-
-        .search-button {
-            background: linear-gradient(45deg, #667eea, #764ba2);
-            color: white;
-            border: none;
-            padding: 15px 30px;
-            border-radius: 10px;
-            font-size: 18px;
-            font-weight: 600;
-            cursor: pointer;
-            width: 100%;
-            margin-top: 10px;
-        }
-
-        .search-button:hover {
-            transform: translateY(-2px);
-        }
-
-        .search-button:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-
-        .status-section {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 30px;
-            border-left: 5px solid #28a745;
-        }
-
-        .progress-bar {
-            background: #e9ecef;
-            height: 10px;
-            border-radius: 5px;
-            overflow: hidden;
-            margin-bottom: 15px;
-        }
-
-        .progress-fill {
-            background: linear-gradient(45deg, #28a745, #20c997);
-            height: 100%;
-            width: 0%;
-            transition: width 0.3s ease;
-        }
-
-        .log-container {
-            background: #2d3748;
-            color: #e2e8f0;
-            padding: 15px;
-            border-radius: 8px;
-            font-family: 'Courier New', monospace;
-            max-height: 200px;
-            overflow-y: auto;
-            font-size: 14px;
-        }
-
-        .results-section {
-            display: none;
-        }
-
-        .summary-stats {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-
-        .stat-card {
-            background: white;
-            padding: 25px;
-            border-radius: 15px;
-            text-align: center;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-        }
-
-        .stat-number {
-            font-size: 2.5rem;
-            font-weight: 700;
-            color: #667eea;
-            display: block;
-        }
-
-        .stat-label {
-            color: #6c757d;
-            margin-top: 5px;
-            font-weight: 600;
-        }
-
-        .station-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-            gap: 25px;
-        }
-
-        .station-card {
-            background: white;
-            border-radius: 15px;
-            padding: 25px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-            border: 2px solid #e9ecef;
-            transition: all 0.3s ease;
-            position: relative;
-        }
-
-        .station-ranking {
-            position: absolute;
-            top: -10px;
-            right: -10px;
-            background: linear-gradient(45deg, #ffd700, #ffed4e);
-            color: #333;
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            font-size: 18px;
-        }
-
-        .station-name {
-            font-size: 1.4rem;
-            font-weight: 700;
-            color: #495057;
-            margin-bottom: 5px;
-        }
-
-        .station-address {
-            color: #6c757d;
-            font-size: 14px;
-            margin-bottom: 10px;
-        }
-
-        .station-type {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-            margin-bottom: 15px;
-        }
-
-        .type-unbranded {
-            background: #d4edda;
-            color: #155724;
-        }
-
-        .type-branded {
-            background: #f8d7da;
-            color: #721c24;
-        }
-
-        .station-image {
-            width: 100%;
-            height: 200px;
-            object-fit: cover;
-            border-radius: 8px;
-            margin-bottom: 15px;
-        }
-
-        .station-metrics {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-
-        .metric {
-            background: #f8f9fa;
-            padding: 12px;
-            border-radius: 8px;
-            text-align: center;
-        }
-
-        .metric-value {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: #667eea;
-            display: block;
-        }
-
-        .metric-label {
-            font-size: 12px;
-            color: #6c757d;
-            margin-top: 2px;
-        }
-
-        .action-button {
-            flex: 1;
-            padding: 8px 16px;
-            border: 2px solid #667eea;
-            background: transparent;
-            color: #667eea;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: 600;
-            margin: 5px;
-        }
-
-        .action-button:hover {
-            background: #667eea;
-            color: white;
-        }
-
-        .station-actions {
-            display: flex;
-            gap: 10px;
-        }
-
-        @media (max-width: 768px) {
-            .search-section {
-                grid-template-columns: 1fr;
-            }
-            .summary-stats {
-                grid-template-columns: 1fr;
-            }
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gas Station Prospector</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+    .spinner { border-top-color: #7c3aed; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>Real Gas Station Finder</h1>
-            <p>Find and rank gas stations by location and brand type</p>
-        </div>
-
-        <div class="main-panel">
-            <div class="search-section">
-                <div class="search-group">
-                    <h3>Location Settings</h3>
-                    <div class="input-group">
-                        <label for="searchArea">Search Area:</label>
-                        <input type="text" id="searchArea" value="Los Angeles, CA" placeholder="Enter city, state">
-                    </div>
-                    <div class="input-group">
-                        <label for="searchRadius">Search Radius:</label>
-                        <select id="searchRadius">
-                            <option value="5">5 miles</option>
-                            <option value="10" selected>10 miles</option>
-                            <option value="25">25 miles</option>
-                        </select>
-                    </div>
-                    <div class="input-group">
-                        <label for="maxResults">Max Results:</label>
-                        <select id="maxResults">
-                            <option value="10">10 stations</option>
-                            <option value="20" selected>20 stations</option>
-                        </select>
-                    </div>
-                </div>
-                
-                <div class="search-group">
-                    <h3>Station Type</h3>
-                    <div class="station-type-selector">
-                        <div class="type-card" id="unbranded-card">
-                            <div class="type-card-icon">🏪</div>
-                            <div class="type-card-title">Unbranded</div>
-                            <div class="type-card-desc">Independent stations</div>
-                        </div>
-                        <div class="type-card selected" id="branded-card">
-                            <div class="type-card-icon">⛽</div>
-                            <div class="type-card-title">Branded</div>
-                            <div class="type-card-desc">Major brand stations</div>
-                        </div>
-                    </div>
-                    <div class="input-group">
-                        <label for="rankingCriteria">Ranking Criteria:</label>
-                        <select id="rankingCriteria">
-                            <option value="overall">Overall Quality</option>
-                            <option value="rating" selected>Google Rating</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="search-group">
-                    <h3>Search</h3>
-                    <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-                        <h4 style="color: #1565c0; margin-bottom: 8px;">Live Data Sources:</h4>
-                        <ul style="color: #1565c0; font-size: 14px; margin-left: 20px;">
-                            <li>Google Places API</li>
-                            <li>Google Street View API</li>
-                            <li>Real-time ratings</li>
-                        </ul>
-                    </div>
-                    <button id="searchButton" class="search-button">Find Real Stations</button>
-                </div>
-            </div>
-
-            <div class="status-section">
-                <h3>Search Status</h3>
-                <div class="progress-bar">
-                    <div class="progress-fill" id="progressFill"></div>
-                </div>
-                <div id="statusText">Ready to search for gas stations...</div>
-                <div class="log-container" id="logContainer">
-                    <div>Gas Station Finder - Ready</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="results-section" id="resultsSection">
-            <div class="main-panel">
-                <h2 style="margin-bottom: 20px; color: #495057;">Search Results</h2>
-                
-                <div class="summary-stats">
-                    <div class="stat-card">
-                        <span class="stat-number" id="totalStations">0</span>
-                        <div class="stat-label">Total Found</div>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-number" id="avgRating">0.0</span>
-                        <div class="stat-label">Avg Rating</div>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-number" id="brandedCount">0</span>
-                        <div class="stat-label">Branded</div>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-number" id="unbrandedCount">0</span>
-                        <div class="stat-label">Unbranded</div>
-                    </div>
-                </div>
-
-                <div class="station-grid" id="stationGrid"></div>
-            </div>
-        </div>
+<body class="bg-gray-100 min-h-screen p-4 flex flex-col items-center">
+  <div class="bg-white rounded-3xl shadow-2xl overflow-hidden max-w-7xl w-full">
+    <div class="bg-gradient-to-r from-purple-500 to-indigo-500 text-white p-8 text-center">
+      <h1 class="text-4xl font-bold mb-2">⛽ Gas Station Prospector</h1>
+      <p class="text-lg opacity-90">Find and analyze branded and unbranded gas station opportunities</p>
     </div>
 
-    <script>
-        // API Configuration
-        const API_KEY = 'AIzaSyBlm18rIsI1bhOwhx3bpHAX589EahvLbPc';
-        let selectedType = 'branded';
-        let isSearching = false;
+    <div class="flex justify-between items-center p-4">
+      <button id="refreshBtn" class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600">🔄 Refresh</button>
+    </div>
 
-        // Initialize when page loads
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('Page loaded successfully');
-            addLog('Gas Station Finder loaded successfully');
-            
-            // Set up event listeners
-            setupEventListeners();
-            
-            // Test backend connection
-            testBackendConnection();
+    <div class="md:flex">
+      <!-- Sidebar -->
+      <div class="md:w-1/3 bg-gray-50 p-6 border-r border-gray-200">
+        <div class="mb-6">
+          <label class="block font-semibold text-gray-800 mb-3">Search Type</label>
+          <div class="space-y-3">
+            <label class="flex items-start p-4 bg-white rounded-xl shadow-sm border cursor-pointer">
+              <input type="radio" name="searchType" value="branded" checked class="mt-1" />
+              <div class="ml-3"><strong>Branded Sites</strong></div>
+            </label>
+            <label class="flex items-start p-4 bg-white rounded-xl shadow-sm border cursor-pointer">
+              <input type="radio" name="searchType" value="unbranded" class="mt-1" />
+              <div class="ml-3"><strong>Unbranded Sites</strong></div>
+            </label>
+          </div>
+        </div>
+
+        <div class="mb-6">
+          <label class="block font-semibold text-gray-800 mb-3">Search Method</label>
+          <div class="space-y-3">
+            <label class="flex items-start p-4 bg-white rounded-xl shadow-sm border cursor-pointer">
+              <input type="radio" name="inputMethod" value="area" checked class="mt-1" />
+              <div class="ml-3"><strong>Area Search</strong></div>
+            </label>
+            <label class="flex items-start p-4 bg-white rounded-xl shadow-sm border cursor-pointer">
+              <input type="radio" name="inputMethod" value="upload" class="mt-1" />
+              <div class="ml-3"><strong>Upload List (CSV/XLSX/XLS)</strong> — uses <em>column B</em> for addresses</div>
+            </label>
+          </div>
+        </div>
+
+        <div id="areaSearchInputs" class="space-y-4">
+          <input type="text" id="locationInput" placeholder="Enter city or address" class="w-full p-3 border-2 border-gray-300 rounded-lg" />
+          <input type="number" id="radiusInput" value="5" min="1" max="50" class="w-full p-3 border-2 border-gray-300 rounded-lg" />
+        </div>
+
+        <div id="uploadInputs" class="space-y-4 hidden">
+          <input id="fileInput" type="file" accept=".csv,.xlsx,.xls" class="w-full" />
+        </div>
+
+        <button id="searchBtn" class="w-full mt-8 p-4 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-xl font-bold text-lg" disabled>🔍 Start Prospecting</button>
+      </div>
+
+      <!-- Results Panel -->
+      <div class="md:w-2/3 p-6 relative">
+        <div id="loadingOverlay" class="absolute inset-0 bg-white bg-opacity-90 flex flex-col items-center justify-center z-10 hidden">
+          <div class="spinner w-16 h-16 border-4 border-gray-200 rounded-full"></div>
+          <div class="mt-4 text-xl font-medium text-gray-700">Working...</div>
+          <div id="progressInfo" class="mt-1 text-sm text-gray-500"></div>
+        </div>
+
+        <div id="resultsContent">
+          <div class="flex items-center justify-between pb-4 border-b border-gray-200 mb-4">
+            <div id="resultsCount" class="text-2xl font-bold text-gray-800">No results yet</div>
+            <div class="flex gap-2">
+              <button id="exportBtn" class="bg-green-500 text-white py-2 px-4 rounded-lg hidden">📥 Export</button>
+            </div>
+          </div>
+          <!-- CHANGED: removed max-h and overflow so results fill right side fully -->
+          <div id="resultsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Map BELOW all results/list -->
+  <div id="map" class="w-full h-48 mt-4 border rounded-lg"></div>
+
+  <script>
+    // Keys (embedded per your request)
+    const GOOGLE_MAPS_API_KEY = 'AIzaSyBKkUjhXbYeIA3jDMxvS8fExTlcPMIchs8';
+    const OPENAI_API_KEY = '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';
+
+    let map, placesService, geocoder;
+    let currentResults = [];
+    let markers = [];
+
+    const PRIORITY_BRANDS = ['Marathon','Citgo','Valero','Exxon','BP','Shell'];
+    const EXCLUDED_CHAINS = ['Sheetz','Wawa','RaceTrac','Race Trac','Circle K','7-Eleven','7-11','Cumberland Farms','QuikTrip','QT','Speedway','Casey','Murphy','Murphy USA','Sunoco','GetGo','Pilot','Flying J','Love','Love\'s','Travel Centers','TA','Petro','Costco','Sam\'s Club','BJ\'s','Kroger','Albertsons','Safeway','H-E-B','Walmart'];
+
+    // Load Google Maps
+    (function loadGoogleMapsAPI(){
+      const s=document.createElement('script');
+      s.src=`https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places&callback=initMap`;
+      s.async=true; s.defer=true; document.head.appendChild(s);
+    })();
+
+    window.initMap = () => {
+      map = new google.maps.Map(document.getElementById('map'), { center: { lat: 35.7796, lng: -78.6382 }, zoom: 8 });
+      placesService = new google.maps.places.PlacesService(map);
+      geocoder = new google.maps.Geocoder();
+      document.getElementById('searchBtn').disabled = false;
+    };
+
+    document.getElementById('refreshBtn').onclick = () => window.location.reload();
+    document.querySelectorAll('input[name="inputMethod"]').forEach(r => {
+      r.addEventListener('change', () => {
+        const isUpload = r.value === 'upload';
+        document.getElementById('areaSearchInputs').classList.toggle('hidden', isUpload);
+        document.getElementById('uploadInputs').classList.toggle('hidden', !isUpload);
+      });
+    });
+
+    const ui = {
+      overlay: document.getElementById('loadingOverlay'),
+      progress: document.getElementById('progressInfo'),
+      resultsCount: document.getElementById('resultsCount'),
+      resultsGrid: document.getElementById('resultsGrid'),
+      exportBtn: document.getElementById('exportBtn')
+    };
+
+    document.getElementById('searchBtn').onclick = startSearch;
+
+    async function startSearch(){
+      const searchType = document.querySelector('input[name="searchType"]:checked').value;
+      const method = document.querySelector('input[name="inputMethod"]:checked').value;
+      ui.overlay.classList.remove('hidden');
+      ui.progress.textContent = 'Starting...';
+      try {
+        if (method === 'upload') {
+          const file = document.getElementById('fileInput').files?.[0];
+          if (!file) { alert('Please select a file'); return; }
+          await searchByUpload(file, searchType);
+        } else {
+          const location = document.getElementById('locationInput').value.trim();
+          const radius = parseFloat(document.getElementById('radiusInput').value) || 5;
+          if (!location) { alert('Enter a location'); return; }
+          await searchByArea(location, radius, searchType);
+        }
+      } finally { ui.overlay.classList.add('hidden'); }
+    }
+
+    // === Area search ===
+    function searchByArea(location, radiusMiles, searchType){
+      return new Promise((resolve) => {
+        ui.progress.textContent = 'Geocoding area...';
+        geocoder.geocode({ address: location }, (results, status) => {
+          if (status !== 'OK' || !results?.[0]) { alert('Location not found'); return resolve(); }
+          const center = results[0].geometry.location; map.setCenter(center); map.setZoom(12);
+          ui.progress.textContent = 'Searching gas stations...';
+          const req = { location: center, radius: radiusMiles * 1609.34, type: 'gas_station' };
+          placesService.nearbySearch(req, async (places, s) => {
+            if (s === google.maps.places.PlacesServiceStatus.OK && places?.length) {
+              await processResults(places, searchType);
+            } else { alert('No stations found around this area.'); }
+            resolve();
+          });
         });
-
-        function setupEventListeners() {
-            // Search button
-            const searchButton = document.getElementById('searchButton');
-            if (searchButton) {
-                searchButton.addEventListener('click', startSearch);
-                console.log('Search button listener added');
-            }
-
-            // Type cards
-            const unbrandedCard = document.getElementById('unbranded-card');
-            const brandedCard = document.getElementById('branded-card');
-            
-            if (unbrandedCard) {
-                unbrandedCard.addEventListener('click', () => selectType('unbranded'));
-            }
-            if (brandedCard) {
-                brandedCard.addEventListener('click', () => selectType('branded'));
-            }
-
-            addLog('Event listeners configured');
-        }
-
-        function selectType(type) {
-            selectedType = type;
-            console.log('Selected type:', type);
-
-            // Update visual selection
-            const unbrandedCard = document.getElementById('unbranded-card');
-            const brandedCard = document.getElementById('branded-card');
-
-            if (unbrandedCard && brandedCard) {
-                unbrandedCard.classList.remove('selected');
-                brandedCard.classList.remove('selected');
-
-                if (type === 'unbranded') {
-                    unbrandedCard.classList.add('selected');
-                } else {
-                    brandedCard.classList.add('selected');
-                }
-            }
-
-            addLog('Station type set to: ' + type);
-        }
-
-        async function startSearch() {
-            if (isSearching) return;
-            
-            console.log('Starting search...');
-            isSearching = true;
-
-            const searchButton = document.getElementById('searchButton');
-            const area = document.getElementById('searchArea').value || 'Los Angeles, CA';
-            
-            if (searchButton) {
-                searchButton.disabled = true;
-                searchButton.textContent = 'Searching...';
-            }
-
-            addLog('Starting search for ' + selectedType + ' stations in ' + area);
-
-            try {
-                // Step 1: Get coordinates
-                updateProgress(20, 'Finding location coordinates...');
-                const coords = await getCoordinates(area);
-                addLog('Location found: ' + coords.lat + ', ' + coords.lng);
-
-                // Step 2: Search for gas stations
-                updateProgress(50, 'Searching for gas stations...');
-                const stations = await findGasStations(coords.lat, coords.lng);
-                addLog('Found ' + stations.length + ' gas stations');
-
-                // Step 3: Filter and process
-                updateProgress(80, 'Processing station data...');
-                const processedStations = processStations(stations);
-                addLog('Processed and ranked stations');
-
-                // Step 4: Display results
-                updateProgress(100, 'Search complete!');
-                displayResults(processedStations, area);
-
-            } catch (error) {
-                console.error('Search error:', error);
-                addLog('Error: ' + error.message, 'error');
-                showError(error.message);
-            } finally {
-                isSearching = false;
-                if (searchButton) {
-                    searchButton.disabled = false;
-                    searchButton.textContent = 'Find Real Stations';
-                }
-            }
-        }
-
-        async function getCoordinates(address) {
-            try {
-                // Try direct API call first (works on some hosting platforms)
-                let url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${API_KEY}`;
-                let response;
-                
-                try {
-                    response = await fetch(url);
-                    if (!response.ok) throw new Error('Direct call failed');
-                } catch (directError) {
-                    console.log('Direct API call failed, trying CORS proxy...');
-                    // Fallback to CORS proxy
-                    response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`);
-                    if (!response.ok) throw new Error('CORS proxy failed');
-                    
-                    const proxyData = await response.json();
-                    const data = JSON.parse(proxyData.contents);
-                    
-                    if (data.status !== 'OK' || !data.results.length) {
-                        throw new Error('Location not found: ' + address);
-                    }
-                    
-                    return data.results[0].geometry.location;
-                }
-                
-                // Direct call succeeded
-                const data = await response.json();
-                if (data.status !== 'OK' || !data.results.length) {
-                    throw new Error('Location not found: ' + address);
-                }
-                
-                return data.results[0].geometry.location;
-                
-            } catch (error) {
-                console.error('Geocoding error:', error);
-                // Fallback to hardcoded coordinates for major cities
-                const cityCoords = {
-                    'los angeles': { lat: 34.0522, lng: -118.2437 },
-                    'new york': { lat: 40.7128, lng: -74.0060 },
-                    'chicago': { lat: 41.8781, lng: -87.6298 },
-                    'houston': { lat: 29.7604, lng: -95.3698 },
-                    'miami': { lat: 25.7617, lng: -80.1918 },
-                    'dallas': { lat: 32.7767, lng: -96.7970 },
-                    'san francisco': { lat: 37.7749, lng: -122.4194 },
-                    'seattle': { lat: 47.6062, lng: -122.3321 }
-                };
-                
-                const city = address.toLowerCase().split(',')[0].trim();
-                const coords = cityCoords[city] || cityCoords['los angeles'];
-                
-                addLog(`Using fallback coordinates for ${city}`, 'warning');
-                return coords;
-            }
-        }
-
-        async function findGasStations(lat, lng) {
-            try {
-                const radius = document.getElementById('searchRadius').value * 1609.34;
-                let url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&type=gas_station&key=${API_KEY}`;
-                let response;
-                
-                try {
-                    response = await fetch(url);
-                    if (!response.ok) throw new Error('Direct call failed');
-                } catch (directError) {
-                    console.log('Direct Places API call failed, trying CORS proxy...');
-                    response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`);
-                    if (!response.ok) throw new Error('CORS proxy failed');
-                    
-                    const proxyData = await response.json();
-                    const data = JSON.parse(proxyData.contents);
-                    
-                    if (data.status !== 'OK') {
-                        throw new Error('Places API error: ' + data.status);
-                    }
-                    
-                    return data.results || [];
-                }
-                
-                // Direct call succeeded
-                const data = await response.json();
-                if (data.status !== 'OK') {
-                    throw new Error('Places API error: ' + data.status);
-                }
-                
-                return data.results || [];
-                
-            } catch (error) {
-                console.error('Places API error:', error);
-                
-                // Generate demo data as fallback
-                addLog('API call failed, generating demo data...', 'warning');
-                return generateDemoStations(lat, lng);
-            }
-        }
-        
-        // Your Render API URL
-        const BACKEND_URL = 'https://sunnourie-live.onrender.com';
-        
-        async function getCoordinates(address) {
-            try {
-                addLog('Calling backend for geocoding...', 'info');
-                const response = await fetch(`${BACKEND_URL}/api/geocode?address=${encodeURIComponent(address)}`);
-                
-                if (!response.ok) {
-                    throw new Error(`Backend geocoding failed: ${response.status}`);
-                }
-
-                const data = await response.json();
-                
-                if (data.status !== 'OK' || !data.results.length) {
-                    throw new Error('Location not found: ' + address);
-                }
-
-                addLog(`Successfully geocoded: ${address}`, 'success');
-                return data.results[0].geometry.location;
-                
-            } catch (error) {
-                console.error('Geocoding error:', error);
-                addLog(`Geocoding failed: ${error.message}`, 'error');
-                
-                // Fallback coordinates for major cities
-                const cityCoords = {
-                    'los angeles': { lat: 34.0522, lng: -118.2437 },
-                    'new york': { lat: 40.7128, lng: -74.0060 },
-                    'chicago': { lat: 41.8781, lng: -87.6298 },
-                    'houston': { lat: 29.7604, lng: -95.3698 },
-                    'miami': { lat: 25.7617, lng: -80.1918 },
-                    'dallas': { lat: 32.7767, lng: -96.7970 },
-                    'san francisco': { lat: 37.7749, lng: -122.4194 },
-                    'seattle': { lat: 47.6062, lng: -122.3321 }
-                };
-                
-                
-                const city = address.toLowerCase().split(',')[0].trim();
-                const coords = cityCoords[city] || cityCoords['los angeles'];
-                addLog(`Using fallback coordinates for ${city}`, 'warning');
-                return coords;
-            }
-        }
-
-        async function findGasStations(lat, lng) {
-            try {
-                const radius = document.getElementById('searchRadius').value * 1609.34; // Convert to meters
-                
-                addLog('Calling backend for gas stations...', 'info');
-                const response = await fetch(`${BACKEND_URL}/api/places/nearby?lat=${lat}&lng=${lng}&radius=${radius}&type=gas_station`);
-                
-                if (!response.ok) {
-                    throw new Error(`Backend Places API failed: ${response.status}`);
-                }
-
-                const data = await response.json();
-                
-                if (data.status !== 'OK') {
-                    throw new Error('Places API error: ' + data.status);
-                }
-
-                addLog(`Found ${data.results.length} real gas stations from backend`, 'success');
-                return data.results || [];
-                
-            } catch (error) {
-                console.error('Places API error:', error);
-                addLog(`Backend API failed: ${error.message}`, 'error');
-                
-                // Show error message instead of demo data
-                throw new Error('Cannot connect to backend API. Check that your Render service is running.');
-            }
-        }
-        
-        // Test backend connection on page load
-        async function testBackendConnection() {
-            try {
-                addLog('Testing backend connection...', 'info');
-                const response = await fetch(`${BACKEND_URL}/api/health`);
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    addLog(`Backend connected successfully: ${data.status}`, 'success');
-                    return true;
-                } else {
-                    throw new Error(`Backend health check failed: ${response.status}`);
-                }
-            } catch (error) {
-                addLog(`Backend connection failed: ${error.message}`, 'error');
-                addLog('Please update BACKEND_URL with your Render API URL', 'warning');
-                return false;
-            }
-        }
-
-        
-        function showDeploymentInstructions() {
-            const stationGrid = document.getElementById('stationGrid');
-            stationGrid.innerHTML = `
-                <div style="grid-column: 1/-1; background: #fff3cd; border: 2px solid #ffc107; border-radius: 15px; padding: 30px;">
-                    <h3 style="color: #856404; margin-bottom: 20px;">Backend API Configuration Required</h3>
-                    
-                    <div style="margin-bottom: 25px;">
-                        <h4 style="color: #856404; margin-bottom: 10px;">Update Your Render Backend URL:</h4>
-                        <p style="color: #856404; margin-left: 20px; line-height: 1.6;">
-                            Replace <code>BACKEND_URL</code> at the top of the JavaScript with your actual Render API URL.<br>
-                            Example: <code>https://your-app-name.onrender.com</code>
-                        </p>
-                    </div>
-                    
-                    <div style="margin-bottom: 25px;">
-                        <h4 style="color: #856404; margin-bottom: 10px;">Required Backend Endpoints:</h4>
-                        <ul style="color: #856404; margin-left: 20px; line-height: 1.6;">
-                            <li><code>GET /api/health</code> - Health check</li>
-                            <li><code>GET /api/geocode?address={address}</code> - Location coordinates</li>
-                            <li><code>GET /api/places/nearby?lat={lat}&lng={lng}&radius={radius}&type=gas_station</code> - Find gas stations</li>
-                        </ul>
-                    </div>
-                    
-                    <div style="background: #e3f2fd; padding: 15px; border-radius: 8px;">
-                        <p style="color: #1565c0; margin: 0;">
-                            <strong>Your Google API key is configured</strong> - once your backend URL is updated, 
-                            you'll get real Google Places data with actual gas station names, addresses, ratings, 
-                            and Street View images.
-                        </p>
-                    </div>
-                </div>
-            `;
-        }
-
-
-        function processStations(stations) {
-            const maxResults = parseInt(document.getElementById('maxResults').value);
-            
-            return stations.slice(0, maxResults).map((station, index) => {
-                const name = station.name || 'Unknown Station';
-                const isUnbranded = !isBrandedStation(name);
-                
-                let typeScore = 0;
-                if (selectedType === 'unbranded' && isUnbranded) typeScore = 10;
-                if (selectedType === 'branded' && !isUnbranded) typeScore = 10;
-
-                return {
-                    ...station,
-                    rank: index + 1,
-                    isUnbranded: isUnbranded,
-                    typeScore: typeScore,
-                    streetViewUrl: getStreetViewUrl(station.geometry?.location?.lat, station.geometry?.location?.lng)
-                };
-            }).sort((a, b) => (b.typeScore || 0) - (a.typeScore || 0) || (b.rating || 0) - (a.rating || 0));
-        }
-
-        function isBrandedStation(name) {
-            const brands = ['shell', 'bp', 'exxon', 'mobil', 'chevron', 'texaco', 'citgo', 'sunoco', 'arco', '76', 'marathon', 'speedway'];
-            return brands.some(brand => name.toLowerCase().includes(brand));
-        }
-
-        function getStreetViewUrl(lat, lng) {
-            if (!lat || !lng) return 'https://via.placeholder.com/600x400?text=No+Image+Available';
-            return `https://maps.googleapis.com/maps/api/streetview?size=600x400&location=${lat},${lng}&heading=0&pitch=0&key=${API_KEY}`;
-        }
-
-        function displayResults(stations, area) {
-            const resultsSection = document.getElementById('resultsSection');
-            resultsSection.style.display = 'block';
-
-            if (stations.length === 0) {
-                showDeploymentInstructions();
-                resultsSection.scrollIntoView({ behavior: 'smooth' });
-                return;
-            }
-
-            // Update stats
-            const avgRating = stations.length > 0 
-                ? (stations.reduce((sum, s) => sum + (s.rating || 0), 0) / stations.length).toFixed(1)
-                : '0.0';
-
-            document.getElementById('totalStations').textContent = stations.length;
-            document.getElementById('avgRating').textContent = avgRating;
-            document.getElementById('brandedCount').textContent = stations.filter(s => !s.isUnbranded).length;
-            document.getElementById('unbrandedCount').textContent = stations.filter(s => s.isUnbranded).length;
-
-            // Display station cards
-            const stationGrid = document.getElementById('stationGrid');
-            stationGrid.innerHTML = '';
-
-            stations.forEach(station => {
-                const card = createStationCard(station);
-                stationGrid.appendChild(card);
-            });
-
-            resultsSection.scrollIntoView({ behavior: 'smooth' });
-            addLog('Results displayed: ' + stations.length + ' stations');
-        }
-
-        function createStationCard(station) {
-            const card = document.createElement('div');
-            card.className = 'station-card';
-
-            const typeClass = station.isUnbranded ? 'type-unbranded' : 'type-branded';
-            const typeName = station.isUnbranded ? 'Unbranded' : 'Branded';
-
-            card.innerHTML = `
-                <div class="station-ranking">${station.rank}</div>
-                <div class="station-name">${station.name}</div>
-                <div class="station-address">${station.vicinity || 'Address not available'}</div>
-                <div class="station-type ${typeClass}">${typeName}</div>
-                
-                <img src="${station.streetViewUrl}" alt="Street view" class="station-image" 
-                     onerror="this.src='https://via.placeholder.com/600x400?text=No+Image'">
-                
-                <div class="station-metrics">
-                    <div class="metric">
-                        <span class="metric-value">${station.rating ? station.rating.toFixed(1) : 'N/A'}</span>
-                        <div class="metric-label">Rating</div>
-                    </div>
-                    <div class="metric">
-                        <span class="metric-value">${station.user_ratings_total || 0}</span>
-                        <div class="metric-label">Reviews</div>
-                    </div>
-                    <div class="metric">
-                        <span class="metric-value">${station.price_level || 'N/A'}</span>
-                        <div class="metric-label">Price Level</div>
-                    </div>
-                    <div class="metric">
-                        <span class="metric-value">${station.typeScore}</span>
-                        <div class="metric-label">Type Match</div>
-                    </div>
-                </div>
-                
-                <div class="station-actions">
-                    <button class="action-button" onclick="viewOnMaps('${station.place_id}')">View on Maps</button>
-                    <button class="action-button" onclick="downloadImage('${station.streetViewUrl}', '${station.name}')">Get Image</button>
-                </div>
-            `;
-
-            return card;
-        }
-
-        function viewOnMaps(placeId) {
-            const url = `https://www.google.com/maps/place/?q=place_id:${placeId}`;
-            window.open(url, '_blank');
-        }
-
-        function downloadImage(imageUrl, stationName) {
-            window.open(imageUrl, '_blank');
-        }
-
-        function showError(message) {
-            const resultsSection = document.getElementById('resultsSection');
-            resultsSection.style.display = 'block';
-
-            const stationGrid = document.getElementById('stationGrid');
-            stationGrid.innerHTML = `
-                <div style="grid-column: 1/-1; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 10px; padding: 30px;">
-                    <h3 style="color: #856404; margin-bottom: 15px;">Search Error</h3>
-                    <p style="color: #856404;">${message}</p>
-                    <p style="color: #856404; margin-top: 15px;">Please check your internet connection and try again.</p>
-                </div>
-            `;
-
-            resultsSection.scrollIntoView({ behavior: 'smooth' });
-        }
-
-        function updateProgress(percentage, status) {
-            const progressFill = document.getElementById('progressFill');
-            const statusText = document.getElementById('statusText');
-
-            if (progressFill) progressFill.style.width = percentage + '%';
-            if (statusText) statusText.textContent = status;
-        }
-
-        function addLog(message, type = 'info') {
-            const logContainer = document.getElementById('logContainer');
-            if (!logContainer) return;
-
-            const timestamp = new Date().toLocaleTimeString();
-            const logLine = document.createElement('div');
-            logLine.textContent = `[${timestamp}] ${message}`;
-
-            if (type === 'error') {
-                logLine.style.color = '#ff6b6b';
-            } else if (type === 'success') {
-                logLine.style.color = '#28a745';
-            }
-
-            logContainer.appendChild(logLine);
-            logContainer.scrollTop = logContainer.scrollHeight;
-        }
-    </script>
-    <script>
-  // Override functions to call Google APIs directly, bypassing backend
-  async function getCoordinates(address) {
-    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${API_KEY}`;
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error('Geocode request failed');
+      });
     }
-    const data = await response.json();
-    if (data.status !== 'OK' || !data.results.length) {
-      throw new Error('Location not found: ' + address);
-    }
-    return data.results[0].geometry.location;
-  }
 
-  async function findGasStations(lat, lng) {
-    const radius = document.getElementById('searchRadius').value * 1609.34; // Convert miles to meters
-    const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&type=gas_station&key=${API_KEY}`;
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error('Places request failed');
+    // === Upload helpers (column B addresses) ===
+    function readAddressesFromCSV(text){
+      return text.split(/\r?\n/).map(l => l.trim()).filter(Boolean).slice(1)
+        .map(line => line.split(',')[1] ? line.split(',')[1].replace(/\"/g,'').trim() : '').filter(Boolean);
     }
-    const data = await response.json();
-    if (data.status !== 'OK') {
-      throw new Error('Places API error: ' + data.status);
+    async function readAddressesFromExcel(file){
+      const data = await file.arrayBuffer();
+      const wb = XLSX.read(data, { type: 'array' });
+      const firstSheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+      return rows.slice(1).map(r => (r?.[1] || '').toString().trim()).filter(Boolean);
     }
-    return data.results || [];
-  }
-</script>
+
+    async function searchByUpload(file, searchType){
+      ui.progress.textContent = 'Reading file...';
+      let addresses = [];
+      const name = file.name.toLowerCase();
+      if (name.endsWith('.csv')) addresses = readAddressesFromCSV(await file.text());
+      else if (name.endsWith('.xlsx') || name.endsWith('.xls')) addresses = await readAddressesFromExcel(file);
+      if (!addresses.length) { alert('No valid addresses in column B'); return; }
+
+      const allPlaces = [];
+      for (let i = 0; i < addresses.length; i++) {
+        ui.progress.textContent = `Geocoding ${i + 1} / ${addresses.length}...`;
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise(res => {
+          geocoder.geocode({ address: addresses[i] }, (results, status) => {
+            if (status === 'OK' && results?.[0]) {
+              const center = results[0].geometry.location;
+              const req = { location: center, radius: 1609.34, type: 'gas_station' };
+              placesService.nearbySearch(req, (places, s) => {
+                if (s === google.maps.places.PlacesServiceStatus.OK) allPlaces.push(...places);
+                res();
+              });
+            } else res();
+          });
+        });
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise(r => setTimeout(r, 200));
+      }
+      if (!allPlaces.length) { alert('No stations found near uploaded addresses'); return; }
+      await processResults(allPlaces, searchType);
+    }
+
+    // === GPT image scoring ===
+    async function analyzeWithChatGPTImage(item){
+      const system = `You are an expert visual inspector of gas-station PHOTOS. Return STRICT JSON: {\\"score\\": int 1..10, \\"reason\\": string <= 140 chars}. Score ONLY what you SEE. BRANDED: older-looking equipment => HIGHER score. UNBRANDED: newer-looking equipment => HIGHER score.`;
+      const userText = `Context: name=${item.name}; brand=${item.brand}; is_unbranded=${item.isUnbranded}; address=${item.address}. Analyze the attached photo per rules.`;
+      const payload = {
+        model: 'gpt-4o-mini',
+        response_format: { type: 'json_object' },
+        temperature: 0.2,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: [ { type: 'text', text: userText }, { type: 'image_url', image_url: { url: item.imageUrl } } ] }
+        ]
+      };
+      try {
+        const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_API_KEY}` },
+          body: JSON.stringify(payload)
+        });
+        if (!resp.ok) throw new Error('OpenAI HTTP ' + resp.status);
+        const data = await resp.json();
+        const txt = data.choices?.[0]?.message?.content || '{}';
+        const json = JSON.parse(txt);
+        let score = parseInt(json.score, 10);
+        if (!Number.isFinite(score)) score = 5;
+        score = Math.min(10, Math.max(1, score));
+        const reason = (json.reason || 'Image-based score').toString();
+        return { score, reason };
+      } catch(e){ return { score:5, reason:'Fallback error' }; }
+    }
+
+    async function processResults(places, searchType){
+      ui.progress.textContent = 'Analyzing results...';
+      const byId = {}; places.forEach(p => { byId[p.place_id] = p; });
+      const uniq = Object.values(byId);
+
+      const base = uniq.map(p => {
+        const nameLc = (p.name || '').toLowerCase();
+        let brand = 'Independent';
+        for (const b of PRIORITY_BRANDS) if (nameLc.includes(b.toLowerCase())) brand = b;
+        const excluded = EXCLUDED_CHAINS.some(ch => nameLc.includes(ch.toLowerCase()));
+        const isUnbranded = (brand === 'Independent' && !excluded);
+        const lat = p.geometry.location.lat();
+        const lng = p.geometry.location.lng();
+        const placesPhoto = p.photos && p.photos.length ? p.photos[0].getUrl({ maxWidth: 640, maxHeight: 480 }) : null;
+        const streetViewFallback = `https://maps.googleapis.com/maps/api/streetview?size=640x480&location=${lat},${lng}&key=${GOOGLE_MAPS_API_KEY}`;
+        const imageUrl = placesPhoto || streetViewFallback;
+        const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.name)}&query_place_id=${p.place_id}`;
+        return { id:p.place_id, name:p.name, address:p.vicinity||p.formatted_address||'—', lat,lng,brand,excluded,isUnbranded,imageUrl,mapsUrl };
+      }).filter(item => searchType==='branded' ? item.brand!=='Independent'&&!item.excluded : item.isUnbranded);
+
+      if (!base.length) { alert('No qualifying stations'); return; }
+
+      const analyzed=[];
+      for (let i=0;i<base.length;i++){
+        const result = await analyzeWithChatGPTImage(base[i]);
+        analyzed.push({ ...base[i], aiScore: result.score, aiReason: result.reason });
+        ui.progress.textContent = `Scored ${i+1} / ${base.length}`;
+        // gentle pacing
+        await new Promise(r=>setTimeout(r,120));
+      }
+
+      currentResults = analyzed.sort((a,b)=>(b.aiScore||0)-(a.aiScore||0));
+      renderResults();
+    }
+
+    function renderResults(){
+      ui.resultsCount.textContent = `Found ${currentResults.length} Qualified Prospects`;
+      ui.exportBtn.classList.toggle('hidden', currentResults.length === 0);
+
+      // Cards
+      ui.resultsGrid.innerHTML = currentResults.map(r=>`
+        <div class="bg-white rounded-xl shadow overflow-hidden">
+          <div class="relative w-full h-40 bg-gray-200">
+            <img src="${r.imageUrl}" class="w-full h-full object-cover"/>
+            ${r.brand !== 'Independent' ? `<span class="absolute top-2 right-2 bg-indigo-600 text-white text-xs px-2 py-1 rounded">${r.brand}</span>` : `<span class="absolute top-2 right-2 bg-emerald-600 text-white text-xs px-2 py-1 rounded">Unbranded</span>`}
+          </div>
+          <div class="p-4">
+            <div class="text-sm text-gray-500">Score</div>
+            <div class="flex items-center gap-2 text-lg font-bold">${r.aiScore ?? '—'} / 10 <span class="text-xs font-medium text-gray-500">${r.aiReason ? `— ${r.aiReason}` : ''}</span></div>
+            <div class="mt-2 font-semibold text-gray-800">${r.name}</div>
+            <div class="text-sm text-gray-600">${r.address}</div>
+          </div>
+        </div>`).join('');
+
+      // Map markers below list
+      if (typeof google !== 'undefined' && map) {
+        // clear old markers
+        markers.forEach(m=>m.setMap(null));
+        markers = [];
+        const bounds = new google.maps.LatLngBounds();
+        currentResults.forEach(r => {
+          const pos = { lat: r.lat, lng: r.lng };
+          const marker = new google.maps.Marker({ position: pos, map, title: r.name });
+          const info = new google.maps.InfoWindow({ content: `<strong>${r.name}</strong><br>${r.address}<br>Score: ${r.aiScore}/10` });
+          marker.addListener('click', () => info.open(map, marker));
+          markers.push(marker);
+          bounds.extend(pos);
+        });
+        if (currentResults.length) map.fitBounds(bounds);
+      }
+    }
+
+    // Export (CSV with reasons)
+    ui.exportBtn.addEventListener('click', () => {
+      if (!currentResults.length) return;
+      let csv = 'Rank,Name,Brand,Unbranded,Address,Score,Reason,Latitude,Longitude,ImageURL,MapsURL\n';
+      currentResults.forEach((r,i)=>{
+        const row = [i+1, r.name, r.brand, r.isUnbranded, r.address, r.aiScore, r.aiReason, r.lat, r.lng, r.imageUrl, r.mapsUrl]
+          .map(v => '"' + String(v ?? '').replaceAll('"','""') + '"').join(',');
+        csv += row + '\n';
+      });
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `gas_station_prospects_${new Date().toISOString().slice(0,10)}.csv`;
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    });
+  </script>
 </body>
 </html>
