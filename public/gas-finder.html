@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gas Station Finder</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .search-panel { background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
+        .search-row { display: flex; gap: 15px; align-items: end; margin-bottom: 15px; }
+        .form-group { flex: 1; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, select, button { padding: 10px; border: 1px solid #ddd; border-radius: 5px; width: 100%; }
+        button { background: #007bff; color: white; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .results { background: white; padding: 20px; border-radius: 10px; }
+        .station { border: 1px solid #eee; padding: 15px; margin: 10px 0; border-radius: 8px; }
+        .station-name { font-weight: bold; font-size: 18px; }
+        .station-address { color: #666; margin: 5px 0; }
+        .station-rating { color: #ff9800; }
+        .loading { text-align: center; padding: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Gas Station Finder</h1>
+        
+        <div class="search-panel">
+            <div class="search-row">
+                <div class="form-group">
+                    <label for="location">Location:</label>
+                    <input type="text" id="location" placeholder="Enter city, state" value="Los Angeles, CA">
+                </div>
+                <div class="form-group">
+                    <label for="radius">Radius:</label>
+                    <select id="radius">
+                        <option value="5">5 miles</option>
+                        <option value="10" selected>10 miles</option>
+                        <option value="25">25 miles</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <button onclick="searchStations()">Find Stations</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="results" class="results" style="display: none;">
+            <h2>Results</h2>
+            <div id="stations"></div>
+        </div>
+    </div>
+
+    <script>
+        async function searchStations() {
+            const location = document.getElementById('location').value;
+            const radius = document.getElementById('radius').value;
+            
+            if (!location) {
+                alert('Please enter a location');
+                return;
+            }
+
+            const resultsDiv = document.getElementById('results');
+            const stationsDiv = document.getElementById('stations');
+            
+            resultsDiv.style.display = 'block';
+            stationsDiv.innerHTML = '<div class="loading">Searching...</div>';
+
+            try {
+                // Get coordinates
+                const geocodeResponse = await fetch(`/api/geocode?address=${encodeURIComponent(location)}`);
+                const geocodeData = await geocodeResponse.json();
+                
+                if (geocodeData.status !== 'OK' || !geocodeData.results.length) {
+                    throw new Error('Location not found');
+                }
+
+                const coords = geocodeData.results[0].geometry.location;
+                
+                // Search for gas stations
+                const radiusMeters = parseInt(radius) * 1609.34;
+                const placesResponse = await fetch(`/api/places/nearby?lat=${coords.lat}&lng=${coords.lng}&radius=${radiusMeters}`);
+                const placesData = await placesResponse.json();
+                
+                if (placesData.status !== 'OK') {
+                    throw new Error('Places search failed');
+                }
+
+                const stations = placesData.results || [];
+                
+                if (stations.length === 0) {
+                    stationsDiv.innerHTML = '<p>No gas stations found in this area.</p>';
+                    return;
+                }
+
+                // Display results
+                stationsDiv.innerHTML = stations.map(station => `
+                    <div class="station">
+                        <div class="station-name">${station.name}</div>
+                        <div class="station-address">${station.vicinity}</div>
+                        <div class="station-rating">
+                            Rating: ${station.rating || 'N/A'} 
+                            (${station.user_ratings_total || 0} reviews)
+                        </div>
+                        <button onclick="viewOnMaps('${station.place_id}')">View on Maps</button>
+                    </div>
+                `).join('');
+
+            } catch (error) {
+                stationsDiv.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+
+        function viewOnMaps(placeId) {
+            window.open(`https://www.google.com/maps/place/?q=place_id:${placeId}`, '_blank');
+        }
+    </script>
+</body>
+</html>
