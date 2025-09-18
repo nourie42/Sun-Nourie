@@ -27,59 +27,11 @@ app.get("/", (_req, res) => {
 });
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
-// ADD THESE NEW ENDPOINTS HERE (after line 25):
-app.get("/api/health", (_req, res) => {
-  res.json({ 
-    status: 'OK', 
-    timestamp: new Date().toISOString(),
-    service: 'Gas Station Finder API',
-    apiKey: GOOGLE_API_KEY ? 'Configured' : 'Missing'
-  });
-});
-
-app.get("/api/geocode", async (req, res) => {
-  try {
-    const { address } = req.query;
-    if (!address) return res.status(400).json({ status: 'INVALID_REQUEST', error: 'Address required' });
-    if (!GOOGLE_API_KEY) return res.status(500).json({ status: 'ERROR', error: 'API key missing' });
-
-    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_API_KEY}`;
-    const response = await fetchWithTimeout(url, { headers: { 'User-Agent': UA } }, 15000);
-    
-    if (!response.ok) throw new Error(`Google API error: ${response.status}`);
-    const data = await response.json();
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({ status: 'ERROR', error: error.message });
-  }
-});
-
-app.get("/api/places/nearby", async (req, res) => {
-  try {
-    const { lat, lng, radius, type } = req.query;
-    if (!lat || !lng) return res.status(400).json({ status: 'INVALID_REQUEST', error: 'Lat/lng required' });
-    if (!GOOGLE_API_KEY) return res.status(500).json({ status: 'ERROR', error: 'API key missing' });
-
-    const searchRadius = radius || '16093';
-    const searchType = type || 'gas_station';
-    
-    const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${searchRadius}&type=${searchType}&key=${GOOGLE_API_KEY}`;
-    const response = await fetchWithTimeout(url, { headers: { 'User-Agent': UA } }, 20000);
-    
-    if (!response.ok) throw new Error(`Google API error: ${response.status}`);
-    const data = await response.json();
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({ status: 'ERROR', error: error.message });
-  }
-});
-
+// ---------- Gas Station Finder Routes ----------
 app.get("/gas-finder", (_req, res) => {
   res.set("Cache-Control", "no-store");
   res.sendFile(path.join(__dirname, "public", "gas-finder.html"));
 });
-
-// Continue with your existing code starting from line 26...
 
 // ---------- Config ----------
 const UA = "FuelEstimator/3.4 (+your-app)";
@@ -579,7 +531,6 @@ async function competitorsWithinRadiusMiles(lat, lon, rMi = 1.5) {
   out.sort((a, b) => a.miles - b.miles);
   return out.filter((s) => s.miles <= rMi);
 }
-
 // ---------- Developments ----------
 async function overpassDevelopments(lat, lon) {
   const rM = Math.round(5 * 1609.344);
