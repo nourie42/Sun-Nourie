@@ -867,17 +867,6 @@ async function exhaustiveDevelopments(addrLabel, lat, lon) {
   };
 }
 
-// Simple fetchWithTimeout helper
-async function fetchWithTimeout(resource, options = {}, timeout = 10000) {
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), timeout);
-  try {
-    return await fetch(resource, { ...options, signal: controller.signal });
-  } finally {
-    clearTimeout(id);
-  }
-}
-
 // ---------- Google proxy ----------
 app.get("/google/status", async (_req, res) => {
   try {
