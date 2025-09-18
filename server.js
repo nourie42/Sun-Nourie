@@ -864,6 +864,7 @@ async function exhaustiveDevelopments(addrLabel, lat, lon) {
         csv: matchCsvDevelopments(admin.city, admin.county, admin.state),
     osm: ded(osm).slice(0, 40),
     note: bing.message,
+    csv:     matchCsvDevelopments(admin.city, admin.county, admin.state),
   };
 }
 
