@@ -275,9 +275,12 @@ async function checkGoogleStatus(){
     apiStatus.textContent=j.ok?"API: Google — Working":`API: Google — ${j.status}`;
   } catch {
     GOOGLE_OK=false; apiStatus.textContent="API: Google — unavailable";
-  }
+  checkGoogleStatus
 }
-document.addEventListener("DOMContentLoaded", checkGoogleStatus);
+document.addEventListener("DOMContentLoaded", checkGoogleStatus
+
+                          checkGoogleStatus();
+
 
 async function googleSearch(q){
   if(!GOOGLE_OK) return [];
