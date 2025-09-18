@@ -33,7 +33,6 @@ app.get("/health", (_req, res) => res.json({ ok: true }));
 const UA = "FuelEstimator/3.4 (+your-app)";
 const CONTACT = process.env.OVERPASS_CONTACT || UA;
 
-const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || "";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 
 const BING_NEWS_KEY = process.env.BING_NEWS_KEY || "";
