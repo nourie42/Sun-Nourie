@@ -377,42 +377,43 @@ async function callEstimate(){
   return await safeJSON("/estimate",{ method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
 }
 
-/* Render */
-function renderAll(d){
-  outNum.textContent = fmt(d.low);
-  outRange.textContent = `Full range: ${fmt(d.low)} – ${fmt(d.high)}`;
-  outY2.textContent=fmt(d.year2); outY3.textContent=fmt(d.year3);
-
-  const method = d.inputs?.aadt_components?.method || "model";
-  aadtBanner.textContent=`AADT used ${fmt(d.inputs.aadt_used)} (${method})`;
-
-  let compTxt=`Competition: ${d.competition.count} within 1.5 mi`;
-  if(d.competition.nearest_mi!=null) compTxt += `; nearest ${(+d.competition.nearest_mi).toFixed(3)} mi`;
-  if((d.competition.notable_brands||[]).length) compTxt += `; heavy: ${d.competition.notable_brands.join(", ")}`;
-  if(d.flags?.rural_bonus_applied) compTxt += `; rural bonus +30% applied`;
-  compLine.textContent = compTxt;
-
-   // Show CSV developments if available. When matches exist in the server‑side
+function renderAll(d) {
+  // Show CSV developments if available. When matches exist in the server-side
   // developments_data.csv for the entered town/state, we replace the three
   // categories with a single card containing a red stop sign and the list of
   // developments. Otherwise we fall back to the existing OSM/news/permits logic.
   if (Array.isArray(d.csv) && d.csv.length) {
     const listHtml = d.csv.map(x => {
-      const nm = esc(x.name || "");
-      const st = esc(x.status || "");
+      const nm  = esc(x.name || "");
+      const st  = esc(x.status || "");
       const dtl = x.details ? ` • ${esc(x.details)}` : "";
-      const dt = x.date ? ` • ${esc(x.date)}` : "";
-      return `<li>${nm}${st?` • ${st}`:''}${dtl}${dt}</li>`;
+      const dt  = x.date ?    ` • ${esc(x.date)}`    : "";
+      return `<li>${nm}${st ? ` • ${st}` : ''}${dtl}${dt}</li>`;
     }).join("");
-    devsBox.innerHTML = `<div style="color:#ff4444;font-weight:700;font-size:1.1em;margin-bottom:4px;">\u26D4; Developments</div><ul>${listHtml}</ul>`;
-    devsExtNews.innerHTML = "";
+    devsBox.innerHTML =
+      `<div style="color:#ff4444;font-weight:700;font-size:1.1em;margin-bottom:4px;">&#x26D4; Developments</div><ul>${listHtml}</ul>`;
+    devsExtNews.innerHTML    = "";
     devsExtPermits.innerHTML = "";
   } else {
-    devsBox.innerHTML = (d.developments||[]).length ? "<ul>"+d.developments.map(x=>`<li>${esc(x.name)} • ${esc(x.status)}${x.approx_miles!=null?` • ~${x.approx_miles} mi`:''}</li>`).join("")+"</ul>" : "<em>none</em>";
-    devsExtNews.innerHTML = (d.developments_external?.news||[]).length ? 
-      "<ul>"+d.developments_external.news.map(x=>`<li>${esc(x.name)} • ${esc(x.status)}${x.link?` • <a href=\"${x.link}\" target=\"_blank\">source</a>`:''}</li>`).join("")+"</ul>" : "<em>none</em>";
-    devsExtPermits.innerHTML = (d.developments_external?.permits||[]).length ? 
-      "<ul>"+d.developments_external.permits.map(x=>`<li>${esc(x.name)} • ${esc(x.status)}${x.link?` • <a href=\"${x.link}\" target=\"_blank\">source</a>`:''}</li>`).join("")+"</ul>" : "<em>none</em>";
+    devsBox.innerHTML = (d.developments||[]).length
+      ? "<ul>"+d.developments.map(x=>
+          `<li>${esc(x.name)} • ${esc(x.status)}${x.approx_miles!=null?` • ~${x.approx_miles} mi`:''}</li>`
+        ).join("")+"</ul>"
+      : "<em>none</em>";
+
+    devsExtNews.innerHTML = (d.developments_external?.news||[]).length
+      ? "<ul>"+d.developments_external.news.map(x=>
+          `<li>${esc(x.name)} • ${esc(x.status)}${x.link?` • <a href=\"${x.link}\" target=\"_blank\">source</a>`:''}</li>`
+        ).join("")+"</ul>"
+      : "<em>none</em>";
+
+    devsExtPermits.innerHTML = (d.developments_external?.permits||[]).length
+      ? "<ul>"+d.developments_external.permits.map(x=>
+          `<li>${esc(x.name)} • ${esc(x.status)}${x.link?` • <a href=\"${x.link}\" target=\"_blank\">source</a>`:''}</li>`
+        ).join("")+"</ul>"
+      : "<em>none</em>";
+  }
+}
 
   // Summary fallback
   let s = (d.summary||"").trim();
