@@ -861,12 +861,11 @@ async function exhaustiveDevelopments(addrLabel, lat, lon) {
   return {
     news: ded(news).slice(0, 80),
     permits: ded(permits).slice(0, 80),
-        csv: matchCsvDevelopments(admin.city, admin.county, admin.state),
+    csv: matchCsvDevelopments(admin.city, admin.county, admin.state),
     osm: ded(osm).slice(0, 40),
-    note: bing.message,
-    csv:     matchCsvDevelopments(admin.city, admin.county, admin.state),
-  };
-}
+    note: bing.message
+    };
+  }
 
   const express = require("express");
   const fetch = require("node-fetch"); // if you're not on Node 18+ with built-in fetch
