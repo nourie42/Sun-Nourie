@@ -468,17 +468,27 @@ async function showRating(address){
   }
 }
 /* Main */
+/* Main */
+
+// This block is at the very bottom of public/index.html, after all the functions.
+// It's where the click handler for the Estimate button is defined.
+
 $("go").addEventListener("click", async ()=>{
-  try{
-    goBtn.disabled=true; setOverlayWorking();
-    const d=await callEstimate();
-    renderAll(d); pills();
-  } catch(e){
-    alert("Error: "+(e.message||e));
-  } finally{
-    goBtn.disabled=false; clearOverlay();
+  try {
+    goBtn.disabled = true;
+    setOverlayWorking();
+
+    const d = await callEstimate();
+    renderAll(d);
+    pills();
+  } catch (e) {
+    alert("Error: " + (e.message||e));
+  } finally {
+    goBtn.disabled = false;
+    clearOverlay();
   }
 });
+
 addrInput.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); $("go").click(); } });
 
 /* PDF Export */
