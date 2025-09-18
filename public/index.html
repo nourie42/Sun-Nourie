@@ -279,7 +279,8 @@ async function checkGoogleStatus(){
 }
 document.addEventListener("DOMContentLoaded", checkGoogleStatus
 
-                          checkGoogleStatus();
+                          // call checkGoogleStatus immediately to update API status even if DOMContentLoaded has already fired
+checkGoogleStatus();
 
 
 async function googleSearch(q){
