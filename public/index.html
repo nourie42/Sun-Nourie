@@ -1,4 +1,4 @@
-<!-- public/index.html — FULL FEATURE BUILD (v2025‑09‑19) -->
+<!-- public/index.html — DOT-direct build (v2025‑09‑19) -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -68,6 +68,7 @@
     .stop-alert { display:none; position:sticky; top:0; z-index:60; margin-bottom:12px; }
     .stop-inner { display:flex; align-items:center; gap:14px; padding:12px 14px; border-radius:12px; border:2px solid #b91c1c; background:linear-gradient(135deg,#7f1d1d,#991b1b); color:#fff; box-shadow:0 12px 24px rgba(0,0,0,.35); }
     .stop-sign { width:52px; height:52px; flex:0 0 52px; border-radius:12px; background:#dc2626; border:4px solid #fca5a5; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:14px; }
+
     table { width:100%; border-collapse: collapse; }
     th, td { text-align:left; border-bottom:1px solid rgba(255,255,255,.06); padding:8px 6px; }
     th { font-size:12px; color:#cfd8ea; }
@@ -177,9 +178,9 @@
       <button id="estimateBtn" class="btn">Run Estimate</button>
     </div>
 
-    <!-- Map & SV -->
+    <!-- Main Map & SV -->
     <div class="card">
-      <div class="muted">Map: Site & competitors (1.5 mi) + AADT (dots) + ⭐ used AADT</div>
+      <div class="muted">Map: Site & competitors (1.5 mi) + AADT dots + ⭐ AADT used</div>
       <div id="map"><div id="overlay" class="muted">—</div></div>
       <div id="svWrap"><div class="muted" style="margin-top:10px;">Street View</div><iframe id="sv" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div>
     </div>
@@ -206,8 +207,9 @@
     <!-- Developments -->
     <div class="card"><div id="devs" class="muted">—</div></div>
 
+    <!-- Rating + GPT Summary -->
     <div class="card"><b>Google Rating</b><div id="ratingLine" class="muted">—</div></div>
-    <div class="card"><b>Summary</b><div id="summary" class="muted">—</div></div>
+    <div class="card"><b>Summary (GPT)</b><div id="summary" class="muted">—</div></div>
   </div>
 
   <div class="footerbar"><button id="exportPDF">Export to PDF</button></div>
@@ -223,13 +225,12 @@ const apiStatus = $("apiStatus"), aadtBanner = $("aadtBanner"), compLine = $("co
       addExtraBtn = $("addExtra"), extraList = $("extraList"), activeExtras = $("activeExtras"),
       ex_large_dev = $("ex_large_dev"), ex_hours18 = $("ex_hours18"), ex_highincome = $("ex_highincome"),
       ex_lowrating = $("ex_lowrating"), ex_competitive_pricing = $("ex_competitive_pricing"),
-      ex_rural = $("ex_rural"), stopBox = $("stopBox"), stopText = $("stopText"),
-      aadtSourceLine = $("aadtSourceLine");
+      ex_rural = $("ex_rural"), aadtSourceLine = $("aadtSourceLine");
 
 let map, layer, mapReady = false, selectedCoords = null, selectedPlaceId = null;
 let aadtMap, aadtLayer, aadtReady = false;
 let acItems = [], acActive = -1;
-let acCommitted = false; // lock suggestions
+let acCommitted = false;
 let lastCommittedText = "";
 
 /* Utils */
@@ -365,7 +366,7 @@ function collectExtras(){
   if(ex_hours18.checked)  out.push({pct:-7.5, note:"18h ops"});
   if(ex_highincome.checked) out.push({pct:2.5, note:"Higher income"});
   if(ex_lowrating.checked)  out.push({pct:-30, note:"Rating < 4.0"});
-  if(ex_competitive_pricing.checked) out.push({pct:10, note:"Competitive site gas pricing"});
+  if(ex_competitive_pricing.checked)  out.push({pct:10, note:"Competitive site gas pricing"});
   for(const chip of extraList.querySelectorAll(".chip")){
     const pct = +chip.querySelector(".extraPct").value;
     const note = chip.querySelector(".extraNote").value.trim();
@@ -404,7 +405,7 @@ function renderAll(d){
   aadtBanner.textContent = d.aadtText || "—";
   compLine.textContent = d.competitionText || "—";
 
-  // STOP banner if CSV devs match
+  // STOP: CSV development stripe + list
   if (Array.isArray(d.csv) && d.csv.length) {
     const lines = d.csv.slice(0,6).map(x => {
       const nm = esc(x.name || "");
@@ -413,27 +414,21 @@ function renderAll(d){
       const dt  = x.date ?    ` • ${esc(x.date)}`    : "";
       return `${nm}${st ? ` • ${st}` : ''}${dtl}${dt}`;
     }).join(" // ");
-    stopText.innerHTML = `Development flagged: <b>${lines}</b>`;
-    stopBox.style.display = "block";
+    document.getElementById("stopText").innerHTML = `Development flagged: <b>${lines}</b>`;
+    document.getElementById("stopBox").style.display = "block";
     devsBox.innerHTML = "<ul>"+d.csv.map(x => `<li>${esc(x.name||'')} • ${esc(x.status||'')}${x.details?` • ${esc(x.details)}`:''}${x.date?` • ${esc(x.date)}`:''}</li>`).join("")+"</ul>";
   } else {
-    stopBox.style.display = "none";
+    document.getElementById("stopBox").style.display = "none";
     devsBox.innerHTML = "<em>no CSV developments</em>";
   }
 
-  // Summary
-  const method = d?.inputs?.aadt_components?.method || "unknown";
-  let s = (d.summary||"").trim();
-  if(!s){
-    s = `AADT used ${fmt(d.inputs?.aadt_used)} (${method}). Baseline ceiling active. Competition ${d.competition?.count ?? 0} within 1.5 mi. Est. LOW ${fmt(d.low)} gal/mo (range ${fmt(d.low)}–${fmt(d.high)}).`;
-  }
-  summaryBox.textContent = s;
+  // Summary (GPT)
+  summaryBox.textContent = (d.summary || "").trim() || "—";
 
-  // Main map + Rating
+  // Maps
   initOrUpdateMainMap(d.map);
-  showRating(addrInput.value.trim());
 
-  // Second map + table: list sources within 1 mile and show USED marker
+  // Second map + table (1 mile)
   if (d?.map?.site) {
     fetch(`/aadt/nearby?lat=${encodeURIComponent(d.map.site.lat)}&lon=${encodeURIComponent(d.map.site.lon)}&radiusMi=1`)
       .then(r => r.json()).then(j => {
@@ -451,9 +446,13 @@ function renderAll(d){
         }
       }).catch(()=>{});
   }
+
+  // Rating
+  showRating(addrInput.value.trim());
 }
 
 /* =================== Rating helpers =================== */
+let selectedPlaceId = null;
 async function resolvePlaceIdIfNeeded(address){
   if (selectedPlaceId) return selectedPlaceId;
   try {
@@ -499,7 +498,7 @@ function chooseAc(i){
   if (!it) return;
   const coords = (Number.isFinite(it.lat) && Number.isFinite(it.lon)) ? { lat: it.lat, lon: it.lon } : null;
   commitAddress(it.display, coords, it.place_id || null);
-  addrInput.blur(); // collapse keyboard + keep list hidden
+  addrInput.blur(); // collapse keyboard
 }
 async function googleSearch(q){
   try {
@@ -526,15 +525,11 @@ function renderAc(list){
 }
 addrInput.addEventListener("input", () => {
   const q = addrInput.value.trim();
-
-  // If we already committed and text hasn't changed, keep list hidden.
   if (acCommitted) {
     if (q === lastCommittedText) { hideAc(); return; }
-    // User started editing -> unlock for a new search.
-    acCommitted = false;
+    acCommitted = false; // unlock only if they edit
   }
   if (q.length < 3) { hideAc(); return; }
-
   Promise.all([googleSearch(q), nominatimSearch(q)]).then(([g,n])=>{
     acItems = [...g, ...n].slice(0, 8);
     renderAc(acItems);
@@ -548,13 +543,6 @@ document.addEventListener("pointerdown", (e) => {
 
 /* =================== Main events ====================== */
 function tidyUI(){ hideAc(); }
-async function checkGoogleStatus(){
-  try {
-    const r = await fetch("/google/status");
-    const j = await r.json();
-    apiStatus.textContent = j.ok ? "API: Google — Working" : `API: Google — ${j.status}`;
-  } catch { apiStatus.textContent = "API: Google — unavailable"; }
-}
 async function onEstimateClick(){
   if(!addrInput.value.trim() && !selectedCoords){
     alert("Please select a valid address first.");
@@ -619,7 +607,7 @@ document.getElementById("exportPDF").addEventListener("click", async ()=>{
     cursorY += imgH + 12;
   }
 
-  // Include AADT table
+  // Include AADT table text
   const tbl = document.getElementById("aadtTable").innerText || "";
   const devLines = doc.splitTextToSize("AADT Sources (1 mi):\n" + tbl, contentW);
   if (cursorY + devLines.length*14 > pageH - margin) { doc.addPage(); cursorY = margin; }
@@ -630,7 +618,15 @@ document.getElementById("exportPDF").addEventListener("click", async ()=>{
 });
 
 /* =================== Init ============================== */
-document.addEventListener("DOMContentLoaded", checkGoogleStatus);
+document.addEventListener("DOMContentLoaded", () => {
+  (async () => {
+    try {
+      const r = await fetch("/google/status");
+      const j = await r.json();
+      apiStatus.textContent = j.ok ? "API: Google — Working" : `API: Google — ${j.status}`;
+    } catch { apiStatus.textContent = "API: Google — unavailable"; }
+  })();
+});
 overlay.textContent="—";
   </script>
 </body>
