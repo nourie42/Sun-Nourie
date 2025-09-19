@@ -1,3 +1,4 @@
+<!-- public/index.html — Fuel IQ UI (drop-in) -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -5,10 +6,12 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Sunoco, LP Fuel IQ - Fuel Site Analyzer</title>
 
-  <!-- Leaflet -->
+  <!-- Leaflet (map) -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <!-- Leaflet image export -->
   <script src="https://unpkg.com/leaflet-image/leaflet-image.js"></script>
+  <!-- jsPDF for PDF export -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous"></script>
 
   <style>
@@ -47,13 +50,22 @@
     .ac-item:hover, .ac-item.active{ background:#101a2b; }
     .badge{ display:inline-block; font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); background:var(--pill); color:#a9c5ff; margin-left:8px; }
 
-    /* STOP banner styles */
-    .stop-card{ border:1px solid #7f1d1d; background:linear-gradient(180deg,#160909,#0e0707); }
-    .stop-banner{ display:flex; align-items:center; gap:12px; font-weight:900; color:#fecaca; font-size:18px; margin-bottom:6px; }
-    .stop-emoji{ font-size:36px; line-height:1; }
-    .stop-note{ color:#fecaca; }
-    .stop-list { margin:6px 0 0 0; padding-left:18px; }
-    .stop-list li{ margin:4px 0; }
+    details summary{ cursor:pointer; }
+    .adv-line{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-top:12px; }
+    .chip{ display:inline-flex; align-items:center; gap:8px; background:#0f1929; border:1px solid var(--line); padding:8px 10px; border-radius:999px; font-size:13px; }
+    .chip input{ width:auto; accent-color:#22d3ee; }
+    .radio-row{ display:flex; flex-wrap:wrap; gap:10px; margin-top:8px; }
+
+    .hero{ display:flex; justify-content:space-between; align-items:flex-end; gap:12px; }
+    .hero .num{ font-size:44px; font-weight:900; letter-spacing:.5px; }
+    .hero .sub{ font-size:13px; color:#a9b6d0; }
+
+    .footerbar{ position:fixed; left:0; right:0; bottom:0; background:linear-gradient(180deg,#0c1220,#0a0f1a); border-top:1px solid var(--line); padding:10px 16px; display:flex; justify-content:center; gap:12px; z-index:50; }
+
+    .aadt-tabs { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:8px 0 12px; }
+    .aadt-tab { display:inline-block; padding:8px 12px; border-radius:999px; border:1px solid var(--line); background:var(--pill); color:var(--text); text-decoration:none; font-weight:700; font-size:13px; letter-spacing:.2px; }
+    .aadt-tab:hover { background:#101a2b; }
+    @media (max-width:680px){ .aadt-tabs{ overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:4px; } .aadt-tab{ white-space:nowrap; } }
   </style>
 </head>
 <body>
@@ -88,7 +100,7 @@
         <div>
           <label>Site search</label>
           <div class="ac-wrap">
-            <input id="addr" placeholder="Enter business or address" autocomplete="off"/>
+            <input id="addr" placeholder="Enter business or address" autocomplete="off" />
             <div id="ac" class="ac-list" style="display:none;"></div>
           </div>
           <div class="muted subtle" style="margin-top:6px" id="apiStatus">API Status: checking…</div>
@@ -158,10 +170,6 @@
     </div>
 
     <!-- Developments -->
-    <div class="card stop-card" id="stopCard" style="display:none;">
-      <div class="stop-banner"><span class="stop-emoji">🛑</span><span id="stopMsg" class="stop-note">Development alert</span></div>
-      <ul id="stopList" class="stop-list"></ul>
-    </div>
     <div class="card"><div id="devs" class="muted">—</div></div>
     <div class="card"><div id="devsExternalNews" class="muted">—</div></div>
     <div class="card"><div id="devsExternalPermits" class="muted">—</div></div>
@@ -173,14 +181,13 @@
   <div class="footerbar"><button id="exportPDF">Export to PDF</button></div>
 
   <script>
-/* ==== DOM refs & state ==== */
+/* =================== Helpers & State =================== */
 const $ = (id) => document.getElementById(id);
 const apiStatus = $("apiStatus"), aadtBanner = $("aadtBanner"), compLine = $("compLine"),
-      overlay = $("overlay"), svFrame = $("sv"),
-      outNum = $("estNum"), outRange = $("estRange"), outY2 = $("y2"), outY3 = $("y3"),
-      devsBox = $("devs"), devsExtNews = $("devsExternalNews"), devsExtPermits = $("devsExternalPermits"),
+      overlay = $("overlay"), svFrame = $("sv"), outNum = $("estNum"), outRange = $("estRange"),
+      outY2 = $("y2"), outY3 = $("y3"), devsBox = $("devs"),
+      devsExtNews = $("devsExternalNews"), devsExtPermits = $("devsExternalPermits"),
       summaryBox = $("summary"), ratingLine = $("ratingLine"),
-      stopCard = $("stopCard"), stopMsg = $("stopMsg"), stopList = $("stopList"),
       addrInput = $("addr"), acBox = $("ac"), goBtn = $("go"), runBtn = $("estimateBtn"),
       addExtraBtn = $("addExtra"), extraList = $("extraList"), activeExtras = $("activeExtras"),
       ex_large_dev = $("ex_large_dev"), ex_hours18 = $("ex_hours18"), ex_highincome = $("ex_highincome"),
@@ -189,20 +196,15 @@ const apiStatus = $("apiStatus"), aadtBanner = $("aadtBanner"), compLine = $("co
 
 let map, layer, mapReady = false, selectedCoords = null, selectedPlaceId = null;
 let acItems = [], acActive = -1;
+let acCommitted = false;           // lock suggestions after selection
+let lastCommittedText = "";        // last committed display text
 
-// Locking + race-proofing
-let acCommitted = false;    // true once a suggestion is chosen or estimate is run
-let lastCommittedText = "";
-let acSeq = 0;              // sequence id to ignore stale responses
-let acAbort = null;         // AbortController to cancel in-flight lookups
-
-/* ==== Helpers ==== */
 function fmt(n){ return (n??0).toLocaleString(undefined,{maximumFractionDigits:0}); }
 function esc(s){ return (s??"").toString().replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
 function setOverlayWorking(){ overlay.textContent = "Working…"; overlay.style.display = "flex"; }
 function clearOverlay(){ overlay.style.display = "none"; }
 
-/* ==== Map & Street View ==== */
+/* =================== Map + Street View =================== */
 function initMap(){ if(mapReady) return;
   map = L.map("map",{zoomControl:true}); window.map = map;
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map);
@@ -245,7 +247,7 @@ function initOrUpdateMap(m){
   clearOverlay(); updateStreetView(site[0], site[1]);
 }
 
-/* ==== Autocomplete & Status ==== */
+/* =================== Autocomplete & Status =============== */
 function hideAc(){ acBox.style.display = "none"; acActive = -1; }
 function commitAddress(display, coords, placeId){
   lastCommittedText = (display || "").trim();
@@ -255,28 +257,32 @@ function commitAddress(display, coords, placeId){
   addrInput.value = display;
   selectedCoords = coords || null;
   selectedPlaceId = placeId || null;
-
-  // Invalidate & cancel pending lookups (prevents stale results reopening the list)
-  acSeq++;
-  if (acAbort) { try { acAbort.abort(); } catch {} }
 }
+
 async function checkGoogleStatus(){
-  try { const r = await fetch("/google/status"); const j = await r.json();
-        apiStatus.textContent = j.ok ? "API: Google — Working" : `API: Google — ${j.status}`;
+  try {
+    const r = await fetch("/google/status");
+    const j = await r.json();
+    apiStatus.textContent = j.ok ? "API: Google — Working" : `API: Google — ${j.status}`;
   } catch { apiStatus.textContent = "API: Google — unavailable"; }
 }
-async function googleSearch(q, signal){
-  const r = await fetch("/google/autocomplete?input=" + encodeURIComponent(q), { signal });
-  const j = await r.json();
-  if(!j.ok) return [];
-  return (j.items||[]).map(it => ({...it, type:"Google", score:1.3}));
+
+async function googleSearch(q){
+  try {
+    const r = await fetch("/google/autocomplete?input=" + encodeURIComponent(q));
+    const j = await r.json();
+    if(!j.ok) return [];
+    return (j.items||[]).map(it => ({...it, type:"Google", score:1.3}));
+  } catch { return []; }
 }
-async function nominatimSearch(q, signal){
-  const url = "https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=us&q=" + encodeURIComponent(q);
-  const r = await fetch(url, { signal });
-  const a = await r.json();
-  return a.map(row => ({ type:"OSM", display:row.display_name, lat:+row.lat, lon:+row.lon, score:0.6 }));
+async function nominatimSearch(q){
+  try {
+    const r = await fetch("https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=us&q=" + encodeURIComponent(q));
+    const a = await r.json();
+    return a.map(row => ({ type:"OSM", display:row.display_name, lat:+row.lat, lon:+row.lon, score:0.6 }));
+  } catch { return []; }
 }
+
 function renderAc(list){
   if(!list.length){ hideAc(); return; }
   acBox.innerHTML = list.map((it,i) =>
@@ -290,43 +296,40 @@ function chooseAc(i){
   if (!it) return;
   const coords = (Number.isFinite(it.lat) && Number.isFinite(it.lon)) ? { lat: it.lat, lon: it.lon } : null;
   commitAddress(it.display, coords, it.place_id || null);
-  addrInput.blur(); // collapse mobile keyboard & trigger blur-hide
+  addrInput.blur(); // collapse mobile keyboard and trigger blur-hide
 }
 
-// Input typing → search unless already committed and unchanged
 addrInput.addEventListener("input", () => {
   const q = addrInput.value.trim();
+
+  // If we have a committed selection and text hasn't changed, keep list hidden.
+  // MDN: input fires whenever value changes; if not changed, do nothing. :contentReference[oaicite:1]{index=1}
   if (acCommitted) {
-    if (q === lastCommittedText) { hideAc(); return; } // keep locked & hidden
-    acCommitted = false; // user edited → unlock suggestions
+    if (q === lastCommittedText) { hideAc(); return; }
+    // User started editing -> unlock suggestions.
+    acCommitted = false;
   }
+
   if (q.length < 3) { hideAc(); return; }
 
-  // Cancel previous lookups and start new ones with AbortController
-  if (acAbort) { try { acAbort.abort(); } catch {} }
-  acAbort = new AbortController();
-  const signal = acAbort.signal;
-
-  const mySeq = ++acSeq; // capture sequence for this round
-  Promise.all([googleSearch(q, signal), nominatimSearch(q, signal)])
-    .then(([g,n])=>{
-      if (mySeq !== acSeq) return; // stale
-      if (acCommitted && addrInput.value.trim() === lastCommittedText) return; // locked
-      if (addrInput.value.trim() !== q) return; // user changed text since we started
-      acItems = [...g, ...n].slice(0, 8);
-      acItems.length ? renderAc(acItems) : hideAc();
-    })
-    .catch((e)=>{ if (e && e.name !== "AbortError") console.warn(e); });
+  Promise.all([googleSearch(q), nominatimSearch(q)]).then(([g,n])=>{
+    acItems = [...g, ...n].slice(0, 8);
+    renderAc(acItems);
+  });
 });
 
-// Hide suggestions on blur, Escape, and outside click
-addrInput.addEventListener("blur", () => { setTimeout(hideAc, 100); });
+// Hide list when input loses focus (standard blur behavior). :contentReference[oaicite:2]{index=2}
+addrInput.addEventListener("blur", () => { setTimeout(hideAc, 120); });
+
+// Hide list on Escape key. (Use KeyboardEvent.key === "Escape") :contentReference[oaicite:3]{index=3}
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") hideAc(); });
+
+// Hide list on outside click/tap (pointerdown covers mouse/touch/pen). :contentReference[oaicite:4]{index=4}
 document.addEventListener("pointerdown", (e) => {
   if (e.target !== addrInput && !acBox.contains(e.target)) hideAc();
 });
 
-/* ==== Advanced badges ==== */
+/* =================== Advanced Badges ===================== */
 function pills(){
   const p=[];
   if(ex_large_dev.checked) p.push("+7.5% Large development nearby");
@@ -366,7 +369,7 @@ function collectExtras(){
 function getFlags(){ return { rural: ex_rural.checked === true }; }
 function getPricePosition(){ const r=document.querySelector('input[name="pricepos"]:checked'); return r ? r.value : "inline"; }
 
-/* ==== API helpers ==== */
+/* =================== API helpers ====================== */
 async function safeJSON(url,opts){ const r=await fetch(url,opts); const t=await r.text(); try{ return JSON.parse(t);}catch{ throw new Error("Bad JSON"); } }
 async function callEstimate(){
   const body = {
@@ -381,103 +384,31 @@ async function callEstimate(){
   return await safeJSON("/estimate", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
 }
 
-/* ==== STOP banner helpers (CSV) ==== */
-function norm(s){ return String(s||"").toLowerCase().replace(/county\b/gi,"").replace(/[^a-z0-9]+/g," ").trim(); }
-function parseCityState(addr){
-  const m = String(addr||"").match(/,\s*([^,]+),\s*([A-Z]{2})\s*\d{5}/);
-  if (m) return { city: m[1].trim(), state: m[2].trim() };
-  const parts = String(addr||"").split(",").map(x=>x.trim());
-  if (parts.length >= 2) {
-    const guessCity = parts[parts.length-2];
-    const stateMatch = (parts[parts.length-1].match(/([A-Z]{2})/)||[])[1]||"";
-    return { city: guessCity, state: stateMatch };
-  }
-  return { city:"", state:"" };
-}
-function parseCsv(text){
-  const rows=[]; let row=[], val="", q=false;
-  for(let i=0;i<text.length;i++){
-    const c=text[i], n=text[i+1];
-    if(c==='"' && n==='"'){ val+='"'; i++; }
-    else if(c==='"'){ q=!q; }
-    else if(c===',' && !q){ row.push(val); val=""; }
-    else if((c==='\n'||c==='\r') && !q){ if(c==='\r'&&n==='\n') i++; row.push(val); val=""; if(row.length) rows.push(row); row=[]; }
-    else { val+=c; }
-  }
-  if (val!=="" || row.length) { row.push(val); rows.push(row); }
-  return rows;
-}
-function extractCsvMatches(text, city, state){
-  const rows = parseCsv(text); if(!rows.length) return [];
-  const headers = rows[0].map(h=>String(h||""));
-  const idxState = headers.findIndex(h => /state/i.test(h));
-  const idxTown = headers.findIndex(h => /(city|county)/i.test(h));
-  const idxName = headers.findIndex(h => /(brand|name|project)/i.test(h));
-  const idxStatus = headers.findIndex(h => /status/i.test(h));
-  const idxDetails = headers.findIndex(h => /details?/i.test(h));
-  const idxDate = headers.findIndex(h => /date/i.test(h));
-  const wantState = norm(state), wantTown = norm(city);
-  const out=[];
-  for(let i=1;i<rows.length;i++){
-    const r=rows[i];
-    const st = norm(r[idxState]); const tw = norm(r[idxTown]);
-    if (!st || !tw) continue;
-    if (st===wantState && (tw===wantTown)) {
-      out.push({
-        name: r[idxName]||"Development",
-        status: r[idxStatus]||"",
-        details: r[idxDetails]||"",
-        date: r[idxDate]||""
-      });
-    }
-  }
-  return out;
-}
-async function ensureStopBanner(address, serverCsv){
-  if (Array.isArray(serverCsv) && serverCsv.length){
-    showStop(serverCsv, address);
-    return;
-  }
-  const {city, state} = parseCityState(address);
-  if (!city || !state) return;
-  try{
-    const txt = await fetch("/developments_data.csv", { cache:"no-store" }).then(r=>r.text());
-    const matches = extractCsvMatches(txt, city, state);
-    if (matches.length) showStop(matches, address);
-  } catch {}
-}
-function showStop(list, address){
-  stopList.innerHTML = list.map(x=>{
-    const nm = esc(x.name||"");
-    const st = x.status ? ` • ${esc(x.status)}` : "";
-    const dtl = x.details ? ` • ${esc(x.details)}` : "";
-    const dt = x.date ? ` • ${esc(x.date)}` : "";
-    return `<li>${nm}${st}${dtl}${dt}</li>`;
-  }).join("");
-  stopMsg.textContent = `Development alert for this town — review before proceeding`;
-  stopCard.style.display = "block";
-}
-
-/* ==== Render ==== */
+/* =================== Rendering ======================== */
 function renderAll(d){
-  // Estimates
+  // Estimate header
   outNum.textContent = fmt(d.estimate?.low ?? d.low ?? 0);
   const rangeTxt = d.estimate?.range || (d.low!=null && d.high!=null ? `${fmt(d.low)}–${fmt(d.high)}` : "—");
   outRange.textContent = "Full range: " + rangeTxt;
   outY2.textContent = fmt(d.estimate?.year2 ?? d.year2 ?? 0);
   outY3.textContent = fmt(d.estimate?.year3 ?? d.year3 ?? 0);
 
+  // Banners
   aadtBanner.textContent = d.aadtText || "—";
   compLine.textContent = d.competitionText || "—";
 
-  // STOP banner first (server csv or client fallback)
-  stopCard.style.display = "none"; stopList.innerHTML = "";
-  ensureStopBanner(addrInput.value.trim(), d.csv);
-
-  // Regular developments (if you still want them below the STOP)
-  if (Array.isArray(d.csv) && d.csv.length){
-    devsBox.innerHTML = "<em>See STOP banner above for flagged developments.</em>";
-    devsExtNews.innerHTML = ""; devsExtPermits.innerHTML = "";
+  // Developments: CSV takes precedence if present
+  if (Array.isArray(d.csv) && d.csv.length) {
+    const listHtml = d.csv.map(x => {
+      const nm = esc(x.name || "");
+      const st = esc(x.status || "");
+      const dtl = x.details ? ` • ${esc(x.details)}` : "";
+      const dt  = x.date ?    ` • ${esc(x.date)}`    : "";
+      return `<li>${nm}${st ? ` • ${st}` : ''}${dtl}${dt}</li>`;
+    }).join("");
+    devsBox.innerHTML = `<div style="color:#ff4444;font-weight:700;font-size:1.1em;margin-bottom:4px;">&#x26D4; Developments</div><ul>${listHtml}</ul>`;
+    devsExtNews.innerHTML = "";
+    devsExtPermits.innerHTML = "";
   } else {
     devsBox.innerHTML = (d.developments||[]).length
       ? "<ul>"+d.developments.map(x=>`<li>${esc(x.name)} • ${esc(x.status)}${x.approx_miles!=null?` • ~${x.approx_miles} mi`:''}</li>`).join("")+"</ul>"
@@ -490,7 +421,7 @@ function renderAll(d){
       : "<em>none</em>";
   }
 
-  // Summary
+  // Summary (fallback safe)
   const method = d?.inputs?.aadt_components?.method || "unknown";
   let s = (d.summary||"").trim();
   if(!s){
@@ -503,35 +434,39 @@ function renderAll(d){
   showRating(addrInput.value.trim());
 }
 
-/* ==== Ratings ==== */
+/* =================== Rating helpers =================== */
 async function resolvePlaceIdIfNeeded(address){
   if (selectedPlaceId) return selectedPlaceId;
-  try { const r = await fetch("/google/findplace?input=" + encodeURIComponent(address));
-        const j = await r.json();
-        if (j.ok && j.place_id) return j.place_id; } catch {}
+  try {
+    const r = await fetch("/google/findplace?input=" + encodeURIComponent(address));
+    const j = await r.json();
+    if (j.ok && j.place_id) return j.place_id;
+  } catch {}
   return null;
 }
 async function showRating(address){
   let rating = null, total = null;
   const pid = await resolvePlaceIdIfNeeded(address);
   if (pid) {
-    try { const r = await fetch("/google/rating?place_id=" + encodeURIComponent(pid));
-          const j = await r.json();
-          if (j.ok) { rating = j.rating ?? null; total = j.total ?? null; } } catch {}
+    try {
+      const r = await fetch("/google/rating?place_id=" + encodeURIComponent(pid));
+      const j = await r.json();
+      if (j.ok) { rating = j.rating ?? null; total = j.total ?? null; }
+    } catch {}
   }
   if ((rating == null || rating === undefined) && selectedCoords) {
-    try { const r2 = await fetch("/google/rating_by_location?lat=" + encodeURIComponent(selectedCoords.lat) + "&lon=" + encodeURIComponent(selectedCoords.lon));
-          const j2 = await r2.json();
-          if (j2.ok) { rating = j2.rating ?? null; total = j2.total ?? null; } } catch {}
+    try {
+      const r2 = await fetch("/google/rating_by_location?lat=" + encodeURIComponent(selectedCoords.lat) + "&lon=" + encodeURIComponent(selectedCoords.lon));
+      const j2 = await r2.json();
+      if (j2.ok) { rating = j2.rating ?? null; total = j2.total ?? null; }
+    } catch {}
   }
   ratingLine.innerHTML = (rating != null && rating !== undefined) ? `\u2B50 ${rating} (${total||0} reviews)` : "—";
 }
 
-/* ==== Main flow ==== */
-function tidyUI(){
-  hideAc();
-  commitAddress(addrInput.value.trim(), selectedCoords, selectedPlaceId); // lock selection
-}
+/* =================== Main events ====================== */
+function tidyUI(){ hideAc(); } // keep UI tidy when committing to estimate
+
 async function onEstimateClick(){
   if(!addrInput.value.trim() && !selectedCoords){
     alert("Please select a valid address first.");
@@ -555,7 +490,7 @@ goBtn.addEventListener("click", onEstimateClick);
 runBtn.addEventListener("click", onEstimateClick);
 addrInput.addEventListener("keydown", (e)=>{ if(e.key==="Enter"){ e.preventDefault(); onEstimateClick(); } });
 
-/* ==== PDF Export ==== */
+/* =================== PDF Export ======================= */
 document.getElementById("exportPDF").addEventListener("click", async ()=>{
   const { jsPDF } = window.jspdf || {};
   if(!jsPDF){ alert("PDF lib failed to load"); return; }
@@ -609,9 +544,10 @@ document.getElementById("exportPDF").addEventListener("click", async ()=>{
   doc.save("FuelIQ_Site_Analyzer.pdf");
 });
 
-/* ==== Init ==== */
+/* =================== Init ============================== */
 document.addEventListener("DOMContentLoaded", checkGoogleStatus);
 overlay.textContent="—";
   </script>
 </body>
 </html>
+
