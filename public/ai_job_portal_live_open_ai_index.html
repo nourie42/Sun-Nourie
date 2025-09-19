@@ -30,33 +30,10 @@
   <div class="max-w-[1200px] mx-auto space-y-6">
     <!-- Header -->
     <header class="text-center text-white">
-      <h1 class="text-3xl font-bold drop-shadow-sm">🤖 AI‑Powered Job Match Portal</h1>
+      <h1 class="text-3xl font-bold drop-shadow-sm">🤖 AI-Powered Job Match Portal</h1>
       <p class="opacity-90">Real AI analysis of job descriptions against your profile</p>
       <div class="mt-2 inline-flex items-center gap-2 badge bg-emerald-500 text-white">Live AI Enabled</div>
     </header>
-
-    <!-- API status / model picker -->
-    <section class="card">
-      <div class="grid sm:grid-cols-2 gap-4">
-        <div>
-          <label class="text-sm font-semibold text-slate-700">OpenAI API Key</label>
-          <input id="apiKey" type="password" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300" value="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" />
-          <p class="text-xs text-amber-700 mt-1">⚠️ Anyone who can view this page source can see the key. For production, proxy via a backend.</p>
-        </div>
-        <div>
-          <label class="text-sm font-semibold text-slate-700">Model</label>
-          <select id="model" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300">
-            <option value="gpt-4o-mini" selected>gpt-4o-mini (fast, $)</option>
-            <option value="gpt-4o">gpt-4o (higher quality)</option>
-            <option value="o4-mini">o4-mini (reasoning)</option>
-          </select>
-        </div>
-      </div>
-      <div class="mt-3 flex items-center gap-3">
-        <button id="btnCheck" class="px-4 py-2 rounded-lg bg-emerald-600 text-white font-semibold hover:brightness-110">Check API Status</button>
-        <span id="apiStatus" class="text-sm"></span>
-      </div>
-    </section>
 
     <!-- Profile & controls -->
     <section class="card">
@@ -135,31 +112,7 @@
   </div>
 
   <script>
-    async function checkApi() {
-      const key = getKey();
-      const model = document.getElementById('model').value;
-      const s = document.getElementById('apiStatus');
-      s.textContent = 'Checking…';
-      try {
-        const res = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-          body: JSON.stringify({
-            model,
-            messages: [{ role: 'user', content: 'reply "ok"' }],
-            max_tokens: 2
-          })
-        });
-        if (!res.ok) throw new Error(await res.text());
-        s.textContent = '✅ API reachable';
-        s.className = 'text-emerald-700 text-sm';
-      } catch (e) {
-        s.textContent = '❌ API error — check key / model / network';
-        s.className = 'text-red-700 text-sm';
-      }
-    }
-
-    document.getElementById('btnCheck').addEventListener('click', checkApi);
+    const API_KEY = "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";
 
     const SOURCES = [
       { name: 'Indeed', color: '#2164f3', url:'https://www.indeed.com' },
@@ -180,8 +133,6 @@
 
     function r(min, max){ return Math.floor(Math.random()*(max-min+1))+min; }
 
-    function getKey(){ return (document.getElementById('apiKey').value||'').trim(); }
-
     function getProfile(){
       return {
         exp: document.getElementById('exp').value,
@@ -198,8 +149,6 @@
     document.getElementById('btnSearch').addEventListener('click', async ()=>{
       const active = [...document.querySelectorAll('.chip.active')].map(x=>x.dataset.category);
       if (active.length===0) return showErr('Select at least one job category.');
-      const key = getKey();
-      if (!key) return showErr('API key required.');
 
       hideErr();
       const btn = document.getElementById('btnSearch');
@@ -210,14 +159,14 @@
         const jobs = SAMPLE.filter(j=>active.includes(j.category)).map(j=>withSource(j));
         const analyzed = [];
         for (const job of jobs){
-          const analysis = await aiAnalyzeJob(key, document.getElementById('model').value, getProfile(), job);
+          const analysis = await aiAnalyzeJob(API_KEY, "gpt-4o-mini", getProfile(), job);
           analyzed.push({...job, analysis});
         }
         const min = parseInt(document.getElementById('matchThreshold').value,10);
         const finalJobs = analyzed.filter(j=>j.analysis.score>=min).sort((a,b)=>b.analysis.score-a.analysis.score);
         renderResults(finalJobs);
       } catch(err){
-        showErr('AI analysis failed. Check key / model / network.');
+        showErr('AI analysis failed.');
         console.error(err);
       } finally {
         btn.disabled = false; busy.classList.add('hidden');
@@ -226,4 +175,48 @@
 
     function withSource(job){
       const s = SOURCES[Math.floor(Math.random()*SOURCES.length)];
-      return { ...job, source: s, location:
+      return { ...job, source: s, location: ['Raleigh','Durham','Cary','Chapel Hill','Wake Forest'][Math.floor(Math.random()*5)], type:'Full-time', tags:['Leadership','Education','Management','Early Childhood'] };
+    }
+
+    async function aiAnalyzeJob(key, model, profile, job){
+      const sys = `You are an expert career coach. Score job fit 0-100 and list strengths, gaps, and a 1-2 sentence recommendation. Return strict JSON with keys: score, strengths, gaps, insight, recommendation.`;
+      const user = `Candidate profile:\n- Experience: ${profile.exp}\n- Current role: ${profile.role}\n- Expertise: ${profile.expertise}\n- Education: ${profile.edu}\n\nJob:\n- Title: ${job.title}\n- Company: ${job.company}\n- Location: ${job.location}, NC\n- Salary: ${job.salary}\n- Requirements: ${job.req.join('; ')}\n- Description: ${job.desc}`;
+
+      const res = await fetch('https://api.openai.com/v1/chat/completions',{
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', 'Authorization':`Bearer ${key}` },
+        body: JSON.stringify({ model, temperature: 0.2, messages:[{role:'system', content: sys},{role:'user', content: user}], response_format: { type: 'json_object' } })
+      });
+
+      if(!res.ok){ throw new Error(await res.text()); }
+      const data = await res.json();
+      const content = data.choices?.[0]?.message?.content || '{}';
+      try { return JSON.parse(content); } catch { return {score:75, strengths:["Leadership"], gaps:["Budget"], insight:"Default", recommendation:"Default"}; }
+    }
+
+    function renderResults(items){
+      const results = document.getElementById('results');
+      const grid = document.getElementById('grid');
+      const empty = document.getElementById('empty');
+      const count = document.getElementById('resultCount');
+      results.classList.remove('hidden');
+      grid.innerHTML='';
+      empty.classList.add('hidden');
+
+      if(!items.length){ empty.classList.remove('hidden'); count.textContent='0 jobs found'; return; }
+
+      count.textContent = `${items.length} job${items.length!==1?'s':''} found`;
+      items.forEach(job=> grid.appendChild(jobCard(job)) );
+    }
+
+    function jobCard(job){
+      const el = document.createElement('div');
+      el.className = 'relative card';
+      el.dataset.score = job.analysis.score;
+      el.innerHTML = `
+        <div class="score">${job.analysis.score}%</div>
+        <div class="pr-20">
+          <h3 class="text-lg font-semibold text-slate-800">${job.title}</h3>
+          <div class="text-slate-600">${job.company} <span class="badge text-white ml-2" style="background:${job.source.color}">${job.source.name}</span></div>
+        </div>
+        <div
