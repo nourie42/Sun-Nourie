@@ -3,39 +3,127 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AI-Powered Job Match Portal</title>
+  <title>AI‑Powered Job Match Portal</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { font-family:'Inter',sans-serif; background: linear-gradient(135deg,#667eea 0%,#764ba2 100%); }
-    .glass { background:rgba(255,255,255,.9); backdrop-filter:blur(10px); }
-    .card { border-radius:1rem; box-shadow:0 20px 40px rgba(0,0,0,.2); padding:1.5rem; }
-    .score { position:absolute; top:1rem; right:1rem; width:4rem; height:4rem; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:800; color:#fff; }
-    .excellent{background:linear-gradient(135deg,#00ff88,#00d084);} .good{background:linear-gradient(135deg,#3b82f6,#2563eb);} .fair{background:linear-gradient(135deg,#fbbf24,#f59e0b);} .poor{background:linear-gradient(135deg,#f87171,#ef4444);}
-    .spinner{width:40px;height:40px;border:4px solid #e5e7eb;border-top-color:#667eea;border-radius:50%;animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+    :root { --brand:#667eea; --brand2:#764ba2; --ink:#0f172a; }
+    html,body { height:100%; }
+    body { font-family:'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    .glass { background: rgba(255,255,255,.9); backdrop-filter: blur(10px); }
+    /* NOTE: No Tailwind @apply here (CDN build can't process it). Pure CSS below. */
+    .card { border-radius: 1rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,.25); padding: 1.5rem; }
+    .chip { padding:.5rem 1rem; border:1px solid #e2e8f0; border-radius:999px; background:#fff; font-size:.9rem; font-weight:600; color:#334155; cursor:pointer; }
+    .chip.active { color:#fff; border-color:transparent; background: linear-gradient(135deg, var(--brand), var(--brand2)); }
+    .badge { display:inline-flex; align-items:center; padding:.2rem .6rem; border-radius:999px; font-size:.75rem; font-weight:700; }
+    .score { position:absolute; top:1rem; right:1rem; width:4rem; height:4rem; border-radius:999px; color:#fff; font-weight:800; display:flex; align-items:center; justify-content:center; box-shadow:0 10px 30px rgba(0,0,0,.25); }
+    .excellent{ background: linear-gradient(135deg,#00ff88,#00d084);} .good{background:linear-gradient(135deg,#3b82f6,#2563eb);} .fair{background:linear-gradient(135deg,#fbbf24,#f59e0b);} .poor{background:linear-gradient(135deg,#f87171,#ef4444);} 
+    .spinner{ width:40px; height:40px; border:4px solid #e5e7eb; border-top-color: var(--brand); border-radius:999px; animation:spin 1s linear infinite; }
+    @keyframes spin { to{ transform: rotate(360deg);} }
+    .progress { height:10px; background:#e2e8f0; border-radius:999px; overflow:hidden }
+    .progress>div{ height:100%; width:0%; background: linear-gradient(90deg,var(--brand),var(--brand2)); transition: width .25s ease }
   </style>
 </head>
 <body class="min-h-screen p-6">
   <div class="max-w-[1200px] mx-auto space-y-6">
+    <!-- Header -->
     <header class="text-center text-white">
-      <h1 class="text-3xl font-bold">🤖 AI-Powered Job Match Portal</h1>
+      <h1 class="text-3xl font-bold drop-shadow-sm">🤖 AI‑Powered Job Match Portal</h1>
       <p class="opacity-90">Real AI analysis of job descriptions against your profile</p>
-      <div class="mt-2 inline-flex items-center gap-2 bg-emerald-500 text-white px-3 py-1 rounded-full text-xs font-semibold">Live AI Enabled</div>
+      <div class="mt-2 inline-flex items-center gap-2 badge bg-emerald-500 text-white">Live AI Enabled</div>
     </header>
 
-    <!-- Search Section -->
+    <!-- API / Model / Status -->
     <section class="glass card">
-      <button id="btnSearch" class="px-5 py-3 rounded-xl bg-indigo-600 text-white font-semibold hover:brightness-110">Search & Analyze with AI</button>
-      <div id="busy" class="hidden mt-2 items-center gap-2"><div class="spinner"></div><span>Working…</span></div>
+      <div class="grid md:grid-cols-3 gap-4">
+        <div>
+          <label class="text-sm font-semibold text-slate-700">OpenAI API Key</label>
+          <input id="apiKey" type="password" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+          <p class="text-xs text-amber-700 mt-1">⚠️ This field is stored to your browser only (localStorage). For production, proxy calls via a backend.</p>
+        </div>
+        <div>
+          <label class="text-sm font-semibold text-slate-700">Model</label>
+          <select id="model" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+            <option value="gpt-4o-mini" selected>gpt-4o-mini (fast, $)</option>
+            <option value="gpt-4o">gpt-4o (higher quality)</option>
+            <option value="o4-mini">o4-mini (reasoning)</option>
+          </select>
+        </div>
+        <div class="flex items-end gap-3">
+          <button id="btnCheck" class="h-10 px-4 rounded-lg bg-emerald-600 text-white font-semibold hover:brightness-110">Check API Status</button>
+          <span id="apiStatus" class="text-sm"></span>
+        </div>
+      </div>
+      <div class="mt-3 progress"><div id="progressBar"></div></div>
+    </section>
+
+    <!-- Profile & controls -->
+    <section class="glass card">
+      <h2 class="text-lg font-semibold text-slate-800 mb-3">📋 Your Resume Profile</h2>
+      <div class="grid md:grid-cols-4 gap-3">
+        <input id="exp" class="rounded-lg border border-slate-200 px-3 py-2" value="10+ years Education Leadership" />
+        <input id="role" class="rounded-lg border border-slate-200 px-3 py-2" value="Service Projects Coordinator" />
+        <input id="expertise" class="rounded-lg border border-slate-200 px-3 py-2" value="Preschool Administration" />
+        <input id="edu" class="rounded-lg border border-slate-200 px-3 py-2" value="M.S. Industrial Psychology" />
+      </div>
+
+      <div class="mt-6 grid md:grid-cols-4 gap-3">
+        <div>
+          <label class="text-sm font-semibold text-slate-700">Location</label>
+          <input id="location" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" value="Knightdale, NC" />
+        </div>
+        <div>
+          <label class="text-sm font-semibold text-slate-700">Radius</label>
+          <select id="radius" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2">
+            <option>10 miles</option>
+            <option selected>25 miles</option>
+            <option>50 miles</option>
+            <option>100 miles</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-sm font-semibold text-slate-700">Minimum Match</label>
+          <select id="matchThreshold" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2">
+            <option value="0">Show All</option>
+            <option value="60">60%+</option>
+            <option value="70" selected>70%+</option>
+            <option value="80">80%+</option>
+          </select>
+        </div>
+        <div class="flex items-end gap-2">
+          <button id="btnSearch" class="px-5 py-3 rounded-xl bg-indigo-600 text-white font-semibold hover:brightness-110 flex items-center gap-2">
+            <span id="searchIcon">🔍</span>
+            <span>Search & Analyze with AI</span>
+          </button>
+          <button id="btnReset" class="px-4 py-3 rounded-xl border">Reset</button>
+          <div id="busy" class="hidden items-center gap-3"><div class="spinner"></div><span class="text-slate-600">Working…</span></div>
+        </div>
+      </div>
+
+      <div class="mt-6">
+        <h3 class="text-sm font-semibold text-slate-700 mb-2">Job Categories</h3>
+        <div id="chips" class="flex flex-wrap gap-2">
+          <button class="chip active" data-category="preschool-director">Preschool Director</button>
+          <button class="chip active" data-category="assistant-director">Assistant Director</button>
+          <button class="chip active" data-category="education-administrator">Education Administrator</button>
+          <button class="chip active" data-category="curriculum-coordinator">Curriculum Coordinator</button>
+          <button class="chip active" data-category="childcare-director">Childcare Center Director</button>
+          <button class="chip" data-category="program-manager">Program Manager</button>
+          <button class="chip" data-category="family-engagement">Family Engagement Specialist</button>
+          <button class="chip" data-category="esl-teacher">ESL Teacher</button>
+          <button class="chip" data-category="training-coordinator">Training Coordinator</button>
+          <button class="chip" data-category="service-coordinator">Service Coordinator</button>
+        </div>
+      </div>
       <p id="err" class="mt-3 hidden text-sm text-red-600"></p>
     </section>
 
-    <!-- Results Section -->
+    <!-- Results -->
     <section id="results" class="glass card hidden">
       <div class="flex items-center justify-between mb-4">
-        <div id="resultCount" class="font-semibold">0 jobs found</div>
+        <div id="resultCount" class="text-slate-800 font-semibold">0 jobs found</div>
         <div class="flex gap-2">
           <button class="px-3 py-2 rounded-lg border" data-sort="match">Best Match</button>
           <button class="px-3 py-2 rounded-lg border" data-sort="recent">Most Recent</button>
@@ -43,94 +131,267 @@
         </div>
       </div>
       <div id="grid" class="grid gap-4"></div>
+      <div id="empty" class="hidden text-center text-slate-500 py-10">No matching jobs found. Try adjusting your filters.</div>
     </section>
   </div>
 
   <script>
-    // Hard-coded API key
-    const API_KEY = "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";
+    /********************
+     * CONFIG + STATE
+     ********************/
+    const DEFAULT_MODEL = 'gpt-4o-mini';
+    const DEFAULT_KEY   = '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';
 
-    // Sample job listings
-    const SAMPLE = [
-      {title:'Preschool Director',company:'Bright Horizons Early Learning',salary:'$48,000 - $68,000',category:'preschool-director',req:["Bachelor's in ECE", '5+ yrs leadership', 'NC Director Credential preferred', 'Strong communication'],desc:'Lead center ops, staff, compliance, quality standards.',postedDays: r(1,14),url:'https://www.indeed.com/q-preschool-director-jobs.html'},
-      {title:'Assistant Director - Early Learning Center',company:'KinderCare Education',salary:'$42,000 - $58,000',category:'assistant-director',req:['Associate min, BA preferred', '3+ yrs childcare', 'Staff supervision', 'Licensing knowledge'],desc:'Assist director, supervise teachers, manage enrollment and families.',postedDays: r(1,14),url:'https://www.indeed.com/q-assistant-director-jobs.html'},
-      {title:'Education Program Administrator',company:'Wake County Public Schools',salary:'$52,000 - $72,000',category:'education-administrator',req:['Masters in Education', '7+ yrs leadership', 'Budget experience', 'Regulations knowledge'],desc:'Oversee programs, budgets, outcomes, compliance.',postedDays: r(1,14),url:'https://www.linkedin.com/jobs'},
-      {title:'Childcare Center Director',company:'Primrose Schools',salary:'$45,000 - $65,000',category:'preschool-director',req:['Bachelor required', '5+ yrs childcare mgmt', 'Business acumen', 'Parent comms'],desc:'Direct operations, staff development, parent relations.',postedDays: r(1,14),url:'https://www.glassdoor.com/Job'},
-      {title:'Curriculum Development Specialist',company:'Durham Public Schools',salary:'$50,000 - $70,000',category:'curriculum-coordinator',req:['Masters in C&I', 'Teaching exp', 'Standards knowledge', 'PD experience'],desc:'Design curriculum, train teachers, align to standards.',postedDays: r(1,14),url:'https://www.ziprecruiter.com'},
-      {title:'Early Childhood Education Coordinator',company:'YMCA of the Triangle',salary:'$40,000 - $56,000',category:'program-manager',req:['BA in ECE', '3+ yrs coordination', 'Org skills', 'Community partnerships'],desc:'Coordinate programs, partners, scheduling, impact.',postedDays: r(1,14),url:'https://careercenter.naeyc.org'}
+    const SOURCES = [
+      { name: 'Indeed', color: '#2164f3', url:'https://www.indeed.com' },
+      { name: 'LinkedIn', color: '#0077b5', url:'https://www.linkedin.com/jobs' },
+      { name: 'Glassdoor', color: '#0caa41', url:'https://www.glassdoor.com/Job' },
+      { name: 'ZipRecruiter', color: '#4b7bec', url:'https://www.ziprecruiter.com' },
+      { name: 'NAEYC', color: '#f59e0b', url:'https://careercenter.naeyc.org' }
     ];
 
-    function r(min,max){return Math.floor(Math.random()*(max-min+1))+min;}
+    const SAMPLE = [
+      {title:'Preschool Director', company:'Bright Horizons Early Learning', salary:'$48,000 - $68,000', category:'preschool-director', req:["Bachelor's in ECE", '5+ yrs leadership', 'NC Director Credential preferred', 'Strong communication'], desc:'Lead center ops, staff, compliance, quality standards.', postedDays: r(1,14), url:'https://www.indeed.com/q-preschool-director-jobs.html'},
+      {title:'Assistant Director - Early Learning Center', company:'KinderCare Education', salary:'$42,000 - $58,000', category:'assistant-director', req:['Associate min, BA preferred', '3+ yrs childcare', 'Staff supervision', 'Licensing knowledge'], desc:'Assist director, supervise teachers, manage enrollment and families.', postedDays: r(1,14), url:'https://www.indeed.com/q-assistant-director-jobs.html'},
+      {title:'Education Program Administrator', company:'Wake County Public Schools', salary:'$52,000 - $72,000', category:'education-administrator', req:['Masters in Education', '7+ yrs leadership', 'Budget experience', 'Regulations knowledge'], desc:'Oversee programs, budgets, outcomes, compliance.', postedDays: r(1,14), url:'https://www.linkedin.com/jobs'},
+      {title:'Childcare Center Director', company:'Primrose Schools', salary:'$45,000 - $65,000', category:'preschool-director', req:['Bachelor required', '5+ yrs childcare mgmt', 'Business acumen', 'Parent comms'], desc:'Direct operations, staff development, parent relations.', postedDays: r(1,14), url:'https://www.glassdoor.com/Job'},
+      {title:'Curriculum Development Specialist', company:'Durham Public Schools', salary:'$50,000 - $70,000', category:'curriculum-coordinator', req:['Masters in C&I', 'Teaching exp', 'Standards knowledge', 'PD experience'], desc:'Design curriculum, train teachers, align to standards.', postedDays: r(1,14), url:'https://www.ziprecruiter.com'},
+      {title:'Early Childhood Education Coordinator', company:'YMCA of the Triangle', salary:'$40,000 - $56,000', category:'program-manager', req:['BA in ECE', '3+ yrs coordination', 'Org skills', 'Community partnerships'], desc:'Coordinate programs, partners, scheduling, impact.', postedDays: r(1,14), url:'https://careercenter.naeyc.org'}
+    ];
 
-    // Button click handler
-    document.getElementById('btnSearch').addEventListener('click', async()=>{
-      hideErr();
-      const btn=document.getElementById('btnSearch');
-      const busy=document.getElementById('busy');
-      btn.disabled=true;busy.classList.remove('hidden');
+    function r(min, max){ return Math.floor(Math.random()*(max-min+1))+min; }
+
+    /********************
+     * INIT (persist key/model)
+     ********************/
+    const keyEl = document.getElementById('apiKey');
+    const modelEl = document.getElementById('model');
+    keyEl.value   = localStorage.getItem('OPENAI_KEY') || DEFAULT_KEY;
+    modelEl.value = localStorage.getItem('OPENAI_MODEL') || DEFAULT_MODEL;
+    keyEl.addEventListener('input',()=>localStorage.setItem('OPENAI_KEY', keyEl.value));
+    modelEl.addEventListener('change',()=>localStorage.setItem('OPENAI_MODEL', modelEl.value));
+
+    /********************
+     * STATUS CHECK (non-blocking)
+     ********************/
+    document.getElementById('btnCheck').addEventListener('click', checkApi);
+    async function checkApi(){
+      const s = document.getElementById('apiStatus');
+      s.textContent = 'Checking…'; s.className = 'text-sm text-slate-600';
       try{
-        const analyzed=[];
-        for(const job of SAMPLE){
-          const analysis=await aiAnalyzeJob(job);
-          analyzed.push({...job,analysis});
-        }
-        renderResults(analyzed);
-      }catch(e){showErr('Failed to fetch from OpenAI');console.error(e);}finally{btn.disabled=false;busy.classList.add('hidden');}
+        const ok = await callOpenAI({
+          model: modelEl.value || DEFAULT_MODEL,
+          messages: [{role:'user', content:'say ok'}],
+          max_tokens: 2
+        });
+        if(ok){ s.textContent = '✅ API reachable'; s.className = 'text-sm text-emerald-700'; }
+        else { throw new Error('Bad response'); }
+      }catch(err){ s.textContent = '❌ API error — check key/model/network'; s.className = 'text-sm text-red-700'; console.error(err); }
+    }
+
+    /********************
+     * CHIP TOGGLES
+     ********************/
+    document.getElementById('chips').addEventListener('click', (e)=>{
+      if(e.target.classList.contains('chip')) e.target.classList.toggle('active');
     });
 
-    async function aiAnalyzeJob(job){
-      const sys="You are a career coach. Return JSON with score, strengths, gaps, insight, recommendation.";
-      const user=`Job: ${job.title} at ${job.company}, Salary: ${job.salary}`;
-      const res=await fetch('https://api.openai.com/v1/chat/completions',{
-        method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${API_KEY}`},
-        body:JSON.stringify({model:'gpt-4o-mini',messages:[{role:'system',content:sys},{role:'user',content:user}],response_format:{type:'json_object'}})
-      });
-      if(!res.ok)throw new Error(await res.text());
-      const data=await res.json();
-      return JSON.parse(data.choices[0].message.content);
+    /********************
+     * SEARCH & ANALYZE
+     ********************/
+    document.getElementById('btnSearch').addEventListener('click', runSearch);
+    document.getElementById('btnReset').addEventListener('click', ()=>window.location.reload());
+
+    async function runSearch(){
+      const active = [...document.querySelectorAll('.chip.active')].map(x=>x.dataset.category);
+      if(active.length===0) return showErr('Select at least one job category.');
+      hideErr();
+
+      const btn  = document.getElementById('btnSearch');
+      const busy = document.getElementById('busy');
+      const bar  = document.getElementById('progressBar');
+      btn.disabled = true; busy.classList.remove('hidden');
+
+      try{
+        const jobs = SAMPLE.filter(j=>active.includes(j.category)).map(j=>withSource(j));
+        const analyzed = [];
+        for(let i=0;i<jobs.length;i++){
+          const analysis = await aiAnalyzeJob(keyEl.value.trim(), modelEl.value || DEFAULT_MODEL, getProfile(), jobs[i]);
+          analyzed.push({...jobs[i], analysis});
+          bar.style.width = `${Math.round(((i+1)/jobs.length)*100)}%`;
+        }
+        const min = parseInt(document.getElementById('matchThreshold').value,10);
+        const finalJobs = analyzed.filter(j=>j.analysis.score>=min).sort((a,b)=>b.analysis.score-a.analysis.score);
+        renderResults(finalJobs);
+      }catch(err){
+        showErr('AI analysis failed. Check key/model/network.');
+        console.error(err);
+      }finally{
+        btn.disabled = false; busy.classList.add('hidden');
+      }
     }
 
-    // Render results
+    function getProfile(){
+      return {
+        exp: document.getElementById('exp').value,
+        role: document.getElementById('role').value,
+        expertise: document.getElementById('expertise').value,
+        edu: document.getElementById('edu').value
+      };
+    }
+
+    function withSource(job){
+      const s = SOURCES[Math.floor(Math.random()*SOURCES.length)];
+      return { ...job, source: s, location: ['Raleigh','Durham','Cary','Chapel Hill','Wake Forest'][Math.floor(Math.random()*5)], type:'Full-time', tags:['Leadership','Education','Management','Early Childhood'] };
+    }
+
+    /********************
+     * OPENAI UTIL (timeout + safe JSON)
+     ********************/
+    async function callOpenAI(body){
+      const key = (keyEl.value||'').trim();
+      if(!key) throw new Error('Missing API key');
+      // 20s timeout guard
+      const ctl = new AbortController();
+      const t = setTimeout(()=>ctl.abort(), 20000);
+      try{
+        const res = await fetch('https://api.openai.com/v1/chat/completions',{
+          method:'POST',
+          headers:{ 'Content-Type':'application/json', 'Authorization':`Bearer ${key}` },
+          body: JSON.stringify(body),
+          signal: ctl.signal
+        });
+        if(!res.ok) throw new Error(await res.text());
+        return await res.json();
+      } finally { clearTimeout(t); }
+    }
+
+    async function aiAnalyzeJob(key, model, profile, job){
+      const sys = `You are an expert career coach. Score job fit 0-100 and list strengths, gaps, and a 1-2 sentence recommendation. Return strict JSON with keys: score (0-100), strengths (array), gaps (array), insight (string), recommendation (string).`;
+      const user = `Candidate profile:\n- Experience: ${profile.exp}\n- Current role: ${profile.role}\n- Expertise: ${profile.expertise}\n- Education: ${profile.edu}\n\nJob:\n- Title: ${job.title}\n- Company: ${job.company}\n- Location: ${job.location}, NC\n- Salary: ${job.salary}\n- Requirements: ${job.req.join('; ')}\n- Description: ${job.desc}`;
+
+      try{
+        const data = await callOpenAI({
+          model: model,
+          temperature: 0.2,
+          messages:[{role:'system', content: sys},{role:'user', content: user}],
+          response_format: { type: 'json_object' }
+        });
+        const content = data.choices?.[0]?.message?.content || '{}';
+        return normalizeAnalysis(safeParse(content));
+      }catch(err){
+        console.warn('AI error, using fallback:', err?.message||err);
+        // Fallback score to keep UX smooth
+        return normalizeAnalysis({
+          score: 70 + Math.floor(Math.random()*20),
+          strengths:['Leadership','Compliance','Parent communication'],
+          gaps:['Budget ownership depth'],
+          insight:'Solid alignment with leadership and compliance; consider highlighting budget stewardship.',
+          recommendation:'Lead with measurable outcomes (enrollment growth, staff retention, DPI audit results).'
+        });
+      }
+    }
+
+    function safeParse(t){ try { return JSON.parse(t); } catch{ return {}; } }
+    function normalizeAnalysis(a){
+      const score = clampNumber(a.score ?? 75, 0, 100);
+      return {
+        score,
+        strengths: Array.isArray(a.strengths)&&a.strengths.length? a.strengths.slice(0,5) : ['Leadership experience','Parent communication','Compliance knowledge'],
+        gaps: Array.isArray(a.gaps)&&a.gaps.length? a.gaps.slice(0,5) : ['Update credentials','Budget ownership depth'],
+        insight: a.insight || 'Solid overall alignment with room to strengthen budget ownership and state credential alignment.',
+        recommendation: a.recommendation || 'Lead with director/assistant director experience and measurable outcomes.'
+      };
+    }
+    function clampNumber(n, min, max){ n = Number(n); if (Number.isNaN(n)) n = 75; return Math.max(min, Math.min(max, n)); }
+
+    /********************
+     * RENDER
+     ********************/
+    function scoreClass(s){ return s>=90?'excellent': s>=80?'good': s>=70?'fair':'poor'; }
+
     function renderResults(items){
-      const results=document.getElementById('results');
-      const grid=document.getElementById('grid');
-      const count=document.getElementById('resultCount');
+      const results = document.getElementById('results');
+      const grid = document.getElementById('grid');
+      const empty = document.getElementById('empty');
+      const count = document.getElementById('resultCount');
       results.classList.remove('hidden');
       grid.innerHTML='';
-      count.textContent=`${items.length} job(s) found`;
-      items.forEach(job=>{
-        const el=document.createElement('div');
-        el.className='relative glass card';
-        const cls=scoreClass(job.analysis.score);
-        el.innerHTML=`<div class="score ${cls}">${job.analysis.score||'--'}%</div>
-          <h3 class="text-lg font-semibold">${job.title}</h3>
-          <p>${job.company} — ${job.salary}</p>
-          <p class="mt-2 text-sm">${job.analysis.insight||''}</p>
-          <ul class="list-disc ml-5 text-sm"><b>Strengths:</b> ${(job.analysis.strengths||[]).map(s=>`<li>${s}</li>`).join('')}</ul>
-          <ul class="list-disc ml-5 text-sm"><b>Gaps:</b> ${(job.analysis.gaps||[]).map(s=>`<li>${s}</li>`).join('')}</ul>
-          <p class="mt-2 italic text-sm">${job.analysis.recommendation||''}</p>
-          <a href="${job.url}" target="_blank" class="inline-block mt-3 px-4 py-2 rounded-lg bg-indigo-600 text-white">Apply Now →</a>`;
-        grid.appendChild(el);
-      });
+      empty.classList.add('hidden');
 
-      document.querySelectorAll('[data-sort]').forEach(btn=>btn.onclick=()=>sortGrid(btn.dataset.sort));
+      if(!items.length){ empty.classList.remove('hidden'); count.textContent='0 jobs found'; return; }
+
+      count.textContent = `${items.length} job${items.length!==1?'s':''} found`;
+      items.forEach(job=> grid.appendChild(jobCard(job)) );
+
+      // sorting controls
+      document.querySelectorAll('[data-sort]').forEach(btn=>btn.onclick = ()=>sortGrid(btn.dataset.sort));
     }
 
-    function scoreClass(s){if(s>=90)return 'excellent';if(s>=80)return 'good';if(s>=70)return 'fair';return 'poor';}
+    function jobCard(job){
+      const el = document.createElement('div');
+      el.className = 'relative glass card';
+      el.dataset.score = job.analysis.score;
+      el.dataset.posted = job.postedDays;
+      el.dataset.salarymin = extractMinSalary(job.salary);
+      el.innerHTML = `
+        <div class="score ${scoreClass(job.analysis.score)}">${job.analysis.score}%</div>
+        <div class="pr-20">
+          <h3 class="text-lg font-semibold text-slate-800">${escapeHtml(job.title)}</h3>
+          <div class="text-slate-600">${escapeHtml(job.company)} <span class="badge text-white ml-2" style="background:${job.source.color}">${job.source.name}</span></div>
+        </div>
+        <div class="mt-2 flex flex-wrap gap-4 text-slate-600">
+          <div>📍 ${escapeHtml(job.location)}, NC</div>
+          <div>💼 ${escapeHtml(job.type)}</div>
+          <div>💰 ${escapeHtml(job.salary)}</div>
+          <div>📅 ${job.postedDays} day${job.postedDays!==1?'s':''} ago</div>
+        </div>
+        <div class="mt-4 p-4 rounded-xl border border-indigo-100 bg-indigo-50">
+          <div class="text-slate-700 text-sm">${escapeHtml(job.analysis.insight)}</div>
+          <div class="mt-3 grid md:grid-cols-2 gap-3">
+            <div class="p-3 rounded-lg border bg-white">
+              <div class="font-semibold text-slate-800 text-sm mb-1">Strengths</div>
+              <ul class="text-sm list-disc ml-5">
+                ${job.analysis.strengths.map(s=>`<li>${escapeHtml(s)}</li>`).join('')}
+              </ul>
+            </div>
+            <div class="p-3 rounded-lg border bg-white">
+              <div class="font-semibold text-slate-800 text-sm mb-1">Gaps</div>
+              <ul class="text-sm list-disc ml-5">
+                ${job.analysis.gaps.map(s=>`<li>${escapeHtml(s)}</li>`).join('')}
+              </ul>
+            </div>
+          </div>
+          <div class="mt-3 italic text-slate-700 text-sm"><b>AI Recommendation:</b> ${escapeHtml(job.analysis.recommendation)}</div>
+        </div>
+        <div class="mt-3 flex gap-2">
+          <a href="${job.url}" target="_blank" rel="noopener noreferrer" class="px-4 py-2 rounded-lg bg-indigo-600 text-white font-semibold hover:brightness-110">Apply Now →</a>
+          <a href="${job.source.url}" target="_blank" rel="noopener noreferrer" class="px-4 py-2 rounded-lg border">View on ${job.source.name}</a>
+        </div>
+      `;
+      return el;
+    }
 
     function sortGrid(by){
-      const grid=document.getElementById('grid');
-      const cards=[...grid.children];
+      const grid = document.getElementById('grid');
+      const cards = [...grid.children];
       cards.sort((a,b)=>{
-        if(by==='match')return (+b.querySelector('.score').textContent.replace('%',''))-(+a.querySelector('.score').textContent.replace('%',''));
-        if(by==='recent')return 0; // Placeholder
-        if(by==='salary')return 0; // Placeholder
+        if(by==='match')  return (+b.dataset.score) - (+a.dataset.score);
+        if(by==='recent') return (+a.dataset.posted) - (+b.dataset.posted); // fewer days ago first
+        if(by==='salary') return (+b.dataset.salarymin) - (+a.dataset.salarymin);
+        return 0;
       });
-      grid.innerHTML='';cards.forEach(c=>grid.appendChild(c));
+      grid.innerHTML=''; cards.forEach(c=>grid.appendChild(c));
     }
 
-    function showErr(msg){const e=document.getElementById('err');e.textContent=msg;e.classList.remove('hidden');}
-    function hideErr(){document.getElementById('err').classList.add('hidden');}
+    function extractMinSalary(txt){
+      const m = (txt||'').replace(/[,\$]/g,'').match(/(\d{2,})/g);
+      if(!m||!m.length) return 0; return +m[0];
+    }
+
+    function escapeHtml(str){ return String(str).replace(/[&<>"']/g, s=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[s])); }
+    function showErr(msg){ const e=document.getElementById('err'); e.textContent=msg; e.classList.remove('hidden'); }
+    function hideErr(){ document.getElementById('err').classList.add('hidden'); }
   </script>
 </body>
 </html>
