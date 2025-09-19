@@ -1,4 +1,4 @@
-<!-- public/index.html — Fuel IQ UI (drop-in) with locked autocomplete & STOP overlay -->
+<!-- public/index.html — FULL FEATURE BUILD (v2025‑09‑19) -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -6,18 +6,16 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Sunoco, LP Fuel IQ - Fuel Site Analyzer</title>
 
-  <!-- Leaflet (map) -->
+  <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <!-- Leaflet image export -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin></script>
   <script src="https://unpkg.com/leaflet-image/leaflet-image.js"></script>
-  <!-- jsPDF for PDF export -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous"></script>
 
   <style>
     :root { --bg:#0b0e15; --panel:#111725; --panel2:#0f1421; --line:#263145; --text:#eaeef7; --muted:#97a3b8; --brand:#0ea5e9; --brand2:#22d3ee; --pill:#0f1929; }
     *{ box-sizing:border-box; }
-    body{ background:var(--bg); color:var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin:0; padding-bottom:72px; }
+    body{ background:var(--bg); color:var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin:0; padding-bottom:84px; }
     .wrap{ max-width:1120px; margin:24px auto; padding:0 16px; }
     header{ display:flex; align-items:center; gap:14px; margin-bottom:6px; }
     header h1{ font-size:28px; margin:0; letter-spacing:.2px; }
@@ -37,7 +35,7 @@
     .muted{ color:var(--muted); }
     .subtle{ font-size:12px; opacity:.9; }
 
-    #map{ height:420px; border-radius:12px; border:1px solid var(--line); position: relative; }
+    #map,#aadtMap{ height:420px; border-radius:12px; border:1px solid var(--line); position: relative; }
     #overlay{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(11,14,21,.55); border-radius:12px; font-weight:800; color:#cde9ff; font-size:18px; padding:20px; text-align:center; }
 
     #svWrap{ margin-top:10px; }
@@ -65,39 +63,35 @@
     .aadt-tabs { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:8px 0 12px; }
     .aadt-tab { display:inline-block; padding:8px 12px; border-radius:999px; border:1px solid var(--line); background:var(--pill); color:var(--text); text-decoration:none; font-weight:700; font-size:13px; letter-spacing:.2px; }
     .aadt-tab:hover { background:#101a2b; }
-    @media (max-width:680px){ .aadt-tabs{ overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:4px; } .aadt-tab{ white-space:nowrap; } }
 
-    /* STOP overlay */
-    #devStop {
-      position: fixed; z-index: 9999; inset: 0; display: none; align-items: center; justify-content: center;
-      background: rgba(0,0,0,.65);
-    }
-    #devStop .box {
-      background: #0b1220; border: 2px solid #ef4444; border-radius: 12px; padding: 20px; max-width: 680px; width: calc(100% - 32px);
-      color:#ffe9e9; text-align: left; box-shadow: 0 22px 44px rgba(0,0,0,.45);
-    }
-    #devStop .sign {
-      width: 100px; height: 100px; background: #EF4444; color: #fff; font-weight: 900; font-size: 28px; border-radius: 12px;
-      display:flex; align-items:center; justify-content:center; margin-right: 16px; clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%);
-      border: 4px solid #fff;
-    }
-    #devStop .row { display:flex; align-items:center; gap:14px; }
-    #devStop h3 { margin:0 0 4px 0; color:#fff; }
-    #devStop small { color:#fecaca; }
-    #devStop ul { margin:10px 0 0 0; padding-left: 18px; }
-    #devStop .actions { display:flex; justify-content:flex-end; gap:10px; margin-top:12px; }
-    #devStop button { background: #ef4444; }
+    /* STOP alert */
+    .stop-alert { display:none; position:sticky; top:0; z-index:60; margin-bottom:12px; }
+    .stop-inner { display:flex; align-items:center; gap:14px; padding:12px 14px; border-radius:12px; border:2px solid #b91c1c; background:linear-gradient(135deg,#7f1d1d,#991b1b); color:#fff; box-shadow:0 12px 24px rgba(0,0,0,.35); }
+    .stop-sign { width:52px; height:52px; flex:0 0 52px; border-radius:12px; background:#dc2626; border:4px solid #fca5a5; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:14px; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { text-align:left; border-bottom:1px solid rgba(255,255,255,.06); padding:8px 6px; }
+    th { font-size:12px; color:#cfd8ea; }
+    tr:hover { background: rgba(255,255,255,.03); }
+    .small { font-size:12px; color:#a9b6d0; }
   </style>
 </head>
 <body>
   <div class="wrap">
     <header>
       <h1>Sunoco, LP Fuel IQ - Fuel Site Analyzer</h1>
-      <span class="build">UI v2025-09-19</span>
+      <span class="build">UI v2025‑09‑19</span>
       <a href="developments.html" style="padding:8px 14px; background:#22d3ee; border-radius:8px; color:#00121e; font-weight:600; text-decoration:none;">Developments Search</a>
       <a href="PA_Signals_AADT_Radius_Map_Final_Generated.html" style="padding:8px 14px; background:#f87171; border-radius:8px; color:#00121e; font-weight:600; text-decoration:none;">PA AADT Map</a>
       <a href="Scraper.html" style="padding:8px 14px; background:#34d399; border-radius:8px; color:#00121e; font-weight:600; text-decoration:none;">Prospector</a>
     </header>
+
+    <!-- STOP banner -->
+    <div id="stopBox" class="stop-alert">
+      <div class="stop-inner">
+        <div class="stop-sign">STOP</div>
+        <div id="stopText" style="font-weight:800;">Major development identified.</div>
+      </div>
+    </div>
 
     <nav class="aadt-tabs" aria-label="State AADT Quick Links">
       <span class="muted">State AADT Quick Links:</span>
@@ -112,7 +106,7 @@
     </nav>
 
     <div class="instructions">
-      <b>Instructions:</b> Enter Address, Click <i>Estimate</i>. Do not exit your browser or let your phone screen shut off until results are ready or you will encounter errors. Click <i>Advanced Options</i> to make changes.
+      <b>Instructions:</b> Enter Address, Click <i>Estimate</i>. Do not exit your browser or let your phone screen shut off until results are ready. Click <i>Advanced Options</i> to make changes.
     </div>
 
     <!-- Inputs -->
@@ -185,36 +179,38 @@
 
     <!-- Map & SV -->
     <div class="card">
-      <div class="muted">Map: Site & competitors (1.5 mi)</div>
+      <div class="muted">Map: Site & competitors (1.5 mi) + AADT (dots) + ⭐ used AADT</div>
       <div id="map"><div id="overlay" class="muted">—</div></div>
       <div id="svWrap"><div class="muted" style="margin-top:10px;">Street View</div><iframe id="sv" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div>
     </div>
 
+    <!-- AADT sources (second map + table) -->
+    <div class="card">
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <div class="muted">AADT Sources (within 1 mile)</div>
+        <div id="aadtSourceLine" class="small">Source: state’s official AADT layer</div>
+      </div>
+      <div id="aadtMap" style="margin-top:8px;"></div>
+      <div style="margin-top:10px; overflow:auto;">
+        <table id="aadtTable">
+          <thead>
+            <tr>
+              <th>Distance</th><th>AADT (Year)</th><th>Route</th><th>Location</th><th>Source</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- Developments -->
     <div class="card"><div id="devs" class="muted">—</div></div>
-    <div class="card"><div id="devsExternalNews" class="muted">—</div></div>
-    <div class="card"><div id="devsExternalPermits" class="muted">—</div></div>
 
     <div class="card"><b>Google Rating</b><div id="ratingLine" class="muted">—</div></div>
-    <div class="card"><b>Summary (GPT)</b><div id="summary" class="muted">—</div></div>
+    <div class="card"><b>Summary</b><div id="summary" class="muted">—</div></div>
   </div>
 
   <div class="footerbar"><button id="exportPDF">Export to PDF</button></div>
-
-  <!-- STOP overlay -->
-  <div id="devStop">
-    <div class="box">
-      <div class="row">
-        <div class="sign">STOP</div>
-        <div>
-          <h3>Planned/Active Developments Detected</h3>
-          <small>The selected city/county matches entries in <b>developments_data.csv</b>. Review the items below.</small>
-        </div>
-      </div>
-      <div id="devStopList" style="margin-top:10px;"></div>
-      <div class="actions"><button id="devStopClose">Dismiss</button></div>
-    </div>
-  </div>
 
   <script>
 /* =================== Helpers & State =================== */
@@ -222,22 +218,21 @@ const $ = (id) => document.getElementById(id);
 const apiStatus = $("apiStatus"), aadtBanner = $("aadtBanner"), compLine = $("compLine"),
       overlay = $("overlay"), svFrame = $("sv"), outNum = $("estNum"), outRange = $("estRange"),
       outY2 = $("y2"), outY3 = $("y3"), devsBox = $("devs"),
-      devsExtNews = $("devsExternalNews"), devsExtPermits = $("devsExternalPermits"),
       summaryBox = $("summary"), ratingLine = $("ratingLine"),
       addrInput = $("addr"), acBox = $("ac"), goBtn = $("go"), runBtn = $("estimateBtn"),
       addExtraBtn = $("addExtra"), extraList = $("extraList"), activeExtras = $("activeExtras"),
       ex_large_dev = $("ex_large_dev"), ex_hours18 = $("ex_hours18"), ex_highincome = $("ex_highincome"),
       ex_lowrating = $("ex_lowrating"), ex_competitive_pricing = $("ex_competitive_pricing"),
-      ex_rural = $("ex_rural");
-
-const devStop = $("devStop"), devStopList = $("devStopList"), devStopClose = $("devStopClose");
+      ex_rural = $("ex_rural"), stopBox = $("stopBox"), stopText = $("stopText"),
+      aadtSourceLine = $("aadtSourceLine");
 
 let map, layer, mapReady = false, selectedCoords = null, selectedPlaceId = null;
+let aadtMap, aadtLayer, aadtReady = false;
 let acItems = [], acActive = -1;
+let acCommitted = false; // lock suggestions
+let lastCommittedText = "";
 
-// NEW: lock suggestions after a choice until field is cleared
-let acLocked = false;
-
+/* Utils */
 function fmt(n){ return (n??0).toLocaleString(undefined,{maximumFractionDigits:0}); }
 function esc(s){ return (s??"").toString().replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
 function setOverlayWorking(){ overlay.textContent = "Working…"; overlay.style.display = "flex"; }
@@ -249,10 +244,15 @@ function initMap(){ if(mapReady) return;
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map);
   layer = L.layerGroup().addTo(map); mapReady = true;
 }
+function initAADTMap(){ if(aadtReady) return;
+  aadtMap = L.map("aadtMap",{zoomControl:true}); window.aadtMap = aadtMap;
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(aadtMap);
+  aadtLayer = L.layerGroup().addTo(aadtMap); aadtReady = true;
+}
 function updateStreetView(lat, lon){
   svFrame.src = `https://maps.google.com/maps?q=&layer=c&cbll=${lat},${lon}&cbp=12,0,,0,0&output=svembed`;
 }
-function renderAADTMarkers(list) {
+function renderAADTMarkers(list, used) {
   if (!Array.isArray(list)) return;
   for (const rec of list) {
     if (!Number.isFinite(rec.lat) || !Number.isFinite(rec.lon) || !Number.isFinite(rec.aadt)) continue;
@@ -264,10 +264,21 @@ function renderAADTMarkers(list) {
     else color = "#84cc16";
     L.circleMarker([rec.lat, rec.lon], {
       radius: 5, weight: 1, color, fillColor: color, fillOpacity: 0.8
-    }).addTo(layer).bindPopup("AADT: " + fmt(val));
+    }).addTo(layer).bindPopup("AADT: " + fmt(val) + (rec.year?` (${rec.year})`:""));
+  }
+  if (used && Number.isFinite(used.lat) && Number.isFinite(used.lon)) {
+    L.marker([used.lat, used.lon], {
+      title: "AADT used",
+      icon: L.divIcon({
+        className: "aadt-used",
+        html: '<div style="font-size:18px;">⭐</div>',
+        iconSize: [24,24],
+        iconAnchor: [12,12]
+      })
+    }).addTo(layer).bindPopup(`<b>USED AADT</b><br>${fmt(used.aadt)}${used.year?` (${used.year})`:''}<br>${esc(used.route||'')}`);
   }
 }
-function initOrUpdateMap(m){
+function initOrUpdateMainMap(m){
   if(!mapReady) initMap();
   layer.clearLayers();
   if(!m || !m.site){ setOverlayWorking(); return; }
@@ -281,116 +292,51 @@ function initOrUpdateMap(m){
       radius:6, weight:1, color:c.heavy?"#ff7f50":"#4ade80", fillColor:c.heavy?"#ff7f50":"#4ade80", fillOpacity:.9
     }).addTo(layer).bindPopup(`${esc(c.name||"Fuel")} • ${c.miles} mi`);
   }
+  if(m.aadt) renderAADTMarkers(m.aadt, m.aadt_used);
   map.fitBounds(L.latLngBounds(pts).pad(0.25));
-  if(m.aadt) renderAADTMarkers(m.aadt);
   clearOverlay(); updateStreetView(site[0], site[1]);
 }
 
-/* =================== Autocomplete & Status =============== */
-function hideAc(){ acBox.style.display = "none"; acActive = -1; }
-function renderAc(list){
-  if(!list.length || acLocked){ hideAc(); return; }
-  acBox.innerHTML = list.map((it,i) =>
-    `<div class="ac-item${i===acActive?" active":""}" data-i="${i}">${esc(it.display)} <span class="badge">${it.type}</span></div>`
-  ).join("");
-  [...acBox.children].forEach(el => el.onclick = () => chooseAc(+el.dataset.i));
-  acBox.style.display = "block";
-}
-function commitAddress(display, coords, placeId){
-  acLocked = true; // lock after commit
-  hideAc();
-  addrInput.value = display || "";
-  selectedCoords = coords || null;
-  selectedPlaceId = placeId || null;
-  // Immediately resolve admin + CSV match and show STOP if needed
-  if (selectedCoords) {
-    showStopIfDev(selectedCoords.lat, selectedCoords.lon).catch(()=>{});
+/* =================== Second map + table =================== */
+function initOrUpdateAADTMap(site, items, used){
+  if(!aadtReady) initAADTMap();
+  aadtLayer.clearLayers();
+  if(!site) return;
+  const siteLL = [site.lat, site.lon];
+  const bounds = [siteLL];
+  L.marker(siteLL,{title:"Site"}).addTo(aadtLayer).bindPopup("<b>Site</b>");
+
+  for (const s of (items||[])) {
+    const color = s.aadt >= 30000 ? "#be123c" : s.aadt >= 20000 ? "#f97316" : s.aadt >= 10000 ? "#eab308" : "#84cc16";
+    L.circleMarker([s.lat, s.lon], { radius: 5, weight:1, color, fillColor: color, fillOpacity:.85 })
+      .addTo(aadtLayer)
+      .bindPopup(`<b>${fmt(s.aadt)}${s.year?` (${s.year})`:''}</b><br>${esc(s.route||'')}${s.location?`<br>${esc(s.location)}`:''}<br><span class="small">~${s.miles} mi</span>`);
+    bounds.push([s.lat, s.lon]);
   }
-}
-function chooseAc(i){
-  const it = acItems[i];
-  if (!it) return;
-  const coords = (Number.isFinite(it.lat) && Number.isFinite(it.lon)) ? { lat: it.lat, lon: it.lon } : null;
-  commitAddress(it.display, coords, it.place_id || null);
-  addrInput.blur();
-}
-
-async function checkGoogleStatus(){
-  try {
-    const r = await fetch("/google/status");
-    const j = await r.json();
-    apiStatus.textContent = j.ok ? "API: Google — Working" : `API: Google — ${j.status}`;
-  } catch { apiStatus.textContent = "API: Google — unavailable"; }
-}
-
-async function googleSearch(q){
-  try {
-    const r = await fetch("/google/autocomplete?input=" + encodeURIComponent(q));
-    const j = await r.json();
-    if(!j.ok) return [];
-    return (j.items||[]).map(it => ({...it, type:"Google", score:1.3}));
-  } catch { return []; }
-}
-async function nominatimSearch(q){
-  try {
-    const r = await fetch("https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=us&q=" + encodeURIComponent(q));
-    const a = await r.json();
-    return a.map(row => ({ type:"OSM", display:row.display_name, lat:+row.lat, lon:+row.lon, score:0.6 }));
-  } catch { return []; }
-}
-
-addrInput.addEventListener("input", () => {
-  const q = addrInput.value.trim();
-
-  // If locked and not cleared, do not show suggestions
-  if (acLocked) {
-    if (q.length === 0) { acLocked = false; } // unlock only when fully cleared
-    else { hideAc(); return; }
+  if (used && Number.isFinite(used.lat) && Number.isFinite(used.lon)) {
+    L.marker([used.lat, used.lon], {
+      title: "AADT used",
+      icon: L.divIcon({ className:"aadt-used-2", html:'<div style="font-size:18px;">⭐</div>', iconSize:[24,24], iconAnchor:[12,12] })
+    }).addTo(aadtLayer).bindPopup(`<b>USED AADT</b><br>${fmt(used.aadt)}${used.year?` (${used.year})`:''}<br>${esc(used.route||'')}`);
+    bounds.push([used.lat, used.lon]);
   }
-
-  if (q.length < 3) { hideAc(); return; }
-
-  Promise.all([googleSearch(q), nominatimSearch(q)]).then(([g,n])=>{
-    acItems = [...g, ...n].slice(0, 8);
-    renderAc(acItems);
-  });
-});
-
-// blur hides
-addrInput.addEventListener("blur", () => { setTimeout(hideAc, 120); });
-
-// esc hides
-document.addEventListener("keydown", (e) => { if (e.key === "Escape") hideAc(); });
-
-// outside click hides
-document.addEventListener("pointerdown", (e) => {
-  if (e.target !== addrInput && !acBox.contains(e.target)) hideAc();
-});
-
-/* =================== STOP overlay ===================== */
-function showStop(items){
-  if (!items || !items.length) return;
-  const html = `<ul>${items.map(x=>{
-    const dtl = x.details ? ` — ${esc(x.details)}` : "";
-    const dt = x.date ? ` (${esc(x.date)})` : "";
-    const st = x.status ? ` — <i>${esc(x.status)}</i>` : "";
-    return `<li><b>${esc(x.name||"Development")}</b>${st}${dtl}${dt}</li>`;
-  }).join("")}</ul>`;
-  devStopList.innerHTML = html;
-  devStop.style.display = "flex";
+  aadtMap.fitBounds(L.latLngBounds(bounds).pad(0.25));
 }
-devStopClose.addEventListener("click", ()=>{ devStop.style.display = "none"; });
-
-async function showStopIfDev(lat, lon){
-  try {
-    const a = await (await fetch(`/admin?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`)).json();
-    if (!a || !a.ok) return;
-    const d = await (await fetch(`/developments/check?city=${encodeURIComponent(a.city||"")}&county=${encodeURIComponent(a.county||"")}&state=${encodeURIComponent(a.state||"")}`)).json();
-    if (d && d.ok && d.count > 0) showStop(d.items);
-  } catch {}
+function renderAADTTable(items){
+  const tb = document.querySelector("#aadtTable tbody");
+  tb.innerHTML = (items||[]).map(s => {
+    const src = s.source_url ? `<a href="${s.source_url}" target="_blank">Source</a>` : "";
+    return `<tr>
+      <td>~${s.miles} mi</td>
+      <td>${fmt(s.aadt)}${s.year?` <span class="small">(${s.year})</span>`:''}</td>
+      <td>${esc(s.route||'')}</td>
+      <td>${esc(s.location||'')}</td>
+      <td>${src}</td>
+    </tr>`;
+  }).join("");
 }
 
-/* =================== Advanced Badges ===================== */
+/* =================== Advanced pills =================== */
 function pills(){
   const p=[];
   if(ex_large_dev.checked) p.push("+7.5% Large development nearby");
@@ -418,7 +364,7 @@ function collectExtras(){
   if(ex_large_dev.checked) out.push({pct:7.5, note:"Large residential/commercial developments"});
   if(ex_hours18.checked)  out.push({pct:-7.5, note:"18h ops"});
   if(ex_highincome.checked) out.push({pct:2.5, note:"Higher income"});
-  if(ex_lowrating.checked)  out.push({pct:-30, note:"Rating <4.0"});
+  if(ex_lowrating.checked)  out.push({pct:-30, note:"Rating < 4.0"});
   if(ex_competitive_pricing.checked) out.push({pct:10, note:"Competitive site gas pricing"});
   for(const chip of extraList.querySelectorAll(".chip")){
     const pct = +chip.querySelector(".extraPct").value;
@@ -458,31 +404,24 @@ function renderAll(d){
   aadtBanner.textContent = d.aadtText || "—";
   compLine.textContent = d.competitionText || "—";
 
-  // Developments: CSV takes precedence if present
+  // STOP banner if CSV devs match
   if (Array.isArray(d.csv) && d.csv.length) {
-    const listHtml = d.csv.map(x => {
+    const lines = d.csv.slice(0,6).map(x => {
       const nm = esc(x.name || "");
       const st = esc(x.status || "");
       const dtl = x.details ? ` • ${esc(x.details)}` : "";
       const dt  = x.date ?    ` • ${esc(x.date)}`    : "";
-      return `<li>${nm}${st ? ` • ${st}` : ''}${dtl}${dt}</li>`;
-    }).join("");
-    devsBox.innerHTML = `<div style="color:#ff4444;font-weight:700;font-size:1.1em;margin-bottom:4px;">&#x26D4; Developments</div><ul>${listHtml}</ul>`;
-    devsExtNews.innerHTML = "";
-    devsExtPermits.innerHTML = "";
+      return `${nm}${st ? ` • ${st}` : ''}${dtl}${dt}`;
+    }).join(" // ");
+    stopText.innerHTML = `Development flagged: <b>${lines}</b>`;
+    stopBox.style.display = "block";
+    devsBox.innerHTML = "<ul>"+d.csv.map(x => `<li>${esc(x.name||'')} • ${esc(x.status||'')}${x.details?` • ${esc(x.details)}`:''}${x.date?` • ${esc(x.date)}`:''}</li>`).join("")+"</ul>";
   } else {
-    devsBox.innerHTML = (d.developments||[]).length
-      ? "<ul>"+d.developments.map(x=>`<li>${esc(x.name)} • ${esc(x.status)}${x.approx_miles!=null?` • ~${x.approx_miles} mi`:''}</li>`).join("")+"</ul>"
-      : "<em>none</em>";
-    devsExtNews.innerHTML = (d.developments_external?.news||[]).length
-      ? "<ul>"+d.developments_external.news.map(x=>`<li>${esc(x.name)} • ${esc(x.status)}${x.link?` • <a href="${x.link}" target="_blank">source</a>`:''}</li>`).join("")+"</ul>"
-      : "<em>none</em>";
-    devsExtPermits.innerHTML = (d.developments_external?.permits||[]).length
-      ? "<ul>"+d.developments_external.permits.map(x=>`<li>${esc(x.name)} • ${esc(x.status)}${x.link?` • <a href="${x.link}" target="_blank">source</a>`:''}</li>`).join("")+"</ul>"
-      : "<em>none</em>";
+    stopBox.style.display = "none";
+    devsBox.innerHTML = "<em>no CSV developments</em>";
   }
 
-  // Summary (fallback safe)
+  // Summary
   const method = d?.inputs?.aadt_components?.method || "unknown";
   let s = (d.summary||"").trim();
   if(!s){
@@ -490,9 +429,28 @@ function renderAll(d){
   }
   summaryBox.textContent = s;
 
-  // Map + Rating
-  initOrUpdateMap(d.map);
+  // Main map + Rating
+  initOrUpdateMainMap(d.map);
   showRating(addrInput.value.trim());
+
+  // Second map + table: list sources within 1 mile and show USED marker
+  if (d?.map?.site) {
+    fetch(`/aadt/nearby?lat=${encodeURIComponent(d.map.site.lat)}&lon=${encodeURIComponent(d.map.site.lon)}&radiusMi=1`)
+      .then(r => r.json()).then(j => {
+        if (j.ok) {
+          initOrUpdateAADTMap(d.map.site, j.items, d.map.aadt_used || null);
+          renderAADTTable(j.items);
+          const st = j.state || "NC";
+          const srcMap = {
+            NC: "NCDOT AADT Stations (official)",
+            VA: "VDOT Traffic Volume ADT (official)",
+            DC: "DDOT 2023 Traffic Volume (official)",
+            FL: "FDOT AADT (TDA/RCI) (official)"
+          };
+          aadtSourceLine.textContent = "Source: " + (srcMap[st] || "official state AADT");
+        }
+      }).catch(()=>{});
+  }
 }
 
 /* =================== Rating helpers =================== */
@@ -525,9 +483,78 @@ async function showRating(address){
   ratingLine.innerHTML = (rating != null && rating !== undefined) ? `\u2B50 ${rating} (${total||0} reviews)` : "—";
 }
 
-/* =================== Main events ====================== */
-function tidyUI(){ hideAc(); } // keep UI tidy when committing to estimate
+/* =================== Autocomplete (lock on commit) =================== */
+function hideAc(){ acBox.style.display = "none"; acActive = -1; }
+function commitAddress(display, coords, placeId){
+  lastCommittedText = (display || "").trim();
+  acCommitted = true;   // LOCK: stop recommending after commit
+  acItems = [];
+  hideAc();
+  addrInput.value = display;
+  selectedCoords = coords || null;
+  selectedPlaceId = placeId || null;
+}
+function chooseAc(i){
+  const it = acItems[i];
+  if (!it) return;
+  const coords = (Number.isFinite(it.lat) && Number.isFinite(it.lon)) ? { lat: it.lat, lon: it.lon } : null;
+  commitAddress(it.display, coords, it.place_id || null);
+  addrInput.blur(); // collapse keyboard + keep list hidden
+}
+async function googleSearch(q){
+  try {
+    const r = await fetch("/google/autocomplete?input=" + encodeURIComponent(q));
+    const j = await r.json();
+    if(!j.ok) return [];
+    return (j.items||[]).map(it => ({...it, type:"Google", score:1.3}));
+  } catch { return []; }
+}
+async function nominatimSearch(q){
+  try {
+    const r = await fetch("https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=us&q=" + encodeURIComponent(q));
+    const a = await r.json();
+    return a.map(row => ({ type:"OSM", display:row.display_name, lat:+row.lat, lon:+row.lon, score:0.6 }));
+  } catch { return []; }
+}
+function renderAc(list){
+  if(!list.length){ hideAc(); return; }
+  acBox.innerHTML = list.map((it,i) =>
+    `<div class="ac-item${i===acActive?" active":""}" data-i="${i}">${esc(it.display)} <span class="badge">${it.type}</span></div>`
+  ).join("");
+  [...acBox.children].forEach(el => el.onclick = () => chooseAc(+el.dataset.i));
+  acBox.style.display = "block";
+}
+addrInput.addEventListener("input", () => {
+  const q = addrInput.value.trim();
 
+  // If we already committed and text hasn't changed, keep list hidden.
+  if (acCommitted) {
+    if (q === lastCommittedText) { hideAc(); return; }
+    // User started editing -> unlock for a new search.
+    acCommitted = false;
+  }
+  if (q.length < 3) { hideAc(); return; }
+
+  Promise.all([googleSearch(q), nominatimSearch(q)]).then(([g,n])=>{
+    acItems = [...g, ...n].slice(0, 8);
+    renderAc(acItems);
+  });
+});
+addrInput.addEventListener("blur", () => { setTimeout(hideAc, 120); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") hideAc(); });
+document.addEventListener("pointerdown", (e) => {
+  if (e.target !== addrInput && !acBox.contains(e.target)) hideAc();
+});
+
+/* =================== Main events ====================== */
+function tidyUI(){ hideAc(); }
+async function checkGoogleStatus(){
+  try {
+    const r = await fetch("/google/status");
+    const j = await r.json();
+    apiStatus.textContent = j.ok ? "API: Google — Working" : `API: Google — ${j.status}`;
+  } catch { apiStatus.textContent = "API: Google — unavailable"; }
+}
 async function onEstimateClick(){
   if(!addrInput.value.trim() && !selectedCoords){
     alert("Please select a valid address first.");
@@ -536,10 +563,7 @@ async function onEstimateClick(){
   try {
     goBtn.disabled = true; runBtn.disabled = true; setOverlayWorking(); tidyUI();
     const resp = await callEstimate();
-    if (!resp || resp.ok !== true) {
-      alert("Estimate failed: " + (resp?.status || "Unknown error"));
-      return;
-    }
+    if (!resp || resp.ok !== true) { alert("Estimate failed: " + (resp?.status || "Unknown error")); return; }
     renderAll(resp); pills();
   } catch (e) {
     alert("Error: " + (e?.message || e));
@@ -555,7 +579,7 @@ addrInput.addEventListener("keydown", (e)=>{ if(e.key==="Enter"){ e.preventDefau
 document.getElementById("exportPDF").addEventListener("click", async ()=>{
   const { jsPDF } = window.jspdf || {};
   if(!jsPDF){ alert("PDF lib failed to load"); return; }
-  const doc=new jsPDF({unit:"pt",format:"a4"}); // 595x842
+  const doc=new jsPDF({unit:"pt",format:"a4"});
   const pageW=595, pageH=842, margin=36, contentW=pageW - margin*2;
 
   doc.setFont("helvetica","bold"); doc.setFontSize(18);
@@ -595,11 +619,11 @@ document.getElementById("exportPDF").addEventListener("click", async ()=>{
     cursorY += imgH + 12;
   }
 
-  const devText = "Developments — News:\n" + (document.getElementById("devsExternalNews").innerText || "—")
-               + "\n\nDevelopments — Permits:\n" + (document.getElementById("devsExternalPermits").innerText || "—");
-  const devLines = doc.splitTextToSize(devText, contentW);
+  // Include AADT table
+  const tbl = document.getElementById("aadtTable").innerText || "";
+  const devLines = doc.splitTextToSize("AADT Sources (1 mi):\n" + tbl, contentW);
   if (cursorY + devLines.length*14 > pageH - margin) { doc.addPage(); cursorY = margin; }
-  doc.setFont("helvetica","bold"); doc.text("Developments", margin, cursorY); cursorY += 14;
+  doc.setFont("helvetica","bold"); doc.text("AADT Sources", margin, cursorY); cursorY += 14;
   doc.setFont("helvetica","normal"); doc.text(devLines, margin, cursorY);
 
   doc.save("FuelIQ_Site_Analyzer.pdf");
@@ -611,3 +635,4 @@ overlay.textContent="—";
   </script>
 </body>
 </html>
+
