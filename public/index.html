@@ -270,7 +270,7 @@ function initOrUpdateMap(m){
 let GOOGLE_OK=false; let acItems=[]; let acActive=-1;
 async function checkGoogleStatus(){
   try {
-    const r = await fetch("/google/status");
+    const r = await fetch(SERVER_BASE + "/google/status");
     const j = await r.json();
     GOOGLE_OK = !!j.ok;
     apiStatus.textContent = j.ok 
