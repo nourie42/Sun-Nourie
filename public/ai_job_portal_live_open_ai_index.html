@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AI‑Powered Job Match Portal</title>
+  <title>AI‑Powered Job Match Portal — Remote‑First Real Jobs</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -32,7 +32,7 @@
     <!-- Header -->
     <header class="text-center text-white">
       <h1 class="text-3xl font-bold drop-shadow-sm">🤖 AI‑Powered Job Match Portal</h1>
-      <p class="opacity-90">AI compares your resume profile to jobs and generates **direct Google job searches** (Indeed, LinkedIn, Glassdoor, etc.), including Remote roles. All original features are preserved.</p>
+      <p class="opacity-90">AI matches your resume to jobs and fetches **real, remote‑first** postings across Indeed, LinkedIn, Glassdoor, ZipRecruiter, etc. Nothing cut.</p>
       <div class="mt-2 inline-flex items-center gap-2 badge bg-emerald-500 text-white">Live AI Enabled</div>
     </header>
 
@@ -73,7 +73,7 @@
 
       <div class="mt-6 grid md:grid-cols-4 gap-3">
         <div>
-          <label class="text-sm font-semibold text-slate-700">Location</label>
+          <label class="text-sm font-semibold text-slate-700">Location (optional)</label>
           <input id="location" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" value="Knightdale, NC" />
         </div>
         <div>
@@ -95,7 +95,7 @@
           </select>
         </div>
         <div class="flex items-end gap-2">
-          <button id="btnSearch" class="px-5 py-3 rounded-xl bg-indigo-600 text-white font-semibold hover:brightness-110 flex items-center gap-2"><span id="searchIcon">🔍</span><span>Search & Analyze with AI</span></button>
+          <button id="btnSearch" class="px-5 py-3 rounded-xl bg-indigo-600 text-white font-semibold hover:brightness-110 flex items-center gap-2"><span id="searchIcon">🔍</span><span>Search & Analyze (Remote‑First)</span></button>
           <button id="btnReset" class="px-4 py-3 rounded-xl border">Reset</button>
           <div id="busy" class="hidden items-center gap-3"><div class="spinner"></div><span class="text-slate-600">Working…</span></div>
         </div>
@@ -144,7 +144,6 @@
      ********************/
     const DEFAULT_MODEL = 'gpt-4o-mini';
 
-    // Recognized job sites for verification/deduping
     const JOB_SITES = [
       'indeed.com', 'linkedin.com/jobs', 'glassdoor.com', 'ziprecruiter.com',
       'monster.com', 'careerbuilder.com', 'simplyhired.com', 'naeyc.org',
@@ -152,7 +151,6 @@
       'kindercare.com', 'brighthorizons.com', 'ymca.org', 'wcpss.net'
     ];
 
-    // Sample jobs (unchanged)
     const SAMPLE = [
       {title:'Preschool Director', company:'Bright Horizons Early Learning', salary:'$48,000 - $68,000', category:'preschool-director', req:["Bachelor's in ECE", '5+ yrs leadership', 'NC Director Credential preferred', 'Strong communication'], desc:'Lead center ops, staff, compliance, quality standards.', postedDays: r(1,14)},
       {title:'Assistant Director - Early Learning Center', company:'KinderCare Education', salary:'$42,000 - $58,000', category:'assistant-director', req:['Associate min, BA preferred', '3+ yrs childcare', 'Staff supervision', 'Licensing knowledge'], desc:'Assist director, supervise teachers, manage enrollment and families.', postedDays: r(1,14)},
@@ -210,22 +208,15 @@
       const s = document.getElementById('apiStatus');
       s.textContent = 'Checking…'; s.className = 'text-sm text-slate-600';
       try{
-        const ok = await callOpenAI({
-          model: modelEl.value || DEFAULT_MODEL,
-          messages: [{role:'user', content:'say ok'}],
-          max_tokens: 2
-        });
-        if(ok){ s.textContent = '✅ API reachable'; s.className = 'text-sm text-emerald-700'; }
-        else { throw new Error('Bad response'); }
+        const ok = await callOpenAI({ model: modelEl.value || DEFAULT_MODEL, messages: [{role:'user', content:'say ok'}], max_tokens: 2 });
+        if(ok){ s.textContent = '✅ API reachable'; s.className = 'text-sm text-emerald-700'; } else { throw new Error('Bad response'); }
       }catch(err){ s.textContent = '❌ API error — check key/model/network'; s.className = 'text-sm text-red-700'; console.error(err); }
     }
 
     /********************
      * CHIP TOGGLES
      ********************/
-    document.getElementById('chips').addEventListener('click', (e)=>{
-      if(e.target.classList.contains('chip')) e.target.classList.toggle('active');
-    });
+    document.getElementById('chips').addEventListener('click', (e)=>{ if(e.target.classList.contains('chip')) e.target.classList.toggle('active'); });
 
     /********************
      * SEARCH & ANALYZE
@@ -256,210 +247,62 @@
         const min = parseInt(document.getElementById('matchThreshold').value,10);
         const finalJobs = analyzed.filter(j=>j.analysis.score>=min).sort((a,b)=>b.analysis.score-a.analysis.score);
         renderResults(finalJobs);
-      }catch(err){
-        showErr('AI analysis failed. Check key/model/network.');
-        console.error(err);
-      }finally{
-        btn.disabled = false; busy.classList.add('hidden');
-      }
+      }catch(err){ showErr('AI analysis failed. Check key/model/network.'); console.error(err); }
+      finally{ btn.disabled = false; busy.classList.add('hidden'); }
     }
 
     function getProfile(){
-      return {
-        exp: document.getElementById('exp').value,
-        role: document.getElementById('role').value,
-        expertise: document.getElementById('expertise').value,
-        edu: document.getElementById('edu').value,
-        resumeText: document.getElementById('resumeText').value
-      };
+      return { exp: document.getElementById('exp').value, role: document.getElementById('role').value, expertise: document.getElementById('expertise').value, edu: document.getElementById('edu').value, resumeText: document.getElementById('resumeText').value };
     }
 
     /********************
      * OPENAI UTIL (timeout + safe JSON)
      ********************/
     async function callOpenAI(body){
-      const key = (keyEl.value||'').trim();
-      if(!key) throw new Error('Missing API key');
-      const ctl = new AbortController();
-      const t = setTimeout(()=>ctl.abort(), 20000);
-      try{
-        const res = await fetch('https://api.openai.com/v1/chat/completions',{
-          method:'POST',
-          headers:{ 'Content-Type':'application/json', 'Authorization':`Bearer ${key}` },
-          body: JSON.stringify(body),
-          signal: ctl.signal
-        });
-        if(!res.ok) throw new Error(await res.text());
-        return await res.json();
-      } finally { clearTimeout(t); }
+      const key = (keyEl.value||'').trim(); if(!key) throw new Error('Missing API key');
+      const ctl = new AbortController(); const t = setTimeout(()=>ctl.abort(), 20000);
+      try{ const res = await fetch('https://api.openai.com/v1/chat/completions',{ method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':`Bearer ${key}` }, body: JSON.stringify(body), signal: ctl.signal }); if(!res.ok) throw new Error(await res.text()); return await res.json(); } finally { clearTimeout(t); }
     }
 
     async function aiAnalyzeJob(model, profile, job){
       const sys = `You are an expert career coach. Return strict JSON with keys: score (0-100), strengths (array), gaps (array), insight (string), recommendation (string).`;
       const user = `Candidate profile (free text allowed):\n${profile.resumeText}\n\nStructured summary:\n- Experience: ${profile.exp}\n- Current role: ${profile.role}\n- Expertise: ${profile.expertise}\n- Education: ${profile.edu}\n\nJob:\n- Title: ${job.title}\n- Company: ${job.company}\n- Location: ${job.location}\n- Salary: ${job.salary}\n- Requirements: ${job.req.join('; ')}\n- Description: ${job.desc}\n\nTask: Compare job to candidate. Score fit 0-100 (integer). Identify strengths and gaps referencing requirements. Provide a short, specific insight and 1-2 sentence recommendation. Output only JSON.`;
-
-      try{
-        const data = await callOpenAI({
-          model,
-          temperature: 0.2,
-          messages:[{role:'system', content: sys},{role:'user', content: user}],
-          response_format: { type: 'json_object' }
-        });
-        const content = data.choices?.[0]?.message?.content || '{}';
-        return normalizeAnalysis(safeParse(content), profile, job);
-      }catch(err){
-        console.warn('AI error, using heuristic fallback:', err?.message||err);
-        return heuristicAnalysis(profile, job);
-      }
+      try{ const data = await callOpenAI({ model, temperature: 0.2, messages:[{role:'system', content: sys},{role:'user', content: user}], response_format: { type: 'json_object' } }); const content = data.choices?.[0]?.message?.content || '{}'; return normalizeAnalysis(safeParse(content), profile, job); }
+      catch(err){ console.warn('AI error, using heuristic fallback:', err?.message||err); return heuristicAnalysis(profile, job); }
     }
 
     function safeParse(t){ try { return JSON.parse(t); } catch{ return {}; } }
 
     function normalizeAnalysis(a, profile, job){
       const score = clampNumber(a.score ?? heuristicScore(profile, job), 0, 100);
-      return {
-        score,
-        strengths: Array.isArray(a.strengths)&&a.strengths.length? a.strengths.slice(0,5) : heuristicStrengths(profile, job),
-        gaps: Array.isArray(a.gaps)&&a.gaps.length? a.gaps.slice(0,5) : heuristicGaps(profile, job),
-        insight: a.insight || 'Overall alignment looks solid; highlight licensing compliance, staff leadership, and measurable outcomes.',
-        recommendation: a.recommendation || 'Lead with director/assistant director wins (enrollment growth, audit results) and quantify team leadership.'
-      };
+      return { score, strengths: Array.isArray(a.strengths)&&a.strengths.length? a.strengths.slice(0,5) : heuristicStrengths(profile, job), gaps: Array.isArray(a.gaps)&&a.gaps.length? a.gaps.slice(0,5) : heuristicGaps(profile, job), insight: a.insight || 'Overall alignment looks solid; highlight licensing compliance, staff leadership, and measurable outcomes.', recommendation: a.recommendation || 'Lead with director/assistant director wins (enrollment growth, audit results) and quantify team leadership.' };
     }
 
-    /********************
-     * Heuristic fallback (no API)
-     ********************/
-    function heuristicAnalysis(profile, job){
-      return {
-        score: heuristicScore(profile, job),
-        strengths: heuristicStrengths(profile, job),
-        gaps: heuristicGaps(profile, job),
-        insight: 'Heuristic analysis used due to API error. Focus on leadership, compliance, and enrollment growth.',
-        recommendation: 'Quantify outcomes and align credentials to state requirements.'
-      };
-    }
-    function heuristicScore(profile, job){
-      const text = (profile.resumeText + ' ' + profile.expertise + ' ' + profile.role + ' ' + profile.edu).toLowerCase();
-      let hits = 0; let total = job.req.length || 1;
-      job.req.forEach(rq => { if(text.includes(rq.split(' ')[0].toLowerCase())) hits++; });
-      let base = 60 + Math.round((hits/total)*35); // 60..95
-      if(/director|lead/i.test(profile.role)) base += 3;
-      if(/ms|master/.test(profile.edu.toLowerCase())) base += 2;
-      return Math.max(50, Math.min(98, base));
-    }
-    function heuristicStrengths(profile, job){
-      const t = (profile.resumeText + ' ' + profile.expertise).toLowerCase();
-      const found = job.req.filter(rq => t.includes(rq.split(' ')[0].toLowerCase()));
-      return found.length? found.slice(0,5) : ['Leadership experience','Compliance knowledge','Parent communication'];
-    }
-    function heuristicGaps(profile, job){
-      const t = (profile.resumeText + ' ' + profile.expertise).toLowerCase();
-      const notFound = job.req.filter(rq => !t.includes(rq.split(' ')[0].toLowerCase()));
-      return notFound.length? notFound.slice(0,5) : ['Budget ownership depth'];
-    }
+    function heuristicAnalysis(profile, job){ return { score: heuristicScore(profile, job), strengths: heuristicStrengths(profile, job), gaps: heuristicGaps(profile, job), insight: 'Heuristic analysis used due to API error. Focus on leadership, compliance, and enrollment growth.', recommendation: 'Quantify outcomes and align credentials to state requirements.' }; }
+    function heuristicScore(profile, job){ const text = (profile.resumeText + ' ' + profile.expertise + ' ' + profile.role + ' ' + profile.edu).toLowerCase(); let hits = 0; let total = job.req.length || 1; job.req.forEach(rq => { if(text.includes(rq.split(' ')[0].toLowerCase())) hits++; }); let base = 60 + Math.round((hits/total)*35); if(/director|lead/i.test(profile.role)) base += 3; if(/ms|master/.test(profile.edu.toLowerCase())) base += 2; return Math.max(50, Math.min(98, base)); }
+    function heuristicStrengths(profile, job){ const t = (profile.resumeText + ' ' + profile.expertise).toLowerCase(); const found = job.req.filter(rq => t.includes(rq.split(' ')[0].toLowerCase())); return found.length? found.slice(0,5) : ['Leadership experience','Compliance knowledge','Parent communication']; }
+    function heuristicGaps(profile, job){ const t = (profile.resumeText + ' ' + profile.expertise).toLowerCase(); const notFound = job.req.filter(rq => !t.includes(rq.split(' ')[0].toLowerCase())); return notFound.length? notFound.slice(0,5) : ['Budget ownership depth']; }
 
     function clampNumber(n, min, max){ n = Number(n); if(Number.isNaN(n)) n = min; return Math.max(min, Math.min(max, n)); }
 
     /********************
-     * GOOGLE LINKS (static queries) — kept from prior version
+     * GOOGLE SEARCH (Remote‑first verified links)
+     * Uses your backend GET /gsearch?q=…&num=… (Render env). Falls back to client CSE via window.GOOGLE_API_KEY/CX if present.
      ********************/
-    function baseQuery(job){
-      const loc = (job.location||'').trim();
-      const parts = [job.title, job.company];
-      if(loc) parts.push(loc);
-      parts.push('jobs');
-      return parts.join(' ');
-    }
-    function remoteQuery(job){
-      return `${job.title} ${job.company} remote "(United States)" jobs`;
-    }
-    function googleJobsUrl(q){ return `https://www.google.com/search?q=${encodeURIComponent(q)}&ibp=htl;jobs`; }
-    function googleSiteUrl(q, site){
-      if(!site) return `https://www.google.com/search?q=${encodeURIComponent(q)}`;
-      if(site==='GOOGLE_JOBS') return googleJobsUrl(q);
-      return `https://www.google.com/search?q=${encodeURIComponent(q + ' site:' + site)}`;
-    }
-    function buildSiteLinks(job){
-      const q = baseQuery(job);
-      const qr = remoteQuery(job);
-      const links = SITE_FILTERS.map(s => ({ label:s.label, url: googleSiteUrl(q, s.site) }));
-      const remoteLinks = SITE_FILTERS.map(s => ({ label:(s.label+ ' — Remote'), url: googleSiteUrl(qr, s.site) }));
-      return {all:q, allRemote:qr, links, remoteLinks};
-    }
-
-    /********************
-     * GOOGLE CSE (REAL LINKS) — no third‑party API required
-     * Uses your Render backend proxy at /gsearch (expected) which calls Google CSE
-     * If /gsearch is missing, optional client fallback uses window.GOOGLE_API_KEY + window.GOOGLE_CX
-     ********************/
-    async function gsearchServer(query, num=10){
-      const url = `/gsearch?q=${encodeURIComponent(query)}&num=${num}`; // Implement on your server: proxy to Google CSE
-      const res = await fetch(url);
-      if(!res.ok) throw new Error('Server gsearch failed');
-      return res.json(); // expected to mirror Google CSE JSON { items: [...] }
-    }
-
-    async function gsearchClient(query, num=10){
-      if(!(window.GOOGLE_API_KEY && window.GOOGLE_CX)) throw new Error('No client CSE creds');
-      const url = `https://www.googleapis.com/customsearch/v1?key=${encodeURIComponent(window.GOOGLE_API_KEY)}&cx=${encodeURIComponent(window.GOOGLE_CX)}&num=${num}&q=${encodeURIComponent(query)}`;
-      const res = await fetch(url);
-      if(!res.ok) throw new Error('Google CSE fetch failed');
-      return res.json();
-    }
-
     function domainOf(href){ try{ return new URL(href).hostname.replace(/^www\./,''); }catch{ return ''; } }
+    function scoreJobLink(item){ const url = item.link||''; const title=(item.title||'').toLowerCase(); const d = domainOf(url); let s = 0; if(JOB_SITES.some(site=>d.includes(site.replace('/jobs','')))) s += 10; if(/apply|careers|job|jobs|opening|posting/.test(url)) s += 6; if(/apply|hiring|director|assistant|education|teacher|coordinator/.test(title)) s += 4; if(/pdf|youtube|facebook|pinterest|reddit/.test(url)) s -= 8; return s; }
+    function dedupeByUrl(items){ const seen = new Set(); return items.filter(it=>{ const u=(it.link||'').split('#')[0]; if(seen.has(u)) return false; seen.add(u); return true; }); }
+    function filterToRealJobs(items){ const filtered = items.filter(it=>{ const d = domainOf(it.link||''); return JOB_SITES.some(site=>d.includes(site.replace('/jobs',''))); }); const scored = filtered.map(it=>({ ...it, __score: scoreJobLink(it) })).sort((a,b)=> b.__score - a.__score); return dedupeByUrl(scored).slice(0,12); }
 
-    function scoreJobLink(item){
-      const url = item.link||''; const title=(item.title||'').toLowerCase();
-      const d = domainOf(url);
-      let s = 0;
-      if(JOB_SITES.some(site=>d.includes(site.replace('/jobs','')))) s += 10;
-      if(/apply|careers|job|jobs|opening|posting/.test(url)) s += 6;
-      if(/apply|hiring|director|assistant|education|teacher|coordinator/.test(title)) s += 4;
-      if(/pdf|youtube|facebook|pinterest|reddit/.test(url)) s -= 8;
-      return s;
-    }
+    function baseQuery(job){ const parts = [job.title, job.company, 'remote', 'jobs']; return parts.join(' '); }
+    function localQuery(job){ const loc = (job.location||'').trim(); const parts = [job.title, job.company, loc, 'jobs']; return parts.filter(Boolean).join(' '); }
+    function siteFilters(){ return JOB_SITES.map(s=>`site:${s}`).join(' OR '); }
+    function buildVerifiedQuery(job, isRemote=true){ const core = isRemote ? baseQuery(job) : localQuery(job); return `${core} (${siteFilters()}) (apply OR job)`; }
 
-    function dedupeByUrl(items){
-      const seen = new Set();
-      return items.filter(it=>{ const u=(it.link||'').split('#')[0]; if(seen.has(u)) return false; seen.add(u); return true; });
-    }
+    async function gsearchServer(query, num=12){ const res = await fetch(`/gsearch?q=${encodeURIComponent(query)}&num=${num}`); if(!res.ok) throw new Error('Server gsearch failed'); return res.json(); }
+    async function gsearchClient(query, num=12){ if(!(window.GOOGLE_API_KEY && window.GOOGLE_CX)) throw new Error('No client CSE creds'); const url = `https://www.googleapis.com/customsearch/v1?key=${encodeURIComponent(window.GOOGLE_API_KEY)}&cx=${encodeURIComponent(window.GOOGLE_CX)}&num=${num}&q=${encodeURIComponent(query)}`; const res = await fetch(url); if(!res.ok) throw new Error('Google CSE fetch failed'); return res.json(); }
 
-    function filterToRealJobs(items){
-      const filtered = items.filter(it=>{
-        const d = domainOf(it.link||'');
-        return JOB_SITES.some(site=>d.includes(site.replace('/jobs','')));
-      });
-      const scored = filtered.map(it=>({ ...it, __score: scoreJobLink(it) }))
-                             .sort((a,b)=> b.__score - a.__score);
-      return dedupeByUrl(scored).slice(0,10);
-    }
-
-    function buildJobQuery(job, remote=false){
-      const base = `${job.title} ${job.company} ${remote? 'remote' : (job.location||'')}`.trim();
-      const filters = JOB_SITES.map(s=>`site:${s}`).join(' OR ');
-      const q = `${base} (${filters}) (apply OR job)`;
-      return q;
-    }
-
-    async function fetchVerifiedLinks(job, remote=false){
-      const q = buildJobQuery(job, remote);
-      try{
-        const data = await gsearchServer(q, 10);
-        const items = (data.items||[]);
-        return filterToRealJobs(items);
-      }catch(e){
-        // Fallback to client CSE if creds present
-        try{
-          const data = await gsearchClient(q, 10);
-          const items = (data.items||[]);
-          return filterToRealJobs(items);
-        }catch(e2){
-          console.warn('CSE fallback failed', e2);
-          return [];
-        }
-      }
-    }
+    async function fetchVerifiedLinks(job, isRemote=true){ const q = buildVerifiedQuery(job, isRemote); try{ const data = await gsearchServer(q, 12); const items = (data.items||[]); return { q, items: filterToRealJobs(items) }; } catch(e){ try{ const data = await gsearchClient(q, 12); const items = (data.items||[]); return { q, items: filterToRealJobs(items) }; } catch(e2){ console.warn('CSE fallback failed', e2); return { q, items: [] }; } } }
 
     /********************
      * RENDER
@@ -467,169 +310,83 @@
     function scoreClass(s){ return s>=90?'excellent': s>=80?'good': s>=70?'fair':'poor'; }
 
     function renderResults(items){
-      const results = document.getElementById('results');
-      const grid = document.getElementById('grid');
-      const empty = document.getElementById('empty');
-      const count = document.getElementById('resultCount');
-      results.classList.remove('hidden');
-      grid.innerHTML='';
-      empty.classList.add('hidden');
-
+      const results = document.getElementById('results'); const grid = document.getElementById('grid'); const empty = document.getElementById('empty'); const count = document.getElementById('resultCount');
+      results.classList.remove('hidden'); grid.innerHTML=''; empty.classList.add('hidden');
       if(!items.length){ empty.classList.remove('hidden'); count.textContent='0 jobs found'; return; }
-
       count.textContent = `${items.length} job${items.length!==1?'s':''} found`;
       items.forEach((job, idx)=> grid.appendChild(jobCard(job, idx)) );
-
-      // sorting controls
       document.querySelectorAll('[data-sort]').forEach(btn=>btn.onclick = ()=>sortGrid(btn.dataset.sort));
-
-      // helpers
       document.getElementById('openTop5').onclick = ()=>openTopGoogle(items.slice(0,5));
       document.getElementById('copyAll').onclick = ()=>copyAllQueries(items);
     }
 
     function jobCard(job, idx){
-      const el = document.createElement('div');
-      el.className = 'relative glass card';
-      el.dataset.score = job.analysis.score;
-      el.dataset.posted = job.postedDays;
-      el.dataset.salarymin = extractMinSalary(job.salary);
-
-      const { all, allRemote, links, remoteLinks } = buildSiteLinks(job);
-      const generalGoogle = `https://www.google.com/search?q=${encodeURIComponent(all)}`;
-
-      const verifiedId = `verified-${idx}`;
-
+      const el = document.createElement('div'); el.className = 'relative glass card'; el.dataset.score = job.analysis.score; el.dataset.posted = job.postedDays; el.dataset.salarymin = extractMinSalary(job.salary);
+      const verifiedId = `verified-${idx}`; const verifiedLocalId = `verified-local-${idx}`; const statusId = `status-${idx}`; const statusLocalId = `status-local-${idx}`;
       el.innerHTML = `
         <div class="score ${scoreClass(job.analysis.score)}">${job.analysis.score}%</div>
-        <div class="pr-20">
-          <h3 class="text-lg font-semibold text-slate-800">${escapeHtml(job.title)}</h3>
-          <div class="text-slate-600">${escapeHtml(job.company)}</div>
-        </div>
+        <div class="pr-20"><h3 class="text-lg font-semibold text-slate-800">${escapeHtml(job.title)}</h3><div class="text-slate-600">${escapeHtml(job.company)}</div></div>
         <div class="mt-2 flex flex-wrap gap-4 text-slate-600">
-          <div>📍 ${escapeHtml(job.location||'NC')}</div>
-          <div>💼 ${escapeHtml(job.type||'')}</div>
-          <div>💰 ${escapeHtml(job.salary||'—')}</div>
-          <div>📅 ${job.postedDays} day${job.postedDays!==1?'s':''} ago</div>
+          <div>📍 ${escapeHtml(job.location||'Remote‑first')}</div><div>💼 ${escapeHtml(job.type||'')}</div><div>💰 ${escapeHtml(job.salary||'—')}</div><div>📅 ${job.postedDays} day${job.postedDays!==1?'s':''} ago</div>
         </div>
         <div class="mt-4 p-4 rounded-xl border border-indigo-100 bg-indigo-50">
           <div class="text-slate-700 text-sm">${escapeHtml(job.analysis.insight)}</div>
           <div class="mt-3 grid md:grid-cols-2 gap-3">
-            <div class="p-3 rounded-lg border bg-white">
-              <div class="font-semibold text-slate-800 text-sm mb-1">Strengths</div>
-              <ul class="text-sm list-disc ml-5">
-                ${job.analysis.strengths.map(s=>`<li>${escapeHtml(s)}</li>`).join('')}
-              </ul>
-            </div>
-            <div class="p-3 rounded-lg border bg-white">
-              <div class="font-semibold text-slate-800 text-sm mb-1">Gaps</div>
-              <ul class="text-sm list-disc ml-5">
-                ${job.analysis.gaps.map(s=>`<li>${escapeHtml(s)}</li>`).join('')}
-              </ul>
-            </div>
+            <div class="p-3 rounded-lg border bg-white"><div class="font-semibold text-slate-800 text-sm mb-1">Strengths</div><ul class="text-sm list-disc ml-5">${job.analysis.strengths.map(s=>`<li>${escapeHtml(s)}</li>`).join('')}</ul></div>
+            <div class="p-3 rounded-lg border bg-white"><div class="font-semibold text-slate-800 text-sm mb-1">Gaps</div><ul class="text-sm list-disc ml-5">${job.analysis.gaps.map(s=>`<li>${escapeHtml(s)}</li>`).join('')}</ul></div>
           </div>
           <div class="mt-3 italic text-slate-700 text-sm"><b>AI Recommendation:</b> ${escapeHtml(job.analysis.recommendation)}</div>
         </div>
         <div class="mt-3 flex flex-wrap gap-2 linkbar">
-          <a href="${generalGoogle}" target="_blank" rel="noopener noreferrer" class="px-4 py-2 rounded-lg bg-indigo-600 text-white font-semibold hover:brightness-110">Google (All) →</a>
-          <a href="${googleJobsUrl(all)}" target="_blank" rel="noopener noreferrer" class="px-4 py-2 rounded-lg border">Google Jobs →</a>
-          <button class="px-4 py-2 rounded-lg border" data-copy="${escapeHtml(all)}">Copy Query</button>
-          <a href="${googleJobsUrl(allRemote)}" target="_blank" rel="noopener noreferrer" class="px-4 py-2 rounded-lg border">Remote — Google Jobs →</a>
-          <button class="px-4 py-2 rounded-lg border" data-open-all>Open All Sites</button>
+          <button class="px-4 py-2 rounded-lg bg-indigo-600 text-white" data-load-remote>Remote Jobs — Show Real Links</button>
+          <button class="px-4 py-2 rounded-lg border" data-load-local>Local Jobs — Show Real Links</button>
+          <button class="px-4 py-2 rounded-lg border" data-open-google>Open Google (remote)</button>
         </div>
-        <details class="mt-3">
-          <summary class="text-sm text-slate-700">Live postings (Google‑verified) — click to load</summary>
-          <div class="mt-2 flex flex-wrap gap-2">
-            <button class="px-3 py-2 rounded-lg bg-emerald-600 text-white" data-load-verified>Find Local</button>
-            <button class="px-3 py-2 rounded-lg border" data-load-verified-remote>Find Remote</button>
-            <span class="text-sm text-slate-600" id="${verifiedId}-status"></span>
-          </div>
-          <ul id="${verifiedId}" class="mt-3 space-y-2 list-disc ml-5"></ul>
+        <div class="mt-1 text-xs text-slate-600">* Links are verified to be from major job boards/employers (Indeed, LinkedIn, Glassdoor, ZipRecruiter, Monster, CareerBuilder, SimplyHired, NAEYC, SchoolSpring, GovernmentJobs, Primrose, KinderCare, Bright Horizons, YMCA, WCPSS).</div>
+        <details class="mt-2" open>
+          <summary class="text-sm text-slate-700">Remote postings</summary>
+          <div class="mt-2 text-sm text-slate-600" id="${statusId}">Not loaded yet.</div>
+          <ul id="${verifiedId}" class="mt-2 space-y-2 list-disc ml-5"></ul>
         </details>
         <details class="mt-2">
-          <summary class="text-sm text-slate-700">More site‑specific searches (includes remote)</summary>
-          <div class="mt-2 flex flex-wrap gap-2 linkbar">
-            ${links.map(l=>`<a class='px-3 py-2 rounded-lg border' target='_blank' rel='noopener noreferrer' href='${l.url}'>${escapeHtml(l.label)}</a>`).join('')}
-          </div>
-          <div class="mt-2 flex flex-wrap gap-2 linkbar">
-            ${remoteLinks.map(l=>`<a class='px-3 py-2 rounded-lg border' target='_blank' rel='noopener noreferrer' href='${l.url}'>${escapeHtml(l.label)}</a>`).join('')}
-          </div>
+          <summary class="text-sm text-slate-700">Local postings</summary>
+          <div class="mt-2 text-sm text-slate-600" id="${statusLocalId}">Not loaded yet.</div>
+          <ul id="${verifiedLocalId}" class="mt-2 space-y-2 list-disc ml-5"></ul>
         </details>
       `;
 
-      // copy handler for this card
-      el.querySelector('[data-copy]')?.addEventListener('click', (ev)=>{
-        const query = ev.currentTarget.getAttribute('data-copy');
-        navigator.clipboard.writeText(query).then(()=>{
-          ev.currentTarget.textContent = 'Copied!';
-          setTimeout(()=>ev.currentTarget.textContent='Copy Query', 1000);
-        });
+      el.querySelector('[data-open-google]')?.addEventListener('click', ()=>{
+        const q = `${job.title} ${job.company} remote jobs ${siteFilters()}`;
+        window.open(`https://www.google.com/search?q=${encodeURIComponent(q)}`, '_blank');
       });
 
-      // open all site‑specific (including remote) in new tabs
-      el.querySelector('[data-open-all]')?.addEventListener('click', ()=>{
-        const allLinks = [...links, ...remoteLinks];
-        allLinks.slice(0,8).forEach(l=> window.open(l.url, '_blank'));
+      el.querySelector('[data-load-remote]')?.addEventListener('click', async ()=>{
+        const status = document.getElementById(statusId); const list = document.getElementById(verifiedId);
+        status.textContent = 'Searching remote…'; list.innerHTML = '';
+        const { q, items } = await fetchVerifiedLinks(job, true);
+        if(!items.length){ status.textContent = 'No remote postings found via Google CSE. Try Open Google or Local.'; return; }
+        status.innerHTML = `Found ${items.length} remote posting(s).`;
+        for(const it of items){ const li = document.createElement('li'); li.innerHTML = `<a class='text-indigo-700 underline' target='_blank' rel='noopener' href='${it.link}'>${escapeHtml(it.title || it.link)}</a><div class='text-xs text-slate-600'>${escapeHtml(it.snippet||'')}</div>`; list.appendChild(li); }
       });
 
-      // load verified postings (local)
-      el.querySelector('[data-load-verified]')?.addEventListener('click', async (ev)=>{
-        const status = document.getElementById(`${verifiedId}-status`);
-        status.textContent = 'Searching…';
-        const list = document.getElementById(verifiedId);
-        list.innerHTML = '';
-        const found = await fetchVerifiedLinks(job, false);
-        if(!found.length){ status.textContent = 'No direct postings found. Try the site links above or Remote.'; return; }
-        status.textContent = `Found ${found.length} posting(s).`;
-        for(const it of found){
-          const li = document.createElement('li');
-          li.innerHTML = `<a class='text-indigo-700 underline' target='_blank' rel='noopener' href='${it.link}'>${escapeHtml(it.title || it.link)}</a><div class='text-xs text-slate-600'>${escapeHtml(it.snippet||'')}</div>`;
-          list.appendChild(li);
-        }
-      });
-
-      // load verified postings (remote)
-      el.querySelector('[data-load-verified-remote]')?.addEventListener('click', async ()=>{
-        const status = document.getElementById(`${verifiedId}-status`);
-        status.textContent = 'Searching remote…';
-        const list = document.getElementById(verifiedId);
-        list.innerHTML = '';
-        const found = await fetchVerifiedLinks(job, true);
-        if(!found.length){ status.textContent = 'No direct remote postings found. Try the site links above.'; return; }
-        status.textContent = `Found ${found.length} remote posting(s).`;
-        for(const it of found){
-          const li = document.createElement('li');
-          li.innerHTML = `<a class='text-indigo-700 underline' target='_blank' rel='noopener' href='${it.link}'>${escapeHtml(it.title || it.link)}</a><div class='text-xs text-slate-600'>${escapeHtml(it.snippet||'')}</div>`;
-          list.appendChild(li);
-        }
+      el.querySelector('[data-load-local]')?.addEventListener('click', async ()=>{
+        const status = document.getElementById(statusLocalId); const list = document.getElementById(verifiedLocalId);
+        status.textContent = 'Searching local…'; list.innerHTML = '';
+        const { q, items } = await fetchVerifiedLinks(job, false);
+        if(!items.length){ status.textContent = 'No local postings found via Google CSE. Try Open Google or Remote.'; return; }
+        status.innerHTML = `Found ${items.length} local posting(s).`;
+        for(const it of items){ const li = document.createElement('li'); li.innerHTML = `<a class='text-indigo-700 underline' target='_blank' rel='noopener' href='${it.link}'>${escapeHtml(it.title || it.link)}</a><div class='text-xs text-slate-600'>${escapeHtml(it.snippet||'')}</div>`; list.appendChild(li); }
       });
 
       return el;
     }
 
-    function sortGrid(by){
-      const grid = document.getElementById('grid');
-      const cards = [...grid.children];
-      cards.sort((a,b)=>{
-        if(by==='match')  return (+b.dataset.score) - (+a.dataset.score);
-        if(by==='recent') return (+a.dataset.posted) - (+b.dataset.posted); // fewer days ago first
-        if(by==='salary') return (+b.dataset.salarymin) - (+a.dataset.salarymin);
-        return 0;
-      });
-      grid.innerHTML=''; cards.forEach(c=>grid.appendChild(c));
-    }
+    function sortGrid(by){ const grid = document.getElementById('grid'); const cards = [...grid.children]; cards.sort((a,b)=>{ if(by==='match') return (+b.dataset.score) - (+a.dataset.score); if(by==='recent') return (+a.dataset.posted) - (+b.dataset.posted); if(by==='salary') return (+b.dataset.salarymin) - (+a.dataset.salarymin); return 0; }); grid.innerHTML=''; cards.forEach(c=>grid.appendChild(c)); }
 
-    function openTopGoogle(items){ items.forEach(j=> window.open(`https://www.google.com/search?q=${encodeURIComponent(baseQuery(j))}`, '_blank')); }
-    function copyAllQueries(items){
-      const all = items.map(j=>baseQuery(j)).join('\n');
-      navigator.clipboard.writeText(all).then(()=>{ alert('All Google queries copied to clipboard.'); });
-    }
+    function openTopGoogle(items){ items.forEach(j=>{ const q = `${j.title} ${j.company} remote jobs ${siteFilters()}`; window.open(`https://www.google.com/search?q=${encodeURIComponent(q)}`, '_blank'); }); }
+    function copyAllQueries(items){ const all = items.map(j=>`${j.title} ${j.company} remote jobs ${siteFilters()}`).join('\n'); navigator.clipboard.writeText(all).then(()=>{ alert('All Google queries copied to clipboard.'); }); }
 
-    function extractMinSalary(txt){
-      const m = (txt||'').replace(/[,$]/g,'').match(/(\d{2,})/g);
-      if(!m||!m.length) return 0; return +m[0];
-    }
-
+    function extractMinSalary(txt){ const m = (txt||'').replace(/[,$]/g,'').match(/(\d{2,})/g); return m&&m.length? +m[0]:0; }
     function escapeHtml(str){ return String(str).replace(/[&<>"']/g, s=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[s])); }
     function showErr(msg){ const e=document.getElementById('err'); e.textContent=msg; e.classList.remove('hidden'); }
     function hideErr(){ document.getElementById('err').classList.add('hidden'); }
@@ -643,3 +400,5 @@
   -->
 </body>
 </html>
+
+
