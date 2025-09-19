@@ -1,4 +1,4 @@
-<!-- public/index.html — UI v2025-09-19 (design unchanged, scripts fixed) -->
+<!-- public/index.html — Fuel IQ UI (drop-in) -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Sunoco, LP Fuel IQ - Fuel Site Analyzer</title>
 
-  <!-- Leaflet -->
+  <!-- Leaflet (map) -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <!-- Leaflet image export -->
@@ -100,7 +100,7 @@
         <div>
           <label>Site search</label>
           <div class="ac-wrap">
-            <input id="addr" placeholder="Enter business or address" autocomplete="off"/>
+            <input id="addr" placeholder="Enter business or address" autocomplete="off" />
             <div id="ac" class="ac-list" style="display:none;"></div>
           </div>
           <div class="muted subtle" style="margin-top:6px" id="apiStatus">API Status: checking…</div>
@@ -196,6 +196,8 @@ const apiStatus = $("apiStatus"), aadtBanner = $("aadtBanner"), compLine = $("co
 
 let map, layer, mapReady = false, selectedCoords = null, selectedPlaceId = null;
 let acItems = [], acActive = -1;
+let acCommitted = false;           // lock suggestions after selection
+let lastCommittedText = "";        // last committed display text
 
 function fmt(n){ return (n??0).toLocaleString(undefined,{maximumFractionDigits:0}); }
 function esc(s){ return (s??"").toString().replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
@@ -246,6 +248,17 @@ function initOrUpdateMap(m){
 }
 
 /* =================== Autocomplete & Status =============== */
+function hideAc(){ acBox.style.display = "none"; acActive = -1; }
+function commitAddress(display, coords, placeId){
+  lastCommittedText = (display || "").trim();
+  acCommitted = true;
+  acItems = [];
+  hideAc();
+  addrInput.value = display;
+  selectedCoords = coords || null;
+  selectedPlaceId = placeId || null;
+}
+
 async function checkGoogleStatus(){
   try {
     const r = await fetch("/google/status");
@@ -253,6 +266,7 @@ async function checkGoogleStatus(){
     apiStatus.textContent = j.ok ? "API: Google — Working" : `API: Google — ${j.status}`;
   } catch { apiStatus.textContent = "API: Google — unavailable"; }
 }
+
 async function googleSearch(q){
   try {
     const r = await fetch("/google/autocomplete?input=" + encodeURIComponent(q));
@@ -268,24 +282,51 @@ async function nominatimSearch(q){
     return a.map(row => ({ type:"OSM", display:row.display_name, lat:+row.lat, lon:+row.lon, score:0.6 }));
   } catch { return []; }
 }
+
 function renderAc(list){
-  if(!list.length){ acBox.style.display = "none"; return; }
-  acBox.innerHTML = list.map((it,i) => `<div class="ac-item${i===acActive?" active":""}" data-i="${i}">${esc(it.display)} <span class="badge">${it.type}</span></div>`).join("");
+  if(!list.length){ hideAc(); return; }
+  acBox.innerHTML = list.map((it,i) =>
+    `<div class="ac-item${i===acActive?" active":""}" data-i="${i}">${esc(it.display)} <span class="badge">${it.type}</span></div>`
+  ).join("");
   [...acBox.children].forEach(el => el.onclick = () => chooseAc(+el.dataset.i));
   acBox.style.display = "block";
 }
 function chooseAc(i){
-  const it = acItems[i]; if(!it) return;
-  addrInput.value = it.display;
-  selectedCoords = (Number.isFinite(it.lat)&&Number.isFinite(it.lon)) ? { lat:it.lat, lon:it.lon } : null;
-  selectedPlaceId = it.place_id || null;
-  acBox.style.display = "none";
+  const it = acItems[i];
+  if (!it) return;
+  const coords = (Number.isFinite(it.lat) && Number.isFinite(it.lon)) ? { lat: it.lat, lon: it.lon } : null;
+  commitAddress(it.display, coords, it.place_id || null);
+  addrInput.blur(); // collapse mobile keyboard and trigger blur-hide
 }
-addrInput.addEventListener("input",()=>{
-  const q = addrInput.value.trim(); if(q.length<3) return;
+
+addrInput.addEventListener("input", () => {
+  const q = addrInput.value.trim();
+
+  // If we have a committed selection and text hasn't changed, keep list hidden.
+  // MDN: input fires whenever value changes; if not changed, do nothing. :contentReference[oaicite:1]{index=1}
+  if (acCommitted) {
+    if (q === lastCommittedText) { hideAc(); return; }
+    // User started editing -> unlock suggestions.
+    acCommitted = false;
+  }
+
+  if (q.length < 3) { hideAc(); return; }
+
   Promise.all([googleSearch(q), nominatimSearch(q)]).then(([g,n])=>{
-    acItems = [...g,...n].slice(0,8); renderAc(acItems);
+    acItems = [...g, ...n].slice(0, 8);
+    renderAc(acItems);
   });
+});
+
+// Hide list when input loses focus (standard blur behavior). :contentReference[oaicite:2]{index=2}
+addrInput.addEventListener("blur", () => { setTimeout(hideAc, 120); });
+
+// Hide list on Escape key. (Use KeyboardEvent.key === "Escape") :contentReference[oaicite:3]{index=3}
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") hideAc(); });
+
+// Hide list on outside click/tap (pointerdown covers mouse/touch/pen). :contentReference[oaicite:4]{index=4}
+document.addEventListener("pointerdown", (e) => {
+  if (e.target !== addrInput && !acBox.contains(e.target)) hideAc();
 });
 
 /* =================== Advanced Badges ===================== */
@@ -328,7 +369,7 @@ function collectExtras(){
 function getFlags(){ return { rural: ex_rural.checked === true }; }
 function getPricePosition(){ const r=document.querySelector('input[name="pricepos"]:checked'); return r ? r.value : "inline"; }
 
-/* =================== API: Estimate ====================== */
+/* =================== API helpers ====================== */
 async function safeJSON(url,opts){ const r=await fetch(url,opts); const t=await r.text(); try{ return JSON.parse(t);}catch{ throw new Error("Bad JSON"); } }
 async function callEstimate(){
   const body = {
@@ -337,11 +378,13 @@ async function callEstimate(){
     diesel: +$("diesel").value || 0,
     advanced: { extra: collectExtras(), flags: getFlags(), price_position: getPricePosition() }
   };
-  if(selectedCoords){ body.siteLat=selectedCoords.lat; body.siteLon=selectedCoords.lon; }
-  const ov = +($("aadtOverride").value||"");
-  if(Number.isFinite(ov)&&ov>0) body.aadtOverride = ov;
-  return await safeJSON("/estimate",{ method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
+  if(selectedCoords){ body.siteLat = selectedCoords.lat; body.siteLon = selectedCoords.lon; }
+  const ov = +($("aadtOverride").value || "");
+  if(Number.isFinite(ov) && ov > 0) body.aadtOverride = ov;
+  return await safeJSON("/estimate", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
 }
+
+/* =================== Rendering ======================== */
 function renderAll(d){
   // Estimate header
   outNum.textContent = fmt(d.estimate?.low ?? d.low ?? 0);
@@ -354,7 +397,7 @@ function renderAll(d){
   aadtBanner.textContent = d.aadtText || "—";
   compLine.textContent = d.competitionText || "—";
 
-  // Developments
+  // Developments: CSV takes precedence if present
   if (Array.isArray(d.csv) && d.csv.length) {
     const listHtml = d.csv.map(x => {
       const nm = esc(x.name || "");
@@ -390,37 +433,47 @@ function renderAll(d){
   initOrUpdateMap(d.map);
   showRating(addrInput.value.trim());
 }
+
+/* =================== Rating helpers =================== */
 async function resolvePlaceIdIfNeeded(address){
   if (selectedPlaceId) return selectedPlaceId;
-  try { const r = await fetch("/google/findplace?input=" + encodeURIComponent(address));
-        const j = await r.json();
-        if (j.ok && j.place_id) return j.place_id; } catch {}
+  try {
+    const r = await fetch("/google/findplace?input=" + encodeURIComponent(address));
+    const j = await r.json();
+    if (j.ok && j.place_id) return j.place_id;
+  } catch {}
   return null;
 }
 async function showRating(address){
   let rating = null, total = null;
   const pid = await resolvePlaceIdIfNeeded(address);
   if (pid) {
-    try { const r = await fetch("/google/rating?place_id=" + encodeURIComponent(pid));
-          const j = await r.json();
-          if (j.ok) { rating = j.rating ?? null; total = j.total ?? null; } } catch {}
+    try {
+      const r = await fetch("/google/rating?place_id=" + encodeURIComponent(pid));
+      const j = await r.json();
+      if (j.ok) { rating = j.rating ?? null; total = j.total ?? null; }
+    } catch {}
   }
   if ((rating == null || rating === undefined) && selectedCoords) {
-    try { const r2 = await fetch("/google/rating_by_location?lat=" + encodeURIComponent(selectedCoords.lat) + "&lon=" + encodeURIComponent(selectedCoords.lon));
-          const j2 = await r2.json();
-          if (j2.ok) { rating = j2.rating ?? null; total = j2.total ?? null; } } catch {}
+    try {
+      const r2 = await fetch("/google/rating_by_location?lat=" + encodeURIComponent(selectedCoords.lat) + "&lon=" + encodeURIComponent(selectedCoords.lon));
+      const j2 = await r2.json();
+      if (j2.ok) { rating = j2.rating ?? null; total = j2.total ?? null; }
+    } catch {}
   }
   ratingLine.innerHTML = (rating != null && rating !== undefined) ? `\u2B50 ${rating} (${total||0} reviews)` : "—";
 }
 
-/* =================== Main Events ======================= */
+/* =================== Main events ====================== */
+function tidyUI(){ hideAc(); } // keep UI tidy when committing to estimate
+
 async function onEstimateClick(){
   if(!addrInput.value.trim() && !selectedCoords){
     alert("Please select a valid address first.");
     return;
   }
   try {
-    goBtn.disabled = true; runBtn.disabled = true; setOverlayWorking();
+    goBtn.disabled = true; runBtn.disabled = true; setOverlayWorking(); tidyUI();
     const resp = await callEstimate();
     if (!resp || resp.ok !== true) {
       alert("Estimate failed: " + (resp?.status || "Unknown error"));
@@ -437,7 +490,7 @@ goBtn.addEventListener("click", onEstimateClick);
 runBtn.addEventListener("click", onEstimateClick);
 addrInput.addEventListener("keydown", (e)=>{ if(e.key==="Enter"){ e.preventDefault(); onEstimateClick(); } });
 
-/* =================== PDF Export ======================== */
+/* =================== PDF Export ======================= */
 document.getElementById("exportPDF").addEventListener("click", async ()=>{
   const { jsPDF } = window.jspdf || {};
   if(!jsPDF){ alert("PDF lib failed to load"); return; }
