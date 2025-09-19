@@ -40,7 +40,6 @@
       <div class="grid sm:grid-cols-2 gap-4">
         <div>
           <label class="text-sm font-semibold text-slate-700">OpenAI API Key</label>
-          <!-- NOTE: You asked to hard‑code the key. It's placed below. If you prefer, clear this field and paste a different key at runtime. -->
           <input id="apiKey" type="password" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300" value="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" />
           <p class="text-xs text-amber-700 mt-1">⚠️ Anyone who can view this page source can see the key. For production, proxy via a backend.</p>
         </div>
@@ -136,10 +135,6 @@
   </div>
 
   <script>
-    // ======= YOU ASKED TO USE YOUR KEY DIRECTLY =======
-    // Note: Anyone with access to this page or its source can see the key.
-    // For production, put the key server-side and proxy requests.
-
     async function checkApi() {
       const key = getKey();
       const model = document.getElementById('model').value;
@@ -166,22 +161,21 @@
 
     document.getElementById('btnCheck').addEventListener('click', checkApi);
 
-    // Sample jobs (client-side) — in a real app you would fetch job boards
     const SOURCES = [
-      { name: 'Indeed', color: '#2164f3' },
-      { name: 'LinkedIn', color: '#0077b5' },
-      { name: 'Glassdoor', color: '#0caa41' },
-      { name: 'ZipRecruiter', color: '#4b7bec' },
-      { name: 'NAEYC', color: '#f59e0b' }
+      { name: 'Indeed', color: '#2164f3', url:'https://www.indeed.com' },
+      { name: 'LinkedIn', color: '#0077b5', url:'https://www.linkedin.com/jobs' },
+      { name: 'Glassdoor', color: '#0caa41', url:'https://www.glassdoor.com/Job' },
+      { name: 'ZipRecruiter', color: '#4b7bec', url:'https://www.ziprecruiter.com' },
+      { name: 'NAEYC', color: '#f59e0b', url:'https://careercenter.naeyc.org' }
     ];
 
     const SAMPLE = [
-      {title:'Preschool Director', company:'Bright Horizons Early Learning', salary:'$48,000 - $68,000', category:'preschool-director', req:["Bachelor's in ECE", '5+ yrs leadership', 'NC Director Credential preferred', 'Strong communication'], desc:'Lead center ops, staff, compliance, quality standards.', postedDays: r(1,14)},
-      {title:'Assistant Director - Early Learning Center', company:'KinderCare Education', salary:'$42,000 - $58,000', category:'assistant-director', req:['Associate min, BA preferred', '3+ yrs childcare', 'Staff supervision', 'Licensing knowledge'], desc:'Assist director, supervise teachers, manage enrollment and families.', postedDays: r(1,14)},
-      {title:'Education Program Administrator', company:'Wake County Public Schools', salary:'$52,000 - $72,000', category:'education-administrator', req:['Masters in Education', '7+ yrs leadership', 'Budget experience', 'Regulations knowledge'], desc:'Oversee programs, budgets, outcomes, compliance.', postedDays: r(1,14)},
-      {title:'Childcare Center Director', company:'Primrose Schools', salary:'$45,000 - $65,000', category:'preschool-director', req:['Bachelor required', '5+ yrs childcare mgmt', 'Business acumen', 'Parent comms'], desc:'Direct operations, staff development, parent relations.', postedDays: r(1,14)},
-      {title:'Curriculum Development Specialist', company:'Durham Public Schools', salary:'$50,000 - $70,000', category:'curriculum-coordinator', req:['Masters in C&I', 'Teaching exp', 'Standards knowledge', 'PD experience'], desc:'Design curriculum, train teachers, align to standards.', postedDays: r(1,14)},
-      {title:'Early Childhood Education Coordinator', company:'YMCA of the Triangle', salary:'$40,000 - $56,000', category:'program-manager', req:['BA in ECE', '3+ yrs coordination', 'Org skills', 'Community partnerships'], desc:'Coordinate programs, partners, scheduling, impact.', postedDays: r(1,14)}
+      {title:'Preschool Director', company:'Bright Horizons Early Learning', salary:'$48,000 - $68,000', category:'preschool-director', req:["Bachelor's in ECE", '5+ yrs leadership', 'NC Director Credential preferred', 'Strong communication'], desc:'Lead center ops, staff, compliance, quality standards.', postedDays: r(1,14), url:'https://www.indeed.com/q-preschool-director-jobs.html'},
+      {title:'Assistant Director - Early Learning Center', company:'KinderCare Education', salary:'$42,000 - $58,000', category:'assistant-director', req:['Associate min, BA preferred', '3+ yrs childcare', 'Staff supervision', 'Licensing knowledge'], desc:'Assist director, supervise teachers, manage enrollment and families.', postedDays: r(1,14), url:'https://www.indeed.com/q-assistant-director-jobs.html'},
+      {title:'Education Program Administrator', company:'Wake County Public Schools', salary:'$52,000 - $72,000', category:'education-administrator', req:['Masters in Education', '7+ yrs leadership', 'Budget experience', 'Regulations knowledge'], desc:'Oversee programs, budgets, outcomes, compliance.', postedDays: r(1,14), url:'https://www.linkedin.com/jobs'},
+      {title:'Childcare Center Director', company:'Primrose Schools', salary:'$45,000 - $65,000', category:'preschool-director', req:['Bachelor required', '5+ yrs childcare mgmt', 'Business acumen', 'Parent comms'], desc:'Direct operations, staff development, parent relations.', postedDays: r(1,14), url:'https://www.glassdoor.com/Job'},
+      {title:'Curriculum Development Specialist', company:'Durham Public Schools', salary:'$50,000 - $70,000', category:'curriculum-coordinator', req:['Masters in C&I', 'Teaching exp', 'Standards knowledge', 'PD experience'], desc:'Design curriculum, train teachers, align to standards.', postedDays: r(1,14), url:'https://www.ziprecruiter.com'},
+      {title:'Early Childhood Education Coordinator', company:'YMCA of the Triangle', salary:'$40,000 - $56,000', category:'program-manager', req:['BA in ECE', '3+ yrs coordination', 'Org skills', 'Community partnerships'], desc:'Coordinate programs, partners, scheduling, impact.', postedDays: r(1,14), url:'https://careercenter.naeyc.org'}
     ];
 
     function r(min, max){ return Math.floor(Math.random()*(max-min+1))+min; }
@@ -197,12 +191,10 @@
       };
     }
 
-    // Chip toggles
     document.getElementById('chips').addEventListener('click', (e)=>{
       if(e.target.classList.contains('chip')) e.target.classList.toggle('active');
     });
 
-    // Search & analyze
     document.getElementById('btnSearch').addEventListener('click', async ()=>{
       const active = [...document.querySelectorAll('.chip.active')].map(x=>x.dataset.category);
       if (active.length===0) return showErr('Select at least one job category.');
@@ -234,115 +226,4 @@
 
     function withSource(job){
       const s = SOURCES[Math.floor(Math.random()*SOURCES.length)];
-      return { ...job, source: s, location: ['Raleigh','Durham','Cary','Chapel Hill','Wake Forest'][Math.floor(Math.random()*5)], type:'Full-time', tags:['Leadership','Education','Management','Early Childhood'] };
-    }
-
-    async function aiAnalyzeJob(key, model, profile, job){
-      const sys = `You are an expert career coach. Score job fit 0-100 and list strengths, gaps, and a 1-2 sentence recommendation. Return strict JSON with keys: score (number 0-100), strengths (array of short strings), gaps (array), insight (string), recommendation (string).`;
-      const user = `Candidate profile:\n- Experience: ${profile.exp}\n- Current role: ${profile.role}\n- Expertise: ${profile.expertise}\n- Education: ${profile.edu}\n\nJob:\n- Title: ${job.title}\n- Company: ${job.company}\n- Location: ${job.location}, NC\n- Salary: ${job.salary}\n- Requirements: ${job.req.join('; ')}\n- Description: ${job.desc}`;
-
-      const res = await fetch('https://api.openai.com/v1/chat/completions',{
-        method:'POST',
-        headers:{ 'Content-Type':'application/json', 'Authorization':`Bearer ${key}` },
-        body: JSON.stringify({ model, temperature: 0.2, messages:[{role:'system', content: sys},{role:'user', content: user}], response_format: { type: 'json_object' } })
-      });
-
-      if(!res.ok){ throw new Error(await res.text()); }
-      const data = await res.json();
-      const content = data.choices?.[0]?.message?.content || '{}';
-      const obj = safeParse(content);
-      return normalizeAnalysis(obj);
-    }
-
-    function safeParse(t){ try { return JSON.parse(t); } catch{ return {}; } }
-    function normalizeAnalysis(a){
-      const score = clampNumber(a.score ?? 75, 0, 100);
-      return {
-        score,
-        strengths: Array.isArray(a.strengths)&&a.strengths.length? a.strengths.slice(0,5) : ['Leadership experience','Parent communication','Compliance knowledge'],
-        gaps: Array.isArray(a.gaps)&&a.gaps.length? a.gaps.slice(0,5) : ['Update credentials','Budget ownership depth'],
-        insight: a.insight || 'Solid overall alignment with room to strengthen budget ownership and state credential alignment.',
-        recommendation: a.recommendation || 'Lead with director/assistant director experience and measurable outcomes (enrollment growth, compliance record).'
-      };
-    }
-    function clampNumber(n, min, max){ n = Number(n); if (Number.isNaN(n)) n = 75; return Math.max(min, Math.min(max, n)); }
-
-    function scoreClass(s){ return s>=90?'excellent': s>=80?'good': s>=70?'fair':'poor'; }
-
-    function renderResults(items){
-      const results = document.getElementById('results');
-      const grid = document.getElementById('grid');
-      const empty = document.getElementById('empty');
-      const count = document.getElementById('resultCount');
-      results.classList.remove('hidden');
-      grid.innerHTML='';
-      empty.classList.add('hidden');
-
-      if(!items.length){ empty.classList.remove('hidden'); count.textContent='0 jobs found'; return; }
-
-      count.textContent = `${items.length} job${items.length!==1?'s':''} found`;
-      items.forEach(job=> grid.appendChild(jobCard(job)) );
-    }
-
-    function jobCard(job){
-      const el = document.createElement('div');
-      el.className = 'relative card';
-      el.dataset.score = job.analysis.score;
-      el.innerHTML = `
-        <div class="score ${scoreClass(job.analysis.score)}">${job.analysis.score}%</div>
-        <div class="pr-20">
-          <h3 class="text-lg font-semibold text-slate-800">${job.title}</h3>
-          <div class="text-slate-600">${job.company} <span class="badge text-white ml-2" style="background:${job.source.color}">${job.source.name}</span></div>
-        </div>
-        <div class="mt-2 flex flex-wrap gap-4 text-slate-600">
-          <div>📍 ${job.location}, NC</div>
-          <div>💼 ${job.type}</div>
-          <div>💰 ${job.salary}</div>
-          <div>📅 ${job.postedDays} days ago</div>
-        </div>
-        <div class="mt-4 p-4 rounded-xl border border-indigo-100 bg-indigo-50">
-          <div class="text-slate-700 text-sm">${job.analysis.insight}</div>
-          <div class="mt-3 grid md:grid-cols-2 gap-3">
-            <div class="p-3 rounded-lg border bg-white">
-              <div class="font-semibold text-slate-800 text-sm mb-1">Strengths</div>
-              <ul class="text-sm list-disc ml-5">
-                ${job.analysis.strengths.map(s=>`<li>${escapeHtml(s)}</li>`).join('')}
-              </ul>
-            </div>
-            <div class="p-3 rounded-lg border bg-white">
-              <div class="font-semibold text-slate-800 text-sm mb-1">Gaps</div>
-              <ul class="text-sm list-disc ml-5">
-                ${job.analysis.gaps.map(s=>`<li>${escapeHtml(s)}</li>`).join('')}
-              </ul>
-            </div>
-          </div>
-          <div class="mt-3 italic text-slate-700 text-sm"><b>AI Recommendation:</b> ${job.analysis.recommendation}</div>
-        </div>
-        <div class="mt-3 flex gap-2">
-          <a href="#" class="px-4 py-2 rounded-lg bg-indigo-600 text-white font-semibold hover:brightness-110">Apply Now →</a>
-        </div>
-      `;
-      return el;
-    }
-
-    function escapeHtml(str){ return String(str).replace(/[&<>"']/g, s=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[s])); }
-
-    function showErr(msg){ const e=document.getElementById('err'); e.textContent=msg; e.classList.remove('hidden'); }
-    function hideErr(){ document.getElementById('err').classList.add('hidden'); }
-
-    // Sorting controls
-    document.querySelectorAll('[data-sort]').forEach(btn=>btn.addEventListener('click',()=>{
-      const by = btn.dataset.sort;
-      const grid = document.getElementById('grid');
-      const cards = [...grid.children];
-      cards.sort((a,b)=>{
-        if(by==='match') return (+b.dataset.score)-(+a.dataset.score);
-        if(by==='recent') return Math.random()-0.5; // placeholder
-        if(by==='salary') return Math.random()-0.5; // placeholder
-        return 0;
-      });
-      grid.innerHTML=''; cards.forEach(c=>grid.appendChild(c));
-    }));
-  </script>
-</body>
-</html>
+      return { ...job, source: s, location:
