@@ -184,6 +184,7 @@
       <hr/>
       <div id="aadtBanner" class="muted">—</div>
       <div id="compLine" class="muted">—</div>
+      <button id="estimateBtn" class="btn">Run Estimate</button>
     </div>
 
     <!-- Map & SV -->
@@ -192,6 +193,48 @@
       <div id="map"><div id="overlay" class="muted">—</div></div>
       <div id="svWrap"><div class="muted" style="margin-top:10px;">Street View</div><iframe id="sv" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div>
     </div>
+    <script>
+const SERVER_BASE = "https://sun-nourie-live.onrender.com";
+
+async function runEstimate(){
+  if(!selectedCoords && !selectedPlaceId){
+    alert("Please select a valid address first.");
+    return;
+  }
+
+  try {
+    const body = {
+      lat: selectedCoords ? selectedCoords.lat : null,
+      lon: selectedCoords ? selectedCoords.lon : null,
+      place_id: selectedPlaceId || null,
+      extras: collectExtras() // your function for extras
+    };
+
+    const r = await fetch(SERVER_BASE + "/estimate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+
+    const j = await r.json();
+    if(j.ok){
+      document.getElementById("estNum").textContent = j.estimate.low;
+      document.getElementById("estRange").textContent = "Full range: " + j.estimate.range;
+      document.getElementById("y2").textContent = j.estimate.year2;
+      document.getElementById("y3").textContent = j.estimate.year3;
+      document.getElementById("aadtBanner").textContent = j.aadtText || "—";
+      document.getElementById("compLine").textContent = j.competitionText || "—";
+    } else {
+      alert("Estimate failed: " + j.status);
+    }
+  } catch(err){
+    console.error(err);
+    alert("An error occurred while running the estimate.");
+  }
+}
+
+document.getElementById("estimateBtn").addEventListener("click", runEstimate);
+</script>
 
     <!-- Developments -->
     <div class="card"><div id="devs" class="muted">—</div></div>
