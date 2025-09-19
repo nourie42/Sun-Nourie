@@ -267,7 +267,13 @@ function initOrUpdateMap(m){
 }
 
 /* Google status + autocomplete */
-let GOOGLE_OK=false; let acItems=[]; let acActive=-1;
+const SERVER_BASE = "https://sun-nourie-live.onrender.com";
+const GOOGLE_API_KEY = "AIzaSyBKkUjhXbYeIA3jDMxvS8fExTlcPMIchs8"; // Replace with your real key if needed
+
+let GOOGLE_OK = false;
+let acItems = [];
+let acActive = -1;
+
 async function checkGoogleStatus(){
   try {
     const r = await fetch(SERVER_BASE + "/google/status");
@@ -290,24 +296,36 @@ checkGoogleStatus();
 
 async function googleSearch(q){
   if(!GOOGLE_OK) return [];
-  try{
-    const r=await fetch(`/google/autocomplete?input=${encodeURIComponent(q)}`);
-    const j=await r.json(); if(!j.ok) return [];
-    return (j.items||[]).map(it=>({...it,type:"Google",score:1.3}));
-  }catch{return[];}
+  try {
+    const r = await fetch(SERVER_BASE + "/google/autocomplete?input=" + encodeURIComponent(q));
+    const j = await r.json();
+    if(!j.ok) return [];
+    return (j.items||[]).map(it => ({...it, type:"Google", score:1.3}));
+  } catch {
+    return [];
+  }
 }
+
 async function nominatimSearch(q){
-  try{
-    const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=us&q=${encodeURIComponent(q)}`);
-    const a=await r.json();
-    return a.map(row=>({ type:"OSM", display:row.display_name, lat:+row.lat, lon:+row.lon, score:0.6 }));
-  }catch{return[];}
+  try {
+    const r = await fetch("https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=us&q=" + encodeURIComponent(q));
+    const a = await r.json();
+    return a.map(row => ({ type:"OSM", display:row.display_name, lat:+row.lat, lon:+row.lon, score:0.6 }));
+  } catch {
+    return [];
+  }
 }
+
 function renderAc(list){
-  if(!list.length){ acBox.style.display="none"; return; }
-  acBox.innerHTML=list.map((it,i)=>`<div class="ac-item${i===acActive?" active":""}" data-i="${i}">${esc(it.display)} <span class="badge">${it.type}</span></div>`).join("");
-  [...acBox.children].forEach(el=>el.onclick=()=>chooseAc(+el.dataset.i));
-  acBox.style.display="block";
+  if(!list.length){
+    acBox.style.display = "none";
+    return;
+  }
+  acBox.innerHTML = list.map((it,i) =>
+    `<div class="ac-item${i===acActive?" active":""}" data-i="${i}">${esc(it.display)} <span class="badge">${it.type}</span></div>`
+  ).join("");
+  [...acBox.children].forEach(el => el.onclick = () => chooseAc(+el.dataset.i));
+  acBox.style.display = "block";
 }
 function chooseAc(i){
   const it=acItems[i]; if(!it) return;
