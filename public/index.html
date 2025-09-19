@@ -1,4 +1,3 @@
-<!-- public/index.html — Fuel IQ UI (drop-in) -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -54,7 +53,7 @@
     .adv-line{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-top:12px; }
     .chip{ display:inline-flex; align-items:center; gap:8px; background:#0f1929; border:1px solid var(--line); padding:8px 10px; border-radius:999px; font-size:13px; }
     .chip input{ width:auto; accent-color:#22d3ee; }
-    .radio-row{ display:flex; flex-wrap:wrap; gap:10px; margin-top:8px; }
+    .radio-row{ display:flex; flex-wrap:wrap; gap:10px; }
 
     .hero{ display:flex; justify-content:space-between; align-items:flex-end; gap:12px; }
     .hero .num{ font-size:44px; font-weight:900; letter-spacing:.5px; }
@@ -80,18 +79,18 @@
 
     <nav class="aadt-tabs" aria-label="State AADT Quick Links">
       <span class="muted">State AADT Quick Links:</span>
-      <a class="aadt-tab" href="https://opendata.dc.gov/datasets/DCGIS::2023-traffic-volume/explore" target="_blank" rel="noopener noreferrer">DC</a>
-      <a class="aadt-tab" href="https://gis-fdot.opendata.arcgis.com/datasets/fdot::annual-average-daily-traffic-tda/explore" target="_blank" rel="noopener noreferrer">FL</a>
-      <a class="aadt-tab" href="https://gdottrafficdata.drakewell.com/publicmultinodemap.asp" target="_blank" rel="noopener noreferrer">GA</a>
-      <a class="aadt-tab" href="https://mhd.public.ms2soft.com/tcds/tsearch.asp?loc=Mhd&mod" target="_blank" rel="noopener noreferrer">MA</a>
-      <a class="aadt-tab" href="https://nysdottrafficdata.drakewell.com/publicmultinodemap.asp" target="_blank" rel="noopener noreferrer">NY</a>
-      <a class="aadt-tab" href="https://scdottrafficdata.drakewell.com/publicmultinodemap.asp" target="_blank" rel="noopener noreferrer">SC</a>
-      <a class="aadt-tab" href="https://www.arcgis.com/apps/webappviewer/index.html?id=35e4c06de0f84a9c9f3fe18e67cd2c92" target="_blank" rel="noopener noreferrer">VA</a>
-      <a class="aadt-tab" href="https://ncdot.public.ms2soft.com/tdms.ui_core/trafficviewer" target="_blank" rel="noopener noreferrer">NC</a>
+      <a class="aadt-tab" href="https://opendata.dc.gov/datasets/DCGIS::2023-traffic-volume/explore" target="_blank">DC</a>
+      <a class="aadt-tab" href="https://gis-fdot.opendata.arcgis.com/datasets/fdot::annual-average-daily-traffic-tda/explore" target="_blank">FL</a>
+      <a class="aadt-tab" href="https://gdottrafficdata.drakewell.com/publicmultinodemap.asp" target="_blank">GA</a>
+      <a class="aadt-tab" href="https://mhd.public.ms2soft.com/tcds/tsearch.asp?loc=Mhd&mod" target="_blank">MA</a>
+      <a class="aadt-tab" href="https://nysdottrafficdata.drakewell.com/publicmultinodemap.asp" target="_blank">NY</a>
+      <a class="aadt-tab" href="https://scdottrafficdata.drakewell.com/publicmultinodemap.asp" target="_blank">SC</a>
+      <a class="aadt-tab" href="https://www.arcgis.com/apps/webappviewer/index.html?id=35e4c06de0f84a9c9f3fe18e67cd2c92" target="_blank">VA</a>
+      <a class="aadt-tab" href="https://ncdot.public.ms2soft.com/tdms.ui_core/trafficviewer" target="_blank">NC</a>
     </nav>
 
     <div class="instructions">
-      <b>Instructions:</b> Enter Address, Click <i>Estimate</i>. Do not exit your browser or let your phone screen shut off until results are ready or you will encounter errors. Click <i>Advanced Options</i> to make changes.
+      <b>Instructions:</b> Enter Address, Click <i>Estimate</i>. Do not exit your browser or let your phone screen shut off until results are ready. Click <i>Advanced Options</i> to make changes.
     </div>
 
     <!-- Inputs -->
@@ -100,7 +99,7 @@
         <div>
           <label>Site search</label>
           <div class="ac-wrap">
-            <input id="addr" placeholder="Enter business or address" autocomplete="off" />
+            <input id="addr" placeholder="Enter business or address" autocomplete="off"/>
             <div id="ac" class="ac-list" style="display:none;"></div>
           </div>
           <div class="muted subtle" style="margin-top:6px" id="apiStatus">API Status: checking…</div>
@@ -181,7 +180,7 @@
   <div class="footerbar"><button id="exportPDF">Export to PDF</button></div>
 
   <script>
-/* =================== Helpers & State =================== */
+/* ===== Helpers & state ===== */
 const $ = (id) => document.getElementById(id);
 const apiStatus = $("apiStatus"), aadtBanner = $("aadtBanner"), compLine = $("compLine"),
       overlay = $("overlay"), svFrame = $("sv"), outNum = $("estNum"), outRange = $("estRange"),
@@ -196,15 +195,18 @@ const apiStatus = $("apiStatus"), aadtBanner = $("aadtBanner"), compLine = $("co
 
 let map, layer, mapReady = false, selectedCoords = null, selectedPlaceId = null;
 let acItems = [], acActive = -1;
-let acCommitted = false;           // lock suggestions after selection
-let lastCommittedText = "";        // last committed display text
+
+/* Autocomplete locking + race-proofing */
+let acCommitted = false;         // user selected a suggestion -> lock
+let lastCommittedText = "";      // text that was committed
+let acSeq = 0;                   // increments per input to ignore stale fetches
 
 function fmt(n){ return (n??0).toLocaleString(undefined,{maximumFractionDigits:0}); }
 function esc(s){ return (s??"").toString().replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
 function setOverlayWorking(){ overlay.textContent = "Working…"; overlay.style.display = "flex"; }
 function clearOverlay(){ overlay.style.display = "none"; }
 
-/* =================== Map + Street View =================== */
+/* ===== Map & SV ===== */
 function initMap(){ if(mapReady) return;
   map = L.map("map",{zoomControl:true}); window.map = map;
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map);
@@ -247,7 +249,7 @@ function initOrUpdateMap(m){
   clearOverlay(); updateStreetView(site[0], site[1]);
 }
 
-/* =================== Autocomplete & Status =============== */
+/* ===== Google status + autocomplete ===== */
 function hideAc(){ acBox.style.display = "none"; acActive = -1; }
 function commitAddress(display, coords, placeId){
   lastCommittedText = (display || "").trim();
@@ -257,13 +259,12 @@ function commitAddress(display, coords, placeId){
   addrInput.value = display;
   selectedCoords = coords || null;
   selectedPlaceId = placeId || null;
+  acSeq++; // invalidate any in-flight suggestion fetches
 }
 
 async function checkGoogleStatus(){
-  try {
-    const r = await fetch("/google/status");
-    const j = await r.json();
-    apiStatus.textContent = j.ok ? "API: Google — Working" : `API: Google — ${j.status}`;
+  try { const r = await fetch("/google/status"); const j = await r.json();
+        apiStatus.textContent = j.ok ? "API: Google — Working" : `API: Google — ${j.status}`;
   } catch { apiStatus.textContent = "API: Google — unavailable"; }
 }
 
@@ -296,40 +297,47 @@ function chooseAc(i){
   if (!it) return;
   const coords = (Number.isFinite(it.lat) && Number.isFinite(it.lon)) ? { lat: it.lat, lon: it.lon } : null;
   commitAddress(it.display, coords, it.place_id || null);
-  addrInput.blur(); // collapse mobile keyboard and trigger blur-hide
+  addrInput.blur(); // standard: remove focus, which also triggers blur-hide. :contentReference[oaicite:1]{index=1}
 }
 
 addrInput.addEventListener("input", () => {
   const q = addrInput.value.trim();
 
-  // If we have a committed selection and text hasn't changed, keep list hidden.
-  // MDN: input fires whenever value changes; if not changed, do nothing. :contentReference[oaicite:1]{index=1}
+  // If selection was committed and text didn't change, keep list hidden.
+  // (input fires on every value change—MDN) :contentReference[oaicite:2]{index=2}
   if (acCommitted) {
     if (q === lastCommittedText) { hideAc(); return; }
-    // User started editing -> unlock suggestions.
+    // user edited the field: unlock suggestions
     acCommitted = false;
   }
 
   if (q.length < 3) { hideAc(); return; }
 
+  const mySeq = ++acSeq; // capture sequence; only latest input may render
   Promise.all([googleSearch(q), nominatimSearch(q)]).then(([g,n])=>{
+    // Ignore if a newer input occurred, or the text changed while we were fetching,
+    // or a commit happened in the meantime.
+    if (mySeq !== acSeq) return;
+    if (acCommitted && addrInput.value.trim() === lastCommittedText) return;
+    if (addrInput.value.trim() !== q) return;
+
     acItems = [...g, ...n].slice(0, 8);
+    if (!acItems.length) { hideAc(); return; }
     renderAc(acItems);
-  });
+  }).catch(()=>{ /* ignore */});
 });
 
-// Hide list when input loses focus (standard blur behavior). :contentReference[oaicite:2]{index=2}
+// Hide suggestions on blur, Escape, and outside click.
+// blur fires when an element loses focus (MDN). :contentReference[oaicite:3]{index=3}
 addrInput.addEventListener("blur", () => { setTimeout(hideAc, 120); });
-
-// Hide list on Escape key. (Use KeyboardEvent.key === "Escape") :contentReference[oaicite:3]{index=3}
+// Escape key value is "Escape" (MDN). :contentReference[oaicite:4]{index=4}
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") hideAc(); });
-
-// Hide list on outside click/tap (pointerdown covers mouse/touch/pen). :contentReference[oaicite:4]{index=4}
+// pointerdown works across mouse, touch, pen (MDN). :contentReference[oaicite:5]{index=5}
 document.addEventListener("pointerdown", (e) => {
   if (e.target !== addrInput && !acBox.contains(e.target)) hideAc();
 });
 
-/* =================== Advanced Badges ===================== */
+/* ===== Advanced badges ===== */
 function pills(){
   const p=[];
   if(ex_large_dev.checked) p.push("+7.5% Large development nearby");
@@ -369,7 +377,7 @@ function collectExtras(){
 function getFlags(){ return { rural: ex_rural.checked === true }; }
 function getPricePosition(){ const r=document.querySelector('input[name="pricepos"]:checked'); return r ? r.value : "inline"; }
 
-/* =================== API helpers ====================== */
+/* ===== API helpers ===== */
 async function safeJSON(url,opts){ const r=await fetch(url,opts); const t=await r.text(); try{ return JSON.parse(t);}catch{ throw new Error("Bad JSON"); } }
 async function callEstimate(){
   const body = {
@@ -384,20 +392,17 @@ async function callEstimate(){
   return await safeJSON("/estimate", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
 }
 
-/* =================== Rendering ======================== */
+/* ===== Render ===== */
 function renderAll(d){
-  // Estimate header
   outNum.textContent = fmt(d.estimate?.low ?? d.low ?? 0);
   const rangeTxt = d.estimate?.range || (d.low!=null && d.high!=null ? `${fmt(d.low)}–${fmt(d.high)}` : "—");
   outRange.textContent = "Full range: " + rangeTxt;
   outY2.textContent = fmt(d.estimate?.year2 ?? d.year2 ?? 0);
   outY3.textContent = fmt(d.estimate?.year3 ?? d.year3 ?? 0);
 
-  // Banners
   aadtBanner.textContent = d.aadtText || "—";
   compLine.textContent = d.competitionText || "—";
 
-  // Developments: CSV takes precedence if present
   if (Array.isArray(d.csv) && d.csv.length) {
     const listHtml = d.csv.map(x => {
       const nm = esc(x.name || "");
@@ -421,7 +426,6 @@ function renderAll(d){
       : "<em>none</em>";
   }
 
-  // Summary (fallback safe)
   const method = d?.inputs?.aadt_components?.method || "unknown";
   let s = (d.summary||"").trim();
   if(!s){
@@ -429,43 +433,36 @@ function renderAll(d){
   }
   summaryBox.textContent = s;
 
-  // Map + Rating
   initOrUpdateMap(d.map);
   showRating(addrInput.value.trim());
 }
 
-/* =================== Rating helpers =================== */
+/* ===== Ratings ===== */
 async function resolvePlaceIdIfNeeded(address){
   if (selectedPlaceId) return selectedPlaceId;
-  try {
-    const r = await fetch("/google/findplace?input=" + encodeURIComponent(address));
-    const j = await r.json();
-    if (j.ok && j.place_id) return j.place_id;
-  } catch {}
+  try { const r = await fetch("/google/findplace?input=" + encodeURIComponent(address));
+        const j = await r.json();
+        if (j.ok && j.place_id) return j.place_id; } catch {}
   return null;
 }
 async function showRating(address){
   let rating = null, total = null;
   const pid = await resolvePlaceIdIfNeeded(address);
   if (pid) {
-    try {
-      const r = await fetch("/google/rating?place_id=" + encodeURIComponent(pid));
-      const j = await r.json();
-      if (j.ok) { rating = j.rating ?? null; total = j.total ?? null; }
-    } catch {}
+    try { const r = await fetch("/google/rating?place_id=" + encodeURIComponent(pid));
+          const j = await r.json();
+          if (j.ok) { rating = j.rating ?? null; total = j.total ?? null; } } catch {}
   }
   if ((rating == null || rating === undefined) && selectedCoords) {
-    try {
-      const r2 = await fetch("/google/rating_by_location?lat=" + encodeURIComponent(selectedCoords.lat) + "&lon=" + encodeURIComponent(selectedCoords.lon));
-      const j2 = await r2.json();
-      if (j2.ok) { rating = j2.rating ?? null; total = j2.total ?? null; }
-    } catch {}
+    try { const r2 = await fetch("/google/rating_by_location?lat=" + encodeURIComponent(selectedCoords.lat) + "&lon=" + encodeURIComponent(selectedCoords.lon));
+          const j2 = await r2.json();
+          if (j2.ok) { rating = j2.rating ?? null; total = j2.total ?? null; } } catch {}
   }
   ratingLine.innerHTML = (rating != null && rating !== undefined) ? `\u2B50 ${rating} (${total||0} reviews)` : "—";
 }
 
-/* =================== Main events ====================== */
-function tidyUI(){ hideAc(); } // keep UI tidy when committing to estimate
+/* ===== Main ===== */
+function tidyUI(){ hideAc(); acCommitted = true; lastCommittedText = addrInput.value.trim(); }
 
 async function onEstimateClick(){
   if(!addrInput.value.trim() && !selectedCoords){
@@ -490,7 +487,7 @@ goBtn.addEventListener("click", onEstimateClick);
 runBtn.addEventListener("click", onEstimateClick);
 addrInput.addEventListener("keydown", (e)=>{ if(e.key==="Enter"){ e.preventDefault(); onEstimateClick(); } });
 
-/* =================== PDF Export ======================= */
+/* ===== PDF Export ===== */
 document.getElementById("exportPDF").addEventListener("click", async ()=>{
   const { jsPDF } = window.jspdf || {};
   if(!jsPDF){ alert("PDF lib failed to load"); return; }
@@ -544,7 +541,7 @@ document.getElementById("exportPDF").addEventListener("click", async ()=>{
   doc.save("FuelIQ_Site_Analyzer.pdf");
 });
 
-/* =================== Init ============================== */
+/* ===== Init ===== */
 document.addEventListener("DOMContentLoaded", checkGoogleStatus);
 overlay.textContent="—";
   </script>
