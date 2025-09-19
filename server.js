@@ -186,104 +186,104 @@ async function geocode(address) {
   else { try { return await geocodeNominatim(address); } catch { return await geocodeCensus(address); } }
 }
 
-/* --------------- AADT (NCDOT + heuristics) ---------- */
+/* --------------- AADT (NCDOT, by-route only) ---------- */
+// Official NCDOT stations layer & docs (ArcGIS FeatureServer). :contentReference[oaicite:2]{index=2}
 const NCDOT_AADT_FS =
   "https://services.arcgis.com/NuWFvHYDMVmmxMeM/ArcGIS/rest/services/NCDOT_AADT_Stations/FeatureServer/0";
 
-async function queryNCDOTNearestAADT(lat, lon, rM = 1609) {
-  const p = new URLSearchParams({
-    f: "json", where: "1=1", outFields: "*", returnGeometry: "true",
-    geometry: `${lon},${lat}`, geometryType: "esriGeometryPoint", inSR: "4326",
-    spatialRel: "esriSpatialRelIntersects", distance: String(rM), units: "esriSRUnit_Meter",
-    outSR: "4326", resultRecordCount: "200",
-  });
-  const r = await fetchWithTimeout(`${NCDOT_AADT_FS}/query?${p}`, { headers: { "User-Agent": UA, Accept: "application/json" } }, 20000);
-  if (!r.ok) return null;
-  const data = await r.json();
-  const feats = data.features || [];
-  const rows = [];
-  for (const f of feats) {
-    const A = f.attributes || {};
-    const pairs = Object.keys(A).filter((k) => k.toLowerCase().includes("aadt")).map((k) => {
-      const val = +A[k]; if (!(val > 0)) return null;
-      let year = null;
-      const mt = String(k).match(/20\d{2}/)?.[0]; if (mt) year = +mt;
-      for (const yk of ["YEAR", "AADT_YEAR", "COUNT_YEAR", "TRAFFICYEAR", "YEAR_", "YR", "YR_"]) {
-        const yv = A[yk];
-        if (yv) { const mty = String(yv).match(/20\d{2}/)?.[0]; if (mty) { year = +mty; break; } }
-      }
-      return { val, year };
-    }).filter(Boolean);
-    if (!pairs.length) continue;
-    pairs.sort((a, b) => (b.year || 0) - (a.year || 0) || b.val - a.val);
-    const x = f.geometry?.x, y = f.geometry?.y; if (x == null || y == null) continue;
-    rows.push({ aadt: pairs[0].val, year: pairs[0].year || null, distM: haversine(lat, lon, y, x) });
+// 🔧 Route-normalization helper so we can match "US 1", "US-1", "US1", etc.
+function routeCandidates(routeRaw) {
+  const r = String(routeRaw || "").toUpperCase().replace(/[–—•]/g, "-").trim();
+  const base = r.replace(/\s+/g, " ");
+  const out = new Set([base, base.replace(/\s*-\s*/g, "-"), base.replace(/\s*-\s*/g, " "), base.replace(/\s+/g, "")]);
+  const m = base.match(/\b(I|US|NC|SR)\s*-?\s*(\d+[A-Z]*)\b/);
+  if (m) {
+    const p = m[1], num = m[2];
+    out.add(`${p}-${num}`);
+    out.add(`${p} ${num}`);
+    out.add(`${p}${num}`);
   }
-  if (!rows.length) return null;
-  rows.sort((A, B) => (B.year || 0) - (A.year || 0) || B.aadt - A.aadt || A.distM - B.distM);
-  return rows[0];
+  return [...out].slice(0, 8);
 }
 
 async function queryNCDOTNearestAADTByRoute(lat, lon, route) {
   if (!route) return null;
-  const p = new URLSearchParams({
-    f: "json", where: `ROUTE='${route}'`, outFields: "*", returnGeometry: "true", outSR: "4326",
-  });
-  try {
-    const resp = await fetchWithTimeout(`${NCDOT_AADT_FS}/query?${p}`, { headers: { "User-Agent": UA, Accept: "application/json" } }, 20000);
-    if (!resp.ok) return null;
-    const data = await resp.json();
-    let best = null;
-    for (const f of data.features || []) {
-      const A = f.attributes || {};
-      const pairs = Object.keys(A).filter((k) => k.toLowerCase().includes("aadt")).map((k) => {
-        const val = +A[k]; if (!(val > 0)) return null;
-        let year = null;
-        const mt = String(k).match(/20\d{2}/)?.[0]; if (mt) year = +mt;
-        for (const yk of ["YEAR", "AADT_YEAR", "COUNT_YEAR", "TRAFFICYEAR", "YEAR_", "YR", "YR_"]) {
-          const yv = A[yk]; if (yv) { const mty = String(yv).match(/20\d{2}/)?.[0]; if (mty) { year = +mty; break; } }
-        }
-        return { val, year };
-      }).filter(Boolean);
-      if (!pairs.length) continue;
-      pairs.sort((a, b) => (b.year || 0) - (a.year || 0) || b.val - a.val);
-      const x = f.geometry?.x, y = f.geometry?.y; if (x == null || y == null) continue;
-      const distM = haversine(lat, lon, y, x);
-      const rec = { aadt: pairs[0].val, year: pairs[0].year || null, distM };
-      if (!best || rec.distM < best.distM) best = rec;
-    }
-    return best;
-  } catch {
-    return null;
+  const tries = routeCandidates(route);
+  let best = null;
+
+  // try strict equality against multiple variants, pick closest by distance
+  for (const cand of tries) {
+    const p = new URLSearchParams({
+      f: "json",
+      where: `ROUTE='${cand.replace(/'/g, "''")}'`,
+      outFields: "*",
+      returnGeometry: "true",
+      outSR: "4326",
+    });
+    try {
+      const resp = await fetchWithTimeout(`${NCDOT_AADT_FS}/query?${p}`, { headers: { "User-Agent": UA, Accept: "application/json" } }, 20000);
+      if (!resp.ok) continue;
+      const data = await resp.json();
+      for (const f of data.features || []) {
+        const A = f.attributes || {};
+        // collect available AADT year/value pairs, choose latest
+        const pairs = Object.keys(A).filter((k) => k.toLowerCase().includes("aadt")).map((k) => {
+          const val = +A[k]; if (!(val > 0)) return null;
+          let year = null;
+          const mt = String(k).match(/20\d{2}/)?.[0]; if (mt) year = +mt;
+          for (const yk of ["YEAR", "AADT_YEAR", "COUNT_YEAR", "TRAFFICYEAR", "YEAR_", "YR", "YR_"]) {
+            const yv = A[yk];
+            if (yv) { const mty = String(yv).match(/20\d{2}/)?.[0]; if (mty) { year = +mty; break; } }
+          }
+          return { val, year };
+        }).filter(Boolean);
+        if (!pairs.length) continue;
+        pairs.sort((a, b) => (b.year || 0) - (a.year || 0) || b.val - a.val);
+        const x = f.geometry?.x, y = f.geometry?.y; if (x == null || y == null) continue;
+        const distM = haversine(lat, lon, y, x);
+        const rec = { aadt: pairs[0].val, year: pairs[0].year || null, distM, lat: y, lon: x };
+        if (!best || rec.distM < best.distM) best = rec;
+      }
+      if (best) break; // we found something for a variant
+    } catch { /* try next */ }
   }
+  return best;
 }
+
 async function queryNCDOTRouteStations(lat, lon, route) {
   if (!route) return [];
-  const p = new URLSearchParams({
-    f: "json", where: `ROUTE='${route}'`, outFields: "*", returnGeometry: "true", outSR: "4326",
-  });
-  try {
-    const resp = await fetchWithTimeout(`${NCDOT_AADT_FS}/query?${p}`, { headers: { "User-Agent": UA, Accept: "application/json" } }, 20000);
-    const data = await resp.json();
-    const out = [];
-    for (const f of data.features || []) {
-      const A = f.attributes || {};
-      const pairs = Object.keys(A).filter((k) => k.toLowerCase().includes("aadt")).map((k) => {
-        const val = +A[k]; if (!(val > 0)) return null;
-        let year = null;
-        const mt = String(k).match(/20\d{2}/)?.[0]; if (mt) year = +mt;
-        return { val, year };
-      }).filter(Boolean);
-      if (!pairs.length) continue;
-      pairs.sort((a, b) => (b.year || 0) - (a.year || 0) || b.val - a.val);
-      const x = f.geometry?.x, y = f.geometry?.y; if (x == null || y == null) continue;
-      const rec = { lat: y, lon: x, aadt: pairs[0].val, year: pairs[0].year || null };
-      rec.distM = haversine(lat, lon, y, x);
-      out.push(rec);
-    }
-    out.sort((a, b) => a.distM - b.distM);
-    return out.slice(0, 50);
-  } catch { return []; }
+  const variants = routeCandidates(route);
+  const seen = new Set();
+  const out = [];
+  for (const cand of variants) {
+    const p = new URLSearchParams({
+      f: "json", where: `ROUTE='${cand.replace(/'/g, "''")}'`, outFields: "*", returnGeometry: "true", outSR: "4326",
+    });
+    try {
+      const resp = await fetchWithTimeout(`${NCDOT_AADT_FS}/query?${p}`, { headers: { "User-Agent": UA, Accept: "application/json" } }, 20000);
+      const data = await resp.json();
+      for (const f of data.features || []) {
+        const A = f.attributes || {};
+        const pairs = Object.keys(A).filter((k) => k.toLowerCase().includes("aadt")).map((k) => {
+          const val = +A[k]; if (!(val > 0)) return null;
+          let year = null;
+          const mt = String(k).match(/20\d{2}/)?.[0]; if (mt) year = +mt;
+          return { val, year };
+        }).filter(Boolean);
+        if (!pairs.length) continue;
+        pairs.sort((a, b) => (b.year || 0) - (a.year || 0) || b.val - a.val);
+        const x = f.geometry?.x, y = f.geometry?.y; if (x == null || y == null) continue;
+        const key = `${Math.round(y*1e5)}|${Math.round(x*1e5)}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const rec = { lat: y, lon: x, aadt: pairs[0].val, year: pairs[0].year || null };
+        rec.distM = haversine(lat, lon, y, x);
+        out.push(rec);
+      }
+    } catch { /* next variant */ }
+  }
+  out.sort((a, b) => a.distM - b.distM);
+  return out.slice(0, 50);
 }
 
 /* ----------------- Competition (OSM+Google) ---------- */
@@ -730,6 +730,7 @@ app.post("/estimate", async (req, res) => {
 
     // Roads & AADT
     const roads = await roadContext(geo.lat, geo.lon).catch(() => ({ summary: "", main: [], side: [], signals: 0, intersections: 0 }));
+
     let usedAADT = 10000, method = "fallback_default";
     let mapStations = [];
 
@@ -737,32 +738,26 @@ app.post("/estimate", async (req, res) => {
     if (Number.isFinite(overrideVal) && overrideVal > 0) {
       usedAADT = Math.round(overrideVal); method = "override";
     } else {
-      let dotAADT = null; let stations = [];
-      const routeName = roads?.main?.[0]?.name || null;
-      if (routeName) {
-        try {
-          const byRoute = await queryNCDOTNearestAADTByRoute(geo.lat, geo.lon, routeName);
-          if (byRoute) { dotAADT = byRoute.aadt; stations = await queryNCDOTRouteStations(geo.lat, geo.lon, routeName); }
-        } catch {}
+      // 🔧 By-route only: Try primary and a few alternates, pick the closest station on that route (no radius).
+      const routeCandidates = [
+        roads?.main?.[0]?.name,
+        roads?.main?.[1]?.name,
+        roads?.side?.[0]?.name,
+        roads?.side?.[1]?.name
+      ].filter(Boolean);
+
+      let dotAADT = null;
+      for (const rname of routeCandidates) {
+        const byRoute = await queryNCDOTNearestAADTByRoute(geo.lat, geo.lon, rname).catch(() => null);
+        if (byRoute) {
+          dotAADT = byRoute.aadt;
+          mapStations = await queryNCDOTRouteStations(geo.lat, geo.lon, rname).catch(() => []);
+          method = "dot_by_route";
+          break;
+        }
       }
-      if (!dotAADT) {
-        let sta = await (async () => {
-          if (!TRAFFIC_URL) return null;
-          const url = TRAFFIC_URL.replace("{lat}", encodeURIComponent(geo.lat))
-                                 .replace("{lon}", encodeURIComponent(geo.lon))
-                                 .replace("{address}", encodeURIComponent(address || ""));
-          try {
-            const r = await fetchWithTimeout(url, { headers: { "User-Agent": UA, Accept: "application/json" } }, 20000);
-            const j = await r.json();
-            const aadt = +j.aadt || +j.volume || +j.count;
-            const year = j.year ? +String(j.year).match(/20\d{2}/)?.[0] : null;
-            if (aadt > 0) return { aadt, year, distM: 0, source: "custom" };
-          } catch {}
-          return null;
-        })();
-        if (!sta) sta = await queryNCDOTNearestAADT(geo.lat, geo.lon, 1609).catch(() => null);
-        if (sta) dotAADT = sta.aadt;
-      }
+
+      // 🔧 If still none found on the route, do NOT fall back to radius; use heuristic only.
       const heur = heuristicAADT(roads);
       const comps = [];
       if (Number.isFinite(dotAADT)) comps.push({ v: dotAADT, w: 1.0, l: "DOT" });
@@ -771,8 +766,9 @@ app.post("/estimate", async (req, res) => {
         const sumW = comps.reduce((s, c) => s + c.w, 0);
         usedAADT = Math.round(comps.reduce((s, c) => s + c.v * c.w, 0) / Math.max(0.0001, sumW));
         method = "blend_" + comps.map((c) => c.l).join("+").toLowerCase();
+      } else {
+        usedAADT = heur; method = "heuristic_only";
       }
-      mapStations = stations;
     }
 
     // Extras & flags
@@ -863,7 +859,7 @@ Result gallons LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
     if (method === "override") aadtText = `AADT (override): ${usedAADT.toLocaleString()} vehicles/day`;
     else if (method.startsWith("blend") && method.includes("dot") && method.includes("heur"))
       aadtText = `AADT: ~${usedAADT.toLocaleString()} vehicles/day (blended DOT + heuristic)`;
-    else if (method.includes("dot")) aadtText = `AADT: ~${usedAADT.toLocaleString()} vehicles/day (DOT)`;
+    else if (method.includes("dot")) aadtText = `AADT: ~${usedAADT.toLocaleString()} vehicles/day (DOT by route)`;
     else if (method.includes("heur")) aadtText = `AADT: ~${usedAADT.toLocaleString()} vehicles/day (heuristic)`;
     else aadtText = `AADT: ~${usedAADT.toLocaleString()} vehicles/day (${method})`;
 
@@ -938,3 +934,4 @@ Result gallons LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
 // Render expects your app to listen on process.env.PORT and on 0.0.0.0
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, "0.0.0.0", () => console.log(`Server listening on :${PORT}`));
+
