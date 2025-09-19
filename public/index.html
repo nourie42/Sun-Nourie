@@ -61,7 +61,7 @@
     .footerbar{ position:fixed; left:0; right:0; bottom:0; background:linear-gradient(180deg,#0c1220,#0a0f1a); border-top:1px solid var(--line); padding:10px 16px; display:flex; justify-content:center; gap:12px; z-index:50; }
 
     .aadt-tabs { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:8px 0 12px; }
-    .aadt-tab { display:inline-block; padding:8px 12px; border-radius:999px; border:1px solid var(--line); background:var(--pill); color:var(--text); text-decoration:none; font-weight:700; font-size:13px; letter-spacing:.2px; }
+    .aadt-tab { display:inline-block; padding:8px 12px; border-radius:999px; border:1px solid var(--line); background:var(--pill); color:#fff; text-decoration:none; font-weight:700; font-size:13px; letter-spacing:.2px; }
     .aadt-tab:hover { background:#101a2b; }
 
     /* STOP alert */
@@ -235,7 +235,7 @@ let lastCommittedText = "";
 
 /* Utils */
 function fmt(n){ return (n??0).toLocaleString(undefined,{maximumFractionDigits:0}); }
-function esc(s){ return (s??"").toString().replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
+function esc(s){ return (s??"").toString().replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;"," >":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
 function setOverlayWorking(){ overlay.textContent = "Working…"; overlay.style.display = "flex"; }
 function clearOverlay(){ overlay.style.display = "none"; }
 
@@ -452,13 +452,12 @@ function renderAll(d){
 }
 
 /* =================== Rating helpers =================== */
-let selectedPlaceId = null;
 async function resolvePlaceIdIfNeeded(address){
   if (selectedPlaceId) return selectedPlaceId;
   try {
     const r = await fetch("/google/findplace?input=" + encodeURIComponent(address));
     const j = await r.json();
-    if (j.ok && j.place_id) return j.place_id;
+    if (j.ok && j.place_id) { selectedPlaceId = j.place_id; return j.place_id; }
   } catch {}
   return null;
 }
@@ -618,14 +617,12 @@ document.getElementById("exportPDF").addEventListener("click", async ()=>{
 });
 
 /* =================== Init ============================== */
-document.addEventListener("DOMContentLoaded", () => {
-  (async () => {
-    try {
-      const r = await fetch("/google/status");
-      const j = await r.json();
-      apiStatus.textContent = j.ok ? "API: Google — Working" : `API: Google — ${j.status}`;
-    } catch { apiStatus.textContent = "API: Google — unavailable"; }
-  })();
+document.addEventListener("DOMContentLoaded", async () => {
+  try {
+    const r = await fetch("/google/status");
+    const j = await r.json();
+    apiStatus.textContent = j.ok ? "API: Google — Working" : `API: Google — ${j.status}`;
+  } catch { apiStatus.textContent = "API: Google — unavailable"; }
 });
 overlay.textContent="—";
   </script>
