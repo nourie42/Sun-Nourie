@@ -456,20 +456,22 @@ function renderAll(d) {
 /* Rating */
 async function resolvePlaceIdIfNeeded(address){
   if (selectedPlaceId) return selectedPlaceId;
-  try{
-    const r=await fetch(`/google/findplace?input=${encodeURIComponent(address)}`);
-    const j=await r.json(); if(j.ok && j.place_id) return j.place_id;
-  }catch{}
+  try {
+    const r = await fetch(SERVER_BASE + "/google/findplace?input=" + encodeURIComponent(address));
+    const j = await r.json();
+    if (j.ok && j.place_id) return j.place_id;
+  } catch {}
   return null;
 }
+
 async function showRating(address){
-   // Attempt to fetch rating by place ID first, then fall back to nearest gas station
+  // Attempt to fetch rating by place ID first, then fall back to nearest gas station
   let rating = null;
   let total = null;
   const pid = await resolvePlaceIdIfNeeded(address);
   if (pid) {
     try {
-      const r = await fetch(`/google/rating?place_id=${encodeURIComponent(pid)}`);
+      const r = await fetch(SERVER_BASE + "/google/rating?place_id=" + encodeURIComponent(pid));
       const j = await r.json();
       if (j.ok) {
         rating = j.rating ?? null;
@@ -480,7 +482,7 @@ async function showRating(address){
   // Fallback: use current coordinates to lookup nearest station rating if none
   if ((rating == null || rating === undefined) && selectedCoords) {
     try {
-      const r2 = await fetch(`/google/rating_by_location?lat=${encodeURIComponent(selectedCoords.lat)}&lon=${encodeURIComponent(selectedCoords.lon)}`);
+      const r2 = await fetch(SERVER_BASE + "/google/rating_by_location?lat=" + encodeURIComponent(selectedCoords.lat) + "&lon=" + encodeURIComponent(selectedCoords.lon));
       const j2 = await r2.json();
       if (j2.ok) {
         rating = j2.rating ?? null;
@@ -488,6 +490,9 @@ async function showRating(address){
       }
     } catch {}
   }
+  return { rating, total };
+}
+
   if (rating != null && rating !== undefined) {
     ratingLine.innerHTML = `\u2B50 ${rating} (${total||0} reviews)`;
   } else {
