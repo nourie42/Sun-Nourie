@@ -23,6 +23,8 @@
     @keyframes spin { to { transform: rotate(360deg);} }
     .progress { height:10px; background:#e2e8f0; border-radius:999px; overflow:hidden }
     .progress>div { height:100%; width:0%; background:linear-gradient(90deg,var(--brand),var(--brand2)); transition:width .25s ease }
+    .linkbar a{ white-space:nowrap }
+    details summary{ cursor:pointer }
   </style>
 </head>
 <body class="min-h-screen p-6">
@@ -30,7 +32,7 @@
     <!-- Header -->
     <header class="text-center text-white">
       <h1 class="text-3xl font-bold drop-shadow-sm">🤖 AI‑Powered Job Match Portal</h1>
-      <p class="opacity-90">AI compares your resume profile to jobs, and links you to Google search for each job.</p>
+      <p class="opacity-90">AI compares your resume profile to jobs and generates Google search links across major job sites (including remote).</p>
       <div class="mt-2 inline-flex items-center gap-2 badge bg-emerald-500 text-white">Live AI Enabled</div>
     </header>
 
@@ -142,7 +144,7 @@
      ********************/
     const DEFAULT_MODEL = 'gpt-4o-mini';
 
-    // Sample jobs (expandable). Each entry intentionally lacks a direct posting URL.
+    // Sample jobs — we will generate Google links to REAL sites (Indeed, LinkedIn, etc.) dynamically per job.
     const SAMPLE = [
       {title:'Preschool Director', company:'Bright Horizons Early Learning', salary:'$48,000 - $68,000', category:'preschool-director', req:["Bachelor's in ECE", '5+ yrs leadership', 'NC Director Credential preferred', 'Strong communication'], desc:'Lead center ops, staff, compliance, quality standards.', postedDays: r(1,14)},
       {title:'Assistant Director - Early Learning Center', company:'KinderCare Education', salary:'$42,000 - $58,000', category:'assistant-director', req:['Associate min, BA preferred', '3+ yrs childcare', 'Staff supervision', 'Licensing knowledge'], desc:'Assist director, supervise teachers, manage enrollment and families.', postedDays: r(1,14)},
@@ -156,6 +158,29 @@
       {title:'ESL Teacher (K‑5)', company:'Raleigh Charter / Public School', salary:'$44,000 - $63,000', category:'esl-teacher', req:['Teaching license', 'ESL certification', 'K‑12 experience'], desc:'Deliver differentiated ESL instruction, assess progress.', postedDays: r(1,14)},
       {title:'Training Coordinator (Education Services)', company:'Chapel Hill Nonprofit', salary:'$45,000 - $60,000', category:'training-coordinator', req:['Program facilitation', 'Curriculum design', 'Reporting'], desc:'Coordinate workshops, PD logistics, and evaluation.', postedDays: r(1,14)},
       {title:'Student Services Coordinator', company:'Cary Academy', salary:'$47,000 - $65,000', category:'service-coordinator', req:['Student services background', 'Data reporting', 'Parent comms'], desc:'Coordinate student support, scheduling, and data.', postedDays: r(1,14)}
+    ];
+
+    // Sites to target via Google ("every website available" → we include many majors + education specific). 
+    const SITE_FILTERS = [
+      {label:'All (no site filter)', site:''},
+      {label:'Google Jobs', site:'GOOGLE_JOBS'},
+      {label:'Indeed', site:'indeed.com'},
+      {label:'LinkedIn', site:'linkedin.com/jobs'},
+      {label:'Glassdoor', site:'glassdoor.com'},
+      {label:'ZipRecruiter', site:'ziprecruiter.com'},
+      {label:'Monster', site:'monster.com'},
+      {label:'CareerBuilder', site:'careerbuilder.com'},
+      {label:'SimplyHired', site:'simplyhired.com'},
+      {label:'Handshake (universities)', site:'joinhandshake.com'},
+      {label:'NAEYC', site:'careercenter.naeyc.org'},
+      {label:'SchoolSpring', site:'schoolspring.com'},
+      {label:'K12JobSpot', site:'k12jobspot.com'},
+      {label:'GovernmentJobs', site:'governmentjobs.com'},
+      {label:'State/County (NC school districts)', site:'wcpss.net'},
+      {label:'YMCA', site:'ymca.org'},
+      {label:'Primrose', site:'primroseschools.com'},
+      {label:'KinderCare', site:'kindercare.com'},
+      {label:'Bright Horizons', site:'brighthorizons.com'}
     ];
 
     function r(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
@@ -243,7 +268,7 @@
     }
 
     /********************
-     * OPENAI UTIL (timeout + safe JSON + localStorage key)
+     * OPENAI UTIL (timeout + safe JSON)
      ********************/
     async function callOpenAI(body){
       const key = (keyEl.value||'').trim();
@@ -266,7 +291,6 @@
       const sys = `You are an expert career coach. Return strict JSON with keys: score (0-100), strengths (array), gaps (array), insight (string), recommendation (string).`;
       const user = `Candidate profile (free text allowed):\n${profile.resumeText}\n\nStructured summary:\n- Experience: ${profile.exp}\n- Current role: ${profile.role}\n- Expertise: ${profile.expertise}\n- Education: ${profile.edu}\n\nJob:\n- Title: ${job.title}\n- Company: ${job.company}\n- Location: ${job.location}\n- Salary: ${job.salary}\n- Requirements: ${job.req.join('; ')}\n- Description: ${job.desc}\n\nTask: Compare job to candidate. Score fit 0-100 (integer). Identify strengths and gaps referencing requirements. Provide a short, specific insight and 1-2 sentence recommendation. Output only JSON.`;
 
-      // Try AI first; on failure, use deterministic heuristic fallback.
       try{
         const data = await callOpenAI({
           model,
@@ -285,7 +309,6 @@
     function safeParse(t){ try { return JSON.parse(t); } catch{ return {}; } }
 
     function normalizeAnalysis(a, profile, job){
-      // If the model omitted fields, pad them sensibly.
       const score = clampNumber(a.score ?? heuristicScore(profile, job), 0, 100);
       return {
         score,
@@ -299,6 +322,15 @@
     /********************
      * Heuristic fallback (no API)
      ********************/
+    function heuristicAnalysis(profile, job){
+      return {
+        score: heuristicScore(profile, job),
+        strengths: heuristicStrengths(profile, job),
+        gaps: heuristicGaps(profile, job),
+        insight: 'Heuristic analysis used due to API error. Focus on leadership, compliance, and enrollment growth.',
+        recommendation: 'Quantify outcomes and align credentials to state requirements.'
+      };
+    }
     function heuristicScore(profile, job){
       const text = (profile.resumeText + ' ' + profile.expertise + ' ' + profile.role + ' ' + profile.edu).toLowerCase();
       let hits = 0; let total = job.req.length || 1;
@@ -310,14 +342,47 @@
     }
     function heuristicStrengths(profile, job){
       const t = (profile.resumeText + ' ' + profile.expertise).toLowerCase();
-      return job.req.filter(rq => t.includes(rq.split(' ')[0].toLowerCase())).slice(0,5);
+      const found = job.req.filter(rq => t.includes(rq.split(' ')[0].toLowerCase()));
+      return found.length? found.slice(0,5) : ['Leadership experience','Compliance knowledge','Parent communication'];
     }
     function heuristicGaps(profile, job){
       const t = (profile.resumeText + ' ' + profile.expertise).toLowerCase();
-      return job.req.filter(rq => !t.includes(rq.split(' ')[0].toLowerCase())).slice(0,5);
+      const notFound = job.req.filter(rq => !t.includes(rq.split(' ')[0].toLowerCase()));
+      return notFound.length? notFound.slice(0,5) : ['Budget ownership depth'];
     }
 
     function clampNumber(n, min, max){ n = Number(n); if(Number.isNaN(n)) n = min; return Math.max(min, Math.min(max, n)); }
+
+    /********************
+     * GOOGLE LINK GENERATION (per-site + remote)
+     ********************/
+    function baseQuery(job){
+      const loc = (job.location||'').trim();
+      const parts = [job.title, job.company];
+      if(loc) parts.push(loc);
+      parts.push('jobs');
+      return parts.join(' ');
+    }
+    function remoteQuery(job){
+      return `${job.title} ${job.company} remote "(United States)" jobs`;
+    }
+    function googleJobsUrl(q){
+      // Opens the Google Jobs module where available
+      return `https://www.google.com/search?q=${encodeURIComponent(q)}&ibp=htl;jobs`;
+    }
+    function googleSiteUrl(q, site){
+      if(!site) return `https://www.google.com/search?q=${encodeURIComponent(q)}`;
+      if(site==='GOOGLE_JOBS') return googleJobsUrl(q);
+      return `https://www.google.com/search?q=${encodeURIComponent(q + ' site:' + site)}`;
+    }
+
+    function buildSiteLinks(job){
+      const q = baseQuery(job);
+      const qr = remoteQuery(job);
+      const links = SITE_FILTERS.map(s => ({ label:s.label, url: googleSiteUrl(q, s.site) }));
+      const remoteLinks = SITE_FILTERS.map(s => ({ label:(s.label+ ' — Remote'), url: googleSiteUrl(qr, s.site) }));
+      return {all:q, allRemote:qr, links, remoteLinks};
+    }
 
     /********************
      * RENDER
@@ -346,22 +411,16 @@
       document.getElementById('copyAll').onclick = ()=>copyAllQueries(items);
     }
 
-    function googleQuery(job){
-      const loc = (job.location||'').trim();
-      return `${job.title} ${job.company} ${loc} jobs`;
-    }
-    function googleUrl(job){
-      return `https://www.google.com/search?q=${encodeURIComponent(googleQuery(job))}`;
-    }
-
     function jobCard(job){
       const el = document.createElement('div');
       el.className = 'relative glass card';
       el.dataset.score = job.analysis.score;
       el.dataset.posted = job.postedDays;
       el.dataset.salarymin = extractMinSalary(job.salary);
-      const q = googleQuery(job);
-      const g = googleUrl(job);
+
+      const { all, allRemote, links, remoteLinks } = buildSiteLinks(job);
+      const generalGoogle = `https://www.google.com/search?q=${encodeURIComponent(all)}`;
+
       el.innerHTML = `
         <div class="score ${scoreClass(job.analysis.score)}">${job.analysis.score}%</div>
         <div class="pr-20">
@@ -392,19 +451,40 @@
           </div>
           <div class="mt-3 italic text-slate-700 text-sm"><b>AI Recommendation:</b> ${escapeHtml(job.analysis.recommendation)}</div>
         </div>
-        <div class="mt-3 flex flex-wrap gap-2">
-          <a href="${g}" target="_blank" rel="noopener noreferrer" class="px-4 py-2 rounded-lg bg-indigo-600 text-white font-semibold hover:brightness-110">Google this job →</a>
-          <button class="px-4 py-2 rounded-lg border" data-copy="${escapeHtml(q)}">Copy Google query</button>
+        <div class="mt-3 flex flex-wrap gap-2 linkbar">
+          <a href="${generalGoogle}" target="_blank" rel="noopener noreferrer" class="px-4 py-2 rounded-lg bg-indigo-600 text-white font-semibold hover:brightness-110">Google (All) →</a>
+          <a href="${googleJobsUrl(all)}" target="_blank" rel="noopener noreferrer" class="px-4 py-2 rounded-lg border">Google Jobs →</a>
+          <button class="px-4 py-2 rounded-lg border" data-copy="${escapeHtml(all)}">Copy Query</button>
+          <a href="${googleJobsUrl(allRemote)}" target="_blank" rel="noopener noreferrer" class="px-4 py-2 rounded-lg border">Remote — Google Jobs →</a>
+          <button class="px-4 py-2 rounded-lg border" data-open-all>Open All Sites</button>
         </div>
+        <details class="mt-2">
+          <summary class="text-sm text-slate-700">More site‑specific searches (includes remote)</summary>
+          <div class="mt-2 flex flex-wrap gap-2 linkbar">
+            ${links.map(l=>`<a class='px-3 py-2 rounded-lg border' target='_blank' rel='noopener noreferrer' href='${l.url}'>${escapeHtml(l.label)}</a>`).join('')}
+          </div>
+          <div class="mt-2 flex flex-wrap gap-2 linkbar">
+            ${remoteLinks.map(l=>`<a class='px-3 py-2 rounded-lg border' target='_blank' rel='noopener noreferrer' href='${l.url}'>${escapeHtml(l.label)}</a>`).join('')}
+          </div>
+        </details>
       `;
+
       // copy handler for this card
       el.querySelector('[data-copy]')?.addEventListener('click', (ev)=>{
         const query = ev.currentTarget.getAttribute('data-copy');
         navigator.clipboard.writeText(query).then(()=>{
           ev.currentTarget.textContent = 'Copied!';
-          setTimeout(()=>ev.currentTarget.textContent='Copy Google query', 1000);
+          setTimeout(()=>ev.currentTarget.textContent='Copy Query', 1000);
         });
       });
+
+      // open all site‑specific (including remote) in new tabs
+      el.querySelector('[data-open-all]')?.addEventListener('click', ()=>{
+        const allLinks = [...links, ...remoteLinks];
+        // Limit to first 8 to avoid popup blockers going wild
+        allLinks.slice(0,8).forEach(l=> window.open(l.url, '_blank'));
+      });
+
       return el;
     }
 
@@ -420,14 +500,10 @@
       grid.innerHTML=''; cards.forEach(c=>grid.appendChild(c));
     }
 
-    function openTopGoogle(items){
-      items.forEach(j=> window.open(googleUrl(j), '_blank'));
-    }
+    function openTopGoogle(items){ items.forEach(j=> window.open(`https://www.google.com/search?q=${encodeURIComponent(baseQuery(j))}`, '_blank')); }
     function copyAllQueries(items){
-      const all = items.map(j=>googleQuery(j)).join('\n');
-      navigator.clipboard.writeText(all).then(()=>{
-        alert('All Google queries copied to clipboard.');
-      });
+      const all = items.map(j=>baseQuery(j)).join('\n');
+      navigator.clipboard.writeText(all).then(()=>{ alert('All Google queries copied to clipboard.'); });
     }
 
     function extractMinSalary(txt){
