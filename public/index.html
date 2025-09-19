@@ -1,4 +1,4 @@
-<!-- Fuel IQ UI v2025-08-29d -->
+<!-- public/index.html — UI v2025-09-19 (design unchanged, scripts fixed) -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -11,7 +11,6 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <!-- Leaflet image export -->
   <script src="https://unpkg.com/leaflet-image/leaflet-image.js"></script>
-
   <!-- jsPDF for PDF export -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous"></script>
 
@@ -63,56 +62,32 @@
 
     .footerbar{ position:fixed; left:0; right:0; bottom:0; background:linear-gradient(180deg,#0c1220,#0a0f1a); border-top:1px solid var(--line); padding:10px 16px; display:flex; justify-content:center; gap:12px; z-index:50; }
 
-    /* AADT tabs (NEW) */
-    .aadt-tabs {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-      margin: 8px 0 12px;
-    }
-    .aadt-tab {
-      display: inline-block;
-      padding: 8px 12px;
-      border-radius: 999px;
-      border: 1px solid var(--line);
-      background: var(--pill);
-      color: var(--text);
-      text-decoration: none;
-      font-weight: 700;
-      font-size: 13px;
-      letter-spacing: .2px;
-    }
-    .aadt-tab:hover { background: #101a2b; }
-    @media (max-width: 680px) {
-      .aadt-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
-      .aadt-tab { white-space: nowrap; }
-    }
+    .aadt-tabs { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:8px 0 12px; }
+    .aadt-tab { display:inline-block; padding:8px 12px; border-radius:999px; border:1px solid var(--line); background:var(--pill); color:var(--text); text-decoration:none; font-weight:700; font-size:13px; letter-spacing:.2px; }
+    .aadt-tab:hover { background:#101a2b; }
+    @media (max-width:680px){ .aadt-tabs{ overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:4px; } .aadt-tab{ white-space:nowrap; } }
   </style>
 </head>
 <body>
   <div class="wrap">
     <header>
       <h1>Sunoco, LP Fuel IQ - Fuel Site Analyzer</h1>
-      <span class="build">UI v2025-08-29d</span>
-      <!-- Safe link to the standalone developments page -->
+      <span class="build">UI v2025-09-19</span>
       <a href="developments.html" style="padding:8px 14px; background:#22d3ee; border-radius:8px; color:#00121e; font-weight:600; text-decoration:none;">Developments Search</a>
-      <!-- PA AADT Map button -->
       <a href="PA_Signals_AADT_Radius_Map_Final_Generated.html" style="padding:8px 14px; background:#f87171; border-radius:8px; color:#00121e; font-weight:600; text-decoration:none;">PA AADT Map</a>
       <a href="Scraper.html" style="padding:8px 14px; background:#34d399; border-radius:8px; color:#00121e; font-weight:600; text-decoration:none;">Prospector</a>
     </header>
 
-    <!-- AADT quick links (NEW) -->
     <nav class="aadt-tabs" aria-label="State AADT Quick Links">
       <span class="muted">State AADT Quick Links:</span>
-      <a class="aadt-tab" href="https://opendata.dc.gov/datasets/DCGIS::2023-traffic-volume/explore" target="_blank" rel="noopener noreferrer" title="District of Columbia AADT map">DC</a>
-      <a class="aadt-tab" href="https://gis-fdot.opendata.arcgis.com/datasets/fdot::annual-average-daily-traffic-tda/explore" target="_blank" rel="noopener noreferrer" title="Florida AADT map">FL</a>
-      <a class="aadt-tab" href="https://gdottrafficdata.drakewell.com/publicmultinodemap.asp" target="_blank" rel="noopener noreferrer" title="Georgia AADT map">GA</a>
-      <a class="aadt-tab" href="https://mhd.public.ms2soft.com/tcds/tsearch.asp?loc=Mhd&mod" target="_blank" rel="noopener noreferrer" title="Massachusetts AADT map">MA</a>
-      <a class="aadt-tab" href="https://nysdottrafficdata.drakewell.com/publicmultinodemap.asp" target="_blank" rel="noopener noreferrer" title="New York AADT map">NY</a>
-      <a class="aadt-tab" href="https://scdottrafficdata.drakewell.com/publicmultinodemap.asp" target="_blank" rel="noopener noreferrer" title="South Carolina AADT map">SC</a>
-      <a class="aadt-tab" href="https://www.arcgis.com/apps/webappviewer/index.html?id=35e4c06de0f84a9c9f3fe18e67cd2c92" target="_blank" rel="noopener noreferrer" title="Virginia AADT map">VA</a>
-      <a class="aadt-tab" href="https://ncdot.public.ms2soft.com/tdms.ui_core/trafficviewer" target="_blank" rel="noopener noreferrer" title="North Carolina AADT map">NC</a>
+      <a class="aadt-tab" href="https://opendata.dc.gov/datasets/DCGIS::2023-traffic-volume/explore" target="_blank" rel="noopener noreferrer">DC</a>
+      <a class="aadt-tab" href="https://gis-fdot.opendata.arcgis.com/datasets/fdot::annual-average-daily-traffic-tda/explore" target="_blank" rel="noopener noreferrer">FL</a>
+      <a class="aadt-tab" href="https://gdottrafficdata.drakewell.com/publicmultinodemap.asp" target="_blank" rel="noopener noreferrer">GA</a>
+      <a class="aadt-tab" href="https://mhd.public.ms2soft.com/tcds/tsearch.asp?loc=Mhd&mod" target="_blank" rel="noopener noreferrer">MA</a>
+      <a class="aadt-tab" href="https://nysdottrafficdata.drakewell.com/publicmultinodemap.asp" target="_blank" rel="noopener noreferrer">NY</a>
+      <a class="aadt-tab" href="https://scdottrafficdata.drakewell.com/publicmultinodemap.asp" target="_blank" rel="noopener noreferrer">SC</a>
+      <a class="aadt-tab" href="https://www.arcgis.com/apps/webappviewer/index.html?id=35e4c06de0f84a9c9f3fe18e67cd2c92" target="_blank" rel="noopener noreferrer">VA</a>
+      <a class="aadt-tab" href="https://ncdot.public.ms2soft.com/tdms.ui_core/trafficviewer" target="_blank" rel="noopener noreferrer">NC</a>
     </nav>
 
     <div class="instructions">
@@ -193,54 +168,11 @@
       <div id="map"><div id="overlay" class="muted">—</div></div>
       <div id="svWrap"><div class="muted" style="margin-top:10px;">Street View</div><iframe id="sv" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div>
     </div>
-    <script>
-const SERVER_BASE = "https://sun-nourie-live.onrender.com";
-
-async function runEstimate(){
-  if(!selectedCoords && !selectedPlaceId){
-    alert("Please select a valid address first.");
-    return;
-  }
-
-  try {
-    const body = {
-      lat: selectedCoords ? selectedCoords.lat : null,
-      lon: selectedCoords ? selectedCoords.lon : null,
-      place_id: selectedPlaceId || null,
-      extras: collectExtras() // your function for extras
-    };
-
-    const r = await fetch(SERVER_BASE + "/estimate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
-    });
-
-    const j = await r.json();
-    if(j.ok){
-      document.getElementById("estNum").textContent = j.estimate.low;
-      document.getElementById("estRange").textContent = "Full range: " + j.estimate.range;
-      document.getElementById("y2").textContent = j.estimate.year2;
-      document.getElementById("y3").textContent = j.estimate.year3;
-      document.getElementById("aadtBanner").textContent = j.aadtText || "—";
-      document.getElementById("compLine").textContent = j.competitionText || "—";
-    } else {
-      alert("Estimate failed: " + j.status);
-    }
-  } catch(err){
-    console.error(err);
-    alert("An error occurred while running the estimate.");
-  }
-}
-
-document.getElementById("estimateBtn").addEventListener("click", runEstimate);
-</script>
 
     <!-- Developments -->
     <div class="card"><div id="devs" class="muted">—</div></div>
     <div class="card"><div id="devsExternalNews" class="muted">—</div></div>
     <div class="card"><div id="devsExternalPermits" class="muted">—</div></div>
-
 
     <div class="card"><b>Google Rating</b><div id="ratingLine" class="muted">—</div></div>
     <div class="card"><b>Summary (GPT)</b><div id="summary" class="muted">—</div></div>
@@ -248,29 +180,37 @@ document.getElementById("estimateBtn").addEventListener("click", runEstimate);
 
   <div class="footerbar"><button id="exportPDF">Export to PDF</button></div>
 
-<script>
-/* DOM helpers */
-const $=id=>document.getElementById(id);
-const apiStatus=$("apiStatus"), aadtBanner=$("aadtBanner"), compLine=$("compLine"), overlay=$("overlay"), svFrame=$("sv");
-const outNum=$("estNum"), outRange=$("estRange"), outY2=$("y2"), outY3=$("y3");
-const devsBox=$("devs"), devsExtNews=$("devsExternalNews"), devsExtPermits=$("devsExternalPermits"), summaryBox=$("summary"), ratingLine=$("ratingLine");
-const addrInput=$("addr"), acBox=$("ac"), goBtn=$("go");
-const addExtraBtn=$("addExtra"), extraList=$("extraList"), activeExtras=$("activeExtras");
-const ex_large_dev=$("ex_large_dev"), ex_hours18=$("ex_hours18"), ex_highincome=$("ex_highincome"), ex_lowrating=$("ex_lowrating"), ex_competitive_pricing=$("ex_competitive_pricing"), ex_rural=$("ex_rural");
+  <script>
+/* =================== Helpers & State =================== */
+const $ = (id) => document.getElementById(id);
+const apiStatus = $("apiStatus"), aadtBanner = $("aadtBanner"), compLine = $("compLine"),
+      overlay = $("overlay"), svFrame = $("sv"), outNum = $("estNum"), outRange = $("estRange"),
+      outY2 = $("y2"), outY3 = $("y3"), devsBox = $("devs"),
+      devsExtNews = $("devsExternalNews"), devsExtPermits = $("devsExternalPermits"),
+      summaryBox = $("summary"), ratingLine = $("ratingLine"),
+      addrInput = $("addr"), acBox = $("ac"), goBtn = $("go"), runBtn = $("estimateBtn"),
+      addExtraBtn = $("addExtra"), extraList = $("extraList"), activeExtras = $("activeExtras"),
+      ex_large_dev = $("ex_large_dev"), ex_hours18 = $("ex_hours18"), ex_highincome = $("ex_highincome"),
+      ex_lowrating = $("ex_lowrating"), ex_competitive_pricing = $("ex_competitive_pricing"),
+      ex_rural = $("ex_rural");
 
-/* Map state */
-let map, layer, mapReady=false, selectedCoords=null, selectedPlaceId=null;
+let map, layer, mapReady = false, selectedCoords = null, selectedPlaceId = null;
+let acItems = [], acActive = -1;
 
-/* Utils */
 function fmt(n){ return (n??0).toLocaleString(undefined,{maximumFractionDigits:0}); }
 function esc(s){ return (s??"").toString().replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
-function setOverlayWorking(){ overlay.textContent="Working…"; overlay.style.display="flex"; }
-function clearOverlay(){ overlay.style.display="none"; }
+function setOverlayWorking(){ overlay.textContent = "Working…"; overlay.style.display = "flex"; }
+function clearOverlay(){ overlay.style.display = "none"; }
 
-/* Map + SV */
-function initMap(){ if(mapReady) return; map=L.map("map",{zoomControl:true}); window.map=map; L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map); layer=L.layerGroup().addTo(map); mapReady=true; }
-function updateStreetView(lat, lon){ svFrame.src=`https://maps.google.com/maps?q=&layer=c&cbll=${lat},${lon}&cbp=12,0,,0,0&output=svembed`; }
-
+/* =================== Map + Street View =================== */
+function initMap(){ if(mapReady) return;
+  map = L.map("map",{zoomControl:true}); window.map = map;
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map);
+  layer = L.layerGroup().addTo(map); mapReady = true;
+}
+function updateStreetView(lat, lon){
+  svFrame.src = `https://maps.google.com/maps?q=&layer=c&cbll=${lat},${lon}&cbp=12,0,,0,0&output=svembed`;
+}
 function renderAADTMarkers(list) {
   if (!Array.isArray(list)) return;
   for (const rec of list) {
@@ -282,140 +222,105 @@ function renderAADTMarkers(list) {
     else if (val >= 10000) color = "#eab308";
     else color = "#84cc16";
     L.circleMarker([rec.lat, rec.lon], {
-      radius: 5,
-      weight: 1,
-      color,
-      fillColor: color,
-      fillOpacity: 0.8
+      radius: 5, weight: 1, color, fillColor: color, fillOpacity: 0.8
     }).addTo(layer).bindPopup("AADT: " + fmt(val));
   }
 }
-
 function initOrUpdateMap(m){
-  if(!mapReady){ initMap(); }
+  if(!mapReady) initMap();
   layer.clearLayers();
-  if(!m||!m.site){ setOverlayWorking(); return; }
-  const site=[m.site.lat,m.site.lon];
+  if(!m || !m.site){ setOverlayWorking(); return; }
+  const site = [m.site.lat, m.site.lon];
   L.marker(site,{title:"Site"}).addTo(layer).bindPopup("<b>Site</b>");
-  const pts=[site];
+  const pts = [site];
   for(const c of (m.competitors||[])){
     if(!Number.isFinite(c.lat)||!Number.isFinite(c.lon)) continue;
     pts.push([c.lat,c.lon]);
-    L.circleMarker([c.lat,c.lon],{radius:6,weight:1,color:c.heavy?"#ff7f50":"#4ade80",fillColor:c.heavy?"#ff7f50":"#4ade80",fillOpacity:.9}).addTo(layer).bindPopup(`${esc(c.name||"Fuel")} • ${c.miles} mi`);
+    L.circleMarker([c.lat,c.lon],{
+      radius:6, weight:1, color:c.heavy?"#ff7f50":"#4ade80", fillColor:c.heavy?"#ff7f50":"#4ade80", fillOpacity:.9
+    }).addTo(layer).bindPopup(`${esc(c.name||"Fuel")} • ${c.miles} mi`);
   }
   map.fitBounds(L.latLngBounds(pts).pad(0.25));
   if(m.aadt) renderAADTMarkers(m.aadt);
-  clearOverlay();
-  updateStreetView(site[0], site[1]);
+  clearOverlay(); updateStreetView(site[0], site[1]);
 }
 
-/* Google status + autocomplete */
-const SERVER_BASE = "https://sun-nourie-live.onrender.com";
-const GOOGLE_API_KEY = "AIzaSyBKkUjhXbYeIA3jDMxvS8fExTlcPMIchs8"; // Replace with your real key if needed
-
-let GOOGLE_OK = false;
-let acItems = [];
-let acActive = -1;
-
+/* =================== Autocomplete & Status =============== */
 async function checkGoogleStatus(){
   try {
-    const r = await fetch(SERVER_BASE + "/google/status");
+    const r = await fetch("/google/status");
     const j = await r.json();
-    GOOGLE_OK = !!j.ok;
-    apiStatus.textContent = j.ok 
-      ? "API: Google — Working" 
-      : `API: Google — ${j.status}`;
-  } catch {
-    GOOGLE_OK = false; 
-    apiStatus.textContent = "API: Google — unavailable";
-  }
+    apiStatus.textContent = j.ok ? "API: Google — Working" : `API: Google — ${j.status}`;
+  } catch { apiStatus.textContent = "API: Google — unavailable"; }
 }
-
-// Run once DOM is ready
-document.addEventListener("DOMContentLoaded", checkGoogleStatus);
-
-// Also call immediately in case DOM is already loaded
-checkGoogleStatus();
-
 async function googleSearch(q){
-  if(!GOOGLE_OK) return [];
   try {
-    const r = await fetch(SERVER_BASE + "/google/autocomplete?input=" + encodeURIComponent(q));
+    const r = await fetch("/google/autocomplete?input=" + encodeURIComponent(q));
     const j = await r.json();
     if(!j.ok) return [];
     return (j.items||[]).map(it => ({...it, type:"Google", score:1.3}));
-  } catch {
-    return [];
-  }
+  } catch { return []; }
 }
-
 async function nominatimSearch(q){
   try {
     const r = await fetch("https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=us&q=" + encodeURIComponent(q));
     const a = await r.json();
     return a.map(row => ({ type:"OSM", display:row.display_name, lat:+row.lat, lon:+row.lon, score:0.6 }));
-  } catch {
-    return [];
-  }
+  } catch { return []; }
 }
-
 function renderAc(list){
-  if(!list.length){
-    acBox.style.display = "none";
-    return;
-  }
-  acBox.innerHTML = list.map((it,i) =>
-    `<div class="ac-item${i===acActive?" active":""}" data-i="${i}">${esc(it.display)} <span class="badge">${it.type}</span></div>`
-  ).join("");
+  if(!list.length){ acBox.style.display = "none"; return; }
+  acBox.innerHTML = list.map((it,i) => `<div class="ac-item${i===acActive?" active":""}" data-i="${i}">${esc(it.display)} <span class="badge">${it.type}</span></div>`).join("");
   [...acBox.children].forEach(el => el.onclick = () => chooseAc(+el.dataset.i));
   acBox.style.display = "block";
 }
 function chooseAc(i){
-  const it=acItems[i]; if(!it) return;
-  addrInput.value=it.display;
-  selectedCoords=(Number.isFinite(it.lat)&&Number.isFinite(it.lon))?{lat:it.lat,lon:it.lon}:null;
-  selectedPlaceId=it.place_id||null;
-  acBox.style.display="none";
+  const it = acItems[i]; if(!it) return;
+  addrInput.value = it.display;
+  selectedCoords = (Number.isFinite(it.lat)&&Number.isFinite(it.lon)) ? { lat:it.lat, lon:it.lon } : null;
+  selectedPlaceId = it.place_id || null;
+  acBox.style.display = "none";
 }
 addrInput.addEventListener("input",()=>{
-  const q=addrInput.value.trim(); if(q.length<3) return;
-  Promise.all([googleSearch(q),nominatimSearch(q)]).then(([g,n])=>{
-    acItems=[...g,...n].slice(0,8); renderAc(acItems);
+  const q = addrInput.value.trim(); if(q.length<3) return;
+  Promise.all([googleSearch(q), nominatimSearch(q)]).then(([g,n])=>{
+    acItems = [...g,...n].slice(0,8); renderAc(acItems);
   });
 });
 
-/* Advanced badges */
+/* =================== Advanced Badges ===================== */
 function pills(){
   const p=[];
-  if(ex_large_dev.checked)p.push("+7.5% Large development nearby");
-  if(ex_hours18.checked)p.push("−7.5% 18h ops");
-  if(ex_highincome.checked)p.push("+2.5% Higher-income");
-  if(ex_lowrating.checked)p.push("−30% Rating < 4.0");
-  if(ex_competitive_pricing.checked)p.push("+10% Competitive site gas pricing");
-  if(ex_rural.checked)p.push("+30% Rural bonus (0 comps within 3 mi)");
-  activeExtras.innerHTML=p.map(x=>`<span class="badge">${esc(x)}</span>`).join(" ");
+  if(ex_large_dev.checked) p.push("+7.5% Large development nearby");
+  if(ex_hours18.checked)  p.push("−7.5% 18h ops");
+  if(ex_highincome.checked) p.push("+2.5% Higher-income");
+  if(ex_lowrating.checked)  p.push("−30% Rating < 4.0");
+  if(ex_competitive_pricing.checked) p.push("+10% Competitive site gas pricing");
+  if(ex_rural.checked) p.push("+30% Rural bonus (0 comps within 3 mi)");
+  activeExtras.innerHTML = p.map(x=>`<span class="badge">${esc(x)}</span>`).join(" ");
 }
 [ex_large_dev,ex_hours18,ex_highincome,ex_lowrating,ex_competitive_pricing,ex_rural].forEach(el=>el.addEventListener("change",pills));
 
 function addExtraRow(pct="",note=""){
   const row=document.createElement("div");
   row.style.marginTop="6px";
-  row.innerHTML=`<span class="chip"><input class="extraPct" type="number" step="0.1" style="width:90px" placeholder="% e.g. 5 or -3" value="${pct}"> <input class="extraNote" style="width:320px" placeholder="Comment" value="${esc(note)}"> <button class="rm" type="button">×</button></span>`;
+  row.innerHTML=`<span class="chip"><input class="extraPct" type="number" step="0.1" style="width:90px" placeholder="% e.g. 5 or -3" value="${pct}">
+  <input class="extraNote" style="width:320px" placeholder="Comment" value="${esc(note)}"> <button class="rm" type="button">×</button></span>`;
   row.querySelector(".rm").addEventListener("click",()=>row.remove());
   extraList.appendChild(row);
 }
-$("addExtra").addEventListener("click",()=>addExtraRow());
+addExtraBtn.addEventListener("click",()=>addExtraRow());
 
 function collectExtras(){
   const out=[];
   if(ex_large_dev.checked) out.push({pct:7.5, note:"Large residential/commercial developments"});
-  if(ex_hours18.checked) out.push({pct:-7.5, note:"18h ops"});
+  if(ex_hours18.checked)  out.push({pct:-7.5, note:"18h ops"});
   if(ex_highincome.checked) out.push({pct:2.5, note:"Higher income"});
   if(ex_lowrating.checked) out.push({pct:-30, note:"Rating <4.0"});
   if(ex_competitive_pricing.checked) out.push({pct:10, note:"Competitive site gas pricing"});
   for(const chip of extraList.querySelectorAll(".chip")){
-    const pct=+chip.querySelector(".extraPct").value;
-    const note=chip.querySelector(".extraNote").value.trim();
+    const pct = +chip.querySelector(".extraPct").value;
+    const note = chip.querySelector(".extraNote").value.trim();
     if(Number.isFinite(pct)) out.push({pct, note});
   }
   return out;
@@ -423,150 +328,116 @@ function collectExtras(){
 function getFlags(){ return { rural: ex_rural.checked === true }; }
 function getPricePosition(){ const r=document.querySelector('input[name="pricepos"]:checked'); return r ? r.value : "inline"; }
 
-/* API calls */
-async function safeJSON(url,opts){
-  const r=await fetch(url,opts);
-  const t=await r.text();
-  if(!r.ok) throw new Error(`HTTP ${r.status}\n${t.slice(0,1200)}`);
-  try{ return JSON.parse(t);}catch{ throw new Error("Bad JSON"); }
-}
+/* =================== API: Estimate ====================== */
+async function safeJSON(url,opts){ const r=await fetch(url,opts); const t=await r.text(); try{ return JSON.parse(t);}catch{ throw new Error("Bad JSON"); } }
 async function callEstimate(){
-  const body={
+  const body = {
     address: addrInput.value.trim(),
-    mpds:+$("mpds").value||0,
-    diesel:+$("diesel").value||0,
-    advanced:{
-      extra: collectExtras(),
-      flags: getFlags(),
-      price_position: getPricePosition()
-    }
+    mpds: +$("mpds").value || 0,
+    diesel: +$("diesel").value || 0,
+    advanced: { extra: collectExtras(), flags: getFlags(), price_position: getPricePosition() }
   };
   if(selectedCoords){ body.siteLat=selectedCoords.lat; body.siteLon=selectedCoords.lon; }
-  const ov=+($("aadtOverride").value||"");
-  if(Number.isFinite(ov)&&ov>0) body.aadtOverride=ov;
+  const ov = +($("aadtOverride").value||"");
+  if(Number.isFinite(ov)&&ov>0) body.aadtOverride = ov;
   return await safeJSON("/estimate",{ method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
 }
+function renderAll(d){
+  // Estimate header
+  outNum.textContent = fmt(d.estimate?.low ?? d.low ?? 0);
+  const rangeTxt = d.estimate?.range || (d.low!=null && d.high!=null ? `${fmt(d.low)}–${fmt(d.high)}` : "—");
+  outRange.textContent = "Full range: " + rangeTxt;
+  outY2.textContent = fmt(d.estimate?.year2 ?? d.year2 ?? 0);
+  outY3.textContent = fmt(d.estimate?.year3 ?? d.year3 ?? 0);
 
-function renderAll(d) {
-  // Show CSV developments if available. When matches exist in the server-side
-  // developments_data.csv for the entered town/state, we replace the three
-  // categories with a single card containing a red stop sign and the list of
-  // developments. Otherwise we fall back to the existing OSM/news/permits logic.
+  // Banners
+  aadtBanner.textContent = d.aadtText || "—";
+  compLine.textContent = d.competitionText || "—";
+
+  // Developments
   if (Array.isArray(d.csv) && d.csv.length) {
     const listHtml = d.csv.map(x => {
-      const nm  = esc(x.name || "");
-      const st  = esc(x.status || "");
+      const nm = esc(x.name || "");
+      const st = esc(x.status || "");
       const dtl = x.details ? ` • ${esc(x.details)}` : "";
       const dt  = x.date ?    ` • ${esc(x.date)}`    : "";
       return `<li>${nm}${st ? ` • ${st}` : ''}${dtl}${dt}</li>`;
     }).join("");
-    devsBox.innerHTML =
-      `<div style="color:#ff4444;font-weight:700;font-size:1.1em;margin-bottom:4px;">&#x26D4; Developments</div><ul>${listHtml}</ul>`;
-    devsExtNews.innerHTML    = "";
+    devsBox.innerHTML = `<div style="color:#ff4444;font-weight:700;font-size:1.1em;margin-bottom:4px;">&#x26D4; Developments</div><ul>${listHtml}</ul>`;
+    devsExtNews.innerHTML = "";
     devsExtPermits.innerHTML = "";
   } else {
     devsBox.innerHTML = (d.developments||[]).length
-      ? "<ul>"+d.developments.map(x=>
-          `<li>${esc(x.name)} • ${esc(x.status)}${x.approx_miles!=null?` • ~${x.approx_miles} mi`:''}</li>`
-        ).join("")+"</ul>"
+      ? "<ul>"+d.developments.map(x=>`<li>${esc(x.name)} • ${esc(x.status)}${x.approx_miles!=null?` • ~${x.approx_miles} mi`:''}</li>`).join("")+"</ul>"
       : "<em>none</em>";
-
     devsExtNews.innerHTML = (d.developments_external?.news||[]).length
-      ? "<ul>"+d.developments_external.news.map(x=>
-          `<li>${esc(x.name)} • ${esc(x.status)}${x.link?` • <a href=\"${x.link}\" target=\"_blank\">source</a>`:''}</li>`
-        ).join("")+"</ul>"
+      ? "<ul>"+d.developments_external.news.map(x=>`<li>${esc(x.name)} • ${esc(x.status)}${x.link?` • <a href="${x.link}" target="_blank">source</a>`:''}</li>`).join("")+"</ul>"
       : "<em>none</em>";
-
     devsExtPermits.innerHTML = (d.developments_external?.permits||[]).length
-      ? "<ul>"+d.developments_external.permits.map(x=>
-          `<li>${esc(x.name)} • ${esc(x.status)}${x.link?` • <a href=\"${x.link}\" target=\"_blank\">source</a>`:''}</li>`
-        ).join("")+"</ul>"
+      ? "<ul>"+d.developments_external.permits.map(x=>`<li>${esc(x.name)} • ${esc(x.status)}${x.link?` • <a href="${x.link}" target="_blank">source</a>`:''}</li>`).join("")+"</ul>"
       : "<em>none</em>";
   }
-}
 
-  // Summary fallback
+  // Summary (fallback safe)
+  const method = d?.inputs?.aadt_components?.method || "unknown";
   let s = (d.summary||"").trim();
   if(!s){
     s = `AADT used ${fmt(d.inputs?.aadt_used)} (${method}). Baseline ceiling active. Competition ${d.competition?.count ?? 0} within 1.5 mi. Est. LOW ${fmt(d.low)} gal/mo (range ${fmt(d.low)}–${fmt(d.high)}).`;
   }
   summaryBox.textContent = s;
 
+  // Map + Rating
   initOrUpdateMap(d.map);
   showRating(addrInput.value.trim());
 }
-
-/* Rating */
 async function resolvePlaceIdIfNeeded(address){
   if (selectedPlaceId) return selectedPlaceId;
-  try {
-    const r = await fetch(SERVER_BASE + "/google/findplace?input=" + encodeURIComponent(address));
-    const j = await r.json();
-    if (j.ok && j.place_id) return j.place_id;
-  } catch {}
+  try { const r = await fetch("/google/findplace?input=" + encodeURIComponent(address));
+        const j = await r.json();
+        if (j.ok && j.place_id) return j.place_id; } catch {}
   return null;
 }
-
 async function showRating(address){
-  // Attempt to fetch rating by place ID first, then fall back to nearest gas station
-  let rating = null;
-  let total = null;
+  let rating = null, total = null;
   const pid = await resolvePlaceIdIfNeeded(address);
   if (pid) {
-    try {
-      const r = await fetch(SERVER_BASE + "/google/rating?place_id=" + encodeURIComponent(pid));
-      const j = await r.json();
-      if (j.ok) {
-        rating = j.rating ?? null;
-        total = j.total ?? null;
-      }
-    } catch {}
+    try { const r = await fetch("/google/rating?place_id=" + encodeURIComponent(pid));
+          const j = await r.json();
+          if (j.ok) { rating = j.rating ?? null; total = j.total ?? null; } } catch {}
   }
-  // Fallback: use current coordinates to lookup nearest station rating if none
   if ((rating == null || rating === undefined) && selectedCoords) {
-    try {
-      const r2 = await fetch(SERVER_BASE + "/google/rating_by_location?lat=" + encodeURIComponent(selectedCoords.lat) + "&lon=" + encodeURIComponent(selectedCoords.lon));
-      const j2 = await r2.json();
-      if (j2.ok) {
-        rating = j2.rating ?? null;
-        total = j2.total ?? null;
-      }
-    } catch {}
+    try { const r2 = await fetch("/google/rating_by_location?lat=" + encodeURIComponent(selectedCoords.lat) + "&lon=" + encodeURIComponent(selectedCoords.lon));
+          const j2 = await r2.json();
+          if (j2.ok) { rating = j2.rating ?? null; total = j2.total ?? null; } } catch {}
   }
-  return { rating, total };
+  ratingLine.innerHTML = (rating != null && rating !== undefined) ? `\u2B50 ${rating} (${total||0} reviews)` : "—";
 }
 
-  if (rating != null && rating !== undefined) {
-    ratingLine.innerHTML = `\u2B50 ${rating} (${total||0} reviews)`;
-  } else {
-    ratingLine.innerHTML = "—";
+/* =================== Main Events ======================= */
+async function onEstimateClick(){
+  if(!addrInput.value.trim() && !selectedCoords){
+    alert("Please select a valid address first.");
+    return;
   }
-}
-/* Main */
-/* Main */
-
-// This block is at the very bottom of public/index.html, after all the functions.
-// It's where the click handler for the Estimate button is defined.
-
-$("go").addEventListener("click", async ()=>{
   try {
-    goBtn.disabled = true;
-    setOverlayWorking();
-
-    const d = await callEstimate();
-    renderAll(d);
-    pills();
+    goBtn.disabled = true; runBtn.disabled = true; setOverlayWorking();
+    const resp = await callEstimate();
+    if (!resp || resp.ok !== true) {
+      alert("Estimate failed: " + (resp?.status || "Unknown error"));
+      return;
+    }
+    renderAll(resp); pills();
   } catch (e) {
-    alert("Error: " + (e.message||e));
+    alert("Error: " + (e?.message || e));
   } finally {
-    goBtn.disabled = false;
-    clearOverlay();
+    goBtn.disabled = false; runBtn.disabled = false; clearOverlay();
   }
-});
+}
+goBtn.addEventListener("click", onEstimateClick);
+runBtn.addEventListener("click", onEstimateClick);
+addrInput.addEventListener("keydown", (e)=>{ if(e.key==="Enter"){ e.preventDefault(); onEstimateClick(); } });
 
-addrInput.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); $("go").click(); } });
-
-/* PDF Export */
+/* =================== PDF Export ======================== */
 document.getElementById("exportPDF").addEventListener("click", async ()=>{
   const { jsPDF } = window.jspdf || {};
   if(!jsPDF){ alert("PDF lib failed to load"); return; }
@@ -620,8 +491,9 @@ document.getElementById("exportPDF").addEventListener("click", async ()=>{
   doc.save("FuelIQ_Site_Analyzer.pdf");
 });
 
-/* Initial */
+/* =================== Init ============================== */
+document.addEventListener("DOMContentLoaded", checkGoogleStatus);
 overlay.textContent="—";
-</script>
+  </script>
 </body>
 </html>
