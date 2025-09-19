@@ -66,6 +66,22 @@
     .aadt-tab { display:inline-block; padding:8px 12px; border-radius:999px; border:1px solid var(--line); background:var(--pill); color:var(--text); text-decoration:none; font-weight:700; font-size:13px; letter-spacing:.2px; }
     .aadt-tab:hover { background:#101a2b; }
     @media (max-width:680px){ .aadt-tabs{ overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:4px; } .aadt-tab{ white-space:nowrap; } }
+
+    /* 🔧 STOP overlay */
+    #stopModal {
+      position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+      background: rgba(0,0,0,.7); z-index: 1000;
+    }
+    #stopBox {
+      background: #0b1220; border: 2px solid #ef4444; border-radius: 14px; max-width: 780px; width: calc(100% - 32px);
+      padding: 18px 18px 14px; box-shadow: 0 24px 48px rgba(0,0,0,.5);
+    }
+    #stopTitle {
+      display:flex; align-items:center; gap:14px; font-size: 22px; font-weight: 900; color:#fecaca;
+    }
+    #stopTitle .icon { font-size: 40px; }
+    #stopList { margin-top: 8px; color:#ffe4e6; }
+    #stopClose { margin-top: 12px; background: linear-gradient(135deg,#ef4444,#f97316); }
   </style>
 </head>
 <body>
@@ -178,6 +194,15 @@
     <div class="card"><b>Summary (GPT)</b><div id="summary" class="muted">—</div></div>
   </div>
 
+  <!-- 🔧 STOP MODAL -->
+  <div id="stopModal" role="dialog" aria-modal="true" aria-labelledby="stopTitle">
+    <div id="stopBox">
+      <div id="stopTitle"><span class="icon">🛑</span> <span>STOP — Potential development flagged for this area</span></div>
+      <div id="stopList" class="muted"></div>
+      <button id="stopClose">OK, continue</button>
+    </div>
+  </div>
+
   <div class="footerbar"><button id="exportPDF">Export to PDF</button></div>
 
   <script>
@@ -192,12 +217,15 @@ const apiStatus = $("apiStatus"), aadtBanner = $("aadtBanner"), compLine = $("co
       addExtraBtn = $("addExtra"), extraList = $("extraList"), activeExtras = $("activeExtras"),
       ex_large_dev = $("ex_large_dev"), ex_hours18 = $("ex_hours18"), ex_highincome = $("ex_highincome"),
       ex_lowrating = $("ex_lowrating"), ex_competitive_pricing = $("ex_competitive_pricing"),
-      ex_rural = $("ex_rural");
+      ex_rural = $("ex_rural"),
+      stopModal = $("stopModal"), stopList = $("stopList"), stopClose = $("stopClose");
 
 let map, layer, mapReady = false, selectedCoords = null, selectedPlaceId = null;
 let acItems = [], acActive = -1;
-let acCommitted = false;           // lock suggestions after selection
+let acCommitted = false;           // 🔧 lock suggestions after selection
 let lastCommittedText = "";        // last committed display text
+
+let devCsvRows = [];               // 🔧 parsed CSV objects for town lookup
 
 function fmt(n){ return (n??0).toLocaleString(undefined,{maximumFractionDigits:0}); }
 function esc(s){ return (s??"").toString().replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
@@ -251,12 +279,15 @@ function initOrUpdateMap(m){
 function hideAc(){ acBox.style.display = "none"; acActive = -1; }
 function commitAddress(display, coords, placeId){
   lastCommittedText = (display || "").trim();
-  acCommitted = true;
+  acCommitted = true;  // 🔧 lock suggestions
   acItems = [];
   hideAc();
   addrInput.value = display;
   selectedCoords = coords || null;
   selectedPlaceId = placeId || null;
+
+  // 🔧 STOP check as soon as address is chosen
+  if (coords) maybeShowStopForCoords(coords.lat, coords.lon).catch(()=>{});
 }
 
 async function checkGoogleStatus(){
@@ -296,18 +327,16 @@ function chooseAc(i){
   if (!it) return;
   const coords = (Number.isFinite(it.lat) && Number.isFinite(it.lon)) ? { lat: it.lat, lon: it.lon } : null;
   commitAddress(it.display, coords, it.place_id || null);
-  addrInput.blur(); // collapse mobile keyboard and trigger blur-hide
+  addrInput.blur();
 }
 
 addrInput.addEventListener("input", () => {
   const q = addrInput.value.trim();
 
-  // If we have a committed selection and text hasn't changed, keep list hidden.
-  // MDN: input fires whenever value changes; if not changed, do nothing. :contentReference[oaicite:1]{index=1}
+  // 🔧 If we've committed a selection, keep suggestions OFF until the field is cleared.
   if (acCommitted) {
-    if (q === lastCommittedText) { hideAc(); return; }
-    // User started editing -> unlock suggestions.
-    acCommitted = false;
+    if (q.length === 0) { acCommitted = false; lastCommittedText = ""; }  // unlock only when cleared
+    else { hideAc(); return; }
   }
 
   if (q.length < 3) { hideAc(); return; }
@@ -318,16 +347,98 @@ addrInput.addEventListener("input", () => {
   });
 });
 
-// Hide list when input loses focus (standard blur behavior). :contentReference[oaicite:2]{index=2}
+// Hide list when input loses focus
 addrInput.addEventListener("blur", () => { setTimeout(hideAc, 120); });
-
-// Hide list on Escape key. (Use KeyboardEvent.key === "Escape") :contentReference[oaicite:3]{index=3}
+// Hide list on Escape
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") hideAc(); });
-
-// Hide list on outside click/tap (pointerdown covers mouse/touch/pen). :contentReference[oaicite:4]{index=4}
+// Hide list on outside click/tap
 document.addEventListener("pointerdown", (e) => {
   if (e.target !== addrInput && !acBox.contains(e.target)) hideAc();
 });
+
+/* =================== Dev CSV + STOP modal ============== */
+// very small CSV helpers (align with backend)
+function parseCsvString(csv) {
+  const rows = [];
+  let row = [], value = "", inQuotes = false;
+  for (let i = 0; i < csv.length; i++) {
+    const c = csv[i];
+    if (c === '"' && csv[i + 1] === '"') { value += '"'; i++; }
+    else if (c === '"') { inQuotes = !inQuotes; }
+    else if (c === ',' && !inQuotes) { row.push(value); value = ""; }
+    else if ((c === '\n' || c === '\r') && !inQuotes) {
+      if (c === '\r' && csv[i + 1] === '\n') i++;
+      row.push(value); value = "";
+      if (row.length > 1 || row[0] !== "") rows.push(row);
+      row = [];
+    } else { value += c; }
+  }
+  if (value !== "" || row.length > 0) { row.push(value); rows.push(row); }
+  return rows;
+}
+function transformCsvData(rows) {
+  if (!rows || !rows.length) return [];
+  const headers = rows[0], data = [];
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i], obj = {};
+    headers.forEach((h, idx) => (obj[h] = r[idx]));
+    const town = obj["City/County"] || obj["City/County.1"] || obj["City/County.2"] || "";
+    const state = obj["State"] || "";
+    const name = obj["Brand"] || obj["Brand.1"] || "";
+    const status = obj["Status"] || "";
+    const details = obj["Details"] || obj["Details.1"] || obj["Details.2"] || "";
+    const date = obj["Date"] || obj["Date.1"] || obj["Date.2"] || "";
+    if (!town && !state) continue;
+    data.push({ name, town, state, status, details, date });
+  }
+  return data;
+}
+async function loadDevCsv() {
+  try {
+    const txt = await fetch("developments_data.csv", { cache: "no-store" }).then(r => r.ok ? r.text() : "");
+    if (!txt) return;
+    const rows = parseCsvString(txt);
+    devCsvRows = transformCsvData(rows);
+  } catch {}
+}
+function matchCsvDevelopments(city, county, state) {
+  if (!devCsvRows.length) return [];
+  const st = (state || "").trim().toLowerCase();
+  const cty = (city || "").trim().toLowerCase();
+  const cnty = (county || "").trim().toLowerCase();
+  return devCsvRows.filter((r) => {
+    const rState = (r.state || "").trim().toLowerCase();
+    const rTown = (r.town || "").trim().toLowerCase();
+    if (!rState || !rTown) return false;
+    if (rState !== st) return false;
+    return rTown === cty || rTown === cnty;
+  });
+}
+function showStopModal(matches, whereText){
+  const lis = matches.map(x => {
+    const nm = esc(x.name || "");
+    const st = esc(x.status || "");
+    const dtl = x.details ? ` • ${esc(x.details)}` : "";
+    const dt  = x.date ?    ` • ${esc(x.date)}`    : "";
+    return `<li>${nm}${st ? ` • ${st}` : ''}${dtl}${dt}</li>`;
+  }).join("");
+  stopList.innerHTML = `<div><b>${esc(whereText)}</b> — found in developments list:</div><ul>${lis}</ul>`;
+  stopModal.style.display = "flex";
+}
+stopClose.addEventListener("click", ()=>{ stopModal.style.display = "none"; });
+
+async function maybeShowStopForCoords(lat, lon){
+  try{
+    const url = `https://nominatim.openstreetmap.org/reverse?format=json&zoom=10&addressdetails=1&lat=${lat}&lon=${lon}`;
+    const j = await fetch(url).then(r=>r.json());
+    const a = j.address || {};
+    const city = a.city || a.town || a.village || a.hamlet || "";
+    const county = a.county || "";
+    const state = a.state || a.region || "";
+    const hits = matchCsvDevelopments(city, county, state);
+    if (hits.length) showStopModal(hits, `${city || county}, ${state}`);
+  } catch {}
+}
 
 /* =================== Advanced Badges ===================== */
 function pills(){
@@ -357,7 +468,7 @@ function collectExtras(){
   if(ex_large_dev.checked) out.push({pct:7.5, note:"Large residential/commercial developments"});
   if(ex_hours18.checked)  out.push({pct:-7.5, note:"18h ops"});
   if(ex_highincome.checked) out.push({pct:2.5, note:"Higher income"});
-  if(ex_lowrating.checked) out.push({pct:-30, note:"Rating <4.0"});
+  if(ex_lowrating.checked)  out.push({pct:-30, note:"Rating <4.0"});
   if(ex_competitive_pricing.checked) out.push({pct:10, note:"Competitive site gas pricing"});
   for(const chip of extraList.querySelectorAll(".chip")){
     const pct = +chip.querySelector(".extraPct").value;
@@ -409,6 +520,9 @@ function renderAll(d){
     devsBox.innerHTML = `<div style="color:#ff4444;font-weight:700;font-size:1.1em;margin-bottom:4px;">&#x26D4; Developments</div><ul>${listHtml}</ul>`;
     devsExtNews.innerHTML = "";
     devsExtPermits.innerHTML = "";
+
+    // 🔧 Also show STOP modal if CSV hits returned from backend
+    showStopModal(d.csv, "Selected area");
   } else {
     devsBox.innerHTML = (d.developments||[]).length
       ? "<ul>"+d.developments.map(x=>`<li>${esc(x.name)} • ${esc(x.status)}${x.approx_miles!=null?` • ~${x.approx_miles} mi`:''}</li>`).join("")+"</ul>"
@@ -545,7 +659,10 @@ document.getElementById("exportPDF").addEventListener("click", async ()=>{
 });
 
 /* =================== Init ============================== */
-document.addEventListener("DOMContentLoaded", checkGoogleStatus);
+document.addEventListener("DOMContentLoaded", ()=>{
+  checkGoogleStatus();
+  loadDevCsv().catch(()=>{});
+});
 overlay.textContent="—";
   </script>
 </body>
