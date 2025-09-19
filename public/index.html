@@ -1,4 +1,4 @@
-<!-- public/index.html — Fuel IQ UI (drop-in) -->
+<!-- public/index.html — Fuel IQ UI (drop-in) with locked autocomplete & STOP overlay -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -67,21 +67,26 @@
     .aadt-tab:hover { background:#101a2b; }
     @media (max-width:680px){ .aadt-tabs{ overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:4px; } .aadt-tab{ white-space:nowrap; } }
 
-    /* 🔧 STOP overlay */
-    #stopModal {
-      position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
-      background: rgba(0,0,0,.7); z-index: 1000;
+    /* STOP overlay */
+    #devStop {
+      position: fixed; z-index: 9999; inset: 0; display: none; align-items: center; justify-content: center;
+      background: rgba(0,0,0,.65);
     }
-    #stopBox {
-      background: #0b1220; border: 2px solid #ef4444; border-radius: 14px; max-width: 780px; width: calc(100% - 32px);
-      padding: 18px 18px 14px; box-shadow: 0 24px 48px rgba(0,0,0,.5);
+    #devStop .box {
+      background: #0b1220; border: 2px solid #ef4444; border-radius: 12px; padding: 20px; max-width: 680px; width: calc(100% - 32px);
+      color:#ffe9e9; text-align: left; box-shadow: 0 22px 44px rgba(0,0,0,.45);
     }
-    #stopTitle {
-      display:flex; align-items:center; gap:14px; font-size: 22px; font-weight: 900; color:#fecaca;
+    #devStop .sign {
+      width: 100px; height: 100px; background: #EF4444; color: #fff; font-weight: 900; font-size: 28px; border-radius: 12px;
+      display:flex; align-items:center; justify-content:center; margin-right: 16px; clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%);
+      border: 4px solid #fff;
     }
-    #stopTitle .icon { font-size: 40px; }
-    #stopList { margin-top: 8px; color:#ffe4e6; }
-    #stopClose { margin-top: 12px; background: linear-gradient(135deg,#ef4444,#f97316); }
+    #devStop .row { display:flex; align-items:center; gap:14px; }
+    #devStop h3 { margin:0 0 4px 0; color:#fff; }
+    #devStop small { color:#fecaca; }
+    #devStop ul { margin:10px 0 0 0; padding-left: 18px; }
+    #devStop .actions { display:flex; justify-content:flex-end; gap:10px; margin-top:12px; }
+    #devStop button { background: #ef4444; }
   </style>
 </head>
 <body>
@@ -194,16 +199,22 @@
     <div class="card"><b>Summary (GPT)</b><div id="summary" class="muted">—</div></div>
   </div>
 
-  <!-- 🔧 STOP MODAL -->
-  <div id="stopModal" role="dialog" aria-modal="true" aria-labelledby="stopTitle">
-    <div id="stopBox">
-      <div id="stopTitle"><span class="icon">🛑</span> <span>STOP — Potential development flagged for this area</span></div>
-      <div id="stopList" class="muted"></div>
-      <button id="stopClose">OK, continue</button>
+  <div class="footerbar"><button id="exportPDF">Export to PDF</button></div>
+
+  <!-- STOP overlay -->
+  <div id="devStop">
+    <div class="box">
+      <div class="row">
+        <div class="sign">STOP</div>
+        <div>
+          <h3>Planned/Active Developments Detected</h3>
+          <small>The selected city/county matches entries in <b>developments_data.csv</b>. Review the items below.</small>
+        </div>
+      </div>
+      <div id="devStopList" style="margin-top:10px;"></div>
+      <div class="actions"><button id="devStopClose">Dismiss</button></div>
     </div>
   </div>
-
-  <div class="footerbar"><button id="exportPDF">Export to PDF</button></div>
 
   <script>
 /* =================== Helpers & State =================== */
@@ -217,15 +228,15 @@ const apiStatus = $("apiStatus"), aadtBanner = $("aadtBanner"), compLine = $("co
       addExtraBtn = $("addExtra"), extraList = $("extraList"), activeExtras = $("activeExtras"),
       ex_large_dev = $("ex_large_dev"), ex_hours18 = $("ex_hours18"), ex_highincome = $("ex_highincome"),
       ex_lowrating = $("ex_lowrating"), ex_competitive_pricing = $("ex_competitive_pricing"),
-      ex_rural = $("ex_rural"),
-      stopModal = $("stopModal"), stopList = $("stopList"), stopClose = $("stopClose");
+      ex_rural = $("ex_rural");
+
+const devStop = $("devStop"), devStopList = $("devStopList"), devStopClose = $("devStopClose");
 
 let map, layer, mapReady = false, selectedCoords = null, selectedPlaceId = null;
 let acItems = [], acActive = -1;
-let acCommitted = false;           // 🔧 lock suggestions after selection
-let lastCommittedText = "";        // last committed display text
 
-let devCsvRows = [];               // 🔧 parsed CSV objects for town lookup
+// NEW: lock suggestions after a choice until field is cleared
+let acLocked = false;
 
 function fmt(n){ return (n??0).toLocaleString(undefined,{maximumFractionDigits:0}); }
 function esc(s){ return (s??"").toString().replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
@@ -277,17 +288,31 @@ function initOrUpdateMap(m){
 
 /* =================== Autocomplete & Status =============== */
 function hideAc(){ acBox.style.display = "none"; acActive = -1; }
+function renderAc(list){
+  if(!list.length || acLocked){ hideAc(); return; }
+  acBox.innerHTML = list.map((it,i) =>
+    `<div class="ac-item${i===acActive?" active":""}" data-i="${i}">${esc(it.display)} <span class="badge">${it.type}</span></div>`
+  ).join("");
+  [...acBox.children].forEach(el => el.onclick = () => chooseAc(+el.dataset.i));
+  acBox.style.display = "block";
+}
 function commitAddress(display, coords, placeId){
-  lastCommittedText = (display || "").trim();
-  acCommitted = true;  // 🔧 lock suggestions
-  acItems = [];
+  acLocked = true; // lock after commit
   hideAc();
-  addrInput.value = display;
+  addrInput.value = display || "";
   selectedCoords = coords || null;
   selectedPlaceId = placeId || null;
-
-  // 🔧 STOP check as soon as address is chosen
-  if (coords) maybeShowStopForCoords(coords.lat, coords.lon).catch(()=>{});
+  // Immediately resolve admin + CSV match and show STOP if needed
+  if (selectedCoords) {
+    showStopIfDev(selectedCoords.lat, selectedCoords.lon).catch(()=>{});
+  }
+}
+function chooseAc(i){
+  const it = acItems[i];
+  if (!it) return;
+  const coords = (Number.isFinite(it.lat) && Number.isFinite(it.lon)) ? { lat: it.lat, lon: it.lon } : null;
+  commitAddress(it.display, coords, it.place_id || null);
+  addrInput.blur();
 }
 
 async function checkGoogleStatus(){
@@ -314,28 +339,12 @@ async function nominatimSearch(q){
   } catch { return []; }
 }
 
-function renderAc(list){
-  if(!list.length){ hideAc(); return; }
-  acBox.innerHTML = list.map((it,i) =>
-    `<div class="ac-item${i===acActive?" active":""}" data-i="${i}">${esc(it.display)} <span class="badge">${it.type}</span></div>`
-  ).join("");
-  [...acBox.children].forEach(el => el.onclick = () => chooseAc(+el.dataset.i));
-  acBox.style.display = "block";
-}
-function chooseAc(i){
-  const it = acItems[i];
-  if (!it) return;
-  const coords = (Number.isFinite(it.lat) && Number.isFinite(it.lon)) ? { lat: it.lat, lon: it.lon } : null;
-  commitAddress(it.display, coords, it.place_id || null);
-  addrInput.blur();
-}
-
 addrInput.addEventListener("input", () => {
   const q = addrInput.value.trim();
 
-  // 🔧 If we've committed a selection, keep suggestions OFF until the field is cleared.
-  if (acCommitted) {
-    if (q.length === 0) { acCommitted = false; lastCommittedText = ""; }  // unlock only when cleared
+  // If locked and not cleared, do not show suggestions
+  if (acLocked) {
+    if (q.length === 0) { acLocked = false; } // unlock only when fully cleared
     else { hideAc(); return; }
   }
 
@@ -347,96 +356,37 @@ addrInput.addEventListener("input", () => {
   });
 });
 
-// Hide list when input loses focus
+// blur hides
 addrInput.addEventListener("blur", () => { setTimeout(hideAc, 120); });
-// Hide list on Escape
+
+// esc hides
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") hideAc(); });
-// Hide list on outside click/tap
+
+// outside click hides
 document.addEventListener("pointerdown", (e) => {
   if (e.target !== addrInput && !acBox.contains(e.target)) hideAc();
 });
 
-/* =================== Dev CSV + STOP modal ============== */
-// very small CSV helpers (align with backend)
-function parseCsvString(csv) {
-  const rows = [];
-  let row = [], value = "", inQuotes = false;
-  for (let i = 0; i < csv.length; i++) {
-    const c = csv[i];
-    if (c === '"' && csv[i + 1] === '"') { value += '"'; i++; }
-    else if (c === '"') { inQuotes = !inQuotes; }
-    else if (c === ',' && !inQuotes) { row.push(value); value = ""; }
-    else if ((c === '\n' || c === '\r') && !inQuotes) {
-      if (c === '\r' && csv[i + 1] === '\n') i++;
-      row.push(value); value = "";
-      if (row.length > 1 || row[0] !== "") rows.push(row);
-      row = [];
-    } else { value += c; }
-  }
-  if (value !== "" || row.length > 0) { row.push(value); rows.push(row); }
-  return rows;
+/* =================== STOP overlay ===================== */
+function showStop(items){
+  if (!items || !items.length) return;
+  const html = `<ul>${items.map(x=>{
+    const dtl = x.details ? ` — ${esc(x.details)}` : "";
+    const dt = x.date ? ` (${esc(x.date)})` : "";
+    const st = x.status ? ` — <i>${esc(x.status)}</i>` : "";
+    return `<li><b>${esc(x.name||"Development")}</b>${st}${dtl}${dt}</li>`;
+  }).join("")}</ul>`;
+  devStopList.innerHTML = html;
+  devStop.style.display = "flex";
 }
-function transformCsvData(rows) {
-  if (!rows || !rows.length) return [];
-  const headers = rows[0], data = [];
-  for (let i = 1; i < rows.length; i++) {
-    const r = rows[i], obj = {};
-    headers.forEach((h, idx) => (obj[h] = r[idx]));
-    const town = obj["City/County"] || obj["City/County.1"] || obj["City/County.2"] || "";
-    const state = obj["State"] || "";
-    const name = obj["Brand"] || obj["Brand.1"] || "";
-    const status = obj["Status"] || "";
-    const details = obj["Details"] || obj["Details.1"] || obj["Details.2"] || "";
-    const date = obj["Date"] || obj["Date.1"] || obj["Date.2"] || "";
-    if (!town && !state) continue;
-    data.push({ name, town, state, status, details, date });
-  }
-  return data;
-}
-async function loadDevCsv() {
-  try {
-    const txt = await fetch("developments_data.csv", { cache: "no-store" }).then(r => r.ok ? r.text() : "");
-    if (!txt) return;
-    const rows = parseCsvString(txt);
-    devCsvRows = transformCsvData(rows);
-  } catch {}
-}
-function matchCsvDevelopments(city, county, state) {
-  if (!devCsvRows.length) return [];
-  const st = (state || "").trim().toLowerCase();
-  const cty = (city || "").trim().toLowerCase();
-  const cnty = (county || "").trim().toLowerCase();
-  return devCsvRows.filter((r) => {
-    const rState = (r.state || "").trim().toLowerCase();
-    const rTown = (r.town || "").trim().toLowerCase();
-    if (!rState || !rTown) return false;
-    if (rState !== st) return false;
-    return rTown === cty || rTown === cnty;
-  });
-}
-function showStopModal(matches, whereText){
-  const lis = matches.map(x => {
-    const nm = esc(x.name || "");
-    const st = esc(x.status || "");
-    const dtl = x.details ? ` • ${esc(x.details)}` : "";
-    const dt  = x.date ?    ` • ${esc(x.date)}`    : "";
-    return `<li>${nm}${st ? ` • ${st}` : ''}${dtl}${dt}</li>`;
-  }).join("");
-  stopList.innerHTML = `<div><b>${esc(whereText)}</b> — found in developments list:</div><ul>${lis}</ul>`;
-  stopModal.style.display = "flex";
-}
-stopClose.addEventListener("click", ()=>{ stopModal.style.display = "none"; });
+devStopClose.addEventListener("click", ()=>{ devStop.style.display = "none"; });
 
-async function maybeShowStopForCoords(lat, lon){
-  try{
-    const url = `https://nominatim.openstreetmap.org/reverse?format=json&zoom=10&addressdetails=1&lat=${lat}&lon=${lon}`;
-    const j = await fetch(url).then(r=>r.json());
-    const a = j.address || {};
-    const city = a.city || a.town || a.village || a.hamlet || "";
-    const county = a.county || "";
-    const state = a.state || a.region || "";
-    const hits = matchCsvDevelopments(city, county, state);
-    if (hits.length) showStopModal(hits, `${city || county}, ${state}`);
+async function showStopIfDev(lat, lon){
+  try {
+    const a = await (await fetch(`/admin?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`)).json();
+    if (!a || !a.ok) return;
+    const d = await (await fetch(`/developments/check?city=${encodeURIComponent(a.city||"")}&county=${encodeURIComponent(a.county||"")}&state=${encodeURIComponent(a.state||"")}`)).json();
+    if (d && d.ok && d.count > 0) showStop(d.items);
   } catch {}
 }
 
@@ -520,9 +470,6 @@ function renderAll(d){
     devsBox.innerHTML = `<div style="color:#ff4444;font-weight:700;font-size:1.1em;margin-bottom:4px;">&#x26D4; Developments</div><ul>${listHtml}</ul>`;
     devsExtNews.innerHTML = "";
     devsExtPermits.innerHTML = "";
-
-    // 🔧 Also show STOP modal if CSV hits returned from backend
-    showStopModal(d.csv, "Selected area");
   } else {
     devsBox.innerHTML = (d.developments||[]).length
       ? "<ul>"+d.developments.map(x=>`<li>${esc(x.name)} • ${esc(x.status)}${x.approx_miles!=null?` • ~${x.approx_miles} mi`:''}</li>`).join("")+"</ul>"
@@ -659,12 +606,8 @@ document.getElementById("exportPDF").addEventListener("click", async ()=>{
 });
 
 /* =================== Init ============================== */
-document.addEventListener("DOMContentLoaded", ()=>{
-  checkGoogleStatus();
-  loadDevCsv().catch(()=>{});
-});
+document.addEventListener("DOMContentLoaded", checkGoogleStatus);
 overlay.textContent="—";
   </script>
 </body>
 </html>
-
