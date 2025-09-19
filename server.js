@@ -1,10 +1,11 @@
-// server.js — Fuel IQ API (v2025‑09‑19) — DOT AADT DIRECT + GPT SUMMARY
-// - USES DOT AADT DIRECTLY in gallons (no blend if a DOT AADT exists)
-// - Prioritizes *entered road* (route/road token match) for AADT pick
-// - Adds /aadt/nearby for 1‑mile AADT table and second map
-// - STOP alert from developments_data.csv
-// - Keeps Google proxy endpoints + rating
-// ------------------------------------------------------------------------------
+// server.js — Fuel IQ API (v2025‑09‑19) — robust, feature‑complete
+// - Fixes front‑end "checking..." (caused by prior JS error; this file keeps API stable)
+// - DOT AADT drives gallons calc directly when available (no blend)
+// - Prioritizes *entered road* match, fallback to nearest DOT station
+// - 1‑mile AADT list + second map endpoint
+// - STOP banner from developments_data.csv
+// - GPT summary restored
+// -----------------------------------------------------------------------------
 
 import express from "express";
 import cors from "cors";
@@ -12,7 +13,7 @@ import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
 
-/* --------------------------------- App --------------------------------- */
+/* --------------------------- App & static UI --------------------------- */
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
@@ -35,22 +36,38 @@ app.get("/", (_req, res) => {
 });
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
-/* -------------------------------- Config -------------------------------- */
+/* ------------------------------ Config ------------------------------ */
 const UA = "FuelEstimator/3.4 (+your-app)";
 const CONTACT = process.env.OVERPASS_CONTACT || UA;
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || "";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 
-// Optional external traffic service (not required)
-const TRAFFIC_URL = process.env.TRAFFIC_URL || "";
-const TRAFFIC_API_KEY = process.env.TRAFFIC_API_KEY || "";
+/* --------------------- fetch() helper (Node 16/18) --------------------- */
+let _cachedFetch = null;
+async function getFetch() {
+  if (typeof fetch === "function") return fetch;
+  if (_cachedFetch) return _cachedFetch;
+  try {
+    const mod = await import("node-fetch"); // npm i node-fetch@3 if on Node 16
+    _cachedFetch = mod.default;
+    return _cachedFetch;
+  } catch (e) {
+    throw new Error("No fetch available. Use Node 18+ or install node-fetch@3.");
+  }
+}
+async function fetchWithTimeout(url, opts = {}, timeoutMs = 25000) {
+  const f = await getFetch();
+  const ctl = new AbortController();
+  const id = setTimeout(() => ctl.abort(), timeoutMs);
+  try { return await f(url, { ...opts, signal: ctl.signal }); }
+  finally { clearTimeout(id); }
+}
 
-/* ----------------------------- CSV (Developments) ----------------------------- */
+/* -------------------- CSV (Developments STOP banner) -------------------- */
 let csvDevData = [];
 function parseCsvString(csv) {
-  const rows = [];
-  let row = [], value = "", inQuotes = false;
+  const rows = []; let row = [], value = "", inQuotes = false;
   for (let i = 0; i < csv.length; i++) {
     const c = csv[i];
     if (c === '"' && csv[i + 1] === '"') { value += '"'; i++; }
@@ -67,7 +84,7 @@ function parseCsvString(csv) {
   return rows;
 }
 function transformCsvData(rows) {
-  if (!rows || !rows.length) return [];
+  if (!rows?.length) return [];
   const headers = rows[0], data = [];
   for (let i = 1; i < rows.length; i++) {
     const r = rows[i], obj = {};
@@ -109,7 +126,7 @@ function matchCsvDevelopments(city, county, state) {
 }
 loadCsvDevData().catch(() => {});
 
-/* --------------------------------- Utils --------------------------------- */
+/* ------------------------------ Utils ------------------------------ */
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const toMiles = (m) => m / 1609.344;
 function haversine(lat1, lon1, lat2, lon2) {
@@ -120,13 +137,8 @@ function haversine(lat1, lon1, lat2, lon2) {
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 function distMiles(a, b, c, d) { return toMiles(haversine(a, b, c, d)); }
-async function fetchWithTimeout(url, opts = {}, timeoutMs = 25000) {
-  const ctl = new AbortController(); const id = setTimeout(() => ctl.abort(), timeoutMs);
-  try { return await fetch(url, { ...opts, signal: ctl.signal }); }
-  finally { clearTimeout(id); }
-}
 
-/* -------------------------------- Geocoding ------------------------------- */
+/* -------------------------- Geocoding helpers -------------------------- */
 function tryParseLatLng(address) {
   const m = String(address || "").trim().match(/^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/);
   if (!m) return null;
@@ -182,7 +194,7 @@ async function geocode(address) {
   else { try { return await geocodeNominatim(address); } catch { return await geocodeCensus(address); } }
 }
 
-/* ---------------------------- States & Providers ---------------------------- */
+/* --------------------------- State detection --------------------------- */
 const STATE_CODE = {
   "alabama":"AL","alaska":"AK","arizona":"AZ","arkansas":"AR","california":"CA","colorado":"CO",
   "connecticut":"CT","delaware":"DE","district of columbia":"DC","washington, dc":"DC","dc":"DC",
@@ -199,15 +211,17 @@ function toStateCode(name) {
   return STATE_CODE[s] || (s.length === 2 ? s.toUpperCase() : null);
 }
 
-// Official provider catalogs (see citations above)
+/* --------------------- Official DOT AADT providers --------------------- */
+// Using authoritative endpoints (see sources). DC layer is MapServer/4 (volume lines),
+// VA is FeatureServer lines, NC is station points, FL is RCI_Layers FeatureServer/0.
 const AADT_PROVIDERS = {
-  NC: { kind: "arcgis", url: "https://services.arcgis.com/NuWFvHYDMVmmxMeM/ArcGIS/rest/services/NCDOT_AADT_Stations/FeatureServer/0", geoType: "point" }, // stations (ROUTE/LOCATION) — NCDOT. :contentReference[oaicite:6]{index=6}
-  VA: { kind: "arcgis", url: "https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/VDOTTrafficVolume/FeatureServer/0", geoType: "line" },        // ADT segments — VDOT. :contentReference[oaicite:7]{index=7}
-  DC: { kind: "arcgis", url: "https://maps2.dcgis.dc.gov/dcgis/rest/services/DCGIS_DATA/Transportation_TrafficVolume_WebMercator/MapServer/4", geoType: "line" }, // 2023 Volume — DDOT. :contentReference[oaicite:8]{index=8}
-  FL: { kind: "arcgis", url: "https://gis.fdot.gov/arcgis/rest/services/RCI_Layers/FeatureServer/0", geoType: "line" },                                      // AADT TDA — FDOT. :contentReference[oaicite:9]{index=9}
+  NC: { kind: "arcgis", url: "https://services.arcgis.com/NuWFvHYDMVmmxMeM/ArcGIS/rest/services/NCDOT_AADT_Stations/FeatureServer/0", geoType: "point" }, // NCDOT stations. :contentReference[oaicite:2]{index=2}
+  VA: { kind: "arcgis", url: "https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/VDOTTrafficVolume/FeatureServer/0", geoType: "line" },          // VDOT Traffic Volume. :contentReference[oaicite:3]{index=3}
+  DC: { kind: "arcgis", url: "https://maps2.dcgis.dc.gov/dcgis/rest/services/DCGIS_DATA/Transportation_TrafficVolume_WebMercator/MapServer/4", geoType: "line" }, // DDOT 2023 volume. :contentReference[oaicite:4]{index=4}
+  FL: { kind: "arcgis", url: "https://gis.fdot.gov/arcgis/rest/services/RCI_Layers/FeatureServer/0", geoType: "line" },                                    // FDOT AADT TDA. :contentReference[oaicite:5]{index=5}
 };
 
-/* --------------------------- ArcGIS helpers ---------------------------- */
+/* -------------------------- ArcGIS query helpers -------------------------- */
 async function arcgisQueryNearby(url, lat, lon, radiusMeters = 1609, outFields = "*") {
   const p = new URLSearchParams({
     f: "json",
@@ -243,7 +257,7 @@ async function arcgisQueryWhere(url, where, outFields = "*", returnGeometry = tr
   return Array.isArray(j.features) ? j.features : [];
 }
 
-/* ------------------------------ AADT parsing ------------------------------ */
+/* ------------------------- AADT parsing utilities ------------------------- */
 function extractLatestAADT(attrs) {
   if (!attrs) return null;
   const pairs = [];
@@ -293,18 +307,14 @@ function looksNumberedHighway(s) {
   const t = String(s || "").toUpperCase();
   return /\b(I[-\s]*\d+|US[-\s]*\d+|NC[-\s]*\d+|VA[-\s]*\d+|FL[-\s]*\d+|SR[-\s]*\d+|STATE\s*ROUTE\s*\d+)\b/.test(t);
 }
-
-/* -------------------- Build WHERE for route/road tokens ------------------- */
 function buildRouteWhere(tokens, fields = ["ROUTE","ROUTE_COMMON_NAME","NAME","STREETNAME","FULLNAME","ROAD","RTE_NAME"]) {
-  if (!tokens || !tokens.length) return null;
+  if (!tokens?.length) return null;
   const ors = [];
   for (const f of fields) {
     for (const t of tokens) ors.push(`UPPER(${f}) LIKE '%${t.toUpperCase().replace(/'/g, "''")}%'`);
   }
   return ors.length ? `(${ors.join(" OR ")})` : null;
 }
-
-/* ----------------------- Geometry helpers & scoring ----------------------- */
 function featureCenterAndDistance(feat, lat, lon) {
   const g = feat.geometry || {};
   if (typeof g.y === "number" && typeof g.x === "number") {
@@ -364,9 +374,7 @@ function pickStationForStreet(stations, streetText) {
     return tokens.some((t) => N.includes(t));
   };
   const withMatch = stations.filter(s => hasToken(s.route) || hasToken(s.location));
-  if (withMatch.length) return withMatch[0]; // nearest first among matches
-
-  // If the entered street is *not* a numbered highway, bias away from numbered routes
+  if (withMatch.length) return withMatch[0];
   if (!looksNumberedHighway(streetText)) {
     const nonNum = stations.filter(s => !(String(s.route||"").match(/\b(I|US|SR|NC|VA|FL)[-\s]?\d+/)));
     if (nonNum.length) return nonNum[0];
@@ -374,7 +382,7 @@ function pickStationForStreet(stations, streetText) {
   return stations[0];
 }
 
-/* ------------------------- Provider lookups (multi-state) ------------------------- */
+/* ---------------------- Provider query wrappers ---------------------- */
 async function providerNearbyAADT(stateCode, lat, lon, radiusMi = 1.0) {
   const prov = AADT_PROVIDERS[stateCode];
   if (!prov) return [];
@@ -389,11 +397,10 @@ async function providerStationsOnStreet(stateCode, lat, lon, streetText) {
   if (!where) return [];
   const feats = await arcgisQueryWhere(prov.url, where, "*", true).catch(() => []);
   const st = featuresToStations(stateCode, feats, lat, lon);
-  // guardrail: restrict to within ~1.5 miles to avoid same-named routes far away
   return st.filter(s => s.distM <= 1.5 * 1609.344);
 }
 
-/* -------------------------- Competition (OSM+Google) -------------------------- */
+/* --------------------- Competition (OSM + Google) --------------------- */
 const OVERPASS = [
   "https://overpass-api.de/api/interpreter",
   "https://overpass.kumi.systems/api/interpreter",
@@ -432,7 +439,6 @@ async function overpassQuery(data) {
 }
 const HEAVY_BRANDS = /(sheetz|wawa|race\s?trac|racetrac|buc-?ee'?s|royal\s?farms|quik.?trip|\bqt\b)/i;
 const IS_SUNOCO = /\bsunoco\b/i;
-
 async function googleNearbyGasStations(lat, lon, rM = 2414) {
   if (!GOOGLE_API_KEY) return [];
   const base = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lon}&radius=${rM}&type=gas_station&key=${GOOGLE_API_KEY}`;
@@ -492,7 +498,7 @@ async function competitorsWithinRadiusMiles(lat, lon, rMi = 1.5) {
   return out.filter((s) => s.miles <= rMi);
 }
 
-/* --------------------------- Road context (heuristic only for context) --------------------------- */
+/* ----------------------- Road context (heuristic only) ----------------------- */
 function parseMaxspeed(ms) { const m = String(ms || "").match(/(\d+)\s*(mph)?/i); return m ? +m[1] : null; }
 function roadWeight(hw) {
   const order = { motorway: 6, trunk: 5, primary: 4, secondary: 3, tertiary: 2, unclassified: 1, residential: 1 };
@@ -579,14 +585,16 @@ function gallonsWithRules({ aadt, mpds, diesel, compCount, heavyCount, pricePosi
   };
 }
 
-/* --------------------------- Google proxy/status --------------------------- */
+/* ------------------------ Google proxy/status ------------------------ */
 app.get("/google/status", async (_req, res) => {
   try {
     if (!GOOGLE_API_KEY) return res.json({ ok: false, status: "MISSING_KEY" });
     const au = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=Test&components=country:us&key=${GOOGLE_API_KEY}`;
     const r = await fetchWithTimeout(au, { headers: { "User-Agent": UA } }, 10000);
     res.json({ ok: r.ok, status: r.ok ? "WORKING" : `HTTP_${r.status}` });
-  } catch { res.json({ ok: false, status: "EXCEPTION" }); }
+  } catch {
+    res.json({ ok: false, status: "EXCEPTION" });
+  }
 });
 app.get("/google/autocomplete", async (req, res) => {
   const q = String(req.query.input || "").trim();
@@ -663,7 +671,7 @@ app.get("/google/rating_by_location", async (req, res) => {
   } catch (e) { res.json({ ok: false, status: "EXCEPTION", error: String(e) }); }
 });
 
-/* ---------------------------- AADT NEARBY (1 mi) ---------------------------- */
+/* --------------------- AADT sources list (1 mile) --------------------- */
 app.get("/aadt/nearby", async (req, res) => {
   try {
     const lat = +req.query.lat, lon = +req.query.lon;
@@ -687,7 +695,7 @@ app.get("/aadt/nearby", async (req, res) => {
   }
 });
 
-/* --------------------------------- Estimate --------------------------------- */
+/* ----------------------------- Estimate core ----------------------------- */
 app.post("/estimate", async (req, res) => {
   try {
     const {
@@ -705,7 +713,7 @@ app.post("/estimate", async (req, res) => {
 
     const pricePosition = String(advanced?.price_position || "inline");
 
-    // Geocode/admin + entered road name
+    // Geocode/admin + entered street
     let geo;
     if (Number.isFinite(siteLat) && Number.isFinite(siteLon)) {
       geo = { lat: +siteLat, lon: +siteLon, label: address || `${siteLat}, ${siteLon}` };
@@ -716,7 +724,6 @@ app.post("/estimate", async (req, res) => {
       reverseAdmin(geo.lat, geo.lon),
       reverseStreet(geo.lat, geo.lon)
     ]);
-
     const stateCode = toStateCode(admin.state) || "NC";
 
     // Competition
@@ -727,16 +734,14 @@ app.post("/estimate", async (req, res) => {
     const sunocoNearby = compAll3.some((c) => c.sunoco && c.miles <= 1.0);
     const ruralEligible = compAll3.length === 0;
 
-    // Developments (CSV)
+    // STOP: CSV developments
     const devCsv = matchCsvDevelopments(admin.city, admin.county, admin.state);
 
-    // Roads (context only)
+    // Road context
     const roads = await roadContext(geo.lat, geo.lon).catch(() => ({ summary: "", main: [], side: [], signals: 0, intersections: 0 }));
 
-    // ------------------------ DOT AADT SELECTION (DIRECT) ------------------------
-    // 1) First: query DOT provider for stations/segments on the *entered street*
-    let usedAADT = null;
-    let method = "dot_station_on_entered_road";
+    // ------------------ DOT AADT selection (entered road first) ------------------
+    let usedAADT = null, method = "dot_station_on_entered_road";
     let aadtUsedMarker = null;
     let mapStations = [];
 
@@ -744,24 +749,14 @@ app.post("/estimate", async (req, res) => {
     if (Number.isFinite(overrideVal) && overrideVal > 0) {
       usedAADT = Math.round(overrideVal); method = "override";
     } else {
-      // on-street set
       let onStreet = await providerStationsOnStreet(stateCode, geo.lat, geo.lon, enteredStreet).catch(() => []);
-      // If nothing matched, also try the dominant OSM way name/ref (roads.main[0])
       if (!onStreet.length && roads?.main?.[0]?.name) {
         onStreet = await providerStationsOnStreet(stateCode, geo.lat, geo.lon, roads.main[0].name).catch(() => []);
       }
-
-      // We also gather all stations within 1 mile for the table/2nd map (display only)
       mapStations = await providerNearbyAADT(stateCode, geo.lat, geo.lon, 1.0).catch(() => []);
-
-      // Pick best station among on-street candidates
       let pick = null;
       if (onStreet.length) pick = pickStationForStreet(onStreet, enteredStreet || roads?.main?.[0]?.name || "");
-      if (!pick) {
-        // HARD fallback: nearest DOT station within 1 mile (still DOT — not heuristic)
-        method = "dot_station_nearest_fallback";
-        pick = mapStations[0] || null;
-      }
+      if (!pick) { method = "dot_station_nearest_fallback"; pick = mapStations[0] || null; }
       if (pick) {
         usedAADT = pick.aadt;
         aadtUsedMarker = {
@@ -772,16 +767,9 @@ app.post("/estimate", async (req, res) => {
         };
       }
     }
+    if (!(Number.isFinite(usedAADT) && usedAADT > 0)) { usedAADT = 8000; method = "fallback_no_dot_found"; }
 
-    // If absolutely no DOT value could be found, as a last resort use a conservative default
-    if (!(Number.isFinite(usedAADT) && usedAADT > 0)) {
-      usedAADT = 8000; // conservative minimal default
-      method = "fallback_no_dot_found";
-    }
-
-    // ------------------------ Gallons: USE DOT AADT DIRECTLY ------------------------
-    // (No blending with heuristics; DOT governs when available as above.)
-    // Extras & flags
+    // --------------------------- Gallons (DOT direct) ---------------------------
     let userExtrasMult = 1.0;
     const extras = (advanced?.extra || [])
       .map((e) => ({ pct: +e?.pct, note: String(e?.note || "").slice(0, 180) }))
@@ -790,7 +778,6 @@ app.post("/estimate", async (req, res) => {
     const ruralRequested = !!(advanced && advanced.flags && advanced.flags.rural === true);
     const ruralApplied = ruralRequested && ruralEligible;
     if (ruralApplied) userExtrasMult *= 1.30;
-
     const autoLow = auto_low_rating === true || (Number.isFinite(client_rating) && client_rating < 4.0);
     if (autoLow) userExtrasMult *= 0.70;
 
@@ -798,7 +785,7 @@ app.post("/estimate", async (req, res) => {
       aadt: usedAADT, mpds: MPDS, diesel: DIESEL, compCount, heavyCount, pricePosition, userExtrasMult,
     });
 
-    // ------------------------ GPT Summary (restored) ------------------------
+    // ------------------------------ GPT summary ------------------------------
     async function gptJSONCore(model, prompt) {
       if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY missing");
       const r = await fetchWithTimeout(
@@ -871,7 +858,7 @@ Result gallons LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
       devCsv: devCsv.slice(0, 4).map((x) => `${x.name} ${x.status ? `(${x.status})` : ""}`).join("; "),
     });
 
-    // Text lines for UI
+    // UI text
     let aadtText = "";
     if (method === "override") aadtText = `AADT (override): ${usedAADT.toLocaleString()} vehicles/day`;
     else if (method === "dot_station_on_entered_road") aadtText = `AADT: ${usedAADT.toLocaleString()} vehicles/day (DOT • entered road)`;
@@ -890,6 +877,7 @@ Result gallons LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
       competitionText += ".";
     }
 
+    // Response
     res.json({
       ok: true,
       estimate: {
@@ -900,9 +888,9 @@ Result gallons LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
       },
       aadtText,
       competitionText,
-      csv: devCsv, // drives STOP banner
+      csv: devCsv,
 
-      // legacy compatible fields
+      // legacy / additional fields
       base: calc.base,
       low: calc.low,
       high: calc.high,
@@ -926,17 +914,15 @@ Result gallons LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
         notable_brands: competitors.filter((c) => c.heavy).slice(0, 6).map((c) => c.name),
       },
 
-      // roads context summary
       roads,
-      summary, // 🔥 GPT summary restored
-
+      summary,                // 🔥 GPT summary restored
       calc_breakdown: calc.breakdown,
 
-      // Map payloads (main map + second AADT map)
+      // Map payloads
       map: {
         site: { lat: geo.lat, lon: geo.lon, label: geo.label },
         competitors,
-        aadt: mapStations,      // dots on main map
+        aadt: mapStations,     // dots for main map
         aadt_used: aadtUsedMarker
       },
     });
@@ -945,6 +931,6 @@ Result gallons LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
   }
 });
 
-/* --------------------------------- Start --------------------------------- */
+/* ------------------------------- Start ------------------------------- */
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, "0.0.0.0", () => console.log(`Server listening on :${PORT}`));
