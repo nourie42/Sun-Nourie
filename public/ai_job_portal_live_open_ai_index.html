@@ -32,7 +32,7 @@
     <!-- Header -->
     <header class="text-center text-white">
       <h1 class="text-3xl font-bold drop-shadow-sm">🤖 AI‑Powered Job Match Portal</h1>
-      <p class="opacity-90">AI compares your resume profile to jobs and generates Google search links across major job sites (including remote).</p>
+      <p class="opacity-90">AI compares your resume profile to jobs and generates **direct Google job searches** (Indeed, LinkedIn, Glassdoor, etc.), including Remote roles. All original features are preserved.</p>
       <div class="mt-2 inline-flex items-center gap-2 badge bg-emerald-500 text-white">Live AI Enabled</div>
     </header>
 
@@ -144,7 +144,15 @@
      ********************/
     const DEFAULT_MODEL = 'gpt-4o-mini';
 
-    // Sample jobs — we will generate Google links to REAL sites (Indeed, LinkedIn, etc.) dynamically per job.
+    // Recognized job sites for verification/deduping
+    const JOB_SITES = [
+      'indeed.com', 'linkedin.com/jobs', 'glassdoor.com', 'ziprecruiter.com',
+      'monster.com', 'careerbuilder.com', 'simplyhired.com', 'naeyc.org',
+      'schoolspring.com', 'governmentjobs.com', 'primroseschools.com',
+      'kindercare.com', 'brighthorizons.com', 'ymca.org', 'wcpss.net'
+    ];
+
+    // Sample jobs (unchanged)
     const SAMPLE = [
       {title:'Preschool Director', company:'Bright Horizons Early Learning', salary:'$48,000 - $68,000', category:'preschool-director', req:["Bachelor's in ECE", '5+ yrs leadership', 'NC Director Credential preferred', 'Strong communication'], desc:'Lead center ops, staff, compliance, quality standards.', postedDays: r(1,14)},
       {title:'Assistant Director - Early Learning Center', company:'KinderCare Education', salary:'$42,000 - $58,000', category:'assistant-director', req:['Associate min, BA preferred', '3+ yrs childcare', 'Staff supervision', 'Licensing knowledge'], desc:'Assist director, supervise teachers, manage enrollment and families.', postedDays: r(1,14)},
@@ -160,7 +168,6 @@
       {title:'Student Services Coordinator', company:'Cary Academy', salary:'$47,000 - $65,000', category:'service-coordinator', req:['Student services background', 'Data reporting', 'Parent comms'], desc:'Coordinate student support, scheduling, and data.', postedDays: r(1,14)}
     ];
 
-    // Sites to target via Google ("every website available" → we include many majors + education specific). 
     const SITE_FILTERS = [
       {label:'All (no site filter)', site:''},
       {label:'Google Jobs', site:'GOOGLE_JOBS'},
@@ -171,12 +178,12 @@
       {label:'Monster', site:'monster.com'},
       {label:'CareerBuilder', site:'careerbuilder.com'},
       {label:'SimplyHired', site:'simplyhired.com'},
-      {label:'Handshake (universities)', site:'joinhandshake.com'},
+      {label:'Handshake', site:'joinhandshake.com'},
       {label:'NAEYC', site:'careercenter.naeyc.org'},
       {label:'SchoolSpring', site:'schoolspring.com'},
       {label:'K12JobSpot', site:'k12jobspot.com'},
       {label:'GovernmentJobs', site:'governmentjobs.com'},
-      {label:'State/County (NC school districts)', site:'wcpss.net'},
+      {label:'WCPSS', site:'wcpss.net'},
       {label:'YMCA', site:'ymca.org'},
       {label:'Primrose', site:'primroseschools.com'},
       {label:'KinderCare', site:'kindercare.com'},
@@ -354,7 +361,7 @@
     function clampNumber(n, min, max){ n = Number(n); if(Number.isNaN(n)) n = min; return Math.max(min, Math.min(max, n)); }
 
     /********************
-     * GOOGLE LINK GENERATION (per-site + remote)
+     * GOOGLE LINKS (static queries) — kept from prior version
      ********************/
     function baseQuery(job){
       const loc = (job.location||'').trim();
@@ -366,22 +373,92 @@
     function remoteQuery(job){
       return `${job.title} ${job.company} remote "(United States)" jobs`;
     }
-    function googleJobsUrl(q){
-      // Opens the Google Jobs module where available
-      return `https://www.google.com/search?q=${encodeURIComponent(q)}&ibp=htl;jobs`;
-    }
+    function googleJobsUrl(q){ return `https://www.google.com/search?q=${encodeURIComponent(q)}&ibp=htl;jobs`; }
     function googleSiteUrl(q, site){
       if(!site) return `https://www.google.com/search?q=${encodeURIComponent(q)}`;
       if(site==='GOOGLE_JOBS') return googleJobsUrl(q);
       return `https://www.google.com/search?q=${encodeURIComponent(q + ' site:' + site)}`;
     }
-
     function buildSiteLinks(job){
       const q = baseQuery(job);
       const qr = remoteQuery(job);
       const links = SITE_FILTERS.map(s => ({ label:s.label, url: googleSiteUrl(q, s.site) }));
       const remoteLinks = SITE_FILTERS.map(s => ({ label:(s.label+ ' — Remote'), url: googleSiteUrl(qr, s.site) }));
       return {all:q, allRemote:qr, links, remoteLinks};
+    }
+
+    /********************
+     * GOOGLE CSE (REAL LINKS) — no third‑party API required
+     * Uses your Render backend proxy at /gsearch (expected) which calls Google CSE
+     * If /gsearch is missing, optional client fallback uses window.GOOGLE_API_KEY + window.GOOGLE_CX
+     ********************/
+    async function gsearchServer(query, num=10){
+      const url = `/gsearch?q=${encodeURIComponent(query)}&num=${num}`; // Implement on your server: proxy to Google CSE
+      const res = await fetch(url);
+      if(!res.ok) throw new Error('Server gsearch failed');
+      return res.json(); // expected to mirror Google CSE JSON { items: [...] }
+    }
+
+    async function gsearchClient(query, num=10){
+      if(!(window.GOOGLE_API_KEY && window.GOOGLE_CX)) throw new Error('No client CSE creds');
+      const url = `https://www.googleapis.com/customsearch/v1?key=${encodeURIComponent(window.GOOGLE_API_KEY)}&cx=${encodeURIComponent(window.GOOGLE_CX)}&num=${num}&q=${encodeURIComponent(query)}`;
+      const res = await fetch(url);
+      if(!res.ok) throw new Error('Google CSE fetch failed');
+      return res.json();
+    }
+
+    function domainOf(href){ try{ return new URL(href).hostname.replace(/^www\./,''); }catch{ return ''; } }
+
+    function scoreJobLink(item){
+      const url = item.link||''; const title=(item.title||'').toLowerCase();
+      const d = domainOf(url);
+      let s = 0;
+      if(JOB_SITES.some(site=>d.includes(site.replace('/jobs','')))) s += 10;
+      if(/apply|careers|job|jobs|opening|posting/.test(url)) s += 6;
+      if(/apply|hiring|director|assistant|education|teacher|coordinator/.test(title)) s += 4;
+      if(/pdf|youtube|facebook|pinterest|reddit/.test(url)) s -= 8;
+      return s;
+    }
+
+    function dedupeByUrl(items){
+      const seen = new Set();
+      return items.filter(it=>{ const u=(it.link||'').split('#')[0]; if(seen.has(u)) return false; seen.add(u); return true; });
+    }
+
+    function filterToRealJobs(items){
+      const filtered = items.filter(it=>{
+        const d = domainOf(it.link||'');
+        return JOB_SITES.some(site=>d.includes(site.replace('/jobs','')));
+      });
+      const scored = filtered.map(it=>({ ...it, __score: scoreJobLink(it) }))
+                             .sort((a,b)=> b.__score - a.__score);
+      return dedupeByUrl(scored).slice(0,10);
+    }
+
+    function buildJobQuery(job, remote=false){
+      const base = `${job.title} ${job.company} ${remote? 'remote' : (job.location||'')}`.trim();
+      const filters = JOB_SITES.map(s=>`site:${s}`).join(' OR ');
+      const q = `${base} (${filters}) (apply OR job)`;
+      return q;
+    }
+
+    async function fetchVerifiedLinks(job, remote=false){
+      const q = buildJobQuery(job, remote);
+      try{
+        const data = await gsearchServer(q, 10);
+        const items = (data.items||[]);
+        return filterToRealJobs(items);
+      }catch(e){
+        // Fallback to client CSE if creds present
+        try{
+          const data = await gsearchClient(q, 10);
+          const items = (data.items||[]);
+          return filterToRealJobs(items);
+        }catch(e2){
+          console.warn('CSE fallback failed', e2);
+          return [];
+        }
+      }
     }
 
     /********************
@@ -401,7 +478,7 @@
       if(!items.length){ empty.classList.remove('hidden'); count.textContent='0 jobs found'; return; }
 
       count.textContent = `${items.length} job${items.length!==1?'s':''} found`;
-      items.forEach(job=> grid.appendChild(jobCard(job)) );
+      items.forEach((job, idx)=> grid.appendChild(jobCard(job, idx)) );
 
       // sorting controls
       document.querySelectorAll('[data-sort]').forEach(btn=>btn.onclick = ()=>sortGrid(btn.dataset.sort));
@@ -411,7 +488,7 @@
       document.getElementById('copyAll').onclick = ()=>copyAllQueries(items);
     }
 
-    function jobCard(job){
+    function jobCard(job, idx){
       const el = document.createElement('div');
       el.className = 'relative glass card';
       el.dataset.score = job.analysis.score;
@@ -420,6 +497,8 @@
 
       const { all, allRemote, links, remoteLinks } = buildSiteLinks(job);
       const generalGoogle = `https://www.google.com/search?q=${encodeURIComponent(all)}`;
+
+      const verifiedId = `verified-${idx}`;
 
       el.innerHTML = `
         <div class="score ${scoreClass(job.analysis.score)}">${job.analysis.score}%</div>
@@ -458,6 +537,15 @@
           <a href="${googleJobsUrl(allRemote)}" target="_blank" rel="noopener noreferrer" class="px-4 py-2 rounded-lg border">Remote — Google Jobs →</a>
           <button class="px-4 py-2 rounded-lg border" data-open-all>Open All Sites</button>
         </div>
+        <details class="mt-3">
+          <summary class="text-sm text-slate-700">Live postings (Google‑verified) — click to load</summary>
+          <div class="mt-2 flex flex-wrap gap-2">
+            <button class="px-3 py-2 rounded-lg bg-emerald-600 text-white" data-load-verified>Find Local</button>
+            <button class="px-3 py-2 rounded-lg border" data-load-verified-remote>Find Remote</button>
+            <span class="text-sm text-slate-600" id="${verifiedId}-status"></span>
+          </div>
+          <ul id="${verifiedId}" class="mt-3 space-y-2 list-disc ml-5"></ul>
+        </details>
         <details class="mt-2">
           <summary class="text-sm text-slate-700">More site‑specific searches (includes remote)</summary>
           <div class="mt-2 flex flex-wrap gap-2 linkbar">
@@ -481,8 +569,39 @@
       // open all site‑specific (including remote) in new tabs
       el.querySelector('[data-open-all]')?.addEventListener('click', ()=>{
         const allLinks = [...links, ...remoteLinks];
-        // Limit to first 8 to avoid popup blockers going wild
         allLinks.slice(0,8).forEach(l=> window.open(l.url, '_blank'));
+      });
+
+      // load verified postings (local)
+      el.querySelector('[data-load-verified]')?.addEventListener('click', async (ev)=>{
+        const status = document.getElementById(`${verifiedId}-status`);
+        status.textContent = 'Searching…';
+        const list = document.getElementById(verifiedId);
+        list.innerHTML = '';
+        const found = await fetchVerifiedLinks(job, false);
+        if(!found.length){ status.textContent = 'No direct postings found. Try the site links above or Remote.'; return; }
+        status.textContent = `Found ${found.length} posting(s).`;
+        for(const it of found){
+          const li = document.createElement('li');
+          li.innerHTML = `<a class='text-indigo-700 underline' target='_blank' rel='noopener' href='${it.link}'>${escapeHtml(it.title || it.link)}</a><div class='text-xs text-slate-600'>${escapeHtml(it.snippet||'')}</div>`;
+          list.appendChild(li);
+        }
+      });
+
+      // load verified postings (remote)
+      el.querySelector('[data-load-verified-remote]')?.addEventListener('click', async ()=>{
+        const status = document.getElementById(`${verifiedId}-status`);
+        status.textContent = 'Searching remote…';
+        const list = document.getElementById(verifiedId);
+        list.innerHTML = '';
+        const found = await fetchVerifiedLinks(job, true);
+        if(!found.length){ status.textContent = 'No direct remote postings found. Try the site links above.'; return; }
+        status.textContent = `Found ${found.length} remote posting(s).`;
+        for(const it of found){
+          const li = document.createElement('li');
+          li.innerHTML = `<a class='text-indigo-700 underline' target='_blank' rel='noopener' href='${it.link}'>${escapeHtml(it.title || it.link)}</a><div class='text-xs text-slate-600'>${escapeHtml(it.snippet||'')}</div>`;
+          list.appendChild(li);
+        }
       });
 
       return el;
@@ -515,5 +634,12 @@
     function showErr(msg){ const e=document.getElementById('err'); e.textContent=msg; e.classList.remove('hidden'); }
     function hideErr(){ document.getElementById('err').classList.add('hidden'); }
   </script>
+
+  <!-- Optional: inject Google CSE creds at build/runtime via Render env
+       <script>
+         window.GOOGLE_API_KEY = "${process.env.GOOGLE_API_KEY}";
+         window.GOOGLE_CX = "${process.env.GOOGLE_CX}";
+       </script>
+  -->
 </body>
 </html>
