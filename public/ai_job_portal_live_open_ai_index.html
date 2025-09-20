@@ -22,7 +22,7 @@
 </head>
 <body class="p-4 md:p-10">
   <h1 class="text-3xl font-bold text-white mb-6">🤖 AI-Powered Job Match Portal</h1>
-  <p class="text-white mb-6">AI matches your resume to jobs and fetches <b>real postings</b> across Indeed, LinkedIn, Glassdoor, ZipRecruiter, etc. Nothing cut.</p>
+  <p class="text-white mb-6">AI matches your resume to jobs and fetches <b>real postings</b> across Indeed, LinkedIn, Glassdoor, ZipRecruiter, etc.</p>
 
   <!-- Status -->
   <section class="glass card">
@@ -32,6 +32,13 @@
       <button id="btnHealth" class="px-3 py-2 rounded bg-indigo-600 text-white text-sm">Recheck</button>
     </div>
     <div class="mt-2 progress"><div id="progressBar"></div></div>
+  </section>
+
+  <!-- API key fallback if backend fails -->
+  <section id="apiKeySection" class="glass card hidden">
+    <h2 class="text-lg font-semibold text-slate-800 mb-3">🔑 Fallback API Access</h2>
+    <p class="text-slate-600 text-sm mb-2">If the backend AI service fails, you can still enter your own API key to continue searching with AI.</p>
+    <input id="apiKey" type="password" class="w-full rounded-lg border border-slate-200 px-3 py-2" placeholder="sk-..." />
   </section>
 
   <!-- Profile & controls -->
@@ -95,12 +102,6 @@
     <div id="empty" class="hidden text-center text-slate-500 py-10">No matching jobs found. Try adjusting your filters.</div>
   </section>
 
-  <!-- Backup -->
-  <section id="backup" class="glass card hidden">
-    <p class="text-slate-700">⚠️ AI search failed. Would you like to search without AI?</p>
-    <button id="btnBackup" class="mt-2 px-4 py-2 rounded bg-amber-600 text-white">Search Without AI</button>
-  </section>
-
   <script>
     const backendStatus = document.getElementById("backendStatus");
     const btnHealth = document.getElementById("btnHealth");
@@ -112,14 +113,17 @@
     const empty = document.getElementById("empty");
     const busy = document.getElementById("busy");
     const err = document.getElementById("err");
-    const backup = document.getElementById("backup");
+    const apiKeySection = document.getElementById("apiKeySection");
+    const apiKeyInput = document.getElementById("apiKey");
 
     async function checkHealth() {
       try {
         const res = await fetch("/health");
         backendStatus.textContent = res.ok ? "✅ Online" : "❌ Down";
+        if (!res.ok) apiKeySection.classList.remove("hidden");
       } catch {
         backendStatus.textContent = "❌ Error";
+        apiKeySection.classList.remove("hidden");
       }
     }
     checkHealth();
@@ -127,7 +131,6 @@
 
     btnSearch.onclick = async () => {
       err.classList.add("hidden");
-      backup.classList.add("hidden");
       busy.classList.remove("hidden");
       progressBar.style.width = "20%";
 
@@ -146,11 +149,26 @@
           remoteOnly: document.getElementById("remoteOnly").checked
         };
 
-        const res = await fetch(proxyUrl, {
+        let res = await fetch(proxyUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(query)
         });
+
+        // If backend fails and user gave API key, fallback directly to OpenAI
+        if (!res.ok && apiKeyInput.value) {
+          res = await fetch("https://api.openai.com/v1/chat/completions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKeyInput.value}` },
+            body: JSON.stringify({
+              model: "gpt-4o-mini",
+              messages: [
+                { role: "system", content: "You are a job search assistant." },
+                { role: "user", content: `Find jobs for resume: ${query.resume}` }
+              ]
+            })
+          });
+        }
 
         if (!res.ok) throw new Error("Failed fetching jobs");
         const jobs = await res.json();
@@ -184,15 +202,10 @@
       } catch (e) {
         err.textContent = e.message;
         err.classList.remove("hidden");
-        backup.classList.remove("hidden");
       } finally {
         busy.classList.add("hidden");
         setTimeout(() => progressBar.style.width = "0%", 1500);
       }
-    };
-
-    document.getElementById("btnBackup").onclick = async () => {
-      window.open(`https://www.google.com/search?q=${encodeURIComponent(document.getElementById("role").value + " jobs")}`,'_blank');
     };
   </script>
 </body>
