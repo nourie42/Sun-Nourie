@@ -3,402 +3,224 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AI‑Powered Job Match Portal — Remote‑First Real Jobs</title>
+  <title>🤖 AI-Powered Job Match Portal</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    :root { --brand:#667eea; --brand2:#764ba2; --ink:#0f172a; }
-    html,body { height:100%; }
-    body { font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:linear-gradient(135deg,#667eea 0%,#764ba2 100%); }
-    .glass { background:rgba(255,255,255,.9); backdrop-filter:blur(10px); }
-    .card { border-radius:1rem; box-shadow:0 25px 50px -12px rgba(0,0,0,.25); padding:1.5rem; }
-    .chip { padding:.5rem 1rem; border:1px solid #e2e8f0; border-radius:999px; background:#fff; font-size:.9rem; font-weight:600; color:#334155; cursor:pointer; }
-    .chip.active { color:#fff; border-color:transparent; background:linear-gradient(135deg,var(--brand),var(--brand2)); }
-    .badge { display:inline-flex; align-items:center; padding:.2rem .6rem; border-radius:999px; font-size:.75rem; font-weight:700; }
-    .score { position:absolute; top:1rem; right:1rem; width:4rem; height:4rem; border-radius:999px; color:#fff; font-weight:800; display:flex; align-items:center; justify-content:center; box-shadow:0 10px 30px rgba(0,0,0,.25); }
-    .excellent{ background:linear-gradient(135deg,#00ff88,#00d084);} .good{background:linear-gradient(135deg,#3b82f6,#2563eb);} .fair{background:linear-gradient(135deg,#fbbf24,#f59e0b);} .poor{background:linear-gradient(135deg,#f87171,#ef4444);} 
-    .spinner{ width:40px; height:40px; border:4px solid #e5e7eb; border-top-color:var(--brand); border-radius:999px; animation:spin 1s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg);} }
-    .progress { height:10px; background:#e2e8f0; border-radius:999px; overflow:hidden }
-    .progress>div { height:100%; width:0%; background:linear-gradient(90deg,var(--brand),var(--brand2)); transition:width .25s ease }
-    .linkbar a{ white-space:nowrap }
-    details summary{ cursor:pointer }
+    body { font-family:'Inter',sans-serif; background: linear-gradient(135deg,#667eea 0%,#764ba2 100%); }
+    .glass { background:rgba(255,255,255,.9); backdrop-filter:blur(10px); border-radius:1rem; padding:1.5rem; }
+    .card { box-shadow:0 10px 25px rgba(0,0,0,0.15); margin-bottom:1.5rem; }
+    .spinner { width:18px; height:18px; border:3px solid #ddd; border-top:3px solid #6366f1; border-radius:50%; animation:spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .chip { padding:.4rem .8rem; border-radius:9999px; border:1px solid #cbd5e1; font-size:.85rem; background:white; cursor:pointer; }
+    .chip.active { background:#6366f1; color:white; border-color:#6366f1; }
+    .progress { height:6px; background:#e2e8f0; border-radius:4px; overflow:hidden; }
+    #progressBar { height:6px; width:0; background:#6366f1; transition:width .3s; }
   </style>
 </head>
-<body class="min-h-screen p-6">
-  <div class="max-w-[1200px] mx-auto space-y-6">
-    <!-- Header -->
-    <header class="text-center text-white">
-      <h1 class="text-3xl font-bold drop-shadow-sm">🤖 AI‑Powered Job Match Portal</h1>
-      <p class="opacity-90">AI matches your resume to jobs and fetches **real, remote‑first** postings across Indeed, LinkedIn, Glassdoor, ZipRecruiter, etc. Nothing cut.</p>
-      <div class="mt-2 inline-flex items-center gap-2 badge bg-emerald-500 text-white">Live AI Enabled</div>
-    </header>
+<body class="p-4 md:p-10">
+  <h1 class="text-3xl font-bold text-white mb-6">🤖 AI-Powered Job Match Portal</h1>
+  <p class="text-white mb-6">AI matches your resume to jobs and fetches <b>real postings</b> across Indeed, LinkedIn, Glassdoor, ZipRecruiter, etc. Nothing cut.</p>
 
-    <!-- API / Model / Status -->
-    <section class="glass card">
-      <div class="grid md:grid-cols-3 gap-4">
-        <div>
-          <label class="text-sm font-semibold text-slate-700">OpenAI API Key</label>
-          <input id="apiKey" type="password" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300" placeholder="sk-..." />
-          <p class="text-xs text-amber-700 mt-1">⚠️ Stored only in your browser (localStorage). In production, proxy through a backend.</p>
-        </div>
-        <div>
-          <label class="text-sm font-semibold text-slate-700">Model</label>
-          <select id="model" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300">
-            <option value="gpt-4o-mini" selected>gpt-4o-mini (fast, $)</option>
-            <option value="gpt-4o">gpt-4o (higher quality)</option>
-            <option value="o4-mini">o4-mini (reasoning)</option>
-          </select>
-        </div>
-        <div class="flex items-end gap-3">
-          <button id="btnCheck" class="h-10 px-4 rounded-lg bg-emerald-600 text-white font-semibold hover:brightness-110">Check API Status</button>
-          <span id="apiStatus" class="text-sm"></span>
-        </div>
+  <!-- API / Model / Status -->
+  <section class="glass card">
+    <div class="grid md:grid-cols-3 gap-4">
+      <div>
+        <label class="text-sm font-semibold text-slate-700">OpenAI API Key</label>
+        <input id="apiKey" type="password" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" placeholder="sk-..." />
+        <p class="text-xs text-amber-700 mt-1">⚠️ Stored only in your browser (localStorage). In production, proxy through a backend.</p>
       </div>
-      <div class="mt-3 progress"><div id="progressBar"></div></div>
-    </section>
+      <div>
+        <label class="text-sm font-semibold text-slate-700">Model</label>
+        <select id="model" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2">
+          <option value="gpt-4o-mini" selected>gpt-4o-mini (fast, $)</option>
+          <option value="gpt-4o">gpt-4o (higher quality)</option>
+          <option value="o4-mini">o4-mini (reasoning)</option>
+        </select>
+      </div>
+      <div class="flex items-end gap-3">
+        <button id="btnCheck" class="h-10 px-4 rounded-lg bg-emerald-600 text-white font-semibold hover:brightness-110">Check API Status</button>
+        <span id="apiStatus" class="text-sm"></span>
+      </div>
+    </div>
+    <div class="mt-3 progress"><div id="progressBar"></div></div>
+  </section>
 
-    <!-- Profile & controls -->
-    <section class="glass card">
-      <h2 class="text-lg font-semibold text-slate-800 mb-3">📋 Your Resume Profile</h2>
-      <div class="grid md:grid-cols-4 gap-3">
-        <input id="exp" class="rounded-lg border border-slate-200 px-3 py-2" value="10+ years Education Leadership" />
-        <input id="role" class="rounded-lg border border-slate-200 px-3 py-2" value="Service Projects Coordinator" />
-        <input id="expertise" class="rounded-lg border border-slate-200 px-3 py-2" value="Preschool Administration" />
-        <input id="edu" class="rounded-lg border border-slate-200 px-3 py-2" value="M.S. Industrial Psychology" />
-      </div>
-      <textarea id="resumeText" class="mt-3 w-full rounded-lg border border-slate-200 px-3 py-2" rows="6" placeholder="Paste your resume text here (optional)">Alicia J. Nourie — Preschool admin & retail ops leadership. Strengths: Early Childhood Education, Preschool Administration, Staff Supervision, Teacher Training, Family Engagement, Curriculum Development, Licensing Compliance. Roles: Lowe’s (Service Projects Coordinator; Customer Experience), English First (ESL Teacher), Green Pines Preschool (Assistant Director), Helping Little Hands Daycare (Owner/Director). Education: M.S. Industrial Psychology (2017).</textarea>
+  <!-- Profile & controls -->
+  <section class="glass card">
+    <h2 class="text-lg font-semibold text-slate-800 mb-3">📋 Your Resume Profile</h2>
+    <div class="grid md:grid-cols-4 gap-3">
+      <input id="exp" class="rounded-lg border border-slate-200 px-3 py-2" value="10+ years Education Leadership" />
+      <input id="role" class="rounded-lg border border-slate-200 px-3 py-2" value="Service Projects Coordinator" />
+      <input id="expertise" class="rounded-lg border border-slate-200 px-3 py-2" value="Preschool Administration" />
+      <input id="edu" class="rounded-lg border border-slate-200 px-3 py-2" value="M.S. Industrial Psychology" />
+    </div>
+    <textarea id="resumeText" class="mt-3 w-full rounded-lg border border-slate-200 px-3 py-2" rows="6">Alicia J. Nourie — Preschool admin & retail ops leadership. Strengths: Early Childhood Education, Preschool Administration, Staff Supervision, Teacher Training, Family Engagement, Curriculum Development, Licensing Compliance. Roles: Lowe’s (Service Projects Coordinator; Customer Experience), English First (ESL Teacher), Green Pines Preschool (Assistant Director), Helping Little Hands Daycare (Owner/Director). Education: M.S. Industrial Psychology (2017).</textarea>
 
-      <div class="mt-6 grid md:grid-cols-4 gap-3">
-        <div>
-          <label class="text-sm font-semibold text-slate-700">Location (optional)</label>
-          <input id="location" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" value="Knightdale, NC" />
-        </div>
-        <div>
-          <label class="text-sm font-semibold text-slate-700">Radius</label>
-          <select id="radius" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2">
-            <option>10 miles</option>
-            <option selected>25 miles</option>
-            <option>50 miles</option>
-            <option>100 miles</option>
-          </select>
-        </div>
-        <div>
-          <label class="text-sm font-semibold text-slate-700">Minimum Match</label>
-          <select id="matchThreshold" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2">
-            <option value="0">Show All</option>
-            <option value="60">60%+</option>
-            <option value="70" selected>70%+</option>
-            <option value="80">80%+</option>
-          </select>
-        </div>
-        <div class="flex items-end gap-2">
-          <button id="btnSearch" class="px-5 py-3 rounded-xl bg-indigo-600 text-white font-semibold hover:brightness-110 flex items-center gap-2"><span id="searchIcon">🔍</span><span>Search & Analyze (Remote‑First)</span></button>
-          <button id="btnReset" class="px-4 py-3 rounded-xl border">Reset</button>
-          <div id="busy" class="hidden items-center gap-3"><div class="spinner"></div><span class="text-slate-600">Working…</span></div>
-        </div>
+    <div class="mt-6 grid md:grid-cols-5 gap-3">
+      <div>
+        <label class="text-sm font-semibold text-slate-700">Location (optional)</label>
+        <input id="location" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" value="Knightdale, NC" />
       </div>
+      <div>
+        <label class="text-sm font-semibold text-slate-700">Radius</label>
+        <select id="radius" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2">
+          <option>10 miles</option>
+          <option selected>25 miles</option>
+          <option>50 miles</option>
+          <option>100 miles</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-sm font-semibold text-slate-700">Minimum Match</label>
+        <select id="matchThreshold" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2">
+          <option value="0">Show All</option>
+          <option value="60">60%+</option>
+          <option value="70" selected>70%+</option>
+          <option value="80">80%+</option>
+        </select>
+      </div>
+      <div class="flex items-center gap-2 mt-6">
+        <input id="remoteOnly" type="checkbox" class="w-4 h-4" />
+        <label for="remoteOnly" class="text-sm font-semibold text-slate-700">Remote Jobs Only</label>
+      </div>
+      <div class="flex items-end gap-2">
+        <button id="btnSearch" class="px-5 py-3 rounded-xl bg-indigo-600 text-white font-semibold hover:brightness-110 flex items-center gap-2"><span id="searchIcon">🔍</span><span>Search & Analyze</span></button>
+        <button id="btnReset" class="px-4 py-3 rounded-xl border">Reset</button>
+        <div id="busy" class="hidden items-center gap-3"><div class="spinner"></div><span class="text-slate-600">Working…</span></div>
+      </div>
+    </div>
 
-      <div class="mt-6">
-        <h3 class="text-sm font-semibold text-slate-700 mb-2">Job Categories</h3>
-        <div id="chips" class="flex flex-wrap gap-2">
-          <button class="chip active" data-category="preschool-director">Preschool Director</button>
-          <button class="chip active" data-category="assistant-director">Assistant Director</button>
-          <button class="chip active" data-category="education-administrator">Education Administrator</button>
-          <button class="chip active" data-category="curriculum-coordinator">Curriculum Coordinator</button>
-          <button class="chip active" data-category="childcare-director">Childcare Center Director</button>
-          <button class="chip" data-category="program-manager">Program Manager</button>
-          <button class="chip" data-category="family-engagement">Family Engagement Specialist</button>
-          <button class="chip" data-category="esl-teacher">ESL Teacher</button>
-          <button class="chip" data-category="training-coordinator">Training Coordinator</button>
-          <button class="chip" data-category="service-coordinator">Service Coordinator</button>
-        </div>
+    <div class="mt-6">
+      <h3 class="text-sm font-semibold text-slate-700 mb-2">Job Categories</h3>
+      <div id="chips" class="flex flex-wrap gap-2">
+        <button class="chip active" data-category="preschool-director">Preschool Director</button>
+        <button class="chip active" data-category="assistant-director">Assistant Director</button>
+        <button class="chip active" data-category="education-administrator">Education Administrator</button>
+        <button class="chip active" data-category="curriculum-coordinator">Curriculum Coordinator</button>
+        <button class="chip active" data-category="childcare-director">Childcare Center Director</button>
+        <button class="chip" data-category="program-manager">Program Manager</button>
+        <button class="chip" data-category="family-engagement">Family Engagement Specialist</button>
+        <button class="chip" data-category="esl-teacher">ESL Teacher</button>
+        <button class="chip" data-category="training-coordinator">Training Coordinator</button>
+        <button class="chip" data-category="service-coordinator">Service Coordinator</button>
       </div>
-      <p id="err" class="mt-3 hidden text-sm text-red-600"></p>
-    </section>
+    </div>
+    <p id="err" class="mt-3 hidden text-sm text-red-600"></p>
+  </section>
 
-    <!-- Results -->
-    <section id="results" class="glass card hidden">
-      <div class="flex items-center justify-between mb-4">
-        <div id="resultCount" class="text-slate-800 font-semibold">0 jobs found</div>
-        <div class="flex gap-2">
-          <button class="px-3 py-2 rounded-lg border" data-sort="match">Best Match</button>
-          <button class="px-3 py-2 rounded-lg border" data-sort="recent">Most Recent</button>
-          <button class="px-3 py-2 rounded-lg border" data-sort="salary">Highest Salary</button>
-        </div>
+  <!-- Results -->
+  <section id="results" class="glass card hidden">
+    <div class="flex items-center justify-between mb-4">
+      <div id="resultCount" class="text-slate-800 font-semibold">0 jobs found</div>
+      <div class="flex gap-2">
+        <button class="px-3 py-2 rounded-lg border" data-sort="match">Best Match</button>
+        <button class="px-3 py-2 rounded-lg border" data-sort="recent">Most Recent</button>
+        <button class="px-3 py-2 rounded-lg border" data-sort="salary">Highest Salary</button>
       </div>
-      <div class="mb-3 flex flex-wrap gap-2">
-        <button id="openTop5" class="px-3 py-2 rounded-lg bg-emerald-600 text-white">Open Top 5 Google Searches</button>
-        <button id="copyAll" class="px-3 py-2 rounded-lg border">Copy All Google Queries</button>
-      </div>
-      <div id="grid" class="grid gap-4"></div>
-      <div id="empty" class="hidden text-center text-slate-500 py-10">No matching jobs found. Try adjusting your filters.</div>
-    </section>
-  </div>
+    </div>
+    <div id="grid" class="grid gap-4"></div>
+    <div id="empty" class="hidden text-center text-slate-500 py-10">No matching jobs found. Try adjusting your filters.</div>
+  </section>
 
   <script>
-    /********************
-     * CONFIG + STATE
-     ********************/
-    const DEFAULT_MODEL = 'gpt-4o-mini';
+    const apiKeyInput = document.getElementById("apiKey");
+    apiKeyInput.value = localStorage.getItem("openai_api_key") || "";
+    apiKeyInput.addEventListener("input", () => localStorage.setItem("openai_api_key", apiKeyInput.value));
 
-    const JOB_SITES = [
-      'indeed.com', 'linkedin.com/jobs', 'glassdoor.com', 'ziprecruiter.com',
-      'monster.com', 'careerbuilder.com', 'simplyhired.com', 'naeyc.org',
-      'schoolspring.com', 'governmentjobs.com', 'primroseschools.com',
-      'kindercare.com', 'brighthorizons.com', 'ymca.org', 'wcpss.net'
-    ];
+    const btnCheck = document.getElementById("btnCheck");
+    const apiStatus = document.getElementById("apiStatus");
+    const progressBar = document.getElementById("progressBar");
+    const btnSearch = document.getElementById("btnSearch");
+    const resultsSection = document.getElementById("results");
+    const grid = document.getElementById("grid");
+    const resultCount = document.getElementById("resultCount");
+    const empty = document.getElementById("empty");
+    const busy = document.getElementById("busy");
+    const err = document.getElementById("err");
 
-    const SAMPLE = [
-      {title:'Preschool Director', company:'Bright Horizons Early Learning', salary:'$48,000 - $68,000', category:'preschool-director', req:["Bachelor's in ECE", '5+ yrs leadership', 'NC Director Credential preferred', 'Strong communication'], desc:'Lead center ops, staff, compliance, quality standards.', postedDays: r(1,14)},
-      {title:'Assistant Director - Early Learning Center', company:'KinderCare Education', salary:'$42,000 - $58,000', category:'assistant-director', req:['Associate min, BA preferred', '3+ yrs childcare', 'Staff supervision', 'Licensing knowledge'], desc:'Assist director, supervise teachers, manage enrollment and families.', postedDays: r(1,14)},
-      {title:'Education Program Administrator', company:'Wake County Public Schools', salary:'$52,000 - $72,000', category:'education-administrator', req:['Masters in Education', '7+ yrs leadership', 'Budget experience', 'Regulations knowledge'], desc:'Oversee programs, budgets, outcomes, compliance.', postedDays: r(1,14)},
-      {title:'Childcare Center Director', company:'Primrose Schools', salary:'$45,000 - $65,000', category:'childcare-director', req:['Bachelor required', '5+ yrs childcare mgmt', 'Business acumen', 'Parent comms'], desc:'Direct operations, staff development, parent relations.', postedDays: r(1,14)},
-      {title:'Curriculum Development Specialist', company:'Durham Public Schools', salary:'$50,000 - $70,000', category:'curriculum-coordinator', req:['Masters in C&I', 'Teaching exp', 'Standards knowledge', 'PD experience'], desc:'Design curriculum, train teachers, align to standards.', postedDays: r(1,14)},
-      {title:'Early Childhood Education Coordinator', company:'YMCA of the Triangle', salary:'$40,000 - $56,000', category:'program-manager', req:['BA in ECE', '3+ yrs coordination', 'Org skills', 'Community partnerships'], desc:'Coordinate programs, partners, scheduling, impact.', postedDays: r(1,14)},
-      {title:'Preschool Assistant Director', company:'The Goddard School', salary:'$44,000 - $62,000', category:'assistant-director', req:['Associate or BA in ECE', '2+ yrs leadership', 'NAEYC knowledge'], desc:'Support director in staff management and licensing compliance.', postedDays: r(1,14)},
-      {title:'Director of Early Learning Center', company:'Learning Care Group', salary:'$50,000 - $72,000', category:'childcare-director', req:['Bachelor preferred', '5+ yrs ECE mgmt', 'Budget oversight'], desc:'Lead center performance, enrollment growth, quality.', postedDays: r(1,14)},
-      {title:'Family Engagement Coordinator', company:'Wake County Head Start', salary:'$40,000 - $55,000', category:'family-engagement', req:['BA in Education/Social Work', 'Community partnerships', 'Bilingual a plus'], desc:'Increase family participation, community resources, outcomes.', postedDays: r(1,14)},
-      {title:'ESL Teacher (K‑5)', company:'Raleigh Charter / Public School', salary:'$44,000 - $63,000', category:'esl-teacher', req:['Teaching license', 'ESL certification', 'K‑12 experience'], desc:'Deliver differentiated ESL instruction, assess progress.', postedDays: r(1,14)},
-      {title:'Training Coordinator (Education Services)', company:'Chapel Hill Nonprofit', salary:'$45,000 - $60,000', category:'training-coordinator', req:['Program facilitation', 'Curriculum design', 'Reporting'], desc:'Coordinate workshops, PD logistics, and evaluation.', postedDays: r(1,14)},
-      {title:'Student Services Coordinator', company:'Cary Academy', salary:'$47,000 - $65,000', category:'service-coordinator', req:['Student services background', 'Data reporting', 'Parent comms'], desc:'Coordinate student support, scheduling, and data.', postedDays: r(1,14)}
-    ];
+    btnCheck.onclick = async () => {
+      const key = apiKeyInput.value.trim();
+      if (!key) return alert("Enter API key");
+      apiStatus.textContent = "Checking...";
+      try {
+        const res = await fetch("https://api.openai.com/v1/models", {
+          headers: { Authorization: `Bearer ${key}` }
+        });
+        apiStatus.textContent = res.ok ? "✅ Working" : "❌ Invalid";
+      } catch {
+        apiStatus.textContent = "❌ Error";
+      }
+    };
 
-    const SITE_FILTERS = [
-      {label:'All (no site filter)', site:''},
-      {label:'Google Jobs', site:'GOOGLE_JOBS'},
-      {label:'Indeed', site:'indeed.com'},
-      {label:'LinkedIn', site:'linkedin.com/jobs'},
-      {label:'Glassdoor', site:'glassdoor.com'},
-      {label:'ZipRecruiter', site:'ziprecruiter.com'},
-      {label:'Monster', site:'monster.com'},
-      {label:'CareerBuilder', site:'careerbuilder.com'},
-      {label:'SimplyHired', site:'simplyhired.com'},
-      {label:'Handshake', site:'joinhandshake.com'},
-      {label:'NAEYC', site:'careercenter.naeyc.org'},
-      {label:'SchoolSpring', site:'schoolspring.com'},
-      {label:'K12JobSpot', site:'k12jobspot.com'},
-      {label:'GovernmentJobs', site:'governmentjobs.com'},
-      {label:'WCPSS', site:'wcpss.net'},
-      {label:'YMCA', site:'ymca.org'},
-      {label:'Primrose', site:'primroseschools.com'},
-      {label:'KinderCare', site:'kindercare.com'},
-      {label:'Bright Horizons', site:'brighthorizons.com'}
-    ];
+    btnSearch.onclick = async () => {
+      const key = apiKeyInput.value.trim();
+      if (!key) return alert("Enter API key");
+      err.classList.add("hidden");
+      busy.classList.remove("hidden");
+      progressBar.style.width = "20%";
 
-    function r(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
+      try {
+        const proxyUrl = "/api/jobs";
 
-    /********************
-     * INIT (persist key/model)
-     ********************/
-    const keyEl = document.getElementById('apiKey');
-    const modelEl = document.getElementById('model');
-    keyEl.value   = localStorage.getItem('OPENAI_KEY') || '';
-    modelEl.value = localStorage.getItem('OPENAI_MODEL') || DEFAULT_MODEL;
-    keyEl.addEventListener('input',()=>localStorage.setItem('OPENAI_KEY', keyEl.value));
-    modelEl.addEventListener('change',()=>localStorage.setItem('OPENAI_MODEL', modelEl.value));
+        const query = {
+          resume: document.getElementById("resumeText").value,
+          exp: document.getElementById("exp").value,
+          role: document.getElementById("role").value,
+          expertise: document.getElementById("expertise").value,
+          edu: document.getElementById("edu").value,
+          location: document.getElementById("location").value,
+          radius: document.getElementById("radius").value,
+          categories: Array.from(document.querySelectorAll("#chips .chip.active")).map(c => c.dataset.category),
+          matchThreshold: document.getElementById("matchThreshold").value,
+          remoteOnly: document.getElementById("remoteOnly").checked
+        };
 
-    /********************
-     * STATUS CHECK (non-blocking)
-     ********************/
-    document.getElementById('btnCheck').addEventListener('click', checkApi);
-    async function checkApi(){
-      const s = document.getElementById('apiStatus');
-      s.textContent = 'Checking…'; s.className = 'text-sm text-slate-600';
-      try{
-        const ok = await callOpenAI({ model: modelEl.value || DEFAULT_MODEL, messages: [{role:'user', content:'say ok'}], max_tokens: 2 });
-        if(ok){ s.textContent = '✅ API reachable'; s.className = 'text-sm text-emerald-700'; } else { throw new Error('Bad response'); }
-      }catch(err){ s.textContent = '❌ API error — check key/model/network'; s.className = 'text-sm text-red-700'; console.error(err); }
-    }
+        const res = await fetch(proxyUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(query)
+        });
 
-    /********************
-     * CHIP TOGGLES
-     ********************/
-    document.getElementById('chips').addEventListener('click', (e)=>{ if(e.target.classList.contains('chip')) e.target.classList.toggle('active'); });
+        if (!res.ok) throw new Error("Failed fetching jobs");
+        const jobs = await res.json();
+        progressBar.style.width = "70%";
 
-    /********************
-     * SEARCH & ANALYZE
-     ********************/
-    document.getElementById('btnSearch').addEventListener('click', runSearch);
-    document.getElementById('btnReset').addEventListener('click', ()=>window.location.reload());
+        const realJobs = jobs.filter(j => j.title && j.company && j.link && j.link.startsWith("http"));
 
-    async function runSearch(){
-      const active = [...document.querySelectorAll('.chip.active')].map(x=>x.dataset.category);
-      if(active.length===0) return showErr('Select at least one job category.');
-      hideErr();
-
-      const btn  = document.getElementById('btnSearch');
-      const busy = document.getElementById('busy');
-      const bar  = document.getElementById('progressBar');
-      btn.disabled = true; busy.classList.remove('hidden');
-
-      try{
-        const loc = (document.getElementById('location').value||'').trim();
-        const jobs = SAMPLE.filter(j=>active.includes(j.category)).map(j=>({ ...j, location: loc, type:'Full-time', tags:['Leadership','Education','Management','Early Childhood'] }));
-
-        const analyzed = [];
-        for(let i=0;i<jobs.length;i++){
-          const analysis = await aiAnalyzeJob(modelEl.value || DEFAULT_MODEL, getProfile(), jobs[i]);
-          analyzed.push({...jobs[i], analysis});
-          bar.style.width = `${Math.round(((i+1)/jobs.length)*100)}%`;
+        grid.innerHTML = "";
+        if (realJobs.length === 0) {
+          empty.classList.remove("hidden");
+          resultsSection.classList.remove("hidden");
+          resultCount.textContent = "0 jobs found";
+        } else {
+          empty.classList.add("hidden");
+          realJobs.forEach(j => {
+            const card = document.createElement("div");
+            card.className = "p-4 border rounded-xl bg-white";
+            card.innerHTML = `
+              <h4 class="font-semibold text-lg">${j.title}</h4>
+              <p class="text-slate-600">${j.company}</p>
+              <p class="text-slate-500 text-sm mb-2">${j.location || "Remote"}</p>
+              <a href="${j.link}" target="_blank" class="text-indigo-600 underline">View Job</a>
+              <p class="text-sm mt-2">Match: ${j.match || "-"}%</p>
+            `;
+            grid.appendChild(card);
+          });
+          resultsSection.classList.remove("hidden");
+          resultCount.textContent = `${realJobs.length} jobs found`;
         }
-        const min = parseInt(document.getElementById('matchThreshold').value,10);
-        const finalJobs = analyzed.filter(j=>j.analysis.score>=min).sort((a,b)=>b.analysis.score-a.analysis.score);
-        renderResults(finalJobs);
-      }catch(err){ showErr('AI analysis failed. Check key/model/network.'); console.error(err); }
-      finally{ btn.disabled = false; busy.classList.add('hidden'); }
-    }
-
-    function getProfile(){
-      return { exp: document.getElementById('exp').value, role: document.getElementById('role').value, expertise: document.getElementById('expertise').value, edu: document.getElementById('edu').value, resumeText: document.getElementById('resumeText').value };
-    }
-
-    /********************
-     * OPENAI UTIL (timeout + safe JSON)
-     ********************/
-    async function callOpenAI(body){
-      const key = (keyEl.value||'').trim(); if(!key) throw new Error('Missing API key');
-      const ctl = new AbortController(); const t = setTimeout(()=>ctl.abort(), 20000);
-      try{ const res = await fetch('https://api.openai.com/v1/chat/completions',{ method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':`Bearer ${key}` }, body: JSON.stringify(body), signal: ctl.signal }); if(!res.ok) throw new Error(await res.text()); return await res.json(); } finally { clearTimeout(t); }
-    }
-
-    async function aiAnalyzeJob(model, profile, job){
-      const sys = `You are an expert career coach. Return strict JSON with keys: score (0-100), strengths (array), gaps (array), insight (string), recommendation (string).`;
-      const user = `Candidate profile (free text allowed):\n${profile.resumeText}\n\nStructured summary:\n- Experience: ${profile.exp}\n- Current role: ${profile.role}\n- Expertise: ${profile.expertise}\n- Education: ${profile.edu}\n\nJob:\n- Title: ${job.title}\n- Company: ${job.company}\n- Location: ${job.location}\n- Salary: ${job.salary}\n- Requirements: ${job.req.join('; ')}\n- Description: ${job.desc}\n\nTask: Compare job to candidate. Score fit 0-100 (integer). Identify strengths and gaps referencing requirements. Provide a short, specific insight and 1-2 sentence recommendation. Output only JSON.`;
-      try{ const data = await callOpenAI({ model, temperature: 0.2, messages:[{role:'system', content: sys},{role:'user', content: user}], response_format: { type: 'json_object' } }); const content = data.choices?.[0]?.message?.content || '{}'; return normalizeAnalysis(safeParse(content), profile, job); }
-      catch(err){ console.warn('AI error, using heuristic fallback:', err?.message||err); return heuristicAnalysis(profile, job); }
-    }
-
-    function safeParse(t){ try { return JSON.parse(t); } catch{ return {}; } }
-
-    function normalizeAnalysis(a, profile, job){
-      const score = clampNumber(a.score ?? heuristicScore(profile, job), 0, 100);
-      return { score, strengths: Array.isArray(a.strengths)&&a.strengths.length? a.strengths.slice(0,5) : heuristicStrengths(profile, job), gaps: Array.isArray(a.gaps)&&a.gaps.length? a.gaps.slice(0,5) : heuristicGaps(profile, job), insight: a.insight || 'Overall alignment looks solid; highlight licensing compliance, staff leadership, and measurable outcomes.', recommendation: a.recommendation || 'Lead with director/assistant director wins (enrollment growth, audit results) and quantify team leadership.' };
-    }
-
-    function heuristicAnalysis(profile, job){ return { score: heuristicScore(profile, job), strengths: heuristicStrengths(profile, job), gaps: heuristicGaps(profile, job), insight: 'Heuristic analysis used due to API error. Focus on leadership, compliance, and enrollment growth.', recommendation: 'Quantify outcomes and align credentials to state requirements.' }; }
-    function heuristicScore(profile, job){ const text = (profile.resumeText + ' ' + profile.expertise + ' ' + profile.role + ' ' + profile.edu).toLowerCase(); let hits = 0; let total = job.req.length || 1; job.req.forEach(rq => { if(text.includes(rq.split(' ')[0].toLowerCase())) hits++; }); let base = 60 + Math.round((hits/total)*35); if(/director|lead/i.test(profile.role)) base += 3; if(/ms|master/.test(profile.edu.toLowerCase())) base += 2; return Math.max(50, Math.min(98, base)); }
-    function heuristicStrengths(profile, job){ const t = (profile.resumeText + ' ' + profile.expertise).toLowerCase(); const found = job.req.filter(rq => t.includes(rq.split(' ')[0].toLowerCase())); return found.length? found.slice(0,5) : ['Leadership experience','Compliance knowledge','Parent communication']; }
-    function heuristicGaps(profile, job){ const t = (profile.resumeText + ' ' + profile.expertise).toLowerCase(); const notFound = job.req.filter(rq => !t.includes(rq.split(' ')[0].toLowerCase())); return notFound.length? notFound.slice(0,5) : ['Budget ownership depth']; }
-
-    function clampNumber(n, min, max){ n = Number(n); if(Number.isNaN(n)) n = min; return Math.max(min, Math.min(max, n)); }
-
-    /********************
-     * GOOGLE SEARCH (Remote‑first verified links)
-     * Uses your backend GET /gsearch?q=…&num=… (Render env). Falls back to client CSE via window.GOOGLE_API_KEY/CX if present.
-     ********************/
-    function domainOf(href){ try{ return new URL(href).hostname.replace(/^www\./,''); }catch{ return ''; } }
-    function scoreJobLink(item){ const url = item.link||''; const title=(item.title||'').toLowerCase(); const d = domainOf(url); let s = 0; if(JOB_SITES.some(site=>d.includes(site.replace('/jobs','')))) s += 10; if(/apply|careers|job|jobs|opening|posting/.test(url)) s += 6; if(/apply|hiring|director|assistant|education|teacher|coordinator/.test(title)) s += 4; if(/pdf|youtube|facebook|pinterest|reddit/.test(url)) s -= 8; return s; }
-    function dedupeByUrl(items){ const seen = new Set(); return items.filter(it=>{ const u=(it.link||'').split('#')[0]; if(seen.has(u)) return false; seen.add(u); return true; }); }
-    function filterToRealJobs(items){ const filtered = items.filter(it=>{ const d = domainOf(it.link||''); return JOB_SITES.some(site=>d.includes(site.replace('/jobs',''))); }); const scored = filtered.map(it=>({ ...it, __score: scoreJobLink(it) })).sort((a,b)=> b.__score - a.__score); return dedupeByUrl(scored).slice(0,12); }
-
-    function baseQuery(job){ const parts = [job.title, job.company, 'remote', 'jobs']; return parts.join(' '); }
-    function localQuery(job){ const loc = (job.location||'').trim(); const parts = [job.title, job.company, loc, 'jobs']; return parts.filter(Boolean).join(' '); }
-    function siteFilters(){ return JOB_SITES.map(s=>`site:${s}`).join(' OR '); }
-    function buildVerifiedQuery(job, isRemote=true){ const core = isRemote ? baseQuery(job) : localQuery(job); return `${core} (${siteFilters()}) (apply OR job)`; }
-
-    async function gsearchServer(query, num=12){ const res = await fetch(`/gsearch?q=${encodeURIComponent(query)}&num=${num}`); if(!res.ok) throw new Error('Server gsearch failed'); return res.json(); }
-    async function gsearchClient(query, num=12){ if(!(window.GOOGLE_API_KEY && window.GOOGLE_CX)) throw new Error('No client CSE creds'); const url = `https://www.googleapis.com/customsearch/v1?key=${encodeURIComponent(window.GOOGLE_API_KEY)}&cx=${encodeURIComponent(window.GOOGLE_CX)}&num=${num}&q=${encodeURIComponent(query)}`; const res = await fetch(url); if(!res.ok) throw new Error('Google CSE fetch failed'); return res.json(); }
-
-    async function fetchVerifiedLinks(job, isRemote=true){ const q = buildVerifiedQuery(job, isRemote); try{ const data = await gsearchServer(q, 12); const items = (data.items||[]); return { q, items: filterToRealJobs(items) }; } catch(e){ try{ const data = await gsearchClient(q, 12); const items = (data.items||[]); return { q, items: filterToRealJobs(items) }; } catch(e2){ console.warn('CSE fallback failed', e2); return { q, items: [] }; } } }
-
-    /********************
-     * RENDER
-     ********************/
-    function scoreClass(s){ return s>=90?'excellent': s>=80?'good': s>=70?'fair':'poor'; }
-
-    function renderResults(items){
-      const results = document.getElementById('results'); const grid = document.getElementById('grid'); const empty = document.getElementById('empty'); const count = document.getElementById('resultCount');
-      results.classList.remove('hidden'); grid.innerHTML=''; empty.classList.add('hidden');
-      if(!items.length){ empty.classList.remove('hidden'); count.textContent='0 jobs found'; return; }
-      count.textContent = `${items.length} job${items.length!==1?'s':''} found`;
-      items.forEach((job, idx)=> grid.appendChild(jobCard(job, idx)) );
-      document.querySelectorAll('[data-sort]').forEach(btn=>btn.onclick = ()=>sortGrid(btn.dataset.sort));
-      document.getElementById('openTop5').onclick = ()=>openTopGoogle(items.slice(0,5));
-      document.getElementById('copyAll').onclick = ()=>copyAllQueries(items);
-    }
-
-    function jobCard(job, idx){
-      const el = document.createElement('div'); el.className = 'relative glass card'; el.dataset.score = job.analysis.score; el.dataset.posted = job.postedDays; el.dataset.salarymin = extractMinSalary(job.salary);
-      const verifiedId = `verified-${idx}`; const verifiedLocalId = `verified-local-${idx}`; const statusId = `status-${idx}`; const statusLocalId = `status-local-${idx}`;
-      el.innerHTML = `
-        <div class="score ${scoreClass(job.analysis.score)}">${job.analysis.score}%</div>
-        <div class="pr-20"><h3 class="text-lg font-semibold text-slate-800">${escapeHtml(job.title)}</h3><div class="text-slate-600">${escapeHtml(job.company)}</div></div>
-        <div class="mt-2 flex flex-wrap gap-4 text-slate-600">
-          <div>📍 ${escapeHtml(job.location||'Remote‑first')}</div><div>💼 ${escapeHtml(job.type||'')}</div><div>💰 ${escapeHtml(job.salary||'—')}</div><div>📅 ${job.postedDays} day${job.postedDays!==1?'s':''} ago</div>
-        </div>
-        <div class="mt-4 p-4 rounded-xl border border-indigo-100 bg-indigo-50">
-          <div class="text-slate-700 text-sm">${escapeHtml(job.analysis.insight)}</div>
-          <div class="mt-3 grid md:grid-cols-2 gap-3">
-            <div class="p-3 rounded-lg border bg-white"><div class="font-semibold text-slate-800 text-sm mb-1">Strengths</div><ul class="text-sm list-disc ml-5">${job.analysis.strengths.map(s=>`<li>${escapeHtml(s)}</li>`).join('')}</ul></div>
-            <div class="p-3 rounded-lg border bg-white"><div class="font-semibold text-slate-800 text-sm mb-1">Gaps</div><ul class="text-sm list-disc ml-5">${job.analysis.gaps.map(s=>`<li>${escapeHtml(s)}</li>`).join('')}</ul></div>
-          </div>
-          <div class="mt-3 italic text-slate-700 text-sm"><b>AI Recommendation:</b> ${escapeHtml(job.analysis.recommendation)}</div>
-        </div>
-        <div class="mt-3 flex flex-wrap gap-2 linkbar">
-          <button class="px-4 py-2 rounded-lg bg-indigo-600 text-white" data-load-remote>Remote Jobs — Show Real Links</button>
-          <button class="px-4 py-2 rounded-lg border" data-load-local>Local Jobs — Show Real Links</button>
-          <button class="px-4 py-2 rounded-lg border" data-open-google>Open Google (remote)</button>
-        </div>
-        <div class="mt-1 text-xs text-slate-600">* Links are verified to be from major job boards/employers (Indeed, LinkedIn, Glassdoor, ZipRecruiter, Monster, CareerBuilder, SimplyHired, NAEYC, SchoolSpring, GovernmentJobs, Primrose, KinderCare, Bright Horizons, YMCA, WCPSS).</div>
-        <details class="mt-2" open>
-          <summary class="text-sm text-slate-700">Remote postings</summary>
-          <div class="mt-2 text-sm text-slate-600" id="${statusId}">Not loaded yet.</div>
-          <ul id="${verifiedId}" class="mt-2 space-y-2 list-disc ml-5"></ul>
-        </details>
-        <details class="mt-2">
-          <summary class="text-sm text-slate-700">Local postings</summary>
-          <div class="mt-2 text-sm text-slate-600" id="${statusLocalId}">Not loaded yet.</div>
-          <ul id="${verifiedLocalId}" class="mt-2 space-y-2 list-disc ml-5"></ul>
-        </details>
-      `;
-
-      el.querySelector('[data-open-google]')?.addEventListener('click', ()=>{
-        const q = `${job.title} ${job.company} remote jobs ${siteFilters()}`;
-        window.open(`https://www.google.com/search?q=${encodeURIComponent(q)}`, '_blank');
-      });
-
-      el.querySelector('[data-load-remote]')?.addEventListener('click', async ()=>{
-        const status = document.getElementById(statusId); const list = document.getElementById(verifiedId);
-        status.textContent = 'Searching remote…'; list.innerHTML = '';
-        const { q, items } = await fetchVerifiedLinks(job, true);
-        if(!items.length){ status.textContent = 'No remote postings found via Google CSE. Try Open Google or Local.'; return; }
-        status.innerHTML = `Found ${items.length} remote posting(s).`;
-        for(const it of items){ const li = document.createElement('li'); li.innerHTML = `<a class='text-indigo-700 underline' target='_blank' rel='noopener' href='${it.link}'>${escapeHtml(it.title || it.link)}</a><div class='text-xs text-slate-600'>${escapeHtml(it.snippet||'')}</div>`; list.appendChild(li); }
-      });
-
-      el.querySelector('[data-load-local]')?.addEventListener('click', async ()=>{
-        const status = document.getElementById(statusLocalId); const list = document.getElementById(verifiedLocalId);
-        status.textContent = 'Searching local…'; list.innerHTML = '';
-        const { q, items } = await fetchVerifiedLinks(job, false);
-        if(!items.length){ status.textContent = 'No local postings found via Google CSE. Try Open Google or Remote.'; return; }
-        status.innerHTML = `Found ${items.length} local posting(s).`;
-        for(const it of items){ const li = document.createElement('li'); li.innerHTML = `<a class='text-indigo-700 underline' target='_blank' rel='noopener' href='${it.link}'>${escapeHtml(it.title || it.link)}</a><div class='text-xs text-slate-600'>${escapeHtml(it.snippet||'')}</div>`; list.appendChild(li); }
-      });
-
-      return el;
-    }
-
-    function sortGrid(by){ const grid = document.getElementById('grid'); const cards = [...grid.children]; cards.sort((a,b)=>{ if(by==='match') return (+b.dataset.score) - (+a.dataset.score); if(by==='recent') return (+a.dataset.posted) - (+b.dataset.posted); if(by==='salary') return (+b.dataset.salarymin) - (+a.dataset.salarymin); return 0; }); grid.innerHTML=''; cards.forEach(c=>grid.appendChild(c)); }
-
-    function openTopGoogle(items){ items.forEach(j=>{ const q = `${j.title} ${j.company} remote jobs ${siteFilters()}`; window.open(`https://www.google.com/search?q=${encodeURIComponent(q)}`, '_blank'); }); }
-    function copyAllQueries(items){ const all = items.map(j=>`${j.title} ${j.company} remote jobs ${siteFilters()}`).join('\n'); navigator.clipboard.writeText(all).then(()=>{ alert('All Google queries copied to clipboard.'); }); }
-
-    function extractMinSalary(txt){ const m = (txt||'').replace(/[,$]/g,'').match(/(\d{2,})/g); return m&&m.length? +m[0]:0; }
-    function escapeHtml(str){ return String(str).replace(/[&<>"']/g, s=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[s])); }
-    function showErr(msg){ const e=document.getElementById('err'); e.textContent=msg; e.classList.remove('hidden'); }
-    function hideErr(){ document.getElementById('err').classList.add('hidden'); }
+        progressBar.style.width = "100%";
+      } catch (e) {
+        err.textContent = e.message;
+        err.classList.remove("hidden");
+      } finally {
+        busy.classList.add("hidden");
+        setTimeout(() => progressBar.style.width = "0%", 1500);
+      }
+    };
   </script>
-
-  <!-- Optional: inject Google CSE creds at build/runtime via Render env
-       <script>
-         window.GOOGLE_API_KEY = "${process.env.GOOGLE_API_KEY}";
-         window.GOOGLE_CX = "${process.env.GOOGLE_CX}";
-       </script>
-  -->
 </body>
 </html>
-
-
