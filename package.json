@@ -1,16 +1,21 @@
 {
-  "name": "fuel-iq",
+  "name": "ai-job-portal",
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "description": "AI Job Match Portal",
   "main": "server.js",
-  "engines": { "node": ">=18" },
   "scripts": {
     "start": "node server.js",
     "build": "npm ci || npm install"
   },
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
+    "express": "^4.19.2",
     "cors": "^2.8.5",
-    "express": "^4.19.2"
+    "body-parser": "^1.20.2",
+    "node-fetch": "^3.3.2"
   }
 }
