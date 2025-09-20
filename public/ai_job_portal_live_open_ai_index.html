@@ -3,67 +3,489 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>🤖 AI-Powered Job Match Portal</title>
+  <title>🤖 AI‑Powered Job Match Portal</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
+    :root { --brand:#6366f1; --brand2:#764ba2; }
     body { font-family:'Inter',sans-serif; background: linear-gradient(135deg,#667eea 0%,#764ba2 100%); }
-    .glass { background:rgba(255,255,255,.9); backdrop-filter:blur(10px); border-radius:1rem; padding:1.5rem; }
-    .card { box-shadow:0 10px 25px rgba(0,0,0,0.15); margin-bottom:1.5rem; }
-    .spinner { width:18px; height:18px; border:3px solid #ddd; border-top:3px solid #6366f1; border-radius:50%; animation:spin 1s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    .glass { background:rgba(255,255,255,.9); backdrop-filter:blur(10px); border-radius:1rem; }
+    .card { box-shadow:0 20px 40px rgba(0,0,0,.15); padding:1.25rem; margin-bottom:1rem; }
+    .chip { padding:.4rem .8rem; border-radius:9999px; border:1px solid #cbd5e1; font-size:.85rem; background:white; cursor:pointer; user-select:none; }
+    .chip.active { background:var(--brand); color:white; border-color:var(--brand); }
     .progress { height:6px; background:#e2e8f0; border-radius:4px; overflow:hidden; }
-    #progressBar { height:6px; width:0; background:#6366f1; transition:width .3s; }
+    #progressBar { height:6px; width:0; background:var(--brand); transition:width .25s ease; }
+    .spinner { width:18px; height:18px; border:3px solid #e5e7eb; border-top:3px solid var(--brand); border-radius:50%; animation:spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .btn { display:inline-flex; align-items:center; gap:.5rem; padding:.7rem 1rem; border-radius:.8rem; font-weight:600; }
+    .btn-primary { background:var(--brand); color:white; }
+    .btn-outline { border:1px solid #cbd5e1; background:white; }
+    .muted { color:#64748b; }
+    .pill { border:1px solid #cbd5e1; border-radius:999px; padding:.15rem .5rem; font-size:.75rem; color:#334155; background:#fff; }
+    .kbd { border:1px solid #cbd5e1; border-radius:.4rem; padding:.05rem .3rem; background:#f1f5f9; font-size:.75rem; }
+    .row { display:grid; gap:.75rem; }
+    @media(min-width:768px){ .row-3 { grid-template-columns: repeat(3,minmax(0,1fr)); } .row-4{grid-template-columns: repeat(4,minmax(0,1fr));} .row-5{grid-template-columns: repeat(5,minmax(0,1fr));} }
+    details summary { cursor:pointer; }
   </style>
 </head>
-<body class="p-4 md:p-10">
-  <h1 class="text-3xl font-bold text-white mb-6">🤖 AI-Powered Job Match Portal</h1>
-  <p class="text-white mb-6">AI matches your resume to jobs and fetches <b>real postings</b>.</p>
+<body class="p-4 md:p-8">
+  <header class="mb-4">
+    <h1 class="text-3xl md:text-4xl font-bold text-white">🤖 AI‑Powered Job Match Portal</h1>
+    <p class="text-white/90">Matches your resume to jobs and fetches <b>real postings</b> across Indeed, LinkedIn, Glassdoor, ZipRecruiter, and employer sites. Nothing cut.</p>
+  </header>
 
-  <!-- Mode + API Key -->
+  <!-- STATUS + MODE -->
   <section class="glass card">
-    <h2 class="text-lg font-semibold text-slate-800 mb-3">⚙️ Mode & API Key</h2>
-    <div class="flex gap-6">
-      <label class="flex items-center gap-2"><input id="modeBackend" type="radio" name="mode" checked> Backend</label>
-      <label class="flex items-center gap-2"><input id="modeAI" type="radio" name="mode"> OpenAI</label>
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <div class="flex items-center gap-4">
+        <div>
+          <div class="text-slate-700 text-sm font-semibold">Backend</div>
+          <div id="backendStatus" class="muted">Checking…</div>
+        </div>
+        <div>
+          <div class="text-slate-700 text-sm font-semibold">OpenAI Key</div>
+          <div id="keyStatus" class="muted">Not set</div>
+        </div>
+        <button id="btnHealth" class="btn btn-outline">Recheck</button>
+      </div>
+      <div class="flex items-center gap-5">
+        <div class="flex items-center gap-2">
+          <span class="text-sm font-semibold text-slate-700">Mode:</span>
+          <label class="flex items-center gap-2 text-sm"><input id="modeAuto" name="mode" type="radio" checked /> Auto</label>
+          <label class="flex items-center gap-2 text-sm"><input id="modeBackend" name="mode" type="radio" /> Backend</label>
+          <label class="flex items-center gap-2 text-sm"><input id="modeAI" name="mode" type="radio" /> OpenAI</label>
+        </div>
+      </div>
     </div>
-    <input id="apiKey" type="password" class="mt-3 w-full rounded-lg border border-slate-200 px-3 py-2" placeholder="sk-..." />
+    <div class="mt-3 progress"><div id="progressBar"></div></div>
   </section>
 
-  <!-- Profile -->
+  <!-- API KEY -->
   <section class="glass card">
-    <h2 class="text-lg font-semibold text-slate-800 mb-3">📋 Your Resume Profile</h2>
-    <textarea id="resumeText" class="w-full rounded-lg border border-slate-200 px-3 py-2" rows="6">Paste resume text here...</textarea>
-    <div class="flex items-end gap-2 mt-4">
-      <button id="btnSearch" class="px-5 py-3 rounded-xl bg-indigo-600 text-white font-semibold">🔍 Search</button>
-      <div id="busy" class="hidden items-center gap-3"><div class="spinner"></div><span>Working…</span></div>
+    <h2 class="text-lg font-semibold text-slate-800 mb-2">🔑 OpenAI API Key (fallback or AI mode)</h2>
+    <input id="apiKey" type="password" class="w-full rounded-lg border border-slate-200 px-3 py-2" placeholder="sk-..." />
+    <p class="text-xs text-amber-700 mt-1">Stored only in your browser (localStorage). In production, proxy through your backend.</p>
+  </section>
+
+  <!-- PROFILE -->
+  <section class="glass card">
+    <h2 class="text-lg font-semibold text-slate-800 mb-2">📋 Your Resume Profile</h2>
+    <div class="row row-4">
+      <input id="exp" class="rounded-lg border border-slate-200 px-3 py-2" value="10+ years Education Leadership" />
+      <input id="role" class="rounded-lg border border-slate-200 px-3 py-2" value="Service Projects Coordinator" />
+      <input id="expertise" class="rounded-lg border border-slate-200 px-3 py-2" value="Preschool Administration" />
+      <input id="edu" class="rounded-lg border border-slate-200 px-3 py-2" value="M.S. Industrial Psychology" />
+    </div>
+    <textarea id="resumeText" rows="6" class="mt-3 w-full rounded-lg border border-slate-200 px-3 py-2">Alicia J. Nourie — Preschool admin & retail ops leadership. Strengths: Early Childhood Education, Preschool Administration, Staff Supervision, Teacher Training, Family Engagement, Curriculum Development, Licensing Compliance. Roles: Lowe’s (Service Projects Coordinator; Customer Experience), English First (ESL Teacher), Green Pines Preschool (Assistant Director), Helping Little Hands Daycare (Owner/Director). Education: M.S. Industrial Psychology (2017).</textarea>
+
+    <div class="row row-5 mt-4">
+      <div>
+        <label class="text-sm font-semibold text-slate-700">Location (address or city/state)</label>
+        <input id="location" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" value="Knightdale, NC" />
+      </div>
+      <div>
+        <label class="text-sm font-semibold text-slate-700">Radius</label>
+        <select id="radius" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2">
+          <option>10 miles</option><option selected>25 miles</option><option>50 miles</option><option>100 miles</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-sm font-semibold text-slate-700">Minimum Match</label>
+        <select id="matchThreshold" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2">
+          <option value="0">Show All</option><option value="60">60%+</option><option value="70" selected>70%+</option><option value="80">80%+</option>
+        </select>
+      </div>
+      <div class="flex items-center gap-2 mt-6">
+        <input id="remoteOnly" type="checkbox" class="w-4 h-4" />
+        <label for="remoteOnly" class="text-sm font-semibold text-slate-700">Remote Jobs Only</label>
+      </div>
+      <!-- Backend payload knobs (for /estimate) -->
+      <div class="row">
+        <label class="text-sm font-semibold text-slate-700">MPDs (backend)</label>
+        <input id="mpds" type="number" min="1" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" value="4" />
+      </div>
+    </div>
+
+    <!-- Categories -->
+    <div class="mt-4">
+      <h3 class="text-sm font-semibold text-slate-700 mb-2">Job Categories</h3>
+      <div id="chips" class="flex flex-wrap gap-2">
+        <button class="chip active" data-category="preschool-director">Preschool Director</button>
+        <button class="chip active" data-category="assistant-director">Assistant Director</button>
+        <button class="chip active" data-category="education-administrator">Education Administrator</button>
+        <button class="chip active" data-category="curriculum-coordinator">Curriculum Coordinator</button>
+        <button class="chip active" data-category="childcare-director">Childcare Center Director</button>
+        <button class="chip" data-category="program-manager">Program Manager</button>
+        <button class="chip" data-category="family-engagement">Family Engagement Specialist</button>
+        <button class="chip" data-category="esl-teacher">ESL Teacher</button>
+        <button class="chip" data-category="training-coordinator">Training Coordinator</button>
+        <button class="chip" data-category="service-coordinator">Service Coordinator</button>
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="mt-4 flex items-center gap-2">
+      <button id="btnSearch" class="btn btn-primary"><span id="searchIcon">🔍</span><span>Search & Analyze</span></button>
+      <button id="btnReset" class="btn btn-outline">Reset</button>
+      <div id="busy" class="hidden items-center gap-2"><div class="spinner"></div><span class="muted">Working…</span></div>
     </div>
     <p id="err" class="mt-3 hidden text-sm text-red-600"></p>
   </section>
 
-  <!-- Results -->
+  <!-- RESULTS -->
   <section id="results" class="glass card hidden">
-    <div class="flex items-center justify-between mb-4">
-      <div id="resultCount" class="font-semibold">0 results</div>
+    <div class="flex items-center justify-between mb-3">
+      <div id="resultCount" class="text-slate-800 font-semibold">0 results</div>
+      <div class="flex flex-wrap gap-2">
+        <button class="btn btn-outline" data-sort="match">Best Match</button>
+        <button class="btn btn-outline" data-sort="recent">Most Recent</button>
+        <button class="btn btn-outline" data-sort="salary">Highest Salary</button>
+      </div>
     </div>
-    <div id="grid" class="grid gap-4"></div>
-    <div id="empty" class="hidden text-center text-slate-500 py-10">No results found.</div>
+
+    <div class="mb-3 flex flex-wrap gap-2">
+      <button id="openTop5" class="btn btn-primary">Open Top 5 Google Searches</button>
+      <button id="copyAll" class="btn btn-outline">Copy All Google Queries</button>
+    </div>
+
+    <div id="grid" class="grid md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+    <div id="empty" class="hidden text-center text-slate-500 py-10">No matching jobs found. Try adjusting your filters.</div>
   </section>
 
-<script>
-const btnSearch=document.getElementById("btnSearch"),busy=document.getElementById("busy"),err=document.getElementById("err"),results=document.getElementById("results"),grid=document.getElementById("grid"),resultCount=document.getElementById("resultCount"),empty=document.getElementById("empty"),apiKeyInput=document.getElementById("apiKey"),modeBackend=document.getElementById("modeBackend"),modeAI=document.getElementById("modeAI");
+  <!-- BACKUP LINKS (always available) -->
+  <section class="glass card">
+    <h3 class="text-slate-800 font-semibold mb-2">🔎 Quick Search Shortcuts</h3>
+    <div class="flex flex-wrap gap-2">
+      <button id="btnGoogle" class="btn btn-outline">Google Jobs</button>
+      <button id="btnIndeed" class="btn btn-outline">Indeed</button>
+      <button id="btnLinkedIn" class="btn btn-outline">LinkedIn</button>
+      <button id="btnGlassdoor" class="btn btn-outline">Glassdoor</button>
+      <button id="btnZip" class="btn btn-outline">ZipRecruiter</button>
+    </div>
+  </section>
 
-apiKeyInput.value=localStorage.getItem("openai_api_key")||"";apiKeyInput.addEventListener("input",()=>localStorage.setItem("openai_api_key",apiKeyInput.value));
+  <!-- DEBUG -->
+  <section class="glass card">
+    <details>
+      <summary class="text-slate-800 font-semibold">🛠 Debug (last responses)</summary>
+      <pre id="dbg" class="mt-2 text-xs whitespace-pre-wrap bg-white/70 p-2 rounded-md border"></pre>
+    </details>
+  </section>
 
-function cleanJSON(s){s=s.trim().replace(/^```json/i,"").replace(/```$/i,"").trim();try{return JSON.parse(s)}catch{const m=s.match(/({[\\s\\S]*}|\\[[\\s\\S]*\\])/);if(m)return JSON.parse(m[1]);throw new Error("Invalid JSON from AI")}}
+  <script>
+    // --- ELEMENTS ---
+    const backendStatus = document.getElementById('backendStatus');
+    const keyStatus = document.getElementById('keyStatus');
+    const btnHealth = document.getElementById('btnHealth');
+    const progressBar = document.getElementById('progressBar');
 
-function renderJobs(list){grid.innerHTML="";list.forEach(j=>{const c=document.createElement("div");c.className="p-4 border rounded-xl bg-white";c.innerHTML=`<h4 class="font-semibold">${j.title}</h4><p>${j.company}</p><p>${j.location||"Remote"}</p>${j.link?`<a href="${j.link}" target="_blank" class="text-indigo-600 underline">View</a>`:""}<p>Match: ${j.match??"-"}%</p>`;grid.appendChild(c)});results.classList.remove("hidden");resultCount.textContent=`${list.length} jobs found`}
+    const apiKeyInput = document.getElementById('apiKey');
+    const modeAuto = document.getElementById('modeAuto');
+    const modeBackend = document.getElementById('modeBackend');
+    const modeAI = document.getElementById('modeAI');
 
-function renderEstimate(e){grid.innerHTML="";const est=e.estimate||e;const c=document.createElement("div");c.className="p-4 border rounded-xl bg-white";c.innerHTML=`<h4>Estimate Result</h4><p>Low: ${est.low}</p><p>Range: ${est.range}</p><p>Year2: ${est.year2}</p><p>Year3: ${est.year3}</p>`;grid.appendChild(c);results.classList.remove("hidden");resultCount.textContent="1 estimate"}
+    const expEl = document.getElementById('exp');
+    const roleEl = document.getElementById('role');
+    const expertiseEl = document.getElementById('expertise');
+    const eduEl = document.getElementById('edu');
+    const resumeEl = document.getElementById('resumeText');
 
-btnSearch.onclick=async()=>{err.classList.add("hidden");busy.classList.remove("hidden");try{const resume=document.getElementById("resumeText").value;let jobs=null;if(modeBackend.checked){const r=await fetch("/estimate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({address:"Knightdale, NC",mpds:4,diesel:0})});if(r.ok)jobs=await r.json();if(jobs?.estimate)renderEstimate(jobs)}else if(modeAI.checked){const key=apiKeyInput.value.trim();if(!key)throw new Error("Enter OpenAI key");const r=await fetch("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${key}`},body:JSON.stringify({model:"gpt-4o-mini",messages:[{role:"system",content:"Return JSON: [{title,company,location,link,match}]"}, {role:"user",content:`Find jobs for ${resume}`}]})});const j=await r.json();jobs=cleanJSON(j.choices?.[0]?.message?.content||"");if(Array.isArray(jobs))renderJobs(jobs);else if(jobs.jobs)renderJobs(jobs.jobs)}else throw new Error("No mode selected")}catch(e){err.textContent=e.message;err.classList.remove("hidden")}finally{busy.classList.add("hidden")}};
-</script>
+    const locationEl = document.getElementById('location');
+    const radiusEl = document.getElementById('radius');
+    const matchEl = document.getElementById('matchThreshold');
+    const remoteOnlyEl = document.getElementById('remoteOnly');
+    const mpdsEl = document.getElementById('mpds');
+
+    const chips = document.getElementById('chips');
+
+    const btnSearch = document.getElementById('btnSearch');
+    const btnReset = document.getElementById('btnReset');
+    const busy = document.getElementById('busy');
+    const err = document.getElementById('err');
+
+    const resultsSection = document.getElementById('results');
+    const resultCount = document.getElementById('resultCount');
+    const grid = document.getElementById('grid');
+    const empty = document.getElementById('empty');
+
+    const openTop5 = document.getElementById('openTop5');
+    const copyAll = document.getElementById('copyAll');
+
+    const btnGoogle = document.getElementById('btnGoogle');
+    const btnIndeed = document.getElementById('btnIndeed');
+    const btnLinkedIn = document.getElementById('btnLinkedIn');
+    const btnGlassdoor = document.getElementById('btnGlassdoor');
+    const btnZip = document.getElementById('btnZip');
+
+    const dbg = document.getElementById('dbg');
+
+    // --- INIT ---
+    apiKeyInput.value = localStorage.getItem('openai_api_key') || '';
+    updateKeyStatus();
+    apiKeyInput.addEventListener('input', () => { localStorage.setItem('openai_api_key', apiKeyInput.value); updateKeyStatus(); });
+
+    function updateKeyStatus(){ keyStatus.textContent = apiKeyInput.value ? 'Present' : 'Not set'; }
+
+    async function checkHealth(){
+      try {
+        const r = await fetch('/health');
+        backendStatus.textContent = r.ok ? '✅ Online' : '❌ Down';
+      } catch(e){ backendStatus.textContent = '❌ Error'; }
+    }
+    btnHealth.onclick = checkHealth;
+    checkHealth();
+
+    // category chip toggle
+    chips.addEventListener('click', (e)=>{
+      const b = e.target.closest('.chip'); if(!b) return;
+      b.classList.toggle('active');
+    });
+
+    btnReset.onclick = () => {
+      document.querySelectorAll('#chips .chip').forEach(c=>c.classList.add('active'));
+      remoteOnlyEl.checked = false;
+      matchEl.value = '70';
+      mpdsEl.value = '4';
+      err.classList.add('hidden');
+      resultsSection.classList.add('hidden');
+      grid.innerHTML = '';
+      empty.classList.add('hidden');
+      dbg.textContent = '';
+    };
+
+    // --- HELPERS ---
+    function setProgress(p){ progressBar.style.width = p + '%'; }
+
+    function cleanJSON(str){
+      if(!str || typeof str!== 'string') throw new Error('Empty AI response');
+      let s = str.trim();
+      s = s.replace(/^```json\s*/i,'').replace(/```\s*$/i,'').trim();
+      try { return JSON.parse(s); } catch {}
+      const m = s.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
+      if(m) return JSON.parse(m[1]);
+      throw new Error('AI returned invalid JSON');
+    }
+
+    function buildQueries(){
+      const role = roleEl.value.trim();
+      const loc = locationEl.value.trim();
+      const remote = remoteOnlyEl.checked;
+      const base = `${role} jobs ${remote? 'remote' : loc}`.trim();
+      return {
+        google: base,
+        indeed: base,
+        linkedin: base,
+        glassdoor: base,
+        zip: base
+      };
+    }
+
+    function openSearches(limit=5){
+      const q = buildQueries();
+      const qs = [
+        `https://www.google.com/search?q=${encodeURIComponent(q.google)}`,
+        `https://www.indeed.com/jobs?q=${encodeURIComponent(q.indeed)}`,
+        `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(q.linkedin)}`,
+        `https://www.glassdoor.com/Job/jobs.htm?sc.keyword=${encodeURIComponent(q.glassdoor)}`,
+        `https://www.ziprecruiter.com/jobs-search?search=${encodeURIComponent(q.zip)}`,
+      ];
+      qs.slice(0,limit).forEach(u=> window.open(u,'_blank'));
+    }
+
+    function copyQueries(){
+      const q = buildQueries();
+      const text = `Google: ${q.google}\nIndeed: ${q.indeed}\nLinkedIn: ${q.linkedin}\nGlassdoor: ${q.glassdoor}\nZipRecruiter: ${q.zip}`;
+      navigator.clipboard.writeText(text).then(()=>{
+        err.classList.add('hidden');
+      }).catch(()=>{
+        err.textContent = 'Could not copy to clipboard';
+        err.classList.remove('hidden');
+      });
+    }
+
+    openTop5.onclick = ()=> openSearches(5);
+    copyAll.onclick = copyQueries;
+
+    btnGoogle.onclick = ()=> window.open(`https://www.google.com/search?q=${encodeURIComponent(buildQueries().google)}`,'_blank');
+    btnIndeed.onclick = ()=> window.open(`https://www.indeed.com/jobs?q=${encodeURIComponent(buildQueries().indeed)}`,'_blank');
+    btnLinkedIn.onclick = ()=> window.open(`https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(buildQueries().linkedin)}`,'_blank');
+    btnGlassdoor.onclick = ()=> window.open(`https://www.glassdoor.com/Job/jobs.htm?sc.keyword=${encodeURIComponent(buildQueries().glassdoor)}`,'_blank');
+    btnZip.onclick = ()=> window.open(`https://www.ziprecruiter.com/jobs-search?search=${encodeURIComponent(buildQueries().zip)}`,'_blank');
+
+    // RENDERERS
+    function renderJobs(list){
+      grid.innerHTML = '';
+      const real = list.filter(j => j && j.title && j.company && j.link && String(j.link).startsWith('http'));
+      if(!real.length){ empty.classList.remove('hidden'); resultsSection.classList.remove('hidden'); resultCount.textContent = '0 jobs found'; return; }
+      empty.classList.add('hidden');
+      real.forEach(j=>{
+        const card = document.createElement('div');
+        card.className = 'p-4 border rounded-xl bg-white';
+        card.innerHTML = `
+          <div class="flex justify-between items-start gap-3">
+            <div>
+              <h4 class="font-semibold text-lg">${j.title}</h4>
+              <p class="muted">${j.company}</p>
+              <p class="text-slate-500 text-sm mb-2">${j.location || 'Remote'}</p>
+              ${j.posted_at? `<span class="pill">Posted: ${j.posted_at}</span>`: ''}
+            </div>
+            <a href="${j.link}" target="_blank" class="btn btn-outline">Open</a>
+          </div>
+          <div class="mt-2 text-sm">Match: <b>${j.match ?? '-'}</b>%</div>
+        `;
+        grid.appendChild(card);
+      });
+      resultsSection.classList.remove('hidden');
+      resultCount.textContent = `${real.length} jobs found`;
+    }
+
+    function renderEstimate(obj){
+      grid.innerHTML = '';
+      const d = obj.estimate || obj;
+      const card = document.createElement('div');
+      card.className = 'p-4 border rounded-xl bg-white';
+      card.innerHTML = `
+        <h4 class="font-semibold text-lg">Estimate</h4>
+        <div class="grid md:grid-cols-2 gap-2 mt-2">
+          <div>
+            <div><b>Low:</b> ${d.low ?? '-'}</div>
+            <div><b>Range:</b> ${d.range ?? '-'}</div>
+            <div><b>Year 2:</b> ${d.year2 ?? '-'}</div>
+            <div><b>Year 3:</b> ${d.year3 ?? '-'}</div>
+          </div>
+          <div class="muted text-sm">
+            ${(obj.aadtText? `<div>${obj.aadtText}</div>`: '')}
+            ${(obj.competitionText? `<div>${obj.competitionText}</div>`: '')}
+            ${(obj.summary? `<div class="mt-2">${obj.summary}</div>`: '')}
+          </div>
+        </div>
+      `;
+      grid.appendChild(card);
+      resultsSection.classList.remove('hidden');
+      resultCount.textContent = '1 result shown';
+    }
+
+    // --- SEARCH HANDLER ---
+    btnSearch.onclick = async () => {
+      err.classList.add('hidden');
+      busy.classList.remove('hidden');
+      setProgress(10);
+      dbg.textContent = '';
+
+      try {
+        // Build unified query
+        const query = {
+          resume: resumeEl.value.trim(),
+          exp: expEl.value.trim(),
+          role: roleEl.value.trim(),
+          expertise: expertiseEl.value.trim(),
+          edu: eduEl.value.trim(),
+          location: locationEl.value.trim(),
+          radius: radiusEl.value,
+          categories: Array.from(document.querySelectorAll('#chips .chip.active')).map(c=>c.dataset.category),
+          matchThreshold: matchEl.value,
+          remoteOnly: remoteOnlyEl.checked
+        };
+
+        const mode = modeBackend.checked ? 'backend' : (modeAI.checked ? 'ai' : 'auto');
+
+        // 1) BACKEND MODE (or AUTO first step)
+        let backendOk = false, backendJson = null;
+        if(mode !== 'ai'){
+          try {
+            setProgress(25);
+            const payload = {
+              address: query.location || 'Knightdale, NC',
+              mpds: Math.max(1, parseInt(mpdsEl.value || '4',10)),
+              diesel: 0,
+              advanced: { price_position: 'inline' }
+            };
+            const r = await fetch('/estimate', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+            const txt = await r.text();
+            dbg.textContent += `\n/estimate status ${r.status}\n` + txt.slice(0,1200) + (txt.length>1200?'...':'') + '\n';
+            if(r.ok){
+              backendJson = JSON.parse(txt);
+              backendOk = true;
+            }
+          } catch(e){ dbg.textContent += `\nBackend error: ${e.message}\n`; }
+        }
+
+        if(backendOk){
+          setProgress(70);
+          renderEstimate(backendJson);
+          setProgress(100);
+          return;
+        }
+
+        // 2) OPENAI MODE or AUTO FALLBACK
+        const key = apiKeyInput.value.trim();
+        if(mode !== 'backend'){
+          if(!key){ throw new Error('Backend failed/unavailable and no OpenAI key provided.'); }
+          setProgress(45);
+          const roleLine = query.role ? `Target role: ${query.role}\n` : '';
+          const expertiseLine = query.expertise ? `Expertise: ${query.expertise}\n` : '';
+          const locLine = query.remoteOnly ? 'Location: remote\n' : `Location: ${query.location}\n`;
+          const cats = query.categories?.length ? `Categories: ${query.categories.join(', ')}\n` : '';
+          const sys = 'You are a precise job-matching agent. Output MUST be strict JSON and nothing else.';
+          const user = `Return ONLY JSON with this shape:\n{\n  "jobs": [\n    {"title":"...","company":"...","location":"...","link":"https://...","match":0-100}\n  ]\n}\nCandidate: ${query.resume}\n${roleLine}${expertiseLine}${locLine}${cats}Only include real, currently active postings from major boards or employer sites. Include full clickable links.`;
+
+          const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+            method:'POST',
+            headers:{ 'Content-Type':'application/json', 'Authorization': `Bearer ${key}` },
+            body: JSON.stringify({
+              model:'gpt-4o-mini',
+              response_format: { type:'json_object' },
+              temperature:0.2,
+              messages:[ {role:'system', content:sys}, {role:'user', content:user} ]
+            })
+          });
+
+          const aiTxt = await aiRes.text();
+          dbg.textContent += `\nOpenAI status ${aiRes.status}\n` + aiTxt.slice(0,1200) + (aiTxt.length>1200?'...':'') + '\n';
+          if(!aiRes.ok){ throw new Error(`OpenAI error ${aiRes.status}`); }
+          let aiJson;
+          try { aiJson = JSON.parse(aiTxt); } catch { throw new Error('AI returned non-JSON envelope'); }
+          const content = aiJson?.choices?.[0]?.message?.content || '';
+          const parsed = cleanJSON(content);
+          const jobsArr = Array.isArray(parsed) ? parsed : (parsed.jobs || []);
+          setProgress(70);
+          renderJobs(jobsArr);
+          setProgress(100);
+          return;
+        }
+
+        // If we got here in backend-only mode, show error
+        throw new Error('Backend returned error');
+
+      } catch(e){
+        err.textContent = e.message;
+        err.classList.remove('hidden');
+      } finally {
+        busy.classList.add('hidden');
+        setTimeout(()=> setProgress(0), 1200);
+      }
+    };
+
+    // SORT HANDLERS (client-side sort of currently rendered cards by dataset when AI returns match)
+    document.querySelectorAll('[data-sort]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const mode = btn.getAttribute('data-sort');
+        const cards = Array.from(grid.children);
+        if(!cards.length) return;
+        if(mode==='match'){
+          cards.sort((a,b)=>{
+            const am = parseFloat(a.querySelector('.mt-2')?.textContent?.match(/(\d+\.?\d*)/)?.[1]||'-1');
+            const bm = parseFloat(b.querySelector('.mt-2')?.textContent?.match(/(\d+\.?\d*)/)?.[1]||'-1');
+            return (isNaN(bm)?-1:bm) - (isNaN(am)?-1:am);
+          });
+        }
+        // For demo: recent/salary not available from AI JSON → keep order
+        grid.innerHTML = '';
+        cards.forEach(c=> grid.appendChild(c));
+      });
+    });
+  </script>
 </body>
 </html>
