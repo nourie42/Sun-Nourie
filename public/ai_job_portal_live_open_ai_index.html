@@ -1,213 +1,130 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>🤖 AI-Powered Job Match Portal</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    body { font-family:'Inter',sans-serif; background: linear-gradient(135deg,#667eea 0%,#764ba2 100%); }
-    .glass { background:rgba(255,255,255,.9); backdrop-filter:blur(10px); border-radius:1rem; padding:1.5rem; }
-    .card { box-shadow:0 10px 25px rgba(0,0,0,0.15); margin-bottom:1.5rem; }
-    .spinner { width:18px; height:18px; border:3px solid #ddd; border-top:3px solid #6366f1; border-radius:50%; animation:spin 1s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .chip { padding:.4rem .8rem; border-radius:9999px; border:1px solid #cbd5e1; font-size:.85rem; background:white; cursor:pointer; }
-    .chip.active { background:#6366f1; color:white; border-color:#6366f1; }
-    .progress { height:6px; background:#e2e8f0; border-radius:4px; overflow:hidden; }
-    #progressBar { height:6px; width:0; background:#6366f1; transition:width .3s; }
-  </style>
-</head>
-<body class="p-4 md:p-10">
-  <h1 class="text-3xl font-bold text-white mb-6">🤖 AI-Powered Job Match Portal</h1>
-  <p class="text-white mb-6">AI matches your resume to jobs and fetches <b>real postings</b> across Indeed, LinkedIn, Glassdoor, ZipRecruiter, etc. Nothing cut.</p>
+<script>
+  const backendStatus = document.getElementById("backendStatus");
+  const btnHealth = document.getElementById("btnHealth");
+  const progressBar = document.getElementById("progressBar");
+  const btnSearch = document.getElementById("btnSearch");
+  const resultsSection = document.getElementById("results");
+  const grid = document.getElementById("grid");
+  const resultCount = document.getElementById("resultCount");
+  const empty = document.getElementById("empty");
+  const busy = document.getElementById("busy");
+  const err = document.getElementById("err");
+  const apiKeyInput = document.getElementById("apiKey");
 
-  <!-- Status -->
-  <section class="glass card">
-    <div class="flex justify-between items-center">
-      <span class="text-slate-700 font-semibold">Backend Status:</span>
-      <span id="backendStatus" class="text-slate-600">Checking…</span>
-      <button id="btnHealth" class="px-3 py-2 rounded bg-indigo-600 text-white text-sm">Recheck</button>
-    </div>
-    <div class="mt-2 progress"><div id="progressBar"></div></div>
-  </section>
+  apiKeyInput.value = localStorage.getItem("openai_api_key") || "";
+  apiKeyInput.addEventListener("input", () => localStorage.setItem("openai_api_key", apiKeyInput.value));
 
-  <!-- OpenAI API key -->
-  <section class="glass card">
-    <h2 class="text-lg font-semibold text-slate-800 mb-3">🔑 OpenAI API Key</h2>
-    <input id="apiKey" type="password" class="w-full rounded-lg border border-slate-200 px-3 py-2" placeholder="sk-..." />
-    <p class="text-xs text-amber-700 mt-1">Stored only in your browser (localStorage). In production, proxy through backend.</p>
-  </section>
-
-  <!-- Profile & controls -->
-  <section class="glass card">
-    <h2 class="text-lg font-semibold text-slate-800 mb-3">📋 Your Resume Profile</h2>
-    <div class="grid md:grid-cols-4 gap-3">
-      <input id="exp" class="rounded-lg border border-slate-200 px-3 py-2" value="10+ years Education Leadership" />
-      <input id="role" class="rounded-lg border border-slate-200 px-3 py-2" value="Service Projects Coordinator" />
-      <input id="expertise" class="rounded-lg border border-slate-200 px-3 py-2" value="Preschool Administration" />
-      <input id="edu" class="rounded-lg border border-slate-200 px-3 py-2" value="M.S. Industrial Psychology" />
-    </div>
-    <textarea id="resumeText" class="mt-3 w-full rounded-lg border border-slate-200 px-3 py-2" rows="6">Alicia J. Nourie — Preschool admin & retail ops leadership. Strengths: Early Childhood Education, Preschool Administration, Staff Supervision, Teacher Training, Family Engagement, Curriculum Development, Licensing Compliance. Roles: Lowe’s (Service Projects Coordinator; Customer Experience), English First (ESL Teacher), Green Pines Preschool (Assistant Director), Helping Little Hands Daycare (Owner/Director). Education: M.S. Industrial Psychology (2017).</textarea>
-
-    <div class="mt-6 grid md:grid-cols-5 gap-3">
-      <div>
-        <label class="text-sm font-semibold text-slate-700">Location (optional)</label>
-        <input id="location" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" value="Knightdale, NC" />
-      </div>
-      <div>
-        <label class="text-sm font-semibold text-slate-700">Radius</label>
-        <select id="radius" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2">
-          <option>10 miles</option>
-          <option selected>25 miles</option>
-          <option>50 miles</option>
-          <option>100 miles</option>
-        </select>
-      </div>
-      <div>
-        <label class="text-sm font-semibold text-slate-700">Minimum Match</label>
-        <select id="matchThreshold" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2">
-          <option value="0">Show All</option>
-          <option value="60">60%+</option>
-          <option value="70" selected>70%+</option>
-          <option value="80">80%+</option>
-        </select>
-      </div>
-      <div class="flex items-center gap-2 mt-6">
-        <input id="remoteOnly" type="checkbox" class="w-4 h-4" />
-        <label for="remoteOnly" class="text-sm font-semibold text-slate-700">Remote Jobs Only</label>
-      </div>
-      <div class="flex items-end gap-2">
-        <button id="btnSearch" class="px-5 py-3 rounded-xl bg-indigo-600 text-white font-semibold hover:brightness-110 flex items-center gap-2"><span id="searchIcon">🔍</span><span>Search & Analyze</span></button>
-        <button id="btnReset" class="px-4 py-3 rounded-xl border">Reset</button>
-        <div id="busy" class="hidden items-center gap-3"><div class="spinner"></div><span class="text-slate-600">Working…</span></div>
-      </div>
-    </div>
-    <p id="err" class="mt-3 hidden text-sm text-red-600"></p>
-  </section>
-
-  <!-- Results -->
-  <section id="results" class="glass card hidden">
-    <div class="flex items-center justify-between mb-4">
-      <div id="resultCount" class="text-slate-800 font-semibold">0 jobs found</div>
-      <div class="flex gap-2">
-        <button class="px-3 py-2 rounded-lg border" data-sort="match">Best Match</button>
-        <button class="px-3 py-2 rounded-lg border" data-sort="recent">Most Recent</button>
-        <button class="px-3 py-2 rounded-lg border" data-sort="salary">Highest Salary</button>
-      </div>
-    </div>
-    <div id="grid" class="grid gap-4"></div>
-    <div id="empty" class="hidden text-center text-slate-500 py-10">No matching jobs found. Try adjusting your filters.</div>
-  </section>
-
-  <script>
-    const backendStatus = document.getElementById("backendStatus");
-    const btnHealth = document.getElementById("btnHealth");
-    const progressBar = document.getElementById("progressBar");
-    const btnSearch = document.getElementById("btnSearch");
-    const resultsSection = document.getElementById("results");
-    const grid = document.getElementById("grid");
-    const resultCount = document.getElementById("resultCount");
-    const empty = document.getElementById("empty");
-    const busy = document.getElementById("busy");
-    const err = document.getElementById("err");
-    const apiKeyInput = document.getElementById("apiKey");
-
-    // Save API key locally
-    apiKeyInput.value = localStorage.getItem("openai_api_key") || "";
-    apiKeyInput.addEventListener("input", () => localStorage.setItem("openai_api_key", apiKeyInput.value));
-
-    async function checkHealth() {
-      try {
-        const res = await fetch("/health");
-        backendStatus.textContent = res.ok ? "✅ Online" : "❌ Down";
-      } catch {
-        backendStatus.textContent = "❌ Error";
-      }
+  async function checkHealth() {
+    try {
+      const res = await fetch("/health");
+      backendStatus.textContent = res.ok ? "✅ Online" : "❌ Down";
+    } catch {
+      backendStatus.textContent = "❌ Error";
     }
-    checkHealth();
-    btnHealth.onclick = checkHealth;
+  }
+  checkHealth();
+  btnHealth.onclick = checkHealth;
 
-    btnSearch.onclick = async () => {
-      err.classList.add("hidden");
-      busy.classList.remove("hidden");
-      progressBar.style.width = "20%";
+  btnSearch.onclick = async () => {
+    err.classList.add("hidden");
+    busy.classList.remove("hidden");
+    progressBar.style.width = "20%";
 
+    try {
+      const query = {
+        resume: document.getElementById("resumeText").value,
+        exp: document.getElementById("exp").value,
+        role: document.getElementById("role").value,
+        expertise: document.getElementById("expertise").value,
+        edu: document.getElementById("edu").value,
+        location: document.getElementById("location").value,
+        radius: document.getElementById("radius").value,
+        matchThreshold: document.getElementById("matchThreshold").value,
+        remoteOnly: document.getElementById("remoteOnly").checked
+      };
+
+      let jobs = null;
+
+      // Try backend first
       try {
-        const query = {
-          resume: document.getElementById("resumeText").value,
-          exp: document.getElementById("exp").value,
-          role: document.getElementById("role").value,
-          expertise: document.getElementById("expertise").value,
-          edu: document.getElementById("edu").value,
-          location: document.getElementById("location").value,
-          radius: document.getElementById("radius").value,
-          categories: [],
-          matchThreshold: document.getElementById("matchThreshold").value,
-          remoteOnly: document.getElementById("remoteOnly").checked
-        };
-
-        // 🔄 Call existing Fuel IQ /estimate endpoint
-        let res = await fetch("/estimate", {
+        const res = await fetch("/estimate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(query)
         });
-
-        if (!res.ok) throw new Error("Backend returned error");
-        let jobs = await res.json();
-
-        // If backend fails and OpenAI key exists, fallback
-        if (!jobs.ok && apiKeyInput.value) {
-          res = await fetch("https://api.openai.com/v1/chat/completions", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKeyInput.value}` },
-            body: JSON.stringify({
-              model: "gpt-4o-mini",
-              messages: [
-                { role: "system", content: "You are a job search assistant. Return JSON." },
-                { role: "user", content: `Find jobs for: ${query.resume}` }
-              ]
-            })
-          });
-          const aiData = await res.json();
-          jobs = aiData.choices?.[0]?.message?.content ? JSON.parse(aiData.choices[0].message.content) : {};
+        if (res.ok) {
+          jobs = await res.json();
         }
+      } catch (e) {
+        console.warn("Backend failed:", e.message);
+      }
 
-        progressBar.style.width = "70%";
-        grid.innerHTML = "";
+      // If backend fails, try OpenAI fallback
+      if (!jobs && apiKeyInput.value) {
+        const res = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKeyInput.value}` },
+          body: JSON.stringify({
+            model: "gpt-4o-mini",
+            messages: [
+              { role: "system", content: "You are a job search assistant. Return JSON as [{title, company, location, link, match}]" },
+              { role: "user", content: `Find jobs for: ${query.resume}, role: ${query.role}, expertise: ${query.expertise}, location: ${query.location}` }
+            ]
+          })
+        });
+        const aiData = await res.json();
+        if (aiData.choices?.[0]?.message?.content) {
+          jobs = JSON.parse(aiData.choices[0].message.content);
+        }
+      }
 
-        if (!jobs || (!jobs.low && !jobs.estimate)) {
-          empty.classList.remove("hidden");
-          resultsSection.classList.remove("hidden");
-          resultCount.textContent = "0 jobs found";
-        } else {
-          empty.classList.add("hidden");
+      progressBar.style.width = "70%";
+      grid.innerHTML = "";
+
+      // Display results
+      if (Array.isArray(jobs) && jobs.length) {
+        empty.classList.add("hidden");
+        jobs.forEach(j => {
           const card = document.createElement("div");
           card.className = "p-4 border rounded-xl bg-white";
           card.innerHTML = `
-            <h4 class="font-semibold text-lg">Estimate Result</h4>
-            <p class="text-slate-600">Low: ${jobs.low || jobs.estimate?.low}</p>
-            <p class="text-slate-600">Range: ${jobs.range || jobs.estimate?.range}</p>
-            <p class="text-slate-600">Year 2: ${jobs.year2 || jobs.estimate?.year2}</p>
-            <p class="text-slate-600">Year 3: ${jobs.year3 || jobs.estimate?.year3}</p>
+            <h4 class="font-semibold text-lg">${j.title}</h4>
+            <p class="text-slate-600">${j.company}</p>
+            <p class="text-slate-500 text-sm mb-2">${j.location || "Remote"}</p>
+            <a href="${j.link}" target="_blank" class="text-indigo-600 underline">View Job</a>
+            <p class="text-sm mt-2">Match: ${j.match || "-"}%</p>
           `;
           grid.appendChild(card);
-          resultsSection.classList.remove("hidden");
-          resultCount.textContent = `1 result shown`;
-        }
-
-        progressBar.style.width = "100%";
-      } catch (e) {
-        err.textContent = e.message;
-        err.classList.remove("hidden");
-      } finally {
-        busy.classList.add("hidden");
-        setTimeout(() => progressBar.style.width = "0%", 1500);
+        });
+        resultsSection.classList.remove("hidden");
+        resultCount.textContent = `${jobs.length} jobs found`;
+      } else if (jobs?.estimate) {
+        // Fallback to showing estimate results
+        const card = document.createElement("div");
+        card.className = "p-4 border rounded-xl bg-white";
+        card.innerHTML = `
+          <h4 class="font-semibold text-lg">Estimate Result</h4>
+          <p class="text-slate-600">Low: ${jobs.low || jobs.estimate.low}</p>
+          <p class="text-slate-600">Range: ${jobs.range || jobs.estimate.range}</p>
+          <p class="text-slate-600">Year 2: ${jobs.year2 || jobs.estimate.year2}</p>
+          <p class="text-slate-600">Year 3: ${jobs.year3 || jobs.estimate.year3}</p>
+        `;
+        grid.appendChild(card);
+        resultsSection.classList.remove("hidden");
+        resultCount.textContent = `1 result shown`;
+      } else {
+        empty.classList.remove("hidden");
+        resultsSection.classList.remove("hidden");
+        resultCount.textContent = "0 jobs found";
       }
-    };
-  </script>
-</body>
-</html>
+
+      progressBar.style.width = "100%";
+    } catch (e) {
+      err.textContent = e.message;
+      err.classList.remove("hidden");
+    } finally {
+      busy.classList.add("hidden");
+      setTimeout(() => progressBar.style.width = "0%", 1500);
+    }
+  };
+</script>
