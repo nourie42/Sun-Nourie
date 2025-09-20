@@ -24,6 +24,16 @@
   <h1 class="text-3xl font-bold text-white mb-6">🤖 AI-Powered Job Match Portal</h1>
   <p class="text-white mb-6">AI matches your resume to jobs and fetches <b>real postings</b> across Indeed, LinkedIn, Glassdoor, ZipRecruiter, etc. Nothing cut.</p>
 
+  <!-- Status -->
+  <section class="glass card">
+    <div class="flex justify-between items-center">
+      <span class="text-slate-700 font-semibold">Backend Status:</span>
+      <span id="backendStatus" class="text-slate-600">Checking…</span>
+      <button id="btnHealth" class="px-3 py-2 rounded bg-indigo-600 text-white text-sm">Recheck</button>
+    </div>
+    <div class="mt-2 progress"><div id="progressBar"></div></div>
+  </section>
+
   <!-- Profile & controls -->
   <section class="glass card">
     <h2 class="text-lg font-semibold text-slate-800 mb-3">📋 Your Resume Profile</h2>
@@ -68,22 +78,6 @@
         <div id="busy" class="hidden items-center gap-3"><div class="spinner"></div><span class="text-slate-600">Working…</span></div>
       </div>
     </div>
-
-    <div class="mt-6">
-      <h3 class="text-sm font-semibold text-slate-700 mb-2">Job Categories</h3>
-      <div id="chips" class="flex flex-wrap gap-2">
-        <button class="chip active" data-category="preschool-director">Preschool Director</button>
-        <button class="chip active" data-category="assistant-director">Assistant Director</button>
-        <button class="chip active" data-category="education-administrator">Education Administrator</button>
-        <button class="chip active" data-category="curriculum-coordinator">Curriculum Coordinator</button>
-        <button class="chip active" data-category="childcare-director">Childcare Center Director</button>
-        <button class="chip" data-category="program-manager">Program Manager</button>
-        <button class="chip" data-category="family-engagement">Family Engagement Specialist</button>
-        <button class="chip" data-category="esl-teacher">ESL Teacher</button>
-        <button class="chip" data-category="training-coordinator">Training Coordinator</button>
-        <button class="chip" data-category="service-coordinator">Service Coordinator</button>
-      </div>
-    </div>
     <p id="err" class="mt-3 hidden text-sm text-red-600"></p>
   </section>
 
@@ -101,7 +95,15 @@
     <div id="empty" class="hidden text-center text-slate-500 py-10">No matching jobs found. Try adjusting your filters.</div>
   </section>
 
+  <!-- Backup -->
+  <section id="backup" class="glass card hidden">
+    <p class="text-slate-700">⚠️ AI search failed. Would you like to search without AI?</p>
+    <button id="btnBackup" class="mt-2 px-4 py-2 rounded bg-amber-600 text-white">Search Without AI</button>
+  </section>
+
   <script>
+    const backendStatus = document.getElementById("backendStatus");
+    const btnHealth = document.getElementById("btnHealth");
     const progressBar = document.getElementById("progressBar");
     const btnSearch = document.getElementById("btnSearch");
     const resultsSection = document.getElementById("results");
@@ -110,15 +112,27 @@
     const empty = document.getElementById("empty");
     const busy = document.getElementById("busy");
     const err = document.getElementById("err");
+    const backup = document.getElementById("backup");
+
+    async function checkHealth() {
+      try {
+        const res = await fetch("/health");
+        backendStatus.textContent = res.ok ? "✅ Online" : "❌ Down";
+      } catch {
+        backendStatus.textContent = "❌ Error";
+      }
+    }
+    checkHealth();
+    btnHealth.onclick = checkHealth;
 
     btnSearch.onclick = async () => {
       err.classList.add("hidden");
+      backup.classList.add("hidden");
       busy.classList.remove("hidden");
       progressBar.style.width = "20%";
 
       try {
-        const proxyUrl = "/api/jobs"; // Backend handles AI calls
-
+        const proxyUrl = "/api/jobs";
         const query = {
           resume: document.getElementById("resumeText").value,
           exp: document.getElementById("exp").value,
@@ -143,8 +157,8 @@
         progressBar.style.width = "70%";
 
         const realJobs = jobs.filter(j => j.title && j.company && j.link && j.link.startsWith("http"));
-
         grid.innerHTML = "";
+
         if (realJobs.length === 0) {
           empty.classList.remove("hidden");
           resultsSection.classList.remove("hidden");
@@ -170,10 +184,15 @@
       } catch (e) {
         err.textContent = e.message;
         err.classList.remove("hidden");
+        backup.classList.remove("hidden");
       } finally {
         busy.classList.add("hidden");
         setTimeout(() => progressBar.style.width = "0%", 1500);
       }
+    };
+
+    document.getElementById("btnBackup").onclick = async () => {
+      window.open(`https://www.google.com/search?q=${encodeURIComponent(document.getElementById("role").value + " jobs")}`,'_blank');
     };
   </script>
 </body>
