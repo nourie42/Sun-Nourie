@@ -132,12 +132,13 @@
           edu: document.getElementById("edu").value,
           location: document.getElementById("location").value,
           radius: document.getElementById("radius").value,
-          categories: Array.from(document.querySelectorAll("#chips .chip.active")).map(c => c.dataset.category),
+          categories: [],
           matchThreshold: document.getElementById("matchThreshold").value,
           remoteOnly: document.getElementById("remoteOnly").checked
         };
 
-        const res = await fetch("/api/jobs", {
+        // 🔄 Call the existing Fuel IQ /estimate endpoint instead of /api/jobs
+        const res = await fetch("/estimate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(query)
@@ -147,30 +148,21 @@
         const jobs = await res.json();
         progressBar.style.width = "70%";
 
-        const realJobs = jobs.filter(j => j.title && j.company && j.link && j.link.startsWith("http"));
+        // Show raw estimate results
         grid.innerHTML = "";
+        const card = document.createElement("div");
+        card.className = "p-4 border rounded-xl bg-white";
+        card.innerHTML = `
+          <h4 class="font-semibold text-lg">Estimate Result</h4>
+          <p class="text-slate-600">Low: ${jobs.low || jobs.estimate?.low}</p>
+          <p class="text-slate-600">Range: ${jobs.range || jobs.estimate?.range}</p>
+          <p class="text-slate-600">Year 2: ${jobs.year2 || jobs.estimate?.year2}</p>
+          <p class="text-slate-600">Year 3: ${jobs.year3 || jobs.estimate?.year3}</p>
+        `;
+        grid.appendChild(card);
 
-        if (realJobs.length === 0) {
-          empty.classList.remove("hidden");
-          resultsSection.classList.remove("hidden");
-          resultCount.textContent = "0 jobs found";
-        } else {
-          empty.classList.add("hidden");
-          realJobs.forEach(j => {
-            const card = document.createElement("div");
-            card.className = "p-4 border rounded-xl bg-white";
-            card.innerHTML = `
-              <h4 class="font-semibold text-lg">${j.title}</h4>
-              <p class="text-slate-600">${j.company}</p>
-              <p class="text-slate-500 text-sm mb-2">${j.location || "Remote"}</p>
-              <a href="${j.link}" target="_blank" class="text-indigo-600 underline">View Job</a>
-              <p class="text-sm mt-2">Match: ${j.match || "-"}%</p>
-            `;
-            grid.appendChild(card);
-          });
-          resultsSection.classList.remove("hidden");
-          resultCount.textContent = `${realJobs.length} jobs found`;
-        }
+        resultsSection.classList.remove("hidden");
+        resultCount.textContent = `1 result shown`;
         progressBar.style.width = "100%";
       } catch (e) {
         err.textContent = e.message;
