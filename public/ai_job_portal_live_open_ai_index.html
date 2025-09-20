@@ -24,30 +24,6 @@
   <h1 class="text-3xl font-bold text-white mb-6">🤖 AI-Powered Job Match Portal</h1>
   <p class="text-white mb-6">AI matches your resume to jobs and fetches <b>real postings</b> across Indeed, LinkedIn, Glassdoor, ZipRecruiter, etc. Nothing cut.</p>
 
-  <!-- API / Model / Status -->
-  <section class="glass card">
-    <div class="grid md:grid-cols-3 gap-4">
-      <div>
-        <label class="text-sm font-semibold text-slate-700">OpenAI API Key</label>
-        <input id="apiKey" type="password" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" placeholder="sk-..." />
-        <p class="text-xs text-amber-700 mt-1">⚠️ Stored only in your browser (localStorage). In production, proxy through a backend.</p>
-      </div>
-      <div>
-        <label class="text-sm font-semibold text-slate-700">Model</label>
-        <select id="model" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2">
-          <option value="gpt-4o-mini" selected>gpt-4o-mini (fast, $)</option>
-          <option value="gpt-4o">gpt-4o (higher quality)</option>
-          <option value="o4-mini">o4-mini (reasoning)</option>
-        </select>
-      </div>
-      <div class="flex items-end gap-3">
-        <button id="btnCheck" class="h-10 px-4 rounded-lg bg-emerald-600 text-white font-semibold hover:brightness-110">Check API Status</button>
-        <span id="apiStatus" class="text-sm"></span>
-      </div>
-    </div>
-    <div class="mt-3 progress"><div id="progressBar"></div></div>
-  </section>
-
   <!-- Profile & controls -->
   <section class="glass card">
     <h2 class="text-lg font-semibold text-slate-800 mb-3">📋 Your Resume Profile</h2>
@@ -126,12 +102,6 @@
   </section>
 
   <script>
-    const apiKeyInput = document.getElementById("apiKey");
-    apiKeyInput.value = localStorage.getItem("openai_api_key") || "";
-    apiKeyInput.addEventListener("input", () => localStorage.setItem("openai_api_key", apiKeyInput.value));
-
-    const btnCheck = document.getElementById("btnCheck");
-    const apiStatus = document.getElementById("apiStatus");
     const progressBar = document.getElementById("progressBar");
     const btnSearch = document.getElementById("btnSearch");
     const resultsSection = document.getElementById("results");
@@ -141,29 +111,13 @@
     const busy = document.getElementById("busy");
     const err = document.getElementById("err");
 
-    btnCheck.onclick = async () => {
-      const key = apiKeyInput.value.trim();
-      if (!key) return alert("Enter API key");
-      apiStatus.textContent = "Checking...";
-      try {
-        const res = await fetch("https://api.openai.com/v1/models", {
-          headers: { Authorization: `Bearer ${key}` }
-        });
-        apiStatus.textContent = res.ok ? "✅ Working" : "❌ Invalid";
-      } catch {
-        apiStatus.textContent = "❌ Error";
-      }
-    };
-
     btnSearch.onclick = async () => {
-      const key = apiKeyInput.value.trim();
-      if (!key) return alert("Enter API key");
       err.classList.add("hidden");
       busy.classList.remove("hidden");
       progressBar.style.width = "20%";
 
       try {
-        const proxyUrl = "/api/jobs";
+        const proxyUrl = "/api/jobs"; // Backend handles AI calls
 
         const query = {
           resume: document.getElementById("resumeText").value,
