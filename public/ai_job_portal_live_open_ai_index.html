@@ -34,6 +34,13 @@
     <div class="mt-2 progress"><div id="progressBar"></div></div>
   </section>
 
+  <!-- OpenAI API key -->
+  <section class="glass card">
+    <h2 class="text-lg font-semibold text-slate-800 mb-3">🔑 OpenAI API Key</h2>
+    <input id="apiKey" type="password" class="w-full rounded-lg border border-slate-200 px-3 py-2" placeholder="sk-..." />
+    <p class="text-xs text-amber-700 mt-1">Stored only in your browser (localStorage). In production, proxy through backend.</p>
+  </section>
+
   <!-- Profile & controls -->
   <section class="glass card">
     <h2 class="text-lg font-semibold text-slate-800 mb-3">📋 Your Resume Profile</h2>
@@ -106,6 +113,11 @@
     const empty = document.getElementById("empty");
     const busy = document.getElementById("busy");
     const err = document.getElementById("err");
+    const apiKeyInput = document.getElementById("apiKey");
+
+    // Save API key locally
+    apiKeyInput.value = localStorage.getItem("openai_api_key") || "";
+    apiKeyInput.addEventListener("input", () => localStorage.setItem("openai_api_key", apiKeyInput.value));
 
     async function checkHealth() {
       try {
@@ -137,32 +149,56 @@
           remoteOnly: document.getElementById("remoteOnly").checked
         };
 
-        // 🔄 Call the existing Fuel IQ /estimate endpoint instead of /api/jobs
-        const res = await fetch("/estimate", {
+        // 🔄 Call existing Fuel IQ /estimate endpoint
+        let res = await fetch("/estimate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(query)
         });
 
         if (!res.ok) throw new Error("Backend returned error");
-        const jobs = await res.json();
+        let jobs = await res.json();
+
+        // If backend fails and OpenAI key exists, fallback
+        if (!jobs.ok && apiKeyInput.value) {
+          res = await fetch("https://api.openai.com/v1/chat/completions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKeyInput.value}` },
+            body: JSON.stringify({
+              model: "gpt-4o-mini",
+              messages: [
+                { role: "system", content: "You are a job search assistant. Return JSON." },
+                { role: "user", content: `Find jobs for: ${query.resume}` }
+              ]
+            })
+          });
+          const aiData = await res.json();
+          jobs = aiData.choices?.[0]?.message?.content ? JSON.parse(aiData.choices[0].message.content) : {};
+        }
+
         progressBar.style.width = "70%";
-
-        // Show raw estimate results
         grid.innerHTML = "";
-        const card = document.createElement("div");
-        card.className = "p-4 border rounded-xl bg-white";
-        card.innerHTML = `
-          <h4 class="font-semibold text-lg">Estimate Result</h4>
-          <p class="text-slate-600">Low: ${jobs.low || jobs.estimate?.low}</p>
-          <p class="text-slate-600">Range: ${jobs.range || jobs.estimate?.range}</p>
-          <p class="text-slate-600">Year 2: ${jobs.year2 || jobs.estimate?.year2}</p>
-          <p class="text-slate-600">Year 3: ${jobs.year3 || jobs.estimate?.year3}</p>
-        `;
-        grid.appendChild(card);
 
-        resultsSection.classList.remove("hidden");
-        resultCount.textContent = `1 result shown`;
+        if (!jobs || (!jobs.low && !jobs.estimate)) {
+          empty.classList.remove("hidden");
+          resultsSection.classList.remove("hidden");
+          resultCount.textContent = "0 jobs found";
+        } else {
+          empty.classList.add("hidden");
+          const card = document.createElement("div");
+          card.className = "p-4 border rounded-xl bg-white";
+          card.innerHTML = `
+            <h4 class="font-semibold text-lg">Estimate Result</h4>
+            <p class="text-slate-600">Low: ${jobs.low || jobs.estimate?.low}</p>
+            <p class="text-slate-600">Range: ${jobs.range || jobs.estimate?.range}</p>
+            <p class="text-slate-600">Year 2: ${jobs.year2 || jobs.estimate?.year2}</p>
+            <p class="text-slate-600">Year 3: ${jobs.year3 || jobs.estimate?.year3}</p>
+          `;
+          grid.appendChild(card);
+          resultsSection.classList.remove("hidden");
+          resultCount.textContent = `1 result shown`;
+        }
+
         progressBar.style.width = "100%";
       } catch (e) {
         err.textContent = e.message;
