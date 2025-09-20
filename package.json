@@ -1,9 +1,8 @@
 {
-  "name": "ai-job-portal",
+  "name": "fuel-iq-ai-job-portal",
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "AI Job Match Portal",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
