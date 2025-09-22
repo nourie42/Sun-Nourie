@@ -111,19 +111,29 @@
     </div>
 
     <!-- Inputs -->
-    <div class="card">
-      <div class="row">
-        <div>
-          <label>Site search</label>
-          <div class="ac-wrap">
-            <input id="addr" placeholder="Enter business or address" autocomplete="off" />
-            <div id="ac" class="ac-list" style="display:none;"></div>
-          </div>
-          <div class="muted subtle" style="margin-top:6px" id="apiStatus">API Status: checking…</div>
-        </div>
-        <div><label>Regular MPDs</label><input id="mpds" type="number" value="3" min="1"/></div>
-        <div><label>Diesel MPDs</label><input id="diesel" type="number" value="0" min="0"/></div>
-        <div><label>AADT override</label><input id="aadtOverride" type="number"/></div>
+    <div class="row" style="align-items:start;">
+      <div>
+        <label>Site search</label>
+       <div class="ac-wrap">
+        <input id="addr" placeholder="Enter business or address" autocomplete="off" />
+        <div id="ac" class="ac-list" style="display:none;"></div>
+       </div>
+       <div class="muted subtle" style="margin-top:6px" id="apiStatus">API Status: checking…</div>
+    </div>  
+  <div>
+      <label>Regular MPDs</label>
+      <input id="mpds" type="number" value="3" min="1"/>
+  </div>
+  <div>
+    <label>Diesel MPDs</label>
+    <input id="diesel" type="number" value="0" min="0"/>
+  </div>
+  <div>
+    <label>AADT override</label>
+    <input id="aadtOverride" type="number"/>
+  </div>
+</div>
+
       </div>
       <div class="toolbar">
         <button id="go">Estimate</button>
