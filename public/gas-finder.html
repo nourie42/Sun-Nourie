@@ -15,7 +15,9 @@
         button { background: #007bff; color: white; cursor: pointer; }
         button:hover { background: #0056b3; }
         .results { background: white; padding: 20px; border-radius: 10px; }
-        .station { border: 1px solid #eee; padding: 15px; margin: 10px 0; border-radius: 8px; }
+        .station { border: 1px solid #eee; padding: 15px; margin: 10px 0; border-radius: 8px; display: flex; gap: 15px; }
+        .station img { width: 200px; height: 120px; object-fit: cover; border-radius: 6px; }
+        .station-details { flex: 1; }
         .station-name { font-weight: bold; font-size: 18px; }
         .station-address { color: #666; margin: 5px 0; }
         .station-rating { color: #ff9800; }
@@ -25,7 +27,7 @@
 <body>
     <div class="container">
         <h1>Gas Station Finder</h1>
-        
+
         <div class="search-panel">
             <div class="search-row">
                 <div class="form-group">
@@ -56,7 +58,7 @@
         async function searchStations() {
             const location = document.getElementById('location').value;
             const radius = document.getElementById('radius').value;
-            
+
             if (!location) {
                 alert('Please enter a location');
                 return;
@@ -64,7 +66,7 @@
 
             const resultsDiv = document.getElementById('results');
             const stationsDiv = document.getElementById('stations');
-            
+
             resultsDiv.style.display = 'block';
             stationsDiv.innerHTML = '<div class="loading">Searching...</div>';
 
@@ -72,41 +74,50 @@
                 // Get coordinates
                 const geocodeResponse = await fetch(`/api/geocode?address=${encodeURIComponent(location)}`);
                 const geocodeData = await geocodeResponse.json();
-                
+
                 if (geocodeData.status !== 'OK' || !geocodeData.results.length) {
                     throw new Error('Location not found');
                 }
 
                 const coords = geocodeData.results[0].geometry.location;
-                
+
                 // Search for gas stations
                 const radiusMeters = parseInt(radius) * 1609.34;
                 const placesResponse = await fetch(`/api/places/nearby?lat=${coords.lat}&lng=${coords.lng}&radius=${radiusMeters}`);
                 const placesData = await placesResponse.json();
-                
+
                 if (placesData.status !== 'OK') {
                     throw new Error('Places search failed');
                 }
 
                 const stations = placesData.results || [];
-                
+
                 if (stations.length === 0) {
                     stationsDiv.innerHTML = '<p>No gas stations found in this area.</p>';
                     return;
                 }
 
-                // Display results
-                stationsDiv.innerHTML = stations.map(station => `
-                    <div class="station">
-                        <div class="station-name">${station.name}</div>
-                        <div class="station-address">${station.vicinity}</div>
-                        <div class="station-rating">
-                            Rating: ${station.rating || 'N/A'} 
-                            (${station.user_ratings_total || 0} reviews)
+                // Display results with Street View images
+                stationsDiv.innerHTML = stations.map(station => {
+                    const lat = station.geometry.location.lat;
+                    const lng = station.geometry.location.lng;
+                    const streetViewUrl = `https://maps.googleapis.com/maps/api/streetview?size=200x120&location=${lat},${lng}&key=YOUR_API_KEY`;
+
+                    return `
+                        <div class="station">
+                            <img src="${streetViewUrl}" alt="Street View">
+                            <div class="station-details">
+                                <div class="station-name">${station.name}</div>
+                                <div class="station-address">${station.vicinity}</div>
+                                <div class="station-rating">
+                                    Rating: ${station.rating || 'N/A'} 
+                                    (${station.user_ratings_total || 0} reviews)
+                                </div>
+                                <button onclick="viewOnMaps('${station.place_id}')">View on Maps</button>
+                            </div>
                         </div>
-                        <button onclick="viewOnMaps('${station.place_id}')">View on Maps</button>
-                    </div>
-                `).join('');
+                    `;
+                }).join('');
 
             } catch (error) {
                 stationsDiv.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
