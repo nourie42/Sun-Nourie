@@ -8,7 +8,10 @@
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin></script>
+  <!-- Map snapshot utilities -->
   <script src="https://unpkg.com/leaflet-image/leaflet-image.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <!-- jsPDF (UMD) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous"></script>
 
   <style>
@@ -27,7 +30,6 @@
     button{ background:linear-gradient(135deg,var(--brand),var(--brand2)); color:#fff; border:0; padding:12px 16px; border-radius:10px; font-weight:700; cursor:pointer; }
     button:disabled{ opacity:.6; cursor:not-allowed; }
 
-    /* CHANGED: align-items:start so 4 inputs align at same top level */
     .row{ display:grid; grid-template-columns:1.6fr 0.7fr 0.7fr 0.8fr; gap:12px; align-items:start; }
     @media (max-width:980px){ .row{ grid-template-columns:1fr; } }
 
@@ -64,7 +66,6 @@
     .aadt-tab { display:inline-block; padding:8px 12px; border-radius:999px; border:1px solid var(--line); background:var(--pill); color:#fff; text-decoration:none; font-weight:700; font-size:13px; letter-spacing:.2px; }
     .aadt-tab:hover { background:#101a2b; }
 
-    /* STOP alert */
     .stop-alert { display:none; position:sticky; top:0; z-index:60; margin-bottom:12px; }
     .stop-inner { display:flex; align-items:center; gap:14px; padding:12px 14px; border-radius:12px; border:2px solid #b91c1c; background:linear-gradient(135deg,#7f1d1d,#991b1b); color:#fff; box-shadow:0 12px 24px rgba(0,0,0,.35); }
     .stop-sign { width:52px; height:52px; flex:0 0 52px; border-radius:12px; background:#dc2626; border:4px solid #fca5a5; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:14px; }
@@ -75,8 +76,7 @@
     tr:hover { background: rgba(255,255,255,.03); }
     .small { font-size:12px; color:#a9b6d0; }
 
-    /* Bigger, full-width main button under AADT override */
-    #go { width:100%; padding:16px; font-size:18px; margin-top:10px; }
+    #go { width:100%; padding:16px; font-size:18px; margin-top:10px; } /* big button under AADT override */
   </style>
 </head>
 <body>
@@ -100,7 +100,7 @@
     <nav class="aadt-tabs" aria-label="State AADT Quick Links">
       <span class="muted">State AADT Quick Links:</span>
       <a class="aadt-tab" href="https://opendata.dc.gov/datasets/DCGIS::2023-traffic-volume/explore" target="_blank" rel="noopener noreferrer">DC</a>
-      <a class="aadt-tab" href="https://gis-fdot.opendata.arcgis.com/datasets/fdot::annual-average-daily-traffic-tda/explore" target="_blank" rel="noopener noreferrer">FL</a>
+      <a class="aadt-tab" href="https://gis.fdot.gov/arcgis/rest/services/RCI_Layers/FeatureServer/0" target="_blank" rel="noopener noreferrer">FL</a>
       <a class="aadt-tab" href="https://gdottrafficdata.drakewell.com/publicmultinodemap.asp" target="_blank" rel="noopener noreferrer">GA</a>
       <a class="aadt-tab" href="https://mhd.public.ms2soft.com/tcds/tsearch.asp?loc=Mhd&mod" target="_blank" rel="noopener noreferrer">MA</a>
       <a class="aadt-tab" href="https://nysdottrafficdata.drakewell.com/publicmultinodemap.asp" target="_blank" rel="noopener noreferrer">NY</a>
@@ -133,7 +133,7 @@
       </div>
     </div>
 
-    <!-- NEW: Math & Assumptions card (always visible) -->
+    <!-- Math & Assumptions (always visible) -->
     <div class="card" id="mathCard">
       <b>Math & Assumptions (always shown)</b>
       <div id="mathTable" class="small" style="margin-top:8px; line-height:1.6">—</div>
@@ -183,7 +183,7 @@
       <hr/>
       <div id="aadtBanner" class="muted">—</div>
       <div id="compLine" class="muted">—</div>
-      <!-- removed extra Run Estimate button -->
+      <!-- removed the duplicate Run Estimate button -->
     </div>
 
     <!-- Main Map & SV -->
@@ -251,12 +251,18 @@ function clearOverlay(){ overlay.style.display = "none"; }
 /* =================== Map + Street View =================== */
 function initMap(){ if(mapReady) return;
   map = L.map("map",{zoomControl:true}); window.map = map;
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
+    attribution:"&copy; OpenStreetMap",
+    crossOrigin: true
+  }).addTo(map);
   layer = L.layerGroup().addTo(map); mapReady = true;
 }
 function initAADTMap(){ if(aadtReady) return;
   aadtMap = L.map("aadtMap",{zoomControl:true}); window.aadtMap = aadtMap;
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(aadtMap);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
+    attribution:"&copy; OpenStreetMap",
+    crossOrigin: true
+  }).addTo(aadtMap);
   aadtLayer = L.layerGroup().addTo(aadtMap); aadtReady = true;
 }
 function updateStreetView(lat, lon){
@@ -408,7 +414,6 @@ async function callEstimate(){
 }
 
 /* =================== Math rendering ======================== */
-/* Server-aligned: uses server calc_breakdown so UI always matches estimate */
 function renderMathFromServer(d){
   if(!mathTableEl){ return; }
   const B = d && d.calc_breakdown;
@@ -452,7 +457,7 @@ function renderMathFromServer(d){
   mathTableEl.innerHTML = rows.map(r=>`<div>${r}</div>`).join('');
 }
 
-/* Fallback ONLY if server breakdown missing (kept for resilience) */
+/* Fallback ONLY if server breakdown missing */
 function buildCalcFallback(d){
   try{
     const aadt = (d?.map?.aadt_used?.aadt) || (+( $("aadtOverride").value || 0)) || null;
@@ -500,6 +505,25 @@ function renderMathFallback(calc){
   mathTableEl.innerHTML = rows.map(r=>`<div>${r}</div>`).join('');
 }
 
+/* =================== Summary cleanup =================== */
+function cleanSummary(text, hasDevs){
+  let s = (text || "").trim();
+
+  // strip surrounding quotes and code fences
+  if (s.startsWith('"') && s.endsWith('"')) s = s.slice(1, -1).trim();
+  s = s.replace(/^```[\s\S]*?```/g, "").trim();
+
+  // remove leading "<text>", "Text:", or "Summary:"
+  s = s.replace(/^<\s*text\s*>\s*/i, "");
+  s = s.replace(/^(text|summary)\s*:\s*/i, "");
+
+  // if no developments, remove sentences that explicitly say "no developments"
+  if (!hasDevs) {
+    s = s.replace(/(^|[\s])[^.]*\b(no|none|not any|no significant)\s+(recent\s+)?developments?[^.]*\./gi, " ").trim();
+  }
+  return s;
+}
+
 /* =================== Rendering ======================== */
 function renderAll(d){
   // Estimate header
@@ -518,7 +542,8 @@ function renderAll(d){
   compLine.textContent = d.competitionText || "—";
 
   // STOP: CSV development stripe + list
-  if (Array.isArray(d.csv) && d.csv.length) {
+  const hasDevs = Array.isArray(d.csv) && d.csv.length > 0;
+  if (hasDevs) {
     const lines = d.csv.slice(0,6).map(x => {
       const nm = esc(x.name || "");
       const st = esc(x.status || "");
@@ -534,8 +559,8 @@ function renderAll(d){
     devsBox.innerHTML = "<em>no CSV developments</em>";
   }
 
-  // Summary (GPT)
-  summaryBox.textContent = (d.summary || "").trim() || "—";
+  // Summary (GPT) — cleaned
+  summaryBox.textContent = cleanSummary(d.summary || "", hasDevs) || "—";
 
   // Maps
   initOrUpdateMainMap(d.map);
@@ -686,67 +711,88 @@ goBtn.addEventListener("click", onEstimateClick);
 addrInput.addEventListener("keydown", (e)=>{ if(e.key==="Enter"){ e.preventDefault(); onEstimateClick(); } });
 
 /* =================== PDF Export ======================= */
+async function captureMapImage(){
+  // Try leaflet-image first
+  try {
+    if (typeof leafletImage === "function" && window.map) {
+      return await new Promise((resolve) => {
+        leafletImage(window.map, (err, canvas) => {
+          if (err || !canvas) return resolve(null);
+          try { resolve(canvas.toDataURL("image/png")); } catch { resolve(null); }
+        });
+      });
+    }
+  } catch {}
+  // Fallback to html2canvas (usesCORS: true)
+  try {
+    if (window.html2canvas) {
+      const node = document.getElementById("map");
+      const cvs = await html2canvas(node, { useCORS: true, backgroundColor: null });
+      return cvs.toDataURL("image/png");
+    }
+  } catch {}
+  return null;
+}
+
 document.getElementById("exportPDF").addEventListener("click", async ()=>{
-  const { jsPDF } = window.jspdf || {};
-  if(!jsPDF){ alert("PDF lib failed to load"); return; }
-  const doc=new jsPDF({unit:"pt",format:"a4"});
-  const pageW=595, pageH=842, margin=36, contentW=pageW - margin*2;
+  try{
+    const { jsPDF } = window.jspdf || {};
+    if(!jsPDF){ alert("PDF library failed to load"); return; }
+    const doc=new jsPDF({unit:"pt",format:"a4"});
+    const pageW=595, pageH=842, margin=36, contentW=pageW - margin*2;
 
-  doc.setFont("helvetica","bold"); doc.setFontSize(18);
-  doc.text("Sunoco, LP Fuel IQ — Fuel Site Analyzer", margin, margin+6);
+    doc.setFont("helvetica","bold"); doc.setFontSize(18);
+    doc.text("Sunoco, LP Fuel IQ — Fuel Site Analyzer", margin, margin+6);
 
-  doc.setFont("helvetica","normal"); doc.setFontSize(11);
-  const lines = doc.splitTextToSize(document.getElementById("summary").innerText || "", contentW);
-  doc.text(lines, margin, margin+28);
+    doc.setFont("helvetica","normal"); doc.setFontSize(11);
+    const lines = doc.splitTextToSize(document.getElementById("summary").innerText || "", contentW);
+    doc.text(lines, margin, margin+28);
 
-  let cursorY = margin + 28 + lines.length*14 + 16;
+    let cursorY = margin + 28 + lines.length*14 + 16;
 
-  const key = [
-    `Address: ${document.getElementById("addr").value || "-"}`,
-    `MPDs: ${document.getElementById("mpds").value}   Diesel: ${document.getElementById("diesel").value}`,
-    document.getElementById("aadtBanner").innerText,
-    `Estimate (LOW): ${document.getElementById("estNum").innerText}  |  Range: ${document.getElementById("estRange").innerText.replace("Full range: ","")}`,
-    document.getElementById("compLine").innerText
-  ].join("\n");
-  const keyLines = doc.splitTextToSize(key, contentW);
-  doc.text(keyLines, margin, cursorY);
-  cursorY += keyLines.length*14 + 12;
+    const key = [
+      `Address: ${document.getElementById("addr").value || "-"}`,
+      `MPDs: ${document.getElementById("mpds").value}   Diesel: ${document.getElementById("diesel").value}`,
+      document.getElementById("aadtBanner").innerText,
+      `Estimate (LOW): ${document.getElementById("estNum").innerText}  |  Range: ${document.getElementById("estRange").innerText.replace("Full range: ","")}`,
+      document.getElementById("compLine").innerText
+    ].join("\n");
+    const keyLines = doc.splitTextToSize(key, contentW);
+    doc.text(keyLines, margin, cursorY);
+    cursorY += keyLines.length*14 + 12;
 
-  // Add math table
-  const mathTxt = (document.getElementById('mathTable')?.innerText || '').trim();
-  if (mathTxt) {
-    const mathLines = doc.splitTextToSize("Math & Assumptions:\n" + mathTxt, contentW);
-    if (cursorY + mathLines.length*14 > pageH - margin) { doc.addPage(); cursorY = margin; }
-    doc.setFont("helvetica","bold"); doc.text("Math & Assumptions", margin, cursorY); cursorY += 14;
-    doc.setFont("helvetica","normal"); doc.text(mathLines, margin, cursorY);
-    cursorY += mathLines.length*14 + 12;
+    // Math table
+    const mathTxt = (document.getElementById('mathTable')?.innerText || '').trim();
+    if (mathTxt) {
+      const mathLines = doc.splitTextToSize("Math & Assumptions:\n" + mathTxt, contentW);
+      if (cursorY + mathLines.length*14 > pageH - margin) { doc.addPage(); cursorY = margin; }
+      doc.setFont("helvetica","bold"); doc.text("Math & Assumptions", margin, cursorY); cursorY += 14;
+      doc.setFont("helvetica","normal"); doc.text(mathLines, margin, cursorY);
+      cursorY += mathLines.length*14 + 12;
+    }
+
+    // Map snapshot (with robust fallback)
+    const mapImg = await captureMapImage();
+    const imgW = contentW, imgH = 260;
+    if (mapImg) {
+      if (cursorY + imgH > pageH - margin) { doc.addPage(); cursorY = margin; }
+      doc.setFont("helvetica","bold"); doc.text("Map & Competitors (1.5 mi)", margin, cursorY);
+      cursorY += 12;
+      doc.addImage(mapImg, "PNG", margin, cursorY, imgW, imgH);
+      cursorY += imgH + 12;
+    }
+
+    // AADT table
+    const tbl = document.getElementById("aadtTable").innerText || "";
+    const devLines = doc.splitTextToSize("AADT Sources (1 mi):\n" + tbl, contentW);
+    if (cursorY + devLines.length*14 > pageH - margin) { doc.addPage(); cursorY = margin; }
+    doc.setFont("helvetica","bold"); doc.text("AADT Sources", margin, cursorY); cursorY += 14;
+    doc.setFont("helvetica","normal"); doc.text(devLines, margin, cursorY);
+
+    doc.save("FuelIQ_Site_Analyzer.pdf");
+  }catch(e){
+    alert("Export failed: " + (e?.message || e));
   }
-
-  const mapImg = await new Promise(resolve=>{
-    if(!window.leafletImage || !window.map){ resolve(null); return; }
-    leafletImage(window.map, function(err, canvas){
-      if(err){ resolve(null); return; }
-      resolve(canvas.toDataURL("image/png"));
-    });
-  });
-
-  const imgW = contentW, imgH = 260;
-  if (mapImg) {
-    if (cursorY + imgH > pageH - margin) { doc.addPage(); cursorY = margin; }
-    doc.setFont("helvetica","bold"); doc.text("Map & Competitors (1.5 mi)", margin, cursorY);
-    cursorY += 12;
-    doc.addImage(mapImg, "PNG", margin, cursorY, imgW, imgH);
-    cursorY += imgH + 12;
-  }
-
-  // Include AADT table text
-  const tbl = document.getElementById("aadtTable").innerText || "";
-  const devLines = doc.splitTextToSize("AADT Sources (1 mi):\n" + tbl, contentW);
-  if (cursorY + devLines.length*14 > pageH - margin) { doc.addPage(); cursorY = margin; }
-  doc.setFont("helvetica","bold"); doc.text("AADT Sources", margin, cursorY); cursorY += 14;
-  doc.setFont("helvetica","normal"); doc.text(devLines, margin, cursorY);
-
-  doc.save("FuelIQ_Site_Analyzer.pdf");
 });
 
 /* =================== Init ============================== */
@@ -761,3 +807,4 @@ overlay.textContent="—";
   </script>
 </body>
 </html>
+
