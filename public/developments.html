@@ -3,7 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Gas Station Developments — Google Maps</title>
+  <title>Gas Station Developments — OpenStreetMap</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     :root {
       --bg: #0b0e15;
@@ -13,83 +15,22 @@
       --accent: #5ec2ff;
       --line: #263145;
     }
-    body {
-      margin: 0;
-      padding: 20px;
-      background: var(--bg);
-      color: var(--text);
-      font-family: system-ui;
-    }
-    .card {
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 14px;
-      padding: 14px;
-      margin: 12px 0;
-    }
-    h1 {
-      margin: 0 0 20px 0;
-      font-size: 1.6rem;
-    }
-    .btn {
-      background: var(--accent);
-      color: #00121e;
-      border: 0;
-      border-radius: 10px;
-      padding: 0.6rem 1rem;
-      font-weight: 700;
-      cursor: pointer;
-      margin: 5px;
-    }
-    .btn.ghost {
-      background: #0f2236;
-      border: 1px solid var(--line);
-      color: #bfe6ff;
-    }
-    input[type="text"],
-    input[type="number"] {
-      width: 200px;
-      padding: 0.5rem;
-      border-radius: 6px;
-      border: 1px solid var(--line);
-      background: #0f1421;
-      color: var(--text);
-      margin: 5px;
-    }
-    #map {
-      height: 500px;
-      width: 100%;
-      border: 1px solid var(--line);
-      border-radius: 10px;
-    }
-    .controls {
-      margin: 10px 0;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 8px;
-      font-size: 0.9rem;
-    }
-    th,
-    td {
-      border-bottom: 1px solid var(--line);
-      text-align: left;
-      padding: 0.5rem;
-    }
-    th {
-      color: var(--muted);
-      font-weight: 600;
-    }
-    .status {
-      color: var(--muted);
-      font-size: 0.9rem;
-      margin: 10px 0;
-    }
+    body { margin: 0; padding: 20px; background: var(--bg); color: var(--text); font-family: system-ui; }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin: 12px 0; }
+    h1 { margin: 0 0 20px 0; font-size: 1.6rem; }
+    .btn { background: var(--accent); color: #00121e; border: 0; border-radius: 10px; padding: 0.6rem 1rem; font-weight: 700; cursor: pointer; margin: 5px; }
+    .btn.ghost { background: #0f2236; border: 1px solid var(--line); color: #bfe6ff; }
+    input[type="text"], input[type="number"] { width: 200px; padding: 0.5rem; border-radius: 6px; border: 1px solid var(--line); background: #0f1421; color: var(--text); margin: 5px; }
+    #map { height: 500px; width: 100%; border: 1px solid var(--line); border-radius: 10px; }
+    .controls { margin: 10px 0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 0.9rem; }
+    th, td { border-bottom: 1px solid var(--line); text-align: left; padding: 0.5rem; }
+    th { color: var(--muted); font-weight: 600; }
+    .status { color: var(--muted); font-size: 0.9rem; margin: 10px 0; }
   </style>
 </head>
 <body>
-  <h1>Gas Station Developments — Google Maps</h1>
+  <h1>Gas Station Developments — OpenStreetMap</h1>
 
   <div class="card">
     <div class="controls">
@@ -98,287 +39,141 @@
       <button id="searchBtn" class="btn">Search</button>
       <button id="clearBtn" class="btn ghost">Show All</button>
     </div>
-    <div id="status" class="status">Loading Google Maps...</div>
+    <div id="status" class="status">Loading data...</div>
   </div>
 
-  <div class="card">
-    <div id="map"></div>
-  </div>
-
-  <div class="card">
-    <div id="results"></div>
-  </div>
-
-  <!-- Google Maps JavaScript API -->
-  <script async defer
-    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBlm18rIsI1bhOwhx3bpHAX589EahvLbPc&callback=initMap">
-  </script>
+  <div class="card"><div id="map"></div></div>
+  <div class="card"><div id="results"></div></div>
 
   <script>
-    // Robust CSV parser that handles commas and newlines inside quoted fields
+    // CSV parsing
     function parseCSV(csv) {
-      const rows = [];
-      let row = [];
-      let value = '';
-      let inQuotes = false;
-      for (let i = 0; i < csv.length; i++) {
-        const char = csv[i];
-        if (char === '"' && csv[i + 1] === '"') {
-          value += '"';
-          i++;
-        } else if (char === '"') {
-          inQuotes = !inQuotes;
-        } else if (char === ',' && !inQuotes) {
-          row.push(value);
-          value = '';
-        } else if ((char === '\n' || char === '\r') && !inQuotes) {
-          // Handle CR+LF or LF line endings
-          if (char === '\r' && csv[i + 1] === '\n') {
-            i++;
-          }
-          row.push(value);
-          value = '';
-          if (row.length > 1 || row[0] !== '') {
-            rows.push(row);
-          }
-          row = [];
-        } else {
-          value += char;
-        }
+      const rows = []; let row = []; let value = ''; let inQuotes = false;
+      for (let i=0; i<csv.length; i++) {
+        const c = csv[i];
+        if (c === '"' && csv[i+1] === '"') { value += '"'; i++; }
+        else if (c === '"') { inQuotes = !inQuotes; }
+        else if (c === ',' && !inQuotes) { row.push(value); value=''; }
+        else if ((c==='\n'||c==='\r') && !inQuotes) {
+          if (c==='\r' && csv[i+1]==='\n') i++;
+          row.push(value); value='';
+          if (row.length>1 || row[0]!=='') rows.push(row);
+          row=[]; 
+        } else { value+=c; }
       }
-      // Push the last value/row if not empty
-      if (value !== '' || row.length > 0) {
-        row.push(value);
-        rows.push(row);
-      }
+      if (value!=='' || row.length>0) { row.push(value); rows.push(row); }
       return rows;
     }
 
-    // Convert rows into objects
     function transformData(rows) {
-      if (!rows || rows.length === 0) return [];
-      const headers = rows[0];
-      const data = [];
-      for (let i = 1; i < rows.length; i++) {
-        const row = rows[i];
-        const obj = {};
-        headers.forEach((h, idx) => (obj[h] = row[idx]));
-        const town =
-          obj['City/County'] ||
-          obj['City/County.1'] ||
-          obj['City/County.2'] ||
-          '';
-        const state = obj['State'] || '';
-        const name = obj['Brand'] || '';
-        const developer = obj['Brand.1'] || '';
-        const date = obj['Date'] || obj['Date.1'] || obj['Date.2'] || '';
-        const notes =
-          obj['Status'] || obj['Details.1'] || obj['Details.2'] || '';
-        // Skip if both town and state are empty
+      if (!rows.length) return [];
+      const headers=rows[0]; const data=[];
+      for (let i=1;i<rows.length;i++) {
+        const obj={}; headers.forEach((h,j)=>obj[h]=rows[i][j]);
+        const town=obj['City/County']||obj['City/County.1']||obj['City/County.2']||'';
+        const state=obj['State']||'';
         if (!town && !state) continue;
-        data.push({ name, town, state, developer, date, notes });
+        data.push({
+          name: obj['Brand']||'',
+          town, state,
+          developer: obj['Brand.1']||'',
+          date: obj['Date']||obj['Date.1']||obj['Date.2']||'',
+          notes: obj['Status']||obj['Details.1']||obj['Details.2']||''
+        });
       }
       return data;
     }
 
-    let map, geocoder, infoWindow;
-    let allData = [];
-    let currentResults = [];
-    let markers = [];
+    let map, markersLayer, allData=[], currentResults=[];
 
     async function loadData() {
       try {
-        const response = await fetch('https://raw.githubusercontent.com/nourie42/Sun-Nourie/main/public/developments_data.csv');
-        const csv = await response.text();
-        const rows = parseCSV(csv);
-        allData = transformData(rows);
-        currentResults = allData;
+        const res=await fetch('https://raw.githubusercontent.com/nourie42/Sun-Nourie/main/public/developments_data.csv');
+        const csv=await res.text();
+        allData=transformData(parseCSV(csv));
+        currentResults=allData;
         addMarkersToMap(allData);
         showResults(allData);
-        document.getElementById('status').textContent =
-          'Loaded ' + allData.length + ' locations';
-      } catch (err) {
-        console.error('Failed to load CSV:', err);
-        document.getElementById('status').textContent =
-          'Error loading data';
+        document.getElementById('status').textContent=`Loaded ${allData.length} locations`;
+      } catch(e) {
+        document.getElementById('status').textContent='Error loading data';
       }
     }
 
-    function initMap() {
-      try {
-        map = new google.maps.Map(document.getElementById('map'), {
-          zoom: 6,
-          center: { lat: 35.7596, lng: -79.0193 },
-          mapTypeId: 'roadmap',
-        });
-        geocoder = new google.maps.Geocoder();
-        infoWindow = new google.maps.InfoWindow();
-        setupEventListeners();
-        loadData();
-      } catch (error) {
-        console.error('Google Maps initialization failed:', error);
-        document.getElementById('status').textContent =
-          'Error: Google Maps failed to load. Check your API key.';
-      }
-    }
-
-    function clearMarkers() {
-      markers.forEach((m) => m.setMap(null));
-      markers = [];
+    async function geocode(address) {
+      const url=`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`;
+      const resp=await fetch(url,{headers:{'User-Agent':'GasStationApp/1.0'}});
+      return await resp.json();
     }
 
     async function addMarkersToMap(data) {
-      clearMarkers();
-      if (!geocoder) return;
-      const bounds = new google.maps.LatLngBounds();
-      let count = 0;
+      markersLayer.clearLayers();
+      const bounds=[];
       for (const item of data) {
-        const address = item.town + ', ' + item.state;
+        const address=`${item.town}, ${item.state}`;
         try {
-          const results = await new Promise((resolve, reject) => {
-            geocoder.geocode({ address }, (res, status) => {
-              if (status === 'OK') resolve(res);
-              else reject(status);
-            });
-          });
-          if (results[0]) {
-            const position = results[0].geometry.location;
-            const marker = new google.maps.Marker({
-              position,
-              map,
-              title: item.name || 'Gas Station Development',
-              icon: {
-                url:
-                  'data:image/svg+xml;base64,' +
-                  btoa(
-                    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="#FF4444" stroke="white" stroke-width="2"/></svg>'
-                  ),
-                scaledSize: new google.maps.Size(24, 24),
-              },
-            });
-            let content =
-              '<div style="color: #333; font-family: Arial; max-width: 250px;">';
-            content +=
-              '<h3 style="margin: 0 0 8px 0;">' +
-              (item.name || 'Gas Station Development') +
-              '</h3>';
-            content +=
-              '<p style="margin: 4px 0;"><strong>Location:</strong> ' +
-              item.town +
-              ', ' +
-              item.state +
-              '</p>';
-            if (item.developer)
-              content +=
-                '<p style="margin: 4px 0;"><strong>Developer:</strong> ' +
-                item.developer +
-                '</p>';
-            if (item.date)
-              content +=
-                '<p style="margin: 4px 0;"><strong>Date:</strong> ' +
-                item.date +
-                '</p>';
-            if (item.notes)
-              content +=
-                '<p style="margin: 4px 0;"><strong>Notes:</strong> ' +
-                item.notes +
-                '</p>';
-            content += '</div>';
-            marker.addListener('click', () => {
-              infoWindow.setContent(content);
-              infoWindow.open(map, marker);
-            });
-            markers.push(marker);
-            bounds.extend(position);
-            count++;
+          const results=await geocode(address);
+          if (results.length>0) {
+            const lat=parseFloat(results[0].lat), lon=parseFloat(results[0].lon);
+            const marker=L.marker([lat,lon]).addTo(markersLayer);
+            let popup=`<b>${item.name||'Gas Station Development'}</b><br/>
+                       <strong>Location:</strong> ${item.town}, ${item.state}<br/>`;
+            if (item.developer) popup+=`<strong>Developer:</strong> ${item.developer}<br/>`;
+            if (item.date) popup+=`<strong>Date:</strong> ${item.date}<br/>`;
+            if (item.notes) popup+=`<strong>Notes:</strong> ${item.notes}<br/>`;
+            marker.bindPopup(popup);
+            bounds.push([lat,lon]);
           }
-        } catch (e) {
-          console.log('Geocoding failed for', address);
-        }
+        } catch {}
       }
-      if (count > 0) {
-        map.fitBounds(bounds);
-        google.maps.event.addListenerOnce(map, 'bounds_changed', () => {
-          if (map.getZoom() > 12) map.setZoom(12);
-        });
-      }
+      if (bounds.length) map.fitBounds(bounds);
     }
 
     function showResults(data) {
-      if (data.length === 0) {
-        document.getElementById('results').innerHTML = '<p>No results found.</p>';
-        return;
-      }
-      let html =
-        '<table><thead><tr><th>Name</th><th>Town</th><th>State</th><th>Developer</th><th>Date</th><th>Notes</th></tr></thead><tbody>';
-      data.forEach((item) => {
-        html += '<tr>';
-        html += '<td>' + (item.name || '') + '</td>';
-        html += '<td>' + (item.town || '') + '</td>';
-        html += '<td>' + (item.state || '') + '</td>';
-        html += '<td>' + (item.developer || '') + '</td>';
-        html += '<td>' + (item.date || '') + '</td>';
-        html += '<td>' + (item.notes || '') + '</td>';
-        html += '</tr>';
+      if (!data.length) { document.getElementById('results').innerHTML='<p>No results.</p>'; return; }
+      let html='<table><thead><tr><th>Name</th><th>Town</th><th>State</th><th>Developer</th><th>Date</th><th>Notes</th></tr></thead><tbody>';
+      data.forEach(item=>{
+        html+=`<tr><td>${item.name||''}</td><td>${item.town||''}</td><td>${item.state||''}</td><td>${item.developer||''}</td><td>${item.date||''}</td><td>${item.notes||''}</td></tr>`;
       });
-      html += '</tbody></table>';
-      document.getElementById('results').innerHTML = html;
+      html+='</tbody></table>';
+      document.getElementById('results').innerHTML=html;
     }
 
     function doSearch() {
-      const query = document.getElementById('townInput').value
-        .trim()
-        .toLowerCase();
-      currentResults = !query
-        ? allData
-        : allData.filter((item) => {
-            const town = (item.town || '').toLowerCase();
-            const state = (item.state || '').toLowerCase();
-            const full = town + ', ' + state;
-            return (
-              town.includes(query) ||
-              full.includes(query) ||
-              query.includes(town)
-            );
-          });
+      const q=document.getElementById('townInput').value.trim().toLowerCase();
+      currentResults=!q?allData:allData.filter(item=>{
+        const town=(item.town||'').toLowerCase();
+        const state=(item.state||'').toLowerCase();
+        const full=town+', '+state;
+        return town.includes(q)||full.includes(q)||q.includes(town);
+      });
       addMarkersToMap(currentResults);
       showResults(currentResults);
-      document.getElementById('status').textContent =
-        'Found ' + currentResults.length + ' results';
+      document.getElementById('status').textContent=`Found ${currentResults.length} results`;
     }
 
     function showAll() {
-      document.getElementById('townInput').value = '';
-      currentResults = allData;
-      addMarkersToMap(currentResults);
-      showResults(currentResults);
-      document.getElementById('status').textContent =
-        'Showing all ' + allData.length + ' locations';
+      document.getElementById('townInput').value='';
+      currentResults=allData;
+      addMarkersToMap(allData);
+      showResults(allData);
+      document.getElementById('status').textContent=`Showing all ${allData.length} locations`;
     }
 
     function setupEventListeners() {
-      document
-        .getElementById('searchBtn')
-        .addEventListener('click', doSearch);
-      document
-        .getElementById('clearBtn')
-        .addEventListener('click', showAll);
-      document
-        .getElementById('townInput')
-        .addEventListener('keypress', function (e) {
-          if (e.key === 'Enter') doSearch();
-        });
+      document.getElementById('searchBtn').addEventListener('click', doSearch);
+      document.getElementById('clearBtn').addEventListener('click', showAll);
+      document.getElementById('townInput').addEventListener('keypress', e=>{ if (e.key==='Enter') doSearch(); });
     }
 
-    // fallback if Google Maps doesn’t load
-    setTimeout(() => {
-      if (typeof google === 'undefined') {
-        document.getElementById('status').textContent =
-          'Error: Google Maps failed to load. Please check your API key and internet connection.';
-        document.getElementById('map').innerHTML =
-          '<div style="padding: 50px; text-align: center; color: #666;">Google Maps could not be loaded. Please add your API key.</div>';
-      }
-    }, 5000);
+    // Leaflet map init
+    window.onload=function() {
+      map=L.map('map').setView([35.7596,-79.0193],6);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(map);
+      markersLayer=L.layerGroup().addTo(map);
+      setupEventListeners();
+      loadData();
+    }
   </script>
 </body>
 </html>
