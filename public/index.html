@@ -1,4 +1,4 @@
-<!-- public/index.html — DOT-direct build (v2025‑09‑19 + math/roadway UI, no removals) -->
+<!-- public/index.html — DOT-direct build (v2025-09-19 + math/roadway UI, no removals) -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -81,7 +81,7 @@
   <div class="wrap">
     <header>
       <h1>Sunoco, LP Fuel IQ - Fuel Site Analyzer</h1>
-      <span class="build">UI v2025‑09‑19</span>
+      <span class="build">UI v2025-09-19</span>
       <a href="developments.html" style="padding:8px 14px; background:#22d3ee; border-radius:8px; color:#00121e; font-weight:600; text-decoration:none;">Developments Search</a>
       <a href="PA_Signals_AADT_Radius_Map_Final_Generated.html" style="padding:8px 14px; background:#f87171; border-radius:8px; color:#00121e; font-weight:600; text-decoration:none;">PA AADT Map</a>
       <a href="Scraper.html" style="padding:8px 14px; background:#34d399; border-radius:8px; color:#00121e; font-weight:600; text-decoration:none;">Prospector</a>
@@ -124,10 +124,15 @@
         </div>
         <div><label>Regular MPDs</label><input id="mpds" type="number" value="3" min="1"/></div>
         <div><label>Diesel MPDs</label><input id="diesel" type="number" value="0" min="0"/></div>
-        <div><label>AADT override</label><input id="aadtOverride" type="number"/></div>
+        <div>
+          <label>AADT override</label>
+          <input id="aadtOverride" type="number"/>
+          <!-- MOVED + BIGGER BUTTON (was in .toolbar) -->
+          <button id="go" style="margin-top:10px;width:100%;padding:16px;font-size:18px;">Estimate</button>
+        </div>
       </div>
       <div class="toolbar">
-        <button id="go">Estimate</button>
+        <!-- (button removed from here – per request) -->
         <span class="muted">Baseline ceiling (AADT×2%×8×30) • competition rule • pricing effect • caps • road layout</span>
       </div>
     </div>
@@ -237,7 +242,9 @@ const apiStatus = $("apiStatus"), aadtBanner = $("aadtBanner"), compLine = $("co
 let map, layer, mapReady = false, selectedCoords = null, selectedPlaceId = null;
 let aadtMap, aadtLayer, aadtReady = false;
 let acItems = [], acActive = -1;
-let acCommitted = false;
+
+/* HARD-LOCK: stop suggestions after commit until the value is changed or cleared */
+let acLocked = false;
 let lastCommittedText = "";
 
 /* Utils */
@@ -503,9 +510,11 @@ function renderAll(d){
             NC: "NCDOT AADT Stations (official)",
             VA: "VDOT Traffic Volume ADT (official)",
             DC: "DDOT 2023 Traffic Volume (official)",
-            FL: "FDOT AADT (TDA/RCI) (official)"
+            FL: "FDOT AADT (TDA/RCI) (official)",
+            NY: "NYSDOT Traffic Monitoring (official)",
+            HPMS: "FHWA HPMS (national) fallback"
           };
-          aadtSourceLine.textContent = "Source: " + (srcMap[st] || "official state AADT");
+          aadtSourceLine.textContent = "Source: " + (srcMap[st] || srcMap.HPMS);
         }
       }).catch(()=>{});
   }
@@ -544,11 +553,11 @@ async function showRating(address){
   ratingLine.innerHTML = (rating != null && rating !== undefined) ? `\u2B50 ${rating} (${total||0} reviews)` : "—";
 }
 
-/* =================== Autocomplete (lock on commit) =================== */
+/* =================== Autocomplete (HARD LOCK after commit) =================== */
 function hideAc(){ acBox.style.display = "none"; acActive = -1; }
 function commitAddress(display, coords, placeId){
   lastCommittedText = (display || "").trim();
-  acCommitted = true;   // LOCK: stop recommending after commit
+  acLocked = true;      // HARD LOCK until user edits/clears
   acItems = [];
   hideAc();
   addrInput.value = display;
@@ -587,10 +596,13 @@ function renderAc(list){
 }
 addrInput.addEventListener("input", () => {
   const q = addrInput.value.trim();
-  if (acCommitted) {
-    if (q === lastCommittedText) { hideAc(); return; }
-    acCommitted = false; // unlock only if they edit
-  }
+
+  // HARD LOCK: if still equal to committed value, never search
+  if (acLocked && q === lastCommittedText) { hideAc(); return; }
+
+  // If user cleared or changed the value, unlock and allow new search
+  if (acLocked && q !== lastCommittedText) acLocked = false;
+
   if (q.length < 3) { hideAc(); return; }
   Promise.all([googleSearch(q), nominatimSearch(q)]).then(([g,n])=>{
     acItems = [...g, ...n].slice(0, 8);
