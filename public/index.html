@@ -8,9 +8,11 @@
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin></script>
+
   <!-- Map snapshot utilities -->
   <script src="https://unpkg.com/leaflet-image/leaflet-image.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
   <!-- jsPDF (UMD) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous"></script>
 
@@ -59,8 +61,8 @@
     .hero{ display:flex; justify-content:space-between; align-items:flex-end; gap:12px; }
     .hero .num{ font-size:44px; font-weight:900; letter-spacing:.5px; }
     .hero .sub{ font-size:13px; color:#a9b6d0; }
-
     .num-row{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+
     .stop-chip{ display:inline-flex; align-items:center; gap:10px; padding:8px 12px; border-radius:12px; border:2px solid #b91c1c; background:linear-gradient(135deg,#7f1d1d,#991b1b); color:#fff; font-weight:800; box-shadow:0 8px 20px rgba(0,0,0,.3); }
     .stop-chip .stop-icon{ width:34px; height:34px; border-radius:8px; background:#dc2626; border:3px solid #fca5a5; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:11px; }
 
@@ -182,7 +184,7 @@
             <!-- Appears ONLY when fallback AADT is used -->
             <span id="fallbackChip" class="stop-chip" style="display:none;">
               <span class="stop-icon">STOP</span>
-              Fallback AADT Used — Verify and Override AADT Using Above AADT Link For Your State
+              Fallback AADT Used — Verify and Override AADT
             </span>
           </div>
           <div class="sub" id="estRange">Full range: —</div>
@@ -469,7 +471,7 @@ function renderMathFromServer(d){
   mathTableEl.innerHTML = rows.map(r=>`<div>${r}</div>`).join('');
 }
 
-/* Fallback math ONLY if server breakdown missing (kept for resilience) */
+/* Fallback ONLY if server breakdown missing */
 function buildCalcFallback(d){
   try{
     const aadt = (d?.map?.aadt_used?.aadt) || (+( $("aadtOverride").value || 0)) || null;
@@ -518,14 +520,28 @@ function renderMathFallback(calc){
 }
 
 /* =================== Summary cleanup =================== */
-function cleanSummary(text, hasDevs){
+function cleanSummary(text, hasDevs, isFallback){
   let s = (text || "").trim();
+
+  // strip common wrappers/prefixes
   if (s.startsWith('"') && s.endsWith('"')) s = s.slice(1, -1).trim();
   s = s.replace(/^```[\s\S]*?```/g, "").trim();
   s = s.replace(/^<\s*text\s*>\s*/i, "");
   s = s.replace(/^(text|summary)\s*:\s*/i, "");
-  if (!hasDevs) s = s.replace(/(^|[\s])[^.]*\b(no|none|not any|no significant)\s+(recent\s+)?developments?[^.]*\./gi, " ").trim();
-  return s;
+
+  // remove "no developments" statements if no devs exist
+  if (!hasDevs) {
+    s = s.replace(/(^|[\s])[^.]*\b(?:no|none|not any|no significant)\s+(?:recent\s+)?developments?[^.]*\./gi, " ");
+  }
+
+  // if fallback AADT, remove any sentence that attributes to DOT
+  if (isFallback) {
+    const parts = s.split(/(?<=[.!?])\s+/);
+    const dotRe = /\b(?:department of transportation(?:\s*\(dot\))?|state\s+(?:department of transportation|dot)|\bDOT\b|\bDoT\b)\b/i;
+    s = parts.filter(p => !dotRe.test(p)).join(' ');
+  }
+
+  return s.replace(/\s{2,}/g," ").replace(/\s+\./g,".").trim();
 }
 
 /* =================== Fallback detection =================== */
@@ -557,7 +573,6 @@ function renderAll(d){
     aadtBanner.textContent = `AADT: ${fmt(usedVal)} vehicles/day (fallback)`;
     fallbackChip.style.display = "inline-flex";
   } else {
-    // Non-fallback: keep existing banner text (can mention DOT)
     aadtBanner.textContent = d.aadtText || (usedVal ? `AADT: ${fmt(usedVal)} vehicles/day` : "—");
     fallbackChip.style.display = "none";
   }
@@ -587,8 +602,8 @@ function renderAll(d){
     devsBox.innerHTML = "<em>no CSV developments</em>";
   }
 
-  // Summary (GPT) — cleaned
-  summaryBox.textContent = cleanSummary(d.summary || "", hasDevs) || "—";
+  // Summary (GPT) — cleaned & DOT-free if fallback
+  summaryBox.textContent = cleanSummary(d.summary || "", hasDevs, fallback) || "—";
 
   // Maps
   initOrUpdateMainMap(d.map);
@@ -690,11 +705,21 @@ function renderAc(list){
 }
 addrInput.addEventListener("input", () => {
   const q = addrInput.value.trim();
+
+  // Hard lock: keep suggestions hidden unless user deletes before the committed text
   if (addressLocked) {
-    if (q.length >= lastCommittedText.length && q.startsWith(lastCommittedText)) { hideAc(); return; }
-    addressLocked = false; acCommitted = false;
+    if (q.length >= lastCommittedText.length && q.startsWith(lastCommittedText)) {
+      hideAc(); return;
+    } else {
+      addressLocked = false; // they edited earlier chars; unlock
+      acCommitted = false;
+    }
   }
-  if (acCommitted) { if (q === lastCommittedText) { hideAc(); return; } acCommitted = false; }
+
+  if (acCommitted) {
+    if (q === lastCommittedText) { hideAc(); return; }
+    acCommitted = false; // unlock if they truly edit
+  }
   if (q.length < 3) { hideAc(); return; }
   Promise.all([googleSearch(q), nominatimSearch(q)]).then(([g,n])=>{
     acItems = [...g, ...n].slice(0, 8);
@@ -730,6 +755,7 @@ addrInput.addEventListener("keydown", (e)=>{ if(e.key==="Enter"){ e.preventDefau
 
 /* =================== PDF Export ======================= */
 async function captureMapImage(){
+  // Try leaflet-image first
   try {
     if (typeof leafletImage === "function" && window.map) {
       return await new Promise((resolve) => {
@@ -740,6 +766,7 @@ async function captureMapImage(){
       });
     }
   } catch {}
+  // Fallback to html2canvas (usesCORS: true)
   try {
     if (window.html2canvas) {
       const node = document.getElementById("map");
@@ -749,6 +776,7 @@ async function captureMapImage(){
   } catch {}
   return null;
 }
+
 document.getElementById("exportPDF").addEventListener("click", async ()=>{
   try{
     const { jsPDF } = window.jspdf || {};
@@ -776,6 +804,7 @@ document.getElementById("exportPDF").addEventListener("click", async ()=>{
     doc.text(keyLines, margin, cursorY);
     cursorY += keyLines.length*14 + 12;
 
+    // Math table
     const mathTxt = (document.getElementById('mathTable')?.innerText || '').trim();
     if (mathTxt) {
       const mathLines = doc.splitTextToSize("Math & Assumptions:\n" + mathTxt, contentW);
@@ -785,6 +814,7 @@ document.getElementById("exportPDF").addEventListener("click", async ()=>{
       cursorY += mathLines.length*14 + 12;
     }
 
+    // Map snapshot
     const mapImg = await captureMapImage();
     const imgW = contentW, imgH = 260;
     if (mapImg) {
@@ -795,6 +825,7 @@ document.getElementById("exportPDF").addEventListener("click", async ()=>{
       cursorY += imgH + 12;
     }
 
+    // AADT table
     const tbl = document.getElementById("aadtTable").innerText || "";
     const devLines = doc.splitTextToSize("AADT Sources (1 mi):\n" + tbl, contentW);
     if (cursorY + devLines.length*14 > pageH - margin) { doc.addPage(); cursorY = margin; }
@@ -819,3 +850,4 @@ overlay.textContent="—";
   </script>
 </body>
 </html>
+
