@@ -60,6 +60,10 @@
     .hero .num{ font-size:44px; font-weight:900; letter-spacing:.5px; }
     .hero .sub{ font-size:13px; color:#a9b6d0; }
 
+    .num-row{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+    .stop-chip{ display:inline-flex; align-items:center; gap:10px; padding:8px 12px; border-radius:12px; border:2px solid #b91c1c; background:linear-gradient(135deg,#7f1d1d,#991b1b); color:#fff; font-weight:800; box-shadow:0 8px 20px rgba(0,0,0,.3); }
+    .stop-chip .stop-icon{ width:34px; height:34px; border-radius:8px; background:#dc2626; border:3px solid #fca5a5; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:11px; }
+
     .footerbar{ position:fixed; left:0; right:0; bottom:0; background:linear-gradient(180deg,#0c1220,#0a0f1a); border-top:1px solid var(--line); padding:10px 16px; display:flex; justify-content:center; gap:12px; z-index:50; }
 
     .aadt-tabs { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:8px 0 12px; }
@@ -76,7 +80,8 @@
     tr:hover { background: rgba(255,255,255,.03); }
     .small { font-size:12px; color:#a9b6d0; }
 
-    #go { width:100%; padding:16px; font-size:18px; margin-top:10px; } /* big button under AADT override */
+    /* Big button under AADT override */
+    #go { width:100%; padding:16px; font-size:18px; margin-top:10px; }
   </style>
 </head>
 <body>
@@ -89,7 +94,7 @@
       <a href="Scraper.html" style="padding:8px 14px; background:#34d399; border-radius:8px; color:#00121e; font-weight:600; text-decoration:none;">Prospector</a>
     </header>
 
-    <!-- STOP banner -->
+    <!-- STOP banner (CSV developments) -->
     <div id="stopBox" class="stop-alert">
       <div class="stop-inner">
         <div class="stop-sign">STOP</div>
@@ -133,7 +138,7 @@
       </div>
     </div>
 
-    <!-- Math & Assumptions (always visible) -->
+    <!-- Math & Assumptions -->
     <div class="card" id="mathCard">
       <b>Math & Assumptions (always shown)</b>
       <div id="mathTable" class="small" style="margin-top:8px; line-height:1.6">—</div>
@@ -172,7 +177,14 @@
       <div class="hero">
         <div>
           <div>Adjusted Base Estimate (LOW)</div>
-          <div class="num" id="estNum">—</div>
+          <div class="num-row">
+            <div class="num" id="estNum">—</div>
+            <!-- Appears ONLY when fallback AADT is used -->
+            <span id="fallbackChip" class="stop-chip" style="display:none;">
+              <span class="stop-icon">STOP</span>
+              Fallback AADT Used — Verify and Override AADT
+            </span>
+          </div>
           <div class="sub" id="estRange">Full range: —</div>
         </div>
         <div class="right sub">
@@ -183,7 +195,6 @@
       <hr/>
       <div id="aadtBanner" class="muted">—</div>
       <div id="compLine" class="muted">—</div>
-      <!-- removed the duplicate Run Estimate button -->
     </div>
 
     <!-- Main Map & SV -->
@@ -233,7 +244,8 @@ const apiStatus = $("apiStatus"), aadtBanner = $("aadtBanner"), compLine = $("co
       addExtraBtn = $("addExtra"), extraList = $("extraList"), activeExtras = $("activeExtras"),
       ex_large_dev = $("ex_large_dev"), ex_hours18 = $("ex_hours18"), ex_highincome = $("ex_highincome"),
       ex_lowrating = $("ex_lowrating"), ex_competitive_pricing = $("ex_competitive_pricing"),
-      ex_rural = $("ex_rural"), aadtSourceLine = $("aadtSourceLine"), mathTableEl = $("mathTable");
+      ex_rural = $("ex_rural"), aadtSourceLine = $("aadtSourceLine"), mathTableEl = $("mathTable"),
+      fallbackChip = $("fallbackChip");
 
 let map, layer, mapReady = false, selectedCoords = null, selectedPlaceId = null;
 let aadtMap, aadtLayer, aadtReady = false;
@@ -457,7 +469,7 @@ function renderMathFromServer(d){
   mathTableEl.innerHTML = rows.map(r=>`<div>${r}</div>`).join('');
 }
 
-/* Fallback ONLY if server breakdown missing */
+/* Fallback math ONLY if server breakdown missing (kept for resilience) */
 function buildCalcFallback(d){
   try{
     const aadt = (d?.map?.aadt_used?.aadt) || (+( $("aadtOverride").value || 0)) || null;
@@ -508,20 +520,23 @@ function renderMathFallback(calc){
 /* =================== Summary cleanup =================== */
 function cleanSummary(text, hasDevs){
   let s = (text || "").trim();
-
-  // strip surrounding quotes and code fences
   if (s.startsWith('"') && s.endsWith('"')) s = s.slice(1, -1).trim();
   s = s.replace(/^```[\s\S]*?```/g, "").trim();
-
-  // remove leading "<text>", "Text:", or "Summary:"
   s = s.replace(/^<\s*text\s*>\s*/i, "");
   s = s.replace(/^(text|summary)\s*:\s*/i, "");
-
-  // if no developments, remove sentences that explicitly say "no developments"
-  if (!hasDevs) {
-    s = s.replace(/(^|[\s])[^.]*\b(no|none|not any|no significant)\s+(recent\s+)?developments?[^.]*\./gi, " ").trim();
-  }
+  if (!hasDevs) s = s.replace(/(^|[\s])[^.]*\b(no|none|not any|no significant)\s+(recent\s+)?developments?[^.]*\./gi, " ").trim();
   return s;
+}
+
+/* =================== Fallback detection =================== */
+function isFallbackAADT(d){
+  const used = d?.map?.aadt_used || {};
+  if (used.fallback === true) return true;
+  const prov = (used.source || used.provider || "").toString().toLowerCase();
+  if (prov.includes("fallback")) return true;
+  const aadtTxt = (d?.aadtText || "").toLowerCase();
+  if (aadtTxt.includes("fallback")) return true;
+  return false;
 }
 
 /* =================== Rendering ======================== */
@@ -533,12 +548,25 @@ function renderAll(d){
   outY2.textContent = fmt(d.estimate?.year2 ?? d.year2 ?? 0);
   outY3.textContent = fmt(d.estimate?.year3 ?? d.year3 ?? 0);
 
+  // AADT banner + STOP chip logic
+  const fallback = isFallbackAADT(d);
+  const usedRec = d?.map?.aadt_used || {};
+  const usedVal = usedRec?.aadt ?? d?.inputs?.aadt_used ?? null;
+
+  if (fallback && usedVal) {
+    aadtBanner.textContent = `AADT: ${fmt(usedVal)} vehicles/day (fallback)`;
+    fallbackChip.style.display = "inline-flex";
+  } else {
+    // Non-fallback: keep existing banner text (can mention DOT)
+    aadtBanner.textContent = d.aadtText || (usedVal ? `AADT: ${fmt(usedVal)} vehicles/day` : "—");
+    fallbackChip.style.display = "none";
+  }
+
   // Math (server-aligned)
   if (d.calc_breakdown) renderMathFromServer(d);
   else renderMathFallback(buildCalcFallback(d));
 
-  // Banners
-  aadtBanner.textContent = d.aadtText || "—";
+  // Competition line
   compLine.textContent = d.competitionText || "—";
 
   // STOP: CSV development stripe + list
@@ -662,21 +690,11 @@ function renderAc(list){
 }
 addrInput.addEventListener("input", () => {
   const q = addrInput.value.trim();
-
-  // Hard lock: keep suggestions hidden unless user deletes before the committed text
   if (addressLocked) {
-    if (q.length >= lastCommittedText.length && q.startsWith(lastCommittedText)) {
-      hideAc(); return;
-    } else {
-      addressLocked = false; // they edited earlier chars; unlock
-      acCommitted = false;
-    }
+    if (q.length >= lastCommittedText.length && q.startsWith(lastCommittedText)) { hideAc(); return; }
+    addressLocked = false; acCommitted = false;
   }
-
-  if (acCommitted) {
-    if (q === lastCommittedText) { hideAc(); return; }
-    acCommitted = false; // unlock if they truly edit
-  }
+  if (acCommitted) { if (q === lastCommittedText) { hideAc(); return; } acCommitted = false; }
   if (q.length < 3) { hideAc(); return; }
   Promise.all([googleSearch(q), nominatimSearch(q)]).then(([g,n])=>{
     acItems = [...g, ...n].slice(0, 8);
@@ -712,7 +730,6 @@ addrInput.addEventListener("keydown", (e)=>{ if(e.key==="Enter"){ e.preventDefau
 
 /* =================== PDF Export ======================= */
 async function captureMapImage(){
-  // Try leaflet-image first
   try {
     if (typeof leafletImage === "function" && window.map) {
       return await new Promise((resolve) => {
@@ -723,7 +740,6 @@ async function captureMapImage(){
       });
     }
   } catch {}
-  // Fallback to html2canvas (usesCORS: true)
   try {
     if (window.html2canvas) {
       const node = document.getElementById("map");
@@ -733,7 +749,6 @@ async function captureMapImage(){
   } catch {}
   return null;
 }
-
 document.getElementById("exportPDF").addEventListener("click", async ()=>{
   try{
     const { jsPDF } = window.jspdf || {};
@@ -761,7 +776,6 @@ document.getElementById("exportPDF").addEventListener("click", async ()=>{
     doc.text(keyLines, margin, cursorY);
     cursorY += keyLines.length*14 + 12;
 
-    // Math table
     const mathTxt = (document.getElementById('mathTable')?.innerText || '').trim();
     if (mathTxt) {
       const mathLines = doc.splitTextToSize("Math & Assumptions:\n" + mathTxt, contentW);
@@ -771,7 +785,6 @@ document.getElementById("exportPDF").addEventListener("click", async ()=>{
       cursorY += mathLines.length*14 + 12;
     }
 
-    // Map snapshot (with robust fallback)
     const mapImg = await captureMapImage();
     const imgW = contentW, imgH = 260;
     if (mapImg) {
@@ -782,7 +795,6 @@ document.getElementById("exportPDF").addEventListener("click", async ()=>{
       cursorY += imgH + 12;
     }
 
-    // AADT table
     const tbl = document.getElementById("aadtTable").innerText || "";
     const devLines = doc.splitTextToSize("AADT Sources (1 mi):\n" + tbl, contentW);
     if (cursorY + devLines.length*14 > pageH - margin) { doc.addPage(); cursorY = margin; }
@@ -807,4 +819,3 @@ overlay.textContent="—";
   </script>
 </body>
 </html>
-
