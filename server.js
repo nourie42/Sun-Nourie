@@ -213,7 +213,7 @@ const AADT_PROVIDERS = {
   NC: { kind: "arcgis", url: "https://services.arcgis.com/NuWFvHYDMVmmxMeM/ArcGIS/rest/services/NCDOT_AADT_Stations/FeatureServer/0", geoType: "point" }, // NCDOT stations
   VA: { kind: "arcgis", url: "https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/VDOTTrafficVolume/FeatureServer/0", geoType: "line" },          // VDOT Traffic Volume
   DC: { kind: "arcgis", url: "https://maps2.dcgis.dc.gov/dcgis/rest/services/DCGIS_DATA/Transportation_TrafficVolume_WebMercator/MapServer/4", geoType: "line" }, // DDOT 2023 volume
-  FL: { kind: "arcgis", url: "https://gis.fdot.gov/arcgis/rest/services/RCI_Layers/FeatureServer/0", geoType: "line" },                                    // FDOT AADT TDA
+  FL: { kind: "arcgis", url: "https://gis-fdot.opendata.arcgis.com/datasets/annual-average-daily-traffic-tda/explore", geoType: "line" },                                    // FDOT AADT TDA
 };
 
 /* -------------------------- ArcGIS query helpers -------------------------- */
