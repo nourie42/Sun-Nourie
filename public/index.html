@@ -90,13 +90,13 @@
   <div class="wrap">
     <header>
       <h1>Sunoco, LP Fuel IQ - Fuel Site Analyzer</h1>
-      <span class="build">UI v2025‑09‑19</span>
+      <span class="build">UI v2025‑10‑01</span>
       <a href="developments.html" style="padding:8px 14px; background:#22d3ee; border-radius:8px; color:#00121e; font-weight:600; text-decoration:none;">Developments Search</a>
       <a href="PA_Signals_AADT_Radius_Map_Final_Generated.html" style="padding:8px 14px; background:#f87171; border-radius:8px; color:#00121e; font-weight:600; text-decoration:none;">PA AADT Map</a>
       <a href="Scraper.html" style="padding:8px 14px; background:#34d399; border-radius:8px; color:#00121e; font-weight:600; text-decoration:none;">Prospector</a>
     </header>
 
-    <!-- STOP banner (CSV developments) -->
+    <!-- STOP banner (developments) -->
     <div id="stopBox" class="stop-alert">
       <div class="stop-inner">
         <div class="stop-sign">STOP</div>
@@ -181,7 +181,7 @@
           <div>Adjusted Base Estimate (LOW)</div>
           <div class="num-row">
             <div class="num" id="estNum">—</div>
-            <!-- Appears ONLY when fallback AADT is used -->
+            <!-- Appears ONLY when hard fallback AADT is used -->
             <span id="fallbackChip" class="stop-chip" style="display:none;">
               <span class="stop-icon">STOP</span>
               Fallback AADT Used — Verify and Override AADT
@@ -201,7 +201,7 @@
 
     <!-- Main Map & SV -->
     <div class="card">
-      <div class="muted">Map: Site & competitors (1.5 mi) + AADT dots + ⭐ AADT used</div>
+      <div class="muted" id="mapTitle">Map: Site & competitors (1.5 mi) + AADT dots + ⭐ AADT used</div>
       <div id="map"><div id="overlay" class="muted">—</div></div>
       <div id="svWrap"><div class="muted" style="margin-top:10px;">Street View</div><iframe id="sv" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div>
     </div>
@@ -247,7 +247,7 @@ const apiStatus = $("apiStatus"), aadtBanner = $("aadtBanner"), compLine = $("co
       ex_large_dev = $("ex_large_dev"), ex_hours18 = $("ex_hours18"), ex_highincome = $("ex_highincome"),
       ex_lowrating = $("ex_lowrating"), ex_competitive_pricing = $("ex_competitive_pricing"),
       ex_rural = $("ex_rural"), aadtSourceLine = $("aadtSourceLine"), mathTableEl = $("mathTable"),
-      fallbackChip = $("fallbackChip");
+      fallbackChip = $("fallbackChip"), mapTitle = $("mapTitle");
 
 let map, layer, mapReady = false, selectedCoords = null, selectedPlaceId = null;
 let aadtMap, aadtLayer, aadtReady = false;
@@ -320,7 +320,8 @@ function initOrUpdateMainMap(m){
   if (m.aadt) renderAADTMarkers(m.aadt, m.aadt_used);
 
   // Competitors after (so they sit on top) + bringToFront
-  for(const c of (m.competitors||[])){
+  const comps = m.all_competitors || m.competitors || [];
+  for(const c of comps){
     if(!Number.isFinite(c.lat)||!Number.isFinite(c.lon)) continue;
     pts.push([c.lat,c.lon]);
     const dot = L.circleMarker([c.lat,c.lon],{
@@ -438,6 +439,8 @@ function renderMathFromServer(d){
   const baseMult    = B.compRule?.baseMult ?? 1;
   const heavyPen    = B.compRule?.heavyPenalty ?? 0;
   const compMult    = B.compRule?.compMult ?? 1;
+  const compCount   = d?.competition?.count ?? B.compRule?.compCount ?? (d?.map?.competitors?.length ?? 0);
+  const heavyCount  = d?.competition?.heavy_count ?? B.compRule?.heavyCount ?? (d?.map?.competitors?.filter?.(c=>c.heavy)?.length ?? 0);
 
   const capEquip    = B.caps?.capEquip ?? compAfter;
   const capSoft     = B.caps?.capSoftTotal ?? compAfter;
@@ -461,6 +464,7 @@ function renderMathFromServer(d){
 
   const rows = [
     `<b>Baseline ceiling</b> = AADT ${fmt(aadtUsed)} × 2% × 8 × 30 = <b>${fmt(baseline)}</b>`,
+    `<b>Competitors in area</b> (1.5 mi): <b>${compCount}</b> total • heavy <b>${heavyCount}</b>`,
     `Competition rule: base ${baseMult.toFixed ? baseMult.toFixed(2) : baseMult} − heavy ${heavyPen.toFixed ? heavyPen.toFixed(2) : heavyPen} = × ${compMult.toFixed ? compMult.toFixed(2) : compMult} → <b>${fmt(compAfter)}</b>`,
     `Capacity caps (equipment/soft/hard): ${fmt(capEquip)} / ${fmt(capSoft)} / ${fmt(capHard)}${softHit ? " • soft penalty −10%" : ""} → <b>${fmt(afterCap)}</b>`,
     `Pricing factor: × ${priceMult} → <b>${fmt(afterPrice)}</b>`,
@@ -508,6 +512,7 @@ function renderMathFallback(calc){
   const extras = (calc.extra_factors||[]).map(e=>`${esc(e.label||'Adj')}: × ${e.mult}`).join(' • ') || '—';
   const rows = [
     `<b>Baseline ceiling</b> = AADT ${fmt(calc.aadt)} × ${(calc.pct_stopping*100).toFixed(1)}% × ${calc.gal_per_stop} × ${calc.days} = <b>${fmt(calc.ceiling)}</b>`,
+    `<b>Competitors in area</b>: see header line`, /* ensures presence even in pure fallback */
     `Capacity cap (MPDs ${calc.regular_mpd}+${calc.diesel_mpd} diesel): <b>${fmt(calc.mpd_cap)}</b>`,
     `After cap: <b>${fmt(calc.after_cap)}</b>`,
     `Competition factor: × ${calc.competition_factor} → <b>${fmt(calc.after_comp)}</b>`,
@@ -529,7 +534,10 @@ function cleanSummary(text, hasDevs, isFallback){
   s = s.replace(/^<\s*text\s*>\s*/i, "");
   s = s.replace(/^(text|summary)\s*:\s*/i, "");
 
-  // remove "no developments" statements if no devs exist
+  // never show the term "CSV"
+  s = s.replace(/\bCSV\b/gi, "").replace(/\s{2,}/g," ").trim();
+
+  // remove "no developments" statements if none exist
   if (!hasDevs) {
     s = s.replace(/(^|[\s])[^.]*\b(?:no|none|not any|no significant)\s+(?:recent\s+)?developments?[^.]*\./gi, " ");
   }
@@ -546,13 +554,8 @@ function cleanSummary(text, hasDevs, isFallback){
 
 /* =================== Fallback detection =================== */
 function isFallbackAADT(d){
-  const used = d?.map?.aadt_used || {};
-  if (used.fallback === true) return true;
-  const prov = (used.source || used.provider || "").toString().toLowerCase();
-  if (prov.includes("fallback")) return true;
-  const aadtTxt = (d?.aadtText || "").toLowerCase();
-  if (aadtTxt.includes("fallback")) return true;
-  return false;
+  const method = d?.inputs?.aadt_components?.method || d?.map?.aadt_used?.method || "";
+  return method === "fallback_no_dot_found"; // ONLY hard fallback triggers STOP chip
 }
 
 /* =================== Rendering ======================== */
@@ -584,7 +587,7 @@ function renderAll(d){
   // Competition line
   compLine.textContent = d.competitionText || "—";
 
-  // STOP: CSV development stripe + list
+  // STOP: development stripe + list (never say "CSV")
   const hasDevs = Array.isArray(d.csv) && d.csv.length > 0;
   if (hasDevs) {
     const lines = d.csv.slice(0,6).map(x => {
@@ -599,14 +602,17 @@ function renderAll(d){
     devsBox.innerHTML = "<ul>"+d.csv.map(x => `<li>${esc(x.name||'')} • ${esc(x.status||'')}${x.details?` • ${esc(x.details)}`:''}${x.date?` • ${esc(x.date)}`:''}</li>`).join("")+"</ul>";
   } else {
     document.getElementById("stopBox").style.display = "none";
-    devsBox.innerHTML = "<em>no CSV developments</em>";
+    devsBox.innerHTML = "<em>No developments flagged</em>";
   }
 
-  // Summary (GPT) — cleaned & DOT-free if fallback
+  // Summary (GPT) — cleaned & DOT-free if fallback; never says "CSV"
   summaryBox.textContent = cleanSummary(d.summary || "", hasDevs, fallback) || "—";
 
   // Maps
   initOrUpdateMainMap(d.map);
+  if (d?.map?.competitor_radius_mi) {
+    mapTitle.textContent = `Map: Site & competitors (${d.map.competitor_radius_mi} mi) + AADT dots + ⭐ AADT used`;
+  }
 
   // Second map + table (1 mile)
   if (d?.map?.site) {
@@ -819,7 +825,7 @@ document.getElementById("exportPDF").addEventListener("click", async ()=>{
     const imgW = contentW, imgH = 260;
     if (mapImg) {
       if (cursorY + imgH > pageH - margin) { doc.addPage(); cursorY = margin; }
-      doc.setFont("helvetica","bold"); doc.text("Map & Competitors (1.5 mi)", margin, cursorY);
+      doc.setFont("helvetica","bold"); doc.text("Map & Competitors", margin, cursorY);
       cursorY += 12;
       doc.addImage(mapImg, "PNG", margin, cursorY, imgW, imgH);
       cursorY += imgH + 12;
@@ -850,4 +856,3 @@ overlay.textContent="—";
   </script>
 </body>
 </html>
-
