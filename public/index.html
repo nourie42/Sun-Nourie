@@ -1,801 +1,858 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Sun‑Nourie Fuel IQ — Pulse Build</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Sunoco, LP Fuel IQ - Fuel Site Analyzer</title>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin></script>
+
+  <!-- Map snapshot utilities -->
+  <script src="https://unpkg.com/leaflet-image/leaflet-image.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+  <!-- jsPDF (UMD) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous"></script>
+
   <style>
-    :root {
-      --bg: #0b1220;
-      --panel: #0f172a; /* slate-900 */
-      --muted: #94a3b8; /* slate-400 */
-      --text: #e5e7eb;  /* gray-200 */
-      --primary: #0B6EEF;
-      --accent: #00C2A8;
-      --ok: #10B981;
-      --warn: #F59E0B;
-      --danger: #EF4444;
-      --info: #60A5FA;
-      --chip-bg: #111827; /* gray-900 */
-      --chip-br: #1f2937; /* gray-800 */
-    }
-    * { box-sizing: border-box; }
-    html, body { height: 100%; }
-    body {
-      margin: 0; padding: 0; height: 100%; background: var(--bg);
-      color: var(--text); font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica Neue, Arial, "Apple Color Emoji", "Segoe UI Emoji";
-    }
-    .app {
-      display: grid; grid-template-rows: auto auto 1fr auto; height: 100vh; width: 100vw;
-      grid-template-columns: 340px 1fr 420px; grid-template-areas:
-        "header header header"
-        "toolbar toolbar toolbar"
-        "left   map    right"
-        "footer footer footer";
-    }
-    header {
-      grid-area: header; display: flex; align-items: center; justify-content: space-between;
-      padding: 12px 16px; background: linear-gradient(90deg, #0f172a, #0b1220);
-      border-bottom: 1px solid #1e293b;
-    }
-    header .brand { display: flex; gap: 12px; align-items: center; }
-    .logo {
-      width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, var(--primary), var(--accent));
-      box-shadow: 0 10px 24px rgba(11,110,239,.35);
-    }
-    .title { font-weight: 800; letter-spacing: .3px; }
-    .env { font-size: 12px; color: var(--muted); margin-top: 2px; }
-    .status-bar { display: flex; gap: 8px; align-items: center; }
-    .chip { padding: 6px 8px; border: 1px solid var(--chip-br); border-radius: 8px; font-size: 12px; background: var(--chip-bg); color: var(--muted); }
-    .chip.ok { color: var(--ok); border-color: rgba(16,185,129,.35); }
-    .chip.warn { color: var(--warn); border-color: rgba(245,158,11,.35); }
-    .chip.info { color: var(--info); border-color: rgba(96,165,250,.35); }
-    .chip.bad { color: var(--danger); border-color: rgba(239,68,68,.35); }
+    :root { --bg:#0b0e15; --panel:#111725; --panel2:#0f1421; --line:#263145; --text:#eaeef7; --muted:#97a3b8; --brand:#0ea5e9; --brand2:#22d3ee; --pill:#0f1929; }
+    *{ box-sizing:border-box; }
+    body{ background:var(--bg); color:var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin:0; padding-bottom:84px; }
+    .wrap{ max-width:1120px; margin:24px auto; padding:0 16px; }
+    header{ display:flex; align-items:center; gap:14px; margin-bottom:6px; }
+    header h1{ font-size:28px; margin:0; letter-spacing:.2px; }
+    .build{ margin-left:auto; font-size:12px; color:#8aa2c0; }
+    .instructions{ margin:4px 0 12px; color:#cfe3ff; font-size:13px; }
 
-    .toolbar { grid-area: toolbar; display: grid; grid-template-columns: 340px 1fr 420px; gap: 12px; padding: 10px 16px; border-bottom: 1px solid #1f2937; background: #0b1220; }
+    .card{ background:linear-gradient(180deg,var(--panel),var(--panel2)); border:1px solid var(--line); border-radius:12px; padding:16px; margin:12px 0; }
+    label{ display:block; font-weight:600; margin:8px 0 6px; color:#d8e3f6; }
+    input, select{ width:100%; padding:12px; border-radius:10px; border:1px solid var(--line); background:#0b1220; color:#eaeef7; }
+    button{ background:linear-gradient(135deg,var(--brand),var(--brand2)); color:#fff; border:0; padding:12px 16px; border-radius:10px; font-weight:700; cursor:pointer; }
+    button:disabled{ opacity:.6; cursor:not-allowed; }
 
-    .panel { background: var(--panel); border: 1px solid #1f2937; border-radius: 14px; padding: 12px; }
-    .panel h3 { margin: 0 0 8px; font-size: 14px; color: var(--muted); font-weight: 600; letter-spacing: .2px; }
-    .panel .row { display: flex; gap: 8px; margin-bottom: 8px; }
-    input[type="text"], input[type="number"] {
-      background: #0b1220; color: var(--text); border: 1px solid #1f2937; border-radius: 10px; padding: 10px 10px; width: 100%; outline: none;
-    }
-    button { background: #0b1220; color: var(--text); border: 1px solid #1f2937; border-radius: 10px; padding: 10px 12px; cursor: pointer; }
-    .btn-primary { background: linear-gradient(180deg, rgba(11,110,239,.15), rgba(11,110,239,.05)); border-color: rgba(11,110,239,.45); }
-    .btn-accent  { background: linear-gradient(180deg, rgba(0,194,168,.15), rgba(0,194,168,.05)); border-color: rgba(0,194,168,.45); }
-    .btn-danger  { background: linear-gradient(180deg, rgba(239,68,68,.15), rgba(239,68,68,.05)); border-color: rgba(239,68,68,.45); }
-    .btn-ghost { opacity: .9; }
+    .row{ display:grid; grid-template-columns:1.6fr 0.7fr 0.7fr 0.8fr; gap:12px; align-items:start; }
+    @media (max-width:980px){ .row{ grid-template-columns:1fr; } }
 
-    #left { grid-area: left; display: grid; grid-template-rows: auto auto 1fr; gap: 12px; padding: 12px 16px; overflow: auto; }
-    #map { grid-area: map; position: relative; }
-    #map .leaflet-container, #map { height: calc(100vh - 170px); width: 100%; }
-    #right { grid-area: right; display: grid; grid-template-rows: auto auto 1fr; gap: 12px; padding: 12px 16px; overflow: auto; }
-    footer { grid-area: footer; display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-top: 1px solid #1f2937; color: var(--muted); background: #0b1220; }
+    .toolbar{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:12px; }
+    .muted{ color:var(--muted); }
+    .subtle{ font-size:12px; opacity:.9; }
 
-    .kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; background: #0b1220; border: 1px solid #1f2937; border-radius: 6px; padding: 2px 6px; font-size: 12px; color: #9ca3af; }
+    #map,#aadtMap{ height:420px; border-radius:12px; border:1px solid var(--line); position: relative; }
+    #overlay{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(11,14,21,.55); border-radius:12px; font-weight:800; color:#cde9ff; font-size:18px; padding:20px; text-align:center; }
 
-    .badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 999px; font-size: 12px; border: 1px solid #223045; margin: 2px 4px 0 0; }
-    .badge.ok { color: var(--ok); border-color: rgba(16,185,129,.35); background: rgba(16,185,129,.08); }
-    .badge.verify { color: var(--warn); border-color: rgba(245,158,11,.35); background: rgba(245,158,11,.08); }
-    .badge.info { color: var(--info); border-color: rgba(96,165,250,.35); background: rgba(96,165,250,.08); }
-    .badge.bad { color: var(--danger); border-color: rgba(239,68,68,.35); background: rgba(239,68,68,.08); }
+    #svWrap{ margin-top:10px; }
+    #sv{ width:100%; height:380px; border:0; border-radius:12px; border:1px solid var(--line); background:#0b1220; }
 
-    .grid { display: grid; gap: 10px; }
-    .grid.two { grid-template-columns: 1fr 1fr; }
-    .grid.three { grid-template-columns: 1fr 1fr 1fr; }
+    .ac-wrap{ position:relative; }
+    .ac-list{ position:absolute; top:100%; left:0; right:0; z-index:30; margin-top:6px; background:#0b1220; border:1px solid var(--line); border-radius:12px; max-height:320px; overflow:auto; box-shadow: 0 18px 36px rgba(0,0,0,.35); }
+    .ac-item{ padding:10px 12px; cursor:pointer; border-bottom:1px solid rgba(255,255,255,.04); }
+    .ac-item:last-child{ border-bottom:0; }
+    .ac-item:hover, .ac-item.active{ background:#101a2b; }
+    .badge{ display:inline-block; font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); background:var(--pill); color:#a9c5ff; margin-left:8px; }
 
-    .kv { display: grid; grid-template-columns: 1fr auto; gap: 6px; }
-    .kv .key { color: var(--muted); }
-    .kv .val { font-weight: 700; }
+    details summary{ cursor:pointer; }
+    .adv-line{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-top:12px; }
+    .chip{ display:inline-flex; align-items:center; gap:8px; background:#0f1929; border:1px solid var(--line); padding:8px 10px; border-radius:999px; font-size:13px; }
+    .chip input{ width:auto; accent-color:#22d3ee; }
+    .radio-row{ display:flex; flex-wrap:wrap; gap:10px; margin-top:8px; }
 
-    .scroll { overflow: auto; max-height: 100%; }
+    .hero{ display:flex; justify-content:space-between; align-items:flex-end; gap:12px; }
+    .hero .num{ font-size:44px; font-weight:900; letter-spacing:.5px; }
+    .hero .sub{ font-size:13px; color:#a9b6d0; }
+    .num-row{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
 
-    table { width: 100%; border-collapse: collapse; }
-    th, td { padding: 8px 6px; border-bottom: 1px solid #1f2937; font-size: 13px; }
-    th { text-align: left; color: var(--muted); position: sticky; top: 0; background: var(--panel); }
+    .stop-chip{ display:inline-flex; align-items:center; gap:10px; padding:8px 12px; border-radius:12px; border:2px solid #b91c1c; background:linear-gradient(135deg,#7f1d1d,#991b1b); color:#fff; font-weight:800; box-shadow:0 8px 20px rgba(0,0,0,.3); }
+    .stop-chip .stop-icon{ width:34px; height:34px; border-radius:8px; background:#dc2626; border:3px solid #fca5a5; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:11px; }
 
-    .sep { height: 1px; background: #1f2937; margin: 8px 0; }
+    .footerbar{ position:fixed; left:0; right:0; bottom:0; background:linear-gradient(180deg,#0c1220,#0a0f1a); border-top:1px solid var(--line); padding:10px 16px; display:flex; justify-content:center; gap:12px; z-index:50; }
 
-    .switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
-    .switch input { display: none; }
-    .switch .track { width: 44px; height: 24px; background: #0b1220; border: 1px solid #1f2937; border-radius: 999px; position: relative; transition: .15s; }
-    .switch .thumb { width: 18px; height: 18px; background: #e5e7eb; border-radius: 999px; position: absolute; top: 2px; left: 2px; transition: .15s; }
-    .switch input:checked + .track { border-color: rgba(11,110,239,.5); box-shadow: inset 0 0 0 12px rgba(11,110,239,.15); }
-    .switch input:checked + .track .thumb { left: 24px; background: #93c5fd; }
+    .aadt-tabs { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:8px 0 12px; }
+    .aadt-tab { display:inline-block; padding:8px 12px; border-radius:999px; border:1px solid var(--line); background:var(--pill); color:#fff; text-decoration:none; font-weight:700; font-size:13px; letter-spacing:.2px; }
+    .aadt-tab:hover { background:#101a2b; }
 
-    .flash { animation: flash .6s ease-in-out 2; }
-    @keyframes flash { 0%{opacity:1} 50%{opacity:.1} 100%{opacity:1} }
+    .stop-alert { display:none; position:sticky; top:0; z-index:60; margin-bottom:12px; }
+    .stop-inner { display:flex; align-items:center; gap:14px; padding:12px 14px; border-radius:12px; border:2px solid #b91c1c; background:linear-gradient(135deg,#7f1d1d,#991b1b); color:#fff; box-shadow:0 12px 24px rgba(0,0,0,.35); }
+    .stop-sign { width:52px; height:52px; flex:0 0 52px; border-radius:12px; background:#dc2626; border:4px solid #fca5a5; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:14px; }
 
-    .tooltip { position: relative; display: inline-block; }
-    .tooltip .tiptext { visibility: hidden; background-color: #111827; color: #e5e7eb; text-align: center; border-radius: 6px; padding: 6px 8px; position: absolute; z-index: 9999; bottom: 125%; left: 50%; transform: translateX(-50%); border: 1px solid #1f2937; white-space: nowrap; }
-    .tooltip:hover .tiptext { visibility: visible; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { text-align:left; border-bottom:1px solid rgba(255,255,255,.06); padding:8px 6px; }
+    th { font-size:12px; color:#cfd8ea; }
+    tr:hover { background: rgba(255,255,255,.03); }
+    .small { font-size:12px; color:#a9b6d0; }
 
-    .score { font-size: 28px; font-weight: 800; letter-spacing: .5px; }
-    .score.good { color: var(--ok); }
-    .score.mid { color: var(--warn); }
-    .score.bad { color: var(--danger); }
+    /* Big button under AADT override */
+    #go { width:100%; padding:16px; font-size:18px; margin-top:10px; }
   </style>
 </head>
 <body>
-  <div class="app">
+  <div class="wrap">
     <header>
-      <div class="brand">
-        <div class="logo" aria-hidden="true"></div>
-        <div>
-          <div class="title">Sun‑Nourie Fuel IQ <span class="env">— Pulse QC build</span></div>
-          <div class="env" id="envText">Environment: production</div>
-        </div>
-      </div>
-      <div class="status-bar" id="statusBar">
-        <span class="chip info" id="apiGoogle">API: Google — Unknown</span>
-        <span class="chip info" id="apiOverpass">API: Overpass — Unknown</span>
-        <span class="chip info" id="apiServer">API: Server — Unknown</span>
-        <span class="chip" id="coordChip">Lat/Lng: —</span>
-      </div>
+      <h1>Sunoco, LP Fuel IQ - Fuel Site Analyzer</h1>
+      <span class="build">UI v2025‑10‑01</span>
+      <a href="developments.html" style="padding:8px 14px; background:#22d3ee; border-radius:8px; color:#00121e; font-weight:600; text-decoration:none;">Developments Search</a>
+      <a href="PA_Signals_AADT_Radius_Map_Final_Generated.html" style="padding:8px 14px; background:#f87171; border-radius:8px; color:#00121e; font-weight:600; text-decoration:none;">PA AADT Map</a>
+      <a href="Scraper.html" style="padding:8px 14px; background:#34d399; border-radius:8px; color:#00121e; font-weight:600; text-decoration:none;">Prospector</a>
     </header>
 
-    <div class="toolbar">
-      <div class="panel">
-        <h3>Search</h3>
-        <div class="row">
-          <input id="addr" type="text" placeholder="Enter address or drop a pin on the map" />
-        </div>
-        <div class="row">
-          <input id="lat" type="number" step="0.000001" placeholder="Lat" />
-          <input id="lng" type="number" step="0.000001" placeholder="Lng" />
-        </div>
-        <div class="row">
-          <button class="btn-ghost" id="locateBtn">📍 Locate Me</button>
-          <button class="btn-primary" id="estimateBtn">🚀 Estimate</button>
-          <button class="btn-ghost" id="clearBtn">Clear</button>
-        </div>
-        <div class="row">
-          <label class="switch">
-            <input type="checkbox" id="roadsToggle" checked>
-            <span class="track"><span class="thumb"></span></span>
-          </label>
-          <span>Roads overlay</span>
-          <label class="switch" style="margin-left:12px;">
-            <input type="checkbox" id="aadtToggle" checked>
-            <span class="track"><span class="thumb"></span></span>
-          </label>
-          <span>AADT overlay</span>
-          <button class="btn-accent" id="flashAADT" style="margin-left:auto;">⚡ Flash AADT</button>
-        </div>
-      </div>
-
-      <div class="panel">
-        <h3>QC & Options</h3>
-        <div class="grid three">
-          <div class="kv"><div class="key">Max Snap Dist</div><div class="val"><span class="kbd" id="qcSnap">30 m</span></div></div>
-          <div class="kv"><div class="key">Max Bearing Δ</div><div class="val"><span class="kbd" id="qcBearing">25°</span></div></div>
-          <div class="kv"><div class="key">AADT Min</div><div class="val"><span class="kbd" id="qcMinAADT">100</span></div></div>
-        </div>
-        <div class="row" style="margin-top:6px;">
-          <label class="switch">
-            <input type="checkbox" id="maskRamps" checked>
-            <span class="track"><span class="thumb"></span></span>
-          </label>
-          <span>Mask ramps / service roads</span>
-        </div>
-        <div class="row">
-          <button class="btn-ghost" id="refreshBtn">Refresh Overlays</button>
-          <button class="btn-ghost" id="recenterBtn">Recenter</button>
-          <button class="btn-danger" id="resetBtn">Reset</button>
-        </div>
-      </div>
-
-      <div class="panel">
-        <h3>Export</h3>
-        <div class="row">
-          <button id="exportPNG" class="btn-ghost">📷 Map PNG</button>
-          <button id="exportJSON" class="btn-ghost">🧾 Analysis JSON</button>
-          <button id="exportZIP" class="btn-primary">🗜️ ZIP (PNG + JSON)</button>
-        </div>
-        <div class="row">
-          <button id="exportCSV" class="btn-ghost">📄 Competitors CSV</button>
-          <button id="exportPDF" class="btn-accent" style="margin-left:auto;">📑 PDF Report</button>
-        </div>
-        <div class="env">Exports include QC flags, competitor counts, and ProspectScore.</div>
+    <!-- STOP banner (developments) -->
+    <div id="stopBox" class="stop-alert">
+      <div class="stop-inner">
+        <div class="stop-sign">STOP</div>
+        <div id="stopText" style="font-weight:800;">Major development identified.</div>
       </div>
     </div>
 
-    <div id="left">
-      <div class="panel" id="mathPanel">
-        <h3>Math & Assumptions</h3>
-        <div id="qcBadges" style="margin-bottom:6px;"></div>
-        <div class="grid two">
-          <div class="kv"><div class="key">AADT</div><div class="val" id="kvAADT">—</div></div>
-          <div class="kv"><div class="key">Route</div><div class="val" id="kvRoute">—</div></div>
-          <div class="kv"><div class="key">Bearing</div><div class="val" id="kvBearing">—</div></div>
-          <div class="kv"><div class="key">Direction</div><div class="val" id="kvDir">—</div></div>
-        </div>
-        <div class="sep"></div>
-        <div class="grid two">
-          <div class="kv"><div class="key">Competitors in 1.5 mi</div><div class="val" id="kvCompetitors">0</div></div>
-          <div class="kv"><div class="key">Independent vs Chain</div><div class="val" id="kvIndChain">—</div></div>
-        </div>
-        <div class="sep"></div>
-        <div class="grid two">
-          <div class="kv"><div class="key">Formula</div><div class="val" id="kvFormula">AADT × 0.02 × 8 × 30</div></div>
-          <div class="kv"><div class="key">Monthly Gallons</div><div class="val" id="kvGallons">—</div></div>
-        </div>
-        <div class="sep"></div>
-        <div class="grid two">
-          <div class="kv"><div class="key">ProspectScore</div><div class="val score" id="kvScore">—</div></div>
-          <div class="kv"><div class="key">Score Breakdown</div><div class="val" id="kvScoreBreak">—</div></div>
-        </div>
-        <div class="env" style="margin-top:6px;">Competitor count is always shown (even when AADT is valid). QC must pass to compute gallons. ProspectScore reflects AADT, QC, competitor pressure, and mix.</div>
-      </div>
+    <nav class="aadt-tabs" aria-label="State AADT Quick Links">
+      <span class="muted">State AADT Quick Links:</span>
+      <a class="aadt-tab" href="https://opendata.dc.gov/datasets/DCGIS::2023-traffic-volume/explore" target="_blank" rel="noopener noreferrer">DC</a>
+      <a class="aadt-tab" href="https://gis-fdot.opendata.arcgis.com/datasets/annual-average-daily-traffic-tda/explore" rel="noopener noreferrer">FL</a>
+      <a class="aadt-tab" href="https://gdottrafficdata.drakewell.com/publicmultinodemap.asp" target="_blank" rel="noopener noreferrer">GA</a>
+      <a class="aadt-tab" href="https://mhd.public.ms2soft.com/tcds/tsearch.asp?loc=Mhd&mod" target="_blank" rel="noopener noreferrer">MA</a>
+      <a class="aadt-tab" href="https://nysdottrafficdata.drakewell.com/publicmultinodemap.asp" target="_blank" rel="noopener noreferrer">NY</a>
+      <a class="aadt-tab" href="https://scdottrafficdata.drakewell.com/publicmultinodemap.asp" target="_blank" rel="noopener noreferrer">SC</a>
+      <a class="aadt-tab" href="https://www.arcgis.com/apps/webappviewer/index.html?id=35e4c06de0f84a9c9f3fe18e67cd2c92" target="_blank" rel="noopener noreferrer">VA</a>
+      <a class="aadt-tab" href="https://ncdot.public.ms2soft.com/tdms.ui_core/trafficviewer" target="_blank" rel="noopener noreferrer">NC</a>
+    </nav>
 
-      <div class="panel" id="assumptionsPanel">
-        <h3>Assumptions</h3>
-        <ul style="margin:0 0 0 18px; padding:0; color: var(--muted); font-size: 13px; line-height: 1.45;">
-          <li>2% of vehicles stop for gas.</li>
-          <li>Average purchase is 8 gallons.</li>
-          <li>30 days per month for coarse planning.</li>
-          <li>Ramps/service roads masked for mainline traffic, unless toggled off.</li>
-          <li>QC checks: max 30 m snap distance, 25° bearing delta, route normalization.</li>
-        </ul>
-      </div>
-
-      <div class="panel" id="flagsPanel">
-        <h3>Flags</h3>
-        <div id="flagsList" class="env">No flags yet.</div>
-      </div>
+    <div class="instructions">
+      <b>Instructions:</b> Enter Address, Click <i>Estimate</i>. Do not exit your browser or let your phone screen shut off until results are ready. Click <i>Advanced Options</i> to make changes.
     </div>
 
-    <div id="map"></div>
-
-    <div id="right">
-      <div class="panel" id="summaryPanel">
-        <h3>Summary</h3>
-        <div id="summaryText" style="white-space: pre-wrap; line-height: 1.45;">Run an estimate to see the QC‑aware summary. Any mention of “CSV” will be suppressed.</div>
-      </div>
-
-      <div class="panel" id="competitorsPanel">
-        <h3>Competitors (1.5 mi)</h3>
-        <div class="scroll" style="max-height: 260px;">
-          <table id="competitorsTable">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Name</th>
-                <th>Brand</th>
-                <th>Dist (mi)</th>
-                <th>Lat</th>
-                <th>Lng</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        </div>
-        <div class="sep"></div>
-        <div class="grid two">
-          <div class="kv"><div class="key">Total</div><div class="val" id="compTotal">0</div></div>
-          <div class="kv"><div class="key">Ind / Chain</div><div class="val" id="compMix">—</div></div>
-        </div>
-      </div>
-
-      <div class="panel" id="legendPanel">
-        <h3>Legend</h3>
+    <!-- Inputs -->
+    <div class="card">
+      <div class="row">
         <div>
-          <span class="badge ok">QC Passed</span>
-          <span class="badge verify">VERIFY: checks needed</span>
-          <span class="badge info">INFO</span>
-          <span class="badge bad">ERROR</span>
+          <label>Site Search-Enter Full Address And Click Correct Result </label>
+          <div class="ac-wrap">
+            <input id="addr" placeholder="Enter business or address" autocomplete="off" />
+            <div id="ac" class="ac-list" style="display:none;"></div>
+          </div>
+          <div class="muted subtle" style="margin-top:6px" id="apiStatus">API Status: checking…</div>
         </div>
-        <div class="env" style="margin-top:8px;">Specific verify badges replace generic “Fallback AADT Used”.</div>
+        <div><label>Regular MPDs</label><input id="mpds" type="number" value="3" min="1"/></div>
+        <div><label>Diesel MPDs</label><input id="diesel" type="number" value="0" min="0"/></div>
+        <div><label>AADT override</label><input id="aadtOverride" type="number"/><button id="go">Estimate</button></div>
+      </div>
+      <div class="toolbar">
+        <span class="muted">Baseline ceiling (AADT×2%×8×30) • competition rule • pricing effect • caps • road layout</span>
       </div>
     </div>
 
-    <footer>
-      <div>Fuel IQ • AADT + Competitor QC • Build: <span id="buildId">2025‑10‑02</span></div>
-      <div>Shortcuts: <span class="kbd">F</span>lash AADT • <span class="kbd">R</span>efresh • <span class="kbd">E</span>stimate</div>
-    </footer>
+    <!-- Math & Assumptions -->
+    <div class="card" id="mathCard">
+      <b>Math & Assumptions (always shown)</b>
+      <div id="mathTable" class="small" style="margin-top:8px; line-height:1.6">—</div>
+    </div>
+
+    <!-- Advanced -->
+    <div class="card">
+      <details>
+        <summary><b>Advanced options</b></summary>
+        <div class="adv-line">
+          <label class="chip"><input type="checkbox" id="ex_large_dev"> Large residential or commercial developments being built (+7.5%)</label>
+          <label class="chip"><input type="checkbox" id="ex_hours18"> Operating hours 18h (−7.5%)</label>
+          <label class="chip"><input type="checkbox" id="ex_highincome"> Higher-income trade area (+2.5%)</label>
+          <label class="chip"><input type="checkbox" id="ex_lowrating"> Ratings below 4.0 / Poorly run site (−30%)</label>
+          <label class="chip"><input type="checkbox" id="ex_competitive_pricing"> Competitive site gas pricing (+10%)</label>
+          <label class="chip"><input type="checkbox" id="ex_rural"> Rural Location Bonus (No competition within 3 miles) (+30%)</label>
+        </div>
+        <div style="margin-top:8px;">
+          <label><b>Gas pricing vs area</b></label>
+          <div class="radio-row">
+            <label class="chip"><input type="radio" name="pricepos" value="below"> Below competition (+10%)</label>
+            <label class="chip"><input type="radio" name="pricepos" value="inline" checked> In line (0%)</label>
+            <label class="chip"><input type="radio" name="pricepos" value="above"> Above competition (−10%)</label>
+          </div>
+        </div>
+        <div class="adv-line">
+          <span class="chip" id="addExtra" style="cursor:pointer;">+ Add adj. (%)</span>
+          <span id="activeExtras" class="subtle"></span>
+        </div>
+        <div id="extraList" style="margin-top:8px;"></div>
+      </details>
+    </div>
+
+    <!-- Estimate -->
+    <div class="card" id="estimateCard">
+      <div class="hero">
+        <div>
+          <div>Adjusted Base Estimate (LOW)</div>
+          <div class="num-row">
+            <div class="num" id="estNum">—</div>
+            <!-- Appears ONLY when hard fallback AADT is used -->
+            <span id="fallbackChip" class="stop-chip" style="display:none;">
+              <span class="stop-icon">STOP</span>
+              Fallback AADT Used — Verify and Override AADT
+            </span>
+          </div>
+          <div class="sub" id="estRange">Full range: —</div>
+        </div>
+        <div class="right sub">
+          <div>Year-2: <b id="y2">—</b></div>
+          <div>Year-3: <b id="y3">—</b></div>
+        </div>
+      </div>
+      <hr/>
+      <div id="aadtBanner" class="muted">—</div>
+      <div id="compLine" class="muted">—</div>
+    </div>
+
+    <!-- Main Map & SV -->
+    <div class="card">
+      <div class="muted" id="mapTitle">Map: Site & competitors (1.5 mi) + AADT dots + ⭐ AADT used</div>
+      <div id="map"><div id="overlay" class="muted">—</div></div>
+      <div id="svWrap"><div class="muted" style="margin-top:10px;">Street View</div><iframe id="sv" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div>
+    </div>
+
+    <!-- AADT sources (second map + table) -->
+    <div class="card">
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <div class="muted">AADT Sources (within 1 mile)</div>
+        <div id="aadtSourceLine" class="small">Source: state’s official AADT layer</div>
+      </div>
+      <div id="aadtMap" style="margin-top:8px;"></div>
+      <div style="margin-top:10px; overflow:auto;">
+        <table id="aadtTable">
+          <thead>
+            <tr>
+              <th>Distance</th><th>AADT (Year)</th><th>Route</th><th>Location</th><th>Source</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Developments -->
+    <div class="card"><div id="devs" class="muted">—</div></div>
+
+    <!-- Rating + GPT Summary -->
+    <div class="card"><b>Google Rating</b><div id="ratingLine" class="muted">—</div></div>
+    <div class="card"><b>Summary (GPT)</b><div id="summary" class="muted">—</div></div>
   </div>
 
+  <div class="footerbar"><button id="exportPDF">Export to PDF</button></div>
+
   <script>
-    // --- Inline config reflecting Pulse ---
-    const CONFIG = {
-      env: 'production',
-      data: {
-        roads: '/data/state_roads.geojson',
-        aadt: '/data/aadt.geojson',
-        competitors: '/data/competitors.csv'
-      },
-      qc: { snap_m: 30, bearing_deg: 25, min_aadt: 100, mask_ramps: true },
-      competitors: { radius_mi: 1.5, independentTags: ['Independent','Unbranded','Unknown'], chainTags: ['Sunoco','BP','Shell','Exxon','Marathon','Circle K','7-Eleven','Wawa','RaceTrac','Sheetz','QuikTrip','Speedway'] }
+/* =================== Helpers & State =================== */
+const $ = (id) => document.getElementById(id);
+const apiStatus = $("apiStatus"), aadtBanner = $("aadtBanner"), compLine = $("compLine"),
+      overlay = $("overlay"), svFrame = $("sv"), outNum = $("estNum"), outRange = $("estRange"),
+      outY2 = $("y2"), outY3 = $("y3"), devsBox = $("devs"),
+      summaryBox = $("summary"), ratingLine = $("ratingLine"),
+      addrInput = $("addr"), acBox = $("ac"), goBtn = $("go"),
+      addExtraBtn = $("addExtra"), extraList = $("extraList"), activeExtras = $("activeExtras"),
+      ex_large_dev = $("ex_large_dev"), ex_hours18 = $("ex_hours18"), ex_highincome = $("ex_highincome"),
+      ex_lowrating = $("ex_lowrating"), ex_competitive_pricing = $("ex_competitive_pricing"),
+      ex_rural = $("ex_rural"), aadtSourceLine = $("aadtSourceLine"), mathTableEl = $("mathTable"),
+      fallbackChip = $("fallbackChip"), mapTitle = $("mapTitle");
+
+let map, layer, mapReady = false, selectedCoords = null, selectedPlaceId = null;
+let aadtMap, aadtLayer, aadtReady = false;
+let acItems = [], acActive = -1;
+let acCommitted = false;
+let lastCommittedText = "";
+let addressLocked = false;
+
+/* Utils */
+function fmt(n){ return (n??0).toLocaleString(undefined,{maximumFractionDigits:0}); }
+function esc(s){ return (s??"").toString().replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
+function setOverlayWorking(){ overlay.textContent = "Working…"; overlay.style.display = "flex"; }
+function clearOverlay(){ overlay.style.display = "none"; }
+
+/* =================== Map + Street View =================== */
+function initMap(){ if(mapReady) return;
+  map = L.map("map",{zoomControl:true}); window.map = map;
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
+    attribution:"&copy; OpenStreetMap",
+    crossOrigin: true
+  }).addTo(map);
+  layer = L.layerGroup().addTo(map); mapReady = true;
+}
+function initAADTMap(){ if(aadtReady) return;
+  aadtMap = L.map("aadtMap",{zoomControl:true}); window.aadtMap = aadtMap;
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
+    attribution:"&copy; OpenStreetMap",
+    crossOrigin: true
+  }).addTo(aadtMap);
+  aadtLayer = L.layerGroup().addTo(aadtMap); aadtReady = true;
+}
+function updateStreetView(lat, lon){
+  svFrame.src = `https://maps.google.com/maps?q=&layer=c&cbll=${lat},${lon}&cbp=12,0,,0,0&output=svembed`;
+}
+function renderAADTMarkers(list, used) {
+  if (!Array.isArray(list)) return;
+  for (const rec of list) {
+    if (!Number.isFinite(rec.lat) || !Number.isFinite(rec.lon) || !Number.isFinite(rec.aadt)) continue;
+    const val = rec.aadt;
+    let color;
+    if (val >= 30000) color = "#be123c";
+    else if (val >= 20000) color = "#f97316";
+    else if (val >= 10000) color = "#eab308";
+    else color = "#84cc16";
+    L.circleMarker([rec.lat, rec.lon], {
+      radius: 5, weight: 1, color, fillColor: color, fillOpacity: 0.8
+    }).addTo(layer).bindPopup("AADT: " + fmt(val) + (rec.year?` (${rec.year})`:""));
+  }
+  if (used && Number.isFinite(used.lat) && Number.isFinite(used.lon)) {
+    L.marker([used.lat, used.lon], {
+      title: "AADT used",
+      icon: L.divIcon({
+        className: "aadt-used",
+        html: '<div style="font-size:18px;">⭐</div>',
+        iconSize: [24,24],
+        iconAnchor: [12,12]
+      })
+    }).addTo(layer).bindPopup(`<b>USED AADT</b><br>${fmt(used.aadt)}${used.year?` (${used.year})`:''}<br>${esc(used.route||'')}`);
+  }
+}
+function initOrUpdateMainMap(m){
+  if(!mapReady) initMap();
+  layer.clearLayers();
+  if(!m || !m.site){ setOverlayWorking(); return; }
+  const site = [m.site.lat, m.site.lon];
+  L.marker(site,{title:"Site"}).addTo(layer).bindPopup("<b>Site</b>");
+  const pts = [site];
+
+  // AADT first (dots)
+  if (m.aadt) renderAADTMarkers(m.aadt, m.aadt_used);
+
+  // Competitors after (so they sit on top) + bringToFront
+  const comps = m.all_competitors || m.competitors || [];
+  for(const c of comps){
+    if(!Number.isFinite(c.lat)||!Number.isFinite(c.lon)) continue;
+    pts.push([c.lat,c.lon]);
+    const dot = L.circleMarker([c.lat,c.lon],{
+      radius:7, weight:1.5, color:c.heavy?"#ff7f50":"#4ade80", fillColor:c.heavy?"#ff7f50":"#4ade80", fillOpacity:.95
+    }).addTo(layer).bindPopup(`${esc(c.name||"Fuel")} • ${c.miles} mi`);
+    if (dot.bringToFront) dot.bringToFront();
+  }
+
+  map.fitBounds(L.latLngBounds(pts).pad(0.25));
+  clearOverlay(); updateStreetView(site[0], site[1]);
+}
+
+/* =================== Second map + table =================== */
+function initOrUpdateAADTMap(site, items, used){
+  if(!aadtReady) initAADTMap();
+  aadtLayer.clearLayers();
+  if(!site) return;
+  const siteLL = [site.lat, site.lon];
+  const bounds = [siteLL];
+  L.marker(siteLL,{title:"Site"}).addTo(aadtLayer).bindPopup("<b>Site</b>");
+
+  for (const s of (items||[])) {
+    const color = s.aadt >= 30000 ? "#be123c" : s.aadt >= 20000 ? "#f97316" : s.aadt >= 10000 ? "#eab308" : "#84cc16";
+    L.circleMarker([s.lat, s.lon], { radius: 5, weight:1, color, fillColor: color, fillOpacity:.85 })
+      .addTo(aadtLayer)
+      .bindPopup(`<b>${fmt(s.aadt)}${s.year?` (${s.year})`:''}</b><br>${esc(s.route||'')}${s.location?`<br>${esc(s.location)}`:''}<br><span class="small">~${s.miles} mi</span>`);
+    bounds.push([s.lat, s.lon]);
+  }
+  if (used && Number.isFinite(used.lat) && Number.isFinite(used.lon)) {
+    L.marker([used.lat, used.lon], {
+      title: "AADT used",
+      icon: L.divIcon({ className:"aadt-used-2", html:'<div style="font-size:18px;">⭐</div>', iconSize:[24,24], iconAnchor:[12,12] })
+    }).addTo(aadtLayer).bindPopup(`<b>USED AADT</b><br>${fmt(used.aadt)}${used.year?` (${used.year})`:''}<br>${esc(used.route||'')}`);
+    bounds.push([used.lat, used.lon]);
+  }
+  aadtMap.fitBounds(L.latLngBounds(bounds).pad(0.25));
+}
+function renderAADTTable(items){
+  const tb = document.querySelector("#aadtTable tbody");
+  tb.innerHTML = (items||[]).map(s => {
+    const src = s.source_url ? `<a href="${s.source_url}" target="_blank">Source</a>` : "";
+    return `<tr>
+      <td>~${s.miles} mi</td>
+      <td>${fmt(s.aadt)}${s.year?` <span class="small">(${s.year})</span>`:''}</td>
+      <td>${esc(s.route||'')}</td>
+      <td>${esc(s.location||'')}</td>
+      <td>${src}</td>
+    </tr>`;
+  }).join("");
+}
+
+/* =================== Advanced pills =================== */
+function pills(){
+  const p=[];
+  if(ex_large_dev.checked) p.push("+7.5% Large development nearby");
+  if(ex_hours18.checked)  p.push("−7.5% 18h ops");
+  if(ex_highincome.checked) p.push("+2.5% Higher-income");
+  if(ex_lowrating.checked)  p.push("−30% Rating < 4.0");
+  if(ex_competitive_pricing.checked)  p.push("+10% Competitive site gas pricing");
+  if(ex_rural.checked) p.push("+30% Rural bonus (0 comps within 3 mi)");
+  activeExtras.innerHTML = p.map(x=>`<span class="badge">${esc(x)}</span>`).join(" ");
+}
+[ex_large_dev,ex_hours18,ex_highincome,ex_lowrating,ex_competitive_pricing,ex_rural].forEach(el=>el.addEventListener("change",pills));
+
+function addExtraRow(pct="",note=""){
+  const row=document.createElement("div");
+  row.style.marginTop="6px";
+  row.innerHTML=`<span class="chip"><input class="extraPct" type="number" step="0.1" style="width:90px" placeholder="% e.g. 5 or -3" value="${pct}">
+  <input class="extraNote" style="width:320px" placeholder="Comment" value="${esc(note)}"> <button class="rm" type="button">×</button></span>`;
+  row.querySelector(".rm").addEventListener("click",()=>row.remove());
+  extraList.appendChild(row);
+}
+addExtraBtn.addEventListener("click",()=>addExtraRow());
+
+function collectExtras(){
+  const out=[];
+  if(ex_large_dev.checked) out.push({pct:7.5, note:"Large residential/commercial developments"});
+  if(ex_hours18.checked)  out.push({pct:-7.5, note:"18h ops"});
+  if(ex_highincome.checked) out.push({pct:2.5, note:"Higher income"});
+  if(ex_lowrating.checked)  out.push({pct:-30, note:"Rating < 4.0"});
+  if(ex_competitive_pricing.checked)  out.push({pct:10, note:"Competitive site gas pricing"});
+  for(const chip of extraList.querySelectorAll(".chip")){
+    const pct = +chip.querySelector(".extraPct").value;
+    const note = chip.querySelector(".extraNote").value.trim();
+    if(Number.isFinite(pct)) out.push({pct, note});
+  }
+  return out;
+}
+function getFlags(){ return { rural: ex_rural.checked === true }; }
+function getPricePosition(){ const r=document.querySelector('input[name="pricepos"]:checked'); return r ? r.value : "inline"; }
+
+/* =================== API helpers ====================== */
+async function safeJSON(url,opts){ const r=await fetch(url,opts); const t=await r.text(); try{ return JSON.parse(t);}catch{ throw new Error("Bad JSON"); } }
+async function callEstimate(){
+  const body = {
+    address: addrInput.value.trim(),
+    mpds: +$("mpds").value || 0,
+    diesel: +$("diesel").value || 0,
+    advanced: { extra: collectExtras(), flags: getFlags(), price_position: getPricePosition() }
+  };
+  if(selectedCoords){ body.siteLat = selectedCoords.lat; body.siteLon = selectedCoords.lon; }
+  const ov = +( $("aadtOverride").value || "" );
+  if(Number.isFinite(ov) && ov > 0) body.aadtOverride = ov;
+  return await safeJSON("/estimate", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
+}
+
+/* =================== Math rendering ======================== */
+function renderMathFromServer(d){
+  if(!mathTableEl){ return; }
+  const B = d && d.calc_breakdown;
+  if(!B){ renderMathFallback(buildCalcFallback(d)); return; }
+
+  const baseline    = B.baseline || 0;
+  const compAfter   = B.compRule?.afterComp ?? baseline;
+  const baseMult    = B.compRule?.baseMult ?? 1;
+  const heavyPen    = B.compRule?.heavyPenalty ?? 0;
+  const compMult    = B.compRule?.compMult ?? 1;
+  const compCount   = d?.competition?.count ?? B.compRule?.compCount ?? (d?.map?.competitors?.length ?? 0);
+  const heavyCount  = d?.competition?.heavy_count ?? B.compRule?.heavyCount ?? (d?.map?.competitors?.filter?.(c=>c.heavy)?.length ?? 0);
+
+  const capEquip    = B.caps?.capEquip ?? compAfter;
+  const capSoft     = B.caps?.capSoftTotal ?? compAfter;
+  const capHard     = B.caps?.capHardTotal ?? compAfter;
+  const minCap      = Math.min(compAfter, capEquip, capHard);
+  const softHit     = compAfter > capSoft;
+  const afterCap    = Math.round(softHit ? minCap * 0.9 : minCap);
+
+  const priceMult   = B.priceMult ?? 1;
+  const afterPrice  = Math.round(afterCap * priceMult);
+  const extrasMult  = B.extrasMult ?? 1;
+  const preClamp    = B.preClamp ?? Math.round(afterPrice * extrasMult);
+
+  const finalBase   = B.finalClampedToBaseline ?? Math.min(preClamp, baseline);
+  const low         = d?.estimate?.low ?? d?.low ?? finalBase;
+  const rangeTxt    = d?.estimate?.range || `${fmt(low)}–${fmt(Math.round(finalBase*1.06))}`;
+  const y2          = d?.estimate?.year2 ?? d?.year2 ?? Math.round(finalBase * 1.027);
+  const y3          = d?.estimate?.year3 ?? d?.year3 ?? Math.round(finalBase * 1.027 * 1.0125);
+
+  const aadtUsed    = d?.inputs?.aadt_used ?? null;
+
+  const rows = [
+    `<b>Baseline ceiling</b> = AADT ${fmt(aadtUsed)} × 2% × 8 × 30 = <b>${fmt(baseline)}</b>`,
+    `<b>Competitors in area</b> (1.5 mi): <b>${compCount}</b> total • heavy <b>${heavyCount}</b>`,
+    `Competition rule: base ${baseMult.toFixed ? baseMult.toFixed(2) : baseMult} − heavy ${heavyPen.toFixed ? heavyPen.toFixed(2) : heavyPen} = × ${compMult.toFixed ? compMult.toFixed(2) : compMult} → <b>${fmt(compAfter)}</b>`,
+    `Capacity caps (equipment/soft/hard): ${fmt(capEquip)} / ${fmt(capSoft)} / ${fmt(capHard)}${softHit ? " • soft penalty −10%" : ""} → <b>${fmt(afterCap)}</b>`,
+    `Pricing factor: × ${priceMult} → <b>${fmt(afterPrice)}</b>`,
+    `Extras: × ${extrasMult} → <b>${fmt(preClamp)}</b>`,
+    `Baseline clamp: min(pre‑clamp, baseline) → <b>${fmt(finalBase)}</b>`,
+    `<b>Final (LOW)</b>: <b>${fmt(low)}</b> • Range: ${rangeTxt} • Y2: ${fmt(y2)} • Y3: ${fmt(y3)}`
+  ];
+  mathTableEl.innerHTML = rows.map(r=>`<div>${r}</div>`).join('');
+}
+
+/* Fallback ONLY if server breakdown missing */
+function buildCalcFallback(d){
+  try{
+    const aadt = (d?.map?.aadt_used?.aadt) || (+( $("aadtOverride").value || 0)) || null;
+    const mpd = +( $("mpds").value || 0 );
+    const diesel = +( $("diesel").value || 0 );
+    const pct_stopping = 0.02, gal_per_stop = 8, days = 30;
+    if(!aadt) return null;
+    const ceiling = aadt * pct_stopping * gal_per_stop * days;
+    const mpd_cap = (mpd + diesel) * 10 * 60 * 16 * 30;
+    const after_cap = Math.min(ceiling, mpd_cap);
+    const price = getPricePosition()==='below'?1.10:(getPricePosition()==='above'?0.90:1.00);
+    const comp = 1.00;
+    const laneF=1, accessF=1, ctxF=1;
+    const extras = collectExtras().map(e=>({label:e.note||"Adj", mult: 1 + (e.pct||0)/100}));
+    let v = after_cap * comp * price * laneF * accessF * ctxF;
+    for(const e of extras) v *= e.mult;
+    return {
+      aadt, pct_stopping, gal_per_stop, days, ceiling,
+      regular_mpd: mpd, diesel_mpd: diesel, mpd_cap,
+      competition_factor: comp, pricing_factor: price,
+      lane_factor: laneF, access_factor: accessF, context_factor: ctxF,
+      extra_factors: extras,
+      after_cap, after_comp: after_cap*comp, after_pricing: after_cap*comp*price,
+      after_roadway: after_cap*comp*price*laneF*accessF*ctxF,
+      after_extras: v,
+      low: Math.round(v), high: Math.round(v*1.25), year2: Math.round(v*1.05), year3: Math.round(v*1.08),
+      _note: "UI fallback calc"
     };
+  }catch{return null;}
+}
+function renderMathFallback(calc){
+  if(!mathTableEl) return;
+  if(!calc){ mathTableEl.innerHTML = '<em>— (no calc available)</em>'; return; }
+  const extras = (calc.extra_factors||[]).map(e=>`${esc(e.label||'Adj')}: × ${e.mult}`).join(' • ') || '—';
+  const rows = [
+    `<b>Baseline ceiling</b> = AADT ${fmt(calc.aadt)} × ${(calc.pct_stopping*100).toFixed(1)}% × ${calc.gal_per_stop} × ${calc.days} = <b>${fmt(calc.ceiling)}</b>`,
+    `<b>Competitors in area</b>: see header line`, /* ensures presence even in pure fallback */
+    `Capacity cap (MPDs ${calc.regular_mpd}+${calc.diesel_mpd} diesel): <b>${fmt(calc.mpd_cap)}</b>`,
+    `After cap: <b>${fmt(calc.after_cap)}</b>`,
+    `Competition factor: × ${calc.competition_factor} → <b>${fmt(calc.after_comp)}</b>`,
+    `Pricing factor: × ${calc.pricing_factor} → <b>${fmt(calc.after_pricing)}</b>`,
+    `Roadway: lanes × access × context = ${calc.lane_factor} × ${calc.access_factor} × ${calc.context_factor} → <b>${fmt(calc.after_roadway)}</b>`,
+    `Extras: ${extras} → <b>${fmt(calc.after_extras)}</b>`,
+    `<b>Final (LOW)</b>: <b>${fmt(calc.low)}</b> • Range: ${fmt(calc.low)}–${fmt(calc.high)} • Y2: ${fmt(calc.year2)} • Y3: ${fmt(calc.year3)}`
+  ];
+  mathTableEl.innerHTML = rows.map(r=>`<div>${r}</div>`).join('');
+}
 
-    // --- Global state ---
-    const state = {
-      map: null,
-      pin: null,
-      layers: { roads: null, aadtPoints: null, aadtLines: null, competitors: null },
-      lastAnalysis: null,
-      lastSnapshot: { png: null, json: null },
-      status: { server: 'Unknown', google: 'Unknown', overpass: 'Unknown' },
-      competitorsInRadius: [],
-    };
+/* =================== Summary cleanup =================== */
+function cleanSummary(text, hasDevs, isFallback){
+  let s = (text || "").trim();
 
-    // --- Utilities ---
-    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-    const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
-    const haversineMi = (a, b) => {
-      const R = 3958.7613; // miles
-      const dLat = (b.lat - a.lat) * Math.PI/180;
-      const dLng = (b.lng - a.lng) * Math.PI/180;
-      const lat1 = a.lat * Math.PI/180;
-      const lat2 = b.lat * Math.PI/180;
-      const sinDLat = Math.sin(dLat/2);
-      const sinDLng = Math.sin(dLng/2);
-      const h = sinDLat*sinDLat + Math.cos(lat1)*Math.cos(lat2)*sinDLng*sinDLng;
-      return 2*R*Math.asin(Math.sqrt(h));
-    };
-    const fmt = {
-      int: (n) => n==null||isNaN(n)?'—':Math.round(n).toLocaleString(),
-      num: (n, d=1) => n==null||isNaN(n)?'—':Number(n).toFixed(d),
-      deg: (n) => n==null||isNaN(n)?'—':`${Math.round(n)}°`,
-      miles: (n,d=2) => n==null||isNaN(n)?'—':Number(n).toFixed(d),
-    };
+  // strip common wrappers/prefixes
+  if (s.startsWith('"') && s.endsWith('"')) s = s.slice(1, -1).trim();
+  s = s.replace(/^```[\s\S]*?```/g, "").trim();
+  s = s.replace(/^<\s*text\s*>\s*/i, "");
+  s = s.replace(/^(text|summary)\s*:\s*/i, "");
 
-    function setChip(id, text, kind='info') {
-      const el = document.getElementById(id);
-      if (!el) return;
-      el.classList.remove('ok','warn','bad','info');
-      el.classList.add(kind);
-      el.textContent = text;
-    }
+  // never show the term "CSV"
+  s = s.replace(/\bCSV\b/gi, "").replace(/\s{2,}/g," ").trim();
 
-    function setCoordChip(lat, lng) {
-      const t = (lat && lng) ? `${lat.toFixed(6)}, ${lng.toFixed(6)}` : '—';
-      setChip('coordChip', `Lat/Lng: ${t}`);
-    }
+  // remove "no developments" statements if none exist
+  if (!hasDevs) {
+    s = s.replace(/(^|[\s])[^.]*\b(?:no|none|not any|no significant)\s+(?:recent\s+)?developments?[^.]*\./gi, " ");
+  }
 
-    // --- Map setup ---
-    function initMap() {
-      const map = L.map('map', { zoomControl: true }).setView([35.7879, -78.6447], 10);
-      state.map = map;
+  // if fallback AADT, remove any sentence that attributes to DOT
+  if (isFallback) {
+    const parts = s.split(/(?<=[.!?])\s+/);
+    const dotRe = /\b(?:department of transportation(?:\s*\(dot\))?|state\s+(?:department of transportation|dot)|\bDOT\b|\bDoT\b)\b/i;
+    s = parts.filter(p => !dotRe.test(p)).join(' ');
+  }
 
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '&copy; OpenStreetMap'
-      }).addTo(map);
+  return s.replace(/\s{2,}/g," ").replace(/\s+\./g,".").trim();
+}
 
-      map.on('click', (e) => {
-        setPin(e.latlng.lat, e.latlng.lng);
-      });
+/* =================== Fallback detection =================== */
+function isFallbackAADT(d){
+  const method = d?.inputs?.aadt_components?.method || d?.map?.aadt_used?.method || "";
+  return method === "fallback_no_dot_found"; // ONLY hard fallback triggers STOP chip
+}
 
-      document.addEventListener('keydown', (e) => {
-        if (e.key.toLowerCase() === 'f') flashAADT();
-        if (e.key.toLowerCase() === 'r') refreshOverlays();
-        if (e.key.toLowerCase() === 'e') runEstimate();
-      });
-    }
+/* =================== Rendering ======================== */
+function renderAll(d){
+  // Estimate header
+  outNum.textContent = fmt(d.estimate?.low ?? d.low ?? 0);
+  const rangeTxt = d.estimate?.range || (d.low!=null && d.high!=null ? `${fmt(d.low)}–${fmt(d.high)}` : "—");
+  outRange.textContent = "Full range: " + rangeTxt;
+  outY2.textContent = fmt(d.estimate?.year2 ?? d.year2 ?? 0);
+  outY3.textContent = fmt(d.estimate?.year3 ?? d.year3 ?? 0);
 
-    function setPin(lat, lng) {
-      if (!state.map) return;
-      if (state.pin) state.map.removeLayer(state.pin);
-      state.pin = L.marker([lat, lng], { draggable: true }).addTo(state.map);
-      state.pin.on('dragend', () => {
-        const { lat, lng } = state.pin.getLatLng();
-        document.getElementById('lat').value = lat.toFixed(6);
-        document.getElementById('lng').value = lng.toFixed(6);
-        setCoordChip(lat, lng);
-      });
-      state.map.setView([lat, lng], 15);
-      document.getElementById('lat').value = lat.toFixed(6);
-      document.getElementById('lng').value = lng.toFixed(6);
-      setCoordChip(lat, lng);
-    }
+  // AADT banner + STOP chip logic
+  const fallback = isFallbackAADT(d);
+  const usedRec = d?.map?.aadt_used || {};
+  const usedVal = usedRec?.aadt ?? d?.inputs?.aadt_used ?? null;
 
-    // --- Overlays ---
-    async function loadRoads() {
-      try {
-        const resp = await fetch(CONFIG.data.roads);
-        if (!resp.ok) throw new Error('roads fetch failed');
-        const gj = await resp.json();
-        if (state.layers.roads) state.map.removeLayer(state.layers.roads);
-        state.layers.roads = L.geoJSON(gj, { style: { weight: 3, opacity: 0.6, color: '#616161' } }).addTo(state.map);
-      } catch (e) { console.warn('roads overlay error', e); }
-    }
+  if (fallback && usedVal) {
+    aadtBanner.textContent = `AADT: ${fmt(usedVal)} vehicles/day (fallback)`;
+    fallbackChip.style.display = "inline-flex";
+  } else {
+    aadtBanner.textContent = d.aadtText || (usedVal ? `AADT: ${fmt(usedVal)} vehicles/day` : "—");
+    fallbackChip.style.display = "none";
+  }
 
-    async function loadAADT() {
-      try {
-        const resp = await fetch(CONFIG.data.aadt);
-        if (!resp.ok) throw new Error('aadt fetch failed');
-        const gj = await resp.json();
-        // Split points and lines
-        const pts = { type:'FeatureCollection', features: gj.features.filter(f=>f.geometry.type==='Point') };
-        const lns = { type:'FeatureCollection', features: gj.features.filter(f=>f.geometry.type!=='Point') };
-        if (state.layers.aadtPoints) state.map.removeLayer(state.layers.aadtPoints);
-        if (state.layers.aadtLines) state.map.removeLayer(state.layers.aadtLines);
-        state.layers.aadtPoints = L.geoJSON(pts, {
-          pointToLayer: (f, latlng) => L.circleMarker(latlng, {
-            radius: clamp(((f.properties?.AADT||0)/5000), 3, 12),
-            opacity: 0.9, weight: 1, color: '#111827', fillOpacity: 0.25
-          }),
-          onEachFeature: (f, layer) => {
-            const v = f.properties?.AADT ?? '—';
-            const r = f.properties?.ROUTE ?? '—';
-            layer.bindPopup(`AADT: ${v}<br>Route: ${r}`);
-          }
-        }).addTo(state.map);
-        state.layers.aadtLines = L.geoJSON(lns, {
-          style: { weight: 4, opacity: 0.9, color: '#111827' },
-          onEachFeature: (f, layer) => {
-            const v = f.properties?.AADT ?? '—';
-            const r = f.properties?.ROUTE ?? '—';
-            layer.bindPopup(`AADT: ${v}<br>Route: ${r}`);
-          }
-        }).addTo(state.map);
-      } catch (e) { console.warn('aadt overlay error', e); }
-    }
+  // Math (server-aligned)
+  if (d.calc_breakdown) renderMathFromServer(d);
+  else renderMathFallback(buildCalcFallback(d));
 
-    async function loadCompetitors() {
-      try {
-        const csvText = await fetch(CONFIG.data.competitors).then(r=>r.text());
-        const parsed = Papa.parse(csvText, { header: true });
-        const rows = parsed.data.filter(r => r && r.lat && r.lng);
-        if (state.layers.competitors) state.map.removeLayer(state.layers.competitors);
-        state.layers.competitors = L.layerGroup();
-        rows.forEach((r,i) => {
-          const lat = Number(r.lat), lng = Number(r.lng);
-          if (isNaN(lat) || isNaN(lng)) return;
-          const m = L.circleMarker([lat,lng], { radius: 6, color: '#0B6EEF', fillColor:'#93C5FD', fillOpacity:.75, weight:1 });
-          m.bindPopup(`<b>${r.name||'Unknown'}</b><br>Brand: ${r.brand||'—'}<br>${fmt.num(lat,6)}, ${fmt.num(lng,6)}`);
-          state.layers.competitors.addLayer(m);
-        });
-        state.layers.competitors.addTo(state.map);
-      } catch (e) { console.warn('competitors overlay error', e); }
-    }
+  // Competition line
+  compLine.textContent = d.competitionText || "—";
 
-    function toggleLayer(layer, on) {
-      if (!layer) return;
-      if (on) layer.addTo(state.map); else state.map.removeLayer(layer);
-    }
+  // STOP: development stripe + list (never say "CSV")
+  const hasDevs = Array.isArray(d.csv) && d.csv.length > 0;
+  if (hasDevs) {
+    const lines = d.csv.slice(0,6).map(x => {
+      const nm = esc(x.name || "");
+      const st = esc(x.status || "");
+      const dtl = x.details ? ` • ${esc(x.details)}` : "";
+      const dt  = x.date ?    ` • ${esc(x.date)}`    : "";
+      return `${nm}${st ? ` • ${st}` : ''}${dtl}${dt}`;
+    }).join(" // ");
+    document.getElementById("stopText").innerHTML = `Development flagged: <b>${lines}</b>`;
+    document.getElementById("stopBox").style.display = "block";
+    devsBox.innerHTML = "<ul>"+d.csv.map(x => `<li>${esc(x.name||'')} • ${esc(x.status||'')}${x.details?` • ${esc(x.details)}`:''}${x.date?` • ${esc(x.date)}`:''}</li>`).join("")+"</ul>";
+  } else {
+    document.getElementById("stopBox").style.display = "none";
+    devsBox.innerHTML = "<em>No developments flagged</em>";
+  }
 
-    function flashAADT() {
-      const containers = [];
-      if (state.layers.aadtPoints) containers.push(state.layers.aadtPoints);
-      if (state.layers.aadtLines) containers.push(state.layers.aadtLines);
-      containers.forEach(l => {
-        const el = l.getLayers ? l.getLayers().map(x=>x._path || x._container).filter(Boolean) : [];
-        el.forEach(e => { e.classList.add('flash'); setTimeout(()=>e.classList.remove('flash'), 600); });
-      });
-    }
+  // Summary (GPT) — cleaned & DOT-free if fallback; never says "CSV"
+  summaryBox.textContent = cleanSummary(d.summary || "", hasDevs, fallback) || "—";
 
-    async function refreshOverlays() {
-      await Promise.all([loadRoads(), loadAADT(), loadCompetitors()]);
-      document.getElementById('statusBar').classList.add('flash');
-      setTimeout(()=>document.getElementById('statusBar').classList.remove('flash'), 600);
-    }
+  // Maps
+  initOrUpdateMainMap(d.map);
+  if (d?.map?.competitor_radius_mi) {
+    mapTitle.textContent = `Map: Site & competitors (${d.map.competitor_radius_mi} mi) + AADT dots + ⭐ AADT used`;
+  }
 
-    // --- Analysis ---
-    const ANALYZE_ENDPOINTS = ['/api/analyze','/analyze'];
-
-    async function callAnalyze(payload) {
-      for (const url of ANALYZE_ENDPOINTS) {
-        try {
-          const resp = await fetch(url, { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify(payload) });
-          if (!resp.ok) throw new Error(`analyze bad status ${resp.status}`);
-          setChip('apiServer', 'API: Server — OK', 'ok');
-          return await resp.json();
-        } catch (e) { console.warn('analyze failed at', url, e); setChip('apiServer', 'API: Server — Retry', 'warn'); }
-      }
-      setChip('apiServer', 'API: Server — Unreachable', 'bad');
-      throw new Error('All analyze endpoints failed');
-    }
-
-    function sanitizeSummary(text) {
-      if (!text) return '';
-      return text.replace(/\bCSV\b/gi, '');
-    }
-
-    function qcBadgeEl(kind, text) {
-      const span = document.createElement('span');
-      span.className = `badge ${kind}`;
-      span.textContent = text;
-      return span;
-    }
-
-    function setQCBadges(qc) {
-      const c = document.getElementById('qcBadges');
-      c.innerHTML = '';
-      if (!qc) return;
-      if (qc.status === 'ok') c.appendChild(qcBadgeEl('ok','QC Passed'));
-      (qc.flags||[]).forEach(f => {
-        let label = f;
-        if (f === 'MISSING_BASELINE_ROAD') label = 'VERIFY: Missing baseline road';
-        if (f === 'BEARING_MISMATCH') label = 'VERIFY: Bearing mismatch';
-        if (f === 'ROUTE_MISMATCH') label = 'VERIFY: Route mismatch';
-        if (f === 'SUSPECT_DUPLICATE') label = 'VERIFY: Suspect duplicate';
-        if (f === 'MASKED_RAMP') label = 'INFO: Ramp/service road masked';
-        const kind = f === 'MASKED_RAMP' ? 'info' : 'verify';
-        c.appendChild(qcBadgeEl(kind, label));
-      });
-    }
-
-    function setFlagsList(qc) {
-      const el = document.getElementById('flagsList');
-      if (!qc || !qc.flags || qc.flags.length === 0) { el.textContent = 'No flags.'; return; }
-      el.innerHTML = '<ul style="margin:0 0 0 18px; padding:0;">' +
-        qc.flags.map(f => `<li>${f}</li>`).join('') + '</ul>';
-    }
-
-    function setMath(analysis) {
-      const a = analysis || {};
-      document.getElementById('kvAADT').textContent = a.aadt != null ? fmt.int(a.aadt) : '—';
-      document.getElementById('kvRoute').textContent = a.route || '—';
-      document.getElementById('kvBearing').textContent = a.bearing != null ? fmt.deg(a.bearing) : '—';
-      document.getElementById('kvDir').textContent = a.direction || '—';
-      document.getElementById('kvGallons').textContent = a.monthly_gallons != null ? fmt.int(a.monthly_gallons) : '—';
-      document.getElementById('kvFormula').textContent = 'AADT × 0.02 × 8 × 30';
-
-      // Prospect score styling and breakdown
-      const kvScore = document.getElementById('kvScore');
-      const kvScoreBreak = document.getElementById('kvScoreBreak');
-      kvScore.classList.remove('good','mid','bad');
-      if (a.prospect_score && typeof a.prospect_score.total === 'number') {
-        kvScore.textContent = a.prospect_score.total + ' / 100';
-        if (a.prospect_score.total >= 75) kvScore.classList.add('good');
-        else if (a.prospect_score.total >= 50) kvScore.classList.add('mid');
-        else kvScore.classList.add('bad');
-        const b = a.prospect_score.breakdown || {};
-        kvScoreBreak.textContent = `AADT ${b.aadt_points||0}, Comp ${b.comp_pressure_points||0}, QC ${b.qc_points||0}, Mix ${b.mix_points||0}`;
-      } else {
-        kvScore.textContent = '—';
-        kvScoreBreak.textContent = '—';
-      }
-    }
-
-    function setCompetitors(list) {
-      const tbody = document.querySelector('#competitorsTable tbody');
-      tbody.innerHTML = '';
-      const rows = (list||[]).map((r, i) => ({
-        idx: i+1,
-        name: r.name || 'Unknown',
-        brand: r.brand || '—',
-        dist: r.distance_mi != null ? r.distance_mi : (r.center ? haversineMi(r.center, {lat: r.lat, lng: r.lng}) : null),
-        lat: r.lat, lng: r.lng
-      }));
-      rows.sort((a,b)=> (a.dist||0)-(b.dist||0));
-      rows.forEach(r => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${r.idx}</td><td>${r.name}</td><td>${r.brand}</td><td>${fmt.miles(r.dist)}</td><td>${fmt.num(r.lat,6)}</td><td>${fmt.num(r.lng,6)}</td>`;
-        tbody.appendChild(tr);
-      });
-      document.getElementById('compTotal').textContent = rows.length;
-      const ind = rows.filter(r => CONFIG.competitors.independentTags.includes(String(r.brand))).length;
-      const chn = rows.filter(r => CONFIG.competitors.chainTags.includes(String(r.brand))).length;
-      document.getElementById('compMix').textContent = `${ind} / ${chn}`;
-      document.getElementById('kvCompetitors').textContent = rows.length;
-      document.getElementById('kvIndChain').textContent = `${ind} / ${chn}`;
-    }
-
-    function computeMonthlyGallons(aadt) {
-      if (aadt == null || isNaN(aadt)) return null;
-      return Math.round(aadt * 0.02 * 8 * 30);
-    }
-
-    function withinRadiusCompetitors(center) {
-      const out = [];
-      // Pull from map overlay markers
-      if (state.layers.competitors) {
-        state.layers.competitors.eachLayer(layer => {
-          if (!layer.getLatLng) return;
-          const { lat, lng } = layer.getLatLng();
-          const d = haversineMi(center, { lat, lng });
-          if (d <= CONFIG.competitors.radius_mi + 1e-9) {
-            const html = layer.getPopup()?.getContent?.() || '';
-            const name = (html.match(/<b>(.*?)<\/b>/)||[])[1] || 'Unknown';
-            const brandMatch = html.match(/Brand: ([^<]+)/);
-            const brand = brandMatch ? brandMatch[1] : '—';
-            out.push({ name, brand, lat, lng, distance_mi: d, center });
-          }
-        });
-      }
-      return out;
-    }
-
-    async function runEstimate() {
-      const lat = parseFloat(document.getElementById('lat').value);
-      const lng = parseFloat(document.getElementById('lng').value);
-      if (isNaN(lat) || isNaN(lng)) { alert('Set a valid Lat/Lng or click the map.'); return; }
-      setChip('apiServer','API: Server — Running…','info');
-
-      const payload = {
-        lat, lng,
-        options: {
-          qc: CONFIG.qc,
-          maskRamps: document.getElementById('maskRamps').checked,
-          radius_mi: CONFIG.competitors.radius_mi
+  // Second map + table (1 mile)
+  if (d?.map?.site) {
+    fetch(`/aadt/nearby?lat=${encodeURIComponent(d.map.site.lat)}&lon=${encodeURIComponent(d.map.site.lon)}&radiusMi=1`)
+      .then(r => r.json()).then(j => {
+        if (j.ok) {
+          initOrUpdateAADTMap(d.map.site, j.items, d.map.aadt_used || null);
+          renderAADTTable(j.items);
+          const st = j.state || "NC";
+          const srcMap = {
+            NC: "NCDOT AADT Stations (official)",
+            VA: "VDOT Traffic Volume ADT (official)",
+            DC: "DDOT 2023 Traffic Volume (official)",
+            FL: "FDOT AADT (TDA/RCI) (official)"
+          };
+          aadtSourceLine.textContent = "Source: " + (srcMap[st] || "official state AADT");
         }
-      };
+      }).catch(()=>{});
+  }
 
-      try {
-        const res = await callAnalyze(payload);
-        // Expected shape:
-        // { qc:{status:'ok'|'verify'|'error', flags:[]}, aadt, route, bearing, direction, monthly_gallons?, competitors:[...], prospect_score:{total,breakdown}, summary }
-        const center = { lat, lng };
+  // Rating
+  showRating(addrInput.value.trim());
+}
 
-        // Always compute competitors locally to guarantee count even if backend omits it
-        const localComps = withinRadiusCompetitors(center);
-        state.competitorsInRadius = localComps;
+/* =================== Rating helpers =================== */
+async function resolvePlaceIdIfNeeded(address){
+  if (selectedPlaceId) return selectedPlaceId;
+  try {
+    const r = await fetch("/google/findplace?input=" + encodeURIComponent(address));
+    const j = await r.json();
+    if (j.ok && j.place_id) { selectedPlaceId = j.place_id; return j.place_id; }
+  } catch {}
+  return null;
+}
+async function showRating(address){
+  let rating = null, total = null;
+  const pid = await resolvePlaceIdIfNeeded(address);
+  if (pid) {
+    try {
+      const r = await fetch("/google/rating?place_id=" + encodeURIComponent(pid));
+      const j = await r.json();
+      if (j.ok) { rating = j.rating ?? null; total = j.total ?? null; }
+    } catch {}
+  }
+  if ((rating == null || rating === undefined) && selectedCoords) {
+    try {
+      const r2 = await fetch("/google/rating_by_location?lat=" + encodeURIComponent(selectedCoords.lat) + "&lon=" + encodeURIComponent(selectedCoords.lon));
+      const j2 = await r2.json();
+      if (j2.ok) { rating = j2.rating ?? null; total = j2.total ?? null; }
+    } catch {}
+  }
+  ratingLine.innerHTML = (rating != null && rating !== undefined) ? `\u2B50 ${rating} (${total||0} reviews)` : "—";
+}
 
-        // Merge backend comps if provided
-        const competitors = Array.isArray(res.competitors) && res.competitors.length ? res.competitors : localComps;
-        setCompetitors(competitors);
+/* =================== Autocomplete (hard lock on commit) =================== */
+function hideAc(){ acBox.style.display = "none"; acActive = -1; }
+function commitAddress(display, coords, placeId){
+  lastCommittedText = (display || "").trim();
+  acCommitted = true;      // lock
+  addressLocked = true;    // hard lock until user deletes before committed text
+  acItems = [];
+  hideAc();
+  addrInput.value = display;
+  selectedCoords = coords || null;
+  selectedPlaceId = placeId || null;
+}
+function chooseAc(i){
+  const it = acItems[i];
+  if (!it) return;
+  const coords = (Number.isFinite(it.lat) && Number.isFinite(it.lon)) ? { lat: it.lat, lon: it.lon } : null;
+  commitAddress(it.display, coords, it.place_id || null);
+  addrInput.blur(); // collapse keyboard
+}
+async function googleSearch(q){
+  try {
+    const r = await fetch("/google/autocomplete?input=" + encodeURIComponent(q));
+    const j = await r.json();
+    if(!j.ok) return [];
+    return (j.items||[]).map(it => ({...it, type:"Google", score:1.3}));
+  } catch { return []; }
+}
+async function nominatimSearch(q){
+  try {
+    const r = await fetch("https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=us&q=" + encodeURIComponent(q));
+    const a = await r.json();
+    return a.map(row => ({ type:"OSM", display:row.display_name, lat:+row.lat, lon:+row.lon, score:0.6 }));
+  } catch { return []; }
+}
+function renderAc(list){
+  if(!list.length){ hideAc(); return; }
+  acBox.innerHTML = list.map((it,i) =>
+    `<div class="ac-item${i===acActive?" active":""}" data-i="${i}">${esc(it.display)} <span class="badge">${it.type}</span></div>`
+  ).join("");
+  [...acBox.children].forEach(el => el.onclick = () => chooseAc(+el.dataset.i));
+  acBox.style.display = "block";
+}
+addrInput.addEventListener("input", () => {
+  const q = addrInput.value.trim();
 
-        // QC badges
-        const qc = res.qc || { status: 'ok', flags: [] };
-        setQCBadges(qc);
-        setFlagsList(qc);
-
-        // Monthly gallons only if QC passes and AADT present
-        let monthly = null;
-        if (qc.status === 'ok' && (res.aadt != null) && (res.aadt >= CONFIG.qc.min_aadt)) {
-          monthly = computeMonthlyGallons(res.aadt);
-        }
-
-        const analysis = {
-          aadt: res.aadt ?? null,
-          route: res.route || null,
-          bearing: res.bearing ?? null,
-          direction: res.direction || null,
-          monthly_gallons: monthly,
-          prospect_score: res.prospect_score || null
-        };
-        state.lastAnalysis = { ...res, analysis, center, competitors };
-        setMath({ ...analysis, prospect_score: res.prospect_score });
-
-        const cleanSummary = sanitizeSummary(res.summary || '');
-        const flaggedPrefix = (qc.flags && qc.flags.length)
-          ? `QC Flags: ${qc.flags.join(', ')}\n\n` : '';
-        document.getElementById('summaryText').textContent = flaggedPrefix + cleanSummary;
-
-        // Drop a pin / move if necessary
-        setPin(lat, lng);
-      } catch (e) {
-        console.error(e);
-        alert('Analysis failed. Check server logs.');
-      }
+  // Hard lock: keep suggestions hidden unless user deletes before the committed text
+  if (addressLocked) {
+    if (q.length >= lastCommittedText.length && q.startsWith(lastCommittedText)) {
+      hideAc(); return;
+    } else {
+      addressLocked = false; // they edited earlier chars; unlock
+      acCommitted = false;
     }
+  }
 
-    // --- Geolocation ---
-    function locateMe() {
-      if (!navigator.geolocation) { alert('Geolocation unsupported.'); return; }
-      navigator.geolocation.getCurrentPosition((pos) => {
-        const lat = pos.coords.latitude, lng = pos.coords.longitude;
-        setPin(lat, lng);
-      }, (err) => {
-        alert('Unable to get your location.');
-      });
-    }
+  if (acCommitted) {
+    if (q === lastCommittedText) { hideAc(); return; }
+    acCommitted = false; // unlock if they truly edit
+  }
+  if (q.length < 3) { hideAc(); return; }
+  Promise.all([googleSearch(q), nominatimSearch(q)]).then(([g,n])=>{
+    acItems = [...g, ...n].slice(0, 8);
+    renderAc(acItems);
+  });
+});
+addrInput.addEventListener("blur", () => { setTimeout(hideAc, 120); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") hideAc(); });
+document.addEventListener("pointerdown", (e) => {
+  if (e.target !== addrInput && !acBox.contains(e.target)) hideAc();
+});
 
-    // --- Exports ---
-    async function exportPNG() {
-      const mapEl = document.querySelector('#map .leaflet-container');
-      const canvas = await html2canvas(mapEl, { useCORS: true, backgroundColor: '#0b1220', logging: false });
-      canvas.toBlob((blob) => { saveAs(blob, 'fueliq_map.png'); });
-    }
+/* =================== Main events ====================== */
+function tidyUI(){ hideAc(); }
+async function onEstimateClick(){
+  if(!addrInput.value.trim() && !selectedCoords){
+    alert("Please select a valid address first.");
+    return;
+  }
+  try {
+    goBtn.disabled = true; setOverlayWorking(); tidyUI();
+    const resp = await callEstimate();
+    if (!resp || resp.ok !== true) { alert("Estimate failed: " + (resp?.status || "Unknown error")); return; }
+    renderAll(resp); pills();
+  } catch (e) {
+    alert("Error: " + (e?.message || e));
+  } finally {
+    goBtn.disabled = false; clearOverlay();
+  }
+}
+goBtn.addEventListener("click", onEstimateClick);
+addrInput.addEventListener("keydown", (e)=>{ if(e.key==="Enter"){ e.preventDefault(); onEstimateClick(); } });
 
-    function exportJSON() {
-      const data = state.lastAnalysis || { note: 'No analysis yet' };
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      saveAs(blob, 'fueliq_analysis.json');
-    }
-
-    async function exportZIP() {
-      const zip = new JSZip();
-      // PNG
-      const mapEl = document.querySelector('#map .leaflet-container');
-      const canvas = await html2canvas(mapEl, { useCORS: true, backgroundColor: '#0b1220', logging: false });
-      const pngBlob = await new Promise(res => canvas.toBlob(res));
-      zip.file('fueliq_map.png', pngBlob);
-      // JSON
-      const data = state.lastAnalysis || { note: 'No analysis yet' };
-      zip.file('fueliq_analysis.json', JSON.stringify(data, null, 2));
-      const content = await zip.generateAsync({ type: 'blob' });
-      saveAs(content, 'fueliq_export.zip');
-    }
-
-    function exportCSV() {
-      const rows = state.competitorsInRadius || [];
-      const header = ['name','brand','distance_mi','lat','lng'];
-      const csv = [header.join(',')].concat(rows.map(r => [
-        JSON.stringify(r.name||''), JSON.stringify(r.brand||''), (r.distance_mi||'').toString(), r.lat, r.lng
-      ].join(','))).join('\n');
-      const blob = new Blob([csv], { type: 'text/csv' });
-      saveAs(blob, 'fueliq_competitors.csv');
-    }
-
-    async function exportPDF() {
-      const payload = state.lastAnalysis || null;
-      if (!payload) { alert('Run an estimate first.'); return; }
-      try {
-        const resp = await fetch('/api/export/pdf', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+/* =================== PDF Export ======================= */
+async function captureMapImage(){
+  // Try leaflet-image first
+  try {
+    if (typeof leafletImage === "function" && window.map) {
+      return await new Promise((resolve) => {
+        leafletImage(window.map, (err, canvas) => {
+          if (err || !canvas) return resolve(null);
+          try { resolve(canvas.toDataURL("image/png")); } catch { resolve(null); }
         });
-        if (!resp.ok) throw new Error('PDF export failed');
-        const blob = await resp.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = 'fueliq_report.pdf'; a.click();
-        URL.revokeObjectURL(url);
-      } catch (e) {
-        console.error(e); alert('PDF export failed');
-      }
+      });
+    }
+  } catch {}
+  // Fallback to html2canvas (usesCORS: true)
+  try {
+    if (window.html2canvas) {
+      const node = document.getElementById("map");
+      const cvs = await html2canvas(node, { useCORS: true, backgroundColor: null });
+      return cvs.toDataURL("image/png");
+    }
+  } catch {}
+  return null;
+}
+
+document.getElementById("exportPDF").addEventListener("click", async ()=>{
+  try{
+    const { jsPDF } = window.jspdf || {};
+    if(!jsPDF){ alert("PDF library failed to load"); return; }
+    const doc=new jsPDF({unit:"pt",format:"a4"});
+    const pageW=595, pageH=842, margin=36, contentW=pageW - margin*2;
+
+    doc.setFont("helvetica","bold"); doc.setFontSize(18);
+    doc.text("Sunoco, LP Fuel IQ — Fuel Site Analyzer", margin, margin+6);
+
+    doc.setFont("helvetica","normal"); doc.setFontSize(11);
+    const lines = doc.splitTextToSize(document.getElementById("summary").innerText || "", contentW);
+    doc.text(lines, margin, margin+28);
+
+    let cursorY = margin + 28 + lines.length*14 + 16;
+
+    const key = [
+      `Address: ${document.getElementById("addr").value || "-"}`,
+      `MPDs: ${document.getElementById("mpds").value}   Diesel: ${document.getElementById("diesel").value}`,
+      document.getElementById("aadtBanner").innerText,
+      `Estimate (LOW): ${document.getElementById("estNum").innerText}  |  Range: ${document.getElementById("estRange").innerText.replace("Full range: ","")}`,
+      document.getElementById("compLine").innerText
+    ].join("\n");
+    const keyLines = doc.splitTextToSize(key, contentW);
+    doc.text(keyLines, margin, cursorY);
+    cursorY += keyLines.length*14 + 12;
+
+    // Math table
+    const mathTxt = (document.getElementById('mathTable')?.innerText || '').trim();
+    if (mathTxt) {
+      const mathLines = doc.splitTextToSize("Math & Assumptions:\n" + mathTxt, contentW);
+      if (cursorY + mathLines.length*14 > pageH - margin) { doc.addPage(); cursorY = margin; }
+      doc.setFont("helvetica","bold"); doc.text("Math & Assumptions", margin, cursorY); cursorY += 14;
+      doc.setFont("helvetica","normal"); doc.text(mathLines, margin, cursorY);
+      cursorY += mathLines.length*14 + 12;
     }
 
-    // --- Event wiring ---
-    function wireUI() {
-      document.getElementById('locateBtn').addEventListener('click', locateMe);
-      document.getElementById('estimateBtn').addEventListener('click', runEstimate);
-      document.getElementById('clearBtn').addEventListener('click', () => {
-        document.getElementById('addr').value = '';
-        document.getElementById('lat').value = '';
-        document.getElementById('lng').value = '';
-        if (state.pin) { state.map.removeLayer(state.pin); state.pin = null; }
-        setCoordChip();
-      });
-      document.getElementById('roadsToggle').addEventListener('change', (e) => toggleLayer(state.layers.roads, e.target.checked));
-      document.getElementById('aadtToggle').addEventListener('change', (e) => {
-        toggleLayer(state.layers.aadtPoints, e.target.checked);
-        toggleLayer(state.layers.aadtLines, e.target.checked);
-      });
-      document.getElementById('flashAADT').addEventListener('click', flashAADT);
-      document.getElementById('refreshBtn').addEventListener('click', refreshOverlays);
-      document.getElementById('recenterBtn').addEventListener('click', () => { if (state.pin) state.map.setView(state.pin.getLatLng(), 15); });
-      document.getElementById('resetBtn').addEventListener('click', async () => {
-        if (!confirm('Reset overlays and UI?')) return;
-        await refreshOverlays();
-        document.getElementById('summaryText').textContent = 'Run an estimate to see the QC‑aware summary.';
-        document.getElementById('flagsList').textContent = 'No flags yet.';
-        document.getElementById('kvAADT').textContent = '—';
-        document.getElementById('kvRoute').textContent = '—';
-        document.getElementById('kvBearing').textContent = '—';
-        document.getElementById('kvDir').textContent = '—';
-        document.getElementById('kvGallons').textContent = '—';
-        document.getElementById('kvCompetitors').textContent = '0';
-        document.querySelector('#competitorsTable tbody').innerHTML = '';
-        document.getElementById('kvScore').textContent = '—';
-        document.getElementById('kvScoreBreak').textContent = '—';
-      });
-      document.getElementById('exportPNG').addEventListener('click', exportPNG);
-      document.getElementById('exportJSON').addEventListener('click', exportJSON);
-      document.getElementById('exportZIP').addEventListener('click', exportZIP);
-      document.getElementById('exportCSV').addEventListener('click', exportCSV);
-      document.getElementById('exportPDF').addEventListener('click', exportPDF);
-
-      // Show QC config numbers
-      document.getElementById('qcSnap').textContent = CONFIG.qc.snap_m + ' m';
-      document.getElementById('qcBearing').textContent = CONFIG.qc.bearing_deg + '°';
-      document.getElementById('qcMinAADT').textContent = CONFIG.qc.min_aadt;
-      document.getElementById('maskRamps').checked = CONFIG.qc.mask_ramps;
-
-      document.getElementById('envText').textContent = `Environment: ${CONFIG.env}`;
+    // Map snapshot
+    const mapImg = await captureMapImage();
+    const imgW = contentW, imgH = 260;
+    if (mapImg) {
+      if (cursorY + imgH > pageH - margin) { doc.addPage(); cursorY = margin; }
+      doc.setFont("helvetica","bold"); doc.text("Map & Competitors", margin, cursorY);
+      cursorY += 12;
+      doc.addImage(mapImg, "PNG", margin, cursorY, imgW, imgH);
+      cursorY += imgH + 12;
     }
 
-    // --- Boot ---
-    (async function boot(){
-      initMap();
-      wireUI();
-      await refreshOverlays();
-      setChip('apiGoogle', 'API: Google — Working', 'ok'); // optimistic until health checks wired
-      setChip('apiOverpass', 'API: Overpass — Working', 'ok');
-      setChip('apiServer', 'API: Server — Ready', 'ok');
-    })();
+    // AADT table
+    const tbl = document.getElementById("aadtTable").innerText || "";
+    const devLines = doc.splitTextToSize("AADT Sources (1 mi):\n" + tbl, contentW);
+    if (cursorY + devLines.length*14 > pageH - margin) { doc.addPage(); cursorY = margin; }
+    doc.setFont("helvetica","bold"); doc.text("AADT Sources", margin, cursorY); cursorY += 14;
+    doc.setFont("helvetica","normal"); doc.text(devLines, margin, cursorY);
+
+    doc.save("FuelIQ_Site_Analyzer.pdf");
+  }catch(e){
+    alert("Export failed: " + (e?.message || e));
+  }
+});
+
+/* =================== Init ============================== */
+document.addEventListener("DOMContentLoaded", async () => {
+  try {
+    const r = await fetch("/google/status");
+    const j = await r.json();
+    apiStatus.textContent = j.ok ? "API: Google — Working" : `API: Google — ${j.status}`;
+  } catch { apiStatus.textContent = "API: Google — unavailable"; }
+});
+overlay.textContent="—";
   </script>
 </body>
 </html>
