@@ -1,10 +1,8 @@
-// server.js — Fuel IQ API (exhaustive competitor finder, 2025-10-03)
-// Key changes in this build:
-//  • Competitors: Overpass (nodes/ways/relations) + Google grid sweep over the full radius,
-//    multiple keyword passes, pagination at each grid point, strict de-dup (place_id, osm id, loc+name).
-//  • Brand normalization & address building. Much wider heavy-brand detection.
-//  • /api/competitors returns richer FeatureCollection {brand,name,address,source} with ETag.
-//  • UI compatibility preserved (strict AADT on entered road, autocomplete bias, PDF export preserved).
+// server.js — Fuel IQ API (exhaustive competitors + strict-road AADT + PDF), 2025-10-03
+// Fixes in this build:
+//  • No changes required for the address/estimate bug (it was in index.html).
+//  • Keeps exhaustive competitors (OSM+Google grid), strict AADT on entered road, PDF export.
+//  • Google Autocomplete supports location bias (closest suggestions bubble up).
 
 import express from "express";
 import cors from "cors";
@@ -44,7 +42,6 @@ const CONTACT = process.env.OVERPASS_CONTACT || UA;
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || "";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 
-// Default competitor radius (miles) used by estimate + /api/competitors
 const COMP_RADIUS_DEFAULT_MI = +process.env.COMP_RADIUS_DEFAULT_MI || 3.0;
 
 /* --------------------- fetch() helper (Node 16/18) --------------------- */
@@ -398,7 +395,6 @@ async function providerStationsOnStreet(stateCode, lat, lon, streetText) {
 }
 
 /* --------------------- Competitor aggregation --------------------- */
-/** Brand normalization + heavy detection **/
 function normalizeBrandName(name) {
   const s = String(name || "").trim();
   if (!s) return "Unknown";
@@ -416,7 +412,6 @@ function normalizeBrandName(name) {
 const HEAVY_BRANDS = /(sheetz|wawa|race\s?trac|racetrac|buc-?ee'?s|royal\s?farms|quik.?trip|\bqt\b|pilot\b|flying\s*j|love'?s|ta\b|travel\s*centers?\s*of\s*america|maverik)/i;
 const IS_SUNOCO = /\bsunoco\b/i;
 
-/** Overpass (OSM) fuel POIs — nodes, ways, relations with out center + addr **/
 const OVERPASS_EP = [
   "https://overpass-api.de/api/interpreter",
   "https://overpass.kumi.systems/api/interpreter",
@@ -494,9 +489,7 @@ async function osmFuelWithin(lat, lon, rM) {
     return out;
   } catch { return []; }
 }
-
-/** Google Places — sweep grid, paginate per grid point, multiple keyword passes **/
-function degLat(m) { return (m / 111320); } // approx
+function degLat(m) { return (m / 111320); }
 function degLon(m, lat) { return (m / (111320 * Math.cos(lat * Math.PI/180))); }
 function hexGridPoints(lat, lon, radiusM, spacingM) {
   const pts = [];
@@ -536,13 +529,11 @@ function asCompetitorFromGoogle(center, it) {
     heavy: HEAVY_BRANDS.test(name), sunoco: IS_SUNOCO.test(name),
   };
 }
-async function googleNearbySearchAll(lat, lon, radiusM, opts = {}) {
+async function googleNearbySearchAll(lat, lon, radiusM) {
   if (!GOOGLE_API_KEY) return [];
-  const spacing = Math.max(800, Math.round(radiusM / 3)); // denser grid for larger radius
+  const spacing = Math.max(800, Math.round(radiusM / 3));
   let points = hexGridPoints(lat, lon, radiusM, spacing);
-  // Clamp grid to avoid hammering API
   if (points.length > 25) {
-    // pick center + ring-ordered subset
     points = points.sort((a,b)=> (haversine(lat,lon,a.lat,a.lon) - haversine(lat,lon,b.lat,b.lon))).slice(0, 25);
   }
   const queries = [
@@ -554,13 +545,12 @@ async function googleNearbySearchAll(lat, lon, radiusM, opts = {}) {
   const out = [];
   for (const p of points) {
     for (const makeUrl of queries) {
-      let url = makeUrl(p, Math.min(radiusM, 3500)); // per-point smaller radius
+      let url = makeUrl(p, Math.min(radiusM, 3500));
       let page = 0;
-      while (url && page < 3) { // up to 3 pages per point
+      while (url && page < 3) {
         page++;
         let j;
-        try { j = await googleNearbyFetch(url); }
-        catch { break; }
+        try { j = await googleNearbyFetch(url); } catch { break; }
         for (const it of (j.results || [])) {
           if (it.place_id && seenPlace.has(it.place_id)) continue;
           const comp = asCompetitorFromGoogle({lat, lon}, it);
@@ -575,8 +565,6 @@ async function googleNearbySearchAll(lat, lon, radiusM, opts = {}) {
   }
   return out;
 }
-
-/** Merge & de-dup across OSM + Google **/
 function dedupCompetitors(list) {
   const byKey = new Map();
   for (const c of list) {
@@ -584,17 +572,14 @@ function dedupCompetitors(list) {
     const kOsm = c.osm_id ? `o:${c.osm_id}` : null;
     const nameKey = (c.name || c.brand || "Fuel").toLowerCase().replace(/\s+/g," ").trim();
     const kGeoName = `n:${round5(c.lat)}|${round5(c.lon)}|${nameKey}`;
-
     const key = kPlace || kOsm || kGeoName;
     if (!byKey.has(key)) byKey.set(key, c);
     else {
-      // merge address/brand if one is richer
       const prev = byKey.get(key);
       if (!prev.address && c.address) prev.address = c.address;
       if ((!prev.brand || prev.brand==="Unknown") && c.brand) prev.brand = c.brand;
       prev.heavy = prev.heavy || c.heavy;
       prev.sunoco = prev.sunoco || c.sunoco;
-      // keep closer miles (from site)
       if (c.miles != null && (prev.miles == null || c.miles < prev.miles)) prev.miles = c.miles;
     }
   }
@@ -602,8 +587,6 @@ function dedupCompetitors(list) {
   merged.sort((a,b) => (a.miles ?? 1e9) - (b.miles ?? 1e9));
   return merged;
 }
-
-/** Public helper used by /estimate and /api/competitors **/
 async function findCompetitorsExhaustive(lat, lon, rMi) {
   const rM = Math.round(rMi * 1609.344);
   const [osm, goog] = await Promise.all([
@@ -611,10 +594,10 @@ async function findCompetitorsExhaustive(lat, lon, rMi) {
     googleNearbySearchAll(lat, lon, rM).catch(() => []),
   ]);
   const merged = dedupCompetitors([...(osm||[]), ...(goog||[])]);
-  return merged.filter(c => c.miles <= rMi + 0.05); // keep slight tolerance
+  return merged.filter(c => c.miles <= rMi + 0.05);
 }
 
-/* ----------------------- Road context (heuristic) ----------------------- */
+/* ----------------------- Road context ----------------------- */
 function parseMaxspeed(ms) { const m = String(ms || "").match(/(\d+)\s*(mph)?/i); return m ? +m[1] : null; }
 function roadWeight(hw) {
   const order = { motorway: 6, trunk: 5, primary: 4, secondary: 3, tertiary: 2, unclassified: 1, residential: 1 };
@@ -710,7 +693,6 @@ app.get("/google/status", async (_req, res) => {
     res.json({ ok: false, status: "EXCEPTION" });
   }
 });
-
 app.get("/google/autocomplete", async (req, res) => {
   const input = String(req.query.input || "").trim();
   if (!input) return res.json({ ok: false, status: "BAD_REQUEST", items: [] });
@@ -1012,8 +994,8 @@ Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
       auto_low_rating: autoLow,
     },
     competition: {
-      count: competitors15.length,      // within 1.5 mi
-      count_3mi: compAll.length,        // within COMP_RADIUS_DEFAULT_MI
+      count: competitors15.length,
+      count_3mi: compAll.length,
       heavy_count: heavyCount,
       nearest_mi: compAll[0]?.miles ?? null,
       notable_brands: compAll.filter((c) => c.heavy).slice(0, 8).map((c) => c.brand || c.name),
@@ -1202,3 +1184,4 @@ app.post("/report/pdf", async (req, res) => {
 /* ------------------------------- Start ------------------------------- */
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, "0.0.0.0", () => console.log(`Server listening on :${PORT}`));
+
