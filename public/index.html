@@ -9,12 +9,11 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin></script>
 
-  <!-- Map snapshot utilities -->
-  <script src="https://unpkg.com/leaflet-image/leaflet-image.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-
-  <!-- jsPDF (UMD) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous"></script>
+  <!-- Optional: MarkerCluster + Heatmap -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
 
   <style>
     :root { --bg:#0b0e15; --panel:#111725; --panel2:#0f1421; --line:#263145; --text:#eaeef7; --muted:#97a3b8; --brand:#0ea5e9; --brand2:#22d3ee; --pill:#0f1929; }
@@ -40,7 +39,7 @@
     .subtle{ font-size:12px; opacity:.9; }
 
     #map,#aadtMap{ height:420px; border-radius:12px; border:1px solid var(--line); position: relative; }
-    #overlay{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(11,14,21,.55); border-radius:12px; font-weight:800; color:#cde9ff; font-size:18px; padding:20px; text-align:center; }
+    #overlay{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(11,14,21,.55); border-radius:12px; font-weight:800; color:#cde9ff; font-size:18px; padding:20px; text-align:center; display:none; }
 
     #svWrap{ margin-top:10px; }
     #sv{ width:100%; height:380px; border:0; border-radius:12px; border:1px solid var(--line); background:#0b1220; }
@@ -82,7 +81,7 @@
     tr:hover { background: rgba(255,255,255,.03); }
     .small { font-size:12px; color:#a9b6d0; }
 
-    /* Big button under AADT override */
+    .cmp-dot{ display:inline-block; width:10px; height:10px; border-radius:50%; box-shadow:0 0 8px rgba(255,255,255,.18) inset; border:1px solid rgba(0,0,0,.35); }
     #go { width:100%; padding:16px; font-size:18px; margin-top:10px; }
   </style>
 </head>
@@ -90,7 +89,7 @@
   <div class="wrap">
     <header>
       <h1>Sunoco, LP Fuel IQ - Fuel Site Analyzer</h1>
-      <span class="build">UI v2025‑10‑01</span>
+      <span class="build">UI v2025‑10‑03</span>
       <a href="developments.html" style="padding:8px 14px; background:#22d3ee; border-radius:8px; color:#00121e; font-weight:600; text-decoration:none;">Developments Search</a>
       <a href="PA_Signals_AADT_Radius_Map_Final_Generated.html" style="padding:8px 14px; background:#f87171; border-radius:8px; color:#00121e; font-weight:600; text-decoration:none;">PA AADT Map</a>
       <a href="Scraper.html" style="padding:8px 14px; background:#34d399; border-radius:8px; color:#00121e; font-weight:600; text-decoration:none;">Prospector</a>
@@ -199,10 +198,42 @@
       <div id="compLine" class="muted">—</div>
     </div>
 
+    <!-- Competitor Layers -->
+    <div class="card">
+      <b>Competitors (independent layer)</b>
+      <div class="adv-line" style="margin-top:4px">
+        <label class="chip"><input type="checkbox" id="cmp_show" checked> Show Competitors</label>
+        <label class="chip"><input type="checkbox" id="cmp_heat"> Heatmap</label>
+        <label class="chip"><input type="checkbox" id="cmp_cluster" checked> Cluster markers</label>
+        <span class="subtle" id="cmpStatus">—</span>
+      </div>
+      <details style="margin-top:8px;">
+        <summary><b>Legend</b></summary>
+        <div id="brandLegend" class="small" style="display:grid; grid-template-columns:1fr 1fr; gap:6px 14px; margin-top:8px;"></div>
+      </details>
+    </div>
+
+    <!-- Brand Filters & Live Stats -->
+    <div class="card">
+      <b>Brand Filters & Live Stats</b>
+      <div id="brandFilters" class="adv-line" style="flex-wrap:wrap; margin-top:8px;">
+        <span class="subtle">Load competitors to see brand filters.</span>
+      </div>
+      <div class="adv-line" style="margin-top:8px;">
+        <button id="brandsClear" class="chip" type="button">Clear</button>
+        <button id="brandsAll" class="chip" type="button">Select All</button>
+      </div>
+      <div class="small" style="margin-top:8px; line-height:1.6;">
+        <div>Visible competitors in view: <b id="liveCount">0</b></div>
+        <div>Unique brands: <b id="liveUnique">0</b></div>
+        <div id="liveBreakdown" style="margin-top:6px;"></div>
+      </div>
+    </div>
+
     <!-- Main Map & SV -->
     <div class="card">
       <div class="muted" id="mapTitle">Map: Site & competitors (1.5 mi) + AADT dots + ⭐ AADT used</div>
-      <div id="map"><div id="overlay" class="muted">—</div></div>
+      <div id="map"><div id="overlay" class="muted"></div></div>
       <div id="svWrap"><div class="muted" style="margin-top:10px;">Street View</div><iframe id="sv" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div>
     </div>
 
@@ -249,34 +280,48 @@ const apiStatus = $("apiStatus"), aadtBanner = $("aadtBanner"), compLine = $("co
       ex_rural = $("ex_rural"), aadtSourceLine = $("aadtSourceLine"), mathTableEl = $("mathTable"),
       fallbackChip = $("fallbackChip"), mapTitle = $("mapTitle");
 
-let map, layer, mapReady = false, selectedCoords = null, selectedPlaceId = null;
+/* NEW: Competitor UI handles */
+const cmpShow = $("cmp_show"), cmpHeat = $("cmp_heat"), cmpCluster = $("cmp_cluster"), cmpStatus = $("cmpStatus");
+const brandLegend = $("brandLegend"), brandFilters = $("brandFilters"), brandsClear = $("brandsClear"), brandsAll = $("brandsAll");
+const liveCount = $("liveCount"), liveUnique = $("liveUnique"), liveBreakdown = $("liveBreakdown");
+
+let map, layer, serverCompLayer, mapReady = false, selectedCoords = null, selectedPlaceId = null;
 let aadtMap, aadtLayer, aadtReady = false;
 let acItems = [], acActive = -1;
 let acCommitted = false;
 let lastCommittedText = "";
 let addressLocked = false;
 
+/* NEW: Live Competitors layer state */
+const COMP_API = "/api/competitors";
+const CMP_MIN_MI = 0.5, CMP_MAX_MI = 2.0;
+let cmpMarkers = [];                 // array of L.Marker
+let cmpClusterGroup = null;          // L.MarkerClusterGroup
+let cmpHeatLayer = null;             // L.heatLayer
+let cmpCache = new Map();            // key -> {etag, geojson}
+let cmpBrandSet = new Set();
+let cmpActiveBrands = new Set();     // empty => all
+const BRAND_COLORS = {};             // deterministic HSL by brand
+
 /* Utils */
 function fmt(n){ return (n??0).toLocaleString(undefined,{maximumFractionDigits:0}); }
 function esc(s){ return (s??"").toString().replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
-function setOverlayWorking(){ overlay.textContent = "Working…"; overlay.style.display = "flex"; }
+function setOverlayWorking(msg="Working…"){ overlay.textContent = msg; overlay.style.display = "flex"; }
 function clearOverlay(){ overlay.style.display = "none"; }
+function colorForBrand(b){ if(!b) return "#9aa4b2"; if(!BRAND_COLORS[b]){ let h=0; for(let i=0;i<b.length;i++) h=(h*31 + b.charCodeAt(i))%360; BRAND_COLORS[b] = `hsl(${h},70%,58%)`; } return BRAND_COLORS[b]; }
 
 /* =================== Map + Street View =================== */
 function initMap(){ if(mapReady) return;
   map = L.map("map",{zoomControl:true}); window.map = map;
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
-    attribution:"&copy; OpenStreetMap",
-    crossOrigin: true
-  }).addTo(map);
-  layer = L.layerGroup().addTo(map); mapReady = true;
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{ attribution:"&copy; OpenStreetMap", crossOrigin:true }).addTo(map);
+  layer = L.layerGroup().addTo(map);          // site, AADT dots, AADT used star
+  serverCompLayer = L.layerGroup().addTo(map); // competitors from /estimate (separate)
+  mapReady = true;
+  map.on("moveend", () => { if (cmpShow.checked) refreshCompetitors(); updateLiveStats(); });
 }
 function initAADTMap(){ if(aadtReady) return;
   aadtMap = L.map("aadtMap",{zoomControl:true}); window.aadtMap = aadtMap;
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
-    attribution:"&copy; OpenStreetMap",
-    crossOrigin: true
-  }).addTo(aadtMap);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{ attribution:"&copy; OpenStreetMap", crossOrigin:true }).addTo(aadtMap);
   aadtLayer = L.layerGroup().addTo(aadtMap); aadtReady = true;
 }
 function updateStreetView(lat, lon){
@@ -292,26 +337,21 @@ function renderAADTMarkers(list, used) {
     else if (val >= 20000) color = "#f97316";
     else if (val >= 10000) color = "#eab308";
     else color = "#84cc16";
-    L.circleMarker([rec.lat, rec.lon], {
-      radius: 5, weight: 1, color, fillColor: color, fillOpacity: 0.8
-    }).addTo(layer).bindPopup("AADT: " + fmt(val) + (rec.year?` (${rec.year})`:""));
+    L.circleMarker([rec.lat, rec.lon], { radius: 5, weight: 1, color, fillColor: color, fillOpacity: 0.8 })
+      .addTo(layer).bindPopup("AADT: " + fmt(val) + (rec.year?` (${rec.year})`:""));
   }
   if (used && Number.isFinite(used.lat) && Number.isFinite(used.lon)) {
     L.marker([used.lat, used.lon], {
       title: "AADT used",
-      icon: L.divIcon({
-        className: "aadt-used",
-        html: '<div style="font-size:18px;">⭐</div>',
-        iconSize: [24,24],
-        iconAnchor: [12,12]
-      })
+      icon: L.divIcon({ className: "aadt-used", html: '<div style="font-size:18px;">⭐</div>', iconSize: [24,24], iconAnchor: [12,12] })
     }).addTo(layer).bindPopup(`<b>USED AADT</b><br>${fmt(used.aadt)}${used.year?` (${used.year})`:''}<br>${esc(used.route||'')}`);
   }
 }
 function initOrUpdateMainMap(m){
   if(!mapReady) initMap();
   layer.clearLayers();
-  if(!m || !m.site){ setOverlayWorking(); return; }
+  serverCompLayer.clearLayers();
+  if(!m || !m.site){ return; }
   const site = [m.site.lat, m.site.lon];
   L.marker(site,{title:"Site"}).addTo(layer).bindPopup("<b>Site</b>");
   const pts = [site];
@@ -319,19 +359,23 @@ function initOrUpdateMainMap(m){
   // AADT first (dots)
   if (m.aadt) renderAADTMarkers(m.aadt, m.aadt_used);
 
-  // Competitors after (so they sit on top) + bringToFront
+  // Competitors from ESTIMATE -> separate layer so we can hide when live layer is on
   const comps = m.all_competitors || m.competitors || [];
   for(const c of comps){
     if(!Number.isFinite(c.lat)||!Number.isFinite(c.lon)) continue;
     pts.push([c.lat,c.lon]);
     const dot = L.circleMarker([c.lat,c.lon],{
       radius:7, weight:1.5, color:c.heavy?"#ff7f50":"#4ade80", fillColor:c.heavy?"#ff7f50":"#4ade80", fillOpacity:.95
-    }).addTo(layer).bindPopup(`${esc(c.name||"Fuel")} • ${c.miles} mi`);
+    }).addTo(serverCompLayer).bindPopup(`${esc(c.name||"Fuel")} • ${c.miles} mi`);
     if (dot.bringToFront) dot.bringToFront();
   }
 
+  // If live competitors are ON, hide the estimate-layer dots
+  if (cmpShow.checked) { if (map.hasLayer(serverCompLayer)) map.removeLayer(serverCompLayer); }
+  else { if (!map.hasLayer(serverCompLayer)) serverCompLayer.addTo(map); }
+
   map.fitBounds(L.latLngBounds(pts).pad(0.25));
-  clearOverlay(); updateStreetView(site[0], site[1]);
+  updateStreetView(site[0], site[1]);
 }
 
 /* =================== Second map + table =================== */
@@ -488,20 +532,11 @@ function buildCalcFallback(d){
     const after_cap = Math.min(ceiling, mpd_cap);
     const price = getPricePosition()==='below'?1.10:(getPricePosition()==='above'?0.90:1.00);
     const comp = 1.00;
-    const laneF=1, accessF=1, ctxF=1;
-    const extras = collectExtras().map(e=>({label:e.note||"Adj", mult: 1 + (e.pct||0)/100}));
-    let v = after_cap * comp * price * laneF * accessF * ctxF;
-    for(const e of extras) v *= e.mult;
+    const v = after_cap * comp * price;
     return {
-      aadt, pct_stopping, gal_per_stop, days, ceiling,
-      regular_mpd: mpd, diesel_mpd: diesel, mpd_cap,
-      competition_factor: comp, pricing_factor: price,
-      lane_factor: laneF, access_factor: accessF, context_factor: ctxF,
-      extra_factors: extras,
+      aadt, ceiling, regular_mpd: mpd, diesel_mpd: diesel, mpd_cap,
       after_cap, after_comp: after_cap*comp, after_pricing: after_cap*comp*price,
-      after_roadway: after_cap*comp*price*laneF*accessF*ctxF,
-      after_extras: v,
-      low: Math.round(v), high: Math.round(v*1.25), year2: Math.round(v*1.05), year3: Math.round(v*1.08),
+      low: Math.round(v), high: Math.round(v*1.06), year2: Math.round(v*1.027), year3: Math.round(v*1.027*1.0125),
       _note: "UI fallback calc"
     };
   }catch{return null;}
@@ -509,16 +544,11 @@ function buildCalcFallback(d){
 function renderMathFallback(calc){
   if(!mathTableEl) return;
   if(!calc){ mathTableEl.innerHTML = '<em>— (no calc available)</em>'; return; }
-  const extras = (calc.extra_factors||[]).map(e=>`${esc(e.label||'Adj')}: × ${e.mult}`).join(' • ') || '—';
   const rows = [
-    `<b>Baseline ceiling</b> = AADT ${fmt(calc.aadt)} × ${(calc.pct_stopping*100).toFixed(1)}% × ${calc.gal_per_stop} × ${calc.days} = <b>${fmt(calc.ceiling)}</b>`,
-    `<b>Competitors in area</b>: see header line`, /* ensures presence even in pure fallback */
+    `<b>Baseline ceiling</b> = AADT ${fmt(calc.aadt)} × 2% × 8 × 30 = <b>${fmt(calc.ceiling)}</b>`,
     `Capacity cap (MPDs ${calc.regular_mpd}+${calc.diesel_mpd} diesel): <b>${fmt(calc.mpd_cap)}</b>`,
     `After cap: <b>${fmt(calc.after_cap)}</b>`,
-    `Competition factor: × ${calc.competition_factor} → <b>${fmt(calc.after_comp)}</b>`,
-    `Pricing factor: × ${calc.pricing_factor} → <b>${fmt(calc.after_pricing)}</b>`,
-    `Roadway: lanes × access × context = ${calc.lane_factor} × ${calc.access_factor} × ${calc.context_factor} → <b>${fmt(calc.after_roadway)}</b>`,
-    `Extras: ${extras} → <b>${fmt(calc.after_extras)}</b>`,
+    `Pricing factor applied`,
     `<b>Final (LOW)</b>: <b>${fmt(calc.low)}</b> • Range: ${fmt(calc.low)}–${fmt(calc.high)} • Y2: ${fmt(calc.year2)} • Y3: ${fmt(calc.year3)}`
   ];
   mathTableEl.innerHTML = rows.map(r=>`<div>${r}</div>`).join('');
@@ -527,28 +557,19 @@ function renderMathFallback(calc){
 /* =================== Summary cleanup =================== */
 function cleanSummary(text, hasDevs, isFallback){
   let s = (text || "").trim();
-
-  // strip common wrappers/prefixes
   if (s.startsWith('"') && s.endsWith('"')) s = s.slice(1, -1).trim();
   s = s.replace(/^```[\s\S]*?```/g, "").trim();
   s = s.replace(/^<\s*text\s*>\s*/i, "");
   s = s.replace(/^(text|summary)\s*:\s*/i, "");
-
-  // never show the term "CSV"
   s = s.replace(/\bCSV\b/gi, "").replace(/\s{2,}/g," ").trim();
-
-  // remove "no developments" statements if none exist
   if (!hasDevs) {
     s = s.replace(/(^|[\s])[^.]*\b(?:no|none|not any|no significant)\s+(?:recent\s+)?developments?[^.]*\./gi, " ");
   }
-
-  // if fallback AADT, remove any sentence that attributes to DOT
   if (isFallback) {
     const parts = s.split(/(?<=[.!?])\s+/);
     const dotRe = /\b(?:department of transportation(?:\s*\(dot\))?|state\s+(?:department of transportation|dot)|\bDOT\b|\bDoT\b)\b/i;
     s = parts.filter(p => !dotRe.test(p)).join(' ');
   }
-
   return s.replace(/\s{2,}/g," ").replace(/\s+\./g,".").trim();
 }
 
@@ -558,16 +579,14 @@ function isFallbackAADT(d){
   return method === "fallback_no_dot_found"; // ONLY hard fallback triggers STOP chip
 }
 
-/* =================== Rendering ======================== */
+/* =================== Rendering (Estimate path) ======================== */
 function renderAll(d){
-  // Estimate header
   outNum.textContent = fmt(d.estimate?.low ?? d.low ?? 0);
   const rangeTxt = d.estimate?.range || (d.low!=null && d.high!=null ? `${fmt(d.low)}–${fmt(d.high)}` : "—");
   outRange.textContent = "Full range: " + rangeTxt;
   outY2.textContent = fmt(d.estimate?.year2 ?? d.year2 ?? 0);
   outY3.textContent = fmt(d.estimate?.year3 ?? d.year3 ?? 0);
 
-  // AADT banner + STOP chip logic
   const fallback = isFallbackAADT(d);
   const usedRec = d?.map?.aadt_used || {};
   const usedVal = usedRec?.aadt ?? d?.inputs?.aadt_used ?? null;
@@ -580,14 +599,11 @@ function renderAll(d){
     fallbackChip.style.display = "none";
   }
 
-  // Math (server-aligned)
   if (d.calc_breakdown) renderMathFromServer(d);
   else renderMathFallback(buildCalcFallback(d));
 
-  // Competition line
   compLine.textContent = d.competitionText || "—";
 
-  // STOP: development stripe + list (never say "CSV")
   const hasDevs = Array.isArray(d.csv) && d.csv.length > 0;
   if (hasDevs) {
     const lines = d.csv.slice(0,6).map(x => {
@@ -605,16 +621,13 @@ function renderAll(d){
     devsBox.innerHTML = "<em>No developments flagged</em>";
   }
 
-  // Summary (GPT) — cleaned & DOT-free if fallback; never says "CSV"
   summaryBox.textContent = cleanSummary(d.summary || "", hasDevs, fallback) || "—";
 
-  // Maps
   initOrUpdateMainMap(d.map);
   if (d?.map?.competitor_radius_mi) {
     mapTitle.textContent = `Map: Site & competitors (${d.map.competitor_radius_mi} mi) + AADT dots + ⭐ AADT used`;
   }
 
-  // Second map + table (1 mile)
   if (d?.map?.site) {
     fetch(`/aadt/nearby?lat=${encodeURIComponent(d.map.site.lat)}&lon=${encodeURIComponent(d.map.site.lon)}&radiusMi=1`)
       .then(r => r.json()).then(j => {
@@ -633,7 +646,6 @@ function renderAll(d){
       }).catch(()=>{});
   }
 
-  // Rating
   showRating(addrInput.value.trim());
 }
 
@@ -678,13 +690,20 @@ function commitAddress(display, coords, placeId){
   addrInput.value = display;
   selectedCoords = coords || null;
   selectedPlaceId = placeId || null;
+
+  if (coords && mapReady) {
+    map.setView([coords.lat, coords.lon], 15);
+    if (cmpShow.checked) refreshCompetitors();
+  } else if (!mapReady) {
+    initMap();
+  }
 }
 function chooseAc(i){
   const it = acItems[i];
   if (!it) return;
   const coords = (Number.isFinite(it.lat) && Number.isFinite(it.lon)) ? { lat: it.lat, lon: it.lon } : null;
   commitAddress(it.display, coords, it.place_id || null);
-  addrInput.blur(); // collapse keyboard
+  addrInput.blur();
 }
 async function googleSearch(q){
   try {
@@ -711,20 +730,16 @@ function renderAc(list){
 }
 addrInput.addEventListener("input", () => {
   const q = addrInput.value.trim();
-
-  // Hard lock: keep suggestions hidden unless user deletes before the committed text
   if (addressLocked) {
     if (q.length >= lastCommittedText.length && q.startsWith(lastCommittedText)) {
       hideAc(); return;
     } else {
-      addressLocked = false; // they edited earlier chars; unlock
-      acCommitted = false;
+      addressLocked = false; acCommitted = false;
     }
   }
-
   if (acCommitted) {
     if (q === lastCommittedText) { hideAc(); return; }
-    acCommitted = false; // unlock if they truly edit
+    acCommitted = false;
   }
   if (q.length < 3) { hideAc(); return; }
   Promise.all([googleSearch(q), nominatimSearch(q)]).then(([g,n])=>{
@@ -734,9 +749,180 @@ addrInput.addEventListener("input", () => {
 });
 addrInput.addEventListener("blur", () => { setTimeout(hideAc, 120); });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") hideAc(); });
-document.addEventListener("pointerdown", (e) => {
-  if (e.target !== addrInput && !acBox.contains(e.target)) hideAc();
+document.addEventListener("pointerdown", (e) => { if (e.target !== addrInput && !acBox.contains(e.target)) hideAc(); });
+
+/* =================== NEW: Live Competitors module ====================== */
+function mapRadiusMi(){
+  if (!mapReady || !map) return 1.0;
+  const b = map.getBounds(), c = b.getCenter();
+  const meters = map.distance(c, b.getNorthEast());
+  return Math.max(CMP_MIN_MI, Math.min(CMP_MAX_MI, meters / 1609.344));
+}
+function keyFor(c, r){ const q = (x,n)=>Math.round(x*Math.pow(10,n))/Math.pow(10,n); return `${q(c.lat,4)},${q(c.lon,4)}:${q(r,1)}`; }
+
+function clearLiveMarkers(){
+  if (cmpClusterGroup){ cmpClusterGroup.clearLayers(); }
+  cmpMarkers.forEach(m => map.removeLayer(m));
+  cmpMarkers = [];
+  cmpBrandSet.clear();
+}
+function isBrandAllowed(b){ return cmpActiveBrands.size === 0 || cmpActiveBrands.has(b||"Unknown"); }
+
+function applyBrandFilterAndRedraw(){
+  if (cmpCluster.checked && window.L && L.MarkerClusterGroup) {
+    if (!cmpClusterGroup) cmpClusterGroup = L.markerClusterGroup();
+    cmpClusterGroup.clearLayers();
+  } else {
+    if (cmpClusterGroup) { map.removeLayer(cmpClusterGroup); cmpClusterGroup = null; }
+  }
+
+  const visibleMarkers = [];
+  for (const m of cmpMarkers) {
+    const allowed = isBrandAllowed(m.__brand);
+    if (allowed) visibleMarkers.push(m);
+    if (!cmpClusterGroup) {
+      if (allowed) { if (!map.hasLayer(m)) m.addTo(map); }
+      else { if (map.hasLayer(m)) map.removeLayer(m); }
+    }
+  }
+  if (cmpClusterGroup) {
+    cmpMarkers.forEach(m => { if (map.hasLayer(m)) map.removeLayer(m); });
+    cmpClusterGroup.addLayers(visibleMarkers);
+    if (!map.hasLayer(cmpClusterGroup)) cmpClusterGroup.addTo(map);
+  }
+
+  if (cmpHeat.checked && window.L && L.heatLayer) {
+    const pts = [];
+    const bounds = map.getBounds();
+    for (const m of visibleMarkers) {
+      const latlng = m.getLatLng();
+      if (!bounds || bounds.contains(latlng)) pts.push([latlng.lat, latlng.lng, 0.7]);
+    }
+    if (!cmpHeatLayer) cmpHeatLayer = L.heatLayer(pts, { radius: 24, blur: 18, maxZoom: 18 });
+    else cmpHeatLayer.setLatLngs(pts);
+    if (!map.hasLayer(cmpHeatLayer)) cmpHeatLayer.addTo(map);
+  } else {
+    if (cmpHeatLayer && map.hasLayer(cmpHeatLayer)) map.removeLayer(cmpHeatLayer);
+  }
+
+  updateLegendAndFilters();
+  updateLiveStats();
+}
+function updateLegendAndFilters(){
+  const brands = [...cmpBrandSet].sort((a,b)=>a.localeCompare(b));
+  brandLegend.innerHTML = brands.map(b => `<span><span class="cmp-dot" style="background:${colorForBrand(b)}"></span> ${esc(b)}</span>`).join("");
+  if (brands.length === 0) {
+    brandFilters.innerHTML = '<span class="subtle">No brands yet.</span>';
+    return;
+  }
+  brandFilters.innerHTML = brands.map(b=>{
+    const checked = (cmpActiveBrands.size===0 || cmpActiveBrands.has(b)) ? "checked" : "";
+    return `<label class="chip"><input type="checkbox" class="bf" data-brand="${esc(b)}" ${checked}> ${esc(b)}</label>`;
+  }).join("");
+}
+function updateLiveStats(){
+  const b = map.getBounds(); let total=0; const counts=new Map();
+  for (const m of cmpMarkers){
+    if (!map.hasLayer(m) && !cmpClusterGroup) continue;
+    const allowed = isBrandAllowed(m.__brand);
+    if (!allowed) continue;
+    const latlng = m.getLatLng();
+    if (!b || b.contains(latlng)) {
+      total++;
+      counts.set(m.__brand, (counts.get(m.__brand)||0)+1);
+    }
+  }
+  liveCount.textContent = fmt(total);
+  liveUnique.textContent = fmt(counts.size);
+  const rows = [...counts.entries()].sort((a,b)=>b[1]-a[1]).slice(0,16)
+    .map(([br,n])=>`<div><span class="cmp-dot" style="background:${colorForBrand(br)}"></span> ${esc(br)} — <b>${fmt(n)}</b></div>`);
+  liveBreakdown.innerHTML = rows.join("") || '<span class="subtle">No competitors visible.</span>';
+}
+function markerHTML(brand){ return `<span class="cmp-dot" style="background:${colorForBrand(brand)}"></span>`; }
+function makeMarker(lat, lon, brand, name, addr){
+  const icon = L.divIcon({ className:"", html: markerHTML(brand), iconSize:[10,10], iconAnchor:[5,5] });
+  const m = L.marker([lat,lon], { icon, title: `${brand||"Brand"} — ${name||""}`, keyboard:false });
+  m.__brand = brand || "Unknown";
+  m.bindPopup(`<b>${esc(brand||"Brand")}</b> — ${esc(name||"")}<div class="small" style="opacity:.8">${esc(addr||"")}</div>`);
+  return m;
+}
+async function fetchCompetitorsForView(){
+  if (!mapReady) return null;
+  const b = map.getBounds(), c = b.getCenter();
+  const rMi = mapRadiusMi();
+  const key = keyFor({lat:c.lat, lon:c.lng}, rMi);
+
+  const cached = cmpCache.get(key);
+  const headers = {};
+  if (cached?.etag) headers["If-None-Match"] = cached.etag;
+
+  cmpStatus.textContent = `Loading… (~${rMi.toFixed(1)} mi)`;
+  try {
+    const res = await fetch(`${COMP_API}?lat=${encodeURIComponent(c.lat)}&lon=${encodeURIComponent(c.lng)}&radiusMi=${encodeURIComponent(rMi.toFixed(2))}`, { headers });
+    if (res.status === 304 && cached?.geo) {
+      cmpStatus.textContent = `Ready (cached)`;
+      return cached.geo;
+    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const etag = res.headers.get("ETag") || null;
+    const geo = await res.json();
+    cmpCache.set(key, { etag, geo });
+    cmpStatus.textContent = `Ready`;
+    return geo;
+  } catch (e) {
+    cmpStatus.textContent = `Load failed`;
+    return null;
+  }
+}
+async function refreshCompetitors(){
+  const geo = await fetchCompetitorsForView();
+  if (!geo || !Array.isArray(geo.features)) return;
+
+  if (cmpHeatLayer && map.hasLayer(cmpHeatLayer)) map.removeLayer(cmpHeatLayer);
+  clearLiveMarkers();
+
+  for (const f of geo.features){
+    const g = f.geometry, p = f.properties || {};
+    const coords = Array.isArray(g?.coordinates) ? g.coordinates : null;
+    if (!coords || coords.length < 2) continue;
+    const lon = +coords[0], lat = +coords[1];
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+    const brand = p.brand || "Unknown";
+    const m = makeMarker(lat, lon, brand, p.name, p.address);
+    cmpMarkers.push(m);
+    cmpBrandSet.add(brand);
+  }
+
+  if (map.hasLayer(serverCompLayer)) map.removeLayer(serverCompLayer);
+  updateLegendAndFilters();
+  applyBrandFilterAndRedraw();
+}
+
+/* =================== Events (Competitor UI) ====================== */
+cmpShow.addEventListener("change", () => {
+  if (cmpShow.checked) {
+    if (!mapReady) initMap();
+    refreshCompetitors();
+  } else {
+    if (cmpHeatLayer && map.hasLayer(cmpHeatLayer)) map.removeLayer(cmpHeatLayer);
+    if (cmpClusterGroup) { cmpClusterGroup.clearLayers(); map.removeLayer(cmpClusterGroup); }
+    cmpMarkers.forEach(m => map.removeLayer(m));
+    if (!map.hasLayer(serverCompLayer)) serverCompLayer.addTo(map);
+    cmpStatus.textContent = "—";
+  }
 });
+cmpHeat.addEventListener("change", applyBrandFilterAndRedraw);
+cmpCluster.addEventListener("change", applyBrandFilterAndRedraw);
+brandFilters.addEventListener("change", (e)=>{
+  const t = e.target;
+  if (t && t.matches('input.bf[data-brand]')){
+    const b = t.getAttribute("data-brand");
+    if (t.checked) cmpActiveBrands.add(b); else cmpActiveBrands.delete(b);
+    applyBrandFilterAndRedraw();
+  }
+});
+brandsClear.addEventListener("click", () => { cmpActiveBrands.clear(); updateLegendAndFilters(); applyBrandFilterAndRedraw(); });
+brandsAll.addEventListener("click", () => { cmpActiveBrands = new Set(cmpBrandSet); updateLegendAndFilters(); applyBrandFilterAndRedraw(); });
 
 /* =================== Main events ====================== */
 function tidyUI(){ hideAc(); }
@@ -746,10 +932,15 @@ async function onEstimateClick(){
     return;
   }
   try {
-    goBtn.disabled = true; setOverlayWorking(); tidyUI();
+    goBtn.disabled = true; setOverlayWorking("Working…");
+    tidyUI();
     const resp = await callEstimate();
     if (!resp || resp.ok !== true) { alert("Estimate failed: " + (resp?.status || "Unknown error")); return; }
     renderAll(resp); pills();
+
+    if (cmpShow.checked && map && serverCompLayer && map.hasLayer(serverCompLayer)) {
+      map.removeLayer(serverCompLayer);
+    }
   } catch (e) {
     alert("Error: " + (e?.message || e));
   } finally {
@@ -759,88 +950,47 @@ async function onEstimateClick(){
 goBtn.addEventListener("click", onEstimateClick);
 addrInput.addEventListener("keydown", (e)=>{ if(e.key==="Enter"){ e.preventDefault(); onEstimateClick(); } });
 
-/* =================== PDF Export ======================= */
-async function captureMapImage(){
-  // Try leaflet-image first
-  try {
-    if (typeof leafletImage === "function" && window.map) {
-      return await new Promise((resolve) => {
-        leafletImage(window.map, (err, canvas) => {
-          if (err || !canvas) return resolve(null);
-          try { resolve(canvas.toDataURL("image/png")); } catch { resolve(null); }
-        });
-      });
-    }
-  } catch {}
-  // Fallback to html2canvas (usesCORS: true)
-  try {
-    if (window.html2canvas) {
-      const node = document.getElementById("map");
-      const cvs = await html2canvas(node, { useCORS: true, backgroundColor: null });
-      return cvs.toDataURL("image/png");
-    }
-  } catch {}
-  return null;
-}
-
+/* =================== Export to PDF (SERVER-SIDE) ======================= */
 document.getElementById("exportPDF").addEventListener("click", async ()=>{
   try{
-    const { jsPDF } = window.jspdf || {};
-    if(!jsPDF){ alert("PDF library failed to load"); return; }
-    const doc=new jsPDF({unit:"pt",format:"a4"});
-    const pageW=595, pageH=842, margin=36, contentW=pageW - margin*2;
-
-    doc.setFont("helvetica","bold"); doc.setFontSize(18);
-    doc.text("Sunoco, LP Fuel IQ — Fuel Site Analyzer", margin, margin+6);
-
-    doc.setFont("helvetica","normal"); doc.setFontSize(11);
-    const lines = doc.splitTextToSize(document.getElementById("summary").innerText || "", contentW);
-    doc.text(lines, margin, margin+28);
-
-    let cursorY = margin + 28 + lines.length*14 + 16;
-
-    const key = [
-      `Address: ${document.getElementById("addr").value || "-"}`,
-      `MPDs: ${document.getElementById("mpds").value}   Diesel: ${document.getElementById("diesel").value}`,
-      document.getElementById("aadtBanner").innerText,
-      `Estimate (LOW): ${document.getElementById("estNum").innerText}  |  Range: ${document.getElementById("estRange").innerText.replace("Full range: ","")}`,
-      document.getElementById("compLine").innerText
-    ].join("\n");
-    const keyLines = doc.splitTextToSize(key, contentW);
-    doc.text(keyLines, margin, cursorY);
-    cursorY += keyLines.length*14 + 12;
-
-    // Math table
-    const mathTxt = (document.getElementById('mathTable')?.innerText || '').trim();
-    if (mathTxt) {
-      const mathLines = doc.splitTextToSize("Math & Assumptions:\n" + mathTxt, contentW);
-      if (cursorY + mathLines.length*14 > pageH - margin) { doc.addPage(); cursorY = margin; }
-      doc.setFont("helvetica","bold"); doc.text("Math & Assumptions", margin, cursorY); cursorY += 14;
-      doc.setFont("helvetica","normal"); doc.text(mathLines, margin, cursorY);
-      cursorY += mathLines.length*14 + 12;
+    if(!addrInput.value.trim() && !selectedCoords){
+      alert("Please select a valid address first.");
+      return;
     }
+    const body = {
+      address: addrInput.value.trim(),
+      mpds: +document.getElementById("mpds").value || 0,
+      diesel: +document.getElementById("diesel").value || 0,
+      aadtOverride: +(document.getElementById("aadtOverride").value || "") || null,
+      advanced: {
+        price_position: getPricePosition(),
+        flags: getFlags(),
+        extra: collectExtras()
+      }
+    };
+    if (selectedCoords) { body.siteLat = selectedCoords.lat; body.siteLon = selectedCoords.lon; }
 
-    // Map snapshot
-    const mapImg = await captureMapImage();
-    const imgW = contentW, imgH = 260;
-    if (mapImg) {
-      if (cursorY + imgH > pageH - margin) { doc.addPage(); cursorY = margin; }
-      doc.setFont("helvetica","bold"); doc.text("Map & Competitors", margin, cursorY);
-      cursorY += 12;
-      doc.addImage(mapImg, "PNG", margin, cursorY, imgW, imgH);
-      cursorY += imgH + 12;
+    setOverlayWorking("Building PDF report…");
+    const resp = await fetch("/report/pdf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    if (!resp.ok) {
+      const t = await resp.text().catch(()=>null);
+      throw new Error("Server PDF failed: " + (t || resp.statusText));
     }
-
-    // AADT table
-    const tbl = document.getElementById("aadtTable").innerText || "";
-    const devLines = doc.splitTextToSize("AADT Sources (1 mi):\n" + tbl, contentW);
-    if (cursorY + devLines.length*14 > pageH - margin) { doc.addPage(); cursorY = margin; }
-    doc.setFont("helvetica","bold"); doc.text("AADT Sources", margin, cursorY); cursorY += 14;
-    doc.setFont("helvetica","normal"); doc.text(devLines, margin, cursorY);
-
-    doc.save("FuelIQ_Site_Analyzer.pdf");
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "FuelIQ_Site_Report.pdf";
+    a.click();
+    URL.revokeObjectURL(url);
   }catch(e){
-    alert("Export failed: " + (e?.message || e));
+    alert("PDF export failed: " + (e?.message || e));
+  }finally{
+    clearOverlay();
   }
 });
 
@@ -851,8 +1001,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     const j = await r.json();
     apiStatus.textContent = j.ok ? "API: Google — Working" : `API: Google — ${j.status}`;
   } catch { apiStatus.textContent = "API: Google — unavailable"; }
+  initMap();
 });
-overlay.textContent="—";
   </script>
 </body>
 </html>
