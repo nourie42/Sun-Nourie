@@ -269,9 +269,9 @@ const liveCount = $("liveCount"), liveUnique = $("liveUnique"), liveBreakdown = 
 /* State */
 let map, layer, serverCompLayer, mapReady = false, selectedCoords = null, selectedPlaceId = null;
 let aadtMap, aadtLayer, aadtReady = false;
-let acItems = [], acActive = -1;
-let lastSelectedDisplay = "";     // for extracting entered road
-let siteCenter = null;           // anchor competitors to site
+let acItems = [], acActive = -1;          // <- single declaration (bug fix)
+let lastSelectedDisplay = "";
+let siteCenter = null;
 const DEFAULT_CMP_RADIUS = 3.0;
 
 /* Utils */
@@ -279,6 +279,7 @@ function fmt(n){ return (n??0).toLocaleString(undefined,{maximumFractionDigits:0
 function esc(s){ return (s??"").toString().replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
 function setOverlayWorking(msg="Working…"){ overlay.textContent = msg; overlay.style.display = "flex"; }
 function clearOverlay(){ overlay.style.display = "none"; }
+function haversineMiles(a,b,c,d){ const R=3958.7613; const toRad=(x)=>x*Math.PI/180; const dLat=toRad(c-a), dLon=toRad(d-b); const s1=Math.sin(dLat/2), s2=Math.sin(dLon/2); return 2*R*Math.asin(Math.sqrt(s1*s1 + Math.cos(toRad(a))*Math.cos(toRad(c))*s2*s2)); }
 
 /* -------------------- Map & SV -------------------- */
 function initMap(){ if(mapReady) return;
@@ -288,7 +289,6 @@ function initMap(){ if(mapReady) return;
   serverCompLayer = L.layerGroup().addTo(map);
   mapReady = true;
   map.on("moveend", () => {
-    // If user pans after a site is selected, we still anchor competitors to the site
     if (cmpShow.checked && siteCenter) refreshCompetitors();
     updateLiveStats();
   });
@@ -318,7 +318,7 @@ function initOrUpdateMainMap(m){
   layer.clearLayers(); serverCompLayer.clearLayers();
   if(!m || !m.site) return;
   const site = [m.site.lat, m.site.lon];
-  siteCenter = { lat: m.site.lat, lon: m.site.lon }; // anchor competitors
+  siteCenter = { lat: m.site.lat, lon: m.site.lon };
   L.marker(site,{title:"Site"}).addTo(layer).bindPopup("<b>Site</b>");
   const pts = [site];
   if (m.aadt) renderAADTMarkers(m.aadt, m.aadt_used);
@@ -541,7 +541,6 @@ function renderAll(d){
   }
   showRating(addrInput.value.trim());
 
-  // After we render the server-provided competitors once, keep live layer anchored to siteCenter
   if (cmpShow.checked) refreshCompetitors();
 }
 
@@ -569,8 +568,7 @@ async function showRating(address){
   $("ratingLine").innerHTML = (rating != null && rating !== undefined) ? `\u2B50 ${rating} (${total||0} reviews)` : "—";
 }
 
-/* -------------------- Autocomplete (always on) -------------------- */
-let acItems = [], acActive = -1;
+/* -------------------- Autocomplete (closest-first) -------------------- */
 function hideAc(){ acBox.style.display = "none"; acActive = -1; }
 function chooseAc(i){
   const it = acItems[i]; if (!it) return;
@@ -591,6 +589,8 @@ function renderAc(list){
 }
 function rankAutocompleteItems(q, items){
   const Q = q.trim().toLowerCase();
+  let center = { lat: 39.8283, lon: -98.5795 }; // US center fallback
+  if (mapReady) { const c = map.getCenter(); center = { lat: c.lat, lon: c.lng }; }
   return [...items].sort((a,b)=>{
     const A = (a.display||"").toLowerCase(), B = (b.display||"").toLowerCase();
     const aw = a.type==="Google"?1.2:0.8, bw = b.type==="Google"?1.2:0.8;
@@ -599,8 +599,12 @@ function rankAutocompleteItems(q, items){
     const aIdx = A.indexOf(Q); const bIdx = B.indexOf(Q);
     const aPen = aIdx>=0 ? aIdx/40 : 1.5;
     const bPen = bIdx>=0 ? bIdx/40 : 1.5;
-    const as = aw + aStarts - aPen;
-    const bs = bw + bStarts - bPen;
+    const aDist = (Number.isFinite(a.lat)&&Number.isFinite(a.lon))?haversineMiles(center.lat, center.lon, a.lat, a.lon):50;
+    const bDist = (Number.isFinite(b.lat)&&Number.isFinite(b.lon))?haversineMiles(center.lat, center.lon, b.lat, b.lon):50;
+    const aNear = Math.max(0, (30 - aDist)) / 10;  // closer => bigger
+    const bNear = Math.max(0, (30 - bDist)) / 10;
+    const as = aw + aStarts - aPen + aNear;
+    const bs = bw + bStarts - bPen + bNear;
     return bs - as;
   });
 }
@@ -610,7 +614,7 @@ async function googleSearch(q){
     const r = await fetch("/google/autocomplete?input=" + encodeURIComponent(q) + bias);
     const j = await r.json();
     if(!j.ok) return [];
-    return (j.items||[]).map(it => ({...it, type:"Google", score:1.3}));
+    return (j.items||[]).map(it => ({...it, type:"Google", score:1.3 }));
   } catch { return []; }
 }
 async function nominatimSearch(q){
@@ -744,11 +748,10 @@ $("brandsClear").addEventListener("click", () => { cmpActiveBrands.clear(); upda
 $("brandsAll").addEventListener("click", () => { cmpActiveBrands = new Set(cmpBrandSet); updateLegendAndFilters(); applyBrandFilterAndRedraw(); });
 
 /* -------------------- Main actions -------------------- */
-function tidyUI(){ /* keep for future */ }
 async function onEstimateClick(){
   if(!addrInput.value.trim() && !selectedCoords){ alert("Please select a valid address first."); return; }
   try {
-    $("go").disabled = true; setOverlayWorking("Working…"); tidyUI();
+    $("go").disabled = true; setOverlayWorking("Working…");
     const resp = await callEstimate();
     if (!resp || resp.ok !== true) { alert("Estimate failed: " + (resp?.status || "Unknown error")); return; }
     renderAll(resp); pills();
