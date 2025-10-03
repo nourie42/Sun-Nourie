@@ -6,14 +6,19 @@
 //  - GPT prompt no longer mentions "CSV"; uses "nearby developments"
 //  - Breakdown carries compCount & heavyCount so UI can always display them
 //  - "Nearest DOT station" wording (no "fallback" term for DOT case)
+//  - NEW: /api/competitors endpoint for persistent map layer (GeoJSON + ETag)
+//  - NEW: /report/pdf endpoint (server-side PDF with site image, competitor map, GPT summary, reasons)
+//  - NEW: performEstimate() helper so PDF can reuse estimate logic safely
 
 import express from "express";
 import cors from "cors";
 import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
+import crypto from "crypto";             // NEW (for ETag + hashing)
+import PDFDocument from "pdfkit";       // NEW (server-side PDF)
 
-/* --------------------------- App & static UI --------------------------- */
+// --------------------------- App & static UI ---------------------------
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
@@ -36,14 +41,14 @@ app.get("/", (_req, res) => {
 });
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
-/* ------------------------------ Config ------------------------------ */
+// ------------------------------ Config ------------------------------
 const UA = "FuelEstimator/3.4 (+your-app)";
 const CONTACT = process.env.OVERPASS_CONTACT || UA;
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || "";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 
-/* --------------------- fetch() helper (Node 16/18) --------------------- */
+// --------------------- fetch() helper (Node 16/18) ---------------------
 let _cachedFetch = null;
 async function getFetch() {
   if (typeof fetch === "function") return fetch;
@@ -60,7 +65,7 @@ async function fetchWithTimeout(url, opts = {}, timeoutMs = 25000) {
   finally { clearTimeout(id); }
 }
 
-/* -------------------- CSV (Developments STOP banner) -------------------- */
+// -------------------- CSV (Developments STOP banner) --------------------
 // (Data still read from CSV file, but "CSV" is never surfaced to the end user.)
 let csvDevData = [];
 function parseCsvString(csv) {
@@ -123,7 +128,7 @@ function matchCsvDevelopments(city, county, state) {
 }
 loadCsvDevData().catch(() => {});
 
-/* ------------------------------ Utils ------------------------------ */
+// ------------------------------ Utils ------------------------------
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const toMiles = (m) => m / 1609.344;
 function haversine(lat1, lon1, lat2, lon2) {
@@ -135,7 +140,7 @@ function haversine(lat1, lon1, lat2, lon2) {
 }
 function distMiles(a, b, c, d) { return toMiles(haversine(a, b, c, d)); }
 
-/* -------------------------- Geocoding helpers -------------------------- */
+// -------------------------- Geocoding helpers --------------------------
 function tryParseLatLng(address) {
   const m = String(address || "").trim().match(/^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/);
   if (!m) return null;
@@ -191,7 +196,7 @@ async function geocode(address) {
   else { try { return await geocodeNominatim(address); } catch { return await geocodeCensus(address); } }
 }
 
-/* --------------------------- State detection --------------------------- */
+// --------------------------- State detection ---------------------------
 const STATE_CODE = {
   "alabama":"AL","alaska":"AK","arizona":"AZ","arkansas":"AR","california":"CA","colorado":"CO",
   "connecticut":"CT","delaware":"DE","district of columbia":"DC","washington, dc":"DC","dc":"DC",
@@ -208,15 +213,15 @@ function toStateCode(name) {
   return STATE_CODE[s] || (s.length === 2 ? s.toUpperCase() : null);
 }
 
-/* --------------------- Official DOT AADT providers --------------------- */
+// --------------------- Official DOT AADT providers ---------------------
 const AADT_PROVIDERS = {
   NC: { kind: "arcgis", url: "https://services.arcgis.com/NuWFvHYDMVmmxMeM/ArcGIS/rest/services/NCDOT_AADT_Stations/FeatureServer/0", geoType: "point" }, // NCDOT stations
   VA: { kind: "arcgis", url: "https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/VDOTTrafficVolume/FeatureServer/0", geoType: "line" },          // VDOT Traffic Volume
   DC: { kind: "arcgis", url: "https://maps2.dcgis.dc.gov/dcgis/rest/services/DCGIS_DATA/Transportation_TrafficVolume_WebMercator/MapServer/4", geoType: "line" }, // DDOT 2023 volume
-  FL: { kind: "arcgis", url: "https://gis-fdot.opendata.arcgis.com/datasets/annual-average-daily-traffic-tda/explore", geoType: "line" },                                    // FDOT AADT TDA
+  FL: { kind: "arcgis", url: "https://gis-fdot.opendata.arcgis.com/datasets/annual-average-daily-traffic-tda/explore", geoType: "line" },                        // FDOT AADT TDA
 };
 
-/* -------------------------- ArcGIS query helpers -------------------------- */
+// -------------------------- ArcGIS query helpers --------------------------
 async function arcgisQueryNearby(url, lat, lon, radiusMeters = 1609, outFields = "*") {
   const p = new URLSearchParams({
     f: "json",
@@ -252,7 +257,7 @@ async function arcgisQueryWhere(url, where, outFields = "*", returnGeometry = tr
   return Array.isArray(j.features) ? j.features : [];
 }
 
-/* ------------------------- AADT parsing utilities ------------------------- */
+// ------------------------- AADT parsing utilities -------------------------
 function extractLatestAADT(attrs) {
   if (!attrs) return null;
   const pairs = [];
@@ -377,7 +382,7 @@ function pickStationForStreet(stations, streetText) {
   return stations[0];
 }
 
-/* ---------------------- Provider query wrappers ---------------------- */
+// ---------------------- Provider query wrappers ----------------------
 async function providerNearbyAADT(stateCode, lat, lon, radiusMi = 1.0) {
   const prov = AADT_PROVIDERS[stateCode];
   if (!prov) return [];
@@ -395,7 +400,7 @@ async function providerStationsOnStreet(stateCode, lat, lon, streetText) {
   return st.filter(s => s.distM <= 1.5 * 1609.344);
 }
 
-/* --------------------- Competition (OSM + Google) --------------------- */
+// --------------------- Competition (OSM + Google) ---------------------
 const OVERPASS = [
   "https://overpass-api.de/api/interpreter",
   "https://overpass.kumi.systems/api/interpreter",
@@ -493,7 +498,7 @@ async function competitorsWithinRadiusMiles(lat, lon, rMi = 1.5) {
   return out.filter((s) => s.miles <= rMi);
 }
 
-/* ----------------------- Road context (heuristic only) ----------------------- */
+// ----------------------- Road context (heuristic only) -----------------------
 function parseMaxspeed(ms) { const m = String(ms || "").match(/(\d+)\s*(mph)?/i); return m ? +m[1] : null; }
 function roadWeight(hw) {
   const order = { motorway: 6, trunk: 5, primary: 4, secondary: 3, tertiary: 2, unclassified: 1, residential: 1 };
@@ -532,7 +537,7 @@ async function roadContext(lat, lon) {
   return { summary: [mainLabel, sideLabel].filter(Boolean).join(" — "), main, side, signals, intersections };
 }
 
-/* ------------------------- Gallons computation ------------------------- */
+// ------------------------- Gallons computation -------------------------
 function gallonsWithRules({ aadt, mpds, diesel, compCount, heavyCount, pricePosition, userExtrasMult = 1 }) {
   // Baseline ceiling (unchanged): AADT × 2% × 8 × 30
   const baseline = aadt * 0.02 * 8 * 30;
@@ -580,7 +585,7 @@ function gallonsWithRules({ aadt, mpds, diesel, compCount, heavyCount, pricePosi
   };
 }
 
-/* ------------------------ Google proxy/status ------------------------ */
+// ------------------------ Google proxy/status ------------------------
 app.get("/google/status", async (_req, res) => {
   try {
     if (!GOOGLE_API_KEY) return res.json({ ok: false, status: "MISSING_KEY" });
@@ -666,7 +671,7 @@ app.get("/google/rating_by_location", async (req, res) => {
   } catch (e) { res.json({ ok: false, status: "EXCEPTION", error: String(e) }); }
 });
 
-/* --------------------- AADT sources list (1 mile) --------------------- */
+// --------------------- AADT sources list (1 mile) ---------------------
 app.get("/aadt/nearby", async (req, res) => {
   try {
     const lat = +req.query.lat, lon = +req.query.lon;
@@ -690,138 +695,138 @@ app.get("/aadt/nearby", async (req, res) => {
   }
 });
 
-/* ----------------------------- Estimate core ----------------------------- */
-app.post("/estimate", async (req, res) => {
-  try {
-    const {
-      address, mpds, diesel, siteLat, siteLon, aadtOverride, advanced,
-      client_rating, auto_low_rating,
-    } = req.body || {};
+// ============================= Estimate core =============================
+// We refactor your /estimate logic into a helper so PDF can reuse it safely.
+async function performEstimate(reqBody) {
+  const {
+    address, mpds, diesel, siteLat, siteLon, aadtOverride, advanced,
+    client_rating, auto_low_rating,
+  } = reqBody || {};
 
-    const MPDS = +mpds, DIESEL = +(diesel || 0);
-    if (!(Number.isFinite(MPDS) && MPDS > 0)) {
-      return res.status(400).json({ ok: false, status: "Regular MPDs required (>0)" });
+  const MPDS = +mpds, DIESEL = +(diesel || 0);
+  if (!(Number.isFinite(MPDS) && MPDS > 0)) {
+    throw new Error("Regular MPDs required (>0)");
+  }
+  if (!address && !(Number.isFinite(siteLat) && Number.isFinite(siteLon))) {
+    throw new Error("Address or coordinates required");
+  }
+
+  const pricePosition = String(advanced?.price_position || "inline");
+
+  // Geocode/admin + entered street
+  let geo;
+  if (Number.isFinite(siteLat) && Number.isFinite(siteLon)) {
+    geo = { lat: +siteLat, lon: +siteLon, label: address || `${siteLat}, ${siteLon}` };
+  } else {
+    geo = await geocode(address);
+  }
+  const [admin, enteredStreet] = await Promise.all([
+    reverseAdmin(geo.lat, geo.lon),
+    reverseStreet(geo.lat, geo.lon)
+  ]);
+  const stateCode = toStateCode(admin.state) || "NC";
+
+  // Competition
+  const compAll3 = await competitorsWithinRadiusMiles(geo.lat, geo.lon, 3.0).catch(() => []);
+  const competitors15 = compAll3.filter((c) => c.miles <= 1.5);
+  const compCount = competitors15.length;
+  const heavyCount = competitors15.filter((c) => c.heavy).length;
+  const sunocoNearby = compAll3.some((c) => c.sunoco && c.miles <= 1.0);
+  const ruralEligible = compAll3.length === 0;
+
+  // Developments (from CSV file, label hidden)
+  const devCsv = matchCsvDevelopments(admin.city, admin.county, admin.state);
+
+  // Road context
+  const roads = await roadContext(geo.lat, geo.lon).catch(() => ({ summary: "", main: [], side: [], signals: 0, intersections: 0 }));
+
+  // ------------------ DOT AADT selection (entered road first) ------------------
+  let usedAADT = null, method = "dot_station_on_entered_road";
+  let aadtUsedMarker = null;
+  let mapStations = [];
+
+  const overrideVal = Number(aadtOverride);
+  if (Number.isFinite(overrideVal) && overrideVal > 0) {
+    usedAADT = Math.round(overrideVal); method = "override";
+  } else {
+    let onStreet = await providerStationsOnStreet(stateCode, geo.lat, geo.lon, enteredStreet).catch(() => []);
+    if (!onStreet.length && roads?.main?.[0]?.name) {
+      onStreet = await providerStationsOnStreet(stateCode, geo.lat, geo.lon, roads.main[0].name).catch(() => []);
     }
-    if (!address && !(Number.isFinite(siteLat) && Number.isFinite(siteLon))) {
-      return res.status(400).json({ ok: false, status: "Address or coordinates required" });
+    mapStations = await providerNearbyAADT(stateCode, geo.lat, geo.lon, 1.0).catch(() => []);
+    let pick = null;
+    if (onStreet.length) pick = pickStationForStreet(onStreet, enteredStreet || roads?.main?.[0]?.name || "");
+    if (!pick) { method = "dot_station_nearest"; pick = mapStations[0] || null; } // <- rename (no "fallback" in label)
+    if (pick) {
+      usedAADT = pick.aadt;
+      aadtUsedMarker = {
+        lat: pick.lat, lon: pick.lon, aadt: pick.aadt, year: pick.year,
+        route: pick.route, location: pick.location,
+        station_id: pick.station_id, source_url: AADT_PROVIDERS[stateCode]?.url || null,
+        state: stateCode,
+        fallback: false,
+        method
+      };
     }
+  }
+  if (!(Number.isFinite(usedAADT) && usedAADT > 0)) { usedAADT = 8000; method = "fallback_no_dot_found"; }
 
-    const pricePosition = String(advanced?.price_position || "inline");
+  // --------------------------- Gallons (DOT direct) ---------------------------
+  let userExtrasMult = 1.0;
+  const extras = (advanced?.extra || [])
+    .map((e) => ({ pct: +e?.pct, note: String(e?.note || "").slice(0, 180) }))
+    .filter((e) => Number.isFinite(e.pct));
+  if (extras.length) userExtrasMult *= extras.reduce((m, e) => m * (1 + e.pct / 100), 1.0);
+  const ruralRequested = !!(advanced && advanced.flags && advanced.flags.rural === true);
+  const ruralApplied = ruralRequested && ruralEligible;
+  if (ruralApplied) userExtrasMult *= 1.30;
+  const autoLow = auto_low_rating === true || (Number.isFinite(client_rating) && client_rating < 4.0);
+  if (autoLow) userExtrasMult *= 0.70;
 
-    // Geocode/admin + entered street
-    let geo;
-    if (Number.isFinite(siteLat) && Number.isFinite(siteLon)) {
-      geo = { lat: +siteLat, lon: +siteLon, label: address || `${siteLat}, ${siteLon}` };
-    } else {
-      geo = await geocode(address);
-    }
-    const [admin, enteredStreet] = await Promise.all([
-      reverseAdmin(geo.lat, geo.lon),
-      reverseStreet(geo.lat, geo.lon)
-    ]);
-    const stateCode = toStateCode(admin.state) || "NC";
+  const calc = gallonsWithRules({
+    aadt: usedAADT, mpds: MPDS, diesel: DIESEL, compCount, heavyCount, pricePosition, userExtrasMult,
+  });
 
-    // Competition
-    const compAll3 = await competitorsWithinRadiusMiles(geo.lat, geo.lon, 3.0).catch(() => []);
-    const competitors15 = compAll3.filter((c) => c.miles <= 1.5);
-    const compCount = competitors15.length;
-    const heavyCount = competitors15.filter((c) => c.heavy).length;
-    const sunocoNearby = compAll3.some((c) => c.sunoco && c.miles <= 1.0);
-    const ruralEligible = compAll3.length === 0;
-
-    // Developments (from CSV file, label hidden)
-    const devCsv = matchCsvDevelopments(admin.city, admin.county, admin.state);
-
-    // Road context
-    const roads = await roadContext(geo.lat, geo.lon).catch(() => ({ summary: "", main: [], side: [], signals: 0, intersections: 0 }));
-
-    // ------------------ DOT AADT selection (entered road first) ------------------
-    let usedAADT = null, method = "dot_station_on_entered_road";
-    let aadtUsedMarker = null;
-    let mapStations = [];
-
-    const overrideVal = Number(aadtOverride);
-    if (Number.isFinite(overrideVal) && overrideVal > 0) {
-      usedAADT = Math.round(overrideVal); method = "override";
-    } else {
-      let onStreet = await providerStationsOnStreet(stateCode, geo.lat, geo.lon, enteredStreet).catch(() => []);
-      if (!onStreet.length && roads?.main?.[0]?.name) {
-        onStreet = await providerStationsOnStreet(stateCode, geo.lat, geo.lon, roads.main[0].name).catch(() => []);
+  // ------------------------------ GPT summary ------------------------------
+  async function gptJSONCore(model, prompt) {
+    if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY missing");
+    const r = await fetchWithTimeout(
+      "https://api.openai.com/v1/chat/completions",
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model,
+          response_format: { type: "json_object" },
+          temperature: 0.2,
+          max_tokens: 1200,
+          messages: [
+            { role: "system", content: "You are a precise fuel/traffic analyst. Always reply with STRICT JSON (no markdown)." },
+            { role: "user", content: prompt },
+          ],
+        }),
+      },
+      35000
+    );
+    const txt = await r.text(); if (!r.ok) throw new Error(`OpenAI ${r.status}: ${txt}`);
+    const data = JSON.parse(txt); const content = data.choices?.[0]?.message?.content;
+    if (!content) throw new Error("No GPT content");
+    return JSON.parse(content);
+  }
+  async function gptJSONWithRetry(prompt) {
+    const models = ["gpt-4o-mini", "gpt-4o"];
+    let last = null;
+    for (const m of models) {
+      for (let i = 0; i < 2; i++) {
+        try { return await gptJSONCore(m, prompt); }
+        catch (e) { last = e; await sleep(400); }
       }
-      mapStations = await providerNearbyAADT(stateCode, geo.lat, geo.lon, 1.0).catch(() => []);
-      let pick = null;
-      if (onStreet.length) pick = pickStationForStreet(onStreet, enteredStreet || roads?.main?.[0]?.name || "");
-      if (!pick) { method = "dot_station_nearest"; pick = mapStations[0] || null; } // <- rename (no "fallback" in label)
-      if (pick) {
-        usedAADT = pick.aadt;
-        aadtUsedMarker = {
-          lat: pick.lat, lon: pick.lon, aadt: pick.aadt, year: pick.year,
-          route: pick.route, location: pick.location,
-          station_id: pick.station_id, source_url: AADT_PROVIDERS[stateCode]?.url || null,
-          state: stateCode,
-          fallback: false,
-          method
-        };
-      }
     }
-    if (!(Number.isFinite(usedAADT) && usedAADT > 0)) { usedAADT = 8000; method = "fallback_no_dot_found"; }
-
-    // --------------------------- Gallons (DOT direct) ---------------------------
-    let userExtrasMult = 1.0;
-    const extras = (advanced?.extra || [])
-      .map((e) => ({ pct: +e?.pct, note: String(e?.note || "").slice(0, 180) }))
-      .filter((e) => Number.isFinite(e.pct));
-    if (extras.length) userExtrasMult *= extras.reduce((m, e) => m * (1 + e.pct / 100), 1.0);
-    const ruralRequested = !!(advanced && advanced.flags && advanced.flags.rural === true);
-    const ruralApplied = ruralRequested && ruralEligible;
-    if (ruralApplied) userExtrasMult *= 1.30;
-    const autoLow = auto_low_rating === true || (Number.isFinite(client_rating) && client_rating < 4.0);
-    if (autoLow) userExtrasMult *= 0.70;
-
-    const calc = gallonsWithRules({
-      aadt: usedAADT, mpds: MPDS, diesel: DIESEL, compCount, heavyCount, pricePosition, userExtrasMult,
-    });
-
-    // ------------------------------ GPT summary ------------------------------
-    async function gptJSONCore(model, prompt) {
-      if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY missing");
-      const r = await fetchWithTimeout(
-        "https://api.openai.com/v1/chat/completions",
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model,
-            response_format: { type: "json_object" },
-            temperature: 0.2,
-            max_tokens: 1200,
-            messages: [
-              { role: "system", content: "You are a precise fuel/traffic analyst. Always reply with STRICT JSON (no markdown)." },
-              { role: "user", content: prompt },
-            ],
-          }),
-        },
-        35000
-      );
-      const txt = await r.text(); if (!r.ok) throw new Error(`OpenAI ${r.status}: ${txt}`);
-      const data = JSON.parse(txt); const content = data.choices?.[0]?.message?.content;
-      if (!content) throw new Error("No GPT content");
-      return JSON.parse(content);
-    }
-    async function gptJSONWithRetry(prompt) {
-      const models = ["gpt-4o-mini", "gpt-4o"];
-      let last = null;
-      for (const m of models) {
-        for (let i = 0; i < 2; i++) {
-          try { return await gptJSONCore(m, prompt); }
-          catch (e) { last = e; await sleep(400); }
-        }
-      }
-      throw last || new Error("GPT failed");
-    }
-    async function gptSummary(ctx) {
-      const sys = 'Return {"summary":"<text>"} ~8–12 sentences. Include AADT method (DOT), baseline ceiling math, competition rule & heavy penalties, pricing, user adjustments, caps, LOW/BASE/HIGH, road context, and notable nearby developments.';
-      const prompt = `
+    throw last || new Error("GPT failed");
+  }
+  async function gptSummary(ctx) {
+    const sys = 'Return {"summary":"<text>"} ~8–12 sentences. Include AADT method (DOT), baseline ceiling math, competition rule & heavy penalties, pricing, user adjustments, caps, LOW/BASE/HIGH, road context, and notable nearby developments.';
+    const prompt = `
 Address: ${ctx.address}
 AADT used (DOT): ${ctx.aadt} (${ctx.method})
 Roads (context): ${ctx.roads.summary}
@@ -830,111 +835,380 @@ Pricing: ${ctx.pricePosition}; User adjustments: ${ctx.userAdj || "none"}
 Nearby developments flagged: ${ctx.dev || "none"}
 Result gallons LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
 `.trim();
-      try {
-        const j = await gptJSONWithRetry(`${sys}\n${prompt}`);
-        const s = (j && j.summary) ? String(j.summary).trim() : "";
-        if (s) return s;
-      } catch {}
-      // Fallback summary
-      return `AADT ${ctx.aadt} (${ctx.method}); competition ${ctx.compCount} (heavy=${ctx.heavyCount}); pricing ${ctx.pricePosition}; adjustments ${ctx.userAdj || "none"}; result ${ctx.low}–${ctx.high} with base ${ctx.base}.`;
-    }
+    try {
+      const j = await gptJSONWithRetry(`${sys}\n${prompt}`);
+      const s = (j && j.summary) ? String(j.summary).trim() : "";
+      if (s) return s;
+    } catch {}
+    // Fallback summary
+    return `AADT ${ctx.aadt} (${ctx.method}); competition ${ctx.compCount} (heavy=${ctx.heavyCount}); pricing ${ctx.pricePosition}; adjustments ${ctx.userAdj || "none"}; result ${ctx.low}–${ctx.high} with base ${ctx.base}.`;
+  }
 
-    const adjBits = [];
-    if (pricePosition === "below") adjBits.push("+10% below-market pricing");
-    if (pricePosition === "above") adjBits.push("−10% above-market pricing");
-    if (ruralApplied) adjBits.push("+30% rural bonus (0 comps within 3 mi)");
-    if (autoLow) adjBits.push("−30% low reviews (<4.0)");
-    extras.forEach((e) => adjBits.push(`${e.pct > 0 ? "+" : ""}${e.pct}% ${e.note || "adj."}`));
-    const summary = await gptSummary({
-      address: address || geo.label,
-      aadt: usedAADT, method,
-      roads, compCount, heavyCount,
-      notable: competitors15.filter((c) => c.heavy).slice(0, 6).map((c) => c.name).join(", ") || "none",
-      pricePosition, userAdj: adjBits.join("; "),
-      base: calc.base, low: calc.low, high: calc.high,
-      dev: devCsv.slice(0, 4).map((x) => `${x.name} ${x.status ? `(${x.status})` : ""}`).join("; "),
-    });
+  const adjBits = [];
+  if (pricePosition === "below") adjBits.push("+10% below-market pricing");
+  if (pricePosition === "above") adjBits.push("−10% above-market pricing");
+  if (ruralApplied) adjBits.push("+30% rural bonus (0 comps within 3 mi)");
+  if (autoLow) adjBits.push("−30% low reviews (<4.0)");
+  extras.forEach((e) => adjBits.push(`${e.pct > 0 ? "+" : ""}${e.pct}% ${e.note || "adj."}`));
+  const summary = await gptSummary({
+    address: address || geo.label,
+    aadt: usedAADT, method,
+    roads, compCount, heavyCount,
+    notable: competitors15.filter((c) => c.heavy).slice(0, 6).map((c) => c.name).join(", ") || "none",
+    pricePosition, userAdj: adjBits.join("; "),
+    base: calc.base, low: calc.low, high: calc.high,
+    dev: devCsv.slice(0, 4).map((x) => `${x.name} ${x.status ? `(${x.status})` : ""}`).join("; "),
+  });
 
-    // UI text
-    let aadtText = "";
-    if (method === "override") aadtText = `AADT (override): ${usedAADT.toLocaleString()} vehicles/day`;
-    else if (method === "dot_station_on_entered_road") aadtText = `AADT: ${usedAADT.toLocaleString()} vehicles/day (DOT • entered road)`;
-    else if (method === "dot_station_nearest") aadtText = `AADT: ${usedAADT.toLocaleString()} vehicles/day (DOT • nearest station)`;
-    else if (method === "fallback_no_dot_found") aadtText = `AADT: ${usedAADT.toLocaleString()} vehicles/day (fallback)`;
-    else aadtText = `AADT: ${usedAADT.toLocaleString()} vehicles/day (${method})`;
+  // UI text
+  let aadtText = "";
+  if (method === "override") aadtText = `AADT (override): ${usedAADT.toLocaleString()} vehicles/day`;
+  else if (method === "dot_station_on_entered_road") aadtText = `AADT: ${usedAADT.toLocaleString()} vehicles/day (DOT • entered road)`;
+  else if (method === "dot_station_nearest") aadtText = `AADT: ${usedAADT.toLocaleString()} vehicles/day (DOT • nearest station)`;
+  else if (method === "fallback_no_dot_found") aadtText = `AADT: ${usedAADT.toLocaleString()} vehicles/day (fallback)`;
+  else aadtText = `AADT: ${usedAADT.toLocaleString()} vehicles/day (${method})`;
 
-    const nearestComp = compAll3.length ? compAll3[0].miles : null;
-    let competitionText = "";
-    if (compCount === 0) {
-      if (ruralEligible) competitionText = "Competition: None within 3 mi.";
-      else competitionText = `Competition: None within 1.5 mi${nearestComp != null ? ` (nearest ~${(+nearestComp).toFixed(1)} mi)` : ""}.`;
-    } else {
-      competitionText = `Competition: ${compCount} station${compCount !== 1 ? "s" : ""} within 1.5 mi`;
-      if (heavyCount > 0) competitionText += ` (${heavyCount} heavy)`;
-      competitionText += ".";
-    }
+  const nearestComp = compAll3.length ? compAll3[0].miles : null;
+  let competitionText = "";
+  if (compCount === 0) {
+    if (ruralEligible) competitionText = "Competition: None within 3 mi.";
+    else competitionText = `Competition: None within 1.5 mi${nearestComp != null ? ` (nearest ~${(+nearestComp).toFixed(1)} mi)` : ""}.`;
+  } else {
+    competitionText = `Competition: ${compCount} station${compCount !== 1 ? "s" : ""} within 1.5 mi`;
+    if (heavyCount > 0) competitionText += ` (${heavyCount} heavy)`;
+    competitionText += ".";
+  }
 
-    // Response
-    res.json({
-      ok: true,
-      estimate: {
-        low: calc.low,
-        range: `${Math.round(calc.low)}–${Math.round(calc.high)}`,
-        year2: calc.year2,
-        year3: calc.year3,
-      },
-      aadtText,
-      competitionText,
-      csv: devCsv,
-
-      // legacy / additional fields
-      base: calc.base,
+  return {
+    ok: true,
+    estimate: {
       low: calc.low,
-      high: calc.high,
+      range: `${Math.round(calc.low)}–${Math.round(calc.high)}`,
       year2: calc.year2,
       year3: calc.year3,
-      inputs: {
-        mpds: MPDS, diesel: DIESEL,
-        aadt_used: usedAADT,
-        price_position: pricePosition,
-        aadt_components: { method },
-      },
-      flags: {
-        rural_bonus_applied: ruralApplied,
-        rural_eligible: ruralEligible,
-        sunoco_within_1mi: sunocoNearby,
-        auto_low_rating: autoLow,
-      },
-      competition: {
-        count: compCount,           // within 1.5 mi (rule)
-        count_3mi: compAll3.length, // for context
-        heavy_count: heavyCount,
-        nearest_mi: competitors15[0]?.miles ?? null,
-        notable_brands: competitors15.filter((c) => c.heavy).slice(0, 6).map((c) => c.name),
-      },
+    },
+    aadtText,
+    competitionText,
+    csv: devCsv,
 
-      roads,
-      summary,                // GPT summary without the word "CSV"
-      calc_breakdown: calc.breakdown,
+    // legacy / additional fields
+    base: calc.base,
+    low: calc.low,
+    high: calc.high,
+    year2: calc.year2,
+    year3: calc.year3,
+    inputs: {
+      mpds: MPDS, diesel: DIESEL,
+      aadt_used: usedAADT,
+      price_position: pricePosition,
+      aadt_components: { method },
+    },
+    flags: {
+      rural_bonus_applied: ruralApplied,
+      rural_eligible: ruralEligible,
+      sunoco_within_1mi: sunocoNearby,
+      auto_low_rating: autoLow,
+    },
+    competition: {
+      count: compCount,           // within 1.5 mi (rule)
+      count_3mi: compAll3.length, // for context
+      heavy_count: heavyCount,
+      nearest_mi: competitors15[0]?.miles ?? null,
+      notable_brands: competitors15.filter((c) => c.heavy).slice(0, 6).map((c) => c.name),
+    },
 
-      // Map payloads
-      map: {
-        site: { lat: geo.lat, lon: geo.lon, label: geo.label },
-        competitors: competitors15,           // still included (<=1.5 mi)
-        all_competitors: compAll3,            // NEW: show everything on the map (<=3.0 mi)
-        competitor_radius_mi: 3.0,
-        aadt: mapStations,                    // dots for main map
-        aadt_used: aadtUsedMarker || {
-          lat: geo.lat, lon: geo.lon, aadt: usedAADT,
-          method, fallback: method === "fallback_no_dot_found"
-        }
-      },
-    });
+    roads,
+    summary,                // GPT summary without the word "CSV"
+    calc_breakdown: calc.breakdown,
+
+    // Map payloads
+    map: {
+      site: { lat: geo.lat, lon: geo.lon, label: geo.label },
+      competitors: competitors15,           // <=1.5 mi
+      all_competitors: compAll3,            // <=3.0 mi
+      competitor_radius_mi: 3.0,
+      aadt: mapStations,
+      aadt_used: aadtUsedMarker || {
+        lat: geo.lat, lon: geo.lon, aadt: usedAADT,
+        method, fallback: method === "fallback_no_dot_found"
+      }
+    },
+  };
+}
+
+app.post("/estimate", async (req, res) => {
+  try {
+    const result = await performEstimate(req.body || {});
+    res.json(result);
   } catch (e) {
-    res.status(500).json({ ok: false, status: "Estimate failed", detail: String(e) });
+    res.status(400).json({ ok: false, status: "Estimate failed", detail: String(e) });
   }
 });
 
-/* ------------------------------- Start ------------------------------- */
+// ========================== NEW: Competitors API ==========================
+// Persistent competitors API for the map layer (independent of /estimate).
+// Returns GeoJSON FeatureCollection with properties { brand, name, address }.
+app.get("/api/competitors", async (req, res) => {
+  try {
+    const lat = +req.query.lat, lon = +req.query.lon;
+    const rMi = Math.max(0.25, Math.min(5, +req.query.radiusMi || 1.0));
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      return res.status(400).json({ error: "lat/lon required" });
+    }
+    const list = await competitorsWithinRadiusMiles(lat, lon, rMi).catch(() => []);
+    // Convert to GeoJSON
+    const features = list.map((s, i) => ({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [s.lon, s.lat] },
+      properties: {
+        id: i,
+        name: s.name || "Fuel",
+        brand: (s.name || "Fuel"),
+        address: null,
+        miles: s.miles,
+        heavy: s.heavy === true,
+        sunoco: s.sunoco === true
+      }
+    }));
+    const body = { type: "FeatureCollection", features };
+    const json = JSON.stringify(body);
+    const etag = 'W/"' + crypto.createHash("sha1").update(json).digest("hex") + '"';
+    const inm = req.headers["if-none-match"];
+    if (inm && inm === etag) return res.status(304).end();
+    res.set("ETag", etag);
+    res.set("Cache-Control", "public, max-age=60");
+    res.type("application/geo+json").send(json);
+  } catch (e) {
+    res.status(500).json({ error: "competitors failed", detail: String(e) });
+  }
+});
+
+// ========================== NEW: PDF Report API ==========================
+function zoomForRadius(lat, radiusMi, mapWidthPx = 1024) {
+  const radiusMeters = radiusMi * 1609.344;
+  const cosLat = Math.cos(lat * Math.PI / 180);
+  const z = Math.log2((156543.03392 * cosLat * mapWidthPx) / (2 * radiusMeters));
+  return Math.max(3, Math.min(20, Math.round(z)));
+}
+async function fetchBuffer(url, timeout = 20000) {
+  const r = await fetchWithTimeout(url, { headers: { "User-Agent": UA } }, timeout);
+  if (!r.ok) throw new Error(`HTTP ${r.status} for ${url}`);
+  const ab = await r.arrayBuffer();
+  return Buffer.from(ab);
+}
+async function buildStaticCompetitorMapImage(site, comps, radiusMi = 3.0, opts = {}) {
+  if (!GOOGLE_API_KEY) return null;
+  const width = opts.width || 1024;
+  const height = opts.height || 640;
+  const scale = 2; // retina
+  const z = zoomForRadius(site.lat, radiusMi, width);
+
+  // Limit markers to avoid URL length blowup
+  const maxComps = Math.min(90, (comps || []).length);
+  const normals = [], heavies = [];
+  for (let i = 0; i < maxComps; i++) {
+    const c = comps[i];
+    if (c.heavy) heavies.push(c);
+    else normals.push(c);
+  }
+
+  function enc(n) { return encodeURIComponent(n); }
+  const params = [];
+  params.push(`center=${site.lat},${site.lon}`);
+  params.push(`zoom=${z}`);
+  params.push(`size=${width}x${height}`);
+  params.push(`scale=${scale}`);
+  params.push(`maptype=roadmap`);
+
+  // Site marker (gold "S")
+  params.push(`markers=size:mid|color:0xFFD700|label:S|${site.lat},${site.lon}`);
+
+  // Heavy comps (red "H")
+  if (heavies.length) {
+    const chunk = heavies.map(c => `${c.lat},${c.lon}`).join("|");
+    params.push(`markers=size:small|color:0xF97373|label:H|${chunk}`);
+  }
+  // Normal comps (green "C")
+  if (normals.length) {
+    const chunk = normals.map(c => `${c.lat},${c.lon}`).join("|");
+    params.push(`markers=size:tiny|color:0x34D399|label:C|${chunk}`);
+  }
+
+  // Optional subtle styling for dark roads
+  params.push("style=feature:poi|visibility:off");
+  params.push("style=feature:road|element:labels.icon|visibility:off");
+  params.push("style=feature:transit|visibility:off");
+
+  const url = `https://maps.googleapis.com/maps/api/staticmap?${params.join("&")}&key=${GOOGLE_API_KEY}`;
+  try {
+    return await fetchBuffer(url, 25000);
+  } catch {
+    return null;
+  }
+}
+async function buildStreetViewImage(site, opts = {}) {
+  if (!GOOGLE_API_KEY) return null;
+  const width = opts.width || 1024;
+  const height = opts.height || 640;
+  const scale = 2;
+  const url = `https://maps.googleapis.com/maps/api/streetview?size=${width}x${height}&scale=${scale}&location=${site.lat},${site.lon}&fov=90&pitch=0&key=${GOOGLE_API_KEY}`;
+  try {
+    return await fetchBuffer(url, 20000);
+  } catch {
+    return null;
+  }
+}
+function drawSectionTitle(doc, text, y, opts = {}) {
+  const { margin, color } = opts;
+  const left = margin || 36;
+  doc.fillColor(color || "#0b0d12");
+  doc.font("Helvetica-Bold").fontSize(13).text(text, left, y);
+  return y + 18;
+}
+function drawKeyValue(doc, key, value, x, y, w) {
+  doc.font("Helvetica-Bold").fontSize(11).fillColor("#0b0d12").text(key, x, y);
+  doc.font("Helvetica").fontSize(11).fillColor("#1c2736")
+    .text(value || "—", x, y + 14, { width: w, continued: false });
+  return y + 34;
+}
+function bulletLines(doc, items, x, y, w) {
+  doc.font("Helvetica").fontSize(11).fillColor("#1c2736");
+  const lineGap = 4;
+  for (const s of items) {
+    doc.circle(x + 3, y + 6, 2).fill("#4b5563").fillColor("#1c2736");
+    doc.text(String(s), x + 12, y, { width: w, lineGap });
+    y = doc.y + 6;
+  }
+  return y;
+}
+app.post("/report/pdf", async (req, res) => {
+  try {
+    // 1) Run the same estimate pipeline
+    const result = await performEstimate(req.body || {});
+    if (!result?.ok) throw new Error("Estimate failed");
+
+    const site = result?.map?.site || null;
+    const comps = result?.map?.all_competitors || [];
+    if (!site) throw new Error("No site location for report");
+
+    // 2) Prepare images up front
+    const [siteImg, mapImg] = await Promise.all([
+      buildStreetViewImage(site),
+      buildStaticCompetitorMapImage(site, comps, result.map?.competitor_radius_mi || 3.0)
+    ]);
+
+    // 3) Start PDF (A4 portrait)
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", "attachment; filename=FuelIQ_Site_Report.pdf");
+    const doc = new PDFDocument({ size: "A4", margin: 36 });
+
+    doc.pipe(res);
+
+    const pageW = doc.page.width;
+    const pageH = doc.page.height;
+    const margin = 36;
+    const contentW = pageW - margin * 2;
+    let y = margin;
+
+    // Header
+    doc.fillColor("#0b0d12").font("Helvetica-Bold").fontSize(18).text("Sunoco, LP Fuel IQ — Site Report", margin, y);
+    y += 24;
+    doc.font("Helvetica").fontSize(11).fillColor("#475569")
+      .text(`Address: ${result.map?.site?.label || req.body?.address || ""}`, margin, y, { width: contentW });
+    y += 16;
+
+    // Images: Competitor map (full width), then site photo under it
+    if (mapImg) {
+      y = drawSectionTitle(doc, "Competitors (map)", y, { margin, color: "#334155" });
+      doc.image(mapImg, margin, y, { width: contentW, align: "center" });
+      y += Math.min(300, (contentW * 0.62)) + 12; // approx height
+    }
+
+    if (siteImg) {
+      y = drawSectionTitle(doc, "Street View (site)", y, { margin, color: "#334155" });
+      doc.image(siteImg, margin, y, { width: contentW, align: "center" });
+      y += Math.min(260, (contentW * 0.5)) + 8;
+    }
+
+    // Headline numbers
+    y = drawSectionTitle(doc, "Estimate Summary", y, { margin, color: "#334155" });
+    const colW = contentW / 2 - 8;
+    let yL = y, yR = y;
+
+    yL = drawKeyValue(doc, "LOW (adjusted base)", (result.estimate?.low ?? result.low)?.toLocaleString() || "—", margin, yL, colW);
+    yL = drawKeyValue(doc, "Range", result.estimate?.range || (result.low && result.high ? `${result.low.toLocaleString()}–${result.high.toLocaleString()}` : "—"), margin, yL, colW);
+
+    yR = drawKeyValue(doc, "Year 2", (result.estimate?.year2 ?? result.year2)?.toLocaleString() || "—", margin + colW + 16, yR, colW);
+    yR = drawKeyValue(doc, "Year 3", (result.estimate?.year3 ?? result.year3)?.toLocaleString() || "—", margin + colW + 16, yR, colW);
+
+    y = Math.max(yL, yR) + 4;
+
+    // AADT & Competition
+    y = drawSectionTitle(doc, "AADT & Competition", y, { margin, color: "#334155" });
+    doc.font("Helvetica").fontSize(11).fillColor("#1c2736").text(result.aadtText || "—", margin, y, { width: contentW });
+    y += 16;
+    doc.font("Helvetica").fontSize(11).fillColor("#1c2736").text(result.competitionText || "—", margin, y, { width: contentW });
+    y += 18;
+
+    // Reasons for estimate
+    y = drawSectionTitle(doc, "Reasons for this estimate", y, { margin, color: "#334155" });
+    const B = result.calc_breakdown || {};
+    const bullets = [];
+
+    if (B.baseline && result.inputs?.aadt_used) {
+      bullets.push(`Baseline ceiling = AADT ${result.inputs.aadt_used.toLocaleString()} × 2% × 8 × 30 = ${B.baseline.toLocaleString()}`);
+    }
+    if (B.compRule) {
+      bullets.push(`Competition rule: base ${Number(B.compRule.baseMult).toFixed(2)} − heavy ${Number(B.compRule.heavyPenalty).toFixed(2)} = × ${Number(B.compRule.compMult).toFixed(2)} → ${Number(B.compRule.afterComp).toLocaleString()}`);
+      bullets.push(`Competitors (1.5 mi): ${Number(B.compRule.compCount ?? result.competition?.count ?? 0)} total • heavy ${Number(B.compRule.heavyCount ?? result.competition?.heavy_count ?? 0)}`);
+    }
+    if (B.caps) {
+      const softHit = B.compRule && B.compRule.afterComp > B.caps.capSoftTotal;
+      bullets.push(`Capacity caps: equipment ${Number(B.caps.capEquip).toLocaleString()} • soft ${Number(B.caps.capSoftTotal).toLocaleString()} • hard ${Number(B.caps.capHardTotal).toLocaleString()}${softHit ? " (soft cap applied −10%)" : ""}`);
+    }
+    if (B.priceMult != null) bullets.push(`Pricing factor: × ${Number(B.priceMult).toFixed(2)}`);
+    if (B.extrasMult != null) bullets.push(`Extras multiplier: × ${Number(B.extrasMult).toFixed(2)}`);
+    if (B.preClamp != null && B.finalClampedToBaseline != null) {
+      bullets.push(`Clamp to baseline: min(${Number(B.preClamp).toLocaleString()}, baseline) → ${Number(B.finalClampedToBaseline).toLocaleString()}`);
+    }
+    if (result.roads?.summary) bullets.push(`Road context: ${result.roads.summary}`);
+    if (result.inputs?.aadt_components?.method) {
+      const m = result.inputs.aadt_components.method;
+      const label = m === "dot_station_on_entered_road" ? "DOT • entered road"
+                  : m === "dot_station_nearest" ? "DOT • nearest station"
+                  : m === "override" ? "override"
+                  : m;
+      bullets.push(`AADT method: ${label}`);
+    }
+
+    y = bulletLines(doc, bullets, margin, y, contentW);
+    y += 6;
+
+    // GPT Summary
+    y = drawSectionTitle(doc, "Summary", y, { margin, color: "#334155" });
+    doc.font("Helvetica").fontSize(11).fillColor("#1c2736").text(
+      (result.summary || "").replace(/\s{2,}/g, " ").trim() || "—",
+      margin, y, { width: contentW }
+    );
+
+    // Optional: Developments
+    if (Array.isArray(result.csv) && result.csv.length) {
+      y = doc.y + 16;
+      y = drawSectionTitle(doc, "Nearby developments (flagged)", y, { margin, color: "#334155" });
+      const devLines = result.csv.slice(0, 6).map(x => {
+        const nm = x.name || ""; const st = x.status ? ` • ${x.status}` : "";
+        const dtl = x.details ? ` • ${x.details}` : ""; const dt = x.date ? ` • ${x.date}` : "";
+        return `${nm}${st}${dtl}${dt}`;
+      });
+      y = bulletLines(doc, devLines, margin, y, contentW);
+    }
+
+    doc.end();
+  } catch (e) {
+    res.status(400).json({ ok: false, status: "PDF_FAILED", detail: String(e) });
+  }
+});
+
+// ------------------------------- Start -------------------------------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, "0.0.0.0", () => console.log(`Server listening on :${PORT}`));
