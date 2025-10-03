@@ -1,8 +1,19 @@
-// server.js — Fuel IQ API (adv toggles reactive & clearer clamps), 2025‑10‑03
-// What's new:
-//  • gallonsWithRules now returns more internals: afterComp, cap limits, afterPrice, clamp flags
-//  • no change to math rules; just clearer outputs so UI explains why a toggle didn't move the result
-//  • (Everything else from your last working build kept intact: strict-road AADT, competitors, PDF, autocomplete)
+// server.js — Fuel IQ (FULL) — 2025‑10‑03
+// Features
+// • Static UI (public/index.html)
+// • Fast autocomplete (/autocomplete): Google + OSM + Census, proximity‑ranked
+// • DOT AADT (NC, VA, DC, FL) with strict entered‑road match + hyphen/space variants
+// • Soft backup: if on‑street match fails but a DOT station is ≤400 m, use it (not "fallback")
+// • AADT nearby table (/aadt/nearby)
+// • Competitors (exhaustive OSM + multi‑grid Google) with dedup + ETag GeoJSON (/api/competitors)
+// • Estimate (/estimate) with full breakdown, clamp reasons, rural/low‑rating logic
+// • PDF report (/report/pdf) with Street View, static competitor map, reasons section
+//
+// Env
+//   GOOGLE_API_KEY   (required for Google-powered features and PDF maps/images)
+//   OPENAI_API_KEY   (optional; if missing, GPT summary is skipped)
+//   OVERPASS_CONTACT (optional; user agent/contact for Overpass)
+//   PORT             (optional; default 3000)
 
 import express from "express";
 import cors from "cors";
@@ -12,6 +23,7 @@ import { fileURLToPath } from "url";
 import crypto from "crypto";
 import PDFDocument from "pdfkit";
 
+/* --------------------------- App setup --------------------------- */
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
@@ -19,7 +31,6 @@ app.use(express.json({ limit: "1mb" }));
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-/* --------------------------- Static UI --------------------------- */
 app.use(
   express.static(path.join(__dirname, "public"), {
     etag: false,
@@ -36,15 +47,16 @@ app.get("/", (_req, res) => {
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
 /* ------------------------------ Config ------------------------------ */
-const UA = "FuelEstimator/3.6 (+your-app)";
+const UA = "FuelEstimator/3.7 (+your-app)";
 const CONTACT = process.env.OVERPASS_CONTACT || UA;
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || "";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 
+// default competitor radius for display/math context
 const COMP_RADIUS_DEFAULT_MI = +process.env.COMP_RADIUS_DEFAULT_MI || 3.0;
 
-/* --------------------- fetch() helper --------------------- */
+/* --------------------- fetch() helper (Node 16/18) --------------------- */
 let _cachedFetch = null;
 async function getFetch() {
   if (typeof fetch === "function") return fetch;
@@ -62,7 +74,7 @@ async function fetchWithTimeout(url, opts = {}, timeoutMs = 25000) {
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/* -------------------- CSV Developments (unchanged) -------------------- */
+/* -------------------- CSV (Developments STOP banner) -------------------- */
 let csvDevData = [];
 function parseCsvString(csv) {
   const rows = []; let row = [], value = "", inQuotes = false;
@@ -211,13 +223,13 @@ function toStateCode(name) {
 
 /* --------------------- Official DOT AADT providers --------------------- */
 const AADT_PROVIDERS = {
-  NC: { kind: "arcgis", url: "https://services.arcgis.com/NuWFvHYDMVmmxMeM/ArcGIS/rest/services/NCDOT_AADT_Stations/FeatureServer/0", geoType: "point" },
+  NC: { kind: "arcgis", url: "https://services.arcgis.com/NuWFvHYDMVmmxMeM/ArcGIS/rest/services/NCDOT_AADT_Stations/FeatureServer/0", geoType: "point" }, // stations
   VA: { kind: "arcgis", url: "https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/VDOTTrafficVolume/FeatureServer/0", geoType: "line" },
   DC: { kind: "arcgis", url: "https://maps2.dcgis.dc.gov/dcgis/rest/services/DCGIS_DATA/Transportation_TrafficVolume_WebMercator/MapServer/4", geoType: "line" },
   FL: { kind: "arcgis", url: "https://gis-fdot.opendata.arcgis.com/datasets/annual-average-daily-traffic-tda/explore", geoType: "line" },
 };
 
-/* -------------------------- ArcGIS helpers -------------------------- */
+/* -------------------------- ArcGIS query helpers -------------------------- */
 async function arcgisQueryNearby(url, lat, lon, radiusMeters = 1609, outFields = "*") {
   const p = new URLSearchParams({
     f: "json",
@@ -253,7 +265,7 @@ async function arcgisQueryWhere(url, where, outFields = "*", returnGeometry = tr
   return Array.isArray(j.features) ? j.features : [];
 }
 
-/* ------------------------- AADT parsing utils ------------------------- */
+/* ------------------------- AADT parsing utilities ------------------------- */
 function extractLatestAADT(attrs) {
   if (!attrs) return null;
   const pairs = [];
@@ -289,7 +301,7 @@ function normalizeRoadText(s) {
   const up = String(s || "").toUpperCase();
   return up
     .replace(/\./g, "")
-    .replace(/[-–—]/g, " ")           // accept US-70 / US 70
+    .replace(/[-–—]/g, " ") // US-70 -> US 70
     .replace(/\b(ROAD)\b/g, "RD")
     .replace(/\b(STREET)\b/g, "ST")
     .replace(/\b(AVENUE)\b/g, "AVE")
@@ -395,6 +407,8 @@ function pickStationForStreet(stations, streetText) {
   }
   return stations[0];
 }
+
+/* ---------------------- Provider query wrappers ---------------------- */
 async function providerNearbyAADT(stateCode, lat, lon, radiusMi = 1.0) {
   const prov = AADT_PROVIDERS[stateCode];
   if (!prov) return [];
@@ -411,18 +425,18 @@ async function providerStationsOnStreet(stateCode, lat, lon, streetText) {
   return st.filter(s => s.distM <= 1.5 * 1609.344);
 }
 
-/* --------------------- Competitors (unchanged) --------------------- */
+/* --------------------- Competition (OSM + Google) --------------------- */
 const HEAVY_BRANDS = /(sheetz|wawa|race\s?trac|racetrac|buc-?ee'?s|royal\s?farms|quik.?trip|\bqt\b|pilot\b|flying\s*j|love'?s|ta\b|maverik)/i;
 const IS_SUNOCO = /\bsunoco\b/i;
 
-const OVERPASS_EP = [
+const OVERPASS = [
   "https://overpass-api.de/api/interpreter",
   "https://overpass.kumi.systems/api/interpreter",
   "https://overpass.openstreetmap.fr/api/interpreter",
 ];
 async function overpassQuery(data) {
   let last = new Error("no tries");
-  for (const ep of OVERPASS_EP) {
+  for (const ep of OVERPASS) {
     for (let i = 0; i < 3; i++) {
       try {
         const r = await fetchWithTimeout(
@@ -441,7 +455,7 @@ async function overpassQuery(data) {
         const ct = r.headers.get("content-type") || "";
         const txt = await r.text();
         if (!r.ok || !ct.includes("application/json"))
-          throw new Error(`Overpass ${r.status}: ${txt.slice(0, 180)}`);
+          throw new Error(`Overpass ${r.status}: ${txt.slice(0, 200)}`);
         return JSON.parse(txt);
       } catch (e) {
         last = e;
@@ -461,11 +475,9 @@ function buildOsmAddress(t) {
 }
 async function osmFuelWithin(lat, lon, rM) {
   const q = `[out:json][timeout:35];
-    (
-      node(around:${rM},${lat},${lon})["amenity"="fuel"];
+    ( node(around:${rM},${lat},${lon})["amenity"="fuel"];
       way(around:${rM},${lat},${lon})["amenity"="fuel"];
-      relation(around:${rM},${lat},${lon})["amenity"="fuel"];
-    );
+      relation(around:${rM},${lat},${lon})["amenity"="fuel"]; );
     out center tags;`;
   try {
     const j = await overpassQuery(q);
@@ -614,7 +626,7 @@ async function findCompetitorsExhaustive(lat, lon, rMi) {
   return merged.filter(c => c.miles <= rMi + 0.05);
 }
 
-/* ----------------------- Road context ----------------------- */
+/* ----------------------- Road context (heuristic only) ----------------------- */
 function parseMaxspeed(ms) { const m = String(ms || "").match(/(\d+)\s*(mph)?/i); return m ? +m[1] : null; }
 function roadWeight(hw) {
   const order = { motorway: 6, trunk: 5, primary: 4, secondary: 3, tertiary: 2, unclassified: 1, residential: 1 };
@@ -655,6 +667,7 @@ async function roadContext(lat, lon) {
 
 /* ------------------------- Gallons computation ------------------------- */
 function gallonsWithRules({ aadt, mpds, diesel, compCount, heavyCount, pricePosition, userExtrasMult = 1 }) {
+  // Baseline ceiling: AADT × 2% × 8 × 30
   const baseline = aadt * 0.02 * 8 * 30;
 
   let baseMult = 1.0;
@@ -709,7 +722,7 @@ function gallonsWithRules({ aadt, mpds, diesel, compCount, heavyCount, pricePosi
   };
 }
 
-/* ------------------------ Google helpers & autocomplete ------------------------ */
+/* ------------------------ Google status & autocomplete ------------------------ */
 app.get("/google/status", async (_req, res) => {
   try {
     if (!GOOGLE_API_KEY) return res.json({ ok: false, status: "MISSING_KEY" });
@@ -832,7 +845,7 @@ app.get("/aadt/nearby", async (req, res) => {
   }
 });
 
-/* ------------------ Strict-road AADT + Estimate core ------------------ */
+/* ----------------------------- Estimate core ----------------------------- */
 function extractStreetFromAddress(addr) {
   let first = String(addr || "").split(",")[0] || "";
   first = first.replace(/\b(Suite|Ste|Apt|Unit)\b.*$/i, "");
@@ -856,17 +869,15 @@ async function performEstimate(reqBody) {
   if (Number.isFinite(siteLat) && Number.isFinite(siteLon)) {
     geo = { lat: +siteLat, lon: +siteLon, label: address || `${siteLat}, ${siteLon}` };
   } else {
-    const direct = tryParseLatLng(address);
-    geo = direct ? { lat: direct.lat, lon: direct.lon, label: direct.label } :
-                   await geocodeCensus(address).catch(async()=>await geocodeNominatim(address));
+    geo = await geocode(address);
   }
   const admin = await reverseAdmin(geo.lat, geo.lon);
   const stateCode = toStateCode(admin.state) || "NC";
 
-  // Entered road (strict)
+  // Entered road text (strict mode)
   const enteredRoadText = String(enteredRoad || extractStreetFromAddress(address || geo.label)).trim();
 
-  // Competitors (exhaustive)
+  // Competition (exhaustive)
   const compAll = await findCompetitorsExhaustive(geo.lat, geo.lon, COMP_RADIUS_DEFAULT_MI).catch(() => []);
   const competitors15 = compAll.filter((c) => c.miles <= 1.5);
   const compCount = competitors15.length;
@@ -878,7 +889,7 @@ async function performEstimate(reqBody) {
   const devCsv = matchCsvDevelopments(admin.city, admin.county, admin.state);
   const roads = await roadContext(geo.lat, geo.lon).catch(() => ({ summary: "", main: [], side: [], signals: 0, intersections: 0 }));
 
-  // AADT strict on entered road
+  // ------------------ DOT AADT selection (entered road first) ------------------
   let usedAADT = null, method = "dot_station_on_entered_road";
   let aadtUsedMarker = null;
   let mapStations = await providerNearbyAADT(stateCode, geo.lat, geo.lon, 1.0).catch(() => []);
@@ -898,7 +909,7 @@ async function performEstimate(reqBody) {
         state: stateCode, fallback: false, method
       };
     } else {
-      // soft backup: if a DOT station is truly next door, use it instead of hard fallback
+      // Soft nearest backup if station is essentially at the site
       const near = (mapStations || []).find(s => s.distM <= 400);
       if (near) {
         method = "dot_station_nearest";
@@ -914,7 +925,7 @@ async function performEstimate(reqBody) {
   }
   if (!(Number.isFinite(usedAADT) && usedAADT > 0)) { usedAADT = 8000; method = "fallback_no_dot_found"; }
 
-  // Gallons math
+  // --------------------------- Gallons (DOT direct) ---------------------------
   let userExtrasMult = 1.0;
   const extras = (advanced?.extra || [])
     .map((e) => ({ pct: +e?.pct, note: String(e?.note || "").slice(0, 180) }))
@@ -931,13 +942,86 @@ async function performEstimate(reqBody) {
     aadt: usedAADT, mpds: MPDS, diesel: DIESEL, compCount, heavyCount, pricePosition, userExtrasMult,
   });
 
-  // GPT summary (unchanged, omitted here for brevity)
-  async function gptSummary() { return ""; } // keep your prior GPT summary code if needed
+  // ------------------------------ GPT summary (optional) ------------------------------
+  async function gptJSONCore(model, prompt) {
+    if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY missing");
+    const r = await fetchWithTimeout(
+      "https://api.openai.com/v1/chat/completions",
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model,
+          response_format: { type: "json_object" },
+          temperature: 0.2,
+          max_tokens: 1100,
+          messages: [
+            { role: "system", content: "You are a precise fuel/traffic analyst. Always reply with STRICT JSON (no markdown)." },
+            { role: "user", content: prompt },
+          ],
+        }),
+      },
+      35000
+    );
+    const txt = await r.text(); if (!r.ok) throw new Error(`OpenAI ${r.status}: ${txt}`);
+    const data = JSON.parse(txt); const content = data.choices?.[0]?.message?.content;
+    if (!content) throw new Error("No GPT content");
+    return JSON.parse(content);
+  }
+  async function gptJSONWithRetry(prompt) {
+    const models = ["gpt-4o-mini", "gpt-4o"];
+    let last = null;
+    for (const m of models) {
+      for (let i = 0; i < 2; i++) {
+        try { return await gptJSONCore(m, prompt); }
+        catch (e) { last = e; await sleep(400); }
+      }
+    }
+    throw last || new Error("GPT failed");
+  }
+  async function gptSummary(ctx) {
+    const sys = 'Return {"summary":"<text>"} ~8–12 sentences. Include AADT method (DOT), baseline math, competition rule & heavy penalties, pricing, user adjustments, capacity caps, LOW/BASE/HIGH, road context, nearby developments.';
+    const prompt = `
+Address: ${ctx.address}
+AADT used (DOT): ${ctx.aadt} (${ctx.method})
+Roads (context): ${ctx.roads.summary}
+Competition: ${ctx.compCount} (heavy ${ctx.heavyCount}) — notable: ${ctx.notable}
+Pricing: ${ctx.pricePosition}; User adjustments: ${ctx.userAdj || "none"}
+Nearby developments flagged: ${ctx.dev || "none"}
+Result gallons LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
+`.trim();
+    try {
+      const j = await gptJSONWithRetry(`${sys}\n${prompt}`);
+      const s = (j && j.summary) ? String(j.summary).trim() : "";
+      if (s) return s;
+    } catch {}
+    // Fallback short summary
+    return `AADT ${ctx.aadt} (${ctx.method}); comps ${ctx.compCount} (heavy=${ctx.heavyCount}); pricing ${ctx.pricePosition}; adj ${ctx.userAdj || "none"}; result ${ctx.low}–${ctx.high} (base ${ctx.base}).`;
+  }
+
+  const adjBits = [];
+  if (pricePosition === "below") adjBits.push("+10% below‑market pricing");
+  if (pricePosition === "above") adjBits.push("−10% above‑market pricing");
+  if (ruralApplied) adjBits.push("+30% rural bonus (0 comps within 3 mi)");
+  if (autoLow) adjBits.push("−30% low reviews (<4.0)");
+  extras.forEach((e) => adjBits.push(`${e.pct > 0 ? "+" : ""}${e.pct}% ${e.note || "adj."}`));
+  let summary = "";
+  try {
+    summary = await gptSummary({
+      address: address || geo.label,
+      aadt: usedAADT, method,
+      roads, compCount, heavyCount,
+      notable: competitors15.filter((c) => c.heavy).slice(0, 6).map((c) => c.name).join(", ") || "none",
+      pricePosition, userAdj: adjBits.join("; "),
+      base: calc.base, low: calc.low, high: calc.high,
+      dev: devCsv.slice(0, 4).map((x) => `${x.name} ${x.status ? `(${x.status})` : ""}`).join("; "),
+    });
+  } catch { /* summary stays empty if no OPENAI_API_KEY */ }
 
   // UI lines
   let aadtText = "";
   if (method === "override") aadtText = `AADT (override): ${usedAADT.toLocaleString()} vehicles/day`;
-  else if (method === "dot_station_on_entered_road") aadtText = `AADT: ${usedAADT.toLocaleString()} vehicles/day (DOT • entered road: ${enteredRoadText || "—"})`;
+  else if (method === "dot_station_on_entered_road") aadtText = `AADT: ${usedAADT.toLocaleString()} vehicles/day (DOT • entered road)`;
   else if (method === "dot_station_nearest") aadtText = `AADT: ${usedAADT.toLocaleString()} vehicles/day (DOT • nearest station)`;
   else if (method === "fallback_no_dot_found") aadtText = `AADT: ${usedAADT.toLocaleString()} vehicles/day (fallback — verify/override)`;
   else aadtText = `AADT: ${usedAADT.toLocaleString()} vehicles/day (${method})`;
@@ -962,11 +1046,14 @@ async function performEstimate(reqBody) {
     competitionText,
     csv: devCsv,
 
+    // scalars
     base: calc.base,
     low: calc.low,
     high: calc.high,
     year2: calc.year2,
     year3: calc.year3,
+    summary,
+
     inputs: {
       mpds: MPDS, diesel: DIESEL,
       aadt_used: usedAADT,
@@ -988,9 +1075,9 @@ async function performEstimate(reqBody) {
     },
 
     roads,
-    summary: "", // keep your GPT summary if you want
     calc_breakdown: calc.breakdown,
 
+    // Map payloads
     map: {
       site: { lat: geo.lat, lon: geo.lon, label: geo.label },
       competitors: competitors15,
@@ -1041,7 +1128,7 @@ app.get("/api/competitors", async (req, res) => {
   } catch (e) { res.status(500).json({ error: "competitors failed", detail: String(e) }); }
 });
 
-/* -------------------------- PDF report API (unchanged layout) -------------------------- */
+/* -------------------------- PDF report API -------------------------- */
 function zoomForRadius(lat, radiusMi, mapWidthPx = 1024) {
   const radiusMeters = radiusMi * 1609.344;
   const cosLat = Math.cos(lat * Math.PI / 180);
@@ -1142,11 +1229,10 @@ app.post("/report/pdf", async (req, res) => {
       bullets.push(`Competitors (1.5 mi): ${Number(B.compRule.compCount ?? result.competition?.count ?? 0)} total • heavy ${Number(B.compRule.heavyCount ?? result.competition?.heavy_count ?? 0)}`);
     }
     if (B.caps) {
-      const softHit = B.caps.limited_by?.soft;
       const lims = [];
       if (B.caps.limited_by?.equipment) lims.push("equipment");
       if (B.caps.limited_by?.hard) lims.push("hard cap");
-      bullets.push(`Capacity caps: equipment ${Number(B.caps.capEquip).toLocaleString()} • soft ${Number(B.caps.capSoftTotal).toLocaleString()} • hard ${Number(B.caps.capHardTotal).toLocaleString()}${lims.length?` (limited by ${lims.join(" & ")})`: ""}${softHit ? " • soft penalty −10%" : ""} → ${Number(B.caps.afterCap).toLocaleString()}`);
+      bullets.push(`Capacity caps: equipment ${Number(B.caps.capEquip).toLocaleString()} • soft ${Number(B.caps.capSoftTotal).toLocaleString()} • hard ${Number(B.caps.capHardTotal).toLocaleString()}${lims.length?` (limited by ${lims.join(" & ")})`: ""}${B.caps.limited_by?.soft ? " • soft penalty −10%" : ""} → ${Number(B.caps.afterCap).toLocaleString()}`);
     }
     if (B.priceMult != null) bullets.push(`Pricing factor: × ${Number(B.priceMult).toFixed(2)} → ${Number(B.afterPrice).toLocaleString()}`);
     if (result.flags?.auto_low_rating) bullets.push(`Low reviews penalty: × 0.70 (applied)`);
@@ -1155,6 +1241,12 @@ app.post("/report/pdf", async (req, res) => {
     else bullets.push(`Final (no baseline clamp): ${Number(B.finalClampedToBaseline).toLocaleString()}`);
     if (result.roads?.summary) bullets.push(`Road context: ${result.roads.summary}`);
     y = bulletLines(doc, bullets, margin, y, contentW); y += 6;
+
+    if (result.summary) {
+      y = drawSectionTitle(doc, "Narrative Summary", y, { margin, color: "#334155" });
+      doc.font("Helvetica").fontSize(11).fillColor("#1c2736")
+        .text(result.summary, margin, y, { width: contentW, lineGap: 4 });
+    }
 
     doc.end();
   } catch (e) { res.status(400).json({ ok: false, status: "PDF_FAILED", detail: String(e) }); }
