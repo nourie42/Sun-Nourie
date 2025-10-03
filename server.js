@@ -1,8 +1,8 @@
-// server.js — Fuel IQ API (exhaustive competitors + strict-road AADT + PDF), 2025-10-03
-// Fixes in this build:
-//  • No changes required for the address/estimate bug (it was in index.html).
-//  • Keeps exhaustive competitors (OSM+Google grid), strict AADT on entered road, PDF export.
-//  • Google Autocomplete supports location bias (closest suggestions bubble up).
+// server.js — Fuel IQ API (exhaustive competitors + strict-road AADT + PDF + SERVER AUTOCOMPLETE), 2025-10-03
+// New in this build:
+//  • /autocomplete endpoint merges Google Places + OSM + US Census on the SERVER
+//  • Address suggestions now work even without a Google API key and bypass browser CORS limits
+//  • No other functionality removed: estimate, strict AADT on entered road, exhaustive competitors, PDF export
 
 import express from "express";
 import cors from "cors";
@@ -693,38 +693,96 @@ app.get("/google/status", async (_req, res) => {
     res.json({ ok: false, status: "EXCEPTION" });
   }
 });
-app.get("/google/autocomplete", async (req, res) => {
-  const input = String(req.query.input || "").trim();
-  if (!input) return res.json({ ok: false, status: "BAD_REQUEST", items: [] });
-  if (!GOOGLE_API_KEY) return res.json({ ok: false, status: "MISSING_KEY", items: [] });
-  const lat = Number(req.query.lat), lon = Number(req.query.lon);
-  const radius = Math.max(1000, Math.min(200000, Number(req.query.radius) || 50000)); // 1–200 km
-  try {
-    const loc = (Number.isFinite(lat) && Number.isFinite(lon)) ? `&location=${lat},${lon}&radius=${radius}` : "";
-    const au = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}&components=country:us${loc}&key=${GOOGLE_API_KEY}`;
-    const ar = await fetchWithTimeout(au, { headers: { "User-Agent": UA } }, 15000);
-    const aj = await ar.json();
-    if (aj.status !== "OK" && aj.status !== "ZERO_RESULTS")
-      return res.json({ ok: false, status: aj.status, items: [] });
 
-    const items = [];
-    for (const p of (aj.predictions || []).slice(0, 8)) {
-      const pid = p.place_id; if (!pid) continue;
-      const du = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${pid}&fields=formatted_address,geometry,name,place_id,types&key=${GOOGLE_API_KEY}`;
-      const dr = await fetchWithTimeout(du, { headers: { "User-Agent": UA } }, 15000);
-      const dj = await dr.json(); if (dj.status !== "OK") continue;
-      const loc2 = dj.result?.geometry?.location;
-      if (loc2 && Number.isFinite(loc2.lat) && Number.isFinite(loc2.lng)) {
-        items.push({
-          type: "Google",
-          display: dj.result.formatted_address || dj.result.name || p.description,
-          lat: +loc2.lat, lon: +loc2.lng, place_id: dj.result.place_id || pid, score: 1.3,
-        });
-      }
+/* ----------------------- NEW: Unified Autocomplete ----------------------- */
+app.get("/autocomplete", async (req, res) => {
+  const input = String(req.query.input || "").trim();
+  const lat = Number(req.query.lat), lon = Number(req.query.lon);
+  const radius = Math.max(1000, Math.min(200000, Number(req.query.radius) || 50000));
+  if (!input) return res.json({ ok: false, status: "BAD_REQUEST", items: [] });
+
+  function rank(items) {
+    const Q = input.toLowerCase();
+    const center = (Number.isFinite(lat) && Number.isFinite(lon)) ? { lat, lon } : { lat: 39.8283, lon: -98.5795 };
+    function miles(a,b,c,d){ return distMiles(a,b,c,d); }
+    return [...items].sort((a,b) => {
+      const A = (a.display||"").toLowerCase(), B = (b.display||"").toLowerCase();
+      const aw = a.type==="Google"?1.2 : a.type==="OSM"?0.9 : 0.7;
+      const bw = b.type==="Google"?1.2 : b.type==="OSM"?0.9 : 0.7;
+      const aStarts = A.startsWith(Q)?3:(A.includes(Q)?1:0);
+      const bStarts = B.startsWith(Q)?3:(B.includes(Q)?1:0);
+      const aIdx = A.indexOf(Q), bIdx = B.indexOf(Q);
+      const aPen = aIdx>=0 ? aIdx/40 : 1.5;
+      const bPen = bIdx>=0 ? bIdx/40 : 1.5;
+      const aD = (Number.isFinite(a.lat)&&Number.isFinite(a.lon))?miles(center.lat, center.lon, a.lat, a.lon):50;
+      const bD = (Number.isFinite(b.lat)&&Number.isFinite(b.lon))?miles(center.lat, center.lon, b.lat, b.lon):50;
+      const aNear = Math.max(0,(30-aD))/10;
+      const bNear = Math.max(0,(30-bD))/10;
+      return (bw + bStarts - bPen + bNear) - (aw + aStarts - aPen + aNear);
+    });
+  }
+  function dedup(items){
+    const seen = new Set(); const out = [];
+    for (const it of items) {
+      const k = `${(it.display||"").toLowerCase()}|${it.lat?round5(it.lat):"?"}|${it.lon?round5(it.lon):"?"}`;
+      if (seen.has(k)) continue; seen.add(k); out.push(it);
     }
-    return res.json({ ok: true, status: "OK", items });
-  } catch (e) { return res.json({ ok: false, status: "ERROR", items: [], error: String(e) }); }
+    return out;
+  }
+
+  async function googlePart() {
+    if (!GOOGLE_API_KEY) return [];
+    try {
+      const loc = (Number.isFinite(lat) && Number.isFinite(lon)) ? `&location=${lat},${lon}&radius=${radius}` : "";
+      const au = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}&components=country:us${loc}&key=${GOOGLE_API_KEY}`;
+      const ar = await fetchWithTimeout(au, { headers: { "User-Agent": UA } }, 15000);
+      const aj = await ar.json();
+      if (aj.status !== "OK" && aj.status !== "ZERO_RESULTS") return [];
+      const items = [];
+      for (const p of (aj.predictions || []).slice(0, 8)) {
+        const pid = p.place_id; if (!pid) continue;
+        const du = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${pid}&fields=formatted_address,geometry,name,place_id,types&key=${GOOGLE_API_KEY}`;
+        const dr = await fetchWithTimeout(du, { headers: { "User-Agent": UA } }, 15000);
+        const dj = await dr.json(); if (dj.status !== "OK") continue;
+        const loc2 = dj.result?.geometry?.location;
+        if (loc2 && Number.isFinite(loc2.lat) && Number.isFinite(loc2.lng)) {
+          items.push({
+            type: "Google",
+            display: dj.result.formatted_address || dj.result.name || p.description,
+            lat: +loc2.lat, lon: +loc2.lng, place_id: dj.result.place_id || pid, score: 1.3,
+          });
+        }
+      }
+      return items;
+    } catch { return []; }
+  }
+  async function osmPart() {
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=8&countrycodes=us&q=${encodeURIComponent(input)}`;
+      const r = await fetchWithTimeout(url, { headers: { "User-Agent": UA, Accept: "application/json" } }, 15000);
+      const a = await r.json();
+      return (a||[]).map(row => ({ type:"OSM", display: row.display_name, lat:+row.lat, lon:+row.lon, score: 0.9 }));
+    } catch { return []; }
+  }
+  async function censusPart() {
+    try {
+      const hasNum = /\d/.test(input);
+      if (!hasNum) return [];
+      const g = await geocodeCensus(input);
+      return g ? [{ type:"Census", display: g.label, lat: g.lat, lon: g.lon, score: 0.8 }] : [];
+    } catch { return []; }
+  }
+
+  try {
+    const [g, o, c] = await Promise.all([googlePart(), osmPart(), censusPart()]);
+    const merged = rank(dedup([...(g||[]), ...(o||[]), ...(c||[])]));
+    res.json({ ok: true, items: merged.slice(0, 12) });
+  } catch (e) {
+    res.json({ ok: false, status: "ERROR", items: [], error: String(e) });
+  }
 });
+
+/* ------------------------ Google detail/rating (existing) ------------------------ */
 app.get("/google/findplace", async (req, res) => {
   try {
     if (!GOOGLE_API_KEY) return res.json({ ok: false, status: "MISSING_KEY" });
@@ -835,7 +893,7 @@ async function performEstimate(reqBody) {
   // Entered road (strict)
   const enteredRoadText = String(enteredRoad || extractStreetFromAddress(address || geo.label)).trim();
 
-  // Competitors (EXHAUSTIVE) — default 3.0 mi
+  // Competitors (EXHAUSTIVE)
   const compAll = await findCompetitorsExhaustive(geo.lat, geo.lon, COMP_RADIUS_DEFAULT_MI).catch(() => []);
   const competitors15 = compAll.filter((c) => c.miles <= 1.5);
   const compCount = competitors15.length;
@@ -1184,4 +1242,3 @@ app.post("/report/pdf", async (req, res) => {
 /* ------------------------------- Start ------------------------------- */
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, "0.0.0.0", () => console.log(`Server listening on :${PORT}`));
-
