@@ -221,7 +221,7 @@
     </div>
 
     <div class="card">
-      <div class="muted" id="mapTitle">Map: Site & competitors (1.5 mi) + AADT dots + ⭐ AADT used</div>
+      <div class="muted" id="mapTitle">Map: Site & competitors (3.0 mi) + AADT dots + ⭐ AADT used</div>
       <div id="map"><div id="overlay" class="muted"></div></div>
       <div id="svWrap"><div class="muted" style="margin-top:10px;">Street View</div><iframe id="sv" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div>
     </div>
@@ -241,7 +241,6 @@
     </div>
 
     <div class="card"><div id="devs" class="muted">—</div></div>
-
     <div class="card"><b>Google Rating</b><div id="ratingLine" class="muted">—</div></div>
     <div class="card"><b>Summary (GPT)</b><div id="summary" class="muted">—</div></div>
   </div>
@@ -270,8 +269,10 @@ const liveCount = $("liveCount"), liveUnique = $("liveUnique"), liveBreakdown = 
 /* State */
 let map, layer, serverCompLayer, mapReady = false, selectedCoords = null, selectedPlaceId = null;
 let aadtMap, aadtLayer, aadtReady = false;
-let acItems = [], acActive = -1; // suggestions & keyboard index
-let lastSelectedDisplay = "";     // for extracting road name
+let acItems = [], acActive = -1;
+let lastSelectedDisplay = "";     // for extracting entered road
+let siteCenter = null;           // anchor competitors to site
+const DEFAULT_CMP_RADIUS = 3.0;
 
 /* Utils */
 function fmt(n){ return (n??0).toLocaleString(undefined,{maximumFractionDigits:0}); }
@@ -286,7 +287,11 @@ function initMap(){ if(mapReady) return;
   layer = L.layerGroup().addTo(map);
   serverCompLayer = L.layerGroup().addTo(map);
   mapReady = true;
-  map.on("moveend", () => { if (cmpShow.checked) refreshCompetitors(); updateLiveStats(); });
+  map.on("moveend", () => {
+    // If user pans after a site is selected, we still anchor competitors to the site
+    if (cmpShow.checked && siteCenter) refreshCompetitors();
+    updateLiveStats();
+  });
 }
 function initAADTMap(){ if(aadtReady) return;
   aadtMap = L.map("aadtMap",{zoomControl:true}); window.aadtMap = aadtMap;
@@ -313,6 +318,7 @@ function initOrUpdateMainMap(m){
   layer.clearLayers(); serverCompLayer.clearLayers();
   if(!m || !m.site) return;
   const site = [m.site.lat, m.site.lon];
+  siteCenter = { lat: m.site.lat, lon: m.site.lon }; // anchor competitors
   L.marker(site,{title:"Site"}).addTo(layer).bindPopup("<b>Site</b>");
   const pts = [site];
   if (m.aadt) renderAADTMarkers(m.aadt, m.aadt_used);
@@ -328,6 +334,7 @@ function initOrUpdateMainMap(m){
   else { if (!map.hasLayer(serverCompLayer)) serverCompLayer.addTo(map); }
   map.fitBounds(L.latLngBounds(pts).pad(0.25));
   updateStreetView(site[0], site[1]);
+  $("mapTitle").textContent = `Map: Site & competitors (${m.competitor_radius_mi ?? DEFAULT_CMP_RADIUS} mi) + AADT dots + ⭐ AADT used`;
 }
 function initOrUpdateAADTMap(site, items, used){
   if(!aadtReady) initAADTMap();
@@ -522,8 +529,6 @@ function renderAll(d){
   $("summary").textContent = (d.summary || "").replace(/\s{2,}/g," ").trim() || "—";
 
   initOrUpdateMainMap(d.map);
-  if (d?.map?.competitor_radius_mi) $("mapTitle").textContent = `Map: Site & competitors (${d.map.competitor_radius_mi} mi) + AADT dots + ⭐ AADT used`;
-
   if (d?.map?.site) {
     fetch(`/aadt/nearby?lat=${encodeURIComponent(d.map.site.lat)}&lon=${encodeURIComponent(d.map.site.lon)}&radiusMi=1`)
       .then(r => r.json()).then(j => {
@@ -535,6 +540,9 @@ function renderAll(d){
       }).catch(()=>{});
   }
   showRating(addrInput.value.trim());
+
+  // After we render the server-provided competitors once, keep live layer anchored to siteCenter
+  if (cmpShow.checked) refreshCompetitors();
 }
 
 /* -------------------- Rating helpers -------------------- */
@@ -562,16 +570,8 @@ async function showRating(address){
 }
 
 /* -------------------- Autocomplete (always on) -------------------- */
+let acItems = [], acActive = -1;
 function hideAc(){ acBox.style.display = "none"; acActive = -1; }
-function commitAddress(display, coords, placeId){
-  // No lock: keep suggestions working even after a selection
-  lastSelectedDisplay = (display || "").trim();
-  acItems = [];
-  hideAc();
-  addrInput.value = display;
-  selectedCoords = coords || null;
-  selectedPlaceId = placeId || null;
-}
 function chooseAc(i){
   const it = acItems[i]; if (!it) return;
   lastSelectedDisplay = it.display || "";
@@ -579,7 +579,7 @@ function chooseAc(i){
   selectedCoords = coords || null; selectedPlaceId = it.place_id || null;
   addrInput.value = it.display;
   hideAc();
-  if (coords && mapReady) { map.setView([coords.lat, coords.lon], 15); if (cmpShow.checked) refreshCompetitors(); }
+  if (coords && mapReady) { map.setView([coords.lat, coords.lon], 15); }
 }
 function renderAc(list){
   if(!list.length){ hideAc(); return; }
@@ -622,12 +622,11 @@ async function nominatimSearch(q){
 }
 addrInput.addEventListener("input", () => {
   const q = addrInput.value.trim();
-  lastSelectedDisplay = q; // track current typed text for enteredRoad extraction
+  lastSelectedDisplay = q;
   if (q.length < 2) { hideAc(); return; }
   Promise.all([googleSearch(q), nominatimSearch(q)]).then(([g,n])=>{
     acItems = rankAutocompleteItems(q, [...g, ...n]).slice(0, 8);
-    acActive = 0; // highlight best match
-    renderAc(acItems);
+    acActive = 0; renderAc(acItems);
   });
 });
 addrInput.addEventListener("keydown", (e) => {
@@ -642,13 +641,11 @@ addrInput.addEventListener("keydown", (e) => {
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") hideAc(); });
 document.addEventListener("pointerdown", (e) => { if (e.target !== addrInput && !acBox.contains(e.target)) hideAc(); });
 
-/* -------------------- Competitors live layer -------------------- */
+/* -------------------- Competitors live layer (anchored to site) -------------------- */
 const COMP_API = "/api/competitors";
-const CMP_MIN_MI = 0.5, CMP_MAX_MI = 2.0;
 let cmpMarkers = [], cmpClusterGroup = null, cmpHeatLayer = null, cmpCache = new Map();
 let cmpBrandSet = new Set(), cmpActiveBrands = new Set(); const BRAND_COLORS = {};
 function colorForBrand(b){ if(!b) return "#9aa4b2"; if(!BRAND_COLORS[b]){ let h=0; for(let i=0;i<b.length;i++) h=(h*31 + b.charCodeAt(i))%360; BRAND_COLORS[b] = `hsl(${h},70%,58%)`; } return BRAND_COLORS[b]; }
-function mapRadiusMi(){ if (!mapReady || !map) return 1.0; const b = map.getBounds(), c = b.getCenter(); const meters = map.distance(c, b.getNorthEast()); return Math.max(CMP_MIN_MI, Math.min(CMP_MAX_MI, meters / 1609.344)); }
 function keyFor(c, r){ const q = (x,n)=>Math.round(x*Math.pow(10,n))/Math.pow(10,n); return `${q(c.lat,4)},${q(c.lon,4)}:${q(r,1)}`; }
 function clearLiveMarkers(){ if (cmpClusterGroup){ cmpClusterGroup.clearLayers(); } cmpMarkers.forEach(m => map.removeLayer(m)); cmpMarkers = []; cmpBrandSet.clear(); }
 function isBrandAllowed(b){ return cmpActiveBrands.size === 0 || cmpActiveBrands.has(b||"Unknown"); }
@@ -677,16 +674,18 @@ function updateLiveStats(){
 function markerHTML(brand){ return `<span class="cmp-dot" style="background:${colorForBrand(brand)}"></span>`; }
 function makeMarker(lat, lon, brand, name, addr){ const icon = L.divIcon({ className:"", html: markerHTML(brand), iconSize:[10,10], iconAnchor:[5,5] }); const m = L.marker([lat,lon], { icon, title: `${brand||"Brand"} — ${name||""}`, keyboard:false }); m.__brand = brand || "Unknown"; m.bindPopup(`<b>${esc(brand||"Brand")}</b> — ${esc(name||"")}<div class="small" style="opacity:.8">${esc(addr||"")}</div>`); return m; }
 async function fetchCompetitorsForView(){
-  if (!mapReady) return null;
-  const b = map.getBounds(), c = b.getCenter(); const rMi = mapRadiusMi(); const key = keyFor({lat:c.lat, lon:c.lon}, rMi);
+  if (!mapReady || !siteCenter) return null;
+  const c = siteCenter; const rMi = DEFAULT_CMP_RADIUS;
+  const key = keyFor({lat:c.lat, lon:c.lon}, rMi);
   const cached = cmpCache.get(key); const headers = {}; if (cached?.etag) headers["If-None-Match"] = cached.etag;
-  $("cmpStatus").textContent = `Loading… (~${rMi.toFixed(1)} mi)`;
+  $("cmpStatus").textContent = `Loading all competitors within ${rMi.toFixed(1)} mi of site…`;
   try {
-    const res = await fetch(`${COMP_API}?lat=${encodeURIComponent(c.lat)}&lon=${encodeURIComponent(c.lng)}&radiusMi=${encodeURIComponent(rMi.toFixed(2))}`, { headers });
+    const res = await fetch(`${COMP_API}?lat=${encodeURIComponent(c.lat)}&lon=${encodeURIComponent(c.lon)}&radiusMi=${encodeURIComponent(rMi.toFixed(2))}`, { headers });
     if (res.status === 304 && cached?.geo) { $("cmpStatus").textContent = `Ready (cached)`; return cached.geo; }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const etag = res.headers.get("ETag") || null; const geo = await res.json(); cmpCache.set(key, { etag, geo });
-    $("cmpStatus").textContent = `Ready`; return geo;
+    $("cmpStatus").textContent = `Ready`;
+    return geo;
   } catch (e) { $("cmpStatus").textContent = `Load failed`; return null; }
 }
 function applyBrandFilterAndRedraw(){
@@ -745,7 +744,7 @@ $("brandsClear").addEventListener("click", () => { cmpActiveBrands.clear(); upda
 $("brandsAll").addEventListener("click", () => { cmpActiveBrands = new Set(cmpBrandSet); updateLegendAndFilters(); applyBrandFilterAndRedraw(); });
 
 /* -------------------- Main actions -------------------- */
-function tidyUI(){ hideAc(); }
+function tidyUI(){ /* keep for future */ }
 async function onEstimateClick(){
   if(!addrInput.value.trim() && !selectedCoords){ alert("Please select a valid address first."); return; }
   try {
@@ -753,7 +752,6 @@ async function onEstimateClick(){
     const resp = await callEstimate();
     if (!resp || resp.ok !== true) { alert("Estimate failed: " + (resp?.status || "Unknown error")); return; }
     renderAll(resp); pills();
-    if (cmpShow.checked && map && serverCompLayer && map.hasLayer(serverCompLayer)) { map.removeLayer(serverCompLayer); }
   } catch (e) { alert("Error: " + (e?.message || e)); }
   finally { $("go").disabled = false; clearOverlay(); }
 }
