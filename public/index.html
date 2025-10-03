@@ -269,7 +269,7 @@ const liveCount = $("liveCount"), liveUnique = $("liveUnique"), liveBreakdown = 
 /* State */
 let map, layer, serverCompLayer, mapReady = false, selectedCoords = null, selectedPlaceId = null;
 let aadtMap, aadtLayer, aadtReady = false;
-let acItems = [], acActive = -1;          // <- single declaration (bug fix)
+let acItems = [], acActive = -1;          // single declaration
 let lastSelectedDisplay = "";
 let siteCenter = null;
 const DEFAULT_CMP_RADIUS = 3.0;
@@ -568,7 +568,7 @@ async function showRating(address){
   $("ratingLine").innerHTML = (rating != null && rating !== undefined) ? `\u2B50 ${rating} (${total||0} reviews)` : "—";
 }
 
-/* -------------------- Autocomplete (closest-first) -------------------- */
+/* -------------------- Autocomplete (SERVER unified) -------------------- */
 function hideAc(){ acBox.style.display = "none"; acActive = -1; }
 function chooseAc(i){
   const it = acItems[i]; if (!it) return;
@@ -587,49 +587,21 @@ function renderAc(list){
   [...acBox.children].forEach(el => el.onclick = () => chooseAc(+el.dataset.i));
   acBox.style.display = "block";
 }
-function rankAutocompleteItems(q, items){
-  const Q = q.trim().toLowerCase();
-  let center = { lat: 39.8283, lon: -98.5795 }; // US center fallback
-  if (mapReady) { const c = map.getCenter(); center = { lat: c.lat, lon: c.lng }; }
-  return [...items].sort((a,b)=>{
-    const A = (a.display||"").toLowerCase(), B = (b.display||"").toLowerCase();
-    const aw = a.type==="Google"?1.2:0.8, bw = b.type==="Google"?1.2:0.8;
-    const aStarts = A.startsWith(Q)?3: (A.includes(Q)?1:0);
-    const bStarts = B.startsWith(Q)?3: (B.includes(Q)?1:0);
-    const aIdx = A.indexOf(Q); const bIdx = B.indexOf(Q);
-    const aPen = aIdx>=0 ? aIdx/40 : 1.5;
-    const bPen = bIdx>=0 ? bIdx/40 : 1.5;
-    const aDist = (Number.isFinite(a.lat)&&Number.isFinite(a.lon))?haversineMiles(center.lat, center.lon, a.lat, a.lon):50;
-    const bDist = (Number.isFinite(b.lat)&&Number.isFinite(b.lon))?haversineMiles(center.lat, center.lon, b.lat, b.lon):50;
-    const aNear = Math.max(0, (30 - aDist)) / 10;  // closer => bigger
-    const bNear = Math.max(0, (30 - bDist)) / 10;
-    const as = aw + aStarts - aPen + aNear;
-    const bs = bw + bStarts - bPen + bNear;
-    return bs - as;
-  });
-}
-async function googleSearch(q){
-  try {
+async function serverAutocomplete(q){
+  try{
     const bias = mapReady && map ? (()=>{ const c = map.getCenter(); return `&lat=${encodeURIComponent(c.lat)}&lon=${encodeURIComponent(c.lng)}&radius=50000`; })() : "";
-    const r = await fetch("/google/autocomplete?input=" + encodeURIComponent(q) + bias);
+    const r = await fetch(`/autocomplete?input=${encodeURIComponent(q)}${bias}`);
     const j = await r.json();
-    if(!j.ok) return [];
-    return (j.items||[]).map(it => ({...it, type:"Google", score:1.3 }));
-  } catch { return []; }
-}
-async function nominatimSearch(q){
-  try {
-    const r = await fetch("https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=us&q=" + encodeURIComponent(q));
-    const a = await r.json();
-    return a.map(row => ({ type:"OSM", display:row.display_name, lat:+row.lat, lon:+row.lon, score:0.6 }));
-  } catch { return []; }
+    if (!j.ok) return [];
+    return j.items || [];
+  }catch{ return []; }
 }
 addrInput.addEventListener("input", () => {
   const q = addrInput.value.trim();
   lastSelectedDisplay = q;
   if (q.length < 2) { hideAc(); return; }
-  Promise.all([googleSearch(q), nominatimSearch(q)]).then(([g,n])=>{
-    acItems = rankAutocompleteItems(q, [...g, ...n]).slice(0, 8);
+  serverAutocomplete(q).then(items => {
+    acItems = items.slice(0, 12);
     acActive = 0; renderAc(acItems);
   });
 });
