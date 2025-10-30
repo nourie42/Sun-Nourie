@@ -282,29 +282,38 @@ function formatNominatimDisplay(row){
   if(!row) return "";
   const addr = row.address || {};
   const baseHead = String(row.display_name || "").split(",")[0].trim();
+  const altHead = String(row.name || "").trim();
   const road = addr.road || addr.residential || addr.pedestrian || addr.path || addr.cycleway || addr.footway || "";
   const house = addr.house_number || addr.house_name || "";
   const hasDigits = (s) => /\d/.test(String(s||""));
 
   let street = "";
-  if (house && road) street = `${house} ${road}`.trim();
-  else if (house) street = String(house);
-  else if (road) {
-    if (baseHead && baseHead.toLowerCase().includes(String(road).toLowerCase()) && hasDigits(baseHead)) street = baseHead;
-    else street = String(road);
-  } else if (baseHead) street = baseHead;
+  if (house && road) {
+    street = `${house} ${road}`.trim();
+  } else if (house) {
+    street = String(house).trim();
+  } else if (road) {
+    const baseMatchesRoad = baseHead && baseHead.toLowerCase().includes(String(road).toLowerCase());
+    if (baseMatchesRoad && hasDigits(baseHead)) street = baseHead;
+    else street = String(road).trim();
+  }
 
-  if (!street && baseHead) street = baseHead;
-  if (street && !hasDigits(street) && hasDigits(baseHead)) street = baseHead;
+  const candidates = [street, baseHead, altHead].map((s) => String(s || "").trim()).filter(Boolean);
+  const chosen = (() => {
+    if (!candidates.length) return "";
+    const withDigits = candidates.find((s) => hasDigits(s));
+    if (withDigits) return withDigits;
+    return candidates[0];
+  })();
 
   const locality = addr.city || addr.town || addr.village || addr.hamlet || addr.suburb || addr.county || "";
   const regionParts = [locality, addr.state || addr.state_district || addr.region || "", addr.postcode || ""].filter(Boolean);
   const tail = regionParts.join(", ");
 
-  if (street && tail) return `${street}, ${tail}`;
-  if (street) return street;
+  if (chosen && tail) return `${chosen}, ${tail}`;
+  if (chosen) return chosen;
   if (tail) return tail;
-  return row.display_name || "";
+  return row.display_name || altHead || "";
 }
 function setOverlayWorking(msg="Working…"){ overlay.textContent = msg; overlay.style.display = "flex"; }
 function clearOverlay(){ overlay.style.display = "none"; }
