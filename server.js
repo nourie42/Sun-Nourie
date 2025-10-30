@@ -551,26 +551,69 @@ app.get("/google/autocomplete", async (req, res) => {
     const au = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}&components=country:us${loc}&key=${GOOGLE_API_KEY}`;
     const ar = await fetchWithTimeout(au, { headers: { "User-Agent": UA } }, 15000);
     const aj = await ar.json();
-    if (aj.status !== "OK" && aj.status !== "ZERO_RESULTS")
+    if (aj.status !== "OK" && aj.status !== "ZERO_RESULTS") {
       return res.json({ ok: false, status: aj.status, items: [] });
-
-    const items = [];
-    for (const p of (aj.predictions || []).slice(0, 8)) {
-      const pid = p.place_id; if (!pid) continue;
-      const du = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${pid}&fields=formatted_address,geometry,name,place_id,types&key=${GOOGLE_API_KEY}`;
-      const dr = await fetchWithTimeout(du, { headers: { "User-Agent": UA } }, 15000);
-      const dj = await dr.json(); if (dj.status !== "OK") continue;
-      const loc2 = dj.result?.geometry?.location;
-      if (loc2 && Number.isFinite(loc2.lat) && Number.isFinite(loc2.lng)) {
-        items.push({
-          type: "Google",
-          display: dj.result.formatted_address || dj.result.name || p.description,
-          lat: +loc2.lat, lon: +loc2.lng, place_id: dj.result.place_id || pid, score: 1.3,
-        });
-      }
     }
+
+    const typedMatch = input.match(/^\s*(\d{1,6})/);
+    const typedNumber = typedMatch ? typedMatch[1] : null;
+    const items = (aj.predictions || []).slice(0, 8).map((p) => {
+      const pid = p.place_id || "";
+      const mainText = p.structured_formatting?.main_text || "";
+      const secondary = p.structured_formatting?.secondary_text || "";
+      let display = p.description || `${mainText}${secondary ? ", " + secondary : ""}`;
+      if (typedNumber && !display.trim().startsWith(typedNumber)) {
+        const needsNumber = mainText && !/^\s*\d/.test(mainText);
+        if (needsNumber) display = `${typedNumber} ${display}`;
+      }
+      return {
+        type: "Google",
+        display,
+        place_id: pid,
+        main_text: mainText,
+        secondary_text: secondary,
+        typedNumber,
+        score: 1.3,
+      };
+    });
     return res.json({ ok: true, status: "OK", items });
-  } catch (e) { return res.json({ ok: false, status: "ERROR", items: [], error: String(e) }); }
+  } catch (e) {
+    return res.json({ ok: false, status: "ERROR", items: [], error: String(e) });
+  }
+});
+
+app.get("/google/place_details", async (req, res) => {
+  if (!GOOGLE_API_KEY) return res.json({ ok: false, status: "MISSING_KEY" });
+  const placeId = String(req.query.place_id || "").trim();
+  if (!placeId) return res.json({ ok: false, status: "BAD_REQUEST" });
+  const typedNumber = String(req.query.typed_number || "").trim();
+  try {
+    const fields = ["geometry", "formatted_address", "name", "place_id"].join(",");
+    const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(placeId)}&fields=${encodeURIComponent(fields)}&key=${GOOGLE_API_KEY}`;
+    const dr = await fetchWithTimeout(url, { headers: { "User-Agent": UA } }, 15000);
+    const dj = await dr.json();
+    if (dj.status !== "OK") {
+      return res.json({ ok: false, status: dj.status || "ERROR", error: dj.error_message || null });
+    }
+    const result = dj.result || {};
+    const loc = result.geometry?.location;
+    const lat = Number(loc?.lat);
+    const lon = Number(loc?.lng);
+    let display = result.formatted_address || result.name || "";
+    if (typedNumber && !display.trim().startsWith(typedNumber)) {
+      display = `${typedNumber} ${display}`.trim();
+    }
+    return res.json({
+      ok: true,
+      status: "OK",
+      place_id: result.place_id || placeId,
+      display,
+      lat: Number.isFinite(lat) ? lat : null,
+      lon: Number.isFinite(lon) ? lon : null,
+    });
+  } catch (e) {
+    return res.json({ ok: false, status: "ERROR", error: String(e) });
+  }
 });
 
 app.get("/google/findplace", async (req, res) => {

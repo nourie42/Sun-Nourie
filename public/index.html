@@ -271,6 +271,7 @@ const liveCount = $("liveCount"), liveUnique = $("liveUnique"), liveBreakdown = 
 let map, layer, serverCompLayer, mapReady = false, selectedCoords = null, selectedPlaceId = null;
 let aadtMap, aadtLayer, aadtReady = false;
 let acItems = [], acActive = -1; // suggestions & keyboard index
+let acFetchTimer = null, acFetchToken = 0; // debounce & in-flight guard
 let lastSelectedDisplay = "";     // for extracting road name
 
 /* Utils */
@@ -278,6 +279,11 @@ function fmt(n){ return (n??0).toLocaleString(undefined,{maximumFractionDigits:0
 function esc(s){ return (s??"").toString().replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
 function setOverlayWorking(msg="Working…"){ overlay.textContent = msg; overlay.style.display = "flex"; }
 function clearOverlay(){ overlay.style.display = "none"; }
+function googleBiasParams(radius = 50000){
+  if (!(mapReady && map)) return "";
+  const c = map.getCenter();
+  return `&lat=${encodeURIComponent(c.lat)}&lon=${encodeURIComponent(c.lng)}&radius=${encodeURIComponent(radius)}`;
+}
 
 /* -------------------- Map & SV -------------------- */
 function initMap(){ if(mapReady) return;
@@ -589,7 +595,7 @@ function renderAc(list){
 }
 async function googleSearch(q){
   try {
-    const bias = mapReady && map ? (()=>{ const c = map.getCenter(); return `&lat=${encodeURIComponent(c.lat)}&lon=${encodeURIComponent(c.lng)}&radius=50000`; })() : "";
+    const bias = googleBiasParams();
     const r = await fetch("/google/autocomplete?input=" + encodeURIComponent(q) + bias);
     const j = await r.json();
     if(!j.ok) return [];
@@ -603,24 +609,138 @@ async function nominatimSearch(q){
     return a.map(row => ({ type:"OSM", display:row.display_name, lat:+row.lat, lon:+row.lon, score:0.6 }));
   } catch { return []; }
 }
-function chooseAc(i){
+async function fetchGooglePlaceDetails(placeId, typedNumber, fallbackDisplay){
+  try {
+    if (!placeId) return null;
+    const qs = new URLSearchParams({ place_id: placeId });
+    if (typedNumber) qs.set("typed_number", typedNumber);
+    const r = await fetch(`/google/place_details?${qs.toString()}`);
+    const j = await r.json();
+    if (!j.ok) return null;
+    const lat = Number(j.lat);
+    const lon = Number(j.lon);
+    return {
+      place_id: j.place_id || placeId,
+      display: j.display || fallbackDisplay || "",
+      lat: Number.isFinite(lat) ? lat : null,
+      lon: Number.isFinite(lon) ? lon : null,
+    };
+  } catch {
+    return null;
+  }
+}
+async function findPlaceByText(display){
+  if (!display) return null;
+  try {
+    const bias = googleBiasParams();
+    const r = await fetch(`/google/findplace?input=${encodeURIComponent(display)}${bias}`);
+    const j = await r.json();
+    if (!j.ok) return null;
+    const loc = j.location || {};
+    const lat = Number(loc.lat);
+    const lon = Number(loc.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    return {
+      place_id: j.place_id || null,
+      display: j.address || display,
+      lat, lon,
+    };
+  } catch {
+    return null;
+  }
+}
+async function chooseAc(i){
+  acFetchToken++; // cancel any pending autocomplete updates
+  if (acFetchTimer) { clearTimeout(acFetchTimer); acFetchTimer = null; }
+  const selectionToken = acFetchToken;
   const it = acItems[i]; if (!it) return;
-  lastSelectedDisplay = it.display || "";
-  const coords = (Number.isFinite(it.lat) && Number.isFinite(it.lon)) ? { lat: it.lat, lon: it.lon } : null;
-  selectedCoords = coords || null; selectedPlaceId = it.place_id || null;
-  addrInput.value = it.display;
   hideAc();
+  let display = it.display || addrInput.value;
+  addrInput.value = display;
+  lastSelectedDisplay = display;
+  selectedPlaceId = it.place_id || null;
+  let lat = Number.isFinite(it.lat) ? it.lat : null;
+  let lon = Number.isFinite(it.lon) ? it.lon : null;
+  if ((!Number.isFinite(lat) || !Number.isFinite(lon)) && it.place_id) {
+    const details = await fetchGooglePlaceDetails(it.place_id, it.typedNumber, it.display);
+    if (selectionToken !== acFetchToken) return;
+    if (details) {
+      display = details.display || display;
+      lat = Number.isFinite(details.lat) ? details.lat : lat;
+      lon = Number.isFinite(details.lon) ? details.lon : lon;
+      selectedPlaceId = details.place_id || selectedPlaceId;
+      addrInput.value = display;
+      lastSelectedDisplay = display;
+    }
+  }
+  if ((!Number.isFinite(lat) || !Number.isFinite(lon)) && display) {
+    const fallback = await findPlaceByText(display);
+    if (selectionToken !== acFetchToken) return;
+    if (fallback) {
+      display = fallback.display || display;
+      lat = Number.isFinite(fallback.lat) ? fallback.lat : lat;
+      lon = Number.isFinite(fallback.lon) ? fallback.lon : lon;
+      if (fallback.place_id) selectedPlaceId = fallback.place_id;
+      addrInput.value = display;
+      lastSelectedDisplay = display;
+    }
+  }
+  if (selectionToken !== acFetchToken) return;
+  const coords = (Number.isFinite(lat) && Number.isFinite(lon)) ? { lat, lon } : null;
+  selectedCoords = coords || null;
   if (coords && mapReady) { map.setView([coords.lat, coords.lon], 15); if (cmpShow.checked) refreshCompetitors(); }
 }
 addrInput.addEventListener("input", () => {
   const q = addrInput.value.trim();
   lastSelectedDisplay = q; // keep current typed text (used to extract road if user doesn't click a suggestion)
-  if (q.length < 2) { hideAc(); return; }
-  Promise.all([googleSearch(q), nominatimSearch(q)]).then(([g,n])=>{
-    acItems = rankAutocompleteItems(q, [...g, ...n]).slice(0, 8);
-    acActive = 0; // highlight best match
-    renderAc(acItems);
-  });
+  if (acFetchTimer) { clearTimeout(acFetchTimer); acFetchTimer = null; }
+  if (q.length < 2) { acItems = []; acActive = -1; hideAc(); return; }
+  const requestToken = ++acFetchToken;
+  acFetchTimer = setTimeout(() => {
+    acFetchTimer = null;
+    let googleItems = [];
+    let osmItems = [];
+    const itemKey = (it) => `${it.place_id||""}|${Number.isFinite(it.lat)?it.lat:""}|${Number.isFinite(it.lon)?it.lon:""}|${(it.display||"").toLowerCase()}`;
+    const dedupeItems = (items) => {
+      const seen = new Set();
+      return items.filter(it => {
+        const key = itemKey(it);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    };
+    const renderMerged = (force = false) => {
+      if (requestToken !== acFetchToken) return; // stale response
+      const merged = rankAutocompleteItems(q, dedupeItems([...googleItems, ...osmItems])).slice(0, 8);
+      if (!merged.length && !force) return;
+      const prevKeys = acItems.map(itemKey);
+      const prevActiveIdx = acActive;
+      const prevActiveKey = acItems[prevActiveIdx] ? itemKey(acItems[prevActiveIdx]) : null;
+      const nextActiveIdx = prevActiveKey ? merged.findIndex(it => itemKey(it) === prevActiveKey) : -1;
+      const computedActive = merged.length ? (nextActiveIdx >= 0 ? nextActiveIdx : 0) : -1;
+      const listsEqual = merged.length === prevKeys.length && merged.every((it, idx) => itemKey(it) === prevKeys[idx]);
+      const shouldRender = force || !listsEqual || computedActive !== prevActiveIdx;
+      acItems = merged;
+      acActive = computedActive;
+      if (!merged.length) { hideAc(); return; }
+      if (shouldRender) renderAc(acItems);
+    };
+    googleSearch(q).then(items => {
+      googleItems = Array.isArray(items) ? items : [];
+      renderMerged(googleItems.length > 0);
+    }).catch(() => renderMerged(false));
+    nominatimSearch(q).then(items => {
+      const typedNumber = q.match(/^\s*(\d{1,6})/);
+      const filtered = Array.isArray(items) ? items.filter(it => {
+        if (!typedNumber) return true;
+        const disp = (it.display || "").toLowerCase();
+        return disp.includes(typedNumber[1]);
+      }) : [];
+      osmItems = filtered;
+      renderMerged(googleItems.length === 0 || filtered.length > 0);
+    }).catch(() => renderMerged(false));
+  }, 200);
 });
 addrInput.addEventListener("keydown", (e) => {
   if (acBox.style.display !== "none" && acItems.length) {
