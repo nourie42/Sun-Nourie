@@ -1,3 +1,9 @@
-node_modules/
-.DS_Store
-npm-debug.log*
+diff --git a/.gitignore b/.gitignore
+new file mode 100644
+index 0000000000000000000000000000000000000000..eff0b4b0aa52bc29ac1a216e224ad0086812d0c9
+--- /dev/null
++++ b/.gitignore
+@@ -0,0 +1,3 @@
++node_modules/
++.DS_Store
++npm-debug.log*
