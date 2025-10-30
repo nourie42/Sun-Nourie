@@ -273,10 +273,39 @@ let aadtMap, aadtLayer, aadtReady = false;
 let acItems = [], acActive = -1; // suggestions & keyboard index
 let lastSelectedDisplay = "";     // for extracting road name
 let acRequestToken = 0;           // latest autocomplete request id
+let skipNextInputReset = false;   // prevent clearing coords when setting value programmatically
 
 /* Utils */
 function fmt(n){ return (n??0).toLocaleString(undefined,{maximumFractionDigits:0}); }
 function esc(s){ return (s??"").toString().replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
+function formatNominatimDisplay(row){
+  if(!row) return "";
+  const addr = row.address || {};
+  const baseHead = String(row.display_name || "").split(",")[0].trim();
+  const road = addr.road || addr.residential || addr.pedestrian || addr.path || addr.cycleway || addr.footway || "";
+  const house = addr.house_number || addr.house_name || "";
+  const hasDigits = (s) => /\d/.test(String(s||""));
+
+  let street = "";
+  if (house && road) street = `${house} ${road}`.trim();
+  else if (house) street = String(house);
+  else if (road) {
+    if (baseHead && baseHead.toLowerCase().includes(String(road).toLowerCase()) && hasDigits(baseHead)) street = baseHead;
+    else street = String(road);
+  } else if (baseHead) street = baseHead;
+
+  if (!street && baseHead) street = baseHead;
+  if (street && !hasDigits(street) && hasDigits(baseHead)) street = baseHead;
+
+  const locality = addr.city || addr.town || addr.village || addr.hamlet || addr.suburb || addr.county || "";
+  const regionParts = [locality, addr.state || addr.state_district || addr.region || "", addr.postcode || ""].filter(Boolean);
+  const tail = regionParts.join(", ");
+
+  if (street && tail) return `${street}, ${tail}`;
+  if (street) return street;
+  if (tail) return tail;
+  return row.display_name || "";
+}
 function setOverlayWorking(msg="Working…"){ overlay.textContent = msg; overlay.style.display = "flex"; }
 function clearOverlay(){ overlay.style.display = "none"; }
 
@@ -569,7 +598,8 @@ function rankAutocompleteItems(q, items){
   const Q = q.trim().toLowerCase();
   return [...items].sort((a,b)=>{
     const A = (a.display||"").toLowerCase(), B = (b.display||"").toLowerCase();
-    const aw = a.type==="Google"?1.2:0.8, bw = b.type==="Google"?1.2:0.8;
+    const aw = Number.isFinite(a.score)?a.score:(a.type==="Google"?1.2:0.8);
+    const bw = Number.isFinite(b.score)?b.score:(b.type==="Google"?1.2:0.8);
     const aStarts = A.startsWith(Q)?3: (A.includes(Q)?1:0);
     const bStarts = B.startsWith(Q)?3: (B.includes(Q)?1:0);
     const aIdx = A.indexOf(Q); const bIdx = B.indexOf(Q);
@@ -601,7 +631,7 @@ async function nominatimSearch(q){
   try {
     const r = await fetch("https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=us&q=" + encodeURIComponent(q));
     const a = await r.json();
-    return a.map(row => ({ type:"OSM", display:row.display_name, lat:+row.lat, lon:+row.lon, score:0.6 }));
+    return a.map(row => ({ type:"OSM", display: formatNominatimDisplay(row) || row.display_name, lat:+row.lat, lon:+row.lon, score:0.7 }));
   } catch { return []; }
 }
 function chooseAc(i){
@@ -610,12 +640,16 @@ function chooseAc(i){
   lastSelectedDisplay = it.display || "";
   const coords = (Number.isFinite(it.lat) && Number.isFinite(it.lon)) ? { lat: it.lat, lon: it.lon } : null;
   selectedCoords = coords || null; selectedPlaceId = it.place_id || null;
+  skipNextInputReset = true;
   addrInput.value = it.display;
   hideAc();
+  setTimeout(() => { skipNextInputReset = false; }, 0);
   if (coords && mapReady) { map.setView([coords.lat, coords.lon], 15); if (cmpShow.checked) refreshCompetitors(); }
 }
 addrInput.addEventListener("input", () => {
   const q = addrInput.value.trim();
+  if (!skipNextInputReset) { selectedCoords = null; selectedPlaceId = null; }
+  skipNextInputReset = false;
   lastSelectedDisplay = q; // keep current typed text (used to extract road if user doesn't click a suggestion)
   const requestId = ++acRequestToken;
   if (q.length < 2) { hideAc(); return; }
