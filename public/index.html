@@ -651,13 +651,22 @@ async function nominatimSearch(q){
       const formatted = formatNominatimDisplay(row) || row.display_name || "";
       const head = formatted.split(",")[0];
       if (!formatted.trim()) return null;
-      if (queryHasDigits && !/\d/.test(head)) return null;
       const addr = row.address || {};
       const hasExplicitNumber = Boolean(addr.house_number || addr.house_name);
+      const lat = Number.parseFloat(row.lat);
+      const lon = Number.parseFloat(row.lon);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+      const headHasDigits = /\d/.test(head);
+      const digitsWeight = queryHasDigits ? (headHasDigits ? 0.25 : -0.15) : 0;
       const preciseBonus = hasExplicitNumber ? 0.25 : 0;
       const typeBonus = preciseTypes.has(row.type) ? 0.15 : 0;
-      if (!Number.isFinite(+row.lat) || !Number.isFinite(+row.lon)) return null;
-      return { type:"OSM", display: formatted, lat:+row.lat, lon:+row.lon, score:0.55 + preciseBonus + typeBonus };
+      return {
+        type:"OSM",
+        display: formatted,
+        lat,
+        lon,
+        score: 0.55 + preciseBonus + typeBonus + digitsWeight
+      };
     }).filter(Boolean);
   } catch { return []; }
 }
