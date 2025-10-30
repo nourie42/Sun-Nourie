@@ -271,6 +271,7 @@ const liveCount = $("liveCount"), liveUnique = $("liveUnique"), liveBreakdown = 
 let map, layer, serverCompLayer, mapReady = false, selectedCoords = null, selectedPlaceId = null;
 let aadtMap, aadtLayer, aadtReady = false;
 let acItems = [], acActive = -1; // suggestions & keyboard index
+let acFetchTimer = null, acFetchToken = 0; // debounce & in-flight guard
 let lastSelectedDisplay = "";     // for extracting road name
 
 /* Utils */
@@ -604,6 +605,8 @@ async function nominatimSearch(q){
   } catch { return []; }
 }
 function chooseAc(i){
+  acFetchToken++; // cancel any pending autocomplete updates
+  if (acFetchTimer) { clearTimeout(acFetchTimer); acFetchTimer = null; }
   const it = acItems[i]; if (!it) return;
   lastSelectedDisplay = it.display || "";
   const coords = (Number.isFinite(it.lat) && Number.isFinite(it.lon)) ? { lat: it.lat, lon: it.lon } : null;
@@ -615,12 +618,54 @@ function chooseAc(i){
 addrInput.addEventListener("input", () => {
   const q = addrInput.value.trim();
   lastSelectedDisplay = q; // keep current typed text (used to extract road if user doesn't click a suggestion)
-  if (q.length < 2) { hideAc(); return; }
-  Promise.all([googleSearch(q), nominatimSearch(q)]).then(([g,n])=>{
-    acItems = rankAutocompleteItems(q, [...g, ...n]).slice(0, 8);
-    acActive = 0; // highlight best match
-    renderAc(acItems);
-  });
+  if (acFetchTimer) { clearTimeout(acFetchTimer); acFetchTimer = null; }
+  if (q.length < 2) { acItems = []; acActive = -1; hideAc(); return; }
+  const requestToken = ++acFetchToken;
+  acFetchTimer = setTimeout(() => {
+    acFetchTimer = null;
+    let googleItems = [];
+    let osmItems = [];
+    const itemKey = (it) => `${it.place_id||""}|${Number.isFinite(it.lat)?it.lat:""}|${Number.isFinite(it.lon)?it.lon:""}|${(it.display||"").toLowerCase()}`;
+    const dedupeItems = (items) => {
+      const seen = new Set();
+      return items.filter(it => {
+        const key = itemKey(it);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    };
+    const renderMerged = (force = false) => {
+      if (requestToken !== acFetchToken) return; // stale response
+      const merged = rankAutocompleteItems(q, dedupeItems([...googleItems, ...osmItems])).slice(0, 8);
+      if (!merged.length && !force) return;
+      const prevKeys = acItems.map(itemKey);
+      const prevActiveIdx = acActive;
+      const prevActiveKey = acItems[prevActiveIdx] ? itemKey(acItems[prevActiveIdx]) : null;
+      const nextActiveIdx = prevActiveKey ? merged.findIndex(it => itemKey(it) === prevActiveKey) : -1;
+      const computedActive = merged.length ? (nextActiveIdx >= 0 ? nextActiveIdx : 0) : -1;
+      const listsEqual = merged.length === prevKeys.length && merged.every((it, idx) => itemKey(it) === prevKeys[idx]);
+      const shouldRender = force || !listsEqual || computedActive !== prevActiveIdx;
+      acItems = merged;
+      acActive = computedActive;
+      if (!merged.length) { hideAc(); return; }
+      if (shouldRender) renderAc(acItems);
+    };
+    googleSearch(q).then(items => {
+      googleItems = Array.isArray(items) ? items : [];
+      renderMerged(googleItems.length > 0);
+    }).catch(() => renderMerged(false));
+    nominatimSearch(q).then(items => {
+      const typedNumber = q.match(/^\s*(\d{1,6})/);
+      const filtered = Array.isArray(items) ? items.filter(it => {
+        if (!typedNumber) return true;
+        const disp = (it.display || "").toLowerCase();
+        return disp.includes(typedNumber[1]);
+      }) : [];
+      osmItems = filtered;
+      renderMerged(googleItems.length === 0 || filtered.length > 0);
+    }).catch(() => renderMerged(false));
+  }, 200);
 });
 addrInput.addEventListener("keydown", (e) => {
   if (acBox.style.display !== "none" && acItems.length) {

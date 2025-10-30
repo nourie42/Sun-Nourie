@@ -554,21 +554,31 @@ app.get("/google/autocomplete", async (req, res) => {
     if (aj.status !== "OK" && aj.status !== "ZERO_RESULTS")
       return res.json({ ok: false, status: aj.status, items: [] });
 
-    const items = [];
-    for (const p of (aj.predictions || []).slice(0, 8)) {
-      const pid = p.place_id; if (!pid) continue;
+    const predictions = (aj.predictions || []).slice(0, 8);
+    const detailResults = await Promise.allSettled(predictions.map(async (p) => {
+      const pid = p.place_id; if (!pid) return null;
       const du = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${pid}&fields=formatted_address,geometry,name,place_id,types&key=${GOOGLE_API_KEY}`;
       const dr = await fetchWithTimeout(du, { headers: { "User-Agent": UA } }, 15000);
-      const dj = await dr.json(); if (dj.status !== "OK") continue;
+      const dj = await dr.json(); if (dj.status !== "OK") return null;
       const loc2 = dj.result?.geometry?.location;
-      if (loc2 && Number.isFinite(loc2.lat) && Number.isFinite(loc2.lng)) {
-        items.push({
-          type: "Google",
-          display: dj.result.formatted_address || dj.result.name || p.description,
-          lat: +loc2.lat, lon: +loc2.lng, place_id: dj.result.place_id || pid, score: 1.3,
-        });
+      if (!loc2 || !Number.isFinite(loc2.lat) || !Number.isFinite(loc2.lng)) return null;
+      const fallbackDisplay = p.description || dj.result.name || "";
+      let display = dj.result.formatted_address || fallbackDisplay;
+      if (/^\s*\d/.test(fallbackDisplay) && !/^\s*\d/.test(display)) {
+        display = fallbackDisplay;
       }
-    }
+      return {
+        type: "Google",
+        display,
+        lat: +loc2.lat,
+        lon: +loc2.lng,
+        place_id: dj.result.place_id || pid,
+        score: 1.3,
+      };
+    }));
+    const items = detailResults
+      .map(r => (r.status === "fulfilled" ? r.value : null))
+      .filter(Boolean);
     return res.json({ ok: true, status: "OK", items });
   } catch (e) { return res.json({ ok: false, status: "ERROR", items: [], error: String(e) }); }
 });
