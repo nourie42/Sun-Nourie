@@ -651,12 +651,18 @@ app.get("/aadt/nearby", async (req, res) => {
 
 /* ------------------ Helpers for strict road selection ------------------ */
 function extractStreetFromAddress(addr) {
+  const raw = String(addr || "").trim();
+  if (!raw) return "";
+  if (tryParseLatLng(raw)) return ""; // coordinates only → no street text
+
   // take first comma part, strip apt/suite, strip leading house number
-  let first = String(addr || "").split(",")[0] || "";
+  let first = raw.split(",")[0] || "";
   first = first.replace(/\b(Suite|Ste|Apt|Unit)\b.*$/i, "");
   first = first.replace(/^\s*\d+[A-Za-z-]?\s*,?\s*/, ""); // remove leading number
+  first = first.replace(/^[^A-Za-z]+/, ""); // strip leftover punctuation like '.' from coordinates
   first = first.replace(/\s+/g, " ").trim();
-  return first;
+
+  return /[A-Za-z]/.test(first) ? first : "";
 }
 
 /* ============================= Estimate core ============================= */
