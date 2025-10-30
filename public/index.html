@@ -272,6 +272,7 @@ let map, layer, serverCompLayer, mapReady = false, selectedCoords = null, select
 let aadtMap, aadtLayer, aadtReady = false;
 let acItems = [], acActive = -1; // suggestions & keyboard index
 let lastSelectedDisplay = "";     // for extracting road name
+let acRequestToken = 0;           // latest autocomplete request id
 
 /* Utils */
 function fmt(n){ return (n??0).toLocaleString(undefined,{maximumFractionDigits:0}); }
@@ -605,6 +606,7 @@ async function nominatimSearch(q){
 }
 function chooseAc(i){
   const it = acItems[i]; if (!it) return;
+  acRequestToken++; // cancel any in-flight autocomplete responses
   lastSelectedDisplay = it.display || "";
   const coords = (Number.isFinite(it.lat) && Number.isFinite(it.lon)) ? { lat: it.lat, lon: it.lon } : null;
   selectedCoords = coords || null; selectedPlaceId = it.place_id || null;
@@ -615,10 +617,14 @@ function chooseAc(i){
 addrInput.addEventListener("input", () => {
   const q = addrInput.value.trim();
   lastSelectedDisplay = q; // keep current typed text (used to extract road if user doesn't click a suggestion)
+  const requestId = ++acRequestToken;
   if (q.length < 2) { hideAc(); return; }
   Promise.all([googleSearch(q), nominatimSearch(q)]).then(([g,n])=>{
-    acItems = rankAutocompleteItems(q, [...g, ...n]).slice(0, 8);
-    acActive = 0; // highlight best match
+    if (requestId !== acRequestToken) return; // stale response
+    if (addrInput.value.trim() !== q) return; // input changed after request started
+    const ranked = rankAutocompleteItems(q, [...g, ...n]);
+    acItems = ranked.slice(0, 8);
+    acActive = acItems.length ? 0 : -1; // highlight best match when available
     renderAc(acItems);
   });
 });
