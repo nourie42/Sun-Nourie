@@ -554,21 +554,42 @@ app.get("/google/autocomplete", async (req, res) => {
     if (aj.status !== "OK" && aj.status !== "ZERO_RESULTS")
       return res.json({ ok: false, status: aj.status, items: [] });
 
-    const items = [];
-    for (const p of (aj.predictions || []).slice(0, 8)) {
-      const pid = p.place_id; if (!pid) continue;
-      const du = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${pid}&fields=formatted_address,geometry,name,place_id,types&key=${GOOGLE_API_KEY}`;
-      const dr = await fetchWithTimeout(du, { headers: { "User-Agent": UA } }, 15000);
-      const dj = await dr.json(); if (dj.status !== "OK") continue;
-      const loc2 = dj.result?.geometry?.location;
-      if (loc2 && Number.isFinite(loc2.lat) && Number.isFinite(loc2.lng)) {
-        items.push({
+    const predictions = (aj.predictions || []).filter((p) => p.place_id).slice(0, 6);
+    if (!predictions.length) return res.json({ ok: true, status: "ZERO_RESULTS", items: [] });
+
+    const detailFields = "formatted_address,geometry,name,place_id";
+    const detailFetches = predictions.map(async (p) => {
+      try {
+        const pid = p.place_id;
+        const du = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${pid}&fields=${encodeURIComponent(detailFields)}&key=${GOOGLE_API_KEY}`;
+        const dr = await fetchWithTimeout(du, { headers: { "User-Agent": UA } }, 15000);
+        const dj = await dr.json();
+        if (dj.status !== "OK") return null;
+        const loc2 = dj.result?.geometry?.location;
+        if (!loc2 || !Number.isFinite(loc2.lat) || !Number.isFinite(loc2.lng)) return null;
+
+        const display = dj.result?.formatted_address || p.description || dj.result?.name || "";
+        if (!display) return null;
+
+        return {
           type: "Google",
-          display: dj.result.formatted_address || dj.result.name || p.description,
-          lat: +loc2.lat, lon: +loc2.lng, place_id: dj.result.place_id || pid, score: 1.3,
-        });
+          display,
+          lat: +loc2.lat,
+          lon: +loc2.lng,
+          place_id: dj.result?.place_id || pid,
+          score: 1.3,
+        };
+      } catch {
+        return null;
       }
-    }
+    });
+
+    const detailResults = await Promise.allSettled(detailFetches);
+    const items = detailResults
+      .map((r) => (r.status === "fulfilled" ? r.value : null))
+      .filter((it) => it && Number.isFinite(it.lat) && Number.isFinite(it.lon));
+
+    if (!items.length) return res.json({ ok: true, status: "ZERO_RESULTS", items: [] });
     return res.json({ ok: true, status: "OK", items });
   } catch (e) { return res.json({ ok: false, status: "ERROR", items: [], error: String(e) }); }
 });
