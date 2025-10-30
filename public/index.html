@@ -314,6 +314,21 @@ function formatNominatimDisplay(row){
   if (chosen) return chosen;
   if (tail) return tail;
   return row.display_name || altHead || "";
+  const street = (()=>{
+    const road = addr.road || addr.residential || addr.pedestrian || addr.path || addr.cycleway || addr.footway;
+    const house = addr.house_number || addr.house_name || "";
+    const parts = [];
+    if (house) parts.push(String(house));
+    if (road) parts.push(String(road));
+    return parts.join(" ").trim();
+  })();
+  const locality = addr.city || addr.town || addr.village || addr.hamlet || addr.county || "";
+  const regionParts = [locality, addr.state || addr.state_district || "", addr.postcode || ""].filter(Boolean);
+  const tail = regionParts.join(", ");
+  if (street && tail) return `${street}, ${tail}`;
+  if (street) return street;
+  if (tail) return tail;
+  return row.display_name || "";
 }
 function setOverlayWorking(msg="Working…"){ overlay.textContent = msg; overlay.style.display = "flex"; }
 function clearOverlay(){ overlay.style.display = "none"; }
@@ -668,6 +683,7 @@ async function nominatimSearch(q){
         score: 0.55 + preciseBonus + typeBonus + digitsWeight
       };
     }).filter(Boolean);
+    return a.map(row => ({ type:"OSM", display: formatNominatimDisplay(row) || row.display_name, lat:+row.lat, lon:+row.lon, score:0.7 }));
   } catch { return []; }
 }
 function chooseAc(i){
