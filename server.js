@@ -727,6 +727,7 @@ async function performEstimate(reqBody) {
   // AADT strict: ONLY from stations on the ENTERED ROAD
   let usedAADT = null, method = "dot_station_on_entered_road";
   let aadtUsedMarker = null;
+  let rawStationAADT = null;
   let mapStations = await providerNearbyAADT(stateCode, geo.lat, geo.lon, 1.0).catch(() => []);
 
   const overrideVal = Number(aadtOverride);
@@ -736,8 +737,13 @@ async function performEstimate(reqBody) {
     let onStreet = await providerStationsOnStreet(stateCode, geo.lat, geo.lon, enteredRoadText).catch(() => []);
     let pick = onStreet.length ? pickStationForStreet(onStreet, enteredRoadText) : null;
 
+    if (!pick && stateCode === "NC" && mapStations.length) {
+      pick = pickStationForStreet(mapStations, enteredRoadText) || mapStations[0];
+    }
+
     if (pick) {
       usedAADT = pick.aadt;
+      rawStationAADT = pick.aadt;
       aadtUsedMarker = {
         lat: pick.lat, lon: pick.lon, aadt: pick.aadt, year: pick.year,
         route: pick.route, location: pick.location,
@@ -746,7 +752,16 @@ async function performEstimate(reqBody) {
       };
     }
   }
-  if (!(Number.isFinite(usedAADT) && usedAADT > 0)) { usedAADT = 8000; method = "fallback_no_dot_found"; }
+  if (!(Number.isFinite(usedAADT) && usedAADT > 0)) {
+    usedAADT = 8000;
+    method = "fallback_no_dot_found";
+    rawStationAADT = null;
+  } else if (method === "dot_station_on_entered_road" && usedAADT < 2000) {
+    rawStationAADT = usedAADT;
+    usedAADT = 8000;
+    method = "fallback_low_aadt";
+    aadtUsedMarker = null;
+  }
 
   // Gallons
   let userExtrasMult = 1.0;
@@ -834,6 +849,10 @@ Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
   if (method === "override") aadtText = `AADT (override): ${usedAADT.toLocaleString()} vehicles/day`;
   else if (method === "dot_station_on_entered_road") aadtText = `AADT: ${usedAADT.toLocaleString()} vehicles/day (DOT • entered road: ${enteredRoadText || "—"})`;
   else if (method === "fallback_no_dot_found") aadtText = `AADT: ${usedAADT.toLocaleString()} vehicles/day (fallback — no DOT station published for "${enteredRoadText}")`;
+  else if (method === "fallback_low_aadt") {
+    const rawTxt = rawStationAADT ? rawStationAADT.toLocaleString() : "<2,000";
+    aadtText = `AADT: ${usedAADT.toLocaleString()} vehicles/day (fallback — DOT reported ${rawTxt} < 2,000)`;
+  }
   else aadtText = `AADT: ${usedAADT.toLocaleString()} vehicles/day (${method})`;
 
   const nearestComp = compAll3.length ? compAll3[0].miles : null;
@@ -852,7 +871,7 @@ Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
     estimate: { low: calc.low, range: `${Math.round(calc.low)}–${Math.round(calc.high)}`, year2: calc.year2, year3: calc.year3 },
     aadtText, competitionText, csv: devCsv,
     base: calc.base, low: calc.low, high: calc.high, year2: calc.year2, year3: calc.year3,
-    inputs: { mpds: MPDS, diesel: DIESEL, aadt_used: usedAADT, price_position: pricePosition, aadt_components: { method, enteredRoad: enteredRoadText } },
+    inputs: { mpds: MPDS, diesel: DIESEL, aadt_used: usedAADT, price_position: pricePosition, aadt_components: { method, enteredRoad: enteredRoadText, raw_aadt: rawStationAADT } },
     flags: { rural_bonus_applied: ruralApplied, rural_eligible: ruralEligible, sunoco_within_1mi: sunocoNearby, auto_low_rating: autoLow },
     competition: {
       count: compCount, count_3mi: compAll3.length, heavy_count: heavyCount,
@@ -866,7 +885,7 @@ Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
       all_competitors: compAll3,
       competitor_radius_mi: 3.0,
       aadt: mapStations,        // for map dots only
-      aadt_used: aadtUsedMarker || { lat: geo.lat, lon: geo.lon, aadt: usedAADT, method, fallback: method === "fallback_no_dot_found" }
+      aadt_used: aadtUsedMarker || { lat: geo.lat, lon: geo.lon, aadt: usedAADT, method, fallback: method === "fallback_no_dot_found" || method === "fallback_low_aadt" }
     },
   };
 }
@@ -1006,7 +1025,21 @@ app.post("/report/pdf", async (req, res) => {
     if (B.extrasMult != null) bullets.push(`Extras multiplier: × ${Number(B.extrasMult).toFixed(2)}`);
     if (B.preClamp != null && B.finalClampedToBaseline != null) bullets.push(`Clamp to baseline: min(${Number(B.preClamp).toLocaleString()}, baseline) → ${Number(B.finalClampedToBaseline).toLocaleString()}`);
     if (result.roads?.summary) bullets.push(`Road context: ${result.roads.summary}`);
-    if (result.inputs?.aadt_components?.method) bullets.push(`AADT method: ${result.inputs.aadt_components.method === "dot_station_on_entered_road" ? `DOT • entered road (${result.inputs.aadt_components.enteredRoad || "—"})` : result.inputs.aadt_components.method}`);
+    if (result.inputs?.aadt_components?.method) {
+      const comp = result.inputs.aadt_components;
+      let mText;
+      if (comp.method === "dot_station_on_entered_road") {
+        mText = `DOT • entered road (${comp.enteredRoad || "—"})`;
+      } else if (comp.method === "fallback_low_aadt") {
+        const raw = Number.isFinite(comp.raw_aadt) ? Number(comp.raw_aadt).toLocaleString() : "<2,000";
+        mText = `Fallback — DOT reported ${raw} < 2,000`;
+      } else if (comp.method === "fallback_no_dot_found") {
+        mText = "Fallback — no DOT station";
+      } else {
+        mText = comp.method;
+      }
+      bullets.push(`AADT method: ${mText}`);
+    }
     y = bulletLines(doc, bullets, margin, y, contentW); y += 6;
 
     y = drawSectionTitle(doc, "Summary", y, { margin, color: "#334155" });
