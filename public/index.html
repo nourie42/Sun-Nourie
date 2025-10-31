@@ -281,6 +281,39 @@ function esc(s){ return (s??"").toString().replace(/[&<>\"']/g,m=>({"&":"&amp;",
 function formatNominatimDisplay(row){
   if(!row) return "";
   const addr = row.address || {};
+  const baseHead = String(row.display_name || "").split(",")[0].trim();
+  const altHead = String(row.name || "").trim();
+  const road = addr.road || addr.residential || addr.pedestrian || addr.path || addr.cycleway || addr.footway || "";
+  const house = addr.house_number || addr.house_name || "";
+  const hasDigits = (s) => /\d/.test(String(s||""));
+
+  let street = "";
+  if (house && road) {
+    street = `${house} ${road}`.trim();
+  } else if (house) {
+    street = String(house).trim();
+  } else if (road) {
+    const baseMatchesRoad = baseHead && baseHead.toLowerCase().includes(String(road).toLowerCase());
+    if (baseMatchesRoad && hasDigits(baseHead)) street = baseHead;
+    else street = String(road).trim();
+  }
+
+  const candidates = [street, baseHead, altHead].map((s) => String(s || "").trim()).filter(Boolean);
+  const chosen = (() => {
+    if (!candidates.length) return "";
+    const withDigits = candidates.find((s) => hasDigits(s));
+    if (withDigits) return withDigits;
+    return candidates[0];
+  })();
+
+  const locality = addr.city || addr.town || addr.village || addr.hamlet || addr.suburb || addr.county || "";
+  const regionParts = [locality, addr.state || addr.state_district || addr.region || "", addr.postcode || ""].filter(Boolean);
+  const tail = regionParts.join(", ");
+
+  if (chosen && tail) return `${chosen}, ${tail}`;
+  if (chosen) return chosen;
+  if (tail) return tail;
+  return row.display_name || altHead || "";
   const street = (()=>{
     const road = addr.road || addr.residential || addr.pedestrian || addr.path || addr.cycleway || addr.footway;
     const house = addr.house_number || addr.house_name || "";
@@ -587,6 +620,7 @@ async function showRating(address){
 function hideAc(){ acBox.style.display = "none"; acActive = -1; }
 function rankAutocompleteItems(q, items){
   const Q = q.trim().toLowerCase();
+  const queryHasDigits = /\d/.test(Q);
   return [...items].sort((a,b)=>{
     const A = (a.display||"").toLowerCase(), B = (b.display||"").toLowerCase();
     const aw = Number.isFinite(a.score)?a.score:(a.type==="Google"?1.2:0.8);
@@ -596,8 +630,12 @@ function rankAutocompleteItems(q, items){
     const aIdx = A.indexOf(Q); const bIdx = B.indexOf(Q);
     const aPen = aIdx>=0 ? aIdx/40 : 1.5;
     const bPen = bIdx>=0 ? bIdx/40 : 1.5;
-    const as = aw + aStarts - aPen;
-    const bs = bw + bStarts - bPen;
+    const aHead = (a.display||"").split(",")[0];
+    const bHead = (b.display||"").split(",")[0];
+    const aDigits = queryHasDigits && /\d/.test(aHead) ? 0.6 : 0;
+    const bDigits = queryHasDigits && /\d/.test(bHead) ? 0.6 : 0;
+    const as = aw + aStarts - aPen + aDigits;
+    const bs = bw + bStarts - bPen + bDigits;
     return bs - as;
   });
 }
@@ -622,6 +660,29 @@ async function nominatimSearch(q){
   try {
     const r = await fetch("https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=us&q=" + encodeURIComponent(q));
     const a = await r.json();
+    const queryHasDigits = /\d/.test(q);
+    const preciseTypes = new Set(["house","residential","apartments","building","yes","detached","commercial","industrial","retail"]);
+    return a.map(row => {
+      const formatted = formatNominatimDisplay(row) || row.display_name || "";
+      const head = formatted.split(",")[0];
+      if (!formatted.trim()) return null;
+      const addr = row.address || {};
+      const hasExplicitNumber = Boolean(addr.house_number || addr.house_name);
+      const lat = Number.parseFloat(row.lat);
+      const lon = Number.parseFloat(row.lon);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+      const headHasDigits = /\d/.test(head);
+      const digitsWeight = queryHasDigits ? (headHasDigits ? 0.25 : -0.15) : 0;
+      const preciseBonus = hasExplicitNumber ? 0.25 : 0;
+      const typeBonus = preciseTypes.has(row.type) ? 0.15 : 0;
+      return {
+        type:"OSM",
+        display: formatted,
+        lat,
+        lon,
+        score: 0.55 + preciseBonus + typeBonus + digitsWeight
+      };
+    }).filter(Boolean);
     return a.map(row => ({ type:"OSM", display: formatNominatimDisplay(row) || row.display_name, lat:+row.lat, lon:+row.lon, score:0.7 }));
   } catch { return []; }
 }
@@ -644,14 +705,18 @@ addrInput.addEventListener("input", () => {
   lastSelectedDisplay = q; // keep current typed text (used to extract road if user doesn't click a suggestion)
   const requestId = ++acRequestToken;
   if (q.length < 2) { hideAc(); return; }
-  Promise.all([googleSearch(q), nominatimSearch(q)]).then(([g,n])=>{
-    if (requestId !== acRequestToken) return; // stale response
-    if (addrInput.value.trim() !== q) return; // input changed after request started
-    const ranked = rankAutocompleteItems(q, [...g, ...n]);
+  const resultState = { google: [], osm: [] };
+  const applyResults = () => {
+    if (requestId !== acRequestToken) return;
+    if (addrInput.value.trim() !== q) return;
+    const ranked = rankAutocompleteItems(q, [...resultState.google, ...resultState.osm]);
     acItems = ranked.slice(0, 8);
-    acActive = acItems.length ? 0 : -1; // highlight best match when available
+    acActive = acItems.length ? 0 : -1;
     renderAc(acItems);
-  });
+  };
+
+  googleSearch(q).then((items)=>{ resultState.google = items || []; applyResults(); });
+  nominatimSearch(q).then((items)=>{ resultState.osm = items || []; applyResults(); });
 });
 addrInput.addEventListener("keydown", (e) => {
   if (acBox.style.display !== "none" && acItems.length) {
