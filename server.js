@@ -44,6 +44,14 @@ const CONTACT = process.env.OVERPASS_CONTACT || UA;
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || "";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 
+const NOMINATIM_CACHE = new Map();
+const NOMINATIM_CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
+const NOMINATIM_CACHE_LIMIT = 200;
+
+const GOOGLE_DETAIL_CACHE = new Map();
+const GOOGLE_DETAIL_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
+const GOOGLE_DETAIL_CACHE_LIMIT = 200;
+
 let _cachedFetch = null;
 async function getFetch() {
   if (typeof fetch === "function") return fetch;
@@ -58,6 +66,24 @@ async function fetchWithTimeout(url, opts = {}, timeoutMs = 25000) {
   const id = setTimeout(() => ctl.abort(), timeoutMs);
   try { return await f(url, { ...opts, signal: ctl.signal }); }
   finally { clearTimeout(id); }
+}
+
+function getCached(map, key) {
+  const hit = map.get(key);
+  if (!hit) return null;
+  if (hit.expires > Date.now()) return hit.value;
+  map.delete(key);
+  return null;
+}
+
+function setCached(map, key, value, ttlMs, limit = 0) {
+  if (!key) return;
+  if (map.has(key)) map.delete(key);
+  if (limit && map.size >= limit) {
+    const oldestKey = map.keys().next().value;
+    if (oldestKey !== undefined) map.delete(oldestKey);
+  }
+  map.set(key, { value, expires: Date.now() + Math.max(ttlMs, 0) });
 }
 
 /* -------------------- CSV (developments) -------------------- */
@@ -175,6 +201,58 @@ async function geocodeNominatim(q) {
   const a = await r.json();
   if (!a?.length) throw new Error("Nominatim: no result");
   return { lat: +a[0].lat, lon: +a[0].lon, label: a[0].display_name };
+}
+
+function formatNominatimDisplay(row) {
+  if (!row) return "";
+  const addr = row.address || {};
+  const street = (() => {
+    const road = addr.road || addr.residential || addr.pedestrian || addr.path || addr.cycleway || addr.footway;
+    const house = addr.house_number || addr.house_name || "";
+    const parts = [];
+    if (house) parts.push(String(house));
+    if (road) parts.push(String(road));
+    return parts.join(" ").trim();
+  })();
+  const locality = addr.city || addr.town || addr.village || addr.hamlet || addr.county || "";
+  const regionParts = [locality, addr.state || addr.state_district || "", addr.postcode || ""].filter(Boolean);
+  const tail = regionParts.join(", ");
+  if (street && tail) return `${street}, ${tail}`;
+  if (street) return street;
+  if (tail) return tail;
+  return row.display_name || "";
+}
+
+function buildOsmNormalized(row) {
+  if (!row) return null;
+  const addr = row.address || {};
+  const lat = Number(row.lat), lon = Number(row.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  const number = addr.house_number || addr.house_name || "";
+  const road = addr.road || addr.residential || addr.pedestrian || addr.path || addr.cycleway || addr.footway || "";
+  const line1Raw = [number, road].filter(Boolean).join(" ").trim();
+  const city = addr.city || addr.town || addr.village || addr.hamlet || "";
+  const county = addr.county || "";
+  const state = addr.state || addr.state_district || "";
+  const postcode = addr.postcode || "";
+  const countryCode = addr.country_code ? String(addr.country_code).toUpperCase() : "";
+  const country = countryCode || addr.country || "";
+  const formatted = row.display_name || [line1Raw, city, state, postcode].filter(Boolean).join(", ");
+  const line1 = line1Raw || (formatted.split(",")[0] || "").trim();
+  return {
+    formatted,
+    line1,
+    city,
+    county,
+    state,
+    postcode,
+    country,
+    lat,
+    lon,
+    source: "OSM",
+    place_id: row.place_id || null,
+    raw: addr,
+  };
 }
 function findComponent(comps, ...types) {
   if (!Array.isArray(comps)) return "";
@@ -630,49 +708,111 @@ app.get("/google/autocomplete", async (req, res) => {
     if (aj.status !== "OK" && aj.status !== "ZERO_RESULTS")
       return res.json({ ok: false, status: aj.status, items: [] });
 
-    const predictions = (aj.predictions || []).filter((p) => p.place_id).slice(0, 6);
+    const predictions = (aj.predictions || []).filter((p) => p.place_id).slice(0, 8);
     if (!predictions.length) return res.json({ ok: true, status: "ZERO_RESULTS", items: [] });
 
-    const detailFields = "formatted_address,geometry,name,place_id,address_component";
-    const detailFetches = predictions.map(async (p) => {
-      try {
-        const pid = p.place_id;
-        const du = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${pid}&fields=${encodeURIComponent(detailFields)}&key=${GOOGLE_API_KEY}`;
-        const dr = await fetchWithTimeout(du, { headers: { "User-Agent": UA } }, 15000);
-        const dj = await dr.json();
-        if (dj.status !== "OK") return null;
-        const loc2 = dj.result?.geometry?.location;
-        if (!loc2 || !Number.isFinite(loc2.lat) || !Number.isFinite(loc2.lng)) return null;
+    const items = predictions.map((p) => ({
+      type: "Google",
+      display: p.description || p.structured_formatting?.main_text || "",
+      place_id: p.place_id,
+      structured_formatting: p.structured_formatting || null,
+      terms: p.terms || null,
+      score: 1.3,
+    }));
 
-        const result = dj.result || {};
-        const display = result.formatted_address || p.description || result.name || "";
-        if (!display) return null;
-
-        const normalized = buildNormalizedFromGoogle(result);
-
-        return {
-          type: "Google",
-          display,
-          lat: +loc2.lat,
-          lon: +loc2.lng,
-          place_id: result.place_id || pid,
-          normalized: normalized || null,
-          storageKey: result.place_id ? `GOOGLE:${result.place_id}` : null,
-          score: 1.3,
-        };
-      } catch {
-        return null;
-      }
-    });
-
-    const detailResults = await Promise.allSettled(detailFetches);
-    const items = detailResults
-      .map((r) => (r.status === "fulfilled" ? r.value : null))
-      .filter((it) => it && Number.isFinite(it.lat) && Number.isFinite(it.lon));
-
-    if (!items.length) return res.json({ ok: true, status: "ZERO_RESULTS", items: [] });
     return res.json({ ok: true, status: "OK", items });
   } catch (e) { return res.json({ ok: false, status: "ERROR", items: [], error: String(e) }); }
+});
+
+app.get("/google/place_details", async (req, res) => {
+  try {
+    if (!GOOGLE_API_KEY) return res.json({ ok: false, status: "MISSING_KEY" });
+    const place_id = String(req.query.place_id || "").trim();
+    if (!place_id) return res.json({ ok: false, status: "BAD_REQUEST" });
+
+    const cached = getCached(GOOGLE_DETAIL_CACHE, place_id);
+    if (cached) return res.json({ ok: true, status: "CACHED", item: cached });
+
+    const fields = "formatted_address,geometry,name,place_id,address_component";
+    const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(place_id)}&fields=${encodeURIComponent(fields)}&key=${GOOGLE_API_KEY}`;
+    const r = await fetchWithTimeout(url, { headers: { "User-Agent": UA } }, 15000);
+    const j = await r.json();
+    if (j.status !== "OK") return res.json({ ok: false, status: j.status || "ERROR", error: j.error_message || null });
+
+    const result = j.result || {};
+    const loc = result.geometry?.location;
+    if (!loc || !Number.isFinite(+loc.lat) || !Number.isFinite(+loc.lng)) {
+      return res.json({ ok: false, status: "NO_LOCATION" });
+    }
+
+    const display = result.formatted_address || result.name || "";
+    if (!display) return res.json({ ok: false, status: "NO_DISPLAY" });
+
+    const normalized = buildNormalizedFromGoogle(result);
+    const item = {
+      type: "Google",
+      display,
+      lat: +loc.lat,
+      lon: +loc.lng,
+      place_id: result.place_id || place_id,
+      normalized: normalized || null,
+      storageKey: result.place_id ? `GOOGLE:${result.place_id}` : null,
+      score: 1.3,
+    };
+
+    setCached(GOOGLE_DETAIL_CACHE, place_id, item, GOOGLE_DETAIL_TTL_MS, GOOGLE_DETAIL_CACHE_LIMIT);
+    return res.json({ ok: true, status: "OK", item });
+  } catch (e) {
+    return res.json({ ok: false, status: "ERROR", error: String(e) });
+  }
+});
+
+app.get("/osm/autocomplete", async (req, res) => {
+  try {
+    const q = String(req.query.q || req.query.input || "").trim();
+    if (q.length < 2) return res.json({ ok: false, status: "BAD_REQUEST", items: [] });
+
+    const cacheKey = q.toLowerCase();
+    const cached = getCached(NOMINATIM_CACHE, cacheKey);
+    if (cached) return res.json({ ok: true, status: "CACHED", items: cached });
+
+    const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=us&q=${encodeURIComponent(q)}`;
+    const r = await fetchWithTimeout(url, { headers: { "User-Agent": UA, Accept: "application/json" } }, 15000);
+    if (!r.ok) return res.json({ ok: false, status: `HTTP_${r.status}`, items: [] });
+    const arr = await r.json();
+    if (!Array.isArray(arr) || !arr.length) return res.json({ ok: true, status: "ZERO_RESULTS", items: [] });
+
+    const items = arr
+      .map((row) => {
+        const lat = Number(row.lat), lon = Number(row.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+        const normalized = buildOsmNormalized(row);
+        const display = formatNominatimDisplay(row) || row.display_name || "";
+        if (!display) return null;
+        const storageKey = row.place_id
+          ? `OSM:${row.place_id}`
+          : normalized && Number.isFinite(normalized.lat) && Number.isFinite(normalized.lon)
+          ? `OSM:${normalized.lat.toFixed(6)},${normalized.lon.toFixed(6)}`
+          : null;
+        return {
+          type: "OSM",
+          display,
+          lat,
+          lon,
+          normalized: normalized || null,
+          place_id: row.place_id || null,
+          storageKey,
+          score: 0.7,
+        };
+      })
+      .filter(Boolean)
+      .slice(0, 8);
+
+    setCached(NOMINATIM_CACHE, cacheKey, items, NOMINATIM_CACHE_TTL_MS, NOMINATIM_CACHE_LIMIT);
+    return res.json({ ok: true, status: "OK", items });
+  } catch (e) {
+    return res.json({ ok: false, status: "ERROR", items: [], error: String(e) });
+  }
 });
 
 app.get("/google/findplace", async (req, res) => {

@@ -677,45 +677,62 @@ async function googleSearch(q){
     const r = await fetch("/google/autocomplete?input=" + encodeURIComponent(q) + bias);
     const j = await r.json();
     if(!j.ok) return [];
-    return (j.items||[]).map(it => ({...it, type:"Google", score:1.3}));
+    return (j.items||[]).map(it => ({...it, type:"Google", score:Number.isFinite(it.score)?it.score:1.3}));
   } catch { return []; }
 }
 async function nominatimSearch(q){
   try {
-    const r = await fetch("https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=us&q=" + encodeURIComponent(q));
-    const a = await r.json();
-    return a
-      .map(row => {
-        const lat = Number(row.lat), lon = Number(row.lon);
-        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-        const normalized = buildOsmNormalized(row);
-        const display = formatNominatimDisplay(row) || row.display_name;
-        return {
-          type: "OSM",
-          display,
-          lat,
-          lon,
-          score: 0.7,
-          normalized,
-          place_id: row.place_id || null,
-          storageKey: row.place_id ? `OSM:${row.place_id}` : (normalized ? `OSM:${lat.toFixed(6)},${lon.toFixed(6)}` : null),
-        };
-      })
-      .filter(Boolean);
+    const r = await fetch("/osm/autocomplete?q=" + encodeURIComponent(q));
+    const j = await r.json();
+    if(!j.ok) return [];
+    return (j.items||[]).map(it => ({...it, type: it.type || "OSM", score: Number.isFinite(it.score)?it.score:0.7}));
   } catch { return []; }
 }
-function chooseAc(i){
-  const it = acItems[i]; if (!it) return;
-  acRequestToken++; // cancel any in-flight autocomplete responses
-  lastSelectedDisplay = it.display || "";
-  const coords = (Number.isFinite(it.lat) && Number.isFinite(it.lon)) ? { lat: it.lat, lon: it.lon } : null;
-  selectedCoords = coords || null; selectedPlaceId = it.place_id || null; selectedNormalized = it.normalized || null;
-  skipNextInputReset = true;
-  addrInput.value = it.display;
-  hideAc();
-  setTimeout(() => { skipNextInputReset = false; }, 0);
-  if (coords && mapReady) { map.setView([coords.lat, coords.lon], 15); if (cmpShow.checked) refreshCompetitors(); }
-  persistNormalizedSelection(it);
+async function fetchGoogleDetails(placeId){
+  if(!placeId) return null;
+  try {
+    const r = await fetch("/google/place_details?place_id=" + encodeURIComponent(placeId));
+    const j = await r.json();
+    if(j.ok && j.item) return j.item;
+  } catch {}
+  return null;
+}
+async function chooseAc(i){
+  try {
+    const base = acItems[i];
+    if (!base) return;
+    acRequestToken++; // cancel any in-flight autocomplete responses
+    lastSelectedDisplay = base.display || "";
+
+    skipNextInputReset = true;
+    addrInput.value = base.display || "";
+    hideAc();
+    setTimeout(() => { skipNextInputReset = false; }, 0);
+
+    let it = base;
+    if (it.type === "Google" && it.place_id && (!Number.isFinite(it.lat) || !Number.isFinite(it.lon))) {
+      const detail = await fetchGoogleDetails(it.place_id);
+      if (detail) {
+        it = { ...it, ...detail };
+        acItems[i] = it;
+      }
+    }
+
+    selectedPlaceId = it.place_id || null;
+    selectedNormalized = it.normalized || null;
+    const coords = (Number.isFinite(it.lat) && Number.isFinite(it.lon)) ? { lat: it.lat, lon: it.lon } : null;
+    selectedCoords = coords || null;
+
+    if (coords && mapReady) {
+      map.setView([coords.lat, coords.lon], 15);
+      if (cmpShow.checked) refreshCompetitors();
+    }
+
+    persistNormalizedSelection(it);
+    showRating(addrInput.value.trim());
+  } catch (err) {
+    console.warn("Failed to apply autocomplete selection", err);
+  }
 }
 addrInput.addEventListener("input", () => {
   const q = addrInput.value.trim();
