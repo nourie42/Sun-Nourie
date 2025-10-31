@@ -274,6 +274,8 @@ let acItems = [], acActive = -1; // suggestions & keyboard index
 let lastSelectedDisplay = "";     // for extracting road name
 let acRequestToken = 0;           // latest autocomplete request id
 let skipNextInputReset = false;   // prevent clearing coords when setting value programmatically
+let selectedNormalized = null;    // normalized address fields for persistence/server
+let lastStoredKey = null;         // dedupe persisted address writes
 
 /* Utils */
 function fmt(n){ return (n??0).toLocaleString(undefined,{maximumFractionDigits:0}); }
@@ -296,6 +298,65 @@ function formatNominatimDisplay(row){
   if (street) return street;
   if (tail) return tail;
   return row.display_name || "";
+}
+function buildOsmNormalized(row){
+  if(!row) return null;
+  const addr = row.address || {};
+  const lat = Number(row.lat), lon = Number(row.lon);
+  if(!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  const number = addr.house_number || addr.house_name || "";
+  const road = addr.road || addr.residential || addr.pedestrian || addr.path || addr.cycleway || addr.footway || "";
+  const line1Raw = [number, road].filter(Boolean).join(" ").trim();
+  const city = addr.city || addr.town || addr.village || addr.hamlet || "";
+  const county = addr.county || "";
+  const state = addr.state || addr.state_district || "";
+  const postcode = addr.postcode || "";
+  const countryCode = addr.country_code ? String(addr.country_code).toUpperCase() : "";
+  const country = countryCode || addr.country || "";
+  const formatted = row.display_name || [line1Raw, city, state, postcode].filter(Boolean).join(", ");
+  const line1 = line1Raw || (formatted.split(",")[0] || "").trim();
+  return {
+    formatted,
+    line1,
+    city,
+    county,
+    state,
+    postcode,
+    country,
+    lat,
+    lon,
+    source: "OSM",
+    place_id: row.place_id || null,
+    raw: addr,
+  };
+}
+function storageKeyForItem(it){
+  if (!it) return null;
+  if (it.storageKey) return it.storageKey;
+  if (it.place_id) return `${it.type||""}:${it.place_id}`;
+  const n = it.normalized;
+  if (n && Number.isFinite(n.lat) && Number.isFinite(n.lon)) {
+    return `${it.type||""}:${n.lat.toFixed(6)},${n.lon.toFixed(6)}`;
+  }
+  return null;
+}
+async function persistNormalizedSelection(item){
+  if(!item || !item.normalized) return;
+  const key = storageKeyForItem(item);
+  if(key && key === lastStoredKey) return;
+  try{
+    const payload = {
+      input: addrInput.value.trim(),
+      normalized: item.normalized,
+      source: item.type || item.normalized?.source || null,
+      place_id: item.place_id || item.normalized?.place_id || null
+    };
+    await fetch("/api/addresses", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(payload) });
+    if(key) lastStoredKey = key;
+  }catch(err){
+    console.warn("Failed to store normalized address", err);
+    if(key) lastStoredKey = null;
+  }
 }
 function setOverlayWorking(msg="Working…"){ overlay.textContent = msg; overlay.style.display = "flex"; }
 function clearOverlay(){ overlay.style.display = "none"; }
@@ -437,6 +498,7 @@ async function callEstimate(){
     enteredRoad: parseRoadFromDisplay(lastSelectedDisplay || addrInput.value.trim())
   };
   if(selectedCoords){ body.siteLat = selectedCoords.lat; body.siteLon = selectedCoords.lon; }
+  if(selectedNormalized){ body.normalizedAddress = selectedNormalized; }
   const ov = +( $("aadtOverride").value || "" ); if(Number.isFinite(ov) && ov > 0) body.aadtOverride = ov;
   return await safeJSON("/estimate", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
 }
@@ -622,7 +684,24 @@ async function nominatimSearch(q){
   try {
     const r = await fetch("https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=us&q=" + encodeURIComponent(q));
     const a = await r.json();
-    return a.map(row => ({ type:"OSM", display: formatNominatimDisplay(row) || row.display_name, lat:+row.lat, lon:+row.lon, score:0.7 }));
+    return a
+      .map(row => {
+        const lat = Number(row.lat), lon = Number(row.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+        const normalized = buildOsmNormalized(row);
+        const display = formatNominatimDisplay(row) || row.display_name;
+        return {
+          type: "OSM",
+          display,
+          lat,
+          lon,
+          score: 0.7,
+          normalized,
+          place_id: row.place_id || null,
+          storageKey: row.place_id ? `OSM:${row.place_id}` : (normalized ? `OSM:${lat.toFixed(6)},${lon.toFixed(6)}` : null),
+        };
+      })
+      .filter(Boolean);
   } catch { return []; }
 }
 function chooseAc(i){
@@ -630,16 +709,17 @@ function chooseAc(i){
   acRequestToken++; // cancel any in-flight autocomplete responses
   lastSelectedDisplay = it.display || "";
   const coords = (Number.isFinite(it.lat) && Number.isFinite(it.lon)) ? { lat: it.lat, lon: it.lon } : null;
-  selectedCoords = coords || null; selectedPlaceId = it.place_id || null;
+  selectedCoords = coords || null; selectedPlaceId = it.place_id || null; selectedNormalized = it.normalized || null;
   skipNextInputReset = true;
   addrInput.value = it.display;
   hideAc();
   setTimeout(() => { skipNextInputReset = false; }, 0);
   if (coords && mapReady) { map.setView([coords.lat, coords.lon], 15); if (cmpShow.checked) refreshCompetitors(); }
+  persistNormalizedSelection(it);
 }
 addrInput.addEventListener("input", () => {
   const q = addrInput.value.trim();
-  if (!skipNextInputReset) { selectedCoords = null; selectedPlaceId = null; }
+  if (!skipNextInputReset) { selectedCoords = null; selectedPlaceId = null; selectedNormalized = null; lastStoredKey = null; }
   skipNextInputReset = false;
   lastSelectedDisplay = q; // keep current typed text (used to extract road if user doesn't click a suggestion)
   const requestId = ++acRequestToken;

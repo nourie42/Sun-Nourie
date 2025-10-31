@@ -21,6 +21,9 @@ app.use(express.json({ limit: "1mb" }));
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const DATA_DIR = path.join(__dirname, "data");
+const NORMALIZED_FILE = path.join(DATA_DIR, "normalized-addresses.json");
+
 app.use(
   express.static(path.join(__dirname, "public"), {
     etag: false,
@@ -119,6 +122,24 @@ function matchCsvDevelopments(city, county, state) {
 }
 loadCsvDevData().catch(() => {});
 
+async function appendNormalizedAddress(entry) {
+  try {
+    await fs.mkdir(DATA_DIR, { recursive: true });
+    let existing = [];
+    try {
+      const raw = await fs.readFile(NORMALIZED_FILE, "utf8");
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) existing = parsed;
+    } catch {}
+    existing.unshift(entry);
+    if (existing.length > 500) existing = existing.slice(0, 500);
+    await fs.writeFile(NORMALIZED_FILE, JSON.stringify(existing, null, 2));
+  } catch (err) {
+    console.error("Failed to store normalized address", err);
+    throw err;
+  }
+}
+
 /* ------------------------------ Utils ------------------------------ */
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const toMiles = (m) => m / 1609.344;
@@ -154,6 +175,61 @@ async function geocodeNominatim(q) {
   const a = await r.json();
   if (!a?.length) throw new Error("Nominatim: no result");
   return { lat: +a[0].lat, lon: +a[0].lon, label: a[0].display_name };
+}
+function findComponent(comps, ...types) {
+  if (!Array.isArray(comps)) return "";
+  for (const type of types) {
+    const comp = comps.find((c) => Array.isArray(c.types) && c.types.includes(type));
+    if (comp) return comp.long_name || comp.short_name || "";
+  }
+  return "";
+}
+function buildNormalizedFromGoogle(result) {
+  if (!result) return null;
+  const comps = Array.isArray(result.address_components) ? result.address_components : [];
+  const loc = result.geometry?.location;
+  const lat = Number(loc?.lat);
+  const lon = Number(loc?.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  const streetNumber = findComponent(comps, "street_number");
+  const route = findComponent(comps, "route");
+  const line1 = [streetNumber, route].filter(Boolean).join(" ").trim();
+  const city = findComponent(
+    comps,
+    "locality",
+    "postal_town",
+    "sublocality",
+    "administrative_area_level_3",
+    "administrative_area_level_2"
+  );
+  const county = findComponent(comps, "administrative_area_level_2");
+  const stateComp = (() => {
+    const comp = Array.isArray(comps)
+      ? comps.find((c) => Array.isArray(c.types) && c.types.includes("administrative_area_level_1"))
+      : null;
+    if (!comp) return "";
+    return comp.short_name || comp.long_name || "";
+  })();
+  const postcode = findComponent(comps, "postal_code");
+  const countryComp = Array.isArray(comps)
+    ? comps.find((c) => Array.isArray(c.types) && c.types.includes("country"))
+    : null;
+  const country = countryComp?.short_name || countryComp?.long_name || "";
+  const formatted = result.formatted_address || [line1, city, stateComp, postcode].filter(Boolean).join(", ");
+  return {
+    formatted,
+    line1: line1 || (formatted.split(",")[0] || "").trim(),
+    city,
+    county,
+    state: stateComp,
+    postcode,
+    country,
+    lat,
+    lon,
+    source: "Google",
+    place_id: result.place_id || null,
+    raw: { components: comps },
+  };
 }
 async function reverseAdmin(lat, lon) {
   try {
@@ -557,7 +633,7 @@ app.get("/google/autocomplete", async (req, res) => {
     const predictions = (aj.predictions || []).filter((p) => p.place_id).slice(0, 6);
     if (!predictions.length) return res.json({ ok: true, status: "ZERO_RESULTS", items: [] });
 
-    const detailFields = "formatted_address,geometry,name,place_id";
+    const detailFields = "formatted_address,geometry,name,place_id,address_component";
     const detailFetches = predictions.map(async (p) => {
       try {
         const pid = p.place_id;
@@ -568,15 +644,20 @@ app.get("/google/autocomplete", async (req, res) => {
         const loc2 = dj.result?.geometry?.location;
         if (!loc2 || !Number.isFinite(loc2.lat) || !Number.isFinite(loc2.lng)) return null;
 
-        const display = dj.result?.formatted_address || p.description || dj.result?.name || "";
+        const result = dj.result || {};
+        const display = result.formatted_address || p.description || result.name || "";
         if (!display) return null;
+
+        const normalized = buildNormalizedFromGoogle(result);
 
         return {
           type: "Google",
           display,
           lat: +loc2.lat,
           lon: +loc2.lng,
-          place_id: dj.result?.place_id || pid,
+          place_id: result.place_id || pid,
+          normalized: normalized || null,
+          storageKey: result.place_id ? `GOOGLE:${result.place_id}` : null,
           score: 1.3,
         };
       } catch {
@@ -645,6 +726,39 @@ app.get("/google/rating_by_location", async (req, res) => {
     if (dj.status !== "OK") return res.json({ ok: false, status: dj.status });
     res.json({ ok: true, status: "OK", rating: dj.result?.rating || null, total: dj.result?.user_ratings_total || 0 });
   } catch (e) { res.json({ ok: false, status: "EXCEPTION", error: String(e) }); }
+});
+
+app.post("/api/addresses", async (req, res) => {
+  try {
+    const { input, normalized, source, place_id } = req.body || {};
+    if (!normalized || !Number.isFinite(+normalized.lat) || !Number.isFinite(+normalized.lon)) {
+      return res.status(400).json({ ok: false, status: "INVALID_NORMALIZED" });
+    }
+    const entry = {
+      id: crypto.randomUUID(),
+      input: String(input || ""),
+      source: String(source || normalized.source || ""),
+      place_id: place_id || normalized.place_id || null,
+      normalized: {
+        formatted: String(normalized.formatted || ""),
+        line1: String(normalized.line1 || ""),
+        city: String(normalized.city || ""),
+        county: String(normalized.county || ""),
+        state: String(normalized.state || ""),
+        postcode: String(normalized.postcode || ""),
+        country: String(normalized.country || ""),
+        lat: +normalized.lat,
+        lon: +normalized.lon,
+      },
+      raw: normalized.raw || null,
+      created_at: new Date().toISOString(),
+    };
+    await appendNormalizedAddress(entry);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error("Store normalized address failed", e);
+    res.status(500).json({ ok: false, status: "STORE_FAILED" });
+  }
 });
 
 /* --------------------- AADT nearby (for table/map) --------------------- */
