@@ -509,7 +509,7 @@ function renderMathFallback(calc){
 }
 
 /* -------------------- Fallback detection -------------------- */
-function isFallbackAADT(d){ const m = d?.inputs?.aadt_components?.method || d?.map?.aadt_used?.method || ""; return m === "fallback_no_dot_found"; }
+function isFallbackAADT(d){ const m = d?.inputs?.aadt_components?.method || d?.map?.aadt_used?.method || ""; return m === "fallback_no_dot_found" || m === "fallback_low_aadt"; }
 
 /* -------------------- Rendering (Estimate) -------------------- */
 function renderAll(d){
