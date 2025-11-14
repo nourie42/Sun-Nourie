@@ -763,6 +763,29 @@ function formatBaselineSummaryLine(aadt, baselineComponents, baselineValue) {
   return `AADT math: ${parts.join(' × ')} = ${Number(baselineValue).toLocaleString()}`;
 }
 
+function cleanSummaryText(raw) {
+  if (raw == null) return "";
+  let text = String(raw);
+  const stripPair = (open, close) => {
+    const openRe = new RegExp(`^\\s*${open}`, "i");
+    const closeRe = new RegExp(`${close}\\s*$`, "i");
+    text = text.replace(openRe, "");
+    text = text.replace(closeRe, "");
+  };
+  stripPair("<text[^>]*>", "</text>");
+  stripPair("<summary[^>]*>", "</summary>");
+  stripPair("<p[^>]*>", "</p>");
+  text = text.replace(/<br\s*\/?>/gi, "\n");
+  text = text.replace(/<\/p>\s*<p[^>]*>/gi, "\n\n");
+  text = text.replace(/<\/?p[^>]*>/gi, "");
+  text = text.replace(/<\/?text[^>]*>/gi, "");
+  text = text.replace(/<\/?summary[^>]*>/gi, "");
+  text = text.replace(/<\/?div[^>]*>/gi, "");
+  text = text.replace(/<[^>]+>/g, " ");
+  text = text.replace(/\s{2,}/g, " ");
+  return text.trim();
+}
+
 /* ------------------------ Google proxy/status ------------------------ */
 app.get("/google/status", async (_req, res) => {
   try {
@@ -1342,13 +1365,15 @@ function drawKeyValue(doc, key, value, x, y, w) {
   doc.font("Helvetica").fontSize(11).fillColor("#1c2736").text(value || "—", x, y + 14, { width: w, continued: false });
   return y + 34;
 }
-function bulletLines(doc, items, x, y, w) {
+function bulletLines(doc, items, x, y, w, opts = {}) {
+  const { bullet = "-" } = opts;
   doc.font("Helvetica").fontSize(11).fillColor("#1c2736");
   const lineGap = 4;
   for (const s of items) {
     const line = String(s || "").trim();
     if (!line) continue;
-    doc.text(`• ${line}`, x, y, { width: w, lineGap });
+    const prefix = bullet ? `${bullet} ` : "";
+    doc.text(`${prefix}${line}`, x, y, { width: w, lineGap });
     y = doc.y + 6;
   }
   return y;
@@ -1437,7 +1462,7 @@ app.post("/report/pdf", async (req, res) => {
       if (notes) return `User Entered Site Notes: ${notes}`;
       return base;
     })();
-    const summaryBlock = (summaryBlockRaw || "").replace(/\s{2,}/g, " ").trim();
+    const summaryBlock = cleanSummaryText(summaryBlockRaw);
     doc.font("Helvetica").fontSize(11).fillColor("#1c2736").text(summaryBlock || "—", margin, y, { width: contentW });
 
     if (Array.isArray(result.csv) && result.csv.length) {
