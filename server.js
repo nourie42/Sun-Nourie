@@ -1140,7 +1140,6 @@ Roads (context): ${ctx.roads.summary}
 Competition: ${ctx.compCount} (heavy ${ctx.heavyCount})
 Pricing: ${ctx.pricePosition}; User adjustments: ${ctx.userAdj || "none"}
 Nearby developments: ${ctx.dev || "none"}
-Site notes: ${ctx.siteNotes || "none"}
 Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
 `.trim();
     try {
@@ -1149,7 +1148,6 @@ Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
       if (s) return s;
     } catch {}
     let fallback = `AADT ${ctx.aadt} (${ctx.method}); competition ${ctx.compCount} (heavy=${ctx.heavyCount}); pricing ${ctx.pricePosition}; adjustments ${ctx.userAdj || "none"}; result ${ctx.low}–${ctx.high} base ${ctx.base}.`;
-    if (ctx.siteNotes) fallback += ` Site notes: ${ctx.siteNotes}`;
     return fallback;
   }
 
@@ -1170,10 +1168,9 @@ Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
     pricePosition, userAdj: adjBits.join("; "),
     base: calc.base, low: calc.low, high: calc.high,
     dev: devCsv.slice(0, 4).map((x) => `${x.name}${x.status ? ` (${x.status})` : ""}`).join("; "),
-    siteNotes,
   });
 
-  const combinedSummary = siteNotes
+  const summaryWithNotes = siteNotes
     ? `${summaryBase}${summaryBase ? "\n\n" : ""}Site Notes: ${siteNotes}`
     : summaryBase;
 
@@ -1219,8 +1216,10 @@ Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
       notable_brands: competitors15.filter((c) => c.heavy).slice(0, 6).map((c) => c.name),
     },
     roads,
-    summary: combinedSummary,
-    summary_base: summaryBase,
+    summary: summaryWithNotes,            // combined GPT summary + optional notes
+    summary_with_notes: summaryWithNotes, // alias for callers expecting this key
+    summary_base: summaryBase,            // GPT-only narrative (no notes)
+    summary_gpt: summaryBase,             // alias for the GPT-only text
     siteNotes,
     calc_breakdown: calc.breakdown,
     map: {
@@ -1389,7 +1388,16 @@ app.post("/report/pdf", async (req, res) => {
     y = bulletLines(doc, bullets, margin, y, contentW); y += 6;
 
     y = drawSectionTitle(doc, "Summary", y, { margin, color: "#334155" });
-    doc.font("Helvetica").fontSize(11).fillColor("#1c2736").text((result.summary || "").replace(/\s{2,}/g, " ").trim() || "—", margin, y, { width: contentW });
+    const summaryBlockRaw = (() => {
+      if (result.summary_with_notes) return result.summary_with_notes;
+      const baseRaw = result.summary_base ?? result.summary ?? "";
+      const base = typeof baseRaw === "string" ? baseRaw : String(baseRaw || "");
+      const notes = typeof result.siteNotes === "string" ? result.siteNotes.trim() : "";
+      if (notes) return base ? `${base}${base ? "\n\n" : ""}Site Notes: ${notes}` : `Site Notes: ${notes}`;
+      return base;
+    })();
+    const summaryBlock = (summaryBlockRaw || "").replace(/\s{2,}/g, " ").trim();
+    doc.font("Helvetica").fontSize(11).fillColor("#1c2736").text(summaryBlock || "—", margin, y, { width: contentW });
 
     if (Array.isArray(result.csv) && result.csv.length) {
       y = doc.y + 16; y = drawSectionTitle(doc, "Nearby developments (flagged)", y, { margin, color: "#334155" });
