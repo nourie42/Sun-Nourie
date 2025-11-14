@@ -189,7 +189,7 @@
     <div class="card" id="estimateCard">
       <div class="hero">
         <div>
-          <div>Adjusted Base Estimate (LOW)</div>
+          <div>Adjusted Base Estimate (BASE)</div>
           <div class="num-row">
             <div class="num" id="estNum">—</div>
             <span id="fallbackChip" class="stop-chip" style="display:none;">
@@ -629,11 +629,16 @@ function renderMathFromServer(d){
   const extrasMult  = B.extrasMult ?? 1;
   const preClamp    = B.preClamp ?? Math.round(afterPrice * extrasMult);
   const finalBase   = B.finalClampedToBaseline ?? Math.min(preClamp, baseline);
-  const low         = d?.estimate?.low ?? d?.low ?? finalBase;
-  const rangeTxt    = d?.estimate?.range || `${fmt(low)}–${fmt(Math.round(finalBase*1.06))}`;
-  const y2          = d?.estimate?.year2 ?? d?.year2 ?? Math.round(finalBase * 1.027);
-  const y3          = d?.estimate?.year3 ?? d?.year3 ?? Math.round(finalBase * 1.027 * 1.0125);
+  const base        = d?.estimate?.base ?? d?.base ?? finalBase;
+  const low         = d?.estimate?.low ?? d?.low ?? (Number.isFinite(base) ? Math.round(base * 0.86) : null);
+  const high        = d?.estimate?.high ?? d?.high ?? (Number.isFinite(base) ? Math.round(base * 1.06) : null);
+  const rangeTxt    = d?.estimate?.range || (Number.isFinite(low) && Number.isFinite(high) ? `${fmt(low)}–${fmt(high)}` : "—");
+  const y2          = d?.estimate?.year2 ?? d?.year2 ?? (Number.isFinite(base) ? Math.round(base * 1.027) : null);
+  const y3          = d?.estimate?.year3 ?? d?.year3 ?? (Number.isFinite(base) ? Math.round(base * 1.027 * 1.0125) : null);
   const aadtUsed    = d?.inputs?.aadt_used ?? null;
+  const y2Txt       = Number.isFinite(y2) ? fmt(y2) : "—";
+  const y3Txt       = Number.isFinite(y3) ? fmt(y3) : "—";
+  const baseTxt     = Number.isFinite(base) ? fmt(base) : "—";
 
   const rows = [
     formatBaselineLine(aadtUsed, B.baselineComponents, baseline),
@@ -643,7 +648,7 @@ function renderMathFromServer(d){
     `Pricing factor: × ${priceMult} → <b>${fmt(afterPrice)}</b>`,
     `Extras: × ${extrasMult} → <b>${fmt(preClamp)}</b>`,
     `Baseline clamp: min(pre‑clamp, baseline) → <b>${fmt(finalBase)}</b>`,
-    `<b>Final (LOW)</b>: <b>${fmt(low)}</b> | Range: ${rangeTxt} | Y2: ${fmt(y2)} | Y3: ${fmt(y3)}`
+    `<b>Final (BASE)</b>: <b>${baseTxt}</b> | Range: ${rangeTxt} | Y2: ${y2Txt} | Y3: ${y3Txt}`
   ];
   $("mathTable").innerHTML = rows.map(r=>`<div>${r}</div>`).join('');
 }
@@ -695,8 +700,11 @@ function renderMathFallback(calc){
   if (Number.isFinite(calc.extrasMult) && Math.abs(calc.extrasMult - 1) > 0.0001) {
     rows.push(`Extras: × ${fmtFloat(calc.extrasMult)} → <b>${fmt(calc.after_extras)}</b>`);
   }
-  rows.push(`Clamp to baseline: min(${fmt(calc.after_extras ?? calc.priceApplied)}, ${fmt(calc.ceiling)}) → <b>${fmt(calc.base)}</b>`);
-  rows.push(`<b>Final (LOW)</b>: <b>${fmt(calc.low)}</b> | Range: ${fmt(calc.low)}–${fmt(calc.high)} | Y2: ${fmt(calc.year2)} | Y3: ${fmt(calc.year3)}`);
+  const baseTxt = Number.isFinite(calc.base) ? fmt(calc.base) : "—";
+  const y2Txt = Number.isFinite(calc.year2) ? fmt(calc.year2) : "—";
+  const y3Txt = Number.isFinite(calc.year3) ? fmt(calc.year3) : "—";
+  rows.push(`Clamp to baseline: min(${fmt(calc.after_extras ?? calc.priceApplied)}, ${fmt(calc.ceiling)}) → <b>${baseTxt}</b>`);
+  rows.push(`<b>Final (BASE)</b>: <b>${baseTxt}</b> | Range: ${fmt(calc.low)}–${fmt(calc.high)} | Y2: ${y2Txt} | Y3: ${y3Txt}`);
   $("mathTable").innerHTML = rows.map(r=>`<div>${r}</div>`).join('');
 }
 
@@ -705,11 +713,17 @@ function isFallbackAADT(d){ const m = d?.inputs?.aadt_components?.method || d?.m
 
 /* -------------------- Rendering (Estimate) -------------------- */
 function renderAll(d){
-  $("estNum").textContent = fmt(d.estimate?.low ?? d.low ?? 0);
-  const rangeTxt = d.estimate?.range || (d.low!=null && d.high!=null ? `${fmt(d.low)}–${fmt(d.high)}` : "—");
+  const base = d.estimate?.base ?? d.base ?? d.estimate?.low ?? d.low ?? null;
+  const low = d.estimate?.low ?? d.low ?? (Number.isFinite(base) ? Math.round(base * 0.86) : null);
+  const high = d.estimate?.high ?? d.high ?? (Number.isFinite(base) ? Math.round(base * 1.06) : null);
+  if (Number.isFinite(base)) $("estNum").textContent = fmt(base);
+  else $("estNum").textContent = "—";
+  const rangeTxt = d.estimate?.range || (Number.isFinite(low) && Number.isFinite(high) ? `${fmt(low)}–${fmt(high)}` : "—");
   $("estRange").textContent = "Full range: " + rangeTxt;
-  $("y2").textContent = fmt(d.estimate?.year2 ?? d.year2 ?? 0);
-  $("y3").textContent = fmt(d.estimate?.year3 ?? d.year3 ?? 0);
+  const y2Val = d.estimate?.year2 ?? d.year2 ?? (Number.isFinite(base) ? Math.round(base * 1.027) : null);
+  const y3Val = d.estimate?.year3 ?? d.year3 ?? (Number.isFinite(base) ? Math.round(base * 1.027 * 1.0125) : null);
+  $("y2").textContent = Number.isFinite(y2Val) ? fmt(y2Val) : "—";
+  $("y3").textContent = Number.isFinite(y3Val) ? fmt(y3Val) : "—";
 
   const fallback = isFallbackAADT(d);
   const usedRec  = d?.map?.aadt_used || {};
