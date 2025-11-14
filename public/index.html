@@ -637,8 +637,8 @@ function renderMathFromServer(d){
 
   const rows = [
     formatBaselineLine(aadtUsed, B.baselineComponents, baseline),
-    `<b>Competitors in area</b> (1.5 mi): <b>${compCount}</b> total • heavy <b>${heavyCount}</b>`,
-    `Competition rule: base ${baseMult.toFixed ? baseMult.toFixed(2) : baseMult} − heavy ${heavyPen.toFixed ? heavyPen.toFixed(2) : heavyPen} = × ${compMult.toFixed ? compMult.toFixed(2) : compMult} → <b>${fmt(compAfter)}</b>`,
+    `<b>Competitors in area</b> (1.5 mi): <b>${compCount}</b> total • Big box <b>${heavyCount}</b>`,
+    `Competition rule: base ${baseMult.toFixed ? baseMult.toFixed(2) : baseMult} − Big box ${heavyPen.toFixed ? heavyPen.toFixed(2) : heavyPen} = × ${compMult.toFixed ? compMult.toFixed(2) : compMult} → <b>${fmt(compAfter)}</b>`,
     `Capacity caps (equipment/soft/hard): ${fmt(capEquip)} / ${fmt(capSoft)} / ${fmt(capHard)}${softHit ? " • soft penalty −10%" : ""} → <b>${fmt(afterCap)}</b>`,
     `Pricing factor: × ${priceMult} → <b>${fmt(afterPrice)}</b>`,
     `Extras: × ${extrasMult} → <b>${fmt(preClamp)}</b>`,

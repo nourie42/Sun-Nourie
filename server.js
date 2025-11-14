@@ -551,10 +551,12 @@ async function googleNearbyGasStations(lat, lon, rM = 2414) {
       const name = it.name || "Fuel";
       const latc = it.geometry?.location?.lat, lonc = it.geometry?.location?.lng;
       if (!Number.isFinite(latc) || !Number.isFinite(lonc)) continue;
+      const milesExact = distMiles(lat, lon, latc, lonc);
+      if (milesExact <= 0.02) continue; // skip the searched site (same address)
       out.push({
         name,
         lat: +latc, lon: +lonc,
-        miles: +distMiles(lat, lon, latc, lonc).toFixed(3),
+        miles: +milesExact.toFixed(3),
         heavy: HEAVY_BRANDS.test(name),
         sunoco: IS_SUNOCO.test(name),
       });
@@ -579,9 +581,11 @@ async function competitorsWithinRadiusMiles(lat, lon, rMi = 1.5) {
     const name = t.brand || t.name || "Fuel";
     const latc = el.lat ?? el.center?.lat, lonc = el.lon ?? el.center?.lon;
     if (latc == null || lonc == null) return null;
+    const milesExact = distMiles(lat, lon, latc, lonc);
+    if (milesExact <= 0.02) return null;
     return {
       name, lat: +latc, lon: +lonc,
-      miles: +distMiles(lat, lon, latc, lonc).toFixed(3),
+      miles: +milesExact.toFixed(3),
       heavy: HEAVY_BRANDS.test(name),
       sunoco: IS_SUNOCO.test(name),
     };
@@ -593,7 +597,7 @@ async function competitorsWithinRadiusMiles(lat, lon, rMi = 1.5) {
     if (seen.has(k)) continue; seen.add(k); out.push(s);
   }
   out.sort((a, b) => a.miles - b.miles);
-  return out.filter((s) => s.miles <= rMi);
+  return out.filter((s) => s.miles <= rMi && s.miles > 0.02);
 }
 
 /* ----------------------- Road context ----------------------- */
@@ -1131,13 +1135,13 @@ async function performEstimate(reqBody) {
     throw last || new Error("GPT failed");
   }
   async function gptSummary(ctx) {
-    const sys = 'Return {"summary":"<text>"} ~8–12 sentences. Include AADT method (DOT), baseline ceiling math, competition rule & heavy penalties, pricing, user adjustments, caps, LOW/BASE/HIGH, road context, and notable nearby developments.';
+    const sys = 'Return {"summary":"<text>"} ~8–12 sentences. Include AADT method (DOT), baseline ceiling math, competition rule & big box penalties, pricing, user adjustments, caps, LOW/BASE/HIGH, road context, and notable nearby developments.';
     const prompt = `
 Address: ${ctx.address}
 AADT used (DOT): ${ctx.aadt} (${ctx.method})
 Road (entered): ${ctx.enteredRoad}
 Roads (context): ${ctx.roads.summary}
-Competition: ${ctx.compCount} (heavy ${ctx.heavyCount})
+Competition: ${ctx.compCount} (Big box ${ctx.heavyCount})
 Pricing: ${ctx.pricePosition}; User adjustments: ${ctx.userAdj || "none"}
 Nearby developments: ${ctx.dev || "none"}
 Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
@@ -1147,7 +1151,7 @@ Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
       const s = (j && j.summary) ? String(j.summary).trim() : "";
       if (s) return s;
     } catch {}
-    let fallback = `AADT ${ctx.aadt} (${ctx.method}); competition ${ctx.compCount} (heavy=${ctx.heavyCount}); pricing ${ctx.pricePosition}; adjustments ${ctx.userAdj || "none"}; result ${ctx.low}–${ctx.high} base ${ctx.base}.`;
+    let fallback = `AADT ${ctx.aadt} (${ctx.method}); competition ${ctx.compCount} (Big box=${ctx.heavyCount}); pricing ${ctx.pricePosition}; adjustments ${ctx.userAdj || "none"}; result ${ctx.low}–${ctx.high} base ${ctx.base}.`;
     return fallback;
   }
 
@@ -1192,7 +1196,10 @@ Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
     else competitionText = `Competition: None within 1.5 mi${nearestComp != null ? ` (nearest ~${(+nearestComp).toFixed(1)} mi)` : ""}.`;
   } else {
     competitionText = `Competition: ${compCount} station${compCount !== 1 ? "s" : ""} within 1.5 mi`;
-    if (heavyCount > 0) competitionText += ` (${heavyCount} heavy)`;
+    if (heavyCount > 0) {
+      const bigBoxLabel = heavyCount === 1 ? "Big box competitor" : "Big box competitors";
+      competitionText += ` (${heavyCount} ${bigBoxLabel})`;
+    }
     competitionText += ".";
   }
 
@@ -1283,7 +1290,7 @@ async function buildStaticCompetitorMapImage(site, comps, radiusMi = 3.0, opts =
   params.push(`center=${site.lat},${site.lon}`); params.push(`zoom=${z}`);
   params.push(`size=${width}x${height}`); params.push(`scale=${scale}`); params.push(`maptype=roadmap`);
   params.push(`markers=size:mid|color:0xFFD700|label:S|${site.lat},${site.lon}`);
-  if (heavies.length) params.push(`markers=size:small|color:0xF97373|label:H|${heavies.map(c => `${c.lat},${c.lon}`).join("|")}`);
+  if (heavies.length) params.push(`markers=size:small|color:0xF97373|label:B|${heavies.map(c => `${c.lat},${c.lon}`).join("|")}`);
   if (normals.length) params.push(`markers=size:tiny|color:0x34D399|label:C|${normals.map(c => `${c.lat},${c.lon}`).join("|")}`);
   params.push("style=feature:poi|visibility:off"); params.push("style=feature:road|element:labels.icon|visibility:off"); params.push("style=feature:transit|visibility:off");
   const url = `https://maps.googleapis.com/maps/api/staticmap?${params.join("&")}&key=${GOOGLE_API_KEY}`;
@@ -1311,8 +1318,9 @@ function bulletLines(doc, items, x, y, w) {
   doc.font("Helvetica").fontSize(11).fillColor("#1c2736");
   const lineGap = 4;
   for (const s of items) {
-    doc.circle(x + 3, y + 6, 2).fill("#4b5563").fillColor("#1c2736");
-    doc.text(String(s), x + 12, y, { width: w, lineGap });
+    const line = String(s || "").trim();
+    if (!line) continue;
+    doc.text(`• ${line}`, x, y, { width: w, lineGap });
     y = doc.y + 6;
   }
   return y;
@@ -1322,13 +1330,8 @@ app.post("/report/pdf", async (req, res) => {
     const result = await performEstimate(req.body || {});
     if (!result?.ok) throw new Error("Estimate failed");
 
-    const site = result?.map?.site || null; const comps = result?.map?.all_competitors || [];
+    const site = result?.map?.site || null;
     if (!site) throw new Error("No site location for report");
-    const [siteImg, mapImg] = await Promise.all([
-      buildStreetViewImage(site),
-      buildStaticCompetitorMapImage(site, comps, result.map?.competitor_radius_mi || 3.0)
-    ]);
-
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", "attachment; filename=FuelIQ_Site_Report.pdf");
     const doc = new PDFDocument({ size: "A4", margin: 36 }); doc.pipe(res);
@@ -1346,9 +1349,6 @@ app.post("/report/pdf", async (req, res) => {
       doc.font("Helvetica").fontSize(11).fillColor("#1c2736").text(`User Entered Site Notes: ${userNotesLine}`, margin, y, { width: contentW });
       y = doc.y + 12;
     }
-
-    if (mapImg) { y = drawSectionTitle(doc, "Competitors (map)", y, { margin, color: "#334155" }); doc.image(mapImg, margin, y, { width: contentW }); y += Math.min(300, (contentW * 0.62)) + 12; }
-    if (siteImg){ y = drawSectionTitle(doc, "Street View (site)", y, { margin, color: "#334155" }); doc.image(siteImg, margin, y, { width: contentW }); y += Math.min(260, (contentW * 0.5)) + 8; }
 
     y = drawSectionTitle(doc, "Estimate Summary", y, { margin, color: "#334155" });
     const colW = contentW / 2 - 8; let yL = y, yR = y;
@@ -1368,8 +1368,8 @@ app.post("/report/pdf", async (req, res) => {
     const baselineLine = formatBaselineSummaryLine(result.inputs?.aadt_used ?? null, baselineSource, B.baseline);
     if (baselineLine) bullets.push(baselineLine);
     if (B.compRule) {
-      bullets.push(`Competition rule: base ${Number(B.compRule.baseMult).toFixed(2)} − heavy ${Number(B.compRule.heavyPenalty).toFixed(2)} = × ${Number(B.compRule.compMult).toFixed(2)} → ${Number(B.compRule.afterComp).toLocaleString()}`);
-      bullets.push(`Competitors (1.5 mi): ${Number(B.compRule.compCount ?? result.competition?.count ?? 0)} total • heavy ${Number(B.compRule.heavyCount ?? result.competition?.heavy_count ?? 0)}`);
+      bullets.push(`Competition rule: base ${Number(B.compRule.baseMult).toFixed(2)} − Big box ${Number(B.compRule.heavyPenalty).toFixed(2)} = × ${Number(B.compRule.compMult).toFixed(2)} → ${Number(B.compRule.afterComp).toLocaleString()}`);
+      bullets.push(`Competitors (1.5 mi): ${Number(B.compRule.compCount ?? result.competition?.count ?? 0)} total • Big box ${Number(B.compRule.heavyCount ?? result.competition?.heavy_count ?? 0)}`);
     }
     if (B.caps) {
       const softHit = B.compRule && B.compRule.afterComp > B.caps.capSoftTotal;
