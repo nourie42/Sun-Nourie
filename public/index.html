@@ -485,7 +485,7 @@ function initOrUpdateMainMap(m){
     if(!Number.isFinite(c.lat)||!Number.isFinite(c.lon)) continue;
     pts.push([c.lat,c.lon]);
     const dot = L.circleMarker([c.lat,c.lon],{ radius:7, weight:1.5, color:c.heavy?"#ff7f50":"#4ade80", fillColor:c.heavy?"#ff7f50":"#4ade80", fillOpacity:.95 })
-      .addTo(serverCompLayer).bindPopup(`${esc(c.name||"Fuel")} • ${c.miles} mi`);
+      .addTo(serverCompLayer).bindPopup(`${esc(c.name||"Fuel")} - ${c.miles} mi`);
     if (dot.bringToFront) dot.bringToFront();
   }
   if (cmpShow.checked) { if (map.hasLayer(serverCompLayer)) map.removeLayer(serverCompLayer); }
@@ -643,7 +643,7 @@ function renderMathFromServer(d){
     `Pricing factor: × ${priceMult} → <b>${fmt(afterPrice)}</b>`,
     `Extras: × ${extrasMult} → <b>${fmt(preClamp)}</b>`,
     `Baseline clamp: min(pre‑clamp, baseline) → <b>${fmt(finalBase)}</b>`,
-    `<b>Final (LOW)</b>: <b>${fmt(low)}</b> • Range: ${rangeTxt} • Y2: ${fmt(y2)} • Y3: ${fmt(y3)}`
+    `<b>Final (LOW)</b>: <b>${fmt(low)}</b> | Range: ${rangeTxt} | Y2: ${fmt(y2)} | Y3: ${fmt(y3)}`
   ];
   $("mathTable").innerHTML = rows.map(r=>`<div>${r}</div>`).join('');
 }
@@ -696,7 +696,7 @@ function renderMathFallback(calc){
     rows.push(`Extras: × ${fmtFloat(calc.extrasMult)} → <b>${fmt(calc.after_extras)}</b>`);
   }
   rows.push(`Clamp to baseline: min(${fmt(calc.after_extras ?? calc.priceApplied)}, ${fmt(calc.ceiling)}) → <b>${fmt(calc.base)}</b>`);
-  rows.push(`<b>Final (LOW)</b>: <b>${fmt(calc.low)}</b> • Range: ${fmt(calc.low)}–${fmt(calc.high)} • Y2: ${fmt(calc.year2)} • Y3: ${fmt(calc.year3)}`);
+  rows.push(`<b>Final (LOW)</b>: <b>${fmt(calc.low)}</b> | Range: ${fmt(calc.low)}–${fmt(calc.high)} | Y2: ${fmt(calc.year2)} | Y3: ${fmt(calc.year3)}`);
   $("mathTable").innerHTML = rows.map(r=>`<div>${r}</div>`).join('');
 }
 
@@ -724,13 +724,24 @@ function renderAll(d){
 
   const hasDevs = Array.isArray(d.csv) && d.csv.length > 0;
   if (hasDevs) {
-    const lines = d.csv.slice(0,6).map(x => {
-      const nm = esc(x.name || ""); const st = esc(x.status || ""); const dtl = x.details ? ` • ${esc(x.details)}` : ""; const dt  = x.date ? ` • ${esc(x.date)}` : "";
-      return `${nm}${st ? ` • ${st}` : ''}${dtl}${dt}`;
+    const lines = d.csv.slice(0,6).map((x) => {
+      const parts = [];
+      if (x.name) parts.push(esc(x.name));
+      if (x.status) parts.push(esc(x.status));
+      if (x.details) parts.push(esc(x.details));
+      if (x.date) parts.push(esc(x.date));
+      return parts.join("; ");
     }).join(" // ");
     $("stopText").innerHTML = `Development flagged: <b>${lines}</b>`;
     $("stopBox").style.display = "block";
-    $("devs").innerHTML = "<ul>"+d.csv.map(x => `<li>${esc(x.name||'')} • ${esc(x.status||'')}${x.details?` • ${esc(x.details)}`:''}${x.date?` • ${esc(x.date)}`:''}</li>`).join("")+"</ul>";
+    $("devs").innerHTML = "<ul>"+d.csv.map((x) => {
+      const parts = [];
+      if (x.name) parts.push(esc(x.name));
+      if (x.status) parts.push(esc(x.status));
+      if (x.details) parts.push(esc(x.details));
+      if (x.date) parts.push(esc(x.date));
+      return `<li>${parts.join("; ")}</li>`;
+    }).join("")+"</ul>";
   } else { $("stopBox").style.display = "none"; $("devs").innerHTML = "<em>No developments flagged</em>"; }
 
   baseSummaryText = (d.summary_base ?? d.summary ?? "").replace(/\s{2,}/g," ").trim();

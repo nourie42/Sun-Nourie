@@ -1,10 +1,10 @@
 // server.js — Fuel IQ API (fix pack 2025-10-03)
 // Changes in this build:
-//  • Autocomplete endpoint supports optional location bias (lat/lon/radius) to improve suggestions.
-//  • Strict AADT selection: use DOT station(s) on the ENTERED ROAD ONLY. If none found, use hard fallback.
+//  - Autocomplete endpoint supports optional location bias (lat/lon/radius) to improve suggestions.
+//  - Strict AADT selection: use DOT station(s) on the ENTERED ROAD ONLY. If none found, use hard fallback.
 //    (We no longer pick “nearest DOT station on a different road”.)
-//  • Client can pass enteredRoad; server extracts a road from the entered address if not provided.
-//  • Everything else preserved: competitors layer, PDF report, math, STOP chip only for true fallback.
+//  - Client can pass enteredRoad; server extracts a road from the entered address if not provided.
+//  - Everything else preserved: competitors layer, PDF report, math, STOP chip only for true fallback.
 
 import express from "express";
 import cors from "cors";
@@ -632,7 +632,7 @@ async function roadContext(lat, lon) {
     (a.distM || 1e12) - (b.distM || 1e12)
   );
   const main = rows.slice(0, 3), side = rows.slice(3, 8);
-  const nice = (r) => [r.name || r.highway, r.maxspeed ? `${r.maxspeed} mph` : null, r.lanes ? `${r.lanes} lanes` : null].filter(Boolean).join(" • ");
+  const nice = (r) => [r.name || r.highway, r.maxspeed ? `${r.maxspeed} mph` : null, r.lanes ? `${r.lanes} lanes` : null].filter(Boolean).join(" - ");
   const mainLabel = main.map(nice).filter(Boolean).slice(0, 3).join(" | ");
   const sideLabel = side.map(nice).filter(Boolean).slice(0, 3).join(" | ");
   const intersections = Math.max(0, Math.round(rows.length / 3));
@@ -1181,7 +1181,7 @@ Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
   // UI lines
   let aadtText = "";
   if (method === "override") aadtText = `AADT (override): ${usedAADT.toLocaleString()} vehicles/day`;
-  else if (method === "dot_station_on_entered_road") aadtText = `AADT: ${usedAADT.toLocaleString()} vehicles/day (DOT • entered road: ${enteredRoadText || "—"})`;
+  else if (method === "dot_station_on_entered_road") aadtText = `AADT: ${usedAADT.toLocaleString()} vehicles/day (DOT - entered road: ${enteredRoadText || "—"})`;
   else if (method === "fallback_no_dot_found") aadtText = `AADT: ${usedAADT.toLocaleString()} vehicles/day (fallback — no DOT station published for "${enteredRoadText}")`;
   else if (method === "fallback_low_aadt") {
     const rawTxt = rawStationAADT ? rawStationAADT.toLocaleString() : "<2,000";
@@ -1373,7 +1373,7 @@ app.post("/report/pdf", async (req, res) => {
     }
     if (B.caps) {
       const softHit = B.compRule && B.compRule.afterComp > B.caps.capSoftTotal;
-      bullets.push(`Capacity caps: equipment ${Number(B.caps.capEquip).toLocaleString()} • soft ${Number(B.caps.capSoftTotal).toLocaleString()} • hard ${Number(B.caps.capHardTotal).toLocaleString()}${softHit ? " (soft cap applied −10%)" : ""}`);
+      bullets.push(`Capacity caps: equipment ${Number(B.caps.capEquip).toLocaleString()}; soft ${Number(B.caps.capSoftTotal).toLocaleString()}; hard ${Number(B.caps.capHardTotal).toLocaleString()}${softHit ? " (soft cap applied −10%)" : ""}`);
     }
     if (B.priceMult != null) bullets.push(`Pricing factor: × ${Number(B.priceMult).toFixed(2)}`);
     if (B.extrasMult != null) bullets.push(`Extras multiplier: × ${Number(B.extrasMult).toFixed(2)}`);
@@ -1383,7 +1383,7 @@ app.post("/report/pdf", async (req, res) => {
       const comp = result.inputs.aadt_components;
       let mText;
       if (comp.method === "dot_station_on_entered_road") {
-        mText = `DOT • entered road (${comp.enteredRoad || "—"})`;
+        mText = `DOT - entered road (${comp.enteredRoad || "—"})`;
       } else if (comp.method === "fallback_low_aadt") {
         const raw = Number.isFinite(comp.raw_aadt) ? Number(comp.raw_aadt).toLocaleString() : "<2,000";
         mText = `Fallback — DOT reported ${raw} < 2,000`;
@@ -1410,10 +1410,9 @@ app.post("/report/pdf", async (req, res) => {
 
     if (Array.isArray(result.csv) && result.csv.length) {
       y = doc.y + 16; y = drawSectionTitle(doc, "Nearby developments (flagged)", y, { margin, color: "#334155" });
-      const devLines = result.csv.slice(0, 6).map(x => {
-        const nm = x.name || ""; const st = x.status ? ` • ${x.status}` : "";
-        const dtl = x.details ? ` • ${x.details}` : ""; const dt = x.date ? ` • ${x.date}` : "";
-        return `${nm}${st}${dtl}${dt}`;
+      const devLines = result.csv.slice(0, 6).map((x) => {
+        const parts = [x.name, x.status, x.details, x.date].map((v) => (typeof v === "string" ? v.trim() : ""));
+        return parts.filter(Boolean).join("; ");
       });
       y = bulletLines(doc, devLines, margin, y, contentW);
     }
