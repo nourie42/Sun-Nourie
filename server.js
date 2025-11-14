@@ -1389,10 +1389,21 @@ app.post("/report/pdf", async (req, res) => {
     y = bulletLines(doc, bullets, margin, y, contentW); y += 6;
 
     y = drawSectionTitle(doc, "Summary", y, { margin, color: "#334155" });
-    doc.font("Helvetica").fontSize(11).fillColor("#1c2736").text((result.summary || "").replace(/\s{2,}/g, " ").trim() || "—", margin, y, { width: contentW });
+    const summaryText = ((result.summary_base ?? result.summary ?? "").replace(/\s{2,}/g, " ").trim()) || "—";
+    doc.font("Helvetica").fontSize(11).fillColor("#1c2736").text(summaryText, margin, y, { width: contentW });
+    y = doc.y + 12;
+
+    const siteNotesText = typeof result.siteNotes === "string" ? result.siteNotes.trim() : "";
+    if (siteNotesText) {
+      if (y > doc.page.height - margin - 60) { doc.addPage(); y = margin; }
+      y = drawSectionTitle(doc, "Site Notes", y, { margin, color: "#334155" });
+      doc.font("Helvetica").fontSize(11).fillColor("#1c2736").text(siteNotesText, margin, y, { width: contentW });
+      y = doc.y + 12;
+    }
 
     if (Array.isArray(result.csv) && result.csv.length) {
-      y = doc.y + 16; y = drawSectionTitle(doc, "Nearby developments (flagged)", y, { margin, color: "#334155" });
+      if (y > doc.page.height - margin - 60) { doc.addPage(); y = margin; }
+      y = drawSectionTitle(doc, "Nearby developments (flagged)", y, { margin, color: "#334155" });
       const devLines = result.csv.slice(0, 6).map(x => {
         const nm = x.name || ""; const st = x.status ? ` • ${x.status}` : "";
         const dtl = x.details ? ` • ${x.details}` : ""; const dt = x.date ? ` • ${x.date}` : "";
