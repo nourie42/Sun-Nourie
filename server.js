@@ -636,8 +636,18 @@ async function roadContext(lat, lon) {
 }
 
 /* ------------------------- Gallons computation ------------------------- */
-function gallonsWithRules({ aadt, mpds, diesel, compCount, heavyCount, pricePosition, userExtrasMult = 1 }) {
-  const baseline = aadt * 0.02 * 8 * 30;
+function gallonsWithRules({ aadt, mpds, diesel, compCount, heavyCount, pricePosition, userExtrasMult = 1, trafficPullPct, gallonsPerFill }) {
+  const trafficPctUsed = Number.isFinite(trafficPullPct) && trafficPullPct > 0 ? Number(trafficPullPct) : 2;
+  const gallonsUsed = Number.isFinite(gallonsPerFill) && gallonsPerFill > 0 ? Number(gallonsPerFill) : 8;
+  const baselineComponents = {
+    trafficShare: trafficPctUsed / 100,
+    trafficPullPct: trafficPctUsed,
+    gallonsPerFill: gallonsUsed,
+    usedCustomTraffic: Number.isFinite(trafficPullPct) && trafficPullPct > 0,
+    usedCustomGallons: Number.isFinite(gallonsPerFill) && gallonsPerFill > 0,
+    days: 30,
+  };
+  const baseline = aadt * baselineComponents.trafficShare * baselineComponents.gallonsPerFill * baselineComponents.days;
 
   let baseMult = 1.0;
   if (compCount === 1) baseMult = 0.75;
@@ -668,17 +678,57 @@ function gallonsWithRules({ aadt, mpds, diesel, compCount, heavyCount, pricePosi
   const low = Math.round(base * 0.86);
   const high = Math.round(base * 1.06);
 
+  const breakdown = {
+    aadt,
+    baseline: Math.round(baseline),
+    baselineComponents,
+    compRule: { compCount, heavyCount, baseMult, heavyPenalty, compMult, afterComp: Math.round(afterComp) },
+    caps: { capEquip: Math.round(capEquip), capSoftTotal, capHardTotal },
+    priceMult,
+    extrasMult: userExtrasMult,
+    preClamp,
+    finalClampedToBaseline: base,
+  };
+
   return {
-    base, low, high,
+    base,
+    low,
+    high,
     year2: Math.round(base * 1.027),
     year3: Math.round(base * 1.027 * 1.0125),
-    breakdown: {
-      aadt, baseline: Math.round(baseline),
-      compRule: { compCount, heavyCount, baseMult, heavyPenalty, compMult, afterComp: Math.round(afterComp) },
-      caps: { capEquip: Math.round(capEquip), capSoftTotal, capHardTotal },
-      priceMult, extrasMult: userExtrasMult, preClamp, finalClampedToBaseline: base,
-    },
+    breakdown,
   };
+}
+function formatNumberCompact(n) {
+  if (!Number.isFinite(n)) return '';
+  const rounded = Math.round(Number(n) * 100) / 100;
+  return Math.abs(rounded - Math.round(rounded)) < 1e-9
+    ? String(Math.round(rounded))
+    : rounded.toFixed(2).replace(/\.?0+$/, '');
+}
+function formatBaselineSummaryLine(aadt, baselineComponents, baselineValue) {
+  if (!Number.isFinite(aadt) || !Number.isFinite(baselineValue)) return null;
+  const comp = baselineComponents || {};
+  let pct = Number.isFinite(comp.trafficPullPct) ? Number(comp.trafficPullPct)
+          : Number.isFinite(comp.traffic_pull_pct) ? Number(comp.traffic_pull_pct)
+          : Number.isFinite(comp.trafficShare) ? Number(comp.trafficShare) * 100
+          : null;
+  let gallons = Number.isFinite(comp.gallonsPerFill) ? Number(comp.gallonsPerFill)
+             : Number.isFinite(comp.gallons_per_fill) ? Number(comp.gallons_per_fill)
+             : null;
+  let days = Number.isFinite(comp.days) ? Number(comp.days)
+          : Number.isFinite(comp.days_per_month) ? Number(comp.days_per_month)
+          : 30;
+  if (!Number.isFinite(pct)) pct = 2;
+  if (!Number.isFinite(gallons)) gallons = 8;
+  if (!Number.isFinite(days)) days = 30;
+  const parts = [
+    `AADT ${Number(aadt).toLocaleString()}`,
+    `${formatNumberCompact(pct)}% traffic pull`,
+    `${formatNumberCompact(gallons)} gal/fill`,
+    `${formatNumberCompact(days)} days`,
+  ];
+  return `Baseline ceiling = ${parts.join(' × ')} = ${Number(baselineValue).toLocaleString()}`;
 }
 
 /* ------------------------ Google proxy/status ------------------------ */
@@ -943,7 +993,7 @@ function extractStreetFromAddress(addr) {
 /* ============================= Estimate core ============================= */
 async function performEstimate(reqBody) {
   const { address, mpds, diesel, siteLat, siteLon, aadtOverride, advanced,
-          client_rating, auto_low_rating, enteredRoad } = reqBody || {};
+          client_rating, auto_low_rating, enteredRoad, trafficPullPct, gallonsPerFill } = reqBody || {};
 
   const MPDS = +mpds, DIESEL = +(diesel || 0);
   if (!(Number.isFinite(MPDS) && MPDS > 0)) throw new Error("Regular MPDs required (>0)");
@@ -1032,7 +1082,20 @@ async function performEstimate(reqBody) {
   const calc = gallonsWithRules({
     aadt: usedAADT, mpds: MPDS, diesel: DIESEL,
     compCount, heavyCount, pricePosition, userExtrasMult,
+    trafficPullPct, gallonsPerFill,
   });
+
+  const baselineComponents = calc.breakdown?.baselineComponents || {};
+  const baselineSettings = {
+    traffic_pull_pct: Number.isFinite(baselineComponents.trafficPullPct) ? Number(baselineComponents.trafficPullPct) : null,
+    gallons_per_fill: Number.isFinite(baselineComponents.gallonsPerFill) ? Number(baselineComponents.gallonsPerFill) : null,
+    traffic_share: Number.isFinite(baselineComponents.trafficShare)
+      ? Number(baselineComponents.trafficShare)
+      : (Number.isFinite(baselineComponents.trafficPullPct) ? Number(baselineComponents.trafficPullPct) / 100 : null),
+    days: Number.isFinite(baselineComponents.days) ? Number(baselineComponents.days) : 30,
+    used_custom_traffic: baselineComponents.usedCustomTraffic === true,
+    used_custom_gallons: baselineComponents.usedCustomGallons === true,
+  };
 
   // GPT summary
   async function gptJSONCore(model, prompt) {
@@ -1083,6 +1146,9 @@ Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
   }
 
   const adjBits = [];
+  if (baselineComponents.usedCustomTraffic || baselineComponents.usedCustomGallons) {
+    adjBits.push(`User baseline inputs: ${formatNumberCompact(baselineComponents.trafficPullPct)}% traffic pull × ${formatNumberCompact(baselineComponents.gallonsPerFill)} gal/fill`);
+  }
   if (pricePosition === "below") adjBits.push("+10% below-market pricing");
   if (pricePosition === "above") adjBits.push("−10% above-market pricing");
   if (ruralApplied) adjBits.push("+30% rural bonus (0 comps within 3 mi)");
@@ -1125,7 +1191,14 @@ Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
     estimate: { low: calc.low, range: `${Math.round(calc.low)}–${Math.round(calc.high)}`, year2: calc.year2, year3: calc.year3 },
     aadtText, competitionText, csv: devCsv,
     base: calc.base, low: calc.low, high: calc.high, year2: calc.year2, year3: calc.year3,
-    inputs: { mpds: MPDS, diesel: DIESEL, aadt_used: usedAADT, price_position: pricePosition, aadt_components: { method, enteredRoad: enteredRoadText, raw_aadt: rawStationAADT } },
+    inputs: {
+      mpds: MPDS,
+      diesel: DIESEL,
+      aadt_used: usedAADT,
+      price_position: pricePosition,
+      aadt_components: { method, enteredRoad: enteredRoadText, raw_aadt: rawStationAADT },
+      baseline_settings: baselineSettings,
+    },
     flags: { rural_bonus_applied: ruralApplied, rural_eligible: ruralEligible, sunoco_within_1mi: sunocoNearby, auto_low_rating: autoLow },
     competition: {
       count: compCount, count_3mi: compAll3.length, heavy_count: heavyCount,
@@ -1266,7 +1339,9 @@ app.post("/report/pdf", async (req, res) => {
 
     y = drawSectionTitle(doc, "Reasons for this estimate", y, { margin, color: "#334155" });
     const B = result.calc_breakdown || {}; const bullets = [];
-    if (B.baseline && result.inputs?.aadt_used) bullets.push(`Baseline ceiling = AADT ${result.inputs.aadt_used.toLocaleString()} × 2% × 8 × 30 = ${B.baseline.toLocaleString()}`);
+    const baselineSource = { ...(B.baselineComponents || {}), ...(result.inputs?.baseline_settings || {}) };
+    const baselineLine = formatBaselineSummaryLine(result.inputs?.aadt_used ?? null, baselineSource, B.baseline);
+    if (baselineLine) bullets.push(baselineLine);
     if (B.compRule) {
       bullets.push(`Competition rule: base ${Number(B.compRule.baseMult).toFixed(2)} − heavy ${Number(B.compRule.heavyPenalty).toFixed(2)} = × ${Number(B.compRule.compMult).toFixed(2)} → ${Number(B.compRule.afterComp).toLocaleString()}`);
       bullets.push(`Competitors (1.5 mi): ${Number(B.compRule.compCount ?? result.competition?.count ?? 0)} total • heavy ${Number(B.compRule.heavyCount ?? result.competition?.heavy_count ?? 0)}`);
