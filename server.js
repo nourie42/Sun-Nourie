@@ -1186,8 +1186,20 @@ async function performEstimate(reqBody) {
     for (const m of models) { for (let i = 0; i < 2; i++) { try { return await gptJSONCore(m, prompt); } catch (e) { last = e; await sleep(400); } } }
     throw last || new Error("GPT failed");
   }
+  function sanitizeSummary(text) {
+    if (!text) return "";
+    const raw = String(text);
+    // Remove stray XML-like wrapper tags without disturbing comparison expressions like "<2,000".
+    const withoutTags = raw
+      .replace(/<\/?text>/gi, "")
+      .replace(/<\/?summary>/gi, "")
+      .replace(/<\/?assistant>/gi, "")
+      .replace(/<\/?response>/gi, "");
+    return withoutTags;
+  }
+
   async function gptSummary(ctx) {
-    const sys = 'Return {"summary":"<text>"} ~8–12 sentences. Include AADT method (DOT), baseline ceiling math, competition rule & big box penalties, pricing, user adjustments, caps, LOW/BASE/HIGH, and road context.';
+    const sys = 'Return {"summary":"text"} in ~8–12 sentences of plain text (no XML/HTML). Include AADT method (DOT), baseline ceiling math, competition rule & big box penalties, pricing, user adjustments, caps, LOW/BASE/HIGH, and road context.';
     const prompt = `
 Address: ${ctx.address}
 AADT used (DOT): ${ctx.aadt} (${ctx.method})
@@ -1199,11 +1211,11 @@ Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
 `.trim();
     try {
       const j = await gptJSONWithRetry(`${sys}\n${prompt}`);
-      const s = (j && j.summary) ? String(j.summary).trim() : "";
+      const s = (j && j.summary) ? sanitizeSummary(j.summary).trim() : "";
       if (s) return s;
     } catch {}
     let fallback = `AADT ${ctx.aadt} (${ctx.method}); competition ${ctx.compCount} (Big box=${ctx.heavyCount}); pricing ${ctx.pricePosition}; adjustments ${ctx.userAdj || "none"}; result ${ctx.low}–${ctx.high} base ${ctx.base}.`;
-    return fallback.trim();
+    return sanitizeSummary(fallback).trim();
   }
 
   const adjBits = [];
@@ -1223,18 +1235,22 @@ Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
     pricePosition, userAdj: adjBits.join("; "),
     base: calc.base, low: calc.low, high: calc.high,
   });
-  const verificationLine = "Verify there are no major gas station developments in the area.";
-  const summaryBody = (summaryCore || "").trim();
-  const summaryBase = summaryBody
-    ? `${summaryBody}\n\n${verificationLine}`
-    : verificationLine;
-  let summaryWithNotes = summaryBody;
+  const developmentDisclaimer = "GPT did not check for major gas station developments.";
+  const appendDevelopmentDisclaimer = (text) => {
+    const trimmed = (text || "").trim();
+    if (!trimmed) return developmentDisclaimer;
+    const alreadyMentioned = trimmed.toLowerCase().includes("did not check for major gas station development");
+    if (alreadyMentioned) return trimmed;
+    const punctuation = /[.!?]$/.test(trimmed) ? "" : ".";
+    return `${trimmed}${punctuation} ${developmentDisclaimer}`.trim();
+  };
+  const summaryBody = sanitizeSummary(summaryCore || "").trim();
+  const summaryBase = appendDevelopmentDisclaimer(summaryBody);
+  let summaryWithNotesBody = summaryBody;
   if (siteNotes) {
-    summaryWithNotes = `${summaryBody}${summaryBody ? "\n\n" : ""}User Entered Site Notes: ${siteNotes}`;
+    summaryWithNotesBody = `${summaryBody}${summaryBody ? "\n\n" : ""}User Entered Site Notes: ${siteNotes}`;
   }
-  summaryWithNotes = summaryWithNotes
-    ? `${summaryWithNotes}\n\n${verificationLine}`
-    : verificationLine;
+  const summaryWithNotes = appendDevelopmentDisclaimer(summaryWithNotesBody);
 
   // UI lines
   let aadtText = "";
