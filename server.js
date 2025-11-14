@@ -726,17 +726,18 @@ function pickFirstFinite(...values) {
 function formatFinalEstimateLine(result) {
   if (!result || typeof result !== 'object') return null;
   const est = result.estimate || {};
-  const low = pickFirstFinite(est.low, result.low, est.base, result.base);
-  const high = pickFirstFinite(est.high, result.high, est.base, result.base);
-  const year2 = pickFirstFinite(est.year2, result.year2);
-  const year3 = pickFirstFinite(est.year3, result.year3);
+  const base = pickFirstFinite(est.base, result.base, est.low, result.low);
+  const low = pickFirstFinite(est.low, result.low, Number.isFinite(base) ? Math.round(Number(base) * 0.86) : null);
+  const high = pickFirstFinite(est.high, result.high, Number.isFinite(base) ? Math.round(Number(base) * 1.06) : null);
+  const year2 = pickFirstFinite(est.year2, result.year2, Number.isFinite(base) ? Math.round(Number(base) * 1.027) : null);
+  const year3 = pickFirstFinite(est.year3, result.year3, Number.isFinite(base) ? Math.round(Number(base) * 1.027 * 1.0125) : null);
   const fmt = (n) => (Number.isFinite(n) ? Number(n).toLocaleString() : '—');
   const range = typeof est.range === 'string' && est.range.trim()
     ? est.range.trim()
     : (Number.isFinite(low) && Number.isFinite(high)
         ? `${Number(low).toLocaleString()}–${Number(high).toLocaleString()}`
         : '—');
-  return `Final (LOW): ${fmt(low)} • Range: ${range} • Y2: ${fmt(year2)} • Y3: ${fmt(year3)}`;
+  return `Final (BASE): ${fmt(base)} • Range: ${range} • Y2: ${fmt(year2)} • Y3: ${fmt(year3)}`;
 }
 function formatBaselineSummaryLine(aadt, baselineComponents, baselineValue) {
   if (!Number.isFinite(aadt) || !Number.isFinite(baselineValue)) return null;
@@ -1405,10 +1406,16 @@ app.post("/report/pdf", async (req, res) => {
 
     y = drawSectionTitle(doc, "Estimate Summary", y, { margin, color: "#334155" });
     const colW = contentW / 2 - 8; let yL = y, yR = y;
-    yL = drawKeyValue(doc, "LOW (adjusted base)", (result.estimate?.low ?? result.low)?.toLocaleString() || "—", margin, yL, colW);
-    yL = drawKeyValue(doc, "Range", result.estimate?.range || (result.low && result.high ? `${result.low.toLocaleString()}–${result.high.toLocaleString()}` : "—"), margin, yL, colW);
-    yR = drawKeyValue(doc, "Year 2", (result.estimate?.year2 ?? result.year2)?.toLocaleString() || "—", margin + colW + 16, yR, colW);
-    yR = drawKeyValue(doc, "Year 3", (result.estimate?.year3 ?? result.year3)?.toLocaleString() || "—", margin + colW + 16, yR, colW);
+    const baseVal = pickFirstFinite(result.estimate?.base, result.base, result.estimate?.low, result.low);
+    const lowVal = pickFirstFinite(result.estimate?.low, result.low, Number.isFinite(baseVal) ? Math.round(Number(baseVal) * 0.86) : null);
+    const highVal = pickFirstFinite(result.estimate?.high, result.high, Number.isFinite(baseVal) ? Math.round(Number(baseVal) * 1.06) : null);
+    const rangeText = result.estimate?.range || (Number.isFinite(lowVal) && Number.isFinite(highVal) ? `${Number(lowVal).toLocaleString()}–${Number(highVal).toLocaleString()}` : "—");
+    const year2Val = pickFirstFinite(result.estimate?.year2, result.year2, Number.isFinite(baseVal) ? Math.round(Number(baseVal) * 1.027) : null);
+    const year3Val = pickFirstFinite(result.estimate?.year3, result.year3, Number.isFinite(baseVal) ? Math.round(Number(baseVal) * 1.027 * 1.0125) : null);
+    yL = drawKeyValue(doc, "BASE (adjusted base)", Number.isFinite(baseVal) ? Number(baseVal).toLocaleString() : "—", margin, yL, colW);
+    yL = drawKeyValue(doc, "Range", rangeText, margin, yL, colW);
+    yR = drawKeyValue(doc, "Year 2", Number.isFinite(year2Val) ? Number(year2Val).toLocaleString() : "—", margin + colW + 16, yR, colW);
+    yR = drawKeyValue(doc, "Year 3", Number.isFinite(year3Val) ? Number(year3Val).toLocaleString() : "—", margin + colW + 16, yR, colW);
     y = Math.max(yL, yR) + 4;
 
     y = drawSectionTitle(doc, "AADT & Competition", y, { margin, color: "#334155" });
