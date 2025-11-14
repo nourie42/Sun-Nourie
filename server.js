@@ -1171,7 +1171,7 @@ Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
   });
 
   const summaryWithNotes = siteNotes
-    ? `${summaryBase}${summaryBase ? "\n\n" : ""}Site Notes: ${siteNotes}`
+    ? `${summaryBase}${summaryBase ? "\n\n" : ""}User Entered Site Notes: ${siteNotes}`
     : summaryBase;
 
   // UI lines
@@ -1337,6 +1337,16 @@ app.post("/report/pdf", async (req, res) => {
     doc.fillColor("#0b0d12").font("Helvetica-Bold").fontSize(18).text("Sunoco, LP Fuel IQ — Site Report", margin, y); y += 24;
     doc.font("Helvetica").fontSize(11).fillColor("#475569").text(`Address: ${result.map?.site?.label || req.body?.address || ""}`, margin, y, { width: contentW }); y += 16;
 
+    const userNotesLine = (() => {
+      if (typeof result.siteNotes === "string" && result.siteNotes.trim()) return result.siteNotes.trim();
+      if (typeof req.body?.siteNotes === "string" && req.body.siteNotes.trim()) return req.body.siteNotes.trim();
+      return "";
+    })();
+    if (userNotesLine) {
+      doc.font("Helvetica").fontSize(11).fillColor("#1c2736").text(`User Entered Site Notes: ${userNotesLine}`, margin, y, { width: contentW });
+      y = doc.y + 12;
+    }
+
     if (mapImg) { y = drawSectionTitle(doc, "Competitors (map)", y, { margin, color: "#334155" }); doc.image(mapImg, margin, y, { width: contentW }); y += Math.min(300, (contentW * 0.62)) + 12; }
     if (siteImg){ y = drawSectionTitle(doc, "Street View (site)", y, { margin, color: "#334155" }); doc.image(siteImg, margin, y, { width: contentW }); y += Math.min(260, (contentW * 0.5)) + 8; }
 
@@ -1388,11 +1398,11 @@ app.post("/report/pdf", async (req, res) => {
 
     y = drawSectionTitle(doc, "Summary", y, { margin, color: "#334155" });
     const summaryBlockRaw = (() => {
-      if (result.summary_with_notes) return result.summary_with_notes;
       const baseRaw = result.summary_base ?? result.summary ?? "";
       const base = typeof baseRaw === "string" ? baseRaw : String(baseRaw || "");
+      if (base) return base;
       const notes = typeof result.siteNotes === "string" ? result.siteNotes.trim() : "";
-      if (notes) return base ? `${base}${base ? "\n\n" : ""}Site Notes: ${notes}` : `Site Notes: ${notes}`;
+      if (notes) return `User Entered Site Notes: ${notes}`;
       return base;
     })();
     const summaryBlock = (summaryBlockRaw || "").replace(/\s{2,}/g, " ").trim();
