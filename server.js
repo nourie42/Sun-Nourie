@@ -1320,7 +1320,7 @@ function bulletLines(doc, items, x, y, w) {
   for (const s of items) {
     const line = String(s || "").trim();
     if (!line) continue;
-    doc.text(`- ${line}`, x, y, { width: w, lineGap });
+    doc.text(`• ${line}`, x, y, { width: w, lineGap });
     y = doc.y + 6;
   }
   return y;
@@ -1369,7 +1369,7 @@ app.post("/report/pdf", async (req, res) => {
     if (baselineLine) bullets.push(baselineLine);
     if (B.compRule) {
       bullets.push(`Competition rule: base ${Number(B.compRule.baseMult).toFixed(2)} − Big box ${Number(B.compRule.heavyPenalty).toFixed(2)} = × ${Number(B.compRule.compMult).toFixed(2)} → ${Number(B.compRule.afterComp).toLocaleString()}`);
-      bullets.push(`Competitors (1.5 mi): ${Number(B.compRule.compCount ?? result.competition?.count ?? 0)} total - Big box ${Number(B.compRule.heavyCount ?? result.competition?.heavy_count ?? 0)}`);
+      bullets.push(`Competitors (1.5 mi): ${Number(B.compRule.compCount ?? result.competition?.count ?? 0)} total • Big box ${Number(B.compRule.heavyCount ?? result.competition?.heavy_count ?? 0)}`);
     }
     if (B.caps) {
       const softHit = B.compRule && B.compRule.afterComp > B.caps.capSoftTotal;
