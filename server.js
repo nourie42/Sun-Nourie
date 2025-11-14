@@ -710,6 +710,34 @@ function formatNumberCompact(n) {
     ? String(Math.round(rounded))
     : rounded.toFixed(2).replace(/\.?0+$/, '');
 }
+function formatMultiplierWithNote(value, digits = 2) {
+  if (!Number.isFinite(Number(value))) return '—';
+  const num = Number(value);
+  const fixed = num.toFixed(digits);
+  return Math.abs(num - 1) < 1e-9 ? `${fixed} (No adjustment)` : fixed;
+}
+function pickFirstFinite(...values) {
+  for (const v of values) {
+    const num = Number(v);
+    if (Number.isFinite(num)) return num;
+  }
+  return null;
+}
+function formatFinalEstimateLine(result) {
+  if (!result || typeof result !== 'object') return null;
+  const est = result.estimate || {};
+  const low = pickFirstFinite(est.low, result.low, est.base, result.base);
+  const high = pickFirstFinite(est.high, result.high, est.base, result.base);
+  const year2 = pickFirstFinite(est.year2, result.year2);
+  const year3 = pickFirstFinite(est.year3, result.year3);
+  const fmt = (n) => (Number.isFinite(n) ? Number(n).toLocaleString() : '—');
+  const range = typeof est.range === 'string' && est.range.trim()
+    ? est.range.trim()
+    : (Number.isFinite(low) && Number.isFinite(high)
+        ? `${Number(low).toLocaleString()}–${Number(high).toLocaleString()}`
+        : '—');
+  return `Final (LOW): ${fmt(low)} • Range: ${range} • Y2: ${fmt(year2)} • Y3: ${fmt(year3)}`;
+}
 function formatBaselineSummaryLine(aadt, baselineComponents, baselineValue) {
   if (!Number.isFinite(aadt) || !Number.isFinite(baselineValue)) return null;
   const comp = baselineComponents || {};
@@ -733,6 +761,29 @@ function formatBaselineSummaryLine(aadt, baselineComponents, baselineValue) {
     `${formatNumberCompact(days)} days`,
   ];
   return `AADT math: ${parts.join(' × ')} = ${Number(baselineValue).toLocaleString()}`;
+}
+
+function cleanSummaryText(raw) {
+  if (raw == null) return "";
+  let text = String(raw);
+  const stripPair = (open, close) => {
+    const openRe = new RegExp(`^\\s*${open}`, "i");
+    const closeRe = new RegExp(`${close}\\s*$`, "i");
+    text = text.replace(openRe, "");
+    text = text.replace(closeRe, "");
+  };
+  stripPair("<text[^>]*>", "</text>");
+  stripPair("<summary[^>]*>", "</summary>");
+  stripPair("<p[^>]*>", "</p>");
+  text = text.replace(/<br\s*\/?>/gi, "\n");
+  text = text.replace(/<\/p>\s*<p[^>]*>/gi, "\n\n");
+  text = text.replace(/<\/?p[^>]*>/gi, "");
+  text = text.replace(/<\/?text[^>]*>/gi, "");
+  text = text.replace(/<\/?summary[^>]*>/gi, "");
+  text = text.replace(/<\/?div[^>]*>/gi, "");
+  text = text.replace(/<[^>]+>/g, " ");
+  text = text.replace(/\s{2,}/g, " ");
+  return text.trim();
 }
 
 /* ------------------------ Google proxy/status ------------------------ */
@@ -1314,13 +1365,15 @@ function drawKeyValue(doc, key, value, x, y, w) {
   doc.font("Helvetica").fontSize(11).fillColor("#1c2736").text(value || "—", x, y + 14, { width: w, continued: false });
   return y + 34;
 }
-function bulletLines(doc, items, x, y, w) {
+function bulletLines(doc, items, x, y, w, opts = {}) {
+  const { bullet = "-" } = opts;
   doc.font("Helvetica").fontSize(11).fillColor("#1c2736");
   const lineGap = 4;
   for (const s of items) {
     const line = String(s || "").trim();
     if (!line) continue;
-    doc.text(`• ${line}`, x, y, { width: w, lineGap });
+    const prefix = bullet ? `${bullet} ` : "";
+    doc.text(`${prefix}${line}`, x, y, { width: w, lineGap });
     y = doc.y + 6;
   }
   return y;
@@ -1364,19 +1417,23 @@ app.post("/report/pdf", async (req, res) => {
 
     y = drawSectionTitle(doc, "Reasons for this estimate", y, { margin, color: "#334155" });
     const B = result.calc_breakdown || {}; const bullets = [];
+    const finalEstimateLine = formatFinalEstimateLine(result);
+    if (finalEstimateLine) bullets.push(finalEstimateLine);
     const baselineSource = { ...(B.baselineComponents || {}), ...(result.inputs?.baseline_settings || {}) };
     const baselineLine = formatBaselineSummaryLine(result.inputs?.aadt_used ?? null, baselineSource, B.baseline);
     if (baselineLine) bullets.push(baselineLine);
     if (B.compRule) {
-      bullets.push(`Competition rule: base ${Number(B.compRule.baseMult).toFixed(2)} − Big box ${Number(B.compRule.heavyPenalty).toFixed(2)} = × ${Number(B.compRule.compMult).toFixed(2)} → ${Number(B.compRule.afterComp).toLocaleString()}`);
+      const baseMultText = formatMultiplierWithNote(B.compRule.baseMult);
+      const compMultText = formatMultiplierWithNote(B.compRule.compMult);
+      bullets.push(`Competition rule: base ${baseMultText} − Big box ${Number(B.compRule.heavyPenalty).toFixed(2)} = × ${compMultText} → ${Number(B.compRule.afterComp).toLocaleString()}`);
       bullets.push(`Competitors (1.5 mi): ${Number(B.compRule.compCount ?? result.competition?.count ?? 0)} total • Big box ${Number(B.compRule.heavyCount ?? result.competition?.heavy_count ?? 0)}`);
     }
     if (B.caps) {
       const softHit = B.compRule && B.compRule.afterComp > B.caps.capSoftTotal;
       bullets.push(`Capacity caps: equipment ${Number(B.caps.capEquip).toLocaleString()} • soft ${Number(B.caps.capSoftTotal).toLocaleString()} • hard ${Number(B.caps.capHardTotal).toLocaleString()}${softHit ? " (soft cap applied −10%)" : ""}`);
     }
-    if (B.priceMult != null) bullets.push(`Pricing factor: × ${Number(B.priceMult).toFixed(2)}`);
-    if (B.extrasMult != null) bullets.push(`Extras multiplier: × ${Number(B.extrasMult).toFixed(2)}`);
+    if (B.priceMult != null) bullets.push(`Pricing factor: × ${formatMultiplierWithNote(B.priceMult)}`);
+    if (B.extrasMult != null) bullets.push(`Extras multiplier: × ${formatMultiplierWithNote(B.extrasMult)}`);
     if (B.preClamp != null && B.finalClampedToBaseline != null) bullets.push(`Clamp to baseline: min(${Number(B.preClamp).toLocaleString()}, baseline) → ${Number(B.finalClampedToBaseline).toLocaleString()}`);
     if (result.roads?.summary) bullets.push(`Road context: ${result.roads.summary}`);
     if (result.inputs?.aadt_components?.method) {
@@ -1405,7 +1462,7 @@ app.post("/report/pdf", async (req, res) => {
       if (notes) return `User Entered Site Notes: ${notes}`;
       return base;
     })();
-    const summaryBlock = (summaryBlockRaw || "").replace(/\s{2,}/g, " ").trim();
+    const summaryBlock = cleanSummaryText(summaryBlockRaw);
     doc.font("Helvetica").fontSize(11).fillColor("#1c2736").text(summaryBlock || "—", margin, y, { width: contentW });
 
     if (Array.isArray(result.csv) && result.csv.length) {
