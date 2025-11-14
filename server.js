@@ -1187,7 +1187,7 @@ async function performEstimate(reqBody) {
     throw last || new Error("GPT failed");
   }
   async function gptSummary(ctx) {
-    const sys = 'Return {"summary":"text"} in ~8–12 sentences of plain text (no XML/HTML). Include AADT method (DOT), baseline ceiling math, competition rule & big box penalties, pricing, user adjustments, caps, LOW/BASE/HIGH, and road context.';
+    const sys = 'Return {"summary":"<text>"} ~8–12 sentences. Include AADT method (DOT), baseline ceiling math, competition rule & big box penalties, pricing, user adjustments, caps, LOW/BASE/HIGH, and road context.';
     const prompt = `
 Address: ${ctx.address}
 AADT used (DOT): ${ctx.aadt} (${ctx.method})
@@ -1223,22 +1223,18 @@ Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
     pricePosition, userAdj: adjBits.join("; "),
     base: calc.base, low: calc.low, high: calc.high,
   });
-  const developmentDisclaimer = "GPT did not check for major gas station developments.";
-  const appendDevelopmentDisclaimer = (text) => {
-    const trimmed = (text || "").trim();
-    if (!trimmed) return developmentDisclaimer;
-    const alreadyMentioned = trimmed.toLowerCase().includes("did not check for major gas station development");
-    if (alreadyMentioned) return trimmed;
-    const punctuation = /[.!?]$/.test(trimmed) ? "" : ".";
-    return `${trimmed}${punctuation} ${developmentDisclaimer}`.trim();
-  };
+  const verificationLine = "Verify there are no major gas station developments in the area.";
   const summaryBody = (summaryCore || "").trim();
-  const summaryBase = appendDevelopmentDisclaimer(summaryBody);
-  let summaryWithNotesBody = summaryBody;
+  const summaryBase = summaryBody
+    ? `${summaryBody}\n\n${verificationLine}`
+    : verificationLine;
+  let summaryWithNotes = summaryBody;
   if (siteNotes) {
-    summaryWithNotesBody = `${summaryBody}${summaryBody ? "\n\n" : ""}User Entered Site Notes: ${siteNotes}`;
+    summaryWithNotes = `${summaryBody}${summaryBody ? "\n\n" : ""}User Entered Site Notes: ${siteNotes}`;
   }
-  const summaryWithNotes = appendDevelopmentDisclaimer(summaryWithNotesBody);
+  summaryWithNotes = summaryWithNotes
+    ? `${summaryWithNotes}\n\n${verificationLine}`
+    : verificationLine;
 
   // UI lines
   let aadtText = "";
