@@ -993,7 +993,12 @@ function extractStreetFromAddress(addr) {
 /* ============================= Estimate core ============================= */
 async function performEstimate(reqBody) {
   const { address, mpds, diesel, siteLat, siteLon, aadtOverride, advanced,
-          client_rating, auto_low_rating, enteredRoad, trafficPullPct, gallonsPerFill } = reqBody || {};
+          client_rating, auto_low_rating, enteredRoad, trafficPullPct, gallonsPerFill,
+          siteNotes: rawSiteNotes } = reqBody || {};
+
+  const siteNotes = typeof rawSiteNotes === "string"
+    ? rawSiteNotes.trim().slice(0, 1200)
+    : "";
 
   const MPDS = +mpds, DIESEL = +(diesel || 0);
   if (!(Number.isFinite(MPDS) && MPDS > 0)) throw new Error("Regular MPDs required (>0)");
@@ -1135,6 +1140,7 @@ Roads (context): ${ctx.roads.summary}
 Competition: ${ctx.compCount} (heavy ${ctx.heavyCount})
 Pricing: ${ctx.pricePosition}; User adjustments: ${ctx.userAdj || "none"}
 Nearby developments: ${ctx.dev || "none"}
+Site notes: ${ctx.siteNotes || "none"}
 Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
 `.trim();
     try {
@@ -1142,7 +1148,9 @@ Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
       const s = (j && j.summary) ? String(j.summary).trim() : "";
       if (s) return s;
     } catch {}
-    return `AADT ${ctx.aadt} (${ctx.method}); competition ${ctx.compCount} (heavy=${ctx.heavyCount}); pricing ${ctx.pricePosition}; adjustments ${ctx.userAdj || "none"}; result ${ctx.low}–${ctx.high} base ${ctx.base}.`;
+    let fallback = `AADT ${ctx.aadt} (${ctx.method}); competition ${ctx.compCount} (heavy=${ctx.heavyCount}); pricing ${ctx.pricePosition}; adjustments ${ctx.userAdj || "none"}; result ${ctx.low}–${ctx.high} base ${ctx.base}.`;
+    if (ctx.siteNotes) fallback += ` Site notes: ${ctx.siteNotes}`;
+    return fallback;
   }
 
   const adjBits = [];
@@ -1154,7 +1162,7 @@ Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
   if (ruralApplied) adjBits.push("+30% rural bonus (0 comps within 3 mi)");
   if (autoLow) adjBits.push("−30% low reviews (<4.0)");
   extras.forEach((e) => adjBits.push(`${e.pct > 0 ? "+" : ""}${e.pct}% ${e.note || "adj."}`));
-  const summary = await gptSummary({
+  const summaryBase = await gptSummary({
     address: address || geo.label,
     aadt: usedAADT, method,
     enteredRoad: enteredRoadText,
@@ -1162,7 +1170,12 @@ Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
     pricePosition, userAdj: adjBits.join("; "),
     base: calc.base, low: calc.low, high: calc.high,
     dev: devCsv.slice(0, 4).map((x) => `${x.name}${x.status ? ` (${x.status})` : ""}`).join("; "),
+    siteNotes,
   });
+
+  const combinedSummary = siteNotes
+    ? `${summaryBase}${summaryBase ? "\n\n" : ""}Site Notes: ${siteNotes}`
+    : summaryBase;
 
   // UI lines
   let aadtText = "";
@@ -1205,7 +1218,11 @@ Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
       nearest_mi: competitors15[0]?.miles ?? null,
       notable_brands: competitors15.filter((c) => c.heavy).slice(0, 6).map((c) => c.name),
     },
-    roads, summary, calc_breakdown: calc.breakdown,
+    roads,
+    summary: combinedSummary,
+    summary_base: summaryBase,
+    siteNotes,
+    calc_breakdown: calc.breakdown,
     map: {
       site: { lat: geo.lat, lon: geo.lon, label: geo.label },
       competitors: competitors15,
@@ -1372,10 +1389,21 @@ app.post("/report/pdf", async (req, res) => {
     y = bulletLines(doc, bullets, margin, y, contentW); y += 6;
 
     y = drawSectionTitle(doc, "Summary", y, { margin, color: "#334155" });
-    doc.font("Helvetica").fontSize(11).fillColor("#1c2736").text((result.summary || "").replace(/\s{2,}/g, " ").trim() || "—", margin, y, { width: contentW });
+    const summaryText = ((result.summary_base ?? result.summary ?? "").replace(/\s{2,}/g, " ").trim()) || "—";
+    doc.font("Helvetica").fontSize(11).fillColor("#1c2736").text(summaryText, margin, y, { width: contentW });
+    y = doc.y + 12;
+
+    const siteNotesText = typeof result.siteNotes === "string" ? result.siteNotes.trim() : "";
+    if (siteNotesText) {
+      if (y > doc.page.height - margin - 60) { doc.addPage(); y = margin; }
+      y = drawSectionTitle(doc, "Site Notes", y, { margin, color: "#334155" });
+      doc.font("Helvetica").fontSize(11).fillColor("#1c2736").text(siteNotesText, margin, y, { width: contentW });
+      y = doc.y + 12;
+    }
 
     if (Array.isArray(result.csv) && result.csv.length) {
-      y = doc.y + 16; y = drawSectionTitle(doc, "Nearby developments (flagged)", y, { margin, color: "#334155" });
+      if (y > doc.page.height - margin - 60) { doc.addPage(); y = margin; }
+      y = drawSectionTitle(doc, "Nearby developments (flagged)", y, { margin, color: "#334155" });
       const devLines = result.csv.slice(0, 6).map(x => {
         const nm = x.name || ""; const st = x.status ? ` • ${x.status}` : "";
         const dtl = x.details ? ` • ${x.details}` : ""; const dt = x.date ? ` • ${x.date}` : "";
