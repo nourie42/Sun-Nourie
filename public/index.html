@@ -251,9 +251,9 @@
 
     <div class="card"><b>Google Rating</b><div id="ratingLine" class="muted">—</div></div>
     <div class="card">
-      <label for="siteNotes" style="margin-top:0;"><b>Site Notes</b></label>
+      <label for="siteNotes" style="margin-top:0;"><b>User Entered Site Notes</b></label>
       <textarea id="siteNotes" placeholder="Add any site-specific observations that should appear in the summary and PDF."></textarea>
-      <div class="muted subtle" style="margin-top:6px;">Notes are saved with the estimate, included in the GPT summary, and exported to PDF.</div>
+      <div class="muted subtle" style="margin-top:6px;">Notes are saved with the estimate and exported to PDF.</div>
     </div>
     <div class="card"><b>Summary (GPT)</b><div id="summary" class="muted">—</div></div>
   </div>
@@ -297,7 +297,7 @@ function updateSummaryDisplay(){
   const base = (baseSummaryText || "").trim();
   const notes = siteNotesInput ? siteNotesInput.value.trim() : "";
   let text = base;
-  if (notes) text = text ? `${text}\n\nSite Notes: ${notes}` : `Site Notes: ${notes}`;
+  if (!text && notes) text = `User Entered Site Notes: ${notes}`;
   summaryBox.textContent = text || "—";
 }
 if (siteNotesInput) siteNotesInput.addEventListener("input", updateSummaryDisplay);
