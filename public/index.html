@@ -27,11 +27,16 @@
 
     .card{ background:linear-gradient(180deg,var(--panel),var(--panel2)); border:1px solid var(--line); border-radius:12px; padding:16px; margin:12px 0; }
     label{ display:block; font-weight:600; margin:8px 0 6px; color:#d8e3f6; }
-    input, select{ width:100%; padding:12px; border-radius:10px; border:1px solid var(--line); background:#0b1220; color:#eaeef7; }
+    input, select, textarea{ width:100%; padding:12px; border-radius:10px; border:1px solid var(--line); background:#0b1220; color:#eaeef7; }
+    textarea{ min-height:96px; resize:vertical; }
     button{ background:linear-gradient(135deg,var(--brand),var(--brand2)); color:#fff; border:0; padding:12px 16px; border-radius:10px; font-weight:700; cursor:pointer; }
     button:disabled{ opacity:.6; cursor:not-allowed; }
 
-    .row{ display:grid; grid-template-columns:1.6fr repeat(4,minmax(0,0.6fr)) minmax(0,0.8fr); gap:12px; align-items:start; }
+    .row{ display:grid; grid-template-columns:1.6fr repeat(4,minmax(0,0.6fr)) minmax(0,1fr); gap:12px; align-items:start; }
+    .input-row > div{ display:flex; flex-direction:column; }
+    .input-row label{ min-height:38px; display:flex; align-items:flex-end; }
+    .input-row button{ margin-top:auto; }
+    @media (min-width:981px){ .input-row label{ white-space:nowrap; } }
     @media (max-width:980px){ .row{ grid-template-columns:1fr; } }
 
     .toolbar{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:12px; }
@@ -82,7 +87,7 @@
     .small { font-size:12px; color:#a9b6d0; }
 
     .cmp-dot{ display:inline-block; width:10px; height:10px; border-radius:50%; box-shadow:0 0 8px rgba(255,255,255,.18) inset; border:1px solid rgba(0,0,0,.35); }
-    #go { width:100%; padding:16px; font-size:18px; margin-top:10px; }
+    #go { width:100%; padding:16px; font-size:18px; margin-top:auto; }
   </style>
 </head>
 <body>
@@ -119,9 +124,9 @@
     </div>
 
     <div class="card">
-      <div class="row">
+      <div class="row input-row">
         <div>
-          <label>Site Search-Enter Full Address And Click Correct Result </label>
+          <label>Site Search</label>
           <div class="ac-wrap">
             <input id="addr" placeholder="Enter business or address" autocomplete="off" />
             <div id="ac" class="ac-list" style="display:none;"></div>
@@ -132,7 +137,7 @@
         <div><label>Diesel MPDs</label><input id="diesel" type="number" value="0" min="0"/></div>
         <div><label>Traffic pull %</label><input id="trafficPullPct" type="number" min="0" step="0.1" placeholder="Default 2"/></div>
         <div><label>Gallons per fill</label><input id="gallonsPerFill" type="number" min="0" step="0.1" placeholder="Default 8"/></div>
-        <div><label>AADT override</label><input id="aadtOverride" type="number" min="1"/><button id="go">Estimate</button></div>
+        <div><label>AADT Confirmation - Required</label><input id="aadtOverride" type="number" min="1"/><button id="go">Estimate</button></div>
       </div>
       <div class="toolbar"><span class="muted">Baseline ceiling (AADT × traffic pull × gallons/fill × 30) • competition rule • pricing effect • caps • road layout</span></div>
     </div>
@@ -245,6 +250,11 @@
     <div class="card"><div id="devs" class="muted">—</div></div>
 
     <div class="card"><b>Google Rating</b><div id="ratingLine" class="muted">—</div></div>
+    <div class="card">
+      <label for="siteNotes" style="margin-top:0;"><b>Site Notes</b></label>
+      <textarea id="siteNotes" placeholder="Add any site-specific observations that should appear in the summary and PDF."></textarea>
+      <div class="muted subtle" style="margin-top:6px;">Notes are saved with the estimate, included in the GPT summary, and exported to PDF.</div>
+    </div>
     <div class="card"><b>Summary (GPT)</b><div id="summary" class="muted">—</div></div>
   </div>
 
@@ -259,7 +269,7 @@ const apiStatus = $("apiStatus"), aadtBanner = $("aadtBanner"), compLine = $("co
       summaryBox = $("summary"), ratingLine = $("ratingLine"),
       addrInput = $("addr"), acBox = $("ac"), goBtn = $("go"),
       trafficPullInput = $("trafficPullPct"), gallonsPerFillInput = $("gallonsPerFill"),
-      aadtOverrideInput = $("aadtOverride"),
+      aadtOverrideInput = $("aadtOverride"), siteNotesInput = $("siteNotes"),
       addExtraBtn = $("addExtra"), extraList = $("extraList"), activeExtras = $("activeExtras"),
       ex_large_dev = $("ex_large_dev"), ex_hours18 = $("ex_hours18"), ex_highincome = $("ex_highincome"),
       ex_lowrating = $("ex_lowrating"), ex_competitive_pricing = $("ex_competitive_pricing"),
@@ -280,6 +290,18 @@ let acRequestToken = 0;           // latest autocomplete request id
 let skipNextInputReset = false;   // prevent clearing coords when setting value programmatically
 let selectedNormalized = null;    // normalized address fields for persistence/server
 let lastStoredKey = null;         // dedupe persisted address writes
+let baseSummaryText = "";
+
+function updateSummaryDisplay(){
+  if (!summaryBox) return;
+  const base = (baseSummaryText || "").trim();
+  const notes = siteNotesInput ? siteNotesInput.value.trim() : "";
+  let text = base;
+  if (notes) text = text ? `${text}\n\nSite Notes: ${notes}` : `Site Notes: ${notes}`;
+  summaryBox.textContent = text || "—";
+}
+if (siteNotesInput) siteNotesInput.addEventListener("input", updateSummaryDisplay);
+updateSummaryDisplay();
 
 /* Utils */
 function fmt(n){ return (n??0).toLocaleString(undefined,{maximumFractionDigits:0}); }
@@ -548,6 +570,8 @@ async function callEstimate(){
   if (baselineInputs.hasCustomGallons) body.gallonsPerFill = baselineInputs.gallonsPerFill;
   if(selectedCoords){ body.siteLat = selectedCoords.lat; body.siteLon = selectedCoords.lon; }
   if(selectedNormalized){ body.normalizedAddress = selectedNormalized; }
+  const notes = siteNotesInput ? siteNotesInput.value.trim() : "";
+  if (notes) body.siteNotes = notes;
   const ov = +(aadtOverrideInput.value || ""); if(Number.isFinite(ov) && ov > 0) body.aadtOverride = ov;
   return await safeJSON("/estimate", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body)});
 }
@@ -675,7 +699,12 @@ function renderAll(d){
     $("devs").innerHTML = "<ul>"+d.csv.map(x => `<li>${esc(x.name||'')} • ${esc(x.status||'')}${x.details?` • ${esc(x.details)}`:''}${x.date?` • ${esc(x.date)}`:''}</li>`).join("")+"</ul>";
   } else { $("stopBox").style.display = "none"; $("devs").innerHTML = "<em>No developments flagged</em>"; }
 
-  $("summary").textContent = (d.summary || "").replace(/\s{2,}/g," ").trim() || "—";
+  baseSummaryText = (d.summary_base ?? d.summary ?? "").replace(/\s{2,}/g," ").trim();
+  if (siteNotesInput) {
+    const returnedNotes = typeof d.siteNotes === "string" ? d.siteNotes : "";
+    siteNotesInput.value = returnedNotes;
+  }
+  updateSummaryDisplay();
 
   initOrUpdateMainMap(d.map);
   if (d?.map?.competitor_radius_mi) $("mapTitle").textContent = `Map: Site & competitors (${d.map.competitor_radius_mi} mi) + AADT dots + ⭐ AADT used`;
@@ -972,6 +1001,8 @@ document.getElementById("exportPDF").addEventListener("click", async ()=>{
     if (baseInputs.hasCustomTraffic) body.trafficPullPct = baseInputs.trafficPullPct;
     if (baseInputs.hasCustomGallons) body.gallonsPerFill = baseInputs.gallonsPerFill;
     if (selectedCoords) { body.siteLat = selectedCoords.lat; body.siteLon = selectedCoords.lon; }
+    const notes = siteNotesInput ? siteNotesInput.value.trim() : "";
+    if (notes) body.siteNotes = notes;
     setOverlayWorking("Building PDF report…");
     const resp = await fetch("/report/pdf", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     if (!resp.ok) { const t = await resp.text().catch(()=>null); throw new Error("Server PDF failed: " + (t || resp.statusText)); }
