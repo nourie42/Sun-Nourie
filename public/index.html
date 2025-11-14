@@ -88,6 +88,7 @@
 
     .cmp-dot{ display:inline-block; width:10px; height:10px; border-radius:50%; box-shadow:0 0 8px rgba(255,255,255,.18) inset; border:1px solid rgba(0,0,0,.35); }
     #go { width:100%; padding:16px; font-size:18px; margin-top:auto; }
+    #refreshAfterChange { width:100%; margin-top:8px; }
   </style>
 </head>
 <body>
@@ -137,7 +138,12 @@
         <div><label>Diesel MPDs</label><input id="diesel" type="number" value="0" min="0"/></div>
         <div><label>Traffic pull %</label><input id="trafficPullPct" type="number" min="0" step="0.1" placeholder="Default 2"/></div>
         <div><label>Gallons per fill</label><input id="gallonsPerFill" type="number" min="0" step="0.1" placeholder="Default 8"/></div>
-        <div><label>AADT Confirmation*Required</label><input id="aadtOverride" type="number" min="1"/><button id="go">Estimate</button></div>
+        <div>
+          <label>AADT Confirmation*Required</label>
+          <input id="aadtOverride" type="number" min="1"/>
+          <button id="go">Estimate</button>
+          <button id="refreshAfterChange" type="button">Refresh After Change</button>
+        </div>
       </div>
       <div class="toolbar"><span class="muted">Baseline ceiling (AADT × traffic pull × gallons/fill × 30) • competition rule • pricing effect • caps • road layout</span></div>
     </div>
@@ -274,7 +280,8 @@ const apiStatus = $("apiStatus"), aadtBanner = $("aadtBanner"), compLine = $("co
       ex_large_dev = $("ex_large_dev"), ex_hours18 = $("ex_hours18"), ex_highincome = $("ex_highincome"),
       ex_lowrating = $("ex_lowrating"), ex_competitive_pricing = $("ex_competitive_pricing"),
       ex_rural = $("ex_rural"), aadtSourceLine = $("aadtSourceLine"), mathTableEl = $("mathTable"),
-      fallbackChip = $("fallbackChip"), mapTitle = $("mapTitle");
+      fallbackChip = $("fallbackChip"), mapTitle = $("mapTitle"),
+      exportBtn = $("exportPDF"), refreshBtn = $("refreshAfterChange");
 
 /* Competitor UI */
 const cmpShow = $("cmp_show"), cmpHeat = $("cmp_heat"), cmpCluster = $("cmp_cluster"), cmpStatus = $("cmpStatus");
@@ -302,6 +309,12 @@ function updateSummaryDisplay(){
 }
 if (siteNotesInput) siteNotesInput.addEventListener("input", updateSummaryDisplay);
 updateSummaryDisplay();
+
+if (refreshBtn) {
+  refreshBtn.addEventListener("click", () => {
+    window.location.reload();
+  });
+}
 
 /* Utils */
 function fmt(n){ return (n??0).toLocaleString(undefined,{maximumFractionDigits:0}); }
@@ -985,31 +998,64 @@ async function onEstimateClick(){
 }
 goBtn.addEventListener("click", onEstimateClick);
 /* -------------------- PDF export (server-side) -------------------- */
-document.getElementById("exportPDF").addEventListener("click", async ()=>{
-  try{
-    if(!addrInput.value.trim() && !selectedCoords){ alert("Please select a valid address first."); return; }
-    if(!updateGoButtonState()){ alert("Please enter an AADT override before exporting."); return; }
-    const baseInputs = getBaselineInputs();
-    const body = {
-      address: addrInput.value.trim(),
-      mpds: +$("mpds").value || 0,
-      diesel: +$("diesel").value || 0,
-      aadtOverride: +(aadtOverrideInput.value || "") || null,
-      advanced: { price_position: getPricePosition(), flags: getFlags(), extra: collectExtras() },
-      enteredRoad: parseRoadFromDisplay(lastSelectedDisplay || addrInput.value.trim())
-    };
-    if (baseInputs.hasCustomTraffic) body.trafficPullPct = baseInputs.trafficPullPct;
-    if (baseInputs.hasCustomGallons) body.gallonsPerFill = baseInputs.gallonsPerFill;
-    if (selectedCoords) { body.siteLat = selectedCoords.lat; body.siteLon = selectedCoords.lon; }
-    const notes = siteNotesInput ? siteNotesInput.value.trim() : "";
-    if (notes) body.siteNotes = notes;
+exportBtn?.addEventListener("click", async ()=>{
+  if(!addrInput.value.trim() && !selectedCoords){ alert("Please select a valid address first."); return; }
+  if(!updateGoButtonState()){ alert("Please enter an AADT override before exporting."); return; }
+  if (exportBtn.disabled) return;
+
+  const baseInputs = getBaselineInputs();
+  const body = {
+    address: addrInput.value.trim(),
+    mpds: +$("mpds").value || 0,
+    diesel: +$("diesel").value || 0,
+    aadtOverride: +(aadtOverrideInput.value || "") || null,
+    advanced: { price_position: getPricePosition(), flags: getFlags(), extra: collectExtras() },
+    enteredRoad: parseRoadFromDisplay(lastSelectedDisplay || addrInput.value.trim())
+  };
+  if (baseInputs.hasCustomTraffic) body.trafficPullPct = baseInputs.trafficPullPct;
+  if (baseInputs.hasCustomGallons) body.gallonsPerFill = baseInputs.gallonsPerFill;
+  if (selectedCoords) { body.siteLat = selectedCoords.lat; body.siteLon = selectedCoords.lon; }
+  const notes = siteNotesInput ? siteNotesInput.value.trim() : "";
+  if (notes) body.siteNotes = notes;
+
+  let previousLabel = null;
+  let toggled = false;
+  if (exportBtn) {
+    try {
+      previousLabel = exportBtn.textContent;
+      exportBtn.disabled = true;
+      exportBtn.textContent = "Exporting…";
+      toggled = true;
+    } catch {}
+  }
+
+  try {
     setOverlayWorking("Building PDF report…");
     const resp = await fetch("/report/pdf", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    if (!resp.ok) { const t = await resp.text().catch(()=>null); throw new Error("Server PDF failed: " + (t || resp.statusText)); }
-    const blob = await resp.blob(); const url = URL.createObjectURL(blob); const a = document.createElement("a");
-    a.href = url; a.download = "FuelIQ_Site_Report.pdf"; a.click(); URL.revokeObjectURL(url);
-  }catch(e){ alert("PDF export failed: " + (e?.message || e)); }
-  finally{ clearOverlay(); }
+    if (!resp.ok) {
+      const t = await resp.text().catch(()=>null);
+      throw new Error("Server PDF failed: " + (t || resp.statusText));
+    }
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "FuelIQ_Site_Report.pdf";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }catch(e){
+    alert("PDF export failed: " + (e?.message || e));
+  }finally{
+    clearOverlay();
+    if (exportBtn && toggled) {
+      exportBtn.disabled = false;
+      try {
+        if (previousLabel != null) exportBtn.textContent = previousLabel;
+      } catch {}
+    }
+  }
 });
 
 /* -------------------- Init -------------------- */
