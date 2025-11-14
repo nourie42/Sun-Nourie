@@ -1216,10 +1216,9 @@ Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
       notable_brands: competitors15.filter((c) => c.heavy).slice(0, 6).map((c) => c.name),
     },
     roads,
-    summary: summaryWithNotes,            // combined GPT summary + optional notes
-    summary_with_notes: summaryWithNotes, // alias for callers expecting this key
-    summary_base: summaryBase,            // GPT-only narrative (no notes)
-    summary_gpt: summaryBase,             // alias for the GPT-only text
+    summary: summaryBase,
+    summary_with_notes: summaryWithNotes,
+    summary_base: summaryBase,
     siteNotes,
     calc_breakdown: calc.breakdown,
     map: {
