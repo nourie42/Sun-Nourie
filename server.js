@@ -1187,7 +1187,7 @@ async function performEstimate(reqBody) {
     throw last || new Error("GPT failed");
   }
   async function gptSummary(ctx) {
-    const sys = 'Return {"summary":"<text>"} ~8–12 sentences. Include AADT method (DOT), baseline ceiling math, competition rule & big box penalties, pricing, user adjustments, caps, LOW/BASE/HIGH, road context, and notable nearby developments.';
+    const sys = 'Return {"summary":"<text>"} ~8–12 sentences. Include AADT method (DOT), baseline ceiling math, competition rule & big box penalties, pricing, user adjustments, caps, LOW/BASE/HIGH, and road context.';
     const prompt = `
 Address: ${ctx.address}
 AADT used (DOT): ${ctx.aadt} (${ctx.method})
@@ -1195,7 +1195,6 @@ Road (entered): ${ctx.enteredRoad}
 Roads (context): ${ctx.roads.summary}
 Competition: ${ctx.compCount} (Big box ${ctx.heavyCount})
 Pricing: ${ctx.pricePosition}; User adjustments: ${ctx.userAdj || "none"}
-Nearby developments: ${ctx.dev || "none"}
 Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
 `.trim();
     try {
@@ -1204,7 +1203,7 @@ Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
       if (s) return s;
     } catch {}
     let fallback = `AADT ${ctx.aadt} (${ctx.method}); competition ${ctx.compCount} (Big box=${ctx.heavyCount}); pricing ${ctx.pricePosition}; adjustments ${ctx.userAdj || "none"}; result ${ctx.low}–${ctx.high} base ${ctx.base}.`;
-    return fallback;
+    return fallback.trim();
   }
 
   const adjBits = [];
@@ -1216,19 +1215,26 @@ Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
   if (ruralApplied) adjBits.push("+30% rural bonus (0 comps within 3 mi)");
   if (autoLow) adjBits.push("−30% low reviews (<4.0)");
   extras.forEach((e) => adjBits.push(`${e.pct > 0 ? "+" : ""}${e.pct}% ${e.note || "adj."}`));
-  const summaryBase = await gptSummary({
+  const summaryCore = await gptSummary({
     address: address || geo.label,
     aadt: usedAADT, method,
     enteredRoad: enteredRoadText,
     roads, compCount, heavyCount,
     pricePosition, userAdj: adjBits.join("; "),
     base: calc.base, low: calc.low, high: calc.high,
-    dev: devCsv.slice(0, 4).map((x) => `${x.name}${x.status ? ` (${x.status})` : ""}`).join("; "),
   });
-
-  const summaryWithNotes = siteNotes
-    ? `${summaryBase}${summaryBase ? "\n\n" : ""}User Entered Site Notes: ${siteNotes}`
-    : summaryBase;
+  const verificationLine = "Verify there are no major gas station developments in the area.";
+  const summaryBody = (summaryCore || "").trim();
+  const summaryBase = summaryBody
+    ? `${summaryBody}\n\n${verificationLine}`
+    : verificationLine;
+  let summaryWithNotes = summaryBody;
+  if (siteNotes) {
+    summaryWithNotes = `${summaryBody}${summaryBody ? "\n\n" : ""}User Entered Site Notes: ${siteNotes}`;
+  }
+  summaryWithNotes = summaryWithNotes
+    ? `${summaryWithNotes}\n\n${verificationLine}`
+    : verificationLine;
 
   // UI lines
   let aadtText = "";
