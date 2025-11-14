@@ -728,7 +728,7 @@ function formatBaselineSummaryLine(aadt, baselineComponents, baselineValue) {
     `${formatNumberCompact(gallons)} gal/fill`,
     `${formatNumberCompact(days)} days`,
   ];
-  return `Baseline ceiling = ${parts.join(' × ')} = ${Number(baselineValue).toLocaleString()}`;
+  return `AADT math: ${parts.join(' × ')} = ${Number(baselineValue).toLocaleString()}`;
 }
 
 /* ------------------------ Google proxy/status ------------------------ */
