@@ -40,6 +40,8 @@
     @media (max-width:980px){ .row{ grid-template-columns:1fr; } }
 
     .toolbar{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:12px; }
+    .notes-toolbar{ flex-direction:column; align-items:stretch; }
+    .notes-toolbar textarea{ margin-top:6px; }
     .muted{ color:var(--muted); }
     .subtle{ font-size:12px; opacity:.9; }
 
@@ -145,7 +147,11 @@
           <button id="refreshAfterChange" type="button">Refresh After Change</button>
         </div>
       </div>
-      <div class="toolbar"><span class="muted">Baseline ceiling (AADT × traffic pull × gallons/fill × 30) • competition rule • pricing effect • caps • road layout</span></div>
+      <div class="toolbar notes-toolbar">
+        <label for="siteNotes" class="muted" style="margin:0;">User Entered Site Notes</label>
+        <textarea id="siteNotes" placeholder="Add any site-specific observations that should appear in the summary and PDF."></textarea>
+        <div class="muted subtle">Notes are saved with the estimate and exported to PDF.</div>
+      </div>
     </div>
 
     <div class="card" id="mathCard">
@@ -256,11 +262,6 @@
     <div class="card"><div id="devs" class="muted">—</div></div>
 
     <div class="card"><b>Google Rating</b><div id="ratingLine" class="muted">—</div></div>
-    <div class="card">
-      <label for="siteNotes" style="margin-top:0;"><b>User Entered Site Notes</b></label>
-      <textarea id="siteNotes" placeholder="Add any site-specific observations that should appear in the summary and PDF."></textarea>
-      <div class="muted subtle" style="margin-top:6px;">Notes are saved with the estimate and exported to PDF.</div>
-    </div>
     <div class="card"><b>Summary (GPT)</b><div id="summary" class="muted">—</div></div>
   </div>
 
@@ -358,7 +359,7 @@ function formatBaselineLine(aadtVal, baselineComponents, baselineValue){
   if (Number.isFinite(pct)) parts.push(`${fmtFloat(pct)}% traffic pull`);
   if (Number.isFinite(gallons)) parts.push(`${fmtFloat(gallons)} gal/fill`);
   if (Number.isFinite(days)) parts.push(`${fmtFloat(days)} days`);
-  return `<b>Baseline ceiling</b> = ${parts.join(" × ")} = <b>${baselineText}</b>`;
+  return `<b>AADT math</b>: ${parts.join(" × ")} = <b>${baselineText}</b>`;
 }
 function esc(s){ return (s??"").toString().replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
 function formatNominatimDisplay(row){
@@ -558,6 +559,12 @@ function collectExtras(){
   }
   return out;
 }
+function getExtrasMultiplierPreview(){
+  const extras = collectExtras();
+  let mult = extras.reduce((m,e) => m * (1 + (Number(e.pct) || 0) / 100), 1);
+  if (ex_rural?.checked) mult *= 1.30;
+  return mult;
+}
 function getFlags(){ return { rural: $("ex_rural").checked === true }; }
 function getPricePosition(){ const r=document.querySelector('input[name="pricepos"]:checked'); return r ? r.value : "inline"; }
 
@@ -650,8 +657,11 @@ function buildCalcFallback(d){
     const ceiling = aadt * baselineInputs.trafficShare * baselineInputs.gallonsPerFill * baselineInputs.days;
     const mpd_cap = (mpd + diesel) * 25 * 12 * 30; // UI rough
     const after_cap = Math.min(ceiling, mpd_cap);
-    const price = getPricePosition()==='below'?1.10:(getPricePosition()==='above'?0.90:1.00);
-    const v = after_cap * price;
+    const priceMult = getPricePosition()==='below'?1.10:(getPricePosition()==='above'?0.90:1.00);
+    const extrasMult = getExtrasMultiplierPreview();
+    const priceApplied = Math.round(after_cap * priceMult);
+    const extrasApplied = Math.round(priceApplied * extrasMult);
+    const base = Math.min(extrasApplied, Math.round(ceiling));
     return {
       aadt,
       ceiling,
@@ -659,10 +669,15 @@ function buildCalcFallback(d){
       diesel_mpd: diesel,
       mpd_cap,
       after_cap,
-      low: Math.round(v),
-      high: Math.round(v*1.06),
-      year2: Math.round(v*1.027),
-      year3: Math.round(v*1.027*1.0125),
+      priceMult,
+      extrasMult,
+      priceApplied,
+      after_extras: extrasApplied,
+      base,
+      low: Math.round(base*0.86),
+      high: Math.round(base*1.06),
+      year2: Math.round(base*1.027),
+      year3: Math.round(base*1.027*1.0125),
       baselineComponents: baselineInputs,
     };
   }catch{return null;}
@@ -673,9 +688,15 @@ function renderMathFallback(calc){
     formatBaselineLine(calc.aadt, calc.baselineComponents, calc.ceiling),
     `Capacity cap (MPDs ${calc.regular_mpd}+${calc.diesel_mpd} diesel): <b>${fmt(calc.mpd_cap)}</b>`,
     `After cap: <b>${fmt(calc.after_cap)}</b>`,
-    `Pricing factor applied`,
-    `<b>Final (LOW)</b>: <b>${fmt(calc.low)}</b> • Range: ${fmt(calc.low)}–${fmt(calc.high)} • Y2: ${fmt(calc.year2)} • Y3: ${fmt(calc.year3)}`
   ];
+  if (Number.isFinite(calc.priceMult)) {
+    rows.push(`Pricing factor: × ${fmtFloat(calc.priceMult)} → <b>${fmt(calc.priceApplied)}</b>`);
+  }
+  if (Number.isFinite(calc.extrasMult) && Math.abs(calc.extrasMult - 1) > 0.0001) {
+    rows.push(`Extras: × ${fmtFloat(calc.extrasMult)} → <b>${fmt(calc.after_extras)}</b>`);
+  }
+  rows.push(`Clamp to baseline: min(${fmt(calc.after_extras ?? calc.priceApplied)}, ${fmt(calc.ceiling)}) → <b>${fmt(calc.base)}</b>`);
+  rows.push(`<b>Final (LOW)</b>: <b>${fmt(calc.low)}</b> • Range: ${fmt(calc.low)}–${fmt(calc.high)} • Y2: ${fmt(calc.year2)} • Y3: ${fmt(calc.year3)}`);
   $("mathTable").innerHTML = rows.map(r=>`<div>${r}</div>`).join('');
 }
 
