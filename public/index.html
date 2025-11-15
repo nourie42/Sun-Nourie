@@ -1113,7 +1113,17 @@ exportBtn?.addEventListener("click", async ()=>{
 
 /* -------------------- Init -------------------- */
 document.addEventListener("DOMContentLoaded", async () => {
-  try { const r = await fetch("/google/status"); const j = await r.json(); $("apiStatus").textContent = j.ok ? "API: Google — Working" : `API: Google — ${j.status}`; }
+  try {
+    const r = await fetch("/google/status");
+    const j = await r.json();
+    const detailParts = [];
+    if (j?.details?.autocomplete?.status) detailParts.push(`Autocomplete: ${j.details.autocomplete.status}`);
+    if (j?.details?.streetview?.status) detailParts.push(`Street View: ${j.details.streetview.status}`);
+    const suffix = detailParts.length ? ` (${detailParts.join("; ")})` : "";
+    $("apiStatus").textContent = j.ok
+      ? `API: Google — Working${suffix}`
+      : `API: Google — ${j.status || "Unavailable"}${suffix}`;
+  }
   catch { $("apiStatus").textContent = "API: Google — unavailable"; }
   initMap();
 });

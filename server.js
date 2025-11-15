@@ -41,7 +41,8 @@ app.get("/health", (_req, res) => res.json({ ok: true }));
 
 const UA = "FuelEstimator/3.4 (+your-app)";
 const CONTACT = process.env.OVERPASS_CONTACT || UA;
-const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || "";
+const DEFAULT_GOOGLE_API_KEY = "AIzaSyC6QditNCTyN0jk3TcBmCGHE47r8sXKRzI";
+const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || DEFAULT_GOOGLE_API_KEY;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 
 const NOMINATIM_CACHE = new Map();
@@ -791,9 +792,33 @@ function cleanSummaryText(raw) {
 app.get("/google/status", async (_req, res) => {
   try {
     if (!GOOGLE_API_KEY) return res.json({ ok: false, status: "MISSING_KEY" });
-    const au = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=Test&components=country:us&key=${GOOGLE_API_KEY}`;
-    const r = await fetchWithTimeout(au, { headers: { "User-Agent": UA } }, 10000);
-    res.json({ ok: r.ok, status: r.ok ? "WORKING" : `HTTP_${r.status}` });
+
+    const [autoResult, streetResult] = await Promise.allSettled([
+      (async () => {
+        const au = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=Test&components=country:us&key=${GOOGLE_API_KEY}`;
+        const r = await fetchWithTimeout(au, { headers: { "User-Agent": UA } }, 10000);
+        return { ok: r.ok, status: r.ok ? "OK" : `HTTP_${r.status}` };
+      })(),
+      (async () => {
+        const svMeta = `https://maps.googleapis.com/maps/api/streetview/metadata?location=40.758,-73.9855&key=${GOOGLE_API_KEY}`;
+        const r = await fetchWithTimeout(svMeta, { headers: { "User-Agent": UA } }, 10000);
+        const body = await r.json().catch(() => ({ status: r.ok ? "OK" : `HTTP_${r.status}` }));
+        const metaStatus = body?.status || (r.ok ? "OK" : `HTTP_${r.status}`);
+        return { ok: metaStatus === "OK", status: metaStatus };
+      })(),
+    ]);
+
+    const autocomplete = autoResult.status === "fulfilled" ? autoResult.value : { ok: false, status: "ERROR" };
+    const streetview = streetResult.status === "fulfilled" ? streetResult.value : { ok: false, status: "ERROR" };
+    const ok = autocomplete.ok && streetview.ok;
+    const statusParts = [];
+    if (!autocomplete.ok) statusParts.push(`Autocomplete ${autocomplete.status}`);
+    if (!streetview.ok) statusParts.push(`StreetView ${streetview.status}`);
+    res.json({
+      ok,
+      status: ok ? "WORKING" : statusParts.join("; ") || "ERROR",
+      details: { autocomplete, streetview },
+    });
   } catch {
     res.json({ ok: false, status: "EXCEPTION" });
   }
