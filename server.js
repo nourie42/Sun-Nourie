@@ -1366,58 +1366,6 @@ app.get("/api/competitors", async (req, res) => {
 });
 
 /* -------------------------- PDF report API -------------------------- */
-function zoomForRadius(lat, radiusMi, mapWidthPx = 1024) {
-  const radiusMeters = radiusMi * 1609.344;
-  const cosLat = Math.cos(lat * Math.PI / 180);
-  const z = Math.log2((156543.03392 * cosLat * mapWidthPx) / (2 * radiusMeters));
-  return Math.max(3, Math.min(20, Math.round(z)));
-}
-async function fetchBuffer(url, timeout = 20000) {
-  const r = await fetchWithTimeout(url, { headers: { "User-Agent": UA } }, timeout);
-  if (!r.ok) throw new Error(`HTTP ${r.status} for ${url}`);
-  const ct = (r.headers.get("content-type") || "").toLowerCase();
-  if (ct && !ct.startsWith("image/")) {
-    const text = await r.text().catch(() => "");
-    throw new Error(`Unexpected content-type ${ct} for ${url}${text ? ` :: ${text.slice(0, 120)}` : ""}`);
-  }
-  const ab = await r.arrayBuffer();
-  return Buffer.from(ab);
-}
-
-function computeStaticImageSize(width, height) {
-  const maxParam = 640;
-  const targetW = Math.max(1, Math.floor(width || 640));
-  const targetH = Math.max(1, Math.floor(height || 640));
-  const requiredScale = Math.ceil(Math.max(targetW, targetH) / maxParam);
-  const scale = Math.max(1, Math.min(2, requiredScale || 1));
-  const paramW = Math.max(1, Math.min(maxParam, Math.round(targetW / scale)));
-  const paramH = Math.max(1, Math.min(maxParam, Math.round(targetH / scale)));
-  return { width: paramW, height: paramH, scale };
-}
-async function buildStaticCompetitorMapImage(site, comps, radiusMi = 3.0, opts = {}) {
-  if (!GOOGLE_API_KEY) return null;
-  const { width, height, scale } = computeStaticImageSize(opts.width || 1024, opts.height || 640);
-  const effectiveWidth = width * scale;
-  const z = zoomForRadius(site.lat, radiusMi, effectiveWidth);
-  const maxComps = Math.min(90, (comps || []).length);
-  const normals = [], heavies = [];
-  for (let i = 0; i < maxComps; i++) { const c = comps[i]; if (c.heavy) heavies.push(c); else normals.push(c); }
-  const params = [];
-  params.push(`center=${site.lat},${site.lon}`); params.push(`zoom=${z}`);
-  params.push(`size=${width}x${height}`); params.push(`scale=${scale}`); params.push(`maptype=roadmap`);
-  params.push(`markers=size:mid|color:0xFFD700|label:S|${site.lat},${site.lon}`);
-  if (heavies.length) params.push(`markers=size:small|color:0xF97373|label:B|${heavies.map(c => `${c.lat},${c.lon}`).join("|")}`);
-  if (normals.length) params.push(`markers=size:tiny|color:0x34D399|label:C|${normals.map(c => `${c.lat},${c.lon}`).join("|")}`);
-  params.push("style=feature:poi|visibility:off"); params.push("style=feature:road|element:labels.icon|visibility:off"); params.push("style=feature:transit|visibility:off");
-  const url = `https://maps.googleapis.com/maps/api/staticmap?${params.join("&")}&key=${GOOGLE_API_KEY}`;
-  try { return await fetchBuffer(url, 25000); } catch { return null; }
-}
-async function buildStreetViewImage(site, opts = {}) {
-  if (!GOOGLE_API_KEY) return null;
-  const { width, height, scale } = computeStaticImageSize(opts.width || 1024, opts.height || 640);
-  const url = `https://maps.googleapis.com/maps/api/streetview?size=${width}x${height}&scale=${scale}&location=${site.lat},${site.lon}&fov=90&pitch=0&key=${GOOGLE_API_KEY}`;
-  try { return await fetchBuffer(url, 20000); } catch { return null; }
-}
 function drawSectionTitle(doc, text, y, opts = {}) {
   const { margin, color } = opts;
   const left = margin || 36;
@@ -1443,19 +1391,8 @@ function bulletLines(doc, items, x, y, w, opts = {}) {
   }
   return y;
 }
-function isTrueFlag(value) {
-  if (value === true) return true;
-  if (typeof value === "string") {
-    const v = value.trim().toLowerCase();
-    return v === "1" || v === "true" || v === "yes" || v === "on";
-  }
-  if (typeof value === "number") return value === 1;
-  return false;
-}
 app.post("/report/pdf", async (req, res) => {
   try {
-    const includeStreetview = isTrueFlag(req.body?.includeStreetview);
-    const includeCompMap = isTrueFlag(req.body?.includeCompMap);
     const result = await performEstimate(req.body || {});
     if (!result?.ok) throw new Error("Estimate failed");
 
@@ -1555,60 +1492,6 @@ app.post("/report/pdf", async (req, res) => {
         return parts.filter(Boolean).join("; ");
       });
       y = bulletLines(doc, devLines, margin, y, contentW);
-    }
-
-    const wantVisuals = includeStreetview || includeCompMap;
-    let visuals = { compImage: null, streetImage: null };
-    if (wantVisuals) {
-      visuals = await (async () => {
-        try {
-          const compsList = Array.isArray(result.map?.all_competitors) && result.map.all_competitors.length
-            ? result.map.all_competitors
-            : (result.map?.competitors || []);
-          const [compImage, streetImage] = await Promise.all([
-            includeCompMap ? buildStaticCompetitorMapImage(site, compsList, result.map?.competitor_radius_mi || 3.0, { width: 1024, height: 640 }) : Promise.resolve(null),
-            includeStreetview ? buildStreetViewImage(site, { width: 1024, height: 640 }) : Promise.resolve(null),
-          ]);
-          return { compImage, streetImage };
-        } catch {
-          return { compImage: null, streetImage: null };
-        }
-      })();
-    }
-
-    if (wantVisuals) {
-      doc.addPage({ size: "A4", margin });
-      const page2W = doc.page.width;
-      const contentW2 = page2W - margin * 2;
-      let y2 = margin;
-      doc.fillColor("#0b0d12").font("Helvetica-Bold").fontSize(16).text("Visual References", margin, y2);
-      y2 += 24;
-
-      if (includeCompMap) {
-        doc.fillColor("#0b0d12").font("Helvetica-Bold").fontSize(12).text("Competition Map", margin, y2);
-        y2 += 16;
-        if (visuals.compImage) {
-          const mapHeight = contentW2 * (640 / 1024);
-          doc.image(visuals.compImage, margin, y2, { width: contentW2, height: mapHeight });
-          y2 += mapHeight + 14;
-        } else {
-          doc.fillColor("#1c2736").font("Helvetica").fontSize(11).text("Competition map unavailable (requires Google Static Maps access).", margin, y2, { width: contentW2 });
-          y2 = doc.y + 16;
-        }
-      }
-
-      if (includeStreetview) {
-        doc.fillColor("#0b0d12").font("Helvetica-Bold").fontSize(12).text("Street View", margin, y2);
-        y2 += 16;
-        if (visuals.streetImage) {
-          const svHeight = contentW2 * (640 / 1024);
-          doc.image(visuals.streetImage, margin, y2, { width: contentW2, height: svHeight });
-          y2 += svHeight + 14;
-        } else {
-          doc.fillColor("#1c2736").font("Helvetica").fontSize(11).text("Street View unavailable (requires Google Street View Static API access).", margin, y2, { width: contentW2 });
-          y2 = doc.y + 16;
-        }
-      }
     }
 
     doc.end();

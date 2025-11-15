@@ -266,8 +266,6 @@
   </div>
 
   <div class="footerbar">
-    <label class="chip"><input type="checkbox" id="pdfIncludeStreetview"> Street View in PDF</label>
-    <label class="chip"><input type="checkbox" id="pdfIncludeCompMap"> Competition Map in PDF</label>
     <button id="exportPDF">Export to PDF</button>
   </div>
 
@@ -286,8 +284,7 @@ const apiStatus = $("apiStatus"), aadtBanner = $("aadtBanner"), compLine = $("co
       ex_lowrating = $("ex_lowrating"), ex_competitive_pricing = $("ex_competitive_pricing"),
       ex_rural = $("ex_rural"), aadtSourceLine = $("aadtSourceLine"), mathTableEl = $("mathTable"),
       fallbackChip = $("fallbackChip"), mapTitle = $("mapTitle"),
-      exportBtn = $("exportPDF"), refreshBtn = $("refreshAfterChange"),
-      pdfStreetview = $("pdfIncludeStreetview"), pdfCompMap = $("pdfIncludeCompMap");
+      exportBtn = $("exportPDF"), refreshBtn = $("refreshAfterChange");
 
 /* Competitor UI */
 const cmpShow = $("cmp_show"), cmpHeat = $("cmp_heat"), cmpCluster = $("cmp_cluster"), cmpStatus = $("cmpStatus");
@@ -1068,8 +1065,6 @@ exportBtn?.addEventListener("click", async ()=>{
   if (selectedCoords) { body.siteLat = selectedCoords.lat; body.siteLon = selectedCoords.lon; }
   const notes = siteNotesInput ? siteNotesInput.value.trim() : "";
   if (notes) body.siteNotes = notes;
-  if (pdfStreetview?.checked) body.includeStreetview = true;
-  if (pdfCompMap?.checked) body.includeCompMap = true;
 
   let previousLabel = null;
   let toggled = false;
