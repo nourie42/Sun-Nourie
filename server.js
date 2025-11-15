@@ -1375,13 +1375,30 @@ function zoomForRadius(lat, radiusMi, mapWidthPx = 1024) {
 async function fetchBuffer(url, timeout = 20000) {
   const r = await fetchWithTimeout(url, { headers: { "User-Agent": UA } }, timeout);
   if (!r.ok) throw new Error(`HTTP ${r.status} for ${url}`);
+  const ct = (r.headers.get("content-type") || "").toLowerCase();
+  if (ct && !ct.startsWith("image/")) {
+    const text = await r.text().catch(() => "");
+    throw new Error(`Unexpected content-type ${ct} for ${url}${text ? ` :: ${text.slice(0, 120)}` : ""}`);
+  }
   const ab = await r.arrayBuffer();
   return Buffer.from(ab);
 }
+
+function computeStaticImageSize(width, height) {
+  const maxParam = 640;
+  const targetW = Math.max(1, Math.floor(width || 640));
+  const targetH = Math.max(1, Math.floor(height || 640));
+  const requiredScale = Math.ceil(Math.max(targetW, targetH) / maxParam);
+  const scale = Math.max(1, Math.min(2, requiredScale || 1));
+  const paramW = Math.max(1, Math.min(maxParam, Math.round(targetW / scale)));
+  const paramH = Math.max(1, Math.min(maxParam, Math.round(targetH / scale)));
+  return { width: paramW, height: paramH, scale };
+}
 async function buildStaticCompetitorMapImage(site, comps, radiusMi = 3.0, opts = {}) {
   if (!GOOGLE_API_KEY) return null;
-  const width = opts.width || 1024, height = opts.height || 640, scale = 2;
-  const z = zoomForRadius(site.lat, radiusMi, width);
+  const { width, height, scale } = computeStaticImageSize(opts.width || 1024, opts.height || 640);
+  const effectiveWidth = width * scale;
+  const z = zoomForRadius(site.lat, radiusMi, effectiveWidth);
   const maxComps = Math.min(90, (comps || []).length);
   const normals = [], heavies = [];
   for (let i = 0; i < maxComps; i++) { const c = comps[i]; if (c.heavy) heavies.push(c); else normals.push(c); }
@@ -1397,7 +1414,7 @@ async function buildStaticCompetitorMapImage(site, comps, radiusMi = 3.0, opts =
 }
 async function buildStreetViewImage(site, opts = {}) {
   if (!GOOGLE_API_KEY) return null;
-  const width = opts.width || 1024, height = opts.height || 640, scale = 2;
+  const { width, height, scale } = computeStaticImageSize(opts.width || 1024, opts.height || 640);
   const url = `https://maps.googleapis.com/maps/api/streetview?size=${width}x${height}&scale=${scale}&location=${site.lat},${site.lon}&fov=90&pitch=0&key=${GOOGLE_API_KEY}`;
   try { return await fetchBuffer(url, 20000); } catch { return null; }
 }
