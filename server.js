@@ -41,7 +41,8 @@ app.get("/health", (_req, res) => res.json({ ok: true }));
 
 const UA = "FuelEstimator/3.4 (+your-app)";
 const CONTACT = process.env.OVERPASS_CONTACT || UA;
-const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || "";
+const DEFAULT_GOOGLE_API_KEY = "AIzaSyC6QditNCTyN0jk3TcBmCGHE47r8sXKRzI";
+const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || DEFAULT_GOOGLE_API_KEY;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 
 const NOMINATIM_CACHE = new Map();
@@ -791,9 +792,33 @@ function cleanSummaryText(raw) {
 app.get("/google/status", async (_req, res) => {
   try {
     if (!GOOGLE_API_KEY) return res.json({ ok: false, status: "MISSING_KEY" });
-    const au = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=Test&components=country:us&key=${GOOGLE_API_KEY}`;
-    const r = await fetchWithTimeout(au, { headers: { "User-Agent": UA } }, 10000);
-    res.json({ ok: r.ok, status: r.ok ? "WORKING" : `HTTP_${r.status}` });
+
+    const [autoResult, streetResult] = await Promise.allSettled([
+      (async () => {
+        const au = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=Test&components=country:us&key=${GOOGLE_API_KEY}`;
+        const r = await fetchWithTimeout(au, { headers: { "User-Agent": UA } }, 10000);
+        return { ok: r.ok, status: r.ok ? "OK" : `HTTP_${r.status}` };
+      })(),
+      (async () => {
+        const svMeta = `https://maps.googleapis.com/maps/api/streetview/metadata?location=40.758,-73.9855&key=${GOOGLE_API_KEY}`;
+        const r = await fetchWithTimeout(svMeta, { headers: { "User-Agent": UA } }, 10000);
+        const body = await r.json().catch(() => ({ status: r.ok ? "OK" : `HTTP_${r.status}` }));
+        const metaStatus = body?.status || (r.ok ? "OK" : `HTTP_${r.status}`);
+        return { ok: metaStatus === "OK", status: metaStatus };
+      })(),
+    ]);
+
+    const autocomplete = autoResult.status === "fulfilled" ? autoResult.value : { ok: false, status: "ERROR" };
+    const streetview = streetResult.status === "fulfilled" ? streetResult.value : { ok: false, status: "ERROR" };
+    const ok = autocomplete.ok && streetview.ok;
+    const statusParts = [];
+    if (!autocomplete.ok) statusParts.push(`Autocomplete ${autocomplete.status}`);
+    if (!streetview.ok) statusParts.push(`StreetView ${streetview.status}`);
+    res.json({
+      ok,
+      status: ok ? "WORKING" : statusParts.join("; ") || "ERROR",
+      details: { autocomplete, streetview },
+    });
   } catch {
     res.json({ ok: false, status: "EXCEPTION" });
   }
@@ -1401,8 +1426,19 @@ function bulletLines(doc, items, x, y, w, opts = {}) {
   }
   return y;
 }
+function isTrueFlag(value) {
+  if (value === true) return true;
+  if (typeof value === "string") {
+    const v = value.trim().toLowerCase();
+    return v === "1" || v === "true" || v === "yes" || v === "on";
+  }
+  if (typeof value === "number") return value === 1;
+  return false;
+}
 app.post("/report/pdf", async (req, res) => {
   try {
+    const includeStreetview = isTrueFlag(req.body?.includeStreetview);
+    const includeCompMap = isTrueFlag(req.body?.includeCompMap);
     const result = await performEstimate(req.body || {});
     if (!result?.ok) throw new Error("Estimate failed");
 
@@ -1410,9 +1446,10 @@ app.post("/report/pdf", async (req, res) => {
     if (!site) throw new Error("No site location for report");
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", "attachment; filename=FuelIQ_Site_Report.pdf");
-    const doc = new PDFDocument({ size: "A4", margin: 36 }); doc.pipe(res);
+    const margin = 36;
+    const doc = new PDFDocument({ size: "A4", margin }); doc.pipe(res);
 
-    const pageW = doc.page.width, margin = 36, contentW = pageW - margin * 2; let y = margin;
+    const pageW = doc.page.width, contentW = pageW - margin * 2; let y = margin;
     doc.fillColor("#0b0d12").font("Helvetica-Bold").fontSize(18).text("Sunoco, LP Fuel IQ — Site Report", margin, y); y += 24;
     doc.font("Helvetica").fontSize(11).fillColor("#475569").text(`Address: ${result.map?.site?.label || req.body?.address || ""}`, margin, y, { width: contentW }); y += 16;
 
@@ -1501,6 +1538,60 @@ app.post("/report/pdf", async (req, res) => {
         return parts.filter(Boolean).join("; ");
       });
       y = bulletLines(doc, devLines, margin, y, contentW);
+    }
+
+    const wantVisuals = includeStreetview || includeCompMap;
+    let visuals = { compImage: null, streetImage: null };
+    if (wantVisuals) {
+      visuals = await (async () => {
+        try {
+          const compsList = Array.isArray(result.map?.all_competitors) && result.map.all_competitors.length
+            ? result.map.all_competitors
+            : (result.map?.competitors || []);
+          const [compImage, streetImage] = await Promise.all([
+            includeCompMap ? buildStaticCompetitorMapImage(site, compsList, result.map?.competitor_radius_mi || 3.0, { width: 1024, height: 640 }) : Promise.resolve(null),
+            includeStreetview ? buildStreetViewImage(site, { width: 1024, height: 640 }) : Promise.resolve(null),
+          ]);
+          return { compImage, streetImage };
+        } catch {
+          return { compImage: null, streetImage: null };
+        }
+      })();
+    }
+
+    if (wantVisuals) {
+      doc.addPage({ size: "A4", margin });
+      const page2W = doc.page.width;
+      const contentW2 = page2W - margin * 2;
+      let y2 = margin;
+      doc.fillColor("#0b0d12").font("Helvetica-Bold").fontSize(16).text("Visual References", margin, y2);
+      y2 += 24;
+
+      if (includeCompMap) {
+        doc.fillColor("#0b0d12").font("Helvetica-Bold").fontSize(12).text("Competition Map", margin, y2);
+        y2 += 16;
+        if (visuals.compImage) {
+          const mapHeight = contentW2 * (640 / 1024);
+          doc.image(visuals.compImage, margin, y2, { width: contentW2, height: mapHeight });
+          y2 += mapHeight + 14;
+        } else {
+          doc.fillColor("#1c2736").font("Helvetica").fontSize(11).text("Competition map unavailable (requires Google Static Maps access).", margin, y2, { width: contentW2 });
+          y2 = doc.y + 16;
+        }
+      }
+
+      if (includeStreetview) {
+        doc.fillColor("#0b0d12").font("Helvetica-Bold").fontSize(12).text("Street View", margin, y2);
+        y2 += 16;
+        if (visuals.streetImage) {
+          const svHeight = contentW2 * (640 / 1024);
+          doc.image(visuals.streetImage, margin, y2, { width: contentW2, height: svHeight });
+          y2 += svHeight + 14;
+        } else {
+          doc.fillColor("#1c2736").font("Helvetica").fontSize(11).text("Street View unavailable (requires Google Street View Static API access).", margin, y2, { width: contentW2 });
+          y2 = doc.y + 16;
+        }
+      }
     }
 
     doc.end();
