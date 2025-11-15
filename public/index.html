@@ -72,7 +72,7 @@
     .stop-chip{ display:inline-flex; align-items:center; gap:10px; padding:8px 12px; border-radius:12px; border:2px solid #b91c1c; background:linear-gradient(135deg,#7f1d1d,#991b1b); color:#fff; font-weight:800; box-shadow:0 8px 20px rgba(0,0,0,.3); }
     .stop-chip .stop-icon{ width:34px; height:34px; border-radius:8px; background:#dc2626; border:3px solid #fca5a5; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:11px; }
 
-    .footerbar{ position:fixed; left:0; right:0; bottom:0; background:linear-gradient(180deg,#0c1220,#0a0f1a); border-top:1px solid var(--line); padding:10px 16px; display:flex; justify-content:center; gap:12px; z-index:50; }
+    .footerbar{ position:fixed; left:0; right:0; bottom:0; background:linear-gradient(180deg,#0c1220,#0a0f1a); border-top:1px solid var(--line); padding:10px 16px; display:flex; justify-content:center; align-items:center; flex-wrap:wrap; gap:12px; z-index:50; }
 
     .aadt-tabs { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:8px 0 12px; }
     .aadt-tab { display:inline-block; padding:8px 12px; border-radius:999px; border:1px solid var(--line); background:var(--pill); color:#fff; text-decoration:none; font-weight:700; font-size:13px; letter-spacing:.2px; }
@@ -265,7 +265,11 @@
     <div class="card"><b>Summary (GPT)</b><div id="summary" class="muted">—</div></div>
   </div>
 
-  <div class="footerbar"><button id="exportPDF">Export to PDF</button></div>
+  <div class="footerbar">
+    <label class="chip"><input type="checkbox" id="pdfIncludeStreetview"> Street View in PDF</label>
+    <label class="chip"><input type="checkbox" id="pdfIncludeCompMap"> Competition Map in PDF</label>
+    <button id="exportPDF">Export to PDF</button>
+  </div>
 
   <script>
 /* -------------------- Shortcuts -------------------- */
@@ -282,7 +286,8 @@ const apiStatus = $("apiStatus"), aadtBanner = $("aadtBanner"), compLine = $("co
       ex_lowrating = $("ex_lowrating"), ex_competitive_pricing = $("ex_competitive_pricing"),
       ex_rural = $("ex_rural"), aadtSourceLine = $("aadtSourceLine"), mathTableEl = $("mathTable"),
       fallbackChip = $("fallbackChip"), mapTitle = $("mapTitle"),
-      exportBtn = $("exportPDF"), refreshBtn = $("refreshAfterChange");
+      exportBtn = $("exportPDF"), refreshBtn = $("refreshAfterChange"),
+      pdfStreetview = $("pdfIncludeStreetview"), pdfCompMap = $("pdfIncludeCompMap");
 
 /* Competitor UI */
 const cmpShow = $("cmp_show"), cmpHeat = $("cmp_heat"), cmpCluster = $("cmp_cluster"), cmpStatus = $("cmpStatus");
@@ -1063,6 +1068,8 @@ exportBtn?.addEventListener("click", async ()=>{
   if (selectedCoords) { body.siteLat = selectedCoords.lat; body.siteLon = selectedCoords.lon; }
   const notes = siteNotesInput ? siteNotesInput.value.trim() : "";
   if (notes) body.siteNotes = notes;
+  if (pdfStreetview?.checked) body.includeStreetview = true;
+  if (pdfCompMap?.checked) body.includeCompMap = true;
 
   let previousLabel = null;
   let toggled = false;
