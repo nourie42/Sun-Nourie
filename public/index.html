@@ -49,7 +49,8 @@
     #overlay{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(11,14,21,.55); border-radius:12px; font-weight:800; color:#cde9ff; font-size:18px; padding:20px; text-align:center; display:none; }
 
     #svWrap{ margin-top:10px; }
-    #sv{ width:100%; height:380px; border:0; border-radius:12px; border:1px solid var(--line); background:#0b1220; }
+    #sv{ width:100%; height:380px; border-radius:12px; border:1px solid var(--line); background:#0b1220; overflow:hidden; position:relative; }
+    #svStatus{ margin-top:6px; }
 
     .ac-wrap{ position:relative; }
     .ac-list{ position:absolute; top:100%; left:0; right:0; z-index:30; margin-top:6px; background:#0b1220; border:1px solid var(--line); border-radius:12px; max-height:320px; overflow:auto; box-shadow: 0 18px 36px rgba(0,0,0,.35); }
@@ -242,7 +243,11 @@
     <div class="card">
       <div class="muted" id="mapTitle">Map: Site & competitors (1.5 mi) + AADT dots + ⭐ AADT used</div>
       <div id="map"><div id="overlay" class="muted"></div></div>
-      <div id="svWrap"><div class="muted" style="margin-top:10px;">Street View</div><iframe id="sv" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div>
+      <div id="svWrap">
+        <div class="muted" style="margin-top:10px;">Street View</div>
+        <div id="sv" aria-label="Street View panorama"></div>
+        <div id="svStatus" class="muted small">Street View will load after selecting a site.</div>
+      </div>
     </div>
 
     <div class="card">
@@ -269,11 +274,12 @@
     <button id="exportPDF">Export to PDF</button>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" crossorigin="anonymous"></script>
   <script>
 /* -------------------- Shortcuts -------------------- */
 const $ = (id) => document.getElementById(id);
 const apiStatus = $("apiStatus"), aadtBanner = $("aadtBanner"), compLine = $("compLine"),
-      overlay = $("overlay"), outNum = $("estNum"), outRange = $("estRange"),
+      overlay = $("overlay"), svNode = $("sv"), svStatusEl = $("svStatus"), outNum = $("estNum"), outRange = $("estRange"),
       outY2 = $("y2"), outY3 = $("y3"), devsBox = $("devs"),
       summaryBox = $("summary"), ratingLine = $("ratingLine"),
       addrInput = $("addr"), acBox = $("ac"), goBtn = $("go"),
@@ -301,6 +307,11 @@ let skipNextInputReset = false;   // prevent clearing coords when setting value 
 let selectedNormalized = null;    // normalized address fields for persistence/server
 let lastStoredKey = null;         // dedupe persisted address writes
 let baseSummaryText = "";
+let streetViewPanorama = null;
+let streetViewService = null;
+let streetViewScriptPromise = null;
+let streetViewReady = false;
+let streetViewRequestId = 0;
 
 function updateSummaryDisplay(){
   if (!summaryBox) return;
@@ -444,6 +455,7 @@ async function persistNormalizedSelection(item){
 }
 function setOverlayWorking(msg="Working…"){ overlay.textContent = msg; overlay.style.display = "flex"; }
 function clearOverlay(){ overlay.style.display = "none"; }
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /* -------------------- Map & SV -------------------- */
 function initMap(){ if(mapReady) return;
@@ -460,10 +472,8 @@ function initAADTMap(){ if(aadtReady) return;
   aadtLayer = L.layerGroup().addTo(aadtMap); aadtReady = true;
 }
 function updateStreetView(lat, lon){
-  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
-  const frame = document.getElementById("sv");
-  if (!frame) return;
-  frame.src = `https://maps.google.com/maps?q=&layer=c&cbll=${lat},${lon}&cbp=12,0,,0,0&output=svembed`;
+  if (!svFrame || !Number.isFinite(lat) || !Number.isFinite(lon)) return;
+  svFrame.src = `https://maps.google.com/maps?q=&layer=c&cbll=${lat},${lon}&cbp=12,0,,0,0&output=svembed`;
 }
 function renderAADTMarkers(list, used) {
   if (!Array.isArray(list)) return;
@@ -1083,7 +1093,17 @@ exportBtn?.addEventListener("click", async ()=>{
   }
 
   try {
+    let streetViewImageData = null;
+    if (streetViewReady && window.html2canvas) {
+      try {
+        setOverlayWorking("Capturing Street View…");
+        streetViewImageData = await captureStreetViewForPdf();
+      } catch (err) {
+        console.warn("Street View capture for PDF failed", err);
+      }
+    }
     setOverlayWorking("Building PDF report…");
+    if (streetViewImageData) body.streetViewImage = streetViewImageData;
     const resp = await fetch("/report/pdf", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     if (!resp.ok) {
       const t = await resp.text().catch(()=>null);
