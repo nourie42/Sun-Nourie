@@ -16,7 +16,7 @@ import PDFDocument from "pdfkit";
 
 const app = express();
 app.use(cors());
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({ limit: "2mb" }));
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -44,6 +44,13 @@ const CONTACT = process.env.OVERPASS_CONTACT || UA;
 const DEFAULT_GOOGLE_API_KEY = "AIzaSyC6QditNCTyN0jk3TcBmCGHE47r8sXKRzI";
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || DEFAULT_GOOGLE_API_KEY;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
+app.get("/google/maps_key", (_req, res) => {
+  if (!GOOGLE_API_KEY) {
+    res.status(404).json({ ok: false, status: "NO_KEY" });
+    return;
+  }
+  res.json({ ok: true, key: GOOGLE_API_KEY });
+});
 
 const NOMINATIM_CACHE = new Map();
 const NOMINATIM_CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
@@ -793,23 +800,17 @@ app.get("/google/status", async (_req, res) => {
   try {
     if (!GOOGLE_API_KEY) return res.json({ ok: false, status: "MISSING_KEY" });
 
-    const [autoResult, streetResult] = await Promise.allSettled([
+    const [autoResult] = await Promise.allSettled([
       (async () => {
         const au = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=Test&components=country:us&key=${GOOGLE_API_KEY}`;
         const r = await fetchWithTimeout(au, { headers: { "User-Agent": UA } }, 10000);
         return { ok: r.ok, status: r.ok ? "OK" : `HTTP_${r.status}` };
       })(),
-      (async () => {
-        const svMeta = `https://maps.googleapis.com/maps/api/streetview/metadata?location=40.758,-73.9855&key=${GOOGLE_API_KEY}`;
-        const r = await fetchWithTimeout(svMeta, { headers: { "User-Agent": UA } }, 10000);
-        const body = await r.json().catch(() => ({ status: r.ok ? "OK" : `HTTP_${r.status}` }));
-        const metaStatus = body?.status || (r.ok ? "OK" : `HTTP_${r.status}`);
-        return { ok: metaStatus === "OK", status: metaStatus };
-      })(),
     ]);
+    const streetResult = { status: "JS API (client)", ok: true };
 
     const autocomplete = autoResult.status === "fulfilled" ? autoResult.value : { ok: false, status: "ERROR" };
-    const streetview = streetResult.status === "fulfilled" ? streetResult.value : { ok: false, status: "ERROR" };
+    const streetview = streetResult;
     const ok = autocomplete.ok && streetview.ok;
     const statusParts = [];
     if (!autocomplete.ok) statusParts.push(`Autocomplete ${autocomplete.status}`);
@@ -1391,9 +1392,22 @@ function bulletLines(doc, items, x, y, w, opts = {}) {
   }
   return y;
 }
+function decodeImageDataUri(dataUri) {
+  if (typeof dataUri !== "string") return null;
+  const match = dataUri.trim().match(/^data:image\/(png|jpe?g);base64,(.+)$/i);
+  if (!match) return null;
+  try {
+    return Buffer.from(match[2], "base64");
+  } catch {
+    return null;
+  }
+}
 app.post("/report/pdf", async (req, res) => {
   try {
-    const result = await performEstimate(req.body || {});
+    const payload = req.body || {};
+    const streetViewImageRaw = typeof payload.streetViewImage === "string" ? payload.streetViewImage : null;
+    const streetViewImageBuffer = decodeImageDataUri(streetViewImageRaw);
+    const result = await performEstimate(payload);
     if (!result?.ok) throw new Error("Estimate failed");
 
     const site = result?.map?.site || null;
@@ -1484,6 +1498,22 @@ app.post("/report/pdf", async (req, res) => {
     })();
     const summaryBlock = cleanSummaryText(summaryBlockRaw);
     doc.font("Helvetica").fontSize(11).fillColor("#1c2736").text(summaryBlock || "—", margin, y, { width: contentW });
+    y = doc.y + 16;
+
+    y = drawSectionTitle(doc, "Street View", y, { margin, color: "#334155" });
+    if (streetViewImageBuffer) {
+      try {
+        const maxHeight = 240;
+        doc.image(streetViewImageBuffer, margin, y, { fit: [contentW, maxHeight], align: "center" });
+        y = doc.y + 12;
+      } catch {
+        doc.font("Helvetica").fontSize(11).fillColor("#1c2736").text("Street View image could not be rendered.", margin, y, { width: contentW });
+        y = doc.y + 12;
+      }
+    } else {
+      doc.font("Helvetica").fontSize(11).fillColor("#1c2736").text("Street View capture was not available for this export.", margin, y, { width: contentW });
+      y = doc.y + 12;
+    }
 
     if (Array.isArray(result.csv) && result.csv.length) {
       y = doc.y + 16; y = drawSectionTitle(doc, "Nearby developments (flagged)", y, { margin, color: "#334155" });
