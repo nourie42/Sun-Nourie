@@ -49,7 +49,31 @@
     #overlay{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(11,14,21,.55); border-radius:12px; font-weight:800; color:#cde9ff; font-size:18px; padding:20px; text-align:center; display:none; }
 
     #svWrap{ margin-top:10px; }
-    #sv{ width:100%; height:380px; border:0; border-radius:12px; border:1px solid var(--line); background:#0b1220; }
+    #sv{
+      width:100%;
+      height:380px;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background:radial-gradient(circle at 20% 20%, rgba(46,74,109,.6), transparent 60%), #0b1220;
+      overflow:hidden;
+      position:relative;
+    }
+    #sv iframe{
+      width:100%;
+      height:100%;
+      border:0;
+      display:block;
+    }
+    #sv::after{
+      content:"";
+      position:absolute;
+      inset:0;
+      background:linear-gradient(120deg, rgba(14,165,233,.05), rgba(34,211,238,.03));
+      opacity:0;
+      transition:opacity .3s ease;
+      pointer-events:none;
+    }
+    #sv.sv-loading::after{ opacity:1; }
 
     .ac-wrap{ position:relative; }
     .ac-list{ position:absolute; top:100%; left:0; right:0; z-index:30; margin-top:6px; background:#0b1220; border:1px solid var(--line); border-radius:12px; max-height:320px; overflow:auto; box-shadow: 0 18px 36px rgba(0,0,0,.35); }
@@ -242,7 +266,19 @@
     <div class="card">
       <div class="muted" id="mapTitle">Map: Site & competitors (1.5 mi) + AADT dots + ⭐ AADT used</div>
       <div id="map"><div id="overlay" class="muted"></div></div>
-      <div id="svWrap"><div class="muted" style="margin-top:10px;">Street View</div><iframe id="sv" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div>
+      <div id="svWrap">
+        <div class="muted" style="margin-top:10px;">Street View</div>
+        <div id="sv" role="region" aria-label="Google Street View panorama" title="Google Street View panorama">
+          <iframe
+            id="svFrame"
+            title="Google Street View"
+            loading="lazy"
+            allowfullscreen
+            referrerpolicy="no-referrer-when-downgrade"
+          ></iframe>
+        </div>
+        <div id="svStatus" class="muted subtle" style="margin-top:6px;">Street View will load after selecting a site.</div>
+      </div>
     </div>
 
     <div class="card">
@@ -273,7 +309,7 @@
 /* -------------------- Shortcuts -------------------- */
 const $ = (id) => document.getElementById(id);
 const apiStatus = $("apiStatus"), aadtBanner = $("aadtBanner"), compLine = $("compLine"),
-      overlay = $("overlay"), svFrame = $("sv"), outNum = $("estNum"), outRange = $("estRange"),
+      overlay = $("overlay"), outNum = $("estNum"), outRange = $("estRange"),
       outY2 = $("y2"), outY3 = $("y3"), devsBox = $("devs"),
       summaryBox = $("summary"), ratingLine = $("ratingLine"),
       addrInput = $("addr"), acBox = $("ac"), goBtn = $("go"),
@@ -284,7 +320,55 @@ const apiStatus = $("apiStatus"), aadtBanner = $("aadtBanner"), compLine = $("co
       ex_lowrating = $("ex_lowrating"), ex_competitive_pricing = $("ex_competitive_pricing"),
       ex_rural = $("ex_rural"), aadtSourceLine = $("aadtSourceLine"), mathTableEl = $("mathTable"),
       fallbackChip = $("fallbackChip"), mapTitle = $("mapTitle"),
-      exportBtn = $("exportPDF"), refreshBtn = $("refreshAfterChange");
+      exportBtn = $("exportPDF"), refreshBtn = $("refreshAfterChange"),
+      svStatusLine = $("svStatus");
+
+let svFrameCache = null;
+function getStreetViewFrame(){
+  if (svFrameCache && svFrameCache.isConnected) return svFrameCache;
+  const el = document.getElementById("svFrame");
+  if (!el) return null;
+  svFrameCache = el;
+  try { window.svFrame = el; } catch {}
+  return el;
+}
+
+let streetViewUpdateToken = 0;
+let lastStreetViewUrl = "";
+let streetViewLoadTimer = null;
+
+function setStreetViewMessage(text){ if (svStatusLine) svStatusLine.textContent = text || ""; }
+function toggleStreetViewLoading(active){
+  const wrap = document.getElementById("sv");
+  if (!wrap) return;
+  wrap.classList.toggle("sv-loading", !!active);
+}
+
+function buildStreetViewUrl(lat, lon){
+  const clampedLat = Math.min(85, Math.max(-85, Number(lat) || 0));
+  const clampedLon = Math.min(180, Math.max(-180, Number(lon) || 0));
+  const latFixed = clampedLat.toFixed(6);
+  const lonFixed = clampedLon.toFixed(6);
+  return `https://maps.google.com/maps?q=&layer=c&cbll=${latFixed},${lonFixed}&cbp=11,0,,0,0&output=svembed`;
+}
+
+function clearStreetViewTimer(){
+  if (streetViewLoadTimer) {
+    clearTimeout(streetViewLoadTimer);
+    streetViewLoadTimer = null;
+  }
+}
+
+function resetStreetViewFrame(frame){
+  if (!frame) return;
+  try {
+    frame.removeAttribute("src");
+    frame.dataset.loaded = "";
+  } catch {}
+  clearStreetViewTimer();
+  frame.onload = null;
+  frame.onerror = null;
+}
 
 /* Competitor UI */
 const cmpShow = $("cmp_show"), cmpHeat = $("cmp_heat"), cmpCluster = $("cmp_cluster"), cmpStatus = $("cmpStatus");
@@ -459,7 +543,61 @@ function initAADTMap(){ if(aadtReady) return;
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{ attribution:"&copy; OpenStreetMap", crossOrigin:true }).addTo(aadtMap);
   aadtLayer = L.layerGroup().addTo(aadtMap); aadtReady = true;
 }
-function updateStreetView(lat, lon){ svFrame.src = `https://maps.google.com/maps?q=&layer=c&cbll=${lat},${lon}&cbp=12,0,,0,0&output=svembed`; }
+function updateStreetView(lat, lon){
+  const frame = getStreetViewFrame();
+  if (!frame) return;
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+    resetStreetViewFrame(frame);
+    lastStreetViewUrl = "";
+    toggleStreetViewLoading(false);
+    setStreetViewMessage("Street View will load after selecting a site.");
+    return;
+  }
+  const url = buildStreetViewUrl(lat, lon);
+  if (url === lastStreetViewUrl && frame.dataset.loaded === "1") {
+    setStreetViewMessage("Street View ready. Drag to explore this site.");
+    return;
+  }
+  const token = ++streetViewUpdateToken;
+  lastStreetViewUrl = url;
+  resetStreetViewFrame(frame);
+  toggleStreetViewLoading(true);
+  setStreetViewMessage("Loading Street View…");
+
+  frame.onload = () => {
+    if (token !== streetViewUpdateToken) return;
+    frame.dataset.loaded = "1";
+    clearStreetViewTimer();
+    frame.onload = null;
+    frame.onerror = null;
+    setStreetViewMessage("Street View ready. Drag to explore this site.");
+    toggleStreetViewLoading(false);
+  };
+  frame.onerror = () => {
+    if (token !== streetViewUpdateToken) return;
+    lastStreetViewUrl = "";
+    clearStreetViewTimer();
+    frame.onload = null;
+    frame.onerror = null;
+    setStreetViewMessage("Street View unavailable at this location.");
+    toggleStreetViewLoading(false);
+  };
+
+  streetViewLoadTimer = setTimeout(() => {
+    if (token !== streetViewUpdateToken) return;
+    frame.onload = null;
+    frame.onerror = null;
+    toggleStreetViewLoading(false);
+    setStreetViewMessage("Street View may be unavailable for this spot.");
+  }, 12000);
+
+  try {
+    frame.src = url;
+  } catch (err) {
+    console.warn("Street View iframe update failed", err);
+    frame.onerror?.();
+  }
+}
 function renderAADTMarkers(list, used) {
   if (!Array.isArray(list)) return;
   for (const rec of list) {
@@ -1108,6 +1246,7 @@ exportBtn?.addEventListener("click", async ()=>{
 
 /* -------------------- Init -------------------- */
 document.addEventListener("DOMContentLoaded", async () => {
+  getStreetViewFrame();
   try {
     const r = await fetch("/google/status");
     const j = await r.json();
