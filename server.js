@@ -807,7 +807,7 @@ app.get("/google/status", async (_req, res) => {
         return { ok: r.ok, status: r.ok ? "OK" : `HTTP_${r.status}` };
       })(),
     ]);
-    const streetResult = { status: "JS API (client)", ok: true };
+    const streetResult = { status: "Embed", ok: true };
 
     const autocomplete = autoResult.status === "fulfilled" ? autoResult.value : { ok: false, status: "ERROR" };
     const streetview = streetResult;
@@ -1405,8 +1405,6 @@ function decodeImageDataUri(dataUri) {
 app.post("/report/pdf", async (req, res) => {
   try {
     const payload = req.body || {};
-    const streetViewImageRaw = typeof payload.streetViewImage === "string" ? payload.streetViewImage : null;
-    const streetViewImageBuffer = decodeImageDataUri(streetViewImageRaw);
     const result = await performEstimate(payload);
     if (!result?.ok) throw new Error("Estimate failed");
 
@@ -1499,21 +1497,6 @@ app.post("/report/pdf", async (req, res) => {
     const summaryBlock = cleanSummaryText(summaryBlockRaw);
     doc.font("Helvetica").fontSize(11).fillColor("#1c2736").text(summaryBlock || "—", margin, y, { width: contentW });
     y = doc.y + 16;
-
-    y = drawSectionTitle(doc, "Street View", y, { margin, color: "#334155" });
-    if (streetViewImageBuffer) {
-      try {
-        const maxHeight = 240;
-        doc.image(streetViewImageBuffer, margin, y, { fit: [contentW, maxHeight], align: "center" });
-        y = doc.y + 12;
-      } catch {
-        doc.font("Helvetica").fontSize(11).fillColor("#1c2736").text("Street View image could not be rendered.", margin, y, { width: contentW });
-        y = doc.y + 12;
-      }
-    } else {
-      doc.font("Helvetica").fontSize(11).fillColor("#1c2736").text("Street View capture was not available for this export.", margin, y, { width: contentW });
-      y = doc.y + 12;
-    }
 
     if (Array.isArray(result.csv) && result.csv.length) {
       y = doc.y + 16; y = drawSectionTitle(doc, "Nearby developments (flagged)", y, { margin, color: "#334155" });
