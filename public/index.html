@@ -459,7 +459,10 @@ function initAADTMap(){ if(aadtReady) return;
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{ attribution:"&copy; OpenStreetMap", crossOrigin:true }).addTo(aadtMap);
   aadtLayer = L.layerGroup().addTo(aadtMap); aadtReady = true;
 }
-function updateStreetView(lat, lon){ svFrame.src = `https://maps.google.com/maps?q=&layer=c&cbll=${lat},${lon}&cbp=12,0,,0,0&output=svembed`; }
+function updateStreetView(lat, lon){
+  if (!svFrame || !Number.isFinite(lat) || !Number.isFinite(lon)) return;
+  svFrame.src = `https://maps.google.com/maps?q=&layer=c&cbll=${lat},${lon}&cbp=12,0,,0,0&output=svembed`;
+}
 function renderAADTMarkers(list, used) {
   if (!Array.isArray(list)) return;
   for (const rec of list) {
