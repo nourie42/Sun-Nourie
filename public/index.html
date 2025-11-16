@@ -273,7 +273,7 @@
 /* -------------------- Shortcuts -------------------- */
 const $ = (id) => document.getElementById(id);
 const apiStatus = $("apiStatus"), aadtBanner = $("aadtBanner"), compLine = $("compLine"),
-      overlay = $("overlay"), svFrame = $("sv"), outNum = $("estNum"), outRange = $("estRange"),
+      overlay = $("overlay"), outNum = $("estNum"), outRange = $("estRange"),
       outY2 = $("y2"), outY3 = $("y3"), devsBox = $("devs"),
       summaryBox = $("summary"), ratingLine = $("ratingLine"),
       addrInput = $("addr"), acBox = $("ac"), goBtn = $("go"),
@@ -285,6 +285,16 @@ const apiStatus = $("apiStatus"), aadtBanner = $("aadtBanner"), compLine = $("co
       ex_rural = $("ex_rural"), aadtSourceLine = $("aadtSourceLine"), mathTableEl = $("mathTable"),
       fallbackChip = $("fallbackChip"), mapTitle = $("mapTitle"),
       exportBtn = $("exportPDF"), refreshBtn = $("refreshAfterChange");
+
+let svFrameCache = null;
+function getStreetViewFrame(){
+  if (svFrameCache && svFrameCache.isConnected) return svFrameCache;
+  const el = document.getElementById("sv");
+  if (!el) return null;
+  svFrameCache = el;
+  try { window.svFrame = el; } catch {}
+  return el;
+}
 
 /* Competitor UI */
 const cmpShow = $("cmp_show"), cmpHeat = $("cmp_heat"), cmpCluster = $("cmp_cluster"), cmpStatus = $("cmpStatus");
@@ -459,7 +469,15 @@ function initAADTMap(){ if(aadtReady) return;
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{ attribution:"&copy; OpenStreetMap", crossOrigin:true }).addTo(aadtMap);
   aadtLayer = L.layerGroup().addTo(aadtMap); aadtReady = true;
 }
-function updateStreetView(lat, lon){ svFrame.src = `https://maps.google.com/maps?q=&layer=c&cbll=${lat},${lon}&cbp=12,0,,0,0&output=svembed`; }
+function updateStreetView(lat, lon){
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+  const frame = getStreetViewFrame();
+  if (!frame) return;
+  const nextSrc = `https://maps.google.com/maps?q=&layer=c&cbll=${lat},${lon}&cbp=12,0,,0,0&output=svembed`;
+  if (frame.dataset?.svSrc === nextSrc) return;
+  frame.src = nextSrc;
+  try { frame.dataset.svSrc = nextSrc; } catch {}
+}
 function renderAADTMarkers(list, used) {
   if (!Array.isArray(list)) return;
   for (const rec of list) {
@@ -1108,6 +1126,7 @@ exportBtn?.addEventListener("click", async ()=>{
 
 /* -------------------- Init -------------------- */
 document.addEventListener("DOMContentLoaded", async () => {
+  getStreetViewFrame();
   try {
     const r = await fetch("/google/status");
     const j = await r.json();
