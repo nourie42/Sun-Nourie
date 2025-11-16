@@ -273,7 +273,7 @@
 /* -------------------- Shortcuts -------------------- */
 const $ = (id) => document.getElementById(id);
 const apiStatus = $("apiStatus"), aadtBanner = $("aadtBanner"), compLine = $("compLine"),
-      overlay = $("overlay"), svFrame = $("sv"), outNum = $("estNum"), outRange = $("estRange"),
+      overlay = $("overlay"), outNum = $("estNum"), outRange = $("estRange"),
       outY2 = $("y2"), outY3 = $("y3"), devsBox = $("devs"),
       summaryBox = $("summary"), ratingLine = $("ratingLine"),
       addrInput = $("addr"), acBox = $("ac"), goBtn = $("go"),
@@ -459,7 +459,12 @@ function initAADTMap(){ if(aadtReady) return;
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{ attribution:"&copy; OpenStreetMap", crossOrigin:true }).addTo(aadtMap);
   aadtLayer = L.layerGroup().addTo(aadtMap); aadtReady = true;
 }
-function updateStreetView(lat, lon){ svFrame.src = `https://maps.google.com/maps?q=&layer=c&cbll=${lat},${lon}&cbp=12,0,,0,0&output=svembed`; }
+function updateStreetView(lat, lon){
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+  const frame = document.getElementById("sv");
+  if (!frame) return;
+  frame.src = `https://maps.google.com/maps?q=&layer=c&cbll=${lat},${lon}&cbp=12,0,,0,0&output=svembed`;
+}
 function renderAADTMarkers(list, used) {
   if (!Array.isArray(list)) return;
   for (const rec of list) {
