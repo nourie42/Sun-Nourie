@@ -44,6 +44,13 @@ const CONTACT = process.env.OVERPASS_CONTACT || UA;
 const DEFAULT_GOOGLE_API_KEY = "AIzaSyC6QditNCTyN0jk3TcBmCGHE47r8sXKRzI";
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || DEFAULT_GOOGLE_API_KEY;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
+app.get("/google/maps_key", (_req, res) => {
+  if (!GOOGLE_API_KEY) {
+    res.status(404).json({ ok: false, status: "NO_KEY" });
+    return;
+  }
+  res.json({ ok: true, key: GOOGLE_API_KEY });
+});
 
 const NOMINATIM_CACHE = new Map();
 const NOMINATIM_CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
@@ -1384,6 +1391,16 @@ function bulletLines(doc, items, x, y, w, opts = {}) {
     y = doc.y + 6;
   }
   return y;
+}
+function decodeImageDataUri(dataUri) {
+  if (typeof dataUri !== "string") return null;
+  const match = dataUri.trim().match(/^data:image\/(png|jpe?g);base64,(.+)$/i);
+  if (!match) return null;
+  try {
+    return Buffer.from(match[2], "base64");
+  } catch {
+    return null;
+  }
 }
 app.post("/report/pdf", async (req, res) => {
   try {
