@@ -177,6 +177,12 @@ async function appendNormalizedAddress(entry) {
 /* ------------------------------ Utils ------------------------------ */
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const toMiles = (m) => m / 1609.344;
+const clamp = (val, min, max) => Math.min(max, Math.max(min, val));
+const normalizeHeading = (val) => {
+  if (!Number.isFinite(val)) return 0;
+  const mod = val % 360;
+  return mod < 0 ? mod + 360 : mod;
+};
 function haversine(lat1, lon1, lat2, lon2) {
   const R = 6371000, t = (d) => (d * Math.PI) / 180;
   const dLat = t(lat2 - lat1), dLon = t(lon2 - lon1);
@@ -823,6 +829,25 @@ app.get("/google/status", async (_req, res) => {
   } catch {
     res.json({ ok: false, status: "EXCEPTION" });
   }
+});
+
+app.get("/google/streetview_embed", (req, res) => {
+  if (!GOOGLE_API_KEY) return res.status(503).json({ ok: false, status: "MISSING_KEY" });
+  const lat = Number(req.query.lat);
+  const lon = Number(req.query.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+    return res.status(400).json({ ok: false, status: "BAD_COORDS" });
+  }
+  const headingRaw = Number(req.query.heading);
+  const pitchRaw = Number(req.query.pitch);
+  const fovRaw = Number(req.query.fov);
+  const url = new URL("https://www.google.com/maps/embed/v1/streetview");
+  url.searchParams.set("key", GOOGLE_API_KEY);
+  url.searchParams.set("location", `${lat},${lon}`);
+  if (Number.isFinite(headingRaw)) url.searchParams.set("heading", normalizeHeading(headingRaw).toFixed(2));
+  if (Number.isFinite(pitchRaw)) url.searchParams.set("pitch", clamp(pitchRaw, -90, 90).toFixed(2));
+  if (Number.isFinite(fovRaw)) url.searchParams.set("fov", clamp(fovRaw, 10, 120).toFixed(2));
+  res.redirect(url.toString());
 });
 
 /* Autocomplete with optional location bias */
