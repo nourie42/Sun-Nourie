@@ -810,14 +810,21 @@ app.get("/google/status", async (_req, res) => {
 
     const autocomplete = autoResult.status === "fulfilled" ? autoResult.value : { ok: false, status: "ERROR" };
     const streetview = streetResult.status === "fulfilled" ? streetResult.value : { ok: false, status: "ERROR" };
-    const ok = autocomplete.ok && streetview.ok;
+    const optionalStreetviewStatuses = new Set(["REQUEST_DENIED", "INVALID_REQUEST", "UNKNOWN_ERROR"]);
+    const streetviewOptional = optionalStreetviewStatuses.has(streetview.status);
+    const streetviewHealthy = streetview.ok || streetviewOptional;
+    const ok = autocomplete.ok && streetviewHealthy;
     const statusParts = [];
     if (!autocomplete.ok) statusParts.push(`Autocomplete ${autocomplete.status}`);
-    if (!streetview.ok) statusParts.push(`StreetView ${streetview.status}`);
+    if (!streetviewHealthy && !streetviewOptional) statusParts.push(`StreetView ${streetview.status}`);
+
+    const details = { autocomplete };
+    if (!streetviewOptional) details.streetview = streetview;
+
     res.json({
       ok,
       status: ok ? "WORKING" : statusParts.join("; ") || "ERROR",
-      details: { autocomplete, streetview },
+      details,
     });
   } catch {
     res.json({ ok: false, status: "EXCEPTION" });
