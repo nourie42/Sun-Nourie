@@ -292,6 +292,16 @@ const apiStatus = $("apiStatus"), aadtBanner = $("aadtBanner"), compLine = $("co
       fallbackChip = $("fallbackChip"), mapTitle = $("mapTitle"),
       exportBtn = $("exportPDF"), refreshBtn = $("refreshAfterChange");
 
+let svFrameCache = null;
+function getStreetViewFrame(){
+  if (svFrameCache && svFrameCache.isConnected) return svFrameCache;
+  const el = document.getElementById("sv");
+  if (!el) return null;
+  svFrameCache = el;
+  try { window.svFrame = el; } catch {}
+  return el;
+}
+
 /* Competitor UI */
 const cmpShow = $("cmp_show"), cmpHeat = $("cmp_heat"), cmpCluster = $("cmp_cluster"), cmpStatus = $("cmpStatus");
 const brandLegend = $("brandLegend"), brandFilters = $("brandFilters"), brandsClear = $("brandsClear"), brandsAll = $("brandsAll");
@@ -1133,6 +1143,7 @@ exportBtn?.addEventListener("click", async ()=>{
 
 /* -------------------- Init -------------------- */
 document.addEventListener("DOMContentLoaded", async () => {
+  getStreetViewFrame();
   try {
     const r = await fetch("/google/status");
     const j = await r.json();
