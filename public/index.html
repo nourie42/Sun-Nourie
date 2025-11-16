@@ -290,7 +290,55 @@ const apiStatus = $("apiStatus"), aadtBanner = $("aadtBanner"), compLine = $("co
       ex_lowrating = $("ex_lowrating"), ex_competitive_pricing = $("ex_competitive_pricing"),
       ex_rural = $("ex_rural"), aadtSourceLine = $("aadtSourceLine"), mathTableEl = $("mathTable"),
       fallbackChip = $("fallbackChip"), mapTitle = $("mapTitle"),
-      exportBtn = $("exportPDF"), refreshBtn = $("refreshAfterChange");
+      exportBtn = $("exportPDF"), refreshBtn = $("refreshAfterChange"),
+      svStatusLine = $("svStatus");
+
+let svFrameCache = null;
+function getStreetViewFrame(){
+  if (svFrameCache && svFrameCache.isConnected) return svFrameCache;
+  const el = document.getElementById("svFrame");
+  if (!el) return null;
+  svFrameCache = el;
+  try { window.svFrame = el; } catch {}
+  return el;
+}
+
+let streetViewUpdateToken = 0;
+let lastStreetViewUrl = "";
+let streetViewLoadTimer = null;
+
+function setStreetViewMessage(text){ if (svStatusLine) svStatusLine.textContent = text || ""; }
+function toggleStreetViewLoading(active){
+  const wrap = document.getElementById("sv");
+  if (!wrap) return;
+  wrap.classList.toggle("sv-loading", !!active);
+}
+
+function buildStreetViewUrl(lat, lon){
+  const clampedLat = Math.min(85, Math.max(-85, Number(lat) || 0));
+  const clampedLon = Math.min(180, Math.max(-180, Number(lon) || 0));
+  const latFixed = clampedLat.toFixed(6);
+  const lonFixed = clampedLon.toFixed(6);
+  return `https://maps.google.com/maps?q=&layer=c&cbll=${latFixed},${lonFixed}&cbp=11,0,,0,0&output=svembed`;
+}
+
+function clearStreetViewTimer(){
+  if (streetViewLoadTimer) {
+    clearTimeout(streetViewLoadTimer);
+    streetViewLoadTimer = null;
+  }
+}
+
+function resetStreetViewFrame(frame){
+  if (!frame) return;
+  try {
+    frame.removeAttribute("src");
+    frame.dataset.loaded = "";
+  } catch {}
+  clearStreetViewTimer();
+  frame.onload = null;
+  frame.onerror = null;
+}
 
 let svFrameCache = null;
 function getStreetViewFrame(){
