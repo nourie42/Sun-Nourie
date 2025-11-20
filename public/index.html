@@ -144,7 +144,25 @@
           <label>AADT Confirmation*Required</label>
           <input id="aadtOverride" type="number" min="1"/>
           <button id="go">Estimate</button>
-          <button id="refreshAfterChange" type="button">Refresh After Change</button>
+          <button id="refreshAfterChange" type="button">Re-Check After Changes</button>
+        </div>
+      </div>
+      <div style="margin-top:10px;">
+        <b>Actual Comp Within 1.5 Miles</b>
+        <div class="adv-line" style="margin-top:8px; align-items:flex-start;">
+          <div style="flex:1; min-width:220px;">
+            <label>Known competitors (total)</label>
+            <input id="actualCompTotal" type="number" min="0" step="1" placeholder="Auto from map" />
+            <div class="muted subtle">Optional override of detected competitor count for calculations.</div>
+          </div>
+          <div style="flex:1; min-width:220px;">
+            <label>Big box competitors</label>
+            <input id="actualCompHeavy" type="number" min="0" step="1" placeholder="Auto from map" />
+            <div class="muted subtle">Subset of total (e.g., Sam's, Costco, Walmart fuel).</div>
+          </div>
+          <div id="actualCompStatus" class="muted subtle" style="max-width:260px;">
+            Using detected competitors. Enter numbers to override and update the gallon estimate.
+          </div>
         </div>
       </div>
       <div class="toolbar notes-toolbar">
@@ -336,7 +354,9 @@ updateSummaryDisplay();
 
 if (refreshBtn) {
   refreshBtn.addEventListener("click", () => {
-    window.location.reload();
+    if(!addrInput.value.trim() && !selectedCoords){ alert("Please select a valid address first."); return; }
+    if(!updateGoButtonState()){ alert("Please enter an AADT override before re-checking."); return; }
+    onEstimateClick();
   });
 }
 
@@ -653,6 +673,7 @@ function canEstimate(){
 function updateGoButtonState(){
   const enabled = canEstimate();
   goBtn.disabled = !enabled;
+  if (refreshBtn) refreshBtn.disabled = !enabled;
   return enabled;
 }
 aadtOverrideInput.addEventListener("input", () => updateGoButtonState());
