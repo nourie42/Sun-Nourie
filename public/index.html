@@ -144,7 +144,25 @@
           <label>AADT Confirmation*Required</label>
           <input id="aadtOverride" type="number" min="1"/>
           <button id="go">Estimate</button>
-          <button id="refreshAfterChange" type="button">Refresh After Change</button>
+          <button id="refreshAfterChange" type="button">Re-Check After Changes</button>
+        </div>
+      </div>
+      <div style="margin-top:10px;">
+        <b>Actual Comp Within 1.5 Miles</b>
+        <div class="adv-line" style="margin-top:8px; align-items:flex-start;">
+          <div style="flex:1; min-width:220px;">
+            <label>Known competitors (total)</label>
+            <input id="actualCompTotal" type="number" min="0" step="1" placeholder="Auto from map" />
+            <div class="muted subtle">Optional override of detected competitor count for calculations.</div>
+          </div>
+          <div style="flex:1; min-width:220px;">
+            <label>Big box competitors</label>
+            <input id="actualCompHeavy" type="number" min="0" step="1" placeholder="Auto from map" />
+            <div class="muted subtle">Subset of total (e.g., Sam's, Costco, Walmart fuel).</div>
+          </div>
+          <div id="actualCompStatus" class="muted subtle" style="max-width:260px;">
+            Using detected competitors. Enter numbers to override and update the gallon estimate.
+          </div>
         </div>
       </div>
       <div class="toolbar notes-toolbar">
@@ -279,6 +297,8 @@ const apiStatus = $("apiStatus"), aadtBanner = $("aadtBanner"), compLine = $("co
       addrInput = $("addr"), acBox = $("ac"), goBtn = $("go"),
       trafficPullInput = $("trafficPullPct"), gallonsPerFillInput = $("gallonsPerFill"),
       aadtOverrideInput = $("aadtOverride"), siteNotesInput = $("siteNotes"),
+      actualCompTotalInput = $("actualCompTotal"), actualCompHeavyInput = $("actualCompHeavy"),
+      actualCompStatus = $("actualCompStatus"),
       addExtraBtn = $("addExtra"), extraList = $("extraList"), activeExtras = $("activeExtras"),
       ex_large_dev = $("ex_large_dev"), ex_hours18 = $("ex_hours18"), ex_highincome = $("ex_highincome"),
       ex_lowrating = $("ex_lowrating"), ex_competitive_pricing = $("ex_competitive_pricing"),
@@ -315,7 +335,9 @@ updateSummaryDisplay();
 
 if (refreshBtn) {
   refreshBtn.addEventListener("click", () => {
-    window.location.reload();
+    if(!addrInput.value.trim() && !selectedCoords){ alert("Please select a valid address first."); return; }
+    if(!updateGoButtonState()){ alert("Please enter an AADT override before re-checking."); return; }
+    onEstimateClick();
   });
 }
 
@@ -324,6 +346,10 @@ function fmt(n){ return (n??0).toLocaleString(undefined,{maximumFractionDigits:0
 function fmtFloat(n){
   if(!Number.isFinite(n)) return "";
   return Number(n).toFixed(2).replace(/\.00$/,"").replace(/(\.\d)0$/,"$1");
+}
+function parseNonNegativeInt(val){
+  const n = Math.round(+val);
+  return Number.isFinite(n) && n >= 0 ? n : null;
 }
 function getBaselineInputs(){
   const pctRaw = +(trafficPullInput?.value || "");
@@ -362,6 +388,26 @@ function formatBaselineLine(aadtVal, baselineComponents, baselineValue){
   if (Number.isFinite(gallons)) parts.push(`${fmtFloat(gallons)} gal/fill`);
   if (Number.isFinite(days)) parts.push(`${fmtFloat(days)} days`);
   return `<b>AADT math</b>: ${parts.join(" × ")} = <b>${baselineText}</b>`;
+}
+function getCompetitionOverride(){
+  const totalRaw = parseNonNegativeInt(actualCompTotalInput?.value);
+  const heavyRaw = parseNonNegativeInt(actualCompHeavyInput?.value);
+  const total = Number.isFinite(totalRaw) ? totalRaw : null;
+  let heavy = Number.isFinite(heavyRaw) ? heavyRaw : null;
+  if (total !== null && heavy !== null && heavy > total) heavy = total;
+  return { total, heavy };
+}
+function updateCompetitionStatusView(d){
+  const count = d?.competition?.count ?? null;
+  const heavy = d?.competition?.heavy_count ?? null;
+  if (actualCompTotalInput) actualCompTotalInput.placeholder = Number.isFinite(count) ? `Auto: ${count}` : "Auto from map";
+  if (actualCompHeavyInput) actualCompHeavyInput.placeholder = Number.isFinite(heavy) ? `Auto: ${heavy}` : "Auto from map";
+  if (actualCompStatus) {
+    const override = d?.competition?.override_applied === true;
+    actualCompStatus.textContent = override
+      ? "Using user-entered competitor counts in the gallon estimate."
+      : "Using detected competitors. Enter numbers to override and update the gallon estimate.";
+  }
 }
 function esc(s){ return (s??"").toString().replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
 function formatNominatimDisplay(row){
@@ -590,6 +636,9 @@ async function callEstimate(){
   };
   if (baselineInputs.hasCustomTraffic) body.trafficPullPct = baselineInputs.trafficPullPct;
   if (baselineInputs.hasCustomGallons) body.gallonsPerFill = baselineInputs.gallonsPerFill;
+  const compOverride = getCompetitionOverride();
+  if (compOverride.total !== null) body.actualCompCount = compOverride.total;
+  if (compOverride.heavy !== null) body.actualCompHeavy = compOverride.heavy;
   if(selectedCoords){ body.siteLat = selectedCoords.lat; body.siteLon = selectedCoords.lon; }
   if(selectedNormalized){ body.normalizedAddress = selectedNormalized; }
   const notes = siteNotesInput ? siteNotesInput.value.trim() : "";
@@ -605,6 +654,7 @@ function canEstimate(){
 function updateGoButtonState(){
   const enabled = canEstimate();
   goBtn.disabled = !enabled;
+  if (refreshBtn) refreshBtn.disabled = !enabled;
   return enabled;
 }
 aadtOverrideInput.addEventListener("input", () => updateGoButtonState());
@@ -737,6 +787,7 @@ function renderAll(d){
   else renderMathFallback(buildCalcFallback(d));
 
   $("compLine").textContent = d.competitionText || "—";
+  updateCompetitionStatusView(d);
 
   const hasDevs = Array.isArray(d.csv) && d.csv.length > 0;
   if (hasDevs) {
@@ -1062,6 +1113,9 @@ exportBtn?.addEventListener("click", async ()=>{
   };
   if (baseInputs.hasCustomTraffic) body.trafficPullPct = baseInputs.trafficPullPct;
   if (baseInputs.hasCustomGallons) body.gallonsPerFill = baseInputs.gallonsPerFill;
+  const compOverride = getCompetitionOverride();
+  if (compOverride.total !== null) body.actualCompCount = compOverride.total;
+  if (compOverride.heavy !== null) body.actualCompHeavy = compOverride.heavy;
   if (selectedCoords) { body.siteLat = selectedCoords.lat; body.siteLon = selectedCoords.lon; }
   const notes = siteNotesInput ? siteNotesInput.value.trim() : "";
   if (notes) body.siteNotes = notes;
