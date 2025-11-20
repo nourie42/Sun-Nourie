@@ -91,6 +91,7 @@
     .cmp-dot{ display:inline-block; width:10px; height:10px; border-radius:50%; box-shadow:0 0 8px rgba(255,255,255,.18) inset; border:1px solid rgba(0,0,0,.35); }
     #go { width:100%; padding:16px; font-size:18px; margin-top:auto; }
     #refreshAfterChange { width:100%; margin-top:8px; }
+    #startOver { width:100%; margin-top:8px; }
   </style>
 </head>
 <body>
@@ -144,7 +145,8 @@
           <label>AADT Confirmation*Required</label>
           <input id="aadtOverride" type="number" min="1"/>
           <button id="go">Estimate</button>
-          <button id="refreshAfterChange" type="button">Refresh After Change</button>
+          <button id="refreshAfterChange" type="button">Re-Check After Changes</button>
+          <button id="startOver" type="button">Start Over</button>
         </div>
       </div>
       <div class="toolbar notes-toolbar">
@@ -284,7 +286,7 @@ const apiStatus = $("apiStatus"), aadtBanner = $("aadtBanner"), compLine = $("co
       ex_lowrating = $("ex_lowrating"), ex_competitive_pricing = $("ex_competitive_pricing"),
       ex_rural = $("ex_rural"), aadtSourceLine = $("aadtSourceLine"), mathTableEl = $("mathTable"),
       fallbackChip = $("fallbackChip"), mapTitle = $("mapTitle"),
-      exportBtn = $("exportPDF"), refreshBtn = $("refreshAfterChange");
+      exportBtn = $("exportPDF"), refreshBtn = $("refreshAfterChange"), startOverBtn = $("startOver");
 
 /* Competitor UI */
 const cmpShow = $("cmp_show"), cmpHeat = $("cmp_heat"), cmpCluster = $("cmp_cluster"), cmpStatus = $("cmpStatus");
@@ -315,6 +317,13 @@ updateSummaryDisplay();
 
 if (refreshBtn) {
   refreshBtn.addEventListener("click", () => {
+    if(!addrInput.value.trim() && !selectedCoords){ alert("Please select a valid address first."); return; }
+    if(!updateGoButtonState()){ alert("Please enter an AADT override before re-checking."); return; }
+    onEstimateClick();
+  });
+}
+if (startOverBtn) {
+  startOverBtn.addEventListener("click", () => {
     window.location.reload();
   });
 }
@@ -605,6 +614,7 @@ function canEstimate(){
 function updateGoButtonState(){
   const enabled = canEstimate();
   goBtn.disabled = !enabled;
+  if (refreshBtn) refreshBtn.disabled = !enabled;
   return enabled;
 }
 aadtOverrideInput.addEventListener("input", () => updateGoButtonState());

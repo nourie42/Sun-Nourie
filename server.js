@@ -1082,6 +1082,7 @@ function extractStreetFromAddress(addr) {
 async function performEstimate(reqBody) {
   const { address, mpds, diesel, siteLat, siteLon, aadtOverride, advanced,
           client_rating, auto_low_rating, enteredRoad, trafficPullPct, gallonsPerFill,
+          actualCompCount, actualCompHeavy,
           siteNotes: rawSiteNotes } = reqBody || {};
 
   const siteNotes = typeof rawSiteNotes === "string"
@@ -1112,10 +1113,31 @@ async function performEstimate(reqBody) {
   // Competition (for math & map)
   const compAll3 = await competitorsWithinRadiusMiles(geo.lat, geo.lon, 3.0).catch(() => []);
   const competitors15 = compAll3.filter((c) => c.miles <= 1.5);
-  const compCount = competitors15.length;
-  const heavyCount = competitors15.filter((c) => c.heavy).length;
+  const compCountDetected = competitors15.length;
+  const heavyCountDetected = competitors15.filter((c) => c.heavy).length;
   const sunocoNearby = compAll3.some((c) => c.sunoco && c.miles <= 1.0);
   const ruralEligible = compAll3.length === 0;
+
+  const parseOverrideCount = (val) => {
+    const raw = String(val ?? "").trim();
+    if (!raw) return null;
+    const n = Number(raw);
+    return Number.isFinite(n) && n >= 0 ? Math.round(n) : null;
+  };
+
+  const overrideTotal = parseOverrideCount(actualCompCount);
+  const overrideHeavy = parseOverrideCount(actualCompHeavy);
+
+  let compCount = compCountDetected;
+  let heavyCount = heavyCountDetected;
+  let competitionOverrideApplied = false;
+  if (overrideTotal !== null || overrideHeavy !== null) {
+    competitionOverrideApplied = true;
+    if (overrideTotal !== null) compCount = overrideTotal;
+    if (overrideHeavy !== null) heavyCount = overrideHeavy;
+    compCount = Math.max(0, compCount);
+    heavyCount = Math.max(0, Math.min(heavyCount, compCount));
+  }
 
   // Developments + roads
   const devCsv = matchCsvDevelopments(admin.city, admin.county, admin.state);
@@ -1297,11 +1319,12 @@ Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
 
   const nearestComp = compAll3.length ? compAll3[0].miles : null;
   let competitionText = "";
+  const compTextPrefix = competitionOverrideApplied ? "Competition (override): " : "Competition: ";
   if (compCount === 0) {
-    if (ruralEligible) competitionText = "Competition: None within 3 mi.";
-    else competitionText = `Competition: None within 1.5 mi${nearestComp != null ? ` (nearest ~${(+nearestComp).toFixed(1)} mi)` : ""}.`;
+    if (ruralEligible) competitionText = `${compTextPrefix}None within 3 mi.`;
+    else competitionText = `${compTextPrefix}None within 1.5 mi${nearestComp != null ? ` (nearest ~${(+nearestComp).toFixed(1)} mi)` : ""}.`;
   } else {
-    competitionText = `Competition: ${compCount} station${compCount !== 1 ? "s" : ""} within 1.5 mi`;
+    competitionText = `${compTextPrefix}${compCount} station${compCount !== 1 ? "s" : ""} within 1.5 mi`;
     if (heavyCount > 0) {
       const bigBoxLabel = heavyCount === 1 ? "Big box competitor" : "Big box competitors";
       competitionText += ` (${heavyCount} ${bigBoxLabel})`;
@@ -1325,6 +1348,8 @@ Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
     flags: { rural_bonus_applied: ruralApplied, rural_eligible: ruralEligible, sunoco_within_1mi: sunocoNearby, auto_low_rating: autoLow },
     competition: {
       count: compCount, count_3mi: compAll3.length, heavy_count: heavyCount,
+      detected_count: compCountDetected, detected_heavy_count: heavyCountDetected,
+      override_applied: competitionOverrideApplied,
       nearest_mi: competitors15[0]?.miles ?? null,
       notable_brands: competitors15.filter((c) => c.heavy).slice(0, 6).map((c) => c.name),
     },
