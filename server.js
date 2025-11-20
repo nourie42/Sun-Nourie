@@ -1118,16 +1118,10 @@ async function performEstimate(reqBody) {
   const sunocoNearby = compAll3.some((c) => c.sunoco && c.miles <= 1.0);
   const ruralEligible = compAll3.length === 0;
 
-  const parseOptionalOverride = (val) => {
-    if (val === undefined || val === null) return null;
-    const raw = String(val).trim();
-    if (!raw) return null;
-    const num = Number(raw);
-    return Number.isFinite(num) && num >= 0 ? Math.round(num) : null;
-  };
-
-  const overrideTotal = parseOptionalOverride(actualCompCount);
-  const overrideHeavy = parseOptionalOverride(actualCompHeavy);
+  const overrideTotalRaw = Number(actualCompCount);
+  const overrideHeavyRaw = Number(actualCompHeavy);
+  const overrideTotal = Number.isFinite(overrideTotalRaw) && overrideTotalRaw >= 0 ? Math.round(overrideTotalRaw) : null;
+  const overrideHeavy = Number.isFinite(overrideHeavyRaw) && overrideHeavyRaw >= 0 ? Math.round(overrideHeavyRaw) : null;
 
   let compCount = compCountDetected;
   let heavyCount = heavyCountDetected;
