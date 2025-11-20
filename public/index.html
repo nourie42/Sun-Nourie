@@ -146,7 +146,6 @@
           <input id="aadtOverride" type="number" min="1"/>
           <button id="go">Estimate</button>
           <button id="refreshAfterChange" type="button">Re-Check After Changes</button>
-          <button id="startOver" type="button">Start Over</button>
         </div>
       </div>
       <div style="margin-top:10px;">
@@ -227,6 +226,25 @@
       <hr/>
       <div id="aadtBanner" class="muted">—</div>
       <div id="compLine" class="muted">—</div>
+    </div>
+
+    <div class="card">
+      <b>Actual Comp Within 1.5 Miles</b>
+      <div class="adv-line" style="margin-top:8px; align-items:flex-start;">
+        <div style="flex:1; min-width:220px;">
+          <label>Known competitors (total)</label>
+          <input id="actualCompTotal" type="number" min="0" step="1" placeholder="Auto from map" />
+          <div class="muted subtle">Optional override of detected competitor count for calculations.</div>
+        </div>
+        <div style="flex:1; min-width:220px;">
+          <label>Big box competitors</label>
+          <input id="actualCompHeavy" type="number" min="0" step="1" placeholder="Auto from map" />
+          <div class="muted subtle">Subset of total (e.g., Sam's, Costco, Walmart fuel).</div>
+        </div>
+        <div id="actualCompStatus" class="muted subtle" style="max-width:260px;">
+          Using detected competitors. Enter numbers to override and update the gallon estimate.
+        </div>
+      </div>
     </div>
 
     <div class="card">
@@ -342,11 +360,6 @@ if (refreshBtn) {
     onEstimateClick();
   });
 }
-if (startOverBtn) {
-  startOverBtn.addEventListener("click", () => {
-    window.location.reload();
-  });
-}
 
 /* Utils */
 function fmt(n){ return (n??0).toLocaleString(undefined,{maximumFractionDigits:0}); }
@@ -355,9 +368,7 @@ function fmtFloat(n){
   return Number(n).toFixed(2).replace(/\.00$/,"").replace(/(\.\d)0$/,"$1");
 }
 function parseNonNegativeInt(val){
-  const str = String(val ?? "").trim();
-  if (!str) return null;
-  const n = Math.round(+str);
+  const n = Math.round(+val);
   return Number.isFinite(n) && n >= 0 ? n : null;
 }
 function getBaselineInputs(){
