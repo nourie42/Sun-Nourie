@@ -1117,9 +1117,8 @@ async function performEstimate(reqBody) {
   const sunocoNearby = compAll3.some((c) => c.sunoco && c.miles <= 1.0);
   const ruralEligible = compAll3.length === 0;
 
-  const compCount = Math.max(0, compCountDetected);
-  const heavyCount = Math.max(0, Math.min(heavyCountDetected, compCount));
-  const competitionOverrideApplied = false;
+  const compCount = compCountDetected;
+  const heavyCount = heavyCountDetected;
 
   // Developments + roads
   const devCsv = matchCsvDevelopments(admin.city, admin.county, admin.state);
@@ -1333,7 +1332,7 @@ Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
     competition: {
       count: compCount, count_3mi: compAll3.length, heavy_count: heavyCount,
       detected_count: compCountDetected, detected_heavy_count: heavyCountDetected,
-      override_applied: competitionOverrideApplied,
+      override_applied: false,
       nearest_mi: competitors15[0]?.miles ?? null,
       notable_brands: competitors15.filter((c) => c.heavy).slice(0, 6).map((c) => c.name),
     },

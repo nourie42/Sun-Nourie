@@ -328,9 +328,9 @@ function fmtFloat(n){
   if(!Number.isFinite(n)) return "";
   return Number(n).toFixed(2).replace(/\.00$/,"").replace(/(\.\d)0$/,"$1");
 }
-  function getBaselineInputs(){
-    const pctRaw = +(trafficPullInput?.value || "");
-    const gallonsRaw = +(gallonsPerFillInput?.value || "");
+function getBaselineInputs(){
+  const pctRaw = +(trafficPullInput?.value || "");
+  const gallonsRaw = +(gallonsPerFillInput?.value || "");
   const hasCustomTraffic = Number.isFinite(pctRaw) && pctRaw > 0;
   const hasCustomGallons = Number.isFinite(gallonsRaw) && gallonsRaw > 0;
   const trafficPullPct = hasCustomTraffic ? pctRaw : 2;
