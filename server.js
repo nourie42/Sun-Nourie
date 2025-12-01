@@ -1132,7 +1132,7 @@ async function performEstimate(reqBody) {
 
   const overrideVal = Number(aadtOverride);
   if (Number.isFinite(overrideVal) && overrideVal > 0) {
-    usedAADT = Math.round(overrideVal); method = "override";
+    usedAADT = Math.round(overrideVal); method = "user_entered";
   } else {
     let onStreet = await providerStationsOnStreet(stateCode, geo.lat, geo.lon, enteredRoadText).catch(() => []);
     let pick = onStreet.length ? pickStationForStreet(onStreet, enteredRoadText) : null;
@@ -1262,9 +1262,11 @@ Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
   if (ruralApplied) adjBits.push("+30% rural bonus (0 comps within 3 mi)");
   if (autoLow) adjBits.push("−30% low reviews (<4.0)");
   extras.forEach((e) => adjBits.push(`${e.pct > 0 ? "+" : ""}${e.pct}% ${e.note || "adj."}`));
+  const methodLabel = method === "user_entered" ? "user-entered value" : method;
+
   const summaryCore = await gptSummary({
     address: address || geo.label,
-    aadt: usedAADT, method,
+    aadt: usedAADT, method: methodLabel,
     enteredRoad: enteredRoadText,
     roads, compCount, heavyCount,
     pricePosition, userAdj: adjBits.join("; "),
@@ -1289,14 +1291,14 @@ Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
 
   // UI lines
   let aadtText = "";
-  if (method === "override") aadtText = `AADT (override): ${usedAADT.toLocaleString()} vehicles/day`;
+  if (method === "user_entered") aadtText = `AADT: ${usedAADT.toLocaleString()} vehicles/day`;
   else if (method === "dot_station_on_entered_road") aadtText = `AADT: ${usedAADT.toLocaleString()} vehicles/day (DOT - entered road: ${enteredRoadText || "—"})`;
   else if (method === "fallback_no_dot_found") aadtText = `AADT: ${usedAADT.toLocaleString()} vehicles/day (fallback — no DOT station published for "${enteredRoadText}")`;
   else if (method === "fallback_low_aadt") {
     const rawTxt = rawStationAADT ? rawStationAADT.toLocaleString() : "<2,000";
     aadtText = `AADT: ${usedAADT.toLocaleString()} vehicles/day (fallback — DOT reported ${rawTxt} < 2,000)`;
   }
-  else aadtText = `AADT: ${usedAADT.toLocaleString()} vehicles/day (${method})`;
+  else aadtText = `AADT: ${usedAADT.toLocaleString()} vehicles/day (${methodLabel})`;
 
   const nearestComp = compAll3.length ? compAll3[0].miles : null;
   let competitionText = "";

@@ -317,7 +317,7 @@ updateSummaryDisplay();
 if (refreshBtn) {
   refreshBtn.addEventListener("click", () => {
     if(!addrInput.value.trim() && !selectedCoords){ alert("Please select a valid address first."); return; }
-    if(!updateGoButtonState()){ alert("Please enter an AADT override before re-checking."); return; }
+    if(!updateGoButtonState()){ alert("Please enter the required AADT value before re-checking."); return; }
     onEstimateClick();
   });
 }
@@ -923,7 +923,7 @@ addrInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter")     { e.preventDefault(); chooseAc(Math.max(0, acActive)); }
   } else if (e.key === "Enter") {
     e.preventDefault();
-    if (goBtn.disabled) { alert("Please enter an AADT override before estimating."); return; }
+    if (goBtn.disabled) { alert("Please enter the required AADT value before estimating."); return; }
     onEstimateClick();
   }
 });
@@ -1036,7 +1036,7 @@ $("brandsAll").addEventListener("click", () => { cmpActiveBrands = new Set(cmpBr
 function tidyUI(){ hideAc(); }
 async function onEstimateClick(){
   if(!addrInput.value.trim() && !selectedCoords){ alert("Please select a valid address first."); return; }
-  if(!updateGoButtonState()){ alert("Please enter an AADT override before estimating."); return; }
+  if(!updateGoButtonState()){ alert("Please enter the required AADT value before estimating."); return; }
   try {
     goBtn.disabled = true;
     setOverlayWorking("Working…");
@@ -1052,7 +1052,7 @@ goBtn.addEventListener("click", onEstimateClick);
 /* -------------------- PDF export (server-side) -------------------- */
 exportBtn?.addEventListener("click", async ()=>{
   if(!addrInput.value.trim() && !selectedCoords){ alert("Please select a valid address first."); return; }
-  if(!updateGoButtonState()){ alert("Please enter an AADT override before exporting."); return; }
+  if(!updateGoButtonState()){ alert("Please enter the required AADT value before exporting."); return; }
   if (exportBtn.disabled) return;
 
   const baseInputs = getBaselineInputs();
