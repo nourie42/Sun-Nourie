@@ -39,11 +39,54 @@ app.get("/", (_req, res) => {
 });
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
+app.get("/api/config", (_req, res) => {
+  res.json({
+    googleMapsApiKey: GOOGLE_API_KEY || null,
+    openAiEnabled: Boolean(OPENAI_API_KEY),
+  });
+});
+
 const UA = "FuelEstimator/3.4 (+your-app)";
 const CONTACT = process.env.OVERPASS_CONTACT || UA;
 const DEFAULT_GOOGLE_API_KEY = "AIzaSyC6QditNCTyN0jk3TcBmCGHE47r8sXKRzI";
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || DEFAULT_GOOGLE_API_KEY;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
+const PLACE_PHOTO_FALLBACK =
+  "https://images.unsplash.com/photo-1503435980610-a51f3fb9ac6c?auto=format&fit=crop&w=1200&q=80";
+const PRIORITY_BRANDS = ["Marathon", "Citgo", "Valero", "Exxon", "BP", "Shell"];
+const EXCLUDED_CHAINS = [
+  "Sheetz",
+  "Wawa",
+  "RaceTrac",
+  "Race Trac",
+  "Circle K",
+  "7-Eleven",
+  "7-11",
+  "Cumberland Farms",
+  "QuikTrip",
+  "QT",
+  "Speedway",
+  "Casey",
+  "Murphy",
+  "Murphy USA",
+  "Sunoco",
+  "GetGo",
+  "Pilot",
+  "Flying J",
+  "Love",
+  "Love's",
+  "Travel Centers",
+  "TA",
+  "Petro",
+  "Costco",
+  "Sam's Club",
+  "BJ's",
+  "Kroger",
+  "Albertsons",
+  "Safeway",
+  "H-E-B",
+  "Walmart",
+];
 
 const NOMINATIM_CACHE = new Map();
 const NOMINATIM_CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
@@ -52,6 +95,30 @@ const NOMINATIM_CACHE_LIMIT = 200;
 const GOOGLE_DETAIL_CACHE = new Map();
 const GOOGLE_DETAIL_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
 const GOOGLE_DETAIL_CACHE_LIMIT = 200;
+
+const STATIC_FALLBACK_SITES = [
+  {
+    name: "Wendell Fuel Plaza",
+    brand: "Independent",
+    address: "353 NC-231, Wendell, NC",
+    lat: 35.7814,
+    lon: -78.3917,
+  },
+  {
+    name: "Raleigh Market Gas",
+    brand: "Exxon",
+    address: "2901 Tryon Rd, Raleigh, NC",
+    lat: 35.7296,
+    lon: -78.6523,
+  },
+  {
+    name: "Clayton Hwy Stop",
+    brand: "Independent",
+    address: "11297 US-70 BUS, Clayton, NC",
+    lat: 35.6552,
+    lon: -78.3791,
+  },
+];
 
 let _cachedFetch = null;
 async function getFetch() {
@@ -149,6 +216,27 @@ function matchCsvDevelopments(city, county, state) {
 }
 loadCsvDevData().catch(() => {});
 
+function buildChatGptPayload(item) {
+  const system =
+    "You are an expert visual inspector of gas-station PHOTOS. Return STRICT JSON: {\\\"score\\\": int 1..10, \\\"reason\\\": string <= 140 chars}. Score ONLY what you SEE. BRANDED: older-looking equipment => HIGHER score. UNBRANDED: newer-looking equipment => HIGHER score.";
+  const userText = `Context: name=${item.name}; brand=${item.brand}; is_unbranded=${item.isUnbranded}; address=${item.address}. Analyze the attached photo per rules.`;
+  return {
+    model: "gpt-4o-mini",
+    response_format: { type: "json_object" },
+    temperature: 0.2,
+    messages: [
+      { role: "system", content: system },
+      {
+        role: "user",
+        content: [
+          { type: "text", text: userText },
+          { type: "image_url", image_url: { url: item.imageUrl } },
+        ],
+      },
+    ],
+  };
+}
+
 async function appendNormalizedAddress(entry) {
   try {
     await fs.mkdir(DATA_DIR, { recursive: true });
@@ -202,6 +290,21 @@ async function geocodeNominatim(q) {
   const a = await r.json();
   if (!a?.length) throw new Error("Nominatim: no result");
   return { lat: +a[0].lat, lon: +a[0].lon, label: a[0].display_name };
+}
+
+async function geocodeLoose(query) {
+  const parsed = tryParseLatLng(query);
+  if (parsed) return parsed;
+  const cached = getCached(NOMINATIM_CACHE, query.trim().toLowerCase());
+  if (cached) return cached;
+  try {
+    const result = await geocodeNominatim(query);
+    setCached(NOMINATIM_CACHE, query.trim().toLowerCase(), result, NOMINATIM_CACHE_TTL_MS, NOMINATIM_CACHE_LIMIT);
+    return result;
+  } catch (err) {
+    console.warn("Nominatim geocode failed", err.message || err);
+    return null;
+  }
 }
 
 function formatNominatimDisplay(row) {
@@ -601,6 +704,37 @@ async function competitorsWithinRadiusMiles(lat, lon, rMi = 1.5) {
   return out.filter((s) => s.miles <= rMi && s.miles > 0.02);
 }
 
+async function nearbyFuelRich(lat, lon, radiusMi = 5) {
+  const rM = Math.round(Math.max(0.5, Math.min(radiusMi, 25)) * 1609.344);
+  const q = `[out:json][timeout:25];
+    ( node(around:${rM},${lat},${lon})["amenity"="fuel"];
+      way(around:${rM},${lat},${lon})["amenity"="fuel"]; );
+    out center tags;`;
+  const res = await overpassQuery(q).then((j) => j.elements || []).catch(() => []);
+  const seen = new Set();
+  return res
+    .map((el) => {
+      const t = el.tags || {};
+      const name = t.name || t.brand || "Fuel";
+      const brand = t.brand || "Independent";
+      const latc = el.lat ?? el.center?.lat, lonc = el.lon ?? el.center?.lon;
+      if (latc == null || lonc == null) return null;
+      const k = `${Math.round(latc * 1e5)}|${Math.round(lonc * 1e5)}`;
+      if (seen.has(k)) return null;
+      seen.add(k);
+      const addr = formatNominatimDisplay({ address: t });
+      return {
+        name,
+        brand,
+        address: addr || t["addr:full"] || t["addr:street"] || "",
+        lat: +latc,
+        lon: +lonc,
+        isUnbranded: !PRIORITY_BRANDS.some((b) => name.toLowerCase().includes(b.toLowerCase())) && !(t.brand || "").trim(),
+      };
+    })
+    .filter(Boolean);
+}
+
 /* ----------------------- Road context ----------------------- */
 function parseMaxspeed(ms) { const m = String(ms || "").match(/(\d+)\s*(mph)?/i); return m ? +m[1] : null; }
 function roadWeight(hw) {
@@ -829,6 +963,102 @@ app.get("/google/status", async (_req, res) => {
   } catch {
     res.json({ ok: false, status: "EXCEPTION" });
   }
+});
+
+app.post("/api/chatgpt-image", async (req, res) => {
+  try {
+    if (!OPENAI_API_KEY) return res.status(503).json({ ok: false, error: "OPENAI_DISABLED" });
+    const item = req.body?.item || {};
+    if (!item.imageUrl) return res.status(400).json({ ok: false, error: "MISSING_IMAGE" });
+
+    const payload = buildChatGptPayload(item);
+    const r = await fetchWithTimeout(
+      "https://api.openai.com/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify(payload),
+      },
+      30000
+    );
+
+    if (!r.ok) {
+      const msg = await r.text().catch(() => "");
+      return res.status(502).json({ ok: false, error: `HTTP_${r.status}`, details: msg || null });
+    }
+    const data = await r.json();
+    const txt = data.choices?.[0]?.message?.content || "{}";
+    let parsed = {};
+    try { parsed = JSON.parse(txt); } catch {}
+    let score = Number(parsed.score);
+    if (!Number.isFinite(score)) score = 5;
+    score = Math.min(10, Math.max(1, score));
+    const reason = (parsed.reason || "Image-based score").toString();
+    return res.json({ ok: true, score, reason });
+  } catch (e) {
+    return res.status(500).json({ ok: false, error: "EXCEPTION", message: String(e) });
+  }
+});
+
+app.post("/api/prospect", async (req, res) => {
+  const body = req.body || {};
+  const searchType = body.searchType === "unbranded" ? "unbranded" : "branded";
+  const radiusMiles = Math.max(0.5, Math.min(25, Number(body.radiusMiles) || 5));
+  const addresses = Array.isArray(body.addresses) ? body.addresses : [];
+  const query = String(body.query || "").trim();
+
+  let center = null;
+  for (const addr of addresses) {
+    // eslint-disable-next-line no-await-in-loop
+    const g = await geocodeLoose(addr);
+    if (g) { center = g; break; }
+  }
+  if (!center && query) center = await geocodeLoose(query);
+  if (!center) center = { lat: 35.7796, lon: -78.6382, label: "Raleigh, NC (fallback)" };
+
+  let items = [];
+  try {
+    items = await nearbyFuelRich(center.lat, center.lon, radiusMiles);
+  } catch (e) {
+    console.warn("nearbyFuelRich failed", e.message || e);
+  }
+  if (!items.length) items = STATIC_FALLBACK_SITES;
+
+  const normalized = items
+    .map((it) => {
+      const name = it.name || "Fuel";
+      const brand = it.brand || "Independent";
+      const nameLc = name.toLowerCase();
+      const excluded = EXCLUDED_CHAINS.some((ch) => nameLc.includes(ch.toLowerCase()));
+      const isUnbranded =
+        it.isUnbranded ?? (brand === "Independent" && !excluded);
+      const allowed = searchType === "branded" ? brand !== "Independent" && !excluded : isUnbranded;
+      if (!allowed) return null;
+      const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}&query=${encodeURIComponent(
+        `${it.lat},${it.lon}`
+      )}`;
+      const imageUrl = it.imageUrl || (GOOGLE_API_KEY
+        ? `https://maps.googleapis.com/maps/api/streetview?size=640x480&location=${it.lat},${it.lon}&key=${GOOGLE_API_KEY}`
+        : PLACE_PHOTO_FALLBACK);
+      return {
+        id: it.id || `${Math.round(it.lat * 1e6)}_${Math.round(it.lon * 1e6)}`,
+        name,
+        brand,
+        address: it.address || it.label || "",
+        lat: it.lat,
+        lng: it.lon,
+        excluded,
+        isUnbranded,
+        imageUrl,
+        mapsUrl,
+      };
+    })
+    .filter(Boolean);
+
+  res.json({ ok: true, center, items: normalized });
 });
 
 /* Autocomplete with optional location bias */
