@@ -655,7 +655,7 @@ async function overpassQuery(data) {
 }
 const HEAVY_BRANDS = /(sheetz|wawa|race\s?trac|racetrac|buc-?ee'?s|royal\s?farms|quik.?trip|\bqt\b)/i;
 const IS_SUNOCO  = /\bsunoco\b/i;
-const SELF_EXCLUDE_RADIUS_MI = 0.05; // ~264 ft — avoid counting the searched site as a competitor
+const SELF_EXCLUDE_RADIUS_MI = 0.15; // ~264 ft — avoid counting the searched site as a competitor
 
 async function googleNearbyGasStations(lat, lon, rM = 2414) {
   if (!GOOGLE_API_KEY) return [];
@@ -806,7 +806,8 @@ function gallonsWithRules({ aadt, mpds, diesel, compCount, heavyCount, pricePosi
 
   let baseMult = 1.0;
   if (compCount === 1) baseMult = 0.75;
-  else if (compCount >= 2 && compCount <= 4) baseMult = 0.6;
+  else if (compCount === 2) baseMult = 0.7;
+  else if (compCount >= 3 && compCount <= 4) baseMult = 0.6;
   else if (compCount >= 5) baseMult = 0.5;
 
   let heavyPenalty = 0;
