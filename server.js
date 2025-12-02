@@ -13,6 +13,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import crypto from "crypto";
 import PDFDocument from "pdfkit";
+import { adjustCompetitionCounts } from "./src/competition.js";
 
 const app = express();
 app.use(cors());
@@ -805,7 +806,8 @@ function gallonsWithRules({ aadt, mpds, diesel, compCount, heavyCount, pricePosi
   const baseline = aadt * baselineComponents.trafficShare * baselineComponents.gallonsPerFill * baselineComponents.days;
 
   let baseMult = 1.0;
-  if (compCount === 1) baseMult = 0.75;
+  if (compCount > 0 && compCount < 1) baseMult = 0.8;
+  else if (compCount === 1) baseMult = 0.75;
   else if (compCount >= 2 && compCount <= 4) baseMult = 0.6;
   else if (compCount >= 5) baseMult = 0.5;
 
@@ -1305,8 +1307,10 @@ async function performEstimate(reqBody) {
   const sunocoNearby = compAll3.some((c) => c.sunoco && c.miles <= 1.0);
   const ruralEligible = compAll3.length === 0;
 
-  const compCount = compCountDetected;
-  const heavyCount = heavyCountDetected;
+  const { compCount, heavyCount } = adjustCompetitionCounts(
+    compCountDetected,
+    heavyCountDetected,
+  );
 
   // Developments + roads
   const devCsv = matchCsvDevelopments(admin.city, admin.county, admin.state);
@@ -1569,6 +1573,14 @@ app.get("/api/competitors", async (req, res) => {
 });
 
 /* -------------------------- PDF report API -------------------------- */
+function coerceClientResultForPdf(result) {
+  if (!result || result.ok !== true) return null;
+  const site = result?.map?.site;
+  if (!site) return null;
+  const { lat, lon } = site;
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  return result;
+}
 function drawSectionTitle(doc, text, y, opts = {}) {
   const { margin, color } = opts;
   const left = margin || 36;
@@ -1596,7 +1608,8 @@ function bulletLines(doc, items, x, y, w, opts = {}) {
 }
 app.post("/report/pdf", async (req, res) => {
   try {
-    const result = await performEstimate(req.body || {});
+    const clientProvided = coerceClientResultForPdf(req.body?.result);
+    const result = clientProvided || await performEstimate(req.body || {});
     if (!result?.ok) throw new Error("Estimate failed");
 
     const site = result?.map?.site || null;
