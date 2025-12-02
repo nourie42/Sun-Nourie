@@ -684,7 +684,7 @@ async function googleNearbyGasStations(lat, lon, rM = 2414) {
   }
   return out;
 }
-async function competitorsWithinRadiusMiles(lat, lon, rMi = 1.5) {
+async function competitorsWithinRadiusMiles(lat, lon, rMi = 1.0) {
   const rM = Math.round(rMi * 1609.344);
   const q = `[out:json][timeout:25];
     ( node(around:${rM},${lat},${lon})["amenity"="fuel"];
@@ -1297,9 +1297,9 @@ async function performEstimate(reqBody) {
 
   // Competition (for math & map)
   const compAll3 = await competitorsWithinRadiusMiles(geo.lat, geo.lon, 3.0).catch(() => []);
-  const competitors15 = compAll3.filter((c) => c.miles <= 1.5);
-  const compCountDetected = competitors15.length;
-  const heavyCountDetected = competitors15.filter((c) => c.heavy).length;
+  const competitors1 = compAll3.filter((c) => c.miles <= 1.0);
+  const compCountDetected = competitors1.length;
+  const heavyCountDetected = competitors1.filter((c) => c.heavy).length;
   const sunocoNearby = compAll3.some((c) => c.sunoco && c.miles <= 1.0);
   const ruralEligible = compAll3.length === 0;
 
@@ -1491,9 +1491,9 @@ Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
   const compTextPrefix = "Competition: ";
   if (compCount === 0) {
     if (ruralEligible) competitionText = `${compTextPrefix}None within 3 mi.`;
-    else competitionText = `${compTextPrefix}None within 1.5 mi${nearestComp != null ? ` (nearest ~${(+nearestComp).toFixed(1)} mi)` : ""}.`;
+    else competitionText = `${compTextPrefix}None within 1 mi${nearestComp != null ? ` (nearest ~${(+nearestComp).toFixed(1)} mi)` : ""}.`;
   } else {
-    competitionText = `${compTextPrefix}${compCount} station${compCount !== 1 ? "s" : ""} within 1.5 mi`;
+    competitionText = `${compTextPrefix}${compCount} station${compCount !== 1 ? "s" : ""} within 1 mi`;
     if (heavyCount > 0) {
       const bigBoxLabel = heavyCount === 1 ? "Big box competitor" : "Big box competitors";
       competitionText += ` (${heavyCount} ${bigBoxLabel})`;
@@ -1519,8 +1519,8 @@ Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
       count: compCount, count_3mi: compAll3.length, heavy_count: heavyCount,
       detected_count: compCountDetected, detected_heavy_count: heavyCountDetected,
       override_applied: false,
-      nearest_mi: competitors15[0]?.miles ?? null,
-      notable_brands: competitors15.filter((c) => c.heavy).slice(0, 6).map((c) => c.name),
+      nearest_mi: competitors1[0]?.miles ?? null,
+      notable_brands: competitors1.filter((c) => c.heavy).slice(0, 6).map((c) => c.name),
     },
     roads,
     summary: summaryBase,
@@ -1530,9 +1530,9 @@ Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
     calc_breakdown: calc.breakdown,
     map: {
       site: { lat: geo.lat, lon: geo.lon, label: geo.label },
-      competitors: competitors15,
+      competitors: competitors1,
       all_competitors: compAll3,
-      competitor_radius_mi: 3.0,
+      competitor_radius_mi: 1.0,
       aadt: mapStations,        // for map dots only
       aadt_used: aadtUsedMarker || { lat: geo.lat, lon: geo.lon, aadt: usedAADT, method, fallback: method === "fallback_no_dot_found" || method === "fallback_low_aadt" }
     },
@@ -1647,7 +1647,7 @@ app.post("/report/pdf", async (req, res) => {
       const baseMultText = formatMultiplierWithNote(B.compRule.baseMult);
       const compMultText = formatMultiplierWithNote(B.compRule.compMult);
       bullets.push(`Competition rule: base ${baseMultText} − Big box ${Number(B.compRule.heavyPenalty).toFixed(2)} = × ${compMultText} → ${Number(B.compRule.afterComp).toLocaleString()}`);
-      bullets.push(`Competitors (1.5 mi): ${Number(B.compRule.compCount ?? result.competition?.count ?? 0)} total • Big box ${Number(B.compRule.heavyCount ?? result.competition?.heavy_count ?? 0)}`);
+      bullets.push(`Competitors (1 mi): ${Number(B.compRule.compCount ?? result.competition?.count ?? 0)} total • Big box ${Number(B.compRule.heavyCount ?? result.competition?.heavy_count ?? 0)}`);
     }
     if (B.caps) {
       const softHit = B.compRule && B.compRule.afterComp > B.caps.capSoftTotal;
