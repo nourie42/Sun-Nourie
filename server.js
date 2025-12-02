@@ -39,6 +39,13 @@ app.get("/", (_req, res) => {
 });
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
+app.get("/api/config", (_req, res) => {
+  res.json({
+    googleMapsApiKey: GOOGLE_API_KEY || null,
+    openAiEnabled: Boolean(OPENAI_API_KEY),
+  });
+});
+
 const UA = "FuelEstimator/3.4 (+your-app)";
 const CONTACT = process.env.OVERPASS_CONTACT || UA;
 const DEFAULT_GOOGLE_API_KEY = "AIzaSyC6QditNCTyN0jk3TcBmCGHE47r8sXKRzI";
@@ -148,6 +155,27 @@ function matchCsvDevelopments(city, county, state) {
   });
 }
 loadCsvDevData().catch(() => {});
+
+function buildChatGptPayload(item) {
+  const system =
+    "You are an expert visual inspector of gas-station PHOTOS. Return STRICT JSON: {\\\"score\\\": int 1..10, \\\"reason\\\": string <= 140 chars}. Score ONLY what you SEE. BRANDED: older-looking equipment => HIGHER score. UNBRANDED: newer-looking equipment => HIGHER score.";
+  const userText = `Context: name=${item.name}; brand=${item.brand}; is_unbranded=${item.isUnbranded}; address=${item.address}. Analyze the attached photo per rules.`;
+  return {
+    model: "gpt-4o-mini",
+    response_format: { type: "json_object" },
+    temperature: 0.2,
+    messages: [
+      { role: "system", content: system },
+      {
+        role: "user",
+        content: [
+          { type: "text", text: userText },
+          { type: "image_url", image_url: { url: item.imageUrl } },
+        ],
+      },
+    ],
+  };
+}
 
 async function appendNormalizedAddress(entry) {
   try {
@@ -828,6 +856,44 @@ app.get("/google/status", async (_req, res) => {
     });
   } catch {
     res.json({ ok: false, status: "EXCEPTION" });
+  }
+});
+
+app.post("/api/chatgpt-image", async (req, res) => {
+  try {
+    if (!OPENAI_API_KEY) return res.status(503).json({ ok: false, error: "OPENAI_DISABLED" });
+    const item = req.body?.item || {};
+    if (!item.imageUrl) return res.status(400).json({ ok: false, error: "MISSING_IMAGE" });
+
+    const payload = buildChatGptPayload(item);
+    const r = await fetchWithTimeout(
+      "https://api.openai.com/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify(payload),
+      },
+      30000
+    );
+
+    if (!r.ok) {
+      const msg = await r.text().catch(() => "");
+      return res.status(502).json({ ok: false, error: `HTTP_${r.status}`, details: msg || null });
+    }
+    const data = await r.json();
+    const txt = data.choices?.[0]?.message?.content || "{}";
+    let parsed = {};
+    try { parsed = JSON.parse(txt); } catch {}
+    let score = Number(parsed.score);
+    if (!Number.isFinite(score)) score = 5;
+    score = Math.min(10, Math.max(1, score));
+    const reason = (parsed.reason || "Image-based score").toString();
+    return res.json({ ok: true, score, reason });
+  } catch (e) {
+    return res.status(500).json({ ok: false, error: "EXCEPTION", message: String(e) });
   }
 });
 
