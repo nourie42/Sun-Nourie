@@ -655,7 +655,7 @@ async function overpassQuery(data) {
 }
 const HEAVY_BRANDS = /(sheetz|wawa|race\s?trac|racetrac|buc-?ee'?s|royal\s?farms|quik.?trip|\bqt\b)/i;
 const IS_SUNOCO  = /\bsunoco\b/i;
-const SELF_EXCLUDE_RADIUS_MI = 0.15; // ~792 ft — avoid counting the searched site as a competitor even with geocode drift
+const SELF_EXCLUDE_RADIUS_MI = 0.15; // ~264 ft — avoid counting the searched site as a competitor
 
 async function googleNearbyGasStations(lat, lon, rM = 2414) {
   if (!GOOGLE_API_KEY) return [];
@@ -672,6 +672,7 @@ async function googleNearbyGasStations(lat, lon, rM = 2414) {
       const latc = it.geometry?.location?.lat, lonc = it.geometry?.location?.lng;
       if (!Number.isFinite(latc) || !Number.isFinite(lonc)) continue;
       const milesExact = distMiles(lat, lon, latc, lonc);
+      if (milesExact <= SELF_EXCLUDE_RADIUS_MI) continue; // skip the searched site (same address)
       out.push({
         name,
         lat: +latc, lon: +lonc,
@@ -701,6 +702,7 @@ async function competitorsWithinRadiusMiles(lat, lon, rMi = 1.0) {
     const latc = el.lat ?? el.center?.lat, lonc = el.lon ?? el.center?.lon;
     if (latc == null || lonc == null) return null;
     const milesExact = distMiles(lat, lon, latc, lonc);
+    if (milesExact <= SELF_EXCLUDE_RADIUS_MI) return null;
     return {
       name, lat: +latc, lon: +lonc,
       miles: +milesExact.toFixed(3),
@@ -715,12 +717,7 @@ async function competitorsWithinRadiusMiles(lat, lon, rMi = 1.0) {
     if (seen.has(k)) continue; seen.add(k); out.push(s);
   }
   out.sort((a, b) => a.miles - b.miles);
-  // Drop only the single closest point when it's effectively the searched site,
-  // but keep other nearby stations even if they are very close by.
-  const filtered = out.length && out[0].miles <= SELF_EXCLUDE_RADIUS_MI
-    ? out.slice(1)
-    : out;
-  return filtered.filter((s) => s.miles <= rMi);
+  return out.filter((s) => s.miles <= rMi && s.miles > SELF_EXCLUDE_RADIUS_MI);
 }
 
 async function nearbyFuelRich(lat, lon, radiusMi = 5) {
