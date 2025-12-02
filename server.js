@@ -267,6 +267,18 @@ function haversine(lat1, lon1, lat2, lon2) {
 }
 function distMiles(a, b, c, d) { return toMiles(haversine(a, b, c, d)); }
 
+async function runWithDeadline(promise, ms, fallback) {
+  let timer;
+  const timeout = new Promise((resolve) => {
+    timer = setTimeout(() => resolve(fallback), ms);
+  });
+  try {
+    return await Promise.race([promise.catch(() => fallback), timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /* -------------------------- Geocoding helpers -------------------------- */
 function tryParseLatLng(address) {
   const m = String(address || "").trim().match(/^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/);
@@ -286,7 +298,7 @@ async function geocodeCensus(q) {
 }
 async function geocodeNominatim(q) {
   const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&q=${encodeURIComponent(q)}`;
-  const r = await fetchWithTimeout(url, { headers: { "User-Agent": UA, Accept: "application/json" } }, 15000);
+  const r = await fetchWithTimeout(url, { headers: { "User-Agent": UA, Accept: "application/json" } }, 10000);
   const a = await r.json();
   if (!a?.length) throw new Error("Nominatim: no result");
   return { lat: +a[0].lat, lon: +a[0].lon, label: a[0].display_name };
@@ -619,15 +631,17 @@ const OVERPASS = [
   "https://overpass.kumi.systems/api/interpreter",
   "https://overpass.openstreetmap.fr/api/interpreter",
 ];
+const OVERPASS_TIMEOUT_MS = 10000;
+const OVERPASS_RETRIES_PER_ENDPOINT = 1;
 async function overpassQuery(data) {
   let last = new Error("no tries");
   for (const ep of OVERPASS) {
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < OVERPASS_RETRIES_PER_ENDPOINT; i++) {
       try {
         const r = await fetchWithTimeout(
           ep,
           { method: "POST", headers: { "User-Agent": CONTACT, "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" }, body: "data=" + encodeURIComponent(data) },
-          25000
+          OVERPASS_TIMEOUT_MS
         );
         const ct = r.headers.get("content-type") || "";
         const txt = await r.text();
