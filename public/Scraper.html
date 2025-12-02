@@ -93,9 +93,8 @@
   <div id="map" class="w-full h-48 mt-4 border rounded-lg"></div>
 
   <script>
-    // Keys (embedded per your request)
-    const GOOGLE_MAPS_API_KEY = 'AIzaSyBKkUjhXbYeIA3jDMxvS8fExTlcPMIchs8';
-    const OPENAI_API_KEY = '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';
+    let GOOGLE_MAPS_API_KEY = '';
+    let openAiEnabled = false;
 
     let map, placesService, geocoder;
     let currentResults = [];
@@ -104,19 +103,23 @@
     const PRIORITY_BRANDS = ['Marathon','Citgo','Valero','Exxon','BP','Shell'];
     const EXCLUDED_CHAINS = ['Sheetz','Wawa','RaceTrac','Race Trac','Circle K','7-Eleven','7-11','Cumberland Farms','QuikTrip','QT','Speedway','Casey','Murphy','Murphy USA','Sunoco','GetGo','Pilot','Flying J','Love','Love\'s','Travel Centers','TA','Petro','Costco','Sam\'s Club','BJ\'s','Kroger','Albertsons','Safeway','H-E-B','Walmart'];
 
-    // Load Google Maps
-    (function loadGoogleMapsAPI(){
-      const s=document.createElement('script');
-      s.src=`https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places&callback=initMap`;
-      s.async=true; s.defer=true; document.head.appendChild(s);
-    })();
-
-    window.initMap = () => {
-      map = new google.maps.Map(document.getElementById('map'), { center: { lat: 35.7796, lng: -78.6382 }, zoom: 8 });
-      placesService = new google.maps.places.PlacesService(map);
-      geocoder = new google.maps.Geocoder();
-      document.getElementById('searchBtn').disabled = false;
-    };
+    function loadGoogleMapsAPI(key){
+      return new Promise((resolve, reject) => {
+        if (!key) return reject(new Error('Missing Google Maps key'));
+        if (window.google?.maps) return resolve();
+        const s=document.createElement('script');
+        s.src=`https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places&callback=initMap`;
+        s.async=true; s.defer=true; s.onerror=()=>reject(new Error('Failed to load Google Maps')); s.dataset.googleMaps='true';
+        document.head.appendChild(s);
+        window.initMap = () => {
+          map = new google.maps.Map(document.getElementById('map'), { center: { lat: 35.7796, lng: -78.6382 }, zoom: 8 });
+          placesService = new google.maps.places.PlacesService(map);
+          geocoder = new google.maps.Geocoder();
+          document.getElementById('searchBtn').disabled = false;
+          resolve();
+        };
+      });
+    }
 
     document.getElementById('refreshBtn').onclick = () => window.location.reload();
     document.querySelectorAll('input[name="inputMethod"]').forEach(r => {
@@ -135,7 +138,27 @@
       exportBtn: document.getElementById('exportBtn')
     };
 
+    bootstrap();
     document.getElementById('searchBtn').onclick = startSearch;
+
+    async function bootstrap(){
+      ui.overlay.classList.remove('hidden');
+      ui.progress.textContent = 'Loading configuration...';
+      try {
+        const resp = await fetch('/api/config');
+        if (!resp.ok) throw new Error('Config request failed');
+        const data = await resp.json();
+        GOOGLE_MAPS_API_KEY = data.googleMapsApiKey || '';
+        openAiEnabled = Boolean(data.openAiEnabled);
+        if (!GOOGLE_MAPS_API_KEY) throw new Error('Google Maps API key missing on server');
+        await loadGoogleMapsAPI(GOOGLE_MAPS_API_KEY);
+      } catch (e) {
+        console.error(e);
+        ui.progress.textContent = 'Failed to load map/API configuration.';
+        return;
+      }
+      ui.overlay.classList.add('hidden');
+    }
 
     async function startSearch(){
       const searchType = document.querySelector('input[name="searchType"]:checked').value;
@@ -221,33 +244,21 @@
 
     // === GPT image scoring ===
     async function analyzeWithChatGPTImage(item){
-      const system = `You are an expert visual inspector of gas-station PHOTOS. Return STRICT JSON: {\\"score\\": int 1..10, \\"reason\\": string <= 140 chars}. Score ONLY what you SEE. BRANDED: older-looking equipment => HIGHER score. UNBRANDED: newer-looking equipment => HIGHER score.`;
-      const userText = `Context: name=${item.name}; brand=${item.brand}; is_unbranded=${item.isUnbranded}; address=${item.address}. Analyze the attached photo per rules.`;
-      const payload = {
-        model: 'gpt-4o-mini',
-        response_format: { type: 'json_object' },
-        temperature: 0.2,
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: [ { type: 'text', text: userText }, { type: 'image_url', image_url: { url: item.imageUrl } } ] }
-        ]
-      };
+      if (!openAiEnabled) return { score: 5, reason: 'AI scoring disabled' };
       try {
-        const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+        const resp = await fetch('/api/chatgpt-image', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_API_KEY}` },
-          body: JSON.stringify(payload)
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ item })
         });
         if (!resp.ok) throw new Error('OpenAI HTTP ' + resp.status);
         const data = await resp.json();
-        const txt = data.choices?.[0]?.message?.content || '{}';
-        const json = JSON.parse(txt);
-        let score = parseInt(json.score, 10);
-        if (!Number.isFinite(score)) score = 5;
-        score = Math.min(10, Math.max(1, score));
-        const reason = (json.reason || 'Image-based score').toString();
-        return { score, reason };
-      } catch(e){ return { score:5, reason:'Fallback error' }; }
+        if (!data.ok) throw new Error(data.error || 'OpenAI error');
+        return { score: data.score, reason: data.reason };
+      } catch(e){
+        console.error('AI scoring error', e);
+        return { score:5, reason:'Fallback error' };
+      }
     }
 
     async function processResults(places, searchType){
