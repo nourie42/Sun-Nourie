@@ -655,6 +655,8 @@ async function overpassQuery(data) {
 }
 const HEAVY_BRANDS = /(sheetz|wawa|race\s?trac|racetrac|buc-?ee'?s|royal\s?farms|quik.?trip|\bqt\b)/i;
 const IS_SUNOCO  = /\bsunoco\b/i;
+const SELF_EXCLUDE_RADIUS_MI = 0.15; // ~792 ft — avoid counting the searched site as a competitor even with geocode drift
+
 async function googleNearbyGasStations(lat, lon, rM = 2414) {
   if (!GOOGLE_API_KEY) return [];
   const base = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lon}&radius=${rM}&type=gas_station&key=${GOOGLE_API_KEY}`;
@@ -670,7 +672,6 @@ async function googleNearbyGasStations(lat, lon, rM = 2414) {
       const latc = it.geometry?.location?.lat, lonc = it.geometry?.location?.lng;
       if (!Number.isFinite(latc) || !Number.isFinite(lonc)) continue;
       const milesExact = distMiles(lat, lon, latc, lonc);
-      if (milesExact <= 0.02) continue; // skip the searched site (same address)
       out.push({
         name,
         lat: +latc, lon: +lonc,
@@ -684,7 +685,7 @@ async function googleNearbyGasStations(lat, lon, rM = 2414) {
   }
   return out;
 }
-async function competitorsWithinRadiusMiles(lat, lon, rMi = 1.5) {
+async function competitorsWithinRadiusMiles(lat, lon, rMi = 1.0) {
   const rM = Math.round(rMi * 1609.344);
   const q = `[out:json][timeout:25];
     ( node(around:${rM},${lat},${lon})["amenity"="fuel"];
@@ -700,7 +701,6 @@ async function competitorsWithinRadiusMiles(lat, lon, rMi = 1.5) {
     const latc = el.lat ?? el.center?.lat, lonc = el.lon ?? el.center?.lon;
     if (latc == null || lonc == null) return null;
     const milesExact = distMiles(lat, lon, latc, lonc);
-    if (milesExact <= 0.02) return null;
     return {
       name, lat: +latc, lon: +lonc,
       miles: +milesExact.toFixed(3),
@@ -715,7 +715,12 @@ async function competitorsWithinRadiusMiles(lat, lon, rMi = 1.5) {
     if (seen.has(k)) continue; seen.add(k); out.push(s);
   }
   out.sort((a, b) => a.miles - b.miles);
-  return out.filter((s) => s.miles <= rMi && s.miles > 0.02);
+  // Drop only the single closest point when it's effectively the searched site,
+  // but keep other nearby stations even if they are very close by.
+  const filtered = out.length && out[0].miles <= SELF_EXCLUDE_RADIUS_MI
+    ? out.slice(1)
+    : out;
+  return filtered.filter((s) => s.miles <= rMi);
 }
 
 async function nearbyFuelRich(lat, lon, radiusMi = 5) {
@@ -804,7 +809,8 @@ function gallonsWithRules({ aadt, mpds, diesel, compCount, heavyCount, pricePosi
 
   let baseMult = 1.0;
   if (compCount === 1) baseMult = 0.75;
-  else if (compCount >= 2 && compCount <= 4) baseMult = 0.6;
+  else if (compCount === 2) baseMult = 0.7;
+  else if (compCount >= 3 && compCount <= 4) baseMult = 0.6;
   else if (compCount >= 5) baseMult = 0.5;
 
   let heavyPenalty = 0;
@@ -1297,9 +1303,9 @@ async function performEstimate(reqBody) {
 
   // Competition (for math & map)
   const compAll3 = await competitorsWithinRadiusMiles(geo.lat, geo.lon, 3.0).catch(() => []);
-  const competitors15 = compAll3.filter((c) => c.miles <= 1.5);
-  const compCountDetected = competitors15.length;
-  const heavyCountDetected = competitors15.filter((c) => c.heavy).length;
+  const competitors1 = compAll3.filter((c) => c.miles <= 1.0);
+  const compCountDetected = competitors1.length;
+  const heavyCountDetected = competitors1.filter((c) => c.heavy).length;
   const sunocoNearby = compAll3.some((c) => c.sunoco && c.miles <= 1.0);
   const ruralEligible = compAll3.length === 0;
 
@@ -1491,9 +1497,9 @@ Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
   const compTextPrefix = "Competition: ";
   if (compCount === 0) {
     if (ruralEligible) competitionText = `${compTextPrefix}None within 3 mi.`;
-    else competitionText = `${compTextPrefix}None within 1.5 mi${nearestComp != null ? ` (nearest ~${(+nearestComp).toFixed(1)} mi)` : ""}.`;
+    else competitionText = `${compTextPrefix}None within 1 mi${nearestComp != null ? ` (nearest ~${(+nearestComp).toFixed(1)} mi)` : ""}.`;
   } else {
-    competitionText = `${compTextPrefix}${compCount} station${compCount !== 1 ? "s" : ""} within 1.5 mi`;
+    competitionText = `${compTextPrefix}${compCount} station${compCount !== 1 ? "s" : ""} within 1 mi`;
     if (heavyCount > 0) {
       const bigBoxLabel = heavyCount === 1 ? "Big box competitor" : "Big box competitors";
       competitionText += ` (${heavyCount} ${bigBoxLabel})`;
@@ -1519,8 +1525,8 @@ Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
       count: compCount, count_3mi: compAll3.length, heavy_count: heavyCount,
       detected_count: compCountDetected, detected_heavy_count: heavyCountDetected,
       override_applied: false,
-      nearest_mi: competitors15[0]?.miles ?? null,
-      notable_brands: competitors15.filter((c) => c.heavy).slice(0, 6).map((c) => c.name),
+      nearest_mi: competitors1[0]?.miles ?? null,
+      notable_brands: competitors1.filter((c) => c.heavy).slice(0, 6).map((c) => c.name),
     },
     roads,
     summary: summaryBase,
@@ -1530,9 +1536,9 @@ Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
     calc_breakdown: calc.breakdown,
     map: {
       site: { lat: geo.lat, lon: geo.lon, label: geo.label },
-      competitors: competitors15,
+      competitors: competitors1,
       all_competitors: compAll3,
-      competitor_radius_mi: 3.0,
+      competitor_radius_mi: 1.0,
       aadt: mapStations,        // for map dots only
       aadt_used: aadtUsedMarker || { lat: geo.lat, lon: geo.lon, aadt: usedAADT, method, fallback: method === "fallback_no_dot_found" || method === "fallback_low_aadt" }
     },
@@ -1647,7 +1653,7 @@ app.post("/report/pdf", async (req, res) => {
       const baseMultText = formatMultiplierWithNote(B.compRule.baseMult);
       const compMultText = formatMultiplierWithNote(B.compRule.compMult);
       bullets.push(`Competition rule: base ${baseMultText} − Big box ${Number(B.compRule.heavyPenalty).toFixed(2)} = × ${compMultText} → ${Number(B.compRule.afterComp).toLocaleString()}`);
-      bullets.push(`Competitors (1.5 mi): ${Number(B.compRule.compCount ?? result.competition?.count ?? 0)} total • Big box ${Number(B.compRule.heavyCount ?? result.competition?.heavy_count ?? 0)}`);
+      bullets.push(`Competitors (1 mi): ${Number(B.compRule.compCount ?? result.competition?.count ?? 0)} total • Big box ${Number(B.compRule.heavyCount ?? result.competition?.heavy_count ?? 0)}`);
     }
     if (B.caps) {
       const softHit = B.compRule && B.compRule.afterComp > B.caps.capSoftTotal;
