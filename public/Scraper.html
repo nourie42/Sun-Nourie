@@ -5,6 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Gas Station Prospector (UNDER CONSTRUCTION)</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
     body { font-family: 'Inter', sans-serif; }
@@ -93,30 +104,13 @@
   <div id="map" class="w-full h-48 mt-4 border rounded-lg"></div>
 
   <script>
-    // Keys (embedded per your request)
-    const GOOGLE_MAPS_API_KEY = 'AIzaSyBKkUjhXbYeIA3jDMxvS8fExTlcPMIchs8';
-    const OPENAI_API_KEY = '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';
+    let openAiEnabled = false;
 
-    let map, placesService, geocoder;
+    let map, markerLayer;
     let currentResults = [];
-    let markers = [];
 
     const PRIORITY_BRANDS = ['Marathon','Citgo','Valero','Exxon','BP','Shell'];
     const EXCLUDED_CHAINS = ['Sheetz','Wawa','RaceTrac','Race Trac','Circle K','7-Eleven','7-11','Cumberland Farms','QuikTrip','QT','Speedway','Casey','Murphy','Murphy USA','Sunoco','GetGo','Pilot','Flying J','Love','Love\'s','Travel Centers','TA','Petro','Costco','Sam\'s Club','BJ\'s','Kroger','Albertsons','Safeway','H-E-B','Walmart'];
-
-    // Load Google Maps
-    (function loadGoogleMapsAPI(){
-      const s=document.createElement('script');
-      s.src=`https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places&callback=initMap`;
-      s.async=true; s.defer=true; document.head.appendChild(s);
-    })();
-
-    window.initMap = () => {
-      map = new google.maps.Map(document.getElementById('map'), { center: { lat: 35.7796, lng: -78.6382 }, zoom: 8 });
-      placesService = new google.maps.places.PlacesService(map);
-      geocoder = new google.maps.Geocoder();
-      document.getElementById('searchBtn').disabled = false;
-    };
 
     document.getElementById('refreshBtn').onclick = () => window.location.reload();
     document.querySelectorAll('input[name="inputMethod"]').forEach(r => {
@@ -135,7 +129,31 @@
       exportBtn: document.getElementById('exportBtn')
     };
 
+    bootstrap();
     document.getElementById('searchBtn').onclick = startSearch;
+
+    async function bootstrap(){
+      ui.overlay.classList.remove('hidden');
+      ui.progress.textContent = 'Loading configuration...';
+      try {
+        const resp = await fetch('/api/config');
+        if (resp.ok) {
+          const data = await resp.json();
+          openAiEnabled = Boolean(data.openAiEnabled);
+        }
+      } catch (e) {
+        console.warn('Config check failed', e);
+      }
+
+      map = L.map('map').setView([35.7796, -78.6382], 8);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(map);
+      markerLayer = L.layerGroup().addTo(map);
+      document.getElementById('searchBtn').disabled = false;
+      ui.overlay.classList.add('hidden');
+    }
 
     async function startSearch(){
       const searchType = document.querySelector('input[name="searchType"]:checked').value;
@@ -157,22 +175,25 @@
     }
 
     // === Area search ===
-    function searchByArea(location, radiusMiles, searchType){
-      return new Promise((resolve) => {
-        ui.progress.textContent = 'Geocoding area...';
-        geocoder.geocode({ address: location }, (results, status) => {
-          if (status !== 'OK' || !results?.[0]) { alert('Location not found'); return resolve(); }
-          const center = results[0].geometry.location; map.setCenter(center); map.setZoom(12);
-          ui.progress.textContent = 'Searching gas stations...';
-          const req = { location: center, radius: radiusMiles * 1609.34, type: 'gas_station' };
-          placesService.nearbySearch(req, async (places, s) => {
-            if (s === google.maps.places.PlacesServiceStatus.OK && places?.length) {
-              await processResults(places, searchType);
-            } else { alert('No stations found around this area.'); }
-            resolve();
-          });
+    async function searchByArea(location, radiusMiles, searchType){
+      ui.progress.textContent = 'Searching around area...';
+      try {
+        const resp = await fetch('/api/prospect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: location, radiusMiles, searchType })
         });
-      });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const data = await resp.json().catch(() => ({}));
+        if (!data.ok || !Array.isArray(data.items) || !data.items.length) {
+          alert('No stations found around this area.');
+          return;
+        }
+        await processResults(data.items, data.center || null);
+      } catch (err) {
+        console.error('Area search failed', err);
+        alert('Something went wrong reaching the server. Please try again.');
+      }
     }
 
     // === Upload helpers (column B addresses) ===
@@ -194,98 +215,64 @@
       const name = file.name.toLowerCase();
       if (name.endsWith('.csv')) addresses = readAddressesFromCSV(await file.text());
       else if (name.endsWith('.xlsx') || name.endsWith('.xls')) addresses = await readAddressesFromExcel(file);
+      addresses = addresses.filter(Boolean).slice(0, 50);
       if (!addresses.length) { alert('No valid addresses in column B'); return; }
 
-      const allPlaces = [];
-      for (let i = 0; i < addresses.length; i++) {
-        ui.progress.textContent = `Geocoding ${i + 1} / ${addresses.length}...`;
-        // eslint-disable-next-line no-await-in-loop
-        await new Promise(res => {
-          geocoder.geocode({ address: addresses[i] }, (results, status) => {
-            if (status === 'OK' && results?.[0]) {
-              const center = results[0].geometry.location;
-              const req = { location: center, radius: 1609.34, type: 'gas_station' };
-              placesService.nearbySearch(req, (places, s) => {
-                if (s === google.maps.places.PlacesServiceStatus.OK) allPlaces.push(...places);
-                res();
-              });
-            } else res();
-          });
+      ui.progress.textContent = `Submitting ${addresses.length} addresses...`;
+      try {
+        const resp = await fetch('/api/prospect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ addresses, searchType, radiusMiles: 1 })
         });
-        // eslint-disable-next-line no-await-in-loop
-        await new Promise(r => setTimeout(r, 200));
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const data = await resp.json().catch(() => ({}));
+        if (!data.ok || !Array.isArray(data.items) || !data.items.length) {
+          alert('No stations found near uploaded addresses');
+          return;
+        }
+        await processResults(data.items, data.center || null);
+      } catch (err) {
+        console.error('Upload search failed', err);
+        alert('Something went wrong reaching the server. Please try again.');
       }
-      if (!allPlaces.length) { alert('No stations found near uploaded addresses'); return; }
-      await processResults(allPlaces, searchType);
     }
 
     // === GPT image scoring ===
     async function analyzeWithChatGPTImage(item){
-      const system = `You are an expert visual inspector of gas-station PHOTOS. Return STRICT JSON: {\\"score\\": int 1..10, \\"reason\\": string <= 140 chars}. Score ONLY what you SEE. BRANDED: older-looking equipment => HIGHER score. UNBRANDED: newer-looking equipment => HIGHER score.`;
-      const userText = `Context: name=${item.name}; brand=${item.brand}; is_unbranded=${item.isUnbranded}; address=${item.address}. Analyze the attached photo per rules.`;
-      const payload = {
-        model: 'gpt-4o-mini',
-        response_format: { type: 'json_object' },
-        temperature: 0.2,
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: [ { type: 'text', text: userText }, { type: 'image_url', image_url: { url: item.imageUrl } } ] }
-        ]
-      };
+      if (!openAiEnabled) return { score: 5, reason: 'AI scoring disabled' };
       try {
-        const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+        const resp = await fetch('/api/chatgpt-image', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_API_KEY}` },
-          body: JSON.stringify(payload)
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ item })
         });
         if (!resp.ok) throw new Error('OpenAI HTTP ' + resp.status);
         const data = await resp.json();
-        const txt = data.choices?.[0]?.message?.content || '{}';
-        const json = JSON.parse(txt);
-        let score = parseInt(json.score, 10);
-        if (!Number.isFinite(score)) score = 5;
-        score = Math.min(10, Math.max(1, score));
-        const reason = (json.reason || 'Image-based score').toString();
-        return { score, reason };
-      } catch(e){ return { score:5, reason:'Fallback error' }; }
+        if (!data.ok) throw new Error(data.error || 'OpenAI error');
+        return { score: data.score, reason: data.reason };
+      } catch(e){
+        console.error('AI scoring error', e);
+        return { score:5, reason:'Fallback error' };
+      }
     }
 
-    async function processResults(places, searchType){
+    async function processResults(baseItems, center){
       ui.progress.textContent = 'Analyzing results...';
-      const byId = {}; places.forEach(p => { byId[p.place_id] = p; });
-      const uniq = Object.values(byId);
-
-      const base = uniq.map(p => {
-        const nameLc = (p.name || '').toLowerCase();
-        let brand = 'Independent';
-        for (const b of PRIORITY_BRANDS) if (nameLc.includes(b.toLowerCase())) brand = b;
-        const excluded = EXCLUDED_CHAINS.some(ch => nameLc.includes(ch.toLowerCase()));
-        const isUnbranded = (brand === 'Independent' && !excluded);
-        const lat = p.geometry.location.lat();
-        const lng = p.geometry.location.lng();
-        const placesPhoto = p.photos && p.photos.length ? p.photos[0].getUrl({ maxWidth: 640, maxHeight: 480 }) : null;
-        const streetViewFallback = `https://maps.googleapis.com/maps/api/streetview?size=640x480&location=${lat},${lng}&key=${GOOGLE_MAPS_API_KEY}`;
-        const imageUrl = placesPhoto || streetViewFallback;
-        const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.name)}&query_place_id=${p.place_id}`;
-        return { id:p.place_id, name:p.name, address:p.vicinity||p.formatted_address||'—', lat,lng,brand,excluded,isUnbranded,imageUrl,mapsUrl };
-      }).filter(item => searchType==='branded' ? item.brand!=='Independent'&&!item.excluded : item.isUnbranded);
-
-      if (!base.length) { alert('No qualifying stations'); return; }
-
       const analyzed=[];
-      for (let i=0;i<base.length;i++){
-        const result = await analyzeWithChatGPTImage(base[i]);
-        analyzed.push({ ...base[i], aiScore: result.score, aiReason: result.reason });
-        ui.progress.textContent = `Scored ${i+1} / ${base.length}`;
+      for (let i=0;i<baseItems.length;i++){
+        const result = await analyzeWithChatGPTImage(baseItems[i]);
+        analyzed.push({ ...baseItems[i], aiScore: result.score, aiReason: result.reason });
+        ui.progress.textContent = `Scored ${i+1} / ${baseItems.length}`;
         // gentle pacing
         await new Promise(r=>setTimeout(r,120));
       }
 
       currentResults = analyzed.sort((a,b)=>(b.aiScore||0)-(a.aiScore||0));
-      renderResults();
+      renderResults(center);
     }
 
-    function renderResults(){
+    function renderResults(center){
       ui.resultsCount.textContent = `Found ${currentResults.length} Qualified Prospects`;
       ui.exportBtn.classList.toggle('hidden', currentResults.length === 0);
 
@@ -304,21 +291,16 @@
           </div>
         </div>`).join('');
 
-      // Map markers below list
-      if (typeof google !== 'undefined' && map) {
-        // clear old markers
-        markers.forEach(m=>m.setMap(null));
-        markers = [];
-        const bounds = new google.maps.LatLngBounds();
+      if (map && markerLayer) {
+        markerLayer.clearLayers();
+        const bounds = [];
         currentResults.forEach(r => {
-          const pos = { lat: r.lat, lng: r.lng };
-          const marker = new google.maps.Marker({ position: pos, map, title: r.name });
-          const info = new google.maps.InfoWindow({ content: `<strong>${r.name}</strong><br>${r.address}<br>Score: ${r.aiScore}/10` });
-          marker.addListener('click', () => info.open(map, marker));
-          markers.push(marker);
-          bounds.extend(pos);
+          const pos = [r.lat, r.lng];
+          L.marker(pos).bindPopup(`<strong>${r.name}</strong><br>${r.address}<br>Score: ${r.aiScore}/10`).addTo(markerLayer);
+          bounds.push(pos);
         });
-        if (currentResults.length) map.fitBounds(bounds);
+        if (bounds.length) map.fitBounds(bounds, { padding:[20,20] });
+        else if (center?.lat && center?.lng) map.setView([center.lat, center.lng], 10);
       }
     }
 
