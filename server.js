@@ -13,6 +13,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import crypto from "crypto";
 import PDFDocument from "pdfkit";
+import { adjustCompetitionCounts } from "./src/competition.js";
 
 const app = express();
 app.use(cors());
@@ -1305,8 +1306,10 @@ async function performEstimate(reqBody) {
   const sunocoNearby = compAll3.some((c) => c.sunoco && c.miles <= 1.0);
   const ruralEligible = compAll3.length === 0;
 
-  const compCount = compCountDetected;
-  const heavyCount = heavyCountDetected;
+  const { compCount, heavyCount } = adjustCompetitionCounts(
+    compCountDetected,
+    heavyCountDetected,
+  );
 
   // Developments + roads
   const devCsv = matchCsvDevelopments(admin.city, admin.county, admin.state);
