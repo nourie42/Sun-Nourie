@@ -1,327 +1,571 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Gas Station Prospector (UNDER CONSTRUCTION)</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-    crossorigin=""
-  />
-  <script
-    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-    crossorigin=""
-  ></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gas Station Prospector - DEBUG VERSION</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-    body { font-family: 'Inter', sans-serif; }
-    .spinner { border-top-color: #7c3aed; animation: spin 1s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+    .container { max-width: 1400px; margin: 0 auto; }
+    .header { background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 30px; border-radius: 10px; text-align: center; margin-bottom: 20px; }
+    .controls { background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
+    .form-row { margin-bottom: 15px; }
+    .form-row label { display: block; font-weight: bold; margin-bottom: 5px; }
+    .form-row input, select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+    .btn { background: #667eea; color: white; border: none; padding: 15px 30px; border-radius: 6px; cursor: pointer; font-size: 16px; width: 100%; font-weight: bold; }
+    .btn:hover { background: #5a67d8; }
+    .debug { background: #fff3cd; border: 1px solid #ffc107; padding: 15px; border-radius: 5px; margin: 10px 0; font-family: monospace; font-size: 12px; max-height: 300px; overflow-y: auto; }
+    .results { background: white; padding: 20px; border-radius: 10px; margin-top: 20px; }
+    .station-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; margin-top: 20px; }
+    .station-card { border: 1px solid #ddd; border-radius: 8px; overflow: hidden; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    .station-image { width: 100%; height: 250px; object-fit: cover; background: #f0f0f0; }
+    .station-image-placeholder { width: 100%; height: 250px; background: linear-gradient(135deg, #f5f7fa, #c3cfe2); display: flex; align-items: center; justify-content: center; flex-direction: column; color: #666; padding: 20px; text-align: center; }
+    .station-info { padding: 20px; }
+    .station-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+    .score { background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 8px 20px; border-radius: 25px; font-weight: bold; font-size: 18px; }
+    .type-badge { padding: 5px 15px; border-radius: 20px; font-size: 13px; font-weight: bold; text-transform: uppercase; }
+    .branded { background: #e3f2fd; color: #1976d2; }
+    .unbranded { background: #e8f5e8; color: #2e7d32; }
+    .station-name { font-size: 22px; font-weight: bold; margin: 0 0 10px 0; }
+    .address { color: #555; font-size: 15px; margin: 8px 0; line-height: 1.5; }
+    .coords { font-family: monospace; color: #888; font-size: 12px; margin: 8px 0; }
+    .reason { font-style: italic; color: #444; margin-top: 15px; font-size: 14px; line-height: 1.6; background: #f8f9fa; padding: 12px; border-radius: 5px; border-left: 3px solid #667eea; }
+    .status { padding: 15px; margin: 10px 0; border-radius: 5px; }
+    .status.loading { background: #e3f2fd; color: #1976d2; }
+    .status.success { background: #e8f5e8; color: #2e7d32; }
+    .status.error { background: #ffebee; color: #c62828; }
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
-<body class="bg-gray-100 min-h-screen p-4 flex flex-col items-center">
-  <div class="bg-white rounded-3xl shadow-2xl overflow-hidden max-w-7xl w-full">
-    <div class="bg-gradient-to-r from-purple-500 to-indigo-500 text-white p-8 text-center">
-      <h1 class="text-4xl font-bold mb-2">⛽ Gas Station Prospector (UNDER CONSTRUCTION)</h1>
-      <p class="text-lg opacity-90">Find and analyze branded and unbranded gas station opportunities</p>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🔧 Gas Station Prospector - DEBUG MODE</h1>
+      <p>This version shows EXACTLY what's happening</p>
     </div>
 
-    <div class="flex justify-between items-center p-4">
-      <button id="refreshBtn" class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600">🔄 Refresh</button>
+    <div style="background: #e8f5e9; border: 1px solid #4caf50; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+      <strong>✅ READY TO USE:</strong> This version uses a CORS proxy and can be run directly by opening the file in your browser!
+      <br><br>
+      <em>No Python, no server needed - just double-click and go!</em>
     </div>
 
-    <div class="md:flex">
-      <!-- Sidebar -->
-      <div class="md:w-1/3 bg-gray-50 p-6 border-r border-gray-200">
-        <div class="mb-6">
-          <label class="block font-semibold text-gray-800 mb-3">Search Type</label>
-          <div class="space-y-3">
-            <label class="flex items-start p-4 bg-white rounded-xl shadow-sm border cursor-pointer">
-              <input type="radio" name="searchType" value="branded" checked class="mt-1" />
-              <div class="ml-3"><strong>Branded Sites</strong></div>
-            </label>
-            <label class="flex items-start p-4 bg-white rounded-xl shadow-sm border cursor-pointer">
-              <input type="radio" name="searchType" value="unbranded" class="mt-1" />
-              <div class="ml-3"><strong>Unbranded Sites</strong></div>
-            </label>
-          </div>
-        </div>
-
-        <div class="mb-6">
-          <label class="block font-semibold text-gray-800 mb-3">Search Method</label>
-          <div class="space-y-3">
-            <label class="flex items-start p-4 bg-white rounded-xl shadow-sm border cursor-pointer">
-              <input type="radio" name="inputMethod" value="area" checked class="mt-1" />
-              <div class="ml-3"><strong>Area Search</strong></div>
-            </label>
-            <label class="flex items-start p-4 bg-white rounded-xl shadow-sm border cursor-pointer">
-              <input type="radio" name="inputMethod" value="upload" class="mt-1" />
-              <div class="ml-3"><strong>Upload List (CSV/XLSX/XLS)</strong> — uses <em>column B</em> for addresses</div>
-            </label>
-          </div>
-        </div>
-
-        <div id="areaSearchInputs" class="space-y-4">
-          <input type="text" id="locationInput" placeholder="Enter city or address" class="w-full p-3 border-2 border-gray-300 rounded-lg" />
-          <input type="number" id="radiusInput" value="5" min="1" max="50" class="w-full p-3 border-2 border-gray-300 rounded-lg" />
-        </div>
-
-        <div id="uploadInputs" class="space-y-4 hidden">
-          <input id="fileInput" type="file" accept=".csv,.xlsx,.xls" class="w-full" />
-        </div>
-
-        <button id="searchBtn" class="w-full mt-8 p-4 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-xl font-bold text-lg" disabled>🔍 Start Prospecting</button>
+    <div class="controls">
+      <div class="form-row">
+        <label>Location (City, State OR Zip Code):</label>
+        <input type="text" id="location" value="Raleigh, NC" placeholder="e.g., Raleigh, NC or 27601">
       </div>
 
-      <!-- Results Panel -->
-      <div class="md:w-2/3 p-6 relative">
-        <div id="loadingOverlay" class="absolute inset-0 bg-white bg-opacity-90 flex flex-col items-center justify-center z-10 hidden">
-          <div class="spinner w-16 h-16 border-4 border-gray-200 rounded-full"></div>
-          <div class="mt-4 text-xl font-medium text-gray-700">Working...</div>
-          <div id="progressInfo" class="mt-1 text-sm text-gray-500"></div>
-        </div>
-
-        <div id="resultsContent">
-          <div class="flex items-center justify-between pb-4 border-b border-gray-200 mb-4">
-            <div id="resultsCount" class="text-2xl font-bold text-gray-800">No results yet</div>
-            <div class="flex gap-2">
-              <button id="exportBtn" class="bg-green-500 text-white py-2 px-4 rounded-lg hidden">📥 Export</button>
-            </div>
-          </div>
-          <!-- CHANGED: removed max-h and overflow so results fill right side fully -->
-          <div id="resultsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"></div>
-        </div>
+      <div class="form-row">
+        <label>Search Radius (miles):</label>
+        <input type="number" id="radius" value="5" min="1" max="50" step="1">
+        <small style="color: #666;">How far from the location to search</small>
       </div>
+
+      <div class="form-row">
+        <label>Search Type:</label>
+        <select id="searchType">
+          <option value="unbranded">Unbranded (Mom & Pop ONLY - excludes ALL major brands)</option>
+          <option value="branded">Branded (Major chains only)</option>
+        </select>
+      </div>
+      
+      <div class="form-row">
+        <label>Google Maps API Key:</label>
+        <input type="password" id="googleKey" placeholder="AIza...">
+      </div>
+      
+      <div class="form-row">
+        <label>OpenAI API Key:</label>
+        <input type="password" id="openaiKey" placeholder="sk-proj-...">
+      </div>
+      
+      <button class="btn" onclick="runSearch()">🔍 START SEARCH</button>
     </div>
+
+    <div id="debugLog" class="debug" style="display: none;">
+      <strong>DEBUG LOG:</strong><br>
+      <div id="logContent"></div>
+    </div>
+
+    <div id="statusArea"></div>
+    <div id="resultsArea" class="results" style="display: none;"></div>
   </div>
 
-  <!-- Map BELOW all results/list -->
-  <div id="map" class="w-full h-48 mt-4 border rounded-lg"></div>
-
   <script>
-    let GOOGLE_MAPS_API_KEY = '';
-    let openAiEnabled = false;
+    let debugLogs = [];
 
-    let map, markerLayer;
-    let currentResults = [];
-
-    const PRIORITY_BRANDS = ['Marathon','Citgo','Valero','Exxon','BP','Shell'];
-    const EXCLUDED_CHAINS = ['Sheetz','Wawa','RaceTrac','Race Trac','Circle K','7-Eleven','7-11','Cumberland Farms','QuikTrip','QT','Speedway','Casey','Murphy','Murphy USA','Sunoco','GetGo','Pilot','Flying J','Love','Love\'s','Travel Centers','TA','Petro','Costco','Sam\'s Club','BJ\'s','Kroger','Albertsons','Safeway','H-E-B','Walmart'];
-
-    function loadGoogleMapsAPI(key){
-      return new Promise((resolve, reject) => {
-        if (!key) return reject(new Error('Missing Google Maps key'));
-        if (window.google?.maps) return resolve();
-        const s=document.createElement('script');
-        s.src=`https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places&callback=initMap`;
-        s.async=true; s.defer=true; s.onerror=()=>reject(new Error('Failed to load Google Maps')); s.dataset.googleMaps='true';
-        document.head.appendChild(s);
-        window.initMap = () => {
-          map = new google.maps.Map(document.getElementById('map'), { center: { lat: 35.7796, lng: -78.6382 }, zoom: 8 });
-          placesService = new google.maps.places.PlacesService(map);
-          geocoder = new google.maps.Geocoder();
-          document.getElementById('searchBtn').disabled = false;
-          resolve();
-        };
-      });
+    function log(message, type = 'info') {
+      const timestamp = new Date().toLocaleTimeString();
+      debugLogs.push(`[${timestamp}] ${message}`);
+      const logEl = document.getElementById('logContent');
+      const debugEl = document.getElementById('debugLog');
+      debugEl.style.display = 'block';
+      logEl.innerHTML = debugLogs.join('<br>');
+      logEl.scrollTop = logEl.scrollHeight;
+      console.log(message);
     }
 
-    document.getElementById('refreshBtn').onclick = () => window.location.reload();
-    document.querySelectorAll('input[name="inputMethod"]').forEach(r => {
-      r.addEventListener('change', () => {
-        const isUpload = r.value === 'upload';
-        document.getElementById('areaSearchInputs').classList.toggle('hidden', isUpload);
-        document.getElementById('uploadInputs').classList.toggle('hidden', !isUpload);
-      });
-    });
+    function showStatus(message, type) {
+      document.getElementById('statusArea').innerHTML = `<div class="status ${type}">${message}</div>`;
+    }
 
-    const ui = {
-      overlay: document.getElementById('loadingOverlay'),
-      progress: document.getElementById('progressInfo'),
-      resultsCount: document.getElementById('resultsCount'),
-      resultsGrid: document.getElementById('resultsGrid'),
-      exportBtn: document.getElementById('exportBtn')
-    };
+    async function runSearch() {
+      debugLogs = [];
+      const location = document.getElementById('location').value.trim();
+      const radiusMiles = parseFloat(document.getElementById('radius').value) || 5;
+      const googleKey = document.getElementById('googleKey').value.trim();
+      const openaiKey = document.getElementById('openaiKey').value.trim();
+      const searchType = document.getElementById('searchType').value;
 
-    bootstrap();
-    document.getElementById('searchBtn').onclick = startSearch;
+      log('🚀 STARTING SEARCH');
+      log(`Location: ${location}`);
+      log(`Radius: ${radiusMiles} miles`);
+      log(`Google Key: ${googleKey ? googleKey.substring(0, 10) + '...' : 'MISSING'}`);
+      log(`OpenAI Key: ${openaiKey ? openaiKey.substring(0, 15) + '...' : 'MISSING'}`);
+      log(`Search Type: ${searchType}`);
 
-    async function bootstrap(){
-      ui.overlay.classList.remove('hidden');
-      ui.progress.textContent = 'Loading configuration...';
-      try {
-        const resp = await fetch('/api/config');
-        if (!resp.ok) throw new Error('Config request failed');
-        const data = await resp.json();
-        GOOGLE_MAPS_API_KEY = data.googleMapsApiKey || '';
-        openAiEnabled = Boolean(data.openAiEnabled);
-        if (!GOOGLE_MAPS_API_KEY) throw new Error('Google Maps API key missing on server');
-        await loadGoogleMapsAPI(GOOGLE_MAPS_API_KEY);
-      } catch (e) {
-        console.error(e);
-        ui.progress.textContent = 'Failed to load map/API configuration.';
+      if (!googleKey || !openaiKey) {
+        showStatus('❌ Both API keys are required!', 'error');
         return;
       }
-      ui.overlay.classList.add('hidden');
-    }
 
-    async function startSearch(){
-      const searchType = document.querySelector('input[name="searchType"]:checked').value;
-      const method = document.querySelector('input[name="inputMethod"]:checked').value;
-      ui.overlay.classList.remove('hidden');
-      ui.progress.textContent = 'Starting...';
       try {
-        if (method === 'upload') {
-          const file = document.getElementById('fileInput').files?.[0];
-          if (!file) { alert('Please select a file'); return; }
-          await searchByUpload(file, searchType);
-        } else {
-          const location = document.getElementById('locationInput').value.trim();
-          const radius = parseFloat(document.getElementById('radiusInput').value) || 5;
-          if (!location) { alert('Enter a location'); return; }
-          await searchByArea(location, radius, searchType);
+        // Step 1: Geocode
+        showStatus('📍 Finding location...', 'loading');
+        log('Step 1: Geocoding location...');
+        
+        // Use CORS proxy to avoid CORS issues when running from file://
+        const corsProxy = 'https://corsproxy.io/?';
+        const geoUrl = `${corsProxy}${encodeURIComponent(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(location)}&countrycodes=us&limit=1`)}`;
+        log(`Geocoding URL: ${geoUrl}`);
+        
+        const geoResponse = await fetch(geoUrl);
+        
+        if (!geoResponse.ok) {
+          throw new Error(`Geocoding failed: ${geoResponse.status} ${geoResponse.statusText}`);
         }
-      } finally { ui.overlay.classList.add('hidden'); }
-    }
+        
+        const geoData = await geoResponse.json();
+        
+        if (!geoData || geoData.length === 0) {
+          throw new Error('Location not found');
+        }
+        
+        const lat = parseFloat(geoData[0].lat);
+        const lng = parseFloat(geoData[0].lon);
+        log(`✅ Coordinates found: ${lat}, ${lng}`);
+        log(`Display name: ${geoData[0].display_name}`);
 
-    // === Area search ===
-    async function searchByArea(location, radiusMiles, searchType){
-      ui.progress.textContent = 'Searching around area...';
-      const resp = await fetch('/api/prospect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: location, radiusMiles, searchType })
-      });
-      const data = await resp.json().catch(() => ({}));
-      if (!data.ok || !Array.isArray(data.items) || !data.items.length) {
-        alert('No stations found around this area.');
-        return;
-      }
-      await processResults(data.items, data.center || null);
-    }
+        // Step 2: Search for REAL gas stations with specified radius
+        const radiusMeters = Math.round(radiusMiles * 1609.34);
+        showStatus(`⛽ Searching for ALL gas stations within ${radiusMiles} miles...`, 'loading');
+        log(`Step 2: Querying Overpass API with ${radiusMeters}m radius...`);
+        
+        const overpassQuery = `[out:json][timeout:30];
+(
+  node["amenity"="fuel"](around:${radiusMeters},${lat},${lng});
+  way["amenity"="fuel"](around:${radiusMeters},${lat},${lng});
+);
+out body;
+>;
+out skel qt;`;
 
-    // === Upload helpers (column B addresses) ===
-    function readAddressesFromCSV(text){
-      return text.split(/\r?\n/).map(l => l.trim()).filter(Boolean).slice(1)
-        .map(line => line.split(',')[1] ? line.split(',')[1].replace(/\"/g,'').trim() : '').filter(Boolean);
-    }
-    async function readAddressesFromExcel(file){
-      const data = await file.arrayBuffer();
-      const wb = XLSX.read(data, { type: 'array' });
-      const firstSheet = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
-      return rows.slice(1).map(r => (r?.[1] || '').toString().trim()).filter(Boolean);
-    }
-
-    async function searchByUpload(file, searchType){
-      ui.progress.textContent = 'Reading file...';
-      let addresses = [];
-      const name = file.name.toLowerCase();
-      if (name.endsWith('.csv')) addresses = readAddressesFromCSV(await file.text());
-      else if (name.endsWith('.xlsx') || name.endsWith('.xls')) addresses = await readAddressesFromExcel(file);
-      addresses = addresses.filter(Boolean).slice(0, 50);
-      if (!addresses.length) { alert('No valid addresses in column B'); return; }
-
-      ui.progress.textContent = `Submitting ${addresses.length} addresses...`;
-      const resp = await fetch('/api/prospect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ addresses, searchType, radiusMiles: 1 })
-      });
-      const data = await resp.json().catch(() => ({}));
-      if (!data.ok || !Array.isArray(data.items) || !data.items.length) {
-        alert('No stations found near uploaded addresses');
-        return;
-      }
-      await processResults(data.items, data.center || null);
-    }
-
-    // === GPT image scoring ===
-    async function analyzeWithChatGPTImage(item){
-      if (!openAiEnabled) return { score: 5, reason: 'AI scoring disabled' };
-      try {
-        const resp = await fetch('/api/chatgpt-image', {
+        log('Sending Overpass query...');
+        const overpassUrl = 'https://overpass-api.de/api/interpreter';
+        
+        const overpassResponse = await fetch(overpassUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ item })
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: 'data=' + encodeURIComponent(overpassQuery)
         });
-        if (!resp.ok) throw new Error('OpenAI HTTP ' + resp.status);
-        const data = await resp.json();
-        if (!data.ok) throw new Error(data.error || 'OpenAI error');
-        return { score: data.score, reason: data.reason };
-      } catch(e){
-        console.error('AI scoring error', e);
-        return { score:5, reason:'Fallback error' };
+        
+        const responseText = await overpassResponse.text();
+        log(`Overpass response length: ${responseText.length} chars`);
+        
+        if (responseText.startsWith('<?xml') || responseText.startsWith('<')) {
+          log('❌ ERROR: Overpass returned XML error');
+          throw new Error('Overpass API returned error - try again in a moment');
+        }
+        
+        const overpassData = JSON.parse(responseText);
+        log(`✅ Parsed JSON successfully`);
+        log(`Found ${overpassData.elements?.length || 0} raw elements`);
+
+        // ALL MAJOR BRAND CHAINS - COMPREHENSIVE LIST
+        const ALL_MAJOR_BRANDS = [
+          // Major oil companies
+          'shell', 'exxon', 'mobil', 'esso', 'bp', 'amoco', 'chevron', 'texaco', 'citgo', 
+          'marathon', 'valero', 'conoco', 'conocophillips', 'phillips 66', 'phillips66', 
+          'sunoco', 'arco', 'gulf', '76', 'union 76', 'sinclair', 'hess',
+          
+          // Convenience store chains with fuel
+          'speedway', 'sheetz', 'wawa', 'racetrac', 'race trac', 'circle k', 'circlek',
+          '7-eleven', '7-11', '7 eleven', 'casey', 'caseys', "casey's", 'pilot', 'flying j', 
+          'flyingj', 'loves', "love's", 'ta', 'petro', 'travel centers', 'travelcenters',
+          'bucees', "buc-ee's", 'buc-ee', 'getgo', 'get go', 'royal farms', 'royalfarms',
+          'kwik trip', 'kwiktrip', 'quiktrip', 'quik trip', 'qt', 'kum & go', 'kum and go',
+          'maverik', 'holiday', 'holidaystationstore', 'thorntons', 'thornton', 'murphy', 
+          'murphyusa', 'murphy usa', 'speedway',
+          
+          // Big box and grocery chains
+          'costco', 'sams club', "sam's club", 'samsclub', 'bjs', "bj's", 'walmart', 
+          'wal-mart', 'kroger', 'safeway', 'albertsons', 'heb', 'h-e-b', 'publix', 
+          'food lion', 'foodlion', 'hannaford', 'stop & shop', 'giant eagle', 'hy-vee', 
+          'hyvee', 'meijer', 'wegmans', 'harris teeter', 'target',
+          
+          // Regional chains
+          'Cumberland farms', 'cumberland', 'wesco', 'refuel', 'rutter', "rutter's",
+          'sheffield', 'turkey hill', 'turkeyhill', 'dash in', 'fas mart', 'fasmart',
+          'mapco', 'kangaroo', 'spinx', 'racewaygm', 'raceway', 'enmarket', 'parker',
+          "parker's", 'gate', 'amerigas', 'twice daily', 'foothills', 'go mart',
+          'yesway', 'allsups', "allsup's", 'stripes', 'on the run', 'ontherun',
+          
+          // Corporate/Franchise indicators
+          'enterprise', 'petroleum', 'fuel depot', 'gas depot', 'truck stop', 'truckstop',
+          'travel plaza', 'service plaza', 'rest stop'
+        ];
+
+        // Process stations
+        const stations = [];
+        let totalFound = 0;
+        let excludedCount = 0;
+        let excludedNames = [];
+        
+        for (const element of (overpassData.elements || [])) {
+          if (!element.tags || element.tags.amenity !== 'fuel') continue;
+          totalFound++;
+          
+          const tags = element.tags;
+          let name = tags.name || tags.brand || tags.operator || '';
+          
+          // Skip if no name at all
+          if (!name) continue;
+          
+          const brand = tags.brand || '';
+          const operator = tags.operator || '';
+          
+          // Get coordinates
+          let stationLat, stationLng;
+          if (element.lat && element.lon) {
+            stationLat = element.lat;
+            stationLng = element.lon;
+          } else if (element.center) {
+            stationLat = element.center.lat;
+            stationLng = element.center.lon;
+          } else {
+            continue;
+          }
+          
+          // Calculate actual distance
+          const distance = calculateDistance(lat, lng, stationLat, stationLng);
+          
+          // STRICT BRAND CHECKING - check name, brand, AND operator
+          const nameLower = name.toLowerCase().trim();
+          const brandLower = brand.toLowerCase().trim();
+          const operatorLower = operator.toLowerCase().trim();
+          
+          // Check if ANY field contains a major brand
+          const isMajorBrand = ALL_MAJOR_BRANDS.some(majorBrand => {
+            const brand = majorBrand.toLowerCase();
+            return nameLower.includes(brand) || 
+                   brandLower.includes(brand) || 
+                   operatorLower.includes(brand) ||
+                   nameLower === brand ||
+                   brandLower === brand ||
+                   operatorLower === brand;
+          });
+          
+          if (searchType === 'unbranded') {
+            // STRICT: Exclude anything that's a major brand
+            if (isMajorBrand) {
+              excludedCount++;
+              excludedNames.push(name);
+              log(`  ❌ EXCLUDED (major brand): ${name} | brand: ${brand || 'none'} | operator: ${operator || 'none'}`);
+              continue;
+            }
+            
+            // Build REAL address - be more aggressive in getting address data
+            let address = '';
+            const street = tags['addr:street'] || tags['street'] || '';
+            const housenum = tags['addr:housenumber'] || tags['housenumber'] || '';
+            const city = tags['addr:city'] || tags['city'] || tags['addr:town'] || tags['town'] || '';
+            const state = tags['addr:state'] || tags['state'] || '';
+            const zip = tags['addr:postcode'] || tags['postcode'] || tags['postal_code'] || '';
+            
+            // Try to get address from contact info if not in addr tags
+            const fullAddress = tags['contact:address'] || tags['address'] || '';
+            
+            if (fullAddress) {
+              address = fullAddress;
+            } else {
+              const parts = [];
+              if (housenum && street) parts.push(`${housenum} ${street}`);
+              else if (street) parts.push(street);
+              if (city) parts.push(city);
+              if (state) parts.push(state);
+              if (zip) parts.push(zip);
+              
+              address = parts.length > 0 ? parts.join(', ') : '';
+            }
+            
+            // If still no address, try reverse geocoding
+            if (!address || address.length < 10) {
+              log(`  ⚠️ Missing address for: ${name} - will reverse geocode`);
+              address = `${stationLat.toFixed(6)}, ${stationLng.toFixed(6)} (address lookup needed)`;
+            }
+            
+            log(`  ✅ INCLUDED: ${name} - ${address}`);
+            
+            stations.push({
+              name: name || 'Independent Station',
+              brand: 'Independent',
+              address,
+              lat: stationLat,
+              lng: stationLng,
+              distance: distance,
+              isBranded: false,
+              isUnbranded: true,
+              needsAddressLookup: !address || address.includes('address lookup needed')
+            });
+          } else {
+            // For branded: ONLY major brands
+            if (!isMajorBrand) {
+              excludedCount++;
+              continue;
+            }
+            
+            // Build address same way
+            let address = '';
+            const street = tags['addr:street'] || '';
+            const housenum = tags['addr:housenumber'] || '';
+            const city = tags['addr:city'] || tags['addr:town'] || '';
+            const state = tags['addr:state'] || '';
+            const zip = tags['addr:postcode'] || '';
+            
+            const parts = [];
+            if (housenum && street) parts.push(`${housenum} ${street}`);
+            else if (street) parts.push(street);
+            if (city) parts.push(city);
+            if (state) parts.push(state);
+            if (zip) parts.push(zip);
+            
+            address = parts.length > 0 ? parts.join(', ') : `${stationLat.toFixed(6)}, ${stationLng.toFixed(6)}`;
+            
+            stations.push({
+              name,
+              brand,
+              address,
+              lat: stationLat,
+              lng: stationLng,
+              distance: distance,
+              isBranded: true,
+              isUnbranded: false,
+              needsAddressLookup: false
+            });
+          }
+        }
+        
+        log(`\n📊 SEARCH SUMMARY:`);
+        log(`Total gas stations found: ${totalFound}`);
+        log(`Qualifying ${searchType} stations: ${stations.length}`);
+        log(`Excluded (major brands): ${excludedCount}`);
+        if (excludedNames.length > 0) {
+          log(`Excluded brands: ${[...new Set(excludedNames)].slice(0, 10).join(', ')}${excludedNames.length > 10 ? '...' : ''}`);
+        }
+        log(`Within ${radiusMiles} miles of ${geoData[0].display_name}`);
+        
+        if (stations.length === 0) {
+          throw new Error(`No independent stations found within ${radiusMiles} miles. Try increasing the radius.`);
+        }
+
+        // Sort by distance
+        stations.sort((a, b) => a.distance - b.distance);
+        
+        // Try to get addresses for stations missing them
+        showStatus(`📍 Looking up missing addresses...`, 'loading');
+        for (let i = 0; i < stations.length; i++) {
+          if (stations[i].needsAddressLookup) {
+            log(`Looking up address for: ${stations[i].name}`);
+            try {
+              const corsProxy = 'https://corsproxy.io/?';
+              const revGeoUrl = `${corsProxy}${encodeURIComponent(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${stations[i].lat}&lon=${stations[i].lng}&zoom=18&addressdetails=1`)}`;
+              const revGeoResponse = await fetch(revGeoUrl);
+              const revGeoData = await revGeoResponse.json();
+              
+              if (revGeoData && revGeoData.address) {
+                const addr = revGeoData.address;
+                const parts = [];
+                if (addr.house_number && addr.road) parts.push(`${addr.house_number} ${addr.road}`);
+                else if (addr.road) parts.push(addr.road);
+                if (addr.city || addr.town || addr.village) parts.push(addr.city || addr.town || addr.village);
+                if (addr.state) parts.push(addr.state);
+                if (addr.postcode) parts.push(addr.postcode);
+                
+                if (parts.length > 0) {
+                  stations[i].address = parts.join(', ');
+                  log(`  ✅ Found address: ${stations[i].address}`);
+                }
+              }
+              
+              // Rate limit
+              await new Promise(r => setTimeout(r, 1000));
+            } catch (e) {
+              log(`  ❌ Address lookup failed: ${e.message}`);
+            }
+          }
+        }
+
+        // Analyze ALL stations (not just first 3)
+        showStatus(`🤖 Analyzing ALL ${stations.length} stations with AI...`, 'loading');
+        
+        const results = [];
+        for (let i = 0; i < stations.length; i++) {
+          const station = stations[i];
+          showStatus(`🤖 AI analyzing ${i + 1}/${stations.length}: ${station.name}`, 'loading');
+          log(`\n--- Analyzing: ${station.name} ---`);
+          
+          const streetViewUrl = `https://maps.googleapis.com/maps/api/streetview?size=640x480&location=${station.lat},${station.lng}&fov=90&key=${googleKey}`;
+          
+          const analysis = await analyzeWithAI(station, openaiKey, streetViewUrl);
+          results.push({ ...station, ...analysis, streetViewUrl });
+          
+          // Delay between API calls
+          await new Promise(r => setTimeout(r, 800));
+        }
+
+        // Display results
+        displayResults(results);
+        showStatus(`✅ Complete! Found ${results.length} ${searchType === 'unbranded' ? 'mom & pop' : 'branded'} stations within ${radiusMiles} miles`, 'success');
+        log('🎉 SEARCH COMPLETE');
+
+      } catch (error) {
+        log(`❌ FATAL ERROR: ${error.message}`);
+        showStatus(`❌ Error: ${error.message}`, 'error');
       }
     }
 
-    async function processResults(baseItems, center){
-      ui.progress.textContent = 'Analyzing results...';
-      const analyzed=[];
-      for (let i=0;i<baseItems.length;i++){
-        const result = await analyzeWithChatGPTImage(baseItems[i]);
-        analyzed.push({ ...baseItems[i], aiScore: result.score, aiReason: result.reason });
-        ui.progress.textContent = `Scored ${i+1} / ${baseItems.length}`;
-        // gentle pacing
-        await new Promise(r=>setTimeout(r,120));
-      }
-
-      currentResults = analyzed.sort((a,b)=>(b.aiScore||0)-(a.aiScore||0));
-      renderResults(center);
+    function calculateDistance(lat1, lon1, lat2, lon2) {
+      const R = 3959; // Earth's radius in miles
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return R * c;
     }
 
-    function renderResults(center){
-      ui.resultsCount.textContent = `Found ${currentResults.length} Qualified Prospects`;
-      ui.exportBtn.classList.toggle('hidden', currentResults.length === 0);
+    async function analyzeWithAI(station, apiKey, imageUrl) {
+      const isUnbranded = station.isUnbranded;
+      
+      try {
+        const payload = {
+          model: 'gpt-4o-mini',
+          max_tokens: 300,
+          temperature: 0.3,
+          messages: [{
+            role: 'system',
+            content: `You are analyzing a gas station from a street view photo.
 
-      // Cards
-      ui.resultsGrid.innerHTML = currentResults.map(r=>`
-        <div class="bg-white rounded-xl shadow overflow-hidden">
-          <div class="relative w-full h-40 bg-gray-200">
-            <img src="${r.imageUrl}" class="w-full h-full object-cover"/>
-            ${r.brand !== 'Independent' ? `<span class="absolute top-2 right-2 bg-indigo-600 text-white text-xs px-2 py-1 rounded">${r.brand}</span>` : `<span class="absolute top-2 right-2 bg-emerald-600 text-white text-xs px-2 py-1 rounded">Unbranded</span>`}
-          </div>
-          <div class="p-4">
-            <div class="text-sm text-gray-500">Score</div>
-            <div class="flex items-center gap-2 text-lg font-bold">${r.aiScore ?? '—'} / 10 <span class="text-xs font-medium text-gray-500">${r.aiReason ? `— ${r.aiReason}` : ''}</span></div>
-            <div class="mt-2 font-semibold text-gray-800">${r.name}</div>
-            <div class="text-sm text-gray-600">${r.address}</div>
-          </div>
-        </div>`).join('');
+SCORING:
+- UNBRANDED: Score 1-10 based on how NEW equipment looks (1=very old, 10=very new)
+- BRANDED: Score 1-10 based on how OLD equipment looks (1=very new, 10=very old)
 
-      if (map && markerLayer) {
-        markerLayer.clearLayers();
-        const bounds = [];
-        currentResults.forEach(r => {
-          const pos = [r.lat, r.lng];
-          L.marker(pos).bindPopup(`<strong>${r.name}</strong><br>${r.address}<br>Score: ${r.aiScore}/10`).addTo(markerLayer);
-          bounds.push(pos);
+Look at: pumps, canopy, building, signage, pavement.
+
+Format: SCORE: [number] REASON: [what you see]`
+          }, {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: `${isUnbranded ? 'UNBRANDED' : 'BRANDED'} station: "${station.name}" at ${station.address}`
+              },
+              {
+                type: 'image_url',
+                image_url: { url: imageUrl, detail: 'high' }
+              }
+            ]
+          }]
+        };
+        
+        log('Sending to OpenAI...');
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify(payload)
         });
-        if (bounds.length) map.fitBounds(bounds, { padding:[20,20] });
-        else if (center?.lat && center?.lng) map.setView([center.lat, center.lng], 10);
+        
+        log(`OpenAI response status: ${response.status}`);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          log(`❌ OpenAI error: ${errorText.substring(0, 200)}`);
+          throw new Error(`OpenAI API error: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        const content = data.choices[0].message.content;
+        log(`✅ AI response: ${content.substring(0, 150)}...`);
+        
+        const scoreMatch = content.match(/SCORE:\s*(\d+)/i);
+        const reasonMatch = content.match(/REASON:\s*(.+)/i);
+        
+        const score = scoreMatch ? parseInt(scoreMatch[1]) : 5;
+        const reason = reasonMatch ? reasonMatch[1].trim() : content;
+        
+        return { score, reason };
+        
+      } catch (error) {
+        log(`❌ AI analysis failed: ${error.message}`);
+        return {
+          score: 5,
+          reason: 'AI analysis failed - ' + error.message
+        };
       }
     }
 
-    // Export (CSV with reasons)
-    ui.exportBtn.addEventListener('click', () => {
-      if (!currentResults.length) return;
-      let csv = 'Rank,Name,Brand,Unbranded,Address,Score,Reason,Latitude,Longitude,ImageURL,MapsURL\n';
-      currentResults.forEach((r,i)=>{
-        const row = [i+1, r.name, r.brand, r.isUnbranded, r.address, r.aiScore, r.aiReason, r.lat, r.lng, r.imageUrl, r.mapsUrl]
-          .map(v => '"' + String(v ?? '').replaceAll('"','""') + '"').join(',');
-        csv += row + '\n';
-      });
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = `gas_station_prospects_${new Date().toISOString().slice(0,10)}.csv`;
-      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-    });
+    function displayResults(results) {
+      const html = results.map((station, index) => `
+        <div class="station-card">
+          <img src="${station.streetViewUrl}" 
+               class="station-image" 
+               alt="Street View"
+               onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+          <div class="station-image-placeholder" style="display: none;">
+            <div style="font-size: 48px;">📍</div>
+            <div><strong>${station.name}</strong></div>
+            <div style="font-size: 12px; margin-top: 10px;">${station.lat.toFixed(4)}, ${station.lng.toFixed(4)}</div>
+            <div style="font-size: 11px; color: #999; margin-top: 5px;">Street View unavailable</div>
+          </div>
+          <div class="station-info">
+            <div class="station-header">
+              <div class="score">${station.score}/10</div>
+              <div class="type-badge ${station.isBranded ? 'branded' : 'unbranded'}">
+                ${station.isBranded ? 'BRANDED' : 'MOM & POP'}
+              </div>
+            </div>
+            <h2 class="station-name">#${index + 1}: ${station.name}</h2>
+            <div class="address">📍 ${station.address}</div>
+            <div class="coords">📏 ${station.distance.toFixed(2)} miles away | ${station.lat.toFixed(6)}, ${station.lng.toFixed(6)}</div>
+            <div class="reason">${station.reason}</div>
+          </div>
+        </div>
+      `).join('');
+      
+      const resultsEl = document.getElementById('resultsArea');
+      resultsEl.innerHTML = `
+        <h2>Found ${results.length} ${results[0]?.isUnbranded ? 'Mom & Pop' : 'Branded'} Stations</h2>
+        <p style="color: #666; margin-bottom: 20px;">Sorted by distance from search location</p>
+        <div class="station-grid">${html}</div>
+      `;
+      resultsEl.style.display = 'block';
+    }
   </script>
 </body>
 </html>
