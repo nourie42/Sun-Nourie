@@ -1003,64 +1003,6 @@ app.post("/api/chatgpt-image", async (req, res) => {
   }
 });
 
-app.post("/api/prospect", async (req, res) => {
-  const body = req.body || {};
-  const searchType = body.searchType === "unbranded" ? "unbranded" : "branded";
-  const radiusMiles = Math.max(0.5, Math.min(25, Number(body.radiusMiles) || 5));
-  const addresses = Array.isArray(body.addresses) ? body.addresses : [];
-  const query = String(body.query || "").trim();
-
-  let center = null;
-  for (const addr of addresses) {
-    // eslint-disable-next-line no-await-in-loop
-    const g = await geocodeLoose(addr);
-    if (g) { center = g; break; }
-  }
-  if (!center && query) center = await geocodeLoose(query);
-  if (!center) center = { lat: 35.7796, lon: -78.6382, label: "Raleigh, NC (fallback)" };
-
-  let items = [];
-  try {
-    items = await nearbyFuelRich(center.lat, center.lon, radiusMiles);
-  } catch (e) {
-    console.warn("nearbyFuelRich failed", e.message || e);
-  }
-  if (!items.length) items = STATIC_FALLBACK_SITES;
-
-  const normalized = items
-    .map((it) => {
-      const name = it.name || "Fuel";
-      const brand = it.brand || "Independent";
-      const nameLc = name.toLowerCase();
-      const excluded = EXCLUDED_CHAINS.some((ch) => nameLc.includes(ch.toLowerCase()));
-      const isUnbranded =
-        it.isUnbranded ?? (brand === "Independent" && !excluded);
-      const allowed = searchType === "branded" ? brand !== "Independent" && !excluded : isUnbranded;
-      if (!allowed) return null;
-      const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}&query=${encodeURIComponent(
-        `${it.lat},${it.lon}`
-      )}`;
-      const imageUrl = it.imageUrl || (GOOGLE_API_KEY
-        ? `https://maps.googleapis.com/maps/api/streetview?size=640x480&location=${it.lat},${it.lon}&key=${GOOGLE_API_KEY}`
-        : PLACE_PHOTO_FALLBACK);
-      return {
-        id: it.id || `${Math.round(it.lat * 1e6)}_${Math.round(it.lon * 1e6)}`,
-        name,
-        brand,
-        address: it.address || it.label || "",
-        lat: it.lat,
-        lng: it.lon,
-        excluded,
-        isUnbranded,
-        imageUrl,
-        mapsUrl,
-      };
-    })
-    .filter(Boolean);
-
-  res.json({ ok: true, center, items: normalized });
-});
-
 /* Autocomplete with optional location bias */
 app.get("/google/autocomplete", async (req, res) => {
   const input = String(req.query.input || "").trim();

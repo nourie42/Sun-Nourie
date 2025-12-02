@@ -104,6 +104,7 @@
   <div id="map" class="w-full h-48 mt-4 border rounded-lg"></div>
 
   <script>
+    let GOOGLE_MAPS_API_KEY = '';
     let openAiEnabled = false;
 
     let map, markerLayer;
@@ -111,6 +112,24 @@
 
     const PRIORITY_BRANDS = ['Marathon','Citgo','Valero','Exxon','BP','Shell'];
     const EXCLUDED_CHAINS = ['Sheetz','Wawa','RaceTrac','Race Trac','Circle K','7-Eleven','7-11','Cumberland Farms','QuikTrip','QT','Speedway','Casey','Murphy','Murphy USA','Sunoco','GetGo','Pilot','Flying J','Love','Love\'s','Travel Centers','TA','Petro','Costco','Sam\'s Club','BJ\'s','Kroger','Albertsons','Safeway','H-E-B','Walmart'];
+
+    function loadGoogleMapsAPI(key){
+      return new Promise((resolve, reject) => {
+        if (!key) return reject(new Error('Missing Google Maps key'));
+        if (window.google?.maps) return resolve();
+        const s=document.createElement('script');
+        s.src=`https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places&callback=initMap`;
+        s.async=true; s.defer=true; s.onerror=()=>reject(new Error('Failed to load Google Maps')); s.dataset.googleMaps='true';
+        document.head.appendChild(s);
+        window.initMap = () => {
+          map = new google.maps.Map(document.getElementById('map'), { center: { lat: 35.7796, lng: -78.6382 }, zoom: 8 });
+          placesService = new google.maps.places.PlacesService(map);
+          geocoder = new google.maps.Geocoder();
+          document.getElementById('searchBtn').disabled = false;
+          resolve();
+        };
+      });
+    }
 
     document.getElementById('refreshBtn').onclick = () => window.location.reload();
     document.querySelectorAll('input[name="inputMethod"]').forEach(r => {
@@ -137,21 +156,17 @@
       ui.progress.textContent = 'Loading configuration...';
       try {
         const resp = await fetch('/api/config');
-        if (resp.ok) {
-          const data = await resp.json();
-          openAiEnabled = Boolean(data.openAiEnabled);
-        }
+        if (!resp.ok) throw new Error('Config request failed');
+        const data = await resp.json();
+        GOOGLE_MAPS_API_KEY = data.googleMapsApiKey || '';
+        openAiEnabled = Boolean(data.openAiEnabled);
+        if (!GOOGLE_MAPS_API_KEY) throw new Error('Google Maps API key missing on server');
+        await loadGoogleMapsAPI(GOOGLE_MAPS_API_KEY);
       } catch (e) {
-        console.warn('Config check failed', e);
+        console.error(e);
+        ui.progress.textContent = 'Failed to load map/API configuration.';
+        return;
       }
-
-      map = L.map('map').setView([35.7796, -78.6382], 8);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '&copy; OpenStreetMap contributors'
-      }).addTo(map);
-      markerLayer = L.layerGroup().addTo(map);
-      document.getElementById('searchBtn').disabled = false;
       ui.overlay.classList.add('hidden');
     }
 
