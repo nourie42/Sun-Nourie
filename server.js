@@ -655,6 +655,8 @@ async function overpassQuery(data) {
 }
 const HEAVY_BRANDS = /(sheetz|wawa|race\s?trac|racetrac|buc-?ee'?s|royal\s?farms|quik.?trip|\bqt\b)/i;
 const IS_SUNOCO  = /\bsunoco\b/i;
+const SELF_EXCLUDE_RADIUS_MI = 0.05; // ~264 ft — avoid counting the searched site as a competitor
+
 async function googleNearbyGasStations(lat, lon, rM = 2414) {
   if (!GOOGLE_API_KEY) return [];
   const base = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lon}&radius=${rM}&type=gas_station&key=${GOOGLE_API_KEY}`;
@@ -670,7 +672,7 @@ async function googleNearbyGasStations(lat, lon, rM = 2414) {
       const latc = it.geometry?.location?.lat, lonc = it.geometry?.location?.lng;
       if (!Number.isFinite(latc) || !Number.isFinite(lonc)) continue;
       const milesExact = distMiles(lat, lon, latc, lonc);
-      if (milesExact <= 0.02) continue; // skip the searched site (same address)
+      if (milesExact <= SELF_EXCLUDE_RADIUS_MI) continue; // skip the searched site (same address)
       out.push({
         name,
         lat: +latc, lon: +lonc,
@@ -700,7 +702,7 @@ async function competitorsWithinRadiusMiles(lat, lon, rMi = 1.0) {
     const latc = el.lat ?? el.center?.lat, lonc = el.lon ?? el.center?.lon;
     if (latc == null || lonc == null) return null;
     const milesExact = distMiles(lat, lon, latc, lonc);
-    if (milesExact <= 0.02) return null;
+    if (milesExact <= SELF_EXCLUDE_RADIUS_MI) return null;
     return {
       name, lat: +latc, lon: +lonc,
       miles: +milesExact.toFixed(3),
@@ -715,7 +717,7 @@ async function competitorsWithinRadiusMiles(lat, lon, rMi = 1.0) {
     if (seen.has(k)) continue; seen.add(k); out.push(s);
   }
   out.sort((a, b) => a.miles - b.miles);
-  return out.filter((s) => s.miles <= rMi && s.miles > 0.02);
+  return out.filter((s) => s.miles <= rMi && s.miles > SELF_EXCLUDE_RADIUS_MI);
 }
 
 async function nearbyFuelRich(lat, lon, radiusMi = 5) {
