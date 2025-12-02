@@ -241,7 +241,7 @@
     </div>
 
     <div class="card">
-      <div class="muted" id="mapTitle">Map: Site & competitors (1.5 mi) + AADT dots + ⭐ AADT used</div>
+      <div class="muted" id="mapTitle">Map: Site & competitors (1 mi) + AADT dots + ⭐ AADT used</div>
       <div id="map"><div id="overlay" class="muted"></div></div>
       <div id="svWrap"><div class="muted" style="margin-top:10px;">Street View</div><iframe id="sv" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div>
     </div>
@@ -648,7 +648,7 @@ function renderMathFromServer(d){
 
   const rows = [
     formatBaselineLine(aadtUsed, B.baselineComponents, baseline),
-    `<b>Competitors in area</b> (1.5 mi): <b>${compCount}</b> total • Big box <b>${heavyCount}</b>`,
+    `<b>Competitors in area</b> (1 mi): <b>${compCount}</b> total • Big box <b>${heavyCount}</b>`,
     `Competition rule: base ${baseMult.toFixed ? baseMult.toFixed(2) : baseMult} − Big box ${heavyPen.toFixed ? heavyPen.toFixed(2) : heavyPen} = × ${compMult.toFixed ? compMult.toFixed(2) : compMult} → <b>${fmt(compAfter)}</b>`,
     `Capacity caps (equipment/soft/hard): ${fmt(capEquip)} / ${fmt(capSoft)} / ${fmt(capHard)}${softHit ? " • soft penalty −10%" : ""} → <b>${fmt(afterCap)}</b>`,
     `Pricing factor: × ${priceMult} → <b>${fmt(afterPrice)}</b>`,
