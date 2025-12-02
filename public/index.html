@@ -302,6 +302,7 @@ let skipNextInputReset = false;   // prevent clearing coords when setting value 
 let selectedNormalized = null;    // normalized address fields for persistence/server
 let lastStoredKey = null;         // dedupe persisted address writes
 let baseSummaryText = "";
+let lastEstimateResult = null;
 
 function updateSummaryDisplay(){
   if (!summaryBox) return;
@@ -719,6 +720,7 @@ function isFallbackAADT(d){ const m = d?.inputs?.aadt_components?.method || d?.m
 
 /* -------------------- Rendering (Estimate) -------------------- */
 function renderAll(d){
+  lastEstimateResult = d;
   const base = d.estimate?.base ?? d.base ?? d.estimate?.low ?? d.low ?? null;
   const low = d.estimate?.low ?? d.low ?? (Number.isFinite(base) ? Math.round(base * 0.86) : null);
   const high = d.estimate?.high ?? d.high ?? (Number.isFinite(base) ? Math.round(base * 1.06) : null);
@@ -1069,6 +1071,7 @@ exportBtn?.addEventListener("click", async ()=>{
   if (selectedCoords) { body.siteLat = selectedCoords.lat; body.siteLon = selectedCoords.lon; }
   const notes = siteNotesInput ? siteNotesInput.value.trim() : "";
   if (notes) body.siteNotes = notes;
+  if (lastEstimateResult && lastEstimateResult.ok === true) body.result = lastEstimateResult;
 
   let previousLabel = null;
   let toggled = false;

@@ -14,8 +14,14 @@ test('never returns negative counts', () => {
   assert.equal(heavyCount, 0);
 });
 
+test('single detected competitor applies 0.8 penalty', () => {
+  const { compCount, heavyCount } = adjustCompetitionCounts(1, 1);
+  assert.ok(Math.abs(compCount - 0.2) < 1e-9);
+  assert.ok(Math.abs(heavyCount - 0.2) < 1e-9);
+});
+
 test('heavy count cannot exceed adjusted total', () => {
   const { compCount, heavyCount } = adjustCompetitionCounts(1, 3);
-  assert.equal(compCount, 0);
-  assert.equal(heavyCount, 0);
+  assert.ok(Math.abs(compCount - 0.2) < 1e-9);
+  assert.ok(Math.abs(heavyCount - 0.2) < 1e-9);
 });
