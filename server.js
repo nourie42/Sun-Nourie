@@ -51,6 +51,42 @@ const CONTACT = process.env.OVERPASS_CONTACT || UA;
 const DEFAULT_GOOGLE_API_KEY = "AIzaSyC6QditNCTyN0jk3TcBmCGHE47r8sXKRzI";
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || DEFAULT_GOOGLE_API_KEY;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
+const PLACE_PHOTO_FALLBACK =
+  "https://images.unsplash.com/photo-1503435980610-a51f3fb9ac6c?auto=format&fit=crop&w=1200&q=80";
+const PRIORITY_BRANDS = ["Marathon", "Citgo", "Valero", "Exxon", "BP", "Shell"];
+const EXCLUDED_CHAINS = [
+  "Sheetz",
+  "Wawa",
+  "RaceTrac",
+  "Race Trac",
+  "Circle K",
+  "7-Eleven",
+  "7-11",
+  "Cumberland Farms",
+  "QuikTrip",
+  "QT",
+  "Speedway",
+  "Casey",
+  "Murphy",
+  "Murphy USA",
+  "Sunoco",
+  "GetGo",
+  "Pilot",
+  "Flying J",
+  "Love",
+  "Love's",
+  "Travel Centers",
+  "TA",
+  "Petro",
+  "Costco",
+  "Sam's Club",
+  "BJ's",
+  "Kroger",
+  "Albertsons",
+  "Safeway",
+  "H-E-B",
+  "Walmart",
+];
 
 const NOMINATIM_CACHE = new Map();
 const NOMINATIM_CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
@@ -59,6 +95,30 @@ const NOMINATIM_CACHE_LIMIT = 200;
 const GOOGLE_DETAIL_CACHE = new Map();
 const GOOGLE_DETAIL_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
 const GOOGLE_DETAIL_CACHE_LIMIT = 200;
+
+const STATIC_FALLBACK_SITES = [
+  {
+    name: "Wendell Fuel Plaza",
+    brand: "Independent",
+    address: "353 NC-231, Wendell, NC",
+    lat: 35.7814,
+    lon: -78.3917,
+  },
+  {
+    name: "Raleigh Market Gas",
+    brand: "Exxon",
+    address: "2901 Tryon Rd, Raleigh, NC",
+    lat: 35.7296,
+    lon: -78.6523,
+  },
+  {
+    name: "Clayton Hwy Stop",
+    brand: "Independent",
+    address: "11297 US-70 BUS, Clayton, NC",
+    lat: 35.6552,
+    lon: -78.3791,
+  },
+];
 
 let _cachedFetch = null;
 async function getFetch() {
@@ -230,6 +290,21 @@ async function geocodeNominatim(q) {
   const a = await r.json();
   if (!a?.length) throw new Error("Nominatim: no result");
   return { lat: +a[0].lat, lon: +a[0].lon, label: a[0].display_name };
+}
+
+async function geocodeLoose(query) {
+  const parsed = tryParseLatLng(query);
+  if (parsed) return parsed;
+  const cached = getCached(NOMINATIM_CACHE, query.trim().toLowerCase());
+  if (cached) return cached;
+  try {
+    const result = await geocodeNominatim(query);
+    setCached(NOMINATIM_CACHE, query.trim().toLowerCase(), result, NOMINATIM_CACHE_TTL_MS, NOMINATIM_CACHE_LIMIT);
+    return result;
+  } catch (err) {
+    console.warn("Nominatim geocode failed", err.message || err);
+    return null;
+  }
 }
 
 function formatNominatimDisplay(row) {
@@ -627,6 +702,37 @@ async function competitorsWithinRadiusMiles(lat, lon, rMi = 1.5) {
   }
   out.sort((a, b) => a.miles - b.miles);
   return out.filter((s) => s.miles <= rMi && s.miles > 0.02);
+}
+
+async function nearbyFuelRich(lat, lon, radiusMi = 5) {
+  const rM = Math.round(Math.max(0.5, Math.min(radiusMi, 25)) * 1609.344);
+  const q = `[out:json][timeout:25];
+    ( node(around:${rM},${lat},${lon})["amenity"="fuel"];
+      way(around:${rM},${lat},${lon})["amenity"="fuel"]; );
+    out center tags;`;
+  const res = await overpassQuery(q).then((j) => j.elements || []).catch(() => []);
+  const seen = new Set();
+  return res
+    .map((el) => {
+      const t = el.tags || {};
+      const name = t.name || t.brand || "Fuel";
+      const brand = t.brand || "Independent";
+      const latc = el.lat ?? el.center?.lat, lonc = el.lon ?? el.center?.lon;
+      if (latc == null || lonc == null) return null;
+      const k = `${Math.round(latc * 1e5)}|${Math.round(lonc * 1e5)}`;
+      if (seen.has(k)) return null;
+      seen.add(k);
+      const addr = formatNominatimDisplay({ address: t });
+      return {
+        name,
+        brand,
+        address: addr || t["addr:full"] || t["addr:street"] || "",
+        lat: +latc,
+        lon: +lonc,
+        isUnbranded: !PRIORITY_BRANDS.some((b) => name.toLowerCase().includes(b.toLowerCase())) && !(t.brand || "").trim(),
+      };
+    })
+    .filter(Boolean);
 }
 
 /* ----------------------- Road context ----------------------- */
