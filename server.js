@@ -658,6 +658,25 @@ const HEAVY_BRANDS = /(sheetz|wawa|race\s?trac|racetrac|buc-?ee'?s|royal\s?farms
 const IS_SUNOCO  = /\bsunoco\b/i;
 const SELF_EXCLUDE_RADIUS_MI = 0.05; // ~264 ft — avoid counting the searched site as a competitor
 
+function fallbackCompetitors(lat, lon, rMi) {
+  return STATIC_FALLBACK_SITES
+    .map((s) => {
+      const milesExact = distMiles(lat, lon, s.lat, s.lon);
+      return {
+        name: s.name,
+        brand: s.brand,
+        address: s.address,
+        lat: s.lat,
+        lon: s.lon,
+        miles: +milesExact.toFixed(3),
+        heavy: HEAVY_BRANDS.test(s.name),
+        sunoco: IS_SUNOCO.test(s.name),
+        fallback: true,
+      };
+    })
+    .filter((s) => s.miles <= rMi && s.miles > SELF_EXCLUDE_RADIUS_MI);
+}
+
 async function googleNearbyGasStations(lat, lon, rM = 2414) {
   if (!GOOGLE_API_KEY) return [];
   const base = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lon}&radius=${rM}&type=gas_station&key=${GOOGLE_API_KEY}`;
@@ -693,9 +712,10 @@ async function competitorsWithinRadiusMiles(lat, lon, rMi = 1.0) {
     ( node(around:${rM},${lat},${lon})["amenity"="fuel"];
       way(around:${rM},${lat},${lon})["amenity"="fuel"]; );
     out center tags;`;
+  let opError = null, googleError = null;
   const [op, g] = await Promise.all([
-    overpassQuery(q).then((j) => j.elements || []).catch(() => []),
-    googleNearbyGasStations(lat, lon, rM).catch(() => []),
+    overpassQuery(q).then((j) => j.elements || []).catch((e) => { opError = e; return []; }),
+    googleNearbyGasStations(lat, lon, rM).catch((e) => { googleError = e; return []; }),
   ]);
   const opList = op.map((el) => {
     const t = el.tags || {};
@@ -718,7 +738,22 @@ async function competitorsWithinRadiusMiles(lat, lon, rMi = 1.0) {
     if (seen.has(k)) continue; seen.add(k); out.push(s);
   }
   out.sort((a, b) => a.miles - b.miles);
-  return out.filter((s) => s.miles <= rMi && s.miles > SELF_EXCLUDE_RADIUS_MI);
+  const filtered = out.filter((s) => s.miles <= rMi && s.miles > SELF_EXCLUDE_RADIUS_MI);
+
+  if (!filtered.length && (opError || googleError)) {
+    const fb = fallbackCompetitors(lat, lon, rMi);
+    if (fb.length) {
+      console.warn("competitors lookup failed; using fallback", {
+        radius_mi: rMi,
+        overpass_error: opError?.message,
+        google_error: googleError?.message,
+        fallback_count: fb.length,
+      });
+      return fb;
+    }
+  }
+
+  return filtered;
 }
 
 async function nearbyFuelRich(lat, lon, radiusMi = 5) {
