@@ -1346,6 +1346,8 @@ async function performEstimate(reqBody) {
     compCountDetected,
     heavyCountDetected,
   );
+  const compCountDisplay = compCountDetected;
+  const heavyCountDisplay = Math.min(heavyCountDetected, compCountDisplay);
 
   // Developments + roads
   const devCsv = matchCsvDevelopments(admin.city, admin.county, admin.state);
@@ -1495,7 +1497,9 @@ Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
     address: address || geo.label,
     aadt: usedAADT, method: methodLabel,
     enteredRoad: enteredRoadText,
-    roads, compCount, heavyCount,
+    roads,
+    compCount: compCountDisplay,
+    heavyCount: heavyCountDisplay,
     pricePosition, userAdj: adjBits.join("; "),
     base: calc.base, low: calc.low, high: calc.high,
   });
@@ -1530,14 +1534,14 @@ Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
   const nearestComp = compAll3.length ? compAll3[0].miles : null;
   let competitionText = "";
   const compTextPrefix = "Competition: ";
-  if (compCount === 0) {
+  if (compCountDisplay === 0) {
     if (ruralEligible) competitionText = `${compTextPrefix}None within 3 mi.`;
     else competitionText = `${compTextPrefix}None within 1 mi${nearestComp != null ? ` (nearest ~${(+nearestComp).toFixed(1)} mi)` : ""}.`;
   } else {
-    competitionText = `${compTextPrefix}${compCount} station${compCount !== 1 ? "s" : ""} within 1 mi`;
-    if (heavyCount > 0) {
-      const bigBoxLabel = heavyCount === 1 ? "Big box competitor" : "Big box competitors";
-      competitionText += ` (${heavyCount} ${bigBoxLabel})`;
+    competitionText = `${compTextPrefix}${compCountDisplay} station${compCountDisplay !== 1 ? "s" : ""} within 1 mi`;
+    if (heavyCountDisplay > 0) {
+      const bigBoxLabel = heavyCountDisplay === 1 ? "Big box competitor" : "Big box competitors";
+      competitionText += ` (${heavyCountDisplay} ${bigBoxLabel})`;
     }
     competitionText += ".";
   }
@@ -1557,7 +1561,8 @@ Result LOW/BASE/HIGH: ${ctx.low}/${ctx.base}/${ctx.high}
     },
     flags: { rural_bonus_applied: ruralApplied, rural_eligible: ruralEligible, sunoco_within_1mi: sunocoNearby, auto_low_rating: autoLow },
     competition: {
-      count: compCount, count_3mi: compAll3.length, heavy_count: heavyCount,
+      count: compCountDisplay, count_3mi: compAll3.length, heavy_count: heavyCountDisplay,
+      adjusted_count: compCount, adjusted_heavy_count: heavyCount,
       detected_count: compCountDetected, detected_heavy_count: heavyCountDetected,
       override_applied: false,
       nearest_mi: competitors1[0]?.miles ?? null,
