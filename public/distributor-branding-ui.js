@@ -9,9 +9,8 @@
       .replace(/\bgpt-[a-z0-9._-]+\b/gi, '')
       .replace(/\bAI Ready\b/gi, 'Fuel IQ Ready')
       .replace(/Fuel IQ model:\s*[^•\n]+/gi, '')
-      .replace(/\s{2,}/g, ' ')
-      .replace(/\s+([,.;:])/g, '$1')
-      .trim();
+      .replace(/[ \t]{2,}/g, ' ')
+      .replace(/[ \t]+([,.;:])/g, '$1');
   }
 
   function sanitizeTextNodes(root = document.body) {
