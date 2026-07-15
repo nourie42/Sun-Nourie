@@ -6,7 +6,7 @@ import { fileURLToPath } from "url";
 import { spawn } from "child_process";
 import { registerDistributorResearchRoutes } from "./src/distributorResearchCompat.js";
 import { registerDistributorCompanySearchRoutes } from "./src/distributorCompanySearch.js";
-import { registerSiteResearchRoutes } from "./src/siteResearch.js";
+import { registerSiteResearchRoutes } from "./src/siteResearchExhaustive.js";
 import { registerSiteEnhancementRoutes } from "./src/siteEnhancements.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -117,6 +117,8 @@ app.get("/health", (_req, res) => {
     propertyRecordsResearch: true,
     competitorRadiusMiles: 1.5,
     multiSourceCompetitorSearch: true,
+    multiPassExhaustiveSiteResearch: true,
+    siteResearchDefaultModel: process.env.OPENAI_SITE_RESEARCH_MODEL || "gpt-4.1-mini",
     webSearchJsonModeCompatibility: true,
     legacyServerReady: legacyReady,
   });
@@ -182,7 +184,7 @@ function proxyToLegacy(req, res) {
 app.use(proxyToLegacy);
 
 const server = app.listen(publicPort, "0.0.0.0", () => {
-  console.log(`Fuel IQ gateway with 1.5-mile competition verification, Word export, Distributor Intelligence, and Site Research listening on :${publicPort}`);
+  console.log(`Fuel IQ gateway with 1.5-mile competition verification, Word export, Distributor Intelligence, and multi-pass Site Research listening on :${publicPort}`);
 });
 
 function shutdown(signal) {
