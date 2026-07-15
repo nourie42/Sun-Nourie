@@ -8,8 +8,10 @@ import {
 
 const sourcePage = await fs.readFile(new URL("../public/distributors.html", import.meta.url), "utf8");
 const page = transformDistributorPage(sourcePage);
-assert.equal(/Chat\s*GPT/i.test(page), false, "Distributor page still exposes a provider name");
-assert.equal(/OpenAI/i.test(page), false, "Distributor page still exposes a provider company name");
+const visiblePage = page.replace(/<script\b[\s\S]*?<\/script>/gi, "");
+assert.equal(/Chat\s*GPT/i.test(visiblePage), false, "Distributor page still exposes a provider name");
+assert.equal(/OpenAI/i.test(visiblePage), false, "Distributor page still exposes a provider company name");
+assert.match(page, /data\.openAiEnabled/, "Page script identifiers were unexpectedly modified");
 
 const payload = sanitizePayload({
   message: "ChatGPT is researching with OpenAI",
