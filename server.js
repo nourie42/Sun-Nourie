@@ -6,6 +6,7 @@ import { fileURLToPath } from "url";
 import { spawn } from "child_process";
 import { registerDistributorResearchRoutes } from "./src/distributorResearchCompat.js";
 import { registerDistributorCompanySearchRoutes } from "./src/distributorCompanySearch.js";
+import { registerSiteResearchRoutes } from "./src/siteResearch.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -56,6 +57,7 @@ registerDistributorCompanySearchRoutes(app, {
   openAiApiKey: process.env.OPENAI_API_KEY || "",
   googleApiKey: process.env.GOOGLE_API_KEY || "",
 });
+registerSiteResearchRoutes(app, { openAiApiKey: process.env.OPENAI_API_KEY || "" });
 
 app.get("/distributors", (_req, res) => res.redirect(302, "/distributors.html"));
 app.get("/distributor-company-search.js", (_req, res) => {
@@ -67,6 +69,11 @@ app.get("/distributor-research-client-v2.js", (_req, res) => {
   res.setHeader("Cache-Control", "no-store");
   res.type("application/javascript");
   res.sendFile(path.join(__dirname, "public", "distributor-research-client-v2.js"));
+});
+app.get("/site-research-client.js", (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.type("application/javascript");
+  res.sendFile(path.join(__dirname, "public", "site-research-client.js"));
 });
 app.get("/distributors.html", async (_req, res) => {
   try {
@@ -89,27 +96,25 @@ app.get("/distributors.html", async (_req, res) => {
   }
 });
 
+app.get(["/developments", "/developments.html", "/prospector", "/Scraper.html"], (_req, res) => {
+  res.redirect(302, "/");
+});
+
 app.get("/health", (_req, res) => {
   res.status(legacyReady ? 200 : 503).json({
     ok: legacyReady,
     distributorIntelligence: true,
     distributorCompanySearch: true,
     distributorBackgroundResearch: true,
+    siteResearch: true,
+    siteResearchWordExport: true,
+    propertyRecordsResearch: true,
     webSearchJsonModeCompatibility: true,
     legacyServerReady: legacyReady,
   });
 });
 
-const launchButton = `
-<a id="fuel-distributor-intelligence-launch" href="/distributors.html" aria-label="Open Fuel Distributor Intelligence">
-  <span class="fdi-icon">◆</span><span>Distributor Intelligence</span>
-</a>
-<style>
-#fuel-distributor-intelligence-launch{position:fixed;right:20px;bottom:20px;z-index:2147483000;display:flex;align-items:center;gap:9px;padding:13px 17px;border-radius:999px;background:#0b1f33;color:#fff!important;text-decoration:none!important;font:700 14px/1 Arial,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.22);transition:transform .15s ease,box-shadow .15s ease}
-#fuel-distributor-intelligence-launch:hover{transform:translateY(-2px);box-shadow:0 14px 36px rgba(0,0,0,.34)}
-#fuel-distributor-intelligence-launch .fdi-icon{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:#fbbf24;color:#0b1f33;font-size:12px}
-@media(max-width:640px){#fuel-distributor-intelligence-launch{right:12px;bottom:12px;padding:12px}#fuel-distributor-intelligence-launch span:last-child{display:none}}
-</style>`;
+const homeEnhancements = '<script src="/site-research-client.js" defer></script>';
 
 function copyHeaders(source, target, { dropLength = false } = {}) {
   for (const [name, value] of Object.entries(source)) {
@@ -138,7 +143,9 @@ function proxyToLegacy(req, res) {
       proxyResponse.on("data", (chunk) => chunks.push(chunk));
       proxyResponse.on("end", () => {
         let page = Buffer.concat(chunks).toString("utf8");
-        page = page.includes("</body>") ? page.replace("</body>", `${launchButton}</body>`) : `${page}${launchButton}`;
+        if (!page.includes("/site-research-client.js")) {
+          page = page.includes("</body>") ? page.replace("</body>", `${homeEnhancements}</body>`) : `${page}${homeEnhancements}`;
+        }
         res.status(proxyResponse.statusCode || 200);
         copyHeaders(proxyResponse.headers, res, { dropLength: true });
         res.setHeader("Content-Length", Buffer.byteLength(page));
@@ -167,7 +174,7 @@ function proxyToLegacy(req, res) {
 app.use(proxyToLegacy);
 
 const server = app.listen(publicPort, "0.0.0.0", () => {
-  console.log(`Fuel IQ gateway with Distributor Intelligence listening on :${publicPort}`);
+  console.log(`Fuel IQ gateway with Distributor Intelligence and Site Research listening on :${publicPort}`);
 });
 
 function shutdown(signal) {
