@@ -9,7 +9,7 @@
     "start": "node server.js",
     "start:legacy": "node legacy-server.js",
     "build": "npm ci || npm install",
-    "check": "node --check server.js && node --check legacy-server.js && node --check src/siteResearch.js && node --check src/distributorResearch.js && node --check src/distributorResearchV2.js && node --check src/distributorResearchV3.js && node --check src/distributorReportV3.js && node --check src/distributorWordV3.js && node --check src/distributorCompanySearch.js && node --check public/site-research-client.js && node --check public/distributor-company-search.js && node --check public/distributor-research-client-v3.js"
+    "check": "node --check server.js && node --check legacy-server.js && node --check src/siteResearch.js && node --check src/distributorResearch.js && node --check src/distributorResearchV2.js && node --check src/distributorResearchV3.js && node --check src/distributorReportV3.js && node --check src/distributorWordV3.js && node --check src/distributorCompanySearch.js && node --check public/site-research-client.js && node --check public/distributor-company-search.js && node --check public/distributor-research-client-v3.js && node scripts/validateDistributorV3.js"
   },
   "engines": { "node": ">=18" },
   "dependencies": {
