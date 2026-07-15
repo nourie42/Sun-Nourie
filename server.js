@@ -72,6 +72,11 @@ app.get("/distributor-company-search.js", (_req, res) => {
   res.type("application/javascript");
   res.sendFile(path.join(__dirname, "public", "distributor-company-search.js"));
 });
+app.get("/distributor-scope-ui.js", (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.type("application/javascript");
+  res.sendFile(path.join(__dirname, "public", "distributor-scope-ui.js"));
+});
 app.get("/distributor-research-client-v2.js", (_req, res) => {
   res.setHeader("Cache-Control", "no-store");
   res.type("application/javascript");
@@ -88,6 +93,7 @@ app.get("/distributors.html", async (_req, res) => {
     let page = await fs.readFile(filename, "utf8");
     const scripts = [
       '<script src="/distributor-company-search.js" defer></script>',
+      '<script src="/distributor-scope-ui.js" defer></script>',
       '<script src="/distributor-research-client-v2.js" defer></script>',
     ];
     for (const script of scripts) {
@@ -112,6 +118,10 @@ app.get("/health", (_req, res) => {
     ok: legacyReady,
     distributorIntelligence: true,
     distributorCompanySearch: true,
+    distributorAutomaticHeadquarters: true,
+    distributorSearchDepthSelection: true,
+    distributorFullSearchDefault: true,
+    distributorLimitedSearch: true,
     distributorBackgroundResearch: true,
     siteResearch: true,
     siteResearchWordExport: true,

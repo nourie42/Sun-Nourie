@@ -11,12 +11,22 @@ function createOpenAiCompatibleFetch() {
           const payload = JSON.parse(init.body);
           const usesWebSearch = Array.isArray(payload.tools) && payload.tools.some((tool) => String(tool?.type || "").startsWith("web_search"));
           const usesJsonMode = payload?.text?.format?.type === "json_object" || payload?.response_format?.type === "json_object";
+          const inputText = String(payload.input || "");
+          const limitedSearch = inputText.includes("SPECIAL FOCUS: LIMITED SEARCH:");
+
           if (usesWebSearch && usesJsonMode) {
             if (payload.text?.format?.type === "json_object") delete payload.text;
             if (payload.response_format?.type === "json_object") delete payload.response_format;
             payload.instructions = `${payload.instructions || ""}\nReturn exactly one valid JSON object. Do not use markdown fences or any text outside the object.`.trim();
-            nextInit = { ...nextInit, body: JSON.stringify(payload) };
           }
+
+          if (limitedSearch) {
+            const scopeOverride = "The user's LIMITED SEARCH instruction overrides any earlier wording that asks for an exhaustive full-company report. Research only the categories explicitly selected by the user, while still confirming the company identity and collecting attributable sources. Keep all unselected JSON report sections present but empty.";
+            payload.instructions = `${payload.instructions || ""}\n${scopeOverride}`.trim();
+            payload.input = `${inputText}\n\nIMPORTANT SCOPE OVERRIDE: ${scopeOverride}`;
+          }
+
+          nextInit = { ...nextInit, body: JSON.stringify(payload) };
         } catch {
           // Leave non-JSON request bodies unchanged.
         }
