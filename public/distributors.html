@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#071522" />
+  <title>Fuel Distributor Intelligence | Fuel IQ</title>
+  <style>
+    :root{
+      --ink:#0b1f33;--ink-2:#18344d;--blue:#1f5f8b;--blue-2:#2d7fb8;--gold:#f4b942;
+      --paper:#fff;--soft:#f2f6fa;--line:#d7e0e8;--muted:#5b6b7b;--green:#0e7a53;--red:#b42318;
+      --shadow:0 16px 45px rgba(9,30,49,.12);--radius:16px;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:linear-gradient(180deg,#071522 0 290px,#edf3f7 290px 100%);min-height:100vh}
+    button,input,textarea{font:inherit}
+    a{color:inherit}
+    .shell{width:min(1460px,calc(100% - 32px));margin:0 auto;padding-bottom:50px}
+    .topbar{height:72px;display:flex;align-items:center;justify-content:space-between;color:#fff}
+    .brand{display:flex;align-items:center;gap:12px;text-decoration:none;font-weight:800;letter-spacing:.01em}
+    .brand-mark{width:38px;height:38px;border-radius:11px;background:linear-gradient(145deg,var(--gold),#ffda7a);color:var(--ink);display:grid;place-items:center;box-shadow:0 8px 24px rgba(244,185,66,.2)}
+    .back-link{color:#d9e7f2;text-decoration:none;font-size:14px}.back-link:hover{color:#fff}
+    .hero{color:#fff;padding:30px 0 34px;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(330px,.8fr);gap:36px;align-items:center}
+    .kicker{color:#8fc4ea;text-transform:uppercase;letter-spacing:.17em;font-weight:800;font-size:12px}
+    h1{font-size:clamp(36px,5vw,64px);letter-spacing:-.045em;line-height:.98;margin:10px 0 16px;max-width:850px}
+    .hero p{font-size:18px;line-height:1.55;color:#c8dae7;max-width:830px;margin:0}
+    .hero-card{border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);backdrop-filter:blur(18px);border-radius:18px;padding:22px}
+    .hero-card strong{display:block;font-size:15px;margin-bottom:10px}.hero-list{display:grid;grid-template-columns:1fr 1fr;gap:9px;color:#d7e6f1;font-size:13px}.hero-list span:before{content:"✓";color:var(--gold);font-weight:900;margin-right:7px}
+    .workspace{display:grid;grid-template-columns:390px minmax(0,1fr);gap:20px;align-items:start}
+    .panel{background:var(--paper);border:1px solid rgba(12,38,59,.08);border-radius:var(--radius);box-shadow:var(--shadow)}
+    .search-panel{padding:22px;position:sticky;top:16px}
+    .panel-title{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:18px}.panel-title h2{margin:0;font-size:21px}.panel-title p{margin:4px 0 0;color:var(--muted);font-size:13px;line-height:1.4}
+    .status{display:inline-flex;align-items:center;gap:7px;border-radius:999px;padding:6px 9px;background:#eef2f6;color:var(--muted);font-size:11px;font-weight:800;white-space:nowrap}.status:before{content:"";width:7px;height:7px;border-radius:50%;background:#8a98a6}.status.ready{background:#e9f8f1;color:var(--green)}.status.ready:before{background:var(--green)}.status.error{background:#fff0ee;color:var(--red)}.status.error:before{background:var(--red)}
+    label{display:block;font-size:12px;font-weight:800;color:#34495b;margin:15px 0 7px;text-transform:uppercase;letter-spacing:.055em}
+    input,textarea{width:100%;border:1px solid var(--line);border-radius:11px;padding:12px 13px;color:var(--ink);background:#fbfdff;outline:none;transition:border-color .15s,box-shadow .15s}textarea{min-height:105px;resize:vertical;line-height:1.45}input:focus,textarea:focus{border-color:var(--blue-2);box-shadow:0 0 0 4px rgba(45,127,184,.11);background:#fff}
+    .primary{width:100%;margin-top:16px;border:0;border-radius:11px;padding:14px 16px;background:linear-gradient(135deg,var(--blue),#123f62);color:#fff;font-weight:850;cursor:pointer;box-shadow:0 10px 24px rgba(31,95,139,.22);transition:transform .15s,filter .15s}.primary:hover{transform:translateY(-1px);filter:brightness(1.04)}.primary:disabled{opacity:.58;cursor:wait;transform:none}
+    .privacy{font-size:11px;line-height:1.45;color:#738292;margin:12px 0 0}.quick{margin-top:22px;padding-top:18px;border-top:1px solid var(--line)}.quick h3,.history h3{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:#617283;margin:0 0 9px}.chips{display:flex;flex-wrap:wrap;gap:7px}.chip{border:1px solid var(--line);background:#fff;color:#31516a;border-radius:999px;padding:7px 10px;font-size:12px;cursor:pointer}.chip:hover{border-color:#8db5d2;background:#f4f9fc}
+    .history{margin-top:19px}.history-list{display:grid;gap:7px}.history-item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:10px;background:#fbfdff}.history-open{border:0;background:transparent;padding:0;text-align:left;cursor:pointer;min-width:0}.history-open strong{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px}.history-open span{display:block;color:#7a8997;font-size:10px;margin-top:3px}.history-delete{border:0;background:transparent;color:#91a0ad;cursor:pointer;font-size:16px;padding:3px}.history-delete:hover{color:var(--red)}
+    .result-panel{min-height:700px;overflow:hidden}.empty-state{min-height:700px;display:grid;place-items:center;padding:40px;text-align:center}.empty-state-inner{max-width:650px}.empty-icon{width:86px;height:86px;margin:0 auto 20px;border-radius:24px;background:linear-gradient(145deg,#e4eef5,#f8fbfd);display:grid;place-items:center;font-size:35px;color:var(--blue);border:1px solid #d9e4ec}.empty-state h2{font-size:28px;margin:0 0 10px}.empty-state p{color:var(--muted);line-height:1.6;margin:0}.empty-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:24px}.empty-grid div{border:1px solid var(--line);border-radius:11px;padding:12px;background:#fbfdff;font-size:12px;color:#506273}
+    .loading{min-height:700px;display:none;place-items:center;padding:40px}.loading.active{display:grid}.loader-wrap{text-align:center;max-width:580px}.radar{width:110px;height:110px;margin:0 auto 24px;border-radius:50%;position:relative;background:radial-gradient(circle at center,#fff 0 7%,transparent 8%),repeating-radial-gradient(circle,#d5e4ee 0 1px,transparent 2px 23px),conic-gradient(from 0deg,transparent 0 70%,rgba(45,127,184,.45) 92%,transparent 100%);animation:spin 2.2s linear infinite}.radar:after{content:"";position:absolute;inset:9px;border-radius:50%;border:1px solid #b7cfdf}@keyframes spin{to{transform:rotate(360deg)}}.loading h2{margin:0 0 8px}.loading p{color:var(--muted);min-height:48px}.progress{height:7px;border-radius:999px;background:#e5edf3;overflow:hidden;margin-top:16px}.progress span{display:block;height:100%;width:22%;border-radius:999px;background:linear-gradient(90deg,var(--blue),#65aedd);animation:progress 11s ease-in-out infinite}@keyframes progress{0%{width:8%}45%{width:62%}75%{width:82%}100%{width:94%}}
+    .report-shell{display:none}.report-shell.active{display:block}.report-toolbar{padding:18px 20px;border-bottom:1px solid var(--line);background:#fff;position:sticky;top:0;z-index:5}.report-top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}.report-top h2{font-size:22px;margin:0}.report-top p{margin:4px 0 0;color:var(--muted);font-size:12px}.actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.action{border:1px solid var(--line);border-radius:9px;background:#fff;padding:9px 11px;font-size:12px;font-weight:750;color:#29475d;cursor:pointer;text-decoration:none}.action:hover{border-color:#8cb4d0;background:#f5f9fc}.action.word{background:var(--blue);color:#fff;border-color:var(--blue)}
+    .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:15px}.metric{background:var(--soft);border:1px solid #e1e8ee;border-radius:10px;padding:10px}.metric span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#71808e}.metric strong{display:block;font-size:16px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .tabs{display:flex;gap:6px;overflow:auto;padding-top:14px;scrollbar-width:thin}.tab{border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 11px;white-space:nowrap;font-size:11px;font-weight:750;color:#526678;cursor:pointer}.tab.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+    #reportContent{padding:0 20px 26px}.report-document{padding-left:0!important;padding-right:0!important}.report-cover{display:none}.report-document h2{scroll-margin-top:190px}
+    .error-box{display:none;margin:20px;padding:16px;border-radius:12px;border:1px solid #f1aaa4;background:#fff3f1;color:#7a241d}.error-box.active{display:block}.error-box strong{display:block;margin-bottom:5px}
+    .footer-note{text-align:center;color:#6e7f8e;font-size:11px;padding:20px}
+    @media(max-width:1050px){.workspace{grid-template-columns:1fr}.search-panel{position:relative;top:0}.hero{grid-template-columns:1fr}.hero-card{display:none}.result-panel,.empty-state,.loading{min-height:520px}}
+    @media(max-width:700px){body{background:linear-gradient(180deg,#071522 0 340px,#edf3f7 340px)}.shell{width:min(100% - 18px,1460px)}.topbar{height:60px}.hero{padding:25px 2px 30px}.hero p{font-size:15px}.search-panel{padding:16px}.report-toolbar{padding:14px}.report-top{display:block}.actions{justify-content:flex-start;margin-top:12px}.metrics{grid-template-columns:1fr 1fr}.empty-grid{grid-template-columns:1fr}.report-document{padding:18px 0!important}#reportContent{padding:0 14px 20px}}
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <nav class="topbar">
+      <a class="brand" href="/"><span class="brand-mark">FIQ</span><span>Fuel IQ</span></a>
+      <a class="back-link" href="/">← Back to Site Analyzer</a>
+    </nav>
+
+    <header class="hero">
+      <div>
+        <div class="kicker">AI-powered M&amp;A research</div>
+        <h1>Fuel Distributor Intelligence</h1>
+        <p>Search any petroleum marketer or fuel distributor. ChatGPT investigates public company records, fleet data, sites, licenses, leadership, environmental history, revenue and gallon estimates, risks, and acquisition diligence—then builds an exportable Word report.</p>
+      </div>
+      <aside class="hero-card">
+        <strong>Exhaustive research coverage</strong>
+        <div class="hero-list">
+          <span>Company &amp; ownership</span><span>Revenue scenarios</span>
+          <span>Gallons &amp; capacity</span><span>Fleet &amp; drivers</span>
+          <span>Public delivery sites</span><span>Fuel licenses</span>
+          <span>Environmental records</span><span>Leadership map</span>
+          <span>Risk assessment</span><span>Diligence plan</span>
+        </div>
+      </aside>
+    </header>
+
+    <main class="workspace">
+      <aside class="panel search-panel">
+        <div class="panel-title">
+          <div><h2>Research a Distributor</h2><p>Enter the company name as precisely as possible.</p></div>
+          <span id="apiStatus" class="status">Checking</span>
+        </div>
+        <form id="researchForm">
+          <label for="companyName">Distributor name</label>
+          <input id="companyName" name="companyName" autocomplete="organization" placeholder="e.g., J.H. Seale & Son, Inc." required />
+
+          <label for="locationHint">Headquarters or operating area <span style="font-weight:500;text-transform:none">(optional)</span></label>
+          <input id="locationHint" name="locationHint" autocomplete="address-level1" placeholder="e.g., Sumter, South Carolina" />
+
+          <label for="researchFocus">Special focus <span style="font-weight:500;text-transform:none">(optional)</span></label>
+          <textarea id="researchFocus" name="researchFocus" placeholder="Examples: identify every public delivery site, focus on ownership and decision makers, estimate gallons and acquisition value..."></textarea>
+
+          <button id="researchButton" class="primary" type="submit">Research Company with ChatGPT</button>
+          <p class="privacy">Research uses public web sources. Financial, gallon, EBITDA, customer, and valuation estimates are clearly labeled as modeled—not verified company data.</p>
+        </form>
+
+        <div class="quick">
+          <h3>Example searches</h3>
+          <div class="chips">
+            <button class="chip" data-company="J.H. Seale & Son, Inc." data-location="Sumter, South Carolina">J.H. Seale</button>
+            <button class="chip" data-company="Mansfield Energy Corp." data-location="Gainesville, Georgia">Mansfield</button>
+            <button class="chip" data-company="TACenergy" data-location="Dallas, Texas">TACenergy</button>
+          </div>
+        </div>
+
+        <div class="history">
+          <h3>Saved on this device</h3>
+          <div id="historyList" class="history-list"><p class="privacy">No saved reports yet.</p></div>
+        </div>
+      </aside>
+
+      <section class="panel result-panel">
+        <div id="errorBox" class="error-box"><strong>Research failed</strong><span id="errorText"></span></div>
+
+        <div id="emptyState" class="empty-state">
+          <div class="empty-state-inner">
+            <div class="empty-icon">⌕</div>
+            <h2>Build a complete public-source company report</h2>
+            <p>The report follows the same diligence structure used for a deep fuel-distributor analysis: confirmed facts, confidence-rated public clues, modeled estimates, source links, risks, and acquisition questions.</p>
+            <div class="empty-grid"><div>Publicly identified sites</div><div>Fleet and gallon capacity</div><div>Word-ready report</div></div>
+          </div>
+        </div>
+
+        <div id="loadingState" class="loading">
+          <div class="loader-wrap">
+            <div class="radar"></div>
+            <h2>ChatGPT is researching the company</h2>
+            <p id="loadingMessage">Identifying the legal entity, official website, and operating model…</p>
+            <div class="progress"><span></span></div>
+            <p style="font-size:11px;min-height:0;margin-top:12px">Deep research can take several minutes because the system checks and cross-references public sources.</p>
+          </div>
+        </div>
+
+        <div id="reportShell" class="report-shell">
+          <div class="report-toolbar">
+            <div class="report-top">
+              <div><h2 id="reportTitle">Distributor report</h2><p id="reportSubtitle"></p></div>
+              <div class="actions">
+                <button id="newSearchButton" class="action" type="button">New Search</button>
+                <button id="printButton" class="action" type="button">Print / PDF</button>
+                <button id="jsonButton" class="action" type="button">Export JSON</button>
+                <button id="wordButton" class="action word" type="button">Export to Word</button>
+              </div>
+            </div>
+            <div class="metrics">
+              <div class="metric"><span>Public sources</span><strong id="sourceMetric">—</strong></div>
+              <div class="metric"><span>Identified sites</span><strong id="siteMetric">—</strong></div>
+              <div class="metric"><span>Strategic fit</span><strong id="fitMetric">—</strong></div>
+              <div class="metric"><span>ChatGPT model</span><strong id="modelMetric">—</strong></div>
+            </div>
+            <div id="tabs" class="tabs"></div>
+          </div>
+          <div id="reportContent"></div>
+          <div class="footer-note">Public-source acquisition screening only. Validate all facts, relationships, estimates, and legal or environmental matters in formal diligence.</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const form = document.getElementById('researchForm');
+    const companyName = document.getElementById('companyName');
+    const locationHint = document.getElementById('locationHint');
+    const researchFocus = document.getElementById('researchFocus');
+    const researchButton = document.getElementById('researchButton');
+    const apiStatus = document.getElementById('apiStatus');
+    const emptyState = document.getElementById('emptyState');
+    const loadingState = document.getElementById('loadingState');
+    const loadingMessage = document.getElementById('loadingMessage');
+    const reportShell = document.getElementById('reportShell');
+    const reportContent = document.getElementById('reportContent');
+    const errorBox = document.getElementById('errorBox');
+    const errorText = document.getElementById('errorText');
+    const historyList = document.getElementById('historyList');
+    let current = null;
+    let loadingTimer = null;
+
+    const loadingMessages = [
+      'Identifying the legal entity, official website, and operating model…',
+      'Checking FMCSA, SAFER, fleet, driver, mileage, and safety records…',
+      'Searching motor-fuel licenses, UST records, and environmental enforcement…',
+      'Finding public stations, delivery evidence, brands, and operating markets…',
+      'Mapping leadership, ownership, decision makers, and acquisition history…',
+      'Modeling revenue, gallons, fleet capacity, customer count, and valuation limits…',
+      'Cross-checking sources, confidence levels, risks, and diligence questions…',
+      'Formatting the complete report and Word export…'
+    ];
+
+    const tabDefinitions = [
+      ['all','Full Report',[]],
+      ['overview','Overview',['report-executive_findings','report-identity_operating_model']],
+      ['financials','Financials',['report-revenue_sales_estimates']],
+      ['sites','Sites',['report-sites_delivery_points','report-appendix-sites','report-appendix-urls']],
+      ['markets','Markets',['report-geographic_footprint']],
+      ['fleet','Fleet',['report-fleet_drivers_capacity_safety']],
+      ['leadership','Leadership',['report-leadership_staff_map']],
+      ['regulatory','Regulatory',['report-licensing_regulatory_records']],
+      ['risk','Risk',['report-risk_assessment']],
+      ['diligence','Diligence',['report-acquisition_due_diligence']],
+      ['sources','Sources',['report-appendix-sources']]
+    ];
+
+    function setState(state) {
+      emptyState.style.display = state === 'empty' ? 'grid' : 'none';
+      loadingState.classList.toggle('active', state === 'loading');
+      reportShell.classList.toggle('active', state === 'report');
+      errorBox.classList.remove('active');
+    }
+
+    function showError(message) {
+      errorText.textContent = message || 'Unknown error.';
+      errorBox.classList.add('active');
+    }
+
+    function startLoadingMessages() {
+      let index = 0;
+      loadingMessage.textContent = loadingMessages[0];
+      clearInterval(loadingTimer);
+      loadingTimer = setInterval(() => {
+        index = Math.min(index + 1, loadingMessages.length - 1);
+        loadingMessage.textContent = loadingMessages[index];
+      }, 11500);
+    }
+
+    function stopLoadingMessages() {
+      clearInterval(loadingTimer);
+      loadingTimer = null;
+    }
+
+    async function checkStatus() {
+      try {
+        const response = await fetch('/api/distributors/status', { cache: 'no-store' });
+        const data = await response.json();
+        if (response.ok && data.openAiEnabled) {
+          apiStatus.textContent = 'AI Ready';
+          apiStatus.className = 'status ready';
+        } else {
+          apiStatus.textContent = 'API Key Needed';
+          apiStatus.className = 'status error';
+        }
+      } catch {
+        apiStatus.textContent = 'Unavailable';
+        apiStatus.className = 'status error';
+      }
+    }
+
+    function getHistory() {
+      try { return JSON.parse(localStorage.getItem('fuelIqDistributorReports') || '[]'); }
+      catch { return []; }
+    }
+
+    function setHistory(history) {
+      try {
+        localStorage.setItem('fuelIqDistributorReports', JSON.stringify(history.slice(0, 6)));
+      } catch {
+        const compact = history.slice(0, 3).map(item => ({...item, report: null}));
+        localStorage.setItem('fuelIqDistributorReports', JSON.stringify(compact));
+      }
+      renderHistory();
+    }
+
+    function saveHistory(item) {
+      const history = getHistory().filter(existing => existing.reportId !== item.reportId && existing.companyName !== item.companyName);
+      history.unshift(item);
+      setHistory(history);
+    }
+
+    function renderHistory() {
+      const history = getHistory();
+      if (!history.length) {
+        historyList.innerHTML = '<p class="privacy">No saved reports yet.</p>';
+        return;
+      }
+      historyList.innerHTML = history.map((item, index) => `
+        <div class="history-item">
+          <button class="history-open" data-history-index="${index}" type="button"><strong>${escapeHtml(item.companyName)}</strong><span>${escapeHtml(new Date(item.savedAt).toLocaleString())}</span></button>
+          <button class="history-delete" data-delete-index="${index}" type="button" aria-label="Delete saved report">×</button>
+        </div>`).join('');
+    }
+
+    function escapeHtml(value) {
+      return String(value || '').replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
+    }
+
+    function siteCount(report) {
+      const sites = report?.appendices?.publicly_identified_sites || report?.sites_delivery_points?.sites || [];
+      return Array.isArray(sites) ? sites.length : 0;
+    }
+
+    function renderTabs() {
+      const tabs = document.getElementById('tabs');
+      tabs.innerHTML = tabDefinitions.map(([id,label]) => `<button type="button" class="tab ${id === 'all' ? 'active' : ''}" data-tab="${id}">${label}</button>`).join('');
+      applyTab('all');
+    }
+
+    function applyTab(tabId) {
+      const selected = tabDefinitions.find(([id]) => id === tabId) || tabDefinitions[0];
+      const allowed = new Set(selected[2]);
+      reportContent.querySelectorAll('.report-document > section').forEach(section => {
+        section.style.display = tabId === 'all' || allowed.has(section.id) ? '' : 'none';
+      });
+      document.querySelectorAll('.tab').forEach(tab => tab.classList.toggle('active', tab.dataset.tab === tabId));
+    }
+
+    function displayReport(payload, { save = true } = {}) {
+      current = payload;
+      reportContent.innerHTML = payload.html || '<p style="padding:20px">Report HTML was not returned.</p>';
+      const report = payload.report || {};
+      document.getElementById('reportTitle').textContent = report.title || report.company_name || 'Distributor report';
+      document.getElementById('reportSubtitle').textContent = `Prepared ${report.prepared_at || 'now'} • Public-source ChatGPT research`;
+      document.getElementById('sourceMetric').textContent = (report?.appendices?.source_register || report?.sources || []).length || '0';
+      document.getElementById('siteMetric').textContent = siteCount(report);
+      document.getElementById('fitMetric').textContent = report?.risk_assessment?.strategic_fit_score_0_to_10 || '—';
+      document.getElementById('modelMetric').textContent = report?._meta?.model || 'ChatGPT';
+      renderTabs();
+      setState('report');
+      window.scrollTo({ top: document.querySelector('.workspace').offsetTop - 10, behavior: 'smooth' });
+      if (save) {
+        saveHistory({
+          reportId: payload.reportId,
+          companyName: report.company_name || report.query || 'Fuel Distributor',
+          savedAt: new Date().toISOString(),
+          html: payload.html,
+          report: payload.report,
+          wordUrl: payload.wordUrl
+        });
+      }
+    }
+
+    async function runResearch(event) {
+      event.preventDefault();
+      const query = companyName.value.trim();
+      if (!query) return;
+      researchButton.disabled = true;
+      researchButton.textContent = 'Researching…';
+      setState('loading');
+      startLoadingMessages();
+      try {
+        const response = await fetch('/api/distributors/research', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ query, location: locationHint.value.trim(), focus: researchFocus.value.trim() })
+        });
+        let data;
+        try { data = await response.json(); }
+        catch { throw new Error(`Server returned ${response.status} without a valid response.`); }
+        if (!response.ok || !data.ok) throw new Error(data.message || data.detail || `Research failed (${response.status}).`);
+        displayReport(data);
+      } catch (error) {
+        setState('empty');
+        showError(error.message || String(error));
+      } finally {
+        stopLoadingMessages();
+        researchButton.disabled = false;
+        researchButton.textContent = 'Research Company with ChatGPT';
+      }
+    }
+
+    async function exportWord() {
+      if (!current?.report) return;
+      if (current.wordUrl) {
+        window.location.href = current.wordUrl;
+        return;
+      }
+      const response = await fetch('/api/distributors/word', {
+        method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({report: current.report})
+      });
+      if (!response.ok) return showError('Word export failed.');
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `${(current.report.company_name || 'fuel-distributor').replace(/[^a-z0-9]+/gi,'-')}-report.doc`;
+      anchor.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+    }
+
+    function exportJson() {
+      if (!current?.report) return;
+      const blob = new Blob([JSON.stringify(current.report, null, 2)], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `${(current.report.company_name || 'fuel-distributor').replace(/[^a-z0-9]+/gi,'-')}-report.json`;
+      anchor.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+    }
+
+    form.addEventListener('submit', runResearch);
+    document.getElementById('wordButton').addEventListener('click', exportWord);
+    document.getElementById('jsonButton').addEventListener('click', exportJson);
+    document.getElementById('printButton').addEventListener('click', () => window.print());
+    document.getElementById('newSearchButton').addEventListener('click', () => {
+      setState('empty'); companyName.focus(); window.scrollTo({top:0,behavior:'smooth'});
+    });
+    document.getElementById('tabs').addEventListener('click', event => {
+      const tab = event.target.closest('[data-tab]'); if (tab) applyTab(tab.dataset.tab);
+    });
+    document.querySelectorAll('.chip').forEach(chip => chip.addEventListener('click', () => {
+      companyName.value = chip.dataset.company || ''; locationHint.value = chip.dataset.location || ''; companyName.focus();
+    }));
+    historyList.addEventListener('click', event => {
+      const open = event.target.closest('[data-history-index]');
+      const remove = event.target.closest('[data-delete-index]');
+      const history = getHistory();
+      if (remove) { history.splice(Number(remove.dataset.deleteIndex),1); setHistory(history); return; }
+      if (open) {
+        const item = history[Number(open.dataset.historyIndex)];
+        if (!item?.report || !item?.html) return showError('This saved report is no longer available on this device. Run the search again.');
+        displayReport({reportId:item.reportId,report:item.report,html:item.html,wordUrl:item.wordUrl},{save:false});
+      }
+    });
+
+    checkStatus();
+    renderHistory();
+  </script>
+</body>
+</html>
