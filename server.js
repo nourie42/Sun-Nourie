@@ -6,6 +6,7 @@ import { fileURLToPath } from "url";
 import { spawn } from "child_process";
 import { registerDistributorResearchRoutes } from "./src/distributorResearchCompat.js";
 import { registerDistributorCompanySearchRoutes } from "./src/distributorCompanySearch.js";
+import { registerDistributorPresentationFix, transformDistributorPage } from "./src/distributorPresentationFix.js";
 import { registerSiteResearchRoutes } from "./src/siteResearchExhaustive.js";
 import { registerSiteEnhancementRoutes } from "./src/siteEnhancements.js";
 import { registerSiteWordLayoutFix } from "./src/siteWordLayoutFix.js";
@@ -54,6 +55,7 @@ async function waitForLegacy() {
 }
 waitForLegacy();
 
+registerDistributorPresentationFix(app);
 registerDistributorResearchRoutes(app, { openAiApiKey: process.env.OPENAI_API_KEY || "" });
 registerDistributorCompanySearchRoutes(app, {
   openAiApiKey: process.env.OPENAI_API_KEY || "",
@@ -82,6 +84,11 @@ app.get("/distributor-research-client-v2.js", (_req, res) => {
   res.type("application/javascript");
   res.sendFile(path.join(__dirname, "public", "distributor-research-client-v2.js"));
 });
+app.get("/distributor-branding-ui.js", (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.type("application/javascript");
+  res.sendFile(path.join(__dirname, "public", "distributor-branding-ui.js"));
+});
 app.get("/site-research-client.js", (_req, res) => {
   res.setHeader("Cache-Control", "no-store");
   res.type("application/javascript");
@@ -90,11 +97,12 @@ app.get("/site-research-client.js", (_req, res) => {
 app.get("/distributors.html", async (_req, res) => {
   try {
     const filename = path.join(__dirname, "public", "distributors.html");
-    let page = await fs.readFile(filename, "utf8");
+    let page = transformDistributorPage(await fs.readFile(filename, "utf8"));
     const scripts = [
       '<script src="/distributor-company-search.js" defer></script>',
       '<script src="/distributor-scope-ui.js" defer></script>',
       '<script src="/distributor-research-client-v2.js" defer></script>',
+      '<script src="/distributor-branding-ui.js" defer></script>',
     ];
     for (const script of scripts) {
       const src = script.match(/src="([^"]+)/)?.[1] || "";
@@ -123,6 +131,10 @@ app.get("/health", (_req, res) => {
     distributorFullSearchDefault: true,
     distributorLimitedSearch: true,
     distributorBackgroundResearch: true,
+    distributorFuelIqOnlyBranding: true,
+    distributorModelVersionHidden: true,
+    distributorWordOnlyExport: true,
+    distributorSourceRegisterMarginFix: true,
     siteResearch: true,
     siteResearchWordExport: true,
     estimateWordExport: true,
@@ -130,7 +142,6 @@ app.get("/health", (_req, res) => {
     competitorRadiusMiles: 1.5,
     multiSourceCompetitorSearch: true,
     multiPassExhaustiveSiteResearch: true,
-    siteResearchDefaultModel: process.env.OPENAI_SITE_RESEARCH_MODEL || "gpt-4.1-mini",
     wordSourceTableMarginFix: true,
     webSearchJsonModeCompatibility: true,
     legacyServerReady: legacyReady,
