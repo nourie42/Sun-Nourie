@@ -8,6 +8,7 @@ import { registerDistributorResearchRoutes } from "./src/distributorResearchComp
 import { registerDistributorCompanySearchRoutes } from "./src/distributorCompanySearch.js";
 import { registerSiteResearchRoutes } from "./src/siteResearchExhaustive.js";
 import { registerSiteEnhancementRoutes } from "./src/siteEnhancements.js";
+import { registerSiteWordLayoutFix } from "./src/siteWordLayoutFix.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -58,6 +59,7 @@ registerDistributorCompanySearchRoutes(app, {
   openAiApiKey: process.env.OPENAI_API_KEY || "",
   googleApiKey: process.env.GOOGLE_API_KEY || "",
 });
+registerSiteWordLayoutFix(app);
 registerSiteResearchRoutes(app, { openAiApiKey: process.env.OPENAI_API_KEY || "" });
 registerSiteEnhancementRoutes(app, {
   legacyPort,
@@ -119,6 +121,7 @@ app.get("/health", (_req, res) => {
     multiSourceCompetitorSearch: true,
     multiPassExhaustiveSiteResearch: true,
     siteResearchDefaultModel: process.env.OPENAI_SITE_RESEARCH_MODEL || "gpt-4.1-mini",
+    wordSourceTableMarginFix: true,
     webSearchJsonModeCompatibility: true,
     legacyServerReady: legacyReady,
   });
