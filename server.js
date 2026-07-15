@@ -7,6 +7,7 @@ import { spawn } from "child_process";
 import { registerDistributorResearchRoutes } from "./src/distributorResearchCompat.js";
 import { registerDistributorCompanySearchRoutes } from "./src/distributorCompanySearch.js";
 import { registerSiteResearchRoutes } from "./src/siteResearch.js";
+import { registerSiteEnhancementRoutes } from "./src/siteEnhancements.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -58,6 +59,10 @@ registerDistributorCompanySearchRoutes(app, {
   googleApiKey: process.env.GOOGLE_API_KEY || "",
 });
 registerSiteResearchRoutes(app, { openAiApiKey: process.env.OPENAI_API_KEY || "" });
+registerSiteEnhancementRoutes(app, {
+  legacyPort,
+  googleApiKey: process.env.GOOGLE_API_KEY || "",
+});
 
 app.get("/distributors", (_req, res) => res.redirect(302, "/distributors.html"));
 app.get("/distributor-company-search.js", (_req, res) => {
@@ -108,7 +113,10 @@ app.get("/health", (_req, res) => {
     distributorBackgroundResearch: true,
     siteResearch: true,
     siteResearchWordExport: true,
+    estimateWordExport: true,
     propertyRecordsResearch: true,
+    competitorRadiusMiles: 1.5,
+    multiSourceCompetitorSearch: true,
     webSearchJsonModeCompatibility: true,
     legacyServerReady: legacyReady,
   });
@@ -174,7 +182,7 @@ function proxyToLegacy(req, res) {
 app.use(proxyToLegacy);
 
 const server = app.listen(publicPort, "0.0.0.0", () => {
-  console.log(`Fuel IQ gateway with Distributor Intelligence and Site Research listening on :${publicPort}`);
+  console.log(`Fuel IQ gateway with 1.5-mile competition verification, Word export, Distributor Intelligence, and Site Research listening on :${publicPort}`);
 });
 
 function shutdown(signal) {
