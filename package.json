@@ -3,13 +3,13 @@
   "version": "1.2.0",
   "private": true,
   "type": "module",
-  "description": "Fuel IQ with reliable background AI fuel distributor intelligence",
+  "description": "Fuel IQ with exhaustive public-source site research and reliable background distributor intelligence",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "start:legacy": "node legacy-server.js",
     "build": "npm ci || npm install",
-    "check": "node --check server.js && node --check legacy-server.js && node --check src/distributorResearch.js && node --check src/distributorResearchV2.js && node --check src/distributorCompanySearch.js && node --check public/distributor-company-search.js && node --check public/distributor-research-client-v2.js"
+    "check": "node --check server.js && node --check legacy-server.js && node --check src/siteResearch.js && node --check src/distributorResearch.js && node --check src/distributorResearchV2.js && node --check src/distributorCompanySearch.js && node --check public/site-research-client.js && node --check public/distributor-company-search.js && node --check public/distributor-research-client-v2.js"
   },
   "engines": { "node": ">=18" },
   "dependencies": {
