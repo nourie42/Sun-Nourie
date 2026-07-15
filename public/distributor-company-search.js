@@ -6,6 +6,7 @@
   const panelDescription = document.querySelector('.panel-title p');
   if (!companyInput || !locationInput || !form || !researchButton) return;
 
+  const LOOKUP_TIMEOUT_MS = 9000;
   const style = document.createElement('style');
   style.textContent = `
     .company-picker{position:relative}
@@ -19,8 +20,8 @@
     .company-result .company-address{display:block;color:#607283;font-size:11px;line-height:1.35;margin-top:3px}
     .company-result .company-meta{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-top:5px;color:#738596;font-size:10px}
     .company-source{display:inline-block;padding:2px 6px;border-radius:999px;background:#e9f2f8;color:#235d84;font-weight:750}
-    .company-manual{border-top:1px solid #e1e8ee;margin-top:4px;padding-top:10px}
-    .company-searching{padding:13px;color:#647688;font-size:12px}
+    .company-manual{border-top:1px solid #e1e8ee;margin-top:4px;padding-top:8px}
+    .company-searching{padding:10px 12px;color:#647688;font-size:11px;border-bottom:1px solid #edf1f4}
     .company-selected{display:none;margin-top:9px;border:1px solid #a7d6bd;background:#eefaf3;border-radius:10px;padding:10px 11px;position:relative}
     .company-selected.open{display:block}
     .company-selected strong{display:block;color:#155e42;font-size:12px;padding-right:26px}
@@ -49,7 +50,7 @@
 
   const help = document.createElement('div');
   help.className = 'company-search-help';
-  help.textContent = 'Type at least 2 characters. Fuel IQ will find possible distributor identities for you to select.';
+  help.textContent = 'Type at least 2 characters. A selectable exact-name option appears immediately while Fuel IQ checks public matches.';
   picker.insertAdjacentElement('afterend', help);
 
   const selectedCard = document.createElement('div');
@@ -60,10 +61,11 @@
   let selectedCompany = null;
   let timer = null;
   let requestNumber = 0;
+  let activeController = null;
   let lastSearched = '';
 
   function escapeHtml(value) {
-    return String(value || '').replace(/[&<>\'\"]/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[character]));
+    return String(value || '').replace(/[&<>\'"]/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[character]));
   }
 
   function closeResults() {
@@ -81,6 +83,12 @@
     help.classList.toggle('error', isError);
   }
 
+  function stopLookup() {
+    requestNumber += 1;
+    if (activeController) activeController.abort();
+    activeController = null;
+  }
+
   function clearSelection({ keepValue = true } = {}) {
     selectedCompany = null;
     selectedCard.classList.remove('open');
@@ -91,9 +99,13 @@
   }
 
   function selectCompany(item) {
+    if (!item) return;
+    stopLookup();
     selectedCompany = item;
     companyInput.value = item.legal_name || item.name || companyInput.value.trim();
-    if (!locationInput.value.trim() && item.headquarters) locationInput.value = item.headquarters;
+    if (item.headquarters && (!locationInput.value.trim() || item.prefer_headquarters)) {
+      locationInput.value = item.headquarters;
+    }
     selectedCard.querySelector('strong').textContent = item.legal_name || item.name || companyInput.value;
     const details = [item.headquarters, item.website, item.source].filter(Boolean).join(' • ');
     selectedCard.querySelector('span').textContent = details || 'Selected company identity';
@@ -101,9 +113,11 @@
     companyInput.classList.remove('company-picker-required');
     researchButton.disabled = false;
     researchButton.textContent = 'Research Selected Company with ChatGPT';
-    setHelp('Company selected. Review the headquarters hint, then start the research.', false);
+    setHelp('Company selected. Click the research button to start the report.', false);
     closeResults();
   }
+
+  window.fuelIqSelectDistributorCompany = selectCompany;
 
   function manualCandidate(query) {
     return {
@@ -111,40 +125,48 @@
       legal_name: query,
       headquarters: locationInput.value.trim(),
       website: '',
-      description: 'Use the exact company name entered',
-      confidence: 'Manual selection',
+      description: 'Use the exact company name and location entered',
+      confidence: 'Exact-name selection',
       source: 'Exact name entered',
       manual: true,
     };
   }
 
-  function renderCandidates(candidates, query) {
-    const valid = Array.isArray(candidates) ? candidates : [];
-    const rows = valid.map((item, index) => {
-      const name = item.legal_name || item.name || 'Company match';
-      const address = item.headquarters || 'Headquarters not identified';
-      const description = item.description || item.confidence || '';
-      return `<button class="company-result" type="button" role="option" data-company-index="${index}">
-        <strong>${escapeHtml(name)}</strong>
-        <span class="company-address">${escapeHtml(address)}</span>
-        <span class="company-meta"><span class="company-source">${escapeHtml(item.source || 'Public search')}</span><span>${escapeHtml(description)}</span></span>
-      </button>`;
-    }).join('');
+  function candidateButton(item, index) {
+    const name = item.legal_name || item.name || 'Company match';
+    const address = item.headquarters || 'Headquarters not identified';
+    const description = item.description || item.confidence || '';
+    return `<button class="company-result" type="button" role="option" data-company-index="${index}">
+      <strong>${escapeHtml(name)}</strong>
+      <span class="company-address">${escapeHtml(address)}</span>
+      <span class="company-meta"><span class="company-source">${escapeHtml(item.source || 'Public search')}</span><span>${escapeHtml(description)}</span></span>
+    </button>`;
+  }
+
+  function renderCandidates(candidates, query, { searching = false, lookupFailed = false } = {}) {
+    const valid = Array.isArray(candidates) ? candidates.filter(Boolean) : [];
+    const manual = manualCandidate(query);
+    const all = [...valid, manual];
+    const rows = valid.map((item, index) => candidateButton(item, index)).join('');
     const manualIndex = valid.length;
-    results.innerHTML = `${rows || '<div class="company-searching">No confident public match was found.</div>'}
-      <div class="company-manual"><button class="company-result" type="button" role="option" data-company-index="${manualIndex}">
-        <strong>Use “${escapeHtml(query)}” exactly as entered</strong>
-        <span class="company-address">Choose this only when the correct company is not listed above.</span>
-        <span class="company-meta"><span class="company-source">Manual</span></span>
-      </button></div>`;
-    results._companyCandidates = [...valid, manualCandidate(query)];
+    results.innerHTML = `${searching ? '<div class="company-searching">Checking public company matches. You can select the exact-name option now without waiting.</div>' : ''}
+      ${rows}
+      <div class="company-manual">${candidateButton(manual, manualIndex)}</div>`;
+    results._companyCandidates = all;
     openResults();
-    setHelp(valid.length ? 'Select the correct company below.' : 'No exact match was found. Select the manual option to continue.', !valid.length);
+    if (searching) {
+      setHelp('Select the exact-name option now, or wait a few seconds for public matches.', false);
+    } else if (valid.length) {
+      setHelp('Select the correct company below.', false);
+    } else {
+      setHelp(lookupFailed ? 'Public lookup timed out. Select the exact-name company option to continue.' : 'No separate public match was found. Select the exact-name option to continue.', lookupFailed);
+    }
   }
 
   async function searchCompanies({ force = false } = {}) {
     const query = companyInput.value.trim();
     if (query.length < 2) {
+      stopLookup();
       closeResults();
       setHelp('Type at least 2 characters to find the company.', false);
       return;
@@ -153,23 +175,33 @@
       openResults();
       return;
     }
+
+    stopLookup();
     lastSearched = query;
-    const thisRequest = ++requestNumber;
-    results.innerHTML = '<div class="company-searching">Searching company records and public business sources…</div>';
-    openResults();
-    setHelp('Finding possible company matches…', false);
+    const thisRequest = requestNumber;
+    renderCandidates([], query, { searching: true });
+
+    const controller = new AbortController();
+    activeController = controller;
+    const timeout = setTimeout(() => controller.abort(), LOOKUP_TIMEOUT_MS);
     try {
-      const response = await fetch(`/api/distributors/search?q=${encodeURIComponent(query)}`, { cache: 'no-store' });
+      const location = locationInput.value.trim();
+      const url = `/api/distributors/search?q=${encodeURIComponent(query)}&location=${encodeURIComponent(location)}`;
+      const response = await fetch(url, { cache: 'no-store', signal: controller.signal });
+      const text = await response.text();
       let data;
-      try { data = await response.json(); }
+      try { data = JSON.parse(text); }
       catch { throw new Error(`Company search returned ${response.status}.`); }
-      if (thisRequest !== requestNumber) return;
+      if (thisRequest !== requestNumber || selectedCompany) return;
       if (!response.ok || !data.ok) throw new Error(data.message || `Company search failed (${response.status}).`);
       renderCandidates(data.candidates, query);
     } catch (error) {
-      if (thisRequest !== requestNumber) return;
-      renderCandidates([], query);
-      setHelp(`${error.message || 'Company lookup is temporarily unavailable.'} Select the exact-name option to continue.`, true);
+      if (thisRequest !== requestNumber || selectedCompany) return;
+      const timedOut = error?.name === 'AbortError';
+      renderCandidates([], query, { lookupFailed: timedOut });
+    } finally {
+      clearTimeout(timeout);
+      if (activeController === controller) activeController = null;
     }
   }
 
@@ -179,7 +211,9 @@
     if (selectedCompany && companyInput.value.trim() === (selectedCompany.legal_name || selectedCompany.name || '').trim()) return;
     clearSelection({ keepValue: true });
     clearTimeout(timer);
-    timer = setTimeout(() => searchCompanies(), 650);
+    const query = companyInput.value.trim();
+    if (query.length >= 2) renderCandidates([], query, { searching: true });
+    timer = setTimeout(() => searchCompanies(), 350);
   });
 
   companyInput.addEventListener('focus', () => {
@@ -204,8 +238,21 @@
     const chip = event.target.closest('.chip');
     if (chip) {
       setTimeout(() => {
-        clearSelection({ keepValue: true });
-        searchCompanies({ force: true });
+        const name = chip.dataset.company || companyInput.value.trim();
+        const headquarters = chip.dataset.location || locationInput.value.trim();
+        if (!name) return;
+        companyInput.value = name;
+        if (headquarters) locationInput.value = headquarters;
+        selectCompany({
+          name,
+          legal_name: name,
+          headquarters,
+          website: '',
+          description: 'Fuel IQ example company',
+          confidence: 'Preset company',
+          source: 'Fuel IQ example',
+          prefer_headquarters: true,
+        });
       }, 0);
     }
   });
@@ -215,11 +262,14 @@
     event.preventDefault();
     event.stopImmediatePropagation();
     companyInput.classList.add('company-picker-required');
-    setHelp('Select the correct company from the search results before starting research.', true);
+    setHelp('Select a company result before starting research. The exact-name option is always available.', true);
     searchCompanies({ force: true });
     companyInput.focus();
   }, true);
 
   const newSearchButton = document.getElementById('newSearchButton');
-  if (newSearchButton) newSearchButton.addEventListener('click', () => clearSelection({ keepValue: true }));
+  if (newSearchButton) newSearchButton.addEventListener('click', () => {
+    stopLookup();
+    clearSelection({ keepValue: true });
+  });
 })();
