@@ -1,0 +1,5 @@
+After deployment verify:
+GET /api/distributors/status returns JSON
+GET /api/distributors/search?q=JH%20Seale returns JSON candidates
+GET /distributors.html includes /distributor-company-search.js
+POST /api/distributors/research reaches the ChatGPT route instead of the legacy 404 handler
