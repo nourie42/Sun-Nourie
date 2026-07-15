@@ -4,7 +4,7 @@ import fs from "fs/promises";
 import http from "http";
 import { fileURLToPath } from "url";
 import { spawn } from "child_process";
-import { registerDistributorResearchRoutes } from "./src/distributorResearchV2.js";
+import { registerDistributorResearchRoutes } from "./src/distributorResearchCompat.js";
 import { registerDistributorCompanySearchRoutes } from "./src/distributorCompanySearch.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -95,6 +95,7 @@ app.get("/health", (_req, res) => {
     distributorIntelligence: true,
     distributorCompanySearch: true,
     distributorBackgroundResearch: true,
+    webSearchJsonModeCompatibility: true,
     legacyServerReady: legacyReady,
   });
 });
