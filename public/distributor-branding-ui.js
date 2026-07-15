@@ -1,5 +1,8 @@
 (() => {
-  let scheduled = false;
+  let timer = null;
+  let applying = false;
+
+  const HERO_TEXT = 'Search any petroleum marketer or fuel distributor. Fuel IQ investigates public company records, fleet data, sites, licenses, leadership, environmental history, revenue and gallon estimates, risks, and acquisition diligence—then builds an exportable Word report.';
 
   function cleanText(value) {
     return String(value || '')
@@ -11,6 +14,10 @@
       .replace(/Fuel IQ model:\s*[^•\n]+/gi, '')
       .replace(/[ \t]{2,}/g, ' ')
       .replace(/[ \t]+([,.;:])/g, '$1');
+  }
+
+  function setText(element, value) {
+    if (element && element.textContent !== value) element.textContent = value;
   }
 
   function sanitizeTextNodes(root = document.body) {
@@ -42,41 +49,54 @@
 
   function hideModelMetric() {
     const metric = document.getElementById('modelMetric')?.closest('.metric');
-    if (metric) metric.style.display = 'none';
+    if (metric && metric.style.display !== 'none') metric.style.display = 'none';
     const metrics = document.querySelector('.metrics');
-    if (metrics) metrics.style.gridTemplateColumns = 'repeat(3,minmax(0,1fr))';
+    const layout = 'repeat(3,minmax(0,1fr))';
+    if (metrics && metrics.style.gridTemplateColumns !== layout) metrics.style.gridTemplateColumns = layout;
   }
 
   function setFuelIqCopy() {
-    const hero = document.querySelector('.hero p');
-    if (hero) {
-      hero.textContent = 'Search any petroleum marketer or fuel distributor. Fuel IQ investigates public company records, fleet data, sites, licenses, leadership, environmental history, revenue and gallon estimates, risks, and acquisition diligence—then builds an exportable Word report.';
-    }
-    const kicker = document.querySelector('.kicker');
-    if (kicker) kicker.textContent = 'Fuel IQ M&A research';
-    const loadingTitle = document.querySelector('#loadingState h2, .loading h2');
-    if (loadingTitle) loadingTitle.textContent = 'Fuel IQ is researching the company';
+    setText(document.querySelector('.hero p'), HERO_TEXT);
+    setText(document.querySelector('.kicker'), 'Fuel IQ M&A research');
+    setText(document.querySelector('#loadingState h2, .loading h2'), 'Fuel IQ is researching the company');
+
     const status = document.getElementById('apiStatus');
-    if (status && /AI Ready/i.test(status.textContent || '')) status.textContent = 'Fuel IQ Ready';
-    const wordButton = document.getElementById('wordButton');
-    if (wordButton) wordButton.textContent = 'Export to Word';
+    if (status && /AI Ready/i.test(status.textContent || '')) setText(status, 'Fuel IQ Ready');
+
+    setText(document.getElementById('wordButton'), 'Export to Word');
   }
 
   function apply() {
-    scheduled = false;
-    removeUnwantedExports();
-    hideModelMetric();
-    setFuelIqCopy();
-    sanitizeTextNodes();
+    if (applying) return;
+    applying = true;
+    try {
+      removeUnwantedExports();
+      hideModelMetric();
+      setFuelIqCopy();
+      sanitizeTextNodes();
+    } finally {
+      applying = false;
+    }
   }
 
   function schedule() {
-    if (scheduled) return;
-    scheduled = true;
-    queueMicrotask(apply);
+    if (applying || timer !== null) return;
+    timer = window.setTimeout(() => {
+      timer = null;
+      apply();
+    }, 25);
   }
 
   const observer = new MutationObserver(schedule);
-  observer.observe(document.documentElement, { subtree: true, childList: true, characterData: true });
-  apply();
+  observer.observe(document.documentElement, {
+    subtree: true,
+    childList: true,
+    characterData: true,
+  });
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', apply, { once: true });
+  } else {
+    apply();
+  }
 })();
