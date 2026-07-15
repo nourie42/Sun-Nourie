@@ -4,9 +4,10 @@
   "private": true,
   "type": "module",
   "description": "Fuel IQ + AI Job Portal",
-  "main": "server.js",
+  "main": "server-with-distributor.js",
   "scripts": {
-    "start": "node server.js",
+    "start": "node server-with-distributor.js",
+    "start:legacy": "node server.js",
     "build": "npm ci || npm install"
   },
   "engines": { "node": ">=18" },
