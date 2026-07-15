@@ -9,7 +9,7 @@ function cleanUserText(value) {
     .replace(/\bgpt-[a-z0-9._-]+\b/gi, "")
     .replace(/\bAI Ready\b/gi, "Fuel IQ Ready")
     .replace(/Fuel IQ model:\s*[^•<\n]+/gi, "")
-    .replace(/\s{2,}/g, " ")
+    .replace(/[ \t]{2,}/g, " ")
     .trim();
 }
 
@@ -81,14 +81,21 @@ function fixWordDocument(body) {
   return html;
 }
 
-export function transformDistributorPage(page) {
-  return String(page ?? "")
+function replaceVisibleMarkup(markup) {
+  return markup
     .replace(/Chat\s*GPT/gi, "Fuel IQ")
     .replace(/OpenAI/gi, "Fuel IQ")
     .replace(/AI-powered M&amp;A research/gi, "Fuel IQ M&amp;A research")
     .replace(/AI Ready/gi, "Fuel IQ Ready")
     .replace(/ChatGPT model/gi, "Research engine")
     .replace(/Fuel IQ model/gi, "Research engine");
+}
+
+export function transformDistributorPage(page) {
+  const source = String(page ?? "");
+  const firstScript = source.search(/<script\b/i);
+  if (firstScript < 0) return replaceVisibleMarkup(source);
+  return `${replaceVisibleMarkup(source.slice(0, firstScript))}${source.slice(firstScript)}`;
 }
 
 export function registerDistributorPresentationFix(app) {
