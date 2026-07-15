@@ -1,21 +1,22 @@
 {
   "name": "fuel-iq-ai-job-portal",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "private": true,
   "type": "module",
-  "description": "Fuel IQ with exhaustive public-source site research and reliable background distributor intelligence",
+  "description": "Fuel IQ with exhaustive public-source site research and reliable distributor intelligence with true DOCX export",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "start:legacy": "node legacy-server.js",
     "build": "npm ci || npm install",
-    "check": "node --check server.js && node --check legacy-server.js && node --check src/siteResearch.js && node --check src/distributorResearch.js && node --check src/distributorResearchV2.js && node --check src/distributorCompanySearch.js && node --check public/site-research-client.js && node --check public/distributor-company-search.js && node --check public/distributor-research-client-v2.js"
+    "check": "node --check server.js && node --check legacy-server.js && node --check src/siteResearch.js && node --check src/distributorResearch.js && node --check src/distributorResearchV2.js && node --check src/distributorResearchV3.js && node --check src/distributorReportV3.js && node --check src/distributorWordV3.js && node --check src/distributorCompanySearch.js && node --check public/site-research-client.js && node --check public/distributor-company-search.js && node --check public/distributor-research-client-v3.js"
   },
   "engines": { "node": ">=18" },
   "dependencies": {
-    "express": "^4.19.2",
-    "cors": "^2.8.5",
     "body-parser": "^1.20.2",
+    "cors": "^2.8.5",
+    "docx": "^9.7.1",
+    "express": "^4.19.2",
     "node-fetch": "^3.3.2",
     "pdfkit": "^0.15.0"
   }
