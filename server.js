@@ -4,7 +4,7 @@ import fs from "fs/promises";
 import http from "http";
 import { fileURLToPath } from "url";
 import { spawn } from "child_process";
-import { registerDistributorResearchRoutes } from "./src/distributorResearch.js";
+import { registerDistributorResearchRoutes } from "./src/distributorResearchV2.js";
 import { registerDistributorCompanySearchRoutes } from "./src/distributorCompanySearch.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -63,13 +63,23 @@ app.get("/distributor-company-search.js", (_req, res) => {
   res.type("application/javascript");
   res.sendFile(path.join(__dirname, "public", "distributor-company-search.js"));
 });
+app.get("/distributor-research-client-v2.js", (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.type("application/javascript");
+  res.sendFile(path.join(__dirname, "public", "distributor-research-client-v2.js"));
+});
 app.get("/distributors.html", async (_req, res) => {
   try {
     const filename = path.join(__dirname, "public", "distributors.html");
     let page = await fs.readFile(filename, "utf8");
-    const pickerScript = '<script src="/distributor-company-search.js" defer></script>';
-    if (!page.includes("/distributor-company-search.js")) {
-      page = page.includes("</body>") ? page.replace("</body>", `${pickerScript}</body>`) : `${page}${pickerScript}`;
+    const scripts = [
+      '<script src="/distributor-company-search.js" defer></script>',
+      '<script src="/distributor-research-client-v2.js" defer></script>',
+    ];
+    for (const script of scripts) {
+      const src = script.match(/src="([^"]+)/)?.[1] || "";
+      if (src && page.includes(src)) continue;
+      page = page.includes("</body>") ? page.replace("</body>", `${script}</body>`) : `${page}${script}`;
     }
     res.setHeader("Cache-Control", "no-store");
     res.type("html").send(page);
@@ -84,6 +94,7 @@ app.get("/health", (_req, res) => {
     ok: legacyReady,
     distributorIntelligence: true,
     distributorCompanySearch: true,
+    distributorBackgroundResearch: true,
     legacyServerReady: legacyReady,
   });
 });
