@@ -50,7 +50,7 @@
 
   const help = document.createElement('div');
   help.className = 'company-search-help';
-  help.textContent = 'Type at least 2 characters. A selectable exact-name option appears immediately while Fuel IQ checks public matches.';
+  help.textContent = 'Type at least 2 characters. Fuel IQ will identify the company and headquarters automatically.';
   picker.insertAdjacentElement('afterend', help);
 
   const selectedCard = document.createElement('div');
@@ -62,6 +62,7 @@
   let timer = null;
   let requestNumber = 0;
   let activeController = null;
+  let enrichmentController = null;
   let lastSearched = '';
 
   function escapeHtml(value) {
@@ -89,32 +90,105 @@
     activeController = null;
   }
 
+  function stopEnrichment() {
+    if (enrichmentController) enrichmentController.abort();
+    enrichmentController = null;
+  }
+
   function clearSelection({ keepValue = true } = {}) {
+    stopEnrichment();
     selectedCompany = null;
     selectedCard.classList.remove('open');
     companyInput.classList.remove('company-picker-required');
+    locationInput.value = '';
     researchButton.disabled = true;
     researchButton.textContent = 'Select a Company to Research';
     if (!keepValue) companyInput.value = '';
   }
 
-  function selectCompany(item) {
-    if (!item) return;
-    stopLookup();
-    selectedCompany = item;
-    companyInput.value = item.legal_name || item.name || companyInput.value.trim();
-    if (item.headquarters && (!locationInput.value.trim() || item.prefer_headquarters)) {
-      locationInput.value = item.headquarters;
-    }
+  function updateSelectedCard(item, fallback = 'Selected company identity') {
     selectedCard.querySelector('strong').textContent = item.legal_name || item.name || companyInput.value;
     const details = [item.headquarters, item.website, item.source].filter(Boolean).join(' • ');
-    selectedCard.querySelector('span').textContent = details || 'Selected company identity';
+    selectedCard.querySelector('span').textContent = details || fallback;
     selectedCard.classList.add('open');
+  }
+
+  function finishSelection(item) {
+    selectedCompany = item;
+    companyInput.value = item.legal_name || item.name || companyInput.value.trim();
+    locationInput.value = item.headquarters || '';
+    updateSelectedCard(item, 'Company selected; headquarters will be identified during research.');
     companyInput.classList.remove('company-picker-required');
     researchButton.disabled = false;
     researchButton.textContent = 'Research Selected Company with ChatGPT';
-    setHelp('Company selected. Click the research button to start the report.', false);
+    setHelp(item.headquarters
+      ? 'Company and headquarters selected automatically. Click the research button to start the report.'
+      : 'Company selected. Fuel IQ will identify the headquarters during research.', false);
     closeResults();
+  }
+
+  async function enrichManualSelection(item) {
+    stopEnrichment();
+    const controller = new AbortController();
+    enrichmentController = controller;
+    const timeout = setTimeout(() => controller.abort(), LOOKUP_TIMEOUT_MS);
+    researchButton.disabled = true;
+    researchButton.textContent = 'Finding Company Headquarters…';
+    updateSelectedCard(item, 'Finding company headquarters automatically…');
+    setHelp('Finding the company headquarters automatically…', false);
+
+    try {
+      const query = item.legal_name || item.name || companyInput.value.trim();
+      const response = await fetch(`/api/distributors/search?q=${encodeURIComponent(query)}&location=`, {
+        cache: 'no-store',
+        signal: controller.signal,
+      });
+      const text = await response.text();
+      let data;
+      try { data = JSON.parse(text); }
+      catch { throw new Error(`Company search returned ${response.status}.`); }
+      if (!response.ok || !data.ok) throw new Error(data.message || `Company search failed (${response.status}).`);
+      if (selectedCompany !== item) return;
+
+      const match = (Array.isArray(data.candidates) ? data.candidates : []).find((candidate) => candidate?.headquarters) || null;
+      if (match) {
+        finishSelection({
+          ...item,
+          legal_name: match.legal_name || match.name || item.legal_name,
+          name: match.name || item.name,
+          headquarters: match.headquarters,
+          website: match.website || '',
+          source: match.source || 'Public company lookup',
+          manual: false,
+        });
+      } else {
+        finishSelection(item);
+      }
+    } catch (error) {
+      if (selectedCompany !== item) return;
+      finishSelection(item);
+    } finally {
+      clearTimeout(timeout);
+      if (enrichmentController === controller) enrichmentController = null;
+    }
+  }
+
+  function selectCompany(item) {
+    if (!item) return;
+    stopLookup();
+    stopEnrichment();
+    selectedCompany = item;
+    companyInput.value = item.legal_name || item.name || companyInput.value.trim();
+    locationInput.value = item.headquarters || '';
+    companyInput.classList.remove('company-picker-required');
+    closeResults();
+
+    if (item.manual && !item.headquarters) {
+      enrichManualSelection(item);
+      return;
+    }
+
+    finishSelection(item);
   }
 
   window.fuelIqSelectDistributorCompany = selectCompany;
@@ -123,9 +197,9 @@
     return {
       name: query,
       legal_name: query,
-      headquarters: locationInput.value.trim(),
+      headquarters: '',
       website: '',
-      description: 'Use the exact company name and location entered',
+      description: 'Use this exact company name; Fuel IQ will find the headquarters automatically',
       confidence: 'Exact-name selection',
       source: 'Exact name entered',
       manual: true,
@@ -134,7 +208,7 @@
 
   function candidateButton(item, index) {
     const name = item.legal_name || item.name || 'Company match';
-    const address = item.headquarters || 'Headquarters not identified';
+    const address = item.headquarters || (item.manual ? 'Headquarters will be found automatically' : 'Headquarters not identified');
     const description = item.description || item.confidence || '';
     return `<button class="company-result" type="button" role="option" data-company-index="${index}">
       <strong>${escapeHtml(name)}</strong>
@@ -149,17 +223,19 @@
     const all = [...valid, manual];
     const rows = valid.map((item, index) => candidateButton(item, index)).join('');
     const manualIndex = valid.length;
-    results.innerHTML = `${searching ? '<div class="company-searching">Checking public company matches. You can select the exact-name option now without waiting.</div>' : ''}
+    results.innerHTML = `${searching ? '<div class="company-searching">Checking public company matches and headquarters…</div>' : ''}
       ${rows}
       <div class="company-manual">${candidateButton(manual, manualIndex)}</div>`;
     results._companyCandidates = all;
     openResults();
     if (searching) {
-      setHelp('Select the exact-name option now, or wait a few seconds for public matches.', false);
+      setHelp('Select a public match, or use the exact-name option and Fuel IQ will find the headquarters automatically.', false);
     } else if (valid.length) {
-      setHelp('Select the correct company below.', false);
+      setHelp('Select the correct company below. Its headquarters will be used automatically.', false);
     } else {
-      setHelp(lookupFailed ? 'Public lookup timed out. Select the exact-name company option to continue.' : 'No separate public match was found. Select the exact-name option to continue.', lookupFailed);
+      setHelp(lookupFailed
+        ? 'Public lookup timed out. Select the exact-name option and Fuel IQ will continue identifying the headquarters.'
+        : 'No separate public match was found. Select the exact-name option to continue.', lookupFailed);
     }
   }
 
@@ -185,9 +261,10 @@
     activeController = controller;
     const timeout = setTimeout(() => controller.abort(), LOOKUP_TIMEOUT_MS);
     try {
-      const location = locationInput.value.trim();
-      const url = `/api/distributors/search?q=${encodeURIComponent(query)}&location=${encodeURIComponent(location)}`;
-      const response = await fetch(url, { cache: 'no-store', signal: controller.signal });
+      const response = await fetch(`/api/distributors/search?q=${encodeURIComponent(query)}&location=`, {
+        cache: 'no-store',
+        signal: controller.signal,
+      });
       const text = await response.text();
       let data;
       try { data = JSON.parse(text); }
@@ -239,10 +316,9 @@
     if (chip) {
       setTimeout(() => {
         const name = chip.dataset.company || companyInput.value.trim();
-        const headquarters = chip.dataset.location || locationInput.value.trim();
+        const headquarters = chip.dataset.location || '';
         if (!name) return;
         companyInput.value = name;
-        if (headquarters) locationInput.value = headquarters;
         selectCompany({
           name,
           legal_name: name,
@@ -258,11 +334,15 @@
   });
 
   form.addEventListener('submit', event => {
-    if (selectedCompany) return;
+    if (selectedCompany && !researchButton.disabled) return;
     event.preventDefault();
     event.stopImmediatePropagation();
+    if (selectedCompany && researchButton.disabled) {
+      setHelp('Fuel IQ is still finding the company headquarters. The research button will unlock automatically.', false);
+      return;
+    }
     companyInput.classList.add('company-picker-required');
-    setHelp('Select a company result before starting research. The exact-name option is always available.', true);
+    setHelp('Select a company result before starting research.', true);
     searchCompanies({ force: true });
     companyInput.focus();
   }, true);
