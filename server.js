@@ -4,7 +4,7 @@ import fs from "fs/promises";
 import http from "http";
 import { fileURLToPath } from "url";
 import { spawn } from "child_process";
-import { registerDistributorResearchRoutes } from "./src/distributorResearchCompat.js";
+import { registerDistributorResearchRoutes } from "./src/distributorResearchV3.js";
 import { registerDistributorCompanySearchRoutes } from "./src/distributorCompanySearch.js";
 import { registerSiteResearchRoutes } from "./src/siteResearch.js";
 
@@ -65,10 +65,10 @@ app.get("/distributor-company-search.js", (_req, res) => {
   res.type("application/javascript");
   res.sendFile(path.join(__dirname, "public", "distributor-company-search.js"));
 });
-app.get("/distributor-research-client-v2.js", (_req, res) => {
+app.get("/distributor-research-client-v3.js", (_req, res) => {
   res.setHeader("Cache-Control", "no-store");
   res.type("application/javascript");
-  res.sendFile(path.join(__dirname, "public", "distributor-research-client-v2.js"));
+  res.sendFile(path.join(__dirname, "public", "distributor-research-client-v3.js"));
 });
 app.get("/site-research-client.js", (_req, res) => {
   res.setHeader("Cache-Control", "no-store");
@@ -81,7 +81,7 @@ app.get("/distributors.html", async (_req, res) => {
     let page = await fs.readFile(filename, "utf8");
     const scripts = [
       '<script src="/distributor-company-search.js" defer></script>',
-      '<script src="/distributor-research-client-v2.js" defer></script>',
+      '<script src="/distributor-research-client-v3.js" defer></script>',
     ];
     for (const script of scripts) {
       const src = script.match(/src="([^"]+)/)?.[1] || "";
@@ -106,10 +106,14 @@ app.get("/health", (_req, res) => {
     distributorIntelligence: true,
     distributorCompanySearch: true,
     distributorBackgroundResearch: true,
+    distributorTwoPhasePipeline: true,
+    distributorStructuredFormatter: true,
+    distributorInternalCitationFiltering: true,
+    distributorWordDocxExport: true,
+    distributorWordOnlyExport: true,
     siteResearch: true,
     siteResearchWordExport: true,
     propertyRecordsResearch: true,
-    webSearchJsonModeCompatibility: true,
     legacyServerReady: legacyReady,
   });
 });
@@ -174,7 +178,7 @@ function proxyToLegacy(req, res) {
 app.use(proxyToLegacy);
 
 const server = app.listen(publicPort, "0.0.0.0", () => {
-  console.log(`Fuel IQ gateway with Distributor Intelligence and Site Research listening on :${publicPort}`);
+  console.log(`Fuel IQ gateway with Distributor Intelligence V3 and Site Research listening on :${publicPort}`);
 });
 
 function shutdown(signal) {
