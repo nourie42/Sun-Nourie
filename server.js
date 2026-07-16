@@ -10,6 +10,9 @@ import { registerDistributorPresentationFix, transformDistributorPage } from "./
 import { registerSiteResearchRoutes } from "./src/siteResearchExhaustive.js";
 import { registerSiteEnhancementRoutes } from "./src/siteEnhancements.js";
 import { registerSiteWordLayoutFix } from "./src/siteWordLayoutFix.js";
+import { transformSiteAnalyzerPage } from "./src/siteAnalyzerPresentation.js";
+import { registerExpandedAadtRoutes } from "./src/aadtCoverage.js";
+import { registerSiteResearchReportEnhancements } from "./src/siteResearchReportEnhancements.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -62,7 +65,9 @@ registerDistributorCompanySearchRoutes(app, {
   googleApiKey: process.env.GOOGLE_API_KEY || "",
 });
 registerSiteWordLayoutFix(app);
+registerSiteResearchReportEnhancements(app);
 registerSiteResearchRoutes(app, { openAiApiKey: process.env.OPENAI_API_KEY || "" });
+registerExpandedAadtRoutes(app, { legacyPort });
 registerSiteEnhancementRoutes(app, {
   legacyPort,
   googleApiKey: process.env.GOOGLE_API_KEY || "",
@@ -144,14 +149,26 @@ app.get("/health", (_req, res) => {
     siteResearchWordExport: true,
     estimateWordExport: true,
     siteAnalyzerProfessionalLayout: true,
+    siteAnalyzerServerRenderedLayout: true,
+    siteAnalyzerNoLegacyFlash: true,
     siteResearchResultsAtBottom: true,
     siteReportDualWordExport: true,
+    siteReportStickyExportDock: true,
+    siteResearchRadarLoading: true,
+    siteResearchScrollToResults: true,
+    siteResearchExpectedGallons: true,
     siteNotesRemovedFromUi: true,
+    basicGoogleRatingHidden: true,
+    basicDevelopmentsHidden: true,
+    combinedSiteAndAadtMaps: true,
+    recommendedAadtAboveResearchSelections: true,
+    expandedAadtCoverage: true,
     propertyRecordsResearch: true,
     competitorRadiusMiles: 1.5,
     multiSourceCompetitorSearch: true,
     multiPassExhaustiveSiteResearch: true,
     wordSourceTableMarginFix: true,
+    basicWordMarginFix: true,
     webSearchJsonModeCompatibility: true,
     legacyServerReady: legacyReady,
   });
@@ -188,7 +205,7 @@ function proxyToLegacy(req, res) {
       const chunks = [];
       proxyResponse.on("data", (chunk) => chunks.push(chunk));
       proxyResponse.on("end", () => {
-        let page = Buffer.concat(chunks).toString("utf8");
+        let page = transformSiteAnalyzerPage(Buffer.concat(chunks).toString("utf8"));
         for (const enhancement of homeEnhancements) {
           const src = enhancement.match(/src="([^"]+)/)?.[1] || "";
           if (src && page.includes(src)) continue;
@@ -196,6 +213,7 @@ function proxyToLegacy(req, res) {
         }
         res.status(proxyResponse.statusCode || 200);
         copyHeaders(proxyResponse.headers, res, { dropLength: true });
+        res.setHeader("Cache-Control", "no-store");
         res.setHeader("Content-Length", Buffer.byteLength(page));
         res.send(page);
       });
@@ -222,7 +240,7 @@ function proxyToLegacy(req, res) {
 app.use(proxyToLegacy);
 
 const server = app.listen(publicPort, "0.0.0.0", () => {
-  console.log(`Fuel IQ gateway with 1.5-mile competition verification, Word export, Distributor Intelligence, and multi-pass Site Research listening on :${publicPort}`);
+  console.log(`Fuel IQ gateway with server-rendered Site Analyzer, expanded AADT coverage, 1.5-mile competition verification, Word export, Distributor Intelligence, and multi-pass Site Research listening on :${publicPort}`);
 });
 
 function shutdown(signal) {
