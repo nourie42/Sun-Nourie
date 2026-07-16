@@ -103,10 +103,10 @@
     document.head.appendChild(style);
   }
 
-  function loadAutocompleteRecovery() {
+  function appendAutocompleteRecovery() {
     if (window.__fiqAutocompleteRecoveryInstalled || document.querySelector('script[data-fiq-autocomplete-recovery]')) return;
     const script = document.createElement("script");
-    script.src = `/site-autocomplete-recovery.js?v=2`;
+    script.src = `/site-autocomplete-recovery.js?v=4`;
     script.defer = true;
     script.dataset.fiqAutocompleteRecovery = "true";
     script.onerror = () => {
@@ -114,6 +114,29 @@
       if (status) status.textContent = "Address search failed to load — refresh the page";
     };
     document.head.appendChild(script);
+  }
+
+  function loadAutocompleteRecovery() {
+    if (window.__fiqAutocompleteRecoveryInstalled || document.querySelector('script[data-fiq-autocomplete-recovery]')) return;
+    if (window.__fiqAddressProviderFallbackInstalled) {
+      appendAutocompleteRecovery();
+      return;
+    }
+
+    const existing = document.querySelector('script[data-fiq-address-provider-fallback]');
+    if (existing) {
+      existing.addEventListener("load", appendAutocompleteRecovery, { once: true });
+      existing.addEventListener("error", appendAutocompleteRecovery, { once: true });
+      return;
+    }
+
+    const providerFallback = document.createElement("script");
+    providerFallback.src = `/site-address-provider-fallback.js?v=1`;
+    providerFallback.defer = true;
+    providerFallback.dataset.fiqAddressProviderFallback = "true";
+    providerFallback.addEventListener("load", appendAutocompleteRecovery, { once: true });
+    providerFallback.addEventListener("error", appendAutocompleteRecovery, { once: true });
+    document.head.appendChild(providerFallback);
   }
 
   function setAddressReady() {
