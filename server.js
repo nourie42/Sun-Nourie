@@ -104,6 +104,11 @@ app.get("/site-research-layout.js", (_req, res) => {
   res.type("application/javascript");
   res.sendFile(path.join(__dirname, "public", "site-research-layout.js"));
 });
+app.get("/site-address-safety.js", (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.type("application/javascript");
+  res.sendFile(path.join(__dirname, "public", "site-address-safety.js"));
+});
 app.get("/distributors.html", async (_req, res) => {
   try {
     const filename = path.join(__dirname, "public", "distributors.html");
@@ -151,6 +156,7 @@ app.get("/health", (_req, res) => {
     siteAnalyzerProfessionalLayout: true,
     siteAnalyzerServerRenderedLayout: true,
     siteAnalyzerNoLegacyFlash: true,
+    siteAddressInputSafety: true,
     siteResearchResultsAtBottom: true,
     siteReportDualWordExport: true,
     siteReportStickyExportDock: true,
@@ -177,6 +183,7 @@ app.get("/health", (_req, res) => {
 const homeEnhancements = [
   '<script src="/site-research-client.js" defer></script>',
   '<script src="/site-research-layout.js" defer></script>',
+  '<script src="/site-address-safety.js" defer></script>',
 ];
 
 function copyHeaders(source, target, { dropLength = false } = {}) {
