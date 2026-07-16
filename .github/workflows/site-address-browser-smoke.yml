@@ -1,0 +1,102 @@
+name: Site Analyzer Address Browser Smoke
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  address-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install application and browser
+        run: |
+          npm install --no-audit --no-fund
+          npm install --no-save --no-audit --no-fund puppeteer@24
+
+      - name: Start Fuel IQ locally
+        shell: bash
+        run: |
+          PORT=3210 NODE_ENV=test node server.js > /tmp/fuel-iq-server.log 2>&1 &
+          echo $! > /tmp/fuel-iq-server.pid
+          for attempt in $(seq 1 80); do
+            if curl -fsS --max-time 2 http://127.0.0.1:3210/health >/tmp/health.json 2>/dev/null; then
+              cat /tmp/health.json
+              exit 0
+            fi
+            sleep 0.5
+          done
+          cat /tmp/fuel-iq-server.log
+          exit 1
+
+      - name: Verify address typing at a short viewport
+        shell: bash
+        run: |
+          cat > address-smoke.mjs <<'EOF'
+          import puppeteer from 'puppeteer';
+
+          const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+          const page = await browser.newPage();
+          await page.setViewport({ width: 800, height: 600 });
+          page.setDefaultTimeout(60000);
+          const pageErrors = [];
+          page.on('pageerror', (error) => pageErrors.push(error.stack || String(error)));
+
+          try {
+            const response = await page.goto('http://127.0.0.1:3210/?smoke=address', { waitUntil: 'domcontentloaded', timeout: 90000 });
+            if (!response?.ok()) throw new Error(`Home page returned ${response?.status()}`);
+            await page.waitForSelector('#addr');
+            await new Promise((resolve) => setTimeout(resolve, 5000));
+
+            const before = await page.evaluate(() => {
+              const input = document.getElementById('addr');
+              const rect = input.getBoundingClientRect();
+              const top = document.elementFromPoint(rect.left + 12, rect.top + 12);
+              return {
+                disabled: input.disabled,
+                readOnly: input.readOnly,
+                pointerEvents: getComputedStyle(input).pointerEvents,
+                topId: top?.id || null,
+                topTag: top?.tagName || null,
+                apiText: document.getElementById('apiStatus')?.textContent || '',
+                dockOverlapClass: document.body.classList.contains('fiq-dock-overlaps-address'),
+              };
+            });
+
+            console.log('before', before);
+            if (before.disabled || before.readOnly) throw new Error('Address field is disabled or read-only.');
+            if (before.pointerEvents === 'none') throw new Error('Address field does not accept pointer input.');
+            if (before.topId !== 'addr') throw new Error(`Address field is covered by ${before.topTag || 'unknown'}#${before.topId || ''}.`);
+            if (/checking/i.test(before.apiText)) throw new Error(`API status remained stuck: ${before.apiText}`);
+
+            await page.click('#addr');
+            await page.type('#addr', '915 Early Boulevard, Early, Texas', { delay: 10 });
+            const value = await page.$eval('#addr', (input) => input.value);
+            console.log('typed_value', value);
+            if (!value.includes('915 Early Boulevard')) throw new Error(`Typing did not reach the address field: ${value}`);
+            if (pageErrors.length) throw new Error(`Page JavaScript errors: ${pageErrors.join(' | ')}`);
+          } finally {
+            await browser.close();
+          }
+          EOF
+          node address-smoke.mjs
+
+      - name: Show server log on failure
+        if: failure()
+        run: cat /tmp/fuel-iq-server.log || true
+
+      - name: Stop local server
+        if: always()
+        shell: bash
+        run: |
+          if [ -f /tmp/fuel-iq-server.pid ]; then
+            kill "$(cat /tmp/fuel-iq-server.pid)" 2>/dev/null || true
+          fi
