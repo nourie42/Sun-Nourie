@@ -47,7 +47,7 @@ jobs:
       - name: Run browser interaction probe
         shell: bash
         run: |
-          cat > /tmp/probe.mjs <<'EOF'
+          cat > "$GITHUB_WORKSPACE/probe.mjs" <<'EOF'
           import puppeteer from 'puppeteer';
 
           const url = 'https://sun-nourie-live.onrender.com/?diagnostic=' + Date.now();
@@ -108,7 +108,7 @@ jobs:
             await browser.close();
           }
           EOF
-          node /tmp/probe.mjs >> "$GITHUB_WORKSPACE/live-diagnostic.txt" 2>&1 || true
+          node "$GITHUB_WORKSPACE/probe.mjs" >> "$GITHUB_WORKSPACE/live-diagnostic.txt" 2>&1 || true
 
       - name: Upload diagnostic report
         uses: actions/upload-artifact@v4
