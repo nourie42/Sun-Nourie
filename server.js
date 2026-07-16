@@ -177,7 +177,6 @@ app.get("/health", (_req, res) => {
 const homeEnhancements = [
   '<script src="/site-research-client.js" defer></script>',
   '<script src="/site-research-layout.js" defer></script>',
-  '<script src="/site-research-runtime-fix.js" defer></script>',
 ];
 
 function copyHeaders(source, target, { dropLength = false } = {}) {
