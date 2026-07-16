@@ -4,7 +4,9 @@
 
   const nativeFetch = window.fetch.bind(window);
   const exactCache = new Map();
+  const exactInflight = new Map();
   const EXACT_CACHE_MS = 15 * 60 * 1000;
+  const EXACT_LOOKUP_TIMEOUT_MS = 6200;
 
   function canonicalQuery(value) {
     return String(value || "")
@@ -33,6 +35,13 @@
   async function jsonOrNull(response) {
     try { return await response.json(); }
     catch { return null; }
+  }
+
+  function settleWithin(promise, timeoutMs = EXACT_LOOKUP_TIMEOUT_MS) {
+    return Promise.race([
+      Promise.resolve(promise).catch(() => null),
+      new Promise((resolve) => setTimeout(() => resolve(null), timeoutMs)),
+    ]);
   }
 
   function finite(value) {
@@ -126,21 +135,22 @@
     return { street, city, state: stateMatch?.[1]?.toUpperCase() || "", zip: zipMatch?.[1] || "" };
   }
 
-  async function lookupExact(query, signal) {
-    const canonical = canonicalQuery(query);
-    const cacheKey = canonical.toLowerCase();
-    const cached = exactCache.get(cacheKey);
-    if (cached && Date.now() - cached.savedAt < EXACT_CACHE_MS) return cached.items;
-
+  async function performExactLookup(canonical, signal) {
     const structured = parseStructuredAddress(canonical);
     const censusBase = "https://geocoding.geo.census.gov/geocoder/locations";
     const calls = [
-      nativeFetch(`/google/findplace?input=${encodeURIComponent(canonical)}&cb=${Date.now()}`, { cache: "no-store", signal })
-        .then(jsonOrNull).then((data) => normalizeFindPlace(data, canonical)),
-      nativeFetch(`${censusBase}/onelineaddress?address=${encodeURIComponent(canonical)}&benchmark=Public_AR_Current&format=json`, { cache: "no-store", signal })
-        .then(jsonOrNull).then((data) => normalizeCensus(data, canonical)),
-      nativeFetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=3&countrycodes=us&q=${encodeURIComponent(canonical)}`, { cache: "no-store", signal })
-        .then(jsonOrNull).then((rows) => Array.isArray(rows) ? rows.map((row) => normalizeNominatim(row, canonical)).filter(Boolean) : []),
+      settleWithin(
+        nativeFetch(`/google/findplace?input=${encodeURIComponent(canonical)}&cb=${Date.now()}`, { cache: "no-store", signal })
+          .then(jsonOrNull).then((data) => normalizeFindPlace(data, canonical))
+      ),
+      settleWithin(
+        nativeFetch(`${censusBase}/onelineaddress?address=${encodeURIComponent(canonical)}&benchmark=Public_AR_Current&format=json`, { cache: "no-store", signal })
+          .then(jsonOrNull).then((data) => normalizeCensus(data, canonical))
+      ),
+      settleWithin(
+        nativeFetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=3&countrycodes=us&q=${encodeURIComponent(canonical)}`, { cache: "no-store", signal })
+          .then(jsonOrNull).then((rows) => Array.isArray(rows) ? rows.map((row) => normalizeNominatim(row, canonical)).filter(Boolean) : [])
+      ),
     ];
 
     if (structured.street && structured.city && structured.state) {
@@ -153,26 +163,42 @@
       });
       if (structured.zip) params.set("zip", structured.zip);
       calls.push(
-        nativeFetch(`${censusBase}/address?${params}`, { cache: "no-store", signal })
-          .then(jsonOrNull).then((data) => normalizeCensus(data, canonical))
+        settleWithin(
+          nativeFetch(`${censusBase}/address?${params}`, { cache: "no-store", signal })
+            .then(jsonOrNull).then((data) => normalizeCensus(data, canonical))
+        )
       );
     }
 
-    const settled = await Promise.allSettled(calls);
-    const flattened = settled.flatMap((result) => {
-      if (result.status !== "fulfilled" || !result.value) return [];
-      return Array.isArray(result.value) ? result.value : [result.value];
+    const settled = await Promise.all(calls);
+    const flattened = settled.flatMap((value) => {
+      if (!value) return [];
+      return Array.isArray(value) ? value : [value];
     });
     const seen = new Set();
-    const items = flattened.filter((item) => {
+    return flattened.filter((item) => {
       const key = `${item.display}`.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
       if (!key || seen.has(key)) return false;
       seen.add(key);
       return true;
     }).slice(0, 8);
+  }
 
-    exactCache.set(cacheKey, { savedAt: Date.now(), items });
-    return items;
+  async function lookupExact(query, signal) {
+    const canonical = canonicalQuery(query);
+    const cacheKey = canonical.toLowerCase();
+    const cached = exactCache.get(cacheKey);
+    if (cached && Date.now() - cached.savedAt < EXACT_CACHE_MS) return cached.items;
+    if (exactInflight.has(cacheKey)) return exactInflight.get(cacheKey);
+
+    const work = performExactLookup(canonical, signal)
+      .then((items) => {
+        exactCache.set(cacheKey, { savedAt: Date.now(), items });
+        return items;
+      })
+      .finally(() => exactInflight.delete(cacheKey));
+    exactInflight.set(cacheKey, work);
+    return work;
   }
 
   function syntheticResponse(body) {
