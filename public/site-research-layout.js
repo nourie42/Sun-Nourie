@@ -66,8 +66,14 @@
     if (propertyNote) propertyNote.insertAdjacentElement('afterend', feedback);
     else researchCard.appendChild(feedback);
 
+    // Preserve the hidden source link before removing the legacy runbar. The fixed
+    // export button and completion observers depend on this link remaining in the DOM.
     const exhaustiveLink = $id('siteResearchWord');
-    if (exhaustiveLink) exhaustiveLink.classList.add('fiq-export-source');
+    if (exhaustiveLink) {
+      exhaustiveLink.classList.add('fiq-export-source');
+      const exportHost = $id('reportExportDock') || document.body;
+      if (exhaustiveLink.parentElement !== exportHost) exportHost.appendChild(exhaustiveLink);
+    }
     runbar?.remove();
     setTimeout(invalidateMovedMaps, 120);
     return true;
@@ -259,7 +265,10 @@
   function initialize(attempt = 0) {
     ensureHiddenCompatibilityFields();
     combineMapSectionsFallback();
-    const ready = positionResearchUi() && wireExportDock() && wireResearchLoading();
+    const positioned = positionResearchUi();
+    const exportReady = wireExportDock();
+    const loadingReady = wireResearchLoading();
+    const ready = positioned && exportReady && loadingReady;
     improveAadtStatus();
     syncResultsState();
     if (!ready && attempt < MAX_BOOT_ATTEMPTS) {
