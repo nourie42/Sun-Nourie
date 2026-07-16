@@ -94,6 +94,11 @@ app.get("/site-research-client.js", (_req, res) => {
   res.type("application/javascript");
   res.sendFile(path.join(__dirname, "public", "site-research-client.js"));
 });
+app.get("/site-research-layout.js", (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.type("application/javascript");
+  res.sendFile(path.join(__dirname, "public", "site-research-layout.js"));
+});
 app.get("/distributors.html", async (_req, res) => {
   try {
     const filename = path.join(__dirname, "public", "distributors.html");
@@ -138,6 +143,10 @@ app.get("/health", (_req, res) => {
     siteResearch: true,
     siteResearchWordExport: true,
     estimateWordExport: true,
+    siteAnalyzerProfessionalLayout: true,
+    siteResearchResultsAtBottom: true,
+    siteReportDualWordExport: true,
+    siteNotesRemovedFromUi: true,
     propertyRecordsResearch: true,
     competitorRadiusMiles: 1.5,
     multiSourceCompetitorSearch: true,
@@ -148,7 +157,10 @@ app.get("/health", (_req, res) => {
   });
 });
 
-const homeEnhancements = '<script src="/site-research-client.js" defer></script>';
+const homeEnhancements = [
+  '<script src="/site-research-client.js" defer></script>',
+  '<script src="/site-research-layout.js" defer></script>',
+];
 
 function copyHeaders(source, target, { dropLength = false } = {}) {
   for (const [name, value] of Object.entries(source)) {
@@ -177,8 +189,10 @@ function proxyToLegacy(req, res) {
       proxyResponse.on("data", (chunk) => chunks.push(chunk));
       proxyResponse.on("end", () => {
         let page = Buffer.concat(chunks).toString("utf8");
-        if (!page.includes("/site-research-client.js")) {
-          page = page.includes("</body>") ? page.replace("</body>", `${homeEnhancements}</body>`) : `${page}${homeEnhancements}`;
+        for (const enhancement of homeEnhancements) {
+          const src = enhancement.match(/src="([^"]+)/)?.[1] || "";
+          if (src && page.includes(src)) continue;
+          page = page.includes("</body>") ? page.replace("</body>", `${enhancement}</body>`) : `${page}${enhancement}`;
         }
         res.status(proxyResponse.statusCode || 200);
         copyHeaders(proxyResponse.headers, res, { dropLength: true });
