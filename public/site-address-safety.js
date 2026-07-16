@@ -139,6 +139,15 @@
     document.head.appendChild(providerFallback);
   }
 
+  function loadAadtAutoload() {
+    if (window.__fiqAadtAutoloadInstalled || document.querySelector('script[data-fiq-aadt-autoload]')) return;
+    const script = document.createElement("script");
+    script.src = `/site-aadt-autoload.js?v=1`;
+    script.defer = true;
+    script.dataset.fiqAadtAutoload = "true";
+    document.head.appendChild(script);
+  }
+
   function setAddressReady() {
     const input = $id("addr");
     if (input) {
@@ -179,10 +188,12 @@
     installStyles();
     setAddressReady();
     loadAutocompleteRecovery();
+    loadAadtAutoload();
     requestAnimationFrame(syncDockOverlap);
     setTimeout(setAddressReady, 1200);
     setTimeout(setAddressReady, 4000);
     setTimeout(loadAutocompleteRecovery, 50);
+    setTimeout(loadAadtAutoload, 75);
     setTimeout(syncDockOverlap, 120);
   }
 
