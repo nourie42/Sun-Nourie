@@ -8,19 +8,39 @@ on:
 jobs:
   diagnose:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+
+      - name: Wait for the Render deployment
+        shell: bash
+        run: |
+          REPORT="$GITHUB_WORKSPACE/live-diagnostic.txt"
+          BASE="https://sun-nourie-live.onrender.com"
+          deployed=0
+          for attempt in $(seq 1 30); do
+            echo "deployment_check=$attempt utc=$(date -u +%FT%TZ)" | tee -a "$REPORT"
+            curl -L -sS --connect-timeout 20 --max-time 90 "${BASE}/?deploy_check=${attempt}-$(date +%s)" -o /tmp/home.html || true
+            if grep -q '/site-address-safety.js' /tmp/home.html; then
+              echo "address_safety_deployed=true" | tee -a "$REPORT"
+              deployed=1
+              break
+            fi
+            sleep 15
+          done
+          if [ "$deployed" -ne 1 ]; then
+            echo "address_safety_deployed=false" | tee -a "$REPORT"
+            exit 1
+          fi
 
       - name: Probe live endpoints
         shell: bash
         run: |
-          set +e
           REPORT="$GITHUB_WORKSPACE/live-diagnostic.txt"
           BASE="https://sun-nourie-live.onrender.com"
           {
             echo "UTC: $(date -u)"
-            for path in /health /google/status /; do
+            for path in /health /google/status /site-address-safety.js /; do
               echo "===== ${path} ====="
               curl -L -sS --connect-timeout 20 --max-time 90 -D - "${BASE}${path}" -o "/tmp/body$(echo "$path" | tr '/?' '__').txt"
               rc=$?
@@ -32,19 +52,15 @@ jobs:
                 echo
               fi
             done
-            curl -L -sS --connect-timeout 20 --max-time 90 "${BASE}/" -o /tmp/home.html || true
+            curl -L -sS --connect-timeout 20 --max-time 90 "${BASE}/?diagnostic=$(date +%s)" -o /tmp/home.html || true
             echo "===== injected scripts ====="
             grep -oE '<script[^>]+src="[^"]+' /tmp/home.html || true
-            echo "===== key markup ====="
-            grep -oE 'id="(addr|apiStatus|siteResearchLoadingOverlay|siteResearchCard|reportExportDock)"[^>]*' /tmp/home.html || true
-            echo "===== runtime override present? ====="
-            grep -n 'site-research-runtime-fix' /tmp/home.html || true
           } >> "$REPORT" 2>&1
 
       - name: Install browser probe
         run: npm install --no-save --no-audit --no-fund puppeteer@24
 
-      - name: Run browser interaction probe
+      - name: Run live browser interaction probe
         shell: bash
         run: |
           cat > "$GITHUB_WORKSPACE/probe.mjs" <<'EOF'
@@ -53,6 +69,7 @@ jobs:
           const url = 'https://sun-nourie-live.onrender.com/?diagnostic=' + Date.now();
           const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
           const page = await browser.newPage();
+          await page.setViewport({ width: 800, height: 600 });
           page.setDefaultTimeout(60000);
           const consoleRows = [];
           const pageErrors = [];
@@ -63,35 +80,35 @@ jobs:
 
           try {
             const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 120000 });
-            console.log('navigation_status', response?.status());
+            if (!response?.ok()) throw new Error(`navigation_status=${response?.status()}`);
             await page.waitForSelector('#addr', { timeout: 60000 });
-            await new Promise((resolve) => setTimeout(resolve, 15000));
+            await new Promise((resolve) => setTimeout(resolve, 8000));
 
             const before = await page.evaluate(() => {
               const addr = document.getElementById('addr');
               const api = document.getElementById('apiStatus');
-              const overlay = document.getElementById('siteResearchLoadingOverlay');
               const rect = addr?.getBoundingClientRect();
-              const top = rect ? document.elementFromPoint(rect.x + Math.min(10, rect.width / 2), rect.y + Math.min(10, rect.height / 2)) : null;
+              const top = rect ? document.elementFromPoint(rect.x + 12, rect.y + 12) : null;
               return {
-                readyState: document.readyState,
                 apiText: api?.textContent || null,
                 addrDisabled: addr?.disabled ?? null,
                 addrReadOnly: addr?.readOnly ?? null,
                 addrPointerEvents: addr ? getComputedStyle(addr).pointerEvents : null,
-                addrDisplay: addr ? getComputedStyle(addr).display : null,
                 addrRect: rect ? { x: rect.x, y: rect.y, width: rect.width, height: rect.height } : null,
                 topElementAtAddr: top ? { id: top.id || null, className: String(top.className || ''), tagName: top.tagName } : null,
-                overlayHidden: overlay?.hidden ?? null,
-                overlayDisplay: overlay ? getComputedStyle(overlay).display : null,
-                bodyBusy: document.body.classList.contains('fiq-research-busy'),
+                dockOverlapClass: document.body.classList.contains('fiq-dock-overlaps-address'),
+                safetyScript: [...document.scripts].some((script) => script.src.includes('/site-address-safety.js')),
               };
             });
             console.log('before', JSON.stringify(before, null, 2));
+            if (!before.safetyScript) throw new Error('site-address-safety.js is not loaded.');
+            if (before.addrDisabled || before.addrReadOnly || before.addrPointerEvents === 'none') throw new Error('Address input is not interactive.');
+            if (before.topElementAtAddr?.id !== 'addr') throw new Error(`Address input remains covered by ${JSON.stringify(before.topElementAtAddr)}.`);
+            if (/checking/i.test(before.apiText || '')) throw new Error(`API status remains stuck: ${before.apiText}`);
 
             await page.click('#addr');
             await page.type('#addr', '915 Early Boulevard, Early, Texas', { delay: 20 });
-            await new Promise((resolve) => setTimeout(resolve, 7000));
+            await new Promise((resolve) => setTimeout(resolve, 5000));
             const after = await page.evaluate(() => ({
               value: document.getElementById('addr')?.value || null,
               apiText: document.getElementById('apiStatus')?.textContent || null,
@@ -99,8 +116,8 @@ jobs:
               suggestionsText: document.getElementById('ac')?.textContent?.trim().slice(0, 1000) || null,
             }));
             console.log('after', JSON.stringify(after, null, 2));
-          } catch (error) {
-            console.error('probe_error', error.stack || String(error));
+            if (!after.value?.includes('915 Early Boulevard')) throw new Error(`Typing failed: ${after.value}`);
+            if (pageErrors.length) throw new Error(`Page errors: ${pageErrors.join(' | ')}`);
           } finally {
             console.log('page_errors', JSON.stringify(pageErrors, null, 2));
             console.log('failed_requests', JSON.stringify(failedRequests, null, 2));
@@ -108,9 +125,10 @@ jobs:
             await browser.close();
           }
           EOF
-          node "$GITHUB_WORKSPACE/probe.mjs" >> "$GITHUB_WORKSPACE/live-diagnostic.txt" 2>&1 || true
+          node "$GITHUB_WORKSPACE/probe.mjs" >> "$GITHUB_WORKSPACE/live-diagnostic.txt" 2>&1
 
       - name: Upload diagnostic report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: live-site-diagnostic
