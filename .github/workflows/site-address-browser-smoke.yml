@@ -37,7 +37,7 @@ jobs:
           cat /tmp/fuel-iq-server.log
           exit 1
 
-      - name: Verify address typing and visible suggestions
+      - name: Verify address typing, exact fallback, and completed report display
         shell: bash
         run: |
           cat > address-smoke.mjs <<'EOF'
@@ -117,6 +117,8 @@ jobs:
             await page.waitForSelector('#addr');
             await page.waitForSelector('script[data-fiq-address-provider-fallback]', { timeout: 15000 });
             await page.waitForSelector('script[data-fiq-autocomplete-recovery]', { timeout: 15000 });
+            await page.waitForSelector('#siteResearchResultsCard', { timeout: 15000 });
+            await page.waitForSelector('#siteResearchWord', { timeout: 15000 });
             await new Promise((resolve) => setTimeout(resolve, 1000));
 
             const before = await page.evaluate(() => {
@@ -196,6 +198,50 @@ jobs:
             }));
             if (!/3201 Buttermilk/i.test(ruralSelected.value)) throw new Error(`Rural suggestion selection failed: ${ruralSelected.value}`);
             if (!Number.isFinite(ruralSelected.selected?.lat) || !Number.isFinite(ruralSelected.selected?.lon)) throw new Error('Rural address did not publish coordinates.');
+
+            const reportBefore = await page.evaluate(() => ({
+              sourceLinkPresent: Boolean(document.getElementById('siteResearchWord')),
+              sourceLinkParent: document.getElementById('siteResearchWord')?.parentElement?.id || '',
+              cardHidden: document.getElementById('siteResearchResultsCard')?.hidden,
+            }));
+            if (!reportBefore.sourceLinkPresent) throw new Error('The exhaustive Word source link was removed from the DOM.');
+            if (reportBefore.sourceLinkParent !== 'reportExportDock') throw new Error(`The exhaustive Word source link is in the wrong container: ${reportBefore.sourceLinkParent}`);
+
+            await page.evaluate(() => {
+              const results = document.getElementById('siteResearchResults');
+              const sourceLink = document.getElementById('siteResearchWord');
+              const status = document.getElementById('siteResearchStatus');
+              const progress = document.getElementById('siteResearchProgress');
+              results.innerHTML = '<article class="site-research-report"><h1>Completed Exhaustive Test Report</h1><p>Visible sourced findings.</p></article>';
+              sourceLink.href = '/api/site-research/word/test-report';
+              sourceLink.hidden = false;
+              status.textContent = 'Exhaustive multi-pass research complete. Review the sourced report below or export it to Word.';
+              progress.hidden = false;
+              progress.value = 100;
+            });
+
+            await page.waitForFunction(() => {
+              const card = document.getElementById('siteResearchResultsCard');
+              const results = document.getElementById('siteResearchResults');
+              const exportButton = document.getElementById('siteResearchWordButton');
+              const scrollButton = document.getElementById('scrollToResearchResults');
+              return card && !card.hidden &&
+                /Completed Exhaustive Test Report/.test(results?.textContent || '') &&
+                exportButton && !exportButton.disabled &&
+                scrollButton && !scrollButton.hidden;
+            }, { timeout: 10000 });
+
+            const reportAfter = await page.evaluate(() => ({
+              cardHidden: document.getElementById('siteResearchResultsCard')?.hidden,
+              reportText: document.getElementById('siteResearchResults')?.textContent || '',
+              exportDisabled: document.getElementById('siteResearchWordButton')?.disabled,
+              scrollHidden: document.getElementById('scrollToResearchResults')?.hidden,
+            }));
+            console.log('completed_report_state', reportAfter);
+            if (reportAfter.cardHidden) throw new Error('Completed exhaustive report card remained hidden.');
+            if (!/Completed Exhaustive Test Report/.test(reportAfter.reportText)) throw new Error('Completed report HTML was not attached to the visible results card.');
+            if (reportAfter.exportDisabled) throw new Error('Completed exhaustive Word export remained disabled.');
+            if (reportAfter.scrollHidden) throw new Error('Scroll-to-results button remained hidden after report completion.');
             if (pageErrors.length) throw new Error(`Page JavaScript errors: ${pageErrors.join(' | ')}`);
           } finally {
             await browser.close();
