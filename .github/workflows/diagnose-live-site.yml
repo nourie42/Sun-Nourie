@@ -1,0 +1,107 @@
+name: Diagnose Live Site
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Probe live endpoints
+        shell: bash
+        run: |
+          set +e
+          BASE="https://sun-nourie-live.onrender.com"
+          echo "UTC: $(date -u)"
+          for path in /health /google/status /; do
+            echo "===== ${path} ====="
+            curl -L -sS --connect-timeout 20 --max-time 90 -D - "${BASE}${path}" -o "/tmp/body$(echo "$path" | tr '/?' '__').txt"
+            rc=$?
+            echo "curl_exit=${rc}"
+            body="/tmp/body$(echo "$path" | tr '/?' '__').txt"
+            if [ -f "$body" ]; then
+              echo "body_bytes=$(wc -c < "$body")"
+              head -c 1500 "$body" || true
+              echo
+            fi
+          done
+          curl -L -sS --connect-timeout 20 --max-time 90 "${BASE}/" -o /tmp/home.html || true
+          echo "===== injected scripts ====="
+          grep -oE '<script[^>]+src="[^"]+' /tmp/home.html || true
+          echo "===== key markup ====="
+          grep -oE 'id="(addr|apiStatus|siteResearchLoadingOverlay|siteResearchCard|reportExportDock)"[^>]*' /tmp/home.html || true
+          echo "===== runtime override present? ====="
+          grep -n 'site-research-runtime-fix' /tmp/home.html || true
+
+      - name: Install browser probe
+        run: npm install --no-save --no-audit --no-fund puppeteer@24
+
+      - name: Run browser interaction probe
+        shell: bash
+        run: |
+          cat > /tmp/probe.mjs <<'EOF'
+          import puppeteer from 'puppeteer';
+
+          const url = 'https://sun-nourie-live.onrender.com/?diagnostic=' + Date.now();
+          const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+          const page = await browser.newPage();
+          page.setDefaultTimeout(60000);
+          const consoleRows = [];
+          const pageErrors = [];
+          const failedRequests = [];
+          page.on('console', (msg) => consoleRows.push(`${msg.type()}: ${msg.text()}`));
+          page.on('pageerror', (err) => pageErrors.push(err.stack || String(err)));
+          page.on('requestfailed', (req) => failedRequests.push(`${req.method()} ${req.url()} :: ${req.failure()?.errorText || 'failed'}`));
+
+          try {
+            const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 120000 });
+            console.log('navigation_status', response?.status());
+            await page.waitForSelector('#addr', { timeout: 60000 });
+            await new Promise((resolve) => setTimeout(resolve, 15000));
+
+            const before = await page.evaluate(() => {
+              const addr = document.getElementById('addr');
+              const api = document.getElementById('apiStatus');
+              const overlay = document.getElementById('siteResearchLoadingOverlay');
+              return {
+                readyState: document.readyState,
+                apiText: api?.textContent || null,
+                addrDisabled: addr?.disabled ?? null,
+                addrReadOnly: addr?.readOnly ?? null,
+                addrPointerEvents: addr ? getComputedStyle(addr).pointerEvents : null,
+                addrDisplay: addr ? getComputedStyle(addr).display : null,
+                addrRect: addr ? { x: addr.getBoundingClientRect().x, y: addr.getBoundingClientRect().y, width: addr.getBoundingClientRect().width, height: addr.getBoundingClientRect().height } : null,
+                topElementAtAddr: addr ? document.elementFromPoint(addr.getBoundingClientRect().x + 10, addr.getBoundingClientRect().y + 10)?.id || document.elementFromPoint(addr.getBoundingClientRect().x + 10, addr.getBoundingClientRect().y + 10)?.className || null : null,
+                overlayHidden: overlay?.hidden ?? null,
+                overlayDisplay: overlay ? getComputedStyle(overlay).display : null,
+                bodyBusy: document.body.classList.contains('fiq-research-busy'),
+              };
+            });
+            console.log('before', JSON.stringify(before, null, 2));
+
+            await page.click('#addr');
+            await page.type('#addr', '915 Early Boulevard, Early, Texas', { delay: 20 });
+            await new Promise((resolve) => setTimeout(resolve, 6000));
+            const after = await page.evaluate(() => ({
+              value: document.getElementById('addr')?.value || null,
+              apiText: document.getElementById('apiStatus')?.textContent || null,
+              suggestionsDisplay: document.getElementById('ac') ? getComputedStyle(document.getElementById('ac')).display : null,
+              suggestionsText: document.getElementById('ac')?.textContent?.trim().slice(0, 500) || null,
+            }));
+            console.log('after', JSON.stringify(after, null, 2));
+          } catch (error) {
+            console.error('probe_error', error.stack || String(error));
+            process.exitCode = 1;
+          } finally {
+            console.log('page_errors', JSON.stringify(pageErrors, null, 2));
+            console.log('failed_requests', JSON.stringify(failedRequests, null, 2));
+            console.log('console_rows', JSON.stringify(consoleRows, null, 2));
+            await browser.close();
+          }
+          EOF
+          node /tmp/probe.mjs
