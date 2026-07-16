@@ -10,6 +10,7 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
 
 const server = read("server.js");
 const layout = read("public/site-research-layout.js");
+const presentation = read("src/siteAnalyzerPresentation.js");
 const aadt = read("src/aadtCoverage.js");
 const reportEnhancements = read("src/siteResearchReportEnhancements.js");
 const wordFix = read("src/siteWordLayoutFix.js");
@@ -29,6 +30,9 @@ const transformed = transformSiteAnalyzerPage(sample);
 assert(transformed.includes('data-fiq-rendered="server"'), "Site Analyzer must be transformed before browser paint.");
 assert(transformed.includes('id="siteResearchProfessionalStyles"'), "Professional styling must be embedded server-side.");
 assert(transformed.includes('id="siteWorkflowCard"'), "The primary workflow card must be server-rendered.");
+assert(transformed.includes('id="fiqSiteAnalyzerTitle"'), "The black hero must contain a prominent Site Analyzer heading.");
+assert(transformed.includes('Estimate volume, validate traffic, and run sourced diligence.'), "The hero headline must fill the black presentation area.");
+assert(!transformed.includes('class="instructions"'), "The legacy client must not be able to replace the professional hero with small instructions.");
 assert(!transformed.includes('class="toolbar notes-toolbar"'), "User comments must not remain visible.");
 assert(transformed.includes('id="siteNotes" type="hidden"'), "A hidden notes compatibility field must preserve existing JS behavior.");
 assert(transformed.includes('id="devs" hidden'), "Developments must be hidden from the basic analyzer.");
@@ -41,6 +45,13 @@ assert(transformed.indexOf('id="scrollToResearchResults"') < transformed.indexOf
 assert(transformed.indexOf('id="exportPDF"') < transformed.indexOf('id="siteResearchWordButton"'), "Basic Word export must be left of Exhaustive Word export.");
 assert(transformed.includes('id="siteResearchLoadingOverlay"'), "Exhaustive research must have a radar loading overlay.");
 assert(transformSiteAnalyzerPage(transformed) === transformed, "Server-side transformation must be idempotent.");
+
+for (const snippet of [
+  '.research-options-panel .site-research-grid .chip input',
+  'width:18px!important',
+  'display:flex!important',
+  'font-size:14px!important',
+]) assert(presentation.includes(snippet), `Exhaustive-selection styling is missing: ${snippet}`);
 
 for (const snippet of [
   'import { transformSiteAnalyzerPage } from "./src/siteAnalyzerPresentation.js"',
@@ -81,4 +92,4 @@ for (const snippet of [
   'Open source',
 ]) assert(wordFix.includes(snippet), `Word margin fix is missing: ${snippet}`);
 
-console.log("Site Analyzer V2 workflow validation passed.");
+console.log("Site Analyzer hero and selection layout validation passed.");
