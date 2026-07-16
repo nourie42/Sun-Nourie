@@ -6,22 +6,25 @@
   const panelDescription = document.querySelector('.panel-title p');
   if (!companyInput || !locationInput || !form || !researchButton) return;
 
-  const LOOKUP_TIMEOUT_MS = 9000;
+  const LOOKUP_TIMEOUT_MS = 38000;
   const style = document.createElement('style');
   style.textContent = `
     .company-picker{position:relative}
     .company-search-help{font-size:11px;color:#6b7c8d;margin:7px 2px 0;line-height:1.4}
     .company-search-help.error{color:#a7352b}
-    .company-results{display:none;position:absolute;z-index:40;left:0;right:0;top:calc(100% + 7px);background:#fff;border:1px solid #cdd9e3;border-radius:12px;box-shadow:0 18px 45px rgba(11,31,51,.19);max-height:360px;overflow:auto;padding:6px}
+    .company-results{display:none;position:absolute;z-index:40;left:0;right:0;top:calc(100% + 7px);background:#fff;border:1px solid #cdd9e3;border-radius:12px;box-shadow:0 18px 45px rgba(11,31,51,.19);max-height:390px;overflow:auto;padding:6px}
     .company-results.open{display:block}
     .company-result{display:block;width:100%;border:0;background:#fff;border-radius:9px;padding:11px 12px;text-align:left;cursor:pointer;color:#0b1f33}
     .company-result:hover,.company-result:focus{background:#eef6fb;outline:none}
     .company-result strong{display:block;font-size:13px;line-height:1.3}
     .company-result .company-address{display:block;color:#607283;font-size:11px;line-height:1.35;margin-top:3px}
-    .company-result .company-meta{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-top:5px;color:#738596;font-size:10px}
-    .company-source{display:inline-block;padding:2px 6px;border-radius:999px;background:#e9f2f8;color:#235d84;font-weight:750}
-    .company-manual{border-top:1px solid #e1e8ee;margin-top:4px;padding-top:8px}
+    .company-result .company-description{display:block;color:#536779;font-size:10.5px;line-height:1.35;margin-top:4px}
+    .company-result .company-meta{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-top:6px;color:#738596;font-size:10px}
+    .company-source,.company-kind{display:inline-block;padding:2px 6px;border-radius:999px;font-weight:750}
+    .company-source{background:#e9f2f8;color:#235d84}
+    .company-kind{background:#e8f7ef;color:#136b4c}
     .company-searching{padding:10px 12px;color:#647688;font-size:11px;border-bottom:1px solid #edf1f4}
+    .company-empty{padding:14px 12px;color:#647688;font-size:11px;line-height:1.45}
     .company-selected{display:none;margin-top:9px;border:1px solid #a7d6bd;background:#eefaf3;border-radius:10px;padding:10px 11px;position:relative}
     .company-selected.open{display:block}
     .company-selected strong{display:block;color:#155e42;font-size:12px;padding-right:26px}
@@ -31,7 +34,9 @@
   `;
   document.head.appendChild(style);
 
-  if (panelDescription) panelDescription.textContent = 'Start typing, then select the correct company from the matches.';
+  if (panelDescription) {
+    panelDescription.textContent = 'Search distributor companies only—Fuel IQ excludes gas stations and store locations.';
+  }
   companyInput.setAttribute('autocomplete', 'off');
   companyInput.setAttribute('aria-autocomplete', 'list');
   companyInput.setAttribute('aria-expanded', 'false');
@@ -50,7 +55,7 @@
 
   const help = document.createElement('div');
   help.className = 'company-search-help';
-  help.textContent = 'Type at least 2 characters. Fuel IQ will identify the company and headquarters automatically.';
+  help.textContent = 'Type at least 2 characters. Fuel IQ checks its corporate distributor index and live public sources.';
   picker.insertAdjacentElement('afterend', help);
 
   const selectedCard = document.createElement('div');
@@ -62,7 +67,6 @@
   let timer = null;
   let requestNumber = 0;
   let activeController = null;
-  let enrichmentController = null;
   let lastSearched = '';
 
   function escapeHtml(value) {
@@ -90,26 +94,25 @@
     activeController = null;
   }
 
-  function stopEnrichment() {
-    if (enrichmentController) enrichmentController.abort();
-    enrichmentController = null;
-  }
-
   function clearSelection({ keepValue = true } = {}) {
-    stopEnrichment();
     selectedCompany = null;
     selectedCard.classList.remove('open');
     companyInput.classList.remove('company-picker-required');
     locationInput.value = '';
     researchButton.disabled = true;
-    researchButton.textContent = 'Select a Company to Research';
+    researchButton.textContent = 'Select a Distributor Company to Research';
     if (!keepValue) companyInput.value = '';
   }
 
-  function updateSelectedCard(item, fallback = 'Selected company identity') {
+  function updateSelectedCard(item) {
     selectedCard.querySelector('strong').textContent = item.legal_name || item.name || companyInput.value;
-    const details = [item.headquarters, item.website, item.source].filter(Boolean).join(' • ');
-    selectedCard.querySelector('span').textContent = details || fallback;
+    const details = [
+      item.headquarters,
+      item.parent_company ? `Parent: ${item.parent_company}` : '',
+      item.website,
+      'Corporate distributor',
+    ].filter(Boolean).join(' • ');
+    selectedCard.querySelector('span').textContent = details || 'Corporate distributor selected; headquarters will be confirmed during research.';
     selectedCard.classList.add('open');
   }
 
@@ -117,126 +120,85 @@
     selectedCompany = item;
     companyInput.value = item.legal_name || item.name || companyInput.value.trim();
     locationInput.value = item.headquarters || '';
-    updateSelectedCard(item, 'Company selected; headquarters will be identified during research.');
+    updateSelectedCard(item);
     companyInput.classList.remove('company-picker-required');
     researchButton.disabled = false;
-    researchButton.textContent = 'Research Selected Company with ChatGPT';
+    researchButton.textContent = 'Research Selected Distributor with ChatGPT';
     setHelp(item.headquarters
-      ? 'Company and headquarters selected automatically. Click the research button to start the report.'
-      : 'Company selected. Fuel IQ will identify the headquarters during research.', false);
+      ? 'Corporate distributor selected. Click the research button to start the report.'
+      : 'Corporate distributor selected. Fuel IQ will confirm its headquarters during research.', false);
     closeResults();
-  }
-
-  async function enrichManualSelection(item) {
-    stopEnrichment();
-    const controller = new AbortController();
-    enrichmentController = controller;
-    const timeout = setTimeout(() => controller.abort(), LOOKUP_TIMEOUT_MS);
-    researchButton.disabled = true;
-    researchButton.textContent = 'Finding Company Headquarters…';
-    updateSelectedCard(item, 'Finding company headquarters automatically…');
-    setHelp('Finding the company headquarters automatically…', false);
-
-    try {
-      const query = item.legal_name || item.name || companyInput.value.trim();
-      const response = await fetch(`/api/distributors/search?q=${encodeURIComponent(query)}&location=`, {
-        cache: 'no-store',
-        signal: controller.signal,
-      });
-      const text = await response.text();
-      let data;
-      try { data = JSON.parse(text); }
-      catch { throw new Error(`Company search returned ${response.status}.`); }
-      if (!response.ok || !data.ok) throw new Error(data.message || `Company search failed (${response.status}).`);
-      if (selectedCompany !== item) return;
-
-      const match = (Array.isArray(data.candidates) ? data.candidates : []).find((candidate) => candidate?.headquarters) || null;
-      if (match) {
-        finishSelection({
-          ...item,
-          legal_name: match.legal_name || match.name || item.legal_name,
-          name: match.name || item.name,
-          headquarters: match.headquarters,
-          website: match.website || '',
-          source: match.source || 'Public company lookup',
-          manual: false,
-        });
-      } else {
-        finishSelection(item);
-      }
-    } catch (error) {
-      if (selectedCompany !== item) return;
-      finishSelection(item);
-    } finally {
-      clearTimeout(timeout);
-      if (enrichmentController === controller) enrichmentController = null;
-    }
   }
 
   function selectCompany(item) {
     if (!item) return;
     stopLookup();
-    stopEnrichment();
-    selectedCompany = item;
-    companyInput.value = item.legal_name || item.name || companyInput.value.trim();
-    locationInput.value = item.headquarters || '';
-    companyInput.classList.remove('company-picker-required');
-    closeResults();
-
-    if (item.manual && !item.headquarters) {
-      enrichManualSelection(item);
-      return;
-    }
-
     finishSelection(item);
   }
 
   window.fuelIqSelectDistributorCompany = selectCompany;
 
-  function manualCandidate(query) {
-    return {
-      name: query,
-      legal_name: query,
-      headquarters: '',
-      website: '',
-      description: 'Use this exact company name; Fuel IQ will find the headquarters automatically',
-      confidence: 'Exact-name selection',
-      source: 'Exact name entered',
-      manual: true,
-    };
+  function isCorporateResult(item) {
+    if (!item || typeof item !== 'object') return false;
+    const type = String(item.entity_type || '').toLowerCase();
+    const source = String(item.source || '').toLowerCase();
+    if (/gas_station|service_station|convenience_store|retail_location|store_location|travel_center|truck_stop|map_listing/.test(type)) return false;
+    if (/openstreetmap|google places|amenity\s*\/\s*fuel|amenity=fuel/.test(source)) return false;
+    return Boolean(item.legal_name || item.name);
   }
 
   function candidateButton(item, index) {
-    const name = item.legal_name || item.name || 'Company match';
-    const address = item.headquarters || (item.manual ? 'Headquarters will be found automatically' : 'Headquarters not identified');
-    const description = item.description || item.confidence || '';
+    const name = item.legal_name || item.name || 'Corporate distributor match';
+    const address = item.headquarters || 'Corporate headquarters will be confirmed during research';
+    const description = item.description || item.corporate_evidence || 'Corporate fuel distributor or petroleum marketer';
+    const source = item.source || 'Corporate distributor search';
+    const parent = item.parent_company ? `Parent: ${item.parent_company}` : '';
     return `<button class="company-result" type="button" role="option" data-company-index="${index}">
       <strong>${escapeHtml(name)}</strong>
       <span class="company-address">${escapeHtml(address)}</span>
-      <span class="company-meta"><span class="company-source">${escapeHtml(item.source || 'Public search')}</span><span>${escapeHtml(description)}</span></span>
+      <span class="company-description">${escapeHtml(description)}</span>
+      <span class="company-meta"><span class="company-kind">Corporate distributor</span><span class="company-source">${escapeHtml(source)}</span>${parent ? `<span>${escapeHtml(parent)}</span>` : ''}</span>
     </button>`;
   }
 
-  function renderCandidates(candidates, query, { searching = false, lookupFailed = false } = {}) {
-    const valid = Array.isArray(candidates) ? candidates.filter(Boolean) : [];
-    const manual = manualCandidate(query);
-    const all = [...valid, manual];
+  function renderCandidates(candidates, query, { searching = false, lookupFailed = false, message = '' } = {}) {
+    const valid = (Array.isArray(candidates) ? candidates : []).filter(isCorporateResult);
+    const status = searching
+      ? '<div class="company-searching">Searching the corporate distributor index and live company sources…</div>'
+      : '';
     const rows = valid.map((item, index) => candidateButton(item, index)).join('');
-    const manualIndex = valid.length;
-    results.innerHTML = `${searching ? '<div class="company-searching">Checking public company matches and headquarters…</div>' : ''}
-      ${rows}
-      <div class="company-manual">${candidateButton(manual, manualIndex)}</div>`;
-    results._companyCandidates = all;
+    const empty = !valid.length && !searching
+      ? `<div class="company-empty">${escapeHtml(message || `No corporate fuel distributor was verified for “${query}”. Try the legal name, DBA, parent company, or a location hint.`)}</div>`
+      : '';
+
+    results.innerHTML = `${status}${rows}${empty}`;
+    results._companyCandidates = valid;
     openResults();
-    if (searching) {
-      setHelp('Select a public match, or use the exact-name option and Fuel IQ will find the headquarters automatically.', false);
+
+    if (searching && valid.length) {
+      setHelp('Corporate index matches are shown now; Fuel IQ is still checking live public sources for aliases and additional distributors.', false);
+    } else if (searching) {
+      setHelp('Searching corporate distributor records. Gas stations, convenience stores, and map locations are excluded.', false);
     } else if (valid.length) {
-      setHelp('Select the correct company below. Its headquarters will be used automatically.', false);
+      setHelp('Select the correct corporate distributor below. Individual stations and store locations are excluded.', false);
     } else {
-      setHelp(lookupFailed
-        ? 'Public lookup timed out. Select the exact-name option and Fuel IQ will continue identifying the headquarters.'
-        : 'No separate public match was found. Select the exact-name option to continue.', lookupFailed);
+      setHelp(message || (lookupFailed
+        ? 'Live corporate search timed out. Try the legal name, DBA, parent company, or a location hint.'
+        : 'No corporate distributor match was verified. Try another company name or alias.'), lookupFailed);
     }
+  }
+
+  async function fetchSearch(query, mode, signal) {
+    const response = await fetch(`/api/distributors/search?q=${encodeURIComponent(query)}&location=&mode=${encodeURIComponent(mode)}`, {
+      cache: 'no-store',
+      signal,
+    });
+    const text = await response.text();
+    let data;
+    try { data = JSON.parse(text); }
+    catch { throw new Error(`Corporate distributor search returned ${response.status}.`); }
+    if (!response.ok || !data.ok) throw new Error(data.message || `Corporate distributor search failed (${response.status}).`);
+    return data;
   }
 
   async function searchCompanies({ force = false } = {}) {
@@ -244,7 +206,7 @@
     if (query.length < 2) {
       stopLookup();
       closeResults();
-      setHelp('Type at least 2 characters to find the company.', false);
+      setHelp('Type at least 2 characters to find a distributor company.', false);
       return;
     }
     if (!force && query === lastSearched && results._companyCandidates?.length) {
@@ -260,22 +222,36 @@
     const controller = new AbortController();
     activeController = controller;
     const timeout = setTimeout(() => controller.abort(), LOOKUP_TIMEOUT_MS);
+    let directoryCandidates = [];
+
     try {
-      const response = await fetch(`/api/distributors/search?q=${encodeURIComponent(query)}&location=`, {
-        cache: 'no-store',
-        signal: controller.signal,
-      });
-      const text = await response.text();
-      let data;
-      try { data = JSON.parse(text); }
-      catch { throw new Error(`Company search returned ${response.status}.`); }
+      try {
+        const directory = await fetchSearch(query, 'directory', controller.signal);
+        if (thisRequest !== requestNumber || selectedCompany) return;
+        directoryCandidates = Array.isArray(directory.candidates) ? directory.candidates : [];
+        if (directoryCandidates.length) renderCandidates(directoryCandidates, query, { searching: true });
+      } catch (error) {
+        if (error?.name === 'AbortError') throw error;
+      }
+
+      const exhaustive = await fetchSearch(query, 'exhaustive', controller.signal);
       if (thisRequest !== requestNumber || selectedCompany) return;
-      if (!response.ok || !data.ok) throw new Error(data.message || `Company search failed (${response.status}).`);
-      renderCandidates(data.candidates, query);
+      const candidates = Array.isArray(exhaustive.candidates) ? exhaustive.candidates : directoryCandidates;
+      renderCandidates(candidates, query, {
+        lookupFailed: Boolean(exhaustive.partial && !candidates.length),
+        message: exhaustive.message || '',
+      });
     } catch (error) {
       if (thisRequest !== requestNumber || selectedCompany) return;
       const timedOut = error?.name === 'AbortError';
-      renderCandidates([], query, { lookupFailed: timedOut });
+      renderCandidates(directoryCandidates, query, {
+        lookupFailed: timedOut,
+        message: directoryCandidates.length
+          ? 'Live verification was unavailable; showing corporate distributor-index matches.'
+          : (timedOut
+            ? 'Live corporate search timed out. Try the legal name, DBA, parent company, or a location hint.'
+            : 'Corporate distributor search could not be completed.'),
+      });
     } finally {
       clearTimeout(timeout);
       if (activeController === controller) activeController = null;
@@ -290,7 +266,7 @@
     clearTimeout(timer);
     const query = companyInput.value.trim();
     if (query.length >= 2) renderCandidates([], query, { searching: true });
-    timer = setTimeout(() => searchCompanies(), 350);
+    timer = setTimeout(() => searchCompanies(), 400);
   });
 
   companyInput.addEventListener('focus', () => {
@@ -324,10 +300,10 @@
           legal_name: name,
           headquarters,
           website: '',
-          description: 'Fuel IQ example company',
-          confidence: 'Preset company',
+          description: 'Fuel IQ corporate distributor example',
+          confidence: 'Preset corporate distributor',
           source: 'Fuel IQ example',
-          prefer_headquarters: true,
+          entity_type: 'corporate_distributor',
         });
       }, 0);
     }
@@ -337,12 +313,8 @@
     if (selectedCompany && !researchButton.disabled) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    if (selectedCompany && researchButton.disabled) {
-      setHelp('Fuel IQ is still finding the company headquarters. The research button will unlock automatically.', false);
-      return;
-    }
     companyInput.classList.add('company-picker-required');
-    setHelp('Select a company result before starting research.', true);
+    setHelp('Select a corporate distributor result before starting research.', true);
     searchCompanies({ force: true });
     companyInput.focus();
   }, true);
