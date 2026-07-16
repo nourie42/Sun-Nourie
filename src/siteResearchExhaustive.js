@@ -66,7 +66,7 @@ function sourcesFrom(payload) {
   return out;
 }
 function parseJson(text) {
-  let value = clean(text, 1000000).replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
+  const value = clean(text, 1000000).replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
   const start = value.indexOf("{"); const end = value.lastIndexOf("}");
   if (start < 0 || end <= start) throw new Error("The synthesis response did not contain a JSON report.");
   return JSON.parse(value.slice(start, end + 1));
@@ -101,7 +101,7 @@ function normalizeReport(raw, meta) {
   const property = report.property_records && typeof report.property_records === "object" ? report.property_records : {};
   const normalizedProperty = { summary: clean(property.summary || property.overview, 12000), record_details: list(property.record_details || property.details).map((r) => ({ field: clean(r?.field || r?.item, 500), value: clean(r?.value || r?.detail || r?.finding, 6000), confidence: clean(r?.confidence || r?.status, 200), source_ids: sourceIds(r?.source_ids || r?.sources) })).filter((r) => r.field || r.value), not_found: list(property.not_found || property.data_gaps).map((x) => clean(x, 2500)).filter(Boolean), source_ids: sourceIds(property.source_ids || property.sources) };
   for (const [key] of PROPERTY_FIELDS) normalizedProperty[key] = clean(property[key], 3500);
-  return { prepared_at: clean(report.prepared_at || new Date().toISOString(), 120), address: clean(report.address || meta.address, 700), title: clean(report.title || `${meta.address} Detailed Site & Market Summary`, 900), disclaimer: clean(report.disclaimer || "Public-source research and model-assisted analysis only. Verify controlling property, traffic, zoning, environmental, competition, and development records before underwriting.", 3500), property_records: normalizedProperty, sections: meta.sections.map((key) => normalizeSection(byKey.get(key) || report[key], key)), source_register: normalizeSources(report.source_register || report.sources, meta.sources), _meta: { generated_at: new Date().toISOString(), model: meta.model, selected_sections: meta.sections, research_passes: meta.passes } };
+  return { prepared_at: clean(report.prepared_at || new Date().toISOString(), 120), address: clean(report.address || meta.address, 700), title: clean(report.title || `${meta.address} Detailed Site & Market Summary`, 900), disclaimer: clean(report.disclaimer || "Public-source research and model-assisted analysis only. Verify controlling property, traffic, zoning, environmental, competition, and development records before underwriting.", 3500), property_records: normalizedProperty, sections: meta.sections.map((key) => normalizeSection(byKey.get(key) || report[key], key)), source_register: normalizeSources(report.source_register || report.sources, meta.sources), _meta: { generated_at: new Date().toISOString(), model: meta.model, selected_sections: meta.sections, research_passes: meta.passes, fallback_synthesis: Boolean(meta.fallback) } };
 }
 
 function compactEstimate(value) {
@@ -117,46 +117,142 @@ const PASSES = [
   { key: "growth_market", label: "residential, commercial, and demographic growth", prompt: (job) => `${commonContext(job)}\nSearch municipal development maps, planning agendas, staff reports, meeting packets, project pages, permits, local news, Census/ACS and economic-development sources. Identify named residential, multifamily, retail, grocery, restaurant, medical, school, daycare, office, industrial, flex, warehouse and mixed-use projects with units/square feet, status, timing, location relationship, source date and traffic/fuel implication. Include population, households, income, commuting and employment demand drivers. Search alternate project names and archived records.` },
   { key: "operations_risk", label: "site operations, environmental risk, and positioning", prompt: (job) => `${commonContext(job)}\nResearch the current station/business identity, operating hours, brand, amenities, diesel/fleet cards, reviews, public photos, age/condition clues, tanks/environmental history, permits, litigation or enforcement clues, and redevelopment constraints. Build strengths, weaknesses, red flags, due-diligence priorities and practical modernization/positioning recommendations. Include direct URLs, dates, conflicting evidence and field-verification needs.` },
 ];
-function researchPayload(job, pass, model) {
-  return { model, background: true, store: true, tools: [{ type: "web_search", search_context_size: "high" }], tool_choice: "required", include: ["web_search_call.action.sources"], instructions: "You are a rigorous petroleum-site M&A research analyst. Search broadly, favor primary sources, open multiple results, cross-check exact addresses, include direct URLs and dates, distinguish fact from inference, and do not stop after obvious search results.", input: pass.prompt(job), max_output_tokens: Number(process.env.OPENAI_SITE_RESEARCH_PASS_TOKENS || 14000) };
+
+function configuredModels() {
+  const configured = clean(process.env.OPENAI_SITE_RESEARCH_MODELS || process.env.OPENAI_SITE_RESEARCH_MODEL, 500)
+    .split(",").map((value) => clean(value, 100)).filter(Boolean);
+  return unique([...configured, "gpt-5.4", "gpt-5.2", "gpt-4.1-mini"]);
+}
+function researchPayloadVariants(job, pass, model) {
+  const base = {
+    model,
+    tools: [{ type: "web_search", search_context_size: "high" }],
+    instructions: "You are a rigorous petroleum-site M&A research analyst. Search broadly, favor primary sources, open multiple results, cross-check exact addresses, include direct URLs and dates, distinguish fact from inference, and do not stop after obvious search results.",
+    input: pass.prompt(job),
+    max_output_tokens: Number(process.env.OPENAI_SITE_RESEARCH_PASS_TOKENS || 10000),
+  };
+  return [
+    { name: "background-required", payload: { ...base, background: true, store: true, tool_choice: "required", include: ["web_search_call.action.sources"] } },
+    { name: "background-auto", payload: { ...base, background: true, store: true, tool_choice: "auto", include: ["web_search_call.action.sources"] } },
+    { name: "foreground-auto", payload: { ...base, store: false, tool_choice: "auto", include: ["web_search_call.action.sources"] } },
+    { name: "foreground-compatible", payload: { ...base, store: false } },
+  ];
 }
 function synthesisPrompt(job) {
   const selected = job.sections.map((key) => `${key}: ${SECTION_CATALOG[key]}`).join("\n");
-  const evidence = job.passes.map((p) => `\n===== ${p.label.toUpperCase()} =====\n${p.output}`).join("\n");
+  const evidence = job.passes.filter((p) => p.output).map((p) => `\n===== ${p.label.toUpperCase()} =====\n${p.output}`).join("\n");
   const urls = job.sources.map((s, i) => `S${i + 1}: ${s.title} | ${s.url}`).join("\n");
   return `Synthesize the exhaustive research below into one detailed Fuel IQ site report. Do not omit useful named projects, competitors, property fields, calculations, conflicts, or data gaps. Use the exact selected section keys and preserve source IDs.\n\nADDRESS: ${job.address}\nSELECTED SECTIONS:\n${selected}\n\nSOURCE REGISTER:\n${urls}\n\nRESEARCH EVIDENCE:\n${evidence}\n\nReturn exactly one JSON object with: prepared_at,address,title,disclaimer,property_records,sections,source_register. property_records must include summary, owner_name, owner_type, owner_mailing_address, situs_address, parcel_id, county, assessed_value, last_sale_date, last_sale_price, lot_size, building_size, year_built, zoning, current_use, legal_description, tax_status, confidence, source_ids, record_details, not_found. Each section must include key,title,summary,findings[{topic,detail,site_implication,confidence,source_ids}],tables[{title,columns,rows}],calculations,cautions. Include one section for every selected key in the same order. Current competition must be limited to 1.5 miles and must not claim zero unless multiple sources support zero. Use empty arrays, never omit required fields.`;
 }
-function synthesisPayload(job, model) {
-  return { model, background: true, store: true, instructions: "You are a precise report synthesizer. Use only supplied research evidence, preserve uncertainty and URLs, and return one valid JSON object without markdown.", input: synthesisPrompt(job), max_output_tokens: Number(process.env.OPENAI_SITE_RESEARCH_SYNTHESIS_TOKENS || 30000), text: { format: { type: "json_object" } } };
+function synthesisPayloadVariants(job, model) {
+  const base = {
+    model,
+    instructions: "You are a precise report synthesizer. Use only supplied research evidence, preserve uncertainty and URLs, and return one valid JSON object without markdown.",
+    input: synthesisPrompt(job),
+    max_output_tokens: Number(process.env.OPENAI_SITE_RESEARCH_SYNTHESIS_TOKENS || 18000),
+  };
+  return [
+    { name: "background-json", payload: { ...base, background: true, store: true, text: { format: { type: "json_object" } } } },
+    { name: "foreground-json", payload: { ...base, store: false, text: { format: { type: "json_object" } } } },
+    { name: "foreground-compatible", payload: { ...base, store: false } },
+  ];
 }
-function apiError(status, text, model) { let detail = ""; try { detail = JSON.parse(text)?.error?.message || ""; } catch {} return new Error(`OpenAI ${status} (${model}): ${clean(detail || text || "Request failed", 1600)}`); }
+function apiError(status, text, model) {
+  let detail = "";
+  try { detail = JSON.parse(text)?.error?.message || ""; } catch {}
+  return new Error(`OpenAI ${status} (${model}): ${clean(detail || text || "Request failed", 1600)}`);
+}
 async function createResponse(apiKey, fetchWithTimeout, payload, model) {
-  const response = await fetchWithTimeout("https://api.openai.com/v1/responses", { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify(payload) }, Number(process.env.OPENAI_SITE_RESEARCH_CREATE_TIMEOUT_MS || 70000));
-  const text = await response.text(); if (!response.ok) throw apiError(response.status, text, model); const data = JSON.parse(text); if (!data?.id) throw new Error("OpenAI did not return a response ID."); return data;
+  const response = await fetchWithTimeout("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  }, Number(process.env.OPENAI_SITE_RESEARCH_CREATE_TIMEOUT_MS || 90000));
+  const text = await response.text();
+  if (!response.ok) throw apiError(response.status, text, model);
+  const data = JSON.parse(text);
+  if (!data?.id && !outputText(data)) throw new Error(`OpenAI returned neither a response ID nor usable output (${model}).`);
+  return data;
 }
 async function retrieveResponse(apiKey, fetchWithTimeout, id) {
-  const response = await fetchWithTimeout(`https://api.openai.com/v1/responses/${encodeURIComponent(id)}`, { headers: { Authorization: `Bearer ${apiKey}` } }, 50000);
-  const text = await response.text(); if (!response.ok) throw apiError(response.status, text, "retrieval"); return JSON.parse(text);
+  const response = await fetchWithTimeout(`https://api.openai.com/v1/responses/${encodeURIComponent(id)}`, { headers: { Authorization: `Bearer ${apiKey}` } }, 60000);
+  const text = await response.text();
+  if (!response.ok) throw apiError(response.status, text, "retrieval");
+  return JSON.parse(text);
+}
+function usableOutput(data) { return clean(outputText(data), 1000000); }
+function completedLike(data) { return data?.status === "completed" || Boolean(usableOutput(data) && !["queued", "in_progress"].includes(data?.status)); }
+function recordSources(job, data) { job.sources.push(...sourcesFrom(data)); }
+function conciseAttemptError(errors) {
+  const uniqueErrors = unique(errors.map((value) => clean(value, 500)).filter(Boolean));
+  return clean(uniqueErrors.slice(-4).join(" | ") || "No compatible OpenAI response configuration succeeded.", 1800);
+}
+
+async function startPass(job, pass, apiKey, fetchWithTimeout) {
+  const errors = [];
+  for (const model of configuredModels()) {
+    for (const variant of researchPayloadVariants(job, pass, model)) {
+      try {
+        const data = await createResponse(apiKey, fetchWithTimeout, variant.payload, model);
+        pass.model = model;
+        pass.mode = variant.name;
+        pass.responseId = data.id || "";
+        if (completedLike(data)) {
+          pass.output = usableOutput(data);
+          pass.status = pass.output ? "completed" : "failed";
+          if (pass.output) recordSources(job, data);
+          else pass.error = "The research pass completed without usable output.";
+        } else {
+          pass.status = data.status || "queued";
+        }
+        return pass.status !== "failed";
+      } catch (error) {
+        errors.push(error?.message || String(error));
+      }
+    }
+  }
+  pass.status = "failed";
+  pass.error = conciseAttemptError(errors);
+  job.errors.push(`${pass.label}: ${pass.error}`);
+  return false;
 }
 async function startResearch(job, apiKey, fetchWithTimeout) {
-  const preferred = clean(process.env.OPENAI_SITE_RESEARCH_MODEL, 100) || "gpt-4.1-mini";
-  job.model = preferred; job.phase = "research"; job.status = "starting";
-  for (const definition of PASSES) {
-    const pass = { ...definition, status: "starting", responseId: "", output: "", error: "" };
-    job.passes.push(pass);
-    try { const data = await createResponse(apiKey, fetchWithTimeout, researchPayload(job, definition, preferred), preferred); pass.responseId = data.id; pass.status = data.status || "queued"; }
-    catch (error) { pass.status = "failed"; pass.error = clean(error?.message || error, 1600); job.errors.push(pass.error); }
+  job.phase = "research";
+  job.status = "starting";
+  job.passes = PASSES.map((definition) => ({ ...definition, status: "starting", responseId: "", output: "", error: "", model: "", mode: "", pollFailures: 0 }));
+  await Promise.all(job.passes.map((pass) => startPass(job, pass, apiKey, fetchWithTimeout)));
+  const successful = job.passes.filter((pass) => pass.status !== "failed");
+  job.model = unique(successful.map((pass) => pass.model)).join(", ") || configuredModels()[0];
+  if (!successful.length) {
+    job.status = "failed";
+    job.message = "The exhaustive report could not start because every research-model attempt was rejected.";
+    return false;
   }
-  if (job.passes.every((p) => p.status === "failed")) { job.status = "failed"; job.message = "All exhaustive research passes failed to start."; return false; }
-  job.status = "in_progress"; job.message = "Running focused exhaustive research passes."; return true;
+  job.status = "in_progress";
+  job.message = "Running focused exhaustive research passes.";
+  return true;
 }
+
 async function startSynthesis(job, apiKey, fetchWithTimeout) {
-  const models = unique([job.model, "gpt-4.1-mini", "gpt-4.1"]);
-  for (const model of models) {
-    try { const data = await createResponse(apiKey, fetchWithTimeout, synthesisPayload(job, model), model); job.synthesis = { responseId: data.id, status: data.status || "queued", model }; job.phase = "synthesis"; job.status = "in_progress"; job.message = "Cross-checking and synthesizing the exhaustive research."; return true; }
-    catch (error) { job.errors.push(clean(error?.message || error, 1600)); }
+  const errors = [];
+  for (const model of configuredModels()) {
+    for (const variant of synthesisPayloadVariants(job, model)) {
+      try {
+        const data = await createResponse(apiKey, fetchWithTimeout, variant.payload, model);
+        job.synthesis = { responseId: data.id || "", status: data.status || "queued", model, mode: variant.name, pollFailures: 0 };
+        job.phase = "synthesis";
+        job.status = "in_progress";
+        job.message = "Cross-checking and synthesizing the exhaustive research.";
+        if (completedLike(data)) finishFromSynthesis(job, data, model);
+        return true;
+      } catch (error) {
+        errors.push(error?.message || String(error));
+      }
+    }
   }
-  job.status = "failed"; job.message = "Research completed, but report synthesis could not start."; return false;
+  job.errors.push(`Synthesis start: ${conciseAttemptError(errors)}`);
+  completeFallbackReport(job, "The structured synthesis service was unavailable after compatibility retries.");
+  return true;
 }
 function progress(job) {
   const done = job.passes.filter((p) => p.status === "completed").length;
@@ -164,6 +260,92 @@ function progress(job) {
   const active = job.passes.find((p) => ["queued", "in_progress", "starting"].includes(p.status));
   return `Exhaustive search ${done}/${job.passes.length} complete${active ? ` — searching ${active.label}` : ""}…`;
 }
+function dedupeJobSources(job) {
+  const deduped = new Map();
+  for (const source of job.sources) {
+    const key = source.url || source.title;
+    if (key && !deduped.has(key)) deduped.set(key, source);
+  }
+  job.sources = [...deduped.values()];
+}
+function relevantPasses(job, sectionKey) {
+  const mapping = {
+    traffic_volume: ["traffic_competition"],
+    current_competition: ["traffic_competition"],
+    competition_growth_future_risk: ["traffic_competition", "growth_market"],
+    area_profile_demand_drivers: ["growth_market"],
+    residential_growth: ["growth_market"],
+    commercial_retail_growth: ["growth_market"],
+    strengths_weaknesses_due_diligence: ["operations_risk", "property"],
+    recommended_site_positioning: ["operations_risk", "traffic_competition", "growth_market"],
+    revised_conclusion: ["property", "traffic_competition", "growth_market", "operations_risk"],
+    site_snapshot: ["property", "operations_risk"],
+    metric_detail: ["traffic_competition", "growth_market"],
+    executive_read: ["property", "traffic_competition", "growth_market", "operations_risk"],
+    sources_notes: ["property", "traffic_competition", "growth_market", "operations_risk"],
+  };
+  const keys = mapping[sectionKey] || job.passes.map((pass) => pass.key);
+  return job.passes.filter((pass) => keys.includes(pass.key) && pass.output);
+}
+function fallbackRawReport(job, reason) {
+  const completed = job.passes.filter((pass) => pass.output);
+  const sourceReferences = job.sources.map((_, index) => `S${index + 1}`);
+  const propertyPass = completed.find((pass) => pass.key === "property");
+  return {
+    prepared_at: new Date().toISOString(),
+    address: job.address,
+    title: `${job.address} Detailed Site & Market Summary`,
+    disclaimer: `Public-source research and model-assisted analysis only. ${reason} The sourced research evidence is preserved below; verify controlling property, traffic, zoning, environmental, competition, and development records before underwriting.`,
+    property_records: {
+      summary: clean(propertyPass?.output || "Property-record research did not return usable evidence.", 12000),
+      confidence: propertyPass?.output ? "Sourced research pass completed; structured extraction requires verification" : "Not confirmed",
+      source_ids: sourceReferences,
+      record_details: [],
+      not_found: propertyPass?.output ? ["The structured field-by-field synthesis was unavailable; confirm each controlling record directly."] : ["No usable property-record pass was returned."],
+    },
+    sections: job.sections.map((key) => {
+      const passes = relevantPasses(job, key);
+      const combined = passes.map((pass) => `${pass.label.toUpperCase()}\n${pass.output}`).join("\n\n");
+      return {
+        key,
+        title: SECTION_CATALOG[key],
+        summary: clean(combined || "No usable evidence was returned for this selected section.", 16000),
+        findings: passes.map((pass) => ({ topic: pass.label, detail: clean(pass.output, 7000), site_implication: "Review the cited public sources and confirm material findings during underwriting.", confidence: "Sourced research pass; structured synthesis fallback", source_ids: sourceReferences })),
+        tables: [],
+        calculations: [],
+        cautions: [reason, "This section was assembled from completed research-pass evidence because the final structured synthesis did not complete."],
+      };
+    }),
+    source_register: job.sources,
+  };
+}
+function storeCompletedReport(job, report, model, fallback = false) {
+  const normalized = normalizeReport(report, { address: job.address, sections: job.sections, model, sources: job.sources, passes: job.passes.map((pass) => ({ key: pass.key, status: pass.status, model: pass.model, mode: pass.mode })), fallback });
+  const reportId = crypto.randomUUID();
+  put(REPORTS, { id: reportId, report: normalized, expiresAt: Date.now() + CACHE_TTL_MS });
+  job.status = "completed";
+  job.phase = "completed";
+  job.message = fallback ? "Exhaustive site research complete with a compatibility synthesis." : "Exhaustive site research complete.";
+  job.result = { reportId, report: normalized, html: renderSiteReport(normalized), wordUrl: `/api/site-research/word/${reportId}` };
+}
+function completeFallbackReport(job, reason) {
+  if (job.status === "completed") return;
+  dedupeJobSources(job);
+  storeCompletedReport(job, fallbackRawReport(job, reason), job.model || configuredModels()[0], true);
+}
+function finishFromSynthesis(job, data, model) {
+  try {
+    const text = usableOutput(data);
+    if (!text) throw new Error("The final synthesis completed without usable output.");
+    recordSources(job, data);
+    dedupeJobSources(job);
+    storeCompletedReport(job, parseJson(text), model, false);
+  } catch (error) {
+    job.errors.push(`Synthesis parse: ${clean(error?.message || error, 1200)}`);
+    completeFallbackReport(job, "The final structured synthesis could not be parsed.");
+  }
+}
+
 async function refresh(job, apiKey, fetchWithTimeout) {
   if (["completed", "failed"].includes(job.status) || job.polling) return;
   job.polling = true;
@@ -173,30 +355,74 @@ async function refresh(job, apiKey, fetchWithTimeout) {
         if (!pass.responseId || ["completed", "failed"].includes(pass.status)) continue;
         try {
           const data = await retrieveResponse(apiKey, fetchWithTimeout, pass.responseId);
-          pass.status = data.status;
-          if (data.status === "completed") { pass.output = outputText(data); const found = sourcesFrom(data); job.sources.push(...found); }
-          else if (!["queued", "in_progress"].includes(data.status)) { pass.status = "failed"; pass.error = clean(data?.error?.message || data?.incomplete_details?.reason || data.status, 1400); }
-        } catch (error) { pass.error = clean(error?.message || error, 1400); }
+          pass.pollFailures = 0;
+          const text = usableOutput(data);
+          if (data.status === "completed" || (text && !["queued", "in_progress"].includes(data.status))) {
+            pass.output = text;
+            pass.status = text ? "completed" : "failed";
+            if (text) recordSources(job, data);
+            else pass.error = "The research pass completed without usable output.";
+          } else if (!["queued", "in_progress"].includes(data.status)) {
+            pass.status = "failed";
+            pass.error = clean(data?.error?.message || data?.incomplete_details?.reason || data.status, 1400);
+          } else {
+            pass.status = data.status;
+          }
+        } catch (error) {
+          pass.pollFailures += 1;
+          pass.error = clean(error?.message || error, 1400);
+          if (pass.pollFailures >= 4) pass.status = "failed";
+        }
       }
-      const terminal = job.passes.every((p) => ["completed", "failed"].includes(p.status));
+      const terminal = job.passes.every((pass) => ["completed", "failed"].includes(pass.status));
       if (terminal) {
-        if (!job.passes.some((p) => p.status === "completed" && p.output)) { job.status = "failed"; job.message = "The exhaustive searches returned no usable evidence."; return; }
-        const deduped = new Map(); for (const s of job.sources) { const k = s.url || s.title; if (k && !deduped.has(k)) deduped.set(k, s); } job.sources = [...deduped.values()];
+        if (!job.passes.some((pass) => pass.status === "completed" && pass.output)) {
+          job.status = "failed";
+          job.message = "The exhaustive searches returned no usable evidence after all model and compatibility retries.";
+          return;
+        }
+        dedupeJobSources(job);
         await startSynthesis(job, apiKey, fetchWithTimeout);
-      } else { job.status = "in_progress"; job.message = progress(job); }
+      } else {
+        job.status = "in_progress";
+        job.message = progress(job);
+      }
       return;
     }
     if (job.phase === "synthesis") {
-      const data = await retrieveResponse(apiKey, fetchWithTimeout, job.synthesis.responseId);
-      job.synthesis.status = data.status;
-      if (["queued", "in_progress"].includes(data.status)) { job.status = "in_progress"; return; }
-      if (data.status !== "completed") { job.status = "failed"; job.message = "The final report synthesis failed."; return; }
-      const report = normalizeReport(parseJson(outputText(data)), { address: job.address, sections: job.sections, model: job.synthesis.model, sources: job.sources, passes: job.passes.map((p) => ({ key: p.key, status: p.status })) });
-      const reportId = crypto.randomUUID(); put(REPORTS, { id: reportId, report, expiresAt: Date.now() + CACHE_TTL_MS });
-      job.status = "completed"; job.message = "Exhaustive site research complete."; job.result = { reportId, report, html: renderSiteReport(report), wordUrl: `/api/site-research/word/${reportId}` };
+      if (!job.synthesis?.responseId) {
+        completeFallbackReport(job, "The final structured synthesis did not return a retrievable job ID.");
+        return;
+      }
+      try {
+        const data = await retrieveResponse(apiKey, fetchWithTimeout, job.synthesis.responseId);
+        job.synthesis.pollFailures = 0;
+        job.synthesis.status = data.status;
+        const text = usableOutput(data);
+        if (["queued", "in_progress"].includes(data.status) && !text) {
+          job.status = "in_progress";
+          return;
+        }
+        if (data.status === "completed" || text) {
+          finishFromSynthesis(job, data, job.synthesis.model);
+          return;
+        }
+        completeFallbackReport(job, `The final structured synthesis ended with status ${clean(data.status, 100) || "unknown"}.`);
+      } catch (error) {
+        job.synthesis.pollFailures += 1;
+        job.errors.push(clean(error?.message || error, 1500));
+        if (job.synthesis.pollFailures >= 4) completeFallbackReport(job, "The final structured synthesis could not be retrieved after repeated retries.");
+      }
     }
-  } catch (error) { job.errors.push(clean(error?.message || error, 1800)); job.status = "in_progress"; job.message = "A temporary research error occurred; Fuel IQ will retry on the next status check."; }
-  finally { job.polling = false; }
+  } catch (error) {
+    job.refreshFailures = Number(job.refreshFailures || 0) + 1;
+    job.errors.push(clean(error?.message || error, 1800));
+    if (job.refreshFailures >= 6 && job.passes.some((pass) => pass.output)) completeFallbackReport(job, "Repeated temporary research-service errors prevented normal synthesis.");
+    else if (job.refreshFailures >= 6) { job.status = "failed"; job.message = "Research could not continue after repeated service errors."; }
+    else { job.status = "in_progress"; job.message = "A temporary research error occurred; Fuel IQ will retry on the next status check."; }
+  } finally {
+    job.polling = false;
+  }
 }
 
 function sourceIdsText(value) { const ids = sourceIds(value); return ids.length ? ids.join(", ") : "—"; }
@@ -222,26 +448,80 @@ export function renderSiteReport(report, options = {}) {
 }
 
 export function registerSiteResearchRoutes(app, options = {}) {
-  const router = express.Router(); const apiKey = options.openAiApiKey || process.env.OPENAI_API_KEY || "";
-  const fetchWithTimeout = options.fetchWithTimeout || (async (url, init = {}, timeoutMs = 30000) => { const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), timeoutMs); try { return await fetch(url, { ...init, signal: controller.signal }); } finally { clearTimeout(timer); } });
+  const router = express.Router();
+  const apiKey = options.openAiApiKey || process.env.OPENAI_API_KEY || "";
+  const fetchWithTimeout = options.fetchWithTimeout || (async (url, init = {}, timeoutMs = 30000) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try { return await fetch(url, { ...init, signal: controller.signal }); }
+    finally { clearTimeout(timer); }
+  });
   router.use(express.json({ limit: "4mb" }));
-  router.get("/status", (_req, res) => res.json({ ok: true, openAiEnabled: Boolean(apiKey), backgroundResearch: true, multiPassExhaustiveSearch: true, defaultModel: process.env.OPENAI_SITE_RESEARCH_MODEL || "gpt-4.1-mini", propertyRecordsAlwaysIncluded: true, competitionRadiusMiles: 1.5, wordExport: true, sectionKeys: DEFAULT_SECTIONS, reportCacheHours: 24 }));
+  router.get("/status", (_req, res) => res.json({ ok: true, openAiEnabled: Boolean(apiKey), backgroundResearch: true, multiPassExhaustiveSearch: true, modelAttempts: configuredModels(), defaultModel: configuredModels()[0], compatibilityFallback: true, fallbackSynthesis: true, propertyRecordsAlwaysIncluded: true, competitionRadiusMiles: 1.5, wordExport: true, sectionKeys: DEFAULT_SECTIONS, reportCacheHours: 24 }));
   router.post("/research", async (req, res) => {
-    const address = clean(req.body?.address, 700), requested = unique(list(req.body?.sections).map((x) => clean(x, 120)).filter((x) => SECTION_CATALOG[x])), sections = requested.length ? requested : DEFAULT_SECTIONS;
+    const address = clean(req.body?.address, 700);
+    const requested = unique(list(req.body?.sections).map((x) => clean(x, 120)).filter((x) => SECTION_CATALOG[x]));
+    const sections = requested.length ? requested : DEFAULT_SECTIONS;
     if (address.length < 4) return res.status(400).json({ ok: false, message: "Enter and select a valid site address." });
     if (!apiKey) return res.status(503).json({ ok: false, message: "OPENAI_API_KEY is not configured on the server." });
-    const job = put(JOBS, { id: crypto.randomUUID(), address, sections, siteNotes: clean(req.body?.siteNotes, 4000), normalizedAddress: req.body?.normalizedAddress && typeof req.body.normalizedAddress === "object" ? req.body.normalizedAddress : null, estimateContext: req.body?.estimateContext && typeof req.body.estimateContext === "object" ? req.body.estimateContext : null, createdAt: Date.now(), expiresAt: Date.now() + CACHE_TTL_MS, status: "starting", phase: "research", message: "Starting focused exhaustive research passes…", model: "", passes: [], sources: [], synthesis: null, errors: [], polling: false, result: null }, 50);
-    if (!await startResearch(job, apiKey, fetchWithTimeout)) return res.status(502).json({ ok: false, jobId: job.id, status: job.status, message: job.message });
-    res.status(202).json({ ok: true, jobId: job.id, status: job.status, message: progress(job), elapsedSeconds: 0, attempt: 1, maxAttempts: PASSES.length + 1 });
+    const job = put(JOBS, {
+      id: crypto.randomUUID(), address, sections,
+      siteNotes: clean(req.body?.siteNotes, 4000),
+      normalizedAddress: req.body?.normalizedAddress && typeof req.body.normalizedAddress === "object" ? req.body.normalizedAddress : null,
+      estimateContext: req.body?.estimateContext && typeof req.body.estimateContext === "object" ? req.body.estimateContext : null,
+      createdAt: Date.now(), expiresAt: Date.now() + CACHE_TTL_MS,
+      status: "starting", phase: "research", message: "Starting focused exhaustive research passes…",
+      model: "", passes: [], sources: [], synthesis: null, errors: [], polling: false, refreshFailures: 0, result: null,
+    }, 50);
+    if (!await startResearch(job, apiKey, fetchWithTimeout)) return res.status(502).json({ ok: false, jobId: job.id, status: job.status, message: job.message, detail: clean(job.errors.at(-1), 1400) });
+    res.status(202).json({ ok: true, jobId: job.id, status: job.status, model: job.model, message: progress(job), elapsedSeconds: 0, attempt: job.passes.filter((pass) => pass.status === "completed").length, maxAttempts: PASSES.length + 1 });
   });
   router.get("/research/:jobId", async (req, res) => {
-    const job = get(JOBS, req.params.jobId, 50); if (!job) return res.status(404).json({ ok: false, status: "expired", message: "This research job expired or the server restarted. Start the search again." });
+    const job = get(JOBS, req.params.jobId, 50);
+    if (!job) return res.status(404).json({ ok: false, status: "expired", message: "This research job expired or the server restarted. Start the search again." });
     await refresh(job, apiKey, fetchWithTimeout);
-    const base = { ok: job.status !== "failed", jobId: job.id, status: job.status, model: job.model, message: job.status === "completed" ? job.message : progress(job), elapsedSeconds: Math.floor((Date.now() - job.createdAt) / 1000), attempt: job.passes.filter((p) => p.status === "completed").length + (job.phase === "synthesis" ? 1 : 0), maxAttempts: PASSES.length + 1 };
+    const base = {
+      ok: job.status !== "failed", jobId: job.id, status: job.status, model: job.model,
+      message: job.status === "completed" ? job.message : progress(job),
+      elapsedSeconds: Math.floor((Date.now() - job.createdAt) / 1000),
+      attempt: job.passes.filter((pass) => pass.status === "completed").length + (job.phase === "synthesis" ? 1 : 0),
+      maxAttempts: PASSES.length + 1,
+      passes: job.passes.map((pass) => ({ key: pass.key, label: pass.label, status: pass.status, model: pass.model, mode: pass.mode })),
+    };
     res.status(job.status === "failed" ? 502 : 200).json(job.status === "completed" ? { ...base, ...job.result } : job.status === "failed" ? { ...base, detail: clean(job.errors.at(-1), 1400) } : base);
   });
-  router.get("/report/:id", (req, res) => { const record = get(REPORTS, req.params.id); if (!record) return res.status(404).json({ ok: false, message: "Report expired or was not found." }); res.json({ ok: true, report: record.report, html: renderSiteReport(record.report), wordUrl: `/api/site-research/word/${req.params.id}` }); });
-  router.get("/word/:id", (req, res) => { const record = get(REPORTS, req.params.id); if (!record) return res.status(404).send("Report expired or was not found."); res.setHeader("Content-Type", "application/msword; charset=utf-8"); res.setHeader("Content-Disposition", `attachment; filename="${slug(record.report.address)}-fuel-iq-site-report.doc"`); res.setHeader("Cache-Control", "no-store"); res.send(renderSiteReport(record.report, { document: true })); });
-  router.post("/word", (req, res) => { try { const raw = req.body?.report || {}; const sections = unique(list(raw?._meta?.selected_sections || raw?.sections?.map?.((s) => s?.key)).map((x) => clean(x, 120)).filter((x) => SECTION_CATALOG[x])); const report = normalizeReport(raw, { address: clean(raw.address || "Fuel IQ Site", 700), sections: sections.length ? sections : DEFAULT_SECTIONS, model: clean(raw?._meta?.model, 100), sources: [], passes: [] }); res.setHeader("Content-Type", "application/msword; charset=utf-8"); res.setHeader("Content-Disposition", `attachment; filename="${slug(report.address)}-fuel-iq-site-report.doc"`); res.send(renderSiteReport(report, { document: true })); } catch (error) { res.status(400).json({ ok: false, message: clean(error?.message || error, 1200) }); } });
+  router.get("/report/:id", (req, res) => {
+    const record = get(REPORTS, req.params.id);
+    if (!record) return res.status(404).json({ ok: false, message: "Report expired or was not found." });
+    res.json({ ok: true, report: record.report, html: renderSiteReport(record.report), wordUrl: `/api/site-research/word/${req.params.id}` });
+  });
+  router.get("/word/:id", (req, res) => {
+    const record = get(REPORTS, req.params.id);
+    if (!record) return res.status(404).send("Report expired or was not found.");
+    res.setHeader("Content-Type", "application/msword; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${slug(record.report.address)}-fuel-iq-site-report.doc"`);
+    res.setHeader("Cache-Control", "no-store");
+    res.send(renderSiteReport(record.report, { document: true }));
+  });
+  router.post("/word", (req, res) => {
+    try {
+      const raw = req.body?.report || {};
+      const sections = unique(list(raw?._meta?.selected_sections || raw?.sections?.map?.((section) => section?.key)).map((x) => clean(x, 120)).filter((x) => SECTION_CATALOG[x]));
+      const report = normalizeReport(raw, { address: clean(raw.address || "Fuel IQ Site", 700), sections: sections.length ? sections : DEFAULT_SECTIONS, model: clean(raw?._meta?.model, 100), sources: [], passes: [], fallback: Boolean(raw?._meta?.fallback_synthesis) });
+      res.setHeader("Content-Type", "application/msword; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="${slug(report.address)}-fuel-iq-site-report.doc"`);
+      res.send(renderSiteReport(report, { document: true }));
+    } catch (error) {
+      res.status(400).json({ ok: false, message: clean(error?.message || error, 1200) });
+    }
+  });
   app.use("/api/site-research", router);
 }
+
+export const __test = {
+  configuredModels,
+  researchPayloadVariants,
+  synthesisPayloadVariants,
+  fallbackRawReport,
+  normalizeReport,
+};
