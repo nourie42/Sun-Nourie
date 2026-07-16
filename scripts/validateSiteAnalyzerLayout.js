@@ -11,6 +11,7 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
 const server = read("server.js");
 const layout = read("public/site-research-layout.js");
 const addressSafety = read("public/site-address-safety.js");
+const autocompleteRecovery = read("public/site-autocomplete-recovery.js");
 const presentation = read("src/siteAnalyzerPresentation.js");
 const aadt = read("src/aadtCoverage.js");
 const reportEnhancements = read("src/siteResearchReportEnhancements.js");
@@ -68,12 +69,21 @@ for (const snippet of [
 for (const snippet of [
   'input.disabled = false',
   'input.readOnly = false',
-  'Address search ready',
+  'Autocomplete ready',
   'Quick Estimate',
   'fiq-dock-overlaps-address',
   'pointer-events: none !important',
   '@media (max-height: 820px)',
+  'site-autocomplete-recovery.js',
 ]) assert(addressSafety.includes(snippet), `Address-field safety is missing: ${snippet}`);
+
+for (const snippet of [
+  'fiqAutocompleteRecovery',
+  '/google/autocomplete?input=',
+  '/osm/autocomplete?q=',
+  'Autocomplete ready',
+  'role="option"',
+]) assert(autocompleteRecovery.includes(snippet), `Autocomplete recovery is missing: ${snippet}`);
 
 const aadtMove = layout.indexOf("workflow.appendChild(aadtCard)");
 const researchMove = layout.indexOf("workflow.appendChild(researchCard)");
@@ -106,4 +116,4 @@ for (const snippet of [
   'Open source',
 ]) assert(wordFix.includes(snippet), `Word margin fix is missing: ${snippet}`);
 
-console.log("Site Analyzer address safety and layout validation passed.");
+console.log("Site Analyzer autocomplete, address safety, and layout validation passed.");

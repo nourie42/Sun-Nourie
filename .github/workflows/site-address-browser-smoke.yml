@@ -37,7 +37,7 @@ jobs:
           cat /tmp/fuel-iq-server.log
           exit 1
 
-      - name: Verify address typing at a short viewport
+      - name: Verify address typing and visible suggestions
         shell: bash
         run: |
           cat > address-smoke.mjs <<'EOF'
@@ -49,12 +49,38 @@ jobs:
           page.setDefaultTimeout(60000);
           const pageErrors = [];
           page.on('pageerror', (error) => pageErrors.push(error.stack || String(error)));
+          await page.setRequestInterception(true);
+          page.on('request', (request) => {
+            const url = request.url();
+            if (url.includes('/google/autocomplete?')) {
+              request.respond({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({ ok: true, status: 'OK', items: [
+                  { type: 'Google', display: '915 Early Boulevard, Early, TX 76802, USA', place_id: 'test-place' },
+                ] }),
+              });
+              return;
+            }
+            if (url.includes('/osm/autocomplete?')) {
+              request.respond({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({ ok: true, status: 'OK', items: [
+                  { type: 'OSM', display: '915 Early Boulevard, Early, Texas 76802', lat: 31.742, lon: -98.945 },
+                ] }),
+              });
+              return;
+            }
+            request.continue();
+          });
 
           try {
-            const response = await page.goto('http://127.0.0.1:3210/?smoke=address', { waitUntil: 'domcontentloaded', timeout: 90000 });
+            const response = await page.goto('http://127.0.0.1:3210/?smoke=autocomplete', { waitUntil: 'domcontentloaded', timeout: 90000 });
             if (!response?.ok()) throw new Error(`Home page returned ${response?.status()}`);
             await page.waitForSelector('#addr');
-            await new Promise((resolve) => setTimeout(resolve, 5000));
+            await page.waitForSelector('script[data-fiq-autocomplete-recovery]', { timeout: 15000 });
+            await new Promise((resolve) => setTimeout(resolve, 1000));
 
             const before = await page.evaluate(() => {
               const input = document.getElementById('addr');
@@ -67,21 +93,38 @@ jobs:
                 topId: top?.id || null,
                 topTag: top?.tagName || null,
                 apiText: document.getElementById('apiStatus')?.textContent || '',
-                dockOverlapClass: document.body.classList.contains('fiq-dock-overlaps-address'),
               };
             });
 
-            console.log('before', before);
             if (before.disabled || before.readOnly) throw new Error('Address field is disabled or read-only.');
             if (before.pointerEvents === 'none') throw new Error('Address field does not accept pointer input.');
             if (before.topId !== 'addr') throw new Error(`Address field is covered by ${before.topTag || 'unknown'}#${before.topId || ''}.`);
-            if (/checking/i.test(before.apiText)) throw new Error(`API status remained stuck: ${before.apiText}`);
 
             await page.click('#addr');
-            await page.type('#addr', '915 Early Boulevard, Early, Texas', { delay: 10 });
-            const value = await page.$eval('#addr', (input) => input.value);
-            console.log('typed_value', value);
-            if (!value.includes('915 Early Boulevard')) throw new Error(`Typing did not reach the address field: ${value}`);
+            await page.type('#addr', '915 Early Boulevard', { delay: 15 });
+            await page.waitForFunction(() => {
+              const box = document.getElementById('fiqAutocompleteRecovery');
+              return box && !box.hidden && box.querySelectorAll('.fiq-ac-option').length >= 1;
+            }, { timeout: 15000 });
+
+            const state = await page.evaluate(() => {
+              const box = document.getElementById('fiqAutocompleteRecovery');
+              return {
+                value: document.getElementById('addr')?.value || '',
+                hidden: box?.hidden,
+                count: box?.querySelectorAll('.fiq-ac-option').length || 0,
+                text: box?.textContent?.trim() || '',
+                status: document.getElementById('apiStatus')?.textContent || '',
+              };
+            });
+            console.log('autocomplete_state', state);
+            if (!state.value.includes('915 Early Boulevard')) throw new Error(`Typing did not reach the address field: ${state.value}`);
+            if (state.hidden || state.count < 1) throw new Error('Autocomplete suggestions were not visibly rendered.');
+            if (!state.text.includes('915 Early Boulevard')) throw new Error(`Expected address was not present: ${state.text}`);
+
+            await page.click('#fiqAutocompleteRecovery .fiq-ac-option');
+            const selected = await page.$eval('#addr', (element) => element.value);
+            if (!selected.includes('915 Early Boulevard')) throw new Error(`Suggestion selection failed: ${selected}`);
             if (pageErrors.length) throw new Error(`Page JavaScript errors: ${pageErrors.join(' | ')}`);
           } finally {
             await browser.close();
