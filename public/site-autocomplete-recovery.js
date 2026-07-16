@@ -192,6 +192,24 @@
     return { found: dedupe(found), successfulProviders };
   }
 
+  function publishSelectedCoordinates(selected) {
+    if (selected.lat == null || selected.lon == null) return;
+    const coords = { lat: Number(selected.lat), lon: Number(selected.lon) };
+    try { selectedCoords = coords; } catch {}
+    try {
+      selectedNormalized = selected.normalized || {
+        formatted: selected.display,
+        lat: coords.lat,
+        lon: coords.lon,
+        source: selected.source,
+        place_id: selected.placeId,
+      };
+    } catch {}
+    window.__fiqSelectedAddress = { ...selected, ...coords };
+    window.dispatchEvent(new CustomEvent("fiq:address-selected", { detail: window.__fiqSelectedAddress }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
   async function persistSelection(item) {
     let selected = item;
     if (item.placeId && (!item.normalized || item.lat == null || item.lon == null)) {
@@ -202,6 +220,7 @@
       } catch {}
     }
     window.__fiqSelectedAddress = selected;
+    publishSelectedCoordinates(selected);
     if (selected.normalized && selected.lat != null && selected.lon != null) {
       fetch("/api/addresses", {
         method: "POST",
@@ -226,7 +245,6 @@
     input.focus();
     hide();
     setStatus(`Address selected — ${item.source}`);
-    input.dispatchEvent(new Event("change", { bubbles: true }));
     persistSelection(item);
   }
 
