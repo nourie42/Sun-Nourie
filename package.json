@@ -9,7 +9,7 @@
     "start": "node server.js",
     "start:legacy": "node legacy-server.js",
     "build": "npm ci || npm install",
-    "check": "node --check server.js && node --check legacy-server.js && node --check src/siteResearchExhaustive.js && node --check src/siteEnhancements.js && node --check src/siteWordLayoutFix.js && node --check src/distributorResearch.js && node --check src/distributorResearchV2.js && node --check src/distributorResearchCompat.js && node --check src/distributorCompanySearch.js && node --check src/distributorPresentationFix.js && node --check public/site-research-client.js && node --check public/distributor-company-search.js && node --check public/distributor-scope-ui.js && node --check public/distributor-research-client-v2.js && node --check public/distributor-branding-ui.js && node scripts/validateDistributorPresentation.js"
+    "check": "node --check server.js && node --check legacy-server.js && node --check src/siteResearchExhaustive.js && node --check src/siteEnhancements.js && node --check src/siteWordLayoutFix.js && node --check src/distributorResearch.js && node --check src/distributorResearchV2.js && node --check src/distributorResearchCompat.js && node --check src/distributorCompanySearch.js && node --check src/distributorPresentationFix.js && node --check public/site-research-client.js && node --check public/site-research-layout.js && node --check public/distributor-company-search.js && node --check public/distributor-scope-ui.js && node --check public/distributor-research-client-v2.js && node --check public/distributor-branding-ui.js && node scripts/validateDistributorPresentation.js && node scripts/validateSiteAnalyzerLayout.js"
   },
   "engines": { "node": ">=18" },
   "dependencies": {
