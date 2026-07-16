@@ -11,6 +11,7 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
 const server = read("server.js");
 const layout = read("public/site-research-layout.js");
 const addressSafety = read("public/site-address-safety.js");
+const addressProviderFallback = read("public/site-address-provider-fallback.js");
 const autocompleteRecovery = read("public/site-autocomplete-recovery.js");
 const presentation = read("src/siteAnalyzerPresentation.js");
 const aadt = read("src/aadtCoverage.js");
@@ -74,8 +75,19 @@ for (const snippet of [
   'fiq-dock-overlaps-address',
   'pointer-events: none !important',
   '@media (max-height: 820px)',
+  'site-address-provider-fallback.js',
   'site-autocomplete-recovery.js',
 ]) assert(addressSafety.includes(snippet), `Address-field safety is missing: ${snippet}`);
+
+for (const snippet of [
+  'window.__fiqAddressProviderFallbackInstalled',
+  '/google/findplace?input=',
+  'geocoding.geo.census.gov/geocoder/locations',
+  'nominatim.openstreetmap.org/search',
+  'Use exact address',
+  'MANUAL_ADDRESS',
+  'fiq:address-selected',
+]) assert(addressProviderFallback.includes(snippet), `Exact-address fallback is missing: ${snippet}`);
 
 for (const snippet of [
   'fiqAutocompleteRecovery',
@@ -116,4 +128,4 @@ for (const snippet of [
   'Open source',
 ]) assert(wordFix.includes(snippet), `Word margin fix is missing: ${snippet}`);
 
-console.log("Site Analyzer autocomplete, address safety, and layout validation passed.");
+console.log("Site Analyzer autocomplete, exact-address fallback, address safety, and layout validation passed.");
