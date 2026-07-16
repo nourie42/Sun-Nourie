@@ -105,7 +105,13 @@ for (const snippet of [
   "scrollToResearchResults",
   "siteResearchResultsCard",
   "Export Basic Report to Word",
+  "const exportHost = $id('reportExportDock') || document.body",
+  "exportHost.appendChild(exhaustiveLink)",
+  "const exportReady = wireExportDock()",
+  "const loadingReady = wireResearchLoading()",
+  "new MutationObserver(syncResultsState).observe(results",
 ]) assert(layout.includes(snippet), `Client layout is missing: ${snippet}`);
+assert(!layout.includes("const ready = positionResearchUi() && wireExportDock() && wireResearchLoading()"), "One failed UI wire-up must not prevent the completed-results observer from being installed.");
 
 for (const snippet of [
   'searchArcgisCatalog(stateCode)',
@@ -128,4 +134,4 @@ for (const snippet of [
   'Open source',
 ]) assert(wordFix.includes(snippet), `Word margin fix is missing: ${snippet}`);
 
-console.log("Site Analyzer autocomplete, exact-address fallback, address safety, and layout validation passed.");
+console.log("Site Analyzer autocomplete, exact-address fallback, completed-report visibility, address safety, and layout validation passed.");
