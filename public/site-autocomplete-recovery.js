@@ -9,6 +9,7 @@
   let requestId = 0;
   let activeIndex = -1;
   let items = [];
+  let controller = null;
 
   const box = document.createElement("div");
   box.id = "fiqAutocompleteRecovery";
@@ -48,9 +49,7 @@
       font: inherit;
     }
     #fiqAutocompleteRecovery .fiq-ac-option:hover,
-    #fiqAutocompleteRecovery .fiq-ac-option.is-active {
-      background: #edf6fb;
-    }
+    #fiqAutocompleteRecovery .fiq-ac-option.is-active { background: #edf6fb; }
     #fiqAutocompleteRecovery .fiq-ac-address {
       min-width: 0;
       overflow-wrap: anywhere;
@@ -73,6 +72,7 @@
       padding: 12px;
       color: #5f7180;
       font-size: 13px;
+      line-height: 1.45;
     }
   `;
   document.head.appendChild(style);
@@ -105,14 +105,14 @@
   }
 
   function normalize(raw, source) {
-    const display = String(raw?.display || raw?.description || raw?.formatted_address || "").trim();
+    const display = String(raw?.display || raw?.description || raw?.formatted_address || raw?.label || "").trim();
     if (!display) return null;
     return {
       display,
-      source: String(raw?.type || source || "Address"),
-      placeId: raw?.place_id || null,
+      source: String(raw?.type || raw?.source || source || "Address"),
+      placeId: raw?.place_id || raw?.placeId || null,
       lat: Number.isFinite(Number(raw?.lat)) ? Number(raw.lat) : null,
-      lon: Number.isFinite(Number(raw?.lon)) ? Number(raw.lon) : null,
+      lon: Number.isFinite(Number(raw?.lon ?? raw?.lng)) ? Number(raw.lon ?? raw.lng) : null,
       normalized: raw?.normalized || null,
     };
   }
@@ -121,16 +121,17 @@
     const seen = new Set();
     return list.filter((item) => {
       if (!item) return false;
-      const key = item.display.toLowerCase().replace(/\s+/g, " ");
-      if (seen.has(key)) return false;
+      const key = item.display.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      if (!key || seen.has(key)) return false;
       seen.add(key);
       return true;
     }).slice(0, 10);
   }
 
-  function render() {
+  function render(emptyMessage = "No matching addresses found yet. Keep typing, or add the city and state.") {
     if (!items.length) {
-      box.innerHTML = '<div class="fiq-ac-empty">No matching addresses found. Keep typing or include the city and state.</div>';
+      box.innerHTML = `<div class="fiq-ac-empty"></div>`;
+      box.querySelector(".fiq-ac-empty").textContent = emptyMessage;
       box.hidden = false;
       positionBox();
       return;
@@ -152,15 +153,55 @@
     positionBox();
   }
 
+  async function fetchJson(url, signal, timeoutMs = 9000) {
+    const timeout = new Promise((_, reject) => {
+      const error = new Error("Address provider timed out");
+      error.name = "TimeoutError";
+      setTimeout(() => reject(error), timeoutMs);
+    });
+    const request = fetch(url, { cache: "no-store", signal }).then(async (response) => {
+      if (!response.ok) throw new Error(`Address provider returned ${response.status}`);
+      return response.json();
+    });
+    return Promise.race([request, timeout]);
+  }
+
+  function queryVariants(query) {
+    const clean = query.replace(/\s+/g, " ").trim();
+    const variants = [clean];
+    if (!/\b(?:USA|United States)\b/i.test(clean)) variants.push(`${clean}, USA`);
+    return [...new Set(variants)].slice(0, 2);
+  }
+
+  async function providerSearch(query, signal) {
+    const variants = queryVariants(query);
+    const calls = [];
+    for (const variant of variants) {
+      calls.push(fetchJson(`/google/autocomplete?input=${encodeURIComponent(variant)}&cb=${Date.now()}`, signal));
+      calls.push(fetchJson(`/osm/autocomplete?q=${encodeURIComponent(variant)}&cb=${Date.now()}`, signal));
+    }
+    const settled = await Promise.allSettled(calls);
+    const found = [];
+    let successfulProviders = 0;
+    for (const result of settled) {
+      if (result.status !== "fulfilled") continue;
+      successfulProviders += 1;
+      if (!result.value?.ok) continue;
+      for (const item of result.value.items || []) found.push(normalize(item, item?.type || "Address"));
+    }
+    return { found: dedupe(found), successfulProviders };
+  }
+
   async function persistSelection(item) {
     let selected = item;
     if (item.placeId && (!item.normalized || item.lat == null || item.lon == null)) {
       try {
-        const response = await fetch(`/google/place_details?place_id=${encodeURIComponent(item.placeId)}`);
-        const data = await response.json();
-        if (data?.ok && data.item) selected = { ...item, ...normalize(data.item, "Google") };
+        const data = await fetchJson(`/google/place_details?place_id=${encodeURIComponent(item.placeId)}`, null, 10000);
+        const normalized = data?.ok && data.item ? normalize(data.item, "Google") : null;
+        if (normalized) selected = { ...item, ...normalized };
       } catch {}
     }
+    window.__fiqSelectedAddress = selected;
     if (selected.normalized && selected.lat != null && selected.lon != null) {
       fetch("/api/addresses", {
         method: "POST",
@@ -178,6 +219,9 @@
   function select(index) {
     const item = items[index];
     if (!item) return;
+    clearTimeout(timer);
+    requestId += 1;
+    controller?.abort();
     input.value = item.display;
     input.focus();
     hide();
@@ -187,32 +231,36 @@
   }
 
   async function search(query, id) {
+    controller?.abort();
+    controller = new AbortController();
     setStatus("Searching addresses…");
     try {
-      const [googleResult, osmResult] = await Promise.allSettled([
-        fetch(`/google/autocomplete?input=${encodeURIComponent(query)}`).then((r) => r.json()),
-        fetch(`/osm/autocomplete?q=${encodeURIComponent(query)}`).then((r) => r.json()),
-      ]);
+      const result = await providerSearch(query, controller.signal);
       if (id !== requestId || input.value.trim() !== query) return;
-      const googleItems = googleResult.status === "fulfilled" && googleResult.value?.ok
-        ? (googleResult.value.items || []).map((item) => normalize(item, "Google")) : [];
-      const osmItems = osmResult.status === "fulfilled" && osmResult.value?.ok
-        ? (osmResult.value.items || []).map((item) => normalize(item, "OSM")) : [];
-      items = dedupe([...googleItems, ...osmItems]);
+      items = result.found;
       activeIndex = items.length ? 0 : -1;
-      render();
-      setStatus(items.length ? `Autocomplete ready — ${items.length} address match${items.length === 1 ? "" : "es"}` : "No address matches yet — add city and state");
-    } catch {
-      if (id !== requestId) return;
+      if (items.length) {
+        render();
+        setStatus(`Autocomplete ready — ${items.length} address match${items.length === 1 ? "" : "es"}`);
+      } else if (!result.successfulProviders) {
+        render("Address search is temporarily unavailable. You can still type the complete address and run the estimate.");
+        setStatus("Address providers unavailable — full address entry still works");
+      } else {
+        render();
+        setStatus("No address matches yet — keep typing or add city and state");
+      }
+    } catch (error) {
+      if (id !== requestId || error?.name === "AbortError") return;
       items = [];
-      render();
-      setStatus("Address search temporarily unavailable — you can still enter the full address");
+      render("Address search is temporarily unavailable. You can still type the complete address and run the estimate.");
+      setStatus("Address search temporarily unavailable — full address entry still works");
     }
   }
 
   input.addEventListener("input", () => {
     const query = input.value.trim();
     clearTimeout(timer);
+    controller?.abort();
     requestId += 1;
     if (query.length < 2) {
       items = [];
@@ -221,7 +269,7 @@
       return;
     }
     const id = requestId;
-    timer = setTimeout(() => search(query, id), 220);
+    timer = setTimeout(() => search(query, id), 260);
   }, true);
 
   input.addEventListener("keydown", (event) => {

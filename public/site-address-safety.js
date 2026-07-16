@@ -106,7 +106,7 @@
   function loadAutocompleteRecovery() {
     if (window.__fiqAutocompleteRecoveryInstalled || document.querySelector('script[data-fiq-autocomplete-recovery]')) return;
     const script = document.createElement("script");
-    script.src = `/site-autocomplete-recovery.js?v=1`;
+    script.src = `/site-autocomplete-recovery.js?v=2`;
     script.defer = true;
     script.dataset.fiqAutocompleteRecovery = "true";
     script.onerror = () => {
