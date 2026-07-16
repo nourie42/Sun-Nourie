@@ -163,10 +163,11 @@
       status.textContent = READY_TEXT;
     }
 
-    const quickEstimate = $id("go");
-    if (quickEstimate && quickEstimate.textContent.trim() === "Estimate") {
-      quickEstimate.textContent = "Quick Estimate";
-    }
+    const estimateButton = $id("go");
+    if (estimateButton) estimateButton.textContent = "Estimate";
+
+    const estimateHelp = $id("aadtOptionalHelp");
+    if (estimateHelp) estimateHelp.textContent = "May take a couple of mins";
   }
 
   function syncDockOverlap() {
