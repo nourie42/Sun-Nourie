@@ -10,6 +10,7 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
 
 const server = read("server.js");
 const layout = read("public/site-research-layout.js");
+const addressSafety = read("public/site-address-safety.js");
 const presentation = read("src/siteAnalyzerPresentation.js");
 const aadt = read("src/aadtCoverage.js");
 const reportEnhancements = read("src/siteResearchReportEnhancements.js");
@@ -59,7 +60,20 @@ for (const snippet of [
   'registerSiteResearchReportEnhancements(app)',
   'transformSiteAnalyzerPage(Buffer.concat(chunks).toString("utf8"))',
   'siteAnalyzerNoLegacyFlash: true',
+  'siteAddressInputSafety: true',
+  '"/site-address-safety.js"',
+  '<script src="/site-address-safety.js" defer></script>',
 ]) assert(server.includes(snippet), `server.js is missing: ${snippet}`);
+
+for (const snippet of [
+  'input.disabled = false',
+  'input.readOnly = false',
+  'Address search ready',
+  'Quick Estimate',
+  'fiq-dock-overlaps-address',
+  'pointer-events: none !important',
+  '@media (max-height: 820px)',
+]) assert(addressSafety.includes(snippet), `Address-field safety is missing: ${snippet}`);
 
 const aadtMove = layout.indexOf("workflow.appendChild(aadtCard)");
 const researchMove = layout.indexOf("workflow.appendChild(researchCard)");
@@ -92,4 +106,4 @@ for (const snippet of [
   'Open source',
 ]) assert(wordFix.includes(snippet), `Word margin fix is missing: ${snippet}`);
 
-console.log("Site Analyzer hero and selection layout validation passed.");
+console.log("Site Analyzer address safety and layout validation passed.");
