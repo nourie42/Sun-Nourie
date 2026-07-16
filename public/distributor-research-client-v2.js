@@ -8,10 +8,12 @@
   if (!form || !companyName || !locationHint || !researchFocus || !researchButton || !loadingMessage) return;
 
   const ACTIVE_JOB_KEY = 'fuelIqActiveDistributorResearchJobV2';
+  const MAX_AUTOMATIC_RESTARTS = 2;
   let activeJobId = '';
   let polling = false;
   let stopped = false;
   let networkFailures = 0;
+  let automaticRestartInProgress = false;
 
   function callGlobal(name, ...args) {
     const fn = window[name];
@@ -33,9 +35,32 @@
     researchButton.textContent = selected ? 'Research Selected Company with ChatGPT' : 'Select a Company to Research';
   }
 
+  function readActiveJob() {
+    try { return JSON.parse(localStorage.getItem(ACTIVE_JOB_KEY) || 'null'); }
+    catch { return null; }
+  }
+
+  function requestFromPage() {
+    return {
+      query: companyName.value.trim(),
+      location: locationHint.value.trim(),
+      focus: researchFocus.value.trim(),
+    };
+  }
+
+  function normalizeSavedRequest(saved) {
+    const current = requestFromPage();
+    return {
+      query: String(saved?.request?.query || saved?.query || current.query || '').trim(),
+      location: String(saved?.request?.location || current.location || '').trim(),
+      focus: String(saved?.request?.focus || current.focus || '').trim(),
+    };
+  }
+
   function showFailure(message, detail = '') {
     stopped = true;
     polling = false;
+    automaticRestartInProgress = false;
     activeJobId = '';
     localStorage.removeItem(ACTIVE_JOB_KEY);
     callGlobal('stopLoadingMessages');
@@ -45,10 +70,16 @@
     resetButton();
   }
 
-  function saveActiveJob(jobId, query) {
+  function saveActiveJob(jobId, request, automaticRestarts = 0) {
     activeJobId = jobId;
     try {
-      localStorage.setItem(ACTIVE_JOB_KEY, JSON.stringify({ jobId, query, savedAt: Date.now() }));
+      localStorage.setItem(ACTIVE_JOB_KEY, JSON.stringify({
+        jobId,
+        query: request?.query || '',
+        request,
+        automaticRestarts,
+        savedAt: Date.now(),
+      }));
     } catch {}
   }
 
@@ -82,8 +113,61 @@
     return `${data?.message || 'OpenAI is researching public sources…'}${time}${model}${attempt}`;
   }
 
+  async function createResearchJob(request, automaticRestarts = 0) {
+    const { response, data } = await fetchJson('/api/distributors/research', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
+    }, 75000);
+
+    if (!response.ok || !data?.ok || !data?.jobId) {
+      throw new Error(data?.message || `Research could not start (${response.status}).`);
+    }
+
+    saveActiveJob(data.jobId, request, automaticRestarts);
+    setUiLoading(statusMessage(data));
+    setTimeout(() => pollJob(data.jobId), 1500);
+    return data;
+  }
+
+  async function restartExpiredJob() {
+    if (automaticRestartInProgress || stopped) return;
+    automaticRestartInProgress = true;
+    polling = false;
+
+    const saved = readActiveJob();
+    const request = normalizeSavedRequest(saved);
+    const restartCount = Number(saved?.automaticRestarts || 0);
+
+    if (!request.query || restartCount >= MAX_AUTOMATIC_RESTARTS) {
+      automaticRestartInProgress = false;
+      showFailure(
+        restartCount >= MAX_AUTOMATIC_RESTARTS
+          ? 'The server restarted repeatedly while this report was running.'
+          : 'The prior research job could not be recovered.',
+        'Start the search again.'
+      );
+      return;
+    }
+
+    setUiLoading(`The server restarted. Fuel IQ is automatically restarting the research for ${request.query}…`);
+    networkFailures = 0;
+
+    try {
+      await createResearchJob(request, restartCount + 1);
+    } catch (error) {
+      automaticRestartInProgress = false;
+      showFailure(error?.name === 'AbortError'
+        ? 'Fuel IQ could not restart the research before the server timeout.'
+        : (error?.message || String(error)));
+      return;
+    }
+
+    automaticRestartInProgress = false;
+  }
+
   async function pollJob(jobId) {
-    if (!jobId || polling || stopped) return;
+    if (!jobId || polling || stopped || automaticRestartInProgress) return;
     polling = true;
     try {
       const { response, data } = await fetchJson(`/api/distributors/research/${encodeURIComponent(jobId)}`, {}, 60000);
@@ -96,7 +180,12 @@
         resetButton();
         return;
       }
-      if (!response.ok || data?.ok === false || ['failed', 'expired', 'cancelled'].includes(data?.status)) {
+      if (response.status === 404 || data?.status === 'expired') {
+        polling = false;
+        await restartExpiredJob();
+        return;
+      }
+      if (!response.ok || data?.ok === false || ['failed', 'cancelled'].includes(data?.status)) {
         showFailure(data?.message || `Research failed (${response.status}).`, data?.detail || '');
         return;
       }
@@ -117,31 +206,16 @@
   async function startResearch(event) {
     event.preventDefault();
     event.stopImmediatePropagation();
-    const query = companyName.value.trim();
-    if (!query) return;
+    const request = requestFromPage();
+    if (!request.query) return;
 
     stopped = false;
     networkFailures = 0;
+    automaticRestartInProgress = false;
     setUiLoading('Starting reliable background research with OpenAI…');
 
     try {
-      const { response, data } = await fetchJson('/api/distributors/research', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          query,
-          location: locationHint.value.trim(),
-          focus: researchFocus.value.trim(),
-        }),
-      }, 75000);
-
-      if (!response.ok || !data?.ok || !data?.jobId) {
-        showFailure(data?.message || `Research could not start (${response.status}).`, data?.detail || '');
-        return;
-      }
-      saveActiveJob(data.jobId, query);
-      setUiLoading(statusMessage(data));
-      setTimeout(() => pollJob(data.jobId), 1500);
+      await createResearchJob(request, 0);
     } catch (error) {
       showFailure(error?.name === 'AbortError' ? 'The research job could not be started before the server timeout.' : (error?.message || String(error)));
     }
@@ -155,17 +229,19 @@
   if (newSearchButton) {
     newSearchButton.addEventListener('click', () => {
       stopped = true;
+      automaticRestartInProgress = false;
       clearActiveJob();
       resetButton();
     });
   }
 
   try {
-    const saved = JSON.parse(localStorage.getItem(ACTIVE_JOB_KEY) || 'null');
+    const saved = readActiveJob();
     if (saved?.jobId && Date.now() - Number(saved.savedAt || 0) < 24 * 60 * 60 * 1000) {
       activeJobId = saved.jobId;
       stopped = false;
-      setUiLoading(`Resuming background research${saved.query ? ` for ${saved.query}` : ''}…`);
+      const request = normalizeSavedRequest(saved);
+      setUiLoading(`Resuming background research${request.query ? ` for ${request.query}` : ''}…`);
       setTimeout(() => pollJob(saved.jobId), 500);
     } else {
       localStorage.removeItem(ACTIVE_JOB_KEY);
