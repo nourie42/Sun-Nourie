@@ -1,6 +1,6 @@
 (() => {
   const $id = (id) => document.getElementById(id);
-  const READY_TEXT = "Address search ready — type an address";
+  const READY_TEXT = "Autocomplete ready — type an address";
 
   function installStyles() {
     if ($id("siteAddressSafetyStyles")) return;
@@ -103,6 +103,19 @@
     document.head.appendChild(style);
   }
 
+  function loadAutocompleteRecovery() {
+    if (window.__fiqAutocompleteRecoveryInstalled || document.querySelector('script[data-fiq-autocomplete-recovery]')) return;
+    const script = document.createElement("script");
+    script.src = `/site-autocomplete-recovery.js?v=1`;
+    script.defer = true;
+    script.dataset.fiqAutocompleteRecovery = "true";
+    script.onerror = () => {
+      const status = $id("apiStatus");
+      if (status) status.textContent = "Address search failed to load — refresh the page";
+    };
+    document.head.appendChild(script);
+  }
+
   function setAddressReady() {
     const input = $id("addr");
     if (input) {
@@ -142,9 +155,11 @@
   function initialize() {
     installStyles();
     setAddressReady();
+    loadAutocompleteRecovery();
     requestAnimationFrame(syncDockOverlap);
     setTimeout(setAddressReady, 1200);
     setTimeout(setAddressReady, 4000);
+    setTimeout(loadAutocompleteRecovery, 50);
     setTimeout(syncDockOverlap, 120);
   }
 
