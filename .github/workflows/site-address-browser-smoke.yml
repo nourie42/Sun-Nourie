@@ -52,13 +52,19 @@ jobs:
           await page.setRequestInterception(true);
           page.on('request', (request) => {
             const url = request.url();
+            const parsed = new URL(url);
+            const autocompleteInput = parsed.searchParams.get('input') || parsed.searchParams.get('q') || '';
+            const isButtermilk = /3201\s+Buttermilk/i.test(autocompleteInput);
+
             if (url.includes('/google/autocomplete?')) {
               request.respond({
                 status: 200,
                 contentType: 'application/json',
-                body: JSON.stringify({ ok: true, status: 'OK', items: [
-                  { type: 'Google', display: '915 Early Boulevard, Early, TX 76802, USA', place_id: 'test-place' },
-                ] }),
+                body: JSON.stringify(isButtermilk
+                  ? { ok: true, status: 'ZERO_RESULTS', items: [] }
+                  : { ok: true, status: 'OK', items: [
+                      { type: 'Google', display: '915 Early Boulevard, Early, TX 76802, USA', place_id: 'test-place' },
+                    ] }),
               });
               return;
             }
@@ -66,10 +72,40 @@ jobs:
               request.respond({
                 status: 200,
                 contentType: 'application/json',
-                body: JSON.stringify({ ok: true, status: 'OK', items: [
-                  { type: 'OSM', display: '915 Early Boulevard, Early, Texas 76802', lat: 31.742, lon: -98.945 },
-                ] }),
+                body: JSON.stringify(isButtermilk
+                  ? { ok: true, status: 'ZERO_RESULTS', items: [] }
+                  : { ok: true, status: 'OK', items: [
+                      { type: 'OSM', display: '915 Early Boulevard, Early, Texas 76802', lat: 31.742, lon: -98.945 },
+                    ] }),
               });
+              return;
+            }
+            if (url.includes('/google/findplace?')) {
+              request.respond({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify(isButtermilk
+                  ? {
+                      ok: true,
+                      status: 'OK',
+                      place_id: 'buttermilk-place',
+                      address: '3201 Buttermilk Rd, Cottondale, AL 35453, USA',
+                      location: { lat: 33.176, lng: -87.445 },
+                    }
+                  : { ok: false, status: 'ZERO_RESULTS' }),
+              });
+              return;
+            }
+            if (url.includes('geocoding.geo.census.gov/geocoder/locations')) {
+              request.respond({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({ result: { addressMatches: [] } }),
+              });
+              return;
+            }
+            if (url.includes('nominatim.openstreetmap.org/search')) {
+              request.respond({ status: 200, contentType: 'application/json', body: '[]' });
               return;
             }
             request.continue();
@@ -79,6 +115,7 @@ jobs:
             const response = await page.goto('http://127.0.0.1:3210/?smoke=autocomplete', { waitUntil: 'domcontentloaded', timeout: 90000 });
             if (!response?.ok()) throw new Error(`Home page returned ${response?.status()}`);
             await page.waitForSelector('#addr');
+            await page.waitForSelector('script[data-fiq-address-provider-fallback]', { timeout: 15000 });
             await page.waitForSelector('script[data-fiq-autocomplete-recovery]', { timeout: 15000 });
             await new Promise((resolve) => setTimeout(resolve, 1000));
 
@@ -125,6 +162,40 @@ jobs:
             await page.click('#fiqAutocompleteRecovery .fiq-ac-option');
             const selected = await page.$eval('#addr', (element) => element.value);
             if (!selected.includes('915 Early Boulevard')) throw new Error(`Suggestion selection failed: ${selected}`);
+
+            await page.click('#addr');
+            await page.evaluate(() => {
+              const input = document.getElementById('addr');
+              input.value = '';
+              input.dispatchEvent(new Event('input', { bubbles: true }));
+            });
+            await page.type('#addr', '3201 Buttermilk Rd, Cottondale, AL 35453', { delay: 8 });
+            await page.waitForFunction(() => {
+              const box = document.getElementById('fiqAutocompleteRecovery');
+              return box && !box.hidden && /3201 Buttermilk/i.test(box.textContent || '');
+            }, { timeout: 20000 });
+
+            const ruralState = await page.evaluate(() => {
+              const box = document.getElementById('fiqAutocompleteRecovery');
+              return {
+                value: document.getElementById('addr')?.value || '',
+                hidden: box?.hidden,
+                count: box?.querySelectorAll('.fiq-ac-option').length || 0,
+                text: box?.textContent?.trim() || '',
+              };
+            });
+            console.log('rural_autocomplete_state', ruralState);
+            if (ruralState.hidden || ruralState.count < 1) throw new Error('Exact rural address fallback did not render a suggestion.');
+            if (!/3201 Buttermilk/i.test(ruralState.text)) throw new Error(`Rural address was not present: ${ruralState.text}`);
+
+            await page.click('#fiqAutocompleteRecovery .fiq-ac-option');
+            await page.waitForFunction(() => Number.isFinite(window.__fiqSelectedAddress?.lat) && Number.isFinite(window.__fiqSelectedAddress?.lon));
+            const ruralSelected = await page.evaluate(() => ({
+              value: document.getElementById('addr')?.value || '',
+              selected: window.__fiqSelectedAddress || null,
+            }));
+            if (!/3201 Buttermilk/i.test(ruralSelected.value)) throw new Error(`Rural suggestion selection failed: ${ruralSelected.value}`);
+            if (!Number.isFinite(ruralSelected.selected?.lat) || !Number.isFinite(ruralSelected.selected?.lon)) throw new Error('Rural address did not publish coordinates.');
             if (pageErrors.length) throw new Error(`Page JavaScript errors: ${pageErrors.join(' | ')}`);
           } finally {
             await browser.close();
