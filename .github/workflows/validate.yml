@@ -22,5 +22,50 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Run syntax checks
-        run: npm run check
+      - name: Check server and module syntax
+        run: |
+          node --check server.js
+          node --check legacy-server.js
+          node --check src/siteResearchExhaustive.js
+          node --check src/siteEnhancements.js
+          node --check src/siteWordLayoutFix.js
+          node --check src/siteAnalyzerPresentation.js
+          node --check src/aadtCoverage.js
+          node --check src/siteResearchReportEnhancements.js
+          node --check src/fuelAtlasRoutes.js
+          node --check src/fuelAtlasLocationCompanyBridge.js
+          node --check src/distributorResearch.js
+          node --check src/distributorResearchV2.js
+          node --check src/distributorResearchCompat.js
+          node --check src/distributorCompanySearch.js
+          node --check src/distributorPresentationFix.js
+      - name: Check browser script syntax
+        run: |
+          node --check public/site-research-client.js
+          node --check public/site-research-layout.js
+          node --check public/site-address-safety.js
+          node --check public/site-address-provider-fallback.js
+          node --check public/site-autocomplete-recovery.js
+          node --check public/site-aadt-autoload.js
+          node --check public/fuel-atlas.js
+          node --check public/distributor-company-search.js
+          node --check public/distributor-scope-ui.js
+          node --check public/distributor-research-client-v2.js
+          node --check public/distributor-branding-ui.js
+          node --check scripts/testFuelAtlasCompanyLookup.js
+          node --check scripts/testFuelAtlasLocationCompanyBridge.js
+      - name: Validate Fuel Atlas
+        run: |
+          node scripts/validateFuelAtlas.js
+          node scripts/testFuelAtlasRoutes.js
+          node scripts/testFuelAtlasCompanyLookup.js
+          node scripts/testFuelAtlasLocationCompanyBridge.js
+      - name: Validate Distributor Intelligence
+        run: |
+          node scripts/validateDistributorPresentation.js
+          node scripts/validateDistributorCompanySearch.js
+          node scripts/validateDistributorResearchRecovery.js
+      - name: Validate Site Analyzer layout
+        run: node scripts/validateSiteAnalyzerLayout.js
+      - name: Validate Site Research reliability
+        run: node scripts/validateSiteResearchReliability.js

@@ -8,9 +8,11 @@ on:
       - "public/fuel-atlas.html"
       - "public/fuel-atlas.js"
       - "src/fuelAtlasRoutes.js"
+      - "src/fuelAtlasLocationCompanyBridge.js"
       - "scripts/validateFuelAtlas.js"
       - "scripts/testFuelAtlasRoutes.js"
       - "scripts/testFuelAtlasCompanyLookup.js"
+      - "scripts/testFuelAtlasLocationCompanyBridge.js"
       - "scripts/testFuelAtlasSourceIntegration.js"
       - "scripts/smokeFuelAtlasLive.js"
       - ".github/workflows/validate-fuel-atlas.yml"
@@ -22,9 +24,11 @@ on:
       - "public/fuel-atlas.html"
       - "public/fuel-atlas.js"
       - "src/fuelAtlasRoutes.js"
+      - "src/fuelAtlasLocationCompanyBridge.js"
       - "scripts/validateFuelAtlas.js"
       - "scripts/testFuelAtlasRoutes.js"
       - "scripts/testFuelAtlasCompanyLookup.js"
+      - "scripts/testFuelAtlasLocationCompanyBridge.js"
       - "scripts/testFuelAtlasSourceIntegration.js"
       - "scripts/smokeFuelAtlasLive.js"
       - ".github/workflows/validate-fuel-atlas.yml"
@@ -39,15 +43,27 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Validate Fuel Atlas syntax and behavior
+      - name: Check Fuel Atlas syntax
         run: |
           node --check src/fuelAtlasRoutes.js
+          node --check src/fuelAtlasLocationCompanyBridge.js
           node --check public/fuel-atlas.js
+          node --check scripts/validateFuelAtlas.js
           node --check scripts/testFuelAtlasCompanyLookup.js
+          node --check scripts/testFuelAtlasLocationCompanyBridge.js
           node --check scripts/smokeFuelAtlasLive.js
           node --check scripts/testFuelAtlasSourceIntegration.js
-          node scripts/validateFuelAtlas.js
-          node scripts/testFuelAtlasRoutes.js
-          node scripts/testFuelAtlasCompanyLookup.js
+      - name: Validate map bounds and source query
+        run: node scripts/validateFuelAtlas.js query
+      - name: Validate facility classification
+        run: node scripts/validateFuelAtlas.js classification
+      - name: Validate Fuel Atlas UI integration
+        run: node scripts/validateFuelAtlas.js ui
+      - name: Validate Fuel Atlas route behavior
+        run: node scripts/testFuelAtlasRoutes.js
+      - name: Validate nationwide company-name lookup
+        run: node scripts/testFuelAtlasCompanyLookup.js
+      - name: Validate city-to-company lookup
+        run: node scripts/testFuelAtlasLocationCompanyBridge.js
       - name: Query live EPA distributor data
         run: node scripts/testFuelAtlasSourceIntegration.js

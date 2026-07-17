@@ -71,7 +71,7 @@ for (const snippet of [
   'input.disabled = false',
   'input.readOnly = false',
   'Autocomplete ready',
-  'Quick Estimate',
+  'estimateButton.textContent = "Estimate"',
   'fiq-dock-overlaps-address',
   'pointer-events: none !important',
   '@media (max-height: 820px)',

@@ -14,6 +14,7 @@ import { transformSiteAnalyzerPage } from "./src/siteAnalyzerPresentation.js";
 import { registerExpandedAadtRoutes } from "./src/aadtCoverage.js";
 import { registerSiteResearchReportEnhancements } from "./src/siteResearchReportEnhancements.js";
 import { registerFuelAtlasRoutes } from "./src/fuelAtlasRoutes.js";
+import { registerFuelAtlasLocationCompanyBridge } from "./src/fuelAtlasLocationCompanyBridge.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -73,6 +74,7 @@ registerSiteEnhancementRoutes(app, {
   legacyPort,
   googleApiKey: process.env.GOOGLE_API_KEY || "",
 });
+registerFuelAtlasLocationCompanyBridge(app);
 registerFuelAtlasRoutes(app, { googleApiKey: process.env.GOOGLE_API_KEY || "" });
 
 app.get("/fuel-atlas", (_req, res) => res.redirect(302, "/fuel-atlas.html"));
@@ -171,6 +173,7 @@ app.get("/health", (_req, res) => {
     fuelAtlas: true,
     fuelAtlasServerSearch: true,
     fuelAtlasPlaceSearch: true,
+    fuelAtlasCityCompanySearch: true,
     siteResearch: true,
     siteResearchWordExport: true,
     estimateWordExport: true,
