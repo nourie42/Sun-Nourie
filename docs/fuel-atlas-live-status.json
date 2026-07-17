@@ -1,0 +1,67 @@
+{
+  "ok": true,
+  "verifiedAt": "2026-07-17T13:11:25.219Z",
+  "verifiedCommit": "9cdc25fdf8c9775773d291770a862cd8f4f81cd2",
+  "liveUrl": "https://sun-nourie-live.onrender.com",
+  "successfulSearches": 5,
+  "attemptedSearches": 5,
+  "totalFacilities": 108,
+  "retailGasStations": 0,
+  "results": [
+    {
+      "metro": "Philadelphia",
+      "ok": true,
+      "count": 13,
+      "retail": 0,
+      "elapsedMs": 63,
+      "sources": [
+        "EPA Facility Registry Service"
+      ],
+      "partial": true
+    },
+    {
+      "metro": "Houston",
+      "ok": true,
+      "count": 8,
+      "retail": 0,
+      "elapsedMs": 62,
+      "sources": [
+        "EPA Facility Registry Service"
+      ],
+      "partial": true
+    },
+    {
+      "metro": "Newark / Elizabeth",
+      "ok": true,
+      "count": 55,
+      "retail": 0,
+      "elapsedMs": 63,
+      "sources": [
+        "EPA Facility Registry Service"
+      ],
+      "partial": true
+    },
+    {
+      "metro": "Chicago",
+      "ok": true,
+      "count": 3,
+      "retail": 0,
+      "elapsedMs": 59,
+      "sources": [
+        "EPA Facility Registry Service"
+      ],
+      "partial": true
+    },
+    {
+      "metro": "Los Angeles / Long Beach",
+      "ok": true,
+      "count": 29,
+      "retail": 0,
+      "elapsedMs": 63,
+      "sources": [
+        "EPA Facility Registry Service"
+      ],
+      "partial": true
+    }
+  ]
+}
