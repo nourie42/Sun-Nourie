@@ -1,24 +1,136 @@
 {
   "ok": true,
-  "verificationRule": "Every result must have NAICS 424710/424720/454310/457210 or an explicit distributor, wholesale, bulk, terminal, heating-oil or propane facility role; retail and unrelated names are rejected.",
-  "filterVersion": "verified-distributors-v2",
-  "verifiedAt": "2026-07-17T13:37:01.263Z",
-  "verifiedCommit": "dc51514e39ee9f9b6a7a46f6c8c4d2252b55d953",
+  "classificationRule": "NAICS qualifies inclusion; explicit facility wording determines terminal or bulk-plant labels. Oil companies, wholesalers, suppliers and fuel dealers default to Distributor when no physical terminal/bulk wording is present. Heating-oil and propane dealers are also included in Distributor.",
+  "filterVersion": "verified-distributor-categories-v3",
+  "verifiedAt": "2026-07-17T14:12:31.673Z",
+  "verifiedCommit": "98a6ebf7456bd4a7a90fe34c48e4b632bca4c9d4",
   "liveUrl": "https://sun-nourie-live.onrender.com",
-  "successfulSearches": 6,
-  "attemptedSearches": 6,
-  "totalFacilities": 317,
+  "successfulSearches": 8,
+  "attemptedSearches": 8,
+  "totalFacilities": 541,
+  "categoryTotals": {
+    "distributor": 289,
+    "heating_oil": 3,
+    "bulk_plant": 45,
+    "terminal": 207,
+    "propane": 7
+  },
   "forbiddenFacilities": 0,
   "unqualifiedFacilities": 0,
+  "categoryErrors": 0,
+  "pearceOilClassification": {
+    "name": "PEARCE OIL COMPANY - 30533",
+    "codes": [
+      "424710"
+    ],
+    "primary": "distributor",
+    "categories": [
+      "distributor"
+    ],
+    "classificationBasis": "Explicit distributor, wholesaler, supplier or fuel-company role",
+    "qualification": "NAICS 424710",
+    "forbidden": false,
+    "qualified": true,
+    "categoryError": ""
+  },
   "bannedNamesPresent": [],
   "results": [
     {
-      "metro": "North Carolina Triangle",
+      "region": "South Hill Virginia",
       "ok": true,
-      "count": 17,
+      "count": 4,
       "forbidden": 0,
       "unqualified": 0,
-      "elapsedMs": 34,
+      "categoryErrors": 0,
+      "categoryCounts": {
+        "distributor": 3,
+        "heating_oil": 0,
+        "bulk_plant": 0,
+        "terminal": 1,
+        "propane": 0
+      },
+      "elapsedMs": 77,
+      "sources": [
+        "OpenStreetMap / Overpass",
+        "EPA ECHO / FRS NAICS"
+      ],
+      "partial": false,
+      "samples": [
+        {
+          "name": "Road Maintenance Facility",
+          "codes": [],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
+          "qualification": "",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "PARKER OIL COMPANY",
+          "codes": [
+            "424710"
+          ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "Explicit distributor, wholesaler, supplier or fuel-company role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "PEARCE OIL COMPANY - 30533",
+          "codes": [
+            "424710"
+          ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "Explicit distributor, wholesaler, supplier or fuel-company role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "PEARCE OIL COMPANY - 30617",
+          "codes": [
+            "424710"
+          ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "Explicit distributor, wholesaler, supplier or fuel-company role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        }
+      ]
+    },
+    {
+      "region": "North Carolina Triangle",
+      "ok": true,
+      "count": 16,
+      "forbidden": 0,
+      "unqualified": 0,
+      "categoryErrors": 0,
+      "categoryCounts": {
+        "distributor": 3,
+        "heating_oil": 0,
+        "bulk_plant": 0,
+        "terminal": 13,
+        "propane": 0
+      },
+      "elapsedMs": 12780,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
@@ -29,19 +141,15 @@
           "codes": [
             "424710"
           ],
-          "qualification": "NAICS 424710",
-          "forbidden": false,
-          "qualified": true
-        },
-        {
-          "name": "CHARTER TRIAD TERMINALS LIMITED LIABILITY COMPANY",
-          "codes": [
-            "424710",
-            "493190"
+          "primary": "terminal",
+          "categories": [
+            "terminal"
           ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
           "name": "DIXIE APEX TERMINAL",
@@ -50,36 +158,60 @@
             "454312",
             "424710"
           ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
           "qualification": "NAICS 457210, 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
           "name": "EXXONMOBIL REFINING AND SUPPLY COMPANY",
           "codes": [
             "424710"
           ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "NAICS 424710 record with no explicit terminal or bulk-plant wording",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
           "name": "GLOBAL APEX TERMINAL",
           "codes": [
             "424710"
           ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
           "name": "HUFFMAN OIL CO. INC.",
           "codes": [
             "424710"
           ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "Explicit distributor, wholesaler, supplier or fuel-company role",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
           "name": "KINDER MORGAN SELMA TERMINAL #4",
@@ -87,9 +219,15 @@
             "424710",
             "493190"
           ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
           "name": "KINDER MORGAN SELMA TERMINAL III 3",
@@ -97,9 +235,15 @@
             "493190",
             "424710"
           ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
           "name": "KM SELMA-II DISTILLATE FUELS TERMINAL",
@@ -107,27 +251,45 @@
             "493190",
             "424710"
           ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
           "name": "MOTIVAENTERPRISES LLC - APEX TERMINAL",
           "codes": [
             "424710"
           ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
           "name": "MPLX TERMINALS LLC - SELMA WEST OAK LP TERMINAL",
           "codes": [
             "424710"
           ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
           "name": "NOBLE OIL SERVICES",
@@ -135,19 +297,350 @@
             "423930",
             "424710"
           ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "NAICS 424710 record with no explicit terminal or bulk-plant wording",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "SELMA TERMINAL",
+          "codes": [
+            "424710"
+          ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "SELMA TERMINAL",
+          "codes": [
+            "424710"
+          ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "SELMA TERMINAL NORTH",
+          "codes": [
+            "424710",
+            "493190"
+          ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "SUNOCO SELMA TERMINAL",
+          "codes": [
+            "424710",
+            "457210",
+            "493190"
+          ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
+          "qualification": "NAICS 424710, 457210",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
         }
       ]
     },
     {
-      "metro": "Philadelphia",
+      "region": "Virginia and Carolinas",
       "ok": true,
-      "count": 30,
+      "count": 374,
       "forbidden": 0,
       "unqualified": 0,
-      "elapsedMs": 12735,
+      "categoryErrors": 0,
+      "categoryCounts": {
+        "distributor": 217,
+        "heating_oil": 2,
+        "bulk_plant": 45,
+        "terminal": 112,
+        "propane": 5
+      },
+      "elapsedMs": 12847,
+      "sources": [
+        "EPA ECHO / FRS NAICS"
+      ],
+      "partial": true,
+      "samples": [
+        {
+          "name": "2590 - RC MILLER OIL CO",
+          "codes": [
+            "424710"
+          ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "Explicit distributor, wholesaler, supplier or fuel-company role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "ABERCROMBIE OIL COMPANY",
+          "codes": [
+            "424710"
+          ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "Explicit distributor, wholesaler, supplier or fuel-company role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "ACTION PETROLEUM CO LTD",
+          "codes": [
+            "424720",
+            "424710"
+          ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "Explicit distributor, wholesaler, supplier or fuel-company role",
+          "qualification": "NAICS 424720, 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "ACTION PETROLEUM STORAGE",
+          "codes": [
+            "424710"
+          ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "NAICS 424710 record with no explicit terminal or bulk-plant wording",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "ADAMS OIL COMPANY",
+          "codes": [
+            "454311",
+            "424710"
+          ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "Explicit distributor, wholesaler, supplier or fuel-company role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "ALLEN PETROLEUM CORP",
+          "codes": [
+            "424710"
+          ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "NAICS 424710 record with no explicit terminal or bulk-plant wording",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "AMERADA HESS CORP GREENSBORO TERMINAL",
+          "codes": [
+            "424710"
+          ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "AMERADA HESS CORP SALISBURY TERMINAL",
+          "codes": [
+            "424710"
+          ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "AMERIGAS PROPANE",
+          "codes": [
+            "424710"
+          ],
+          "primary": "propane",
+          "categories": [
+            "distributor",
+            "propane"
+          ],
+          "classificationBasis": "Explicit propane or LPG dealer/supplier role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "AMOCO LUBE OIL PLANT",
+          "codes": [
+            "424710"
+          ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "NAICS 424710 record with no explicit terminal or bulk-plant wording",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "AMOCO OIL CO  BEDFORD",
+          "codes": [
+            "424710"
+          ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "Explicit distributor, wholesaler, supplier or fuel-company role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "ANDERSON OIL",
+          "codes": [
+            "424710"
+          ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "NAICS 424710 record with no explicit terminal or bulk-plant wording",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "APEX OIL CO",
+          "codes": [
+            "424710",
+            "493190"
+          ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "Explicit distributor, wholesaler, supplier or fuel-company role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "APEX OIL COMPANY",
+          "codes": [
+            "424710",
+            "493190"
+          ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "Explicit distributor, wholesaler, supplier or fuel-company role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "APEX OIL COMPANY ASPHALT - WILMINGTON TERMINAL",
+          "codes": [
+            "493110",
+            "493190",
+            "424710"
+          ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        }
+      ]
+    },
+    {
+      "region": "Philadelphia",
+      "ok": true,
+      "count": 16,
+      "forbidden": 0,
+      "unqualified": 0,
+      "categoryErrors": 0,
+      "categoryCounts": {
+        "distributor": 3,
+        "heating_oil": 0,
+        "bulk_plant": 0,
+        "terminal": 13,
+        "propane": 0
+      },
+      "elapsedMs": 12778,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
@@ -159,9 +652,15 @@
             "424720",
             "213112"
           ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "NAICS 424720 petroleum-product merchant wholesaler",
           "qualification": "NAICS 424720",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
           "name": "BUCKEYE - PENNSAUKEN TERMINAL",
@@ -169,61 +668,30 @@
             "493190",
             "424710"
           ],
-          "qualification": "NAICS 424710",
-          "forbidden": false,
-          "qualified": true
-        },
-        {
-          "name": "CLEAN HARBORS ENVIRONMENTAL SERVICES INC",
-          "codes": [
-            "424710",
-            "562910",
-            "562112",
-            "562111"
+          "primary": "terminal",
+          "categories": [
+            "terminal"
           ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
-        },
-        {
-          "name": "CONOCO FUELS",
-          "codes": [
-            "424710"
-          ],
-          "qualification": "NAICS 424710",
-          "forbidden": false,
-          "qualified": true
-        },
-        {
-          "name": "DELAWARE RIVER PARTNERS",
-          "codes": [
-            "424710"
-          ],
-          "qualification": "NAICS 424710",
-          "forbidden": false,
-          "qualified": true
-        },
-        {
-          "name": "E I DUPONT DE NEMOURS - REPAUNO PLANT",
-          "codes": [
-            "311999",
-            "424710",
-            "211112",
-            "325222",
-            "313230"
-          ],
-          "qualification": "NAICS 424710",
-          "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
           "name": "EDDYSTONE MARINE AND RAIL TERMINAL COMPANY, LLC",
           "codes": [
             "424710"
           ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
           "name": "ENERGY TRANSFER MARCUS HOOK TERMINAL",
@@ -236,9 +704,15 @@
             "324191",
             "325120"
           ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
           "name": "ENERGY TRANSFER PHILADELPHIA TERMINAL",
@@ -247,9 +721,15 @@
             "493190",
             "213112"
           ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
           "name": "ERGON ASPHALT PARTNERS, LP",
@@ -257,117 +737,255 @@
             "324121",
             "424710"
           ],
-          "qualification": "NAICS 424710",
-          "forbidden": false,
-          "qualified": true
-        },
-        {
-          "name": "FJ JANOSKI PETRO CO/EAST NORRITON",
-          "codes": [
-            "424710"
+          "primary": "distributor",
+          "categories": [
+            "distributor"
           ],
+          "classificationBasis": "NAICS 424710 record with no explicit terminal or bulk-plant wording",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
           "name": "FORMER BP PAULSBORO TERMINAL NO 4555",
           "codes": [
             "424710"
           ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "GLOBAL COMPANIES LLC - WOODBURY TERMINAL",
+          "codes": [
+            "424710"
+          ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "KINDER MORGAN POINT BREEZE TERMINAL",
+          "codes": [
+            "424710"
+          ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "MARCUS HOOK TANK FARM 2",
+          "codes": [
+            "424710"
+          ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "MIPC G STREET TERMINAL",
+          "codes": [
+            "424710"
+          ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "MIPC LLC / CHELSEA TANK FARM",
+          "codes": [
+            "486910",
+            "424710"
+          ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "PENN DISTRIBUTORS",
+          "codes": [
+            "424710"
+          ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "Explicit distributor, wholesaler, supplier or fuel-company role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "SCHUYLKILL RIVER TANK FARM",
+          "codes": [
+            "324110",
+            "424710",
+            "238910",
+            "488119"
+          ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "SUNOCO PARTNERS M&T LP - BELMONT TERMINAL",
+          "codes": [
+            "424710",
+            "213112",
+            "493190"
+          ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
         }
       ]
     },
     {
-      "metro": "Houston",
+      "region": "Houston",
       "ok": true,
-      "count": 50,
+      "count": 28,
       "forbidden": 0,
       "unqualified": 0,
-      "elapsedMs": 12733,
+      "categoryErrors": 0,
+      "categoryCounts": {
+        "distributor": 3,
+        "heating_oil": 0,
+        "bulk_plant": 0,
+        "terminal": 25,
+        "propane": 1
+      },
+      "elapsedMs": 12775,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
       "partial": true,
       "samples": [
         {
-          "name": "AJ HURT JR INC DBA THE HURT CO",
-          "codes": [
-            "424710"
-          ],
-          "qualification": "NAICS 424710",
-          "forbidden": false,
-          "qualified": true
-        },
-        {
           "name": "ALMEDA LPG FACILITY",
           "codes": [
             "424710",
             "486990"
           ],
+          "primary": "propane",
+          "categories": [
+            "distributor",
+            "propane"
+          ],
+          "classificationBasis": "Explicit propane or LPG dealer/supplier role",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
-        },
-        {
-          "name": "ASHLAND CHEMICAL",
-          "codes": [
-            "424710",
-            "424690",
-            "424720",
-            "325188"
-          ],
-          "qualification": "NAICS 424710, 424720",
-          "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
           "name": "BAYTOWN TERMINAL",
           "codes": [
             "457210"
           ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
           "qualification": "NAICS 457210",
           "forbidden": false,
-          "qualified": true
-        },
-        {
-          "name": "BELLE CHASSE MARINE LUBRICANTS",
-          "codes": [
-            "424710"
-          ],
-          "qualification": "NAICS 424710",
-          "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
           "name": "CHEVRON GALENA PARK TERMINAL",
           "codes": [
             "424710"
           ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
           "name": "CHEVRON PRODUCTS CO - GALENA PARK TERMINAL",
           "codes": [
             "424710"
           ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
           "name": "DEER PARK RAIL TERMINAL",
           "codes": [
             "424710"
           ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
           "name": "EAST HOUSTON TERMINAL",
@@ -376,9 +994,15 @@
             "424710",
             "493190"
           ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
           "name": "GALENA PARK MARINE TERMINAL",
@@ -387,18 +1011,30 @@
             "486910",
             "493190"
           ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
           "name": "GALENA PARK TERMINAL",
           "codes": [
             "424710"
           ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
           "name": "GALENA PARK TERMINAL",
@@ -410,41 +1046,146 @@
             "325199",
             "424710"
           ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "GLOBAL PASADENA TERMINAL",
+          "codes": [
+            "424710"
+          ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "HOUSTON HOUSTON TERMINAL",
+          "codes": [
+            "424710",
+            "999999"
+          ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "HOUSTON REFINERY",
+          "codes": [
+            "324110",
+            "424710"
+          ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "NAICS 424710 record with no explicit terminal or bulk-plant wording",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "HOUSTON TANK TERMINAL",
+          "codes": [
+            "424710"
+          ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "IAH FUEL BULK FUEL STORAGE FACILITY",
+          "codes": [
+            "424710",
+            "488190"
+          ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "NAICS 424710 record with no explicit terminal or bulk-plant wording",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "KINDER MORGAN EXPORT TERMINAL",
+          "codes": [
+            "221112",
+            "424710"
+          ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
         }
       ]
     },
     {
-      "metro": "Newark / Elizabeth",
+      "region": "Newark / Elizabeth",
       "ok": true,
-      "count": 32,
+      "count": 21,
       "forbidden": 0,
       "unqualified": 0,
-      "elapsedMs": 12734,
+      "categoryErrors": 0,
+      "categoryCounts": {
+        "distributor": 6,
+        "heating_oil": 0,
+        "bulk_plant": 0,
+        "terminal": 15,
+        "propane": 0
+      },
+      "elapsedMs": 12779,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
       "partial": true,
       "samples": [
         {
-          "name": "ALLIED AVIATION SERVICE CO OF NEW JERSEY INC",
-          "codes": [
-            "424710"
-          ],
-          "qualification": "NAICS 424710",
-          "forbidden": false,
-          "qualified": true
-        },
-        {
           "name": "AMERADA HESS CORP SECAUCUS TERMINAL",
           "codes": [
             "424710"
           ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
           "name": "APPROVED OIL COMPANY OF BROOKLYN INC",
@@ -453,18 +1194,30 @@
             "238220",
             "811411"
           ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "Explicit distributor, wholesaler, supplier or fuel-company role",
           "qualification": "NAICS 454310",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
           "name": "BP NORTH AMERICA PETROLEUM",
           "codes": [
             "424710"
           ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "NAICS 424710 record with no explicit terminal or bulk-plant wording",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
           "name": "BROOKLYN TERMINAL - SUNOCO LLC",
@@ -474,9 +1227,15 @@
             "493110",
             "454311"
           ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
           "name": "BUCKEYE BAYONNE TERMINAL",
@@ -484,9 +1243,15 @@
             "424710",
             "493190"
           ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
           "name": "BUCKEYE NEWARK TERMINAL",
@@ -494,9 +1259,15 @@
             "493190",
             "424710"
           ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
           "name": "BUCKEYE PORT READING TERMINAL",
@@ -506,9 +1277,15 @@
             "424710",
             "488119"
           ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
           "name": "BUCKEYE TERMINALS LLC-BROOKLYN TERMINAL",
@@ -518,98 +1295,192 @@
             "531120",
             "457210"
           ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
           "qualification": "NAICS 424710, 457210",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
-          "name": "BUCKEYE TERMINALS LLC PARCEL 1",
+          "name": "CARTERET TRUCK RACK TERMINAL",
           "codes": [
             "424710",
-            "488330"
+            "493190"
           ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
-          "name": "C&C BIOFUELS",
+          "name": "CITGO LINDEN TERMINAL",
           "codes": [
-            "454310"
+            "424710"
           ],
-          "qualification": "NAICS 454310",
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
+          "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
-          "name": "C&C BIOFUELS LLC",
+          "name": "CITGO PETROLEUM CORP",
           "codes": [
-            "562111",
-            "454310"
+            "424710"
           ],
-          "qualification": "NAICS 454310",
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "NAICS 424710 record with no explicit terminal or bulk-plant wording",
+          "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "CONOCOPHILLIPS CO TREMLEY POINT TERMINAL",
+          "codes": [
+            "424710"
+          ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "ENERGY TRANSFER - NEWARK TERMINAL",
+          "codes": [
+            "324199",
+            "424710",
+            "493190"
+          ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "EXXONMOBIL OIL CORP LINDEN TERMINAL",
+          "codes": [
+            "424710"
+          ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "FAST OIL",
+          "codes": [
+            "493190",
+            "999999",
+            "424710"
+          ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "NAICS 424710 record with no explicit terminal or bulk-plant wording",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
         }
       ]
     },
     {
-      "metro": "Chicago",
+      "region": "Chicago",
       "ok": true,
-      "count": 103,
+      "count": 45,
       "forbidden": 0,
       "unqualified": 0,
-      "elapsedMs": 12736,
+      "categoryErrors": 0,
+      "categoryCounts": {
+        "distributor": 40,
+        "heating_oil": 1,
+        "bulk_plant": 0,
+        "terminal": 5,
+        "propane": 0
+      },
+      "elapsedMs": 12777,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
       "partial": true,
       "samples": [
         {
-          "name": "AIRCRAFT SERVICE INTERNATIONAL INC DBA MENZIES AVIATION",
-          "codes": [
-            "424710"
-          ],
-          "qualification": "NAICS 424710",
-          "forbidden": false,
-          "qualified": true
-        },
-        {
           "name": "AMEROPAN OIL CORPORATION, INC",
           "codes": [
             "424710"
           ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "NAICS 424710 record with no explicit terminal or bulk-plant wording",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
           "name": "AMOCO OIL",
           "codes": [
             "424710"
           ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "NAICS 424710 record with no explicit terminal or bulk-plant wording",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
           "name": "AMOCO OIL CO",
           "codes": [
             "424710"
           ],
-          "qualification": "NAICS 424710",
-          "forbidden": false,
-          "qualified": true
-        },
-        {
-          "name": "ARCO PRODUCTS COMPANY",
-          "codes": [
-            "339999",
-            "424710"
+          "primary": "distributor",
+          "categories": [
+            "distributor"
           ],
+          "classificationBasis": "Explicit distributor, wholesaler, supplier or fuel-company role",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
           "name": "ARGO TERMINAL CO",
@@ -618,9 +1489,15 @@
             "484230",
             "484220"
           ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
           "name": "ASHLAND DISTRIBUTION CO",
@@ -628,86 +1505,204 @@
             "424690",
             "424710"
           ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "Explicit distributor, wholesaler, supplier or fuel-company role",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
           "name": "ASPHALT OPERATING SERVICES-CHICAGO",
           "codes": [
             "424710"
           ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "NAICS 424710 record with no explicit terminal or bulk-plant wording",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
           "name": "ASPHALT OPERATING SERVICES OF CHICAGO, LLC",
           "codes": [
             "424710"
           ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "NAICS 424710 record with no explicit terminal or bulk-plant wording",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
-          "name": "ATLANTIC AVIATION",
-          "codes": [
-            "424720"
-          ],
-          "qualification": "NAICS 424720",
-          "forbidden": false,
-          "qualified": true
-        },
-        {
-          "name": "ATLANTIC RICHFIELD CO",
+          "name": "BELL OIL TERMINAL",
           "codes": [
             "424710"
           ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
-          "name": "AUTOFRAN INC",
+          "name": "BODIE-HOOVER PETROLEUM CORP",
+          "codes": [
+            "424710",
+            "324191"
+          ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "NAICS 424710 record with no explicit terminal or bulk-plant wording",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "BP OIL CO WHITING TERMINALS",
           "codes": [
             "424710"
           ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "Explicit distributor, wholesaler, supplier or fuel-company role",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "BULK PETROLEUM CORP",
+          "codes": [
+            "424710"
+          ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "NAICS 424710 record with no explicit terminal or bulk-plant wording",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "BURNEX OIL COMPANY",
+          "codes": [
+            "424710"
+          ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "Explicit distributor, wholesaler, supplier or fuel-company role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "C & L PETROLEUM CO INC",
+          "codes": [
+            "424710"
+          ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "Explicit distributor, wholesaler, supplier or fuel-company role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "CHEMICAL PETROLEUM EXCHANGE",
+          "codes": [
+            "324121",
+            "424710"
+          ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "NAICS 424710 record with no explicit terminal or bulk-plant wording",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "CITGO PETROLEUM CORP",
+          "codes": [
+            "424710"
+          ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "NAICS 424710 record with no explicit terminal or bulk-plant wording",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
         }
       ]
     },
     {
-      "metro": "Los Angeles / Long Beach",
+      "region": "Los Angeles / Long Beach",
       "ok": true,
-      "count": 85,
+      "count": 37,
       "forbidden": 0,
       "unqualified": 0,
-      "elapsedMs": 12740,
+      "categoryErrors": 0,
+      "categoryCounts": {
+        "distributor": 14,
+        "heating_oil": 0,
+        "bulk_plant": 0,
+        "terminal": 23,
+        "propane": 1
+      },
+      "elapsedMs": 12777,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
       "partial": true,
       "samples": [
         {
-          "name": "AMERIGAS",
-          "codes": [
-            "457210"
-          ],
-          "qualification": "NAICS 457210",
-          "forbidden": false,
-          "qualified": true
-        },
-        {
           "name": "ARCO TERMINAL SERVICES CORPORATION",
           "codes": [
             "424710"
           ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
           "name": "ATLANTIC RICHFIELD CO CARSON TERMINAL",
@@ -715,94 +1710,222 @@
             "424710",
             "454312"
           ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
           "name": "BP MARINE TERMINAL 3",
           "codes": [
             "424710"
           ],
-          "qualification": "NAICS 424710",
-          "forbidden": false,
-          "qualified": true
-        },
-        {
-          "name": "BP WEST COAST PRODUCTS LLC/ MARINE TER 1",
-          "codes": [
-            "424710"
+          "primary": "terminal",
+          "categories": [
+            "terminal"
           ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
-        },
-        {
-          "name": "BP WEST COAST PRODUCTS, LLC/CARSON TERMI",
-          "codes": [
-            "424710",
-            "454312"
-          ],
-          "qualification": "NAICS 424710",
-          "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
           "name": "BREA CANON OIL CO. - SOUTH TORRANCE TANK FARM",
           "codes": [
             "424720"
           ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
           "qualification": "NAICS 424720",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
-          "name": "BRENNTAG PACIFIC, INC.",
-          "codes": [
-            "424690",
-            "425120",
-            "424710"
-          ],
-          "qualification": "NAICS 424710",
-          "forbidden": false,
-          "qualified": true
-        },
-        {
-          "name": "BURKE ORANGE PARTNERS, LLC",
+          "name": "CHALLENGER PETROLEUM",
           "codes": [
             "424720"
           ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "NAICS 424720 petroleum-product merchant wholesaler",
           "qualification": "NAICS 424720",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
-          "name": "CALIFORNIA CARTAGE TRANSPORTATION LLC / NFI",
+          "name": "CHEM OIL CARSON TANK FARM",
           "codes": [
-            "457210",
+            "424710",
+            "486910",
+            "324110",
             "493190"
           ],
-          "qualification": "NAICS 457210",
-          "forbidden": false,
-          "qualified": true
-        },
-        {
-          "name": "CALIFORNIA FUELS AND LUBRICANTS",
-          "codes": [
-            "454310"
+          "primary": "terminal",
+          "categories": [
+            "terminal"
           ],
-          "qualification": "NAICS 454310",
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
+          "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
         },
         {
-          "name": "CARD LOCK FUELS",
+          "name": "CHEVRON MONTEBELLO TERMINAL",
           "codes": [
             "424710"
           ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
           "qualification": "NAICS 424710",
           "forbidden": false,
-          "qualified": true
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "COSBY OIL COMPANY",
+          "codes": [
+            "424720",
+            "424710"
+          ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "Explicit distributor, wholesaler, supplier or fuel-company role",
+          "qualification": "NAICS 424720, 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "DEFENSE FUEL SUPPLY POINT SAN PEDRO",
+          "codes": [
+            "424710",
+            "928110",
+            "493190"
+          ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "NAICS 424710 record with no explicit terminal or bulk-plant wording",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "DEFENSE FUEL SUPPORT POINT NORWALK DFSP",
+          "codes": [
+            "111419",
+            "486910",
+            "928110",
+            "424710"
+          ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "NAICS 424710 record with no explicit terminal or bulk-plant wording",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "DFSP SAN PEDRO FUEL PIER",
+          "codes": [
+            "424710"
+          ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "NAICS 424710 record with no explicit terminal or bulk-plant wording",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "EQUILON SIGNAL HILL TERMINAL",
+          "codes": [
+            "424710"
+          ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "EXXONMOBIL OIL CORP VERNON",
+          "codes": [
+            "424710",
+            "324191",
+            "457210"
+          ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "Fuel-dealer NAICS; no narrower heating-oil or propane wording",
+          "qualification": "NAICS 424710, 457210",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "FORMER OK FUEL",
+          "codes": [
+            "424720"
+          ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "NAICS 424720 petroleum-product merchant wholesaler",
+          "qualification": "NAICS 424720",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "KINDER MORGAN ENERGY PARTNERS, LP, ORANGE TERMINAL, SANTA FE PACIFIC PIPELINE",
+          "codes": [
+            "493190",
+            "424710"
+          ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
         }
       ]
     }
