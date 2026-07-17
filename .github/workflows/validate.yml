@@ -65,7 +65,7 @@ jobs:
           node scripts/validateDistributorPresentation.js
           node scripts/validateDistributorCompanySearch.js
           node scripts/validateDistributorResearchRecovery.js
-      - name: Validate Site Analyzer
-        run: |
-          node scripts/validateSiteAnalyzerLayout.js
-          node scripts/validateSiteResearchReliability.js
+      - name: Validate Site Analyzer layout
+        run: node scripts/validateSiteAnalyzerLayout.js
+      - name: Validate Site Research reliability
+        run: node scripts/validateSiteResearchReliability.js
