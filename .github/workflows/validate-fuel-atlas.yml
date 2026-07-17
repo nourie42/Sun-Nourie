@@ -43,7 +43,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Validate Fuel Atlas syntax and behavior
+      - name: Check Fuel Atlas syntax
         run: |
           node --check src/fuelAtlasRoutes.js
           node --check src/fuelAtlasLocationCompanyBridge.js
@@ -52,9 +52,13 @@ jobs:
           node --check scripts/testFuelAtlasLocationCompanyBridge.js
           node --check scripts/smokeFuelAtlasLive.js
           node --check scripts/testFuelAtlasSourceIntegration.js
+      - name: Validate Fuel Atlas structure and route behavior
+        run: |
           node scripts/validateFuelAtlas.js
           node scripts/testFuelAtlasRoutes.js
-          node scripts/testFuelAtlasCompanyLookup.js
-          node scripts/testFuelAtlasLocationCompanyBridge.js
+      - name: Validate nationwide company-name lookup
+        run: node scripts/testFuelAtlasCompanyLookup.js
+      - name: Validate city-to-company lookup
+        run: node scripts/testFuelAtlasLocationCompanyBridge.js
       - name: Query live EPA distributor data
         run: node scripts/testFuelAtlasSourceIntegration.js
