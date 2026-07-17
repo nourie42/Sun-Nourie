@@ -1,0 +1,24 @@
+name: Verify Cary Live Production
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/verify-cary-live-production.yml"
+
+jobs:
+  verify-cary-live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Test Cary, NC against the deployed Fuel Atlas
+        env:
+          FUEL_ATLAS_LIVE_URL: https://sun-nourie-live.onrender.com
+        run: node scripts/smokeFuelAtlasCaryLive.js
