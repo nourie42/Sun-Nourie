@@ -5,10 +5,14 @@ on:
     branches:
       - main
     paths:
+      - "server.js"
       - "public/fuel-atlas.html"
       - "public/fuel-atlas.js"
       - "src/fuelAtlasRoutes.js"
+      - "src/fuelAtlasLocationCompanyBridge.js"
+      - "scripts/testFuelAtlasLocationCompanyBridge.js"
       - "scripts/smokeFuelAtlasLive.js"
+      - "scripts/smokeFuelAtlasCaryLive.js"
       - ".github/workflows/fuel-atlas-live-smoke.yml"
   workflow_dispatch:
 
@@ -26,7 +30,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Wait for Render and test live Fuel Atlas
+      - name: Wait for Render and verify Cary city search
+        env:
+          FUEL_ATLAS_LIVE_URL: https://sun-nourie-live.onrender.com
+        run: node scripts/smokeFuelAtlasCaryLive.js
+      - name: Test live regional Fuel Atlas searches
         env:
           FUEL_ATLAS_LIVE_URL: https://sun-nourie-live.onrender.com
         run: node scripts/smokeFuelAtlasLive.js
@@ -34,7 +42,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/fuel-atlas-live-status.json
+          git add docs/fuel-atlas-live-status.json docs/fuel-atlas-cary-live-status.json
           git commit -m "Record successful Fuel Atlas live verification"
           git pull --rebase origin main
           git push origin HEAD:main
