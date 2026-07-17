@@ -13,6 +13,7 @@ import { registerSiteWordLayoutFix } from "./src/siteWordLayoutFix.js";
 import { transformSiteAnalyzerPage } from "./src/siteAnalyzerPresentation.js";
 import { registerExpandedAadtRoutes } from "./src/aadtCoverage.js";
 import { registerSiteResearchReportEnhancements } from "./src/siteResearchReportEnhancements.js";
+import { registerFuelAtlasRoutes } from "./src/fuelAtlasRoutes.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -71,6 +72,18 @@ registerExpandedAadtRoutes(app, { legacyPort });
 registerSiteEnhancementRoutes(app, {
   legacyPort,
   googleApiKey: process.env.GOOGLE_API_KEY || "",
+});
+registerFuelAtlasRoutes(app, { googleApiKey: process.env.GOOGLE_API_KEY || "" });
+
+app.get("/fuel-atlas", (_req, res) => res.redirect(302, "/fuel-atlas.html"));
+app.get("/fuel-atlas.html", (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.sendFile(path.join(__dirname, "public", "fuel-atlas.html"));
+});
+app.get("/fuel-atlas.js", (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.type("application/javascript");
+  res.sendFile(path.join(__dirname, "public", "fuel-atlas.js"));
 });
 
 app.get("/distributors", (_req, res) => res.redirect(302, "/distributors.html"));
@@ -155,6 +168,9 @@ app.get("/health", (_req, res) => {
     distributorModelVersionHidden: true,
     distributorWordOnlyExport: true,
     distributorSourceRegisterMarginFix: true,
+    fuelAtlas: true,
+    fuelAtlasServerSearch: true,
+    fuelAtlasPlaceSearch: true,
     siteResearch: true,
     siteResearchWordExport: true,
     estimateWordExport: true,
@@ -253,7 +269,7 @@ function proxyToLegacy(req, res) {
 app.use(proxyToLegacy);
 
 const server = app.listen(publicPort, "0.0.0.0", () => {
-  console.log(`Fuel IQ gateway with server-rendered Site Analyzer, expanded AADT coverage, 1.5-mile competition verification, Word export, Distributor Intelligence, and multi-pass Site Research listening on :${publicPort}`);
+  console.log(`Fuel IQ gateway with server-rendered Site Analyzer, Fuel Distributor Atlas, expanded AADT coverage, 1.5-mile competition verification, Word export, Distributor Intelligence, and multi-pass Site Research listening on :${publicPort}`);
 });
 
 function shutdown(signal) {
