@@ -1,0 +1,71 @@
+name: Fuel Atlas full check diagnostic
+
+on:
+  push:
+    branches:
+      - "fix/fuel-atlas-*"
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: npm ci || npm install
+      - name: Check gateway syntax
+        run: node --check server.js
+      - name: Check legacy server syntax
+        run: node --check legacy-server.js
+      - name: Check existing source syntax
+        run: |
+          node --check src/siteResearchExhaustive.js
+          node --check src/siteEnhancements.js
+          node --check src/siteWordLayoutFix.js
+          node --check src/siteAnalyzerPresentation.js
+          node --check src/aadtCoverage.js
+          node --check src/siteResearchReportEnhancements.js
+          node --check src/fuelAtlasRoutes.js
+          node --check src/distributorResearch.js
+          node --check src/distributorResearchV2.js
+          node --check src/distributorResearchCompat.js
+          node --check src/distributorCompanySearch.js
+          node --check src/distributorPresentationFix.js
+      - name: Check browser syntax
+        run: |
+          node --check public/site-research-client.js
+          node --check public/site-research-layout.js
+          node --check public/site-address-safety.js
+          node --check public/site-address-provider-fallback.js
+          node --check public/site-autocomplete-recovery.js
+          node --check public/site-aadt-autoload.js
+          node --check public/fuel-atlas.js
+          node --check public/distributor-company-search.js
+          node --check public/distributor-scope-ui.js
+          node --check public/distributor-research-client-v2.js
+          node --check public/distributor-branding-ui.js
+      - name: Validate Fuel Atlas UI
+        run: node scripts/validateFuelAtlas.js
+      - name: Test existing Fuel Atlas provider route
+        run: node scripts/testFuelAtlasRoutes.js
+      - name: Test Fuel Atlas fast route
+        run: node scripts/testFuelAtlasFastSearch.js
+      - name: Validate Distributor presentation
+        run: node scripts/validateDistributorPresentation.js
+      - name: Validate Site Analyzer layout
+        run: node scripts/validateSiteAnalyzerLayout.js
+      - name: Validate Distributor company search
+        run: node scripts/validateDistributorCompanySearch.js
+      - name: Validate Distributor research recovery
+        run: node scripts/validateDistributorResearchRecovery.js
+      - name: Validate Site Research reliability
+        run: node scripts/validateSiteResearchReliability.js
