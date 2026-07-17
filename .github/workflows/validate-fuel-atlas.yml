@@ -10,6 +10,7 @@ on:
       - "src/fuelAtlasRoutes.js"
       - "scripts/validateFuelAtlas.js"
       - "scripts/testFuelAtlasRoutes.js"
+      - "scripts/testFuelAtlasCompanyLookup.js"
       - "scripts/testFuelAtlasSourceIntegration.js"
       - "scripts/smokeFuelAtlasLive.js"
       - ".github/workflows/validate-fuel-atlas.yml"
@@ -23,6 +24,7 @@ on:
       - "src/fuelAtlasRoutes.js"
       - "scripts/validateFuelAtlas.js"
       - "scripts/testFuelAtlasRoutes.js"
+      - "scripts/testFuelAtlasCompanyLookup.js"
       - "scripts/testFuelAtlasSourceIntegration.js"
       - "scripts/smokeFuelAtlasLive.js"
       - ".github/workflows/validate-fuel-atlas.yml"
@@ -41,9 +43,11 @@ jobs:
         run: |
           node --check src/fuelAtlasRoutes.js
           node --check public/fuel-atlas.js
+          node --check scripts/testFuelAtlasCompanyLookup.js
           node --check scripts/smokeFuelAtlasLive.js
           node --check scripts/testFuelAtlasSourceIntegration.js
           node scripts/validateFuelAtlas.js
           node scripts/testFuelAtlasRoutes.js
+          node scripts/testFuelAtlasCompanyLookup.js
       - name: Query live EPA distributor data
         run: node scripts/testFuelAtlasSourceIntegration.js
