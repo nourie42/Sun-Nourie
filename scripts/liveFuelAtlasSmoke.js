@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import { clearFuelAtlasFastCache, registerFuelAtlasFastSearchRoute } from "../src/fuelAtlasFastSearch.js";
 
 function makeResponse() {
@@ -26,4 +27,13 @@ assert.ok(response.payload.records.length > 0, `live search returned no speciali
 assert.equal(response.payload.records.some((item) => /gas station|service station|convenience|food mart/i.test(item.name)), false, "live result contained an ordinary retail gas station");
 assert.equal(response.payload.sourceSummary.some((source) => source.name === "EPA ECHO" && source.status === "ok"), true, "EPA ECHO did not complete successfully");
 
-console.log(JSON.stringify({ elapsedMs: elapsed, count: response.payload.records.length, firstFive: response.payload.records.slice(0, 5).map((item) => item.name), sources: response.payload.sourceSummary }, null, 2));
+const result = {
+  checkedAt: new Date().toISOString(),
+  elapsedMs: elapsed,
+  count: response.payload.records.length,
+  ordinaryGasStations: response.payload.records.filter((item) => /gas station|service station|convenience|food mart/i.test(item.name)).length,
+  firstFive: response.payload.records.slice(0, 5).map((item) => item.name),
+  sources: response.payload.sourceSummary,
+};
+fs.writeFileSync("fuel-atlas-smoke-result.json", `${JSON.stringify(result, null, 2)}\n`);
+console.log(JSON.stringify(result, null, 2));
