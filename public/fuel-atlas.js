@@ -597,12 +597,7 @@
     }
 
     if (CORPORATE_QUERY_TEXT.test(normalized)) return false;
-    const words = normalized.split(" ");
-    for (const state of STATE_NAMES) {
-      if (normalized.endsWith(` ${state}`) && words.length <= state.split(" ").length + 3) return true;
-    }
-    const finalWord = words.at(-1);
-    return words.length <= 4 && STATE_ABBREVIATIONS.has(finalWord);
+    return true;
   }
 
   function headquartersParts(value) {
@@ -701,7 +696,7 @@
     const thisSearch = ++searchSequence;
     globalSearchActive = true;
     pinnedCompanyRecord = null;
-    els.placeButton.disabled = true;
+    for (const button of [els.placeButton, els.reload, els.locate, els.resetView]) button.disabled = true;
     setLoadingOverlay(true, "Searching nationwide distributor companies…", `Checking the same Fuel IQ corporate distributor index used by Distributor Intelligence for “${value}”.`);
     setStatus(`Searching nationwide for ${value}…`, "loading");
 
@@ -763,13 +758,14 @@
       if (thisSearch !== searchSequence) return;
       pinnedCompanyRecord = priorPinnedCompany;
       records = priorRecords;
+      textFilter = "";
       render();
       setStatus(error?.message || "Search could not be completed.", "error");
       els.results.insertAdjacentHTML("afterbegin", `<p class="empty"><strong>No company or place match was found.</strong><br>${escapeHtml(error?.message || "Try the legal company name, DBA, parent company, city, state, ZIP code, or address.")}</p>`);
     } finally {
       if (thisSearch === searchSequence) {
         globalSearchActive = false;
-        els.placeButton.disabled = false;
+        for (const button of [els.placeButton, els.reload, els.locate, els.resetView]) button.disabled = false;
         if (!loading) setLoadingOverlay(false);
         updateSearchButton();
       }
