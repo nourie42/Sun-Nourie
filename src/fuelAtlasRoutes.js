@@ -6,13 +6,20 @@ const MAX_LAT_SPAN = 9;
 const MAX_LON_SPAN = 15;
 const MAX_BBOX_AREA = 110;
 const MAX_RESULTS = 2500;
-const USER_AGENT = "FuelIQ-Fuel-Atlas/1.1 (+https://github.com/nourie42/Sun-Nourie)";
+const OVERPASS_TIMEOUT_MS = 18000;
+const PROVIDER_STAGGER_MS = 650;
+const USER_AGENT = "FuelIQ-Fuel-Atlas/1.2 (+https://github.com/nourie42/Sun-Nourie)";
 
 const DEFAULT_OVERPASS_ENDPOINTS = [
+  "https://overpass.private.coffee/api/interpreter",
   "https://overpass-api.de/api/interpreter",
-  "https://overpass.kumi.systems/api/interpreter",
   "https://overpass.openstreetmap.fr/api/interpreter",
 ];
+
+const TARGET_INDUSTRIAL = /^(oil|petroleum|fuel|tank_farm|oil_storage|petroleum_storage|fuel_storage|bulk_plant|fuel_terminal|oil_terminal|terminal|depot)$/i;
+const TARGET_STORAGE = /^(fuel|fuel_oil|heating_oil|oil|petroleum|diesel|gasoline|kerosene|propane|lpg)$/i;
+const TARGET_TEXT = /\b(heating[ _-]?oil|fuel[ _-]?oil|fuel distributor|petroleum distributor|oil company|petroleum|propane|\blpg\b|bulk[ _-]?plant|bulk fuel|tank[ _-]?farm|storage terminal|fuel terminal|oil terminal|fuel depot|oil depot)\b/i;
+const RETAIL_TEXT = /\b(gas station|service station|filling station|travel center|truck stop|convenience store|c-store|car wash|oil change|lube shop)\b/i;
 
 const searchCache = new Map();
 const geocodeCache = new Map();
@@ -41,12 +48,23 @@ function cacheSet(cache, key, value, ttlMs) {
 
 async function timedFetch(url, init = {}, timeoutMs = 35000) {
   const controller = new AbortController();
+  const upstreamSignal = init.signal;
+  const abortFromUpstream = () => controller.abort();
+  if (upstreamSignal?.aborted) abortFromUpstream();
+  else upstreamSignal?.addEventListener("abort", abortFromUpstream, { once: true });
+
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const { signal: _ignoredSignal, ...requestInit } = init;
   try {
-    return await fetch(url, { ...init, signal: controller.signal });
+    return await fetch(url, { ...requestInit, signal: controller.signal });
   } finally {
     clearTimeout(timer);
+    upstreamSignal?.removeEventListener("abort", abortFromUpstream);
   }
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function numberParam(value) {
@@ -89,21 +107,74 @@ export function parseFuelAtlasBounds(query = {}) {
   return { ok: true, south, west, north, east, zoom: requestedZoom, latSpan, lonSpan, area };
 }
 
+function tagText(tags = {}) {
+  return [
+    tags.name,
+    tags.operator,
+    tags["operator:name"],
+    tags.owner,
+    tags["owner:name"],
+    tags.brand,
+    tags.description,
+    tags.product,
+    tags.products,
+    tags.content,
+    tags.substance,
+    tags.storage,
+    tags.shop,
+    tags.industrial,
+    tags.office,
+    tags.landuse,
+    tags.building,
+  ].filter(Boolean).join(" ");
+}
+
+export function isTargetFuelFacility(element = {}) {
+  const tags = element.tags || {};
+  const amenity = clean(tags.amenity, 80).toLowerCase();
+  const shop = clean(tags.shop, 80).toLowerCase();
+  const text = tagText(tags);
+
+  if (amenity === "fuel") return false;
+  if (["fuel", "gas", "convenience", "supermarket"].includes(shop)) return false;
+  if (RETAIL_TEXT.test(text)) return false;
+
+  if (shop === "heating_oil") return true;
+  if (TARGET_INDUSTRIAL.test(clean(tags.industrial, 100))) return true;
+  if (clean(tags.landuse, 100).toLowerCase() === "industrial" && TARGET_TEXT.test(text)) return true;
+  if (/^(industrial|warehouse)$/i.test(clean(tags.building, 100)) && TARGET_TEXT.test(text)) return true;
+
+  const storedMaterial = clean(tags.content || tags.substance || tags.storage, 120);
+  const identifiedFacility = Boolean(tags.name || tags.operator || tags["operator:name"] || tags.owner || tags["owner:name"]);
+  if (clean(tags.man_made, 100).toLowerCase() === "storage_tank" && TARGET_STORAGE.test(storedMaterial) && identifiedFacility) return true;
+  if (TARGET_STORAGE.test(clean(tags.storage, 120)) && identifiedFacility) return true;
+
+  const office = /^(company|logistics)$/i.test(clean(tags.office, 100));
+  return office && TARGET_TEXT.test(text);
+}
+
 export function buildFuelAtlasQuery(bounds) {
   const box = [bounds.south, bounds.west, bounds.north, bounds.east]
     .map((value) => Number(value).toFixed(5))
     .join(",");
+  const businessTerms = "heating[ _-]?oil|fuel[ _-]?oil|fuel distributor|petroleum distributor|oil company|petroleum|propane|lpg|bulk[ _-]?plant|bulk fuel|tank[ _-]?farm|storage terminal|fuel terminal|oil terminal|fuel depot|oil depot";
+  const storageTerms = "fuel|fuel_oil|heating_oil|oil|petroleum|diesel|gasoline|kerosene|propane|lpg";
 
-  return `[out:json][timeout:32];
+  return `[out:json][timeout:18];
 (
-  nwr["industrial"~"^(oil|petroleum|fuel|tank_farm|storage)$",i](${box});
-  nwr["landuse"="industrial"]["name"~"(fuel|heating oil|fuel oil|oil company|petroleum|propane|terminal|bulk|energy)",i](${box});
-  nwr["man_made"="storage_tank"]["content"~"(fuel|oil|petroleum|diesel|gasoline|propane|lpg)",i](${box});
-  nwr["storage"~"^(oil|fuel|gas|petroleum|propane)$",i](${box});
-  nwr["shop"~"^(fuel|heating_oil|gas)$",i](${box});
-  nwr["office"]["name"~"(fuel|heating oil|fuel oil|oil company|petroleum|propane|energy)",i](${box});
-  nwr["amenity"="fuel"]["access"~"^(private|customers|permit)$",i](${box});
-  nwr["amenity"="fuel"]["hgv"="yes"]["name"~"(fleet|commercial|cardlock|bulk|terminal|fuel|oil|petroleum|propane)",i](${box});
+  nwr["shop"="heating_oil"](${box});
+  nwr["industrial"~"^(oil|petroleum|fuel|tank_farm|oil_storage|petroleum_storage|fuel_storage|bulk_plant|fuel_terminal|oil_terminal|terminal|depot)$",i](${box});
+  nwr["landuse"="industrial"]["name"~"(${businessTerms})",i](${box});
+  nwr["building"~"^(industrial|warehouse)$"]["name"~"(${businessTerms})",i](${box});
+  nwr["office"~"^(company|logistics)$"]["name"~"(${businessTerms})",i](${box});
+  nwr["office"~"^(company|logistics)$"]["operator"~"(${businessTerms})",i](${box});
+  nwr["office"~"^(company|logistics)$"]["product"~"(${storageTerms})",i](${box});
+  nwr["office"~"^(company|logistics)$"]["description"~"(heating[ _-]?oil|fuel[ _-]?oil|petroleum|propane|bulk[ _-]?plant|terminal|distribut|wholesal)",i](${box});
+  nwr["man_made"="storage_tank"]["content"~"^(${storageTerms})$",i]["operator"](${box});
+  nwr["man_made"="storage_tank"]["substance"~"^(${storageTerms})$",i]["operator"](${box});
+  nwr["man_made"="storage_tank"]["content"~"^(${storageTerms})$",i]["name"](${box});
+  nwr["man_made"="storage_tank"]["substance"~"^(${storageTerms})$",i]["name"](${box});
+  nwr["storage"~"^(oil|fuel|petroleum|propane|lpg)$",i]["name"~"(${businessTerms})",i](${box});
 );
 out body center qt ${MAX_RESULTS};`;
 }
@@ -113,39 +184,62 @@ function overpassEndpoints() {
   return [...new Set([configured, ...DEFAULT_OVERPASS_ENDPOINTS].filter(Boolean))];
 }
 
-async function fetchOverpass(query) {
-  const failures = [];
-  for (const endpoint of overpassEndpoints()) {
-    try {
-      const response = await timedFetch(endpoint, {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-          "User-Agent": USER_AGENT,
-        },
-        body: `data=${encodeURIComponent(query)}`,
-      }, 38000);
+async function fetchOverpassEndpoint(endpoint, query, signal) {
+  const response = await timedFetch(endpoint, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+      "User-Agent": USER_AGENT,
+    },
+    body: `data=${encodeURIComponent(query)}`,
+    signal,
+  }, OVERPASS_TIMEOUT_MS);
 
-      const text = await response.text();
-      if (!response.ok) throw new Error(`HTTP ${response.status}${text ? `: ${text.slice(0, 160)}` : ""}`);
+  const text = await response.text();
+  if (!response.ok) throw new Error(`HTTP ${response.status}${text ? `: ${text.slice(0, 160)}` : ""}`);
 
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch {
-        throw new Error("The map source returned a non-JSON response.");
-      }
-      if (!Array.isArray(data.elements)) throw new Error("The map source returned an invalid result.");
-      return { elements: data.elements, endpoint };
-    } catch (error) {
-      failures.push(`${endpoint}: ${clean(error?.message || error, 240)}`);
-    }
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error("The map source returned a non-JSON response.");
   }
+  if (!Array.isArray(data.elements)) throw new Error("The map source returned an invalid result.");
+  return { elements: data.elements, endpoint };
+}
 
-  const error = new Error("All public map providers failed for this request.");
-  error.failures = failures;
-  throw error;
+async function fetchOverpass(query) {
+  const endpoints = overpassEndpoints();
+  const failures = [];
+  const sharedController = new AbortController();
+  const attempts = endpoints.map((endpoint, index) => (async () => {
+    if (index) await delay(index * PROVIDER_STAGGER_MS);
+    if (sharedController.signal.aborted) {
+      const error = new Error("Request cancelled");
+      error.name = "AbortError";
+      throw error;
+    }
+    try {
+      return await fetchOverpassEndpoint(endpoint, query, sharedController.signal);
+    } catch (error) {
+      if (!(sharedController.signal.aborted && error?.name === "AbortError")) {
+        failures.push(`${endpoint}: ${clean(error?.message || error, 240)}`);
+      }
+      throw error;
+    }
+  })());
+
+  try {
+    const result = await Promise.any(attempts);
+    sharedController.abort();
+    return result;
+  } catch {
+    sharedController.abort();
+    const error = new Error("All public map providers failed for this request.");
+    error.failures = failures;
+    throw error;
+  }
 }
 
 function normalizeGeocodeResult(result) {
@@ -268,13 +362,14 @@ export function registerFuelAtlasRoutes(app, { googleApiKey = "" } = {}) {
     try {
       const query = buildFuelAtlasQuery(bounds);
       const result = await fetchOverpass(query);
+      const elements = result.elements.filter(isTargetFuelFacility);
       const payload = {
         ok: true,
         cached: false,
         source: "OpenStreetMap contributors via Overpass",
         fetchedAt: new Date().toISOString(),
         truncated: result.elements.length >= MAX_RESULTS,
-        elements: result.elements,
+        elements,
       };
       cacheSet(searchCache, key, payload, SEARCH_CACHE_TTL_MS);
       res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=600");
@@ -284,7 +379,7 @@ export function registerFuelAtlasRoutes(app, { googleApiKey = "" } = {}) {
       return res.status(502).json({
         ok: false,
         code: "PUBLIC_MAP_UNAVAILABLE",
-        message: "The public fuel-location source is temporarily unavailable. Please retry or search a smaller nearby area.",
+        message: "The public distributor-location source is temporarily unavailable. Please retry or search a smaller nearby area.",
       });
     }
   });
