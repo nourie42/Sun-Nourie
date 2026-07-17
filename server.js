@@ -109,6 +109,11 @@ app.get("/site-address-safety.js", (_req, res) => {
   res.type("application/javascript");
   res.sendFile(path.join(__dirname, "public", "site-address-safety.js"));
 });
+app.get("/home-navigation.js", (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.type("application/javascript");
+  res.sendFile(path.join(__dirname, "public", "home-navigation.js"));
+});
 app.get("/distributors.html", async (_req, res) => {
   try {
     const filename = path.join(__dirname, "public", "distributors.html");
@@ -184,6 +189,7 @@ const homeEnhancements = [
   '<script src="/site-research-client.js" defer></script>',
   '<script src="/site-research-layout.js" defer></script>',
   '<script src="/site-address-safety.js" defer></script>',
+  '<script src="/home-navigation.js" defer></script>',
 ];
 
 function copyHeaders(source, target, { dropLength = false } = {}) {
