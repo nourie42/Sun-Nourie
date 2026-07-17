@@ -13,6 +13,7 @@ import { registerSiteWordLayoutFix } from "./src/siteWordLayoutFix.js";
 import { transformSiteAnalyzerPage } from "./src/siteAnalyzerPresentation.js";
 import { registerExpandedAadtRoutes } from "./src/aadtCoverage.js";
 import { registerSiteResearchReportEnhancements } from "./src/siteResearchReportEnhancements.js";
+import { registerFuelAtlasFastSearchRoute } from "./src/fuelAtlasFastSearch.js";
 import { registerFuelAtlasRoutes } from "./src/fuelAtlasRoutes.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -72,6 +73,10 @@ registerExpandedAadtRoutes(app, { legacyPort });
 registerSiteEnhancementRoutes(app, {
   legacyPort,
   googleApiKey: process.env.GOOGLE_API_KEY || "",
+});
+registerFuelAtlasFastSearchRoute(app, {
+  googleApiKey: process.env.GOOGLE_API_KEY || "",
+  legacyPort,
 });
 registerFuelAtlasRoutes(app, { googleApiKey: process.env.GOOGLE_API_KEY || "" });
 
@@ -170,6 +175,8 @@ app.get("/health", (_req, res) => {
     distributorSourceRegisterMarginFix: true,
     fuelAtlas: true,
     fuelAtlasServerSearch: true,
+    fuelAtlasFastSearch: true,
+    fuelAtlasEpaEcho: true,
     fuelAtlasPlaceSearch: true,
     siteResearch: true,
     siteResearchWordExport: true,
