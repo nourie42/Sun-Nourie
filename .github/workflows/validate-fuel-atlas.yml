@@ -1,0 +1,41 @@
+name: Validate Fuel Atlas
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "public/fuel-atlas.html"
+      - "public/fuel-atlas.js"
+      - "src/fuelAtlasRoutes.js"
+      - "scripts/validateFuelAtlas.js"
+      - "scripts/testFuelAtlasRoutes.js"
+      - ".github/workflows/validate-fuel-atlas.yml"
+  push:
+    branches:
+      - main
+      - "fix/fuel-atlas-*"
+    paths:
+      - "public/fuel-atlas.html"
+      - "public/fuel-atlas.js"
+      - "src/fuelAtlasRoutes.js"
+      - "scripts/validateFuelAtlas.js"
+      - "scripts/testFuelAtlasRoutes.js"
+      - ".github/workflows/validate-fuel-atlas.yml"
+
+jobs:
+  validate-atlas:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate Fuel Atlas syntax and behavior
+        run: |
+          node --check src/fuelAtlasRoutes.js
+          node --check public/fuel-atlas.js
+          node scripts/validateFuelAtlas.js
+          node scripts/testFuelAtlasRoutes.js

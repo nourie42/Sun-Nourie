@@ -24,11 +24,17 @@ assert.equal(tooLargeResponse.payload.code, "AREA_TOO_LARGE");
 
 const originalFetch = globalThis.fetch;
 let calls = 0;
-globalThis.fetch = async () => {
+const submittedQueries = [];
+globalThis.fetch = async (_url, init = {}) => {
   calls += 1;
+  const encoded = String(init.body || "").replace(/^data=/, "");
+  submittedQueries.push(decodeURIComponent(encoded));
   if (calls === 1) return new Response("busy", { status: 503 });
   return new Response(JSON.stringify({
-    elements: [{ type: "node", id: 1, lat: 40.1, lon: -76.2, tags: { name: "Test Fuel", shop: "fuel" } }],
+    elements: [
+      { type: "node", id: 1, lat: 40.1, lon: -76.2, tags: { name: "Retail Gas Station", amenity: "fuel" } },
+      { type: "way", id: 2, center: { lat: 40.2, lon: -76.3 }, tags: { name: "Test Bulk Plant", industrial: "bulk_plant", operator: "Test Petroleum" } },
+    ],
   }), { status: 200, headers: { "content-type": "application/json" } });
 };
 
@@ -37,8 +43,10 @@ try {
   await routes.get("/api/fuel-atlas/search")({ query: { south: "39", west: "-80", north: "42", east: "-74", zoom: "8" } }, response);
   assert.equal(response.statusCode, 200);
   assert.equal(response.payload.ok, true);
-  assert.equal(response.payload.elements.length, 1);
-  assert.equal(calls, 2, "the route should fail over to a second public-map endpoint");
+  assert.equal(response.payload.elements.length, 1, "retail gas stations should be removed from returned results");
+  assert.equal(response.payload.elements[0].tags.name, "Test Bulk Plant");
+  assert.ok(calls >= 2, "the route should fall through when the first public-map provider fails");
+  assert.ok(submittedQueries.every((query) => !query.includes('["amenity"="fuel"]')), "provider queries must never request retail gas stations");
 } finally {
   globalThis.fetch = originalFetch;
 }
