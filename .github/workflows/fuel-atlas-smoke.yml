@@ -1,0 +1,52 @@
+name: Fuel Atlas smoke test
+
+on:
+  push:
+    paths:
+      - "src/fuelAtlasRoutes.js"
+      - "src/fuelAtlasFastSearch.js"
+      - "public/fuel-atlas.html"
+      - "public/fuel-atlas.js"
+      - "scripts/*FuelAtlas*.js"
+      - ".github/workflows/fuel-atlas-smoke.yml"
+      - "server.js"
+  pull_request:
+    paths:
+      - "src/fuelAtlasRoutes.js"
+      - "src/fuelAtlasFastSearch.js"
+      - "public/fuel-atlas.html"
+      - "public/fuel-atlas.js"
+      - "scripts/*FuelAtlas*.js"
+      - ".github/workflows/fuel-atlas-smoke.yml"
+      - "server.js"
+
+permissions:
+  contents: read
+
+jobs:
+  deterministic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: node --check src/fuelAtlasRoutes.js
+      - run: node --check src/fuelAtlasFastSearch.js
+      - run: node --check public/fuel-atlas.js
+      - run: node --check server.js
+      - run: node scripts/validateFuelAtlas.js
+      - run: node scripts/testFuelAtlasRoutes.js
+      - run: node scripts/testFuelAtlasFastSearch.js
+
+  live-public-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Confirm a live specialized-facility search completes and returns records
+        run: node scripts/liveFuelAtlasSmoke.js
