@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { __test as distributorCompanySearchTest } from "../src/distributorCompanySearch.js";
 import {
   buildFuelAtlasQuery,
   classifyFuelFacility,
@@ -20,6 +21,10 @@ assert.equal(valid.ok, true, "metro map bounds should be accepted");
 const tooLarge = parseFuelAtlasBounds({ south: "24", west: "-125", north: "50", east: "-66", zoom: "4" });
 assert.equal(tooLarge.ok, false, "national browser-sized requests should be rejected");
 assert.equal(tooLarge.code, "AREA_TOO_LARGE");
+
+const tiger = distributorCompanySearchTest.knownCandidates("Tiger Fuels in Virginia");
+assert.equal(tiger[0]?.legal_name, "Tiger Fuel Company", "The Distributor Intelligence lookup must resolve Tiger Fuels in Virginia nationwide.");
+assert.equal(tiger[0]?.headquarters, "Charlottesville, Virginia");
 
 const query = buildFuelAtlasQuery(valid);
 assert.match(query, /heating_oil/);
@@ -81,6 +86,12 @@ assert.match(html, /verified-distributor-categories-v3/);
 assert.match(client, /verified-distributor-categories-v3/);
 assert.match(client, /record\.categories\.includes\(activeType\)/);
 assert.match(client, /NAICS alone does not make a location a bulk plant or terminal/);
+assert.match(client, /\/api\/distributors\/search\?/i, "Fuel Atlas must use the same corporate search endpoint as Distributor Intelligence.");
+assert.match(client, /companyCandidates\(value, "directory"\)/, "Fuel Atlas must run the fast corporate directory phase.");
+assert.match(client, /companyCandidates\(value, "exhaustive"\)/, "Fuel Atlas must retain the exhaustive live corporate fallback.");
+assert.match(client, /Corporate distributor match/);
+assert.match(client, /Find any distributor company, city\/state, or ZIP/);
+assert.match(client, /same Fuel IQ lookup used by Distributor Intelligence/);
 assert.doesNotMatch(client, /overpass-api\.de\/api\/interpreter/, "browser code must not call Overpass directly");
 
-console.log("Fuel Atlas category-classification validation passed.");
+console.log("Fuel Atlas category and nationwide company-search validation passed.");
