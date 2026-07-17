@@ -52,10 +52,10 @@ jobs:
           node --check scripts/testFuelAtlasLocationCompanyBridge.js
           node --check scripts/smokeFuelAtlasLive.js
           node --check scripts/testFuelAtlasSourceIntegration.js
-      - name: Validate Fuel Atlas structure and route behavior
-        run: |
-          node scripts/validateFuelAtlas.js
-          node scripts/testFuelAtlasRoutes.js
+      - name: Validate Fuel Atlas structure
+        run: node scripts/validateFuelAtlas.js
+      - name: Validate Fuel Atlas route behavior
+        run: node scripts/testFuelAtlasRoutes.js
       - name: Validate nationwide company-name lookup
         run: node scripts/testFuelAtlasCompanyLookup.js
       - name: Validate city-to-company lookup
