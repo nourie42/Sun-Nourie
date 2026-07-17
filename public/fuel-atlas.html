@@ -124,6 +124,178 @@
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin></script>
+  <script>
+  (() => {
+    "use strict";
+
+    const TYPE_LABELS = {
+      distributor: "Fuel distributor",
+      heating_oil: "Heating oil dealer",
+      bulk_plant: "Bulk plant",
+      terminal: "Terminal / depot",
+      propane: "Propane dealer",
+    };
+    let latestElements = [];
+
+    function csvValue(value) {
+      let text = String(value ?? "").replace(/\r?\n/g, " ").trim();
+      if (/^[=+\-@]/.test(text)) text = `'${text}`;
+      return `"${text.replace(/"/g, '""')}"`;
+    }
+
+    function tagsFor(element) {
+      return element && typeof element === "object" && element.tags && typeof element.tags === "object"
+        ? element.tags
+        : {};
+    }
+
+    function categoriesFor(tags) {
+      const supplied = String(tags["fuel_iq:categories"] || "")
+        .split(",")
+        .map((item) => item.trim())
+        .filter((item) => TYPE_LABELS[item]);
+      const primary = String(tags["fuel_iq:facility_type"] || "distributor").trim();
+      if (supplied.length) return [...new Set(supplied)];
+      if (primary === "heating_oil" || primary === "propane") return ["distributor", primary];
+      return [TYPE_LABELS[primary] ? primary : "distributor"];
+    }
+
+    function addressFor(tags) {
+      const street = [tags["addr:housenumber"], tags["addr:street"]].filter(Boolean).join(" ");
+      return street || tags["addr:full"] || "";
+    }
+
+    function sourceUrlFor(element) {
+      if (element.source_url) return element.source_url;
+      const center = element.center || element;
+      if (["node", "way", "relation"].includes(element.type) && element.id) {
+        return `https://www.openstreetmap.org/${element.type}/${element.id}`;
+      }
+      if (Number.isFinite(Number(center?.lat)) && Number.isFinite(Number(center?.lon))) {
+        return `https://www.openstreetmap.org/?mlat=${center.lat}&mlon=${center.lon}`;
+      }
+      return "";
+    }
+
+    function activeCategory() {
+      return document.querySelector("#filters .filter.active")?.dataset?.type || "all";
+    }
+
+    function exportRows() {
+      const category = activeCategory();
+      return latestElements.filter((element) => {
+        const tags = tagsFor(element);
+        return category === "all" || categoriesFor(tags).includes(category);
+      });
+    }
+
+    function updateExportButton() {
+      const button = document.getElementById("exportAtlasCsv");
+      const helper = document.getElementById("exportAtlasHelp");
+      if (!button) return;
+      const count = exportRows().length;
+      button.disabled = count === 0;
+      button.textContent = count
+        ? `Export ${count.toLocaleString()} Rows to CSV`
+        : "Export Loaded List to CSV";
+      if (helper) helper.textContent = count
+        ? "Opens in Excel or Google Sheets with separate columns and a blank Notes column."
+        : "Run a map search before exporting.";
+    }
+
+    function exportCsv() {
+      const elements = exportRows();
+      if (!elements.length) return;
+
+      const headers = [
+        "Company Name", "Primary Category", "Included Categories", "Street Address",
+        "City", "State", "ZIP", "Legal Owner", "Operating Entity", "Phone", "Email",
+        "Website", "Qualification", "Classification Basis", "NAICS Codes", "Source",
+        "Latitude", "Longitude", "Source URL", "Notes",
+      ];
+
+      const rows = elements.map((element) => {
+        const tags = tagsFor(element);
+        const center = element.center || element;
+        const primary = String(tags["fuel_iq:facility_type"] || "distributor").trim();
+        const categories = categoriesFor(tags);
+        return [
+          tags.name || tags.operator || tags.owner || "Fuel distribution facility",
+          TYPE_LABELS[primary] || "Fuel distributor",
+          categories.map((value) => TYPE_LABELS[value] || value).join("; "),
+          addressFor(tags),
+          tags["addr:city"] || tags["addr:town"] || tags["addr:village"] || "",
+          tags["addr:state"] || "",
+          tags["addr:postcode"] || "",
+          tags.owner || tags["owner:name"] || "",
+          tags.operator || tags["operator:name"] || "",
+          tags.phone || tags["contact:phone"] || tags["contact:mobile"] || "",
+          tags.email || tags["contact:email"] || "",
+          tags.website || tags["contact:website"] || tags.url || "",
+          tags["fuel_iq:qualification"] || "",
+          tags["fuel_iq:classification_basis"] || "",
+          tags["fuel_iq:naics_codes"] || tags.naics || tags["naics:code"] || "",
+          element.source_name || tags["fuel_iq:source"] || "",
+          Number.isFinite(Number(center?.lat)) ? Number(center.lat) : "",
+          Number.isFinite(Number(center?.lon)) ? Number(center.lon) : "",
+          sourceUrlFor(element),
+          "",
+        ];
+      });
+
+      const csv = "\uFEFF" + [headers, ...rows]
+        .map((row) => row.map(csvValue).join(","))
+        .join("\r\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const category = activeCategory();
+      const date = new Date().toISOString().slice(0, 10);
+      link.href = url;
+      link.download = `fuel-distributor-atlas-${category}-${date}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function installExportControls() {
+      const filters = document.getElementById("filters");
+      if (!filters || document.getElementById("exportAtlasCsv")) return;
+
+      const wrapper = document.createElement("div");
+      wrapper.style.marginTop = "12px";
+      wrapper.innerHTML = `
+        <button id="exportAtlasCsv" type="button" disabled
+          style="width:100%;border:0;border-radius:10px;padding:11px 13px;background:#0b6e9c;color:#fff;font-weight:900;cursor:pointer;">
+          Export Loaded List to CSV
+        </button>
+        <p id="exportAtlasHelp" class="empty" style="margin:7px 1px 0;">Run a map search before exporting.</p>`;
+      filters.insertAdjacentElement("afterend", wrapper);
+      document.getElementById("exportAtlasCsv").addEventListener("click", exportCsv);
+      filters.addEventListener("click", () => window.setTimeout(updateExportButton, 0));
+    }
+
+    const originalFetch = window.fetch.bind(window);
+    window.fetch = async (...args) => {
+      const response = await originalFetch(...args);
+      const requestUrl = String(args[0]?.url || args[0] || "");
+      if (response.ok && requestUrl.includes("/api/fuel-atlas/search")) {
+        response.clone().json().then((payload) => {
+          latestElements = Array.isArray(payload?.elements) ? payload.elements : [];
+          updateExportButton();
+        }).catch(() => {});
+      }
+      return response;
+    };
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", installExportControls, { once: true });
+    } else {
+      installExportControls();
+    }
+  })();
+  </script>
   <script src="/fuel-atlas.js?v=verified-distributor-categories-v3"></script>
 </body>
 </html>
