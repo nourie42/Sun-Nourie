@@ -29,6 +29,7 @@
     .section{padding:18px;border-bottom:1px solid var(--line)}.eyebrow{margin:0 0 5px;color:var(--blue);font-size:11px;font-weight:850;text-transform:uppercase;letter-spacing:.1em}
     .section h1,.section h2{margin:0}.section h1{font-size:24px}.section h2{font-size:16px}
     .notice{margin-top:12px;padding:11px;border-radius:10px;background:#fff8e7;border:1px solid #efd894;color:#6d5316;font-size:12px;line-height:1.48}.notice strong{color:#49360c}
+    .category-warning{margin:12px 0 0;padding:12px 13px;border:2px solid #c62828;border-radius:10px;background:#fff1f1;color:#c62828;font-size:14px;font-weight:900;line-height:1.45}
     .search-help{margin:11px 0 0;color:var(--muted);font-size:12px;line-height:1.45}.quick-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
     .secondary{border:1px solid var(--line);background:#fff;border-radius:10px;padding:10px 11px;color:#29475d;font-size:12px;font-weight:800;cursor:pointer}.secondary:hover{border-color:#7eb6d2;background:#f7fbfd}
     .metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}.metric{padding:10px;border:1px solid var(--line);border-radius:10px;background:#f8fbfd}.metric strong{display:block;font-size:20px}.metric span{font-size:10px;color:var(--muted);text-transform:uppercase}
@@ -47,7 +48,7 @@
     .detail-body{padding:18px}.badge{display:inline-flex;border-radius:999px;background:#eaf6fc;color:#0b658f;padding:6px 9px;font-size:10px;font-weight:850;text-transform:uppercase;letter-spacing:.05em}.detail-body h2{font-size:25px;margin:12px 0 6px}.address{color:var(--muted);line-height:1.45}
     .detail-block{margin-top:20px;padding-top:16px;border-top:1px solid var(--line)}.detail-block h3{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#637789}.detail-row{margin:10px 0}.detail-row label{display:block;font-size:10px;color:var(--muted);text-transform:uppercase}.detail-row a,.detail-block>a{color:#0b6e9c;overflow-wrap:anywhere}.empty{color:var(--muted);font-size:12px;line-height:1.55}
     @media(max-width:1100px){.workspace,.workspace.detail-open{grid-template-columns:330px minmax(0,1fr)}.details{position:fixed;right:0;top:70px;bottom:0;width:min(390px,92vw);z-index:1200}.navlink{display:none}.loading-card strong{font-size:23px}}
-    @media(max-width:720px){.app{grid-template-rows:116px 1fr}.topbar{height:116px;display:grid;grid-template-columns:1fr auto;grid-template-rows:54px 52px;padding:3px 10px 7px}.brand{grid-column:1}.place-search{grid-column:1/-1;grid-row:2;width:100%;max-width:none;margin:0}.workspace,.workspace.detail-open{grid-template-columns:1fr}.sidebar{position:absolute;left:8px;top:124px;bottom:10px;width:min(330px,88vw);z-index:900;border-radius:14px;box-shadow:var(--shadow)}.details{top:116px}.reload{top:10px;font-size:13px}.mapstatus{bottom:10px;font-size:12px;border-radius:14px}.title{display:block}.loading-card{padding:25px 18px}.radar{width:120px;height:120px}}
+    @media(max-width:720px){.app{grid-template-rows:116px 1fr}.topbar{height:116px;display:grid;grid-template-columns:1fr auto;grid-template-rows:54px 52px;padding:3px 10px 7px}.brand{grid-column:1}.place-search{grid-column:1/-1;grid-row:2;width:100%;max-width:none;margin:0}.workspace,.workspace.detail-open{grid-template-columns:1fr}.sidebar{position:absolute;left:8px;top:124px;bottom:10px;width:min(330px,88vw);z-index:900;border-radius:14px;box-shadow:var(--shadow)}.details{top:116px}.reload{top:10px;font-size:13px}.mapstatus{bottom:10px;font-size:12px;border-radius:14px}.title{display:block}.loading-card{padding:25px 18px}.radar{width:120px;height:120px}.category-warning{font-size:13px}}
     @media(prefers-reduced-motion:reduce){.radar{animation-duration:5s}}
   </style>
 </head>
@@ -84,6 +85,7 @@
         <section class="section">
           <p class="eyebrow">Facility type</p>
           <h2>Filter corrected categories</h2>
+          <div class="category-warning" role="note">IMPORTANT: Many fuel distributors may appear under another category based on their official industry designation. Check Heating oil, Bulk plants, Terminals / depots, and Propane in addition to Distributors.</div>
           <div id="filters" class="filters">
             <button class="filter active" type="button" data-type="all">All locations</button>
             <button class="filter" type="button" data-type="distributor">Distributors</button>
