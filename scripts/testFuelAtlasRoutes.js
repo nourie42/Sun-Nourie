@@ -13,7 +13,7 @@ function makeResponse() {
 }
 
 const routes = new Map();
-registerFuelAtlasRoutes({ get(path, handler) { routes.set(path, handler); } });
+registerFuelAtlasRoutes({ get(route, handler) { routes.set(route, handler); } });
 assert.ok(routes.has("/api/fuel-atlas/search"));
 assert.ok(routes.has("/api/fuel-atlas/geocode"));
 
@@ -24,40 +24,24 @@ assert.equal(tooLargeResponse.payload.code, "AREA_TOO_LARGE");
 
 const originalFetch = globalThis.fetch;
 let overpassCalls = 0;
-let frsCalls = 0;
+let echoCalls = 0;
 globalThis.fetch = async (input) => {
   const url = String(input);
   if (url.includes("overpass")) {
     overpassCalls += 1;
     return new Response("busy", { status: 503 });
   }
-  if (url.includes("frs_rest_services.get_facilities")) {
-    frsCalls += 1;
+  if (url.includes("echogeo.epa.gov")) {
+    echoCalls += 1;
     return new Response(JSON.stringify({
-      Results: {
-        FRSFacility: [
-          {
-            RegistryId: "110000000001",
-            FacilityName: "Philadelphia Petroleum Terminal",
-            LocationAddress: "100 Terminal Ave",
-            CityName: "Philadelphia",
-            StateAbbr: "PA",
-            ZipCode: "19148",
-            Latitude83: "39.91",
-            Longitude83: "-75.14",
-          },
-          {
-            RegistryId: "110000000002",
-            FacilityName: "Quick Stop Gas Station",
-            LocationAddress: "200 Retail Rd",
-            CityName: "Philadelphia",
-            StateAbbr: "PA",
-            ZipCode: "19147",
-            Latitude83: "39.92",
-            Longitude83: "-75.16",
-          },
-        ],
-      },
+      exceededTransferLimit: false,
+      features: [
+        { attributes: { REGISTRY_ID: "1101", FAC_NAME: "Carolina Petroleum Distributors", FAC_STREET: "100 Distribution Way", FAC_CITY: "Raleigh", FAC_STATE: "NC", FAC_ZIP: "27601", FAC_LAT: 35.78, FAC_LONG: -78.64, FAC_NAICS_CODES: "424720", DFR_URL: "https://echo.epa.gov/1101" } },
+        { attributes: { REGISTRY_ID: "1102", FAC_NAME: "PETRO MART #9", FAC_STREET: "133 Hillsboro Street", FAC_CITY: "Pittsboro", FAC_STATE: "NC", FAC_ZIP: "27312", FAC_LAT: 35.72, FAC_LONG: -79.18, FAC_NAICS_CODES: "424720,457110" } },
+        { attributes: { REGISTRY_ID: "1103", FAC_NAME: "ADMIRAL PETROLEUM #5390-TREATMENT PLANT #1", FAC_CITY: "Raleigh", FAC_STATE: "NC", FAC_LAT: 35.80, FAC_LONG: -78.60, FAC_NAICS_CODES: "424720" } },
+        { attributes: { REGISTRY_ID: "1104", FAC_NAME: "Triangle Petroleum Bulk Terminal", FAC_STREET: "200 Terminal Road", FAC_CITY: "Cary", FAC_STATE: "NC", FAC_ZIP: "27513", FAC_LAT: 35.79, FAC_LONG: -78.78, FAC_NAICS_CODES: "424710" } },
+        { attributes: { REGISTRY_ID: "1105", FAC_NAME: "Random Warehouse", FAC_CITY: "Durham", FAC_STATE: "NC", FAC_LAT: 35.99, FAC_LONG: -78.90, FAC_NAICS_CODES: "493110" } },
+      ],
     }), { status: 200, headers: { "content-type": "application/json" } });
   }
   throw new Error(`Unexpected URL ${url}`);
@@ -65,17 +49,17 @@ globalThis.fetch = async (input) => {
 
 try {
   const response = makeResponse();
-  await routes.get("/api/fuel-atlas/search")({ query: { south: "39.7", west: "-75.5", north: "40.2", east: "-74.9", zoom: "10" } }, response);
+  await routes.get("/api/fuel-atlas/search")({ query: { south: "35.2", west: "-79.5", north: "36.2", east: "-78.0", zoom: "9" } }, response);
   assert.equal(response.statusCode, 200);
   assert.equal(response.payload.ok, true);
-  assert.equal(response.payload.elements.length, 1, "retail gas station should be removed while terminal remains");
-  assert.equal(response.payload.elements[0].tags.name, "Philadelphia Petroleum Terminal");
-  assert.ok(response.payload.sources.includes("EPA Facility Registry Service"));
-  assert.equal(response.payload.partial, true, "EPA results should still be returned when Overpass is unavailable");
+  assert.equal(response.payload.filterVersion, "verified-distributors-v2");
+  assert.deepEqual(response.payload.elements.map((item) => item.tags.name).sort(), ["Carolina Petroleum Distributors", "Triangle Petroleum Bulk Terminal"]);
+  assert.ok(response.payload.sources.includes("EPA ECHO / FRS NAICS"));
+  assert.equal(response.payload.partial, true, "ECHO results should survive an Overpass outage");
   assert.ok(overpassCalls >= 1);
-  assert.equal(frsCalls, 7);
+  assert.equal(echoCalls, 1);
 } finally {
   globalThis.fetch = originalFetch;
 }
 
-console.log("Fuel Atlas route tests passed.");
+console.log("Fuel Atlas distributors-only route tests passed.");
