@@ -1,13 +1,14 @@
 (() => {
   "use strict";
 
-  const MIN_SEARCH_ZOOM = 7;
-  const MAX_LAT_SPAN = 9;
-  const MAX_LON_SPAN = 15;
-  const MAX_BBOX_AREA = 110;
-  const INITIAL_CENTER = [40.9, -77.7];
-  const INITIAL_ZOOM = 8;
-  const LIST_LIMIT = 250;
+  const MIN_SEARCH_ZOOM = 8;
+  const MAX_LAT_SPAN = 5;
+  const MAX_LON_SPAN = 8;
+  const MAX_BBOX_AREA = 28;
+  const INITIAL_CENTER = [40.2732, -76.8867];
+  const INITIAL_ZOOM = 10;
+  const LIST_LIMIT = 300;
+  const CLIENT_SEARCH_TIMEOUT_MS = 20000;
 
   const els = {
     workspace: document.getElementById("workspace"),
@@ -28,6 +29,9 @@
     close: document.getElementById("close"),
     resultTitle: document.getElementById("resultTitle"),
     searchHelp: document.getElementById("searchHelp"),
+    searchOverlay: document.getElementById("searchOverlay"),
+    searchingTitle: document.getElementById("searchingTitle"),
+    searchingDetail: document.getElementById("searchingDetail"),
   };
 
   if (typeof L === "undefined" || !document.getElementById("map")) {
@@ -62,11 +66,20 @@
     els.status.dataset.tone = tone;
   }
 
+  function setSearching(active, title = "Searching public fuel-location sources…", detail = "") {
+    if (!els.searchOverlay) return;
+    els.searchOverlay.hidden = !active;
+    els.searchOverlay.setAttribute("aria-hidden", active ? "false" : "true");
+    document.body.setAttribute("aria-busy", active ? "true" : "false");
+    if (title && els.searchingTitle) els.searchingTitle.textContent = title;
+    if (els.searchingDetail) els.searchingDetail.textContent = detail || "Checking distributor, heating-oil, bulk-plant, terminal and propane records. Gas stations are excluded.";
+  }
+
   function typeLabel(type) {
     return ({
       distributor: "Fuel distributor",
       heating_oil: "Heating oil company",
-      bulk_plant: "Bulk plant",
+      bulk_plant: "Bulk plant / cardlock",
       terminal: "Terminal / depot",
       propane: "Propane distributor",
     })[type] || "Fuel business";
@@ -82,7 +95,7 @@
     })[type] || "#1976a8";
   }
 
-  function classify(tags) {
+  function classify(tags = {}) {
     const text = [
       tags.name,
       tags.operator,
@@ -98,14 +111,14 @@
       tags.landuse,
     ].filter(Boolean).join(" ").toLowerCase();
 
-    if (/heating[ _-]?oil|home heating|fuel oil/.test(text)) return "heating_oil";
+    if (/heating[ _-]?oil|home heating|fuel[ _-]?oil/.test(text)) return "heating_oil";
     if (/propane|\blpg\b/.test(text)) return "propane";
     if (/terminal|tank[ _-]?farm|storage terminal|fuel depot|oil depot/.test(text)) return "terminal";
-    if (/bulk plant|bulk fuel|petroleum bulk|cardlock/.test(text)) return "bulk_plant";
+    if (/bulk(?:\s+(?:fuel|oil|petroleum|plant|storage))?|cardlock|commercial fuel|fleet fuel/.test(text)) return "bulk_plant";
     return "distributor";
   }
 
-  function addressLine(tags) {
+  function addressLine(tags = {}) {
     return [tags["addr:housenumber"], tags["addr:street"]].filter(Boolean).join(" ") || tags["addr:full"] || "";
   }
 
@@ -116,22 +129,41 @@
     return `https://www.openstreetmap.org/?mlat=${encodeURIComponent(lat)}&mlon=${encodeURIComponent(lon)}#map=17/${encodeURIComponent(lat)}/${encodeURIComponent(lon)}`;
   }
 
-  function normalize(element) {
-    const tags = element.tags || {};
-    const center = element.center || element;
+  function normalizeRecord(item) {
+    if (!item) return null;
+    if (item.source && Number.isFinite(Number(item.lat)) && Number.isFinite(Number(item.lon))) {
+      return {
+        id: String(item.id || `${item.source}-${item.lat}-${item.lon}-${item.name || "facility"}`),
+        name: String(item.name || item.operator || item.owner || "Fuel distribution facility"),
+        owner: String(item.owner || ""),
+        operator: String(item.operator || ""),
+        phone: String(item.phone || ""),
+        email: String(item.email || ""),
+        website: String(item.website || ""),
+        street: String(item.street || ""),
+        city: String(item.city || ""),
+        state: String(item.state || ""),
+        zip: String(item.zip || ""),
+        lat: Number(item.lat),
+        lon: Number(item.lon),
+        type: item.type || "distributor",
+        source: String(item.source || "Public source"),
+        sourceUrl: String(item.sourceUrl || ""),
+        sources: Array.isArray(item.sources) ? item.sources : [{ name: item.source || "Public source", url: item.sourceUrl || "" }],
+      };
+    }
+
+    const tags = item.tags || {};
+    const center = item.center || item;
     const lat = Number(center.lat);
     const lon = Number(center.lon);
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-
     const owner = tags.owner || tags["owner:name"] || "";
     const operator = tags.operator || tags["operator:name"] || "";
-    const name = tags.name || operator || tags.brand || owner || "Fuel storage or distribution facility";
-    const meaningful = Boolean(tags.name || operator || owner || tags.brand || tags.shop || tags.office || tags.industrial || tags.landuse);
-    if (!meaningful) return null;
-
+    const url = sourceUrl(item, lat, lon);
     return {
-      id: `${element.type || "feature"}-${element.id || `${lat}-${lon}`}`,
-      name,
+      id: `${item.type || "feature"}-${item.id || `${lat}-${lon}`}`,
+      name: tags.name || operator || tags.brand || owner || "Fuel distribution facility",
       owner,
       operator,
       phone: tags.phone || tags["contact:phone"] || tags["contact:mobile"] || "",
@@ -144,8 +176,9 @@
       lat,
       lon,
       type: classify(tags),
-      sourceUrl: sourceUrl(element, lat, lon),
-      tags,
+      source: "OpenStreetMap",
+      sourceUrl: url,
+      sources: [{ name: "OpenStreetMap", url }],
     };
   }
 
@@ -174,6 +207,15 @@
       : `<span>${escapeHtml(value)}</span>`}</div>`;
   }
 
+  function sourceRows(record) {
+    const sources = Array.isArray(record.sources) && record.sources.length
+      ? record.sources
+      : [{ name: record.source || "Public source", url: record.sourceUrl || "" }];
+    return sources.map((source) => source.url
+      ? `<li><a href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(source.name || "Open source record")}</a></li>`
+      : `<li>${escapeHtml(source.name || "Public source")}</li>`).join("");
+  }
+
   function openDetails(record) {
     els.details.hidden = false;
     els.workspace.classList.add("detail-open");
@@ -195,9 +237,9 @@
         ${detailRow("Website", record.website, record.website ? normalizeLink(record.website) : "")}
       </div>
       <div class="detail-block">
-        <h3>Source</h3>
-        <p class="empty">OpenStreetMap public business and facility tags. Owner and contact fields are shown only when the source explicitly supplies them.</p>
-        <a href="${escapeHtml(record.sourceUrl)}" target="_blank" rel="noopener noreferrer">Open source record</a>
+        <h3>Sources</h3>
+        <p class="empty">Owner and contact fields appear only when a public source explicitly supplies them. Missing fields are not inferred.</p>
+        <ul class="source-list">${sourceRows(record)}</ul>
       </div>`;
   }
 
@@ -213,7 +255,7 @@
     if (!items.length) {
       els.results.innerHTML = records.length
         ? '<p class="empty">No loaded locations match the current filter.</p>'
-        : '<p class="empty">No public distributor, heating-oil, bulk-plant, terminal, or propane records were found in this area. Try a nearby city or a slightly wider regional view.</p>';
+        : '<p class="empty">No specialized distributor, heating-oil, bulk-plant, terminal, cardlock, or propane records were returned for this exact map view. Gas stations are intentionally excluded.</p>';
       return;
     }
 
@@ -263,15 +305,15 @@
     els.reload.textContent = readiness.ready ? "Search this map area" : "Zoom in to search";
     els.reload.classList.toggle("needs-zoom", !readiness.ready);
     els.searchHelp.textContent = readiness.ready
-      ? "This view is small enough for a detailed public-source search."
+      ? "This view is ready for a focused distributor and fuel-facility search. Ordinary gas stations are excluded."
       : `Searches work at zoom ${MIN_SEARCH_ZOOM} or closer. Find a city/state above, use your location, or zoom in.`;
   }
 
-  async function fetchJson(url, timeoutMs = 50000) {
+  async function fetchJson(url, timeoutMs = CLIENT_SEARCH_TIMEOUT_MS) {
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const response = await fetch(url, { headers: { Accept: "application/json" }, signal: controller.signal });
+      const response = await fetch(url, { headers: { Accept: "application/json" }, signal: controller.signal, cache: "no-store" });
       const text = await response.text();
       let payload = null;
       try { payload = text ? JSON.parse(text) : null; } catch {}
@@ -288,9 +330,16 @@
   }
 
   function showAreaTooLarge() {
+    setSearching(false);
     setStatus("Choose a city/state or zoom in before searching.", "warning");
     els.results.innerHTML = `<p class="empty"><strong>This map view is too large for a dependable detailed search.</strong><br>Enter a city, state, ZIP code, or address above; use “My location”; or zoom to level ${MIN_SEARCH_ZOOM}+.</p>`;
     els.placeSearch.focus();
+  }
+
+  function successfulSourceNames(payload) {
+    return (payload?.sourceSummary || [])
+      .filter((source) => source.status === "ok" && Number(source.count) >= 0)
+      .map((source) => source.name);
   }
 
   async function loadArea({ fitResults = false } = {}) {
@@ -318,39 +367,57 @@
     els.locate.disabled = true;
     els.reload.textContent = "Searching…";
     setStatus("Searching public fuel-location sources…", "loading");
+    setSearching(
+      true,
+      "Searching public fuel-location sources…",
+      "Checking fuel distributors, heating-oil companies, bulk plants, terminals, depots, cardlocks and propane suppliers. Gas stations are excluded.",
+    );
 
     try {
       const payload = await fetchJson(`/api/fuel-atlas/search?${params.toString()}`);
       if (requestId !== requestSequence) return;
       const seen = new Set();
-      records = (payload?.elements || [])
-        .map(normalize)
+      records = (payload?.records || payload?.elements || [])
+        .map(normalizeRecord)
         .filter((record) => record && !seen.has(record.id) && seen.add(record.id));
       textFilter = "";
       render();
+
       if (fitResults && records.length) {
         const boundsForResults = L.latLngBounds(records.map((record) => [record.lat, record.lon]));
         if (boundsForResults.isValid()) map.fitBounds(boundsForResults.pad(0.12), { maxZoom: 12 });
       }
-      const suffix = payload?.cached ? " (cached)" : "";
-      const truncation = payload?.truncated ? " Result cap reached—zoom in for complete local detail." : "";
-      setStatus(`${records.length.toLocaleString()} public fuel-related records loaded${suffix}.${truncation}`, payload?.truncated ? "warning" : "success");
+
+      const elapsedSeconds = Number(payload?.durationMs) > 0 ? ` in ${(Number(payload.durationMs) / 1000).toFixed(1)}s` : "";
+      const sourceNames = successfulSourceNames(payload);
+      const sourceText = sourceNames.length ? ` Sources: ${sourceNames.join(", ")}.` : "";
+      const cacheText = payload?.stale ? " Using the most recent cached results." : payload?.cached ? " Cached result." : "";
+      if (records.length) {
+        const warningText = payload?.partial ? " Some public sources were unavailable, but completed sources are shown." : "";
+        setStatus(`${records.length.toLocaleString()} specialized fuel locations loaded${elapsedSeconds}.${sourceText}${cacheText}${warningText}`, payload?.partial ? "warning" : "success");
+      } else if (sourceNames.length) {
+        setStatus(`Search completed${elapsedSeconds}; no specialized fuel locations were returned in this exact view. Gas stations were excluded.${sourceText}`, "warning");
+      } else {
+        setStatus("The search completed, but no public source returned data. Retry shortly or move the map a few miles.", "error");
+        els.results.innerHTML = '<p class="empty"><strong>No source returned usable data.</strong><br>The request ended without hanging. Retry once, or move to a nearby city and search again.</p>';
+      }
     } catch (error) {
       if (requestId !== requestSequence) return;
       records = [];
       render();
       if (error?.name === "AbortError") {
-        setStatus("Search timed out. Try a smaller nearby area.", "error");
-        els.results.innerHTML = '<p class="empty">The public map source took too long to respond. Zoom in one level and retry.</p>';
+        setStatus("Fuel IQ did not receive the server response. Retry this exact area.", "error");
+        els.results.innerHTML = '<p class="empty"><strong>The Fuel IQ server did not answer within 20 seconds.</strong><br>The public-source calls are capped server-side; retry once after the deployment has fully restarted.</p>';
       } else if (error?.code === "AREA_TOO_LARGE") {
         showAreaTooLarge();
       } else {
-        setStatus(error?.message || "Search failed. Retry in a smaller area.", "error");
-        els.results.innerHTML = `<p class="empty"><strong>Search could not be completed.</strong><br>${escapeHtml(error?.message || "The public source may be temporarily busy.")}</p>`;
+        setStatus(error?.message || "Search failed. Retry this area.", "error");
+        els.results.innerHTML = `<p class="empty"><strong>Search could not be completed.</strong><br>${escapeHtml(error?.message || "The search service may still be restarting.")}</p>`;
       }
     } finally {
       if (requestId === requestSequence) {
         loading = false;
+        setSearching(false);
         els.reload.disabled = false;
         els.placeButton.disabled = false;
         els.locate.disabled = false;
@@ -369,20 +436,23 @@
 
     els.placeButton.disabled = true;
     setStatus(`Finding ${value}…`, "loading");
+    setSearching(true, "Finding the requested map area…", `Locating ${value} before searching the specialized fuel-location sources.`);
     try {
-      const payload = await fetchJson(`/api/fuel-atlas/geocode?q=${encodeURIComponent(value)}`, 30000);
+      const payload = await fetchJson(`/api/fuel-atlas/geocode?q=${encodeURIComponent(value)}`, 12000);
       const result = payload?.result;
       if (!result || !Number.isFinite(Number(result.lat)) || !Number.isFinite(Number(result.lon))) throw new Error("No matching U.S. location was found.");
 
-      map.setView([Number(result.lat), Number(result.lon)], 10);
+      map.setView([Number(result.lat), Number(result.lon)], 11);
       els.placeSearch.value = result.label || value;
       setStatus(`Searching around ${result.label || value}…`, "loading");
       await loadArea({ fitResults: false });
     } catch (error) {
+      setSearching(false);
       setStatus(error?.message || "Location could not be found.", "error");
       els.results.innerHTML = `<p class="empty">${escapeHtml(error?.message || "No matching U.S. location was found.")}</p>`;
     } finally {
       els.placeButton.disabled = false;
+      if (!loading) setSearching(false);
     }
   }
 
@@ -393,12 +463,14 @@
     }
     els.locate.disabled = true;
     setStatus("Requesting your location…", "loading");
+    setSearching(true, "Finding your location…", "Your browser is locating the map area before the fuel-facility search begins.");
     navigator.geolocation.getCurrentPosition(async (position) => {
-      map.setView([position.coords.latitude, position.coords.longitude], 10);
+      map.setView([position.coords.latitude, position.coords.longitude], 11);
       setStatus("Searching around your location…", "loading");
       els.locate.disabled = false;
       await loadArea();
     }, (error) => {
+      setSearching(false);
       els.locate.disabled = false;
       setStatus(error.code === error.PERMISSION_DENIED ? "Location permission was declined. Search a city or state instead." : "Your location could not be determined.", "error");
     }, { enableHighAccuracy: false, timeout: 12000, maximumAge: 10 * 60 * 1000 });
@@ -413,6 +485,7 @@
   els.locate.addEventListener("click", useCurrentLocation);
   els.resetView.addEventListener("click", () => {
     requestSequence += 1;
+    setSearching(false);
     map.setView([39.8283, -98.5795], 4);
     records = [];
     render();
@@ -431,7 +504,7 @@
   els.placeForm.addEventListener("submit", (event) => {
     event.preventDefault();
     const query = els.placeSearch.value.trim();
-    const localMatches = visibleRecords().filter((record) => [record.name, record.owner, record.operator].join(" ").toLowerCase().includes(query.toLowerCase()));
+    const localMatches = records.filter((record) => [record.name, record.owner, record.operator].join(" ").toLowerCase().includes(query.toLowerCase()));
     if (query && localMatches.length) {
       const first = localMatches[0];
       map.setView([first.lat, first.lon], 14);
@@ -459,5 +532,6 @@
 
   updateSearchButton();
   setStatus("Loading the starting region…", "loading");
-  window.setTimeout(() => loadArea(), 100);
+  setSearching(true, "Searching public fuel-location sources…", "Loading distributors, heating-oil companies, bulk plants, terminals, depots, cardlocks and propane suppliers around Harrisburg. Gas stations are excluded.");
+  window.setTimeout(() => loadArea(), 150);
 })();
