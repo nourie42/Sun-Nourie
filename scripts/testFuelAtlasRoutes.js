@@ -23,30 +23,57 @@ assert.equal(tooLargeResponse.statusCode, 422);
 assert.equal(tooLargeResponse.payload.code, "AREA_TOO_LARGE");
 
 const originalFetch = globalThis.fetch;
-let calls = 0;
-const submittedQueries = [];
-globalThis.fetch = async (_url, init = {}) => {
-  calls += 1;
-  const encoded = String(init.body || "").replace(/^data=/, "");
-  submittedQueries.push(decodeURIComponent(encoded));
-  if (calls === 1) return new Response("busy", { status: 503 });
-  return new Response(JSON.stringify({
-    elements: [
-      { type: "node", id: 1, lat: 40.1, lon: -76.2, tags: { name: "Retail Gas Station", amenity: "fuel" } },
-      { type: "way", id: 2, center: { lat: 40.2, lon: -76.3 }, tags: { name: "Test Bulk Plant", industrial: "bulk_plant", operator: "Test Petroleum" } },
-    ],
-  }), { status: 200, headers: { "content-type": "application/json" } });
+let overpassCalls = 0;
+let frsCalls = 0;
+globalThis.fetch = async (input) => {
+  const url = String(input);
+  if (url.includes("overpass")) {
+    overpassCalls += 1;
+    return new Response("busy", { status: 503 });
+  }
+  if (url.includes("frs_rest_services.get_facilities")) {
+    frsCalls += 1;
+    return new Response(JSON.stringify({
+      Results: {
+        FRSFacility: [
+          {
+            RegistryId: "110000000001",
+            FacilityName: "Philadelphia Petroleum Terminal",
+            LocationAddress: "100 Terminal Ave",
+            CityName: "Philadelphia",
+            StateAbbr: "PA",
+            ZipCode: "19148",
+            Latitude83: "39.91",
+            Longitude83: "-75.14",
+          },
+          {
+            RegistryId: "110000000002",
+            FacilityName: "Quick Stop Gas Station",
+            LocationAddress: "200 Retail Rd",
+            CityName: "Philadelphia",
+            StateAbbr: "PA",
+            ZipCode: "19147",
+            Latitude83: "39.92",
+            Longitude83: "-75.16",
+          },
+        ],
+      },
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  }
+  throw new Error(`Unexpected URL ${url}`);
 };
 
 try {
   const response = makeResponse();
-  await routes.get("/api/fuel-atlas/search")({ query: { south: "39", west: "-80", north: "42", east: "-74", zoom: "8" } }, response);
+  await routes.get("/api/fuel-atlas/search")({ query: { south: "39.7", west: "-75.5", north: "40.2", east: "-74.9", zoom: "10" } }, response);
   assert.equal(response.statusCode, 200);
   assert.equal(response.payload.ok, true);
-  assert.equal(response.payload.elements.length, 1, "retail gas stations should be removed from returned results");
-  assert.equal(response.payload.elements[0].tags.name, "Test Bulk Plant");
-  assert.ok(calls >= 2, "the route should fall through when the first public-map provider fails");
-  assert.ok(submittedQueries.every((query) => !query.includes('["amenity"="fuel"]')), "provider queries must never request retail gas stations");
+  assert.equal(response.payload.elements.length, 1, "retail gas station should be removed while terminal remains");
+  assert.equal(response.payload.elements[0].tags.name, "Philadelphia Petroleum Terminal");
+  assert.ok(response.payload.sources.includes("EPA Facility Registry Service"));
+  assert.equal(response.payload.partial, true, "EPA results should still be returned when Overpass is unavailable");
+  assert.ok(overpassCalls >= 1);
+  assert.equal(frsCalls, 7);
 } finally {
   globalThis.fetch = originalFetch;
 }

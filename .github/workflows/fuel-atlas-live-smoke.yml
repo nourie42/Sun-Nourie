@@ -1,0 +1,29 @@
+name: Fuel Atlas Live Smoke
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "public/fuel-atlas.html"
+      - "public/fuel-atlas.js"
+      - "src/fuelAtlasRoutes.js"
+      - "scripts/smokeFuelAtlasLive.js"
+      - ".github/workflows/fuel-atlas-live-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  live-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Wait for Render and test live Fuel Atlas
+        env:
+          FUEL_ATLAS_LIVE_URL: https://sun-nourie-live.onrender.com
+        run: node scripts/smokeFuelAtlasLive.js
