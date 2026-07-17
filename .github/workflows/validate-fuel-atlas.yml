@@ -48,12 +48,19 @@ jobs:
           node --check src/fuelAtlasRoutes.js
           node --check src/fuelAtlasLocationCompanyBridge.js
           node --check public/fuel-atlas.js
+          node --check scripts/validateFuelAtlas.js
           node --check scripts/testFuelAtlasCompanyLookup.js
           node --check scripts/testFuelAtlasLocationCompanyBridge.js
           node --check scripts/smokeFuelAtlasLive.js
           node --check scripts/testFuelAtlasSourceIntegration.js
-      - name: Validate Fuel Atlas structure
-        run: node scripts/validateFuelAtlas.js
+      - name: Validate corporate directory example
+        run: node scripts/validateFuelAtlas.js corporate
+      - name: Validate map bounds and source query
+        run: node scripts/validateFuelAtlas.js query
+      - name: Validate facility classification
+        run: node scripts/validateFuelAtlas.js classification
+      - name: Validate Fuel Atlas UI integration
+        run: node scripts/validateFuelAtlas.js ui
       - name: Validate Fuel Atlas route behavior
         run: node scripts/testFuelAtlasRoutes.js
       - name: Validate nationwide company-name lookup
