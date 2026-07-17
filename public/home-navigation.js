@@ -14,21 +14,21 @@
         display:inline-flex!important;
         align-items:center!important;
         justify-content:center!important;
-        min-width:286px!important;
-        min-height:76px!important;
-        padding:14px 26px!important;
+        min-width:0!important;
+        min-height:46px!important;
+        padding:11px 18px!important;
         border:2px solid #ffe08a!important;
-        border-radius:20px!important;
+        border-radius:12px!important;
         background:linear-gradient(135deg,#fbbf24 0%,#f59e0b 55%,#ea580c 100%)!important;
         color:#071522!important;
-        font-size:24px!important;
-        font-weight:950!important;
-        line-height:1!important;
+        font-size:16px!important;
+        font-weight:900!important;
+        line-height:1.1!important;
         letter-spacing:.01em!important;
         text-decoration:none!important;
         text-align:center!important;
         white-space:nowrap!important;
-        box-shadow:0 0 0 3px rgba(251,191,36,.18),0 10px 26px rgba(245,158,11,.38)!important;
+        box-shadow:0 0 0 2px rgba(251,191,36,.14),0 8px 20px rgba(245,158,11,.28)!important;
         transform:translateY(0);
         transition:transform .16s ease,box-shadow .16s ease,filter .16s ease;
       }
@@ -36,9 +36,9 @@
       #fuelDistributorIntelligenceTop.fiq-matched-tool-link:focus-visible,
       #fuelLocationAtlasTop.fiq-matched-tool-link:hover,
       #fuelLocationAtlasTop.fiq-matched-tool-link:focus-visible {
-        transform:translateY(-2px)!important;
-        filter:brightness(1.08)!important;
-        box-shadow:0 0 0 4px rgba(251,191,36,.28),0 14px 32px rgba(245,158,11,.48)!important;
+        transform:translateY(-1px)!important;
+        filter:brightness(1.06)!important;
+        box-shadow:0 0 0 3px rgba(251,191,36,.22),0 10px 24px rgba(245,158,11,.34)!important;
         outline:none!important;
       }
       .fiq-map-grid.fiq-single-map-layout {
@@ -61,15 +61,35 @@
       .fiq-aadt-map-hidden {
         display:none!important;
       }
+      #gptSummaryPanel {
+        margin:16px 0 4px!important;
+        padding:15px 16px!important;
+        border:1px solid #c8dbe8!important;
+        border-radius:12px!important;
+        background:linear-gradient(180deg,#f5fbff,#eef7fc)!important;
+        color:#20384b!important;
+      }
+      #gptSummaryPanel strong {
+        display:block!important;
+        margin-bottom:7px!important;
+        color:#123f62!important;
+        font-size:13px!important;
+        letter-spacing:.04em!important;
+        text-transform:uppercase!important;
+      }
+      #gptSummaryPanel #summary {
+        color:#39566b!important;
+        font-size:14px!important;
+        line-height:1.55!important;
+      }
       @media(max-width:720px) {
         #fuelDistributorIntelligenceTop.fiq-matched-tool-link,
         #fuelLocationAtlasTop.fiq-matched-tool-link {
-          min-width:0!important;
-          width:100%!important;
-          min-height:54px!important;
-          padding:11px 15px!important;
-          border-radius:14px!important;
-          font-size:17px!important;
+          width:auto!important;
+          min-height:42px!important;
+          padding:9px 13px!important;
+          border-radius:11px!important;
+          font-size:14px!important;
         }
         .fiq-map-grid.fiq-single-map-layout #sv {
           min-height:320px!important;
@@ -105,6 +125,49 @@
     if (streetView) streetView.style.width = '100%';
   }
 
+  function limitAadtTableToFive() {
+    const body = document.querySelector('#aadtTable tbody');
+    if (!body) return;
+    const rows = [...body.querySelectorAll('tr')];
+    if (!rows.length) return;
+
+    const distance = (row) => {
+      const match = String(row.cells?.[0]?.textContent || '').replace(/,/g, '').match(/-?\d+(?:\.\d+)?/);
+      return match ? Number(match[0]) : Number.POSITIVE_INFINITY;
+    };
+    rows.sort((a, b) => distance(a) - distance(b));
+    rows.forEach((row) => body.appendChild(row));
+    rows.slice(5).forEach((row) => row.remove());
+  }
+
+  function moveGptSummaryBelowEstimate() {
+    const estimateCard = document.getElementById('estimateCard');
+    const summary = document.getElementById('summary');
+    if (!estimateCard || !summary) return;
+
+    let panel = document.getElementById('gptSummaryPanel');
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.id = 'gptSummaryPanel';
+      panel.innerHTML = '<strong>GPT Summary</strong>';
+      const hero = estimateCard.querySelector('.hero');
+      if (hero) hero.insertAdjacentElement('afterend', panel);
+      else estimateCard.prepend(panel);
+    }
+    if (summary.parentElement !== panel) panel.appendChild(summary);
+
+    const oldCard = [...document.querySelectorAll('.card')].find((card) =>
+      card !== estimateCard && card.contains(summary) && card !== panel
+    );
+    if (oldCard && oldCard !== estimateCard) oldCard.remove();
+
+    document.querySelectorAll('.card').forEach((card) => {
+      if (card === estimateCard) return;
+      const title = String(card.textContent || '').trim();
+      if (/^Summary \(GPT\)/i.test(title) && !card.contains(summary)) card.remove();
+    });
+  }
+
   function applyNavigation() {
     if (applying) return;
     applying = true;
@@ -112,6 +175,8 @@
       ensureStyles();
       removeAadtQuickLinks();
       applySingleMapLayout();
+      limitAadtTableToFive();
+      moveGptSummaryBelowEstimate();
 
       const header = document.querySelector('header');
       if (!header) return;
