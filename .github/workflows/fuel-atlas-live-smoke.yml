@@ -3,12 +3,14 @@ name: Fuel Atlas live smoke
 on:
   push:
     branches:
+      - main
       - "fix/fuel-atlas-*"
     paths:
       - "src/fuelAtlasFastSearch.js"
       - "scripts/testFuelAtlasFastSearch.js"
       - "scripts/liveFuelAtlasSmoke.js"
       - "server.js"
+      - "package.json"
       - ".github/workflows/fuel-atlas-live-smoke.yml"
   pull_request:
     branches:
@@ -18,6 +20,7 @@ on:
       - "scripts/testFuelAtlasFastSearch.js"
       - "scripts/liveFuelAtlasSmoke.js"
       - "server.js"
+      - "package.json"
       - ".github/workflows/fuel-atlas-live-smoke.yml"
 
 permissions:
