@@ -1,67 +1,810 @@
 {
   "ok": true,
-  "verifiedAt": "2026-07-17T13:11:25.219Z",
-  "verifiedCommit": "9cdc25fdf8c9775773d291770a862cd8f4f81cd2",
+  "verificationRule": "Every result must have NAICS 424710/424720/454310/457210 or an explicit distributor, wholesale, bulk, terminal, heating-oil or propane facility role; retail and unrelated names are rejected.",
+  "filterVersion": "verified-distributors-v2",
+  "verifiedAt": "2026-07-17T13:37:01.263Z",
+  "verifiedCommit": "dc51514e39ee9f9b6a7a46f6c8c4d2252b55d953",
   "liveUrl": "https://sun-nourie-live.onrender.com",
-  "successfulSearches": 5,
-  "attemptedSearches": 5,
-  "totalFacilities": 108,
-  "retailGasStations": 0,
+  "successfulSearches": 6,
+  "attemptedSearches": 6,
+  "totalFacilities": 317,
+  "forbiddenFacilities": 0,
+  "unqualifiedFacilities": 0,
+  "bannedNamesPresent": [],
   "results": [
+    {
+      "metro": "North Carolina Triangle",
+      "ok": true,
+      "count": 17,
+      "forbidden": 0,
+      "unqualified": 0,
+      "elapsedMs": 34,
+      "sources": [
+        "EPA ECHO / FRS NAICS"
+      ],
+      "partial": true,
+      "samples": [
+        {
+          "name": "BLANCHARD BUFFALO SELMA TERMINAL",
+          "codes": [
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "CHARTER TRIAD TERMINALS LIMITED LIABILITY COMPANY",
+          "codes": [
+            "424710",
+            "493190"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "DIXIE APEX TERMINAL",
+          "codes": [
+            "457210",
+            "454312",
+            "424710"
+          ],
+          "qualification": "NAICS 457210, 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "EXXONMOBIL REFINING AND SUPPLY COMPANY",
+          "codes": [
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "GLOBAL APEX TERMINAL",
+          "codes": [
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "HUFFMAN OIL CO. INC.",
+          "codes": [
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "KINDER MORGAN SELMA TERMINAL #4",
+          "codes": [
+            "424710",
+            "493190"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "KINDER MORGAN SELMA TERMINAL III 3",
+          "codes": [
+            "493190",
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "KM SELMA-II DISTILLATE FUELS TERMINAL",
+          "codes": [
+            "493190",
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "MOTIVAENTERPRISES LLC - APEX TERMINAL",
+          "codes": [
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "MPLX TERMINALS LLC - SELMA WEST OAK LP TERMINAL",
+          "codes": [
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "NOBLE OIL SERVICES",
+          "codes": [
+            "423930",
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        }
+      ]
+    },
     {
       "metro": "Philadelphia",
       "ok": true,
-      "count": 13,
-      "retail": 0,
-      "elapsedMs": 63,
+      "count": 30,
+      "forbidden": 0,
+      "unqualified": 0,
+      "elapsedMs": 12735,
       "sources": [
-        "EPA Facility Registry Service"
+        "EPA ECHO / FRS NAICS"
       ],
-      "partial": true
+      "partial": true,
+      "samples": [
+        {
+          "name": "BAKER PETROLITE EDDYSTONE WHSE",
+          "codes": [
+            "424720",
+            "213112"
+          ],
+          "qualification": "NAICS 424720",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "BUCKEYE - PENNSAUKEN TERMINAL",
+          "codes": [
+            "493190",
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "CLEAN HARBORS ENVIRONMENTAL SERVICES INC",
+          "codes": [
+            "424710",
+            "562910",
+            "562112",
+            "562111"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "CONOCO FUELS",
+          "codes": [
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "DELAWARE RIVER PARTNERS",
+          "codes": [
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "E I DUPONT DE NEMOURS - REPAUNO PLANT",
+          "codes": [
+            "311999",
+            "424710",
+            "211112",
+            "325222",
+            "313230"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "EDDYSTONE MARINE AND RAIL TERMINAL COMPANY, LLC",
+          "codes": [
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "ENERGY TRANSFER MARCUS HOOK TERMINAL",
+          "codes": [
+            "221112",
+            "493190",
+            "324110",
+            "424710",
+            "221119",
+            "324191",
+            "325120"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "ENERGY TRANSFER PHILADELPHIA TERMINAL",
+          "codes": [
+            "424710",
+            "493190",
+            "213112"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "ERGON ASPHALT PARTNERS, LP",
+          "codes": [
+            "324121",
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "FJ JANOSKI PETRO CO/EAST NORRITON",
+          "codes": [
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "FORMER BP PAULSBORO TERMINAL NO 4555",
+          "codes": [
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        }
+      ]
     },
     {
       "metro": "Houston",
       "ok": true,
-      "count": 8,
-      "retail": 0,
-      "elapsedMs": 62,
+      "count": 50,
+      "forbidden": 0,
+      "unqualified": 0,
+      "elapsedMs": 12733,
       "sources": [
-        "EPA Facility Registry Service"
+        "EPA ECHO / FRS NAICS"
       ],
-      "partial": true
+      "partial": true,
+      "samples": [
+        {
+          "name": "AJ HURT JR INC DBA THE HURT CO",
+          "codes": [
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "ALMEDA LPG FACILITY",
+          "codes": [
+            "424710",
+            "486990"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "ASHLAND CHEMICAL",
+          "codes": [
+            "424710",
+            "424690",
+            "424720",
+            "325188"
+          ],
+          "qualification": "NAICS 424710, 424720",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "BAYTOWN TERMINAL",
+          "codes": [
+            "457210"
+          ],
+          "qualification": "NAICS 457210",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "BELLE CHASSE MARINE LUBRICANTS",
+          "codes": [
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "CHEVRON GALENA PARK TERMINAL",
+          "codes": [
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "CHEVRON PRODUCTS CO - GALENA PARK TERMINAL",
+          "codes": [
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "DEER PARK RAIL TERMINAL",
+          "codes": [
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "EAST HOUSTON TERMINAL",
+          "codes": [
+            "486910",
+            "424710",
+            "493190"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "GALENA PARK MARINE TERMINAL",
+          "codes": [
+            "424710",
+            "486910",
+            "493190"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "GALENA PARK TERMINAL",
+          "codes": [
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "GALENA PARK TERMINAL",
+          "codes": [
+            "493190",
+            "484110",
+            "493110",
+            "221112",
+            "325199",
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        }
+      ]
     },
     {
       "metro": "Newark / Elizabeth",
       "ok": true,
-      "count": 55,
-      "retail": 0,
-      "elapsedMs": 63,
+      "count": 32,
+      "forbidden": 0,
+      "unqualified": 0,
+      "elapsedMs": 12734,
       "sources": [
-        "EPA Facility Registry Service"
+        "EPA ECHO / FRS NAICS"
       ],
-      "partial": true
+      "partial": true,
+      "samples": [
+        {
+          "name": "ALLIED AVIATION SERVICE CO OF NEW JERSEY INC",
+          "codes": [
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "AMERADA HESS CORP SECAUCUS TERMINAL",
+          "codes": [
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "APPROVED OIL COMPANY OF BROOKLYN INC",
+          "codes": [
+            "454310",
+            "238220",
+            "811411"
+          ],
+          "qualification": "NAICS 454310",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "BP NORTH AMERICA PETROLEUM",
+          "codes": [
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "BROOKLYN TERMINAL - SUNOCO LLC",
+          "codes": [
+            "424710",
+            "493190",
+            "493110",
+            "454311"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "BUCKEYE BAYONNE TERMINAL",
+          "codes": [
+            "424710",
+            "493190"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "BUCKEYE NEWARK TERMINAL",
+          "codes": [
+            "493190",
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "BUCKEYE PORT READING TERMINAL",
+          "codes": [
+            "493190",
+            "324110",
+            "424710",
+            "488119"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "BUCKEYE TERMINALS LLC-BROOKLYN TERMINAL",
+          "codes": [
+            "493190",
+            "424710",
+            "531120",
+            "457210"
+          ],
+          "qualification": "NAICS 424710, 457210",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "BUCKEYE TERMINALS LLC PARCEL 1",
+          "codes": [
+            "424710",
+            "488330"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "C&C BIOFUELS",
+          "codes": [
+            "454310"
+          ],
+          "qualification": "NAICS 454310",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "C&C BIOFUELS LLC",
+          "codes": [
+            "562111",
+            "454310"
+          ],
+          "qualification": "NAICS 454310",
+          "forbidden": false,
+          "qualified": true
+        }
+      ]
     },
     {
       "metro": "Chicago",
       "ok": true,
-      "count": 3,
-      "retail": 0,
-      "elapsedMs": 59,
+      "count": 103,
+      "forbidden": 0,
+      "unqualified": 0,
+      "elapsedMs": 12736,
       "sources": [
-        "EPA Facility Registry Service"
+        "EPA ECHO / FRS NAICS"
       ],
-      "partial": true
+      "partial": true,
+      "samples": [
+        {
+          "name": "AIRCRAFT SERVICE INTERNATIONAL INC DBA MENZIES AVIATION",
+          "codes": [
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "AMEROPAN OIL CORPORATION, INC",
+          "codes": [
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "AMOCO OIL",
+          "codes": [
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "AMOCO OIL CO",
+          "codes": [
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "ARCO PRODUCTS COMPANY",
+          "codes": [
+            "339999",
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "ARGO TERMINAL CO",
+          "codes": [
+            "424710",
+            "484230",
+            "484220"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "ASHLAND DISTRIBUTION CO",
+          "codes": [
+            "424690",
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "ASPHALT OPERATING SERVICES-CHICAGO",
+          "codes": [
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "ASPHALT OPERATING SERVICES OF CHICAGO, LLC",
+          "codes": [
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "ATLANTIC AVIATION",
+          "codes": [
+            "424720"
+          ],
+          "qualification": "NAICS 424720",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "ATLANTIC RICHFIELD CO",
+          "codes": [
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "AUTOFRAN INC",
+          "codes": [
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        }
+      ]
     },
     {
       "metro": "Los Angeles / Long Beach",
       "ok": true,
-      "count": 29,
-      "retail": 0,
-      "elapsedMs": 63,
+      "count": 85,
+      "forbidden": 0,
+      "unqualified": 0,
+      "elapsedMs": 12740,
       "sources": [
-        "EPA Facility Registry Service"
+        "EPA ECHO / FRS NAICS"
       ],
-      "partial": true
+      "partial": true,
+      "samples": [
+        {
+          "name": "AMERIGAS",
+          "codes": [
+            "457210"
+          ],
+          "qualification": "NAICS 457210",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "ARCO TERMINAL SERVICES CORPORATION",
+          "codes": [
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "ATLANTIC RICHFIELD CO CARSON TERMINAL",
+          "codes": [
+            "424710",
+            "454312"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "BP MARINE TERMINAL 3",
+          "codes": [
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "BP WEST COAST PRODUCTS LLC/ MARINE TER 1",
+          "codes": [
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "BP WEST COAST PRODUCTS, LLC/CARSON TERMI",
+          "codes": [
+            "424710",
+            "454312"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "BREA CANON OIL CO. - SOUTH TORRANCE TANK FARM",
+          "codes": [
+            "424720"
+          ],
+          "qualification": "NAICS 424720",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "BRENNTAG PACIFIC, INC.",
+          "codes": [
+            "424690",
+            "425120",
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "BURKE ORANGE PARTNERS, LLC",
+          "codes": [
+            "424720"
+          ],
+          "qualification": "NAICS 424720",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "CALIFORNIA CARTAGE TRANSPORTATION LLC / NFI",
+          "codes": [
+            "457210",
+            "493190"
+          ],
+          "qualification": "NAICS 457210",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "CALIFORNIA FUELS AND LUBRICANTS",
+          "codes": [
+            "454310"
+          ],
+          "qualification": "NAICS 454310",
+          "forbidden": false,
+          "qualified": true
+        },
+        {
+          "name": "CARD LOCK FUELS",
+          "codes": [
+            "424710"
+          ],
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true
+        }
+      ]
     }
   ]
 }
