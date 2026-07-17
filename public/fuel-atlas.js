@@ -7,15 +7,15 @@
   const MAX_BBOX_AREA = 110;
   const INITIAL_CENTER = [40.9, -77.7];
   const INITIAL_ZOOM = 8;
-  const LIST_LIMIT = 250;
-  const REQUIRED_FILTER_VERSION = "verified-distributors-v2";
-  const DISTRIBUTOR_NAICS = new Set(["424710", "424720", "454310", "457210"]);
+  const LIST_LIMIT = 350;
+  const REQUIRED_BUILD_ID = "2026-07-17-naics-bbox-v4";
+  const TARGET_NAICS = new Set(["424710", "424720", "454310", "454311", "454312", "454319", "457210", "486110", "486910"]);
+  const TARGET_SIC = new Set(["5171", "5172", "5983", "5984"]);
   const RETAIL_NAICS = new Set(["447110", "447190", "457110", "457120"]);
-  const EXPLICIT_ROLE_TEXT = /\b(distribut(?:or|ors|ion|ions|ing)?|wholesal(?:e|er|ing)?|bulk(?:\s+(?:plant|station|fuel))?|terminal|depot|tank\s*farm|storage\s+terminal|heating[ _-]?oil|fuel[ _-]?oil|home\s+heating|propane|\blpg\b|card\s*lock)\b/i;
-  const RETAIL_OR_UNRELATED_TEXT = /\b(gas\s+station|service\s+station|filling\s+station|fuel\s+center|travel\s+center|truck\s+stop|travel\s+plaza|truck\s+plaza|convenience|c-?store|food\s+mart|petro\s+mart|mini\s+mart|quick\s+mart|\bmart\b|retail|car\s+wash|oil\s+change|lube\s+shop|quick\s+lube|treatment\s+plant|wastewater|sewage|water\s+treatment|remediation|cleanup|spill\s+site|landfill|power\s+plant|generating\s+station|school|hospital)\b/i;
-  const HIGH_CONFIDENCE_INDUSTRIAL = /^(bulk_plant|fuel_terminal|oil_terminal|tank_farm|oil_storage|petroleum_storage|fuel_storage|depot)$/i;
-  const GENERIC_INDUSTRIAL = /^(oil|petroleum|fuel|storage|terminal)$/i;
-  const STORAGE_PRODUCTS = /^(fuel|fuel_oil|heating_oil|oil|petroleum|diesel|gasoline|kerosene|propane|lpg)$/i;
+  const RETAIL_SIC = new Set(["5541"]);
+  const STRONG_ROLE_TEXT = /\b(heating[ _-]?oil|fuel[ _-]?oil|propane|\blpg\b|bulk[ _-]?(plant|station|terminal)|tank[ _-]?farm|storage[ _-]?terminal|petroleum[ _-]?terminal|fuel[ _-]?terminal|oil[ _-]?terminal|fuel[ _-]?depot|oil[ _-]?depot|fuel[ _-]?(distribut|wholesal)|petroleum[ _-]?(distribut|wholesal)|oil[ _-]?(company|co\.?|distribut|wholesal)|pipeline[ _-]?terminal)\b/i;
+  const REJECT_TEXT = /\b(gas station|service station|filling station|fuel center|fuel centre|travel center|travel centre|truck stop|convenience store|food mart|mini mart|quick stop|petro mart|gas mart|c-store|car wash|oil change|quick lube|lube shop|treatment plant|wastewater|sewage|landfill)\b/i;
+  const RETAIL_BRAND_ONLY = /^(shell|bp|exxon|mobil|exxonmobil|sunoco|marathon|citgo|valero|chevron|gulf|speedway|circle k|wawa|sheetz|7[- ]?eleven|murphy|murphy usa|costco|sam'?s club|pilot|flying j|love'?s)(?:\s*#?\s*\d+)?$/i;
 
   const els = {
     workspace: document.getElementById("workspace"),
@@ -77,51 +77,52 @@
     els.loadingOverlay.setAttribute("aria-busy", visible ? "true" : "false");
   }
 
-  function parseNaicsCodes(value) {
-    return [...new Set((String(value || "").match(/\b\d{6}\b/g) || []))];
+  function parseCodes(value) {
+    return [...new Set((String(value || "").match(/\b\d{4,6}\b/g) || []))];
   }
 
   function tagText(tags = {}) {
     return [
       tags.name, tags.operator, tags["operator:name"], tags.owner, tags["owner:name"], tags.brand,
       tags.description, tags.product, tags.products, tags.content, tags.substance, tags.storage,
-      tags.shop, tags.industrial, tags.office, tags.landuse, tags.building, tags["fuel_iq:qualification"],
+      tags.shop, tags.industrial, tags.office, tags.landuse, tags.building, tags["fuel_iq:evidence"],
     ].filter(Boolean).join(" ");
   }
 
   function isClearlyRetailOrUnrelated(tags = {}) {
     const amenity = String(tags.amenity || "").toLowerCase();
     const shop = String(tags.shop || "").toLowerCase();
+    const name = String(tags.name || tags.operator || tags.brand || "").trim();
+    const naics = parseCodes(tags["fuel_iq:naics_codes"] || tags.naics || tags["naics:code"]);
+    const sic = parseCodes(tags["fuel_iq:sic_codes"] || tags.sic || tags["sic:code"]);
     if (amenity === "fuel") return true;
     if (["fuel", "gas", "convenience", "supermarket"].includes(shop)) return true;
-    return RETAIL_OR_UNRELATED_TEXT.test(tagText(tags));
+    if (naics.some((code) => RETAIL_NAICS.has(code)) || sic.some((code) => RETAIL_SIC.has(code))) return true;
+    if (REJECT_TEXT.test(tagText(tags))) return true;
+    return RETAIL_BRAND_ONLY.test(name);
   }
 
   function isQualifiedFacility(tags = {}) {
     if (isClearlyRetailOrUnrelated(tags)) return false;
-    const codes = parseNaicsCodes(tags["fuel_iq:naics_codes"] || tags.naics || tags["naics:code"]);
-    if (codes.length) {
-      const qualifying = codes.some((code) => DISTRIBUTOR_NAICS.has(code));
-      const retail = codes.some((code) => RETAIL_NAICS.has(code));
-      if (!qualifying) return false;
-      if (retail && !EXPLICIT_ROLE_TEXT.test(tagText(tags))) return false;
-      return true;
+    const verified = String(tags["fuel_iq:verified"] || "").toLowerCase() === "yes";
+    const naics = parseCodes(tags["fuel_iq:naics_codes"] || tags.naics || tags["naics:code"]);
+    const sic = parseCodes(tags["fuel_iq:sic_codes"] || tags.sic || tags["sic:code"]);
+    if (verified) {
+      return naics.some((code) => TARGET_NAICS.has(code)) || sic.some((code) => TARGET_SIC.has(code));
     }
 
-    const identified = Boolean(tags.name || tags.operator || tags["operator:name"] || tags.owner || tags["owner:name"]);
     const text = tagText(tags);
+    const identified = Boolean(tags.name || tags.operator || tags["operator:name"] || tags.owner || tags["owner:name"]);
+    if (!identified || !STRONG_ROLE_TEXT.test(text)) return false;
     const shop = String(tags.shop || "").toLowerCase();
     const industrial = String(tags.industrial || "");
-    if (shop === "heating_oil" && identified) return true;
-    if (HIGH_CONFIDENCE_INDUSTRIAL.test(industrial) && identified) return true;
-    if (GENERIC_INDUSTRIAL.test(industrial) && identified && EXPLICIT_ROLE_TEXT.test(text)) return true;
-    if (String(tags.landuse || "").toLowerCase() === "industrial" && identified && EXPLICIT_ROLE_TEXT.test(text)) return true;
-    if (/^(industrial|warehouse)$/i.test(String(tags.building || "")) && identified && EXPLICIT_ROLE_TEXT.test(text)) return true;
-    if (String(tags.man_made || "").toLowerCase() === "storage_tank"
-        && STORAGE_PRODUCTS.test(String(tags.content || tags.substance || tags.storage || ""))
-        && identified
-        && EXPLICIT_ROLE_TEXT.test(text)) return true;
-    return /^(company|logistics)$/i.test(String(tags.office || "")) && identified && EXPLICIT_ROLE_TEXT.test(text);
+    if (shop === "heating_oil") return true;
+    if (/^(bulk_plant|fuel_terminal|oil_terminal|tank_farm|oil_storage|petroleum_storage|fuel_storage|depot)$/i.test(industrial)) return true;
+    if (/^(oil|petroleum|fuel|terminal)$/i.test(industrial)) return true;
+    if (String(tags.landuse || "").toLowerCase() === "industrial") return true;
+    if (/^(industrial|warehouse)$/i.test(String(tags.building || ""))) return true;
+    if (/^(company|logistics)$/i.test(String(tags.office || ""))) return true;
+    return String(tags.man_made || "").toLowerCase() === "storage_tank";
   }
 
   function typeLabel(type) {
@@ -146,7 +147,7 @@
     const text = tagText(tags).toLowerCase();
     if (/heating[ _-]?oil|home heating|fuel[ _-]?oil/.test(text)) return "heating_oil";
     if (/propane|\blpg\b/.test(text)) return "propane";
-    if (/terminal|tank[ _-]?farm|storage terminal|fuel depot|oil depot/.test(text)) return "terminal";
+    if (/terminal|tank[ _-]?farm|storage terminal|fuel depot|oil depot|pipeline/.test(text)) return "terminal";
     if (/bulk[ _-]?(plant|station|fuel)|petroleum bulk/.test(text)) return "bulk_plant";
     return "distributor";
   }
@@ -186,9 +187,11 @@
       city: tags["addr:city"] || tags["addr:town"] || tags["addr:village"] || tags["addr:hamlet"] || "",
       state: tags["addr:state"] || "",
       zip: tags["addr:postcode"] || "",
-      qualification: tags["fuel_iq:qualification"] || "Explicit distributor, bulk, terminal, heating-oil or propane facility tag",
+      qualification: tags["fuel_iq:evidence"] || "Explicit distributor, bulk, terminal, heating-oil or propane facility tag",
       naics: tags["fuel_iq:naics_codes"] || "",
-      sourceName: element.source_name || tags["fuel_iq:source"] || "OpenStreetMap public facility data",
+      sic: tags["fuel_iq:sic_codes"] || "",
+      registryId: tags["fuel_iq:registry_id"] || "",
+      sourceName: element.source_name || tags["fuel_iq:source"] || "OpenStreetMap explicit facility data",
       lat,
       lon,
       type: classify(tags),
@@ -202,7 +205,7 @@
     return records.filter((record) => {
       if (activeType !== "all" && record.type !== activeType) return false;
       if (!query) return true;
-      return [record.name, record.owner, record.operator, record.street, record.city, record.state, record.zip, record.naics]
+      return [record.name, record.owner, record.operator, record.street, record.city, record.state, record.zip, record.naics, record.sic]
         .join(" ").toLowerCase().includes(query);
     });
   }
@@ -230,8 +233,10 @@
       <h2>${escapeHtml(record.name)}</h2>
       <div class="address">${escapeHtml(fullAddress || "Address not publicly supplied")}</div>
       <div class="detail-block"><h3>Why this location qualifies</h3>
-        ${detailRow("Qualification", record.qualification)}
+        ${detailRow("Industry evidence", record.qualification)}
         ${detailRow("NAICS codes", record.naics)}
+        ${detailRow("SIC codes", record.sic)}
+        ${detailRow("EPA registry ID", record.registryId)}
       </div>
       <div class="detail-block"><h3>Ownership and operation</h3>
         ${detailRow("Legal owner", record.owner)}
@@ -260,7 +265,7 @@
     if (!items.length) {
       els.results.innerHTML = records.length
         ? '<p class="empty">No verified locations match the current filter.</p>'
-        : '<p class="empty">No facilities in this area met the distributor, fuel-dealer, bulk-plant or terminal verification rules. Ordinary gas stations are never substituted.</p>';
+        : '<p class="empty">No facilities in this area met the petroleum-wholesaler, fuel-dealer, bulk-terminal, pipeline-terminal, heating-oil or propane verification rules. Ordinary gas stations are never substituted.</p>';
       return;
     }
 
@@ -305,11 +310,11 @@
     els.reload.textContent = readiness.ready ? "Search this map area" : "Zoom in to search";
     els.reload.classList.toggle("needs-zoom", !readiness.ready);
     els.searchHelp.textContent = readiness.ready
-      ? "Ready to search industry-verified distributors, fuel dealers, bulk plants and terminals."
+      ? "Ready to scan the entire visible box for industry-verified distributors, fuel dealers, bulk plants, pipelines and terminals."
       : `Searches work at zoom ${MIN_SEARCH_ZOOM} or closer. Find a city/state above, use your location, or zoom in.`;
   }
 
-  async function fetchJson(url, timeoutMs = 30000) {
+  async function fetchJson(url, timeoutMs = 45000) {
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -331,7 +336,7 @@
 
   function showAreaTooLarge() {
     setLoadingOverlay(false);
-    setStatus("Choose a city/state or zoom in before searching.", "warning");
+    setStatus("Choose a state or multi-state region, or zoom in before searching.", "warning");
     els.results.innerHTML = `<p class="empty"><strong>This map view is too large for a dependable verified search.</strong><br>Enter a city, state, ZIP code, or address above; use “My location”; or zoom to level ${MIN_SEARCH_ZOOM}+.</p>`;
     els.placeSearch.focus();
   }
@@ -350,7 +355,7 @@
     const params = new URLSearchParams({
       south: bounds.getSouth().toFixed(5), west: bounds.getWest().toFixed(5),
       north: bounds.getNorth().toFixed(5), east: bounds.getEast().toFixed(5),
-      zoom: String(map.getZoom()), v: REQUIRED_FILTER_VERSION,
+      zoom: String(map.getZoom()), v: REQUIRED_BUILD_ID,
     });
 
     loading = true;
@@ -366,18 +371,18 @@
     els.states.textContent = "0";
     els.owners.textContent = "0";
     els.resultTitle.textContent = "Searching…";
-    els.results.innerHTML = '<p class="empty">Checking industry codes and explicit distributor facility records…</p>';
+    els.results.innerHTML = '<p class="empty">Scanning the entire visible map box and checking industry-code evidence…</p>';
     setLoadingOverlay(
       true,
       "Searching verified distributor locations…",
-      "Checking petroleum wholesalers, heating-oil and propane dealers, bulk plants and terminals. Ordinary gas stations are excluded.",
+      "Scanning the entire visible area for petroleum wholesalers, fuel dealers, bulk plants, pipelines, terminals, heating oil and propane. Ordinary gas stations are excluded.",
     );
-    setStatus("Searching industry-verified distributor and bulk-facility records…", "loading");
+    setStatus("Searching the full visible box for industry-verified distributor facilities…", "loading");
 
     try {
       const payload = await fetchJson(`/api/fuel-atlas/search?${params.toString()}`);
       if (requestId !== requestSequence) return;
-      if (payload?.filterVersion !== REQUIRED_FILTER_VERSION) throw new Error("The server is still deploying the distributors-only search. Refresh in a moment.");
+      if (payload?.buildId !== REQUIRED_BUILD_ID) throw new Error("The full-bounds distributor build is still deploying. Refresh in a moment.");
       const seen = new Set();
       records = (payload?.elements || []).map(normalize).filter((record) => record && !seen.has(record.id) && seen.add(record.id));
       render();
@@ -386,15 +391,19 @@
         if (resultBounds.isValid()) map.fitBounds(resultBounds.pad(0.12), { maxZoom: 12 });
       }
       const suffix = payload?.cached ? " (cached)" : "";
-      const partial = payload?.partial ? " One source was unavailable; verified results from the other source are shown." : "";
+      const sourceCount = Array.isArray(payload?.sourceSummary)
+        ? payload.sourceSummary.filter((source) => source.status === "ok").length
+        : (payload?.sources || []).length;
+      const sectors = Number(payload?.coverage?.occupiedGridCells || 0);
+      const partial = payload?.partial ? " Supplemental coverage was unavailable or skipped; verified primary-source results are shown." : "";
       const truncation = payload?.truncated ? " Result cap reached—zoom in for complete local detail." : "";
-      setStatus(`${records.length.toLocaleString()} verified distributor/fuel-dealer facilities loaded${suffix}.${partial}${truncation}`, payload?.truncated ? "warning" : "success");
+      setStatus(`${records.length.toLocaleString()} verified facilities loaded from ${sourceCount || 1} source${sourceCount === 1 ? "" : "s"}, spanning ${sectors.toLocaleString()} map sector${sectors === 1 ? "" : "s"}${suffix}.${partial}${truncation}`, payload?.truncated ? "warning" : "success");
     } catch (error) {
       if (requestId !== requestSequence) return;
       records = [];
       render();
       if (error?.name === "AbortError") {
-        setStatus("Verified distributor search timed out. Retry this metro area.", "error");
+        setStatus("Verified distributor search timed out. Retry this area.", "error");
         els.results.innerHTML = '<p class="empty">The verified distributor sources did not respond before the browser deadline. Retry once; ordinary gas stations will not be shown as a fallback.</p>';
       } else if (error?.code === "AREA_TOO_LARGE") {
         showAreaTooLarge();
@@ -423,7 +432,7 @@
       return;
     }
     els.placeButton.disabled = true;
-    setLoadingOverlay(true, "Finding your search area…", `Locating ${value} before searching verified distributor facilities.`);
+    setLoadingOverlay(true, "Finding your search area…", `Locating ${value} before scanning the visible area for verified distributors.`);
     setStatus(`Finding ${value}…`, "loading");
     try {
       const payload = await fetchJson(`/api/fuel-atlas/geocode?q=${encodeURIComponent(value)}`, 30000);
@@ -449,7 +458,7 @@
       return;
     }
     els.locate.disabled = true;
-    setLoadingOverlay(true, "Finding your location…", "Your location is used only to position this distributor search.");
+    setLoadingOverlay(true, "Finding your location…", "Your location is used only to position this verified distributor search.");
     setStatus("Requesting your location…", "loading");
     navigator.geolocation.getCurrentPosition(async (position) => {
       map.setView([position.coords.latitude, position.coords.longitude], 10);
@@ -509,11 +518,11 @@
     updateSearchButton();
     if (!loading) {
       const readiness = currentSearchReadiness();
-      setStatus(readiness.ready ? "Map moved—search this area to refresh verified distributors." : `Zoom to level ${MIN_SEARCH_ZOOM}+ or find a city/state.`, readiness.ready ? "neutral" : "warning");
+      setStatus(readiness.ready ? "Map moved—search this area to rescan the full visible box." : `Zoom to level ${MIN_SEARCH_ZOOM}+ or find a city/state.`, readiness.ready ? "neutral" : "warning");
     }
   });
 
   updateSearchButton();
-  setStatus("Loading the starting verified distributor region…", "loading");
+  setStatus("Loading the starting full-bounds distributor region…", "loading");
   window.setTimeout(() => loadArea(), 100);
 })();
