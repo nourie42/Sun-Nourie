@@ -8,6 +8,13 @@ on:
       - ".patchparts/**"
       - "scripts/applyViewportPatchArchive.js"
       - ".github/workflows/apply-viewport-patch.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".patchparts/**"
+      - "scripts/applyViewportPatchArchive.js"
+      - ".github/workflows/apply-viewport-patch.yml"
 
 permissions:
   contents: write
@@ -16,8 +23,10 @@ jobs:
   apply:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository
+      - name: Check out patch branch
         uses: actions/checkout@v4
+        with:
+          ref: fix/fuel-atlas-viewport-company-results
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
