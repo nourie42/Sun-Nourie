@@ -35,11 +35,34 @@
         box-shadow:0 0 0 4px rgba(251,191,36,.28),0 14px 32px rgba(245,158,11,.48)!important;
         outline:none!important;
       }
+      .fiq-map-grid.fiq-single-map-layout {
+        grid-template-columns:minmax(0,1fr)!important;
+      }
+      .fiq-map-grid.fiq-single-map-layout > .fiq-map-pane:first-child {
+        width:100%!important;
+        max-width:none!important;
+        grid-column:1/-1!important;
+      }
+      .fiq-map-grid.fiq-single-map-layout #map,
+      .fiq-map-grid.fiq-single-map-layout #svWrap,
+      .fiq-map-grid.fiq-single-map-layout #sv {
+        width:100%!important;
+        max-width:none!important;
+      }
+      .fiq-map-grid.fiq-single-map-layout #sv {
+        min-height:390px!important;
+      }
+      .fiq-aadt-map-hidden {
+        display:none!important;
+      }
       @media(max-width:720px) {
         #fuelLocationAtlasTop.ma-prospector-top-link {
           min-height:42px!important;
           padding:9px 14px!important;
           font-size:14px!important;
+        }
+        .fiq-map-grid.fiq-single-map-layout #sv {
+          min-height:320px!important;
         }
       }
     `;
@@ -50,12 +73,35 @@
     document.querySelectorAll('.aadt-tabs, nav[aria-label*="AADT" i]').forEach((element) => element.remove());
   }
 
+  function applySingleMapLayout() {
+    const aadtMap = document.getElementById('aadtMap');
+    const mapGrid = document.querySelector('.fiq-map-grid');
+    const mainMapPane = mapGrid?.querySelector('.fiq-map-pane:first-child');
+    const aadtPane = aadtMap?.closest('.fiq-map-pane');
+
+    if (mapGrid) mapGrid.classList.add('fiq-single-map-layout');
+    if (mainMapPane) {
+      mainMapPane.style.width = '100%';
+      mainMapPane.style.maxWidth = 'none';
+    }
+    if (aadtPane && aadtPane !== mainMapPane) {
+      aadtPane.classList.add('fiq-aadt-map-hidden');
+      aadtPane.setAttribute('aria-hidden', 'true');
+    }
+
+    const streetViewWrap = document.getElementById('svWrap');
+    const streetView = document.getElementById('sv');
+    if (streetViewWrap) streetViewWrap.style.width = '100%';
+    if (streetView) streetView.style.width = '100%';
+  }
+
   function applyNavigation() {
     if (applying) return;
     applying = true;
     try {
       ensureStyles();
       removeAadtQuickLinks();
+      applySingleMapLayout();
 
       const header = document.querySelector('header');
       if (!header) return;
