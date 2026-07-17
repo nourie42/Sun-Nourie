@@ -49,3 +49,10 @@ jobs:
           node-version: "22"
       - name: Confirm a live specialized-facility search completes and returns records
         run: node scripts/liveFuelAtlasSmoke.js
+      - name: Upload live verification result
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuel-atlas-smoke-result
+          path: fuel-atlas-smoke-result.json
+          if-no-files-found: error
+          retention-days: 7
