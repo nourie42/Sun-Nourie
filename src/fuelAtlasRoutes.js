@@ -8,21 +8,24 @@ const MAX_BBOX_AREA = 110;
 const MAX_RESULTS = 2500;
 const OVERPASS_TIMEOUT_MS = 12000;
 const PROVIDER_STAGGER_MS = 350;
-const FRS_TIMEOUT_MS = 9000;
-const USER_AGENT = "FuelIQ-Fuel-Atlas/1.3 (+https://github.com/nourie42/Sun-Nourie)";
+const ECHO_TIMEOUT_MS = 12000;
+const USER_AGENT = "FuelIQ-Fuel-Atlas/2.0 (+https://github.com/nourie42/Sun-Nourie)";
+const FILTER_VERSION = "verified-distributors-v2";
 
 const DEFAULT_OVERPASS_ENDPOINTS = [
   "https://overpass.private.coffee/api/interpreter",
   "https://overpass-api.de/api/interpreter",
   "https://overpass.openstreetmap.fr/api/interpreter",
 ];
-const FRS_ENDPOINT = "https://ofmpub.epa.gov/frs_public2/frs_rest_services.get_facilities";
-const FRS_TERMS = ["heating oil", "fuel oil", "fuel distributor", "petroleum", "propane", "bulk plant", "terminal"];
+const ECHO_QUERY_ENDPOINT = "https://echogeo.epa.gov/arcgis/rest/services/ECHO/Facilities/MapServer/0/query";
 
-const TARGET_INDUSTRIAL = /^(oil|petroleum|fuel|tank_farm|oil_storage|petroleum_storage|fuel_storage|bulk_plant|fuel_terminal|oil_terminal|terminal|depot)$/i;
-const TARGET_STORAGE = /^(fuel|fuel_oil|heating_oil|oil|petroleum|diesel|gasoline|kerosene|propane|lpg)$/i;
-const TARGET_TEXT = /\b(heating[ _-]?oil|fuel[ _-]?oil|fuel distributor|petroleum distributor|oil company|petroleum|propane|\blpg\b|bulk[ _-]?plant|bulk fuel|tank[ _-]?farm|storage terminal|fuel terminal|oil terminal|fuel depot|oil depot)\b/i;
-const RETAIL_TEXT = /\b(gas station|service station|filling station|travel center|truck stop|convenience store|c-store|car wash|oil change|lube shop|quick lube)\b/i;
+const DISTRIBUTOR_NAICS = new Set(["424710", "424720", "454310", "457210"]);
+const RETAIL_NAICS = new Set(["447110", "447190", "457110", "457120"]);
+const EXPLICIT_ROLE_TEXT = /\b(distribut(?:or|ors|ion|ions|ing)?|wholesal(?:e|er|ing)?|bulk(?:\s+(?:plant|station|fuel))?|terminal|depot|tank\s*farm|storage\s+terminal|heating[ _-]?oil|fuel[ _-]?oil|home\s+heating|propane|\blpg\b|card\s*lock)\b/i;
+const RETAIL_OR_UNRELATED_TEXT = /\b(gas\s+station|service\s+station|filling\s+station|fuel\s+center|travel\s+center|truck\s+stop|travel\s+plaza|truck\s+plaza|convenience|c-?store|food\s+mart|petro\s+mart|mini\s+mart|quick\s+mart|\bmart\b|retail|car\s+wash|oil\s+change|lube\s+shop|quick\s+lube|treatment\s+plant|wastewater|sewage|water\s+treatment|remediation|cleanup|spill\s+site|landfill|power\s+plant|generating\s+station|school|hospital)\b/i;
+const HIGH_CONFIDENCE_INDUSTRIAL = /^(bulk_plant|fuel_terminal|oil_terminal|tank_farm|oil_storage|petroleum_storage|fuel_storage|depot)$/i;
+const GENERIC_INDUSTRIAL = /^(oil|petroleum|fuel|storage|terminal)$/i;
+const STORAGE_PRODUCTS = /^(fuel|fuel_oil|heating_oil|oil|petroleum|diesel|gasoline|kerosene|propane|lpg)$/i;
 
 const searchCache = new Map();
 const geocodeCache = new Map();
@@ -94,7 +97,7 @@ export function parseFuelAtlasBounds(query = {}) {
       ok: false,
       status: 422,
       code: "AREA_TOO_LARGE",
-      message: "Zoom in to a state or metro area before searching the detailed distributor layer.",
+      message: "Zoom in to a state or metro area before searching the verified distributor layer.",
       minimumZoom: MIN_DETAIL_ZOOM,
       latSpan,
       lonSpan,
@@ -104,50 +107,77 @@ export function parseFuelAtlasBounds(query = {}) {
   return { ok: true, south, west, north, east, zoom: requestedZoom, latSpan, lonSpan, area };
 }
 
+export function parseNaicsCodes(value) {
+  return [...new Set((String(value || "").match(/\b\d{6}\b/g) || []))];
+}
+
+function hasCode(codes, accepted) {
+  return codes.some((code) => accepted.has(code));
+}
+
 function tagText(tags = {}) {
   return [
     tags.name, tags.operator, tags["operator:name"], tags.owner, tags["owner:name"], tags.brand,
     tags.description, tags.product, tags.products, tags.content, tags.substance, tags.storage,
-    tags.shop, tags.industrial, tags.office, tags.landuse, tags.building, tags["fuel_iq:matched_term"],
+    tags.shop, tags.industrial, tags.office, tags.landuse, tags.building, tags["fuel_iq:qualification"],
   ].filter(Boolean).join(" ");
+}
+
+function isClearlyRetailOrUnrelated(tags = {}) {
+  const amenity = clean(tags.amenity, 80).toLowerCase();
+  const shop = clean(tags.shop, 80).toLowerCase();
+  const text = tagText(tags);
+  if (amenity === "fuel") return true;
+  if (["fuel", "gas", "convenience", "supermarket"].includes(shop)) return true;
+  return RETAIL_OR_UNRELATED_TEXT.test(text);
 }
 
 export function isTargetFuelFacility(element = {}) {
   const tags = element.tags || {};
-  const amenity = clean(tags.amenity, 80).toLowerCase();
-  const shop = clean(tags.shop, 80).toLowerCase();
+  if (isClearlyRetailOrUnrelated(tags)) return false;
+
+  const codes = parseNaicsCodes(tags["fuel_iq:naics_codes"] || tags.naics || tags["naics:code"]);
+  if (codes.length) {
+    if (!hasCode(codes, DISTRIBUTOR_NAICS)) return false;
+    if (hasCode(codes, RETAIL_NAICS) && !EXPLICIT_ROLE_TEXT.test(tagText(tags))) return false;
+    return true;
+  }
+
+  const nameOrOperator = Boolean(tags.name || tags.operator || tags["operator:name"] || tags.owner || tags["owner:name"]);
   const text = tagText(tags);
-  if (amenity === "fuel") return false;
-  if (["fuel", "gas", "convenience", "supermarket"].includes(shop)) return false;
-  if (RETAIL_TEXT.test(text)) return false;
-  if (shop === "heating_oil") return true;
-  if (TARGET_INDUSTRIAL.test(clean(tags.industrial, 100))) return true;
-  if (clean(tags.landuse, 100).toLowerCase() === "industrial" && TARGET_TEXT.test(text)) return true;
-  if (/^(industrial|warehouse)$/i.test(clean(tags.building, 100)) && TARGET_TEXT.test(text)) return true;
+  const shop = clean(tags.shop, 80).toLowerCase();
+  const industrial = clean(tags.industrial, 100);
+  if (shop === "heating_oil" && nameOrOperator) return true;
+  if (HIGH_CONFIDENCE_INDUSTRIAL.test(industrial) && nameOrOperator) return true;
+  if (GENERIC_INDUSTRIAL.test(industrial) && nameOrOperator && EXPLICIT_ROLE_TEXT.test(text)) return true;
+  if (clean(tags.landuse, 100).toLowerCase() === "industrial" && nameOrOperator && EXPLICIT_ROLE_TEXT.test(text)) return true;
+  if (/^(industrial|warehouse)$/i.test(clean(tags.building, 100)) && nameOrOperator && EXPLICIT_ROLE_TEXT.test(text)) return true;
+
   const storedMaterial = clean(tags.content || tags.substance || tags.storage, 120);
-  const identifiedFacility = Boolean(tags.name || tags.operator || tags["operator:name"] || tags.owner || tags["owner:name"]);
-  if (clean(tags.man_made, 100).toLowerCase() === "storage_tank" && TARGET_STORAGE.test(storedMaterial) && identifiedFacility) return true;
-  if (TARGET_STORAGE.test(clean(tags.storage, 120)) && identifiedFacility) return true;
+  if (clean(tags.man_made, 100).toLowerCase() === "storage_tank"
+      && STORAGE_PRODUCTS.test(storedMaterial)
+      && nameOrOperator
+      && EXPLICIT_ROLE_TEXT.test(text)) return true;
+
   const office = /^(company|logistics)$/i.test(clean(tags.office, 100));
-  return office && TARGET_TEXT.test(text);
+  return office && nameOrOperator && EXPLICIT_ROLE_TEXT.test(text);
 }
 
 export function buildFuelAtlasQuery(bounds) {
   const box = [bounds.south, bounds.west, bounds.north, bounds.east].map((value) => Number(value).toFixed(5)).join(",");
-  const businessTerms = "heating[ _-]?oil|fuel[ _-]?oil|fuel distributor|petroleum distributor|oil company|petroleum|propane|lpg|bulk[ _-]?plant|bulk fuel|tank[ _-]?farm|storage terminal|fuel terminal|oil terminal|fuel depot|oil depot";
-  const storageTerms = "fuel|fuel_oil|heating_oil|oil|petroleum|diesel|gasoline|kerosene|propane|lpg";
+  const roleTerms = "distribut|wholesal|bulk[ _-]?(plant|station|fuel)|terminal|depot|tank[ _-]?farm|heating[ _-]?oil|fuel[ _-]?oil|home[ _-]?heating|propane|lpg|card[ _-]?lock";
+  const industrialTerms = "bulk_plant|fuel_terminal|oil_terminal|tank_farm|oil_storage|petroleum_storage|fuel_storage|depot";
   return `[out:json][timeout:12];(
-  nwr["shop"="heating_oil"](${box});
-  nwr["industrial"~"^(oil|petroleum|fuel|tank_farm|oil_storage|petroleum_storage|fuel_storage|bulk_plant|fuel_terminal|oil_terminal|terminal|depot)$",i](${box});
-  nwr["landuse"="industrial"]["name"~"(${businessTerms})",i](${box});
-  nwr["building"~"^(industrial|warehouse)$"]["name"~"(${businessTerms})",i](${box});
-  nwr["office"~"^(company|logistics)$"]["name"~"(${businessTerms})",i](${box});
-  nwr["office"~"^(company|logistics)$"]["operator"~"(${businessTerms})",i](${box});
-  nwr["office"~"^(company|logistics)$"]["description"~"(heating[ _-]?oil|fuel[ _-]?oil|petroleum|propane|bulk[ _-]?plant|terminal|distribut|wholesal)",i](${box});
-  nwr["man_made"="storage_tank"]["content"~"^(${storageTerms})$",i]["operator"](${box});
-  nwr["man_made"="storage_tank"]["substance"~"^(${storageTerms})$",i]["operator"](${box});
-  nwr["man_made"="storage_tank"]["content"~"^(${storageTerms})$",i]["name"](${box});
-  nwr["man_made"="storage_tank"]["substance"~"^(${storageTerms})$",i]["name"](${box});
+  nwr["shop"="heating_oil"]["name"](${box});
+  nwr["industrial"~"^(${industrialTerms})$",i](${box});
+  nwr["industrial"~"^(oil|petroleum|fuel|storage|terminal)$",i]["name"~"(${roleTerms})",i](${box});
+  nwr["landuse"="industrial"]["name"~"(${roleTerms})",i](${box});
+  nwr["building"~"^(industrial|warehouse)$",i]["name"~"(${roleTerms})",i](${box});
+  nwr["office"~"^(company|logistics)$",i]["name"~"(${roleTerms})",i](${box});
+  nwr["office"~"^(company|logistics)$",i]["operator"~"(${roleTerms})",i](${box});
+  nwr["office"~"^(company|logistics)$",i]["description"~"(${roleTerms})",i](${box});
+  nwr["man_made"="storage_tank"]["name"~"(${roleTerms})",i](${box});
+  nwr["man_made"="storage_tank"]["operator"~"(${roleTerms})",i](${box});
 );out body center qt ${MAX_RESULTS};`;
 }
 
@@ -168,7 +198,7 @@ async function fetchOverpassEndpoint(endpoint, query, signal) {
   let data;
   try { data = JSON.parse(text); } catch { throw new Error("The map source returned a non-JSON response."); }
   if (!Array.isArray(data.elements)) throw new Error("The map source returned an invalid result.");
-  return { elements: data.elements, source: "OpenStreetMap / Overpass", endpoint };
+  return { elements: data.elements.filter(isTargetFuelFacility), source: "OpenStreetMap / Overpass", endpoint };
 }
 
 async function fetchOverpass(query) {
@@ -196,100 +226,113 @@ async function fetchOverpass(query) {
   }
 }
 
-function distanceMiles(lat1, lon1, lat2, lon2) {
-  const rad = (degrees) => degrees * Math.PI / 180;
-  const dLat = rad(lat2 - lat1);
-  const dLon = rad(lon2 - lon1);
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLon / 2) ** 2;
-  return 3958.7613 * 2 * Math.asin(Math.sqrt(a));
-}
-
-function frsSearchGeometry(bounds) {
-  const latitude = (bounds.south + bounds.north) / 2;
-  const longitude = (bounds.west + bounds.east) / 2;
-  const farthest = Math.max(
-    distanceMiles(latitude, longitude, bounds.south, bounds.west),
-    distanceMiles(latitude, longitude, bounds.south, bounds.east),
-    distanceMiles(latitude, longitude, bounds.north, bounds.west),
-    distanceMiles(latitude, longitude, bounds.north, bounds.east),
-  );
-  return { latitude, longitude, radius: Math.min(25, Math.max(3, Math.ceil(farthest))) };
-}
-
-function arrayify(value) {
-  if (Array.isArray(value)) return value;
-  return value ? [value] : [];
+export function buildEchoQueryUrl(bounds, resultOffset = 0) {
+  const url = new URL(ECHO_QUERY_ENDPOINT);
+  const where = [...DISTRIBUTOR_NAICS]
+    .map((code) => `FAC_NAICS_CODES LIKE '%${code}%'`)
+    .join(" OR ");
+  url.searchParams.set("where", `(${where})`);
+  url.searchParams.set("geometry", `${bounds.west},${bounds.south},${bounds.east},${bounds.north}`);
+  url.searchParams.set("geometryType", "esriGeometryEnvelope");
+  url.searchParams.set("inSR", "4326");
+  url.searchParams.set("spatialRel", "esriSpatialRelIntersects");
+  url.searchParams.set("outFields", "REGISTRY_ID,FAC_NAME,FAC_STREET,FAC_CITY,FAC_STATE,FAC_ZIP,FAC_LAT,FAC_LONG,FAC_NAICS_CODES,DFR_URL");
+  url.searchParams.set("returnGeometry", "true");
+  url.searchParams.set("outSR", "4326");
+  url.searchParams.set("resultOffset", String(resultOffset));
+  url.searchParams.set("resultRecordCount", "1000");
+  url.searchParams.set("orderByFields", "FAC_NAME");
+  url.searchParams.set("f", "json");
+  return url;
 }
 
 function pointInsideBounds(lat, lon, bounds) {
   return lat >= bounds.south && lat <= bounds.north && lon >= bounds.west && lon <= bounds.east;
 }
 
-function frsIndustrialValue(term) {
-  if (/bulk/i.test(term)) return "bulk_plant";
-  if (/terminal/i.test(term)) return "terminal";
-  if (/propane/i.test(term)) return "fuel";
-  return "petroleum";
+function echoFacilityType(name, codes) {
+  if (/propane|\blpg\b/i.test(name)) return "propane";
+  if (/heating[ _-]?oil|fuel[ _-]?oil|home\s+heating/i.test(name) || codes.includes("454310") || codes.includes("457210")) return "heating_oil";
+  if (codes.includes("424710")) return /terminal|depot|tank\s*farm/i.test(name) ? "terminal" : "bulk_plant";
+  return "distributor";
 }
 
-export function frsFacilityToElement(facility = {}, matchedTerm = "petroleum", bounds = null) {
-  const lat = Number(facility.Latitude83);
-  const lon = Number(facility.Longitude83);
-  const name = clean(facility.FacilityName, 300);
+export function echoFeatureToElement(feature = {}, bounds = null) {
+  const attrs = feature.attributes || feature.properties || {};
+  const geometry = feature.geometry || {};
+  const lat = Number(attrs.FAC_LAT ?? geometry.y ?? geometry.coordinates?.[1]);
+  const lon = Number(attrs.FAC_LONG ?? geometry.x ?? geometry.coordinates?.[0]);
+  const name = clean(attrs.FAC_NAME, 300);
+  const codes = parseNaicsCodes(attrs.FAC_NAICS_CODES);
   if (!Number.isFinite(lat) || !Number.isFinite(lon) || !name) return null;
   if (bounds && !pointInsideBounds(lat, lon, bounds)) return null;
-  if (RETAIL_TEXT.test(name)) return null;
-  const registryId = clean(facility.RegistryId, 80) || `${lat}-${lon}-${name}`;
-  const sourceUrl = `${FRS_ENDPOINT}?registry_id=${encodeURIComponent(registryId)}&output=JSON`;
+  if (!hasCode(codes, DISTRIBUTOR_NAICS)) return null;
+  if (RETAIL_OR_UNRELATED_TEXT.test(name)) return null;
+  if (hasCode(codes, RETAIL_NAICS) && !EXPLICIT_ROLE_TEXT.test(name)) return null;
+
+  const matchedCodes = codes.filter((code) => DISTRIBUTOR_NAICS.has(code));
+  const facilityType = echoFacilityType(name, matchedCodes);
+  const registryId = clean(attrs.REGISTRY_ID, 80) || `${lat}-${lon}-${name}`;
+  const sourceUrl = clean(attrs.DFR_URL, 1000)
+    || `https://echo.epa.gov/detailed-facility-report?fid=${encodeURIComponent(registryId)}`;
+  const industrial = facilityType === "terminal" ? "fuel_terminal"
+    : facilityType === "bulk_plant" ? "bulk_plant"
+      : facilityType === "propane" ? "fuel"
+        : facilityType === "heating_oil" ? "fuel"
+          : "petroleum";
+
   return {
-    type: "frs",
+    type: "echo",
     id: registryId,
     lat,
     lon,
-    source_name: "EPA Facility Registry Service",
+    source_name: "EPA ECHO / FRS NAICS",
     source_url: sourceUrl,
     tags: {
       name,
-      industrial: frsIndustrialValue(matchedTerm),
-      description: `EPA FRS facility matched by ${matchedTerm}`,
-      "fuel_iq:matched_term": matchedTerm,
-      "addr:full": clean(facility.LocationAddress, 400),
-      "addr:city": clean(facility.CityName, 160),
-      "addr:state": clean(facility.StateAbbr, 20),
-      "addr:postcode": clean(facility.ZipCode, 30),
+      industrial,
+      description: `EPA ECHO facility verified by distributor/fuel-dealer NAICS ${matchedCodes.join(", ")}`,
+      "fuel_iq:facility_type": facilityType,
+      "fuel_iq:naics_codes": codes.join(","),
+      "fuel_iq:qualification": `NAICS ${matchedCodes.join(", ")}`,
+      "fuel_iq:source": "EPA ECHO / FRS",
+      "addr:full": clean(attrs.FAC_STREET, 400),
+      "addr:city": clean(attrs.FAC_CITY, 160),
+      "addr:state": clean(attrs.FAC_STATE, 20),
+      "addr:postcode": clean(attrs.FAC_ZIP, 30),
       "fuel_iq:registry_id": registryId,
     },
   };
 }
 
-async function fetchFrsTerm(term, bounds) {
-  const geometry = frsSearchGeometry(bounds);
-  const url = new URL(FRS_ENDPOINT);
-  url.searchParams.set("facility_name", term);
-  url.searchParams.set("latitude83", geometry.latitude.toFixed(6));
-  url.searchParams.set("longitude83", geometry.longitude.toFixed(6));
-  url.searchParams.set("search_radius", String(geometry.radius));
-  url.searchParams.set("output", "JSON");
-  const response = await timedFetch(url, { headers: { Accept: "application/json", "User-Agent": USER_AGENT } }, FRS_TIMEOUT_MS);
-  if (!response.ok) throw new Error(`EPA FRS HTTP ${response.status}`);
+async function fetchEchoPage(bounds, resultOffset = 0) {
+  const response = await timedFetch(buildEchoQueryUrl(bounds, resultOffset), {
+    headers: { Accept: "application/json", "User-Agent": USER_AGENT },
+  }, ECHO_TIMEOUT_MS);
+  if (!response.ok) throw new Error(`EPA ECHO HTTP ${response.status}`);
   const data = await response.json();
-  return arrayify(data?.Results?.FRSFacility).map((facility) => frsFacilityToElement(facility, term, bounds)).filter(Boolean);
+  if (data?.error) throw new Error(`EPA ECHO ${data.error.message || "query error"}`);
+  const features = Array.isArray(data?.features) ? data.features : [];
+  return {
+    elements: features.map((feature) => echoFeatureToElement(feature, bounds)).filter(Boolean),
+    exceededTransferLimit: data?.exceededTransferLimit === true,
+  };
 }
 
-async function fetchFrs(bounds) {
-  const settled = await Promise.allSettled(FRS_TERMS.map((term) => fetchFrsTerm(term, bounds)));
-  const elements = [];
-  const failures = [];
-  settled.forEach((result, index) => {
-    if (result.status === "fulfilled") elements.push(...result.value);
-    else failures.push(`${FRS_TERMS[index]}: ${clean(result.reason?.message || result.reason, 200)}`);
-  });
-  if (settled.every((result) => result.status === "rejected")) {
-    const error = new Error("EPA Facility Registry Service did not respond.");
-    error.failures = failures;
-    throw error;
+async function fetchEcho(bounds) {
+  const first = await fetchEchoPage(bounds, 0);
+  let elements = first.elements;
+  let truncated = first.exceededTransferLimit;
+  if (first.exceededTransferLimit) {
+    try {
+      const second = await fetchEchoPage(bounds, 1000);
+      elements = elements.concat(second.elements);
+      truncated = second.exceededTransferLimit;
+    } catch (error) {
+      return { elements, source: "EPA ECHO / FRS NAICS", failures: [clean(error?.message || error, 240)], truncated: true };
+    }
   }
-  return { elements, source: "EPA Facility Registry Service", failures, coverageRadiusMi: frsSearchGeometry(bounds).radius };
+  return { elements, source: "EPA ECHO / FRS NAICS", failures: [], truncated };
 }
 
 function elementCenter(element) {
@@ -303,7 +346,7 @@ function elementName(element) {
 
 function elementScore(element) {
   const tags = element.tags || {};
-  return [tags.name, tags.owner, tags.operator, tags.phone, tags.email, tags.website, tags["addr:full"], tags["addr:city"], tags["addr:state"]].filter(Boolean).length;
+  return [tags.name, tags.owner, tags.operator, tags.phone, tags.email, tags.website, tags["addr:full"], tags["addr:city"], tags["addr:state"], tags["fuel_iq:naics_codes"]].filter(Boolean).length;
 }
 
 function dedupeElements(elements) {
@@ -326,28 +369,24 @@ function dedupeElements(elements) {
 
 export async function searchFuelAtlasSources(bounds) {
   const query = buildFuelAtlasQuery(bounds);
-  const settled = await Promise.allSettled([fetchOverpass(query), fetchFrs(bounds)]);
+  const settled = await Promise.allSettled([fetchOverpass(query), fetchEcho(bounds)]);
   const elements = [];
   const sources = [];
   const warnings = [];
   let truncated = false;
-  let frsCoverageRadiusMi = null;
   settled.forEach((result, index) => {
-    const sourceName = index === 0 ? "OpenStreetMap / Overpass" : "EPA Facility Registry Service";
+    const sourceName = index === 0 ? "OpenStreetMap / Overpass" : "EPA ECHO / FRS NAICS";
     if (result.status === "fulfilled") {
       elements.push(...result.value.elements);
       sources.push(result.value.source || sourceName);
-      if (index === 0) truncated = result.value.elements.length >= MAX_RESULTS;
-      if (index === 1) {
-        frsCoverageRadiusMi = result.value.coverageRadiusMi;
-        warnings.push(...result.value.failures);
-      }
+      truncated ||= result.value.truncated === true || (index === 0 && result.value.elements.length >= MAX_RESULTS);
+      warnings.push(...(result.value.failures || []));
     } else {
       warnings.push(`${sourceName}: ${clean(result.reason?.message || result.reason, 240)}`);
     }
   });
   if (!sources.length) {
-    const error = new Error("All distributor-location sources failed for this request.");
+    const error = new Error("All verified distributor-location sources failed for this request.");
     error.failures = warnings;
     throw error;
   }
@@ -356,7 +395,6 @@ export async function searchFuelAtlasSources(bounds) {
     sources: [...new Set(sources)],
     warnings,
     truncated,
-    frsCoverageRadiusMi,
   };
 }
 
@@ -446,7 +484,7 @@ export function registerFuelAtlasRoutes(app, { googleApiKey = "" } = {}) {
   app.get("/api/fuel-atlas/search", async (req, res) => {
     const bounds = parseFuelAtlasBounds(req.query);
     if (!bounds.ok) return res.status(bounds.status).json(bounds);
-    const key = [bounds.south, bounds.west, bounds.north, bounds.east].map((value) => Number(value).toFixed(3)).join(",");
+    const key = [FILTER_VERSION, bounds.south, bounds.west, bounds.north, bounds.east].map((value) => typeof value === "number" ? value.toFixed(3) : value).join(",");
     const cached = cacheGet(searchCache, key);
     if (cached) {
       res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=600");
@@ -457,24 +495,24 @@ export function registerFuelAtlasRoutes(app, { googleApiKey = "" } = {}) {
       const payload = {
         ok: true,
         cached: false,
+        filterVersion: FILTER_VERSION,
         source: result.sources.join(" + "),
         sources: result.sources,
         warnings: result.warnings,
         partial: result.warnings.length > 0,
         fetchedAt: new Date().toISOString(),
         truncated: result.truncated,
-        frsCoverageRadiusMi: result.frsCoverageRadiusMi,
         elements: result.elements,
       };
       cacheSet(searchCache, key, payload, SEARCH_CACHE_TTL_MS);
       res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=600");
       return res.json(payload);
     } catch (error) {
-      console.error("Fuel Atlas multi-source search failed:", error.failures || error);
+      console.error("Fuel Atlas verified-source search failed:", error.failures || error);
       return res.status(502).json({
         ok: false,
-        code: "PUBLIC_MAP_UNAVAILABLE",
-        message: "Distributor-location sources are temporarily unavailable. Please retry this metro area.",
+        code: "DISTRIBUTOR_SOURCES_UNAVAILABLE",
+        message: "Verified distributor-location sources are temporarily unavailable. Please retry this metro area.",
       });
     }
   });
