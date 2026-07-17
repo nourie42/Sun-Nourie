@@ -10,6 +10,7 @@ on:
       - "src/fuelAtlasRoutes.js"
       - "scripts/validateFuelAtlas.js"
       - "scripts/testFuelAtlasRoutes.js"
+      - "scripts/smokeFuelAtlasLive.js"
       - ".github/workflows/validate-fuel-atlas.yml"
   push:
     branches:
@@ -21,6 +22,7 @@ on:
       - "src/fuelAtlasRoutes.js"
       - "scripts/validateFuelAtlas.js"
       - "scripts/testFuelAtlasRoutes.js"
+      - "scripts/smokeFuelAtlasLive.js"
       - ".github/workflows/validate-fuel-atlas.yml"
 
 jobs:
@@ -37,5 +39,6 @@ jobs:
         run: |
           node --check src/fuelAtlasRoutes.js
           node --check public/fuel-atlas.js
+          node --check scripts/smokeFuelAtlasLive.js
           node scripts/validateFuelAtlas.js
           node scripts/testFuelAtlasRoutes.js
