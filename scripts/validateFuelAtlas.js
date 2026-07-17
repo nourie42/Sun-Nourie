@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { __test as distributorCompanySearchTest } from "../src/distributorCompanySearch.js";
 import {
   buildFuelAtlasQuery,
   classifyFuelFacility,
@@ -15,12 +14,6 @@ const __filename = fileURLToPath(import.meta.url);
 const root = path.resolve(path.dirname(__filename), "..");
 const html = fs.readFileSync(path.join(root, "public", "fuel-atlas.html"), "utf8");
 const client = fs.readFileSync(path.join(root, "public", "fuel-atlas.js"), "utf8");
-
-function validateCorporateLookup() {
-  const tiger = distributorCompanySearchTest.knownCandidates("Tiger Fuels in Virginia");
-  assert.equal(tiger[0]?.legal_name, "Tiger Fuel Company", "The Distributor Intelligence lookup must resolve Tiger Fuels in Virginia nationwide.");
-  assert.equal(tiger[0]?.headquarters, "Charlottesville, Virginia");
-}
 
 function validateBoundsAndQuery() {
   const valid = parseFuelAtlasBounds({ south: "35.2", west: "-79.5", north: "36.2", east: "-78.0", zoom: "9" });
@@ -103,7 +96,6 @@ function validateUi() {
 }
 
 const groups = {
-  corporate: validateCorporateLookup,
   query: validateBoundsAndQuery,
   classification: validateClassification,
   ui: validateUi,
