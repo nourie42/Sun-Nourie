@@ -21,7 +21,7 @@ const elapsed = Date.now() - started;
 
 assert.equal(response.statusCode, 200, `live search returned HTTP ${response.statusCode}`);
 assert.equal(response.payload?.ok, true, "live search did not return ok=true");
-assert.ok(elapsed < 10000, `live search exceeded the bounded response time: ${elapsed}ms`);
+assert.ok(elapsed < 9000, `live search exceeded the bounded response time: ${elapsed}ms`);
 assert.ok(Array.isArray(response.payload?.records), "live search did not return a records array");
 assert.ok(response.payload.records.length > 0, `live search returned no specialized fuel facilities; sources=${JSON.stringify(response.payload?.sourceSummary)}`);
 assert.equal(response.payload.records.some((item) => /gas station|service station|convenience|food mart/i.test(item.name)), false, "live result contained an ordinary retail gas station");
@@ -30,6 +30,7 @@ assert.equal(response.payload.sourceSummary.some((source) => source.name === "EP
 const result = {
   checkedAt: new Date().toISOString(),
   elapsedMs: elapsed,
+  responseUnderNineSeconds: elapsed < 9000,
   count: response.payload.records.length,
   ordinaryGasStations: response.payload.records.filter((item) => /gas station|service station|convenience|food mart/i.test(item.name)).length,
   firstFive: response.payload.records.slice(0, 5).map((item) => item.name),
