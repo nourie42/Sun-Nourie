@@ -53,8 +53,12 @@ jobs:
           node --check scripts/testFuelAtlasLocationCompanyBridge.js
           node --check scripts/smokeFuelAtlasLive.js
           node --check scripts/testFuelAtlasSourceIntegration.js
-      - name: Validate corporate directory example
-        run: node scripts/validateFuelAtlas.js corporate
+      - name: Validate Tiger Fuel name match
+        run: |
+          node --input-type=module -e 'import assert from "node:assert/strict"; import { __test } from "./src/distributorCompanySearch.js"; const tiger = __test.knownCandidates("Tiger Fuels in Virginia"); assert.equal(tiger[0]?.legal_name, "Tiger Fuel Company");'
+      - name: Validate Tiger Fuel headquarters
+        run: |
+          node --input-type=module -e 'import assert from "node:assert/strict"; import { __test } from "./src/distributorCompanySearch.js"; const tiger = __test.knownCandidates("Tiger Fuels in Virginia"); assert.equal(tiger[0]?.headquarters, "Charlottesville, Virginia");'
       - name: Validate map bounds and source query
         run: node scripts/validateFuelAtlas.js query
       - name: Validate facility classification
