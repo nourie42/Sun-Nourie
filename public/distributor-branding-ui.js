@@ -57,15 +57,22 @@
 
   function addAtlasLink() {
     const topbar = document.querySelector('.topbar');
-    if (!topbar || document.getElementById('fuelAtlasLink')) return;
-    const link = document.createElement('a');
-    link.id = 'fuelAtlasLink';
+    if (!topbar) return;
+
+    let link = document.getElementById('fuelAtlasLink');
+    if (!link) {
+      link = document.createElement('a');
+      link.id = 'fuelAtlasLink';
+      const back = topbar.querySelector('.back-link');
+      if (back) topbar.insertBefore(link, back);
+      else topbar.appendChild(link);
+    }
+
     link.href = '/fuel-atlas.html';
-    link.textContent = 'Fuel Location Atlas';
+    link.textContent = 'M&A Prospector';
+    link.setAttribute('aria-label', 'Open M&A Prospector');
+    link.setAttribute('title', 'Open M&A Prospector');
     link.style.cssText = 'color:#071522;background:#f4b942;text-decoration:none;font-size:13px;font-weight:850;padding:9px 12px;border-radius:9px;margin-left:auto;white-space:nowrap';
-    const back = topbar.querySelector('.back-link');
-    if (back) topbar.insertBefore(link, back);
-    else topbar.appendChild(link);
   }
 
   function setFuelIqCopy() {
