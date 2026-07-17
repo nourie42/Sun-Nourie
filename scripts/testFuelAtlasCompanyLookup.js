@@ -94,36 +94,37 @@ async function fetchStub(input) {
   calls.push(url);
   if (url.startsWith("/api/distributors/search?")) {
     const params = new URL(`https://fuel-iq.test${url}`).searchParams;
-    assert.equal(params.get("q"), "Tiger Fuels in Virginia");
+    const query = params.get("q");
     assert.equal(params.get("mode"), "directory");
-    return new Response(JSON.stringify({
-      ok: true,
-      candidates: [{
-        legal_name: "Tiger Fuel Company",
-        aliases: ["Tiger Fuel", "Tiger Fuels"],
-        headquarters: "Charlottesville, Virginia",
-        website: "https://tigerfuel.com/",
-        description: "Corporate fuel distributor and petroleum marketer",
-        parent_company: "",
-        entity_type: "corporate_distributor",
-        source: "Fuel IQ corporate distributor index",
-        source_url: "https://tigerfuel.com/",
-      }],
-    }), { status: 200, headers: { "content-type": "application/json" } });
+    const candidates = query === "Tiger Fuels in Virginia" ? [{
+      legal_name: "Tiger Fuel Company",
+      aliases: ["Tiger Fuel", "Tiger Fuels"],
+      headquarters: "Charlottesville, Virginia",
+      website: "https://tigerfuel.com/",
+      description: "Corporate fuel distributor and petroleum marketer",
+      parent_company: "",
+      entity_type: "corporate_distributor",
+      source: "Fuel IQ corporate distributor index",
+      source_url: "https://tigerfuel.com/",
+    }] : [];
+    return new Response(JSON.stringify({ ok: true, candidates }), { status: 200, headers: { "content-type": "application/json" } });
   }
   if (url.startsWith("/api/fuel-atlas/geocode?")) {
     const params = new URL(`https://fuel-iq.test${url}`).searchParams;
-    assert.match(params.get("q"), /Tiger Fuel Company/);
-    assert.match(params.get("q"), /Charlottesville, Virginia/);
-    return new Response(JSON.stringify({
-      ok: true,
-      result: {
-        lat: 38.0293,
-        lon: -78.4767,
-        label: "Charlottesville, Virginia",
-        provider: "Test geocoder",
-      },
-    }), { status: 200, headers: { "content-type": "application/json" } });
+    const query = params.get("q");
+    const result = query === "Richmond"
+      ? { lat: 37.5407, lon: -77.4360, label: "Richmond, Virginia", provider: "Test geocoder" }
+      : {
+          lat: 38.0293,
+          lon: -78.4767,
+          label: "Charlottesville, Virginia",
+          provider: "Test geocoder",
+        };
+    if (query !== "Richmond") {
+      assert.match(query, /Tiger Fuel Company/);
+      assert.match(query, /Charlottesville, Virginia/);
+    }
+    return new Response(JSON.stringify({ ok: true, result }), { status: 200, headers: { "content-type": "application/json" } });
   }
   if (url.startsWith("/api/fuel-atlas/search?")) {
     return new Response(JSON.stringify({
@@ -171,4 +172,14 @@ assert.match(elements.detailBody.innerHTML, /same nationwide corporate lookup us
 assert.equal(Number(map.center[0]), 38.0293, "The company latitude should come from the matched headquarters, not the original map view");
 assert.equal(Number(map.center[1]), -78.4767, "The company longitude should come from the matched headquarters, not the original map view");
 
-console.log("Fuel Atlas nationwide Tiger Fuel company lookup passed.");
+const callsBeforePlaceSearch = calls.length;
+elements.placeSearch.value = "Richmond";
+await elements.placeForm.listeners.submit({ preventDefault() {} });
+const placeCalls = calls.slice(callsBeforePlaceSearch);
+assert.equal(placeCalls.some((url) => url.includes("/api/distributors/search") && url.includes("mode=directory")), true, "Place searches should still check the fast directory first");
+assert.equal(placeCalls.some((url) => url.includes("/api/fuel-atlas/geocode") && url.includes("Richmond")), true, "A city name should use the geographic lookup without waiting on exhaustive corporate research");
+assert.equal(placeCalls.some((url) => url.includes("mode=exhaustive")), false, "A clear city search should not call the slower exhaustive corporate phase");
+assert.equal(Number(map.center[0]), 37.5407);
+assert.equal(Number(map.center[1]), -77.4360);
+
+console.log("Fuel Atlas nationwide Tiger Fuel company lookup and city fallback passed.");
