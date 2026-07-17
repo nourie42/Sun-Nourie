@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 
 const baseUrl = String(process.env.FUEL_ATLAS_LIVE_URL || "https://sun-nourie-live.onrender.com").replace(/\/$/, "");
 const deploymentDeadlineMs = Number(process.env.FUEL_ATLAS_DEPLOYMENT_WAIT_MS || 18 * 60 * 1000);
@@ -122,4 +124,20 @@ assert.ok(totalFacilities > 0, "Live Fuel Atlas returned zero facilities across 
 assert.equal(totalRetail, 0, "Live Fuel Atlas returned one or more retail gas-station records");
 assert.ok(multiSourceResponses >= 3, "Live Fuel Atlas did not expose source metadata for enough searches");
 
+const status = {
+  ok: true,
+  verifiedAt: new Date().toISOString(),
+  verifiedCommit: process.env.GITHUB_SHA || null,
+  liveUrl: baseUrl,
+  successfulSearches: successful.length,
+  attemptedSearches: metros.length,
+  totalFacilities,
+  retailGasStations: totalRetail,
+  results,
+};
+const statusPath = path.resolve("docs", "fuel-atlas-live-status.json");
+fs.mkdirSync(path.dirname(statusPath), { recursive: true });
+fs.writeFileSync(statusPath, `${JSON.stringify(status, null, 2)}\n`);
+
 console.log(`Fuel Atlas live smoke passed: ${successful.length}/${metros.length} searches succeeded with ${totalFacilities} facilities and zero retail gas stations.`);
+console.log(`Wrote ${statusPath}`);

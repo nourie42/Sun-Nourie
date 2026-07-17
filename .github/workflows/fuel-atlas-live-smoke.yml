@@ -12,6 +12,9 @@ on:
       - ".github/workflows/fuel-atlas-live-smoke.yml"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   live-smoke:
     runs-on: ubuntu-latest
@@ -27,3 +30,11 @@ jobs:
         env:
           FUEL_ATLAS_LIVE_URL: https://sun-nourie-live.onrender.com
         run: node scripts/smokeFuelAtlasLive.js
+      - name: Publish live verification result
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/fuel-atlas-live-status.json
+          git commit -m "Record successful Fuel Atlas live verification"
+          git pull --rebase origin main
+          git push origin HEAD:main
