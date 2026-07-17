@@ -3,60 +3,132 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#071522">
   <title>Fuel Distributor Atlas | Fuel IQ</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin>
   <style>
-    :root{--navy:#071522;--panel:#0d2031;--paper:#fff;--soft:#eef4f8;--line:#d6e1e9;--ink:#0b1f33;--muted:#617487;--blue:#1976a8;--gold:#f4b942;--green:#12805c;--shadow:0 18px 50px rgba(4,25,43,.18)}
-    *{box-sizing:border-box}html,body{height:100%;margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);background:var(--soft)}button,input{font:inherit}.app{height:100%;display:grid;grid-template-rows:70px 1fr}.topbar{display:flex;align-items:center;gap:14px;padding:0 18px;background:var(--navy);color:#fff;z-index:1001}.brand{display:flex;align-items:center;gap:10px;color:#fff;text-decoration:none;font-weight:850;white-space:nowrap}.mark{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;background:linear-gradient(145deg,var(--gold),#ffe09a);color:var(--navy);font-size:12px}.title small{display:block;color:#9dc5df;font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.09em}.search{flex:1;max-width:760px;margin-left:auto}.search input{width:100%;padding:11px 14px;border-radius:11px;border:1px solid rgba(255,255,255,.2);background:#10283b;color:#fff;outline:none}.search input::placeholder{color:#9cb0c0}.navlink{color:#d6e6f1;text-decoration:none;font-size:13px}.workspace{min-height:0;display:grid;grid-template-columns:365px 1fr 0}.workspace.detail-open{grid-template-columns:365px 1fr 390px}.sidebar,.details{background:#fff;min-height:0;overflow:auto;z-index:800}.sidebar{border-right:1px solid var(--line)}.details{border-left:1px solid var(--line);box-shadow:-12px 0 35px rgba(5,30,50,.1)}.section{padding:18px;border-bottom:1px solid var(--line)}.eyebrow{margin:0 0 5px;color:var(--blue);font-size:11px;font-weight:850;text-transform:uppercase;letter-spacing:.1em}.section h1,.section h2{margin:0}.section h1{font-size:24px}.section h2{font-size:16px}.notice{margin-top:12px;padding:11px;border-radius:10px;background:#fff8e7;border:1px solid #efd894;color:#6d5316;font-size:12px;line-height:1.45}.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}.metric{padding:10px;border:1px solid var(--line);border-radius:10px;background:#f8fbfd}.metric strong{display:block;font-size:20px}.metric span{font-size:10px;color:var(--muted);text-transform:uppercase}.filters{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}.filter{border:1px solid var(--line);background:#fff;border-radius:10px;padding:9px 10px;text-align:left;font-size:12px;cursor:pointer}.filter.active{border-color:var(--blue);background:#eaf6fc;color:#0c5c83;font-weight:800}.results{display:grid;gap:8px;margin-top:12px}.result{width:100%;text-align:left;border:1px solid var(--line);background:#fff;border-radius:11px;padding:11px;cursor:pointer}.result:hover{border-color:#7eb6d2;background:#f7fbfd}.result strong{display:block}.result span{display:block;color:var(--muted);font-size:11px;margin-top:3px}.mapwrap{position:relative;min-width:0}.map{height:100%;width:100%}.mapstatus{position:absolute;left:14px;bottom:16px;z-index:700;background:rgba(7,21,34,.92);color:#fff;border-radius:999px;padding:8px 12px;font-size:11px;box-shadow:var(--shadow)}.reload{position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:700;border:0;border-radius:999px;padding:10px 14px;background:#fff;color:var(--ink);font-weight:800;box-shadow:var(--shadow);cursor:pointer}.detail-head{position:sticky;top:0;background:#fff;border-bottom:1px solid var(--line);padding:15px;display:flex;justify-content:space-between;align-items:center;z-index:2}.close{border:0;background:#eef3f6;border-radius:9px;width:34px;height:34px;cursor:pointer}.detail-body{padding:18px}.badge{display:inline-flex;border-radius:999px;background:#eaf6fc;color:#0b658f;padding:6px 9px;font-size:10px;font-weight:850;text-transform:uppercase;letter-spacing:.05em}.detail-body h2{font-size:25px;margin:12px 0 6px}.address{color:var(--muted);line-height:1.45}.block{margin-top:20px;padding-top:16px;border-top:1px solid var(--line)}.block h3{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#637789}.row{margin:10px 0}.row label{display:block;font-size:10px;color:var(--muted);text-transform:uppercase}.row a{color:#0b6e9c}.empty{color:var(--muted);font-size:12px;line-height:1.5}.leaflet-popup-content-wrapper{border-radius:12px}.dot{width:15px;height:15px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.4)}
-    @media(max-width:980px){.workspace,.workspace.detail-open{grid-template-columns:320px 1fr}.details{position:fixed;right:0;top:70px;bottom:0;width:min(390px,92vw);z-index:1200}.navlink{display:none}}@media(max-width:700px){.app{grid-template-rows:62px 1fr}.topbar{padding:0 10px}.title{display:none}.workspace,.workspace.detail-open{grid-template-columns:1fr}.sidebar{position:absolute;left:8px;top:70px;bottom:10px;width:min(330px,88vw);z-index:900;border-radius:14px;box-shadow:var(--shadow)}.details{top:62px}.search{margin-left:0}}
+    :root {
+      --navy:#071522;--paper:#fff;--soft:#eef4f8;--line:#d6e1e9;--ink:#0b1f33;
+      --muted:#617487;--blue:#1976a8;--gold:#f4b942;--green:#12805c;--red:#b42318;
+      --shadow:0 18px 50px rgba(4,25,43,.18)
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);background:var(--soft)}
+    button,input{font:inherit}
+    button:disabled{opacity:.55;cursor:wait}
+    .app{height:100%;display:grid;grid-template-rows:70px 1fr}
+    .topbar{display:flex;align-items:center;gap:14px;padding:0 18px;background:var(--navy);color:#fff;z-index:1001}
+    .brand{display:flex;align-items:center;gap:10px;color:#fff;text-decoration:none;font-weight:850;white-space:nowrap}
+    .mark{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;background:linear-gradient(145deg,var(--gold),#ffe09a);color:var(--navy);font-size:12px}
+    .title small{display:block;color:#9dc5df;font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.09em}
+    .place-search{display:grid;grid-template-columns:minmax(0,1fr) auto;flex:1;max-width:720px;margin-left:auto}
+    .place-search input{width:100%;padding:11px 14px;border-radius:11px 0 0 11px;border:1px solid rgba(255,255,255,.2);border-right:0;background:#10283b;color:#fff;outline:none}
+    .place-search input::placeholder{color:#9cb0c0}
+    .place-search button{border:0;border-radius:0 11px 11px 0;padding:0 17px;background:var(--gold);color:var(--navy);font-weight:850;cursor:pointer}
+    .navlink{color:#d6e6f1;text-decoration:none;font-size:13px;white-space:nowrap}
+    .workspace{min-height:0;display:grid;grid-template-columns:365px minmax(0,1fr) 0}
+    .workspace.detail-open{grid-template-columns:365px minmax(0,1fr) 390px}
+    .sidebar,.details{background:#fff;min-height:0;overflow:auto;z-index:800}
+    .sidebar{border-right:1px solid var(--line)}
+    .details{border-left:1px solid var(--line);box-shadow:-12px 0 35px rgba(5,30,50,.1)}
+    .section{padding:18px;border-bottom:1px solid var(--line)}
+    .eyebrow{margin:0 0 5px;color:var(--blue);font-size:11px;font-weight:850;text-transform:uppercase;letter-spacing:.1em}
+    .section h1,.section h2{margin:0}.section h1{font-size:24px}.section h2{font-size:16px}
+    .notice{margin-top:12px;padding:11px;border-radius:10px;background:#fff8e7;border:1px solid #efd894;color:#6d5316;font-size:12px;line-height:1.48}
+    .search-help{margin:11px 0 0;color:var(--muted);font-size:12px;line-height:1.45}
+    .quick-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+    .secondary{border:1px solid var(--line);background:#fff;border-radius:10px;padding:10px 11px;color:#29475d;font-size:12px;font-weight:800;cursor:pointer}
+    .secondary:hover{border-color:#7eb6d2;background:#f7fbfd}
+    .metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
+    .metric{padding:10px;border:1px solid var(--line);border-radius:10px;background:#f8fbfd}
+    .metric strong{display:block;font-size:20px}.metric span{font-size:10px;color:var(--muted);text-transform:uppercase}
+    .filters{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+    .filter{border:1px solid var(--line);background:#fff;border-radius:10px;padding:9px 10px;text-align:left;font-size:12px;cursor:pointer}
+    .filter.active{border-color:var(--blue);background:#eaf6fc;color:#0c5c83;font-weight:800}
+    .results{display:grid;gap:8px;margin-top:12px}
+    .result{width:100%;text-align:left;border:1px solid var(--line);background:#fff;border-radius:11px;padding:11px;cursor:pointer}
+    .result:hover{border-color:#7eb6d2;background:#f7fbfd}.result strong{display:block}.result span{display:block;color:var(--muted);font-size:11px;margin-top:3px}
+    .result-limit{padding:8px 2px}
+    .mapwrap{position:relative;min-width:0}.map{height:100%;width:100%}
+    .mapstatus{position:absolute;left:14px;bottom:16px;z-index:700;max-width:min(620px,calc(100% - 28px));background:rgba(7,21,34,.94);color:#fff;border-radius:999px;padding:8px 12px;font-size:11px;box-shadow:var(--shadow)}
+    .mapstatus[data-tone="success"]{background:rgba(14,122,83,.95)}.mapstatus[data-tone="warning"]{background:rgba(116,79,11,.95)}.mapstatus[data-tone="error"]{background:rgba(142,31,31,.96)}
+    .reload{position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:700;border:0;border-radius:999px;padding:10px 14px;background:#fff;color:var(--ink);font-weight:850;box-shadow:var(--shadow);cursor:pointer;white-space:nowrap}
+    .reload.needs-zoom{background:#fff8e7;color:#6d5316}
+    .detail-head{position:sticky;top:0;background:#fff;border-bottom:1px solid var(--line);padding:15px;display:flex;justify-content:space-between;align-items:center;z-index:2}
+    .close{border:0;background:#eef3f6;border-radius:9px;width:34px;height:34px;cursor:pointer;font-size:22px}
+    .detail-body{padding:18px}.badge{display:inline-flex;border-radius:999px;background:#eaf6fc;color:#0b658f;padding:6px 9px;font-size:10px;font-weight:850;text-transform:uppercase;letter-spacing:.05em}
+    .detail-body h2{font-size:25px;margin:12px 0 6px}.address{color:var(--muted);line-height:1.45}
+    .detail-block{margin-top:20px;padding-top:16px;border-top:1px solid var(--line)}.detail-block h3{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#637789}
+    .detail-row{margin:10px 0}.detail-row label{display:block;font-size:10px;color:var(--muted);text-transform:uppercase}.detail-row a,.detail-block>a{color:#0b6e9c}
+    .empty{color:var(--muted);font-size:12px;line-height:1.55}.leaflet-popup-content-wrapper{border-radius:12px}
+    @media(max-width:1100px){.workspace,.workspace.detail-open{grid-template-columns:330px minmax(0,1fr)}.details{position:fixed;right:0;top:70px;bottom:0;width:min(390px,92vw);z-index:1200}.navlink{display:none}}
+    @media(max-width:720px){.app{grid-template-rows:116px 1fr}.topbar{height:116px;display:grid;grid-template-columns:1fr auto;grid-template-rows:54px 52px;padding:3px 10px 7px}.brand{grid-column:1}.place-search{grid-column:1/-1;grid-row:2;width:100%;max-width:none;margin:0}.workspace,.workspace.detail-open{grid-template-columns:1fr}.sidebar{position:absolute;left:8px;top:124px;bottom:10px;width:min(330px,88vw);z-index:900;border-radius:14px;box-shadow:var(--shadow)}.details{top:116px}.reload{top:10px}.mapstatus{bottom:10px}.title{display:block}}
   </style>
 </head>
 <body>
-<div class="app">
-  <header class="topbar">
-    <a class="brand" href="/"><span class="mark">FIQ</span><span class="title">Fuel IQ<small>Fuel Distributor Atlas</small></span></a>
-    <div class="search"><input id="search" type="search" placeholder="Search company, owner, city, state, ZIP or address"></div>
-    <a class="navlink" href="/distributors.html">Distributor Intelligence</a>
-    <a class="navlink" href="/">Site Analyzer</a>
-  </header>
-  <main id="workspace" class="workspace">
-    <aside class="sidebar">
-      <section class="section">
-        <p class="eyebrow">National location directory</p><h1>Fuel locations</h1>
-        <div class="notice"><strong>Live public map layer.</strong> This section searches OpenStreetMap for fuel distributors, heating-oil businesses, bulk plants, depots and terminals in the visible area. Owner and contact fields appear when publicly supplied by the source. It does not claim every business is present yet.</div>
-        <div class="metrics"><div class="metric"><strong id="count">0</strong><span>in view</span></div><div class="metric"><strong id="states">0</strong><span>states</span></div><div class="metric"><strong id="owners">0</strong><span>owners</span></div></div>
+  <div class="app">
+    <header class="topbar">
+      <a class="brand" href="/"><span class="mark">FIQ</span><span class="title">Fuel IQ<small>Fuel Distributor Atlas</small></span></a>
+      <form id="placeForm" class="place-search" role="search">
+        <input id="placeSearch" type="search" autocomplete="off" aria-label="Find a city, state, ZIP code, address, company, or owner" placeholder="Find city/state/ZIP, or filter loaded companies">
+        <button id="placeButton" type="submit">Find</button>
+      </form>
+      <a class="navlink" href="/distributors.html">Distributor Intelligence</a>
+      <a class="navlink" href="/">Site Analyzer</a>
+    </header>
+
+    <main id="workspace" class="workspace">
+      <aside class="sidebar">
+        <section class="section">
+          <p class="eyebrow">U.S. location directory</p>
+          <h1>Fuel locations</h1>
+          <div class="notice"><strong>Reliable regional search.</strong> The map now searches through the Fuel IQ server with multiple public-map fallbacks instead of sending one oversized browser request. It starts in Pennsylvania; use the search box or your location to move anywhere in the United States.</div>
+          <p id="searchHelp" class="search-help">Loading the starting region…</p>
+          <div class="quick-actions">
+            <button id="locate" class="secondary" type="button">My location</button>
+            <button id="resetView" class="secondary" type="button">U.S. view</button>
+          </div>
+          <div class="metrics">
+            <div class="metric"><strong id="count">0</strong><span>in view</span></div>
+            <div class="metric"><strong id="states">0</strong><span>states tagged</span></div>
+            <div class="metric"><strong id="owners">0</strong><span>owners listed</span></div>
+          </div>
+        </section>
+
+        <section class="section">
+          <p class="eyebrow">Facility type</p>
+          <h2>Filter loaded results</h2>
+          <div id="filters" class="filters">
+            <button class="filter active" type="button" data-type="all">All locations</button>
+            <button class="filter" type="button" data-type="distributor">Distributors</button>
+            <button class="filter" type="button" data-type="heating_oil">Heating oil</button>
+            <button class="filter" type="button" data-type="bulk_plant">Bulk plants</button>
+            <button class="filter" type="button" data-type="terminal">Terminals / depots</button>
+            <button class="filter" type="button" data-type="propane">Propane</button>
+          </div>
+        </section>
+
+        <section class="section">
+          <p class="eyebrow">Visible results</p>
+          <h2 id="resultTitle">Locations</h2>
+          <div id="results" class="results"><p class="empty">Loading the starting region…</p></div>
+        </section>
+      </aside>
+
+      <section class="mapwrap">
+        <div id="map" class="map" aria-label="Fuel distributor map"></div>
+        <button id="reload" class="reload" type="button">Search this map area</button>
+        <div id="status" class="mapstatus" role="status" aria-live="polite">Preparing map…</div>
       </section>
-      <section class="section"><p class="eyebrow">Facility type</p><h2>Filter the map</h2><div id="filters" class="filters">
-        <button class="filter active" data-type="all">All locations</button><button class="filter" data-type="distributor">Distributors</button><button class="filter" data-type="heating_oil">Heating oil</button><button class="filter" data-type="bulk_plant">Bulk plants</button><button class="filter" data-type="terminal">Terminals / depots</button><button class="filter" data-type="propane">Propane</button>
-      </div></section>
-      <section class="section"><p class="eyebrow">Visible results</p><h2 id="resultTitle">Locations</h2><div id="results" class="results"><p class="empty">Move or zoom the map, then select “Search this map area.”</p></div></section>
-    </aside>
-    <section class="mapwrap"><div id="map" class="map"></div><button id="reload" class="reload">Search this map area</button><div id="status" class="mapstatus">Ready to search</div></section>
-    <aside id="details" class="details" hidden><div class="detail-head"><strong>Location details</strong><button id="close" class="close">×</button></div><div id="detailBody" class="detail-body"></div></aside>
-  </main>
-</div>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin></script>
-<script>
-(()=>{'use strict';
-const map=L.map('map',{zoomControl:true}).setView([37.8,-96],4);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(map);
-const layer=L.layerGroup().addTo(map), els={workspace:document.getElementById('workspace'),search:document.getElementById('search'),filters:document.getElementById('filters'),results:document.getElementById('results'),count:document.getElementById('count'),states:document.getElementById('states'),owners:document.getElementById('owners'),status:document.getElementById('status'),reload:document.getElementById('reload'),details:document.getElementById('details'),detailBody:document.getElementById('detailBody'),close:document.getElementById('close'),resultTitle:document.getElementById('resultTitle')};
-let records=[],active='all',timer=null;
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function classify(t){const text=[t.name,t.operator,t.brand,t.description,t.product,t.fuel,t.shop,t.industrial,t.office].filter(Boolean).join(' ').toLowerCase();if(/heating oil|home heating|fuel oil/.test(text))return'heating_oil';if(/propane|lpg/.test(text))return'propane';if(/terminal|tank farm|storage terminal/.test(text))return'terminal';if(/bulk plant|bulk fuel|petroleum bulk/.test(text))return'bulk_plant';return'distributor'}
-function label(type){return({distributor:'Fuel distributor',heating_oil:'Heating oil company',bulk_plant:'Bulk plant',terminal:'Terminal / depot',propane:'Propane distributor'})[type]||'Fuel business'}
-function address(t){return [t['addr:housenumber'],t['addr:street']].filter(Boolean).join(' ')||t['addr:full']||''}
-function normalize(el){const t=el.tags||{},center=el.center||el;return{id:`${el.type}-${el.id}`,name:t.name||t.operator||t.brand||'Unnamed fuel location',owner:t.owner||t['owner:name']||'',operator:t.operator||'',phone:t.phone||t['contact:phone']||'',email:t.email||t['contact:email']||'',website:t.website||t['contact:website']||'',street:address(t),city:t['addr:city']||t['addr:town']||t['addr:village']||'',state:t['addr:state']||'',zip:t['addr:postcode']||'',lat:center.lat,lon:center.lon,type:classify(t),tags:t}}
-function visible(){const q=els.search.value.trim().toLowerCase();return records.filter(r=>(active==='all'||r.type===active)&&(!q||[r.name,r.owner,r.operator,r.street,r.city,r.state,r.zip].join(' ').toLowerCase().includes(q)))}
-function render(){const items=visible();layer.clearLayers();els.results.innerHTML='';els.count.textContent=items.length;els.states.textContent=new Set(items.map(x=>x.state).filter(Boolean)).size;els.owners.textContent=items.filter(x=>x.owner).length;els.resultTitle.textContent=`${items.length} locations`;
- if(!items.length){els.results.innerHTML='<p class="empty">No matching locations in this map area. Try a broader search or zoom out.</p>';return}
- items.slice(0,150).forEach(r=>{const icon=L.divIcon({className:'',html:`<div class="dot" style="background:${r.type==='heating_oil'?'#e48b24':r.type==='bulk_plant'?'#6f55aa':r.type==='terminal'?'#c83d4f':r.type==='propane'?'#18805d':'#1976a8'}"></div>`,iconSize:[15,15],iconAnchor:[7,7]});L.marker([r.lat,r.lon],{icon,title:r.name}).on('click',()=>open(r)).addTo(layer);const b=document.createElement('button');b.className='result';b.innerHTML=`<strong>${esc(r.name)}</strong><span>${esc(label(r.type))} · ${esc([r.city,r.state].filter(Boolean).join(', ')||r.street||'Address not supplied')}</span>`;b.onclick=()=>{map.setView([r.lat,r.lon],14);open(r)};els.results.appendChild(b)})}
-function row(name,value,link){if(!value)return`<div class="row"><label>${name}</label><span class="empty">Not publicly listed</span></div>`;return`<div class="row"><label>${name}</label>${link?`<a href="${esc(link)}" target="_blank" rel="noopener">${esc(value)}</a>`:`<span>${esc(value)}</span>`}</div>`}
-function open(r){els.details.hidden=false;els.workspace.classList.add('detail-open');const full=[r.street,[r.city,r.state].filter(Boolean).join(', '),r.zip].filter(Boolean).join(' ');els.detailBody.innerHTML=`<span class="badge">${esc(label(r.type))}</span><h2>${esc(r.name)}</h2><div class="address">${esc(full||'Address not publicly supplied')}</div><div class="block"><h3>Ownership and operation</h3>${row('Legal owner',r.owner)}${row('Operating entity',r.operator)}</div><div class="block"><h3>Public business contact</h3>${row('Phone',r.phone,r.phone?'tel:'+r.phone:null)}${row('Email',r.email,r.email?'mailto:'+r.email:null)}${row('Website',r.website,r.website)}</div><div class="block"><h3>Source</h3><p class="empty">OpenStreetMap public business and facility tags. Missing fields are left blank rather than inferred.</p><a href="https://www.openstreetmap.org/?mlat=${r.lat}&mlon=${r.lon}#map=17/${r.lat}/${r.lon}" target="_blank" rel="noopener">Open source record</a></div>`}
-els.close.onclick=()=>{els.details.hidden=true;els.workspace.classList.remove('detail-open')};
-async function load(){const b=map.getBounds(),s=b.getSouth().toFixed(5),w=b.getWest().toFixed(5),n=b.getNorth().toFixed(5),e=b.getEast().toFixed(5);els.status.textContent='Searching public fuel-location sources…';els.reload.disabled=true;const q=`[out:json][timeout:45];(nwr["office"="company"]["company"~"fuel|oil|petroleum|propane",i](${s},${w},${n},${e});nwr["industrial"~"oil|petroleum|fuel|tank_farm",i](${s},${w},${n},${e});nwr["man_made"="storage_tank"]["content"~"fuel|oil|petroleum|diesel|gasoline|propane",i](${s},${w},${n},${e});nwr["amenity"="fuel"]["fuel:diesel"="yes"](${s},${w},${n},${e});nwr["shop"~"fuel|heating_oil",i](${s},${w},${n},${e}););out center tags;`;
- try{const res=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'data='+encodeURIComponent(q)});if(!res.ok)throw new Error('Public map service returned '+res.status);const data=await res.json();const seen=new Set();records=(data.elements||[]).map(normalize).filter(r=>r.lat&&r.lon&&!seen.has(r.id)&&(seen.add(r.id),true));els.status.textContent=`${records.length} public fuel-related records loaded`;render()}catch(err){els.status.textContent='Search failed — try again';els.results.innerHTML=`<p class="empty">${esc(err.message)}. The public source may be busy.</p>`}finally{els.reload.disabled=false}}
-els.reload.onclick=load;els.filters.onclick=e=>{const b=e.target.closest('[data-type]');if(!b)return;active=b.dataset.type;els.filters.querySelectorAll('.filter').forEach(x=>x.classList.toggle('active',x===b));render()};els.search.oninput=()=>{clearTimeout(timer);timer=setTimeout(render,180)};map.on('moveend',()=>els.status.textContent='Map moved — search this area to refresh');
-})();
-</script>
+
+      <aside id="details" class="details" hidden>
+        <div class="detail-head"><strong>Location details</strong><button id="close" class="close" type="button" aria-label="Close details">×</button></div>
+        <div id="detailBody" class="detail-body"></div>
+      </aside>
+    </main>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin></script>
+  <script src="/fuel-atlas.js"></script>
 </body>
 </html>
