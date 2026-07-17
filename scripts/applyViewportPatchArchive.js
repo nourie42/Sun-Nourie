@@ -24,8 +24,5 @@ const archivePath = path.join(root, ".viewport-patch.tar.gz");
 fs.writeFileSync(archivePath, archive);
 execFileSync("tar", ["-xzf", archivePath, "-C", root], { stdio: "inherit" });
 fs.rmSync(archivePath, { force: true });
-fs.rmSync(partsDir, { recursive: true, force: true });
-fs.rmSync(path.join(root, "scripts", "applyViewportPatchArchive.js"), { force: true });
-fs.rmSync(path.join(root, ".github", "workflows", "apply-viewport-patch.yml"), { force: true });
 
 console.log("Applied and verified Fuel Atlas viewport-company patch archive.");
