@@ -4,19 +4,32 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#14233f">
-  <meta name="description" content="Weather Fusion by Sun-Nourie. Local NWS forecasts, professional AI briefings, model comparisons and interactive weather maps.">
-  <title>Weather Fusion · Sun-Nourie</title>
+  <meta name="description" content="Weather Fusion by Nourie Weather. Local NWS forecasts, professional AI briefings, model comparisons, thermal-exposure science and interactive weather maps.">
+  <title>Weather Fusion · Nourie Weather</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-  <link rel="stylesheet" href="/weather-fusion/style.css?v=2-direct">
+  <link rel="stylesheet" href="/weather-fusion/style.css?v=3-skin">
   <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script type="module" src="/weather-fusion/app.js?v=2-direct"></script>
+  <script type="module" src="/weather-fusion/app.js?v=3-skin"></script>
+  <style>
+    .brand small{letter-spacing:.16em}
+    .skin-exposure{width:min(720px,calc(100% - 24px));margin:10px auto 8px;padding:13px 16px 12px;border:1px solid rgba(255,255,255,.17);border-radius:20px;background:linear-gradient(145deg,rgba(255,255,255,.12),rgba(255,255,255,.055));box-shadow:inset 0 1px 0 rgba(255,255,255,.08);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);text-align:center}
+    .skin-kicker{font-size:10px;font-weight:800;letter-spacing:.18em;color:rgba(235,245,255,.72);margin-bottom:4px}
+    .skin-values{font-size:clamp(16px,3.4vw,23px);font-weight:680;letter-spacing:-.02em;color:#fff;line-height:1.25}
+    .skin-science{font-size:12px;color:rgba(230,240,252,.78);margin-top:5px;line-height:1.4}
+    .skin-disclaimer{font-size:10px;color:rgba(220,232,248,.58);margin-top:3px;line-height:1.35}
+    .thermal-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:14px 0}
+    .thermal-grid>div{padding:12px;border:1px solid rgba(255,255,255,.10);border-radius:14px;background:rgba(255,255,255,.035)}
+    .thermal-grid strong{display:block;margin-bottom:4px}
+    .thermal-grid p{margin:0}
+    @media(max-width:640px){.skin-exposure{width:calc(100% - 18px);padding:11px 12px}.skin-values{font-size:17px}.skin-science{font-size:11px}.thermal-grid{grid-template-columns:1fr}}
+  </style>
 </head>
 <body data-sky="day">
   <a class="skip-link" href="#forecast">Skip to forecast</a>
   <div class="atmosphere" aria-hidden="true"><div class="sky-glow"></div><div class="cloud cloud-one"></div><div class="cloud cloud-two"></div><div class="stars"></div></div>
   <div class="shell">
     <header class="topbar">
-      <a class="brand" href="/weather-fusion"><span class="brand-sun" aria-hidden="true">◒</span><span>Weather <b>Fusion</b><small>BY SUN-NOURIE</small></span></a>
+      <a class="brand" href="/weather-fusion"><span class="brand-sun" aria-hidden="true">◒</span><span>Weather <b>Fusion</b><small>NOURIE WEATHER</small></span></a>
       <nav aria-label="Page tools"><a class="back-link" href="/">← Back to Sun-Nourie</a><button class="icon-button" id="refresh" title="Refresh weather" aria-label="Refresh weather">↻</button></nav>
     </header>
     <div class="location-bar">
@@ -33,6 +46,12 @@
         <div class="eyebrow" id="hero-date">YOUR WEATHER, IN FOCUS</div>
         <h1 id="city-name">Knightdale / Raleigh</h1>
         <div class="hero-temperature" id="temperature">—<span>°</span></div>
+        <div class="skin-exposure" id="skin-exposure" aria-live="polite">
+          <div class="skin-kicker">EXPOSED-SKIN THERMAL EQUIVALENT</div>
+          <div class="skin-values" id="skin-values">Calculating shade and sun exposure…</div>
+          <div class="skin-science" id="skin-science">Uses air temperature, dew point / humidity, wet-bulb temperature, wind and solar exposure.</div>
+          <div class="skin-disclaimer">Equivalent outdoor thermal exposure — not a measurement of your literal skin-surface temperature.</div>
+        </div>
         <div class="hero-condition" id="condition">Gathering the latest forecast</div>
         <div class="hero-range" id="high-low">High —° <span>Low —°</span></div>
         <div class="observation-label" id="observation-label">Official NWS forecasts · model-aware insight</div>
@@ -64,12 +83,141 @@
         <div class="section-top"><h2 id="evidence-title">◈ &nbsp; BEHIND THE FORECAST</h2><span>Evidence, not guesswork</span></div>
         <div class="feed-health" id="feed-health"></div>
         <details class="evidence-detail"><summary>Latest local NWS forecast discussion <span id="afd-office"></span></summary><p id="afd-stamp" class="muted"></p><pre id="afd-text">The local office discussion is loading.</pre><a id="afd-link" href="https://www.weather.gov/" target="_blank" rel="noopener noreferrer">Read the original NWS discussion ↗</a></details>
+        <details class="evidence-detail"><summary>Exposed-skin thermal science</summary>
+          <p>The number under the current temperature is an <strong>equivalent thermal-exposure temperature</strong>, not a claim that a person’s skin is physically at that temperature. Actual skin temperature depends on physiology, clothing, activity, acclimatization and exposure time, which weather observations cannot determine.</p>
+          <div class="thermal-grid">
+            <div><strong>Shade equivalent</strong><p>Uses NWS heat index in hot/humid conditions, NWS wind chill in cold/windy conditions, and Steadman apparent temperature between those regimes so humidity/dew point and wind remain represented.</p></div>
+            <div><strong>Wet bulb</strong><p>Estimated with the Stull (2011) wet-bulb approximation when its published temperature/humidity range is satisfied. Wet bulb represents evaporative-cooling potential; it is not WBGT.</p></div>
+            <div><strong>Direct sun</strong><p>The shade equivalent is adjusted only during daylight using solar elevation and the NWS research-based guidance that full sun can materially raise apparent heat. Forecast sky wording attenuates the adjustment when clouds, rain or fog are present.</p></div>
+            <div><strong>Why not call it skin temperature?</strong><p>Physiological indices such as UTCI model thermal strain using air temperature, vapor pressure, wind and mean radiant temperature. They do not imply one unique physical skin temperature for every person.</p></div>
+          </div>
+          <p class="muted">Primary references: <a href="https://www.weather.gov/safety/heat-index" target="_blank" rel="noopener noreferrer">NWS Heat Index ↗</a> · <a href="https://www.weather.gov/safety/cold-faqs" target="_blank" rel="noopener noreferrer">NWS Wind Chill ↗</a> · <a href="https://journals.ametsoc.org/view/journals/apme/50/11/jamc-d-11-0143.1.xml" target="_blank" rel="noopener noreferrer">Stull wet-bulb approximation ↗</a> · <a href="https://www.osha.gov/heat-exposure/wbgt-calculator" target="_blank" rel="noopener noreferrer">OSHA outdoor WBGT science ↗</a> · <a href="https://www.utci.org/utci_calc.php" target="_blank" rel="noopener noreferrer">UTCI ↗</a>.</p>
+        </details>
         <details class="evidence-detail"><summary>Models, timing & forecast policy</summary><p id="methodology"></p><div class="policy-grid"><div><strong>Models actually used</strong><p>HRRR, ECMWF IFS and NOAA NBM point values are decoded from provider GRIB2 data. Model initialization, coverage and availability are checked before contributing. The two saved locations have native model inputs; other searched locations retain NWS coverage.</p></div><div><strong>AI explains the evidence</strong><p>The AI receives the blended numbers, individual model estimates, HRRR simulated reflectivity and latest local NWS discussion. It cannot change numeric cards or official alerts. Starting blend weights are not a statistically calibrated skill ranking.</p></div><div><strong>Precipitation windows</strong><p>The main metric shows the next 24 hours. Daily cards show the remaining period through 7 AM, or complete 7 AM–7 AM future days. Totals are liquid equivalent, not measured rainfall. Interpolation within coarse model intervals does not establish storm arrival times.</p></div></div><p class="muted" id="google-status">Google WeatherNext is not currently included: approved forecast dataset access is required. A text-generation model is not a substitute for numerical weather data.</p><p class="muted">Map images use the same decoded runs as the point inputs. HRRR reflectivity is a forecast, not live radar. ECMWF rain accumulates from its model initialization; NBM rain uses the interval shown under the map. Cloud/wind/temperature maps use ECMWF. Regional map coverage: North Carolina and surrounding areas.</p><p class="muted">External comparisons: <a href="https://weather.us/model-charts/rapid-us/north-carolina/radar-reflectivity.html" target="_blank" rel="noopener noreferrer">Weather.us HRRR ↗</a> · <a href="https://weather.us/model-charts/euro/north-carolina/acc-total-precipitation.html" target="_blank" rel="noopener noreferrer">Weather.us ECMWF ↗</a>. These references do not supply the numeric forecast and are not embedded.</p><div id="source-register"></div></details>
       </section>
-      <footer><div><span class="footer-brand">Weather Fusion</span><p>Thoughtfully presented. Grounded in the forecast.</p></div><p>Not an official NWS product. Always follow official warnings.<br>Sources: NOAA / NWS · NOAA/NCEP HRRR & NBM · ECMWF Open Data (CC BY 4.0) · USGS The National Map</p><p class="privacy">Location searches and coordinates are sent to weather providers. AI briefings send the selected location and public forecast data to OpenAI; no Sun-Nourie business records are included. Weather model maps are generated from public provider data, not embedded third-party webpages. Your browser location is requested only when you choose the location button.</p></footer>
+      <footer><div><span class="footer-brand">Weather Fusion</span><p>Nourie Weather · thoughtfully presented · grounded in the forecast.</p></div><p>Not an official NWS product. Always follow official warnings.<br>Sources: NOAA / NWS · NOAA/NCEP HRRR & NBM · ECMWF Open Data (CC BY 4.0) · USGS The National Map</p><p class="privacy">Location searches and coordinates are sent to weather providers. AI briefings send the selected location and public forecast data to OpenAI; no Sun-Nourie business records are included. Weather model maps are generated from public provider data, not embedded third-party webpages. Your browser location is requested only when you choose the location button.</p></footer>
     </main>
   </div>
   <dialog id="day-dialog" aria-labelledby="day-title"><button id="close-day" class="dialog-close" aria-label="Close daily forecast">×</button><div id="day-content"></div></dialog>
   <noscript><p class="noscript">Weather Fusion requires JavaScript. Visit <a href="https://www.weather.gov/">weather.gov</a> for official forecasts and warnings.</p></noscript>
+  <script>
+    (() => {
+      const originalFetch = window.fetch.bind(window);
+      const finiteNumber = (n) => typeof n === 'number' && Number.isFinite(n);
+      const fToC = (f) => (f - 32) / 1.8;
+      const cToF = (c) => c * 1.8 + 32;
+      const round = (n) => finiteNumber(n) ? Math.round(n) : null;
+      const saturationHpa = (c) => 6.112 * Math.exp((17.67 * c) / (c + 243.5));
+      function rhFromTemperatureDewpoint(tempF, dewF) {
+        if (!finiteNumber(tempF) || !finiteNumber(dewF)) return null;
+        const rh = 100 * saturationHpa(fToC(dewF)) / saturationHpa(fToC(tempF));
+        return Math.max(0, Math.min(100, rh));
+      }
+      function wetBulbStull(tempF, rh) {
+        if (!finiteNumber(tempF) || !finiteNumber(rh)) return null;
+        const t = fToC(tempF);
+        // Stull (2011) approximation: published for 0–50 C and 5–99% RH.
+        if (t < 0 || t > 50 || rh < 5 || rh > 99) return null;
+        const tw = t * Math.atan(0.151977 * Math.sqrt(rh + 8.313659)) + Math.atan(t + rh) - Math.atan(rh - 1.676331) + 0.00391838 * rh ** 1.5 * Math.atan(0.023101 * rh) - 4.686035;
+        return cToF(tw);
+      }
+      function heatIndex(tempF, rh) {
+        if (!(tempF >= 80) || !finiteNumber(rh)) return null;
+        const simple = 0.5 * (tempF + 61 + 1.2 * (tempF - 68) + 0.094 * rh);
+        if ((simple + tempF) / 2 < 80) return tempF;
+        let hi = -42.379 + 2.04901523 * tempF + 10.14333127 * rh - 0.22475541 * tempF * rh - 0.00683783 * tempF ** 2 - 0.05481717 * rh ** 2 + 0.00122874 * tempF ** 2 * rh + 0.00085282 * tempF * rh ** 2 - 0.00000199 * tempF ** 2 * rh ** 2;
+        if (rh < 13 && tempF >= 80 && tempF <= 112) hi -= (13 - rh) / 4 * Math.sqrt((17 - Math.abs(tempF - 95)) / 17);
+        else if (rh > 85 && tempF <= 87) hi += (rh - 85) / 10 * (87 - tempF) / 5;
+        return hi;
+      }
+      function windChill(tempF, windMph) {
+        if (!(tempF <= 50) || !(windMph > 3)) return null;
+        return 35.74 + 0.6215 * tempF - 35.75 * windMph ** 0.16 + 0.4275 * tempF * windMph ** 0.16;
+      }
+      function steadmanShade(tempF, rh, dewF, windMph) {
+        if (!finiteNumber(tempF) || !finiteNumber(windMph)) return null;
+        const t = fToC(tempF), wind = windMph * 0.44704;
+        const vapor = finiteNumber(dewF) ? saturationHpa(fToC(dewF)) : finiteNumber(rh) ? saturationHpa(t) * rh / 100 : null;
+        if (!finiteNumber(vapor)) return null;
+        // Steadman/BOM apparent temperature for an adult walking outdoors in shade.
+        return cToF(t + 0.33 * vapor - 0.70 * wind - 4.0);
+      }
+      function shadeEquivalent(tempF, rh, dewF, windMph) {
+        const wc = windChill(tempF, windMph);
+        if (finiteNumber(wc)) return { value: wc, method: 'NWS wind chill' };
+        const hi = heatIndex(tempF, rh);
+        if (finiteNumber(hi) && tempF >= 80) return { value: hi, method: 'NWS heat index' };
+        const at = steadmanShade(tempF, rh, dewF, windMph);
+        return finiteNumber(at) ? { value: at, method: 'Steadman apparent temperature' } : { value: tempF, method: 'air temperature' };
+      }
+      function solarElevation(ms, latitude, longitude) {
+        if (!finiteNumber(ms) || !finiteNumber(latitude) || !finiteNumber(longitude)) return null;
+        const rad = Math.PI / 180, d = ms / 86400000 - 10957.5, lw = -longitude * rad, phi = latitude * rad;
+        const m = rad * (357.5291 + 0.98560028 * d);
+        const l = m + rad * (1.9148 * Math.sin(m) + 0.0200 * Math.sin(2 * m) + 0.0003 * Math.sin(3 * m)) + rad * 102.9372 + Math.PI;
+        const e = rad * 23.4397;
+        const dec = Math.asin(Math.sin(l) * Math.sin(e));
+        const ra = Math.atan2(Math.sin(l) * Math.cos(e), Math.cos(l));
+        const sidereal = rad * (280.16 + 360.9856235 * d) - lw;
+        const h = sidereal - ra;
+        return Math.asin(Math.sin(phi) * Math.sin(dec) + Math.cos(phi) * Math.cos(dec) * Math.cos(h));
+      }
+      function skyTransmission(condition) {
+        const text = String(condition || '').toLowerCase();
+        if (/thunder|storm|rain|shower|drizzle|fog|mist/.test(text)) return 0.18;
+        if (/overcast/.test(text)) return 0.12;
+        if (/mostly cloudy/.test(text)) return 0.32;
+        if (/cloudy/.test(text)) return 0.42;
+        if (/partly cloudy/.test(text)) return 0.66;
+        if (/mostly sunny|few clouds/.test(text)) return 0.86;
+        if (/sunny|clear/.test(text)) return 1;
+        return 0.72;
+      }
+      function renderSkinExposure(data) {
+        const values = document.getElementById('skin-values'), science = document.getElementById('skin-science');
+        if (!values || !science || !data?.current) return;
+        const c = data.current, temp = c.temperature, wind = c.wind;
+        const rh = finiteNumber(c.humidity) ? c.humidity : rhFromTemperatureDewpoint(temp, c.dewpoint);
+        const shade = shadeEquivalent(temp, rh, c.dewpoint, finiteNumber(wind) ? wind : 0);
+        const wetBulb = wetBulbStull(temp, rh);
+        const when = Date.parse(data.assembledAt || c.time || new Date().toISOString());
+        const elevation = solarElevation(when, data.location?.latitude, data.location?.longitude);
+        const daylight = finiteNumber(elevation) && elevation > 0;
+        let sun = null, solarAdjustment = 0;
+        if (daylight && finiteNumber(shade.value)) {
+          const elevationFactor = Math.pow(Math.max(0, Math.sin(elevation)), 0.65);
+          const cloudFactor = skyTransmission(c.condition || data.hours?.[0]?.condition);
+          const maximum = finiteNumber(temp) && temp <= 50 ? 18 : 15;
+          solarAdjustment = maximum * elevationFactor * cloudFactor;
+          sun = shade.value + solarAdjustment;
+        }
+        const shadeText = finiteNumber(shade.value) ? `${round(shade.value)}° shade` : 'shade unavailable';
+        const sunText = finiteNumber(sun) ? `${round(sun)}° direct sun` : daylight ? 'direct sun unavailable' : 'sun below horizon';
+        values.textContent = `${shadeText} · ${sunText}`;
+        const facts = [];
+        if (finiteNumber(wetBulb)) facts.push(`wet bulb ${round(wetBulb)}°`);
+        if (finiteNumber(c.dewpoint)) facts.push(`dew point ${round(c.dewpoint)}°`);
+        if (finiteNumber(rh)) facts.push(`RH ${round(rh)}%`);
+        if (finiteNumber(wind)) facts.push(`wind ${round(wind)} mph`);
+        if (finiteNumber(solarAdjustment) && solarAdjustment > 0.4) facts.push(`solar load +${round(solarAdjustment)}° est.`);
+        science.textContent = `${shade.method}${facts.length ? ` · ${facts.join(' · ')}` : ''}`;
+      }
+      window.fetch = async (...args) => {
+        const response = await originalFetch(...args);
+        try {
+          const request = args[0];
+          const url = typeof request === 'string' ? request : request?.url || '';
+          if (url.includes('/api/weather-fusion/forecast')) response.clone().json().then(renderSkinExposure).catch(() => {});
+        } catch { /* The core weather app owns its own fetch error handling. */ }
+        return response;
+      };
+      document.addEventListener('click', (event) => {
+        if (!event.target.closest('.location-bar button')) return;
+        const values = document.getElementById('skin-values'), science = document.getElementById('skin-science');
+        if (values) values.textContent = 'Updating thermal exposure…';
+        if (science) science.textContent = 'Recalculating from the selected location’s weather observations.';
+      });
+    })();
+  </script>
 </body>
 </html>
