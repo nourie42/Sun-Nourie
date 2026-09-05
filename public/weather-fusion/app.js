@@ -1,4 +1,6 @@
-/* Weather Fusion browser client. Forecast values never originate in AI prose. */
+import {renderComfort,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js';
+import {dailyDisplay} from './weather-math.js';
+/* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);
 const presets = {
   knightdale: { id: 'knightdale', name: 'Knightdale / Raleigh', latitude: 35.787, longitude: -78.4806 },
@@ -69,22 +71,24 @@ function render(data) {
   $('hero-date').textContent = new Intl.DateTimeFormat('en-US', { timeZone: data.location.timeZone, weekday: 'long', month: 'long', day: 'numeric' }).format(new Date()).toUpperCase();
   $('temperature').innerHTML = `${number(c.temperature)}<span>°</span>`;
   $('condition').textContent = c.condition || (data.hours[0]?.condition ? `${data.hours[0].condition} · forecast` : 'Current condition description unavailable');
-  $('high-low').innerHTML = `High ${temperature(d.high)} <span>Low ${temperature(d.low)}</span>`;
-  $('observation-label').textContent = c.type === 'observation' ? `Observed at ${c.station} · ${clock(c.time)} · nearby station, not your exact address` : 'Current observation unavailable · showing forecast guidance';
+  const currentDay = dailyDisplay(d, 0, Date.now(), data.location.timeZone);
+  $('high-low').innerHTML = currentDay.tonight ? `Tonight’s low ${temperature(d.low)}` : `High ${temperature(d.high)} <span>Low ${temperature(d.low)}</span>`;
+  $('observation-label').textContent = c.type === 'observation' ? `Nearby weather station · updated ${clock(c.time)}` : 'Estimated current conditions';
   $('hero-scene').innerHTML = icon(c.condition || data.hours[0]?.condition, day, 120);
   document.querySelectorAll('[data-place]').forEach((button) => { const active = button.dataset.place === place.id; button.classList.toggle('active', active); button.setAttribute('aria-pressed', String(active)); });
   renderAlerts(data);
   renderHours(data);
   renderDays(data);
+  renderComfort(data);
   renderMetrics(data);
   renderEvidence(data);
   if (currentBriefing?.signature !== data.signature) {
-    renderBriefing({ mode: 'nws-summary', signature: data.signature, headline: d.condition, summary: d.detail || 'The official forecast is temporarily unavailable.', nearTerm: d.nightDetail, extended: data.days[1]?.detail,
-      uncertainty: 'Available model comparisons are shown in the daily details. Agreement is not a guarantee.', reason: data.aiConfigured ? 'Updating AI synthesis from the latest source forecast…' : 'AI is not configured. Showing the official NWS text.', sources: ['nws'] });
+    renderBriefing({ mode: 'nws-summary', signature: data.signature, headline: currentDay.tonight ? 'Your evening outlook' : d.condition, summary: currentDay.detail || 'The official forecast is temporarily unavailable.', nearTerm: d.nightDetail, extended: data.days[1]?.detail,
+      uncertainty: 'Forecasts can change, especially the timing of showers.', reason: data.aiConfigured ? 'Updating your local outlook…' : 'National Weather Service forecast', sources: ['nws'] });
   }
   if (map) { marker?.setLatLng([place.latitude, place.longitude]); renderMapWarnings(data); }
-  const unavailable = data.feeds.filter((f) => ['unavailable', 'stale', 'not-configured'].includes(f.status));
-  $('status').textContent = `Checked ${clock(data.assembledAt)} · ${unavailable.length ? `${unavailable.length} source${unavailable.length === 1 ? '' : 's'} limited — see feed health` : 'Source feeds available'} · °F / mph / inches`;
+  const unavailable = data.feeds.filter((f) => ['unavailable', 'stale', 'not-configured', 'not-covered'].includes(f.status));
+  $('status').textContent = `Updated ${clock(data.assembledAt)}${unavailable.length ? ' · Some details are unavailable' : ''}`;
   $('status').classList.toggle('error', unavailable.length > 0);
 }
 function renderAlerts(data) {
@@ -100,32 +104,11 @@ function renderHours(data) {
   $('hourly').innerHTML = data.hours.length ? data.hours.map((h, i) => `<div class="hour ${i === 0 ? 'now' : ''}" title="${esc(h.condition)} · NWS rain chance ${percent(h.pop)} · ${esc(h.wind)} ${esc(h.windDirection)}"><span>${i === 0 ? 'Now' : esc(shortHour(h.time))}</span>${icon(h.condition, h.isDay)}<strong>${temperature(h.temperature)}</strong><small>${finite(h.pop) ? percent(h.pop) : '—'}</small></div>`).join('') : '<p class="muted">Official hourly guidance is unavailable. No substitute forecast has been invented.</p>';
   $('hourly').scrollLeft = position;
 }
-function renderDays(data) {
-  const valid = data.days.flatMap((d) => [d.high, d.low]).filter(finite);
-  const low = valid.length ? Math.min(...valid) : 0, high = valid.length ? Math.max(...valid) : 1, range = Math.max(1, high - low);
-  $('daily').innerHTML = data.days.map((d, i) => {
-    const left = finite(d.low) ? Math.max(0, Math.min(100, (d.low - low) / range * 100)) : 0;
-    const width = finite(d.high) && finite(d.low) ? Math.max(2, Math.min(100 - left, (d.high - d.low) / range * 100)) : 0;
-    return `<button class="day-row" data-day="${i}" aria-label="${esc(d.label)}, ${esc(d.condition)}, high ${number(d.high)}, low ${number(d.low)}, NWS rain chance ${percent(d.pop)}. Open details."><span class="day-name">${esc(d.label)}</span><span class="day-icon">${icon(d.condition)}<small>${finite(d.pop) ? percent(d.pop) : '—'}</small></span><span class="day-low">${temperature(d.low)}</span><span class="temp-track"><span class="temp-fill" style="left:${left}%;width:${width}%"></span></span><span class="day-high">${temperature(d.high)}</span></button>`;
-  }).join('');
-}
+function renderDays(data) { renderDailyRows(data, icon); }
 function compass(degrees) {
   return finite(degrees) ? ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'][Math.round(degrees / 22.5) % 16] : 'Direction unavailable';
 }
-function renderMetrics(data) {
-  const c = data.current, d = data.days[0];
-  const card = (title, type, value, note, extra = '', cls = '') => `<article class="glass metric ${cls}"><h2>${smallIcon(type)}${title}</h2><div class="metric-value">${value}</div>${extra}<p>${esc(note)}</p></article>`;
-  $('metrics').innerHTML = [
-    card('FEELS LIKE', 'temp', temperature(c.apparent), c.apparentSource || 'Feels-like calculation unavailable.'),
-    card('PRECIPITATION', 'drop', finite(data.precipitation?.value) ? `${number(data.precipitation.value, 2)}<small>in</small>` : '—', `Next 24 hours from ${clock(data.precipitation?.start)} · ${data.precipitation?.source || 'Unavailable'}. Forecast liquid equivalent.`),
-    card('WIND', 'wind', `${number(c.wind)}<small>mph</small>`, `${compass(c.windDirection)} · ${c.type === 'observation' ? 'station observation' : 'model guidance'}`, `<div class="tiny-value">Gusts ${finite(c.gust) ? `${number(c.gust)} mph` : 'unavailable'}</div>${finite(c.windDirection) ? `<div class="compass" aria-hidden="true"><span class="north">N</span><div class="needle" style="transform:rotate(${c.windDirection}deg)"></div></div>` : ''}`, 'metric-wind'),
-    card('HUMIDITY', 'drop', `${number(c.humidity)}<small>%</small>`, `Dew point ${temperature(c.dewpoint)} · ${c.type === 'observation' ? 'nearby station' : 'model guidance'}`, `<div class="mini-track" aria-hidden="true"><div style="width:${finite(c.humidity) ? Math.max(0, Math.min(100, c.humidity)) : 0}%"></div></div>`),
-    card('RAIN CHANCE', 'drop', percent(d.pop), `NWS day ${percent(d.popDay)} · night ${percent(d.popNight)}. Highest period shown, not a combined daily probability.`),
-    card('VISIBILITY', 'eye', `${number(c.visibility, 1)}<small>mi</small>`, finite(c.visibility) ? 'Latest available nearby station observation.' : 'The observation feed did not supply visibility.'),
-    card('PRESSURE', 'gauge', `${number(c.pressure, 2)}<small>inHg</small>`, finite(c.pressure) ? 'Station barometric pressure. No trend is inferred from one reading.' : 'Station pressure is currently unavailable.'),
-    card('SUNSET', 'sun', data.solar.sunset ? esc(clock(data.solar.sunset)) : '—', data.solar.sunrise ? `Sunrise ${clock(data.solar.sunrise)} · calculated local time.` : 'Astronomical times are temporarily unavailable.', data.solar.sunset ? '<div class="sun-arc" aria-hidden="true"></div>' : '', 'metric-sun'),
-  ].join('');
-}
+function renderMetrics(data) { renderMetricTiles(data, smallIcon); }
 function renderEvidence(data) {
   const important = ['nws', 'afd', 'hrrr', 'ecmwf', 'nbm', 'alerts'];
   const labels = { nws: 'NWS', afd: 'Local discussion', hrrr: 'HRRR', ecmwf: 'ECMWF IFS', nbm: 'National Blend', alerts: 'Alerts' };
@@ -148,14 +131,16 @@ function renderBriefing(data) {
   currentBriefing = data;
   $('briefing-title').textContent = data.headline || 'Local forecast';
   $('briefing-summary').textContent = data.summary || 'The source forecast is currently unavailable.';
-  $('ai-label').textContent = data.mode === 'ai' ? 'AI + NUMERICAL MODELS' : 'OFFICIAL NWS TEXT';
+  $('ai-label').textContent = data.mode === 'ai' ? 'YOUR LOCAL OUTLOOK' : 'NWS FORECAST';
   const refs = (data.sources || []).filter((id) => ['nws', 'afd', 'hrrr', 'ecmwf', 'nbm'].includes(id)).map((id) => {
     const f = forecast?.feeds.find((s) => s.id === id);
     const url = id === 'afd' ? forecast?.discussion?.url : f?.url;
     return url && /^https:\/\/(api\.weather\.gov|www\.nco\.ncep\.noaa\.gov|www\.ecmwf\.int)\//.test(url) ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(f?.label || id)} ↗</a>` : esc(f?.label || id);
   });
-  $('briefing-detail').innerHTML = `<div><strong>Tonight & near term</strong><p>${esc(data.nearTerm || 'See the official hourly forecast below.')}</p></div><div><strong>Looking ahead</strong><p>${esc(data.extended || 'Extended details are currently unavailable.')}</p></div><div><strong>Confidence & uncertainty</strong><p>${esc(data.uncertainty || '')}</p></div><div><strong>Sources used</strong><p>${refs.join(' · ')}</p></div>`;
-  $('briefing-stamp').textContent = data.mode === 'ai' ? `AI synthesis · ${clock(data.generatedAt)} · checked against this forecast’s source signature` : data.reason || 'Official NWS wording; not an AI-generated forecast.';
+  $('briefing-detail').innerHTML = `<div><strong>Tonight & tomorrow</strong><p>${esc(data.nearTerm || 'See the hourly forecast below.')}</p></div><div><strong>The week ahead</strong><p>${esc(data.extended || 'More details will appear with the next update.')}</p></div><div><strong>What could change</strong><p>${esc(data.uncertainty || '')}</p></div>`;
+  $('briefing-stamp').textContent = data.mode === 'ai' ? `Updated ${clock(data.generatedAt)} · based on your local NWS discussion` : 'National Weather Service forecast';
+  $('outlook-science').innerHTML = `<p>Summary type: ${esc(data.mode === 'ai' ? 'AI plain-language paraphrase of the local discussion, checked against the point forecast and available model data' : 'Official NWS forecast fallback; not an AI paraphrase')}. ${esc(data.reason || '')}</p><p>Sources used: ${refs.join(' · ') || 'Waiting for the local outlook'}</p>`;
+
 }
 async function load({ moveMap = false } = {}) {
   const id = ++generation;
@@ -189,6 +174,8 @@ async function load({ moveMap = false } = {}) {
 function chooseLocation(value) {
   place = { ...value };
   currentBriefing = null;
+  resetExperience();
+  if ($('day-dialog').open) $('day-dialog').close();
   // Clear the previous location immediately, including its alerts and AI text.
   forecast = null;
   $('city-name').textContent = value.name;
@@ -213,22 +200,13 @@ function chooseLocation(value) {
   void load({ moveMap: true });
 }
 function showDay(index) {
-  const d = forecast?.days[index];
-  if (!d) return;
-  const names = { hrrr: 'NOAA HRRR', ecmwf: 'ECMWF IFS · 0.25°', nbm: 'NOAA National Blend' };
-  const hasModelValues = (v = {}) => [v.high, v.low, v.qpf, v.gust].some(finite);
-  const hrrrRunAt = forecast?.modelContributions?.find((model) => model.id === 'hrrr')?.runAt || forecast?.assembledAt;
-  const hrrrRunMs = Date.parse(hrrrRunAt || '');
-  const dayWindowEndMs = Date.parse(d.qpfWindow?.end || '');
-  const hrrrOutside24h = Number.isFinite(hrrrRunMs) && Number.isFinite(dayWindowEndMs) && dayWindowEndMs > hrrrRunMs + 24 * 60 * 60 * 1000;
-  const modelRows = Object.entries(d.guidance)
-    .filter(([id, v]) => !(id === 'hrrr' && hrrrOutside24h && !hasModelValues(v)))
-    .map(([id,v])=>`<tr><td>${names[id] || esc(id)}</td><td>${temperature(v.high)} / ${temperature(v.low)}</td><td>${inches(v.qpf)}</td><td>${finite(v.gust)?`${number(v.gust)} mph`:'—'}</td></tr>`).join('');
-  const weights = (blend) => (blend?.sources || []).map(x=>`${x.id.toUpperCase()} ${Math.round(x.weight*100)}%`).join(' / ') || 'Unavailable';
-  const eveningLabel = d.label === 'Today' ? 'Tonight' : 'Evening';
-  $('day-content').innerHTML = `<div class="dialog-eyebrow">${esc(d.date)} · Weather Fusion</div><h2 id="day-title" class="dialog-title">${esc(d.label==='Today'?'Today & tonight':d.label)}</h2><p class="dialog-condition">${esc(d.condition)}</p><div class="dialog-temps">${temperature(d.high)}<span>${temperature(d.low)}</span></div><div class="dialog-stats"><div><strong>${percent(d.popDay)} / ${percent(d.popNight)}</strong><small>Official NWS chance · day / night</small></div><div><strong>${inches(d.qpf)}</strong><small>${esc(d.qpfWindowLabel || 'Forecast window')}</small></div></div><p class="dialog-prose"><strong>Official NWS detail:</strong> ${esc(d.detail || 'Unavailable')}</p>${d.nightDetail && d.nightDetail!==d.detail?`<p class="dialog-prose"><strong>${esc(eveningLabel)}:</strong> ${esc(d.nightDetail)}</p>`:''}<h3 class="dialog-subtitle">Source comparison · ${esc(d.agreement)}</h3><table class="comparison"><thead><tr><th>Source</th><th>High / low</th><th>Precipitation</th><th>Peak gust</th></tr></thead><tbody><tr><td><strong>Weather Fusion</strong></td><td>${temperature(d.high)} / ${temperature(d.low)}</td><td>${inches(d.qpf)}</td><td>—</td></tr><tr><td>NWS official</td><td>${temperature(d.official?.high)} / ${temperature(d.official?.low)}</td><td>${inches(d.qpfBlend?.sourceValues?.nws)}</td><td>—</td></tr>${modelRows}</tbody></table><p class="table-note"><strong>Temperature blend:</strong> high ${esc(weights(d.highBlend))}; low ${esc(weights(d.lowBlend))}.</p><p class="table-note"><strong>Precipitation blend:</strong> ${esc(d.qpfSource)}. ${esc(clock(d.qpfWindow.start,{month:'short',day:'numeric'}))} → ${esc(clock(d.qpfWindow.end,{month:'short',day:'numeric'}))}.</p><p class="table-note">Model temperatures are aligned to NWS daytime / overnight forecast periods. Missing coverage is not zero. Forecast-model rows with no coverage because the requested day is beyond that model’s horizon are omitted. Coarse model precipitation intervals are prorated at window boundaries. These are forecast values, not measured accumulation.</p><p class="table-note">Starting blend weights are uncalibrated; model agreement is not an accuracy probability. Official NWS rain probability and warnings remain separate.</p>`;
+  const d=forecast?.days[index]; if(!d) return;
+  const p=dailyDisplay(d,index,Date.now(),forecast.location.timeZone);
+  $('day-content').innerHTML=`<div class="dialog-eyebrow">WEATHER NOURIE</div><h2 id="day-title" class="dialog-title">${esc(p.label)}</h2><p class="dialog-condition">${esc(p.condition)}</p><div class="dialog-temps">${temperature(p.primary)}<span>${p.primaryLabel.toLowerCase()}${!p.tonight&&finite(p.secondary)?` · ${temperature(p.secondary)} low`:''}</span></div><div class="dialog-stats"><div><strong>${percent(p.pop)}</strong><small>${p.tonight?'Rain chance tonight':'Rain chance'}</small></div><div><strong>${inches(d.qpf)}</strong><small>${p.tonight?'Forecast rain through morning':'Expected rain'}</small></div></div><p class="dialog-prose">${esc(p.detail || 'More details will appear when the forecast updates.')}</p>${!p.tonight&&d.nightDetail?`<h3 class="dialog-subtitle">Overnight</h3><p class="dialog-prose">${esc(d.nightDetail)}</p>`:''}<a href="#scientific-stuff" class="science-link" id="day-science-link">Scientific stuff ↓</a>`;
   $('day-dialog').showModal();
+  $('day-science-link').addEventListener('click',()=>$('day-dialog').close());
 }
+
 function setBasemap() {
   if (!map || !window.L) return;
   if (baseLayer) map.removeLayer(baseLayer);
@@ -393,5 +371,6 @@ $('locate').addEventListener('click', () => {
 document.addEventListener('visibilitychange', () => { if (document.hidden) stopRadar(); else if (!busy) void load(); });
 // The site refreshes while open; this is not a push-alert system or background task.
 setInterval(() => { if (!document.hidden && !busy) void load(); }, 60000);
+installExperience();
 readSaved();
 void load({ moveMap: true });

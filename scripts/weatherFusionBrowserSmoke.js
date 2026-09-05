@@ -14,6 +14,7 @@ const report={checkedAt:new Date().toISOString(),base,locations:[],maps:[],brows
 for(const location of ['knightdale','greenville']){
  const data=await json('/api/weather-fusion/forecast?location='+location);
  assert.equal(data.version,'weather-fusion-v2-direct');
+ assert.equal(data.experienceVersion,'weather-nourie-friendly-v1');
  assert.equal(data.directModelStatus,'ready',`${location}: ${JSON.stringify(data.feeds)}`);
  assert.equal(data.modelContributions.length,3);
  assert.equal(data.days.length,7);assert.ok(data.days.slice(1).every(d=>Number.isFinite(d.high)&&Number.isFinite(d.low)));
@@ -41,15 +42,15 @@ try{
  await page.waitForFunction(()=>{
   const value=document.querySelector('#skin-values')?.textContent||'';
   const science=document.querySelector('#skin-science')?.textContent||'';
-  return /° shade/.test(value)&&(/° direct sun/.test(value)||/sun below horizon/.test(value))&&/(wet bulb|NWS wind chill|Steadman apparent temperature|NWS heat index)/.test(science);
+  return /°.*in the shade/.test(value)&&value.includes('in the shade')&&/(wet bulb|NWS wind chill|Steadman apparent temperature|NWS heat index)/.test(science);
  },null,{timeout:30000});
  assert.equal(await page.locator('iframe').count(),0);
  assert.ok(!(await page.locator('#metrics').innerText()).includes('—°'),'Feels-like metric is still missing');
- assert.match(await page.locator('.brand').innerText(),/WEATHER\s+FUSION[\s\S]*NOURIE WEATHER/i);
+ assert.match(await page.locator('.brand').innerText(),/WEATHER\s+NOURIE/i);
  const skinValue=await page.locator('#skin-values').innerText();
- const skinScience=await page.locator('#skin-science').innerText();
+ const skinScience=await page.locator('#skin-science').textContent();
  assert.ok(!skinValue.includes('Calculating')&&!skinValue.includes('Updating'));
- assert.match(await page.locator('#skin-exposure').innerText(),/not a measurement of your literal skin-surface temperature/i);
+ assert.match(await page.locator('#scientific-stuff').innerText(),/SCIENTIFIC STUFF/i);
  report.skinExposure={knightdale:skinValue,science:skinScience};
  await page.locator('#map-panel').scrollIntoViewIfNeeded();
  await page.waitForFunction(()=>[...document.querySelectorAll('.leaflet-weather-base-pane img')].some(i=>i.complete&&i.naturalWidth>0),null,{timeout:60000});
@@ -83,11 +84,11 @@ try{
  const radar=await json('/api/weather-fusion/radar');assert.ok(radar.frames.length>0);
  report.maps.push({layer:'radar',advertisedFrames:radar.frames.length,status:radar.status});
  await page.locator('[data-day="1"]').click();assert.ok(await page.locator('#day-dialog').isVisible());
- assert.ok((await page.locator('#day-content').innerText()).includes('Weather Fusion'));
+ assert.ok((await page.locator('#day-content').innerText()).includes('WEATHER NOURIE'));
  await page.locator('#close-day').click();
  await page.locator('[data-place="greenville"]').click();
  await page.waitForFunction(()=>document.querySelector('#city-name').textContent.includes('Greenville')&&document.querySelectorAll('#metrics .metric-value').length===8,null,{timeout:75000});
- await page.waitForFunction(()=>/° shade/.test(document.querySelector('#skin-values')?.textContent||'')&&!/Updating/.test(document.querySelector('#skin-values')?.textContent||''),null,{timeout:30000});
+ await page.waitForFunction(()=>/°.*in the shade/.test(document.querySelector('#skin-values')?.textContent||'')&&!/Updating/.test(document.querySelector('#skin-values')?.textContent||''),null,{timeout:30000});
  report.skinExposure.greenville=await page.locator('#skin-values').innerText();
  await page.locator('[data-layer="temperature"]').click();
  await page.waitForFunction(()=>document.querySelector('#map-error').hidden,null,{timeout:45000});
@@ -96,12 +97,26 @@ try{
  await page.setViewportSize({width:390,height:844});
  await page.reload({waitUntil:'domcontentloaded'});
  await page.waitForFunction(()=>document.querySelectorAll('#metrics .metric-value').length===8,null,{timeout:75000});
- await page.waitForFunction(()=>/° shade/.test(document.querySelector('#skin-values')?.textContent||''),null,{timeout:30000});
+ await page.waitForFunction(()=>/°.*in the shade/.test(document.querySelector('#skin-values')?.textContent||''),null,{timeout:30000});
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),true,'Mobile document overflows horizontally');
  await page.locator('[data-layer="ecmwf"]').click();
  await page.waitForFunction(()=>document.querySelector('#map-error').hidden && document.querySelectorAll('.leaflet-image-layer').length>0,null,{timeout:60000});
  await page.evaluate(()=>document.activeElement?.blur());
  await page.screenshot({path:dir+'/mobile.png',fullPage:true});
+ report.metricCharts=[];
+ for(const key of ['feels','precipitation','wind','humidity','pop','visibility','pressure','solar']) {
+  await page.locator(`[data-metric="${key}"]`).click();
+  assert.ok(await page.locator('#metric-dialog').isVisible());
+  const value=await page.locator('#chart-value').innerText();
+  const available=!(await page.locator('#chart-empty').isVisible());
+  if(['feels','precipitation','wind','humidity','pop','solar'].includes(key))assert.ok(available,`${key}: forecast not populated`);
+  await page.locator('#chart-scrubber').fill('3');
+  if(key==='humidity')await page.screenshot({path:dir+'/humidity-graph.png'});
+  if(key==='pressure')await page.screenshot({path:dir+'/pressure-graph.png'});
+  report.metricCharts.push({key,value,available});
+  await page.keyboard.press('Escape');
+ }
+
  assert.deepEqual(report.browserErrors,[]);
  report.success=true;
 }finally{await browser.close();await fs.writeFile(dir+'/report.json',JSON.stringify(report,null,2));}

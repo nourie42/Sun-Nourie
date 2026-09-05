@@ -1,7 +1,7 @@
 name: Weather Fusion direct model data
 on:
   push:
-    branches: [main, weather-fusion-data-repair]
+    branches: [main, weather-fusion-data-repair, weather-nourie-friendly-graphs]
     paths:
       - 'scripts/weather_fusion_collect.py'
       - 'scripts/weather_fusion_refresh.py'
