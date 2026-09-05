@@ -68,10 +68,10 @@ function render(data) {
   $('city-name').textContent = presets[place.id]?.name || data.location.name || place.name;
   $('hero-date').textContent = new Intl.DateTimeFormat('en-US', { timeZone: data.location.timeZone, weekday: 'long', month: 'long', day: 'numeric' }).format(new Date()).toUpperCase();
   $('temperature').innerHTML = `${number(c.temperature)}<span>°</span>`;
-  $('condition').textContent = c.condition || 'Current conditions unavailable';
+  $('condition').textContent = c.condition || (data.hours[0]?.condition ? `${data.hours[0].condition} · forecast` : 'Current condition description unavailable');
   $('high-low').innerHTML = `High ${temperature(d.high)} <span>Low ${temperature(d.low)}</span>`;
   $('observation-label').textContent = c.type === 'observation' ? `Observed at ${c.station} · ${clock(c.time)} · nearby station, not your exact address` : 'Current observation unavailable · showing forecast guidance';
-  $('hero-scene').innerHTML = icon(c.condition, day, 120);
+  $('hero-scene').innerHTML = icon(c.condition || data.hours[0]?.condition, day, 120);
   document.querySelectorAll('[data-place]').forEach((button) => { const active = button.dataset.place === place.id; button.classList.toggle('active', active); button.setAttribute('aria-pressed', String(active)); });
   renderAlerts(data);
   renderHours(data);
@@ -225,9 +225,15 @@ function setBasemap() {
   if (!map || !window.L) return;
   if (baseLayer) map.removeLayer(baseLayer);
   const selected = $('basemap').value;
-  const options = selected === 'satellite' ? ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', 'Imagery © Esri, Maxar, Earthstar Geographics · background imagery, not live clouds'] : selected === 'street' ? ['https://tile.openstreetmap.org/{z}/{x}/{y}.png', '© OpenStreetMap contributors'] : ['https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', '© OpenStreetMap contributors © CARTO'];
-  baseLayer = window.L.tileLayer(options[0], { maxZoom: 16, attribution: options[1], zIndex: 0 }).addTo(map);
-  baseLayer.on('tileerror', () => mapMessage('The base map could not load. Weather feeds and official source links remain available.'));
+  const service = selected === 'satellite' ? 'USGSImageryTopo' : 'USGSTopo';
+  const pane = map.getPane('weather-base') || map.createPane('weather-base');
+  pane.style.zIndex = '200';
+  pane.style.filter = selected === 'dark' ? 'grayscale(1) invert(1) brightness(.7) contrast(.9)' : '';
+  baseLayer = window.L.tileLayer(`https://basemap.nationalmap.gov/arcgis/rest/services/${service}/MapServer/tile/{z}/{y}/{x}`, {
+    pane: 'weather-base', maxZoom: 16, maxNativeZoom: 16, updateWhenIdle: true,
+    attribution: '<a href="https://www.usgs.gov/programs/national-geospatial-program/national-map" target="_blank" rel="noopener noreferrer">USGS The National Map</a> · background map, not live clouds'
+  }).addTo(map);
+  baseLayer.on('tileerror', () => mapMessage('The USGS background map could not load. Weather-model overlays and official source links remain available.'));
 }
 function initMap() {
   if (map) return;

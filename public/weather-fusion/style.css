@@ -2,3 +2,6 @@
 
 /* Direct-model evidence and map UI remain scoped to the weather add-on. */
 .feed-chip small{display:block;margin-top:4px;font-size:10px;opacity:.8}.map-caption{gap:12px;align-items:flex-start}.map-caption>span:first-child{flex:1}.radar-legend{white-space:normal;font-size:11px;line-height:1.6}.map-error{pointer-events:none}.map-stage{background:rgba(12,27,46,.7)}
+
+/* Full-page background remains visible during scrolling and full-page capture. */
+body{background-attachment:scroll}

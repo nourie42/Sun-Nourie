@@ -41,6 +41,15 @@ try{
  assert.equal(await page.locator('iframe').count(),0);
  assert.ok(!(await page.locator('#metrics').innerText()).includes('—°'),'Feels-like metric is still missing');
  await page.locator('#map-panel').scrollIntoViewIfNeeded();
+ await page.waitForFunction(()=>[...document.querySelectorAll('.leaflet-weather-base-pane img')].some(i=>i.complete&&i.naturalWidth>0),null,{timeout:60000});
+ for(const style of ['street','satellite','dark']){
+  await page.locator('#basemap').selectOption(style);
+  await page.waitForFunction(()=>[...document.querySelectorAll('.leaflet-weather-base-pane img')].some(i=>i.complete&&i.naturalWidth>0),null,{timeout:60000});
+  const urls=await page.locator('.leaflet-weather-base-pane img').evaluateAll(imgs=>imgs.filter(i=>i.complete&&i.naturalWidth>0).map(i=>i.src));
+  assert.ok(urls.every(url=>url.includes('basemap.nationalmap.gov')));
+  report.maps.push({layer:'basemap-'+style,loaded:true,provider:'USGS The National Map'});
+ }
+
  for(const layer of ['hrrr','ecmwf','nbm','temperature','wind','clouds']){
   await page.locator(`[data-layer="${layer}"]`).click();
   await page.waitForFunction(()=>{
@@ -69,6 +78,7 @@ try{
  await page.waitForFunction(()=>document.querySelector('#city-name').textContent.includes('Greenville')&&document.querySelectorAll('#metrics .metric-value').length===8,null,{timeout:75000});
  await page.locator('[data-layer="temperature"]').click();
  await page.waitForFunction(()=>document.querySelector('#map-error').hidden,null,{timeout:45000});
+ await page.evaluate(()=>document.activeElement?.blur());
  await page.screenshot({path:dir+'/desktop.png',fullPage:true});
  await page.setViewportSize({width:390,height:844});
  await page.reload({waitUntil:'domcontentloaded'});
@@ -76,6 +86,7 @@ try{
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),true,'Mobile document overflows horizontally');
  await page.locator('[data-layer="ecmwf"]').click();
  await page.waitForFunction(()=>document.querySelector('#map-error').hidden && document.querySelectorAll('.leaflet-image-layer').length>0,null,{timeout:60000});
+ await page.evaluate(()=>document.activeElement?.blur());
  await page.screenshot({path:dir+'/mobile.png',fullPage:true});
  assert.deepEqual(report.browserErrors,[]);
  report.success=true;
