@@ -1,6 +1,11 @@
 {
-  "checkedAt": "2026-09-05T19:03:56Z",
+  "checkedAt": "2026-09-05T19:09:20Z",
   "results": [
+    {
+      "model": "nbm",
+      "runAt": "2026-09-05T18:00:00Z",
+      "reused": true
+    },
     {
       "model": "hrrr",
       "runAt": "2026-09-05T12:00:00Z",
@@ -8,12 +13,8 @@
     },
     {
       "model": "ecmwf",
-      "error": "No complete ECMWF mirror: https://storage.googleapis.com/ecmwf-open-data/: HTTPError; https://data.ecmwf.int/forecasts/: HTTPError; https://ecmwf-forecasts.s3.eu-central-1.amazonaws.com/: HTTPError; https://ecmwf-forecasts.s3.eu-central-1.amazonaws.com/: HTTPError"
-    },
-    {
-      "model": "nbm",
-      "runAt": "2026-09-05T18:00:00Z",
-      "messages": 124,
+      "runAt": "2026-09-05T00:00:00Z",
+      "messages": 342,
       "complete": true
     }
   ]
