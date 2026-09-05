@@ -29,10 +29,10 @@ SOURCES = {
     "ecmwf": {"label": "ECMWF IFS", "resolution": "0.25° Open Data grid", "hours": 192, "url": "https://www.ecmwf.int/en/forecasts/datasets/open-data"},
 }
 NOAA_FIELDS = {
-    "hrrr": {("TMP", "2 m above ground"): "temperature", ("DPT", "2 m above ground"): "dewpoint", ("APCP", "surface"): "precipitation", ("REFC", "entire atmosphere"): "reflectivity", ("GUST", "surface"): "gust"},
+    "hrrr": {("TMP", "2 m above ground"): "temperature", ("DPT", "2 m above ground"): "dewpoint", ("APCP", "surface"): "precipitation", ("REFC", "entire atmosphere"): "reflectivity", ("GUST", "surface"): "gust", ("VIS", "surface"): "visibility"},
     "nbm": {("TMP", "2 m above ground"): "temperature", ("APCP", "surface"): "precipitation"},
 }
-ECMWF_FIELDS = {"2t": "temperature", "2d": "dewpoint", "10u": "u", "10v": "v", "tp": "precipitation", "tcc": "clouds"}
+ECMWF_FIELDS = {"2t": "temperature", "2d": "dewpoint", "10u": "u", "10v": "v", "tp": "precipitation", "tcc": "clouds", "msl": "pressure_msl"}
 
 def iso(value: dt.datetime | float) -> str:
     if isinstance(value, (float, int)):
@@ -103,7 +103,7 @@ def make_hourly(native: list[dict[str, Any]], intervals: list[dict[str, Any]]) -
         raise ValueError("No native model values")
     times = list(range(int(rows[0]["time"]), int(rows[-1]["time"]) + 1, 3600))
     hourly: dict[str, list[Any]] = {"time": times}
-    aliases = {"temperature": "temperature_2m", "dewpoint": "dew_point_2m", "gust": "wind_gusts_10m", "wind": "wind_speed_10m", "humidity": "relative_humidity_2m", "clouds": "cloud_cover", "reflectivity": "reflectivity", "nearbyReflectivity": "nearby_reflectivity"}
+    aliases = {"temperature": "temperature_2m", "dewpoint": "dew_point_2m", "gust": "wind_gusts_10m", "wind": "wind_speed_10m", "humidity": "relative_humidity_2m", "clouds": "cloud_cover", "reflectivity": "reflectivity", "nearbyReflectivity": "nearby_reflectivity", "visibility": "visibility", "pressure_msl": "pressure_msl"}
     for key, alias in aliases.items():
         samples = [r for r in rows if isinstance(r.get(key), (float, int)) and math.isfinite(r[key])]
         data = []
@@ -125,7 +125,7 @@ def make_hourly(native: list[dict[str, Any]], intervals: list[dict[str, Any]]) -
     for stamp in times:
         interval = next((r for r in intervals if r["start"] < stamp <= r["end"] and stamp-3600 >= r["start"]), None)
         hourly["precipitation"].append(round(interval["value"] * 3600/(interval["end"]-interval["start"]), 6) if interval else None)
-    return {"hourly": hourly, "hourly_units": {"time": "unixtime", "temperature_2m": "°F", "dew_point_2m": "°F", "precipitation": "inch", "wind_speed_10m": "mp/h", "wind_gusts_10m": "mp/h", "relative_humidity_2m": "%", "cloud_cover": "%", "reflectivity": "dBZ", "nearby_reflectivity": "dBZ"}}
+    return {"hourly": hourly, "hourly_units": {"time": "unixtime", "temperature_2m": "°F", "dew_point_2m": "°F", "precipitation": "inch", "wind_speed_10m": "mp/h", "wind_gusts_10m": "mp/h", "relative_humidity_2m": "%", "cloud_cover": "%", "reflectivity": "dBZ", "nearby_reflectivity": "dBZ", "visibility": "mi", "pressure_msl": "inHg"}}
 
 def collect_model(model: str, output: str) -> dict[str, Any]:
     import requests
@@ -186,7 +186,7 @@ def collect_model(model: str, output: str) -> dict[str, Any]:
     target = out / "models" / f"{model}.json"
     if target.exists():
         old = json.loads(target.read_text())
-        if old.get("runAt") == iso(run) and old.get("schema") == SCHEMA and old.get("complete"):
+        if old.get("runAt") == iso(run) and old.get("schema") == SCHEMA and old.get("complete") and old.get("cardFieldsVersion") == 1:
             print(f"REUSE {model} run={iso(run)} (no needless GRIB downloads)", flush=True)
             return {"model": model, "runAt": iso(run), "reused": True}
     print(f"COLLECT {model} run={iso(run)}", flush=True)
@@ -236,6 +236,14 @@ def collect_model(model: str, output: str) -> dict[str, Any]:
             if units != "K": raise ValueError(f"Unexpected temperature units: {units}")
             data = (data - 273.15) * 1.8 + 32
             data[(data < -160) | (data > 160)] = np.nan
+        elif field == "visibility":
+            if units != "m": raise ValueError(f"Unexpected visibility units: {units}")
+            data /= 1609.344
+            data[(data < 0) | (data > 200)] = np.nan
+        elif field == "pressure_msl":
+            if units != "Pa": raise ValueError(f"Unexpected pressure units: {units}")
+            data /= 3386.389
+            data[(data < 20) | (data > 35)] = np.nan
         elif field == "precipitation":
             if units == "m": data *= 1000/25.4
             elif units in ["kg m**-2", "kg m-2", "mm", "kg m^-2"]: data /= 25.4
@@ -349,7 +357,7 @@ def collect_model(model: str, output: str) -> dict[str, Any]:
         future=[r for r in p["native"] if r["time"] > now.timestamp()]
         if len(future)<12 or not any(r["value"]>=0 and r["end"]>now.timestamp() for r in p["precipitationIntervals"]):
             raise ValueError(f"{model} insufficient future numerical coverage")
-    data = {"schema":SCHEMA,"model":model,"label":SOURCES[model]["label"],"resolution":SOURCES[model]["resolution"],"runAt":iso(run),"generatedAt":iso(dt.datetime.now(UTC)),"validUntil":iso(run+dt.timedelta(hours=SOURCES[model]["hours"])),"complete":True,"sourceUrl":SOURCES[model]["url"],"transport":"Official provider public-cloud copy; indexed GRIB2 byte-range extraction with ECMWF ecCodes","interpolation":"Native nearest-gridpoint data. Temperature and wind are linearly interpolated only between samples <=6h apart; precipitation is uniformly allocated within its native accumulation interval. Reflectivity is never time-interpolated.","cyclePolicy":"Latest fully published extended run (HRRR 00/06/12/18Z; IFS 00/12Z; NBM hourly).","points":list(points.values()),"maps":maps,"provenance":provenance}
+    data = {"schema":SCHEMA,"model":model,"label":SOURCES[model]["label"],"resolution":SOURCES[model]["resolution"],"runAt":iso(run),"generatedAt":iso(dt.datetime.now(UTC)),"validUntil":iso(run+dt.timedelta(hours=SOURCES[model]["hours"])),"complete":True,"sourceUrl":SOURCES[model]["url"],"transport":"Official provider public-cloud copy; indexed GRIB2 byte-range extraction with ECMWF ecCodes","interpolation":"Native nearest-gridpoint data. Temperature and wind are linearly interpolated only between samples <=6h apart; precipitation is uniformly allocated within its native accumulation interval. Reflectivity is never time-interpolated.","cyclePolicy":"Latest fully published extended run (HRRR 00/06/12/18Z; IFS 00/12Z; NBM hourly).","cardFieldsVersion":1,"points":list(points.values()),"maps":maps,"provenance":provenance}
     target.write_text(json.dumps(data,separators=(",",":"),allow_nan=False))
     print(f"SUCCESS {model} run={data['runAt']} points={len(points)} messages={len(provenance)} frames={sum(map(len,maps.values()))}",flush=True)
     return {"model":model,"runAt":data["runAt"],"messages":len(provenance),"complete":True}
