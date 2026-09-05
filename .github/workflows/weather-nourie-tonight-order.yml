@@ -1,0 +1,37 @@
+name: Verify Weather Nourie Tonight hero ordering
+on:
+  push:
+    branches: [weather-nourie-tonight-order]
+    paths:
+      - 'scripts/patchWeatherNourieHeroOrder.py'
+      - 'test/weatherFusionHeroOrder.test.js'
+      - '.github/workflows/weather-nourie-tonight-order.yml'
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: python scripts/patchWeatherNourieHeroOrder.py
+      - run: npm ci
+      - name: Weather and existing-site checks
+        run: |
+          node --test test/weatherFusion*.test.js
+          npm run check
+      - name: Publish verified hero markup
+        run: |
+          tar -cf /tmp/hero-order.tar public/weather-fusion/index.html test/weatherFusionHeroOrder.test.js
+          git fetch --depth=1 origin main
+          git switch --detach FETCH_HEAD
+          tar -xf /tmp/hero-order.tar
+          git add public/weather-fusion/index.html test/weatherFusionHeroOrder.test.js
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Put Tonight forecast directly under the main temperature'
+          git push origin HEAD:weather-nourie-tonight-order-verified
