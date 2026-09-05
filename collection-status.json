@@ -1,0 +1,21 @@
+{
+  "checkedAt": "2026-09-05T18:41:17Z",
+  "results": [
+    {
+      "model": "hrrr",
+      "runAt": "2026-09-05T12:00:00Z",
+      "messages": 245,
+      "complete": true
+    },
+    {
+      "model": "nbm",
+      "runAt": "2026-09-05T12:00:00Z",
+      "messages": 124,
+      "complete": true
+    },
+    {
+      "model": "ecmwf",
+      "error": "ecmwf collection incomplete: FH090: HTTPError: 503 Server Error: Slow Down for url: https://ecmwf-forecasts.s3.eu-central-1.amazonaws.com/20260905/00z/ifs/0p25/oper/20260905000000-90h-ope; FH102: HTTPError: 503 Server Error: Slow Down for url: https://ecmwf-forecasts.s3.eu-central-1.amazonaws.com/20260905/00z/ifs/0p25/oper/20260905000000-102h-op; FH105: HTTPError: 503 Server Error: Slow Down for url: https://ecmwf-forecasts.s3.eu-central-1.amazonaws.com/20260905/00z/ifs/0p25/oper/20260905000000-105h-op; FH108: HTTPError: 503 Server Error: Slow Down for url: https://ecmwf-forecasts.s3.eu-centra"
+    }
+  ]
+}
