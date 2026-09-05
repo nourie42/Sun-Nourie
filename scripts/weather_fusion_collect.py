@@ -25,8 +25,8 @@ BOUNDS = [[32.5, -85.0], [38.0, -74.0]]
 WIDTH, HEIGHT = 440, 280
 SOURCES = {
     "hrrr": {"label": "NOAA HRRR", "resolution": "3 km native grid", "hours": 48, "url": "https://www.nco.ncep.noaa.gov/pmb/products/hrrr/"},
-    "nbm": {"label": "NOAA National Blend", "resolution": "2.5 km native grid", "hours": 192, "url": "https://www.nco.ncep.noaa.gov/pmb/products/blend/"},
-    "ecmwf": {"label": "ECMWF IFS", "resolution": "0.25° Open Data grid", "hours": 192, "url": "https://www.ecmwf.int/en/forecasts/datasets/open-data"},
+    "nbm": {"label": "NOAA National Blend", "resolution": "2.5 km native grid", "hours": 240, "url": "https://www.nco.ncep.noaa.gov/pmb/products/blend/"},
+    "ecmwf": {"label": "ECMWF IFS", "resolution": "0.25° Open Data grid", "hours": 240, "url": "https://www.ecmwf.int/en/forecasts/datasets/open-data"},
 }
 NOAA_FIELDS = {
     "hrrr": {("TMP", "2 m above ground"): "temperature", ("DPT", "2 m above ground"): "dewpoint", ("APCP", "surface"): "precipitation", ("REFC", "entire atmosphere"): "reflectivity", ("GUST", "surface"): "gust", ("VIS", "surface"): "visibility"},
@@ -167,30 +167,42 @@ def collect_model(model: str, output: str) -> dict[str, Any]:
         raise AssertionError("unreachable")
     now = dt.datetime.now(UTC)
     run = None
+    run_hours = None
     for back in range(1, 31):
         candidate = (now-dt.timedelta(hours=back)).replace(minute=0, second=0, microsecond=0)
-        if model == "hrrr" and candidate.hour % 6:
-            continue
         if model == "ecmwf" and candidate.hour not in [0, 12]:
             continue
-        _, index = urls(model, candidate, SOURCES[model]["hours"])
+        # HRRR produces a new CONUS run every hour. The 00/06/12/18Z cycles
+        # extend to 48 h; the intervening cycles provide the shorter operational
+        # horizon. Probe 18 h first so a fresh hourly run is never ignored.
+        probe = 18 if model == "hrrr" else SOURCES[model]["hours"]
+        _, index = urls(model, candidate, probe)
         try:
             entries = parse_index(model, get(index, retries=0).decode())
             if any(r["field"] == "temperature" for r in entries):
                 run = candidate
+                run_hours = probe
+                if model == "hrrr" and candidate.hour % 6 == 0:
+                    try:
+                        _, extended_index = urls(model, candidate, 48)
+                        extended = parse_index(model, get(extended_index, retries=0).decode())
+                        if any(r["field"] == "temperature" for r in extended):
+                            run_hours = 48
+                    except Exception:
+                        pass
                 break
         except Exception:
             pass
-    if run is None:
+    if run is None or run_hours is None:
         raise RuntimeError(f"No complete recent {model} run found")
     target = out / "models" / f"{model}.json"
     if target.exists():
         old = json.loads(target.read_text())
-        if old.get("runAt") == iso(run) and old.get("schema") == SCHEMA and old.get("complete") and old.get("cardFieldsVersion") == 1:
+        if old.get("runAt") == iso(run) and old.get("schema") == SCHEMA and old.get("complete") and old.get("cardFieldsVersion") == 1 and old.get("forecastHours") == run_hours:
             print(f"REUSE {model} run={iso(run)} (no needless GRIB downloads)", flush=True)
             return {"model": model, "runAt": iso(run), "reused": True}
     print(f"COLLECT {model} run={iso(run)}", flush=True)
-    steps = list(range(49)) if model == "hrrr" else list(range(1,37)) + list(range(42,193,6)) if model == "nbm" else list(range(0,145,3)) + list(range(150,193,6))
+    steps = list(range(run_hours+1)) if model == "hrrr" else list(range(1,37)) + list(range(42,241,6)) if model == "nbm" else list(range(0,145,3)) + list(range(150,241,6))
     run_epoch = int(run.timestamp())
     geometry: dict[str, Any] = {}
     points = {p["id"]: {**p, "native": [], "precipitationIntervals": [], "gridPoint": None} for p in POINTS}
@@ -357,7 +369,7 @@ def collect_model(model: str, output: str) -> dict[str, Any]:
         future=[r for r in p["native"] if r["time"] > now.timestamp()]
         if len(future)<12 or not any(r["value"]>=0 and r["end"]>now.timestamp() for r in p["precipitationIntervals"]):
             raise ValueError(f"{model} insufficient future numerical coverage")
-    data = {"schema":SCHEMA,"model":model,"label":SOURCES[model]["label"],"resolution":SOURCES[model]["resolution"],"runAt":iso(run),"generatedAt":iso(dt.datetime.now(UTC)),"validUntil":iso(run+dt.timedelta(hours=SOURCES[model]["hours"])),"complete":True,"sourceUrl":SOURCES[model]["url"],"transport":"Official provider public-cloud copy; indexed GRIB2 byte-range extraction with ECMWF ecCodes","interpolation":"Native nearest-gridpoint data. Temperature and wind are linearly interpolated only between samples <=6h apart; precipitation is uniformly allocated within its native accumulation interval. Reflectivity is never time-interpolated.","cyclePolicy":"Latest fully published extended run (HRRR 00/06/12/18Z; IFS 00/12Z; NBM hourly).","cardFieldsVersion":1,"points":list(points.values()),"maps":maps,"provenance":provenance}
+    data = {"schema":SCHEMA,"model":model,"label":SOURCES[model]["label"],"resolution":SOURCES[model]["resolution"],"runAt":iso(run),"generatedAt":iso(dt.datetime.now(UTC)),"validUntil":iso(run+dt.timedelta(hours=run_hours)),"forecastHours":run_hours,"complete":True,"sourceUrl":SOURCES[model]["url"],"transport":"Official provider public-cloud copy; indexed GRIB2 byte-range extraction with ECMWF ecCodes","interpolation":"Native nearest-gridpoint data. Temperature and wind are linearly interpolated only between samples <=6h apart; precipitation is uniformly allocated within its native accumulation interval. Reflectivity is never time-interpolated.","cyclePolicy":"Latest completed run: HRRR checked hourly (48 h at 00/06/12/18Z, shorter horizon on intervening cycles); ECMWF IFS 00/12Z; NBM hourly.","cardFieldsVersion":1,"points":list(points.values()),"maps":maps,"provenance":provenance}
     target.write_text(json.dumps(data,separators=(",",":"),allow_nan=False))
     print(f"SUCCESS {model} run={data['runAt']} points={len(points)} messages={len(provenance)} frames={sum(map(len,maps.values()))}",flush=True)
     return {"model":model,"runAt":data["runAt"],"messages":len(provenance),"complete":True}

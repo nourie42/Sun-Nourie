@@ -1,5 +1,6 @@
 import {renderComfort,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js';
 import {dailyDisplay} from './weather-math.js';
+import {heroWeather} from './hero-mode.js';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);
 const presets = {
@@ -69,12 +70,13 @@ function render(data) {
   document.body.dataset.sky = !day ? 'night' : /rain|storm|shower/i.test(c.condition) ? 'rain' : 'day';
   $('city-name').textContent = presets[place.id]?.name || data.location.name || place.name;
   $('hero-date').textContent = new Intl.DateTimeFormat('en-US', { timeZone: data.location.timeZone, weekday: 'long', month: 'long', day: 'numeric' }).format(new Date()).toUpperCase();
-  $('temperature').innerHTML = `${number(c.temperature)}<span>°</span>`;
-  $('condition').textContent = c.condition || (data.hours[0]?.condition ? `${data.hours[0].condition} · forecast` : 'Current condition description unavailable');
   const currentDay = dailyDisplay(d, 0, Date.now(), data.location.timeZone);
-  $('high-low').innerHTML = currentDay.tonight ? `Tonight’s low ${temperature(d.low)}` : `High ${temperature(d.high)} <span>Low ${temperature(d.low)}</span>`;
-  $('observation-label').textContent = c.type === 'observation' ? `Nearby weather station · updated ${clock(c.time)}` : 'Estimated current conditions';
-  $('hero-scene').innerHTML = icon(c.condition || data.hours[0]?.condition, day, 120);
+  const hero = heroWeather(data, Date.now());
+  $('temperature').innerHTML = `${number(hero.temperature)}<span>°</span>`;
+  $('condition').textContent = hero.tonight ? `Tonight · ${hero.condition}` : hero.condition;
+  $('high-low').textContent = hero.tonight ? 'Overnight low' : hero.range;
+  $('observation-label').textContent = hero.tonight ? `Tonight’s forecast · updated ${clock(data.assembledAt)}` : (c.type === 'observation' ? `Nearby weather station · updated ${clock(c.time)}` : 'Estimated current conditions');
+  $('hero-scene').innerHTML = icon(hero.condition, hero.isDay, 120);
   document.querySelectorAll('[data-place]').forEach((button) => { const active = button.dataset.place === place.id; button.classList.toggle('active', active); button.setAttribute('aria-pressed', String(active)); });
   renderAlerts(data);
   renderHours(data);

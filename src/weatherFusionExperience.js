@@ -50,8 +50,25 @@ export function addExperience(out,{models={},grid,periods=[],now,solarTimes,next
    series[key].push({time:h.time,value:round(value.value,digits),source:value.source, ...(value.runAt?{runAt:value.runAt}:{}),...(key==='precipitation'?{end:new Date(time+H).toISOString()}: {})});
   }
  }
+ // The NWS hourly product is intentionally limited to 48 hours, but the Gross Meter
+ // needs an honest extended dew-point outlook. Append only real direct-model values;
+ // do not hold a reading flat or invent missing hours. HRRR wins when its fresh run
+ // covers the hour, then ECMWF supplies the extended horizon.
+ const extendedStart=Math.ceil(now/H)*H, extendedEnd=extendedStart+240*H;
+ for(const [key,field,ids,digits] of [
+  ['dewpoint','dew_point_2m',['hrrr','ecmwf','nbm'],1],
+  ['wind','wind_speed_10m',['hrrr','ecmwf','nbm'],1],
+ ]){
+  const existing=new Set(series[key].map(p=>p.time));
+  for(let time=extendedStart;time<=extendedEnd;time+=H){
+   const stamp=new Date(time).toISOString();if(existing.has(stamp))continue;
+   const value=modelSample(models,time,field,ids);
+   if(finite(value.value))series[key].push({time:stamp,value:round(value.value,digits),source:value.source,...(value.runAt?{runAt:value.runAt}:{})});
+  }
+  series[key].sort((a,b)=>Date.parse(a.time)-Date.parse(b.time));
+ }
  const days=out.days.map((d,index)=>({date:d.date,...solarTimes(d.date,out.location.latitude,out.location.longitude)}));
- out.metricForecasts={version:EXPERIENCE_VERSION,series,solar:days,notes:{pressure:'Mean sea-level pressure forecast; separate from the observed station pressure on the card.',visibility:'NWS visibility where published, otherwise HRRR model visibility. Missing intervals stay blank.',feels:'Calculated shade apparent temperature using forecast temperature, humidity/dew point and wind. Not a measured skin temperature.',precipitation:'Hourly liquid-equivalent forecast amounts; coarse source intervals are apportioned uniformly. This does not predict minute-exact rain timing.',wind:'NWS grid/period wind first; numeric speed from a forecast range uses the upper value.',solar:'Astronomical sunrise, sunset and daylight duration; not cloud or sunshine duration.'}};
+ out.metricForecasts={version:EXPERIENCE_VERSION,series,solar:days,dewpointHorizonHours:240,notes:{pressure:'Mean sea-level pressure forecast; separate from the observed station pressure on the card.',visibility:'NWS visibility where published, otherwise HRRR model visibility. Missing intervals stay blank.',feels:'Calculated shade apparent temperature using forecast temperature, humidity/dew point and wind. Not a measured skin temperature.',dewpoint:'NWS/local guidance first in the near term; fresh HRRR and ECMWF direct-model dew points extend the Gross Meter. Missing hours are never filled from the current reading.',precipitation:'Hourly liquid-equivalent forecast amounts; coarse source intervals are apportioned uniformly. This does not predict minute-exact rain timing.',wind:'NWS grid/period wind first; numeric speed from a forecast range uses the upper value.',solar:'Astronomical sunrise, sunset and daylight duration; not cloud or sunshine duration.'}};
  out.comfort=thermalComfort(out.current,out.location,now);
  out.experienceVersion=EXPERIENCE_VERSION;
  for(const d of out.days){
