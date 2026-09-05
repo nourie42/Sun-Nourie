@@ -1,8 +1,6 @@
-"""Run the direct-data collector with per-run, verified ECMWF mirror selection.
-
-A mirror is pinned for the entire initialization so inventory byte offsets and
-GRIB bodies come from the same copy. No webpage scraping or model substitution.
-The original collector retains GRIB metadata, units, range and coverage checks.
+"""Run direct GRIB collection with per-run ECMWF mirror selection.
+Inventory offsets and binary messages stay pinned to the same official mirror.
+Unavailable new cycles fall back to an older complete run, retaining its time.
 """
 from __future__ import annotations
 import datetime as dt
@@ -26,7 +24,6 @@ def verified_urls(model: str, run: dt.datetime, hour: int) -> tuple[str, str]:
     if key not in PINNED:
         _, last = ORIGINAL_URLS(model, run, collector.SOURCES[model]['hours'])
         tail = last.split('.amazonaws.com/', 1)[1]
-        errors = []
         for base in MIRRORS:
             for attempt in range(2):
                 try:
@@ -44,7 +41,6 @@ def verified_urls(model: str, run: dt.datetime, hour: int) -> tuple[str, str]:
                     print(f'ECMWF mirror verified: {base} run={key}', flush=True)
                     break
                 except Exception as error:
-                    errors.append(f'{base}: {type(error).__name__}')
                     if getattr(error, 'code', None) in [404, 403]:
                         break
                     if attempt == 0:
@@ -52,7 +48,10 @@ def verified_urls(model: str, run: dt.datetime, hour: int) -> tuple[str, str]:
             if key in PINNED:
                 break
         if key not in PINNED:
-            raise RuntimeError('No complete ECMWF mirror: ' + '; '.join(errors))
+            # urls() is called before the collector's per-cycle try/except.
+            # Return a real URL, allowing its failed fetch to advance discovery.
+            PINNED[key] = MIRRORS[0]
+            print(f'ECMWF run {key} not fully published; checking earlier cycle.', flush=True)
     base = PINNED[key]
     return base + body.split('.amazonaws.com/', 1)[1], base + index.split('.amazonaws.com/', 1)[1]
 
