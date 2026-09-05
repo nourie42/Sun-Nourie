@@ -1,0 +1,64 @@
+name: Weather Fusion integrate and browser-test repair
+on:
+  push:
+    branches: [weather-fusion-data-repair]
+    paths: ['.github/workflows/weather-fusion-install-repair.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply only weather-module changes
+        run: |
+          python .weather-repair/backend.py
+          python .weather-repair/interface.py
+          python .weather-repair/tests.py
+          node --check src/weatherFusion.js
+          node --check src/weatherFusionDirect.js
+          node --check public/weather-fusion/app.js
+          node --test test/weatherFusion*.test.js
+      - run: npm ci
+      - name: Existing website checks
+        run: npm run check
+      - name: Commit verified source integration on repair branch only
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- src/weatherFusion.js public/weather-fusion/index.html public/weather-fusion/app.js public/weather-fusion/style.css test/weatherFusion.test.js test/weatherFusion.fixtures.js .github/workflows/weather-fusion.yml
+          git diff --cached --stat
+          git commit -m 'Integrate real model forecasts, working map overlays and repaired weather metrics'
+          git push origin HEAD:weather-fusion-data-repair
+      - name: Install browser test dependencies without changing package files
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Start the unchanged application entrypoint
+        run: |
+          PORT=3123 node server.js > /tmp/weather-server.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3123/health; then break; fi
+            sleep 2
+          done
+      - name: Test actual provider data and desktop/mobile browser interactions
+        run: node scripts/weatherFusionBrowserSmoke.js
+      - name: Preserve diagnostic source and logs
+        if: always()
+        run: |
+          mkdir -p /tmp/weather-browser-results
+          cp /tmp/weather-server.log /tmp/weather-browser-results/server.log 2>/dev/null || true
+          git archive --format=tar HEAD > /tmp/weather-browser-results/tested-source.tar
+          git fetch --depth=1 origin weather-fusion-data
+          git archive --format=tar FETCH_HEAD > /tmp/weather-browser-results/weather-data.tar
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: weather-integrated-browser
+          path: /tmp/weather-browser-results
+          retention-days: 7
