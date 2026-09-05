@@ -19,7 +19,8 @@ jobs:
           python - <<'PY'
           import base64, lzma, json, hashlib
           from pathlib import Path
-          raw=lzma.decompress(base64.b64decode(Path('scripts/weatherNourieUpgrade.b64').read_text()))
+          parts=['scripts/weatherNourieUpgrade.1.b64','scripts/weatherNourieUpgrade.2.b64','scripts/weatherNourieUpgrade.3.b64','scripts/weatherNourieUpgrade.b64']
+          raw=lzma.decompress(base64.b64decode(''.join(Path(p).read_text().strip() for p in parts)))
           assert hashlib.sha256(raw).hexdigest()=='8651571ba23e84981a0aa7c70525d17060a370ed7e248c541c1f0544a72a46af'
           edits=json.loads(raw)
           for edit in edits:
@@ -32,6 +33,10 @@ jobs:
             for start,end,insert in reversed(edit['changes']):new=new[:start]+insert+new[end:]
             assert hashlib.sha256(new.encode()).hexdigest()==edit['new'],name+' output mismatch'
             path.parent.mkdir(parents=True,exist_ok=True);path.write_text(new)
+          # UI-only solar estimates must not repeatedly invalidate the AI weather briefing.
+          p=Path('src/weatherFusion.js');s=p.read_text()
+          assert 'comfort:output.comfort, ' in s
+          p.write_text(s.replace('comfort:output.comfort, ',''))
           # Expand the existing native model collector for real pressure/visibility graphs.
           p=Path('scripts/weather_fusion_collect.py');s=p.read_text()
           def change(old,new):
@@ -43,15 +48,16 @@ jobs:
           change('"nearbyReflectivity": "nearby_reflectivity"}', '"nearbyReflectivity": "nearby_reflectivity", "visibility": "visibility", "pressure_msl": "pressure_msl"}')
           change('"nearby_reflectivity": "dBZ"}', '"nearby_reflectivity": "dBZ", "visibility": "mi", "pressure_msl": "inHg"}')
           change('and old.get("complete"):', 'and old.get("complete") and old.get("cardFieldsVersion") == 1:')
-          change('        elif field == "precipitation":', '''        elif field == "visibility":
-                      if units != "m": raise ValueError(f"Unexpected visibility units: {units}")
-                      data /= 1609.344
-                      data[(data < 0) | (data > 200)] = np.nan
-                  elif field == "pressure_msl":
-                      if units != "Pa": raise ValueError(f"Unexpected pressure units: {units}")
-                      data /= 3386.389
-                      data[(data < 20) | (data > 35)] = np.nan
-                  elif field == "precipitation":'''.replace('\n          ', '\n'))
+          change('        elif field == "precipitation":', '\n'.join([
+            '        elif field == "visibility":',
+            '            if units != "m": raise ValueError(f"Unexpected visibility units: {units}")',
+            '            data /= 1609.344',
+            '            data[(data < 0) | (data > 200)] = np.nan',
+            '        elif field == "pressure_msl":',
+            '            if units != "Pa": raise ValueError(f"Unexpected pressure units: {units}")',
+            '            data /= 3386.389',
+            '            data[(data < 20) | (data > 35)] = np.nan',
+            '        elif field == "precipitation":']))
           change('"points":list(points.values())','"cardFieldsVersion":1,"points":list(points.values())')
           p.write_text(s)
           PY
@@ -65,7 +71,7 @@ jobs:
         run: node scripts/weatherNourieBrowserSmoke.js
       - name: Commit verified weather-only tree on a staging branch
         run: |
-          git rm -- .github/workflows/weather-nourie-build.yml scripts/weatherNourieUpgrade.b64
+          git rm -- .github/workflows/weather-nourie-build.yml scripts/weatherNourieUpgrade*.b64
           git add -- public/weather-fusion src/weatherFusion*.js test/weatherFusion*.js scripts/weatherFusionBrowserSmoke.js scripts/weatherNourie*.js scripts/weather_fusion_collect.py docs/weather-nourie-experience.md .github/workflows/weather-fusion-data.yml .github/workflows/weather-fusion-live.yml
           git diff --cached --stat
           git config user.name 'github-actions[bot]'
