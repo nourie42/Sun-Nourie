@@ -2,7 +2,7 @@ name: Assemble Weather Nourie upgrade
 on:
   push:
     branches: [weather-nourie-friendly-graphs]
-    paths: ['scripts/weatherNourieUpgrade.b64']
+    paths: ['scripts/weatherNourieUpgrade.b64', '.github/workflows/weather-nourie-build.yml']
 permissions:
   contents: write
 jobs:
@@ -37,6 +37,11 @@ jobs:
           p=Path('src/weatherFusion.js');s=p.read_text()
           assert 'comfort:output.comfort, ' in s
           p.write_text(s.replace('comfort:output.comfort, ',''))
+          # The decorative icon was positioned beyond the 320px hero. Keep it inside,
+          # without hiding document overflow or suppressing the responsive test.
+          p=Path('public/weather-fusion/style.css')
+          with p.open('a') as f:
+            f.write('\n/* Keep the decorative weather icon inside the hero on narrow screens. */\n@media(max-width:380px){.hero-scene{left:auto;right:2px;width:62px;height:62px}.hero-scene svg{width:60px;height:60px}}\n')
           # Expand the existing native model collector for real pressure/visibility graphs.
           p=Path('scripts/weather_fusion_collect.py');s=p.read_text()
           def change(old,new):
