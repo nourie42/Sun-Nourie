@@ -17,9 +17,11 @@ jobs:
           node-version: '22'
       - name: Apply only weather-module changes
         run: |
-          python .weather-repair/backend.py
-          python .weather-repair/interface.py
-          python .weather-repair/tests.py
+          if ! grep -q 'weather-fusion-v2-direct' src/weatherFusion.js; then
+            python .weather-repair/backend.py
+            python .weather-repair/interface.py
+            python .weather-repair/tests.py
+          fi
           node --check src/weatherFusion.js
           node --check src/weatherFusionDirect.js
           node --check public/weather-fusion/app.js
@@ -31,10 +33,12 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -- src/weatherFusion.js public/weather-fusion/index.html public/weather-fusion/app.js public/weather-fusion/style.css test/weatherFusion.test.js test/weatherFusion.fixtures.js .github/workflows/weather-fusion.yml
+          git add -- src/weatherFusion.js public/weather-fusion/index.html public/weather-fusion/app.js public/weather-fusion/style.css test/weatherFusion.test.js test/weatherFusion.fixtures.js
           git diff --cached --stat
-          git commit -m 'Integrate real model forecasts, working map overlays and repaired weather metrics'
-          git push origin HEAD:weather-fusion-data-repair
+          if ! git diff --cached --quiet; then
+            git commit -m 'Integrate real model forecasts, working map overlays and repaired weather metrics'
+            git push origin HEAD:weather-fusion-data-repair
+          fi
       - name: Install browser test dependencies without changing package files
         run: |
           npm install --no-save --package-lock=false playwright@1.55.0
