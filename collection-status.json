@@ -1,21 +1,22 @@
 {
-  "checkedAt": "2026-09-05T22:04:05Z",
+  "checkedAt": "2026-09-05T22:56:58Z",
   "results": [
     {
       "model": "nbm",
       "runAt": "2026-09-05T18:00:00Z",
-      "reused": true
+      "messages": 124,
+      "complete": true
     },
     {
       "model": "hrrr",
       "runAt": "2026-09-05T18:00:00Z",
-      "messages": 245,
+      "messages": 294,
       "complete": true
     },
     {
       "model": "ecmwf",
       "runAt": "2026-09-05T12:00:00Z",
-      "messages": 342,
+      "messages": 399,
       "complete": true
     }
   ]
