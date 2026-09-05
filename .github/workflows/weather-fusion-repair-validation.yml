@@ -1,0 +1,60 @@
+name: Weather Fusion repair validation
+on:
+  push:
+    branches: [weather-fusion-data-repair]
+    paths:
+      - '.github/workflows/weather-fusion-repair-validation.yml'
+      - 'src/weatherFusion*.js'
+      - 'public/weather-fusion/**'
+      - 'test/weatherFusion*.js'
+      - 'scripts/weather_fusion*'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - name: Tests
+        run: |
+          node --test test/weatherFusion*.test.js
+          npm run check
+      - name: Collect public source diagnostics
+        run: |
+          python -u - <<'PY'
+          import urllib.request as u, datetime as d, json
+          now=d.datetime.now(d.timezone.utc)
+          for back in [12,24,36]:
+            r=(now-d.timedelta(hours=back)).replace(hour=0,minute=0,second=0,microsecond=0)
+            date=r.strftime('%Y%m%d');path=f'{date}/00z/ifs/0p25/oper/{date}000000-192h-oper-fc.index'
+            for host in ['https://data.ecmwf.int/forecasts/','https://ecmwf-forecasts.s3.eu-central-1.amazonaws.com/','https://storage.googleapis.com/ecmwf-open-data/','https://ai4edataeuwest.blob.core.windows.net/ecmwf/']:
+              try:
+                with u.urlopen(host+path,timeout=12) as res:
+                  text=res.read(100000).decode(); print('MIRROR',host+path,res.status,text[:250])
+              except Exception as e:print('MIRROR FAIL',host+path,str(e)[:150])
+          for path in ['/health','/api/weather-fusion/forecast?location=knightdale']:
+            try:
+              with u.urlopen('https://sun-nourie-live.onrender.com'+path,timeout=75) as res:
+                x=json.load(res); print('LIVE',json.dumps({k:x.get(k) for k in ['ok','version','current','feeds','aiConfigured']})[:12000])
+            except Exception as e:print('LIVE FAIL',str(e))
+          PY
+      - name: Bundle public source checkout and current snapshots for browser tests
+        if: always()
+        run: |
+          git archive --format=tar HEAD > /tmp/weather-source.tar
+          git fetch --depth=1 origin weather-fusion-data
+          git archive --format=tar FETCH_HEAD > /tmp/weather-snapshots.tar
+          mkdir -p /tmp/weather-validation
+          cp /tmp/weather-source.tar /tmp/weather-snapshots.tar /tmp/weather-validation/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: weather-validation
+          path: /tmp/weather-validation
+          retention-days: 3
