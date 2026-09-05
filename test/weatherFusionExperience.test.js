@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {dailyDisplay,temperatureBar,shadeFeelsLike,thermalComfort,wetBulb} from '../public/weather-fusion/weather-math.js';
+import {dailyDisplay,temperatureBar,shadeFeelsLike,thermalComfort,wetBulb,vaporPressureFromDewpoint} from '../public/weather-fusion/weather-math.js';
 import {gridSample,parseWind,PLAIN_OUTLOOK_INSTRUCTIONS} from '../src/weatherFusionExperience.js';
 import {buildForecast} from '../src/weatherFusion.js';
 import {testInputs} from './weatherFusion.fixtures.js';
@@ -36,6 +36,24 @@ test('graph data comes from forecasts and does not hold current pressure or visi
  assert.equal(output.metricForecasts.series.wind[0].value,10);
  assert.ok(output.metricForecasts.series.feels.some(p=>Number.isFinite(p.value)));
  assert.equal(output.metricForecasts.solar.length,7);
+});
+test('lower dew point makes mild weather feel cooler through vapor pressure and evaporation',()=>{
+ const humid=shadeFeelsLike(78,null,5,70),dry=shadeFeelsLike(78,null,5,45);
+ assert.ok(Number.isFinite(humid.value)&&Number.isFinite(dry.value));
+ assert.ok(dry.value<humid.value,`dry=${dry.value} humid=${humid.value}`);
+ assert.ok(vaporPressureFromDewpoint(78,45,null)<vaporPressureFromDewpoint(78,70,null));
+ assert.match(dry.method,/Steadman\/BOM/);
+});
+test('cold weather uses wind chill without inventing a humidity penalty',()=>{
+ const damp=shadeFeelsLike(30,95,15,29),dry=shadeFeelsLike(30,20,15,-5);
+ assert.equal(Math.round(damp.value),19);assert.equal(Math.round(dry.value),19);
+ assert.match(damp.method,/NWS wind chill/);
+});
+test('hot humid weather uses NWS heat index and solar scenario stays within NWS full-sun ceiling',()=>{
+ assert.equal(Math.round(shadeFeelsLike(95,47,0,72).value),103);
+ const c=thermalComfort({temperature:95,humidity:47,dewpoint:72,wind:5,condition:'Sunny',type:'observation'},{latitude:35.787,longitude:-78.4806},Date.parse('2026-09-05T17:00:00Z'));
+ assert.ok(c.solarAdjustment>=0&&c.solarAdjustment<=15);
+ assert.ok(c.sun>=c.shade);assert.match(c.note,/pavement, building shade and street-canyon effects are not guessed/);
 });
 test('humidity, wind chill and heat index remain physically separated from sun estimates',()=>{
  assert.ok(shadeFeelsLike(79,84,5,73).value>79);assert.equal(Math.round(shadeFeelsLike(30,70,15).value),19);
