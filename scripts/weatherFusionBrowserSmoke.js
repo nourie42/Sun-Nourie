@@ -18,7 +18,7 @@ for(const location of ['knightdale','greenville']){
  assert.equal(data.directModelStatus,'ready',`${location}: ${JSON.stringify(data.feeds)}`);
  assert.equal(data.modelContributions.length,3);
  assert.equal(data.days.length,7);assert.ok(data.days.slice(1).every(d=>Number.isFinite(d.high)&&Number.isFinite(d.low)));
- assert.ok(Number.isFinite(data.current.apparent));assert.ok(Number.isFinite(data.precipitation.value));
+ assert.ok(Number.isFinite(data.current.apparent));assert.match(data.current.apparentSource,/Steadman apparent temperature/);assert.ok(Number.isFinite(data.precipitation.value));
  assert.equal(data.discussion.office,location==='knightdale'?'RAH':'MHX');
  assert.ok(data.days[1].highBlend.sources.some(s=>s.id==='nbm'));
  assert.ok(data.days[0].qpfBlend.sources.some(s=>s.id==='hrrr'));
@@ -30,7 +30,7 @@ for(const location of ['knightdale','greenville']){
   assert.equal(ai.mode,'ai',JSON.stringify(ai));
   for(const id of ['nws','afd','hrrr','ecmwf','nbm'])assert.ok(ai.sources.includes(id),'AI did not cite '+id);
  }
- report.locations.push({location,version:data.version,feelsLike:data.current.apparent,next24HourPrecipitationIn:data.precipitation.value,models:data.modelContributions,office:data.discussion.office,ai:ai?{mode:ai.mode,sources:ai.sources,headline:ai.headline}:null});
+ report.locations.push({location,version:data.version,feelsLike:data.current.apparent,feelsLikeMethod:data.current.apparentSource,next24HourPrecipitationIn:data.precipitation.value,models:data.modelContributions,office:data.discussion.office,ai:ai?{mode:ai.mode,sources:ai.sources,headline:ai.headline}:null});
 }
 const browser=await chromium.launch({headless:true});
 try{
@@ -42,16 +42,19 @@ try{
  await page.waitForFunction(()=>{
   const value=document.querySelector('#skin-values')?.textContent||'';
   const science=document.querySelector('#skin-science')?.textContent||'';
-  return /°.*in the shade/.test(value)&&value.includes('in the shade')&&/(wet bulb|NWS wind chill|Steadman apparent temperature|NWS heat index)/.test(science);
+  return /°.*in the shade/.test(value)&&value.includes('in the shade')&&/Steadman apparent temperature/.test(science);
  },null,{timeout:30000});
  assert.equal(await page.locator('iframe').count(),0);
  assert.ok(!(await page.locator('#metrics').innerText()).includes('—°'),'Feels-like metric is still missing');
  assert.match(await page.locator('.brand').innerText(),/WEATHER\s+NOURIE/i);
  const skinValue=await page.locator('#skin-values').innerText();
  const skinScience=await page.locator('#skin-science').textContent();
+ const skinWhy=await page.locator('#skin-explanation').innerText();
  assert.ok(!skinValue.includes('Calculating')&&!skinValue.includes('Updating'));
+ assert.ok(!skinWhy.includes('Sunshine can make it feel warmer. A breeze can help cool you down.'));
+ assert.match(skinWhy,/dew point|wind|breeze|sun|radiation|moisture|air temperature/i);
  assert.match(await page.locator('#scientific-stuff').innerText(),/SCIENTIFIC STUFF/i);
- report.skinExposure={knightdale:skinValue,science:skinScience};
+ report.skinExposure={knightdale:skinValue,why:skinWhy,science:skinScience};
  await page.locator('#map-panel').scrollIntoViewIfNeeded();
  await page.waitForFunction(()=>[...document.querySelectorAll('.leaflet-weather-base-pane img')].some(i=>i.complete&&i.naturalWidth>0),null,{timeout:60000});
  for(const style of ['street','satellite','dark']){
@@ -90,6 +93,7 @@ try{
  await page.waitForFunction(()=>document.querySelector('#city-name').textContent.includes('Greenville')&&document.querySelectorAll('#metrics .metric-value').length===8,null,{timeout:75000});
  await page.waitForFunction(()=>/°.*in the shade/.test(document.querySelector('#skin-values')?.textContent||'')&&!/Updating/.test(document.querySelector('#skin-values')?.textContent||''),null,{timeout:30000});
  report.skinExposure.greenville=await page.locator('#skin-values').innerText();
+ report.skinExposure.greenvilleWhy=await page.locator('#skin-explanation').innerText();
  await page.locator('[data-layer="temperature"]').click();
  await page.waitForFunction(()=>document.querySelector('#map-error').hidden,null,{timeout:45000});
  await page.evaluate(()=>document.activeElement?.blur());
