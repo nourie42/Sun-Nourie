@@ -1,0 +1,78 @@
+name: Weather Fusion provider probe
+on:
+  push:
+    branches: [weather-fusion-data-repair]
+    paths: ['.github/workflows/weather-fusion-provider-probe.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install 'eccodes>=2.40,<3' 'numpy<3' 'requests<3'
+      - name: Public source and production diagnostics (no secrets)
+        run: |
+          python -u - <<'PY'
+          import requests, datetime as dt, json, re, numpy as np
+          import eccodes as ec
+          now=dt.datetime.now(dt.timezone.utc)
+          print('UTC clock',now.isoformat())
+          s=requests.Session();s.headers['User-Agent']='Sun-Nourie-WeatherFusion/2.0 (https://github.com/nourie42/Sun-Nourie)'
+          for path in ['/health','/api/weather-fusion/forecast?location=knightdale','/api/weather-fusion/forecast?location=greenville']:
+            try:
+              r=s.get('https://sun-nourie-live.onrender.com'+path,timeout=75);print('LIVE',path,r.status_code)
+              j=r.json()
+              print(json.dumps({k:j.get(k) for k in ['ok','version','current','feeds','aiConfigured','modelAccessConfigured']})[:16000])
+              if j.get('days'): print('DAY',json.dumps(j['days'][0]))
+            except Exception as e: print('LIVE ERROR',type(e).__name__,str(e)[:300])
+          for url in ['https://weather.us/model-charts/rapid-us/north-carolina/radar-reflectivity.html','https://weather.us/model-charts/euro/north-carolina/acc-total-precipitation.html']:
+            try:
+              r=s.get(url,timeout=25); print('EMBED',r.status_code,'XFRAME',r.headers.get('X-Frame-Options'),'CSP',r.headers.get('Content-Security-Policy'))
+            except Exception as e: print('EMBED',type(e).__name__)
+          for model in ['hrrr','nbm','ecmwf']:
+            found=None
+            for back in range(3,31):
+              run=(now-dt.timedelta(hours=back)).replace(minute=0,second=0,microsecond=0)
+              if model in ['hrrr','ecmwf'] and run.hour not in [0,6,12,18]:continue
+              date=run.strftime('%Y%m%d');hour=run.strftime('%H')
+              if model=='hrrr': url=f'https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.{date}/conus/hrrr.t{hour}z.wrfsfcf03.grib2';idx=url+'.idx'
+              elif model=='nbm':url=f'https://noaa-nbm-grib2-pds.s3.amazonaws.com/blend.{date}/{hour}/core/blend.t{hour}z.core.f003.co.grib2';idx=url+'.idx'
+              else:url=f'https://ecmwf-forecasts.s3.eu-central-1.amazonaws.com/{date}/{hour}z/ifs/0p25/oper/{date}{hour}0000-3h-oper-fc.grib2';idx=url[:-6]+'.index'
+              try:
+                r=s.get(idx,timeout=20)
+                print('INDEX',model,r.status_code,idx)
+                if r.ok:found=(run,url,r.text);break
+              except Exception as e:print('INDEX ERROR',type(e).__name__)
+            if not found:continue
+            run,url,text=found
+            print('INDEX SAMPLE',model,text[:2000])
+            if model=='ecmwf':
+              rows=[json.loads(line) for line in text.splitlines() if line.startswith('{')]
+              entries=[x for x in rows if x.get('param') in ['2t','2d','10u','10v','tp','tcc','msl']]
+              print('FIELDS',model,json.dumps(entries)[:20000])
+              row=entries[0];a=int(row['_offset']);b=a+int(row['_length'])-1
+            else:
+              rows=[line.split(':') for line in text.splitlines() if re.match(r'^\d+:\d+:',line)]
+              selected=[x for x in rows if x[3] in ['TMP','DPT','RH','UGRD','VGRD','GUST','APCP','REFC','TCDC'] and (x[4] in ['2 m above ground','10 m above ground','surface','entire atmosphere','entire atmosphere (considered as a single layer)'])]
+              print('FIELDS',model,json.dumps(selected)[:20000])
+              row=next(x for x in selected if x[3]=='TMP' and x[4]=='2 m above ground');i=rows.index(row);a=int(row[1]);b=int(rows[i+1][1])-1
+            try:
+              r=s.get(url,headers={'Range':f'bytes={a}-{b}'},timeout=45);print('RANGE',r.status_code,len(r.content),r.headers.get('Content-Range'))
+              r.raise_for_status();g=ec.codes_new_from_message(r.content)
+              props={}
+              for key in ['shortName','units','dataDate','dataTime','stepType','startStep','endStep','gridType','Ni','Nj','Nx','Ny','jScansPositively','iScansNegatively','uvRelativeToGrid','bitmapPresent']:
+                try: props[key]=ec.codes_get(g,key)
+                except: pass
+              print('GRIB',model,props)
+              lat=ec.codes_get_array(g,'latitudes');lon=ec.codes_get_array(g,'longitudes');vals=ec.codes_get_values(g)
+              for name,la,lo in [('Knightdale',35.787,-78.4806),('Greenville',35.6127,-77.3664)]:
+                delta=((lon-lo+180)%360-180)*np.cos(la*np.pi/180);i=int(np.argmin((lat-la)**2+delta**2));print('REAL POINT',model,name,float(lat[i]),float(lon[i]),float(vals[i]))
+              ec.codes_release(g)
+            except Exception as e:print('DECODE ERROR',type(e).__name__,str(e)[:500])
+          PY
