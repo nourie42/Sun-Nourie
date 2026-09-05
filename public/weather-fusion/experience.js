@@ -1,6 +1,6 @@
 import {dailyDisplay,temperatureBar,thermalComfort,finite} from './weather-math.js';
 const $=id=>document.getElementById(id);
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
 const number=(n,d=0)=>finite(n)?n.toFixed(d):'—';
 const temp=n=>`${number(n)}°`;
 const defs={
@@ -19,6 +19,65 @@ const formatTime=(v,options={})=>new Intl.DateTimeFormat('en-US',{timeZone:data?
 const localMinutes=v=>{const p=new Intl.DateTimeFormat('en-US',{timeZone:data?.location.timeZone||'America/New_York',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date(v));return Number(p.find(x=>x.type==='hour').value)*60+Number(p.find(x=>x.type==='minute').value);};
 const clockMinutes=n=>{const h=Math.floor(n/60)%24,m=Math.round(n%60);return `${h%12||12}:${String(m).padStart(2,'0')} ${h>=12?'PM':'AM'}`;};
 const displayValue=(v,def)=>!finite(v)?'Not available':def.solar?clockMinutes(v):`${number(v,def.digits||0)}${def.unit}`;
+function locationClock(time,zone='America/New_York'){
+ const parts=new Intl.DateTimeFormat('en-US',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date(time));
+ const get=type=>parts.find(p=>p.type===type)?.value;
+ return {day:`${get('year')}-${get('month')}-${get('day')}`,hour:Number(get('hour')),minute:Number(get('minute'))};
+}
+export function comfortDisplayMode(time=Date.now(),zone='America/New_York'){
+ const p=locationClock(time,zone),clock=p.hour+p.minute/60;
+ return clock>=18||clock<6?'overnight':'day';
+}
+export function overnightComfort(forecast,now=Date.now()){
+ const zone=forecast?.location?.timeZone||'America/New_York',mode=comfortDisplayMode(now,zone);
+ if(mode!=='overnight')return null;
+ const source=forecast?.metricForecasts?.series?.feels||[],start=locationClock(now,zone),rows=[];
+ for(const point of source){
+  const stamp=Date.parse(point.time);if(!finite(stamp)||stamp<now)continue;
+  const p=locationClock(stamp,zone);rows.push(point);
+  const reachedMorning=start.hour>=18?(p.day!==start.day&&p.hour>=7):(p.day===start.day&&p.hour>=7);
+  if(reachedMorning||rows.length>=15)break;
+ }
+ const valid=rows.filter(p=>finite(p.value));if(!valid.length)return null;
+ const coolest=valid.reduce((a,b)=>b.value<a.value?b:a),warmest=valid.reduce((a,b)=>b.value>a.value?b:a);
+ return {low:coolest.value,high:warmest.value,lowTime:coolest.time,end:rows.at(-1)?.time||coolest.time,points:rows};
+}
+function valuesThrough(series,now,end){return (series||[]).filter(p=>{const t=Date.parse(p.time);return finite(t)&&t>=now&&t<=Date.parse(end)&&finite(p.value);}).map(p=>p.value);}
+export function comfortWeatherKind(forecast,now=Date.now()){
+ const zone=forecast?.location?.timeZone||'America/New_York',night=comfortDisplayMode(now,zone)==='overnight';
+ const d=forecast?.days?.[0]||{},condition=String(night?(d.nightCondition||forecast?.current?.condition||''):(forecast?.current?.condition||d.condition||'')).toLowerCase();
+ const pop=night?d.popNight:d.pop,wind=forecast?.current?.wind;
+ if(/thunder|storm/.test(condition))return 'storm';
+ if(/snow|sleet|ice pellets|freezing rain/.test(condition))return 'snow';
+ if(/rain|shower|drizzle/.test(condition)||(finite(pop)&&pop>=35))return 'rain';
+ if(/fog|mist/.test(condition))return 'fog';
+ if(finite(wind)&&wind>=18)return 'wind';
+ if(night)return 'night';
+ if(/sunny|clear|few clouds/.test(condition))return 'sun';
+ if(/cloud|overcast/.test(condition))return 'cloud';
+ return 'calm';
+}
+function weatherArt(kind){
+ const items=(cls,count,symbol='')=>Array.from({length:count},(_,i)=>`<i class="${cls}" style="--i:${i};--x:${7+(i*37)%89}%;--delay:-${((i*43)%170)/100}s">${symbol}</i>`).join('');
+ if(kind==='rain')return items('wx-drop',14);
+ if(kind==='storm')return `<i class="wx-flash"></i>${items('wx-drop',16)}`;
+ if(kind==='snow')return items('wx-flake',14,'✦');
+ if(kind==='night')return items('wx-star',12,'✦');
+ if(kind==='wind')return items('wx-wind-line',7);
+ if(kind==='fog')return items('wx-fog-line',5);
+ if(kind==='cloud')return '<i class="wx-cloud wx-cloud-a"></i><i class="wx-cloud wx-cloud-b"></i>';
+ if(kind==='sun')return '<i class="wx-sun-glow"></i><i class="wx-sun-ring"></i>';
+ return '';
+}
+function renderComfortArt(forecast,now){
+ const tile=$('skin-exposure');if(!tile)return;
+ let art=tile.querySelector('.comfort-weather-art');if(!art){art=document.createElement('div');art.className='comfort-weather-art';art.setAttribute('aria-hidden','true');tile.prepend(art);}
+ const kind=comfortWeatherKind(forecast,now);tile.dataset.weather=kind;art.className=`comfort-weather-art weather-${kind}`;art.innerHTML=weatherArt(kind);
+}
+function ensureComfortStyles(){
+ if(document.getElementById('weather-nourie-comfort-effects'))return;
+ const link=document.createElement('link');link.id='weather-nourie-comfort-effects';link.rel='stylesheet';link.href='/weather-fusion/comfort-effects.css?v=1-evening';document.head.append(link);
+}
 function pointsFor(key, hours=48) {
  if(!data)return [];
  if(key==='solar')return (data.metricForecasts?.solar||[]).map(d=>({time:d.sunset,value:d.sunset?localMinutes(d.sunset):null,sunrise:d.sunrise,date:d.date})).filter(d=>d.time);
@@ -32,7 +91,7 @@ function sparkline(points) {
  points.forEach((p,i)=>{if(!finite(p.value)){continuous=false;return;}const x=2+i/Math.max(1,points.length-1)*116,y=29-(p.value-lo)/span*23;drawing+=`${continuous?'L':'M'}${x.toFixed(1)},${y.toFixed(1)} `;continuous=true;});
  return `<svg class="tile-spark" viewBox="0 0 120 34" aria-hidden="true"><path d="${drawing}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 }
-function comfortExplanation(c,current) {
+function daytimeComfortExplanation(c,current) {
  const t=current.temperature,dp=current.dewpoint,wind=current.wind;
  if(!finite(c.shade))return 'We’re waiting for enough temperature, moisture and wind data to work this out.';
  const shadeDelta=finite(t)?c.shade-t:null,sunDelta=finite(c.sun)?c.sun-c.shade:null;
@@ -51,18 +110,17 @@ function comfortExplanation(c,current) {
  } else if(finite(t)&&t<55){
   if(finite(wind)&&wind>=15)sentences.push(`The ${number(wind)} mph wind is the main reason it feels colder — moving air carries heat away from exposed skin much faster.`);
   else if(finite(wind)&&wind>=6)sentences.push(`The ${number(wind)} mph breeze is pulling the feel below the air temperature by speeding up heat loss.`);
-  else sentences.push(`With very little wind, the cold is staying closer to the actual air temperature instead of being driven sharply lower by moving air.`);
+  else sentences.push('With very little wind, the cold is staying closer to the actual air temperature instead of being driven sharply lower by moving air.');
   if(finite(dp)&&dp<25)sentences.push(`The ${number(dp)}° dew point is very dry; that matters less than wind in cold air, but it can make exposed skin and lips feel drier.`);
-  else if(finite(dp)&&dp>40)sentences.push(`The higher dew point makes the air damper, but in this temperature range the wind is still the stronger cooling factor.`);
+  else if(finite(dp)&&dp>40)sentences.push('The higher dew point makes the air damper, but in this temperature range the wind is still the stronger cooling factor.');
  } else {
   if(finite(dp)&&dp>=68)sentences.push(`The ${number(dp)}° dew point is high for otherwise mild weather, so the air feels muggy and less comfortable than the temperature sounds.`);
   else if(finite(dp)&&dp<50)sentences.push(`The ${number(dp)}° dew point keeps the air crisp and lets evaporation work easily, which makes the same temperature feel cleaner and cooler.`);
   else if(finite(dp))sentences.push(`The ${number(dp)}° dew point is fairly comfortable, so moisture isn’t adding much extra stress.`);
   if(finite(wind)&&wind>=12)sentences.push(`A ${number(wind)} mph breeze is noticeable and pushes the feel cooler.`);
-  else if(finite(wind)&&wind<3&&finite(dp)&&dp>=65)sentences.push(`Because the air is nearly still, there’s little breeze to offset the humidity.`);
+  else if(finite(wind)&&wind<3&&finite(dp)&&dp>=65)sentences.push('Because the air is nearly still, there’s little breeze to offset the humidity.');
  }
  if(finite(sunDelta)&&sunDelta>=3)sentences.push(`In direct sun, the radiation calculation adds about ${number(sunDelta)}° compared with shade, so exposed pavement and open areas will feel hotter.`);
- else if(c.daylight===false)sentences.push('The sun is down, so solar radiation is not adding extra heat right now.');
  if(finite(shadeDelta)){
   if(shadeDelta>=4)sentences.push(`Put together, those effects make the shade feel about ${number(Math.abs(shadeDelta))}° warmer than the measured air temperature.`);
   else if(shadeDelta<=-4)sentences.push(`Put together, those effects make the shade feel about ${number(Math.abs(shadeDelta))}° cooler than the measured air temperature.`);
@@ -70,12 +128,37 @@ function comfortExplanation(c,current) {
  }
  return sentences.slice(0,3).join(' ');
 }
+function overnightComfortExplanation(c,current,forecast,summary,now){
+ if(!finite(c.shade))return 'We’re waiting for enough temperature, moisture and wind data to work this out.';
+ const series=forecast?.metricForecasts?.series||{},end=summary?.end;
+ const dewpoints=end?valuesThrough(series.dewpoint,now,end):[],winds=end?valuesThrough(series.wind,now,end):[];
+ const dewMin=dewpoints.length?Math.min(...dewpoints):current.dewpoint,dewMax=dewpoints.length?Math.max(...dewpoints):current.dewpoint,windMax=winds.length?Math.max(...winds):current.wind;
+ const sentences=[];
+ if(finite(dewMin)&&dewMin>=70)sentences.push(`The dew point stays in the ${Math.round(dewMin)}–${Math.round(dewMax)}° range overnight, so even as the temperature falls the air will stay muggy and your body won’t shed heat as easily.`);
+ else if(finite(dewMax)&&dewMax>=65)sentences.push(`The dew point stays fairly high overnight, so the cooler air will still feel a little sticky rather than crisp.`);
+ else if(finite(dewMax)&&dewMax<50)sentences.push(`The overnight dew point stays low, so the air should feel drier and crisper as temperatures fall.`);
+ else if(finite(current.dewpoint))sentences.push(`The ${number(current.dewpoint)}° dew point is moderate, so moisture should not be the main thing controlling how tonight feels.`);
+ if(finite(windMax)&&windMax>=15)sentences.push(`Winds reach about ${number(windMax)} mph overnight, which increases heat loss and will pull the feel cooler than the air temperature at times.`);
+ else if(finite(windMax)&&windMax>=7)sentences.push(`A breeze near ${number(windMax)} mph overnight should provide noticeable moving-air cooling.`);
+ else if(finite(windMax))sentences.push('Winds stay light overnight, so there will not be much extra cooling from moving air.');
+ if(summary&&finite(summary.low)){
+  const when=new Intl.DateTimeFormat('en-US',{timeZone:forecast.location.timeZone,hour:'numeric'}).format(new Date(summary.lowTime));
+  sentences.push(`The all-weather calculation bottoms out near ${temp(summary.low)} around ${when}, so that is the coolest it should actually feel before morning.`);
+ }
+ return sentences.slice(0,3).join(' ');
+}
 export function renderComfort(forecast) {
- data=forecast;
- const c=forecast.comfort||thermalComfort(forecast.current,forecast.location,Date.parse(forecast.assembledAt));
- $('skin-values').innerHTML=`<span><strong>${temp(c.shade)}</strong> in the shade</span>${finite(c.sun)?`<span><strong>~${temp(c.sun)}</strong> in the sun</span>`:''}`;
- $('skin-explanation').textContent=comfortExplanation(c,forecast.current);
- $('skin-science').textContent=`${c.method}. Air ${temp(forecast.current.temperature)}; dew point ${temp(forecast.current.dewpoint)}; relative humidity ${number(c.humidity)}%; wind ${number(forecast.current.wind)} mph. ${finite(c.wetBulb)?`Estimated wet bulb ${temp(c.wetBulb)}. `:''}${finite(c.absorbedRadiation)?`Estimated absorbed solar/radiant input ${number(c.absorbedRadiation)} W/m²; direct-sun equivalent is ${number(c.solarAdjustment)}°F above the shade calculation. `:''}${c.note}`;
+ data=forecast;ensureComfortStyles();
+ const now=Date.parse(forecast.assembledAt)||Date.now(),c=forecast.comfort||thermalComfort(forecast.current,forecast.location,now),mode=comfortDisplayMode(now,forecast.location.timeZone),overnight=overnightComfort(forecast,now);
+ if(mode==='overnight'){
+  $('skin-values').innerHTML=`<span><strong>${temp(c.shade)}</strong> right now</span>${overnight&&finite(overnight.low)?`<span><strong>${temp(overnight.low)}</strong> coolest overnight</span>`:''}`;
+  $('skin-explanation').textContent=overnightComfortExplanation(c,forecast.current,forecast,overnight,now);
+ }else{
+  $('skin-values').innerHTML=`<span><strong>${temp(c.shade)}</strong> in the shade</span>${finite(c.sun)?`<span><strong>~${temp(c.sun)}</strong> in the sun</span>`:''}`;
+  $('skin-explanation').textContent=daytimeComfortExplanation(c,forecast.current);
+ }
+ renderComfortArt(forecast,now);
+ $('skin-science').textContent=`${c.method}. Air ${temp(forecast.current.temperature)}; dew point ${temp(forecast.current.dewpoint)}; relative humidity ${number(c.humidity)}%; wind ${number(forecast.current.wind)} mph. ${finite(c.wetBulb)?`Estimated wet bulb ${temp(c.wetBulb)}. `:''}${mode==='day'&&finite(c.absorbedRadiation)?`Estimated absorbed solar/radiant input ${number(c.absorbedRadiation)} W/m²; direct-sun equivalent is ${number(c.solarAdjustment)}°F above the shade calculation. `:''}${mode==='overnight'&&overnight?`Overnight real-feel minimum ${temp(overnight.low)} from the hourly forecast through morning. `:''}${c.note}`;
 }
 export function renderDailyRows(forecast,icon) {
  const values=forecast.days.flatMap(d=>[d.high,d.low]).filter(finite),lo=values.length?Math.min(...values)-3:0,hi=values.length?Math.max(...values)+3:1;
@@ -173,8 +256,10 @@ export function resetExperience() {
  if($('metric-dialog').open)$('metric-dialog').close();
  $('skin-values').textContent='Checking how it will feel…';$('skin-explanation').textContent='Getting the weather for this location.';
  $('skin-science').textContent='Waiting for this location’s weather.';
+ const tile=$('skin-exposure');if(tile){delete tile.dataset.weather;tile.querySelector('.comfort-weather-art')?.remove();}
 }
 export function installExperience() {
+ ensureComfortStyles();
  $('metrics').addEventListener('click',e=>{const card=e.target.closest('[data-metric]');if(card)openMetric(card.dataset.metric);});
  $('temperature').addEventListener('click',()=>openMetric('temperature'));
  $('temperature').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openMetric('temperature');}});
