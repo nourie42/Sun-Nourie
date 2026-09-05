@@ -1,4 +1,5 @@
 /** Direct, decoded NOAA/ECMWF model snapshots. No provider key and no webpage scraping. */
+import {shadeFeelsLike} from '../public/weather-fusion/weather-math.js';
 export const DATA_ROOT = 'https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/';
 export const DIRECT_SCHEMA = 'weather-fusion-direct-v2';
 const H = 3600000;
@@ -96,21 +97,10 @@ export function weighted(values, policy) {
   return { value: sum ? round(sources.reduce((n,s) => n+s.value*s.weight,0)/sum,4) : null,
     sources: sources.map((s) => ({ ...s, weight: round(s.weight/sum,6) })), calibrated: false };
 }
-/** NWS Rothfusz heat index / wind chill; calculated from observations, never called a measurement. */
-export function feelsLike(t, rh, wind) {
-  if (!finite(t)) return { value: null, method: 'Temperature unavailable' };
-  if (t <= 50) {
-    if (!finite(wind)) return { value: null, method: 'Wind needed to calculate cold-weather feels like' };
-    return wind > 3 ? { value: round(35.74+.6215*t-35.75*wind**.16+.4275*t*wind**.16,0), method: 'Calculated NWS wind chill' } : { value: t, method: 'Air temperature; wind chill not applicable' };
-  }
-  if (t < 80) return { value: t, method: 'Air temperature; no heat-index adjustment' };
-  if (!finite(rh) || rh < 0 || rh > 100) return { value: null, method: 'Humidity needed to calculate heat index' };
-  const simple = .5*(t+61+1.2*(t-68)+.094*rh);
-  if ((simple+t)/2 < 80) return { value: t, method: 'Air temperature; no heat-index adjustment' };
-  let hi = -42.379+2.04901523*t+10.14333127*rh-.22475541*t*rh-.00683783*t*t-.05481717*rh*rh+.00122874*t*t*rh+.00085282*t*rh*rh-.00000199*t*t*rh*rh;
-  if (rh < 13 && t >= 80 && t <= 112) hi -= (13-rh)/4*Math.sqrt((17-Math.abs(t-95))/17);
-  else if (rh > 85 && t <= 87) hi += (rh-85)/10*(87-t)/5;
-  return { value: round(hi,0), method: 'Calculated NWS heat index (shade)' };
+/** Backward-compatible API helper using the same all-weather Steadman equation as Weather Nourie. */
+export function feelsLike(t, rh, wind, dewpoint = null) {
+  const result=shadeFeelsLike(t,rh,wind,dewpoint);
+  return {value:finite(result.value)?round(result.value,0):null,method:result.method};
 }
 function extrema(payload, start, end, mode) {
   const h = payload?.hourly;
@@ -204,7 +194,7 @@ export function enhanceForecast(out, { models, grid, periods = [], now, gridQpf,
     hour.reflectivity=sample(sourceModels.hrrr,time,'reflectivity');
     hour.nearbyReflectivity=sample(sourceModels.hrrr,time,'nearby_reflectivity');
   }
-  const apparent=feelsLike(out.current.temperature,out.current.humidity,out.current.wind);
+  const apparent=feelsLike(out.current.temperature,out.current.humidity,out.current.wind,out.current.dewpoint);
   out.current.apparent=apparent.value;
   out.current.apparentSource=`${apparent.method}; ${out.current.type==='observation'?'using nearby station observations':'using forecast guidance'}.`;
   out.solar=solarTimes(out.days[0].date,out.location.latitude,out.location.longitude);

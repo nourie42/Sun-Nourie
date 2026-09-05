@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {dailyDisplay,temperatureBar,shadeFeelsLike,thermalComfort,wetBulb,vaporPressureFromDewpoint} from '../public/weather-fusion/weather-math.js';
+import {dailyDisplay,temperatureBar,shadeFeelsLike,thermalComfort,wetBulb,vaporPressureFromDewpoint,radiationFeelsLike,estimatedAbsorbedRadiation} from '../public/weather-fusion/weather-math.js';
 import {gridSample,parseWind,PLAIN_OUTLOOK_INSTRUCTIONS} from '../src/weatherFusionExperience.js';
 import {buildForecast} from '../src/weatherFusion.js';
 import {testInputs} from './weatherFusion.fixtures.js';
@@ -37,30 +37,38 @@ test('graph data comes from forecasts and does not hold current pressure or visi
  assert.ok(output.metricForecasts.series.feels.some(p=>Number.isFinite(p.value)));
  assert.equal(output.metricForecasts.solar.length,7);
 });
-test('lower dew point makes mild weather feel cooler through vapor pressure and evaporation',()=>{
+test('lower dew point makes the same mild weather feel cooler',()=>{
  const humid=shadeFeelsLike(78,null,5,70),dry=shadeFeelsLike(78,null,5,45);
  assert.ok(Number.isFinite(humid.value)&&Number.isFinite(dry.value));
  assert.ok(dry.value<humid.value,`dry=${dry.value} humid=${humid.value}`);
  assert.ok(vaporPressureFromDewpoint(78,45,null)<vaporPressureFromDewpoint(78,70,null));
- assert.match(dry.method,/Steadman\/BOM/);
+ assert.match(dry.method,/Steadman apparent temperature/);
 });
-test('cold weather uses wind chill without inventing a humidity penalty',()=>{
- const damp=shadeFeelsLike(30,95,15,29),dry=shadeFeelsLike(30,20,15,-5);
- assert.equal(Math.round(damp.value),19);assert.equal(Math.round(dry.value),19);
- assert.match(damp.method,/NWS wind chill/);
+test('one Steadman equation family is used in cold mild and hot weather',()=>{
+ for(const sample of [shadeFeelsLike(30,95,15,29),shadeFeelsLike(70,50,8,50),shadeFeelsLike(95,47,5,72)])assert.match(sample.method,/Steadman apparent temperature/);
+ const coldWindy=shadeFeelsLike(30,70,20,20),coldCalm=shadeFeelsLike(30,70,2,20);
+ assert.ok(coldWindy.value<coldCalm.value);
+ const coldDry=shadeFeelsLike(30,null,15,-5),coldDamp=shadeFeelsLike(30,null,15,29);
+ assert.ok(coldDry.value<coldDamp.value);
 });
-test('hot humid weather uses NWS heat index and solar scenario stays within NWS full-sun ceiling',()=>{
- assert.equal(Math.round(shadeFeelsLike(95,47,0,72).value),103);
+test('hot humidity raises all-weather apparent temperature without switching to heat index',()=>{
+ const humid=shadeFeelsLike(95,null,5,72),dry=shadeFeelsLike(95,null,5,45);
+ assert.ok(humid.value>dry.value);assert.match(humid.method,/all-weather shade/);
+ assert.equal(Math.round(humid.value),101);
+});
+test('direct sun uses the radiation-inclusive Steadman equation and bounded absorbed radiation',()=>{
+ const q=estimatedAbsorbedRadiation('Sunny',Math.PI/2);assert.equal(Math.round(q),130);
+ const shade=shadeFeelsLike(90,null,5,65),sun=radiationFeelsLike(90,null,5,65,q);
+ assert.ok(sun.value>shade.value);assert.match(sun.method,/with radiation/);
  const c=thermalComfort({temperature:95,humidity:47,dewpoint:72,wind:5,condition:'Sunny',type:'observation'},{latitude:35.787,longitude:-78.4806},Date.parse('2026-09-05T17:00:00Z'));
- assert.ok(c.solarAdjustment>=0&&c.solarAdjustment<=15);
- assert.ok(c.sun>=c.shade);assert.match(c.note,/pavement, building shade and street-canyon effects are not guessed/);
+ assert.ok(c.absorbedRadiation>=0&&c.absorbedRadiation<=130);assert.ok(c.sun>=c.shade);
+ assert.match(c.note,/does not add a fake urban bonus or penalty|hot sidewalk/);
 });
-test('humidity, wind chill and heat index remain physically separated from sun estimates',()=>{
- assert.ok(shadeFeelsLike(79,84,5,73).value>79);assert.equal(Math.round(shadeFeelsLike(30,70,15).value),19);
- assert.equal(Math.round(shadeFeelsLike(95,47,0).value),103);assert.equal(shadeFeelsLike(79,84,null).value,null);
+test('wet bulb stays diagnostic and is not double-counted into the final real-feel value',()=>{
  assert.equal(wetBulb(20,50),null);
  const c=thermalComfort({temperature:79,humidity:84,dewpoint:73,wind:5,condition:'Clear'},{latitude:35.787,longitude:-78.4806},Date.parse('2026-09-06T05:00:00Z'));
  assert.equal(c.daylight,false);assert.equal(c.sun,null);assert.ok(c.shade>79);
+ assert.match(c.note,/not added again/);
 });
 test('plain-language outlook prompt prioritizes local discussion and keeps required attribution',()=>{
  assert.match(PLAIN_OUTLOOK_INSTRUCTIONS,/latest local NWS Area Forecast Discussion/);
@@ -73,5 +81,7 @@ test('all cards have dialog graphs and science is below the main experience',()=
  assert.match(html,/id="metric-dialog"/);assert.match(html,/id="chart-scrubber"/);
  assert.ok(html.indexOf('SCIENTIFIC STUFF')>html.indexOf('id="metrics"'));
  assert.ok(!html.includes('Back to Sun-Nourie'));assert.ok(!html.includes('Weather Fusion'));
+ assert.ok(!html.includes('Uses NWS heat index'));assert.ok(!html.includes('NWS Wind Chill'));
+ assert.match(html,/One formula in every season/);assert.match(html,/radiation-inclusive/);
  assert.match(client,/data-metric/);assert.match(client,/showModal/);assert.match(client,/made-up line/);
 });
