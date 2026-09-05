@@ -1,0 +1,68 @@
+name: Weather Fusion AI reliability repair
+on:
+  push:
+    branches: [weather-fusion-ai-reliability]
+    paths: ['.github/workflows/weather-fusion-ai-repair.yml']
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply weather-only reliability changes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('src/weatherFusion.js');s=p.read_text()
+          assert "return aiCache.get(data.signature, 30 * MINUTE" in s
+          s=s.replace("if (!response.ok) throw errorWithStatus(`Source returned HTTP ${response.status}.`, 502);", "if (!response.ok) { const error = errorWithStatus(`Source returned HTTP ${response.status}.`, 502); if (u.hostname === 'api.openai.com') { error.aiDiagnostic = `AI_PROVIDER_HTTP_${response.status}`; try { const detail = await response.json(); const parameter = detail.error?.param; if (typeof parameter === 'string' && /^[a-zA-Z0-9_.-]{1,60}$/.test(parameter)) error.aiDiagnostic += '_' + parameter; } catch {} } throw error; }")
+          s=s.replace("if ((failureCooldown.get(key) || 0) > now()) return fallback(data, 'AI is cooling down after an unavailable response; official guidance is shown.');", "const previousFailure = failureCooldown.get(key);\n    if (previousFailure?.until > now()) return { ...fallback(data, 'AI is cooling down after an unavailable response; official guidance is shown.'), diagnostic: previousFailure.diagnostic, retryAfter: iso(previousFailure.until) };")
+          s=s.replace("return aiCache.get(data.signature, 30 * MINUTE, async () => {", "const briefing = await aiCache.get(data.signature, 30 * MINUTE, async () => {")
+          s=s.replace("      aiBudget.count += 1;", "      let lastFailure = null;")
+          s=s.replace("      try {\n        const result = await request('https://api.openai.com/v1/responses'", "      for (let attempt = 0; attempt < 2 && aiBudget.count < limit; attempt += 1) {\n      aiBudget.count += 1;\n      try {\n        const result = await request('https://api.openai.com/v1/responses'")
+          s=s.replace("input: JSON.stringify(facts), text:", "input: JSON.stringify({ ...facts, requiredSources: ['nws','afd',...data.modelContributions.map(m=>m.id)], revisionInstruction: attempt ? 'The previous attempt failed automated validation. Return every required source ID exactly. Do not include any digit characters in prose; refer to today, tonight, tomorrow and the week ahead. Keep every prose field nonempty and concise. Do not issue weather warnings or promise safe conditions.' : 'Copy every required source ID into the sources array. Write concise professional prose with no digit characters.' }), text:")
+          before="        if (result.status !== 'completed' || fields.some((k) => typeof content[k] !== 'string' || !content[k].trim() || content[k].length > 1600 || /\\d/.test(content[k]))) throw new Error('AI response failed validation.');"
+          after="        if (result.status !== 'completed') throw Object.assign(new Error('AI response was incomplete.'), { aiDiagnostic: 'AI_RESPONSE_INCOMPLETE' });\n        if (fields.some((k) => typeof content[k] !== 'string' || !content[k].trim() || content[k].length > 1600)) throw Object.assign(new Error('AI prose structure failed validation.'), { aiDiagnostic: 'AI_PROSE_STRUCTURE' });\n        if (fields.some((k) => /\\d/.test(content[k]))) throw Object.assign(new Error('AI numerical prose failed validation.'), { aiDiagnostic: 'AI_PROSE_CONTAINS_DIGITS' });"
+          assert before in s;s=s.replace(before,after)
+          s=s.replace("throw new Error('AI source attribution failed validation.');", "throw Object.assign(new Error('AI source attribution failed validation.'), { aiDiagnostic: 'AI_SOURCE_ATTRIBUTION' });")
+          s=s.replace("throw new Error('AI safety wording failed validation.');", "throw Object.assign(new Error('AI safety wording failed validation.'), { aiDiagnostic: 'AI_SAFETY_WORDING' });")
+          a=s.index("      } catch (error) {\n        console.warn('Weather Fusion AI synthesis failed:'")
+          b=s.index('  async function search(query)',a)
+          s=s[:a]+'''      } catch (error) {
+                  const diagnostic = typeof error.aiDiagnostic === 'string' && /^AI_[A-Z0-9_a-z.\\-]{1,100}$/.test(error.aiDiagnostic) ? error.aiDiagnostic : error.name === 'TimeoutError' || error.name === 'AbortError' ? 'AI_PROVIDER_TIMEOUT' : error instanceof SyntaxError ? 'AI_RESPONSE_JSON' : 'AI_RESPONSE_UNAVAILABLE';
+                  console.warn('Weather Fusion AI synthesis failed:', diagnostic);
+                  lastFailure = diagnostic;
+                  if (diagnostic.startsWith('AI_PROVIDER_')) break;
+                }
+                }
+                if (failureCooldown.size > 200) failureCooldown.clear();
+                const until = now() + 5 * MINUTE;
+                failureCooldown.set(key, { until, diagnostic: lastFailure || 'AI_REQUEST_LIMIT' });
+                return { ...fallback(data, 'AI synthesis is temporarily unavailable; the verified source forecast remains visible.'), diagnostic: lastFailure || 'AI_REQUEST_LIMIT', retryAfter: iso(until) };
+              });
+              // A failed generation is not a successful 30-minute briefing cache entry.
+              if (briefing.mode !== 'ai') aiCache.values.delete(data.signature);
+              return briefing;
+            }
+          '''+s[b:]
+          p.write_text(s)
+          p=Path('public/weather-fusion/style.css');s=p.read_text();s+='\n/* Keep the keyboard skip link out of scrolled screenshots until focused. */\n.skip-link:not(:focus){clip-path:inset(50%);width:1px;height:1px;padding:0;overflow:hidden;white-space:nowrap}\n';p.write_text(s)
+          PY
+      - run: |
+          npm ci
+          node --check src/weatherFusion.js
+          node --test test/weatherFusion*.test.js
+          npm run check
+      - name: Commit only verified weather source files on repair branch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/weatherFusion.js public/weather-fusion/style.css
+          git commit -m 'Retry invalid AI prose once, preserve validation and expose safe failure diagnostics'
+          git push origin HEAD:weather-fusion-ai-reliability
+          git rev-parse HEAD
