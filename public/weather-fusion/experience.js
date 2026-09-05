@@ -1,4 +1,5 @@
 import {dailyDisplay,temperatureBar,thermalComfort,finite} from './weather-math.js';
+import {renderDewpointMeter,resetDewpointMeter} from './dewpoint-meter.js';
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
 const number=(n,d=0)=>finite(n)?n.toFixed(d):'—';
@@ -158,6 +159,7 @@ export function renderComfort(forecast) {
   $('skin-explanation').textContent=daytimeComfortExplanation(c,forecast.current);
  }
  renderComfortArt(forecast,now);
+ renderDewpointMeter(forecast,now);
  $('skin-science').textContent=`${c.method}. Air ${temp(forecast.current.temperature)}; dew point ${temp(forecast.current.dewpoint)}; relative humidity ${number(c.humidity)}%; wind ${number(forecast.current.wind)} mph. ${finite(c.wetBulb)?`Estimated wet bulb ${temp(c.wetBulb)}. `:''}${mode==='day'&&finite(c.absorbedRadiation)?`Estimated absorbed solar/radiant input ${number(c.absorbedRadiation)} W/m²; direct-sun equivalent is ${number(c.solarAdjustment)}°F above the shade calculation. `:''}${mode==='overnight'&&overnight?`Overnight real-feel minimum ${temp(overnight.low)} from the hourly forecast through morning. `:''}${c.note}`;
 }
 export function renderDailyRows(forecast,icon) {
@@ -257,6 +259,7 @@ export function resetExperience() {
  $('skin-values').textContent='Checking how it will feel…';$('skin-explanation').textContent='Getting the weather for this location.';
  $('skin-science').textContent='Waiting for this location’s weather.';
  const tile=$('skin-exposure');if(tile){delete tile.dataset.weather;tile.querySelector('.comfort-weather-art')?.remove();}
+ resetDewpointMeter();
 }
 export function installExperience() {
  ensureComfortStyles();
