@@ -22,6 +22,25 @@ export function temperatureBar(value, floor, ceiling) {
 export function humidityFromDewpoint(temp, dewpoint) {
   return finite(temp)&&finite(dewpoint)&&dewpoint<=temp+1 ? Math.min(100,Math.max(0,100*sat(fToC(dewpoint))/sat(fToC(temp)))) : null;
 }
+export function vaporPressureFromDewpoint(temp, dewpoint, rh) {
+  if (finite(dewpoint) && (!finite(temp) || dewpoint <= temp + 1)) return sat(fToC(dewpoint));
+  if (finite(temp) && finite(rh) && rh >= 0 && rh <= 100) return sat(fToC(temp)) * rh / 100;
+  return null;
+}
+function nwsHeatIndex(t, humidity) {
+  const simple=.5*(t+61+1.2*(t-68)+.094*humidity);
+  if((simple+t)/2<80)return null;
+  let hi=-42.379+2.04901523*t+10.14333127*humidity-.22475541*t*humidity-.00683783*t*t-.05481717*humidity**2+.00122874*t*t*humidity+.00085282*t*humidity**2-.00000199*t*t*humidity**2;
+  if(humidity<13&&t>=80&&t<=112)hi-=(13-humidity)/4*Math.sqrt(Math.max(0,(17-Math.abs(t-95))/17));
+  else if(humidity>85&&t>=80&&t<=87)hi+=(humidity-85)/10*(87-t)/5;
+  return hi;
+}
+/**
+ * Physiologic shade apparent temperature.
+ * Cold: NWS wind chill. Hot: NWS heat index when applicable.
+ * Otherwise: Steadman/BOM apparent temperature using vapor pressure and wind.
+ * Dew point is preferred for vapor pressure, so drier air lowers the estimate naturally.
+ */
 export function shadeFeelsLike(t, rh, wind, dewpoint) {
   if (!finite(t)) return {value:null,method:'Missing air temperature'};
   const humidity=finite(rh)&&rh>=0&&rh<=100?rh:humidityFromDewpoint(t,dewpoint);
@@ -29,19 +48,15 @@ export function shadeFeelsLike(t, rh, wind, dewpoint) {
     if(!finite(wind)||wind<0)return {value:null,method:'Missing wind for cold-weather calculation'};
     return wind>3?{value:35.74+.6215*t-35.75*wind**.16+.4275*t*wind**.16,method:'NWS wind chill'}:{value:t,method:'Air temperature; wind chill not applicable'};
   }
-  if(!finite(humidity))return {value:null,method:'Humidity unavailable'};
-  if(t>=80) {
-    const simple=.5*(t+61+1.2*(t-68)+.094*humidity);
-    if((simple+t)/2>=80) {
-      let hi=-42.379+2.04901523*t+10.14333127*humidity-.22475541*t*humidity-.00683783*t*t-.05481717*humidity**2+.00122874*t*t*humidity+.00085282*t*humidity**2-.00000199*t*t*humidity**2;
-      if(humidity<13&&t<=112)hi-=(13-humidity)/4*Math.sqrt((17-Math.abs(t-95))/17);
-      else if(humidity>85&&t<=87)hi+=(humidity-85)/10*(87-t)/5;
-      return {value:hi,method:'NWS heat index (shade)'};
-    }
+  if(t>=80 && finite(humidity)) {
+    const hi=nwsHeatIndex(t,humidity);
+    if(finite(hi))return {value:hi,method:'NWS heat index (shade)'};
   }
   if(!finite(wind)||wind<0)return {value:null,method:'Wind unavailable'};
-  const c=fToC(t),vapor=sat(c)*humidity/100;
-  return {value:cToF(c+.33*vapor-.7*wind*.44704-4),method:'Steadman/BOM apparent temperature (shade)'};
+  const vapor=vaporPressureFromDewpoint(t,dewpoint,humidity);
+  if(!finite(vapor))return {value:null,method:'Moisture data unavailable'};
+  const c=fToC(t), ms=wind*.44704;
+  return {value:cToF(c+.33*vapor-.7*ms-4),method:'Steadman/BOM apparent temperature (shade)'};
 }
 export function wetBulb(t, rh) {
   if(!finite(t)||!finite(rh))return null;
@@ -56,16 +71,43 @@ export function solarElevation(time, latitude, longitude) {
   const dec=Math.asin(Math.sin(l)*Math.sin(r*23.4397)),ra=Math.atan2(Math.sin(l)*Math.cos(r*23.4397),Math.cos(l)),h=r*(280.16+360.9856235*d)-lw-ra;
   return Math.asin(Math.sin(phi)*Math.sin(dec)+Math.cos(phi)*Math.cos(dec)*Math.cos(h));
 }
+function skyTransmission(condition='') {
+  const text=String(condition).toLowerCase();
+  if(/thunder|storm|rain|shower|drizzle|fog|mist/.test(text))return .18;
+  if(/overcast/.test(text))return .12;
+  if(/mostly cloudy/.test(text))return .32;
+  if(/partly cloudy|partly sunny/.test(text))return .66;
+  if(/mostly sunny|few clouds/.test(text))return .86;
+  if(/cloudy/.test(text))return .42;
+  if(/sunny|clear/.test(text))return 1;
+  return null;
+}
+function dewpointMessage(dewpoint) {
+  if(!finite(dewpoint))return 'Dew point is unavailable.';
+  if(dewpoint<50)return 'The air is dry, so evaporation works well and warmth usually feels less sticky.';
+  if(dewpoint<60)return 'The air is fairly comfortable, with good evaporative cooling.';
+  if(dewpoint<65)return 'There is some moisture in the air, but it is not especially muggy.';
+  if(dewpoint<70)return 'The air is humid, so sweat evaporates less efficiently.';
+  return 'The air is very humid, so sweat evaporates slowly and warmth can feel heavier.';
+}
 export function thermalComfort(current, location, now) {
   const rh=finite(current.humidity)?current.humidity:humidityFromDewpoint(current.temperature,current.dewpoint);
   const shade=shadeFeelsLike(current.temperature,rh,current.wind,current.dewpoint);
   const elevation=solarElevation(now,location.latitude,location.longitude);
   const daylight=finite(elevation)?elevation>0:null;
-  const text=String(current.condition||'').toLowerCase();
-  // This is a disclosed heuristic scenario, NOT measured radiation, WBGT or UTCI.
-  let transmission=/thunder|storm|rain|shower|drizzle|fog|mist/.test(text)?.18:/overcast/.test(text)?.12:/mostly cloudy/.test(text)?.32:/partly cloudy|partly sunny/.test(text)?.66:/mostly sunny|few clouds/.test(text)?.86:/cloudy/.test(text)?.42:/sunny|clear/.test(text)?1:null;
-  const adjustment=daylight&&finite(transmission)?(current.temperature<=50?18:15)*Math.max(0,Math.sin(elevation))**.65*transmission:null;
+  const transmission=skyTransmission(current.condition);
+  // NWS notes full sunshine can add up to about 15°F to heat-index-type exposure.
+  // We scale that ceiling by solar height and sky cover. This is a scenario estimate,
+  // not measured shortwave/longwave radiation, WBGT, UTCI, or literal skin temperature.
+  const adjustment=daylight&&finite(transmission)?15*Math.max(0,Math.sin(elevation))**.65*transmission:null;
+  const localContext=current.type==='observation'
+    ? 'The nearby observed air temperature already captures some broad local neighborhood heat. Exact pavement, building shade and street-canyon effects are not guessed.'
+    : 'Exact urban pavement, building shade and street-canyon effects are not available, so no made-up city temperature bonus is added.';
+  const coldContext=finite(current.temperature)&&current.temperature<=50
+    ? 'In cold weather, moving air is handled with the NWS wind-chill formula; humidity is not artificially added to wind chill.'
+    : '';
   return {shade:finite(shade.value)?Math.round(shade.value):null,sun:finite(shade.value)&&finite(adjustment)?Math.round(shade.value+adjustment):null,
     method:shade.method,humidity:rh,wetBulb:wetBulb(current.temperature,rh),daylight,solarAdjustment:adjustment,
-    note:'Feels-like estimate, not measured skin temperature. The sun estimate uses solar height and sky wording, not a radiation sensor.'};
+    dewpointEffect:dewpointMessage(current.dewpoint),microclimate:localContext,coldContext,
+    note:`Feels-like estimate, not measured skin temperature. ${dewpointMessage(current.dewpoint)} ${coldContext} ${localContext} The sun value is a solar-exposure scenario, not a radiation-sensor measurement.`};
 }
