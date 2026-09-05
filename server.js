@@ -15,6 +15,7 @@ import { registerExpandedAadtRoutes } from "./src/aadtCoverage.js";
 import { registerSiteResearchReportEnhancements } from "./src/siteResearchReportEnhancements.js";
 import { registerFuelAtlasRoutes } from "./src/fuelAtlasRoutes.js";
 import { registerFuelAtlasLocationCompanyBridge } from "./src/fuelAtlasLocationCompanyBridge.js";
+import { registerWeatherFusionRoutes } from "./src/weatherFusion.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -76,6 +77,7 @@ registerSiteEnhancementRoutes(app, {
 });
 registerFuelAtlasLocationCompanyBridge(app);
 registerFuelAtlasRoutes(app, { googleApiKey: process.env.GOOGLE_API_KEY || "" });
+registerWeatherFusionRoutes(app);
 
 app.get("/fuel-atlas", (_req, res) => res.redirect(302, "/fuel-atlas.html"));
 app.get("/fuel-atlas.html", (_req, res) => {
