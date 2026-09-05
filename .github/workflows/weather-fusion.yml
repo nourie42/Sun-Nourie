@@ -2,17 +2,18 @@ name: Weather Fusion additive checks
 on:
   push:
     paths:
+      - 'server.js'
       - 'server-with-weather.js'
       - 'src/weatherFusion*.js'
       - 'public/weather-fusion/**'
-      - 'test/weatherFusion*.test.js'
+      - 'test/weatherFusion*.js'
       - '.github/workflows/weather-fusion.yml'
   pull_request:
     paths:
-      - 'server-with-weather.js'
+      - 'server.js'
       - 'src/weatherFusion*.js'
       - 'public/weather-fusion/**'
-      - 'test/weatherFusion*.test.js'
+      - 'test/weatherFusion*.js'
       - '.github/workflows/weather-fusion.yml'
   workflow_dispatch:
 permissions:
@@ -33,9 +34,10 @@ jobs:
           node --check server-with-weather.js
           node --check src/weatherFusionGateway.js
           node --check src/weatherFusion.js
+          node --check src/weatherFusionDirect.js
           node --check public/weather-fusion/app.js
           node --check public/weather-fusion/nav.js
       - name: Forecast and gateway isolation tests
-        run: node --test test/weatherFusion.test.js test/weatherFusionGateway.test.js
+        run: node --test test/weatherFusion*.test.js
       - name: Existing website regression checks
         run: npm run check

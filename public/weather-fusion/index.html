@@ -7,9 +7,9 @@
   <meta name="description" content="Weather Fusion by Sun-Nourie. Local NWS forecasts, professional AI briefings, model comparisons and interactive weather maps.">
   <title>Weather Fusion · Sun-Nourie</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-  <link rel="stylesheet" href="/weather-fusion/style.css">
+  <link rel="stylesheet" href="/weather-fusion/style.css?v=2-direct">
   <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script type="module" src="/weather-fusion/app.js"></script>
+  <script type="module" src="/weather-fusion/app.js?v=2-direct"></script>
 </head>
 <body data-sky="day">
   <a class="skip-link" href="#forecast">Skip to forecast</a>
@@ -45,16 +45,16 @@
         <div id="briefing-detail" class="briefing-detail" hidden></div>
         <div class="briefing-bottom"><span id="briefing-stamp">Professional analysis · transparent sources</span><button id="expand-briefing" class="text-button" aria-expanded="false" aria-controls="briefing-detail">Read full outlook <span aria-hidden="true">↗</span></button></div>
       </section>
-      <section class="glass hourly-panel" aria-labelledby="hourly-title"><div class="section-top"><h2 id="hourly-title">◷ &nbsp; HOURLY FORECAST</h2><span>NWS · next 48 hours</span></div><div id="hourly" class="hourly-strip" tabindex="0" aria-label="Scrollable hourly forecast"><p class="muted">Hourly data is loading.</p></div></section>
+      <section class="glass hourly-panel" aria-labelledby="hourly-title"><div class="section-top"><h2 id="hourly-title">◷ &nbsp; HOURLY FORECAST</h2><span>Fusion temperatures · NWS rain chance</span></div><div id="hourly" class="hourly-strip" tabindex="0" aria-label="Scrollable hourly forecast"><p class="muted">Hourly data is loading.</p></div></section>
       <div class="forecast-grid">
-        <section class="glass daily-panel" aria-labelledby="daily-title"><div class="section-top"><h2 id="daily-title">▦ &nbsp; 7-DAY FORECAST</h2><span>Tap a day for details</span></div><div id="daily"><p class="muted">Daily data is loading.</p></div><p class="daily-footnote">Daytime high · overnight low. Blue percentages show the highest NWS day/night rain chance.</p></section>
+        <section class="glass daily-panel" aria-labelledby="daily-title"><div class="section-top"><h2 id="daily-title">▦ &nbsp; 7-DAY FORECAST</h2><span>Tap a day for details</span></div><div id="daily"><p class="muted">Daily data is loading.</p></div><p class="daily-footnote">Blended daytime high · overnight low. Blue percentages show the highest NWS day/night rain chance.</p></section>
         <section class="glass map-panel" id="map-panel" aria-labelledby="map-title">
           <div class="section-top"><h2 id="map-title">◎ &nbsp; WEATHER MAPS</h2><button id="fullscreen" class="text-button" aria-label="Expand weather map">⛶ Expand</button></div>
           <div class="map-tabs" role="group" aria-label="Weather map layer">
-            <button class="selected" data-layer="radar" aria-pressed="true">Radar</button><button data-layer="rain" aria-pressed="false">Rain</button><button data-layer="temp" aria-pressed="false">Temperature</button><button data-layer="wind" aria-pressed="false">Wind</button><button data-layer="clouds" aria-pressed="false">Clouds</button><button data-direct-model="hrrr" aria-pressed="false">HRRR</button><button data-direct-model="ecmwf" aria-pressed="false">ECMWF</button><button data-direct-model="nbm" aria-pressed="false">NBM</button>
+            <button class="selected" data-layer="radar" aria-pressed="true">Live radar</button><button data-layer="hrrr" aria-pressed="false">HRRR</button><button data-layer="ecmwf" aria-pressed="false">ECMWF rain</button><button data-layer="nbm" aria-pressed="false">NBM rain</button><button data-layer="temperature" aria-pressed="false">Temperature</button><button data-layer="wind" aria-pressed="false">Wind</button><button data-layer="clouds" aria-pressed="false">Clouds</button>
           </div>
-          <div class="map-stage"><div id="radar-map" role="region" aria-label="Interactive NOAA radar map"></div><iframe id="model-map" title="Model weather map" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen hidden></iframe><div id="map-error" class="map-error" hidden></div></div>
-          <div id="radar-controls" class="radar-controls"><button id="radar-play" class="play-button" aria-label="Play radar animation" disabled>▶</button><label for="radar-time" class="sr-only">Radar frame</label><input id="radar-time" type="range" min="0" max="0" value="0" disabled><span id="radar-stamp">Loading radar…</span><label class="sr-only" for="basemap">Base map</label><select id="basemap"><option value="dark">Dark</option><option value="street">Street</option><option value="satellite">Satellite imagery</option></select></div>
+          <div class="map-stage"><div id="radar-map" role="region" aria-label="Interactive NOAA radar map"></div><div id="model-map" hidden></div><div id="map-error" class="map-error" hidden></div></div>
+          <div id="radar-controls" class="radar-controls"><button id="radar-play" class="play-button" aria-label="Play radar animation" disabled>▶</button><label for="radar-time" class="sr-only">Radar frame</label><input id="radar-time" type="range" min="0" max="0" value="0" disabled><span id="radar-stamp">Loading radar…</span><label class="sr-only" for="basemap">Base map</label><select id="basemap"><option value="dark">Dark</option><option value="street">Topographic</option><option value="satellite">Aerial imagery</option></select></div>
           <div class="map-caption"><span id="map-caption">NOAA observed reflectivity · past frames only</span><span><a href="https://radar.weather.gov/" target="_blank" rel="noopener noreferrer" id="map-source">Official radar ↗</a> <a href="https://www.weather.gov/" target="_blank" rel="noopener noreferrer" id="model-official-source" hidden>Official model source ↗</a></span></div>
           <div id="radar-legend" class="radar-legend"><span>Reflectivity</span><i aria-hidden="true"></i><span>Light → Strong</span></div>
         </section>
@@ -64,90 +64,12 @@
         <div class="section-top"><h2 id="evidence-title">◈ &nbsp; BEHIND THE FORECAST</h2><span>Evidence, not guesswork</span></div>
         <div class="feed-health" id="feed-health"></div>
         <details class="evidence-detail"><summary>Latest local NWS forecast discussion <span id="afd-office"></span></summary><p id="afd-stamp" class="muted"></p><pre id="afd-text">The local office discussion is loading.</pre><a id="afd-link" href="https://www.weather.gov/" target="_blank" rel="noopener noreferrer">Read the original NWS discussion ↗</a></details>
-        <details class="evidence-detail"><summary>Models, timing & forecast policy</summary><p id="methodology"></p><div class="policy-grid"><div><strong>Now & near term</strong><p>NWS observations and official hourly guidance remain the numerical anchor. The local Area Forecast Discussion provides forecaster context, and the HRRR map is available for short-range convective timing and reflectivity guidance.</p></div><div><strong>The week ahead</strong><p>NWS remains primary. NOAA’s National Blend and ECMWF IFS are available as direct model-map references for comparison. Agreement between maps is context, not a calibrated accuracy score.</p></div><div><strong>Precipitation accounting</strong><p>NWS grid totals use local 7 AM–7 AM windows, including overnight weather. These are full-window forecast estimates, not measured rain. Snow and ice are included as liquid equivalent.</p></div></div><p class="muted"><strong>Direct-source policy:</strong> Weather Fusion does not scrape Weather.us or treat it as a weather API. The HRRR and ECMWF buttons open the user-selected Weather.us visualizations you provided; official source links remain NOAA/NCEP and ECMWF. NBM links directly to NOAA/NCEP model guidance. The numerical public forecast continues to come from NWS unless a verified direct point-model decoder is available.</p><p class="muted">The optional HRRR 60% / ECMWF 40% comparison is not displayed as authoritative when direct point values are unavailable. Raw-model maps are guidance and may differ from the official forecast.</p><div id="source-register"></div></details>
+        <details class="evidence-detail"><summary>Models, timing & forecast policy</summary><p id="methodology"></p><div class="policy-grid"><div><strong>Models actually used</strong><p>HRRR, ECMWF IFS and NOAA NBM point values are decoded from provider GRIB2 data. Model initialization, coverage and availability are checked before contributing. The two saved locations have native model inputs; other searched locations retain NWS coverage.</p></div><div><strong>AI explains the evidence</strong><p>The AI receives the blended numbers, individual model estimates, HRRR simulated reflectivity and latest local NWS discussion. It cannot change numeric cards or official alerts. Starting blend weights are not a statistically calibrated skill ranking.</p></div><div><strong>Precipitation windows</strong><p>The main metric shows the next 24 hours. Daily cards show the remaining period through 7 AM, or complete 7 AM–7 AM future days. Totals are liquid equivalent, not measured rainfall. Interpolation within coarse model intervals does not establish storm arrival times.</p></div></div><p class="muted" id="google-status">Google WeatherNext is not currently included: approved forecast dataset access is required. A text-generation model is not a substitute for numerical weather data.</p><p class="muted">Map images use the same decoded runs as the point inputs. HRRR reflectivity is a forecast, not live radar. ECMWF rain accumulates from its model initialization; NBM rain uses the interval shown under the map. Cloud/wind/temperature maps use ECMWF. Regional map coverage: North Carolina and surrounding areas.</p><p class="muted">External comparisons: <a href="https://weather.us/model-charts/rapid-us/north-carolina/radar-reflectivity.html" target="_blank" rel="noopener noreferrer">Weather.us HRRR ↗</a> · <a href="https://weather.us/model-charts/euro/north-carolina/acc-total-precipitation.html" target="_blank" rel="noopener noreferrer">Weather.us ECMWF ↗</a>. These references do not supply the numeric forecast and are not embedded.</p><div id="source-register"></div></details>
       </section>
-      <footer><div><span class="footer-brand">Weather Fusion</span><p>Thoughtfully presented. Grounded in the forecast.</p></div><p>Not an official NWS product. Always follow official warnings.<br>Sources: NOAA / NWS · NOAA/NCEP HRRR & NBM · ECMWF Open Data · Weather.us user-selected model visualization · Windy · OpenStreetMap / CARTO / Esri</p><p class="privacy">Location searches and coordinates are sent to weather providers. AI briefings send the selected location and public forecast data to OpenAI; no Sun-Nourie business records are included. Weather.us model pages are loaded only when you select those model tabs. Your browser location is requested only when you choose the location button.</p></footer>
+      <footer><div><span class="footer-brand">Weather Fusion</span><p>Thoughtfully presented. Grounded in the forecast.</p></div><p>Not an official NWS product. Always follow official warnings.<br>Sources: NOAA / NWS · NOAA/NCEP HRRR & NBM · ECMWF Open Data (CC BY 4.0) · USGS The National Map</p><p class="privacy">Location searches and coordinates are sent to weather providers. AI briefings send the selected location and public forecast data to OpenAI; no Sun-Nourie business records are included. Weather model maps are generated from public provider data, not embedded third-party webpages. Your browser location is requested only when you choose the location button.</p></footer>
     </main>
   </div>
   <dialog id="day-dialog" aria-labelledby="day-title"><button id="close-day" class="dialog-close" aria-label="Close daily forecast">×</button><div id="day-content"></div></dialog>
   <noscript><p class="noscript">Weather Fusion requires JavaScript. Visit <a href="https://www.weather.gov/">weather.gov</a> for official forecasts and warnings.</p></noscript>
-  <script>
-    (() => {
-      const directModels = {
-        hrrr: {
-          label: 'HRRR forecast reflectivity',
-          visual: 'https://weather.us/model-charts/rapid-us/north-carolina/radar-reflectivity.html',
-          official: 'https://mag.ncep.noaa.gov/model-guidance-model-parameter.php?area=US-NC&group=Model%20Guidance&model=HRRR&ps=area',
-          caption: 'HRRR · North Carolina forecast reflectivity · Weather.us visualization of NOAA guidance'
-        },
-        ecmwf: {
-          label: 'ECMWF accumulated precipitation',
-          visual: 'https://weather.us/model-charts/euro/north-carolina/acc-total-precipitation.html',
-          official: 'https://www.ecmwf.int/en/forecasts/datasets/open-data',
-          caption: 'ECMWF IFS · North Carolina accumulated precipitation · Weather.us visualization'
-        },
-        nbm: {
-          label: 'NOAA National Blend of Models',
-          visual: 'https://mag.ncep.noaa.gov/model-guidance-model-parameter.php?area=CONUS&group=Model%20Guidance&model=NBM&ps=area',
-          official: 'https://www.nco.ncep.noaa.gov/pmb/products/blend/',
-          caption: 'NOAA National Blend of Models · official NCEP model guidance'
-        }
-      };
-      const byId = (id) => document.getElementById(id);
-      const directButtons = () => [...document.querySelectorAll('[data-direct-model]')];
-      function selectDirectModel(id) {
-        const model = directModels[id];
-        if (!model) return;
-        document.querySelectorAll('.map-tabs button').forEach((button) => {
-          const selected = button.dataset.directModel === id;
-          button.classList.toggle('selected', selected);
-          button.setAttribute('aria-pressed', selected ? 'true' : 'false');
-        });
-        const radar = byId('radar-map');
-        const frame = byId('model-map');
-        const error = byId('map-error');
-        if (radar) radar.style.display = 'none';
-        if (error) error.hidden = true;
-        if (frame) {
-          frame.hidden = false;
-          frame.title = model.label;
-          if (frame.src !== model.visual) frame.src = model.visual;
-        }
-        if (byId('radar-controls')) byId('radar-controls').style.display = 'none';
-        if (byId('radar-legend')) byId('radar-legend').style.display = 'none';
-        if (byId('map-caption')) byId('map-caption').textContent = model.caption;
-        const source = byId('map-source');
-        if (source) { source.href = model.visual; source.textContent = 'Open full model page ↗'; }
-        const official = byId('model-official-source');
-        if (official) { official.hidden = false; official.href = model.official; official.textContent = ' Official source ↗'; }
-      }
-      function clearDirectSelection() {
-        directButtons().forEach((button) => { button.classList.remove('selected'); button.setAttribute('aria-pressed', 'false'); });
-        const official = byId('model-official-source');
-        if (official) official.hidden = true;
-      }
-      function patchFeedHealth() {
-        const feed = byId('feed-health');
-        if (!feed) return;
-        for (const chip of feed.querySelectorAll('.feed-chip')) {
-          const text = chip.textContent || '';
-          if (text.startsWith('HRRR') && text.includes('Setup required')) {
-            chip.textContent = 'HRRR · Direct map'; chip.title = 'Direct NOAA HRRR guidance is available in the model-map selector. Point-model API setup is not required for the map.';
-          } else if (text.startsWith('ECMWF IFS') && text.includes('Setup required')) {
-            chip.textContent = 'ECMWF IFS · Direct map'; chip.title = 'ECMWF model guidance is available in the model-map selector. Weather.us is visualization only; ECMWF remains the source.';
-          } else if (text.startsWith('National Blend') && text.includes('Setup required')) {
-            chip.textContent = 'National Blend · NOAA direct'; chip.title = 'Official NOAA/NCEP NBM guidance is available directly in the model-map selector.';
-          }
-        }
-      }
-      window.addEventListener('DOMContentLoaded', () => {
-        directButtons().forEach((button) => button.addEventListener('click', () => selectDirectModel(button.dataset.directModel)));
-        document.querySelectorAll('.map-tabs button[data-layer]').forEach((button) => button.addEventListener('click', clearDirectSelection));
-        patchFeedHealth();
-        const feed = byId('feed-health');
-        if (feed) new MutationObserver(patchFeedHealth).observe(feed, { childList: true, subtree: true });
-      });
-    })();
-  </script>
 </body>
 </html>

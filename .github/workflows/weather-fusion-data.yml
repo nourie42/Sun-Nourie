@@ -1,0 +1,73 @@
+name: Weather Fusion direct model data
+on:
+  push:
+    branches: [main, weather-fusion-data-repair]
+    paths:
+      - 'scripts/weather_fusion_collect.py'
+      - 'scripts/weather_fusion_refresh.py'
+      - '.github/workflows/weather-fusion-data.yml'
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: weather-fusion-direct-data
+  cancel-in-progress: false
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install the GRIB decoder and raster dependencies
+        run: pip install 'eccodes==2.48.0' 'numpy<3' 'scipy<2' 'Pillow<13' 'requests<3'
+      - name: Open isolated public-weather data worktree
+        shell: bash
+        run: |
+          DATA="$RUNNER_TEMP/weather-fusion-publish"
+          if git ls-remote --exit-code --heads origin weather-fusion-data > /dev/null; then
+            git fetch --depth=1 origin weather-fusion-data
+            git worktree add --detach "$DATA" FETCH_HEAD
+          else
+            git worktree add --detach "$DATA" HEAD
+            git -C "$DATA" switch --orphan weather-fusion-publish
+          fi
+          echo "WEATHER_DATA_DIR=$DATA" >> "$GITHUB_ENV"
+      - name: Decode current NOAA HRRR, NOAA NBM and ECMWF IFS
+        id: collect
+        continue-on-error: true
+        run: python -u scripts/weather_fusion_refresh.py --output "$WEATHER_DATA_DIR"
+      - name: Publish verified model snapshots without redeploying the main website
+        shell: bash
+        run: |
+          cd "$WEATHER_DATA_DIR"
+          test -f manifest.json
+          if ! find models -name '*.json' -print -quit | grep -q .; then
+            echo 'No numerical model snapshots were produced.'
+            exit 1
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- models maps manifest.json collection-status.json
+          if ! git diff --cached --quiet; then
+            git commit -m 'Refresh verified NOAA and ECMWF weather model data'
+            git push origin HEAD:weather-fusion-data
+          fi
+      - name: Record actual collection status
+        if: always()
+        run: |
+          if [ -f "$WEATHER_DATA_DIR/collection-status.json" ]; then
+            cat "$WEATHER_DATA_DIR/collection-status.json"
+            cat "$WEATHER_DATA_DIR/collection-status.json" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ '${{ steps.collect.outcome }}' != 'success' ]; then
+            echo 'At least one source failed. Last good snapshots retain original run timestamps; website freshness checks apply.'
+            exit 1
+          fi

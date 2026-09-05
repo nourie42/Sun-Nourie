@@ -1,0 +1,48 @@
+name: Weather Fusion live verification
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/weatherFusion*.js'
+      - 'public/weather-fusion/**'
+      - 'scripts/weatherFusionBrowserSmoke.js'
+      - '.github/workflows/weather-fusion-live.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm install --no-save --package-lock=false playwright@1.55.0
+      - run: npx playwright install --with-deps chromium
+      - name: Wait for additive weather deployment
+        run: |
+          node --input-type=module - <<'JS'
+          const delay=ms=>new Promise(r=>setTimeout(r,ms));
+          let ready=false;
+          for(let i=0;i<40;i++){
+            try{const r=await fetch('https://sun-nourie-live.onrender.com/api/weather-fusion/forecast?location=knightdale',{signal:AbortSignal.timeout(45000)});const d=await r.json();if(d.version==='weather-fusion-v2-direct'){ready=true;break;}}
+            catch{}
+            await delay(15000);
+          }
+          if(!ready)throw new Error('Render has not served the committed Weather Fusion version; deployment is not verified.');
+          JS
+      - name: Live numerical feeds, browser maps, and actual AI
+        env:
+          WEATHER_BASE_URL: https://sun-nourie-live.onrender.com
+          WEATHER_LIVE_CHECK: 'true'
+          WEATHER_REPORT_DIR: /tmp/weather-browser-results
+        run: node scripts/weatherFusionBrowserSmoke.js
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: weather-fusion-live-results
+          path: /tmp/weather-browser-results
+          retention-days: 7
