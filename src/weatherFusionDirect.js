@@ -97,7 +97,7 @@ export function weighted(values, policy) {
   return { value: sum ? round(sources.reduce((n,s) => n+s.value*s.weight,0)/sum,4) : null,
     sources: sources.map((s) => ({ ...s, weight: round(s.weight/sum,6) })), calibrated: false };
 }
-/** Backward-compatible API helper using the same all-weather Steadman equation as the UI. */
+/** Backward-compatible API helper using the same all-weather Steadman equation as Weather Nourie. */
 export function feelsLike(t, rh, wind, dewpoint = null) {
   const result=shadeFeelsLike(t,rh,wind,dewpoint);
   return {value:finite(result.value)?round(result.value,0):null,method:result.method};
@@ -138,28 +138,69 @@ export function enhanceForecast(out, { models, grid, periods = [], now, gridQpf,
   const active = Object.keys(sourceModels);
   function qpf(start,end,index) {
     const values = { nws: gridQpf(grid,start,end) };
-    for (const id of active) values[id] = intervalTotal(sourceModels[id].precipitationIntervals,start,end);
-    return weighted(values,rainPolicy((start-now)/H));
+    for (const [id,m] of Object.entries(sourceModels)) values[id]=intervalTotal(m.precipitationIntervals,start,end);
+    const result = weighted(values,rainPolicy(index === 0 ? 0 : (start-now)/H));
+    // Preserve operational NWS/NBM fallbacks without claiming an absent HRRR/IFS contribution.
+    const backup = result.value === null ? weighted(values,{nbm:.6,nws:.4}) : result;
+    return { ...backup, start:iso(start),end:iso(end),sourceValues:values,
+      source:backup.sources.length ? backup.sources.map((s)=>`${s.id.toUpperCase()} ${Math.round(s.weight*100)}%`).join(' / ') : 'Unavailable' };
   }
-  const today=out.days[0]?.date;
-  for (const day of out.days) {
-    const start = localTime(day.date,7), end=localTime(nextDate(day.date),7);
-    const isToday = day.date===today, qpfStart=isToday?Math.max(now,start):start;
-    day.qpfWindow={start:iso(qpfStart),end:iso(end),isFullWindow:qpfStart===start};
-    day.qpfBlend=qpf(qpfStart,end,day.index);
-  }
-  for (const hour of out.hours) {
-    const time=Date.parse(hour.time);
-    const hrrr=sourceModels.hrrr;
-    if (hrrr) {
-      hour.reflectivity=sample(hrrr,time,'reflectivity');
-      hour.nearbyReflectivity=sample(hrrr,time,'nearby_reflectivity');
+  // For direct model forecasts align temperature samples to NWS day/night periods.
+  for (const [index,d] of out.days.entries()) {
+    const day = periods.find((p)=>p.isDaytime && Date.parse(p.endTime)>now && dateKey(Date.parse(p.startTime),out.location.timeZone)===d.date);
+    const night = periods.find((p)=>!p.isDaytime && Date.parse(p.endTime)>now && dateKey(Date.parse(p.startTime),out.location.timeZone)===d.date);
+    d.official = { high:d.high,low:d.low,condition:d.condition,pop:d.pop,detail:d.detail,nightDetail:d.nightDetail };
+    if (active.length) {
+      for (const [kind,period] of [['high',day],['low',night]]) {
+        const defaultA = localTime(d.date,kind==='high'?7:19,out.location.timeZone);
+        const defaultB = kind==='high'?localTime(d.date,19,out.location.timeZone):localTime(nextDate(d.date),7,out.location.timeZone);
+        const start = period ? Math.max(Date.parse(period.startTime),Math.ceil(now/H)*H) : Math.max(Math.ceil(now/H)*H,defaultA), end=period?Date.parse(period.endTime):defaultB;
+        const official = period && finite(period.temperature) ? (period.temperatureUnit==='C'?period.temperature*1.8+32:period.temperature) : null;
+        const values = { nws:official };
+        for (const [id,m] of Object.entries(sourceModels)) {
+          values[id]=extrema(m,start,end,kind);
+          d.guidance[id] ||= {};
+          d.guidance[id][kind]=round(values[id],1);
+        }
+        const blend=weighted(values,tempPolicy(index));
+        d[kind]=round(blend.value,0); d[`${kind}Blend`]=blend;
+        d[`${kind}Window`]={start:iso(start),end:iso(end)};
+      }
+      d.temperatureSource='Weather Fusion blend · NWS + available native model values';
+      d.lowLabel='Overnight low';
     }
+    const fullStart=Date.parse(d.qpfWindow.start),end=Date.parse(d.qpfWindow.end);
+    const start=index===0?Math.max(fullStart,Math.ceil(now/H)*H):fullStart;
+    const rain=qpf(start,end,index);
+    d.fullWindowQpf=qpf(fullStart,end,index);
+    d.qpf=rain.value;d.qpfSource=rain.source;d.qpfBlend=rain;
+    d.qpfWindow={start:iso(start),end:iso(end)};
+    d.qpfWindowLabel=start>fullStart?'Remaining forecast through 7 AM':'7 AM–7 AM forecast';
+    for(const [id,value] of Object.entries(rain.sourceValues)) if(id!=='nws') {d.guidance[id] ||= {};d.guidance[id].qpf=value;}
+    const highs=[d.official.high,...active.map(id=>d.guidance[id]?.high)].filter(finite);
+    const spread=highs.length>1?Math.max(...highs)-Math.min(...highs):null;
+    d.highSpread=round(spread,1);d.agreement=spread===null?'Limited guidance':spread<=3?'Close agreement':spread<=6?'Some disagreement':'Wide disagreement';
+  }
+  const from=Math.ceil(now/H)*H;
+  out.precipitation=qpf(from,from+24*H,0);
+  out.precipitation.label='Next 24 hours';
+  for (const hour of out.hours) {
+    const time=Date.parse(hour.time),values={nws:hour.temperature};
+    for(const [id,m] of Object.entries(sourceModels)) values[id]=sample(m,time,'temperature_2m');
+    hour.officialTemperature=hour.temperature;
+    if(active.length){hour.temperatureBlend=weighted(values,tempPolicy((time-now)/H<24?0:1));hour.temperature=round(hour.temperatureBlend.value,0);}
+    const rain=qpf(time,time+H,(time-now)/H<24?0:1);
+    hour.precipitation=rain.value;hour.precipitationSource=rain.source;
+    hour.reflectivity=sample(sourceModels.hrrr,time,'reflectivity');
+    hour.nearbyReflectivity=sample(sourceModels.hrrr,time,'nearby_reflectivity');
   }
   const apparent=feelsLike(out.current.temperature,out.current.humidity,out.current.wind,out.current.dewpoint);
   out.current.apparent=apparent.value;
   out.current.apparentSource=`${apparent.method}; ${out.current.type==='observation'?'using nearby station observations':'using forecast guidance'}.`;
   out.solar=solarTimes(out.days[0].date,out.location.latitude,out.location.longitude);
   out.modelContributions=active.map(id=>({id,runAt:sourceModels[id].runAt,resolution:sourceModels[id].resolution}));
+  out.convectiveGuidance=out.hours.filter(h=>finite(h.reflectivity)||finite(h.nearbyReflectivity)).slice(0,30).map(h=>({time:h.time,pointReflectivityDbz:h.reflectivity,nearby25kmMaxReflectivityDbz:h.nearbyReflectivity}));
+  out.google={status:'access-required',contributes:false,label:'Google WeatherNext',message:'Not included: approved Google WeatherNext dataset access has not been configured.',url:'https://developers.google.com/weathernext/guides/access-forecast'};
+  out.methodology='Numeric Weather Fusion blend: NWS is the largest temperature input (60% starting weight). HRRR, ECMWF IFS and NBM contribute only where a fresh run fully covers the requested period. Near-term precipitation starts at HRRR 60% / ECMWF 40%; extended precipitation at ECMWF 60% / NBM 25% / NWS 15%, with documented fallbacks. Available weights renormalize; missing values never become zero. These are uncalibrated starting weights, not a proven accuracy ranking. NWS precipitation probability remains separate and official warnings are never altered. Raw models use native gridpoint samples; ECMWF is the 0.25° Open Data grid. Coarser precipitation intervals are prorated at boundaries; interpolated hourly amounts do not establish storm arrival times. Today’s daily rain card covers only the remaining period when earlier forecast hours have passed; the main precipitation metric covers the next 24 hours.';
   return out;
 }
