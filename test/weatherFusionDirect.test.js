@@ -73,3 +73,20 @@ test('no embedded model webpages or cosmetic feed-health replacements remain',()
  assert.ok(!js.includes('embed.windy'));assert.ok(js.includes('L.imageOverlay')||js.includes('window.L.imageOverlay'));
  assert.ok(js.includes("api('models')"));
 });
+test('Nourie Weather branding and exposed-skin estimate are scientifically bounded and clearly labeled',()=>{
+ const html=fs.readFileSync(new URL('../public/weather-fusion/index.html',import.meta.url),'utf8');
+ assert.match(html,/Weather <b>Fusion<\/b><small>NOURIE WEATHER<\/small>/);
+ assert.match(html,/id="skin-exposure"/);
+ assert.match(html,/EXPOSED-SKIN THERMAL EQUIVALENT/);
+ assert.match(html,/not a measurement of your literal skin-surface temperature/);
+ assert.match(html,/function wetBulbStull/);
+ assert.match(html,/NWS heat index/);
+ assert.match(html,/NWS wind chill/);
+ assert.match(html,/Steadman apparent temperature/);
+ assert.match(html,/Stull \(2011\)/);
+ assert.match(html,/maximum = finiteNumber\(temp\) && temp <= 50 \? 18 : 15/);
+ assert.match(html,/weather\.gov\/safety\/heat-index/);
+ assert.match(html,/weather\.gov\/safety\/cold-faqs/);
+ assert.match(html,/osha\.gov\/heat-exposure\/wbgt-calculator/);
+ assert.match(html,/utci\.org\/utci_calc\.php/);
+});
