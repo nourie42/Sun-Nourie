@@ -4,6 +4,7 @@ on:
     branches: [main, weather-fusion-data-repair]
     paths:
       - 'scripts/weather_fusion_collect.py'
+      - 'scripts/weather_fusion_refresh.py'
       - '.github/workflows/weather-fusion-data.yml'
   schedule:
     - cron: '17 * * * *'
@@ -42,7 +43,7 @@ jobs:
       - name: Decode current NOAA HRRR, NOAA NBM and ECMWF IFS
         id: collect
         continue-on-error: true
-        run: python -u scripts/weather_fusion_collect.py --output "$WEATHER_DATA_DIR"
+        run: python -u scripts/weather_fusion_refresh.py --output "$WEATHER_DATA_DIR"
       - name: Publish verified model snapshots without redeploying the main website
         shell: bash
         run: |
