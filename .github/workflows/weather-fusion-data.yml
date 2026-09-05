@@ -7,7 +7,7 @@ on:
       - 'scripts/weather_fusion_refresh.py'
       - '.github/workflows/weather-fusion-data.yml'
   schedule:
-    - cron: '17 * * * *'
+    - cron: '12,42 * * * *'
   workflow_dispatch:
 permissions:
   contents: write
