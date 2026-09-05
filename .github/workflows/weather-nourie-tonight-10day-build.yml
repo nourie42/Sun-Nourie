@@ -1,0 +1,57 @@
+name: Verify Weather Nourie tonight and 10-day dew point
+on:
+  push:
+    branches: [weather-nourie-tonight-10day-dewpoint]
+    paths:
+      - 'scripts/patchWeatherNourieTonight10Day.py'
+      - 'public/weather-fusion/dewpoint-meter.*'
+      - 'public/weather-fusion/hero-mode.js'
+      - 'test/weatherFusionTonightExtended.test.js'
+      - '.github/workflows/weather-nourie-tonight-10day-build.yml'
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Apply scoped Weather Nourie changes
+        run: python scripts/patchWeatherNourieTonight10Day.py
+      - name: Syntax and model-cycle policy checks
+        run: |
+          node --check public/weather-fusion/app.js
+          node --check public/weather-fusion/hero-mode.js
+          node --check public/weather-fusion/dewpoint-meter.js
+          node --check src/weatherFusionExperience.js
+          python -m py_compile scripts/weather_fusion_collect.py scripts/weather_fusion_refresh.py
+          python - <<'PY'
+          import sys
+          sys.path.insert(0,'scripts')
+          import weather_fusion_collect as c
+          assert c.SOURCES['ecmwf']['hours']==240
+          assert c.SOURCES['nbm']['hours']==240
+          src=open('scripts/weather_fusion_collect.py').read()
+          assert 'probe = 18 if model == "hrrr"' in src
+          assert 'candidate.hour % 6:\n            continue' not in src
+          workflow=open('.github/workflows/weather-fusion-data.yml').read()
+          assert "cron: '12,42 * * * *'" in workflow
+          PY
+      - run: npm ci
+      - name: Weather and existing-site regression tests
+        run: |
+          node --test test/weatherFusion*.test.js
+          npm run check
+      - name: Commit the verified scoped feature
+        run: |
+          git rm .github/workflows/weather-nourie-tonight-10day-build.yml scripts/patchWeatherNourieTonight10Day.py
+          git add public/weather-fusion/app.js public/weather-fusion/hero-mode.js public/weather-fusion/dewpoint-meter.js public/weather-fusion/dewpoint-meter.css src/weatherFusionExperience.js scripts/weather_fusion_collect.py .github/workflows/weather-fusion-data.yml test/weatherFusionTonightExtended.test.js
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Show tonight after 3 PM and extend the Dew Point Gross Meter to 10 days'
+          git push origin HEAD:weather-nourie-tonight-10day-verified --force
+          git rev-parse HEAD >> "$GITHUB_STEP_SUMMARY"
