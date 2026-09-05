@@ -36,11 +36,11 @@ test('missing blend inputs are excluded rather than filled with zero',()=>{
  assert.equal(weighted({hrrr:null,ecmwf:1},{hrrr:.6,ecmwf:.4}).value,1);
  assert.equal(weighted({hrrr:null,ecmwf:null},{hrrr:.6,ecmwf:.4}).value,null);
 });
-test('feels like calculates heat index from available measurements without models',()=>{
- assert.equal(feelsLike(95,47,0).value,103);
- assert.equal(feelsLike(30,70,15).value,19);
- assert.equal(feelsLike(70,null,0).value,70);
- assert.equal(feelsLike(95,null,0).value,null);
+test('API feels-like helper uses the same Steadman equation family in hot mild and cold weather',()=>{
+ const hot=feelsLike(95,47,5,72),mild=feelsLike(70,50,8,50),cold=feelsLike(30,70,15,20);
+ for(const item of [hot,mild,cold])assert.match(item.method,/Steadman apparent temperature/);
+ assert.ok(hot.value>95);assert.ok(cold.value<30);assert.ok(Number.isFinite(mild.value));
+ assert.equal(feelsLike(70,null,0,null).value,null);
 });
 test('solar events are calculated independently of model availability',()=>{
  const s=solarTimes('2026-09-05',35.787,-78.4806);
@@ -82,6 +82,7 @@ test('Weather Nourie keeps thermal qualifications at the bottom, without a fetch
  assert.match(html,/How’s it really gonna feel/);
  assert.ok(html.indexOf('id="scientific-stuff"')>html.indexOf('id="metrics"'));
  assert.match(html,/not measured sunlight/);assert.match(html,/not a claim that a person/);
- assert.match(math,/NWS wind chill/);assert.match(math,/NWS heat index/);assert.match(math,/Steadman/);
- assert.match(html,/Stull \(2011\)/);
+ assert.ok(!math.includes('NWS wind chill'));assert.ok(!math.includes('NWS heat index'));
+ assert.match(math,/Steadman apparent temperature \(all-weather shade\)/);assert.match(math,/radiationFeelsLike/);
+ assert.match(html,/One formula in every season/);assert.match(html,/Stull \(2011\)/);
 });
