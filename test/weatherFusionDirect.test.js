@@ -84,5 +84,5 @@ test('Weather Nourie keeps thermal qualifications at the bottom, without a fetch
  assert.match(html,/not measured sunlight/);assert.match(html,/not a claim that a person/);
  assert.ok(!math.includes('NWS wind chill'));assert.ok(!math.includes('NWS heat index'));
  assert.match(math,/Steadman apparent temperature \(all-weather shade\)/);assert.match(math,/radiationFeelsLike/);
- assert.match(html,/One formula in every season/);assert.match(html,/Stull \(2011\)/);
+ assert.match(html,/One formula in every season/);assert.match(html,/Stull approximation/);
 });
