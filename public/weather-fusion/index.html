@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#14233f">
+  <meta name="description" content="Weather Fusion by Sun-Nourie. Local NWS forecasts, professional AI briefings, model comparisons and interactive weather maps.">
+  <title>Weather Fusion · Sun-Nourie</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <link rel="stylesheet" href="/weather-fusion/style.css">
+  <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script type="module" src="/weather-fusion/app.js"></script>
+</head>
+<body data-sky="day">
+  <a class="skip-link" href="#forecast">Skip to forecast</a>
+  <div class="atmosphere" aria-hidden="true"><div class="sky-glow"></div><div class="cloud cloud-one"></div><div class="cloud cloud-two"></div><div class="stars"></div></div>
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand" href="/weather-fusion"><span class="brand-sun" aria-hidden="true">◒</span><span>Weather <b>Fusion</b><small>BY SUN-NOURIE</small></span></a>
+      <nav aria-label="Page tools"><a class="back-link" href="/">← Back to Sun-Nourie</a><button class="icon-button" id="refresh" title="Refresh weather" aria-label="Refresh weather">↻</button></nav>
+    </header>
+    <div class="location-bar">
+      <div class="saved-locations" role="group" aria-label="Saved locations">
+        <button class="place-button active" data-place="knightdale" aria-pressed="true"><span aria-hidden="true">⌂</span> Knightdale / Raleigh</button>
+        <button class="place-button" data-place="greenville" aria-pressed="false"><span aria-hidden="true">◇</span> Greenville, NC</button>
+      </div>
+      <div class="search-wrap"><label for="city-search" class="sr-only">Search a U.S. city or ZIP code</label><span aria-hidden="true">⌕</span><input id="city-search" type="search" placeholder="Search city or ZIP" autocomplete="off" aria-controls="search-results" aria-expanded="false"><button id="locate" title="Use my location" aria-label="Use my location">⌖</button><div id="search-results" class="search-results" hidden></div></div>
+    </div>
+    <main id="forecast">
+      <div id="status" class="status-line" role="status" aria-live="polite">Connecting to weather sources…</div>
+      <section class="hero" aria-labelledby="city-name">
+        <div class="hero-scene" id="hero-scene" aria-hidden="true"></div>
+        <div class="eyebrow" id="hero-date">YOUR WEATHER, IN FOCUS</div>
+        <h1 id="city-name">Knightdale / Raleigh</h1>
+        <div class="hero-temperature" id="temperature">—<span>°</span></div>
+        <div class="hero-condition" id="condition">Gathering the latest forecast</div>
+        <div class="hero-range" id="high-low">High —° <span>Low —°</span></div>
+        <div class="observation-label" id="observation-label">Official NWS forecasts · model-aware insight</div>
+      </section>
+      <section id="alerts" class="alerts" aria-label="Official weather alerts"></section>
+      <section class="glass briefing" aria-labelledby="briefing-title">
+        <div class="section-top"><h2><span class="sparkle" aria-hidden="true">✦</span> LOCAL OUTLOOK</h2><span id="ai-label" class="pill">NWS-ANCHORED</span></div>
+        <h3 id="briefing-title">A clearer picture of what’s ahead.</h3>
+        <p id="briefing-summary">The latest local NWS discussion and available model guidance will be brought together here. Official alerts remain separate and authoritative.</p>
+        <div id="briefing-detail" class="briefing-detail" hidden></div>
+        <div class="briefing-bottom"><span id="briefing-stamp">Professional analysis · transparent sources</span><button id="expand-briefing" class="text-button" aria-expanded="false" aria-controls="briefing-detail">Read full outlook <span aria-hidden="true">↗</span></button></div>
+      </section>
+      <section class="glass hourly-panel" aria-labelledby="hourly-title"><div class="section-top"><h2 id="hourly-title">◷ &nbsp; HOURLY FORECAST</h2><span>NWS · next 48 hours</span></div><div id="hourly" class="hourly-strip" tabindex="0" aria-label="Scrollable hourly forecast"><p class="muted">Hourly data is loading.</p></div></section>
+      <div class="forecast-grid">
+        <section class="glass daily-panel" aria-labelledby="daily-title"><div class="section-top"><h2 id="daily-title">▦ &nbsp; 7-DAY FORECAST</h2><span>Tap a day for details</span></div><div id="daily"><p class="muted">Daily data is loading.</p></div><p class="daily-footnote">Daytime high · overnight low. Blue percentages show the highest NWS day/night rain chance.</p></section>
+        <section class="glass map-panel" id="map-panel" aria-labelledby="map-title">
+          <div class="section-top"><h2 id="map-title">◎ &nbsp; WEATHER MAPS</h2><button id="fullscreen" class="text-button" aria-label="Expand weather map">⛶ Expand</button></div>
+          <div class="map-tabs" role="group" aria-label="Weather map layer">
+            <button class="selected" data-layer="radar" aria-pressed="true">Radar</button><button data-layer="rain" aria-pressed="false">Rain</button><button data-layer="temp" aria-pressed="false">Temperature</button><button data-layer="wind" aria-pressed="false">Wind</button><button data-layer="clouds" aria-pressed="false">Clouds</button>
+          </div>
+          <div class="map-stage"><div id="radar-map" role="region" aria-label="Interactive NOAA radar map"></div><iframe id="model-map" title="ECMWF model weather map provided by Windy" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen hidden></iframe><div id="map-error" class="map-error" hidden></div></div>
+          <div id="radar-controls" class="radar-controls"><button id="radar-play" class="play-button" aria-label="Play radar animation" disabled>▶</button><label for="radar-time" class="sr-only">Radar frame</label><input id="radar-time" type="range" min="0" max="0" value="0" disabled><span id="radar-stamp">Loading radar…</span><label class="sr-only" for="basemap">Base map</label><select id="basemap"><option value="dark">Dark</option><option value="street">Street</option><option value="satellite">Satellite imagery</option></select></div>
+          <div class="map-caption"><span id="map-caption">NOAA observed reflectivity · past frames only</span><a href="https://radar.weather.gov/" target="_blank" rel="noopener noreferrer" id="map-source">Official radar ↗</a></div>
+          <div id="radar-legend" class="radar-legend"><span>Reflectivity</span><i aria-hidden="true"></i><span>Light → Strong</span></div>
+        </section>
+      </div>
+      <section class="metrics" id="metrics" aria-label="Weather details"></section>
+      <section class="glass evidence-panel" aria-labelledby="evidence-title">
+        <div class="section-top"><h2 id="evidence-title">◈ &nbsp; BEHIND THE FORECAST</h2><span>Evidence, not guesswork</span></div>
+        <div class="feed-health" id="feed-health"></div>
+        <details class="evidence-detail"><summary>Latest local NWS forecast discussion <span id="afd-office"></span></summary><p id="afd-stamp" class="muted"></p><pre id="afd-text">The local office discussion is loading.</pre><a id="afd-link" href="https://www.weather.gov/" target="_blank" rel="noopener noreferrer">Read the original NWS discussion ↗</a></details>
+        <details class="evidence-detail"><summary>Models, timing & forecast policy</summary><p id="methodology"></p><div class="policy-grid"><div><strong>Now & near term</strong><p>NWS observations and official hourly guidance, with HRRR for short-range precipitation detail. Radar shows observed reflectivity, not a forecast.</p></div><div><strong>The week ahead</strong><p>NWS remains primary. NOAA’s National Blend and ECMWF IFS offer comparison and fallback guidance. Agreement is not a calibrated accuracy score.</p></div><div><strong>Precipitation accounting</strong><p>Totals use local 7 AM–7 AM windows, including overnight weather. These are full-window forecast estimates, not measured rain. Snow and ice are included as liquid equivalent.</p></div></div><p class="muted">Open-Meteo supplies explicitly selected model data, not its automatic “Best Match” forecast. Retrieval timestamps are not model initialization times. Exact run provenance is not supplied in these point-forecast responses. Separate Windy maps show the provider’s model, not the local Weather Fusion calculation.</p><p class="muted">The optional HRRR 60% / ECMWF 40% comparison is an illustrative, uncalibrated blend and renormalizes only over complete source totals. It is not advertised as the most accurate forecast.</p><div id="source-register"></div></details>
+      </section>
+      <footer><div><span class="footer-brand">Weather Fusion</span><p>Thoughtfully presented. Grounded in the forecast.</p></div><p>Not an official NWS product. Always follow official warnings.<br>Sources: NOAA / NWS · ECMWF & NOAA via Open-Meteo · Windy · OpenStreetMap / CARTO / Esri</p><p class="privacy">Location searches and coordinates are sent to weather providers. AI briefings send the selected location and public forecast data to OpenAI; no Sun-Nourie business records are included. Your browser location is requested only when you choose the location button.</p></footer>
+    </main>
+  </div>
+  <dialog id="day-dialog" aria-labelledby="day-title"><button id="close-day" class="dialog-close" aria-label="Close daily forecast">×</button><div id="day-content"></div></dialog>
+  <noscript><p class="noscript">Weather Fusion requires JavaScript. Visit <a href="https://www.weather.gov/">weather.gov</a> for official forecasts and warnings.</p></noscript>
+</body>
+</html>
