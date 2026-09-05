@@ -1,0 +1,47 @@
+name: Weather Nourie review
+on:
+  push:
+    branches: [weather-nourie-friendly-graphs]
+    paths:
+      - '.github/workflows/weather-nourie-review.yml'
+      - 'public/weather-fusion/**'
+      - 'src/weatherFusion*.js'
+      - 'test/weatherNourie*.js'
+      - 'scripts/weatherNourie*.js'
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm run check
+      - run: node --test test/weatherFusion*.test.js
+      - name: Weather-only review snapshot
+        run: |
+          mkdir -p /tmp/weather-review
+          tar -czf /tmp/weather-review/source.tgz package.json package-lock.json src/weatherFusion*.js public/weather-fusion test/weatherFusion* scripts/weatherFusion* .github/workflows/weather-fusion*.yml
+          node --input-type=module - <<'JS'
+          import fs from 'node:fs/promises';
+          for(const location of ['knightdale','greenville']) {
+            const r=await fetch('https://sun-nourie-live.onrender.com/api/weather-fusion/forecast?location='+location,{signal:AbortSignal.timeout(75000)});
+            if(r.ok)await fs.writeFile('/tmp/weather-review/'+location+'.json',await r.text());
+          }
+          JS
+      - name: Review changed graph interface when present
+        if: ${{ hashFiles('scripts/weatherNourieBrowserSmoke.js') != '' }}
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0
+          npx playwright install --with-deps chromium
+          node scripts/weatherNourieBrowserSmoke.js
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: weather-nourie-review
+          path: /tmp/weather-review
+          retention-days: 3
