@@ -32,14 +32,50 @@ function sparkline(points) {
  points.forEach((p,i)=>{if(!finite(p.value)){continuous=false;return;}const x=2+i/Math.max(1,points.length-1)*116,y=29-(p.value-lo)/span*23;drawing+=`${continuous?'L':'M'}${x.toFixed(1)},${y.toFixed(1)} `;continuous=true;});
  return `<svg class="tile-spark" viewBox="0 0 120 34" aria-hidden="true"><path d="${drawing}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 }
+function comfortExplanation(c,current) {
+ const t=current.temperature,dp=current.dewpoint,wind=current.wind;
+ if(!finite(c.shade))return 'We’re waiting for enough temperature, moisture and wind data to work this out.';
+ const shadeDelta=finite(t)?c.shade-t:null,sunDelta=finite(c.sun)?c.sun-c.shade:null;
+ const sentences=[];
+ if(finite(t)&&t>=80){
+  if(finite(dp)&&dp>=70){
+   sentences.push(`The ${number(dp)}° dew point is the biggest reason the air feels heavier — sweat evaporates slowly, so your body sheds heat less efficiently.`);
+   if(finite(wind)&&wind<5)sentences.push(`With only about ${number(wind)} mph of wind, there isn’t much moving-air cooling to offset that mugginess.`);
+   else if(finite(wind)&&wind>=8)sentences.push(`The ${number(wind)} mph breeze is taking some of the edge off, but the high dew point still wins.`);
+  } else if(finite(dp)&&dp>=60){
+   sentences.push(`A ${number(dp)}° dew point adds some humidity drag, so the warmth feels a little more tiring than the thermometer alone suggests.`);
+  } else if(finite(dp)){
+   sentences.push(`The ${number(dp)}° dew point is relatively dry, so evaporation works well and keeps the heat from feeling as oppressive.`);
+   if(finite(wind)&&wind>=6)sentences.push(`A ${number(wind)} mph breeze adds more cooling on top of the dry air.`);
+  }
+ } else if(finite(t)&&t<55){
+  if(finite(wind)&&wind>=15)sentences.push(`The ${number(wind)} mph wind is the main reason it feels colder — moving air carries heat away from exposed skin much faster.`);
+  else if(finite(wind)&&wind>=6)sentences.push(`The ${number(wind)} mph breeze is pulling the feel below the air temperature by speeding up heat loss.`);
+  else sentences.push(`With very little wind, the cold is staying closer to the actual air temperature instead of being driven sharply lower by moving air.`);
+  if(finite(dp)&&dp<25)sentences.push(`The ${number(dp)}° dew point is very dry; that matters less than wind in cold air, but it can make exposed skin and lips feel drier.`);
+  else if(finite(dp)&&dp>40)sentences.push(`The higher dew point makes the air damper, but in this temperature range the wind is still the stronger cooling factor.`);
+ } else {
+  if(finite(dp)&&dp>=68)sentences.push(`The ${number(dp)}° dew point is high for otherwise mild weather, so the air feels muggy and less comfortable than the temperature sounds.`);
+  else if(finite(dp)&&dp<50)sentences.push(`The ${number(dp)}° dew point keeps the air crisp and lets evaporation work easily, which makes the same temperature feel cleaner and cooler.`);
+  else if(finite(dp))sentences.push(`The ${number(dp)}° dew point is fairly comfortable, so moisture isn’t adding much extra stress.`);
+  if(finite(wind)&&wind>=12)sentences.push(`A ${number(wind)} mph breeze is noticeable and pushes the feel cooler.`);
+  else if(finite(wind)&&wind<3&&finite(dp)&&dp>=65)sentences.push(`Because the air is nearly still, there’s little breeze to offset the humidity.`);
+ }
+ if(finite(sunDelta)&&sunDelta>=3)sentences.push(`In direct sun, the radiation calculation adds about ${number(sunDelta)}° compared with shade, so exposed pavement and open areas will feel hotter.`);
+ else if(c.daylight===false)sentences.push('The sun is down, so solar radiation is not adding extra heat right now.');
+ if(finite(shadeDelta)){
+  if(shadeDelta>=4)sentences.push(`Put together, those effects make the shade feel about ${number(Math.abs(shadeDelta))}° warmer than the measured air temperature.`);
+  else if(shadeDelta<=-4)sentences.push(`Put together, those effects make the shade feel about ${number(Math.abs(shadeDelta))}° cooler than the measured air temperature.`);
+  else sentences.push('The moisture and wind effects mostly balance out, so the shade feel stays close to the measured air temperature.');
+ }
+ return sentences.slice(0,3).join(' ');
+}
 export function renderComfort(forecast) {
  data=forecast;
  const c=forecast.comfort||thermalComfort(forecast.current,forecast.location,Date.parse(forecast.assembledAt));
  $('skin-values').innerHTML=`<span><strong>${temp(c.shade)}</strong> in the shade</span>${finite(c.sun)?`<span><strong>~${temp(c.sun)}</strong> in the sun</span>`:''}`;
- const t=forecast.current.temperature;
- const note=!finite(c.shade)?'We’re waiting for the details needed to work this out.':c.daylight===false?'The sun is down. This is how it may feel outside right now.':finite(c.sun)?'Sunshine can make it feel warmer. A breeze can help cool you down.':'This is how it may feel in the shade. The sunshine estimate is not available.';
- $('skin-explanation').textContent=note;
- $('skin-science').textContent=`${c.method}. ${finite(c.wetBulb)?`Estimated wet bulb ${temp(c.wetBulb)}. `:''}Dew point ${temp(forecast.current.dewpoint)}; relative humidity ${number(c.humidity)}%; wind ${number(forecast.current.wind)} mph. ${finite(c.solarAdjustment)?`Sunshine adjustment ${number(c.solarAdjustment)}°F (heuristic, not measured solar radiation).`:''} ${c.note}`;
+ $('skin-explanation').textContent=comfortExplanation(c,forecast.current);
+ $('skin-science').textContent=`${c.method}. Air ${temp(forecast.current.temperature)}; dew point ${temp(forecast.current.dewpoint)}; relative humidity ${number(c.humidity)}%; wind ${number(forecast.current.wind)} mph. ${finite(c.wetBulb)?`Estimated wet bulb ${temp(c.wetBulb)}. `:''}${finite(c.absorbedRadiation)?`Estimated absorbed solar/radiant input ${number(c.absorbedRadiation)} W/m²; direct-sun equivalent is ${number(c.solarAdjustment)}°F above the shade calculation. `:''}${c.note}`;
 }
 export function renderDailyRows(forecast,icon) {
  const values=forecast.days.flatMap(d=>[d.high,d.low]).filter(finite),lo=values.length?Math.min(...values)-3:0,hi=values.length?Math.max(...values)+3:1;
@@ -54,7 +90,7 @@ export function renderMetricTiles(forecast,smallIcon) {
  const currentComfort=data.comfort||thermalComfort(c,data.location,Date.parse(data.assembledAt));
  const windText=finite(c.wind)?c.wind<3?'Hardly a breeze.':c.wind<12?'A light breeze.':c.wind<25?'A breezy day.':'Strong winds.':'';
  const tiles=[
-  ['feels','temp',temp(currentComfort.shade),'How it may feel in the shade.'],
+  ['feels','temp',temp(currentComfort.shade),'Temp + dew point + wind, in one all-weather calculation.'],
   ['precipitation','drop',finite(data.precipitation?.value)?`${number(data.precipitation.value,2)}<small>in</small>`:'—','Expected over the next 24 hours.'],
   ['wind','wind',`${number(c.wind)}<small>mph</small>`,windText],
   ['humidity','drop',`${number(c.humidity)}<small>%</small>`,finite(c.dewpoint)&&c.dewpoint>=65?'The air feels muggy.':finite(c.humidity)?'Moisture in the air.':'Waiting for an update.'],
