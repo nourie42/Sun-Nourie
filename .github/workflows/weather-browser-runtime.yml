@@ -1,0 +1,22 @@
+name: Weather browser regression runtime
+on:
+  push:
+    branches: [fix/weather-radar-geolocation-nowcast]
+    paths: ['.github/workflows/weather-browser-runtime.yml']
+permissions: {contents: read}
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: npm install playwright@1.55.0
+      - run: npx playwright install chromium
+      - run: tar -czf /tmp/weather-browser.tgz -C "$HOME/.cache/ms-playwright" .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: weather-browser-runtime
+          path: /tmp/weather-browser.tgz
+          compression-level: 0
+          retention-days: 1
