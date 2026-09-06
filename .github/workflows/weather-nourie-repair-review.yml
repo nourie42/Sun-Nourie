@@ -2,7 +2,7 @@ name: Weather Nourie repair review
 on:
   push:
     branches: [weather-nourie-morning-map-fix]
-    paths: ['scripts/weatherNourieRepair.b64']
+    paths: ['scripts/weatherNourieRepair.b64', '.github/workflows/weather-nourie-repair-review.yml']
 permissions:
   contents: write
 jobs:
@@ -47,6 +47,8 @@ jobs:
           PY
       - run: npm install --no-save --package-lock=false playwright@1.55.0
       - run: npx playwright install --with-deps chromium
+      - name: Print browser repair test for diagnosis
+        run: sed -n '1,220p' scripts/weatherNourieRepairSmoke.js
       - name: Morning boundary, large chart, all tile dialogs, slow map frames and product switching
         run: node scripts/weatherNourieRepairSmoke.js
       - name: Publish verified weather-only tree on staging branch
