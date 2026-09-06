@@ -1,6 +1,6 @@
 import {comfortMode,comfortWindow,comfortNarrative} from './comfort-outlook.js';
 import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js';
-import {renderDewpointMeter,resetDewpointMeter} from './dewpoint-meter.js';
+import {resetDewpointMeter} from './dewpoint-meter.js';
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const number=(n,d=0)=>finite(n)?n.toFixed(d):'—';
@@ -87,7 +87,6 @@ export function renderComfort(forecast) {
  $('skin-values').innerHTML=`<span><strong>${temp(c.shade)}</strong> right now</span>${summary?`<span><strong>~${temp(summary.chosen.value)}</strong> ${summary.label}</span>`:''}`;
  $('skin-explanation').textContent=comfortNarrative(forecast.current,c,summary,forecast.location.timeZone);
  renderComfortArt(forecast,now);
- renderDewpointMeter(forecast,now);
  const alignment=forecast.metricForecasts?.comfortAlignment;
  $('skin-science').textContent=`${c.method}. Current air ${temp(forecast.current.temperature)}; dew point ${temp(forecast.current.dewpoint)}; relative humidity ${number(c.humidity)}%; wind ${number(forecast.current.wind)} mph. Station ${forecast.current.stationName||forecast.current.station||'unavailable'}, observation ${forecast.current.time||'unavailable'}. ${finite(c.wetBulb)?`Estimated wet bulb ${temp(c.wetBulb)}. `:''}${alignment?.note||''} ${c.note}`;
 }

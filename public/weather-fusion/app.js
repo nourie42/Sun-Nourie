@@ -2,6 +2,8 @@ import {createFramePlayer} from './frame-player.js';
 import {renderComfort,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js';
 import {dailyDisplay} from './weather-math.js';
 import {heroWeather} from './hero-mode.js';
+import {renderDewpointMeter} from './dewpoint-meter.js';
+import {renderWeatherPanel} from './render-safety.js';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);
 const presets = {
@@ -68,6 +70,11 @@ function isDaylight() {
 }
 function render(data) {
   forecast = data;
+  const failedPanels = [];
+  const draw = (id, label, renderer) => renderWeatherPanel(id, label, renderer, (error) => {
+    failedPanels.push(label);
+    console.error(`Weather Nourie panel failed: ${label}`, error);
+  });
   const c = data.current, d = data.days[0], day = isDaylight();
   document.body.dataset.sky = !day ? 'night' : /rain|storm|shower/i.test(c.condition) ? 'rain' : 'day';
   $('city-name').textContent = presets[place.id]?.name || data.location.name || place.name;
@@ -80,20 +87,21 @@ function render(data) {
   $('observation-label').textContent = hero.tonight ? `Tonight’s forecast · updated ${clock(data.assembledAt)}` : (c.type === 'observation' ? `Nearby weather station · updated ${clock(c.time)}` : 'Estimated current conditions');
   $('hero-scene').innerHTML = icon(hero.condition, hero.isDay, 120);
   document.querySelectorAll('[data-place]').forEach((button) => { const active = button.dataset.place === place.id; button.classList.toggle('active', active); button.setAttribute('aria-pressed', String(active)); });
-  renderAlerts(data);
-  renderHours(data);
-  renderDays(data);
-  renderComfort(data);
-  renderMetrics(data);
-  renderEvidence(data);
+  draw('alerts', 'Official alerts', () => renderAlerts(data));
+  draw('hourly', 'Hourly forecast', () => renderHours(data));
+  draw('daily', 'Daily forecast', () => renderDays(data));
+  draw('skin-exposure', 'Feels-like outlook', () => renderComfort(data));
+  draw('dewpoint-gross-meter', 'Dew Point Gross Meter', () => renderDewpointMeter(data));
+  draw('metrics', 'Weather details', () => renderMetrics(data));
+  draw('scientific-stuff', 'Source details', () => renderEvidence(data));
   if (currentBriefing?.signature !== data.signature) {
-    renderBriefing({ mode: 'nws-summary', signature: data.signature, headline: currentDay.tonight ? 'Your evening outlook' : d.condition, summary: currentDay.detail || 'The official forecast is temporarily unavailable.', nearTerm: d.nightDetail, extended: data.days[1]?.detail,
-      uncertainty: 'Forecasts can change, especially the timing of showers.', reason: data.aiConfigured ? 'Updating your local outlook…' : 'National Weather Service forecast', sources: ['nws'] });
+    draw('briefing-summary', 'Local outlook', () => renderBriefing({ mode: 'nws-summary', signature: data.signature, headline: currentDay.tonight ? 'Your evening outlook' : d.condition, summary: currentDay.detail || 'The official forecast is temporarily unavailable.', nearTerm: d.nightDetail, extended: data.days[1]?.detail,
+      uncertainty: 'Forecasts can change, especially the timing of showers.', reason: data.aiConfigured ? 'Updating your local outlook…' : 'National Weather Service forecast', sources: ['nws'] }));
   }
   if (map) { marker?.setLatLng([place.latitude, place.longitude]); renderMapWarnings(data); }
   const unavailable = data.feeds.filter((f) => ['unavailable', 'stale', 'not-configured', 'not-covered'].includes(f.status));
-  $('status').textContent = `Updated ${clock(data.assembledAt)}${unavailable.length ? ' · Some details are unavailable' : ''}`;
-  $('status').classList.toggle('error', unavailable.length > 0);
+  $('status').textContent = `Updated ${clock(data.assembledAt)}${unavailable.length ? ' · Some source details are unavailable' : ''}${failedPanels.length ? ` · Display issue: ${failedPanels.join(', ')}. Other forecasts remain available; use Refresh to retry.` : ''}`;
+  $('status').classList.toggle('error', unavailable.length > 0 || failedPanels.length > 0);
 }
 function renderAlerts(data) {
   const status = data.feeds.find((f) => f.id === 'alerts')?.status;
@@ -148,6 +156,7 @@ function renderBriefing(data) {
 }
 async function load({ moveMap = false } = {}) {
   const id = ++generation;
+  let receivedForecast = false;
   requestController?.abort();
   requestController = new AbortController();
   busy = true; $('refresh').classList.add('loading');
@@ -155,6 +164,7 @@ async function load({ moveMap = false } = {}) {
   try {
     const data = await api('forecast', query(), requestController.signal);
     if (id !== generation) return;
+    receivedForecast = true;
     render(data);
     if (!map) initMap();
     if (moveMap && map) map.setView([place.latitude, place.longitude], 8);
@@ -170,9 +180,12 @@ async function load({ moveMap = false } = {}) {
     }
   } catch (e) {
     if (id !== generation || e.name === 'AbortError') return;
-    $('status').textContent = `Weather update failed. ${forecast ? `The displayed snapshot was checked at ${clock(forecast.assembledAt)} and may be stale.` : 'Please retry or check weather.gov.'}`;
+    console.error(receivedForecast ? 'Weather Nourie display failed' : 'Weather Nourie request failed', e);
+    $('status').textContent = receivedForecast
+      ? 'The forecast arrived, but a display component failed. Use Refresh to retry.'
+      : `Weather update failed. ${forecast ? `The displayed snapshot was checked at ${clock(forecast.assembledAt)} and may be stale.` : 'Please retry or check weather.gov.'}`;
     $('status').classList.add('error');
-    $('alerts').innerHTML = '<p class="alert-note warning">Live alert status could not be checked. Consult the official NWS forecast and warnings.</p>';
+    if (!receivedForecast) $('alerts').innerHTML = '<p class="alert-note warning">Live alert status could not be checked. Consult the official NWS forecast and warnings.</p>';
   } finally { if (id === generation) { busy = false; $('refresh').classList.remove('loading'); } }
 }
 function chooseLocation(value) {

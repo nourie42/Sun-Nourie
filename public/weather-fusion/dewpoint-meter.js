@@ -64,7 +64,7 @@ export function renderDewpointMeter(forecast,now=Date.now()){
  const all=dewpointPoints(forecast,now,240),pts=dewpointPoints(forecast,now,horizon),valid=pts.filter(p=>finite(p.value));
  const worst=valid.reduce((best,p)=>!best||p.value>best.value?p:best,null),coverage=all.filter(p=>finite(p.value)).at(-1);
  const hoursAvailable=coverage?Math.max(0,Math.floor((coverage.epoch-now)/HOUR)):0;
- const built=graph(pts,horizon,Math.max(280,panel.clientWidth-40));
+ const built=graph(pts,horizon,zone,Math.max(280,panel.clientWidth-40));
  panel.dataset.level=level.key;panel.dataset.hours=String(horizon);
  panel.innerHTML=`<div class="gross-eyebrow" id="gross-title">DEW POINT · GROSS METER</div>
   <div class="gross-now"><strong class="gross-number">${finite(dp)?Math.round(dp)+'°':'—'}</strong><span class="gross-now-label">current dew point</span></div>
