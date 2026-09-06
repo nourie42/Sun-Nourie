@@ -114,7 +114,7 @@ try{
  await page.waitForFunction(()=>{
   const value=document.querySelector('#skin-values')?.textContent||'';
   const science=document.querySelector('#skin-science')?.textContent||'';
-  return /°.*(?:in the shade|right now)/.test(value)&&/Steadman apparent temperature/.test(science);
+  return /°.*(?:in the shade|right now)/.test(value)&&/(?:UTCI Tier-3|Steadman apparent temperature)/.test(science);
  },null,{timeout:30000});
  await page.waitForFunction(()=>document.querySelector('#dewpoint-gross-meter .gross-chart')&&/DEW POINT · GROSS METER/.test(document.querySelector('#dewpoint-gross-meter')?.innerText||''),null,{timeout:30000});
  assert.equal(await page.locator('iframe').count(),0);
