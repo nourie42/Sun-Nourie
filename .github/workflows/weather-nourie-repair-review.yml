@@ -18,8 +18,9 @@ jobs:
         run: |
           python - <<'PY'
           import pathlib,json,base64,lzma,hashlib
-          raw=lzma.decompress(base64.b64decode(pathlib.Path('scripts/weatherNourieRepair.b64').read_text()))
-          assert hashlib.sha256(raw).hexdigest()=='d2aefa382afb2fc7408d0f938bcf4bcbe5734eaa50a30ae93fdbdc01318d5ef2'
+          parts=['scripts/weatherNourieRepair.1.b64','scripts/weatherNourieRepair.2.b64','scripts/weatherNourieRepair.b64']
+          raw=lzma.decompress(base64.b64decode(''.join(pathlib.Path(p).read_text().strip() for p in parts)))
+          assert hashlib.sha256(raw).hexdigest()=='d2596daa7caf78746eb502c740cb4234a2f3b1bc6b2784fb935c6c478b99742c'
           edits=json.loads(raw)
           for e in edits:
             name=e['path'];assert '..' not in name and name.startswith(('src/weatherFusion','public/weather-fusion/','scripts/weather','test/weatherFusion','docs/weather-nourie'))
