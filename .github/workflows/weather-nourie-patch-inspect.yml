@@ -1,0 +1,36 @@
+name: Inspect Weather Nourie repair bundle
+on:
+  push:
+    branches: [weather-nourie-morning-map-fix]
+    paths: ['.github/workflows/weather-nourie-patch-inspect.yml']
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply repair bundle and capture rendered-source dependencies
+        run: |
+          python - <<'PY'
+          import pathlib,json,base64,lzma,hashlib
+          parts=['scripts/weatherNourieRepair.1.b64','scripts/weatherNourieRepair.2.b64','scripts/weatherNourieRepair.b64']
+          raw=lzma.decompress(base64.b64decode(''.join(pathlib.Path(p).read_text().strip() for p in parts)))
+          assert hashlib.sha256(raw).hexdigest()=='d2596daa7caf78746eb502c740cb4234a2f3b1bc6b2784fb935c6c478b99742c'
+          for e in json.loads(raw):
+            p=pathlib.Path(e['path']);old=p.read_text() if p.exists() else ''
+            assert hashlib.sha256(old.encode()).hexdigest()==e['old']
+            lines=old.splitlines(keepends=True)
+            for a,b,insert in reversed(e['changes']):lines[a:b]=insert
+            p.parent.mkdir(parents=True,exist_ok=True);p.write_text(''.join(lines))
+          out=pathlib.Path('/tmp/inspect');out.mkdir()
+          for f in ['public/weather-fusion/experience.js','public/weather-fusion/dewpoint-meter.js','public/weather-fusion/app.js','public/weather-fusion/index.html','public/weather-fusion/map-frame-controller.js','scripts/weatherNourieRepairSmoke.js']:
+            p=pathlib.Path(f)
+            if p.exists():(out/p.name).write_text(p.read_text())
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: weather-nourie-patched-source
+          path: /tmp/inspect
+          retention-days: 1
