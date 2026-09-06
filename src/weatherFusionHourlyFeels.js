@@ -30,7 +30,8 @@ export function rebuildHourlyFeels(out,{now,temperatureAt,humidityAt,periods=[]}
  }
  series.temperature=temperatures;series.feels=feels;series.feelsSun=suns;series.humidity=humidities;series.dewpoint=dewpoints;
  out.metricForecasts.comfortAlignment={status:'not-applied',note:'Forecast feels-like values use exactly the displayed temperature and the matching hourly dew point and wind. No separate temperature-only residual, daily maximum, or current observation is inserted into future hours.'};
- out.metricForecasts.notes.feels='One timestamp-matched all-weather shade estimate per hour. The current card uses observed conditions; future values use forecast inputs, not current humidity or a recycled daily value. Daily summaries use extrema of these same hourly values. Missing hours stay blank; this is a forecast, not a guarantee.';
+ out.metricForecasts.notes.feels='One timestamp-matched all-weather shade estimate per hour. UTCI remains the all-season base; in warm humid air the warmer Steadman vapor-pressure result is kept as a moisture safeguard so cloud cover does not erase the dew-point effect. The current card uses observed conditions; future values use forecast inputs, not current humidity or a recycled daily value. Daily summaries use extrema of these same hourly values. Missing hours stay blank; this is a forecast, not a guarantee.';
+ out.humidFeelsVersion='weather-nourie-humid-v1';
  out.thermalVersion='weather-nourie-hourly-feels-v2';
  return out;
 }

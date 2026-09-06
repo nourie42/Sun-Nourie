@@ -4,7 +4,9 @@ export function renderBulletins(forecast,result=null,now=Date.now()){
  const root=document.getElementById('alerts'),panel=document.getElementById('nws-bulletins');if(!root)return;
  const items=bulletinFacts(forecast,now),status=forecast.feeds?.find(f=>f.id==='alerts')?.status;
  const discussionStatus=forecast.feeds?.find(f=>f.id==='special-discussions')?.status;
- if(panel)panel.hidden=!items.length&&status==='ready'&&discussionStatus==='ready';
+ // The bulletin card is message-driven, not feed-health-driven. Source outages still
+ // appear in Scientific Stuff, but an empty alert/special-discussion list shows no card.
+ if(panel)panel.hidden=!items.length;
  const open=new Set([...root.querySelectorAll('details[open]')].map(d=>d.dataset.bulletinId));
  const summaries=result?.signature===forecast.signature&&result?.mode==='ai'?result.summaries||[]:[];
  const time=value=>{const t=Date.parse(value);return Number.isFinite(t)?new Intl.DateTimeFormat('en-US',{timeZone:forecast.location?.timeZone||'America/New_York',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}).format(new Date(t)):'unavailable';};

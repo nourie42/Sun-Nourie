@@ -28,11 +28,11 @@ jobs:
           const delay=ms=>new Promise(r=>setTimeout(r,ms));
           let ready=false;
           for(let i=0;i<40;i++){
-            try{const r=await fetch('https://sun-nourie-live.onrender.com/api/weather-fusion/forecast?location=knightdale',{signal:AbortSignal.timeout(45000)});const d=await r.json();if(d.experienceVersion==='weather-nourie-friendly-v1'){ready=true;break;}}
+            try{const r=await fetch('https://sun-nourie-live.onrender.com/api/weather-fusion/forecast?location=knightdale',{signal:AbortSignal.timeout(45000)});const d=await r.json();if(d.humidFeelsVersion==='weather-nourie-humid-v1'){ready=true;break;}}
             catch{}
             await delay(15000);
           }
-          if(!ready)throw new Error('Render has not served the committed Weather Fusion version; deployment is not verified.');
+          if(!ready)throw new Error('Render has not served the committed Weather Nourie humidity-feels version; deployment is not verified.');
           JS
       - name: Live numerical feeds, browser maps, and actual AI
         env:

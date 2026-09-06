@@ -100,9 +100,22 @@ function windMessage(temp,wind) {
 }
 
 /** Tier-3 operational fallback from the attached research framework.
- * UTCI is the all-season primary index. Radiation is estimated from solar elevation
- * and broad sky state; this is not research-grade EPST and is not literal skin temperature.
+ * UTCI is the all-season base. In warm, humid weather we retain the warmer
+ * Steadman vapor-pressure result as a moisture safeguard, so clouds can reduce
+ * radiation without erasing the dew-point effect.
  */
+function warmHumidSteadman(current,rh,elevation,exposure='shade'){
+  if(!finite(current?.temperature)||current.temperature<75||!finite(current?.wind)||current.wind<0)return null;
+  const validDewpoint=finite(current.dewpoint)&&current.dewpoint<=current.temperature+1?current.dewpoint:null;
+  const muggy=finite(validDewpoint)?validDewpoint>=60:finite(rh)&&rh>=50;
+  if(!muggy)return null;
+  const shade=shadeFeelsLike(current.temperature,rh,current.wind,current.dewpoint).value;
+  if(!finite(shade)||shade<=current.temperature)return null;
+  if(exposure!=='outdoors')return shade;
+  const q=estimatedAbsorbedRadiation(current.condition,elevation);
+  const radiant=finite(q)?radiationFeelsLike(current.temperature,rh,current.wind,current.dewpoint,q).value:null;
+  return finite(radiant)?Math.max(shade,radiant):shade;
+}
 function genericMrtDeltaC(condition,elevation,exposure='shade') {
   if(!finite(elevation)||elevation<=0)return 0;
   const w=weatherState(condition),sun=Math.max(0,Math.sin(elevation))**.72;
@@ -118,9 +131,11 @@ export function tier3FeelsLike(current,location,now,exposure='shade') {
   const elevation=solarElevation(now,location?.latitude,location?.longitude),deltaC=genericMrtDeltaC(current.condition,elevation,exposure);
   const tr=current.temperature+deltaC*1.8;
   let value=utciF(current.temperature,tr,current.wind,rh);
-  // UTCI operational wind floor is 0.5 m/s. Calm weather is evaluated at the documented floor.
   if(!finite(value))value=shadeFeelsLike(current.temperature,rh,current.wind,current.dewpoint).value;
-  return {value,method:finite(value)?'UTCI Tier-3 fallback with estimated mean radiant temperature':'Feels-like unavailable',rh,tr,deltaMrtC:deltaC};
+  const humidSafeguard=warmHumidSteadman(current,rh,elevation,exposure);
+  const humidControls=finite(humidSafeguard)&&(!finite(value)||humidSafeguard>value);
+  if(humidControls)value=humidSafeguard;
+  return {value,method:finite(value)?humidControls?'UTCI Tier-3 with Steadman hot-humid safeguard':'UTCI Tier-3 fallback with estimated mean radiant temperature':'Feels-like unavailable',rh,tr,deltaMrtC:deltaC,humidSafeguard};
 }
 
 export function thermalComfort(current, location, now) {
@@ -141,5 +156,5 @@ export function thermalComfort(current, location, now) {
     method:shade.method,humidity:rh,wetBulb:wet,daylight,absorbedRadiation:estimatedAbsorbedRadiation(current.condition,elevation),
     solarAdjustment:finite(outdoorValue)&&finite(shadeValue)?outdoorValue-shadeValue:null,
     dewpointEffect:dewpointMessage(current.dewpoint),windEffect:windMessage(current.temperature,current.wind),microclimate:localContext,
-    note:`Tier-3 operational fallback from the attached Real-Feel Skin Temperature research: UTCI is the primary all-season index using air temperature, humidity/dew point and standard wind, with solar elevation and broad sky state used for a generic radiant estimate. This is a modeled equivalent temperature, not measured skin temperature or validated EPST. ${dewpointMessage(current.dewpoint)} ${windMessage(current.temperature,current.wind)} ${localContext} Wet bulb is diagnostic only and is not added again to the UTCI result.`};
+    note:`Tier-3 operational fallback from the attached Real-Feel Skin Temperature research: UTCI is the all-season base using air temperature, humidity/dew point and standard wind, with solar elevation and broad sky state used for a generic radiant estimate. In warm humid air, the warmer Steadman vapor-pressure apparent temperature is retained as a safeguard, so cloud cover can reduce radiant heating without wiping out the dew-point effect. This is a modeled equivalent temperature, not measured skin temperature or validated EPST. ${dewpointMessage(current.dewpoint)} ${windMessage(current.temperature,current.wind)} ${localContext} Wet bulb is diagnostic only and is not added again to the result.`};
 }
