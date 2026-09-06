@@ -1,8 +1,10 @@
 import {createFramePlayer} from './frame-player.js';
-import {renderComfort,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js';
+import {renderComfort,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=8-personal';
 import {dailyDisplay} from './weather-math.js';
-import {heroWeather} from './hero-mode.js';
-import {renderDewpointMeter} from './dewpoint-meter.js';
+import {currentHero} from './current-temperature.js?v=1-current';
+import {renderBulletins} from './bulletins.js?v=1-bulletins';
+import {dailyGrossHTML,modelFreshnessText} from './personal-details.js?v=1-personal';
+import {renderDewpointMeter} from './dewpoint-meter.js?v=5-compact';
 import {renderWeatherPanel} from './render-safety.js';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);
@@ -80,7 +82,7 @@ function render(data) {
   $('city-name').textContent = presets[place.id]?.name || data.location.name || place.name;
   $('hero-date').textContent = new Intl.DateTimeFormat('en-US', { timeZone: data.location.timeZone, weekday: 'long', month: 'long', day: 'numeric' }).format(new Date()).toUpperCase();
   const currentDay = dailyDisplay(d, 0, Date.now(), data.location.timeZone);
-  const hero = heroWeather(data, Date.now());
+  const hero = currentHero(data, day);
   $('temperature').innerHTML = `${number(hero.temperature)}<span>°</span>`;
   $('condition').textContent = hero.tonight ? `Tonight · ${hero.condition}` : hero.condition;
   $('high-low').textContent = hero.tonight ? 'Overnight low' : hero.range;
@@ -103,14 +105,7 @@ function render(data) {
   $('status').textContent = `Updated ${clock(data.assembledAt)}${unavailable.length ? ' · Some source details are unavailable' : ''}${failedPanels.length ? ` · Display issue: ${failedPanels.join(', ')}. Other forecasts remain available; use Refresh to retry.` : ''}`;
   $('status').classList.toggle('error', unavailable.length > 0 || failedPanels.length > 0);
 }
-function renderAlerts(data) {
-  const status = data.feeds.find((f) => f.id === 'alerts')?.status;
-  const cards = data.alerts.filter((a) => Date.parse(a.expires) > Date.now()).map((a) => {
-    const source = /^https:\/\/api\.weather\.gov\//.test(a.id || '') ? a.id : 'https://www.weather.gov/';
-    return `<details class="alert-card ${['Extreme', 'Severe'].includes(a.severity) ? 'urgent' : ''}"><summary>⚠ ${esc(a.event)} · ${esc(a.headline || a.areaDesc)}</summary><p>${esc(a.description)}</p><p><strong>${esc(a.instruction || 'Follow the official NWS guidance.')}</strong></p><p>Issued ${esc(clock(a.sent))} · expires ${esc(clock(a.expires))}</p><a href="${esc(source)}" target="_blank" rel="noopener noreferrer">Original NWS alert ↗</a></details>`;
-  });
-  $('alerts').innerHTML = status !== 'ready' ? '<p class="alert-note warning">Alert feed unavailable or stale. The absence of an alert here does not mean there are no warnings. Check weather.gov.</p>' + cards.join('') : cards.length ? cards.join('') : '<p class="alert-note">No active NWS alerts returned for this point at the last check. Conditions can change.</p>';
-}
+function renderAlerts(data) { renderBulletins(data); }
 function renderHours(data) {
   const position = $('hourly').scrollLeft;
   $('hourly').innerHTML = data.hours.length ? data.hours.map((h, i) => `<div class="hour ${i === 0 ? 'now' : ''}" title="${esc(h.condition)} · NWS rain chance ${percent(h.pop)} · ${esc(h.wind)} ${esc(h.windDirection)}"><span>${i === 0 ? esc(shortHour(h.time)) : esc(shortHour(h.time))}</span>${icon(h.condition, h.isDay)}<strong>${temperature(h.temperature)}</strong><small>${finite(h.pop) ? percent(h.pop) : '—'}</small></div>`).join('') : '<p class="muted">Official hourly guidance is unavailable. No substitute forecast has been invented.</p>';
@@ -149,7 +144,7 @@ function renderBriefing(data) {
     const url = id === 'afd' ? forecast?.discussion?.url : f?.url;
     return url && /^https:\/\/(api\.weather\.gov|www\.nco\.ncep\.noaa\.gov|www\.ecmwf\.int)\//.test(url) ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(f?.label || id)} ↗</a>` : esc(f?.label || id);
   });
-  $('briefing-detail').innerHTML = `<div><strong>Tonight & tomorrow</strong><p>${esc(data.nearTerm || 'See the hourly forecast below.')}</p></div><div><strong>The week ahead</strong><p>${esc(data.extended || 'More details will appear with the next update.')}</p></div><div><strong>What could change</strong><p>${esc(data.uncertainty || '')}</p></div>`;
+  $('briefing-detail').innerHTML = `<div><strong>Tonight & tomorrow</strong><p>${esc(data.nearTerm || 'See the hourly forecast below.')}</p></div><div><strong>The week ahead</strong><p>${esc(data.extended || 'More details will appear with the next update.')}</p></div><div><strong>What could change - Dan's take</strong><p>${esc(data.uncertainty || '')}</p></div>`;
   // Reuse the same outlook uncertainty below today's graphic, including refresh/reset.
   const uncertainty = typeof data.uncertainty === 'string' ? data.uncertainty.trim() : '';
   const todayUncertainty = $('today-uncertainty'), todayUncertaintyText = $('today-uncertainty-text');
@@ -161,7 +156,7 @@ function renderBriefing(data) {
   $('outlook-science').innerHTML = `<p>Summary type: ${esc(data.mode === 'ai' ? 'AI plain-language paraphrase of the local discussion, checked against the point forecast and available model data' : 'Official NWS forecast fallback; not an AI paraphrase')}. ${esc(data.reason || '')}</p><p>Sources used: ${refs.join(' · ') || 'Waiting for the local outlook'}</p>`;
 
 }
-async function load({ moveMap = false } = {}) {
+async function load({ moveMap = false, refreshModels = false } = {}) {
   const id = ++generation;
   let receivedForecast = false;
   requestController?.abort();
@@ -173,9 +168,15 @@ async function load({ moveMap = false } = {}) {
     if (id !== generation) return;
     receivedForecast = true;
     render(data);
+    // Official notices are rendered synchronously; AI explanations never delay them.
+    api('bulletins', query({ signature: data.signature }), requestController.signal).then((bulletins) => {
+      if (id === generation && bulletins.signature === forecast?.signature) renderBulletins(forecast, bulletins);
+    }).catch((error) => {
+      if (id === generation && error.name !== 'AbortError' && forecast) renderBulletins(forecast, {mode:'official', signature:forecast.signature});
+    });
     if (!map) initMap();
     if (moveMap && map) map.setView([place.latitude, place.longitude], 8);
-    if (selectedLayer !== 'radar' && (moveMap || Date.now()-modelFetched > 120000)) void loadModelMap();
+    if (selectedLayer !== 'radar' && (refreshModels || moveMap || Date.now()-modelFetched >= 55000)) void loadModelMap(refreshModels);
     if (Date.now() - lastRadarFetch > 2 * 60000) void loadRadar();
     if (data.aiConfigured && !(currentBriefing?.mode === 'ai' && currentBriefing.signature === data.signature)) {
       api('briefing', query({ signature: data.signature }), requestController.signal).then((briefing) => {
@@ -227,7 +228,7 @@ function chooseLocation(value) {
 function showDay(index) {
   const d=forecast?.days[index]; if(!d) return;
   const p=dailyDisplay(d,index,Date.now(),forecast.location.timeZone);
-  $('day-content').innerHTML=`<div class="dialog-eyebrow">WEATHER NOURIE</div><h2 id="day-title" class="dialog-title">${esc(p.label)}</h2><p class="dialog-condition">${esc(p.condition)}</p><div class="dialog-temps">${temperature(p.primary)}<span>${p.primaryLabel.toLowerCase()}${!p.tonight&&finite(p.secondary)?` · ${temperature(p.secondary)} low`:''}</span></div><div class="dialog-stats"><div><strong>${percent(p.pop)}</strong><small>${p.tonight?'Rain chance tonight':'Rain chance'}</small></div><div><strong>${inches(d.qpf)}</strong><small>${p.tonight?'Forecast rain through morning':'Expected rain'}</small></div></div><p class="dialog-prose">${esc(p.detail || 'More details will appear when the forecast updates.')}</p>${!p.tonight&&d.nightDetail?`<h3 class="dialog-subtitle">Overnight</h3><p class="dialog-prose">${esc(d.nightDetail)}</p>`:''}<a href="#scientific-stuff" class="science-link" id="day-science-link">Scientific stuff ↓</a>`;
+  $('day-content').innerHTML=`<div class="dialog-eyebrow">WEATHER NOURIE</div><h2 id="day-title" class="dialog-title">${esc(p.label)}</h2><p class="dialog-condition">${esc(p.condition)}</p><div class="dialog-temps">${temperature(p.primary)}<span>${p.primaryLabel.toLowerCase()}${!p.tonight&&finite(p.secondary)?` · ${temperature(p.secondary)} low`:''}</span></div><div class="dialog-stats"><div><strong>${percent(p.pop)}</strong><small>${p.tonight?'Rain chance tonight':'Rain chance'}</small></div><div><strong>${inches(d.qpf)}</strong><small>${p.tonight?'Forecast rain through morning':'Expected rain'}</small></div></div><p class="dialog-prose">${esc(p.detail || 'More details will appear when the forecast updates.')}</p>${!p.tonight&&d.nightDetail?`<h3 class="dialog-subtitle">Overnight</h3><p class="dialog-prose">${esc(d.nightDetail)}</p>`:''}${dailyGrossHTML(forecast,index,p.tonight)}<a href="#scientific-stuff" class="science-link" id="day-science-link">Scientific stuff ↓</a>`;
   $('day-dialog').showModal();
   $('day-science-link').addEventListener('click',()=>$('day-dialog').close());
 }
@@ -307,13 +308,19 @@ function modelCaption(layer,frame){
   const interval=frame.field==='precipitation'?` · ${clock(frame.start,{month:'short',day:'numeric'})} → ${clock(frame.end,{month:'short',day:'numeric'})}`:'';
   return `${layer.label} · ${type} · ${frame.units}${interval} · run ${clock(layer.runAt,{month:'short',day:'numeric'})}${mismatch}`;
 }
-async function loadModelMap(){
+async function loadModelMap(force=false){
   const token=++mapSelectionToken,layerName=selectedLayer;
   if(layerName==='radar')return;
   try{
-    if(!modelCatalog||Date.now()-modelFetched>120000){modelCatalog=await api('models');modelFetched=Date.now();}
+    if(force||!modelCatalog||Date.now()-modelFetched>=55000){modelCatalog=await api('models');modelFetched=Date.now();}
     if(token!==mapSelectionToken||selectedLayer!==layerName)return;
     const layer=modelCatalog.layers[layerName];
+    const freshness=$('model-freshness');
+    if(freshness){
+      freshness.hidden=false;
+      freshness.textContent=modelFreshnessText(layer,modelCatalog.checkedAt||new Date(modelFetched).toISOString(),forecast?.location?.timeZone);
+      freshness.dataset.delayed=String(layer?.model==='hrrr'&&Date.now()-Date.parse(layer.runAt)>150*60000);
+    }
     const previousTime=modelFrames[modelIndex]?.time,previousURL=modelFrames[modelIndex]?.url;
     modelFrames=layer?.frames || [];
     if(framePlayer?.visible && modelFrames.some(f=>f.url===previousURL)){
@@ -348,6 +355,7 @@ async function showModelFrame(index){
 }
 function selectLayer(layer){
   selectedLayer=layer;stopRadar();++mapSelectionToken;++modelFrameToken;
+  const freshness=$('model-freshness');if(freshness){freshness.hidden=layer==='radar';freshness.textContent=layer==='radar'?'':'Checking the latest published run…';freshness.dataset.delayed='false';}
   document.querySelectorAll('[data-layer]').forEach(button=>{const active=button.dataset.layer===layer;button.classList.toggle('selected',active);button.setAttribute('aria-pressed',String(active));});
   if(radarLayer){radarLayer.off();map?.removeLayer(radarLayer);radarLayer=null;}framePlayer?.clear();
   $('radar-map').hidden=false;$('radar-map').style.display='';$('model-map').hidden=true;$('radar-controls').hidden=false;$('radar-controls').style.display='';$('radar-legend').hidden=false;$('radar-legend').style.display='';
@@ -358,7 +366,7 @@ function selectLayer(layer){
 }
 function showSelectedFrame(index){if(selectedLayer==='radar')showFrame(index);else showModelFrame(index);}
 
-$('refresh').addEventListener('click', () => { if (!busy) void load(); });
+$('refresh').addEventListener('click', () => { if (!busy) void load({refreshModels:true}); });
 document.querySelectorAll('[data-place]').forEach((button) => button.addEventListener('click', () => chooseLocation(presets[button.dataset.place])));
 document.querySelectorAll('[data-layer]').forEach((button) => button.addEventListener('click', () => selectLayer(button.dataset.layer)));
 $('daily').addEventListener('click', (event) => { const button = event.target.closest('[data-day]'); if (button) showDay(Number(button.dataset.day)); });

@@ -14,7 +14,7 @@ async function json(path){
 }
 // Do not mistake a previous deployment with the same old schema for this repair.
 if(live){
- const paths=['index.html','forecast-layout.css','app.js','experience.js','hero-mode.js','comfort-outlook.js','frame-player.js','dewpoint-meter.js','dewpoint-meter.css'];
+ const paths=['personal-details.js','personal-details.css','bulletin-facts.js','bulletins.js','current-temperature.js','comfort-outlook.js','index.html','forecast-layout.css','app.js','experience.js','hero-mode.js','comfort-outlook.js','frame-player.js','dewpoint-meter.js','dewpoint-meter.css'];
  const wanted=Object.fromEntries(await Promise.all(paths.map(async p=>[p,createHash('sha256').update(await fs.readFile('public/weather-fusion/'+p)).digest('hex')])));
  let deployed=false;
  for(let attempt=0;attempt<35&&!deployed;attempt++){
@@ -38,7 +38,8 @@ async function checkForecastDetails(page){
   const text=document.querySelector('#today-uncertainty-text');
   const title=document.querySelector('#gross-title');
   const source=document.querySelector('#briefing-detail>div:last-child p');
-  const hourly=panel.nextElementSibling;
+  const next=panel.nextElementSibling;
+  const hourly=next?.id==='nws-bulletins'?next.nextElementSibling:next;
   return {viewport:innerWidth,text:text.textContent,source:source.textContent.trim(),hidden:note.hidden,
    belowGraphic:note.getBoundingClientRect().top>=row.getBoundingClientRect().bottom,
    aboveHourly:note.getBoundingClientRect().bottom<=hourly.getBoundingClientRect().top,
@@ -49,13 +50,20 @@ async function checkForecastDetails(page){
  });
  assert.equal(details.text,details.source,'The same outlook uncertainty must appear below the daily graphic');
  assert.equal(details.hidden,!details.source);
- assert.ok(details.adjacentHourly,'Hourly must remain immediately after the Today/Tonight panel');
+ assert.ok(details.adjacentHourly,'Hourly must follow the Today/Tonight and bulletin panels');
  if(!details.hidden){
   assert.ok(details.belowGraphic&&details.aboveHourly,'Uncertainty must sit between the graphic and hourly forecast');
   assert.ok(details.noteFont<details.forecastFont&&details.noteWeight>=700,'Uncertainty must be smaller and bold');
   assert.ok(details.noOverflow,'Uncertainty must wrap within its card');
  }
  assert.equal(details.titleAlign,'center');assert.ok(details.titleWeight>=700,'Gross Meter heading must be bold');
+ assert.equal((await page.locator('.current-temp-label').innerText()).trim(),'Current temperature');
+ assert.equal(await page.locator('#high-low').isVisible(),false);
+ assert.equal(await page.locator('#condition').isVisible(),false);
+ assert.equal(await page.locator('.sun-shade-comparison figure').count(),2);
+ assert.ok(!(await page.locator('#skin-exposure').innerText()).includes('~'));
+ assert.match(await page.locator('.brand small').innerText(),/Because Apple, Google and Samsung weather suck/);
+ assert.equal(await page.locator('.today-uncertainty-label').innerText(),"What could change - Dan's take");
  return details;
 }
 const report={checkedAt:new Date().toISOString(),base,locations:[],maps:[],browserErrors:[],liveAI:live,skinExposure:null,dewpointGross:null,forecastDetails:[]};
@@ -81,6 +89,9 @@ for(const location of ['knightdale','greenville']){
   assert.equal(data.aiConfigured,true,'Live AI must be configured');
   ai=await json('/api/weather-fusion/briefing?location='+location);
   assert.equal(ai.mode,'ai',JSON.stringify(ai));
+  const bulletins=await json('/api/weather-fusion/bulletins?location='+location);
+  if(data.discussion||data.alerts.length)assert.equal(bulletins.mode,'ai',JSON.stringify(bulletins));
+  (report.nwsBulletins??=[]).push({location,mode:bulletins.mode,summaries:bulletins.summaries?.length||0,pressureTrend:data.current.pressureTrend||null});
   for(const id of ['nws','afd','hrrr','ecmwf','nbm'])assert.ok(ai.sources.includes(id),'AI did not cite '+id);
  }
  report.locations.push({location,version:data.version,feelsLike:data.current.apparent,feelsLikeMethod:data.current.apparentSource,next24HourPrecipitationIn:data.precipitation.value,models:data.modelContributions,office:data.discussion.office,ai:ai?{mode:ai.mode,sources:ai.sources,headline:ai.headline}:null});
@@ -154,6 +165,7 @@ try{
  report.maps.push({layer:'radar',advertisedFrames:radar.frames.length,status:radar.status});
  await page.locator('[data-day="1"]').click();assert.ok(await page.locator('#day-dialog').isVisible());
  assert.ok((await page.locator('#day-content').innerText()).includes('WEATHER NOURIE'));
+ assert.equal(await page.locator('#day-content .day-gross').count(),1);
  await page.locator('#close-day').click();
  await page.locator('[data-place="greenville"]').click();
  await page.waitForFunction(()=>document.querySelector('#city-name').textContent.includes('Greenville')&&document.querySelectorAll('#metrics .metric-value').length===8,null,{timeout:75000});
@@ -200,7 +212,7 @@ try{
   if(['feels','precipitation','wind','humidity','pop','solar'].includes(key))assert.ok(available,`${key}: forecast not populated`);
   await page.locator('#chart-scrubber').fill('3');
   if(key==='humidity')await page.screenshot({path:dir+'/humidity-graph.png'});
-  if(key==='pressure')await page.screenshot({path:dir+'/pressure-graph.png'});
+  if(key==='pressure'){if(available)assert.match(value,/mb/);await page.screenshot({path:dir+'/pressure-graph.png'});}
   report.metricCharts.push({key,value,available});
   await page.keyboard.press('Escape');
  }

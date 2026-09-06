@@ -1,3 +1,4 @@
+import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=1-personal';
 import {comfortMode,comfortWindow,comfortNarrative} from './comfort-outlook.js';
 import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js';
 import {resetDewpointMeter} from './dewpoint-meter.js';
@@ -13,7 +14,7 @@ const defs={
  humidity:{title:'Humidity',unit:'%',field:'humidity',note:'How damp the air is expected to be.',color:'#9edfff',zero:true,max:100},
  pop:{title:'Rain chance',unit:'%',field:'pop',note:'The chance of rain during each forecast hour.',color:'#adcbff',zero:true,max:100},
  visibility:{title:'Visibility',unit:' mi',field:'visibility',note:'How far you may be able to see clearly.',color:'#c5dcf1',digits:1,zero:true},
- pressure:{title:'Pressure',unit:' inHg',field:'pressure',note:'How air pressure is expected to change.',color:'#c6bafa',digits:2},
+ pressure:{title:'Pressure',unit:' mb',field:'pressure',note:'How sea-level pressure is expected to change.',color:'#c6bafa',digits:1},
  solar:{title:'Sunset',unit:'',field:'solar',note:'When the sun is expected to set over the next week.',color:'#ffdc9b',solar:true},
 };
 let data=null, active=null, horizon=24, selected=0, graphPoints=[], graphGeometry=null;
@@ -71,7 +72,8 @@ function ensureComfortStyles(){
 function pointsFor(key, hours=48) {
  if(!data)return [];
  if(key==='solar')return (data.metricForecasts?.solar||[]).map(d=>({time:d.sunset,value:d.sunset?localMinutes(d.sunset):null,sunrise:d.sunrise,date:d.date})).filter(d=>d.time);
- return (data.metricForecasts?.series?.[defs[key].field]||[]).slice(0,hours);
+ const points=(data.metricForecasts?.series?.[defs[key].field]||[]).slice(0,hours);
+ return key==='pressure'?points.map(p=>({...p,value:pressureMb(p.value)})):points;
 }
 function sparkline(points) {
  const values=points.map(p=>p.value).filter(finite);
@@ -84,7 +86,7 @@ function sparkline(points) {
 export function renderComfort(forecast) {
  data=forecast;ensureComfortStyles();
  const now=Date.now(),c=forecast.comfort||thermalComfort(forecast.current,forecast.location,now),summary=comfortWindow(forecast,now);
- $('skin-values').innerHTML=`<span><strong>${temp(c.shade)}</strong> right now</span>${summary?`<span><strong>~${temp(summary.chosen.value)}</strong> ${summary.label}</span>`:''}`;
+ $('skin-values').innerHTML=`${sunShadeHTML(c,forecast.location,now)}${summary?`<p class="comfort-later"><strong>${temp(summary.chosen.value)}</strong> ${summary.label}</p>`:''}`;
  $('skin-explanation').textContent=comfortNarrative(forecast.current,c,summary,forecast.location.timeZone);
  renderComfortArt(forecast,now);
  const alignment=forecast.metricForecasts?.comfortAlignment;
@@ -122,11 +124,11 @@ export function renderMetricTiles(forecast,smallIcon) {
   ['humidity','drop',`${number(c.humidity)}<small>%</small>`,finite(c.dewpoint)&&c.dewpoint>=65?'The air feels muggy.':finite(c.humidity)?'Moisture in the air.':'Waiting for an update.'],
   ['pop','drop',finite(d.pop)?`${number(d.pop)}<small>%</small>`:'—',d.tonight?'Chance of rain tonight.':'Chance of rain today or tonight.'],
   ['visibility','eye',`${number(c.visibility,finite(c.visibility)&&Number.isInteger(c.visibility)?0:1)}<small>mi</small>`,'How far you can see clearly right now.'],
-  ['pressure','gauge',`${number(c.pressure,2)}<small>inHg</small>`,'Current air pressure.'],
+  ['pressure','gauge',`${number(stationPressureMb(c),1)}<small>mb</small>`,pressureTrendText(c)],
   ['solar','sun',data.solar.sunset?esc(formatTime(data.solar.sunset)):'—',data.solar.sunrise?`Sunrise ${formatTime(data.solar.sunrise)}.`:'Daylight through the week.'],
  ];
- $('metrics').innerHTML=tiles.map(([key,ic,value,note])=>`<button type="button" class="glass metric metric-${key}" data-metric="${key}" aria-haspopup="dialog" aria-label="${defs[key].title}: open forecast graph"><span class="metric-title">${smallIcon(ic)}${defs[key].title}<span class="tile-arrow" aria-hidden="true">↗</span></span><span class="metric-value">${value}</span><span class="metric-note">${esc(note)}</span>${sparkline(pointsFor(key,24))}<span class="tile-hint">${key==='solar'?'See the week ahead':'Explore the forecast'} <span aria-hidden="true">→</span></span></button>`).join('');
- $('metric-science').innerHTML=`<p>Current cards use the latest station observations when available. Tap a card for separate future forecast data. Current pressure is station pressure; the pressure graph is explicitly labeled mean sea-level pressure. One is not appended to the other.</p>${Object.entries(data.metricForecasts?.notes||{}).map(([key,note])=>`<p><strong>${esc(key)}:</strong> ${esc(note)}</p>`).join('')}`;
+ $('metrics').innerHTML=tiles.map(([key,ic,value,note])=>`<button type="button" class="glass metric metric-${key}" data-metric="${key}"${key==='pressure'?` data-pressure-trend="${esc(c.pressureTrend?.direction||'unknown')}"`:''} aria-haspopup="dialog" aria-label="${defs[key].title}: open forecast graph"><span class="metric-title">${smallIcon(ic)}${defs[key].title}<span class="tile-arrow" aria-hidden="true">↗</span></span><span class="metric-value">${value}</span><span class="metric-note">${esc(note)}</span>${sparkline(pointsFor(key,24))}<span class="tile-hint">${key==='solar'?'See the week ahead':'Explore the forecast'} <span aria-hidden="true">→</span></span></button>`).join('');
+ $('metric-science').innerHTML=`<p>Current cards use the latest station observations when available. Tap a card for separate future forecast data. All displayed pressures use millibars (mb). The trend compares the same station about three hours apart. Current pressure is station pressure; the graph is mean sea-level forecast pressure. These are kept separate.</p>${Object.entries(data.metricForecasts?.notes||{}).map(([key,note])=>`<p><strong>${esc(key)}:</strong> ${esc(note)}</p>`).join('')}`;
  if(active&&$('metric-dialog')?.open)drawChart();
 }
 function chartGrid(def,points) {
@@ -138,7 +140,7 @@ function chartGrid(def,points) {
  if(high<=low)high=low+1;
  const a=points.length?Date.parse(points[0].time):0,b=points.length?Date.parse(points.at(-1).time):1;
  const x=i=>L+(Date.parse(points[i].time)-a)/Math.max(1,b-a)*(W-L-R),y=v=>T+(high-v)/(high-low)*(H-T-B);
- const ticks=Array.from({length:4},(_,i)=>{const v=low+(high-low)*i/3;const label=def.solar?clockMinutes(Math.round(v)):def.unit===' in'?v.toFixed(2):def.unit===' inHg'?v.toFixed(2):Math.round(v)+ (def.unit==='°'?'°':'');return `<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" class="graph-grid"/><text x="${L-9}" y="${y(v)+4}" text-anchor="end" class="graph-axis">${label}</text>`;}).join('');
+ const ticks=Array.from({length:4},(_,i)=>{const v=low+(high-low)*i/3;const label=def.solar?clockMinutes(Math.round(v)):def.unit===' in'?v.toFixed(2):def.unit===' mb'?v.toFixed(1):Math.round(v)+ (def.unit==='°'?'°':'');return `<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" class="graph-grid"/><text x="${L-9}" y="${y(v)+4}" text-anchor="end" class="graph-axis">${label}</text>`;}).join('');
  const tickCount=points.length<2?1:4;
  const times=Array.from({length:tickCount},(_,i)=>{const ix=Math.round(i/Math.max(1,tickCount-1)*(points.length-1));return points[ix]?`<text x="${x(ix)}" y="${H-8}" text-anchor="${i===0?'start':i===tickCount-1?'end':'middle'}" class="graph-axis">${esc(def.solar?formatTime(points[ix].time,{weekday:'short',hour:undefined,minute:undefined}):formatTime(points[ix].time,{hour:'numeric',minute:undefined}))}</text>`:'';}).join('');
  let lines='',areas='',segment=[];
@@ -156,7 +158,7 @@ function selectPoint(i) {
  $('chart-value').textContent=displayValue(p.value,def);
  $('chart-time').textContent=formatTime(p.time,{weekday:'short',month:'short',day:'numeric'});
  if(def.solar&&p.sunrise)$('chart-note').textContent=`Sunrise ${formatTime(p.sunrise)} · sunset ${formatTime(p.time)}.`;
- else if(active==='pressure')$('chart-note').textContent='Sea-level forecast · separate from the station reading.';
+ else if(active==='pressure')$('chart-note').textContent='Sea-level forecast in mb · separate from the station reading and its observed trend.';
  else $('chart-note').textContent=!finite(p.value)?'The forecast source has a gap at this time.':def.note;
  const {x,y}=graphGeometry;
  $('graph-cursor')?.setAttribute('x1',x(selected));$('graph-cursor')?.setAttribute('x2',x(selected));

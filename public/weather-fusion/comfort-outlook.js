@@ -39,6 +39,5 @@ export function comfortNarrative(current,comfort,summary,zone='America/New_York'
     const lead=summary.mode==='day'?'Later today':summary.mode==='predawn'?'Before sunrise':'Tonight';
     sentences.push(`${lead}, the forecast ${delta>2?'rises to':delta<-2?'eases to':'stays near'} about ${Math.round(summary.chosen.value)}° around ${when}${cause}.`);
   }
-  if(finite(comfort.sun)&&finite(comfort.shade)&&comfort.sun-comfort.shade>=2&&summary?.mode==='day')sentences.push(`In direct sun right now, the estimate is about ${Math.round(comfort.sun-comfort.shade)}° warmer than in shade.`);
   return sentences.slice(0,3).join(' ');
 }

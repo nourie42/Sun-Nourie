@@ -1,3 +1,5 @@
+import {createBulletinService} from './weatherFusionBulletins.js';
+import {pressureTrendFromObservations} from './weatherFusionPressure.js';
 import {eveningPeriod} from './weatherFusionPolicy.js';
 import { addExperience, PLAIN_OUTLOOK_INSTRUCTIONS } from './weatherFusionExperience.js';
 import { solarTimes } from './weatherFusionDirect.js';
@@ -297,7 +299,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
         forecast: get('nws', 'NWS forecast', point?.forecast, 10 * MINUTE, (d) => d.properties?.periods?.length ? d.properties : null),
         hourly: get('hourly', 'NWS hourly', point?.forecastHourly, 10 * MINUTE, (d) => d.properties?.periods?.length ? d.properties : null),
         grid: get('grid', 'NWS precipitation grid', point?.forecastGridData, 10 * MINUTE, (d) => d.properties),
-        alerts: feed('alerts', 'Official NWS alerts', `https://api.weather.gov/alerts/active?point=${key}`, MINUTE, (d) => Array.isArray(d.features) ? d.features.filter((f) => f.properties?.status === 'Actual' && Date.parse(f.properties?.expires) > now()).map((f) => ({ id: f.id, geometry: f.geometry, ...f.properties })) : null),
+        alerts: feed('alerts', 'Official NWS alerts', `https://api.weather.gov/alerts/active?point=${key}`, MINUTE, (d) => Array.isArray(d.features) ? d.features.filter((f) => f.properties?.status === 'Actual' && f.properties?.messageType !== 'Cancel' && Date.parse(f.properties?.expires) > now()).map((f) => ({ id: f.id, geometry: f.geometry, ...f.properties })) : null),
         discussion: point?.cwa ? feed('afd', `NWS ${point.cwa} discussion`, `https://api.weather.gov/products/types/AFD/locations/${point.cwa}`, 5 * MINUTE, async (d) => {
           const latest = (d['@graph'] || []).filter((p) => p.productCode === 'AFD' && Date.parse(p.issuanceTime) <= now() + MINUTE).sort((a, b) => Date.parse(b.issuanceTime) - Date.parse(a.issuanceTime))[0];
           if (!latest?.['@id']) return null;
@@ -318,10 +320,20 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
                 stationDistanceKm: rounded(Math.sqrt(distance(s))*111.2,1), station: id, stationName: clean(s.properties?.name, 140), humidity: rounded(o.relativeHumidity?.value), dewpoint: rounded(toF(o.dewpoint)),
                 wind: rounded(toMph(o.windSpeed)), gust: rounded(toMph(o.windGust)), windDirection: numeric(o.windDirection?.value),
                 visibility: o.visibility?.unitCode === 'wmoUnit:m' && finite(o.visibility.value) ? rounded(o.visibility.value / 1609.344, 1) : null,
+                pressurePa: o.barometricPressure?.unitCode === 'wmoUnit:Pa' ? numeric(o.barometricPressure.value) : null,
                 pressure: o.barometricPressure?.unitCode === 'wmoUnit:Pa' && finite(o.barometricPressure.value) ? rounded(o.barometricPressure.value / 3386.389, 2) : null };
             } catch { return null; }
           }));
-          return candidates.find(Boolean) || null;
+          const chosen=candidates.find(Boolean)||null;
+          if(chosen?.station&&finite(chosen.pressurePa)){
+            try{
+              const stamp=Date.parse(chosen.time);
+              const params=new URLSearchParams({start:iso(stamp-3.5*HOUR),end:iso(stamp-2.5*HOUR),limit:'100'});
+              const {data:history}=await cached(`https://api.weather.gov/stations/${chosen.station}/observations?${params}`,5*MINUTE);
+              chosen.pressureTrend=pressureTrendFromObservations(history.features,chosen);
+            }catch{chosen.pressureTrend={status:'unavailable',direction:'unknown'};}
+          }
+          return chosen;
         }) : unavailable('observation', 'Station observation'),
         hrrr: loadModel('hrrr', location),
         ecmwf: loadModel('ecmwf', location),
@@ -409,7 +421,8 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
     return { frames, url: RADAR_URL, layer: 'conus_bref_qcd', status: frames.length ? (now() - Date.parse(frames.at(-1)) > 20 * MINUTE ? 'stale' : 'ready') : 'unavailable',
       fetchedAt: result.meta.fetchedAt, message: frames.length ? 'Observed radar mosaic; not a future forecast.' : 'Radar timestamps could not be verified. Use the official radar link.', officialUrl: 'https://radar.weather.gov/' };
   }
-  return { getForecast, getBriefing, search, radar, modelMaps: direct.maps };
+  const getBulletins=createBulletinService({getForecast,request,env,now});
+  return { getForecast, getBriefing, getBulletins, search, radar, modelMaps: direct.maps };
 }
 
 export function registerWeatherFusionRoutes(app, options = {}) {
@@ -432,12 +445,13 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
   });
-  for (const name of ['app.js', 'style.css', 'nav.js', 'experience.js', 'weather-math.js','hero-mode.js','dewpoint-meter.js','dewpoint-meter.css','comfort-effects.css','frame-player.js','comfort-outlook.js']) app.get(`/weather-fusion/${name}`, (_req, res) => {
+  for (const name of ['app.js', 'style.css', 'nav.js', 'experience.js', 'weather-math.js','hero-mode.js','dewpoint-meter.js','dewpoint-meter.css','comfort-effects.css','frame-player.js','comfort-outlook.js','forecast-layout.css','personal-details.js','personal-details.css','bulletin-facts.js','bulletins.js','current-temperature.js']) app.get(`/weather-fusion/${name}`, (_req, res) => {
     res.setHeader('Cache-Control', 'no-cache');
     res.sendFile(path.join(PUBLIC_DIR, name));
   });
   app.get('/api/weather-fusion/forecast', route(service.getForecast));
   app.get('/api/weather-fusion/briefing', route(service.getBriefing));
+  app.get('/api/weather-fusion/bulletins', route(service.getBulletins));
   app.get('/api/weather-fusion/search', route((q) => service.search(q.q)));
   app.get('/api/weather-fusion/radar', route(service.radar));
   app.get('/api/weather-fusion/models', route(service.modelMaps));

@@ -40,13 +40,13 @@ export function createDirectModels({ fetchImpl = globalThis.fetch, now = Date.no
     if (hit?.until > now()) return hit.data;
     if (pending.has(file)) return pending.get(file);
     const task = (async () => {
-      const response = await fetchImpl(DATA_ROOT + file, { headers: { Accept: 'application/json', 'User-Agent': 'Sun-Nourie-WeatherFusion/2.1' }, redirect: 'error', signal: AbortSignal.timeout(18000) });
+      const response = await fetchImpl(DATA_ROOT + file, { headers: { Accept: 'application/json', 'User-Agent': 'Sun-Nourie-WeatherFusion/2.1', 'Cache-Control':'no-cache' }, cache:'no-store', redirect: 'error', signal: AbortSignal.timeout(18000) });
       if (!response.ok) throw new Error(`Direct data request returned HTTP ${response.status}.`);
       if (Number(response.headers.get('content-length')) > 2500000) throw new Error('Model snapshot exceeds size limit.');
       const text = await response.text();
       if (Buffer.byteLength(text) > 2500000) throw new Error('Model snapshot exceeds size limit.');
       const data = JSON.parse(text);
-      cache.set(file, { until: now()+2*60000, data });
+      cache.set(file, { until: now()+60000, data });
       return data;
     })().finally(() => pending.delete(file));
     pending.set(file, task);
@@ -72,7 +72,7 @@ export function createDirectModels({ fetchImpl = globalThis.fetch, now = Date.no
         layers[name] = { model: model.model, label: model.label, resolution: model.resolution, runAt: model.runAt, status: frames.length ? status : 'unavailable', frames: frames.sort((a,b) => Date.parse(a.time)-Date.parse(b.time)), sourceUrl: SOURCE[model.model] };
       }
     }
-    return { schema: DIRECT_SCHEMA, generatedAt: manifest.generatedAt, layers, coverage: 'North Carolina and surrounding region', note: 'Model forecast images are generated from decoded GRIB2 values. They are not observed radar or an embedded webpage.' };
+    return { schema: DIRECT_SCHEMA, checkedAt:iso(now()), generatedAt: manifest.generatedAt, layers, coverage: 'North Carolina and surrounding region', note: 'Model forecast images are generated from decoded GRIB2 values. They are not observed radar or an embedded webpage.' };
   }
   return { load, maps };
 }

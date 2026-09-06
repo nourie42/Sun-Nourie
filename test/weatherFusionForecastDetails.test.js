@@ -24,7 +24,7 @@ test('uncertainty is below the daily graphic and before the still-adjacent hourl
   assert.ok(panel);
   assert.ok(panel.indexOf('id="today-forecast"') < panel.indexOf('id="today-uncertainty"'));
   assert.match(panel, /id="today-uncertainty"[^>]*hidden/);
-  assert.match(panel, /<strong class="today-uncertainty-label">What could change<\/strong>/);
+  assert.match(panel, /<strong class="today-uncertainty-label">What could change - Dan's take<\/strong>/);
   assert.match(html, /<\/section>\s*<section class="glass hourly-panel"/);
   for (const id of ['today-forecast','today-uncertainty','today-uncertainty-text','hourly']) {
     assert.equal(html.split(`id="${id}"`).length - 1, 1, `${id} must stay unique`);
@@ -101,7 +101,7 @@ test('Gross Meter heading is centered and bold without changing chart geometry',
 });
 
 test('changed assets are cache-busted and late briefing responses stay guarded', () => {
-  assert.match(html, /forecast-layout\.css\?v=2-forecast-details/);
-  assert.match(html, /app\.js\?v=7-forecast-details/);
+  assert.match(html, /forecast-layout\.css\?v=3-personal/);
+  assert.match(html, /app\.js\?v=8-personal/);
   assert.match(app, /if \(id === generation && briefing\.signature === forecast\?\.signature\) renderBriefing\(briefing\)/);
 });

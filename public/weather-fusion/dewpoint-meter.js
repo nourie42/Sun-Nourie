@@ -24,7 +24,7 @@ export function dewpointPoints(forecast,now,hours=240){
 }
 function styles(){
  if(document.getElementById('weather-nourie-dewpoint-meter-css'))return;
- const l=document.createElement('link');l.id='weather-nourie-dewpoint-meter-css';l.rel='stylesheet';l.href='/weather-fusion/dewpoint-meter.css?v=4-fit';
+ const l=document.createElement('link');l.id='weather-nourie-dewpoint-meter-css';l.rel='stylesheet';l.href='/weather-fusion/dewpoint-meter.css?v=5-compact';
  l.addEventListener('load',()=>{if(latest)renderDewpointMeter(latest,lastNow);},{once:true});document.head.append(l);
 }
 const hourText=(t,z)=>new Intl.DateTimeFormat('en-US',{timeZone:z,hour:'numeric',minute:'2-digit'}).format(new Date(t));
@@ -34,7 +34,7 @@ export function graphGeometry(points,hours,viewport=640,start=points[0]?.epoch??
  const vals=points.filter(p=>finite(p.value)).map(p=>p.value);
  const min=vals.length?Math.floor((Math.min(...vals)-4)/5)*5:40,max=vals.length?Math.ceil((Math.max(...vals)+4)/5)*5:80;
  // Keep the complete selected horizon inside the available width, not a wider scroll surface.
- const W=Math.max(120,finite(viewport)?Math.floor(viewport):640),height=300,L=W<400?40:48,R=16,T=24,B=42;
+ const W=Math.max(120,finite(viewport)?Math.floor(viewport):640),height=W<600?210:230,L=W<400?40:48,R=16,T=24,B=42;
  // Missing leading/trailing hours stay blank instead of stretching available data.
  const first=start,last=first+Math.max(1,hours-1)*HOUR;
  return {W,height,L,R,T,B,min,max,first,last,x:t=>L+(t-first)/Math.max(HOUR,last-first)*(W-L-R),y:v=>T+(max-v)/Math.max(5,max-min)*(height-T-B)};

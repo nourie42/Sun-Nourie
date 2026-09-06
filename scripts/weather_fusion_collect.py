@@ -198,6 +198,9 @@ def collect_model(model: str, output: str) -> dict[str, Any]:
     target = out / "models" / f"{model}.json"
     if target.exists():
         old = json.loads(target.read_text())
+        if old.get("schema") == SCHEMA and old.get("complete") and old.get("runAt", "") > iso(run):
+            print(f"KEEP newer verified {model} run={old['runAt']}", flush=True)
+            return {"model": model, "runAt": old["runAt"], "reused": True}
         if old.get("runAt") == iso(run) and old.get("schema") == SCHEMA and old.get("complete") and old.get("cardFieldsVersion") == 2 and old.get("forecastHours") == run_hours:
             print(f"REUSE {model} run={iso(run)} (no needless GRIB downloads)", flush=True)
             return {"model": model, "runAt": iso(run), "reused": True}
@@ -377,11 +380,12 @@ def collect_model(model: str, output: str) -> dict[str, Any]:
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument("--output",required=True)
+    parser.add_argument("--models",nargs="+",choices=list(SOURCES),default=list(SOURCES))
     args=parser.parse_args()
     out=Path(args.output);out.mkdir(parents=True,exist_ok=True)
     results=[]
     with concurrent.futures.ProcessPoolExecutor(max_workers=3) as executor:
-        tasks={executor.submit(collect_model,m,str(out)):m for m in SOURCES}
+        tasks={executor.submit(collect_model,m,str(out)):m for m in args.models}
         for task in concurrent.futures.as_completed(tasks):
             try:results.append(task.result())
             except Exception as e:results.append({"model":tasks[task],"error":str(e)[:600]});print('MODEL ERROR',tasks[task],str(e),flush=True)
@@ -402,7 +406,14 @@ def main():
         parts=path.name.split('-')
         if str(path.relative_to(out)) not in referenced and (len(parts)<3 or parts[1] not in runs.get(parts[0],[])):path.unlink()
     (out/"manifest.json").write_text(json.dumps(manifest,separators=(",",":"),allow_nan=False))
-    (out/"collection-status.json").write_text(json.dumps({"checkedAt":iso(dt.datetime.now(UTC)),"results":results},indent=2))
+    checked=iso(dt.datetime.now(UTC))
+    previous={}
+    try:
+        previous={r["model"]:r for r in json.loads((out/"collection-status.json").read_text()).get("results",[])}
+    except (OSError,ValueError,KeyError):
+        pass
+    previous.update({r["model"]:{**r,"checkedAt":checked} for r in results})
+    (out/"collection-status.json").write_text(json.dumps({"checkedAt":checked,"results":list(previous.values())},indent=2))
     print(json.dumps({"collected":results,"manifestModels":len(manifest['models'])},indent=2),flush=True)
     if any("error" in r for r in results):raise SystemExit(1)
 
