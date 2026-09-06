@@ -1,6 +1,8 @@
 import {rebuildHourlyFeels} from '../src/weatherFusionHourlyFeels.js';
 import {thermalComfort,shadeFeelsLike} from '../public/weather-fusion/weather-math.js';
 import {feelsAt,dailyFeels} from '../public/weather-fusion/hourly-feels.js';
+import {currentSample,hourlyDisplaySamples} from '../public/weather-fusion/weather-display.js';
+import {comfortWindow} from '../public/weather-fusion/comfort-outlook.js';
 /** Deterministic integration coverage. Fixture weather is never deployed or published. */
 import express from 'express';
 import {chromium} from 'playwright';
@@ -53,7 +55,20 @@ try{
   });
   assert.equal(layout.noteAlign,'center');assert.ok(layout.noteWeight>=700);assert.ok(layout.noteFont<layout.graphicFont);assert.ok(layout.bulletinsBelow&&layout.hourlyAfter);assert.ok(layout.grossTitleSize>=16&&layout.grossTitleWeight>=700);assert.ok(layout.grossHeight<910,'Gross Meter should be compact');assert.ok(layout.noOverflow,'Document must fit the viewport');
   assert.equal(await page.locator('.today-uncertainty-label').innerText(),"What could change - Dan's take");
-  assert.equal(await page.locator('.sun-shade-comparison figure').count(),2);assert.ok((await page.locator('.sun-shade-comparison').innerText()).includes(fixture().comfort.sun+'°'));assert.ok(!(await page.locator('#skin-exposure').innerText()).includes('~'));assert.ok(!(await page.locator('#skin-explanation').innerText()).includes('warmer than in shade'));
+  const knightdaleFixture=fixture(),knightdaleCurrent=currentSample(knightdaleFixture,epoch),knightdalePeak=comfortWindow(knightdaleFixture,epoch+1);
+  assert.equal(await page.locator('.sun-shade-comparison figure').count(),2);
+  const exposureText=await page.locator('.sun-shade-comparison').innerText();
+  assert.ok(exposureText.includes(Math.round(knightdaleCurrent.feels)+'°'),'Current exposure tile must use the same feels-like reading as the hero');
+  assert.ok(!/Unavailable|null°/.test(exposureText),'Cloudy weather must keep a numeric outdoor estimate');
+  assert.equal(await page.locator('.sun-shade-comparison [data-weather="cloudy"]').count(),2);
+  assert.match(await page.locator('.sun-person').innerText(),/Under clouds/);
+  assert.equal(await page.locator('.sun-person .sky-sun').count(),0,'Cloudy exposure must not draw a direct-sun icon');
+  assert.ok(!(await page.locator('#skin-exposure').innerText()).includes('~'));assert.ok(!(await page.locator('#skin-explanation').innerText()).includes('warmer than in shade'));
+  const firstHourly=page.locator('#hourly .hour').first();
+  assert.equal((await firstHourly.locator('> span').first().innerText()).trim(),'Now');
+  assert.equal((await firstHourly.locator('> strong').innerText()).trim(),Math.round(knightdaleCurrent.temperature)+'°');
+  assert.equal((await firstHourly.locator('.hour-feels b').innerText()).trim(),Math.round(knightdaleCurrent.feels)+'°');
+  if(knightdalePeak){assert.equal((await page.locator('#skin-values .comfort-later strong').innerText()).trim(),Math.round(Math.max(knightdaleCurrent.feels,knightdalePeak.chosen.value))+'°');}
   assert.match(await page.locator('#alerts').innerText(),/AI plain-language summary/);assert.match(await page.locator('#alerts').innerText(),/Move to higher ground now/);assert.equal(await page.locator('#alerts img').count(),0);
   assert.equal(await page.locator('#alerts .bulletin-warning').count(),1);assert.equal(await page.locator('#alerts .bulletin-watch').count(),1);assert.equal(await page.locator('#alerts .bulletin-discussion').count(),1);
   for(const n of [24,48,168,240]){await page.locator(`[data-gross-hours="${n}"]`).click();assert.ok(await page.locator('.gross-scroll').evaluate(el=>el.scrollWidth<=el.clientWidth+1));assert.ok(await page.locator('.gross-chart').evaluate(el=>el.getBoundingClientRect().height<=230));await page.locator('#gross-scrubber').fill('12');assert.match(await page.locator('.gross-selected-time').innerText(),/forecast/);}
@@ -63,10 +78,13 @@ try{
   if(width===390||width===1365){await page.screenshot({path:`${dir}/weather-personal-${width}.png`,fullPage:true});await page.locator('#skin-exposure').screenshot({path:`${dir}/sun-shade-${width}.png`});}
   await page.locator('[data-place="greenville"]').click();await page.waitForFunction(()=>document.querySelector('#today-uncertainty-text')?.textContent.includes('Greenville'));
   assert.equal((await page.locator('#temperature').innerText()).trim(),'71°');assert.match(await page.locator('.metric-pressure .metric-note').innerText(),/Rising/);assert.ok(!(await page.locator('#alerts').innerText()).includes('Knightdale'));
-  assert.match(await page.locator('#hero-feels').innerText(),new RegExp('Feels like '+fixture('greenville').comfort.shade+'°'));
-  const activeFixture=fixture('greenville');
+  const activeFixture=fixture('greenville'),activeCurrent=currentSample(activeFixture,epoch),activeSamples=hourlyDisplaySamples(activeFixture,epoch);
+  assert.match(await page.locator('#hero-feels').innerText(),new RegExp('Feels like '+Math.round(activeCurrent.feels)+'°'));
   const hourlyLabels=await page.locator('#hourly .hour-feels b').allTextContents();
-  assert.deepEqual(hourlyLabels,activeFixture.hours.map(h=>Math.round(feelsAt(activeFixture,h.time))+'°'));
+  assert.deepEqual(hourlyLabels,activeSamples.map(sample=>Math.round(sample.feels)+'°'));
+  const hourlyAir=await page.locator('#hourly .hour > strong').allTextContents();
+  assert.deepEqual(hourlyAir,activeSamples.map(sample=>Math.round(sample.temperature)+'°'));
+  assert.equal((await page.locator('#hourly .hour').first().locator('> span').first().innerText()).trim(),'Now');
   assert.equal(await page.locator('#daily .daily-feels').count(),14);
   assert.ok(!(await page.locator('#alerts').innerText()).includes('forecast discussion'));
   assert.equal(await page.locator('.person-eyes').count(),2);
@@ -87,7 +105,7 @@ try{
  await page.addInitScript(time=>{const NativeDate=Date;window.Date=class extends NativeDate{constructor(...args){super(...(args.length?args:[time]));}static now(){return time;}};},Date.parse('2026-09-07T02:00:00Z'));
  await page.route('https://unpkg.com/**',route=>route.fulfill({body:'',contentType:'application/javascript'}));
  page.on('pageerror',e=>report.browserErrors.push(e.message));await page.goto(base+'/weather-fusion/',{waitUntil:'networkidle'});
- assert.equal((await page.locator('#temperature').innerText()).trim(),'75°');assert.match(await page.locator('.sun-person').innerText(),/No direct sun at night/);report.nightCurrentTemperature=true;
+ assert.equal((await page.locator('#temperature').innerText()).trim(),'75°');assert.match(await page.locator('.sun-person').innerText(),/Outdoors at night/);assert.match(await page.locator('#skin-exposure').innerText(),/No direct sun at night/);assert.equal(await page.locator('.sun-person .sky-sun').count(),0);report.nightCurrentTemperature=true;
  assert.deepEqual(report.browserErrors,[]);report.success=true;
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));await fs.writeFile(dir+'/report.json',JSON.stringify(report,null,2));}
 console.log(JSON.stringify(report,null,2));
