@@ -127,10 +127,17 @@ test('AI uses Responses API, validates its sources, and is cached by signature',
 });
 test('invalid numerical AI prose falls back to NWS text', async () => {
   const s = createWeatherService({ now: () => now, env: { OPENAI_API_KEY: 'TEST', WEATHER_FUSION_NONCOMMERCIAL: 'true' }, fetchImpl: async (url, options) => {
-    if (url.includes('api.openai.com')) return response({ status: 'completed', output: [{ content: [{ type: 'output_text', text: '{"headline":"Temperature 999","summary":"bad","nearTerm":"bad","extended":"bad","uncertainty":"bad","sources":["nws","afd"]}' }] }] });
+    if (url.includes('api.openai.com')) return response({ status: 'completed', output: [{ content: [{ type: 'output_text', text: '{"headline":"Temperature 999","summary":"bad","nearTerm":"bad","extended":"bad","uncertainty":"bad","sources":["nws","afd","hrrr","ecmwf","nbm"]}' }] }] });
     return mockFetch(url, options);
   } });
   const b = await s.getBriefing({ location: 'knightdale' }); assert.equal(b.mode, 'nws-summary'); assert.ok(!JSON.stringify(b).includes('999'));
+});
+test('AI outlook allows clock times, normalizes them to h:mmam/pm, and still blocks weather numbers', async () => {
+  const s = createWeatherService({ now: () => now, env: { OPENAI_API_KEY: 'TEST', WEATHER_FUSION_NONCOMMERCIAL: 'true' }, fetchImpl: async (url, options) => {
+    if (url.includes('api.openai.com')) return response({ status: 'completed', output: [{ content: [{ type: 'output_text', text: JSON.stringify({headline:'Sunday outlook',summary:'As of Sunday at 2:02 PM, clouds remain nearby.',nearTerm:'Showers may develop later.',extended:'The week starts quieter.',uncertainty:'Rain coverage remains uncertain.',sources:['nws','afd','hrrr','ecmwf','nbm']}) }] }] });
+    return mockFetch(url, options);
+  } });
+  const b = await s.getBriefing({ location: 'knightdale' }); assert.equal(b.mode, 'ai'); assert.match(b.summary,/2:02pm/); assert.ok(!b.summary.includes('2:02 PM'));
 });
 test('fresh NWS forecast and AFD are required for AI', async () => {
   let aiCalled = false;

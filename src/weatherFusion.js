@@ -29,6 +29,9 @@ const max = (a) => a.filter(finite).length ? Math.max(...a.filter(finite)) : nul
 const min = (a) => a.filter(finite).length ? Math.min(...a.filter(finite)) : null;
 const rounded = (v, digits = 0) => finite(v) ? Number(v.toFixed(digits)) : null;
 const clean = (v, size = 500) => typeof v === 'string' ? v.slice(0, size) : '';
+const CLOCK_TIME = /\b(1[0-2]|[1-9]):([0-5]\d)\s*(am|pm)\b/gi;
+const normalizeClockTimes = (value) => typeof value === 'string' ? value.replace(CLOCK_TIME, (_, hour, minute, meridiem) => `${hour}:${minute}${meridiem.toLowerCase()}`) : value;
+const hasNonClockDigits = (value) => /\d/.test(String(value).replace(CLOCK_TIME, 'CLOCK'));
 const iso = (ms) => new Date(ms).toISOString();
 const hash = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex').slice(0, 24);
 const errorWithStatus = (text, status = 503) => Object.assign(new Error(text), { status });
@@ -386,17 +389,18 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
         const result = await request('https://api.openai.com/v1/responses', { timeout: 35000, body: {
           model: env.WEATHER_FUSION_AI_MODEL || 'gpt-5-mini', store: false, max_output_tokens: 4000, reasoning: { effort: 'low' },
           instructions: PLAIN_OUTLOOK_INSTRUCTIONS,
-          input: JSON.stringify({ ...facts, requiredSources: ['nws','afd',...data.modelContributions.map(m=>m.id)], revisionInstruction: attempt ? 'The previous attempt failed automated validation. Return every required source ID exactly. Do not include any digit characters in prose; refer to today, tonight, tomorrow and the week ahead. Keep every prose field nonempty and concise. Do not issue weather warnings or promise safe conditions.' : 'Copy every required source ID into the sources array. Write concise professional prose with no digit characters.' }), text: { format: { type: 'json_schema', name: 'weather_briefing', strict: true, schema: { type: 'object', additionalProperties: false, properties, required: Object.keys(properties) } } },
+          input: JSON.stringify({ ...facts, requiredSources: ['nws','afd',...data.modelContributions.map(m=>m.id)], revisionInstruction: attempt ? 'The previous attempt failed automated validation. Return every required source ID exactly. Do not include numeric weather values or quantities. Clock times are the only numeric exception and must use h:mmam/pm form, such as 2:02pm. Keep every prose field nonempty and concise. Do not issue weather warnings or promise safe conditions.' : 'Copy every required source ID into the sources array. Write concise professional prose without numeric weather values or quantities. Clock times are allowed only in h:mmam/pm form, such as 2:02pm.' }), text: { format: { type: 'json_schema', name: 'weather_briefing', strict: true, schema: { type: 'object', additionalProperties: false, properties, required: Object.keys(properties) } } },
         } });
         const text = (result.output || []).flatMap((o) => o.content || []).filter((c) => c.type === 'output_text').map((c) => c.text).join('');
         const content = JSON.parse(text);
         const fields = ['headline', 'summary', 'nearTerm', 'extended', 'uncertainty'];
         if (result.status !== 'completed') throw Object.assign(new Error('AI response was incomplete.'), { aiDiagnostic: 'AI_RESPONSE_INCOMPLETE' });
         if (fields.some((k) => typeof content[k] !== 'string' || !content[k].trim() || content[k].length > 1600)) throw Object.assign(new Error('AI prose structure failed validation.'), { aiDiagnostic: 'AI_PROSE_STRUCTURE' });
-        if (fields.some((k) => /\d/.test(content[k]))) throw Object.assign(new Error('AI numerical prose failed validation.'), { aiDiagnostic: 'AI_PROSE_CONTAINS_DIGITS' });
+        if (fields.some((k) => hasNonClockDigits(content[k]))) throw Object.assign(new Error('AI numerical prose failed validation.'), { aiDiagnostic: 'AI_PROSE_CONTAINS_NONCLOCK_DIGITS' });
         if (fields.some(k=>/\b(deterministic|HRRR|ECMWF|NBM|CAPE|QPF|synoptic|advection|guidance|Weather Fusion)\b/i.test(content[k]))) throw Object.assign(new Error('Outlook needs plain language.'),{aiDiagnostic:'AI_PROSE_JARGON'});
         if (!Array.isArray(content.sources) || !['nws', 'afd', ...data.modelContributions.map(m=>m.id)].every((id) => content.sources.includes(id)) || content.sources.some((id) => !data.feeds.some((f) => f.id === id && f.status === 'ready'))) throw Object.assign(new Error('AI source attribution failed validation.'), { aiDiagnostic: 'AI_SOURCE_ATTRIBUTION' });
         if (/\b(all clear|no (?:active )?(?:warnings|severe weather)|guaranteed|perfectly safe)\b/i.test(fields.map((k) => content[k]).join(' '))) throw Object.assign(new Error('AI safety wording failed validation.'), { aiDiagnostic: 'AI_SAFETY_WORDING' });
+        for (const k of fields) content[k] = normalizeClockTimes(content[k]);
         return { ...content, mode: 'ai', signature: data.signature, generatedAt: iso(now()), model: env.WEATHER_FUSION_AI_MODEL || 'gpt-5-mini' };
       } catch (error) {
         const diagnostic = typeof error.aiDiagnostic === 'string' && /^AI_[A-Z0-9_a-z.\-]{1,100}$/.test(error.aiDiagnostic) ? error.aiDiagnostic : error.name === 'TimeoutError' || error.name === 'AbortError' ? 'AI_PROVIDER_TIMEOUT' : error instanceof SyntaxError ? 'AI_RESPONSE_JSON' : 'AI_RESPONSE_UNAVAILABLE';

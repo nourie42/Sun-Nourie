@@ -100,6 +100,7 @@ test('empty verified special-discussion response differs from a failed feed',asy
 });
 test('waving figures have faces and honor reduced-motion preferences',()=>{
  const read=p=>readFileSync(new URL('../public/weather-fusion/'+p,import.meta.url),'utf8');
- assert.match(read('exposure-scene.js'),/person-eyes/);assert.match(read('exposure-scene.js'),/person-smile/);assert.match(read('exposure-scene.js'),/friendly-wave/);
- assert.match(read('hourly-feels.css'),/prefers-reduced-motion:reduce/);
+ const scene=read('exposure-scene.js'),css=read('hourly-feels.css');
+ assert.match(scene,/person-eyes/);assert.match(scene,/person-smile/);assert.match(scene,/friendly-raised-arm/);assert.match(scene,/friendly-wave/);assert.ok(scene.indexOf('friendly-raised-arm')<scene.indexOf('<g class=\"friendly-wave\">'));
+ assert.match(css,/transform-box:fill-box/);assert.match(css,/prefers-reduced-motion:reduce/);
 });
