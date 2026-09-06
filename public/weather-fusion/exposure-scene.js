@@ -6,9 +6,12 @@ function person(){return `<g class="exposure-person-art" transform="translate(11
  <path d="M-8 39L-10 58M8 39L11 58" stroke="#527da4" stroke-width="9" stroke-linecap="round"/>
  <path d="M-14 61h10M7 61h11" stroke="#e0f0f9" stroke-width="5" stroke-linecap="round"/>
  <path d="M-10 22L-17 41" stroke="#efbd96" stroke-width="6" stroke-linecap="round"/>
- <g class="friendly-wave"><path d="M10 24L22 14L25-2" fill="none" stroke="#efbd96" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M24 1L20-6M25-1L24-10M27-1L28-10M29 0L32-7" fill="none" stroke="#efbd96" stroke-width="2.8" stroke-linecap="round"/>
-  <ellipse cx="26" cy="-1" rx="5" ry="6" fill="#efbd96"/>
+ <g class="friendly-wave-pose">
+  <path class="friendly-raised-arm" d="M10 24L22 14L25-2" fill="none" stroke="#efbd96" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <g class="friendly-wave">
+   <path d="M24 1L20-6M25-1L24-10M27-1L28-10M29 0L32-7" fill="none" stroke="#efbd96" stroke-width="2.8" stroke-linecap="round"/>
+   <ellipse cx="26" cy="-1" rx="5" ry="6" fill="#efbd96"/>
+  </g>
  </g>
  <path d="M-9 19Q0 15 9 19L14 38Q0 43-14 38Z" fill="#b2e1eb"/>
  <path d="M-3 14v6q3 3 6 0v-6" fill="#e8b088"/>
