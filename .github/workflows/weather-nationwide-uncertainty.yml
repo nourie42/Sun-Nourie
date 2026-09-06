@@ -53,6 +53,7 @@ jobs:
           public/weather-fusion/index.html
           public/weather-fusion/personal-details.css
           test/weatherFusionForecastDetails.test.js
+          test/weatherFusionPersonalDetails.test.js
           test/weatherFusionUserFeedback.test.js
           docs/weather-fusion.md
           scripts/patch_weather_nationwide_uncertainty.py
