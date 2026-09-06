@@ -1,0 +1,42 @@
+name: Apply Fuel Atlas Viewport Patch
+
+on:
+  push:
+    branches:
+      - fix/fuel-atlas-viewport-company-results
+    paths:
+      - ".patchparts/**"
+      - "scripts/applyViewportPatchArchive.js"
+      - ".github/workflows/apply-viewport-patch.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".patchparts/**"
+      - "scripts/applyViewportPatchArchive.js"
+      - ".github/workflows/apply-viewport-patch.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out patch branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/fuel-atlas-viewport-company-results
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Assemble and apply viewport patch
+        run: node scripts/applyViewportPatchArchive.js
+      - name: Commit generated source changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Show corporate distributors in visible map areas"
+          git push origin HEAD:fix/fuel-atlas-viewport-company-results
