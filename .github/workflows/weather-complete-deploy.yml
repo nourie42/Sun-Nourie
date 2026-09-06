@@ -44,6 +44,49 @@ jobs:
           echo 'cf555137bcbcc90d8fb746efef75b474a52d64a0f94e3eaa66f373917040bda2  /tmp/weather-repair.patch' | sha256sum -c -
           patch -p1 --batch --forward --dry-run < /tmp/weather-repair.patch
           patch -p1 --batch --forward < /tmp/weather-repair.patch
+      - name: Update browser regression assertions for repaired weather UI
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/weatherFusionPersonalBrowser.js')
+          text=p.read_text()
+          text=text.replace("import {feelsAt,dailyFeels} from '../public/weather-fusion/hourly-feels.js';", "import {feelsAt,dailyFeels} from '../public/weather-fusion/hourly-feels.js';\nimport {currentSample,hourlyDisplaySamples} from '../public/weather-fusion/weather-display.js';\nimport {comfortWindow} from '../public/weather-fusion/comfort-outlook.js';")
+          old="""  assert.equal(await page.locator('.sun-shade-comparison figure').count(),2);assert.ok((await page.locator('.sun-shade-comparison').innerText()).includes(fixture().comfort.sun+'°'));assert.ok(!(await page.locator('#skin-exposure').innerText()).includes('~'));assert.ok(!(await page.locator('#skin-explanation').innerText()).includes('warmer than in shade'));"""
+          new="""  const knightdaleFixture=fixture(),knightdaleCurrent=currentSample(knightdaleFixture,epoch),knightdaleSamples=hourlyDisplaySamples(knightdaleFixture,epoch),knightdalePeak=comfortWindow(knightdaleFixture,epoch+1);
+          assert.equal(await page.locator('.sun-shade-comparison figure').count(),2);
+          const exposureText=await page.locator('.sun-shade-comparison').innerText();
+          assert.ok(exposureText.includes(Math.round(knightdaleCurrent.feels)+'°'),'Current exposure tile must use the same feels-like reading as the hero');
+          assert.ok(!/Unavailable|null°/.test(exposureText),'Cloudy weather must keep a numeric outdoor estimate');
+          assert.equal(await page.locator('.sun-shade-comparison [data-weather=\"cloudy\"]').count(),2);
+          assert.match(await page.locator('.sun-person').innerText(),/Under clouds/);
+          assert.equal(await page.locator('.sun-person .sky-sun').count(),0,'Cloudy exposure must not draw a direct-sun icon');
+          assert.ok(!(await page.locator('#skin-exposure').innerText()).includes('~'));assert.ok(!(await page.locator('#skin-explanation').innerText()).includes('warmer than in shade'));
+          const firstHourly=page.locator('#hourly .hour').first();
+          assert.equal((await firstHourly.locator('> span').first().innerText()).trim(),'Now');
+          assert.equal((await firstHourly.locator('> strong').innerText()).trim(),Math.round(knightdaleCurrent.temperature)+'°');
+          assert.equal((await firstHourly.locator('.hour-feels b').innerText()).trim(),Math.round(knightdaleCurrent.feels)+'°');
+          if(knightdalePeak)assert.equal((await page.locator('#skin-values .comfort-later strong').innerText()).trim(),Math.round(Math.max(knightdaleCurrent.feels,knightdalePeak.chosen.value))+'°');"""
+          assert old in text
+          text=text.replace(old,new)
+          old="""  assert.match(await page.locator('#hero-feels').innerText(),new RegExp('Feels like '+fixture('greenville').comfort.shade+'°'));
+          const activeFixture=fixture('greenville');
+          const hourlyLabels=await page.locator('#hourly .hour-feels b').allTextContents();
+          assert.deepEqual(hourlyLabels,activeFixture.hours.map(h=>Math.round(feelsAt(activeFixture,h.time))+'°'));"""
+          new="""  const activeFixture=fixture('greenville'),activeCurrent=currentSample(activeFixture,epoch),activeSamples=hourlyDisplaySamples(activeFixture,epoch);
+          assert.match(await page.locator('#hero-feels').innerText(),new RegExp('Feels like '+Math.round(activeCurrent.feels)+'°'));
+          const hourlyLabels=await page.locator('#hourly .hour-feels b').allTextContents();
+          assert.deepEqual(hourlyLabels,activeSamples.map(sample=>Math.round(sample.feels)+'°'));
+          const hourlyAir=await page.locator('#hourly .hour > strong').allTextContents();
+          assert.deepEqual(hourlyAir,activeSamples.map(sample=>Math.round(sample.temperature)+'°'));
+          assert.equal((await page.locator('#hourly .hour').first().locator('> span').first().innerText()).trim(),'Now');"""
+          assert old in text
+          text=text.replace(old,new)
+          old=""" assert.equal((await page.locator('#temperature').innerText()).trim(),'75°');assert.match(await page.locator('.sun-person').innerText(),/No direct sun at night/);report.nightCurrentTemperature=true;"""
+          new=""" assert.equal((await page.locator('#temperature').innerText()).trim(),'75°');assert.match(await page.locator('.sun-person').innerText(),/Outdoors at night/);assert.match(await page.locator('#skin-exposure').innerText(),/No direct sun at night/);assert.equal(await page.locator('.sun-person .sky-sun').count(),0);report.nightCurrentTemperature=true;"""
+          assert old in text
+          p.write_text(text.replace(old,new))
+          PY
+          node --check scripts/weatherFusionPersonalBrowser.js
       - run: npm ci
       - name: JavaScript syntax checks
         run: |
@@ -92,6 +135,7 @@ jobs:
           public/weather-fusion/personal-details.js
           public/weather-fusion/weather-math.js
           public/weather-fusion/weather-repair.css
+          scripts/weatherFusionPersonalBrowser.js
           '''.split())
           actual=set(subprocess.check_output(['git','diff','--name-only','493782fc3e173d74f47aefdb9f9de95645aaa443'],text=True).split())
           if actual != expected:
