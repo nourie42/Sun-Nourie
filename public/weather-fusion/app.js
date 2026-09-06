@@ -1,10 +1,11 @@
+import {degrees,feelsAt,dayFeelsHTML} from './hourly-feels.js?v=2-hourly';
 import {createFramePlayer} from './frame-player.js';
-import {renderComfort,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=8-personal';
+import {renderComfort,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=9-hourly';
 import {dailyDisplay} from './weather-math.js';
 import {currentHero} from './current-temperature.js?v=1-current';
-import {renderBulletins} from './bulletins.js?v=1-bulletins';
-import {dailyGrossHTML,modelFreshnessText} from './personal-details.js?v=1-personal';
-import {renderDewpointMeter} from './dewpoint-meter.js?v=5-compact';
+import {renderBulletins} from './bulletins.js?v=2-special';
+import {dailyGrossHTML,modelFreshnessText} from './personal-details.js?v=2-hourly';
+import {renderDewpointMeter} from './dewpoint-meter.js?v=6-future';
 import {renderWeatherPanel} from './render-safety.js';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);
@@ -84,6 +85,7 @@ function render(data) {
   const currentDay = dailyDisplay(d, 0, Date.now(), data.location.timeZone);
   const hero = currentHero(data, day);
   $('temperature').innerHTML = `${number(hero.temperature)}<span>°</span>`;
+  if($('hero-feels'))$('hero-feels').innerHTML=`Feels like <strong>${degrees(data.comfort?.shade)}</strong><small>In the shade · ${c.type==='observation'?'based on the current station reading':'estimated from forecast data'}</small>`;
   $('condition').textContent = hero.tonight ? `Tonight · ${hero.condition}` : hero.condition;
   $('high-low').textContent = hero.tonight ? 'Overnight low' : hero.range;
   $('observation-label').textContent = hero.tonight ? `Tonight’s forecast · updated ${clock(data.assembledAt)}` : (c.type === 'observation' ? `Nearby weather station · updated ${clock(c.time)}` : 'Estimated current conditions');
@@ -108,7 +110,7 @@ function render(data) {
 function renderAlerts(data) { renderBulletins(data); }
 function renderHours(data) {
   const position = $('hourly').scrollLeft;
-  $('hourly').innerHTML = data.hours.length ? data.hours.map((h, i) => `<div class="hour ${i === 0 ? 'now' : ''}" title="${esc(h.condition)} · NWS rain chance ${percent(h.pop)} · ${esc(h.wind)} ${esc(h.windDirection)}"><span>${i === 0 ? esc(shortHour(h.time)) : esc(shortHour(h.time))}</span>${icon(h.condition, h.isDay)}<strong>${temperature(h.temperature)}</strong><small>${finite(h.pop) ? percent(h.pop) : '—'}</small></div>`).join('') : '<p class="muted">Official hourly guidance is unavailable. No substitute forecast has been invented.</p>';
+  $('hourly').innerHTML = data.hours.length ? data.hours.map((h, i) => `<div class="hour ${i === 0 ? 'now' : ''}" title="${esc(h.condition)} · NWS rain chance ${percent(h.pop)} · ${esc(h.wind)} ${esc(h.windDirection)}"><span>${i === 0 ? esc(shortHour(h.time)) : esc(shortHour(h.time))}</span>${icon(h.condition, h.isDay)}<strong>${temperature(h.temperature)}</strong><span class="hour-feels">Feels like<b>${degrees(feelsAt(data,h.time))}</b></span><small>${finite(h.pop) ? percent(h.pop) : '—'}</small></div>`).join('') : '<p class="muted">Official hourly guidance is unavailable. No substitute forecast has been invented.</p>';
   $('hourly').scrollLeft = position;
 }
 function renderDays(data) { renderDailyRows(data, icon); }
@@ -206,6 +208,7 @@ function chooseLocation(value) {
   forecast = null;
   $('city-name').textContent = value.name;
   $('temperature').innerHTML = '—<span>°</span>';
+  if($('hero-feels'))$('hero-feels').textContent='Feels like —';
   $('condition').textContent = 'Loading the selected location';
   $('high-low').textContent = 'High —° · Low —°';
   $('observation-label').textContent = 'Awaiting the new location’s sources';
@@ -228,7 +231,7 @@ function chooseLocation(value) {
 function showDay(index) {
   const d=forecast?.days[index]; if(!d) return;
   const p=dailyDisplay(d,index,Date.now(),forecast.location.timeZone);
-  $('day-content').innerHTML=`<div class="dialog-eyebrow">WEATHER NOURIE</div><h2 id="day-title" class="dialog-title">${esc(p.label)}</h2><p class="dialog-condition">${esc(p.condition)}</p><div class="dialog-temps">${temperature(p.primary)}<span>${p.primaryLabel.toLowerCase()}${!p.tonight&&finite(p.secondary)?` · ${temperature(p.secondary)} low`:''}</span></div><div class="dialog-stats"><div><strong>${percent(p.pop)}</strong><small>${p.tonight?'Rain chance tonight':'Rain chance'}</small></div><div><strong>${inches(d.qpf)}</strong><small>${p.tonight?'Forecast rain through morning':'Expected rain'}</small></div></div><p class="dialog-prose">${esc(p.detail || 'More details will appear when the forecast updates.')}</p>${!p.tonight&&d.nightDetail?`<h3 class="dialog-subtitle">Overnight</h3><p class="dialog-prose">${esc(d.nightDetail)}</p>`:''}${dailyGrossHTML(forecast,index,p.tonight)}<a href="#scientific-stuff" class="science-link" id="day-science-link">Scientific stuff ↓</a>`;
+  $('day-content').innerHTML=`<div class="dialog-eyebrow">WEATHER NOURIE</div><h2 id="day-title" class="dialog-title">${esc(p.label)}</h2><p class="dialog-condition">${esc(p.condition)}</p><div class="dialog-temps">${temperature(p.primary)}<span>${p.primaryLabel.toLowerCase()}${!p.tonight&&finite(p.secondary)?` · ${temperature(p.secondary)} low`:''}</span></div>${dayFeelsHTML(forecast,index,p.tonight)}<div class="dialog-stats"><div><strong>${percent(p.pop)}</strong><small>${p.tonight?'Rain chance tonight':'Rain chance'}</small></div><div><strong>${inches(d.qpf)}</strong><small>${p.tonight?'Forecast rain through morning':'Expected rain'}</small></div></div><p class="dialog-prose">${esc(p.detail || 'More details will appear when the forecast updates.')}</p>${!p.tonight&&d.nightDetail?`<h3 class="dialog-subtitle">Overnight</h3><p class="dialog-prose">${esc(d.nightDetail)}</p>`:''}${dailyGrossHTML(forecast,index,p.tonight)}<a href="#scientific-stuff" class="science-link" id="day-science-link">Scientific stuff ↓</a>`;
   $('day-dialog').showModal();
   $('day-science-link').addEventListener('click',()=>$('day-dialog').close());
 }

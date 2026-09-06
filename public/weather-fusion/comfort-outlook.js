@@ -21,7 +21,7 @@ export function comfortNarrative(current,comfort,summary,zone='America/New_York'
   const clock=new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',minute:'2-digit'}).format(new Date(summary.chosen.time));
   const p=summary.chosen,inputs=p.inputs||{},period=summary.mode==='day'?'The highest remaining hourly shade estimate':summary.mode==='predawn'?'The lowest hourly shade estimate before morning':'The lowest hourly shade estimate tonight';
   sentences.push(`${period} is ${Math.round(p.value)}° at ${clock}${finite(inputs.temperature)?`, with an air temperature of ${Math.round(inputs.temperature)}°`:''}.`);
-  if(p.value<=comfort.shade&&summary.mode==='day')sentences.push('That forecast is not being forced above the current reading; changing humidity and wind can offset warmer air.');
+  if(p.value<=comfort.shade&&summary.mode==='day')sentences.push('Changing humidity and wind can offset warmer air, so the feels-like and air-temperature peaks may occur at different times.');
   if(summary.partial)sentences.push('Some forecast hours are unavailable, so this is the peak of the available readings only.');
  }
  return sentences.join(' ');

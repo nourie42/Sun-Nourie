@@ -14,7 +14,7 @@ async function json(path){
 }
 // Do not mistake a previous deployment with the same old schema for this repair.
 if(live){
- const paths=['personal-details.js','personal-details.css','bulletin-facts.js','bulletins.js','current-temperature.js','comfort-outlook.js','index.html','forecast-layout.css','app.js','experience.js','hero-mode.js','comfort-outlook.js','frame-player.js','dewpoint-meter.js','dewpoint-meter.css'];
+ const paths=['hourly-feels.js','hourly-feels.css','exposure-scene.js','personal-details.js','personal-details.css','bulletin-facts.js','bulletins.js','current-temperature.js','comfort-outlook.js','index.html','forecast-layout.css','app.js','experience.js','hero-mode.js','comfort-outlook.js','frame-player.js','dewpoint-meter.js','dewpoint-meter.css'];
  const wanted=Object.fromEntries(await Promise.all(paths.map(async p=>[p,createHash('sha256').update(await fs.readFile('public/weather-fusion/'+p)).digest('hex')])));
  let deployed=false;
  for(let attempt=0;attempt<35&&!deployed;attempt++){
@@ -64,12 +64,20 @@ async function checkForecastDetails(page){
  assert.ok(!(await page.locator('#skin-exposure').innerText()).includes('~'));
  assert.match(await page.locator('.brand small').innerText(),/Because Apple, Google and Samsung weather suck/);
  assert.equal(await page.locator('.today-uncertainty-label').innerText(),"What could change - Dan's take");
+ assert.match(await page.locator('#hero-feels').innerText(),/Feels like/);
+ assert.equal(await page.locator('#hourly .hour-feels').count(),await page.locator('#hourly .hour').count());
+ assert.equal(await page.locator('.person-eyes').count(),2);
+ assert.equal(await page.locator('.friendly-wave').count(),2);
+ assert.ok(!(await page.locator('#alerts').textContent()).includes('forecast discussion'));
  return details;
 }
 const report={checkedAt:new Date().toISOString(),base,locations:[],maps:[],browserErrors:[],liveAI:live,skinExposure:null,dewpointGross:null,forecastDetails:[]};
 for(const location of ['knightdale','greenville']){
  const data=await json('/api/weather-fusion/forecast?location='+location);
  assert.equal(data.version,'weather-fusion-v2-direct');
+ assert.equal(data.thermalVersion,'weather-nourie-hourly-feels-v2');
+ for(const h of data.hours){const p=data.metricForecasts.series.feels.find(p=>Date.parse(p.time)===Date.parse(h.time));assert.ok(p,'Missing paired hourly row');assert.equal(h.feelsLike,p.value);assert.equal(p.inputs.temperature,h.temperature);}
+
  assert.equal(data.repairVersion,REPAIR_VERSION);
  assert.deepEqual(data.blendPolicy.sameDay,{nws:.4,hrrr:.4,ecmwf:.2});
  const dp=data.metricForecasts.series.dewpoint;
@@ -90,7 +98,7 @@ for(const location of ['knightdale','greenville']){
   ai=await json('/api/weather-fusion/briefing?location='+location);
   assert.equal(ai.mode,'ai',JSON.stringify(ai));
   const bulletins=await json('/api/weather-fusion/bulletins?location='+location);
-  if(data.discussion||data.alerts.length)assert.equal(bulletins.mode,'ai',JSON.stringify(bulletins));
+  if(data.alerts.length||data.specialDiscussions?.length)assert.equal(bulletins.mode,'ai',JSON.stringify(bulletins));
   (report.nwsBulletins??=[]).push({location,mode:bulletins.mode,summaries:bulletins.summaries?.length||0,pressureTrend:data.current.pressureTrend||null});
   for(const id of ['nws','afd','hrrr','ecmwf','nbm'])assert.ok(ai.sources.includes(id),'AI did not cite '+id);
  }

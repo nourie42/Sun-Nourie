@@ -55,7 +55,7 @@ test('full-range compact graph fits available width and retains real time spacin
 test('5:40 AM is today, never tonight or the previous overnight minimum',()=>{
  const t=Date.parse('2026-09-06T09:40:00Z'),f={location:{timeZone:zone},current:{temperature:73},days:[{high:84,low:65}],metricForecasts:{series:{feels:[{time:'2026-09-06T11:00Z',value:74},{time:'2026-09-06T18:00Z',value:91},{time:'2026-09-07T09:00Z',value:66}]}}};
  assert.equal(comfortMode(t,zone),'day');assert.equal(comfortMode(Date.parse('2026-09-06T08:59Z'),zone),'predawn');
- const summary=comfortWindow(f,t);assert.equal(summary.label,'warmest today');assert.equal(summary.chosen.value,91);
+ const summary=comfortWindow(f,t);assert.equal(summary.label,'Forecast feels-like peak ahead');assert.equal(summary.chosen.value,91);
  assert.equal(heroWeather(f,t).tonight,false);
  assert.doesNotMatch(comfortNarrative({temperature:73,dewpoint:73,wind:0},{shade:82},summary,zone),/tonight|overnight|bottoms out/i);
  assert.equal(comfortMode(Date.parse('2026-09-06T19:00Z'),zone),'overnight');

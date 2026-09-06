@@ -14,6 +14,11 @@ export function dewpointGrossLevel(dewpoint,wind=0){
 }
 
 
+export function forecastGrossLevel(dewpoint,wind=0){
+ const level=dewpointGrossLevel(dewpoint,wind);
+ const labels={dry:'It will feel very dry',nice:'It should feel pretty comfortable','nice-breeze':'The breeze should make it feel comfortable',humid:'It will feel a bit humid',gross:'It will feel a bit gross',nogo:'It will feel very muggy',nope:'It will feel extremely muggy',unknown:'The dew-point forecast is unavailable'};
+ return {...level,label:labels[level.key]||labels.unknown};
+}
 export function dewpointPoints(forecast,now,hours=240){
  const unique=new Map(),start=Math.ceil(now/HOUR)*HOUR,end=start+hours*HOUR;
  for(const p of forecast?.metricForecasts?.series?.dewpoint||[]){
@@ -91,7 +96,7 @@ export function renderDewpointMeter(forecast,now=Date.now()){
   ${worst?`<p class="gross-worst"><strong>Muggiest in this view:</strong> ${Math.round(worst.value)}° · ${esc(dayText(worst.time,zone))} at ${esc(hourText(worst.time,zone))}</p>`:'<p class="gross-empty">No dew-point forecast is available for these hours.</p>'}`;
  const select=i=>{
   const p=pts[Math.max(0,Math.min(pts.length-1,i))];if(!p)return;selectedEpoch=p.epoch;
-  const v=dewpointGrossLevel(p.value,pairedWind(forecast,p.time));
+  const v=forecastGrossLevel(p.value,pairedWind(forecast,p.time));
   panel.querySelector('.gross-selected-value').textContent=finite(p.value)?Math.round(p.value)+'°':'Unavailable';
   panel.querySelector('.gross-selected-time').textContent=`${dayText(p.time,zone)} · ${hourText(p.time,zone)} forecast`;
   panel.querySelector('.gross-selected-label').textContent=v.label;

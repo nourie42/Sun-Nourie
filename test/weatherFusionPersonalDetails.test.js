@@ -9,7 +9,7 @@ import {createBulletinService,validateBulletinSummaries} from '../src/weatherFus
 const H=3600000,now=Date.parse('2026-09-06T13:00:00Z');
 const location={latitude:35.787,longitude:-78.4806,timeZone:'America/New_York'};
 const alert={id:'https://api.weather.gov/alerts/example',status:'Actual',messageType:'Alert',event:'Flash Flood Warning',description:'Heavy rain is causing flash flooding.',instruction:'Move to higher ground now. Do not drive through flooded roads.',sent:'2026-09-06T12:00:00Z',expires:'2026-09-06T16:00:00Z',areaDesc:'Wake County',severity:'Severe'};
-const source=()=>({signature:'s1',location,alerts:[{...alert}],feeds:[{id:'alerts',status:'ready'},{id:'afd',status:'ready'}],discussion:{id:'afd-example',url:'https://api.weather.gov/products/example',office:'RAH',issuanceTime:'2026-09-06T11:00:00Z',text:'Rain may be widespread this afternoon.'}});
+const source=()=>({signature:'s1',location,specialDiscussions:[{id:'https://www.spc.noaa.gov/products/md/md2000.html',url:'https://www.spc.noaa.gov/products/md/md2000.html',event:'SPC special weather discussion',productType:'SPC-MD',applicable:true,sent:'2026-09-06T12:00:00Z',expires:'2026-09-06T16:00:00Z',description:'Rain may become heavy.',areaDesc:'Regional special discussion covering this point; not a warning.'}],alerts:[{...alert}],feeds:[{id:'alerts',status:'ready'},{id:'afd',status:'ready'}],discussion:{id:'afd-example',url:'https://api.weather.gov/products/example',office:'RAH',issuanceTime:'2026-09-06T11:00:00Z',text:'Rain may be widespread this afternoon.'}});
 const output=summaries=>({status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify({summaries})}]}]});
 
 test('hero stays current in daylight and at night, independently of daily low',()=>{
@@ -61,7 +61,7 @@ test('NWS facts exclude expired, cancelled and exercise notices',()=>{
  const f=source();f.alerts.push({...alert,id:'expired',expires:'2026-09-06T12:59:00Z'},{...alert,id:'cancelled',messageType:'Cancel'},{...alert,id:'exercise',status:'Exercise'},{...alert,id:'ended',ends:'2026-09-06T12:59:00Z'});
  const facts=bulletinFacts(f,now);assert.equal(facts.length,2);assert.equal(facts[0].instruction,alert.instruction);assert.equal(facts[1].kind,'discussion');assert.match(facts[1].area,/Regional/);
 });
-test('stale regional discussion is not represented as current',()=>{const f=source();f.discussion.issuanceTime='2026-09-04T12:00:00Z';assert.equal(bulletinFacts(f,now).length,1);});
+test('expired special discussion is removed and routine AFD never listed',()=>{const f=source();f.specialDiscussions[0].expires='2026-09-06T12:00:00Z';assert.equal(bulletinFacts(f,now).length,1);assert.ok(bulletinFacts(f,now).every(i=>!i.title.includes('forecast discussion')));});
 test('official links reject lookalike hosts, credentials and javascript',()=>{
  for(const url of ['javascript:alert(1)','https://api.weather.gov.evil.invalid/alerts/test','https://user:pass@api.weather.gov/alerts/test'])assert.equal(officialBulletinUrl(url),'https://www.weather.gov/');
  assert.equal(officialBulletinUrl(alert.id),alert.id);

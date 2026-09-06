@@ -1,4 +1,5 @@
-import {dewpointGrossLevel} from './dewpoint-meter.js';
+import {forecastGrossLevel} from './dewpoint-meter.js?v=6-future';
+import {exposureScene} from './exposure-scene.js?v=2-wave';
 import {solarElevation} from './weather-math.js';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -32,7 +33,7 @@ export function dailyGrossSummary(forecast,index,tonight=false,now=Date.now()){
  const pts=[...unique.values()].sort((a,b)=>a.epoch-b.epoch);if(!pts.length)return null;
  const peak=pts.reduce((a,b)=>a.value>=b.value?a:b),low=Math.min(...pts.map(p=>p.value));
  const wind=forecast.metricForecasts?.series?.wind?.find(p=>Date.parse(p.time)===peak.epoch)?.value;
- return {peak:peak.value,low,time:peak.time,level:dewpointGrossLevel(peak.value,wind),available:pts.length,expected,partial:pts.length<expected,zone,tonight};
+ return {peak:peak.value,low,time:peak.time,level:forecastGrossLevel(peak.value,wind),available:pts.length,expected,partial:pts.length<expected,zone,tonight};
 }
 export function dailyGrossHTML(forecast,index,tonight=false,now=Date.now()){
  const s=dailyGrossSummary(forecast,index,tonight,now);
@@ -40,16 +41,11 @@ export function dailyGrossHTML(forecast,index,tonight=false,now=Date.now()){
  const when=new Intl.DateTimeFormat('en-US',{timeZone:s.zone,weekday:'short',hour:'numeric',minute:'2-digit'}).format(new Date(s.time));
  return `<section class="day-gross" data-gross-level="${esc(s.level.key)}"><h3>Gross Meter · dew point</h3><div class="day-gross-reading"><strong>${Math.round(s.peak)}°</strong><span>Muggiest forecast${tonight?' tonight':''}<small>${esc(when)}</small></span></div><p class="day-gross-verdict">${esc(s.level.label)}</p><p>Forecast range: ${Math.round(s.low)}–${Math.round(s.peak)}°F dew point.</p><small>${s.partial?'Partial coverage · ':''}${s.available} of ${s.expected} forecast hours available · ${tonight?'Tonight through 7 AM':'7 AM through 7 AM the next day; past hours excluded'}.</small></section>`;
 }
-function person(){return '<ellipse cx="109" cy="133" rx="31" ry="5" fill="#10293c" opacity=".28"/><circle cx="110" cy="68" r="10" fill="#f3cfaf"/><path d="M100 78Q110 74 120 78L124 104H96Z" fill="#c8e7f4"/><path d="M100 103L98 128M118 103L121 128" stroke="#deeff9" stroke-width="8" stroke-linecap="round"/><path d="M100 82L89 102M120 82L130 101" stroke="#f3cfaf" stroke-width="6" stroke-linecap="round"/>';}
-function scene(sun,daylight){
- const sky=sun?'<circle cx="47" cy="37" r="16" fill="#ffdc83"/><g stroke="#ffdc83" stroke-width="3" stroke-linecap="round"><path d="M47 10v-5M47 64v5M20 37h-5M74 37h5M27 17l-4-4M67 57l4 4M27 57l-4 4M67 17l4-4"/></g>':'<path d="M46 53L47 131" stroke="#a1b9bc" stroke-width="9" stroke-linecap="round"/><path d="M48 86L80 55" stroke="#a1b9bc" stroke-width="6"/><path d="M40 68C-4 66 2 26 34 25C34-1 80 0 89 22C125 11 144 55 117 68Z" fill="#78b4ac"/><path d="M55 75L145 130H60Z" fill="#122d47" opacity=".24"/>';
- return `<svg viewBox="0 0 170 146" role="img" aria-label="${sun?'A person in direct sunlight':'A person standing in the shade of a tree'}"${sun&&!daylight?' class="sun-unavailable"':''}>${sky}<path d="M14 134H157" stroke="#b5d5d9" stroke-opacity=".35" stroke-width="2"/>${person()}</svg>`;
-}
 export function sunShadeHTML(comfort,location,now=Date.now()){
  const elevation=solarElevation(now,location?.latitude,location?.longitude),daylight=finite(elevation)&&elevation>0;
  const shade=finite(comfort?.shade)?`${Math.round(comfort.shade)}°`:'—';
  const sun=daylight&&finite(comfort?.sun)?`${Math.round(comfort.sun)}°`:'—';
- return `<div class="sun-shade-comparison"><figure class="exposure-person shade-person">${scene(false,daylight)}<figcaption><strong>${shade}</strong><span>In the shade · right now</span></figcaption></figure><figure class="exposure-person sun-person">${scene(true,daylight)}<figcaption><strong>${sun}</strong><span>${daylight?'In direct sun · right now':'No direct sun at night'}</span></figcaption></figure></div><small class="exposure-estimate">Estimated feels-like temperatures · °F${daylight&&!finite(comfort?.sun)?' · Sun estimate unavailable':''}</small>`;
+ return `<div class="sun-shade-comparison"><figure class="exposure-person shade-person">${exposureScene(false,daylight)}<figcaption><strong>${shade}</strong><span>In the shade · right now</span></figcaption></figure><figure class="exposure-person sun-person">${exposureScene(true,daylight)}<figcaption><strong>${sun}</strong><span>${daylight?'In direct sun · right now':'No direct sun at night'}</span></figcaption></figure></div><small class="exposure-estimate">Estimated feels-like temperatures · °F${daylight&&!finite(comfort?.sun)?' · Sun estimate unavailable':''}</small>`;
 }
 export function modelFreshnessText(layer,checkedAt,zone='America/New_York',now=Date.now()){
  if(!layer)return '';

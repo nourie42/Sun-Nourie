@@ -1,7 +1,8 @@
-import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=1-personal';
-import {comfortMode,comfortWindow,comfortNarrative} from './comfort-outlook.js';
+import {degrees,feelsAt,dailyFeels,forecastValue,peakFeelsHTML} from './hourly-feels.js?v=2-hourly';
+import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=2-hourly';
+import {comfortMode,comfortWindow,comfortNarrative} from './comfort-outlook.js?v=2-hourly';
 import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js';
-import {resetDewpointMeter} from './dewpoint-meter.js';
+import {resetDewpointMeter} from './dewpoint-meter.js?v=6-future';
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const number=(n,d=0)=>finite(n)?n.toFixed(d):'—';
@@ -86,7 +87,7 @@ function sparkline(points) {
 export function renderComfort(forecast) {
  data=forecast;ensureComfortStyles();
  const now=Date.now(),c=forecast.comfort||thermalComfort(forecast.current,forecast.location,now),summary=comfortWindow(forecast,now);
- $('skin-values').innerHTML=`${sunShadeHTML(c,forecast.location,now)}${summary?`<p class="comfort-later"><strong>${temp(summary.chosen.value)}</strong> ${summary.label}</p>`:''}`;
+ $('skin-values').innerHTML=`${sunShadeHTML(c,forecast.location,now)}${peakFeelsHTML(summary,forecast.location.timeZone)}`;
  $('skin-explanation').textContent=comfortNarrative(forecast.current,c,summary,forecast.location.timeZone);
  renderComfortArt(forecast,now);
  const alignment=forecast.metricForecasts?.comfortAlignment;
@@ -95,8 +96,8 @@ export function renderComfort(forecast) {
 export function renderDailyRows(forecast,icon) {
  const values=forecast.days.flatMap(d=>[d.high,d.low]).filter(finite),lo=values.length?Math.min(...values)-3:0,hi=values.length?Math.max(...values)+3:1;
  const rows=forecast.days.map((d,i)=>{
-  const p=dailyDisplay(d,i,Date.now(),forecast.location.timeZone),bar=temperatureBar(p.primary,lo,hi);
-  return `<button class="day-row ${p.tonight?'tonight-row':''}" data-day="${i}" aria-label="${esc(p.label)}, ${p.primaryLabel} ${number(p.primary)} degrees${finite(p.secondary)?`, low ${number(p.secondary)} degrees`:''}. Open details."><span class="day-name">${esc(p.label)}</span><span class="day-icon">${icon(p.condition,!p.tonight)}<small>${finite(p.pop)?`${number(p.pop)}%`:''}</small></span><span class="day-high"><strong>${temp(p.primary)}</strong><small>${p.primaryLabel}</small></span><span class="temp-track" aria-hidden="true">${bar===null?'':`<span class="temp-fill" style="left:0;width:${bar}%"></span><i class="high-marker" style="left:clamp(4px,${bar}%,calc(100% - 4px))"></i>`}</span>${p.tonight?'<span class="night-label">☾<small>Overnight</small></span>':`<span class="day-low">${temp(p.secondary)}<small>Low</small></span>`}</button>`;
+  const p=dailyDisplay(d,i,Date.now(),forecast.location.timeZone),bar=temperatureBar(p.primary,lo,hi),feel=dailyFeels(forecast,i,Date.now());
+  return `<button class="day-row ${p.tonight?'tonight-row':''}" data-day="${i}" aria-label="${esc(p.label)}, ${p.primaryLabel} ${number(p.primary)} degrees${finite(p.secondary)?`, low ${number(p.secondary)} degrees`:''}. Open details."><span class="day-name">${esc(p.label)}</span><span class="day-icon">${icon(p.condition,!p.tonight)}<small>${finite(p.pop)?`${number(p.pop)}%`:''}</small></span><span class="day-high"><strong>${temp(p.primary)}</strong><small>${p.primaryLabel}</small><span class="daily-feels">Feels ${degrees(p.tonight?feel.low?.low?.value:feel.high?.high?.value)}${(p.tonight?feel.low:feel.high)?.partial?' · partial':''}</span></span><span class="temp-track" aria-hidden="true">${bar===null?'':`<span class="temp-fill" style="left:0;width:${bar}%"></span><i class="high-marker" style="left:clamp(4px,${bar}%,calc(100% - 4px))"></i>`}</span>${p.tonight?'<span class="night-label">☾<small>Overnight</small></span>':`<span class="day-low">${temp(p.secondary)}<small>Low</small><span class="daily-feels">Feels ${degrees(feel.low?.low?.value)}${feel.low?.partial?' · partial':''}</span></span>`}</button>`;
  });
  $('daily').innerHTML=rows.join('');
  // Reuse the exact first daily row, including its Today/Tonight policy and bar.
@@ -157,6 +158,8 @@ function selectPoint(i) {
  const p=graphPoints[selected];if(!p)return;
  $('chart-value').textContent=displayValue(p.value,def);
  $('chart-time').textContent=formatTime(p.time,{weekday:'short',month:'short',day:'numeric'});
+ const companion=$('chart-companion');
+ if(companion){companion.hidden=!['temperature','feels'].includes(active);companion.textContent=active==='temperature'?`Feels like ${degrees(feelsAt(data,p.time))} in the shade at this hour`:active==='feels'?`Air temperature ${degrees(forecastValue(data,'temperature',p.time))} at this hour`:'';}
  if(def.solar&&p.sunrise)$('chart-note').textContent=`Sunrise ${formatTime(p.sunrise)} · sunset ${formatTime(p.time)}.`;
  else if(active==='pressure')$('chart-note').textContent='Sea-level forecast in mb · separate from the station reading and its observed trend.';
  else $('chart-note').textContent=!finite(p.value)?'The forecast source has a gap at this time.':def.note;
@@ -182,7 +185,7 @@ function drawChart() {
  $('chart-low').textContent=displayValue(minimum,def);$('chart-high').textContent=displayValue(maximum,def);
  $('chart-coverage').textContent=`${valid.length} of ${graphPoints.length} ${def.solar?'days':'hours'} available`;
  if(graphPoints.length)selectPoint(Math.min(selected,graphPoints.length-1));
- else {$('chart-value').textContent='Not available';$('chart-time').textContent='No forecast data';$('chart-note').textContent=def.note;}
+ else {if($('chart-companion')){$('chart-companion').hidden=true;$('chart-companion').textContent='';}$('chart-value').textContent='Not available';$('chart-time').textContent='No forecast data';$('chart-note').textContent=def.note;}
  $('forecast-graph').addEventListener('pointermove',event=>{
   if(event.pointerType==='touch'&&event.buttons===0)return;
   const rect=event.currentTarget.getBoundingClientRect(),x=(event.clientX-rect.left)/rect.width*graphGeometry.W;
