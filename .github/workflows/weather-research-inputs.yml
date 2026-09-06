@@ -12,8 +12,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
-      - run: pip install pythermalcomfort sympy
-      - name: Export coefficients, numeric reference cases and source licence without production changes
+      - run: pip install pythermalcomfort==4.4.2 sympy==1.14.0
+      - name: Export coefficients and independently calculated reference cases
         run: |
           python - <<'PY'
           import importlib,importlib.metadata,inspect,ast,json,random,pathlib,shutil,base64,gzip
@@ -23,9 +23,11 @@ jobs:
           root=pathlib.Path('/tmp/research-inputs');root.mkdir()
           shutil.copytree('.weather-repair',root/'staged')
           for p in (root/'staged').glob('*.b64'):
-              decoded=gzip.decompress(base64.b64decode(p.read_text()))
-              (root/(p.stem+'.json')).write_bytes(decoded)
-              data=json.loads(decoded);print(p.name,'FORMAT',type(data).__name__,list(data)[:6])
+              try:
+                  decoded=gzip.decompress(base64.b64decode(p.read_text(),validate=True))
+                  (root/(p.stem+'.json')).write_bytes(decoded)
+                  data=json.loads(decoded);print(p.name,'FORMAT',type(data).__name__,list(data)[:6])
+              except Exception as error: print('INVALID STAGED INPUT; NOT APPLIED',p.name,str(error))
           source=inspect.getsource(mod)
           (root/'utci-source.py').write_text(source)
           dist=importlib.metadata.distribution('pythermalcomfort')
@@ -41,9 +43,7 @@ jobs:
           random.seed(9062026);cases=[]
           for i in range(240):
               ta=random.uniform(-35,45);tr=ta+random.uniform(-20,60);v=random.uniform(.5,16);rh=random.uniform(5,95)
-              # UTCI polynomial is not validated above 5 kPa vapour pressure.
-              r=utci(tdb=ta,tr=tr,v=v,rh=rh,round_output=False,limit_inputs=True)
-              value=float(r.utci)
+              value=float(utci(tdb=ta,tr=tr,v=v,rh=rh,round_output=False,limit_inputs=True).utci)
               if value==value:cases.append({'ta':ta,'tr':tr,'v':v,'rh':rh,'utci':value})
           for ta,tr,v,rh in [(25,25,1,50),(30,30,.5,50),(0,0,5,50),(35,55,2,65),(26,35,3,80)]:
               cases.append({'ta':ta,'tr':tr,'v':v,'rh':rh,'utci':float(utci(tdb=ta,tr=tr,v=v,rh=rh,round_output=False).utci)})
@@ -51,6 +51,7 @@ jobs:
           print('REFERENCE',dist.version,'terms',len(coefficients),'cases',len(cases))
           PY
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: weather-research-inputs
           path: /tmp/research-inputs
