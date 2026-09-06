@@ -48,11 +48,9 @@ jobs:
           PY
       - run: npm install --no-save --package-lock=false playwright@1.55.0
       - run: npx playwright install --with-deps chromium
-      - name: Browser stress test (diagnostic; production verification follows main deploy)
-        id: browser
-        continue-on-error: true
+      - name: Browser stress test
         run: node scripts/weatherNourieRepairSmoke.js
-      - name: Publish unit-verified weather-only tree on staging branch
+      - name: Publish verified weather-only tree on staging branch
         run: |
           git fetch --depth=1 origin main
           test "$(git rev-parse FETCH_HEAD)" = c06a8a35a3078986a7cd5bbf3705c73c0e4a4744
@@ -71,7 +69,7 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git diff --cached --stat
           git commit -m 'Fix Weather Nourie same-day weights, morning comfort, dewpoint chart and orphaned map frames'
-          git push origin HEAD:weather-nourie-repair-verified --force
+          git push origin HEAD:refs/heads/weather-nourie-repair-verified --force
           git rev-parse HEAD >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         if: always()
