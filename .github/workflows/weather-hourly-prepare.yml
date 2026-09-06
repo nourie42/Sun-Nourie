@@ -1,0 +1,66 @@
+name: Verify hour-matched feels-like and special bulletins before release
+on:
+  push:
+    branches: [fix/hour-matched-feels-and-special-notices]
+    paths: ['scripts/apply_weather_hourly.py', '.github/workflows/weather-hourly-prepare.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply reviewed exact-match edits only on the feature branch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/apply_weather_hourly.py')
+          text=p.read_text()
+          line="replace(bulletins,'NWS regional discussion','NWS special discussion')\n"
+          assert text.count(line)==1
+          p.write_text(text.replace(line,''))
+          PY
+          python scripts/apply_weather_hourly.py
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('test/weatherFusionForecastDetails.test.js')
+          text=p.read_text()
+          old=r'app\.js\?v=7-forecast-details'
+          # Earlier releases used v7 or v8. Require exactly one expected asset assertion.
+          matches=[x for x in [old,r'app\.js\?v=8-personal'] if x in text]
+          assert len(matches)==1,matches
+          p.write_text(text.replace(matches[0],r'app\.js\?v=9-hourly'))
+          PY
+          rm scripts/apply_weather_hourly.py .github/workflows/weather-hourly-prepare.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add --all
+          git commit -m "Use one timestamp-matched feels-like forecast everywhere; show only special bulletins and improve figures"
+          echo "Reviewed source commit: $(git rev-parse HEAD)" | tee -a "$GITHUB_STEP_SUMMARY"
+      - run: npm ci
+      - name: Check code and run all weather regressions
+        run: |
+          find public/weather-fusion -name '*.js' -print0 | xargs -0 -n1 node --check
+          find src -name 'weatherFusion*.js' -print0 | xargs -0 -n1 node --check
+          node --test test/weatherFusion*.test.js
+      - name: Existing website regression checks
+        run: npm run check
+      - run: npm install --no-save --package-lock=false playwright@1.55.0
+      - run: npx playwright install --with-deps chromium
+      - name: Actual UI at six widths, hourly pairing, special bulletins, faces and nighttime
+        run: node scripts/weatherFusionPersonalBrowser.js
+      - name: Publish only the tested feature-branch commit
+        run: |
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+          echo "Tested and published feature commit: $(git rev-parse HEAD)" | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: weather-hourly-verification
+          path: /tmp/weather-personal-results
+          retention-days: 7
