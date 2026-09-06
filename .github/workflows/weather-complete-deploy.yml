@@ -79,6 +79,7 @@ jobs:
           set -euo pipefail
           rm -f .weather-release/repair.patch.xz .weather-release/chunk{00..09} .weather-release/chunk05a .weather-release/chunk05b .github/workflows/weather-complete-deploy.yml
           rmdir .weather-release 2>/dev/null || true
+          git add -A
           python - <<'PY'
           import subprocess
           expected=set('''
@@ -108,7 +109,7 @@ jobs:
           public/weather-fusion/weather-repair.css
           scripts/weatherFusionPersonalBrowser.js
           '''.split())
-          actual=set(subprocess.check_output(['git','diff','--name-only','493782fc3e173d74f47aefdb9f9de95645aaa443'],text=True).split())
+          actual=set(subprocess.check_output(['git','diff','--cached','--name-only','493782fc3e173d74f47aefdb9f9de95645aaa443'],text=True).split())
           if actual != expected:
               print('Unexpected release diff. Missing:',sorted(expected-actual),'Extra:',sorted(actual-expected))
               raise SystemExit(1)
@@ -120,7 +121,6 @@ jobs:
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
           git commit -m 'Fix Weather Nourie feels-like consistency, weather exposure, radar and HRRR maps'
           git push origin HEAD:fix/weather-complete-deploy
           echo "Tested commit: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
