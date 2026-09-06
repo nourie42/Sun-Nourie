@@ -7,7 +7,7 @@ on:
       - 'scripts/weather_fusion_refresh.py'
       - '.github/workflows/weather-fusion-data.yml'
   schedule:
-    - cron: '12,42 * * * *'
+    - cron: '7,22,37,52 * * * *'
   workflow_dispatch:
 permissions:
   contents: write
@@ -39,25 +39,37 @@ jobs:
             git worktree add --detach "$DATA" HEAD
             git -C "$DATA" switch --orphan weather-fusion-publish
           fi
+          git -C "$DATA" config user.name 'github-actions[bot]'
+          git -C "$DATA" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           echo "WEATHER_DATA_DIR=$DATA" >> "$GITHUB_ENV"
-      - name: Decode current NOAA HRRR, NOAA NBM and ECMWF IFS
-        id: collect
+      - name: Collect the latest completed hourly HRRR run first
+        id: hrrr
         continue-on-error: true
-        run: python -u scripts/weather_fusion_refresh.py --output "$WEATHER_DATA_DIR"
-      - name: Publish verified model snapshots without redeploying the main website
+        run: python -u scripts/weather_fusion_refresh.py --output "$WEATHER_DATA_DIR" --models hrrr
+      - name: Publish HRRR immediately, without waiting for the other models
         shell: bash
         run: |
           cd "$WEATHER_DATA_DIR"
           test -f manifest.json
-          if ! find models -name '*.json' -print -quit | grep -q .; then
-            echo 'No numerical model snapshots were produced.'
-            exit 1
-          fi
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          test -f models/hrrr.json
           git add -- models maps manifest.json collection-status.json
           if ! git diff --cached --quiet; then
-            git commit -m 'Refresh verified NOAA and ECMWF weather model data'
+            git commit -m 'Publish the latest verified hourly HRRR run'
+            git push origin HEAD:weather-fusion-data
+          fi
+          cat collection-status.json >> "$GITHUB_STEP_SUMMARY"
+      - name: Refresh NOAA NBM and ECMWF IFS independently of HRRR publication
+        id: others
+        continue-on-error: true
+        run: python -u scripts/weather_fusion_refresh.py --output "$WEATHER_DATA_DIR" --models nbm ecmwf
+      - name: Publish verified remaining models without redeploying the website
+        shell: bash
+        run: |
+          cd "$WEATHER_DATA_DIR"
+          test -f manifest.json
+          git add -- models maps manifest.json collection-status.json
+          if ! git diff --cached --quiet; then
+            git commit -m 'Refresh verified NBM and ECMWF weather model data'
             git push origin HEAD:weather-fusion-data
           fi
       - name: Record actual collection status
@@ -67,7 +79,7 @@ jobs:
             cat "$WEATHER_DATA_DIR/collection-status.json"
             cat "$WEATHER_DATA_DIR/collection-status.json" >> "$GITHUB_STEP_SUMMARY"
           fi
-          if [ '${{ steps.collect.outcome }}' != 'success' ]; then
-            echo 'At least one source failed. Last good snapshots retain original run timestamps; website freshness checks apply.'
+          if [ '${{ steps.hrrr.outcome }}' != 'success' ] || [ '${{ steps.others.outcome }}' != 'success' ]; then
+            echo 'A source failed. Last good snapshots keep their actual initialization times. No newer run is invented.'
             exit 1
           fi

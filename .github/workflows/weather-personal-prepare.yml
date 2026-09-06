@@ -1,0 +1,48 @@
+name: Prepare and verify requested Weather Nourie refinements
+on:
+  push:
+    branches: [fix/weather-nourie-personal-details]
+    paths: ['scripts/apply_weather_personal.py']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply reviewed, exact-match edits on the isolated feature branch
+        run: |
+          python scripts/apply_weather_personal.py
+          rm scripts/apply_weather_personal.py
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- public/weather-fusion src/weatherFusion.js src/weatherFusionDirect.js scripts/weather_fusion_collect.py scripts/weatherFusionBrowserSmoke.js test/weatherFusionForecastDetails.test.js scripts/apply_weather_personal.py
+          git commit -m "Apply requested Weather Nourie layout, bulletins, pressure and HRRR refinements"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+          echo "Tested source commit: $(git rev-parse HEAD)" | tee -a "$GITHUB_STEP_SUMMARY"
+      - run: npm ci
+      - name: Syntax and all weather regression tests
+        run: |
+          find public/weather-fusion -name '*.js' -print0 | xargs -0 -n1 node --check
+          node --check src/weatherFusion.js
+          node --check src/weatherFusionBulletins.js
+          node --check src/weatherFusionPressure.js
+          python -m py_compile scripts/weather_fusion_collect.py scripts/weather_fusion_refresh.py
+          node --test test/weatherFusion*.test.js
+      - name: Existing website regression checks
+        run: npm run check
+      - run: npm install --no-save --package-lock=false playwright@1.55.0
+      - run: npx playwright install --with-deps chromium
+      - name: Six responsive widths, bulletin safety, units, charts, location changes and nighttime
+        run: node scripts/weatherFusionPersonalBrowser.js
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: weather-personal-layout-results
+          path: /tmp/weather-personal-results
+          retention-days: 7
