@@ -2,7 +2,7 @@ name: Weather Nourie repair review
 on:
   push:
     branches: [weather-nourie-morning-map-fix]
-    paths: ['scripts/weatherNourieRepair.b64', '.github/workflows/weather-nourie-repair-review.yml']
+    paths: ['scripts/weatherNourieRepair*', '.github/workflows/weather-nourie-repair-review.yml']
 permissions:
   contents: write
 jobs:
