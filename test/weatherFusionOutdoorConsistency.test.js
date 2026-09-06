@@ -28,7 +28,7 @@ test('86 shade versus 94 sunlight: every main current display selects 94, not 86
  try{renderHourlyWeather(f,now);assert.match(root.innerHTML,/<span>Now<\/span>.*?Feels like<b>94°<\/b>/);assert.equal(root.scrollLeft,35);}
  finally{delete globalThis.document;}
  const figures=sunShadeHTML(f.comfort,f.location,now);
- assert.match(figures,/shade-person.*?<strong>86°<\/strong>/);assert.match(figures,/sun-person.*?<strong>94°<\/strong>/);
+ assert.match(figures,/shade-person.*?<strong>86°<\/strong>/s);assert.match(figures,/sun-person.*?<strong>94°<\/strong>/s);
 });
 for(const [condition,time] of [['Sunny',now],['Partly Cloudy',now],['Overcast',now],['Rain',now],['Thunderstorms',now],['Snow',now],['Fog',now],['',now],['Clear',Date.parse('2026-09-07T03:00:00Z')]]){
  test(`same sky/exposure across API, Now and future preview: ${condition||'unknown'} ${time}`,()=>{
