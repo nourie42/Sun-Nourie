@@ -1,0 +1,103 @@
+name: Verify complete Weather Nourie repair
+on:
+  push:
+    branches: [fix/weather-complete-deploy]
+    paths:
+      - '.github/workflows/weather-complete-deploy.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: weather-complete-deploy
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify and apply the reviewed repair bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'af107ad35ab607663ca9b528d6a82040640b39fe71419ec841bd1b76c1b1cee4  .weather-release/repair.patch.xz' | sha256sum -c -
+          xz -dc .weather-release/repair.patch.xz > /tmp/weather-repair.patch
+          echo 'cf555137bcbcc90d8fb746efef75b474a52d64a0f94e3eaa66f373917040bda2  /tmp/weather-repair.patch' | sha256sum -c -
+          patch -p1 --batch --forward --dry-run < /tmp/weather-repair.patch
+          patch -p1 --batch --forward < /tmp/weather-repair.patch
+      - run: npm ci
+      - name: JavaScript syntax checks
+        run: |
+          find public/weather-fusion -name '*.js' -print0 | xargs -0 -n1 node --check
+          find src -name 'weatherFusion*.js' -print0 | xargs -0 -n1 node --check
+      - name: All Weather Nourie regression tests
+        run: node --test test/weatherFusion*.test.js
+      - name: Existing website regression checks
+        run: npm run check
+      - run: npm install --no-save --package-lock=false playwright@1.55.0
+      - run: npx playwright install --with-deps chromium
+      - name: Responsive browser integration checks
+        env:
+          WEATHER_REPORT_DIR: /tmp/weather-complete-browser
+        run: node scripts/weatherFusionPersonalBrowser.js
+      - name: Ensure the release contains only the reviewed production and regression files
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .weather-release/repair.patch.xz .github/workflows/weather-complete-deploy.yml
+          python - <<'PY'
+          import subprocess
+          expected=set('''
+          test/weatherFusionEvening.test.js
+          test/weatherFusionDirect.test.js
+          test/weatherFusionSkyConsistency.test.js
+          test/weatherFusionExperience.test.js
+          test/weatherFusionForecastDetails.test.js
+          test/weatherFusionPersonalDetails.test.js
+          test/weatherFusionHourlyConsistency.test.js
+          src/weatherFusionHrrrMap.js
+          src/weatherFusionHourlyFeels.js
+          src/weatherFusionDirect.js
+          src/weatherFusion.js
+          public/weather-fusion/comfort-outlook.js
+          public/weather-fusion/exposure-scene.js
+          public/weather-fusion/weather-display.js
+          public/weather-fusion/weather-state.js
+          public/weather-fusion/utci.js
+          public/weather-fusion/index.html
+          public/weather-fusion/app.js
+          public/weather-fusion/hourly-feels.css
+          public/weather-fusion/frame-player.js
+          public/weather-fusion/experience.js
+          public/weather-fusion/personal-details.js
+          public/weather-fusion/weather-math.js
+          public/weather-fusion/weather-repair.css
+          '''.split())
+          actual=set(subprocess.check_output(['git','diff','--name-only','493782fc3e173d74f47aefdb9f9de95645aaa443'],text=True).split())
+          if actual != expected:
+              print('Unexpected release diff. Missing:',sorted(expected-actual),'Extra:',sorted(actual-expected))
+              raise SystemExit(1)
+          print('Reviewed release file set verified:',len(actual),'files')
+          PY
+      - name: Commit exactly the tested repair to the feature branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Fix Weather Nourie feels-like consistency, weather exposure, radar and HRRR maps'
+          git push origin HEAD:fix/weather-complete-deploy
+          echo "TESTED_COMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+          echo "Tested commit: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: weather-complete-browser-results
+          path: /tmp/weather-complete-browser
+          retention-days: 7
