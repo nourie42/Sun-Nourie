@@ -1,5 +1,5 @@
 name: Verify complete Weather Nourie repair
-# all ten reviewed repair chunks are present
+# all reviewed repair chunks are present
 on:
   push:
     branches: [fix/weather-complete-deploy]
@@ -31,12 +31,13 @@ jobs:
           echo 'ab93250a033cd48d3a56740a9f1a5d5e4f66934a10c1286b50da238bf6231900  .weather-release/chunk02' | sha256sum -c -
           echo '87a7541cbeef3588d2540c79bb198abbaa265b552c72f7b81937b96edbabbd60  .weather-release/chunk03' | sha256sum -c -
           echo 'beccf57c83cd0520cfb845d33e6372a5e7ced4f1f369d2ffec797a19bdecc1e5  .weather-release/chunk04' | sha256sum -c -
-          echo 'ce59c2fd1d6aa239cc73dfca5eb9da62b509a5e0218be0e50089c8b1eb1cd1c0  .weather-release/chunk05' | sha256sum -c -
+          echo '81d2def4d4d35730818ba13b7c7be128c27661f26cdfb9caab97646223fc9a82  .weather-release/chunk05a' | sha256sum -c -
+          echo '90d94d1773d134b9128ebd4f7a6e8433ef8352b1b74df741bcb3365b12a5f41e  .weather-release/chunk05b' | sha256sum -c -
           echo '488adfbdcf378ca9da76fa3f171378bbc14ecc30b4250b6f6f84ce080cd5f1f6  .weather-release/chunk06' | sha256sum -c -
           echo 'a8c1d49e4e8eb67a04c4255960aa532146f80d6cc61c5f0796b952a575729a86  .weather-release/chunk07' | sha256sum -c -
           echo 'a4999d7c95fdaef6b3181b13dfd18c7448cc3ee98d2e2cdd9d9805fca16ebdaa  .weather-release/chunk08' | sha256sum -c -
           echo '8e9214269690f0251497f9a946aeffe721be711c5ac90fa809563ec534b35382  .weather-release/chunk09' | sha256sum -c -
-          cat .weather-release/chunk{00..09} > /tmp/weather-repair.b64
+          cat .weather-release/chunk00 .weather-release/chunk01 .weather-release/chunk02 .weather-release/chunk03 .weather-release/chunk04 .weather-release/chunk05a .weather-release/chunk05b .weather-release/chunk06 .weather-release/chunk07 .weather-release/chunk08 .weather-release/chunk09 > /tmp/weather-repair.b64
           base64 -d /tmp/weather-repair.b64 > /tmp/weather-repair.patch.xz
           echo 'af107ad35ab607663ca9b528d6a82040640b39fe71419ec841bd1b76c1b1cee4  /tmp/weather-repair.patch.xz' | sha256sum -c -
           xz -dc /tmp/weather-repair.patch.xz > /tmp/weather-repair.patch
@@ -62,7 +63,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rm -f .weather-release/repair.patch.xz .weather-release/chunk{00..09} .github/workflows/weather-complete-deploy.yml
+          rm -f .weather-release/repair.patch.xz .weather-release/chunk{00..09} .weather-release/chunk05a .weather-release/chunk05b .github/workflows/weather-complete-deploy.yml
           rmdir .weather-release 2>/dev/null || true
           python - <<'PY'
           import subprocess
