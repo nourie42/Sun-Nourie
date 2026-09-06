@@ -1,0 +1,38 @@
+name: Check hourly HRRR map provider
+on:
+  push:
+    branches: [fix/weather-radar-geolocation-nowcast]
+    paths: ['.github/workflows/weather-hrrr-source-check.yml']
+permissions: {contents: read}
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Query documented metadata and verify pinned map images
+        run: |
+          python - <<'PY'
+          import urllib.request,json,datetime,pathlib
+          root='https://mesonet.agron.iastate.edu'
+          for resource in ['/data/gis/images/4326/hrrr/refd_1080.json','/ogc/google_example.phtml']:
+            try:
+              with urllib.request.urlopen(root+resource,timeout=20) as r:
+                text=r.read().decode();print(resource,text[:9000])
+                if resource.endswith('.json'):meta=json.loads(text)
+            except Exception as e:print(e)
+          init=meta['model_init_utc'];print('INITIALIZATION',repr(init))
+          stamp=init.replace('-','').replace(':','').replace('T','').replace(' ','').replace('Z','')[:12]
+          for y in [24,39]:
+            url=f'{root}/cache/tile.py/1.0.0/hrrr::REFD-F0180-{stamp}/6/18/{y}.png'
+            try:
+              with urllib.request.urlopen(url,timeout=20) as r:
+                content=r.read();print('TILE',url,r.status,r.headers.get('Content-Type'),len(content));pathlib.Path(f'/tmp/hrrr-tile-{y}.png').write_bytes(content)
+            except Exception as e:print('TILE ERROR',url,e)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pinned-hrrr-source-images
+          path: /tmp/hrrr-tile-*.png
+          retention-days: 1
