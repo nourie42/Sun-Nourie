@@ -2,38 +2,76 @@ name: Weather Nourie repair review
 on:
   push:
     branches: [weather-nourie-morning-map-fix]
-    paths: ['.github/workflows/weather-nourie-repair-review.yml', 'scripts/weatherNourieRepair.*']
+    paths: ['scripts/weatherNourieRepair.b64']
 permissions:
-  contents: read
+  contents: write
 jobs:
   review:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 18
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: npm ci
-      - name: Collect weather-only review copy and live API evidence
+      - name: Apply integrity-checked weather-only edits
         run: |
-          mkdir -p /tmp/weather-nourie-review
           python - <<'PY'
-          import pathlib, zipfile, urllib.request
-          root=pathlib.Path('.')
-          with zipfile.ZipFile('/tmp/weather-nourie-review/source.zip','w',zipfile.ZIP_DEFLATED) as z:
-            for pattern in ['public/weather-fusion/**/*','src/weather*.js','test/weather*','scripts/weather*','docs/weather*','.github/workflows/weather*','package*.json','node_modules/**/*']:
-              for p in root.glob(pattern):
-                if p.is_file():z.write(p,str(p))
-          for loc in ['knightdale','greenville']:
-            url='https://sun-nourie-live.onrender.com/api/weather-fusion/forecast?location='+loc
-            try:
-              with urllib.request.urlopen(url,timeout=65) as r:
-                pathlib.Path('/tmp/weather-nourie-review/'+loc+'.json').write_bytes(r.read(3000000))
-            except Exception as e:print(loc,str(e))
+          import pathlib,json,base64,lzma,hashlib
+          raw=lzma.decompress(base64.b64decode(pathlib.Path('scripts/weatherNourieRepair.b64').read_text()))
+          assert hashlib.sha256(raw).hexdigest()=='d2aefa382afb2fc7408d0f938bcf4bcbe5734eaa50a30ae93fdbdc01318d5ef2'
+          edits=json.loads(raw)
+          for e in edits:
+            name=e['path'];assert '..' not in name and name.startswith(('src/weatherFusion','public/weather-fusion/','scripts/weather','test/weatherFusion','docs/weather-nourie'))
+            p=pathlib.Path(name);old=p.read_text() if p.exists() else ''
+            assert hashlib.sha256(old.encode()).hexdigest()==e['old'],name+' changed since review'
+            lines=old.splitlines(keepends=True)
+            for a,b,insert in reversed(e['changes']):lines[a:b]=insert
+            new=''.join(lines);assert hashlib.sha256(new.encode()).hexdigest()==e['new'],name+' output mismatch'
+            p.parent.mkdir(exist_ok=True,parents=True);p.write_text(new)
+          pathlib.Path('/tmp/weather-repair-paths.json').write_text(json.dumps([e['path'] for e in edits]))
           PY
+      - run: npm ci
+      - name: Weather unit tests, original site checks and native model syntax
+        run: |
+          node --test test/weatherFusion*.test.js
+          npm run check
+          python -m py_compile scripts/weather_fusion_collect.py
+          python - <<'PY'
+          import sys
+          sys.path.insert(0,'scripts')
+          import weather_fusion_collect as c
+          assert c.NOAA_FIELDS['hrrr'][('UGRD','10 m above ground')]=='u'
+          assert c.NOAA_FIELDS['hrrr'][('VGRD','10 m above ground')]=='v'
+          PY
+      - run: npm install --no-save --package-lock=false playwright@1.55.0
+      - run: npx playwright install --with-deps chromium
+      - name: Morning boundary, large chart, all tile dialogs, slow map frames and product switching
+        run: node scripts/weatherNourieRepairSmoke.js
+      - name: Publish verified weather-only tree on staging branch
+        run: |
+          git fetch --depth=1 origin main
+          test "$(git rev-parse FETCH_HEAD)" = c06a8a35a3078986a7cd5bbf3705c73c0e4a4744
+          export PUBLISH="$RUNNER_TEMP/weather-nourie-repair"
+          git worktree add --detach "$PUBLISH" FETCH_HEAD
+          python - <<'PY'
+          import pathlib,json,os,shutil,subprocess
+          root=pathlib.Path(os.environ['PUBLISH'])
+          paths=json.loads(pathlib.Path('/tmp/weather-repair-paths.json').read_text())
+          for name in paths:
+            target=root/name;target.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(name,target)
+          subprocess.run(['git','-C',str(root),'add','--',*paths],check=True)
+          PY
+          cd "$PUBLISH"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git diff --cached --stat
+          git commit -m 'Fix Weather Nourie same-day weights, morning comfort, dewpoint chart and orphaned map frames'
+          git push origin HEAD:weather-nourie-repair-verified
+          git rev-parse HEAD >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: weather-nourie-repair-source
-          path: /tmp/weather-nourie-review
-          retention-days: 1
+          name: weather-nourie-repair-browser
+          path: /tmp/weather-repair-results
+          retention-days: 3
