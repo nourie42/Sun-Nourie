@@ -1,0 +1,62 @@
+name: Diagnose weather map positioning and data freshness
+on:
+  push:
+    branches: [fix/weather-radar-geolocation-nowcast]
+    paths: ['.github/workflows/weather-map-diagnosis.yml']
+permissions:
+  contents: read
+  actions: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: npm ci
+      - run: npm install --no-save --package-lock=false playwright@1.55.0 leaflet@1.9.4
+      - run: npx playwright install --with-deps chromium
+      - name: Inspect real inputs and current collection runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs/promises';
+          const css=await fs.readFile('public/weather-fusion/style.css','utf8');
+          console.log('MAP CSS:',css.match(/.{0,70}(?:leaflet|img\{|max-width|transform).{0,180}/g)?.filter(x=>/leaflet|img/.test(x)));
+          const base='https://sun-nourie-live.onrender.com';
+          const forecast=await (await fetch(base+'/api/weather-fusion/forecast?location=knightdale')).json();
+          console.log('LIVE CURRENT',JSON.stringify({assembled:forecast.assembledAt,current:forecast.current,comfort:forecast.comfort,hours:forecast.hours.slice(0,8),peak:forecast.metricForecasts.series.feels.slice(0,10)},null,2));
+          const radar=await (await fetch(base+'/api/weather-fusion/radar')).json();console.log('LIVE RADAR',JSON.stringify(radar));
+          const q=new URLSearchParams({service:'WMS',version:'1.1.1',request:'GetMap',layers:radar.layer,styles:'',format:'image/png',transparent:'true',srs:'EPSG:4326',bbox:'-80,34,-77,37',width:'512',height:'512',time:radar.frames.at(-1)});
+          const rr=await fetch(radar.url+'?'+q);console.log('RADAR IMAGE',rr.status,rr.headers.get('content-type'));await fs.writeFile('/tmp/radar-response',Buffer.from(await rr.arrayBuffer()));
+          const api='https://api.github.com/repos/nourie42/Sun-Nourie';
+          const runs=await (await fetch(api+'/actions/runs?event=schedule&per_page=5',{headers:{Authorization:'Bearer '+process.env.GH_TOKEN}})).json();console.log('SCHEDULE RUNS',JSON.stringify(runs.workflow_runs?.map(r=>({id:r.id,name:r.name,created:r.created_at,status:r.status,conclusion:r.conclusion}))));
+          const status=await (await fetch('https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/collection-status.json')).json();console.log('PUBLISHED',JSON.stringify(status));
+          const now=new Date();for(let back=0;back<5;back++){
+            const d=new Date(now.getTime()-back*3600000),date=d.toISOString().slice(0,10).replaceAll('-',''),hour=d.toISOString().slice(11,13);
+            const u=`https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.${date}/conus/hrrr.t${hour}z.wrfsfcf18.grib2.idx`;
+            const r=await fetch(u);console.log('PROVIDER HRRR',date,hour,r.status,r.headers.get('last-modified'));
+          }
+          JS
+      - name: Measure image corner registration with production CSS through zoom and pan
+        run: |
+          cat > /tmp/map-audit.mjs <<'JS'
+          import express from 'express';
+          import {chromium} from 'playwright';
+          const app=express();app.use('/weather-fusion',express.static('public/weather-fusion'));app.use('/leaflet',express.static('node_modules/leaflet/dist'));
+          app.get('/',(req,res)=>res.send(`<link rel="stylesheet" href="/leaflet/leaflet.css"><link rel="stylesheet" href="/weather-fusion/style.css"><div class="shell"><div class="glass map-panel"><div class="map-stage"><div id="radar-map"></div></div></div></div><script src="/leaflet/leaflet.js"></script><script>window.map=L.map('radar-map',{zoomControl:true,zoomAnimation:true}).setView([35.787,-78.4806],8);window.bounds=L.latLngBounds([[32.5,-85],[38,-74]]);window.layer=L.imageOverlay('data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="440" height="280"><rect width="440" height="280" fill="red" opacity=".5"/></svg>'),bounds).addTo(map);</script>`));
+          const server=app.listen(3128,'127.0.0.1');const browser=await chromium.launch({headless:true});
+          try{for(const mobile of [false,true]){const context=await browser.newContext({viewport:{width:mobile?390:1365,height:900},isMobile:mobile,hasTouch:mobile});const p=await context.newPage();await p.goto('http://127.0.0.1:3128');await p.waitForTimeout(300);
+          for(const zoom of [8,7,6,5,9,10,7]){await p.evaluate(z=>map.setZoom(z),zoom);await p.waitForTimeout(400);console.log('REGISTRATION',JSON.stringify(await p.evaluate(()=>{const img=layer.getElement(),rect=img.getBoundingClientRect(),mapRect=map.getContainer().getBoundingClientRect(),nw=map.latLngToContainerPoint(bounds.getNorthWest()),se=map.latLngToContainerPoint(bounds.getSouthEast());return {zoom:map.getZoom(),mobile:L.Browser.mobile,actual:[rect.x-mapRect.x,rect.y-mapRect.y,rect.width,rect.height],expected:[nw.x,nw.y,se.x-nw.x,se.y-nw.y],css:getComputedStyle(img).cssText,transform:getComputedStyle(img).transform,maxWidth:getComputedStyle(img).maxWidth};})))}await context.close();}}
+          finally{await browser.close();server.close();}
+          JS
+          cp /tmp/map-audit.mjs ./map-audit.mjs
+          node map-audit.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: radar-response-diagnosis
+          path: /tmp/radar-response
+          retention-days: 2
