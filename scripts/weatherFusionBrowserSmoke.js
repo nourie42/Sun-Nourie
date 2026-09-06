@@ -14,7 +14,7 @@ async function json(path){
 }
 // Do not mistake a previous deployment with the same old schema for this repair.
 if(live){
- const paths=['app.js','experience.js','hero-mode.js','comfort-outlook.js','frame-player.js','dewpoint-meter.js','dewpoint-meter.css'];
+ const paths=['index.html','forecast-layout.css','app.js','experience.js','hero-mode.js','comfort-outlook.js','frame-player.js','dewpoint-meter.js','dewpoint-meter.css'];
  const wanted=Object.fromEntries(await Promise.all(paths.map(async p=>[p,createHash('sha256').update(await fs.readFile('public/weather-fusion/'+p)).digest('hex')])));
  let deployed=false;
  for(let attempt=0;attempt<35&&!deployed;attempt++){
@@ -29,7 +29,36 @@ if(live){
  }
  assert.ok(deployed,'Production must serve the exact reviewed frontend files and repaired backend before testing');
 }
-const report={checkedAt:new Date().toISOString(),base,locations:[],maps:[],browserErrors:[],liveAI:live,skinExposure:null,dewpointGross:null};
+// Check the actual rendered layout at both browser sizes, not just source strings.
+async function checkForecastDetails(page){
+ const details=await page.evaluate(()=>{
+  const panel=document.querySelector('.today-panel');
+  const row=document.querySelector('#today-forecast');
+  const note=document.querySelector('#today-uncertainty');
+  const text=document.querySelector('#today-uncertainty-text');
+  const title=document.querySelector('#gross-title');
+  const source=document.querySelector('#briefing-detail>div:last-child p');
+  const hourly=panel.nextElementSibling;
+  return {viewport:innerWidth,text:text.textContent,source:source.textContent.trim(),hidden:note.hidden,
+   belowGraphic:note.getBoundingClientRect().top>=row.getBoundingClientRect().bottom,
+   aboveHourly:note.getBoundingClientRect().bottom<=hourly.getBoundingClientRect().top,
+   adjacentHourly:hourly.classList.contains('hourly-panel'),
+   noteFont:parseFloat(getComputedStyle(text).fontSize),forecastFont:parseFloat(getComputedStyle(row.querySelector('.day-name')).fontSize),
+   noteWeight:Number(getComputedStyle(text).fontWeight),titleWeight:Number(getComputedStyle(title).fontWeight),titleAlign:getComputedStyle(title).textAlign,
+   noOverflow:note.scrollWidth<=note.clientWidth+1};
+ });
+ assert.equal(details.text,details.source,'The same outlook uncertainty must appear below the daily graphic');
+ assert.equal(details.hidden,!details.source);
+ assert.ok(details.adjacentHourly,'Hourly must remain immediately after the Today/Tonight panel');
+ if(!details.hidden){
+  assert.ok(details.belowGraphic&&details.aboveHourly,'Uncertainty must sit between the graphic and hourly forecast');
+  assert.ok(details.noteFont<details.forecastFont&&details.noteWeight>=700,'Uncertainty must be smaller and bold');
+  assert.ok(details.noOverflow,'Uncertainty must wrap within its card');
+ }
+ assert.equal(details.titleAlign,'center');assert.ok(details.titleWeight>=700,'Gross Meter heading must be bold');
+ return details;
+}
+const report={checkedAt:new Date().toISOString(),base,locations:[],maps:[],browserErrors:[],liveAI:live,skinExposure:null,dewpointGross:null,forecastDetails:[]};
 for(const location of ['knightdale','greenville']){
  const data=await json('/api/weather-fusion/forecast?location='+location);
  assert.equal(data.version,'weather-fusion-v2-direct');
@@ -81,6 +110,7 @@ try{
  assert.match(await page.locator('#scientific-stuff').innerText(),/SCIENTIFIC STUFF/i);
  report.skinExposure={knightdale:skinValue,why:skinWhy,science:skinScience};
  report.dewpointGross={knightdale:await page.locator('#dewpoint-gross-meter').innerText()};
+ report.forecastDetails.push(await checkForecastDetails(page));
  await page.locator('#map-panel').scrollIntoViewIfNeeded();
  await page.waitForFunction(()=>[...document.querySelectorAll('.leaflet-weather-base-pane img')].some(i=>i.complete&&i.naturalWidth>0),null,{timeout:60000});
  for(const style of ['street','satellite','dark']){
@@ -144,6 +174,7 @@ try{
  await page.waitForFunction(()=>/°.*(?:in the shade|right now)/.test(document.querySelector('#skin-values')?.textContent||''),null,{timeout:30000});
  await page.waitForFunction(()=>document.querySelector('#dewpoint-gross-meter .gross-chart'),null,{timeout:30000});
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),true,'Mobile document overflows horizontally');
+ report.forecastDetails.push(await checkForecastDetails(page));
  await startOverlayAudit();
  await page.locator('[data-layer="ecmwf"]').click();
  await page.waitForFunction(()=>document.querySelector('#map-error').hidden && document.querySelectorAll('.leaflet-image-layer').length>0,null,{timeout:60000});
@@ -152,10 +183,14 @@ try{
  await page.locator('#dewpoint-gross-meter').screenshot({path:dir+'/gross-meter-mobile.png'});
  await page.locator('.hero').screenshot({path:dir+'/hero-mobile.png'});
  await page.locator('[data-gross-hours="168"]').click();
- assert.ok(await page.locator('.gross-scroll').evaluate(el=>el.scrollWidth>el.clientWidth));
+ assert.ok(await page.locator('.gross-scroll').evaluate(el=>el.scrollWidth<=el.clientWidth+1),'The full 7-day graph must fit without horizontal scrolling');
  await page.locator('#gross-scrubber').fill('30');
  assert.match(await page.locator('.gross-selected-time').innerText(),/forecast/);
  await page.locator('#dewpoint-gross-meter').screenshot({path:dir+'/gross-meter-week.png'});
+ await page.locator('[data-gross-hours="240"]').click();
+ assert.ok(await page.locator('.gross-scroll').evaluate(el=>el.scrollWidth<=el.clientWidth+1),'The full 10-day graph must fit without horizontal scrolling');
+ await page.locator('#gross-scrubber').fill('30');
+ assert.match(await page.locator('.gross-selected-time').innerText(),/forecast/);
  report.metricCharts=[];
  for(const key of ['feels','precipitation','wind','humidity','pop','visibility','pressure','solar']) {
   await page.locator(`[data-metric="${key}"]`).click();
