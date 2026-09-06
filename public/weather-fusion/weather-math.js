@@ -113,7 +113,8 @@ function warmHumidSteadman(current,rh,elevation,exposure='shade'){
   if(!finite(shade)||shade<=current.temperature)return null;
   if(exposure!=='outdoors')return shade;
   const q=estimatedAbsorbedRadiation(current.condition,elevation);
-  const radiant=finite(q)?radiationFeelsLike(current.temperature,rh,current.wind,current.dewpoint,q).value:null;
+  if(!finite(q)||q<=0)return shade;
+  const radiant=radiationFeelsLike(current.temperature,rh,current.wind,current.dewpoint,q).value;
   return finite(radiant)?Math.max(shade,radiant):shade;
 }
 function genericMrtDeltaC(condition,elevation,exposure='shade') {
