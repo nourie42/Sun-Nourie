@@ -86,11 +86,13 @@ function render(data) {
   draw('scientific-stuff', 'Source details', () => renderEvidence(data));
   if (currentBriefing?.signature !== data.signature) {
     draw('briefing-summary', 'Local outlook', () => renderBriefing({ mode: 'nws-summary', signature: data.signature, headline: currentDay.tonight ? 'Your evening outlook' : d.condition, summary: currentDay.detail || 'The official forecast is temporarily unavailable.', nearTerm: d.nightDetail, extended: data.days[1]?.detail,
-      uncertainty: 'Forecasts can change, especially the timing of showers.', reason: data.aiConfigured ? 'Updating your local outlook…' : 'National Weather Service forecast', sources: ['nws'] }));
+      uncertainty: '', reason: data.aiConfigured ? 'Updating your local outlook…' : 'National Weather Service forecast', sources: ['nws'] }));
   }
   if (map) { marker?.setLatLng([place.latitude, place.longitude]); renderMapWarnings(data); }
-  const unavailable = data.feeds.filter((f) => ['unavailable', 'stale', 'not-configured', 'not-covered'].includes(f.status));
-  $('status').textContent = `Updated ${clock(data.assembledAt)}${unavailable.length ? ' · Some source details are unavailable' : ''}${failedPanels.length ? ` · Display issue: ${failedPanels.join(', ')}. Other forecasts remain available; use Refresh to retry.` : ''}`;
+  const unavailable = data.feeds.filter((f) => ['unavailable', 'stale', 'not-configured'].includes(f.status));
+  const locationLimited = data.feeds.filter((f) => f.status === 'not-covered');
+  const sourceNote = unavailable.length ? ' · Some sources are unavailable or stale — details in Scientific Stuff below' : locationLimited.length ? ' · Some optional model details are limited for this location — details below' : '';
+  $('status').textContent = `Updated ${clock(data.assembledAt)}${sourceNote}${failedPanels.length ? ` · Display issue: ${failedPanels.join(', ')}. Other forecasts remain available; use Refresh to retry.` : ''}`;
   $('status').classList.toggle('error', unavailable.length > 0 || failedPanels.length > 0);
 }
 function renderAlerts(data) { renderBulletins(data); }
@@ -103,7 +105,13 @@ function renderMetrics(data) { renderMetricTiles(data, smallIcon); }
 function renderEvidence(data) {
   const important = ['nws', 'afd', 'hrrr', 'ecmwf', 'nbm', 'alerts'];
   const labels = { nws: 'NWS', afd: 'Local discussion', hrrr: 'HRRR', ecmwf: 'ECMWF IFS', nbm: 'National Blend', alerts: 'Alerts' };
-  const names = { ready: 'Available', unavailable: 'Unavailable', stale: 'Stale — excluded', 'not-covered': 'NWS-only location' };
+  const names = { ready: 'Available', unavailable: 'Unavailable', stale: 'Stale — excluded', 'not-configured': 'Not configured', 'not-covered': 'Not collected for this location' };
+  const sourceIssues=data.feeds.filter(f=>['unavailable','stale','not-configured','not-covered'].includes(f.status));
+  const sourceSummary=$('source-unavailable-summary');
+  if(sourceSummary){
+    if(!sourceIssues.length){sourceSummary.hidden=true;sourceSummary.innerHTML='';}
+    else{const issueNames={unavailable:'Unavailable',stale:'Stale and excluded','not-configured':'Not configured','not-covered':'Not collected for this location'};sourceSummary.innerHTML=`<strong>What is unavailable or limited</strong><ul>${sourceIssues.map(f=>`<li>${esc(f.label||f.id)} — ${esc(issueNames[f.status]||f.status)}${f.message?`: ${esc(f.message)}`:''}</li>`).join('')}</ul>`;sourceSummary.hidden=false;}
+  }
   $('feed-health').innerHTML = important.map((id) => {
     const f = data.feeds.find((s) => s.id === id);
     return `<span class="feed-chip ${esc(f?.status || 'unavailable')}" title="${esc(f?.message || f?.label || '')}">${labels[id]} · ${f?.contributes ? 'Contributing' : names[f?.status] || 'Unavailable'}${f?.contributes && f.issuedAt ? `<small>Run ${esc(clock(f.issuedAt, { month: 'short', day: 'numeric' }))}</small>` : ''}</span>`;
@@ -295,7 +303,8 @@ function modelCaption(layer,frame){
   const pointRun=forecast?.modelContributions?.find(m=>m.id===layer.model)?.runAt;
   const mismatch=pointRun && Date.parse(pointRun)!==Date.parse(layer.runAt)?' · Map and point forecast have different run times; refresh the forecast.':'';
   const interval=frame.field==='precipitation'?` · ${clock(frame.start,{month:'short',day:'numeric'})} → ${clock(frame.end,{month:'short',day:'numeric'})}`:'';
-  return `${layer.label} · ${type} · ${frame.units}${interval} · run ${clock(layer.runAt,{month:'short',day:'numeric'})}${mismatch}`;
+  const coverage=layer.coverage?` · ${layer.coverage}`:'';
+  return `${layer.label} · ${type} · ${frame.units}${interval} · run ${clock(layer.runAt,{month:'short',day:'numeric'})}${coverage}${mismatch}`;
 }
 async function loadModelMap(force=false){
   const token=++mapSelectionToken,layerName=selectedLayer;
@@ -339,7 +348,7 @@ async function showModelFrame(index){
       if(token!==modelFrameToken||selectedLayer!==name)return;
       modelIndex=index;
       $('radar-time').value=String(index);$('radar-stamp').textContent=clock(f.time,{weekday:'short'});$('map-caption').textContent=modelCaption(layer,f);
-      mapMessage(map.getBounds().intersects(f.bounds)?'':'Model image covers North Carolina and the surrounding region. Pan back to the saved locations.');
+      mapMessage(map.getBounds().intersects(f.bounds)?'':'This model image does not cover the current map view. Pan back toward the selected forecast point.');
     },
     error:()=>{if(token===modelFrameToken&&selectedLayer===name){stopRadar();mapMessage('This frame could not load. The previous image has been cleared; choose another time or refresh.');$('radar-stamp').textContent='Frame unavailable';}}
   });

@@ -72,12 +72,12 @@ export function createDirectModels({ fetchImpl = globalThis.fetch, now = Date.no
       for (const [name, rawFrames] of Object.entries(model.maps || {})) {
         if (!['hrrr','ecmwf','nbm','temperature','wind','clouds'].includes(name) || !Array.isArray(rawFrames)) continue;
         const frames = status === 'ready' ? rawFrames.filter((f) => /^maps\/(hrrr|nbm|ecmwf)-\d{10}-(reflectivity|precipitation|temperature|wind|clouds)-\d{3}\.png$/.test(f.file) && f.file.startsWith(`maps/${model.model}-`) && finite(Date.parse(f.time)) && Date.parse(f.time) >= now()-3*H && Date.parse(f.time) <= Date.parse(model.validUntil) && JSON.stringify(f.bounds) === '[[32.5,-85],[38,-74]]').map((f) => ({ ...f, url: DATA_ROOT+f.file })) : [];
-        layers[name] = { model: model.model, label: model.label, resolution: model.resolution, runAt: model.runAt, status: frames.length ? status : 'unavailable', frames: frames.sort((a,b) => Date.parse(a.time)-Date.parse(b.time)), sourceUrl: SOURCE[model.model] };
+        layers[name] = { model: model.model, label: model.label, resolution: model.resolution, coverage:'North Carolina and surrounding region', runAt: model.runAt, status: frames.length ? status : 'unavailable', frames: frames.sort((a,b) => Date.parse(a.time)-Date.parse(b.time)), sourceUrl: SOURCE[model.model] };
       }
     }
     const live=independent.status==='fulfilled'?independent.value:null;
-    if(live?.layer&&(!layers.hrrr?.frames.length||Date.parse(live.layer.runAt)>=Date.parse(layers.hrrr.runAt)))layers.hrrr={...live.layer,sourceCheck:live.status};
-    return { schema: DIRECT_SCHEMA, hrrrHourlySource:live?.status||'unavailable', checkedAt:iso(now()), generatedAt: manifest.generatedAt, layers, coverage: 'North Carolina and surrounding region', note: 'Model maps are not observed radar. HRRR can use independently refreshed Iowa State low-level REFD tiles; the caption identifies its source and actual initialization. Other maps use decoded native snapshots.' };
+    if(live?.layer)layers.hrrr={...live.layer,sourceCheck:live.status};
+    return { schema: DIRECT_SCHEMA, hrrrHourlySource:live?.status||'unavailable', checkedAt:iso(now()), generatedAt: manifest.generatedAt, layers, coverage: 'HRRR: contiguous United States; other decoded model maps: North Carolina and surrounding region', note: 'Model maps are not observed radar. HRRR uses independently refreshed, timestamp-pinned Iowa State low-level REFD tiles across the contiguous United States when that source verifies. Other maps use decoded native regional snapshots.' };
   }
   return { load, maps };
 }

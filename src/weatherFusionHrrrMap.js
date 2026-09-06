@@ -16,7 +16,7 @@ export function hrrrTileManifest(meta,now=Date.now(),checkedAt=new Date(now).toI
   bounds:[[20,-130],[55,-60]],
   url:`https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/hrrr::REFD-F${String(hour*60).padStart(4,'0')}-${stamp}/{z}/{x}/{y}.png`
  })).filter(f=>Date.parse(f.time)>=now-3*H);
- return {model:'hrrr',label:'NOAA HRRR · hourly via Iowa State',resolution:'3 km model · tiled REFD at 1 km AGL',
+ return {model:'hrrr',label:'NOAA HRRR · hourly via Iowa State',resolution:'3 km model · tiled REFD at 1 km AGL',coverage:'Contiguous United States',
   runAt:new Date(run).toISOString(),checkedAt,status:now-run>150*60000?'delayed':'ready',frames,
   product:'REFD_1000m_AGL',provider:'Iowa Environmental Mesonet',sourceUrl:'https://mesonet.agron.iastate.edu/GIS/model.phtml',
   note:'Low-level simulated reflectivity, not observed radar. Initialization is pinned in every tile URL. This independent map source does not modify the numeric point forecast.'};

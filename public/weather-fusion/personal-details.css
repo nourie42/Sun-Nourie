@@ -67,3 +67,5 @@
 .day-gross p{font-size:13px;line-height:1.55}.day-gross .day-gross-verdict{font-size:15px;font-weight:700}
 .day-gross>small{font-size:11px;line-height:1.5;display:block;color:#bdd2e8}
 @media(max-width:600px){#gross-title{font-size:16px}.bulletins-panel{padding:15px 14px}#dewpoint-gross-meter{padding:16px 14px}.exposure-person svg{height:110px}.sun-shade-comparison{gap:9px}#skin-values .exposure-person strong{font-size:31px}.current-temp-label{font-size:12px}.brand small{max-width:230px;font-size:9px!important}}
+.source-unavailable-summary{margin:0 0 14px;padding:12px 14px;border:1px solid #ffdda02e;border-radius:12px;background:#ffcc6610;color:#f4e2c6;font-size:12px;line-height:1.6;text-align:left}
+.source-unavailable-summary[hidden]{display:none}.source-unavailable-summary strong{display:block;color:#fff1d5;margin-bottom:4px}.source-unavailable-summary ul{margin:6px 0 0;padding-left:18px}.source-unavailable-summary li{margin:3px 0;overflow-wrap:anywhere}

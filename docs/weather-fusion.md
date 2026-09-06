@@ -86,8 +86,10 @@ forecast-time sliders, playback, units, run time and attribution. There are no
 embedded Weather.us/Windy webpages or cosmetic overrides hiding failed model feeds.
 The user's Weather.us links remain optional external comparison links.
 
-Model rasters cover North Carolina and surrounding areas. Display images use
-nearest-cell Web Mercator resampling; forecast points use native grid cells.
+The HRRR reflectivity map uses a separately verified, timestamp-pinned Iowa State
+NOAA HRRR tile source across the contiguous United States. The decoded ECMWF/NBM
+and temperature/wind/cloud raster products remain North Carolina regional. Display
+images use nearest-cell Web Mercator resampling; forecast points use native grid cells.
 ECMWF rain is cumulative from initialization; NBM rain uses the displayed native
 interval. Neither is automatically the same window as the next-24-hour point card.
 A map/point run mismatch is identified. Missing or stale frames show an honest error.

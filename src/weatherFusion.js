@@ -29,9 +29,10 @@ const max = (a) => a.filter(finite).length ? Math.max(...a.filter(finite)) : nul
 const min = (a) => a.filter(finite).length ? Math.min(...a.filter(finite)) : null;
 const rounded = (v, digits = 0) => finite(v) ? Number(v.toFixed(digits)) : null;
 const clean = (v, size = 500) => typeof v === 'string' ? v.slice(0, size) : '';
-const CLOCK_TIME = /\b(1[0-2]|[1-9]):([0-5]\d)\s*(am|pm)\b/gi;
-const normalizeClockTimes = (value) => typeof value === 'string' ? value.replace(CLOCK_TIME, (_, hour, minute, meridiem) => `${hour}:${minute}${meridiem.toLowerCase()}`) : value;
-const hasNonClockDigits = (value) => /\d/.test(String(value).replace(CLOCK_TIME, 'CLOCK'));
+const CLOCK_TIME = /\b(1[0-2]|[1-9])(?::([0-5]\d))?\s*(am|pm)\b/gi;
+const normalizeClockTimes = (value) => typeof value === 'string' ? value.replace(CLOCK_TIME, (_, hour, minute, meridiem) => `${hour}:${minute || '00'}${meridiem.toLowerCase()}`) : value;
+const collectFactNumbers = (value, out = []) => { if (finite(value)) out.push(value); else if (Array.isArray(value)) for (const item of value) collectFactNumbers(item, out); else if (value && typeof value === 'object') for (const item of Object.values(value)) collectFactNumbers(item, out); return out; };
+const hasUngroundedNumbers = (value, facts) => { const claims=[...String(value).replace(CLOCK_TIME,'CLOCK').matchAll(/-?\d+(?:\.\d+)?/g)].map(m=>Number(m[0])).filter(finite); if(!claims.length)return false; const allowed=collectFactNumbers(facts); return claims.some(number=>!allowed.some(candidate=>Math.abs(candidate-number)<=Math.max(.051,Math.abs(candidate)*.001))); };
 const iso = (ms) => new Date(ms).toISOString();
 const hash = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex').slice(0, 24);
 const errorWithStatus = (text, status = 503) => Object.assign(new Error(text), { status });
@@ -358,12 +359,30 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
       return result;
     });
   }
+  function discussionUncertainty(data) {
+    const raw=String(data?.discussion?.text||'').replace(/\s+/g,' ').trim();
+    if(!raw)return '';
+    const rows=raw.split(/(?<=[.!?])\s+/).map(text=>text.trim()).filter(text=>text.length>=24&&text.length<=460);
+    const weights=[[/\b(uncertain|uncertainty|confidence|forecast challenge|low confidence)\b/i,9],[/\b(timing|track|path|coverage|widespread|scattered|isolated|placement|depends|could|may)\b/i,5],[/\b(front|boundary|low pressure|storm|shower|rain|fog|cloud|clearing|wind|temperature)\b/i,2]];
+    const best=rows.map(text=>({text,score:weights.reduce((sum,[re,w])=>sum+(re.test(text)?w:0),0)})).sort((a,b)=>b.score-a.score)[0];
+    if(!best||best.score<4)return 'The latest local NWS discussion does not highlight a major forecast-changing factor right now.';
+    const s=best.text.toLowerCase();
+    if(/track|path|placement|low pressure/.test(s))return 'The track and placement of the weather system are the main wildcard; a shift could change which conditions reach this location.';
+    if(/timing|front|boundary/.test(s))return 'The timing of the next front or boundary is the main wildcard; a faster or slower arrival could shift when conditions change.';
+    if(/(coverage|widespread|scattered|isolated)/.test(s)&&/(shower|storm|rain)/.test(s))return 'The main uncertainty is how widespread showers or storms become, so nearby places could end up with different rain coverage.';
+    if(/cloud|clearing/.test(s))return 'Cloud cover and clearing are the main wildcard; they could change temperatures and how quickly conditions evolve.';
+    if(/fog/.test(s))return 'Fog development is the main wildcard and will depend on how quickly skies clear and winds ease.';
+    if(/wind/.test(s))return 'Wind strength and direction are a key uncertainty as the weather system evolves near this location.';
+    if(/temperature/.test(s))return 'Temperature confidence is lower than usual because the latest local discussion highlights conditions that could shift the forecast.';
+    if(/shower|storm|rain/.test(s))return 'The local NWS discussion highlights uncertainty in how showers or storms develop near this location.';
+    return 'The latest local NWS discussion highlights uncertainty in how conditions evolve near this location.';
+  }
   function fallback(data, reason) {
     const evening = Number(new Intl.DateTimeFormat('en-US',{timeZone:data.location.timeZone,hour:'numeric',hourCycle:'h23'}).format(new Date(now()))) >= 15;
     return { mode: 'nws-summary', signature: data.signature, generatedAt: iso(now()), reason,
       headline: evening ? 'Your evening outlook' : data.days[0]?.condition || 'Forecast update', summary: (evening ? data.days[0]?.nightDetail : data.days[0]?.detail) || data.days[0]?.detail || 'The forecast is temporarily unavailable. Check the National Weather Service for the latest update.',
       nearTerm: data.days[0]?.nightDetail || '', extended: data.days[1]?.detail || '',
-      uncertainty: 'Forecasts can change, especially the timing and location of showers.', sources: ['nws'] };
+      uncertainty: discussionUncertainty(data), sources: data.discussion ? ['nws','afd'] : ['nws'] };
   }
   async function getBriefing(query) {
     const data = await getForecast(query);
@@ -396,7 +415,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
         const fields = ['headline', 'summary', 'nearTerm', 'extended', 'uncertainty'];
         if (result.status !== 'completed') throw Object.assign(new Error('AI response was incomplete.'), { aiDiagnostic: 'AI_RESPONSE_INCOMPLETE' });
         if (fields.some((k) => typeof content[k] !== 'string' || !content[k].trim() || content[k].length > 1600)) throw Object.assign(new Error('AI prose structure failed validation.'), { aiDiagnostic: 'AI_PROSE_STRUCTURE' });
-        if (fields.some((k) => hasNonClockDigits(content[k]))) throw Object.assign(new Error('AI numerical prose failed validation.'), { aiDiagnostic: 'AI_PROSE_CONTAINS_NONCLOCK_DIGITS' });
+        if (fields.some((k) => hasUngroundedNumbers(content[k], facts))) throw Object.assign(new Error('AI numerical prose failed validation.'), { aiDiagnostic: 'AI_PROSE_CONTAINS_NONCLOCK_DIGITS' });
         if (fields.some(k=>/\b(deterministic|HRRR|ECMWF|NBM|CAPE|QPF|synoptic|advection|guidance|Weather Fusion)\b/i.test(content[k]))) throw Object.assign(new Error('Outlook needs plain language.'),{aiDiagnostic:'AI_PROSE_JARGON'});
         if (!Array.isArray(content.sources) || !['nws', 'afd', ...data.modelContributions.map(m=>m.id)].every((id) => content.sources.includes(id)) || content.sources.some((id) => !data.feeds.some((f) => f.id === id && f.status === 'ready'))) throw Object.assign(new Error('AI source attribution failed validation.'), { aiDiagnostic: 'AI_SOURCE_ATTRIBUTION' });
         if (/\b(all clear|no (?:active )?(?:warnings|severe weather)|guaranteed|perfectly safe)\b/i.test(fields.map((k) => content[k]).join(' '))) throw Object.assign(new Error('AI safety wording failed validation.'), { aiDiagnostic: 'AI_SAFETY_WORDING' });
