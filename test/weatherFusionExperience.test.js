@@ -27,12 +27,14 @@ test('NWS grid intervals are start-inclusive, end-exclusive, and units are check
  grid.relativeHumidity.uom='wrong';assert.equal(gridSample(grid,'relativeHumidity',Date.parse('2026-09-05T16:00Z'),'percent'),null);
  assert.equal(parseWind('5 to 10 mph'),10);assert.equal(parseWind('Calm'),0);assert.equal(parseWind('10 km/h'),null);
 });
-test('graph data comes from forecasts and does not hold current pressure or visibility flat',()=>{
+test('extended paired graph data comes from forecasts and does not hold current pressure or visibility flat',()=>{
  const output=buildForecast({...testInputs,models:{}});
- assert.equal(output.metricForecasts.series.temperature.length,48);
+ assert.equal(output.metricForecasts.series.temperature.length,241);
+ assert.equal(output.metricForecasts.series.feels.length,241);
+ assert.deepEqual(output.metricForecasts.series.temperature.map(p=>p.time),output.metricForecasts.series.feels.map(p=>p.time));
  assert.equal(output.metricForecasts.series.pressure.every(p=>p.value===null),true);
  assert.equal(output.metricForecasts.series.visibility.every(p=>p.value===null),true);
- assert.ok(Math.abs(output.metricForecasts.series.humidity[0].value-58.2)<.1); // Consistent T/dewpoint instead of incompatible RH.
+ assert.ok(Math.abs(output.metricForecasts.series.humidity[0].value-58.2)<.1);
  assert.equal(output.metricForecasts.series.wind[0].value,10);
  assert.ok(output.metricForecasts.series.feels.some(p=>Number.isFinite(p.value)));
  assert.equal(output.metricForecasts.solar.length,7);
