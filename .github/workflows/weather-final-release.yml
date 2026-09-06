@@ -1,0 +1,96 @@
+name: Verify and prepare complete weather repair
+on:
+  push:
+    branches: [fix/weather-verified-release]
+    paths: ['.weather-final/**', '.github/workflows/weather-final-release.yml']
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Apply only exact reviewed source edits
+        run: |
+          python - <<'PY'
+          import pathlib,json,hashlib
+          changes=[]
+          for f in sorted(pathlib.Path('.weather-final').glob('*.json')): changes.extend(json.loads(f.read_text()))
+          assert len(changes)==19,len(changes)
+          output=[]
+          for c in changes:
+            path=pathlib.Path(c['path'])
+            assert not path.is_absolute() and '..' not in path.parts
+            old=path.read_text();assert hashlib.sha256(old.encode()).hexdigest()==c['before'],str(path)+' unexpected source'
+            last=len(old)+1;new=old
+            for start,end,text in reversed(c['edits']):
+              assert 0<=start<=end<last
+              new=new[:start]+text+new[end:];last=start
+            assert hashlib.sha256(new.encode()).hexdigest()==c['after'],str(path)+' edited content failed verification'
+            output.append((path,new))
+          for path,new in output:path.write_text(new)
+          print('Applied',len(output),'hash-verified files')
+          PY
+      - name: Generate pinned UTCI polynomial and independent numeric reference cases
+        run: |
+          pip install pythermalcomfort==4.4.2 sympy==1.14.0
+          python - <<'PY'
+          import importlib,importlib.metadata,inspect,ast,json,random,pathlib,math
+          import sympy as s
+          from pythermalcomfort.models import utci
+          source=inspect.getsource(importlib.import_module('pythermalcomfort.models.utci'))
+          fn=next(n for n in ast.parse(source).body if isinstance(n,ast.FunctionDef) and n.name=='_utci_optimized')
+          expr=next(n.value for n in ast.walk(fn) if isinstance(n,ast.Return))
+          symbols=s.symbols('tdb v delta_t_tr pa')
+          terms=[[float(c),*powers] for powers,c in s.Poly(s.sympify(ast.unparse(expr)),*symbols).terms()]
+          assert len(terms)==210
+          pathlib.Path('public/weather-fusion/utci-terms.js').write_text('// UTCI polynomial from pythermalcomfort 4.4.2 (MIT); see UTCI-LICENSE.txt.\nexport const UTCI_TERMS='+json.dumps(terms,separators=(',',':'))+';\n')
+          dist=importlib.metadata.distribution('pythermalcomfort');licences=[dist.locate_file(f) for f in dist.files if 'license' in str(f).lower() and pathlib.Path(dist.locate_file(f)).is_file()]
+          licence=next(pathlib.Path(f).read_text() for f in licences if 'MIT License' in pathlib.Path(f).read_text() and 'Federico' in pathlib.Path(f).read_text())
+          pathlib.Path('public/weather-fusion/UTCI-LICENSE.txt').write_text(licence)
+          random.seed(9062026);cases=[]
+          for i in range(240):
+            ta=random.uniform(-35,45);tr=ta+random.uniform(-20,60);v=random.uniform(.5,16);rh=random.uniform(5,95)
+            value=float(utci(tdb=ta,tr=tr,v=v,rh=rh,round_output=False,limit_inputs=True).utci)
+            if math.isfinite(value):cases.append(dict(ta=ta,tr=tr,v=v,rh=rh,utci=value))
+          for ta,tr,v,rh in [(25,25,1,50),(30,30,.5,50),(0,0,5,50),(35,55,2,65),(26,35,3,80)]:cases.append(dict(ta=ta,tr=tr,v=v,rh=rh,utci=float(utci(tdb=ta,tr=tr,v=v,rh=rh,round_output=False).utci)))
+          pathlib.Path('test/weather-utci-reference.json').write_text(json.dumps(cases,indent=2))
+          print('Independent reference cases:',len(cases))
+          PY
+      - run: npm ci
+      - name: Syntax, all weather tests, and existing website checks
+        run: |
+          find public/weather-fusion src -name '*.js' -print0 | xargs -0 -n1 node --check
+          node --test test/weatherFusion*.test.js | tee /tmp/weather-unit-tests.txt
+          npm run check | tee /tmp/weather-site-checks.txt
+      - run: npm install --no-save --package-lock=false playwright@1.55.0 leaflet@1.9.4
+      - run: npx playwright install --with-deps chromium
+      - name: Six responsive widths and all matching weather scenes
+        run: node scripts/weatherFusionPersonalBrowser.js
+      - name: Real Leaflet frame changes, zoom registration and visible radar pixels
+        run: node scripts/weatherFusionMapRegression.js
+      - name: Publish the complete tested feature commit; main remains unchanged
+        run: |
+          rm -rf .weather-final .github/workflows/weather-final-release.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/weather-fusion src scripts test .github .weather-final
+          git commit -m 'Repair and verify weather exposure consistency, current-hour display, radar layering and pinned HRRR maps'
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+          echo "TESTED_COMMIT=$(git rev-parse HEAD)" | tee /tmp/weather-tested-commit.txt >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: weather-final-verification
+          path: |
+            /tmp/weather-unit-tests.txt
+            /tmp/weather-site-checks.txt
+            /tmp/weather-tested-commit.txt
+            /tmp/weather-personal-results
+            /tmp/weather-map-results
+          retention-days: 7

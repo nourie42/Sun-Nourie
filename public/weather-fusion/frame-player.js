@@ -1,7 +1,8 @@
-/** Own all model overlays so rapid seeks and slow loads can never orphan a frame. */
+/** Own model overlays. Remove from Leaflet BEFORE clearing listeners: its
+ * once(remove) handler owns map-event unsubscription and must run on removal. */
 export function createFramePlayer({map,makeImage,timeoutMs=20000}) {
   const owned=new Set();let visible=null,pending=null,generation=0;
-  function remove(layer) {if(!layer)return;layer.off();map.removeLayer(layer);owned.delete(layer);}
+  function remove(layer) {if(!layer)return;map.removeLayer(layer);layer.off();owned.delete(layer);}
   function abortPending() {
     if(!pending)return;
     const previous=pending;pending=null;clearTimeout(previous.timer);remove(previous.layer);previous.resolve(false);
@@ -18,7 +19,6 @@ export function createFramePlayer({map,makeImage,timeoutMs=20000}) {
       const fail=()=>{
         if(token!==generation)return;
         pending=null;clearTimeout(request.timer);remove(layer);
-        // Remove the old image too; do not present it with the failed frame's time.
         for(const old of [...owned])remove(old);visible=null;
         hooks.error?.(new Error('Model frame failed to load'));resolve(false);
       };
@@ -27,11 +27,11 @@ export function createFramePlayer({map,makeImage,timeoutMs=20000}) {
         clearTimeout(request.timer);pending=null;
         for(const old of [...owned])if(old!==layer)remove(old);
         layer.setOpacity(1);visible=layer;
-        const element=layer.getElement?.();
+        const element=layer.getElement?.()||layer.getContainer?.();
         if(element){element.dataset.weatherModelFrame='visible';element.dataset.frameTime=frame.time||'';element.dataset.frameUrl=frame.url;}
         hooks.loaded?.();resolve(true);
       });
-      layer.on('error',fail);
+      layer.on('error',fail);layer.on('tileerror',fail);
       request.timer=setTimeout(fail,timeoutMs);
       try{layer.addTo(map);}catch{fail();}
     });
