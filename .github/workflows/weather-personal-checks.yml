@@ -4,12 +4,14 @@ on:
     paths:
       - 'src/weatherFusion*.js'
       - 'public/weather-fusion/**'
+      - 'test/weatherFusion*.test.js'
       - 'scripts/weatherFusionPersonalBrowser.js'
       - '.github/workflows/weather-personal-checks.yml'
   pull_request:
     paths:
       - 'src/weatherFusion*.js'
       - 'public/weather-fusion/**'
+      - 'test/weatherFusion*.test.js'
       - 'scripts/weatherFusionPersonalBrowser.js'
   workflow_dispatch:
 permissions:
@@ -27,13 +29,38 @@ jobs:
       - name: Check production JavaScript and collector syntax
         run: |
           find public/weather-fusion -name '*.js' -print0 | xargs -0 -n1 node --check
-          node --check src/weatherFusion.js
-          node --check src/weatherFusionBulletins.js
-          node --check src/weatherFusionPressure.js
+          find src -name 'weatherFusion*.js' -print0 | xargs -0 -n1 node --check
           python -m py_compile scripts/weather_fusion_collect.py scripts/weather_fusion_refresh.py
+      - name: All weather regression tests
+        run: node --test test/weatherFusion*.test.js
+      - name: Existing website regression checks
+        run: npm run check
+      - name: Record actual official special-discussion source availability
+        continue-on-error: true
+        run: |
+          node --input-type=module <<'JS'
+          import {createSpecialDiscussionService} from './src/weatherFusionSpecialDiscussions.js';
+          import fs from 'node:fs/promises';
+          import assert from 'node:assert/strict';
+          const cached=async(url,ttl,options={})=>{
+            const response=await fetch(url,{headers:{'User-Agent':'Weather-Nourie-source-verification/1.0'},signal:AbortSignal.timeout(15000),redirect:'error'});
+            if(!response.ok)throw new Error('Official source HTTP '+response.status);
+            return {data:options.text?await response.text():await response.json(),fetchedAt:new Date().toISOString()};
+          };
+          const service=createSpecialDiscussionService({cached});
+          const records=[];
+          for(const location of [{name:'Knightdale',latitude:35.787,longitude:-78.4806},{name:'Greenville',latitude:35.6127,longitude:-77.3664}]){
+            const result=await service(location);
+            records.push({location:location.name,status:result.meta.status,checkedAt:result.meta.fetchedAt,active:result.value?.map(d=>({title:d.event,url:d.url,expires:d.expires}))??null,message:result.meta.message??null});
+          }
+          await fs.mkdir('/tmp/weather-personal-results',{recursive:true});
+          await fs.writeFile('/tmp/weather-personal-results/special-source.json',JSON.stringify(records,null,2));
+          console.log(JSON.stringify(records,null,2));
+          assert.ok(records.every(r=>r.status==='ready'),'Official special-discussion source is unavailable; no empty list should be presented as an all-clear');
+          JS
       - run: npm install --no-save --package-lock=false playwright@1.55.0
       - run: npx playwright install --with-deps chromium
-      - name: Six responsive widths, bulletin safety, units, charts, location changes and nighttime
+      - name: Six responsive widths, paired hourly temperatures, bulletin safety, charts and nighttime
         run: node scripts/weatherFusionPersonalBrowser.js
       - uses: actions/upload-artifact@v4
         if: always()
