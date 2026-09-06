@@ -1,0 +1,112 @@
+name: Weather Nourie recovery live audit
+on:
+  push:
+    branches: [weather-nourie-render-recovery-tested]
+    paths: ['.github/workflows/weather-render-live-audit.yml']
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm install --no-save --package-lock=false playwright@1.55.0
+      - run: npx playwright install --with-deps chromium
+      - name: Production rendering and deliberate client-only chart failure
+        run: |
+          node --input-type=module - <<'JS'
+          import {chromium} from 'playwright';
+          import assert from 'node:assert/strict';
+          import fs from 'node:fs/promises';
+          import {createHash} from 'node:crypto';
+          const base='https://sun-nourie-live.onrender.com',dir='/tmp/weather-production-recovery';
+          await fs.mkdir(dir,{recursive:true});
+          const report={base,checkedAt:new Date().toISOString(),checks:[],errors:[],expectedFaults:[]};
+          const hash=v=>createHash('sha256').update(v).digest('hex');
+          for(const file of ['app.js','experience.js','dewpoint-meter.js','render-safety.js','index.html']){
+            const response=await fetch(`${base}/weather-fusion/${file}?verify=${Date.now()}`);
+            assert.ok(response.ok);
+            assert.equal(hash(await response.text()),hash(await fs.readFile('public/weather-fusion/'+file)),`${file}: production must match the tested file`);
+          }
+          report.checks.push('All five repaired browser assets match production byte-for-byte');
+          const browser=await chromium.launch({headless:true});
+          const page=await browser.newPage({viewport:{width:390,height:844}});
+          let injecting=false;
+          page.on('pageerror',e=>report.errors.push(e.message));
+          page.on('console',m=>{
+            if(m.type()!=='error'||!/Weather Nourie (panel|display|request) failed/.test(m.text()))return;
+            if(injecting&&m.text().includes('TEST_INJECTED_CHART_FAILURE'))report.expectedFaults.push(m.text());
+            else report.errors.push(m.text());
+          });
+          async function healthy(){
+            await page.waitForFunction(()=>document.querySelectorAll('#metrics [data-metric]').length===8&&document.querySelector('#gross-scrubber')&&document.querySelector('#radar-map.leaflet-container'),null,{timeout:90000});
+            assert.doesNotMatch(await page.locator('#status').innerText(),/update failed|display issue|component failed/i);
+            assert.notEqual(await page.locator('#briefing-title').innerText(),'A clearer picture of what’s ahead.');
+            assert.notEqual(await page.locator('#briefing-summary').innerText(),'What to expect, when it could change, and how to plan your day.');
+            assert.ok((await page.locator('#briefing-summary').innerText()).length>35);
+          }
+          try{
+            await page.goto(base+'/weather-fusion/',{waitUntil:'domcontentloaded',timeout:90000});
+            await healthy();
+            report.checks.push('No false update-failed message; Gross Meter, outlook and all eight tiles populated');
+            await page.locator('#map-panel').scrollIntoViewIfNeeded();
+            await page.waitForFunction(()=>[...document.querySelectorAll('#radar-map img')].some(i=>/service=wms/i.test(i.src)&&i.complete&&i.naturalWidth>0)&&!/loading/i.test(document.querySelector('#radar-stamp').textContent),null,{timeout:60000});
+            assert.ok(await page.locator('#map-error').isHidden());
+            report.radar=await page.locator('#radar-map img').evaluateAll(images=>images.filter(i=>/service=wms/i.test(i.src)&&i.complete&&i.naturalWidth>0).map(i=>({src:i.src,width:i.naturalWidth,height:i.naturalHeight})));
+            await page.locator('#map-panel').screenshot({path:dir+'/live-radar-mobile.png'});
+            report.checks.push('Observed NOAA radar tiles decoded and visible, not just radar metadata');
+            for(const layer of ['hrrr','ecmwf','nbm','temperature','wind','clouds']){
+              await page.locator(`[data-layer="${layer}"]`).click();
+              await page.waitForFunction(()=>document.querySelector('[data-weather-model-frame="visible"]')&&document.querySelector('#map-error').hidden,null,{timeout:60000});
+              const img=page.locator('[data-weather-model-frame="visible"]');
+              assert.equal(await img.count(),1);assert.ok(await img.evaluate(i=>i.complete&&i.naturalWidth>0));
+              report.checks.push(layer+' image decoded with only one visible overlay');
+            }
+            await page.locator('[data-layer="hrrr"]').click();
+            await page.waitForFunction(()=>document.querySelector('[data-weather-model-frame="visible"]'),null,{timeout:60000});
+            const images=new Set();await page.locator('#radar-play').click();
+            for(let i=0;i<12;i++){
+              await page.waitForTimeout(350);
+              const srcs=await page.locator('[data-weather-model-frame="visible"]').evaluateAll(imgs=>imgs.map(i=>i.src));
+              assert.ok(srcs.length<=1);srcs.forEach(src=>images.add(src));
+            }
+            await page.locator('#radar-play').click();assert.ok(images.size>=2,'HRRR playback must actually advance');
+            report.checks.push('HRRR animation advances without stacked visible frames');
+            await page.locator('#map-panel').screenshot({path:dir+'/live-hrrr-mobile.png'});
+            await page.locator('#dewpoint-gross-meter').screenshot({path:dir+'/live-gross-meter.png'});
+            await page.locator('#forecast').screenshot({path:dir+'/live-mobile-page.png'});
+            await page.locator('#refresh').click();await healthy();
+            report.checks.push('Manual refresh keeps the restored page working');
+            // Modify only this test browser response, never the production server.
+            injecting=true;
+            await page.route('**/dewpoint-meter.js*',async route=>{
+              const response=await route.fetch();const source=await response.text();
+              const anchor='export function renderDewpointMeter(forecast,now=Date.now()){';
+              assert.ok(source.includes(anchor));
+              await route.fulfill({response,body:source.replace(anchor,anchor+"if(!window.__weatherFaultOnce){window.__weatherFaultOnce=true;throw new Error('TEST_INJECTED_CHART_FAILURE');}")});
+            });
+            await page.reload({waitUntil:'domcontentloaded',timeout:90000});
+            await page.waitForFunction(()=>document.querySelectorAll('#metrics [data-metric]').length===8&&document.querySelector('#radar-map.leaflet-container')&&document.querySelector('#status').textContent.includes('Display issue'),null,{timeout:90000});
+            assert.doesNotMatch(await page.locator('#status').innerText(),/Weather update failed/);
+            assert.notEqual(await page.locator('#briefing-title').innerText(),'A clearer picture of what’s ahead.');
+            await page.locator('#refresh').click();await healthy();
+            assert.equal(report.expectedFaults.length,1);assert.deepEqual(report.errors,[]);
+            report.checks.push('An intentionally crashed chart cannot suppress outlook, metrics or map startup; Refresh restores it');
+            report.success=true;
+          }finally{
+            await fs.writeFile(dir+'/report.json',JSON.stringify(report,null,2));
+            console.log(JSON.stringify(report,null,2));
+            await browser.close();
+          }
+          JS
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: weather-production-recovery-proof
+          path: /tmp/weather-production-recovery
+          retention-days: 7
