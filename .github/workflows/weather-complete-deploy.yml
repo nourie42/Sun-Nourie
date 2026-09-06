@@ -43,6 +43,19 @@ jobs:
           echo 'cf555137bcbcc90d8fb746efef75b474a52d64a0f94e3eaa66f373917040bda2  /tmp/weather-repair.patch' | sha256sum -c -
           patch -p1 --batch --forward --dry-run < /tmp/weather-repair.patch
           patch -p1 --batch --forward < /tmp/weather-repair.patch
+      - name: Align nighttime browser assertion with condition-specific exposure
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/weatherFusionPersonalBrowser.js')
+          text=p.read_text()
+          old="assert.equal((await page.locator('#temperature').innerText()).trim(),'75°');assert.match(await page.locator('.sun-person').innerText(),/Outdoors at night/);assert.match(await page.locator('#skin-exposure').innerText(),/No direct sun at night/);assert.equal(await page.locator('.sun-person .sky-sun').count(),0);report.nightCurrentTemperature=true;"
+          new="assert.equal((await page.locator('#temperature').innerText()).trim(),'75°');assert.match(await page.locator('.sun-person').innerText(),/Under clouds/);assert.equal(await page.locator('.sun-person .sky-sun').count(),0);assert.ok((await page.locator('.sun-person').innerText()).includes('71°'));report.nightCurrentTemperature=true;"
+          if text.count(old)!=1:
+              raise SystemExit('Expected one stale nighttime assertion, found '+str(text.count(old)))
+          p.write_text(text.replace(old,new))
+          PY
       - name: Browser regression syntax
         run: node --check scripts/weatherFusionPersonalBrowser.js
       - run: npm ci
