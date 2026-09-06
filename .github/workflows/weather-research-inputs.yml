@@ -1,0 +1,57 @@
+name: Weather research implementation inputs
+on:
+  push:
+    branches: [fix/weather-radar-geolocation-nowcast]
+    paths: ['.github/workflows/weather-research-inputs.yml']
+permissions: {contents: read}
+jobs:
+  inputs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: pip install pythermalcomfort sympy
+      - name: Export coefficients, numeric reference cases and source licence without production changes
+        run: |
+          python - <<'PY'
+          import importlib,importlib.metadata,inspect,ast,json,random,pathlib,shutil,base64,gzip
+          import sympy as s
+          from pythermalcomfort.models import utci
+          mod=importlib.import_module('pythermalcomfort.models.utci')
+          root=pathlib.Path('/tmp/research-inputs');root.mkdir()
+          shutil.copytree('.weather-repair',root/'staged')
+          for p in (root/'staged').glob('*.b64'):
+              decoded=gzip.decompress(base64.b64decode(p.read_text()))
+              (root/(p.stem+'.json')).write_bytes(decoded)
+              data=json.loads(decoded);print(p.name,'FORMAT',type(data).__name__,list(data)[:6])
+          source=inspect.getsource(mod)
+          (root/'utci-source.py').write_text(source)
+          dist=importlib.metadata.distribution('pythermalcomfort')
+          for f in dist.files:
+              if 'license' in str(f).lower() and pathlib.Path(dist.locate_file(f)).is_file():
+                  (root/'UTCI-LICENSE.txt').write_text(pathlib.Path(dist.locate_file(f)).read_text())
+          tree=ast.parse(source);fn=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='_utci_optimized')
+          expr=next(n.value for n in ast.walk(fn) if isinstance(n,ast.Return))
+          symbols=s.symbols('tdb v delta_t_tr pa')
+          polynomial=s.Poly(s.sympify(ast.unparse(expr)),*symbols)
+          coefficients=[[float(c),*powers] for powers,c in polynomial.terms()]
+          (root/'utci-coefficients.json').write_text(json.dumps({'package':'pythermalcomfort','version':dist.version,'variables':[str(v) for v in symbols],'terms':coefficients},indent=2))
+          random.seed(9062026);cases=[]
+          for i in range(240):
+              ta=random.uniform(-35,45);tr=ta+random.uniform(-20,60);v=random.uniform(.5,16);rh=random.uniform(5,95)
+              # UTCI polynomial is not validated above 5 kPa vapour pressure.
+              r=utci(tdb=ta,tr=tr,v=v,rh=rh,round_output=False,limit_inputs=True)
+              value=float(r.utci)
+              if value==value:cases.append({'ta':ta,'tr':tr,'v':v,'rh':rh,'utci':value})
+          for ta,tr,v,rh in [(25,25,1,50),(30,30,.5,50),(0,0,5,50),(35,55,2,65),(26,35,3,80)]:
+              cases.append({'ta':ta,'tr':tr,'v':v,'rh':rh,'utci':float(utci(tdb=ta,tr=tr,v=v,rh=rh,round_output=False).utci)})
+          (root/'utci-reference.json').write_text(json.dumps(cases,indent=2))
+          print('REFERENCE',dist.version,'terms',len(coefficients),'cases',len(cases))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: weather-research-inputs
+          path: /tmp/research-inputs
+          retention-days: 2
