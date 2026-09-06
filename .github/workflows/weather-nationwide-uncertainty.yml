@@ -56,8 +56,6 @@ jobs:
           test/weatherFusionPersonalDetails.test.js
           test/weatherFusionUserFeedback.test.js
           docs/weather-fusion.md
-          scripts/patch_weather_nationwide_uncertainty.py
-          .github/workflows/weather-nationwide-uncertainty.yml
           '''.split())
           actual=set(subprocess.check_output(['git','diff','--cached','--name-only','d057f0d216ea1a10f778e7921f3df4a21ddf3307'],text=True).split())
           if actual != expected:
