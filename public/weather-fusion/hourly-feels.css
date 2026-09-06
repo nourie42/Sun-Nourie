@@ -23,3 +23,6 @@
 @media(prefers-reduced-motion:reduce){.friendly-wave{animation:none}}
 
 .day-row .day-low{display:flex;flex-direction:column;align-items:center;justify-self:end;text-align:center;min-width:44px}.day-row .day-low .daily-feels{text-align:center;width:100%}.today-panel .day-low{align-items:center;text-align:center}
+
+/* Exposure labels make the primary outdoor basis explicit at every hour. */
+.hour .hour-feels .hour-exposure{font-style:normal;font-size:10px;font-weight:500;line-height:1.25;white-space:normal;overflow-wrap:anywhere;text-align:center;max-width:76px;min-height:2.5em;margin-top:4px;color:#c4e7fb}

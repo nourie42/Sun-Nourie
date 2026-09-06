@@ -1,8 +1,8 @@
 import {weatherState} from './weather-state.js';
-import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=1-repair';
-import {degrees,feelsAt,dailyFeels,forecastValue,peakFeelsHTML} from './hourly-feels.js?v=2-hourly';
-import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=3-weather';
-import {comfortMode,comfortWindow,comfortNarrative} from './comfort-outlook.js?v=3-weather';
+import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=outdoor-v1';
+import {degrees,feelsAt,dailyFeels,forecastValue,peakFeelsHTML} from './hourly-feels.js?v=outdoor-v1';
+import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=outdoor-v1';
+import {comfortMode,comfortWindow,comfortNarrative} from './comfort-outlook.js?v=outdoor-v1';
 import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js';
 import {resetDewpointMeter} from './dewpoint-meter.js?v=6-future';
 const $=id=>document.getElementById(id);
@@ -11,7 +11,7 @@ const number=(n,d=0)=>finite(n)?n.toFixed(d):'—';
 const temp=n=>`${number(n)}°`;
 const defs={
  temperature:{title:'Temperature',unit:'°',field:'temperature',note:'How the air temperature is expected to change.',color:'#ffd58a'},
- feels:{title:'Feels like',unit:'°',field:'feels',note:'How warm or cool it may feel in the shade.',color:'#ffcf96'},
+ feels:{title:'Feels like',unit:'°',field:'feels',note:'Outdoor feels-like forecast using the sky and sunlight at each hour. The outdoor figure and hourly forecast use this same reading.',color:'#ffcf96'},
  precipitation:{title:'Precipitation',unit:' in',field:'precipitation',note:'How much rain or melted snow is expected each hour.',color:'#8bcfff',digits:2,bars:true,zero:true},
  wind:{title:'Wind',unit:' mph',field:'wind',note:'How breezy it is expected to be.',color:'#a7e5d1',zero:true},
  humidity:{title:'Humidity',unit:'%',field:'humidity',note:'How damp the air is expected to be.',color:'#9edfff',zero:true,max:100},
@@ -94,7 +94,7 @@ export function renderComfort(forecast) {
  const preview=`<div class="comfort-preview-heading"><span>${esc(sampleCaption(sample,zone))}</span>${sample.now?'':'<button type="button" data-comfort-reset>Back to now</button>'}</div>`;
  $('skin-values').innerHTML=`${preview}${sunShadeHTML(c,forecast.location,sample.now?now:Date.parse(sample.time),{forecast:!sample.now,condition:sample.condition})}${sample.now?peakComparisonHTML(summary,current.feels,zone):''}`;
  $('skin-values').querySelector('[data-comfort-reset]')?.addEventListener('click',()=>selectComfortHour('now'));
- $('skin-explanation').textContent=sample.now?comfortNarrative(sample.inputs,c,summary,zone):`${sample.condition}. This hour uses air ${degrees(sample.temperature)}, dew point ${degrees(sample.inputs.dewpoint)} and ${number(sample.inputs.wind)} mph wind. Shade feels like ${degrees(sample.feels)}. The outdoor illustration and solar estimate use this same forecast hour.`;
+ $('skin-explanation').textContent=sample.now?comfortNarrative(sample.inputs,c,summary,zone):`${sample.condition}. This hour uses air ${degrees(sample.temperature)}, dew point ${degrees(sample.inputs.dewpoint)} and ${number(sample.inputs.wind)} mph wind. Outdoors feels like ${degrees(sample.feels)}; shade ${degrees(c.shade)}. The outdoor illustration and solar estimate use this same forecast hour.`;
  const tile=$('skin-exposure');tile.dataset.preview=sample.now?'current':'forecast';tile.dataset.weather=weatherState(sample.condition).kind;
  tile.querySelector('.comfort-weather-art')?.remove();
  document.querySelectorAll('#hourly [data-comfort-time]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.comfortTime===(sample.now?'now':sample.id))));
@@ -126,7 +126,7 @@ export function renderMetricTiles(forecast,smallIcon) {
  const currentComfort=data.comfort||thermalComfort(c,data.location,Date.parse(data.assembledAt));
  const windText=finite(c.wind)?c.wind<3?'Hardly a breeze.':c.wind<12?'A light breeze.':c.wind<25?'A breezy day.':'Strong winds.':'';
  const tiles=[
-  ['feels','temp',temp(currentComfort.shade),'UTCI Tier-3 fallback using temperature, moisture, wind and sky/radiant context.'],
+  ['feels','temp',degrees(currentSample(forecast).feels),`${currentSample(forecast).exposure.label} · same outdoor estimate as Now.`],
   ['precipitation','drop',finite(data.precipitation?.value)?`${number(data.precipitation.value,2)}<small>in</small>`:'—','Expected over the next 24 hours.'],
   ['wind','wind',`${number(c.wind)}<small>mph</small>`,windText],
   ['humidity','drop',`${number(c.humidity)}<small>%</small>`,finite(c.dewpoint)&&c.dewpoint>=65?'The air feels muggy.':finite(c.humidity)?'Moisture in the air.':'Waiting for an update.'],
@@ -166,7 +166,7 @@ function selectPoint(i) {
  $('chart-value').textContent=displayValue(p.value,def);
  $('chart-time').textContent=formatTime(p.time,{weekday:'short',month:'short',day:'numeric'});
  const companion=$('chart-companion');
- if(companion){companion.hidden=!['temperature','feels'].includes(active);companion.textContent=active==='temperature'?`Feels like ${degrees(feelsAt(data,p.time))} in the shade at this hour`:active==='feels'?`Air temperature ${degrees(forecastValue(data,'temperature',p.time))} at this hour`:'';}
+ if(companion){companion.hidden=!['temperature','feels'].includes(active);companion.textContent=active==='temperature'?`Feels like ${degrees(feelsAt(data,p.time))} outdoors at this hour`:active==='feels'?`Air temperature ${degrees(forecastValue(data,'temperature',p.time))} at this hour`:'';}
  if(def.solar&&p.sunrise)$('chart-note').textContent=`Sunrise ${formatTime(p.sunrise)} · sunset ${formatTime(p.time)}.`;
  else if(active==='pressure')$('chart-note').textContent='Sea-level forecast in mb · separate from the station reading and its observed trend.';
  else $('chart-note').textContent=!finite(p.value)?'The forecast source has a gap at this time.':def.note;

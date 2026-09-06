@@ -19,7 +19,7 @@ function data(temp,dp=70,wind=3){
 const rebuild=f=>rebuildHourlyFeels(f,{now,temperatureAt:()=>({value:null}),humidityAt:()=>null});
 test('every displayed hourly temperature is paired with the same canonical feels-like inputs',()=>{
  const f=rebuild(data([80,83,86,90,92]));
- for(const h of f.hours){const p=f.metricForecasts.series.feels.find(p=>Date.parse(p.time)===Date.parse(h.time));assert.equal(p.inputs.temperature,h.temperature);assert.equal(h.feelsLike,p.value);assert.equal(feelsAt(f,h.time),h.feelsLike);assert.ok(Math.abs(p.value-tier3FeelsLike({...p.inputs,condition:h.condition,type:'guidance'},f.location,Date.parse(h.time),'shade').value)<=.051);}
+ for(const h of f.hours){const p=f.metricForecasts.series.feels.find(p=>Date.parse(p.time)===Date.parse(h.time));assert.equal(p.inputs.temperature,h.temperature);assert.equal(h.feelsLike,p.value);assert.equal(feelsAt(f,h.time),h.feelsLike);assert.ok(Math.abs(p.value-tier3FeelsLike({...p.inputs,condition:h.condition,type:'guidance'},f.location,Date.parse(h.time),'outdoors').value)<=.051);}
  assert.equal(f.thermalVersion,'weather-nourie-hourly-feels-v2');
 });
 test('warmth later in the day produces a later, higher peak when wind and moisture stay equal',()=>{

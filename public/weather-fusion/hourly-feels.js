@@ -45,10 +45,10 @@ export function dayFeelsHTML(f,index,tonight=false,now=Date.now()){
   if(!p)return `<div><small>${label}</small><strong>Unavailable</strong><span>Hourly inputs are missing.</span></div>`;
   return `<div><small>${label}${summary.partial?' · partial data':''}</small><strong>${degrees(p.value)}</strong><span>${esc(clock(p.time))} · air ${degrees(forecastValue(f,'temperature',p.time))}</span></div>`;
  };
- return `<section class="day-feels" aria-label="Hourly feels-like forecast"><h3>How it’s forecast to feel</h3><div class="day-feels-grid">${tonight?'':card(s.high,'high','Feels-like high')}${card(s.low,'low','Feels-like overnight low')}</div><p>Shade estimates from each hour’s temperature, dew point and wind. The feels-like peak and air-temperature high can occur at different hours.</p></section>`;
+ return `<section class="day-feels" aria-label="Hourly feels-like forecast"><h3>How it’s forecast to feel</h3><div class="day-feels-grid">${tonight?'':card(s.high,'high','Feels-like high')}${card(s.low,'low','Feels-like overnight low')}</div><p>Outdoor estimates from each hour’s temperature, dew point, wind and sky/sun exposure; the same values appear in the hourly forecast and outdoor figure. The feels-like peak and air-temperature high can occur at different hours.</p></section>`;
 }
 export function peakFeelsHTML(summary,zone='America/New_York'){
  if(!summary)return '<p class="comfort-later">Hourly feels-like outlook unavailable. Missing readings stay blank.</p>';
  const p=summary.chosen,time=new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',minute:'2-digit'}).format(new Date(p.time));
- return `<div class="comfort-later" data-peak-time="${esc(p.time)}"><span>${esc(summary.label)}${summary.partial?' · partial data':''}</span><strong>${degrees(p.value)}</strong><small>${esc(time)} · in the shade · hourly forecast</small></div>`;
+ return `<div class="comfort-later" data-peak-time="${esc(p.time)}"><span>${esc(summary.label)}${summary.partial?' · partial data':''}</span><strong>${degrees(p.value)}</strong><small>${esc(time)} · outdoors · hourly forecast</small></div>`;
 }

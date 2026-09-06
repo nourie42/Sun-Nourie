@@ -1,5 +1,6 @@
+import {outdoorExposure} from './outdoor-feels.js?v=outdoor-v1';
 import {finite,localHour} from './weather-math.js';
-import {timeAt,summarizeFeels} from './hourly-feels.js';
+import {timeAt,summarizeFeels} from './hourly-feels.js?v=outdoor-v1';
 export function comfortMode(time,zone='America/New_York'){
  const hour=localHour(time,zone);return hour>=15?'overnight':hour<5?'predawn':'day';
 }
@@ -13,16 +14,16 @@ export function comfortWindow(forecast,now=Date.now()){
   label:mode==='day'?'Forecast feels-like peak ahead':mode==='predawn'?'Forecast feels-like low before morning':'Forecast feels-like low tonight',end:summary.points.at(-1).time};
 }
 export function comfortNarrative(current,comfort,summary,zone='America/New_York'){
- const t=current?.temperature,dp=current?.dewpoint,wind=current?.wind,sentences=[];
- if(!finite(comfort?.shade))return 'A feels-like estimate needs temperature, moisture and wind readings. Some of those readings are missing.';
+ const t=current?.temperature,dp=current?.dewpoint,wind=current?.wind,sentences=[],outdoor=outdoorExposure(comfort).value;
+ if(!finite(outdoor))return 'A feels-like estimate needs temperature, moisture and wind readings. Some of those readings are missing.';
  if(finite(dp))sentences.push(dp>=68?`The ${Math.round(dp)}° dew point is keeping the air muggy.`:dp<50?`The ${Math.round(dp)}° dew point means dry air.`:`The ${Math.round(dp)}° dew point ${dp>=60?'adds some stickiness':'is fairly comfortable'}.`);
  if(finite(wind)&&wind>=8)sentences.push(`The ${Math.round(wind)} mph breeze is helping it feel ${finite(t)&&t<55?'colder':'cooler'}.`);
  if(summary){
   const clock=new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',minute:'2-digit'}).format(new Date(summary.chosen.time));
-  const p=summary.chosen,inputs=p.inputs||{},period=summary.mode==='day'?'The highest remaining hourly shade estimate':summary.mode==='predawn'?'The lowest hourly shade estimate before morning':'The lowest hourly shade estimate tonight';
-  if(summary.mode==='day'&&finite(comfort.shade)&&Math.round(comfort.shade)>=Math.round(p.value)) sentences.push(`Right now is the warmest shade estimate from now on at ${Math.round(comfort.shade)}°. The highest later hourly forecast is ${Math.round(p.value)}° at ${clock}${finite(inputs.temperature)?`, with an air temperature of ${Math.round(inputs.temperature)}°`:''}.`);
+  const p=summary.chosen,inputs=p.inputs||{},period=summary.mode==='day'?'The highest remaining hourly outdoor estimate':summary.mode==='predawn'?'The lowest hourly outdoor estimate before morning':'The lowest hourly outdoor estimate tonight';
+  if(summary.mode==='day'&&finite(outdoor)&&Math.round(outdoor)>=Math.round(p.value)) sentences.push(`Right now is the warmest outdoor estimate from now on at ${Math.round(outdoor)}°. The highest later hourly forecast is ${Math.round(p.value)}° at ${clock}${finite(inputs.temperature)?`, with an air temperature of ${Math.round(inputs.temperature)}°`:''}.`);
   else sentences.push(`${period} is ${Math.round(p.value)}° at ${clock}${finite(inputs.temperature)?`, with an air temperature of ${Math.round(inputs.temperature)}°`:''}.`);
-  if(p.value<comfort.shade&&summary.mode==='day')sentences.push('Changing humidity, wind and sky conditions can make later hours feel cooler even if the air temperature rises.');
+  if(p.value<outdoor&&summary.mode==='day')sentences.push('Changing humidity, wind and sky conditions can make later hours feel cooler even if the air temperature rises.');
   if(summary.partial)sentences.push('Some forecast hours are unavailable, so this is the peak of the available readings only.');
  }
  return sentences.join(' ');

@@ -22,3 +22,6 @@ Sources:
 - https://utci.org/
 
 Tests: `node --test test/weatherFusion*.test.js`, `npm run check`, and `node scripts/weatherNourieBrowserSmoke.js` (explicit fixture weather). The production workflow separately checks live data, model maps, actual AI, and metric dialogs; fixture screenshots are not proof of a successful deployment.
+
+## Outdoor feels-like contract — September 6, 2026
+Main feels-like numbers (hero, Now, hourly forecast, metric, graphs, daily extrema and outdoor figure) use the same outdoors exposure. Shade is retained as a separately labeled comparison. Each forecast hour uses its own temperature, moisture, wind, sky and solar time. No numeric value is raised simply to match another exposure. The thermal equations are unchanged. API `metricForecasts.series.feels` is outdoors; `feelsShade` retains shade, and `outdoorFeelsVersion` identifies this contract. Legacy `current.apparent` remains the named Steadman diagnostic; UI consumers use `current.feelsLike` / `comfort.outdoors`.

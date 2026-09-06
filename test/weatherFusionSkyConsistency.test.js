@@ -65,7 +65,7 @@ function fixture(){
 }
 test('Now is identical to the hero and does not expose the older current-hour forecast as another current observation',()=>{
  const f=fixture(),samples=hourlyDisplaySamples(f,now);
- assert.equal(samples[0].id,'now');assert.equal(samples[0].temperature,f.current.temperature);assert.equal(samples[0].feels,f.comfort.shade);
+ assert.equal(samples[0].id,'now');assert.equal(samples[0].temperature,f.current.temperature);assert.equal(samples[0].feels,f.comfort.outdoors);
  assert.equal(samples[1].time,'2026-09-06T16:00:00Z');assert.equal(samples.length,3);
  assert.equal(samples.filter(p=>!p.now&&Date.parse(p.time)<=now).length,0);
 });

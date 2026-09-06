@@ -1,4 +1,4 @@
-import {weatherShapes} from './weather-display.js';
+import {weatherShapes} from './weather-display.js?v=outdoor-v1';
 import {weatherState} from './weather-state.js';
 /** Purpose-built vector artwork. Shared ground line; canopy taller than the adult. */
 function person(){return `<g class="exposure-person-art" transform="translate(118 101)">

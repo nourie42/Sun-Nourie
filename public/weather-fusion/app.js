@@ -1,11 +1,11 @@
-import {weatherIcon,renderHourlyWeather} from './weather-display.js?v=1-repair';
-import {degrees,feelsAt,dayFeelsHTML} from './hourly-feels.js?v=2-hourly';
+import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './weather-display.js?v=outdoor-v1';
+import {degrees,feelsAt,dayFeelsHTML} from './hourly-feels.js?v=outdoor-v1';
 import {createFramePlayer} from './frame-player.js';
-import {renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=10-weather-repair';
+import {renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=outdoor-v1';
 import {dailyDisplay} from './weather-math.js';
 import {currentHero} from './current-temperature.js?v=1-current';
 import {renderBulletins} from './bulletins.js?v=2-special';
-import {dailyGrossHTML,modelFreshnessText} from './personal-details.js?v=3-weather';
+import {dailyGrossHTML,modelFreshnessText} from './personal-details.js?v=outdoor-v1';
 import {renderDewpointMeter} from './dewpoint-meter.js?v=6-future';
 import {renderWeatherPanel} from './render-safety.js';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
@@ -71,7 +71,7 @@ function render(data) {
   const currentDay = dailyDisplay(d, 0, Date.now(), data.location.timeZone);
   const hero = currentHero(data, day);
   $('temperature').innerHTML = `${number(hero.temperature)}<span>°</span>`;
-  if($('hero-feels'))$('hero-feels').innerHTML=`Feels like <strong>${degrees(data.comfort?.shade)}</strong><small>In the shade · ${c.type==='observation'?'based on the current station reading':'estimated from forecast data'}</small>`;
+  if($('hero-feels'))$('hero-feels').innerHTML=heroFeelsHTML(currentSample(data));
   $('condition').textContent = hero.tonight ? `Tonight · ${hero.condition}` : hero.condition;
   $('high-low').textContent = hero.tonight ? 'Overnight low' : hero.range;
   $('observation-label').textContent = hero.tonight ? `Tonight’s forecast · updated ${clock(data.assembledAt)}` : (c.type === 'observation' ? `Nearby weather station · updated ${clock(c.time)}` : 'Estimated current conditions');

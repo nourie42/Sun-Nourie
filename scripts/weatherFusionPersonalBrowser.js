@@ -101,6 +101,62 @@ try{
   await page.keyboard.press('Escape');
   report.checks.push({width,...layout,pairedHourly:true,futureTense:true,wavingFaces:true,tallTree:true,fullRanges:[24,48,168,240],sunShade:true,pressureMb:true,locationSwitch:true,dayGross:true,nwsAI:true});await context.close();
  }
+ for(const width of [320,390,1365]){
+  for(const [condition,time,patch] of [
+   ['Sunny',epoch,{}],['Partly Cloudy',epoch,{}],['Cloudy',epoch,{}],['Rain',epoch,{}],['Fog',epoch,{}],
+   ['Snow',epoch,{temperature:25,dewpoint:20}],['Clear',Date.parse('2026-09-07T02:00:00Z'),{}],
+   ['Sunny',epoch,{wind:null}],['Clear',epoch,{temperature:0,dewpoint:-5}]
+  ]){
+   const make=(place='knightdale')=>{
+    const f=fixture(place);f.assembledAt=new Date(time).toISOString();
+    f.current={...f.current,temperature:79,dewpoint:68,humidity:null,wind:0,condition,...patch,time:new Date(time-900000).toISOString()};
+    f.comfort=thermalComfort(f.current,f.location,time);
+    for(const h of f.hours)h.condition=condition;
+    rebuildHourlyFeels(f,{now:time,temperatureAt:()=>({value:null}),humidityAt:()=>null});
+    return f;
+   };
+   const context=await browser.newContext({viewport:{width,height:900}}),page=await context.newPage();
+   await page.addInitScript(time=>{const NativeDate=Date;window.Date=class extends NativeDate{constructor(...args){super(...(args.length?args:[time]));}static now(){return time;}};},time);
+   await page.route('https://unpkg.com/**',r=>r.fulfill({body:'',contentType:r.request().url().includes('.css')?'text/css':'application/javascript'}));
+   await page.route('**/api/weather-fusion/forecast?**',r=>r.fulfill({json:make(new URL(r.request().url()).searchParams.get('location')||'knightdale')}));
+   page.on('pageerror',e=>report.browserErrors.push(e.message));
+   await page.goto(base+'/weather-fusion/',{waitUntil:'networkidle'});
+   const degree=v=>Number.isFinite(v)?Math.round(v)+'°':'—';
+   const assertNow=async(place='knightdale')=>{
+    const f=make(place),expected=degree(f.comfort.outdoors);
+    assert.equal((await page.locator('#hero-feels strong').innerText()).trim(),expected,'Hero uses outdoors');
+    assert.equal((await page.locator('#hourly .hour-current .hour-feels b').innerText()).trim(),expected,'Now equals hero');
+    assert.equal((await page.locator('.metric-feels .metric-value').innerText()).trim(),expected,'Metric equals Now');
+    assert.equal((await page.locator('.sun-person figcaption strong').innerText()).trim(),expected==='—'?'Unavailable':expected,'Outdoor figure equals Now');
+    assert.equal((await page.locator('.shade-person figcaption strong').innerText()).trim(),Number.isFinite(f.comfort.shade)?degree(f.comfort.shade):'Unavailable','Shade remains separately labeled');
+    assert.ok((await page.locator('#hourly .hour-current .hour-exposure').innerText()).trim());
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+    return f;
+   };
+   const f=await assertNow();
+   if(condition==='Sunny'&&patch.wind!==null)assert.ok(f.comfort.outdoors>f.comfort.shade,'The test must catch differing sun and shade values');
+   if(!f.comfort.daylight||!['clear','partly-cloudy'].includes(f.comfort.weatherKind))assert.equal(await page.locator('.sun-person .sky-sun').count(),0);
+   const future=page.locator('#hourly .forecast-hour').first(),instant=await future.getAttribute('data-time');
+   const expected=degree(feelsAt(f,instant));
+   await future.click();
+   assert.equal((await page.locator('.sun-person figcaption strong').innerText()).trim(),expected==='—'?'Unavailable':expected,'Selected hourly value equals the outdoor preview');
+   await page.locator('#hourly .hour-current').click();await assertNow();
+   await page.locator('[data-metric="feels"]').click();
+   const index=f.metricForecasts.series.feels.findIndex(p=>Date.parse(p.time)===Date.parse(instant));
+   await page.locator('#chart-scrubber').fill(String(index));
+   assert.equal((await page.locator('#chart-value').innerText()).trim(),expected==='—'?'Not available':expected,'Graph equals the selected hour');
+   await page.keyboard.press('Escape');
+   await page.locator('[data-place="greenville"]').click();
+   await page.waitForFunction(()=>document.querySelector('#city-name').textContent.includes('Greenville'));
+   await assertNow('greenville');
+   if(width===390&&condition==='Sunny'&&patch.wind!==null){
+    await page.locator('#hourly').screenshot({path:dir+'/outdoor-hourly-390.png'});
+    await page.locator('#skin-exposure').screenshot({path:dir+'/outdoor-figures-390.png'});
+   }
+   (report.outdoorExposureChecks??=[]).push({width,condition,time:new Date(time).toISOString(),missingWind:patch.wind===null,heroNowMetricOutdoorAgree:true,shadeSeparate:true,forecastPreviewAndGraphAgree:true,locationSwitch:true});
+   await context.close();
+  }
+ }
  const context=await browser.newContext({viewport:{width:390,height:844}}),page=await context.newPage();
  await page.addInitScript(time=>{const NativeDate=Date;window.Date=class extends NativeDate{constructor(...args){super(...(args.length?args:[time]));}static now(){return time;}};},Date.parse('2026-09-07T02:00:00Z'));
  await page.route('https://unpkg.com/**',route=>route.fulfill({body:'',contentType:'application/javascript'}));
