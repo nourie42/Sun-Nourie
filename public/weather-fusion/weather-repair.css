@@ -1,0 +1,14 @@
+/* No map-pane, global card or unrelated dashboard overrides. */
+#hourly button.hour{appearance:none;border:0;background:transparent;color:inherit;font-family:inherit;padding-left:0;padding-right:0;cursor:pointer;border-radius:12px}
+#hourly button.hour:focus-visible{outline:2px solid #bce6ff;outline-offset:-2px}
+#hourly button.hour[aria-pressed="true"]{background:#bde4ff12}
+#hourly .hour-current>small{font-size:10px;font-weight:600;color:#cbe5f7}
+.hourly-preview-help{font-size:11px;color:#c6dced;text-align:left;margin:10px 0 0}
+.comfort-preview-heading{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:8px;font-size:12px;line-height:1.5;color:#d4e6f3;margin:10px auto}
+.comfort-preview-heading button{background:#c5e7ff16;border:1px solid #b2ddfc45;border-radius:10px;color:#d4efff;padding:7px 11px;font-size:12px;font-weight:650;cursor:pointer}
+#skin-values .exposure-person figcaption span{min-height:2.8em}
+#skin-values .exposure-estimate{line-height:1.6}
+#skin-exposure .comfort-weather-art{display:none}
+#skin-exposure[data-preview="forecast"] .comfort-later{display:none}
+#hero-scene svg[data-weather-kind="unknown"]{opacity:.55}
+@media(prefers-reduced-motion:reduce){.friendly-wave{animation:none!important}}

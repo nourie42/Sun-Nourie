@@ -1,5 +1,5 @@
 import {forecastGrossLevel} from './dewpoint-meter.js?v=6-future';
-import {exposureScene} from './exposure-scene.js?v=2-wave';
+import {exposureScene} from './exposure-scene.js?v=3-weather';
 import {solarElevation} from './weather-math.js';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -41,11 +41,20 @@ export function dailyGrossHTML(forecast,index,tonight=false,now=Date.now()){
  const when=new Intl.DateTimeFormat('en-US',{timeZone:s.zone,weekday:'short',hour:'numeric',minute:'2-digit'}).format(new Date(s.time));
  return `<section class="day-gross" data-gross-level="${esc(s.level.key)}"><h3>Gross Meter · dew point</h3><div class="day-gross-reading"><strong>${Math.round(s.peak)}°</strong><span>Muggiest forecast${tonight?' tonight':''}<small>${esc(when)}</small></span></div><p class="day-gross-verdict">${esc(s.level.label)}</p><p>Forecast range: ${Math.round(s.low)}–${Math.round(s.peak)}°F dew point.</p><small>${s.partial?'Partial coverage · ':''}${s.available} of ${s.expected} forecast hours available · ${tonight?'Tonight through 7 AM':'7 AM through 7 AM the next day; past hours excluded'}.</small></section>`;
 }
-export function sunShadeHTML(comfort,location,now=Date.now()){
- const elevation=solarElevation(now,location?.latitude,location?.longitude),daylight=finite(elevation)&&elevation>0;
- const shade=finite(comfort?.shade)?`${Math.round(comfort.shade)}°`:'—';
- const sun=daylight&&finite(comfort?.sun)?`${Math.round(comfort.sun)}°`:'—';
- return `<div class="sun-shade-comparison"><figure class="exposure-person shade-person">${exposureScene(false,daylight)}<figcaption><strong>${shade}</strong><span>In the shade · right now</span></figcaption></figure><figure class="exposure-person sun-person">${exposureScene(true,daylight)}<figcaption><strong>${sun}</strong><span>${daylight?'In direct sun · right now':'No direct sun at night'}</span></figcaption></figure></div><small class="exposure-estimate">Estimated feels-like temperatures · °F${daylight&&!finite(comfort?.sun)?' · Sun estimate unavailable':''}</small>`;
+export function sunShadeHTML(comfort,location,now=Date.now(),context={}){
+ const daylight=typeof comfort?.daylight==='boolean'?comfort.daylight:solarElevation(now,location?.latitude,location?.longitude)>0;
+ const kind=comfort?.weatherKind||(finite(comfort?.sun)?'clear':'unknown');
+ const condition=context.condition||comfort?.condition||({clear:'Clear','partly-cloudy':'Partly Cloudy',cloudy:'Cloudy',rain:'Rain',storm:'Thunderstorms',snow:'Snow',fog:'Fog'}[kind]||'');
+ const shade=finite(comfort?.shade)?`${Math.round(comfort.shade)}°`:'Unavailable';
+ const outdoorValue=finite(comfort?.outdoors)?comfort.outdoors:daylight&&finite(comfort?.sun)?comfort.sun:comfort?.shade;
+ const outside=finite(outdoorValue)?`${Math.round(outdoorValue)}°`:'Unavailable';
+ const period=context.forecast?'forecast':'right now';
+ const chance=/chance|possible|isolated|scattered (?:showers|storms)/i.test(condition);
+ const labels={clear:'In direct sun','partly-cloudy':'During sunny breaks',cloudy:'Under clouds',rain:chance?'Rain possible':'In rainy weather',storm:chance?'Storms possible':'In stormy weather',snow:'In snowy weather',fog:'In fog or haze',unknown:'Outdoors · shade estimate only'};
+ const label=!daylight?'Outdoors at night':labels[kind]||labels.unknown;
+ const basis=comfort?.conditionSource?` · ${esc(comfort.conditionSource)}`:'';
+ const note=!daylight?' · No direct sun at night.':kind==='unknown'?' · Sky data unavailable; no solar adjustment.':kind==='partly-cloudy'?' · Sunny-break estimate, not continuous direct sunlight.':['rain','storm','snow','fog','cloudy'].includes(kind)?' · No direct-sun adjustment; wet clothing is not modelled.':'';
+ return `<div class="sun-shade-comparison"><figure class="exposure-person shade-person" data-weather="${esc(kind)}">${exposureScene(false,daylight,condition)}<figcaption><strong>${shade}</strong><span>In the shade · ${period}</span></figcaption></figure><figure class="exposure-person sun-person" data-weather="${esc(kind)}">${exposureScene(true,daylight,condition)}<figcaption><strong>${outside}</strong><span>${label} · ${period}</span></figcaption></figure></div><small class="exposure-estimate">Estimated feels-like temperatures · °F${note}${basis}</small>`;
 }
 export function modelFreshnessText(layer,checkedAt,zone='America/New_York',now=Date.now()){
  if(!layer)return '';

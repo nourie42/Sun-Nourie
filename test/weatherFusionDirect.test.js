@@ -84,6 +84,6 @@ test('Weather Nourie keeps thermal qualifications at the bottom, without a fetch
  assert.ok(html.indexOf('id="scientific-stuff"')>html.indexOf('id="metrics"'));
  assert.match(html,/not measured sunlight/);assert.match(html,/not a claim that a person/);
  assert.ok(!math.includes('NWS wind chill'));assert.ok(!math.includes('NWS heat index'));
- assert.match(math,/Steadman apparent temperature \(all-weather shade\)/);assert.match(math,/radiationFeelsLike/);
- assert.match(html,/One formula in every season/);assert.match(html,/Stull approximation/);
+ assert.match(math,/UTCI Tier-3 fallback/);assert.match(math,/tier3FeelsLike/);
+ assert.match(html,/One all-season fallback/);assert.match(html,/Stull approximation/);
 });

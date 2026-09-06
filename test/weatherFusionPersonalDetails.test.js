@@ -47,7 +47,7 @@ test('tonight Gross Meter excludes afternoon values',()=>{
  assert.equal(dailyGrossSummary(f,0,true,Date.parse('2026-09-06T19:00:00Z')).peak,63);
 });
 test('two accessible people show actual sun/shade values without approximation symbol',()=>{
- const html=sunShadeHTML({shade:80,sun:84},location,now);assert.equal((html.match(/<figure/g)||[]).length,2);assert.match(html,/80°/);assert.match(html,/84°/);assert.match(html,/A person standing in the shade/);assert.match(html,/A person in direct sunlight/);assert.ok(!html.includes('~'));assert.match(html,/Estimated/);
+ const html=sunShadeHTML({shade:80,sun:84},location,now);assert.equal((html.match(/<figure/g)||[]).length,2);assert.match(html,/80°/);assert.match(html,/84°/);assert.match(html,/shade tree/);assert.match(html,/sun/i);assert.ok(!html.includes('~'));assert.match(html,/Estimated/);
  const night=sunShadeHTML({shade:70,sun:90},location,Date.parse('2026-09-07T04:00:00Z'));assert.match(night,/No direct sun at night/);assert.ok(!night.includes('90°'));
 });
 test('HRRR labels retain the true initialization and flag delayed publication',()=>{

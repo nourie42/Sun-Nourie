@@ -102,6 +102,6 @@ test('Gross Meter heading is centered and bold without changing chart geometry',
 
 test('changed assets are cache-busted and late briefing responses stay guarded', () => {
   assert.match(html, /forecast-layout\.css\?v=3-personal/);
-  assert.match(html, /app\.js\?v=9-hourly/);
+  assert.match(html, /app\.js\?v=11-utci-radar/);
   assert.match(app, /if \(id === generation && briefing\.signature === forecast\?\.signature\) renderBriefing\(briefing\)/);
 });

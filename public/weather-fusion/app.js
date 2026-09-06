@@ -1,10 +1,11 @@
+import {weatherIcon,renderHourlyWeather} from './weather-display.js?v=1-repair';
 import {degrees,feelsAt,dayFeelsHTML} from './hourly-feels.js?v=2-hourly';
 import {createFramePlayer} from './frame-player.js';
-import {renderComfort,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=9-hourly';
+import {renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=10-weather-repair';
 import {dailyDisplay} from './weather-math.js';
 import {currentHero} from './current-temperature.js?v=1-current';
 import {renderBulletins} from './bulletins.js?v=2-special';
-import {dailyGrossHTML,modelFreshnessText} from './personal-details.js?v=2-hourly';
+import {dailyGrossHTML,modelFreshnessText} from './personal-details.js?v=3-weather';
 import {renderDewpointMeter} from './dewpoint-meter.js?v=6-future';
 import {renderWeatherPanel} from './render-safety.js';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
@@ -42,22 +43,7 @@ async function api(path, params = '', signal) {
   if (!response.ok) throw Object.assign(new Error(data.error || 'Weather service unavailable.'), { status: response.status });
   return data;
 }
-function icon(condition = '', isDay = true, size = 32) {
-  const text = String(condition).toLowerCase();
-  const storm = /thunder|storm/.test(text), snow = /snow|sleet|flurr/.test(text), rain = /rain|shower|drizzle/.test(text), fog = /fog|mist|haze/.test(text), cloudy = /cloud|overcast/.test(text);
-  const sun = '<circle cx="18" cy="17" r="8" fill="#ffda8c"/><g stroke="#ffda8c" stroke-width="2" stroke-linecap="round"><path d="M18 3v3M18 28v3M4 17h3M29 17h3M8 7l2 2M26 25l2 2M8 27l2-2M26 9l2-2"/></g>';
-  const moon = '<path d="M27 6A13 13 0 1 0 36 27 14 14 0 0 1 27 6" fill="#e6eaf5"/>';
-  const cloud = '<path d="M10 32a8 8 0 0 1-1-16 12 12 0 0 1 22-4 9 9 0 1 1 5 20Z" fill="#e4edf8"/><path d="M10 32h26a9 9 0 0 0 7-3H7a8 8 0 0 0 3 3" fill="#c6d9ed"/>';
-  let shapes = '';
-  if (storm) shapes = cloud + '<path d="m23 31-5 10h6l-2 7 11-14h-7l3-5" fill="#ffdd83"/>';
-  else if (snow) shapes = cloud + '<g fill="#c4e7ff"><circle cx="14" cy="39" r="2"/><circle cx="26" cy="42" r="2"/><circle cx="37" cy="38" r="2"/></g>';
-  else if (rain) shapes = cloud + '<g stroke="#9dcffe" stroke-width="2.7" stroke-linecap="round"><path d="m14 37-2 5M25 37l-2 5M36 37l-2 5"/></g>';
-  else if (fog) shapes = cloud + '<g stroke="#c6d8ef" stroke-width="2" stroke-linecap="round"><path d="M9 38h29M13 43h21"/></g>';
-  else if (cloudy) shapes = (/partly|mostly sunny|few/.test(text) ? (isDay ? sun : moon) : '') + cloud;
-  else if (!text || /unavailable|loading/.test(text)) shapes = '<path d="M12 29h25" stroke="#a3bad6" stroke-width="3" stroke-linecap="round"/>';
-  else shapes = isDay ? `<g transform="translate(7 7)">${sun}</g>` : moon;
-  return `<svg width="${size}" height="${size}" viewBox="0 0 50 50" aria-hidden="true">${shapes}</svg>`;
-}
+function icon(condition = '', isDay = true, size = 32) { return weatherIcon(condition,isDay,size); }
 function smallIcon(type) {
   const paths = { drop: 'M12 2C9 7 4 11 4 16a8 8 0 0 0 16 0c0-5-5-9-8-14Z',
     wind: 'M3 8h12c5 0 5-6 1-6M3 12h16c5 0 5 6 1 6M3 16h7c4 0 4 6 0 6',
@@ -108,11 +94,7 @@ function render(data) {
   $('status').classList.toggle('error', unavailable.length > 0 || failedPanels.length > 0);
 }
 function renderAlerts(data) { renderBulletins(data); }
-function renderHours(data) {
-  const position = $('hourly').scrollLeft;
-  $('hourly').innerHTML = data.hours.length ? data.hours.map((h, i) => `<div class="hour ${i === 0 ? 'now' : ''}" title="${esc(h.condition)} · NWS rain chance ${percent(h.pop)} · ${esc(h.wind)} ${esc(h.windDirection)}"><span>${i === 0 ? esc(shortHour(h.time)) : esc(shortHour(h.time))}</span>${icon(h.condition, h.isDay)}<strong>${temperature(h.temperature)}</strong><span class="hour-feels">Feels like<b>${degrees(feelsAt(data,h.time))}</b></span><small>${finite(h.pop) ? percent(h.pop) : '—'}</small></div>`).join('') : '<p class="muted">Official hourly guidance is unavailable. No substitute forecast has been invented.</p>';
-  $('hourly').scrollLeft = position;
-}
+function renderHours(data) { renderHourlyWeather(data,Date.now()); }
 function renderDays(data) { renderDailyRows(data, icon); }
 function compass(degrees) {
   return finite(degrees) ? ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'][Math.round(degrees / 22.5) % 16] : 'Direction unavailable';
@@ -255,9 +237,13 @@ function initMap() {
   if (!window.L) { mapMessage('The mapping library could not load. Check your connection or use the official radar link.'); return; }
   const L = window.L;
   map = L.map('radar-map', { zoomControl: true, scrollWheelZoom: false }).setView([place.latitude, place.longitude], 8);
+  for (const [name,z] of [['weather-base',200],['weather-model',360],['weather-radar',430],['weather-warnings',500]]) {
+    const pane=map.getPane(name)||map.createPane(name);pane.style.zIndex=String(z);
+  }
+  map.getPane('weather-model').style.pointerEvents='none';map.getPane('weather-radar').style.pointerEvents='none';
   setBasemap();
   marker = L.marker([place.latitude, place.longitude], { icon: L.divIcon({ className: 'map-marker', iconSize: [13, 13] }) }).addTo(map);
-  warningLayer = L.geoJSON(null, { style: { color: '#ffc1b4', weight: 2, fillOpacity: 0.1 }, onEachFeature: (f, layer) => {
+  warningLayer = L.geoJSON(null, { pane:'weather-warnings', style: { color: '#ffc1b4', weight: 2, fillOpacity: 0.1 }, onEachFeature: (f, layer) => {
     const node = document.createElement('div'); node.textContent = `${f.properties?.event || 'NWS alert'} — ${f.properties?.headline || ''}`; layer.bindPopup(node);
   } }).addTo(map);
   map.on('click', (e) => {
@@ -295,9 +281,9 @@ function configureFrames(count,index=0) {
 function showFrame(index) {
   if(selectedLayer!=='radar'||!map||!window.L||!radarMeta||!frames[index])return;
   frameIndex=index;
-  if(radarLayer){radarLayer.off();map.removeLayer(radarLayer);}
+  if(radarLayer){map.removeLayer(radarLayer);radarLayer.off();}
   const expected=frames[index];
-  radarLayer=window.L.tileLayer.wms(radarMeta.url,{layers:radarMeta.layer,format:'image/png',transparent:true,version:'1.1.1',opacity:.72,time:expected,zIndex:200,attribution:'Observed radar © NOAA / NWS',updateWhenIdle:true}).addTo(map);
+  radarLayer=window.L.tileLayer.wms(radarMeta.url,{pane:'weather-radar',layers:radarMeta.layer,format:'image/png',transparent:true,version:'1.1.1',opacity:.82,time:expected,attribution:'Observed radar © NOAA / NWS',updateWhenIdle:true,keepBuffer:3}).addTo(map);
   $('radar-time').value=String(index);$('radar-stamp').textContent=`${clock(expected)} · loading`;
   const activeRadar=radarLayer;
   radarLayer.on('load',()=>{if(radarLayer===activeRadar&&selectedLayer==='radar'&&frames[frameIndex]===expected){$('radar-stamp').textContent=clock(expected);mapMessage(radarMeta.status==='stale'?'Radar is stale; check its timestamp.':'');}});
@@ -342,11 +328,13 @@ async function loadModelMap(force=false){
 async function showModelFrame(index){
   const f=modelFrames[index],layer=modelCatalog?.layers[selectedLayer];
   if(!f||!layer||!map||selectedLayer==='radar')return false;
-  if(!framePlayer)framePlayer=createFramePlayer({map,makeImage:(url,bounds,options)=>window.L.imageOverlay(url,bounds,options)});
+  if(!framePlayer)framePlayer=createFramePlayer({map,makeImage:(url,bounds,options,frame)=>frame?.kind==='xyz'
+    ? window.L.tileLayer(url,{...options,pane:'weather-model',maxZoom:12,minZoom:1,keepBuffer:3,updateWhenIdle:true})
+    : window.L.imageOverlay(url,bounds,{...options,pane:'weather-model'})});
   const name=selectedLayer,token=++modelFrameToken;
   $('radar-time').value=String(index);$('radar-stamp').textContent=`${clock(f.time,{weekday:'short'})} · loading`;
   if(!framePlayer.visible)mapMessage('Loading decoded model data…');
-  return framePlayer.show(f,{zIndex:200,attribution:layer.model==='ecmwf'?'ECMWF Open Data · CC BY 4.0':'NOAA model guidance'},{
+  return framePlayer.show(f,{pane:'weather-model',attribution:layer.model==='ecmwf'?'ECMWF Open Data · CC BY 4.0':layer.provider?`${layer.provider} · NOAA HRRR guidance`:'NOAA model guidance'},{
     loaded:()=>{
       if(token!==modelFrameToken||selectedLayer!==name)return;
       modelIndex=index;
@@ -360,7 +348,7 @@ function selectLayer(layer){
   selectedLayer=layer;stopRadar();++mapSelectionToken;++modelFrameToken;
   const freshness=$('model-freshness');if(freshness){freshness.hidden=layer==='radar';freshness.textContent=layer==='radar'?'':'Checking the latest published run…';freshness.dataset.delayed='false';}
   document.querySelectorAll('[data-layer]').forEach(button=>{const active=button.dataset.layer===layer;button.classList.toggle('selected',active);button.setAttribute('aria-pressed',String(active));});
-  if(radarLayer){radarLayer.off();map?.removeLayer(radarLayer);radarLayer=null;}framePlayer?.clear();
+  if(radarLayer){map?.removeLayer(radarLayer);radarLayer.off();radarLayer=null;}framePlayer?.clear();
   $('radar-map').hidden=false;$('radar-map').style.display='';$('model-map').hidden=true;$('radar-controls').hidden=false;$('radar-controls').style.display='';$('radar-legend').hidden=false;$('radar-legend').style.display='';
   const official=$('model-official-source');if(official)official.hidden=true;
   mapMessage('');if(!map)initMap();map?.invalidateSize();
@@ -372,6 +360,7 @@ function showSelectedFrame(index){if(selectedLayer==='radar')showFrame(index);el
 $('refresh').addEventListener('click', () => { if (!busy) void load({refreshModels:true}); });
 document.querySelectorAll('[data-place]').forEach((button) => button.addEventListener('click', () => chooseLocation(presets[button.dataset.place])));
 document.querySelectorAll('[data-layer]').forEach((button) => button.addEventListener('click', () => selectLayer(button.dataset.layer)));
+$('hourly').addEventListener('click',event=>{const button=event.target.closest('[data-comfort-time]');if(button)selectComfortHour(button.dataset.comfortTime);});
 $('daily').addEventListener('click', (event) => { const button = event.target.closest('[data-day]'); if (button) showDay(Number(button.dataset.day)); });
 $('close-day').addEventListener('click', () => $('day-dialog').close());
 $('day-dialog').addEventListener('click', (e) => { if (e.target === $('day-dialog')) { const r = e.target.getBoundingClientRect(); if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) e.target.close(); } });

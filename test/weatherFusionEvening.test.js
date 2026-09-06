@@ -34,8 +34,8 @@ test('evening real-feel uses the hourly forecast through the next local morning 
 });
 
 test('tile artwork follows the relevant near-term weather and nighttime state',()=>{
- assert.equal(comfortWeatherKind(forecast,evening),'storm');
- const rainy=structuredClone(forecast);rainy.days[0].nightCondition='Chance Showers';assert.equal(comfortWeatherKind(rainy,evening),'rain');
- const clear=structuredClone(forecast);clear.days[0].nightCondition='Clear';clear.days[0].popNight=10;assert.equal(comfortWeatherKind(clear,evening),'night');
+ assert.equal(comfortWeatherKind(forecast,evening),'night');
+ const rainy=structuredClone(forecast);rainy.current.condition='Rain';assert.equal(comfortWeatherKind(rainy,evening),'rain');
+ const clear=structuredClone(forecast);clear.current.condition='Clear';assert.equal(comfortWeatherKind(clear,evening),'night');
  const daytime=structuredClone(clear);daytime.current.condition='Sunny';assert.equal(comfortWeatherKind(daytime,Date.parse('2026-09-05T17:00:00Z')),'sun');
 });

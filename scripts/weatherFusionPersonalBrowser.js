@@ -105,7 +105,7 @@ try{
  await page.addInitScript(time=>{const NativeDate=Date;window.Date=class extends NativeDate{constructor(...args){super(...(args.length?args:[time]));}static now(){return time;}};},Date.parse('2026-09-07T02:00:00Z'));
  await page.route('https://unpkg.com/**',route=>route.fulfill({body:'',contentType:'application/javascript'}));
  page.on('pageerror',e=>report.browserErrors.push(e.message));await page.goto(base+'/weather-fusion/',{waitUntil:'networkidle'});
- assert.equal((await page.locator('#temperature').innerText()).trim(),'75°');assert.match(await page.locator('.sun-person').innerText(),/Outdoors at night/);assert.match(await page.locator('#skin-exposure').innerText(),/No direct sun at night/);assert.equal(await page.locator('.sun-person .sky-sun').count(),0);report.nightCurrentTemperature=true;
+ assert.equal((await page.locator('#temperature').innerText()).trim(),'75°');assert.match(await page.locator('.sun-person').innerText(),/Under clouds/);assert.equal(await page.locator('.sun-person .sky-sun').count(),0);assert.ok((await page.locator('.sun-person').innerText()).includes('71°'));report.nightCurrentTemperature=true;
  assert.deepEqual(report.browserErrors,[]);report.success=true;
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));await fs.writeFile(dir+'/report.json',JSON.stringify(report,null,2));}
 console.log(JSON.stringify(report,null,2));

@@ -1,4 +1,4 @@
-import {finite,humidityFromDewpoint,shadeFeelsLike,thermalComfort} from '../public/weather-fusion/weather-math.js';
+import {finite,humidityFromDewpoint,tier3FeelsLike,thermalComfort} from '../public/weather-fusion/weather-math.js';
 const H=3600000,round=v=>finite(v)?Number(v.toFixed(1)):null;
 /** A single numeric feels-like series, computed from the SAME hour's displayed
  * air temperature, dew point and wind. Never copy today's observation into future
@@ -17,8 +17,8 @@ export function rebuildHourlyFeels(out,{now,temperatureAt,humidityAt,periods=[]}
   const dewpoint=round(finite(temperature)&&finite(rawDewpoint?.value)?Math.min(temperature,rawDewpoint.value):rawDewpoint?.value);
   const humidity=round(humidityFromDewpoint(temperature,dewpoint)??maps.humidity.get(epoch)?.value??humidityAt(epoch));
   const inputs={temperature,dewpoint,wind,humidity};
-  const estimate=shadeFeelsLike(temperature,humidity,wind,dewpoint);
   const condition=hour?.condition||periods.find(p=>Date.parse(p.startTime)<=epoch&&epoch<Date.parse(p.endTime))?.shortForecast||'';
+  const estimate=tier3FeelsLike({...inputs,condition,type:'guidance'},out.location,epoch,'shade');
   const sun=thermalComfort({...inputs,condition,type:'guidance'},out.location,epoch);
   temperatures.push({...t,time,value:temperature});
   dewpoints.push({...rawDewpoint,time,value:dewpoint});

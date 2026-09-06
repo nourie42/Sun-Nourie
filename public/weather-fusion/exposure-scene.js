@@ -1,3 +1,5 @@
+import {weatherShapes} from './weather-display.js';
+import {weatherState} from './weather-state.js';
 /** Purpose-built vector artwork. Shared ground line; canopy taller than the adult. */
 function person(){return `<g class="exposure-person-art" transform="translate(118 101)">
  <ellipse cx="0" cy="63" rx="24" ry="4" fill="#102c43" opacity=".32"/>
@@ -18,8 +20,10 @@ function person(){return `<g class="exposure-person-art" transform="translate(11
  <path class="person-smile" d="M-4 13Q0 17 4 13" fill="none" stroke="#975b56" stroke-width="1.6" stroke-linecap="round"/>
  <circle cx="-8" cy="11" r="2" fill="#e9a99a" opacity=".65"/><circle cx="8" cy="11" r="2" fill="#e9a99a" opacity=".65"/>
  </g>`;}
-export function exposureScene(sun,daylight=true){
+export function exposureScene(sun,daylight=true,condition='Clear'){
  const tree=`<g class="exposure-tree"><ellipse cx="93" cy="164" rx="68" ry="6" fill="#0e2942" opacity=".26"/><path d="M48 61L49 162" stroke="#a2b7aa" stroke-width="13" stroke-linecap="round"/><path d="M49 115L82 71M49 92L29 70" stroke="#a2b7aa" stroke-width="7" stroke-linecap="round"/><path d="M28 88C0 74 7 43 32 38C26 11 69 1 86 22C122 8 147 34 139 53C174 62 159 96 131 96L39 96Z" fill="#408f83"/><path d="M23 63C7 48 24 26 45 32C44 9 79 7 91 30C117 17 140 37 132 55C154 64 139 83 118 82H43Z" fill="#65b2a0"/><path d="M39 50Q60 35 79 42M88 62Q110 51 124 61" fill="none" stroke="#8bcbbb" stroke-width="5" stroke-linecap="round" opacity=".6"/></g>`;
- const sunshine=`<g class="exposure-sun"><circle cx="58" cy="40" r="22" fill="#ffdc84"/><g stroke="#ffdc84" stroke-width="3.5" stroke-linecap="round"><path d="M58 8V2M58 73v6M25 40h-6M91 40h6M35 17l-4-4M81 63l4 4M35 63l-4 4M81 17l4-4"/></g><path d="M94 59L156 158M111 58L176 158" stroke="#ffe5a1" stroke-width="10" opacity=".06"/></g>`;
- return `<svg viewBox="0 0 220 180" role="img" aria-label="${sun?'A person in direct sunlight, smiling with eyes and hair and waving':'A person standing in the shade of a tall tree, smiling with eyes and hair and waving'}"${sun&&!daylight?' class="sun-unavailable"':''}>${sun?sunshine:tree}<path d="M13 167H204" stroke="#b6d5d2" stroke-opacity=".4" stroke-width="2"/>${person()}</svg>`;
+ const weather=weatherState(condition),sky=`<g class="person-weather" data-weather-kind="${weather.kind}" transform="translate(16 6) scale(1.65)">${weatherShapes(condition,daylight)}</g>`;
+ const treeSky=['cloudy','partly-cloudy','rain','storm','snow','fog'].includes(weather.kind)?`<g transform="translate(148 4) scale(.8)">${weatherShapes(condition,daylight)}</g>`:'';
+ const label=sun?`A smiling person waving outdoors in ${!daylight?'nighttime':weather.label.toLowerCase()} conditions`:'A smiling person waving under a tall shade tree';
+ return `<svg viewBox="0 0 220 180" role="img" aria-label="${label}">${sun?sky:tree+treeSky}<path d="M13 167H204" stroke="#b6d5d2" stroke-opacity=".4" stroke-width="2"/>${person()}</svg>`;
 }

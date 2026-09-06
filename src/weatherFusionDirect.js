@@ -1,3 +1,4 @@
+import {createHrrrMapSource} from './weatherFusionHrrrMap.js';
 /** Direct, decoded NOAA/ECMWF model snapshots. No provider key and no webpage scraping. */
 import {SAME_DAY_WEIGHTS,temperaturePolicy as tempPolicy,precipitationPolicy,forecastDayIndex,eveningPeriod,REPAIR_VERSION} from './weatherFusionPolicy.js';
 import {shadeFeelsLike} from '../public/weather-fusion/weather-math.js';
@@ -34,6 +35,7 @@ export function validateSnapshot(data, id, location, now) {
 }
 export function createDirectModels({ fetchImpl = globalThis.fetch, now = Date.now } = {}) {
   const cache = new Map(), pending = new Map();
+  const hourlyMap = createHrrrMapSource({fetchImpl,now});
   async function resource(file) {
     if (!/^(manifest\.json|models\/(hrrr|ecmwf|nbm)\.json)$/.test(file)) throw new Error('Invalid weather data resource.');
     const hit = cache.get(file);
@@ -61,7 +63,8 @@ export function createDirectModels({ fetchImpl = globalThis.fetch, now = Date.no
     } catch (error) { return { value: null, meta: { ...meta, status: 'unavailable', message: String(error.message).slice(0,180) } }; }
   }
   async function maps() {
-    const manifest = await resource('manifest.json');
+    const [manifestResult,independent]=await Promise.allSettled([resource('manifest.json'),hourlyMap()]);
+    const manifest=manifestResult.status==='fulfilled'?manifestResult.value:{schema:DIRECT_SCHEMA,models:[],generatedAt:null};
     if (manifest.schema !== DIRECT_SCHEMA || !Array.isArray(manifest.models)) throw new Error('Invalid model map manifest.');
     const layers = {};
     for (const model of manifest.models) {
@@ -72,7 +75,9 @@ export function createDirectModels({ fetchImpl = globalThis.fetch, now = Date.no
         layers[name] = { model: model.model, label: model.label, resolution: model.resolution, runAt: model.runAt, status: frames.length ? status : 'unavailable', frames: frames.sort((a,b) => Date.parse(a.time)-Date.parse(b.time)), sourceUrl: SOURCE[model.model] };
       }
     }
-    return { schema: DIRECT_SCHEMA, checkedAt:iso(now()), generatedAt: manifest.generatedAt, layers, coverage: 'North Carolina and surrounding region', note: 'Model forecast images are generated from decoded GRIB2 values. They are not observed radar or an embedded webpage.' };
+    const live=independent.status==='fulfilled'?independent.value:null;
+    if(live?.layer&&(!layers.hrrr?.frames.length||Date.parse(live.layer.runAt)>=Date.parse(layers.hrrr.runAt)))layers.hrrr={...live.layer,sourceCheck:live.status};
+    return { schema: DIRECT_SCHEMA, hrrrHourlySource:live?.status||'unavailable', checkedAt:iso(now()), generatedAt: manifest.generatedAt, layers, coverage: 'North Carolina and surrounding region', note: 'Model maps are not observed radar. HRRR can use independently refreshed Iowa State low-level REFD tiles; the caption identifies its source and actual initialization. Other maps use decoded native snapshots.' };
   }
   return { load, maps };
 }

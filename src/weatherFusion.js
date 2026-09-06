@@ -1,8 +1,9 @@
+import {stationWeather,resolveCurrentWeather} from '../public/weather-fusion/weather-state.js';
 import {createSpecialDiscussionService} from './weatherFusionSpecialDiscussions.js';
 import {createBulletinService} from './weatherFusionBulletins.js';
 import {pressureTrendFromObservations} from './weatherFusionPressure.js';
 import {eveningPeriod} from './weatherFusionPolicy.js';
-import { addExperience, PLAIN_OUTLOOK_INSTRUCTIONS } from './weatherFusionExperience.js';
+import { addExperience, gridSample, PLAIN_OUTLOOK_INSTRUCTIONS } from './weatherFusionExperience.js';
 import { solarTimes } from './weatherFusionDirect.js';
 /** Weather Fusion: isolated, dependency-free Express route registration.
  * Numeric forecasts stay deterministic. AI explains supplied facts; it cannot edit them.
@@ -246,9 +247,11 @@ export function buildForecast({ location, point, forecast, hourly, grid, discuss
       sunset: models.ecmwf?.daily?.sunset?.[solarIndex] ? iso(models.ecmwf.daily.sunset[solarIndex] * 1000) : null },
     methodology: 'NWS temperatures, conditions and precipitation probabilities are primary. NWS grid precipitation is integrated over local 7 AM–7 AM windows. Model guidance is supplementary and not a verified skill-weighted forecast. Model high/low comparisons use calendar days; the NWS low is overnight. Precipitation includes liquid-equivalent snow/ice.' };
   enhanceForecast(output, { models, grid, periods: forecast?.periods || [], now, gridQpf, localTime, nextDate, dateKey });
+  Object.assign(output.current,resolveCurrentWeather(output.current,output.hours,now,gridSample(grid,'skyCover',now,'percent')));
   addExperience(output, {models, grid, periods:forecast?.periods || [], now, solarTimes, nextDate});
+  output.weatherDisplayVersion='weather-nourie-sky-consistency-v1';
   // Hash all forecast facts and source issuance, not just rainfall. Retrieval time is not model run time.
-  output.signature = hash({ experienceVersion: output.experienceVersion, metricForecasts:output.metricForecasts, version: VERSION, location: output.location, days, hours, discussion, specialDiscussions:output.specialDiscussions,
+  output.signature = hash({ experienceVersion: output.experienceVersion, metricForecasts:output.metricForecasts, version: VERSION, location: output.location, current:output.current, days, hours, discussion, specialDiscussions:output.specialDiscussions,
     precipitation: output.precipitation, modelContributions: output.modelContributions, alerts: output.alerts.map((a) => [a.id, a.sent, a.expires]), feeds: feeds.map((f) => [f.id, f.status, f.issuedAt]) });
   return output;
 }
@@ -318,7 +321,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
               const { data } = await cached(`https://api.weather.gov/stations/${id}/observations/latest`, 5 * MINUTE);
               const o = data.properties, time = Date.parse(o?.timestamp);
               if (!finite(toF(o?.temperature)) || now() - time > 2 * HOUR || time > now() + 5 * MINUTE) return null;
-              return { temperature: rounded(toF(o.temperature)), condition: clean(o.textDescription, 120), time: o.timestamp,
+              return { temperature: rounded(toF(o.temperature)), ...stationWeather(o), time: o.timestamp,
                 stationDistanceKm: rounded(Math.sqrt(distance(s))*111.2,1), station: id, stationName: clean(s.properties?.name, 140), humidity: rounded(o.relativeHumidity?.value), dewpoint: rounded(toF(o.dewpoint)),
                 wind: rounded(toMph(o.windSpeed)), gust: rounded(toMph(o.windGust)), windDirection: numeric(o.windDirection?.value),
                 visibility: o.visibility?.unitCode === 'wmoUnit:m' && finite(o.visibility.value) ? rounded(o.visibility.value / 1609.344, 1) : null,
@@ -448,7 +451,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
   });
-  for (const name of ['app.js', 'style.css', 'nav.js', 'experience.js', 'weather-math.js','hero-mode.js','dewpoint-meter.js','dewpoint-meter.css','comfort-effects.css','frame-player.js','comfort-outlook.js','forecast-layout.css','personal-details.js','personal-details.css','bulletin-facts.js','bulletins.js','current-temperature.js','hourly-feels.js','hourly-feels.css','exposure-scene.js']) app.get(`/weather-fusion/${name}`, (_req, res) => {
+  for (const name of ['app.js', 'style.css', 'nav.js', 'experience.js', 'weather-math.js','hero-mode.js','dewpoint-meter.js','dewpoint-meter.css','comfort-effects.css','frame-player.js','comfort-outlook.js','forecast-layout.css','personal-details.js','personal-details.css','bulletin-facts.js','bulletins.js','current-temperature.js','hourly-feels.js','hourly-feels.css','exposure-scene.js','weather-state.js','weather-display.js','weather-repair.css','utci.js']) app.get(`/weather-fusion/${name}`, (_req, res) => {
     res.setHeader('Cache-Control', 'no-cache');
     res.sendFile(path.join(PUBLIC_DIR, name));
   });

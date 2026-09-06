@@ -7,7 +7,7 @@ const dateAt=(t,z)=>new Intl.DateTimeFormat('en-CA',{timeZone:z,year:'numeric',m
 export function comfortWindow(forecast,now=Date.now()){
  const zone=forecast?.location?.timeZone||'America/New_York',mode=comfortMode(now,zone),today=dateAt(now,zone),tomorrow=new Date(Date.parse(today+'T12:00:00Z')+86400000).toISOString().slice(0,10);
  const start=mode==='overnight'?timeAt(today,18,zone):timeAt(today,0,zone),end=mode==='day'?timeAt(today,19,zone):mode==='predawn'?timeAt(today,8,zone):timeAt(tomorrow,8,zone);
- const summary=summarizeFeels(forecast,start,end,now);if(!summary)return null;
+ const summary=summarizeFeels(forecast,start,end,now+1);if(!summary)return null;
  const chosen=mode==='day'?summary.high:summary.low;
  return {...summary,mode,chosen,low:summary.low.value,high:summary.high.value,lowTime:summary.low.time,highTime:summary.high.time,
   label:mode==='day'?'Forecast feels-like peak ahead':mode==='predawn'?'Forecast feels-like low before morning':'Forecast feels-like low tonight',end:summary.points.at(-1).time};
@@ -20,8 +20,9 @@ export function comfortNarrative(current,comfort,summary,zone='America/New_York'
  if(summary){
   const clock=new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',minute:'2-digit'}).format(new Date(summary.chosen.time));
   const p=summary.chosen,inputs=p.inputs||{},period=summary.mode==='day'?'The highest remaining hourly shade estimate':summary.mode==='predawn'?'The lowest hourly shade estimate before morning':'The lowest hourly shade estimate tonight';
-  sentences.push(`${period} is ${Math.round(p.value)}° at ${clock}${finite(inputs.temperature)?`, with an air temperature of ${Math.round(inputs.temperature)}°`:''}.`);
-  if(p.value<=comfort.shade&&summary.mode==='day')sentences.push('Changing humidity and wind can offset warmer air, so the feels-like and air-temperature peaks may occur at different times.');
+  if(summary.mode==='day'&&finite(comfort.shade)&&Math.round(comfort.shade)>=Math.round(p.value)) sentences.push(`Right now is the warmest shade estimate from now on at ${Math.round(comfort.shade)}°. The highest later hourly forecast is ${Math.round(p.value)}° at ${clock}${finite(inputs.temperature)?`, with an air temperature of ${Math.round(inputs.temperature)}°`:''}.`);
+  else sentences.push(`${period} is ${Math.round(p.value)}° at ${clock}${finite(inputs.temperature)?`, with an air temperature of ${Math.round(inputs.temperature)}°`:''}.`);
+  if(p.value<comfort.shade&&summary.mode==='day')sentences.push('Changing humidity, wind and sky conditions can make later hours feel cooler even if the air temperature rises.');
   if(summary.partial)sentences.push('Some forecast hours are unavailable, so this is the peak of the available readings only.');
  }
  return sentences.join(' ');

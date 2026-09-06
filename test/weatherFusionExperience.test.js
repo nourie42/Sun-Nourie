@@ -64,7 +64,7 @@ test('direct sun uses the radiation-inclusive Steadman equation and bounded abso
  assert.ok(sun.value>shade.value);assert.match(sun.method,/with radiation/);
  const c=thermalComfort({temperature:95,humidity:47,dewpoint:72,wind:5,condition:'Sunny',type:'observation'},{latitude:35.787,longitude:-78.4806},Date.parse('2026-09-05T17:00:00Z'));
  assert.ok(c.absorbedRadiation>=0&&c.absorbedRadiation<=130);assert.ok(c.sun>=c.shade);
- assert.match(c.note,/does not add a fake urban bonus or penalty|hot sidewalk/);
+ assert.match(c.note,/no fixed urban bonus or penalty|block-level pavement/);
 });
 test('wet bulb stays diagnostic and is not double-counted into the final real-feel value',()=>{
  assert.equal(wetBulb(20,50),null);
@@ -84,6 +84,6 @@ test('all cards have dialog graphs and science is below the main experience',()=
  assert.ok(html.indexOf('SCIENTIFIC STUFF')>html.indexOf('id="metrics"'));
  assert.ok(!html.includes('Back to Sun-Nourie'));assert.ok(!html.includes('Weather Fusion'));
  assert.ok(!html.includes('Uses NWS heat index'));assert.ok(!html.includes('NWS Wind Chill'));
- assert.match(html,/One formula in every season/);assert.match(html,/radiation-inclusive/);
+ assert.match(html,/One all-season fallback/);assert.match(html,/UTCI/);
  assert.match(client,/data-metric/);assert.match(client,/showModal/);assert.match(client,/made-up line/);
 });

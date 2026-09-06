@@ -1,3 +1,5 @@
+import {weatherState,weatherTransmission} from './weather-state.js';
+import {utciF} from './utci.js';
 /* Pure presentation math shared by the weather API, browser and tests. */
 export const EXPERIENCE_VERSION = 'weather-nourie-friendly-v1';
 export const finite = n => typeof n === 'number' && Number.isFinite(n);
@@ -70,17 +72,7 @@ export function solarElevation(time, latitude, longitude) {
   const dec=Math.asin(Math.sin(l)*Math.sin(r*23.4397)),ra=Math.atan2(Math.sin(l)*Math.cos(r*23.4397),Math.cos(l)),h=r*(280.16+360.9856235*d)-lw-ra;
   return Math.asin(Math.sin(phi)*Math.sin(dec)+Math.cos(phi)*Math.cos(dec)*Math.cos(h));
 }
-function skyTransmission(condition='') {
-  const text=String(condition).toLowerCase();
-  if(/thunder|storm|rain|shower|drizzle|fog|mist/.test(text))return .18;
-  if(/overcast/.test(text))return .12;
-  if(/mostly cloudy/.test(text))return .32;
-  if(/partly cloudy|partly sunny/.test(text))return .66;
-  if(/mostly sunny|few clouds/.test(text))return .86;
-  if(/cloudy/.test(text))return .42;
-  if(/sunny|clear/.test(text))return 1;
-  return null;
-}
+function skyTransmission(condition='') { return weatherTransmission(condition); }
 /** Estimated absorbed net extra radiation for the Steadman radiation term.
  * The 130 W/m² ceiling follows the published range commonly used with the
  * radiation-inclusive apparent-temperature equation. This remains an estimate
@@ -106,21 +98,48 @@ function windMessage(temp,wind) {
   if(finite(temp)&&temp>80)return 'The breeze helps remove heat, although humid air can limit evaporative cooling.';
   return 'The breeze provides some moving-air cooling.';
 }
-export function thermalComfort(current, location, now) {
+
+/** Tier-3 operational fallback from the attached research framework.
+ * UTCI is the all-season primary index. Radiation is estimated from solar elevation
+ * and broad sky state; this is not research-grade EPST and is not literal skin temperature.
+ */
+function genericMrtDeltaC(condition,elevation,exposure='shade') {
+  if(!finite(elevation)||elevation<=0)return 0;
+  const w=weatherState(condition),sun=Math.max(0,Math.sin(elevation))**.72;
+  const diffuse={clear:18,'partly-cloudy':15,cloudy:8,rain:5,storm:4,snow:10,fog:5,unknown:0}[w.kind]??0;
+  const direct=exposure==='outdoors'?(estimatedAbsorbedRadiation(condition,elevation)||0):0;
+  // Generic SolarCal-style effective-radiant conversion. Keep within UTCI's MRT domain.
+  return Math.max(-5,Math.min(35,(diffuse*sun+direct)/6.1));
+}
+export function tier3FeelsLike(current,location,now,exposure='shade') {
+  if(!finite(current?.temperature)||!finite(current?.wind)||current.wind<0)return {value:null,method:'Tier-3 UTCI inputs unavailable'};
   const rh=finite(current.humidity)?current.humidity:humidityFromDewpoint(current.temperature,current.dewpoint);
-  const shade=shadeFeelsLike(current.temperature,rh,current.wind,current.dewpoint);
+  if(!finite(rh))return {value:null,method:'Tier-3 UTCI moisture unavailable'};
+  const elevation=solarElevation(now,location?.latitude,location?.longitude),deltaC=genericMrtDeltaC(current.condition,elevation,exposure);
+  const tr=current.temperature+deltaC*1.8;
+  let value=utciF(current.temperature,tr,current.wind,rh);
+  // UTCI operational wind floor is 0.5 m/s. Calm weather is evaluated at the documented floor.
+  if(!finite(value))value=shadeFeelsLike(current.temperature,rh,current.wind,current.dewpoint).value;
+  return {value,method:finite(value)?'UTCI Tier-3 fallback with estimated mean radiant temperature':'Feels-like unavailable',rh,tr,deltaMrtC:deltaC};
+}
+
+export function thermalComfort(current, location, now) {
+  const weather=weatherState(current.condition,current.skyCover);
+  const rh=finite(current.humidity)?current.humidity:humidityFromDewpoint(current.temperature,current.dewpoint);
+  const shade=tier3FeelsLike(current,location,now,'shade');
+  const outdoor=tier3FeelsLike(current,location,now,'outdoors');
   const elevation=solarElevation(now,location.latitude,location.longitude);
   const daylight=finite(elevation)?elevation>0:null;
-  const absorbed=daylight?estimatedAbsorbedRadiation(current.condition,elevation):null;
-  const sunCalc=finite(absorbed)?radiationFeelsLike(current.temperature,rh,current.wind,current.dewpoint,absorbed):{value:null};
-  const sun=finite(sunCalc.value)&&finite(shade.value)?Math.max(shade.value,sunCalc.value):sunCalc.value;
   const localContext=current.type==='observation'
-    ? 'The nearby observed air temperature already carries some broad local neighborhood influence. A hot sidewalk, shaded courtyard, parking lot or windy street canyon can still differ from the station.'
-    : 'Block-by-block pavement, building shade and street-canyon wind are not measured here, so Weather Nourie does not add a fake urban bonus or penalty.';
+    ? 'The nearby observed air temperature carries broad neighborhood influence, but block-level pavement, walls, shade and wind can still differ.'
+    : 'Block-level pavement, walls, shade and street-canyon wind are not measured, so no fixed urban bonus or penalty is added.';
   const wet=wetBulb(current.temperature,rh);
-  return {shade:finite(shade.value)?Math.round(shade.value):null,sun:finite(sun)?Math.round(sun):null,
-    method:shade.method,humidity:rh,wetBulb:wet,daylight,absorbedRadiation:absorbed,
-    solarAdjustment:finite(sun)&&finite(shade.value)?sun-shade.value:null,
+  const shadeValue=finite(shade.value)?Math.round(shade.value):null,outdoorValue=finite(outdoor.value)?Math.round(outdoor.value):shadeValue;
+  return {shade:shadeValue,sun:daylight&&(weather.kind==='clear'||weather.kind==='partly-cloudy')?outdoorValue:null,outdoors:outdoorValue,
+    weatherKind:weather.kind,weatherLabel:weather.label,condition:current.condition,conditionSource:current.conditionSource||null,
+    radiationStatus:daylight===false?'night':weather.known?'estimated-by-sky-state':'unknown',
+    method:shade.method,humidity:rh,wetBulb:wet,daylight,absorbedRadiation:estimatedAbsorbedRadiation(current.condition,elevation),
+    solarAdjustment:finite(outdoorValue)&&finite(shadeValue)?outdoorValue-shadeValue:null,
     dewpointEffect:dewpointMessage(current.dewpoint),windEffect:windMessage(current.temperature,current.wind),microclimate:localContext,
-    note:`One Steadman all-weather apparent-temperature model is used in cold, mild and hot conditions rather than changing equations by temperature zone. ${dewpointMessage(current.dewpoint)} ${windMessage(current.temperature,current.wind)} ${localContext} Wet bulb is shown separately as evaporative-cooling context and is not added again, which would double-count moisture. The sun number uses the radiation-inclusive Steadman equation with an estimated absorbed-radiation input, not measured sunlight or literal skin temperature.`};
+    note:`Tier-3 operational fallback from the attached Real-Feel Skin Temperature research: UTCI is the primary all-season index using air temperature, humidity/dew point and standard wind, with solar elevation and broad sky state used for a generic radiant estimate. This is a modeled equivalent temperature, not measured skin temperature or validated EPST. ${dewpointMessage(current.dewpoint)} ${windMessage(current.temperature,current.wind)} ${localContext} Wet bulb is diagnostic only and is not added again to the UTCI result.`};
 }

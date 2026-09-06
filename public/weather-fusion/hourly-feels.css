@@ -20,3 +20,5 @@
 #skin-exposure .comfort-weather-art{opacity:.2;pointer-events:none}#skin-values{position:relative;z-index:1}
 @media(max-width:600px){.day-row .daily-feels{font-size:9px!important}.today-panel .daily-feels{font-size:10px!important}.day-row{min-height:88px}#skin-values .exposure-person svg{height:128px}.hero-feels{margin-bottom:10px}.day-feels{padding:12px}.day-feels-grid{gap:10px}}
 @media(prefers-reduced-motion:reduce){.friendly-wave{animation:none}}
+
+.day-row .day-low{display:flex;flex-direction:column;align-items:center;justify-self:end;text-align:center;min-width:44px}.day-row .day-low .daily-feels{text-align:center;width:100%}.today-panel .day-low{align-items:center;text-align:center}

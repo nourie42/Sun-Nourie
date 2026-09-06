@@ -1,6 +1,8 @@
+import {weatherState} from './weather-state.js';
+import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=1-repair';
 import {degrees,feelsAt,dailyFeels,forecastValue,peakFeelsHTML} from './hourly-feels.js?v=2-hourly';
-import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=2-hourly';
-import {comfortMode,comfortWindow,comfortNarrative} from './comfort-outlook.js?v=2-hourly';
+import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=3-weather';
+import {comfortMode,comfortWindow,comfortNarrative} from './comfort-outlook.js?v=3-weather';
 import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js';
 import {resetDewpointMeter} from './dewpoint-meter.js?v=6-future';
 const $=id=>document.getElementById(id);
@@ -18,6 +20,7 @@ const defs={
  pressure:{title:'Pressure',unit:' mb',field:'pressure',note:'How sea-level pressure is expected to change.',color:'#c6bafa',digits:1},
  solar:{title:'Sunset',unit:'',field:'solar',note:'When the sun is expected to set over the next week.',color:'#ffdc9b',solar:true},
 };
+let comfortPreview=null;
 let data=null, active=null, horizon=24, selected=0, graphPoints=[], graphGeometry=null;
 const formatTime=(v,options={})=>new Intl.DateTimeFormat('en-US',{timeZone:data?.location.timeZone||'America/New_York',hour:'numeric',minute:'2-digit',...options}).format(new Date(v));
 const localMinutes=v=>{const p=new Intl.DateTimeFormat('en-US',{timeZone:data?.location.timeZone||'America/New_York',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date(v));return Number(p.find(x=>x.type==='hour').value)*60+Number(p.find(x=>x.type==='minute').value);};
@@ -34,20 +37,14 @@ export function overnightComfort(forecast,now=Date.now()){
 }
 function valuesThrough(series,now,end){return (series||[]).filter(p=>{const t=Date.parse(p.time);return finite(t)&&t>=now&&t<=Date.parse(end)&&finite(p.value);}).map(p=>p.value);}
 export function comfortWeatherKind(forecast,now=Date.now()){
- const zone=forecast?.location?.timeZone||'America/New_York',mode=comfortDisplayMode(now,zone),evening=mode==='overnight';
- const elevation=solarElevation(now,forecast?.location?.latitude,forecast?.location?.longitude);
- const night=finite(elevation)?elevation<=0:mode!=='day';
- const d=forecast?.days?.[0]||{},condition=String(evening?(d.nightCondition||forecast?.current?.condition||''):(forecast?.current?.condition||d.condition||'')).toLowerCase();
- const pop=evening?d.popNight:d.pop,wind=forecast?.current?.wind;
- if(/thunder|storm/.test(condition))return 'storm';
- if(/snow|sleet|ice pellets|freezing rain/.test(condition))return 'snow';
- if(/rain|shower|drizzle/.test(condition)||(finite(pop)&&pop>=35))return 'rain';
- if(/fog|mist/.test(condition))return 'fog';
- if(finite(wind)&&wind>=18)return 'wind';
- if(night)return 'night';
- if(/sunny|clear|few clouds/.test(condition))return 'sun';
- if(/cloud|overcast/.test(condition))return 'cloud';
- return 'calm';
+ const current=forecast?.current||{},weather=weatherState(current.condition),elevation=solarElevation(now,forecast?.location?.latitude,forecast?.location?.longitude),hour=localMinutes(now)/60;
+ if(weather.kind==='storm')return 'storm';
+ if(weather.kind==='rain')return 'rain';
+ if(weather.kind==='snow')return 'snow';
+ if(weather.kind==='fog')return 'fog';
+ if((finite(elevation)&&elevation<=0)||(!finite(elevation)&&(hour<7||hour>=19)))return 'night';
+ if(['cloudy','partly-cloudy'].includes(weather.kind))return 'cloud';
+ return weather.kind==='clear'?'sun':'calm';
 }
 function weatherArt(kind){
  const items=(cls,count,symbol='')=>Array.from({length:count},(_,i)=>`<i class="${cls}" style="--i:${i};--x:${7+(i*37)%89}%;--delay:-${((i*43)%170)/100}s">${symbol}</i>`).join('');
@@ -84,14 +81,24 @@ function sparkline(points) {
  points.forEach((p,i)=>{if(!finite(p.value)){continuous=false;return;}const x=2+i/Math.max(1,points.length-1)*116,y=29-(p.value-lo)/span*23;drawing+=`${continuous?'L':'M'}${x.toFixed(1)},${y.toFixed(1)} `;continuous=true;});
  return `<svg class="tile-spark" viewBox="0 0 120 34" aria-hidden="true"><path d="${drawing}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 }
+export function selectComfortHour(time){
+ comfortPreview=time==='now'?null:time;
+ if(data)renderComfort(data);
+}
 export function renderComfort(forecast) {
  data=forecast;ensureComfortStyles();
- const now=Date.now(),c=forecast.comfort||thermalComfort(forecast.current,forecast.location,now),summary=comfortWindow(forecast,now);
- $('skin-values').innerHTML=`${sunShadeHTML(c,forecast.location,now)}${peakFeelsHTML(summary,forecast.location.timeZone)}`;
- $('skin-explanation').textContent=comfortNarrative(forecast.current,c,summary,forecast.location.timeZone);
- renderComfortArt(forecast,now);
- const alignment=forecast.metricForecasts?.comfortAlignment;
- $('skin-science').textContent=`${c.method}. Current air ${temp(forecast.current.temperature)}; dew point ${temp(forecast.current.dewpoint)}; relative humidity ${number(c.humidity)}%; wind ${number(forecast.current.wind)} mph. Station ${forecast.current.stationName||forecast.current.station||'unavailable'}, observation ${forecast.current.time||'unavailable'}. ${finite(c.wetBulb)?`Estimated wet bulb ${temp(c.wetBulb)}. `:''}${alignment?.note||''} ${c.note}`;
+ const now=Date.now(),current=currentSample(forecast,now);
+ const sample=comfortPreview?forecastSample(forecast,comfortPreview):current;
+ if(!sample){comfortPreview=null;return renderComfort(forecast);}
+ const c=sample.comfort,zone=forecast.location.timeZone,summary=comfortWindow(forecast,now+1);
+ const preview=`<div class="comfort-preview-heading"><span>${esc(sampleCaption(sample,zone))}</span>${sample.now?'':'<button type="button" data-comfort-reset>Back to now</button>'}</div>`;
+ $('skin-values').innerHTML=`${preview}${sunShadeHTML(c,forecast.location,sample.now?now:Date.parse(sample.time),{forecast:!sample.now,condition:sample.condition})}${sample.now?peakComparisonHTML(summary,current.feels,zone):''}`;
+ $('skin-values').querySelector('[data-comfort-reset]')?.addEventListener('click',()=>selectComfortHour('now'));
+ $('skin-explanation').textContent=sample.now?comfortNarrative(sample.inputs,c,summary,zone):`${sample.condition}. This hour uses air ${degrees(sample.temperature)}, dew point ${degrees(sample.inputs.dewpoint)} and ${number(sample.inputs.wind)} mph wind. Shade feels like ${degrees(sample.feels)}. The outdoor illustration and solar estimate use this same forecast hour.`;
+ const tile=$('skin-exposure');tile.dataset.preview=sample.now?'current':'forecast';tile.dataset.weather=weatherState(sample.condition).kind;
+ tile.querySelector('.comfort-weather-art')?.remove();
+ document.querySelectorAll('#hourly [data-comfort-time]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.comfortTime===(sample.now?'now':sample.id))));
+ $('skin-science').textContent=`${c.method}. ${sampleCaption(sample,zone)}. Air ${degrees(sample.temperature)}; dew point ${degrees(sample.inputs.dewpoint)}; wind ${number(sample.inputs.wind)} mph. ${c.note} Current observations and future forecasts are different sources; the Now card uses exactly the same observation as the hero. No temperature or peak is forced upward.`;
 }
 export function renderDailyRows(forecast,icon) {
  const values=forecast.days.flatMap(d=>[d.high,d.low]).filter(finite),lo=values.length?Math.min(...values)-3:0,hi=values.length?Math.max(...values)+3:1;
@@ -119,7 +126,7 @@ export function renderMetricTiles(forecast,smallIcon) {
  const currentComfort=data.comfort||thermalComfort(c,data.location,Date.parse(data.assembledAt));
  const windText=finite(c.wind)?c.wind<3?'Hardly a breeze.':c.wind<12?'A light breeze.':c.wind<25?'A breezy day.':'Strong winds.':'';
  const tiles=[
-  ['feels','temp',temp(currentComfort.shade),'Temp + dew point + wind, in one all-weather calculation.'],
+  ['feels','temp',temp(currentComfort.shade),'UTCI Tier-3 fallback using temperature, moisture, wind and sky/radiant context.'],
   ['precipitation','drop',finite(data.precipitation?.value)?`${number(data.precipitation.value,2)}<small>in</small>`:'—','Expected over the next 24 hours.'],
   ['wind','wind',`${number(c.wind)}<small>mph</small>`,windText],
   ['humidity','drop',`${number(c.humidity)}<small>%</small>`,finite(c.dewpoint)&&c.dewpoint>=65?'The air feels muggy.':finite(c.humidity)?'Moisture in the air.':'Waiting for an update.'],
@@ -200,7 +207,7 @@ export function openMetric(key) {
  $('metric-dialog').showModal();document.body.classList.add('dialog-open');drawChart();
 }
 export function resetExperience() {
- data=null;active=null;
+ data=null;active=null;comfortPreview=null;
  if($('today-forecast'))$('today-forecast').innerHTML='<p class="muted">Daily data is loading.</p>';
  if($('metric-dialog').open)$('metric-dialog').close();
  $('skin-values').textContent='Checking how it will feel…';$('skin-explanation').textContent='Getting the weather for this location.';
