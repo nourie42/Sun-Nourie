@@ -21,43 +21,42 @@ jobs:
           from pathlib import Path
           p=Path('scripts/apply_weather_hourly.py')
           text=p.read_text()
-          line="replace(bulletins,'NWS regional discussion','NWS special discussion')\n"
-          assert text.count(line)==1
-          p.write_text(text.replace(line,''))
+          redundant="replace(bulletins,'NWS regional discussion','NWS special discussion')\n"
+          assert text.count(redundant)==1
+          text=text.replace(redundant,'')
+          humidity_line="replace(backend,\"humidity:source(h.humidity,'Consistent forecast temperature + dew point')\",\"humidity:source(humidity,'Consistent forecast temperature + dew point')\")\n"
+          assert text.count(humidity_line)==1
+          assert "humidity:source(humidity,'Consistent forecast temperature + dew point')" in Path('src/weatherFusionExperience.js').read_text()
+          text=text.replace(humidity_line,'')
+          p.write_text(text)
           PY
           python scripts/apply_weather_hourly.py
           python - <<'PY'
           from pathlib import Path
           p=Path('test/weatherFusionForecastDetails.test.js')
           text=p.read_text()
-          old=r'app\.js\?v=7-forecast-details'
-          # Earlier releases used v7 or v8. Require exactly one expected asset assertion.
-          matches=[x for x in [old,r'app\.js\?v=8-personal'] if x in text]
+          matches=[x for x in [r'app\.js\?v=7-forecast-details',r'app\.js\?v=8-personal'] if x in text]
           assert len(matches)==1,matches
           p.write_text(text.replace(matches[0],r'app\.js\?v=9-hourly'))
           PY
+          find public/weather-fusion -name '*.js' -print0 | xargs -0 -n1 node --check
+          find src -name 'weatherFusion*.js' -print0 | xargs -0 -n1 node --check
           rm scripts/apply_weather_hourly.py .github/workflows/weather-hourly-prepare.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add --all
           git commit -m "Use one timestamp-matched feels-like forecast everywhere; show only special bulletins and improve figures"
-          echo "Reviewed source commit: $(git rev-parse HEAD)" | tee -a "$GITHUB_STEP_SUMMARY"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+          echo "Feature-branch source commit under test: $(git rev-parse HEAD)" | tee -a "$GITHUB_STEP_SUMMARY"
       - run: npm ci
-      - name: Check code and run all weather regressions
-        run: |
-          find public/weather-fusion -name '*.js' -print0 | xargs -0 -n1 node --check
-          find src -name 'weatherFusion*.js' -print0 | xargs -0 -n1 node --check
-          node --test test/weatherFusion*.test.js
+      - name: All weather regressions
+        run: node --test test/weatherFusion*.test.js
       - name: Existing website regression checks
         run: npm run check
       - run: npm install --no-save --package-lock=false playwright@1.55.0
       - run: npx playwright install --with-deps chromium
       - name: Actual UI at six widths, hourly pairing, special bulletins, faces and nighttime
         run: node scripts/weatherFusionPersonalBrowser.js
-      - name: Publish only the tested feature-branch commit
-        run: |
-          git push origin "HEAD:${GITHUB_REF_NAME}"
-          echo "Tested and published feature commit: $(git rev-parse HEAD)" | tee -a "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
