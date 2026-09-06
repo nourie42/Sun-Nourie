@@ -1,7 +1,7 @@
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
-const DAY=86400000;
-
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const HOUR=3600000;
+let horizon=48,selectedEpoch=null,latest=null,lastNow=0,resizeInstalled=false;
 export function dewpointGrossLevel(dewpoint,wind=0){
   if(!finite(dewpoint))return {key:'unknown',label:'Waiting on the dew point',note:'We need a dew-point reading before calling it.'};
   if(dewpoint<50)return {key:'dry',label:'You’re either cold or you’re gettin’ ashy',note:'Very dry air. Moisture is not what is making the weather uncomfortable.'};
@@ -13,73 +13,90 @@ export function dewpointGrossLevel(dewpoint,wind=0){
   return {key:'nope',label:'Nope',note:'Extremely muggy air. Evaporative cooling is heavily limited.'};
 }
 
-function ensureStyles(){
-  if(document.getElementById('weather-nourie-dewpoint-meter-css'))return;
-  const link=document.createElement('link');
-  link.id='weather-nourie-dewpoint-meter-css';link.rel='stylesheet';link.href='/weather-fusion/dewpoint-meter.css?v=2-ten-day';
-  document.head.append(link);
+
+export function dewpointPoints(forecast,now,hours=240){
+ const unique=new Map(),start=Math.ceil(now/HOUR)*HOUR,end=start+hours*HOUR;
+ for(const p of forecast?.metricForecasts?.series?.dewpoint||[]){
+  const t=Date.parse(p.time);if(!finite(t)||t<start||t>=end)continue;
+  if(!unique.has(t)||(!finite(unique.get(t).value)&&finite(p.value)))unique.set(t,{...p,time:new Date(t).toISOString(),epoch:t});
+ }
+ return [...unique.values()].sort((a,b)=>a.epoch-b.epoch);
 }
-function formatHour(time,zone){return new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric'}).format(new Date(time));}
-function formatDay(time,zone){return new Intl.DateTimeFormat('en-US',{timeZone:zone,weekday:'short',month:'numeric',day:'numeric'}).format(new Date(time));}
-function graph(points,zone){
-  const valid=points.filter(p=>finite(p.value));
-  if(valid.length<2)return '<div class="gross-empty">The dew-point forecast is still filling in.</div>';
-  const W=900,H=330,L=48,R=16,T=14,B=44,min=Math.min(40,...valid.map(p=>p.value))-2,max=Math.max(80,...valid.map(p=>p.value))+2,span=Math.max(1,max-min);
-  const x=i=>L+i/Math.max(1,points.length-1)*(W-L-R),y=v=>T+(max-v)/span*(H-T-B);
-  const bands=[
-    {a:75,b:max,cls:'band-nope',label:'NOPE'},
-    {a:70,b:75,cls:'band-nogo',label:'NO-GO'},
-    {a:65,b:70,cls:'band-gross',label:'GROSS'},
-    {a:60,b:65,cls:'band-humid',label:'HUMID'},
-    {a:50,b:60,cls:'band-nice',label:'NOT BAD'},
-    {a:min,b:50,cls:'band-dry',label:'DRY'},
-  ].filter(b=>b.b>min&&b.a<max);
-  const bandRects=bands.map(b=>`<rect class="gross-band ${b.cls}" x="${L}" y="${y(Math.min(max,b.b))}" width="${W-L-R}" height="${Math.max(0,y(Math.max(min,b.a))-y(Math.min(max,b.b)))}"/>`).join('');
-  const bandLabels=bands.map(b=>{const a=Math.max(min,b.a),z=Math.min(max,b.b),cy=(y(a)+y(z))/2;return `<text class="gross-band-label" x="${W-R-8}" y="${cy+4}" text-anchor="end">${b.label}</text>`;}).join('');
-  const thresholds=[50,60,65,70,75].filter(v=>v>min&&v<max).map(v=>`<line class="gross-threshold" x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}"/><text class="gross-y" x="${L-8}" y="${y(v)+4}" text-anchor="end">${v}°</text>`).join('');
-  const first=Date.parse(points[0].time),last=Date.parse(points.at(-1).time),coverageDays=Math.max(1,Math.ceil((last-first)/DAY));
-  const dayTicks=[];
-  for(let d=0;d<=coverageDays;d++){
-    const target=first+d*DAY;let best=0;
-    points.forEach((p,i)=>{if(Math.abs(Date.parse(p.time)-target)<Math.abs(Date.parse(points[best].time)-target))best=i;});
-    if(!dayTicks.includes(best))dayTicks.push(best);
-  }
-  const dayGrid=dayTicks.map((i,n)=>`<line class="gross-day-line" x1="${x(i)}" x2="${x(i)}" y1="${T}" y2="${H-B}"/><text class="gross-x" x="${x(i)}" y="${H-12}" text-anchor="${n===0?'start':n===dayTicks.length-1?'end':'middle'}">${n===0?'Now':esc(formatDay(points[i].time,zone))}</text>`).join('');
-  let path='',drawing=false;
-  points.forEach((p,i)=>{if(!finite(p.value)){drawing=false;return;}path+=`${drawing?'L':'M'}${x(i).toFixed(1)},${y(p.value).toFixed(1)} `;drawing=true;});
-  const dots=points.map((p,i)=>finite(p.value)&&i%6===0?`<circle class="gross-dot" cx="${x(i)}" cy="${y(p.value)}" r="3.2"/>`:'').join('');
-  const firstValid=points.findIndex(p=>finite(p.value));
-  const currentMark=firstValid>=0?`<circle class="gross-current-halo" cx="${x(firstValid)}" cy="${y(points[firstValid].value)}" r="10"/><circle class="gross-current" cx="${x(firstValid)}" cy="${y(points[firstValid].value)}" r="5"/><text class="gross-current-label" x="${x(firstValid)+10}" y="${y(points[firstValid].value)-10}">NOW ${Math.round(points[firstValid].value)}°</text>`:'';
-  return `<svg class="gross-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Dew point forecast for the next ${coverageDays} days">${bandRects}${dayGrid}${thresholds}${bandLabels}<path class="gross-line-shadow" d="${path}"/><path class="gross-line" d="${path}"/>${dots}${currentMark}</svg>`;
+function styles(){
+ if(document.getElementById('weather-nourie-dewpoint-meter-css'))return;
+ const l=document.createElement('link');l.id='weather-nourie-dewpoint-meter-css';l.rel='stylesheet';l.href='/weather-fusion/dewpoint-meter.css?v=3-readable';document.head.append(l);
 }
-function pairedWind(forecast,time){
-  const rows=forecast?.metricForecasts?.series?.wind||[];
-  const stamp=Date.parse(time);
-  let best=null,distance=Infinity;
-  for(const row of rows){const d=Math.abs(Date.parse(row.time)-stamp);if(d<distance&&finite(row.value)){best=row;distance=d;}}
-  return best&&distance<=3600000?best.value:null;
+const hourText=(t,z)=>new Intl.DateTimeFormat('en-US',{timeZone:z,hour:'numeric',minute:'2-digit'}).format(new Date(t));
+const dayText=(t,z)=>new Intl.DateTimeFormat('en-US',{timeZone:z,weekday:'short',month:'numeric',day:'numeric'}).format(new Date(t));
+function pairedWind(f,time){const t=Date.parse(time);return f?.metricForecasts?.series?.wind?.find(p=>Date.parse(p.time)===t)?.value??null;}
+export function graphGeometry(points,hours,viewport=640){
+ const vals=points.filter(p=>finite(p.value)).map(p=>p.value);
+ const min=vals.length?Math.floor((Math.min(...vals)-4)/5)*5:40,max=vals.length?Math.ceil((Math.max(...vals)+4)/5)*5:80;
+ const W=Math.max(viewport,hours>48?Math.ceil(hours/24)*120:hours===48?660:500),height=300,L=48,R=24,T=24,B=42;
+ const first=points[0]?.epoch??0,last=points.at(-1)?.epoch??first+HOUR;
+ return {W,height,L,R,T,B,min,max,first,last,x:t=>L+(t-first)/Math.max(HOUR,last-first)*(W-L-R),y:v=>T+(max-v)/Math.max(5,max-min)*(height-T-B)};
+}
+function graph(points,hours,zone,width){
+ const g=graphGeometry(points,hours,width),{W,height,L,R,T,B,min,max,x,y}=g;
+ const bands=[[-Infinity,50,'dry','DRY'],[50,60,'nice','NOT BAD'],[60,65,'humid','HUMID'],[65,70,'gross','GROSS'],[70,75,'nogo','NO-GO'],[75,Infinity,'nope','NOPE']];
+ const rects=bands.filter(([a,b])=>a<max&&b>min).map(([a,b,c])=>`<rect class="gross-band band-${c}" x="${L}" y="${y(Math.min(max,b))}" width="${W-L-R}" height="${y(Math.max(min,a))-y(Math.min(max,b))}"/>`).join('');
+ const ticks=[];for(let v=min;v<=max;v+=5)ticks.push(`<line class="gross-threshold" x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}"/><text class="gross-y" x="${L-8}" y="${y(v)+4}" text-anchor="end">${v}°</text>`);
+ const step=hours>48?24:6,axis=[];let lastX=-1000;
+ for(const p of points){
+  const local=new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',hourCycle:'h23'}).format(new Date(p.epoch));
+  const isFirst=p===points[0];
+  if(!isFirst&&Number(local)%step!==0)continue;
+  const xx=x(p.epoch);if(xx-lastX<78||xx>W-R-50&&!isFirst)continue;lastX=xx;
+  axis.push(`<line class="gross-day-line" x1="${xx}" x2="${xx}" y1="${T}" y2="${height-B}"/><text class="gross-x" x="${xx}" y="${height-12}" text-anchor="${isFirst?'start':'middle'}">${esc(hours>48?dayText(p.time,zone):hourText(p.time,zone))}</text>`);
+ }
+ let d='',prev=null;
+ for(const p of points){if(!finite(p.value)){prev=null;continue;}const continuous=prev&&p.epoch-prev.epoch<=HOUR*1.1;d+=`${continuous?'L':'M'}${x(p.epoch).toFixed(2)},${y(p.value).toFixed(2)} `;prev=p;}
+ const dots=points.filter((p,i)=>finite(p.value)&&i%3===0).map(p=>`<circle class="gross-dot" cx="${x(p.epoch)}" cy="${y(p.value)}" r="2.4"/>`).join('');
+ return {g,html:`<svg class="gross-chart" width="${W}" height="${height}" viewBox="0 0 ${W} ${height}" style="width:${W}px;height:${height}px;max-width:none" role="img" aria-label="${hours/24}-day dew-point forecast. Tap a point or use the slider for its value.">${rects}${ticks.join('')}${axis.join('')}<path class="gross-line-shadow" d="${d}"/><path class="gross-line" d="${d}"/>${dots}<line class="gross-cursor" y1="${T}" y2="${height-B}"/><circle class="gross-selected" r="5"/></svg>`};
 }
 export function renderDewpointMeter(forecast,now=Date.now()){
-  ensureStyles();
-  const host=document.getElementById('skin-exposure');if(!host)return;
-  let panel=document.getElementById('dewpoint-gross-meter');
-  if(!panel){panel=document.createElement('section');panel.id='dewpoint-gross-meter';panel.className='glass dewpoint-gross-meter';panel.setAttribute('aria-labelledby','gross-title');host.insertAdjacentElement('afterend',panel);}
-  const zone=forecast?.location?.timeZone||'America/New_York';
-  const current=forecast?.current?.dewpoint,wind=forecast?.current?.wind,level=dewpointGrossLevel(current,wind);
-  const series=(forecast?.metricForecasts?.series?.dewpoint||[]).filter(p=>Date.parse(p.time)>=now).slice(0,241);
-  const valid=series.filter(p=>finite(p.value));
-  const worst=valid.length?valid.reduce((a,b)=>b.value>a.value?b:a):null,worstLevel=worst?dewpointGrossLevel(worst.value,pairedWind(forecast,worst.time)):null;
-  const last=series.at(-1),coverageDays=last?Math.max(1,Math.ceil((Date.parse(last.time)-now)/DAY)):0;
-  panel.dataset.level=level.key;
-  panel.innerHTML=`
-    <div class="gross-head">
-      <div><div class="gross-eyebrow">DEW POINT · GROSS METER</div><h2 id="gross-title">${finite(current)?`${Math.round(current)}°`:'—'} <span>${esc(level.label)}</span></h2></div>
-      <div class="gross-pill gross-${level.key}">${esc(level.key==='nice-breeze'?'BREEZE SAVES IT':level.key.replace('-',' ').toUpperCase())}</div>
-    </div>
-    <p class="gross-note">${esc(level.note)}</p>
-    <div class="gross-forecast-title">${coverageDays>=7?`${coverageDays}-DAY`:'EXTENDED'} DEW POINT FORECAST</div>
-    ${worst?`<p class="gross-worst"><strong>Worst in the next ${coverageDays||1} days:</strong> ${Math.round(worst.value)}° around ${esc(formatHour(worst.time,zone))} ${esc(formatDay(worst.time,zone))} · ${esc(worstLevel.label)}</p>`:''}
-    ${graph(series,zone)}
-    <div class="gross-scale" aria-label="Gross meter scale"><span>Dry</span><span>Not bad</span><span>Humid</span><span>Gross</span><span>No-go</span><span>Nope</span></div>`;
+ latest=forecast;lastNow=now;styles();
+ const host=document.getElementById('skin-exposure');if(!host)return;
+ let panel=document.getElementById('dewpoint-gross-meter');
+ if(!panel){panel=document.createElement('section');panel.id='dewpoint-gross-meter';panel.className='glass dewpoint-gross-meter';panel.setAttribute('aria-labelledby','gross-title');host.insertAdjacentElement('afterend',panel);}
+ const scroll=panel.querySelector('.gross-scroll')?.scrollLeft||0;
+ const zone=forecast.location.timeZone||'America/New_York',dp=forecast.current.dewpoint,level=dewpointGrossLevel(dp,forecast.current.wind);
+ const all=dewpointPoints(forecast,now,240),pts=dewpointPoints(forecast,now,horizon),valid=pts.filter(p=>finite(p.value));
+ const worst=valid.reduce((best,p)=>!best||p.value>best.value?p:best,null),coverage=all.filter(p=>finite(p.value)).at(-1);
+ const hoursAvailable=coverage?Math.max(0,Math.floor((coverage.epoch-now)/HOUR)):0;
+ const built=graph(pts,horizon,Math.max(280,panel.clientWidth-40));
+ panel.dataset.level=level.key;panel.dataset.hours=String(horizon);
+ panel.innerHTML=`<div class="gross-eyebrow" id="gross-title">DEW POINT · GROSS METER</div>
+  <div class="gross-now"><strong class="gross-number">${finite(dp)?Math.round(dp)+'°':'—'}</strong><span class="gross-now-label">current dew point</span></div>
+  <p class="gross-verdict">${esc(level.label)}</p><span class="gross-pill gross-${level.key}">${esc(level.key==='nice-breeze'?'BREEZE SAVES IT':level.key==='nogo'?'NO-GO':level.key.toUpperCase())}</span>
+  <p class="gross-note">${esc(level.note)}</p>
+  <div class="gross-toolbar"><span>Explore the forecast</span><div class="gross-periods" role="group" aria-label="Dew-point graph time range">${[[24,'24h'],[48,'48h'],[168,'7 days'],[240,'10 days']].map(([n,l])=>`<button type="button" data-gross-hours="${n}" aria-pressed="${horizon===n}" class="${horizon===n?'selected':''}">${l}</button>`).join('')}</div></div>
+  <p class="gross-coverage">${hoursAvailable>=24?`${Math.floor(hoursAvailable/24)} days ${hoursAvailable%24} hours of forecast available`:'Forecast coverage is limited'}${hoursAvailable<horizon?' · Missing hours stay blank.':''}</p>
+  <div class="gross-selection" aria-live="polite"><strong class="gross-selected-value">—</strong><span class="gross-selected-time"></span><span class="gross-selected-label"></span></div>
+  <p class="gross-scroll-hint">Swipe the timeline ↔ · Tap the line for details</p>
+  <div class="gross-scroll" tabindex="0" role="region" aria-label="Scrollable dew-point forecast chart">${built.html}</div>
+  <label class="gross-slider-label" for="gross-scrubber">Explore each forecast hour</label><input id="gross-scrubber" type="range" min="0" max="${Math.max(0,pts.length-1)}" value="0" ${pts.length?'':'disabled'} aria-label="Forecast dew-point hour"/>
+  <div class="gross-scale"><span>Dry &lt;50°</span><span>Not bad 50–59°</span><span>Humid 60–64°</span><span>Gross 65–69°</span><span>No-go 70–74°</span><span>Nope 75°+</span></div>
+  ${worst?`<p class="gross-worst"><strong>Muggiest in this view:</strong> ${Math.round(worst.value)}° · ${esc(dayText(worst.time,zone))} at ${esc(hourText(worst.time,zone))}</p>`:'<p class="gross-empty">No dew-point forecast is available for these hours.</p>'}`;
+ const select=i=>{
+  const p=pts[Math.max(0,Math.min(pts.length-1,i))];if(!p)return;selectedEpoch=p.epoch;
+  const v=dewpointGrossLevel(p.value,pairedWind(forecast,p.time));
+  panel.querySelector('.gross-selected-value').textContent=finite(p.value)?Math.round(p.value)+'°':'Unavailable';
+  panel.querySelector('.gross-selected-time').textContent=`${dayText(p.time,zone)} · ${hourText(p.time,zone)} forecast`;
+  panel.querySelector('.gross-selected-label').textContent=v.label;
+  const dot=panel.querySelector('.gross-selected'),cursor=panel.querySelector('.gross-cursor');
+  dot.style.display=finite(p.value)?'':'none';if(finite(p.value)){dot.setAttribute('cx',built.g.x(p.epoch));dot.setAttribute('cy',built.g.y(p.value));}
+  cursor.setAttribute('x1',built.g.x(p.epoch));cursor.setAttribute('x2',built.g.x(p.epoch));
+  const slider=panel.querySelector('#gross-scrubber');slider.value=String(pts.indexOf(p));slider.setAttribute('aria-valuetext',`${dayText(p.time,zone)} ${hourText(p.time,zone)}: ${finite(p.value)?Math.round(p.value)+' degrees':'unavailable'}`);
+ };
+ const ix=pts.findIndex(p=>p.epoch===selectedEpoch);select(Math.max(0,ix));
+ panel.querySelector('.gross-scroll').scrollLeft=scroll;
+ panel.querySelectorAll('[data-gross-hours]').forEach(button=>button.addEventListener('click',()=>{horizon=Number(button.dataset.grossHours);selectedEpoch=null;panel.querySelector('.gross-scroll').scrollLeft=0;renderDewpointMeter(latest,lastNow);}));
+ panel.querySelector('#gross-scrubber').addEventListener('input',e=>{
+  select(Number(e.target.value));const p=pts[Number(e.target.value)],scroller=panel.querySelector('.gross-scroll');
+  if(p){const x=built.g.x(p.epoch);if(x<scroller.scrollLeft+50||x>scroller.scrollLeft+scroller.clientWidth-30)scroller.scrollLeft=Math.max(0,x-scroller.clientWidth/2);}
+ });
+ const svg=panel.querySelector('.gross-chart');svg.addEventListener('click',e=>{const rect=svg.getBoundingClientRect(),x=e.clientX-rect.left;const i=pts.reduce((best,p,ix)=>Math.abs(built.g.x(p.epoch)-x)<Math.abs(built.g.x(pts[best].epoch)-x)?ix:best,0);select(i);});
+ if(!resizeInstalled){resizeInstalled=true;let timer;window.addEventListener('resize',()=>{clearTimeout(timer);timer=setTimeout(()=>{if(latest)renderDewpointMeter(latest,lastNow);},150);});}
 }
-export function resetDewpointMeter(){document.getElementById('dewpoint-gross-meter')?.remove();}
+export function resetDewpointMeter(){latest=null;selectedEpoch=null;document.getElementById('dewpoint-gross-meter')?.remove();}

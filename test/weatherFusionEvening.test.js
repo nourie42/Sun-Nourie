@@ -16,11 +16,11 @@ const forecast={
  }}
 };
 
-test('Weather Nourie switches the real-feel card to overnight mode at 6 PM local time',()=>{
- assert.equal(comfortDisplayMode(Date.parse('2026-09-05T21:59:00Z'),zone),'day');
- assert.equal(comfortDisplayMode(Date.parse('2026-09-05T22:00:00Z'),zone),'overnight');
+test('Weather Nourie switches the real-feel card to overnight mode at 3 PM local time and leaves overnight at 5 AM',()=>{
+ assert.equal(comfortDisplayMode(Date.parse('2026-09-05T18:59:00Z'),zone),'day');
+ assert.equal(comfortDisplayMode(Date.parse('2026-09-05T19:00:00Z'),zone),'overnight');
  assert.equal(comfortDisplayMode(evening,zone),'overnight');
- assert.equal(comfortDisplayMode(Date.parse('2026-09-06T09:30:00Z'),zone),'overnight'); // 5:30 AM
+ assert.equal(comfortDisplayMode(Date.parse('2026-09-06T09:30:00Z'),zone),'day'); // 5:30 AM
  assert.equal(comfortDisplayMode(Date.parse('2026-09-06T10:00:00Z'),zone),'day'); // 6 AM
 });
 

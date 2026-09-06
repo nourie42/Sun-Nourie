@@ -32,7 +32,7 @@ test('graph data comes from forecasts and does not hold current pressure or visi
  assert.equal(output.metricForecasts.series.temperature.length,48);
  assert.equal(output.metricForecasts.series.pressure.every(p=>p.value===null),true);
  assert.equal(output.metricForecasts.series.visibility.every(p=>p.value===null),true);
- assert.equal(output.metricForecasts.series.humidity[0].value,65);
+ assert.ok(Math.abs(output.metricForecasts.series.humidity[0].value-58.2)<.1); // Consistent T/dewpoint instead of incompatible RH.
  assert.equal(output.metricForecasts.series.wind[0].value,10);
  assert.ok(output.metricForecasts.series.feels.some(p=>Number.isFinite(p.value)));
  assert.equal(output.metricForecasts.solar.length,7);

@@ -29,7 +29,7 @@ SOURCES = {
     "ecmwf": {"label": "ECMWF IFS", "resolution": "0.25° Open Data grid", "hours": 240, "url": "https://www.ecmwf.int/en/forecasts/datasets/open-data"},
 }
 NOAA_FIELDS = {
-    "hrrr": {("TMP", "2 m above ground"): "temperature", ("DPT", "2 m above ground"): "dewpoint", ("APCP", "surface"): "precipitation", ("REFC", "entire atmosphere"): "reflectivity", ("GUST", "surface"): "gust", ("VIS", "surface"): "visibility"},
+    "hrrr": {("TMP", "2 m above ground"): "temperature", ("DPT", "2 m above ground"): "dewpoint", ("APCP", "surface"): "precipitation", ("REFC", "entire atmosphere"): "reflectivity", ("GUST", "surface"): "gust", ("VIS", "surface"): "visibility", ("UGRD", "10 m above ground"): "u", ("VGRD", "10 m above ground"): "v"},
     "nbm": {("TMP", "2 m above ground"): "temperature", ("APCP", "surface"): "precipitation"},
 }
 ECMWF_FIELDS = {"2t": "temperature", "2d": "dewpoint", "10u": "u", "10v": "v", "tp": "precipitation", "tcc": "clouds", "msl": "pressure_msl"}
@@ -198,7 +198,7 @@ def collect_model(model: str, output: str) -> dict[str, Any]:
     target = out / "models" / f"{model}.json"
     if target.exists():
         old = json.loads(target.read_text())
-        if old.get("runAt") == iso(run) and old.get("schema") == SCHEMA and old.get("complete") and old.get("cardFieldsVersion") == 1 and old.get("forecastHours") == run_hours:
+        if old.get("runAt") == iso(run) and old.get("schema") == SCHEMA and old.get("complete") and old.get("cardFieldsVersion") == 2 and old.get("forecastHours") == run_hours:
             print(f"REUSE {model} run={iso(run)} (no needless GRIB downloads)", flush=True)
             return {"model": model, "runAt": iso(run), "reused": True}
     print(f"COLLECT {model} run={iso(run)}", flush=True)
@@ -346,7 +346,7 @@ def collect_model(model: str, output: str) -> dict[str, Any]:
                         for p in POINTS:
                             value = float(speed[info["point"][p["id"]]])
                             if math.isfinite(value):native[p["id"]]["wind"] = value
-                        save_map("wind","wind",speed,info,end,start,end,step)
+                        if model == "ecmwf":save_map("wind","wind",speed,info,end,start,end,step)
                         components.clear()
                     provenance.append({"url":url,"field":field,"hour":step,"startStep":a,"endStep":b,"sha256":hashlib.sha256(body).hexdigest()})
                 finally:
@@ -369,7 +369,7 @@ def collect_model(model: str, output: str) -> dict[str, Any]:
         future=[r for r in p["native"] if r["time"] > now.timestamp()]
         if len(future)<12 or not any(r["value"]>=0 and r["end"]>now.timestamp() for r in p["precipitationIntervals"]):
             raise ValueError(f"{model} insufficient future numerical coverage")
-    data = {"schema":SCHEMA,"model":model,"label":SOURCES[model]["label"],"resolution":SOURCES[model]["resolution"],"runAt":iso(run),"generatedAt":iso(dt.datetime.now(UTC)),"validUntil":iso(run+dt.timedelta(hours=run_hours)),"forecastHours":run_hours,"complete":True,"sourceUrl":SOURCES[model]["url"],"transport":"Official provider public-cloud copy; indexed GRIB2 byte-range extraction with ECMWF ecCodes","interpolation":"Native nearest-gridpoint data. Temperature and wind are linearly interpolated only between samples <=6h apart; precipitation is uniformly allocated within its native accumulation interval. Reflectivity is never time-interpolated.","cyclePolicy":"Latest completed run: HRRR checked hourly (48 h at 00/06/12/18Z, shorter horizon on intervening cycles); ECMWF IFS 00/12Z; NBM hourly.","cardFieldsVersion":1,"points":list(points.values()),"maps":maps,"provenance":provenance}
+    data = {"schema":SCHEMA,"model":model,"label":SOURCES[model]["label"],"resolution":SOURCES[model]["resolution"],"runAt":iso(run),"generatedAt":iso(dt.datetime.now(UTC)),"validUntil":iso(run+dt.timedelta(hours=run_hours)),"forecastHours":run_hours,"complete":True,"sourceUrl":SOURCES[model]["url"],"transport":"Official provider public-cloud copy; indexed GRIB2 byte-range extraction with ECMWF ecCodes","interpolation":"Native nearest-gridpoint data. Temperature and wind are linearly interpolated only between samples <=6h apart; precipitation is uniformly allocated within its native accumulation interval. Reflectivity is never time-interpolated.","cyclePolicy":"Latest completed run: HRRR checked hourly (48 h at 00/06/12/18Z, shorter horizon on intervening cycles); ECMWF IFS 00/12Z; NBM hourly.","cardFieldsVersion":2,"points":list(points.values()),"maps":maps,"provenance":provenance}
     target.write_text(json.dumps(data,separators=(",",":"),allow_nan=False))
     print(f"SUCCESS {model} run={data['runAt']} points={len(points)} messages={len(provenance)} frames={sum(map(len,maps.values()))}",flush=True)
     return {"model":model,"runAt":data["runAt"],"messages":len(provenance),"complete":True}
@@ -394,8 +394,13 @@ def main():
         entry={k:data[k] for k in ["model","label","resolution","runAt","generatedAt","validUntil","sourceUrl","maps","cyclePolicy"]}
         manifest["models"].append(entry)
         for frames in data["maps"].values():referenced.update(f["file"] for f in frames)
-    for path in (out/"maps").glob('*.png'):
-        if str(path.relative_to(out)) not in referenced:path.unlink()
+    # Keep the last two run families while old clients finish loading a cached
+    # catalog. Deleting every previous frame on publication caused transient 404s.
+    paths=list((out/"maps").glob('*.png'))
+    runs={m:sorted({p.name.split('-')[1] for p in paths if p.name.startswith(m+'-')},reverse=True)[:2] for m in SOURCES}
+    for path in paths:
+        parts=path.name.split('-')
+        if str(path.relative_to(out)) not in referenced and (len(parts)<3 or parts[1] not in runs.get(parts[0],[])):path.unlink()
     (out/"manifest.json").write_text(json.dumps(manifest,separators=(",",":"),allow_nan=False))
     (out/"collection-status.json").write_text(json.dumps({"checkedAt":iso(dt.datetime.now(UTC)),"results":results},indent=2))
     print(json.dumps({"collected":results,"manifestModels":len(manifest['models'])},indent=2),flush=True)

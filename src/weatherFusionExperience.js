@@ -1,5 +1,8 @@
+import {temperaturePolicy,forecastDayIndex,eveningPeriod} from './weatherFusionPolicy.js';
+import {weighted} from './weatherFusionDirect.js';
+import {alignComfortHours} from './weatherFusionNowcast.js';
 /** Actual forecast series for the tap-to-explore cards. No invented or held-flat data. */
-import {EXPERIENCE_VERSION, finite, thermalComfort, shadeFeelsLike} from '../public/weather-fusion/weather-math.js';
+import {EXPERIENCE_VERSION, finite, thermalComfort, shadeFeelsLike, humidityFromDewpoint} from '../public/weather-fusion/weather-math.js';
 const H=3600000;
 const num=n=>finite(n)?n:null;
 const round=(n,d=1)=>finite(n)?Number(n.toFixed(d)):null;
@@ -33,53 +36,68 @@ function modelSample(models,time,field,ids) {
 }
 export function addExperience(out,{models={},grid,periods=[],now,solarTimes,nextDate}) {
  const source=(value,name)=>({value:num(value),source:finite(value)?name:null});
- const choose=(...candidates)=>candidates.find(x=>finite(x.value))||{value:null,source:null};
- const series=Object.fromEntries(['temperature','feels','precipitation','wind','gust','humidity','dewpoint','pop','visibility','pressure'].map(k=>[k,[]]));
+ const choose=(...items)=>items.find(x=>finite(x.value))||{value:null,source:null};
+ const zone=out.location.timeZone;
+ const mix=(official,time,field)=>{
+   const values={nws:official};
+   for(const id of ['hrrr','ecmwf','nbm'])values[id]=modelSample(models,time,field,[id]).value;
+   const result=weighted(values,temperaturePolicy(forecastDayIndex(time,now,zone)));
+   return {...result,source:result.sources.map(s=>`${s.id.toUpperCase()} ${Math.round(s.weight*100)}%`).join(' / ')||null};
+ };
+ const raw=[];
+ const fieldsByTime=new Map();
  for(const h of out.hours) {
-  const time=Date.parse(h.time);
-  const wind=choose(source(gridSample(grid,'windSpeed',time,'wind'),'NWS grid'),source(parseWind(h.wind),'NWS hourly'),modelSample(models,time,'wind_speed_10m',['nbm','ecmwf','hrrr']));
-  const humidity=choose(source(gridSample(grid,'relativeHumidity',time,'percent'),'NWS grid'),source(h.humidity,'NWS hourly'),modelSample(models,time,'relative_humidity_2m',['hrrr','ecmwf','nbm']));
-  const dewpoint=choose(source(gridSample(grid,'dewpoint',time,'temperature'),'NWS grid'),source(h.dewpoint,'NWS hourly'),modelSample(models,time,'dew_point_2m',['hrrr','ecmwf','nbm']));
-  const gust=choose(source(gridSample(grid,'windGust',time,'wind'),'NWS grid'),modelSample(models,time,'wind_gusts_10m',['hrrr','nbm','ecmwf']));
-  const visibility=choose(source(gridSample(grid,'visibility',time,'distance'),'NWS grid'),modelSample(models,time,'visibility',['hrrr']));
-  const pressure=modelSample(models,time,'pressure_msl',['ecmwf']);
-  const feels=shadeFeelsLike(h.temperature,humidity.value,wind.value,dewpoint.value);
-  const fields={temperature:source(h.temperature,'Forecast blend'),feels:source(feels.value,feels.method),precipitation:source(h.precipitation,h.precipitationSource),pop:source(h.pop,'NWS hourly'),wind,gust,humidity,dewpoint,visibility,pressure};
-  for(const [key,value] of Object.entries(fields)) {
-   const digits=key==='precipitation'?4:key==='pressure'?3:1;
-   series[key].push({time:h.time,value:round(value.value,digits),source:value.source, ...(value.runAt?{runAt:value.runAt}:{}),...(key==='precipitation'?{end:new Date(time+H).toISOString()}: {})});
-  }
+   const epoch=Date.parse(h.time),time=new Date(epoch).toISOString();
+   const wind=mix(gridSample(grid,'windSpeed',epoch,'wind')??parseWind(h.wind),epoch,'wind_speed_10m');
+   const dewpoint=mix(gridSample(grid,'dewpoint',epoch,'temperature')??h.dewpoint,epoch,'dew_point_2m');
+   const humidity=humidityFromDewpoint(h.temperature,finite(dewpoint.value)?Math.min(h.temperature,dewpoint.value):null)??gridSample(grid,'relativeHumidity',epoch,'percent')??h.humidity;
+   const gust=choose(source(gridSample(grid,'windGust',epoch,'wind'),'NWS grid'),modelSample(models,epoch,'wind_gusts_10m',['hrrr','nbm','ecmwf']));
+   const visibility=choose(source(gridSample(grid,'visibility',epoch,'distance'),'NWS grid'),modelSample(models,epoch,'visibility',['hrrr']));
+   const pressure=modelSample(models,epoch,'pressure_msl',['ecmwf']);
+   raw.push({epoch,time,temperature:h.temperature,dewpoint:dewpoint.value,humidity,wind:wind.value});
+   fieldsByTime.set(epoch,{temperature:source(h.temperature,'Forecast blend'),dewpoint,wind,humidity:source(humidity,'Consistent forecast temperature + dew point'),gust,visibility,pressure,
+     precipitation:source(h.precipitation,h.precipitationSource),pop:source(h.pop,'NWS hourly')});
  }
- // The NWS hourly product is intentionally limited to 48 hours, but the Gross Meter
- // needs an honest extended dew-point outlook. Append only real direct-model values;
- // do not hold a reading flat or invent missing hours. HRRR wins when its fresh run
- // covers the hour, then ECMWF supplies the extended horizon.
- const extendedStart=Math.ceil(now/H)*H, extendedEnd=extendedStart+240*H;
- for(const [key,field,ids,digits] of [
-  ['dewpoint','dew_point_2m',['hrrr','ecmwf','nbm'],1],
-  ['wind','wind_speed_10m',['hrrr','ecmwf','nbm'],1],
- ]){
-  const existing=new Set(series[key].map(p=>p.time));
-  for(let time=extendedStart;time<=extendedEnd;time+=H){
-   const stamp=new Date(time).toISOString();if(existing.has(stamp))continue;
-   const value=modelSample(models,time,field,ids);
-   if(finite(value.value))series[key].push({time:stamp,value:round(value.value,digits),source:value.source,...(value.runAt?{runAt:value.runAt}:{})});
-  }
-  series[key].sort((a,b)=>Date.parse(a.time)-Date.parse(b.time));
+ const aligned=alignComfortHours(raw,out.current,now);
+ const series=Object.fromEntries(['temperature','feels','precipitation','wind','gust','humidity','dewpoint','pop','visibility','pressure'].map(k=>[k,[]]));
+ for(const r of aligned.hours) {
+   const fields={...fieldsByTime.get(r.epoch),feels:{value:r.feels,source:r.method}};
+   for(const [key,v] of Object.entries(fields)) {
+     const digits=key==='precipitation'?4:key==='pressure'?3:1;
+     series[key].push({time:r.time,value:round(v.value,digits),source:v.source,
+       ...(v.sources?{sources:v.sources}:{}),...(v.runAt?{runAt:v.runAt}:{}),
+       ...(key==='feels'?{inputs:{temperature:round(r.temperature),dewpoint:round(r.dewpoint),wind:round(r.wind),humidity:round(r.humidity)},rawInputs:r.rawInputs,alignmentFactor:r.alignmentFactor}:{}),
+       ...(key==='precipitation'?{end:new Date(r.epoch+H).toISOString()}: {})});
+   }
  }
- const days=out.days.map((d,index)=>({date:d.date,...solarTimes(d.date,out.location.latitude,out.location.longitude)}));
- out.metricForecasts={version:EXPERIENCE_VERSION,series,solar:days,dewpointHorizonHours:240,notes:{pressure:'Mean sea-level pressure forecast; separate from the observed station pressure on the card.',visibility:'NWS visibility where published, otherwise HRRR model visibility. Missing intervals stay blank.',feels:'Calculated shade apparent temperature using forecast temperature, humidity/dew point and wind. Not a measured skin temperature.',dewpoint:'NWS/local guidance first in the near term; fresh HRRR and ECMWF direct-model dew points extend the Gross Meter. Missing hours are never filled from the current reading.',precipitation:'Hourly liquid-equivalent forecast amounts; coarse source intervals are apportioned uniformly. This does not predict minute-exact rain timing.',wind:'NWS grid/period wind first; numeric speed from a forecast range uses the upper value.',solar:'Astronomical sunrise, sunset and daylight duration; not cloud or sunshine duration.'}};
+ // Build a unique epoch-based time axis. Local offset strings and UTC strings
+ // for the same instant are NOT two samples. Keep explicit missing-hour gaps.
+ const start=Math.floor(now/H)*H,end=start+240*H;
+ for(const [key,field,gridField,kind] of [['dewpoint','dew_point_2m','dewpoint','temperature'],['wind','wind_speed_10m','windSpeed','wind']]) {
+   const existing=new Map(series[key].map(p=>[Date.parse(p.time),p]));
+   const extended=[];
+   for(let epoch=start;epoch<=end;epoch+=H) {
+     if(existing.has(epoch)){extended.push(existing.get(epoch));continue;}
+     const value=mix(gridSample(grid,gridField,epoch,kind),epoch,field);
+     extended.push({time:new Date(epoch).toISOString(),value:round(value.value),source:value.source,sources:value.sources});
+   }
+   series[key]=extended;
+ }
+ const valid=series.dewpoint.filter(p=>finite(p.value)&&Date.parse(p.time)>=now);
+ const days=out.days.map(d=>({date:d.date,...solarTimes(d.date,out.location.latitude,out.location.longitude)}));
+ out.metricForecasts={version:EXPERIENCE_VERSION,series,solar:days,comfortAlignment:aligned.alignment,
+   dewpointHorizonHours:valid.length?Math.max(0,(Date.parse(valid.at(-1).time)-start)/H):0,
+   notes:{pressure:'Mean sea-level forecast pressure is separate from observed station pressure.',visibility:'NWS visibility where published, otherwise HRRR; missing intervals stay blank.',
+     feels:'Same all-weather equation for every forecast hour. Temperature, dew point and wind are blended consistently. A bounded near-term station residual fades out over three hours; raw inputs and the adjustment are retained. Not a measured skin temperature or guaranteed forecast.',
+     dewpoint:'Current dew point is a station observation. The graph is forecast data, not a replay of that observation. Current day starts at NWS 40% / HRRR 40% / ECMWF 20%; absent inputs are renormalized. Coarse model samples are interpolated, not independent hourly predictions.',
+     precipitation:'Hourly liquid-equivalent amounts; coarse source intervals are apportioned uniformly, not minute-exact timing.',wind:'NWS, HRRR and ECMWF numeric speeds; current-day starting weights 40/40/20, renormalized for missing sources.',solar:'Astronomical sunrise and sunset, not sunshine duration.'}};
  out.comfort=thermalComfort(out.current,out.location,now);
  out.experienceVersion=EXPERIENCE_VERSION;
- for(const d of out.days){
-  const night=periods.find(p=>!p.isDaytime&&new Intl.DateTimeFormat('en-CA',{timeZone:out.location.timeZone,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(p.startTime))===d.date);
-  d.nightCondition=night?.shortForecast||'';
- }
- // Recover an official daytime high while "Today" is still shown. No observation is relabeled a daily high.
- const hour=Number(new Intl.DateTimeFormat('en-US',{timeZone:out.location.timeZone,hour:'numeric',hourCycle:'h23'}).format(new Date(now)));
+ for(const d of out.days)d.nightCondition=eveningPeriod(periods,d.date,zone,now)?.shortForecast||'';
+ const hour=Number(new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',hourCycle:'h23'}).format(new Date(now)));
  if(hour<15&&!finite(out.days[0]?.high)) {
-  const high=gridSample(grid,'maxTemperature',now,'temperature');
-  if(finite(high)){out.days[0].high=Math.round(high);out.days[0].temperatureSource='NWS maximum-temperature grid';}
+   const high=gridSample(grid,'maxTemperature',now,'temperature');
+   if(finite(high)){out.days[0].high=Math.round(high);out.days[0].temperatureSource='NWS maximum-temperature grid';}
  }
  return out;
 }

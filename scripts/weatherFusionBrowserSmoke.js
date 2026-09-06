@@ -1,4 +1,6 @@
 /** Actual HTTP + browser integration checks, not a screenshot-only mock. */
+import {createHash} from 'node:crypto';
+import {REPAIR_VERSION} from '../src/weatherFusionPolicy.js';
 import {chromium} from 'playwright';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -10,10 +12,32 @@ async function json(path){
  const res=await fetch(base+path,{signal:AbortSignal.timeout(75000)});
  assert.ok(res.ok,`${path}: HTTP ${res.status}`);return res.json();
 }
+// Do not mistake a previous deployment with the same old schema for this repair.
+if(live){
+ const paths=['app.js','experience.js','hero-mode.js','comfort-outlook.js','frame-player.js','dewpoint-meter.js','dewpoint-meter.css'];
+ const wanted=Object.fromEntries(await Promise.all(paths.map(async p=>[p,createHash('sha256').update(await fs.readFile('public/weather-fusion/'+p)).digest('hex')])));
+ let deployed=false;
+ for(let attempt=0;attempt<35&&!deployed;attempt++){
+   try{
+     const d=await json('/api/weather-fusion/forecast?location=knightdale');
+     if(d.repairVersion===REPAIR_VERSION){
+       const actual=await Promise.all(paths.map(async p=>{const res=await fetch(base+'/weather-fusion/'+p+'?verify='+Date.now(),{cache:'no-store',signal:AbortSignal.timeout(15000)});if(!res.ok)return false;return createHash('sha256').update(await res.text()).digest('hex')===wanted[p];}));
+       deployed=actual.every(Boolean);
+     }
+   }catch{}
+   if(!deployed)await new Promise(r=>setTimeout(r,15000));
+ }
+ assert.ok(deployed,'Production must serve the exact reviewed frontend files and repaired backend before testing');
+}
 const report={checkedAt:new Date().toISOString(),base,locations:[],maps:[],browserErrors:[],liveAI:live,skinExposure:null,dewpointGross:null};
 for(const location of ['knightdale','greenville']){
  const data=await json('/api/weather-fusion/forecast?location='+location);
  assert.equal(data.version,'weather-fusion-v2-direct');
+ assert.equal(data.repairVersion,REPAIR_VERSION);
+ assert.deepEqual(data.blendPolicy.sameDay,{nws:.4,hrrr:.4,ecmwf:.2});
+ const dp=data.metricForecasts.series.dewpoint;
+ assert.equal(dp.length,new Set(dp.map(p=>Date.parse(p.time))).size,'No duplicate dew-point instants');
+ assert.ok(dp.filter(p=>Number.isFinite(p.value)).length>=168,'Saved locations need at least seven days of populated dew-point forecast');
  assert.equal(data.experienceVersion,'weather-nourie-friendly-v1');
  assert.equal(data.directModelStatus,'ready',`${location}: ${JSON.stringify(data.feeds)}`);
  assert.equal(data.modelContributions.length,3);
@@ -66,6 +90,11 @@ try{
   assert.ok(urls.every(url=>url.includes('basemap.nationalmap.gov')));
   report.maps.push({layer:'basemap-'+style,loaded:true,provider:'USGS The National Map'});
  }
+ const startOverlayAudit=async()=>page.evaluate(()=>{
+   window.modelOverlayAudit=[];
+   new MutationObserver(()=>{const all=[...document.querySelectorAll('.leaflet-image-layer')];window.modelOverlayAudit.push({total:all.length,visible:all.filter(i=>getComputedStyle(i).opacity!=='0').length});}).observe(document.querySelector('#radar-map'),{subtree:true,childList:true,attributes:true,attributeFilter:['style']});
+ });
+ await startOverlayAudit();
  for(const layer of ['hrrr','ecmwf','nbm','temperature','wind','clouds']){
   await page.locator(`[data-layer="${layer}"]`).click();
   await page.waitForFunction(()=>{
@@ -75,6 +104,13 @@ try{
   },null,{timeout:60000});
   const src=await page.locator('.leaflet-image-layer').last().getAttribute('src');
   assert.ok(src.includes('weather-fusion-data/maps/'));
+  assert.equal(await page.locator('.leaflet-image-layer').count(),1,layer+' must have only one settled image');
+  if(['hrrr','nbm'].includes(layer)){
+    await page.locator('#radar-play').click();await page.waitForTimeout(5500);
+    if((await page.locator('#radar-play').innerText()).includes('Ⅱ'))await page.locator('#radar-play').click();
+    await page.waitForFunction(()=>document.querySelectorAll('.leaflet-image-layer').length===1&&!document.querySelector('#radar-stamp').textContent.includes('loading'),null,{timeout:30000});
+    assert.equal(await page.locator('#map-error').isVisible(),false);
+  }
   report.maps.push({layer,loaded:true,src,caption:await page.locator('#map-caption').innerText()});
  }
  await page.locator('[data-layer="hrrr"]').click();
@@ -101,15 +137,25 @@ try{
  await page.evaluate(()=>document.activeElement?.blur());
  await page.screenshot({path:dir+'/desktop.png',fullPage:true});
  await page.setViewportSize({width:390,height:844});
+ const desktopAudit=await page.evaluate(()=>window.modelOverlayAudit||[]);
+ assert.ok(desktopAudit.length>0,'Overlay audit must collect desktop samples');
  await page.reload({waitUntil:'domcontentloaded'});
  await page.waitForFunction(()=>document.querySelectorAll('#metrics .metric-value').length===8,null,{timeout:75000});
  await page.waitForFunction(()=>/°.*(?:in the shade|right now)/.test(document.querySelector('#skin-values')?.textContent||''),null,{timeout:30000});
  await page.waitForFunction(()=>document.querySelector('#dewpoint-gross-meter .gross-chart'),null,{timeout:30000});
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),true,'Mobile document overflows horizontally');
+ await startOverlayAudit();
  await page.locator('[data-layer="ecmwf"]').click();
  await page.waitForFunction(()=>document.querySelector('#map-error').hidden && document.querySelectorAll('.leaflet-image-layer').length>0,null,{timeout:60000});
  await page.evaluate(()=>document.activeElement?.blur());
  await page.screenshot({path:dir+'/mobile.png',fullPage:true});
+ await page.locator('#dewpoint-gross-meter').screenshot({path:dir+'/gross-meter-mobile.png'});
+ await page.locator('.hero').screenshot({path:dir+'/hero-mobile.png'});
+ await page.locator('[data-gross-hours="168"]').click();
+ assert.ok(await page.locator('.gross-scroll').evaluate(el=>el.scrollWidth>el.clientWidth));
+ await page.locator('#gross-scrubber').fill('30');
+ assert.match(await page.locator('.gross-selected-time').innerText(),/forecast/);
+ await page.locator('#dewpoint-gross-meter').screenshot({path:dir+'/gross-meter-week.png'});
  report.metricCharts=[];
  for(const key of ['feels','precipitation','wind','humidity','pop','visibility','pressure','solar']) {
   await page.locator(`[data-metric="${key}"]`).click();
@@ -123,6 +169,12 @@ try{
   report.metricCharts.push({key,value,available});
   await page.keyboard.press('Escape');
  }
+ const mobileAudit=await page.evaluate(()=>window.modelOverlayAudit||[]);
+ assert.ok(mobileAudit.length>0,'Overlay audit must collect mobile samples');
+ const audit=[...desktopAudit,...mobileAudit];
+ assert.ok(audit.every(a=>a.total<=2&&a.visible<=1),'A model loop left overlapping or orphaned overlays');
+ report.overlayAudit={samples:audit.length,maxTotal:Math.max(0,...audit.map(a=>a.total)),maxVisible:Math.max(0,...audit.map(a=>a.visible))};
+ report.release=REPAIR_VERSION;
  assert.deepEqual(report.browserErrors,[]);
  report.success=true;
 }finally{await browser.close();await fs.writeFile(dir+'/report.json',JSON.stringify(report,null,2));}

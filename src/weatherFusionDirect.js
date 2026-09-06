@@ -1,4 +1,5 @@
 /** Direct, decoded NOAA/ECMWF model snapshots. No provider key and no webpage scraping. */
+import {SAME_DAY_WEIGHTS,temperaturePolicy as tempPolicy,precipitationPolicy,forecastDayIndex,eveningPeriod,REPAIR_VERSION} from './weatherFusionPolicy.js';
 import {shadeFeelsLike} from '../public/weather-fusion/weather-math.js';
 export const DATA_ROOT = 'https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/';
 export const DIRECT_SCHEMA = 'weather-fusion-direct-v2';
@@ -76,7 +77,7 @@ export function createDirectModels({ fetchImpl = globalThis.fetch, now = Date.no
   return { load, maps };
 }
 /** Integrate a complete native QPF interval window; gaps and overlaps never become zero. */
-export function intervalTotal(intervals, start, end) {
+export function intervalTotal(intervals, start, end, precision = 4) {
   if (!(finite(start) && finite(end) && end > start)) return null;
   let cursor = start/1000, total = 0;
   const finish = end/1000;
@@ -87,7 +88,7 @@ export function intervalTotal(intervals, start, end) {
     const b = Math.min(r.end, finish);
     total += r.value * (b-cursor)/(r.end-r.start);
     cursor = b;
-    if (cursor >= finish-0.001) return round(total, 4);
+    if (cursor >= finish-0.001) return round(total, precision);
   }
   return null;
 }
@@ -117,8 +118,6 @@ function sample(payload, time, field) {
   const h = payload?.hourly, i = h?.time?.indexOf(time/1000);
   return i >= 0 && finite(h[field]?.[i]) ? h[field][i] : null;
 }
-function tempPolicy(index) { return index === 0 ? { nws:.6,hrrr:.2,ecmwf:.1,nbm:.1 } : index === 1 ? { nws:.6,hrrr:.1,ecmwf:.2,nbm:.1 } : { nws:.6,ecmwf:.25,nbm:.15 }; }
-function rainPolicy(leadHours) { return leadHours <= 24 ? { hrrr:.6,ecmwf:.4 } : { ecmwf:.6,nbm:.25,nws:.15 }; }
 /** Astronomical sunrise/sunset, independent of model availability. */
 export function solarTimes(date, latitude, longitude) {
   if (!finite(latitude) || !finite(longitude)) return { sunrise:null,sunset:null };
@@ -137,18 +136,33 @@ export function enhanceForecast(out, { models, grid, periods = [], now, gridQpf,
   const sourceModels = Object.fromEntries(Object.entries(models).filter(([,m]) => m?.direct));
   const active = Object.keys(sourceModels);
   function qpf(start,end,index) {
-    const values = { nws: gridQpf(grid,start,end) };
-    for (const [id,m] of Object.entries(sourceModels)) values[id]=intervalTotal(m.precipitationIntervals,start,end);
-    const result = weighted(values,rainPolicy(index === 0 ? 0 : (start-now)/H));
-    // Preserve operational NWS/NBM fallbacks without claiming an absent HRRR/IFS contribution.
-    const backup = result.value === null ? weighted(values,{nbm:.6,nws:.4}) : result;
-    return { ...backup, start:iso(start),end:iso(end),sourceValues:values,
-      source:backup.sources.length ? backup.sources.map((s)=>`${s.id.toUpperCase()} ${Math.round(s.weight*100)}%`).join(' / ') : 'Unavailable' };
+    // Blend each time segment first. An 18-hour HRRR run must contribute where
+    // covered rather than being discarded for not covering an entire 24h window.
+    const totals={}, durations={}, sourceTotals={}, sourceCoverage={};
+    let total=0, covered=0;
+    for(let cursor=start; cursor<end; ) {
+      const stop=Math.min(end,(Math.floor(cursor/H)+1)*H),span=stop-cursor;
+      const policy=precipitationPolicy(index===0 ? 0 : forecastDayIndex(cursor,now,out.location.timeZone));
+      const values={nws:gridQpf(grid,cursor,stop,8)};
+      for(const [id,m] of Object.entries(sourceModels))values[id]=intervalTotal(m.precipitationIntervals,cursor,stop,8);
+      let result=weighted(values,policy);
+      if(result.value===null)result=weighted(values,{nbm:1});
+      for(const [id,v] of Object.entries(values))if(finite(v)){sourceTotals[id]=(sourceTotals[id]||0)+v;sourceCoverage[id]=(sourceCoverage[id]||0)+span;}
+      if(result.value===null)return {value:null,sources:[],calibrated:false,start:iso(start),end:iso(end),sourceValues:values,source:'Incomplete forecast coverage'};
+      total+=result.sources.reduce((n,s)=>n+s.value*s.weight,0);covered+=span;
+      for(const src of result.sources){totals[src.id]=(totals[src.id]||0)+src.value*src.weight;durations[src.id]=(durations[src.id]||0)+src.weight*span;}
+      cursor=stop;
+    }
+    const sources=Object.keys(totals).map(id=>({id,weight:round(durations[id]/covered,6),value:round(sourceTotals[id],4),coverageHours:round(sourceCoverage[id]/H,1)}));
+    return {value:covered?round(total,3):null,sources,calibrated:false,start:iso(start),end:iso(end),
+      sourceValues:Object.fromEntries(['nws',...active].map(id=>[id,sourceCoverage[id]>=end-start?round(sourceTotals[id],4):null])),
+      source:sources.length?sources.map(s=>`${s.id.toUpperCase()} ${Math.round(s.weight*100)}%`).join(' / '):'Unavailable',
+      weighting:'Per-hour blend; displayed weights are window-average contributions. HRRR contributes only within its published horizon.'};
   }
   // For direct model forecasts align temperature samples to NWS day/night periods.
   for (const [index,d] of out.days.entries()) {
     const day = periods.find((p)=>p.isDaytime && Date.parse(p.endTime)>now && dateKey(Date.parse(p.startTime),out.location.timeZone)===d.date);
-    const night = periods.find((p)=>!p.isDaytime && Date.parse(p.endTime)>now && dateKey(Date.parse(p.startTime),out.location.timeZone)===d.date);
+    const night = eveningPeriod(periods,d.date,out.location.timeZone,now);
     d.official = { high:d.high,low:d.low,condition:d.condition,pop:d.pop,detail:d.detail,nightDetail:d.nightDetail };
     if (active.length) {
       for (const [kind,period] of [['high',day],['low',night]]) {
@@ -188,7 +202,7 @@ export function enhanceForecast(out, { models, grid, periods = [], now, gridQpf,
     const time=Date.parse(hour.time),values={nws:hour.temperature};
     for(const [id,m] of Object.entries(sourceModels)) values[id]=sample(m,time,'temperature_2m');
     hour.officialTemperature=hour.temperature;
-    if(active.length){hour.temperatureBlend=weighted(values,tempPolicy((time-now)/H<24?0:1));hour.temperature=round(hour.temperatureBlend.value,0);}
+    if(active.length){hour.temperatureBlend=weighted(values,tempPolicy(forecastDayIndex(time,now,out.location.timeZone)));hour.temperature=round(hour.temperatureBlend.value,0);}
     const rain=qpf(time,time+H,(time-now)/H<24?0:1);
     hour.precipitation=rain.value;hour.precipitationSource=rain.source;
     hour.reflectivity=sample(sourceModels.hrrr,time,'reflectivity');
@@ -201,6 +215,8 @@ export function enhanceForecast(out, { models, grid, periods = [], now, gridQpf,
   out.modelContributions=active.map(id=>({id,runAt:sourceModels[id].runAt,resolution:sourceModels[id].resolution}));
   out.convectiveGuidance=out.hours.filter(h=>finite(h.reflectivity)||finite(h.nearbyReflectivity)).slice(0,30).map(h=>({time:h.time,pointReflectivityDbz:h.reflectivity,nearby25kmMaxReflectivityDbz:h.nearbyReflectivity}));
   out.google={status:'access-required',contributes:false,label:'Google WeatherNext',message:'Not included: approved Google WeatherNext dataset access has not been configured.',url:'https://developers.google.com/weathernext/guides/access-forecast'};
-  out.methodology='Numeric Weather Fusion blend: NWS is the largest temperature input (60% starting weight). HRRR, ECMWF IFS and NBM contribute only where a fresh run fully covers the requested period. Near-term precipitation starts at HRRR 60% / ECMWF 40%; extended precipitation at ECMWF 60% / NBM 25% / NWS 15%, with documented fallbacks. Available weights renormalize; missing values never become zero. These are uncalibrated starting weights, not a proven accuracy ranking. NWS precipitation probability remains separate and official warnings are never altered. Raw models use native gridpoint samples; ECMWF is the 0.25° Open Data grid. Coarser precipitation intervals are prorated at boundaries; interpolated hourly amounts do not establish storm arrival times. Today’s daily rain card covers only the remaining period when earlier forecast hours have passed; the main precipitation metric covers the next 24 hours.';
+  out.repairVersion=REPAIR_VERSION;
+  out.blendPolicy={sameDay:SAME_DAY_WEIGHTS,probability:'NWS only; deterministic rain amounts are not probabilities',partialCoverage:'Unavailable inputs are excluded and remaining weights renormalized'};
+  out.methodology='Numeric Weather Nourie blend: Current-day temperatures start at NWS 40% / HRRR 40% / ECMWF 20%. HRRR, ECMWF IFS and NBM contribute only where a fresh run fully covers the requested period. Current-day precipitation starts at NWS 40% / HRRR 40% / ECMWF 20%, blended per hour so a short HRRR run still contributes; extended precipitation at ECMWF 60% / NBM 25% / NWS 15%, with documented fallbacks. Available weights renormalize; missing values never become zero. These are uncalibrated starting weights, not a proven accuracy ranking. NWS precipitation probability remains separate and official warnings are never altered. Raw models use native gridpoint samples; ECMWF is the 0.25° Open Data grid. Coarser precipitation intervals are prorated at boundaries; interpolated hourly amounts do not establish storm arrival times. Today’s daily rain card covers only the remaining period when earlier forecast hours have passed; the main precipitation metric covers the next 24 hours.';
   return out;
 }

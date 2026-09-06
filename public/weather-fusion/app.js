@@ -1,3 +1,4 @@
+import {createFramePlayer} from './frame-player.js';
 import {renderComfort,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js';
 import {dailyDisplay} from './weather-math.js';
 import {heroWeather} from './hero-mode.js';
@@ -17,6 +18,7 @@ let place = presets.knightdale, forecast = null, generation = 0, busy = false, s
 let map = null, baseLayer = null, radarLayer = null, warningLayer = null, marker = null;
 let frames = [], frameIndex = 0, radarTimer = null, selectedLayer = 'radar', radarMeta = null, radarGeneration = 0;
 let modelCatalog = null, modelFetched = 0, modelFrames = [], modelIndex = 0, modelLayer = null, mapSelectionToken = 0, modelFrameToken = 0;
+let framePlayer=null;
 let lastRadarFetch = 0, currentBriefing = null, requestController = null;
 const readSaved = () => {
   try { const p = JSON.parse(localStorage.getItem('weather-fusion-place')); if (p && finite(p.latitude) && finite(p.longitude) && p.latitude >= 24 && p.latitude <= 50 && p.longitude >= -125 && p.longitude <= -66) place = p; } catch { /* Storage may be unavailable. */ }
@@ -103,7 +105,7 @@ function renderAlerts(data) {
 }
 function renderHours(data) {
   const position = $('hourly').scrollLeft;
-  $('hourly').innerHTML = data.hours.length ? data.hours.map((h, i) => `<div class="hour ${i === 0 ? 'now' : ''}" title="${esc(h.condition)} · NWS rain chance ${percent(h.pop)} · ${esc(h.wind)} ${esc(h.windDirection)}"><span>${i === 0 ? 'Now' : esc(shortHour(h.time))}</span>${icon(h.condition, h.isDay)}<strong>${temperature(h.temperature)}</strong><small>${finite(h.pop) ? percent(h.pop) : '—'}</small></div>`).join('') : '<p class="muted">Official hourly guidance is unavailable. No substitute forecast has been invented.</p>';
+  $('hourly').innerHTML = data.hours.length ? data.hours.map((h, i) => `<div class="hour ${i === 0 ? 'now' : ''}" title="${esc(h.condition)} · NWS rain chance ${percent(h.pop)} · ${esc(h.wind)} ${esc(h.windDirection)}"><span>${i === 0 ? esc(shortHour(h.time)) : esc(shortHour(h.time))}</span>${icon(h.condition, h.isDay)}<strong>${temperature(h.temperature)}</strong><small>${finite(h.pop) ? percent(h.pop) : '—'}</small></div>`).join('') : '<p class="muted">Official hourly guidance is unavailable. No substitute forecast has been invented.</p>';
   $('hourly').scrollLeft = position;
 }
 function renderDays(data) { renderDailyRows(data, icon); }
@@ -175,6 +177,7 @@ async function load({ moveMap = false } = {}) {
 }
 function chooseLocation(value) {
   place = { ...value };
+  stopRadar();framePlayer?.clear();++modelFrameToken;++mapSelectionToken;
   currentBriefing = null;
   resetExperience();
   if ($('day-dialog').open) $('day-dialog').close();
@@ -268,12 +271,13 @@ function configureFrames(count,index=0) {
 function showFrame(index) {
   if(selectedLayer!=='radar'||!map||!window.L||!radarMeta||!frames[index])return;
   frameIndex=index;
-  if(radarLayer)map.removeLayer(radarLayer);
+  if(radarLayer){radarLayer.off();map.removeLayer(radarLayer);}
   const expected=frames[index];
   radarLayer=window.L.tileLayer.wms(radarMeta.url,{layers:radarMeta.layer,format:'image/png',transparent:true,version:'1.1.1',opacity:.72,time:expected,zIndex:200,attribution:'Observed radar © NOAA / NWS',updateWhenIdle:true}).addTo(map);
   $('radar-time').value=String(index);$('radar-stamp').textContent=`${clock(expected)} · loading`;
-  radarLayer.on('load',()=>{if(selectedLayer==='radar'&&frames[frameIndex]===expected){$('radar-stamp').textContent=clock(expected);mapMessage(radarMeta.status==='stale'?'Radar is stale; check its timestamp.':'');}});
-  radarLayer.on('tileerror',()=>{if(selectedLayer==='radar'){stopRadar();mapMessage('A radar tile failed to load. Blank areas do not establish clear weather.');}});
+  const activeRadar=radarLayer;
+  radarLayer.on('load',()=>{if(radarLayer===activeRadar&&selectedLayer==='radar'&&frames[frameIndex]===expected){$('radar-stamp').textContent=clock(expected);mapMessage(radarMeta.status==='stale'?'Radar is stale; check its timestamp.':'');}});
+  radarLayer.on('tileerror',()=>{if(radarLayer===activeRadar&&selectedLayer==='radar'){stopRadar();mapMessage('A radar tile failed to load. Blank areas do not establish clear weather.');}});
 }
 function stopRadar(){if(radarTimer)clearInterval(radarTimer);radarTimer=null;$('radar-play').textContent='▶';$('radar-play').setAttribute('aria-label','Play map animation');}
 function modelCaption(layer,frame){
@@ -289,7 +293,13 @@ async function loadModelMap(){
   try{
     if(!modelCatalog||Date.now()-modelFetched>120000){modelCatalog=await api('models');modelFetched=Date.now();}
     if(token!==mapSelectionToken||selectedLayer!==layerName)return;
-    const layer=modelCatalog.layers[layerName];modelFrames=layer?.frames || [];modelIndex=0;
+    const layer=modelCatalog.layers[layerName];
+    const previousTime=modelFrames[modelIndex]?.time,previousURL=modelFrames[modelIndex]?.url;
+    modelFrames=layer?.frames || [];
+    if(framePlayer?.visible && modelFrames.some(f=>f.url===previousURL)){
+      modelIndex=modelFrames.findIndex(f=>f.url===previousURL);configureFrames(modelFrames.length,modelIndex);return;
+    }
+    framePlayer?.clear();modelIndex=0;
     configureFrames(modelFrames.length,0);
     if(!modelFrames.length){mapMessage('No verified current frames are available for this model. Other forecasts remain usable.');$('radar-stamp').textContent='Unavailable';return;}
     const nearest=modelFrames.findIndex(f=>Date.parse(f.time)>=Date.now());modelIndex=Math.max(0,nearest);
@@ -299,27 +309,27 @@ async function loadModelMap(){
     showModelFrame(modelIndex);
   }catch{if(token===mapSelectionToken){configureFrames(0);mapMessage('Model map data could not be loaded. Retry with Refresh.');}}
 }
-function showModelFrame(index){
+async function showModelFrame(index){
   const f=modelFrames[index],layer=modelCatalog?.layers[selectedLayer];
-  if(!f||!layer||!map||selectedLayer==='radar')return;
-  modelIndex=index;const token=++modelFrameToken;
+  if(!f||!layer||!map||selectedLayer==='radar')return false;
+  if(!framePlayer)framePlayer=createFramePlayer({map,makeImage:(url,bounds,options)=>window.L.imageOverlay(url,bounds,options)});
+  const name=selectedLayer,token=++modelFrameToken;
   $('radar-time').value=String(index);$('radar-stamp').textContent=`${clock(f.time,{weekday:'short'})} · loading`;
-  mapMessage('Loading decoded model data…');
-  const image=window.L.imageOverlay(f.url,f.bounds,{opacity:1,zIndex:200,attribution:layer.model==='ecmwf'?'ECMWF Open Data · CC BY 4.0':'NOAA model guidance'});
-  const previous=modelLayer;modelLayer=image;
-  image.on('load',()=>{
-    if(token!==modelFrameToken){map.removeLayer(image);return;}
-    if(previous)map.removeLayer(previous);
-    $('radar-stamp').textContent=clock(f.time,{weekday:'short'});$('map-caption').textContent=modelCaption(layer,f);
-    mapMessage(map.getBounds().intersects(f.bounds)?'':'Model image covers North Carolina and the surrounding region. Pan back to the saved locations.');
+  if(!framePlayer.visible)mapMessage('Loading decoded model data…');
+  return framePlayer.show(f,{zIndex:200,attribution:layer.model==='ecmwf'?'ECMWF Open Data · CC BY 4.0':'NOAA model guidance'},{
+    loaded:()=>{
+      if(token!==modelFrameToken||selectedLayer!==name)return;
+      modelIndex=index;
+      $('radar-time').value=String(index);$('radar-stamp').textContent=clock(f.time,{weekday:'short'});$('map-caption').textContent=modelCaption(layer,f);
+      mapMessage(map.getBounds().intersects(f.bounds)?'':'Model image covers North Carolina and the surrounding region. Pan back to the saved locations.');
+    },
+    error:()=>{if(token===modelFrameToken&&selectedLayer===name){stopRadar();mapMessage('This frame could not load. The previous image has been cleared; choose another time or refresh.');$('radar-stamp').textContent='Frame unavailable';}}
   });
-  image.on('error',()=>{if(token===modelFrameToken){stopRadar();map.removeLayer(image);if(previous)map.removeLayer(previous);modelLayer=null;mapMessage('This model image did not load. Choose another frame or refresh.');}});
-  image.addTo(map);
 }
 function selectLayer(layer){
   selectedLayer=layer;stopRadar();++mapSelectionToken;++modelFrameToken;
   document.querySelectorAll('[data-layer]').forEach(button=>{const active=button.dataset.layer===layer;button.classList.toggle('selected',active);button.setAttribute('aria-pressed',String(active));});
-  if(radarLayer){map?.removeLayer(radarLayer);radarLayer=null;}if(modelLayer){map?.removeLayer(modelLayer);modelLayer=null;}
+  if(radarLayer){radarLayer.off();map?.removeLayer(radarLayer);radarLayer=null;}framePlayer?.clear();
   $('radar-map').hidden=false;$('radar-map').style.display='';$('model-map').hidden=true;$('radar-controls').hidden=false;$('radar-controls').style.display='';$('radar-legend').hidden=false;$('radar-legend').style.display='';
   const official=$('model-official-source');if(official)official.hidden=true;
   mapMessage('');if(!map)initMap();map?.invalidateSize();
@@ -341,7 +351,7 @@ $('radar-play').addEventListener('click', () => {
   if (radarTimer) return stopRadar();
   if ((selectedLayer==='radar'?frames:modelFrames).length < 2) return;
   $('radar-play').textContent = 'Ⅱ'; $('radar-play').setAttribute('aria-label', 'Pause radar animation');
-  radarTimer = setInterval(() => { const count=(selectedLayer==='radar'?frames:modelFrames).length; const index=selectedLayer==='radar'?frameIndex:modelIndex; if(count)showSelectedFrame((index+1)%count); }, 1600);
+  radarTimer = setInterval(() => { const count=(selectedLayer==='radar'?frames:modelFrames).length; const index=selectedLayer==='radar'?frameIndex:modelIndex; if(count&&!framePlayer?.loading)showSelectedFrame((index+1)%count); }, 1600);
 });
 $('fullscreen').addEventListener('click', async () => {
   try { if (document.fullscreenElement) await document.exitFullscreen(); else await $('map-panel').requestFullscreen(); }

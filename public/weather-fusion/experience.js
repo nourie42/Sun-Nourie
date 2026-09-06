@@ -1,7 +1,8 @@
-import {dailyDisplay,temperatureBar,thermalComfort,finite} from './weather-math.js';
+import {comfortMode,comfortWindow,comfortNarrative} from './comfort-outlook.js';
+import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js';
 import {renderDewpointMeter,resetDewpointMeter} from './dewpoint-meter.js';
 const $=id=>document.getElementById(id);
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const number=(n,d=0)=>finite(n)?n.toFixed(d):'—';
 const temp=n=>`${number(n)}°`;
 const defs={
@@ -25,29 +26,17 @@ function locationClock(time,zone='America/New_York'){
  const get=type=>parts.find(p=>p.type===type)?.value;
  return {day:`${get('year')}-${get('month')}-${get('day')}`,hour:Number(get('hour')),minute:Number(get('minute'))};
 }
-export function comfortDisplayMode(time=Date.now(),zone='America/New_York'){
- const p=locationClock(time,zone),clock=p.hour+p.minute/60;
- return clock>=18||clock<6?'overnight':'day';
-}
+export function comfortDisplayMode(time=Date.now(),zone='America/New_York'){return comfortMode(time,zone);}
 export function overnightComfort(forecast,now=Date.now()){
- const zone=forecast?.location?.timeZone||'America/New_York',mode=comfortDisplayMode(now,zone);
- if(mode!=='overnight')return null;
- const source=forecast?.metricForecasts?.series?.feels||[],start=locationClock(now,zone),rows=[];
- for(const point of source){
-  const stamp=Date.parse(point.time);if(!finite(stamp)||stamp<now)continue;
-  const p=locationClock(stamp,zone);rows.push(point);
-  const reachedMorning=start.hour>=18?(p.day!==start.day&&p.hour>=7):(p.day===start.day&&p.hour>=7);
-  if(reachedMorning||rows.length>=15)break;
- }
- const valid=rows.filter(p=>finite(p.value));if(!valid.length)return null;
- const coolest=valid.reduce((a,b)=>b.value<a.value?b:a),warmest=valid.reduce((a,b)=>b.value>a.value?b:a);
- return {low:coolest.value,high:warmest.value,lowTime:coolest.time,end:rows.at(-1)?.time||coolest.time,points:rows};
+ const summary=comfortWindow(forecast,now);return summary&&summary.mode!=='day'?summary:null;
 }
 function valuesThrough(series,now,end){return (series||[]).filter(p=>{const t=Date.parse(p.time);return finite(t)&&t>=now&&t<=Date.parse(end)&&finite(p.value);}).map(p=>p.value);}
 export function comfortWeatherKind(forecast,now=Date.now()){
- const zone=forecast?.location?.timeZone||'America/New_York',night=comfortDisplayMode(now,zone)==='overnight';
- const d=forecast?.days?.[0]||{},condition=String(night?(d.nightCondition||forecast?.current?.condition||''):(forecast?.current?.condition||d.condition||'')).toLowerCase();
- const pop=night?d.popNight:d.pop,wind=forecast?.current?.wind;
+ const zone=forecast?.location?.timeZone||'America/New_York',mode=comfortDisplayMode(now,zone),evening=mode==='overnight';
+ const elevation=solarElevation(now,forecast?.location?.latitude,forecast?.location?.longitude);
+ const night=finite(elevation)?elevation<=0:mode!=='day';
+ const d=forecast?.days?.[0]||{},condition=String(evening?(d.nightCondition||forecast?.current?.condition||''):(forecast?.current?.condition||d.condition||'')).toLowerCase();
+ const pop=evening?d.popNight:d.pop,wind=forecast?.current?.wind;
  if(/thunder|storm/.test(condition))return 'storm';
  if(/snow|sleet|ice pellets|freezing rain/.test(condition))return 'snow';
  if(/rain|shower|drizzle/.test(condition)||(finite(pop)&&pop>=35))return 'rain';
@@ -92,75 +81,15 @@ function sparkline(points) {
  points.forEach((p,i)=>{if(!finite(p.value)){continuous=false;return;}const x=2+i/Math.max(1,points.length-1)*116,y=29-(p.value-lo)/span*23;drawing+=`${continuous?'L':'M'}${x.toFixed(1)},${y.toFixed(1)} `;continuous=true;});
  return `<svg class="tile-spark" viewBox="0 0 120 34" aria-hidden="true"><path d="${drawing}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 }
-function daytimeComfortExplanation(c,current) {
- const t=current.temperature,dp=current.dewpoint,wind=current.wind;
- if(!finite(c.shade))return 'We’re waiting for enough temperature, moisture and wind data to work this out.';
- const shadeDelta=finite(t)?c.shade-t:null,sunDelta=finite(c.sun)?c.sun-c.shade:null;
- const sentences=[];
- if(finite(t)&&t>=80){
-  if(finite(dp)&&dp>=70){
-   sentences.push(`The ${number(dp)}° dew point is the biggest reason the air feels heavier — sweat evaporates slowly, so your body sheds heat less efficiently.`);
-   if(finite(wind)&&wind<5)sentences.push(`With only about ${number(wind)} mph of wind, there isn’t much moving-air cooling to offset that mugginess.`);
-   else if(finite(wind)&&wind>=8)sentences.push(`The ${number(wind)} mph breeze is taking some of the edge off, but the high dew point still wins.`);
-  } else if(finite(dp)&&dp>=60){
-   sentences.push(`A ${number(dp)}° dew point adds some humidity drag, so the warmth feels a little more tiring than the thermometer alone suggests.`);
-  } else if(finite(dp)){
-   sentences.push(`The ${number(dp)}° dew point is relatively dry, so evaporation works well and keeps the heat from feeling as oppressive.`);
-   if(finite(wind)&&wind>=6)sentences.push(`A ${number(wind)} mph breeze adds more cooling on top of the dry air.`);
-  }
- } else if(finite(t)&&t<55){
-  if(finite(wind)&&wind>=15)sentences.push(`The ${number(wind)} mph wind is the main reason it feels colder — moving air carries heat away from exposed skin much faster.`);
-  else if(finite(wind)&&wind>=6)sentences.push(`The ${number(wind)} mph breeze is pulling the feel below the air temperature by speeding up heat loss.`);
-  else sentences.push('With very little wind, the cold is staying closer to the actual air temperature instead of being driven sharply lower by moving air.');
-  if(finite(dp)&&dp<25)sentences.push(`The ${number(dp)}° dew point is very dry; that matters less than wind in cold air, but it can make exposed skin and lips feel drier.`);
-  else if(finite(dp)&&dp>40)sentences.push('The higher dew point makes the air damper, but in this temperature range the wind is still the stronger cooling factor.');
- } else {
-  if(finite(dp)&&dp>=68)sentences.push(`The ${number(dp)}° dew point is high for otherwise mild weather, so the air feels muggy and less comfortable than the temperature sounds.`);
-  else if(finite(dp)&&dp<50)sentences.push(`The ${number(dp)}° dew point keeps the air crisp and lets evaporation work easily, which makes the same temperature feel cleaner and cooler.`);
-  else if(finite(dp))sentences.push(`The ${number(dp)}° dew point is fairly comfortable, so moisture isn’t adding much extra stress.`);
-  if(finite(wind)&&wind>=12)sentences.push(`A ${number(wind)} mph breeze is noticeable and pushes the feel cooler.`);
-  else if(finite(wind)&&wind<3&&finite(dp)&&dp>=65)sentences.push('Because the air is nearly still, there’s little breeze to offset the humidity.');
- }
- if(finite(sunDelta)&&sunDelta>=3)sentences.push(`In direct sun, the radiation calculation adds about ${number(sunDelta)}° compared with shade, so exposed pavement and open areas will feel hotter.`);
- if(finite(shadeDelta)){
-  if(shadeDelta>=4)sentences.push(`Put together, those effects make the shade feel about ${number(Math.abs(shadeDelta))}° warmer than the measured air temperature.`);
-  else if(shadeDelta<=-4)sentences.push(`Put together, those effects make the shade feel about ${number(Math.abs(shadeDelta))}° cooler than the measured air temperature.`);
-  else sentences.push('The moisture and wind effects mostly balance out, so the shade feel stays close to the measured air temperature.');
- }
- return sentences.slice(0,3).join(' ');
-}
-function overnightComfortExplanation(c,current,forecast,summary,now){
- if(!finite(c.shade))return 'We’re waiting for enough temperature, moisture and wind data to work this out.';
- const series=forecast?.metricForecasts?.series||{},end=summary?.end;
- const dewpoints=end?valuesThrough(series.dewpoint,now,end):[],winds=end?valuesThrough(series.wind,now,end):[];
- const dewMin=dewpoints.length?Math.min(...dewpoints):current.dewpoint,dewMax=dewpoints.length?Math.max(...dewpoints):current.dewpoint,windMax=winds.length?Math.max(...winds):current.wind;
- const sentences=[];
- if(finite(dewMin)&&dewMin>=70)sentences.push(`The dew point stays in the ${Math.round(dewMin)}–${Math.round(dewMax)}° range overnight, so even as the temperature falls the air will stay muggy and your body won’t shed heat as easily.`);
- else if(finite(dewMax)&&dewMax>=65)sentences.push(`The dew point stays fairly high overnight, so the cooler air will still feel a little sticky rather than crisp.`);
- else if(finite(dewMax)&&dewMax<50)sentences.push(`The overnight dew point stays low, so the air should feel drier and crisper as temperatures fall.`);
- else if(finite(current.dewpoint))sentences.push(`The ${number(current.dewpoint)}° dew point is moderate, so moisture should not be the main thing controlling how tonight feels.`);
- if(finite(windMax)&&windMax>=15)sentences.push(`Winds reach about ${number(windMax)} mph overnight, which increases heat loss and will pull the feel cooler than the air temperature at times.`);
- else if(finite(windMax)&&windMax>=7)sentences.push(`A breeze near ${number(windMax)} mph overnight should provide noticeable moving-air cooling.`);
- else if(finite(windMax))sentences.push('Winds stay light overnight, so there will not be much extra cooling from moving air.');
- if(summary&&finite(summary.low)){
-  const when=new Intl.DateTimeFormat('en-US',{timeZone:forecast.location.timeZone,hour:'numeric'}).format(new Date(summary.lowTime));
-  sentences.push(`The all-weather calculation bottoms out near ${temp(summary.low)} around ${when}, so that is the coolest it should actually feel before morning.`);
- }
- return sentences.slice(0,3).join(' ');
-}
 export function renderComfort(forecast) {
  data=forecast;ensureComfortStyles();
- const now=Date.parse(forecast.assembledAt)||Date.now(),c=forecast.comfort||thermalComfort(forecast.current,forecast.location,now),mode=comfortDisplayMode(now,forecast.location.timeZone),overnight=overnightComfort(forecast,now);
- if(mode==='overnight'){
-  $('skin-values').innerHTML=`<span><strong>${temp(c.shade)}</strong> right now</span>${overnight&&finite(overnight.low)?`<span><strong>${temp(overnight.low)}</strong> coolest overnight</span>`:''}`;
-  $('skin-explanation').textContent=overnightComfortExplanation(c,forecast.current,forecast,overnight,now);
- }else{
-  $('skin-values').innerHTML=`<span><strong>${temp(c.shade)}</strong> in the shade</span>${finite(c.sun)?`<span><strong>~${temp(c.sun)}</strong> in the sun</span>`:''}`;
-  $('skin-explanation').textContent=daytimeComfortExplanation(c,forecast.current);
- }
+ const now=Date.now(),c=forecast.comfort||thermalComfort(forecast.current,forecast.location,now),summary=comfortWindow(forecast,now);
+ $('skin-values').innerHTML=`<span><strong>${temp(c.shade)}</strong> right now</span>${summary?`<span><strong>~${temp(summary.chosen.value)}</strong> ${summary.label}</span>`:''}`;
+ $('skin-explanation').textContent=comfortNarrative(forecast.current,c,summary,forecast.location.timeZone);
  renderComfortArt(forecast,now);
  renderDewpointMeter(forecast,now);
- $('skin-science').textContent=`${c.method}. Air ${temp(forecast.current.temperature)}; dew point ${temp(forecast.current.dewpoint)}; relative humidity ${number(c.humidity)}%; wind ${number(forecast.current.wind)} mph. ${finite(c.wetBulb)?`Estimated wet bulb ${temp(c.wetBulb)}. `:''}${mode==='day'&&finite(c.absorbedRadiation)?`Estimated absorbed solar/radiant input ${number(c.absorbedRadiation)} W/m²; direct-sun equivalent is ${number(c.solarAdjustment)}°F above the shade calculation. `:''}${mode==='overnight'&&overnight?`Overnight real-feel minimum ${temp(overnight.low)} from the hourly forecast through morning. `:''}${c.note}`;
+ const alignment=forecast.metricForecasts?.comfortAlignment;
+ $('skin-science').textContent=`${c.method}. Current air ${temp(forecast.current.temperature)}; dew point ${temp(forecast.current.dewpoint)}; relative humidity ${number(c.humidity)}%; wind ${number(forecast.current.wind)} mph. Station ${forecast.current.stationName||forecast.current.station||'unavailable'}, observation ${forecast.current.time||'unavailable'}. ${finite(c.wetBulb)?`Estimated wet bulb ${temp(c.wetBulb)}. `:''}${alignment?.note||''} ${c.note}`;
 }
 export function renderDailyRows(forecast,icon) {
  const values=forecast.days.flatMap(d=>[d.high,d.low]).filter(finite),lo=values.length?Math.min(...values)-3:0,hi=values.length?Math.max(...values)+3:1;

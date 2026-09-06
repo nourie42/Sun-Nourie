@@ -1,3 +1,4 @@
+import {eveningPeriod} from './weatherFusionPolicy.js';
 import { addExperience, PLAIN_OUTLOOK_INSTRUCTIONS } from './weatherFusionExperience.js';
 import { solarTimes } from './weatherFusionDirect.js';
 /** Weather Fusion: isolated, dependency-free Express route registration.
@@ -81,7 +82,7 @@ export function sumHourly(rows, start, end, key = 'precipitation') {
   return rounded(sum, 3);
 }
 /** NWS grid QPF is an interval total. Boundary overlap is prorated, not duplicated. */
-export function gridQpf(grid, start, end) {
+export function gridQpf(grid, start, end, precision = 3) {
   if (!(end > start)) return null;
   const field = grid?.quantitativePrecipitation;
   const unit = field?.uom;
@@ -98,7 +99,7 @@ export function gridQpf(grid, start, end) {
     if (b > a) { total += interval.value * (b - a) / (interval.b - interval.a); cursor = b; }
     if (cursor >= end) break;
   }
-  return cursor >= end ? rounded(total / (unit === 'wmoUnit:mm' ? 25.4 : 1), 3) : null;
+  return cursor >= end ? rounded(total / (unit === 'wmoUnit:mm' ? 25.4 : 1), precision) : null;
 }
 export function guidanceBlend(hrrr, ecmwf) {
   const sources = [{ name: 'HRRR', value: hrrr, weight: 0.6 }, { name: 'ECMWF IFS', value: ecmwf, weight: 0.4 }].filter((s) => finite(s.value));
@@ -180,7 +181,7 @@ export function buildForecast({ location, point, forecast, hourly, grid, discuss
     const date = nextDate(today, index), start = localTime(date, 7, zone), end = localTime(nextDate(date), 7, zone);
     const midnight = localTime(date, 0, zone), nextMidnight = localTime(nextDate(date), 0, zone);
     const dayPeriods = periods.filter((p) => dateKey(Date.parse(p.startTime), zone) === date);
-    const day = dayPeriods.find((p) => p.isDaytime), night = dayPeriods.find((p) => !p.isDaytime);
+    const day = dayPeriods.find((p) => p.isDaytime), night = eveningPeriod(periods,date,zone,now);
     const modelValues = Object.fromEntries(Object.entries(rows).map(([key, series]) => {
       const dayRows = series.filter((r) => r.time >= midnight && r.time < nextMidnight);
       const temperatures = dayRows.map((r) => r.temperature_2m).filter(finite);
@@ -314,7 +315,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
               const o = data.properties, time = Date.parse(o?.timestamp);
               if (!finite(toF(o?.temperature)) || now() - time > 2 * HOUR || time > now() + 5 * MINUTE) return null;
               return { temperature: rounded(toF(o.temperature)), condition: clean(o.textDescription, 120), time: o.timestamp,
-                station: id, stationName: clean(s.properties?.name, 140), humidity: rounded(o.relativeHumidity?.value), dewpoint: rounded(toF(o.dewpoint)),
+                stationDistanceKm: rounded(Math.sqrt(distance(s))*111.2,1), station: id, stationName: clean(s.properties?.name, 140), humidity: rounded(o.relativeHumidity?.value), dewpoint: rounded(toF(o.dewpoint)),
                 wind: rounded(toMph(o.windSpeed)), gust: rounded(toMph(o.windGust)), windDirection: numeric(o.windDirection?.value),
                 visibility: o.visibility?.unitCode === 'wmoUnit:m' && finite(o.visibility.value) ? rounded(o.visibility.value / 1609.344, 1) : null,
                 pressure: o.barometricPressure?.unitCode === 'wmoUnit:Pa' && finite(o.barometricPressure.value) ? rounded(o.barometricPressure.value / 3386.389, 2) : null };
@@ -431,8 +432,8 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
   });
-  for (const name of ['app.js', 'style.css', 'nav.js', 'experience.js', 'weather-math.js']) app.get(`/weather-fusion/${name}`, (_req, res) => {
-    res.setHeader('Cache-Control', 'public, max-age=300');
+  for (const name of ['app.js', 'style.css', 'nav.js', 'experience.js', 'weather-math.js','hero-mode.js','dewpoint-meter.js','dewpoint-meter.css','comfort-effects.css','frame-player.js','comfort-outlook.js']) app.get(`/weather-fusion/${name}`, (_req, res) => {
+    res.setHeader('Cache-Control', 'no-cache');
     res.sendFile(path.join(PUBLIC_DIR, name));
   });
   app.get('/api/weather-fusion/forecast', route(service.getForecast));
