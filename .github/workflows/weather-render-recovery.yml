@@ -1,0 +1,91 @@
+name: Weather Nourie render recovery
+on:
+  push:
+    branches: [weather-nourie-render-recovery]
+    paths:
+      - '.github/workflows/weather-render-recovery.yml'
+      - 'scripts/weatherRenderRecovery*'
+      - 'public/weather-fusion/render-safety.js'
+permissions:
+  contents: write
+concurrency:
+  group: weather-nourie-render-recovery
+  cancel-in-progress: false
+jobs:
+  recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python scripts/weatherRenderRecovery.py
+      - run: npm ci
+      - run: node --test test/weatherFusion*.test.js
+      - run: npm run check
+      - run: npm install --no-save --package-lock=false playwright@1.55.0
+      - run: npx playwright install --with-deps chromium
+      - name: Capture exact staged sources for local diagnosis
+        run: |
+          mkdir -p /tmp/weather-recovery-source
+          python - <<'PY'
+          import pathlib,zipfile,subprocess
+          with zipfile.ZipFile('/tmp/weather-recovery-source/source.zip','w',zipfile.ZIP_DEFLATED) as z:
+            paths=set(subprocess.check_output(['git','ls-files','-z']).decode().split('\0'))
+            paths.update(str(p) for p in pathlib.Path('node_modules').rglob('*') if p.is_file())
+            for name in sorted(paths):
+              p=pathlib.Path(name)
+              if name and p.is_file():z.write(p,name)
+          PY
+      - name: Required browser regression with simulated slow and failed map images
+        run: node scripts/weatherNourieRepairSmoke.js
+      - name: Required staged browser test using real live forecasts, AI and map images
+        run: |
+          node --input-type=module - <<'JS'
+          import express from 'express';
+          import {spawn} from 'node:child_process';
+          const app=express();
+          app.use('/api/weather-fusion',async(req,res)=>{
+            try {
+              const r=await fetch('https://sun-nourie-live.onrender.com'+req.originalUrl,{signal:AbortSignal.timeout(80000)});
+              res.status(r.status).type(r.headers.get('content-type')||'application/json').send(await r.text());
+            } catch(e) {res.status(502).json({error:e.message});}
+          });
+          app.use('/weather-fusion',express.static('public/weather-fusion'));
+          const server=await new Promise(resolve=>{const s=app.listen(0,'127.0.0.1',()=>resolve(s));});
+          const base='http://127.0.0.1:'+server.address().port;
+          const p=spawn(process.execPath,['scripts/weatherFusionBrowserSmoke.js'],{stdio:'inherit',env:{...process.env,WEATHER_BASE_URL:base,WEATHER_LIVE_CHECK:'true',WEATHER_REPORT_DIR:'/tmp/weather-recovery-live'}});
+          const code=await new Promise(resolve=>p.on('exit',resolve));
+          server.closeAllConnections();await new Promise(resolve=>server.close(resolve));
+          process.exitCode=code??1;
+          JS
+      - name: Publish only the tested weather files
+        run: |
+          git fetch --depth=1 origin main
+          test "$(git rev-parse FETCH_HEAD)" = f9834d1b1cc6f36fffcf6752c39e84e12bd12f39
+          export PUBLISH="$RUNNER_TEMP/weather-render-tested"
+          git worktree add --detach "$PUBLISH" FETCH_HEAD
+          python - <<'PY'
+          import pathlib,os,shutil,subprocess
+          root=pathlib.Path(os.environ['PUBLISH'])
+          paths=['public/weather-fusion/app.js','public/weather-fusion/experience.js','public/weather-fusion/dewpoint-meter.js','public/weather-fusion/index.html','public/weather-fusion/render-safety.js']
+          for name in paths:
+            target=root/name;target.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(name,target)
+          subprocess.run(['git','-C',str(root),'add','--',*paths],check=True)
+          PY
+          cd "$PUBLISH"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Fix dewpoint timezone crash and isolate weather panels'
+          git push origin HEAD:refs/heads/weather-nourie-render-recovery-tested
+          git rev-parse HEAD >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: weather-render-recovery-evidence
+          path: |
+            /tmp/weather-repair-results
+            /tmp/weather-recovery-live
+            /tmp/weather-recovery-source
+          retention-days: 3
