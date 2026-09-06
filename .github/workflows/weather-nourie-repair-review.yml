@@ -31,6 +31,9 @@ jobs:
             new=''.join(lines);assert hashlib.sha256(new.encode()).hexdigest()==e['new'],name+' output mismatch'
             p.parent.mkdir(exist_ok=True,parents=True);p.write_text(new)
           pathlib.Path('/tmp/weather-repair-paths.json').write_text(json.dumps([e['path'] for e in edits]))
+          pathlib.Path('/tmp/weather-repair-results').mkdir(parents=True,exist_ok=True)
+          pathlib.Path('/tmp/weather-repair-results/dewpoint-meter.js').write_text(pathlib.Path('public/weather-fusion/dewpoint-meter.js').read_text())
+          pathlib.Path('/tmp/weather-repair-results/dewpoint-meter.css').write_text(pathlib.Path('public/weather-fusion/dewpoint-meter.css').read_text())
           PY
       - run: npm ci
       - name: Weather unit tests, original site checks and native model syntax
@@ -47,8 +50,6 @@ jobs:
           PY
       - run: npm install --no-save --package-lock=false playwright@1.55.0
       - run: npx playwright install --with-deps chromium
-      - name: Print browser repair test for diagnosis
-        run: sed -n '1,220p' scripts/weatherNourieRepairSmoke.js
       - name: Morning boundary, large chart, all tile dialogs, slow map frames and product switching
         run: node scripts/weatherNourieRepairSmoke.js
       - name: Publish verified weather-only tree on staging branch
