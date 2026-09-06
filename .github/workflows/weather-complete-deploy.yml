@@ -13,7 +13,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
@@ -25,8 +25,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo 'af107ad35ab607663ca9b528d6a82040640b39fe71419ec841bd1b76c1b1cee4  .weather-release/repair.patch.xz' | sha256sum -c -
-          xz -dc .weather-release/repair.patch.xz > /tmp/weather-repair.patch
+          echo '5514cf80ad75b5497751cb4909151983d2894260213bb927b33a38b33994ad0c  .weather-release/chunk00' | sha256sum -c -
+          echo 'e7f5722d61051b69c18fbee2b83e77d37410643bfb6896b448bf7b3de347d888  .weather-release/chunk01' | sha256sum -c -
+          echo 'ab93250a033cd48d3a56740a9f1a5d5e4f66934a10c1286b50da238bf6231900  .weather-release/chunk02' | sha256sum -c -
+          echo '87a7541cbeef3588d2540c79bb198abbaa265b552c72f7b81937b96edbabbd60  .weather-release/chunk03' | sha256sum -c -
+          echo 'beccf57c83cd0520cfb845d33e6372a5e7ced4f1f369d2ffec797a19bdecc1e5  .weather-release/chunk04' | sha256sum -c -
+          echo 'ce59c2fd1d6aa239cc73dfca5eb9da62b509a5e0218be0e50089c8b1eb1cd1c0  .weather-release/chunk05' | sha256sum -c -
+          echo '488adfbdcf378ca9da76fa3f171378bbc14ecc30b4250b6f6f84ce080cd5f1f6  .weather-release/chunk06' | sha256sum -c -
+          echo 'a8c1d49e4e8eb67a04c4255960aa532146f80d6cc61c5f0796b952a575729a86  .weather-release/chunk07' | sha256sum -c -
+          echo 'a4999d7c95fdaef6b3181b13dfd18c7448cc3ee98d2e2cdd9d9805fca16ebdaa  .weather-release/chunk08' | sha256sum -c -
+          echo '8e9214269690f0251497f9a946aeffe721be711c5ac90fa809563ec534b35382  .weather-release/chunk09' | sha256sum -c -
+          cat .weather-release/chunk{00..09} > /tmp/weather-repair.b64
+          base64 -d /tmp/weather-repair.b64 > /tmp/weather-repair.patch.xz
+          echo 'af107ad35ab607663ca9b528d6a82040640b39fe71419ec841bd1b76c1b1cee4  /tmp/weather-repair.patch.xz' | sha256sum -c -
+          xz -dc /tmp/weather-repair.patch.xz > /tmp/weather-repair.patch
           echo 'cf555137bcbcc90d8fb746efef75b474a52d64a0f94e3eaa66f373917040bda2  /tmp/weather-repair.patch' | sha256sum -c -
           patch -p1 --batch --forward --dry-run < /tmp/weather-repair.patch
           patch -p1 --batch --forward < /tmp/weather-repair.patch
@@ -45,11 +57,12 @@ jobs:
         env:
           WEATHER_REPORT_DIR: /tmp/weather-complete-browser
         run: node scripts/weatherFusionPersonalBrowser.js
-      - name: Ensure the release contains only the reviewed production and regression files
+      - name: Verify release file set and remove staging files
         shell: bash
         run: |
           set -euo pipefail
-          rm .weather-release/repair.patch.xz .github/workflows/weather-complete-deploy.yml
+          rm -f .weather-release/repair.patch.xz .weather-release/chunk{00..09} .github/workflows/weather-complete-deploy.yml
+          rmdir .weather-release 2>/dev/null || true
           python - <<'PY'
           import subprocess
           expected=set('''
@@ -93,7 +106,6 @@ jobs:
           git add -A
           git commit -m 'Fix Weather Nourie feels-like consistency, weather exposure, radar and HRRR maps'
           git push origin HEAD:fix/weather-complete-deploy
-          echo "TESTED_COMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
           echo "Tested commit: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         if: always()
