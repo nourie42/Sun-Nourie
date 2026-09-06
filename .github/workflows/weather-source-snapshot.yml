@@ -1,0 +1,23 @@
+name: Export exact weather source for repair tests
+on:
+  push:
+    branches: [fix/weather-radar-geolocation-nowcast]
+    paths: ['.github/workflows/weather-source-snapshot.yml']
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: npm ci
+      - run: npm install --no-save --package-lock=false leaflet@1.9.4 playwright@1.55.0
+      - name: Archive only repository code and installed open-source dependencies
+        run: tar czf /tmp/weather-source.tgz public/weather-fusion src scripts test package.json package-lock.json .github/workflows node_modules
+      - uses: actions/upload-artifact@v4
+        with:
+          name: weather-source-snapshot
+          path: /tmp/weather-source.tgz
+          retention-days: 1
