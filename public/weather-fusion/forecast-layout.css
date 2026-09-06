@@ -1,0 +1,21 @@
+/* The first daily graphic and hourly strip sit together below the hero reading. */
+.today-panel{padding:14px 23px;margin:22px 0 17px;text-align:left}
+.today-panel .day-row{grid-template-columns:90px 54px 64px minmax(35px,1fr) 64px;gap:18px;min-height:86px}
+.today-panel .day-name{font-size:20px}
+.today-panel .day-icon svg{width:42px;height:42px}
+.today-panel .day-icon small{font-size:12px;line-height:1.4}
+.today-panel .day-high strong{font-size:32px}
+.today-panel .day-low{font-size:27px}
+.today-panel .day-high small,.today-panel .day-low small,.today-panel .night-label small{font-size:11px}
+.today-panel .temp-track{height:8px}
+.today-panel .night-label{display:flex;flex-direction:column;align-items:center;font-size:22px}
+.hero .hourly-panel{text-align:left}
+@media(max-width:600px){
+ .today-panel{padding:12px 14px;margin-top:18px}
+ .today-panel .day-row{grid-template-columns:57px 33px 42px minmax(24px,1fr) 47px;gap:8px;min-height:72px}
+ .today-panel .day-name{font-size:15px}
+ .today-panel .day-icon svg{width:32px;height:32px}
+ .today-panel .day-high strong{font-size:24px}
+ .today-panel .day-low{font-size:22px}
+ .today-panel .day-high small,.today-panel .day-low small,.today-panel .night-label small{font-size:9px}
+}

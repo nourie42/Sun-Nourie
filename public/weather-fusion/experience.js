@@ -92,10 +92,23 @@ export function renderComfort(forecast) {
 }
 export function renderDailyRows(forecast,icon) {
  const values=forecast.days.flatMap(d=>[d.high,d.low]).filter(finite),lo=values.length?Math.min(...values)-3:0,hi=values.length?Math.max(...values)+3:1;
- $('daily').innerHTML=forecast.days.map((d,i)=>{
+ const rows=forecast.days.map((d,i)=>{
   const p=dailyDisplay(d,i,Date.now(),forecast.location.timeZone),bar=temperatureBar(p.primary,lo,hi);
   return `<button class="day-row ${p.tonight?'tonight-row':''}" data-day="${i}" aria-label="${esc(p.label)}, ${p.primaryLabel} ${number(p.primary)} degrees${finite(p.secondary)?`, low ${number(p.secondary)} degrees`:''}. Open details."><span class="day-name">${esc(p.label)}</span><span class="day-icon">${icon(p.condition,!p.tonight)}<small>${finite(p.pop)?`${number(p.pop)}%`:''}</small></span><span class="day-high"><strong>${temp(p.primary)}</strong><small>${p.primaryLabel}</small></span><span class="temp-track" aria-hidden="true">${bar===null?'':`<span class="temp-fill" style="left:0;width:${bar}%"></span><i class="high-marker" style="left:clamp(4px,${bar}%,calc(100% - 4px))"></i>`}</span>${p.tonight?'<span class="night-label">☾<small>Overnight</small></span>':`<span class="day-low">${temp(p.secondary)}<small>Low</small></span>`}</button>`;
- }).join('');
+ });
+ $('daily').innerHTML=rows.join('');
+ // Reuse the exact first daily row, including its Today/Tonight policy and bar.
+ const today=$('today-forecast');
+ if(today){
+  today.innerHTML=rows[0]||'<p class="muted">Daily forecast is unavailable.</p>';
+  const button=today.querySelector('[data-day]');
+  if(button){
+   button.removeAttribute('data-day');
+   button.setAttribute('data-today-forecast','');
+   button.setAttribute('aria-haspopup','dialog');
+   button.addEventListener('click',()=>$('daily')?.querySelector('[data-day="0"]')?.click());
+  }
+ }
 }
 export function renderMetricTiles(forecast,smallIcon) {
  data=forecast;
@@ -108,7 +121,7 @@ export function renderMetricTiles(forecast,smallIcon) {
   ['wind','wind',`${number(c.wind)}<small>mph</small>`,windText],
   ['humidity','drop',`${number(c.humidity)}<small>%</small>`,finite(c.dewpoint)&&c.dewpoint>=65?'The air feels muggy.':finite(c.humidity)?'Moisture in the air.':'Waiting for an update.'],
   ['pop','drop',finite(d.pop)?`${number(d.pop)}<small>%</small>`:'—',d.tonight?'Chance of rain tonight.':'Chance of rain today or tonight.'],
-  ['visibility','eye',`${number(c.visibility,finite(c.visibility)&&Number.isInteger(c.visibility)?0:1)}<small>mi</small>`,'How far you can see right now.'],
+  ['visibility','eye',`${number(c.visibility,finite(c.visibility)&&Number.isInteger(c.visibility)?0:1)}<small>mi</small>`,'How far you can see clearly right now.'],
   ['pressure','gauge',`${number(c.pressure,2)}<small>inHg</small>`,'Current air pressure.'],
   ['solar','sun',data.solar.sunset?esc(formatTime(data.solar.sunset)):'—',data.solar.sunrise?`Sunrise ${formatTime(data.solar.sunrise)}.`:'Daylight through the week.'],
  ];
@@ -183,6 +196,7 @@ export function openMetric(key) {
 }
 export function resetExperience() {
  data=null;active=null;
+ if($('today-forecast'))$('today-forecast').innerHTML='<p class="muted">Daily data is loading.</p>';
  if($('metric-dialog').open)$('metric-dialog').close();
  $('skin-values').textContent='Checking how it will feel…';$('skin-explanation').textContent='Getting the weather for this location.';
  $('skin-science').textContent='Waiting for this location’s weather.';
