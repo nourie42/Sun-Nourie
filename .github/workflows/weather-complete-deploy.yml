@@ -1,4 +1,5 @@
 name: Verify complete Weather Nourie repair
+# all ten reviewed repair chunks are present
 on:
   push:
     branches: [fix/weather-complete-deploy]
