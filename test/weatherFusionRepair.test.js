@@ -46,9 +46,9 @@ test('same instant with UTC and local offset becomes one dew-point hour, not a s
  const p=dewpointPoints({metricForecasts:{series:{dewpoint:[{time:'2026-09-05T12:00:00-04:00',value:70},{time:'2026-09-05T16:00:00Z',value:67}]}}},now,24);
  assert.equal(p.length,1);assert.equal(p[0].value,70);
 });
-test('full-range graph fits available width and retains real time spacing',()=>{
+test('full-range compact graph fits available width and retains real time spacing',()=>{
  const points=[0,1,10].map(n=>({epoch:now+n*H,value:65+n/2}));
- const g=graphGeometry(points,240,310);assert.equal(g.W,310);assert.equal(g.height,300);
+ const g=graphGeometry(points,240,310);assert.equal(g.W,310);assert.equal(g.height,210);
  assert.ok(Math.abs((g.x(points[2].epoch)-g.x(now))/(g.x(points[1].epoch)-g.x(now))-10)<.001);
  assert.ok(g.min>=55,'vertical scale should fit the actual dewpoint range');
 });
