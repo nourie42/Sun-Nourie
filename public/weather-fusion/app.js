@@ -150,6 +150,13 @@ function renderBriefing(data) {
     return url && /^https:\/\/(api\.weather\.gov|www\.nco\.ncep\.noaa\.gov|www\.ecmwf\.int)\//.test(url) ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(f?.label || id)} ↗</a>` : esc(f?.label || id);
   });
   $('briefing-detail').innerHTML = `<div><strong>Tonight & tomorrow</strong><p>${esc(data.nearTerm || 'See the hourly forecast below.')}</p></div><div><strong>The week ahead</strong><p>${esc(data.extended || 'More details will appear with the next update.')}</p></div><div><strong>What could change</strong><p>${esc(data.uncertainty || '')}</p></div>`;
+  // Reuse the same outlook uncertainty below today's graphic, including refresh/reset.
+  const uncertainty = typeof data.uncertainty === 'string' ? data.uncertainty.trim() : '';
+  const todayUncertainty = $('today-uncertainty'), todayUncertaintyText = $('today-uncertainty-text');
+  if (todayUncertainty && todayUncertaintyText) {
+    todayUncertaintyText.textContent = uncertainty;
+    todayUncertainty.hidden = !uncertainty;
+  }
   $('briefing-stamp').textContent = data.mode === 'ai' ? `Updated ${clock(data.generatedAt)} · based on your local NWS discussion` : 'National Weather Service forecast';
   $('outlook-science').innerHTML = `<p>Summary type: ${esc(data.mode === 'ai' ? 'AI plain-language paraphrase of the local discussion, checked against the point forecast and available model data' : 'Official NWS forecast fallback; not an AI paraphrase')}. ${esc(data.reason || '')}</p><p>Sources used: ${refs.join(' · ') || 'Waiting for the local outlook'}</p>`;
 

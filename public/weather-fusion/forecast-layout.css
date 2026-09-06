@@ -19,3 +19,12 @@
  .today-panel .day-low{font-size:22px}
  .today-panel .day-high small,.today-panel .day-low small,.today-panel .night-label small{font-size:9px}
 }
+
+/* Keep the outlook caveat compact, readable and independent of the daily button. */
+.today-uncertainty{margin:8px 0 2px;padding-top:12px;border-top:1px solid #deebff24;color:#edf5ff;text-align:left;font-size:14px;font-weight:700;line-height:1.55;overflow-wrap:anywhere}
+.today-uncertainty[hidden]{display:none}
+.today-uncertainty-label{display:block;font-size:inherit;font-weight:800}
+.today-uncertainty p{margin:4px 0 0;font-size:inherit;font-weight:700;line-height:inherit}
+/* This ID wins over the Gross Meter's asynchronously loaded eyebrow styles. */
+#gross-title{text-align:center;font-weight:800}
+@media(max-width:600px){.today-uncertainty{font-size:13px;padding-top:10px}}

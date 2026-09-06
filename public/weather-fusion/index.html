@@ -8,9 +8,9 @@
   <title>Weather Nourie</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
   <link rel="stylesheet" href="/weather-fusion/style.css?v=4-friendly">
-  <link rel="stylesheet" href="/weather-fusion/forecast-layout.css?v=1">
+  <link rel="stylesheet" href="/weather-fusion/forecast-layout.css?v=2-forecast-details">
   <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script type="module" src="/weather-fusion/app.js?v=6-forecast-layout"></script>
+  <script type="module" src="/weather-fusion/app.js?v=7-forecast-details"></script>
 
 </head>
 <body data-sky="day">
@@ -38,7 +38,13 @@
         <div class="hero-condition" id="condition">Gathering the latest forecast</div>
         <div class="hero-range" id="high-low">High —° <span>Low —°</span></div>
         <div class="observation-label" id="observation-label">The latest weather near you</div>
-        <section class="glass today-panel" aria-label="Today or tonight forecast"><div id="today-forecast"><p class="muted">Daily data is loading.</p></div></section>
+        <section class="glass today-panel" aria-label="Today or tonight forecast">
+          <div id="today-forecast"><p class="muted">Daily data is loading.</p></div>
+          <div id="today-uncertainty" class="today-uncertainty" hidden>
+            <strong class="today-uncertainty-label">What could change</strong>
+            <p id="today-uncertainty-text"></p>
+          </div>
+        </section>
         <section class="glass hourly-panel" aria-labelledby="hourly-title"><div class="section-top"><h2 id="hourly-title">◷ &nbsp; HOURLY FORECAST</h2><span>Your next 48 hours</span></div><div id="hourly" class="hourly-strip" tabindex="0" aria-label="Scrollable hourly forecast"><p class="muted">Hourly data is loading.</p></div></section>
         <div class="skin-exposure" id="skin-exposure" aria-live="polite">
           <h2 class="skin-kicker">How’s it really gonna feel?</h2>
