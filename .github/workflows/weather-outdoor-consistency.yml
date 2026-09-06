@@ -1,0 +1,106 @@
+name: Weather Nourie outdoor exposure consistency
+on:
+  push:
+    branches: [fix/weather-outdoor-consistency, main]
+    paths:
+      - 'public/weather-fusion/**'
+      - 'src/weatherFusionHourlyFeels.js'
+      - 'test/weatherFusionOutdoorConsistency.test.js'
+      - 'scripts/patch_weather_outdoor_consistency.py'
+      - 'scripts/weatherFusionPersonalBrowser.js'
+      - 'scripts/verifyWeatherOutdoorLive.js'
+      - '.github/workflows/weather-outdoor-consistency.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  prepare:
+    if: github.ref == 'refs/heads/fix/weather-outdoor-consistency'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply reviewed exposure patch
+        run: |
+          if test -f scripts/patch_weather_outdoor_consistency.py; then
+            python scripts/patch_weather_outdoor_consistency.py
+          fi
+          node --check src/weatherFusionHourlyFeels.js
+          node --check public/weather-fusion/outdoor-feels.js
+          node --check public/weather-fusion/weather-display.js
+          node --check public/weather-fusion/experience.js
+          node --check public/weather-fusion/app.js
+          node --check scripts/verifyWeatherOutdoorLive.js
+          node --check scripts/weatherFusionPersonalBrowser.js
+      - run: npm ci
+      - name: All Weather Nourie unit regressions
+        run: node --test test/weatherFusion*.test.js
+      - name: Existing business-site regressions
+        run: npm run check
+      - run: npm install --no-save --package-lock=false playwright@1.55.0
+      - run: npx playwright install --with-deps chromium
+      - name: Actual responsive DOM and 27 outdoor exposure scenarios
+        run: node scripts/weatherFusionPersonalBrowser.js
+      - name: Commit only verified weather changes to the repair branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp /tmp/weather-personal-results/report.json docs/weather-outdoor-fixture-verification.json
+          rm -f scripts/patch_weather_outdoor_consistency.py
+          git add -A
+          python - <<'PY'
+          import subprocess,json
+          report=json.load(open('docs/weather-outdoor-fixture-verification.json'))
+          assert report['success'] and report['fixture'] and len(report['outdoorExposureChecks'])==27
+          actual=subprocess.check_output(['git','diff','--cached','--name-only','0200408a3712c2aa1940f4404b22115af1dedab3'],text=True).splitlines()
+          allowed={'.github/workflows/weather-outdoor-consistency.yml','src/weatherFusionHourlyFeels.js','scripts/weatherFusionPersonalBrowser.js','scripts/verifyWeatherOutdoorLive.js','test/weatherFusionOutdoorConsistency.test.js','test/weatherFusionSkyConsistency.test.js','test/weatherFusionHourlyConsistency.test.js','test/weatherFusionForecastDetails.test.js','docs/weather-outdoor-fixture-verification.json','docs/weather-nourie-experience.md'}
+          assert all(p in allowed or p.startswith('public/weather-fusion/') for p in actual),actual
+          print('Verified weather-only changes:',actual)
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Use one outdoor feels-like reading across Now, sun figures, hours and graphs'
+          git push origin HEAD:fix/weather-outdoor-consistency
+          echo "Verified repair commit: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: weather-outdoor-responsive-proof
+          path: /tmp/weather-personal-results
+          retention-days: 7
+  live:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm install --no-save --package-lock=false playwright@1.55.0
+      - run: npx playwright install --with-deps chromium
+      - name: Verify exact deployed bytes and live browser exposure equality in four locations
+        run: node scripts/verifyWeatherOutdoorLive.js
+      - name: Publish live proof on an evidence branch without redeploying main
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp /tmp/weather-outdoor-live.json docs/weather-outdoor-live-verification.json
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/weather-outdoor-live-verification.json
+          git commit -m "Record live outdoor exposure proof for ${GITHUB_SHA}"
+          git push origin HEAD:refs/heads/verification/weather-outdoor-${GITHUB_SHA:0:12}
+          echo "Live proof branch: verification/weather-outdoor-${GITHUB_SHA:0:12}" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: weather-outdoor-live-proof
+          path: /tmp/weather-outdoor-live.json
+          retention-days: 7
