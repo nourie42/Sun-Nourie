@@ -1,0 +1,44 @@
+name: Weather integrity source snapshot
+on:
+  push:
+    branches: [fix/weather-forecast-integrity]
+    paths: ['.github/workflows/weather-integrity-snapshot.yml']
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: npm ci >/tmp/npm.log 2>&1
+      - name: Archive exact source, dependency files, and live full-horizon inputs
+        run: |
+          mkdir -p /tmp/integrity/live
+          git archive HEAD > /tmp/integrity/source.tar
+          tar -czf /tmp/integrity/dependencies.tgz node_modules
+          node --input-type=module - <<'JS'
+          import fs from 'node:fs/promises';
+          const base='https://sun-nourie-live.onrender.com/api/weather-fusion/';
+          for(const [name,q] of [['knightdale','location=knightdale'],['white-lake','latitude=34.6385&longitude=-78.5025'],['denver','latitude=39.7392&longitude=-104.9903'],['seattle','latitude=47.6062&longitude=-122.3321']]){
+            try{
+              const r=await fetch(base+'forecast?'+q,{signal:AbortSignal.timeout(80000)}),f=await r.json();
+              await fs.writeFile('/tmp/integrity/live/'+name+'.json',JSON.stringify(f));
+              if(!r.ok)continue;
+              const coords=f.location.latitude+','+f.location.longitude;
+              const point=await (await fetch('https://api.weather.gov/points/'+coords,{headers:{'User-Agent':'Weather-Nourie-integrity-audit'},signal:AbortSignal.timeout(20000)})).json();
+              const urls=Object.entries(point.properties||{}).filter(([k])=>['forecast','forecastHourly','forecastGridData'].includes(k));
+              for(const [key,url] of urls){
+                try{const s=await fetch(url,{headers:{'User-Agent':'Weather-Nourie-integrity-audit'},signal:AbortSignal.timeout(20000)});if(s.ok)await fs.writeFile('/tmp/integrity/live/'+name+'-'+key+'.json',await s.text());}catch{}
+              }
+              console.log(name,'hours',f.hours.length,'last day',f.days.at(-1).date,'discussion',f.discussion?.office);
+            }catch(e){console.log(name,e.message);}
+          }
+          JS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: weather-integrity-source
+          path: /tmp/integrity
+          retention-days: 7
