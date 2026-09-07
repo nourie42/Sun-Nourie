@@ -3,6 +3,9 @@ import {weatherState} from './weather-state.js';
 import {thermalComfort, finite, solarElevation} from './weather-math.js?v=integrity-v1';
 import {feelsAt, forecastValue, degrees} from './hourly-feels.js?v=integrity-v1';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const currentSource = current => current?.type === 'observation'
+  ? (Array.isArray(current.thermalInputFallbackFields) && current.thermalInputFallbackFields.length ? 'Station observation + current-hour forecast' : 'Station observation')
+  : 'Current estimate';
 export function weatherShapes(condition, isDay = true) {
   const weather = weatherState(condition);
   const sun = '<g class="sky-sun"><circle cx="18" cy="16" r="8" fill="#ffdb83"/><path d="M18 3V0M18 29v3M5 16H2M31 16h3M8 6L6 4M28 26l2 2M8 26l-2 2M28 6l2-2" stroke="#ffdb83" stroke-width="2.3" stroke-linecap="round"/></g>';
@@ -26,7 +29,7 @@ export function currentSample(forecast, now = Date.now()) {
   return {id:'now', now:true, time:current.time, temperature:finite(current.temperature) ? current.temperature : null,
     feels:outdoorExposure(comfort).value, exposure:outdoorExposure(comfort), comfort, condition:current.condition || 'Sky conditions unavailable',
     isDay:comfort.daylight ?? (solarElevation(now,forecast.location.latitude,forecast.location.longitude) > 0),
-    source:current.type === 'observation' ? 'Station observation' : 'Current estimate', inputs:current};
+    source:currentSource(current), inputs:current};
 }
 export function forecastSample(forecast, time) {
   const epoch = Date.parse(time), hour = forecast?.hours?.find(row => Date.parse(row.time) === epoch);
@@ -50,7 +53,7 @@ export function renderHourlyWeather(forecast, now = Date.now()) {
   const root = document.getElementById('hourly'); if (!root) return;
   const scroll = root.scrollLeft, zone = forecast.location.timeZone || 'America/New_York';
   const hour = time => new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric'}).format(new Date(time)).replace(' ','');
-  root.innerHTML = hourlyDisplaySamples(forecast,now).map(sample => `<button type="button" class="hour ${sample.now ? 'now hour-current' : 'forecast-hour'}" data-comfort-time="${esc(sample.id)}" data-time="${esc(sample.time)}" title="${esc(sample.condition)} · ${esc(sample.source)}" aria-label="${sample.now ? 'Now' : esc(hour(sample.time))}, ${esc(sample.condition)}, air ${degrees(sample.temperature)}, feels like ${degrees(sample.feels)} ${esc(sample.exposure.label.toLowerCase())}. Preview this weather."><span>${sample.now ? 'Now' : esc(hour(sample.time))}</span>${weatherIcon(sample.condition,sample.isDay)}<strong>${degrees(sample.temperature)}</strong><span class="hour-feels">Feels like<b>${degrees(sample.feels)}</b><em class="hour-exposure">${esc(sample.exposure.shortLabel)}</em></span><small>${sample.now ? 'Station estimate' : finite(sample.pop) ? `${Math.round(sample.pop)}%` : '—'}</small></button>`).join('');
+  root.innerHTML = hourlyDisplaySamples(forecast,now).map(sample => `<button type="button" class="hour ${sample.now ? 'now hour-current' : 'forecast-hour'}" data-comfort-time="${esc(sample.id)}" data-time="${esc(sample.time)}" title="${esc(sample.condition)} · ${esc(sample.source)}" aria-label="${sample.now ? 'Now' : esc(hour(sample.time))}, ${esc(sample.condition)}, air ${degrees(sample.temperature)}, feels like ${degrees(sample.feels)} ${esc(sample.exposure.label.toLowerCase())}. Preview this weather."><span>${sample.now ? 'Now' : esc(hour(sample.time))}</span>${weatherIcon(sample.condition,sample.isDay)}<strong>${degrees(sample.temperature)}</strong><span class="hour-feels">Feels like<b>${degrees(sample.feels)}</b><em class="hour-exposure">${esc(sample.exposure.shortLabel)}</em></span><small>${sample.now ? (sample.source === 'Station observation + current-hour forecast' ? 'Station + forecast fill' : sample.source === 'Station observation' ? 'Station estimate' : 'Current estimate') : finite(sample.pop) ? `${Math.round(sample.pop)}%` : '—'}</small></button>`).join('');
   root.scrollLeft = scroll;
 }
 export function peakComparison(summary, currentShade) {
@@ -73,11 +76,12 @@ export function sampleCaption(sample, zone = 'America/New_York') {
   const time = valid ? new Intl.DateTimeFormat('en-US',{timeZone:zone,weekday:'short',hour:'numeric',minute:'2-digit'}).format(new Date(sample.time)) : 'time unavailable';
   const station=sample.inputs?.station,km=sample.inputs?.stationDistanceKm;
   const site=station?` · ${station}${finite(km)?` · ${Math.round(km/1.609344)} mi away`:''}`:'';
-  return sample.now ? `Current conditions · ${sample.source === 'Station observation' ? 'station estimate' : 'forecast estimate'}${site} at ${time}`
+  const currentLabel=sample.source === 'Station observation + current-hour forecast' ? 'station temperature + current-hour forecast fill' : sample.source === 'Station observation' ? 'station estimate' : 'forecast estimate';
+  return sample.now ? `Current conditions · ${currentLabel}${site} at ${time}`
     : `${time} forecast · air ${degrees(sample.temperature)} · feels like ${degrees(sample.feels)} ${sample.exposure.label.toLowerCase()}`;
 }
 
 export function heroFeelsHTML(sample) {
-  const source = sample.source === 'Station observation' ? 'based on the current station reading' : 'estimated from forecast data';
+  const source = sample.source === 'Station observation + current-hour forecast' ? 'station temperature with matching NWS current-hour moisture/wind fill' : sample.source === 'Station observation' ? 'based on the current station reading' : 'estimated from forecast data';
   return `Feels like <strong>${degrees(sample.feels)}</strong><small>${esc(sample.exposure.label)} · ${source}</small>`;
 }

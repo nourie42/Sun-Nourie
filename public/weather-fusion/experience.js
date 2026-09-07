@@ -100,7 +100,7 @@ export function renderComfort(forecast) {
  const tile=$('skin-exposure');tile.dataset.preview=sample.now?'current':'forecast';tile.dataset.weather=weatherState(sample.condition).kind;
  tile.querySelector('.comfort-weather-art')?.remove();
  document.querySelectorAll('#hourly [data-comfort-time]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.comfortTime===(sample.now?'now':sample.id))));
- $('skin-science').textContent=`${c.method}. ${sampleCaption(sample,zone)}. Air ${degrees(sample.temperature)}; dew point ${degrees(sample.inputs.dewpoint)}; wind ${number(sample.inputs.wind)} mph. ${c.note} Current observations and future forecasts are different sources; the Now card uses exactly the same observation as the hero. No temperature or peak is forced upward.`;
+ $('skin-science').textContent=`${c.method}. ${sampleCaption(sample,zone)}. Air ${degrees(sample.temperature)}; dew point ${degrees(sample.inputs.dewpoint)}; wind ${number(sample.inputs.wind)} mph. ${c.note} Current station observations and current-hour forecast fill-ins are tracked separately; the Now card uses the same current inputs as the hero, and any missing station moisture or wind filled from the matching NWS hour is labeled as an estimate. No temperature or peak is forced upward.`;
 }
 export function renderDailyRows(forecast,icon) {
  const values=forecast.days.flatMap(d=>[d.high,d.low]).filter(finite),lo=values.length?Math.min(...values)-3:0,hi=values.length?Math.max(...values)+3:1;

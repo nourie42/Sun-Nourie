@@ -1,5 +1,43 @@
 /** Shared sky classification. Missing reports never mean clear weather. */
 const finite = value => typeof value === 'number' && Number.isFinite(value);
+function matchingCurrentHour(hours = [], now = Date.now()) {
+  return hours.find(row => { const time = Date.parse(row?.time); return finite(time) && time <= now && now < time + 3600000; }) || null;
+}
+function hourlyWindMph(value) {
+  if (finite(value)) return value >= 0 ? value : null;
+  const text = String(value || '').trim();
+  if (/\bcalm\b/i.test(text)) return 0;
+  const values = [...text.matchAll(/\d+(?:\.\d+)?/g)].map(match => Number(match[0])).filter(finite);
+  return values.length ? values.reduce((sum, number) => sum + number, 0) / values.length : null;
+}
+function supplementObservedThermal(current, hour) {
+  if (current?.type !== 'observation' || !hour) return current || {};
+  const patch = {}, fields = [];
+  const humidityOk = finite(current.humidity) && current.humidity >= 0 && current.humidity <= 100;
+  const dewpointOk = finite(current.dewpoint) && (!finite(current.temperature) || current.dewpoint <= current.temperature + 1);
+  if (!dewpointOk) {
+    if (humidityOk) {
+      if (finite(current.dewpoint)) patch.dewpoint = null;
+    } else if (finite(hour.dewpoint)) {
+      patch.dewpoint = hour.dewpoint;
+      fields.push('dew point');
+    } else if (finite(hour.humidity) && hour.humidity >= 0 && hour.humidity <= 100) {
+      patch.dewpoint = null;
+      patch.humidity = hour.humidity;
+      fields.push('humidity');
+    }
+  }
+  if (!finite(current.wind) || current.wind < 0) {
+    const wind = hourlyWindMph(hour.wind);
+    if (finite(wind)) { patch.wind = wind; fields.push('wind'); }
+  }
+  if (!fields.length && !Object.keys(patch).length) return current;
+  return {...current, ...patch, ...(fields.length ? {
+    thermalInputFallbackFields: fields,
+    thermalInputFallbackSource: 'NWS current-hour forecast',
+    thermalInputFallbackTime: hour.time,
+  } : {})};
+}
 export function weatherState(condition = '', skyCover = null) {
   const text = String(condition || '').trim(), lower = text.toLowerCase();
   let kind = 'unknown', label = 'Sky conditions unavailable';
@@ -31,15 +69,16 @@ export function stationWeather(observation = {}) {
   return {condition: text, conditionSource: 'Station sky unavailable', conditionTime: observation.timestamp || null};
 }
 export function resolveCurrentWeather(current, hours = [], now = Date.now(), skyCover = null) {
-  const observed = weatherState(current?.condition, current?.skyCover);
-  if (observed.known) return {...current, weather: observed,
-    conditionSource: current.conditionSource || (current.type === 'observation' ? 'Station weather report' : 'Hourly forecast')};
-  const hour = hours.find(row => { const t = Date.parse(row.time); return t <= now && now < t + 3600000; });
+  const hour = matchingCurrentHour(hours, now);
+  const resolvedCurrent = supplementObservedThermal(current, hour);
+  const observed = weatherState(resolvedCurrent?.condition, resolvedCurrent?.skyCover);
+  if (observed.known) return {...resolvedCurrent, weather: observed,
+    conditionSource: resolvedCurrent.conditionSource || (resolvedCurrent.type === 'observation' ? 'Station weather report' : 'Hourly forecast')};
   const fallback = weatherState(hour?.condition, skyCover);
-  if (fallback.known) return {...current, condition: weatherState(hour?.condition).known ? hour.condition : fallback.label, weather: fallback,
+  if (fallback.known) return {...resolvedCurrent, condition: weatherState(hour?.condition).known ? hour.condition : fallback.label, weather: fallback,
     conditionSource: hour && weatherState(hour.condition).known ? 'NWS current-hour forecast (sky only)' : 'NWS current-hour sky-cover forecast',
     conditionTime: hour?.time || new Date(now).toISOString()};
-  return {...current, condition: 'Sky conditions unavailable', weather: weatherState(), conditionSource: 'Sky conditions unavailable'};
+  return {...resolvedCurrent, condition: 'Sky conditions unavailable', weather: weatherState(), conditionSource: 'Sky conditions unavailable'};
 }
 /** This is an explicit radiation-estimation policy, not measured irradiance.
  * Do not claim direct sunshine in overcast/rain/fog. Those scenes use the

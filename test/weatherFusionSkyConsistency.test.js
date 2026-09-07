@@ -25,6 +25,20 @@ test('missing station sky may use ONLY the matching current-hour forecast, witho
  assert.equal(resolveCurrentWeather(input,hours,now+3*H).weather.kind,'unknown');
  assert.equal(resolveCurrentWeather(input,[],now,99).condition,'Cloudy');
 });
+test('incomplete station thermal inputs use only the matching current-hour NWS forecast instead of blanking feels-like',()=>{
+ const input={...readings,dewpoint:null,humidity:null,wind:null,condition:'Partly Cloudy'};
+ const hours=[{time:'2026-09-06T15:00:00Z',temperature:82,condition:'Partly Cloudy',dewpoint:68,humidity:60,wind:'5 to 7 mph'}];
+ const resolved=resolveCurrentWeather(input,hours,now);
+ assert.equal(resolved.temperature,input.temperature);assert.equal(resolved.time,input.time);
+ assert.equal(resolved.dewpoint,68);assert.equal(resolved.wind,6);
+ assert.deepEqual(resolved.thermalInputFallbackFields,['dew point','wind']);
+ assert.equal(resolved.thermalInputFallbackSource,'NWS current-hour forecast');
+ assert.ok(Number.isFinite(thermalComfort(resolved,location,now).outdoors));
+ const sample=currentSample({location,assembledAt:new Date(now).toISOString(),current:resolved},now);
+ assert.ok(Number.isFinite(sample.feels));assert.match(sample.source,/current-hour forecast/);
+ const futureOnly=resolveCurrentWeather(input,[{...hours[0],time:'2026-09-06T16:00:00Z'}],now);
+ assert.equal(futureOnly.dewpoint,null);assert.equal(futureOnly.wind,null);assert.equal(thermalComfort(futureOnly,location,now).outdoors,null);
+});
 test('valid station condition is never silently replaced by a conflicting forecast',()=>{
  const value=resolveCurrentWeather({...readings,condition:'Overcast'},[{time:'2026-09-06T15:00:00Z',condition:'Sunny'}],now);
  assert.equal(value.condition,'Overcast');assert.equal(value.weather.kind,'cloudy');

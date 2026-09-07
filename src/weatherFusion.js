@@ -346,7 +346,9 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
                 pressure: o.barometricPressure?.unitCode === 'wmoUnit:Pa' && finite(o.barometricPressure.value) ? rounded(o.barometricPressure.value / 3386.389, 2) : null };
             } catch { return null; }
           }));
-          const chosen=candidates.find(Boolean)||null;
+          const thermalComplete=c=>c&&finite(c.temperature)&&finite(c.wind)&&c.wind>=0&&
+            (finite(c.dewpoint)||(finite(c.humidity)&&c.humidity>=0&&c.humidity<=100));
+          const chosen=candidates.find(thermalComplete)||candidates.find(Boolean)||null;
           if(chosen?.station&&finite(chosen.pressurePa)){
             try{
               const stamp=Date.parse(chosen.time);
