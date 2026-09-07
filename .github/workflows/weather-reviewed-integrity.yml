@@ -78,7 +78,7 @@ jobs:
           assert reference['passed'] and reference['maximumAbsoluteErrorF']<1e-6
           assert browser['success'] and len(browser['centeringChecks'])==6
           assert len(browser['danTakeChecks'])==21 and len(browser['outdoorExposureChecks'])==27
-          changed=subprocess.check_output(['git','diff','--cached','--name-only','f23610ec7091383573e84ba0780a010d64b78125'],text=True).splitlines()
+          changed=subprocess.check_output(['git','diff','--cached','--name-only','origin/main'],text=True).splitlines()
           prefixes=['public/weather-fusion/','src/weatherFusion','test/weatherFusion','docs/weather-integrity-']
           exact={'.github/workflows/weather-reviewed-integrity.yml','scripts/weatherFusionPersonalBrowser.js','scripts/weatherFusionBrowserSmoke.js','scripts/verifyWeatherIntegrityReference.py','scripts/verifyWeatherIntegrityLive.js'}
           assert all(p in exact or any(p.startswith(prefix) for prefix in prefixes) for p in changed),changed
