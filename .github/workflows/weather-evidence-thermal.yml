@@ -6,7 +6,7 @@ on:
       - 'public/weather-fusion/**'
       - 'src/weatherFusion*.js'
       - 'test/weatherFusion*.test.js'
-      - 'scripts/patch_weather_evidence.py'
+      - 'scripts/patch_weather_evidence*.py'
       - 'scripts/weatherFusionPersonalBrowser.js'
       - 'scripts/verifyWeatherEvidenceLive.js'
       - 'scripts/verifyWeatherThermalReference.py'
@@ -29,6 +29,7 @@ jobs:
       - name: Apply reviewed repair and check syntax
         run: |
           if test -f scripts/patch_weather_evidence.py; then python scripts/patch_weather_evidence.py; fi
+          if test -f scripts/patch_weather_evidence_adjustments.py; then python scripts/patch_weather_evidence_adjustments.py; fi
           for file in src/weatherFusion.js src/weatherFusionHourlyFeels.js src/weatherFusionExperience.js public/weather-fusion/forecast-changes.js public/weather-fusion/weather-math.js public/weather-fusion/weather-display.js public/weather-fusion/app.js scripts/verifyWeatherEvidenceLive.js; do node --check "$file"; done
       - run: npm ci
       - run: pip install -q pythermalcomfort==4.4.2
@@ -44,7 +45,7 @@ jobs:
           from pathlib import Path
           s=Path('/tmp/weather-evidence-unit.log').read_text()
           for part in s.split('# Subtest:'):
-              if '\nnot ok ' in part: print('# Subtest:'+part[:15000])
+              if '\nnot ok ' in part: print('# Subtest:'+part[:4000])
           print(s[-600:])
           PY
             exit 1
@@ -59,7 +60,7 @@ jobs:
       - name: Commit only verified weather changes to the repair branch
         run: |
           set -euo pipefail
-          rm -f scripts/patch_weather_evidence.py .github/workflows/weather-evidence-audit.yml
+          rm -f scripts/patch_weather_evidence.py scripts/patch_weather_evidence_adjustments.py .github/workflows/weather-evidence-audit.yml
           cp /tmp/weather-personal-results/report.json docs/weather-evidence-responsive-verification.json
           git add -A
           python - <<'PY'
