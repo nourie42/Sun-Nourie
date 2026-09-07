@@ -89,7 +89,7 @@ if s.count(anchor)!=1:raise RuntimeError('browser heading anchor')
 s=s.replace(anchor,anchor+"\n  assert.equal((await page.locator('#skin-kicker').innerText()).trim(),'How does it feel outside right now');\n  assert.equal(await page.locator('#daily .forecast-confidence').count(),7);\n  assert.ok((await page.locator('#daily .forecast-confidence').allTextContents()).every(t=>t.includes('Forecast confidence')));")
 anchor2="  assert.equal(await page.locator('.person-eyes').count(),2);"
 if s.count(anchor2)!=1:raise RuntimeError('browser clothing anchor')
-s=s.replace(anchor2,"  const shadeOutfit=clothingForFeels(knightdaleCurrent.comfort.shade),sunOutfit=clothingForFeels(knightdaleCurrent.feels);\n  assert.equal(await page.locator(`.shade-person svg[data-outfit=\"${shadeOutfit}\"]`).count(),1,'Shade figure outfit follows its displayed feels-like temperature');\n  assert.equal(await page.locator(`.sun-person svg[data-outfit=\"${sunOutfit}\"]`).count(),1,'Outdoor figure outfit follows its displayed feels-like temperature');\n"+anchor2)
+s=s.replace(anchor2,"  for(const selector of ['.shade-person','.sun-person']){const figure=page.locator(selector),shown=parseFloat(await figure.locator('figcaption strong').innerText()),actual=await figure.locator('svg').getAttribute('data-outfit');assert.equal(actual,clothingForFeels(shown),selector+' outfit follows its visible feels-like number');}\n"+anchor2)
 Path(p).write_text(s)
 
 # Cache-bust changed browser dependencies.
