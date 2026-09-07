@@ -8,7 +8,9 @@ const app=read('public/weather-fusion/app.js'),html=read('public/weather-fusion/
 test('Dan take is location-discussion specific instead of seeded boilerplate',()=>{
  assert.ok(!app.includes("uncertainty: 'Forecasts can change"));
  assert.ok(!server.includes("uncertainty: 'Forecasts can change"));
- assert.match(server,/function discussionUncertainty\(data\)/);
+ assert.ok(!server.includes('function discussionUncertainty('));
+ assert.match(server,/approveDanTake/);
+ assert.match(server,/visibleDanTakeItems/);
  assert.match(prompt,/specific forecast-changing factor highlighted by the latest local discussion/i);
  assert.match(prompt,/Never use generic boilerplate/i);
 });

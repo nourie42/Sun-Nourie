@@ -101,3 +101,21 @@ test('location timezone, midnight, DST and year rollover preserve the source day
 test('explicit until-six-am period ends at six, not the following midnight',()=>{
  const r=discussionPeriod('THROUGH 6 AM TUESDAY',now,'America/New_York');assert.equal(r.end,Date.parse('2026-09-08T10:00:00Z'));
 });
+
+test('a pronoun sentence after a yesterday recap cannot inherit todays section dates',()=>{
+ const f=forecast('.DISCUSSION...\nYesterday the front arrived. Its timing remained uncertain.');
+ assert.deepEqual(collectDanTakeEvidence(f,now).candidates,[]);
+ const g=forecast('.NEAR TERM /TODAY/...\nYesterday the storms arrived. Their timing is uncertain.');
+ assert.deepEqual(collectDanTakeEvidence(g,now).candidates,[]);
+});
+test('a preceding front recap cannot license a front claim from a future fog excerpt',()=>{
+ const f=forecast('.SHORT TERM /TUESDAY/...\nThe front passed through yesterday. Fog clearing time is uncertain Tuesday morning.');
+ const c=collectDanTakeEvidence(f,now).candidates;assert.equal(c.length,1);
+ assert.equal(approveDanTake([{evidenceId:c[0].id,summary:paraphrase}],f,now).forecastChanges.length,0);
+});
+test('malformed cached items and invalid timezones hide the take instead of crashing',()=>{
+ const f=forecast(upcoming),b=briefing(f);
+ assert.deepEqual(visibleDanTakeItems({...b,forecastChanges:{}},f,now),[]);
+ assert.deepEqual(visibleDanTakeItems({...b,forecastChanges:[null]},f,now),[]);
+ assert.deepEqual(collectDanTakeEvidence({...f,location:{...f.location,timeZone:'invalid'}},now).candidates,[]);
+});

@@ -31,7 +31,7 @@ function partRange(date, part, zone) {
   const [a,b]=hours[part]||[0,24];
   return {start:wall(date,a,zone),end:wall(date,b,zone),part:part||''};
 }
-const past = text => /\b(yesterday|last night|last (?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)|earlier today|previous day|already (?:passed|ended|moved|occurred)|has (?:already )?(?:passed|ended|departed)|had (?:been|passed|ended)|was uncertain|were uncertain|moved through|passed through)\b/i.test(text);
+const past = text => /\b(yesterday|last night|last (?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)|earlier today|previous day|already (?:passed|ended|moved|occurred)|has (?:already )?(?:passed|ended|departed)|had (?:been|passed|ended)|was uncertain|were uncertain|remained uncertain|uncertainty was|moved through|passed through)\b/i.test(text);
 export function explicitForecastUncertainty(text) {
   const s=norm(text);
   if(!s||past(s)||/\b(?:no|little|minimal)\b[^.!?]{0,35}\b(?:uncertainty|forecast changes?)\b|\bhigh confidence\b/i.test(s))return false;
@@ -90,6 +90,7 @@ function sourceOf(data, now) {
   const d=data?.discussion,loc=data?.location;
   if(!d?.text||!loc?.timeZone||!d.office||!loc.office||d.office.toUpperCase()!==loc.office.toUpperCase())return null;
   if(data.feeds?.find(f=>f.id==='afd')?.status!=='ready')return null;
+  try{new Intl.DateTimeFormat('en-US',{timeZone:loc.timeZone}).format(new Date(now));}catch{return null;}
   const issued=Date.parse(d.issuanceTime);
   if(!finite(issued)||issued>now||now-issued>MAX_SOURCE_AGE)return null;
   if(!d.id&&!d.url)return null;
@@ -113,7 +114,9 @@ export function collectDanTakeEvidence(data, now=Date.now()) {
         const previous=sentences[qi-1]||'',context=norm([previous,quote,sentences[qi+1]||''].join(' '));
         // Own timing takes priority; otherwise inherit the previous sentence or
         // the explicit section period. Never inherit a yesterday/last-night recap.
-        const range=discussionPeriod(quote,anchor,zone)||(!past(previous)&&discussionPeriod(previous,anchor,zone))||headingRange;
+        const ownRange=discussionPeriod(quote,anchor,zone);
+        if(!ownRange&&past(previous))continue;
+        const range=ownRange||discussionPeriod(previous,anchor,zone)||headingRange;
         if(!range||range.end<=now||range.start>=now+8*DAY||range.end>anchor+maxLead)continue;
         if(!norm(raw).includes(quote))continue;
         const display=new Intl.DateTimeFormat('en-US',{timeZone:zone,weekday:'long',month:'short',day:'numeric'});
@@ -129,9 +132,9 @@ export function collectDanTakeEvidence(data, now=Date.now()) {
 }
 function acceptableParaphrase(text, candidate) {
   if(typeof text!=='string'||text.trim().length<15||text.length>420||/[<>]|\d/.test(text))return false;
-  if(/\b(yesterday|last night|earlier today|today|tonight|tomorrow)\b/i.test(text))return false; // server supplies the dated period
+  if(/\b(yesterday|last night|earlier today|today|tonight|tomorrow|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/i.test(text))return false; // server supplies the dated period
   if(/forecast(?:s)? can change|no (?:major|meaningful|significant).*uncertaint|main sources? of forecast uncertainty|all clear|guaranteed|perfectly safe|\b(?:HRRR|ECMWF|NBM|CAPE|QPF|synoptic|advection|deterministic|convection|guidance)\b/i.test(text))return false;
-  const evidence=candidate.context;
+  const evidence=/front|boundary|rain|storm|thunder|convec|cloud|fog|temp|wind|snow|warm|cool|highs|lows/i.test(candidate.quote)?candidate.quote:candidate.context;
   const topics=[[/\bfront\b/i,/\bfront|boundary/i],[/\bstorms?\b|thunder/i,/storm|thunder|convec/i],[/\brain\b|showers?/i,/rain|precip|shower|convec/i],[/\bsnow\b/i,/snow|winter|frozen/i],[/\bfog\b/i,/fog|visib/i],[/\bcloud|clearing/i,/cloud|clear|stratus|sun/i],[/\bwind/i,/wind|breeze|gust/i],[/\btemperatures?|warmer|cooler|colder|hotter/i,/temp|warm|cool|cold|heat|highs|lows/i]];
   return !topics.some(([claim,support])=>claim.test(text)&&!support.test(evidence));
 }
@@ -153,8 +156,8 @@ export function visibleDanTakeItems(briefing, forecast, now=Date.now()) {
   // An old quote, an ended interval or an old discussion must not survive a
   // cache hit, location change, new AFD, midnight or a suspended browser tab.
   const candidates=context.candidates;
-  const verified=(briefing.forecastChanges||[]).filter(item=>{
-    const c=candidates.find(c=>c.id===item.evidenceId);
+  const verified=(Array.isArray(briefing.forecastChanges)?briefing.forecastChanges:[]).filter(item=>{
+    const c=candidates.find(c=>c.id===item?.evidenceId);
     return c&&item.sourceQuote===c.quote&&item.validUntil===c.validUntil&&Date.parse(item.validUntil)>now;
   });
   return approveDanTake(verified,forecast,now).forecastChanges;

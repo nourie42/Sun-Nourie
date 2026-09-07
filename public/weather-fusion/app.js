@@ -1,3 +1,4 @@
+import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText} from './dans-take.js?v=2-dated';
 import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './weather-display.js?v=outdoor-v1';
 import {degrees,feelsAt,dayFeelsHTML} from './hourly-feels.js?v=outdoor-v1';
 import {createFramePlayer} from './frame-player.js';
@@ -128,6 +129,8 @@ function renderEvidence(data) {
 }
 function renderBriefing(data) {
   currentBriefing = data;
+  const takeItems=visibleDanTakeItems(data,forecast,Date.now());
+  const uncertainty=danTakeText(takeItems);
   $('briefing-title').textContent = data.headline || 'Local forecast';
   $('briefing-summary').textContent = data.summary || 'The source forecast is currently unavailable.';
   $('ai-label').textContent = data.mode === 'ai' ? 'YOUR LOCAL OUTLOOK' : 'NWS FORECAST';
@@ -136,16 +139,17 @@ function renderBriefing(data) {
     const url = id === 'afd' ? forecast?.discussion?.url : f?.url;
     return url && /^https:\/\/(api\.weather\.gov|www\.nco\.ncep\.noaa\.gov|www\.ecmwf\.int)\//.test(url) ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(f?.label || id)} ↗</a>` : esc(f?.label || id);
   });
-  $('briefing-detail').innerHTML = `<div><strong>Tonight & tomorrow</strong><p>${esc(data.nearTerm || 'See the hourly forecast below.')}</p></div><div><strong>The week ahead</strong><p>${esc(data.extended || 'More details will appear with the next update.')}</p></div><div><strong>What could change - Dan's take</strong><p>${esc(data.uncertainty || '')}</p></div>`;
+  $('briefing-detail').innerHTML = `<div><strong>Tonight & tomorrow</strong><p>${esc(data.nearTerm || 'See the hourly forecast below.')}</p></div><div><strong>The week ahead</strong><p>${esc(data.extended || 'More details will appear with the next update.')}</p></div>${uncertainty?`<div data-dans-take><strong>Dan's take</strong><p style="white-space:pre-line">${esc(uncertainty)}</p></div>`:''}`;
   // Reuse the same outlook uncertainty below today's graphic, including refresh/reset.
-  const uncertainty = typeof data.uncertainty === 'string' ? data.uncertainty.trim() : '';
+  // Never render legacy free text: only source-bound, unexpired, approved items.
   const todayUncertainty = $('today-uncertainty'), todayUncertaintyText = $('today-uncertainty-text');
   if (todayUncertainty && todayUncertaintyText) {
     todayUncertaintyText.textContent = uncertainty;
+    if(todayUncertaintyText.style)todayUncertaintyText.style.whiteSpace='pre-line';
     todayUncertainty.hidden = !uncertainty;
   }
   $('briefing-stamp').textContent = data.mode === 'ai' ? `Updated ${clock(data.generatedAt)} · based on your local NWS discussion` : 'National Weather Service forecast';
-  $('outlook-science').innerHTML = `<p>Summary type: ${esc(data.mode === 'ai' ? 'AI plain-language paraphrase of the local discussion, checked against the point forecast and available model data' : 'Official NWS forecast fallback; not an AI paraphrase')}. ${esc(data.reason || '')}</p><p>Sources used: ${refs.join(' · ') || 'Waiting for the local outlook'}</p>`;
+  $('outlook-science').innerHTML = `<p>Summary type: ${esc(data.mode === 'ai' ? 'AI plain-language paraphrase of the local discussion, checked against the point forecast and available model data' : 'Official NWS forecast fallback; not an AI paraphrase')}. ${esc(data.reason || '')}</p><p>Sources used: ${refs.join(' · ') || 'Waiting for the local outlook'}</p><p>Dan's take: ${takeItems.length?'Only the following explicitly supported, still-upcoming discussion changes are displayed.':'Hidden: no approved, dated, still-upcoming change is available from the current local discussion.'}</p>${takeItems.map(item=>`<details><summary>${esc(item.period)} · source evidence</summary><p>${esc(item.sourceQuote)}</p><p>Original section: ${esc(item.section)} · issued ${esc(clock(item.sectionIssuedAt,{month:'short',day:'numeric'}))}. Applies through ${esc(clock(item.eventEnd,{month:'short',day:'numeric'}))}.</p></details>`).join('')}`;
 
 }
 async function load({ moveMap = false, refreshModels = false } = {}) {
@@ -415,3 +419,7 @@ setInterval(() => { if (!document.hidden && !busy) void load(); }, 60000);
 installExperience();
 readSaved();
 void load({ moveMap: true });
+
+// Expire passed discussion periods even while this page remains open.
+setInterval(()=>{if(currentBriefing&&forecast)renderBriefing(currentBriefing);},30000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&currentBriefing&&forecast)renderBriefing(currentBriefing);});

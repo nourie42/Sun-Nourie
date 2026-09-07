@@ -1,3 +1,4 @@
+import {collectDanTakeEvidence,approveDanTake,danTakeText} from '../public/weather-fusion/dans-take.js';
 import {rebuildHourlyFeels} from '../src/weatherFusionHourlyFeels.js';
 import {thermalComfort,shadeFeelsLike} from '../public/weather-fusion/weather-math.js';
 import {feelsAt,dailyFeels} from '../public/weather-fusion/hourly-feels.js';
@@ -16,7 +17,7 @@ function fixture(place='knightdale'){
  const green=place==='greenville',name=green?'Greenville, NC':'Knightdale / Raleigh';
  const series=Object.fromEntries(['temperature','feels','dewpoint','wind','humidity','pop','visibility','pressure','precipitation'].map(key=>[key,Array.from({length:240},(_,i)=>({time:new Date(epoch+i*H).toISOString(),value:key==='pressure'?29.91+i*.001:key==='precipitation'?.01:key==='dewpoint'?72-i%9:key==='wind'?8:key==='humidity'?70:key==='pop'?30:key==='visibility'?10:key==='feels'?80+i%8:75+i%10,inputs:{temperature:75+i%10,dewpoint:72-i%9,wind:8}}))]));
  const days=Array.from({length:7},(_,i)=>({date:`2026-09-${String(6+i).padStart(2,'0')}`,label:i?'Mon':'Today',high:84+i,low:65+i,condition:'Cloudy',nightCondition:'Partly cloudy',detail:'Warm with rain possible.',nightDetail:'Some clouds overnight.',pop:30,popDay:30,popNight:20,qpf:.1,qpfWindow:{start:new Date(epoch+i*24*H-2*H).toISOString(),end:new Date(epoch+(i+1)*24*H-2*H).toISOString()}}));
- const result={signature:place+'-personal-fixture',assembledAt:new Date(epoch).toISOString(),location:{id:place,name,latitude:green?35.6127:35.787,longitude:green?-77.3664:-78.4806,timeZone:'America/New_York',office:green?'MHX':'RAH'},current:{temperature:green?71:75,condition:'Cloudy',time:new Date(epoch).toISOString(),type:'observation',station:'KRDU',stationName:'Fixture station',dewpoint:72,wind:8,humidity:70,pressure:29.91,pressurePa:101300,pressureTrend:{status:'ready',direction:green?'rising':'falling',deltaMb:green?.8:-1.2,hours:3},visibility:10},comfort:{shade:80,sun:84,wetBulb:70,humidity:70,method:'Steadman apparent temperature',note:'Environmental estimate, not skin temperature.'},hours:series.temperature.slice(0,48).map(p=>({...p,temperature:p.value,condition:'Cloudy',isDay:true,pop:30,wind:'8 mph',windDirection:'SW'})),days,precipitation:{value:.1},feeds:['nws','afd','hrrr','ecmwf','nbm','alerts'].map(id=>({id,label:id.toUpperCase(),status:'ready',contributes:true,issuedAt:new Date(epoch-H).toISOString(),url:'https://api.weather.gov/'})),alerts:[{id:'https://api.weather.gov/alerts/fixture-'+place,event:'Flash Flood Warning',status:'Actual',sent:new Date(epoch-H).toISOString(),expires:new Date(epoch+12*H).toISOString(),areaDesc:name,severity:'Severe',description:'Heavy rain can cause flooding. <img src=x onerror=alert(1)>',instruction:'Move to higher ground now. Do not drive through flooded roads.'},{id:'https://api.weather.gov/alerts/watch-'+place,event:'Flood Watch',status:'Actual',sent:new Date(epoch-H).toISOString(),expires:new Date(epoch+12*H).toISOString(),areaDesc:name,description:'Flooding is possible.'}],discussion:{id:'afd-'+place,office:green?'MHX':'RAH',issuanceTime:new Date(epoch-H).toISOString(),text:'Rain may be widespread in the region this afternoon.',url:'https://api.weather.gov/products/fixture-'+place},modelContributions:[],aiConfigured:true,methodology:'Fixture data for automated layout checks only.',metricForecasts:{series,notes:{pressure:'Forecast mean sea-level pressure, separate from station observations.'},solar:days.map(d=>({date:d.date,sunrise:d.date+'T10:30:00Z',sunset:d.date+'T23:30:00Z'}))},solar:{sunrise:'2026-09-06T10:30:00Z',sunset:'2026-09-06T23:30:00Z'}};
+ const result={signature:place+'-personal-fixture',assembledAt:new Date(epoch).toISOString(),location:{id:place,name,latitude:green?35.6127:35.787,longitude:green?-77.3664:-78.4806,timeZone:'America/New_York',office:green?'MHX':'RAH'},current:{temperature:green?71:75,condition:'Cloudy',time:new Date(epoch).toISOString(),type:'observation',station:'KRDU',stationName:'Fixture station',dewpoint:72,wind:8,humidity:70,pressure:29.91,pressurePa:101300,pressureTrend:{status:'ready',direction:green?'rising':'falling',deltaMb:green?.8:-1.2,hours:3},visibility:10},comfort:{shade:80,sun:84,wetBulb:70,humidity:70,method:'Steadman apparent temperature',note:'Environmental estimate, not skin temperature.'},hours:series.temperature.slice(0,48).map(p=>({...p,temperature:p.value,condition:'Cloudy',isDay:true,pop:30,wind:'8 mph',windDirection:'SW'})),days,precipitation:{value:.1},feeds:['nws','afd','hrrr','ecmwf','nbm','alerts'].map(id=>({id,label:id.toUpperCase(),status:'ready',contributes:true,issuedAt:new Date(epoch-H).toISOString(),url:'https://api.weather.gov/'})),alerts:[{id:'https://api.weather.gov/alerts/fixture-'+place,event:'Flash Flood Warning',status:'Actual',sent:new Date(epoch-H).toISOString(),expires:new Date(epoch+12*H).toISOString(),areaDesc:name,severity:'Severe',description:'Heavy rain can cause flooding. <img src=x onerror=alert(1)>',instruction:'Move to higher ground now. Do not drive through flooded roads.'},{id:'https://api.weather.gov/alerts/watch-'+place,event:'Flood Watch',status:'Actual',sent:new Date(epoch-H).toISOString(),expires:new Date(epoch+12*H).toISOString(),areaDesc:name,description:'Flooding is possible.'}],discussion:{id:'afd-'+place,office:green?'MHX':'RAH',issuanceTime:new Date(epoch-H).toISOString(),text:'.NEAR TERM /TODAY/...\nThe timing of afternoon rain is uncertain this afternoon.',url:'https://api.weather.gov/products/fixture-'+place},modelContributions:[],aiConfigured:true,methodology:'Fixture data for automated layout checks only.',metricForecasts:{series,notes:{pressure:'Forecast mean sea-level pressure, separate from station observations.'},solar:days.map(d=>({date:d.date,sunrise:d.date+'T10:30:00Z',sunset:d.date+'T23:30:00Z'}))},solar:{sunrise:'2026-09-06T10:30:00Z',sunset:'2026-09-06T23:30:00Z'}};
  result.specialDiscussions=[{id:'https://www.spc.noaa.gov/products/md/md2000.html',url:'https://www.spc.noaa.gov/products/md/md2000.html',event:'SPC special weather discussion',productType:'SPC-MD',applicable:true,sent:new Date(epoch-H).toISOString(),expires:new Date(epoch+12*H).toISOString(),areaDesc:'Special discussion covering this location',description:'Heavy rain may develop.'}];
  result.feeds.push({id:'special-discussions',status:'ready'});
  result.comfort=thermalComfort(result.current,result.location,epoch);
@@ -27,7 +28,7 @@ const app=express();app.use('/weather-fusion',express.static('public/weather-fus
 app.get('/api/weather-fusion/:kind',(req,res)=>{
  const f=fixture(req.query.location||'knightdale');
  if(req.params.kind==='forecast')return res.json(f);
- if(req.params.kind==='briefing')return res.json({signature:f.signature,mode:'ai',generatedAt:f.assembledAt,headline:'Local outlook',summary:'Warm with rain possible.',uncertainty:`Rain timing could change around ${f.location.name}.`,nearTerm:'Clouds tonight.',extended:'A warmer week.',sources:['nws','afd']});
+ if(req.params.kind==='briefing'){const candidates=collectDanTakeEvidence(f,epoch).candidates;const take=approveDanTake(candidates.map(c=>({evidenceId:c.id,summary:`Rain could arrive earlier or later around ${f.location.name}.`})),f,epoch);return res.json({signature:f.signature,mode:'ai',generatedAt:f.assembledAt,headline:'Local outlook',summary:'Warm with rain possible.',...take,uncertainty:danTakeText(take.forecastChanges),nearTerm:'Clouds tonight.',extended:'A warmer week.',sources:['nws','afd']});}
  if(req.params.kind==='bulletins')return res.json({signature:f.signature,mode:'ai',summaries:bulletinFacts(f,epoch).map(i=>({id:i.id,sourceKey:i.sourceKey,summary:'Rain could affect travel. Follow the official instructions below.'}))});
  if(req.params.kind==='radar')return res.json({frames:[],message:'Radar intentionally not loaded by this deterministic layout test.'});
  if(req.params.kind==='models')return res.json({layers:{}});
@@ -154,6 +155,58 @@ try{
     await page.locator('#skin-exposure').screenshot({path:dir+'/outdoor-figures-390.png'});
    }
    (report.outdoorExposureChecks??=[]).push({width,condition,time:new Date(time).toISOString(),missingWind:patch.wind===null,heroNowMetricOutdoorAgree:true,shadeSeparate:true,forecastPreviewAndGraphAgree:true,locationSwitch:true});
+   await context.close();
+  }
+ }
+ // Render the actual entire production page, not a screenshot-only mock.
+ for(const width of [320,390,1365]){
+  const takeNow=Date.parse('2026-09-07T16:00:00Z');
+  for(const [name,text,expected,at] of [
+   ['yesterday-front','.DISCUSSION...\nThe front passed through yesterday. Storm timing was uncertain yesterday.\nDry weather is expected today.',0,takeNow],
+   ['routine-chance','.DISCUSSION...\nScattered rain and storms are possible Tuesday.',0,takeNow],
+   ['undated','.DISCUSSION...\nThe timing of the front is uncertain.',0,takeNow],
+   ['later-week','.LONG TERM /THURSDAY THROUGH FRIDAY/...\nThe timing of the front remains uncertain Thursday into Friday.',1,takeNow],
+   ['retained-yesterday','.NEAR TERM /THROUGH SUNDAY/...\nAs of 200 PM EDT Sunday...\nThe timing of the front is uncertain today.\n\n.LONG TERM /THURSDAY THROUGH FRIDAY/...\nThe front timing remains uncertain Thursday into Friday.',1,takeNow],
+   ['cloud-temperature','.LONG TERM /THURSDAY/...\nIf clouds clear sooner Thursday, temperatures could be warmer than forecast.',1,takeNow],
+   ['expires-on-open-page','.NEAR TERM /TODAY/...\nThe timing of the front remains uncertain this morning.',1,takeNow-60000]
+  ]){
+   const make=(place='knightdale')=>{
+    const f=fixture(place);f.signature='dated-'+name+'-'+place;f.assembledAt=new Date(at).toISOString();
+    f.discussion={...f.discussion,issuanceTime:'2026-09-07T14:00:00Z',text:place==='greenville'?'.DISCUSSION...\nDry weather is expected this week.':text};
+    const candidates=collectDanTakeEvidence(f,at).candidates;
+    const take=approveDanTake(candidates.map(c=>({evidenceId:c.id,summary:name==='cloud-temperature'?'Earlier cloud clearing could make temperatures warmer than expected.':'The front could arrive earlier or later than expected.'})),f,at);
+    const b={mode:'ai',signature:f.signature,generatedAt:new Date(at).toISOString(),headline:'Local outlook',summary:'The main forecast remains available.',nearTerm:'Check the hourly forecast.',extended:'Check the week ahead.',sources:['nws','afd'],...take,uncertainty:'Timing of the front and storms are the main sources of forecast uncertainty.'};
+    return {f,b};
+   };
+   const context=await browser.newContext({viewport:{width,height:900}}),page=await context.newPage();
+   await page.addInitScript(time=>{window.__takeNow=time;const NativeDate=Date;window.Date=class extends NativeDate{constructor(...args){super(...(args.length?args:[window.__takeNow]));}static now(){return window.__takeNow;}};},at);
+   await page.route('https://unpkg.com/**',r=>r.fulfill({body:'',contentType:r.request().url().includes('.css')?'text/css':'application/javascript'}));
+   await page.route('**/api/weather-fusion/forecast?**',r=>r.fulfill({json:make(new URL(r.request().url()).searchParams.get('location')||'knightdale').f}));
+   await page.route('**/api/weather-fusion/briefing?**',r=>r.fulfill({json:make(new URL(r.request().url()).searchParams.get('location')||'knightdale').b}));
+   page.on('pageerror',e=>report.browserErrors.push(e.message));
+   await page.goto(base+'/weather-fusion/',{waitUntil:'networkidle'});
+   await page.waitForFunction(()=>document.querySelector('#briefing-title').textContent==='Local outlook');
+   assert.equal(await page.locator('#today-uncertainty').isVisible(),expected>0,name+' conditional visibility');
+   assert.equal(await page.locator('#briefing-detail [data-dans-take]').count(),expected?1:0);
+   const shown=(await page.locator('#today-uncertainty-text').textContent()).trim();
+   assert.equal(shown,danTakeText(make().b.forecastChanges));
+   assert.ok(!/yesterday|main sources of forecast uncertainty|Forecasts can change/i.test(shown));
+   if(expected){
+    assert.match(shown,/(?:Monday|Thursday), Sep (?:7|10)/);
+    assert.ok(await page.locator('#today-uncertainty').evaluate(e=>e.scrollWidth<=e.clientWidth+1));
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+   }
+   if(name==='expires-on-open-page'){
+    await page.evaluate(time=>{window.__takeNow=time;document.dispatchEvent(new Event('visibilitychange'));},takeNow);
+    assert.equal(await page.locator('#today-uncertainty').isVisible(),false,'Passed morning auto-expires on return to page');
+    assert.equal(await page.locator('#briefing-detail [data-dans-take]').count(),0);
+   }
+   if(width===390&&name==='later-week')await page.locator('.today-panel').screenshot({path:dir+'/dans-take-dated-390.png'});
+   await page.locator('[data-place="greenville"]').click();
+   assert.equal(await page.locator('#today-uncertainty').isVisible(),false,'Old location take clears immediately');
+   await page.waitForFunction(()=>document.querySelector('#briefing-title').textContent==='Local outlook');
+   assert.equal(await page.locator('#today-uncertainty').isVisible(),false,'Quiet new location does not inherit prior concern');
+   (report.danTakeChecks??=[]).push({name,width,expectedItems:expected,datedSourceOnly:true,legacyTextIgnored:true,locationReset:true,expiry:name==='expires-on-open-page'});
    await context.close();
   }
  }
