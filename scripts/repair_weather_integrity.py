@@ -6,18 +6,28 @@ def replace_once(path, old, new):
     p = Path(path)
     text = p.read_text()
     if old not in text:
-        raise SystemExit(f'Expected text not found in {path}: {old[:120]!r}')
+        raise SystemExit(f'Expected text not found in {path}: {old[:160]!r}')
     p.write_text(text.replace(old, new, 1))
 
-# 1) Keep the observed temperature, but if the selected station omits the
-# moisture or wind input required by UTCI, fill ONLY those missing inputs from
-# the matching NWS current-hour forecast.  Mark the fill explicitly so the UI
-# never presents it as a pure station observation.
+# Prefer the nearest station that actually has the inputs needed for the
+# current UTCI calculation. A temperature-only station is retained only as a
+# last station fallback and can then receive explicitly labelled current-hour
+# NWS input fill-ins below.
+replace_once(
+    'src/weatherFusion.js',
+    '          const chosen=candidates.find(Boolean)||null;',
+    """          const thermalComplete=c=>c&&finite(c.temperature)&&finite(c.wind)&&c.wind>=0&&
+            (finite(c.dewpoint)||(finite(c.humidity)&&c.humidity>=0&&c.humidity<=100));
+          const chosen=candidates.find(thermalComplete)||candidates.find(Boolean)||null;"""
+)
+
+# If even the best nearby observation lacks moisture or wind, keep the observed
+# temperature/time but fill ONLY the missing thermal inputs from the matching
+# NWS current-hour forecast. Never borrow a future hour and never hide provenance.
 replace_once(
     'public/weather-fusion/weather-state.js',
-    "const finite = value => typeof value === 'number' && Number.isFinite(value);\nexport function weatherState",
-    """const finite = value => typeof value === 'number' && Number.isFinite(value);
-function matchingCurrentHour(hours = [], now = Date.now()) {
+    'export function weatherState',
+    """function matchingCurrentHour(hours = [], now = Date.now()) {
   return hours.find(row => { const time = Date.parse(row?.time); return finite(time) && time <= now && now < time + 3600000; }) || null;
 }
 function hourlyWindMph(value) {
@@ -83,14 +93,12 @@ new_resolver = """export function resolveCurrentWeather(current, hours = [], now
 }"""
 replace_once('public/weather-fusion/weather-state.js', old_resolver, new_resolver)
 
-# 2) User-facing source labels must say when a station observation needed a
-# current-hour forecast fill.  This keeps the restored feels-like numeric while
-# preserving provenance.
+# User-facing provenance. The restored value is numeric, but when a field came
+# from the current-hour forecast it must never be called a pure station reading.
 replace_once(
     'public/weather-fusion/weather-display.js',
-    "const esc = value => String(value ?? '').replace(/[&<>\\\"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\\\"':'&quot;',\"'\":'&#39;'}[c]));\nexport function weatherShapes",
-    """const esc = value => String(value ?? '').replace(/[&<>\\\"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\\\"':'&quot;',\"'\":'&#39;'}[c]));
-const currentSource = current => current?.type === 'observation'
+    'export function weatherShapes',
+    """const currentSource = current => current?.type === 'observation'
   ? (Array.isArray(current.thermalInputFallbackFields) && current.thermalInputFallbackFields.length ? 'Station observation + current-hour forecast' : 'Station observation')
   : 'Current estimate';
 export function weatherShapes"""
@@ -98,7 +106,7 @@ export function weatherShapes"""
 replace_once(
     'public/weather-fusion/weather-display.js',
     "    source:current.type === 'observation' ? 'Station observation' : 'Current estimate', inputs:current};",
-    "    source:currentSource(current), inputs:current};"
+    '    source:currentSource(current), inputs:current};'
 )
 replace_once(
     'public/weather-fusion/weather-display.js',
@@ -116,8 +124,6 @@ replace_once(
     "  const source = sample.source === 'Station observation + current-hour forecast' ? 'station temperature with matching NWS current-hour moisture/wind fill' : sample.source === 'Station observation' ? 'based on the current station reading' : 'estimated from forecast data';"
 )
 
-# 3) Scientific evidence and explanatory copy must not call forecast-filled
-# moisture/wind pure station inputs.
 replace_once(
     'public/weather-fusion/app.js',
     "    const n=(v,s='')=>finite(v)?`${Math.round(v*10)/10}${s}`:'Unavailable';\n    root.innerHTML=",
@@ -131,9 +137,8 @@ replace_once(
     'Current station observations and current-hour forecast fill-ins are tracked separately; the Now card uses the same current inputs as the hero, and any missing station moisture or wind filled from the matching NWS hour is labeled as an estimate.'
 )
 
-# 4) Regression: a station with temperature but missing dew point/wind must no
-# longer blank the feels-like when the matching NWS hourly forecast has those
-# inputs.  A non-matching future hour must not be borrowed.
+# Regression: a temperature-only observation plus matching NWS current-hour
+# moisture/wind must produce a current feels-like; a future hour cannot be used.
 marker = "test('valid station condition is never silently replaced by a conflicting forecast',()=>{"
 insert = """test('incomplete station thermal inputs use only the matching current-hour NWS forecast instead of blanking feels-like',()=>{
  const input={...readings,dewpoint:null,humidity:null,wind:null,condition:'Partly Cloudy'};
@@ -152,9 +157,7 @@ insert = """test('incomplete station thermal inputs use only the matching curren
 """ + marker
 replace_once('test/weatherFusionSkyConsistency.test.js', marker, insert)
 
-# Restore the workflow file after this temporary branch-trigger is used.  The
-# verified branch/PR should contain only the product/test repair, not a permanent
-# special-case workflow trigger.
+# Remove the temporary branch trigger from the resulting verified diff.
 workflow = Path('.github/workflows/weather-reviewed-integrity.yml')
 if workflow.exists():
     text = workflow.read_text()
@@ -165,6 +168,10 @@ if workflow.exists():
     text = text.replace(
         f"if: github.ref == 'refs/heads/fix/weather-reviewed-integrity' || github.ref == 'refs/heads/{BRANCH}'",
         "if: github.ref == 'refs/heads/fix/weather-reviewed-integrity'",
+    )
+    text = text.replace(
+        'git commit -m "Verify current feels-like fallback and forecast integrity"\n          git push origin HEAD:fix/weather-current-feels-inputs',
+        'git commit -m "Verify forecast integrity: dated Dan take, hourly sky, independent UTCI and centered temperatures"\n          git push origin HEAD:fix/weather-reviewed-integrity',
     )
     workflow.write_text(text)
 
