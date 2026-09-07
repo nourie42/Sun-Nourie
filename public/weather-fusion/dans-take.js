@@ -3,7 +3,7 @@
  * Ambiguous timing is omitted, not guessed. Dates are anchored to source issuance,
  * including a retained section's own "As of" time, never to the time of retrieval.
  */
-export const DAN_TAKE_VERSION = 'weather-nourie-dans-take-v2';
+export const DAN_TAKE_VERSION = 'weather-nourie-dans-take-integrity-v1';
 const H = 3600000, DAY = 24 * H, MAX_SOURCE_AGE = 12 * H;
 const norm = v => String(v || '').replace(/\s+/g, ' ').trim();
 const finite = Number.isFinite;
@@ -58,10 +58,8 @@ export function discussionPeriod(text, anchor, zone) {
     found.push({...partRange(date,part,zone),index:m.index});
   }
   if(!found.length)return null;
-  let first=found[0],last=found.at(-1);
-  if(last.start<first.start&&found.length>1){
-    const p=localParts(last.start,zone);last=partRange(addDays(p.date,7),last.part,zone);
-  }
+  const first=found.reduce((a,b)=>a.start<=b.start?a:b);
+  const last=found.reduce((a,b)=>a.end>=b.end?a:b);
   // A source's explicit "until/by/through 6 AM Tuesday" expires at that time,
   // not at the end of Tuesday. Do not extend an already elapsed morning.
   const clock=/\b(?:until|by|through)\s+(\d{1,2})(?::([0-5]\d))?\s*(am|pm)\b/i.exec(s);
@@ -121,7 +119,9 @@ export function collectDanTakeEvidence(data, now=Date.now()) {
         if(!norm(raw).includes(quote))continue;
         const display=new Intl.DateTimeFormat('en-US',{timeZone:zone,weekday:'long',month:'short',day:'numeric'});
         const a=display.format(new Date(range.start)),b=display.format(new Date(range.end-1));
-        const period=a===b?a+(range.part?` ${range.part}`:''):`${a} – ${b}`;
+        const daysAhead=Math.round((Date.parse(localParts(range.start,zone).date+'T12:00Z')-Date.parse(localParts(now,zone).date+'T12:00Z'))/DAY);
+        const prefix=daysAhead>=2&&daysAhead<=7?'This coming week — ':'';
+        const period=prefix+(a===b?a+(range.part?` ${range.part}`:''):`${a} – ${b}`);
         candidates.push({id:`s${si}-p${pi}-q${qi}`,quote,context,section:section.name,sourcePeriod:section.heading,
           sectionIssuedAt:new Date(anchor).toISOString(),period,validFrom:new Date(range.start).toISOString(),
           eventEnd:new Date(range.end).toISOString(),validUntil:new Date(Math.min(range.end,issued+MAX_SOURCE_AGE)).toISOString()});

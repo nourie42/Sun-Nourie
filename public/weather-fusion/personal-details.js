@@ -1,7 +1,7 @@
 import {forecastGrossLevel} from './dewpoint-meter.js?v=6-future';
 import {exposureScene} from './exposure-scene.js?v=3-weather';
-import {outdoorExposure} from './outdoor-feels.js?v=outdoor-v1';
-import {solarElevation} from './weather-math.js';
+import {outdoorExposure} from './outdoor-feels.js?v=integrity-v1';
+import {solarElevation} from './weather-math.js?v=integrity-v1';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const HOUR=3600000;
@@ -45,7 +45,7 @@ export function dailyGrossHTML(forecast,index,tonight=false,now=Date.now()){
 export function sunShadeHTML(comfort,location,now=Date.now(),context={}){
  const daylight=typeof comfort?.daylight==='boolean'?comfort.daylight:solarElevation(now,location?.latitude,location?.longitude)>0;
  const kind=comfort?.weatherKind||(finite(comfort?.sun)?'clear':'unknown');
- const condition=context.condition||comfort?.condition||({clear:'Clear','partly-cloudy':'Partly Cloudy',cloudy:'Cloudy',rain:'Rain',storm:'Thunderstorms',snow:'Snow',fog:'Fog'}[kind]||'');
+ const condition=comfort?.radiantCondition||context.condition||comfort?.condition||({clear:'Clear','partly-cloudy':'Partly Cloudy',cloudy:'Cloudy',rain:'Rain',storm:'Thunderstorms',snow:'Snow',fog:'Fog'}[kind]||'');
  const shade=finite(comfort?.shade)?`${Math.round(comfort.shade)}°`:'Unavailable';
  const exposure=outdoorExposure({...comfort,daylight,weatherKind:kind,condition});
  const outdoorValue=exposure.value;
@@ -55,7 +55,7 @@ export function sunShadeHTML(comfort,location,now=Date.now(),context={}){
  const labels={clear:'In direct sun','partly-cloudy':'During sunny breaks',cloudy:'Under clouds',rain:chance?'Rain possible':'In rainy weather',storm:chance?'Storms possible':'In stormy weather',snow:'In snowy weather',fog:'In fog or haze',unknown:'Outdoors · shade estimate only'};
  const label=exposure.label;
  const basis=comfort?.conditionSource?` · ${esc(comfort.conditionSource)}`:'';
- const note=!daylight?' · No direct sun at night.':kind==='unknown'?' · Sky data unavailable; no solar adjustment.':kind==='partly-cloudy'?' · Sunny-break estimate, not continuous direct sunlight.':['rain','storm','snow','fog','cloudy'].includes(kind)?' · No direct-sun adjustment; wet clothing is not modelled.':'';
+ const note=!daylight?' · No direct sun at night.':finite(comfort?.inputEvidence?.skyCover)?' · Hourly cloud-adjusted radiation estimate; actual sun exposure varies.':kind==='unknown'?' · Sky data unavailable; no solar adjustment.':kind==='partly-cloudy'?' · Sunny-break estimate, not continuous direct sunlight.':['rain','storm','snow','fog','cloudy'].includes(kind)?' · No direct-sun adjustment; wet clothing is not modelled.':'';
  return `<div class="sun-shade-comparison"><figure class="exposure-person shade-person" data-weather="${esc(kind)}">${exposureScene(false,daylight,condition)}<figcaption><strong>${shade}</strong><span>In the shade · ${period}</span></figcaption></figure><figure class="exposure-person sun-person" data-weather="${esc(kind)}">${exposureScene(true,daylight,condition)}<figcaption><strong>${outside}</strong><span>${label} · ${period}</span></figcaption></figure></div><small class="exposure-estimate">Estimated feels-like temperatures · °F${note}${basis} Main readings match the outdoor figure; shade is shown separately.</small>`;
 }
 export function modelFreshnessText(layer,checkedAt,zone='America/New_York',now=Date.now()){

@@ -36,7 +36,7 @@ app.get('/api/weather-fusion/:kind',(req,res)=>{
 });
 const server=await new Promise(resolve=>{const s=app.listen(0,'127.0.0.1',()=>resolve(s));});
 const base=`http://127.0.0.1:${server.address().port}`;
-const browser=await chromium.launch({headless:true});
+const browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{})});
 try{
  for(const width of [320,360,390,514,768,1365]){
   const context=await browser.newContext({viewport:{width,height:900}}),page=await context.newPage();
@@ -55,7 +55,7 @@ try{
    return {noteAlign:getComputedStyle(note).textAlign,noteWeight:Number(getComputedStyle(note).fontWeight),noteFont:parseFloat(getComputedStyle(note).fontSize),graphicFont:parseFloat(getComputedStyle(graphic.querySelector('.day-name')).fontSize),bulletinsBelow:document.querySelector('.today-panel').nextElementSibling===b,hourlyAfter:b.nextElementSibling===h,grossTitleSize:parseFloat(getComputedStyle(title).fontSize),grossTitleWeight:Number(getComputedStyle(title).fontWeight),grossHeight:gross.getBoundingClientRect().height,noOverflow:document.documentElement.scrollWidth<=innerWidth+1};
   });
   assert.equal(layout.noteAlign,'center');assert.ok(layout.noteWeight>=700);assert.ok(layout.noteFont<layout.graphicFont);assert.ok(layout.bulletinsBelow&&layout.hourlyAfter);assert.ok(layout.grossTitleSize>=16&&layout.grossTitleWeight>=700);assert.ok(layout.grossHeight<910,'Gross Meter should be compact');assert.ok(layout.noOverflow,'Document must fit the viewport');
-  assert.equal(await page.locator('.today-uncertainty-label').innerText(),"What could change - Dan's take");
+  assert.equal(await page.locator('.today-uncertainty-label').innerText(),"Dan's take");
   const knightdaleFixture=fixture(),knightdaleCurrent=currentSample(knightdaleFixture,epoch),knightdalePeak=comfortWindow(knightdaleFixture,epoch+1);
   assert.equal(await page.locator('.sun-shade-comparison figure').count(),2);
   const exposureText=await page.locator('.sun-shade-comparison').innerText();
@@ -87,6 +87,22 @@ try{
   assert.deepEqual(hourlyAir,activeSamples.map(sample=>Math.round(sample.temperature)+'°'));
   assert.equal((await page.locator('#hourly .hour').first().locator('> span').first().innerText()).trim(),'Now');
   assert.equal(await page.locator('#daily .daily-feels').count(),14);
+  const centerAudit=await page.evaluate(()=>{
+    const results=[];
+    for(const column of document.querySelectorAll('#daily .day-high,#daily .day-low')){
+      const air=column.querySelector(':scope > strong');
+      let a;
+      if(air)a=air.getBoundingClientRect();
+      else{const range=document.createRange();range.selectNode(column.firstChild);a=range.getBoundingClientRect();}
+      const b=column.querySelector('.daily-feels b');const before=b.textContent;
+      for(const text of [before,'104°']){b.textContent=text;const r=b.getBoundingClientRect();results.push({text,error:Math.abs(a.x+a.width/2-r.x-r.width/2),wrapped:r.height>30});}
+      b.textContent=before;
+    }
+    return results;
+  });
+  assert.ok(centerAudit.every(r=>r.error<=1&&!r.wrapped),'Every two/three-digit feels-like value must center under air temperature');
+  (report.centeringChecks??=[]).push({width,columns:14,threeDigitStress:true,maximumErrorPx:Math.max(...centerAudit.map(r=>r.error))});
+
   assert.ok(!(await page.locator('#alerts').innerText()).includes('forecast discussion'));
   assert.equal(await page.locator('.person-eyes').count(),2);
   assert.equal(await page.locator('.friendly-wave').count(),2);

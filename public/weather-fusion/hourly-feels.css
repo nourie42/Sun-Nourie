@@ -26,3 +26,8 @@
 
 /* Exposure labels make the primary outdoor basis explicit at every hour. */
 .hour .hour-feels .hour-exposure{font-style:normal;font-size:10px;font-weight:500;line-height:1.25;white-space:normal;overflow-wrap:anywhere;text-align:center;max-width:76px;min-height:2.5em;margin-top:4px;color:#c4e7fb}
+
+/* Two- and three-digit feels-like values share exactly the air-temperature axis. */
+.day-row .day-high,.day-row .day-low{display:flex;flex-direction:column;align-items:center;text-align:center;min-width:0}
+.day-row .daily-feels{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;width:100%;line-height:1.35}
+.day-row .daily-feels b{display:block;font:inherit;font-weight:700;white-space:nowrap}

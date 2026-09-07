@@ -1,12 +1,12 @@
-import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText} from './dans-take.js?v=2-dated';
-import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './weather-display.js?v=outdoor-v1';
-import {degrees,feelsAt,dayFeelsHTML} from './hourly-feels.js?v=outdoor-v1';
+import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText} from './dans-take.js?v=integrity-v1';
+import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './weather-display.js?v=integrity-v1';
+import {degrees,feelsAt,dayFeelsHTML} from './hourly-feels.js?v=integrity-v1';
 import {createFramePlayer} from './frame-player.js';
-import {renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=outdoor-v1';
-import {dailyDisplay} from './weather-math.js';
+import {renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=integrity-v1';
+import {dailyDisplay} from './weather-math.js?v=integrity-v1';
 import {currentHero} from './current-temperature.js?v=1-current';
 import {renderBulletins} from './bulletins.js?v=2-special';
-import {dailyGrossHTML,modelFreshnessText} from './personal-details.js?v=outdoor-v1';
+import {dailyGrossHTML,modelFreshnessText} from './personal-details.js?v=integrity-v1';
 import {renderDewpointMeter} from './dewpoint-meter.js?v=6-future';
 import {renderWeatherPanel} from './render-safety.js';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
@@ -104,6 +104,13 @@ function compass(degrees) {
 }
 function renderMetrics(data) { renderMetricTiles(data, smallIcon); }
 function renderEvidence(data) {
+  const root=$('thermal-input-evidence');
+  if(root){
+    const c=data.current||{},e=data.comfort?.inputEvidence||{};
+    const next=data.metricForecasts?.series?.feels?.find(p=>Date.parse(p.time)>Date.now());
+    const n=(v,s='')=>finite(v)?`${Math.round(v*10)/10}${s}`:'Unavailable';
+    root.innerHTML=`<p><strong>Current station inputs:</strong> ${esc(c.stationName||c.station||'Forecast estimate')}${finite(c.stationDistanceKm)?` · ${Math.round(c.stationDistanceKm/1.609344)} miles away`:''}; ${esc(c.time||'time unavailable')}. Air ${n(c.temperature,'°F')}, dew point ${n(c.dewpoint,'°F')}, wind ${n(c.wind,' mph')}. Outdoor UTCI ${n(data.comfort?.rawOutdoors,'°F')}.</p>${next?`<p><strong>Next forecast hour — separate inputs:</strong> ${esc(next.time)}. Air ${n(next.inputs.temperature,'°F')}, dew point ${n(next.inputs.dewpoint,'°F')}, wind ${n(next.inputs.wind,' mph')}, cloud cover ${n(next.inputs.skyCover,'%')}. Outdoor UTCI ${n(next.value,'°F')}.</p>`:''}<p>${esc(e.windPolicy||'')} · ${esc(e.radiationBasis||'')}. Station estimates are not copied into future forecasts. No output is raised or lowered to make values match.</p>`;
+  }
   const important = ['nws', 'afd', 'hrrr', 'ecmwf', 'nbm', 'alerts'];
   const labels = { nws: 'NWS', afd: 'Local discussion', hrrr: 'HRRR', ecmwf: 'ECMWF IFS', nbm: 'National Blend', alerts: 'Alerts' };
   const names = { ready: 'Available', unavailable: 'Unavailable', stale: 'Stale — excluded', 'not-configured': 'Not configured', 'not-covered': 'Not collected for this location' };

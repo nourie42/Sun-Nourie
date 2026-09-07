@@ -11,9 +11,9 @@
   <link rel="stylesheet" href="/weather-fusion/forecast-layout.css?v=3-personal">
   <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <link rel="stylesheet" href="/weather-fusion/personal-details.css?v=2-source-details">
-  <link rel="stylesheet" href="/weather-fusion/hourly-feels.css?v=3-outdoor">
+  <link rel="stylesheet" href="/weather-fusion/hourly-feels.css?v=integrity-v1">
   <link rel="stylesheet" href="/weather-fusion/weather-repair.css?v=1-repair">
-  <script type="module" src="/weather-fusion/app.js?v=14-dated-dans-take"></script>
+  <script type="module" src="/weather-fusion/app.js?v=integrity-v1"></script>
 
 </head>
 <body data-sky="day">
@@ -46,7 +46,7 @@
         <section class="glass today-panel" aria-label="Today or tonight forecast">
           <div id="today-forecast"><p class="muted">Daily data is loading.</p></div>
           <div id="today-uncertainty" class="today-uncertainty" hidden>
-            <strong class="today-uncertainty-label">What could change - Dan's take</strong>
+            <strong class="today-uncertainty-label">Dan's take</strong>
             <p id="today-uncertainty-text"></p>
           </div>
         </section>
@@ -92,7 +92,7 @@
         <details class="evidence-detail"><summary>About the local outlook</summary><div id="outlook-science"></div></details>
         <details class="evidence-detail"><summary>About the tile graphs</summary><div id="metric-science"></div></details>
         <details class="evidence-detail"><summary>Latest local NWS forecast discussion <span id="afd-office"></span></summary><p id="afd-stamp" class="muted"></p><pre id="afd-text">The local office discussion is loading.</pre><a id="afd-link" href="https://www.weather.gov/" target="_blank" rel="noopener noreferrer">Read the original NWS discussion ↗</a></details>
-        <details class="evidence-detail"><summary>How the feels-like estimates work</summary><p id="skin-science">Waiting for the latest weather.</p>
+        <details class="evidence-detail"><summary>How the feels-like estimates work</summary><div id="thermal-input-evidence"></div><p id="skin-science">Waiting for the latest weather.</p>
           <p>The number under the current temperature is an <strong>equivalent outdoor apparent temperature</strong>, not a claim that a person’s skin is physically at that temperature. Actual skin temperature depends on physiology, clothing, activity, acclimatization and exposure time.</p>
           <div class="thermal-grid">
             <div><strong>One all-season fallback</strong><p>Weather Nourie follows the attached Real-Feel Skin Temperature research Tier 3 approach: UTCI is the primary all-season fallback, using air temperature, moisture, wind and an estimated mean-radiant environment instead of switching between Heat Index and Wind Chill.</p></div>

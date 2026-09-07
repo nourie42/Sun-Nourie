@@ -331,9 +331,9 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
               const { data } = await cached(`https://api.weather.gov/stations/${id}/observations/latest`, 5 * MINUTE);
               const o = data.properties, time = Date.parse(o?.timestamp);
               if (!finite(toF(o?.temperature)) || now() - time > 2 * HOUR || time > now() + 5 * MINUTE) return null;
-              return { temperature: rounded(toF(o.temperature)), ...stationWeather(o), time: o.timestamp,
-                stationDistanceKm: rounded(Math.sqrt(distance(s))*111.2,1), station: id, stationName: clean(s.properties?.name, 140), humidity: rounded(o.relativeHumidity?.value), dewpoint: rounded(toF(o.dewpoint)),
-                wind: rounded(toMph(o.windSpeed)), gust: rounded(toMph(o.windGust)), windDirection: numeric(o.windDirection?.value),
+              return { temperature: toF(o.temperature), ...stationWeather(o), time: o.timestamp,
+                stationDistanceKm: rounded(Math.sqrt(distance(s))*111.2,1), station: id, stationName: clean(s.properties?.name, 140), humidity: numeric(o.relativeHumidity?.value), dewpoint: toF(o.dewpoint),
+                wind: toMph(o.windSpeed), gust: rounded(toMph(o.windGust)), windDirection: numeric(o.windDirection?.value),
                 visibility: o.visibility?.unitCode === 'wmoUnit:m' && finite(o.visibility.value) ? rounded(o.visibility.value / 1609.344, 1) : null,
                 pressurePa: o.barometricPressure?.unitCode === 'wmoUnit:Pa' ? numeric(o.barometricPressure.value) : null,
                 pressure: o.barometricPressure?.unitCode === 'wmoUnit:Pa' && finite(o.barometricPressure.value) ? rounded(o.barometricPressure.value / 3386.389, 2) : null };
@@ -360,6 +360,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
       const result = buildForecast({ ...data, point, location, models: { hrrr: data.hrrr, ecmwf: data.ecmwf, nbm: data.nbm }, feeds: [pointFeed.meta, ...Object.values(values).map((f) => f.meta)], now: now() });
       // Access never exposes the provider credential or a made-up model run timestamp.
       result.aiConfigured = !!env.OPENAI_API_KEY;
+      result.integrityVersion='weather-nourie-integrity-v1';
       result.modelAccessConfigured = true;
       result.directModelStatus = result.modelContributions.length === 3 ? 'ready' : 'partial';
       return result;
@@ -391,7 +392,8 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
       let lastFailure = null;
       const properties = Object.fromEntries(['headline', 'summary', 'nearTerm', 'extended', 'uncertainty'].map((k) => [k, { type: 'string' }]));
       properties.forecastChanges={type:'array',maxItems:6,items:{type:'object',additionalProperties:false,properties:{evidenceId:{type:'string',enum:takeEvidence.candidates.length?takeEvidence.candidates.map(c=>c.id):['no-eligible-evidence']},summary:{type:'string'}},required:['evidenceId','summary']}};
-      properties.sources = { type: 'array', items: { type: 'string', enum: ['nws', 'afd', 'hrrr', 'ecmwf', 'nbm'] } };
+      const requiredSources=['nws','afd',...data.modelContributions.map(m=>m.id)];
+      properties.sources = { type: 'array', items: { type: 'string', enum: requiredSources } };
       const facts = { danTakeEvidence:takeEvidence, currentLocalTime: new Intl.DateTimeFormat('en-US',{timeZone:data.location.timeZone,dateStyle:'full',timeStyle:'short'}).format(new Date(now())), discussionPriority: 'Translate the latest local NWS discussion into everyday language; technical provenance is only for metadata.', blendPolicy: data.methodology, modelContributions: data.modelContributions, convectiveGuidance: data.convectiveGuidance, next24HoursPrecipitation: data.precipitation, location: data.location, localDate: dateKey(now(), data.location.timeZone), days: data.days, hours: data.hours.slice(0, 30), discussion: data.discussion, feedStatus: data.feeds.map((f) => ({ id: f.id, status: f.status, issuedAt: f.issuedAt })) };
       for (let attempt = 0; attempt < 2 && aiBudget.count < limit; attempt += 1) {
       aiBudget.count += 1;
@@ -399,7 +401,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
         const result = await request('https://api.openai.com/v1/responses', { timeout: 35000, body: {
           model: env.WEATHER_FUSION_AI_MODEL || 'gpt-5-mini', store: false, max_output_tokens: 4000, reasoning: { effort: 'low' },
           instructions: PLAIN_OUTLOOK_INSTRUCTIONS,
-          input: JSON.stringify({ ...facts, requiredSources: ['nws','afd',...data.modelContributions.map(m=>m.id)], revisionInstruction: attempt ? 'The previous attempt failed automated validation. Return every required source ID exactly. Do not include numeric weather values or quantities. Clock times are the only numeric exception and must use h:mmam/pm form, such as 2:02pm. Keep headline, summary, nearTerm and extended nonempty and concise. Leave uncertainty empty; return forecastChanges=[] when no eligible source evidence supports an upcoming change. Do not issue weather warnings or promise safe conditions.' : 'Copy every required source ID into the sources array. Write concise professional prose without numeric weather values or quantities. Clock times are allowed only in h:mmam/pm form, such as 2:02pm.' }), text: { format: { type: 'json_schema', name: 'weather_briefing', strict: true, schema: { type: 'object', additionalProperties: false, properties, required: Object.keys(properties) } } },
+          input: JSON.stringify({ ...facts, requiredSources, revisionInstruction: attempt ? 'The previous attempt failed automated validation. Return every required source ID exactly. Do not include numeric weather values or quantities. Clock times are the only numeric exception and must use h:mmam/pm form, such as 2:02pm. Keep headline, summary, nearTerm and extended nonempty and concise. Leave uncertainty empty; return forecastChanges=[] when no eligible source evidence supports an upcoming change. Do not issue weather warnings or promise safe conditions.' : 'Copy every required source ID into the sources array. Write concise professional prose without numeric weather values or quantities. Clock times are allowed only in h:mmam/pm form, such as 2:02pm.' }), text: { format: { type: 'json_schema', name: 'weather_briefing', strict: true, schema: { type: 'object', additionalProperties: false, properties, required: Object.keys(properties) } } },
         } });
         const text = (result.output || []).flatMap((o) => o.content || []).filter((c) => c.type === 'output_text').map((c) => c.text).join('');
         const content = JSON.parse(text);

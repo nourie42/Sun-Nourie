@@ -19,17 +19,16 @@ function make(condition='Sunny',time=now,patch={}){
  rebuildHourlyFeels(f,{now:time,temperatureAt:()=>({value:null}),humidityAt:()=>null});
  return f;
 }
-test('86 shade versus 94 sunlight: every main current display selects 94, not 86',()=>{
- const f=make();f.comfort={...f.comfort,shade:86,sun:94,outdoors:94,daylight:true,weatherKind:'clear'};
- const sample=currentSample(f,now);
- assert.equal(sample.feels,94);assert.match(heroFeelsHTML(sample),/<strong>94°<\/strong>/);
- assert.match(heroFeelsHTML(sample),/In direct sun/);
+test('current display independently calculates inputs and rejects a painted 999 degree cache',()=>{
+ const f=make(),expected=thermalComfort(f.current,f.location,now);
+ f.comfort={...expected,shade:999,sun:999,outdoors:999};const sample=currentSample(f,now);
+ assert.equal(sample.feels,expected.outdoors);assert.notEqual(sample.feels,999);
+ assert.ok(heroFeelsHTML(sample).includes('<strong>'+expected.outdoors+'°</strong>'));
  const root={innerHTML:'',scrollLeft:35};globalThis.document={getElementById:()=>root};
- try{renderHourlyWeather(f,now);assert.match(root.innerHTML,/<span>Now<\/span>.*?Feels like<b>94°<\/b>/);assert.equal(root.scrollLeft,35);}
- finally{delete globalThis.document;}
- const figures=sunShadeHTML(f.comfort,f.location,now);
- assert.match(figures,/shade-person.*?<strong>86°<\/strong>/s);assert.match(figures,/sun-person.*?<strong>94°<\/strong>/s);
+ try{renderHourlyWeather(f,now);assert.ok(root.innerHTML.includes('Feels like<b>'+expected.outdoors+'°</b>'));assert.equal(root.scrollLeft,35);}finally{delete globalThis.document;}
+ assert.ok(!sunShadeHTML(sample.comfort,f.location,now).includes('999°'));
 });
+
 for(const [condition,time] of [['Sunny',now],['Partly Cloudy',now],['Overcast',now],['Rain',now],['Thunderstorms',now],['Snow',now],['Fog',now],['',now],['Clear',Date.parse('2026-09-07T03:00:00Z')]]){
  test(`same sky/exposure across API, Now and future preview: ${condition||'unknown'} ${time}`,()=>{
   const f=make(condition,time),sample=currentSample(f,time);

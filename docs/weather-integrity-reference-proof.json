@@ -1,0 +1,10 @@
+{
+  "reference": "pythermalcomfort 4.4.2 UTCI",
+  "referenceSource": "https://pythermalcomfort.readthedocs.io/en/stable/_modules/pythermalcomfort/models/utci.html",
+  "caseCount": 3456,
+  "numericCases": 2880,
+  "outOfDomainCases": 576,
+  "maximumAbsoluteErrorF": 1.935518412210513e-11,
+  "passed": true,
+  "scope": "Independent verification of UTCI arithmetic, all-season continuity and domain handling. Estimated cloud attenuation/MRT, airport representativeness and individual physiology are not validated by equation agreement."
+}

@@ -57,7 +57,7 @@ function fixture(){
  const current={...readings},times=[15,16,17].map(hour=>`2026-09-06T${hour}:00:00Z`);
  const values=[79,80,82],feels=values.map((temperature,index)=>{
   const inputs={temperature,dewpoint:68+index,wind:6,condition:index===2?'Rain':'Sunny'};
-  return {time:times[index],inputs,value:Number(shadeFeelsLike(temperature,null,6,inputs.dewpoint).value.toFixed(1))};
+  const comfort=thermalComfort(inputs,location,Date.parse(times[index]));return {time:times[index],inputs,value:Number(comfort.rawOutdoors.toFixed(1)),shadeValue:Number(comfort.rawShade.toFixed(1))};
  });
  return {location,assembledAt:new Date(now).toISOString(),current,comfort:thermalComfort(current,location,now),
   hours:times.map((time,index)=>({time,temperature:values[index],condition:index===2?'Rain':'Sunny',pop:20})),

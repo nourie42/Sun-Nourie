@@ -6,16 +6,11 @@ import {renderBulletins} from '../public/weather-fusion/bulletins.js';
 const now=Date.parse('2026-09-06T19:00:00Z');
 const location={latitude:34.64,longitude:-78.48,timeZone:'America/New_York'};
 
-test('high dew point remains a hot signal even under clouds',()=>{
+test('humidity raises the same UTCI cloudy estimate without selecting a warmer unrelated index',()=>{
  const current={temperature:88,dewpoint:72,humidity:null,wind:5,condition:'Cloudy',type:'observation'};
- const moisture=shadeFeelsLike(current.temperature,current.humidity,current.wind,current.dewpoint).value;
- const comfort=thermalComfort(current,location,now);
- assert.ok(moisture>current.temperature);
- assert.ok(comfort.shade>=Math.round(moisture));
- assert.ok(comfort.shade>current.temperature);
- assert.equal(comfort.sun,null);
- assert.equal(comfort.outdoors,comfort.shade);
- assert.match(comfort.note,/cloud cover can reduce radiant heating without wiping out the dew-point effect/i);
+ const moist=thermalComfort(current,location,now),dry=thermalComfort({...current,dewpoint:50},location,now);
+ assert.ok(moist.rawOutdoors>dry.rawOutdoors);assert.equal(moist.sun,null);assert.equal(moist.outdoors,moist.shade);
+ assert.match(moist.note,/No warmer-formula override/);
 });
 
 test('bulletin card stays hidden when there is no actual message, even if a source is stale',()=>{

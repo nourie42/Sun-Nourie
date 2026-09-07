@@ -28,7 +28,7 @@ test('optional take remains below daily graphic and ahead of hourly forecast',()
  const panel=html.match(/<section class="glass today-panel"[^>]*>([\s\S]*?)<\/section>/)?.[1];
  assert.ok(panel);assert.ok(panel.indexOf('id="today-forecast"')<panel.indexOf('id="today-uncertainty"'));
  assert.match(panel,/id="today-uncertainty"[^>]*hidden/);
- assert.match(panel,/<strong class="today-uncertainty-label">What could change - Dan's take<\/strong>/);
+ assert.match(panel,/<strong class="today-uncertainty-label">Dan's take<\/strong>/);
  assert.match(html,/<\/section>\s*<section class="glass hourly-panel"/);
  for(const id of ['today-forecast','today-uncertainty','today-uncertainty-text','hourly'])assert.equal(html.split(`id="${id}"`).length-1,1);
 });
@@ -88,6 +88,6 @@ test('Gross Meter heading stays centered and bold without changing chart geometr
  assert.match(css,/#gross-title\{text-align:center;font-weight:800\}/);assert.ok(!/\.gross-(scroll|chart)\s*\{/.test(css));
 });
 test('changed assets are cache-busted and late briefing responses stay guarded',()=>{
- assert.match(html,/forecast-layout\.css\?v=3-personal/);assert.match(html,/app\.js\?v=14-dated-dans-take/);
+ assert.match(html,/forecast-layout\.css\?v=3-personal/);assert.match(html,/app\.js\?v=integrity-v1/);
  assert.match(app,/if \(id === generation && briefing\.signature === forecast\?\.signature\) renderBriefing\(briefing\)/);
 });
