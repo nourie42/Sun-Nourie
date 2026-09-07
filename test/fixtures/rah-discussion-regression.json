@@ -1,0 +1,18 @@
+{
+  "capturedAt": "2026-09-07T11:04:11.438Z",
+  "scope": "Selected verbatim header and discussion paragraphs from captured official products; not full documents.",
+  "oldProduct": {
+    "id": "97964668-8ba0-42cd-9542-8b320beccc1a",
+    "productCode": "AFD",
+    "issuingOffice": "KRAH",
+    "issuanceTime": "2026-09-06T18:15:00+00:00",
+    "productText": "\n000\nFXUS62 KRAH 061815\nAFDRAH\n\nArea Forecast Discussion\nNational Weather Service Raleigh NC\n215 PM EDT Sun Sep 6 2026\n\n.DISCUSSION...\nAs of 215 PM Sunday...\n\nAloft, the ~594 dam mid-level anticyclone to the west to start the \nweek will strengthen and build ewd across the region by mid-week. \nThe trough associated with a potent nrn stream system tracking \nacross cntl and ern Canada should amplify swd, then progress ewd \nacross the region mid to late week. This trough should help push the \nanticyclone wwd and out of the area before it builds in over the \nweekend once again. At the surface, high pressure will slide sewd \nacross the mid-Atlantic, shifting offshore by Tue night. The high \nmay continue to ridge into the area on Wed, however a warm front \nshould lift nwd across the area Wed night/Thu as the pre-frontal \ntrough sets up, with sly-swly flow expected Thu-Fri. The cold front \nshould approach from the north on Fri, however its progression into \nthe area remains uncertain at this time. While diurnal convection is \npossible each day, the highest chances will be Thu/Fri ahead of the \nfront. High temperatures to start the week should be in the low to \nmid 80s, moderating through Thu, when highs in the upper 80s to low \n90s are expected.\n"
+  },
+  "newProduct": {
+    "id": "dad80929-ba34-41d6-8d78-1db8218511b5",
+    "productCode": "AFD",
+    "issuingOffice": "KRAH",
+    "issuanceTime": "2026-09-07T07:01:00+00:00",
+    "productText": "\n000\nFXUS62 KRAH 070701\nAFDRAH\n\nArea Forecast Discussion\nNational Weather Service Raleigh NC\n300 AM EDT Mon Sep 7 2026\n\n.DISCUSSION...\nAs of 300 AM Monday...\n\nAs the upper ridge continues to flatten, we'll eventually see a \nlongwave trough and attendant surface cold front move out of the \nOhio Valley and into the Mid Atlantic/Southeast late in the week. As \nsuch we'll see increasing shower and storm chances as early as \nThursday afternoon within an increasingly unstable pre-frontal \nairmass. There is still some uncertainty with respect to when the \nfront/trough will move through NC (most ensemble guidance suggests \nFriday vs Thursday night), but we'll continue to maintain increased \nPoPs through the day Friday given ensemble support. That said the \nstrongest forcing for ascent associated with the trough should be \ndisplaced well north of NC and it remains to be seen just how much \nQPF is realized with the front when it arrives. \n"
+  }
+}
