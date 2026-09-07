@@ -1,0 +1,2116 @@
+{
+  "checkedAt": "2026-09-07T09:03:33.485Z",
+  "locations": [
+    {
+      "location": "knightdale",
+      "assembledAt": "2026-09-07T09:03:24.240Z",
+      "current": {
+        "temperature": 66,
+        "condition": "Clear",
+        "conditionSource": "Station weather report",
+        "conditionTime": "2026-09-07T08:35:00+00:00",
+        "time": "2026-09-07T08:35:00+00:00",
+        "stationDistanceKm": 28.6,
+        "station": "KJNX",
+        "stationName": "Smithfield, Johnston County Airport",
+        "humidity": 94,
+        "dewpoint": 64,
+        "wind": 0,
+        "gust": null,
+        "windDirection": 0,
+        "visibility": 10,
+        "pressurePa": 101660,
+        "pressure": 30.02,
+        "pressureTrend": {
+          "status": "ready",
+          "direction": "rising",
+          "deltaMb": 0.7,
+          "hours": 3,
+          "fromTime": "2026-09-07T05:35:00.000Z",
+          "toTime": "2026-09-07T08:35:00+00:00",
+          "basis": "Same-station observed barometric pressure"
+        },
+        "type": "observation",
+        "apparent": 71,
+        "apparentSource": "Steadman apparent temperature (all-weather shade); using nearby station observations.",
+        "weather": {
+          "kind": "clear",
+          "label": "Clear",
+          "condition": "Clear",
+          "known": true,
+          "chance": false
+        },
+        "feelsLike": 70,
+        "feelsLikeShade": 70,
+        "feelsLikeSun": null,
+        "feelsLikeExposure": "outdoors"
+      },
+      "comfort": {
+        "shade": 70,
+        "sun": null,
+        "outdoors": 70,
+        "weatherKind": "clear",
+        "weatherLabel": "Clear",
+        "condition": "Clear",
+        "conditionSource": "Station weather report",
+        "radiationStatus": "night",
+        "method": "UTCI Tier-3 fallback with estimated mean radiant temperature",
+        "humidity": 94,
+        "wetBulb": 64.6896867958805,
+        "daylight": false,
+        "absorbedRadiation": null,
+        "solarAdjustment": 0,
+        "dewpointEffect": "There is some moisture in the air, but it is not especially muggy.",
+        "windEffect": "There is very little wind, so moving-air cooling is small.",
+        "microclimate": "The nearby observed air temperature carries broad neighborhood influence, but block-level pavement, walls, shade and wind can still differ.",
+        "note": "Tier-3 operational fallback from the attached Real-Feel Skin Temperature research: UTCI is the all-season base using air temperature, humidity/dew point and standard wind, with solar elevation and broad sky state used for a generic radiant estimate. In warm humid air, the warmer Steadman vapor-pressure apparent temperature is retained as a safeguard, so cloud cover can reduce radiant heating without wiping out the dew-point effect. This is a modeled equivalent temperature, not measured skin temperature or validated EPST. There is some moisture in the air, but it is not especially muggy. There is very little wind, so moving-air cooling is small. The nearby observed air temperature carries broad neighborhood influence, but block-level pavement, walls, shade and wind can still differ. Wet bulb is diagnostic only and is not added again to the result."
+      },
+      "discussion": {
+        "id": "dad80929-ba34-41d6-8d78-1db8218511b5",
+        "office": "RAH",
+        "issuanceTime": "2026-09-07T07:01:00+00:00",
+        "text": "\n000\nFXUS62 KRAH 070701\nAFDRAH\n\nArea Forecast Discussion\nNational Weather Service Raleigh NC\n300 AM EDT Mon Sep 7 2026\n\n.WHAT HAS CHANGED...\n\n* Dry/continental air related to high pressure that will build \n  across and offshore the Middle Atlantic will favor lower surface \n  dewpoints/afternoon RH and low temperatures, both of which have \n  been adjusted lower by several degrees than the NBM/official \n  forecast, through Wed.\n  \n\n&&\n\n.KEY MESSAGES...\nAs of 300 AM Monday...\n\n1) Seasonable start to the second week of September\n\n2) Above normal temperatures return by mid week, with increasing \nshower/storm chances Thursday and Friday\n\n&&\n\n.DISCUSSION...\nAs of 300 AM Monday...\n\nKEY MESSAGE 1... Seasonable start to the second week of \nSeptember\n\nA lower mid-latidue/subtropical ridge over the srn Plains will \nprogress ewd and reach the Carolinas by 12Z Wed. Rising heights and \nweakening nwly flow aloft will result over cntl NC. \n\nBeneath and downstream of the ridge aloft, 1022 mb surface high \npressure will build across and offshore the Middle Atlantic, while \nextending wwd into NC. Influence from the ridge and associated \ncontinental/dry air will favor mixed/afternoon surface dewpoints in \nthe 50s, except lwr 60s in the Coastal Plain and ern Sandhills and \nalso low temperatures in the 50s to lwr 60s. \n\nKEY MESSAGE 2... Above normal temperatures return by mid week, with \nincreasing shower/storm chances Thursday and Friday\n\nStrong ridging will remain in place across much of the southern US \nthrough mid week, with H5 heights forecast to steadily increase \nacross NC through Wednesday (peaking around 594-596dm). Meanwhile at \nthe surface, a 1025mb ridge off the Mid Atlantic coast will support \nincreasing southerly flow area-wide. While dewpoints will be slow to \nrecover and remain in the low to mid 60s on Wednesday, they will \nclimb markedly Thursday into Friday with upper 60s to lower 70s \nbecoming increasingly common. This will translate into steadily \nincreasing heat index values reaching the mid 90s Thursday and \nFriday. \n\nAs the upper ridge continues to flatten, we'll eventually see a \nlongwave trough and attendant surface cold front move out of the \nOhio Valley and into the Mid Atlantic/Southeast late in the week. As \nsuch we'll see increasing shower and storm chances as early as \nThursday afternoon within an increasingly unstable pre-frontal \nairmass. There is still some uncertainty with respect to when the \nfront/trough will move through NC (most ensemble guidance suggests \nFriday vs Thursday night), but we'll continue to maintain increased \nPoPs through the day Friday given ensemble support. That said the \nstrongest forcing for ascent associated with the trough should be \ndisplaced well north of NC and it remains to be seen just how much \nQPF is realized with the front when it arrives. \n\nPrecip chances should decrease in the wake of the front through the \nweekend. Temps will also decrease, albeit slightly, with highs \nreaching the upper 80s/lower 90s Saturday and Sunday.\n\n&&\n\n.AVIATION /06Z MONDAY THROUGH FRIDAY/...\nAs of 130 AM Monday...\n\nNely flow around high pressure building across the Great Lakes and \nMiddle Atlantic will become gusty into the teens kts with daytime \nheating primarily at FAY, and more briefly at RWI and RDU around \nmidday. \n\nOutlook: High pressure over the Middle Atlantic will favor VFR \nconditions through mid week, with the exception of a chance of \nshallow, radiation fog/mist at RWI due to local effects. A frontal \nzone will settle into the NC with a chance of convection and \nassociated flight restrictions on Fri. \n\n&&\n\n.RAH WATCHES/WARNINGS/ADVISORIES...\nNone.\n\n&&\n\n$$\n\nDISCUSSION...MWS/Leins\nAVIATION...MWS\n",
+        "url": "https://api.weather.gov/products/dad80929-ba34-41d6-8d78-1db8218511b5"
+      },
+      "briefing": {
+        "headline": "Quiet start, warmer later with rain risk Thu\u2013Fri",
+        "summary": "As of 5:02am Monday the NWS discussion says expect a dry, seasonable start to the week. Temperatures climb midweek with increasing chances for showers and storms late in the week.",
+        "nearTerm": "Today will be mostly sunny with drier air keeping overnight lows and afternoon humidity lower than recently. East winds will be light and conditions should stay dry through Wednesday.",
+        "extended": "A warming trend continues Wednesday into Thursday as southerly flow brings more humid air. A front moving in late Thursday into Friday will raise chances of showers and storms, then precipitation should ease behind the front for the weekend.",
+        "uncertainty": "The main forecast uncertainty is the exact timing of the front and when shower and storm chances increase.",
+        "sources": [
+          "nws",
+          "afd",
+          "hrrr",
+          "ecmwf",
+          "nbm"
+        ],
+        "mode": "ai",
+        "signature": "51d20c421b9f1ffc4394e4cf",
+        "generatedAt": "2026-09-07T09:02:10.656Z",
+        "model": "gpt-5-mini"
+      },
+      "feeds": [
+        {
+          "id": "point",
+          "label": "NWS location",
+          "status": "ready",
+          "fetchedAt": "2026-09-06T22:03:46.311Z",
+          "issuedAt": null,
+          "url": "https://api.weather.gov/points/35.787,-78.4806"
+        },
+        {
+          "id": "nws",
+          "label": "NWS forecast",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T08:56:15.389Z",
+          "issuedAt": "2026-09-07T06:28:39+00:00",
+          "url": "https://api.weather.gov/gridpoints/RAH/80,58/forecast"
+        },
+        {
+          "id": "hourly",
+          "label": "NWS hourly",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T08:56:15.507Z",
+          "issuedAt": "2026-09-07T06:28:39+00:00",
+          "url": "https://api.weather.gov/gridpoints/RAH/80,58/forecast/hourly"
+        },
+        {
+          "id": "grid",
+          "label": "NWS precipitation grid",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T08:56:15.468Z",
+          "issuedAt": "2026-09-07T06:28:39+00:00",
+          "url": "https://api.weather.gov/gridpoints/RAH/80,58"
+        },
+        {
+          "id": "alerts",
+          "label": "Official NWS alerts",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:03:24.240Z",
+          "issuedAt": null,
+          "url": "https://api.weather.gov/alerts/active?point=35.787,-78.4806"
+        },
+        {
+          "id": "afd",
+          "label": "NWS RAH discussion",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:02:03.791Z",
+          "issuedAt": "2026-09-07T07:01:00+00:00",
+          "url": "https://api.weather.gov/products/types/AFD/locations/RAH"
+        },
+        {
+          "id": "observation",
+          "label": "Nearby station observation",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:02:03.699Z",
+          "issuedAt": "2026-09-07T08:35:00+00:00",
+          "url": "https://api.weather.gov/gridpoints/RAH/80,58/stations"
+        },
+        {
+          "id": "special-discussions",
+          "label": "SPC special weather discussions",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:02:03.862Z",
+          "issuedAt": null,
+          "url": "https://www.spc.noaa.gov/products/md/"
+        },
+        {
+          "id": "hrrr",
+          "label": "NOAA HRRR \u00b7 3 km",
+          "url": "https://www.nco.ncep.noaa.gov/pmb/products/hrrr/",
+          "issuedAt": "2026-09-07T04:00:00Z",
+          "fetchedAt": "2026-09-07T09:03:24.064Z",
+          "transport": "Native GRIB2 \u2192 verified snapshot",
+          "contributes": true,
+          "status": "ready",
+          "validUntil": "2026-09-07T22:00:00Z",
+          "resolution": "3 km native grid",
+          "message": "3 km native grid; native grid extraction; initialized 2026-09-07T04:00:00Z.",
+          "snapshotUrl": "https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/hrrr.json"
+        },
+        {
+          "id": "ecmwf",
+          "label": "ECMWF IFS \u00b7 0.25\u00b0 Open Data",
+          "url": "https://www.ecmwf.int/en/forecasts/datasets/open-data",
+          "issuedAt": "2026-09-06T12:00:00Z",
+          "fetchedAt": "2026-09-07T09:03:24.067Z",
+          "transport": "Native GRIB2 \u2192 verified snapshot",
+          "contributes": true,
+          "status": "ready",
+          "validUntil": "2026-09-16T12:00:00Z",
+          "resolution": "0.25\u00b0 Open Data grid",
+          "message": "0.25\u00b0 Open Data grid; native grid extraction; initialized 2026-09-06T12:00:00Z.",
+          "snapshotUrl": "https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/ecmwf.json"
+        },
+        {
+          "id": "nbm",
+          "label": "NOAA National Blend \u00b7 2.5 km",
+          "url": "https://www.nco.ncep.noaa.gov/pmb/products/blend/",
+          "issuedAt": "2026-09-07T00:00:00Z",
+          "fetchedAt": "2026-09-07T09:03:24.068Z",
+          "transport": "Native GRIB2 \u2192 verified snapshot",
+          "contributes": true,
+          "status": "ready",
+          "validUntil": "2026-09-17T00:00:00Z",
+          "resolution": "2.5 km native grid",
+          "message": "2.5 km native grid; native grid extraction; initialized 2026-09-07T00:00:00Z.",
+          "snapshotUrl": "https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/nbm.json"
+        }
+      ],
+      "hours": [
+        {
+          "time": "2026-09-07T05:00:00-04:00",
+          "temperature": 65,
+          "pop": 0,
+          "condition": "Mostly Clear",
+          "isDay": false,
+          "wind": "2 mph",
+          "windDirection": "NE",
+          "humidity": 90,
+          "dewpoint": 63,
+          "precipitation": 0,
+          "precipitationSource": "NWS 40% / HRRR 40% / ECMWF 20%",
+          "apparent": 65,
+          "gust": 10,
+          "officialTemperature": 66,
+          "temperatureBlend": {
+            "value": 65.222,
+            "sources": [
+              {
+                "id": "nws",
+                "weight": 0.4,
+                "value": 66
+              },
+              {
+                "id": "hrrr",
+                "weight": 0.4,
+                "value": 63.67
+              },
+              {
+                "id": "ecmwf",
+                "weight": 0.2,
+                "value": 66.77
+              }
+            ],
+            "calibrated": false
+          },
+          "reflectivity": -10,
+          "nearbyReflectivity": -10,
+          "feelsLike": 65,
+          "feelsLikeShade": 65,
+          "feelsLikeSun": null,
+          "feelsLikeExposure": "outdoors",
+          "feelsLikeInputs": {
+            "temperature": 65,
+            "dewpoint": 63.1,
+            "wind": 4.3,
+            "humidity": 93.6
+          }
+        },
+        {
+          "time": "2026-09-07T06:00:00-04:00",
+          "temperature": 65,
+          "pop": 0,
+          "condition": "Sunny",
+          "isDay": true,
+          "wind": "2 mph",
+          "windDirection": "NE",
+          "humidity": 87,
+          "dewpoint": 62,
+          "precipitation": 0,
+          "precipitationSource": "NWS 40% / HRRR 40% / ECMWF 20%",
+          "apparent": 65.1,
+          "gust": 11,
+          "officialTemperature": 66,
+          "temperatureBlend": {
+            "value": 64.8594,
+            "sources": [
+              {
+                "id": "nws",
+                "weight": 0.4,
+                "value": 66
+              },
+              {
+                "id": "hrrr",
+                "weight": 0.4,
+                "value": 62.566
+              },
+              {
+                "id": "ecmwf",
+                "weight": 0.2,
+                "value": 67.165
+              }
+            ],
+            "calibrated": false
+          },
+          "reflectivity": -10,
+          "nearbyReflectivity": -10,
+          "feelsLike": 65.1,
+          "feelsLikeShade": 65.1,
+          "feelsLikeSun": null,
+          "feelsLikeExposure": "outdoors",
+          "feelsLikeInputs": {
+            "temperature": 65,
+            "dewpoint": 62.2,
+            "wind": 4.1,
+            "humidity": 90.6
+          }
+        },
+        {
+          "time": "2026-09-07T07:00:00-04:00",
+          "temperature": 64,
+          "pop": 0,
+          "condition": "Sunny",
+          "isDay": true,
+          "wind": "3 mph",
+          "windDirection": "NE",
+          "humidity": 90,
+          "dewpoint": 62,
+          "precipitation": 0,
+          "precipitationSource": "NWS 40% / HRRR 40% / ECMWF 20%",
+          "apparent": 63.7,
+          "gust": 13,
+          "officialTemperature": 65,
+          "temperatureBlend": {
+            "value": 64.1254,
+            "sources": [
+              {
+                "id": "nws",
+                "weight": 0.4,
+                "value": 65
+              },
+              {
+                "id": "hrrr",
+                "weight": 0.4,
+                "value": 61.533
+              },
+              {
+                "id": "ecmwf",
+                "weight": 0.2,
+                "value": 67.561
+              }
+            ],
+            "calibrated": false
+          },
+          "reflectivity": -10,
+          "nearbyReflectivity": -10,
+          "feelsLike": 63.7,
+          "feelsLikeShade": 63,
+          "feelsLikeSun": 63.7,
+          "feelsLikeExposure": "outdoors",
+          "feelsLikeInputs": {
+            "temperature": 64,
+            "dewpoint": 61.4,
+            "wind": 4.8,
+            "humidity": 91.3
+          }
+        },
+        {
+          "time": "2026-09-07T08:00:00-04:00",
+          "temperature": 67,
+          "pop": 0,
+          "condition": "Sunny",
+          "isDay": true,
+          "wind": "5 mph",
+          "windDirection": "NE",
+          "humidity": 84,
+          "dewpoint": 62,
+          "precipitation": 0,
+          "precipitationSource": "NWS 40% / HRRR 40% / ECMWF 20%",
+          "apparent": 68,
+          "gust": 15,
+          "officialTemperature": 67,
+          "temperatureBlend": {
+            "value": 66.6268,
+            "sources": [
+              {
+                "id": "nws",
+                "weight": 0.4,
+                "value": 67
+              },
+              {
+                "id": "hrrr",
+                "weight": 0.4,
+                "value": 65.589
+              },
+              {
+                "id": "ecmwf",
+                "weight": 0.2,
+                "value": 67.956
+              }
+            ],
+            "calibrated": false
+          },
+          "reflectivity": -10,
+          "nearbyReflectivity": -10,
+          "feelsLike": 68,
+          "feelsLikeShade": 64,
+          "feelsLikeSun": 68,
+          "feelsLikeExposure": "outdoors",
+          "feelsLikeInputs": {
+            "temperature": 67,
+            "dewpoint": 61.1,
+            "wind": 6.3,
+            "humidity": 81.3
+          }
+        },
+        {
+          "time": "2026-09-07T09:00:00-04:00",
+          "temperature": 71,
+          "pop": 0,
+          "condition": "Sunny",
+          "isDay": true,
+          "wind": "7 mph",
+          "windDirection": "NE",
+          "humidity": 78,
+          "dewpoint": 63,
+          "precipitation": 0,
+          "precipitationSource": "NWS 40% / HRRR 40% / ECMWF 20%",
+          "apparent": 72.2,
+          "gust": 18,
+          "officialTemperature": 70,
+          "temperatureBlend": {
+            "value": 70.7044,
+            "sources": [
+              {
+                "id": "nws",
+                "weight": 0.4,
+                "value": 70
+              },
+              {
+                "id": "hrrr",
+                "weight": 0.4,
+                "value": 71.218
+              },
+              {
+                "id": "ecmwf",
+                "weight": 0.2,
+                "value": 71.086
+              }
+            ],
+            "calibrated": false
+          },
+          "reflectivity": -10,
+          "nearbyReflectivity": -10,
+          "feelsLike": 72.2,
+          "feelsLikeShade": 66.4,
+          "feelsLikeSun": 72.2,
+          "feelsLikeExposure": "outdoors",
+          "feelsLikeInputs": {
+            "temperature": 71,
+            "dewpoint": 62,
+            "wind": 8,
+            "humidity": 73.2
+          }
+        }
+      ],
+      "points": [
+        {
+          "time": "2026-09-07T09:00:00.000Z",
+          "value": 65,
+          "inputs": {
+            "temperature": 65,
+            "dewpoint": 63.1,
+            "wind": 4.3,
+            "humidity": 93.6
+          },
+          "condition": "Mostly Clear",
+          "exposure": "outdoors",
+          "shadeValue": 65,
+          "sunValue": null,
+          "daylight": false,
+          "weatherKind": "clear",
+          "source": "UTCI Tier-3 fallback with estimated mean radiant temperature",
+          "alignmentFactor": 0,
+          "rawInputs": {
+            "temperature": 65,
+            "dewpoint": 63.1,
+            "wind": 4.3,
+            "humidity": 93.6
+          }
+        },
+        {
+          "time": "2026-09-07T10:00:00.000Z",
+          "value": 65.1,
+          "inputs": {
+            "temperature": 65,
+            "dewpoint": 62.2,
+            "wind": 4.1,
+            "humidity": 90.6
+          },
+          "condition": "Sunny",
+          "exposure": "outdoors",
+          "shadeValue": 65.1,
+          "sunValue": null,
+          "daylight": false,
+          "weatherKind": "clear",
+          "source": "UTCI Tier-3 fallback with estimated mean radiant temperature",
+          "alignmentFactor": 0,
+          "rawInputs": {
+            "temperature": 65,
+            "dewpoint": 62.2,
+            "wind": 4.1,
+            "humidity": 90.6
+          }
+        },
+        {
+          "time": "2026-09-07T11:00:00.000Z",
+          "value": 63.7,
+          "inputs": {
+            "temperature": 64,
+            "dewpoint": 61.4,
+            "wind": 4.8,
+            "humidity": 91.3
+          },
+          "condition": "Sunny",
+          "exposure": "outdoors",
+          "shadeValue": 63,
+          "sunValue": 63.7,
+          "daylight": true,
+          "weatherKind": "clear",
+          "source": "UTCI Tier-3 fallback with estimated mean radiant temperature",
+          "alignmentFactor": 0,
+          "rawInputs": {
+            "temperature": 64,
+            "dewpoint": 61.4,
+            "wind": 4.8,
+            "humidity": 91.3
+          }
+        },
+        {
+          "time": "2026-09-07T12:00:00.000Z",
+          "value": 68,
+          "inputs": {
+            "temperature": 67,
+            "dewpoint": 61.1,
+            "wind": 6.3,
+            "humidity": 81.3
+          },
+          "condition": "Sunny",
+          "exposure": "outdoors",
+          "shadeValue": 64,
+          "sunValue": 68,
+          "daylight": true,
+          "weatherKind": "clear",
+          "source": "UTCI Tier-3 fallback with estimated mean radiant temperature",
+          "alignmentFactor": 0,
+          "rawInputs": {
+            "temperature": 67,
+            "dewpoint": 61.1,
+            "wind": 6.3,
+            "humidity": 81.3
+          }
+        },
+        {
+          "time": "2026-09-07T13:00:00.000Z",
+          "value": 72.2,
+          "inputs": {
+            "temperature": 71,
+            "dewpoint": 62,
+            "wind": 8,
+            "humidity": 73.2
+          },
+          "condition": "Sunny",
+          "exposure": "outdoors",
+          "shadeValue": 66.4,
+          "sunValue": 72.2,
+          "daylight": true,
+          "weatherKind": "clear",
+          "source": "UTCI Tier-3 fallback with estimated mean radiant temperature",
+          "alignmentFactor": 0,
+          "rawInputs": {
+            "temperature": 71,
+            "dewpoint": 62,
+            "wind": 8,
+            "humidity": 73.2
+          }
+        }
+      ],
+      "independentNightReferenceF": 69.82205411397078
+    },
+    {
+      "location": "greenville",
+      "assembledAt": "2026-09-07T09:03:34.043Z",
+      "current": {
+        "temperature": 64,
+        "condition": "Clear",
+        "conditionSource": "Station weather report",
+        "conditionTime": "2026-09-07T08:35:00+00:00",
+        "time": "2026-09-07T08:35:00+00:00",
+        "stationDistanceKm": 3.2,
+        "station": "KPGV",
+        "stationName": "Pitt-Greenville Airport",
+        "humidity": 100,
+        "dewpoint": 64,
+        "wind": 1,
+        "gust": null,
+        "windDirection": 310,
+        "visibility": 10,
+        "pressurePa": 101660,
+        "pressure": 30.02,
+        "pressureTrend": {
+          "status": "ready",
+          "direction": "rising",
+          "deltaMb": 0.7,
+          "hours": 3,
+          "fromTime": "2026-09-07T05:35:00.000Z",
+          "toTime": "2026-09-07T08:35:00+00:00",
+          "basis": "Same-station observed barometric pressure"
+        },
+        "type": "observation",
+        "apparent": 68,
+        "apparentSource": "Steadman apparent temperature (all-weather shade); using nearby station observations.",
+        "weather": {
+          "kind": "clear",
+          "label": "Clear",
+          "condition": "Clear",
+          "known": true,
+          "chance": false
+        },
+        "feelsLike": 68,
+        "feelsLikeShade": 68,
+        "feelsLikeSun": null,
+        "feelsLikeExposure": "outdoors"
+      },
+      "comfort": {
+        "shade": 68,
+        "sun": null,
+        "outdoors": 68,
+        "weatherKind": "clear",
+        "weatherLabel": "Clear",
+        "condition": "Clear",
+        "conditionSource": "Station weather report",
+        "radiationStatus": "night",
+        "method": "UTCI Tier-3 fallback with estimated mean radiant temperature",
+        "humidity": 100,
+        "wetBulb": null,
+        "daylight": false,
+        "absorbedRadiation": null,
+        "solarAdjustment": 0,
+        "dewpointEffect": "There is some moisture in the air, but it is not especially muggy.",
+        "windEffect": "There is very little wind, so moving-air cooling is small.",
+        "microclimate": "The nearby observed air temperature carries broad neighborhood influence, but block-level pavement, walls, shade and wind can still differ.",
+        "note": "Tier-3 operational fallback from the attached Real-Feel Skin Temperature research: UTCI is the all-season base using air temperature, humidity/dew point and standard wind, with solar elevation and broad sky state used for a generic radiant estimate. In warm humid air, the warmer Steadman vapor-pressure apparent temperature is retained as a safeguard, so cloud cover can reduce radiant heating without wiping out the dew-point effect. This is a modeled equivalent temperature, not measured skin temperature or validated EPST. There is some moisture in the air, but it is not especially muggy. There is very little wind, so moving-air cooling is small. The nearby observed air temperature carries broad neighborhood influence, but block-level pavement, walls, shade and wind can still differ. Wet bulb is diagnostic only and is not added again to the result."
+      },
+      "discussion": {
+        "id": "fc11e10d-9806-467d-a2f9-f828a2cc0adb",
+        "office": "MHX",
+        "issuanceTime": "2026-09-07T06:34:00+00:00",
+        "text": "\n000\nFXUS62 KMHX 070634\nAFDMHX\n\nArea Forecast Discussion\nNational Weather Service Newport/Morehead City NC\n234 AM EDT Mon Sep 7 2026\n\n.WHAT HAS CHANGED...\nNo significant changes. \n\n&&\n\n.KEY MESSAGES...\n1) Return to more seasonable September temps for the beginning \nof the week with a warming trend developing late week ahead of \nthe next front.\n\n2) The next front will impact the area late week and this weekend,\nwith a return to unsettled weather. \n\n&&\n\n.DISCUSSION...\nKEY MESSAGE 1...High pressure centered over the Great Lakes will\ncontinue to build southeastward today, becoming centered over\nthe Mid-Atlantic and Carolinas Tuesday, before sliding offshore\nWed. This will keep a cooler/drier NE-E flow over the area, with\nseasonable temps for early September and feeling much more \ncomfortable, with highs in the 80s and dewpoints in the 60s/low \n70s. Temps will begin to warm mid to late week as southerly flow\nre-develops ahead of the next front. Isolated coastal showers \nwill be possible today, with bulk of activity remaining \noffshore. Mostly dry weather will then prevail through mid week\nwith drier air in place. \n\nKEY MESSAGE 2...The next front will approach the area late week,\npossibly stalling over the area into the weekend. This will lead\nto increasing precip chances Fri and Sat. \n\n&&\n\n.AVIATION /06Z MONDAY THROUGH FRIDAY/...\nPred VFR conditions expected through the period. NE-ENE wind\ngusts 15-20 kt this afternoon. \n\nNOTE: AMD NOT SKED has been appended to the EWN TAFs as the \nsite is not transmitting through normal channels. The site is \nstill reporting via telephone so it will be monitored, but not \nas frequently as when it is completely operational. The next \nclosest ASOS is at Cherry Point (KNKT).\n\nOutlook (Tue through Fri): High pressure will build in from the\nnorth through mid week, with pred VFR conditions expected.\n\n&&\n\n.MARINE...\nLatest obs show NE-ENE winds 10-20 kt with seas 3-5 ft. High\npressure building in from the north will keep moderate to breezy\nNE-ENE winds 15-25 kt across the area tonight, slowly easing \nthrough the day Tue. SCAs continue for the coastal waters and\nPamlico Sound into tonight and Tue. Seas will build to to 4-8 \nft today, highest across the outer waters, subsiding to 4-7 ft\nTue morning. \n\nOutlook (Tue through Fri): Winds and seas will begin to ease \nTuesday and Wed as high pressure builds in. SW winds 5-15 kt \nreturn Wed night and Thu with seas 2-3 ft.\n\n&&\n\n.MHX WATCHES/WARNINGS/ADVISORIES...\nNC...Beach Hazards Statement from 8 AM EDT this morning through \n     this evening for NCZ196-203>205.\nMARINE...Small Craft Advisory from 9 AM this morning to 8 PM EDT this \n     evening for AMZ135.\n     Small Craft Advisory until midnight EDT tonight for AMZ150.\n     Small Craft Advisory until noon EDT Tuesday for AMZ152-154.\n     Small Craft Advisory until 2 PM EDT Tuesday for AMZ156-158.\n\n&&\n\n$$\n\nDISCUSSION...CQD/CEB\nAVIATION...CQD/CEB\nMARINE...CQD/CEB\n",
+        "url": "https://api.weather.gov/products/fc11e10d-9806-467d-a2f9-f828a2cc0adb"
+      },
+      "briefing": {
+        "headline": "Seasonable start to week; front late week",
+        "summary": "High pressure keeps the start of the week dry and more seasonable. A front late in the week may bring a return to unsettled weather.",
+        "nearTerm": "Today will be mostly sunny with a northeast breeze and generally dry conditions. Coastal spots could see an isolated shower, but most rain should remain offshore.",
+        "extended": "Temperatures will warm a bit mid to late week as southerly flow returns. Late week into the weekend the approaching front will raise the chance of showers and storms across the area.",
+        "uncertainty": "Timing and stall location of the next front late week will change how widespread the rain will be.",
+        "sources": [
+          "nws",
+          "afd",
+          "hrrr",
+          "ecmwf",
+          "nbm"
+        ],
+        "mode": "ai",
+        "signature": "9a7e59998e08ffc31328d4f8",
+        "generatedAt": "2026-09-07T09:03:41.212Z",
+        "model": "gpt-5-mini"
+      },
+      "feeds": [
+        {
+          "id": "point",
+          "label": "NWS location",
+          "status": "ready",
+          "fetchedAt": "2026-09-06T22:04:08.971Z",
+          "issuedAt": null,
+          "url": "https://api.weather.gov/points/35.6127,-77.3664"
+        },
+        {
+          "id": "nws",
+          "label": "NWS forecast",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:03:33.992Z",
+          "issuedAt": "2026-09-07T08:33:03+00:00",
+          "url": "https://api.weather.gov/gridpoints/MHX/30,95/forecast"
+        },
+        {
+          "id": "hourly",
+          "label": "NWS hourly",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:03:34.013Z",
+          "issuedAt": "2026-09-07T08:33:03+00:00",
+          "url": "https://api.weather.gov/gridpoints/MHX/30,95/forecast/hourly"
+        },
+        {
+          "id": "grid",
+          "label": "NWS precipitation grid",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:03:34.029Z",
+          "issuedAt": "2026-09-07T08:33:03+00:00",
+          "url": "https://api.weather.gov/gridpoints/MHX/30,95"
+        },
+        {
+          "id": "alerts",
+          "label": "Official NWS alerts",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:03:34.014Z",
+          "issuedAt": null,
+          "url": "https://api.weather.gov/alerts/active?point=35.6127,-77.3664"
+        },
+        {
+          "id": "afd",
+          "label": "NWS MHX discussion",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:03:33.893Z",
+          "issuedAt": "2026-09-07T06:34:00+00:00",
+          "url": "https://api.weather.gov/products/types/AFD/locations/MHX"
+        },
+        {
+          "id": "observation",
+          "label": "Nearby station observation",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:03:33.829Z",
+          "issuedAt": "2026-09-07T08:35:00+00:00",
+          "url": "https://api.weather.gov/gridpoints/MHX/30,95/stations"
+        },
+        {
+          "id": "special-discussions",
+          "label": "SPC special weather discussions",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:03:33.859Z",
+          "issuedAt": null,
+          "url": "https://www.spc.noaa.gov/products/md/"
+        },
+        {
+          "id": "hrrr",
+          "label": "NOAA HRRR \u00b7 3 km",
+          "url": "https://www.nco.ncep.noaa.gov/pmb/products/hrrr/",
+          "issuedAt": "2026-09-07T04:00:00Z",
+          "fetchedAt": "2026-09-07T09:03:33.741Z",
+          "transport": "Native GRIB2 \u2192 verified snapshot",
+          "contributes": true,
+          "status": "ready",
+          "validUntil": "2026-09-07T22:00:00Z",
+          "resolution": "3 km native grid",
+          "message": "3 km native grid; native grid extraction; initialized 2026-09-07T04:00:00Z.",
+          "snapshotUrl": "https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/hrrr.json"
+        },
+        {
+          "id": "ecmwf",
+          "label": "ECMWF IFS \u00b7 0.25\u00b0 Open Data",
+          "url": "https://www.ecmwf.int/en/forecasts/datasets/open-data",
+          "issuedAt": "2026-09-06T12:00:00Z",
+          "fetchedAt": "2026-09-07T09:03:33.741Z",
+          "transport": "Native GRIB2 \u2192 verified snapshot",
+          "contributes": true,
+          "status": "ready",
+          "validUntil": "2026-09-16T12:00:00Z",
+          "resolution": "0.25\u00b0 Open Data grid",
+          "message": "0.25\u00b0 Open Data grid; native grid extraction; initialized 2026-09-06T12:00:00Z.",
+          "snapshotUrl": "https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/ecmwf.json"
+        },
+        {
+          "id": "nbm",
+          "label": "NOAA National Blend \u00b7 2.5 km",
+          "url": "https://www.nco.ncep.noaa.gov/pmb/products/blend/",
+          "issuedAt": "2026-09-07T00:00:00Z",
+          "fetchedAt": "2026-09-07T09:03:33.741Z",
+          "transport": "Native GRIB2 \u2192 verified snapshot",
+          "contributes": true,
+          "status": "ready",
+          "validUntil": "2026-09-17T00:00:00Z",
+          "resolution": "2.5 km native grid",
+          "message": "2.5 km native grid; native grid extraction; initialized 2026-09-07T00:00:00Z.",
+          "snapshotUrl": "https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/nbm.json"
+        }
+      ],
+      "hours": [
+        {
+          "time": "2026-09-07T05:00:00-04:00",
+          "temperature": 66,
+          "pop": 0,
+          "condition": "Mostly Clear",
+          "isDay": false,
+          "wind": "3 mph",
+          "windDirection": "NE",
+          "humidity": 90,
+          "dewpoint": 64,
+          "precipitation": 0,
+          "precipitationSource": "NWS 40% / HRRR 40% / ECMWF 20%",
+          "apparent": 66.1,
+          "gust": 13,
+          "officialTemperature": 67,
+          "temperatureBlend": {
+            "value": 65.7008,
+            "sources": [
+              {
+                "id": "nws",
+                "weight": 0.4,
+                "value": 67
+              },
+              {
+                "id": "hrrr",
+                "weight": 0.4,
+                "value": 63.783
+              },
+              {
+                "id": "ecmwf",
+                "weight": 0.2,
+                "value": 66.938
+              }
+            ],
+            "calibrated": false
+          },
+          "reflectivity": -10,
+          "nearbyReflectivity": -10,
+          "feelsLike": 66.1,
+          "feelsLikeShade": 66.1,
+          "feelsLikeSun": null,
+          "feelsLikeExposure": "outdoors",
+          "feelsLikeInputs": {
+            "temperature": 66,
+            "dewpoint": 63.2,
+            "wind": 4.2,
+            "humidity": 90.7
+          }
+        },
+        {
+          "time": "2026-09-07T06:00:00-04:00",
+          "temperature": 66,
+          "pop": 0,
+          "condition": "Sunny",
+          "isDay": true,
+          "wind": "3 mph",
+          "windDirection": "NE",
+          "humidity": 90,
+          "dewpoint": 64,
+          "precipitation": 0,
+          "precipitationSource": "NWS 40% / HRRR 40% / ECMWF 20%",
+          "apparent": 66.7,
+          "gust": 13,
+          "officialTemperature": 67,
+          "temperatureBlend": {
+            "value": 65.7058,
+            "sources": [
+              {
+                "id": "nws",
+                "weight": 0.4,
+                "value": 67
+              },
+              {
+                "id": "hrrr",
+                "weight": 0.4,
+                "value": 63.354
+              },
+              {
+                "id": "ecmwf",
+                "weight": 0.2,
+                "value": 67.821
+              }
+            ],
+            "calibrated": false
+          },
+          "reflectivity": -10,
+          "nearbyReflectivity": -10,
+          "feelsLike": 66.7,
+          "feelsLikeShade": 66.7,
+          "feelsLikeSun": null,
+          "feelsLikeExposure": "outdoors",
+          "feelsLikeInputs": {
+            "temperature": 66,
+            "dewpoint": 63.3,
+            "wind": 3.8,
+            "humidity": 91
+          }
+        },
+        {
+          "time": "2026-09-07T07:00:00-04:00",
+          "temperature": 66,
+          "pop": 0,
+          "condition": "Sunny",
+          "isDay": true,
+          "wind": "3 mph",
+          "windDirection": "NE",
+          "humidity": 90,
+          "dewpoint": 64,
+          "precipitation": 0,
+          "precipitationSource": "NWS 40% / HRRR 40% / ECMWF 20%",
+          "apparent": 67.6,
+          "gust": 13,
+          "officialTemperature": 67,
+          "temperatureBlend": {
+            "value": 65.694,
+            "sources": [
+              {
+                "id": "nws",
+                "weight": 0.4,
+                "value": 67
+              },
+              {
+                "id": "hrrr",
+                "weight": 0.4,
+                "value": 62.883
+              },
+              {
+                "id": "ecmwf",
+                "weight": 0.2,
+                "value": 68.704
+              }
+            ],
+            "calibrated": false
+          },
+          "reflectivity": -10,
+          "nearbyReflectivity": -10,
+          "feelsLike": 67.6,
+          "feelsLikeShade": 66.5,
+          "feelsLikeSun": 67.6,
+          "feelsLikeExposure": "outdoors",
+          "feelsLikeInputs": {
+            "temperature": 66,
+            "dewpoint": 63.1,
+            "wind": 4,
+            "humidity": 90.4
+          }
+        },
+        {
+          "time": "2026-09-07T08:00:00-04:00",
+          "temperature": 68,
+          "pop": 0,
+          "condition": "Sunny",
+          "isDay": true,
+          "wind": "5 mph",
+          "windDirection": "NE",
+          "humidity": 90,
+          "dewpoint": 65,
+          "precipitation": 0,
+          "precipitationSource": "NWS 40% / HRRR 40% / ECMWF 20%",
+          "apparent": 71.6,
+          "gust": 15,
+          "officialTemperature": 68,
+          "temperatureBlend": {
+            "value": 67.5778,
+            "sources": [
+              {
+                "id": "nws",
+                "weight": 0.4,
+                "value": 68
+              },
+              {
+                "id": "hrrr",
+                "weight": 0.4,
+                "value": 66.151
+              },
+              {
+                "id": "ecmwf",
+                "weight": 0.2,
+                "value": 69.587
+              }
+            ],
+            "calibrated": false
+          },
+          "reflectivity": -10,
+          "nearbyReflectivity": -10,
+          "feelsLike": 71.6,
+          "feelsLikeShade": 67.5,
+          "feelsLikeSun": 71.6,
+          "feelsLikeExposure": "outdoors",
+          "feelsLikeInputs": {
+            "temperature": 68,
+            "dewpoint": 64.2,
+            "wind": 5.2,
+            "humidity": 87.6
+          }
+        },
+        {
+          "time": "2026-09-07T09:00:00-04:00",
+          "temperature": 72,
+          "pop": 0,
+          "condition": "Sunny",
+          "isDay": true,
+          "wind": "6 mph",
+          "windDirection": "NE",
+          "humidity": 81,
+          "dewpoint": 65,
+          "precipitation": 0,
+          "precipitationSource": "NWS 40% / HRRR 40% / ECMWF 20%",
+          "apparent": 75.4,
+          "gust": 20,
+          "officialTemperature": 71,
+          "temperatureBlend": {
+            "value": 71.581,
+            "sources": [
+              {
+                "id": "nws",
+                "weight": 0.4,
+                "value": 71
+              },
+              {
+                "id": "hrrr",
+                "weight": 0.4,
+                "value": 71.556
+              },
+              {
+                "id": "ecmwf",
+                "weight": 0.2,
+                "value": 72.793
+              }
+            ],
+            "calibrated": false
+          },
+          "reflectivity": -10,
+          "nearbyReflectivity": -10,
+          "feelsLike": 75.4,
+          "feelsLikeShade": 69.5,
+          "feelsLikeSun": 75.4,
+          "feelsLikeExposure": "outdoors",
+          "feelsLikeInputs": {
+            "temperature": 72,
+            "dewpoint": 64.8,
+            "wind": 7,
+            "humidity": 78.1
+          }
+        }
+      ],
+      "points": [
+        {
+          "time": "2026-09-07T09:00:00.000Z",
+          "value": 66.1,
+          "inputs": {
+            "temperature": 66,
+            "dewpoint": 63.2,
+            "wind": 4.2,
+            "humidity": 90.7
+          },
+          "condition": "Mostly Clear",
+          "exposure": "outdoors",
+          "shadeValue": 66.1,
+          "sunValue": null,
+          "daylight": false,
+          "weatherKind": "clear",
+          "source": "UTCI Tier-3 fallback with estimated mean radiant temperature",
+          "alignmentFactor": 0,
+          "rawInputs": {
+            "temperature": 66,
+            "dewpoint": 63.2,
+            "wind": 4.2,
+            "humidity": 90.7
+          }
+        },
+        {
+          "time": "2026-09-07T10:00:00.000Z",
+          "value": 66.7,
+          "inputs": {
+            "temperature": 66,
+            "dewpoint": 63.3,
+            "wind": 3.8,
+            "humidity": 91
+          },
+          "condition": "Sunny",
+          "exposure": "outdoors",
+          "shadeValue": 66.7,
+          "sunValue": null,
+          "daylight": false,
+          "weatherKind": "clear",
+          "source": "UTCI Tier-3 fallback with estimated mean radiant temperature",
+          "alignmentFactor": 0,
+          "rawInputs": {
+            "temperature": 66,
+            "dewpoint": 63.3,
+            "wind": 3.8,
+            "humidity": 91
+          }
+        },
+        {
+          "time": "2026-09-07T11:00:00.000Z",
+          "value": 67.6,
+          "inputs": {
+            "temperature": 66,
+            "dewpoint": 63.1,
+            "wind": 4,
+            "humidity": 90.4
+          },
+          "condition": "Sunny",
+          "exposure": "outdoors",
+          "shadeValue": 66.5,
+          "sunValue": 67.6,
+          "daylight": true,
+          "weatherKind": "clear",
+          "source": "UTCI Tier-3 fallback with estimated mean radiant temperature",
+          "alignmentFactor": 0,
+          "rawInputs": {
+            "temperature": 66,
+            "dewpoint": 63.1,
+            "wind": 4,
+            "humidity": 90.4
+          }
+        },
+        {
+          "time": "2026-09-07T12:00:00.000Z",
+          "value": 71.6,
+          "inputs": {
+            "temperature": 68,
+            "dewpoint": 64.2,
+            "wind": 5.2,
+            "humidity": 87.6
+          },
+          "condition": "Sunny",
+          "exposure": "outdoors",
+          "shadeValue": 67.5,
+          "sunValue": 71.6,
+          "daylight": true,
+          "weatherKind": "clear",
+          "source": "UTCI Tier-3 fallback with estimated mean radiant temperature",
+          "alignmentFactor": 0,
+          "rawInputs": {
+            "temperature": 68,
+            "dewpoint": 64.2,
+            "wind": 5.2,
+            "humidity": 87.6
+          }
+        },
+        {
+          "time": "2026-09-07T13:00:00.000Z",
+          "value": 75.4,
+          "inputs": {
+            "temperature": 72,
+            "dewpoint": 64.8,
+            "wind": 7,
+            "humidity": 78.1
+          },
+          "condition": "Sunny",
+          "exposure": "outdoors",
+          "shadeValue": 69.5,
+          "sunValue": 75.4,
+          "daylight": true,
+          "weatherKind": "clear",
+          "source": "UTCI Tier-3 fallback with estimated mean radiant temperature",
+          "alignmentFactor": 0,
+          "rawInputs": {
+            "temperature": 72,
+            "dewpoint": 64.8,
+            "wind": 7,
+            "humidity": 78.1
+          }
+        }
+      ],
+      "independentNightReferenceF": 68.19241497433947
+    }
+  ],
+  "referenceCases": [
+    {
+      "t": 0,
+      "rh": 20,
+      "wind": 0,
+      "tr": 0,
+      "actual": -0.014316999652749018,
+      "independentReferenceF": -0.014316999652756124,
+      "errorF": 7.105427357601002e-15
+    },
+    {
+      "t": 0,
+      "rh": 20,
+      "wind": 2,
+      "tr": 0,
+      "actual": -2.689778132922477,
+      "independentReferenceF": -2.6897781329224557,
+      "errorF": -2.1316282072803006e-14
+    },
+    {
+      "t": 0,
+      "rh": 20,
+      "wind": 10,
+      "tr": 0,
+      "actual": -29.53205390532974,
+      "independentReferenceF": -29.532053905329803,
+      "errorF": 6.394884621840902e-14
+    },
+    {
+      "t": 0,
+      "rh": 20,
+      "wind": 25,
+      "tr": 0,
+      "actual": -57.35415595726417,
+      "independentReferenceF": -57.35415595726407,
+      "errorF": -9.947598300641403e-14
+    },
+    {
+      "t": 0,
+      "rh": 50,
+      "wind": 0,
+      "tr": 0,
+      "actual": -0.006685399648716839,
+      "independentReferenceF": -0.006685399648716839,
+      "errorF": 0.0
+    },
+    {
+      "t": 0,
+      "rh": 50,
+      "wind": 2,
+      "tr": 0,
+      "actual": -2.681389108969242,
+      "independentReferenceF": -2.6813891089692277,
+      "errorF": -1.4210854715202004e-14
+    },
+    {
+      "t": 0,
+      "rh": 50,
+      "wind": 10,
+      "tr": 0,
+      "actual": -29.63429616671359,
+      "independentReferenceF": -29.63429616671357,
+      "errorF": -2.1316282072803006e-14
+    },
+    {
+      "t": 0,
+      "rh": 50,
+      "wind": 25,
+      "tr": 0,
+      "actual": -57.98946783691511,
+      "independentReferenceF": -57.989467836915054,
+      "errorF": -5.684341886080802e-14
+    },
+    {
+      "t": 0,
+      "rh": 90,
+      "wind": 0,
+      "tr": 0,
+      "actual": -0.04418854828962537,
+      "independentReferenceF": -0.04418854828961827,
+      "errorF": -7.105427357601002e-15
+    },
+    {
+      "t": 0,
+      "rh": 90,
+      "wind": 2,
+      "tr": 0,
+      "actual": -2.718698300462542,
+      "independentReferenceF": -2.718698300462549,
+      "errorF": 7.105427357601002e-15
+    },
+    {
+      "t": 0,
+      "rh": 90,
+      "wind": 10,
+      "tr": 0,
+      "actual": -29.822361688310167,
+      "independentReferenceF": -29.82236168831018,
+      "errorF": 1.4210854715202004e-14
+    },
+    {
+      "t": 0,
+      "rh": 90,
+      "wind": 25,
+      "tr": 0,
+      "actual": -58.867976508611704,
+      "independentReferenceF": -58.86797650861156,
+      "errorF": -1.4210854715202004e-13
+    },
+    {
+      "t": 32,
+      "rh": 20,
+      "wind": 0,
+      "tr": 32,
+      "actual": 31.822904687060223,
+      "independentReferenceF": 31.822904687060223,
+      "errorF": 0.0
+    },
+    {
+      "t": 32,
+      "rh": 20,
+      "wind": 2,
+      "tr": 32,
+      "actual": 29.723647177058766,
+      "independentReferenceF": 29.723647177058766,
+      "errorF": 0.0
+    },
+    {
+      "t": 32,
+      "rh": 20,
+      "wind": 10,
+      "tr": 32,
+      "actual": 6.890306629425744,
+      "independentReferenceF": 6.890306629425751,
+      "errorF": -7.105427357601002e-15
+    },
+    {
+      "t": 32,
+      "rh": 20,
+      "wind": 25,
+      "tr": 32,
+      "actual": -19.081442522136072,
+      "independentReferenceF": -19.081442522135895,
+      "errorF": -1.7763568394002505e-13
+    },
+    {
+      "t": 32,
+      "rh": 50,
+      "wind": 0,
+      "tr": 32,
+      "actual": 33.204301751262925,
+      "independentReferenceF": 33.204301751262925,
+      "errorF": 0.0
+    },
+    {
+      "t": 32,
+      "rh": 50,
+      "wind": 2,
+      "tr": 32,
+      "actual": 31.15128434145383,
+      "independentReferenceF": 31.15128434145383,
+      "errorF": 0.0
+    },
+    {
+      "t": 32,
+      "rh": 50,
+      "wind": 10,
+      "tr": 32,
+      "actual": 8.536061809305362,
+      "independentReferenceF": 8.536061809305373,
+      "errorF": -1.0658141036401503e-14
+    },
+    {
+      "t": 32,
+      "rh": 50,
+      "wind": 25,
+      "tr": 32,
+      "actual": -17.909360532392363,
+      "independentReferenceF": -17.909360532392157,
+      "errorF": -2.0605739337042905e-13
+    },
+    {
+      "t": 32,
+      "rh": 90,
+      "wind": 0,
+      "tr": 32,
+      "actual": 34.56474967188031,
+      "independentReferenceF": 34.56474967188031,
+      "errorF": 0.0
+    },
+    {
+      "t": 32,
+      "rh": 90,
+      "wind": 2,
+      "tr": 32,
+      "actual": 32.554424367657475,
+      "independentReferenceF": 32.554424367657475,
+      "errorF": 0.0
+    },
+    {
+      "t": 32,
+      "rh": 90,
+      "wind": 10,
+      "tr": 32,
+      "actual": 10.066954981949927,
+      "independentReferenceF": 10.066954981949934,
+      "errorF": -7.105427357601002e-15
+    },
+    {
+      "t": 32,
+      "rh": 90,
+      "wind": 25,
+      "tr": 32,
+      "actual": -17.193813480483684,
+      "independentReferenceF": -17.193813480483485,
+      "errorF": -1.9895196601282805e-13
+    },
+    {
+      "t": 46,
+      "rh": 20,
+      "wind": 0,
+      "tr": 46,
+      "actual": 45.9452869010086,
+      "independentReferenceF": 45.94528690100859,
+      "errorF": 7.105427357601002e-15
+    },
+    {
+      "t": 46,
+      "rh": 20,
+      "wind": 2,
+      "tr": 46,
+      "actual": 44.38675321753746,
+      "independentReferenceF": 44.38675321753745,
+      "errorF": 7.105427357601002e-15
+    },
+    {
+      "t": 46,
+      "rh": 20,
+      "wind": 10,
+      "tr": 46,
+      "actual": 25.753456415873167,
+      "independentReferenceF": 25.753456415873167,
+      "errorF": 0.0
+    },
+    {
+      "t": 46,
+      "rh": 20,
+      "wind": 25,
+      "tr": 46,
+      "actual": 3.975007157441837,
+      "independentReferenceF": 3.9750071574419863,
+      "errorF": -1.4921397450962104e-13
+    },
+    {
+      "t": 46,
+      "rh": 50,
+      "wind": 0,
+      "tr": 46,
+      "actual": 47.33564930821066,
+      "independentReferenceF": 47.335649308210655,
+      "errorF": 7.105427357601002e-15
+    },
+    {
+      "t": 46,
+      "rh": 50,
+      "wind": 2,
+      "tr": 46,
+      "actual": 45.83777922697438,
+      "independentReferenceF": 45.83777922697438,
+      "errorF": 0.0
+    },
+    {
+      "t": 46,
+      "rh": 50,
+      "wind": 10,
+      "tr": 46,
+      "actual": 27.638402134674443,
+      "independentReferenceF": 27.638402134674436,
+      "errorF": 7.105427357601002e-15
+    },
+    {
+      "t": 46,
+      "rh": 50,
+      "wind": 25,
+      "tr": 46,
+      "actual": 5.861451808279494,
+      "independentReferenceF": 5.861451808279671,
+      "errorF": -1.7763568394002505e-13
+    },
+    {
+      "t": 46,
+      "rh": 90,
+      "wind": 0,
+      "tr": 46,
+      "actual": 49.04544252385266,
+      "independentReferenceF": 49.04544252385266,
+      "errorF": 0.0
+    },
+    {
+      "t": 46,
+      "rh": 90,
+      "wind": 2,
+      "tr": 46,
+      "actual": 47.59251994154595,
+      "independentReferenceF": 47.592519941545945,
+      "errorF": 7.105427357601002e-15
+    },
+    {
+      "t": 46,
+      "rh": 90,
+      "wind": 10,
+      "tr": 46,
+      "actual": 29.63618873744287,
+      "independentReferenceF": 29.636188737442865,
+      "errorF": 3.552713678800501e-15
+    },
+    {
+      "t": 46,
+      "rh": 90,
+      "wind": 25,
+      "tr": 46,
+      "actual": 7.364558999758906,
+      "independentReferenceF": 7.364558999759133,
+      "errorF": -2.2737367544323206e-13
+    },
+    {
+      "t": 66,
+      "rh": 20,
+      "wind": 0,
+      "tr": 66,
+      "actual": 64.19872795915768,
+      "independentReferenceF": 64.19872795915768,
+      "errorF": 0.0
+    },
+    {
+      "t": 66,
+      "rh": 20,
+      "wind": 2,
+      "tr": 66,
+      "actual": 63.54543565581096,
+      "independentReferenceF": 63.54543565581095,
+      "errorF": 1.4210854715202004e-14
+    },
+    {
+      "t": 66,
+      "rh": 20,
+      "wind": 10,
+      "tr": 66,
+      "actual": 52.38534366765509,
+      "independentReferenceF": 52.3853436676551,
+      "errorF": -7.105427357601002e-15
+    },
+    {
+      "t": 66,
+      "rh": 20,
+      "wind": 25,
+      "tr": 66,
+      "actual": 39.841407123301884,
+      "independentReferenceF": 39.841407123302005,
+      "errorF": -1.2079226507921703e-13
+    },
+    {
+      "t": 66,
+      "rh": 50,
+      "wind": 0,
+      "tr": 66,
+      "actual": 65.85617970658669,
+      "independentReferenceF": 65.85617970658666,
+      "errorF": 2.842170943040401e-14
+    },
+    {
+      "t": 66,
+      "rh": 50,
+      "wind": 2,
+      "tr": 66,
+      "actual": 65.1964187847304,
+      "independentReferenceF": 65.19641878473038,
+      "errorF": 1.4210854715202004e-14
+    },
+    {
+      "t": 66,
+      "rh": 50,
+      "wind": 10,
+      "tr": 66,
+      "actual": 54.2640771052491,
+      "independentReferenceF": 54.26407710524907,
+      "errorF": 2.842170943040401e-14
+    },
+    {
+      "t": 66,
+      "rh": 50,
+      "wind": 25,
+      "tr": 66,
+      "actual": 42.30569405216091,
+      "independentReferenceF": 42.30569405216108,
+      "errorF": -1.7053025658242404e-13
+    },
+    {
+      "t": 66,
+      "rh": 90,
+      "wind": 0,
+      "tr": 66,
+      "actual": 69.41705249114159,
+      "independentReferenceF": 69.41705249114153,
+      "errorF": 5.684341886080802e-14
+    },
+    {
+      "t": 66,
+      "rh": 90,
+      "wind": 2,
+      "tr": 66,
+      "actual": 68.72365821872147,
+      "independentReferenceF": 68.72365821872143,
+      "errorF": 4.263256414560601e-14
+    },
+    {
+      "t": 66,
+      "rh": 90,
+      "wind": 10,
+      "tr": 66,
+      "actual": 57.72393768221052,
+      "independentReferenceF": 57.723937682210476,
+      "errorF": 4.263256414560601e-14
+    },
+    {
+      "t": 66,
+      "rh": 90,
+      "wind": 25,
+      "tr": 66,
+      "actual": 45.61592960637936,
+      "independentReferenceF": 45.61592960637945,
+      "errorF": -9.237055564881302e-14
+    },
+    {
+      "t": 75,
+      "rh": 20,
+      "wind": 0,
+      "tr": 75,
+      "actual": 72.16486467944944,
+      "independentReferenceF": 72.16486467944944,
+      "errorF": 0.0
+    },
+    {
+      "t": 75,
+      "rh": 20,
+      "wind": 2,
+      "tr": 75,
+      "actual": 71.88765686312941,
+      "independentReferenceF": 71.88765686312942,
+      "errorF": -1.4210854715202004e-14
+    },
+    {
+      "t": 75,
+      "rh": 20,
+      "wind": 10,
+      "tr": 75,
+      "actual": 64.01602395142667,
+      "independentReferenceF": 64.01602395142672,
+      "errorF": -4.263256414560601e-14
+    },
+    {
+      "t": 75,
+      "rh": 20,
+      "wind": 25,
+      "tr": 75,
+      "actual": 56.12602752585823,
+      "independentReferenceF": 56.12602752585836,
+      "errorF": -1.3500311979441904e-13
+    },
+    {
+      "t": 75,
+      "rh": 50,
+      "wind": 0,
+      "tr": 75,
+      "actual": 74.69876267411416,
+      "independentReferenceF": 74.69876267411416,
+      "errorF": 0.0
+    },
+    {
+      "t": 75,
+      "rh": 50,
+      "wind": 2,
+      "tr": 75,
+      "actual": 74.33731014524867,
+      "independentReferenceF": 74.33731014524867,
+      "errorF": 0.0
+    },
+    {
+      "t": 75,
+      "rh": 50,
+      "wind": 10,
+      "tr": 75,
+      "actual": 66.29139182938765,
+      "independentReferenceF": 66.29139182938766,
+      "errorF": -1.4210854715202004e-14
+    },
+    {
+      "t": 75,
+      "rh": 50,
+      "wind": 25,
+      "tr": 75,
+      "actual": 59.006168797371764,
+      "independentReferenceF": 59.00616879737198,
+      "errorF": -2.1316282072803006e-13
+    },
+    {
+      "t": 75,
+      "rh": 90,
+      "wind": 0,
+      "tr": 75,
+      "actual": 79.92160635338882,
+      "independentReferenceF": 79.92160635338888,
+      "errorF": -5.684341886080802e-14
+    },
+    {
+      "t": 75,
+      "rh": 90,
+      "wind": 2,
+      "tr": 75,
+      "actual": 79.47048289661078,
+      "independentReferenceF": 79.47048289661086,
+      "errorF": -8.526512829121202e-14
+    },
+    {
+      "t": 75,
+      "rh": 90,
+      "wind": 10,
+      "tr": 75,
+      "actual": 71.09444499421132,
+      "independentReferenceF": 71.0944449942114,
+      "errorF": -8.526512829121202e-14
+    },
+    {
+      "t": 75,
+      "rh": 90,
+      "wind": 25,
+      "tr": 75,
+      "actual": 63.66677884377522,
+      "independentReferenceF": 63.66677884377543,
+      "errorF": -2.1316282072803006e-13
+    },
+    {
+      "t": 79,
+      "rh": 20,
+      "wind": 0,
+      "tr": 79,
+      "actual": 75.8709135810486,
+      "independentReferenceF": 75.87091358104863,
+      "errorF": -2.842170943040401e-14
+    },
+    {
+      "t": 79,
+      "rh": 20,
+      "wind": 2,
+      "tr": 79,
+      "actual": 75.74168179755407,
+      "independentReferenceF": 75.74168179755407,
+      "errorF": 0.0
+    },
+    {
+      "t": 79,
+      "rh": 20,
+      "wind": 10,
+      "tr": 79,
+      "actual": 69.20991430399094,
+      "independentReferenceF": 69.20991430399098,
+      "errorF": -4.263256414560601e-14
+    },
+    {
+      "t": 79,
+      "rh": 20,
+      "wind": 25,
+      "tr": 79,
+      "actual": 63.3322851529212,
+      "independentReferenceF": 63.33228515292144,
+      "errorF": -2.4158453015843406e-13
+    },
+    {
+      "t": 79,
+      "rh": 50,
+      "wind": 0,
+      "tr": 79,
+      "actual": 78.92773439347778,
+      "independentReferenceF": 78.92773439347778,
+      "errorF": 0.0
+    },
+    {
+      "t": 79,
+      "rh": 50,
+      "wind": 2,
+      "tr": 79,
+      "actual": 78.67245653558103,
+      "independentReferenceF": 78.67245653558102,
+      "errorF": 1.4210854715202004e-14
+    },
+    {
+      "t": 79,
+      "rh": 50,
+      "wind": 10,
+      "tr": 79,
+      "actual": 71.74290244813957,
+      "independentReferenceF": 71.74290244813955,
+      "errorF": 2.842170943040401e-14
+    },
+    {
+      "t": 79,
+      "rh": 50,
+      "wind": 25,
+      "tr": 79,
+      "actual": 66.43039667076538,
+      "independentReferenceF": 66.43039667076559,
+      "errorF": -2.1316282072803006e-13
+    },
+    {
+      "t": 79,
+      "rh": 90,
+      "wind": 0,
+      "tr": 79,
+      "actual": 85.1743824736108,
+      "independentReferenceF": 85.17438247361059,
+      "errorF": 2.1316282072803006e-13
+    },
+    {
+      "t": 79,
+      "rh": 90,
+      "wind": 2,
+      "tr": 79,
+      "actual": 84.80639055641478,
+      "independentReferenceF": 84.80639055641473,
+      "errorF": 5.684341886080802e-14
+    },
+    {
+      "t": 79,
+      "rh": 90,
+      "wind": 10,
+      "tr": 79,
+      "actual": 77.437714760436,
+      "independentReferenceF": 77.43771476043597,
+      "errorF": 2.842170943040401e-14
+    },
+    {
+      "t": 79,
+      "rh": 90,
+      "wind": 25,
+      "tr": 79,
+      "actual": 71.9215971473937,
+      "independentReferenceF": 71.92159714739378,
+      "errorF": -8.526512829121202e-14
+    },
+    {
+      "t": 88,
+      "rh": 20,
+      "wind": 0,
+      "tr": 88,
+      "actual": 84.90176262520913,
+      "independentReferenceF": 84.90176262520912,
+      "errorF": 1.4210854715202004e-14
+    },
+    {
+      "t": 88,
+      "rh": 20,
+      "wind": 2,
+      "tr": 88,
+      "actual": 85.04998613695719,
+      "independentReferenceF": 85.04998613695719,
+      "errorF": 0.0
+    },
+    {
+      "t": 88,
+      "rh": 20,
+      "wind": 10,
+      "tr": 88,
+      "actual": 81.14862439102828,
+      "independentReferenceF": 81.14862439102826,
+      "errorF": 1.4210854715202004e-14
+    },
+    {
+      "t": 88,
+      "rh": 20,
+      "wind": 25,
+      "tr": 88,
+      "actual": 79.46227323975727,
+      "independentReferenceF": 79.46227323975742,
+      "errorF": -1.5631940186722204e-13
+    },
+    {
+      "t": 88,
+      "rh": 50,
+      "wind": 0,
+      "tr": 88,
+      "actual": 89.16760201500497,
+      "independentReferenceF": 89.16760201500509,
+      "errorF": -1.1368683772161603e-13
+    },
+    {
+      "t": 88,
+      "rh": 50,
+      "wind": 2,
+      "tr": 88,
+      "actual": 89.0898177642378,
+      "independentReferenceF": 89.08981776423784,
+      "errorF": -4.263256414560601e-14
+    },
+    {
+      "t": 88,
+      "rh": 50,
+      "wind": 10,
+      "tr": 88,
+      "actual": 84.26682868828397,
+      "independentReferenceF": 84.26682868828397,
+      "errorF": 0.0
+    },
+    {
+      "t": 88,
+      "rh": 50,
+      "wind": 25,
+      "tr": 88,
+      "actual": 83.00567812962743,
+      "independentReferenceF": 83.00567812962763,
+      "errorF": -1.9895196601282805e-13
+    },
+    {
+      "t": 88,
+      "rh": 90,
+      "wind": 0,
+      "tr": 88,
+      "actual": 100.16135114392699,
+      "independentReferenceF": 100.16135114392712,
+      "errorF": -1.2789769243681803e-13
+    },
+    {
+      "t": 88,
+      "rh": 90,
+      "wind": 2,
+      "tr": 88,
+      "actual": 99.92993866890053,
+      "independentReferenceF": 99.92993866890082,
+      "errorF": -2.8421709430404007e-13
+    },
+    {
+      "t": 88,
+      "rh": 90,
+      "wind": 10,
+      "tr": 88,
+      "actual": 94.43096332067154,
+      "independentReferenceF": 94.4309633206704,
+      "errorF": 1.1368683772161603e-12
+    },
+    {
+      "t": 88,
+      "rh": 90,
+      "wind": 25,
+      "tr": 88,
+      "actual": 92.4236109652822,
+      "independentReferenceF": 92.42361096528226,
+      "errorF": -7.105427357601002e-14
+    },
+    {
+      "t": 95,
+      "rh": 20,
+      "wind": 0,
+      "tr": 95,
+      "actual": 92.6680754500497,
+      "independentReferenceF": 92.66807545004974,
+      "errorF": -4.263256414560601e-14
+    },
+    {
+      "t": 95,
+      "rh": 20,
+      "wind": 2,
+      "tr": 95,
+      "actual": 92.97779111041444,
+      "independentReferenceF": 92.97779111041444,
+      "errorF": 0.0
+    },
+    {
+      "t": 95,
+      "rh": 20,
+      "wind": 10,
+      "tr": 95,
+      "actual": 90.73279106984684,
+      "independentReferenceF": 90.73279106984683,
+      "errorF": 1.4210854715202004e-14
+    },
+    {
+      "t": 95,
+      "rh": 20,
+      "wind": 25,
+      "tr": 95,
+      "actual": 91.8767499582957,
+      "independentReferenceF": 91.87674995829596,
+      "errorF": -2.5579538487363607e-13
+    },
+    {
+      "t": 95,
+      "rh": 50,
+      "wind": 0,
+      "tr": 95,
+      "actual": 97.82731228288452,
+      "independentReferenceF": 97.82731228288407,
+      "errorF": 4.547473508864641e-13
+    },
+    {
+      "t": 95,
+      "rh": 50,
+      "wind": 2,
+      "tr": 95,
+      "actual": 97.83613210764446,
+      "independentReferenceF": 97.8361321076442,
+      "errorF": 2.5579538487363607e-13
+    },
+    {
+      "t": 95,
+      "rh": 50,
+      "wind": 10,
+      "tr": 95,
+      "actual": 94.30319413436638,
+      "independentReferenceF": 94.30319413436602,
+      "errorF": 3.552713678800501e-13
+    },
+    {
+      "t": 95,
+      "rh": 50,
+      "wind": 25,
+      "tr": 95,
+      "actual": 95.74071103569639,
+      "independentReferenceF": 95.74071103569617,
+      "errorF": 2.2737367544323206e-13
+    },
+    {
+      "t": 95,
+      "rh": 90,
+      "wind": 0,
+      "tr": 95,
+      "actual": 119.30224467613016,
+      "independentReferenceF": 119.30224467613094,
+      "errorF": -7.815970093361102e-13
+    },
+    {
+      "t": 95,
+      "rh": 90,
+      "wind": 2,
+      "tr": 95,
+      "actual": 119.14116596818614,
+      "independentReferenceF": 119.14116596818675,
+      "errorF": -6.110667527536862e-13
+    },
+    {
+      "t": 95,
+      "rh": 90,
+      "wind": 10,
+      "tr": 95,
+      "actual": 114.71094324046112,
+      "independentReferenceF": 114.71094324046167,
+      "errorF": -5.542233338928781e-13
+    },
+    {
+      "t": 95,
+      "rh": 90,
+      "wind": 25,
+      "tr": 95,
+      "actual": 114.2628808731093,
+      "independentReferenceF": 114.26288087310927,
+      "errorF": 2.842170943040401e-14
+    },
+    {
+      "t": 110,
+      "rh": 20,
+      "wind": 0,
+      "tr": 110,
+      "actual": 110.0735181449979,
+      "independentReferenceF": 110.07351814499772,
+      "errorF": 1.8474111129762605e-13
+    },
+    {
+      "t": 110,
+      "rh": 20,
+      "wind": 2,
+      "tr": 110,
+      "actual": 110.64008201899753,
+      "independentReferenceF": 110.64008201899735,
+      "errorF": 1.8474111129762605e-13
+    },
+    {
+      "t": 110,
+      "rh": 20,
+      "wind": 10,
+      "tr": 110,
+      "actual": 111.31147025314681,
+      "independentReferenceF": 111.3114702531466,
+      "errorF": 2.1316282072803006e-13
+    },
+    {
+      "t": 110,
+      "rh": 20,
+      "wind": 25,
+      "tr": 110,
+      "actual": 117.49130474995064,
+      "independentReferenceF": 117.49130474995066,
+      "errorF": -1.4210854715202004e-14
+    },
+    {
+      "t": 110,
+      "rh": 50,
+      "wind": 0,
+      "tr": 110,
+      "actual": 121.74767135180488,
+      "independentReferenceF": 121.74767135180434,
+      "errorF": 5.400124791776761e-13
+    },
+    {
+      "t": 110,
+      "rh": 50,
+      "wind": 2,
+      "tr": 110,
+      "actual": 121.82128993738434,
+      "independentReferenceF": 121.8212899373839,
+      "errorF": 4.405364961712621e-13
+    },
+    {
+      "t": 110,
+      "rh": 50,
+      "wind": 10,
+      "tr": 110,
+      "actual": 120.10787355787657,
+      "independentReferenceF": 120.10787355787696,
+      "errorF": -3.836930773104541e-13
+    },
+    {
+      "t": 110,
+      "rh": 50,
+      "wind": 25,
+      "tr": 110,
+      "actual": 125.24292022412571,
+      "independentReferenceF": 125.24292022412672,
+      "errorF": -1.0089706847793423e-12
+    },
+    {
+      "t": 110,
+      "rh": 90,
+      "wind": 0,
+      "tr": 110,
+      "actual": 201.3497167454662,
+      "independentReferenceF": 201.34971674545335,
+      "errorF": 1.2846612662542611e-11
+    },
+    {
+      "t": 110,
+      "rh": 90,
+      "wind": 2,
+      "tr": 110,
+      "actual": 201.99745631974227,
+      "independentReferenceF": 201.99745631973073,
+      "errorF": 1.1539214028744027e-11
+    },
+    {
+      "t": 110,
+      "rh": 90,
+      "wind": 10,
+      "tr": 110,
+      "actual": 205.07830246510045,
+      "independentReferenceF": 205.07830246509567,
+      "errorF": 4.774847184307873e-12
+    },
+    {
+      "t": 110,
+      "rh": 90,
+      "wind": 25,
+      "tr": 110,
+      "actual": 215.210147656428,
+      "independentReferenceF": 215.21014765641166,
+      "errorF": 1.6342482922482304e-11
+    }
+  ],
+  "maxAbsoluteReferenceErrorF": 1.6342482922482304e-11
+}
