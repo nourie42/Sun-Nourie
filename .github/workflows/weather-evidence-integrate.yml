@@ -1,0 +1,78 @@
+name: Integrate audited weather repair with current main
+on:
+  push:
+    branches: [fix/weather-evidence-and-thermal-audit]
+    paths: ['scripts/integrate_weather_repair.py','.github/workflows/weather-evidence-integrate.yml']
+permissions:
+  contents: write
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Integrate without discarding newer main changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          python scripts/integrate_weather_repair.py
+          node --check src/weatherFusion.js
+          node --check public/weather-fusion/app.js
+          node --check public/weather-fusion/dans-take.js
+      - run: npm ci
+      - run: pip install -q pythermalcomfort==4.4.2
+      - name: Independent thermal reference
+        run: python scripts/verifyWeatherThermalReference.py
+      - name: Every weather unit regression, including newer main coverage
+        run: |
+          if node --test test/weatherFusion*.test.js >/tmp/weather-integration-unit.log 2>&1; then
+            tail -10 /tmp/weather-integration-unit.log
+          else
+            python - <<'PY'
+          from pathlib import Path
+          s=Path('/tmp/weather-integration-unit.log').read_text()
+          for part in s.split('# Subtest:'):
+              if '\nnot ok ' in part:print('# Subtest:'+part[:4500])
+          print(s[-500:])
+          PY
+            exit 1
+          fi
+      - run: npm run check
+      - run: npm install --no-save --package-lock=false playwright@1.55.0
+      - name: Install browser
+        run: npx playwright install --with-deps chromium >/tmp/weather-integration-install.log 2>&1 || (tail -20 /tmp/weather-integration-install.log; exit 1)
+      - name: Responsive DOM, thermal input and dated Dan take browser regressions
+        run: node scripts/weatherFusionPersonalBrowser.js >/tmp/weather-integration-browser.log 2>&1 || (tail -70 /tmp/weather-integration-browser.log; exit 1)
+      - name: Commit the verified merge to this branch, never force main
+        run: |
+          set -euo pipefail
+          rm scripts/integrate_weather_repair.py .github/workflows/weather-evidence-integrate.yml
+          cp /tmp/weather-personal-results/report.json docs/weather-evidence-responsive-verification.json
+          git add -A
+          python - <<'PY'
+          import subprocess,json
+          report=json.load(open('docs/weather-evidence-responsive-verification.json'))
+          assert report['success']
+          paths=subprocess.check_output(['git','diff','--cached','--name-only','f23610ec7091383573e84ba0780a010d64b78125'],text=True).splitlines()
+          allowed=['public/weather-fusion/','src/weatherFusion','test/weatherFusion','docs/weather-']
+          exact={'.github/workflows/weather-evidence-thermal.yml','scripts/weatherFusionPersonalBrowser.js','scripts/weatherFusionBrowserSmoke.js','scripts/verifyWeatherDansTakeLive.js','scripts/verifyWeatherEvidenceLive.js','scripts/verifyWeatherThermalReference.py'}
+          assert all(p in exact or any(p.startswith(prefix) for prefix in allowed) for p in paths),paths
+          print('Verified integration:',paths)
+          PY
+          git commit -m 'Integrate evidence-dated Dan take and independent thermal verification without forced readings'
+          git push origin HEAD:fix/weather-evidence-and-thermal-audit
+          echo "Verified integrated commit: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: weather-integrated-proof
+          path: |
+            /tmp/weather-integration-*.log
+            /tmp/weather-personal-results
+            docs/weather-thermal-reference-verification.json
+          retention-days: 7
