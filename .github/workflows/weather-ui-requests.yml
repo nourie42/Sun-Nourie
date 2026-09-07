@@ -27,7 +27,8 @@ jobs:
         with: {node-version: '22'}
       - name: Apply exact reviewed UI patch
         run: |
-          cat scripts/ui_patch_part_*.b64 | base64 -d >/tmp/patch_weather_ui_requests.py
+          : >/tmp/patch_weather_ui_requests.py
+          for file in $(printf '%s\n' scripts/ui_patch_part_*.b64 | sort); do base64 -d "$file" >>/tmp/patch_weather_ui_requests.py; done
           python /tmp/patch_weather_ui_requests.py
           node --check src/weatherFusion.js
           node --check src/weatherFusionExperience.js
