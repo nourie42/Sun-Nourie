@@ -1,5 +1,5 @@
 import {forecastGrossLevel} from './dewpoint-meter.js?v=6-future';
-import {exposureScene} from './exposure-scene.js?v=3-weather';
+import {exposureScene} from './exposure-scene.js?v=ui-requests-v1';
 import {outdoorExposure} from './outdoor-feels.js?v=integrity-v1';
 import {solarElevation} from './weather-math.js?v=integrity-v1';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
@@ -56,7 +56,7 @@ export function sunShadeHTML(comfort,location,now=Date.now(),context={}){
  const label=exposure.label;
  const basis=comfort?.conditionSource?` · ${esc(comfort.conditionSource)}`:'';
  const note=!daylight?' · No direct sun at night.':finite(comfort?.inputEvidence?.skyCover)?' · Hourly cloud-adjusted radiation estimate; actual sun exposure varies.':kind==='unknown'?' · Sky data unavailable; no solar adjustment.':kind==='partly-cloudy'?' · Sunny-break estimate, not continuous direct sunlight.':['rain','storm','snow','fog','cloudy'].includes(kind)?' · No direct-sun adjustment; wet clothing is not modelled.':'';
- return `<div class="sun-shade-comparison"><figure class="exposure-person shade-person" data-weather="${esc(kind)}">${exposureScene(false,daylight,condition)}<figcaption><strong>${shade}</strong><span>In the shade · ${period}</span></figcaption></figure><figure class="exposure-person sun-person" data-weather="${esc(kind)}">${exposureScene(true,daylight,condition)}<figcaption><strong>${outside}</strong><span>${label} · ${period}</span></figcaption></figure></div><small class="exposure-estimate">Estimated feels-like temperatures · °F${note}${basis} Main readings match the outdoor figure; shade is shown separately.</small>`;
+ return `<div class="sun-shade-comparison"><figure class="exposure-person shade-person" data-weather="${esc(kind)}">${exposureScene(false,daylight,condition,comfort?.shade)}<figcaption><strong>${shade}</strong><span>In the shade · ${period}</span></figcaption></figure><figure class="exposure-person sun-person" data-weather="${esc(kind)}">${exposureScene(true,daylight,condition,outdoorValue)}<figcaption><strong>${outside}</strong><span>${label} · ${period}</span></figcaption></figure></div><small class="exposure-estimate">Estimated feels-like temperatures · °F${note}${basis} Main readings match the outdoor figure; shade is shown separately.</small>`;
 }
 export function modelFreshnessText(layer,checkedAt,zone='America/New_York',now=Date.now()){
  if(!layer)return '';

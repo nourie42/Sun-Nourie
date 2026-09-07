@@ -139,7 +139,7 @@ function acceptableParaphrase(text, candidate) {
   // weekday is rejected; ambiguous relative dates still come only from code.
   const mentioned=[...text.matchAll(/\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/gi)].map(m=>m[1].toLowerCase());
   if(mentioned.some(day=>!candidate.period.toLowerCase().includes(day)))return false;
-  if(/forecast(?:s)? can change|no (?:major|meaningful|significant).*uncertaint|main sources? of forecast uncertainty|all clear|guaranteed|perfectly safe|\b(?:HRRR|ECMWF|NBM|CAPE|QPF|synoptic|advection|deterministic|convection|guidance)\b/i.test(text))return false;
+  if(/forecast(?:s)? can change|no (?:major|meaningful|significant).*uncertaint|main sources? of forecast uncertainty|all clear|guaranteed|perfectly safe|\bforecasters?\s+(?:indicate|say|expect|think|believe|are unsure)|\b(?:HRRR|ECMWF|NBM|CAPE|QPF|synoptic|advection|deterministic|convection|guidance)\b/i.test(text))return false;
   // The adjacent sentences are part of the supplied, exact AFD excerpt. Using
   // only the middle sentence wrongly rejected a plain-English rain paraphrase
   // of 'front timing / PoPs / QPF'. Never borrow a phenomenon from a past recap.
@@ -171,7 +171,16 @@ export function visibleDanTakeItems(briefing, forecast, now=Date.now()) {
   });
   return approveDanTake(verified,forecast,now).forecastChanges;
 }
-export const danTakeText = items => items.map(item=>`${item.period}: ${item.summary}`).join('\n\n');
+export function danTakeText(items){
+  const groups=new Map();
+  for(const item of Array.isArray(items)?items:[]){
+    if(!item?.period||!item?.summary)continue;
+    if(!groups.has(item.period))groups.set(item.period,[]);
+    const list=groups.get(item.period),key=item.summary.toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+    if(!list.some(entry=>entry.key===key))list.push({key,text:item.summary.trim()});
+  }
+  return [...groups].map(([period,list])=>`${period}: ${list.map(x=>x.text).join(' ')}`).join('\n\n');
+}
 
 /** Reuse ONLY a previously approved take from the same exact discussion and
  * location. A changed numeric forecast signature is not a changed AFD. Full

@@ -28,3 +28,10 @@
 /* This ID wins over the Gross Meter's asynchronously loaded eyebrow styles. */
 #gross-title{text-align:center;font-weight:800}
 @media(max-width:600px){.today-uncertainty{font-size:13px;padding-top:10px}}
+
+/* Relative forecast confidence: evidence-based, explicitly not a probability. */
+.forecast-confidence{grid-column:1/-1;display:grid;grid-template-columns:auto auto minmax(54px,90px);justify-content:end;align-items:center;gap:7px;margin:1px 0 4px;color:#b9cce3;font-size:9px;line-height:1.2;text-align:right}
+.forecast-confidence>b{font-size:10px;color:#eef6ff;font-weight:750;white-space:nowrap}.confidence-meter{display:block;width:100%;height:4px;background:#10243b88;border-radius:20px;overflow:hidden}.confidence-meter em{display:block;height:100%;background:linear-gradient(90deg,#93cde3,#d8e6b0,#ffd58f);border-radius:20px}
+.dialog-confidence{margin:16px 0;padding:12px 14px;border:1px solid #d8e8ff20;border-radius:12px;background:#ffffff08}.dialog-confidence strong{font-size:13px}.dialog-confidence p{margin:5px 0;font-size:11px;line-height:1.5;color:#d3e0f0}.dialog-confidence small{font-size:9px;color:#aebfd4;line-height:1.5;display:block}
+.today-panel .forecast-confidence{font-size:10px;margin-top:4px}.today-panel .forecast-confidence>b{font-size:11px}
+@media(max-width:600px){.forecast-confidence{grid-template-columns:auto auto 52px;gap:5px;font-size:8px}.forecast-confidence>b{font-size:9px}.today-panel .forecast-confidence{font-size:8px}.today-panel .forecast-confidence>b{font-size:9px}}

@@ -1,12 +1,12 @@
-import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText,rebindDanTake} from './dans-take.js?v=source-v3';
+import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText,rebindDanTake} from './dans-take.js?v=ui-requests-v1';
 import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './weather-display.js?v=integrity-v1';
 import {degrees,feelsAt,dayFeelsHTML} from './hourly-feels.js?v=integrity-v1';
 import {createFramePlayer} from './frame-player.js';
-import {renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=integrity-v1';
+import {renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=ui-requests-v1';
 import {dailyDisplay} from './weather-math.js?v=integrity-v1';
 import {currentHero} from './current-temperature.js?v=1-current';
 import {renderBulletins} from './bulletins.js?v=2-special';
-import {dailyGrossHTML,modelFreshnessText} from './personal-details.js?v=integrity-v1';
+import {dailyGrossHTML,modelFreshnessText} from './personal-details.js?v=ui-requests-v1';
 import {renderDewpointMeter} from './dewpoint-meter.js?v=6-future';
 import {renderWeatherPanel} from './render-safety.js';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
@@ -233,7 +233,7 @@ function chooseLocation(value) {
 function showDay(index) {
   const d=forecast?.days[index]; if(!d) return;
   const p=dailyDisplay(d,index,Date.now(),forecast.location.timeZone);
-  $('day-content').innerHTML=`<div class="dialog-eyebrow">WEATHER NOURIE</div><h2 id="day-title" class="dialog-title">${esc(p.label)}</h2><p class="dialog-condition">${esc(p.condition)}</p><div class="dialog-temps">${temperature(p.primary)}<span>${p.primaryLabel.toLowerCase()}${!p.tonight&&finite(p.secondary)?` · ${temperature(p.secondary)} low`:''}</span></div>${dayFeelsHTML(forecast,index,p.tonight)}<div class="dialog-stats"><div><strong>${percent(p.pop)}</strong><small>${p.tonight?'Rain chance tonight':'Rain chance'}</small></div><div><strong>${inches(d.qpf)}</strong><small>${p.tonight?'Forecast rain through morning':'Expected rain'}</small></div></div><p class="dialog-prose">${esc(p.detail || 'More details will appear when the forecast updates.')}</p>${!p.tonight&&d.nightDetail?`<h3 class="dialog-subtitle">Overnight</h3><p class="dialog-prose">${esc(d.nightDetail)}</p>`:''}${dailyGrossHTML(forecast,index,p.tonight)}<a href="#scientific-stuff" class="science-link" id="day-science-link">Scientific stuff ↓</a>`;
+  $('day-content').innerHTML=`<div class="dialog-eyebrow">WEATHER NOURIE</div><h2 id="day-title" class="dialog-title">${esc(p.label)}</h2><p class="dialog-condition">${esc(p.condition)}</p><div class="dialog-temps">${temperature(p.primary)}<span>${p.primaryLabel.toLowerCase()}${!p.tonight&&finite(p.secondary)?` · ${temperature(p.secondary)} low`:''}</span></div>${dayFeelsHTML(forecast,index,p.tonight)}<div class="dialog-stats"><div><strong>${percent(p.pop)}</strong><small>${p.tonight?'Rain chance tonight':'Rain chance'}</small></div><div><strong>${inches(d.qpf)}</strong><small>${p.tonight?'Forecast rain through morning':'Expected rain'}</small></div></div><p class="dialog-prose">${esc(p.detail || 'More details will appear when the forecast updates.')}</p>${!p.tonight&&d.nightDetail?`<h3 class="dialog-subtitle">Overnight</h3><p class="dialog-prose">${esc(d.nightDetail)}</p>`:''}${d.confidence?`<div class="dialog-confidence" data-confidence="${esc(d.confidence.key)}"><strong>Forecast confidence: ${esc(d.confidence.label)}</strong><p>${esc(d.confidence.factors.join(' · '))}</p><small>${esc(d.confidence.note)}</small></div>`:''}${dailyGrossHTML(forecast,index,p.tonight)}<a href="#scientific-stuff" class="science-link" id="day-science-link">Scientific stuff ↓</a>`;
   $('day-dialog').showModal();
   $('day-science-link').addEventListener('click',()=>$('day-dialog').close());
 }

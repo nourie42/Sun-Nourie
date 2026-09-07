@@ -1,4 +1,5 @@
 import {createDiscussionSource,DISCUSSION_SOURCE_VERSION} from './weatherFusionDiscussionSource.js';
+import {FORECAST_CONFIDENCE_VERSION,forecastConfidence} from '../public/weather-fusion/forecast-confidence.js';
 import {DAN_TAKE_VERSION,collectDanTakeEvidence,approveDanTake,visibleDanTakeItems,danTakeText,rebindDanTake} from '../public/weather-fusion/dans-take.js';
 import {stationWeather,resolveCurrentWeather} from '../public/weather-fusion/weather-state.js';
 import {createSpecialDiscussionService} from './weatherFusionSpecialDiscussions.js';
@@ -210,6 +211,10 @@ export function buildForecast({ location, point, forecast, hourly, grid, discuss
     const highs = [high, ...Object.values(modelValues).map((v) => v.high)].filter(finite);
     const spread = highs.length >= 2 ? max(highs) - min(highs) : null;
     const agreement = spread == null ? 'Limited guidance' : spread <= 3 ? 'Close agreement' : spread <= 6 ? 'Some disagreement' : 'Wide disagreement';
+    const qpfValues=Object.values(modelValues).map(v=>v.qpf).filter(finite);
+    const qpfSpread=qpfValues.length>=2?max(qpfValues)-min(qpfValues):null;
+    const guidanceCount=Object.values(modelValues).filter(v=>finite(v.high)||finite(v.low)||finite(v.qpf)).length;
+    const confidence=forecastConfidence({dayIndex:index,highSpread:spread,qpfSpread,guidanceCount,officialDay:high!==null,officialNight:low!==null});
     return { date, label: index === 0 ? 'Today' : new Intl.DateTimeFormat('en-US', { timeZone: zone, weekday: 'short' }).format(new Date(midnight + 12 * HOUR)),
       high: rounded(high ?? guidanceHigh), low: rounded(low ?? guidanceLow),
       temperatureSource: high !== null || low !== null ? 'NWS; missing values may use guidance' : 'Model guidance; NWS unavailable',
@@ -220,7 +225,7 @@ export function buildForecast({ location, point, forecast, hourly, grid, discuss
       popLabel: 'Highest NWS day/night period chance, not a combined daily probability',
       qpf, qpfSource, qpfWindow: { start: iso(start), end: iso(end) },
       remainingQpf: index === 0 ? gridQpf(grid, Math.max(start, Math.ceil(now / HOUR) * HOUR), end) : null,
-      guidance: modelValues, illustrativeBlend: index === 0 ? blend : null, agreement, highSpread: rounded(spread, 1),
+      guidance: modelValues, illustrativeBlend: index === 0 ? blend : null, agreement, highSpread: rounded(spread, 1), qpfSpread:rounded(qpfSpread,2), confidence,
       wind: clean(day?.windSpeed || night?.windSpeed, 60), windDirection: clean(day?.windDirection || night?.windDirection, 20) };
   });
   const officialHours = (hourly?.periods || []).filter((p) => Date.parse(p.endTime) > now).slice(0, 48);
@@ -251,11 +256,12 @@ export function buildForecast({ location, point, forecast, hourly, grid, discuss
     current, hours, days, discussion: discussion || null, alerts: alerts || [], specialDiscussions: specialDiscussions || [], feeds,
     solar: { sunrise: models.ecmwf?.daily?.sunrise?.[solarIndex] ? iso(models.ecmwf.daily.sunrise[solarIndex] * 1000) : null,
       sunset: models.ecmwf?.daily?.sunset?.[solarIndex] ? iso(models.ecmwf.daily.sunset[solarIndex] * 1000) : null },
-    methodology: 'NWS temperatures, conditions and precipitation probabilities are primary. NWS grid precipitation is integrated over local 7 AM–7 AM windows. Model guidance is supplementary and not a verified skill-weighted forecast. Model high/low comparisons use calendar days; the NWS low is overnight. Precipitation includes liquid-equivalent snow/ice.' };
+    methodology: 'NWS temperatures, conditions and precipitation probabilities are primary. NWS grid precipitation is integrated over local 7 AM–7 AM windows. Model guidance is supplementary and not a verified skill-weighted forecast. Model high/low comparisons use calendar days; the NWS low is overnight. Precipitation includes liquid-equivalent snow/ice. Daily forecast confidence is a relative index, not a probability; it uses lead time, NWS/model high-temperature spread, rainfall-guidance spread, usable guidance coverage, and NWS day/night availability.' };
   enhanceForecast(output, { models, grid, periods: forecast?.periods || [], now, gridQpf, localTime, nextDate, dateKey });
   Object.assign(output.current,resolveCurrentWeather(output.current,output.hours,now,gridSample(grid,'skyCover',now,'percent')));
   addExperience(output, {models, grid, periods:forecast?.periods || [], now, solarTimes, nextDate});
   output.danTakeVersion=DAN_TAKE_VERSION;
+  output.forecastConfidenceVersion=FORECAST_CONFIDENCE_VERSION;
   output.weatherDisplayVersion='weather-nourie-sky-consistency-v1';
   // Hash all forecast facts and source issuance, not just rainfall. Retrieval time is not model run time.
   output.signature = hash({ danTakeVersion:DAN_TAKE_VERSION, experienceVersion: output.experienceVersion, metricForecasts:output.metricForecasts, version: VERSION, location: output.location, current:output.current, days, hours, discussion, specialDiscussions:output.specialDiscussions,
