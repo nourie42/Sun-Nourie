@@ -49,7 +49,7 @@ try{
  let latestForecast=null;
  page.on('response',async r=>{if(r.url().includes('/api/weather-fusion/forecast?')&&r.ok()){try{latestForecast=await r.json();}catch{}}});
  await page.goto(base+'/weather-fusion/',{waitUntil:'domcontentloaded',timeout:90000});
- await page.waitForFunction(()=>document.querySelector('#today-uncertainty')?.hidden===false,{},{timeout:80000});
+ await page.waitForFunction(()=>document.querySelector('#today-uncertainty')?.hidden===false,null,{timeout:80000});
  await page.evaluate(()=>{
   window.danTakeVisibility=[];
   new MutationObserver(()=>window.danTakeVisibility.push({hidden:document.querySelector('#today-uncertainty').hidden,text:document.querySelector('#today-uncertainty-text').textContent})).observe(document.querySelector('#today-uncertainty'),{attributes:true,subtree:true,childList:true,characterData:true});
@@ -62,7 +62,9 @@ try{
   const restored=visibleDanTakeItems(latestForecast.danTake,latestForecast);
   assert.ok(restored.length>0,'Forecast response must itself carry the revalidated take for an immediate reload');
   for(const item of restored)assert.ok(latestForecast.discussion.text.replace(/\s+/g,' ').includes(item.sourceQuote));
-  const entry={label,checkedAt:new Date().toISOString(),signature:latestForecast.signature,discussionId:latestForecast.discussion.id,issuedAt:latestForecast.discussion.issuanceTime,cachedItems:restored,visible:true,text};
+  const feed=latestForecast.feeds.find(f=>f.id==='afd');
+  assert.ok(Number.isFinite(Date.parse(latestForecast.assembledAt))&&Number.isFinite(Date.parse(feed?.checkedAt)));
+  const entry={label,checkedAt:new Date().toISOString(),assembledAt:latestForecast.assembledAt,sourceCheckedAt:feed.checkedAt,sourceRetrieval:feed.retrievalStatus,signature:latestForecast.signature,discussionId:latestForecast.discussion.id,issuedAt:latestForecast.discussion.issuanceTime,cachedItems:restored,visible:true,text};
   report.checks.push(entry);console.log('LIVE_CARD_PERSISTENCE',JSON.stringify(entry));
  }
  await record('initial-page');
@@ -81,7 +83,15 @@ try{
  await page.waitForFunction(()=>document.querySelector('#today-uncertainty')?.hidden===false,null,{timeout:15000});
  await record('full-page-reload');
  assert.deepEqual(errors,[]);
- assert.ok(new Set(report.checks.map(x=>x.signature)).size>=2,'Verification must include changed numerical forecast snapshots, not four reads of one cached snapshot');
+ // A new assembly/check can legitimately have the SAME weather signature.
+ // Measure cache turnover using actual source timestamps, not a requirement
+ // that weather change every two minutes. Changed signatures are exercised by
+ // the deterministic full-service and browser failure-path regressions.
+ report.distinctWeatherSignatures=new Set(report.checks.map(x=>x.signature)).size;
+ report.distinctForecastAssemblies=new Set(report.checks.map(x=>x.assembledAt)).size;
+ report.distinctDiscussionChecks=new Set(report.checks.map(x=>x.sourceCheckedAt)).size;
+ assert.ok(report.distinctForecastAssemblies>=2,'Live verification must cross the forecast assembly cache lifetime');
+ assert.ok(report.distinctDiscussionChecks>=2,'Live verification must independently recheck the discussion after its source-cache lifetime');
  await page.locator('.today-panel').screenshot({path:dir+'/raleigh-dans-take.png'});
  report.browserErrors=errors;report.success=true;
 }finally{
