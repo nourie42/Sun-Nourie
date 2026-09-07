@@ -1,0 +1,53 @@
+name: Weather dawn source and input snapshot
+on:
+  push:
+    branches: [fix/weather-dawn-and-discussion]
+    paths: ['.github/workflows/weather-dawn-snapshot.yml']
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: npm ci >/tmp/npm-ci.log 2>&1
+      - run: pip install -q pythermalcomfort==4.4.2
+      - name: Record source, independent reference and unmodified live provider inputs
+        run: |
+          mkdir -p /tmp/dawn/live /tmp/dawn/reference
+          git archive HEAD > /tmp/dawn/source.tar
+          tar -czf /tmp/dawn/dependencies.tgz node_modules
+          python - <<'PY'
+          import inspect,pathlib,importlib
+          for name in ['pythermalcomfort.models.utci','pythermalcomfort.models.solar_gain']:
+              m=importlib.import_module(name)
+              pathlib.Path('/tmp/dawn/reference/'+name.rsplit('.',1)[-1]+'.py').write_text(inspect.getsource(m))
+          PY
+          node --input-type=module - <<'JS'
+          import fs from 'node:fs/promises';
+          const base='https://sun-nourie-live.onrender.com/api/weather-fusion/';
+          const places=[['knightdale','location=knightdale'],['white-lake','latitude=34.6385&longitude=-78.5025'],['denver','latitude=39.7392&longitude=-104.9903'],['seattle','latitude=47.6062&longitude=-122.3321']];
+          async function read(url){const r=await fetch(url,{headers:{'User-Agent':'Weather-Nourie-input-audit'},signal:AbortSignal.timeout(75000)});const text=await r.text();if(!r.ok)throw Error(r.status+': '+text.slice(0,200));return JSON.parse(text);}
+          await Promise.all(places.map(async([name,q])=>{
+            try{
+              const f=await read(base+'forecast?'+q);await fs.writeFile('/tmp/dawn/live/'+name+'-forecast.json',JSON.stringify(f));
+              const b=await read(base+'briefing?'+q);await fs.writeFile('/tmp/dawn/live/'+name+'-briefing.json',JSON.stringify(b));
+              const point=await read('https://api.weather.gov/points/'+f.location.latitude+','+f.location.longitude);
+              for(const key of ['forecastHourly','forecastGridData','observationStations'])if(point.properties?.[key]){
+                try{const value=await read(point.properties[key]);await fs.writeFile('/tmp/dawn/live/'+name+'-'+key+'.json',JSON.stringify(value));}catch(e){console.log(name,key,e.message);}
+              }
+              console.log(name,JSON.stringify({current:f.current,comfort:f.comfort,discussion:f.discussion?.office,briefingMode:b.mode,take:b.forecastChanges,diagnostic:b.diagnostic,review:b.danTakeReview}));
+            }catch(e){console.log(name,e.message);}
+          }));
+          JS
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: weather-dawn-snapshot
+          path: /tmp/dawn
+          retention-days: 7
