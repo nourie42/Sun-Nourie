@@ -5,32 +5,31 @@ on:
     paths: ['.github/workflows/read-dans-take-proof.yml']
 permissions:
   contents: write
-  actions: read
 jobs:
   evidence:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 6
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/setup-node@v4
         with:
-          name: weather-dans-take-live-proof
-          github-token: ${{ github.token }}
-          repository: nourie42/Sun-Nourie
-          run-id: 34105079022
-          path: /tmp/take-proof
-      - name: Preserve the actual failed verification report
+          node-version: '22'
+      - name: Read public runtime diagnostics, not secrets
         run: |
-          cp /tmp/take-proof/weather-dans-take-live.json docs/weather-dans-take-live-diagnostic.json
-          python - <<'PY'
-          import json
-          d=json.load(open('docs/weather-dans-take-live-diagnostic.json'))
-          print('Original verification success:',d['success'])
-          for p in d['locations']:
-              print(p['place'],p['aiMode'],p['aiReason'],p['takeStatus'],len(p['eligibleExcerpts']))
-          PY
+          node --input-type=module - <<'JS'
+          import fs from 'node:fs/promises';
+          const base='https://sun-nourie-live.onrender.com/api/weather-fusion';
+          const rows=[];
+          for(const query of ['location=knightdale','latitude=34.6385&longitude=-78.5025','latitude=30.3322&longitude=-81.6557','latitude=39.7392&longitude=-104.9903']){
+            const f=await (await fetch(base+'/forecast?'+query,{signal:AbortSignal.timeout(60000)})).json();
+            const b=await (await fetch(base+'/briefing?'+query,{signal:AbortSignal.timeout(80000)})).json();
+            rows.push({query,location:f.location,feeds:f.feeds,briefing:b});
+            console.log(JSON.stringify(rows.at(-1)));
+          }
+          await fs.writeFile('docs/weather-dans-take-runtime-diagnostic.json',JSON.stringify({checkedAt:new Date().toISOString(),rows},null,2));
+          JS
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add docs/weather-dans-take-live-diagnostic.json
-          git commit -m 'Record original failed live verification evidence for diagnosis'
+          git add docs/weather-dans-take-runtime-diagnostic.json
+          git commit -m 'Record actual briefing diagnostics and source status'
           git push origin HEAD:verification/dans-take-diagnostic
