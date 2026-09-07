@@ -1,0 +1,74 @@
+name: Review Dan take source-context correction
+on:
+  push:
+    branches: [fix/weather-reviewed-discussion-context]
+    paths: ['scripts/repair_dan_context.py','test/weatherFusionDanContext.test.js','.github/workflows/weather-context-review.yml']
+permissions:
+  contents: write
+concurrency:
+  group: weather-context-review
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Apply exact reviewed changes
+        run: |
+          python scripts/repair_dan_context.py
+          node --check public/weather-fusion/dans-take.js
+          node --check public/weather-fusion/app.js
+          node --check scripts/verifyWeatherIntegrityLive.js
+      - run: npm ci
+      - name: All weather regressions including live-source positive and negative cases
+        run: |
+          if node --test test/weatherFusion*.test.js >/tmp/weather-context-unit.log 2>&1; then
+            tail -10 /tmp/weather-context-unit.log
+          else
+            python - <<'PY'
+          from pathlib import Path
+          s=Path('/tmp/weather-context-unit.log').read_text()
+          for part in s.split('# Subtest:'):
+              if '\nnot ok ' in part: print('# Subtest:'+part[:5000])
+          print(s[-500:])
+          PY
+            exit 1
+          fi
+      - run: npm run check
+      - run: npm install --no-save --package-lock=false playwright@1.55.0
+      - run: npx playwright install --with-deps chromium >/tmp/weather-context-install.log 2>&1 || (tail -20 /tmp/weather-context-install.log; exit 1)
+      - name: Full responsive, centered temperatures, dated take and outdoor browser regressions
+        run: node scripts/weatherFusionPersonalBrowser.js >/tmp/weather-context-browser.log 2>&1 || (tail -70 /tmp/weather-context-browser.log; exit 1)
+      - name: Commit verified source-context changes only
+        run: |
+          set -euo pipefail
+          cp /tmp/weather-personal-results/report.json docs/weather-integrity-browser-proof.json
+          cp /tmp/weather-context-unit.log docs/weather-integrity-unit-proof.log
+          rm scripts/repair_dan_context.py .github/workflows/weather-context-review.yml
+          git add -A
+          python - <<'PY'
+          import subprocess,json
+          p=json.load(open('docs/weather-integrity-browser-proof.json'))
+          assert p['success'] and len(p['centeringChecks'])==6 and len(p['danTakeChecks'])==21 and len(p['outdoorExposureChecks'])==27
+          changed=set(subprocess.check_output(['git','diff','--cached','--name-only','ddadda530ad0fc741a9c28141fb9e0d7e78ca605'],text=True).splitlines())
+          allowed={'public/weather-fusion/dans-take.js','public/weather-fusion/app.js','public/weather-fusion/index.html','test/weatherFusionForecastDetails.test.js','test/weatherFusionDanContext.test.js','scripts/verifyWeatherIntegrityLive.js','docs/weather-integrity-browser-proof.json','docs/weather-integrity-unit-proof.log'}
+          assert changed<=allowed,changed
+          print('Verified narrow correction:',sorted(changed))
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m "Preserve supported upcoming-week Dan take using its actual source context"
+          git push origin HEAD:fix/weather-reviewed-discussion-context
+          echo "Verified context correction: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: weather-context-review-proof
+          path: |
+            /tmp/weather-context-*.log
+            /tmp/weather-personal-results
+          retention-days: 7
