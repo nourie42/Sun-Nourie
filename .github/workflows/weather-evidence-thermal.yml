@@ -1,0 +1,125 @@
+name: Weather Nourie evidence and thermal verification
+on:
+  push:
+    branches: [fix/weather-evidence-and-thermal-audit, main]
+    paths:
+      - 'public/weather-fusion/**'
+      - 'src/weatherFusion*.js'
+      - 'test/weatherFusion*.test.js'
+      - 'scripts/patch_weather_evidence.py'
+      - 'scripts/weatherFusionPersonalBrowser.js'
+      - 'scripts/verifyWeatherEvidenceLive.js'
+      - 'scripts/verifyWeatherThermalReference.py'
+      - '.github/workflows/weather-evidence-thermal.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  prepare:
+    if: github.ref == 'refs/heads/fix/weather-evidence-and-thermal-audit'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Apply reviewed repair and check syntax
+        run: |
+          if test -f scripts/patch_weather_evidence.py; then python scripts/patch_weather_evidence.py; fi
+          for file in src/weatherFusion.js src/weatherFusionHourlyFeels.js src/weatherFusionExperience.js public/weather-fusion/forecast-changes.js public/weather-fusion/weather-math.js public/weather-fusion/weather-display.js public/weather-fusion/app.js scripts/verifyWeatherEvidenceLive.js; do node --check "$file"; done
+      - run: npm ci
+      - run: pip install -q pythermalcomfort==4.4.2
+      - name: Independent published UTCI reference across cold, mild, hot, humid, sunny and nighttime cases
+        run: python scripts/verifyWeatherThermalReference.py
+      - name: All weather regression tests
+        shell: bash
+        run: |
+          if node --test test/weatherFusion*.test.js >/tmp/weather-evidence-unit.log 2>&1; then
+            tail -10 /tmp/weather-evidence-unit.log
+          else
+            python - <<'PY'
+          from pathlib import Path
+          s=Path('/tmp/weather-evidence-unit.log').read_text()
+          for part in s.split('# Subtest:'):
+              if '\nnot ok ' in part: print('# Subtest:'+part[:15000])
+          print(s[-600:])
+          PY
+            exit 1
+          fi
+      - name: Existing business-site regressions
+        run: npm run check
+      - run: npm install --no-save --package-lock=false playwright@1.55.0
+      - name: Install browser
+        run: npx playwright install --with-deps chromium >/tmp/weather-evidence-browser-install.log 2>&1 || (tail -30 /tmp/weather-evidence-browser-install.log; exit 1)
+      - name: Responsive real-DOM regression
+        run: node scripts/weatherFusionPersonalBrowser.js >/tmp/weather-evidence-browser.log 2>&1 || (tail -70 /tmp/weather-evidence-browser.log; exit 1)
+      - name: Commit only verified weather changes to the repair branch
+        run: |
+          set -euo pipefail
+          rm -f scripts/patch_weather_evidence.py .github/workflows/weather-evidence-audit.yml
+          cp /tmp/weather-personal-results/report.json docs/weather-evidence-responsive-verification.json
+          git add -A
+          python - <<'PY'
+          import subprocess,json
+          proof=json.load(open('docs/weather-thermal-reference-verification.json'))
+          assert proof['passed'] and proof['maximumAbsoluteErrorF']<1e-6
+          paths=subprocess.check_output(['git','diff','--cached','--name-only','f4d1a1d42dfc7641f4766293b8c2f09992365fed'],text=True).splitlines()
+          permitted=['public/weather-fusion/','src/weatherFusion','test/weatherFusion','docs/weather-']
+          exact={'.github/workflows/weather-evidence-thermal.yml','scripts/weatherFusionPersonalBrowser.js','scripts/weatherFusionBrowserSmoke.js','scripts/verifyWeatherEvidenceLive.js','scripts/verifyWeatherThermalReference.py'}
+          assert all(p in exact or any(p.startswith(prefix) for prefix in permitted) for p in paths),paths
+          print('Verified weather-only file set:',paths)
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Require dated AFD evidence for Dan take and independently validate thermal calculations'
+          git push origin HEAD:fix/weather-evidence-and-thermal-audit
+          echo "Verified repair commit: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: weather-evidence-regressions
+          path: |
+            /tmp/weather-evidence-*.log
+            /tmp/weather-personal-results
+            docs/weather-thermal-reference-verification.json
+          retention-days: 7
+  live:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: npm ci
+      - run: pip install -q pythermalcomfort==4.4.2
+      - run: npm install --no-save --package-lock=false playwright@1.55.0
+      - name: Install browser
+        run: npx playwright install --with-deps chromium >/tmp/weather-evidence-install.log 2>&1 || (tail -30 /tmp/weather-evidence-install.log; exit 1)
+      - name: Exact deployed bytes, actual AI evidence and separate station-versus-hourly values
+        run: node scripts/verifyWeatherEvidenceLive.js
+      - name: Independently verify actual live thermal input calculations
+        run: python scripts/verifyWeatherThermalReference.py /tmp/weather-evidence-live.json
+      - name: Publish verification without redeploying main
+        run: |
+          set -euo pipefail
+          cp /tmp/weather-evidence-live.json docs/weather-evidence-live-verification.json
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/weather-evidence-live-verification.json
+          git commit -m "Record live evidence and independent thermal proof for ${GITHUB_SHA}"
+          git push origin HEAD:refs/heads/verification/weather-evidence-${GITHUB_SHA:0:12}
+          echo "Live proof branch: verification/weather-evidence-${GITHUB_SHA:0:12}" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: weather-evidence-live-proof
+          path: |
+            /tmp/weather-evidence-live.json
+            /tmp/weather-evidence-*.png
+          retention-days: 7
