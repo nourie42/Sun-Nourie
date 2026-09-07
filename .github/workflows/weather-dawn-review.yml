@@ -1,0 +1,167 @@
+name: Weather dawn and independent Dan take verification
+on:
+  push:
+    branches: [fix/weather-dawn-and-discussion, main]
+    paths:
+      - 'src/weatherFusion*.js'
+      - 'public/weather-fusion/**'
+      - 'test/weatherFusion*.test.js'
+      - 'scripts/repair_weather_dawn.py'
+      - 'scripts/verifyWeatherDawn*.js'
+      - '.github/workflows/weather-dawn-review.yml'
+  workflow_dispatch:
+concurrency:
+  group: weather-dawn-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: write
+  actions: read
+jobs:
+  review:
+    if: github.ref == 'refs/heads/fix/weather-dawn-and-discussion'
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Preserve reviewed newer main, then apply guarded changes
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          test "$(git rev-parse origin/main)" = '4e1fdaa552f01d6c1785d212f5293698db38063a'
+          git merge --no-commit --no-ff 4e1fdaa552f01d6c1785d212f5293698db38063a
+          python scripts/repair_weather_dawn.py
+          for file in src/weatherFusion.js src/weatherFusionDanTake.js public/weather-fusion/dans-take.js public/weather-fusion/app.js public/weather-fusion/source-transition.js scripts/verifyWeatherDawnBrowser.js scripts/verifyWeatherDawnLive.js; do node --check "$file"; done
+      - uses: actions/download-artifact@v4
+        with:
+          name: weather-dawn-snapshot
+          github-token: ${{ github.token }}
+          repository: nourie42/Sun-Nourie
+          run-id: 34112624180
+          path: /tmp/dawn-source
+      - name: Preserve exact public discussion regression fixtures
+        run: |
+          python - <<'PY'
+          import json,pathlib
+          fixtures={}
+          for name in ['knightdale','white-lake','denver','seattle']:
+              f=json.load(open('/tmp/dawn-source/live/'+name+'-forecast.json'))
+              fixtures[name]={k:f[k] for k in ['signature','assembledAt','location','discussion','feeds']}
+          p=pathlib.Path('test/fixtures/weather-dawn-discussions.json');p.parent.mkdir(exist_ok=True)
+          p.write_text(json.dumps(fixtures,indent=2)+'\n')
+          PY
+      - run: npm ci
+      - run: pip install -q pythermalcomfort==4.4.2
+      - name: Independently verify 3456 UTCI inputs and exposure cases
+        run: python scripts/verifyWeatherIntegrityReference.py
+      - name: All weather regressions including the current main branch
+        run: |
+          if node --test test/weatherFusion*.test.js >/tmp/weather-dawn-unit.log 2>&1; then
+            tail -10 /tmp/weather-dawn-unit.log
+          else
+            python - <<'PY'
+          from pathlib import Path
+          s=Path('/tmp/weather-dawn-unit.log').read_text()
+          for part in s.split('# Subtest:'):
+              if '\nnot ok ' in part:print('# Subtest:'+part[:4500])
+          print(s[-500:])
+          PY
+            exit 1
+          fi
+      - name: Existing business website regression checks
+        run: npm run check
+      - run: npm install --no-save --package-lock=false playwright@1.55.0
+      - name: Install browser
+        run: npx playwright install --with-deps chromium >/tmp/weather-dawn-install.log 2>&1 || (tail -25 /tmp/weather-dawn-install.log; exit 1)
+      - name: Existing six-width, 21 dated-take and 27 outdoor DOM scenarios
+        run: node scripts/weatherFusionPersonalBrowser.js >/tmp/weather-dawn-existing-browser.log 2>&1 || (tail -70 /tmp/weather-dawn-existing-browser.log; exit 1)
+      - name: Captured four-city dawn inputs and independent take with late empty outlook
+        run: node scripts/verifyWeatherDawnBrowser.js
+      - name: Commit only verified weather changes on the repair branch
+        run: |
+          set -euo pipefail
+          cp /tmp/weather-dawn-browser/report.json docs/weather-dawn-browser-proof.json
+          cp /tmp/weather-dawn-unit.log docs/weather-dawn-unit-proof.log
+          cp /tmp/weather-personal-results/report.json docs/weather-dawn-existing-browser-proof.json
+          rm -f scripts/repair_weather_dawn.py .github/workflows/weather-dawn-snapshot.yml
+          git add -A
+          python - <<'PY'
+          import json,subprocess
+          ref=json.load(open('docs/weather-integrity-reference-proof.json'));assert ref['passed'] and ref['maximumAbsoluteErrorF']<1e-6
+          new=json.load(open('docs/weather-dawn-browser-proof.json'));assert new['success'] and len(new['checks'])==12
+          old=json.load(open('docs/weather-dawn-existing-browser-proof.json'));assert old['success'] and len(old['centeringChecks'])==6 and len(old['danTakeChecks'])==21 and len(old['outdoorExposureChecks'])==27
+          paths=subprocess.check_output(['git','diff','--cached','--name-only','4e1fdaa552f01d6c1785d212f5293698db38063a'],text=True).splitlines()
+          allowed=['public/weather-fusion/','src/weatherFusion','test/weatherFusion','test/fixtures/weather-dawn-','docs/weather-','scripts/verifyWeatherDawn']
+          assert all(p=='.github/workflows/weather-dawn-review.yml' or any(p.startswith(a) for a in allowed) for p in paths),paths
+          print('Verified changes:',paths)
+          PY
+          git commit -m "Keep Dan's take current and independently verified; expose dawn weather inputs without forced temperatures"
+          git push origin HEAD:fix/weather-dawn-and-discussion
+          echo "Verified branch commit: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: weather-dawn-review-proof
+          path: |
+            /tmp/weather-dawn-browser
+            /tmp/weather-personal-results
+            /tmp/weather-dawn-*.log
+            docs/weather-integrity-reference-proof.json
+          retention-days: 7
+  live:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: npm ci
+      - run: pip install -q pythermalcomfort==4.4.2
+      - run: npm install --no-save --package-lock=false playwright@1.55.0
+      - name: Install browser
+        run: npx playwright install --with-deps chromium >/tmp/weather-dawn-install.log 2>&1 || (tail -25 /tmp/weather-dawn-install.log; exit 1)
+      - name: Exact deployed files, actual positive AI discussion and full hourly input checks
+        run: node scripts/verifyWeatherDawnLive.js
+      - name: Independent reference for actual live current and seven-day inputs
+        run: |
+          python - <<'PY'
+          import json,math,warnings
+          from pythermalcomfort.models import utci
+          warnings.filterwarnings('ignore',category=UserWarning)
+          p='/tmp/weather-dawn-live/report.json';r=json.load(open(p));errors=[];missing=0
+          for s in r['referenceInputs']:
+              if any(s.get(k) is None for k in ['temperature','humidity','wind','tr']):
+                  assert s['actual'] is None;s['referenceStatus']='missing';missing+=1;continue
+              reference=float(utci(tdb=(s['temperature']-32)/1.8,tr=(s['tr']-32)/1.8,v=max(.5,s['wind']*.44704),rh=s['humidity'],round_output=False).utci)*1.8+32
+              if not math.isfinite(reference):
+                  assert s['actual'] is None;missing+=1;continue
+              assert s['actual'] is not None
+              error=abs(s['actual']-reference);assert error<1e-6,(s,reference,error)
+              errors.append(error)
+          assert len(errors)>500
+          r['independentReference']={'implementation':'pythermalcomfort 4.4.2 UTCI','numericSamples':len(errors),'missingOrOutOfDomain':missing,'maximumAbsoluteErrorF':max(errors),'passed':True,'scope':'Verifies arithmetic at the supplied estimated radiant conditions; not measured local radiation, station representativeness or individual sensation.'}
+          json.dump(r,open(p,'w'),indent=2)
+          print(r['independentReference'])
+          PY
+      - name: Publish live proof without redeploying main
+        run: |
+          cp /tmp/weather-dawn-live/report.json docs/weather-dawn-live-proof.json
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/weather-dawn-live-proof.json
+          git commit -m "Record actual live dawn, discussion and independent reference proof for ${GITHUB_SHA}"
+          git push origin HEAD:refs/heads/verification/weather-dawn-${GITHUB_SHA:0:12}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: weather-dawn-live-proof
+          path: /tmp/weather-dawn-live
+          retention-days: 7
