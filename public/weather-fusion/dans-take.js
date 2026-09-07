@@ -3,7 +3,7 @@
  * Ambiguous timing is omitted, not guessed. Dates are anchored to source issuance,
  * including a retained section's own "As of" time, never to the time of retrieval.
  */
-export const DAN_TAKE_VERSION = 'weather-nourie-dans-take-integrity-v2';
+export const DAN_TAKE_VERSION = 'weather-nourie-dans-take-source-v3';
 const H = 3600000, DAY = 24 * H, MAX_SOURCE_AGE = 12 * H;
 const norm = v => String(v || '').replace(/\s+/g, ' ').trim();
 const finite = Number.isFinite;
@@ -172,3 +172,16 @@ export function visibleDanTakeItems(briefing, forecast, now=Date.now()) {
   return approveDanTake(verified,forecast,now).forecastChanges;
 }
 export const danTakeText = items => items.map(item=>`${item.period}: ${item.summary}`).join('\n\n');
+
+/** Reuse ONLY a previously approved take from the same exact discussion and
+ * location. A changed numeric forecast signature is not a changed AFD. Full
+ * outlook prose is intentionally excluded from this small source-bound object. */
+export function rebindDanTake(previous,forecast,now=Date.now()){
+  if(!previous||!forecast?.signature)return null;
+  const rebound={...previous,signature:forecast.signature};
+  const items=visibleDanTakeItems(rebound,forecast,now);
+  if(!items.length)return null;
+  return {mode:'ai',signature:forecast.signature,danTakeVersion:DAN_TAKE_VERSION,
+    danTakeSource:rebound.danTakeSource,danTakeStatus:'supported',forecastChanges:items,
+    generatedAt:previous.generatedAt||null,model:previous.model||null,reused:true};
+}

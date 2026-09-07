@@ -1,4 +1,5 @@
-import {DAN_TAKE_VERSION,collectDanTakeEvidence,approveDanTake,visibleDanTakeItems,danTakeText} from '../public/weather-fusion/dans-take.js';
+import {createDiscussionSource,DISCUSSION_SOURCE_VERSION} from './weatherFusionDiscussionSource.js';
+import {DAN_TAKE_VERSION,collectDanTakeEvidence,approveDanTake,visibleDanTakeItems,danTakeText,rebindDanTake} from '../public/weather-fusion/dans-take.js';
 import {stationWeather,resolveCurrentWeather} from '../public/weather-fusion/weather-state.js';
 import {createSpecialDiscussionService} from './weatherFusionSpecialDiscussions.js';
 import {createBulletinService} from './weatherFusionBulletins.js';
@@ -265,11 +266,18 @@ export function buildForecast({ location, point, forecast, hourly, grid, discuss
 export function createWeatherService({ fetchImpl = globalThis.fetch, env = process.env, now = Date.now } = {}) {
   const cache = new Cache(350, now), forecastCache = new Cache(100, now), aiCache = new Cache(100, now);
   const failureCooldown = new Map();
+  const approvedTakes = new Map();
+  const takeKey=data=>`${data?.location?.latitude},${data?.location?.longitude}`;
+  function retainedTake(data){return rebindDanTake(approvedTakes.get(takeKey(data)),data,now());}
+  function rememberTake(data,briefing){
+    const take=rebindDanTake(briefing,data,now());
+    if(take){if(approvedTakes.size>=100&&!approvedTakes.has(takeKey(data)))approvedTakes.delete(approvedTakes.keys().next().value);approvedTakes.set(takeKey(data),take);}
+  }
   let aiBudget = { day: '', count: 0 };
   let apiMinute = { minute: 0, count: 0 };
   const userAgent = env.WEATHER_FUSION_USER_AGENT || 'Sun-Nourie-WeatherFusion/1.0 (https://github.com/nourie42/Sun-Nourie)';
   const direct = createDirectModels({ fetchImpl, now });
-  async function request(url, { text = false, body = null, timeout = 12000 } = {}) {
+  async function request(url, { text = false, body = null, timeout = 12000, revalidate = false } = {}) {
     const u = new URL(url);
     const allowed = ['api.weather.gov', 'geocoding-api.open-meteo.com', 'opengeo.ncep.noaa.gov', 'api.openai.com', 'mapservices.weather.noaa.gov', 'www.spc.noaa.gov'];
     if (u.protocol !== 'https:' || !allowed.includes(u.hostname) || u.port || u.username || u.password) throw errorWithStatus('Unexpected source URL.', 502);
@@ -277,6 +285,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
     if (apiMinute.minute !== minute) apiMinute = { minute, count: 0 };
     if (++apiMinute.count > 400) throw errorWithStatus('Weather source request budget reached.', 429);
     const headers = { 'User-Agent': userAgent, Accept: text ? 'application/xml,text/xml' : 'application/json' };
+    if(revalidate)headers['Cache-Control']='no-cache';
     if (body) { headers['Content-Type'] = 'application/json'; headers.Authorization = `Bearer ${env.OPENAI_API_KEY}`; }
     const response = await fetchImpl(url, { headers, method: body ? 'POST' : 'GET', body: body ? JSON.stringify(body) : undefined, redirect: 'error', signal: AbortSignal.timeout(timeout) });
     if (!response.ok) { const error = errorWithStatus(`Source returned HTTP ${response.status}.`, 502); if (u.hostname === 'api.openai.com') { error.aiDiagnostic = `AI_PROVIDER_HTTP_${response.status}`; try { const detail = await response.json(); const parameter = detail.error?.param; if (typeof parameter === 'string' && /^[a-zA-Z0-9_.-]{1,60}$/.test(parameter)) error.aiDiagnostic += '_' + parameter; } catch {} } throw error; }
@@ -299,9 +308,10 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
   }
   async function loadModel(id, location) { return direct.load(id, location); }
   const loadSpecialDiscussions=createSpecialDiscussionService({cached,now});
+  const loadDiscussion=createDiscussionSource({request,now});
   async function getForecast(query) {
     const location = coordinates(query), key = `${location.latitude},${location.longitude}`;
-    return forecastCache.get(key, MINUTE, async () => {
+    const snapshot=await forecastCache.get(key, MINUTE, async () => {
       const pointFeed = await feed('point', 'NWS location', `https://api.weather.gov/points/${key}`, 24 * HOUR, (d) => d.properties);
       const point = pointFeed.value;
       const unavailable = (id, label) => Promise.resolve({ value: null, meta: { id, label, status: 'unavailable', message: 'NWS location lookup unavailable.', issuedAt: null } });
@@ -311,16 +321,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
         hourly: get('hourly', 'NWS hourly', point?.forecastHourly, 10 * MINUTE, (d) => d.properties?.periods?.length ? d.properties : null),
         grid: get('grid', 'NWS precipitation grid', point?.forecastGridData, 10 * MINUTE, (d) => d.properties),
         alerts: feed('alerts', 'Official NWS alerts', `https://api.weather.gov/alerts/active?point=${key}`, MINUTE, (d) => Array.isArray(d.features) ? d.features.filter((f) => f.properties?.status === 'Actual' && f.properties?.messageType !== 'Cancel' && Date.parse(f.properties?.expires) > now()).map((f) => ({ id: f.id, geometry: f.geometry, ...f.properties })) : null),
-        discussion: point?.cwa ? feed('afd', `NWS ${point.cwa} discussion`, `https://api.weather.gov/products/types/AFD/locations/${point.cwa}`, 5 * MINUTE, async (d) => {
-          const latest = (d['@graph'] || []).filter((p) => p.productCode === 'AFD' && Date.parse(p.issuanceTime) <= now() + MINUTE).sort((a, b) => Date.parse(b.issuanceTime) - Date.parse(a.issuanceTime))[0];
-          if (!latest?.['@id']) return null;
-          const { data } = await cached(latest['@id'], 5 * MINUTE);
-          const returnedOffice=String(data.issuingOffice||'').replace(/^K/,'').toUpperCase();
-          if(data.productCode && data.productCode!=='AFD')return null;
-          if(returnedOffice && returnedOffice!==point.cwa.toUpperCase())return null;
-          if(Date.parse(data.issuanceTime)!==Date.parse(latest.issuanceTime))return null;
-          return data.productText ? { id: data.id || latest['@id'], office: point.cwa, issuanceTime: data.issuanceTime, text: clean(data.productText, 26000), url: latest['@id'] } : null;
-        }) : unavailable('afd', 'NWS discussion'),
+        discussion: loadDiscussion(point?.cwa),
         observation: point?.observationStations ? feed('observation', 'Nearby station observation', point.observationStations, 5 * MINUTE, async (d) => {
           const distance = (s) => { const c=s.geometry?.coordinates; return c ? (c[1]-location.latitude)**2+((c[0]-location.longitude)*Math.cos(location.latitude*Math.PI/180))**2 : Infinity; };
           const stations = [...(d.features || [])].sort((a,b)=>distance(a)-distance(b)).slice(0, 6);
@@ -361,17 +362,19 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
       // Access never exposes the provider credential or a made-up model run timestamp.
       result.aiConfigured = !!env.OPENAI_API_KEY;
       result.integrityVersion='weather-nourie-integrity-v1';
+      result.discussionSourceVersion=DISCUSSION_SOURCE_VERSION;
       result.modelAccessConfigured = true;
       result.directModelStatus = result.modelContributions.length === 3 ? 'ready' : 'partial';
       return result;
     });
+    return {...snapshot,danTake:retainedTake(snapshot)};
   }
   function fallback(data, reason) {
     const evening = Number(new Intl.DateTimeFormat('en-US',{timeZone:data.location.timeZone,hour:'numeric',hourCycle:'h23'}).format(new Date(now()))) >= 15;
     return { mode: 'nws-summary', signature: data.signature, generatedAt: iso(now()), reason,
       headline: evening ? 'Your evening outlook' : data.days[0]?.condition || 'Forecast update', summary: (evening ? data.days[0]?.nightDetail : data.days[0]?.detail) || data.days[0]?.detail || 'The forecast is temporarily unavailable. Check the National Weather Service for the latest update.',
       nearTerm: data.days[0]?.nightDetail || '', extended: data.days[1]?.detail || '',
-      uncertainty: '', ...approveDanTake([],data,now()), sources: data.discussion ? ['nws','afd'] : ['nws'] };
+      uncertainty: '', ...approveDanTake([],data,now()), danTake:retainedTake(data), sources: data.discussion ? ['nws','afd'] : ['nws'] };
   }
   async function getBriefing(query) {
     const data = await getForecast(query);
@@ -416,6 +419,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
         if (/\b(all clear|no (?:active )?(?:warnings|severe weather)|guaranteed|perfectly safe)\b/i.test(fields.map((k) => content[k]).join(' '))) throw Object.assign(new Error('AI safety wording failed validation.'), { aiDiagnostic: 'AI_SAFETY_WORDING' });
         for (const k of fields) content[k] = normalizeClockTimes(content[k]);
         const take=approveDanTake(content.forecastChanges,data,now());
+        rememberTake(data,{...take,mode:'ai',signature:data.signature,generatedAt:iso(now()),model:env.WEATHER_FUSION_AI_MODEL||'gpt-5-mini'});
         return { ...content, ...take, uncertainty:danTakeText(take.forecastChanges), mode: 'ai', signature: data.signature, generatedAt: iso(now()), model: env.WEATHER_FUSION_AI_MODEL || 'gpt-5-mini' };
       } catch (error) {
         const diagnostic = typeof error.aiDiagnostic === 'string' && /^AI_[A-Z0-9_a-z.\-]{1,100}$/.test(error.aiDiagnostic) ? error.aiDiagnostic : error.name === 'TimeoutError' || error.name === 'AbortError' ? 'AI_PROVIDER_TIMEOUT' : error instanceof SyntaxError ? 'AI_RESPONSE_JSON' : 'AI_RESPONSE_UNAVAILABLE';
@@ -432,7 +436,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
     // A failed generation is not a successful 30-minute briefing cache entry.
     if (briefing.mode !== 'ai') aiCache.values.delete(briefingKey);
     const activeChanges=visibleDanTakeItems(briefing,data,now());
-    return {...briefing,forecastChanges:activeChanges,uncertainty:danTakeText(activeChanges)};
+    return {...briefing,danTake:activeChanges.length?null:retainedTake(data),forecastChanges:activeChanges,uncertainty:danTakeText(activeChanges)};
   }
   async function search(query) {
     const text = clean(query, 80).trim();

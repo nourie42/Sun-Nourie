@@ -1,4 +1,4 @@
-import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText} from './dans-take.js?v=integrity-v2';
+import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText,rebindDanTake} from './dans-take.js?v=source-v3';
 import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './weather-display.js?v=integrity-v1';
 import {degrees,feelsAt,dayFeelsHTML} from './hourly-feels.js?v=integrity-v1';
 import {createFramePlayer} from './frame-player.js';
@@ -87,7 +87,7 @@ function render(data) {
   draw('scientific-stuff', 'Source details', () => renderEvidence(data));
   if (currentBriefing?.signature !== data.signature) {
     draw('briefing-summary', 'Local outlook', () => renderBriefing({ mode: 'nws-summary', signature: data.signature, headline: currentDay.tonight ? 'Your evening outlook' : d.condition, summary: currentDay.detail || 'The official forecast is temporarily unavailable.', nearTerm: d.nightDetail, extended: data.days[1]?.detail,
-      uncertainty: '', reason: data.aiConfigured ? 'Updating your local outlook…' : 'National Weather Service forecast', sources: ['nws'] }));
+      uncertainty: '', danTake:data.danTake||rebindDanTake(currentBriefing?.danTake||currentBriefing,data), reason: data.aiConfigured ? 'Updating your local outlook…' : 'National Weather Service forecast', sources: ['nws'] }));
   }
   if (map) { marker?.setLatLng([place.latitude, place.longitude]); renderMapWarnings(data); }
   const unavailable = data.feeds.filter((f) => ['unavailable', 'stale', 'not-configured'].includes(f.status));
@@ -131,12 +131,12 @@ function renderEvidence(data) {
   $('methodology').textContent = data.methodology;
   $('source-register').innerHTML = data.feeds.map((f) => {
     const url = /^https:\/\/(api\.weather\.gov|www\.nco\.ncep\.noaa\.gov|www\.ecmwf\.int|open-meteo\.com)\//.test(f.url || '') ? f.url : 'https://www.weather.gov/';
-    return `<div class="source-item"><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(f.label)} ↗</a><span>${esc(names[f.status] || f.status)} · retrieved ${f.fetchedAt ? esc(clock(f.fetchedAt)) : '—'}${f.issuedAt ? ` · issued ${esc(clock(f.issuedAt, { month: 'short', day: 'numeric' }))}` : ' · model run/issuance not supplied'}</span></div>`;
+    return `<div class="source-item"><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(f.label)} ↗</a><span>${esc(names[f.status] || f.status)} · retrieved ${f.fetchedAt ? esc(clock(f.fetchedAt)) : '—'}${f.issuedAt ? ` · issued ${esc(clock(f.issuedAt, { month: 'short', day: 'numeric' }))}` : ' · model run/issuance not supplied'}${f.message?` · ${esc(f.message)}`:''}</span></div>`;
   }).join('');
 }
 function renderBriefing(data) {
   currentBriefing = data;
-  const takeItems=visibleDanTakeItems(data,forecast,Date.now());
+  const takeItems=visibleDanTakeItems(data.danTake||data,forecast,Date.now());
   const uncertainty=danTakeText(takeItems);
   $('briefing-title').textContent = data.headline || 'Local forecast';
   $('briefing-summary').textContent = data.summary || 'The source forecast is currently unavailable.';
@@ -156,10 +156,10 @@ function renderBriefing(data) {
     todayUncertainty.hidden = !uncertainty;
   }
   $('briefing-stamp').textContent = data.mode === 'ai' ? `Updated ${clock(data.generatedAt)} · based on your local NWS discussion` : 'National Weather Service forecast';
-  $('outlook-science').innerHTML = `<p>Summary type: ${esc(data.mode === 'ai' ? 'AI plain-language paraphrase of the local discussion, checked against the point forecast and available model data' : 'Official NWS forecast fallback; not an AI paraphrase')}. ${esc(data.reason || '')}</p><p>Sources used: ${refs.join(' · ') || 'Waiting for the local outlook'}</p><p>Dan's take: ${takeItems.length?'Only the following explicitly supported, still-upcoming discussion changes are displayed.':'Hidden: no approved, dated, still-upcoming change is available from the current local discussion.'}</p>${takeItems.map(item=>`<details><summary>${esc(item.period)} · source evidence</summary><p>${esc(item.sourceQuote)}</p><p>Original section: ${esc(item.section)} · issued ${esc(clock(item.sectionIssuedAt,{month:'short',day:'numeric'}))}. Applies through ${esc(clock(item.eventEnd,{month:'short',day:'numeric'}))}.</p></details>`).join('')}`;
+  $('outlook-science').innerHTML = `<p>Summary type: ${esc(data.mode === 'ai' ? 'AI plain-language paraphrase of the local discussion, checked against the point forecast and available model data' : 'Official NWS forecast fallback; not an AI paraphrase')}. ${esc(data.reason || '')}</p><p>Sources used: ${refs.join(' · ') || 'Waiting for the local outlook'}</p><p>Dan's take: ${takeItems.length?'Only the following explicitly supported, still-upcoming discussion changes are displayed.':'Hidden: '+(data.danTakeStatus==='discussion-not-current'?'the local discussion is missing or stale.':data.danTakeStatus==='no-explicit-future-change'?'the current discussion identifies no dated upcoming uncertainty.':data.reason||'the current discussion has not produced an approved explanation yet.')}</p>${takeItems.map(item=>`<details><summary>${esc(item.period)} · source evidence</summary><p>${esc(item.sourceQuote)}</p><p>Original section: ${esc(item.section)} · issued ${esc(clock(item.sectionIssuedAt,{month:'short',day:'numeric'}))}. Applies through ${esc(clock(item.eventEnd,{month:'short',day:'numeric'}))}.</p></details>`).join('')}`;
 
 }
-async function load({ moveMap = false, refreshModels = false } = {}) {
+async function load({ moveMap = false, refreshModels = false, briefingRetry = 0 } = {}) {
   const id = ++generation;
   let receivedForecast = false;
   requestController?.abort();
@@ -186,6 +186,7 @@ async function load({ moveMap = false, refreshModels = false } = {}) {
         if (id === generation && briefing.signature === forecast?.signature) renderBriefing(briefing);
       }).catch((error) => {
         if (id !== generation || error.name === 'AbortError') return;
+        if(error.status===409&&briefingRetry<2){void load({briefingRetry:briefingRetry+1});return;}
         $('briefing-stamp').textContent = error.status === 409 ? 'Sources changed while the briefing was prepared. The next refresh will use the new forecast.' : 'AI synthesis is unavailable. Official NWS wording remains visible.';
       });
     }

@@ -226,6 +226,50 @@ try{
    await context.close();
   }
  }
+ // The card must survive ordinary numerical refreshes and a failed or late
+ // general briefing while the exact same current source remains valid.
+ for(const width of [390,1365]){
+  const context=await browser.newContext({viewport:{width,height:900}}),page=await context.newPage();
+  await page.addInitScript(time=>{const NativeDate=Date;window.Date=class extends NativeDate{constructor(...args){super(...(args.length?args:[time]));}static now(){return time;}};},epoch);
+  await page.route('https://unpkg.com/**',r=>r.fulfill({body:'',contentType:r.request().url().includes('.css')?'text/css':'application/javascript'}));
+  let version=0,mode='success',forecastRequests=0,briefingRequests=0,held=null;
+  const sample=()=>{
+   const f=fixture('knightdale');f.signature='lifecycle-'+version;
+   if(mode==='new-source'||mode==='quiet')f.discussion={...f.discussion,id:'different-discussion',text:mode==='quiet'?'.DISCUSSION...\nDry weather is expected today.':f.discussion.text};
+   const c=collectDanTakeEvidence(f,epoch).candidates;
+   const b={mode:'ai',signature:f.signature,generatedAt:f.assembledAt,headline:'Local outlook',summary:'The regular forecast is available.',nearTerm:'The hourly forecast remains available.',extended:'See the week ahead.',sources:['nws','afd'],...approveDanTake(c.map(c=>({evidenceId:c.id,summary:'Rain could arrive earlier or later than expected.'})),f,epoch)};
+   if(mode==='cached')f.danTake={...b,reused:true};
+   return {f,b};
+  };
+  await page.route('**/api/weather-fusion/forecast?**',r=>{forecastRequests++;return r.fulfill({json:sample().f});});
+  await page.route('**/api/weather-fusion/briefing?**',async r=>{
+   briefingRequests++;
+   if(mode==='slow'){held=r;return;}
+   if(mode==='cached')return r.fulfill({status:503,json:{error:'Simulated full-outlook outage'}});
+   if(mode==='conflict'&&briefingRequests===1)return r.fulfill({status:409,json:{error:'Forecast changed'}});
+   return r.fulfill({json:sample().b});
+  });
+  page.on('pageerror',e=>report.browserErrors.push(e.message));
+  await page.goto(base+'/weather-fusion/',{waitUntil:'networkidle'});
+  await page.waitForFunction(()=>!document.querySelector('#today-uncertainty').hidden);
+  const expected=await page.locator('#today-uncertainty-text').textContent();assert.ok(expected);
+  mode='slow';version++;await page.locator('#refresh').click();
+  while(!held)await page.waitForTimeout(20);
+  assert.equal(await page.locator('#today-uncertainty').isVisible(),true,'A numerical refresh must not erase a current-source take while AI is pending');
+  assert.equal(await page.locator('#today-uncertainty-text').textContent(),expected);
+  await held.fulfill({status:503,json:{error:'Simulated outage'}});held=null;
+  await page.waitForTimeout(100);assert.equal(await page.locator('#today-uncertainty').isVisible(),true);
+  mode='cached';version++;await page.reload({waitUntil:'networkidle'});
+  assert.equal(await page.locator('#today-uncertainty').isVisible(),true,'Reload immediately renders the cached, revalidated source take without a successful full outlook');
+  mode='quiet';version++;await page.locator('#refresh').click();await page.waitForTimeout(500);
+  assert.equal(await page.locator('#today-uncertainty').isVisible(),false,'A different quiet discussion invalidates the prior card');
+  mode='conflict';version++;forecastRequests=0;briefingRequests=0;await page.reload({waitUntil:'networkidle'});
+  await page.waitForFunction(()=>!document.querySelector('#today-uncertainty').hidden);
+  assert.equal(briefingRequests,2,'A forecast-signature conflict is retried once, not silently ignored until manual refresh');
+  assert.equal(forecastRequests,2);
+  (report.danTakeLifecycleChecks??=[]).push({width,pendingRefreshRetained:true,failedBriefingRetained:true,reloadRetained:true,newQuietSourceCleared:true,signatureConflictRecovered:true});
+  await context.close();
+ }
  const context=await browser.newContext({viewport:{width:390,height:844}}),page=await context.newPage();
  await page.addInitScript(time=>{const NativeDate=Date;window.Date=class extends NativeDate{constructor(...args){super(...(args.length?args:[time]));}static now(){return time;}};},Date.parse('2026-09-07T02:00:00Z'));
  await page.route('https://unpkg.com/**',route=>route.fulfill({body:'',contentType:'application/javascript'}));
