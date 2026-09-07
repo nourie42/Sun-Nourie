@@ -1,11 +1,12 @@
-import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './weather-display.js?v=outdoor-v1';
-import {degrees,feelsAt,dayFeelsHTML} from './hourly-feels.js?v=outdoor-v1';
+import {changesText,activeChanges} from './forecast-changes.js?v=evidence-v1';
+import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './weather-display.js?v=evidence-v1';
+import {degrees,feelsAt,dayFeelsHTML} from './hourly-feels.js?v=evidence-v1';
 import {createFramePlayer} from './frame-player.js';
-import {renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=outdoor-v1';
-import {dailyDisplay} from './weather-math.js';
+import {renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=evidence-v1';
+import {dailyDisplay} from './weather-math.js?v=evidence-v1';
 import {currentHero} from './current-temperature.js?v=1-current';
 import {renderBulletins} from './bulletins.js?v=2-special';
-import {dailyGrossHTML,modelFreshnessText} from './personal-details.js?v=outdoor-v1';
+import {dailyGrossHTML,modelFreshnessText} from './personal-details.js?v=evidence-v1';
 import {renderDewpointMeter} from './dewpoint-meter.js?v=6-future';
 import {renderWeatherPanel} from './render-safety.js';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
@@ -103,6 +104,13 @@ function compass(degrees) {
 }
 function renderMetrics(data) { renderMetricTiles(data, smallIcon); }
 function renderEvidence(data) {
+  const inputRoot=$('thermal-input-evidence');
+  if(inputRoot){
+    const c=data.current||{},rows=data.metricForecasts?.series?.feels||[],at=Date.now();
+    const currentHour=rows.find(p=>Date.parse(p.time)<=at&&at<Date.parse(p.time)+3600000);
+    const n=(v,suffix='')=>finite(v)?`${Math.round(v*10)/10}${suffix}`:'Unavailable';
+    inputRoot.innerHTML=`<p><strong>Current station sample</strong>: ${esc(c.stationName||c.station||'Forecast estimate')}${finite(c.stationDistanceKm)?` · ${Math.round(c.stationDistanceKm/1.609344)} miles from the selected point`:''}; ${esc(c.time||'time unavailable')}. Air ${n(c.temperature,'°F')}; dew point ${n(c.dewpoint,'°F')}; wind ${n(c.wind,' mph')}. Calculated outdoor UTCI ${n(data.comfort?.rawOutdoors,'°F')}.</p>${currentHour?`<p><strong>Current-hour forecast, kept separate</strong>: ${esc(currentHour.time)}. Air ${n(currentHour.inputs?.temperature,'°F')}; dew point ${n(currentHour.inputs?.dewpoint,'°F')}; wind ${n(currentHour.inputs?.wind,' mph')}. Calculated outdoor UTCI ${n(currentHour.value,'°F')}.</p>`:''}<p>${esc(data.comfort?.inputEvidence?.windPolicy||'')}. ${esc(data.comfort?.inputEvidence?.radiationBasis||'')}. The station estimate is not copied into the hourly forecast. Sun, shade, and future hours are distinct exposures and samples; equal-looking displays are not a validation of local human sensation.</p>`;
+  }
   const important = ['nws', 'afd', 'hrrr', 'ecmwf', 'nbm', 'alerts'];
   const labels = { nws: 'NWS', afd: 'Local discussion', hrrr: 'HRRR', ecmwf: 'ECMWF IFS', nbm: 'National Blend', alerts: 'Alerts' };
   const names = { ready: 'Available', unavailable: 'Unavailable', stale: 'Stale — excluded', 'not-configured': 'Not configured', 'not-covered': 'Not collected for this location' };
@@ -136,9 +144,9 @@ function renderBriefing(data) {
     const url = id === 'afd' ? forecast?.discussion?.url : f?.url;
     return url && /^https:\/\/(api\.weather\.gov|www\.nco\.ncep\.noaa\.gov|www\.ecmwf\.int)\//.test(url) ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(f?.label || id)} ↗</a>` : esc(f?.label || id);
   });
-  $('briefing-detail').innerHTML = `<div><strong>Tonight & tomorrow</strong><p>${esc(data.nearTerm || 'See the hourly forecast below.')}</p></div><div><strong>The week ahead</strong><p>${esc(data.extended || 'More details will appear with the next update.')}</p></div><div><strong>What could change - Dan's take</strong><p>${esc(data.uncertainty || '')}</p></div>`;
+  const uncertainty=changesText(data,forecast);
+  $('briefing-detail').innerHTML = `<div><strong>Tonight & tomorrow</strong><p>${esc(data.nearTerm || 'See the hourly forecast below.')}</p></div><div><strong>The week ahead</strong><p>${esc(data.extended || 'More details will appear with the next update.')}</p></div><div data-dans-take-detail ${uncertainty?'':'hidden'}><strong>Dan's take</strong><p>${esc(uncertainty)}</p></div>`;
   // Reuse the same outlook uncertainty below today's graphic, including refresh/reset.
-  const uncertainty = typeof data.uncertainty === 'string' ? data.uncertainty.trim() : '';
   const todayUncertainty = $('today-uncertainty'), todayUncertaintyText = $('today-uncertainty-text');
   if (todayUncertainty && todayUncertaintyText) {
     todayUncertaintyText.textContent = uncertainty;
@@ -147,6 +155,14 @@ function renderBriefing(data) {
   $('briefing-stamp').textContent = data.mode === 'ai' ? `Updated ${clock(data.generatedAt)} · based on your local NWS discussion` : 'National Weather Service forecast';
   $('outlook-science').innerHTML = `<p>Summary type: ${esc(data.mode === 'ai' ? 'AI plain-language paraphrase of the local discussion, checked against the point forecast and available model data' : 'Official NWS forecast fallback; not an AI paraphrase')}. ${esc(data.reason || '')}</p><p>Sources used: ${refs.join(' · ') || 'Waiting for the local outlook'}</p>`;
 
+  const evidence=activeChanges(data,forecast);
+  if(evidence.length)$('outlook-science').innerHTML+=`<details><summary>Dan's take — source evidence</summary>${evidence.map(c=>`<p><strong>${esc(c.periodLabel)}</strong> · NWS ${esc(c.office)} · section issued ${esc(c.sectionIssuedAt)}</p><blockquote>${esc(c.text)}</blockquote>`).join('')}</details>`;
+}
+function expireDansTake(){
+ const text=changesText(currentBriefing,forecast),root=$('today-uncertainty'),body=$('today-uncertainty-text');
+ if(root&&body){body.textContent=text;root.hidden=!text;}
+ const detail=document.querySelector('[data-dans-take-detail]');
+ if(detail){detail.hidden=!text;const p=detail.querySelector('p');if(p)p.textContent=text;}
 }
 async function load({ moveMap = false, refreshModels = false } = {}) {
   const id = ++generation;
@@ -415,3 +431,6 @@ setInterval(() => { if (!document.hidden && !busy) void load(); }, 60000);
 installExperience();
 readSaved();
 void load({ moveMap: true });
+
+setInterval(expireDansTake,60000);
+document.addEventListener('visibilitychange',expireDansTake);

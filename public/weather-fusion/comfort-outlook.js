@@ -1,6 +1,6 @@
-import {outdoorExposure} from './outdoor-feels.js?v=outdoor-v1';
-import {finite,localHour} from './weather-math.js';
-import {timeAt,summarizeFeels} from './hourly-feels.js?v=outdoor-v1';
+import {outdoorExposure} from './outdoor-feels.js?v=evidence-v1';
+import {finite,localHour} from './weather-math.js?v=evidence-v1';
+import {timeAt,summarizeFeels} from './hourly-feels.js?v=evidence-v1';
 export function comfortMode(time,zone='America/New_York'){
  const hour=localHour(time,zone);return hour>=15?'overnight':hour<5?'predawn':'day';
 }

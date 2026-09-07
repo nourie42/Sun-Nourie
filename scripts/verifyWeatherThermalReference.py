@@ -2,7 +2,8 @@
 Mean radiant temperature remains an explicitly disclosed meteorological estimate.
 Install the pinned reference with: pip install pythermalcomfort==4.4.2
 """
-import json, math, subprocess, sys
+import json, math, subprocess, sys, warnings
+warnings.filterwarnings("ignore", category=UserWarning, module=r"pythermalcomfort\.models\.utci")
 from pathlib import Path
 from pythermalcomfort.models import utci
 

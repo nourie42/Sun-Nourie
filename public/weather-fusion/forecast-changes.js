@@ -122,7 +122,7 @@ export function activeChanges(briefing,forecast,now=Date.now()){
  if(briefing?.changesVersion!==CHANGES_VERSION||briefing.mode!=='ai'||briefing.signature!==forecast?.signature)return [];
  const d=forecast?.discussion,issued=Date.parse(d?.issuanceTime);
  if(!d?.id||!Number.isFinite(issued)||now-issued>12*H||issued>now+60000)return [];
- return (briefing.forecastChanges||[]).filter(c=>c.validated===true&&c.discussionId===d.id&&c.discussionIssuedAt===d.issuanceTime&&typeof c.summary==='string'&&typeof c.periodLabel==='string'&&Date.parse(c.validUntil)>now&&Date.parse(c.validFrom)<now+8*DAY);
+ return (Array.isArray(briefing.forecastChanges)?briefing.forecastChanges:[]).filter(c=>c.validated===true&&c.discussionId===d.id&&c.discussionIssuedAt===d.issuanceTime&&typeof c.summary==='string'&&typeof c.periodLabel==='string'&&Date.parse(c.validUntil)>now&&Date.parse(c.validFrom)<now+8*DAY);
 }
 export function changesText(briefing,forecast,now=Date.now()){
  return activeChanges(briefing,forecast,now).map(c=>`${c.periodLabel}: ${c.summary}`).join('\n\n');

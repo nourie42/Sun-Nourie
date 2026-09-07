@@ -1,7 +1,7 @@
 import {forecastGrossLevel} from './dewpoint-meter.js?v=6-future';
 import {exposureScene} from './exposure-scene.js?v=3-weather';
-import {outdoorExposure} from './outdoor-feels.js?v=outdoor-v1';
-import {solarElevation} from './weather-math.js';
+import {outdoorExposure} from './outdoor-feels.js?v=evidence-v1';
+import {solarElevation} from './weather-math.js?v=evidence-v1';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const HOUR=3600000;

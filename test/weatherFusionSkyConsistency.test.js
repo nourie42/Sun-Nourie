@@ -57,17 +57,17 @@ function fixture(){
  const current={...readings},times=[15,16,17].map(hour=>`2026-09-06T${hour}:00:00Z`);
  const values=[79,80,82],feels=values.map((temperature,index)=>{
   const inputs={temperature,dewpoint:68+index,wind:6,condition:index===2?'Rain':'Sunny'};
-  return {time:times[index],inputs,value:Number(shadeFeelsLike(temperature,null,6,inputs.dewpoint).value.toFixed(1))};
+  const comfort=thermalComfort(inputs,location,Date.parse(times[index]));return {time:times[index],inputs,value:Number(comfort.rawOutdoors.toFixed(1)),shadeValue:Number(comfort.rawShade.toFixed(1)),exposure:'outdoors'};
  });
  return {location,assembledAt:new Date(now).toISOString(),current,comfort:thermalComfort(current,location,now),
   hours:times.map((time,index)=>({time,temperature:values[index],condition:index===2?'Rain':'Sunny',pop:20})),
   metricForecasts:{series:{temperature:times.map((time,index)=>({time,value:values[index]})),feels}}};
 }
-test('Now is identical to the hero and does not expose the older current-hour forecast as another current observation',()=>{
+test('Now is the station estimate and the overlapping forecast hour remains a separate forecast',()=>{
  const f=fixture(),samples=hourlyDisplaySamples(f,now);
  assert.equal(samples[0].id,'now');assert.equal(samples[0].temperature,f.current.temperature);assert.equal(samples[0].feels,f.comfort.outdoors);
- assert.equal(samples[1].time,'2026-09-06T16:00:00Z');assert.equal(samples.length,3);
- assert.equal(samples.filter(p=>!p.now&&Date.parse(p.time)<=now).length,0);
+ assert.equal(samples[1].time,'2026-09-06T15:00:00Z');assert.equal(samples.length,4);assert.equal(samples[1].source,'Hourly forecast');assert.equal(samples[0].source,'Station observation');
+ assert.equal(samples.filter(p=>!p.now&&Date.parse(p.time)<=now).length,1);
 });
 test('future preview reads the exact canonical temperature and feels-like at the selected instant',()=>{
  const f=fixture(),p=forecastSample(f,'2026-09-06T13:00:00-04:00');

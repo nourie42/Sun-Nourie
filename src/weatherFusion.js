@@ -1,3 +1,4 @@
+import {CHANGES_VERSION,changeContext,validateChanges,CHANGE_SCHEMA,CHANGE_INSTRUCTIONS} from '../public/weather-fusion/forecast-changes.js';
 import {stationWeather,resolveCurrentWeather} from '../public/weather-fusion/weather-state.js';
 import {createSpecialDiscussionService} from './weatherFusionSpecialDiscussions.js';
 import {createBulletinService} from './weatherFusionBulletins.js';
@@ -325,9 +326,9 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
               const { data } = await cached(`https://api.weather.gov/stations/${id}/observations/latest`, 5 * MINUTE);
               const o = data.properties, time = Date.parse(o?.timestamp);
               if (!finite(toF(o?.temperature)) || now() - time > 2 * HOUR || time > now() + 5 * MINUTE) return null;
-              return { temperature: rounded(toF(o.temperature)), ...stationWeather(o), time: o.timestamp,
-                stationDistanceKm: rounded(Math.sqrt(distance(s))*111.2,1), station: id, stationName: clean(s.properties?.name, 140), humidity: rounded(o.relativeHumidity?.value), dewpoint: rounded(toF(o.dewpoint)),
-                wind: rounded(toMph(o.windSpeed)), gust: rounded(toMph(o.windGust)), windDirection: numeric(o.windDirection?.value),
+              return { temperature: toF(o.temperature), ...stationWeather(o), time: o.timestamp,
+                stationDistanceKm: rounded(Math.sqrt(distance(s))*111.2,1), station: id, stationName: clean(s.properties?.name, 140), humidity: numeric(o.relativeHumidity?.value), dewpoint: toF(o.dewpoint),
+                wind: toMph(o.windSpeed), gust: rounded(toMph(o.windGust)), windDirection: numeric(o.windDirection?.value),
                 visibility: o.visibility?.unitCode === 'wmoUnit:m' && finite(o.visibility.value) ? rounded(o.visibility.value / 1609.344, 1) : null,
                 pressurePa: o.barometricPressure?.unitCode === 'wmoUnit:Pa' ? numeric(o.barometricPressure.value) : null,
                 pressure: o.barometricPressure?.unitCode === 'wmoUnit:Pa' && finite(o.barometricPressure.value) ? rounded(o.barometricPressure.value / 3386.389, 2) : null };
@@ -354,35 +355,19 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
       const result = buildForecast({ ...data, point, location, models: { hrrr: data.hrrr, ecmwf: data.ecmwf, nbm: data.nbm }, feeds: [pointFeed.meta, ...Object.values(values).map((f) => f.meta)], now: now() });
       // Access never exposes the provider credential or a made-up model run timestamp.
       result.aiConfigured = !!env.OPENAI_API_KEY;
+      result.changesVersion=CHANGES_VERSION;
+      result.thermalAuditVersion='weather-nourie-thermal-audit-v1';
       result.modelAccessConfigured = true;
       result.directModelStatus = result.modelContributions.length === 3 ? 'ready' : 'partial';
       return result;
     });
-  }
-  function discussionUncertainty(data) {
-    const raw=String(data?.discussion?.text||'').replace(/\s+/g,' ').trim();
-    if(!raw)return '';
-    const rows=raw.split(/(?<=[.!?])\s+/).map(text=>text.trim()).filter(text=>text.length>=24&&text.length<=460);
-    const weights=[[/\b(uncertain|uncertainty|confidence|forecast challenge|low confidence)\b/i,9],[/\b(timing|track|path|coverage|widespread|scattered|isolated|placement|depends|could|may)\b/i,5],[/\b(front|boundary|low pressure|storm|shower|rain|fog|cloud|clearing|wind|temperature)\b/i,2]];
-    const best=rows.map(text=>({text,score:weights.reduce((sum,[re,w])=>sum+(re.test(text)?w:0),0)})).sort((a,b)=>b.score-a.score)[0];
-    if(!best||best.score<4)return 'The latest local NWS discussion does not highlight a major forecast-changing factor right now.';
-    const s=best.text.toLowerCase();
-    if(/track|path|placement|low pressure/.test(s))return 'The track and placement of the weather system are the main wildcard; a shift could change which conditions reach this location.';
-    if(/timing|front|boundary/.test(s))return 'The timing of the next front or boundary is the main wildcard; a faster or slower arrival could shift when conditions change.';
-    if(/(coverage|widespread|scattered|isolated)/.test(s)&&/(shower|storm|rain)/.test(s))return 'The main uncertainty is how widespread showers or storms become, so nearby places could end up with different rain coverage.';
-    if(/cloud|clearing/.test(s))return 'Cloud cover and clearing are the main wildcard; they could change temperatures and how quickly conditions evolve.';
-    if(/fog/.test(s))return 'Fog development is the main wildcard and will depend on how quickly skies clear and winds ease.';
-    if(/wind/.test(s))return 'Wind strength and direction are a key uncertainty as the weather system evolves near this location.';
-    if(/temperature/.test(s))return 'Temperature confidence is lower than usual because the latest local discussion highlights conditions that could shift the forecast.';
-    if(/shower|storm|rain/.test(s))return 'The local NWS discussion highlights uncertainty in how showers or storms develop near this location.';
-    return 'The latest local NWS discussion highlights uncertainty in how conditions evolve near this location.';
   }
   function fallback(data, reason) {
     const evening = Number(new Intl.DateTimeFormat('en-US',{timeZone:data.location.timeZone,hour:'numeric',hourCycle:'h23'}).format(new Date(now()))) >= 15;
     return { mode: 'nws-summary', signature: data.signature, generatedAt: iso(now()), reason,
       headline: evening ? 'Your evening outlook' : data.days[0]?.condition || 'Forecast update', summary: (evening ? data.days[0]?.nightDetail : data.days[0]?.detail) || data.days[0]?.detail || 'The forecast is temporarily unavailable. Check the National Weather Service for the latest update.',
       nearTerm: data.days[0]?.nightDetail || '', extended: data.days[1]?.detail || '',
-      uncertainty: discussionUncertainty(data), sources: data.discussion ? ['nws','afd'] : ['nws'] };
+      uncertainty: '', forecastChanges: [], changesVersion: CHANGES_VERSION, sources: data.discussion ? ['nws','afd'] : ['nws'] };
   }
   async function getBriefing(query) {
     const data = await getForecast(query);
@@ -392,27 +377,30 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
     const key = `${data.location.latitude},${data.location.longitude}`;
     const previousFailure = failureCooldown.get(key);
     if (previousFailure?.until > now()) return { ...fallback(data, 'AI is cooling down after an unavailable response; official guidance is shown.'), diagnostic: previousFailure.diagnostic, retryAfter: iso(previousFailure.until) };
-    const briefing = await aiCache.get(data.signature, 30 * MINUTE, async () => {
+    const changeEvidence=changeContext(data,now());
+    const briefingKey=`${CHANGES_VERSION}:${data.signature}:${Math.floor(now()/(15*MINUTE))}`;
+    const briefing = await aiCache.get(briefingKey, 15 * MINUTE, async () => {
       const day = new Date(now()).toISOString().slice(0, 10);
       if (aiBudget.day !== day) aiBudget = { day, count: 0 };
       const rawLimit = Number(env.WEATHER_FUSION_AI_DAILY_LIMIT || 96);
       const limit = finite(rawLimit) ? Math.max(0, Math.min(500, rawLimit)) : 96;
       if (aiBudget.count >= limit) return fallback(data, 'The configured AI daily request limit has been reached.');
       let lastFailure = null;
-      const properties = Object.fromEntries(['headline', 'summary', 'nearTerm', 'extended', 'uncertainty'].map((k) => [k, { type: 'string' }]));
+      const properties = Object.fromEntries(['headline', 'summary', 'nearTerm', 'extended'].map((k) => [k, { type: 'string' }]));
+      properties.forecastChanges=CHANGE_SCHEMA;
       properties.sources = { type: 'array', items: { type: 'string', enum: ['nws', 'afd', 'hrrr', 'ecmwf', 'nbm'] } };
-      const facts = { currentLocalTime: new Intl.DateTimeFormat('en-US',{timeZone:data.location.timeZone,dateStyle:'full',timeStyle:'short'}).format(new Date(now())), discussionPriority: 'Translate the latest local NWS discussion into everyday language; technical provenance is only for metadata.', blendPolicy: data.methodology, modelContributions: data.modelContributions, convectiveGuidance: data.convectiveGuidance, next24HoursPrecipitation: data.precipitation, location: data.location, localDate: dateKey(now(), data.location.timeZone), days: data.days, hours: data.hours.slice(0, 30), discussion: data.discussion, feedStatus: data.feeds.map((f) => ({ id: f.id, status: f.status, issuedAt: f.issuedAt })) };
+      const facts = { forecastChangeEvidence:changeEvidence, currentLocalTime: new Intl.DateTimeFormat('en-US',{timeZone:data.location.timeZone,dateStyle:'full',timeStyle:'short'}).format(new Date(now())), discussionPriority: 'Translate the latest local NWS discussion into everyday language; technical provenance is only for metadata.', blendPolicy: data.methodology, modelContributions: data.modelContributions, convectiveGuidance: data.convectiveGuidance, next24HoursPrecipitation: data.precipitation, location: data.location, localDate: dateKey(now(), data.location.timeZone), days: data.days, hours: data.hours.slice(0, 30), discussion: data.discussion, feedStatus: data.feeds.map((f) => ({ id: f.id, status: f.status, issuedAt: f.issuedAt })) };
       for (let attempt = 0; attempt < 2 && aiBudget.count < limit; attempt += 1) {
       aiBudget.count += 1;
       try {
         const result = await request('https://api.openai.com/v1/responses', { timeout: 35000, body: {
           model: env.WEATHER_FUSION_AI_MODEL || 'gpt-5-mini', store: false, max_output_tokens: 4000, reasoning: { effort: 'low' },
-          instructions: PLAIN_OUTLOOK_INSTRUCTIONS,
+          instructions: PLAIN_OUTLOOK_INSTRUCTIONS+' '+CHANGE_INSTRUCTIONS,
           input: JSON.stringify({ ...facts, requiredSources: ['nws','afd',...data.modelContributions.map(m=>m.id)], revisionInstruction: attempt ? 'The previous attempt failed automated validation. Return every required source ID exactly. Do not include numeric weather values or quantities. Clock times are the only numeric exception and must use h:mmam/pm form, such as 2:02pm. Keep every prose field nonempty and concise. Do not issue weather warnings or promise safe conditions.' : 'Copy every required source ID into the sources array. Write concise professional prose without numeric weather values or quantities. Clock times are allowed only in h:mmam/pm form, such as 2:02pm.' }), text: { format: { type: 'json_schema', name: 'weather_briefing', strict: true, schema: { type: 'object', additionalProperties: false, properties, required: Object.keys(properties) } } },
         } });
         const text = (result.output || []).flatMap((o) => o.content || []).filter((c) => c.type === 'output_text').map((c) => c.text).join('');
         const content = JSON.parse(text);
-        const fields = ['headline', 'summary', 'nearTerm', 'extended', 'uncertainty'];
+        const fields = ['headline', 'summary', 'nearTerm', 'extended'];
         if (result.status !== 'completed') throw Object.assign(new Error('AI response was incomplete.'), { aiDiagnostic: 'AI_RESPONSE_INCOMPLETE' });
         if (fields.some((k) => typeof content[k] !== 'string' || !content[k].trim() || content[k].length > 1600)) throw Object.assign(new Error('AI prose structure failed validation.'), { aiDiagnostic: 'AI_PROSE_STRUCTURE' });
         if (fields.some((k) => hasUngroundedNumbers(content[k], facts))) throw Object.assign(new Error('AI numerical prose failed validation.'), { aiDiagnostic: 'AI_PROSE_CONTAINS_NONCLOCK_DIGITS' });
@@ -420,7 +408,8 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
         if (!Array.isArray(content.sources) || !['nws', 'afd', ...data.modelContributions.map(m=>m.id)].every((id) => content.sources.includes(id)) || content.sources.some((id) => !data.feeds.some((f) => f.id === id && f.status === 'ready'))) throw Object.assign(new Error('AI source attribution failed validation.'), { aiDiagnostic: 'AI_SOURCE_ATTRIBUTION' });
         if (/\b(all clear|no (?:active )?(?:warnings|severe weather)|guaranteed|perfectly safe)\b/i.test(fields.map((k) => content[k]).join(' '))) throw Object.assign(new Error('AI safety wording failed validation.'), { aiDiagnostic: 'AI_SAFETY_WORDING' });
         for (const k of fields) content[k] = normalizeClockTimes(content[k]);
-        return { ...content, mode: 'ai', signature: data.signature, generatedAt: iso(now()), model: env.WEATHER_FUSION_AI_MODEL || 'gpt-5-mini' };
+        const forecastChanges=validateChanges(content.forecastChanges,changeEvidence,now());
+        return { ...content, forecastChanges, uncertainty:forecastChanges.map(c=>`${c.periodLabel}: ${c.summary}`).join('\n\n'),changesVersion:CHANGES_VERSION, mode: 'ai', signature: data.signature, generatedAt: iso(now()), model: env.WEATHER_FUSION_AI_MODEL || 'gpt-5-mini' };
       } catch (error) {
         const diagnostic = typeof error.aiDiagnostic === 'string' && /^AI_[A-Z0-9_a-z.\-]{1,100}$/.test(error.aiDiagnostic) ? error.aiDiagnostic : error.name === 'TimeoutError' || error.name === 'AbortError' ? 'AI_PROVIDER_TIMEOUT' : error instanceof SyntaxError ? 'AI_RESPONSE_JSON' : 'AI_RESPONSE_UNAVAILABLE';
         console.warn('Weather Fusion AI synthesis failed:', diagnostic);
@@ -434,8 +423,10 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
       return { ...fallback(data, 'AI synthesis is temporarily unavailable; the verified source forecast remains visible.'), diagnostic: lastFailure || 'AI_REQUEST_LIMIT', retryAfter: iso(until) };
     });
     // A failed generation is not a successful 30-minute briefing cache entry.
-    if (briefing.mode !== 'ai') aiCache.values.delete(data.signature);
-    return briefing;
+    if (briefing.mode !== 'ai') aiCache.values.delete(briefingKey);
+    // Recheck validity on every cache hit; an ended event is never made current by retrieval.
+    const active=(briefing.forecastChanges||[]).filter(c=>c.discussionId===data.discussion?.id&&Date.parse(c.validUntil)>now()&&now()-Date.parse(c.discussionIssuedAt)<=12*HOUR);
+    return {...briefing,forecastChanges:active,uncertainty:active.map(c=>`${c.periodLabel}: ${c.summary}`).join('\n\n')};
   }
   async function search(query) {
     const text = clean(query, 80).trim();
@@ -474,7 +465,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
   });
-  for (const name of ['app.js', 'style.css', 'nav.js', 'experience.js', 'weather-math.js','hero-mode.js','dewpoint-meter.js','dewpoint-meter.css','comfort-effects.css','frame-player.js','comfort-outlook.js','forecast-layout.css','personal-details.js','personal-details.css','bulletin-facts.js','bulletins.js','current-temperature.js','hourly-feels.js','hourly-feels.css','exposure-scene.js','weather-state.js','weather-display.js','weather-repair.css','utci.js']) app.get(`/weather-fusion/${name}`, (_req, res) => {
+  for (const name of ['app.js', 'style.css', 'nav.js', 'experience.js', 'weather-math.js','hero-mode.js','dewpoint-meter.js','dewpoint-meter.css','comfort-effects.css','frame-player.js','comfort-outlook.js','forecast-layout.css','personal-details.js','personal-details.css','bulletin-facts.js','bulletins.js','current-temperature.js','hourly-feels.js','hourly-feels.css','exposure-scene.js','weather-state.js','weather-display.js','weather-repair.css','utci.js','outdoor-feels.js','forecast-changes.js']) app.get(`/weather-fusion/${name}`, (_req, res) => {
     res.setHeader('Cache-Control', 'no-cache');
     res.sendFile(path.join(PUBLIC_DIR, name));
   });

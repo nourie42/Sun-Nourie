@@ -1,9 +1,9 @@
 import {weatherState} from './weather-state.js';
-import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=outdoor-v1';
-import {degrees,feelsAt,dailyFeels,forecastValue,peakFeelsHTML} from './hourly-feels.js?v=outdoor-v1';
-import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=outdoor-v1';
-import {comfortMode,comfortWindow,comfortNarrative} from './comfort-outlook.js?v=outdoor-v1';
-import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js';
+import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=evidence-v1';
+import {degrees,feelsAt,dailyFeels,forecastValue,peakFeelsHTML} from './hourly-feels.js?v=evidence-v1';
+import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=evidence-v1';
+import {comfortMode,comfortWindow,comfortNarrative} from './comfort-outlook.js?v=evidence-v1';
+import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js?v=evidence-v1';
 import {resetDewpointMeter} from './dewpoint-meter.js?v=6-future';
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

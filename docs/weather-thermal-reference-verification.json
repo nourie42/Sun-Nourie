@@ -1,0 +1,56 @@
+{
+  "reference": "pythermalcomfort 4.4.2 UTCI (independent Python implementation)",
+  "source": "https://pythermalcomfort.readthedocs.io/en/stable/_modules/pythermalcomfort/models/utci.html",
+  "cases": 720,
+  "numericCases": 576,
+  "outOfDomainOrMissingCases": 144,
+  "maximumAbsoluteErrorF": 1.878674993349705e-11,
+  "passed": true,
+  "examples": [
+    {
+      "temperature": 66,
+      "humidity": 94,
+      "wind": 0,
+      "condition": "Clear",
+      "time": "2026-09-07T09:00Z",
+      "tr": 66,
+      "actual": 69.83658887563581,
+      "independentReferenceF": 69.83658887563583,
+      "absoluteErrorF": 1.4210854715202004e-14
+    },
+    {
+      "temperature": 66,
+      "humidity": 94,
+      "wind": 4.3,
+      "condition": "Clear",
+      "time": "2026-09-07T09:00Z",
+      "tr": 66,
+      "actual": 66.31106094110633,
+      "independentReferenceF": 66.31106094110633,
+      "absoluteErrorF": 0.0
+    },
+    {
+      "temperature": 88,
+      "humidity": 94,
+      "wind": 0,
+      "condition": "Clear",
+      "time": "2026-09-07T09:00Z",
+      "tr": 88,
+      "actual": 102.30376693947531,
+      "independentReferenceF": 102.30376693947537,
+      "absoluteErrorF": 5.684341886080802e-14
+    },
+    {
+      "temperature": 88,
+      "humidity": 94,
+      "wind": 4.3,
+      "condition": "Clear",
+      "time": "2026-09-07T09:00Z",
+      "tr": 88,
+      "actual": 100.65320984687531,
+      "independentReferenceF": 100.65320984687534,
+      "absoluteErrorF": 2.842170943040401e-14
+    }
+  ],
+  "scope": "Confirms UTCI arithmetic and domain handling, not physical accuracy of assumed MRT, airport representativeness, or individual skin sensation."
+}

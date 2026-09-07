@@ -1,4 +1,4 @@
-import {finite} from './weather-math.js';
+import {finite} from './weather-math.js?v=evidence-v1';
 export const OUTDOOR_FEELS_VERSION = 'weather-nourie-outdoor-v1';
 /** One exposure contract for every primary feels-like reading. The existing
  * thermal model is unchanged; shade is a separately named comparison, never

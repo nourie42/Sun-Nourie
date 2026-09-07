@@ -27,17 +27,17 @@ export function rebuildHourlyFeels(out,{now,temperatureAt,humidityAt,periods=[]}
   humidities.push({time,value:humidity,source:'Same-hour temperature and dew point; NWS humidity only when dew point is missing'});
   const value=round(estimate.value);
   const shadeValue=round(shade.value),sunValue=finite(sun.sun)?value:null;
-  feels.push({time,value,inputs,condition,exposure:'outdoors',shadeValue,sunValue,daylight:sun.daylight,weatherKind:sun.weatherKind,source:estimate.method,alignmentFactor:0,rawInputs:inputs});
+  feels.push({time,value,inputs,condition,exposure:'outdoors',shadeValue,sunValue,daylight:sun.daylight,weatherKind:sun.weatherKind,source:estimate.method,inputEvidence:sun.inputEvidence,alignmentFactor:0,rawInputs:inputs});
   shades.push({time,value:shadeValue,inputs,condition,exposure:'shade',source:shade.method});
   suns.push({time,value:sunValue,inputs,source:'Estimated sun-exposed apparent temperature at this forecast hour',daylight:sun.daylight});
   if(hour){hour.feelsLike=value;hour.feelsLikeShade=shadeValue;hour.feelsLikeSun=sunValue;hour.feelsLikeExposure='outdoors';hour.feelsLikeInputs=inputs;hour.apparent=value;}
  }
  series.temperature=temperatures;series.feels=feels;series.feelsShade=shades;series.feelsSun=suns;series.humidity=humidities;series.dewpoint=dewpoints;
  out.metricForecasts.comfortAlignment={status:'not-applied',note:'Forecast feels-like values use exactly the displayed temperature and the matching hourly dew point and wind. No separate temperature-only residual, daily maximum, or current observation is inserted into future hours.'};
- out.metricForecasts.notes.feels='One timestamp-matched outdoor exposure estimate per hour, including the same sky and sunlight estimate shown by the outdoor figure. Shade is retained separately in feelsShade. UTCI remains the all-season base; in warm humid air the warmer Steadman vapor-pressure result is kept as a moisture safeguard so cloud cover does not erase the dew-point effect. The current card uses observed conditions; future values use forecast inputs, not current humidity or a recycled daily value. Daily summaries use extrema of these same hourly values. Missing hours stay blank; this is a forecast, not a guarantee.';
+ out.metricForecasts.notes.feels='One timestamp-matched outdoor exposure estimate per hour, including the same sky and sunlight estimate shown by the outdoor figure. Shade is retained separately in feelsShade. The published UTCI equation is the all-season base, without a warmer-formula override. Source wind, calm-wind handling and estimated radiation are disclosed separately. The current card uses observed conditions; future values use forecast inputs, not current humidity or a recycled daily value. Daily summaries use extrema of these same hourly values. Missing hours stay blank; this is a forecast, not a guarantee.';
  out.outdoorFeelsVersion=OUTDOOR_FEELS_VERSION;
  if(out.current){
-  out.comfort=out.comfort||thermalComfort(out.current,out.location,now);
+  out.comfort=thermalComfort(out.current,out.location,now);
   out.current.feelsLike=out.comfort.outdoors;out.current.feelsLikeShade=out.comfort.shade;
   out.current.feelsLikeSun=out.comfort.sun;out.current.feelsLikeExposure='outdoors';
  }

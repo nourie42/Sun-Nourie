@@ -19,17 +19,22 @@ function make(condition='Sunny',time=now,patch={}){
  rebuildHourlyFeels(f,{now:time,temperatureAt:()=>({value:null}),humidityAt:()=>null});
  return f;
 }
-test('86 shade versus 94 sunlight: every main current display selects 94, not 86',()=>{
- const f=make();f.comfort={...f.comfort,shade:86,sun:94,outdoors:94,daylight:true,weatherKind:'clear'};
+test('every current display calculates from raw inputs rather than trusting a painted sun value',()=>{
+ const f=make(),expected=thermalComfort(f.current,f.location,now);
+ f.comfort={...expected,shade:999,sun:999,outdoors:999};
  const sample=currentSample(f,now);
- assert.equal(sample.feels,94);assert.match(heroFeelsHTML(sample),/<strong>94°<\/strong>/);
+ assert.equal(sample.feels,expected.outdoors);assert.notEqual(sample.feels,999);
+ assert.match(heroFeelsHTML(sample),new RegExp('<strong>'+Math.round(expected.outdoors)+'°</strong>'));
  assert.match(heroFeelsHTML(sample),/In direct sun/);
  const root={innerHTML:'',scrollLeft:35};globalThis.document={getElementById:()=>root};
- try{renderHourlyWeather(f,now);assert.match(root.innerHTML,/<span>Now<\/span>.*?Feels like<b>94°<\/b>/);assert.equal(root.scrollLeft,35);}
+ try{renderHourlyWeather(f,now);assert.match(root.innerHTML,new RegExp('<span>Now</span>.*?Feels like<b>'+Math.round(expected.outdoors)+'°</b>'));assert.equal(root.scrollLeft,35);}
  finally{delete globalThis.document;}
- const figures=sunShadeHTML(f.comfort,f.location,now);
- assert.match(figures,/shade-person.*?<strong>86°<\/strong>/s);assert.match(figures,/sun-person.*?<strong>94°<\/strong>/s);
+ const figures=sunShadeHTML(sample.comfort,f.location,now);
+ assert.match(figures,new RegExp('shade-person.*?<strong>'+Math.round(expected.shade)+'°</strong>','s'));
+ assert.match(figures,new RegExp('sun-person.*?<strong>'+Math.round(expected.outdoors)+'°</strong>','s'));
+ assert.ok(!figures.includes('999°'));
 });
+
 for(const [condition,time] of [['Sunny',now],['Partly Cloudy',now],['Overcast',now],['Rain',now],['Thunderstorms',now],['Snow',now],['Fog',now],['',now],['Clear',Date.parse('2026-09-07T03:00:00Z')]]){
  test(`same sky/exposure across API, Now and future preview: ${condition||'unknown'} ${time}`,()=>{
   const f=make(condition,time),sample=currentSample(f,time);
