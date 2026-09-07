@@ -1,7 +1,7 @@
 name: Weather Nourie reviewed integrity
 on:
   push:
-    branches: [fix/weather-reviewed-integrity, main]
+    branches: [fix/weather-reviewed-integrity, fix/weather-current-feels-inputs, main]
     paths:
       - 'scripts/repair_weather_*.py'
       - 'scripts/verifyWeatherIntegrity*.py'
@@ -19,7 +19,7 @@ permissions:
   contents: write
 jobs:
   verify:
-    if: github.ref == 'refs/heads/fix/weather-reviewed-integrity'
+    if: github.ref == 'refs/heads/fix/weather-reviewed-integrity' || github.ref == 'refs/heads/fix/weather-current-feels-inputs'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -86,8 +86,8 @@ jobs:
           PY
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m "Verify forecast integrity: dated Dan take, hourly sky, independent UTCI and centered temperatures"
-          git push origin HEAD:fix/weather-reviewed-integrity
+          git commit -m "Verify current feels-like fallback and forecast integrity"
+          git push origin HEAD:fix/weather-current-feels-inputs
           echo "Verified commit: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         if: always()
