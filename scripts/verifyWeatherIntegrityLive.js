@@ -70,7 +70,7 @@ try{
   // Evidence lives inside a native collapsed details element. Exercise the
   // user's actual open-details interaction before asserting visible text.
   const calculationDetails=page.locator('details').filter({has:page.locator('#thermal-input-evidence')});
-  if(!(await calculationDetails.getAttribute('open')))await calculationDetails.locator(':scope > summary').click();
+  if((await calculationDetails.getAttribute('open'))===null)await calculationDetails.locator(':scope > summary').click();
   await page.locator('#thermal-input-evidence').waitFor({state:'visible'});
   assert.match(await page.locator('#thermal-input-evidence').innerText(),/Current station inputs/);
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
@@ -78,7 +78,9 @@ try{
   assert.ok(center.every(x=>x<=1));
   const first=page.locator('#hourly .forecast-hour').first();
   if(await first.count()){
-   const time=await first.getAttribute('data-time'),point=f.metricForecasts.series.feels.find(p=>p.time===time);
+   const time=await first.getAttribute('data-time');
+   const point=f.metricForecasts.series.feels.find(p=>Date.parse(p.time)===Date.parse(time));
+   assert.ok(point,'Rendered hourly instant must have its own calculation inputs');
    await first.click();assert.equal((await page.locator('.sun-person figcaption strong').innerText()).trim(),Number.isFinite(point.value)?degrees(point.value):'Unavailable');
   }
   const last=dailyFeels(f,6,Date.now()).high?.high;
