@@ -1,0 +1,590 @@
+{
+  "checkedAt": "2026-09-07T09:20:27.838Z",
+  "rows": [
+    {
+      "query": "location=knightdale",
+      "location": {
+        "id": "knightdale",
+        "name": "Knightdale / Raleigh",
+        "latitude": 35.787,
+        "longitude": -78.4806,
+        "timeZone": "America/New_York",
+        "office": "RAH"
+      },
+      "feeds": [
+        {
+          "id": "point",
+          "label": "NWS location",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:17:00.779Z",
+          "issuedAt": null,
+          "url": "https://api.weather.gov/points/35.787,-78.4806"
+        },
+        {
+          "id": "nws",
+          "label": "NWS forecast",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:17:00.873Z",
+          "issuedAt": "2026-09-07T06:28:39+00:00",
+          "url": "https://api.weather.gov/gridpoints/RAH/80,58/forecast"
+        },
+        {
+          "id": "hourly",
+          "label": "NWS hourly",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:17:00.818Z",
+          "issuedAt": "2026-09-07T06:28:39+00:00",
+          "url": "https://api.weather.gov/gridpoints/RAH/80,58/forecast/hourly"
+        },
+        {
+          "id": "grid",
+          "label": "NWS precipitation grid",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:17:00.866Z",
+          "issuedAt": "2026-09-07T06:28:39+00:00",
+          "url": "https://api.weather.gov/gridpoints/RAH/80,58"
+        },
+        {
+          "id": "alerts",
+          "label": "Official NWS alerts",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:20:24.937Z",
+          "issuedAt": null,
+          "url": "https://api.weather.gov/alerts/active?point=35.787,-78.4806"
+        },
+        {
+          "id": "afd",
+          "label": "NWS RAH discussion",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:17:00.873Z",
+          "issuedAt": "2026-09-07T07:01:00+00:00",
+          "url": "https://api.weather.gov/products/types/AFD/locations/RAH"
+        },
+        {
+          "id": "observation",
+          "label": "Nearby station observation",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:17:00.810Z",
+          "issuedAt": "2026-09-07T08:35:00+00:00",
+          "url": "https://api.weather.gov/gridpoints/RAH/80,58/stations"
+        },
+        {
+          "id": "special-discussions",
+          "label": "SPC special weather discussions",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:20:24.846Z",
+          "issuedAt": null,
+          "url": "https://www.spc.noaa.gov/products/md/"
+        },
+        {
+          "id": "hrrr",
+          "label": "NOAA HRRR · 3 km",
+          "url": "https://www.nco.ncep.noaa.gov/pmb/products/hrrr/",
+          "issuedAt": "2026-09-07T04:00:00Z",
+          "fetchedAt": "2026-09-07T09:20:24.744Z",
+          "transport": "Native GRIB2 → verified snapshot",
+          "contributes": true,
+          "status": "ready",
+          "validUntil": "2026-09-07T22:00:00Z",
+          "resolution": "3 km native grid",
+          "message": "3 km native grid; native grid extraction; initialized 2026-09-07T04:00:00Z.",
+          "snapshotUrl": "https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/hrrr.json"
+        },
+        {
+          "id": "ecmwf",
+          "label": "ECMWF IFS · 0.25° Open Data",
+          "url": "https://www.ecmwf.int/en/forecasts/datasets/open-data",
+          "issuedAt": "2026-09-06T12:00:00Z",
+          "fetchedAt": "2026-09-07T09:20:24.746Z",
+          "transport": "Native GRIB2 → verified snapshot",
+          "contributes": true,
+          "status": "ready",
+          "validUntil": "2026-09-16T12:00:00Z",
+          "resolution": "0.25° Open Data grid",
+          "message": "0.25° Open Data grid; native grid extraction; initialized 2026-09-06T12:00:00Z.",
+          "snapshotUrl": "https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/ecmwf.json"
+        },
+        {
+          "id": "nbm",
+          "label": "NOAA National Blend · 2.5 km",
+          "url": "https://www.nco.ncep.noaa.gov/pmb/products/blend/",
+          "issuedAt": "2026-09-07T00:00:00Z",
+          "fetchedAt": "2026-09-07T09:20:24.747Z",
+          "transport": "Native GRIB2 → verified snapshot",
+          "contributes": true,
+          "status": "ready",
+          "validUntil": "2026-09-17T00:00:00Z",
+          "resolution": "2.5 km native grid",
+          "message": "2.5 km native grid; native grid extraction; initialized 2026-09-07T00:00:00Z.",
+          "snapshotUrl": "https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/nbm.json"
+        }
+      ],
+      "briefing": {
+        "headline": "Sunny start, showers and storms possible late week",
+        "summary": "High pressure brings dry, mostly sunny weather through midweek. Showers and storms become more likely late in the week as a front approaches.",
+        "nearTerm": "Today will be mostly sunny with low humidity and light east winds. Nights will be mostly clear and a bit cool for early September.",
+        "extended": "Southerly flow will warm and humidify the region midweek. Shower and storm chances increase Thursday into Friday as a front approaches.",
+        "uncertainty": "",
+        "forecastChanges": [],
+        "sources": [
+          "nws",
+          "afd",
+          "hrrr",
+          "ecmwf",
+          "nbm"
+        ],
+        "danTakeVersion": "weather-nourie-dans-take-v2",
+        "danTakeSource": {
+          "id": "dad80929-ba34-41d6-8d78-1db8218511b5",
+          "office": "RAH",
+          "issuedAt": "2026-09-07T07:01:00+00:00",
+          "locationKey": "35.787,-78.4806",
+          "expiresAt": "2026-09-07T19:01:00.000Z"
+        },
+        "danTakeStatus": "no-approved-change",
+        "mode": "ai",
+        "signature": "343426570b22aa287e6ee104",
+        "generatedAt": "2026-09-07T09:17:24.127Z",
+        "model": "gpt-5-mini"
+      }
+    },
+    {
+      "query": "latitude=34.6385&longitude=-78.5025",
+      "location": {
+        "latitude": 34.6385,
+        "longitude": -78.5025,
+        "name": "White Lake, NC",
+        "id": "",
+        "timeZone": "America/New_York",
+        "office": "ILM"
+      },
+      "feeds": [
+        {
+          "id": "point",
+          "label": "NWS location",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:17:19.810Z",
+          "issuedAt": null,
+          "url": "https://api.weather.gov/points/34.6385,-78.5025"
+        },
+        {
+          "id": "nws",
+          "label": "NWS forecast",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:17:19.853Z",
+          "issuedAt": "2026-09-07T09:02:33+00:00",
+          "url": "https://api.weather.gov/gridpoints/ILM/67,91/forecast"
+        },
+        {
+          "id": "hourly",
+          "label": "NWS hourly",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:17:19.872Z",
+          "issuedAt": "2026-09-07T09:02:33+00:00",
+          "url": "https://api.weather.gov/gridpoints/ILM/67,91/forecast/hourly"
+        },
+        {
+          "id": "grid",
+          "label": "NWS precipitation grid",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:17:19.875Z",
+          "issuedAt": "2026-09-07T09:02:33+00:00",
+          "url": "https://api.weather.gov/gridpoints/ILM/67,91"
+        },
+        {
+          "id": "alerts",
+          "label": "Official NWS alerts",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:20:25.788Z",
+          "issuedAt": null,
+          "url": "https://api.weather.gov/alerts/active?point=34.6385,-78.5025"
+        },
+        {
+          "id": "afd",
+          "label": "NWS ILM discussion",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:17:19.937Z",
+          "issuedAt": "2026-09-07T05:47:00+00:00",
+          "url": "https://api.weather.gov/products/types/AFD/locations/ILM"
+        },
+        {
+          "id": "observation",
+          "label": "Nearby station observation",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:17:19.855Z",
+          "issuedAt": "2026-09-07T08:35:00+00:00",
+          "url": "https://api.weather.gov/gridpoints/ILM/67,91/stations"
+        },
+        {
+          "id": "special-discussions",
+          "label": "SPC special weather discussions",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:20:25.724Z",
+          "issuedAt": null,
+          "url": "https://www.spc.noaa.gov/products/md/"
+        },
+        {
+          "id": "hrrr",
+          "label": "NOAA HRRR · 3 km",
+          "url": "https://www.nco.ncep.noaa.gov/pmb/products/hrrr/",
+          "issuedAt": "2026-09-07T04:00:00Z",
+          "fetchedAt": "2026-09-07T09:20:25.666Z",
+          "transport": "Native GRIB2 → verified snapshot",
+          "contributes": false,
+          "status": "not-covered",
+          "validUntil": "2026-09-07T22:00:00Z",
+          "resolution": "3 km native grid",
+          "message": "Direct model collection currently covers the two saved locations. This location uses NWS only.",
+          "snapshotUrl": "https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/hrrr.json"
+        },
+        {
+          "id": "ecmwf",
+          "label": "ECMWF IFS · 0.25° Open Data",
+          "url": "https://www.ecmwf.int/en/forecasts/datasets/open-data",
+          "issuedAt": "2026-09-06T12:00:00Z",
+          "fetchedAt": "2026-09-07T09:20:25.666Z",
+          "transport": "Native GRIB2 → verified snapshot",
+          "contributes": false,
+          "status": "not-covered",
+          "validUntil": "2026-09-16T12:00:00Z",
+          "resolution": "0.25° Open Data grid",
+          "message": "Direct model collection currently covers the two saved locations. This location uses NWS only.",
+          "snapshotUrl": "https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/ecmwf.json"
+        },
+        {
+          "id": "nbm",
+          "label": "NOAA National Blend · 2.5 km",
+          "url": "https://www.nco.ncep.noaa.gov/pmb/products/blend/",
+          "issuedAt": "2026-09-07T00:00:00Z",
+          "fetchedAt": "2026-09-07T09:20:25.666Z",
+          "transport": "Native GRIB2 → verified snapshot",
+          "contributes": false,
+          "status": "not-covered",
+          "validUntil": "2026-09-17T00:00:00Z",
+          "resolution": "2.5 km native grid",
+          "message": "Direct model collection currently covers the two saved locations. This location uses NWS only.",
+          "snapshotUrl": "https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/nbm.json"
+        }
+      ],
+      "briefing": {
+        "mode": "nws-summary",
+        "signature": "54a1667dc5d156666147f38e",
+        "generatedAt": "2026-09-07T09:20:26.291Z",
+        "reason": "AI is cooling down after an unavailable response; official guidance is shown.",
+        "headline": "Sunny",
+        "summary": "Sunny, with a high near 87. Northeast wind 3 to 8 mph, with gusts as high as 17 mph.",
+        "nearTerm": "Mostly clear, with a low around 66. Northeast wind 2 to 6 mph.",
+        "extended": "Sunny, with a high near 88. East wind around 7 mph.",
+        "uncertainty": "",
+        "danTakeVersion": "weather-nourie-dans-take-v2",
+        "danTakeSource": {
+          "id": "6bab62da-2590-4e55-be2d-fc6057b63680",
+          "office": "ILM",
+          "issuedAt": "2026-09-07T05:47:00+00:00",
+          "locationKey": "34.6385,-78.5025",
+          "expiresAt": "2026-09-07T17:47:00.000Z"
+        },
+        "danTakeStatus": "no-explicit-future-change",
+        "forecastChanges": [],
+        "sources": [
+          "nws",
+          "afd"
+        ],
+        "diagnostic": "AI_SOURCE_ATTRIBUTION",
+        "retryAfter": "2026-09-07T09:22:31.233Z"
+      }
+    },
+    {
+      "query": "latitude=30.3322&longitude=-81.6557",
+      "location": {
+        "latitude": 30.3322,
+        "longitude": -81.6557,
+        "name": "Jacksonville, FL",
+        "id": "",
+        "timeZone": "America/New_York",
+        "office": "JAX"
+      },
+      "feeds": [
+        {
+          "id": "point",
+          "label": "NWS location",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:17:21.365Z",
+          "issuedAt": null,
+          "url": "https://api.weather.gov/points/30.3322,-81.6557"
+        },
+        {
+          "id": "nws",
+          "label": "NWS forecast",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:17:21.526Z",
+          "issuedAt": "2026-09-07T06:21:31+00:00",
+          "url": "https://api.weather.gov/gridpoints/JAX/66,65/forecast"
+        },
+        {
+          "id": "hourly",
+          "label": "NWS hourly",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:17:21.646Z",
+          "issuedAt": "2026-09-07T06:21:31+00:00",
+          "url": "https://api.weather.gov/gridpoints/JAX/66,65/forecast/hourly"
+        },
+        {
+          "id": "grid",
+          "label": "NWS precipitation grid",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:17:21.600Z",
+          "issuedAt": "2026-09-07T06:21:31+00:00",
+          "url": "https://api.weather.gov/gridpoints/JAX/66,65"
+        },
+        {
+          "id": "alerts",
+          "label": "Official NWS alerts",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:20:26.433Z",
+          "issuedAt": null,
+          "url": "https://api.weather.gov/alerts/active?point=30.3322,-81.6557"
+        },
+        {
+          "id": "afd",
+          "label": "NWS JAX discussion",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:17:21.481Z",
+          "issuedAt": "2026-09-07T06:09:00+00:00",
+          "url": "https://api.weather.gov/products/types/AFD/locations/JAX"
+        },
+        {
+          "id": "observation",
+          "label": "Nearby station observation",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:17:21.407Z",
+          "issuedAt": "2026-09-07T08:53:00+00:00",
+          "url": "https://api.weather.gov/gridpoints/JAX/66,65/stations"
+        },
+        {
+          "id": "special-discussions",
+          "label": "SPC special weather discussions",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:20:26.381Z",
+          "issuedAt": null,
+          "url": "https://www.spc.noaa.gov/products/md/"
+        },
+        {
+          "id": "hrrr",
+          "label": "NOAA HRRR · 3 km",
+          "url": "https://www.nco.ncep.noaa.gov/pmb/products/hrrr/",
+          "issuedAt": "2026-09-07T04:00:00Z",
+          "fetchedAt": "2026-09-07T09:20:26.329Z",
+          "transport": "Native GRIB2 → verified snapshot",
+          "contributes": false,
+          "status": "not-covered",
+          "validUntil": "2026-09-07T22:00:00Z",
+          "resolution": "3 km native grid",
+          "message": "Direct model collection currently covers the two saved locations. This location uses NWS only.",
+          "snapshotUrl": "https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/hrrr.json"
+        },
+        {
+          "id": "ecmwf",
+          "label": "ECMWF IFS · 0.25° Open Data",
+          "url": "https://www.ecmwf.int/en/forecasts/datasets/open-data",
+          "issuedAt": "2026-09-06T12:00:00Z",
+          "fetchedAt": "2026-09-07T09:20:26.329Z",
+          "transport": "Native GRIB2 → verified snapshot",
+          "contributes": false,
+          "status": "not-covered",
+          "validUntil": "2026-09-16T12:00:00Z",
+          "resolution": "0.25° Open Data grid",
+          "message": "Direct model collection currently covers the two saved locations. This location uses NWS only.",
+          "snapshotUrl": "https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/ecmwf.json"
+        },
+        {
+          "id": "nbm",
+          "label": "NOAA National Blend · 2.5 km",
+          "url": "https://www.nco.ncep.noaa.gov/pmb/products/blend/",
+          "issuedAt": "2026-09-07T00:00:00Z",
+          "fetchedAt": "2026-09-07T09:20:26.329Z",
+          "transport": "Native GRIB2 → verified snapshot",
+          "contributes": false,
+          "status": "not-covered",
+          "validUntil": "2026-09-17T00:00:00Z",
+          "resolution": "2.5 km native grid",
+          "message": "Direct model collection currently covers the two saved locations. This location uses NWS only.",
+          "snapshotUrl": "https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/nbm.json"
+        }
+      ],
+      "briefing": {
+        "mode": "nws-summary",
+        "signature": "ce0d3c2f1c3c66b2275bb411",
+        "generatedAt": "2026-09-07T09:20:27.042Z",
+        "reason": "AI is cooling down after an unavailable response; official guidance is shown.",
+        "headline": "Slight Chance Showers And Thunderstorms then Showers And Thunderstorms Likely",
+        "summary": "A slight chance of showers and thunderstorms before 7am, then a chance of showers and thunderstorms between 7am and 8am, then a chance of showers and thunderstorms between 8am and 11am, then showers and thunderstorms likely between 11am and 2pm, then showers and thunderstorms likely between 2pm and 5pm, then showers and thunderstorms likely. Mostly cloudy. High near 87, with temperatures falling to around 82 in the afternoon. North wind 2 to 9 mph. Chance of precipitation is 70%. New rainfall amounts between a quarter and half of an inch possible.",
+        "nearTerm": "Showers and thunderstorms likely before 7pm, then a chance of showers and thunderstorms between 7pm and 11pm, then a chance of showers and thunderstorms between 11pm and midnight, then a slight chance of showers and thunderstorms between midnight and 1am, then a chance of showers and thunderstorms. Mostly cloudy. Low around 75, with temperatures rising to around 76 overnight. Northeast wind 2 to 9 mph. Chance of precipitation is 60%. New rainfall amounts between a quarter and half of an inch possible.",
+        "extended": "A chance of rain showers before 11am, then a chance of showers and thunderstorms between 11am and 4pm, then showers and thunderstorms likely. Partly sunny. High near 86, with temperatures falling to around 82 in the afternoon. Northeast wind 3 to 13 mph, with gusts as high as 17 mph. Chance of precipitation is 60%.",
+        "uncertainty": "",
+        "danTakeVersion": "weather-nourie-dans-take-v2",
+        "danTakeSource": {
+          "id": "7a7ec5e7-e082-4973-b3c0-ce66b6e2c826",
+          "office": "JAX",
+          "issuedAt": "2026-09-07T06:09:00+00:00",
+          "locationKey": "30.3322,-81.6557",
+          "expiresAt": "2026-09-07T18:09:00.000Z"
+        },
+        "danTakeStatus": "no-approved-change",
+        "forecastChanges": [],
+        "sources": [
+          "nws",
+          "afd"
+        ],
+        "diagnostic": "AI_SOURCE_ATTRIBUTION",
+        "retryAfter": "2026-09-07T09:22:33.604Z"
+      }
+    },
+    {
+      "query": "latitude=39.7392&longitude=-104.9903",
+      "location": {
+        "latitude": 39.7392,
+        "longitude": -104.9903,
+        "name": "Denver, CO",
+        "id": "",
+        "timeZone": "America/Denver",
+        "office": "BOU"
+      },
+      "feeds": [
+        {
+          "id": "point",
+          "label": "NWS location",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:17:22.972Z",
+          "issuedAt": null,
+          "url": "https://api.weather.gov/points/39.7392,-104.9903"
+        },
+        {
+          "id": "nws",
+          "label": "NWS forecast",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:17:22.993Z",
+          "issuedAt": "2026-09-07T06:46:30+00:00",
+          "url": "https://api.weather.gov/gridpoints/BOU/63,62/forecast"
+        },
+        {
+          "id": "hourly",
+          "label": "NWS hourly",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:17:22.996Z",
+          "issuedAt": "2026-09-07T08:56:10+00:00",
+          "url": "https://api.weather.gov/gridpoints/BOU/63,62/forecast/hourly"
+        },
+        {
+          "id": "grid",
+          "label": "NWS precipitation grid",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:17:23.001Z",
+          "issuedAt": "2026-09-07T08:56:10+00:00",
+          "url": "https://api.weather.gov/gridpoints/BOU/63,62"
+        },
+        {
+          "id": "alerts",
+          "label": "Official NWS alerts",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:20:27.248Z",
+          "issuedAt": null,
+          "url": "https://api.weather.gov/alerts/active?point=39.7392,-104.9903"
+        },
+        {
+          "id": "afd",
+          "label": "NWS BOU discussion",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:17:23.073Z",
+          "issuedAt": "2026-09-07T08:39:00+00:00",
+          "url": "https://api.weather.gov/products/types/AFD/locations/BOU"
+        },
+        {
+          "id": "observation",
+          "label": "Nearby station observation",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:17:22.997Z",
+          "issuedAt": "2026-09-07T07:58:00+00:00",
+          "url": "https://api.weather.gov/gridpoints/BOU/63,62/stations"
+        },
+        {
+          "id": "special-discussions",
+          "label": "SPC special weather discussions",
+          "status": "ready",
+          "fetchedAt": "2026-09-07T09:20:27.122Z",
+          "issuedAt": null,
+          "url": "https://www.spc.noaa.gov/products/md/"
+        },
+        {
+          "id": "hrrr",
+          "label": "NOAA HRRR · 3 km",
+          "url": "https://www.nco.ncep.noaa.gov/pmb/products/hrrr/",
+          "issuedAt": "2026-09-07T04:00:00Z",
+          "fetchedAt": "2026-09-07T09:20:27.084Z",
+          "transport": "Native GRIB2 → verified snapshot",
+          "contributes": false,
+          "status": "not-covered",
+          "validUntil": "2026-09-07T22:00:00Z",
+          "resolution": "3 km native grid",
+          "message": "Direct model collection currently covers the two saved locations. This location uses NWS only.",
+          "snapshotUrl": "https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/hrrr.json"
+        },
+        {
+          "id": "ecmwf",
+          "label": "ECMWF IFS · 0.25° Open Data",
+          "url": "https://www.ecmwf.int/en/forecasts/datasets/open-data",
+          "issuedAt": "2026-09-06T12:00:00Z",
+          "fetchedAt": "2026-09-07T09:20:27.084Z",
+          "transport": "Native GRIB2 → verified snapshot",
+          "contributes": false,
+          "status": "not-covered",
+          "validUntil": "2026-09-16T12:00:00Z",
+          "resolution": "0.25° Open Data grid",
+          "message": "Direct model collection currently covers the two saved locations. This location uses NWS only.",
+          "snapshotUrl": "https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/ecmwf.json"
+        },
+        {
+          "id": "nbm",
+          "label": "NOAA National Blend · 2.5 km",
+          "url": "https://www.nco.ncep.noaa.gov/pmb/products/blend/",
+          "issuedAt": "2026-09-07T00:00:00Z",
+          "fetchedAt": "2026-09-07T09:20:27.084Z",
+          "transport": "Native GRIB2 → verified snapshot",
+          "contributes": false,
+          "status": "not-covered",
+          "validUntil": "2026-09-17T00:00:00Z",
+          "resolution": "2.5 km native grid",
+          "message": "Direct model collection currently covers the two saved locations. This location uses NWS only.",
+          "snapshotUrl": "https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/nbm.json"
+        }
+      ],
+      "briefing": {
+        "mode": "nws-summary",
+        "signature": "2a9e8c0cee0b138b10fc022c",
+        "generatedAt": "2026-09-07T09:20:27.824Z",
+        "reason": "AI is cooling down after an unavailable response; official guidance is shown.",
+        "headline": "Partly Sunny then Chance Showers And Thunderstorms",
+        "summary": "A chance of showers and thunderstorms after noon. Partly sunny. High near 91, with temperatures falling to around 86 in the afternoon. East wind 2 to 7 mph. Chance of precipitation is 30%.",
+        "nearTerm": "A slight chance of showers and thunderstorms before 9pm. Mostly cloudy. Low around 63, with temperatures rising to around 65 overnight. West southwest wind around 5 mph. Chance of precipitation is 20%.",
+        "extended": "A slight chance of rain showers between noon and 3pm, then a slight chance of showers and thunderstorms. Mostly sunny, with a high near 87. East northeast wind 2 to 7 mph, with gusts as high as 16 mph. Chance of precipitation is 20%.",
+        "uncertainty": "",
+        "danTakeVersion": "weather-nourie-dans-take-v2",
+        "danTakeSource": {
+          "id": "35f83fb3-ee34-45ec-84b6-4406d027a924",
+          "office": "BOU",
+          "issuedAt": "2026-09-07T08:39:00+00:00",
+          "locationKey": "39.7392,-104.9903",
+          "expiresAt": "2026-09-07T20:39:00.000Z"
+        },
+        "danTakeStatus": "no-explicit-future-change",
+        "forecastChanges": [],
+        "sources": [
+          "nws",
+          "afd"
+        ],
+        "diagnostic": "AI_PROSE_CONTAINS_NONCLOCK_DIGITS",
+        "retryAfter": "2026-09-07T09:22:35.655Z"
+      }
+    }
+  ]
+}
