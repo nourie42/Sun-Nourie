@@ -1,0 +1,36 @@
+name: Read dated Dan take live diagnostic
+on:
+  push:
+    branches: [verification/dans-take-diagnostic]
+    paths: ['.github/workflows/read-dans-take-proof.yml']
+permissions:
+  contents: write
+  actions: read
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: weather-dans-take-live-proof
+          github-token: ${{ github.token }}
+          repository: nourie42/Sun-Nourie
+          run-id: 34105079022
+          path: /tmp/take-proof
+      - name: Preserve the actual failed verification report
+        run: |
+          cp /tmp/take-proof/weather-dans-take-live.json docs/weather-dans-take-live-diagnostic.json
+          python - <<'PY'
+          import json
+          d=json.load(open('docs/weather-dans-take-live-diagnostic.json'))
+          print('Original verification success:',d['success'])
+          for p in d['locations']:
+              print(p['place'],p['aiMode'],p['aiReason'],p['takeStatus'],len(p['eligibleExcerpts']))
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/weather-dans-take-live-diagnostic.json
+          git commit -m 'Record original failed live verification evidence for diagnosis'
+          git push origin HEAD:verification/dans-take-diagnostic
