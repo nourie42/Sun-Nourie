@@ -175,9 +175,11 @@ export function danTakeText(items){
   const groups=new Map();
   for(const item of Array.isArray(items)?items:[]){
     if(!item?.period||!item?.summary)continue;
+    const summary=item.summary.trim().replace(/^(?:Dan['’]s take\s*:\s*)+/i,'').trim();
+    if(!summary)continue;
     if(!groups.has(item.period))groups.set(item.period,[]);
-    const list=groups.get(item.period),key=item.summary.toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
-    if(!list.some(entry=>entry.key===key))list.push({key,text:item.summary.trim()});
+    const list=groups.get(item.period),key=summary.toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+    if(!list.some(entry=>entry.key===key))list.push({key,text:summary});
   }
   return [...groups].map(([period,list])=>`${period}: ${list.map(x=>x.text).join(' ')}`).join('\n\n');
 }
