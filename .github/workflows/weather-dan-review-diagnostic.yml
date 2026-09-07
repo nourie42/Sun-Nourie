@@ -1,0 +1,37 @@
+name: Review actual Dan take source decisions
+on:
+  push:
+    branches: [fix/weather-reviewed-integrity]
+    paths: ['.github/workflows/weather-dan-review-diagnostic.yml']
+permissions:
+  contents: write
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: main}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Inspect public forecast evidence and briefing decisions
+        run: |
+          node --input-type=module - <<'JS'
+          import fs from 'node:fs/promises';
+          import {collectDanTakeEvidence} from './public/weather-fusion/dans-take.js';
+          const rows=[];
+          for(const query of ['location=knightdale','latitude=39.7392&longitude=-104.9903']){
+            const base='https://sun-nourie-live.onrender.com/api/weather-fusion/';
+            const f=await (await fetch(base+'forecast?'+query,{signal:AbortSignal.timeout(60000)})).json();
+            const b=await (await fetch(base+'briefing?'+query,{signal:AbortSignal.timeout(90000)})).json();
+            const context=collectDanTakeEvidence(f);
+            const row={query,location:f.location,discussion:f.discussion,context,briefing:b};
+            rows.push(row);console.log('SOURCE_DECISION',JSON.stringify({query,candidates:context.candidates,status:context.status,briefing:b}));
+          }
+          await fs.writeFile('docs/weather-reviewed-dan-diagnostic.json',JSON.stringify({checkedAt:new Date().toISOString(),rows},null,2));
+          JS
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/weather-reviewed-dan-diagnostic.json
+          git commit -m 'Record actual source evidence and AI take decisions'
+          git push origin HEAD:refs/heads/verification/reviewed-dan-source-decisions
