@@ -1,0 +1,184 @@
+{
+  "commit": "8d885579c26802527b7700ed4107e904fbfe35dc",
+  "checkedAt": "2026-09-07T12:14:26.415Z",
+  "fixture": false,
+  "success": true,
+  "checks": [
+    {
+      "label": "initial-page",
+      "checkedAt": "2026-09-07T12:14:47.416Z",
+      "assembledAt": "2026-09-07T12:14:32.204Z",
+      "sourceCheckedAt": "2026-09-07T12:14:32.062Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "f11c3ea5a56acf12a5f5be51",
+      "discussionId": "1cec486c-9803-4664-b82c-673729b544f3",
+      "issuedAt": "2026-09-07T11:46:00+00:00",
+      "cachedItems": [
+        {
+          "evidenceId": "s2-p6-q3",
+          "summary": "The strongest lift with the system is expected north of NC, so it is unclear how widespread the rain will be when the front passes.",
+          "period": "This coming week — Thursday, Sep 10 – Friday, Sep 11",
+          "sourceQuote": "That said the strongest forcing for ascent associated with the trough should be displaced well north of NC and it remains to be seen just how much QPF is realized with the front when it arrives.",
+          "section": "DISCUSSION",
+          "sectionIssuedAt": "2026-09-07T07:00:00.000Z",
+          "validFrom": "2026-09-10T22:00:00.000Z",
+          "eventEnd": "2026-09-12T04:00:00.000Z",
+          "validUntil": "2026-09-07T23:46:00.000Z"
+        }
+      ],
+      "visible": true,
+      "text": "This coming week — Thursday, Sep 10 – Friday, Sep 11: The strongest lift with the system is expected north of NC, so it is unclear how widespread the rain will be when the front passes."
+    },
+    {
+      "label": "refresh-1",
+      "checkedAt": "2026-09-07T12:15:53.183Z",
+      "assembledAt": "2026-09-07T12:15:47.279Z",
+      "sourceCheckedAt": "2026-09-07T12:14:32.062Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "f11c3ea5a56acf12a5f5be51",
+      "discussionId": "1cec486c-9803-4664-b82c-673729b544f3",
+      "issuedAt": "2026-09-07T11:46:00+00:00",
+      "cachedItems": [
+        {
+          "evidenceId": "s2-p6-q3",
+          "summary": "The strongest lift with the system is expected north of NC, so it is unclear how widespread the rain will be when the front passes.",
+          "period": "This coming week — Thursday, Sep 10 – Friday, Sep 11",
+          "sourceQuote": "That said the strongest forcing for ascent associated with the trough should be displaced well north of NC and it remains to be seen just how much QPF is realized with the front when it arrives.",
+          "section": "DISCUSSION",
+          "sectionIssuedAt": "2026-09-07T07:00:00.000Z",
+          "validFrom": "2026-09-10T22:00:00.000Z",
+          "eventEnd": "2026-09-12T04:00:00.000Z",
+          "validUntil": "2026-09-07T23:46:00.000Z"
+        }
+      ],
+      "visible": true,
+      "text": "This coming week — Thursday, Sep 10 – Friday, Sep 11: The strongest lift with the system is expected north of NC, so it is unclear how widespread the rain will be when the front passes."
+    },
+    {
+      "label": "refresh-2",
+      "checkedAt": "2026-09-07T12:16:59.728Z",
+      "assembledAt": "2026-09-07T12:16:58.456Z",
+      "sourceCheckedAt": "2026-09-07T12:16:58.437Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "f11c3ea5a56acf12a5f5be51",
+      "discussionId": "1cec486c-9803-4664-b82c-673729b544f3",
+      "issuedAt": "2026-09-07T11:46:00+00:00",
+      "cachedItems": [
+        {
+          "evidenceId": "s2-p6-q3",
+          "summary": "The strongest lift with the system is expected north of NC, so it is unclear how widespread the rain will be when the front passes.",
+          "period": "This coming week — Thursday, Sep 10 – Friday, Sep 11",
+          "sourceQuote": "That said the strongest forcing for ascent associated with the trough should be displaced well north of NC and it remains to be seen just how much QPF is realized with the front when it arrives.",
+          "section": "DISCUSSION",
+          "sectionIssuedAt": "2026-09-07T07:00:00.000Z",
+          "validFrom": "2026-09-10T22:00:00.000Z",
+          "eventEnd": "2026-09-12T04:00:00.000Z",
+          "validUntil": "2026-09-07T23:46:00.000Z"
+        }
+      ],
+      "visible": true,
+      "text": "This coming week — Thursday, Sep 10 – Friday, Sep 11: The strongest lift with the system is expected north of NC, so it is unclear how widespread the rain will be when the front passes."
+    },
+    {
+      "label": "full-page-reload",
+      "checkedAt": "2026-09-07T12:17:00.240Z",
+      "assembledAt": "2026-09-07T12:16:58.456Z",
+      "sourceCheckedAt": "2026-09-07T12:16:58.437Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "f11c3ea5a56acf12a5f5be51",
+      "discussionId": "1cec486c-9803-4664-b82c-673729b544f3",
+      "issuedAt": "2026-09-07T11:46:00+00:00",
+      "cachedItems": [
+        {
+          "evidenceId": "s2-p6-q3",
+          "summary": "The strongest lift with the system is expected north of NC, so it is unclear how widespread the rain will be when the front passes.",
+          "period": "This coming week — Thursday, Sep 10 – Friday, Sep 11",
+          "sourceQuote": "That said the strongest forcing for ascent associated with the trough should be displaced well north of NC and it remains to be seen just how much QPF is realized with the front when it arrives.",
+          "section": "DISCUSSION",
+          "sectionIssuedAt": "2026-09-07T07:00:00.000Z",
+          "validFrom": "2026-09-10T22:00:00.000Z",
+          "eventEnd": "2026-09-12T04:00:00.000Z",
+          "validUntil": "2026-09-07T23:46:00.000Z"
+        }
+      ],
+      "visible": true,
+      "text": "This coming week — Thursday, Sep 10 – Friday, Sep 11: The strongest lift with the system is expected north of NC, so it is unclear how widespread the rain will be when the front passes."
+    }
+  ],
+  "deployed": {
+    "sourceVersion": "nws-afd-monotonic-v1",
+    "danTakeVersion": "weather-nourie-dans-take-source-v3",
+    "assets": {
+      "index.html": "7ae4da4e5062bf0b83be1e5c3b226f7d3e280525aa04db1caf2b363675860331",
+      "app.js": "220977a40d9ab7d1836e13dd6f6d1be798de275efa565e6fcb42febf825ac5a4",
+      "dans-take.js": "b92bb3c981e065bf7009540bad61de39e941ccb47b252a002808bb8fd64a22ac"
+    }
+  },
+  "independentOfficialLatest": {
+    "id": "1cec486c-9803-4664-b82c-673729b544f3",
+    "issuedAt": "2026-09-07T11:46:00+00:00"
+  },
+  "initial": {
+    "discussion": {
+      "id": "1cec486c-9803-4664-b82c-673729b544f3",
+      "office": "RAH",
+      "issuanceTime": "2026-09-07T11:46:00+00:00",
+      "text": "\n000\nFXUS62 KRAH 071146\nAFDRAH\n\nArea Forecast Discussion\nNational Weather Service Raleigh NC\n746 AM EDT Mon Sep 7 2026\n\n.WHAT HAS CHANGED...\n\n* Dry/continental air related to high pressure that will build \n  across and offshore the Middle Atlantic will favor lower surface \n  dewpoints/afternoon RH and low temperatures, both of which have \n  been adjusted lower by several degrees than the NBM/official \n  forecast, through Wed.\n  \n&&\n\n.KEY MESSAGES...\nAs of 300 AM Monday...\n\n1) Seasonable start to the second week of September\n\n2) Above normal temperatures return by mid week, with increasing \nshower/storm chances Thursday and Friday\n\n&&\n\n.DISCUSSION...\nAs of 300 AM Monday...\n\nKEY MESSAGE 1... Seasonable start to the second week of \nSeptember\n\nA lower mid-latidue/subtropical ridge over the srn Plains will \nprogress ewd and reach the Carolinas by 12Z Wed. Rising heights and \nweakening nwly flow aloft will result over cntl NC. \n\nBeneath and downstream of the ridge aloft, 1022 mb surface high \npressure will build across and offshore the Middle Atlantic, while \nextending wwd into NC. Influence from the ridge and associated \ncontinental/dry air will favor mixed/afternoon surface dewpoints in \nthe 50s, except lwr 60s in the Coastal Plain and ern Sandhills and \nalso low temperatures in the 50s to lwr 60s. \n\nKEY MESSAGE 2... Above normal temperatures return by mid week, with \nincreasing shower/storm chances Thursday and Friday\n\nStrong ridging will remain in place across much of the southern US \nthrough mid week, with H5 heights forecast to steadily increase \nacross NC through Wednesday (peaking around 594-596dm). Meanwhile at \nthe surface, a 1025mb ridge off the Mid Atlantic coast will support \nincreasing southerly flow area-wide. While dewpoints will be slow to \nrecover and remain in the low to mid 60s on Wednesday, they will \nclimb markedly Thursday into Friday with upper 60s to lower 70s \nbecoming increasingly common. This will translate into steadily \nincreasing heat index values reaching the mid 90s Thursday and \nFriday. \n\nAs the upper ridge continues to flatten, we'll eventually see a \nlongwave trough and attendant surface cold front move out of the \nOhio Valley and into the Mid Atlantic/Southeast late in the week. As \nsuch we'll see increasing shower and storm chances as early as \nThursday afternoon within an increasingly unstable pre-frontal \nairmass. There is still some uncertainty with respect to when the \nfront/trough will move through NC (most ensemble guidance suggests \nFriday vs Thursday night), but we'll continue to maintain increased \nPoPs through the day Friday given ensemble support. That said the \nstrongest forcing for ascent associated with the trough should be \ndisplaced well north of NC and it remains to be seen just how much \nQPF is realized with the front when it arrives. \n\nPrecip chances should decrease in the wake of the front through the \nweekend. Temps will also decrease, albeit slightly, with highs \nreaching the upper 80s/lower 90s Saturday and Sunday.\n\n&&\n\n.AVIATION /12Z MONDAY THROUGH FRIDAY/...\nAs of 745 AM Monday...\n\nNely flow around high pressure building across the Great Lakes and \nMiddle Atlantic will become gusty into the teens kts with daytime \nheating primarily at FAY, and more briefly at RWI and RDU around \nmidday. \n\nOutlook: High pressure over the Middle Atlantic will favor VFR \nconditions through mid week, with the exception of a chance of \nshallow, radiation fog/mist at RWI due to local effects. A frontal \nzone will settle into the NC with a chance of convection and \nassociated flight restrictions on Fri. \n\n&&\n\n.RAH WATCHES/WARNINGS/ADVISORIES...\nNone.\n\n&&\n\n$$\n\nDISCUSSION...MWS/Leins\nAVIATION...MWS\n",
+      "url": "https://api.weather.gov/products/1cec486c-9803-4664-b82c-673729b544f3"
+    },
+    "feed": {
+      "id": "afd",
+      "label": "NWS RAH discussion",
+      "url": "https://api.weather.gov/products/types/AFD/locations/RAH/latest",
+      "status": "ready",
+      "sourceVersion": "nws-afd-monotonic-v1",
+      "retrievalStatus": "verified-latest",
+      "fetchedAt": "2026-09-07T12:14:32.062Z",
+      "checkedAt": "2026-09-07T12:14:32.062Z",
+      "issuedAt": "2026-09-07T11:46:00+00:00",
+      "productUrl": "https://api.weather.gov/products/1cec486c-9803-4664-b82c-673729b544f3",
+      "message": ""
+    },
+    "aiMode": "ai",
+    "generatedAt": "2026-09-07T12:14:46.464Z",
+    "items": [
+      {
+        "evidenceId": "s2-p6-q3",
+        "summary": "The strongest lift with the system is expected north of NC, so it is unclear how widespread the rain will be when the front passes.",
+        "period": "This coming week — Thursday, Sep 10 – Friday, Sep 11",
+        "sourceQuote": "That said the strongest forcing for ascent associated with the trough should be displaced well north of NC and it remains to be seen just how much QPF is realized with the front when it arrives.",
+        "section": "DISCUSSION",
+        "sectionIssuedAt": "2026-09-07T07:00:00.000Z",
+        "validFrom": "2026-09-10T22:00:00.000Z",
+        "eventEnd": "2026-09-12T04:00:00.000Z",
+        "validUntil": "2026-09-07T23:46:00.000Z"
+      }
+    ]
+  },
+  "observedRefreshVisibility": [
+    {
+      "hidden": false,
+      "text": "This coming week — Thursday, Sep 10 – Friday, Sep 11: The strongest lift with the system is expected north of NC, so it is unclear how widespread the rain will be when the front passes."
+    },
+    {
+      "hidden": false,
+      "text": "This coming week — Thursday, Sep 10 – Friday, Sep 11: The strongest lift with the system is expected north of NC, so it is unclear how widespread the rain will be when the front passes."
+    },
+    {
+      "hidden": false,
+      "text": "This coming week — Thursday, Sep 10 – Friday, Sep 11: The strongest lift with the system is expected north of NC, so it is unclear how widespread the rain will be when the front passes."
+    },
+    {
+      "hidden": false,
+      "text": "This coming week — Thursday, Sep 10 – Friday, Sep 11: The strongest lift with the system is expected north of NC, so it is unclear how widespread the rain will be when the front passes."
+    },
+    {
+      "hidden": false,
+      "text": "This coming week — Thursday, Sep 10 – Friday, Sep 11: The strongest lift with the system is expected north of NC, so it is unclear how widespread the rain will be when the front passes."
+    }
+  ],
+  "distinctWeatherSignatures": 1,
+  "distinctForecastAssemblies": 3,
+  "distinctDiscussionChecks": 2,
+  "browserErrors": []
+}
