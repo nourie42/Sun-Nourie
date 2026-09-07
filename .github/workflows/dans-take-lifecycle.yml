@@ -1,0 +1,118 @@
+name: Verify Dan take source and request lifecycle
+on:
+  push:
+    branches: [fix/dans-take-request-lifecycle, main]
+    paths:
+      - 'src/weatherFusionDiscussionSource.js'
+      - 'src/weatherFusion.js'
+      - 'public/weather-fusion/app.js'
+      - 'public/weather-fusion/dans-take.js'
+      - 'public/weather-fusion/index.html'
+      - 'test/weatherFusionDiscussionLifecycle.test.js'
+      - 'test/fixtures/rah-discussion-regression.json'
+      - 'scripts/repair_dans_lifecycle.py'
+      - 'scripts/verifyDanTakeLifecycleLive.js'
+      - '.github/workflows/dans-take-lifecycle.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: dans-lifecycle-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    if: github.ref == 'refs/heads/fix/dans-take-request-lifecycle'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Apply reviewed, narrow source and lifecycle changes
+        run: |
+          python scripts/repair_dans_lifecycle.py
+          node --check src/weatherFusionDiscussionSource.js
+          node --check src/weatherFusion.js
+          node --check public/weather-fusion/app.js
+          node --check public/weather-fusion/dans-take.js
+          node --check scripts/weatherFusionPersonalBrowser.js
+          node --check scripts/verifyDanTakeLifecycleLive.js
+      - run: npm ci
+      - name: All weather unit regressions
+        run: |
+          if node --test test/weatherFusion*.test.js >/tmp/dans-lifecycle-unit.log 2>&1; then
+            tail -10 /tmp/dans-lifecycle-unit.log
+          else
+            python - <<'PY'
+          from pathlib import Path
+          s=Path('/tmp/dans-lifecycle-unit.log').read_text()
+          for part in s.split('# Subtest:'):
+              if '\nnot ok ' in part: print('# Subtest:'+part[:5000])
+          print(s[-500:])
+          PY
+            exit 1
+          fi
+      - name: Existing website regressions
+        run: npm run check
+      - run: npm install --no-save --package-lock=false playwright@1.55.0
+      - run: npx playwright install --with-deps chromium >/tmp/dans-install.log 2>&1 || (tail -20 /tmp/dans-install.log; exit 1)
+      - name: Full browser regressions plus pending, failed, cached, quiet and conflicting refreshes
+        run: node scripts/weatherFusionPersonalBrowser.js >/tmp/dans-lifecycle-browser.log 2>&1 || (tail -90 /tmp/dans-lifecycle-browser.log; exit 1)
+      - name: Commit only verified source and display-lifecycle changes
+        run: |
+          set -euo pipefail
+          cp /tmp/weather-personal-results/report.json docs/dans-take-lifecycle-browser-proof.json
+          cp /tmp/dans-lifecycle-unit.log docs/dans-take-lifecycle-unit-proof.log
+          rm scripts/repair_dans_lifecycle.py .github/workflows/dans-take-lifecycle-diagnostic.yml .github/workflows/dans-source-check.yml
+          git add -A
+          python - <<'PY'
+          import json,subprocess
+          b=json.load(open('docs/dans-take-lifecycle-browser-proof.json'))
+          assert b['success'] and len(b['danTakeLifecycleChecks'])==2
+          assert len(b['danTakeChecks'])==21 and len(b['outdoorExposureChecks'])==27
+          allowed={'src/weatherFusion.js','src/weatherFusionDiscussionSource.js','public/weather-fusion/app.js','public/weather-fusion/dans-take.js','public/weather-fusion/index.html','test/weatherFusionForecastDetails.test.js','test/weatherFusionDiscussionLifecycle.test.js','test/fixtures/rah-discussion-regression.json','scripts/weatherFusionPersonalBrowser.js','scripts/verifyDanTakeLifecycleLive.js','docs/dans-take-lifecycle-browser-proof.json','docs/dans-take-lifecycle-unit-proof.log','.github/workflows/dans-take-lifecycle.yml'}
+          changed=set(subprocess.check_output(['git','diff','--cached','--name-only','4e1fdaa552f01d6c1785d212f5293698db38063a'],text=True).splitlines())
+          assert changed<=allowed,changed
+          print('Verified source-only correction:',sorted(changed))
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m "Keep Dan's take tied to the newest verified discussion across refreshes"
+          git push origin HEAD:fix/dans-take-request-lifecycle
+          echo "Verified commit: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dans-lifecycle-regression-proof
+          path: |
+            /tmp/dans-lifecycle-*.log
+            /tmp/weather-personal-results
+          retention-days: 7
+  live:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: npm ci
+      - run: npm install --no-save --package-lock=false playwright@1.55.0
+      - run: npx playwright install --with-deps chromium >/tmp/dans-install.log 2>&1 || (tail -20 /tmp/dans-install.log; exit 1)
+      - name: Exact production files, current official source and repeated browser refreshes
+        run: node scripts/verifyDanTakeLifecycleLive.js
+      - name: Publish actual production evidence without redeploying main
+        run: |
+          cp /tmp/dans-lifecycle-live/report.json docs/dans-take-lifecycle-live-proof.json
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/dans-take-lifecycle-live-proof.json
+          git commit -m "Record repeated live Dan take verification for ${GITHUB_SHA}"
+          git push origin HEAD:refs/heads/verification/dans-lifecycle-${GITHUB_SHA:0:12}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dans-lifecycle-live-proof
+          path: /tmp/dans-lifecycle-live
+          retention-days: 7
