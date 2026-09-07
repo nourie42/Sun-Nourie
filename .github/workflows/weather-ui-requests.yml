@@ -27,8 +27,18 @@ jobs:
         with: {node-version: '22'}
       - name: Apply exact reviewed UI patch
         run: |
-          : >/tmp/patch_weather_ui_requests.py
-          for file in $(printf '%s\n' scripts/ui_patch_part_*.b64 | sort); do base64 -d "$file" >>/tmp/patch_weather_ui_requests.py; done
+          python - <<'PY'
+          import base64,glob,re,pathlib
+          target=pathlib.Path('/tmp/patch_weather_ui_requests.py')
+          with target.open('wb') as out:
+              for name in sorted(glob.glob('scripts/ui_patch_part_*.b64')):
+                  raw=pathlib.Path(name).read_bytes()
+                  clean=re.sub(rb'[^A-Za-z0-9+/=]',b'',raw).rstrip(b'=')
+                  clean+=b'='*((-len(clean))%4)
+                  out.write(base64.b64decode(clean,validate=False))
+                  print('decoded',name,len(raw),'encoded bytes')
+          print('patch bytes',target.stat().st_size)
+          PY
           python /tmp/patch_weather_ui_requests.py
           node --check src/weatherFusion.js
           node --check src/weatherFusionExperience.js
