@@ -3,7 +3,7 @@
  * Ambiguous timing is omitted, not guessed. Dates are anchored to source issuance,
  * including a retained section's own "As of" time, never to the time of retrieval.
  */
-export const DAN_TAKE_VERSION = 'weather-nourie-dans-take-integrity-v1';
+export const DAN_TAKE_VERSION = 'weather-nourie-dans-take-integrity-v2';
 const H = 3600000, DAY = 24 * H, MAX_SOURCE_AGE = 12 * H;
 const norm = v => String(v || '').replace(/\s+/g, ' ').trim();
 const finite = Number.isFinite;
@@ -36,6 +36,8 @@ export function explicitForecastUncertainty(text) {
   const s=norm(text);
   if(!s||past(s)||/\b(?:no|little|minimal)\b[^.!?]{0,35}\b(?:uncertainty|forecast changes?)\b|\bhigh confidence\b/i.test(s))return false;
   return /\buncertain(?:ty|ties)?\b|\blow(?:er)? confidence\b|\bconfidence\b[^.!?]{0,35}\b(?:low|limited|poor)\b|\bforecast challenge\b|\b(?:models?|solutions?|guidance|ensembles?)\b[^.!?]{0,65}\b(?:disagree|differ|diverge|spread|uncertain)\w*\b|\b(?:differences|spread|disagreement)\b[^.!?]{0,50}\b(?:models?|solutions?|guidance|ensembles?)\b|\bforecast\b[^.!?]{0,50}\b(?:adjust|revis|chang|shift)\w*\b/i.test(s)
+    || /\b(?:GFS|ECMWF|HRRR|NAM|NBM|GEFS|EPS)\b[^.!?]{0,110}\b(?:faster|slower|earlier|later|warmer|cooler|wetter|drier|farther|further)\b[^.!?]{0,110}\b(?:while|than|but|whereas)\b/i.test(s)
+    || /\b(?:remains to be seen|not yet clear|not clear yet|still unclear)\b[^.!?]{0,130}\b(?:rain|QPF|precip|front|cloud|fog|wind|temp|timing|coverage)\w*/i.test(s)
     || /\bif\b[^.!?]{8,180}\b(?:could|may|might|would)\b/i.test(s)
     || /\b(?:could|may|might)\b[^.!?]{0,100}\b(?:shift|change|delay|speed up|slow down|arrive earlier|arrive later|higher than|lower than|warmer than|cooler than|wetter than|drier than|increase|decrease|limit|reduce|depend)\w*\b/i.test(s);
 }
@@ -132,22 +134,29 @@ export function collectDanTakeEvidence(data, now=Date.now()) {
 }
 function acceptableParaphrase(text, candidate) {
   if(typeof text!=='string'||text.trim().length<15||text.length>420||/[<>]|\d/.test(text))return false;
-  if(/\b(yesterday|last night|earlier today|today|tonight|tomorrow|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/i.test(text))return false; // server supplies the dated period
+  if(/\b(yesterday|last night|earlier today|today|tonight|tomorrow)\b/i.test(text))return false;
+  // A day explicitly present in the verified period is supported. An unrelated
+  // weekday is rejected; ambiguous relative dates still come only from code.
+  const mentioned=[...text.matchAll(/\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/gi)].map(m=>m[1].toLowerCase());
+  if(mentioned.some(day=>!candidate.period.toLowerCase().includes(day)))return false;
   if(/forecast(?:s)? can change|no (?:major|meaningful|significant).*uncertaint|main sources? of forecast uncertainty|all clear|guaranteed|perfectly safe|\b(?:HRRR|ECMWF|NBM|CAPE|QPF|synoptic|advection|deterministic|convection|guidance)\b/i.test(text))return false;
-  const evidence=/front|boundary|rain|storm|thunder|convec|cloud|fog|temp|wind|snow|warm|cool|highs|lows/i.test(candidate.quote)?candidate.quote:candidate.context;
-  const topics=[[/\bfront\b/i,/\bfront|boundary/i],[/\bstorms?\b|thunder/i,/storm|thunder|convec/i],[/\brain\b|showers?/i,/rain|precip|shower|convec/i],[/\bsnow\b/i,/snow|winter|frozen/i],[/\bfog\b/i,/fog|visib/i],[/\bcloud|clearing/i,/cloud|clear|stratus|sun/i],[/\bwind/i,/wind|breeze|gust/i],[/\btemperatures?|warmer|cooler|colder|hotter/i,/temp|warm|cool|cold|heat|highs|lows/i]];
+  // The adjacent sentences are part of the supplied, exact AFD excerpt. Using
+  // only the middle sentence wrongly rejected a plain-English rain paraphrase
+  // of 'front timing / PoPs / QPF'. Never borrow a phenomenon from a past recap.
+  const evidence=norm([candidate.quote,...candidate.context.split(/(?<=[.!?])\s+/).filter(s=>!past(s))].join(' '));
+  const topics=[[/\bfront\b/i,/\bfront|boundary/i],[/\bstorms?\b|thunder/i,/storm|thunder|convec/i],[/\brain\b|showers?/i,/rain|precip|shower|convec|PoPs|QPF/i],[/\bsnow\b/i,/snow|winter|frozen/i],[/\bfog\b/i,/fog|visib/i],[/\bcloud|clearing/i,/cloud|clear|stratus|sun/i],[/\bwind/i,/wind|breeze|gust/i],[/\btemperatures?|warmer|cooler|colder|hotter/i,/temp|warm|cool|cold|heat|highs|lows/i]];
   return !topics.some(([claim,support])=>claim.test(text)&&!support.test(evidence));
 }
 export function approveDanTake(proposals, data, now=Date.now()) {
-  const context=collectDanTakeEvidence(data,now),seen=new Set(),items=[];
+  const context=collectDanTakeEvidence(data,now),seen=new Set(),items=[],rejected=[];
   for(const proposal of Array.isArray(proposals)?proposals:[]){
     const c=context.candidates.find(c=>c.id===proposal?.evidenceId);
-    if(!c||seen.has(c.id)||!acceptableParaphrase(proposal.summary,c))continue;
+    if(!c||seen.has(c.id)||!acceptableParaphrase(proposal.summary,c)){rejected.push({evidenceId:String(proposal?.evidenceId||'').slice(0,60),reason:!c?'unknown-evidence':seen.has(c.id)?'duplicate':'unsupported-paraphrase'});continue;}
     seen.add(c.id);items.push({evidenceId:c.id,summary:proposal.summary.trim(),period:c.period,sourceQuote:c.quote,
       section:c.section,sectionIssuedAt:c.sectionIssuedAt,validFrom:c.validFrom,eventEnd:c.eventEnd,validUntil:c.validUntil});
   }
   items.sort((a,b)=>Date.parse(a.validFrom)-Date.parse(b.validFrom));
-  return {danTakeVersion:DAN_TAKE_VERSION,danTakeSource:context.source,danTakeStatus:items.length?'supported':context.status==='evidence-available'?'no-approved-change':context.status,forecastChanges:items.slice(0,6)};
+  return {danTakeVersion:DAN_TAKE_VERSION,danTakeReview:{candidateCount:context.candidates.length,proposedCount:Array.isArray(proposals)?proposals.length:0,approvedCount:items.length,rejected},danTakeSource:context.source,danTakeStatus:items.length?'supported':context.status==='evidence-available'?'no-approved-change':context.status,forecastChanges:items.slice(0,6)};
 }
 export function visibleDanTakeItems(briefing, forecast, now=Date.now()) {
   if(briefing?.mode!=='ai'||briefing.danTakeVersion!==DAN_TAKE_VERSION||!forecast?.signature||briefing.signature!==forecast.signature)return [];

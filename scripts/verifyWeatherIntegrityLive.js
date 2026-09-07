@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {thermalComfort,tier3FeelsLike} from '../public/weather-fusion/weather-math.js';
 import {dailyFeels} from '../public/weather-fusion/hourly-feels.js';
-import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText} from '../public/weather-fusion/dans-take.js';
+import {DAN_TAKE_VERSION,collectDanTakeEvidence,visibleDanTakeItems,danTakeText} from '../public/weather-fusion/dans-take.js';
 const base='https://sun-nourie-live.onrender.com',output='/tmp/weather-integrity-live.json';
 const report={commit:process.env.GITHUB_SHA,checkedAt:new Date().toISOString(),fixture:false,locations:[],success:false};
 const paths=['index.html','app.js','weather-math.js','utci.js','weather-display.js','personal-details.js','experience.js','hourly-feels.css','dans-take.js'];
@@ -58,6 +58,7 @@ try{
    const h=f.hours.find(h=>Date.parse(h.time)===Date.parse(p.time));
    if(h){assert.equal(h.feelsLike,p.value);assert.equal(h.skyCover,p.inputs.skyCover);assert.equal(h.windMph,p.inputs.wind);}
   }
+  const evidence=collectDanTakeEvidence(f,Date.now());
   const items=visibleDanTakeItems(b,f,Date.now()),text=danTakeText(items);
   await page.waitForFunction(()=>document.querySelector('#hourly .hour-current .hour-feels b')&&document.querySelector('.sun-person figcaption strong'),null,{timeout:75000});
   await page.waitForFunction(text=>document.querySelector('#today-uncertainty-text').textContent===text,text,{timeout:20000});
@@ -86,7 +87,7 @@ try{
   const last=dailyFeels(f,6,Date.now()).high?.high;
   if(last){const v=(await page.locator('#daily .day-row').nth(6).locator('.day-high .daily-feels b').innerText()).trim();assert.equal(v,degrees(last.value));}
   assert.deepEqual(errors,[]);
-  const row={place:place.name,observation:f.current.time,station:f.current.station,currentInputs:calculated.inputEvidence,currentOutdoor:calculated.rawOutdoors,numericForecastHours:numeric,daySevenPeak:last?{time:last.time,value:last.value,inputs:last.inputs}:null,aiMode:b?.mode||null,aiReason:b?.reason||null,danTake:text,approvedChanges:items,maximumCenteringErrorPx:Math.max(...center),passed:true};
+  const row={place:place.name,observation:f.current.time,station:f.current.station,currentInputs:calculated.inputEvidence,currentOutdoor:calculated.rawOutdoors,numericForecastHours:numeric,daySevenPeak:last?{time:last.time,value:last.value,inputs:last.inputs}:null,aiMode:b?.mode||null,aiReason:b?.reason||null,danTakeStatus:b?.danTakeStatus||null,danTakeReview:b?.danTakeReview||null,candidateCount:evidence.candidates.length,danTake:text,approvedChanges:items,maximumCenteringErrorPx:Math.max(...center),passed:true};
   report.locations.push(row);console.log('LIVE_REVIEW_PASSED',JSON.stringify(row));
   const safe=place.id||place.name.split(',')[0].toLowerCase().replace(/\s/g,'-');
   await page.locator('#daily').screenshot({path:'/tmp/weather-integrity-'+safe+'.png'});
@@ -94,6 +95,8 @@ try{
  }
  report.actualAICount=report.locations.filter(x=>x.aiMode==='ai').length;
  assert.ok(report.actualAICount>0,'At least one live AI generation must be verified, not only hidden fallback cards');
+ report.visibleChangeCount=report.locations.reduce((sum,row)=>sum+row.approvedChanges.length,0);
+ if(report.locations.some(row=>row.candidateCount>0))assert.ok(report.visibleChangeCount>0,'Actual current discussion candidates must yield a verified, meaningful AI take somewhere, not just hidden cards');
  report.success=true;
 }finally{
  if(browser)await browser.close();await fs.writeFile(output,JSON.stringify(report,null,2)+'\n');

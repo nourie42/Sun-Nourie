@@ -88,6 +88,6 @@ test('Gross Meter heading stays centered and bold without changing chart geometr
  assert.match(css,/#gross-title\{text-align:center;font-weight:800\}/);assert.ok(!/\.gross-(scroll|chart)\s*\{/.test(css));
 });
 test('changed assets are cache-busted and late briefing responses stay guarded',()=>{
- assert.match(html,/forecast-layout\.css\?v=3-personal/);assert.match(html,/app\.js\?v=integrity-v1/);
+ assert.match(html,/forecast-layout\.css\?v=3-personal/);assert.match(html,/app\.js\?v=integrity-v2/);
  assert.match(app,/if \(id === generation && briefing\.signature === forecast\?\.signature\) renderBriefing\(briefing\)/);
 });

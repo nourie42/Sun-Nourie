@@ -1,4 +1,4 @@
-import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText} from './dans-take.js?v=integrity-v1';
+import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText} from './dans-take.js?v=integrity-v2';
 import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './weather-display.js?v=integrity-v1';
 import {degrees,feelsAt,dayFeelsHTML} from './hourly-feels.js?v=integrity-v1';
 import {createFramePlayer} from './frame-player.js';
