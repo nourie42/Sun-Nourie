@@ -67,6 +67,11 @@ try{
   const shown=(await page.locator('#hourly .hour-current .hour-feels b').innerText()).trim();
   assert.equal(shown,degrees(calculated.rawOutdoors));
   assert.equal((await page.locator('.sun-person figcaption strong').innerText()).trim(),Number.isFinite(calculated.rawOutdoors)?shown:'Unavailable');
+  // Evidence lives inside a native collapsed details element. Exercise the
+  // user's actual open-details interaction before asserting visible text.
+  const calculationDetails=page.locator('details').filter({has:page.locator('#thermal-input-evidence')});
+  if(!(await calculationDetails.getAttribute('open')))await calculationDetails.locator(':scope > summary').click();
+  await page.locator('#thermal-input-evidence').waitFor({state:'visible'});
   assert.match(await page.locator('#thermal-input-evidence').innerText(),/Current station inputs/);
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
   const center=await page.locator('#daily .day-high').evaluateAll(cols=>cols.map(c=>{const a=c.querySelector(':scope>strong').getBoundingClientRect(),b=c.querySelector('.daily-feels b').getBoundingClientRect();return Math.abs(a.x+a.width/2-b.x-b.width/2);}));
