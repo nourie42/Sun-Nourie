@@ -1,0 +1,50 @@
+name: Weather evidence and thermal input audit
+on:
+  push:
+    branches: [fix/weather-evidence-time-physics]
+    paths: ['.github/workflows/weather-evidence-audit.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Package weather source and actual live inputs
+        run: |
+          mkdir -p /tmp/weather-evidence-audit/code /tmp/weather-evidence-audit/live
+          python - <<'PY'
+          import pathlib, shutil
+          root=pathlib.Path('/tmp/weather-evidence-audit/code')
+          for pattern in ['public/weather-fusion/*','src/weather*.js','test/weather*.js','scripts/*weather*','scripts/*Weather*','docs/weather*','package.json','package-lock.json','.github/workflows/weather*.yml']:
+              for path in pathlib.Path('.').glob(pattern):
+                  if path.is_file():
+                      target=root/path
+                      target.parent.mkdir(parents=True,exist_ok=True)
+                      shutil.copy2(path,target)
+          PY
+          node --input-type=module - <<'JS'
+          import fs from 'node:fs/promises';
+          const base='https://sun-nourie-live.onrender.com';
+          for(const [name,query] of [['knightdale','location=knightdale'],['white-lake','latitude=34.6385&longitude=-78.5025'],['denver','latitude=39.7392&longitude=-104.9903'],['seattle','latitude=47.6062&longitude=-122.3321']]){
+            for(const endpoint of ['forecast','briefing']){
+              try {
+                const r=await fetch(`${base}/api/weather-fusion/${endpoint}?${query}`,{signal:AbortSignal.timeout(85000)});
+                const text=await r.text();
+                await fs.writeFile(`/tmp/weather-evidence-audit/live/${name}-${endpoint}.json`,text);
+                if(endpoint==='forecast'&&r.ok){const d=JSON.parse(text);console.log(name,JSON.stringify({current:d.current,comfort:d.comfort,hours:d.hours?.slice(0,3),office:d.discussion?.office,discussionIssued:d.discussion?.issuanceTime}));}
+              }catch(error){console.log(name,endpoint,error.message);}
+            }
+          }
+          JS
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: weather-evidence-audit
+          path: /tmp/weather-evidence-audit
+          retention-days: 7
