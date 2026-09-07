@@ -46,7 +46,10 @@ export function sunShadeHTML(comfort,location,now=Date.now(),context={}){
  const daylight=typeof comfort?.daylight==='boolean'?comfort.daylight:solarElevation(now,location?.latitude,location?.longitude)>0;
  const kind=comfort?.weatherKind||(finite(comfort?.sun)?'clear':'unknown');
  const condition=comfort?.radiantCondition||context.condition||comfort?.condition||({clear:'Clear','partly-cloudy':'Partly Cloudy',cloudy:'Cloudy',rain:'Rain',storm:'Thunderstorms',snow:'Snow',fog:'Fog'}[kind]||'');
- const shade=finite(comfort?.shade)?`${Math.round(comfort.shade)}°`:'Unavailable';
+ const shadeAir=finite(comfort?.inputEvidence?.temperature)?comfort.inputEvidence.temperature:null;
+ const shadeFallback=finite(comfort?.shade)?comfort.shade:null;
+ const shadeDisplay=finite(shadeAir)?shadeAir:shadeFallback;
+ const shade=finite(shadeDisplay)?`${Math.round(shadeDisplay)}°`:'Unavailable';
  const exposure=outdoorExposure({...comfort,daylight,weatherKind:kind,condition});
  const outdoorValue=exposure.value;
  const outside=finite(outdoorValue)?`${Math.round(outdoorValue)}°`:'Unavailable';
@@ -56,7 +59,9 @@ export function sunShadeHTML(comfort,location,now=Date.now(),context={}){
  const label=exposure.label;
  const basis=comfort?.conditionSource?` · ${esc(comfort.conditionSource)}`:'';
  const note=!daylight?' · No direct sun at night.':finite(comfort?.inputEvidence?.skyCover)?' · Hourly cloud-adjusted radiation estimate; actual sun exposure varies.':kind==='unknown'?' · Sky data unavailable; no solar adjustment.':kind==='partly-cloudy'?' · Sunny-break estimate, not continuous direct sunlight.':['rain','storm','snow','fog','cloudy'].includes(kind)?' · No direct-sun adjustment; wet clothing is not modelled.':'';
- return `<div class="sun-shade-comparison"><figure class="exposure-person shade-person" data-weather="${esc(kind)}">${exposureScene(false,daylight,condition,comfort?.shade)}<figcaption><strong>${shade}</strong><span>In the shade · ${period}</span></figcaption></figure><figure class="exposure-person sun-person" data-weather="${esc(kind)}">${exposureScene(true,daylight,condition,outdoorValue)}<figcaption><strong>${outside}</strong><span>${label} · ${period}</span></figcaption></figure></div><small class="exposure-estimate">Estimated feels-like temperatures · °F${note}${basis} Main readings match the outdoor figure; shade is shown separately.</small>`;
+ const shadeBasis=finite(shadeAir)?' Shade is the source air temperature — the same temperature used by the main current/forecast reading. Outdoor is the modeled exposure feels-like.':' Air temperature was unavailable, so shade falls back to the modeled shade feels-like. Outdoor is the modeled exposure feels-like.';
+ const shadeOutfit=finite(shadeFallback)?shadeFallback:shadeDisplay;
+ return `<div class="sun-shade-comparison"><figure class="exposure-person shade-person" data-weather="${esc(kind)}">${exposureScene(false,daylight,condition,shadeOutfit)}<figcaption><strong>${shade}</strong><span>Air temperature in the shade · ${period}</span></figcaption></figure><figure class="exposure-person sun-person" data-weather="${esc(kind)}">${exposureScene(true,daylight,condition,outdoorValue)}<figcaption><strong>${outside}</strong><span>${label} · ${period}</span></figcaption></figure></div><small class="exposure-estimate">Temperatures · °F${note}${basis}${shadeBasis}</small>`;
 }
 export function modelFreshnessText(layer,checkedAt,zone='America/New_York',now=Date.now()){
  if(!layer)return '';
