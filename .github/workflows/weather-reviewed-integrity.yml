@@ -1,7 +1,7 @@
 name: Weather Nourie reviewed integrity
 on:
   push:
-    branches: [fix/weather-reviewed-integrity, fix/weather-current-feels-inputs, main]
+    branches: [fix/weather-reviewed-integrity, main]
     paths:
       - 'scripts/repair_weather_*.py'
       - 'scripts/verifyWeatherIntegrity*.py'
@@ -19,7 +19,7 @@ permissions:
   contents: write
 jobs:
   verify:
-    if: github.ref == 'refs/heads/fix/weather-reviewed-integrity' || github.ref == 'refs/heads/fix/weather-current-feels-inputs'
+    if: github.ref == 'refs/heads/fix/weather-reviewed-integrity'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -78,7 +78,7 @@ jobs:
           assert reference['passed'] and reference['maximumAbsoluteErrorF']<1e-6
           assert browser['success'] and len(browser['centeringChecks'])==6
           assert len(browser['danTakeChecks'])==21 and len(browser['outdoorExposureChecks'])==27
-          changed=subprocess.check_output(['git','diff','--cached','--name-only','origin/main'],text=True).splitlines()
+          changed=subprocess.check_output(['git','diff','--cached','--name-only','f23610ec7091383573e84ba0780a010d64b78125'],text=True).splitlines()
           prefixes=['public/weather-fusion/','src/weatherFusion','test/weatherFusion','docs/weather-integrity-']
           exact={'.github/workflows/weather-reviewed-integrity.yml','scripts/weatherFusionPersonalBrowser.js','scripts/weatherFusionBrowserSmoke.js','scripts/verifyWeatherIntegrityReference.py','scripts/verifyWeatherIntegrityLive.js'}
           assert all(p in exact or any(p.startswith(prefix) for prefix in prefixes) for p in changed),changed
@@ -86,8 +86,8 @@ jobs:
           PY
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m "Verify current feels-like fallback and forecast integrity"
-          git push origin HEAD:fix/weather-current-feels-inputs
+          git commit -m "Verify forecast integrity: dated Dan take, hourly sky, independent UTCI and centered temperatures"
+          git push origin HEAD:fix/weather-reviewed-integrity
           echo "Verified commit: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         if: always()
