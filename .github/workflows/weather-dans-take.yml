@@ -1,0 +1,103 @@
+name: Weather Nourie dated Dan take verification
+on:
+  push:
+    branches: [fix/dans-take-evidence-time, main]
+    paths:
+      - 'public/weather-fusion/**'
+      - 'src/weatherFusion.js'
+      - 'src/weatherFusionExperience.js'
+      - 'test/weatherFusion*'
+      - 'scripts/patch_dans_take*.py'
+      - 'scripts/weatherFusionPersonalBrowser.js'
+      - 'scripts/verifyWeatherDansTakeLive.js'
+      - '.github/workflows/weather-dans-take.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  prepare:
+    if: github.ref == 'refs/heads/fix/dans-take-evidence-time'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply reviewed, narrow source-evidence patch
+        run: |
+          if test -f scripts/patch_dans_take_evidence_time.py; then python scripts/patch_dans_take_evidence_time.py; fi
+          if test -f scripts/patch_dans_take_browser.py; then python scripts/patch_dans_take_browser.py; fi
+          node --check public/weather-fusion/dans-take.js
+          node --check public/weather-fusion/app.js
+          node --check src/weatherFusion.js
+          node --check src/weatherFusionExperience.js
+          node --check scripts/weatherFusionPersonalBrowser.js
+      - run: npm ci
+      - name: All Weather Nourie regression tests
+        run: node --test test/weatherFusion*.test.js
+      - name: Existing business-site regressions
+        run: npm run check
+      - run: npm install --no-save --package-lock=false playwright@1.55.0
+      - run: npx playwright install --with-deps chromium
+      - name: Full-page temporal, responsive and outdoor regression cases
+        run: node scripts/weatherFusionPersonalBrowser.js
+      - name: Commit verified weather-only changes to repair branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp /tmp/weather-personal-results/report.json docs/weather-dans-take-fixture-proof.json
+          rm -f scripts/patch_dans_take_evidence_time.py scripts/patch_dans_take_browser.py
+          git add -A
+          python - <<'PY'
+          import subprocess,json
+          proof=json.load(open('docs/weather-dans-take-fixture-proof.json'))
+          assert proof['success'] and proof['fixture'] and len(proof['danTakeChecks'])==21
+          assert len(proof['outdoorExposureChecks'])==27
+          changed=subprocess.check_output(['git','diff','--cached','--name-only','f4d1a1d42dfc7641f4766293b8c2f09992365fed'],text=True).splitlines()
+          allowed={'public/weather-fusion/dans-take.js','public/weather-fusion/app.js','public/weather-fusion/index.html','src/weatherFusion.js','src/weatherFusionExperience.js','scripts/weatherFusionPersonalBrowser.js','scripts/verifyWeatherDansTakeLive.js','test/weatherFusionDansTake.test.js','test/weatherFusionForecastDetails.test.js','test/weatherFusionUserFeedback.test.js','docs/weather-dans-take.md','docs/weather-dans-take-fixture-proof.json','.github/workflows/weather-dans-take.yml'}
+          assert set(changed)<=allowed,changed
+          print('Verified changed files:',changed)
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m "Show Dan's take only for evidenced, dated, upcoming forecast changes"
+          git push origin HEAD:fix/dans-take-evidence-time
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: weather-dans-take-browser-proof
+          path: /tmp/weather-personal-results
+          retention-days: 7
+  live:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm install --no-save --package-lock=false playwright@1.55.0
+      - run: npx playwright install --with-deps chromium
+      - name: Exact deployment and actual AFD / AI / browser proof
+        run: node scripts/verifyWeatherDansTakeLive.js
+      - name: Publish live verification evidence without redeploying main
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp /tmp/weather-dans-take-live.json docs/weather-dans-take-live-proof.json
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/weather-dans-take-live-proof.json
+          git commit -m "Record live dated Dan take proof for ${GITHUB_SHA}"
+          git push origin HEAD:refs/heads/verification/dans-take-${GITHUB_SHA:0:12}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: weather-dans-take-live-proof
+          path: /tmp/weather-dans-take-live.json
+          retention-days: 7
