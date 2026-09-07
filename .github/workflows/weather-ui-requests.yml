@@ -6,7 +6,7 @@ on:
       - 'public/weather-fusion/**'
       - 'src/weatherFusion*.js'
       - 'test/weatherFusion*.test.js'
-      - 'scripts/ui_patch_part_*.b64'
+      - 'scripts/apply_weather_ui_requests.py'
       - 'scripts/weatherFusionPersonalBrowser.js'
       - '.github/workflows/weather-ui-requests.yml'
   workflow_dispatch:
@@ -27,25 +27,14 @@ jobs:
         with: {node-version: '22'}
       - name: Apply exact reviewed UI patch
         run: |
-          python - <<'PY'
-          import base64,glob,re,pathlib
-          target=pathlib.Path('/tmp/patch_weather_ui_requests.py')
-          with target.open('wb') as out:
-              for name in sorted(glob.glob('scripts/ui_patch_part_*.b64')):
-                  raw=pathlib.Path(name).read_bytes()
-                  clean=re.sub(rb'[^A-Za-z0-9+/=]',b'',raw).rstrip(b'=')
-                  clean+=b'='*((-len(clean))%4)
-                  out.write(base64.b64decode(clean,validate=False))
-                  print('decoded',name,len(raw),'encoded bytes')
-          print('patch bytes',target.stat().st_size)
-          PY
-          python /tmp/patch_weather_ui_requests.py
+          python scripts/apply_weather_ui_requests.py
           node --check src/weatherFusion.js
           node --check src/weatherFusionExperience.js
           node --check public/weather-fusion/experience.js
           node --check public/weather-fusion/exposure-scene.js
           node --check public/weather-fusion/dans-take.js
           node --check public/weather-fusion/personal-details.js
+          node --check public/weather-fusion/forecast-confidence.js
       - run: npm ci
       - name: All weather unit regressions
         run: |
@@ -62,7 +51,7 @@ jobs:
           set -euo pipefail
           cp /tmp/weather-personal-results/report.json docs/weather-ui-requests-browser-proof.json
           cp /tmp/weather-ui-unit.log docs/weather-ui-requests-unit-proof.log
-          rm scripts/ui_patch_part_*.b64
+          rm -f scripts/apply_weather_ui_requests.py scripts/ui_patch_part_*.b64
           git add -A
           python - <<'PY'
           import json,subprocess
@@ -72,8 +61,8 @@ jobs:
           allowed_prefixes=['public/weather-fusion/','src/weatherFusion','test/weatherFusion','docs/weather-ui-requests','scripts/weatherFusionPersonalBrowser.js']
           allowed_exact={'.github/workflows/weather-ui-requests.yml'}
           assert all(path in allowed_exact or any(path.startswith(prefix) for prefix in allowed_prefixes) for path in changed),changed
-          assert 'public/weather-fusion/forecast-confidence.js' in changed
-          assert 'public/weather-fusion/exposure-scene.js' in changed
+          for required in ['public/weather-fusion/forecast-confidence.js','public/weather-fusion/exposure-scene.js','public/weather-fusion/experience.js','public/weather-fusion/dans-take.js','public/weather-fusion/index.html']:
+              assert required in changed,required
           print('Verified UI-request diff:',sorted(changed))
           PY
           git config user.name 'github-actions[bot]'
