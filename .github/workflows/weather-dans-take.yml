@@ -12,6 +12,9 @@ on:
       - 'scripts/verifyWeatherDansTakeLive.js'
       - '.github/workflows/weather-dans-take.yml'
   workflow_dispatch:
+concurrency:
+  group: weather-dans-take-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: write
 jobs:
@@ -30,11 +33,13 @@ jobs:
         run: |
           if test -f scripts/patch_dans_take_evidence_time.py; then python scripts/patch_dans_take_evidence_time.py; fi
           if test -f scripts/patch_dans_take_browser.py; then python scripts/patch_dans_take_browser.py; fi
+          if test -f scripts/patch_dans_take_hardening.py; then python scripts/patch_dans_take_hardening.py; fi
           node --check public/weather-fusion/dans-take.js
           node --check public/weather-fusion/app.js
           node --check src/weatherFusion.js
           node --check src/weatherFusionExperience.js
           node --check scripts/weatherFusionPersonalBrowser.js
+          node --check scripts/verifyWeatherDansTakeLive.js
       - run: npm ci
       - name: All Weather Nourie regression tests
         run: node --test test/weatherFusion*.test.js
@@ -49,7 +54,7 @@ jobs:
         run: |
           set -euo pipefail
           cp /tmp/weather-personal-results/report.json docs/weather-dans-take-fixture-proof.json
-          rm -f scripts/patch_dans_take_evidence_time.py scripts/patch_dans_take_browser.py
+          rm -f scripts/patch_dans_take_evidence_time.py scripts/patch_dans_take_browser.py scripts/patch_dans_take_hardening.py
           git add -A
           python - <<'PY'
           import subprocess,json
