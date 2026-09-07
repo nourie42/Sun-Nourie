@@ -672,6 +672,24 @@
       "expiry": true
     }
   ],
+  "danTakeLifecycleChecks": [
+    {
+      "width": 390,
+      "pendingRefreshRetained": true,
+      "failedBriefingRetained": true,
+      "reloadRetained": true,
+      "newQuietSourceCleared": true,
+      "signatureConflictRecovered": true
+    },
+    {
+      "width": 1365,
+      "pendingRefreshRetained": true,
+      "failedBriefingRetained": true,
+      "reloadRetained": true,
+      "newQuietSourceCleared": true,
+      "signatureConflictRecovered": true
+    }
+  ],
   "nightCurrentTemperature": true,
   "success": true
 }

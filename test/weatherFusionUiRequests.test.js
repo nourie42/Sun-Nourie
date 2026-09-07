@@ -42,6 +42,12 @@ test('Dan take groups multiple concerns under one period instead of repeating th
  const text=danTakeText([{period,summary:'The front could arrive earlier or later.'},{period,summary:'The amount of rain is still uncertain.'},{period,summary:'The amount of rain is still uncertain.'}]);
  assert.equal(text.split(period).length-1,1);assert.match(text,/front could arrive/);assert.match(text,/amount of rain/);
 });
+test('Dan take display strips repeated Dan take prefixes because the card already has the heading',()=>{
+ const period='This coming week — Thursday, Sep 10 – Friday, Sep 11';
+ const text=danTakeText([{period,summary:"Dan's take: The front could arrive earlier or later."},{period,summary:'Dan’s take: The amount of rain is still uncertain.'}]);
+ assert.doesNotMatch(text,/Dan['’]s take\s*:/i);
+ assert.match(text,/front could arrive/);assert.match(text,/amount of rain/);
+});
 test('Dan take rejects forecaster-attribution filler and accepts direct wording',()=>{
  const candidates=collectDanTakeEvidence(forecast,now).candidates;assert.ok(candidates.length>=1);
  const id=candidates[0].id;
