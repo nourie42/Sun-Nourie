@@ -82,14 +82,14 @@ with Path('public/weather-fusion/forecast-layout.css').open('a') as f:
 p='scripts/weatherFusionPersonalBrowser.js'
 s=Path(p).read_text()
 s=s.replace("import {thermalComfort,shadeFeelsLike} from '../public/weather-fusion/weather-math.js';",
-            "import {thermalComfort,shadeFeelsLike} from '../public/weather-fusion/weather-math.js';\nimport {forecastConfidence} from '../public/weather-fusion/forecast-confidence.js';")
+            "import {thermalComfort,shadeFeelsLike} from '../public/weather-fusion/weather-math.js';\nimport {forecastConfidence} from '../public/weather-fusion/forecast-confidence.js';\nimport {clothingForFeels} from '../public/weather-fusion/exposure-scene.js';")
 s=s.replace("qpf:.1,qpfWindow:","qpf:.1,confidence:forecastConfidence({dayIndex:i,highSpread:i<2?2:i<5?4:7,qpfSpread:i<3?.04:i<5?.12:.3,guidanceCount:i<2?3:2,officialDay:true,officialNight:true}),qpfWindow:")
 anchor="  assert.equal((await page.locator('.brand small').innerText()).trim(),'Because Apple, Google and Samsung weather suck');"
 if s.count(anchor)!=1:raise RuntimeError('browser heading anchor')
 s=s.replace(anchor,anchor+"\n  assert.equal((await page.locator('#skin-kicker').innerText()).trim(),'How does it feel outside right now');\n  assert.equal(await page.locator('#daily .forecast-confidence').count(),7);\n  assert.ok((await page.locator('#daily .forecast-confidence').allTextContents()).every(t=>t.includes('Forecast confidence')));")
 anchor2="  assert.equal(await page.locator('.person-eyes').count(),2);"
 if s.count(anchor2)!=1:raise RuntimeError('browser clothing anchor')
-s=s.replace(anchor2,"  assert.equal(await page.locator('.sun-shade-comparison svg[data-outfit=\"warm\"]').count(),2,'75–80°F fixture should use warm-weather clothing');\n"+anchor2)
+s=s.replace(anchor2,"  const shadeOutfit=clothingForFeels(knightdaleCurrent.comfort.shade),sunOutfit=clothingForFeels(knightdaleCurrent.feels);\n  assert.equal(await page.locator(`.shade-person svg[data-outfit=\"${shadeOutfit}\"]`).count(),1,'Shade figure outfit follows its displayed feels-like temperature');\n  assert.equal(await page.locator(`.sun-person svg[data-outfit=\"${sunOutfit}\"]`).count(),1,'Outdoor figure outfit follows its displayed feels-like temperature');\n"+anchor2)
 Path(p).write_text(s)
 
 # Cache-bust changed browser dependencies.
