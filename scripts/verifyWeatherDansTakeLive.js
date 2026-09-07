@@ -62,12 +62,14 @@ try{
    assert.ok(item.period&&item.sectionIssuedAt);
   }
   assert.deepEqual(errors,[]);
-  const evidence={place:place.name,verifiedAt:new Date(time).toISOString(),aiMode:b.mode,aiReason:b.reason||null,takeStatus:b.danTakeStatus,source:sourceEvidence.source,eligibleExcerpts:sourceEvidence.candidates,displayed,approvedChanges:items,discussion:f.discussion?{id:f.discussion.id,office:f.discussion.office,issuedAt:f.discussion.issuanceTime,url:f.discussion.url,text:f.discussion.text}:null};
-  report.locations.push(evidence);console.log('LIVE_DATED_TAKE',JSON.stringify({place:place.name,aiMode:b.mode,visible:!displayed.hidden,items,text}));
+  const evidence={place:place.name,verifiedAt:new Date(time).toISOString(),aiMode:b.mode,aiReason:b.reason||null,aiDiagnostic:b.diagnostic||null,review:b.danTakeReview||null,takeStatus:b.danTakeStatus,source:sourceEvidence.source,eligibleExcerpts:sourceEvidence.candidates,displayed,approvedChanges:items,discussion:f.discussion?{id:f.discussion.id,office:f.discussion.office,issuedAt:f.discussion.issuanceTime,url:f.discussion.url,text:f.discussion.text}:null};
+  report.locations.push(evidence);console.log('LIVE_DATED_TAKE',JSON.stringify({place:place.name,aiMode:b.mode,diagnostic:b.diagnostic||null,review:b.danTakeReview||null,visible:!displayed.hidden,items,text}));
   await context.close();
  }
  report.actualAIGenerations=report.locations.filter(r=>r.aiMode==='ai').length;
  assert.ok(report.actualAIGenerations>=2,'At least two locations must verify actual AI, not only hidden fallback cards');
+ report.actualVisibleChanges=report.locations.reduce((n,r)=>n+r.approvedChanges.length,0);
+ assert.ok(report.actualVisibleChanges>0,'Live acceptance must demonstrate a real supported future change, not only hidden cards');
  report.success=true;console.log('LIVE_DATED_TAKE_VERIFIED',JSON.stringify({commit:report.commit,locations:report.locations.length,actualAI:report.actualAIGenerations,success:true}));
 }finally{
  if(browser)await browser.close();await fs.writeFile(output,JSON.stringify(report,null,2)+'\n');

@@ -1,4 +1,4 @@
-import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText} from './dans-take.js?v=2-dated';
+import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText} from './dans-take.js?v=3-dated';
 import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './weather-display.js?v=outdoor-v1';
 import {degrees,feelsAt,dayFeelsHTML} from './hourly-feels.js?v=outdoor-v1';
 import {createFramePlayer} from './frame-player.js';

@@ -119,3 +119,27 @@ test('malformed cached items and invalid timezones hide the take instead of cras
  assert.deepEqual(visibleDanTakeItems({...b,forecastChanges:[null]},f,now),[]);
  assert.deepEqual(collectDanTakeEvidence({...f,location:{...f.location,timeZone:'invalid'}},now).candidates,[]);
 });
+
+test('actual RAH wording Friday vs Thursday night retains both dates without rolling a week',()=>{
+ const text='There is still some uncertainty with respect to when the front/trough will move through NC (most ensemble guidance suggests Friday vs Thursday night), but we will maintain increased PoPs through the day Friday.';
+ const f=forecast('.DISCUSSION...\n'+text);
+ const candidates=collectDanTakeEvidence(f,now).candidates;assert.equal(candidates.length,1);
+ assert.equal(candidates[0].validFrom,'2026-09-10T22:00:00.000Z');
+ assert.equal(candidates[0].eventEnd,'2026-09-12T04:00:00.000Z');
+ assert.match(candidates[0].period,/Thursday, Sep 10.*Friday, Sep 11/);
+ const b=approveDanTake([{evidenceId:candidates[0].id,summary:'The front could arrive Thursday night or Friday, changing when rain reaches the area.'}],f,now);
+ assert.equal(b.forecastChanges.length,1);
+ assert.equal(approveDanTake([{evidenceId:candidates[0].id,summary:'The front could arrive Tuesday instead.'}],f,now).forecastChanges.length,0);
+});
+test('actual BOU model-speed disagreement is an explicit uncertainty for Sunday, not ordinary chance wording',()=>{
+ const f=forecast('.DISCUSSION /Through Sunday/...\nOn Sun, an upper level trough moves into the northern Rockies. The GFS is faster with moving a cold front across the area during the day while the ECMWF is slower.');
+ const candidates=collectDanTakeEvidence(f,now).candidates;
+ assert.equal(candidates.length,1);assert.match(candidates[0].period,/Sunday, Sep 13/);
+ assert.equal(approveDanTake([{evidenceId:candidates[0].id,summary:'The front could arrive earlier or later than expected.'}],f,now).forecastChanges.length,1);
+});
+test('RAH rainfall-amount uncertainty retains its upcoming front period',()=>{
+ const f=forecast('.DISCUSSION...\nThe front timing remains uncertain Thursday into Friday. It remains to be seen just how much QPF is realized with the front when it arrives.');
+ const candidates=collectDanTakeEvidence(f,now).candidates;
+ assert.equal(candidates.length,2);assert.match(candidates[1].period,/Thursday, Sep 10/);
+ assert.equal(approveDanTake([{evidenceId:candidates[1].id,summary:'How much rain the front brings is still uncertain.'}],f,now).forecastChanges.length,1);
+});
