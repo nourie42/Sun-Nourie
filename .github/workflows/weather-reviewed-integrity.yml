@@ -1,0 +1,129 @@
+name: Weather Nourie reviewed integrity
+on:
+  push:
+    branches: [fix/weather-reviewed-integrity, main]
+    paths:
+      - 'scripts/repair_weather_*.py'
+      - 'scripts/verifyWeatherIntegrity*.py'
+      - 'scripts/verifyWeatherIntegrity*.js'
+      - 'scripts/weatherFusionPersonalBrowser.js'
+      - 'src/weatherFusion*.js'
+      - 'public/weather-fusion/**'
+      - 'test/weatherFusion*.test.js'
+      - '.github/workflows/weather-reviewed-integrity.yml'
+  workflow_dispatch:
+concurrency:
+  group: weather-reviewed-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: write
+jobs:
+  verify:
+    if: github.ref == 'refs/heads/fix/weather-reviewed-integrity'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Apply reviewed changes, never guessed patches
+        run: |
+          if test -f scripts/repair_weather_integrity.py; then python scripts/repair_weather_integrity.py; fi
+          if test -f scripts/repair_weather_tests.py; then python scripts/repair_weather_tests.py; fi
+          node --check src/weatherFusion.js
+          node --check src/weatherFusionHourlyFeels.js
+          node --check src/weatherFusionExperience.js
+          node --check public/weather-fusion/app.js
+          node --check public/weather-fusion/experience.js
+      - run: npm ci
+      - run: pip install -q pythermalcomfort==4.4.2
+      - name: Independent UTCI reference across 3456 input/exposure cases
+        run: python scripts/verifyWeatherIntegrityReference.py
+      - name: All weather regression tests
+        shell: bash
+        run: |
+          if node --test test/weatherFusion*.test.js >/tmp/weather-reviewed-unit.log 2>&1; then
+            tail -10 /tmp/weather-reviewed-unit.log
+          else
+            python - <<'PY'
+          from pathlib import Path
+          s=Path('/tmp/weather-reviewed-unit.log').read_text()
+          for part in s.split('# Subtest:'):
+              if '\nnot ok ' in part:print('# Subtest:'+part[:5000])
+          print(s[-500:])
+          PY
+            exit 1
+          fi
+      - name: Existing business website regressions
+        run: npm run check
+      - run: npm install --no-save --package-lock=false playwright@1.55.0
+      - name: Install browser
+        run: npx playwright install --with-deps chromium >/tmp/weather-reviewed-install.log 2>&1 || (tail -30 /tmp/weather-reviewed-install.log; exit 1)
+      - name: Actual mobile/desktop layout, dated Dan take, thermal previews and three-digit centering
+        run: node scripts/weatherFusionPersonalBrowser.js >/tmp/weather-reviewed-browser.log 2>&1 || (tail -80 /tmp/weather-reviewed-browser.log; exit 1)
+      - name: Preserve verified code and evidence on repair branch
+        run: |
+          set -euo pipefail
+          cp /tmp/weather-personal-results/report.json docs/weather-integrity-browser-proof.json
+          cp /tmp/weather-reviewed-unit.log docs/weather-integrity-unit-proof.log
+          rm -f scripts/repair_weather_integrity.py scripts/repair_weather_tests.py
+          git add -A
+          python - <<'PY'
+          import json,subprocess
+          reference=json.load(open('docs/weather-integrity-reference-proof.json'))
+          browser=json.load(open('docs/weather-integrity-browser-proof.json'))
+          assert reference['passed'] and reference['maximumAbsoluteErrorF']<1e-6
+          assert browser['success'] and len(browser['centeringChecks'])==6
+          assert len(browser['danTakeChecks'])==21 and len(browser['outdoorExposureChecks'])==27
+          changed=subprocess.check_output(['git','diff','--cached','--name-only','f23610ec7091383573e84ba0780a010d64b78125'],text=True).splitlines()
+          prefixes=['public/weather-fusion/','src/weatherFusion','test/weatherFusion','docs/weather-integrity-']
+          exact={'.github/workflows/weather-reviewed-integrity.yml','scripts/weatherFusionPersonalBrowser.js','scripts/weatherFusionBrowserSmoke.js','scripts/verifyWeatherIntegrityReference.py','scripts/verifyWeatherIntegrityLive.js'}
+          assert all(p in exact or any(p.startswith(prefix) for prefix in prefixes) for p in changed),changed
+          print('Reviewed weather-only diff:',changed)
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m "Verify forecast integrity: dated Dan take, hourly sky, independent UTCI and centered temperatures"
+          git push origin HEAD:fix/weather-reviewed-integrity
+          echo "Verified commit: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: weather-reviewed-proof
+          path: |
+            /tmp/weather-reviewed-*.log
+            /tmp/weather-personal-results
+            docs/weather-integrity-reference-proof.json
+          retention-days: 7
+  live:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: npm ci
+      - run: npm install --no-save --package-lock=false playwright@1.55.0
+      - run: npx playwright install --with-deps chromium >/tmp/weather-live-install.log 2>&1 || (tail -20 /tmp/weather-live-install.log; exit 1)
+      - name: Verify exact deployed version and current API/browser output
+        run: node scripts/verifyWeatherIntegrityLive.js
+      - name: Record live proof without redeploying production
+        run: |
+          cp /tmp/weather-integrity-live.json docs/weather-integrity-live-proof.json
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/weather-integrity-live-proof.json
+          git commit -m "Record live forecast-integrity proof for ${GITHUB_SHA}"
+          git push origin HEAD:refs/heads/verification/reviewed-${GITHUB_SHA:0:12}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: weather-reviewed-live-proof
+          path: |
+            /tmp/weather-integrity-live.json
+            /tmp/weather-integrity-*.png
+          retention-days: 7
