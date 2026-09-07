@@ -1,0 +1,131 @@
+{
+  "checkedAt": "2026-09-07T10:42:39.817Z",
+  "rows": [
+    {
+      "query": "location=knightdale",
+      "location": {
+        "id": "knightdale",
+        "name": "Knightdale / Raleigh",
+        "latitude": 35.787,
+        "longitude": -78.4806,
+        "timeZone": "America/New_York",
+        "office": "RAH"
+      },
+      "discussion": {
+        "id": "dad80929-ba34-41d6-8d78-1db8218511b5",
+        "office": "RAH",
+        "issuanceTime": "2026-09-07T07:01:00+00:00",
+        "text": "\n000\nFXUS62 KRAH 070701\nAFDRAH\n\nArea Forecast Discussion\nNational Weather Service Raleigh NC\n300 AM EDT Mon Sep 7 2026\n\n.WHAT HAS CHANGED...\n\n* Dry/continental air related to high pressure that will build \n  across and offshore the Middle Atlantic will favor lower surface \n  dewpoints/afternoon RH and low temperatures, both of which have \n  been adjusted lower by several degrees than the NBM/official \n  forecast, through Wed.\n  \n\n&&\n\n.KEY MESSAGES...\nAs of 300 AM Monday...\n\n1) Seasonable start to the second week of September\n\n2) Above normal temperatures return by mid week, with increasing \nshower/storm chances Thursday and Friday\n\n&&\n\n.DISCUSSION...\nAs of 300 AM Monday...\n\nKEY MESSAGE 1... Seasonable start to the second week of \nSeptember\n\nA lower mid-latidue/subtropical ridge over the srn Plains will \nprogress ewd and reach the Carolinas by 12Z Wed. Rising heights and \nweakening nwly flow aloft will result over cntl NC. \n\nBeneath and downstream of the ridge aloft, 1022 mb surface high \npressure will build across and offshore the Middle Atlantic, while \nextending wwd into NC. Influence from the ridge and associated \ncontinental/dry air will favor mixed/afternoon surface dewpoints in \nthe 50s, except lwr 60s in the Coastal Plain and ern Sandhills and \nalso low temperatures in the 50s to lwr 60s. \n\nKEY MESSAGE 2... Above normal temperatures return by mid week, with \nincreasing shower/storm chances Thursday and Friday\n\nStrong ridging will remain in place across much of the southern US \nthrough mid week, with H5 heights forecast to steadily increase \nacross NC through Wednesday (peaking around 594-596dm). Meanwhile at \nthe surface, a 1025mb ridge off the Mid Atlantic coast will support \nincreasing southerly flow area-wide. While dewpoints will be slow to \nrecover and remain in the low to mid 60s on Wednesday, they will \nclimb markedly Thursday into Friday with upper 60s to lower 70s \nbecoming increasingly common. This will translate into steadily \nincreasing heat index values reaching the mid 90s Thursday and \nFriday. \n\nAs the upper ridge continues to flatten, we'll eventually see a \nlongwave trough and attendant surface cold front move out of the \nOhio Valley and into the Mid Atlantic/Southeast late in the week. As \nsuch we'll see increasing shower and storm chances as early as \nThursday afternoon within an increasingly unstable pre-frontal \nairmass. There is still some uncertainty with respect to when the \nfront/trough will move through NC (most ensemble guidance suggests \nFriday vs Thursday night), but we'll continue to maintain increased \nPoPs through the day Friday given ensemble support. That said the \nstrongest forcing for ascent associated with the trough should be \ndisplaced well north of NC and it remains to be seen just how much \nQPF is realized with the front when it arrives. \n\nPrecip chances should decrease in the wake of the front through the \nweekend. Temps will also decrease, albeit slightly, with highs \nreaching the upper 80s/lower 90s Saturday and Sunday.\n\n&&\n\n.AVIATION /06Z MONDAY THROUGH FRIDAY/...\nAs of 130 AM Monday...\n\nNely flow around high pressure building across the Great Lakes and \nMiddle Atlantic will become gusty into the teens kts with daytime \nheating primarily at FAY, and more briefly at RWI and RDU around \nmidday. \n\nOutlook: High pressure over the Middle Atlantic will favor VFR \nconditions through mid week, with the exception of a chance of \nshallow, radiation fog/mist at RWI due to local effects. A frontal \nzone will settle into the NC with a chance of convection and \nassociated flight restrictions on Fri. \n\n&&\n\n.RAH WATCHES/WARNINGS/ADVISORIES...\nNone.\n\n&&\n\n$$\n\nDISCUSSION...MWS/Leins\nAVIATION...MWS\n",
+        "url": "https://api.weather.gov/products/dad80929-ba34-41d6-8d78-1db8218511b5"
+      },
+      "context": {
+        "version": "weather-nourie-dans-take-integrity-v1",
+        "source": {
+          "id": "dad80929-ba34-41d6-8d78-1db8218511b5",
+          "office": "RAH",
+          "issuedAt": "2026-09-07T07:01:00+00:00",
+          "locationKey": "35.787,-78.4806",
+          "expiresAt": "2026-09-07T19:01:00.000Z"
+        },
+        "candidates": [
+          {
+            "id": "s2-p6-q2",
+            "quote": "There is still some uncertainty with respect to when the front/trough will move through NC (most ensemble guidance suggests Friday vs Thursday night), but we'll continue to maintain increased PoPs through the day Friday given ensemble support.",
+            "context": "As such we'll see increasing shower and storm chances as early as Thursday afternoon within an increasingly unstable pre-frontal airmass. There is still some uncertainty with respect to when the front/trough will move through NC (most ensemble guidance suggests Friday vs Thursday night), but we'll continue to maintain increased PoPs through the day Friday given ensemble support. That said the strongest forcing for ascent associated with the trough should be displaced well north of NC and it remains to be seen just how much QPF is realized with the front when it arrives.",
+            "section": "DISCUSSION",
+            "sourcePeriod": "",
+            "sectionIssuedAt": "2026-09-07T07:00:00.000Z",
+            "period": "This coming week — Thursday, Sep 10 – Friday, Sep 11",
+            "validFrom": "2026-09-10T22:00:00.000Z",
+            "eventEnd": "2026-09-12T04:00:00.000Z",
+            "validUntil": "2026-09-07T19:01:00.000Z"
+          }
+        ],
+        "status": "evidence-available"
+      },
+      "briefing": {
+        "headline": "Dry start, warming late week with shower/storm chances",
+        "summary": "As of Monday, September 7 at 6:42am the week begins dry and pleasant with lower humidity and comfortable nights. Warming arrives midweek with an increasing chance of showers and storms late in the week.",
+        "nearTerm": "Today will be mostly sunny with lower humidity and light east winds. Nights will be clear and a bit cool compared to recent days.",
+        "extended": "Midweek will warm and humidity will rise. Shower and storm chances increase late in the week as a front approaches, with timing still somewhat uncertain.",
+        "uncertainty": "",
+        "forecastChanges": [],
+        "sources": [
+          "nws",
+          "afd",
+          "hrrr",
+          "ecmwf",
+          "nbm"
+        ],
+        "danTakeVersion": "weather-nourie-dans-take-integrity-v1",
+        "danTakeSource": {
+          "id": "dad80929-ba34-41d6-8d78-1db8218511b5",
+          "office": "RAH",
+          "issuedAt": "2026-09-07T07:01:00+00:00",
+          "locationKey": "35.787,-78.4806",
+          "expiresAt": "2026-09-07T19:01:00.000Z"
+        },
+        "danTakeStatus": "no-approved-change",
+        "mode": "ai",
+        "signature": "46c0f33cd290a2d83eb0891e",
+        "generatedAt": "2026-09-07T10:42:24.065Z",
+        "model": "gpt-5-mini"
+      }
+    },
+    {
+      "query": "latitude=39.7392&longitude=-104.9903",
+      "location": {
+        "latitude": 39.7392,
+        "longitude": -104.9903,
+        "name": "Denver, CO",
+        "id": "",
+        "timeZone": "America/Denver",
+        "office": "BOU"
+      },
+      "discussion": {
+        "id": "35f83fb3-ee34-45ec-84b6-4406d027a924",
+        "office": "BOU",
+        "issuanceTime": "2026-09-07T08:39:00+00:00",
+        "text": "\n000\nFXUS65 KBOU 070839\nAFDBOU\n\nArea Forecast Discussion\nNational Weather Service Denver/Boulder CO\n239 AM MDT Mon Sep 7 2026\n\n.KEY MESSAGES...\n\n- Better chance for showers and thunderstorms this afternoon with\n  locally heavy rain in a few areas across the plains.\n\n- Temperatures will remain very warm, with only slight cool down \n  Tuesday and Wednesday.\n\n- Chance of afternoon thunderstorms mainly Palmer Divide and east\n  central plains on Tuesday,\n\n- Warmer and drier for Thursday and Friday.\n\n- Some potential for a brief cooldown next weekend.\n\n&&\n\n.DISCUSSION /Through Sunday/...\nIssued at 233 AM MDT Mon Sep 7 2026\n\nA upper level trough will move across the nrn Rockies today thru \ntonight with SW flow aloft across the area. Monsoon moisture will\nbe embedded in the flow with PW values 150 to 175 percent above \nnormal. MLCAPE will be around 1000 j/kg from the Palmer Divide \nacross the far ern plains this aftn with lower values further \nwest. Overall, will see a good chance of showers/tstms this aftn \nthru the evening hours, especially across the plains. There is \nenough shear for an isold svr storm or two where the highest \nMLCAPE will exist this aftn. In addition, with decent PW's some \nlocally heavy rainfall will be possible as well. Highs this aftn \nwill be in the upper 80's to mid 90's across the plains.\n\nOn Tue, the flow aloft will become more westerly as a wek cool front \nmoves across the plains.  There will still be some monsoon moisture \nembedded in the flow, however, PW values will decrease, especially \nacross the nrn half of the area.  Best chc for showers/tstms will be \nover the Palmer Divide and sern areas of the plains.  MLCAPE is fcst \nto be in the 500-800 j/kg range, however, shear will be better so \ncan't rule out an isold svr storm over the Palmer Divide.  Highs \nacross the plains will be in the 85 to 90 degree range.\n\nFor Wed, the flow aloft will become more WNW as a surge of cooler \nair moves across late Tue night into Wed morning.  This will lead \nmainly dry conditions with highs across nern CO in the upper 70's to \nmid 80's.\n\nLooking ahead to Thu and Fri, the flow aloft will be mainly zonal \nwith minimal moisture embedded in the flow.  As a result, expect \nmainly dry conditions both days with warmer temperatures as readings \nover nern CO rise back into the upper 80's to lower 90s.\n\nFor next weekend, the flow aloft will remain zonal on Sat as another \nweak front moves across.  As a result, highs will drop back into the \n80's across the plains.  Meanwhile, will leave in a slight chc for \naftn tstms across the area.  On Sun, the flow aloft will become more \nSW as an upper level trough moves into the nrn Rockies.  The GFS is \nfaster with moving a cold front across the area during the day while \nthe ECMWF is slower.  With SW flow aloft and upper level trough \nstill to the NW of the area, ECMWF probably has a better handle on \ntiming of front.  Thus may see highs reach the upper 80's to lower \n90's over nern CO on Sun before it reaches the area Sun night. \n\n&&\n\n.AVIATION /06Z TAFS through 06Z Tuesday/...\nIssued at 1112 PM MDT Sun Sep 6 2026\n\nAn outflow boundary from earlier tstms near the foothills has\nmoved across with a wind shift to the W/WSW.  These winds should\nbecome more SSW/S by 07z at APA/DIA with WNW winds at BJC.\n\nOn Mon, winds will be light and variable by 13z and then trend to\nmore easterly at BJC and DIA by 17z. At APA, winds will be from\nthe NW by 19z. There will be a chc of showers/tstms by 22z which\nwill linger thru 02z Mon evening.  For now have kept a prob30\nbetween 22z and 02z with brief gusty winds up to 35 mph possible.\n\n&&\n\n.BOU WATCHES/WARNINGS/ADVISORIES...\nNone.\n\n&&\n\n$$\n\nDISCUSSION...RPK\nAVIATION...RPK\n",
+        "url": "https://api.weather.gov/products/35f83fb3-ee34-45ec-84b6-4406d027a924"
+      },
+      "context": {
+        "version": "weather-nourie-dans-take-integrity-v1",
+        "source": {
+          "id": "35f83fb3-ee34-45ec-84b6-4406d027a924",
+          "office": "BOU",
+          "issuedAt": "2026-09-07T08:39:00+00:00",
+          "locationKey": "39.7392,-104.9903",
+          "expiresAt": "2026-09-07T20:39:00.000Z"
+        },
+        "candidates": [],
+        "status": "no-explicit-future-change"
+      },
+      "briefing": {
+        "headline": "Chance of afternoon showers and storms; very warm",
+        "summary": "Forecasters expect a better chance of showers and storms this afternoon, mainly across the plains, with a few areas seeing locally heavy rain. Temperatures will stay very warm through midweek with only a slight cooldown later on.",
+        "nearTerm": "Today starts partly cloudy, then a chance of showers and storms develops this afternoon and into the evening, especially east of the city. A few storms could be strong and produce brief heavy rain and gusty winds.",
+        "extended": "Tuesday has a smaller chance for afternoon showers and storms, mainly near the Palmer Divide and eastern plains as moisture decreases. Thursday and Friday look warmer and mostly dry, with a possible brief cooldown next weekend.",
+        "uncertainty": "",
+        "forecastChanges": [],
+        "sources": [
+          "nws",
+          "afd"
+        ],
+        "danTakeVersion": "weather-nourie-dans-take-integrity-v1",
+        "danTakeSource": {
+          "id": "35f83fb3-ee34-45ec-84b6-4406d027a924",
+          "office": "BOU",
+          "issuedAt": "2026-09-07T08:39:00+00:00",
+          "locationKey": "39.7392,-104.9903",
+          "expiresAt": "2026-09-07T20:39:00.000Z"
+        },
+        "danTakeStatus": "no-explicit-future-change",
+        "mode": "ai",
+        "signature": "26e006ef9dfb522103fccdd4",
+        "generatedAt": "2026-09-07T10:42:39.803Z",
+        "model": "gpt-5-mini"
+      }
+    }
+  ]
+}
