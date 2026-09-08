@@ -37,10 +37,11 @@ test('clothing follows the figure feels-like temperature from hot to cold',()=>{
  assert.match(exposureScene(true,true,'Clear',95),/light hot-weather clothing/);
 });
 
-test('Dan take groups multiple concerns under one period instead of repeating the date heading',()=>{
+test('Dan take groups one period and strips every repeated Dan take label from body text',()=>{
  const period='This coming week — Thursday, Sep 10 – Friday, Sep 11';
- const text=danTakeText([{period,summary:'The front could arrive earlier or later.'},{period,summary:'The amount of rain is still uncertain.'},{period,summary:'The amount of rain is still uncertain.'}]);
+ const text=danTakeText([{period,summary:"Dan's take: The front could arrive earlier or later."},{period,summary:'DAN’S TAKE — Dans take: The amount of rain is still uncertain.'},{period,summary:'The amount of rain is still uncertain.'}]);
  assert.equal(text.split(period).length-1,1);assert.match(text,/front could arrive/);assert.match(text,/amount of rain/);
+ assert.equal((text.match(/dan\s*['’]?\s*s\s+take/gi)||[]).length,0);
 });
 test('Dan take rejects forecaster-attribution filler and accepts direct wording',()=>{
  const candidates=collectDanTakeEvidence(forecast,now).candidates;assert.ok(candidates.length>=1);

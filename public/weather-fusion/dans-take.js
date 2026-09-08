@@ -3,7 +3,7 @@
  * Ambiguous timing is omitted, not guessed. Dates are anchored to source issuance,
  * including a retained section's own "As of" time, never to the time of retrieval.
  */
-export const DAN_TAKE_VERSION = 'weather-nourie-dans-take-source-v3';
+export const DAN_TAKE_VERSION = 'weather-nourie-dans-take-source-v4';
 const H = 3600000, DAY = 24 * H, MAX_SOURCE_AGE = 12 * H;
 const norm = v => String(v || '').replace(/\s+/g, ' ').trim();
 const finite = Number.isFinite;
@@ -173,11 +173,13 @@ export function visibleDanTakeItems(briefing, forecast, now=Date.now()) {
 }
 export function danTakeText(items){
   const groups=new Map();
+  const cleanSummary=value=>norm(value).replace(/^(?:dan\s*['’]?\s*s\s+take\b\s*[:\-—–.]?\s*)+/i,'').trim();
   for(const item of Array.isArray(items)?items:[]){
     if(!item?.period||!item?.summary)continue;
+    const summary=cleanSummary(item.summary);if(!summary)continue;
     if(!groups.has(item.period))groups.set(item.period,[]);
-    const list=groups.get(item.period),key=item.summary.toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
-    if(!list.some(entry=>entry.key===key))list.push({key,text:item.summary.trim()});
+    const list=groups.get(item.period),key=summary.toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+    if(!list.some(entry=>entry.key===key))list.push({key,text:summary});
   }
   return [...groups].map(([period,list])=>`${period}: ${list.map(x=>x.text).join(' ')}`).join('\n\n');
 }

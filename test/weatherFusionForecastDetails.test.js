@@ -24,59 +24,61 @@ function harness({missingNote=false}={}){
  runInNewContext(`${renderer}\nthis.renderBriefing=renderBriefing;`,context);
  return {elements,context,render:context.renderBriefing,setTime:t=>{time=t;}};
 }
-test('optional take remains below daily graphic and ahead of hourly forecast',()=>{
+test('exactly one Dan take heading stays below daily graphic and ahead of hourly forecast',()=>{
  const panel=html.match(/<section class="glass today-panel"[^>]*>([\s\S]*?)<\/section>/)?.[1];
  assert.ok(panel);assert.ok(panel.indexOf('id="today-forecast"')<panel.indexOf('id="today-uncertainty"'));
- assert.match(panel,/id="today-uncertainty"[^>]*hidden/);
+ assert.doesNotMatch(panel,/id="today-uncertainty"[^>]*hidden/);
  assert.match(panel,/<strong class="today-uncertainty-label">Dan's take<\/strong>/);
+ assert.equal((panel.match(/Dan's take/g)||[]).length,1);
+ assert.match(panel,/Checking the latest forecast discussion/);
  assert.match(html,/<\/section>\s*<section class="glass hourly-panel"/);
  for(const id of ['today-forecast','today-uncertainty','today-uncertainty-text','hourly'])assert.equal(html.split(`id="${id}"`).length-1,1);
 });
-test('NWS fallback keeps the normal forecast but never manufactures Dan take',()=>{
+test('NWS fallback keeps one Dan take heading with a neutral status message',()=>{
  const {elements,render}=harness();
  render({mode:'nws-summary',summary:'Warm with a chance of rain.',uncertainty:'Forecasts can change, especially the timing of showers.'});
- assert.equal(elements['today-uncertainty-text'].textContent,'');assert.equal(elements['today-uncertainty'].hidden,true);
- assert.ok(!elements['briefing-detail'].innerHTML.includes('Dan\'s take'));
+ assert.equal(elements['today-uncertainty-text'].textContent,'No additional take is available right now.');assert.equal(elements['today-uncertainty'].hidden,false);
+ assert.ok(!elements['briefing-detail'].innerHTML.includes('data-dans-take'));
  assert.equal(elements['briefing-summary'].textContent,'Warm with a chance of rain.');
 });
 test('only approved dated AI changes appear in both places, without duplicates',()=>{
  const {elements,render}=harness(),note=elements['today-uncertainty'];
  render(supported());assert.equal(note.hidden,false);assert.match(elements['today-uncertainty-text'].textContent,/Thursday, Sep 10/);
- assert.ok(elements['briefing-detail'].innerHTML.includes('The front could arrive earlier or later than expected.'));
+ assert.ok(!elements['briefing-detail'].innerHTML.includes('data-dans-take'));
  render(supported('The front may arrive later than expected.'));
  assert.equal(elements['today-uncertainty'],note);assert.ok(!elements['briefing-detail'].innerHTML.includes('earlier or later'));
- assert.equal(elements['briefing-detail'].innerHTML.split('data-dans-take').length-1,1);
+ assert.equal(elements['briefing-detail'].innerHTML.split('data-dans-take').length-1,0);
 });
-for(const uncertainty of [undefined,null,'',' \n\t ',42,{},'Yesterday\'s front might change the forecast.'])test('unverified legacy uncertainty is always hidden: '+JSON.stringify(uncertainty),()=>{
+for(const uncertainty of [undefined,null,'',' \n\t ',42,{},'Yesterday\'s front might change the forecast.'])test('unverified legacy uncertainty never becomes take content: '+JSON.stringify(uncertainty),()=>{
  const {elements,render}=harness();render(supported());render({mode:'ai',signature:source.signature,uncertainty});
- assert.equal(elements['today-uncertainty'].hidden,true);assert.equal(elements['today-uncertainty-text'].textContent,'');
+ assert.equal(elements['today-uncertainty'].hidden,false);assert.equal(elements['today-uncertainty-text'].textContent,'No additional forecast changes to call out right now.');
  assert.ok(!elements['briefing-detail'].innerHTML.includes('data-dans-take'));
 });
 test('location reset clears the old take immediately',()=>{
  const choose=app.slice(app.indexOf('function chooseLocation(value)'),app.indexOf('\nfunction showDay('));
  assert.match(choose,/renderBriefing\(\{ headline: 'Preparing your local outlook\.'/);
  const {elements,render}=harness();render(supported());render({headline:'Preparing your local outlook.',sources:[]});
- assert.equal(elements['today-uncertainty'].hidden,true);assert.equal(elements['today-uncertainty-text'].textContent,'');
+ assert.equal(elements['today-uncertainty'].hidden,false);assert.equal(elements['today-uncertainty-text'].textContent,'Checking the latest forecast discussion…');
 });
 test('source replacement removes previously valid take, even under the old signature',()=>{
  const {elements,context,render}=harness(),b=supported();render(b);
  context.forecast.discussion.text='.DISCUSSION...\nDry weather is expected this week.';render(b);
- assert.equal(elements['today-uncertainty'].hidden,true);
+ assert.equal(elements['today-uncertainty'].hidden,false);assert.equal(elements['today-uncertainty-text'].textContent,'No additional forecast changes to call out right now.');
 });
-test('source expiry removes the card and duplicated full-outlook section',()=>{
+test('source expiry removes expired content without removing the single heading',()=>{
  const {elements,render,setTime}=harness(),b=supported();render(b);setTime(now+12*3600000);render(b);
- assert.equal(elements['today-uncertainty'].hidden,true);assert.ok(!elements['briefing-detail'].innerHTML.includes('data-dans-take'));
+ assert.equal(elements['today-uncertainty'].hidden,false);assert.equal(elements['today-uncertainty-text'].textContent,'No additional forecast changes to call out right now.');assert.ok(!elements['briefing-detail'].innerHTML.includes('data-dans-take'));
  assert.match(app,/setInterval\(.*renderBriefing\(currentBriefing\).*30000/);
  assert.match(app,/visibilitychange/);
 });
 test('untrusted text cannot execute HTML',()=>{
  const {elements,render}=harness();render({...supported(),uncertainty:'<img src=x onerror=alert(1)>',nearTerm:'<img src=x onerror=alert(1)>'});
  assert.ok(!elements['briefing-detail'].innerHTML.includes('<img'));assert.ok(elements['briefing-detail'].innerHTML.includes('&lt;img'));
- const b=supported();b.forecastChanges[0].summary='<img src=x onerror=alert(1)>';render(b);assert.equal(elements['today-uncertainty'].hidden,true);
+ const b=supported();b.forecastChanges[0].summary='<img src=x onerror=alert(1)>';render(b);assert.equal(elements['today-uncertainty'].hidden,false);assert.equal(elements['today-uncertainty-text'].textContent,'No additional forecast changes to call out right now.');
 });
 test('an older cached document without the optional note cannot break the outlook',()=>{
  const {elements,render}=harness({missingNote:true});assert.doesNotThrow(()=>render(supported()));
- assert.ok(elements['briefing-detail'].innerHTML.includes('data-dans-take'));
+ assert.ok(!elements['briefing-detail'].innerHTML.includes('data-dans-take'));
 });
 test('note is smaller and bold, with wrapping rather than clipping',()=>{
  assert.match(css,/\.today-uncertainty\{[^}]*font-size:14px;[^}]*font-weight:700;[^}]*overflow-wrap:anywhere/);
@@ -88,6 +90,6 @@ test('Gross Meter heading stays centered and bold without changing chart geometr
  assert.match(css,/#gross-title\{text-align:center;font-weight:800\}/);assert.ok(!/\.gross-(scroll|chart)\s*\{/.test(css));
 });
 test('changed assets are cache-busted and late briefing responses stay guarded',()=>{
- assert.match(html,/forecast-layout\.css\?v=4-confidence/);assert.match(html,/app\.js\?v=ui-requests-v1/);
+ assert.match(html,/forecast-layout\.css\?v=4-confidence/);assert.match(html,/app\.js\?v=dans-take-once-v1/);
  assert.match(app,/if \(id === generation && briefing\.signature === forecast\?\.signature\) renderBriefing\(briefing\)/);
 });

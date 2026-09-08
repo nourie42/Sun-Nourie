@@ -52,9 +52,10 @@ try{
    assert.equal(b.uncertainty,text,'API compatibility text must be built from approved items only');
    assert.equal((b.forecastChanges||[]).length,items.length);
   }else assert.equal(items.length,0,'No unverified or non-AI take is allowed');
-  await page.waitForFunction(expected=>document.querySelector('#today-uncertainty-text')?.textContent===expected,text,{timeout:15000});
-  const displayed=await page.evaluate(()=>({text:document.querySelector('#today-uncertainty-text').textContent,hidden:document.querySelector('#today-uncertainty').hidden,fullOutlookSections:document.querySelectorAll('#briefing-detail [data-dans-take]').length,overflow:document.documentElement.scrollWidth>innerWidth+1}));
-  assert.equal(displayed.hidden,!items.length);assert.equal(displayed.fullOutlookSections,items.length?1:0);assert.equal(displayed.overflow,false);
+  const expectedText=text||(b.mode==='ai'?'No additional forecast changes to call out right now.':'No additional take is available right now.');
+  await page.waitForFunction(expected=>document.querySelector('#today-uncertainty-text')?.textContent===expected,expectedText,{timeout:15000});
+  const displayed=await page.evaluate(()=>({text:document.querySelector('#today-uncertainty-text').textContent,hidden:document.querySelector('#today-uncertainty').hidden,headingCount:document.querySelectorAll('.today-uncertainty-label').length,bodyHasLabel:/dan\s*['’]?\s*s\s+take/i.test(document.querySelector('#today-uncertainty-text').textContent),fullOutlookSections:document.querySelectorAll('#briefing-detail [data-dans-take]').length,overflow:document.documentElement.scrollWidth>innerWidth+1}));
+  assert.equal(displayed.hidden,false);assert.equal(displayed.headingCount,1);assert.equal(displayed.bodyHasLabel,false);assert.equal(displayed.fullOutlookSections,0);assert.equal(displayed.overflow,false);
   for(const item of items){
    assert.ok(Date.parse(item.eventEnd)>time&&Date.parse(item.validUntil)>time);
    assert.ok(f.discussion.text.replace(/\s+/g,' ').includes(item.sourceQuote));

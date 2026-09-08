@@ -208,10 +208,11 @@ try{
    page.on('pageerror',e=>report.browserErrors.push(e.message));
    await page.goto(base+'/weather-fusion/',{waitUntil:'networkidle'});
    await page.waitForFunction(()=>document.querySelector('#briefing-title').textContent==='Local outlook');
-   assert.equal(await page.locator('#today-uncertainty').isVisible(),expected>0,name+' conditional visibility');
-   assert.equal(await page.locator('#briefing-detail [data-dans-take]').count(),expected?1:0);
+   assert.equal(await page.locator('#today-uncertainty').isVisible(),true,name+' keeps the one Dan take heading');
+   assert.equal(await page.locator('#briefing-detail [data-dans-take]').count(),0);
    const shown=(await page.locator('#today-uncertainty-text').textContent()).trim();
-   assert.equal(shown,danTakeText(make().b.forecastChanges));
+   const expectedText=danTakeText(make().b.forecastChanges);
+   assert.equal(shown,expectedText||'No additional forecast changes to call out right now.');
    assert.ok(!/yesterday|main sources of forecast uncertainty|Forecasts can change/i.test(shown));
    if(expected){
     assert.match(shown,/(?:Monday|Thursday), Sep (?:7|10)/);
@@ -220,14 +221,16 @@ try{
    }
    if(name==='expires-on-open-page'){
     await page.evaluate(time=>{window.__takeNow=time;document.dispatchEvent(new Event('visibilitychange'));},takeNow);
-    assert.equal(await page.locator('#today-uncertainty').isVisible(),false,'Passed morning auto-expires on return to page');
+    assert.equal(await page.locator('#today-uncertainty').isVisible(),true,'Passed morning clears content but keeps one heading on return to page');
+    assert.equal((await page.locator('#today-uncertainty-text').textContent()).trim(),'No additional forecast changes to call out right now.');
     assert.equal(await page.locator('#briefing-detail [data-dans-take]').count(),0);
    }
    if(width===390&&name==='later-week')await page.locator('.today-panel').screenshot({path:dir+'/dans-take-dated-390.png'});
    await page.locator('[data-place="greenville"]').click();
-   assert.equal(await page.locator('#today-uncertainty').isVisible(),false,'Old location take clears immediately');
+   assert.equal(await page.locator('#today-uncertainty').isVisible(),true,'Old location content clears but the one heading remains');
    await page.waitForFunction(()=>document.querySelector('#briefing-title').textContent==='Local outlook');
-   assert.equal(await page.locator('#today-uncertainty').isVisible(),false,'Quiet new location does not inherit prior concern');
+   assert.equal(await page.locator('#today-uncertainty').isVisible(),true,'Quiet new location keeps one heading without inheriting prior concern');
+   assert.equal((await page.locator('#today-uncertainty-text').textContent()).trim(),'No additional forecast changes to call out right now.');
    (report.danTakeChecks??=[]).push({name,width,expectedItems:expected,datedSourceOnly:true,legacyTextIgnored:true,locationReset:true,expiry:name==='expires-on-open-page'});
    await context.close();
   }
@@ -268,7 +271,7 @@ try{
   mode='cached';version++;await page.reload({waitUntil:'networkidle'});
   assert.equal(await page.locator('#today-uncertainty').isVisible(),true,'Reload immediately renders the cached, revalidated source take without a successful full outlook');
   mode='quiet';version++;await page.locator('#refresh').click();await page.waitForTimeout(500);
-  assert.equal(await page.locator('#today-uncertainty').isVisible(),false,'A different quiet discussion invalidates the prior card');
+  assert.equal(await page.locator('#today-uncertainty').isVisible(),true,'A different quiet discussion clears prior content but keeps one heading');assert.equal((await page.locator('#today-uncertainty-text').textContent()).trim(),'No additional forecast changes to call out right now.');
   mode='conflict';version++;forecastRequests=0;briefingRequests=0;await page.reload({waitUntil:'networkidle'});
   await page.waitForFunction(()=>!document.querySelector('#today-uncertainty').hidden);
   assert.equal(briefingRequests,2,'A forecast-signature conflict is retried once, not silently ignored until manual refresh');

@@ -60,10 +60,14 @@ try{
   }
   const evidence=collectDanTakeEvidence(f,Date.now());
   const items=visibleDanTakeItems(b,f,Date.now()),text=danTakeText(items);
+  const expectedTake=text||(b?.mode==='ai'?'No additional forecast changes to call out right now.':'No additional take is available right now.');
   await page.waitForFunction(()=>document.querySelector('#hourly .hour-current .hour-feels b')&&document.querySelector('.sun-person figcaption strong'),null,{timeout:75000});
-  await page.waitForFunction(text=>document.querySelector('#today-uncertainty-text').textContent===text,text,{timeout:20000});
-  assert.equal(await page.locator('#today-uncertainty').isVisible(),items.length>0);
+  await page.waitForFunction(text=>document.querySelector('#today-uncertainty-text').textContent===text,expectedTake,{timeout:20000});
+  assert.equal(await page.locator('#today-uncertainty').isVisible(),true);
   assert.equal((await page.locator('.today-uncertainty-label').textContent()).trim(),"Dan's take");
+  assert.equal(await page.locator('.today-uncertainty-label').count(),1);
+  assert.equal(await page.locator('#briefing-detail [data-dans-take]').count(),0);
+  assert.equal(/dan\s*['’]?\s*s\s+take/i.test(await page.locator('#today-uncertainty-text').textContent()),false);
   for(const item of items){assert.ok(f.discussion.text.replace(/\s+/g,' ').includes(item.sourceQuote));assert.ok(Date.parse(item.eventEnd)>Date.now());}
   const shown=(await page.locator('#hourly .hour-current .hour-feels b').innerText()).trim();
   assert.equal(shown,degrees(calculated.rawOutdoors));
@@ -94,9 +98,9 @@ try{
   await context.close();
  }
  report.actualAICount=report.locations.filter(x=>x.aiMode==='ai').length;
- assert.ok(report.actualAICount>0,'At least one live AI generation must be verified, not only hidden fallback cards');
+ assert.ok(report.actualAICount>0,'At least one live AI generation must be verified, not only fallback status text');
  report.visibleChangeCount=report.locations.reduce((sum,row)=>sum+row.approvedChanges.length,0);
- if(report.locations.some(row=>row.candidateCount>0))assert.ok(report.visibleChangeCount>0,'Actual current discussion candidates must yield a verified, meaningful AI take somewhere, not just hidden cards');
+ if(report.locations.some(row=>row.candidateCount>0))assert.ok(report.visibleChangeCount>0,'Actual current discussion candidates must yield a verified, meaningful AI take somewhere, not just fallback status text');
  report.success=true;
 }finally{
  if(browser)await browser.close();await fs.writeFile(output,JSON.stringify(report,null,2)+'\n');
