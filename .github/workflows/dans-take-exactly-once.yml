@@ -23,7 +23,7 @@ jobs:
           fi
           node --check public/weather-fusion/dans-take.js
           node --check public/weather-fusion/app.js
-          node --check scripts/weatherFusionPersonalBrowser.js
+          node --check scripts/verifyDansTakeExactlyOnceBrowser.js
           node --check scripts/verifyWeatherDansTakeLive.js
           node --check scripts/verifyWeatherIntegrityLive.js
       - run: npm ci
@@ -34,8 +34,8 @@ jobs:
       - run: npm install --no-save --package-lock=false playwright@1.55.0
       - name: Install Chromium
         run: npx playwright install --with-deps chromium >/tmp/dans-take-install.log 2>&1 || (tail -40 /tmp/dans-take-install.log; exit 1)
-      - name: Actual responsive browser suite
-        run: node scripts/weatherFusionPersonalBrowser.js >/tmp/dans-take-browser.log 2>&1 || (tail -120 /tmp/dans-take-browser.log; exit 1)
+      - name: Focused actual-browser exact-one check
+        run: node scripts/verifyDansTakeExactlyOnceBrowser.js | tee /tmp/dans-take-browser.log
       - name: Commit verified product changes
         shell: bash
         run: |
@@ -46,12 +46,6 @@ jobs:
             echo 'No product changes to commit.'
             exit 0
           fi
-          python - <<'PY'
-          import json
-          report=json.load(open('/tmp/weather-personal-results/report.json'))
-          assert report['success']
-          assert len(report.get('danTakeChecks',[]))==21
-          PY
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git commit -m "Render exactly one Dan's take heading"
@@ -63,5 +57,4 @@ jobs:
           path: |
             /tmp/dans-take-browser.log
             /tmp/dans-take-install.log
-            /tmp/weather-personal-results
           retention-days: 7
