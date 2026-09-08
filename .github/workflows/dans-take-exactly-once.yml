@@ -1,0 +1,67 @@
+name: Dan take exactly once
+on:
+  push:
+    branches: [fix/dans-take-exactly-once]
+permissions:
+  contents: write
+concurrency:
+  group: dans-take-exactly-once-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Apply exact-one repair
+        run: |
+          if test -f scripts/repair_dans_take_exactly_once.py; then
+            python scripts/repair_dans_take_exactly_once.py
+          fi
+          node --check public/weather-fusion/dans-take.js
+          node --check public/weather-fusion/app.js
+          node --check scripts/weatherFusionPersonalBrowser.js
+          node --check scripts/verifyWeatherDansTakeLive.js
+          node --check scripts/verifyWeatherIntegrityLive.js
+      - run: npm ci
+      - name: All Weather Nourie unit regressions
+        run: node --test test/weatherFusion*.test.js
+      - name: Existing website regressions
+        run: npm run check
+      - run: npm install --no-save --package-lock=false playwright@1.55.0
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium >/tmp/dans-take-install.log 2>&1 || (tail -40 /tmp/dans-take-install.log; exit 1)
+      - name: Actual responsive browser suite
+        run: node scripts/weatherFusionPersonalBrowser.js >/tmp/dans-take-browser.log 2>&1 || (tail -120 /tmp/dans-take-browser.log; exit 1)
+      - name: Commit verified product changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f scripts/repair_dans_take_exactly_once.py
+          git add -A
+          if git diff --cached --quiet; then
+            echo 'No product changes to commit.'
+            exit 0
+          fi
+          python - <<'PY'
+          import json
+          report=json.load(open('/tmp/weather-personal-results/report.json'))
+          assert report['success']
+          assert len(report.get('danTakeChecks',[]))==21
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m "Render exactly one Dan's take heading"
+          git push origin HEAD:fix/dans-take-exactly-once
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dans-take-exactly-once-proof
+          path: |
+            /tmp/dans-take-browser.log
+            /tmp/dans-take-install.log
+            /tmp/weather-personal-results
+          retention-days: 7
