@@ -1,17 +1,18 @@
 {
-  "checkedAt": "2026-09-09T01:38:04Z",
+  "checkedAt": "2026-09-09T01:38:24Z",
   "results": [
     {
       "model": "ecmwf",
       "runAt": "2026-09-08T12:00:00Z",
       "reused": true,
-      "checkedAt": "2026-09-08T23:39:35Z"
+      "checkedAt": "2026-09-09T01:38:24Z"
     },
     {
       "model": "nbm",
-      "runAt": "2026-09-08T18:00:00Z",
-      "reused": true,
-      "checkedAt": "2026-09-08T23:39:35Z"
+      "runAt": "2026-09-09T00:00:00Z",
+      "messages": 140,
+      "complete": true,
+      "checkedAt": "2026-09-09T01:38:24Z"
     },
     {
       "model": "hrrr",
