@@ -4,6 +4,7 @@ import {chromium} from 'playwright';
 import {createWeatherService} from '../src/weatherFusion.js';
 import {pavementEstimate,pavementWarning} from '../public/weather-fusion/pavement.js';
 import {currentSample} from '../public/weather-fusion/weather-display.js';
+import {thermalRisk} from '../public/weather-fusion/thermal-risk.js';
 const base=process.env.WEATHER_BASE_URL||'https://sun-nourie-live.onrender.com',output=process.env.WEATHER_QA_DIR||'../qa-model-coverage';
 const local=process.env.WEATHER_LOCAL_PIPELINE==='1',service=local?createWeatherService({env:{}}):null;
 const locations=[{id:'knightdale'},{id:'greenville'},{latitude:35.99,longitude:-78.9},{latitude:39.7392,longitude:-104.9903}];
@@ -44,7 +45,10 @@ try{
    assert.deepEqual(await page.locator('#skin-values .exposure-label').allTextContents(),['Shade','Sun','For Pets']);
    assert.ok(await page.locator('#map-panel').evaluate(el=>el.getBoundingClientRect().top>=document.querySelector('#metrics').getBoundingClientRect().bottom));
    assert.match(await page.locator('.comfort-later small').innerText(),/\d{1,2}:\d{2} [AP]M/);
-   assert.match(await page.locator('.comfort-later>span').innerText(),/Warmest feels like today/);
+   assert.match(await page.locator('.comfort-later>span').first().innerText(),/Warmest feels like today/);
+   const humanRisk=thermalRisk(currentSample(shown).feels);
+   assert.equal(await page.locator('.sun-person .thermal-risk').count(),humanRisk?1:0);
+   if(humanRisk){assert.equal(await page.locator('.sun-person .thermal-risk').innerText(),humanRisk.short);assert.ok(await page.locator('.sun-person .thermal-risk').evaluate(el=>el.getBoundingClientRect().bottom<=document.querySelector('.sun-person figcaption strong').getBoundingClientRect().top));}
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true);
    const expectedWarning=pavementWarning(pavementEstimate(shown,currentSample(shown).inputs));
    assert.equal(await page.locator('.pavement-warning').count(),expectedWarning?1:0);
