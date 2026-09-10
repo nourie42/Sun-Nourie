@@ -23,7 +23,7 @@ function person(feels){
   ? `<path d="M-11 21L-18 40" stroke="${outfit==='cold'?'#456079':'#6f96b6'}" stroke-width="7" stroke-linecap="round"/><g class="friendly-wave-pose"><path class="friendly-raised-arm" d="M11 22L21 13L24 2" fill="none" stroke="${outfit==='cold'?'#456079':'#6f96b6'}" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="25" cy="0" r="5" fill="#efbd96"/><g class="friendly-wave"><path d="M24 1L20-6M25-1L24-10M27-1L28-10M29 0L32-7" fill="none" stroke="#efbd96" stroke-width="2.8" stroke-linecap="round"/></g></g>`
   : `<path d="M-10 22L-17 41" stroke="#efbd96" stroke-width="6" stroke-linecap="round"/><g class="friendly-wave-pose"><path class="friendly-raised-arm" d="M10 24L22 14L25-2" fill="none" stroke="#efbd96" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><g class="friendly-wave"><path d="M24 1L20-6M25-1L24-10M27-1L28-10M29 0L32-7" fill="none" stroke="#efbd96" stroke-width="2.8" stroke-linecap="round"/><ellipse cx="26" cy="-1" rx="5" ry="6" fill="#efbd96"/></g></g>`;
  const winter=outfit==='cold'?`<path d="M-10 17Q0 22 10 17" fill="none" stroke="#e8c98f" stroke-width="5"/><path d="M-12-4Q0-15 12-4L11 0H-11Z" fill="#6b8098"/><circle cx="0" cy="-12" r="3" fill="#e8c98f"/>`:'';
- return `<g class="exposure-person-art" data-outfit="${outfit}" transform="translate(118 57.8) scale(1.35 1.72)">
+ return `<g class="exposure-person-art" data-outfit="${outfit}" transform="translate(118 3.8) scale(1.85 2.58)">
  <ellipse cx="0" cy="63" rx="24" ry="4" fill="#102c43" opacity=".32"/>
  ${legs}<path d="M-14 61h10M7 61h11" stroke="#e0f0f9" stroke-width="5" stroke-linecap="round"/>
  ${arms}${torso}<ellipse class="person-resting-hand" cx="-17" cy="41" rx="3.8" ry="4.5" fill="#efbd96"/>
@@ -39,9 +39,9 @@ function person(feels){
 }
 export function exposureScene(sun,daylight=true,condition='Clear',feels=null){
  const tree=`<g class="exposure-tree"><ellipse cx="93" cy="164" rx="68" ry="6" fill="#0e2942" opacity=".26"/><path d="M48 61L49 162" stroke="#a2b7aa" stroke-width="13" stroke-linecap="round"/><path d="M49 115L82 71M49 92L29 70" stroke="#a2b7aa" stroke-width="7" stroke-linecap="round"/><path d="M28 88C0 74 7 43 32 38C26 11 69 1 86 22C122 8 147 34 139 53C174 62 159 96 131 96L39 96Z" fill="#408f83"/><path d="M23 63C7 48 24 26 45 32C44 9 79 7 91 30C117 17 140 37 132 55C154 64 139 83 118 82H43Z" fill="#65b2a0"/></g>`;
- const weather=weatherState(condition),sky=`<g class="person-weather" data-weather-kind="${weather.kind}" transform="translate(16 -20) scale(1.65)">${weatherShapes(condition,daylight)}</g>`;
- const treeSky=['cloudy','partly-cloudy','rain','storm','snow','fog'].includes(weather.kind)?`<g class="shade-weather" transform="translate(72 -88) scale(.8)">${weatherShapes(condition,daylight)}</g>`:'';
+ const weather=weatherState(condition),sky=`<g class="person-weather" data-weather-kind="${weather.kind}" transform="translate(72 -190) scale(2.2)">${weatherShapes(condition,daylight)}</g>`;
+ const treeSky=['cloudy','partly-cloudy','rain','storm','snow','fog'].includes(weather.kind)?`<g class="shade-weather" transform="translate(72 -190) scale(2.2)">${weatherShapes(condition,daylight)}</g>`:'';
  const outfit=clothingForFeels(feels),clothing={hot:'light hot-weather clothing',warm:'light warm-weather clothing',mild:'everyday mild-weather clothing',cool:'a jacket and long pants',cold:'a coat, scarf and warm hat'}[outfit];
  const label=sun?`A smiling person in ${clothing}, waving outdoors in ${!daylight?'nighttime':weather.label.toLowerCase()} conditions`:`A smiling person in ${clothing}, waving under a tall shade tree`;
- return `<svg viewBox="0 0 220 180" role="img" aria-label="${label}" data-outfit="${outfit}">${sun?sky:tree+treeSky}<path d="M13 167H204" stroke="#b6d5d2" stroke-opacity=".4" stroke-width="2"/>${person(feels)}</svg>`;
+ return `<svg viewBox="0 -200 220 380" role="img" aria-label="${label}" data-outfit="${outfit}">${sun?sky:tree+treeSky}<path d="M13 167H204" stroke="#b6d5d2" stroke-opacity=".4" stroke-width="2"/>${person(feels)}</svg>`;
 }
