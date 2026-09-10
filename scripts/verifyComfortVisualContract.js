@@ -39,10 +39,11 @@ try{
   const m=await page.evaluate(()=>{
    const box=s=>{const r=document.querySelector(s)?.getBoundingClientRect();return r?{x:r.x,y:r.y,width:r.width,height:r.height,top:r.top,bottom:r.bottom,left:r.left,right:r.right}:null;};
    const tree=box('.shade-person .exposure-tree'),person=box('.shade-person .exposure-person-art');
-   const shadeSun=box('.shade-person .sky-sun'),directSun=box('.sun-person .sky-sun');
+   const shadeSun=box('.shade-person .sky-sun'),directSun=box('.sun-person .sky-sun'),shadeSvg=box('.shade-person svg');
+   const shadeSvgElement=document.querySelector('.shade-person svg'),shadeOverflow=getComputedStyle(shadeSvgElement).overflow;
    const pet=document.querySelector('.pavement-person .poodle-scene'),petStyle=getComputedStyle(pet);
    const card=box('.sun-shade-comparison'),viewport=document.documentElement.getBoundingClientRect();
-   return {tree,person,shadeSun,directSun,treeRatio:tree.height/person.height,treeClearance:person.top-tree.top,
+   return {tree,person,shadeSun,directSun,shadeSvg,shadeOverflow,treeRatio:tree.height/person.height,treeClearance:person.top-tree.top,
     shadeSunRatio:shadeSun.height/person.height,directSunRatio:directSun.height/person.height,
     petSunBackground:petStyle.backgroundImage,petBackgroundSize:petStyle.backgroundSize,
     heatBanners:[...document.querySelectorAll('.sun-person .thermal-risk,.pavement-person .pavement-warning')].map(x=>x.textContent.trim()),
@@ -53,6 +54,8 @@ try{
   assert.ok(m.shadeSunRatio>=.60,`Shade sun is too small at ${width}px: ${m.shadeSunRatio.toFixed(2)}x person height`);
   assert.ok(m.directSunRatio>=.60,`Direct-sun symbol is too small at ${width}px: ${m.directSunRatio.toFixed(2)}x person height`);
   assert.ok(Math.abs(m.shadeSun.height-m.directSun.height)<=1,'The first two sun symbols must be the same size');
+  assert.ok(m.shadeSun.bottom<=m.tree.top-2,`Shade sun must sit fully above the tree crown at ${width}px`);
+  assert.ok(m.shadeOverflow==='visible'||(m.shadeSun.top>=m.shadeSvg.top&&m.shadeSun.bottom<=m.shadeSvg.bottom),`Shade sun must not be clipped at ${width}px`);
   assert.notEqual(m.petSunBackground,'none','The pet panel must visibly render a sun whenever the direct-sun panel renders one');
   assert.ok(m.petSunBackground.includes('data:image/svg+xml'),'The pet sun must be a real rendered background graphic');
   assert.deepEqual(m.heatBanners,['Heat stress','Heat stress'],'Human and pet heat-stress banners must both be present');
@@ -63,7 +66,7 @@ try{
  }
  await fs.writeFile(`${out}/metrics.json`,JSON.stringify(results,null,2));
  console.log('COMFORT_VISUAL_CONTRACT_PASS');
- for(const r of results)console.log(JSON.stringify({width:r.width,treeToPerson:Number(r.treeRatio.toFixed(2)),shadeSunToPerson:Number(r.shadeSunRatio.toFixed(2)),directSunToPerson:Number(r.directSunRatio.toFixed(2)),petSun:r.petSunBackground!=='none',heatBanners:r.heatBanners,overflow:r.overflow}));
+ for(const r of results)console.log(JSON.stringify({width:r.width,treeToPerson:Number(r.treeRatio.toFixed(2)),shadeSunToPerson:Number(r.shadeSunRatio.toFixed(2)),directSunToPerson:Number(r.directSunRatio.toFixed(2)),shadeSunAboveTree:r.shadeSun.bottom<=r.tree.top-2,shadeOverflow:r.shadeOverflow,petSun:r.petSunBackground!=='none',heatBanners:r.heatBanners,overflow:r.overflow}));
 } finally {
  await browser.close();
  await new Promise(resolve=>server.close(resolve));
