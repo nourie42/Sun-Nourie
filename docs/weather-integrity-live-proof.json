@@ -1,0 +1,309 @@
+{
+  "commit": "a84efaa131131b25d17558759b527253ad71a90e",
+  "checkedAt": "2026-09-10T23:42:45.504Z",
+  "fixture": false,
+  "locations": [
+    {
+      "place": "Knightdale / Raleigh",
+      "observation": "2026-09-10T23:15:00+00:00",
+      "station": "KLHZ",
+      "currentInputs": {
+        "temperature": 84.2,
+        "dewpoint": 68,
+        "humidity": 58.31559727771738,
+        "windMph": 8.05296816,
+        "windUsedMps": 3.5999988862464,
+        "skyCover": null,
+        "skySource": "Station weather report",
+        "meanRadiantTemperatureF": 84.2,
+        "sourceTime": "2026-09-10T23:15:00+00:00",
+        "station": "KLHZ",
+        "stationDistanceKm": 29.4,
+        "windPolicy": "Source wind; no observation-to-forecast adjustment",
+        "radiationBasis": "No solar load at night; unmeasured mean radiant temperature assumed equal to air"
+      },
+      "currentOutdoor": 81.44561941580787,
+      "numericForecastHours": 217,
+      "daySevenPeak": {
+        "time": "2026-09-16T18:00:00.000Z",
+        "value": 93.2,
+        "inputs": {
+          "temperature": 85.3,
+          "dewpoint": 66.2,
+          "wind": 3.9,
+          "humidity": 52.9,
+          "skyCover": 18.15,
+          "skySource": "NWS 60% / ECMWF 25% / NBM 15%",
+          "skySources": [
+            {
+              "id": "nws",
+              "weight": 0.6,
+              "value": 24
+            },
+            {
+              "id": "ecmwf",
+              "weight": 0.25,
+              "value": 0
+            },
+            {
+              "id": "nbm",
+              "weight": 0.15,
+              "value": 25
+            }
+          ]
+        }
+      },
+      "aiMode": "ai",
+      "aiReason": null,
+      "danTakeStatus": "no-explicit-future-change",
+      "danTakeReview": {
+        "candidateCount": 0,
+        "proposedCount": 0,
+        "approvedCount": 0,
+        "rejected": []
+      },
+      "candidateCount": 0,
+      "danTake": "",
+      "approvedChanges": [],
+      "maximumCenteringErrorPx": 0.0078125,
+      "passed": true,
+      "sourceExcerpt": null,
+      "overview": ""
+    },
+    {
+      "place": "White Lake, NC",
+      "observation": "2026-09-10T23:15:00+00:00",
+      "station": "KEYF",
+      "currentInputs": {
+        "temperature": 82.94,
+        "dewpoint": 73.4,
+        "humidity": 72.99189759172432,
+        "windMph": 4.69756476,
+        "windUsedMps": 2.0999993503103997,
+        "skyCover": null,
+        "skySource": "Station weather report",
+        "meanRadiantTemperatureF": 82.94,
+        "sourceTime": "2026-09-10T23:15:00+00:00",
+        "station": "KEYF",
+        "stationDistanceKm": 8,
+        "windPolicy": "Source wind; no observation-to-forecast adjustment",
+        "radiationBasis": "No solar load at night; unmeasured mean radiant temperature assumed equal to air"
+      },
+      "currentOutdoor": 84.95525571722449,
+      "numericForecastHours": 217,
+      "daySevenPeak": {
+        "time": "2026-09-16T18:00:00.000Z",
+        "value": 94.7,
+        "inputs": {
+          "temperature": 86.2,
+          "dewpoint": 66.1,
+          "wind": 3.3,
+          "humidity": 51.2,
+          "skyCover": 16.2,
+          "skySource": "NWS 60% / ECMWF 25% / NBM 15%",
+          "skySources": [
+            {
+              "id": "nws",
+              "weight": 0.6,
+              "value": 19
+            },
+            {
+              "id": "ecmwf",
+              "weight": 0.25,
+              "value": 0
+            },
+            {
+              "id": "nbm",
+              "weight": 0.15,
+              "value": 32
+            }
+          ]
+        }
+      },
+      "aiMode": "ai",
+      "aiReason": null,
+      "danTakeStatus": "no-explicit-future-change",
+      "danTakeReview": {
+        "candidateCount": 0,
+        "proposedCount": 0,
+        "approvedCount": 0,
+        "rejected": []
+      },
+      "candidateCount": 0,
+      "danTake": "",
+      "approvedChanges": [],
+      "maximumCenteringErrorPx": 0.0078125,
+      "passed": true,
+      "sourceExcerpt": null,
+      "overview": ""
+    },
+    {
+      "place": "Denver, CO",
+      "observation": "2026-09-10T22:58:00+00:00",
+      "station": "KBKF",
+      "currentInputs": {
+        "temperature": 88.88,
+        "dewpoint": 18.6,
+        "humidity": 7.5248343678379905,
+        "windMph": 5.81603256,
+        "windUsedMps": 2.5999991956224,
+        "skyCover": null,
+        "skySource": "Station weather report",
+        "meanRadiantTemperatureF": 104.8860079241904,
+        "sourceTime": "2026-09-10T22:58:00+00:00",
+        "station": "KBKF",
+        "stationDistanceKm": 20.1,
+        "windPolicy": "Source wind; no observation-to-forecast adjustment",
+        "radiationBasis": "Radiation estimated from the same-hour sky and solar elevation; not measured"
+      },
+      "currentOutdoor": 87.64973614472837,
+      "numericForecastHours": 217,
+      "daySevenPeak": {
+        "time": "2026-09-16T19:00:00.000Z",
+        "value": 79,
+        "inputs": {
+          "temperature": 76.4,
+          "dewpoint": 52.9,
+          "wind": 5,
+          "humidity": 44,
+          "skyCover": 41.85,
+          "skySource": "NWS 60% / ECMWF 25% / NBM 15%",
+          "skySources": [
+            {
+              "id": "nws",
+              "weight": 0.6,
+              "value": 56
+            },
+            {
+              "id": "ecmwf",
+              "weight": 0.25,
+              "value": 9
+            },
+            {
+              "id": "nbm",
+              "weight": 0.15,
+              "value": 40
+            }
+          ]
+        }
+      },
+      "aiMode": "ai",
+      "aiReason": null,
+      "danTakeStatus": "supported",
+      "danTakeReview": {
+        "candidateCount": 1,
+        "proposedCount": 1,
+        "approvedCount": 1,
+        "rejected": []
+      },
+      "candidateCount": 1,
+      "danTake": "Thursday, Sep 10: A few high-based showers may occur in the northern mountains and could produce gusty outflows but little measurable rain.",
+      "approvedChanges": [
+        {
+          "evidenceId": "s1-p2-q3",
+          "summary": "A few high-based showers may occur in the northern mountains and could produce gusty outflows but little measurable rain.",
+          "period": "Thursday, Sep 10",
+          "sourceQuote": "We could see a few high-based showers in our northern mountains in the afternoon, but instability remains limited.",
+          "section": "DISCUSSION",
+          "sectionIssuedAt": "2026-09-10T18:03:00.000Z",
+          "validFrom": "2026-09-10T06:00:00.000Z",
+          "eventEnd": "2026-09-11T06:00:00.000Z",
+          "validUntil": "2026-09-11T06:00:00.000Z"
+        }
+      ],
+      "maximumCenteringErrorPx": 0.0078125,
+      "passed": true,
+      "sourceExcerpt": null,
+      "overview": "Thursday, Sep 10: A few high-based showers may occur in the northern mountains and could produce gusty outflows but little measurable rain."
+    },
+    {
+      "place": "Seattle, WA",
+      "observation": "2026-09-10T23:20:00+00:00",
+      "station": "KBFI",
+      "currentInputs": {
+        "temperature": 69.80000000000001,
+        "dewpoint": 51.8,
+        "humidity": 52.77258552324428,
+        "windMph": 5.748924492,
+        "windUsedMps": 2.56999920490368,
+        "skyCover": null,
+        "skySource": "Station weather report",
+        "meanRadiantTemperatureF": 71.14007491574502,
+        "sourceTime": "2026-09-10T23:20:00+00:00",
+        "station": "KBFI",
+        "stationDistanceKm": 6.9,
+        "windPolicy": "Source wind; no observation-to-forecast adjustment",
+        "radiationBasis": "Radiation estimated from the same-hour sky and solar elevation; not measured"
+      },
+      "currentOutdoor": 65.36179039470278,
+      "numericForecastHours": 217,
+      "daySevenPeak": {
+        "time": "2026-09-16T22:00:00.000Z",
+        "value": 75,
+        "inputs": {
+          "temperature": 73.2,
+          "dewpoint": 55.8,
+          "wind": 7.7,
+          "humidity": 54.4,
+          "skyCover": 6.45,
+          "skySource": "NWS 60% / ECMWF 25% / NBM 15%",
+          "skySources": [
+            {
+              "id": "nws",
+              "weight": 0.6,
+              "value": 10
+            },
+            {
+              "id": "ecmwf",
+              "weight": 0.25,
+              "value": 0
+            },
+            {
+              "id": "nbm",
+              "weight": 0.15,
+              "value": 3
+            }
+          ]
+        }
+      },
+      "aiMode": "ai",
+      "aiReason": null,
+      "danTakeStatus": "no-explicit-future-change",
+      "danTakeReview": {
+        "candidateCount": 0,
+        "proposedCount": 0,
+        "approvedCount": 0,
+        "rejected": []
+      },
+      "candidateCount": 0,
+      "danTake": "",
+      "approvedChanges": [],
+      "maximumCenteringErrorPx": 0.0078125,
+      "passed": true,
+      "sourceExcerpt": null,
+      "overview": ""
+    }
+  ],
+  "success": true,
+  "deployed": {
+    "integrityVersion": "weather-nourie-integrity-v1",
+    "danTakeVersion": "weather-nourie-dans-take-plain-v8",
+    "assets": {
+      "index.html": "256edcddd60691b5f61768b03a2b7ba6943578a9cfd0066153bdd76e34709c9d",
+      "app.js": "037163bd15590c0b39caa08351b5313e4d536970717e019ec2962708f70661a1",
+      "dans-summary.js": "52369551bf46498006eb85f71e97ba8c2e6a884fd10efc7dc7ae36e77dd605b0",
+      "current-inputs.js": "9f2c99ef54d53152d389a9b2186113ae702bdc7c091c082e10fbc108958f7125",
+      "pavement.js": "e5f1b580610b6e635b9f7316e2c4a486204637aef3f9eea219b2d6723ab0d4ed",
+      "daily-uv.js": "4327bb7ab8a9bac7d21abbcafe674a13849d40a54c0c73966ee2e9a78a98e2e8",
+      "weather-math.js": "9f2e476e3cbf42bca0f9f94ac8911d4de6f717264d03a2e19da9ca8e3e01afc3",
+      "utci.js": "db0a67652cfcb41edc45c738b60d7d816ef6c70ad8db0870757076e4932b0613",
+      "weather-display.js": "808dc655b8cc8f9b2f91f47c8479a880d518be8172b8ca73aec7e2c8400ae798",
+      "personal-details.js": "67147d19c2720ee3720b83951e820c0110491e46a2f72f8933caae45dfa549b4",
+      "experience.js": "214488fcce7bf85927f363102a35cfbe25841b426620c21a355a95e811db3158",
+      "hourly-feels.css": "bdc44e2838335a229c565a58691e4cc2d9b9c6895c1ebf277b3d2ef0501df801",
+      "dans-take.js": "65fee2f8f7e5ad4ebe39b7db37e6c3fde775d9f590b0d4ff6fa72f9435f96cd2"
+    }
+  },
+  "actualAICount": 4,
+  "visibleChangeCount": 1
+}
