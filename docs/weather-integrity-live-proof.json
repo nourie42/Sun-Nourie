@@ -1,0 +1,234 @@
+{
+  "commit": "893dcad3a5640a2e2f7bff579ebc7693be949f68",
+  "checkedAt": "2026-09-10T16:16:15.337Z",
+  "fixture": false,
+  "locations": [
+    {
+      "place": "Knightdale / Raleigh",
+      "observation": "2026-09-10T15:55:00+00:00",
+      "station": "KJNX",
+      "currentInputs": {
+        "temperature": 86,
+        "dewpoint": 71.6,
+        "humidity": 62.249006005994666,
+        "windMph": 9.17143596,
+        "windUsedMps": 4.0999987315584,
+        "skyCover": null,
+        "skySource": "Station weather report",
+        "meanRadiantTemperatureF": 124.35856834448941,
+        "sourceTime": "2026-09-10T15:55:00+00:00",
+        "station": "KJNX",
+        "stationDistanceKm": 28.6,
+        "windPolicy": "Source wind; no observation-to-forecast adjustment",
+        "radiationBasis": "Radiation estimated from the same-hour sky and solar elevation; not measured"
+      },
+      "currentOutdoor": 92.38711852156581,
+      "numericForecastHours": 225,
+      "daySevenPeak": {
+        "time": "2026-09-16T18:00:00.000Z",
+        "value": 93.4,
+        "inputs": {
+          "temperature": 86.5,
+          "dewpoint": 67.3,
+          "wind": 3.9,
+          "humidity": 52.9,
+          "skyCover": 31,
+          "skySource": "NWS same-hour sky-cover grid"
+        }
+      },
+      "aiMode": "ai",
+      "aiReason": null,
+      "danTakeStatus": "no-explicit-future-change",
+      "danTakeReview": {
+        "candidateCount": 0,
+        "proposedCount": 0,
+        "approvedCount": 0,
+        "rejected": []
+      },
+      "candidateCount": 0,
+      "danTake": "",
+      "approvedChanges": [],
+      "maximumCenteringErrorPx": 0.0078125,
+      "passed": true,
+      "sourceExcerpt": null,
+      "overview": ""
+    },
+    {
+      "place": "White Lake, NC",
+      "observation": "2026-09-10T15:55:00+00:00",
+      "station": "KEYF",
+      "currentInputs": {
+        "temperature": 88.16,
+        "dewpoint": 69.80000000000001,
+        "humidity": 54.660981753637195,
+        "windMph": 8.05296816,
+        "windUsedMps": 3.5999988862464,
+        "skyCover": null,
+        "skySource": "Station weather report",
+        "meanRadiantTemperatureF": 126.84593365510399,
+        "sourceTime": "2026-09-10T15:55:00+00:00",
+        "station": "KEYF",
+        "stationDistanceKm": 8,
+        "windPolicy": "Source wind; no observation-to-forecast adjustment",
+        "radiationBasis": "Radiation estimated from the same-hour sky and solar elevation; not measured"
+      },
+      "currentOutdoor": 95.08850053546982,
+      "numericForecastHours": 177,
+      "daySevenPeak": {
+        "time": "2026-09-16T18:00:00.000Z",
+        "value": 99,
+        "inputs": {
+          "temperature": 90,
+          "dewpoint": 72,
+          "wind": 2.3,
+          "humidity": 55.6,
+          "skyCover": 31,
+          "skySource": "NWS same-hour sky-cover grid"
+        }
+      },
+      "aiMode": "ai",
+      "aiReason": null,
+      "danTakeStatus": "no-explicit-future-change",
+      "danTakeReview": {
+        "candidateCount": 0,
+        "proposedCount": 0,
+        "approvedCount": 0,
+        "rejected": []
+      },
+      "candidateCount": 0,
+      "danTake": "",
+      "approvedChanges": [],
+      "maximumCenteringErrorPx": 0.0078125,
+      "passed": true,
+      "sourceExcerpt": null,
+      "overview": ""
+    },
+    {
+      "place": "Denver, CO",
+      "observation": "2026-09-10T16:05:00+00:00",
+      "station": "KAPA",
+      "currentInputs": {
+        "temperature": 73.4,
+        "dewpoint": 34,
+        "humidity": 23.581040572422186,
+        "windMph": 0,
+        "windUsedMps": 0.5,
+        "skyCover": null,
+        "skySource": "Station weather report",
+        "meanRadiantTemperatureF": 105.06906714653948,
+        "sourceTime": "2026-09-10T16:05:00+00:00",
+        "station": "KAPA",
+        "stationDistanceKm": 23.3,
+        "windPolicy": "Calm-wind approximation: UTCI minimum 0.5 m/s",
+        "radiationBasis": "Radiation estimated from the same-hour sky and solar elevation; not measured"
+      },
+      "currentOutdoor": 80.50233280692808,
+      "numericForecastHours": 177,
+      "daySevenPeak": {
+        "time": "2026-09-16T20:00:00.000Z",
+        "value": 84.2,
+        "inputs": {
+          "temperature": 83,
+          "dewpoint": 48,
+          "wind": 5.8,
+          "humidity": 29.5,
+          "skyCover": 40,
+          "skySource": "NWS same-hour sky-cover grid"
+        }
+      },
+      "aiMode": "ai",
+      "aiReason": null,
+      "danTakeStatus": "no-approved-change",
+      "danTakeReview": {
+        "candidateCount": 1,
+        "proposedCount": 1,
+        "approvedCount": 0,
+        "rejected": [
+          {
+            "evidenceId": "s1-p5-q2",
+            "reason": "unsupported-paraphrase"
+          }
+        ]
+      },
+      "candidateCount": 1,
+      "danTake": "",
+      "approvedChanges": [],
+      "maximumCenteringErrorPx": 0.0078125,
+      "passed": true,
+      "sourceExcerpt": null,
+      "overview": ""
+    },
+    {
+      "place": "Seattle, WA",
+      "observation": "2026-09-10T16:05:00+00:00",
+      "station": "KBFI",
+      "currentInputs": {
+        "temperature": 62.6,
+        "dewpoint": 55.400000000000006,
+        "humidity": 77.29251672522165,
+        "windMph": 3.4448808239999997,
+        "windUsedMps": 1.5399995235609598,
+        "skyCover": null,
+        "skySource": "Station weather report",
+        "meanRadiantTemperatureF": 63.87313132689231,
+        "sourceTime": "2026-09-10T16:05:00+00:00",
+        "station": "KBFI",
+        "stationDistanceKm": 6.9,
+        "windPolicy": "Source wind; no observation-to-forecast adjustment",
+        "radiationBasis": "Radiation estimated from the same-hour sky and solar elevation; not measured"
+      },
+      "currentOutdoor": 62.51958895812073,
+      "numericForecastHours": 177,
+      "daySevenPeak": {
+        "time": "2026-09-16T20:00:00.000Z",
+        "value": 75.9,
+        "inputs": {
+          "temperature": 71,
+          "dewpoint": 55,
+          "wind": 5.8,
+          "humidity": 57,
+          "skyCover": 8,
+          "skySource": "NWS same-hour sky-cover grid"
+        }
+      },
+      "aiMode": "ai",
+      "aiReason": null,
+      "danTakeStatus": "no-explicit-future-change",
+      "danTakeReview": {
+        "candidateCount": 0,
+        "proposedCount": 0,
+        "approvedCount": 0,
+        "rejected": []
+      },
+      "candidateCount": 0,
+      "danTake": "",
+      "approvedChanges": [],
+      "maximumCenteringErrorPx": 0.0078125,
+      "passed": true,
+      "sourceExcerpt": null,
+      "overview": ""
+    }
+  ],
+  "success": true,
+  "deployed": {
+    "integrityVersion": "weather-nourie-integrity-v1",
+    "danTakeVersion": "weather-nourie-dans-take-concise-v6",
+    "assets": {
+      "index.html": "fe01c024c11e6ec4cff9b679559215addf67a59c62f401ff3435c0fd72fba724",
+      "app.js": "0924af352ddd2de742be8fc90f6268c057d378ae130eb4a1fb4f0baf30358cac",
+      "dans-summary.js": "c55f9b38b2b5175e2edf7a42b81fdb2b7e6aae757812d957ffc67fe5ce3f7f64",
+      "current-inputs.js": "920f6408fefa1bde84f6c6080c6c0f11830d71adc7502d90377ea1a662e77d08",
+      "pavement.js": "e75df305988fd46e3c018eb2455b9d9f1f75df7cb46ba683f105d8d52e545a60",
+      "daily-uv.js": "4327bb7ab8a9bac7d21abbcafe674a13849d40a54c0c73966ee2e9a78a98e2e8",
+      "weather-math.js": "8f65196bf5ba4d6f598117333586fed9b3ebdf0aeac97fe328ff99db1c980f94",
+      "utci.js": "db0a67652cfcb41edc45c738b60d7d816ef6c70ad8db0870757076e4932b0613",
+      "weather-display.js": "b5a73bcb21c169cdb10f081eb723ae812ab7c7cc784203185f98394a48b39385",
+      "personal-details.js": "8221543a594d2ceb11cb44ddd1c8a795b98eb634127dc1e750083649af185076",
+      "experience.js": "ee695caaa330a89740768c77cf7aab55a28849bc166d2ba83dd865b4c3c1bae8",
+      "hourly-feels.css": "e35b0d16adb10c40e1ad309705b936e0cee8ba70d127eae3769dc25a02e13727",
+      "dans-take.js": "f7c829c34f392a34e7e85bf220557f6aa0aee36eb7fa2fc24584f777dfb71b78"
+    }
+  },
+  "actualAICount": 4,
+  "visibleChangeCount": 0
+}
