@@ -116,8 +116,7 @@ test('Gross Meter heading stays centered and bold without changing chart geometr
  assert.match(css,/#gross-title\{text-align:center;font-weight:800\}/);assert.ok(!/\.gross-(scroll|chart)\s*\{/.test(css));
 });
 test('changed assets are cache-busted and late briefing responses stay guarded',()=>{
- assert.match(html,/forecast-layout\.css\?v=clear-weather-daygraph-v3/);assert.match(html,/app\.js\?v=actual-feels-blend-v4/);
- assert.match(app,/dans-take\.js\?v=clear-weather-daygraph-v3/);
+ assert.match(html,/forecast-layout\.css\?v=location-models-paw-warning-v5/);assert.match(html,/app\.js\?v=location-models-paw-warning-v5/);
+ assert.match(app,/dans-take\.js\?v=location-models-paw-warning-v5/);
  assert.match(app,/if \(id === generation && briefing\.signature === forecast\?\.signature\) renderBriefing\(briefing\)/);
 });
-

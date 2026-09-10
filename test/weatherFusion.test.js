@@ -110,7 +110,9 @@ test('direct NOAA/ECMWF data works without an intermediary API key', async () =>
   const calls = [];
   const s = createWeatherService({ now: () => now, env: {}, fetchImpl: async (...args) => { calls.push(args[0]); return mockFetch(...args); } });
   const f = await s.getForecast({ location: 'knightdale' });
-  assert.equal(f.feeds.find((x) => x.id === 'hrrr').status, 'ready'); assert.ok(calls.filter(u=>u.includes('open-meteo')).every(u=>u.includes('daily=uv_index_max')),'Open-Meteo is only the independent UV/surface feed; NOAA/ECMWF numerical models remain direct');
+  assert.equal(f.feeds.find((x) => x.id === 'hrrr').status, 'ready');
+  assert.ok(calls.some(u=>u.includes('models=gfs_hrrr')),'Try the explicitly named location-specific HRRR, never best_match');
+  assert.ok(calls.some(u=>u.includes('/models/hrrr.json')),'Native NOAA fallback remains usable without an API key');
   const b = await s.getBriefing({ location: 'knightdale' }); assert.equal(b.mode, 'nws-summary');
 });
 test('briefing rejects mismatched snapshots and never displays stale AI as current', async () => {

@@ -1,4 +1,5 @@
 import {createHrrrMapSource} from './weatherFusionHrrrMap.js';
+import {createPointModels} from './weatherFusionPointModels.js';
 /** Direct, decoded NOAA/ECMWF model snapshots. No provider key and no webpage scraping. */
 import {SAME_DAY_WEIGHTS,temperaturePolicy as tempPolicy,precipitationPolicy,forecastDayIndex,eveningPeriod,REPAIR_VERSION} from './weatherFusionPolicy.js';
 import {shadeFeelsLike} from '../public/weather-fusion/weather-math.js';
@@ -37,6 +38,7 @@ export function validateSnapshot(data, id, location, now) {
 export function createDirectModels({ fetchImpl = globalThis.fetch, now = Date.now } = {}) {
   const cache = new Map(), pending = new Map();
   const hourlyMap = createHrrrMapSource({fetchImpl,now});
+  const pointModel = createPointModels({fetchImpl,now});
   async function resource(file) {
     if (!/^(manifest\.json|models\/(hrrr|ecmwf|nbm)\.json)$/.test(file)) throw new Error('Invalid weather data resource.');
     const hit = cache.get(file);
@@ -57,11 +59,27 @@ export function createDirectModels({ fetchImpl = globalThis.fetch, now = Date.no
   }
   async function load(id, location) {
     const meta = { id, label: LABELS[id], url: SOURCE[id], issuedAt: null, fetchedAt: iso(now()), transport: 'Native GRIB2 → verified snapshot', contributes: false };
+    // The named point feed covers ALL supported search locations and all-weather
+    // variables. Native extracts remain a verified fallback, never a city proxy.
+    let pointFailure;
+    try {
+      const point=await pointModel(id,location),value={...point,hourly:{...point.hourly}};
+      // Preserve the independently decoded simulated reflectivity used by the
+      // local outlook. It is not supplied by the point API; never invent it.
+      if(id==='hrrr')try{
+        const native=validateSnapshot(await resource('models/hrrr.json'),id,location,now()).value;
+        if(native){for(const field of ['reflectivity','nearby_reflectivity'])if(native.hourly[field])value.hourly[field]=value.hourly.time.map(t=>{const i=native.hourly.time.indexOf(t);return i>=0?native.hourly[field][i]:null;});value.reflectivityRunAt=native.runAt;}
+      }catch{/* Optional native reflectivity must not discard verified point weather. */}
+      return {value,meta:{...meta,status:'ready',label:`${id.toUpperCase()} · ${value.resolution}`,transport:value.transport,url:value.sourceUrl,issuedAt:value.runAt,validUntil:value.validUntil,resolution:value.resolution,contributes:true,message:value.refreshWarning||value.runScope,modelGrid:value.modelGrid}};
+    }catch(error){pointFailure=String(error.message);}
+    let nativeFailure;
     try {
       const data = await resource(`models/${id}.json`);
       const result = validateSnapshot(data, id, location, now());
-      return { value: result.value, meta: { ...meta, status: result.status, issuedAt: data.runAt, validUntil: data.validUntil, resolution: data.resolution, message: result.message, contributes: result.status === 'ready', snapshotUrl: DATA_ROOT+`models/${id}.json` } };
-    } catch (error) { return { value: null, meta: { ...meta, status: 'unavailable', message: String(error.message).slice(0,180) } }; }
+      if(result.value)return { value: result.value, meta: { ...meta, status: result.status, issuedAt: data.runAt, validUntil: data.validUntil, resolution: data.resolution, message: result.message, contributes: true, snapshotUrl: DATA_ROOT+`models/${id}.json` } };
+      nativeFailure=result.message;
+    } catch (error) { nativeFailure=String(error.message); }
+    return {value:null,meta:{...meta,status:'unavailable',message:`Location-specific model unavailable: ${pointFailure.slice(0,150)}`,nativeFailure}};
   }
   async function maps() {
     const [manifestResult,independent]=await Promise.allSettled([resource('manifest.json'),hourlyMap()]);
@@ -139,7 +157,7 @@ export function solarTimes(date, latitude, longitude) {
   return finite(rise)&&finite(set)?{sunrise:iso((rise-2440587.5)*86400000),sunset:iso((set-2440587.5)*86400000),source:'Calculated astronomical times'}:{sunrise:null,sunset:null};
 }
 export function enhanceForecast(out, { models, grid, periods = [], now, gridQpf, localTime, nextDate, dateKey }) {
-  const sourceModels = Object.fromEntries(Object.entries(models).filter(([,m]) => m?.direct));
+  const sourceModels = Object.fromEntries(Object.entries(models).filter(([,m]) => m?.direct||m?.verifiedModel));
   const active = Object.keys(sourceModels);
   function qpf(start,end,index) {
     // Blend each time segment first. An 18-hour HRRR run must contribute where
@@ -186,7 +204,7 @@ export function enhanceForecast(out, { models, grid, periods = [], now, gridQpf,
         d[kind]=round(blend.value,0); d[`${kind}Blend`]=blend;
         d[`${kind}Window`]={start:iso(start),end:iso(end)};
       }
-      d.temperatureSource='Weather Fusion blend · NWS + available native model values';
+      d.temperatureSource='Weather Fusion blend · NWS + verified named-model values';
       d.lowLabel='Overnight low';
     }
     const fullStart=Date.parse(d.qpfWindow.start),end=Date.parse(d.qpfWindow.end);
@@ -219,7 +237,7 @@ export function enhanceForecast(out, { models, grid, periods = [], now, gridQpf,
     hour.officialTemperature=hour.temperature;
     if(active.length){hour.temperatureBlend=weighted(values,tempPolicy(forecastDayIndex(time,now,out.location.timeZone)));hour.temperature=round(hour.temperatureBlend.value,0);}
     const rain=qpf(time,time+H,(time-now)/H<24?0:1);
-    hour.precipitation=rain.value;hour.precipitationSource=rain.source;
+    hour.precipitation=rain.value;hour.precipitationSource=rain.source;hour.precipitationBlend=rain;
     hour.reflectivity=sample(sourceModels.hrrr,time,'reflectivity');
     hour.nearbyReflectivity=sample(sourceModels.hrrr,time,'nearby_reflectivity');
   }
@@ -227,11 +245,11 @@ export function enhanceForecast(out, { models, grid, periods = [], now, gridQpf,
   out.current.apparent=apparent.value;
   out.current.apparentSource=`${apparent.method}; ${out.current.type==='observation'?'using nearby station observations':'using forecast guidance'}.`;
   out.solar=solarTimes(out.days[0].date,out.location.latitude,out.location.longitude);
-  out.modelContributions=active.map(id=>({id,runAt:sourceModels[id].runAt,resolution:sourceModels[id].resolution}));
-  out.convectiveGuidance=out.hours.filter(h=>finite(h.reflectivity)||finite(h.nearbyReflectivity)).slice(0,30).map(h=>({time:h.time,pointReflectivityDbz:h.reflectivity,nearby25kmMaxReflectivityDbz:h.nearbyReflectivity}));
+  out.modelContributions=active.map(id=>({id,runAt:sourceModels[id].runAt,resolution:sourceModels[id].resolution,transport:sourceModels[id].transport||'Native GRIB2 snapshot',runScope:sourceModels[id].runScope||'Pinned native initialization'}));
+  out.convectiveGuidance=out.hours.filter(h=>finite(h.reflectivity)||finite(h.nearbyReflectivity)).slice(0,30).map(h=>({time:h.time,pointReflectivityDbz:h.reflectivity,nearby25kmMaxReflectivityDbz:h.nearbyReflectivity,runAt:sourceModels.hrrr?.reflectivityRunAt||sourceModels.hrrr?.runAt}));
   out.google={status:'access-required',contributes:false,label:'Google WeatherNext',message:'Not included: approved Google WeatherNext dataset access has not been configured.',url:'https://developers.google.com/weathernext/guides/access-forecast'};
   out.repairVersion=REPAIR_VERSION;
   out.blendPolicy={sameDay:SAME_DAY_WEIGHTS,probability:'NWS only; deterministic rain amounts are not probabilities',partialCoverage:'Unavailable inputs are excluded and remaining weights renormalized'};
-  out.methodology='Numeric Weather Nourie blend: Current-day temperatures start at NWS 40% / HRRR 40% / ECMWF 20%. HRRR, ECMWF IFS and NBM contribute only where a fresh run fully covers the requested period. Current-day precipitation starts at NWS 40% / HRRR 40% / ECMWF 20%, blended per hour so a short HRRR run still contributes; extended precipitation at ECMWF 60% / NBM 25% / NWS 15%, with documented fallbacks. Available weights renormalize; missing values never become zero. These are uncalibrated starting weights, not a proven accuracy ranking. NWS precipitation probability remains separate and official warnings are never altered. Raw models use native gridpoint samples; ECMWF is the 0.25° Open Data grid. Coarser precipitation intervals are prorated at boundaries; interpolated hourly amounts do not establish storm arrival times. Today’s daily rain card covers only the remaining period when earlier forecast hours have passed; the main precipitation metric covers the next 24 hours.';
+  out.methodology='Numeric Weather Nourie blend: Current-day temperatures start at NWS 40% / HRRR 40% / ECMWF 20%. HRRR, ECMWF IFS and NBM contribute only where a fresh run fully covers the requested period. Current-day precipitation starts at NWS 40% / HRRR 40% / ECMWF 20%, blended per hour so a short HRRR run still contributes; extended precipitation at ECMWF 60% / NBM 25% / NWS 15%, with documented fallbacks. Available weights renormalize; missing values never become zero. These are uncalibrated starting weights, not a proven accuracy ranking. NWS precipitation probability remains separate and official warnings are never altered. Explicit HRRR, ECMWF IFS 0.25° and NBM point feeds cover the selected coordinates through Open-Meteo, with native extracts as a fallback. Point feeds can combine successive runs of the same named model; their initialization metadata refers to the latest published run. Temperature, dew point, wind, gust and cloud cover share the requested lead-day weights; humidity and feels-like are derived consistently. Pressure and visibility include only published fields. Station observations, UV, NWS probabilities and official text retain separate provenance. Coarser precipitation intervals are prorated at boundaries; interpolated hourly amounts do not establish storm arrival times. Today’s daily rain card covers only the remaining period when earlier forecast hours have passed; the main precipitation metric covers the next 24 hours.';
   return out;
 }

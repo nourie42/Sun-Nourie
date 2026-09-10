@@ -60,4 +60,3 @@ test('requested current comfort heading is exact and daily renderer includes For
  assert.match(experience,/Forecast confidence/);
  assert.match(html,/Forecast confidence<\/strong>/);
 });
-

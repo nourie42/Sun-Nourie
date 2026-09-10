@@ -292,4 +292,3 @@ try{
  assert.deepEqual(report.browserErrors,[]);report.success=true;
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));await fs.writeFile(dir+'/report.json',JSON.stringify(report,null,2));}
 console.log(JSON.stringify(report,null,2));
-

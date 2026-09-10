@@ -88,8 +88,19 @@ export function walkerOutfit(feels){
 }
 export function pavementHTML(result,feels){
  const walker=walkerOutfit(feels);
+ const warning=pavementWarning(result);
  const value=r=>r?`${r.value}°`:'—';
- return `<figure class="exposure-person pavement-person" id="pavement-content" data-status="${result.status}" aria-label="Estimated hard-surface temperature for dogs right now"><img class="poodle-walk" data-outfit="${walker.outfit}" src="/weather-fusion/${walker.asset}" width="768" height="512" alt="A person walking a light brown toy poodle"><figcaption><strong>${value(result.concrete)}</strong><span>Sidewalk</span><small class="pavement-secondary">Asphalt ${value(result.asphalt)}</small><small>Est. surface · °F</small></figcaption></figure>`;
+ return `<figure class="exposure-person pavement-person" id="pavement-content" data-status="${result.status}" aria-label="Estimated hard-surface temperature for dogs right now"><span class="exposure-label">For Pets</span><span class="exposure-alert-slot">${warning?`<span class="pavement-warning" data-risk="${warning.level}" role="status">${warning.label}</span>`:''}</span><img class="poodle-walk" data-outfit="${walker.outfit}" src="/weather-fusion/${walker.asset}" width="768" height="512" alt="A person walking a light brown toy poodle"><figcaption><strong>${value(result.concrete)}</strong><small class="pavement-secondary">Asphalt ${value(result.asphalt)}</small><small>Est. surface · °F</small></figcaption></figure>`;
+}
+/** AAHA reports rapid paw burns at 135°F. The upper engineering bound triggers
+ * an earlier precaution; it is not a measured temperature or probability. No
+ * warning must never be interpreted as a guarantee of paw safety. */
+export function pavementWarning(result){
+ if(result?.status!=='estimated')return null;
+ const surfaces=[result.concrete,result.asphalt].filter(Boolean);
+ if(surfaces.some(s=>finite(s.value)&&s.value>=135))return {level:'danger',label:'Paw burn risk'};
+ if(surfaces.some(s=>finite(s.high)&&s.high>=135))return {level:'caution',label:'Hot pavement possible'};
+ return null;
 }
 export function pavementDetailsHTML(result){
  const range=(r,label)=>r?`${label}: ${r.low}–${r.high}°F.`:`${label}: unavailable.`;

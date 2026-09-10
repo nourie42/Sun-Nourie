@@ -52,6 +52,11 @@ try{
   const placement=await page.evaluate(()=>{const q=s=>document.querySelector(s),a=q('.sun-person').getBoundingClientRect(),b=q('#pavement-content').getBoundingClientRect(),c=q('#skin-exposure').getBoundingClientRect();return {sameRow:Math.abs(a.top-b.top)<2,pawsRight:b.left>=a.right,inside:b.left>=c.left&&b.right<=c.right&&q('#skin-exposure').contains(q('#pavement-content')),three:q('.sun-shade-comparison').children.length,meta:[...document.querySelectorAll('.day-meta')].every(el=>{const f=el.querySelector('.forecast-confidence').getBoundingClientRect(),u=el.querySelector('.daily-uv').getBoundingClientRect();return u.left>=f.right&&Math.abs((u.top+u.bottom)/2-(f.top+f.bottom)/2)<2;})};});
   assert.deepEqual(placement,{sameRow:true,pawsRight:true,inside:true,three:3,meta:true});
   assert.equal(await page.locator('#skin-kicker').innerText(),'How it actually feels right now');
+  assert.deepEqual(await page.locator('#skin-values .exposure-label').allTextContents(),['Shade','Sun','For Pets']);
+  assert.match(await page.locator('.comfort-later small').innerText(),/\d{1,2}:\d{2} [AP]M/);
+  assert.ok(await page.locator('#map-panel').evaluate(el=>el.getBoundingClientRect().top>=document.querySelector('#metrics').getBoundingClientRect().bottom));
+  assert.ok(await page.locator('.pavement-warning').evaluate(el=>el.getBoundingClientRect().bottom<=document.querySelector('.poodle-walk').getBoundingClientRect().top));
+  assert.equal(await page.locator('.pavement-warning').evaluate(el=>getComputedStyle(el).color),'rgb(67, 43, 6)');
   assert.equal(await page.locator('#today-take-source').count(),0);
   const uvHours=await page.evaluate(async()=>{const {hourlyUvValue,uvCategory}=await import('/weather-fusion/daily-uv.js?v=clear-weather-daygraph-v3');const f=await fetch('/api/weather-fusion/forecast?location=knightdale').then(r=>r.json());return [...document.querySelectorAll('#hourly .hour')].map(el=>{const t=el.classList.contains('hour-current')?Date.now():Date.parse(el.dataset.time);return {shown:el.querySelector('.hour-uv b')?.textContent,expected:String(uvCategory(hourlyUvValue(f,t)).index??'—')};});});
   assert.equal(uvHours.length,1+data().hours.filter(h=>Date.parse(h.time)>now).length);for(const hour of uvHours)assert.equal(hour.shown,hour.expected);
@@ -112,4 +117,3 @@ try{
  report.scenarios.push('All walker outfits load and match human feels-like, independent of 104-degree pavement');report.success=true;
 }finally{await fs.writeFile(`${output}/browser-report.json`,JSON.stringify(report,null,2));await browser.close();if(server)await new Promise(resolve=>server.close(resolve));}
 console.log(JSON.stringify(report,null,2));
-

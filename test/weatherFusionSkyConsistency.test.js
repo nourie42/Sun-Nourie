@@ -76,10 +76,11 @@ test('future preview reads the exact canonical temperature and feels-like at the
  assert.equal(forecastSample(f,'2026-09-06T18:00:00Z'),null);
 });
 test('same, lower and higher later readings are labeled honestly and never changed to force warming',()=>{
- for(const [peak,kind,value] of [[85,'now',85],[83,'now',85],[89,'peak',89]]){
+ for(const [peak,kind,value] of [[85,'peak',85],[83,'now',85],[89,'peak',89]]){
   const summary={mode:'day',label:'Forecast feels-like peak ahead',chosen:{time:'2026-09-06T17:00:00Z',value:peak}};
   const comparison=peakComparison(summary,85);assert.equal(comparison.kind,kind);assert.equal(comparison.value,value);
   assert.match(peakComparisonHTML(summary,85),new RegExp(`${value}°`));
+  assert.match(peakComparisonHTML(summary,85),/1:00 PM/);
  }
 });
 test('hourly renderer preserves scroll and escapes provider text',()=>{

@@ -1,13 +1,13 @@
-import {FORECAST_CONFIDENCE_VERSION} from './forecast-confidence.js?v=clear-weather-daygraph-v3';
-import {dailyUvHTML} from './daily-uv.js?v=clear-weather-daygraph-v3';
-import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=clear-weather-daygraph-v3';
+import {FORECAST_CONFIDENCE_VERSION} from './forecast-confidence.js?v=location-models-paw-warning-v5';
+import {dailyUvHTML} from './daily-uv.js?v=location-models-paw-warning-v5';
+import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=location-models-paw-warning-v5';
 import {weatherState} from './weather-state.js';
-import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=clear-weather-daygraph-v3';
-import {degrees,feelsAt,dailyFeels,forecastValue,peakFeelsHTML} from './hourly-feels.js?v=clear-weather-daygraph-v3';
-import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=clear-weather-daygraph-v3';
-import {comfortMode,comfortWindow,comfortNarrative} from './comfort-outlook.js?v=clear-weather-daygraph-v3';
-import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js?v=clear-weather-daygraph-v3';
-import {resetDewpointMeter} from './dewpoint-meter.js?v=clear-weather-daygraph-v3';
+import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=location-models-paw-warning-v5';
+import {degrees,feelsAt,dailyFeels,forecastValue,peakFeelsHTML} from './hourly-feels.js?v=location-models-paw-warning-v5';
+import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=location-models-paw-warning-v5';
+import {comfortMode,comfortWindow,comfortNarrative} from './comfort-outlook.js?v=location-models-paw-warning-v5';
+import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js?v=location-models-paw-warning-v5';
+import {resetDewpointMeter} from './dewpoint-meter.js?v=location-models-paw-warning-v5';
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const number=(n,d=0)=>finite(n)?n.toFixed(d):'—';
@@ -68,7 +68,7 @@ function renderComfortArt(forecast,now){
 }
 function ensureComfortStyles(){
  if(document.getElementById('weather-nourie-comfort-effects'))return;
- const link=document.createElement('link');link.id='weather-nourie-comfort-effects';link.rel='stylesheet';link.href='/weather-fusion/comfort-effects.css?v=clear-weather-daygraph-v3';document.head.append(link);
+ const link=document.createElement('link');link.id='weather-nourie-comfort-effects';link.rel='stylesheet';link.href='/weather-fusion/comfort-effects.css?v=location-models-paw-warning-v5';document.head.append(link);
 }
 function pointsFor(key, hours=48) {
  if(!data)return [];
@@ -240,4 +240,3 @@ export function installExperience() {
  $('chart-science-link').addEventListener('click',()=>$('metric-dialog').close());
  window.addEventListener('resize',()=>{if(active&&$('metric-dialog').open)drawChart();});
 }
-

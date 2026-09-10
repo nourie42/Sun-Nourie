@@ -19,7 +19,7 @@ export function forecastConfidence({dayIndex=0,highSpread=null,qpfSpread=null,gu
  factors.push(dayIndex===0?'same-day lead time':`${dayIndex}-day lead time`);
  factors.push(finite(highSpread)?`${highSpread.toFixed(1)}°F high-temperature spread`:'limited temperature comparison');
  factors.push(finite(qpfSpread)?`${qpfSpread.toFixed(2)} in rainfall-guidance spread`:'limited rainfall comparison');
- factors.push(sourceIds?`${sourceIds.length} forecast sources: ${sourceIds.map(id=>id.toUpperCase()).join(', ')}`:`${guidanceCount} usable model source${guidanceCount===1?'':'s'}`);
+ factors.push(sourceIds?`${sourceIds.length} forecast source${sourceIds.length===1?'':'s'}: ${sourceIds.map(id=>id.toUpperCase()).join(', ')}`:`${guidanceCount} usable model source${guidanceCount===1?'':'s'}`);
  factors.push(officialDay&&officialNight?'NWS day and night periods available':officialDay||officialNight?'one NWS period available':'NWS day/night period unavailable');
  return {version:FORECAST_CONFIDENCE_VERSION,score,label,key,factors,sourceIds,sourceCount:sourceIds?.length??guidanceCount,
    note:'Relative confidence index, not a probability. It decreases with lead time and forecast spread, and can improve on a later day when guidance agrees better.'};

@@ -18,8 +18,8 @@ export function rebuildHourlyFeels(out,{now,temperatureAt,humidityAt,skyAt=()=>n
   const temperature=round(t.value),rawDewpoint=maps.dewpoint.get(epoch),wind=round(maps.wind.get(epoch)?.value);
   const dewpoint=round(finite(temperature)&&finite(rawDewpoint?.value)?Math.min(temperature,rawDewpoint.value):rawDewpoint?.value);
   const humidity=round(humidityFromDewpoint(temperature,dewpoint)??maps.humidity.get(epoch)?.value??humidityAt(epoch));
-  const skyCover=skyAt(epoch);
-  const inputs={temperature,dewpoint,wind,humidity,skyCover:finite(skyCover)?skyCover:null,skySource:finite(skyCover)?'NWS same-hour sky-cover grid':null};
+  const sky=skyAt(epoch),skyCover=typeof sky==='object'?sky?.value:sky;
+  const inputs={temperature,dewpoint,wind,humidity,skyCover:finite(skyCover)?skyCover:null,skySource:finite(skyCover)?(sky?.source||'NWS same-hour sky-cover grid'):null,skySources:sky?.sources||[]};
   const condition=hour?.condition||periods.find(p=>Date.parse(p.startTime)<=epoch&&epoch<Date.parse(p.endTime))?.shortForecast||'';
   const estimate=tier3FeelsLike({...inputs,condition,type:'guidance'},out.location,epoch,'outdoors');
   const shade=tier3FeelsLike({...inputs,condition,type:'guidance'},out.location,epoch,'shade');
@@ -32,7 +32,7 @@ export function rebuildHourlyFeels(out,{now,temperatureAt,humidityAt,skyAt=()=>n
   feels.push({time,value,inputs,condition,exposure:'outdoors',shadeValue,sunValue,daylight:sun.daylight,weatherKind:sun.weatherKind,source:estimate.method,inputEvidence:sun.inputEvidence,alignmentFactor:0,rawInputs:inputs});
   shades.push({time,value:shadeValue,inputs,condition,exposure:'shade',source:shade.method});
   suns.push({time,value:sunValue,inputs,source:'Estimated sun-exposed apparent temperature at this forecast hour',daylight:sun.daylight});
-  if(hour){hour.skyCover=inputs.skyCover;hour.skySource=inputs.skySource;hour.wind=finite(wind)?`${wind} mph`:null;hour.windMph=wind;hour.feelsLike=value;hour.feelsLikeShade=shadeValue;hour.feelsLikeSun=sunValue;hour.feelsLikeExposure='outdoors';hour.feelsLikeInputs=inputs;hour.apparent=value;}
+  if(hour){hour.skyCover=inputs.skyCover;hour.skySource=inputs.skySource;hour.dewpoint=dewpoint;hour.humidity=humidity;hour.wind=finite(wind)?`${wind} mph`:null;hour.windMph=wind;hour.feelsLike=value;hour.feelsLikeShade=shadeValue;hour.feelsLikeSun=sunValue;hour.feelsLikeExposure='outdoors';hour.feelsLikeInputs=inputs;hour.apparent=value;}
  }
  series.temperature=temperatures;series.feels=feels;series.feelsShade=shades;series.feelsSun=suns;series.humidity=humidities;series.dewpoint=dewpoints;
  out.metricForecasts.comfortAlignment={status:'not-applied',note:'Forecast feels-like values use exactly the displayed temperature and the matching hourly dew point and wind. No separate temperature-only residual, daily maximum, or current observation is inserted into future hours.'};

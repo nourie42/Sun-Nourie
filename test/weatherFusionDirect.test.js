@@ -87,4 +87,3 @@ test('Weather Nourie keeps thermal qualifications at the bottom, without a fetch
  assert.match(math,/UTCI Tier-3 fallback/);assert.match(math,/tier3FeelsLike/);
  assert.match(html,/One all-season fallback/);assert.match(html,/Stull approximation/);
 });
-
