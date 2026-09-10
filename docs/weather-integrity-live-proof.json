@@ -1,0 +1,234 @@
+{
+  "commit": "46035732486026c17ead1ffe42b757941570c1f4",
+  "checkedAt": "2026-09-10T17:57:00.372Z",
+  "fixture": false,
+  "locations": [
+    {
+      "place": "Knightdale / Raleigh",
+      "observation": "2026-09-10T17:15:00+00:00",
+      "station": "KJNX",
+      "currentInputs": {
+        "temperature": 89.6,
+        "dewpoint": 69.80000000000001,
+        "humidity": 52.230548603586435,
+        "windMph": 6.93450036,
+        "windUsedMps": 3.0999990409344003,
+        "skyCover": null,
+        "skySource": "Station weather report",
+        "meanRadiantTemperatureF": 128.19169597602217,
+        "sourceTime": "2026-09-10T17:15:00+00:00",
+        "station": "KJNX",
+        "stationDistanceKm": 28.6,
+        "windPolicy": "Source wind; no observation-to-forecast adjustment",
+        "radiationBasis": "Radiation estimated from the same-hour sky and solar elevation; not measured"
+      },
+      "currentOutdoor": 97.45547309650264,
+      "numericForecastHours": 224,
+      "daySevenPeak": {
+        "time": "2026-09-16T18:00:00.000Z",
+        "value": 93.4,
+        "inputs": {
+          "temperature": 86.5,
+          "dewpoint": 67.3,
+          "wind": 3.9,
+          "humidity": 52.9,
+          "skyCover": 31,
+          "skySource": "NWS same-hour sky-cover grid"
+        }
+      },
+      "aiMode": "ai",
+      "aiReason": null,
+      "danTakeStatus": "no-explicit-future-change",
+      "danTakeReview": {
+        "candidateCount": 0,
+        "proposedCount": 0,
+        "approvedCount": 0,
+        "rejected": []
+      },
+      "candidateCount": 0,
+      "danTake": "",
+      "approvedChanges": [],
+      "maximumCenteringErrorPx": 0.0078125,
+      "passed": true,
+      "sourceExcerpt": null,
+      "overview": ""
+    },
+    {
+      "place": "White Lake, NC",
+      "observation": "2026-09-10T17:15:00+00:00",
+      "station": "KEYF",
+      "currentInputs": {
+        "temperature": 90.32,
+        "dewpoint": 67.28,
+        "humidity": 46.82724555355656,
+        "windMph": 10.28990376,
+        "windUsedMps": 4.5999985768704,
+        "skyCover": null,
+        "skySource": "Station weather report",
+        "meanRadiantTemperatureF": 129.23497199066708,
+        "sourceTime": "2026-09-10T17:15:00+00:00",
+        "station": "KEYF",
+        "stationDistanceKm": 8,
+        "windPolicy": "Source wind; no observation-to-forecast adjustment",
+        "radiationBasis": "Radiation estimated from the same-hour sky and solar elevation; not measured"
+      },
+      "currentOutdoor": 95.47981053802366,
+      "numericForecastHours": 176,
+      "daySevenPeak": {
+        "time": "2026-09-16T18:00:00.000Z",
+        "value": 99,
+        "inputs": {
+          "temperature": 90,
+          "dewpoint": 72,
+          "wind": 2.3,
+          "humidity": 55.6,
+          "skyCover": 31,
+          "skySource": "NWS same-hour sky-cover grid"
+        }
+      },
+      "aiMode": "ai",
+      "aiReason": null,
+      "danTakeStatus": "no-explicit-future-change",
+      "danTakeReview": {
+        "candidateCount": 0,
+        "proposedCount": 0,
+        "approvedCount": 0,
+        "rejected": []
+      },
+      "candidateCount": 0,
+      "danTake": "",
+      "approvedChanges": [],
+      "maximumCenteringErrorPx": 0.0078125,
+      "passed": true,
+      "sourceExcerpt": null,
+      "overview": ""
+    },
+    {
+      "place": "Denver, CO",
+      "observation": "2026-09-10T16:58:00+00:00",
+      "station": "KBKF",
+      "currentInputs": {
+        "temperature": 78.98,
+        "dewpoint": 32,
+        "humidity": 18.07511107024437,
+        "windMph": 6.93450036,
+        "windUsedMps": 3.0999990409344003,
+        "skyCover": null,
+        "skySource": "Station weather report",
+        "meanRadiantTemperatureF": 111.44074952068576,
+        "sourceTime": "2026-09-10T16:58:00+00:00",
+        "station": "KBKF",
+        "stationDistanceKm": 20.1,
+        "windPolicy": "Source wind; no observation-to-forecast adjustment",
+        "radiationBasis": "Radiation estimated from the same-hour sky and solar elevation; not measured"
+      },
+      "currentOutdoor": 80.86339929772771,
+      "numericForecastHours": 176,
+      "daySevenPeak": {
+        "time": "2026-09-16T20:00:00.000Z",
+        "value": 84.2,
+        "inputs": {
+          "temperature": 83,
+          "dewpoint": 48,
+          "wind": 5.8,
+          "humidity": 29.5,
+          "skyCover": 40,
+          "skySource": "NWS same-hour sky-cover grid"
+        }
+      },
+      "aiMode": "ai",
+      "aiReason": null,
+      "danTakeStatus": "no-approved-change",
+      "danTakeReview": {
+        "candidateCount": 1,
+        "proposedCount": 1,
+        "approvedCount": 0,
+        "rejected": [
+          {
+            "evidenceId": "s1-p5-q2",
+            "reason": "unsupported-paraphrase"
+          }
+        ]
+      },
+      "candidateCount": 1,
+      "danTake": "",
+      "approvedChanges": [],
+      "maximumCenteringErrorPx": 0.0078125,
+      "passed": true,
+      "sourceExcerpt": null,
+      "overview": ""
+    },
+    {
+      "place": "Seattle, WA",
+      "observation": "2026-09-10T17:35:00+00:00",
+      "station": "KBFI",
+      "currentInputs": {
+        "temperature": 64.4,
+        "dewpoint": 55.400000000000006,
+        "humidity": 72.56154588997066,
+        "windMph": 4.6080873360000005,
+        "windUsedMps": 2.0599993626854403,
+        "skyCover": null,
+        "skySource": "Station weather report",
+        "meanRadiantTemperatureF": 66.09448276051246,
+        "sourceTime": "2026-09-10T17:35:00+00:00",
+        "station": "KBFI",
+        "stationDistanceKm": 6.9,
+        "windPolicy": "Source wind; no observation-to-forecast adjustment",
+        "radiationBasis": "Radiation estimated from the same-hour sky and solar elevation; not measured"
+      },
+      "currentOutdoor": 62.58709329196732,
+      "numericForecastHours": 176,
+      "daySevenPeak": {
+        "time": "2026-09-16T20:00:00.000Z",
+        "value": 75.9,
+        "inputs": {
+          "temperature": 71,
+          "dewpoint": 55,
+          "wind": 5.8,
+          "humidity": 57,
+          "skyCover": 8,
+          "skySource": "NWS same-hour sky-cover grid"
+        }
+      },
+      "aiMode": "ai",
+      "aiReason": null,
+      "danTakeStatus": "no-explicit-future-change",
+      "danTakeReview": {
+        "candidateCount": 0,
+        "proposedCount": 0,
+        "approvedCount": 0,
+        "rejected": []
+      },
+      "candidateCount": 0,
+      "danTake": "",
+      "approvedChanges": [],
+      "maximumCenteringErrorPx": 0.0078125,
+      "passed": true,
+      "sourceExcerpt": null,
+      "overview": ""
+    }
+  ],
+  "success": true,
+  "deployed": {
+    "integrityVersion": "weather-nourie-integrity-v1",
+    "danTakeVersion": "weather-nourie-dans-take-plain-v7",
+    "assets": {
+      "index.html": "6bd4d04c40454171f11bedb92713f5c4a4bf10e007c21900b25ee053a081aa99",
+      "app.js": "a7e2ef3d13b3eec288b58ff1cb320fd8f7ab2dc4b869f674cf2287b9007ae324",
+      "dans-summary.js": "a4f33e1f7343ebc021156a59c5254f787bd1e53ada624ca5408aeda06725697b",
+      "current-inputs.js": "9f2c99ef54d53152d389a9b2186113ae702bdc7c091c082e10fbc108958f7125",
+      "pavement.js": "401691a12065f787fb19902fb0c6a37de66a180679786085f34f80c9d5bf25a4",
+      "daily-uv.js": "4327bb7ab8a9bac7d21abbcafe674a13849d40a54c0c73966ee2e9a78a98e2e8",
+      "weather-math.js": "9f2e476e3cbf42bca0f9f94ac8911d4de6f717264d03a2e19da9ca8e3e01afc3",
+      "utci.js": "db0a67652cfcb41edc45c738b60d7d816ef6c70ad8db0870757076e4932b0613",
+      "weather-display.js": "6655e40f055bf01bc8df432536071f6a838ba07637fa1a32aeaef3bd60520fbf",
+      "personal-details.js": "6b12e980794bb4ec2c7a2015ff918f89f1406b13a24b4d645466bfaad3d7bbd2",
+      "experience.js": "846e61542ae5b38e26309924c93e32794cd32bf0ae0686d94a39985866dbc8f6",
+      "hourly-feels.css": "bdc44e2838335a229c565a58691e4cc2d9b9c6895c1ebf277b3d2ef0501df801",
+      "dans-take.js": "098b64218fe86bc0d66741d680700ad4bad20eef9a244e041f949d4de0515ad0"
+    }
+  },
+  "actualAICount": 4,
+  "visibleChangeCount": 0
+}
