@@ -213,10 +213,6 @@
 #skin-values .exposure-tree{
   transform:none!important;
 }
-#skin-values .shade-person .shade-weather .sky-sun,
-#skin-values .sun-person .person-weather .sky-sun{
-  transform:none;
-}
 #skin-values .shade-person>.exposure-label{
   transform:none!important;
 }

@@ -41,13 +41,14 @@ try{
    const box=s=>{const r=document.querySelector(s)?.getBoundingClientRect();return r?{x:r.x,y:r.y,width:r.width,height:r.height,top:r.top,bottom:r.bottom,left:r.left,right:r.right}:null;};
    const tree=box('.shade-person .exposure-tree'),person=box('.shade-person .exposure-person-art');
    const shadeSun=box('.shade-person .sky-sun'),directSun=box('.sun-person .sky-sun');
+   const shadeSvg=box('.shade-person svg'),sunSvg=box('.sun-person svg');
    const pet=document.querySelector('.pavement-person'),petSun=getComputedStyle(pet,'::after');
    const figures=[...document.querySelectorAll('.exposure-person')].map(el=>({box:el.getBoundingClientRect(),label:el.querySelector('.exposure-label')?.textContent.trim(),subtitle:el.querySelector('.exposure-subtitle')?.textContent.trim()}));
    const temps=[...document.querySelectorAll('.exposure-person figcaption strong')].map(x=>x.textContent.trim());
    const asphalt=document.querySelector('.pavement-secondary')?.textContent.trim();
    const card=box('.sun-shade-comparison');
    return {
-    tree,person,shadeSun,directSun,
+    tree,person,shadeSun,directSun,shadeSvg,sunSvg,
     treeRatio:tree.height/person.height,treeClearance:person.top-tree.top,
     shadeSunRatio:shadeSun.height/person.height,directSunRatio:directSun.height/person.height,
     petSun:petSun.content!=='none'&&petSun.content!=='normal',
@@ -68,6 +69,9 @@ try{
   assert.ok(m.shadeSun&&m.directSun,'Shade and Sun scenes must both contain a visible weather sun');
   assert.ok(m.shadeSunRatio>=.25,`Shade sun is too small at ${width}px`);
   assert.ok(m.directSunRatio>=.38,`Direct-sun symbol is too small at ${width}px`);
+  const inset=1.5;
+  assert.ok(m.shadeSun.left>=m.shadeSvg.left-inset&&m.shadeSun.right<=m.shadeSvg.right+inset&&m.shadeSun.top>=m.shadeSvg.top-inset&&m.shadeSun.bottom<=m.shadeSvg.bottom+inset,`Shade sun must be fully visible inside its scene at ${width}px`);
+  assert.ok(m.directSun.left>=m.sunSvg.left-inset&&m.directSun.right<=m.sunSvg.right+inset&&m.directSun.top>=m.sunSvg.top-inset&&m.directSun.bottom<=m.sunSvg.bottom+inset,`Direct sun must be fully visible inside its scene at ${width}px`);
   assert.ok(m.petSun,'The pet panel must show a visible sun whenever the Sun panel does');
   assert.notEqual(m.petSunBackground,'none','The pet sun must be an actual rendered graphic');
   assert.ok(m.figures.every(x=>x.box.height>0&&x.box.width>0),'All three visual cards must render at non-zero size');
@@ -90,7 +94,7 @@ try{
  }
  await fs.writeFile(`${out}/metrics.json`,JSON.stringify(results,null,2));
  console.log('CINEMATIC_COMFORT_VISUAL_CONTRACT_PASS');
- for(const r of results)console.log(JSON.stringify({width:r.width,values:r.temps,asphalt:r.asphalt,titles:r.figures.map(x=>x.label),subtitles:r.figures.map(x=>x.subtitle),treeToPerson:Number(r.treeRatio.toFixed(2)),shadeSunToPerson:Number(r.shadeSunRatio.toFixed(2)),directSunToPerson:Number(r.directSunRatio.toFixed(2)),petSun:r.petSun,hotWarnings:r.hotWarnings,overflow:r.overflow}));
+ for(const r of results)console.log(JSON.stringify({width:r.width,values:r.temps,asphalt:r.asphalt,titles:r.figures.map(x=>x.label),subtitles:r.figures.map(x=>x.subtitle),treeToPerson:Number(r.treeRatio.toFixed(2)),shadeSunToPerson:Number(r.shadeSunRatio.toFixed(2)),directSunToPerson:Number(r.directSunRatio.toFixed(2)),shadeSunFullyVisible:r.shadeSun.left>=r.shadeSvg.left-1.5&&r.shadeSun.right<=r.shadeSvg.right+1.5&&r.shadeSun.top>=r.shadeSvg.top-1.5&&r.shadeSun.bottom<=r.shadeSvg.bottom+1.5,directSunFullyVisible:r.directSun.left>=r.sunSvg.left-1.5&&r.directSun.right<=r.sunSvg.right+1.5&&r.directSun.top>=r.sunSvg.top-1.5&&r.directSun.bottom<=r.sunSvg.bottom+1.5,petSun:r.petSun,hotWarnings:r.hotWarnings,overflow:r.overflow}));
 } finally {
  await browser.close();
  await new Promise(resolve=>server.close(resolve));
