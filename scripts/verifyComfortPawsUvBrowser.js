@@ -99,6 +99,10 @@ try{
   for(const r of riskChecks.results){assert.ok(r.above);assert.equal(r.banner,'');}
   assert.equal(new Set(riskChecks.results.map(r=>r.value)).size,4);
   assert.ok(riskChecks.scale.every(t=>t.includes('scale(1.85)')));
+  const treeSize=await page.evaluate(()=>{const q=s=>document.querySelector(s).getBoundingClientRect(),t=q('.exposure-tree'),p=q('.shade-person .exposure-person-art'),b=q('.shade-person .exposure-alert-slot');return {ratio:t.height/p.height,top:t.top,personTop:p.top,bannerBottom:b.bottom};});
+  assert.ok(treeSize.ratio>1.4,'Tree is visibly taller than the person');
+  assert.ok(treeSize.top<treeSize.personTop-10,'Tree crown clears the person');
+  assert.ok(treeSize.top>=treeSize.bannerBottom,'Tree does not overlap the banner');
   const concise=await page.locator('#skin-exposure').innerText();assert.doesNotMatch(concise,/station|paw care|source air temperature|Sidewalk ranges/i);
   assert.equal(await page.locator('#scientific-stuff #skin-explanation').count(),1);
   assert.equal(await page.locator('#scientific-stuff .pavement-details').count(),1);

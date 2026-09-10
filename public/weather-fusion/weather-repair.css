@@ -50,3 +50,7 @@
 #skin-values .exposure-person .thermal-risk,#skin-values .exposure-person .pavement-warning{display:flex;align-items:center;justify-content:center;width:100%;height:36px;min-height:36px;box-sizing:border-box;margin:0;padding:4px 5px;border-radius:6px;background:#ffe1a0;color:#432b06;font-family:inherit;font-size:10px;font-weight:750;line-height:1.2;text-align:center;white-space:normal;letter-spacing:0}
 #skin-values .exposure-person .thermal-risk[data-risk=danger]{background:#ffd0c9;color:#6a1711}
 #skin-values .exposure-person .thermal-risk[data-risk=extreme]{background:#7a1836;color:#fff}
+#skin-values .exposure-tree{transform-origin:0 0;transform:translateY(-58px) scaleY(1.35)}
+#skin-values .exposure-person svg{overflow:visible}
+#skin-values .exposure-person svg,#skin-values .poodle-walk{margin-top:40px}
+@media(max-width:600px){#skin-values .exposure-person svg,#skin-values .poodle-walk{margin-top:24px}}
