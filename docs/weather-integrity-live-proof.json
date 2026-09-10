@@ -1,0 +1,268 @@
+{
+  "commit": "0b956d9ecc9729d705b53fa7a0769700cb7c25b8",
+  "checkedAt": "2026-09-10T15:44:32.409Z",
+  "fixture": false,
+  "locations": [
+    {
+      "place": "Knightdale / Raleigh",
+      "observation": "2026-09-10T14:55:00+00:00",
+      "station": "KJNX",
+      "currentInputs": {
+        "temperature": 84.2,
+        "dewpoint": 71.6,
+        "humidity": 65.94848538100689,
+        "windMph": 10.28990376,
+        "windUsedMps": 4.5999985768704,
+        "skyCover": null,
+        "skySource": "NWS current-hour forecast (sky only)",
+        "meanRadiantTemperatureF": 121.43386507298649,
+        "sourceTime": "2026-09-10T14:55:00+00:00",
+        "station": "KJNX",
+        "stationDistanceKm": 28.6,
+        "windPolicy": "Source wind; no observation-to-forecast adjustment",
+        "radiationBasis": "Radiation estimated from the same-hour sky and solar elevation; not measured"
+      },
+      "currentOutdoor": 89.44577964513898,
+      "numericForecastHours": 226,
+      "daySevenPeak": {
+        "time": "2026-09-16T18:00:00.000Z",
+        "value": 93.4,
+        "inputs": {
+          "temperature": 86.5,
+          "dewpoint": 67.3,
+          "wind": 3.9,
+          "humidity": 52.9,
+          "skyCover": 31,
+          "skySource": "NWS same-hour sky-cover grid"
+        }
+      },
+      "aiMode": "ai",
+      "aiReason": null,
+      "danTakeStatus": "supported",
+      "danTakeReview": {
+        "candidateCount": 2,
+        "proposedCount": 2,
+        "approvedCount": 2,
+        "rejected": []
+      },
+      "candidateCount": 2,
+      "danTake": "This coming week — Saturday, Sep 12 – Monday, Sep 14: Cooling this weekend will be limited, and temperatures are expected to rebound after the brief dip.\n\nSaturday, Sep 12 – Sunday, Sep 13: The next front is weakening, so the risk for excessive rain will be lower and how widespread the rain will be is expected to be limited.",
+      "approvedChanges": [
+        {
+          "evidenceId": "s0-p1-q0",
+          "summary": "Cooling this weekend will be limited, and temperatures are expected to rebound after the brief dip.",
+          "period": "This coming week — Saturday, Sep 12 – Monday, Sep 14",
+          "sourceQuote": "* Limited cooling into the mid 80s to around 90 this weekend, with heat returning Monday.",
+          "section": "WHAT HAS CHANGED",
+          "sectionIssuedAt": "2026-09-10T10:14:00.000Z",
+          "validFrom": "2026-09-12T04:00:00.000Z",
+          "eventEnd": "2026-09-15T04:00:00.000Z",
+          "validUntil": "2026-09-10T22:14:00.000Z"
+        },
+        {
+          "evidenceId": "s0-p2-q0",
+          "summary": "The next front is weakening, so the risk for excessive rain will be lower and how widespread the rain will be is expected to be limited.",
+          "period": "This coming week — Saturday, Sep 12 – Sunday, Sep 13",
+          "sourceQuote": "* Risk for excessive rain lowering with the next (weakening) front this weekend.",
+          "section": "WHAT HAS CHANGED",
+          "sectionIssuedAt": "2026-09-10T10:14:00.000Z",
+          "validFrom": "2026-09-12T04:00:00.000Z",
+          "eventEnd": "2026-09-14T04:00:00.000Z",
+          "validUntil": "2026-09-10T22:14:00.000Z"
+        }
+      ],
+      "maximumCenteringErrorPx": 0.0078125,
+      "passed": true,
+      "sourceExcerpt": null,
+      "overview": "It will feel hot through the end of the week with only a little relief this weekend.  A weakening front should lower the threat for heavy rain, then warmer conditions return afterward.\n\nWatch for changes — This coming week — Saturday, Sep 12 – Monday, Sep 14: Cooling this weekend will be limited, and temperatures are expected to rebound after the brief dip.\n\nSaturday, Sep 12 – Sunday, Sep 13: The next front is weakening, so the risk for excessive rain will be lower and how widespread the rain will be is expected to be limited."
+    },
+    {
+      "place": "White Lake, NC",
+      "observation": "2026-09-10T15:15:00+00:00",
+      "station": "KEYF",
+      "currentInputs": {
+        "temperature": 86.53999999999999,
+        "dewpoint": 69.98,
+        "humidity": 57.903831810372346,
+        "windMph": 0,
+        "windUsedMps": 0.5,
+        "skyCover": null,
+        "skySource": "Station weather report",
+        "meanRadiantTemperatureF": 124.08297698848173,
+        "sourceTime": "2026-09-10T15:15:00+00:00",
+        "station": "KEYF",
+        "stationDistanceKm": 8,
+        "windPolicy": "Calm-wind approximation: UTCI minimum 0.5 m/s",
+        "radiationBasis": "Radiation estimated from the same-hour sky and solar elevation; not measured"
+      },
+      "currentOutdoor": 98.29794346134719,
+      "numericForecastHours": 178,
+      "daySevenPeak": {
+        "time": "2026-09-16T18:00:00.000Z",
+        "value": 99,
+        "inputs": {
+          "temperature": 90,
+          "dewpoint": 72,
+          "wind": 2.3,
+          "humidity": 55.6,
+          "skyCover": 31,
+          "skySource": "NWS same-hour sky-cover grid"
+        }
+      },
+      "aiMode": "ai",
+      "aiReason": null,
+      "danTakeStatus": "no-explicit-future-change",
+      "danTakeReview": {
+        "candidateCount": 0,
+        "proposedCount": 0,
+        "approvedCount": 0,
+        "rejected": []
+      },
+      "candidateCount": 0,
+      "danTake": "",
+      "approvedChanges": [],
+      "maximumCenteringErrorPx": 0.0078125,
+      "passed": true,
+      "sourceExcerpt": null,
+      "overview": "It will be hot and humid today with mainly sunny skies and light winds.  Shower and thunderstorm chances increase this weekend as a slow-moving system approaches."
+    },
+    {
+      "place": "Denver, CO",
+      "observation": "2026-09-10T13:58:00+00:00",
+      "station": "KBKF",
+      "currentInputs": {
+        "temperature": 62.96,
+        "dewpoint": 42.44,
+        "humidity": 47.014942763690186,
+        "windMph": 5.81603256,
+        "windUsedMps": 2.5999991956224,
+        "skyCover": null,
+        "skySource": "Station weather report",
+        "meanRadiantTemperatureF": 88.38951589728397,
+        "sourceTime": "2026-09-10T13:58:00+00:00",
+        "station": "KBKF",
+        "stationDistanceKm": 20.1,
+        "windPolicy": "Source wind; no observation-to-forecast adjustment",
+        "radiationBasis": "Radiation estimated from the same-hour sky and solar elevation; not measured"
+      },
+      "currentOutdoor": 64.7465655941484,
+      "numericForecastHours": 178,
+      "daySevenPeak": {
+        "time": "2026-09-16T20:00:00.000Z",
+        "value": 84.2,
+        "inputs": {
+          "temperature": 83,
+          "dewpoint": 48,
+          "wind": 5.8,
+          "humidity": 29.5,
+          "skyCover": 40,
+          "skySource": "NWS same-hour sky-cover grid"
+        }
+      },
+      "aiMode": "ai",
+      "aiReason": null,
+      "danTakeStatus": "no-approved-change",
+      "danTakeReview": {
+        "candidateCount": 1,
+        "proposedCount": 1,
+        "approvedCount": 0,
+        "rejected": [
+          {
+            "evidenceId": "s1-p5-q2",
+            "reason": "unsupported-paraphrase"
+          }
+        ]
+      },
+      "candidateCount": 1,
+      "danTake": "",
+      "approvedChanges": [],
+      "maximumCenteringErrorPx": 0.0078125,
+      "passed": true,
+      "sourceExcerpt": {
+        "id": "s1-p5-q2",
+        "quote": "If this front does hold off until Mon night, then another day of above normal temps would occur over the plains.",
+        "context": "Models have backed off on the timing of another cold front moving across as they now show it moving in Mon night into Tue morning. If this front does hold off until Mon night, then another day of above normal temps would occur over the plains. Meanwhile, may have a better chc of showers/tstms across the plains Mon night into Tue morning as position of upper level jet combines with upslope flow behind the front.",
+        "section": "DISCUSSION",
+        "sourcePeriod": "Through Wednesday",
+        "sectionIssuedAt": "2026-09-10T08:40:00.000Z",
+        "period": "This coming week — Monday, Sep 14 – Tuesday, Sep 15",
+        "validFrom": "2026-09-15T00:00:00.000Z",
+        "eventEnd": "2026-09-15T12:00:00.000Z",
+        "validUntil": "2026-09-10T23:06:00.000Z"
+      },
+      "overview": "Sunny and warmer than normal through Friday, then a cooler day Saturday.  A pattern change could bring a better chance of showers and storms early next week.\n\nWatch for changes — This coming week — Monday, Sep 14 – Tuesday, Sep 15: If this front does hold off until Mon night, then another day of above normal temperatures would occur over the plains."
+    },
+    {
+      "place": "Seattle, WA",
+      "observation": "2026-09-10T15:25:00+00:00",
+      "station": "KBFI",
+      "currentInputs": {
+        "temperature": 62.6,
+        "dewpoint": 53.6,
+        "humidity": 72.38099317955187,
+        "windMph": 4.6080873360000005,
+        "windUsedMps": 2.0599993626854403,
+        "skyCover": null,
+        "skySource": "Station weather report",
+        "meanRadiantTemperatureF": 63.69107331472736,
+        "sourceTime": "2026-09-10T15:25:00+00:00",
+        "station": "KBFI",
+        "stationDistanceKm": 6.9,
+        "windPolicy": "Source wind; no observation-to-forecast adjustment",
+        "radiationBasis": "Radiation estimated from the same-hour sky and solar elevation; not measured"
+      },
+      "currentOutdoor": 60.323879599384796,
+      "numericForecastHours": 178,
+      "daySevenPeak": {
+        "time": "2026-09-16T20:00:00.000Z",
+        "value": 75.9,
+        "inputs": {
+          "temperature": 71,
+          "dewpoint": 55,
+          "wind": 5.8,
+          "humidity": 57,
+          "skyCover": 8,
+          "skySource": "NWS same-hour sky-cover grid"
+        }
+      },
+      "aiMode": "ai",
+      "aiReason": null,
+      "danTakeStatus": "no-explicit-future-change",
+      "danTakeReview": {
+        "candidateCount": 0,
+        "proposedCount": 0,
+        "approvedCount": 0,
+        "rejected": []
+      },
+      "candidateCount": 0,
+      "danTake": "",
+      "approvedChanges": [],
+      "maximumCenteringErrorPx": 0.0078125,
+      "passed": true,
+      "sourceExcerpt": null,
+      "overview": "Marine low clouds will keep skies mostly cloudy this morning with inland areas becoming partly sunny by afternoon.  An upper low will move onshore and bring a higher chance of rain and cooler temperatures by Saturday."
+    }
+  ],
+  "success": true,
+  "deployed": {
+    "integrityVersion": "weather-nourie-integrity-v1",
+    "danTakeVersion": "weather-nourie-dans-take-overview-v5",
+    "assets": {
+      "index.html": "06de7cff8c09ce46a4639dd7a972f9c3e4e772c1b0706aae8690d0769012c027",
+      "app.js": "39821d65f8f84d6288cda85546a8c741093706470138ef7b44a47ce285d6b0fd",
+      "dans-summary.js": "6143757166de77436e7950945afbaf45c861d0f4d14e567788f90c13397b243e",
+      "current-inputs.js": "08e24759b1843366802272aa19f7cf610f9590c9cf73f61e3d4e6353bb1e9818",
+      "pavement.js": "91659b9ae724c81e6f8720dfb3ff16bb64c8f1de3a0d248f9d8464e68fbb75da",
+      "daily-uv.js": "c7941e4ffc89a52ebb5ebff7d3d5298932d1fbd0992f0486bfc2e36ee610a036",
+      "weather-math.js": "3d09f15a1667e3b4b76f8798e6005e439b4a7b9ed2a3bb529f0b74bf8e9766e6",
+      "utci.js": "db0a67652cfcb41edc45c738b60d7d816ef6c70ad8db0870757076e4932b0613",
+      "weather-display.js": "440e867f8c6b7e8d21d78c70212c625596c988bdd1006d1ed756101b2f285529",
+      "personal-details.js": "49838ff30f0ae6412c432750330559f2f38869f6086e7b013e68b3525d76618e",
+      "experience.js": "a843c1ee53d0a828b208d86227cde68ec39ebbd9e28cdc76fc94789df58664a5",
+      "hourly-feels.css": "e35b0d16adb10c40e1ad309705b936e0cee8ba70d127eae3769dc25a02e13727",
+      "dans-take.js": "29805b36c3b4a103b08bcdf5b7d308ae58c32c245c63a9db8180fd33f5c67feb"
+    }
+  },
+  "actualAICount": 4,
+  "visibleChangeCount": 3
+}
