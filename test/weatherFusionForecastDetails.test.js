@@ -58,7 +58,7 @@ test('Dan displays at most two concise changes while retaining source evidence',
  }};
  const summaries=[
   'Coverage of Friday’s showers and storms may be limited because dry air could suppress development.',
-  'Saturday may trend cooler than earlier runs, which would generally reduce thunderstorm coverage.',
+  'Saturday may be cooler than earlier forecasts, so thunderstorms may be less widespread.',
   'Sunday may have lower storm energy, so heavy or severe storms appear less likely though showers remain possible.'
  ];
  const candidates=collectDanTakeEvidence(f,time).candidates;

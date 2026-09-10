@@ -1,4 +1,4 @@
-import {hasDanJargon,collectDanTakeEvidence,visibleDanTakeItems,danTakeText,discussionPeriod,sectionAnchor,explicitForecastUncertainty} from './dans-take.js?v=clear-weather-daygraph-v3';
+import {plainDanWording,hasDanJargon,collectDanTakeEvidence,visibleDanTakeItems,danTakeText,discussionPeriod,sectionAnchor,explicitForecastUncertainty} from './dans-take.js?v=clear-weather-daygraph-v3';
 const norm=v=>String(v||'').replace(/\s+/g,' ').trim();
 const dateKey=(time,zone)=>new Intl.DateTimeFormat('en-CA',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(time));
 function anchoredText(text,anchor,zone,now){
@@ -35,7 +35,7 @@ export function danCard(briefing,forecast,now=Date.now()){
  const items=[],parts=[];
  const compact=value=>norm(value).replace(/^(?:dan\s*['’]?\s*s\s+take\b\s*[:\-—–.]?\s*)+/i,'');
  const append=(item,summary)=>{
-  const sentence=compact(summary),period=item.period.replace(/^This coming week — /,'');
+  const sentence=plainDanWording(compact(summary)),period=item.period.replace(/^This coming week — /,'');
   if(hasDanJargon(sentence)||!sentence||sentence.length>200||sentence.split(/\s+/).length>28)return false;
   const part=`${period}: ${sentence}`,combined=[...parts,part].join(' ');
   if(combined.length>380||combined.split(/\s+/).length>55)return false;

@@ -119,7 +119,7 @@ try{
  await page.waitForFunction(()=>{
   const value=document.querySelector('#skin-values')?.textContent||'';
   const science=document.querySelector('#skin-science')?.textContent||'';
-  return /°.*(?:in the shade|right now)/.test(value)&&/(?:UTCI Tier-3|Steadman apparent temperature)/.test(science);
+  return /°.*Shade/.test(value)&&/(?:UTCI Tier-3|Steadman apparent temperature)/.test(science);
  },null,{timeout:30000});
  await page.waitForFunction(()=>document.querySelector('#dewpoint-gross-meter .gross-chart')&&/DEW POINT · GROSS METER/.test(document.querySelector('#dewpoint-gross-meter')?.innerText||''),null,{timeout:30000});
  assert.equal(await page.locator('iframe').count(),0);
@@ -127,7 +127,7 @@ try{
  assert.match(await page.locator('.brand').innerText(),/WEATHER\s+NOURIE/i);
  const skinValue=await page.locator('#skin-values').innerText();
  const skinScience=await page.locator('#skin-science').textContent();
- const skinWhy=await page.locator('#skin-explanation').innerText();
+ const skinWhy=await page.locator('#skin-explanation').textContent();
  assert.ok(!skinValue.includes('Calculating')&&!skinValue.includes('Updating'));
  assert.ok(!skinWhy.includes('Sunshine can make it feel warmer. A breeze can help cool you down.'));
  assert.match(skinWhy,/dew point|wind|breeze|sun|radiation|moisture|air temperature/i);
@@ -182,10 +182,10 @@ try{
  await page.locator('#close-day').click();
  await page.locator('[data-place="greenville"]').click();
  await page.waitForFunction(()=>document.querySelector('#city-name').textContent.includes('Greenville')&&document.querySelectorAll('#metrics .metric-value').length===8,null,{timeout:75000});
- await page.waitForFunction(()=>/°.*(?:in the shade|right now)/.test(document.querySelector('#skin-values')?.textContent||'')&&!/Updating/.test(document.querySelector('#skin-values')?.textContent||''),null,{timeout:30000});
+ await page.waitForFunction(()=>/°.*Shade/.test(document.querySelector('#skin-values')?.textContent||'')&&!/Updating/.test(document.querySelector('#skin-values')?.textContent||''),null,{timeout:30000});
  await page.waitForFunction(()=>document.querySelector('#dewpoint-gross-meter .gross-chart'),null,{timeout:30000});
  report.skinExposure.greenville=await page.locator('#skin-values').innerText();
- report.skinExposure.greenvilleWhy=await page.locator('#skin-explanation').innerText();
+ report.skinExposure.greenvilleWhy=await page.locator('#skin-explanation').textContent();
  report.dewpointGross.greenville=await page.locator('#dewpoint-gross-meter').innerText();
  await page.locator('[data-layer="temperature"]').click();
  await page.waitForFunction(()=>document.querySelector('#map-error').hidden,null,{timeout:45000});
@@ -196,7 +196,7 @@ try{
  assert.ok(desktopAudit.length>0,'Overlay audit must collect desktop samples');
  await page.reload({waitUntil:'domcontentloaded'});
  await page.waitForFunction(()=>document.querySelectorAll('#metrics .metric-value').length===8,null,{timeout:75000});
- await page.waitForFunction(()=>/°.*(?:in the shade|right now)/.test(document.querySelector('#skin-values')?.textContent||''),null,{timeout:30000});
+ await page.waitForFunction(()=>/°.*Shade/.test(document.querySelector('#skin-values')?.textContent||''),null,{timeout:30000});
  await page.waitForFunction(()=>document.querySelector('#dewpoint-gross-meter .gross-chart'),null,{timeout:30000});
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),true,'Mobile document overflows horizontally');
  report.forecastDetails.push(await checkForecastDetails(page));

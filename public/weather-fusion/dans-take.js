@@ -3,8 +3,9 @@
  * Ambiguous timing is omitted, not guessed. Dates are anchored to source issuance,
  * including a retained section's own "As of" time, never to the time of retrieval.
  */
-export const DAN_TAKE_VERSION = 'weather-nourie-dans-take-plain-v7';
-export const hasDanJargon=text=>/\b(?:subsidence|mid[ -]level|aloft|instability|shear|vorticity|shortwave|troughing|ridging|isentropic|HRRR|ECMWF|NBM|CAPE|QPF|synoptic|advection|deterministic|convection|guidance)\b|\bsinking air\b/i.test(text);
+export const DAN_TAKE_VERSION = 'weather-nourie-dans-take-plain-v8';
+export const plainDanWording=text=>String(text||'').replace(/than (?:some |the )?(?:model )?runs (?:indicate|suggest|show)/gi,'than expected').replace(/\ba dry layer\b/gi,'dry air').replace(/\ba layer of dry air\b/gi,'dry air');
+export const hasDanJargon=text=>/\b(?:subsidence|mid[ -]level|aloft|instability|shear|vorticity|shortwave|troughing|ridging|isentropic|HRRR|ECMWF|NBM|CAPE|QPF|synoptic|advection|deterministic|convection|guidance|runs)\b|\bsinking air\b/i.test(text);
 const H = 3600000, DAY = 24 * H, MAX_SOURCE_AGE = 12 * H;
 const norm = v => String(v || '').replace(/\s+/g, ' ').trim();
 const finite = Number.isFinite;
@@ -156,9 +157,9 @@ function acceptableParaphrase(text, candidate) {
 export function approveDanTake(proposals, data, now=Date.now()) {
   const context=collectDanTakeEvidence(data,now),seen=new Set(),items=[],rejected=[];
   for(const proposal of Array.isArray(proposals)?proposals:[]){
-    const c=context.candidates.find(c=>c.id===proposal?.evidenceId);
-    if(!c||seen.has(c.id)||!acceptableParaphrase(proposal.summary,c)){rejected.push({evidenceId:String(proposal?.evidenceId||'').slice(0,60),reason:!c?'unknown-evidence':seen.has(c.id)?'duplicate':'unsupported-paraphrase'});continue;}
-    seen.add(c.id);items.push({evidenceId:c.id,summary:proposal.summary.trim(),period:c.period,sourceQuote:c.quote,
+    const c=context.candidates.find(c=>c.id===proposal?.evidenceId),summary=plainDanWording(proposal?.summary);
+    if(!c||seen.has(c.id)||!acceptableParaphrase(summary,c)){rejected.push({evidenceId:String(proposal?.evidenceId||'').slice(0,60),reason:!c?'unknown-evidence':seen.has(c.id)?'duplicate':'unsupported-paraphrase'});continue;}
+    seen.add(c.id);items.push({evidenceId:c.id,summary:summary.trim(),period:c.period,sourceQuote:c.quote,
       section:c.section,sectionIssuedAt:c.sectionIssuedAt,validFrom:c.validFrom,eventEnd:c.eventEnd,validUntil:c.validUntil});
   }
   items.sort((a,b)=>Date.parse(a.validFrom)-Date.parse(b.validFrom));

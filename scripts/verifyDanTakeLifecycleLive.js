@@ -30,10 +30,10 @@ try{
  const {data:official}=await json('https://api.weather.gov/products/types/AFD/locations/RAH/latest');
  report.independentOfficialLatest={id:official.id,issuedAt:official.issuanceTime};
  let f,b;
- for(let attempt=0;attempt<3;attempt++){
+ for(let attempt=0;attempt<6;attempt++){
   f=(await json(base+'/api/weather-fusion/forecast?location=knightdale')).data;
   const response=await json(base+'/api/weather-fusion/briefing?location=knightdale&signature='+f.signature);
-  if(response.status===409)continue;
+  if(response.status===409){await delay(2000);continue;}
   assert.equal(response.status,200);b=response.data;break;
  }
  assert.ok(b&&f.discussion);assert.ok(Date.parse(f.discussion.issuanceTime)>=Date.parse(official.issuanceTime),'The live application cannot be behind the separately checked official latest product');

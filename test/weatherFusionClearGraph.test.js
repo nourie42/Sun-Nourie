@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {dayGraphPoints,dayGraphHTML} from '../public/weather-fusion/day-graph.js';
 import {walkerOutfit} from '../public/weather-fusion/pavement.js';
 import {danCard} from '../public/weather-fusion/dans-summary.js';
-import {approveDanTake,collectDanTakeEvidence} from '../public/weather-fusion/dans-take.js';
+import {approveDanTake,collectDanTakeEvidence,plainDanWording,hasDanJargon} from '../public/weather-fusion/dans-take.js';
 import {buildForecast} from '../src/weatherFusion.js';
 import {snapshot,testInputs} from './weatherFusion.fixtures.js';
 import {validateSnapshot} from '../src/weatherFusionDirect.js';
@@ -28,6 +28,8 @@ test('dog outfits follow human feels-like thresholds, not pavement',()=>{
  for(const [feels,asset] of [[104,'hot'],[88,'hot'],[74,'hot'],[65,'mild'],[58,'mild'],[42,'cool'],[30,'cold']])assert.equal(walkerOutfit(feels).asset,asset==='cool'?'poodle-walk.png':`poodle-walk-${asset}.png`);
 });
 test('Dan translates the screenshot uncertainty and rejects technical paraphrases',()=>{
+ assert.equal(plainDanWording('Rain may be less widespread than some runs indicate because a dry layer could linger.'),'Rain may be less widespread than expected because dry air could linger.');
+ assert.ok(hasDanJargon('Earlier runs suggest more rain.'));
  const f={signature:'jargon',location:{...location,office:'MHX',timeZone:'America/New_York'},feeds:[{id:'afd',status:'ready'}],discussion:{id:'afd-test',office:'MHX',issuanceTime:new Date(now-H).toISOString(),text:'.SHORT TERM /Sunday/...\nShowers and storms are expected Sunday. Coverage may be limited as models are suggesting mid level subsidence and a dry layer lingering into Sunday.\n&&'}};
  const candidates=collectDanTakeEvidence(f,now).candidates;assert.equal(candidates.length,1);
  const card=danCard(null,f,now);assert.match(card.text,/Showers and storms may be less widespread than expected/);assert.doesNotMatch(card.text,/subsidence|sinking|mid level/);assert.ok(card.text.split(/\s+/).length<25);
