@@ -60,7 +60,7 @@
 #skin-values .poodle-scene .poodle-walk{width:167px;height:111.333px;margin:0}
 
 /* Comfort visual contract v13: the tree must read as a real tree, not person-sized. */
-#skin-values .shade-person .exposure-tree{transform-box:fill-box;transform-origin:50% 100%;transform:translateX(16px) scale(1.30)}
+#skin-values .shade-person .exposure-tree{transform-box:fill-box;transform-origin:50% 100%;transform:translateX(16px) scale(1.48)}
 
 /* Weather symbols are intentionally prominent and stay proportional. */
 #skin-values .shade-person .shade-weather .sky-sun,
