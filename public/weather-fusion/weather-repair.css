@@ -55,17 +55,9 @@
 #skin-values .exposure-person .thermal-risk[data-risk=danger],#skin-values .exposure-person .pavement-warning[data-risk=danger]{background:#ffd0c9;color:#6a1711}
 #skin-values .exposure-person .thermal-risk[data-risk=extreme],#skin-values .exposure-person .pavement-warning[data-risk=extreme]{background:#7a1836;color:#fff}
 
-/* Keep the artwork proportional: no separate trunk/canopy stretching. */
-#skin-values .exposure-tree,#skin-values .exposure-tree>path{transform:none}
+/* Cinematic SVGs now own their own tree and sun geometry. Do not apply the old
+   post-render transforms here: they can distort or clip the redesigned artwork. */
 #skin-values .poodle-scene .poodle-walk{width:167px;height:111.333px;margin:0}
-
-/* Comfort visual contract v13: the tree must read as a real tree, not person-sized. */
-#skin-values .shade-person .exposure-tree{transform-box:fill-box;transform-origin:50% 100%;transform:translateX(16px) scale(1.48)}
-
-/* Weather symbols are intentionally prominent and stay proportional. */
-#skin-values .shade-person .shade-weather .sky-sun{transform-box:fill-box;transform-origin:50% 50%;transform:translateY(-55px) scale(1.70)}
-#skin-values .sun-person .person-weather .sky-sun{transform-box:fill-box;transform-origin:50% 50%;transform:scale(1.70)}
-@media(min-width:601px){#skin-values .shade-person>.exposure-label{transform:translateY(-18px)}}
 
 /* The pet panel shows the same direct-sun cue whenever the outdoor panel actually contains a sun.
    Because this keys off the rendered sun glyph, it does not invent a sun at night or under overcast skies. */
