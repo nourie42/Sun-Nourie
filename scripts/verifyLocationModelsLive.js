@@ -9,7 +9,7 @@ const local=process.env.WEATHER_LOCAL_PIPELINE==='1',service=local?createWeather
 const locations=[{id:'knightdale'},{id:'greenville'},{latitude:35.99,longitude:-78.9},{latitude:39.7392,longitude:-104.9903}];
 const report={base,checkedAt:new Date().toISOString(),success:false,locations:[]};await fs.mkdir(output,{recursive:true});
 if(!local){
- for(const name of ['index.html','app.js','experience.js','weather-display.js','personal-details.js','pavement.js','weather-repair.css','forecast-confidence.js']){
+ for(const name of ['index.html','app.js','experience.js','weather-display.js','comfort-outlook.js','personal-details.js','pavement.js','weather-repair.css','forecast-confidence.js']){
   const actual=await fetch(`${base}/weather-fusion/${name}?proof=${Date.now()}`).then(r=>r.text()),expected=await fs.readFile('public/weather-fusion/'+name,'utf8');
   assert.equal(actual.replace(/\r\n/g,'\n'),expected.replace(/\r\n/g,'\n'),'Exact deployed '+name);
  }
@@ -44,6 +44,7 @@ try{
    assert.deepEqual(await page.locator('#skin-values .exposure-label').allTextContents(),['Shade','Sun','For Pets']);
    assert.ok(await page.locator('#map-panel').evaluate(el=>el.getBoundingClientRect().top>=document.querySelector('#metrics').getBoundingClientRect().bottom));
    assert.match(await page.locator('.comfort-later small').innerText(),/\d{1,2}:\d{2} [AP]M/);
+   assert.match(await page.locator('.comfort-later>span').innerText(),/Warmest feels like today/);
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true);
    const expectedWarning=pavementWarning(pavementEstimate(shown,currentSample(shown).inputs));
    assert.equal(await page.locator('.pavement-warning').count(),expectedWarning?1:0);

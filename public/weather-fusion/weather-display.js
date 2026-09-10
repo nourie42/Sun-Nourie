@@ -65,8 +65,12 @@ export function peakComparison(summary, currentShade) {
   }
   return {kind:'peak', label:summary.mode === 'day' ? 'Warmest feels like today' : summary.label, value:peak, time:summary.chosen.time, now:false};
 }
-export function peakComparisonHTML(summary, currentShade, zone = 'America/New_York') {
+export function peakComparisonHTML(summary, currentShade, zone = 'America/New_York', now=Date.now()) {
   const comparison = peakComparison(summary,currentShade);
+  if(!summary&&finite(currentShade)){
+    const clock=new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',minute:'2-digit'}).format(new Date(now));
+    return `<div class="comfort-later" data-comparison="current-only"><span>Warmest feels like today</span><strong>${degrees(currentShade)}</strong><small>Now · ${esc(clock)} · later forecast unavailable</small></div>`;
+  }
   if (!summary) return '<p class="comfort-later">Warmest feels like today unavailable. Missing readings stay blank.</p>';
   const clock=new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',minute:'2-digit'}).format(new Date(comparison.time));
   const time = comparison.now ? `Now · later peak ${degrees(comparison.later)} at ${clock}` : `${clock} · hourly forecast`;

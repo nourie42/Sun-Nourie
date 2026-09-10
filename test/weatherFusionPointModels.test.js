@@ -8,6 +8,7 @@ import {mixWindDirection} from '../src/weatherFusionExperience.js';
 import {testInputs,snapshot} from './weatherFusion.fixtures.js';
 import {pavementWarning,pavementHTML} from '../public/weather-fusion/pavement.js';
 import {peakComparisonHTML} from '../public/weather-fusion/weather-display.js';
+import {warmestTodayWindow} from '../public/weather-fusion/comfort-outlook.js';
 const now=Date.parse('2026-09-05T16:00:00Z'),H=3600000,location={latitude:35.99,longitude:-78.9};
 function raw(id='hrrr',point=location){
  const offset=id==='hrrr'?0:id==='ecmwf'?1:2;
@@ -84,4 +85,10 @@ test('weather maps follow day-at-a-glance cards in the actual document',()=>{
 test('forecast directions cross north correctly; opposed directions are unresolved',()=>{
  const north=mixWindDirection({nws:350,hrrr:10},{nws:.5,hrrr:.5}).value;
  assert.ok(Math.min(north,360-north)<.001);assert.equal(mixWindDirection({nws:0,hrrr:180},{nws:.5,hrrr:.5}).value,null);
+});
+test('afternoon warmest card stays a same-day high and retains its clock time after 3 PM',()=>{
+ const forecast={location:{timeZone:'America/New_York'},metricForecasts:{series:{feels:[{time:'2026-09-05T20:00:00Z',value:99},{time:'2026-09-05T21:00:00Z',value:96},{time:'2026-09-06T10:00:00Z',value:71}]}}};
+ const summary=warmestTodayWindow(forecast,Date.parse('2026-09-05T19:30:00Z'));
+ assert.equal(summary.chosen.value,99);assert.match(peakComparisonHTML(summary,95),/Warmest feels like today/);assert.match(peakComparisonHTML(summary,95),/4:00 PM/);
+ assert.match(peakComparisonHTML(null,85,'America/New_York',Date.parse('2026-09-06T03:30:00Z')),/11:30 PM/);
 });

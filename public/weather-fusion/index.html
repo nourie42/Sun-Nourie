@@ -7,13 +7,13 @@
   <meta name="description" content="Weather Nourie. Local NWS forecasts, professional AI briefings, model comparisons, thermal-exposure science and interactive weather maps.">
   <title>Weather Nourie</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-  <link rel="stylesheet" href="/weather-fusion/style.css?v=location-models-paw-warning-v5">
-  <link rel="stylesheet" href="/weather-fusion/forecast-layout.css?v=location-models-paw-warning-v5">
+  <link rel="stylesheet" href="/weather-fusion/style.css?v=location-models-paw-warning-v6">
+  <link rel="stylesheet" href="/weather-fusion/forecast-layout.css?v=location-models-paw-warning-v6">
   <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <link rel="stylesheet" href="/weather-fusion/personal-details.css?v=location-models-paw-warning-v5">
-  <link rel="stylesheet" href="/weather-fusion/hourly-feels.css?v=location-models-paw-warning-v5">
-  <link rel="stylesheet" href="/weather-fusion/weather-repair.css?v=location-models-paw-warning-v5">
-  <script type="module" src="/weather-fusion/app.js?v=location-models-paw-warning-v5"></script>
+  <link rel="stylesheet" href="/weather-fusion/personal-details.css?v=location-models-paw-warning-v6">
+  <link rel="stylesheet" href="/weather-fusion/hourly-feels.css?v=location-models-paw-warning-v6">
+  <link rel="stylesheet" href="/weather-fusion/weather-repair.css?v=location-models-paw-warning-v6">
+  <script type="module" src="/weather-fusion/app.js?v=location-models-paw-warning-v6"></script>
 
 </head>
 <body data-sky="day">
@@ -103,6 +103,7 @@
         </details>
         <details class="evidence-detail"><summary>Latest local NWS forecast discussion <span id="afd-office"></span></summary><p id="afd-stamp" class="muted"></p><pre id="afd-text">The local office discussion is loading.</pre><a id="afd-link" href="https://www.weather.gov/" target="_blank" rel="noopener noreferrer">Read the original NWS discussion ↗</a></details>
         <details class="evidence-detail"><summary>How the feels-like estimates work</summary><div id="thermal-input-evidence"></div><p id="skin-science">Waiting for the latest weather.</p><div id="comfort-extra-science"></div><p id="skin-explanation"></p>
+          <p>Warmest feels like today compares the current estimate with the remaining hourly forecasts before local midnight. The time is the highest remaining forecast hour; when the current estimate is warmer, both Now and the later forecast peak time are shown. This is not a history of earlier station readings. Missing future hours are disclosed; the card does not substitute tomorrow morning's low after 3 PM.</p>
           <p>The number under the current temperature is an <strong>equivalent outdoor apparent temperature</strong>, not a claim that a person’s skin is physically at that temperature. Actual skin temperature depends on physiology, clothing, activity, acclimatization and exposure time.</p>
           <div class="thermal-grid">
             <div><strong>One all-season fallback</strong><p>Weather Nourie follows the attached Real-Feel Skin Temperature research Tier 3 approach: UTCI is the primary all-season fallback, using air temperature, moisture, wind and an estimated mean-radiant environment instead of switching between Heat Index and Wind Chill.</p></div>

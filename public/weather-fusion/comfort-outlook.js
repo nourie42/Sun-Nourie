@@ -5,6 +5,14 @@ export function comfortMode(time,zone='America/New_York'){
  const hour=localHour(time,zone);return hour>=15?'overnight':hour<5?'predawn':'day';
 }
 const dateAt=(t,z)=>new Intl.DateTimeFormat('en-CA',{timeZone:z,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(t));
+/** The requested warmest card remains a same-day high after the daily row has
+ * switched to Tonight. Keep the overnight narrative separate from this card. */
+export function warmestTodayWindow(forecast,now=Date.now()){
+ const zone=forecast?.location?.timeZone||'America/New_York',today=dateAt(now,zone);
+ const tomorrow=new Date(Date.parse(today+'T12:00:00Z')+86400000).toISOString().slice(0,10);
+ const summary=summarizeFeels(forecast,timeAt(today,0,zone),timeAt(tomorrow,0,zone),now);
+ return summary?{...summary,mode:'day',chosen:summary.high,label:'Warmest feels like today'}:null;
+}
 export function comfortWindow(forecast,now=Date.now()){
  const zone=forecast?.location?.timeZone||'America/New_York',mode=comfortMode(now,zone),today=dateAt(now,zone),tomorrow=new Date(Date.parse(today+'T12:00:00Z')+86400000).toISOString().slice(0,10);
  const start=mode==='overnight'?timeAt(today,18,zone):timeAt(today,0,zone),end=mode==='day'?timeAt(today,19,zone):mode==='predawn'?timeAt(today,8,zone):timeAt(tomorrow,8,zone);
