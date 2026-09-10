@@ -1,13 +1,14 @@
-import {FORECAST_CONFIDENCE_VERSION} from './forecast-confidence.js?v=location-models-paw-warning-v6';
-import {dailyUvHTML} from './daily-uv.js?v=location-models-paw-warning-v6';
-import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=location-models-paw-warning-v6';
+import {thermalRiskHTML} from './thermal-risk.js?v=thermal-risk-people-v7';
+import {FORECAST_CONFIDENCE_VERSION} from './forecast-confidence.js?v=thermal-risk-people-v7';
+import {dailyUvHTML} from './daily-uv.js?v=thermal-risk-people-v7';
+import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=thermal-risk-people-v7';
 import {weatherState} from './weather-state.js';
-import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=location-models-paw-warning-v6';
-import {degrees,feelsAt,dailyFeels,forecastValue,peakFeelsHTML} from './hourly-feels.js?v=location-models-paw-warning-v6';
-import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=location-models-paw-warning-v6';
-import {comfortMode,comfortWindow,comfortNarrative,warmestTodayWindow} from './comfort-outlook.js?v=location-models-paw-warning-v6';
-import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js?v=location-models-paw-warning-v6';
-import {resetDewpointMeter} from './dewpoint-meter.js?v=location-models-paw-warning-v6';
+import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=thermal-risk-people-v7';
+import {degrees,feelsAt,dailyFeels,forecastValue,peakFeelsHTML} from './hourly-feels.js?v=thermal-risk-people-v7';
+import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=thermal-risk-people-v7';
+import {comfortMode,comfortWindow,comfortNarrative,warmestTodayWindow} from './comfort-outlook.js?v=thermal-risk-people-v7';
+import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js?v=thermal-risk-people-v7';
+import {resetDewpointMeter} from './dewpoint-meter.js?v=thermal-risk-people-v7';
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const number=(n,d=0)=>finite(n)?n.toFixed(d):'—';
@@ -68,7 +69,7 @@ function renderComfortArt(forecast,now){
 }
 function ensureComfortStyles(){
  if(document.getElementById('weather-nourie-comfort-effects'))return;
- const link=document.createElement('link');link.id='weather-nourie-comfort-effects';link.rel='stylesheet';link.href='/weather-fusion/comfort-effects.css?v=location-models-paw-warning-v6';document.head.append(link);
+ const link=document.createElement('link');link.id='weather-nourie-comfort-effects';link.rel='stylesheet';link.href='/weather-fusion/comfort-effects.css?v=thermal-risk-people-v7';document.head.append(link);
 }
 function pointsFor(key, hours=48) {
  if(!data)return [];
@@ -113,7 +114,7 @@ export function renderDailyRows(forecast,icon) {
   const p=dailyDisplay(d,i,Date.now(),forecast.location.timeZone),bar=temperatureBar(p.primary,lo,hi),feel=dailyFeels(forecast,i,Date.now());
   const confidence=d.confidence||{label:'Unavailable',score:null,key:'unavailable',factors:[],note:'Forecast confidence data is unavailable.'};
   const confidenceTitle=`Forecast confidence: ${confidence.label}. ${confidence.factors?.join('; ')||confidence.note||''} ${confidence.note||''}`.trim();
-  return `<button class="day-row ${p.tonight?'tonight-row':''}" data-day="${i}" aria-label="${esc(p.label)}, ${p.primaryLabel} ${number(p.primary)} degrees${finite(p.secondary)?`, low ${number(p.secondary)} degrees`:''}. Forecast confidence ${esc(confidence.label)}. Open details."><span class="day-name">${esc(p.label)}</span><span class="day-icon">${icon(p.condition,!p.tonight)}<small>${finite(p.pop)?`${number(p.pop)}%`:''}</small></span>${p.tonight?'<span class="night-label">☾<small>Overnight</small></span>':`<span class="day-low">${temp(p.secondary)}<small>Low</small><span class="daily-feels"><span>Feels</span><b>${degrees(feel.low?.low?.value)}</b>${feel.low?.partial?' · partial':''}</span></span>`}<span class="temp-track" aria-hidden="true">${bar===null?'':`<span class="temp-fill" style="left:0;width:${bar}%"></span><i class="high-marker" style="left:clamp(4px,${bar}%,calc(100% - 4px))"></i>`}</span><span class="day-high"><strong>${temp(p.primary)}</strong><small>${p.primaryLabel}</small><span class="daily-feels"><span>Feels</span><b>${degrees(p.tonight?feel.low?.low?.value:feel.high?.high?.value)}</b>${(p.tonight?feel.low:feel.high)?.partial?' · partial':''}</span></span><span class="day-meta"><span class="forecast-confidence" data-confidence="${esc(confidence.key)}" title="${esc(confidenceTitle)}"><span>Forecast confidence</span><b>${esc(confidence.label)}</b>${finite(confidence.score)?`<i class="confidence-meter" aria-hidden="true"><em style="width:${confidence.score}%"></em></i>`:''}</span>${dailyUvHTML(d.uvMax,p.tonight?'Peak UV today':'Peak UV')}</span></button>`;
+  return `<button class="day-row ${p.tonight?'tonight-row':''}" data-day="${i}" aria-label="${esc(p.label)}, ${p.primaryLabel} ${number(p.primary)} degrees${finite(p.secondary)?`, low ${number(p.secondary)} degrees`:''}. Forecast confidence ${esc(confidence.label)}. Open details."><span class="day-name">${esc(p.label)}</span><span class="day-icon">${icon(p.condition,!p.tonight)}<small>${finite(p.pop)?`${number(p.pop)}%`:''}</small></span>${p.tonight?'<span class="night-label">☾<small>Overnight</small></span>':`<span class="day-low">${temp(p.secondary)}<small>Low</small><span class="daily-feels"><span>Feels</span>${thermalRiskHTML(feel.low?.low?.value,true)}<b>${degrees(feel.low?.low?.value)}</b>${feel.low?.partial?' · partial':''}</span></span>`}<span class="temp-track" aria-hidden="true">${bar===null?'':`<span class="temp-fill" style="left:0;width:${bar}%"></span><i class="high-marker" style="left:clamp(4px,${bar}%,calc(100% - 4px))"></i>`}</span><span class="day-high"><strong>${temp(p.primary)}</strong><small>${p.primaryLabel}</small><span class="daily-feels"><span>Feels</span>${thermalRiskHTML(p.tonight?feel.low?.low?.value:feel.high?.high?.value,true)}<b>${degrees(p.tonight?feel.low?.low?.value:feel.high?.high?.value)}</b>${(p.tonight?feel.low:feel.high)?.partial?' · partial':''}</span></span><span class="day-meta"><span class="forecast-confidence" data-confidence="${esc(confidence.key)}" title="${esc(confidenceTitle)}"><span>Forecast confidence</span><b>${esc(confidence.label)}</b>${finite(confidence.score)?`<i class="confidence-meter" aria-hidden="true"><em style="width:${confidence.score}%"></em></i>`:''}</span>${dailyUvHTML(d.uvMax,p.tonight?'Peak UV today':'Peak UV')}</span></button>`;
  });
  $('daily').innerHTML=rows.join('');
  // Reuse the exact first daily row, including its Today/Tonight policy and bar.
@@ -144,7 +145,7 @@ export function renderMetricTiles(forecast,smallIcon) {
   ['pressure','gauge',`${number(stationPressureMb(c),1)}<small>mb</small>`,pressureTrendText(c)],
   ['solar','sun',data.solar.sunset?esc(formatTime(data.solar.sunset)):'—',data.solar.sunrise?`Sunrise ${formatTime(data.solar.sunrise)}.`:'Daylight through the week.'],
  ];
- $('metrics').innerHTML=tiles.map(([key,ic,value,note])=>`<button type="button" class="glass metric metric-${key}" data-metric="${key}"${key==='pressure'?` data-pressure-trend="${esc(c.pressureTrend?.direction||'unknown')}"`:''} aria-haspopup="dialog" aria-label="${defs[key].title}: open forecast graph"><span class="metric-title">${smallIcon(ic)}${defs[key].title}<span class="tile-arrow" aria-hidden="true">↗</span></span><span class="metric-value">${value}</span><span class="metric-note">${esc(note)}</span>${sparkline(pointsFor(key,24))}<span class="tile-hint">${key==='solar'?'See the week ahead':'Explore the forecast'} <span aria-hidden="true">→</span></span></button>`).join('');
+ $('metrics').innerHTML=tiles.map(([key,ic,value,note])=>`<button type="button" class="glass metric metric-${key}" data-metric="${key}"${key==='pressure'?` data-pressure-trend="${esc(c.pressureTrend?.direction||'unknown')}"`:''} aria-haspopup="dialog" aria-label="${defs[key].title}: open forecast graph"><span class="metric-title">${smallIcon(ic)}${defs[key].title}<span class="tile-arrow" aria-hidden="true">↗</span></span>${key==='feels'?thermalRiskHTML(currentSample(forecast).feels):''}<span class="metric-value">${value}</span><span class="metric-note">${esc(note)}</span>${sparkline(pointsFor(key,24))}<span class="tile-hint">${key==='solar'?'See the week ahead':'Explore the forecast'} <span aria-hidden="true">→</span></span></button>`).join('');
  $('metric-science').innerHTML=`<p>Current cards use the latest station observations when available. Tap a card for separate future forecast data. Daily forecasts share one hour-by-hour graph: temperature, feels-like and Gross Meter dew point use the left Fahrenheit scale; UV uses the right index scale. Slide or tap to read all four at the same hour. Gaps mean missing data, not zero. Gross Meter describes humidity through dew point, not a second feels-like temperature. All displayed pressures use millibars (mb). The trend compares the same station about three hours apart. Current pressure is station pressure; the graph is mean sea-level forecast pressure. These are kept separate.</p>${Object.entries(data.metricForecasts?.notes||{}).map(([key,note])=>`<p><strong>${esc(key)}:</strong> ${esc(note)}</p>`).join('')}`;
  if(active&&$('metric-dialog')?.open)drawChart();
 }
@@ -173,9 +174,10 @@ function selectPoint(i) {
  selected=Math.max(0,Math.min(graphPoints.length-1,i));
  const p=graphPoints[selected];if(!p)return;
  $('chart-value').textContent=displayValue(p.value,def);
+ $('chart-risk').innerHTML=active==='feels'?thermalRiskHTML(p.value):'';
  $('chart-time').textContent=formatTime(p.time,{weekday:'short',month:'short',day:'numeric'});
  const companion=$('chart-companion');
- if(companion){companion.hidden=!['temperature','feels'].includes(active);companion.textContent=active==='temperature'?`Feels like ${degrees(feelsAt(data,p.time))} outdoors at this hour`:active==='feels'?`Air temperature ${degrees(forecastValue(data,'temperature',p.time))} at this hour`:'';}
+ if(companion){companion.hidden=!['temperature','feels'].includes(active);companion.innerHTML=active==='temperature'?`${thermalRiskHTML(feelsAt(data,p.time))}Feels like ${degrees(feelsAt(data,p.time))} outdoors at this hour`:active==='feels'?`Air temperature ${degrees(forecastValue(data,'temperature',p.time))} at this hour`:'';}
  if(def.solar&&p.sunrise)$('chart-note').textContent=`Sunrise ${formatTime(p.sunrise)} · sunset ${formatTime(p.time)}.`;
  else if(active==='pressure')$('chart-note').textContent='Sea-level forecast in mb · separate from the station reading and its observed trend.';
  else $('chart-note').textContent=!finite(p.value)?'The forecast source has a gap at this time.':def.note;
@@ -199,9 +201,10 @@ function drawChart() {
  $('chart-scrubber').max=String(Math.max(0,graphPoints.length-1));$('chart-scrubber').disabled=!graphPoints.length;
  const minimum=valid.length?Math.min(...valid.map(p=>p.value)):null,maximum=valid.length?Math.max(...valid.map(p=>p.value)):null;
  $('chart-low').textContent=displayValue(minimum,def);$('chart-high').textContent=displayValue(maximum,def);
+ $('chart-low-risk').innerHTML=active==='feels'?thermalRiskHTML(minimum,true):'';$('chart-high-risk').innerHTML=active==='feels'?thermalRiskHTML(maximum,true):'';
  $('chart-coverage').textContent=`${valid.length} of ${graphPoints.length} ${def.solar?'days':'hours'} available`;
  if(graphPoints.length)selectPoint(Math.min(selected,graphPoints.length-1));
- else {if($('chart-companion')){$('chart-companion').hidden=true;$('chart-companion').textContent='';}$('chart-value').textContent='Not available';$('chart-time').textContent='No forecast data';$('chart-note').textContent=def.note;}
+ else {$('chart-risk').innerHTML='';if($('chart-companion')){$('chart-companion').hidden=true;$('chart-companion').textContent='';}$('chart-value').textContent='Not available';$('chart-time').textContent='No forecast data';$('chart-note').textContent=def.note;}
  $('forecast-graph').addEventListener('pointermove',event=>{
   if(event.pointerType==='touch'&&event.buttons===0)return;
   const rect=event.currentTarget.getBoundingClientRect(),x=(event.clientX-rect.left)/rect.width*graphGeometry.W;

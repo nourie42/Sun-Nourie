@@ -1,4 +1,4 @@
-import {weatherShapes} from './weather-display.js?v=clear-weather-daygraph-v3';
+import {weatherShapes} from './weather-display.js?v=thermal-risk-people-v7';
 import {weatherState} from './weather-state.js';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 export function clothingForFeels(value){
@@ -23,7 +23,7 @@ function person(feels){
   ? `<path d="M-11 21L-18 40" stroke="${outfit==='cold'?'#456079':'#6f96b6'}" stroke-width="7" stroke-linecap="round"/><g class="friendly-wave-pose"><path class="friendly-raised-arm" d="M11 22L21 13L24 2" fill="none" stroke="${outfit==='cold'?'#456079':'#6f96b6'}" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="25" cy="0" r="5" fill="#efbd96"/><g class="friendly-wave"><path d="M24 1L20-6M25-1L24-10M27-1L28-10M29 0L32-7" fill="none" stroke="#efbd96" stroke-width="2.8" stroke-linecap="round"/></g></g>`
   : `<path d="M-10 22L-17 41" stroke="#efbd96" stroke-width="6" stroke-linecap="round"/><g class="friendly-wave-pose"><path class="friendly-raised-arm" d="M10 24L22 14L25-2" fill="none" stroke="#efbd96" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><g class="friendly-wave"><path d="M24 1L20-6M25-1L24-10M27-1L28-10M29 0L32-7" fill="none" stroke="#efbd96" stroke-width="2.8" stroke-linecap="round"/><ellipse cx="26" cy="-1" rx="5" ry="6" fill="#efbd96"/></g></g>`;
  const winter=outfit==='cold'?`<path d="M-10 17Q0 22 10 17" fill="none" stroke="#e8c98f" stroke-width="5"/><path d="M-12-4Q0-15 12-4L11 0H-11Z" fill="#6b8098"/><circle cx="0" cy="-12" r="3" fill="#e8c98f"/>`:'';
- return `<g class="exposure-person-art" data-outfit="${outfit}" transform="translate(118 101)">
+ return `<g class="exposure-person-art" data-outfit="${outfit}" transform="translate(118 47) scale(1.85)">
  <ellipse cx="0" cy="63" rx="24" ry="4" fill="#102c43" opacity=".32"/>
  ${legs}<path d="M-14 61h10M7 61h11" stroke="#e0f0f9" stroke-width="5" stroke-linecap="round"/>
  ${arms}${torso}<ellipse class="person-resting-hand" cx="-17" cy="41" rx="3.8" ry="4.5" fill="#efbd96"/>

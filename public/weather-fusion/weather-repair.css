@@ -41,5 +41,13 @@
 #skin-values .exposure-person .pavement-warning{display:block;background:#ffe1a0;color:#432b06;border-radius:6px;padding:4px 5px;font-size:10px;font-weight:750;line-height:1.2}
 #skin-values .exposure-person .pavement-warning[data-risk=danger]{background:#ffd0c9;color:#6a1711}
 .forecast-grid{display:block}.map-panel{margin-bottom:24px}
+.thermal-risk,.hero .thermal-risk,#skin-values .exposure-person .thermal-risk{display:block;width:fit-content;max-width:100%;box-sizing:border-box;margin:3px auto 5px;padding:4px 7px;border-radius:6px;background:#ffe1a0;color:#432b06;font-family:inherit;font-size:12px;font-weight:750;line-height:1.25;letter-spacing:0;white-space:normal;text-align:center}
+.thermal-risk[data-risk=danger],.hero .thermal-risk[data-risk=danger],#skin-values .exposure-person .thermal-risk[data-risk=danger]{background:#ffd0c9;color:#6a1711}
+.thermal-risk[data-risk=extreme],.hero .thermal-risk[data-risk=extreme],#skin-values .exposure-person .thermal-risk[data-risk=extreme]{background:#7a1836;color:#fff}
+.thermal-risk.thermal-risk-compact,#skin-values .exposure-person .thermal-risk{font-size:10px;padding:3px 4px}
+.comfort-later .peak-reading{grid-column:2;grid-row:1 / span 2;align-self:center;display:flex;flex-direction:column;align-items:center}
+.comfort-later .peak-reading strong{display:block}.daily-feels .thermal-risk{font-size:9px;line-height:1.2;margin:3px auto;max-width:68px}
+#skin-values .comfort-later .peak-reading strong{font-size:30px;margin:0}
+#hourly .hour-feels .thermal-risk{font-size:10px;min-height:0;margin:3px auto;max-width:90px}.day-graph-readout .thermal-risk{font-size:9px;padding:3px;line-height:1.2}
 @media(max-width:600px){.exposure-cards .skin-exposure{padding:20px 12px}#skin-values .sun-shade-comparison{gap:6px}#skin-values .exposure-person{padding:5px 3px 10px;border-radius:14px}#skin-values .exposure-person svg,#skin-values .poodle-walk{height:110px}#skin-values .exposure-person figcaption span{font-size:11px}#skin-values .exposure-person figcaption small{font-size:10px}.day-meta{gap:10px}.day-meta .forecast-confidence{gap:4px;text-align:left}.day-meta .confidence-meter{width:28px}.day-meta .daily-uv{font-size:10px}}
 @media(max-width:360px){#skin-values .exposure-person svg,#skin-values .poodle-walk{height:92px}.day-meta{gap:8px}.day-meta .forecast-confidence>span{max-width:52px}.day-meta .confidence-meter{width:22px}.day-meta .daily-uv{font-size:9px}}

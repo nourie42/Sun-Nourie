@@ -1,4 +1,5 @@
-import {timeAt,forecastValue,degrees} from './hourly-feels.js?v=clear-weather-daygraph-v3';
+import {thermalRiskHTML} from './thermal-risk.js?v=thermal-risk-people-v7';
+import {timeAt,forecastValue,degrees} from './hourly-feels.js?v=thermal-risk-people-v7';
 import {hourlyUvValue,uvCategory} from './daily-uv.js?v=clear-weather-daygraph-v3';
 import {forecastGrossLevel} from './dewpoint-meter.js?v=clear-weather-daygraph-v3';
 const H=3600000,finite=Number.isFinite;
@@ -26,7 +27,7 @@ export function installDayGraph(root,f,index,tonight=false,now=Date.now()){
  const svg=root.querySelector('.day-graph svg'),zone=f.location?.timeZone||'America/New_York';
  const update=()=>{const i=Number(input.value),p=points[i],time=new Intl.DateTimeFormat('en-US',{timeZone:zone,weekday:'short',hour:'numeric',minute:'2-digit'}).format(new Date(p.time));
   root.querySelector('.day-graph-time').textContent=time;
-  root.querySelector('.day-graph-readout').innerHTML=fields.map(([k,label,color])=>`<div style="--line-color:${color}" data-readout="${k}"><span>${label}</span><strong>${k==='uv'?(uvCategory(p.uv).index??'—'):degrees(p[k])}</strong><small>${k==='dewpoint'?esc(forecastGrossLevel(p.dewpoint,p.wind).label):k==='uv'?uvCategory(p.uv).label:finite(p[k])?'°F':'Unavailable'}</small></div>`).join('');
+  root.querySelector('.day-graph-readout').innerHTML=fields.map(([k,label,color])=>`<div style="--line-color:${color}" data-readout="${k}"><span>${label}</span>${k==='feels'?thermalRiskHTML(p.feels,true):''}<strong>${k==='uv'?(uvCategory(p.uv).index??'—'):degrees(p[k])}</strong><small>${k==='dewpoint'?esc(forecastGrossLevel(p.dewpoint,p.wind).label):k==='uv'?uvCategory(p.uv).label:finite(p[k])?'°F':'Unavailable'}</small></div>`).join('');
   root.querySelector('.day-graph-cursor').setAttribute('d',`M${40+i/Math.max(1,points.length-1)*420} 25 V175`);input.setAttribute('aria-valuetext',time);
  };input.addEventListener('input',update);
  const point=e=>{const r=svg.getBoundingClientRect();input.value=String(Math.round(Math.max(0,Math.min(1,((e.clientX-r.left)/r.width*500-40)/420))*(points.length-1)));update();};

@@ -9,7 +9,7 @@ const local=process.env.WEATHER_LOCAL_PIPELINE==='1',service=local?createWeather
 const locations=[{id:'knightdale'},{id:'greenville'},{latitude:35.99,longitude:-78.9},{latitude:39.7392,longitude:-104.9903}];
 const report={base,checkedAt:new Date().toISOString(),success:false,locations:[]};await fs.mkdir(output,{recursive:true});
 if(!local){
- for(const name of ['index.html','app.js','experience.js','weather-display.js','comfort-outlook.js','personal-details.js','pavement.js','weather-repair.css','forecast-confidence.js']){
+ for(const name of ['index.html','app.js','experience.js','weather-display.js','comfort-outlook.js','personal-details.js','pavement.js','weather-repair.css','forecast-confidence.js','thermal-risk.js','exposure-scene.js','day-graph.js','hourly-feels.js']){
   const actual=await fetch(`${base}/weather-fusion/${name}?proof=${Date.now()}`).then(r=>r.text()),expected=await fs.readFile('public/weather-fusion/'+name,'utf8');
   assert.equal(actual.replace(/\r\n/g,'\n'),expected.replace(/\r\n/g,'\n'),'Exact deployed '+name);
  }

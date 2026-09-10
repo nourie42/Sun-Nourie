@@ -1,9 +1,10 @@
+import {thermalRiskHTML} from './thermal-risk.js?v=thermal-risk-people-v7';
 import {hourlyUvValue,hourlyUvHTML} from './daily-uv.js?v=clear-weather-daygraph-v3';
 import {outdoorExposure} from './outdoor-feels.js?v=clear-weather-daygraph-v3';
 import {currentComfortInputs} from './current-inputs.js?v=clear-weather-daygraph-v3';
 import {weatherState} from './weather-state.js';
 import {thermalComfort, finite, solarElevation} from './weather-math.js?v=clear-weather-daygraph-v3';
-import {feelsAt, forecastValue, degrees} from './hourly-feels.js?v=clear-weather-daygraph-v3';
+import {feelsAt, forecastValue, degrees} from './hourly-feels.js?v=thermal-risk-people-v7';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function weatherShapes(condition, isDay = true) {
   const weather = weatherState(condition);
@@ -54,7 +55,7 @@ export function renderHourlyWeather(forecast, now = Date.now()) {
   const root = document.getElementById('hourly'); if (!root) return;
   const scroll = root.scrollLeft, zone = forecast.location.timeZone || 'America/New_York';
   const hour = time => new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric'}).format(new Date(time)).replace(' ','');
-  root.innerHTML = hourlyDisplaySamples(forecast,now).map(sample => `<button type="button" class="hour ${sample.now ? 'now hour-current' : 'forecast-hour'}" data-comfort-time="${esc(sample.id)}" data-time="${esc(sample.time)}" title="${esc(sample.condition)} · ${esc(sample.source)}" aria-label="${sample.now ? 'Now' : esc(hour(sample.time))}, ${esc(sample.condition)}, air ${degrees(sample.temperature)}, feels like ${degrees(sample.feels)} ${esc(sample.exposure.label.toLowerCase())}. Preview this weather."><span>${sample.now ? 'Now' : esc(hour(sample.time))}</span>${weatherIcon(sample.condition,sample.isDay)}<strong>${degrees(sample.temperature)}</strong><span class="hour-feels">Feels like<b>${degrees(sample.feels)}</b><em class="hour-exposure">${esc(sample.exposure.shortLabel)}</em></span><small>${sample.now ? 'Station estimate' : finite(sample.pop) ? `${Math.round(sample.pop)}%` : '—'}</small>${hourlyUvHTML(sample.uvIndex)}</button>`).join('');
+  root.innerHTML = hourlyDisplaySamples(forecast,now).map(sample => `<button type="button" class="hour ${sample.now ? 'now hour-current' : 'forecast-hour'}" data-comfort-time="${esc(sample.id)}" data-time="${esc(sample.time)}" title="${esc(sample.condition)} · ${esc(sample.source)}" aria-label="${sample.now ? 'Now' : esc(hour(sample.time))}, ${esc(sample.condition)}, air ${degrees(sample.temperature)}, feels like ${degrees(sample.feels)} ${esc(sample.exposure.label.toLowerCase())}. Preview this weather."><span>${sample.now ? 'Now' : esc(hour(sample.time))}</span>${weatherIcon(sample.condition,sample.isDay)}<strong>${degrees(sample.temperature)}</strong><span class="hour-feels">Feels like${thermalRiskHTML(sample.feels,true)}<b>${degrees(sample.feels)}</b><em class="hour-exposure">${esc(sample.exposure.shortLabel)}</em></span><small>${sample.now ? 'Station estimate' : finite(sample.pop) ? `${Math.round(sample.pop)}%` : '—'}</small>${hourlyUvHTML(sample.uvIndex)}</button>`).join('');
   root.scrollLeft = scroll;
 }
 export function peakComparison(summary, currentShade) {
@@ -69,12 +70,12 @@ export function peakComparisonHTML(summary, currentShade, zone = 'America/New_Yo
   const comparison = peakComparison(summary,currentShade);
   if(!summary&&finite(currentShade)){
     const clock=new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',minute:'2-digit'}).format(new Date(now));
-    return `<div class="comfort-later" data-comparison="current-only"><span>Warmest feels like today</span><strong>${degrees(currentShade)}</strong><small>Now · ${esc(clock)} · later forecast unavailable</small></div>`;
+    return `<div class="comfort-later" data-comparison="current-only"><span>Warmest feels like today</span><span class="peak-reading">${thermalRiskHTML(currentShade,true)}<strong>${degrees(currentShade)}</strong></span><small>Now · ${esc(clock)} · later forecast unavailable</small></div>`;
   }
   if (!summary) return '<p class="comfort-later">Warmest feels like today unavailable. Missing readings stay blank.</p>';
   const clock=new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',minute:'2-digit'}).format(new Date(comparison.time));
   const time = comparison.now ? `Now · later peak ${degrees(comparison.later)} at ${clock}` : `${clock} · hourly forecast`;
-  return `<div class="comfort-later" data-peak-time="${esc(comparison.time)}" data-comparison="${comparison.kind}"><span>${esc(comparison.label)}${summary.partial ? ' · partial forecast' : ''}</span><strong>${degrees(comparison.value)}</strong><small>${esc(time)}</small></div>`;
+  return `<div class="comfort-later" data-peak-time="${esc(comparison.time)}" data-comparison="${comparison.kind}"><span>${esc(comparison.label)}${summary.partial ? ' · partial forecast' : ''}</span><span class="peak-reading">${thermalRiskHTML(comparison.value,true)}<strong>${degrees(comparison.value)}</strong></span><small>${esc(time)}</small></div>`;
 }
 export function sampleCaption(sample, zone = 'America/New_York') {
   const valid = Number.isFinite(Date.parse(sample.time));
@@ -87,5 +88,5 @@ export function sampleCaption(sample, zone = 'America/New_York') {
 
 export function heroFeelsHTML(sample) {
   const source = sample.source === 'Station observation' ? 'based on the current station reading'+(sample.inputs.comfortSourceNote?' · '+sample.inputs.comfortSourceNote:'') : 'estimated from forecast data';
-  return `Feels like <strong>${degrees(sample.feels)}</strong><small>${esc(sample.exposure.label)} · ${source}</small>`;
+  return `${thermalRiskHTML(sample.feels)}Feels like <strong>${degrees(sample.feels)}</strong><small>${esc(sample.exposure.label)} · ${source}</small>`;
 }
