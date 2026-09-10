@@ -1,10 +1,10 @@
 import {FORECAST_CONFIDENCE_VERSION} from './forecast-confidence.js?v=weather-art-labels-v10';
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
-import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=natural-comfort-art-v12';
+import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=reference-comfort-v16';
 import {weatherState} from './weather-state.js';
 import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=weather-art-labels-v10';
 import {degrees,feelsAt,dailyFeels,forecastValue,peakFeelsHTML} from './hourly-feels.js?v=weather-art-labels-v10';
-import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=natural-comfort-art-v12';
+import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=reference-comfort-v16';
 import {comfortMode,comfortWindow,comfortNarrative,warmestTodayWindow} from './comfort-outlook.js?v=weather-art-labels-v10';
 import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js?v=weather-art-labels-v10';
 import {resetDewpointMeter} from './dewpoint-meter.js?v=weather-art-labels-v10';
@@ -94,16 +94,16 @@ export function renderComfort(forecast) {
  const sample=comfortPreview?forecastSample(forecast,comfortPreview):current;
  if(!sample){comfortPreview=null;return renderComfort(forecast);}
  const c=sample.comfort,zone=forecast.location.timeZone,summary=comfortWindow(forecast,now+1);
- const pavement=pavementEstimate(forecast,current.inputs,now);
+ const pavement=pavementEstimate(forecast,sample.inputs,sample.now?now:Date.parse(sample.time),{checkedAt:now});
  const kicker=$('skin-kicker');if(kicker)kicker.textContent=sample.now?'How it actually feels right now':`How will it feel outside at ${formatTime(sample.time)}?`;
  const preview=sample.now?'':'<div class="comfort-preview-heading"><button type="button" data-comfort-reset>Back to now</button></div>';
- $('skin-values').innerHTML=`${preview}${sunShadeHTML(c,forecast.location,sample.now?now:Date.parse(sample.time),{forecast:!sample.now,condition:sample.condition,compact:true,pavement:pavementHTML(pavement,current.feels)})}${sample.now?peakComparisonHTML(warmestTodayWindow(forecast,now),current.feels,zone,now):''}`;
+ $('skin-values').innerHTML=`${preview}${sunShadeHTML(c,forecast.location,sample.now?now:Date.parse(sample.time),{forecast:!sample.now,condition:sample.condition,compact:true,pavement:pavementHTML(pavement,sample.feels,{condition:c.radiantCondition||sample.condition,forecast:!sample.now})})}${sample.now?peakComparisonHTML(warmestTodayWindow(forecast,now),current.feels,zone,now):''}`;
  $('skin-values').querySelector('[data-comfort-reset]')?.addEventListener('click',()=>selectComfortHour('now'));
  $('skin-explanation').textContent=sample.now?comfortNarrative(sample.inputs,c,summary,zone):`${sample.condition}. This hour uses air ${degrees(sample.temperature)}, dew point ${degrees(sample.inputs.dewpoint)} and ${number(sample.inputs.wind)} mph wind. Outdoors feels like ${degrees(sample.feels)}; shade ${degrees(c.shade)}. The outdoor illustration and solar estimate use this same forecast hour.`;
  const tile=$('skin-exposure');tile.dataset.preview=sample.now?'current':'forecast';tile.dataset.weather=weatherState(sample.condition).kind;
  tile.querySelector('.comfort-weather-art')?.remove();
  document.querySelectorAll('#hourly [data-comfort-time]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.comfortTime===(sample.now?'now':sample.id))));
- if($('comfort-extra-science'))$('comfort-extra-science').innerHTML=`<p>${esc(sampleCaption(sample,zone))}</p><p>Shade is the source air temperature. The outdoor number is the modeled feels-like temperature, accounting for humidity, wind, clouds and sunlight. The sidewalk and asphalt readings are estimated surface temperatures, not air temperature or human feels-like. The dog walker’s outfit follows the current outdoor feels-like estimate, not the pavement.</p>`;
+ if($('comfort-extra-science'))$('comfort-extra-science').innerHTML=`<p>${esc(sampleCaption(sample,zone))}</p><p>Shade and outdoors are modeled feels-like temperatures from the same weather inputs. The outdoor number also includes radiant exposure, accounting for humidity, wind, clouds and sunlight. The sidewalk and asphalt readings are estimated surface temperatures, not air temperature or human feels-like. The dog walker’s outfit follows the selected outdoor feels-like estimate, not the pavement.</p>`;
  if($('pavement-current-science'))$('pavement-current-science').innerHTML=pavementDetailsHTML(pavement);
  $('skin-science').textContent=`${c.method}. ${sampleCaption(sample,zone)}. Air ${degrees(sample.temperature)}; dew point ${degrees(sample.inputs.dewpoint)}; wind ${number(sample.inputs.wind)} mph. ${c.note} Current observations and future forecasts are different sources; the Now card uses exactly the same observation as the hero. No temperature or peak is forced upward.`;
 }

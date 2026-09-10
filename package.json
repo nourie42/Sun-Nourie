@@ -6,6 +6,7 @@
   "description": "Fuel IQ with exhaustive public-source site research and configurable distributor intelligence",
   "main": "server.js",
   "scripts": {
+    "dev": "node scripts/dev-weather.js",
     "start": "node server.js",
     "start:legacy": "node legacy-server.js",
     "build": "npm ci || npm install",

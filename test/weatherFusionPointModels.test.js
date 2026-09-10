@@ -72,7 +72,7 @@ test('surface danger and uncertainty warnings sit above the walker, with no safe
  const result=(value,high)=>({status:'estimated',concrete:{value:value-10,high:high-10},asphalt:{value,high}});
  assert.equal(pavementWarning(result(135,155)).level,'danger');assert.equal(pavementWarning(result(115,135)).level,'caution');
  assert.equal(pavementWarning(result(95,115)),null);assert.equal(pavementWarning({status:'unavailable'}),null);
- const html=pavementHTML(result(135,155),99);assert.ok(html.indexOf('Paw burn risk')<html.indexOf('<svg'));assert.ok(html.indexOf('For Pets')<html.indexOf('<svg'));assert.match(html,/poodle-walk-hot/);assert.doesNotMatch(html,/>Sidewalk</);
+ const html=pavementHTML(result(135,155),99);assert.ok(html.indexOf('Paw burn risk')<html.indexOf('<svg'));assert.ok(html.indexOf('For Pets')<html.indexOf('<svg'));assert.match(html,/data-outfit="hot"/);assert.match(html,/comfort-reference-scenes\.png/);assert.doesNotMatch(html,/>Sidewalk</);
 });
 test('peak time survives rounded ties and a hotter current observation',()=>{
  const summary={mode:'day',chosen:{time:'2026-09-05T19:00:00Z',value:96.4}};

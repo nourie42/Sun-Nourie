@@ -118,6 +118,8 @@ function shadeTree(){
 }
 
 export function exposureScene(sun,daylight=true,condition='Clear',feels=null){
+ const illustrated=referenceScene(sun?1:0,daylight,condition,feels);
+ if(illustrated)return illustrated;
  const weather=weatherState(condition),id=sun?'direct-scene':'shade-scene',p=skyPalette(weather,daylight);
  const defs=sharedDefs(id,p),weatherClass=sun?'person-weather':'shade-weather';
  const icon=!daylight?`<g class="${weatherClass}">${weatherShapes(condition,false)}</g>`:(['clear','partly-cloudy'].includes(weather.kind)?`<g class="${weatherClass}">${sunGlyph(id,sun?235:247,sun?76:62,sun?1:.78)}</g>`:`<g class="${weatherClass}" transform="translate(215 30) scale(1.1)">${weatherShapes(condition,daylight)}</g>`);
@@ -127,4 +129,18 @@ export function exposureScene(sun,daylight=true,condition='Clear',feels=null){
  const clothing={hot:'light hot-weather clothing',warm:'light warm-weather clothing',mild:'everyday mild-weather clothing',cool:'a jacket and long pants',cold:'a coat, scarf and warm hat'}[clothingForFeels(feels)];
  const label=sun?`A smiling person in ${clothing}, outdoors in ${weather.label.toLowerCase()} conditions`:`A smiling person in ${clothing}, sitting beneath a tall shade tree`;
  return `<svg viewBox="0 0 300 360" preserveAspectRatio="xMidYMid slice" role="img" aria-label="${label}" data-outfit="${clothingForFeels(feels)}">${defs}${background}${icon}${art}</svg>`;
+}
+
+// Text and readings remain HTML. The artwork has no baked-in weather symbols;
+// every scene uses the same current/hourly condition and day/night state.
+export function referenceScene(panel,daylight=true,condition='Clear',feels=null){
+ if(!finite(feels)||feels<74)return null; // Preserve the existing seasonal outfits.
+ const weather=weatherState(condition),id=`reference-scene-${panel}`;
+ const sky=skyPalette(weather,daylight);
+ const label=panel===0?'A smiling boy sitting beneath a leafy shade tree':panel===1?'A smiling boy waving outdoors':'A woman walking a light brown toy poodle';
+ const tint=!daylight?'#061536':['rain','storm','cloudy','fog','snow'].includes(weather.kind)?'#42576d':null;
+ const symbol=panel===0?'':daylight&&weather.kind==='clear'
+  ?sunGlyph(id,248,57,.64)
+  :`<g transform="translate(214 20) scale(1.5)">${weatherShapes(condition,daylight)}</g>`;
+ return `<svg class="reference-scene${panel===2?' poodle-scene':''}" viewBox="0 0 300 300" preserveAspectRatio="xMidYMid slice" role="img" aria-label="${label}, in light ${clothingForFeels(feels)}-weather clothing" data-outfit="${clothingForFeels(feels)}" data-daylight="${daylight}" data-weather="${weather.kind}">${sharedDefs(id,sky)}<image class="reference-art" href="/weather-fusion/comfort-reference-scenes.png" x="${-300*panel}" y="0" width="900" height="300" preserveAspectRatio="none"/>${tint?`<rect width="300" height="300" fill="${tint}" opacity="${daylight?'.38':'.66'}"/>`:''}${symbol}</svg>`;
 }
