@@ -1,0 +1,243 @@
+{
+  "commit": "0b956d9ecc9729d705b53fa7a0769700cb7c25b8",
+  "checkedAt": "2026-09-10T15:44:48.868Z",
+  "fixture": false,
+  "success": true,
+  "checks": [
+    {
+      "label": "initial-page",
+      "checkedAt": "2026-09-10T15:45:05.931Z",
+      "assembledAt": "2026-09-10T15:44:48.110Z",
+      "sourceCheckedAt": "2026-09-10T15:44:46.932Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "98f640d112c6d89769a36131",
+      "discussionId": "7a130951-7114-43e1-9257-fae178066e33",
+      "issuedAt": "2026-09-10T10:14:00+00:00",
+      "cachedItems": [
+        {
+          "evidenceId": "s0-p1-q0",
+          "summary": "Temperatures may be a little lower over the weekend, but heat is likely to return by Monday.",
+          "period": "This coming week — Saturday, Sep 12 – Monday, Sep 14",
+          "sourceQuote": "* Limited cooling into the mid 80s to around 90 this weekend, with heat returning Monday.",
+          "section": "WHAT HAS CHANGED",
+          "sectionIssuedAt": "2026-09-10T10:14:00.000Z",
+          "validFrom": "2026-09-12T04:00:00.000Z",
+          "eventEnd": "2026-09-15T04:00:00.000Z",
+          "validUntil": "2026-09-10T22:14:00.000Z"
+        },
+        {
+          "evidenceId": "s0-p2-q0",
+          "summary": "The chance for heavy rain and how widespread the rain will be may be lower because the front is expected to weaken this weekend.",
+          "period": "This coming week — Saturday, Sep 12 – Sunday, Sep 13",
+          "sourceQuote": "* Risk for excessive rain lowering with the next (weakening) front this weekend.",
+          "section": "WHAT HAS CHANGED",
+          "sectionIssuedAt": "2026-09-10T10:14:00.000Z",
+          "validFrom": "2026-09-12T04:00:00.000Z",
+          "eventEnd": "2026-09-14T04:00:00.000Z",
+          "validUntil": "2026-09-10T22:14:00.000Z"
+        }
+      ],
+      "visible": true,
+      "text": "It feels hot and humid today with more heat through Friday.  A weaker front this weekend may bring some showers and storms and only limited cooling before heat returns early next week.\n\nWatch for changes — This coming week — Saturday, Sep 12 – Monday, Sep 14: Temperatures may be a little lower over the weekend, but heat is likely to return by Monday.\n\nSaturday, Sep 12 – Sunday, Sep 13: The chance for heavy rain and how widespread the rain will be may be lower because the front is expected to weaken this weekend."
+    },
+    {
+      "label": "refresh-1",
+      "checkedAt": "2026-09-10T15:46:11.704Z",
+      "assembledAt": "2026-09-10T15:46:05.809Z",
+      "sourceCheckedAt": "2026-09-10T15:44:46.932Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "98f640d112c6d89769a36131",
+      "discussionId": "7a130951-7114-43e1-9257-fae178066e33",
+      "issuedAt": "2026-09-10T10:14:00+00:00",
+      "cachedItems": [
+        {
+          "evidenceId": "s0-p1-q0",
+          "summary": "Temperatures may be a little lower over the weekend, but heat is likely to return by Monday.",
+          "period": "This coming week — Saturday, Sep 12 – Monday, Sep 14",
+          "sourceQuote": "* Limited cooling into the mid 80s to around 90 this weekend, with heat returning Monday.",
+          "section": "WHAT HAS CHANGED",
+          "sectionIssuedAt": "2026-09-10T10:14:00.000Z",
+          "validFrom": "2026-09-12T04:00:00.000Z",
+          "eventEnd": "2026-09-15T04:00:00.000Z",
+          "validUntil": "2026-09-10T22:14:00.000Z"
+        },
+        {
+          "evidenceId": "s0-p2-q0",
+          "summary": "The chance for heavy rain and how widespread the rain will be may be lower because the front is expected to weaken this weekend.",
+          "period": "This coming week — Saturday, Sep 12 – Sunday, Sep 13",
+          "sourceQuote": "* Risk for excessive rain lowering with the next (weakening) front this weekend.",
+          "section": "WHAT HAS CHANGED",
+          "sectionIssuedAt": "2026-09-10T10:14:00.000Z",
+          "validFrom": "2026-09-12T04:00:00.000Z",
+          "eventEnd": "2026-09-14T04:00:00.000Z",
+          "validUntil": "2026-09-10T22:14:00.000Z"
+        }
+      ],
+      "visible": true,
+      "text": "It feels hot and humid today with more heat through Friday.  A weaker front this weekend may bring some showers and storms and only limited cooling before heat returns early next week.\n\nWatch for changes — This coming week — Saturday, Sep 12 – Monday, Sep 14: Temperatures may be a little lower over the weekend, but heat is likely to return by Monday.\n\nSaturday, Sep 12 – Sunday, Sep 13: The chance for heavy rain and how widespread the rain will be may be lower because the front is expected to weaken this weekend."
+    },
+    {
+      "label": "refresh-2",
+      "checkedAt": "2026-09-10T15:47:18.963Z",
+      "assembledAt": "2026-09-10T15:47:17.047Z",
+      "sourceCheckedAt": "2026-09-10T15:47:17.047Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "98f640d112c6d89769a36131",
+      "discussionId": "7a130951-7114-43e1-9257-fae178066e33",
+      "issuedAt": "2026-09-10T10:14:00+00:00",
+      "cachedItems": [
+        {
+          "evidenceId": "s0-p1-q0",
+          "summary": "Temperatures may be a little lower over the weekend, but heat is likely to return by Monday.",
+          "period": "This coming week — Saturday, Sep 12 – Monday, Sep 14",
+          "sourceQuote": "* Limited cooling into the mid 80s to around 90 this weekend, with heat returning Monday.",
+          "section": "WHAT HAS CHANGED",
+          "sectionIssuedAt": "2026-09-10T10:14:00.000Z",
+          "validFrom": "2026-09-12T04:00:00.000Z",
+          "eventEnd": "2026-09-15T04:00:00.000Z",
+          "validUntil": "2026-09-10T22:14:00.000Z"
+        },
+        {
+          "evidenceId": "s0-p2-q0",
+          "summary": "The chance for heavy rain and how widespread the rain will be may be lower because the front is expected to weaken this weekend.",
+          "period": "This coming week — Saturday, Sep 12 – Sunday, Sep 13",
+          "sourceQuote": "* Risk for excessive rain lowering with the next (weakening) front this weekend.",
+          "section": "WHAT HAS CHANGED",
+          "sectionIssuedAt": "2026-09-10T10:14:00.000Z",
+          "validFrom": "2026-09-12T04:00:00.000Z",
+          "eventEnd": "2026-09-14T04:00:00.000Z",
+          "validUntil": "2026-09-10T22:14:00.000Z"
+        }
+      ],
+      "visible": true,
+      "text": "It feels hot and humid today with more heat through Friday.  A weaker front this weekend may bring some showers and storms and only limited cooling before heat returns early next week.\n\nWatch for changes — This coming week — Saturday, Sep 12 – Monday, Sep 14: Temperatures may be a little lower over the weekend, but heat is likely to return by Monday.\n\nSaturday, Sep 12 – Sunday, Sep 13: The chance for heavy rain and how widespread the rain will be may be lower because the front is expected to weaken this weekend."
+    },
+    {
+      "label": "full-page-reload",
+      "checkedAt": "2026-09-10T15:47:19.610Z",
+      "assembledAt": "2026-09-10T15:47:17.047Z",
+      "sourceCheckedAt": "2026-09-10T15:47:17.047Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "98f640d112c6d89769a36131",
+      "discussionId": "7a130951-7114-43e1-9257-fae178066e33",
+      "issuedAt": "2026-09-10T10:14:00+00:00",
+      "cachedItems": [
+        {
+          "evidenceId": "s0-p1-q0",
+          "summary": "Temperatures may be a little lower over the weekend, but heat is likely to return by Monday.",
+          "period": "This coming week — Saturday, Sep 12 – Monday, Sep 14",
+          "sourceQuote": "* Limited cooling into the mid 80s to around 90 this weekend, with heat returning Monday.",
+          "section": "WHAT HAS CHANGED",
+          "sectionIssuedAt": "2026-09-10T10:14:00.000Z",
+          "validFrom": "2026-09-12T04:00:00.000Z",
+          "eventEnd": "2026-09-15T04:00:00.000Z",
+          "validUntil": "2026-09-10T22:14:00.000Z"
+        },
+        {
+          "evidenceId": "s0-p2-q0",
+          "summary": "The chance for heavy rain and how widespread the rain will be may be lower because the front is expected to weaken this weekend.",
+          "period": "This coming week — Saturday, Sep 12 – Sunday, Sep 13",
+          "sourceQuote": "* Risk for excessive rain lowering with the next (weakening) front this weekend.",
+          "section": "WHAT HAS CHANGED",
+          "sectionIssuedAt": "2026-09-10T10:14:00.000Z",
+          "validFrom": "2026-09-12T04:00:00.000Z",
+          "eventEnd": "2026-09-14T04:00:00.000Z",
+          "validUntil": "2026-09-10T22:14:00.000Z"
+        }
+      ],
+      "visible": true,
+      "text": "It feels hot and humid today with more heat through Friday.  A weaker front this weekend may bring some showers and storms and only limited cooling before heat returns early next week.\n\nWatch for changes — This coming week — Saturday, Sep 12 – Monday, Sep 14: Temperatures may be a little lower over the weekend, but heat is likely to return by Monday.\n\nSaturday, Sep 12 – Sunday, Sep 13: The chance for heavy rain and how widespread the rain will be may be lower because the front is expected to weaken this weekend."
+    }
+  ],
+  "deployed": {
+    "sourceVersion": "nws-afd-monotonic-v1",
+    "danTakeVersion": "weather-nourie-dans-take-overview-v5",
+    "assets": {
+      "index.html": "06de7cff8c09ce46a4639dd7a972f9c3e4e772c1b0706aae8690d0769012c027",
+      "app.js": "39821d65f8f84d6288cda85546a8c741093706470138ef7b44a47ce285d6b0fd",
+      "dans-summary.js": "6143757166de77436e7950945afbaf45c861d0f4d14e567788f90c13397b243e",
+      "current-inputs.js": "08e24759b1843366802272aa19f7cf610f9590c9cf73f61e3d4e6353bb1e9818",
+      "pavement.js": "91659b9ae724c81e6f8720dfb3ff16bb64c8f1de3a0d248f9d8464e68fbb75da",
+      "daily-uv.js": "c7941e4ffc89a52ebb5ebff7d3d5298932d1fbd0992f0486bfc2e36ee610a036",
+      "dans-take.js": "29805b36c3b4a103b08bcdf5b7d308ae58c32c245c63a9db8180fd33f5c67feb"
+    }
+  },
+  "independentOfficialLatest": {
+    "id": "7a130951-7114-43e1-9257-fae178066e33",
+    "issuedAt": "2026-09-10T10:14:00+00:00"
+  },
+  "initial": {
+    "discussion": {
+      "id": "7a130951-7114-43e1-9257-fae178066e33",
+      "office": "RAH",
+      "issuanceTime": "2026-09-10T10:14:00+00:00",
+      "text": "\n000\nFXUS62 KRAH 101014\nAFDRAH\n\nArea Forecast Discussion\nNational Weather Service Raleigh NC\n620 AM EDT Thu Sep 10 2026\n\n.WHAT HAS CHANGED...\n\n* Limited cooling into the mid 80s to around 90 this weekend, with \n  heat returning Monday. \n\n* Risk for excessive rain lowering with the next (weakening) front \n  this weekend. \n\n&&\n\n.KEY MESSAGES...\nAs of 155 AM Thursday...\n\n1) Continued hot weather through Friday, with limited cooling this \nweekend. \n\n2) Marginal risk for excessive rain (flash flooding) on Saturday.\n\n&&\n\n.DISCUSSION...\nAs of 155 AM Thursday...\n\nKEY MESSAGE 1...  Continued hot weather through Friday, with limited \ncooling into the mid 80s to around 90 this weekend. \n\nCurrent observations and model data continue to suggest a weaker \nupper disturbance, stronger return of upper ridging more quickly, \nand a weaker cold front becoming stationary or washing out Saturday. \n\nStrong mid/upper level ridging will be overhead today and begin to \nshift off the south Atlantic coast Friday. This will allow a \nweakening cold front to push toward the region Friday afternoon and \nlikely stall somewhere over central NC Friday night, then lift back \nas a warm front over the weekend. The upshot of all this will be the \nhottest day will occur today with very limited chance of PM \nconvection. Highs in the lower to mid 90s. Heat indices will still \nbe 100 or lower due to the dew points in the 60s. \n\nDew points are forecast to rise into the lower to mid 70s Friday as \nthe cold front approaches. There will be an increasing chance of \nshowers/storms in the afternoon and evening. Highs will likely be a \nfew degrees lower than today, offset by higher dew points. Heat \nindices of 98 to 105 NW to SE expected, with actual highs 90-95.\n\n2) Marginal risk for excessive rain (flash flooding) on Saturday.\n\nHowever, models continue to suggest a weaker upper disturbance, \nstronger return of upper ridging more quickly, and a weaker cold \nfront becoming stationary or washing out Saturday. Excessive \nrainfall potential should be limited to isolated flooding and mainly \nin urban and poor drainage areas. Less QPF means little help with \nthe current drought. \n\nSaturday will bring scattered thunderstorms with a low end excessive \nrainfall threat with the aforementioned helpful convective PM \ntriggers. Limited shear should keep the storms from being organized \nand/or severe.\n \nThe return of strong upper ridging as early as Sunday means lower \nchance of PM thunderstorms Sunday into next week with increasing \nheat again, with highs Monday back in the lower to mid 90s. \n\n&&\n\n.AVIATION /12Z THURSDAY THROUGH MONDAY/...\nAs of 620 AM Thursday...\n\nGenerally VFR conditions are expected through 12z/Friday. \n\nOutlook: A cold front will slowly work its way south from VA and \npotentially into NC Fri into Fri night. This boundary will likely be \na focus for convection, but also bring a risk for post-frontal sub-\nVFR cigs Sat morning. An approaching disturbance from the TN Valley \nand Deep South will bring a chance for more scattered to widespread \nshowers/storms on Sat that may continue into early overnight period. \nA return to mainly VFR conditions are expected Sunday into early \nnext week. \n\n&&\n\n.RAH WATCHES/WARNINGS/ADVISORIES...\nNone.\n\n&&\n\n$$\n\nDISCUSSION...Badgett\nAVIATION...Badgett/AS\n",
+      "url": "https://api.weather.gov/products/7a130951-7114-43e1-9257-fae178066e33"
+    },
+    "feed": {
+      "id": "afd",
+      "label": "NWS RAH discussion",
+      "url": "https://api.weather.gov/products/types/AFD/locations/RAH/latest",
+      "status": "ready",
+      "sourceVersion": "nws-afd-monotonic-v1",
+      "retrievalStatus": "verified-latest",
+      "fetchedAt": "2026-09-10T15:44:46.932Z",
+      "checkedAt": "2026-09-10T15:44:46.932Z",
+      "issuedAt": "2026-09-10T10:14:00+00:00",
+      "productUrl": "https://api.weather.gov/products/7a130951-7114-43e1-9257-fae178066e33",
+      "message": ""
+    },
+    "aiMode": "ai",
+    "generatedAt": "2026-09-10T15:45:04.885Z",
+    "items": [
+      {
+        "evidenceId": "s0-p1-q0",
+        "summary": "Temperatures may be a little lower over the weekend, but heat is likely to return by Monday.",
+        "period": "This coming week — Saturday, Sep 12 – Monday, Sep 14",
+        "sourceQuote": "* Limited cooling into the mid 80s to around 90 this weekend, with heat returning Monday.",
+        "section": "WHAT HAS CHANGED",
+        "sectionIssuedAt": "2026-09-10T10:14:00.000Z",
+        "validFrom": "2026-09-12T04:00:00.000Z",
+        "eventEnd": "2026-09-15T04:00:00.000Z",
+        "validUntil": "2026-09-10T22:14:00.000Z"
+      },
+      {
+        "evidenceId": "s0-p2-q0",
+        "summary": "The chance for heavy rain and how widespread the rain will be may be lower because the front is expected to weaken this weekend.",
+        "period": "This coming week — Saturday, Sep 12 – Sunday, Sep 13",
+        "sourceQuote": "* Risk for excessive rain lowering with the next (weakening) front this weekend.",
+        "section": "WHAT HAS CHANGED",
+        "sectionIssuedAt": "2026-09-10T10:14:00.000Z",
+        "validFrom": "2026-09-12T04:00:00.000Z",
+        "eventEnd": "2026-09-14T04:00:00.000Z",
+        "validUntil": "2026-09-10T22:14:00.000Z"
+      }
+    ]
+  },
+  "observedRefreshVisibility": [
+    {
+      "hidden": false,
+      "text": "It feels hot and humid today with more heat through Friday.  A weaker front this weekend may bring some showers and storms and only limited cooling before heat returns early next week.\n\nWatch for changes — This coming week — Saturday, Sep 12 – Monday, Sep 14: Temperatures may be a little lower over the weekend, but heat is likely to return by Monday.\n\nSaturday, Sep 12 – Sunday, Sep 13: The chance for heavy rain and how widespread the rain will be may be lower because the front is expected to weaken this weekend."
+    },
+    {
+      "hidden": false,
+      "text": "It feels hot and humid today with more heat through Friday.  A weaker front this weekend may bring some showers and storms and only limited cooling before heat returns early next week.\n\nWatch for changes — This coming week — Saturday, Sep 12 – Monday, Sep 14: Temperatures may be a little lower over the weekend, but heat is likely to return by Monday.\n\nSaturday, Sep 12 – Sunday, Sep 13: The chance for heavy rain and how widespread the rain will be may be lower because the front is expected to weaken this weekend."
+    },
+    {
+      "hidden": false,
+      "text": "It feels hot and humid today with more heat through Friday.  A weaker front this weekend may bring some showers and storms and only limited cooling before heat returns early next week.\n\nWatch for changes — This coming week — Saturday, Sep 12 – Monday, Sep 14: Temperatures may be a little lower over the weekend, but heat is likely to return by Monday.\n\nSaturday, Sep 12 – Sunday, Sep 13: The chance for heavy rain and how widespread the rain will be may be lower because the front is expected to weaken this weekend."
+    },
+    {
+      "hidden": false,
+      "text": "It feels hot and humid today with more heat through Friday.  A weaker front this weekend may bring some showers and storms and only limited cooling before heat returns early next week.\n\nWatch for changes — This coming week — Saturday, Sep 12 – Monday, Sep 14: Temperatures may be a little lower over the weekend, but heat is likely to return by Monday.\n\nSaturday, Sep 12 – Sunday, Sep 13: The chance for heavy rain and how widespread the rain will be may be lower because the front is expected to weaken this weekend."
+    },
+    {
+      "hidden": false,
+      "text": "It feels hot and humid today with more heat through Friday.  A weaker front this weekend may bring some showers and storms and only limited cooling before heat returns early next week.\n\nWatch for changes — This coming week — Saturday, Sep 12 – Monday, Sep 14: Temperatures may be a little lower over the weekend, but heat is likely to return by Monday.\n\nSaturday, Sep 12 – Sunday, Sep 13: The chance for heavy rain and how widespread the rain will be may be lower because the front is expected to weaken this weekend."
+    }
+  ],
+  "distinctWeatherSignatures": 1,
+  "distinctForecastAssemblies": 3,
+  "distinctDiscussionChecks": 2,
+  "browserErrors": []
+}
