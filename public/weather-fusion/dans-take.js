@@ -3,7 +3,7 @@
  * Ambiguous timing is omitted, not guessed. Dates are anchored to source issuance,
  * including a retained section's own "As of" time, never to the time of retrieval.
  */
-export const DAN_TAKE_VERSION = 'weather-nourie-dans-take-source-v4';
+export const DAN_TAKE_VERSION = 'weather-nourie-dans-take-overview-v5';
 const H = 3600000, DAY = 24 * H, MAX_SOURCE_AGE = 12 * H;
 const norm = v => String(v || '').replace(/\s+/g, ' ').trim();
 const finite = Number.isFinite;
@@ -59,6 +59,10 @@ export function discussionPeriod(text, anchor, zone) {
     }
     found.push({...partRange(date,part,zone),index:m.index});
   }
+  for(const m of s.matchAll(/\b(?:this\s+)?weekend\b/gi)){
+    const dow=weekday(base.date),saturday=addDays(base.date,dow===0?-1:(6-dow+7)%7);
+    found.push({start:wall(saturday,0,zone),end:wall(addDays(saturday,2),0,zone),part:'',index:m.index});
+  }
   if(!found.length)return null;
   const first=found.reduce((a,b)=>a.start<=b.start?a:b);
   const last=found.reduce((a,b)=>a.end>=b.end?a:b);
@@ -70,7 +74,7 @@ export function discussionPeriod(text, anchor, zone) {
   const start=/^\s*(?:until|through|by)\b/i.test(s)?Math.min(anchor,first.start):first.start;
   return end>start?{start,end,part:found.length===1?first.part:''}:null;
 }
-function sectionAnchor(body, issued, zone) {
+export function sectionAnchor(body, issued, zone) {
   const m=new RegExp(`\\b(?:as of|issued at)\\s+(\\d{1,4})\\s*(AM|PM)\\s*(?:(?:[ECMP][DS]T|AK[DS]T|HST|UTC)\\s+)?(${dayPattern})?`,'i').exec(body.slice(0,350));
   if(!m)return issued;
   const digits=+m[1],hour=(Math.floor(digits>=100?digits/100:digits)%12)+(m[2].toLowerCase()==='pm'?12:0),minute=digits>=100?digits%100:0;
@@ -101,7 +105,7 @@ export function collectDanTakeEvidence(data, now=Date.now()) {
   if(!source)return {version:DAN_TAKE_VERSION,source:null,candidates,status:'discussion-not-current'};
   const issued=Date.parse(source.issuedAt),zone=data.location.timeZone,raw=data.discussion.text;
   for(const [si,section] of sections(raw).entries()){
-    if(!/^(?:UPDATE|SYNOPSIS|NEAR TERM|SHORT TERM|LONG TERM|DISCUSSION|KEY MESSAGES|WEATHER SUMMARY)$/.test(section.name))continue;
+    if(!/^(?:UPDATE|SYNOPSIS|NEAR TERM|SHORT TERM|LONG TERM|DISCUSSION|KEY MESSAGES|WEATHER SUMMARY|WHAT HAS CHANGED)$/.test(section.name))continue;
     const anchor=sectionAnchor(section.body,issued,zone);if(!finite(anchor)||issued-anchor>DAY)continue;
     const headingRange=discussionPeriod(section.heading,anchor,zone);
     const maxLead=section.name==='NEAR TERM'?36*H:section.name==='SHORT TERM'?96*H:8*DAY;
@@ -110,7 +114,7 @@ export function collectDanTakeEvidence(data, now=Date.now()) {
     for(const [pi,paragraph] of body.split(/\n\s*\n/).entries()){
       const sentences=norm(paragraph).split(/(?<=[.!?])\s+/).filter(Boolean);
       for(const [qi,quote] of sentences.entries()){
-        if(quote.length<24||quote.length>850||!explicitForecastUncertainty(quote))continue;
+        if(quote.length<24||quote.length>850||past(quote)||(section.name!=='WHAT HAS CHANGED'&&!explicitForecastUncertainty(quote)))continue;
         const previous=sentences[qi-1]||'',context=norm([previous,quote,sentences[qi+1]||''].join(' '));
         // Own timing takes priority; otherwise inherit the previous sentence or
         // the explicit section period. Never inherit a yesterday/last-night recap.

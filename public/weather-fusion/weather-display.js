@@ -1,7 +1,8 @@
-import {outdoorExposure} from './outdoor-feels.js?v=integrity-v1';
+import {outdoorExposure} from './outdoor-feels.js?v=comfort-paws-uv-v1';
+import {currentComfortInputs} from './current-inputs.js?v=comfort-paws-uv-v1';
 import {weatherState} from './weather-state.js';
-import {thermalComfort, finite, solarElevation} from './weather-math.js?v=integrity-v1';
-import {feelsAt, forecastValue, degrees} from './hourly-feels.js?v=integrity-v1';
+import {thermalComfort, finite, solarElevation} from './weather-math.js?v=comfort-paws-uv-v1';
+import {feelsAt, forecastValue, degrees} from './hourly-feels.js?v=comfort-paws-uv-v1';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function weatherShapes(condition, isDay = true) {
   const weather = weatherState(condition);
@@ -21,8 +22,10 @@ export function weatherIcon(condition = '', isDay = true, size = 32) {
   return `<svg width="${size}" height="${size}" viewBox="0 0 50 50" aria-hidden="true" data-weather-kind="${weatherState(condition).kind}">${weatherShapes(condition, isDay)}</svg>`;
 }
 export function currentSample(forecast, now = Date.now()) {
-  const current = forecast?.current || {}, assembled = Date.parse(forecast?.assembledAt);
+  const current = currentComfortInputs(forecast,now), assembled = Date.parse(forecast?.assembledAt);
   const comfort = thermalComfort(current, forecast.location, finite(assembled) ? assembled : now);
+  comfort.inputEvidence.estimatedFields=current.comfortEstimatedFields;
+  comfort.inputEvidence.fallbackSources=current.comfortInputSources;
   return {id:'now', now:true, time:current.time, temperature:finite(current.temperature) ? current.temperature : null,
     feels:outdoorExposure(comfort).value, exposure:outdoorExposure(comfort), comfort, condition:current.condition || 'Sky conditions unavailable',
     isDay:comfort.daylight ?? (solarElevation(now,forecast.location.latitude,forecast.location.longitude) > 0),
@@ -73,11 +76,11 @@ export function sampleCaption(sample, zone = 'America/New_York') {
   const time = valid ? new Intl.DateTimeFormat('en-US',{timeZone:zone,weekday:'short',hour:'numeric',minute:'2-digit'}).format(new Date(sample.time)) : 'time unavailable';
   const station=sample.inputs?.station,km=sample.inputs?.stationDistanceKm;
   const site=station?` · ${station}${finite(km)?` · ${Math.round(km/1.609344)} mi away`:''}`:'';
-  return sample.now ? `Current conditions · ${sample.source === 'Station observation' ? 'station estimate' : 'forecast estimate'}${site} at ${time}`
+  return sample.now ? `Current conditions · ${sample.source === 'Station observation' ? 'station estimate' : 'forecast estimate'}${site} at ${time}${sample.inputs?.comfortSourceNote?' · '+sample.inputs.comfortSourceNote:''}`
     : `${time} forecast · air ${degrees(sample.temperature)} · feels like ${degrees(sample.feels)} ${sample.exposure.label.toLowerCase()}`;
 }
 
 export function heroFeelsHTML(sample) {
-  const source = sample.source === 'Station observation' ? 'based on the current station reading' : 'estimated from forecast data';
+  const source = sample.source === 'Station observation' ? 'based on the current station reading'+(sample.inputs.comfortSourceNote?' · '+sample.inputs.comfortSourceNote:'') : 'estimated from forecast data';
   return `Feels like <strong>${degrees(sample.feels)}</strong><small>${esc(sample.exposure.label)} · ${source}</small>`;
 }

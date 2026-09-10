@@ -1,4 +1,5 @@
 import {createDiscussionSource,DISCUSSION_SOURCE_VERSION} from './weatherFusionDiscussionSource.js';
+import {exposureWeatherUrl,normalizeExposureWeather,addExposureWeather} from './weatherFusionExposure.js';
 import {FORECAST_CONFIDENCE_VERSION,forecastConfidence} from '../public/weather-fusion/forecast-confidence.js';
 import {DAN_TAKE_VERSION,collectDanTakeEvidence,approveDanTake,visibleDanTakeItems,danTakeText,rebindDanTake} from '../public/weather-fusion/dans-take.js';
 import {stationWeather,resolveCurrentWeather} from '../public/weather-fusion/weather-state.js';
@@ -183,7 +184,7 @@ export class Cache {
   }
 }
 
-export function buildForecast({ location, point, forecast, hourly, grid, discussion, observation, alerts, specialDiscussions, models, feeds, now }) {
+export function buildForecast({ location, point, forecast, hourly, grid, discussion, observation, alerts, specialDiscussions, exposureWeather, models, feeds, now }) {
   const zone = point?.timeZone || models.ecmwf?.timezone || 'America/New_York';
   const today = dateKey(now, zone);
   const rows = Object.fromEntries(Object.entries(models).map(([key, value]) => [key, normalizeModel(value, now, key === 'hrrr' ? 48 : 240)]));
@@ -260,6 +261,7 @@ export function buildForecast({ location, point, forecast, hourly, grid, discuss
   enhanceForecast(output, { models, grid, periods: forecast?.periods || [], now, gridQpf, localTime, nextDate, dateKey });
   Object.assign(output.current,resolveCurrentWeather(output.current,output.hours,now,gridSample(grid,'skyCover',now,'percent')));
   addExperience(output, {models, grid, periods:forecast?.periods || [], now, solarTimes, nextDate});
+  addExposureWeather(output,exposureWeather);
   output.danTakeVersion=DAN_TAKE_VERSION;
   output.forecastConfidenceVersion=FORECAST_CONFIDENCE_VERSION;
   output.weatherDisplayVersion='weather-nourie-sky-consistency-v1';
@@ -285,7 +287,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
   const direct = createDirectModels({ fetchImpl, now });
   async function request(url, { text = false, body = null, timeout = 12000, revalidate = false } = {}) {
     const u = new URL(url);
-    const allowed = ['api.weather.gov', 'geocoding-api.open-meteo.com', 'opengeo.ncep.noaa.gov', 'api.openai.com', 'mapservices.weather.noaa.gov', 'www.spc.noaa.gov'];
+    const allowed = ['api.weather.gov', 'api.open-meteo.com', 'geocoding-api.open-meteo.com', 'opengeo.ncep.noaa.gov', 'api.openai.com', 'mapservices.weather.noaa.gov', 'www.spc.noaa.gov'];
     if (u.protocol !== 'https:' || !allowed.includes(u.hostname) || u.port || u.username || u.password) throw errorWithStatus('Unexpected source URL.', 502);
     const minute = Math.floor(now() / MINUTE);
     if (apiMinute.minute !== minute) apiMinute = { minute, count: 0 };
@@ -323,6 +325,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
       const unavailable = (id, label) => Promise.resolve({ value: null, meta: { id, label, status: 'unavailable', message: 'NWS location lookup unavailable.', issuedAt: null } });
       const get = (id, label, url, ttl, transform) => url ? feed(id, label, url, ttl, transform) : unavailable(id, label);
       const jobs = {
+        exposureWeather: feed('exposure','UV and surface-weather forecast',exposureWeatherUrl(location,point?.timeZone),30*MINUTE,normalizeExposureWeather),
         forecast: get('nws', 'NWS forecast', point?.forecast, 10 * MINUTE, (d) => d.properties?.periods?.length ? d.properties : null),
         hourly: get('hourly', 'NWS hourly', point?.forecastHourly, 10 * MINUTE, (d) => d.properties?.periods?.length ? d.properties : null),
         grid: get('grid', 'NWS precipitation grid', point?.forecastGridData, 10 * MINUTE, (d) => d.properties),
@@ -337,7 +340,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
               if (!/^[A-Z0-9]{3,8}$/.test(id || '')) return null;
               const { data } = await cached(`https://api.weather.gov/stations/${id}/observations/latest`, 5 * MINUTE);
               const o = data.properties, time = Date.parse(o?.timestamp);
-              if (!finite(toF(o?.temperature)) || now() - time > 2 * HOUR || time > now() + 5 * MINUTE) return null;
+              if (!finite(time) || !finite(toF(o?.temperature)) || now() - time > 2 * HOUR || time > now() + 5 * MINUTE) return null;
               return { temperature: toF(o.temperature), ...stationWeather(o), time: o.timestamp,
                 stationDistanceKm: rounded(Math.sqrt(distance(s))*111.2,1), station: id, stationName: clean(s.properties?.name, 140), humidity: numeric(o.relativeHumidity?.value), dewpoint: toF(o.dewpoint),
                 wind: toMph(o.windSpeed), gust: rounded(toMph(o.windGust)), windDirection: numeric(o.windDirection?.value),
@@ -481,7 +484,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
   });
-  for (const name of ['app.js', 'style.css', 'nav.js', 'experience.js', 'weather-math.js','hero-mode.js','dewpoint-meter.js','dewpoint-meter.css','comfort-effects.css','frame-player.js','comfort-outlook.js','forecast-layout.css','personal-details.js','personal-details.css','bulletin-facts.js','bulletins.js','current-temperature.js','hourly-feels.js','hourly-feels.css','exposure-scene.js','weather-state.js','weather-display.js','weather-repair.css','utci.js']) app.get(`/weather-fusion/${name}`, (_req, res) => {
+  for (const name of ['current-inputs.js','daily-uv.js','dans-summary.js','pavement.js','poodle-walk.png','outdoor-feels.js','dans-take.js','forecast-confidence.js','render-safety.js','app.js', 'style.css', 'nav.js', 'experience.js', 'weather-math.js','hero-mode.js','dewpoint-meter.js','dewpoint-meter.css','comfort-effects.css','frame-player.js','comfort-outlook.js','forecast-layout.css','personal-details.js','personal-details.css','bulletin-facts.js','bulletins.js','current-temperature.js','hourly-feels.js','hourly-feels.css','exposure-scene.js','weather-state.js','weather-display.js','weather-repair.css','utci.js']) app.get(`/weather-fusion/${name}`, (_req, res) => {
     res.setHeader('Cache-Control', 'no-cache');
     res.sendFile(path.join(PUBLIC_DIR, name));
   });

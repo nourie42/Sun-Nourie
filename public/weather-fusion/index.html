@@ -7,13 +7,13 @@
   <meta name="description" content="Weather Nourie. Local NWS forecasts, professional AI briefings, model comparisons, thermal-exposure science and interactive weather maps.">
   <title>Weather Nourie</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-  <link rel="stylesheet" href="/weather-fusion/style.css?v=4-friendly">
-  <link rel="stylesheet" href="/weather-fusion/forecast-layout.css?v=4-confidence">
+  <link rel="stylesheet" href="/weather-fusion/style.css?v=comfort-paws-uv-v1">
+  <link rel="stylesheet" href="/weather-fusion/forecast-layout.css?v=comfort-paws-uv-v1">
   <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <link rel="stylesheet" href="/weather-fusion/personal-details.css?v=2-source-details">
-  <link rel="stylesheet" href="/weather-fusion/hourly-feels.css?v=integrity-v1">
-  <link rel="stylesheet" href="/weather-fusion/weather-repair.css?v=1-repair">
-  <script type="module" src="/weather-fusion/app.js?v=dans-take-week-once-v2"></script>
+  <link rel="stylesheet" href="/weather-fusion/personal-details.css?v=comfort-paws-uv-v1">
+  <link rel="stylesheet" href="/weather-fusion/hourly-feels.css?v=comfort-paws-uv-v1">
+  <link rel="stylesheet" href="/weather-fusion/weather-repair.css?v=comfort-paws-uv-v1">
+  <script type="module" src="/weather-fusion/app.js?v=comfort-paws-uv-v1"></script>
 
 </head>
 <body data-sky="day">
@@ -40,6 +40,7 @@
         <div class="current-temp-label">Current temperature</div>
         <div class="hero-temperature" id="temperature" role="button" tabindex="0" aria-label="Open temperature forecast graph" aria-haspopup="dialog">—<span>°</span></div>
         <div id="hero-feels" class="hero-feels" aria-live="polite">Feels like —</div>
+        <div id="hero-uv" class="hero-uv" aria-live="polite">Peak UV today —</div>
         <div class="hero-condition" id="condition" hidden>Gathering the latest forecast</div>
         <div class="hero-range" id="high-low" hidden>High —° <span>Low —°</span></div>
         <div class="observation-label" id="observation-label">The latest weather near you</div>
@@ -48,6 +49,7 @@
           <div id="today-uncertainty" class="today-uncertainty">
             <strong class="today-uncertainty-label">Dan's take</strong>
             <p id="today-uncertainty-text">Checking the latest forecast discussion…</p>
+            <small id="today-take-source"></small>
           </div>
         </section>
         <section class="glass bulletins-panel" id="nws-bulletins" aria-labelledby="bulletins-title">
@@ -55,11 +57,19 @@
           <div id="alerts" class="alerts" aria-label="Official NWS notices and explanations"><p class="bulletin-time">Checking local NWS notices…</p></div>
         </section>
         <section class="glass hourly-panel" aria-labelledby="hourly-title"><div class="section-top"><h2 id="hourly-title">◷ &nbsp; HOURLY FORECAST</h2><span>Your next 48 hours</span></div><div id="hourly" class="hourly-strip" tabindex="0" aria-label="Current observation followed by future hourly forecasts; select an hour to preview"><p class="muted">Hourly data is loading.</p></div></section>
+        <div class="exposure-cards">
         <div class="skin-exposure" id="skin-exposure" aria-live="polite">
           <h2 class="skin-kicker" id="skin-kicker">How does it feel outside right now</h2>
           <div class="skin-values" id="skin-values">Checking how it will feel…</div>
           <p class="skin-explanation" id="skin-explanation">A little more useful than the temperature alone.</p>
           <a class="science-link" href="#scientific-stuff">Scientific stuff further down ↓</a>
+        </div>
+        <section class="skin-exposure pavement-card" id="pavement-exposure" aria-labelledby="pavement-title">
+          <h2 class="skin-kicker" id="pavement-title">How do hard surfaces feel for dogs?</h2>
+          <p class="pavement-subtitle">Estimated surface temperature · right now</p>
+          <div id="pavement-content" aria-live="polite">Checking pavement warmth…</div>
+          <a class="science-link" href="#pavement-science">How the sidewalk estimate works ↓</a>
+        </section>
         </div>
       </section>
       <section class="glass briefing" aria-labelledby="briefing-title">
@@ -70,7 +80,7 @@
         <div class="briefing-bottom"><span id="briefing-stamp">Based on your local forecasters</span><button id="expand-briefing" class="text-button" aria-expanded="false" aria-controls="briefing-detail">Read full outlook <span aria-hidden="true">↗</span></button></div>
       </section>
       <div class="forecast-grid">
-        <section class="glass daily-panel" aria-labelledby="daily-title"><div class="section-top"><h2 id="daily-title">▦ &nbsp; 7-DAY FORECAST</h2><span>Tap a day for details</span></div><div id="daily"><p class="muted">Daily data is loading.</p></div><p class="daily-footnote">High on the left, low on the right. The bar ends at the high. After 3 PM, the first row shows tonight’s low.</p></section>
+        <section class="glass daily-panel" aria-labelledby="daily-title"><div class="section-top"><h2 id="daily-title">▦ &nbsp; 7-DAY FORECAST</h2><span>Tap a day for details</span></div><div id="daily"><p class="muted">Daily data is loading.</p></div><p class="daily-footnote">Low on the left, high on the right. The bar ends at the high. After 3 PM, the first row shows tonight’s low.</p></section>
         <section class="glass map-panel" id="map-panel" aria-labelledby="map-title">
           <div class="section-top"><h2 id="map-title">◎ &nbsp; WEATHER MAPS</h2><button id="fullscreen" class="text-button" aria-label="Expand weather map">⛶ Expand</button></div>
           <div class="map-tabs" role="group" aria-label="Weather map layer">
@@ -91,6 +101,13 @@
         <div class="feed-health" id="feed-health"></div>
         <details class="evidence-detail"><summary>About the local outlook</summary><div id="outlook-science"></div></details>
         <details class="evidence-detail"><summary>About the tile graphs</summary><div id="metric-science"></div></details>
+        <details class="evidence-detail" id="pavement-science"><summary>Sidewalk heat and UV index</summary>
+          <p>Surface temperatures are estimates for dry concrete and dark asphalt exposed to the sky. A two-layer heat-balance model integrates up to 48 hours of recent model weather, absorbed sunlight, thermal radiation from clouds and the sky, wind cooling and heat stored below the surface. Current station air temperature and available current-hour companion readings finish the calculation. Cloud-adjusted solar radiation is used directly; solar position and cloud fraction provide a fallback when radiation is missing. Clouds also slow cooling at night.</p>
+          <p>The estimated ranges vary material reflectivity, conductivity, heat capacity, wind exposure, sunlight and initial stored heat. They are engineering estimates, not measured temperatures or a validated confidence interval. Opaque cloud amount is approximated with total cloud cover. Trees, buildings, wet pavement, snow and ice can make the actual surface different. Recent weather comes from archived model forecasts, not a sidewalk sensor. Missing history is shown as unavailable.</p>
+          <p>This is surface heat, not a prediction of a dog's body temperature or a guarantee of paw safety. <a href="https://www.weather.gov/wrn/summer-article-keep-your-pets-cool" target="_blank" rel="noopener noreferrer">NWS pet guidance</a> recommends checking the actual pavement with the back of your hand and avoiding hot asphalt and cement.</p>
+          <p>Peak UV is the highest forecast index for that location's entire local calendar day, including hours already passed. It stays the day's maximum on Tonight. It comes from <a href="https://open-meteo.com/en/docs" target="_blank" rel="noopener noreferrer">Open-Meteo</a>, separately from the temperature blend. Values are rounded to whole numbers; 0–2 Low, 3–5 Moderate, 6–7 High, 8–10 Very high, and 11+ Extreme. <a href="https://www.who.int/news-room/questions-and-answers/item/radiation-the-ultraviolet-%28uv%29-index" target="_blank" rel="noopener noreferrer">WHO recommends sun protection at UV 3 and above.</a></p>
+          <p>Methods: <a href="https://journals.ametsoc.org/abstract/journals/apme/40/11/1520-0450_2001_040_2026_manmfr_2.0.co_2.xml" target="_blank" rel="noopener noreferrer">METRo surface energy balance</a> · <a href="https://energyplus.readthedocs.io/en/v25.1.0/auxiliary-programs/auxiliary-programs.html" target="_blank" rel="noopener noreferrer">EnergyPlus sky radiation</a> · <a href="https://www.fhwa.dot.gov/publications/research/infrastructure/pavements/pccp/04127/appb.cfm" target="_blank" rel="noopener noreferrer">FHWA pavement properties</a>. The simplified model here has not been locally calibrated.</p>
+        </details>
         <details class="evidence-detail"><summary>Latest local NWS forecast discussion <span id="afd-office"></span></summary><p id="afd-stamp" class="muted"></p><pre id="afd-text">The local office discussion is loading.</pre><a id="afd-link" href="https://www.weather.gov/" target="_blank" rel="noopener noreferrer">Read the original NWS discussion ↗</a></details>
         <details class="evidence-detail"><summary>How the feels-like estimates work</summary><div id="thermal-input-evidence"></div><p id="skin-science">Waiting for the latest weather.</p>
           <p>The number under the current temperature is an <strong>equivalent outdoor apparent temperature</strong>, not a claim that a person’s skin is physically at that temperature. Actual skin temperature depends on physiology, clothing, activity, acclimatization and exposure time.</p>

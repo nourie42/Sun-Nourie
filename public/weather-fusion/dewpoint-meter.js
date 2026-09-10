@@ -29,7 +29,7 @@ export function dewpointPoints(forecast,now,hours=240){
 }
 function styles(){
  if(document.getElementById('weather-nourie-dewpoint-meter-css'))return;
- const l=document.createElement('link');l.id='weather-nourie-dewpoint-meter-css';l.rel='stylesheet';l.href='/weather-fusion/dewpoint-meter.css?v=5-compact';
+ const l=document.createElement('link');l.id='weather-nourie-dewpoint-meter-css';l.rel='stylesheet';l.href='/weather-fusion/dewpoint-meter.css?v=comfort-paws-uv-v1';
  l.addEventListener('load',()=>{if(latest)renderDewpointMeter(latest,lastNow);},{once:true});document.head.append(l);
 }
 const hourText=(t,z)=>new Intl.DateTimeFormat('en-US',{timeZone:z,hour:'numeric',minute:'2-digit'}).format(new Date(t));
@@ -71,7 +71,8 @@ function graph(points,hours,zone,width,start){
 }
 export function renderDewpointMeter(forecast,now=Date.now()){
  latest=forecast;lastNow=now;styles();
- const host=document.getElementById('skin-exposure');if(!host)return;
+ const skin=document.getElementById('skin-exposure');if(!skin)return;
+ const host=skin.closest?.('.exposure-cards')||skin;
  let panel=document.getElementById('dewpoint-gross-meter');
  if(!panel){panel=document.createElement('section');panel.id='dewpoint-gross-meter';panel.className='glass dewpoint-gross-meter';panel.setAttribute('aria-labelledby','gross-title');host.insertAdjacentElement('afterend',panel);}
  const zone=forecast.location.timeZone||'America/New_York',dp=forecast.current.dewpoint,level=dewpointGrossLevel(dp,forecast.current.wind);

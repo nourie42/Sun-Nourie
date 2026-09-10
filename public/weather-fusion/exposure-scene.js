@@ -1,4 +1,4 @@
-import {weatherShapes} from './weather-display.js?v=ui-requests-v1';
+import {weatherShapes} from './weather-display.js?v=comfort-paws-uv-v1';
 import {weatherState} from './weather-state.js';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 export function clothingForFeels(value){
@@ -26,7 +26,7 @@ function person(feels){
  return `<g class="exposure-person-art" data-outfit="${outfit}" transform="translate(118 101)">
  <ellipse cx="0" cy="63" rx="24" ry="4" fill="#102c43" opacity=".32"/>
  ${legs}<path d="M-14 61h10M7 61h11" stroke="#e0f0f9" stroke-width="5" stroke-linecap="round"/>
- ${arms}${torso}
+ ${arms}${torso}<ellipse class="person-resting-hand" cx="-17" cy="41" rx="3.8" ry="4.5" fill="#efbd96"/>
  <path d="M-3 14v6q3 3 6 0v-6" fill="#e8b088"/>
  <ellipse cx="0" cy="4" rx="12" ry="14" fill="#f5c8a4"/>
  <path d="M-12 4Q-15-10 0-11Q15-10 12 4L7-3Q-1 2-6-3L-9 6Z" fill="#4b3540"/>

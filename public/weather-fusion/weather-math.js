@@ -1,5 +1,5 @@
 import {weatherState,weatherTransmission} from './weather-state.js';
-import {utciF} from './utci.js?v=integrity-v1';
+import {utciF} from './utci.js?v=comfort-paws-uv-v1';
 /* Pure presentation math shared by the weather API, browser and tests. */
 export const EXPERIENCE_VERSION = 'weather-nourie-friendly-v1';
 export const finite = n => typeof n === 'number' && Number.isFinite(n);
@@ -102,7 +102,8 @@ function windMessage(temp,wind) {
 /** One continuous UTCI calculation. No warmer-of-two-index selection.
  * MRT is explicitly a Tier-3 estimate, not measured radiation or skin temperature. */
 export function thermalHumidity(current) {
-  if(finite(current?.dewpoint))return humidityFromDewpoint(current.temperature,current.dewpoint);
+  const derived=humidityFromDewpoint(current?.temperature,current?.dewpoint);
+  if(finite(derived))return derived;
   return finite(current?.humidity)&&current.humidity>=0&&current.humidity<=100?current.humidity:null;
 }
 export function radiationSky(current={}) {

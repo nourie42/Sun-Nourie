@@ -1,13 +1,15 @@
-import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText,rebindDanTake} from './dans-take.js?v=dans-take-week-once-v2';
-import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './weather-display.js?v=integrity-v1';
-import {degrees,feelsAt,dayFeelsHTML} from './hourly-feels.js?v=integrity-v1';
+import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText,rebindDanTake} from './dans-take.js?v=comfort-paws-uv-v1';
+import {danCard} from './dans-summary.js?v=comfort-paws-uv-v1';
+import {dailyUvHTML} from './daily-uv.js?v=comfort-paws-uv-v1';
+import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './weather-display.js?v=comfort-paws-uv-v1';
+import {degrees,feelsAt,dayFeelsHTML} from './hourly-feels.js?v=comfort-paws-uv-v1';
 import {createFramePlayer} from './frame-player.js';
-import {renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=ui-requests-v1';
-import {dailyDisplay} from './weather-math.js?v=integrity-v1';
-import {currentHero} from './current-temperature.js?v=1-current';
-import {renderBulletins} from './bulletins.js?v=2-special';
-import {dailyGrossHTML,modelFreshnessText} from './personal-details.js?v=ui-requests-v1';
-import {renderDewpointMeter} from './dewpoint-meter.js?v=6-future';
+import {renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=comfort-paws-uv-v1';
+import {dailyDisplay} from './weather-math.js?v=comfort-paws-uv-v1';
+import {currentHero} from './current-temperature.js?v=comfort-paws-uv-v1';
+import {renderBulletins} from './bulletins.js?v=comfort-paws-uv-v1';
+import {dailyGrossHTML,modelFreshnessText} from './personal-details.js?v=comfort-paws-uv-v1';
+import {renderDewpointMeter} from './dewpoint-meter.js?v=comfort-paws-uv-v1';
 import {renderWeatherPanel} from './render-safety.js';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);
@@ -73,6 +75,7 @@ function render(data) {
   const hero = currentHero(data, day);
   $('temperature').innerHTML = `${number(hero.temperature)}<span>°</span>`;
   if($('hero-feels'))$('hero-feels').innerHTML=heroFeelsHTML(currentSample(data));
+  if($('hero-uv'))$('hero-uv').innerHTML=dailyUvHTML(data.days[0]?.uvMax,'Peak UV today');
   $('condition').textContent = hero.tonight ? `Tonight · ${hero.condition}` : hero.condition;
   $('high-low').textContent = hero.tonight ? 'Overnight low' : hero.range;
   $('observation-label').textContent = hero.tonight ? `Tonight’s forecast · updated ${clock(data.assembledAt)}` : (c.type === 'observation' ? `Nearby weather station · updated ${clock(c.time)}` : 'Estimated current conditions');
@@ -106,10 +109,10 @@ function renderMetrics(data) { renderMetricTiles(data, smallIcon); }
 function renderEvidence(data) {
   const root=$('thermal-input-evidence');
   if(root){
-    const c=data.current||{},e=data.comfort?.inputEvidence||{};
+    const c=currentSample(data).inputs,e=currentSample(data).comfort.inputEvidence||{};
     const next=data.metricForecasts?.series?.feels?.find(p=>Date.parse(p.time)>Date.now());
     const n=(v,s='')=>finite(v)?`${Math.round(v*10)/10}${s}`:'Unavailable';
-    root.innerHTML=`<p><strong>Current station inputs:</strong> ${esc(c.stationName||c.station||'Forecast estimate')}${finite(c.stationDistanceKm)?` · ${Math.round(c.stationDistanceKm/1.609344)} miles away`:''}; ${esc(c.time||'time unavailable')}. Air ${n(c.temperature,'°F')}, dew point ${n(c.dewpoint,'°F')}, wind ${n(c.wind,' mph')}. Outdoor UTCI ${n(data.comfort?.rawOutdoors,'°F')}.</p>${next?`<p><strong>Next forecast hour — separate inputs:</strong> ${esc(next.time)}. Air ${n(next.inputs.temperature,'°F')}, dew point ${n(next.inputs.dewpoint,'°F')}, wind ${n(next.inputs.wind,' mph')}, cloud cover ${n(next.inputs.skyCover,'%')}. Outdoor UTCI ${n(next.value,'°F')}.</p>`:''}<p>${esc(e.windPolicy||'')} · ${esc(e.radiationBasis||'')}. Station estimates are not copied into future forecasts. No output is raised or lowered to make values match.</p>`;
+    root.innerHTML=`<p><strong>Current thermal inputs:</strong> ${esc(c.stationName||c.station||'Forecast estimate')}${finite(c.stationDistanceKm)?` · ${Math.round(c.stationDistanceKm/1.609344)} miles away`:''}; ${esc(c.time||'time unavailable')}. Air ${n(c.temperature,'°F')}, dew point ${n(c.dewpoint,'°F')}, wind ${n(c.wind,' mph')}. ${esc(c.comfortSourceNote||'')} Outdoor UTCI ${n(data.comfort?.rawOutdoors,'°F')}.</p>${next?`<p><strong>Next forecast hour — separate inputs:</strong> ${esc(next.time)}. Air ${n(next.inputs.temperature,'°F')}, dew point ${n(next.inputs.dewpoint,'°F')}, wind ${n(next.inputs.wind,' mph')}, cloud cover ${n(next.inputs.skyCover,'%')}. Outdoor UTCI ${n(next.value,'°F')}.</p>`:''}<p>${esc(e.windPolicy||'')} · ${esc(e.radiationBasis||'')}. Station estimates are not copied into future forecasts. No output is raised or lowered to make values match.</p>`;
   }
   const important = ['nws', 'afd', 'hrrr', 'ecmwf', 'nbm', 'alerts'];
   const labels = { nws: 'NWS', afd: 'Local discussion', hrrr: 'HRRR', ecmwf: 'ECMWF IFS', nbm: 'National Blend', alerts: 'Alerts' };
@@ -138,11 +141,9 @@ function renderBriefing(data) {
   currentBriefing = data;
   const takeItems=visibleDanTakeItems(data.danTake||data,forecast,Date.now());
   const uncertainty=danTakeText(takeItems);
-  const takeDisplay=uncertainty||(data.mode==='ai'
-    ?'No additional forecast changes to call out right now.'
-    :/prepar|updat/i.test(`${data.headline||''} ${data.reason||''}`)
-      ?'Checking the latest forecast discussion…'
-      :'No additional take is available right now.');
+  const card=danCard(data,forecast,Date.now());
+  if(card.sourceExcerpt)takeItems.push({...card.sourceExcerpt,sourceQuote:card.sourceExcerpt.quote});
+  const takeDisplay=card.text;
   $('briefing-title').textContent = data.headline || 'Local forecast';
   $('briefing-summary').textContent = data.summary || 'The source forecast is currently unavailable.';
   $('ai-label').textContent = data.mode === 'ai' ? 'YOUR LOCAL OUTLOOK' : 'NWS FORECAST';
@@ -160,6 +161,7 @@ function renderBriefing(data) {
     if(todayUncertaintyText.style)todayUncertaintyText.style.whiteSpace='pre-line';
     todayUncertainty.hidden = false;
   }
+  if($('today-take-source'))$('today-take-source').textContent=card.source;
   $('briefing-stamp').textContent = data.mode === 'ai' ? `Updated ${clock(data.generatedAt)} · based on your local NWS discussion` : 'National Weather Service forecast';
   $('outlook-science').innerHTML = `<p>Summary type: ${esc(data.mode === 'ai' ? 'AI plain-language paraphrase of the local discussion, checked against the point forecast and available model data' : 'Official NWS forecast fallback; not an AI paraphrase')}. ${esc(data.reason || '')}</p><p>Sources used: ${refs.join(' · ') || 'Waiting for the local outlook'}</p><p>Take status: ${takeItems.length?'The following explicitly supported, still-upcoming discussion changes are displayed.':'No displayed change: '+(data.danTakeStatus==='discussion-not-current'?'the local discussion is missing or stale.':data.danTakeStatus==='no-explicit-future-change'?'the current discussion identifies no dated upcoming uncertainty.':data.reason||'the current discussion has not produced an approved explanation yet.')}</p>${takeItems.map(item=>`<details><summary>${esc(item.period)} · source evidence</summary><p>${esc(item.sourceQuote)}</p><p>Original section: ${esc(item.section)} · issued ${esc(clock(item.sectionIssuedAt,{month:'short',day:'numeric'}))}. Applies through ${esc(clock(item.eventEnd,{month:'short',day:'numeric'}))}.</p></details>`).join('')}`;
 
@@ -202,6 +204,7 @@ async function load({ moveMap = false, refreshModels = false, briefingRetry = 0 
       ? 'The forecast arrived, but a display component failed. Use Refresh to retry.'
       : `Weather update failed. ${forecast ? `The displayed snapshot was checked at ${clock(forecast.assembledAt)} and may be stale.` : 'Please retry or check weather.gov.'}`;
     $('status').classList.add('error');
+    if(forecast)renderComfort(forecast);
     if (!receivedForecast) $('alerts').innerHTML = '<p class="alert-note warning">Live alert status could not be checked. Consult the official NWS forecast and warnings.</p>';
   } finally { if (id === generation) { busy = false; $('refresh').classList.remove('loading'); } }
 }
@@ -216,6 +219,7 @@ function chooseLocation(value) {
   $('city-name').textContent = value.name;
   $('temperature').innerHTML = '—<span>°</span>';
   if($('hero-feels'))$('hero-feels').textContent='Feels like —';
+  if($('hero-uv'))$('hero-uv').textContent='Peak UV today —';
   $('condition').textContent = 'Loading the selected location';
   $('high-low').textContent = 'High —° · Low —°';
   $('observation-label').textContent = 'Awaiting the new location’s sources';
@@ -435,4 +439,5 @@ void load({ moveMap: true });
 
 // Expire passed discussion periods even while this page remains open.
 setInterval(()=>{if(currentBriefing&&forecast)renderBriefing(currentBriefing);},30000);
+setInterval(()=>{if(forecast&&Date.now()-Date.parse(forecast.assembledAt)>90*60000)renderComfort(forecast);},30000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&currentBriefing&&forecast)renderBriefing(currentBriefing);});

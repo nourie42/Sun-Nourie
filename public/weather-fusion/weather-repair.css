@@ -12,3 +12,26 @@
 #skin-exposure[data-preview="forecast"] .comfort-later{display:none}
 #hero-scene svg[data-weather-kind="unknown"]{opacity:.55}
 @media(prefers-reduced-motion:reduce){.friendly-wave{animation:none!important}}
+
+/* Stable figures, matched exposure cards and full-day UV. */
+.exposure-cards{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:20px;align-items:stretch;margin:12px 0 20px}
+.exposure-cards .skin-exposure{width:100%;max-width:none;margin:0;min-width:0;box-sizing:border-box}
+.pavement-subtitle{font-size:14px;line-height:1.5;color:#c7dced;margin:0}
+.poodle-walk{display:block;width:min(100%,360px);height:220px;object-fit:contain;margin:8px auto 0}
+.pavement-values{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.pavement-values>div{padding:14px 8px;background:#102a4426;border:1px solid #cfdef52b;border-radius:16px;min-width:0}
+.pavement-values span,.pavement-values small{display:block;line-height:1.5;font-size:14px;color:#d5e5f4}
+.pavement-values strong{display:block;font-size:36px;margin:4px 0;color:#fff}
+.pavement-note,.pavement-advice{font-size:14px;line-height:1.6;color:#d5e5f4;margin:14px 0}
+.pavement-advice{color:#ffe4b9}
+.pavement-card .science-link{font-size:14px}
+.hero-uv{margin:-3px 0 14px;font-size:14px}
+.daily-uv{color:#dae9f8;font-size:12px;line-height:1.5;font-weight:500;letter-spacing:0}
+.daily-uv b{font-size:inherit;color:#d7efd9}
+.daily-uv[data-uv=moderate] b{color:#f6e497}.daily-uv[data-uv=high] b{color:#ffc38a}.daily-uv[data-uv=very-high] b{color:#ffb8b8}.daily-uv[data-uv=extreme] b{color:#edb9ff}
+.day-row>.daily-uv{grid-column:1/-1;text-align:right;margin:0 0 8px}
+.hero-uv .daily-uv{font-size:14px}
+#today-take-source{display:block;font-size:12px;font-weight:400;color:#bbd0e6;margin-top:6px}
+#skin-values .exposure-person figcaption strong{font-size:clamp(22px,3vw,34px);overflow-wrap:anywhere}
+@media(max-width:1000px){.exposure-cards{grid-template-columns:1fr;max-width:680px;margin:12px auto 20px}}
+@media(max-width:600px){.exposure-cards{gap:16px}.exposure-cards .skin-exposure{padding:20px 16px}.poodle-walk{height:200px}.daily-uv{font-size:12px}.pavement-values strong{font-size:32px}}

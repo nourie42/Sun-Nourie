@@ -1,11 +1,13 @@
-import {FORECAST_CONFIDENCE_VERSION} from './forecast-confidence.js?v=ui-requests-v1';
+import {FORECAST_CONFIDENCE_VERSION} from './forecast-confidence.js?v=comfort-paws-uv-v1';
+import {dailyUvHTML} from './daily-uv.js?v=comfort-paws-uv-v1';
+import {pavementEstimate,pavementHTML} from './pavement.js?v=comfort-paws-uv-v1';
 import {weatherState} from './weather-state.js';
-import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=integrity-v1';
-import {degrees,feelsAt,dailyFeels,forecastValue,peakFeelsHTML} from './hourly-feels.js?v=integrity-v1';
-import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=ui-requests-v1';
-import {comfortMode,comfortWindow,comfortNarrative} from './comfort-outlook.js?v=integrity-v1';
-import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js?v=integrity-v1';
-import {resetDewpointMeter} from './dewpoint-meter.js?v=6-future';
+import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=comfort-paws-uv-v1';
+import {degrees,feelsAt,dailyFeels,forecastValue,peakFeelsHTML} from './hourly-feels.js?v=comfort-paws-uv-v1';
+import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=comfort-paws-uv-v1';
+import {comfortMode,comfortWindow,comfortNarrative} from './comfort-outlook.js?v=comfort-paws-uv-v1';
+import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js?v=comfort-paws-uv-v1';
+import {resetDewpointMeter} from './dewpoint-meter.js?v=comfort-paws-uv-v1';
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const number=(n,d=0)=>finite(n)?n.toFixed(d):'—';
@@ -66,7 +68,7 @@ function renderComfortArt(forecast,now){
 }
 function ensureComfortStyles(){
  if(document.getElementById('weather-nourie-comfort-effects'))return;
- const link=document.createElement('link');link.id='weather-nourie-comfort-effects';link.rel='stylesheet';link.href='/weather-fusion/comfort-effects.css?v=1-evening';document.head.append(link);
+ const link=document.createElement('link');link.id='weather-nourie-comfort-effects';link.rel='stylesheet';link.href='/weather-fusion/comfort-effects.css?v=comfort-paws-uv-v1';document.head.append(link);
 }
 function pointsFor(key, hours=48) {
  if(!data)return [];
@@ -92,6 +94,12 @@ export function renderComfort(forecast) {
  const sample=comfortPreview?forecastSample(forecast,comfortPreview):current;
  if(!sample){comfortPreview=null;return renderComfort(forecast);}
  const c=sample.comfort,zone=forecast.location.timeZone,summary=comfortWindow(forecast,now+1);
+ const pavementRoot=$('pavement-content');
+ if(pavementRoot){
+  const result=pavementEstimate(forecast,current.inputs,now);
+  pavementRoot.innerHTML=pavementHTML(result);
+  pavementRoot.dataset.status=result.status;
+ }
  const kicker=$('skin-kicker');if(kicker)kicker.textContent=sample.now?'How does it feel outside right now':`How will it feel outside at ${formatTime(sample.time)}?`;
  const preview=`<div class="comfort-preview-heading"><span>${esc(sampleCaption(sample,zone))}</span>${sample.now?'':'<button type="button" data-comfort-reset>Back to now</button>'}</div>`;
  $('skin-values').innerHTML=`${preview}${sunShadeHTML(c,forecast.location,sample.now?now:Date.parse(sample.time),{forecast:!sample.now,condition:sample.condition})}${sample.now?peakComparisonHTML(summary,current.feels,zone):''}`;
@@ -108,7 +116,7 @@ export function renderDailyRows(forecast,icon) {
   const p=dailyDisplay(d,i,Date.now(),forecast.location.timeZone),bar=temperatureBar(p.primary,lo,hi),feel=dailyFeels(forecast,i,Date.now());
   const confidence=d.confidence||{label:'Unavailable',score:null,key:'unavailable',factors:[],note:'Forecast confidence data is unavailable.'};
   const confidenceTitle=`Forecast confidence: ${confidence.label}. ${confidence.factors?.join('; ')||confidence.note||''} ${confidence.note||''}`.trim();
-  return `<button class="day-row ${p.tonight?'tonight-row':''}" data-day="${i}" aria-label="${esc(p.label)}, ${p.primaryLabel} ${number(p.primary)} degrees${finite(p.secondary)?`, low ${number(p.secondary)} degrees`:''}. Forecast confidence ${esc(confidence.label)}. Open details."><span class="day-name">${esc(p.label)}</span><span class="day-icon">${icon(p.condition,!p.tonight)}<small>${finite(p.pop)?`${number(p.pop)}%`:''}</small></span><span class="day-high"><strong>${temp(p.primary)}</strong><small>${p.primaryLabel}</small><span class="daily-feels"><span>Feels</span><b>${degrees(p.tonight?feel.low?.low?.value:feel.high?.high?.value)}</b>${(p.tonight?feel.low:feel.high)?.partial?' · partial':''}</span></span><span class="temp-track" aria-hidden="true">${bar===null?'':`<span class="temp-fill" style="left:0;width:${bar}%"></span><i class="high-marker" style="left:clamp(4px,${bar}%,calc(100% - 4px))"></i>`}</span>${p.tonight?'<span class="night-label">☾<small>Overnight</small></span>':`<span class="day-low">${temp(p.secondary)}<small>Low</small><span class="daily-feels"><span>Feels</span><b>${degrees(feel.low?.low?.value)}</b>${feel.low?.partial?' · partial':''}</span></span>`}<span class="forecast-confidence" data-confidence="${esc(confidence.key)}" title="${esc(confidenceTitle)}"><span>Forecast confidence</span><b>${esc(confidence.label)}</b>${finite(confidence.score)?`<i class="confidence-meter" aria-hidden="true"><em style="width:${confidence.score}%"></em></i>`:''}</span></button>`;
+  return `<button class="day-row ${p.tonight?'tonight-row':''}" data-day="${i}" aria-label="${esc(p.label)}, ${p.primaryLabel} ${number(p.primary)} degrees${finite(p.secondary)?`, low ${number(p.secondary)} degrees`:''}. Forecast confidence ${esc(confidence.label)}. Open details."><span class="day-name">${esc(p.label)}</span><span class="day-icon">${icon(p.condition,!p.tonight)}<small>${finite(p.pop)?`${number(p.pop)}%`:''}</small></span>${p.tonight?'<span class="night-label">☾<small>Overnight</small></span>':`<span class="day-low">${temp(p.secondary)}<small>Low</small><span class="daily-feels"><span>Feels</span><b>${degrees(feel.low?.low?.value)}</b>${feel.low?.partial?' · partial':''}</span></span>`}<span class="temp-track" aria-hidden="true">${bar===null?'':`<span class="temp-fill" style="left:0;width:${bar}%"></span><i class="high-marker" style="left:clamp(4px,${bar}%,calc(100% - 4px))"></i>`}</span><span class="day-high"><strong>${temp(p.primary)}</strong><small>${p.primaryLabel}</small><span class="daily-feels"><span>Feels</span><b>${degrees(p.tonight?feel.low?.low?.value:feel.high?.high?.value)}</b>${(p.tonight?feel.low:feel.high)?.partial?' · partial':''}</span></span><span class="forecast-confidence" data-confidence="${esc(confidence.key)}" title="${esc(confidenceTitle)}"><span>Forecast confidence</span><b>${esc(confidence.label)}</b>${finite(confidence.score)?`<i class="confidence-meter" aria-hidden="true"><em style="width:${confidence.score}%"></em></i>`:''}</span>${dailyUvHTML(d.uvMax,p.tonight?'Peak UV today':'Peak UV')}</button>`;
  });
  $('daily').innerHTML=rows.join('');
  // Reuse the exact first daily row, including its Today/Tonight policy and bar.
@@ -211,7 +219,8 @@ export function openMetric(key) {
  $('metric-dialog').showModal();document.body.classList.add('dialog-open');drawChart();
 }
 export function resetExperience() {
- data=null;active=null;comfortPreview=null;
+  data=null;active=null;comfortPreview=null;
+  if($('pavement-content')){$('pavement-content').textContent='Checking pavement warmth…';$('pavement-content').dataset.status='loading';}
  if($('today-forecast'))$('today-forecast').innerHTML='<p class="muted">Daily data is loading.</p>';
  if($('skin-kicker'))$('skin-kicker').textContent='How does it feel outside right now';
  if($('metric-dialog').open)$('metric-dialog').close();

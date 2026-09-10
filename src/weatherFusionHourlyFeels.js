@@ -1,5 +1,6 @@
 import {finite,humidityFromDewpoint,tier3FeelsLike,thermalComfort} from '../public/weather-fusion/weather-math.js';
 import {OUTDOOR_FEELS_VERSION} from '../public/weather-fusion/outdoor-feels.js';
+import {currentComfortInputs} from '../public/weather-fusion/current-inputs.js';
 const H=3600000,round=v=>finite(v)?Number(v.toFixed(1)):null;
 /** A single numeric feels-like series, computed from the SAME hour's displayed
  * air temperature, dew point and wind. Never copy today's observation into future
@@ -38,7 +39,10 @@ export function rebuildHourlyFeels(out,{now,temperatureAt,humidityAt,skyAt=()=>n
  out.metricForecasts.notes.feels='One timestamp-matched outdoor exposure estimate per hour, including the same sky and sunlight estimate shown by the outdoor figure. Shade is retained separately in feelsShade. UTCI is used across all hours without a warmer-index override. Same-hour sky cover controls estimated radiation. Calm-wind limits and source inputs are disclosed. The current card uses observed conditions; future values use forecast inputs, not current humidity or a recycled daily value. Daily summaries use extrema of these same hourly values. Missing hours stay blank; this is a forecast, not a guarantee.';
  out.outdoorFeelsVersion=OUTDOOR_FEELS_VERSION;
  if(out.current){
-  out.comfort=thermalComfort(out.current,out.location,now);
+  const inputs=currentComfortInputs(out,now);
+  out.comfort=thermalComfort(inputs,out.location,now);
+  out.comfort.inputEvidence.estimatedFields=inputs.comfortEstimatedFields;
+  out.comfort.inputEvidence.fallbackSources=inputs.comfortInputSources;
   out.current.feelsLike=out.comfort.outdoors;out.current.feelsLikeShade=out.comfort.shade;
   out.current.feelsLikeSun=out.comfort.sun;out.current.feelsLikeExposure='outdoors';
  }

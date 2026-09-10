@@ -102,5 +102,5 @@ test('waving figures have faces and honor reduced-motion preferences',()=>{
  const read=p=>readFileSync(new URL('../public/weather-fusion/'+p,import.meta.url),'utf8');
  const scene=read('exposure-scene.js'),css=read('hourly-feels.css');
  assert.match(scene,/person-eyes/);assert.match(scene,/person-smile/);assert.match(scene,/friendly-raised-arm/);assert.match(scene,/friendly-wave/);assert.ok(scene.indexOf('friendly-raised-arm')<scene.indexOf('<g class=\"friendly-wave\">'));
- assert.match(css,/transform-box:fill-box/);assert.match(css,/prefers-reduced-motion:reduce/);
+ assert.match(css,/\.friendly-wave\{animation:none;transform:none\}/);assert.match(css,/prefers-reduced-motion:reduce/);
 });

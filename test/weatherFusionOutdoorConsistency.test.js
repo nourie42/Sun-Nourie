@@ -64,7 +64,7 @@ test('zero is real; explicit missing is not replaced by an unrelated shade or su
  assert.equal(outdoorExposure({outdoors:0,shade:-1,daylight:false}).value,0);
  assert.equal(outdoorExposure({outdoors:null,shade:86,sun:94,daylight:true}).value,null);
  assert.equal(outdoorExposure({shade:86,sun:94,daylight:false}).value,86);
- const f=make('Sunny',now,{wind:null});assert.equal(currentSample(f,now).feels,null);
+ const f=make('Sunny',now,{wind:null});assert.ok(Number.isFinite(currentSample(f,now).feels));assert.deepEqual(currentSample(f,now).inputs.comfortEstimatedFields,['wind']);
  f.metricForecasts.series.wind[1].value=null;rebuildHourlyFeels(f,{now,temperatureAt:()=>({value:null}),humidityAt:()=>null});
  assert.equal(forecastSample(f,f.hours[1].time).feels,null);
  assert.equal(forecastSample(f,f.hours[1].time).comfort.outdoors,null);
