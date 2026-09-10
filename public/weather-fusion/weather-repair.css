@@ -58,3 +58,19 @@
 /* Keep the artwork proportional: no separate trunk/canopy stretching. */
 #skin-values .exposure-tree,#skin-values .exposure-tree>path{transform:none}
 #skin-values .poodle-scene .poodle-walk{width:167px;height:111.333px;margin:0}
+
+/* Comfort visual contract v13: the tree must read as a real tree, not person-sized. */
+#skin-values .shade-person .exposure-tree{transform-box:fill-box;transform-origin:50% 100%;transform:translateX(16px) scale(1.30)}
+
+/* Weather symbols are intentionally prominent and stay proportional. */
+#skin-values .shade-person .shade-weather .sky-sun,
+#skin-values .sun-person .person-weather .sky-sun{transform-box:fill-box;transform-origin:50% 50%;transform:scale(1.70)}
+
+/* The pet panel shows the same direct-sun cue whenever the outdoor panel actually contains a sun.
+   Because this keys off the rendered sun glyph, it does not invent a sun at night or under overcast skies. */
+#skin-values .sun-shade-comparison:has(.sun-person .sky-sun) .pavement-person .poodle-scene{
+ background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2080%2080%22%3E%3Ccircle%20cx%3D%2240%22%20cy%3D%2240%22%20r%3D%2217%22%20fill%3D%22%23ffdb83%22/%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%23ffdb83%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%3E%3Cpath%20d%3D%22M40%207v10M40%2063v10M7%2040h10M63%2040h10M16%2016l8%208M56%2056l8%208M16%2064l8-8M56%2024l8-8%22/%3E%3C/g%3E%3C/svg%3E");
+ background-repeat:no-repeat;
+ background-position:center 6%;
+ background-size:clamp(48px,34%,76px) clamp(48px,34%,76px);
+}

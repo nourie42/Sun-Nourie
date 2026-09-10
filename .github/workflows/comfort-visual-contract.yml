@@ -1,0 +1,32 @@
+name: Comfort card visual contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "public/weather-fusion/weather-repair.css"
+      - "scripts/verifyComfortVisualContract.js"
+      - ".github/workflows/comfort-visual-contract.yml"
+  workflow_dispatch:
+
+jobs:
+  visual-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm install --no-save --package-lock=false playwright@1.55.0
+      - run: npx playwright install --with-deps chromium
+      - name: Verify tree scale, all three sun cues, heat warnings and overflow
+        run: node scripts/verifyComfortVisualContract.js
+      - name: Upload visual proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: comfort-visual-contract
+          path: /tmp/comfort-visual-contract
+          retention-days: 7
