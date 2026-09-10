@@ -3,7 +3,8 @@
  * Ambiguous timing is omitted, not guessed. Dates are anchored to source issuance,
  * including a retained section's own "As of" time, never to the time of retrieval.
  */
-export const DAN_TAKE_VERSION = 'weather-nourie-dans-take-concise-v6';
+export const DAN_TAKE_VERSION = 'weather-nourie-dans-take-plain-v7';
+export const hasDanJargon=text=>/\b(?:subsidence|mid[ -]level|aloft|instability|shear|vorticity|shortwave|troughing|ridging|isentropic|HRRR|ECMWF|NBM|CAPE|QPF|synoptic|advection|deterministic|convection|guidance)\b|\bsinking air\b/i.test(text);
 const H = 3600000, DAY = 24 * H, MAX_SOURCE_AGE = 12 * H;
 const norm = v => String(v || '').replace(/\s+/g, ' ').trim();
 const finite = Number.isFinite;
@@ -137,6 +138,7 @@ export function collectDanTakeEvidence(data, now=Date.now()) {
   return {version:DAN_TAKE_VERSION,source,candidates:candidates.slice(0,64),status:candidates.length?'evidence-available':'no-explicit-future-change'};
 }
 function acceptableParaphrase(text, candidate) {
+  if(hasDanJargon(text))return false;
   if(typeof text!=='string'||text.trim().length<15||text.length>420||/[<>]|\d/.test(text))return false;
   if(/\b(yesterday|last night|earlier today|today|tonight|tomorrow)\b/i.test(text))return false;
   // A day explicitly present in the verified period is supported. An unrelated

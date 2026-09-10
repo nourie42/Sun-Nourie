@@ -1,5 +1,5 @@
 import {weatherState,weatherTransmission} from './weather-state.js';
-import {utciF} from './utci.js?v=compact-comfort-hourly-uv-v2';
+import {utciF} from './utci.js?v=clear-weather-daygraph-v3';
 /* Pure presentation math shared by the weather API, browser and tests. */
 export const EXPERIENCE_VERSION = 'weather-nourie-friendly-v1';
 export const finite = n => typeof n === 'number' && Number.isFinite(n);

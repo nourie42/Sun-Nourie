@@ -1,4 +1,5 @@
-import {finite,solarElevation,thermalHumidity} from './weather-math.js?v=compact-comfort-hourly-uv-v2';
+import {finite,solarElevation,thermalHumidity} from './weather-math.js?v=clear-weather-daygraph-v3';
+import {clothingForFeels} from './exposure-scene.js?v=clear-weather-daygraph-v3';
 const H=3600000,SIGMA=5.670374419e-8,clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 const c=f=>(f-32)/1.8,f=c=>c*1.8+32;
 export const PAVEMENT_VERSION='pavement-energy-balance-v1';
@@ -81,9 +82,14 @@ export function pavementEstimate(forecast,current,now=Date.now()){
   note:frozen?'Snow, ice and freezing change surface behavior; these dry-surface estimates are unreliable in these conditions.':wet?'Recent modeled rain may mean wet surfaces. These are dry-surface estimates; wet pavement can be cooler.':'Estimated dry, exposed surfaces. Shade, color and local shelter can change the actual temperature.',
   advice:'Check the actual surface with the back of your hand. If it feels too hot, choose grass or a cooler route.'};
 }
-export function pavementHTML(result){
+export function walkerOutfit(feels){
+ const outfit=clothingForFeels(feels),asset=outfit==='hot'||outfit==='warm'?'poodle-walk-hot.png':outfit==='cold'?'poodle-walk-cold.png':outfit==='cool'?'poodle-walk.png':'poodle-walk-mild.png';
+ return {outfit,asset};
+}
+export function pavementHTML(result,feels){
+ const walker=walkerOutfit(feels);
  const value=r=>r?`${r.value}°`:'—';
- return `<figure class="exposure-person pavement-person" id="pavement-content" data-status="${result.status}" aria-label="Estimated hard-surface temperature for dogs right now"><img class="poodle-walk" src="/weather-fusion/poodle-walk.png" width="768" height="512" alt="A person walking a light brown toy poodle"><figcaption><strong>${value(result.concrete)}</strong><span>Sidewalk for dogs · now</span><small class="pavement-secondary">Asphalt ${value(result.asphalt)}</small><small>Estimated · °F</small></figcaption></figure>`;
+ return `<figure class="exposure-person pavement-person" id="pavement-content" data-status="${result.status}" aria-label="Estimated hard-surface temperature for dogs right now"><img class="poodle-walk" data-outfit="${walker.outfit}" src="/weather-fusion/${walker.asset}" width="768" height="512" alt="A person walking a light brown toy poodle"><figcaption><strong>${value(result.concrete)}</strong><span>Sidewalk</span><small class="pavement-secondary">Asphalt ${value(result.asphalt)}</small><small>Est. surface · °F</small></figcaption></figure>`;
 }
 export function pavementDetailsHTML(result){
  const range=(r,label)=>r?`${label}: ${r.low}–${r.high}°F.`:`${label}: unavailable.`;

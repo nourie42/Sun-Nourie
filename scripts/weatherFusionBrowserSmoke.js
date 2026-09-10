@@ -178,7 +178,7 @@ try{
  report.maps.push({layer:'radar',advertisedFrames:radar.frames.length,status:radar.status});
  await page.locator('[data-day="1"]').click();assert.ok(await page.locator('#day-dialog').isVisible());
  assert.ok((await page.locator('#day-content').innerText()).includes('WEATHER NOURIE'));
- assert.equal(await page.locator('#day-content .day-gross').count(),1);
+ assert.equal(await page.locator('#day-content .day-graph').count(),1);
  await page.locator('#close-day').click();
  await page.locator('[data-place="greenville"]').click();
  await page.waitForFunction(()=>document.querySelector('#city-name').textContent.includes('Greenville')&&document.querySelectorAll('#metrics .metric-value').length===8,null,{timeout:75000});

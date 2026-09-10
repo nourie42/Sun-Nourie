@@ -1,5 +1,5 @@
 /** Independent UV / surface-weather feed. It never changes the NWS/model blend. */
-export const EXPOSURE_VERSION='compact-comfort-hourly-uv-v2';
+export const EXPOSURE_VERSION='clear-weather-daygraph-v3';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 export function exposureWeatherUrl(location,zone='America/New_York'){
  return 'https://api.open-meteo.com/v1/forecast?'+new URLSearchParams({

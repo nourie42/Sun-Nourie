@@ -1,4 +1,4 @@
-import {solarElevation} from './weather-math.js?v=compact-comfort-hourly-uv-v2';
+import {solarElevation} from './weather-math.js?v=clear-weather-daygraph-v3';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 export function localHour(time=Date.now(),zone='America/New_York'){
   return Number(new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',hourCycle:'h23'}).format(new Date(time)));

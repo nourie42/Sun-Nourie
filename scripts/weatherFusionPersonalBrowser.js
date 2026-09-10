@@ -81,7 +81,7 @@ try{
   for(const n of [24,48,168,240]){await page.locator(`[data-gross-hours="${n}"]`).click();assert.ok(await page.locator('.gross-scroll').evaluate(el=>el.scrollWidth<=el.clientWidth+1));assert.ok(await page.locator('.gross-chart').evaluate(el=>el.getBoundingClientRect().height<=230));await page.locator('#gross-scrubber').fill('12');assert.match(await page.locator('.gross-selected-time').innerText(),/forecast/);}
   await page.locator('[data-metric="pressure"]').click();assert.match(await page.locator('#chart-value').innerText(),/mb/);assert.ok(!(await page.locator('#chart-value').innerText()).includes('inHg'));await page.keyboard.press('Escape');
   assert.match(await page.locator('.metric-pressure .metric-value').innerText(),/1013.*mb/s);assert.match(await page.locator('.metric-pressure .metric-note').innerText(),/Dropping/);
-  await page.locator('#daily [data-day="1"]').click();assert.match(await page.locator('#day-dialog .day-gross').innerText(),/Gross Meter/);assert.match(await page.locator('#day-dialog .day-gross').innerText(),/72°/);await page.keyboard.press('Escape');
+  await page.locator('#daily [data-day="1"]').click();assert.match(await page.locator('#day-dialog .day-graph').innerText(),/Gross · dew point/);assert.equal(await page.locator('[data-readout="dewpoint"] strong').count(),1);await page.keyboard.press('Escape');
   if(width===390||width===1365){await page.screenshot({path:`${dir}/weather-personal-${width}.png`,fullPage:true});await page.locator('#skin-exposure').screenshot({path:`${dir}/sun-shade-${width}.png`});}
   await page.locator('[data-place="greenville"]').click();await page.waitForFunction(()=>document.querySelector('#today-uncertainty-text')?.textContent.includes('Greenville'));
   assert.equal((await page.locator('#temperature').innerText()).trim(),'71°');assert.match(await page.locator('.metric-pressure .metric-note').innerText(),/Rising/);assert.ok(!(await page.locator('#alerts').innerText()).includes('Knightdale'));
@@ -115,9 +115,9 @@ try{
   assert.equal(await page.locator('.friendly-wave').count(),2);
   assert.ok(await page.locator('.exposure-tree').evaluate(el=>el.getBBox().height>el.closest('svg').querySelector('.exposure-person-art').getBBox().height*1.5));
   await page.locator('#daily [data-day="2"]').click();
-  assert.equal(await page.locator('#day-dialog .day-feels').count(),1);
-  assert.match(await page.locator('#day-dialog .day-gross-verdict').innerText(),/will|should/);
-  assert.ok(!(await page.locator('#day-dialog .day-gross-verdict').innerText()).includes('gettin'));
+  assert.equal(await page.locator('#day-dialog .day-graph').count(),1);
+  assert.match(await page.locator('#day-dialog [data-readout="dewpoint"] small').innerText(),/will|should/);
+  assert.ok(!(await page.locator('#day-dialog [data-readout="dewpoint"] small').innerText()).includes('gettin'));
   await page.keyboard.press('Escape');
   await page.locator('#temperature').click();
   await page.locator('#chart-scrubber').fill('6');
@@ -153,7 +153,7 @@ try{
     assert.equal((await page.locator('.metric-feels .metric-value').innerText()).trim(),expected,'Metric equals Now');
     assert.equal((await page.locator('.sun-person figcaption strong').innerText()).trim(),expected==='—'?'Unavailable':expected,'Outdoor figure equals Now');
     assert.equal((await page.locator('.shade-person figcaption strong').innerText()).trim(),degree(f.current.temperature),'Shade is explicitly labeled air temperature');
-    if(patch.wind===null){assert.ok(Number.isFinite(f.comfort.outdoors));assert.deepEqual(f.comfort.inputEvidence.estimatedFields,['wind']);assert.equal(f.current.wind,null);assert.match(await page.locator('.comfort-preview-heading').innerText(),/Wind estimated from the current forecast hour/);}
+    if(patch.wind===null){assert.ok(Number.isFinite(f.comfort.outdoors));assert.deepEqual(f.comfort.inputEvidence.estimatedFields,['wind']);assert.equal(f.current.wind,null);assert.match(await page.locator('#comfort-extra-science').textContent(),/Wind estimated from the current forecast hour/);}
     assert.ok((await page.locator('#hourly .hour-current .hour-exposure').innerText()).trim());
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
     return f;

@@ -2,6 +2,7 @@ import {createHrrrMapSource} from './weatherFusionHrrrMap.js';
 /** Direct, decoded NOAA/ECMWF model snapshots. No provider key and no webpage scraping. */
 import {SAME_DAY_WEIGHTS,temperaturePolicy as tempPolicy,precipitationPolicy,forecastDayIndex,eveningPeriod,REPAIR_VERSION} from './weatherFusionPolicy.js';
 import {shadeFeelsLike} from '../public/weather-fusion/weather-math.js';
+import {forecastConfidence} from '../public/weather-fusion/forecast-confidence.js';
 export const DATA_ROOT = 'https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/';
 export const DIRECT_SCHEMA = 'weather-fusion-direct-v2';
 const H = 3600000;
@@ -196,9 +197,18 @@ export function enhanceForecast(out, { models, grid, periods = [], now, gridQpf,
     d.qpfWindow={start:iso(start),end:iso(end)};
     d.qpfWindowLabel=start>fullStart?'Remaining forecast through 7 AM':'7 AM–7 AM forecast';
     for(const [id,value] of Object.entries(rain.sourceValues)) if(id!=='nws') {d.guidance[id] ||= {};d.guidance[id].qpf=value;}
-    const highs=[d.official.high,...active.map(id=>d.guidance[id]?.high)].filter(finite);
+    // Confidence must describe the final period-aligned blend, not the earlier
+    // calendar-day completeness check. Only positive-weight contributors count.
+    for(const [kind,period] of [['high',day],['low',night]])if(!d[`${kind}Blend`]&&finite(period?.temperature))d[`${kind}Blend`]={value:d[kind],sources:[{id:'nws',weight:1,value:d[kind]}]};
+    const contributors=[...(d.highBlend?.sources||[]),...(d.lowBlend?.sources||[]),...(d.qpfBlend?.sources||[])].filter(s=>s.weight>0&&finite(s.value));
+    const sourceIds=['nws','hrrr','ecmwf','nbm'].filter(id=>contributors.some(s=>s.id===id));
+    const highs=(d.highBlend?.sources||[]).filter(s=>s.weight>0).map(s=>s.value).filter(finite);
     const spread=highs.length>1?Math.max(...highs)-Math.min(...highs):null;
     d.highSpread=round(spread,1);d.agreement=spread===null?'Limited guidance':spread<=3?'Close agreement':spread<=6?'Some disagreement':'Wide disagreement';
+    const rainValues=(d.qpfBlend?.sources||[]).filter(s=>s.weight>0).map(s=>d.qpfBlend.sourceValues[s.id]).filter(finite);
+    d.qpfSpread=rainValues.length>1?round(Math.max(...rainValues)-Math.min(...rainValues),2):null;
+    d.confidence=forecastConfidence({dayIndex:index,highSpread:d.highSpread,qpfSpread:d.qpfSpread,guidanceCount:sourceIds.length,sourceIds,officialDay:!!day,officialNight:!!night});
+    d.confidence.contributions={high:d.highBlend?.sources||[],low:d.lowBlend?.sources||[],rain:d.qpfBlend?.sources||[]};
   }
   const from=Math.ceil(now/H)*H;
   out.precipitation=qpf(from,from+24*H,0);

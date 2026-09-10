@@ -1,13 +1,13 @@
-import {FORECAST_CONFIDENCE_VERSION} from './forecast-confidence.js?v=compact-comfort-hourly-uv-v2';
-import {dailyUvHTML} from './daily-uv.js?v=compact-comfort-hourly-uv-v2';
-import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=compact-comfort-hourly-uv-v2';
+import {FORECAST_CONFIDENCE_VERSION} from './forecast-confidence.js?v=clear-weather-daygraph-v3';
+import {dailyUvHTML} from './daily-uv.js?v=clear-weather-daygraph-v3';
+import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=clear-weather-daygraph-v3';
 import {weatherState} from './weather-state.js';
-import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=compact-comfort-hourly-uv-v2';
-import {degrees,feelsAt,dailyFeels,forecastValue,peakFeelsHTML} from './hourly-feels.js?v=compact-comfort-hourly-uv-v2';
-import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=compact-comfort-hourly-uv-v2';
-import {comfortMode,comfortWindow,comfortNarrative} from './comfort-outlook.js?v=compact-comfort-hourly-uv-v2';
-import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js?v=compact-comfort-hourly-uv-v2';
-import {resetDewpointMeter} from './dewpoint-meter.js?v=compact-comfort-hourly-uv-v2';
+import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=clear-weather-daygraph-v3';
+import {degrees,feelsAt,dailyFeels,forecastValue,peakFeelsHTML} from './hourly-feels.js?v=clear-weather-daygraph-v3';
+import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=clear-weather-daygraph-v3';
+import {comfortMode,comfortWindow,comfortNarrative} from './comfort-outlook.js?v=clear-weather-daygraph-v3';
+import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js?v=clear-weather-daygraph-v3';
+import {resetDewpointMeter} from './dewpoint-meter.js?v=clear-weather-daygraph-v3';
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const number=(n,d=0)=>finite(n)?n.toFixed(d):'—';
@@ -68,7 +68,7 @@ function renderComfortArt(forecast,now){
 }
 function ensureComfortStyles(){
  if(document.getElementById('weather-nourie-comfort-effects'))return;
- const link=document.createElement('link');link.id='weather-nourie-comfort-effects';link.rel='stylesheet';link.href='/weather-fusion/comfort-effects.css?v=compact-comfort-hourly-uv-v2';document.head.append(link);
+ const link=document.createElement('link');link.id='weather-nourie-comfort-effects';link.rel='stylesheet';link.href='/weather-fusion/comfort-effects.css?v=clear-weather-daygraph-v3';document.head.append(link);
 }
 function pointsFor(key, hours=48) {
  if(!data)return [];
@@ -96,13 +96,15 @@ export function renderComfort(forecast) {
  const c=sample.comfort,zone=forecast.location.timeZone,summary=comfortWindow(forecast,now+1);
  const pavement=pavementEstimate(forecast,current.inputs,now);
  const kicker=$('skin-kicker');if(kicker)kicker.textContent=sample.now?'How does it feel outside right now?':`How will it feel outside at ${formatTime(sample.time)}?`;
- const preview=`<div class="comfort-preview-heading"><span>${esc(sampleCaption(sample,zone))}</span>${sample.now?'':'<button type="button" data-comfort-reset>Back to now</button>'}</div>`;
- $('skin-values').innerHTML=`${preview}${sunShadeHTML(c,forecast.location,sample.now?now:Date.parse(sample.time),{forecast:!sample.now,condition:sample.condition,pavement:pavementHTML(pavement)})}${pavementDetailsHTML(pavement)}${sample.now?peakComparisonHTML(summary,current.feels,zone):''}`;
+ const preview=sample.now?'':'<div class="comfort-preview-heading"><button type="button" data-comfort-reset>Back to now</button></div>';
+ $('skin-values').innerHTML=`${preview}${sunShadeHTML(c,forecast.location,sample.now?now:Date.parse(sample.time),{forecast:!sample.now,condition:sample.condition,compact:true,pavement:pavementHTML(pavement,current.feels)})}${sample.now?peakComparisonHTML(summary,current.feels,zone):''}`;
  $('skin-values').querySelector('[data-comfort-reset]')?.addEventListener('click',()=>selectComfortHour('now'));
  $('skin-explanation').textContent=sample.now?comfortNarrative(sample.inputs,c,summary,zone):`${sample.condition}. This hour uses air ${degrees(sample.temperature)}, dew point ${degrees(sample.inputs.dewpoint)} and ${number(sample.inputs.wind)} mph wind. Outdoors feels like ${degrees(sample.feels)}; shade ${degrees(c.shade)}. The outdoor illustration and solar estimate use this same forecast hour.`;
  const tile=$('skin-exposure');tile.dataset.preview=sample.now?'current':'forecast';tile.dataset.weather=weatherState(sample.condition).kind;
  tile.querySelector('.comfort-weather-art')?.remove();
  document.querySelectorAll('#hourly [data-comfort-time]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.comfortTime===(sample.now?'now':sample.id))));
+ if($('comfort-extra-science'))$('comfort-extra-science').innerHTML=`<p>${esc(sampleCaption(sample,zone))}</p><p>Shade is the source air temperature. The outdoor number is the modeled feels-like temperature, accounting for humidity, wind, clouds and sunlight. The sidewalk and asphalt readings are estimated surface temperatures, not air temperature or human feels-like. The dog walker’s outfit follows the current outdoor feels-like estimate, not the pavement.</p>`;
+ if($('pavement-current-science'))$('pavement-current-science').innerHTML=pavementDetailsHTML(pavement);
  $('skin-science').textContent=`${c.method}. ${sampleCaption(sample,zone)}. Air ${degrees(sample.temperature)}; dew point ${degrees(sample.inputs.dewpoint)}; wind ${number(sample.inputs.wind)} mph. ${c.note} Current observations and future forecasts are different sources; the Now card uses exactly the same observation as the hero. No temperature or peak is forced upward.`;
 }
 export function renderDailyRows(forecast,icon) {
@@ -143,7 +145,7 @@ export function renderMetricTiles(forecast,smallIcon) {
   ['solar','sun',data.solar.sunset?esc(formatTime(data.solar.sunset)):'—',data.solar.sunrise?`Sunrise ${formatTime(data.solar.sunrise)}.`:'Daylight through the week.'],
  ];
  $('metrics').innerHTML=tiles.map(([key,ic,value,note])=>`<button type="button" class="glass metric metric-${key}" data-metric="${key}"${key==='pressure'?` data-pressure-trend="${esc(c.pressureTrend?.direction||'unknown')}"`:''} aria-haspopup="dialog" aria-label="${defs[key].title}: open forecast graph"><span class="metric-title">${smallIcon(ic)}${defs[key].title}<span class="tile-arrow" aria-hidden="true">↗</span></span><span class="metric-value">${value}</span><span class="metric-note">${esc(note)}</span>${sparkline(pointsFor(key,24))}<span class="tile-hint">${key==='solar'?'See the week ahead':'Explore the forecast'} <span aria-hidden="true">→</span></span></button>`).join('');
- $('metric-science').innerHTML=`<p>Current cards use the latest station observations when available. Tap a card for separate future forecast data. All displayed pressures use millibars (mb). The trend compares the same station about three hours apart. Current pressure is station pressure; the graph is mean sea-level forecast pressure. These are kept separate.</p>${Object.entries(data.metricForecasts?.notes||{}).map(([key,note])=>`<p><strong>${esc(key)}:</strong> ${esc(note)}</p>`).join('')}`;
+ $('metric-science').innerHTML=`<p>Current cards use the latest station observations when available. Tap a card for separate future forecast data. Daily forecasts share one hour-by-hour graph: temperature, feels-like and Gross Meter dew point use the left Fahrenheit scale; UV uses the right index scale. Slide or tap to read all four at the same hour. Gaps mean missing data, not zero. Gross Meter describes humidity through dew point, not a second feels-like temperature. All displayed pressures use millibars (mb). The trend compares the same station about three hours apart. Current pressure is station pressure; the graph is mean sea-level forecast pressure. These are kept separate.</p>${Object.entries(data.metricForecasts?.notes||{}).map(([key,note])=>`<p><strong>${esc(key)}:</strong> ${esc(note)}</p>`).join('')}`;
  if(active&&$('metric-dialog')?.open)drawChart();
 }
 function chartGrid(def,points) {
@@ -215,7 +217,8 @@ export function openMetric(key) {
 }
 export function resetExperience() {
   data=null;active=null;comfortPreview=null;
-  if($('pavement-content')){$('pavement-content').textContent='Checking pavement warmth…';$('pavement-content').dataset.status='loading';}
+  if($('pavement-current-science'))$('pavement-current-science').textContent='Waiting for this location’s surface estimate.';
+  if($('comfort-extra-science'))$('comfort-extra-science').textContent='Waiting for this location’s weather.';
  if($('today-forecast'))$('today-forecast').innerHTML='<p class="muted">Daily data is loading.</p>';
  if($('skin-kicker'))$('skin-kicker').textContent='How does it feel outside right now?';
  if($('metric-dialog').open)$('metric-dialog').close();

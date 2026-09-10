@@ -1,4 +1,4 @@
-import {collectDanTakeEvidence,visibleDanTakeItems,danTakeText,discussionPeriod,sectionAnchor,explicitForecastUncertainty} from './dans-take.js?v=compact-comfort-hourly-uv-v2';
+import {hasDanJargon,collectDanTakeEvidence,visibleDanTakeItems,danTakeText,discussionPeriod,sectionAnchor,explicitForecastUncertainty} from './dans-take.js?v=clear-weather-daygraph-v3';
 const norm=v=>String(v||'').replace(/\s+/g,' ').trim();
 const dateKey=(time,zone)=>new Intl.DateTimeFormat('en-CA',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(time));
 function anchoredText(text,anchor,zone,now){
@@ -36,7 +36,7 @@ export function danCard(briefing,forecast,now=Date.now()){
  const compact=value=>norm(value).replace(/^(?:dan\s*['’]?\s*s\s+take\b\s*[:\-—–.]?\s*)+/i,'');
  const append=(item,summary)=>{
   const sentence=compact(summary),period=item.period.replace(/^This coming week — /,'');
-  if(!sentence||sentence.length>200||sentence.split(/\s+/).length>28)return false;
+  if(hasDanJargon(sentence)||!sentence||sentence.length>200||sentence.split(/\s+/).length>28)return false;
   const part=`${period}: ${sentence}`,combined=[...parts,part].join(' ');
   if(combined.length>380||combined.split(/\s+/).length>55)return false;
   items.push({...item,summary:sentence});parts.push(part);return true;
@@ -48,7 +48,10 @@ export function danCard(briefing,forecast,now=Date.now()){
  let sourceExcerpt=null;
  if(!parts.length&&briefing?.mode!=='ai')for(const c of collectDanTakeEvidence(forecast,now).candidates){
   if(!explicitForecastUncertainty(c.quote))continue;
-  const summary=plain(anchoredText(c.quote,Date.parse(c.sectionIssuedAt),forecast.location.timeZone,now));
+  let summary=plain(anchoredText(c.quote,Date.parse(c.sectionIssuedAt),forecast.location.timeZone,now));
+  // Source-bound fallback states the explicit rain-coverage uncertainty, not
+  // the technical mechanism. Unknown jargon is omitted, never pasted verbatim.
+  if(/\bcoverage\b[^.!?]*\b(?:may|could|might)\b[^.!?]*\blimit/i.test(c.quote)&&/rain|shower|storm|convec/i.test(c.context)&&/subsidence|dry layer/i.test(c.quote))summary='Showers and storms may be less widespread than expected.';
   // A short, complete dated excerpt is allowed during an AI failure. No generic
   // overview, routine forecast or truncated half-sentence fills an empty card.
   if(append({...c,sourceQuote:c.quote},summary)){sourceExcerpt=c;break;}
