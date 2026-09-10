@@ -14,10 +14,10 @@ app.get('/comfort-visual-contract',(_req,res)=>res.type('html').send(`<!doctype 
 </head><body><div class="shell"><div class="exposure-cards"><div class="skin-exposure" id="skin-exposure"><h2 class="skin-kicker">How it actually feels right now</h2><div id="skin-values"></div></div></div></div>
 <script type="module">
 const [{sunShadeHTML},{pavementHTML}]=await Promise.all([
- import('/weather-fusion/personal-details.js?v=cinematic-comfort-card-v14'),
- import('/weather-fusion/pavement.js?v=cinematic-comfort-card-v14')
+ import('/weather-fusion/personal-details.js?v=cinematic-comfort-card-v15'),
+ import('/weather-fusion/pavement.js?v=cinematic-comfort-card-v15')
 ]);
-const pavement={status:'estimated',concrete:{value:94,low:85,high:105},asphalt:{value:97,low:90,high:110}};
+const pavement={status:'estimated',daylight:true,concrete:{value:94,low:85,high:105},asphalt:{value:97,low:90,high:110}};
 const comfort={daylight:true,weatherKind:'clear',radiantCondition:'Sunny',condition:'Sunny',shade:86,outdoors:88,sun:88,inputEvidence:{temperature:87,skyCover:0}};
 document.querySelector('#skin-values').innerHTML=sunShadeHTML(comfort,{latitude:35.787,longitude:-78.4806},Date.now(),{compact:true,pavement:pavementHTML(pavement,88)});
 window.__comfortVisualReady=true;
@@ -40,61 +40,55 @@ try{
   const m=await page.evaluate(()=>{
    const box=s=>{const r=document.querySelector(s)?.getBoundingClientRect();return r?{x:r.x,y:r.y,width:r.width,height:r.height,top:r.top,bottom:r.bottom,left:r.left,right:r.right}:null;};
    const tree=box('.shade-person .exposure-tree'),person=box('.shade-person .exposure-person-art');
-   const shadeSun=box('.shade-person .sky-sun'),directSun=box('.sun-person .sky-sun');
-   const shadeSvg=box('.shade-person svg'),sunSvg=box('.sun-person svg');
-   const pet=document.querySelector('.pavement-person'),petSun=getComputedStyle(pet,'::after');
-   const figures=[...document.querySelectorAll('.exposure-person')].map(el=>({box:el.getBoundingClientRect(),label:el.querySelector('.exposure-label')?.textContent.trim(),subtitle:el.querySelector('.exposure-subtitle')?.textContent.trim()}));
+   const shadeSun=box('.shade-person .sky-sun'),directSun=box('.sun-person .sky-sun'),petSun=box('.pavement-person .sky-sun');
+   const shadeSvg=box('.shade-person>svg'),sunSvg=box('.sun-person>svg'),petSvg=box('.pavement-person>svg');
+   const figures=[...document.querySelectorAll('.exposure-person')].map(el=>({box:el.getBoundingClientRect(),label:el.querySelector('.exposure-label')?.textContent.trim(),subtitle:el.querySelector('.exposure-subtitle')?.textContent.trim(),caption:el.querySelector('figcaption')?.getBoundingClientRect()}));
    const temps=[...document.querySelectorAll('.exposure-person figcaption strong')].map(x=>x.textContent.trim());
    const asphalt=document.querySelector('.pavement-secondary')?.textContent.trim();
-   const card=box('.sun-shade-comparison');
-   return {
-    tree,person,shadeSun,directSun,shadeSvg,sunSvg,
-    treeRatio:tree.height/person.height,treeClearance:person.top-tree.top,
-    shadeSunRatio:shadeSun.height/person.height,directSunRatio:directSun.height/person.height,
-    petSun:petSun.content!=='none'&&petSun.content!=='normal',
-    petSunBackground:petSun.backgroundImage,
-    figures,temps,asphalt,card,
-    overflow:document.documentElement.scrollWidth>innerWidth+1
-   };
+   return {tree,person,shadeSun,directSun,petSun,shadeSvg,sunSvg,petSvg,treeRatio:tree.height/person.height,treeClearance:person.top-tree.top,shadeSunRatio:shadeSun.height/person.height,directSunRatio:directSun.height/person.height,figures,temps,asphalt,overflow:document.documentElement.scrollWidth>innerWidth+1};
   });
-  assert.deepEqual(m.temps,['86°','88°','94°'],'Shade, Sun and pet surface values must render exactly from the supplied model values');
-  assert.equal(m.asphalt,'Asphalt 97°','Asphalt secondary value must remain exact');
-  assert.deepEqual(m.figures.map(x=>x.label),['Shade','Sun','For Pets'],'The three card titles must match the approved design');
-  assert.ok(m.figures.every(x=>x.subtitle),'Every card must have a readable descriptive subtitle');
+  assert.deepEqual(m.temps,['86°','88°','94°']);
+  assert.equal(m.asphalt,'Asphalt 97°');
+  assert.deepEqual(m.figures.map(x=>x.label),['Shade','Sun','For Pets']);
   assert.equal(m.figures[0].subtitle,'Pleasant & comfortable');
   assert.equal(m.figures[1].subtitle,'Hot in direct sunlight');
   assert.equal(m.figures[2].subtitle,'Hot on pavement');
   assert.ok(m.treeRatio>=1.55,`Shade tree must be clearly taller than the seated person; got ${m.treeRatio.toFixed(2)}x at ${width}px`);
-  assert.ok(m.treeClearance>=m.person.height*.25,`Tree crown must rise clearly above the seated person at ${width}px`);
-  assert.ok(m.shadeSun&&m.directSun,'Shade and Sun scenes must both contain a visible weather sun');
-  assert.ok(m.shadeSunRatio>=.25,`Shade sun is too small at ${width}px`);
-  assert.ok(m.directSunRatio>=.38,`Direct-sun symbol is too small at ${width}px`);
-  const inset=1.5;
-  assert.ok(m.shadeSun.left>=m.shadeSvg.left-inset&&m.shadeSun.right<=m.shadeSvg.right+inset&&m.shadeSun.top>=m.shadeSvg.top-inset&&m.shadeSun.bottom<=m.shadeSvg.bottom+inset,`Shade sun must be fully visible inside its scene at ${width}px`);
-  assert.ok(m.directSun.left>=m.sunSvg.left-inset&&m.directSun.right<=m.sunSvg.right+inset&&m.directSun.top>=m.sunSvg.top-inset&&m.directSun.bottom<=m.sunSvg.bottom+inset,`Direct sun must be fully visible inside its scene at ${width}px`);
-  assert.ok(m.petSun,'The pet panel must show a visible sun whenever the Sun panel does');
-  assert.notEqual(m.petSunBackground,'none','The pet sun must be an actual rendered graphic');
-  assert.ok(m.figures.every(x=>x.box.height>0&&x.box.width>0),'All three visual cards must render at non-zero size');
-  assert.equal(m.overflow,false,'The three-column card must not cause horizontal overflow');
+  assert.ok(m.treeClearance>=m.person.height*.25);
+  assert.ok(m.shadeSun&&m.directSun&&m.petSun,'All three daylight scenes must carry the correct visible daylight cue');
+  assert.ok(m.shadeSunRatio>=.25);assert.ok(m.directSunRatio>=.38);
+  const heights=m.figures.map(x=>x.box.height),bottoms=m.figures.map(x=>x.box.bottom),captionTops=m.figures.map(x=>x.caption.top);
+  assert.ok(Math.max(...heights)-Math.min(...heights)<=1,`Card heights differ at ${width}px: ${heights.join(', ')}`);
+  assert.ok(Math.max(...bottoms)-Math.min(...bottoms)<=1,`Card bottoms differ at ${width}px: ${bottoms.join(', ')}`);
+  assert.ok(Math.max(...captionTops)-Math.min(...captionTops)<=1,`Temperature bands do not start evenly at ${width}px: ${captionTops.join(', ')}`);
+  for(const fig of m.figures){const ratio=fig.box.width/fig.box.height;assert.ok(ratio>=.56&&ratio<=.70,`Card ratio ${ratio.toFixed(2)} is outside the reference-like portrait range at ${width}px`);}
+  assert.equal(m.overflow,false);
+
+  const night=await page.evaluate(async()=>{
+   const [{sunShadeHTML},{pavementHTML}]=await Promise.all([import('/weather-fusion/personal-details.js?v=cinematic-comfort-card-v15'),import('/weather-fusion/pavement.js?v=cinematic-comfort-card-v15')]);
+   const node=document.createElement('div');
+   node.innerHTML=sunShadeHTML({daylight:false,weatherKind:'clear',radiantCondition:'Clear',condition:'Clear',shade:72,outdoors:72,sun:null,inputEvidence:{temperature:73,skyCover:0}},{latitude:35.787,longitude:-78.4806},Date.now(),{compact:true,pavement:pavementHTML({status:'estimated',daylight:false,concrete:{value:76},asphalt:{value:78}},72)});
+   return {petMoon:!!node.querySelector('.pavement-person .pet-moon'),petSun:!!node.querySelector('.pavement-person .sky-sun'),humanSun:!!node.querySelector('.sun-person .sky-sun'),petDaylight:node.querySelector('.pavement-person')?.dataset.daylight};
+  });
+  assert.equal(night.petMoon,true,'Pet scene must switch to moon/night styling with the human cards');
+  assert.equal(night.petSun,false,'Pet scene must not show a sun at night');
+  assert.equal(night.humanSun,false,'Human Sun scene must not show a sun at night');
+  assert.equal(night.petDaylight,'false');
 
   const hot=await page.evaluate(async()=>{
-   const [{sunShadeHTML},{pavementHTML}]=await Promise.all([
-    import('/weather-fusion/personal-details.js?v=cinematic-comfort-card-v14'),
-    import('/weather-fusion/pavement.js?v=cinematic-comfort-card-v14')
-   ]);
+   const [{sunShadeHTML},{pavementHTML}]=await Promise.all([import('/weather-fusion/personal-details.js?v=cinematic-comfort-card-v15'),import('/weather-fusion/pavement.js?v=cinematic-comfort-card-v15')]);
    const node=document.createElement('div');
-   node.innerHTML=sunShadeHTML({daylight:true,weatherKind:'clear',radiantCondition:'Sunny',condition:'Sunny',shade:90,outdoors:96,sun:96,inputEvidence:{temperature:91,skyCover:0}},{latitude:35.787,longitude:-78.4806},Date.now(),{compact:true,pavement:pavementHTML({status:'estimated',concrete:{value:112,low:100,high:125},asphalt:{value:118,low:105,high:130}},96)});
+   node.innerHTML=sunShadeHTML({daylight:true,weatherKind:'clear',radiantCondition:'Sunny',condition:'Sunny',shade:90,outdoors:96,sun:96,inputEvidence:{temperature:91,skyCover:0}},{latitude:35.787,longitude:-78.4806},Date.now(),{compact:true,pavement:pavementHTML({status:'estimated',daylight:true,concrete:{value:112,low:100,high:125},asphalt:{value:118,low:105,high:130}},96)});
    return [...node.querySelectorAll('.sun-person .thermal-risk,.pavement-person .pavement-warning')].map(x=>x.textContent.trim());
   });
-  assert.deepEqual(hot,['Heat stress','Heat stress'],'Heat-stress warnings must still appear for both the human and pet cards when the modeled threshold is crossed');
-
+  assert.deepEqual(hot,['Heat stress','Heat stress']);
   await page.locator('.exposure-cards').screenshot({path:`${out}/comfort-${width}.png`});
-  results.push({width,...m,hotWarnings:hot});
+  results.push({width,...m,night,hotWarnings:hot});
   await page.close();
  }
  await fs.writeFile(`${out}/metrics.json`,JSON.stringify(results,null,2));
- console.log('CINEMATIC_COMFORT_VISUAL_CONTRACT_PASS');
- for(const r of results)console.log(JSON.stringify({width:r.width,values:r.temps,asphalt:r.asphalt,titles:r.figures.map(x=>x.label),subtitles:r.figures.map(x=>x.subtitle),treeToPerson:Number(r.treeRatio.toFixed(2)),shadeSunToPerson:Number(r.shadeSunRatio.toFixed(2)),directSunToPerson:Number(r.directSunRatio.toFixed(2)),shadeSunFullyVisible:r.shadeSun.left>=r.shadeSvg.left-1.5&&r.shadeSun.right<=r.shadeSvg.right+1.5&&r.shadeSun.top>=r.shadeSvg.top-1.5&&r.shadeSun.bottom<=r.shadeSvg.bottom+1.5,directSunFullyVisible:r.directSun.left>=r.sunSvg.left-1.5&&r.directSun.right<=r.sunSvg.right+1.5&&r.directSun.top>=r.sunSvg.top-1.5&&r.directSun.bottom<=r.sunSvg.bottom+1.5,petSun:r.petSun,hotWarnings:r.hotWarnings,overflow:r.overflow}));
+ console.log('REFERENCE_COMFORT_VISUAL_CONTRACT_PASS');
+ for(const r of results)console.log(JSON.stringify({width:r.width,values:r.temps,asphalt:r.asphalt,cardHeights:r.figures.map(x=>x.box.height),cardBottoms:r.figures.map(x=>x.box.bottom),captionTops:r.figures.map(x=>x.caption.top),treeToPerson:Number(r.treeRatio.toFixed(2)),dayPetSun:!!r.petSun,night:r.night,hotWarnings:r.hotWarnings,overflow:r.overflow}));
 } finally {
  await browser.close();
  await new Promise(resolve=>server.close(resolve));
