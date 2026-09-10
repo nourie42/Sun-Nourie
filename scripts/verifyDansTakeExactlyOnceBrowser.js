@@ -3,6 +3,7 @@ import express from 'express';
 import {chromium} from 'playwright';
 import {fixture} from './weatherNourieFixture.js';
 import {DAN_TAKE_VERSION,collectDanTakeEvidence,approveDanTake} from '../public/weather-fusion/dans-take.js';
+import {danCard} from '../public/weather-fusion/dans-summary.js';
 
 const now=Date.parse('2026-09-05T16:00:00Z');
 function forecastFixture(){
@@ -29,22 +30,21 @@ function approvedBriefing(f){
   assert.equal(approved.forecastChanges.length,2,'both prefixed summaries must remain evidence-supported');
   return {mode:'ai',signature:f.signature,generatedAt:new Date(now).toISOString(),headline:'Prefixed outlook',summary:'The regular forecast remains available.',nearTerm:'Check the hourly forecast.',extended:'Check the week ahead.',sources:['nws','afd'],...approved};
 }
-function quietBriefing(f){
-  return {mode:'ai',signature:f.signature,generatedAt:new Date(now).toISOString(),headline:'Quiet outlook',summary:'The regular forecast remains available.',nearTerm:'Check the hourly forecast.',extended:'Check the week ahead.',sources:['nws','afd'],danTakeVersion:DAN_TAKE_VERSION,forecastChanges:[]};
-}
+function quietBriefing(f){return {...approvedBriefing(forecastFixture()),signature:f.signature,headline:'Quiet outlook',summary:'Warm, dry weather continues today.',...approveDanTake([],f,now)};}
 
 const f=forecastFixture();let mode='prefixed';
+const selectedForecast=()=>mode==='quiet'?{...f,signature:f.signature+'-quiet',discussion:{...f.discussion,id:'quiet-afd',text:'.SYNOPSIS...\nWarm, dry weather continues today.\n&&'}}:f;
 const app=express();
-app.get('/api/weather-fusion/forecast',(_req,res)=>res.json(f));
-app.get('/api/weather-fusion/briefing',(_req,res)=>res.json(mode==='prefixed'?approvedBriefing(f):quietBriefing(f)));
+app.get('/api/weather-fusion/forecast',(_req,res)=>res.json(selectedForecast()));
+app.get('/api/weather-fusion/briefing',(_req,res)=>res.json(mode==='prefixed'?approvedBriefing(f):quietBriefing(selectedForecast())));
 app.get('/api/weather-fusion/radar',(_req,res)=>res.json({frames:[],status:'unavailable'}));
 app.get('/api/weather-fusion/models',(_req,res)=>res.json({layers:{}}));
 app.use('/weather-fusion',express.static('public/weather-fusion'));
 const server=await new Promise(resolve=>{const s=app.listen(0,'127.0.0.1',()=>resolve(s));});
 const base=`http://127.0.0.1:${server.address().port}`;
-const browser=await chromium.launch({headless:true});
+const browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{})});
 try{
-  for(const scenario of ['prefixed','quiet']){
+  for(const scenario of ['prefixed','quiet','empty-ai-proposals']){
     mode=scenario;
     const context=await browser.newContext({viewport:{width:390,height:1000}}),page=await context.newPage(),errors=[];
     await page.addInitScript(time=>{const NativeDate=Date;window.Date=class extends NativeDate{constructor(...args){super(...(args.length?args:[time]));}static now(){return time;}};},now);
@@ -62,9 +62,9 @@ try{
     if(scenario==='prefixed'){
       assert.match(body,/front could arrive earlier or later/i);
       assert.match(body,/amount of rain is still uncertain/i);
-    }else{
-      assert.equal(body,'No additional forecast changes to call out right now.');
-    }
+    }else if(scenario==='quiet'){
+      assert.equal(body,'Warm, dry weather continues today.');assert.doesNotMatch(body,/Watch for changes/);
+    }else{assert.equal(body,danCard(quietBriefing(f),f,now).text);assert.match(body,/Watch for changes/);assert.match(body,/front timing remains uncertain/i);}
     assert.deepEqual(errors,[]);
     await context.close();
   }

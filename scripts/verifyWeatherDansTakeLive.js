@@ -3,9 +3,10 @@ import {createHash} from 'node:crypto';
 import fs from 'node:fs/promises';
 import {chromium} from 'playwright';
 import {DAN_TAKE_VERSION,collectDanTakeEvidence,visibleDanTakeItems,danTakeText} from '../public/weather-fusion/dans-take.js';
-const base='https://sun-nourie-live.onrender.com',output='/tmp/weather-dans-take-live.json';
+import {danCard} from '../public/weather-fusion/dans-summary.js';
+const base='https://sun-nourie-live.onrender.com',output=process.env.WEATHER_DANS_REPORT||'/tmp/weather-dans-take-live.json';
 const report={checkedAt:new Date().toISOString(),commit:process.env.GITHUB_SHA,base,fixture:false,success:false,locations:[]};
-const assets=['index.html','app.js','dans-take.js'],digest=v=>createHash('sha256').update(v).digest('hex');
+const assets=['index.html','app.js','dans-summary.js','current-inputs.js','pavement.js','daily-uv.js','dans-take.js'],digest=v=>createHash('sha256').update(v.toString().replace(/\r\n/g,'\n')).digest('hex');
 const expected=Object.fromEntries(await Promise.all(assets.map(async p=>[p,digest(await fs.readFile('public/weather-fusion/'+p))])));
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
 let ready=false,browser;
@@ -22,7 +23,7 @@ try{
  }
  assert.ok(ready,'Production must serve the new backend contract and exact reviewed frontend bytes');
  report.deployed={version:DAN_TAKE_VERSION,exactAssets:expected};console.log('DATED_TAKE_DEPLOYMENT_VERIFIED',process.env.GITHUB_SHA);
- browser=await chromium.launch({headless:true});
+ browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{})});
  for(const place of [
   {id:'knightdale',name:'Knightdale / Raleigh',latitude:35.787,longitude:-78.4806},
   {id:'',name:'White Lake, NC',latitude:34.6385,longitude:-78.5025},
@@ -52,7 +53,8 @@ try{
    assert.equal(b.uncertainty,text,'API compatibility text must be built from approved items only');
    assert.equal((b.forecastChanges||[]).length,items.length);
   }else assert.equal(items.length,0,'No unverified or non-AI take is allowed');
-  const expectedText=text||(b.mode==='ai'?'No additional forecast changes to call out right now.':'No additional take is available right now.');
+  const card=danCard(b,f,time),expectedText=card.text;
+  if(card.sourceExcerpt){assert.ok(f.discussion.text.replace(/\s+/g,' ').includes(card.sourceExcerpt.quote));assert.ok(Date.parse(card.sourceExcerpt.eventEnd)>time);}
   await page.waitForFunction(expected=>document.querySelector('#today-uncertainty-text')?.textContent===expected,expectedText,{timeout:15000});
   const displayed=await page.evaluate(()=>({text:document.querySelector('#today-uncertainty-text').textContent,hidden:document.querySelector('#today-uncertainty').hidden,headingCount:document.querySelectorAll('.today-uncertainty-label').length,bodyHasLabel:/dan\s*['’]?\s*s\s+take/i.test(document.querySelector('#today-uncertainty-text').textContent),fullOutlookSections:document.querySelectorAll('#briefing-detail [data-dans-take]').length,overflow:document.documentElement.scrollWidth>innerWidth+1}));
   assert.equal(displayed.hidden,false);assert.equal(displayed.headingCount,1);assert.equal(displayed.bodyHasLabel,false);assert.equal(displayed.fullOutlookSections,0);assert.equal(displayed.overflow,false);

@@ -6,6 +6,7 @@ on:
       - 'public/weather-fusion/**'
       - 'test/weatherFusion*.test.js'
       - 'scripts/weatherFusionPersonalBrowser.js'
+      - 'scripts/verifyComfortPawsUv*.js'
       - '.github/workflows/weather-personal-checks.yml'
   pull_request:
     paths:
@@ -13,6 +14,7 @@ on:
       - 'public/weather-fusion/**'
       - 'test/weatherFusion*.test.js'
       - 'scripts/weatherFusionPersonalBrowser.js'
+      - 'scripts/verifyComfortPawsUv*.js'
   workflow_dispatch:
 permissions:
   contents: read
@@ -62,6 +64,15 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Six responsive widths, paired hourly temperatures, bulletin safety, charts and nighttime
         run: node scripts/weatherFusionPersonalBrowser.js
+      - name: Peak UV, missing current inputs, paws, fixed hands and always-visible overview
+        env:
+          WEATHER_QA_DIR: /tmp/weather-personal-results/comfort-paws-uv
+        run: node scripts/verifyComfortPawsUvBrowser.js
+      - name: Verify exact live comfort, paws and UV release with real weather
+        if: github.ref == 'refs/heads/main'
+        env:
+          WEATHER_QA_DIR: /tmp/weather-personal-results/live-comfort-paws-uv
+        run: node scripts/verifyComfortPawsUvLive.js
       - uses: actions/upload-artifact@v4
         if: always()
         with:

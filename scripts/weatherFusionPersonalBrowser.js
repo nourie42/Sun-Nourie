@@ -1,4 +1,5 @@
 import {collectDanTakeEvidence,approveDanTake,danTakeText} from '../public/weather-fusion/dans-take.js';
+import {danCard} from '../public/weather-fusion/dans-summary.js';
 import {rebuildHourlyFeels} from '../src/weatherFusionHourlyFeels.js';
 import {thermalComfort,shadeFeelsLike} from '../public/weather-fusion/weather-math.js';
 import {forecastConfidence} from '../public/weather-fusion/forecast-confidence.js';
@@ -109,7 +110,7 @@ try{
   (report.centeringChecks??=[]).push({width,columns:14,threeDigitStress:true,maximumErrorPx:Math.max(...centerAudit.map(r=>r.error))});
 
   assert.ok(!(await page.locator('#alerts').innerText()).includes('forecast discussion'));
-  for(const selector of ['.shade-person','.sun-person']){const figure=page.locator(selector),shown=parseFloat(await figure.locator('figcaption strong').innerText()),actual=await figure.locator('svg').getAttribute('data-outfit');assert.equal(actual,clothingForFeels(shown),selector+' outfit follows its visible feels-like number');}
+  for(const [selector,key] of [['.shade-person','shade'],['.sun-person','outdoors']]){const figure=page.locator(selector),actual=await figure.locator('svg').getAttribute('data-outfit');assert.equal(actual,clothingForFeels(currentSample(activeFixture,epoch).comfort[key]),selector+' outfit follows modeled comfort; shade number is air temperature');}
   assert.equal(await page.locator('.person-eyes').count(),2);
   assert.equal(await page.locator('.friendly-wave').count(),2);
   assert.ok(await page.locator('.exposure-tree').evaluate(el=>el.getBBox().height>el.closest('svg').querySelector('.exposure-person-art').getBBox().height*1.5));
@@ -151,7 +152,8 @@ try{
     assert.equal((await page.locator('#hourly .hour-current .hour-feels b').innerText()).trim(),expected,'Now equals hero');
     assert.equal((await page.locator('.metric-feels .metric-value').innerText()).trim(),expected,'Metric equals Now');
     assert.equal((await page.locator('.sun-person figcaption strong').innerText()).trim(),expected==='—'?'Unavailable':expected,'Outdoor figure equals Now');
-    assert.equal((await page.locator('.shade-person figcaption strong').innerText()).trim(),Number.isFinite(f.comfort.shade)?degree(f.comfort.shade):'Unavailable','Shade remains separately labeled');
+    assert.equal((await page.locator('.shade-person figcaption strong').innerText()).trim(),degree(f.current.temperature),'Shade is explicitly labeled air temperature');
+    if(patch.wind===null){assert.ok(Number.isFinite(f.comfort.outdoors));assert.deepEqual(f.comfort.inputEvidence.estimatedFields,['wind']);assert.equal(f.current.wind,null);assert.match(await page.locator('.comfort-preview-heading').innerText(),/Wind estimated from the current forecast hour/);}
     assert.ok((await page.locator('#hourly .hour-current .hour-exposure').innerText()).trim());
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
     return f;
@@ -211,8 +213,9 @@ try{
    assert.equal(await page.locator('#today-uncertainty').isVisible(),true,name+' keeps the one Dan take heading');
    assert.equal(await page.locator('#briefing-detail [data-dans-take]').count(),0);
    const shown=(await page.locator('#today-uncertainty-text').textContent()).trim();
-   const expectedText=danTakeText(make().b.forecastChanges);
-   assert.equal(shown,expectedText||'No additional forecast changes to call out right now.');
+   const sample=make(),card=danCard(sample.b,sample.f,at);
+   assert.equal(shown,card.text);assert.equal(sample.b.forecastChanges.length,expected);
+   assert.ok(card.text.length>20,'A substantive overview remains visible even without changes');
    assert.ok(!/yesterday|main sources of forecast uncertainty|Forecasts can change/i.test(shown));
    if(expected){
     assert.match(shown,/(?:Monday|Thursday), Sep (?:7|10)/);
@@ -222,7 +225,8 @@ try{
    if(name==='expires-on-open-page'){
     await page.evaluate(time=>{window.__takeNow=time;document.dispatchEvent(new Event('visibilitychange'));},takeNow);
     assert.equal(await page.locator('#today-uncertainty').isVisible(),true,'Passed morning clears content but keeps one heading on return to page');
-    assert.equal((await page.locator('#today-uncertainty-text').textContent()).trim(),'No additional forecast changes to call out right now.');
+    assert.equal((await page.locator('#today-uncertainty-text').textContent()).trim(),danCard(sample.b,sample.f,takeNow).text);
+    assert.doesNotMatch(await page.locator('#today-uncertainty-text').textContent(),/Watch for changes/);
     assert.equal(await page.locator('#briefing-detail [data-dans-take]').count(),0);
    }
    if(width===390&&name==='later-week')await page.locator('.today-panel').screenshot({path:dir+'/dans-take-dated-390.png'});
@@ -230,7 +234,8 @@ try{
    assert.equal(await page.locator('#today-uncertainty').isVisible(),true,'Old location content clears but the one heading remains');
    await page.waitForFunction(()=>document.querySelector('#briefing-title').textContent==='Local outlook');
    assert.equal(await page.locator('#today-uncertainty').isVisible(),true,'Quiet new location keeps one heading without inheriting prior concern');
-   assert.equal((await page.locator('#today-uncertainty-text').textContent()).trim(),'No additional forecast changes to call out right now.');
+   const green=make('greenville');assert.equal((await page.locator('#today-uncertainty-text').textContent()).trim(),danCard(green.b,green.f,name==='expires-on-open-page'?takeNow:at).text);
+   assert.doesNotMatch(await page.locator('#today-uncertainty-text').textContent(),/Watch for changes/);
    (report.danTakeChecks??=[]).push({name,width,expectedItems:expected,datedSourceOnly:true,legacyTextIgnored:true,locationReset:true,expiry:name==='expires-on-open-page'});
    await context.close();
   }
@@ -265,13 +270,14 @@ try{
   mode='slow';version++;await page.locator('#refresh').click();
   while(!held)await page.waitForTimeout(20);
   assert.equal(await page.locator('#today-uncertainty').isVisible(),true,'A numerical refresh must not erase a current-source take while AI is pending');
-  assert.equal(await page.locator('#today-uncertainty-text').textContent(),expected);
+  assert.equal((await page.locator('#today-uncertainty-text').textContent()).split('Watch for changes — ')[1],expected.split('Watch for changes — ')[1],'Revalidated source changes persist while the overview is refreshed');
+  assert.ok((await page.locator('#today-uncertainty-text').textContent()).split('Watch for changes — ')[0].trim());
   await held.fulfill({status:503,json:{error:'Simulated outage'}});held=null;
   await page.waitForTimeout(100);assert.equal(await page.locator('#today-uncertainty').isVisible(),true);
   mode='cached';version++;await page.reload({waitUntil:'networkidle'});
   assert.equal(await page.locator('#today-uncertainty').isVisible(),true,'Reload immediately renders the cached, revalidated source take without a successful full outlook');
   mode='quiet';version++;await page.locator('#refresh').click();await page.waitForTimeout(500);
-  assert.equal(await page.locator('#today-uncertainty').isVisible(),true,'A different quiet discussion clears prior content but keeps one heading');assert.equal((await page.locator('#today-uncertainty-text').textContent()).trim(),'No additional forecast changes to call out right now.');
+  assert.equal(await page.locator('#today-uncertainty').isVisible(),true,'A different quiet discussion clears prior changes but keeps an overview');assert.equal((await page.locator('#today-uncertainty-text').textContent()).trim(),danCard(sample().b,sample().f,epoch).text);assert.doesNotMatch(await page.locator('#today-uncertainty-text').textContent(),/Watch for changes/);
   mode='conflict';version++;forecastRequests=0;briefingRequests=0;await page.reload({waitUntil:'networkidle'});
   await page.waitForFunction(()=>!document.querySelector('#today-uncertainty').hidden);
   assert.equal(briefingRequests,2,'A forecast-signature conflict is retried once, not silently ignored until manual refresh');
@@ -283,7 +289,7 @@ try{
  await page.addInitScript(time=>{const NativeDate=Date;window.Date=class extends NativeDate{constructor(...args){super(...(args.length?args:[time]));}static now(){return time;}};},Date.parse('2026-09-07T02:00:00Z'));
  await page.route('https://unpkg.com/**',route=>route.fulfill({body:'',contentType:'application/javascript'}));
  page.on('pageerror',e=>report.browserErrors.push(e.message));await page.goto(base+'/weather-fusion/',{waitUntil:'networkidle'});
- assert.equal((await page.locator('#temperature').innerText()).trim(),'75°');assert.match(await page.locator('.sun-person').innerText(),/Under clouds/);assert.equal(await page.locator('.sun-person .sky-sun').count(),0);assert.ok((await page.locator('.sun-person').innerText()).includes(Math.round(fixture().comfort.shade)+'°'));report.nightCurrentTemperature=true;
+ assert.equal((await page.locator('#temperature').innerText()).trim(),'75°');assert.match(await page.locator('.sun-person').innerText(),/Under clouds/);assert.equal(await page.locator('.sun-person .sky-sun').count(),0);assert.ok((await page.locator('.sun-person').innerText()).includes(Math.round(currentSample(fixture(),Date.parse('2026-09-07T02:00:00Z')).feels)+'°'));report.nightCurrentTemperature=true;
  assert.deepEqual(report.browserErrors,[]);report.success=true;
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));await fs.writeFile(dir+'/report.json',JSON.stringify(report,null,2));}
 console.log(JSON.stringify(report,null,2));

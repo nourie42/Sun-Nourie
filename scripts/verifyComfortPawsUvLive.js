@@ -46,6 +46,7 @@ try{
   await page.waitForSelector('#pavement-content[data-status="estimated"]',{timeout:90000});
   const briefing=await briefingResponse;
   await page.waitForFunction(()=>document.querySelector('#today-uncertainty-text')?.textContent.length>20);
+  await page.waitForFunction(()=>{const img=document.querySelector('.poodle-walk');return img?.complete&&img.naturalWidth>0;},null,{timeout:30000});
   const rendered=await page.evaluate(()=>{
    const q=s=>document.querySelector(s),text=s=>q(s)?.textContent.trim();
    const row=q('#daily .day-row'),low=row.querySelector('.day-low').getBoundingClientRect(),high=row.querySelector('.day-high').getBoundingClientRect();

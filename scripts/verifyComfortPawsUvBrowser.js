@@ -1,9 +1,12 @@
 import {chromium} from 'playwright';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
+import express from 'express';
 import {fixture} from './weatherNourieFixture.js';
 import {addExposureWeather} from '../src/weatherFusionExposure.js';
-const base=process.env.WEATHER_BASE_URL||'http://127.0.0.1:3123';
+const app=express();app.use('/weather-fusion',express.static('public/weather-fusion'));
+const server=process.env.WEATHER_BASE_URL?null:await new Promise(resolve=>{const s=app.listen(0,'127.0.0.1',()=>resolve(s));});
+const base=process.env.WEATHER_BASE_URL||`http://127.0.0.1:${server.address().port}`;
 const output=process.env.WEATHER_QA_DIR||'../qa';
 const H=3600000,now=Date.parse('2026-09-05T17:00:00Z');
 await fs.mkdir(output,{recursive:true});
@@ -80,5 +83,5 @@ try{
  await page.locator('#outfits').screenshot({path:`${output}/all-outfits.png`});
  assert.equal(await page.locator('.person-resting-hand').count(),5);assert.equal(await page.locator('.friendly-wave').count(),5);
  report.scenarios.push('All five clothing states have two hands');report.success=true;
-}finally{await fs.writeFile(`${output}/browser-report.json`,JSON.stringify(report,null,2));await browser.close();}
+}finally{await fs.writeFile(`${output}/browser-report.json`,JSON.stringify(report,null,2));await browser.close();if(server)await new Promise(resolve=>server.close(resolve));}
 console.log(JSON.stringify(report,null,2));

@@ -48,6 +48,8 @@ Dan's take contains a short overview even when no forecast changes are identifie
 - `WEATHER_BROWSER_PATH=... WEATHER_BASE_URL=http://127.0.0.1:3123 node scripts/verifyComfortPawsUvBrowser.js`: deterministic browser checks at 320, 390 and 1440 pixels, optional-feed/AI failure, missing current wind/moisture, repeated refresh, Tonight, failed location change, high-right ordering, all UV placements, poodle loading, both hands in all clothing states, and no horizontal overflow.
 - Live verification is performed separately against Render with real provider responses, not fixtures.
 
+Release verification on September 10, 2026 also passed the six-width responsive suite (320–1365 px), 27 outdoor scenarios, 21 dated-summary scenarios, and two failed/pending/reload lifecycle scenarios. Live Render checks matched the exact changed assets and backend release marker. Greenville and Knightdale displayed all seven UV maxima, numeric pavement estimates, complete fixed graphics and matching current sun values across the hero, Now, metric and figure. Separate live thermal and discussion checks covered Knightdale, White Lake, Jacksonville, Denver and Seattle; Dan's overview remained visible with no approved changes and with a dated source-excerpt fallback. Repeated live refreshes crossed both forecast and discussion cache lifetimes without hiding the card. The responsive workflow now runs the new deterministic and live UV/pavement checks.
+
 The generated poodle illustration is `public/weather-fusion/poodle-walk.png` (1536 × 1024 PNG). It is a fixed asset, not generated anew on refresh.
 
 Generation prompt:

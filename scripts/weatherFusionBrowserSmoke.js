@@ -1,6 +1,7 @@
 /** Actual HTTP + browser integration checks, not a screenshot-only mock. */
 import {createHash} from 'node:crypto';
 import {REPAIR_VERSION} from '../src/weatherFusionPolicy.js';
+import {danCard} from '../public/weather-fusion/dans-summary.js';
 import {chromium} from 'playwright';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -14,8 +15,8 @@ async function json(path){
 }
 // Do not mistake a previous deployment with the same old schema for this repair.
 if(live){
- const paths=['hourly-feels.js','hourly-feels.css','exposure-scene.js','personal-details.js','personal-details.css','bulletin-facts.js','bulletins.js','current-temperature.js','comfort-outlook.js','index.html','forecast-layout.css','app.js','experience.js','hero-mode.js','comfort-outlook.js','frame-player.js','dewpoint-meter.js','dewpoint-meter.css'];
- const wanted=Object.fromEntries(await Promise.all(paths.map(async p=>[p,createHash('sha256').update(await fs.readFile('public/weather-fusion/'+p)).digest('hex')])));
+ const paths=['hourly-feels.js','hourly-feels.css','exposure-scene.js','personal-details.js','personal-details.css','bulletin-facts.js','bulletins.js','current-temperature.js','comfort-outlook.js','index.html','forecast-layout.css','app.js','dans-summary.js','current-inputs.js','pavement.js','daily-uv.js','experience.js','hero-mode.js','comfort-outlook.js','frame-player.js','dewpoint-meter.js','dewpoint-meter.css'];
+ const wanted=Object.fromEntries(await Promise.all(paths.map(async p=>[p,createHash('sha256').update((await fs.readFile('public/weather-fusion/'+p,'utf8')).replace(/\r\n/g,'\n')).digest('hex')])));
  let deployed=false;
  for(let attempt=0;attempt<35&&!deployed;attempt++){
    try{
@@ -31,13 +32,14 @@ if(live){
 }
 // Check the actual rendered layout at both browser sizes, not just source strings.
 async function checkForecastDetails(page){
+ if(live)await page.waitForFunction(()=>document.querySelector('#ai-label')?.textContent==='YOUR LOCAL OUTLOOK',null,{timeout:90000});
  const details=await page.evaluate(()=>{
   const panel=document.querySelector('.today-panel');
   const row=document.querySelector('#today-forecast');
   const note=document.querySelector('#today-uncertainty');
   const text=document.querySelector('#today-uncertainty-text');
   const title=document.querySelector('#gross-title');
-  const source=document.querySelector('#briefing-detail>div:last-child p');
+  const source=document.querySelector('#today-take-source');
   const next=panel.nextElementSibling;
   const hourly=next?.id==='nws-bulletins'?next.nextElementSibling:next;
   return {viewport:innerWidth,text:text.textContent,source:source.textContent.trim(),hidden:note.hidden,
@@ -48,8 +50,10 @@ async function checkForecastDetails(page){
    noteWeight:Number(getComputedStyle(text).fontWeight),titleWeight:Number(getComputedStyle(title).fontWeight),titleAlign:getComputedStyle(title).textAlign,
    noOverflow:note.scrollWidth<=note.clientWidth+1};
  });
- assert.equal(details.text,details.source,'The same outlook uncertainty must appear below the daily graphic');
- assert.equal(details.hidden,!details.source);
+ const f=page.weatherForecast,b=page.weatherBriefing;
+ assert.ok(f,'Browser must receive real forecast data before card verification');
+ assert.equal(details.text,danCard(b?.signature===f.signature?b:{danTake:f.danTake},f).text,'Dan card must match its source-bound overview and changes');
+ assert.equal(details.hidden,false);assert.match(details.source,/NWS/);
  assert.ok(details.adjacentHourly,'Hourly must follow the Today/Tonight and bulletin panels');
  if(!details.hidden){
   assert.ok(details.belowGraphic&&details.aboveHourly,'Uncertainty must sit between the graphic and hourly forecast');
@@ -104,10 +108,11 @@ for(const location of ['knightdale','greenville']){
  }
  report.locations.push({location,version:data.version,feelsLike:data.current.apparent,feelsLikeMethod:data.current.apparentSource,next24HourPrecipitationIn:data.precipitation.value,models:data.modelContributions,office:data.discussion.office,ai:ai?{mode:ai.mode,sources:ai.sources,headline:ai.headline}:null});
 }
-const browser=await chromium.launch({headless:true});
+const browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{})});
 try{
  const context=await browser.newContext({viewport:{width:1365,height:1000}});
  const page=await context.newPage();
+ page.on('response',async response=>{try{if(response.ok()&&response.url().includes('/api/weather-fusion/forecast?'))page.weatherForecast=await response.json();if(response.ok()&&response.url().includes('/api/weather-fusion/briefing?'))page.weatherBriefing=await response.json();}catch{}});
  page.on('pageerror',error=>report.browserErrors.push(error.message));
  await page.goto(base+'/weather-fusion/',{waitUntil:'domcontentloaded',timeout:75000});
  await page.waitForFunction(()=>document.querySelectorAll('#metrics .metric-value').length===8,null,{timeout:75000});
@@ -141,23 +146,23 @@ try{
  }
  const startOverlayAudit=async()=>page.evaluate(()=>{
    window.modelOverlayAudit=[];
-   new MutationObserver(()=>{const all=[...document.querySelectorAll('.leaflet-image-layer')];window.modelOverlayAudit.push({total:all.length,visible:all.filter(i=>getComputedStyle(i).opacity!=='0').length});}).observe(document.querySelector('#radar-map'),{subtree:true,childList:true,attributes:true,attributeFilter:['style']});
+   new MutationObserver(()=>{const all=[...document.querySelectorAll('.leaflet-weather-model-pane > .leaflet-layer,.leaflet-weather-model-pane > .leaflet-image-layer')];window.modelOverlayAudit.push({total:all.length,visible:all.filter(i=>getComputedStyle(i).opacity!=='0').length});}).observe(document.querySelector('#radar-map'),{subtree:true,childList:true,attributes:true,attributeFilter:['style']});
  });
  await startOverlayAudit();
  for(const layer of ['hrrr','ecmwf','nbm','temperature','wind','clouds']){
   await page.locator(`[data-layer="${layer}"]`).click();
-  await page.waitForFunction(()=>{
+  await page.waitForFunction(layer=>{
     const selected=document.querySelector('.map-tabs .selected')?.dataset.layer;
-    const imgs=[...document.querySelectorAll('.leaflet-image-layer')];
-    return selected!=='radar'&&imgs.some(i=>i.complete&&i.naturalWidth>0)&&!document.querySelector('#radar-stamp').textContent.includes('loading')&&document.querySelector('#map-error').hidden;
-  },null,{timeout:60000});
-  const src=await page.locator('.leaflet-image-layer').last().getAttribute('src');
-  assert.ok(src.includes('weather-fusion-data/maps/'));
-  assert.equal(await page.locator('.leaflet-image-layer').count(),1,layer+' must have only one settled image');
+    const imgs=[...document.querySelectorAll('.leaflet-weather-model-pane img')];
+    return selected===layer&&imgs.some(i=>i.complete&&i.naturalWidth>0)&&!document.querySelector('#radar-stamp').textContent.includes('loading')&&document.querySelector('#map-error').hidden;
+  },layer,{timeout:60000});
+  const src=await page.locator('.leaflet-weather-model-pane img').evaluateAll(imgs=>imgs.find(i=>i.complete&&i.naturalWidth>0)?.src);
+  assert.ok(src.includes('weather-fusion-data/maps/')||(layer==='hrrr'&&src.startsWith('https://mesonet.agron.iastate.edu/cache/tile.py/')&&src.includes('hrrr::REFD-')));
+  assert.equal(await page.locator('.leaflet-weather-model-pane > .leaflet-layer,.leaflet-weather-model-pane > .leaflet-image-layer').count(),1,layer+' must have only one settled raster or XYZ layer');
   if(['hrrr','nbm'].includes(layer)){
     await page.locator('#radar-play').click();await page.waitForTimeout(5500);
     if((await page.locator('#radar-play').innerText()).includes('Ⅱ'))await page.locator('#radar-play').click();
-    await page.waitForFunction(()=>document.querySelectorAll('.leaflet-image-layer').length===1&&!document.querySelector('#radar-stamp').textContent.includes('loading'),null,{timeout:30000});
+    await page.waitForFunction(()=>document.querySelectorAll('.leaflet-weather-model-pane > .leaflet-layer,.leaflet-weather-model-pane > .leaflet-image-layer').length===1&&!document.querySelector('#radar-stamp').textContent.includes('loading'),null,{timeout:30000});
     assert.equal(await page.locator('#map-error').isVisible(),false);
   }
   report.maps.push({layer,loaded:true,src,caption:await page.locator('#map-caption').innerText()});
@@ -197,7 +202,7 @@ try{
  report.forecastDetails.push(await checkForecastDetails(page));
  await startOverlayAudit();
  await page.locator('[data-layer="ecmwf"]').click();
- await page.waitForFunction(()=>document.querySelector('#map-error').hidden && document.querySelectorAll('.leaflet-image-layer').length>0,null,{timeout:60000});
+ await page.waitForFunction(()=>document.querySelector('#map-error').hidden && document.querySelector('[data-weather-model-frame="visible"]'),null,{timeout:60000});
  await page.evaluate(()=>document.activeElement?.blur());
  await page.screenshot({path:dir+'/mobile.png',fullPage:true});
  await page.locator('#dewpoint-gross-meter').screenshot({path:dir+'/gross-meter-mobile.png'});

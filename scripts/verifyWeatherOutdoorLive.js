@@ -6,8 +6,8 @@ import {OUTDOOR_FEELS_VERSION} from '../public/weather-fusion/outdoor-feels.js';
 const base='https://sun-nourie-live.onrender.com';
 const report={checkedAt:new Date().toISOString(),commit:process.env.GITHUB_SHA,base,fixture:false,success:false,locations:[]};
 const output=process.env.WEATHER_OUTDOOR_REPORT||'/tmp/weather-outdoor-live.json';
-const assets=['index.html','app.js','weather-display.js','experience.js','personal-details.js','hourly-feels.js','comfort-outlook.js','outdoor-feels.js','hourly-feels.css'];
-const digest=body=>createHash('sha256').update(body).digest('hex');
+const assets=['index.html','app.js','dans-summary.js','current-inputs.js','pavement.js','daily-uv.js','weather-display.js','experience.js','personal-details.js','hourly-feels.js','comfort-outlook.js','outdoor-feels.js','hourly-feels.css'];
+const digest=body=>createHash('sha256').update(body.toString().replace(/\r\n/g,'\n')).digest('hex');
 const wanted=Object.fromEntries(await Promise.all(assets.map(async p=>[p,digest(await fs.readFile('public/weather-fusion/'+p))])));
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 let deployed=false;
@@ -27,7 +27,7 @@ for(let attempt=0;attempt<35;attempt++){
 }
 assert.ok(deployed,'The production backend marker and exact changed frontend bytes must match this commit');
 console.log('DEPLOYMENT_VERIFIED',process.env.GITHUB_SHA,OUTDOOR_FEELS_VERSION);
-const browser=await chromium.launch({headless:true});
+const browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{})});
 const degrees=v=>Number.isFinite(v)?Math.round(v)+'°':'—';
 try{
  for(const [id,name,latitude,longitude,width] of [
@@ -56,7 +56,8 @@ try{
   }));
   for(const key of ['hero','now','metric'])assert.equal(rendered[key],expected,name+' '+key+' matches outdoor API value');
   assert.equal(rendered.outdoors,expected==='—'?'Unavailable':expected,name+' outdoor figure equals Now');
-  assert.equal(rendered.shade,Number.isFinite(f.comfort.shade)?degrees(f.comfort.shade):'Unavailable');
+  const shadeAir=Number.isFinite(f.current.temperature)?f.current.temperature:f.comfort.shade;
+  assert.equal(rendered.shade,Number.isFinite(shadeAir)?degrees(shadeAir):'Unavailable','Shade figure labels air temperature, not shade UTCI');
   assert.equal(f.current.feelsLike,f.comfort.outdoors);
   assert.ok(rendered.exposure);assert.ok(rendered.noOverflow);
   for(const h of f.hours){
