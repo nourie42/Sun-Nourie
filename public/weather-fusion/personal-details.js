@@ -5,12 +5,12 @@ import {exposureScene} from './exposure-scene.js?v=cinematic-comfort-card-v14';
 import {outdoorExposure} from './outdoor-feels.js?v=clear-weather-daygraph-v3';
 import {solarElevation} from './weather-math.js?v=clear-weather-daygraph-v3';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
 const HOUR=3600000;
 function ensureCinematicComfortStyles(){
  if(typeof document==='undefined'||document.getElementById('weather-nourie-cinematic-comfort'))return;
  const link=document.createElement('link');
- link.id='weather-nourie-cinematic-comfort';link.rel='stylesheet';link.href='/weather-fusion/comfort-cinematic.css?v=cinematic-comfort-card-v14';
+ link.id='weather-nourie-cinematic-comfort';link.rel='stylesheet';link.href='/weather-fusion/comfort-cinematic.css?v=cinematic-comfort-card-v15';
  document.head.append(link);
 }
 export const pressureMb=value=>finite(value)?value*33.86389:null;
