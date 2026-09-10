@@ -1,4 +1,3 @@
-import {thermalRiskHTML} from './thermal-risk.js?v=thermal-risk-people-v7';
 import {finite} from './weather-math.js?v=clear-weather-daygraph-v3';
 const H=3600000;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -44,12 +43,12 @@ export function dayFeelsHTML(f,index,tonight=false,now=Date.now()){
  const card=(summary,kind,label)=>{
   const p=summary?.[kind];
   if(!p)return `<div><small>${label}</small><strong>Unavailable</strong><span>Hourly inputs are missing.</span></div>`;
-  return `<div><small>${label}${summary.partial?' · partial data':''}</small>${thermalRiskHTML(p.value,true)}<strong>${degrees(p.value)}</strong><span>${esc(clock(p.time))} · air ${degrees(forecastValue(f,'temperature',p.time))}</span></div>`;
+  return `<div><small>${label}${summary.partial?' · partial data':''}</small><strong>${degrees(p.value)}</strong><span>${esc(clock(p.time))} · air ${degrees(forecastValue(f,'temperature',p.time))}</span></div>`;
  };
  return `<section class="day-feels" aria-label="Hourly feels-like forecast"><h3>How it’s forecast to feel</h3><div class="day-feels-grid">${tonight?'':card(s.high,'high','Feels-like high')}${card(s.low,'low','Feels-like overnight low')}</div><p>Outdoor estimates from each hour’s temperature, dew point, wind and sky/sun exposure; the same values appear in the hourly forecast and outdoor figure. The feels-like peak and air-temperature high can occur at different hours.</p></section>`;
 }
 export function peakFeelsHTML(summary,zone='America/New_York'){
  if(!summary)return '<p class="comfort-later">Hourly feels-like outlook unavailable. Missing readings stay blank.</p>';
  const p=summary.chosen,time=new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',minute:'2-digit'}).format(new Date(p.time));
- return `<div class="comfort-later" data-peak-time="${esc(p.time)}"><span>${esc(summary.label)}${summary.partial?' · partial data':''}</span>${thermalRiskHTML(p.value,true)}<strong>${degrees(p.value)}</strong><small>${esc(time)} · outdoors · hourly forecast</small></div>`;
+ return `<div class="comfort-later" data-peak-time="${esc(p.time)}"><span>${esc(summary.label)}${summary.partial?' · partial data':''}</span><strong>${degrees(p.value)}</strong><small>${esc(time)} · outdoors · hourly forecast</small></div>`;
 }

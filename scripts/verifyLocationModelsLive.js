@@ -46,6 +46,7 @@ try{
    assert.ok(await page.locator('#map-panel').evaluate(el=>el.getBoundingClientRect().top>=document.querySelector('#metrics').getBoundingClientRect().bottom));
    assert.match(await page.locator('.comfort-later small').innerText(),/\d{1,2}:\d{2} [AP]M/);
    assert.match(await page.locator('.comfort-later>span').first().innerText(),/Warmest feels like today/);
+   assert.equal(await page.locator('.thermal-risk').evaluateAll(els=>els.some(el=>!el.closest('.sun-shade-comparison'))),false);
    const humanRisk=thermalRisk(currentSample(shown).feels);
    assert.equal(await page.locator('.sun-person .thermal-risk').count(),humanRisk?1:0);
    if(humanRisk){assert.equal(await page.locator('.sun-person .thermal-risk').innerText(),humanRisk.short);assert.ok(await page.locator('.sun-person .thermal-risk').evaluate(el=>el.getBoundingClientRect().bottom<=document.querySelector('.sun-person figcaption strong').getBoundingClientRect().top));}
@@ -57,6 +58,7 @@ try{
    await page.locator('#daily [data-day="0"]').click();await page.locator('#day-dialog[open]').waitFor();
    assert.match(await page.locator('.dialog-confidence summary').innerText(),/3 sources/);
    assert.equal(await page.locator('.day-graph [data-series]').count(),4);
+   assert.equal(await page.locator('#day-content .thermal-risk').count(),0);
    await page.locator('.dialog-confidence summary').click();assert.match(await page.locator('.dialog-confidence').innerText(),/NWS, HRRR, ECMWF/);
    await page.locator('#day-content').screenshot({path:output+'/live-'+(place.id||f.location.office)+'-confidence.png'});
    result.renderedConfidence=await page.locator('.dialog-confidence').innerText();assert.deepEqual(errors,[]);await context.close();

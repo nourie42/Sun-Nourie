@@ -1,4 +1,4 @@
-import {weatherShapes} from './weather-display.js?v=thermal-risk-people-v7';
+import {weatherShapes} from './weather-display.js?v=comfort-only-banners-v8';
 import {weatherState} from './weather-state.js';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 export function clothingForFeels(value){

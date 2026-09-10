@@ -79,18 +79,24 @@ try{
   await page.locator('#day-content').screenshot({path:output+'/combined-day-'+width+'.png'});
   await page.locator('#close-day').click();
   const riskChecks=await page.evaluate(async()=>{
-   const {thermalRiskHTML}=await import('/weather-fusion/thermal-risk.js?v=thermal-risk-people-v7');
-   const {dayGraphHTML,installDayGraph}=await import('/weather-fusion/day-graph.js?v=thermal-risk-people-v7');
+   const {thermalRiskHTML}=await import('/weather-fusion/thermal-risk.js?v=comfort-only-banners-v8');
+   const {dayGraphHTML,installDayGraph}=await import('/weather-fusion/day-graph.js?v=comfort-only-banners-v8');
    const f=await fetch('/api/weather-fusion/forecast?location=knightdale').then(r=>r.json());
    f.metricForecasts.series.feels.forEach((p,i)=>p.value=[105,70,0,null][i%4]);
    const root=document.createElement('div');root.style.width='280px';document.body.append(root);
    root.innerHTML=dayGraphHTML(f,1);installDayGraph(root,f,1);
    const slider=root.querySelector('input'),results=[];
    for(let i=0;i<4;i++){slider.value=i;slider.dispatchEvent(new Event('input'));const read=root.querySelector('[data-readout="feels"]'),banner=read.querySelector('.thermal-risk'),value=read.querySelector('strong');results.push({value:value.textContent,banner:banner?.textContent||'',above:!banner||banner.getBoundingClientRect().bottom<=value.getBoundingClientRect().top+1});}
-   root.remove();return {results,missing:thermalRiskHTML(null),normal:thermalRiskHTML(70),scale:[...document.querySelectorAll('.exposure-person-art')].map(el=>el.getAttribute('transform'))};
+   root.remove();
+   const sun=document.querySelector('.sun-person .exposure-alert-slot'),saved=sun.innerHTML;sun.innerHTML=thermalRiskHTML(105,true);
+   const b=sun.firstElementChild,p=document.querySelector('.pavement-warning'),br=b.getBoundingClientRect(),pr=p.getBoundingClientRect();
+   if(Math.abs(br.width-pr.width)>1||Math.abs(br.height-pr.height)>1)throw Error('Human/pet banner dimensions differ');
+   sun.innerHTML=saved;
+   if([...document.querySelectorAll('.thermal-risk')].some(el=>!el.closest('.sun-shade-comparison')))throw Error('Risk banner outside people graphics');
+   return {results,missing:thermalRiskHTML(null),normal:thermalRiskHTML(70),scale:[...document.querySelectorAll('.exposure-person-art')].map(el=>el.getAttribute('transform'))};
   });
   assert.equal(riskChecks.missing,'');assert.equal(riskChecks.normal,'');
-  for(const r of riskChecks.results){assert.ok(r.above);assert.equal(r.banner,r.value==='105°'?'High heat risk':r.value==='0°'?'Cold stress':'');}
+  for(const r of riskChecks.results){assert.ok(r.above);assert.equal(r.banner,'');}
   assert.equal(new Set(riskChecks.results.map(r=>r.value)).size,4);
   assert.ok(riskChecks.scale.every(t=>t.includes('scale(1.85)')));
   const concise=await page.locator('#skin-exposure').innerText();assert.doesNotMatch(concise,/station|paw care|source air temperature|Sidewalk ranges/i);

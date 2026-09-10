@@ -1,6 +1,6 @@
-import {thermalRiskHTML} from './thermal-risk.js?v=thermal-risk-people-v7';
+import {thermalRiskHTML} from './thermal-risk.js?v=comfort-only-banners-v8';
 import {forecastGrossLevel} from './dewpoint-meter.js?v=clear-weather-daygraph-v3';
-import {exposureScene} from './exposure-scene.js?v=thermal-risk-people-v7';
+import {exposureScene} from './exposure-scene.js?v=comfort-only-banners-v8';
 import {outdoorExposure} from './outdoor-feels.js?v=clear-weather-daygraph-v3';
 import {solarElevation} from './weather-math.js?v=clear-weather-daygraph-v3';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
