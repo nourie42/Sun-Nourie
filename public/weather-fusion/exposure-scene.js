@@ -44,5 +44,6 @@ export function exposureScene(sun,daylight=true,condition='Clear',feels=null){
  const treeSky=weather.known?`<g class="shade-weather" transform="translate(78 -74) scale(1.35)">${weatherShapes(condition,daylight)}</g>`:'';
  const outfit=clothingForFeels(feels),clothing={hot:'light hot-weather clothing',warm:'light warm-weather clothing',mild:'everyday mild-weather clothing',cool:'a jacket and long pants',cold:'a coat, scarf and warm hat'}[outfit];
  const label=sun?`A smiling person in ${clothing}, waving outdoors in ${!daylight?'nighttime':weather.label.toLowerCase()} conditions`:`A smiling person in ${clothing}, waving under a tall shade tree`;
- return `<svg viewBox="0 -85 220 260" role="img" aria-label="${label}" data-outfit="${outfit}">${sun?sky:tree+treeSky}<path d="M13 167H204" stroke="#b6d5d2" stroke-opacity=".4" stroke-width="2"/>${person(feels)}</svg>`;
+ const overflow=sun?'':' style="overflow:visible"';
+ return `<svg viewBox="0 -85 220 260" role="img" aria-label="${label}" data-outfit="${outfit}"${overflow}>${sun?sky:tree+treeSky}<path d="M13 167H204" stroke="#b6d5d2" stroke-opacity=".4" stroke-width="2"/>${person(feels)}</svg>`;
 }
