@@ -44,7 +44,7 @@ try{
   const f=await (await forecastResponse).json();
   assert.equal(f.outdoorFeelsVersion,OUTDOOR_FEELS_VERSION);
   await page.waitForFunction(()=>document.querySelector('#hourly .hour-current .hour-feels b')&&document.querySelector('.sun-person figcaption strong'),null,{timeout:75000});
-  const expected=degrees(f.comfort.outdoors);
+  const expected=degrees(f.comfort.outdoors),expectedShade=degrees(f.comfort.shade);
   const rendered=await page.evaluate(()=>({
    hero:document.querySelector('#hero-feels strong').textContent.trim(),
    now:document.querySelector('#hourly .hour-current .hour-feels b').textContent.trim(),
@@ -56,9 +56,9 @@ try{
   }));
   for(const key of ['hero','now','metric'])assert.equal(rendered[key],expected,name+' '+key+' matches outdoor API value');
   assert.equal(rendered.outdoors,expected==='—'?'Unavailable':expected,name+' outdoor figure equals Now');
-  const shadeAir=Number.isFinite(f.current.temperature)?f.current.temperature:f.comfort.shade;
-  assert.equal(rendered.shade,Number.isFinite(shadeAir)?degrees(shadeAir):'Unavailable','Shade figure labels air temperature, not shade UTCI');
+  assert.equal(rendered.shade,expectedShade==='—'?'Unavailable':expectedShade,name+' Shade figure equals the modeled shade feels-like value');
   assert.equal(f.current.feelsLike,f.comfort.outdoors);
+  assert.equal(f.current.feelsLikeShade,f.comfort.shade);
   assert.ok(rendered.exposure);assert.ok(rendered.noOverflow);
   for(const h of f.hours){
    const p=f.metricForecasts.series.feels.find(p=>Date.parse(p.time)===Date.parse(h.time));
