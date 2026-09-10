@@ -63,7 +63,7 @@ export function comfortSubtitle(value){
  if(!finite(value))return 'Feels-like unavailable';
  if(value>=100)return 'Very hot conditions';
  if(value>=88)return 'Hot & uncomfortable';
- if(value>=80)return 'Warm but manageable';
+ if(value>=87)return 'Warm but manageable';
  if(value>=65)return 'Pleasant & comfortable';
  if(value>=50)return 'Cool & comfortable';
  if(value>=35)return 'Chilly outside';

@@ -27,8 +27,8 @@ function palette(feels){
 function face(p){
  return `<ellipse cx="0" cy="0" rx="19" ry="22" fill="${p.skin}"/>
  <path d="M-19-1Q-20-24 0-25Q22-23 19 2Q14-8 7-12Q-3-7-12-12Q-16-7-19-1Z" fill="${p.hair}"/>
- <ellipse cx="-7" cy="3" rx="2.5" ry="3.3" fill="#17324b"/><ellipse cx="7" cy="3" rx="2.5" ry="3.3" fill="#17324b"/>
- <path d="M-8 12Q0 19 8 12" fill="none" stroke="#a54d45" stroke-width="2.3" stroke-linecap="round"/>
+ <g class="person-eyes" fill="#17324b"><ellipse cx="-7" cy="3" rx="2.5" ry="3.3"/><ellipse cx="7" cy="3" rx="2.5" ry="3.3"/></g>
+ <path class="person-smile" d="M-8 12Q0 19 8 12" fill="none" stroke="#a54d45" stroke-width="2.3" stroke-linecap="round"/>
  <circle cx="-13" cy="9" r="2.8" fill="#f49b88" opacity=".45"/><circle cx="13" cy="9" r="2.8" fill="#f49b88" opacity=".45"/>`;
 }
 
@@ -43,7 +43,7 @@ function standingPerson(feels){
   <path d="M-18 91H-3M7 91H23" stroke="${p.shoe}" stroke-width="9" stroke-linecap="round"/>
   <path d="M-16 18Q0 11 16 18L21 50Q0 58-21 50Z" fill="${p.shirt}"/>
   <path d="M-14 22L-27 51" stroke="${p.skin}" stroke-width="9" stroke-linecap="round"/>
-  <path d="M14 22L31 4L35-20" fill="none" stroke="${p.skin}" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <path class="friendly-raised-arm" d="M14 22L31 4L35-20" fill="none" stroke="${p.skin}" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
   <g class="friendly-wave" stroke="${p.skin}" stroke-width="4" stroke-linecap="round">
    <path d="M34-18L28-31M36-20L35-35M38-20L42-34M40-17L48-28"/>
   </g>
@@ -63,7 +63,7 @@ function seatedPerson(feels){
   <path d="M-20 31H18L15 49Q0 56-17 48Z" fill="${p.pants}"/>
   <path d="M-17 4Q0-4 18 4L22 34Q0 43-22 34Z" fill="${p.shirt}"/>
   <path d="M-14 8L-28 32" stroke="${p.skin}" stroke-width="9" stroke-linecap="round"/>
-  <path d="M15 7L31-7L35-28" fill="none" stroke="${p.skin}" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <path class="friendly-raised-arm" d="M15 7L31-7L35-28" fill="none" stroke="${p.skin}" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
   <g class="friendly-wave" stroke="${p.skin}" stroke-width="4" stroke-linecap="round">
    <path d="M34-27L29-39M36-29L36-43M38-29L43-42M40-26L49-36"/>
   </g>
@@ -119,12 +119,12 @@ function shadeTree(){
 
 export function exposureScene(sun,daylight=true,condition='Clear',feels=null){
  const weather=weatherState(condition),id=sun?'direct-scene':'shade-scene',p=skyPalette(weather,daylight);
- const defs=sharedDefs(id,p);
- const icon=!daylight?weatherShapes(condition,false):(['clear','partly-cloudy'].includes(weather.kind)?sunGlyph(id,sun?235:247,sun?76:62,sun?1:.78):`<g class="${sun?'person-weather':'shade-weather'}" transform="translate(215 30) scale(1.1)">${weatherShapes(condition,daylight)}</g>`);
+ const defs=sharedDefs(id,p),weatherClass=sun?'person-weather':'shade-weather';
+ const icon=!daylight?`<g class="${weatherClass}">${weatherShapes(condition,false)}</g>`:(['clear','partly-cloudy'].includes(weather.kind)?`<g class="${weatherClass}">${sunGlyph(id,sun?235:247,sun?76:62,sun?1:.78)}</g>`:`<g class="${weatherClass}" transform="translate(215 30) scale(1.1)">${weatherShapes(condition,daylight)}</g>`);
  const cloud=`<g fill="#fff" opacity=".8"><ellipse cx="222" cy="171" rx="48" ry="17"/><ellipse cx="255" cy="165" rx="31" ry="22"/><ellipse cx="191" cy="169" rx="26" ry="14"/></g>`;
  const background=`<rect width="300" height="360" rx="22" fill="url(#${id}-sky)"/>${daylight&&['clear','partly-cloudy'].includes(weather.kind)?cloud:''}${distantPark(id,p)}`;
  const art=sun?standingPerson(feels):shadeTree()+seatedPerson(feels);
- const clothing={hot:'light hot-weather clothing',warm:'light warm-weather clothing',mild:'everyday mild-weather clothing',cool:'a jacket and long pants',cold:'a coat and warm pants'}[clothingForFeels(feels)];
+ const clothing={hot:'light hot-weather clothing',warm:'light warm-weather clothing',mild:'everyday mild-weather clothing',cool:'a jacket and long pants',cold:'a coat, scarf and warm hat'}[clothingForFeels(feels)];
  const label=sun?`A smiling person in ${clothing}, outdoors in ${weather.label.toLowerCase()} conditions`:`A smiling person in ${clothing}, sitting beneath a tall shade tree`;
  return `<svg viewBox="0 0 300 360" role="img" aria-label="${label}" data-outfit="${clothingForFeels(feels)}">${defs}${background}${icon}${art}</svg>`;
 }
