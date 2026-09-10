@@ -3,7 +3,7 @@ import {outdoorExposure} from './outdoor-feels.js?v=clear-weather-daygraph-v3';
 import {currentComfortInputs} from './current-inputs.js?v=clear-weather-daygraph-v3';
 import {weatherState} from './weather-state.js';
 import {thermalComfort, finite, solarElevation} from './weather-math.js?v=clear-weather-daygraph-v3';
-import {feelsAt, forecastValue, degrees} from './hourly-feels.js?v=comfort-only-banners-v8';
+import {feelsAt, forecastValue, degrees} from './hourly-feels.js?v=weather-art-labels-v10';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function weatherShapes(condition, isDay = true) {
   const weather = weatherState(condition);

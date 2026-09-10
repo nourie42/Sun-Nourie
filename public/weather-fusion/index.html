@@ -7,13 +7,13 @@
   <meta name="description" content="Weather Nourie. Local NWS forecasts, professional AI briefings, model comparisons, thermal-exposure science and interactive weather maps.">
   <title>Weather Nourie</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-  <link rel="stylesheet" href="/weather-fusion/style.css?v=comfort-only-banners-v8">
-  <link rel="stylesheet" href="/weather-fusion/forecast-layout.css?v=comfort-only-banners-v8">
+  <link rel="stylesheet" href="/weather-fusion/style.css?v=weather-art-labels-v10">
+  <link rel="stylesheet" href="/weather-fusion/forecast-layout.css?v=weather-art-labels-v10">
   <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <link rel="stylesheet" href="/weather-fusion/personal-details.css?v=comfort-only-banners-v8">
-  <link rel="stylesheet" href="/weather-fusion/hourly-feels.css?v=comfort-only-banners-v8">
-  <link rel="stylesheet" href="/weather-fusion/weather-repair.css?v=shade-tree-proportion-v9">
-  <script type="module" src="/weather-fusion/app.js?v=comfort-only-banners-v8"></script>
+  <link rel="stylesheet" href="/weather-fusion/personal-details.css?v=weather-art-labels-v10">
+  <link rel="stylesheet" href="/weather-fusion/hourly-feels.css?v=weather-art-labels-v10">
+  <link rel="stylesheet" href="/weather-fusion/weather-repair.css?v=weather-art-labels-v10">
+  <script type="module" src="/weather-fusion/app.js?v=weather-art-labels-v10"></script>
 
 </head>
 <body data-sky="day">
@@ -103,7 +103,7 @@
         </details>
         <details class="evidence-detail"><summary>Latest local NWS forecast discussion <span id="afd-office"></span></summary><p id="afd-stamp" class="muted"></p><pre id="afd-text">The local office discussion is loading.</pre><a id="afd-link" href="https://www.weather.gov/" target="_blank" rel="noopener noreferrer">Read the original NWS discussion ↗</a></details>
         <details class="evidence-detail"><summary>How the feels-like estimates work</summary><div id="thermal-input-evidence"></div><p id="skin-science">Waiting for the latest weather.</p><div id="comfort-extra-science"></div><p id="skin-explanation"></p>
-          <p>Human risk banners use the site's estimated UTCI, not NWS Heat Index or an official warning. Strong heat stress begins at 89.6°F UTCI (32°C), very strong at 100.4°F (38°C), and extreme at 114.8°F (46°C). Strong cold stress begins at 8.6°F UTCI (−13°C), very strong at −16.6°F (−27°C), and extreme at −40°F (−40°C). We include the boundary conservatively and classify before display rounding. <a href="https://confluence.ecmwf.int/spaces/FUG/pages/673551030/Section+8.1.18+Thermal+parameters" target="_blank" rel="noopener noreferrer">ECMWF UTCI stress categories</a>. Shade's displayed temperature remains air temperature; its banner uses the separately calculated shade UTCI. Sun uses its matching feels-like estimate. Risk banners appear only above the Shade, Sun and For Pets graphics. These broad estimates are not a diagnosis or a guarantee of safety; activity, exposure duration and individual vulnerability matter. Missing readings receive no invented category. Pet pavement banners use the separate surface-heat method below.</p>
+          <p>Human risk banners use the site's estimated UTCI, not NWS Heat Index or an official warning. Strong heat stress begins at 89.6°F UTCI (32°C), very strong at 100.4°F (38°C), and extreme at 114.8°F (46°C). Strong cold stress begins at 8.6°F UTCI (−13°C), very strong at −16.6°F (−27°C), and extreme at −40°F (−40°C). We include the boundary conservatively and classify before display rounding. <a href="https://confluence.ecmwf.int/spaces/FUG/pages/673551030/Section+8.1.18+Thermal+parameters" target="_blank" rel="noopener noreferrer">ECMWF UTCI stress categories</a>. Shade displays air temperature and has no risk banner. Sun uses its matching feels-like estimate. Risk banners appear only above the outdoor-weather and For Pets graphics. These broad estimates are not a diagnosis or a guarantee of safety; activity, exposure duration and individual vulnerability matter. Missing readings receive no invented category. Pet pavement banners use the separate surface-heat method below.</p>
           <p>Warmest feels like today compares the current estimate with the remaining hourly forecasts before local midnight. The time is the highest remaining forecast hour; when the current estimate is warmer, both Now and the later forecast peak time are shown. This is not a history of earlier station readings. Missing future hours are disclosed; the card does not substitute tomorrow morning's low after 3 PM.</p>
           <p>The number under the current temperature is an <strong>equivalent outdoor apparent temperature</strong>, not a claim that a person’s skin is physically at that temperature. Actual skin temperature depends on physiology, clothing, activity, acclimatization and exposure time.</p>
           <div class="thermal-grid">

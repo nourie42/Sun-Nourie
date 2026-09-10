@@ -1,4 +1,4 @@
-import {timeAt,forecastValue,degrees} from './hourly-feels.js?v=comfort-only-banners-v8';
+import {timeAt,forecastValue,degrees} from './hourly-feels.js?v=weather-art-labels-v10';
 import {hourlyUvValue,uvCategory} from './daily-uv.js?v=clear-weather-daygraph-v3';
 import {forecastGrossLevel} from './dewpoint-meter.js?v=clear-weather-daygraph-v3';
 const H=3600000,finite=Number.isFinite;

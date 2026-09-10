@@ -1,3 +1,4 @@
+import {exposureTitle} from '../public/weather-fusion/personal-details.js';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import {chromium} from 'playwright';
@@ -42,11 +43,12 @@ try{
    await page.goto(base+'/weather-fusion/',{waitUntil:'domcontentloaded'});const shown=await(await response).json();
    await page.waitForSelector('#pavement-content');
    assert.equal(await page.locator('#skin-kicker').innerText(),'How it actually feels right now');
-   assert.deepEqual(await page.locator('#skin-values .exposure-label').allTextContents(),['Shade','Sun','For Pets']);
+   assert.deepEqual(await page.locator('#skin-values .exposure-label').allTextContents(),['Shade',exposureTitle(currentSample(shown).comfort.radiantCondition,currentSample(shown).isDay,currentSample(shown).inputs.skyCover),'For Pets']);
    assert.ok(await page.locator('#map-panel').evaluate(el=>el.getBoundingClientRect().top>=document.querySelector('#metrics').getBoundingClientRect().bottom));
    assert.match(await page.locator('.comfort-later small').innerText(),/\d{1,2}:\d{2} [AP]M/);
    assert.match(await page.locator('.comfort-later>span').first().innerText(),/Warmest feels like today/);
    assert.equal(await page.locator('.thermal-risk').evaluateAll(els=>els.some(el=>!el.closest('.sun-shade-comparison'))),false);
+   assert.equal(await page.locator('.shade-person .thermal-risk').count(),0);
    const humanRisk=thermalRisk(currentSample(shown).feels);
    assert.equal(await page.locator('.sun-person .thermal-risk').count(),humanRisk?1:0);
    if(humanRisk){assert.equal(await page.locator('.sun-person .thermal-risk').innerText(),humanRisk.short);assert.ok(await page.locator('.sun-person .thermal-risk').evaluate(el=>el.getBoundingClientRect().bottom<=document.querySelector('.sun-person figcaption strong').getBoundingClientRect().top));}

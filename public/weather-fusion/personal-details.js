@@ -1,6 +1,7 @@
-import {thermalRiskHTML} from './thermal-risk.js?v=comfort-only-banners-v8';
+import {weatherState} from './weather-state.js';
+import {thermalRiskHTML} from './thermal-risk.js?v=weather-art-labels-v10';
 import {forecastGrossLevel} from './dewpoint-meter.js?v=clear-weather-daygraph-v3';
-import {exposureScene} from './exposure-scene.js?v=comfort-only-banners-v8';
+import {exposureScene} from './exposure-scene.js?v=weather-art-labels-v10';
 import {outdoorExposure} from './outdoor-feels.js?v=clear-weather-daygraph-v3';
 import {solarElevation} from './weather-math.js?v=clear-weather-daygraph-v3';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
@@ -43,6 +44,15 @@ export function dailyGrossHTML(forecast,index,tonight=false,now=Date.now()){
  const when=new Intl.DateTimeFormat('en-US',{timeZone:s.zone,weekday:'short',hour:'numeric',minute:'2-digit'}).format(new Date(s.time));
  return `<section class="day-gross" data-gross-level="${esc(s.level.key)}"><h3>Gross Meter · dew point</h3><div class="day-gross-reading"><strong>${Math.round(s.peak)}°</strong><span>Muggiest forecast${tonight?' tonight':''}<small>${esc(when)}</small></span></div><p class="day-gross-verdict">${esc(s.level.label)}</p><p>Forecast range: ${Math.round(s.low)}–${Math.round(s.peak)}°F dew point.</p><small>${s.partial?'Partial coverage · ':''}${s.available} of ${s.expected} forecast hours available · ${tonight?'Tonight through 7 AM':'7 AM through 7 AM the next day; past hours excluded'}.</small></section>`;
 }
+export function exposureTitle(condition,daylight=true,skyCover=null){
+ const w=weatherState(condition,skyCover),s=String(condition||'').toLowerCase();
+ if(['rain','storm','snow'].includes(w.kind))return w.chance?(w.kind==='storm'?'Storms possible':w.kind==='rain'?'Rain possible':'Snow possible'):w.label;
+ if(w.kind==='fog')return /haze/.test(s)?'Hazy':'Foggy';
+ if(w.kind==='cloudy')return /mostly|broken/.test(s)?'Mostly cloudy':'Cloudy';
+ if(w.kind==='partly-cloudy')return /partly sunny/.test(s)?'Partly sunny':'Partly cloudy';
+ if(w.kind==='clear')return /mostly|few clouds/.test(s)?(daylight?'Mostly sunny':'Mostly clear'):(daylight?'Sun':'Clear');
+ return 'Outdoors';
+}
 export function sunShadeHTML(comfort,location,now=Date.now(),context={}){
  const daylight=typeof comfort?.daylight==='boolean'?comfort.daylight:solarElevation(now,location?.latitude,location?.longitude)>0;
  const kind=comfort?.weatherKind||(finite(comfort?.sun)?'clear':'unknown');
@@ -62,7 +72,7 @@ export function sunShadeHTML(comfort,location,now=Date.now(),context={}){
  const note=!daylight?' · No direct sun at night.':finite(comfort?.inputEvidence?.skyCover)?' · Hourly cloud-adjusted radiation estimate; actual sun exposure varies.':kind==='unknown'?' · Sky data unavailable; no solar adjustment.':kind==='partly-cloudy'?' · Sunny-break estimate, not continuous direct sunlight.':['rain','storm','snow','fog','cloudy'].includes(kind)?' · No direct-sun adjustment; wet clothing is not modelled.':'';
  const shadeBasis=finite(shadeAir)?' Shade is the source air temperature — the same temperature used by the main current/forecast reading. Outdoor is the modeled exposure feels-like.':' Air temperature was unavailable, so shade falls back to the modeled shade feels-like. Outdoor is the modeled exposure feels-like.';
  const shadeOutfit=finite(shadeFallback)?shadeFallback:shadeDisplay;
- return `<div class="sun-shade-comparison"><figure class="exposure-person shade-person" data-weather="${esc(kind)}">${context.compact?`<span class="exposure-label">Shade</span><span class="exposure-alert-slot">${thermalRiskHTML(comfort?.shade,true)}</span>`:''}${exposureScene(false,daylight,condition,shadeOutfit)}<figcaption>${context.compact?'':thermalRiskHTML(comfort?.shade,true)}<strong>${shade}</strong>${context.compact?'':`<span>Air temperature in the shade · ${period}</span>`}</figcaption></figure><figure class="exposure-person sun-person" data-weather="${esc(kind)}">${context.compact?`<span class="exposure-label">Sun</span><span class="exposure-alert-slot">${thermalRiskHTML(outdoorValue,true)}</span>`:''}${exposureScene(true,daylight,condition,outdoorValue)}<figcaption>${context.compact?'':thermalRiskHTML(outdoorValue,true)}<strong>${outside}</strong>${context.compact?'':`<span>${label} · ${period}</span>`}</figcaption></figure>${context.pavement||''}</div>${context.compact?'':`<small class="exposure-estimate">Shade air temperature + Estimated outdoor feels-like · °F${note}${basis}${shadeBasis}</small>`}`;
+ return `<div class="sun-shade-comparison"><figure class="exposure-person shade-person" data-weather="${esc(kind)}">${context.compact?`<span class="exposure-label">Shade</span><span class="exposure-alert-slot"></span>`:''}${exposureScene(false,daylight,condition,shadeOutfit)}<figcaption><strong>${shade}</strong>${context.compact?'':`<span>Air temperature in the shade · ${period}</span>`}</figcaption></figure><figure class="exposure-person sun-person" data-weather="${esc(kind)}">${context.compact?`<span class="exposure-label">${esc(exposureTitle(condition,daylight,comfort?.inputEvidence?.skyCover))}</span><span class="exposure-alert-slot">${thermalRiskHTML(outdoorValue,true)}</span>`:''}${exposureScene(true,daylight,condition,outdoorValue)}<figcaption>${context.compact?'':thermalRiskHTML(outdoorValue,true)}<strong>${outside}</strong>${context.compact?'':`<span>${label} · ${period}</span>`}</figcaption></figure>${context.pavement||''}</div>${context.compact?'':`<small class="exposure-estimate">Shade air temperature + Estimated outdoor feels-like · °F${note}${basis}${shadeBasis}</small>`}`;
 }
 export function modelFreshnessText(layer,checkedAt,zone='America/New_York',now=Date.now()){
  if(!layer)return '';
