@@ -2,9 +2,7 @@
 #skin-exposure{background:radial-gradient(circle at 50% -18%,rgba(44,181,255,.22),transparent 46%),linear-gradient(155deg,#083e68 0%,#073659 54%,#062a49 100%);border:1px solid rgba(143,216,255,.35);border-radius:30px;box-shadow:0 18px 48px rgba(3,22,45,.28),inset 0 1px 0 rgba(255,255,255,.08);padding:26px 22px 22px}
 #skin-exposure .skin-kicker{font-size:clamp(30px,4vw,50px);line-height:1.05;font-weight:850;letter-spacing:-.04em;margin:4px auto 26px;color:#f9fcff;text-shadow:0 2px 18px rgba(0,34,72,.32)}
 #skin-values .sun-shade-comparison{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));max-width:1060px;gap:16px;margin:0 auto;align-items:stretch}
-
-/* Same portrait proportions as the supplied design. No forced vertical height. */
-#skin-values .sun-shade-comparison .exposure-person{position:relative;isolation:isolate;display:grid;grid-template-rows:13% 13% 54% 20%;min-width:0;width:100%;aspect-ratio:.65;margin:0;padding:0;overflow:hidden;border-radius:30px;border:2px solid rgba(125,213,255,.72);background:linear-gradient(180deg,#058fd9 0%,#0878ba 53%,#075080 100%);box-shadow:0 14px 30px rgba(1,29,59,.24),inset 0 1px 0 rgba(255,255,255,.16)}
+#skin-values .sun-shade-comparison .exposure-person{position:relative;isolation:isolate;display:grid;grid-template-rows:13% 13% 47% 27%;min-width:0;width:100%;aspect-ratio:.65;margin:0;padding:0;overflow:hidden;border-radius:30px;border:2px solid rgba(125,213,255,.72);background:linear-gradient(180deg,#058fd9 0%,#0878ba 53%,#075080 100%);box-shadow:0 14px 30px rgba(1,29,59,.24),inset 0 1px 0 rgba(255,255,255,.16)}
 #skin-values .sun-shade-comparison .exposure-person::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(180deg,rgba(255,255,255,.055),transparent 22%,transparent 77%,rgba(0,25,53,.22))}
 #skin-values .sun-shade-comparison .exposure-person>.exposure-label{grid-row:1;display:flex;align-items:end;justify-content:center;min-height:0;margin:0;padding:0 10px 7px;font-size:clamp(25px,2.8vw,36px);line-height:1;font-weight:850;letter-spacing:-.03em;color:#fff;text-align:center;text-shadow:0 2px 12px rgba(2,35,65,.32);transform:none!important}
 #skin-values .sun-shade-comparison .exposure-person>.exposure-subtitle{grid-row:2;display:flex;align-items:start;justify-content:center;min-height:0;margin:0;padding:4px 14px 0;color:#d7f1ff;font-size:clamp(14px,1.65vw,20px);line-height:1.22;font-weight:500;text-align:center;letter-spacing:-.012em}
@@ -13,8 +11,6 @@
 #skin-values .sun-shade-comparison .exposure-person .thermal-risk,#skin-values .sun-shade-comparison .exposure-person .pavement-warning{width:auto;height:auto;min-height:0;max-width:92%;margin:0;padding:6px 11px;border-radius:999px;border:1px solid rgba(255,234,175,.72);background:rgba(255,221,139,.94);box-shadow:0 7px 18px rgba(28,36,28,.16);color:#412b08;font-size:clamp(10px,1.05vw,12px);line-height:1.15;font-weight:800;white-space:nowrap;backdrop-filter:blur(7px)}
 #skin-values .sun-shade-comparison .exposure-person .thermal-risk[data-risk=danger],#skin-values .sun-shade-comparison .exposure-person .pavement-warning[data-risk=danger]{border-color:rgba(255,203,195,.72);background:rgba(255,205,196,.95);color:#671a13}
 #skin-values .sun-shade-comparison .exposure-person .thermal-risk[data-risk=extreme],#skin-values .sun-shade-comparison .exposure-person .pavement-warning[data-risk=extreme]{border-color:rgba(255,170,196,.75);background:rgba(112,20,52,.95);color:#fff}
-
-/* The illustration is edge-to-edge in the same middle band for Shade, Sun and Pets. */
 #skin-values .sun-shade-comparison .exposure-person>svg{grid-row:3;display:block;width:100%!important;height:100%!important;max-width:none!important;min-height:0;margin:0!important;overflow:hidden;object-fit:cover;aspect-ratio:auto!important}
 #skin-values .sun-shade-comparison .shade-person>svg,#skin-values .sun-shade-comparison .sun-person>svg{filter:saturate(1.1) contrast(1.02)}
 #skin-values .sun-shade-comparison .pavement-person>.poodle-scene{grid-row:3;position:relative;width:100%!important;height:100%!important;max-width:none!important;min-height:0;margin:0!important;overflow:hidden;aspect-ratio:auto!important;background:none!important}
@@ -22,8 +18,6 @@
 #skin-values .sun-shade-comparison .pavement-person[data-daylight="true"]>.poodle-scene{filter:saturate(1.08) contrast(1.02)}
 #skin-values .sun-shade-comparison .pavement-person::after{display:none!important}
 #skin-values .sun-shade-comparison .pavement-person .poodle-walk{width:288px;height:192px;margin:0}
-
-/* Identical bottom band and border position on all three cards. */
 #skin-values .sun-shade-comparison .exposure-person>figcaption{grid-row:4;position:relative;z-index:6;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:3px;width:100%;height:100%;margin:0!important;padding:10px 8px 8px;text-align:center;background:linear-gradient(180deg,rgba(3,80,129,.14),rgba(2,48,85,.48));border-top:1px solid rgba(255,255,255,.1);box-sizing:border-box}
 #skin-values .sun-shade-comparison .exposure-person>figcaption>strong{display:block;font-size:clamp(48px,5.5vw,74px);line-height:.92;font-weight:800;letter-spacing:-.055em;color:#fff;text-shadow:0 3px 18px rgba(0,28,55,.35)}
 #skin-values .sun-shade-comparison .exposure-person>figcaption>small{color:#e8f5fd;font-size:clamp(11px,1.2vw,15px);line-height:1.18}
@@ -32,26 +26,27 @@
 #skin-values .sun-shade-comparison .sun-person{background:linear-gradient(180deg,#0798e4 0%,#087cc2 53%,#07558d 100%)}
 #skin-values .sun-shade-comparison .pavement-person{background:linear-gradient(180deg,#0793dc 0%,#0877b9 52%,#07517f 100%)}
 #skin-values .sun-shade-comparison .exposure-tree{transform:none!important}
-
 @media(max-width:760px){
  #skin-exposure{border-radius:24px;padding:20px 10px 16px}
  #skin-exposure .skin-kicker{font-size:clamp(25px,7vw,36px);margin-bottom:18px}
  #skin-values .sun-shade-comparison{gap:7px}
- #skin-values .sun-shade-comparison .exposure-person{aspect-ratio:.64;border-radius:20px;border-width:1.5px;grid-template-rows:13% 14% 53% 20%}
+ #skin-values .sun-shade-comparison .exposure-person{aspect-ratio:.62;border-radius:20px;border-width:1.5px;grid-template-rows:13% 14% 46% 27%}
  #skin-values .sun-shade-comparison .exposure-person>.exposure-label{font-size:clamp(17px,5vw,24px);padding:0 4px 4px}
  #skin-values .sun-shade-comparison .exposure-person>.exposure-subtitle{padding:3px 4px 0;font-size:clamp(9px,2.7vw,13px);line-height:1.15}
  #skin-values .sun-shade-comparison .exposure-person>.exposure-alert-slot{top:25.5%;left:3px;right:3px}
  #skin-values .sun-shade-comparison .exposure-person .thermal-risk,#skin-values .sun-shade-comparison .exposure-person .pavement-warning{max-width:98%;padding:4px 6px;font-size:8px}
- #skin-values .sun-shade-comparison .exposure-person>figcaption{padding:7px 3px 5px}
- #skin-values .sun-shade-comparison .exposure-person>figcaption>strong{font-size:clamp(34px,11vw,50px)}
- #skin-values .sun-shade-comparison .exposure-person>figcaption>small{font-size:9px}
- #skin-values .sun-shade-comparison .exposure-person>figcaption>.pavement-secondary{font-size:10px;margin-top:2px}
+ #skin-values .sun-shade-comparison .exposure-person>figcaption{padding:6px 3px 4px;gap:1px}
+ #skin-values .sun-shade-comparison .exposure-person>figcaption>strong{font-size:clamp(30px,10vw,45px)}
+ #skin-values .sun-shade-comparison .exposure-person>figcaption>small{font-size:8px;line-height:1.1}
+ #skin-values .sun-shade-comparison .exposure-person>figcaption>.pavement-secondary{font-size:9px;margin-top:1px}
 }
 @media(max-width:410px){
  #skin-exposure{padding-left:7px;padding-right:7px}
  #skin-values .sun-shade-comparison{gap:4px}
- #skin-values .sun-shade-comparison .exposure-person{aspect-ratio:.62;border-radius:17px}
+ #skin-values .sun-shade-comparison .exposure-person{aspect-ratio:.6;border-radius:17px;grid-template-rows:13% 14% 44% 29%}
  #skin-values .sun-shade-comparison .exposure-person>.exposure-label{font-size:16px}
  #skin-values .sun-shade-comparison .exposure-person>.exposure-subtitle{font-size:8.5px;padding-left:2px;padding-right:2px}
- #skin-values .sun-shade-comparison .exposure-person>figcaption>strong{font-size:33px}
+ #skin-values .sun-shade-comparison .exposure-person>figcaption>strong{font-size:31px}
+ #skin-values .sun-shade-comparison .exposure-person>figcaption>small{font-size:7px}
+ #skin-values .sun-shade-comparison .exposure-person>figcaption>.pavement-secondary{font-size:8px}
 }
