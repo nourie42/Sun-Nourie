@@ -52,19 +52,19 @@ try{
     page.on('pageerror',error=>errors.push(error.message));
     await page.goto(base+'/weather-fusion/',{waitUntil:'networkidle'});
     await page.waitForFunction(title=>document.querySelector('#briefing-title')?.textContent===title,scenario==='prefixed'?'Prefixed outlook':'Quiet outlook');
-    assert.equal(await page.locator('#today-uncertainty').isVisible(),true,scenario+' keeps the Dan take card visible');
+    assert.equal(await page.locator('#today-uncertainty').isVisible(),scenario==='prefixed',scenario+' only shows approved changes');
     assert.equal(await page.locator('.today-uncertainty-label').count(),1,scenario+' has exactly one Dan take heading element');
-    assert.equal((await page.locator('.today-uncertainty-label').innerText()).trim(),"Dan's take");
+    assert.equal((await page.locator('.today-uncertainty-label').textContent()).trim(),"Dan's take");
     assert.equal(await page.locator('#briefing-detail [data-dans-take]').count(),0,'full outlook must not add a second Dan take block');
-    const body=(await page.locator('#today-uncertainty-text').innerText()).trim();
+    const body=(await page.locator('#today-uncertainty-text').textContent()).trim();
     assert.equal(/dan\s*['’]?\s*s\s+take/i.test(body),false,'body must never repeat the Dan take label');
-    assert.equal((await page.locator('body').innerText()).split("Dan's take").length-1,1,'visible page must contain the exact heading only once');
+    assert.equal((await page.locator('body').innerText()).split("Dan's take").length-1,scenario==='prefixed'?1:0,'visible page only contains the heading when supported');
     if(scenario==='prefixed'){
       assert.match(body,/front could arrive earlier or later/i);
       assert.match(body,/amount of rain is still uncertain/i);
     }else if(scenario==='quiet'){
-      assert.equal(body,'Warm, dry weather continues today.');assert.doesNotMatch(body,/Watch for changes/);
-    }else{assert.equal(body,danCard(quietBriefing(f),f,now).text);assert.match(body,/Watch for changes/);assert.match(body,/front timing remains uncertain/i);}
+      assert.equal(body,'');assert.doesNotMatch(body,/Watch for changes/);
+    }else{assert.equal(body,danCard(quietBriefing(f),f,now).text);assert.equal(body,'');}
     assert.deepEqual(errors,[]);
     await context.close();
   }

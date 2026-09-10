@@ -1,6 +1,6 @@
 # Current comfort, pavement, daily UV and Dan's take
 
-Release marker: `comfort-paws-uv-v1`. Existing Node/Express and Render hosting are retained.
+Release marker: `compact-comfort-hourly-uv-v2`. Existing Node/Express and Render hosting are retained.
 
 ## Current exposure and illustrations
 
@@ -39,7 +39,7 @@ Sources: [Open-Meteo forecast fields](https://open-meteo.com/en/docs), [EPA UV c
 
 ## Always-visible Dan's take
 
-Dan's take contains a short overview even when no forecast changes are identified. Fresh source-matched AI can summarize the local NWS discussion. During an AI outage, current NWS SYNOPSIS or KEY MESSAGES supplies the overview, with the ordinary NWS forecast as a clearly labeled last fallback. Dated, source-supported possible changes remain separate. WHAT HAS CHANGED sections are supported. Expired periods are excluded and relative terms from an earlier local date are anchored to their actual dates. No speculative change is invented merely to fill the panel.
+Dan's take is now changes-only: at most two concise, dated possible changes (55 words / 380 characters total), with no general overview or attribution beneath it. It is hidden when no eligible current discussion evidence remains. The AI is asked for one or two short sentences and its successful empty result is authoritative, clearing any prior retained approval. During an AI outage, a short complete dated uncertainty excerpt may be shown; text is never cut mid-sentence. Routine weather in WHAT HAS CHANGED is not sufficient. Source quotes remain in Scientific Stuff. Freshness, event expiry, exact-source and location checks still apply.
 
 ## Verification
 
@@ -64,3 +64,7 @@ Style/medium: Polished friendly rounded flat illustration, clean simple silhouet
 Composition/framing: Landscape 3:2 composition, entire illustration centered with generous transparent padding around every edge. Person and dog arranged side by side in a natural walking pose, leash clearly connecting the hand to the dog's collar. No cropping of person, dog, leash, or sidewalk.
 Constraints: Exactly one person, one dog. No missing or extra limbs, no hidden hands. No text, numbers, temperature, UI, border, logos, watermark, clouds or sun. One final image only.
 ```
+
+## Requested compact layout follow-up
+
+The poodle and sidewalk reading are the third figure inside the same comfort card, immediately to the right of the sun figure at every tested width. Asphalt remains a secondary reading; model ranges and paw-care advice are in expandable details within that card. The heading ends in a question mark. Daily UV and forecast confidence share one horizontal row. Each hourly button uses its own timestamp-matched `hourly=uv_index` value; it never substitutes the daily maximum. Zero and missing data remain distinct, including at night and across daylight-saving changes.

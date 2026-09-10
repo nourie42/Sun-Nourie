@@ -279,6 +279,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
   function retainedTake(data){return rebindDanTake(approvedTakes.get(takeKey(data)),data,now());}
   function rememberTake(data,briefing){
     const take=rebindDanTake(briefing,data,now());
+    if(!take&&briefing.mode==='ai')approvedTakes.delete(takeKey(data));
     if(take){if(approvedTakes.size>=100&&!approvedTakes.has(takeKey(data)))approvedTakes.delete(approvedTakes.keys().next().value);approvedTakes.set(takeKey(data),take);}
   }
   let aiBudget = { day: '', count: 0 };
@@ -403,7 +404,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
       if (aiBudget.count >= limit) return fallback(data, 'The configured AI daily request limit has been reached.');
       let lastFailure = null;
       const properties = Object.fromEntries(['headline', 'summary', 'nearTerm', 'extended', 'uncertainty'].map((k) => [k, { type: 'string' }]));
-      properties.forecastChanges={type:'array',maxItems:6,items:{type:'object',additionalProperties:false,properties:{evidenceId:{type:'string',enum:takeEvidence.candidates.length?takeEvidence.candidates.map(c=>c.id):['no-eligible-evidence']},summary:{type:'string'}},required:['evidenceId','summary']}};
+      properties.forecastChanges={type:'array',maxItems:2,items:{type:'object',additionalProperties:false,properties:{evidenceId:{type:'string',enum:takeEvidence.candidates.length?takeEvidence.candidates.map(c=>c.id):['no-eligible-evidence']},summary:{type:'string'}},required:['evidenceId','summary']}};
       const requiredSources=['nws','afd',...data.modelContributions.map(m=>m.id)];
       properties.sources = { type: 'array', items: { type: 'string', enum: requiredSources } };
       const facts = { danTakeEvidence:takeEvidence, currentLocalTime: new Intl.DateTimeFormat('en-US',{timeZone:data.location.timeZone,dateStyle:'full',timeStyle:'short'}).format(new Date(now())), discussionPriority: 'Translate the latest local NWS discussion into everyday language; technical provenance is only for metadata.', blendPolicy: data.methodology, modelContributions: data.modelContributions, convectiveGuidance: data.convectiveGuidance, next24HoursPrecipitation: data.precipitation, location: data.location, localDate: dateKey(now(), data.location.timeZone), days: data.days, hours: data.hours.slice(0, 30), discussion: data.discussion, feedStatus: data.feeds.map((f) => ({ id: f.id, status: f.status, issuedAt: f.issuedAt })) };
@@ -445,7 +446,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
     // A failed generation is not a successful 30-minute briefing cache entry.
     if (briefing.mode !== 'ai') aiCache.values.delete(briefingKey);
     const activeChanges=visibleDanTakeItems(briefing,data,now());
-    return {...briefing,danTake:activeChanges.length?null:retainedTake(data),forecastChanges:activeChanges,uncertainty:danTakeText(activeChanges)};
+    return {...briefing,danTake:activeChanges.length||briefing.mode==='ai'?null:retainedTake(data),forecastChanges:activeChanges,uncertainty:danTakeText(activeChanges)};
   }
   async function search(query) {
     const text = clean(query, 80).trim();

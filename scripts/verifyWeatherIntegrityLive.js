@@ -71,7 +71,7 @@ try{
   if(card.sourceExcerpt){assert.ok(f.discussion.text.replace(/\s+/g,' ').includes(card.sourceExcerpt.quote));assert.ok(Date.parse(card.sourceExcerpt.eventEnd)>Date.now());}
   await page.waitForFunction(()=>document.querySelector('#hourly .hour-current .hour-feels b')&&document.querySelector('.sun-person figcaption strong'),null,{timeout:75000});
   await page.waitForFunction(text=>document.querySelector('#today-uncertainty-text').textContent===text,expectedTake,{timeout:20000});
-  assert.equal(await page.locator('#today-uncertainty').isVisible(),true);
+  assert.equal(await page.locator('#today-uncertainty').isVisible(),Boolean(expectedTake));
   assert.equal((await page.locator('.today-uncertainty-label').textContent()).trim(),"Dan's take");
   assert.equal(await page.locator('.today-uncertainty-label').count(),1);
   assert.equal(await page.locator('#briefing-detail [data-dans-take]').count(),0);

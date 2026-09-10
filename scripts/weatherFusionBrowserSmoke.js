@@ -42,7 +42,7 @@ async function checkForecastDetails(page){
   const source=document.querySelector('#today-take-source');
   const next=panel.nextElementSibling;
   const hourly=next?.id==='nws-bulletins'?next.nextElementSibling:next;
-  return {viewport:innerWidth,text:text.textContent,source:source.textContent.trim(),hidden:note.hidden,
+  return {viewport:innerWidth,text:text.textContent,source:source?.textContent.trim()||'',hidden:note.hidden,
    belowGraphic:note.getBoundingClientRect().top>=row.getBoundingClientRect().bottom,
    aboveHourly:note.getBoundingClientRect().bottom<=hourly.getBoundingClientRect().top,
    adjacentHourly:hourly.classList.contains('hourly-panel'),
@@ -52,8 +52,8 @@ async function checkForecastDetails(page){
  });
  const f=page.weatherForecast,b=page.weatherBriefing;
  assert.ok(f,'Browser must receive real forecast data before card verification');
- assert.equal(details.text,danCard(b?.signature===f.signature?b:{danTake:f.danTake},f).text,'Dan card must match its source-bound overview and changes');
- assert.equal(details.hidden,false);assert.match(details.source,/NWS/);
+ assert.equal(details.text,danCard(b?.signature===f.signature?b:{danTake:f.danTake},f).text,'Dan card must match its source-bound possible changes');
+ assert.equal(details.hidden,!details.text);assert.equal(details.source,'');
  assert.ok(details.adjacentHourly,'Hourly must follow the Today/Tonight and bulletin panels');
  if(!details.hidden){
   assert.ok(details.belowGraphic&&details.aboveHourly,'Uncertainty must sit between the graphic and hourly forecast');
@@ -64,10 +64,10 @@ async function checkForecastDetails(page){
  assert.equal((await page.locator('.current-temp-label').innerText()).trim(),'Current temperature');
  assert.equal(await page.locator('#high-low').isVisible(),false);
  assert.equal(await page.locator('#condition').isVisible(),false);
- assert.equal(await page.locator('.sun-shade-comparison figure').count(),2);
+ assert.equal(await page.locator('.sun-shade-comparison figure').count(),3);
  assert.ok(!(await page.locator('#skin-exposure').innerText()).includes('~'));
  assert.match(await page.locator('.brand small').innerText(),/Because Apple, Google and Samsung weather suck/);
- assert.equal(await page.locator('.today-uncertainty-label').innerText(),"Dan's take");
+ assert.equal(await page.locator('.today-uncertainty-label').textContent(),"Dan's take");
  assert.match(await page.locator('#hero-feels').innerText(),/Feels like/);
  assert.equal(await page.locator('#hourly .hour-feels').count(),await page.locator('#hourly .hour').count());
  assert.equal(await page.locator('.person-eyes').count(),2);

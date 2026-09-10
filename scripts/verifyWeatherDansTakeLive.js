@@ -57,7 +57,7 @@ try{
   if(card.sourceExcerpt){assert.ok(f.discussion.text.replace(/\s+/g,' ').includes(card.sourceExcerpt.quote));assert.ok(Date.parse(card.sourceExcerpt.eventEnd)>time);}
   await page.waitForFunction(expected=>document.querySelector('#today-uncertainty-text')?.textContent===expected,expectedText,{timeout:15000});
   const displayed=await page.evaluate(()=>({text:document.querySelector('#today-uncertainty-text').textContent,hidden:document.querySelector('#today-uncertainty').hidden,headingCount:document.querySelectorAll('.today-uncertainty-label').length,bodyHasLabel:/dan\s*['’]?\s*s\s+take/i.test(document.querySelector('#today-uncertainty-text').textContent),fullOutlookSections:document.querySelectorAll('#briefing-detail [data-dans-take]').length,overflow:document.documentElement.scrollWidth>innerWidth+1}));
-  assert.equal(displayed.hidden,false);assert.equal(displayed.headingCount,1);assert.equal(displayed.bodyHasLabel,false);assert.equal(displayed.fullOutlookSections,0);assert.equal(displayed.overflow,false);
+  assert.equal(displayed.hidden,!displayed.text);assert.equal(displayed.headingCount,1);assert.equal(displayed.bodyHasLabel,false);assert.equal(displayed.fullOutlookSections,0);assert.equal(displayed.overflow,false);
   for(const item of items){
    assert.ok(Date.parse(item.eventEnd)>time&&Date.parse(item.validUntil)>time);
    assert.ok(f.discussion.text.replace(/\s+/g,' ').includes(item.sourceQuote));

@@ -1,4 +1,4 @@
-import {finite,solarElevation,thermalHumidity} from './weather-math.js?v=comfort-paws-uv-v1';
+import {finite,solarElevation,thermalHumidity} from './weather-math.js?v=compact-comfort-hourly-uv-v2';
 const H=3600000,SIGMA=5.670374419e-8,clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 const c=f=>(f-32)/1.8,f=c=>c*1.8+32;
 export const PAVEMENT_VERSION='pavement-energy-balance-v1';
@@ -82,6 +82,10 @@ export function pavementEstimate(forecast,current,now=Date.now()){
   advice:'Check the actual surface with the back of your hand. If it feels too hot, choose grass or a cooler route.'};
 }
 export function pavementHTML(result){
- const value=(r,label)=>`<div><span>${label}</span><strong>${r?`${r.value}°`:'—'}</strong><small>${r?`Estimated range ${r.low}–${r.high}°F`:'Estimate unavailable'}</small></div>`;
- return `<img class="poodle-walk" src="/weather-fusion/poodle-walk.png" width="768" height="512" alt="A person walking a small light brown toy poodle on a leash along a sidewalk"><div class="pavement-values">${value(result.concrete,'Concrete sidewalk')}${value(result.asphalt,'Dark asphalt')}</div><p class="pavement-note">${result.note||result.reason}</p><p class="pavement-advice">${result.advice||'Check the actual surface before walking. Choose grass or a cooler route when the pavement feels hot.'}</p>`;
+ const value=r=>r?`${r.value}°`:'—';
+ return `<figure class="exposure-person pavement-person" id="pavement-content" data-status="${result.status}" aria-label="Estimated hard-surface temperature for dogs right now"><img class="poodle-walk" src="/weather-fusion/poodle-walk.png" width="768" height="512" alt="A person walking a light brown toy poodle"><figcaption><strong>${value(result.concrete)}</strong><span>Sidewalk for dogs · now</span><small class="pavement-secondary">Asphalt ${value(result.asphalt)}</small><small>Estimated · °F</small></figcaption></figure>`;
+}
+export function pavementDetailsHTML(result){
+ const range=(r,label)=>r?`${label}: ${r.low}–${r.high}°F.`:`${label}: unavailable.`;
+ return `<details class="pavement-details"><summary>Sidewalk ranges & paw care</summary><p>${range(result.concrete,'Concrete')}${' '}${range(result.asphalt,'Dark asphalt')}</p><p>${result.note||result.reason}</p><p>${result.advice||'Check the actual surface before walking. Choose grass or a cooler route when it feels hot.'}</p><a href="#pavement-science">How the sidewalk estimate works ↓</a></details>`;
 }

@@ -50,7 +50,7 @@ try{
  let latestForecast=null;
  page.on('response',async r=>{if(r.url().includes('/api/weather-fusion/forecast?')&&r.ok()){try{latestForecast=await r.json();}catch{}}});
  await page.goto(base+'/weather-fusion/',{waitUntil:'domcontentloaded',timeout:90000});
- await page.waitForFunction(()=>document.querySelector('#status')?.textContent.startsWith('Updated')&&document.querySelector('#today-take-source')?.textContent.includes('NWS'),null,{timeout:80000});
+ await page.waitForFunction(()=>document.querySelector('#status')?.textContent.startsWith('Updated')&&document.querySelector('#ai-label')?.textContent==='YOUR LOCAL OUTLOOK',null,{timeout:80000});
  await page.evaluate(()=>{
   window.danTakeVisibility=[];
   new MutationObserver(()=>window.danTakeVisibility.push({hidden:document.querySelector('#today-uncertainty').hidden,text:document.querySelector('#today-uncertainty-text').textContent})).observe(document.querySelector('#today-uncertainty'),{attributes:true,subtree:true,childList:true,characterData:true});
@@ -58,31 +58,31 @@ try{
  async function record(label){
   assert.ok(latestForecast?.discussion);
   const text=(await page.locator('#today-uncertainty-text').textContent()).trim();
-  assert.ok(text&&await page.locator('#today-uncertainty').isVisible(),label+' must have a visible actual message');
+  assert.equal(await page.locator('#today-uncertainty').isVisible(),Boolean(text),label+' visibility follows eligible changes');assert.ok(text.length<=380);
   const restored=visibleDanTakeItems(latestForecast.danTake,latestForecast);
   const sameSource=latestForecast.discussion.id===f.discussion.id&&latestForecast.discussion.issuanceTime===f.discussion.issuanceTime;
   if(sameSource&&items.some(i=>Date.parse(i.validUntil)>Date.now()))assert.ok(restored.length>0,'A still-valid approved same-source take must survive reload');
   for(const item of restored)assert.ok(latestForecast.discussion.text.replace(/\s+/g,' ').includes(item.sourceQuote));
-  if(!restored.length){const card=danCard({danTake:latestForecast.danTake},latestForecast);assert.ok(card.text.length>20);if(card.sourceExcerpt)assert.ok(latestForecast.discussion.text.replace(/\s+/g,' ').includes(card.sourceExcerpt.quote));}
+  if(!restored.length){const card=danCard({danTake:latestForecast.danTake},latestForecast);assert.ok(card.text.length<=380);if(card.sourceExcerpt)assert.ok(latestForecast.discussion.text.replace(/\s+/g,' ').includes(card.sourceExcerpt.quote));}
   const feed=latestForecast.feeds.find(f=>f.id==='afd');
   assert.ok(Number.isFinite(Date.parse(latestForecast.assembledAt))&&Number.isFinite(Date.parse(feed?.checkedAt)));
-  const entry={label,checkedAt:new Date().toISOString(),assembledAt:latestForecast.assembledAt,sourceCheckedAt:feed.checkedAt,sourceRetrieval:feed.retrievalStatus,signature:latestForecast.signature,discussionId:latestForecast.discussion.id,issuedAt:latestForecast.discussion.issuanceTime,cachedItems:restored,visible:true,text};
+  const entry={label,checkedAt:new Date().toISOString(),assembledAt:latestForecast.assembledAt,sourceCheckedAt:feed.checkedAt,sourceRetrieval:feed.retrievalStatus,signature:latestForecast.signature,discussionId:latestForecast.discussion.id,issuedAt:latestForecast.discussion.issuanceTime,cachedItems:restored,visible:Boolean(text),text};
   report.checks.push(entry);console.log('LIVE_CARD_PERSISTENCE',JSON.stringify(entry));
  }
  await record('initial-page');
  // Cross both the one-minute forecast and two-minute AFD-cache lifetimes.
  for(let i=0;i<2;i++){
-  await delay(65000);
+  await delay(55000);await delay(10000);
   const response=page.waitForResponse(r=>r.url().includes('/api/weather-fusion/forecast?')&&r.ok(),{timeout:80000});
   await page.locator('#refresh').click();latestForecast=await (await response).json();
   await page.waitForTimeout(500);await record('refresh-'+(i+1));
  }
  const history=await page.evaluate(()=>window.danTakeVisibility);
- assert.ok(history.length>0);assert.ok(history.every(s=>!s.hidden),'Valid current-source take must not blink out during weather refreshes');
+ assert.ok(history.length>0);assert.ok(history.every(s=>s.hidden===!s.text),'Only nonempty current-source takes are visible');
  report.observedRefreshVisibility=history;
  const response=page.waitForResponse(r=>r.url().includes('/api/weather-fusion/forecast?')&&r.ok(),{timeout:80000});
  await page.reload({waitUntil:'domcontentloaded'});latestForecast=await (await response).json();
- await page.waitForFunction(()=>document.querySelector('#status')?.textContent.startsWith('Updated')&&document.querySelector('#today-take-source')?.textContent.includes('NWS'),null,{timeout:15000});
+ await page.waitForFunction(()=>document.querySelector('#status')?.textContent.startsWith('Updated')&&document.querySelector('#ai-label')?.textContent==='YOUR LOCAL OUTLOOK',null,{timeout:15000});
  await record('full-page-reload');
  assert.deepEqual(errors,[]);
  // A new assembly/check can legitimately have the SAME weather signature.

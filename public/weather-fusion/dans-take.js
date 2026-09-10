@@ -3,7 +3,7 @@
  * Ambiguous timing is omitted, not guessed. Dates are anchored to source issuance,
  * including a retained section's own "As of" time, never to the time of retrieval.
  */
-export const DAN_TAKE_VERSION = 'weather-nourie-dans-take-overview-v5';
+export const DAN_TAKE_VERSION = 'weather-nourie-dans-take-concise-v6';
 const H = 3600000, DAY = 24 * H, MAX_SOURCE_AGE = 12 * H;
 const norm = v => String(v || '').replace(/\s+/g, ' ').trim();
 const finite = Number.isFinite;
@@ -114,7 +114,7 @@ export function collectDanTakeEvidence(data, now=Date.now()) {
     for(const [pi,paragraph] of body.split(/\n\s*\n/).entries()){
       const sentences=norm(paragraph).split(/(?<=[.!?])\s+/).filter(Boolean);
       for(const [qi,quote] of sentences.entries()){
-        if(quote.length<24||quote.length>850||past(quote)||(section.name!=='WHAT HAS CHANGED'&&!explicitForecastUncertainty(quote)))continue;
+        if(quote.length<24||quote.length>850||past(quote)||!explicitForecastUncertainty(quote))continue;
         const previous=sentences[qi-1]||'',context=norm([previous,quote,sentences[qi+1]||''].join(' '));
         // Own timing takes priority; otherwise inherit the previous sentence or
         // the explicit section period. Never inherit a yesterday/last-night recap.

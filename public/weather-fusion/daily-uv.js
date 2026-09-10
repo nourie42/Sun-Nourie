@@ -9,3 +9,14 @@ export function dailyUvHTML(value,label='Peak UV'){
  const uv=uvCategory(value);
  return `<span class="daily-uv" data-uv="${uv.key}"><span>${label}</span> <b>${uv.value===null?'—':uv.index}</b> · ${uv.label}</span>`;
 }
+export function hourlyUvValue(forecast,time){
+ const epoch=typeof time==='number'?time:Date.parse(time);
+ if(!finite(epoch))return null;
+ const hour=Math.floor(epoch/3600000)*3600000;
+ const value=forecast?.uv?.hourly?.find(p=>Date.parse(p.time)===hour)?.value;
+ return finite(value)&&value>=0?value:null;
+}
+export function hourlyUvHTML(value){
+ const uv=uvCategory(value);
+ return `<span class="hour-uv daily-uv" data-uv="${uv.key}" title="Hourly UV forecast · ${uv.label}">UV <b>${uv.value===null?'—':uv.index}</b></span>`;
+}

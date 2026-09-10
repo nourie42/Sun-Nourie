@@ -29,7 +29,7 @@ export function dewpointPoints(forecast,now,hours=240){
 }
 function styles(){
  if(document.getElementById('weather-nourie-dewpoint-meter-css'))return;
- const l=document.createElement('link');l.id='weather-nourie-dewpoint-meter-css';l.rel='stylesheet';l.href='/weather-fusion/dewpoint-meter.css?v=comfort-paws-uv-v1';
+ const l=document.createElement('link');l.id='weather-nourie-dewpoint-meter-css';l.rel='stylesheet';l.href='/weather-fusion/dewpoint-meter.css?v=compact-comfort-hourly-uv-v2';
  l.addEventListener('load',()=>{if(latest)renderDewpointMeter(latest,lastNow);},{once:true});document.head.append(l);
 }
 const hourText=(t,z)=>new Intl.DateTimeFormat('en-US',{timeZone:z,hour:'numeric',minute:'2-digit'}).format(new Date(t));

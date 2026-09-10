@@ -1,5 +1,5 @@
 import {weatherState,weatherTransmission} from './weather-state.js';
-import {utciF} from './utci.js?v=comfort-paws-uv-v1';
+import {utciF} from './utci.js?v=compact-comfort-hourly-uv-v2';
 /* Pure presentation math shared by the weather API, browser and tests. */
 export const EXPERIENCE_VERSION = 'weather-nourie-friendly-v1';
 export const finite = n => typeof n === 'number' && Number.isFinite(n);

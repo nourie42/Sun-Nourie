@@ -76,14 +76,14 @@ test('rebind retains only exact-current-source take across changed numeric forec
  assert.equal(rebindDanTake(b,next,Date.parse(newest.issuanceTime)+12*H),null);
 });
 function response(d){return new Response(JSON.stringify(d),{status:200,headers:{'Content-Type':'application/json'}});}
-test('full service: general AI budget exhaustion cannot erase an approved same-source card after refresh',async()=>{
+for(const emptyReview of [false,true])test(emptyReview?'full service: successful empty review clears a retained same-source take':'full service: general AI budget exhaustion cannot erase an approved same-source card after refresh',async()=>{
  let time=fixtureNow,aiCalls=0;
  const date=new Date(time).toISOString(),product={id:'lifecycle-afd',productCode:'AFD',issuingOffice:'KRAH',issuanceTime:date,productText:'.DISCUSSION...\nThe timing of the front remains uncertain tomorrow.'};
  const fetchImpl=async(url,options)=>{
   const u=new URL(url);
   if(u.hostname==='api.openai.com'){
    aiCalls++;const facts=JSON.parse(JSON.parse(options.body).input),c=facts.danTakeEvidence.candidates[0];assert.ok(c);
-   return response({status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify({headline:'Local outlook',summary:'The forecast is based on the latest local discussion.',nearTerm:'Clouds may linger.',extended:'A front approaches.',uncertainty:'',forecastChanges:[{evidenceId:c.id,summary:'The front could arrive earlier or later than expected.'}],sources:facts.requiredSources})}]}]});
+   return response({status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify({headline:'Local outlook',summary:'The forecast is based on the latest local discussion.',nearTerm:'Clouds may linger.',extended:'A front approaches.',uncertainty:'',forecastChanges:emptyReview&&aiCalls>1?[]:[{evidenceId:c.id,summary:'The front could arrive earlier or later than expected.'}],sources:facts.requiredSources})}]}]});
   }
   if(u.hostname==='raw.githubusercontent.com'&&u.pathname.includes('/models/'))return response(snapshot(u.pathname.split('/').at(-1).replace('.json','')));
   if(u.pathname.startsWith('/points/'))return response({properties:{...inputs.point,forecast:'https://api.weather.gov/gridpoints/RAH/1,1/forecast',forecastHourly:'https://api.weather.gov/gridpoints/RAH/1,1/forecast/hourly',forecastGridData:'https://api.weather.gov/gridpoints/RAH/1,1'}});
@@ -95,12 +95,12 @@ test('full service: general AI budget exhaustion cannot erase an approved same-s
   if(u.pathname.includes('/products/types/AFD/'))return response(list(product));
   throw new Error('Unmocked source: '+url);
  };
- const service=createWeatherService({now:()=>time,env:{OPENAI_API_KEY:'TEST',WEATHER_FUSION_AI_DAILY_LIMIT:'1'},fetchImpl});
+ const service=createWeatherService({now:()=>time,env:{OPENAI_API_KEY:'TEST',WEATHER_FUSION_AI_DAILY_LIMIT:emptyReview?'5':'1'},fetchImpl});
  const first=await service.getForecast({location:'knightdale'}),b=await service.getBriefing({location:'knightdale',signature:first.signature});
  assert.equal(b.forecastChanges.length,1);assert.equal(aiCalls,1);
  time+=11*M;
  const next=await service.getForecast({location:'knightdale'});assert.notEqual(next.signature,first.signature);assert.ok(next.danTake);
  assert.equal(visibleDanTakeItems(next.danTake,next,time).length,1);
  const fallback=await service.getBriefing({location:'knightdale',signature:next.signature});
- assert.equal(fallback.mode,'nws-summary');assert.match(fallback.reason,/limit/);assert.ok(fallback.danTake);assert.equal(aiCalls,1);
+ if(emptyReview){assert.equal(fallback.mode,'ai');assert.deepEqual(fallback.forecastChanges,[]);assert.equal(fallback.danTake,null);time+=2*M;const fresh=await service.getForecast({location:'knightdale'});assert.equal(fresh.danTake,null);assert.equal(aiCalls,2);}else{assert.equal(fallback.mode,'nws-summary');assert.match(fallback.reason,/limit/);assert.ok(fallback.danTake);assert.equal(aiCalls,1);}
 });

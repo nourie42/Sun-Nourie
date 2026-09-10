@@ -64,7 +64,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Six responsive widths, paired hourly temperatures, bulletin safety, charts and nighttime
         run: node scripts/weatherFusionPersonalBrowser.js
-      - name: Peak UV, missing current inputs, paws, fixed hands and always-visible overview
+      - name: Hourly/daily UV, integrated paws, fixed hands and concise changes-only Dan
         env:
           WEATHER_QA_DIR: /tmp/weather-personal-results/comfort-paws-uv
         run: node scripts/verifyComfortPawsUvBrowser.js

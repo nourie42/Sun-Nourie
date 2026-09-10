@@ -1,15 +1,15 @@
-import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText,rebindDanTake} from './dans-take.js?v=comfort-paws-uv-v1';
-import {danCard} from './dans-summary.js?v=comfort-paws-uv-v1';
-import {dailyUvHTML} from './daily-uv.js?v=comfort-paws-uv-v1';
-import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './weather-display.js?v=comfort-paws-uv-v1';
-import {degrees,feelsAt,dayFeelsHTML} from './hourly-feels.js?v=comfort-paws-uv-v1';
+import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText,rebindDanTake} from './dans-take.js?v=compact-comfort-hourly-uv-v2';
+import {danCard} from './dans-summary.js?v=compact-comfort-hourly-uv-v2';
+import {dailyUvHTML} from './daily-uv.js?v=compact-comfort-hourly-uv-v2';
+import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './weather-display.js?v=compact-comfort-hourly-uv-v2';
+import {degrees,feelsAt,dayFeelsHTML} from './hourly-feels.js?v=compact-comfort-hourly-uv-v2';
 import {createFramePlayer} from './frame-player.js';
-import {renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=comfort-paws-uv-v1';
-import {dailyDisplay} from './weather-math.js?v=comfort-paws-uv-v1';
-import {currentHero} from './current-temperature.js?v=comfort-paws-uv-v1';
-import {renderBulletins} from './bulletins.js?v=comfort-paws-uv-v1';
-import {dailyGrossHTML,modelFreshnessText} from './personal-details.js?v=comfort-paws-uv-v1';
-import {renderDewpointMeter} from './dewpoint-meter.js?v=comfort-paws-uv-v1';
+import {renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=compact-comfort-hourly-uv-v2';
+import {dailyDisplay} from './weather-math.js?v=compact-comfort-hourly-uv-v2';
+import {currentHero} from './current-temperature.js?v=compact-comfort-hourly-uv-v2';
+import {renderBulletins} from './bulletins.js?v=compact-comfort-hourly-uv-v2';
+import {dailyGrossHTML,modelFreshnessText} from './personal-details.js?v=compact-comfort-hourly-uv-v2';
+import {renderDewpointMeter} from './dewpoint-meter.js?v=compact-comfort-hourly-uv-v2';
 import {renderWeatherPanel} from './render-safety.js';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);
@@ -139,10 +139,8 @@ function renderEvidence(data) {
 }
 function renderBriefing(data) {
   currentBriefing = data;
-  const takeItems=visibleDanTakeItems(data.danTake||data,forecast,Date.now());
-  const uncertainty=danTakeText(takeItems);
   const card=danCard(data,forecast,Date.now());
-  if(card.sourceExcerpt)takeItems.push({...card.sourceExcerpt,sourceQuote:card.sourceExcerpt.quote});
+  const takeItems=card.items||[];
   const takeDisplay=card.text;
   $('briefing-title').textContent = data.headline || 'Local forecast';
   $('briefing-summary').textContent = data.summary || 'The source forecast is currently unavailable.';
@@ -159,9 +157,8 @@ function renderBriefing(data) {
   if (todayUncertainty && todayUncertaintyText) {
     todayUncertaintyText.textContent = takeDisplay;
     if(todayUncertaintyText.style)todayUncertaintyText.style.whiteSpace='pre-line';
-    todayUncertainty.hidden = false;
+    todayUncertainty.hidden = !takeDisplay;
   }
-  if($('today-take-source'))$('today-take-source').textContent=card.source;
   $('briefing-stamp').textContent = data.mode === 'ai' ? `Updated ${clock(data.generatedAt)} · based on your local NWS discussion` : 'National Weather Service forecast';
   $('outlook-science').innerHTML = `<p>Summary type: ${esc(data.mode === 'ai' ? 'AI plain-language paraphrase of the local discussion, checked against the point forecast and available model data' : 'Official NWS forecast fallback; not an AI paraphrase')}. ${esc(data.reason || '')}</p><p>Sources used: ${refs.join(' · ') || 'Waiting for the local outlook'}</p><p>Take status: ${takeItems.length?'The following explicitly supported, still-upcoming discussion changes are displayed.':'No displayed change: '+(data.danTakeStatus==='discussion-not-current'?'the local discussion is missing or stale.':data.danTakeStatus==='no-explicit-future-change'?'the current discussion identifies no dated upcoming uncertainty.':data.reason||'the current discussion has not produced an approved explanation yet.')}</p>${takeItems.map(item=>`<details><summary>${esc(item.period)} · source evidence</summary><p>${esc(item.sourceQuote)}</p><p>Original section: ${esc(item.section)} · issued ${esc(clock(item.sectionIssuedAt,{month:'short',day:'numeric'}))}. Applies through ${esc(clock(item.eventEnd,{month:'short',day:'numeric'}))}.</p></details>`).join('')}`;
 

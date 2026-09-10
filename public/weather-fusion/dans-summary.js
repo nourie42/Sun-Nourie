@@ -1,4 +1,4 @@
-import {collectDanTakeEvidence,visibleDanTakeItems,danTakeText,discussionPeriod,sectionAnchor} from './dans-take.js?v=comfort-paws-uv-v1';
+import {collectDanTakeEvidence,visibleDanTakeItems,danTakeText,discussionPeriod,sectionAnchor,explicitForecastUncertainty} from './dans-take.js?v=compact-comfort-hourly-uv-v2';
 const norm=v=>String(v||'').replace(/\s+/g,' ').trim();
 const dateKey=(time,zone)=>new Intl.DateTimeFormat('en-CA',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(time));
 function anchoredText(text,anchor,zone,now){
@@ -32,12 +32,27 @@ export function danOverview(briefing,forecast,now=Date.now()){
  return {text:text||'The local forecast is temporarily unavailable. Please check the National Weather Service for the latest weather.',source:'NWS forecast · discussion summary unavailable'};
 }
 export function danCard(briefing,forecast,now=Date.now()){
- const overview=danOverview(briefing,forecast,now);
- const items=visibleDanTakeItems(briefing?.danTake||briefing,forecast,now);
- let changes=danTakeText(items);
- // During AI/provider failures, a dated source excerpt still makes an explicitly
- // discussed possible change available, with its original timing and attribution.
+ const items=[],parts=[];
+ const compact=value=>norm(value).replace(/^(?:dan\s*['’]?\s*s\s+take\b\s*[:\-—–.]?\s*)+/i,'');
+ const append=(item,summary)=>{
+  const sentence=compact(summary),period=item.period.replace(/^This coming week — /,'');
+  if(!sentence||sentence.length>200||sentence.split(/\s+/).length>28)return false;
+  const part=`${period}: ${sentence}`,combined=[...parts,part].join(' ');
+  if(combined.length>380||combined.split(/\s+/).length>55)return false;
+  items.push({...item,summary:sentence});parts.push(part);return true;
+ };
+ for(const item of visibleDanTakeItems(briefing?.danTake||briefing,forecast,now)){
+  if(items.length===2)break;
+  if(explicitForecastUncertainty(item.sourceQuote))append(item,item.summary);
+ }
  let sourceExcerpt=null;
- if(!changes){const c=collectDanTakeEvidence(forecast,now).candidates.find(c=>c.quote.length<=330);if(c){sourceExcerpt=c;changes=`${c.period}: ${plain(anchoredText(c.quote,Date.parse(c.sectionIssuedAt),forecast.location.timeZone,now))}`;}}
- return {...overview,changes,sourceExcerpt,source:overview.source+(sourceExcerpt?' · changes: NWS discussion excerpt':''),text:overview.text+(changes?'\n\nWatch for changes — '+changes:'')};
+ if(!parts.length&&briefing?.mode!=='ai')for(const c of collectDanTakeEvidence(forecast,now).candidates){
+  if(!explicitForecastUncertainty(c.quote))continue;
+  const summary=plain(anchoredText(c.quote,Date.parse(c.sectionIssuedAt),forecast.location.timeZone,now));
+  // A short, complete dated excerpt is allowed during an AI failure. No generic
+  // overview, routine forecast or truncated half-sentence fills an empty card.
+  if(append({...c,sourceQuote:c.quote},summary)){sourceExcerpt=c;break;}
+ }
+ const text=parts.join(' ');
+ return {text,changes:text,items,sourceExcerpt,source:''};
 }

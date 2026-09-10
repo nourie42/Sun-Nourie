@@ -4,7 +4,7 @@ import {thermalHumidity,thermalComfort} from '../public/weather-fusion/weather-m
 import {currentComfortInputs} from '../public/weather-fusion/current-inputs.js';
 import {currentSample,forecastSample} from '../public/weather-fusion/weather-display.js';
 import {integrateSurface,solarRadiation,skyLongwave,pavementEstimate} from '../public/weather-fusion/pavement.js';
-import {uvCategory} from '../public/weather-fusion/daily-uv.js';
+import {uvCategory,hourlyUvValue,hourlyUvHTML} from '../public/weather-fusion/daily-uv.js';
 import {danCard,danOverview} from '../public/weather-fusion/dans-summary.js';
 import {collectDanTakeEvidence,approveDanTake} from '../public/weather-fusion/dans-take.js';
 import {normalizeExposureWeather,addExposureWeather,exposureWeatherUrl} from '../src/weatherFusionExposure.js';
@@ -105,41 +105,41 @@ test('UV categories use displayed whole number; zero, extreme, null and NaN hand
  for(const value of [null,undefined,NaN,-1,'3'])assert.equal(uvCategory(value).label,'Unavailable');
 });
 function discussionForecast(text){return {signature:'s',location,feeds:[{id:'afd',status:'ready'}],days:[{detail:'Warm and humid today.',nightDetail:'Mild tonight.'}],discussion:{id:'afd',office:'RAH',issuanceTime:new Date(now-H).toISOString(),text}};}
-test('Dan always has a concise summary, including a wrapped synopsis and no forecast changes',()=>{
+test('Dan is empty for a routine synopsis with no forecast changes',()=>{
  const f=discussionForecast('.SYNOPSIS...\nHot and humid weather continues\ntoday. A cooler, rainy weekend is coming.\n&&\n.LONG TERM...\nDry later.');
  const card=danCard({mode:'nws-summary'},f,now);
- assert.equal(card.text,'Hot and humid weather continues today. A cooler, rainy weekend is coming.');assert.equal(card.changes,'');
+ assert.equal(card.text,'');assert.equal(card.changes,'');
 });
-test('Dan combines verified AFD overview with supported changes, rejects stale AI overview',()=>{
+test('Dan contains only supported changes, never the general AI overview',()=>{
  const f=discussionForecast('.SHORT TERM /SUNDAY/...\nSunday rainfall amounts remain uncertain.');
  const evidence=collectDanTakeEvidence(f,now),approved=approveDanTake([{evidenceId:evidence.candidates[0].id,summary:'Rainfall amounts could be higher or lower.'}],f,now);
  const b={mode:'ai',signature:'s',summary:'Hot and humid today, with rain coming on Sunday.',...approved};
- const card=danCard(b,f,now);assert.match(card.text,/^Hot and humid today/);assert.match(card.changes,/Sunday.*Rainfall amounts/);
+ const card=danCard(b,f,now);assert.doesNotMatch(card.text,/Hot and humid today/);assert.equal(card.source,'');assert.match(card.changes,/Sunday.*Rainfall amounts/);
  f.discussion.id='replacement';assert.doesNotMatch(danOverview(b,f,now).text,/rain coming on Sunday/);
  assert.doesNotMatch(danOverview(b,f,now+13*H).text,/Hot and humid today/);
 });
 test('Dan preserves source weather meaning when AI fails and clears on location loading',()=>{
  const f=discussionForecast('.SYNOPSIS...\nSummer precipitation is possible today.\n&&');
  assert.doesNotMatch(danCard({},f,now).text,/snow/);
- assert.match(danCard({},null,now).text,/Checking/);
+ assert.equal(danCard({},null,now).text,'');
 });
-test('NWS key messages and changed-forecast sections support a quick weekend overview',()=>{
+test('A changed-forecast heading does not turn routine weather into possible-change evidence',()=>{
  const f=discussionForecast('.WHAT HAS CHANGED...\nLimited cooling this weekend, with heat returning Monday.\n&&\n.KEY MESSAGES...\nAs of 1200 PM Saturday...\n\n1) Hot weather today, with limited cooling\nthis weekend.\n\n2) Rain may return Sunday.\n&&');
  const card=danCard({},f,now);
- assert.match(card.text,/^Hot weather today, with limited cooling this weekend\. Rain may return Sunday\./);
- assert.match(card.changes,/Limited cooling/);assert.ok(card.sourceExcerpt);
+ assert.equal(card.text,'');assert.equal(card.changes,'');assert.equal(card.sourceExcerpt,null);
 });
 test('Dan expires old relative AI wording at midnight and anchors source tomorrow to its issuance',()=>{
  const late=Date.parse('2026-09-11T03:00:00Z'),after=Date.parse('2026-09-11T04:10:00Z');
  const f=discussionForecast('.SYNOPSIS...\nRain returns tomorrow.\n&&\n.SHORT TERM /FRIDAY/...\nTomorrow rainfall amounts remain uncertain.\n&&');
  f.discussion.issuanceTime=new Date(late).toISOString();
  const b={mode:'ai',signature:'s',generatedAt:new Date(late+30*60000).toISOString(),summary:'Rain arrives tomorrow.',...approveDanTake([],f,late)};
- const card=danCard(b,f,after);
+ const card=danCard({mode:'nws-summary'},f,after);
+ assert.equal(danCard(b,f,after).text,'','A successful empty AI result does not trigger an excerpt');
  assert.doesNotMatch(card.text,/tomorrow/i);assert.match(card.text,/Friday, Sep 11/);
 });
 test('retained key messages use their own As-of day, not the newer product date',()=>{
  const after=Date.parse('2026-09-11T06:00:00Z');
- const f=discussionForecast('.KEY MESSAGES...\nAs of 1100 PM Thursday...\nRain arrives tomorrow morning.\n&&');
+ const f=discussionForecast('.KEY MESSAGES...\nAs of 1100 PM Thursday...\nRainfall amounts remain uncertain tomorrow morning.\n&&');
  f.discussion.issuanceTime='2026-09-11T05:50:00Z';
  const card=danCard({},f,after);
  assert.doesNotMatch(card.text,/tomorrow/i);assert.match(card.text,/Friday, Sep 11 morning/);
@@ -148,5 +148,42 @@ test('a retained overview older than one day is not recycled into a fresh produc
  const f=discussionForecast('.KEY MESSAGES...\nAs of 1100 PM Wednesday...\nHeavy rain is coming tomorrow.\n&&');
  f.discussion.issuanceTime='2026-09-11T05:50:00Z';
  const card=danCard({},f,Date.parse('2026-09-11T06:00:00Z'));
- assert.doesNotMatch(card.text,/Heavy rain/);assert.match(card.source,/discussion summary unavailable/);
+ assert.doesNotMatch(card.text,/Heavy rain/);assert.equal(card.text,'');assert.equal(card.source,'');
+});
+
+test('hourly UV normalizes exact instants and preserves true zero versus missing',()=>{
+ const epochs=[now-H,now,now+H,now+2*H,now+3*H];
+ const raw={timezone:'America/New_York',hourly_units:{temperature_2m:'°F',wind_speed_10m:'mp/h',shortwave_radiation_instant:'W/m²'},hourly:{time:epochs.map(t=>t/1000),uv_index:[0,6.4,null,-1,'3']},daily:{time:[now/1000],uv_index_max:[9]}};
+ const normal=normalizeExposureWeather(raw),f={days:[{date:'2026-09-05'}],hours:epochs.map(t=>({time:new Date(t).toISOString()}))};
+ addExposureWeather(f,normal);
+ assert.deepEqual(f.hours.map(h=>h.uvIndex),[0,6.4,null,null,null]);
+ assert.equal(hourlyUvValue(f,now+25*60000),6.4);
+ assert.equal(hourlyUvValue(f,now-H),0);
+ for(const time of [now+H,now+2*H,now+3*H,now+10*H,'invalid'])assert.equal(hourlyUvValue(f,time),null);
+ assert.match(hourlyUvHTML(0),/>0<\/b>/);assert.match(hourlyUvHTML(null),/>—<\/b>/);
+ assert.ok(new URL(exposureWeatherUrl(location)).searchParams.get('hourly').split(',').includes('uv_index'));
+});
+test('UV Now follows the current wall hour rather than the station observation time',()=>{
+ const f=fixture('knightdale',now);f.current.time=new Date(now-H).toISOString();
+ f.uv={hourly:[{time:new Date(now-H).toISOString(),value:2},{time:new Date(now).toISOString(),value:6},{time:new Date(now+H).toISOString(),value:7}]};
+ assert.equal(currentSample(f,now+10*60000).uvIndex,6);
+ assert.equal(forecastSample(f,new Date(now+H).toISOString()).uvIndex,7);
+});
+test('hourly UV distinguishes repeated local hours across daylight-saving changes',()=>{
+ const f={uv:{hourly:[{time:'2026-11-01T05:00:00Z',value:1},{time:'2026-11-01T06:00:00Z',value:2}]}};
+ assert.equal(hourlyUvValue(f,'2026-11-01T01:20:00-04:00'),1);
+ assert.equal(hourlyUvValue(f,'2026-11-01T01:20:00-05:00'),2);
+});
+test('Dan preserves complete uncertainty context and decimals, and honors a successful empty result',()=>{
+ const f=discussionForecast('.SHORT TERM /SUNDAY/...\nSunday rainfall amounts remain uncertain and may increase to 0.25 inches.');
+ const c=collectDanTakeEvidence(f,now).candidates[0];assert.ok(c);
+ const b={mode:'ai',signature:f.signature,...approveDanTake([{evidenceId:c.id,summary:'Rain will arrive Sunday. Rainfall amounts remain uncertain.'}],f,now)};
+ assert.ok(b.forecastChanges.length);
+ assert.match(danCard(b,f,now).text,/Rain will arrive Sunday\. Rainfall amounts remain uncertain\./);
+ assert.match(danCard({mode:'nws-summary'},f,now).text,/0\.25 inches\./);
+ assert.equal(danCard({mode:'ai',...approveDanTake([],f,now)},f,now).text,'');
+});
+test('Dan never truncates an overlong paragraph into a potentially misleading claim',()=>{
+ const f=discussionForecast('.SHORT TERM /SUNDAY/...\nSunday rainfall amounts remain uncertain because '+ 'additional source context matters and '.repeat(8)+'several outcomes remain possible.');
+ assert.equal(danCard({mode:'nws-summary'},f,now).text,'');
 });

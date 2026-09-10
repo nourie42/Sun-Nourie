@@ -1,4 +1,4 @@
-import {bulletinFacts,BULLETIN_GROUPS} from './bulletin-facts.js?v=comfort-paws-uv-v1';
+import {bulletinFacts,BULLETIN_GROUPS} from './bulletin-facts.js?v=compact-comfort-hourly-uv-v2';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function renderBulletins(forecast,result=null,now=Date.now()){
  const root=document.getElementById('alerts'),panel=document.getElementById('nws-bulletins');if(!root)return;
