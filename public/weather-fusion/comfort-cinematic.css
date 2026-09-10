@@ -3,22 +3,23 @@
 #skin-exposure{background:radial-gradient(circle at 50% -18%,rgba(44,181,255,.25),transparent 46%),linear-gradient(155deg,#083e68 0%,#073659 54%,#062a49 100%);border:1px solid rgba(143,216,255,.35);border-radius:30px;box-shadow:0 18px 48px rgba(3,22,45,.28),inset 0 1px 0 rgba(255,255,255,.08);padding:28px 24px 24px}
 #skin-exposure .skin-kicker{font-size:clamp(30px,4vw,50px);line-height:1.05;font-weight:850;letter-spacing:-.04em;margin:4px auto 28px;color:#f9fcff;text-shadow:0 2px 18px rgba(0,34,72,.32)}
 #skin-values .sun-shade-comparison{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));max-width:1060px;gap:18px;margin:0 auto;align-items:stretch}
-#skin-values .exposure-person{position:relative;isolation:isolate;display:grid;grid-template-rows:54px 54px 34px minmax(0,1fr) 118px;min-width:0;height:650px;margin:0;padding:16px 0 0;overflow:hidden;border-radius:30px;border:2px solid rgba(125,213,255,.68);background:linear-gradient(180deg,#058fd9 0%,#0878ba 53%,#075080 100%);box-shadow:0 14px 30px rgba(1,29,59,.24),inset 0 1px 0 rgba(255,255,255,.16)}
+#skin-values .exposure-person{position:relative;isolation:isolate;display:grid;grid-template-rows:58px 64px minmax(0,1fr) 124px;min-width:0;height:650px;margin:0;padding:14px 0 0;overflow:hidden;border-radius:30px;border:2px solid rgba(125,213,255,.7);background:linear-gradient(180deg,#058fd9 0%,#0878ba 53%,#075080 100%);box-shadow:0 14px 30px rgba(1,29,59,.24),inset 0 1px 0 rgba(255,255,255,.16)}
 #skin-values .exposure-person::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(180deg,rgba(255,255,255,.06),transparent 22%,transparent 77%,rgba(0,25,53,.22))}
 #skin-values .exposure-label{grid-row:1;display:flex;align-items:center;justify-content:center;min-height:0;margin:0;padding:0 14px;font-size:clamp(25px,2.8vw,36px);line-height:1;font-weight:850;letter-spacing:-.03em;color:#fff;text-align:center;text-shadow:0 2px 12px rgba(2,35,65,.32);transform:none!important}
 #skin-values .exposure-subtitle{grid-row:2;display:flex;align-items:flex-start;justify-content:center;min-height:0;margin:0;padding:4px 18px 0;color:#d7f1ff;font-size:clamp(14px,1.65vw,20px);line-height:1.25;font-weight:500;text-align:center;letter-spacing:-.012em}
-#skin-values .exposure-alert-slot{grid-row:3;position:relative;z-index:8;top:auto;left:auto;right:auto;display:flex;align-items:center;justify-content:center;min-height:0;margin:0;padding:0 10px;pointer-events:none}
-#skin-values .exposure-alert-slot:empty{display:block}
-#skin-values .exposure-person .thermal-risk,#skin-values .exposure-person .pavement-warning{width:auto;height:auto;min-height:0;max-width:92%;margin:0;padding:6px 11px;border-radius:999px;border:1px solid rgba(255,234,175,.7);background:rgba(255,221,139,.94);box-shadow:0 7px 18px rgba(28,36,28,.16);color:#412b08;font-size:clamp(10px,1.1vw,12px);line-height:1.15;font-weight:800;white-space:nowrap;backdrop-filter:blur(7px)}
+#skin-values .exposure-alert-slot{position:absolute;z-index:9;top:120px;left:12px;right:12px;display:flex;align-items:center;justify-content:center;min-height:0;margin:0;padding:0;pointer-events:none}
+#skin-values .exposure-alert-slot:empty{display:none}
+#skin-values .exposure-person .thermal-risk,#skin-values .exposure-person .pavement-warning{width:auto;height:auto;min-height:0;max-width:92%;margin:0;padding:6px 11px;border-radius:999px;border:1px solid rgba(255,234,175,.72);background:rgba(255,221,139,.94);box-shadow:0 7px 18px rgba(28,36,28,.16);color:#412b08;font-size:clamp(10px,1.1vw,12px);line-height:1.15;font-weight:800;white-space:nowrap;backdrop-filter:blur(7px)}
 #skin-values .exposure-person .thermal-risk[data-risk=danger],#skin-values .exposure-person .pavement-warning[data-risk=danger]{border-color:rgba(255,203,195,.72);background:rgba(255,205,196,.95);color:#671a13}
 #skin-values .exposure-person .thermal-risk[data-risk=extreme],#skin-values .exposure-person .pavement-warning[data-risk=extreme]{border-color:rgba(255,170,196,.75);background:rgba(112,20,52,.95);color:#fff}
-#skin-values .exposure-person>svg{grid-row:4;display:block;width:100%;height:100%;max-width:none;min-height:0;margin:0;overflow:hidden;object-fit:cover;aspect-ratio:auto}
+#skin-values .exposure-person>svg{grid-row:3;display:block;width:100%;height:100%;max-width:none;min-height:0;margin:0;overflow:hidden;object-fit:cover;aspect-ratio:auto}
 #skin-values .shade-person>svg,#skin-values .sun-person>svg{filter:saturate(1.12) contrast(1.03)}
-#skin-values .pavement-person .poodle-scene{grid-row:4;position:relative;width:100%;height:100%;max-width:none;min-height:0;margin:0;overflow:hidden;aspect-ratio:auto;background:linear-gradient(180deg,#0a97df 0%,#5ccff5 61%,#91cbd2 62%,#617783 100%)}
-#skin-values .sun-shade-comparison:has(.sun-person .sky-sun) .pavement-person .poodle-scene{background:radial-gradient(circle at 74% 17%,rgba(255,242,157,.5),transparent 22%),linear-gradient(180deg,#078fe0 0%,#61d1fb 62%,#8cc8d1 63%,#637985 100%)}
-#skin-values .sun-shade-comparison:has(.sun-person .sky-sun) .pavement-person::after{content:"";position:absolute;z-index:5;top:154px;right:10%;width:clamp(64px,25%,92px);aspect-ratio:1;pointer-events:none;background:radial-gradient(circle,#fff5a6 0 36%,#ffd95c 37% 48%,transparent 49%),conic-gradient(from 0deg,transparent 0 7%,#ffd765 8% 11%,transparent 12% 19%,#ffd765 20% 23%,transparent 24% 31%,#ffd765 32% 35%,transparent 36% 43%,#ffd765 44% 47%,transparent 48% 55%,#ffd765 56% 59%,transparent 60% 67%,#ffd765 68% 71%,transparent 72% 79%,#ffd765 80% 83%,transparent 84% 91%,#ffd765 92% 95%,transparent 96%);filter:drop-shadow(0 0 15px rgba(255,222,91,.75))}
+#skin-values .pavement-person .poodle-scene{grid-row:3;position:relative;width:100%;height:100%;max-width:none;min-height:0;margin:0;overflow:hidden;aspect-ratio:auto;background:linear-gradient(180deg,#0a97df 0%,#5ccff5 61%,#91cbd2 62%,#617783 100%)}
+#skin-values .pavement-person[data-daylight="false"] .poodle-scene{background:linear-gradient(180deg,#071c46 0%,#123c69 62%,#285e7b 100%)}
+#skin-values .sun-shade-comparison:has(.sun-person .sky-sun) .pavement-person[data-daylight="true"] .poodle-scene{background:radial-gradient(circle at 74% 17%,rgba(255,242,157,.5),transparent 22%),linear-gradient(180deg,#078fe0 0%,#61d1fb 62%,#8cc8d1 63%,#637985 100%)}
+#skin-values .sun-shade-comparison:has(.sun-person .sky-sun) .pavement-person[data-daylight="true"]::after{content:"";position:absolute;z-index:5;top:145px;right:10%;width:clamp(64px,25%,92px);aspect-ratio:1;pointer-events:none;background:radial-gradient(circle,#fff5a6 0 36%,#ffd95c 37% 48%,transparent 49%),conic-gradient(from 0deg,transparent 0 7%,#ffd765 8% 11%,transparent 12% 19%,#ffd765 20% 23%,transparent 24% 31%,#ffd765 32% 35%,transparent 36% 43%,#ffd765 44% 47%,transparent 48% 55%,#ffd765 56% 59%,transparent 60% 67%,#ffd765 68% 71%,transparent 72% 79%,#ffd765 80% 83%,transparent 84% 91%,#ffd765 92% 95%,transparent 96%);filter:drop-shadow(0 0 15px rgba(255,222,91,.75))}
 #skin-values .pavement-person .poodle-walk{width:288px;height:192px;margin:0}
-#skin-values .exposure-person figcaption{grid-row:5;position:relative;z-index:6;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:3px;margin:0;padding:10px 10px 8px;text-align:center;background:linear-gradient(180deg,rgba(4,83,132,.12),rgba(3,54,94,.42));border-top:1px solid rgba(255,255,255,.08);box-sizing:border-box}
+#skin-values .exposure-person figcaption{grid-row:4;position:relative;z-index:6;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:3px;height:124px;margin:0;padding:10px 10px 8px;text-align:center;background:linear-gradient(180deg,rgba(4,83,132,.12),rgba(3,54,94,.42));border-top:1px solid rgba(255,255,255,.08);box-sizing:border-box}
 #skin-values .exposure-person figcaption strong{display:block;font-size:clamp(52px,5.8vw,78px);line-height:.92;font-weight:800;letter-spacing:-.055em;color:#fff;text-shadow:0 3px 18px rgba(0,28,55,.35)}
 #skin-values .exposure-person figcaption small{color:#e8f5fd;font-size:clamp(12px,1.3vw,16px);line-height:1.2}
 #skin-values .exposure-person figcaption .pavement-secondary{margin-top:4px;color:#fff;font-weight:750;font-size:clamp(14px,1.55vw,19px)}
@@ -27,22 +28,24 @@
 #skin-values .pavement-person{background:linear-gradient(180deg,#0793dc 0%,#0877b9 52%,#07517f 100%)}
 #skin-values .exposure-tree{transform:none!important}
 
-/* The three panels deliberately share the exact same row geometry. This prevents the
-   extra asphalt line in the pet card from pushing its lower border below Shade/Sun. */
-#skin-values .shade-person figcaption,#skin-values .sun-person figcaption,#skin-values .pavement-person figcaption{height:118px}
+/* Reference-card contract: all three cards have the same outer height, artwork band,
+   temperature band and bottom edge regardless of the extra asphalt lines in Pets. */
+#skin-values .shade-person,#skin-values .sun-person,#skin-values .pavement-person{height:650px}
+#skin-values .shade-person figcaption,#skin-values .sun-person figcaption,#skin-values .pavement-person figcaption{height:124px}
 
 @media(max-width:760px){
  #skin-exposure{border-radius:24px;padding:22px 12px 18px}
  #skin-exposure .skin-kicker{font-size:clamp(26px,7vw,36px);margin-bottom:20px}
  #skin-values .sun-shade-comparison{gap:8px}
- #skin-values .exposure-person{grid-template-rows:38px 50px 26px minmax(0,1fr) 92px;height:490px;padding-top:10px;border-radius:20px;border-width:1.5px}
+ #skin-values .exposure-person{grid-template-rows:40px 54px minmax(0,1fr) 96px;height:490px;padding-top:10px;border-radius:20px;border-width:1.5px}
  #skin-values .exposure-label{font-size:clamp(17px,5vw,24px);padding:0 4px}
  #skin-values .exposure-subtitle{padding:2px 5px 0;font-size:clamp(9px,2.8vw,13px);line-height:1.15}
- #skin-values .exposure-alert-slot{padding:0 3px}
+ #skin-values .exposure-alert-slot{top:96px;left:3px;right:3px}
  #skin-values .exposure-person .thermal-risk,#skin-values .exposure-person .pavement-warning{max-width:98%;padding:4px 6px;font-size:8px}
- #skin-values .sun-shade-comparison:has(.sun-person .sky-sun) .pavement-person::after{top:116px;right:5%;width:31%}
- #skin-values .exposure-person figcaption{padding:8px 3px 5px}
- #skin-values .shade-person figcaption,#skin-values .sun-person figcaption,#skin-values .pavement-person figcaption{height:92px}
+ #skin-values .sun-shade-comparison:has(.sun-person .sky-sun) .pavement-person[data-daylight="true"]::after{top:108px;right:5%;width:31%}
+ #skin-values .exposure-person figcaption{height:96px;padding:8px 3px 5px}
+ #skin-values .shade-person,#skin-values .sun-person,#skin-values .pavement-person{height:490px}
+ #skin-values .shade-person figcaption,#skin-values .sun-person figcaption,#skin-values .pavement-person figcaption{height:96px}
  #skin-values .exposure-person figcaption strong{font-size:clamp(36px,11.5vw,54px)}
  #skin-values .exposure-person figcaption small{font-size:9px}
  #skin-values .exposure-person figcaption .pavement-secondary{font-size:10px;margin-top:2px}
@@ -50,9 +53,11 @@
 @media(max-width:410px){
  #skin-exposure{padding-left:8px;padding-right:8px}
  #skin-values .sun-shade-comparison{gap:5px}
- #skin-values .exposure-person{grid-template-rows:34px 44px 24px minmax(0,1fr) 86px;height:455px;border-radius:17px}
+ #skin-values .exposure-person{grid-template-rows:36px 48px minmax(0,1fr) 90px;height:455px;border-radius:17px}
  #skin-values .exposure-label{font-size:16px}
  #skin-values .exposure-subtitle{font-size:9px;padding-left:3px;padding-right:3px}
- #skin-values .shade-person figcaption,#skin-values .sun-person figcaption,#skin-values .pavement-person figcaption{height:86px}
+ #skin-values .exposure-alert-slot{top:84px}
+ #skin-values .shade-person,#skin-values .sun-person,#skin-values .pavement-person{height:455px}
+ #skin-values .shade-person figcaption,#skin-values .sun-person figcaption,#skin-values .pavement-person figcaption{height:90px}
  #skin-values .exposure-person figcaption strong{font-size:34px}
 }
