@@ -95,7 +95,7 @@ export function renderComfort(forecast) {
  if(!sample){comfortPreview=null;return renderComfort(forecast);}
  const c=sample.comfort,zone=forecast.location.timeZone,summary=comfortWindow(forecast,now+1);
  const pavement=pavementEstimate(forecast,current.inputs,now);
- const kicker=$('skin-kicker');if(kicker)kicker.textContent=sample.now?'How does it feel outside right now?':`How will it feel outside at ${formatTime(sample.time)}?`;
+ const kicker=$('skin-kicker');if(kicker)kicker.textContent=sample.now?'How it actually feels right now':`How will it feel outside at ${formatTime(sample.time)}?`;
  const preview=sample.now?'':'<div class="comfort-preview-heading"><button type="button" data-comfort-reset>Back to now</button></div>';
  $('skin-values').innerHTML=`${preview}${sunShadeHTML(c,forecast.location,sample.now?now:Date.parse(sample.time),{forecast:!sample.now,condition:sample.condition,compact:true,pavement:pavementHTML(pavement,current.feels)})}${sample.now?peakComparisonHTML(summary,current.feels,zone):''}`;
  $('skin-values').querySelector('[data-comfort-reset]')?.addEventListener('click',()=>selectComfortHour('now'));
@@ -220,7 +220,7 @@ export function resetExperience() {
   if($('pavement-current-science'))$('pavement-current-science').textContent='Waiting for this location’s surface estimate.';
   if($('comfort-extra-science'))$('comfort-extra-science').textContent='Waiting for this location’s weather.';
  if($('today-forecast'))$('today-forecast').innerHTML='<p class="muted">Daily data is loading.</p>';
- if($('skin-kicker'))$('skin-kicker').textContent='How does it feel outside right now?';
+ if($('skin-kicker'))$('skin-kicker').textContent='How it actually feels right now';
  if($('metric-dialog').open)$('metric-dialog').close();
  $('skin-values').textContent='Checking how it will feel…';$('skin-explanation').textContent='Getting the weather for this location.';
  $('skin-science').textContent='Waiting for this location’s weather.';
@@ -240,3 +240,4 @@ export function installExperience() {
  $('chart-science-link').addEventListener('click',()=>$('metric-dialog').close());
  window.addEventListener('resize',()=>{if(active&&$('metric-dialog').open)drawChart();});
 }
+

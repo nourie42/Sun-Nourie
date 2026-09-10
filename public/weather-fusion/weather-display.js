@@ -58,16 +58,16 @@ export function renderHourlyWeather(forecast, now = Date.now()) {
   root.scrollLeft = scroll;
 }
 export function peakComparison(summary, currentShade) {
-  if (!summary) return {kind:'missing', label:'Warmest from now on unavailable', value:null, time:null, now:false};
+  if (!summary) return {kind:'missing', label:'Warmest feels like today unavailable', value:null, time:null, now:false};
   const peak = summary.chosen.value;
   if (summary.mode === 'day' && finite(currentShade) && Math.round(currentShade) >= Math.round(peak)) {
-    return {kind:'now', label:'Warmest from now on · Now', value:currentShade, time:null, now:true, later:peak};
+    return {kind:'now', label:'Warmest feels like today', value:currentShade, time:null, now:true, later:peak};
   }
-  return {kind:'peak', label:summary.mode === 'day' ? 'Warmest from now on · forecast peak' : summary.label, value:peak, time:summary.chosen.time, now:false};
+  return {kind:'peak', label:summary.mode === 'day' ? 'Warmest feels like today' : summary.label, value:peak, time:summary.chosen.time, now:false};
 }
 export function peakComparisonHTML(summary, currentShade, zone = 'America/New_York') {
   const comparison = peakComparison(summary,currentShade);
-  if (!summary) return '<p class="comfort-later">Warmest-from-now-on forecast unavailable. Missing readings stay blank.</p>';
+  if (!summary) return '<p class="comfort-later">Warmest feels like today unavailable. Missing readings stay blank.</p>';
   const time = comparison.now ? 'Now · current conditions' : `${new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',minute:'2-digit'}).format(new Date(comparison.time))} · hourly forecast`;
   const note = comparison.now && finite(comparison.later) && Math.round(comparison.later) < Math.round(currentShade) ? ` · highest later forecast ${degrees(comparison.later)}` : '';
   return `<div class="comfort-later" data-peak-time="${comparison.now?'now':esc(comparison.time)}" data-comparison="${comparison.kind}"><span>${esc(comparison.label)}${summary.partial ? ' · partial forecast' : ''}</span><strong>${degrees(comparison.value)}</strong><small>${esc(time)}${note}</small></div>`;
@@ -85,3 +85,4 @@ export function heroFeelsHTML(sample) {
   const source = sample.source === 'Station observation' ? 'based on the current station reading'+(sample.inputs.comfortSourceNote?' · '+sample.inputs.comfortSourceNote:'') : 'estimated from forecast data';
   return `Feels like <strong>${degrees(sample.feels)}</strong><small>${esc(sample.exposure.label)} · ${source}</small>`;
 }
+

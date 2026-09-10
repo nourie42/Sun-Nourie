@@ -53,7 +53,7 @@ try{
   assert.equal((await page.locator('#temperature').innerText()).trim(),'75°');
   assert.equal(await page.locator('#condition').isVisible(),false);assert.equal(await page.locator('#high-low').isVisible(),false);
   assert.equal((await page.locator('.brand small').innerText()).trim(),'Because Apple, Google and Samsung weather suck');
-  assert.equal((await page.locator('#skin-kicker').innerText()).trim(),'How does it feel outside right now?');
+  assert.equal((await page.locator('#skin-kicker').innerText()).trim(),'How it actually feels right now');
   assert.equal(await page.locator('#daily .forecast-confidence').count(),7);
   assert.ok((await page.locator('#daily .forecast-confidence').allTextContents()).every(t=>t.includes('Forecast confidence')));
   const layout=await page.evaluate(()=>{
@@ -292,3 +292,4 @@ try{
  assert.deepEqual(report.browserErrors,[]);report.success=true;
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));await fs.writeFile(dir+'/report.json',JSON.stringify(report,null,2));}
 console.log(JSON.stringify(report,null,2));
+

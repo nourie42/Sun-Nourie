@@ -1,11 +1,11 @@
 import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText,rebindDanTake} from './dans-take.js?v=clear-weather-daygraph-v3';
 import {danCard} from './dans-summary.js?v=clear-weather-daygraph-v3';
 import {dailyUvHTML} from './daily-uv.js?v=clear-weather-daygraph-v3';
-import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './weather-display.js?v=clear-weather-daygraph-v3';
+import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './weather-display.js?v=actual-feels-blend-v4';
 import {dayGraphHTML,installDayGraph} from './day-graph.js?v=clear-weather-daygraph-v3';
 import {degrees,feelsAt} from './hourly-feels.js?v=clear-weather-daygraph-v3';
 import {createFramePlayer} from './frame-player.js';
-import {renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=clear-weather-daygraph-v3';
+import {renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=actual-feels-blend-v4';
 import {dailyDisplay} from './weather-math.js?v=clear-weather-daygraph-v3';
 import {currentHero} from './current-temperature.js?v=clear-weather-daygraph-v3';
 import {renderBulletins} from './bulletins.js?v=clear-weather-daygraph-v3';
@@ -440,3 +440,4 @@ void load({ moveMap: true });
 setInterval(()=>{if(currentBriefing&&forecast)renderBriefing(currentBriefing);},30000);
 setInterval(()=>{if(forecast&&Date.now()-Date.parse(forecast.assembledAt)>90*60000)renderComfort(forecast);},30000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&currentBriefing&&forecast)renderBriefing(currentBriefing);});
+

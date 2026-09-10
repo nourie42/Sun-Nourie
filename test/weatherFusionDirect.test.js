@@ -80,10 +80,11 @@ test('Weather Nourie keeps thermal qualifications at the bottom, without a fetch
  assert.match(html,/Weather <b>Nourie<\/b>/);
  assert.ok(!html.includes('Back to Sun-Nourie'));assert.ok(!html.includes('Weather Fusion'));
  assert.ok(!html.includes('originalFetch'));
- assert.match(html,/How does it feel outside right now/);
+ assert.match(html,/How it actually feels right now/);
  assert.ok(html.indexOf('id="scientific-stuff"')>html.indexOf('id="metrics"'));
  assert.match(html,/not measured sunlight/);assert.match(html,/not a claim that a person/);
  assert.ok(!math.includes('NWS wind chill'));assert.ok(!math.includes('NWS heat index'));
  assert.match(math,/UTCI Tier-3 fallback/);assert.match(math,/tier3FeelsLike/);
  assert.match(html,/One all-season fallback/);assert.match(html,/Stull approximation/);
 });
+
