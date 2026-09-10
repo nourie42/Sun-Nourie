@@ -1,4 +1,5 @@
-/* No map-pane, global card or unrelated dashboard overrides. */
+/* Targeted non-cinematic repairs only. The people/pet comfort card is owned by
+   comfort-cinematic.css so older rules cannot stretch or misalign it. */
 #hourly button.hour{appearance:none;border:0;background:transparent;color:inherit;font-family:inherit;padding-left:0;padding-right:0;cursor:pointer;border-radius:12px}
 #hourly button.hour:focus-visible{outline:2px solid #bce6ff;outline-offset:-2px}
 #hourly button.hour[aria-pressed="true"]{background:#bde4ff12}
@@ -6,22 +7,13 @@
 .hourly-preview-help{font-size:11px;color:#c6dced;text-align:left;margin:10px 0 0}
 .comfort-preview-heading{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:8px;font-size:12px;line-height:1.5;color:#d4e6f3;margin:10px auto}
 .comfort-preview-heading button{background:#c5e7ff16;border:1px solid #b2ddfc45;border-radius:10px;color:#d4efff;padding:7px 11px;font-size:12px;font-weight:650;cursor:pointer}
-#skin-values .exposure-person figcaption span{min-height:0}
-#skin-values .exposure-estimate{line-height:1.6}
 #skin-exposure .comfort-weather-art{display:none}
 #skin-exposure[data-preview="forecast"] .comfort-later{display:none}
 #hero-scene svg[data-weather-kind="unknown"]{opacity:.55}
 @media(prefers-reduced-motion:reduce){.friendly-wave{animation:none!important}}
 
-/* Three readings share one card, including on phones. */
-.exposure-cards{display:block;max-width:960px;margin:12px auto 20px}
+.exposure-cards{display:block;max-width:1120px;margin:12px auto 20px}
 .exposure-cards .skin-exposure{width:100%;max-width:none;margin:0;min-width:0;box-sizing:border-box}
-#skin-values .sun-shade-comparison{grid-template-columns:repeat(3,minmax(0,1fr));max-width:780px;gap:12px}
-#skin-values .exposure-person{display:flex;flex-direction:column;min-width:0}
-#skin-values .exposure-person svg{display:block;width:100%;height:auto;aspect-ratio:11/13;max-width:220px;object-fit:contain;margin:0 auto;overflow:hidden}
-#skin-values .exposure-person figcaption{margin-top:auto}
-#skin-values .exposure-person figcaption small{font-size:11px;line-height:1.4;color:#c7dced}
-#skin-values .pavement-secondary{font-weight:650;color:#e0edf7}
 .pavement-details{font-size:12px;line-height:1.55;color:#d5e5f4;margin:12px 0;text-align:center}
 .pavement-details summary{cursor:pointer;color:#d7e9f7;padding:6px 0;text-decoration:underline;text-underline-offset:4px}
 .pavement-details p{margin:9px 0}
@@ -37,33 +29,9 @@
 .day-meta .daily-uv{white-space:nowrap;font-size:11px}
 #hourly .hour-uv{display:block;white-space:nowrap;margin-top:5px;font-size:11px}
 .hero-uv .daily-uv{font-size:14px}
-#skin-values .exposure-person figcaption strong{font-size:clamp(22px,3vw,34px);overflow-wrap:anywhere}
-#skin-values .exposure-label{display:flex;align-items:center;justify-content:center;min-height:42px;font-size:14px;font-weight:700;line-height:1.5;margin:5px 0 0}
-#skin-values .exposure-alert-slot{display:flex;align-items:center;justify-content:center;min-height:36px;font-size:10px;line-height:1.2;margin:2px 0}
-#skin-values .exposure-person .pavement-warning{display:flex;align-items:center;justify-content:center;width:100%;height:36px;min-height:36px;box-sizing:border-box;margin:0;padding:4px 5px;background:#ffe1a0;color:#432b06;border-radius:6px;font-size:10px;font-weight:750;line-height:1.2;text-align:center;white-space:normal}
-#skin-values .exposure-person .pavement-warning[data-risk=danger]{background:#ffd0c9;color:#6a1711}
-#skin-values .exposure-person .pavement-warning[data-risk=extreme]{background:#7a1836;color:#fff}
 .forecast-grid{display:block}.map-panel{margin-bottom:24px}
 .comfort-later .peak-reading{grid-column:2;grid-row:1 / span 2;align-self:center;display:flex;flex-direction:column;align-items:center}
 .comfort-later .peak-reading strong{display:block}
 #skin-values .comfort-later .peak-reading strong{font-size:30px;margin:0}
-@media(max-width:600px){.exposure-cards .skin-exposure{padding:20px 12px}#skin-values .sun-shade-comparison{gap:6px}#skin-values .exposure-person{padding:5px 3px 10px;border-radius:14px}#skin-values .exposure-person figcaption span{font-size:11px}#skin-values .exposure-person figcaption small{font-size:10px}.day-meta{gap:10px}.day-meta .forecast-confidence{gap:4px;text-align:left}.day-meta .confidence-meter{width:28px}.day-meta .daily-uv{font-size:10px}}
+@media(max-width:600px){.exposure-cards .skin-exposure{padding:16px 8px}.day-meta{gap:10px}.day-meta .forecast-confidence{gap:4px;text-align:left}.day-meta .confidence-meter{width:28px}.day-meta .daily-uv{font-size:10px}}
 @media(max-width:360px){.day-meta{gap:8px}.day-meta .forecast-confidence>span{max-width:52px}.day-meta .confidence-meter{width:22px}.day-meta .daily-uv{font-size:9px}}
-
-/* Human and pet alert banners stay aligned. */
-#skin-values .exposure-person .thermal-risk,#skin-values .exposure-person .pavement-warning{display:flex;align-items:center;justify-content:center;width:100%;height:36px;min-height:36px;box-sizing:border-box;margin:0;padding:4px 5px;border-radius:6px;background:#ffe1a0;color:#432b06;font-family:inherit;font-size:10px;font-weight:750;line-height:1.2;text-align:center;white-space:normal;letter-spacing:0}
-#skin-values .exposure-person .thermal-risk[data-risk=danger],#skin-values .exposure-person .pavement-warning[data-risk=danger]{background:#ffd0c9;color:#6a1711}
-#skin-values .exposure-person .thermal-risk[data-risk=extreme],#skin-values .exposure-person .pavement-warning[data-risk=extreme]{background:#7a1836;color:#fff}
-
-/* Cinematic SVGs now own their own tree and sun geometry. Do not apply the old
-   post-render transforms here: they can distort or clip the redesigned artwork. */
-#skin-values .poodle-scene .poodle-walk{width:167px;height:111.333px;margin:0}
-
-/* The pet panel shows the same direct-sun cue whenever the outdoor panel actually contains a sun.
-   Because this keys off the rendered sun glyph, it does not invent a sun at night or under overcast skies. */
-#skin-values .sun-shade-comparison:has(.sun-person .sky-sun) .pavement-person .poodle-scene{
- background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2080%2080%22%3E%3Ccircle%20cx%3D%2240%22%20cy%3D%2240%22%20r%3D%2217%22%20fill%3D%22%23ffdb83%22/%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%23ffdb83%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%3E%3Cpath%20d%3D%22M40%207v10M40%2063v10M7%2040h10M63%2040h10M16%2016l8%208M56%2056l8%208M16%2064l8-8M56%2024l8-8%22/%3E%3C/g%3E%3C/svg%3E");
- background-repeat:no-repeat;
- background-position:center 6%;
- background-size:clamp(48px,34%,76px) clamp(48px,34%,76px);
-}
