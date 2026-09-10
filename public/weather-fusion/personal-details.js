@@ -1,12 +1,18 @@
 import {weatherState} from './weather-state.js';
 import {thermalRiskHTML} from './thermal-risk.js?v=weather-art-labels-v10';
 import {forecastGrossLevel} from './dewpoint-meter.js?v=clear-weather-daygraph-v3';
-import {exposureScene} from './exposure-scene.js?v=natural-comfort-art-v12';
+import {exposureScene} from './exposure-scene.js?v=cinematic-comfort-card-v14';
 import {outdoorExposure} from './outdoor-feels.js?v=clear-weather-daygraph-v3';
 import {solarElevation} from './weather-math.js?v=clear-weather-daygraph-v3';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const HOUR=3600000;
+function ensureCinematicComfortStyles(){
+ if(typeof document==='undefined'||document.getElementById('weather-nourie-cinematic-comfort'))return;
+ const link=document.createElement('link');
+ link.id='weather-nourie-cinematic-comfort';link.rel='stylesheet';link.href='/weather-fusion/comfort-cinematic.css?v=cinematic-comfort-card-v14';
+ document.head.append(link);
+}
 export const pressureMb=value=>finite(value)?value*33.86389:null;
 export function stationPressureMb(current){return finite(current?.pressurePa)?current.pressurePa/100:pressureMb(current?.pressure);}
 export function pressureTrendText(current){
@@ -53,23 +59,42 @@ export function exposureTitle(condition,daylight=true,skyCover=null){
  if(w.kind==='clear')return /mostly|few clouds/.test(s)?(daylight?'Mostly sunny':'Mostly clear'):(daylight?'Sun':'Clear');
  return 'Outdoors';
 }
+export function comfortSubtitle(value){
+ if(!finite(value))return 'Feels-like unavailable';
+ if(value>=100)return 'Very hot conditions';
+ if(value>=88)return 'Hot & uncomfortable';
+ if(value>=80)return 'Warm but manageable';
+ if(value>=65)return 'Pleasant & comfortable';
+ if(value>=50)return 'Cool & comfortable';
+ if(value>=35)return 'Chilly outside';
+ return 'Cold conditions';
+}
+function sunSubtitle(value,kind,daylight){
+ if(!daylight)return comfortSubtitle(value);
+ const direct=kind==='clear'?'in direct sunlight':kind==='partly-cloudy'?'during sunny breaks':'outdoors';
+ if(!finite(value))return 'Feels-like unavailable';
+ if(value>=100)return `Very hot ${direct}`;
+ if(value>=88)return `Hot ${direct}`;
+ if(value>=80)return `Warm ${direct}`;
+ if(value>=65)return `Comfortable ${direct}`;
+ return `${comfortSubtitle(value)} ${direct}`;
+}
 export function sunShadeHTML(comfort,location,now=Date.now(),context={}){
+ ensureCinematicComfortStyles();
  const daylight=typeof comfort?.daylight==='boolean'?comfort.daylight:solarElevation(now,location?.latitude,location?.longitude)>0;
  const kind=comfort?.weatherKind||(finite(comfort?.sun)?'clear':'unknown');
  const condition=comfort?.radiantCondition||context.condition||comfort?.condition||({clear:'Clear','partly-cloudy':'Partly Cloudy',cloudy:'Cloudy',rain:'Rain',storm:'Thunderstorms',snow:'Snow',fog:'Fog'}[kind]||'');
  const shadeDisplay=finite(comfort?.shade)?comfort.shade:null;
  const shade=finite(shadeDisplay)?`${Math.round(shadeDisplay)}°`:'Unavailable';
- const exposure=outdoorExposure({...comfort,daylight,weatherKind:kind,condition}),outsideInfo=exposure;
+ const exposure=outdoorExposure({...comfort,daylight,weatherKind:kind,condition});
  const outdoorValue=exposure.value;
  const outside=finite(outdoorValue)?`${Math.round(outdoorValue)}°`:'Unavailable';
  const period=context.forecast?'forecast':'right now';
- const chance=/chance|possible|isolated|scattered (?:showers|storms)/i.test(condition);
- const labels={clear:'In direct sun','partly-cloudy':'During sunny breaks',cloudy:'Under clouds',rain:chance?'Rain possible':'In rainy weather',storm:chance?'Storms possible':'In stormy weather',snow:'In snowy weather',fog:'In fog or haze',unknown:'Outdoors · shade estimate only'};
- const label=exposure.label;
  const basis=comfort?.conditionSource?` · ${esc(comfort.conditionSource)}`:'';
  const note=!daylight?' · No direct sun at night.':finite(comfort?.inputEvidence?.skyCover)?' · Hourly cloud-adjusted radiation estimate; actual sun exposure varies.':kind==='unknown'?' · Sky data unavailable; no solar adjustment.':kind==='partly-cloudy'?' · Sunny-break estimate, not continuous direct sunlight.':['rain','storm','snow','fog','cloudy'].includes(kind)?' · No direct-sun adjustment; wet clothing is not modelled.':'';
  const shadeBasis=' Shade and outdoor are comparable modeled feels-like values from the same air temperature, moisture and wind; outdoor also includes the estimated radiant load.';
- return `<div class="sun-shade-comparison"><figure class="exposure-person shade-person" data-weather="${esc(kind)}">${context.compact?`<span class="exposure-label">Shade</span><span class="exposure-alert-slot"></span>`:''}${exposureScene(false,daylight,condition,shadeDisplay)}<figcaption><strong>${shade}</strong>${context.compact?'':`<span>Modeled shade feels-like · ${period}</span>`}</figcaption></figure><figure class="exposure-person sun-person" data-weather="${esc(kind)}">${context.compact?`<span class="exposure-label">${esc(exposureTitle(condition,daylight,comfort?.inputEvidence?.skyCover))}</span><span class="exposure-alert-slot">${thermalRiskHTML(outdoorValue,true)}</span>`:''}${exposureScene(true,daylight,condition,outdoorValue)}<figcaption>${context.compact?'':thermalRiskHTML(outdoorValue,true)}<strong>${outside}</strong>${context.compact?'':`<span>${label} · ${period}</span>`}</figcaption></figure>${context.pavement||''}</div>${context.compact?'':`<small class="exposure-estimate">Estimated feels-like temperatures · °F${note}${basis}${shadeBasis}</small>`}`;
+ const compactSunTitle=daylight&&['clear','partly-cloudy'].includes(kind)?'Sun':exposureTitle(condition,daylight,comfort?.inputEvidence?.skyCover);
+ return `<div class="sun-shade-comparison"><figure class="exposure-person shade-person" data-weather="${esc(kind)}">${context.compact?`<span class="exposure-label">Shade</span><span class="exposure-subtitle">${esc(comfortSubtitle(shadeDisplay))}</span><span class="exposure-alert-slot"></span>`:''}${exposureScene(false,daylight,condition,shadeDisplay)}<figcaption><strong>${shade}</strong>${context.compact?'':`<span>Modeled shade feels-like · ${period}</span>`}</figcaption></figure><figure class="exposure-person sun-person" data-weather="${esc(kind)}">${context.compact?`<span class="exposure-label">${esc(compactSunTitle)}</span><span class="exposure-subtitle">${esc(sunSubtitle(outdoorValue,kind,daylight))}</span><span class="exposure-alert-slot">${thermalRiskHTML(outdoorValue,true)}</span>`:''}${exposureScene(true,daylight,condition,outdoorValue)}<figcaption>${context.compact?'':thermalRiskHTML(outdoorValue,true)}<strong>${outside}</strong>${context.compact?'':`<span>${esc(exposure.label)} · ${period}</span>`}</figcaption></figure>${context.pavement||''}</div>${context.compact?'':`<small class="exposure-estimate">Estimated feels-like temperatures · °F${note}${basis}${shadeBasis}</small>`}`;
 }
 export function modelFreshnessText(layer,checkedAt,zone='America/New_York',now=Date.now()){
  if(!layer)return '';

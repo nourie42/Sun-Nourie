@@ -1,5 +1,5 @@
 import {finite,solarElevation,thermalHumidity} from './weather-math.js?v=clear-weather-daygraph-v3';
-import {clothingForFeels} from './exposure-scene.js?v=natural-comfort-art-v12';
+import {clothingForFeels} from './exposure-scene.js?v=cinematic-comfort-card-v14';
 import {thermalRisk} from './thermal-risk.js?v=weather-art-labels-v10';
 const H=3600000,SIGMA=5.670374419e-8,clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 const c=f=>(f-32)/1.8,f=c=>c*1.8+32;
@@ -91,11 +91,21 @@ function petWeatherWarning(feels){
  if(!risk)return null;
  return {level:risk.level,label:risk.short,source:'weather'};
 }
+export function petSurfaceSubtitle(result){
+ if(result?.status!=='estimated')return 'Check the actual pavement';
+ const hottest=Math.max(result.concrete?.value??-Infinity,result.asphalt?.value??-Infinity);
+ if(!finite(hottest))return 'Surface temperature unavailable';
+ if(hottest>=135)return 'Dangerously hot pavement';
+ if(hottest>=115)return 'Very hot on pavement';
+ if(hottest>=95)return 'Hot on pavement';
+ if(hottest>=80)return 'Warm pavement';
+ return 'Pavement is relatively cool';
+}
 export function pavementHTML(result,feels){
  const walker=walkerOutfit(feels);
  const surfaceWarning=pavementWarning(result),weatherWarning=petWeatherWarning(feels),warning=surfaceWarning||weatherWarning;
  const value=r=>r?`${r.value}°`:'—';
- return `<figure class="exposure-person pavement-person" id="pavement-content" data-status="${result.status}" aria-label="Estimated hard-surface temperature for dogs right now"><span class="exposure-label">For Pets</span><span class="exposure-alert-slot">${warning?`<span class="pavement-warning${warning.source==='weather'?' pet-weather-warning':''}" data-risk="${warning.level}" role="status">${warning.label}</span>`:''}</span><svg class="poodle-scene" viewBox="0 -85 220 260" role="img" aria-label="A person walking a light brown toy poodle"><image class="poodle-walk" data-outfit="${walker.outfit}" href="/weather-fusion/${walker.asset}" x="15" y="50" width="167" height="111.333"/></svg><figcaption><strong>${value(result.concrete)}</strong><small class="pavement-secondary">Asphalt ${value(result.asphalt)}</small><small>Est. surface · °F</small></figcaption></figure>`;
+ return `<figure class="exposure-person pavement-person" id="pavement-content" data-status="${result.status}" aria-label="Estimated hard-surface temperature for dogs right now"><span class="exposure-label">For Pets</span><span class="exposure-subtitle">${petSurfaceSubtitle(result)}</span><span class="exposure-alert-slot">${warning?`<span class="pavement-warning${warning.source==='weather'?' pet-weather-warning':''}" data-risk="${warning.level}" role="status">${warning.label}</span>`:''}</span><svg class="poodle-scene" viewBox="0 0 300 360" role="img" aria-label="A person walking a light brown toy poodle"><defs><linearGradient id="pet-road" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#7f929d"/><stop offset="1" stop-color="#405463"/></linearGradient></defs><g class="pet-horizon" fill="#2d9b5d" opacity=".9"><circle cx="22" cy="242" r="34"/><circle cx="61" cy="235" r="29"/><circle cx="248" cy="238" r="37"/><circle cx="288" cy="246" r="32"/></g><path d="M0 272Q77 257 153 271Q226 252 300 270V360H0Z" fill="url(#pet-road)"/><image class="poodle-walk" data-outfit="${walker.outfit}" href="/weather-fusion/${walker.asset}" x="6" y="126" width="288" height="192" preserveAspectRatio="xMidYMid meet"/></svg><figcaption><strong>${value(result.concrete)}</strong><small class="pavement-secondary">Asphalt ${value(result.asphalt)}</small><small>Est. surface temp · °F</small></figcaption></figure>`;
 }
 /** AAHA reports rapid paw burns at 135°F. The upper engineering bound triggers
  * an earlier precaution; it is not a measured temperature or probability. No

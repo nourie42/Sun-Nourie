@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
     paths:
+      - "public/weather-fusion/comfort-cinematic.css"
+      - "public/weather-fusion/exposure-scene.js"
+      - "public/weather-fusion/personal-details.js"
+      - "public/weather-fusion/pavement.js"
       - "public/weather-fusion/weather-repair.css"
       - "scripts/verifyComfortVisualContract.js"
       - ".github/workflows/comfort-visual-contract.yml"
@@ -21,7 +25,7 @@ jobs:
       - run: npm ci
       - run: npm install --no-save --package-lock=false playwright@1.55.0
       - run: npx playwright install --with-deps chromium
-      - name: Verify tree scale, all three sun cues, heat warnings and overflow
+      - name: Verify cinematic people card, exact temperatures and warnings
         run: node scripts/verifyComfortVisualContract.js
       - name: Upload visual proof
         if: always()
