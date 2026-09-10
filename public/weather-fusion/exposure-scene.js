@@ -44,9 +44,9 @@ function standingPerson(feels){
   <path d="M-16 18Q0 11 16 18L21 50Q0 58-21 50Z" fill="${p.shirt}"/>
   <path d="M-14 22L-27 51" stroke="${p.skin}" stroke-width="9" stroke-linecap="round"/>
   <path class="friendly-raised-arm" d="M14 22L31 4L35-20" fill="none" stroke="${p.skin}" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
-  <g class="friendly-wave" stroke="${p.skin}" stroke-width="4" stroke-linecap="round">
+  <g class="friendly-wave"><g stroke="${p.skin}" stroke-width="4" stroke-linecap="round">
    <path d="M34-18L28-31M36-20L35-35M38-20L42-34M40-17L48-28"/>
-  </g>
+  </g></g>
   <ellipse cx="37" cy="-18" rx="7" ry="8" fill="${p.skin}"/>
   <path d="M-4 16V22Q0 26 4 22V16" fill="#e6a57e"/>
   <g transform="translate(0,-4)">${face(p)}</g>
@@ -64,9 +64,9 @@ function seatedPerson(feels){
   <path d="M-17 4Q0-4 18 4L22 34Q0 43-22 34Z" fill="${p.shirt}"/>
   <path d="M-14 8L-28 32" stroke="${p.skin}" stroke-width="9" stroke-linecap="round"/>
   <path class="friendly-raised-arm" d="M15 7L31-7L35-28" fill="none" stroke="${p.skin}" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
-  <g class="friendly-wave" stroke="${p.skin}" stroke-width="4" stroke-linecap="round">
+  <g class="friendly-wave"><g stroke="${p.skin}" stroke-width="4" stroke-linecap="round">
    <path d="M34-27L29-39M36-29L36-43M38-29L43-42M40-26L49-36"/>
-  </g>
+  </g></g>
   <ellipse cx="37" cy="-27" rx="7" ry="8" fill="${p.skin}"/>
   <path d="M-4 1V6Q0 10 4 6V1" fill="#e6a57e"/>
   <g transform="translate(0,-19)">${face(p)}</g>
