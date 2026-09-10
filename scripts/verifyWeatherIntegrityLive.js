@@ -109,7 +109,11 @@ try{
  report.actualAICount=report.locations.filter(x=>x.aiMode==='ai').length;
  assert.ok(report.actualAICount>0,'At least one live AI generation must be verified, not only fallback status text');
  report.visibleChangeCount=report.locations.reduce((sum,row)=>sum+row.approvedChanges.length+(row.sourceExcerpt?1:0),0);
- if(report.locations.some(row=>row.candidateCount>0))assert.ok(report.visibleChangeCount>0,'Eligible discussion changes must produce a grounded paraphrase or dated source excerpt');
+ for(const row of report.locations){
+  assert.ok(row.overview.length<=380);assert.ok(!row.overview||row.overview.split(/\s+/).length<=55);
+  if(row.overview)assert.ok(row.candidateCount>0,'Visible text needs current possible-change evidence');
+  if(!row.approvedChanges.length&&!row.sourceExcerpt)assert.equal(row.overview,'','A successful empty review must stay hidden, even when candidates existed');
+ }
  report.success=true;
 }finally{
  if(browser)await browser.close();await fs.writeFile(output,JSON.stringify(report,null,2)+'\n');

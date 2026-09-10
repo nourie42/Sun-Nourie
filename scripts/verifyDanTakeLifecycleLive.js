@@ -38,7 +38,7 @@ try{
  }
  assert.ok(b&&f.discussion);assert.ok(Date.parse(f.discussion.issuanceTime)>=Date.parse(official.issuanceTime),'The live application cannot be behind the separately checked official latest product');
  const evidence=collectDanTakeEvidence(f),items=visibleDanTakeItems(b.danTake||b,f);
- const initialCard=danCard(b,f);assert.ok(initialCard.text.length>20,'Both quiet and uncertain discussions require an overview');
+ const initialCard=danCard(b,f);assert.ok(initialCard.text.length<=380);assert.ok(!initialCard.text||initialCard.text.split(/\s+/).length<=55,'Dan stays concise, and quiet discussions may hide the card');
  for(const item of items)assert.ok(f.discussion.text.replace(/\s+/g,' ').includes(item.sourceQuote));
  if(initialCard.sourceExcerpt)assert.ok(f.discussion.text.replace(/\s+/g,' ').includes(initialCard.sourceExcerpt.quote));
  report.initial={discussion:f.discussion,feed:f.feeds.find(p=>p.id==='afd'),aiMode:b.mode,generatedAt:b.generatedAt,items};
