@@ -37,7 +37,7 @@ function standingPerson(feels){
   ? `<path d="M-14 46H14L11 61H2L0 54L-2 61H-11Z" fill="${p.pants}"/>
      <path d="M-8 60L-10 88M8 60L11 88" stroke="${p.skin}" stroke-width="10" stroke-linecap="round"/>`
   : `<path d="M-9 48L-12 88M9 48L12 88" stroke="${p.pants}" stroke-width="12" stroke-linecap="round"/>`;
- return `<g class="exposure-person-art standing-person" data-outfit="${p.outfit}" transform="translate(136 176) scale(1.28)">
+ return `<g class="exposure-person-art standing-person" data-outfit="${p.outfit}" transform="translate(136 180) scale(1.55)">
   <ellipse cx="1" cy="98" rx="37" ry="7" fill="#0a3858" opacity=".24"/>
   ${legs}
   <path d="M-18 91H-3M7 91H23" stroke="${p.shoe}" stroke-width="9" stroke-linecap="round"/>
@@ -55,7 +55,7 @@ function standingPerson(feels){
 
 function seatedPerson(feels){
  const p=palette(feels);
- return `<g class="exposure-person-art seated-person" data-outfit="${p.outfit}" transform="translate(183 213) scale(1.15)">
+ return `<g class="exposure-person-art seated-person" data-outfit="${p.outfit}" transform="translate(181 210) scale(1.32)">
   <ellipse cx="-1" cy="76" rx="55" ry="8" fill="#0a3858" opacity=".24"/>
   <path d="M-16 39Q-24 52-35 62L-49 67" fill="none" stroke="${p.skin}" stroke-width="12" stroke-linecap="round"/>
   <path d="M12 42Q23 54 37 63L52 67" fill="none" stroke="${p.skin}" stroke-width="12" stroke-linecap="round"/>
@@ -126,5 +126,5 @@ export function exposureScene(sun,daylight=true,condition='Clear',feels=null){
  const art=sun?standingPerson(feels):shadeTree()+seatedPerson(feels);
  const clothing={hot:'light hot-weather clothing',warm:'light warm-weather clothing',mild:'everyday mild-weather clothing',cool:'a jacket and long pants',cold:'a coat, scarf and warm hat'}[clothingForFeels(feels)];
  const label=sun?`A smiling person in ${clothing}, outdoors in ${weather.label.toLowerCase()} conditions`:`A smiling person in ${clothing}, sitting beneath a tall shade tree`;
- return `<svg viewBox="0 0 300 360" role="img" aria-label="${label}" data-outfit="${clothingForFeels(feels)}">${defs}${background}${icon}${art}</svg>`;
+ return `<svg viewBox="0 0 300 360" preserveAspectRatio="xMidYMid slice" role="img" aria-label="${label}" data-outfit="${clothingForFeels(feels)}">${defs}${background}${icon}${art}</svg>`;
 }
