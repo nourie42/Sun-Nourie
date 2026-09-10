@@ -1,5 +1,6 @@
 import {finite,solarElevation,thermalHumidity} from './weather-math.js?v=clear-weather-daygraph-v3';
-import {clothingForFeels} from './exposure-scene.js?v=clear-weather-daygraph-v3';
+import {clothingForFeels} from './exposure-scene.js?v=natural-comfort-art-v12';
+import {thermalRisk} from './thermal-risk.js?v=weather-art-labels-v10';
 const H=3600000,SIGMA=5.670374419e-8,clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 const c=f=>(f-32)/1.8,f=c=>c*1.8+32;
 export const PAVEMENT_VERSION='pavement-energy-balance-v1';
@@ -60,7 +61,6 @@ export function pavementEstimate(forecast,current,now=Date.now()){
  const a=timed.findLast(r=>r.epoch<=now),b=timed.find(r=>r.epoch>=now);
  if(!a||!b||b.epoch-a.epoch>1.5*H||rows.length<24)return missing('At least a day of recent weather is needed to estimate heat stored in pavement.');
  const last={...interpolate(a,b,now),epoch:now};
- // Current observed air plus clearly labelled current-hour companion estimates.
  for(const key of ['temperature','dewpoint','humidity','wind'])if(finite(current?.[key]))last[key]=current[key];
  if(finite(current?.skyCover)){
   const transmission=n=>1-.75*(clamp(n,0,100)/100)**3.4;
@@ -86,11 +86,16 @@ export function walkerOutfit(feels){
  const outfit=clothingForFeels(feels),asset=outfit==='hot'||outfit==='warm'?'poodle-walk-hot.png':outfit==='cold'?'poodle-walk-cold.png':outfit==='cool'?'poodle-walk.png':'poodle-walk-mild.png';
  return {outfit,asset};
 }
+function petWeatherWarning(feels){
+ const risk=thermalRisk(feels);
+ if(!risk)return null;
+ return {level:risk.level,label:risk.short,source:'weather'};
+}
 export function pavementHTML(result,feels){
  const walker=walkerOutfit(feels);
- const warning=pavementWarning(result);
+ const surfaceWarning=pavementWarning(result),weatherWarning=petWeatherWarning(feels),warning=surfaceWarning||weatherWarning;
  const value=r=>r?`${r.value}°`:'—';
- return `<figure class="exposure-person pavement-person" id="pavement-content" data-status="${result.status}" aria-label="Estimated hard-surface temperature for dogs right now"><span class="exposure-label">For Pets</span><span class="exposure-alert-slot">${warning?`<span class="pavement-warning" data-risk="${warning.level}" role="status">${warning.label}</span>`:''}</span><svg class="poodle-scene" viewBox="0 -240 220 420" role="img" aria-label="A person walking a light brown toy poodle"><image class="poodle-walk" data-outfit="${walker.outfit}" href="/weather-fusion/${walker.asset}" x="-55" y="-29" width="319" height="212.667"/></svg><figcaption><strong>${value(result.concrete)}</strong><small class="pavement-secondary">Asphalt ${value(result.asphalt)}</small><small>Est. surface · °F</small></figcaption></figure>`;
+ return `<figure class="exposure-person pavement-person" id="pavement-content" data-status="${result.status}" aria-label="Estimated hard-surface temperature for dogs right now"><span class="exposure-label">For Pets</span><span class="exposure-alert-slot">${warning?`<span class="pavement-warning${warning.source==='weather'?' pet-weather-warning':''}" data-risk="${warning.level}" role="status">${warning.label}</span>`:''}</span><svg class="poodle-scene" viewBox="0 -85 220 260" role="img" aria-label="A person walking a light brown toy poodle"><image class="poodle-walk" data-outfit="${walker.outfit}" href="/weather-fusion/${walker.asset}" x="15" y="50" width="167" height="111.333"/></svg><figcaption><strong>${value(result.concrete)}</strong><small class="pavement-secondary">Asphalt ${value(result.asphalt)}</small><small>Est. surface · °F</small></figcaption></figure>`;
 }
 /** AAHA reports rapid paw burns at 135°F. The upper engineering bound triggers
  * an earlier precaution; it is not a measured temperature or probability. No
