@@ -26,9 +26,6 @@ function interpolate(a,b,t){
  for(const key of ['temperature','dewpoint','humidity','wind','skyCover','solar','rain'])out[key]=finite(a[key])&&finite(b[key])?a[key]+fraction*(b[key]-a[key]):null;
  return out;
 }
-/** Two-layer finite-volume heat balance. Convection and LW use inward-positive
- * signs. Dry surfaces have NO evaporative term. Integration never treats rain
- * chance as measured wetness. Parameter bounds are an engineering envelope. */
 export function integrateSurface(rows,location,{albedo=.3,k=2,capacity=2.2e6,windFactor=1,solarFactor=1,initialOffset=0,stepSeconds=60}={}){
  if(rows.length<2)return null;
  const deep=rows.reduce((sum,r)=>sum+c(r.temperature),0)/rows.length;
@@ -106,13 +103,12 @@ export function pavementHTML(result,feels){
  const walker=walkerOutfit(feels);
  const surfaceWarning=pavementWarning(result),weatherWarning=petWeatherWarning(feels),warning=surfaceWarning||weatherWarning;
  const value=r=>r?`${r.value}°`:'—',night=result?.daylight===false;
- const sky=night?`<rect width="300" height="360" fill="url(#pet-night-sky)"/><g class="pet-stars" fill="#dcecff" opacity=".86"><circle cx="28" cy="34" r="2"/><circle cx="73" cy="66" r="1.7"/><circle cx="126" cy="35" r="1.5"/><circle cx="169" cy="73" r="2"/><circle cx="223" cy="38" r="1.5"/><circle cx="270" cy="84" r="1.8"/><circle cx="246" cy="124" r="1.2"/><circle cx="105" cy="116" r="1.2"/></g><path class="pet-moon" d="M238 54A28 28 0 1 0 262 96A31 31 0 0 1 238 54Z" fill="#eef3ff"/>`:`<rect width="300" height="360" fill="url(#pet-day-sky)"/>`;
+ const sky=night
+  ? `<rect width="300" height="360" fill="url(#pet-night-sky)"/><g class="pet-stars" fill="#dcecff" opacity=".86"><circle cx="28" cy="34" r="2"/><circle cx="73" cy="66" r="1.7"/><circle cx="126" cy="35" r="1.5"/><circle cx="169" cy="73" r="2"/><circle cx="223" cy="38" r="1.5"/><circle cx="270" cy="84" r="1.8"/><circle cx="246" cy="124" r="1.2"/><circle cx="105" cy="116" r="1.2"/></g><path class="pet-moon" d="M238 54A28 28 0 1 0 262 96A31 31 0 0 1 238 54Z" fill="#eef3ff"/>`
+  : `<rect width="300" height="360" fill="url(#pet-day-sky)"/><g class="sky-sun" transform="translate(238 67)"><circle r="42" fill="#ffe680" opacity=".18"/><g stroke="#ffda63" stroke-width="7" stroke-linecap="round"><path d="M0-49V-37M0 49V37M-49 0H-37M49 0H37M-35-35L-26-26M35 35L26 26M-35 35L-26 26M35-35L26-26"/></g><circle r="27" fill="#ffe56f"/></g>`;
  const horizon=night?'#173d4c':'#2d9b5d';
  return `<figure class="exposure-person pavement-person" id="pavement-content" data-status="${result.status}" data-daylight="${night?'false':'true'}" aria-label="Estimated hard-surface temperature for dogs right now"><span class="exposure-label">For Pets</span><span class="exposure-subtitle">${petSurfaceSubtitle(result)}</span><span class="exposure-alert-slot">${warning?`<span class="pavement-warning${warning.source==='weather'?' pet-weather-warning':''}" data-risk="${warning.level}" role="status">${warning.label}</span>`:''}</span><svg class="poodle-scene" viewBox="0 0 300 360" role="img" aria-label="A person walking a light brown toy poodle"><defs><linearGradient id="pet-road" x1="0" y1="0" x2="0" y2="1"><stop stop-color="${night?'#4f6170':'#7f929d'}"/><stop offset="1" stop-color="${night?'#293b49':'#405463'}"/></linearGradient><linearGradient id="pet-day-sky" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#078fe0"/><stop offset=".68" stop-color="#61d1fb"/><stop offset="1" stop-color="#9bdcf0"/></linearGradient><linearGradient id="pet-night-sky" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#071c46"/><stop offset=".58" stop-color="#123c69"/><stop offset="1" stop-color="#285e7b"/></linearGradient></defs>${sky}<g class="pet-horizon" fill="${horizon}" opacity=".92"><circle cx="22" cy="242" r="34"/><circle cx="61" cy="235" r="29"/><circle cx="248" cy="238" r="37"/><circle cx="288" cy="246" r="32"/></g><path d="M0 272Q77 257 153 271Q226 252 300 270V360H0Z" fill="url(#pet-road)"/><image class="poodle-walk" data-outfit="${walker.outfit}" href="/weather-fusion/${walker.asset}" x="6" y="126" width="288" height="192" preserveAspectRatio="xMidYMid meet"/></svg><figcaption><strong>${value(result.concrete)}</strong><small class="pavement-secondary">Asphalt ${value(result.asphalt)}</small><small>Est. surface temp · °F</small></figcaption></figure>`;
 }
-/** AAHA reports rapid paw burns at 135°F. The upper engineering bound triggers
- * an earlier precaution; it is not a measured temperature or probability. No
- * warning must never be interpreted as a guarantee of paw safety. */
 export function pavementWarning(result){
  if(result?.status!=='estimated')return null;
  const surfaces=[result.concrete,result.asphalt].filter(Boolean);
