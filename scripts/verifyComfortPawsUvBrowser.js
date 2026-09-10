@@ -98,7 +98,7 @@ try{
   assert.equal(riskChecks.missing,'');assert.equal(riskChecks.normal,'');
   for(const r of riskChecks.results){assert.ok(r.above);assert.equal(r.banner,'');}
   assert.equal(new Set(riskChecks.results.map(r=>r.value)).size,4);
-  assert.ok(riskChecks.scale.every(t=>t.includes('scale(1.85 2.58)')));
+  assert.ok(riskChecks.scale.every(t=>t.includes('scale(2.58)')));
   const treeSize=await page.evaluate(()=>{const q=s=>document.querySelector(s).getBoundingClientRect(),t=q('.exposure-tree'),p=q('.shade-person .exposure-person-art'),b=q('.shade-person .exposure-alert-slot');return {ratio:t.height/p.height,top:t.top,personTop:p.top,bannerBottom:b.bottom};});
   assert.ok(treeSize.ratio>1.4,'Tree is visibly taller than the person');
   assert.ok(treeSize.top<treeSize.personTop-10,'Tree crown clears the person');
@@ -117,6 +117,23 @@ try{
   assert.ok(Math.abs(art.personHeight/art.walkerHeight-1)<.1,'Visible human heights agree within 10%');
   assert.ok(Math.abs(art.personHeight-art.sunHeight)<1);
   report.scenarios.push({width,art});
+  const originalScenes=await page.locator('.sun-shade-comparison').evaluate(el=>el.outerHTML);
+  for(const [condition,kind,title] of [['Sunny','clear','Sun'],['Mostly Cloudy','cloudy','Mostly cloudy'],['Partly Cloudy','partly-cloudy','Partly cloudy']]){
+   await page.evaluate(async({condition,kind})=>{
+    const {sunShadeHTML}=await import('/weather-fusion/personal-details.js?v=natural-comfort-art-v12');
+    const comfort={daylight:true,weatherKind:kind,radiantCondition:condition,shade:95,outdoors:98,inputEvidence:{temperature:91}};
+    const pavement=document.querySelector('#pavement-content').outerHTML;
+    document.querySelector('.sun-shade-comparison').outerHTML=sunShadeHTML(comfort,{latitude:35,longitude:-78},Date.now(),{compact:true,pavement});
+   },{condition,kind});
+   assert.equal(await page.locator('.sun-person .exposure-label').innerText(),title);
+   assert.equal(await page.locator('.shade-weather').count(),1,'Sky symbol exists above shade tree including sunny weather');
+   assert.equal(await page.locator('.shade-person .thermal-risk').count(),0);
+   assert.ok(await page.locator('.exposure-person-art').evaluateAll(els=>els.every(el=>{const m=el.transform.baseVal.consolidate().matrix;return Math.abs(m.a-m.d)<.001;})),'People preserve their original aspect ratio');
+   assert.ok(await page.locator('.shade-weather').evaluate(el=>el.getBoundingClientRect().bottom<document.querySelector('.exposure-tree').getBoundingClientRect().top));
+   await page.locator('.exposure-cards').screenshot({path:output+'/checked-'+kind+'-'+width+'.png'});
+  }
+  await page.locator('.sun-shade-comparison').evaluate((el,html)=>el.outerHTML=html,originalScenes);
+
 
   const concise=await page.locator('#skin-exposure').innerText();assert.doesNotMatch(concise,/station|paw care|source air temperature|Sidewalk ranges/i);
   assert.equal(await page.locator('#scientific-stuff #skin-explanation').count(),1);
