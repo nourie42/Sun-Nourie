@@ -181,7 +181,17 @@ export function danTakeText(items){
     const list=groups.get(item.period),key=summary.toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
     if(!list.some(entry=>entry.key===key))list.push({key,text:summary});
   }
-  return [...groups].map(([period,list])=>`${period}: ${list.map(x=>x.text).join(' ')}`).join('\n\n');
+  // Distinct dates share one weekly label; retain every dated forecast below it.
+  let comingWeekShown=false;
+  return [...groups].map(([period,list])=>{
+    const weeklyPrefix='This coming week — ';
+    let label=period;
+    if(period.startsWith(weeklyPrefix)){
+      if(comingWeekShown)label=period.slice(weeklyPrefix.length);
+      comingWeekShown=true;
+    }
+    return `${label}: ${list.map(x=>x.text).join(' ')}`;
+  }).join('\n\n');
 }
 
 /** Reuse ONLY a previously approved take from the same exact discussion and

@@ -49,6 +49,31 @@ test('only approved dated AI changes appear in both places, without duplicates',
  assert.equal(elements['today-uncertainty'],note);assert.ok(!elements['briefing-detail'].innerHTML.includes('earlier or later'));
  assert.equal(elements['briefing-detail'].innerHTML.split('data-dans-take').length-1,0);
 });
+test('Friday, Saturday and Sunday takes show the coming-week label once across distinct dates',()=>{
+ const time=Date.parse('2026-09-10T09:00:00Z');
+ const f={...structuredClone(source),signature:'distinct-weekend-dates',discussion:{
+  id:'afd-weekend',office:'RAH',issuanceTime:'2026-09-10T07:00:00Z',
+  text:'.DISCUSSION...\nFriday shower and storm coverage may be limited because dry air could suppress development.\n\nSaturday may trend cooler than earlier runs, which could reduce thunderstorm coverage.\n\nSunday may have lower storm energy, which could reduce heavy or severe storms while showers remain possible.'
+ }};
+ const summaries=[
+  'Coverage of Friday’s showers and storms may be limited because dry air could suppress development.',
+  'Saturday may trend cooler than earlier runs, which would generally reduce thunderstorm coverage.',
+  'Sunday may have lower storm energy, so heavy or severe storms appear less likely though showers remain possible.'
+ ];
+ const candidates=collectDanTakeEvidence(f,time).candidates;
+ assert.equal(candidates.length,3);
+ const b={mode:'ai',signature:f.signature,...approveDanTake(candidates.map((c,i)=>({evidenceId:c.id,summary:summaries[i]})),f,time)};
+ assert.equal(b.forecastChanges.length,3,'all three forecasts must remain approved');
+ assert.equal(b.forecastChanges.filter(i=>i.period.startsWith('This coming week')).length,2,'reproduce separate Saturday and Sunday weekly periods');
+ const {elements,context,render,setTime}=harness();context.forecast=f;setTime(time);
+ for(let refresh=0;refresh<2;refresh++){
+  render(b);
+  const text=elements['today-uncertainty-text'].textContent;
+  assert.equal((text.match(/This coming week/g)||[]).length,1,'one weekly label on every render');
+  assert.equal(text,[`Friday, Sep 11: ${summaries[0]}`,`This coming week — Saturday, Sep 12: ${summaries[1]}`,`Sunday, Sep 13: ${summaries[2]}`].join('\n\n'));
+  assert.equal(elements['today-uncertainty'].hidden,false);
+ }
+});
 for(const uncertainty of [undefined,null,'',' \n\t ',42,{},'Yesterday\'s front might change the forecast.'])test('unverified legacy uncertainty never becomes take content: '+JSON.stringify(uncertainty),()=>{
  const {elements,render}=harness();render(supported());render({mode:'ai',signature:source.signature,uncertainty});
  assert.equal(elements['today-uncertainty'].hidden,false);assert.equal(elements['today-uncertainty-text'].textContent,'No additional forecast changes to call out right now.');
@@ -90,6 +115,7 @@ test('Gross Meter heading stays centered and bold without changing chart geometr
  assert.match(css,/#gross-title\{text-align:center;font-weight:800\}/);assert.ok(!/\.gross-(scroll|chart)\s*\{/.test(css));
 });
 test('changed assets are cache-busted and late briefing responses stay guarded',()=>{
- assert.match(html,/forecast-layout\.css\?v=4-confidence/);assert.match(html,/app\.js\?v=dans-take-once-v1/);
+ assert.match(html,/forecast-layout\.css\?v=4-confidence/);assert.match(html,/app\.js\?v=dans-take-week-once-v2/);
+ assert.match(app,/dans-take\.js\?v=dans-take-week-once-v2/);
  assert.match(app,/if \(id === generation && briefing\.signature === forecast\?\.signature\) renderBriefing\(briefing\)/);
 });
