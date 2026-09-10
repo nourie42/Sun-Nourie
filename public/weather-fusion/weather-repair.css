@@ -65,6 +65,7 @@
 /* Weather symbols are intentionally prominent and stay proportional. */
 #skin-values .shade-person .shade-weather .sky-sun{transform-box:fill-box;transform-origin:50% 50%;transform:translateY(-55px) scale(1.70)}
 #skin-values .sun-person .person-weather .sky-sun{transform-box:fill-box;transform-origin:50% 50%;transform:scale(1.70)}
+@media(min-width:601px){#skin-values .shade-person>.exposure-label{transform:translateY(-18px)}}
 
 /* The pet panel shows the same direct-sun cue whenever the outdoor panel actually contains a sun.
    Because this keys off the rendered sun glyph, it does not invent a sun at night or under overcast skies. */
