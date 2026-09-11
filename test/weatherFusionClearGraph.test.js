@@ -36,3 +36,15 @@ test('Dan translates the screenshot uncertainty and rejects technical paraphrase
  for(const summary of ['Mid level sinking may limit rain coverage.','Subsidence may limit the showers.','Instability and shear may increase storms.'])assert.equal(approveDanTake([{evidenceId:candidates[0].id,summary}],f,now).forecastChanges.length,0);
  f.discussion.text='.SHORT TERM /Sunday/...\nVorticity and isentropic lift may increase Sunday.\n&&';assert.equal(danCard(null,f,now).text,'');
 });
+test('Dan never shows convergence or trough wording from the forecast discussion',()=>{
+ const f={signature:'screenshot-jargon',location:{...location,office:'MHX',timeZone:'America/New_York'},feeds:[{id:'afd',status:'ready'}],discussion:{id:'afd-screenshot',office:'MHX',issuanceTime:new Date(now-3600000).toISOString(),text:'.LONG TERM /Friday/...\nA few inland showers or storms may pop up Friday. There is some uncertainty regarding the strength of convergence along the inland trough.\n&&'}};
+ const candidate=collectDanTakeEvidence(f,now).candidates[0];assert.ok(candidate);
+ for(const copied of ['There is some uncertainty regarding the strength of convergence along the inland trough.','The trough and convergence may be stronger than expected.']){
+  assert.ok(hasDanJargon(copied));
+  assert.equal(approveDanTake([{evidenceId:candidate.id,summary:copied}],f,now).forecastChanges.length,0);
+ }
+ const simple='A few inland showers or storms may pop up, but they may not cover many places.';
+ const approved=approveDanTake([{evidenceId:candidate.id,summary:simple}],f,now);
+ assert.equal(approved.forecastChanges.length,1);assert.equal(approved.forecastChanges[0].summary,simple);
+ assert.doesNotMatch(approved.forecastChanges[0].summary,/convergence|trough/i);
+});

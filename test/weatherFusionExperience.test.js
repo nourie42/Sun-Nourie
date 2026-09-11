@@ -74,7 +74,8 @@ test('wet bulb stays diagnostic and is not double-counted into the final real-fe
 });
 test('plain-language outlook prompt prioritizes local discussion and keeps required attribution',()=>{
  assert.match(PLAIN_OUTLOOK_INSTRUCTIONS,/latest local NWS Area Forecast Discussion/);
- assert.match(PLAIN_OUTLOOK_INSTRUCTIONS,/middle-school/);assert.match(PLAIN_OUTLOOK_INSTRUCTIONS,/current local time/);
+ assert.match(PLAIN_OUTLOOK_INSTRUCTIONS,/ten-year-old/);assert.match(PLAIN_OUTLOOK_INSTRUCTIONS,/current local time/);
+ assert.match(PLAIN_OUTLOOK_INSTRUCTIONS,/what people may notice/);assert.match(PLAIN_OUTLOOK_INSTRUCTIONS,/convergence or a trough/);
  assert.match(PLAIN_OUTLOOK_INSTRUCTIONS,/sources array/);assert.match(PLAIN_OUTLOOK_INSTRUCTIONS,/Never promise safety/);
 });
 test('all cards have dialog graphs and science is below the main experience',()=>{
