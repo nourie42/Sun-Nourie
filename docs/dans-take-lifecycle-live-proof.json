@@ -1,0 +1,124 @@
+{
+  "commit": "b8a71a5b12a4d63297c8ba2ae66780cbf8256ff0",
+  "checkedAt": "2026-09-11T00:10:58.238Z",
+  "fixture": false,
+  "success": true,
+  "checks": [
+    {
+      "label": "initial-page",
+      "checkedAt": "2026-09-11T00:11:18.018Z",
+      "assembledAt": "2026-09-11T00:10:54.608Z",
+      "sourceCheckedAt": "2026-09-11T00:10:54.149Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "717a2967be710c53745b0778",
+      "discussionId": "605a34bd-c97f-4fe5-a618-d1bf464e0c3e",
+      "issuedAt": "2026-09-10T23:09:00+00:00",
+      "cachedItems": [],
+      "visible": false,
+      "text": ""
+    },
+    {
+      "label": "refresh-1",
+      "checkedAt": "2026-09-11T00:12:23.952Z",
+      "assembledAt": "2026-09-11T00:12:17.738Z",
+      "sourceCheckedAt": "2026-09-11T00:10:54.149Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "717a2967be710c53745b0778",
+      "discussionId": "605a34bd-c97f-4fe5-a618-d1bf464e0c3e",
+      "issuedAt": "2026-09-10T23:09:00+00:00",
+      "cachedItems": [],
+      "visible": false,
+      "text": ""
+    },
+    {
+      "label": "refresh-2",
+      "checkedAt": "2026-09-11T00:13:30.886Z",
+      "assembledAt": "2026-09-11T00:13:29.363Z",
+      "sourceCheckedAt": "2026-09-11T00:13:29.363Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "717a2967be710c53745b0778",
+      "discussionId": "605a34bd-c97f-4fe5-a618-d1bf464e0c3e",
+      "issuedAt": "2026-09-10T23:09:00+00:00",
+      "cachedItems": [],
+      "visible": false,
+      "text": ""
+    },
+    {
+      "label": "full-page-reload",
+      "checkedAt": "2026-09-11T00:13:32.100Z",
+      "assembledAt": "2026-09-11T00:13:29.363Z",
+      "sourceCheckedAt": "2026-09-11T00:13:29.363Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "717a2967be710c53745b0778",
+      "discussionId": "605a34bd-c97f-4fe5-a618-d1bf464e0c3e",
+      "issuedAt": "2026-09-10T23:09:00+00:00",
+      "cachedItems": [],
+      "visible": false,
+      "text": ""
+    }
+  ],
+  "deployed": {
+    "sourceVersion": "nws-afd-monotonic-v1",
+    "danTakeVersion": "weather-nourie-dans-take-plain-v8",
+    "assets": {
+      "index.html": "74797a0445d8457c28b3d6e4c92cbe57b19235ae5d2894a6e0a6907bdcea9ff9",
+      "app.js": "b7200a05f1e8003ed40ba86cffb81a3f34965aadc4438416a1fe8df4381628d4",
+      "dans-summary.js": "52369551bf46498006eb85f71e97ba8c2e6a884fd10efc7dc7ae36e77dd605b0",
+      "current-inputs.js": "9f2c99ef54d53152d389a9b2186113ae702bdc7c091c082e10fbc108958f7125",
+      "pavement.js": "25eb12645b87113a454655dec341870c7abcfbdf8d08d25367f46ebf3c392764",
+      "daily-uv.js": "4327bb7ab8a9bac7d21abbcafe674a13849d40a54c0c73966ee2e9a78a98e2e8",
+      "dans-take.js": "65fee2f8f7e5ad4ebe39b7db37e6c3fde775d9f590b0d4ff6fa72f9435f96cd2"
+    }
+  },
+  "independentOfficialLatest": {
+    "id": "605a34bd-c97f-4fe5-a618-d1bf464e0c3e",
+    "issuedAt": "2026-09-10T23:09:00+00:00"
+  },
+  "initial": {
+    "discussion": {
+      "id": "605a34bd-c97f-4fe5-a618-d1bf464e0c3e",
+      "office": "RAH",
+      "issuanceTime": "2026-09-10T23:09:00+00:00",
+      "text": "\n000\nFXUS62 KRAH 102309\nAFDRAH\n\nArea Forecast Discussion\nNational Weather Service Raleigh NC\n710 PM EDT Thu Sep 10 2026\n\n.WHAT HAS CHANGED...\n\n* No significant changes from previous forecast thinking\n\n&&\n\n.KEY MESSAGES...\nAs of 215 PM Thursday...\n\n1) Hot temperatures to persist through the end of the week, with \nlimited cooling this weekend. Warm temperature return next week. \n\n2) Unsettled weather returns Friday and Saturday with a Marginal \nRisk for excessive rain (flash flooding). \n\n&&\n\n.DISCUSSION...\nAs of 157 PM Thursday...\n\nKEY MESSAGE 1... Hot temperatures to persist through the end of the \nweek, with limited cooling this weekend. Warm temperature return \nnext week. \n\nEarly afternoon water vapor imagery reveals an upper ridge \npositioned off the SC coast, with a similarly strong (594dm) ridge \nover the Southwest US. In between, a weak longwave trough stretched \nfrom MI to MO which was slowly dragging a surface cold front into \nthe Ohio Valley. Ahead of this front across NC, temperatures have \nwarmed and dewpoints have risen quite a bit with heat index values \napproaching the triple digits in many locations south and east of \nthe Triangle.\n\nThe front will be slow to approach the area, keeping NC within the \npre-frontal warm sector through Friday. As such, increased heat \nindex values near or slightly above 100 degrees will be common \nthrough tomorrow, with the highest values across the Triangle and \npoints southeast. Deep BL mixing Friday afternoon will allow \ndewpoints to retreat slightly into the lower 70s which should keep \nobs several degrees below Heat Advisory criteria, although those who \nare sensitive to the heat should take the proper precautions through \nthe end of the week.\n\nAs the front approaches the area on Saturday, it'll wash out and/or \nretreat back northward early next week. Cloud cover will keep \ntemperatures in check with highs Saturday and Sunday in the \nmid/upper 80s. The front will result in slightly lower thicknesses \nand dewpoints across NC next week, but still with highs in the upper \n80s to lower 90s. Dewpoints in the mid to upper 60s should keep heat \nindex values in the low to mid 90s. \n\n\nKEY MESSAGE 2... Unsettled weather returns Friday and Saturday with \na Marginal Risk for excessive rain (flash flooding). \n\nAs mentioned above, a slow moving cold front will approach from the \nwest on Friday before stalling out, then washing out, Saturday into \nSunday. Pre-frontal moisture advection will promote dewpoints in the \nlow to mid 70s Friday and Saturday and there should be enough \ninstability to support scattered shower and thunderstorm \ndevelopment. The best jet dynamics will be displaced well to our \nnorth and with the decaying nature of the surface boundary, \norganized severe convection looks to be limited in nature. The \nincrease in moisture and relatively slow moving nature of any storms \nthat develop will support an isolated risk of flash flooding, and \nnearly all of central NC remains within a WPC Marginal Risk of \nexcessive rainfall. A few HREF LPMM bullseyes of more than 2\" are \npresent across the Coastal Plain Friday afternoon, although I would \nanticipate more areal coverage and localized heavy precip potential \non Saturday given the nearby proximity of the decaying surface \nboundary. By Sunday the front should be non-existent with convection \nbecoming more isolated and less organized.\n\n&&\n\n.AVIATION /00Z FRIDAY THROUGH TUESDAY/... \nAs of 710 PM Thursday...\n\nMost of central NC will remain VFR through the 24 hour TAF period. \nLate overnight into early Friday morning there could be a brief \nperiod of restrictions as it looks like an area of low stratus/fog \ncould develop in the southern Coastal Plain and Sandhills. \nConfidence is low in this happening thus only a TEMPO at KRWI and \nKFAY were added. While there is a low chance of isolated to \nscattered showers/thunderstorms across the region Friday evening, \nconfidence was not high enough at this time to add any mention with \nthis 00Z TAF package. \n\nOutlook: Shower and thunderstorm chances are possible each \nafternoon/evening through the weekend, with the best chance for \nwidespread rain Saturday. Additionally, low stratus and/or fog may \ndevelop and cause sub-VFR restrictions the next several mornings.\n\n&&\n\n.RAH WATCHES/WARNINGS/ADVISORIES...\nNone.\n\n&&\n\n$$\n\nDISCUSSION...Leins\nAVIATION...Helock/CA\n",
+      "url": "https://api.weather.gov/products/605a34bd-c97f-4fe5-a618-d1bf464e0c3e"
+    },
+    "feed": {
+      "id": "afd",
+      "label": "NWS RAH discussion",
+      "url": "https://api.weather.gov/products/types/AFD/locations/RAH/latest",
+      "status": "ready",
+      "sourceVersion": "nws-afd-monotonic-v1",
+      "retrievalStatus": "verified-latest",
+      "fetchedAt": "2026-09-11T00:10:54.149Z",
+      "checkedAt": "2026-09-11T00:10:54.149Z",
+      "issuedAt": "2026-09-10T23:09:00+00:00",
+      "productUrl": "https://api.weather.gov/products/605a34bd-c97f-4fe5-a618-d1bf464e0c3e",
+      "message": ""
+    },
+    "aiMode": "ai",
+    "generatedAt": "2026-09-11T00:11:15.482Z",
+    "items": []
+  },
+  "observedRefreshVisibility": [
+    {
+      "hidden": true,
+      "text": ""
+    },
+    {
+      "hidden": true,
+      "text": ""
+    },
+    {
+      "hidden": true,
+      "text": ""
+    },
+    {
+      "hidden": true,
+      "text": ""
+    }
+  ],
+  "distinctWeatherSignatures": 1,
+  "distinctForecastAssemblies": 3,
+  "distinctDiscussionChecks": 2,
+  "browserErrors": []
+}
