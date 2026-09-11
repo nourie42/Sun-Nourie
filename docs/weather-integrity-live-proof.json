@@ -1,0 +1,320 @@
+{
+  "commit": "aa40139f38420e45fd31696fdf89dc9f8d581579",
+  "checkedAt": "2026-09-11T08:55:44.153Z",
+  "fixture": false,
+  "locations": [
+    {
+      "place": "Knightdale / Raleigh",
+      "observation": "2026-09-11T08:15:00+00:00",
+      "station": "KJNX",
+      "currentInputs": {
+        "temperature": 71.6,
+        "dewpoint": 71.6,
+        "humidity": 100,
+        "windMph": 0,
+        "windUsedMps": 0.5,
+        "skyCover": null,
+        "skySource": "Station weather report",
+        "meanRadiantTemperatureF": 71.6,
+        "sourceTime": "2026-09-11T08:15:00+00:00",
+        "station": "KJNX",
+        "stationDistanceKm": 28.6,
+        "windPolicy": "Calm-wind approximation: UTCI minimum 0.5 m/s",
+        "radiationBasis": "No solar load at night; unmeasured mean radiant temperature assumed equal to air"
+      },
+      "currentOutdoor": 77.2090619591357,
+      "numericForecastHours": 232,
+      "daySevenPeak": {
+        "time": "2026-09-17T18:00:00.000Z",
+        "value": 94.9,
+        "inputs": {
+          "temperature": 86.5,
+          "dewpoint": 64.3,
+          "wind": 2.9,
+          "humidity": 47.6,
+          "skyCover": 13.35,
+          "skySource": "NWS 60% / ECMWF 25% / NBM 15%",
+          "skySources": [
+            {
+              "id": "nws",
+              "weight": 0.6,
+              "value": 17
+            },
+            {
+              "id": "ecmwf",
+              "weight": 0.25,
+              "value": 0
+            },
+            {
+              "id": "nbm",
+              "weight": 0.15,
+              "value": 21
+            }
+          ]
+        }
+      },
+      "aiMode": "nws-summary",
+      "aiReason": "AI synthesis is temporarily unavailable; the verified source forecast remains visible.",
+      "danTakeStatus": "no-explicit-future-change",
+      "danTakeReview": {
+        "candidateCount": 0,
+        "proposedCount": 0,
+        "approvedCount": 0,
+        "rejected": []
+      },
+      "candidateCount": 0,
+      "danTake": "",
+      "approvedChanges": [],
+      "maximumCenteringErrorPx": 0.0078125,
+      "passed": true,
+      "sourceExcerpt": null,
+      "overview": ""
+    },
+    {
+      "place": "White Lake, NC",
+      "observation": "2026-09-11T08:15:00+00:00",
+      "station": "KEYF",
+      "currentInputs": {
+        "temperature": 75.74000000000001,
+        "dewpoint": 75.2,
+        "humidity": 98.21427086549524,
+        "windMph": 0,
+        "windUsedMps": 0.5,
+        "skyCover": null,
+        "skySource": "Station weather report",
+        "meanRadiantTemperatureF": 75.74000000000001,
+        "sourceTime": "2026-09-11T08:15:00+00:00",
+        "station": "KEYF",
+        "stationDistanceKm": 8,
+        "windPolicy": "Calm-wind approximation: UTCI minimum 0.5 m/s",
+        "radiationBasis": "No solar load at night; unmeasured mean radiant temperature assumed equal to air"
+      },
+      "currentOutdoor": 82.35176080164874,
+      "numericForecastHours": 232,
+      "daySevenPeak": {
+        "time": "2026-09-17T18:00:00.000Z",
+        "value": 96.5,
+        "inputs": {
+          "temperature": 87.3,
+          "dewpoint": 66.7,
+          "wind": 1.9,
+          "humidity": 50.5,
+          "skyCover": 16.35,
+          "skySource": "NWS 60% / ECMWF 25% / NBM 15%",
+          "skySources": [
+            {
+              "id": "nws",
+              "weight": 0.6,
+              "value": 20
+            },
+            {
+              "id": "ecmwf",
+              "weight": 0.25,
+              "value": 0
+            },
+            {
+              "id": "nbm",
+              "weight": 0.15,
+              "value": 29
+            }
+          ]
+        }
+      },
+      "aiMode": "nws-summary",
+      "aiReason": "AI is cooling down after an unavailable response; official guidance is shown.",
+      "danTakeStatus": "no-explicit-future-change",
+      "danTakeReview": {
+        "candidateCount": 0,
+        "proposedCount": 0,
+        "approvedCount": 0,
+        "rejected": []
+      },
+      "candidateCount": 0,
+      "danTake": "",
+      "approvedChanges": [],
+      "maximumCenteringErrorPx": 0.0078125,
+      "passed": true,
+      "sourceExcerpt": null,
+      "overview": ""
+    },
+    {
+      "place": "Denver, CO",
+      "observation": "2026-09-11T06:58:00+00:00",
+      "station": "KBKF",
+      "currentInputs": {
+        "temperature": 69.44,
+        "dewpoint": 55.76,
+        "humidity": 61.756142904796526,
+        "windMph": 6,
+        "windUsedMps": 2.68224,
+        "skyCover": null,
+        "skySource": "NWS current-hour forecast (sky only)",
+        "meanRadiantTemperatureF": 69.44,
+        "sourceTime": "2026-09-11T06:58:00+00:00",
+        "station": "KBKF",
+        "stationDistanceKm": 20.1,
+        "windPolicy": "Source wind; no observation-to-forecast adjustment",
+        "radiationBasis": "No solar load at night; unmeasured mean radiant temperature assumed equal to air"
+      },
+      "currentOutdoor": 65.02570693460436,
+      "numericForecastHours": 232,
+      "daySevenPeak": {
+        "time": "2026-09-17T21:00:00.000Z",
+        "value": 74.8,
+        "inputs": {
+          "temperature": 76.2,
+          "dewpoint": 51.7,
+          "wind": 5.8,
+          "humidity": 42.4,
+          "skyCover": 68.05,
+          "skySource": "NWS 60% / ECMWF 25% / NBM 15%",
+          "skySources": [
+            {
+              "id": "nws",
+              "weight": 0.6,
+              "value": 59
+            },
+            {
+              "id": "ecmwf",
+              "weight": 0.25,
+              "value": 100
+            },
+            {
+              "id": "nbm",
+              "weight": 0.15,
+              "value": 51
+            }
+          ]
+        }
+      },
+      "aiMode": "ai",
+      "aiReason": null,
+      "danTakeStatus": "supported",
+      "danTakeReview": {
+        "candidateCount": 3,
+        "proposedCount": 2,
+        "approvedCount": 2,
+        "rejected": []
+      },
+      "candidateCount": 3,
+      "danTake": "Saturday, Sep 12: Afternoon and evening shower/storm coverage is uncertain and may be limited, with only a few late storms possible.\n\nThis coming week — Tuesday, Sep 15: The degree of mid-week cooling is uncertain, but a noticeable drop in temperatures is likely with the next front.",
+      "approvedChanges": [
+        {
+          "evidenceId": "s1-p2-q2",
+          "summary": "Afternoon and evening shower/storm coverage is uncertain and may be limited, with only a few late storms possible.",
+          "period": "Saturday, Sep 12",
+          "sourceQuote": "While moisture levels increase slightly, considerable uncertainty exists for afternoon and evening shower/storm coverage due to thermal profiles.",
+          "section": "DISCUSSION",
+          "sectionIssuedAt": "2026-09-11T08:31:00.000Z",
+          "validFrom": "2026-09-12T06:00:00.000Z",
+          "eventEnd": "2026-09-13T06:00:00.000Z",
+          "validUntil": "2026-09-11T20:31:00.000Z"
+        },
+        {
+          "evidenceId": "s1-p4-q2",
+          "summary": "The degree of mid-week cooling is uncertain, but a noticeable drop in temperatures is likely with the next front.",
+          "period": "This coming week — Tuesday, Sep 15",
+          "sourceQuote": "While daily uncertainties exist about the degree of cooling, there is modest agreement we'll settle into highs in the 70s (and 30-40% chance of 60s) for the plains and I-25 Corridor.",
+          "section": "DISCUSSION",
+          "sectionIssuedAt": "2026-09-11T08:31:00.000Z",
+          "validFrom": "2026-09-15T06:00:00.000Z",
+          "eventEnd": "2026-09-16T06:00:00.000Z",
+          "validUntil": "2026-09-11T20:31:00.000Z"
+        }
+      ],
+      "maximumCenteringErrorPx": 0.0078125,
+      "passed": true,
+      "sourceExcerpt": null,
+      "overview": "Saturday, Sep 12: Afternoon and evening shower/storm coverage is uncertain and may be limited, with only a few late storms possible. Tuesday, Sep 15: The degree of mid-week cooling is uncertain, but a noticeable drop in temperatures is likely with the next front."
+    },
+    {
+      "place": "Seattle, WA",
+      "observation": "2026-09-11T08:30:00+00:00",
+      "station": "KBFI",
+      "currentInputs": {
+        "temperature": 57.2,
+        "dewpoint": 51.8,
+        "humidity": 82.12183738504665,
+        "windMph": 6.912131004000001,
+        "windUsedMps": 3.0899990440281604,
+        "skyCover": null,
+        "skySource": "Station weather report",
+        "meanRadiantTemperatureF": 57.2,
+        "sourceTime": "2026-09-11T08:30:00+00:00",
+        "station": "KBFI",
+        "stationDistanceKm": 6.9,
+        "windPolicy": "Source wind; no observation-to-forecast adjustment",
+        "radiationBasis": "No solar load at night; unmeasured mean radiant temperature assumed equal to air"
+      },
+      "currentOutdoor": 50.19955974228412,
+      "numericForecastHours": 232,
+      "daySevenPeak": {
+        "time": "2026-09-17T22:00:00.000Z",
+        "value": 79.4,
+        "inputs": {
+          "temperature": 75.7,
+          "dewpoint": 55,
+          "wind": 6,
+          "humidity": 48.6,
+          "skyCover": 4.5,
+          "skySource": "NWS 60% / ECMWF 25% / NBM 15%",
+          "skySources": [
+            {
+              "id": "nws",
+              "weight": 0.6,
+              "value": 7
+            },
+            {
+              "id": "ecmwf",
+              "weight": 0.25,
+              "value": 0
+            },
+            {
+              "id": "nbm",
+              "weight": 0.15,
+              "value": 2
+            }
+          ]
+        }
+      },
+      "aiMode": "ai",
+      "aiReason": null,
+      "danTakeStatus": "no-explicit-future-change",
+      "danTakeReview": {
+        "candidateCount": 0,
+        "proposedCount": 0,
+        "approvedCount": 0,
+        "rejected": []
+      },
+      "candidateCount": 0,
+      "danTake": "",
+      "approvedChanges": [],
+      "maximumCenteringErrorPx": 0.0078125,
+      "passed": true,
+      "sourceExcerpt": null,
+      "overview": ""
+    }
+  ],
+  "success": true,
+  "deployed": {
+    "integrityVersion": "weather-nourie-integrity-v1",
+    "danTakeVersion": "weather-nourie-dans-take-plain-v8",
+    "assets": {
+      "index.html": "0dc6a36e5cb65b805760a9deb76185394498fd71985480d26b7c57b819522da4",
+      "app.js": "7db15c5b347f1d9afa3324d93c353d286da2a7b12a65d27c39ccc14d59ae90d7",
+      "dans-summary.js": "52369551bf46498006eb85f71e97ba8c2e6a884fd10efc7dc7ae36e77dd605b0",
+      "current-inputs.js": "9f2c99ef54d53152d389a9b2186113ae702bdc7c091c082e10fbc108958f7125",
+      "pavement.js": "3e2e0f4a2ec351e35ec727de89c3815db103159604f5b52db8cc11ad32c567b7",
+      "daily-uv.js": "4327bb7ab8a9bac7d21abbcafe674a13849d40a54c0c73966ee2e9a78a98e2e8",
+      "weather-math.js": "9f2e476e3cbf42bca0f9f94ac8911d4de6f717264d03a2e19da9ca8e3e01afc3",
+      "utci.js": "db0a67652cfcb41edc45c738b60d7d816ef6c70ad8db0870757076e4932b0613",
+      "weather-display.js": "7e2afc1c20f6a6483edf95f1762a668e8bdfcdbd82d5f106afcd4b7a2b0ffe41",
+      "personal-details.js": "34406fcf139e97865be70049a206474785944dccf72520bc30e81cbc741daa22",
+      "experience.js": "b434fec000d7b002ba3ef00e60570d27181bd69d9cd855aea025f1c12814386c",
+      "hourly-feels.css": "bdc44e2838335a229c565a58691e4cc2d9b9c6895c1ebf277b3d2ef0501df801",
+      "dans-take.js": "65fee2f8f7e5ad4ebe39b7db37e6c3fde775d9f590b0d4ff6fa72f9435f96cd2"
+    }
+  },
+  "actualAICount": 2,
+  "visibleChangeCount": 2
+}
