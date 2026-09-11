@@ -29,7 +29,7 @@ export function dewpointPoints(forecast,now,hours=240){
 }
 function styles(){
  if(document.getElementById('weather-nourie-dewpoint-meter-css'))return;
- const l=document.createElement('link');l.id='weather-nourie-dewpoint-meter-css';l.rel='stylesheet';l.href='/weather-fusion/dewpoint-meter.css?v=clear-weather-daygraph-v3';
+ const l=document.createElement('link');l.id='weather-nourie-dewpoint-meter-css';l.rel='stylesheet';l.href='/weather-fusion/dewpoint-meter.css?v=dynamic-scenes-v27';
  l.addEventListener('load',()=>{if(latest)renderDewpointMeter(latest,lastNow);},{once:true});document.head.append(l);
 }
 const hourText=(t,z)=>new Intl.DateTimeFormat('en-US',{timeZone:z,hour:'numeric',minute:'2-digit'}).format(new Date(t));
@@ -82,19 +82,22 @@ export function renderDewpointMeter(forecast,now=Date.now()){
  const box=window.getComputedStyle(panel);
  const width=panel.clientWidth-(parseFloat(box.paddingLeft)||0)-(parseFloat(box.paddingRight)||0)-2;
  const built=graph(pts,horizon,zone,width,Math.ceil(now/HOUR)*HOUR);
+ const marker=finite(dp)?Math.max(0,Math.min(100,(dp-45)/35*100)):0;
+ const pill=level.key==='nice-breeze'?'BREEZE SAVES IT':level.key==='nogo'?'NO-GO':level.key.toUpperCase();
  panel.dataset.level=level.key;panel.dataset.hours=String(horizon);
- panel.innerHTML=`<div class="gross-eyebrow" id="gross-title">DEW POINT · GROSS METER</div>
-  <div class="gross-now"><strong class="gross-number">${finite(dp)?Math.round(dp)+'°':'—'}</strong><span class="gross-now-label">current dew point</span></div>
-  <p class="gross-verdict">${esc(level.label)}</p><span class="gross-pill gross-${level.key}">${esc(level.key==='nice-breeze'?'BREEZE SAVES IT':level.key==='nogo'?'NO-GO':level.key.toUpperCase())}</span>
-  <p class="gross-note">${esc(level.note)}</p>
-  <div class="gross-toolbar"><span>Explore the forecast</span><div class="gross-periods" role="group" aria-label="Dew-point graph time range">${[[24,'24h'],[48,'48h'],[168,'7 days'],[240,'10 days']].map(([n,l])=>`<button type="button" data-gross-hours="${n}" aria-pressed="${horizon===n}" class="${horizon===n?'selected':''}">${l}</button>`).join('')}</div></div>
-  <p class="gross-coverage">${hoursAvailable>=24?`${Math.floor(hoursAvailable/24)} days ${hoursAvailable%24} hours of forecast available`:'Forecast coverage is limited'}${hoursAvailable<horizon?' · Missing hours stay blank.':''}</p>
-  <div class="gross-selection" aria-live="polite"><strong class="gross-selected-value">—</strong><span class="gross-selected-time"></span><span class="gross-selected-label"></span></div>
-  <p class="gross-scroll-hint">Full range shown · Tap the line or use the slider for details</p>
-  <div class="gross-scroll" tabindex="0" role="region" aria-label="Full-range dew-point forecast chart">${built.html}</div>
-  <label class="gross-slider-label" for="gross-scrubber">Explore each forecast hour</label><input id="gross-scrubber" type="range" min="0" max="${Math.max(0,pts.length-1)}" value="0" ${pts.length?'':'disabled'} aria-label="Forecast dew-point hour"/>
-  <div class="gross-scale"><span>Dry &lt;50°</span><span>Not bad 50–59°</span><span>Humid 60–64°</span><span>Gross 65–69°</span><span>No-go 70–74°</span><span>Nope 75°+</span></div>
-  ${worst?`<p class="gross-worst"><strong>Muggiest in this view:</strong> ${Math.round(worst.value)}° · ${esc(dayText(worst.time,zone))} at ${esc(hourText(worst.time,zone))}</p>`:'<p class="gross-empty">No dew-point forecast is available for these hours.</p>'}`;
+ panel.innerHTML=`<div class="gross-summary">
+   <div class="gross-intro"><div class="gross-eyebrow" id="gross-title"><strong>Dew Point</strong><span>Gross Meter</span></div><p class="gross-note">${esc(level.note)}</p></div>
+   <div class="gross-now"><svg class="gross-drop" viewBox="0 0 64 76" aria-hidden="true"><path d="M32 3C23 20 10 36 10 51a22 22 0 0 0 44 0C54 36 41 20 32 3Z"/><path d="M53 26h8M53 38h8M53 50h8"/></svg><span><strong class="gross-number">${finite(dp)?Math.round(dp)+'°':'—'}</strong><small class="gross-now-label">Current dew point</small></span></div>
+   <div class="gross-callout"><span class="gross-pill gross-${level.key}">${esc(pill)}</span><p class="gross-verdict">${esc(level.label)}</p></div>
+   <div class="gross-current-scale" style="--gross-position:${marker}%"><div class="gross-current-track"><i></i></div><div class="gross-current-labels"><span><b>50°</b>Dry</span><span><b>60°</b>Not bad</span><span><b>70°</b>Humid</span><span><b>75°</b>Gross</span></div></div>
+  </div>
+  <div class="gross-explore"><div class="gross-toolbar"><span>Explore the forecast</span><div class="gross-periods" role="group" aria-label="Dew-point graph time range">${[[24,'24h'],[48,'48h'],[168,'7 days'],[240,'10 days']].map(([n,l])=>`<button type="button" data-gross-hours="${n}" aria-pressed="${horizon===n}" class="${horizon===n?'selected':''}">${l}</button>`).join('')}</div></div>
+   <p class="gross-coverage">${hoursAvailable>=24?`${Math.floor(hoursAvailable/24)} days ${hoursAvailable%24} hours of forecast available`:'Forecast coverage is limited'}${hoursAvailable<horizon?' · Missing hours stay blank.':''}</p>
+   <div class="gross-forecast-layout"><div class="gross-readout"><div class="gross-selection" aria-live="polite"><strong class="gross-selected-value">—</strong><span class="gross-selected-time"></span><span class="gross-selected-label"></span></div><p class="gross-scroll-hint">Full range shown · Tap the line or use the slider for details</p></div>
+    <div class="gross-scroll" tabindex="0" role="region" aria-label="Full-range dew-point forecast chart">${built.html}</div></div>
+   <label class="gross-slider-label" for="gross-scrubber">Explore each forecast hour</label><input id="gross-scrubber" type="range" min="0" max="${Math.max(0,pts.length-1)}" value="0" ${pts.length?'':'disabled'} aria-label="Forecast dew-point hour"/>
+   <div class="gross-scale"><span>Dry &lt;50°</span><span>Not bad 50–59°</span><span>Humid 60–64°</span><span>Gross 65–69°</span><span>No-go 70–74°</span><span>Nope 75°+</span></div>
+   ${worst?`<p class="gross-worst"><strong>Muggiest in this view:</strong> ${Math.round(worst.value)}° · ${esc(dayText(worst.time,zone))} at ${esc(hourText(worst.time,zone))}</p>`:'<p class="gross-empty">No dew-point forecast is available for these hours.</p>'}</div>`;
  const select=i=>{
   const p=pts[Math.max(0,Math.min(pts.length-1,i))];if(!p)return;selectedEpoch=p.epoch;
   const v=forecastGrossLevel(p.value,pairedWind(forecast,p.time));

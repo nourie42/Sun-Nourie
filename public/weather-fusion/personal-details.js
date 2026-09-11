@@ -1,7 +1,7 @@
 import {weatherState} from './weather-state.js';
 import {thermalRiskHTML} from './thermal-risk.js?v=weather-art-labels-v10';
-import {forecastGrossLevel} from './dewpoint-meter.js?v=clear-weather-daygraph-v3';
-import {exposureScene} from './exposure-scene.js?v=compact-weather-v21';
+import {forecastGrossLevel} from './dewpoint-meter.js?v=dynamic-scenes-v27';
+import {exposureScene} from './exposure-scene.js?v=dynamic-scenes-v27';
 import {outdoorExposure} from './outdoor-feels.js?v=clear-weather-daygraph-v3';
 import {solarElevation} from './weather-math.js?v=clear-weather-daygraph-v3';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
@@ -10,7 +10,7 @@ const HOUR=3600000;
 function ensureCinematicComfortStyles(){
  if(typeof document==='undefined'||document.getElementById('weather-nourie-cinematic-comfort'))return;
  const link=document.createElement('link');
- link.id='weather-nourie-cinematic-comfort';link.rel='stylesheet';link.href='/weather-fusion/comfort-cinematic.css?v=compact-weather-v21';
+ link.id='weather-nourie-cinematic-comfort';link.rel='stylesheet';link.href='/weather-fusion/comfort-cinematic.css?v=dynamic-scenes-v27';
  document.head.append(link);
 }
 export const pressureMb=value=>finite(value)?value*33.86389:null;
@@ -82,8 +82,10 @@ function sunSubtitle(value,kind,daylight){
 export function sunShadeHTML(comfort,location,now=Date.now(),context={}){
  ensureCinematicComfortStyles();
  const daylight=typeof comfort?.daylight==='boolean'?comfort.daylight:solarElevation(now,location?.latitude,location?.longitude)>0;
- const kind=comfort?.weatherKind||(finite(comfort?.sun)?'clear':'unknown');
- const condition=comfort?.radiantCondition||context.condition||comfort?.condition||({clear:'Clear','partly-cloudy':'Partly Cloudy',cloudy:'Cloudy',rain:'Rain',storm:'Thunderstorms',snow:'Snow',fog:'Fog'}[kind]||'');
+ const fallbackKind=comfort?.weatherKind||(finite(comfort?.sun)?'clear':'unknown');
+ const condition=context.condition||comfort?.radiantCondition||comfort?.condition||({clear:'Clear','partly-cloudy':'Partly Cloudy',cloudy:'Cloudy',rain:'Rain',storm:'Thunderstorms',snow:'Snow',fog:'Fog'}[fallbackKind]||'');
+ const conditionKind=weatherState(condition,comfort?.inputEvidence?.skyCover).kind;
+ const kind=conditionKind==='unknown'?fallbackKind:conditionKind;
  const shadeDisplay=finite(comfort?.shade)?comfort.shade:null;
  const shade=finite(shadeDisplay)?`${Math.round(shadeDisplay)}°`:'Unavailable';
  const exposure=outdoorExposure({...comfort,daylight,weatherKind:kind,condition});

@@ -12,7 +12,7 @@ import {currentSample} from '../public/weather-fusion/weather-display.js';
 const base=process.env.WEATHER_BASE_URL||'https://sun-nourie-live.onrender.com';
 const output=process.env.WEATHER_QA_DIR||'../qa';
 await fs.mkdir(output,{recursive:true});
-const assets=['index.html','app.js','weather-math.js','weather-display.js','current-inputs.js','daily-uv.js','dans-summary.js','dans-take.js','pavement.js','experience.js','exposure-scene.js','dewpoint-meter.js','weather-repair.css','hourly-feels.css','poodle-walk.png','poodle-walk-hot.png','poodle-walk-mild.png','poodle-walk-cold.png','day-graph.js','forecast-confidence.js'];
+const assets=['index.html','app.js','weather-math.js','weather-display.js','current-inputs.js','daily-uv.js','dans-summary.js','dans-take.js','pavement.js','experience.js','exposure-scene.js','dewpoint-meter.js','weather-repair.css','hourly-feels.css','poodle-walk.png','poodle-walk-hot.png','poodle-walk-mild.png','poodle-walk-cold.png','comfort-reference-scenes.webp','comfort-reference-scenes-hot.webp','comfort-reference-scenes-rain.webp','comfort-reference-scenes-cold.webp','day-graph.js','forecast-confidence.js'];
 const digest=(body,name)=>createHash('sha256').update(name.endsWith('.png')?body:body.toString().replace(/\r\n/g,'\n')).digest('hex');
 const expected=Object.fromEntries(await Promise.all(assets.map(async name=>[name,digest(await fs.readFile('public/weather-fusion/'+name),name)])));
 const report={base,commit:process.env.GITHUB_SHA,checkedAt:new Date().toISOString(),fixture:false,success:false,locations:[]};

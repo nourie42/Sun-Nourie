@@ -5,26 +5,6 @@
 #today-uncertainty,#today-uncertainty p{text-align:center;font-weight:750}
 #today-uncertainty .today-uncertainty-label{font-weight:850}
 #briefing-detail>div:last-child{text-align:center;font-weight:700}
-#gross-title{font-size:18px;font-weight:850;text-align:center;letter-spacing:1.6px;margin-bottom:12px}
-#dewpoint-gross-meter{padding:18px 20px;margin-bottom:18px}
-#dewpoint-gross-meter .gross-number{font-size:48px}
-#dewpoint-gross-meter .gross-verdict{margin:10px auto 8px;font-size:18px}
-#dewpoint-gross-meter .gross-note{margin:10px auto 14px;font-size:12px}
-#dewpoint-gross-meter .gross-toolbar{padding-top:12px;gap:6px}
-#dewpoint-gross-meter .gross-toolbar>span{font-size:13px}
-#dewpoint-gross-meter .gross-periods{padding:2px;gap:2px}
-#dewpoint-gross-meter .gross-periods button{font-size:11px;padding:6px;min-height:36px}
-#dewpoint-gross-meter .gross-coverage{font-size:11px;line-height:1.4;margin:6px 0 8px}
-#dewpoint-gross-meter .gross-selection{padding:8px 10px;min-height:54px;column-gap:10px}
-#dewpoint-gross-meter .gross-selected-value{font-size:24px;min-width:42px}
-#dewpoint-gross-meter .gross-selected-time,#dewpoint-gross-meter .gross-selected-label{font-size:11px;line-height:1.45}
-#dewpoint-gross-meter .gross-scroll-hint{font-size:11px;line-height:1.4;margin:8px 0 6px}
-#dewpoint-gross-meter .gross-x,#dewpoint-gross-meter .gross-y{font-size:11px}
-#dewpoint-gross-meter .gross-slider-label{font-size:11px;margin:7px 0 0}
-#dewpoint-gross-meter #gross-scrubber{height:30px}
-#dewpoint-gross-meter .gross-scale{gap:6px;margin:6px 0}
-#dewpoint-gross-meter .gross-scale span{font-size:10px;padding-top:4px}
-#dewpoint-gross-meter .gross-worst,#dewpoint-gross-meter .gross-empty{font-size:11px;line-height:1.45;margin-top:9px}
 .sun-shade-comparison{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;width:100%;max-width:510px;margin:12px auto 0}
 .exposure-person{min-width:0;margin:0;padding:8px 8px 12px;border-radius:19px;background:#17314a35;border:1px solid #d6e9ff24}
 .exposure-person svg{display:block;width:100%;height:126px;max-width:180px;margin:0 auto}
@@ -66,6 +46,6 @@
 .day-gross-reading strong{font-size:36px;font-weight:750}.day-gross-reading span{font-size:13px}.day-gross-reading small{display:block;margin-top:4px}
 .day-gross p{font-size:13px;line-height:1.55}.day-gross .day-gross-verdict{font-size:15px;font-weight:700}
 .day-gross>small{font-size:11px;line-height:1.5;display:block;color:#bdd2e8}
-@media(max-width:600px){#gross-title{font-size:16px}.bulletins-panel{padding:15px 14px}#dewpoint-gross-meter{padding:16px 14px}.exposure-person svg{height:110px}.sun-shade-comparison{gap:9px}#skin-values .exposure-person strong{font-size:31px}.current-temp-label{font-size:12px}.brand small{max-width:230px;font-size:9px!important}}
+@media(max-width:600px){.bulletins-panel{padding:15px 14px}.exposure-person svg{height:110px}.sun-shade-comparison{gap:9px}#skin-values .exposure-person strong{font-size:31px}.current-temp-label{font-size:12px}.brand small{max-width:230px;font-size:9px!important}}
 .source-unavailable-summary{margin:0 0 14px;padding:12px 14px;border:1px solid #ffdda02e;border-radius:12px;background:#ffcc6610;color:#f4e2c6;font-size:12px;line-height:1.6;text-align:left}
 .source-unavailable-summary[hidden]{display:none}.source-unavailable-summary strong{display:block;color:#fff1d5;margin-bottom:4px}.source-unavailable-summary ul{margin:6px 0 0;padding-left:18px}.source-unavailable-summary li{margin:3px 0;overflow-wrap:anywhere}

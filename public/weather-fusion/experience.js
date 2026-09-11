@@ -1,14 +1,14 @@
 import {todayForecastHTML} from './today-card.js?v=compact-weather-v21';
 import {FORECAST_CONFIDENCE_VERSION} from './forecast-confidence.js?v=weather-art-labels-v10';
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
-import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=compact-weather-v21';
+import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=dynamic-scenes-v27';
 import {weatherState} from './weather-state.js';
 import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=compact-weather-v21';
 import {degrees,feelsAt,dailyFeels,forecastValue,peakFeelsHTML} from './hourly-feels.js?v=weather-art-labels-v10';
-import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=compact-weather-v21';
+import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=dynamic-scenes-v27';
 import {comfortMode,comfortWindow,comfortNarrative,warmestTodayWindow} from './comfort-outlook.js?v=weather-art-labels-v10';
 import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js?v=weather-art-labels-v10';
-import {resetDewpointMeter} from './dewpoint-meter.js?v=weather-art-labels-v10';
+import {resetDewpointMeter} from './dewpoint-meter.js?v=dynamic-scenes-v27';
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const number=(n,d=0)=>finite(n)?n.toFixed(d):'—';
@@ -98,7 +98,7 @@ export function renderComfort(forecast) {
  const pavement=pavementEstimate(forecast,sample.inputs,sample.now?now:Date.parse(sample.time),{checkedAt:now});
  const kicker=$('skin-kicker');if(kicker)kicker.textContent=sample.now?'How it actually feels right now':`How will it feel outside at ${formatTime(sample.time)}?`;
  const preview=sample.now?'':'<div class="comfort-preview-heading"><button type="button" data-comfort-reset>Back to now</button></div>';
- $('skin-values').innerHTML=`${preview}${sunShadeHTML(c,forecast.location,sample.now?now:Date.parse(sample.time),{forecast:!sample.now,condition:sample.condition,compact:true,pavement:pavementHTML(pavement,sample.feels,{condition:c.radiantCondition||sample.condition,forecast:!sample.now})})}${sample.now?peakComparisonHTML(warmestTodayWindow(forecast,now),current.feels,zone,now):''}`;
+ $('skin-values').innerHTML=`${preview}${sunShadeHTML(c,forecast.location,sample.now?now:Date.parse(sample.time),{forecast:!sample.now,condition:sample.condition,compact:true,pavement:pavementHTML(pavement,sample.feels,{condition:sample.condition||c.radiantCondition,forecast:!sample.now})})}${sample.now?peakComparisonHTML(warmestTodayWindow(forecast,now),current.feels,zone,now):''}`;
  $('skin-values').querySelector('[data-comfort-reset]')?.addEventListener('click',()=>selectComfortHour('now'));
  $('skin-explanation').textContent=sample.now?comfortNarrative(sample.inputs,c,summary,zone):`${sample.condition}. This hour uses air ${degrees(sample.temperature)}, dew point ${degrees(sample.inputs.dewpoint)} and ${number(sample.inputs.wind)} mph wind. Outdoors feels like ${degrees(sample.feels)}; shade ${degrees(c.shade)}. The outdoor illustration and solar estimate use this same forecast hour.`;
  const tile=$('skin-exposure');tile.dataset.preview=sample.now?'current':'forecast';tile.dataset.weather=weatherState(sample.condition).kind;

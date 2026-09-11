@@ -121,7 +121,7 @@ try{
   const science=document.querySelector('#skin-science')?.textContent||'';
   return /°.*Shade/.test(value)&&/(?:UTCI Tier-3|Steadman apparent temperature)/.test(science);
  },null,{timeout:30000});
- await page.waitForFunction(()=>document.querySelector('#dewpoint-gross-meter .gross-chart')&&/DEW POINT · GROSS METER/.test(document.querySelector('#dewpoint-gross-meter')?.innerText||''),null,{timeout:30000});
+ await page.waitForFunction(()=>document.querySelector('#dewpoint-gross-meter .gross-chart')&&/Dew Point\s+Gross Meter/i.test(document.querySelector('#dewpoint-gross-meter')?.innerText||''),null,{timeout:30000});
  assert.equal(await page.locator('iframe').count(),0);
  assert.ok(!(await page.locator('#metrics').innerText()).includes('—°'),'Feels-like metric is still missing');
  assert.match(await page.locator('.brand').innerText(),/WEATHER\s+NOURIE/i);
