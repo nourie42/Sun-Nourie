@@ -18,7 +18,7 @@
 #skin-values .sun-shade-comparison .exposure-person>svg{grid-row:3;display:block;width:100%!important;height:100%!important;max-width:none!important;min-height:0;margin:0!important;overflow:hidden;object-fit:cover;aspect-ratio:auto!important}
 #skin-values .sun-shade-comparison .shade-person>svg,#skin-values .sun-shade-comparison .sun-person>svg{filter:saturate(1.1) contrast(1.02)}
 #skin-values .sun-shade-comparison .pavement-person>.poodle-scene{grid-row:3;position:relative;width:100%!important;height:100%!important;max-width:none!important;min-height:0;margin:0!important;overflow:hidden;aspect-ratio:auto!important;background:none!important}
-#skin-values .sun-shade-comparison .pavement-person[data-daylight="false"]>.poodle-scene{filter:saturate(.92) brightness(.9)}
+#skin-values .sun-shade-comparison .pavement-person[data-daylight="false"]>.poodle-scene{filter:saturate(1) brightness(1.03)}
 #skin-values .sun-shade-comparison .pavement-person[data-daylight="true"]>.poodle-scene{filter:saturate(1.08) contrast(1.02)}
 #skin-values .sun-shade-comparison .pavement-person::after{display:none!important}
 #skin-values .sun-shade-comparison .pavement-person .poodle-walk{width:344px;height:229.333px;margin:0}
@@ -71,7 +71,7 @@
  #skin-values .sun-shade-comparison .exposure-person>.exposure-label{font-size:clamp(14px,4.4vw,21px);padding:0 2px 0;align-items:center;white-space:nowrap}
  #skin-values .sun-shade-comparison .sun-person>.exposure-label{font-size:clamp(13px,3.8vw,19px);white-space:normal;line-height:1}
  #skin-values .sun-shade-comparison .exposure-person>.exposure-subtitle{font-size:clamp(10px,2.85vw,13px);line-height:1.18;padding:3px 3px 0}
- #skin-values .sun-shade-comparison .exposure-person>svg,#skin-values .sun-shade-comparison .pavement-person>.poodle-scene{height:auto!important;aspect-ratio:1!important}
+ #skin-values .sun-shade-comparison .exposure-person>svg,#skin-values .sun-shade-comparison .pavement-person>.poodle-scene{height:auto!important;aspect-ratio:.82!important}
  #skin-values .sun-shade-comparison .exposure-person>.exposure-alert-slot{top:68px;left:2px;right:2px}
  #skin-values .sun-shade-comparison .exposure-person .thermal-risk,#skin-values .sun-shade-comparison .exposure-person .pavement-warning{max-width:100%;padding:3px 5px;font-size:9px;white-space:normal;text-align:center}
  #skin-values .sun-shade-comparison .exposure-person>figcaption{padding:7px 2px 5px;gap:3px}

@@ -25,7 +25,7 @@ test('current display independently calculates inputs and rejects a painted 999 
  assert.equal(sample.feels,expected.outdoors);assert.notEqual(sample.feels,999);
  assert.ok(heroFeelsHTML(sample).includes('<strong>'+expected.outdoors+'°</strong>'));
  const root={innerHTML:'',scrollLeft:35};globalThis.document={getElementById:()=>root};
- try{renderHourlyWeather(f,now);assert.ok(root.innerHTML.includes('Feels like<b>'+expected.outdoors+'°</b>'));assert.equal(root.scrollLeft,35);}finally{delete globalThis.document;}
+ try{renderHourlyWeather(f,now);assert.ok(root.innerHTML.includes('Feels <b>'+expected.outdoors+'°</b>'));assert.equal(root.scrollLeft,35);}finally{delete globalThis.document;}
  assert.ok(!sunShadeHTML(sample.comfort,f.location,now).includes('999°'));
 });
 

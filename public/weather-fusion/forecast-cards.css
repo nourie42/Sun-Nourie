@@ -1,0 +1,124 @@
+/* Shared blue-glass treatment for the featured daily and hourly forecasts. */
+.hero .today-panel,.hero .hourly-panel{position:relative;isolation:isolate;background:radial-gradient(ellipse at 25% 0,#1688b426,transparent 70%),linear-gradient(135deg,#104773,#073b63 60%,#073153);border:1px solid #58c7f16b;border-radius:28px;box-shadow:inset 0 1px 2px #a3e8ff20,0 12px 28px #041d3626;color:#f7fcff}
+.hero .today-panel{padding:20px;margin:20px 0 16px;overflow:hidden}
+.hero .today-panel::before{content:"";position:absolute;z-index:-1;left:-10%;right:-10%;top:58%;height:70%;border-radius:50%;background:#129bc010;transform:rotate(-7deg);pointer-events:none}
+#today-forecast .today-weather-card{display:block;width:100%;padding:0;border:0;background:none;color:inherit;text-align:left;font:inherit;cursor:pointer}
+#today-forecast .today-weather-card:focus-visible{outline:2px solid #b9eeff;outline-offset:5px;border-radius:14px}
+#today-forecast .today-main{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:24px;padding:10px 8px 22px}
+#today-forecast .today-overview{display:grid;grid-template-columns:minmax(0,1fr) 100px;gap:14px;padding-right:24px;border-right:1px solid #80d5fa88}
+#today-forecast .today-description{display:flex;flex-direction:column;gap:12px;min-width:0}
+#today-forecast .day-name{color:#fff;font-size:clamp(30px,4vw,50px);font-weight:850;line-height:1;letter-spacing:-.035em}
+#today-forecast .today-condition{font-size:clamp(17px,2.2vw,25px);line-height:1.25;font-weight:650;color:#a4dff7;overflow-wrap:anywhere}
+#today-forecast .today-symbol{display:flex;flex-direction:column;align-items:center;text-align:center;gap:2px;color:#9fdefb}
+#today-forecast .today-symbol>svg{width:78px;height:78px;filter:drop-shadow(0 4px 9px #011e3d30)}
+#today-forecast .today-symbol>strong{font-size:25px;line-height:1.2;font-weight:800}
+#today-forecast .today-symbol>small{max-width:80px;font-size:13px;line-height:1.3}
+#today-forecast .today-range{min-width:0;display:flex;flex-direction:column;justify-content:space-between;gap:18px}
+#today-forecast .today-temperatures{display:grid;grid-template-columns:76px minmax(20px,1fr) 76px;gap:14px;align-items:start;text-align:center}
+#today-forecast .today-low,#today-forecast .today-high{display:flex;flex-direction:column;align-items:center;min-width:0}
+#today-forecast .today-low>strong,#today-forecast .today-high>strong{font-size:clamp(40px,5vw,62px);font-weight:800;line-height:1;letter-spacing:-.04em}
+#today-forecast .today-low{color:#97d8f7}
+#today-forecast .today-low>small,#today-forecast .today-high>small{font-size:15px;color:#a6dff8;margin-top:5px;font-weight:650}
+#today-forecast .today-feels{display:block;color:#9fdcf7;font-size:15px;line-height:1.3;margin-top:15px;font-weight:600}
+#today-forecast .today-feels b{display:block;font-size:26px;line-height:1.15;font-weight:750}
+#today-forecast .today-feels small{display:block;font-size:9px;font-weight:500}
+#today-forecast .today-temp-track{height:12px;margin-top:42px;border-radius:99px;background:#031e3b80;position:relative;isolation:isolate}
+#today-forecast .today-temp-track>span{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#37bdf6,#a6dfd7 45%,#ffe389 85%,#f9bc70)}
+#today-forecast .today-temp-track>i{position:absolute;top:50%;width:19px;height:19px;border-radius:50%;background:#ffe28d;transform:translate(-50%,-50%);box-shadow:0 0 14px #ffde8155}
+#today-forecast .today-night-note{align-self:center;color:#a9def5;font-size:17px;font-weight:650;line-height:1.5}
+#today-forecast .today-meta{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px 14px;color:#a0d9f3}
+#today-forecast .forecast-confidence{display:flex;justify-content:flex-start;flex-wrap:wrap;gap:6px;font-size:12px;line-height:1.3;margin:0;text-align:left;color:#a8dff7}
+#today-forecast .forecast-confidence>b{font-size:13px;color:#fff}
+#today-forecast .confidence-meter{width:35px;height:6px}
+#today-forecast .today-meta>.daily-uv{font-size:13px;font-weight:650;white-space:nowrap}
+#today-forecast .today-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));padding:17px 5px;border:1px solid #49b8eb4f;border-radius:20px;background:#042e542e}
+#today-forecast .today-metric{display:flex;align-items:center;justify-content:center;gap:12px;padding:2px 8px;color:#a6e2fb;min-width:0}
+#today-forecast .today-metric+.today-metric{border-left:1px solid #74cffa66}
+#today-forecast .today-metric svg{width:30px;height:30px;flex-shrink:0}
+#today-forecast .today-metric strong{display:block;color:#fff;font-size:20px;line-height:1.2;font-weight:750;white-space:nowrap}
+#today-forecast .today-metric strong em{font-size:15px;font-style:normal}
+#today-forecast .today-metric small{display:block;font-size:13px;line-height:1.4;margin-top:3px}
+.hero .today-panel .today-uncertainty{text-align:center;color:#c9e9fa;border-color:#72c8ee33;font-size:13px;line-height:1.5}
+.hero .today-panel .today-uncertainty-label{font-size:15px;color:#fff}
+.hero .hourly-panel{padding:18px 14px 12px;margin-bottom:16px;min-width:0}
+.hero .hourly-panel .section-top{margin:0 6px 14px;align-items:center;gap:10px}
+.hero .hourly-panel .section-top h2{font-size:clamp(22px,3vw,32px);font-weight:850;letter-spacing:-.035em;line-height:1.15;color:#fff}
+.hero .hourly-panel .section-top h2>span{display:inline-block;color:#98dffb;font-weight:500;font-size:.9em;margin-right:8px}
+.hero .hourly-panel .section-top>span{font-size:clamp(12px,1.7vw,18px);color:#a1dbf6;white-space:nowrap}
+#hourly.hourly-strip{display:flex;gap:7px;max-width:100%;padding:0 1px 8px;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x proximity;scrollbar-width:thin;scrollbar-color:#70c2e288 #082f50}
+#hourly button.hour{box-sizing:border-box;display:flex;flex:0 0 calc((100% - 49px)/8);min-width:92px;flex-direction:column;align-items:center;gap:0;padding:14px 7px 12px;border:1px solid #168cd645;border-radius:20px;background:linear-gradient(160deg,#06477775,#07375777);color:#a0daf7;scroll-snap-align:start;text-align:center;transition:background .15s,border-color .15s}
+#hourly button.hour[aria-pressed="true"]{border-color:#31bcffa6;background:linear-gradient(155deg,#087bc3,#084878 72%);box-shadow:inset 0 0 15px #29b9ff18}
+#hourly button.hour>span:first-child{font-size:17px;font-weight:750;color:#b0e5fd;line-height:1.2;margin:0 0 10px;white-space:nowrap}
+#hourly button.hour[aria-pressed="true"]>span:first-child{color:white}
+#hourly button.hour>svg{width:52px;height:52px;margin:0 0 8px;flex-shrink:0;filter:drop-shadow(0 3px 8px #00172c30)}
+#hourly button.hour>strong{color:#fff;font-size:34px;line-height:1.05;font-weight:800;letter-spacing:-.04em;margin:0 0 7px}
+#hourly .hour-feels{display:flex;flex-direction:row;justify-content:center;gap:3px;align-items:baseline;white-space:nowrap;font-size:12px;color:#ace2fc;line-height:1.3;margin-bottom:14px}
+#hourly .hour-feels>b{font-size:14px;font-weight:700}
+#hourly .hour-feels .hour-exposure{position:absolute;width:1px;height:1px;min-height:0;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+#hourly .hour-pop{display:flex;align-items:center;justify-content:center;gap:3px;margin:0 0 12px;color:#71d7ff;font-size:15px;font-weight:650;line-height:1.2;min-height:22px}
+#hourly .hour-pop>svg{width:13px;height:17px;margin:0}
+#hourly .hour-uv{font-size:15px;font-weight:650;line-height:1.2;margin:0 0 12px;color:#bce8ff}
+#hourly .hour-wind{display:flex;flex-direction:column;align-items:center;gap:4px;margin:0;color:#97ddfa}
+#hourly .hour-wind>svg{width:29px;height:29px;margin:0 0 2px}
+#hourly .hour-wind>b{font-size:15px;font-weight:650;line-height:1.2;white-space:nowrap}
+#hourly .hour-wind>small{font-size:12px;font-weight:500;line-height:1.2;color:#a1dff8}
+@media(max-width:760px){
+ .hero .today-panel{padding:14px;border-radius:24px}
+ #today-forecast .today-main{grid-template-columns:1fr;gap:16px;padding:3px 2px 16px}
+ #today-forecast .today-overview{grid-template-columns:minmax(0,1fr) 110px;gap:15px;border:0;padding:0;align-items:center}
+ #today-forecast .today-description{gap:7px}
+ #today-forecast .day-name{font-size:34px}
+ #today-forecast .today-condition{font-size:16px;max-width:22ch}
+ #today-forecast .today-symbol{display:grid;grid-template-columns:56px minmax(0,1fr);column-gap:4px}
+ #today-forecast .today-symbol>svg{grid-row:1/3;width:56px;height:56px}
+ #today-forecast .today-symbol>strong{font-size:22px;align-self:end}
+ #today-forecast .today-symbol>small{font-size:10px;line-height:1.2;align-self:start}
+ #today-forecast .today-temperatures{grid-template-columns:65px minmax(20px,1fr) 65px;gap:12px}
+ #today-forecast .today-low>strong,#today-forecast .today-high>strong{font-size:44px}
+ #today-forecast .today-low>small,#today-forecast .today-high>small{font-size:12px;margin-top:2px}
+ #today-forecast .today-temp-track{margin-top:25px;height:10px}
+ #today-forecast .today-feels{font-size:12px;margin-top:8px}
+ #today-forecast .today-feels b{font-size:22px}
+ #today-forecast .today-range{gap:13px}
+ #today-forecast .today-meta{gap:8px}
+ #today-forecast .forecast-confidence{font-size:10px;gap:4px}
+ #today-forecast .forecast-confidence>b{font-size:11px}
+ #today-forecast .confidence-meter{width:24px;height:5px}
+ #today-forecast .today-meta>.daily-uv{font-size:11px}
+ #today-forecast .today-metrics{padding:11px 0;border-radius:15px}
+ #today-forecast .today-metric{flex-direction:column;gap:4px;padding:0 2px;text-align:center}
+ #today-forecast .today-metric svg{width:22px;height:22px}
+ #today-forecast .today-metric strong{font-size:14px;white-space:normal}
+ #today-forecast .today-metric strong em{font-size:10px}
+ #today-forecast .today-metric small{font-size:10px;margin-top:2px}
+ .hero .hourly-panel{padding:14px 9px 8px;border-radius:24px}
+ .hero .hourly-panel .section-top{margin:0 3px 12px;gap:5px}
+ .hero .hourly-panel .section-top h2{font-size:22px}
+ .hero .hourly-panel .section-top h2>span{margin-right:4px}
+ .hero .hourly-panel .section-top>span{font-size:10px}
+ #hourly.hourly-strip{gap:5px}
+ #hourly button.hour{flex-basis:calc((100% - 15px)/4);min-width:68px;padding:11px 3px 10px;border-radius:15px}
+ #hourly button.hour>span:first-child{font-size:13px;margin-bottom:9px}
+ #hourly button.hour>svg{width:43px;height:43px;margin-bottom:7px}
+ #hourly button.hour>strong{font-size:28px;margin-bottom:6px}
+ #hourly .hour-feels{font-size:12px;gap:3px;margin-bottom:11px}
+ #hourly .hour-feels>b{font-size:12px}
+ #hourly .hour-pop{font-size:12px;margin-bottom:9px;min-height:18px}
+ #hourly .hour-pop>svg{width:10px;height:14px}
+ #hourly .hour-uv{font-size:12px;margin-bottom:11px}
+ #hourly .hour-wind>svg{width:24px;height:24px}
+ #hourly .hour-wind>b{font-size:12px}
+ #hourly .hour-wind>small{font-size:10px}
+}
+@media(max-width:359px){
+ .hero .today-panel{padding:11px}
+ #today-forecast .today-meta{justify-content:center}
+ #today-forecast .today-metric strong{font-size:12px}
+ #today-forecast .today-metric strong em{font-size:9px}
+ #today-forecast .today-metric small{font-size:9px}
+ .hero .hourly-panel .section-top h2{font-size:19px}
+ .hero .hourly-panel .section-top>span{font-size:9px}
+ #hourly button.hour{min-width:60px}
+ #hourly .hour-feels{font-size:11px}
+ #hourly .hour-feels>b{font-size:11px}
+}

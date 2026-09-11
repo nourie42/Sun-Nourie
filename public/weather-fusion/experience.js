@@ -1,10 +1,11 @@
+import {todayForecastHTML} from './today-card.js?v=mobile-weather-v19';
 import {FORECAST_CONFIDENCE_VERSION} from './forecast-confidence.js?v=weather-art-labels-v10';
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
-import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=reference-comfort-v18';
+import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=mobile-weather-v19';
 import {weatherState} from './weather-state.js';
-import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=weather-art-labels-v10';
+import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=mobile-weather-v19';
 import {degrees,feelsAt,dailyFeels,forecastValue,peakFeelsHTML} from './hourly-feels.js?v=weather-art-labels-v10';
-import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=reference-comfort-v18';
+import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=mobile-weather-v19';
 import {comfortMode,comfortWindow,comfortNarrative,warmestTodayWindow} from './comfort-outlook.js?v=weather-art-labels-v10';
 import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js?v=weather-art-labels-v10';
 import {resetDewpointMeter} from './dewpoint-meter.js?v=weather-art-labels-v10';
@@ -116,13 +117,12 @@ export function renderDailyRows(forecast,icon) {
   return `<button class="day-row ${p.tonight?'tonight-row':''}" data-day="${i}" aria-label="${esc(p.label)}, ${p.primaryLabel} ${number(p.primary)} degrees${finite(p.secondary)?`, low ${number(p.secondary)} degrees`:''}. Forecast confidence ${esc(confidence.label)}. Open details."><span class="day-name">${esc(p.label)}</span><span class="day-icon">${icon(p.condition,!p.tonight)}<small>${finite(p.pop)?`${number(p.pop)}%`:''}</small></span>${p.tonight?'<span class="night-label">☾<small>Overnight</small></span>':`<span class="day-low">${temp(p.secondary)}<small>Low</small><span class="daily-feels"><span>Feels</span><b>${degrees(feel.low?.low?.value)}</b>${feel.low?.partial?' · partial':''}</span></span>`}<span class="temp-track" aria-hidden="true">${bar===null?'':`<span class="temp-fill" style="left:0;width:${bar}%"></span><i class="high-marker" style="left:clamp(4px,${bar}%,calc(100% - 4px))"></i>`}</span><span class="day-high"><strong>${temp(p.primary)}</strong><small>${p.primaryLabel}</small><span class="daily-feels"><span>Feels</span><b>${degrees(p.tonight?feel.low?.low?.value:feel.high?.high?.value)}</b>${(p.tonight?feel.low:feel.high)?.partial?' · partial':''}</span></span><span class="day-meta"><span class="forecast-confidence" data-confidence="${esc(confidence.key)}" title="${esc(confidenceTitle)}"><span>Forecast confidence</span><b>${esc(confidence.label)}</b>${finite(confidence.score)?`<i class="confidence-meter" aria-hidden="true"><em style="width:${confidence.score}%"></em></i>`:''}</span>${dailyUvHTML(d.uvMax,p.tonight?'Peak UV today':'Peak UV')}</span></button>`;
  });
  $('daily').innerHTML=rows.join('');
- // Reuse the exact first daily row, including its Today/Tonight policy and bar.
+ // The featured card shares the daily timing policy and opens the same details.
  const today=$('today-forecast');
  if(today){
-  today.innerHTML=rows[0]||'<p class="muted">Daily forecast is unavailable.</p>';
-  const button=today.querySelector('[data-day]');
+  today.innerHTML=todayForecastHTML(forecast);
+  const button=today.querySelector('[data-today-forecast]');
   if(button){
-   button.removeAttribute('data-day');
    button.setAttribute('data-today-forecast','');
    button.setAttribute('aria-haspopup','dialog');
    button.addEventListener('click',()=>$('daily')?.querySelector('[data-day="0"]')?.click());

@@ -43,10 +43,10 @@ test('gross meter uses a fitted SVG and never instructs or forces horizontal scr
  assert.match(css,/\.gross-scroll\{[^}]*overflow:hidden/);
  assert.match(css,/\.gross-chart\{[^}]*width:100%/);
 });
-test('today summary reuses the daily rows and existing detail handler',()=>{
+test('today summary keeps the daily timing policy and existing detail handler',()=>{
  const js=source('experience.js');
- assert.match(js,/today\.innerHTML=rows\[0\]/);
- assert.match(js,/button\.removeAttribute\('data-day'\)/);
+ assert.match(js,/today\.innerHTML=todayForecastHTML\(forecast\)/);
+ assert.match(source('today-card.js'),/dailyDisplay\(day,0,now,forecast.location.timeZone\)/);
  assert.match(js,/\$\('daily'\)\?\.querySelector\('\[data-day="0"\]'\)\?\.click\(\)/);
  assert.match(js,/\$\('daily'\)\.innerHTML=rows\.join\(''\)/);
 });

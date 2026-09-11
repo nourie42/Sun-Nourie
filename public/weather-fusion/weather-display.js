@@ -22,12 +22,25 @@ export function weatherShapes(condition, isDay = true) {
 export function weatherIcon(condition = '', isDay = true, size = 32) {
   return `<svg width="${size}" height="${size}" viewBox="0 0 50 50" aria-hidden="true" data-weather-kind="${weatherState(condition).kind}">${weatherShapes(condition, isDay)}</svg>`;
 }
+export function weatherMetricIcon(kind){
+ const paths={wind:'M3 8h12c5 0 5-6 1-6M3 12h16c5 0 5 6 1 6M3 16h7c4 0 4 6 0 6',drop:'M12 2C9 7 5 12 5 16a7 7 0 0 0 14 0c0-4-4-9-7-14Z',sun:'M12 3V1M12 23v-2M3 12H1M23 12h-2M4 4l2 2M18 18l2 2M4 20l2-2M18 6l2-2M17 12a5 5 0 1 1-10 0 5 5 0 0 1 10 0',humidity:'M12 2C9 7 5 12 5 16a7 7 0 0 0 14 0c0-4-4-9-7-14ZM9 18l6-7M9 12h.01M15 18h.01'};
+ return `<svg class="weather-metric-icon" viewBox="0 0 24 24" fill="${kind==='drop'?'currentColor':'none'}" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${paths[kind]||paths.wind}"/></svg>`;
+}
+export function windDirectionLabel(value){
+ if(finite(value)&&value>=0&&value<=360)return ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'][Math.round(value/22.5)%16];
+ return typeof value==='string'&&/^(N|NNE|NE|ENE|E|ESE|SE|SSE|S|SSW|SW|WSW|W|WNW|NW|NNW|VRB)$/i.test(value)?value.toUpperCase():'—';
+}
+export function hourlyWindHTML(sample){
+ const speed=sample.inputs?.wind,direction=windDirectionLabel(sample.windDirection);
+ return `<span class="hour-wind" title="${sample.now?'Current':'Forecast'} wind">${weatherMetricIcon('wind')}<b>${finite(speed)&&speed>=0?`${Math.round(speed)} mph`:'— mph'}</b><small>${speed===0?'Calm':direction}</small></span>`;
+}
 export function currentSample(forecast, now = Date.now()) {
   const current = currentComfortInputs(forecast,now), assembled = Date.parse(forecast?.assembledAt);
   const comfort = thermalComfort(current, forecast.location, finite(assembled) ? assembled : now);
   comfort.inputEvidence.estimatedFields=current.comfortEstimatedFields;
   comfort.inputEvidence.fallbackSources=current.comfortInputSources;
-  return {uvIndex:hourlyUvValue(forecast,now),id:'now', now:true, time:current.time, temperature:finite(current.temperature) ? current.temperature : null,
+  const currentHour=forecast?.hours?.find(h=>Date.parse(h.time)<=now&&now<Date.parse(h.time)+3600000);
+  return {windDirection:current.windDirection,pop:currentHour?.pop,uvIndex:hourlyUvValue(forecast,now),id:'now', now:true, time:current.time, temperature:finite(current.temperature) ? current.temperature : null,
     feels:outdoorExposure(comfort).value, exposure:outdoorExposure(comfort), comfort, condition:current.condition || 'Sky conditions unavailable',
     isDay:comfort.daylight ?? (solarElevation(now,forecast.location.latitude,forecast.location.longitude) > 0),
     source:current.type === 'observation' ? 'Station observation' : 'Current estimate', inputs:current};
@@ -42,7 +55,7 @@ export function forecastSample(forecast, time) {
   const value=rounded(estimated.rawOutdoors);
   if(finite(value)!==finite(point.value)||(finite(value)&&Math.abs(value-point.value)>.11))return null;
   const comfort={...estimated,outdoors:value,shade:rounded(estimated.rawShade),sun:estimated.sun===null?null:value};
-  return {uvIndex:hourlyUvValue(forecast,epoch),id:new Date(epoch).toISOString(), now:false, time:hour.time,
+  return {windDirection:hour.windDirectionDegrees??hour.windDirection,uvIndex:hourlyUvValue(forecast,epoch),id:new Date(epoch).toISOString(), now:false, time:hour.time,
     temperature:forecastValue(forecast,'temperature',hour.time), feels:feelsAt(forecast,hour.time),
     condition:inputs.condition, isDay:comfort.daylight, exposure:outdoorExposure(comfort), comfort, inputs, source:'Hourly forecast', pop:hour.pop};
 }
@@ -54,7 +67,7 @@ export function renderHourlyWeather(forecast, now = Date.now()) {
   const root = document.getElementById('hourly'); if (!root) return;
   const scroll = root.scrollLeft, zone = forecast.location.timeZone || 'America/New_York';
   const hour = time => new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric'}).format(new Date(time)).replace(' ','');
-  root.innerHTML = hourlyDisplaySamples(forecast,now).map(sample => `<button type="button" class="hour ${sample.now ? 'now hour-current' : 'forecast-hour'}" data-comfort-time="${esc(sample.id)}" data-time="${esc(sample.time)}" title="${esc(sample.condition)} · ${esc(sample.source)}" aria-label="${sample.now ? 'Now' : esc(hour(sample.time))}, ${esc(sample.condition)}, air ${degrees(sample.temperature)}, feels like ${degrees(sample.feels)} ${esc(sample.exposure.label.toLowerCase())}. Preview this weather."><span>${sample.now ? 'Now' : esc(hour(sample.time))}</span>${weatherIcon(sample.condition,sample.isDay)}<strong>${degrees(sample.temperature)}</strong><span class="hour-feels">Feels like<b>${degrees(sample.feels)}</b><em class="hour-exposure">${esc(sample.exposure.shortLabel)}</em></span><small>${sample.now ? 'Station estimate' : finite(sample.pop) ? `${Math.round(sample.pop)}%` : '—'}</small>${hourlyUvHTML(sample.uvIndex)}</button>`).join('');
+  root.innerHTML = hourlyDisplaySamples(forecast,now).map(sample => `<button type="button" class="hour ${sample.now ? 'now hour-current' : 'forecast-hour'}" data-comfort-time="${esc(sample.id)}" data-time="${esc(sample.time)}" title="${esc(sample.condition)} · ${esc(sample.source)}" aria-label="${sample.now ? 'Now' : esc(hour(sample.time))}, ${esc(sample.condition)}, air ${degrees(sample.temperature)}, feels like ${degrees(sample.feels)} ${esc(sample.exposure.label.toLowerCase())}. Preview this weather."><span>${sample.now ? 'Now' : esc(hour(sample.time))}</span>${weatherIcon(sample.condition,sample.isDay)}<strong>${degrees(sample.temperature)}</strong><span class="hour-feels">Feels <b>${degrees(sample.feels)}</b><em class="hour-exposure sr-only">${esc(sample.exposure.shortLabel)}</em></span><small class="hour-pop" title="${sample.now?'Current-hour forecast rain chance':'Forecast rain chance'}">${weatherMetricIcon('drop')}${finite(sample.pop) ? `${Math.round(sample.pop)}%` : '—'}</small>${hourlyUvHTML(sample.uvIndex)}${hourlyWindHTML(sample)}</button>`).join('');
   root.scrollLeft = scroll;
 }
 export function peakComparison(summary, currentShade) {

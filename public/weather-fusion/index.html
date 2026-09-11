@@ -12,8 +12,9 @@
   <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <link rel="stylesheet" href="/weather-fusion/personal-details.css?v=weather-art-labels-v10">
   <link rel="stylesheet" href="/weather-fusion/hourly-feels.css?v=weather-art-labels-v10">
-  <link rel="stylesheet" href="/weather-fusion/weather-repair.css?v=reference-comfort-v18">
-  <script type="module" src="/weather-fusion/app.js?v=reference-comfort-v18"></script>
+  <link rel="stylesheet" href="/weather-fusion/weather-repair.css?v=mobile-weather-v19">
+  <link rel="stylesheet" href="/weather-fusion/forecast-cards.css?v=mobile-weather-v19">
+  <script type="module" src="/weather-fusion/app.js?v=mobile-weather-v19"></script>
 
 </head>
 <body data-sky="day">
@@ -55,7 +56,7 @@
           <div class="section-top"><h2 id="bulletins-title">NWS BULLETINS</h2></div>
           <div id="alerts" class="alerts" aria-label="Official NWS notices and explanations"><p class="bulletin-time">Checking local NWS notices…</p></div>
         </section>
-        <section class="glass hourly-panel" aria-labelledby="hourly-title"><div class="section-top"><h2 id="hourly-title">◷ &nbsp; HOURLY FORECAST</h2><span>Your next 48 hours</span></div><div id="hourly" class="hourly-strip" tabindex="0" aria-label="Current observation followed by future hourly forecasts; select an hour to preview"><p class="muted">Hourly data is loading.</p></div></section>
+        <section class="glass hourly-panel" aria-labelledby="hourly-title"><div class="section-top"><h2 id="hourly-title"><span aria-hidden="true">◷</span> Hourly Forecast</h2><span>Your next 48 hours</span></div><div id="hourly" class="hourly-strip" tabindex="0" aria-label="Current observation followed by future hourly forecasts; select an hour to preview"><p class="muted">Hourly data is loading.</p></div></section>
         <div class="exposure-cards">
         <div class="skin-exposure" id="skin-exposure" aria-live="polite">
           <h2 class="skin-kicker" id="skin-kicker">How it actually feels right now</h2>
