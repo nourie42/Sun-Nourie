@@ -21,8 +21,9 @@ POINTS = [
     {"id": "knightdale", "name": "Knightdale / Raleigh", "latitude": 35.787, "longitude": -78.4806},
     {"id": "greenville", "name": "Greenville, NC", "latitude": 35.6127, "longitude": -77.3664},
 ]
-BOUNDS = [[32.5, -85.0], [38.0, -74.0]]
-WIDTH, HEIGHT = 440, 280
+BOUNDS = [[20.0, -130.0], [55.0, -60.0]]
+WIDTH, HEIGHT = 840, 420
+MAP_COVERAGE_VERSION = 3
 SOURCES = {
     "hrrr": {"label": "NOAA HRRR", "resolution": "3 km native grid", "hours": 48, "url": "https://www.nco.ncep.noaa.gov/pmb/products/hrrr/"},
     "nbm": {"label": "NOAA National Blend", "resolution": "2.5 km native grid", "hours": 240, "url": "https://www.nco.ncep.noaa.gov/pmb/products/blend/"},
@@ -201,7 +202,7 @@ def collect_model(model: str, output: str) -> dict[str, Any]:
         if old.get("schema") == SCHEMA and old.get("complete") and old.get("runAt", "") > iso(run):
             print(f"KEEP newer verified {model} run={old['runAt']}", flush=True)
             return {"model": model, "runAt": old["runAt"], "reused": True}
-        if old.get("runAt") == iso(run) and old.get("schema") == SCHEMA and old.get("complete") and old.get("cardFieldsVersion") == 2 and old.get("forecastHours") == run_hours:
+        if old.get("runAt") == iso(run) and old.get("schema") == SCHEMA and old.get("complete") and old.get("cardFieldsVersion") == MAP_COVERAGE_VERSION and old.get("forecastHours") == run_hours:
             print(f"REUSE {model} run={iso(run)} (no needless GRIB downloads)", flush=True)
             return {"model": model, "runAt": iso(run), "reused": True}
     print(f"COLLECT {model} run={iso(run)}", flush=True)
@@ -372,7 +373,7 @@ def collect_model(model: str, output: str) -> dict[str, Any]:
         future=[r for r in p["native"] if r["time"] > now.timestamp()]
         if len(future)<12 or not any(r["value"]>=0 and r["end"]>now.timestamp() for r in p["precipitationIntervals"]):
             raise ValueError(f"{model} insufficient future numerical coverage")
-    data = {"schema":SCHEMA,"model":model,"label":SOURCES[model]["label"],"resolution":SOURCES[model]["resolution"],"runAt":iso(run),"generatedAt":iso(dt.datetime.now(UTC)),"validUntil":iso(run+dt.timedelta(hours=run_hours)),"forecastHours":run_hours,"complete":True,"sourceUrl":SOURCES[model]["url"],"transport":"Official provider public-cloud copy; indexed GRIB2 byte-range extraction with ECMWF ecCodes","interpolation":"Native nearest-gridpoint data. Temperature and wind are linearly interpolated only between samples <=6h apart; precipitation is uniformly allocated within its native accumulation interval. Reflectivity is never time-interpolated.","cyclePolicy":"Latest completed run: HRRR checked hourly (48 h at 00/06/12/18Z, shorter horizon on intervening cycles); ECMWF IFS 00/12Z; NBM hourly.","cardFieldsVersion":2,"points":list(points.values()),"maps":maps,"provenance":provenance}
+    data = {"schema":SCHEMA,"model":model,"label":SOURCES[model]["label"],"resolution":SOURCES[model]["resolution"],"runAt":iso(run),"generatedAt":iso(dt.datetime.now(UTC)),"validUntil":iso(run+dt.timedelta(hours=run_hours)),"forecastHours":run_hours,"complete":True,"sourceUrl":SOURCES[model]["url"],"transport":"Official provider public-cloud copy; indexed GRIB2 byte-range extraction with ECMWF ecCodes","interpolation":"Native nearest-gridpoint data. Temperature and wind are linearly interpolated only between samples <=6h apart; precipitation is uniformly allocated within its native accumulation interval. Reflectivity is never time-interpolated.","cyclePolicy":"Latest completed run: HRRR checked hourly (48 h at 00/06/12/18Z, shorter horizon on intervening cycles); ECMWF IFS 00/12Z; NBM hourly.","cardFieldsVersion":MAP_COVERAGE_VERSION,"points":list(points.values()),"maps":maps,"provenance":provenance}
     target.write_text(json.dumps(data,separators=(",",":"),allow_nan=False))
     print(f"SUCCESS {model} run={data['runAt']} points={len(points)} messages={len(provenance)} frames={sum(map(len,maps.values()))}",flush=True)
     return {"model":model,"runAt":data["runAt"],"messages":len(provenance),"complete":True}

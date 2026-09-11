@@ -36,6 +36,16 @@ test('verified independent HRRR map is CONUS and preferred over regional fallbac
  assert.ok(!app.includes('Model image covers North Carolina and the surrounding region'));
 });
 
+test('all newly decoded model maps cover CONUS and refocus on the selected place',()=>{
+ const collector=read('scripts/weather_fusion_collect.py');
+ assert.match(collector,/BOUNDS = \[\[20\.0, -130\.0\], \[55\.0, -60\.0\]\]/);
+ assert.match(collector,/MAP_COVERAGE_VERSION = 3/);
+ assert.match(direct,/CONUS_MAP_BOUNDS = '\[\[20,-130\],\[55,-60\]\]'/);
+ assert.match(direct,/Contiguous United States on newly generated model maps/);
+ assert.match(app,/setView\(\[place\.latitude,place\.longitude\],7,\{animate:false\}\)/);
+ assert.match(html,/decoded from native contiguous-U\.S\. model data/);
+});
+
 test('AI number validation rejects invented values without rejecting grounded weather numbers',()=>{
  assert.match(server,/hasUngroundedNumbers/);
  assert.match(server,/collectFactNumbers/);

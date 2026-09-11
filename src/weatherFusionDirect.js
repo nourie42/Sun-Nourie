@@ -12,6 +12,8 @@ const round = (n, d = 2) => finite(n) ? Number(n.toFixed(d)) : null;
 const iso = (t) => new Date(t).toISOString();
 const LABELS = { hrrr: 'NOAA HRRR · 3 km', ecmwf: 'ECMWF IFS · 0.25° Open Data', nbm: 'NOAA National Blend · 2.5 km' };
 const SOURCE = { hrrr: 'https://www.nco.ncep.noaa.gov/pmb/products/hrrr/', nbm: 'https://www.nco.ncep.noaa.gov/pmb/products/blend/', ecmwf: 'https://www.ecmwf.int/en/forecasts/datasets/open-data' };
+const CONUS_MAP_BOUNDS = '[[20,-130],[55,-60]]';
+const LEGACY_REGIONAL_MAP_BOUNDS = '[[32.5,-85],[38,-74]]';
 export function modelStatus(model, runAt, validUntil, now = Date.now()) {
   const run = Date.parse(runAt), end = Date.parse(validUntil);
   if (!LABELS[model] || !finite(run) || !finite(end) || run > now + 15 * 60000 || end <= now) return 'unavailable';
@@ -90,13 +92,14 @@ export function createDirectModels({ fetchImpl = globalThis.fetch, now = Date.no
       const status = modelStatus(model.model, model.runAt, model.validUntil, now());
       for (const [name, rawFrames] of Object.entries(model.maps || {})) {
         if (!['hrrr','ecmwf','nbm','temperature','wind','clouds'].includes(name) || !Array.isArray(rawFrames)) continue;
-        const frames = status === 'ready' ? rawFrames.filter((f) => /^maps\/(hrrr|nbm|ecmwf)-\d{10}-(reflectivity|precipitation|temperature|wind|clouds)-\d{3}\.png$/.test(f.file) && f.file.startsWith(`maps/${model.model}-`) && finite(Date.parse(f.time)) && Date.parse(f.time) >= now()-3*H && Date.parse(f.time) <= Date.parse(model.validUntil) && JSON.stringify(f.bounds) === '[[32.5,-85],[38,-74]]').map((f) => ({ ...f, url: DATA_ROOT+f.file })) : [];
-        layers[name] = { model: model.model, label: model.label, resolution: model.resolution, coverage:'North Carolina and surrounding region', runAt: model.runAt, status: frames.length ? status : 'unavailable', frames: frames.sort((a,b) => Date.parse(a.time)-Date.parse(b.time)), sourceUrl: SOURCE[model.model] };
+        const frames = status === 'ready' ? rawFrames.filter((f) => /^maps\/(hrrr|nbm|ecmwf)-\d{10}-(reflectivity|precipitation|temperature|wind|clouds)-\d{3}\.png$/.test(f.file) && f.file.startsWith(`maps/${model.model}-`) && finite(Date.parse(f.time)) && Date.parse(f.time) >= now()-3*H && Date.parse(f.time) <= Date.parse(model.validUntil) && [CONUS_MAP_BOUNDS,LEGACY_REGIONAL_MAP_BOUNDS].includes(JSON.stringify(f.bounds))).map((f) => ({ ...f, url: DATA_ROOT+f.file })) : [];
+        const coverage=frames.some(f=>JSON.stringify(f.bounds)===CONUS_MAP_BOUNDS)?'Contiguous United States':'North Carolina and surrounding region';
+        layers[name] = { model: model.model, label: model.label, resolution: model.resolution, coverage, runAt: model.runAt, status: frames.length ? status : 'unavailable', frames: frames.sort((a,b) => Date.parse(a.time)-Date.parse(b.time)), sourceUrl: SOURCE[model.model] };
       }
     }
     const live=independent.status==='fulfilled'?independent.value:null;
     if(live?.layer)layers.hrrr={...live.layer,sourceCheck:live.status};
-    return { schema: DIRECT_SCHEMA, hrrrHourlySource:live?.status||'unavailable', checkedAt:iso(now()), generatedAt: manifest.generatedAt, layers, coverage: 'HRRR: contiguous United States; other decoded model maps: North Carolina and surrounding region', note: 'Model maps are not observed radar. HRRR uses independently refreshed, timestamp-pinned Iowa State low-level REFD tiles across the contiguous United States when that source verifies. Other maps use decoded native regional snapshots.' };
+    return { schema: DIRECT_SCHEMA, hrrrHourlySource:live?.status||'unavailable', checkedAt:iso(now()), generatedAt: manifest.generatedAt, layers, coverage: 'Contiguous United States on newly generated model maps', note: 'Model maps are not observed radar. HRRR uses independently refreshed, timestamp-pinned Iowa State low-level REFD tiles. ECMWF and NBM layers use decoded native CONUS snapshots; an older regional snapshot remains accepted only until its replacement finishes.' };
   }
   return { load, maps };
 }

@@ -382,7 +382,7 @@ function selectLayer(layer){
   const official=$('model-official-source');if(official)official.hidden=true;
   mapMessage('');if(!map)initMap();map?.invalidateSize();
   if(layer==='radar'){$('map-source').href='https://radar.weather.gov/';$('map-source').textContent='Official radar ↗';$('map-caption').textContent='NOAA observed reflectivity · past frames only';$('radar-legend').textContent='Observed reflectivity · light → strong';configureFrames(frames.length,frameIndex);if(frames.length)showFrame(frameIndex);else void loadRadar();}
-  else{configureFrames(0);void loadModelMap();}
+  else{map?.setView([place.latitude,place.longitude],7,{animate:false});configureFrames(0);void loadModelMap();}
 }
 function showSelectedFrame(index){if(selectedLayer==='radar')showFrame(index);else showModelFrame(index);}
 
