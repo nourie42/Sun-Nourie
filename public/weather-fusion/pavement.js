@@ -1,7 +1,7 @@
 import {finite,solarElevation,thermalHumidity} from './weather-math.js?v=clear-weather-daygraph-v3';
-import {clothingForFeels,referenceScene} from './exposure-scene.js?v=mobile-weather-v19';
+import {clothingForFeels,referenceScene} from './exposure-scene.js?v=compact-weather-v21';
 import {thermalRisk} from './thermal-risk.js?v=weather-art-labels-v10';
-import {weatherShapes} from './weather-display.js?v=mobile-weather-v19';
+import {weatherShapes} from './weather-display.js?v=compact-weather-v21';
 import {weatherState} from './weather-state.js';
 const H=3600000,SIGMA=5.670374419e-8,clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 const c=f=>(f-32)/1.8,f=c=>c*1.8+32;

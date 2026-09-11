@@ -122,3 +122,57 @@
  #hourly .hour-feels{font-size:11px}
  #hourly .hour-feels>b{font-size:11px}
 }
+/* Compact phone proportions: retain every reading without turning cards into tall panels. */
+@media(max-width:760px){
+ .hero .today-panel{padding:10px 11px;margin:14px 0 12px;border-radius:20px}
+ #today-forecast .today-main{gap:5px;padding:0 0 7px}
+ #today-forecast .today-overview{grid-template-columns:minmax(0,1fr) 92px;gap:8px;min-height:58px}
+ #today-forecast .today-description{gap:3px}
+ #today-forecast .day-name{font-size:28px}
+ #today-forecast .today-condition{font-size:13px;line-height:1.18}
+ #today-forecast .today-symbol{grid-template-columns:43px minmax(0,1fr);column-gap:2px}
+ #today-forecast .today-symbol>svg{width:43px;height:43px}
+ #today-forecast .today-symbol>strong{font-size:18px}
+ #today-forecast .today-symbol>small{font-size:8px}
+ #today-forecast .today-range{gap:5px}
+ #today-forecast .today-temperatures{grid-template-columns:57px minmax(18px,1fr) 57px;gap:7px}
+ #today-forecast .today-low>strong,#today-forecast .today-high>strong{font-size:36px}
+ #today-forecast .today-low>small,#today-forecast .today-high>small{font-size:10px}
+ #today-forecast .today-temp-track{margin-top:20px;height:8px}
+ #today-forecast .today-temp-track>i{width:15px;height:15px}
+ #today-forecast .today-feels{font-size:10px;margin-top:4px}
+ #today-forecast .today-feels b{font-size:17px}
+ #today-forecast .today-night-note{font-size:13px;line-height:1.25}
+ #today-forecast .today-meta{gap:3px 7px;margin-top:-1px}
+ #today-forecast .forecast-confidence{font-size:8px;gap:3px}
+ #today-forecast .forecast-confidence>b{font-size:9px}
+ #today-forecast .confidence-meter{width:20px;height:4px}
+ #today-forecast .today-meta>.daily-uv{font-size:9px}
+ #today-forecast .today-metrics{padding:6px 0;border-radius:12px}
+ #today-forecast .today-metric{gap:2px;padding:0 1px}
+ #today-forecast .today-metric svg{width:17px;height:17px}
+ #today-forecast .today-metric strong{font-size:11px;line-height:1.1}
+ #today-forecast .today-metric strong em{font-size:8px}
+ #today-forecast .today-metric small{font-size:8px;line-height:1.15;margin-top:1px}
+ .hero .today-panel .today-uncertainty{font-size:10px;padding-top:7px;margin-top:5px}
+ .hero .today-panel .today-uncertainty-label{font-size:11px}
+ .hero .hourly-panel{padding:10px 8px 6px;margin-bottom:12px;border-radius:20px}
+ .hero .hourly-panel .section-top{margin:0 2px 7px}
+ .hero .hourly-panel .section-top h2{font-size:19px}
+ .hero .hourly-panel .section-top>span{font-size:8px}
+ #hourly.hourly-strip{padding-bottom:5px}
+ #hourly button.hour{padding:7px 2px 6px;border-radius:13px}
+ #hourly button.hour>span:first-child{font-size:11px;margin-bottom:4px}
+ #hourly button.hour>svg{width:31px;height:31px;margin-bottom:3px}
+ #hourly button.hour>strong{font-size:24px;margin-bottom:3px}
+ #hourly .hour-feels{font-size:9px;gap:2px;margin-bottom:5px}
+ #hourly .hour-feels>b{font-size:10px}
+ #hourly .hour-pop{font-size:9px;margin-bottom:5px;min-height:13px}
+ #hourly .hour-pop>svg{width:8px;height:10px}
+ #hourly .hour-uv{font-size:10px;margin-bottom:5px}
+ #hourly .hour-wind{gap:1px}
+ #hourly .hour-wind>svg{width:18px;height:18px;margin-bottom:0}
+ #hourly .hour-wind>b{font-size:9px}
+ #hourly .hour-wind>small{font-size:8px}
+}
+body[data-sky="night"] .hero .today-panel,body[data-sky="night"] .hero .hourly-panel{background:radial-gradient(ellipse at 25% 0,#174b762b,transparent 68%),linear-gradient(145deg,#072b4a,#051d36 62%,#04172c);border-color:#5ba8d052;box-shadow:inset 0 1px 1px #b0e9ff12,0 12px 30px #02091455}

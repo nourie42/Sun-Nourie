@@ -2,7 +2,7 @@ import {weatherState} from './weather-state.js';
 import {dailyDisplay,finite,temperatureBar} from './weather-math.js?v=weather-art-labels-v10';
 import {dailyFeels,degrees,timeAt} from './hourly-feels.js?v=weather-art-labels-v10';
 import {dailyUvHTML,uvCategory} from './daily-uv.js?v=weather-art-labels-v10';
-import {weatherIcon,weatherMetricIcon} from './weather-display.js?v=mobile-weather-v19';
+import {weatherIcon,weatherMetricIcon} from './weather-display.js?v=compact-weather-v21';
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const reading=(value,unit='')=>finite(value)?`${Math.round(value)}${unit}`:'—';
 export function periodWeatherStats(forecast,now=Date.now()){
