@@ -4,6 +4,7 @@ import {FORECAST_CONFIDENCE_VERSION,forecastConfidence} from '../public/weather-
 import {DAN_TAKE_VERSION,collectDanTakeEvidence,approveDanTake,visibleDanTakeItems,danTakeText,rebindDanTake} from '../public/weather-fusion/dans-take.js';
 import {stationWeather,resolveCurrentWeather} from '../public/weather-fusion/weather-state.js';
 import {createSpecialDiscussionService} from './weatherFusionSpecialDiscussions.js';
+import {createRiskOutlookService} from './weatherFusionRisks.js';
 import {createBulletinService} from './weatherFusionBulletins.js';
 import {pressureTrendFromObservations} from './weatherFusionPressure.js';
 import {eveningPeriod} from './weatherFusionPolicy.js';
@@ -184,7 +185,7 @@ export class Cache {
   }
 }
 
-export function buildForecast({ location, point, forecast, hourly, grid, discussion, observation, alerts, specialDiscussions, exposureWeather, models, feeds, now }) {
+export function buildForecast({ location, point, forecast, hourly, grid, discussion, observation, alerts, specialDiscussions, riskOutlooks, exposureWeather, models, feeds, now }) {
   const zone = point?.timeZone || models.ecmwf?.timezone || 'America/New_York';
   const today = dateKey(now, zone);
   const rows = Object.fromEntries(Object.entries(models).map(([key, value]) => [key, normalizeModel(value, now, key === 'hrrr' ? 48 : 240)]));
@@ -254,7 +255,7 @@ export function buildForecast({ location, point, forecast, hourly, grid, discuss
   const resolvedName = location.name || [point?.relativeLocation?.properties?.city, point?.relativeLocation?.properties?.state].filter(Boolean).join(', ') || 'Selected location';
   const solarIndex = (models.ecmwf?.daily?.time || []).findIndex((t) => dateKey(t * 1000, zone) === today);
   const output = { version: VERSION, assembledAt: iso(now), location: { ...location, name: resolvedName, timeZone: zone, office: point?.cwa || null },
-    current, hours, days, discussion: discussion || null, alerts: alerts || [], specialDiscussions: specialDiscussions || [], feeds,
+    current, hours, days, discussion: discussion || null, alerts: alerts || [], specialDiscussions: specialDiscussions || [], riskOutlooks: riskOutlooks || [], feeds,
     solar: { sunrise: models.ecmwf?.daily?.sunrise?.[solarIndex] ? iso(models.ecmwf.daily.sunrise[solarIndex] * 1000) : null,
       sunset: models.ecmwf?.daily?.sunset?.[solarIndex] ? iso(models.ecmwf.daily.sunset[solarIndex] * 1000) : null },
     methodology: 'NWS temperatures, conditions and precipitation probabilities are primary. NWS grid precipitation is integrated over local 7 AM–7 AM windows. Model guidance is supplementary and not a verified skill-weighted forecast. Model high/low comparisons use calendar days; the NWS low is overnight. Precipitation includes liquid-equivalent snow/ice. Daily forecast confidence is a relative index, not a probability; it uses lead time, NWS/model high-temperature spread, rainfall-guidance spread, usable guidance coverage, and NWS day/night availability.' };
@@ -266,7 +267,7 @@ export function buildForecast({ location, point, forecast, hourly, grid, discuss
   output.forecastConfidenceVersion=FORECAST_CONFIDENCE_VERSION;
   output.weatherDisplayVersion='weather-nourie-sky-consistency-v1';
   // Hash all forecast facts and source issuance, not just rainfall. Retrieval time is not model run time.
-  output.signature = hash({ danTakeVersion:DAN_TAKE_VERSION, experienceVersion: output.experienceVersion, metricForecasts:output.metricForecasts, version: VERSION, location: output.location, current:output.current, days, hours, discussion, specialDiscussions:output.specialDiscussions,
+  output.signature = hash({ danTakeVersion:DAN_TAKE_VERSION, experienceVersion: output.experienceVersion, metricForecasts:output.metricForecasts, version: VERSION, location: output.location, current:output.current, days, hours, discussion, specialDiscussions:output.specialDiscussions, riskOutlooks:output.riskOutlooks,
     precipitation: output.precipitation, modelContributions: output.modelContributions, alerts: output.alerts.map((a) => [a.id, a.sent, a.expires]), feeds: feeds.map((f) => [f.id, f.status, f.issuedAt]) });
   return output;
 }
@@ -288,7 +289,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
   const direct = createDirectModels({ fetchImpl, now });
   async function request(url, { text = false, body = null, timeout = 12000, revalidate = false } = {}) {
     const u = new URL(url);
-    const allowed = ['api.weather.gov', 'api.open-meteo.com', 'geocoding-api.open-meteo.com', 'opengeo.ncep.noaa.gov', 'api.openai.com', 'mapservices.weather.noaa.gov', 'www.spc.noaa.gov'];
+    const allowed = ['api.weather.gov', 'api.open-meteo.com', 'geocoding-api.open-meteo.com', 'opengeo.ncep.noaa.gov', 'api.openai.com', 'mapservices.weather.noaa.gov', 'www.spc.noaa.gov', 'www.wpc.ncep.noaa.gov'];
     if (u.protocol !== 'https:' || !allowed.includes(u.hostname) || u.port || u.username || u.password) throw errorWithStatus('Unexpected source URL.', 502);
     const minute = Math.floor(now() / MINUTE);
     if (apiMinute.minute !== minute) apiMinute = { minute, count: 0 };
@@ -317,6 +318,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
   }
   async function loadModel(id, location) { return direct.load(id, location); }
   const loadSpecialDiscussions=createSpecialDiscussionService({cached,now});
+  const loadRiskOutlooks=createRiskOutlookService({cached,now});
   const loadDiscussion=createDiscussionSource({request,now});
   async function getForecast(query) {
     const location = coordinates(query), key = `${location.latitude},${location.longitude}`;
@@ -362,13 +364,15 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
           return chosen;
         }) : unavailable('observation', 'Station observation'),
         specialDiscussions: loadSpecialDiscussions(location),
+        riskOutlooks: loadRiskOutlooks(location),
         hrrr: loadModel('hrrr', location),
         ecmwf: loadModel('ecmwf', location),
         nbm: loadModel('nbm', location),
       };
       const values = Object.fromEntries(await Promise.all(Object.entries(jobs).map(async ([id, promise]) => [id, await promise])));
-      const data = Object.fromEntries(Object.entries(values).map(([id, f]) => [id, f.meta.status === 'ready' ? f.value : null]));
-      const result = buildForecast({ ...data, point, location, models: { hrrr: data.hrrr, ecmwf: data.ecmwf, nbm: data.nbm }, feeds: [pointFeed.meta, ...Object.values(values).map((f) => f.meta)], now: now() });
+      const data = Object.fromEntries(Object.entries(values).map(([id, f]) => [id, Array.isArray(f.meta)?f.value:(f.meta.status === 'ready' ? f.value : null)]));
+      const feedMeta=[pointFeed.meta,...Object.values(values).flatMap(f=>Array.isArray(f.meta)?f.meta:[f.meta])];
+      const result = buildForecast({ ...data, point, location, models: { hrrr: data.hrrr, ecmwf: data.ecmwf, nbm: data.nbm }, feeds: feedMeta, now: now() });
       // Access never exposes the provider credential or a made-up model run timestamp.
       result.aiConfigured = !!env.OPENAI_API_KEY;
       result.integrityVersion='weather-nourie-integrity-v1';

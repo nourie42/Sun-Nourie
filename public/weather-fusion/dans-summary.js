@@ -1,4 +1,5 @@
 import {plainDanWording,hasDanJargon,collectDanTakeEvidence,visibleDanTakeItems,danTakeText,discussionPeriod,sectionAnchor,explicitForecastUncertainty} from './dans-take.js?v=clear-weather-daygraph-v3';
+import {bulletinFacts} from './bulletin-facts.js';
 const norm=v=>String(v||'').replace(/\s+/g,' ').trim();
 const dateKey=(time,zone)=>new Intl.DateTimeFormat('en-CA',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(time));
 function anchoredText(text,anchor,zone,now){
@@ -41,6 +42,19 @@ export function danCard(briefing,forecast,now=Date.now()){
   if(combined.length>380||combined.split(/\s+/).length>55)return false;
   items.push({...item,summary:sentence});parts.push(part);return true;
  };
+ const bulletin=bulletinFacts(forecast,now).find(item=>item.kind!=='discussion');
+ if(bulletin){
+  const advice=bulletin.kind==='warning'?'Take action now and follow the official warning.':bulletin.kind==='watch'?'Be ready to act if a warning is issued.':'Check the official notice for local details.';
+  const text=`${bulletin.title}. ${advice}`;
+  return {text,changes:text,items:[{...bulletin,summary:text,period:'Right now',official:true}],sourceExcerpt:null,source:'Official NWS alert'};
+ }
+ const risks=(forecast?.riskOutlooks||[]).filter(r=>Date.parse(r.expires)>now).sort((a,b)=>(b.rank||0)-(a.rank||0));
+ if(risks.length){
+  const selected=[...new Map(risks.map(r=>[r.kind,r])).values()].slice(0,2);
+  const line=r=>r.kind==='wpc'?`Flooding rain: ${r.level} risk today. ${r.level==='Marginal'?'A few spots could flood.':'Flooding is possible; stay away from flooded roads.'}`:`Severe storms: ${r.level} risk today. ${r.level==='Marginal'?'A few storms could become strong.':'Severe storms are possible; stay weather-aware.'}`;
+  const text=selected.map(line).join('\n');
+  return {text,changes:text,items:selected.map(r=>({...r,summary:line(r),period:'Today',official:true})),sourceExcerpt:null,source:'Official SPC/WPC outlook'};
+ }
  for(const item of visibleDanTakeItems(briefing?.danTake||briefing,forecast,now)){
   if(items.length===2)break;
   if(explicitForecastUncertainty(item.sourceQuote))append(item,item.summary);

@@ -1,5 +1,5 @@
 import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText,rebindDanTake} from './dans-take.js?v=weather-art-labels-v10';
-import {danCard} from './dans-summary.js?v=weather-art-labels-v10';
+import {danCard} from './dans-summary.js?v=dans-take-alerts-v11';
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
 import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './weather-display.js?v=compact-weather-v21';
 import {dayGraphHTML,installDayGraph} from './day-graph.js?v=weather-art-labels-v10';
@@ -134,7 +134,7 @@ function renderEvidence(data) {
   $('afd-link').href = /^https:\/\/api\.weather\.gov\//.test(data.discussion?.url || '') ? data.discussion.url : 'https://www.weather.gov/';
   $('methodology').textContent = data.methodology;
   $('source-register').innerHTML = data.feeds.map((f) => {
-    const url = /^https:\/\/(api\.weather\.gov|www\.nco\.ncep\.noaa\.gov|www\.ecmwf\.int|open-meteo\.com)\//.test(f.url || '') ? f.url : 'https://www.weather.gov/';
+    const url = /^https:\/\/(api\.weather\.gov|www\.nco\.ncep\.noaa\.gov|www\.ecmwf\.int|open-meteo\.com|www\.spc\.noaa\.gov|www\.wpc\.ncep\.noaa\.gov)\//.test(f.url || '') ? f.url : 'https://www.weather.gov/';
     return `<div class="source-item"><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(f.label)} ↗</a><span>${esc(names[f.status] || f.status)} · retrieved ${f.fetchedAt ? esc(clock(f.fetchedAt)) : '—'}${f.issuedAt ? ` · issued ${esc(clock(f.issuedAt, { month: 'short', day: 'numeric' }))}` : ' · model run/issuance not supplied'}${f.message?` · ${esc(f.message)}`:''}</span></div>`;
   }).join('');
 }
@@ -161,7 +161,8 @@ function renderBriefing(data) {
     todayUncertainty.hidden = !takeDisplay;
   }
   $('briefing-stamp').textContent = data.mode === 'ai' ? `Updated ${clock(data.generatedAt)} · based on your local NWS discussion` : 'National Weather Service forecast';
-  $('outlook-science').innerHTML = `<p>Summary type: ${esc(data.mode === 'ai' ? 'AI plain-language paraphrase of the local discussion, checked against the point forecast and available model data' : 'Official NWS forecast fallback; not an AI paraphrase')}. ${esc(data.reason || '')}</p><p>Sources used: ${refs.join(' · ') || 'Waiting for the local outlook'}</p><p>Take status: ${takeItems.length?'The following explicitly supported, still-upcoming discussion changes are displayed.':'No displayed change: '+(data.danTakeStatus==='discussion-not-current'?'the local discussion is missing or stale.':data.danTakeStatus==='no-explicit-future-change'?'the current discussion identifies no dated upcoming uncertainty.':data.reason||'the current discussion has not produced an approved explanation yet.')}</p>${takeItems.map(item=>`<details><summary>${esc(item.period)} · source evidence</summary><p>${esc(item.sourceQuote)}</p><p>Original section: ${esc(item.section)} · issued ${esc(clock(item.sectionIssuedAt,{month:'short',day:'numeric'}))}. Applies through ${esc(clock(item.eventEnd,{month:'short',day:'numeric'}))}.</p></details>`).join('')}`;
+  const discussionItems=takeItems.filter(item=>!item.official);
+  $('outlook-science').innerHTML = `<p>Summary type: ${esc(data.mode === 'ai' ? 'AI plain-language paraphrase of the local discussion, checked against the point forecast and available model data' : 'Official NWS forecast fallback; not an AI paraphrase')}. ${esc(data.reason || '')}</p><p>Sources used: ${refs.join(' · ') || 'Waiting for the local outlook'}</p><p>Take status: ${takeItems.some(item=>item.official)?'An active official local notice or point-specific risk outlook is displayed.':takeItems.length?'An explicitly supported, still-upcoming discussion change is displayed.':'No displayed change: '+(data.danTakeStatus==='discussion-not-current'?'the local discussion is missing or stale.':data.danTakeStatus==='no-explicit-future-change'?'the current discussion identifies no dated upcoming uncertainty.':data.reason||'the current discussion has not produced an approved explanation yet.')}</p>${discussionItems.map(item=>`<details><summary>${esc(item.period)} · source evidence</summary><p>${esc(item.sourceQuote)}</p><p>Original section: ${esc(item.section)} · issued ${esc(clock(item.sectionIssuedAt,{month:'short',day:'numeric'}))}. Applies through ${esc(clock(item.eventEnd,{month:'short',day:'numeric'}))}.</p></details>`).join('')}`;
 
 }
 async function load({ moveMap = false, refreshModels = false, briefingRetry = 0 } = {}) {
