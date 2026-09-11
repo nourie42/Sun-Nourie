@@ -176,3 +176,65 @@
  #hourly .hour-wind>small{font-size:8px}
 }
 body[data-sky="night"] .hero .today-panel,body[data-sky="night"] .hero .hourly-panel{background:radial-gradient(ellipse at 25% 0,#174b762b,transparent 68%),linear-gradient(145deg,#072b4a,#051d36 62%,#04172c);border-color:#5ba8d052;box-shadow:inset 0 1px 1px #b0e9ff12,0 12px 30px #02091455}
+
+/* Carry the forecast-card finish through the rest of the page without changing card geometry. */
+.hero .bulletins-panel,
+.dewpoint-gross-meter,
+.briefing,
+.daily-panel,
+.metric,
+.map-panel,
+.evidence-panel{
+ background:radial-gradient(ellipse at 25% 0,#1688b426,transparent 70%),linear-gradient(135deg,#104773,#073b63 60%,#073153);
+ border-color:#58c7f16b;
+ box-shadow:inset 0 1px 2px #a3e8ff20,0 12px 28px #041d3626;
+ color:#f7fcff;
+}
+.briefing .section-top h2,
+.daily-panel .section-top h2,
+.map-panel .section-top h2,
+.evidence-panel .section-top h2,
+.hero .bulletins-panel .section-top h2,
+.dewpoint-gross-meter .section-top h2,
+.dewpoint-gross-meter .gross-eyebrow,
+.metric .metric-title{
+ color:#fff;
+ font-weight:750;
+}
+.briefing .section-top>span,
+.daily-panel .section-top>span,
+.map-panel .section-top>span,
+.evidence-panel .section-top>span,
+.hero .bulletins-panel .section-top>span,
+.dewpoint-gross-meter .section-top>span,
+.metric .metric-note,
+.metric .tile-hint{
+ color:#a8def7;
+}
+.daily-panel .day-row{border-bottom-color:#73c9ee2e}
+.daily-panel .day-row:hover{background:#2cb7f00d}
+.map-panel .map-tabs{background:#042e5450;border:1px solid #49b8eb2e}
+.map-panel .map-tabs button.selected{background:#2aaee834;color:#fff}
+.evidence-panel .evidence-detail{border-top-color:#73c9ee2e}
+.evidence-panel .feed-chip{background:#042e5440;border-color:#58c7f12e}
+body[data-sky="night"] .hero .bulletins-panel,
+body[data-sky="night"] .dewpoint-gross-meter,
+body[data-sky="night"] .briefing,
+body[data-sky="night"] .daily-panel,
+body[data-sky="night"] .metric,
+body[data-sky="night"] .map-panel,
+body[data-sky="night"] .evidence-panel{
+ background:radial-gradient(ellipse at 25% 0,#174b762b,transparent 68%),linear-gradient(145deg,#072b4a,#051d36 62%,#04172c);
+ border-color:#5ba8d052;
+ box-shadow:inset 0 1px 1px #b0e9ff12,0 12px 30px #02091455;
+}
+@media(max-width:760px){
+ #skin-exposure,
+ #dewpoint-gross-meter,
+ .hero .bulletins-panel,
+ .briefing,
+ .daily-panel,
+ .metric,
+ .map-panel,
+ .evidence-panel{border-radius:20px}
+}
