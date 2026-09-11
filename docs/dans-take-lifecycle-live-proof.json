@@ -1,0 +1,124 @@
+{
+  "commit": "8c756eca6158c9a50051315d30d214b19dbc5a27",
+  "checkedAt": "2026-09-11T12:45:01.488Z",
+  "fixture": false,
+  "success": true,
+  "checks": [
+    {
+      "label": "initial-page",
+      "checkedAt": "2026-09-11T12:45:33.963Z",
+      "assembledAt": "2026-09-11T12:44:55.995Z",
+      "sourceCheckedAt": "2026-09-11T12:44:55.438Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "e98a412e16c398bbfb7cc518",
+      "discussionId": "011391c8-ac25-4979-a24e-c07d6d2edae0",
+      "issuedAt": "2026-09-11T10:47:00+00:00",
+      "cachedItems": [],
+      "visible": false,
+      "text": ""
+    },
+    {
+      "label": "refresh-1",
+      "checkedAt": "2026-09-11T12:46:39.769Z",
+      "assembledAt": "2026-09-11T12:46:33.780Z",
+      "sourceCheckedAt": "2026-09-11T12:44:55.438Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "e98a412e16c398bbfb7cc518",
+      "discussionId": "011391c8-ac25-4979-a24e-c07d6d2edae0",
+      "issuedAt": "2026-09-11T10:47:00+00:00",
+      "cachedItems": [],
+      "visible": false,
+      "text": ""
+    },
+    {
+      "label": "refresh-2",
+      "checkedAt": "2026-09-11T12:47:46.634Z",
+      "assembledAt": "2026-09-11T12:47:45.067Z",
+      "sourceCheckedAt": "2026-09-11T12:47:45.067Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "e98a412e16c398bbfb7cc518",
+      "discussionId": "011391c8-ac25-4979-a24e-c07d6d2edae0",
+      "issuedAt": "2026-09-11T10:47:00+00:00",
+      "cachedItems": [],
+      "visible": false,
+      "text": ""
+    },
+    {
+      "label": "full-page-reload",
+      "checkedAt": "2026-09-11T12:47:47.233Z",
+      "assembledAt": "2026-09-11T12:47:45.067Z",
+      "sourceCheckedAt": "2026-09-11T12:47:45.067Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "e98a412e16c398bbfb7cc518",
+      "discussionId": "011391c8-ac25-4979-a24e-c07d6d2edae0",
+      "issuedAt": "2026-09-11T10:47:00+00:00",
+      "cachedItems": [],
+      "visible": false,
+      "text": ""
+    }
+  ],
+  "deployed": {
+    "sourceVersion": "nws-afd-monotonic-v1",
+    "danTakeVersion": "weather-nourie-dans-take-kid-clear-v10",
+    "assets": {
+      "index.html": "80bc5a4e6f388f725f6b953d9f5243232a2ee1ce97e509cd82af248c114cd1ae",
+      "app.js": "792884051759d2f2930dad7e11c0c65ebc4537261bb1781397798300ae7e736c",
+      "dans-summary.js": "52369551bf46498006eb85f71e97ba8c2e6a884fd10efc7dc7ae36e77dd605b0",
+      "current-inputs.js": "9f2c99ef54d53152d389a9b2186113ae702bdc7c091c082e10fbc108958f7125",
+      "pavement.js": "184a8ea37dacf8d0c0b5dced9a32d633d41d324917335914b157ca221c5cc55f",
+      "daily-uv.js": "4327bb7ab8a9bac7d21abbcafe674a13849d40a54c0c73966ee2e9a78a98e2e8",
+      "dans-take.js": "5da354860928555d55010a026466988d6962f11cbea1f3dbabb4a47fd61c6f9b"
+    }
+  },
+  "independentOfficialLatest": {
+    "id": "011391c8-ac25-4979-a24e-c07d6d2edae0",
+    "issuedAt": "2026-09-11T10:47:00+00:00"
+  },
+  "initial": {
+    "discussion": {
+      "id": "011391c8-ac25-4979-a24e-c07d6d2edae0",
+      "office": "RAH",
+      "issuanceTime": "2026-09-11T10:47:00+00:00",
+      "text": "\n000\nFXUS62 KRAH 111047\nAFDRAH\n\nArea Forecast Discussion\nNational Weather Service Raleigh NC\n646 AM EDT Fri Sep 11 2026\n\n.WHAT HAS CHANGED...\n\n* Heat indices 100-102 in the Triangle Area south and east to the \n  coast today. Best chance of storms in the northeast.\n\n&&\n\n.KEY MESSAGES...\nAs of 215 AM Friday...\n\n1) Hot today with a chance of PM thunderstorms, especially north \nand east. \n\n2) A bit cooler Saturday, but high humidity and thunderstorms are \nexpected.  \n\n&&\n\n.DISCUSSION...\nAs of 200 AM Friday...\n\nKEY MESSAGE 1... Hot today with a chance of PM thunderstorms, \nespecially north and east. \n\nExpect the day to begin mostly sunny as the latest satellite and \nobservational data depict mainly clear skies under the upper ridge \nover the SE states. Highs will reach the lower to mid 90s, with heat \nindices of 100-102 expected this afternoon, mainly from the eastern \nPiedmont through the Coastal Plain. \n\nA weak front to our north is expected to trigger scattered \nthunderstorms, mainly over VA this afternoon. The latest hi-res \nconvection allowing models suggest that widely scattered to \nscattered thunderstorms will develop, mainly over the northern and \neastern areas of central NC this afternoon, then linger into the \nevening. There may be a minimum of storm chances over the west-\ncentral Piedmont (west of the pre-frontal trough). \n\nVery muggy lows tonight in the 70s are expected. \n\nKEY MESSAGE 2... A bit cooler Saturday, but high humidity and \nthunderstorms are expected.  \n\nThe approaching mid/upper disturbance and weakening trough will give \nus a glancing blow as it passes to our north on Saturday. A \nweakening cold front and previous days left over boundaries should \nfocus a day when more numerous thunderstorms develop over the \nregion. QPF is up this run a little from previous runs, but 50 \npercent of the area may still remain less than 0.50 or less. PWs \nwill be very high and this moisture will combine with surface \nheating into the mid 80s NW and 90 SE to produce MLCapes around 2000 \nto 2500 j/kg SE. Locally heavy rain is expected, yet flash flooding \nshould be isolated and limited to poor drainage areas. A few lucky \nareas will get 1 to 1.5 inches storm totals.\n\nKEY MESSAGE 3... Lingering showers/storms mainly I-95 east on \nSunday; otherwise, drier with temperatures closer to the 30 \nyear historical averages most of the upcoming week. \n\nThere is a lingering chance of mainly PM showers/storms, especially \naround and east of I-95 Sunday. Otherwise, dry upper ridging will \ntake control again Monday into Thursday. There is some good news as \ntemperatures are expected to be closer to normal, with a surface \nhigh to our north and northeast bringing a light NE flow. Highs in \ngeneral this week will be in the 80s, flirting with 90 in the east.\n\n&&\n\n.AVIATION /12Z FRIDAY THROUGH TUESDAY/... \nAs of 646 AM Friday...\n\nMost of central NC will remain VFR through the 24 hour TAF period. \nAn exception this afternoon and evening will be the chance of a \nthunderstorm, mainly 18z-03z today/Sat. In addition, low stratus and \nsome fog are likely between 09z and 13z/Saturday morning. \n\nOutlook: A period of two of showers/storms will be possible on \nSaturday, mainly in the afternoon and evening. Otherwise, generally \nVFR daytime conditions are expected Sunday into Tuesday.\n\nAdditionally, low stratus and/or fog may develop and cause sub-VFR \nrestrictions early Sunday and early Monday mornings. \n\n&&\n\n.RAH WATCHES/WARNINGS/ADVISORIES...\nNone.\n\n&&\n\n$$\n\nDISCUSSION...Badgett\nAVIATION...Badgett\n",
+      "url": "https://api.weather.gov/products/011391c8-ac25-4979-a24e-c07d6d2edae0"
+    },
+    "feed": {
+      "id": "afd",
+      "label": "NWS RAH discussion",
+      "url": "https://api.weather.gov/products/types/AFD/locations/RAH/latest",
+      "status": "ready",
+      "sourceVersion": "nws-afd-monotonic-v1",
+      "retrievalStatus": "verified-latest",
+      "fetchedAt": "2026-09-11T12:44:55.438Z",
+      "checkedAt": "2026-09-11T12:44:55.438Z",
+      "issuedAt": "2026-09-11T10:47:00+00:00",
+      "productUrl": "https://api.weather.gov/products/011391c8-ac25-4979-a24e-c07d6d2edae0",
+      "message": ""
+    },
+    "aiMode": "ai",
+    "generatedAt": "2026-09-11T12:45:30.880Z",
+    "items": []
+  },
+  "observedRefreshVisibility": [
+    {
+      "hidden": true,
+      "text": ""
+    },
+    {
+      "hidden": true,
+      "text": ""
+    },
+    {
+      "hidden": true,
+      "text": ""
+    },
+    {
+      "hidden": true,
+      "text": ""
+    }
+  ],
+  "distinctWeatherSignatures": 1,
+  "distinctForecastAssemblies": 3,
+  "distinctDiscussionChecks": 2,
+  "browserErrors": []
+}
