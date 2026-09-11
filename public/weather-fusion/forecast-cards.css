@@ -258,7 +258,7 @@ body[data-sky="night"] .evidence-panel{
 #today-forecast .today-temperatures>i{color:#bceeff;font-size:32px;font-style:normal;font-weight:300}
 #today-forecast .today-feels{margin:14px 0 0;font-size:18px;color:#d7f3ff;font-weight:650}
 #today-forecast .today-feels b{display:inline;font-size:32px;color:#fff;margin-left:6px}
-#today-forecast .today-symbol{position:absolute;z-index:2;top:24px;right:26px;display:grid;grid-template-columns:auto 72px;grid-template-rows:auto auto;gap:0 8px;color:#c6f0ff;text-align:right;text-shadow:0 2px 12px #00335599}
+#today-forecast .today-symbol{position:absolute;z-index:2;top:24px;right:8px;display:grid;grid-template-columns:auto 72px;grid-template-rows:auto auto;gap:0 8px;color:#c6f0ff;text-align:right;text-shadow:0 2px 12px #00335599}
 #today-forecast .today-symbol>svg{grid-column:2;grid-row:1/3;width:70px;height:70px}
 #today-forecast .today-symbol>strong{grid-column:1;grid-row:1;align-self:end;color:#80e7ff;font-size:42px;line-height:1;font-weight:850}
 #today-forecast .today-symbol>small{grid-column:1;grid-row:2;align-self:start;max-width:none;font-size:14px;line-height:1.25;color:#e2f7ff}
@@ -284,7 +284,7 @@ body[data-sky="night"] .evidence-panel{
  #today-forecast .today-temperatures>i{font-size:20px}
  #today-forecast .today-feels{font-size:12px;margin-top:5px}
  #today-forecast .today-feels b{font-size:21px;margin-left:3px}
- #today-forecast .today-symbol{top:12px;right:10px;grid-template-columns:72px 38px;column-gap:4px;padding:0;border:0;border-radius:0;background:none;box-shadow:none;filter:drop-shadow(0 2px 5px #002d50)}
+ #today-forecast .today-symbol{top:12px;right:2px;grid-template-columns:72px 38px;column-gap:4px;padding:0;border:0;border-radius:0;background:none;box-shadow:none;filter:drop-shadow(0 2px 5px #002d50)}
  #today-forecast .today-symbol>svg{width:38px;height:38px}
  #today-forecast .today-symbol>strong{font-size:28px;color:#8beaff;font-weight:900;-webkit-text-stroke:.25px #d9f8ff}
  #today-forecast .today-symbol>small{font-size:9px;max-width:72px;color:#fff;font-weight:850;text-shadow:0 2px 5px #002d50,0 0 2px #002d50}
