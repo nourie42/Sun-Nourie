@@ -29,7 +29,7 @@ export function dewpointPoints(forecast,now,hours=240){
 }
 function styles(){
  if(document.getElementById('weather-nourie-dewpoint-meter-css'))return;
- const l=document.createElement('link');l.id='weather-nourie-dewpoint-meter-css';l.rel='stylesheet';l.href='/weather-fusion/dewpoint-meter.css?v=dynamic-scenes-v27';
+ const l=document.createElement('link');l.id='weather-nourie-dewpoint-meter-css';l.rel='stylesheet';l.href='/weather-fusion/dewpoint-meter.css?v=scenario-weather-v28';
  l.addEventListener('load',()=>{if(latest)renderDewpointMeter(latest,lastNow);},{once:true});document.head.append(l);
 }
 const hourText=(t,z)=>new Intl.DateTimeFormat('en-US',{timeZone:z,hour:'numeric',minute:'2-digit'}).format(new Date(t));
@@ -84,6 +84,7 @@ export function renderDewpointMeter(forecast,now=Date.now()){
  const built=graph(pts,horizon,zone,width,Math.ceil(now/HOUR)*HOUR);
  const marker=finite(dp)?Math.max(0,Math.min(100,(dp-45)/35*100)):0;
  const pill=level.key==='nice-breeze'?'BREEZE SAVES IT':level.key==='nogo'?'NO-GO':level.key.toUpperCase();
+ const humidity=forecast.current.humidity,air=forecast.current.temperature,feels=forecast.comfort?.outdoors;
  panel.dataset.level=level.key;panel.dataset.hours=String(horizon);
  panel.innerHTML=`<div class="gross-summary">
    <div class="gross-intro"><div class="gross-eyebrow" id="gross-title"><strong>Dew Point</strong><span>Gross Meter</span></div><p class="gross-note">${esc(level.note)}</p></div>
@@ -97,7 +98,13 @@ export function renderDewpointMeter(forecast,now=Date.now()){
     <div class="gross-scroll" tabindex="0" role="region" aria-label="Full-range dew-point forecast chart">${built.html}</div></div>
    <label class="gross-slider-label" for="gross-scrubber">Explore each forecast hour</label><input id="gross-scrubber" type="range" min="0" max="${Math.max(0,pts.length-1)}" value="0" ${pts.length?'':'disabled'} aria-label="Forecast dew-point hour"/>
    <div class="gross-scale"><span>Dry &lt;50°</span><span>Not bad 50–59°</span><span>Humid 60–64°</span><span>Gross 65–69°</span><span>No-go 70–74°</span><span>Nope 75°+</span></div>
-   ${worst?`<p class="gross-worst"><strong>Muggiest in this view:</strong> ${Math.round(worst.value)}° · ${esc(dayText(worst.time,zone))} at ${esc(hourText(worst.time,zone))}</p>`:'<p class="gross-empty">No dew-point forecast is available for these hours.</p>'}</div>`;
+   ${worst?`<p class="gross-worst"><strong>Muggiest in this view:</strong> ${Math.round(worst.value)}° · ${esc(dayText(worst.time,zone))} at ${esc(hourText(worst.time,zone))}</p>`:'<p class="gross-empty">No dew-point forecast is available for these hours.</p>'}</div>
+  <div class="gross-facts" aria-label="Current conditions supporting the Gross Meter">
+   <span><i aria-hidden="true">●</i><b>${finite(dp)?Math.round(dp)+'°':'—'}</b><small>Dew point</small></span>
+   <span><i aria-hidden="true">≋</i><b>${finite(humidity)?Math.round(humidity)+'%':'—'}</b><small>Humidity</small></span>
+   <span><i aria-hidden="true">♨</i><b>${finite(air)?Math.round(air)+'°':'—'}</b><small>Air temperature</small></span>
+   <span><i aria-hidden="true">◇</i><b>${finite(feels)?Math.round(feels)+'°':'—'}</b><small>Feels like</small></span>
+  </div>`;
  const select=i=>{
   const p=pts[Math.max(0,Math.min(pts.length-1,i))];if(!p)return;selectedEpoch=p.epoch;
   const v=forecastGrossLevel(p.value,pairedWind(forecast,p.time));

@@ -117,8 +117,8 @@ function shadeTree(){
  </g>`;
 }
 
-export function exposureScene(sun,daylight=true,condition='Clear',feels=null){
- const illustrated=referenceScene(sun?1:0,daylight,condition,feels);
+export function exposureScene(sun,daylight=true,condition='Clear',feels=null,context={}){
+ const illustrated=referenceScene(sun?1:0,daylight,condition,feels,context);
  if(illustrated)return illustrated;
  const weather=weatherState(condition),id=sun?'direct-scene':'shade-scene',p=skyPalette(weather,daylight);
  const defs=sharedDefs(id,p),weatherClass=sun?'person-weather':'shade-weather';
@@ -131,15 +131,27 @@ export function exposureScene(sun,daylight=true,condition='Clear',feels=null){
  return `<svg viewBox="0 0 300 360" preserveAspectRatio="xMidYMid slice" role="img" aria-label="${label}" data-outfit="${clothingForFeels(feels)}">${defs}${background}${icon}${art}</svg>`;
 }
 
-export function comfortSceneState(daylight=true,condition='Clear',feels=null){
- const kind=weatherState(condition).kind;
- if(['rain','storm'].includes(kind))return {key:'rain',asset:'comfort-reference-scenes-rain.webp'};
+export function precipitationActivity(condition='',context={}){
+ const weather=weatherState(condition),amount=context.precipitation,pop=context.pop;
+ if(!['rain','storm'].includes(weather.kind))return 'none';
+ if(!weather.chance)return 'active';
+ if(finite(amount)&&amount>=.05)return 'active';
+ if(finite(pop)&&pop>=60)return 'active';
+ return 'possible';
+}
+
+export function comfortSceneState(daylight=true,condition='Clear',feels=null,context={}){
+ const kind=weatherState(condition).kind,precipitation=precipitationActivity(condition,context);
  if(kind==='snow'||(finite(feels)&&feels<40))return {key:'cold',asset:'comfort-reference-scenes-cold.webp'};
- if(daylight&&finite(feels)&&feels>=88)return {key:'hot',asset:'comfort-reference-scenes-hot.webp'};
+ if(precipitation==='active')return {key:'rain',asset:'comfort-reference-scenes-rain.webp'};
+ if(kind==='fog')return {key:'fog',asset:'comfort-reference-scenes-fog.webp'};
+ if(!daylight)return {key:'dawn',asset:'comfort-reference-scenes-dawn.webp'};
+ if(precipitation==='possible'||kind==='cloudy')return {key:'watch',asset:'comfort-reference-scenes-watch.webp'};
+ if(finite(feels)&&feels>=88&&['clear','partly-cloudy'].includes(kind))return {key:'hot',asset:'comfort-reference-scenes-hot.webp'};
  return {key:'normal',asset:'comfort-reference-scenes.webp'};
 }
 
-const comfortSceneAssets=['comfort-reference-scenes.webp','comfort-reference-scenes-hot.webp','comfort-reference-scenes-rain.webp','comfort-reference-scenes-cold.webp'];
+const comfortSceneAssets=['comfort-reference-scenes.webp','comfort-reference-scenes-hot.webp','comfort-reference-scenes-rain.webp','comfort-reference-scenes-cold.webp','comfort-reference-scenes-fog.webp','comfort-reference-scenes-watch.webp','comfort-reference-scenes-dawn.webp'];
 export function preloadComfortScenes(){
  if(typeof Image==='undefined')return false;
  for(const asset of comfortSceneAssets){const image=new Image();image.decoding='async';image.src=`/weather-fusion/${asset}`;}
@@ -152,16 +164,16 @@ if(typeof window!=='undefined'){
 
 // Text and readings remain HTML. The selected sprite changes with the same
 // current/hourly condition and feels-like value used everywhere else.
-export function referenceScene(panel,daylight=true,condition='Clear',feels=null){
+export function referenceScene(panel,daylight=true,condition='Clear',feels=null,context={}){
  if(!finite(feels))return null;
  const weather=weatherState(condition),id=`reference-scene-${panel}`;
- const scene=comfortSceneState(daylight,condition,feels);
+ const scene=comfortSceneState(daylight,condition,feels,context);
  const sky=skyPalette(weather,daylight);
  const subject=panel===0?'A boy sitting beneath a shade tree':panel===1?'A boy outdoors':'A woman walking a light brown toy poodle';
  const normalClothing={hot:'light hot-weather clothing',warm:'light warm-weather clothing',mild:'everyday mild-weather clothing',cool:'a jacket and long pants',cold:'a coat, scarf and warm hat'}[clothingForFeels(feels)];
- const action={hot:'visibly reacting to extreme heat in light hot-weather clothing',rain:'using rain gear and an umbrella in steady rain',cold:'wearing a coat, scarf and warm hat for cold weather',normal:`outdoors in ${normalClothing}`}[scene.key];
+ const action={hot:'visibly reacting to extreme heat in light hot-weather clothing',rain:'using rain gear and an umbrella in steady rain',cold:'wearing a coat, scarf and warm hat for cold weather',fog:'clearly visible in diffuse fog with no direct sunlight',watch:'looking at a cloudy sky because rain is possible but not occurring',dawn:'clearly visible outdoors before sunrise with no direct sunlight',normal:`outdoors in ${normalClothing}`}[scene.key];
  const label=`${subject}, ${action}`;
- const tint=!daylight?'#061536':scene.key==='normal'&&['rain','storm','cloudy','fog','snow'].includes(weather.kind)?'#42576d':null;
+ const tint=null;
  const symbol=scene.key!=='normal'||panel===0?'':daylight&&weather.kind==='clear'
   ?sunGlyph(id,248,57,.64)
   :`<g transform="translate(214 20) scale(1.5)">${weatherShapes(condition,daylight)}</g>`;

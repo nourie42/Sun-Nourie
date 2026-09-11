@@ -1,14 +1,14 @@
 import {todayForecastHTML} from './today-card.js?v=compact-weather-v21';
 import {FORECAST_CONFIDENCE_VERSION} from './forecast-confidence.js?v=weather-art-labels-v10';
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
-import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=dynamic-scenes-v27';
+import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=scenario-weather-v28';
 import {weatherState} from './weather-state.js';
 import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=compact-weather-v21';
 import {degrees,feelsAt,dailyFeels,forecastValue,peakFeelsHTML} from './hourly-feels.js?v=weather-art-labels-v10';
-import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=dynamic-scenes-v27';
+import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=scenario-weather-v28';
 import {comfortMode,comfortWindow,comfortNarrative,warmestTodayWindow} from './comfort-outlook.js?v=weather-art-labels-v10';
 import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js?v=weather-art-labels-v10';
-import {resetDewpointMeter} from './dewpoint-meter.js?v=dynamic-scenes-v27';
+import {resetDewpointMeter} from './dewpoint-meter.js?v=scenario-weather-v28';
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const number=(n,d=0)=>finite(n)?n.toFixed(d):'—';
@@ -95,10 +95,12 @@ export function renderComfort(forecast) {
  const sample=comfortPreview?forecastSample(forecast,comfortPreview):current;
  if(!sample){comfortPreview=null;return renderComfort(forecast);}
  const c=sample.comfort,zone=forecast.location.timeZone,summary=comfortWindow(forecast,now+1);
- const pavement=pavementEstimate(forecast,sample.inputs,sample.now?now:Date.parse(sample.time),{checkedAt:now});
+ const precipitation=forecastValue(forecast,'precipitation',sample.time);
+ const sceneContext={forecast:!sample.now,condition:sample.condition,pop:sample.pop,precipitation};
+ const pavement=pavementEstimate(forecast,sample.inputs,sample.now?now:Date.parse(sample.time),{checkedAt:now,...sceneContext});
  const kicker=$('skin-kicker');if(kicker)kicker.textContent=sample.now?'How it actually feels right now':`How will it feel outside at ${formatTime(sample.time)}?`;
  const preview=sample.now?'':'<div class="comfort-preview-heading"><button type="button" data-comfort-reset>Back to now</button></div>';
- $('skin-values').innerHTML=`${preview}${sunShadeHTML(c,forecast.location,sample.now?now:Date.parse(sample.time),{forecast:!sample.now,condition:sample.condition,compact:true,pavement:pavementHTML(pavement,sample.feels,{condition:sample.condition||c.radiantCondition,forecast:!sample.now})})}${sample.now?peakComparisonHTML(warmestTodayWindow(forecast,now),current.feels,zone,now):''}`;
+ $('skin-values').innerHTML=`${preview}${sunShadeHTML(c,forecast.location,sample.now?now:Date.parse(sample.time),{...sceneContext,compact:true,pavement:pavementHTML(pavement,sample.feels,sceneContext)})}${sample.now?peakComparisonHTML(warmestTodayWindow(forecast,now),current.feels,zone,now):''}`;
  $('skin-values').querySelector('[data-comfort-reset]')?.addEventListener('click',()=>selectComfortHour('now'));
  $('skin-explanation').textContent=sample.now?comfortNarrative(sample.inputs,c,summary,zone):`${sample.condition}. This hour uses air ${degrees(sample.temperature)}, dew point ${degrees(sample.inputs.dewpoint)} and ${number(sample.inputs.wind)} mph wind. Outdoors feels like ${degrees(sample.feels)}; shade ${degrees(c.shade)}. The outdoor illustration and solar estimate use this same forecast hour.`;
  const tile=$('skin-exposure');tile.dataset.preview=sample.now?'current':'forecast';tile.dataset.weather=weatherState(sample.condition).kind;
@@ -114,7 +116,18 @@ export function renderDailyRows(forecast,icon) {
   const p=dailyDisplay(d,i,Date.now(),forecast.location.timeZone),bar=temperatureBar(p.primary,lo,hi),feel=dailyFeels(forecast,i,Date.now());
   const confidence=d.confidence||{label:'Unavailable',score:null,key:'unavailable',factors:[],note:'Forecast confidence data is unavailable.'};
   const confidenceTitle=`Forecast confidence: ${confidence.label}. ${confidence.factors?.join('; ')||confidence.note||''} ${confidence.note||''}`.trim();
-  return `<button class="day-row ${p.tonight?'tonight-row':''}" data-day="${i}" aria-label="${esc(p.label)}, ${p.primaryLabel} ${number(p.primary)} degrees${finite(p.secondary)?`, low ${number(p.secondary)} degrees`:''}. Forecast confidence ${esc(confidence.label)}. Open details."><span class="day-name">${esc(p.label)}</span><span class="day-icon">${icon(p.condition,!p.tonight)}<small>${finite(p.pop)?`${number(p.pop)}%`:''}</small></span>${p.tonight?'<span class="night-label">☾<small>Overnight</small></span>':`<span class="day-low">${temp(p.secondary)}<small>Low</small><span class="daily-feels"><span>Feels</span><b>${degrees(feel.low?.low?.value)}</b>${feel.low?.partial?' · partial':''}</span></span>`}<span class="temp-track" aria-hidden="true">${bar===null?'':`<span class="temp-fill" style="left:0;width:${bar}%"></span><i class="high-marker" style="left:clamp(4px,${bar}%,calc(100% - 4px))"></i>`}</span><span class="day-high"><strong>${temp(p.primary)}</strong><small>${p.primaryLabel}</small><span class="daily-feels"><span>Feels</span><b>${degrees(p.tonight?feel.low?.low?.value:feel.high?.high?.value)}</b>${(p.tonight?feel.low:feel.high)?.partial?' · partial':''}</span></span><span class="day-meta"><span class="forecast-confidence" data-confidence="${esc(confidence.key)}" title="${esc(confidenceTitle)}"><span>Forecast confidence</span><b>${esc(confidence.label)}</b>${finite(confidence.score)?`<i class="confidence-meter" aria-hidden="true"><em style="width:${confidence.score}%"></em></i>`:''}</span>${dailyUvHTML(d.uvMax,p.tonight?'Peak UV today':'Peak UV')}</span></button>`;
+  const low=p.tonight?p.primary:p.secondary,high=p.tonight?null:p.primary;
+  const lowFeels=feel.low?.low?.value,highFeels=p.tonight?lowFeels:feel.high?.high?.value;
+  const feelsText=p.tonight?degrees(highFeels):`${degrees(lowFeels)} / ${degrees(highFeels)}`;
+  return `<button class="day-row ${p.tonight?'tonight-row':''}" data-day="${i}" aria-label="${esc(p.label)}, ${p.primaryLabel} ${number(p.primary)} degrees${finite(p.secondary)?`, low ${number(p.secondary)} degrees`:''}. Forecast confidence ${esc(confidence.label)}. Open details.">
+   <span class="day-name">${esc(p.label)}</span>
+   <span class="day-icon">${icon(p.condition,!p.tonight)}<small>${finite(p.pop)?`${number(p.pop)}%`:''}</small></span>
+   <span class="day-low">${temp(low)}<small>Low</small></span>
+   <span class="temp-track" aria-hidden="true">${bar===null?'':`<span class="temp-fill" style="left:0;width:${bar}%"></span><i class="high-marker" style="left:clamp(4px,${bar}%,calc(100% - 4px))"></i>`}</span>
+   <span class="day-high">${finite(high)?`<strong>${temp(high)}</strong><small>High</small>`:''}</span>
+   <span class="day-feels-summary"><small>Feels like</small><b>${feelsText}</b></span>
+   <span class="day-meta"><span class="forecast-confidence" data-confidence="${esc(confidence.key)}" title="${esc(confidenceTitle)}"><span>Forecast confidence</span><b>${esc(confidence.label)}</b>${finite(confidence.score)?`<i class="confidence-meter" aria-hidden="true"><em style="width:${confidence.score}%"></em></i>`:''}</span>${dailyUvHTML(d.uvMax,p.tonight?'Peak UV today':'Peak UV')}</span>
+  </button>`;
  });
  $('daily').innerHTML=rows.join('');
  // The featured card shares the daily timing policy and opens the same details.
