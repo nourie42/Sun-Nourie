@@ -5,11 +5,11 @@ import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './wea
 import {dayGraphHTML,installDayGraph} from './day-graph.js?v=weather-art-labels-v10';
 import {degrees,feelsAt} from './hourly-feels.js?v=weather-art-labels-v10';
 import {createFramePlayer} from './frame-player.js';
-import {renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=reference-comfort-v17';
+import {renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=reference-comfort-v18';
 import {dailyDisplay} from './weather-math.js?v=weather-art-labels-v10';
 import {currentHero} from './current-temperature.js?v=weather-art-labels-v10';
 import {renderBulletins} from './bulletins.js?v=weather-art-labels-v10';
-import {modelFreshnessText} from './personal-details.js?v=reference-comfort-v17';
+import {modelFreshnessText} from './personal-details.js?v=reference-comfort-v18';
 import {renderDewpointMeter} from './dewpoint-meter.js?v=weather-art-labels-v10';
 import {renderWeatherPanel} from './render-safety.js';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */

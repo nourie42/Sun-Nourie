@@ -53,7 +53,7 @@ try{
   assert.ok(!/Unavailable|null°/.test(exposureText),'Cloudy weather must keep a numeric outdoor estimate');
   assert.equal(await page.locator('.sun-shade-comparison > figure[data-weather="cloudy"]').count(),2);
   const cloudyCard=await page.locator('.sun-person').innerText();
-  assert.match(cloudyCard,/Cloudy/);assert.match(cloudyCard,/Comfortable outdoors/);
+  assert.match(cloudyCard,/Cloudy/);assert.match(cloudyCard,/Warm outdoors/);
   assert.equal(await page.locator('.sun-person .sky-sun').count(),0,'Cloudy exposure must not draw a direct-sun icon');
   assert.ok(!(await page.locator('#skin-exposure').innerText()).includes('~'));assert.ok(!(await page.locator('#skin-explanation').innerText()).includes('warmer than in shade'));
   const firstHourly=page.locator('#hourly .hour').first();

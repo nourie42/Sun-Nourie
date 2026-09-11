@@ -69,6 +69,7 @@
  #skin-values .sun-shade-comparison{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;overflow:visible;max-width:100%;padding:0;scroll-snap-type:none}
  #skin-values .sun-shade-comparison .exposure-person,#skin-values .sun-shade-comparison .exposure-person:has(.reference-scene){grid-template-rows:28px 40px auto 72px;aspect-ratio:auto;border-radius:16px}
  #skin-values .sun-shade-comparison .exposure-person>.exposure-label{font-size:clamp(14px,4.4vw,21px);padding:0 2px 0;align-items:center;white-space:nowrap}
+ #skin-values .sun-shade-comparison .sun-person>.exposure-label{font-size:clamp(13px,3.8vw,19px);white-space:normal;line-height:1}
  #skin-values .sun-shade-comparison .exposure-person>.exposure-subtitle{font-size:clamp(10px,2.85vw,13px);line-height:1.18;padding:3px 3px 0}
  #skin-values .sun-shade-comparison .exposure-person>svg,#skin-values .sun-shade-comparison .pavement-person>.poodle-scene{height:auto!important;aspect-ratio:1!important}
  #skin-values .sun-shade-comparison .exposure-person>.exposure-alert-slot{top:68px;left:2px;right:2px}

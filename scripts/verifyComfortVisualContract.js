@@ -14,8 +14,8 @@ app.get('/comfort-visual-contract',(_req,res)=>res.type('html').send(`<!doctype 
 </head><body><div class="shell"><div class="exposure-cards"><div class="skin-exposure" id="skin-exposure"><h2 class="skin-kicker">How it actually feels right now</h2><div id="skin-values"></div></div></div></div>
 <script type="module">
 const [{sunShadeHTML},{pavementHTML}]=await Promise.all([
- import('/weather-fusion/personal-details.js?v=reference-comfort-v17'),
- import('/weather-fusion/pavement.js?v=reference-comfort-v17')
+ import('/weather-fusion/personal-details.js?v=reference-comfort-v18'),
+ import('/weather-fusion/pavement.js?v=reference-comfort-v18')
 ]);
 const pavement={status:'estimated',daylight:true,concrete:{value:94,low:85,high:105},asphalt:{value:97,low:90,high:110}};
 const comfort={daylight:true,weatherKind:'clear',radiantCondition:'Sunny',condition:'Sunny',shade:86,outdoors:88,sun:88,inputEvidence:{temperature:87,skyCover:0}};
@@ -76,7 +76,7 @@ try{
   assert.equal(m.overflow,false);
 
   const night=await page.evaluate(async()=>{
-   const [{sunShadeHTML},{pavementHTML}]=await Promise.all([import('/weather-fusion/personal-details.js?v=reference-comfort-v17'),import('/weather-fusion/pavement.js?v=reference-comfort-v17')]);
+   const [{sunShadeHTML},{pavementHTML}]=await Promise.all([import('/weather-fusion/personal-details.js?v=reference-comfort-v18'),import('/weather-fusion/pavement.js?v=reference-comfort-v18')]);
    const node=document.createElement('div');
    node.innerHTML=sunShadeHTML({daylight:false,weatherKind:'clear',radiantCondition:'Clear',condition:'Clear',shade:72,outdoors:72,sun:null,inputEvidence:{temperature:73,skyCover:0}},{latitude:35.787,longitude:-78.4806},Date.now(),{compact:true,pavement:pavementHTML({status:'estimated',daylight:false,concrete:{value:76},asphalt:{value:78}},72)});
    return {petMoon:!!node.querySelector('.pavement-person .pet-moon'),petSun:!!node.querySelector('.pavement-person .sky-sun'),humanSun:!!node.querySelector('.sun-person .sky-sun'),petDaylight:node.querySelector('.pavement-person')?.dataset.daylight};
@@ -87,7 +87,7 @@ try{
   assert.equal(night.petDaylight,'false');
 
   const hot=await page.evaluate(async()=>{
-   const [{sunShadeHTML},{pavementHTML}]=await Promise.all([import('/weather-fusion/personal-details.js?v=reference-comfort-v17'),import('/weather-fusion/pavement.js?v=reference-comfort-v17')]);
+   const [{sunShadeHTML},{pavementHTML}]=await Promise.all([import('/weather-fusion/personal-details.js?v=reference-comfort-v18'),import('/weather-fusion/pavement.js?v=reference-comfort-v18')]);
    const node=document.createElement('div');
    node.innerHTML=sunShadeHTML({daylight:true,weatherKind:'clear',radiantCondition:'Sunny',condition:'Sunny',shade:90,outdoors:96,sun:96,inputEvidence:{temperature:91,skyCover:0}},{latitude:35.787,longitude:-78.4806},Date.now(),{compact:true,pavement:pavementHTML({status:'estimated',daylight:true,concrete:{value:112,low:100,high:125},asphalt:{value:118,low:105,high:130}},96)});
    return [...node.querySelectorAll('.sun-person .thermal-risk,.pavement-person .pavement-warning')].map(x=>x.textContent.trim());
