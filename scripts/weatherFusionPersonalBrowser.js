@@ -36,7 +36,7 @@ try{
  for(const width of [320,360,390,514,768,1365]){
   const context=await browser.newContext({viewport:{width,height:1000}}),page=await context.newPage();
   await page.addInitScript(({location,epoch})=>{localStorage.setItem('weather-fusion-place',JSON.stringify(location));Date.now=()=>epoch;},{location,epoch});
-  await page.goto(base+'/weather-fusion/',{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.querySelector('.sun-shade-comparison figure'));
+  await page.goto(base+'/weather-fusion/#today-forecast',{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.querySelector('.sun-shade-comparison figure'));
   assert.equal((await page.locator('.brand small').innerText()).trim(),'Because Apple, Google and Samsung weather suck');
   assert.equal((await page.locator('#skin-kicker').innerText()).trim(),'How it actually feels right now');
   assert.equal(await page.locator('#daily .forecast-confidence').count(),7);
@@ -46,6 +46,7 @@ try{
    return {noteAlign:getComputedStyle(note).textAlign,noteWeight:Number(getComputedStyle(note).fontWeight),noteFont:parseFloat(getComputedStyle(note).fontSize),graphicFont:parseFloat(getComputedStyle(graphic.querySelector('.day-name')).fontSize),bulletinsBelow:document.querySelector('.today-panel').nextElementSibling===b,hourlyAfter:b.nextElementSibling===h,grossTitleSize:parseFloat(getComputedStyle(title).fontSize),grossTitleWeight:Number(getComputedStyle(title).fontWeight),grossHeight:gross.getBoundingClientRect().height,noOverflow:document.documentElement.scrollWidth<=innerWidth+1};
   });
   assert.equal(layout.noteAlign,'center');assert.ok(layout.noteWeight>=700);assert.ok(layout.noteFont<layout.graphicFont);assert.ok(layout.bulletinsBelow&&layout.hourlyAfter);assert.ok(layout.grossTitleSize>=16&&layout.grossTitleWeight>=700);assert.ok(layout.grossHeight<910,'Gross Meter should be compact');assert.ok(layout.noOverflow,'Document must fit the viewport');
+  assert.equal(await page.locator('.today-panel').evaluate(el=>el.scrollTop),0,'Anchoring to Today must not scroll or crop the inside of the card');
   assert.equal(await page.locator('.today-uncertainty-label').innerText(),"Dan's take");
   const knightdaleFixture=fixture(),knightdaleCurrent=currentSample(knightdaleFixture,epoch),knightdalePeak=comfortWindow(knightdaleFixture,epoch+1);
   assert.equal(await page.locator('.sun-shade-comparison figure').count(),3);
