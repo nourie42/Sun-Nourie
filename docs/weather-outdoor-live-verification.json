@@ -1,0 +1,129 @@
+{
+  "checkedAt": "2026-09-11T00:01:51.808Z",
+  "commit": "e61f8c21ae91b69effff9dedcaa88d6fd18ee110",
+  "base": "https://sun-nourie-live.onrender.com",
+  "fixture": false,
+  "success": true,
+  "locations": [
+    {
+      "name": "Knightdale / Raleigh",
+      "width": 390,
+      "observationTime": "2026-09-10T23:15:00+00:00",
+      "assembledAt": "2026-09-11T00:01:14.243Z",
+      "air": 80.6,
+      "condition": "Clear",
+      "apiOutdoor": 84,
+      "apiShade": 84,
+      "rendered": {
+        "hero": "84°",
+        "now": "84°",
+        "outdoors": "84°",
+        "shade": "84°",
+        "metric": "84°",
+        "exposure": "At night",
+        "noOverflow": true
+      },
+      "future": {
+        "time": "2026-09-10T21:00:00-04:00",
+        "api": 78.6,
+        "displayed": "79°",
+        "matched": true
+      },
+      "matched": true
+    },
+    {
+      "name": "White Lake, NC",
+      "width": 390,
+      "observationTime": "2026-09-10T23:35:00+00:00",
+      "assembledAt": "2026-09-11T00:01:50.657Z",
+      "air": 81.86,
+      "condition": "Clear",
+      "apiOutdoor": 84,
+      "apiShade": 84,
+      "rendered": {
+        "hero": "84°",
+        "now": "84°",
+        "outdoors": "84°",
+        "shade": "84°",
+        "metric": "84°",
+        "exposure": "At night",
+        "noOverflow": true
+      },
+      "future": {
+        "time": "2026-09-10T21:00:00-04:00",
+        "api": 82,
+        "displayed": "82°",
+        "matched": true
+      },
+      "matched": true
+    },
+    {
+      "name": "Jacksonville, FL",
+      "width": 390,
+      "observationTime": "2026-09-10T23:24:00+00:00",
+      "assembledAt": "2026-09-11T00:01:56.485Z",
+      "air": 82.94,
+      "condition": "Mostly Cloudy",
+      "apiOutdoor": 82,
+      "apiShade": 82,
+      "rendered": {
+        "hero": "82°",
+        "now": "82°",
+        "outdoors": "82°",
+        "shade": "82°",
+        "metric": "82°",
+        "exposure": "At night",
+        "noOverflow": true
+      },
+      "future": {
+        "time": "2026-09-10T21:00:00-04:00",
+        "api": 82.7,
+        "displayed": "83°",
+        "matched": true
+      },
+      "matched": true
+    },
+    {
+      "name": "Denver, CO",
+      "width": 1365,
+      "observationTime": "2026-09-10T22:58:00+00:00",
+      "assembledAt": "2026-09-11T00:01:58.471Z",
+      "air": 88.88,
+      "condition": "Mostly Clear",
+      "apiOutdoor": 87,
+      "apiShade": 84,
+      "rendered": {
+        "hero": "87°",
+        "now": "87°",
+        "outdoors": "87°",
+        "shade": "84°",
+        "metric": "87°",
+        "exposure": "In sun",
+        "noOverflow": true
+      },
+      "future": {
+        "time": "2026-09-10T19:00:00-06:00",
+        "api": 79.1,
+        "displayed": "79°",
+        "matched": true
+      },
+      "matched": true
+    }
+  ],
+  "exactDeployedAssets": [
+    "index.html",
+    "app.js",
+    "dans-summary.js",
+    "current-inputs.js",
+    "pavement.js",
+    "daily-uv.js",
+    "weather-display.js",
+    "experience.js",
+    "personal-details.js",
+    "hourly-feels.js",
+    "comfort-outlook.js",
+    "outdoor-feels.js",
+    "hourly-feels.css"
+  ],
+  "outdoorFeelsVersion": "weather-nourie-outdoor-v1"
+}
