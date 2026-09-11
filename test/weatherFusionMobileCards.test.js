@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {todayForecastHTML,periodWeatherStats,shortForecastCondition,todaySkyProfile,todaySkySceneHTML} from '../public/weather-fusion/today-card.js';
+import {todayForecastHTML,periodWeatherStats,shortForecastCondition,todaySkyProfile,todaySkySceneHTML,moonPhaseAt,moonPhaseHTML} from '../public/weather-fusion/today-card.js';
 import {hourlyWindHTML,windDirectionLabel} from '../public/weather-fusion/weather-display.js';
 const now=Date.parse('2026-09-11T12:00:00Z'),H=3600000;
 function fixture(){
@@ -25,7 +25,19 @@ test('Today sky adds clouds and precipitation by forecast scenario',()=>{
  assert.equal(todaySkyProfile({condition:'Overcast with Rain',pop:80}).scene,'overcast-rain');
  assert.match(todaySkySceneHTML(todaySkyProfile({condition:'Thunderstorms',pop:75})),/today-sky-storm\.webp/);
  assert.match(todaySkySceneHTML(todaySkyProfile({condition:'Overcast with Rain',pop:80})),/today-sky-rain\.webp/);
- assert.match(todaySkySceneHTML(todaySkyProfile({condition:'Clear',pop:0},true)),/today-sky-night\.webp/);
+ assert.match(todaySkySceneHTML(todaySkyProfile({condition:'Clear',pop:0},true)),/today-sky-night-v2\.webp/);
+});
+test('Tonight moon follows the astronomical phase for the displayed date',()=>{
+ const phases=[
+  ['2026-09-11T03:27:00Z','New moon',0],
+  ['2026-09-18T20:44:00Z','First quarter',.25],
+  ['2026-09-26T16:49:00Z','Full moon',.5],
+  ['2026-10-03T13:25:00Z','Last quarter',.75]
+ ];
+ for(const [date,name,fraction] of phases){const phase=moonPhaseAt(Date.parse(date));assert.equal(phase.name,name);assert.ok(Math.abs(phase.fraction-fraction)<.01,`${name}: ${phase.fraction}`);}
+ assert.match(moonPhaseHTML(Date.parse(phases[2][0])),/Full moon, 100 percent illuminated/);
+ assert.match(todaySkySceneHTML(todaySkyProfile({condition:'Clear'},true),Date.parse(phases[1][0])),/First quarter/);
+ assert.doesNotMatch(todaySkySceneHTML(todaySkyProfile({condition:'Clear'},false),Date.parse(phases[1][0])),/today-moon/);
 });
 test('Tonight keeps the overnight low and never repeats the daytime high',()=>{
  const html=todayForecastHTML(fixture(),Date.parse('2026-09-11T23:00:00Z'));

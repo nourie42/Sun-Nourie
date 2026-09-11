@@ -1,4 +1,4 @@
-import {todayForecastHTML} from './today-card.js?v=dynamic-today-sky-v22';
+import {todayForecastHTML} from './today-card.js?v=moon-phase-v23';
 import {FORECAST_CONFIDENCE_VERSION} from './forecast-confidence.js?v=weather-art-labels-v10';
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
 import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=scenario-weather-v29';

@@ -242,6 +242,8 @@ body[data-sky="night"] .evidence-panel{
 /* Scenic Today card: forecast data selects cloud build, rain and daylight layers. */
 #today-forecast .today-weather-card{position:relative;isolation:isolate;display:grid;grid-template-rows:minmax(220px,1fr) 78px 36px;min-height:390px;overflow:hidden;border:1px solid #57c8f178!important;border-radius:25px!important;background:#07527f!important;box-shadow:inset 0 1px 1px #c9f2ff30;text-shadow:0 2px 12px #00243c80}
 #today-forecast .today-sky{position:absolute;z-index:0;inset:0 0 114px;width:100%;height:calc(100% - 114px);display:block;object-fit:cover;object-position:center center}
+#today-forecast .today-moon{position:absolute;z-index:1;top:18px;left:60%;width:clamp(58px,7vw,78px);aspect-ratio:1;filter:drop-shadow(0 0 10px #d9efff80);pointer-events:none}
+#today-forecast .today-moon svg{display:block;width:100%;height:100%}
 #today-forecast .today-cloud{fill:#f3fbff;filter:drop-shadow(0 8px 10px #164e7540)}
 #today-forecast .today-cloud-dark{fill:#819bad}
 #today-forecast .today-rain path{stroke:#b9eaff;stroke-width:7;stroke-linecap:round;opacity:.8}
@@ -276,6 +278,7 @@ body[data-sky="night"] .evidence-panel{
  .hero .today-panel{padding:8px!important}
  #today-forecast .today-weather-card{grid-template-rows:165px 52px 24px;min-height:241px;border-radius:18px!important}
  #today-forecast .today-sky{inset:0 0 76px;height:calc(100% - 76px)}
+ #today-forecast .today-moon{top:8px;left:50%;width:38px;filter:drop-shadow(0 0 7px #d9efff80)}
  #today-forecast .today-scene-shade{inset:0 0 76px}
  #today-forecast .today-copy{width:57%;padding:12px 0 7px 14px}
  #today-forecast .day-name{font-size:39px}
