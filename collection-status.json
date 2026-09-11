@@ -1,17 +1,17 @@
 {
-  "checkedAt": "2026-09-11T00:32:04Z",
+  "checkedAt": "2026-09-11T00:32:06Z",
   "results": [
     {
       "model": "ecmwf",
       "runAt": "2026-09-10T12:00:00Z",
       "reused": true,
-      "checkedAt": "2026-09-10T22:34:31Z"
+      "checkedAt": "2026-09-11T00:32:06Z"
     },
     {
       "model": "nbm",
       "runAt": "2026-09-10T18:00:00Z",
       "reused": true,
-      "checkedAt": "2026-09-10T22:34:31Z"
+      "checkedAt": "2026-09-11T00:32:06Z"
     },
     {
       "model": "hrrr",
