@@ -262,6 +262,8 @@ body[data-sky="night"] .evidence-panel{
 #today-forecast .today-symbol>svg{grid-column:2;grid-row:1/3;width:70px;height:70px}
 #today-forecast .today-symbol>strong{grid-column:1;grid-row:1;align-self:end;color:#80e7ff;font-size:42px;line-height:1;font-weight:850}
 #today-forecast .today-symbol>small{grid-column:1;grid-row:2;align-self:start;max-width:none;font-size:14px;line-height:1.25;color:#e2f7ff}
+#today-forecast .today-night .today-symbol{grid-template-columns:auto 56px;column-gap:0}
+#today-forecast .today-night .today-symbol>svg{width:56px;height:56px;justify-self:end}
 #today-forecast .today-metrics{position:relative;z-index:2;grid-row:2;display:grid;grid-template-columns:repeat(2,1fr);margin:0 14px;padding:8px 0;border:1px solid #66cdf376;border-radius:20px;background:linear-gradient(90deg,#075286ef,#075b94ef)}
 #today-forecast .today-metric{flex-direction:row;gap:11px;padding:0 10px}
 #today-forecast .today-metric svg{width:34px;height:34px}
@@ -288,6 +290,8 @@ body[data-sky="night"] .evidence-panel{
  #today-forecast .today-symbol>svg{width:38px;height:38px}
  #today-forecast .today-symbol>strong{font-size:28px;color:#8beaff;font-weight:900;-webkit-text-stroke:.25px #d9f8ff}
  #today-forecast .today-symbol>small{font-size:9px;max-width:72px;color:#fff;font-weight:850;text-shadow:0 2px 5px #002d50,0 0 2px #002d50}
+ #today-forecast .today-night .today-symbol{grid-template-columns:64px 32px;column-gap:0}
+ #today-forecast .today-night .today-symbol>svg{width:32px;height:32px}
  #today-forecast .today-metrics{margin:0 6px;padding:3px 0;border-radius:13px}
  #today-forecast .today-metric{flex-direction:row;gap:5px;padding:0 4px}
  #today-forecast .today-metric svg{width:21px;height:21px}
