@@ -14,8 +14,8 @@ app.get('/comfort-visual-contract',(_req,res)=>res.type('html').send(`<!doctype 
 </head><body><div class="shell"><div class="exposure-cards"><div class="skin-exposure" id="skin-exposure"><h2 class="skin-kicker">How it actually feels right now</h2><div id="skin-values"></div></div></div></div>
 <script type="module">
 const [{sunShadeHTML},{pavementHTML}]=await Promise.all([
- import('/weather-fusion/personal-details.js?v=reference-comfort-v16'),
- import('/weather-fusion/pavement.js?v=reference-comfort-v16')
+ import('/weather-fusion/personal-details.js?v=reference-comfort-v17'),
+ import('/weather-fusion/pavement.js?v=reference-comfort-v17')
 ]);
 const pavement={status:'estimated',daylight:true,concrete:{value:94,low:85,high:105},asphalt:{value:97,low:90,high:110}};
 const comfort={daylight:true,weatherKind:'clear',radiantCondition:'Sunny',condition:'Sunny',shade:86,outdoors:88,sun:88,inputEvidence:{temperature:87,skyCover:0}};
@@ -30,7 +30,7 @@ await fs.mkdir(out,{recursive:true});
 const browser=await chromium.launch({headless:true});
 const results=[];
 try{
- for(const width of [390,1024]){
+ for(const width of [320,390,430,1024]){
   const page=await browser.newPage({viewport:{width,height:1200},deviceScaleFactor:1});
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto(base+'/comfort-visual-contract',{waitUntil:'networkidle'});
@@ -45,7 +45,8 @@ try{
    const figures=[...document.querySelectorAll('.exposure-person')].map(el=>({box:el.getBoundingClientRect(),label:el.querySelector('.exposure-label')?.textContent.trim(),subtitle:el.querySelector('.exposure-subtitle')?.textContent.trim(),caption:el.querySelector('figcaption')?.getBoundingClientRect()}));
    const temps=[...document.querySelectorAll('.exposure-person figcaption strong')].map(x=>x.textContent.trim());
    const asphalt=document.querySelector('.pavement-secondary')?.textContent.trim();
-   return {artwork,directSun,petSun,shadeSvg,sunSvg,petSvg,figures,temps,asphalt,overflow:document.documentElement.scrollWidth>innerWidth+1};
+   const comparison=document.querySelector('.sun-shade-comparison');
+   return {artwork,directSun,petSun,shadeSvg,sunSvg,petSvg,figures,temps,asphalt,comparison:box('.sun-shade-comparison'),comparisonOverflow:comparison.scrollWidth>comparison.clientWidth+1,overflow:document.documentElement.scrollWidth>innerWidth+1};
   });
   assert.deepEqual(m.temps,['86°','88°','94°']);
   assert.equal(m.asphalt,'Asphalt 97°');
@@ -55,7 +56,7 @@ try{
   assert.equal(m.figures[2].subtitle,'Hot on pavement');
   assert.equal(m.artwork.length,3,'Each reference card must display its illustration');
   for(const [i,art] of m.artwork.entries()){
-   assert.ok(art.box.height>=m.figures[i].box.height*.55,'People must occupy the large middle band');
+   assert.ok(art.box.height>=art.box.width*.95,'People must retain a complete, prominent illustration band');
    assert.equal(art.fit,'xMidYMid slice','Artwork must preserve its natural proportions');
    assert.equal(art.source,'/weather-fusion/comfort-reference-scenes.png');
   }
@@ -66,11 +67,16 @@ try{
   assert.ok(Math.max(...heights)-Math.min(...heights)<=1,`Card heights differ at ${width}px: ${heights.join(', ')}`);
   assert.ok(Math.max(...bottoms)-Math.min(...bottoms)<=1,`Card bottoms differ at ${width}px: ${bottoms.join(', ')}`);
   assert.ok(Math.max(...captionTops)-Math.min(...captionTops)<=1,`Temperature bands do not start evenly at ${width}px: ${captionTops.join(', ')}`);
-  for(const fig of m.figures){const ratio=fig.box.width/fig.box.height;assert.ok(ratio>=.56&&ratio<=.70,`Card ratio ${ratio.toFixed(2)} is outside the reference-like portrait range at ${width}px`);}
+  for(const fig of m.figures){
+   assert.ok(fig.box.left>=m.comparison.left-1&&fig.box.right<=m.comparison.right+1,`Every card must be visible without scrolling at ${width}px`);
+   if(width<=540)assert.ok(fig.box.height<280,`Phone cards must stay compact at ${width}px`);
+   else {const ratio=fig.box.width/fig.box.height;assert.ok(ratio>=.56&&ratio<=.70,`Card ratio ${ratio.toFixed(2)} is outside the reference-like portrait range at ${width}px`);}
+  }
+  assert.equal(m.comparisonOverflow,false,`Comparison must not scroll sideways at ${width}px`);
   assert.equal(m.overflow,false);
 
   const night=await page.evaluate(async()=>{
-   const [{sunShadeHTML},{pavementHTML}]=await Promise.all([import('/weather-fusion/personal-details.js?v=reference-comfort-v16'),import('/weather-fusion/pavement.js?v=reference-comfort-v16')]);
+   const [{sunShadeHTML},{pavementHTML}]=await Promise.all([import('/weather-fusion/personal-details.js?v=reference-comfort-v17'),import('/weather-fusion/pavement.js?v=reference-comfort-v17')]);
    const node=document.createElement('div');
    node.innerHTML=sunShadeHTML({daylight:false,weatherKind:'clear',radiantCondition:'Clear',condition:'Clear',shade:72,outdoors:72,sun:null,inputEvidence:{temperature:73,skyCover:0}},{latitude:35.787,longitude:-78.4806},Date.now(),{compact:true,pavement:pavementHTML({status:'estimated',daylight:false,concrete:{value:76},asphalt:{value:78}},72)});
    return {petMoon:!!node.querySelector('.pavement-person .pet-moon'),petSun:!!node.querySelector('.pavement-person .sky-sun'),humanSun:!!node.querySelector('.sun-person .sky-sun'),petDaylight:node.querySelector('.pavement-person')?.dataset.daylight};
@@ -81,7 +87,7 @@ try{
   assert.equal(night.petDaylight,'false');
 
   const hot=await page.evaluate(async()=>{
-   const [{sunShadeHTML},{pavementHTML}]=await Promise.all([import('/weather-fusion/personal-details.js?v=reference-comfort-v16'),import('/weather-fusion/pavement.js?v=reference-comfort-v16')]);
+   const [{sunShadeHTML},{pavementHTML}]=await Promise.all([import('/weather-fusion/personal-details.js?v=reference-comfort-v17'),import('/weather-fusion/pavement.js?v=reference-comfort-v17')]);
    const node=document.createElement('div');
    node.innerHTML=sunShadeHTML({daylight:true,weatherKind:'clear',radiantCondition:'Sunny',condition:'Sunny',shade:90,outdoors:96,sun:96,inputEvidence:{temperature:91,skyCover:0}},{latitude:35.787,longitude:-78.4806},Date.now(),{compact:true,pavement:pavementHTML({status:'estimated',daylight:true,concrete:{value:112,low:100,high:125},asphalt:{value:118,low:105,high:130}},96)});
    return [...node.querySelectorAll('.sun-person .thermal-risk,.pavement-person .pavement-warning')].map(x=>x.textContent.trim());
