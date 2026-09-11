@@ -89,7 +89,23 @@
 
 #skin-values .sun-shade-comparison .exposure-person[data-reading="unavailable"]>figcaption>strong{font-size:clamp(20px,2.6vw,28px);line-height:1.3;letter-spacing:0;overflow-wrap:normal}
 
+/* Keep warning pills in their own blue header row, immediately above the scene. */
+#skin-values .sun-shade-comparison .exposure-person,
+#skin-values .sun-shade-comparison .exposure-person:has(.reference-scene){grid-template-rows:9% 9% 7% 55% 20%}
+#skin-values .sun-shade-comparison .exposure-person>.exposure-alert-slot{position:static;grid-row:3;z-index:9;align-self:center;left:auto;right:auto;top:auto;padding:0 4px}
+#skin-values .sun-shade-comparison .exposure-person>svg,
+#skin-values .sun-shade-comparison .pavement-person>.poodle-scene{grid-row:4}
+#skin-values .sun-shade-comparison .exposure-person>figcaption{grid-row:5}
+
 @media(max-width:540px){#skin-values .sun-shade-comparison .exposure-person[data-reading="unavailable"]>figcaption>strong{font-size:clamp(10px,2.9vw,15px)}}
+@media(max-width:540px){
+ #skin-values .sun-shade-comparison .exposure-person,
+ #skin-values .sun-shade-comparison .exposure-person:has(.reference-scene){grid-template-rows:28px 40px 22px auto 72px}
+ #skin-values .sun-shade-comparison .exposure-person>.exposure-alert-slot{top:auto;left:auto;right:auto;padding:0 2px}
+ #skin-values .sun-shade-comparison .exposure-person>svg,
+ #skin-values .sun-shade-comparison .pavement-person>.poodle-scene{grid-row:4}
+ #skin-values .sun-shade-comparison .exposure-person>figcaption{grid-row:5}
+}
 /* Night scenes stay dark while faces and clothing remain readable. */
 body[data-sky="night"] #skin-values .reference-scene .reference-art{filter:brightness(1.18) saturate(1.02)}
 body[data-sky="night"] #skin-values .reference-scene .reference-weather-tint{opacity:.12}

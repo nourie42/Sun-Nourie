@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {todayForecastHTML,periodWeatherStats,shortForecastCondition} from '../public/weather-fusion/today-card.js';
+import {todayForecastHTML,periodWeatherStats,shortForecastCondition,todaySkyProfile,todaySkySceneHTML} from '../public/weather-fusion/today-card.js';
 import {hourlyWindHTML,windDirectionLabel} from '../public/weather-fusion/weather-display.js';
 const now=Date.parse('2026-09-11T12:00:00Z'),H=3600000;
 function fixture(){
@@ -11,8 +11,21 @@ test('Today metrics use their forecast period and never substitute current condi
  const f=fixture();f.current={wind:99,humidity:99};
  assert.deepEqual(periodWeatherStats(f,now),{wind:6,humidity:68});
  const html=todayForecastHTML(f,now);
- for(const value of ['Today','95°','74°','103°','23%','6 mph','68%','Forecast confidence','UV Index'])assert.ok(html.includes(value),value);
+ for(const value of ['Today','95°','74°','103°','23%','6 mph','UV Index','Click for more details'])assert.ok(html.includes(value),value);
+ assert.doesNotMatch(html,/>Humidity<|>Precipitation</);
  assert.match(html,/data-today-forecast/);assert.doesNotMatch(html,/99 mph|99%|Sunrise|Sunset/);
+});
+test('Today sky adds clouds and precipitation by forecast scenario',()=>{
+ assert.equal(todaySkyProfile({condition:'Mostly Sunny',pop:10}).scene,'clear');
+ assert.equal(todaySkyProfile({condition:'Mostly Sunny',pop:22}).scene,'few-clouds');
+ assert.equal(todaySkyProfile({condition:'Mostly Cloudy',pop:48}).scene,'cloudy');
+ assert.equal(todaySkyProfile({condition:'Slight Chance Thunderstorms',pop:22,detail:'Atmospheric lift may support a storm.'}).scene,'few-clouds');
+ assert.equal(todaySkyProfile({condition:'Chance Thunderstorms',pop:40,detail:'Atmospheric lift may support a storm.'}).scene,'building');
+ assert.equal(todaySkyProfile({condition:'Thunderstorms',pop:75}).scene,'storm');
+ assert.equal(todaySkyProfile({condition:'Overcast with Rain',pop:80}).scene,'overcast-rain');
+ assert.match(todaySkySceneHTML(todaySkyProfile({condition:'Thunderstorms',pop:75})),/today-sky-storm\.webp/);
+ assert.match(todaySkySceneHTML(todaySkyProfile({condition:'Overcast with Rain',pop:80})),/today-sky-rain\.webp/);
+ assert.match(todaySkySceneHTML(todaySkyProfile({condition:'Clear',pop:0},true)),/today-sky-night\.webp/);
 });
 test('Tonight keeps the overnight low and never repeats the daytime high',()=>{
  const html=todayForecastHTML(fixture(),Date.parse('2026-09-11T23:00:00Z'));

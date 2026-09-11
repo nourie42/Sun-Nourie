@@ -238,3 +238,61 @@ body[data-sky="night"] .evidence-panel{
  .map-panel,
  .evidence-panel{border-radius:20px}
 }
+
+/* Scenic Today card: forecast data selects cloud build, rain and daylight layers. */
+#today-forecast .today-weather-card{position:relative;isolation:isolate;display:grid;grid-template-rows:minmax(220px,1fr) 78px 36px;min-height:390px;overflow:hidden;border:1px solid #57c8f178!important;border-radius:25px!important;background:#07527f!important;box-shadow:inset 0 1px 1px #c9f2ff30;text-shadow:0 2px 12px #00243c80}
+#today-forecast .today-sky{position:absolute;z-index:0;inset:0 0 114px;width:100%;height:calc(100% - 114px);display:block;object-fit:cover;object-position:center center}
+#today-forecast .today-cloud{fill:#f3fbff;filter:drop-shadow(0 8px 10px #164e7540)}
+#today-forecast .today-cloud-dark{fill:#819bad}
+#today-forecast .today-rain path{stroke:#b9eaff;stroke-width:7;stroke-linecap:round;opacity:.8}
+#today-forecast .today-lightning{fill:#ffe559;filter:drop-shadow(0 0 6px #fff1a6)}
+#today-forecast .today-scene-shade{position:absolute;z-index:1;inset:0 0 114px;background:linear-gradient(90deg,rgba(1,43,79,.78) 0,rgba(1,54,94,.45) 34%,transparent 65%),linear-gradient(0deg,rgba(0,40,64,.22),transparent 45%)}
+#today-forecast .today-copy{position:relative;z-index:2;grid-row:1;align-self:stretch;display:flex;flex-direction:column;width:48%;padding:24px 0 16px 25px;box-sizing:border-box}
+#today-forecast .day-name{font-size:clamp(44px,7vw,74px);line-height:.92}
+#today-forecast .today-condition{max-width:17ch;margin-top:14px;color:#c5efff;font-size:clamp(18px,2.3vw,28px);font-weight:700;line-height:1.16}
+#today-forecast .today-temperatures{display:flex;align-items:center;gap:12px;margin-top:auto;text-align:left}
+#today-forecast .today-low,#today-forecast .today-high{display:flex;flex-direction:column;align-items:center}
+#today-forecast .today-low>strong,#today-forecast .today-high>strong{font-size:clamp(45px,6.5vw,72px);line-height:.9;color:#fff}
+#today-forecast .today-low>strong{color:#79e2ff}
+#today-forecast .today-low>small,#today-forecast .today-high>small{margin-top:8px;color:#c5ebfc;font-size:15px;font-weight:700}
+#today-forecast .today-temperatures>i{color:#bceeff;font-size:32px;font-style:normal;font-weight:300}
+#today-forecast .today-feels{margin:14px 0 0;font-size:18px;color:#d7f3ff;font-weight:650}
+#today-forecast .today-feels b{display:inline;font-size:32px;color:#fff;margin-left:6px}
+#today-forecast .today-symbol{position:absolute;z-index:2;top:24px;right:26px;display:grid;grid-template-columns:72px auto;grid-template-rows:auto auto;gap:0 8px;color:#c6f0ff;text-align:left;text-shadow:0 2px 12px #00335599}
+#today-forecast .today-symbol>svg{grid-row:1/3;width:70px;height:70px}
+#today-forecast .today-symbol>strong{align-self:end;color:#80e7ff;font-size:42px;line-height:1;font-weight:850}
+#today-forecast .today-symbol>small{align-self:start;max-width:none;font-size:14px;line-height:1.25;color:#e2f7ff}
+#today-forecast .today-metrics{position:relative;z-index:2;grid-row:2;display:grid;grid-template-columns:repeat(2,1fr);margin:0 14px;padding:8px 0;border:1px solid #66cdf376;border-radius:20px;background:linear-gradient(90deg,#075286ef,#075b94ef)}
+#today-forecast .today-metric{flex-direction:row;gap:11px;padding:0 10px}
+#today-forecast .today-metric svg{width:34px;height:34px}
+#today-forecast .today-metric strong{font-size:24px}
+#today-forecast .today-metric small{font-size:14px}
+#today-forecast .today-more{position:relative;z-index:2;grid-row:3;display:flex;align-items:center;justify-content:center;margin:6px 14px 0;border:1px solid #56c5ef62;border-radius:999px;color:#cceeff;background:#086096aa;font-size:15px;font-weight:650;text-shadow:none}
+#today-forecast .today-more b{font-size:25px;line-height:1;margin-left:10px}
+
+@media(max-width:540px){
+ .hero .today-panel{padding:8px!important}
+ #today-forecast .today-weather-card{grid-template-rows:165px 52px 24px;min-height:241px;border-radius:18px!important}
+ #today-forecast .today-sky{inset:0 0 76px;height:calc(100% - 76px)}
+ #today-forecast .today-scene-shade{inset:0 0 76px}
+ #today-forecast .today-copy{width:57%;padding:12px 0 7px 14px}
+ #today-forecast .day-name{font-size:39px}
+ #today-forecast .today-condition{margin-top:5px;font-size:14px;line-height:1.12;max-width:18ch}
+ #today-forecast .today-temperatures{gap:6px}
+ #today-forecast .today-low>strong,#today-forecast .today-high>strong{font-size:36px}
+ #today-forecast .today-low>small,#today-forecast .today-high>small{font-size:9px;margin-top:2px}
+ #today-forecast .today-temperatures>i{font-size:20px}
+ #today-forecast .today-feels{font-size:12px;margin-top:5px}
+ #today-forecast .today-feels b{font-size:21px;margin-left:3px}
+ #today-forecast .today-symbol{top:12px;right:10px;grid-template-columns:38px 72px;column-gap:4px;padding:0;border:0;border-radius:0;background:none;box-shadow:none;filter:drop-shadow(0 2px 5px #002d50)}
+ #today-forecast .today-symbol>svg{width:38px;height:38px}
+ #today-forecast .today-symbol>strong{font-size:28px;color:#8beaff;font-weight:900;-webkit-text-stroke:.25px #d9f8ff}
+ #today-forecast .today-symbol>small{font-size:9px;max-width:72px;color:#fff;font-weight:850;text-shadow:0 2px 5px #002d50,0 0 2px #002d50}
+ #today-forecast .today-metrics{margin:0 6px;padding:3px 0;border-radius:13px}
+ #today-forecast .today-metric{flex-direction:row;gap:5px;padding:0 4px}
+ #today-forecast .today-metric svg{width:21px;height:21px}
+ #today-forecast .today-metric strong{font-size:14px;white-space:nowrap}
+ #today-forecast .today-metric small{font-size:9px;margin-top:0}
+ #today-forecast .today-more{margin:3px 6px 0;font-size:10px}
+ #today-forecast .today-more b{font-size:16px;margin-left:5px}
+}
