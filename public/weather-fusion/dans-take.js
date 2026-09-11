@@ -3,12 +3,12 @@
  * Ambiguous timing is omitted, not guessed. Dates are anchored to source issuance,
  * including a retained section's own "As of" time, never to the time of retrieval.
  */
-export const DAN_TAKE_VERSION = 'weather-nourie-dans-take-kid-clear-v9';
+export const DAN_TAKE_VERSION = 'weather-nourie-dans-take-kid-clear-v10';
 export const plainDanWording=text=>String(text||'').replace(/than (?:some |the )?(?:model )?runs (?:indicate|suggest|show)/gi,'than expected').replace(/\ba dry layer\b/gi,'dry air').replace(/\ba layer of dry air\b/gi,'dry air');
 // Dan's Take is an outcome-first explanation for a ten-year-old, not a lightly
 // edited forecast discussion. Keep this list broad so scientific mechanisms can
 // never leak into the public card when the AI merely copies the source.
-export const hasDanJargon=text=>/\b(?:convergence|divergence|troughs?|troughing|ridges?|ridging|subsidence|mid[ -]levels?|upper[ -]levels?|aloft|instability|shear|vorticity|shortwaves?|isentropic|baroclinic|cyclogenesis|anticyclones?|dewpoint|PWAT|HRRR|ECMWF|NBM|CAPE|QPF|synoptic|advection|deterministic|convection|guidance|ensembles?|runs|forcing(?: for ascent)?|airmass)\b|\bsinking air\b/i.test(text);
+export const hasDanJargon=text=>/\b(?:convergence|divergence|troughs?|troughing|ridges?|ridging|subsidence|mid[ -]levels?|upper[ -]levels?|aloft|instability|shear|vorticity|shortwaves?|isentropic|baroclinic|cyclogenesis|anticyclones?|dewpoint|PWAT|HRRR|ECMWF|NBM|CAPE|QPF|synoptic|advection|deterministic|convection|guidance|ensembles?|runs|forcing(?: for ascent)?|airmass)\b|\bsinking air\b|\b(?:inland|coastal)\s+(?:feature|plain)\b|\bweather (?:feature|setup|pattern)\b/i.test(text);
 const H = 3600000, DAY = 24 * H, MAX_SOURCE_AGE = 12 * H;
 const norm = v => String(v || '').replace(/\s+/g, ' ').trim();
 const finite = Number.isFinite;

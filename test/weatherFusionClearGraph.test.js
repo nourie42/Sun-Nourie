@@ -48,3 +48,6 @@ test('Dan never shows convergence or trough wording from the forecast discussion
  assert.equal(approved.forecastChanges.length,1);assert.equal(approved.forecastChanges[0].summary,simple);
  assert.doesNotMatch(approved.forecastChanges[0].summary,/convergence|trough/i);
 });
+test('Dan rejects vague replacements for weather jargon',()=>{
+ for(const wording of ['The inland feature may be weaker.','The weather setup may change.','Storms may be less widespread across the coastal plain.'])assert.ok(hasDanJargon(wording));
+});
