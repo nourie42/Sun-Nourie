@@ -11,3 +11,9 @@ test('shade has no banner even at extreme UTCI; outdoor warning remains',()=>{
  assert.doesNotMatch(shade,/thermal-risk|Heat stress/);
  assert.match(html,/Mostly cloudy/);assert.match(html,/Extreme heat/);
 });
+test('compact outdoor card is always titled Night after dark',()=>{
+ const html=sunShadeHTML({shade:83,outdoors:83,daylight:false,weatherKind:'storm',radiantCondition:'Chance Showers And Thunderstorms',inputEvidence:{temperature:83}},{latitude:35,longitude:-78},Date.parse('2026-09-12T00:00:00Z'),{compact:true,pop:20});
+ const outdoor=html.slice(html.indexOf('sun-person'),html.indexOf('</figure>',html.indexOf('sun-person')));
+ assert.match(outdoor,/<span class="exposure-label">Night<\/span>/);
+ assert.doesNotMatch(outdoor,/Storms possible/);
+});
