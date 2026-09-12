@@ -1,7 +1,7 @@
 import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText,rebindDanTake} from './dans-take.js?v=weather-art-labels-v10';
 import {danCard} from './dans-summary.js?v=dans-take-alerts-v11';
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
-import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './weather-display.js?v=rain-now-v42';
+import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './weather-display.js?v=weighted-rain-v43';
 import {dayGraphHTML,dayGraphPoints,installDayGraph} from './day-graph.js?v=weather-art-labels-v10';
 import {degrees,feelsAt} from './hourly-feels.js?v=weather-art-labels-v10';
 import {createFramePlayer} from './frame-player.js';
@@ -14,7 +14,7 @@ import {renderDewpointMeter} from './dewpoint-meter.js?v=car-wash-order-v31';
 import {renderWeatherPanel} from './render-safety.js';
 import {forecastPeriodSummary} from './forecast-story.js?v=forecast-trace-v40';
 import {isExperimentalWeatherPage,renderCarWashForecast,resetCarWashForecast} from './car-wash.js?v=rain-consensus-v41';
-import {renderModelExplanation,resetModelExplanation} from './model-explanation.js?v=rain-consensus-v41';
+import {renderModelExplanation,resetModelExplanation} from './model-explanation.js?v=weighted-rain-v43';
 import {updateRainTrend} from './rain-trend.js?v=rain-consensus-v41';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);

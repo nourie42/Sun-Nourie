@@ -66,6 +66,7 @@ function sourceRows(likelihood) {
     const used = sources.find(source => source.id === id && finite(source.value) && finite(source.weight) && source.weight > 0);
     const value = finite(likelihood?.sourceValues?.[id]) ? likelihood.sourceValues[id] : used?.value;
     return {id,value:finite(value)?value:null,amount:finite(likelihood?.sourceAmounts?.[id])?likelihood.sourceAmounts[id]:null,
+      support:finite(likelihood?.qpfSupport?.[id])?likelihood.qpfSupport[id]:null,
       weight:used?.weight ?? null,points:used ? used.value*used.weight : null,runAt:used?.runAt || null};
   });
 }
@@ -75,7 +76,7 @@ function sourceTable(likelihood, caption = 'Inputs for the highest hour') {
     const input = source.id === 'nws'
       ? source.value === null ? 'Unavailable' : `${number(source.value)}% probability`
       : source.amount === null ? 'Unavailable' : `${number(source.amount,8)} in`;
-    const signal = source.id === 'nws' ? '' : source.value === null ? '' : `<small>QPF evidence: ${number(source.value)}/100</small>`;
+    const signal = source.id === 'nws' ? '' : source.value === null ? '' : `<small>QPF support: ${number(source.support)}/100 · NWS-anchored input: ${percent(source.value)}</small>`;
     return `<tr><th scope="row">${names[source.id]}</th><td>${input}${signal}</td><td>${source.weight === null?'Not used':`${number(source.weight*100,4)}%`}</td><td>${source.points === null?'—':number(source.points,6)}</td></tr>`;
   }).join('');
   return `<table class="model-inputs"><caption>${esc(caption)}</caption><thead><tr><th scope="col">Source</th><th scope="col">Rain input</th><th scope="col">Weight</th><th scope="col">Points</th></tr></thead><tbody>${rows}</tbody></table>`;
@@ -128,7 +129,7 @@ export function modelExplanationHTML(forecast, options = {}) {
     ${!view.complete?`<p class="model-data-warning">Incomplete coverage: ${number(period.coverage?.availableHours)} of ${number(period.coverage?.expectedHours)} hours. The period estimate stays unavailable.${view.maximum===null?'':` Highest available hour: ${percent(view.maximum)}.`}</p>`:''}
     ${view.peakTime?`<h3>Highest hour: ${esc(stamp(view.peakTime,zone))}–${esc(stamp(view.peakEnd,zone,false))}</h3>`:''}
     ${sourceTable(peak)}${arithmetic(peak)}
-    <details class="model-method" data-model-detail="method"><summary>How the inputs are used</summary><p>NWS supplies an official rain probability. HRRR and ECMWF supply rain amounts, not their own probabilities.${threshold===null?'':` An hourly amount below ${threshold} in is treated as trace-only and gets 0 evidence points.`}${fullScale===null?'':` Amounts from ${threshold} to ${fullScale} in scale from 10 to 100 evidence points; larger amounts stay at 100.`}</p><p>The listed weights are the weights actually used for this hour. Missing sources are excluded, not counted as dry, and the remaining weights are rescaled. This is an uncalibrated blend, not a proven model-accuracy ranking.</p><p>A weak blend below 25% is displayed as 0% unless at least two available sources support rain. This prevents one trace or low-probability input from putting rain on an otherwise dry hour.</p></details>
+    <details class="model-method" data-model-detail="method"><summary>How the inputs are used</summary><p>NWS supplies the official rain probability and sets the ceiling. HRRR and ECMWF supply rain amounts, not probabilities.${threshold===null?'':` An hourly amount below ${threshold} in supplies 0 support.`}${fullScale===null?'':` Amounts from ${threshold} to ${fullScale} in scale from partial to full support; larger amounts stay at full support.`} A model at full support uses the NWS percentage as its probability input—never 100%—so deterministic guidance cannot raise the weighted result above NWS.</p><p>The listed weights are the weights actually used for this hour. Missing sources are excluded, not counted as dry, and the remaining weights are rescaled. This is an uncalibrated blend, not a proven model-accuracy ranking.</p><p>A weak blend below 25% is displayed as 0% unless at least two available sources support rain. This prevents one trace or low-probability input from putting rain on an otherwise dry hour.</p></details>
     <details class="model-hourly-list" data-model-detail="hours"><summary>All ${rows.length} forecast hours in this period</summary>${audit||'<p>No hourly calculation data was supplied.</p>'}</details>
     ${temperatures?`<details class="model-temperature-list" data-model-detail="temperatures"><summary>Temperature calculations</summary>${temperatures}</details>`:''}
     <details class="model-source-list" data-model-detail="sources"><summary>Source runs and availability</summary>${sourceStatus(forecast,view)}</details>`;

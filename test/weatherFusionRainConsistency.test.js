@@ -139,10 +139,11 @@ test('source evidence preserves exact amounts, trace threshold and normalized ar
   assert.equal(score.traceThresholdInches,.01);
   assert.equal(score.signalFullScaleInches,.1);
   assert.equal(score.sourceValues.hrrr,null);
-  assert.equal(score.sourceValues.ecmwf,16);
+  assert.equal(score.qpfSupport.ecmwf,16);
+  assert.equal(score.sourceValues.ecmwf,6.24);
   assert.equal(score.sourceAmounts.ecmwf,.016);
-  assert.equal(score.weightedValue,31.33333333);
-  assert.equal(score.value,31);
+  assert.equal(score.weightedValue,28.08);
+  assert.equal(score.value,28);
   assert.deepEqual(score.sources.map(row=>[row.id,row.weight]),[['nws',.666667],['ecmwf',.333333]]);
   assert.equal(precipitationLikelihood(39,{sourceValues:{ecmwf:.0049}}).sourceValues.ecmwf,0);
   const data=buildForecast(inputs({amount:.001})),row=data.rainTimeline[0];
@@ -154,6 +155,7 @@ test('source evidence preserves exact amounts, trace threshold and normalized ar
   const below=buildForecast(inputs({chance:0,amount:.00499})).rainTimeline[0];
   assert.equal(below.rainLikelihood.sourceAmounts.hrrr,.00499);
   assert.equal(below.rainLikelihood.sourceValues.hrrr,0,'source evidence is not rounded up across the wet threshold');
+  assert.equal(below.rainLikelihood.qpfSupport.hrrr,0);
   assert.equal(below.rainLikelihood.value,0);
 });
 
@@ -201,8 +203,8 @@ test('corroborated new model rain changes both the hourly and period result with
   wet.models.hrrr.precipitationIntervals.find(row=>row.start*1000===now).value=.02;
   const first=buildForecast(dry),updated=buildForecast(wet);
   assert.equal(first.hours[0].rainLikelihood.value,0);
-  assert.equal(updated.hours[0].rainLikelihood.value,20);
-  assert.equal(updated.days[0].popDayLikelihood.value,20);
+  assert.equal(updated.hours[0].rainLikelihood.value,14);
+  assert.equal(updated.days[0].popDayLikelihood.value,14);
   assert.equal(updated.days[0].popDayLikelihood.peak.sources.find(source=>source.id==='hrrr').runAt,iso(now));
   assert.notEqual(first.signature,updated.signature);
 });

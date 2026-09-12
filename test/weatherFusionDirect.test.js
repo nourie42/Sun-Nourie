@@ -36,13 +36,17 @@ test('missing blend inputs are excluded rather than filled with zero',()=>{
  assert.equal(weighted({hrrr:null,ecmwf:1},{hrrr:.6,ecmwf:.4}).value,1);
  assert.equal(weighted({hrrr:null,ecmwf:null},{hrrr:.6,ecmwf:.4}).value,null);
 });
-test('hourly rain likelihood combines NWS probability with graduated HRRR and ECMWF QPF evidence',()=>{
+test('hourly rain likelihood is an NWS-anchored weighted average of deterministic QPF support',()=>{
  const dry=precipitationLikelihood(10,{sourceValues:{nws:0,hrrr:0,ecmwf:0}});
  assert.equal(dry.rawValue,4);assert.equal(dry.value,0);
  assert.deepEqual(dry.sourceValues,{nws:10,hrrr:0,ecmwf:0});
  const mixed=precipitationLikelihood(50,{sourceValues:{hrrr:0,ecmwf:.035}});
- assert.equal(mixed.value,27);
+ assert.equal(mixed.value,24);
  assert.equal(mixed.calibrated,false);
+ const reported=precipitationLikelihood(31,{sourceValues:{hrrr:0,ecmwf:.138}});
+ assert.equal(reported.weightedValue,18.6);assert.equal(reported.value,19);
+ assert.deepEqual(reported.sourceValues,{nws:31,hrrr:0,ecmwf:31});
+ assert.deepEqual(reported.qpfSupport,{hrrr:0,ecmwf:100});
  const missing=precipitationLikelihood(10,{sourceValues:{hrrr:null,ecmwf:null}});
  assert.equal(missing.value,10);
  const lowOfficialAndDryEcmwf=precipitationLikelihood(5,{sourceValues:{nws:null,hrrr:null,ecmwf:0}});

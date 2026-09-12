@@ -9,7 +9,7 @@ const at = offset => new Date(now+offset*HOUR).toISOString();
 
 function likelihood(value, options = {}) {
   return {value,rawValue:value,weightedValue:value,
-    sourceValues:{nws:value/.4,hrrr:0,ecmwf:0},sourceAmounts:{nws:.01,hrrr:0,ecmwf:.004},drySources:['hrrr','ecmwf'],wetSources:['nws'],traceThresholdInches:.01,signalFullScaleInches:.1,uncorroboratedDisplayLimit:25,
+    sourceValues:{nws:value/.4,hrrr:0,ecmwf:0},sourceAmounts:{nws:.01,hrrr:0,ecmwf:.004},qpfSupport:{hrrr:0,ecmwf:0},drySources:['hrrr','ecmwf'],wetSources:['nws'],traceThresholdInches:.01,signalFullScaleInches:.1,uncorroboratedDisplayLimit:25,
     sources:[{id:'nws',value:value/.4,weight:.4,runAt:at(-1)},{id:'hrrr',value:0,weight:.4,runAt:at(-2)},{id:'ecmwf',value:0,weight:.2,runAt:at(-5)}],...options};
 }
 
@@ -54,10 +54,11 @@ test('NWS probability and model rain-amount signals are explicitly different inp
   const html=modelExplanationHTML(fixture(),{now});
   assert.match(html,/30% probability/);
   assert.match(html,/0\.004 in/);
-  assert.match(html,/QPF evidence: 0\/100/);
-  assert.match(html,/HRRR and ECMWF supply rain amounts, not their own probabilities/);
-  assert.match(html,/below 0\.01 in is treated as trace-only/);
-  assert.match(html,/0\.01 to 0\.1 in scale from 10 to 100 evidence points/);
+  assert.match(html,/QPF support: 0\/100 · NWS-anchored input: 0%/);
+  assert.match(html,/HRRR and ECMWF supply rain amounts, not probabilities/);
+  assert.match(html,/below 0\.01 in supplies 0 support/);
+  assert.match(html,/0\.01 to 0\.1 in scale from partial to full support/);
+  assert.match(html,/cannot raise the weighted result above NWS/);
   assert.match(html,/uncalibrated blend, not a proven model-accuracy ranking/);
   assert.match(html,/not a separate probability of rain at any time/);
   assert.doesNotMatch(html,/ECMWF probability|HRRR probability/);
@@ -65,13 +66,13 @@ test('NWS probability and model rain-amount signals are explicitly different inp
 
 test('weights and arithmetic come from the exact used sources rather than fixed starting weights',()=>{
   const forecast=fixture();
-  const value=likelihood(47,{weightedValue:46.6667,rawValue:47,sourceValues:{nws:20,hrrr:null,ecmwf:100},sourceAmounts:{nws:.01,hrrr:null,ecmwf:.02},sources:[{id:'nws',value:20,weight:.666667},{id:'ecmwf',value:100,weight:.333333}],drySources:[]});
+  const value=likelihood(20,{weightedValue:20,rawValue:20,sourceValues:{nws:20,hrrr:null,ecmwf:20},sourceAmounts:{nws:.01,hrrr:null,ecmwf:.02},qpfSupport:{hrrr:null,ecmwf:100},sources:[{id:'nws',value:20,weight:.666667},{id:'ecmwf',value:20,weight:.333333}],drySources:[]});
   forecast.rainTimeline[0].rainLikelihood=value;
-  Object.assign(forecast.days[0].popDayLikelihood,{value:47,peak:value});
+  Object.assign(forecast.days[0].popDayLikelihood,{value:20,peak:value});
   const html=modelExplanationHTML(forecast,{now});
   assert.match(html,/66\.6667%/);
-  assert.match(html,/20 × 0\.666667 \+ 100 × 0\.333333 ≈ 46\.6667/);
-  assert.match(html,/Rounded: <b>47%<\/b>\. Shown: <b>47%/);
+  assert.match(html,/20 × 0\.666667 \+ 20 × 0\.333333 ≈ 20/);
+  assert.match(html,/Rounded: <b>20%<\/b>\. Shown: <b>20%/);
   assert.match(html,/<th scope="row">HRRR<\/th><td>Unavailable<\/td><td>Not used<\/td><td>—/);
 });
 
