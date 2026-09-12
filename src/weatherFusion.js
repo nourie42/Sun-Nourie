@@ -484,13 +484,27 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     try { return res.json(await handler(req.query || {})); }
     catch (e) { return res.status(e.status || 503).json({ error: e.status === 400 || e.status === 409 ? e.message : 'Weather data is temporarily unavailable. Please retry.' }); }
   };
-  app.get(['/weather', '/weather-fusion', '/weather-fusion/'], (_req, res) => {
+  app.get(['/weather', '/weather-fusion', '/weather-fusion/', '/weather-fusion/experimental-weather.html'], (_req, res) => {
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
   });
-  for (const name of ['experimental-weather.html','current-inputs.js','daily-uv.js','dans-summary.js','pavement.js','poodle-walk.png','comfort-reference-scenes.png','comfort-reference-scenes.webp','comfort-reference-scenes-hot.webp','comfort-reference-scenes-rain.webp','comfort-reference-scenes-umbrella.png','comfort-reference-scenes-cold.webp','outdoor-feels.js','dans-take.js','forecast-confidence.js','render-safety.js','app.js', 'style.css', 'nav.js', 'experience.js', 'weather-math.js','hero-mode.js','dewpoint-meter.js','dewpoint-meter.css','comfort-effects.css','frame-player.js','comfort-outlook.js','forecast-layout.css','personal-details.js','personal-details.css','bulletin-facts.js','bulletins.js','current-temperature.js','hourly-feels.js','hourly-feels.css','exposure-scene.js','weather-state.js','weather-display.js','weather-repair.css','utci.js']) app.get(`/weather-fusion/${name}`, (_req, res) => {
+  for (const name of [
+    'app.js','bulletin-facts.js','bulletins.js','car-wash.js','car-wash.css','car-wash-background.webp',
+    'comfort-cinematic.css','comfort-effects.css','comfort-outlook.js','current-inputs.js','current-temperature.js',
+    'daily-uv.js','dans-summary.js','dans-take.js','day-graph.js','dewpoint-meter.js','dewpoint-meter.css',
+    'experience.js','exposure-scene.js','forecast-cards.css','forecast-confidence.js','forecast-layout.css','forecast-story.js',
+    'frame-player.js','hero-mode.js','hourly-feels.js','hourly-feels.css','nav.js','outdoor-feels.js','pavement.js',
+    'personal-details.js','personal-details.css','render-safety.js','scenario-layout.css','style.css','thermal-risk.js',
+    'today-card.js','utci.js','weather-display.js','weather-math.js','weather-repair.css','weather-state.js',
+    'comfort-reference-scenes.png','comfort-reference-scenes.webp','comfort-reference-scenes-cold.webp',
+    'comfort-reference-scenes-dawn.webp','comfort-reference-scenes-fog.webp','comfort-reference-scenes-hot.webp',
+    'comfort-reference-scenes-rain.webp','comfort-reference-scenes-umbrella.png','comfort-reference-scenes-watch.webp',
+    'poodle-walk.png','poodle-walk-cold.png','poodle-walk-hot.png','poodle-walk-mild.png',
+    'today-sky-clear.webp','today-sky-clouds.webp','today-sky-night-v2.webp','today-sky-night.webp',
+    'today-sky-rain.webp','today-sky-storm.webp',
+  ]) app.get(`/weather-fusion/${name}`, (_req, res) => {
     res.setHeader('Cache-Control', 'no-cache');
     res.sendFile(path.join(PUBLIC_DIR, name));
   });

@@ -15,7 +15,8 @@
   <link rel="stylesheet" href="/weather-fusion/weather-repair.css?v=compact-weather-v21">
   <link rel="stylesheet" href="/weather-fusion/forecast-cards.css?v=hrrr-rain-signal-v27">
   <link rel="stylesheet" href="/weather-fusion/scenario-layout.css?v=scenario-weather-v29">
-  <script type="module" src="/weather-fusion/app.js?v=consistent-rain-scenes-v38"></script>
+  <link rel="stylesheet" href="/weather-fusion/car-wash.css?v=car-wash-v39">
+  <script type="module" src="/weather-fusion/app.js?v=experimental-car-wash-v39"></script>
 
 </head>
 <body data-sky="day">
@@ -65,6 +66,7 @@
           <a class="science-link" href="#scientific-stuff">Scientific stuff further down ↓</a>
         </div>
         </div>
+        <section class="glass car-wash-forecast" id="car-wash-forecast" aria-labelledby="car-wash-title" hidden></section>
       </section>
       <section class="glass briefing" aria-labelledby="briefing-title">
         <div class="section-top"><h2><span class="sparkle" aria-hidden="true">✦</span> LOCAL OUTLOOK</h2><span id="ai-label" class="pill">YOUR LOCAL OUTLOOK</span></div>
@@ -81,7 +83,7 @@
         <section class="glass map-panel" id="map-panel" aria-labelledby="map-title">
           <div class="section-top"><h2 id="map-title">◎ &nbsp; WEATHER MAPS</h2><button id="fullscreen" class="text-button" aria-label="Expand weather map">⛶ Expand</button></div>
           <div class="map-tabs" role="group" aria-label="Weather map layer">
-            <button class="selected" data-layer="radar" aria-pressed="true">Live radar</button><button data-layer="hrrr" aria-pressed="false">HRRR</button><button data-layer="ecmwf" aria-pressed="false">ECMWF rain</button><button data-layer="nbm" aria-pressed="false">NBM rain</button><button data-layer="temperature" aria-pressed="false">Temperature</button><button data-layer="wind" aria-pressed="false">Wind</button><button data-layer="clouds" aria-pressed="false">Clouds</button>
+            <button class="selected" data-layer="radar" aria-pressed="true">Live radar</button>
           </div>
           <div class="map-stage"><div id="radar-map" role="region" aria-label="Interactive NOAA radar map"></div><div id="model-map" hidden></div><div id="map-error" class="map-error" hidden></div></div>
           <div id="radar-controls" class="radar-controls"><button id="radar-play" class="play-button" aria-label="Play radar animation" disabled>▶</button><label for="radar-time" class="sr-only">Radar frame</label><input id="radar-time" type="range" min="0" max="0" value="0" disabled><span id="radar-stamp">Loading radar…</span><label class="sr-only" for="basemap">Base map</label><select id="basemap"><option value="dark">Dark</option><option value="street">Topographic</option><option value="satellite">Aerial imagery</option></select></div>

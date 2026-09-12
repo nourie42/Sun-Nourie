@@ -10,10 +10,13 @@ import {dailyDisplay} from './weather-math.js?v=rain-consensus-v24';
 import {currentHero} from './current-temperature.js?v=weather-art-labels-v10';
 import {renderBulletins} from './bulletins.js?v=weather-art-labels-v10';
 import {modelFreshnessText} from './personal-details.js?v=consistent-rain-scenes-v35';
-import {renderDewpointMeter} from './dewpoint-meter.js?v=centered-heading-v30';
+import {renderDewpointMeter} from './dewpoint-meter.js?v=car-wash-order-v31';
 import {renderWeatherPanel} from './render-safety.js';
+import {forecastPeriodSummary} from './forecast-story.js?v=forecast-story-v39';
+import {isExperimentalWeatherPage,renderCarWashForecast,resetCarWashForecast} from './car-wash.js?v=car-wash-v39';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);
+const experimentalPage = isExperimentalWeatherPage();
 const presets = {
   knightdale: { id: 'knightdale', name: 'Knightdale / Raleigh', latitude: 35.787, longitude: -78.4806 },
   greenville: { id: 'greenville', name: 'Greenville, NC', latitude: 35.6127, longitude: -77.3664 },
@@ -30,6 +33,18 @@ let frames = [], frameIndex = 0, radarTimer = null, selectedLayer = 'radar', rad
 let modelCatalog = null, modelFetched = 0, modelFrames = [], modelIndex = 0, modelLayer = null, mapSelectionToken = 0, modelFrameToken = 0;
 let framePlayer=null;
 let lastRadarFetch = 0, currentBriefing = null, requestController = null;
+function configurePageMode() {
+  document.documentElement.dataset.weatherPage=experimentalPage?'experimental':'main';
+  if(experimentalPage)document.title='Experimental Weather · Weather Nourie';
+  const tabs=document.querySelector('.map-tabs');
+  if(experimentalPage&&tabs&&!tabs.querySelector('[data-layer="hrrr"]')){
+    for(const [layer,label] of [['hrrr','HRRR'],['ecmwf','ECMWF rain'],['nbm','NBM rain'],['temperature','Temperature'],['wind','Wind'],['clouds','Clouds']]){
+      const button=document.createElement('button');button.type='button';button.dataset.layer=layer;button.setAttribute('aria-pressed','false');button.textContent=label;tabs.append(button);
+    }
+  }
+  const carWash=$('car-wash-forecast');if(carWash)carWash.hidden=!experimentalPage;
+}
+configurePageMode();
 const readSaved = () => {
   try { const p = JSON.parse(localStorage.getItem('weather-fusion-place')); if (p && finite(p.latitude) && finite(p.longitude) && p.latitude >= 24 && p.latitude <= 50 && p.longitude >= -125 && p.longitude <= -66) place = p; } catch { /* Storage may be unavailable. */ }
 };
@@ -86,6 +101,7 @@ function render(data) {
   draw('hourly', 'Hourly forecast', () => renderHours(data));
   draw('daily', 'Daily forecast', () => renderDays(data));
   draw('skin-exposure', 'Feels-like outlook', () => renderComfort(data));
+  if(experimentalPage)draw('car-wash-forecast', 'Car Wash Forecast', () => renderCarWashForecast(data));
   draw('dewpoint-gross-meter', 'Dew Point Gross Meter', () => renderDewpointMeter(data));
   draw('metrics', 'Weather details', () => renderMetrics(data));
   draw('scientific-stuff', 'Source details', () => renderEvidence(data));
@@ -232,6 +248,7 @@ function chooseLocation(value) {
   $('afd-stamp').textContent = 'Checking the selected location’s forecast office…';
   $('afd-link').href = 'https://www.weather.gov/';
   $('source-register').replaceChildren();
+  resetCarWashForecast();
   renderBriefing({ headline: 'Preparing your local outlook.', summary: 'Loading the latest NWS forecast and local discussion for this location.', sources: [] });
   $('search-results').hidden = true; $('city-search').value = ''; $('city-search').setAttribute('aria-expanded', 'false');
   try { localStorage.setItem('weather-fusion-place', JSON.stringify(place)); } catch { /* nonessential */ }
@@ -241,7 +258,10 @@ function chooseLocation(value) {
 function showDay(index) {
   const d=forecast?.days[index]; if(!d) return;
   const p=dailyDisplay(d,index,Date.now(),forecast.location.timeZone);
-  $('day-content').innerHTML=`<div class="dialog-eyebrow">WEATHER NOURIE</div><h2 id="day-title" class="dialog-title">${esc(p.label)}</h2><p class="dialog-condition">${esc(p.condition)}</p><div class="dialog-temps">${temperature(p.primary)}<span>${p.primaryLabel.toLowerCase()}${!p.tonight&&finite(p.secondary)?` · ${temperature(p.secondary)} low`:''}</span></div>${dayGraphHTML(forecast,index,p.tonight)}<div class="dialog-stats"><div><strong>${percent(p.pop)}</strong><small>${p.tonight?'Rain chance tonight':'Rain chance'}</small></div><div><strong>${inches(d.qpf)}</strong><small>${p.tonight?'Forecast rain through morning':'Expected rain'}</small></div></div><p class="dialog-prose">${esc(p.detail || 'More details will appear when the forecast updates.')}</p>${!p.tonight&&d.nightDetail?`<h3 class="dialog-subtitle">Overnight</h3><p class="dialog-prose">${esc(d.nightDetail)}</p>`:''}${d.confidence?`<details class="dialog-confidence" data-confidence="${esc(d.confidence.key)}"><summary>Forecast confidence: ${esc(d.confidence.label)} · ${d.confidence.sourceCount??'?'} source${d.confidence.sourceCount===1?'':'s'}</summary><p>${esc(d.confidence.factors.join(' · '))}</p><small>${esc(d.confidence.note)}</small></details>`:''}<a href="#scientific-stuff" class="science-link" id="day-science-link">Scientific stuff ↓</a>`;
+  const now=Date.now(),phase=p.tonight?'overnight':index===0?'daytime':'overall';
+  const story=forecastPeriodSummary(forecast,index,phase,now),overnight=phase==='daytime'?forecastPeriodSummary(forecast,index,'overnight',now):null;
+  const condition=phase==='overall'?`Day: ${d.condition||'forecast unavailable'} · Night: ${d.nightCondition||'forecast unavailable'}`:p.condition;
+  $('day-content').innerHTML=`<div class="dialog-eyebrow">WEATHER NOURIE</div><h2 id="day-title" class="dialog-title">${esc(p.label)}</h2><p class="dialog-condition">${esc(condition)}</p><div class="dialog-temps">${temperature(p.primary)}<span>${p.primaryLabel.toLowerCase()}${!p.tonight&&finite(p.secondary)?` · ${temperature(p.secondary)} low`:''}</span></div>${dayGraphHTML(forecast,index,p.tonight)}<div class="dialog-stats"><div><strong>${percent(story.chance)}</strong><small>${p.tonight?'Rain chance tonight':phase==='overall'?'Day and night rain chance':'Rain chance today'}</small></div><div><strong>${inches(story.amount)}</strong><small>${p.tonight?'Forecast rain through morning':phase==='overall'?'Forecast rain through next morning':'Expected rain today'}</small></div></div><p class="dialog-prose">${esc(story.summary)}</p><p class="dialog-data-note">${esc(story.sourceNote)}</p>${overnight?`<h3 class="dialog-subtitle">Overnight · ${percent(overnight.chance)} rain chance</h3><p class="dialog-prose">${esc(overnight.summary)}</p><p class="dialog-data-note">${esc(overnight.sourceNote)}</p>`:''}${d.confidence?`<details class="dialog-confidence" data-confidence="${esc(d.confidence.key)}"><summary>Forecast confidence: ${esc(d.confidence.label)} · ${d.confidence.sourceCount??'?'} source${d.confidence.sourceCount===1?'':'s'}</summary><p>${esc(d.confidence.factors.join(' · '))}</p><small>${esc(d.confidence.note)}</small></details>`:''}<a href="#scientific-stuff" class="science-link" id="day-science-link">Scientific stuff ↓</a>`;
   installDayGraph($('day-content'),forecast,index,p.tonight);
   $('day-dialog').showModal();
   $('day-science-link').addEventListener('click',()=>$('day-dialog').close());

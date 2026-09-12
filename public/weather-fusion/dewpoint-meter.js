@@ -74,7 +74,7 @@ export function renderDewpointMeter(forecast,now=Date.now()){
  const skin=document.getElementById('skin-exposure');if(!skin)return;
  const host=skin.closest?.('.exposure-cards')||skin;
  let panel=document.getElementById('dewpoint-gross-meter');
- if(!panel){panel=document.createElement('section');panel.id='dewpoint-gross-meter';panel.className='glass dewpoint-gross-meter';panel.setAttribute('aria-labelledby','gross-title');host.insertAdjacentElement('afterend',panel);}
+ if(!panel){const anchor=document.getElementById('car-wash-forecast')||host;panel=document.createElement('section');panel.id='dewpoint-gross-meter';panel.className='glass dewpoint-gross-meter';panel.setAttribute('aria-labelledby','gross-title');anchor.insertAdjacentElement('afterend',panel);}
  const zone=forecast.location.timeZone||'America/New_York',dp=forecast.current.dewpoint,level=dewpointGrossLevel(dp,forecast.current.wind);
  const all=dewpointPoints(forecast,now,240),pts=dewpointPoints(forecast,now,horizon),valid=pts.filter(p=>finite(p.value));
  const worst=valid.reduce((best,p)=>!best||p.value>best.value?p:best,null),coverage=all.filter(p=>finite(p.value)).at(-1);
