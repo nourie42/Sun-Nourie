@@ -66,7 +66,7 @@ function sourceRows(likelihood) {
     const used = sources.find(source => source.id === id && finite(source.value) && finite(source.weight) && source.weight > 0);
     const value = finite(likelihood?.sourceValues?.[id]) ? likelihood.sourceValues[id] : used?.value;
     return {id,value:finite(value)?value:null,amount:finite(likelihood?.sourceAmounts?.[id])?likelihood.sourceAmounts[id]:null,
-      support:finite(likelihood?.qpfSupport?.[id])?likelihood.qpfSupport[id]:null,
+      officialProbability:id==='nws'&&finite(likelihood?.officialProbability)?likelihood.officialProbability:null,
       weight:used?.weight ?? null,points:used ? used.value*used.weight : null,runAt:used?.runAt || null};
   });
 }
@@ -74,9 +74,9 @@ function sourceRows(likelihood) {
 function sourceTable(likelihood, caption = 'Inputs for the highest hour') {
   const rows = sourceRows(likelihood).map(source => {
     const input = source.id === 'nws'
-      ? source.value === null ? 'Unavailable' : `${number(source.value)}% probability`
+      ? source.value === null ? 'Unavailable' : `${number(source.officialProbability)}% probability`
       : source.amount === null ? 'Unavailable' : `${number(source.amount,8)} in`;
-    const signal = source.id === 'nws' ? '' : source.value === null ? '' : `<small>QPF support: ${number(source.support)}/100 · NWS-anchored input: ${percent(source.value)}</small>`;
+    const signal = source.value === null ? '' : `<small>Rain forecast: ${source.value>0?'Yes':'No'}</small>`;
     return `<tr><th scope="row">${names[source.id]}</th><td>${input}${signal}</td><td>${source.weight === null?'Not used':`${number(source.weight*100,4)}%`}</td><td>${source.points === null?'—':number(source.points,6)}</td></tr>`;
   }).join('');
   return `<table class="model-inputs"><caption>${esc(caption)}</caption><thead><tr><th scope="col">Source</th><th scope="col">Rain input</th><th scope="col">Weight</th><th scope="col">Points</th></tr></thead><tbody>${rows}</tbody></table>`;
@@ -89,11 +89,8 @@ function arithmetic(likelihood) {
   const formula = sources.map(source=>`${number(source.value)} × ${number(source.weight,6)}`).join(' + ');
   const weightedValue = finite(likelihood.weightedValue) ? likelihood.weightedValue : null;
   const rounded = finite(likelihood.rawValue) ? likelihood.rawValue : null;
-  const zeroed = rounded !== null && rounded !== likelihood.value && likelihood.value === 0;
-  const wet = (likelihood.wetSources || []).map(id=>names[id]||id);
   return `<div class="model-calculation"><p class="model-formula">${esc(formula)}${weightedValue===null?'':` ≈ ${number(weightedValue,8)}`}</p>
-    <p>${rounded===null?'':`Rounded: <b>${number(rounded)}%</b>. `}Shown: <b>${percent(likelihood.value)}</b>.</p>
-    ${zeroed?`<p class="model-zero-rule">Shown as 0% because the blend is below ${number(likelihood.uncorroboratedDisplayLimit)}% and fewer than two available sources support rain${wet.length?` (${esc(wet.join(', '))} only)`:''}.</p>`:''}</div>`;
+    <p>${rounded===null?'':`Rounded: <b>${number(rounded)}%</b>. `}Shown: <b>${percent(likelihood.value)}</b>.</p></div>`;
 }
 
 function temperatureBlend(day, kind) {
@@ -118,8 +115,6 @@ export function modelExplanationHTML(forecast, options = {}) {
   const view = modelExplanationView(forecast,options), {day,zone,period,rows,peak,phase} = view;
   const choices = (forecast?.days || []).map((row,index)=>`<option value="${index}"${index===view.index?' selected':''}>${esc(dayLabel(row.date,index))}</option>`).join('');
   const phaseOptions = Object.entries(phaseNames).map(([key,name])=>`<option value="${key}"${key===phase?' selected':''}>${name}</option>`).join('');
-  const threshold = finite(peak?.traceThresholdInches) ? number(peak.traceThresholdInches,8) : null;
-  const fullScale = finite(peak?.signalFullScaleInches) ? number(peak.signalFullScaleInches,8) : null;
   const temperatures = temperatureBlend(day,'high')+temperatureBlend(day,'low');
   const audit = rows.map(row=>`<details class="model-hour-audit" data-model-detail="hour-${esc(row.time)}"${row.time===view.peakTime?' data-peak="true"':''}><summary><span>${esc(stamp(row.time,zone))}</span><strong>${percent(row.rainLikelihood?.value)}</strong></summary>${sourceTable(row.rainLikelihood,'Hourly inputs')}${arithmetic(row.rainLikelihood)}</details>`).join('');
   return `<div class="model-explanation-heading"><h2 id="model-explanation-title">Why this forecast</h2><div class="model-selectors"><label>Day<select aria-label="Day" data-model-day>${choices}</select></label><label>Period<select aria-label="Period" data-model-phase>${phaseOptions}</select></label></div></div>
@@ -129,7 +124,7 @@ export function modelExplanationHTML(forecast, options = {}) {
     ${!view.complete?`<p class="model-data-warning">Incomplete coverage: ${number(period.coverage?.availableHours)} of ${number(period.coverage?.expectedHours)} hours. The period estimate stays unavailable.${view.maximum===null?'':` Highest available hour: ${percent(view.maximum)}.`}</p>`:''}
     ${view.peakTime?`<h3>Highest hour: ${esc(stamp(view.peakTime,zone))}–${esc(stamp(view.peakEnd,zone,false))}</h3>`:''}
     ${sourceTable(peak)}${arithmetic(peak)}
-    <details class="model-method" data-model-detail="method"><summary>How the inputs are used</summary><p>NWS supplies the official rain probability and sets the ceiling. HRRR, ECMWF and NBM supply rain amounts, not probabilities.${threshold===null?'':` An hourly amount below ${threshold} in supplies 0 support.`}${fullScale===null?'':` Amounts from ${threshold} to ${fullScale} in scale from partial to full support; larger amounts stay at full support.`} A model at full support uses the NWS percentage as its probability input—never 100%—so deterministic guidance cannot raise the weighted result above NWS.</p><p>The starting weights are NWS 40%, HRRR 30%, ECMWF 10% and NBM 20%. The listed weights are the weights actually used for this hour. Missing sources are excluded, not counted as dry, and the remaining weights are rescaled. This is an uncalibrated blend, not a proven model-accuracy ranking.</p><p>A weak blend below 25% is displayed as 0% unless at least two available sources support rain. This prevents one trace or low-probability input from putting rain on an otherwise dry hour.</p></details>
+    <details class="model-method" data-model-detail="method"><summary>How the inputs are used</summary><p>Each available source gets one yes-or-no rain vote for the hour. NWS votes yes when its official chance is above 0%. HRRR, ECMWF and NBM vote yes when their forecast amount is above 0 in. A yes earns that source’s full weight; a no earns zero. The amount of rain does not change the rain-chance points and is calculated separately.</p><p>The starting weights are NWS 40%, HRRR 30%, ECMWF 10% and NBM 20%. The listed weights are the weights actually used for this hour. Missing sources are excluded, not counted as dry, and the remaining weights are rescaled. If every available source forecasts rain, the result is 100%. This is an uncalibrated blend, not a proven model-accuracy ranking.</p></details>
     <details class="model-hourly-list" data-model-detail="hours"><summary>All ${rows.length} forecast hours in this period</summary>${audit||'<p>No hourly calculation data was supplied.</p>'}</details>
     ${temperatures?`<details class="model-temperature-list" data-model-detail="temperatures"><summary>Temperature calculations</summary>${temperatures}</details>`:''}
     <details class="model-source-list" data-model-detail="sources"><summary>Source runs and availability</summary>${sourceStatus(forecast,view)}</details>`;

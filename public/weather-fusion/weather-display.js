@@ -46,8 +46,8 @@ export function hourlyRainHTML(sample){
  }
  const blend=sample.rainLikelihood,value=sampleRainChance(sample);
  const votes=blend?.sourceValues||{},parts=[];
- if(finite(votes.nws))parts.push(`NWS ${Math.round(votes.nws)}%`);
- for(const id of ['hrrr','ecmwf'])if(finite(votes[id]))parts.push(`${id.toUpperCase()} QPF support ${Math.round(blend?.qpfSupport?.[id]??0)}/100, NWS-anchored input ${Math.round(votes[id])}%`);
+ if(finite(votes.nws))parts.push(`NWS rain ${votes.nws>0?'yes':'no'}${finite(blend?.officialProbability)?` (official ${Math.round(blend.officialProbability)}%)`:''}`);
+ for(const id of ['hrrr','ecmwf','nbm'])if(finite(votes[id]))parts.push(`${id.toUpperCase()} rain ${votes[id]>0?'yes':'no'}`);
  const detail=parts.length?` Inputs: ${parts.join(', ')}.`:'';
  return `<span class="hour-rain" title="Weather Nourie rain likelihood.${detail}"><small class="hour-pop">${weatherMetricIcon('drop')}${finite(value)?`${Math.round(value)}%`:'—'}</small></span>`;
 }

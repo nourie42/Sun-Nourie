@@ -125,53 +125,34 @@ export function weighted(values, policy) {
   return { value: sum ? round(sources.reduce((n,s) => n+s.value*s.weight,0)/sum,4) : null,
     sources: sources.map((s) => ({ ...s, weight: round(s.weight/sum,6) })), calibrated: false };
 }
-const RAIN_TRACE_THRESHOLD_IN = .01;
-const RAIN_SIGNAL_FULL_SCALE_IN = .1;
-const UNCORROBORATED_DISPLAY_LIMIT = 25;
-/**
- * Deterministic QPF is an amount, not a probability. Convert it to a bounded
- * evidence score without letting a trace amount become a 100% wet vote.
- */
+/** A rain-chance source votes yes when its forecast value is above zero. */
 export function deterministicRainSignal(amount) {
   if (!finite(amount)) return null;
-  if (amount < RAIN_TRACE_THRESHOLD_IN) return 0;
-  return Math.min(100, Math.round(amount / RAIN_SIGNAL_FULL_SCALE_IN * 100));
+  return amount > 0 ? 100 : 0;
 }
-/** NWS supplies probability; deterministic QPF can only support or reduce that probability. */
+/**
+ * Rain chance is weighted source agreement, not a score for rainfall amount.
+ * Each available source casts one wet/dry vote; a wet vote earns its full
+ * normalized weight and a dry vote earns zero. Rainfall inches stay separate.
+ */
 export function precipitationLikelihood(nwsProbability, precipitationBlend, policy = SAME_DAY_WEIGHTS) {
   const amounts = precipitationBlend?.sourceValues || {};
   const nws=finite(nwsProbability)?Math.max(0,Math.min(100,nwsProbability)):null;
-  const qpfSupport={hrrr:deterministicRainSignal(amounts.hrrr),ecmwf:deterministicRainSignal(amounts.ecmwf),nbm:deterministicRainSignal(amounts.nbm)};
-  // HRRR, ECMWF and NBM are deterministic amounts, not probabilities. Their
-  // probability-equivalent input is therefore capped at the official NWS PoP:
-  // a fully wet signal supports it, while a dry signal contributes zero.
-  const supportedProbability=id=>finite(nws)&&finite(qpfSupport[id])?round(nws*qpfSupport[id]/100,4):null;
   const values = {
-    nws,
-    hrrr:supportedProbability('hrrr'),
-    ecmwf:supportedProbability('ecmwf'),
-    nbm:supportedProbability('nbm')
+    nws:deterministicRainSignal(nws),
+    hrrr:deterministicRainSignal(amounts.hrrr),
+    ecmwf:deterministicRainSignal(amounts.ecmwf),
+    nbm:deterministicRainSignal(amounts.nbm)
   };
   const result = weighted(values, policy);
-  const included=Object.entries(values).filter(([id,value])=>finite(value)&&policy[id]>0);
-  const totalWeight=included.reduce((sum,[id])=>sum+policy[id],0);
-  // Preserve arithmetic before whole-percent rounding, without binary-float noise at 10%.
-  const weightedValue=totalWeight?round(included.reduce((sum,[id,value])=>sum+value*policy[id],0)/totalWeight,8):null;
+  const weightedValue=result.value;
   const rounded=finite(weightedValue)?Math.round(weightedValue):null;
   const sourceAmounts=Object.fromEntries(['nws','hrrr','ecmwf','nbm'].map(id=>[id,finite(amounts[id])?amounts[id]:null]));
-  const drySources=['hrrr','ecmwf','nbm'].filter(id=>finite(sourceAmounts[id])&&sourceAmounts[id]<RAIN_TRACE_THRESHOLD_IN);
-  if(finite(values.nws)&&values.nws<15)drySources.unshift('nws');
-  const wetSources=['nws','hrrr','ecmwf','nbm'].filter(id=>finite(values[id])&&(id==='nws'?values[id]>=15:sourceAmounts[id]>=RAIN_TRACE_THRESHOLD_IN));
-  // A weak result supported by fewer than two sources is displayed as zero.
-  // This removes isolated trace-QPF artifacts such as a sunny day receiving a
-  // rain percentage from one coarse model interval.
-  const consensusSuppressed=finite(weightedValue)&&weightedValue<UNCORROBORATED_DISPLAY_LIMIT&&wetSources.length<2&&included.length>=2;
-  const value=consensusSuppressed?0:rounded;
-  return {...result,value,rawValue:rounded,weightedValue,sourceValues:values,
-    sourceAmounts,qpfSupport,drySources,wetSources,consensusSuppressed,
-    source:'Weather Nourie weighted average · NWS probability anchored by HRRR/ECMWF/NBM QPF support',calibrated:false,
-    traceThresholdInches:RAIN_TRACE_THRESHOLD_IN,signalFullScaleInches:RAIN_SIGNAL_FULL_SCALE_IN,
-    uncorroboratedDisplayLimit:UNCORROBORATED_DISPLAY_LIMIT};
+  const drySources=['nws','hrrr','ecmwf','nbm'].filter(id=>values[id]===0);
+  const wetSources=['nws','hrrr','ecmwf','nbm'].filter(id=>values[id]===100);
+  return {...result,value:rounded,rawValue:rounded,weightedValue,sourceValues:values,
+    sourceAmounts,officialProbability:nws,drySources,wetSources,consensusSuppressed:false,
+    source:'Weather Nourie weighted wet/dry source agreement',calibrated:false};
 }
 /** A period card is the highest of its actual hourly scores, never a new vote on accumulated rain. */
 export function summarizeRainTimeline(timeline, start, end) {
@@ -381,8 +362,8 @@ export function enhanceForecast(out, { models, grid, periods = [], hourlyPeriods
   out.convectiveGuidance=out.hours.filter(h=>finite(h.reflectivity)||finite(h.nearbyReflectivity)).slice(0,30).map(h=>({time:h.time,pointReflectivityDbz:h.reflectivity,nearby25kmMaxReflectivityDbz:h.nearbyReflectivity,runAt:sourceModels.hrrr?.reflectivityRunAt||sourceModels.hrrr?.runAt}));
   out.google={status:'access-required',contributes:false,label:'Google WeatherNext',message:'Not included: approved Google WeatherNext dataset access has not been configured.',url:'https://developers.google.com/weathernext/guides/access-forecast'};
   out.repairVersion=REPAIR_VERSION;
-  out.blendPolicy={allForecastHours:SAME_DAY_WEIGHTS,sameDay:SAME_DAY_WEIGHTS,precipitation:'Every forecast hour starts at NWS 40% / HRRR 30% / ECMWF 10% / NBM 20%. Every amount is summed from that same hourly blend.',probability:'Hourly weighted average: NWS probability is the ceiling; HRRR/ECMWF/NBM deterministic QPF can support or reduce it but cannot become a probability or raise it; uncalibrated',periodProbability:'Highest canonical hourly score within the explicit period window, not an independently estimated all-day event probability',lowDryConsensus:'Deterministic amounts below 0.01 in/hour are trace-only. A blended result below 25% displays 0% when fewer than two available sources support rain.',partialCoverage:'Unavailable inputs are excluded and remaining weights renormalized; a period with missing hourly scores is unavailable, not dry'};
-  out.methodology='Numeric Weather Nourie blend: Every forecast hour starts at NWS 40% / HRRR 30% / ECMWF 10% / NBM 20%. HRRR, ECMWF IFS and NBM contribute only where a fresh run covers the requested hour or period, so unavailable inputs are excluded and the remaining weights renormalize; missing values never become zero. These are uncalibrated starting weights, not a proven accuracy ranking. Each hourly rain likelihood is a weighted average anchored to the official NWS probability. Deterministic HRRR, ECMWF and NBM amounts are not probabilities: amounts below 0.01 inch per hour supply zero support, amounts from 0.01 to 0.10 inch scale from zero to full support, and even full support uses the NWS probability as that model input rather than inventing 100%. Therefore deterministic guidance can reduce or support the official probability but cannot raise the result above it. A weak blend below 25% is shown as 0% unless at least two available sources support rain. This is a transparent, uncalibrated weighted estimate. Official warnings are never altered. Explicit HRRR, ECMWF IFS 0.25° and NBM point feeds cover the selected coordinates through Open-Meteo, with native extracts as a fallback. Point feeds can combine successive runs of the same named model; their initialization metadata refers to the latest published run. Temperature, dew point, wind, gust and cloud cover share the requested weights; humidity and feels-like are derived consistently. Pressure and visibility include only published fields. Station observations, UV and official text retain separate provenance. Coarser precipitation intervals are prorated at boundaries; interpolated hourly amounts do not establish storm arrival times. Today’s daily rain card covers only the remaining period when earlier forecast hours have passed; the main precipitation metric covers the next 24 hours.';
+  out.blendPolicy={allForecastHours:SAME_DAY_WEIGHTS,sameDay:SAME_DAY_WEIGHTS,precipitation:'Rainfall amount is calculated separately in inches from the hourly source amounts.',probability:'Each available source casts a wet/dry vote. Any value above zero earns that source its full normalized weight; zero earns no points.',periodProbability:'Highest canonical hourly score within the explicit period window, not an independently estimated all-day event probability',partialCoverage:'Unavailable inputs are excluded and remaining weights renormalized; a period with missing hourly scores is unavailable, not dry'};
+  out.methodology='Numeric Weather Nourie blend: Every forecast hour starts at NWS 40% / HRRR 30% / ECMWF 10% / NBM 20%. HRRR, ECMWF IFS and NBM contribute only where a fresh run covers the requested hour or period, so unavailable inputs are excluded and the remaining weights renormalize; missing values never become zero. These are uncalibrated starting weights, not a proven accuracy ranking. Rain chance measures weighted source agreement on whether rain is forecast. The NWS votes yes when its official probability is above zero; HRRR, ECMWF and NBM vote yes when their hourly rainfall amount is above zero. A yes vote earns the source’s full normalized weight and a no vote earns zero, so unanimous available-source support is 100% regardless of forecast amount. Rainfall amount is calculated separately in inches. Official warnings are never altered. Explicit HRRR, ECMWF IFS 0.25° and NBM point feeds cover the selected coordinates through Open-Meteo, with native extracts as a fallback. Point feeds can combine successive runs of the same named model; their initialization metadata refers to the latest published run. Temperature, dew point, wind, gust and cloud cover share the requested weights; humidity and feels-like are derived consistently. Pressure and visibility include only published fields. Station observations, UV and official text retain separate provenance. Coarser precipitation intervals are prorated at boundaries; interpolated hourly amounts do not establish storm arrival times. Today’s daily rain card covers only the remaining period when earlier forecast hours have passed; the main precipitation metric covers the next 24 hours.';
   out.methodology=out.methodology.replace('The hourly rain likelihood','Each hourly rain likelihood')+' Daily, daytime and overnight rain percentages are the highest canonical hourly score inside their stated windows, not independently calculated full-period probabilities. The same complete hourly timeline supplies daily cards, forecast details, the hourly display, car-wash decisions and experimental source evidence. A missing hourly score leaves its period unavailable. Expected rainfall amounts are summed from that same timeline.';
   return out;
 }
