@@ -5,7 +5,7 @@ import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './wea
 import {dayGraphHTML,dayGraphPoints,installDayGraph} from './day-graph.js?v=weather-art-labels-v10';
 import {degrees,feelsAt} from './hourly-feels.js?v=weather-art-labels-v10';
 import {createFramePlayer} from './frame-player.js';
-import {renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=remainder-today-v48';
+import {renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=local-current-v49';
 import {dailyDisplay} from './weather-math.js?v=remainder-today-v41';
 import {currentHero} from './current-temperature.js?v=radar-now-v47';
 import {renderBulletins} from './bulletins.js?v=weather-art-labels-v10';
@@ -100,7 +100,7 @@ function render(data) {
   if($('hero-uv'))$('hero-uv').innerHTML=dailyUvHTML(data.days[0]?.uvMax,'Peak UV today');
   $('condition').textContent = hero.tonight ? `Tonight · ${hero.condition}` : hero.condition;
   $('high-low').textContent = hero.tonight ? 'Overnight low' : hero.range;
-  $('observation-label').textContent = hero.tonight ? `Tonight’s forecast · updated ${clock(data.assembledAt)}` : (c.radarPrecipitation?.status==='ready'&&c.radarPrecipitation.atLocation===true ? `NOAA radar at this location · updated ${clock(c.radarPrecipitation.observedAt)}` : c.type === 'observation' ? `Nearby weather station · updated ${clock(c.time)}` : 'Estimated current conditions');
+  $('observation-label').textContent = hero.tonight ? `Tonight’s forecast · updated ${clock(data.assembledAt)}` : (c.radarPrecipitation?.status==='ready'&&c.radarPrecipitation.atLocation===true ? `NOAA radar at this location · temperature is a local grid estimate` : c.localEstimate ? `Selected-location estimate · valid ${clock(c.time)}` : c.type === 'observation' ? `Nearby weather station · updated ${clock(c.time)}` : 'Estimated current conditions');
   $('hero-scene').innerHTML = icon(hero.condition, hero.isDay, 120);
   document.querySelectorAll('[data-place]').forEach((button) => { const active = button.dataset.place === place.id; button.classList.toggle('active', active); button.setAttribute('aria-pressed', String(active)); });
   draw('alerts', 'Official alerts', () => renderAlerts(data));
@@ -137,7 +137,7 @@ function renderEvidence(data) {
     const c=currentSample(data).inputs,e=currentSample(data).comfort.inputEvidence||{};
     const next=data.metricForecasts?.series?.feels?.find(p=>Date.parse(p.time)>Date.now());
     const n=(v,s='')=>finite(v)?`${Math.round(v*10)/10}${s}`:'Unavailable';
-    root.innerHTML=`<p><strong>Current thermal inputs:</strong> ${esc(c.stationName||c.station||'Forecast estimate')}${finite(c.stationDistanceKm)?` · ${Math.round(c.stationDistanceKm/1.609344)} miles away`:''}; ${esc(c.time||'time unavailable')}. Air ${n(c.temperature,'°F')}, dew point ${n(c.dewpoint,'°F')}, wind ${n(c.wind,' mph')}. ${esc(c.comfortSourceNote||'')} Outdoor UTCI ${n(data.comfort?.rawOutdoors,'°F')}.</p>${next?`<p><strong>Next forecast hour — separate inputs:</strong> ${esc(next.time)}. Air ${n(next.inputs.temperature,'°F')}, dew point ${n(next.inputs.dewpoint,'°F')}, wind ${n(next.inputs.wind,' mph')}, cloud cover ${n(next.inputs.skyCover,'%')}. Outdoor UTCI ${n(next.value,'°F')}.</p>`:''}<p>${esc(e.windPolicy||'')} · ${esc(e.radiationBasis||'')}. Station estimates are not copied into future forecasts. No output is raised or lowered to make values match.</p>`;
+    root.innerHTML=`<p><strong>Current thermal inputs:</strong> ${esc(c.localEstimate?.source||c.stationName||c.station||'Forecast estimate')}${finite(c.stationDistanceKm)?` · ${Math.round(c.stationDistanceKm/1.609344)} miles away`:''}; ${esc(c.time||'time unavailable')}. Air ${n(c.temperature,'°F')}, dew point ${n(c.dewpoint,'°F')}, wind ${n(c.wind,' mph')}. ${esc(c.localEstimate?.reason||c.comfortSourceNote||'')} Outdoor UTCI ${n(data.comfort?.rawOutdoors,'°F')}.</p>${next?`<p><strong>Next forecast hour — separate inputs:</strong> ${esc(next.time)}. Air ${n(next.inputs.temperature,'°F')}, dew point ${n(next.inputs.dewpoint,'°F')}, wind ${n(next.inputs.wind,' mph')}, cloud cover ${n(next.inputs.skyCover,'%')}. Outdoor UTCI ${n(next.value,'°F')}.</p>`:''}<p>${esc(e.windPolicy||'')} · ${esc(e.radiationBasis||'')}. Station estimates are not copied into future forecasts. No output is raised or lowered to make values match.</p>`;
   }
   const important = ['nws', 'afd', 'hrrr', 'ecmwf', 'nbm', 'alerts'];
   const labels = { nws: 'NWS', afd: 'Local discussion', hrrr: 'HRRR', ecmwf: 'ECMWF IFS', nbm: 'National Blend', alerts: 'Alerts' };

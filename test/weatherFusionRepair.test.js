@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {buildForecast} from '../src/weatherFusion.js';
+import {buildForecast,MAX_DIRECT_STATION_DISTANCE_KM} from '../src/weatherFusion.js';
 import {temperaturePolicy,precipitationPolicy,eveningPeriod,forecastDayIndex,REPAIR_VERSION} from '../src/weatherFusionPolicy.js';
 import {validateSnapshot} from '../src/weatherFusionDirect.js';
 import {testInputs,snapshot} from './weatherFusion.fixtures.js';
 import {alignComfortHours} from '../src/weatherFusionNowcast.js';
-import {shadeFeelsLike} from '../public/weather-fusion/weather-math.js';
+import {shadeFeelsLike,thermalComfort} from '../public/weather-fusion/weather-math.js';
 import {comfortMode,comfortWindow,comfortNarrative} from '../public/weather-fusion/comfort-outlook.js';
 import {heroWeather} from '../public/weather-fusion/hero-mode.js';
 import {dewpointPoints,graphGeometry} from '../public/weather-fusion/dewpoint-meter.js';
@@ -73,7 +73,7 @@ test('night low is the coming evening, not the predawn period with the same cale
 test('bounded thermal observation alignment fades from the actual observation, not each refresh',()=>{
  const time=Date.parse('2026-09-06T09:41Z'),obs=Date.parse('2026-09-06T09:15Z');
  const raw=Array.from({length:8},(_,i)=>({epoch:Date.parse('2026-09-06T09:00Z')+i*H,temperature:i===2?69:70,dewpoint:70,wind:3.5,humidity:100}));
- const current={type:'observation',station:'TEST',stationDistanceKm:25,time:new Date(obs).toISOString(),temperature:73,dewpoint:73,wind:0};
+ const current={type:'observation',station:'TEST',stationDistanceKm:10,time:new Date(obs).toISOString(),temperature:73,dewpoint:73,wind:0};
  const a=alignComfortHours(raw,current,time),b=alignComfortHours(raw,current,time+5*60000);
  assert.equal(a.alignment.status,'applied');assert.deepEqual(a.hours,b.hours);
  const at7=a.hours[2],uncorrected=shadeFeelsLike(69,100,3.5,70).value;
@@ -81,8 +81,21 @@ test('bounded thermal observation alignment fades from the actual observation, n
  assert.equal(a.hours[5].alignmentFactor,0);
  assert.equal(at7.feels,shadeFeelsLike(at7.temperature,at7.humidity,at7.wind,at7.dewpoint).value);
  for(const row of a.hours)assert.ok(row.dewpoint<=row.temperature);
- assert.equal(alignComfortHours(raw,{...current,stationDistanceKm:90},time).alignment.status,'not-applied');
+ assert.equal(alignComfortHours(raw,{...current,stationDistanceKm:25},time).alignment.status,'not-applied');
  assert.equal(alignComfortHours(raw,current,time+2*H).alignment.status,'not-applied');
+});
+test('a distant airport reading is reference data, not the selected location current temperature',()=>{
+ const input=structuredClone(testInputs);input.models=models();
+ input.observation={...input.observation,temperature:88,station:'KJNX',stationName:'Smithfield, Johnston County Airport',stationDistanceKm:28.6};
+ const out=buildForecast(input);
+ assert.equal(MAX_DIRECT_STATION_DISTANCE_KM,16.1);
+ assert.equal(out.current.type,'guidance');
+ assert.equal(out.current.temperature,80);
+ assert.equal(out.current.station,null);
+ assert.equal(out.current.localEstimate.source,'NOAA National Blend · 2.5 km');
+ assert.deepEqual(out.current.localEstimate.referenceStation,{station:'KJNX',stationName:'Smithfield, Johnston County Airport',distanceKm:28.6,temperature:88,observedAt:input.observation.time});
+ assert.equal(out.metricForecasts.comfortAlignment.status,'not-applied');
+ assert.notEqual(out.current.feelsLike,thermalComfort(input.observation,input.location,now).outdoors);
 });
 function fakePlayer(){
  const layers=new Set(),made=[],map={removeLayer:l=>layers.delete(l)};
