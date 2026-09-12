@@ -135,8 +135,13 @@ export function precipitationLikelihood(nwsProbability, precipitationBlend, poli
     ecmwf: finite(amounts.ecmwf) ? (amounts.ecmwf >= RAIN_VOTE_THRESHOLD_IN ? 100 : 0) : null
   };
   const result = weighted(values, policy);
-  return {...result,value:finite(result.value)?Math.round(result.value):null,sourceValues:values,
-    sourceAmounts:{hrrr:finite(amounts.hrrr)?amounts.hrrr:null,ecmwf:finite(amounts.ecmwf)?amounts.ecmwf:null},
+  const rounded=finite(result.value)?Math.round(result.value):null;
+  const sourceAmounts=Object.fromEntries(['nws','hrrr','ecmwf'].map(id=>[id,finite(amounts[id])?amounts[id]:null]));
+  const drySources=Object.entries(sourceAmounts).filter(([,amount])=>finite(amount)&&amount<RAIN_VOTE_THRESHOLD_IN).map(([id])=>id);
+  if(!finite(sourceAmounts.nws)&&finite(nwsProbability)&&nwsProbability<10&&!drySources.includes('nws'))drySources.push('nws');
+  const value=finite(rounded)&&rounded<10&&drySources.length>=2?0:rounded;
+  return {...result,value,rawValue:rounded,sourceValues:values,
+    sourceAmounts,drySources,
     source:'Weather Nourie consensus · NWS probability + HRRR/ECMWF wet-dry guidance',calibrated:false,thresholdInches:RAIN_VOTE_THRESHOLD_IN};
 }
 /** Backward-compatible API helper using the same all-weather Steadman equation as Weather Nourie. */
@@ -231,6 +236,15 @@ export function enhanceForecast(out, { models, grid, periods = [], now, gridQpf,
     d.qpf=rain.value;d.qpfSource=rain.source;d.qpfBlend=rain;
     d.qpfWindow={start:iso(start),end:iso(end)};
     d.qpfWindowLabel=start>fullStart?'Remaining forecast through 7 AM':'7 AM–7 AM forecast';
+    const periodRain=period=>{
+      const a=Math.max(Date.parse(period?.startTime),index===0?Math.ceil(now/H)*H:0),b=Date.parse(period?.endTime);
+      return finite(a)&&finite(b)&&b>a?qpf(a,b,index):null;
+    };
+    const dayRain=periodRain(day),nightRain=periodRain(night);
+    d.officialPop=d.pop;d.officialPopDay=d.popDay;d.officialPopNight=d.popNight;
+    d.rainLikelihood=precipitationLikelihood(d.pop,rain,SAME_DAY_WEIGHTS);
+    d.popDayLikelihood=precipitationLikelihood(d.popDay,dayRain||rain,SAME_DAY_WEIGHTS);
+    d.popNightLikelihood=precipitationLikelihood(d.popNight,nightRain||rain,SAME_DAY_WEIGHTS);
     for(const [id,value] of Object.entries(rain.sourceValues)) if(id!=='nws') {d.guidance[id] ||= {};d.guidance[id].qpf=value;}
     // Confidence must describe the final period-aligned blend, not the earlier
     // calendar-day completeness check. Only positive-weight contributors count.
@@ -256,7 +270,7 @@ export function enhanceForecast(out, { models, grid, periods = [], now, gridQpf,
     const rain=qpf(time,time+H,(time-now)/H<24?0:1);
     hour.precipitation=rain.value;hour.precipitationSource=rain.source;hour.precipitationBlend=rain;
     hour.officialPop=hour.pop;
-    hour.rainLikelihood=precipitationLikelihood(hour.pop,rain,(time-now)/H<24?SAME_DAY_WEIGHTS:precipitationPolicy(forecastDayIndex(time,now,out.location.timeZone)));
+    hour.rainLikelihood=precipitationLikelihood(hour.pop,rain,SAME_DAY_WEIGHTS);
     hour.reflectivity=sample(sourceModels.hrrr,time,'reflectivity');
     hour.nearbyReflectivity=sample(sourceModels.hrrr,time,'nearby_reflectivity');
   }
@@ -268,7 +282,8 @@ export function enhanceForecast(out, { models, grid, periods = [], now, gridQpf,
   out.convectiveGuidance=out.hours.filter(h=>finite(h.reflectivity)||finite(h.nearbyReflectivity)).slice(0,30).map(h=>({time:h.time,pointReflectivityDbz:h.reflectivity,nearby25kmMaxReflectivityDbz:h.nearbyReflectivity,runAt:sourceModels.hrrr?.reflectivityRunAt||sourceModels.hrrr?.runAt}));
   out.google={status:'access-required',contributes:false,label:'Google WeatherNext',message:'Not included: approved Google WeatherNext dataset access has not been configured.',url:'https://developers.google.com/weathernext/guides/access-forecast'};
   out.repairVersion=REPAIR_VERSION;
-  out.blendPolicy={sameDay:SAME_DAY_WEIGHTS,probability:'Hourly Weather Nourie consensus: NWS probability plus deterministic HRRR/ECMWF wet-dry votes; uncalibrated',partialCoverage:'Unavailable inputs are excluded and remaining weights renormalized'};
+  out.blendPolicy={sameDay:SAME_DAY_WEIGHTS,probability:'Weather Nourie hourly/daily consensus: NWS probability plus deterministic HRRR/ECMWF wet-dry votes; uncalibrated',lowDryConsensus:'Display 0% when at least two source rain amounts are dry and the weighted result is below 10%',partialCoverage:'Unavailable inputs are excluded and remaining weights renormalized'};
   out.methodology='Numeric Weather Nourie blend: Current-day temperatures start at NWS 40% / HRRR 40% / ECMWF 20%. HRRR, ECMWF IFS and NBM contribute only where a fresh run fully covers the requested period. Current-day precipitation starts at NWS 40% / HRRR 40% / ECMWF 20%, blended per hour so a short HRRR run still contributes; extended precipitation at ECMWF 60% / NBM 25% / NWS 15%, with documented fallbacks. Available weights renormalize; missing values never become zero. These are uncalibrated starting weights, not a proven accuracy ranking. The hourly rain likelihood combines the official NWS probability with wet-or-dry votes from deterministic HRRR and ECMWF runs; it is a transparent consensus score, not a native calibrated probability from either deterministic model. Official warnings are never altered. Explicit HRRR, ECMWF IFS 0.25° and NBM point feeds cover the selected coordinates through Open-Meteo, with native extracts as a fallback. Point feeds can combine successive runs of the same named model; their initialization metadata refers to the latest published run. Temperature, dew point, wind, gust and cloud cover share the requested lead-day weights; humidity and feels-like are derived consistently. Pressure and visibility include only published fields. Station observations, UV and official text retain separate provenance. Coarser precipitation intervals are prorated at boundaries; interpolated hourly amounts do not establish storm arrival times. Today’s daily rain card covers only the remaining period when earlier forecast hours have passed; the main precipitation metric covers the next 24 hours.';
+  out.methodology=out.methodology.replace('The hourly rain likelihood','The hourly and daily rain likelihoods');
   return out;
 }

@@ -37,14 +37,16 @@ test('missing blend inputs are excluded rather than filled with zero',()=>{
  assert.equal(weighted({hrrr:null,ecmwf:null},{hrrr:.6,ecmwf:.4}).value,null);
 });
 test('hourly rain likelihood combines NWS probability with HRRR and ECMWF wet-dry guidance',()=>{
- const dry=precipitationLikelihood(10,{sourceValues:{hrrr:0,ecmwf:0}});
- assert.equal(dry.value,4);
+ const dry=precipitationLikelihood(10,{sourceValues:{nws:0,hrrr:0,ecmwf:0}});
+ assert.equal(dry.rawValue,4);assert.equal(dry.value,0);
  assert.deepEqual(dry.sourceValues,{nws:10,hrrr:0,ecmwf:0});
  const mixed=precipitationLikelihood(50,{sourceValues:{hrrr:0,ecmwf:.035}});
  assert.equal(mixed.value,40);
  assert.equal(mixed.calibrated,false);
  const missing=precipitationLikelihood(10,{sourceValues:{hrrr:null,ecmwf:null}});
  assert.equal(missing.value,10);
+ const lowOfficialAndDryEcmwf=precipitationLikelihood(5,{sourceValues:{nws:null,hrrr:null,ecmwf:0}});
+ assert.equal(lowOfficialAndDryEcmwf.rawValue,3);assert.equal(lowOfficialAndDryEcmwf.value,0);
 });
 test('API feels-like helper uses the same Steadman equation family in hot mild and cold weather',()=>{
  const hot=feelsLike(95,47,5,72),mild=feelsLike(70,50,8,50),cold=feelsLike(30,70,15,20);
@@ -71,6 +73,11 @@ test('direct models materially change numeric forecast and the source signature'
  const b=buildForecast({...testInputs,models:hotter});
  assert.notEqual(a.days[0].high,b.days[0].high);assert.notEqual(a.signature,b.signature);
  assert.equal(a.days[0].pop,testInputs.forecast.periods[1].probabilityOfPrecipitation.value);
+ assert.ok(Number.isFinite(a.days[0].rainLikelihood.value));
+ assert.ok(Number.isFinite(a.days[0].popDayLikelihood.value));
+ assert.ok(Number.isFinite(a.days[0].popNightLikelihood.value));
+ assert.equal(a.hours[0].officialPop,testInputs.hourly.periods[0].probabilityOfPrecipitation.value);
+ assert.ok(Number.isFinite(a.hours[0].rainLikelihood.value));
  assert.equal(a.google.contributes,false);
 });
 test('expired or absent direct feeds do not manufacture a model value',async()=>{

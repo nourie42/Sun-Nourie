@@ -15,7 +15,7 @@ export function dailyDisplay(day, index, now, zone) {
     primary:tonight?day.low:day.high, secondary:tonight?null:day.low,
     primaryLabel:tonight?'Low':'High', condition:tonight?(day.nightCondition||day.condition):day.condition,
     detail:tonight?(day.nightDetail||day.detail):day.detail,
-    pop:tonight?day.popNight:day.pop};
+    pop:tonight?(day.popNightLikelihood?.value??day.popNight):index===0?(day.popDayLikelihood?.value??day.popDay??day.rainLikelihood?.value??day.pop):(day.rainLikelihood?.value??day.pop)};
 }
 export function temperatureBar(value, floor, ceiling) {
   if (![value,floor,ceiling].every(finite)) return null;

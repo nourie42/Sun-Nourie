@@ -72,7 +72,7 @@ export function addExperience(out,{models={},grid,periods=[],now,solarTimes,next
    h.windDirectionDegrees=round(h.windDirectionBlend.value);h.windDirection=finite(h.windDirectionDegrees)?COMPASS[Math.round(h.windDirectionDegrees/22.5)%16]:null;
    raw.push({epoch,time,temperature:h.temperature,dewpoint:dewpoint.value,humidity,wind:wind.value});
    fieldsByTime.set(epoch,{temperature:{...source(h.temperature,'Forecast blend'),sources:h.temperatureBlend?.sources},dewpoint,wind,humidity:source(humidity,'Consistent forecast temperature + dew point'),gust,visibility,pressure,cloud,
-     precipitation:source(h.precipitation,h.precipitationSource),pop:source(h.pop,'NWS hourly')});
+     precipitation:source(h.precipitation,h.precipitationSource),pop:source(h.rainLikelihood?.value??h.pop,h.rainLikelihood?.source||'NWS hourly')});
  }
  const aligned=alignComfortHours(raw,out.current,now);
  const series=Object.fromEntries(['temperature','feels','precipitation','wind','gust','humidity','dewpoint','pop','visibility','pressure','cloud'].map(k=>[k,[]]));

@@ -13,6 +13,12 @@ test('first row changes at 3 PM in the LOCATION timezone, not browser timezone',
  assert.equal(dailyDisplay(day,0,Date.parse('2026-09-05T19:00:00Z'),'America/Los_Angeles').label,'Today');
  assert.equal(dailyDisplay(day,1,Date.parse('2026-09-05T23:00:00Z'),'America/New_York').primary,86);
 });
+test('daily display consistently prefers the blended rain likelihood',()=>{
+ const blended={...day,popDay:60,popDayLikelihood:{value:24},popNightLikelihood:{value:12},rainLikelihood:{value:32}};
+ assert.equal(dailyDisplay(blended,0,Date.parse('2026-09-05T18:00:00Z'),'America/New_York').pop,24);
+ assert.equal(dailyDisplay(blended,0,Date.parse('2026-09-05T20:00:00Z'),'America/New_York').pop,12);
+ assert.equal(dailyDisplay(blended,1,Date.parse('2026-09-05T20:00:00Z'),'America/New_York').pop,32);
+});
 test('Tonight never invents or relabels a missing high',()=>{
  const p=dailyDisplay({...day,high:null},0,Date.parse('2026-09-05T23:00:00Z'),'America/New_York');assert.equal(p.primary,68);assert.equal(p.primaryLabel,'Low');
 });

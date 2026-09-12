@@ -12,6 +12,7 @@ test('Today metrics use their forecast period and never substitute current condi
  assert.deepEqual(periodWeatherStats(f,now),{wind:6,humidity:68});
  const html=todayForecastHTML(f,now);
  for(const value of ['Today','95°','74°','103°','23%','6 mph','UV Index','Click for more details'])assert.ok(html.includes(value),value);
+ assert.match(html,/Rain chance/);assert.doesNotMatch(html,/NWS chance/);
  assert.doesNotMatch(html,/>Humidity<|>Precipitation</);
  assert.match(html,/data-today-forecast/);assert.doesNotMatch(html,/99 mph|99%|Sunrise|Sunset/);
 });
@@ -61,4 +62,9 @@ test('hourly card shows the Weather Nourie consensus rather than relabeling NWS 
  assert.match(hourlyRainHTML({pop:21,rainLikelihood:{value:48,sourceValues:{nws:21,hrrr:100,ecmwf:0}}}),/>48%</);
  assert.doesNotMatch(hourlyRainHTML({pop:21,rainLikelihood:{value:48,sourceValues:{nws:21,hrrr:100,ecmwf:0}}}),/% NWS|HRRR: rain/);
  assert.match(hourlyRainHTML({pop:22}),/>22%</);
+});
+test('Today and Tonight prefer their matching blended rain likelihood',()=>{
+ const f=fixture();f.days[0].popDayLikelihood={value:8};f.days[0].popNightLikelihood={value:3};f.days[0].rainLikelihood={value:12};
+ assert.match(todayForecastHTML(f,now),/>8%<\/strong><small>Rain chance/);
+ assert.match(todayForecastHTML(f,Date.parse('2026-09-11T23:00:00Z')),/>3%<\/strong><small>Rain chance/);
 });
