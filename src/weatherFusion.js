@@ -27,6 +27,13 @@ export const PRESETS = [
 ];
 export const RADAR_URL = 'https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows';
 export const RADAR_NEARBY_MILES = 12;
+const HYDROMETEOR_COLORS = [
+  ['biological',[156,156,156]],['ground-clutter',[118,118,118]],['ice-crystals',[255,176,176]],
+  ['dry-snow',[0,255,255]],['wet-snow',[0,144,255]],['rain',[0,251,144]],['heavy-rain',[0,187,0]],
+  ['big-drops',[208,208,96]],['graupel',[210,132,132]],['hail',[255,0,0]],['large-hail',[160,20,20]],
+  ['giant-hail',[255,255,0]],['unknown',[231,0,255]],['range-folded',[119,0,125]],
+];
+const PRECIPITATION_HYDROMETEORS = new Set(['dry-snow','wet-snow','rain','heavy-rain','big-drops','graupel','hail','large-hail','giant-hail']);
 const HOUR = 3600000;
 const MINUTE = 60000;
 const VERSION = 'weather-fusion-v2-direct';
@@ -172,12 +179,12 @@ export function parseRadarTimes(xml, now = Date.now()) {
 export function radarSampleLocations(location) {
   const latitude = Number(location?.latitude), longitude = Number(location?.longitude);
   if (!finite(latitude) || !finite(longitude)) return [];
-  const points = [{ latitude, longitude, distanceMiles: 0 }];
+  const points = [{ latitude, longitude, distanceMiles: 0, bearing: null }];
   for (const [radius, bearings] of [[RADAR_NEARBY_MILES / 2, [0, 90, 180, 270]], [RADAR_NEARBY_MILES, [0, 45, 90, 135, 180, 225, 270, 315]]]) {
     const north = radius / 69, east = radius / (69 * Math.cos(latitude * Math.PI / 180));
     for (const bearing of bearings) {
       const angle = bearing * Math.PI / 180;
-      points.push({latitude:rounded(latitude + north * Math.cos(angle),4),longitude:rounded(longitude + east * Math.sin(angle),4),distanceMiles:radius});
+      points.push({latitude:rounded(latitude + north * Math.cos(angle),4),longitude:rounded(longitude + east * Math.sin(angle),4),distanceMiles:radius,bearing});
     }
   }
   return points;
@@ -188,20 +195,57 @@ export function radarFeatureActive(payload) {
   return finite(properties?.ALPHA_BAND) ? properties.ALPHA_BAND > 0 : null;
 }
 
+export function radarHydrometeorClass(payload) {
+  const properties = payload?.features?.[0]?.properties;
+  if (!finite(properties?.ALPHA_BAND) || properties.ALPHA_BAND <= 0) return null;
+  const rgb = [properties.RED_BAND,properties.GREEN_BAND,properties.BLUE_BAND];
+  if (!rgb.every(finite)) return null;
+  let match = null, distance = Infinity;
+  for (const [name,color] of HYDROMETEOR_COLORS) {
+    const candidate = color.reduce((sum,value,index) => sum + (value-rgb[index])**2,0);
+    if (candidate < distance) { match = name; distance = candidate; }
+  }
+  // Published classification colors are exact; allow only tiny rendering variation.
+  return distance <= 75 ? match : null;
+}
+
 export function radarFeatureInfoUrl(point, time) {
   const halfDegree = .01;
   return `${RADAR_URL}?${new URLSearchParams({service:'WMS',version:'1.3.0',request:'GetFeatureInfo',layers:'conus_bref_qcd',query_layers:'conus_bref_qcd',styles:'radar_reflectivity',crs:'CRS:84',bbox:[point.longitude-halfDegree,point.latitude-halfDegree,point.longitude+halfDegree,point.latitude+halfDegree].join(','),width:'3',height:'3',i:'1',j:'1',info_format:'application/json',time})}`;
+}
+
+export function radarHydrometeorUrl(station, request = 'GetCapabilities', point = null, time = null) {
+  const code = String(station || '').toLowerCase();
+  if (!/^k[a-z]{3}$/.test(code)) return null;
+  const layer = `${code}_bdhc`, base = `https://opengeo.ncep.noaa.gov/geoserver/${code}/${layer}/ows`;
+  if (request === 'GetCapabilities') return `${base}?${new URLSearchParams({service:'WMS',version:'1.3.0',request})}`;
+  if (!point || !time) return null;
+  const halfDegree = .01;
+  return `${base}?${new URLSearchParams({service:'WMS',version:'1.3.0',request:'GetFeatureInfo',layers:layer,query_layers:layer,styles:'radar_bdhc',crs:'CRS:84',bbox:[point.longitude-halfDegree,point.latitude-halfDegree,point.longitude+halfDegree,point.latitude+halfDegree].join(','),width:'3',height:'3',i:'1',j:'1',info_format:'application/json',time})}`;
+}
+
+function coherentNearbyPrecipitation(samples) {
+  const active = samples.filter(sample => sample.distanceMiles > 0 && sample.active === true && finite(sample.bearing));
+  // A single spoke or a couple of isolated pixels are common radar artifacts.
+  // Require three distinct bearings across both sampling rings within one 90-degree sector.
+  if(active.length<3||new Set(active.map(sample=>sample.distanceMiles)).size<2)return false;
+  return active.some(({bearing})=>{
+    const sector=active.filter(sample=>((sample.bearing-bearing+360)%360)<=90);
+    return new Set(sector.map(sample=>sample.bearing)).size>=3&&new Set(sector.map(sample=>sample.distanceMiles)).size>=2;
+  });
 }
 
 export function summarizeRadarPresence(samples, observedAt) {
   const available = samples.filter(sample => typeof sample.active === 'boolean');
   const active = available.filter(sample => sample.active);
   const center = samples.find(sample => sample.distanceMiles === 0);
+  const nearby = coherentNearbyPrecipitation(samples);
+  const accepted = active.filter(sample => sample.distanceMiles === 0 || nearby);
   return {status:available.length ? 'ready' : 'unavailable',observedAt,
     atLocation:typeof center?.active === 'boolean' ? center.active : null,
-    nearby:active.some(sample => sample.distanceMiles > 0),
-    nearestRainMiles:active.length ? Math.min(...active.map(sample => sample.distanceMiles)) : null,
-    scanRadiusMiles:RADAR_NEARBY_MILES,source:'NOAA MRMS observed radar'};
+    nearby,
+    nearestRainMiles:accepted.length ? Math.min(...accepted.map(sample => sample.distanceMiles)) : null,
+    scanRadiusMiles:RADAR_NEARBY_MILES,source:'NOAA MRMS reflectivity checked against local NEXRAD dual-polarization classification'};
 }
 
 /** Bounded in-process cache with concurrent request de-duplication and no stale fallback. */
@@ -502,19 +546,40 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
   }
   async function radar(query = {}) {
     const location = coordinates(query);
-    const result = await feed('radar', 'NOAA radar mosaic', `${RADAR_URL}?service=WMS&version=1.3.0&request=GetCapabilities`, 2 * MINUTE, (xml) => parseRadarTimes(xml, now()), { text: true });
+    const pointUrl=`https://api.weather.gov/points/${location.latitude},${location.longitude}`;
+    const [result,pointResult] = await Promise.all([
+      feed('radar', 'NOAA radar mosaic', `${RADAR_URL}?service=WMS&version=1.3.0&request=GetCapabilities`, 2 * MINUTE, (xml) => parseRadarTimes(xml, now()), { text: true }),
+      cached(pointUrl,24*HOUR).catch(()=>null),
+    ]);
     const frames = result.value || [];
     const status = frames.length ? (now() - Date.parse(frames.at(-1)) > 20 * MINUTE ? 'stale' : 'ready') : 'unavailable';
-    let precipitation = {status:'unavailable',observedAt:frames.at(-1)||null,atLocation:null,nearby:false,nearestRainMiles:null,scanRadiusMiles:RADAR_NEARBY_MILES,source:'NOAA MRMS observed radar'};
+    let precipitation = {status:'unavailable',observedAt:frames.at(-1)||null,atLocation:null,nearby:false,nearestRainMiles:null,scanRadiusMiles:RADAR_NEARBY_MILES,source:'NOAA MRMS reflectivity checked against local NEXRAD dual-polarization classification'};
     if (status === 'ready') {
       const observedAt = frames.at(-1), points = radarSampleLocations(location);
-      const samples = await Promise.all(points.map(async point => {
+      const radarStation=pointResult?.data?.properties?.radarStation;
+      const hydrometeorCapabilitiesUrl=radarHydrometeorUrl(radarStation);
+      const hydrometeorTimes=hydrometeorCapabilitiesUrl
+        ? cached(hydrometeorCapabilitiesUrl,2*MINUTE,{text:true}).then(({data})=>parseRadarTimes(data,now())).catch(()=>[])
+        : Promise.resolve([]);
+      const [reflectivitySamples,hydrometeorFrames] = await Promise.all([Promise.all(points.map(async point => {
         try {
           const {data} = await cached(radarFeatureInfoUrl(point,observedAt),2*MINUTE);
-          return {...point,active:radarFeatureActive(data)};
-        } catch { return {...point,active:null}; }
+          return {...point,reflectivityActive:radarFeatureActive(data)};
+        } catch { return {...point,reflectivityActive:null}; }
+      })),hydrometeorTimes]);
+      const latestHydrometeor=hydrometeorFrames.at(-1);
+      const hydrometeorObservedAt=latestHydrometeor&&now()-Date.parse(latestHydrometeor)<=20*MINUTE?latestHydrometeor:null;
+      const samples=await Promise.all(reflectivitySamples.map(async sample=>{
+        if(sample.reflectivityActive===false)return {...sample,hydrometeor:null,active:false};
+        if(sample.reflectivityActive!==true||!hydrometeorObservedAt)return {...sample,hydrometeor:null,active:null};
+        try{
+          const url=radarHydrometeorUrl(radarStation,'GetFeatureInfo',sample,hydrometeorObservedAt);
+          const {data}=await cached(url,2*MINUTE);
+          const hydrometeor=radarHydrometeorClass(data);
+          return {...sample,hydrometeor,active:hydrometeor===null?null:PRECIPITATION_HYDROMETEORS.has(hydrometeor)};
+        }catch{return {...sample,hydrometeor:null,active:null};}
       }));
-      precipitation = summarizeRadarPresence(samples,observedAt);
+      precipitation = {...summarizeRadarPresence(samples,observedAt),classification:{station:radarStation||null,observedAt:hydrometeorObservedAt}};
     }
     return { frames, url: RADAR_URL, layer: 'conus_bref_qcd', status,
       location:{latitude:location.latitude,longitude:location.longitude},precipitation,

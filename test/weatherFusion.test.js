@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { coordinates, localTime, dateKey, nextDate, durationMs, sumHourly, gridQpf, guidanceBlend, normalizeModel, parseRadarTimes, radarSampleLocations, radarFeatureActive, summarizeRadarPresence, Cache, buildForecast, createWeatherService, registerWeatherFusionRoutes } from '../src/weatherFusion.js';
+import { coordinates, localTime, dateKey, nextDate, durationMs, sumHourly, gridQpf, guidanceBlend, normalizeModel, parseRadarTimes, radarSampleLocations, radarFeatureActive, radarHydrometeorClass, radarHydrometeorUrl, summarizeRadarPresence, Cache, buildForecast, createWeatherService, registerWeatherFusionRoutes } from '../src/weatherFusion.js';
 import {H,now,base,times,model,periods,hourlyPeriods,grid,inputs,snapshot} from './weatherFusion.fixtures.js';
 test('coordinate validation is finite, bounded, and rejects coercion and arrays', () => {
   assert.equal(coordinates({ location: 'greenville' }).longitude, -77.3664);
@@ -162,19 +162,30 @@ test('live radar distinguishes the selected point from precipitation nearby', as
   assert.equal(radarFeatureActive({features:[{properties:{ALPHA_BAND:255}}]}),true);
   assert.equal(radarFeatureActive({features:[{properties:{ALPHA_BAND:0}}]}),false);
   assert.equal(radarFeatureActive({features:[]}),null);
-  const summary=summarizeRadarPresence(points.map((point,index)=>({...point,active:index===8})),new Date(now).toISOString());
-  assert.equal(summary.atLocation,false);assert.equal(summary.nearby,true);assert.equal(summary.nearestRainMiles,12);
+  assert.equal(radarHydrometeorClass({features:[{properties:{RED_BAND:156,GREEN_BAND:156,BLUE_BAND:156,ALPHA_BAND:255}}]}),'biological');
+  assert.equal(radarHydrometeorClass({features:[{properties:{RED_BAND:0,GREEN_BAND:251,BLUE_BAND:144,ALPHA_BAND:255}}]}),'rain');
+  assert.equal(radarHydrometeorClass({features:[{properties:{RED_BAND:0,GREEN_BAND:0,BLUE_BAND:0,ALPHA_BAND:0}}]}),null);
+  assert.match(radarHydrometeorUrl('KRAX'),/krax\/krax_bdhc/);assert.equal(radarHydrometeorUrl('../bad'),null);
+  let summary=summarizeRadarPresence(points.map((point,index)=>({...point,active:index===8})),new Date(now).toISOString());
+  assert.equal(summary.atLocation,false);assert.equal(summary.nearby,false);assert.equal(summary.nearestRainMiles,null);
+  summary=summarizeRadarPresence(points.map((point,index)=>({...point,active:[1,6,7].includes(index)})),new Date(now).toISOString());
+  assert.equal(summary.nearby,true);assert.equal(summary.nearestRainMiles,6);
   const xml=`<Dimension name="time">${new Date(now-2*60000).toISOString()}</Dimension>`;
   const fetchImpl=async value=>{
     const url=new URL(value),request=url.searchParams.get('request')?.toLowerCase();
+    if(url.pathname.startsWith('/points/'))return response({properties:{radarStation:'KRAX'}});
     if(request==='getcapabilities')return new Response(xml,{status:200,headers:{'content-type':'application/xml'}});
     if(request==='getfeatureinfo'){
       const [west,,east]=url.searchParams.get('bbox').split(',').map(Number),longitude=(west+east)/2;
-      const alpha=longitude < -78.6 ? 255 : 0;
-      return new Response(JSON.stringify({features:[{properties:{RED_BAND:20,GREEN_BAND:180,BLUE_BAND:30,ALPHA_BAND:alpha}}]}),{status:200,headers:{'content-type':'application/json'}});
+      if(url.pathname.includes('_bdhc')){
+        const biological=longitude > -78.6;
+        return response({features:[{properties:biological?{RED_BAND:156,GREEN_BAND:156,BLUE_BAND:156,ALPHA_BAND:255}:{RED_BAND:0,GREEN_BAND:251,BLUE_BAND:144,ALPHA_BAND:255}}]});
+      }
+      return response({features:[{properties:{RED_BAND:20,GREEN_BAND:180,BLUE_BAND:30,ALPHA_BAND:255}}]});
     }
     throw new Error('Unexpected radar request');
   };
   const live=await createWeatherService({fetchImpl,now:()=>now}).radar({location:'knightdale'});
-  assert.equal(live.precipitation.status,'ready');assert.equal(live.precipitation.atLocation,false);assert.equal(live.precipitation.nearby,true);
+  assert.equal(live.precipitation.status,'ready');assert.equal(live.precipitation.atLocation,false);assert.equal(live.precipitation.nearby,false);
+  assert.equal(live.precipitation.classification.station,'KRAX');
 });
