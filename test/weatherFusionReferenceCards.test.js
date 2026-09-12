@@ -12,7 +12,13 @@ test('illustrated weather stays synchronized across outdoor and pet scenes',()=>
   assert.match(referenceScene(panel,true,'Rain',88),/data-scene="rain"/);
   assert.match(referenceScene(panel,true,'Rain',88),/comfort-reference-scenes-rain\.webp/);
   assert.doesNotMatch(referenceScene(panel,true,'Rain',88),/class="sky-sun"/);
+  if(panel===2){
+   assert.match(referenceScene(panel,true,'Rain',88),/data-pet-motion="shake-off"/);
+   assert.match(referenceScene(panel,true,'Rain',88),/dog shakes rainwater from its fur/);
+  }else assert.doesNotMatch(referenceScene(panel,true,'Rain',88),/data-pet-motion=/);
  }
+ assert.doesNotMatch(referenceScene(2,true,'Clear',88),/data-pet-motion=/,'dry pet scenes stay still');
+ assert.doesNotMatch(referenceScene(2,true,'Chance Showers',88,{pop:50}),/data-pet-motion=/,'umbrella-only scenes stay still');
  assert.match(referenceScene(1,true,'Clear',70),/class="sky-sun"/);
  assert.match(referenceScene(1,true,'Snow',30),/data-scene="cold"/);
  assert.match(referenceScene(1,true,'Clear',30),/comfort-reference-scenes-cold\.webp/);
