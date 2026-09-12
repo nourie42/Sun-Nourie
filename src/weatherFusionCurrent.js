@@ -28,11 +28,11 @@ export function validateCurrentConditions(current,hours=[],modelRows={},now=Date
  const observedAt=Date.parse(current.time),ageMs=now-observedAt;
  const fresh=finite(observedAt)&&ageMs>=-5*60000&&ageMs<=MAX_STATION_AGE_MS;
  const close=current.stationDistanceKm<=MAX_DIRECT_STATION_DISTANCE_KM;
- const differenceF=finite(localTemperature)&&finite(current.temperature)?Math.abs(current.temperature-localTemperature):null;
+ const differenceF=finite(localTemperature)&&finite(current.temperature)?round(Math.abs(current.temperature-localTemperature),1):null;
  const agrees=current.stationDistanceKm<=ALWAYS_TRUST_STATION_DISTANCE_KM||!finite(differenceF)||differenceF<=MAX_STATION_GUIDANCE_DIFFERENCE_F;
  const accepted=fresh&&close&&agrees;
  const checks={accepted,stationDistanceKm:current.stationDistanceKm,stationAgeMinutes:finite(ageMs)?round(ageMs/60000,1):null,
-  stationVsLocalGuidanceF:round(differenceF,1),limits:{distanceKm:MAX_DIRECT_STATION_DISTANCE_KM,ageMinutes:MAX_STATION_AGE_MS/60000,differenceF:MAX_STATION_GUIDANCE_DIFFERENCE_F,unconditionalDistanceKm:ALWAYS_TRUST_STATION_DISTANCE_KM}};
+  stationVsLocalGuidanceF:differenceF,limits:{distanceKm:MAX_DIRECT_STATION_DISTANCE_KM,ageMinutes:MAX_STATION_AGE_MS/60000,differenceF:MAX_STATION_GUIDANCE_DIFFERENCE_F,unconditionalDistanceKm:ALWAYS_TRUST_STATION_DISTANCE_KM}};
  if(accepted)return {...current,sourceValidation:checks};
  if(!finite(localTemperature))return {type:'unavailable',temperature:null,condition:'Current conditions unavailable',conditionSource:'No accepted local source',time:iso(epoch),station:null,stationName:null,stationDistanceKm:null,
   humidity:null,dewpoint:null,wind:null,gust:null,windDirection:null,visibility:null,pressure:null,pressurePa:null,pressureTrend:{status:'unavailable',direction:'unknown'},apparent:null,apparentSource:'Unavailable',

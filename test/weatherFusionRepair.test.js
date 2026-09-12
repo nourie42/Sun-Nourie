@@ -104,7 +104,7 @@ test('current-source validation applies to every coordinate, not named locations
  const observation={type:'observation',temperature:88,time:new Date(now-20*60000).toISOString(),station:'TEST',stationName:'Generic station'};
  const at=(distance,patch={})=>validateCurrentConditions({...observation,stationDistanceKm:distance,...patch},hours,models,now);
  assert.equal(at(4).type,'observation','a very close fresh station remains the measurement even when guidance differs');
- assert.equal(at(12,{temperature:84}).type,'observation','a moderately close station that agrees remains the measurement');
+ assert.equal(at(12,{temperature:85}).type,'observation','the exact five-degree agreement boundary remains accepted');
  assert.equal(at(12).type,'guidance','a moderately close station with a large disagreement is rejected');
  assert.equal(at(20).type,'guidance','a distant station is rejected even when fresh');
  assert.equal(at(4,{time:new Date(now-76*60000).toISOString()}).type,'guidance','an old station report is rejected even when close');
