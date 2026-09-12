@@ -1,0 +1,124 @@
+{
+  "commit": "7df5188648f619e081be79b6215196016b2a96cf",
+  "checkedAt": "2026-09-12T01:47:40.112Z",
+  "fixture": false,
+  "success": true,
+  "checks": [
+    {
+      "label": "initial-page",
+      "checkedAt": "2026-09-12T01:47:51.763Z",
+      "assembledAt": "2026-09-12T01:47:25.100Z",
+      "sourceCheckedAt": "2026-09-12T01:47:24.969Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "991e36c3c0dedef2b6dea99f",
+      "discussionId": "3f74352a-342e-4a02-9c0c-2f9e09d56b51",
+      "issuedAt": "2026-09-12T00:06:00+00:00",
+      "cachedItems": [],
+      "visible": true,
+      "text": "Flooding rain: Marginal risk today. A few spots could flood."
+    },
+    {
+      "label": "refresh-1",
+      "checkedAt": "2026-09-12T01:48:57.513Z",
+      "assembledAt": "2026-09-12T01:48:51.764Z",
+      "sourceCheckedAt": "2026-09-12T01:47:24.969Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "991e36c3c0dedef2b6dea99f",
+      "discussionId": "3f74352a-342e-4a02-9c0c-2f9e09d56b51",
+      "issuedAt": "2026-09-12T00:06:00+00:00",
+      "cachedItems": [],
+      "visible": true,
+      "text": "Flooding rain: Marginal risk today. A few spots could flood."
+    },
+    {
+      "label": "refresh-2",
+      "checkedAt": "2026-09-12T01:50:05.256Z",
+      "assembledAt": "2026-09-12T01:50:03.698Z",
+      "sourceCheckedAt": "2026-09-12T01:50:03.094Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "991e36c3c0dedef2b6dea99f",
+      "discussionId": "3f74352a-342e-4a02-9c0c-2f9e09d56b51",
+      "issuedAt": "2026-09-12T00:06:00+00:00",
+      "cachedItems": [],
+      "visible": true,
+      "text": "Flooding rain: Marginal risk today. A few spots could flood."
+    },
+    {
+      "label": "full-page-reload",
+      "checkedAt": "2026-09-12T01:50:06.129Z",
+      "assembledAt": "2026-09-12T01:50:03.698Z",
+      "sourceCheckedAt": "2026-09-12T01:50:03.094Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "991e36c3c0dedef2b6dea99f",
+      "discussionId": "3f74352a-342e-4a02-9c0c-2f9e09d56b51",
+      "issuedAt": "2026-09-12T00:06:00+00:00",
+      "cachedItems": [],
+      "visible": true,
+      "text": "Flooding rain: Marginal risk today. A few spots could flood."
+    }
+  ],
+  "deployed": {
+    "sourceVersion": "nws-afd-monotonic-v1",
+    "danTakeVersion": "weather-nourie-dans-take-kid-clear-v10",
+    "assets": {
+      "index.html": "74081d38f4eae556183954ee8c82b2a21ff5bd3c0fe3efe8c498ab27d3b89bf4",
+      "app.js": "8a05fa153fedab045386b42c2e8020855c3f26d0cfba9260a9333bdc16270398",
+      "dans-summary.js": "8a10571c35be1c5670dad17589e22702af6a41b1b20568d0e6b00a613c6a1cd0",
+      "current-inputs.js": "9f2c99ef54d53152d389a9b2186113ae702bdc7c091c082e10fbc108958f7125",
+      "pavement.js": "184a8ea37dacf8d0c0b5dced9a32d633d41d324917335914b157ca221c5cc55f",
+      "daily-uv.js": "4327bb7ab8a9bac7d21abbcafe674a13849d40a54c0c73966ee2e9a78a98e2e8",
+      "dans-take.js": "5da354860928555d55010a026466988d6962f11cbea1f3dbabb4a47fd61c6f9b"
+    }
+  },
+  "independentOfficialLatest": {
+    "id": "3f74352a-342e-4a02-9c0c-2f9e09d56b51",
+    "issuedAt": "2026-09-12T00:06:00+00:00"
+  },
+  "initial": {
+    "discussion": {
+      "id": "3f74352a-342e-4a02-9c0c-2f9e09d56b51",
+      "office": "RAH",
+      "issuanceTime": "2026-09-12T00:06:00+00:00",
+      "text": "\n000\nFXUS62 KRAH 120006\nAFDRAH\n\nArea Forecast Discussion\nNational Weather Service Raleigh NC\n806 PM EDT Fri Sep 11 2026\n\n.WHAT HAS CHANGED...\n\n* Minor PoP adjustments for this weekend, otherwise no major changes.\n\n&&\n\n.KEY MESSAGES...\nAs of 245 PM Friday...\n\n1) Unsettled wx pattern this weekend, potentially wet at times later \nSaturday. \n\n2) Mainly dry with temps closer to seasonable values much of next \nweek. \n\n&&\n\n.DISCUSSION...\nAs of 245 PM Friday...\n\n1) Unsettled wx pattern this weekend, potentially wet at times later \nSaturday. \n\nAn upper short wave trough currently moving across the Miss Valley \nwill lift NE across the TN Valley tomorrow and exit off the Mid-\nAtlantic coast by mid-day Sunday.  In response, we'll see several \nopportunities for showers and tstms through early Sunday, the first \nof which being widely scattered showers and tstms the rest of today, \na few of which could include an isolated strong or possibly damaging \nwind gust (see SWODY1 for additional details).  \n\nSaturday, particularly later in the day and early night, appears to \nbe the most unsettled part of the weekend as the trough approaches \nand begins moving across. While a shower/tstm will be possible any \ntime Saturday, the most likely time and best coverage will likely be \nlate in the day from mid-afternoon hours through the late evening \nhours. It's worth noting that central NC is included in the Days 1 \nand 2 ERO, so any of the heavier downpours could results in isold \nflooding of the typical spots that are more sensitive to heavy \ndownpours, such as urban and low-lying areas. \n\nWhile the bulk of the prefrontal shower/tstm activity should be to \nour east by daybreak Sunday morning, we can't rule out a few \nadditional showers or tstms assoc with the actual frontal passage \nwhich will occur later Sunday, thus the reason for the ongoing \nelevated PoPs Sunday afternoon; however, coverage and intensity \nshould be much less compared to the previous day.  \n\n2) Mainly dry with temps closer to seasonable values much of next \nweek.  \n\nMost of next week will be dry thanks to an upper ridge that will be \npositioned to our west much of the time and resulting dry northerly \nflow. In addition, the airmass... while still a few deg above \nnormal... will at least be closer to normal with highs each day \ngenerally in the 80s.  It's worth noting that a closed upper trough, \nbroken off from a larger-scale trough moving off the Northeast \nstates early next week, will drift south parallel to the East Coast. \n Today's NWP models forecast it to remain far enough offshore so \nthat our only impact from it will be occasional gusty NE winds at \ntimes during the mid-week period. \n\n&&\n\n.AVIATION /00Z SATURDAY THROUGH WEDNESDAY/... \nAs of 800 PM Friday...\n\nVFR will largely prevail across central NC through this evening, \nwith mostly mid and high clouds. Isolated showers and storms have \ndeveloped across mainly far northern and far southern parts of the \nregion, along with a developing cluster near RDU. Brief heavy rain, \nlightning, and gusty winds will be possible with any storm, but \nother than what is currently happening around RDU, the chances of a \nstorm directly impacting a terminal are low. \n\nOvernight tonight after about 06z, low stratus will begin to spread \ninto central NC from north to south, with all terminals likely to \nexperience IFR conditions. A period of LIFR is even possible around \ndaybreak, along with patchy MVFR/IFR visibilities. VFR will return to \nmost areas by midday on Saturday, but MVFR may linger into early \nafternoon around the Triad. Showers and storms are then expected to \ndevelop in the afternoon across the region, and they should be more \nwidespread compared to today. Brief gusty winds and sub-VFR \nconditions will be possible with any storms.\n\nOutlook: Shower and thunderstorm chances will continue through \nSaturday evening as a cold front makes its way through central NC.\nLow stratus and/or fog may develop and cause sub-VFR restrictions \nagain on Sunday and Monday mornings as well. \n\n&&\n\n.RAH WATCHES/WARNINGS/ADVISORIES...\nNone.\n\n&&\n\n$$\n\nDISCUSSION...np \nAVIATION...Danco/Helock\n",
+      "url": "https://api.weather.gov/products/3f74352a-342e-4a02-9c0c-2f9e09d56b51"
+    },
+    "feed": {
+      "id": "afd",
+      "label": "NWS RAH discussion",
+      "url": "https://api.weather.gov/products/types/AFD/locations/RAH/latest",
+      "status": "ready",
+      "sourceVersion": "nws-afd-monotonic-v1",
+      "retrievalStatus": "verified-latest",
+      "fetchedAt": "2026-09-12T01:47:24.969Z",
+      "checkedAt": "2026-09-12T01:47:24.969Z",
+      "issuedAt": "2026-09-12T00:06:00+00:00",
+      "productUrl": "https://api.weather.gov/products/3f74352a-342e-4a02-9c0c-2f9e09d56b51",
+      "message": ""
+    },
+    "aiMode": "ai",
+    "generatedAt": "2026-09-12T01:47:48.985Z",
+    "items": []
+  },
+  "observedRefreshVisibility": [
+    {
+      "hidden": false,
+      "text": "Flooding rain: Marginal risk today. A few spots could flood."
+    },
+    {
+      "hidden": false,
+      "text": "Flooding rain: Marginal risk today. A few spots could flood."
+    },
+    {
+      "hidden": false,
+      "text": "Flooding rain: Marginal risk today. A few spots could flood."
+    },
+    {
+      "hidden": false,
+      "text": "Flooding rain: Marginal risk today. A few spots could flood."
+    }
+  ],
+  "distinctWeatherSignatures": 1,
+  "distinctForecastAssemblies": 3,
+  "distinctDiscussionChecks": 2,
+  "browserErrors": []
+}
