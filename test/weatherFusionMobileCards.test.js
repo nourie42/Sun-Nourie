@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {todayForecastHTML,periodWeatherStats,shortForecastCondition,todaySkyProfile,todaySkySceneHTML,moonPhaseAt,moonPhaseHTML} from '../public/weather-fusion/today-card.js';
-import {hourlyWindHTML,windDirectionLabel} from '../public/weather-fusion/weather-display.js';
+import {hourlyRainHTML,hourlyWindHTML,windDirectionLabel} from '../public/weather-fusion/weather-display.js';
 const now=Date.parse('2026-09-11T12:00:00Z'),H=3600000;
 function fixture(){
  const rows=values=>values.map((value,i)=>({time:new Date(now+i*H).toISOString(),value}));
@@ -56,4 +56,13 @@ test('compact descriptions preserve uncertainty and the complete forecast is acc
  assert.equal(shortForecastCondition('Mostly Sunny then Slight Chance Showers And Thunderstorms'),'Mostly sunny, then storms possible');
  assert.match(todayForecastHTML(fixture(),now),/title="Slight Chance Showers And Thunderstorms"/);
  const f=fixture();f.days[0].condition='<script>alert(1)</script>';assert.doesNotMatch(todayForecastHTML(f,now),/<script>/);
+});
+test('NWS probability and deterministic HRRR rain stay separate and compact',()=>{
+ const f=fixture();f.days[0].qpfBlend={sourceValues:{hrrr:.071}};
+ const today=todayForecastHTML(f,now);
+ assert.match(today,/23%/);assert.match(today,/NWS chance/);assert.match(today,/HRRR: rain today/);
+ assert.match(hourlyRainHTML({pop:21,precipitationBlend:{sourceValues:{hrrr:.071}}}),/21% NWS/);
+ assert.match(hourlyRainHTML({pop:21,precipitationBlend:{sourceValues:{hrrr:.071}}}),/HRRR: rain/);
+ assert.doesNotMatch(hourlyRainHTML({pop:22,precipitationBlend:{sourceValues:{hrrr:.001}}}),/HRRR: rain/);
+ assert.doesNotMatch(hourlyRainHTML({pop:22}),/HRRR: rain/);
 });
