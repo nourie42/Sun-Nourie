@@ -1,0 +1,140 @@
+{
+  "commit": "eaf3aa8f6b2ebffdb093a797ac020af900200797",
+  "checkedAt": "2026-09-12T12:03:39.154Z",
+  "fixture": false,
+  "success": true,
+  "checks": [
+    {
+      "label": "initial-page",
+      "checkedAt": "2026-09-12T12:03:57.786Z",
+      "assembledAt": "2026-09-12T12:03:38.296Z",
+      "sourceCheckedAt": "2026-09-12T12:03:37.872Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "6acb6fb99a1894dbfc9a85d8",
+      "discussionId": "1a70ae4c-b328-4818-9e31-ad99e2e555ab",
+      "issuedAt": "2026-09-12T10:55:00+00:00",
+      "cachedItems": [],
+      "visible": true,
+      "text": "Flooding rain: Marginal risk today. A few spots could flood."
+    },
+    {
+      "label": "refresh-1",
+      "checkedAt": "2026-09-12T12:05:03.625Z",
+      "assembledAt": "2026-09-12T12:04:57.539Z",
+      "sourceCheckedAt": "2026-09-12T12:03:37.872Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "84ddce7e4e17594ecf2409f6",
+      "discussionId": "1a70ae4c-b328-4818-9e31-ad99e2e555ab",
+      "issuedAt": "2026-09-12T10:55:00+00:00",
+      "cachedItems": [],
+      "visible": true,
+      "text": "Flooding rain: Marginal risk today. A few spots could flood."
+    },
+    {
+      "label": "refresh-2",
+      "checkedAt": "2026-09-12T12:06:09.572Z",
+      "assembledAt": "2026-09-12T12:05:58.744Z",
+      "sourceCheckedAt": "2026-09-12T12:05:58.744Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "47a068c0011b21e0b32dccea",
+      "discussionId": "1a70ae4c-b328-4818-9e31-ad99e2e555ab",
+      "issuedAt": "2026-09-12T10:55:00+00:00",
+      "cachedItems": [],
+      "visible": true,
+      "text": "Flooding rain: Marginal risk today. A few spots could flood."
+    },
+    {
+      "label": "full-page-reload",
+      "checkedAt": "2026-09-12T12:06:10.524Z",
+      "assembledAt": "2026-09-12T12:05:58.744Z",
+      "sourceCheckedAt": "2026-09-12T12:05:58.744Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "47a068c0011b21e0b32dccea",
+      "discussionId": "1a70ae4c-b328-4818-9e31-ad99e2e555ab",
+      "issuedAt": "2026-09-12T10:55:00+00:00",
+      "cachedItems": [],
+      "visible": true,
+      "text": "Flooding rain: Marginal risk today. A few spots could flood."
+    }
+  ],
+  "deployed": {
+    "sourceVersion": "nws-afd-monotonic-v1",
+    "danTakeVersion": "weather-nourie-dans-take-kid-clear-v10",
+    "assets": {
+      "index.html": "86a50bb4c558f6c3cb7d377946dd64b089fb91f455f0a6855a1cf076977229c7",
+      "app.js": "e49627c0b4e8f552f0237798ef04c331f0d995f52142f80944033fba1fb98e8a",
+      "dans-summary.js": "8a10571c35be1c5670dad17589e22702af6a41b1b20568d0e6b00a613c6a1cd0",
+      "current-inputs.js": "55adb15e8e98e1cd057f9c3e83facf4c709ebbc240bcbb824738edec0cb4e82a",
+      "pavement.js": "46ff5450b028927475c752f36765c9ae383c8a6dc21c79a94f711c3295966776",
+      "daily-uv.js": "4327bb7ab8a9bac7d21abbcafe674a13849d40a54c0c73966ee2e9a78a98e2e8",
+      "dans-take.js": "5da354860928555d55010a026466988d6962f11cbea1f3dbabb4a47fd61c6f9b"
+    }
+  },
+  "independentOfficialLatest": {
+    "id": "1a70ae4c-b328-4818-9e31-ad99e2e555ab",
+    "issuedAt": "2026-09-12T10:55:00+00:00"
+  },
+  "initial": {
+    "discussion": {
+      "id": "1a70ae4c-b328-4818-9e31-ad99e2e555ab",
+      "office": "RAH",
+      "issuanceTime": "2026-09-12T10:55:00+00:00",
+      "text": "\n000\nFXUS62 KRAH 121055\nAFDRAH\n\nArea Forecast Discussion\nNational Weather Service Raleigh NC\n655 AM EDT Sat Sep 12 2026\n\n.WHAT HAS CHANGED...\n\n* Reduced POP for Sunday, raised MaxT Sunday.\n\n&&\n\n.KEY MESSAGES...\nAs of 252 PM Friday...\n\n1) Very warm and humid today with scattered, mainly PM \nshowers/thunderstorms. Last shot at significant rain through the \nweek. \n\n2) Sunday is trending drier, a bit hotter. Dry with temperatures \ncloser to seasonable values much of next week. \n\n&&\n\n.DISCUSSION...\nAs of 252 AM Saturday...\n\n1) Very warm and humid today, with scattered, mainly PM \nshowers/thunderstorms. Last chance of significant rain for a while!\n\nThe upper level short wave trough will move from the Tennessee \nValley east across the Appalachians and over our region through \ntonight. The base of the trough will move east of the area Sunday \nmorning. \n\nAt the surface, a weak cold front (likely consisting of old \nconvective boundaries) was located from west to east, generally \nalong the US-64 corridor from just south of the Triad to the \nsouthern part of the Triangle areas. PW's were analyzed at 1.75 in \nthe western Piedmont to 2+ inches in the NE Coastal Plain. Dew \npoints and surface temperatures were generally in the lower to mid \n70s. Earlier lingering showers have all dissipated, with plenty of \nmid and high clouds around. There were areas of low stratus \ndeveloping.\n\nSome earlier 00z/CAMS were forecasting some showers/storms this \nmorning. It appears they were tied to old MCV's and disturbances \nleft over from Friday's storms upstream. However, with the activity \nnow all but gone, the latest CAMS suggest that it will be mostly low \nstratus and some fog through 13z or so that will prevail. There is \nlittle indicating of any additional showers through mid-morning. \n\nHowever, as the stratus breaks we are expecting fairly aggressive \nheating today into the lower to mid 80s by noon. As the short wave \naloft approaches, expect areas of showers and thunderstorms to \ndevelop, especially after noon. The higher POP should be between 200 \nPM and 900 PM. QPF continues to show a lot of variability, but \naverages around 0.5 in Piedmont. Locally heavy rain is expected to \naffect some areas, but just as many will not see any rainfall. \n\nThere should still be scattered storms this evening, even possibly \nlinger into the night in the east. \n\n2) Sunday trending drier, a bit hotter. Mainly dry with temps closer \nto seasonable values much of next week.  \n\nWith the base of the short wave trough expected to pass east toward \nthe coast before heating Sunday and the surface front to not be far \nbehind, it appears Sunday will bring drier weather and hotter \ntemperatures than today. Readings should reach the upper 80s to \naround 90. In addition, the showers are expected to be along the \ncoast for the most part. \n\nMost of next week will be dry and cooler thanks to an upper ridge \nthat will be positioned to our west much of the time, with surface \nhigh pressure to our north and northeast. This will result in a low \nlevel NE flow and highs in the 80s. Lows should dip into the 60s \nfor the most part.  \n\n&&\n\n.AVIATION /12Z SATURDAY THROUGH WEDNESDAY/... \nAs of 655 AM Saturday...\n\nAreas of stratus are expected over central NC through 13z, before \ncigs scattered out by 15z. Generally VFR will return to most areas \nby midday today, but MVFR may linger into early afternoon around the \nTriad. Scattered  showers and storms are then expected to develop in \nthe afternoon across the region. Brief gusty winds and sub-VFR \nconditions will be possible with any storms.\n\nOutlook: Shower and thunderstorm chances will continue through this \nevening as a cold front makes its way through central NC.\nLow stratus and/or fog may develop and cause sub-VFR restrictions \nagain on Sunday and Monday mornings as well. \n\nVFR conditions with a light NE flow are expected with high pressure \nthrough the week. \n\n&&\n\n.RAH WATCHES/WARNINGS/ADVISORIES...\nNone.\n\n&&\n\n$$\n\nDISCUSSION...Badgett\nAVIATION...Badgett\n",
+      "url": "https://api.weather.gov/products/1a70ae4c-b328-4818-9e31-ad99e2e555ab"
+    },
+    "feed": {
+      "id": "afd",
+      "label": "NWS RAH discussion",
+      "url": "https://api.weather.gov/products/types/AFD/locations/RAH/latest",
+      "status": "ready",
+      "sourceVersion": "nws-afd-monotonic-v1",
+      "retrievalStatus": "verified-latest",
+      "fetchedAt": "2026-09-12T12:03:37.872Z",
+      "checkedAt": "2026-09-12T12:03:37.872Z",
+      "issuedAt": "2026-09-12T10:55:00+00:00",
+      "productUrl": "https://api.weather.gov/products/1a70ae4c-b328-4818-9e31-ad99e2e555ab",
+      "message": ""
+    },
+    "aiMode": "ai",
+    "generatedAt": "2026-09-12T12:03:51.501Z",
+    "items": []
+  },
+  "observedRefreshVisibility": [
+    {
+      "hidden": false,
+      "text": "Flooding rain: Marginal risk today. A few spots could flood."
+    },
+    {
+      "hidden": false,
+      "text": "Flooding rain: Marginal risk today. A few spots could flood."
+    },
+    {
+      "hidden": false,
+      "text": "Flooding rain: Marginal risk today. A few spots could flood."
+    },
+    {
+      "hidden": false,
+      "text": "Flooding rain: Marginal risk today. A few spots could flood."
+    },
+    {
+      "hidden": false,
+      "text": "Flooding rain: Marginal risk today. A few spots could flood."
+    },
+    {
+      "hidden": false,
+      "text": "Flooding rain: Marginal risk today. A few spots could flood."
+    },
+    {
+      "hidden": false,
+      "text": "Flooding rain: Marginal risk today. A few spots could flood."
+    },
+    {
+      "hidden": false,
+      "text": "Flooding rain: Marginal risk today. A few spots could flood."
+    }
+  ],
+  "distinctWeatherSignatures": 3,
+  "distinctForecastAssemblies": 3,
+  "distinctDiscussionChecks": 2,
+  "browserErrors": []
+}
