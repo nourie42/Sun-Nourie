@@ -1,6 +1,6 @@
 /** User-selected weights, not a measured accuracy ranking. */
 export const SAME_DAY_WEIGHTS = Object.freeze({nws: .4, hrrr: .3, ecmwf: .1, nbm: .2});
-export const REPAIR_VERSION = 'weather-nourie-rain-vote-v6';
+export const REPAIR_VERSION = 'weather-nourie-rain-base-v7';
 export function calendarDate(time, zone = 'America/New_York') {
   return new Intl.DateTimeFormat('en-CA', {timeZone: zone, year:'numeric', month:'2-digit', day:'2-digit'}).format(new Date(time));
 }

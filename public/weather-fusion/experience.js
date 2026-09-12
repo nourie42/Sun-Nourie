@@ -3,9 +3,9 @@ import {FORECAST_CONFIDENCE_VERSION} from './forecast-confidence.js?v=weather-ar
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
 import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=pet-static-shake-v32';
 import {weatherState} from './weather-state.js';
-import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=rain-consensus-v41';
+import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=comfort-rain-v49';
 import {degrees,feelsAt,dailyFeels,forecastValue,peakFeelsHTML} from './hourly-feels.js?v=weather-art-labels-v10';
-import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=pet-static-shake-v37';
+import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=comfort-rain-v38';
 import {comfortMode,comfortWindow,comfortNarrative,warmestTodayWindow} from './comfort-outlook.js?v=weather-art-labels-v10';
 import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js?v=remainder-today-v41';
 import {resetDewpointMeter} from './dewpoint-meter.js?v=centered-heading-v30';

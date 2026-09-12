@@ -81,6 +81,10 @@ test('same, lower and higher later readings are labeled honestly and never chang
   const comparison=peakComparison(summary,85);assert.equal(comparison.kind,kind);assert.equal(comparison.value,value);
   assert.match(peakComparisonHTML(summary,85),new RegExp(`${value}°`));
   assert.match(peakComparisonHTML(summary,85),/1:00 PM/);
+  if(kind==='now'){
+   assert.match(peakComparisonHTML(summary,85),/Now is warmest · later high 83°/);
+   assert.doesNotMatch(peakComparisonHTML(summary,85),/later peak/);
+  }
  }
 });
 test('hourly renderer preserves scroll and escapes provider text',()=>{

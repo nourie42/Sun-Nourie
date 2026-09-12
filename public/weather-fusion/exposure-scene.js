@@ -1,4 +1,4 @@
-import {weatherShapes} from './weather-display.js?v=rain-consensus-v41';
+import {weatherShapes} from './weather-display.js?v=comfort-rain-v49';
 import {weatherState} from './weather-state.js';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 
@@ -149,7 +149,7 @@ export function comfortSceneState(daylight=true,condition='Clear',feels=null,con
  const kind=weatherState(condition).kind,precipitation=precipitationActivity(condition,context);
  if(kind==='snow'||(finite(feels)&&feels<40))return {key:'cold',asset:'comfort-reference-scenes-cold.webp'};
  if(precipitation==='active')return {key:'rain',asset:'comfort-reference-scenes-rain.webp'};
- if(precipitation==='umbrella')return {key:'umbrella',asset:'comfort-reference-scenes-umbrella.png'};
+ if(precipitation==='umbrella')return {key:'umbrella',asset:'comfort-reference-scenes-umbrella.webp'};
  if(kind==='fog')return {key:'fog',asset:'comfort-reference-scenes-fog.webp'};
  if(!daylight)return {key:'dawn',asset:'comfort-reference-scenes-dawn.webp'};
  if(precipitation==='possible'||kind==='cloudy')return {key:'watch',asset:'comfort-reference-scenes-watch.webp'};
@@ -157,10 +157,11 @@ export function comfortSceneState(daylight=true,condition='Clear',feels=null,con
  return {key:'normal',asset:'comfort-reference-scenes.webp'};
 }
 
-const comfortSceneAssets=['comfort-reference-scenes.webp','comfort-reference-scenes-hot.webp','comfort-reference-scenes-rain.webp','comfort-reference-scenes-umbrella.png','comfort-reference-scenes-cold.webp','comfort-reference-scenes-fog.webp','comfort-reference-scenes-watch.webp','comfort-reference-scenes-dawn.webp'];
+const comfortSceneAssets=['comfort-reference-scenes.webp','comfort-reference-scenes-hot.webp','comfort-reference-scenes-rain.webp','comfort-reference-scenes-umbrella.webp','comfort-reference-scenes-cold.webp','comfort-reference-scenes-fog.webp','comfort-reference-scenes-watch.webp','comfort-reference-scenes-dawn.webp'];
+const comfortSceneUrl=asset=>`/weather-fusion/${asset}${asset==='comfort-reference-scenes-umbrella.webp'?'?v=umbrella-repair-v1':''}`;
 export function preloadComfortScenes(){
  if(typeof Image==='undefined')return false;
- for(const asset of comfortSceneAssets){const image=new Image();image.decoding='async';image.src=`/weather-fusion/${asset}`;}
+ for(const asset of comfortSceneAssets){const image=new Image();image.decoding='async';image.src=comfortSceneUrl(asset);}
  return true;
 }
 if(typeof window!=='undefined'){
@@ -185,5 +186,5 @@ export function referenceScene(panel,daylight=true,condition='Clear',feels=null,
  const symbol=scene.key!=='normal'||panel===0?'':daylight&&weather.kind==='clear'
   ?sunGlyph(id,248,57,.64)
   :`<g transform="translate(214 20) scale(1.5)">${weatherShapes(condition,daylight)}</g>`;
- return `<svg class="reference-scene${panel===2?' poodle-scene':''}" viewBox="0 0 300 300" preserveAspectRatio="xMidYMid slice" role="img" aria-label="${label}" data-scene="${scene.key}" data-outfit="${clothingForFeels(feels)}" data-daylight="${daylight}" data-weather="${weather.kind}">${sharedDefs(id,sky)}<image class="reference-art" href="/weather-fusion/${scene.asset}" x="${-300*panel}" y="0" width="900" height="300" preserveAspectRatio="none"/>${tint?`<rect width="300" height="300" fill="${tint}" class="reference-weather-tint" opacity="${daylight?'.06':'.18'}"/>`:''}${symbol}</svg>`;
+ return `<svg class="reference-scene${panel===2?' poodle-scene':''}" viewBox="0 0 300 300" preserveAspectRatio="xMidYMid slice" role="img" aria-label="${label}" data-scene="${scene.key}" data-outfit="${clothingForFeels(feels)}" data-daylight="${daylight}" data-weather="${weather.kind}">${sharedDefs(id,sky)}<image class="reference-art" href="${comfortSceneUrl(scene.asset)}" x="${-300*panel}" y="0" width="900" height="300" preserveAspectRatio="none"/>${tint?`<rect width="300" height="300" fill="${tint}" class="reference-weather-tint" opacity="${daylight?'.06':'.18'}"/>`:''}${symbol}</svg>`;
 }

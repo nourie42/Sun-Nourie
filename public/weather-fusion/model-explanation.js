@@ -67,7 +67,7 @@ function sourceRows(likelihood) {
     const value = finite(likelihood?.sourceValues?.[id]) ? likelihood.sourceValues[id] : used?.value;
     return {id,value:finite(value)?value:null,amount:finite(likelihood?.sourceAmounts?.[id])?likelihood.sourceAmounts[id]:null,
       officialProbability:id==='nws'&&finite(likelihood?.officialProbability)?likelihood.officialProbability:null,
-      weight:used?.weight ?? null,points:used ? used.value*used.weight : null,runAt:used?.runAt || null};
+      weight:used?.weight ?? null,points:finite(likelihood?.sourcePoints?.[id])?likelihood.sourcePoints[id]:finite(used?.points)?used.points:used ? used.value*used.weight : null,runAt:used?.runAt || null};
   });
 }
 
@@ -76,8 +76,9 @@ function sourceTable(likelihood, caption = 'Inputs for the highest hour') {
     const input = source.id === 'nws'
       ? source.value === null ? 'Unavailable' : `${number(source.officialProbability)}% probability`
       : source.amount === null ? 'Unavailable' : `${number(source.amount,8)} in`;
-    const signal = source.value === null ? '' : `<small>Rain forecast: ${source.value>0?'Yes':'No'}</small>`;
-    return `<tr><th scope="row">${names[source.id]}</th><td>${input}${signal}</td><td>${source.weight === null?'Not used':`${number(source.weight*100,4)}%`}</td><td>${source.points === null?'—':number(source.points,6)}</td></tr>`;
+    const signal = source.id==='nws'||source.value === null ? '' : `<small>Rain forecast: ${source.value>0?'Yes':'No'}</small>`;
+    const weight=source.id==='nws'?(source.value===null?'Unavailable':'Base chance'):source.weight===null?'Not used':`${number(source.weight*100,4)}%`;
+    return `<tr><th scope="row">${names[source.id]}</th><td>${input}${signal}</td><td>${weight}</td><td>${source.points === null?'—':number(source.points,6)}</td></tr>`;
   }).join('');
   return `<table class="model-inputs"><caption>${esc(caption)}</caption><thead><tr><th scope="col">Source</th><th scope="col">Rain input</th><th scope="col">Weight</th><th scope="col">Points</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
@@ -86,10 +87,11 @@ function arithmetic(likelihood) {
   if (!likelihood || chance(likelihood.value) === null) return '<p class="model-calculation">This hour does not have a usable rain estimate.</p>';
   const sources = sourceRows(likelihood).filter(source => source.weight !== null);
   if (!sources.length) return '<p class="model-calculation">The calculation inputs were not supplied.</p>';
-  const formula = sources.map(source=>`${number(source.value)} × ${number(source.weight,6)}`).join(' + ');
+  const formula = sources.map(source=>number(source.points)).join(' + ');
   const weightedValue = finite(likelihood.weightedValue) ? likelihood.weightedValue : null;
   const rounded = finite(likelihood.rawValue) ? likelihood.rawValue : null;
-  return `<div class="model-calculation"><p class="model-formula">${esc(formula)}${weightedValue===null?'':` ≈ ${number(weightedValue,8)}`}</p>
+  const capped=finite(likelihood.rawTotal)&&likelihood.rawTotal>100;
+  return `<div class="model-calculation"><p class="model-formula">${esc(formula)}${weightedValue===null?'':` = ${number(weightedValue,8)}${capped?' → capped at 100':''}`}</p>
     <p>${rounded===null?'':`Rounded: <b>${number(rounded)}%</b>. `}Shown: <b>${percent(likelihood.value)}</b>.</p></div>`;
 }
 
@@ -124,7 +126,7 @@ export function modelExplanationHTML(forecast, options = {}) {
     ${!view.complete?`<p class="model-data-warning">Incomplete coverage: ${number(period.coverage?.availableHours)} of ${number(period.coverage?.expectedHours)} hours. The period estimate stays unavailable.${view.maximum===null?'':` Highest available hour: ${percent(view.maximum)}.`}</p>`:''}
     ${view.peakTime?`<h3>Highest hour: ${esc(stamp(view.peakTime,zone))}–${esc(stamp(view.peakEnd,zone,false))}</h3>`:''}
     ${sourceTable(peak)}${arithmetic(peak)}
-    <details class="model-method" data-model-detail="method"><summary>How the inputs are used</summary><p>Each available source gets one yes-or-no rain vote for the hour. NWS votes yes when its official chance is above 0%. HRRR, ECMWF and NBM vote yes when their forecast amount is above 0 in. A yes earns that source’s full weight; a no earns zero. The amount of rain does not change the rain-chance points and is calculated separately.</p><p>The starting weights are NWS 40%, HRRR 30%, ECMWF 10% and NBM 20%. The listed weights are the weights actually used for this hour. Missing sources are excluded, not counted as dry, and the remaining weights are rescaled. If every available source forecasts rain, the result is 100%. This is an uncalibrated blend, not a proven model-accuracy ranking.</p></details>
+    <details class="model-method" data-model-detail="method"><summary>How the inputs are used</summary><p>The exact NWS hourly percentage is the base chance. HRRR adds 30 points when it forecasts any rain, ECMWF adds 10, and NBM adds 20. A model with zero rain adds zero. The amount of rain does not change these points and is calculated separately.</p><p>The points are added and the result is capped at 100%. For example, NWS 13% plus ECMWF rain is 13 + 10 = 23%. An unavailable model adds no points. This is an uncalibrated estimate, not a proven model-accuracy ranking.</p></details>
     <details class="model-hourly-list" data-model-detail="hours"><summary>All ${rows.length} forecast hours in this period</summary>${audit||'<p>No hourly calculation data was supplied.</p>'}</details>
     ${temperatures?`<details class="model-temperature-list" data-model-detail="temperatures"><summary>Temperature calculations</summary>${temperatures}</details>`:''}
     <details class="model-source-list" data-model-detail="sources"><summary>Source runs and availability</summary>${sourceStatus(forecast,view)}</details>`;

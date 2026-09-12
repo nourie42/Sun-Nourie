@@ -46,8 +46,9 @@ export function hourlyRainHTML(sample){
  }
  const blend=sample.rainLikelihood,value=sampleRainChance(sample);
  const votes=blend?.sourceValues||{},parts=[];
- if(finite(votes.nws))parts.push(`NWS rain ${votes.nws>0?'yes':'no'}${finite(blend?.officialProbability)?` (official ${Math.round(blend.officialProbability)}%)`:''}`);
- for(const id of ['hrrr','ecmwf','nbm'])if(finite(votes[id]))parts.push(`${id.toUpperCase()} rain ${votes[id]>0?'yes':'no'}`);
+ if(finite(votes.nws))parts.push(`NWS base ${Math.round(votes.nws)}%`);
+ const points={hrrr:30,ecmwf:10,nbm:20};
+ for(const id of ['hrrr','ecmwf','nbm'])if(finite(votes[id]))parts.push(`${id.toUpperCase()} rain ${votes[id]>0?`yes (+${points[id]} points)`:'no (+0 points)'}`);
  const detail=parts.length?` Inputs: ${parts.join(', ')}.`:'';
  return `<span class="hour-rain" title="Weather Nourie rain likelihood.${detail}"><small class="hour-pop">${weatherMetricIcon('drop')}${finite(value)?`${Math.round(value)}%`:'—'}</small></span>`;
 }
@@ -121,7 +122,7 @@ export function peakComparisonHTML(summary, currentShade, zone = 'America/New_Yo
   }
   if (!summary) return '<p class="comfort-later">Warmest feels like today unavailable. Missing readings stay blank.</p>';
   const clock=new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',minute:'2-digit'}).format(new Date(comparison.time));
-  const time = comparison.now ? `Now · later peak ${degrees(comparison.later)} at ${clock}` : `${clock} · hourly forecast`;
+  const time = comparison.now ? `Now is warmest · later high ${degrees(comparison.later)} at ${clock}` : `${clock} · hourly forecast`;
   return `<div class="comfort-later" data-peak-time="${esc(comparison.time)}" data-comparison="${comparison.kind}"><span>${esc(comparison.label)}${summary.partial ? ' · partial forecast' : ''}</span><span class="peak-reading"><strong>${degrees(comparison.value)}</strong></span><small>${esc(time)}</small></div>`;
 }
 export function sampleCaption(sample, zone = 'America/New_York') {

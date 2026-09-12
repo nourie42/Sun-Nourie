@@ -8,14 +8,15 @@ const now = Date.parse('2026-09-12T11:00:00Z');
 const at = offset => new Date(now+offset*HOUR).toISOString();
 
 function likelihood(value, options = {}) {
-  const hrrrWet=value===70,sourceValues={nws:100,hrrr:hrrrWet?100:0,ecmwf:0,nbm:0};
-  return {value,rawValue:value,weightedValue:value,
-    officialProbability:30,sourceValues,sourceAmounts:{nws:.01,hrrr:hrrrWet?.02:0,ecmwf:0,nbm:0},drySources:['hrrr','ecmwf','nbm'],wetSources:['nws'],
-    sources:[{id:'nws',value:100,weight:.4,runAt:at(-1)},{id:'hrrr',value:sourceValues.hrrr,weight:.3,runAt:at(-2)},{id:'ecmwf',value:0,weight:.1,runAt:at(-5)},{id:'nbm',value:0,weight:.2,runAt:at(-3)}],...options};
+  const hrrrWet=value===60,sourceValues={nws:30,hrrr:hrrrWet?100:0,ecmwf:0,nbm:0};
+  const sourcePoints={nws:30,hrrr:hrrrWet?30:0,ecmwf:0,nbm:0};
+  return {value,rawValue:value,weightedValue:value,rawTotal:value,
+    officialProbability:30,sourceValues,sourcePoints,sourceAmounts:{nws:.01,hrrr:hrrrWet?.02:0,ecmwf:0,nbm:0},drySources:['hrrr','ecmwf','nbm'],wetSources:hrrrWet?['hrrr']:[],
+    sources:[{id:'nws',value:30,weight:1,points:30,runAt:at(-1)},{id:'hrrr',value:sourceValues.hrrr,weight:.3,points:sourcePoints.hrrr,runAt:at(-2)},{id:'ecmwf',value:0,weight:.1,points:0,runAt:at(-5)},{id:'nbm',value:0,weight:.2,points:0,runAt:at(-3)}],...options};
 }
 
 function fixture() {
-  const rainTimeline = Array.from({length:72},(_,index)=>({time:at(index),end:at(index+1),rainLikelihood:likelihood(index===58?70:40),officialPop:70,precipitation:0}));
+  const rainTimeline = Array.from({length:72},(_,index)=>({time:at(index),end:at(index+1),rainLikelihood:likelihood(index===58?60:30),officialPop:30,precipitation:0}));
   function period(start,end) {
     const rows=rainTimeline.slice(start,end),peak=rows.reduce((a,b)=>a.rainLikelihood.value>=b.rainLikelihood.value?a:b);
     return {value:peak.rainLikelihood.value,aggregation:'maximum-hourly',window:{start:at(start),end:at(end)},coverage:{expectedHours:end-start,availableHours:end-start,complete:true},peakTime:peak.time,peakEnd:peak.end,peak:peak.rainLikelihood,sources:peak.rainLikelihood.sources};
@@ -38,8 +39,8 @@ test('model explanation defaults to the same Today/ Tonight period as the main c
 
 test('every daily estimate is tied to its canonical peak hour including beyond the 48-hour strip',()=>{
   const forecast=fixture(),view=modelExplanationView(forecast,{index:2,now});
-  assert.equal(view.value,70);
-  assert.equal(view.maximum,70);
+  assert.equal(view.value,60);
+  assert.equal(view.maximum,60);
   assert.equal(view.peakTime,at(58));
   assert.equal(view.rows.length,24);
   assert.equal(view.mismatch,false);
@@ -51,44 +52,44 @@ test('every daily estimate is tied to its canonical peak hour including beyond t
   assert.match(html,/data-peak="true"/);
 });
 
-test('rain inputs use simple yes-or-no votes and unanimous support is 100%',()=>{
+test('rain inputs use exact NWS chance plus fixed model points',()=>{
   const html=modelExplanationHTML(fixture(),{now});
   assert.match(html,/30% probability/);
   assert.match(html,/<th scope="row">NBM<\/th><td>0 in<small>Rain forecast: No<\/small><\/td><td>20%<\/td><td>0<\/td>/);
   assert.doesNotMatch(html,/QPF support|NWS-anchored input/);
-  assert.match(html,/Each available source gets one yes-or-no rain vote/);
-  assert.match(html,/starting weights are NWS 40%, HRRR 30%, ECMWF 10% and NBM 20%/);
-  assert.match(html,/amount of rain does not change the rain-chance points/);
-  assert.match(html,/every available source forecasts rain, the result is 100%/);
-  assert.match(html,/uncalibrated blend, not a proven model-accuracy ranking/);
+  assert.match(html,/exact NWS hourly percentage is the base chance/);
+  assert.match(html,/HRRR adds 30 points when it forecasts any rain, ECMWF adds 10, and NBM adds 20/);
+  assert.match(html,/amount of rain does not change these points/);
+  assert.match(html,/result is capped at 100%/);
+  assert.match(html,/uncalibrated estimate, not a proven model-accuracy ranking/);
   assert.match(html,/not a separate probability of rain at any time/);
-  const forecast=fixture(),allWet=likelihood(100,{officialProbability:53,
-    sourceValues:{nws:100,hrrr:100,ecmwf:100,nbm:100},sourceAmounts:{nws:.02,hrrr:.157,ecmwf:.016,nbm:.012},
-    sources:[{id:'nws',value:100,weight:.4},{id:'hrrr',value:100,weight:.3},{id:'ecmwf',value:100,weight:.1},{id:'nbm',value:100,weight:.2}],drySources:[],wetSources:['nws','hrrr','ecmwf','nbm']});
+  const forecast=fixture(),allWet=likelihood(100,{officialProbability:53,rawTotal:113,weightedValue:113,
+    sourceValues:{nws:53,hrrr:100,ecmwf:100,nbm:100},sourcePoints:{nws:53,hrrr:30,ecmwf:10,nbm:20},sourceAmounts:{nws:.02,hrrr:.157,ecmwf:.016,nbm:.012},
+    sources:[{id:'nws',value:53,weight:1,points:53},{id:'hrrr',value:100,weight:.3,points:30},{id:'ecmwf',value:100,weight:.1,points:10},{id:'nbm',value:100,weight:.2,points:20}],drySources:[],wetSources:['hrrr','ecmwf','nbm']});
   forecast.rainTimeline[0].rainLikelihood=allWet;
   Object.assign(forecast.days[0].popDayLikelihood,{value:100,peak:allWet,peakTime:at(0)});
   const unanimous=modelExplanationHTML(forecast,{now});
-  assert.match(unanimous,/53% probability<small>Rain forecast: Yes<\/small><\/td><td>40%<\/td><td>40<\/td>/);
+  assert.match(unanimous,/53% probability<\/td><td>Base chance<\/td><td>53<\/td>/);
   assert.match(unanimous,/0\.157 in<small>Rain forecast: Yes<\/small><\/td><td>30%<\/td><td>30<\/td>/);
   assert.match(unanimous,/0\.016 in<small>Rain forecast: Yes<\/small><\/td><td>10%<\/td><td>10<\/td>/);
   assert.match(unanimous,/0\.012 in<small>Rain forecast: Yes<\/small><\/td><td>20%<\/td><td>20<\/td>/);
   assert.match(unanimous,/Shown: <b>100%/);
+  assert.match(unanimous,/53 \+ 30 \+ 10 \+ 20 = 113 → capped at 100/);
 });
 
-test('weights and arithmetic come from the exact used sources rather than fixed starting weights',()=>{
+test('missing models do not renormalize the NWS base or remaining model points',()=>{
   const forecast=fixture();
-  const value=likelihood(100,{officialProbability:20,weightedValue:100,rawValue:100,sourceValues:{nws:100,hrrr:null,ecmwf:100},sourceAmounts:{nws:.01,hrrr:null,ecmwf:.02},sources:[{id:'nws',value:100,weight:.666667},{id:'ecmwf',value:100,weight:.333333}],drySources:[]});
+  const value=likelihood(30,{officialProbability:20,weightedValue:30,rawTotal:30,rawValue:30,sourceValues:{nws:20,hrrr:null,ecmwf:100,nbm:null},sourcePoints:{nws:20,hrrr:null,ecmwf:10,nbm:null},sourceAmounts:{nws:.01,hrrr:null,ecmwf:.02,nbm:null},sources:[{id:'nws',value:20,weight:1,points:20},{id:'ecmwf',value:100,weight:.1,points:10}],drySources:[]});
   forecast.rainTimeline[0].rainLikelihood=value;
-  Object.assign(forecast.days[0].popDayLikelihood,{value:100,peak:value,peakTime:at(0)});
+  Object.assign(forecast.days[0].popDayLikelihood,{value:30,peak:value,peakTime:at(0)});
   const html=modelExplanationHTML(forecast,{now});
-  assert.match(html,/66\.6667%/);
-  assert.match(html,/100 × 0\.666667 \+ 100 × 0\.333333 ≈ 100/);
-  assert.match(html,/Rounded: <b>100%<\/b>\. Shown: <b>100%/);
+  assert.match(html,/20 \+ 10 = 30/);
+  assert.match(html,/Rounded: <b>30%<\/b>\. Shown: <b>30%/);
   assert.match(html,/<th scope="row">HRRR<\/th><td>Unavailable<\/td><td>Not used<\/td><td>—/);
 });
 
 test('a single wet vote keeps its exact points without low-score suppression',()=>{
-  const forecast=fixture(),single=likelihood(20,{officialProbability:0,weightedValue:20,rawValue:20,sourceValues:{nws:0,hrrr:0,ecmwf:0,nbm:100},wetSources:['nbm'],sources:[{id:'nws',value:0,weight:.4},{id:'hrrr',value:0,weight:.3},{id:'ecmwf',value:0,weight:.1},{id:'nbm',value:100,weight:.2}]});
+  const forecast=fixture(),single=likelihood(20,{officialProbability:0,weightedValue:20,rawTotal:20,rawValue:20,sourceValues:{nws:0,hrrr:0,ecmwf:0,nbm:100},sourcePoints:{nws:0,hrrr:0,ecmwf:0,nbm:20},wetSources:['nbm'],sources:[{id:'nws',value:0,weight:1,points:0},{id:'hrrr',value:0,weight:.3,points:0},{id:'ecmwf',value:0,weight:.1,points:0},{id:'nbm',value:100,weight:.2,points:20}]});
   for(const row of forecast.rainTimeline)row.rainLikelihood=single;
   Object.assign(forecast.days[0].popDayLikelihood,{value:20,peak:single});
   const html=modelExplanationHTML(forecast,{now});
@@ -103,10 +104,10 @@ test('missing hourly data remains unavailable instead of becoming a zero or a re
   forecast.rainTimeline=forecast.rainTimeline.slice(0,4);
   const view=modelExplanationView(forecast,{now}),html=modelExplanationHTML(forecast,{now});
   assert.equal(view.value,null);
-  assert.equal(view.maximum,40);
+  assert.equal(view.maximum,30);
   assert.equal(view.complete,false);
   assert.match(html,/Incomplete coverage: 4 of 12 hours/);
-  assert.match(html,/Highest available hour: 40%/);
+  assert.match(html,/Highest available hour: 30%/);
   assert.match(html,/<div class="model-period"><strong>—<\/strong>/);
 });
 
@@ -115,7 +116,7 @@ test('a real period/hour mismatch is flagged rather than hidden by the explanati
   forecast.days[0].popDayLikelihood.value=59;
   const view=modelExplanationView(forecast,{now});
   assert.equal(view.mismatch,true);
-  assert.match(modelExplanationHTML(forecast,{now}),/Data mismatch: the period shows 59%, but the highest supplied hour is 40%/);
+  assert.match(modelExplanationHTML(forecast,{now}),/Data mismatch: the period shows 59%, but the highest supplied hour is 30%/);
 });
 
 test('source runs use issuance metadata and preserve supplied run scope',()=>{
@@ -134,7 +135,7 @@ test('source status distinguishes a checked-but-failed refresh from the last dat
   assert.match(html,/Last check: Sat, Sep 12, 8 AM/);
   assert.match(html,/Using last verified data; the latest refresh did not succeed/);
   assert.match(html,/Latest fetch unavailable; retaining the verified run/);
-  assert.match(html,/A yes earns that source’s full weight; a no earns zero/);
+  assert.match(html,/exact NWS hourly percentage is the base chance/);
 });
 
 test('NWS hourly source time never borrows the different daily forecast issuance',()=>{
@@ -174,7 +175,7 @@ test('experimental rendering stays off the main page and reset clears previous-l
     assert.equal(renderModelExplanation(fixture(),now),null);
     assert.equal(panel.hidden,true);
     globalThis.location.pathname='/weather-fusion/experimental-weather.html';
-    assert.equal(renderModelExplanation(fixture(),now).value,40);
+    assert.equal(renderModelExplanation(fixture(),now).value,30);
     assert.equal(panel.hidden,false);
     assert.match(panel.innerHTML,/Why this forecast/);
     resetModelExplanation();
