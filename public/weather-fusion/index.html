@@ -49,16 +49,16 @@
         <div class="hero-condition" id="condition" hidden>Gathering the latest forecast</div>
         <div class="hero-range" id="high-low" hidden>High —° <span>Low —°</span></div>
         <div class="observation-label" id="observation-label">The latest weather near you</div>
+        <section class="glass bulletins-panel" id="nws-bulletins" aria-labelledby="bulletins-title">
+          <div class="section-top"><h2 id="bulletins-title">NWS BULLETINS</h2></div>
+          <div id="alerts" class="alerts" aria-label="Official NWS notices and explanations"><p class="bulletin-time">Checking local NWS notices…</p></div>
+        </section>
         <section class="glass today-panel" aria-label="Today or tonight forecast">
           <div id="today-forecast"><p class="muted">Daily data is loading.</p></div>
           <div id="today-uncertainty" class="today-uncertainty" hidden>
             <strong class="today-uncertainty-label">Dan's take</strong>
             <p id="today-uncertainty-text"></p>
           </div>
-        </section>
-        <section class="glass bulletins-panel" id="nws-bulletins" aria-labelledby="bulletins-title">
-          <div class="section-top"><h2 id="bulletins-title">NWS BULLETINS</h2></div>
-          <div id="alerts" class="alerts" aria-label="Official NWS notices and explanations"><p class="bulletin-time">Checking local NWS notices…</p></div>
         </section>
         <section class="glass hourly-panel" aria-labelledby="hourly-title"><div class="section-top"><h2 id="hourly-title"><span aria-hidden="true">◷</span> Hourly Forecast</h2><span>Your next 48 hours</span></div><div id="hourly" class="hourly-strip" tabindex="0" aria-label="Current observation followed by future hourly forecasts; select an hour to preview"><p class="muted">Hourly data is loading.</p></div></section>
         <div class="exposure-cards">

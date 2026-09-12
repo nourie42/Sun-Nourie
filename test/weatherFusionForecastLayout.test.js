@@ -27,12 +27,12 @@ test('empty and missing dew-point values stay unavailable, not invented',()=>{
  const forecast={metricForecasts:{series:{dewpoint:[{time:new Date(start).toISOString(),value:null},{time:new Date(start+H).toISOString(),value:65}]}}};
  const points=dewpointPoints(forecast,start,240);assert.equal(points.length,2);assert.equal(points[0].value,null);
 });
-test('current temperature, Today, NWS bulletins and hourly forecast precede comfort panels',()=>{
- const html=source('index.html'),ids=['id="temperature"','id="today-forecast"','id="nws-bulletins"','id="hourly"','id="skin-exposure"'];
+test('current temperature, active NWS bulletins, Today and hourly forecast precede comfort panels',()=>{
+ const html=source('index.html'),ids=['id="temperature"','id="nws-bulletins"','id="today-forecast"','id="hourly"','id="skin-exposure"'];
  const positions=ids.map(id=>html.indexOf(id));assert.ok(positions.every(i=>i>=0));
  for(let i=1;i<positions.length;i++)assert.ok(positions[i]>positions[i-1]);
  for(const id of ['today-forecast','nws-bulletins','alerts','hourly','daily','skin-exposure','map-panel','scientific-stuff'])assert.equal((html.match(new RegExp(`id="${id}"`,'g'))||[]).length,1);
- const between=html.slice(html.indexOf('id="today-forecast"'),html.indexOf('id="hourly"'));
+ const between=html.slice(html.indexOf('id="temperature"'),html.indexOf('id="hourly"'));
  assert.doesNotMatch(between,/skin-exposure|briefing-summary/);
  assert.match(between,/id="nws-bulletins"/);assert.match(between,/id="alerts"/);
 });
