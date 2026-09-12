@@ -26,15 +26,19 @@ export function inGeoJson(longitude,latitude,geometry){
 }
 const spcLabel={3:'Marginal',4:'Slight',5:'Enhanced',6:'Moderate',8:'High'};
 const wpcRank={marginal:1,slight:2,moderate:3,high:4};
+const DAY=86400000;
+function availableDayOneRisk(issue,start,end,now){
+ return [issue,start,end,now].every(finite)&&issue<=now&&start<=now+DAY&&end>now;
+}
 export function normalizeSpcRisk(attributes,now=Date.now()){
- const level=spcLabel[Number(attributes?.dn)],start=stamp(attributes?.valid),end=stamp(attributes?.expire);
- if(!level||!(start<=now&&end>now))return null;
- return {id:`spc-day1-${level.toLowerCase()}`,kind:'spc',level,rank:Number(attributes.dn),title:`${level} risk of severe storms today`,summary:level==='Marginal'?'A few storms could become strong.':'Severe storms are possible. Stay weather-aware.',issuedAt:new Date(stamp(attributes.issue)).toISOString(),validFrom:new Date(start).toISOString(),expires:new Date(end).toISOString(),url:'https://www.spc.noaa.gov/products/outlook/day1otlk.html'};
+ const level=spcLabel[Number(attributes?.dn)],issue=stamp(attributes?.issue),start=stamp(attributes?.valid),end=stamp(attributes?.expire);
+ if(!level||!availableDayOneRisk(issue,start,end,now))return null;
+ return {id:`spc-day1-${level.toLowerCase()}`,kind:'spc',level,rank:Number(attributes.dn),title:`${level} risk of severe storms today`,summary:level==='Marginal'?'A few storms could become strong.':'Severe storms are possible. Stay weather-aware.',issuedAt:new Date(issue).toISOString(),validFrom:new Date(start).toISOString(),expires:new Date(end).toISOString(),url:'https://www.spc.noaa.gov/products/outlook/day1otlk.html'};
 }
 export function normalizeWpcRisk(feature,longitude,latitude,now=Date.now()){
- const p=feature?.properties||{},level=String(p.OUTLOOK||'').match(/Marginal|Slight|Moderate|High/i)?.[0],start=stamp(p.START_TIME),end=stamp(p.END_TIME);
- if(!level||!inGeoJson(longitude,latitude,feature.geometry)||!(start<=now&&end>now))return null;
- return {id:`wpc-day1-${level.toLowerCase()}`,kind:'wpc',level,rank:wpcRank[level.toLowerCase()]||0,title:`${level} risk of flooding rain today`,summary:level==='Marginal'?'Heavy rain could cause flooding in a few spots.':'Heavy rain could cause flooding. Keep away from flooded roads.',issuedAt:new Date(stamp(p.ISSUE_TIME)).toISOString(),validFrom:new Date(start).toISOString(),expires:new Date(end).toISOString(),url:'https://www.wpc.ncep.noaa.gov/qpf/excessive_rainfall_outlook_ero.php'};
+ const p=feature?.properties||{},level=String(p.OUTLOOK||'').match(/Marginal|Slight|Moderate|High/i)?.[0],issue=stamp(p.ISSUE_TIME),start=stamp(p.START_TIME),end=stamp(p.END_TIME);
+ if(!level||!inGeoJson(longitude,latitude,feature.geometry)||!availableDayOneRisk(issue,start,end,now))return null;
+ return {id:`wpc-day1-${level.toLowerCase()}`,kind:'wpc',level,rank:wpcRank[level.toLowerCase()]||0,title:`${level} risk of flooding rain today`,summary:level==='Marginal'?'Heavy rain could cause flooding in a few spots.':'Heavy rain could cause flooding. Keep away from flooded roads.',issuedAt:new Date(issue).toISOString(),validFrom:new Date(start).toISOString(),expires:new Date(end).toISOString(),url:'https://www.wpc.ncep.noaa.gov/qpf/excessive_rainfall_outlook_ero.php'};
 }
 export function createRiskOutlookService({cached,now=Date.now}){
  return async location=>{
