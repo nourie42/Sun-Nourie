@@ -8,7 +8,7 @@ import {comfortWindow} from '../public/weather-fusion/comfort-outlook.js';
 import {dewpointGrossLevel,forecastGrossLevel} from '../public/weather-fusion/dewpoint-meter.js';
 import {bulletinFacts} from '../public/weather-fusion/bulletin-facts.js';
 import {inDiscussionPolygon,parseSpecialDiscussion,discussionUrl,createSpecialDiscussionService} from '../src/weatherFusionSpecialDiscussions.js';
-import {normalizeConvectiveSigmet,createConvectiveSigmetService} from '../src/weatherFusionConvectiveSigmets.js';
+import {parsePrecipitationDiscussion,precipitationDiscussionUrl,simplifyPrecipitationSummary,createPrecipitationDiscussionService} from '../src/weatherFusionPrecipitationDiscussions.js';
 import {buildForecast} from '../src/weatherFusion.js';
 import {testInputs} from './weatherFusion.fixtures.js';
 const H=3600000,now=Date.parse('2026-09-06T14:00:00Z'),location={latitude:35.787,longitude:-78.4806,timeZone:'America/New_York'};
@@ -99,17 +99,20 @@ test('empty verified special-discussion response differs from a failed feed',asy
  assert.equal((await success(location)).meta.status,'ready');assert.deepEqual((await success(location)).value,[]);
  const failure=createSpecialDiscussionService({now:()=>now,cached:async()=>{throw new Error('offline');}});assert.equal((await failure(location)).meta.status,'unavailable');
 });
-test('active Convective SIGMET covering the selected point becomes a distinct aviation advisory',()=>{
- const item={icaoId:'KKCI',seriesId:'17E',airSigmetType:'SIGMET',hazard:'CONVECTIVE',validTimeFrom:(now-H)/1000,validTimeTo:(now+H)/1000,movementDir:190,movementSpd:15,altitudeHi1:45000,rawAirSigmet:'WSUS31 KKCI 061255\nSIGE\nCONVECTIVE SIGMET 17E\nVALID UNTIL 1500Z\nVA NC AND CSTL WTRS\nFROM RIC-ECG-RDU-RIC\nAREA TS MOV FROM 19015KT. TOPS ABV FL450.',coords:[{lon:-80,lat:34},{lon:-77,lat:34},{lon:-77,lat:37},{lon:-80,lat:37},{lon:-80,lat:34}]};
- const advisory=normalizeConvectiveSigmet(item,location,now);assert.ok(advisory);assert.equal(advisory.event,'Convective SIGMET 17E');assert.equal(advisory.productType,'AWC-CSIGMET');assert.match(advisory.areaDesc,/Aviation thunderstorm advisory; not a public warning/);
- const f={alerts:[],convectiveSigmets:[advisory]};assert.deepEqual(bulletinFacts(f,now).map(value=>value.title),['Convective SIGMET 17E']);
- assert.equal(normalizeConvectiveSigmet({...item,coords:item.coords.map(point=>({lon:point.lon+20,lat:point.lat}))},location,now),null);
- assert.equal(normalizeConvectiveSigmet({...item,validTimeTo:(now-H/2)/1000},location,now),null);
+test('active WPC precipitation discussion becomes a plain-language heavy-rain bulletin',()=>{
+ const url='https://www.wpc.ncep.noaa.gov/metwatch/metwatch_mpd_multi.php?md=1263&yr=2026';
+ const html='<pre>Mesoscale Precipitation Discussion 1263\nNWS Weather Prediction Center College Park MD\n\nAreas affected...South-Central VA...Northeast NC\n\nConcerning...Heavy rainfall...Flash flooding possible\n\nValid 061300Z - 061600Z\n\nSUMMARY...Scattered clusters of heavy showers and thunderstorms may promote some localized and mainly urban areas of flash flooding going through this evening.\n\nDISCUSSION...Technical details.\n\nLAT...LON   37008000 37007700 34007700 34008000</pre>';
+ const discussion=parsePrecipitationDiscussion(html,url,location,now);assert.ok(discussion);assert.equal(discussion.productType,'WPC-MPD');assert.equal(discussion.event,'Heavy Rain & Flash Flooding Discussion');assert.equal(discussion.plainSummary,'Scattered clusters of heavy showers and thunderstorms could cause localized flash flooding, especially in urban areas through this evening.');
+ const f={alerts:[],precipitationDiscussions:[discussion]};assert.deepEqual(bulletinFacts(f,now).map(value=>value.title),['Heavy Rain & Flash Flooding Discussion']);assert.equal(bulletinFacts(f,now)[0].plainSummary,discussion.plainSummary);
+ assert.equal(parsePrecipitationDiscussion(html,url,{latitude:45,longitude:-100},now),null);assert.equal(precipitationDiscussionUrl('https://evil.invalid/metwatch/metwatch_mpd_multi.php?md=1263&yr=2026'),null);
+ assert.equal(simplifyPrecipitationSummary('Storms will be capable of producing flash flood concerns.'),'Storms could produce flash-flood risk.');
 });
-test('Convective SIGMET feed distinguishes a clear result from an outage',async()=>{
- const success=createConvectiveSigmetService({now:()=>now,cached:async()=>({data:[],fetchedAt:new Date(now).toISOString()})});
- assert.equal((await success(location)).meta.status,'ready');assert.deepEqual((await success(location)).value,[]);
- const failure=createConvectiveSigmetService({now:()=>now,cached:async()=>{throw new Error('offline');}});assert.equal((await failure(location)).meta.status,'unavailable');
+test('WPC precipitation-discussion feed distinguishes a clear result from an outage',async()=>{
+ const index='<a href="/metwatch/metwatch_mpd_multi.php?md=1263&amp;yr=2026">MPD</a>',page='<pre>Mesoscale Precipitation Discussion 1263\nAreas affected...North Carolina\n\nConcerning...Heavy rainfall...Flash flooding possible\n\nValid 061300Z - 061600Z\n\nSUMMARY...Heavy rain could cause flash flooding.\n\nDISCUSSION...Technical details.\nLAT...LON 37008000 37007700 34007700 34008000</pre>';
+ const success=createPrecipitationDiscussionService({now:()=>now,cached:async url=>({data:url.includes('multi.php')?page:index,fetchedAt:new Date(now).toISOString()})});
+ const result=await success(location);assert.equal(result.meta.status,'ready');assert.equal(result.value.length,1);
+ const failure=createPrecipitationDiscussionService({now:()=>now,cached:async()=>{throw new Error('offline');}});assert.equal((await failure(location)).meta.status,'unavailable');
+ const bulletins=readFileSync(new URL('../public/weather-fusion/bulletins.js',import.meta.url),'utf8');assert.match(bulletins,/item\.plainSummary/);assert.match(bulletins,/Show full official discussion/);
 });
 test('waving figures have faces and honor reduced-motion preferences',()=>{
  const read=p=>readFileSync(new URL('../public/weather-fusion/'+p,import.meta.url),'utf8');

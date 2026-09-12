@@ -8,7 +8,7 @@ import {createFramePlayer} from './frame-player.js';
 import {renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=local-current-v49';
 import {dailyDisplay} from './weather-math.js?v=remainder-today-v41';
 import {currentHero} from './current-temperature.js?v=radar-now-v47';
-import {renderBulletins} from './bulletins.js?v=convective-sigmet-v1';
+import {renderBulletins} from './bulletins.js?v=wpc-mpd-v1';
 import {modelFreshnessText} from './personal-details.js?v=pet-static-shake-v37';
 import {renderDewpointMeter} from './dewpoint-meter.js?v=car-wash-order-v31';
 import {renderWeatherPanel} from './render-safety.js';
