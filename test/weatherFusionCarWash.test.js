@@ -158,7 +158,7 @@ test('at 3:01 PM an 80% chance at 4 PM still means WAIT even with a dry night an
   assert.equal(bestWashWindow(forecast,0,now),null);
 });
 
-test('low rain chance never rewrites the forecast condition or its weather icon',()=>{
+test('nonzero low rain chance preserves the forecast condition and its weather icon',()=>{
   const forecast=fixture([5,5,5,5,5,5,5]);
   forecast.days[0].condition='Slight Chance Thunderstorms';
   const summary=carWashSummary(forecast,start);
@@ -166,6 +166,17 @@ test('low rain chance never rewrites the forecast condition or its weather icon'
   const firstCard=carWashHTML(summary).match(/<article class="car-wash-day"[\s\S]*?<\/article>/)?.[0]||'';
   assert.match(firstCard,/data-weather-kind="storm"/);
   assert.match(firstCard,/sky-lightning/);
+});
+
+test('a car-wash card displayed as 0% never shows rain, lightning, or snow',()=>{
+  const forecast=fixture([0.4,0,0,0,0,0,0]);
+  forecast.days[0].condition='Slight Chance Thunderstorms';
+  const summary=carWashSummary(forecast,start);
+  assert.equal(Math.round(summary.days[0].chance),0);
+  assert.equal(summary.days[0].condition,'Slight Chance Thunderstorms','source wording remains available');
+  const firstCard=carWashHTML(summary).match(/<article class="car-wash-day"[\s\S]*?<\/article>/)?.[0]||'';
+  assert.match(firstCard,/data-weather-kind="partly-cloudy"/);
+  assert.doesNotMatch(firstCard,/sky-(?:rain|lightning|snow)/);
 });
 
 test('five displayed days each apply the same rolling three-day rule',()=>{

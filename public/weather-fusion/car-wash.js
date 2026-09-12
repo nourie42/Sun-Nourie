@@ -188,10 +188,20 @@ function fact(icon, title, detail, good = false) {
   return `<span class="car-wash-fact ${good?'good':''}"><i aria-hidden="true">${icon}</i><span><b>${esc(title)}</b><small>${esc(detail)}</small></span></span>`;
 }
 
+export function carWashIconCondition(day = {}) {
+  const chance = validChance(day.chance), kind = weatherState(day.condition).kind;
+  // The icon and the displayed blended percentage must describe the same
+  // forecast. A rounded 0% cannot retain rain, lightning, or snow artwork
+  // inherited from an unblended source condition.
+  return chance !== null && Math.round(chance) === 0 && ['rain','storm','snow'].includes(kind)
+    ? 'Partly Cloudy'
+    : day.condition;
+}
+
 export function carWashHTML(summary) {
   const label = verdictLabel(summary.state), good = summary.canWash;
   const cards = summary.days.map(day => `<article class="car-wash-day" data-car-wash-state="${day.state}">
-    <strong>${esc(day.label)}</strong><small>${esc(day.stamp)}</small>${weatherIcon(day.condition,day.isDay!==false,42)}
+    <strong>${esc(day.label)}</strong><small>${esc(day.stamp)}</small>${weatherIcon(carWashIconCondition(day),day.isDay!==false,42)}
     <span class="car-wash-temps">${finite(day.low)?Math.round(day.low)+'°':'—'} <i>|</i> ${finite(day.high)?Math.round(day.high)+'°':'—'}</span>
     <span class="car-wash-chance">💧 ${day.chance===null?'—':Math.round(day.chance)+'%'}</span><b class="car-wash-day-verdict">${verdictLabel(day.state)}</b>
   </article>`).join('');

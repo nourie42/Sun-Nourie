@@ -117,11 +117,11 @@ test('Gross Meter heading stays centered and bold without changing chart geometr
  assert.match(css,/#gross-title\{text-align:center;font-weight:800\}/);assert.match(meterCss,/\.gross-eyebrow\{width:calc\(100% \+ 86px\);[^}]*text-align:center/);assert.match(meterCss,/@media\(max-width:760px\)[\s\S]*\.gross-eyebrow\{width:calc\(100% \+ 62px\)\}/);assert.ok(!/\.gross-(scroll|chart)\s*\{/.test(css));
 });
 test('changed assets are cache-busted and late briefing responses stay guarded',()=>{
- assert.match(html,/forecast-layout\.css\?v=weather-art-labels-v10/);assert.match(html,/app\.js\?v=nbm-blend-v45/);assert.match(html,/car-wash\.css\?v=rain-consensus-v41/);assert.match(html,/forecast-cards\.css\?v=rain-consensus-v41/);assert.match(html,/scenario-layout\.css\?v=scenario-weather-v29/);
+ assert.match(html,/style\.css\?v=car-wash-icon-back-v46/);assert.match(html,/forecast-layout\.css\?v=weather-art-labels-v10/);assert.match(html,/app\.js\?v=car-wash-icon-back-v46/);assert.match(html,/car-wash\.css\?v=rain-consensus-v41/);assert.match(html,/forecast-cards\.css\?v=rain-consensus-v41/);assert.match(html,/scenario-layout\.css\?v=scenario-weather-v29/);
  assert.match(app,/dans-take\.js\?v=weather-art-labels-v10/);
  assert.match(app,/experience\.js\?v=nbm-blend-v45/);
  assert.match(app,/forecast-story\.js\?v=forecast-trace-v40/);
- assert.match(app,/car-wash\.js\?v=car-wash-consistency-v44/);
+ assert.match(app,/car-wash\.js\?v=car-wash-icon-back-v46/);
  assert.match(app,/model-explanation\.js\?v=nbm-blend-v45/);
  assert.match(app,/if \(id === generation && briefing\.signature === forecast\?\.signature\) renderBriefing\(briefing\)/);
 });
@@ -130,4 +130,9 @@ test('Weather Nourie title quietly opens the shared experimental weather app',()
  assert.match(app,/document\.documentElement\.dataset\.weatherPage=experimentalPage\?'experimental':'main'/);
  assert.match(app,/if\(experimentalPage\)document\.title='Experimental Weather · Weather Nourie'/);
  assert.match(app,/if\(experimentalPage\)draw\('car-wash-forecast'/);
+});
+test('experimental weather has a top back button while the main page keeps it hidden',()=>{
+ assert.match(html,/<div class="shell">\s*<a class="experimental-back" id="experimental-back" href="\/weather-fusion\/" hidden>/);
+ assert.match(app,/const back=\$\('experimental-back'\);if\(back\)back\.hidden=!experimentalPage/);
+ const style=read('style.css');assert.match(style,/\.experimental-back\{[^}]*display:inline-flex/);
 });
