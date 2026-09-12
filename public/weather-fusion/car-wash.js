@@ -153,8 +153,11 @@ export function carWashSummary(forecast, now = Date.now()) {
     }
   }
   const activeKind = weatherState(forecast?.current?.condition).kind;
-  const rainingNow = ['rain','storm','snow'].includes(activeKind) && forecast?.current?.type === 'observation';
-  if (decisions[0] && rainingNow) decisions[0] = {...decisions[0],state:'wait',canWash:false,reason:'Rain or wintry weather is happening now.',activeWeather:true};
+  const stationPrecipitation = ['rain','storm','snow'].includes(activeKind) && forecast?.current?.type === 'observation';
+  const radar=forecast?.current?.radarPrecipitation,radarPrecipitation=radar?.status === 'ready' && radar.atLocation === true;
+  const radarNearby=radar?.status === 'ready' && radar.nearby === true;
+  if (decisions[0] && (stationPrecipitation || radarPrecipitation || radarNearby)) decisions[0] = {...decisions[0],state:'wait',canWash:false,
+    reason:radarPrecipitation&&!stationPrecipitation?'Observed radar shows precipitation at this location.':radarNearby&&!stationPrecipitation?'Observed radar shows rain nearby.':'Rain or wintry weather is happening now.',activeWeather:true};
   const washOptions = decisions.filter(decision => decision.canWash);
   let firstWash = washOptions[0] || null, window = null;
   for (const decision of washOptions) {

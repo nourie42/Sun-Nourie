@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { coordinates, localTime, dateKey, nextDate, durationMs, sumHourly, gridQpf, guidanceBlend, normalizeModel, parseRadarTimes, Cache, buildForecast, createWeatherService, registerWeatherFusionRoutes } from '../src/weatherFusion.js';
+import { coordinates, localTime, dateKey, nextDate, durationMs, sumHourly, gridQpf, guidanceBlend, normalizeModel, parseRadarTimes, radarSampleLocations, radarFeatureActive, summarizeRadarPresence, Cache, buildForecast, createWeatherService, registerWeatherFusionRoutes } from '../src/weatherFusion.js';
 import {H,now,base,times,model,periods,hourlyPeriods,grid,inputs,snapshot} from './weatherFusion.fixtures.js';
 test('coordinate validation is finite, bounded, and rejects coercion and arrays', () => {
   assert.equal(coordinates({ location: 'greenville' }).longitude, -77.3664);
@@ -155,4 +155,26 @@ test('weather routes register without changing any existing route', () => {
   assert.ok(pageRoute[0].includes('/weather-fusion/experimental-weather.html'));
   assert.ok(routes.some(([p]) => p === '/api/weather-fusion/forecast'));
   assert.ok(!routes.some(([p]) => p === '/'));
+});
+test('live radar distinguishes the selected point from precipitation nearby', async () => {
+  const points=radarSampleLocations({latitude:35.787,longitude:-78.4806});
+  assert.equal(points.length,13);assert.equal(points[0].distanceMiles,0);assert.equal(Math.max(...points.map(point=>point.distanceMiles)),12);
+  assert.equal(radarFeatureActive({features:[{properties:{ALPHA_BAND:255}}]}),true);
+  assert.equal(radarFeatureActive({features:[{properties:{ALPHA_BAND:0}}]}),false);
+  assert.equal(radarFeatureActive({features:[]}),null);
+  const summary=summarizeRadarPresence(points.map((point,index)=>({...point,active:index===8})),new Date(now).toISOString());
+  assert.equal(summary.atLocation,false);assert.equal(summary.nearby,true);assert.equal(summary.nearestRainMiles,12);
+  const xml=`<Dimension name="time">${new Date(now-2*60000).toISOString()}</Dimension>`;
+  const fetchImpl=async value=>{
+    const url=new URL(value),request=url.searchParams.get('request')?.toLowerCase();
+    if(request==='getcapabilities')return new Response(xml,{status:200,headers:{'content-type':'application/xml'}});
+    if(request==='getfeatureinfo'){
+      const [west,,east]=url.searchParams.get('bbox').split(',').map(Number),longitude=(west+east)/2;
+      const alpha=longitude < -78.6 ? 255 : 0;
+      return new Response(JSON.stringify({features:[{properties:{RED_BAND:20,GREEN_BAND:180,BLUE_BAND:30,ALPHA_BAND:alpha}}]}),{status:200,headers:{'content-type':'application/json'}});
+    }
+    throw new Error('Unexpected radar request');
+  };
+  const live=await createWeatherService({fetchImpl,now:()=>now}).radar({location:'knightdale'});
+  assert.equal(live.precipitation.status,'ready');assert.equal(live.precipitation.atLocation,false);assert.equal(live.precipitation.nearby,true);
 });

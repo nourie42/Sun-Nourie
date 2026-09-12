@@ -57,7 +57,7 @@ test('Now reports the observed precipitation state while future hours preserve c
  const f=make();
  for(const hour of f.hours){hour.pop=90;hour.rainLikelihood={value:null};}
  assert.equal(currentSample(f,now).pop,0);
- assert.deepEqual(currentSample(f,now).currentPrecipitation,{active:false,label:'Dry now',source:'Current station reports no precipitation.'});
+ assert.deepEqual(currentSample(f,now).currentPrecipitation,{active:false,label:'Dry at station',source:'The nearby station reports no precipitation; radar is checked separately.'});
  assert.equal(forecastSample(f,f.hours[1].time).pop,null);
  f.hours[1].rainLikelihood.value=0;
  assert.equal(forecastSample(f,f.hours[1].time).pop,0);
@@ -66,6 +66,13 @@ test('Now reports the observed precipitation state while future hours preserve c
  assert.equal(currentSample(f,now).currentPrecipitation.label,'Rain now');
  f.current.type='forecast';
  assert.equal(currentSample(f,now).pop,null,'without a station observation Now retains the canonical current-hour estimate');
+});
+test('fresh observed radar overrides a dry station label and keeps nearby rain distinct',()=>{
+ const f=make('Cloudy');
+ f.current.radarPrecipitation={status:'ready',observedAt:new Date(now).toISOString(),atLocation:true,nearby:true,scanRadiusMiles:12};
+ let sample=currentSample(f,now);assert.equal(sample.currentPrecipitation.label,'Rain on radar');assert.equal(sample.currentPrecipitation.active,true);assert.equal(sample.condition,'Rain');
+ f.current.radarPrecipitation.atLocation=false;
+ sample=currentSample(f,now);assert.equal(sample.currentPrecipitation.label,'Rain nearby');assert.equal(sample.currentPrecipitation.active,false);assert.equal(sample.currentPrecipitation.nearby,true);assert.equal(sample.condition,'Cloudy');
 });
 test('a rainy future hour does not reuse the sunny current observation',()=>{
  const f=make(),h=f.hours[1];h.condition='Rain';

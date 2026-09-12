@@ -25,6 +25,7 @@ export const PRESETS = [
   { id: 'greenville', name: 'Greenville, NC', latitude: 35.6127, longitude: -77.3664 },
 ];
 export const RADAR_URL = 'https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows';
+export const RADAR_NEARBY_MILES = 12;
 const HOUR = 3600000;
 const MINUTE = 60000;
 const VERSION = 'weather-fusion-v2-direct';
@@ -165,6 +166,41 @@ export function parseRadarTimes(xml, now = Date.now()) {
   // At most 13 real, advertised times. Do not manufacture historical frames.
   const every = Math.max(1, Math.ceil(sorted.length / 12));
   return [...new Set([...sorted.filter((_, i) => i % every === 0), ...sorted.slice(-1)])].map(iso);
+}
+
+export function radarSampleLocations(location) {
+  const latitude = Number(location?.latitude), longitude = Number(location?.longitude);
+  if (!finite(latitude) || !finite(longitude)) return [];
+  const points = [{ latitude, longitude, distanceMiles: 0 }];
+  for (const [radius, bearings] of [[RADAR_NEARBY_MILES / 2, [0, 90, 180, 270]], [RADAR_NEARBY_MILES, [0, 45, 90, 135, 180, 225, 270, 315]]]) {
+    const north = radius / 69, east = radius / (69 * Math.cos(latitude * Math.PI / 180));
+    for (const bearing of bearings) {
+      const angle = bearing * Math.PI / 180;
+      points.push({latitude:rounded(latitude + north * Math.cos(angle),4),longitude:rounded(longitude + east * Math.sin(angle),4),distanceMiles:radius});
+    }
+  }
+  return points;
+}
+
+export function radarFeatureActive(payload) {
+  const properties = payload?.features?.[0]?.properties;
+  return finite(properties?.ALPHA_BAND) ? properties.ALPHA_BAND > 0 : null;
+}
+
+export function radarFeatureInfoUrl(point, time) {
+  const halfDegree = .01;
+  return `${RADAR_URL}?${new URLSearchParams({service:'WMS',version:'1.3.0',request:'GetFeatureInfo',layers:'conus_bref_qcd',query_layers:'conus_bref_qcd',styles:'radar_reflectivity',crs:'CRS:84',bbox:[point.longitude-halfDegree,point.latitude-halfDegree,point.longitude+halfDegree,point.latitude+halfDegree].join(','),width:'3',height:'3',i:'1',j:'1',info_format:'application/json',time})}`;
+}
+
+export function summarizeRadarPresence(samples, observedAt) {
+  const available = samples.filter(sample => typeof sample.active === 'boolean');
+  const active = available.filter(sample => sample.active);
+  const center = samples.find(sample => sample.distanceMiles === 0);
+  return {status:available.length ? 'ready' : 'unavailable',observedAt,
+    atLocation:typeof center?.active === 'boolean' ? center.active : null,
+    nearby:active.some(sample => sample.distanceMiles > 0),
+    nearestRainMiles:active.length ? Math.min(...active.map(sample => sample.distanceMiles)) : null,
+    scanRadiusMiles:RADAR_NEARBY_MILES,source:'NOAA MRMS observed radar'};
 }
 
 /** Bounded in-process cache with concurrent request de-duplication and no stale fallback. */
@@ -462,10 +498,24 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
     const { data } = await cached(url, HOUR);
     return { results: (data.results || []).filter((p) => p.country_code === 'US' && p.latitude >= 24 && p.latitude <= 50 && p.longitude >= -125 && p.longitude <= -66).map((p) => ({ id: String(p.id), name: [p.name, p.admin1].filter(Boolean).join(', '), latitude: p.latitude, longitude: p.longitude })) };
   }
-  async function radar() {
+  async function radar(query = {}) {
+    const location = coordinates(query);
     const result = await feed('radar', 'NOAA radar mosaic', `${RADAR_URL}?service=WMS&version=1.3.0&request=GetCapabilities`, 2 * MINUTE, (xml) => parseRadarTimes(xml, now()), { text: true });
     const frames = result.value || [];
-    return { frames, url: RADAR_URL, layer: 'conus_bref_qcd', status: frames.length ? (now() - Date.parse(frames.at(-1)) > 20 * MINUTE ? 'stale' : 'ready') : 'unavailable',
+    const status = frames.length ? (now() - Date.parse(frames.at(-1)) > 20 * MINUTE ? 'stale' : 'ready') : 'unavailable';
+    let precipitation = {status:'unavailable',observedAt:frames.at(-1)||null,atLocation:null,nearby:false,nearestRainMiles:null,scanRadiusMiles:RADAR_NEARBY_MILES,source:'NOAA MRMS observed radar'};
+    if (status === 'ready') {
+      const observedAt = frames.at(-1), points = radarSampleLocations(location);
+      const samples = await Promise.all(points.map(async point => {
+        try {
+          const {data} = await cached(radarFeatureInfoUrl(point,observedAt),2*MINUTE);
+          return {...point,active:radarFeatureActive(data)};
+        } catch { return {...point,active:null}; }
+      }));
+      precipitation = summarizeRadarPresence(samples,observedAt);
+    }
+    return { frames, url: RADAR_URL, layer: 'conus_bref_qcd', status,
+      location:{latitude:location.latitude,longitude:location.longitude},precipitation,
       fetchedAt: result.meta.fetchedAt, message: frames.length ? 'Observed radar mosaic; not a future forecast.' : 'Radar timestamps could not be verified. Use the official radar link.', officialUrl: 'https://radar.weather.gov/' };
   }
   const getBulletins=createBulletinService({getForecast,request,env,now});

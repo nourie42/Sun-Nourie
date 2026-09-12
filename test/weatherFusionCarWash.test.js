@@ -218,6 +218,18 @@ test('an observed shower overrides today even when the three-day outlook is dry'
   assert.equal(summary.decisions[0].activeWeather,true);
   assert.match(summary.reason,/happening now/);
 });
+test('observed radar at the selected location also overrides a low car-wash chance',()=>{
+ const forecast=fixture([0,0,0,0,0,0,0]);
+ forecast.current.radarPrecipitation={status:'ready',atLocation:true,nearby:true,scanRadiusMiles:12};
+ const summary=carWashSummary(forecast,start);
+ assert.equal(summary.state,'wait');assert.equal(summary.canWash,false);assert.equal(summary.reason,'Observed radar shows precipitation at this location.');
+});
+test('nearby observed rain prevents a misleading wash recommendation',()=>{
+ const forecast=fixture([0,0,0,0,0,0,0]);
+ forecast.current.radarPrecipitation={status:'ready',atLocation:false,nearby:true,scanRadiusMiles:12};
+ const summary=carWashSummary(forecast,start);
+ assert.equal(summary.state,'wait');assert.equal(summary.canWash,false);assert.equal(summary.reason,'Observed radar shows rain nearby.');
+});
 
 test('best wash window follows contiguous blended hourly chances, not conflicting raw POP',()=>{
   const forecast = fixture([5,5,5,5,5,5,5]);

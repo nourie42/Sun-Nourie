@@ -62,10 +62,21 @@ export function currentSample(forecast, now = Date.now()) {
   const currentHour=forecast?.hours?.find(h=>Date.parse(h.time)<=now&&now<Date.parse(h.time)+3600000);
   const kind=weatherState(current.condition).kind,stationCondition=current.type==='observation'&&!/forecast/i.test(current.conditionSource||'')&&kind!=='unknown';
   const activePrecipitation=stationCondition&&['rain','storm','snow'].includes(kind);
-  const currentPrecipitation=stationCondition?{active:activePrecipitation,label:activePrecipitation?(kind==='snow'?'Snow now':'Rain now'):'Dry now',source:`Current station reports ${activePrecipitation?'precipitation':'no precipitation'}.`}:null;
-  const currentLikelihood=stationCondition?{value:activePrecipitation?100:0,source:'Current station observation'}:currentHour?.rainLikelihood;
+  const radar=current.radarPrecipitation,radarReady=radar?.status==='ready';
+  const radarHere=radarReady&&radar.atLocation===true,radarNearby=radarReady&&radar.nearby===true;
+  const currentPrecipitation=activePrecipitation
+    ? {active:true,label:kind==='snow'?'Snow now':'Rain now',source:'Current station reports precipitation.'}
+    : radarHere
+      ? {active:true,label:'Rain on radar',source:'NOAA observed radar shows precipitation at the selected location.'}
+      : radarNearby
+        ? {active:false,nearby:true,label:'Rain nearby',source:'NOAA observed radar shows precipitation near the selected location.'}
+        : stationCondition
+          ? {active:false,label:'Dry at station',source:'The nearby station reports no precipitation; radar is checked separately.'}
+          : null;
+  const currentLikelihood=activePrecipitation||radarHere?{value:100,source:activePrecipitation?'Current station observation':'NOAA observed radar'}:stationCondition?{value:0,source:'Current station observation'}:currentHour?.rainLikelihood;
+  const displayCondition=radarHere&&!activePrecipitation?'Rain':current.condition;
   return {windDirection:current.windDirection,pop:rainChanceValue(currentLikelihood),officialPop:currentHour?.officialPop??currentHour?.pop,rainLikelihood:currentLikelihood,currentPrecipitation,precipitationBlend:currentHour?.precipitationBlend,uvIndex:hourlyUvValue(forecast,now),id:'now', now:true, time:current.time, temperature:finite(current.temperature) ? current.temperature : null,
-    feels:outdoorExposure(comfort).value, exposure:outdoorExposure(comfort), comfort, condition:current.condition || 'Sky conditions unavailable',
+    feels:outdoorExposure(comfort).value, exposure:outdoorExposure(comfort), comfort, condition:displayCondition || 'Sky conditions unavailable',
     isDay:comfort.daylight ?? (solarElevation(now,forecast.location.latitude,forecast.location.longitude) > 0),
     source:current.type === 'observation' ? 'Station observation' : 'Current estimate', inputs:current};
 }

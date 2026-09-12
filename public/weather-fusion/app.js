@@ -1,19 +1,19 @@
 import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText,rebindDanTake} from './dans-take.js?v=weather-art-labels-v10';
 import {danCard} from './dans-summary.js?v=dans-take-alerts-v11';
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
-import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './weather-display.js?v=weighted-rain-v43';
+import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './weather-display.js?v=radar-now-v47';
 import {dayGraphHTML,dayGraphPoints,installDayGraph} from './day-graph.js?v=weather-art-labels-v10';
 import {degrees,feelsAt} from './hourly-feels.js?v=weather-art-labels-v10';
 import {createFramePlayer} from './frame-player.js';
 import {renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=nbm-blend-v45';
 import {dailyDisplay} from './weather-math.js?v=forecast-trace-v40';
-import {currentHero} from './current-temperature.js?v=weather-art-labels-v10';
+import {currentHero} from './current-temperature.js?v=radar-now-v47';
 import {renderBulletins} from './bulletins.js?v=weather-art-labels-v10';
 import {modelFreshnessText} from './personal-details.js?v=consistent-rain-scenes-v35';
 import {renderDewpointMeter} from './dewpoint-meter.js?v=car-wash-order-v31';
 import {renderWeatherPanel} from './render-safety.js';
 import {forecastPeriodSummary} from './forecast-story.js?v=forecast-trace-v40';
-import {isExperimentalWeatherPage,renderCarWashForecast,resetCarWashForecast} from './car-wash.js?v=car-wash-icon-back-v46';
+import {isExperimentalWeatherPage,renderCarWashForecast,resetCarWashForecast} from './car-wash.js?v=radar-now-v47';
 import {renderModelExplanation,resetModelExplanation} from './model-explanation.js?v=nbm-blend-v45';
 import {updateRainTrend} from './rain-trend.js?v=rain-consensus-v41';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
@@ -100,7 +100,7 @@ function render(data) {
   if($('hero-uv'))$('hero-uv').innerHTML=dailyUvHTML(data.days[0]?.uvMax,'Peak UV today');
   $('condition').textContent = hero.tonight ? `Tonight · ${hero.condition}` : hero.condition;
   $('high-low').textContent = hero.tonight ? 'Overnight low' : hero.range;
-  $('observation-label').textContent = hero.tonight ? `Tonight’s forecast · updated ${clock(data.assembledAt)}` : (c.type === 'observation' ? `Nearby weather station · updated ${clock(c.time)}` : 'Estimated current conditions');
+  $('observation-label').textContent = hero.tonight ? `Tonight’s forecast · updated ${clock(data.assembledAt)}` : (c.radarPrecipitation?.status==='ready'&&c.radarPrecipitation.atLocation===true ? `NOAA radar at this location · updated ${clock(c.radarPrecipitation.observedAt)}` : c.type === 'observation' ? `Nearby weather station · updated ${clock(c.time)}` : 'Estimated current conditions');
   $('hero-scene').innerHTML = icon(hero.condition, hero.isDay, 120);
   document.querySelectorAll('[data-place]').forEach((button) => { const active = button.dataset.place === place.id; button.classList.toggle('active', active); button.setAttribute('aria-pressed', String(active)); });
   draw('alerts', 'Official alerts', () => renderAlerts(data));
@@ -233,7 +233,7 @@ async function load({ moveMap = false, refreshModels = false, briefingRetry = 0 
 }
 function chooseLocation(value) {
   place = { ...value };
-  stopRadar();framePlayer?.clear();++modelFrameToken;++mapSelectionToken;
+  stopRadar();framePlayer?.clear();++modelFrameToken;++mapSelectionToken;++radarGeneration;lastRadarFetch=0;
   currentBriefing = null;
   resetExperience();
   if ($('day-dialog').open) $('day-dialog').close();
@@ -340,10 +340,12 @@ async function loadRadar() {
   const id = ++radarGeneration;
   lastRadarFetch = Date.now();
   try {
-    const data = await api('radar');
+    const data = await api('radar',query());
     if (id !== radarGeneration) return;
     radarMeta = data; frames = data.frames || [];
     frameIndex = Math.max(0, frames.length-1);
+    const samePlace=finite(data.location?.latitude)&&finite(data.location?.longitude)&&Math.abs(data.location.latitude-place.latitude)<.00011&&Math.abs(data.location.longitude-place.longitude)<.00011;
+    if(forecast&&samePlace){forecast.current.radarPrecipitation=data.precipitation;render(forecast);}
     if (selectedLayer !== 'radar') return;
     configureFrames(frames.length,frameIndex);
     if (!frames.length) { if(radarLayer){map?.removeLayer(radarLayer);radarLayer=null;} $('radar-stamp').textContent='Unavailable'; mapMessage(data.message); return; }
