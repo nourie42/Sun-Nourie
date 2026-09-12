@@ -131,8 +131,9 @@ export function deterministicRainSignal(amount) {
   return amount > 0 ? 100 : 0;
 }
 /**
- * Start with the official NWS probability, then add each deterministic model's
- * fixed weight when that model forecasts any rain. Rainfall inches stay separate.
+ * Fill the NWS 40-point share in proportion to its official probability, then
+ * add each deterministic model's full fixed weight when it forecasts any rain.
+ * Rainfall inches stay separate.
  */
 export function precipitationLikelihood(nwsProbability, precipitationBlend, policy = SAME_DAY_WEIGHTS) {
   const amounts = precipitationBlend?.sourceValues || {};
@@ -144,7 +145,7 @@ export function precipitationLikelihood(nwsProbability, precipitationBlend, poli
     nbm:deterministicRainSignal(amounts.nbm)
   };
   const sourcePoints={
-    nws,
+    nws:finite(nws)?round(nws*policy.nws,8):null,
     hrrr:finite(values.hrrr)?round(values.hrrr*policy.hrrr,8):null,
     ecmwf:finite(values.ecmwf)?round(values.ecmwf*policy.ecmwf,8):null,
     nbm:finite(values.nbm)?round(values.nbm*policy.nbm,8):null
@@ -155,10 +156,10 @@ export function precipitationLikelihood(nwsProbability, precipitationBlend, poli
   const sourceAmounts=Object.fromEntries(['nws','hrrr','ecmwf','nbm'].map(id=>[id,finite(amounts[id])?amounts[id]:null]));
   const drySources=['hrrr','ecmwf','nbm'].filter(id=>values[id]===0);
   const wetSources=['hrrr','ecmwf','nbm'].filter(id=>values[id]===100);
-  const sources=included.map(id=>({id,value:values[id],weight:id==='nws'?1:policy[id],points:sourcePoints[id]}));
+  const sources=included.map(id=>({id,value:values[id],weight:policy[id],points:sourcePoints[id]}));
   return {value,rawValue:value,weightedValue:rawTotal,rawTotal,sourceValues:values,sourcePoints,
     sourceAmounts,officialProbability:nws,drySources,wetSources,sources,
-    source:'NWS probability plus fixed wet-model points',calibrated:false};
+    source:'Weighted NWS probability plus fixed wet-model points',calibrated:false};
 }
 /** A period card is the highest of its actual hourly scores, never a new vote on accumulated rain. */
 export function summarizeRainTimeline(timeline, start, end) {
@@ -368,7 +369,7 @@ export function enhanceForecast(out, { models, grid, periods = [], hourlyPeriods
   out.convectiveGuidance=out.hours.filter(h=>finite(h.reflectivity)||finite(h.nearbyReflectivity)).slice(0,30).map(h=>({time:h.time,pointReflectivityDbz:h.reflectivity,nearby25kmMaxReflectivityDbz:h.nearbyReflectivity,runAt:sourceModels.hrrr?.reflectivityRunAt||sourceModels.hrrr?.runAt}));
   out.google={status:'access-required',contributes:false,label:'Google WeatherNext',message:'Not included: approved Google WeatherNext dataset access has not been configured.',url:'https://developers.google.com/weathernext/guides/access-forecast'};
   out.repairVersion=REPAIR_VERSION;
-  out.blendPolicy={allForecastHours:SAME_DAY_WEIGHTS,sameDay:SAME_DAY_WEIGHTS,precipitation:'Rainfall amount is calculated separately in inches from the hourly source amounts.',probability:'Start with the exact NWS hourly probability. Add 30 points for HRRR rain, 10 for ECMWF rain and 20 for NBM rain; zero QPF adds zero. Cap the total at 100%.',periodProbability:'Highest canonical hourly score within the explicit period window, not an independently estimated all-day event probability',partialCoverage:'An unavailable deterministic model adds no points; a period with missing canonical hourly scores is unavailable, not dry'};
+  out.blendPolicy={allForecastHours:SAME_DAY_WEIGHTS,sameDay:SAME_DAY_WEIGHTS,precipitation:'Rainfall amount is calculated separately in inches from the hourly source amounts.',probability:'The NWS hourly probability fills its 40-point share proportionally. Add 30 points for HRRR rain, 10 for ECMWF rain and 20 for NBM rain; zero QPF adds zero. Cap the total at 100%.',periodProbability:'Highest canonical hourly score within the explicit period window, not an independently estimated all-day event probability',partialCoverage:'An unavailable deterministic model adds no points; a period with missing canonical hourly scores is unavailable, not dry'};
   out.methodology='Numeric Weather Nourie blend: Each hourly rain chance starts with the exact official NWS percentage. HRRR adds 30 points, ECMWF adds 10 points and NBM adds 20 points when that model forecasts any hourly rain; a zero amount adds zero points. The total is capped at 100%. Rainfall amount is calculated separately in inches, so the size of a positive model amount never changes its rain-chance points. Unavailable deterministic inputs add no points and are never treated as observed dry weather. This is a transparent, uncalibrated estimate, not a proven accuracy ranking. Official warnings are never altered. Explicit HRRR, ECMWF IFS 0.25° and NBM point feeds cover the selected coordinates through Open-Meteo, with native extracts as a fallback. Point feeds can combine successive runs of the same named model; their initialization metadata refers to the latest published run. Temperature, dew point, wind, gust and cloud cover use their separate requested weighted-average policy; humidity and feels-like are derived consistently. Pressure and visibility include only published fields. Station observations, UV and official text retain separate provenance. Coarser precipitation intervals are prorated at boundaries; interpolated hourly amounts do not establish storm arrival times. Today’s daily rain card covers only the remaining period when earlier forecast hours have passed; the main precipitation metric covers the next 24 hours.';
   out.methodology=out.methodology.replace('The hourly rain likelihood','Each hourly rain likelihood')+' Daily, daytime and overnight rain percentages are the highest canonical hourly score inside their stated windows, not independently calculated full-period probabilities. The same complete hourly timeline supplies daily cards, forecast details, the hourly display, car-wash decisions and experimental source evidence. A missing hourly score leaves its period unavailable. Expected rainfall amounts are summed from that same timeline.';
   return out;

@@ -14,7 +14,7 @@ import {renderDewpointMeter} from './dewpoint-meter.js?v=car-wash-order-v31';
 import {renderWeatherPanel} from './render-safety.js';
 import {forecastPeriodSummary} from './forecast-story.js?v=forecast-trace-v40';
 import {isExperimentalWeatherPage,renderCarWashForecast,resetCarWashForecast} from './car-wash.js?v=radar-now-v47';
-import {renderModelExplanation,resetModelExplanation} from './model-explanation.js?v=rain-base-v47';
+import {renderModelExplanation,resetModelExplanation} from './model-explanation.js?v=nws-weight-v48';
 import {updateRainTrend} from './rain-trend.js?v=remainder-today-v42';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);

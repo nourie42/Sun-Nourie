@@ -34,9 +34,9 @@ function matchingRows(data,summary) {
 test('any positive model amount adds that model full fixed points',()=>{
   const data=buildForecast(inputs());
   const day=data.days[1],rows=matchingRows(data,day.rainLikelihood);
-  assert.equal(day.rainLikelihood.value,99);
+  assert.equal(day.rainLikelihood.value,76);
   assert.equal(day.rainLikelihood.value,Math.max(...rows.map(row=>row.rainLikelihood.value)));
-  assert.deepEqual(new Set(rows.map(row=>row.rainLikelihood.value)),new Set([69,99]),'hours beyond HRRR coverage lose only HRRR’s 30 points');
+  assert.deepEqual(new Set(rows.map(row=>row.rainLikelihood.value)),new Set([46,76]),'hours beyond HRRR coverage lose only HRRR’s 30 points');
   assert.equal(day.rainLikelihood.coverage.complete,true);
   assert.equal(day.officialPop,39,'raw NWS period probability remains separate');
 });
@@ -69,7 +69,7 @@ test('daily peak beyond the 48-hour strip remains auditable on the full hourly t
   assert.equal(forecast.hours.length,48);
   assert.ok(forecast.rainTimeline.length>48);
   assert.equal(day.rainLikelihood.peakTime,iso(peakTime));
-  assert.equal(day.rainLikelihood.value,81);
+  assert.equal(day.rainLikelihood.value,32);
   assert.equal(day.rainLikelihood.peak.sourceValues.nws,81);
   assert.equal(day.rainLikelihood.peak.officialProbability,81);
   assert.equal(day.rainLikelihood.peak.sources.find(source=>source.id==='nws').runAt,iso(now-H));
@@ -116,22 +116,23 @@ test('daily and next-24-hour amounts sum the same canonical hourly graph values'
   assert.equal(forecast.precipitation.value,total(forecast.precipitation.start,forecast.precipitation.end));
 });
 
-test('NWS contributes its exact official percentage',()=>{
+test('NWS fills its 40-point share in proportion to the official percentage',()=>{
   const score=precipitationLikelihood(10,{sourceValues:{hrrr:0,ecmwf:0,nbm:0}});
-  assert.equal(score.value,10);
+  assert.equal(score.value,4);
   assert.deepEqual(score.sourceValues,{nws:10,hrrr:0,ecmwf:0,nbm:0});
+  assert.equal(score.sourcePoints.nws,4);
 });
 
-test('NWS stays exact and model points are neither scaled nor renormalized',()=>{
+test('NWS is scaled within its share and model points are neither scaled nor renormalized',()=>{
   const dryAmounts={sourceValues:{nws:.01,hrrr:0,ecmwf:0,nbm:0}};
   const below=precipitationLikelihood(62,dryAmounts),boundary=precipitationLikelihood(62.5,dryAmounts);
-  assert.equal(below.weightedValue,62);
-  assert.equal(below.rawValue,62);
-  assert.equal(below.value,62);
-  assert.equal(boundary.weightedValue,62.5);
-  assert.equal(boundary.value,63);
+  assert.equal(below.weightedValue,24.8);
+  assert.equal(below.rawValue,25);
+  assert.equal(below.value,25);
+  assert.equal(boundary.weightedValue,25);
+  assert.equal(boundary.value,25);
   assert.deepEqual(below.drySources,['hrrr','ecmwf','nbm']);
-  assert.equal(precipitationLikelihood(9,{sourceValues:{nws:.01,hrrr:null,ecmwf:null,nbm:null}}).value,9,'missing models do not inflate the NWS percentage');
+  assert.equal(precipitationLikelihood(9,{sourceValues:{nws:.01,hrrr:null,ecmwf:null,nbm:null}}).value,4,'missing models do not inflate the weighted NWS contribution');
 });
 
 test('source evidence preserves exact amounts while vote arithmetic stays binary',()=>{
@@ -139,9 +140,9 @@ test('source evidence preserves exact amounts while vote arithmetic stays binary
   assert.equal(score.sourceValues.hrrr,null);
   assert.equal(score.sourceValues.ecmwf,100);
   assert.equal(score.sourceAmounts.ecmwf,.016);
-  assert.equal(score.weightedValue,49);
-  assert.equal(score.value,49);
-  assert.deepEqual(score.sources.map(row=>[row.id,row.weight]),[['nws',1],['ecmwf',.1]]);
+  assert.equal(score.weightedValue,25.6);
+  assert.equal(score.value,26);
+  assert.deepEqual(score.sources.map(row=>[row.id,row.weight]),[['nws',.4],['ecmwf',.1]]);
   assert.equal(precipitationLikelihood(39,{sourceValues:{ecmwf:.0049}}).sourceValues.ecmwf,100);
   const data=buildForecast(inputs({amount:.001})),row=data.rainTimeline[0];
   assert.equal(row.precipitationBlend.sourceValues.hrrr,.001);
@@ -159,7 +160,7 @@ test('expired peak hours leave the remaining forecast when the current hour adva
   const data=inputs({chance:0,amount:0});
   data.hourly.periods[0].probabilityOfPrecipitation.value=80;
   const first=buildForecast(data),later=buildForecast({...data,now:now+H});
-  assert.equal(first.days[0].popDayLikelihood.value,80);
+  assert.equal(first.days[0].popDayLikelihood.value,32);
   assert.equal(later.days[0].popDayLikelihood.value,0);
   assert.equal(later.days[0].popDayLikelihood.window.start,iso(now+H));
   assert.ok(later.rainTimeline.every(row=>Date.parse(row.time)>=now+H));
@@ -170,10 +171,10 @@ test('an in-progress rainy hour stays in Today at 12:01 and its remaining amount
   data.models={};
   data.hourly.periods[0].probabilityOfPrecipitation.value=80;
   const initial=buildForecast(data),minuteLater=buildForecast({...data,now:now+60000});
-  assert.equal(initial.days[0].popDayLikelihood.value,80);
-  assert.equal(minuteLater.hours[0].rainLikelihood.value,80);
-  assert.equal(minuteLater.days[0].popDayLikelihood.value,80);
-  assert.equal(minuteLater.days[0].rainLikelihood.value,80);
+  assert.equal(initial.days[0].popDayLikelihood.value,32);
+  assert.equal(minuteLater.hours[0].rainLikelihood.value,32);
+  assert.equal(minuteLater.days[0].popDayLikelihood.value,32);
+  assert.equal(minuteLater.days[0].rainLikelihood.value,32);
   assert.equal(minuteLater.days[0].popDayLikelihood.window.start,iso(now+60000));
   assert.equal(minuteLater.days[0].popDayLikelihood.coverage.complete,true);
   assert.equal(minuteLater.days[0].qpfWindow.start,iso(now+60000));
@@ -198,9 +199,9 @@ test('corroborated new model rain changes both the hourly and period result with
   wet.models.hrrr.runAt=iso(now);
   wet.models.hrrr.precipitationIntervals.find(row=>row.start*1000===now).value=.02;
   const first=buildForecast(dry),updated=buildForecast(wet);
-  assert.equal(first.hours[0].rainLikelihood.value,30);
-  assert.equal(updated.hours[0].rainLikelihood.value,60);
-  assert.equal(updated.days[0].popDayLikelihood.value,60);
+  assert.equal(first.hours[0].rainLikelihood.value,12);
+  assert.equal(updated.hours[0].rainLikelihood.value,42);
+  assert.equal(updated.days[0].popDayLikelihood.value,42);
   assert.equal(updated.days[0].popDayLikelihood.peak.sources.find(source=>source.id==='hrrr').runAt,iso(now));
   assert.notEqual(first.signature,updated.signature);
 });

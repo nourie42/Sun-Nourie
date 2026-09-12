@@ -36,33 +36,33 @@ test('missing blend inputs are excluded rather than filled with zero',()=>{
  assert.equal(weighted({hrrr:null,ecmwf:1},{hrrr:.6,ecmwf:.4}).value,1);
  assert.equal(weighted({hrrr:null,ecmwf:null},{hrrr:.6,ecmwf:.4}).value,null);
 });
-test('hourly rain likelihood uses the exact NWS chance plus fixed wet-model points',()=>{
+test('hourly rain likelihood scales the NWS share and adds full wet-model points',()=>{
  const dry=precipitationLikelihood(10,{sourceValues:{nws:0,hrrr:0,ecmwf:0,nbm:0}});
- assert.equal(dry.rawValue,10);assert.equal(dry.value,10);
+ assert.equal(dry.rawValue,4);assert.equal(dry.value,4);
  assert.deepEqual(dry.sourceValues,{nws:10,hrrr:0,ecmwf:0,nbm:0});
- assert.deepEqual(dry.sources.map(source=>[source.id,source.weight]),[['nws',1],['hrrr',.3],['ecmwf',.1],['nbm',.2]]);
+ assert.deepEqual(dry.sources.map(source=>[source.id,source.weight]),[['nws',.4],['hrrr',.3],['ecmwf',.1],['nbm',.2]]);
  const mixed=precipitationLikelihood(50,{sourceValues:{hrrr:0,ecmwf:.035,nbm:0}});
- assert.equal(mixed.value,60);
+ assert.equal(mixed.value,30);
  assert.equal(mixed.calibrated,false);
  const reported=precipitationLikelihood(31,{sourceValues:{hrrr:0,ecmwf:.138,nbm:.138}});
- assert.equal(reported.weightedValue,61);assert.equal(reported.value,61);
+ assert.equal(reported.weightedValue,42.4);assert.equal(reported.value,42);
  assert.deepEqual(reported.sourceValues,{nws:31,hrrr:0,ecmwf:100,nbm:100});
  const missing=precipitationLikelihood(10,{sourceValues:{hrrr:null,ecmwf:null,nbm:null}});
- assert.equal(missing.value,10);
+ assert.equal(missing.value,4);
  const lowOfficialAndDryEcmwf=precipitationLikelihood(5,{sourceValues:{nws:null,hrrr:null,ecmwf:0,nbm:null}});
- assert.equal(lowOfficialAndDryEcmwf.rawValue,5);assert.equal(lowOfficialAndDryEcmwf.value,5);
+ assert.equal(lowOfficialAndDryEcmwf.rawValue,2);assert.equal(lowOfficialAndDryEcmwf.value,2);
  assert.equal(deterministicRainSignal(.0099),100);
  assert.equal(deterministicRainSignal(.016),100);
  assert.equal(deterministicRainSignal(.1),100);
  assert.equal(deterministicRainSignal(.4),100);
  const unanimous=precipitationLikelihood(53,{sourceValues:{hrrr:.157,ecmwf:.016,nbm:.012}});
- assert.equal(unanimous.value,100);
- assert.equal(unanimous.rawTotal,113);
- assert.deepEqual(unanimous.sources.map(source=>source.points),[53,30,10,20]);
+ assert.equal(unanimous.value,81);
+ assert.equal(unanimous.rawTotal,81.2);
+ assert.deepEqual(unanimous.sources.map(source=>source.points),[21.2,30,10,20]);
  assert.equal(unanimous.officialProbability,53);
  const requested=precipitationLikelihood(13,{sourceValues:{hrrr:0,ecmwf:1,nbm:0}});
- assert.equal(requested.value,23);
- assert.deepEqual(requested.sourcePoints,{nws:13,hrrr:0,ecmwf:10,nbm:0});
+ assert.equal(requested.value,15);
+ assert.deepEqual(requested.sourcePoints,{nws:5.2,hrrr:0,ecmwf:10,nbm:0});
 });
 test('API feels-like helper uses the same Steadman equation family in hot mild and cold weather',()=>{
  const hot=feelsLike(95,47,5,72),mild=feelsLike(70,50,8,50),cold=feelsLike(30,70,15,20);
