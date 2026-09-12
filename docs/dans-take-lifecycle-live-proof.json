@@ -1,0 +1,196 @@
+{
+  "commit": "f6628e33029aef0d17dcc149a26092b366f39229",
+  "checkedAt": "2026-09-12T22:40:58.718Z",
+  "fixture": false,
+  "success": true,
+  "checks": [
+    {
+      "label": "initial-page",
+      "checkedAt": "2026-09-12T22:41:29.765Z",
+      "assembledAt": "2026-09-12T22:41:04.707Z",
+      "sourceCheckedAt": "2026-09-12T22:41:04.363Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "526a9e5aaad963e1b428066b",
+      "discussionId": "db38269e-67d1-4745-812e-243dbcde2c04",
+      "issuedAt": "2026-09-12T18:40:00+00:00",
+      "cachedItems": [
+        {
+          "evidenceId": "s2-p10-q2",
+          "summary": "Temperatures, humidity and clouds may rise, and rain chances may increase over the weekend into early next week.",
+          "period": "Saturday, Sep 12 – Sunday, Sep 13",
+          "sourceQuote": "The result for our area will be an increase in temperatures, moisture and clouds and depending on the track and evolution of the upper low and coastal font, an uptick in rain chances over the weekend that could increase further early next week.",
+          "section": "DISCUSSION",
+          "sectionIssuedAt": "2026-09-12T18:40:00.000Z",
+          "validFrom": "2026-09-12T04:00:00.000Z",
+          "eventEnd": "2026-09-14T04:00:00.000Z",
+          "validUntil": "2026-09-13T06:40:00.000Z"
+        }
+      ],
+      "visible": true,
+      "text": "Flooding rain: Marginal risk today. A few spots could flood."
+    },
+    {
+      "label": "refresh-1",
+      "checkedAt": "2026-09-12T22:42:35.590Z",
+      "assembledAt": "2026-09-12T22:42:26.626Z",
+      "sourceCheckedAt": "2026-09-12T22:41:04.363Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "29309cff26c6fc600a5b763c",
+      "discussionId": "db38269e-67d1-4745-812e-243dbcde2c04",
+      "issuedAt": "2026-09-12T18:40:00+00:00",
+      "cachedItems": [
+        {
+          "evidenceId": "s2-p10-q2",
+          "summary": "Temperatures, humidity and clouds may rise, and rain chances may increase over the weekend into early next week.",
+          "period": "Saturday, Sep 12 – Sunday, Sep 13",
+          "sourceQuote": "The result for our area will be an increase in temperatures, moisture and clouds and depending on the track and evolution of the upper low and coastal font, an uptick in rain chances over the weekend that could increase further early next week.",
+          "section": "DISCUSSION",
+          "sectionIssuedAt": "2026-09-12T18:40:00.000Z",
+          "validFrom": "2026-09-12T04:00:00.000Z",
+          "eventEnd": "2026-09-14T04:00:00.000Z",
+          "validUntil": "2026-09-13T06:40:00.000Z"
+        }
+      ],
+      "visible": true,
+      "text": "Flooding rain: Marginal risk today. A few spots could flood."
+    },
+    {
+      "label": "refresh-2",
+      "checkedAt": "2026-09-12T22:43:41.423Z",
+      "assembledAt": "2026-09-12T22:43:29.455Z",
+      "sourceCheckedAt": "2026-09-12T22:43:23.267Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "d223428fec6778e17ea7af5a",
+      "discussionId": "db38269e-67d1-4745-812e-243dbcde2c04",
+      "issuedAt": "2026-09-12T18:40:00+00:00",
+      "cachedItems": [
+        {
+          "evidenceId": "s2-p10-q2",
+          "summary": "Rain chances may increase over the weekend and could rise further early next week.",
+          "period": "Saturday, Sep 12 – Sunday, Sep 13",
+          "sourceQuote": "The result for our area will be an increase in temperatures, moisture and clouds and depending on the track and evolution of the upper low and coastal font, an uptick in rain chances over the weekend that could increase further early next week.",
+          "section": "DISCUSSION",
+          "sectionIssuedAt": "2026-09-12T18:40:00.000Z",
+          "validFrom": "2026-09-12T04:00:00.000Z",
+          "eventEnd": "2026-09-14T04:00:00.000Z",
+          "validUntil": "2026-09-13T06:40:00.000Z"
+        }
+      ],
+      "visible": true,
+      "text": "Flooding rain: Marginal risk today. A few spots could flood."
+    },
+    {
+      "label": "full-page-reload",
+      "checkedAt": "2026-09-12T22:43:42.725Z",
+      "assembledAt": "2026-09-12T22:43:29.455Z",
+      "sourceCheckedAt": "2026-09-12T22:43:23.267Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "d223428fec6778e17ea7af5a",
+      "discussionId": "db38269e-67d1-4745-812e-243dbcde2c04",
+      "issuedAt": "2026-09-12T18:40:00+00:00",
+      "cachedItems": [
+        {
+          "evidenceId": "s2-p10-q2",
+          "summary": "Rain chances may increase over the weekend and could rise further early next week.",
+          "period": "Saturday, Sep 12 – Sunday, Sep 13",
+          "sourceQuote": "The result for our area will be an increase in temperatures, moisture and clouds and depending on the track and evolution of the upper low and coastal font, an uptick in rain chances over the weekend that could increase further early next week.",
+          "section": "DISCUSSION",
+          "sectionIssuedAt": "2026-09-12T18:40:00.000Z",
+          "validFrom": "2026-09-12T04:00:00.000Z",
+          "eventEnd": "2026-09-14T04:00:00.000Z",
+          "validUntil": "2026-09-13T06:40:00.000Z"
+        }
+      ],
+      "visible": true,
+      "text": "Flooding rain: Marginal risk today. A few spots could flood."
+    }
+  ],
+  "deployed": {
+    "sourceVersion": "nws-afd-monotonic-v1",
+    "danTakeVersion": "weather-nourie-dans-take-kid-clear-v10",
+    "assets": {
+      "index.html": "c46ec0ddfc64046b8c6ac41f56e748024e3c97e46c59ba8e0b13b7f33690ee29",
+      "app.js": "3dd04c5d23c59d417ee62586f49465d0740838feaf3282ce5a2fbc55a5b80493",
+      "dans-summary.js": "8a10571c35be1c5670dad17589e22702af6a41b1b20568d0e6b00a613c6a1cd0",
+      "current-inputs.js": "55adb15e8e98e1cd057f9c3e83facf4c709ebbc240bcbb824738edec0cb4e82a",
+      "pavement.js": "be6691187a36631f923aea959d4734beffee333fe3e7a3dcaa66490781f609d3",
+      "daily-uv.js": "4327bb7ab8a9bac7d21abbcafe674a13849d40a54c0c73966ee2e9a78a98e2e8",
+      "dans-take.js": "5da354860928555d55010a026466988d6962f11cbea1f3dbabb4a47fd61c6f9b"
+    }
+  },
+  "independentOfficialLatest": {
+    "id": "db38269e-67d1-4745-812e-243dbcde2c04",
+    "issuedAt": "2026-09-12T18:40:00+00:00"
+  },
+  "initial": {
+    "discussion": {
+      "id": "db38269e-67d1-4745-812e-243dbcde2c04",
+      "office": "RAH",
+      "issuanceTime": "2026-09-12T18:40:00+00:00",
+      "text": "\n000\nFXUS62 KRAH 121840\nAFDRAH\n\nArea Forecast Discussion\nNational Weather Service Raleigh NC\n240 PM EDT Sat Sep 12 2026\n\n.WHAT HAS CHANGED...\n\n* No major changes\n\n&&\n\n.KEY MESSAGES...\nAs of 240 PM Saturday...\n\n1) A warm and humid day today, with afternoon showers and another \nround of showers/thunderstorms later tonight. \n\n2) Limited chances of a shower or storm Sunday afternoon and Sunday \nnight, with the greatest chances during the afternoon across the \nCoastal Plain. \n\n3) A northeast flow will result in near average temperatures and \nlower humidity on Tuesday and Wednesday that will feel cooler than \nrecent days.\n\n4) The low and mid level flow will become more east and \nsoutheasterly late in the work week and weekend resulting in warming \ntemperatures, an increase in humidity, and an uptick in rain \nchances. \n\n&&\n\n.DISCUSSION...\nAs of 240 PM Saturday...\n\nKEY MESSAGE 1... A warm and humid day today, with afternoon showers \nand another round of showers/thunderstorms later tonight.\n\nLast night into this morning, a boundary set up over central NC, \nbisecting the region in half. Shower activity started developing \nalong this boundary as it started lifting north over Wake county \njust after noon. PWs over the region are very high (around 2-2.3 in) \nwhich will allow showers to be efficient rain producers this \nafternoon. This will combine with slow cell motions to create an \nisolated flooding threat, especially if a shower moves over an urban \nor poor drainage area. The area of any showers/thunderstorms should \nincrease over the next few hours as the boundary continues north and \noutflows from previous showers/storms provides additional areas of \nlift. \n\nLater this evening into tonight, an additional area of \nshower/thunderstorm development may be possible as a pre-frontal \ntrough moves through central NC from the west. Any rain that \ndevelops due to this should move faster than this afternoon's rain, \nleading to a lower flooding threat. \n\nIn terms of the strength of the cells today, severe weather is not \ncurrently expected. CAPE values this afternoon look to maximize \naround 1500-2000 J/kg, with low shear values. This should allow for \na few cells to get tall enough to produce lightning, but keep any \nwinds with them below severe strength. However, a few water-loaded \ndowndrafts could produce brief periods of strong gusty winds this \nafternoon. \n\n\nKEY MESSAGE 2... Limited chances of a shower or storm Sunday \nafternoon and Sunday night, with the greatest chances during the \nafternoon across the Coastal Plain.\n\nA mid level short wave trough across TN and AL at midday today will \nbe located just east of the Blue Ridge on Sunday morning and then \nmove offshore by Sunday evening. The best forcing for ascent will be \neast of this feature and should be exiting our eastern areas during \nthe afternoon. Deep layer moisture will be above average areawide on \nSunday but greatest across the east. Expect Sunday to be less \nconvectively active than today with the greatest threat of a shower \nor storm across the east during the afternoon. However, a cold front \nwill trail behind the short wave trough and move across the area \nlate Sunday night and there is a limited chance or a shower or storm \nin the lingering moisture ahead of the front on Sunday night. Highs \nshould range in the upper 80s to lower 90s with lows near 70. \n\n\nKEY MESSAGE 3... A northeast flow will result in near average \ntemperatures and lower humidity on Tuesday and Wednesday that will \nfeel cooler than recent days.\n\nAn anomalously strong mid-level ridge centered in the TN Valley on \nTuesday and Wednesday will result in a northerly flow at mid levels \nacross VA and the Carolinas while a 1030 mb surface high pressure \nsystem centered over New England will produce a northeast low level \nflow across the area. The result will be near to slightly above \nseasonal temperatures that will feel notably cooler than recent \nweeks. Highs should range in the lower to mid 80s both days and \nnighttime lows in the lower to mid 60s with some upper 50s (maybe \nmid 50s) possible in the typically cooler locations. Dry weather \nwith partly cloudy skies and a noticeable northeast breeze at times \nare expected during the period. \n\n\nKEY MESSAGE 4... The low and mid level flow will become more east \nand southeasterly late in the work week and weekend resulting in \nwarming temperatures, an increase in humidity, and an uptick in rain \nchances. \n\nThe upper-level ridge at mid levels weakens late in the week and \nbecomes more west to east oriented as a mid level weakness/upper low \norganizes near the Bahamas and shifts west into the northern Gulf. \nMeanwhile the narrow surface ridge extending southwest into VA and \nthe Carolinas weakens late in the work week as a weak coastal front \ntries to develop off the Carolina coast. The result for our area \nwill be an increase in temperatures, moisture and clouds and \ndepending on the track and evolution of the upper low and coastal \nfont, an uptick in rain chances over the weekend that could increase \nfurther early next week. \n\n&&\n\n.AVIATION /18Z SATURDAY THROUGH THURSDAY/... \nAs of 145 PM Saturday...\n\nAs of the 17Z observations, there remains a mix of MVFR to VFR \nceilings over central NC. Overnight, a boundary bisected the region, \nwith sub-VFR ceilings in the north which have been generally slow to \nlift. This boundary will continue to shift north this afternoon, \nwhich will allow ceilings to continue to lift/scatter out, along \nwith allowing a mechanism for isolated to scattered shower \ndevelopment. A few rumbles of thunder may be possible in these \ncells, but they should generally remain as rain showers with some \ngusty winds. Later this evening into the night, another chance for \nrain will come ahead of a cold front. Due to increased moisture and \nthe approaching frontal boundary, there could be a period of IFR to \nperhaps LIFR ceilings and/or reduced visibilities late tonight/early \nSunday morning. Restrictions may remain in place until the front \nmoves through central NC Sunday afternoon. \n\nOutlook: There will be a limited risk of shower/storm development \nalong the frontal passage Sunday afternoon into the evening. There \nis a lesser, but non-zero chance of low stratus and/or fog \ndevelopment again on Monday morning as well. VFR conditions are then \ngenerally expected to prevail. \n\n&&\n\n.RAH WATCHES/WARNINGS/ADVISORIES...\nNone.\n\n&&\n\n$$\n\nDISCUSSION...Blaes/LH \nAVIATION...LH\n",
+      "url": "https://api.weather.gov/products/db38269e-67d1-4745-812e-243dbcde2c04"
+    },
+    "feed": {
+      "id": "afd",
+      "label": "NWS RAH discussion",
+      "url": "https://api.weather.gov/products/types/AFD/locations/RAH/latest",
+      "status": "ready",
+      "sourceVersion": "nws-afd-monotonic-v1",
+      "retrievalStatus": "verified-latest",
+      "fetchedAt": "2026-09-12T22:41:04.363Z",
+      "checkedAt": "2026-09-12T22:41:04.363Z",
+      "issuedAt": "2026-09-12T18:40:00+00:00",
+      "productUrl": "https://api.weather.gov/products/db38269e-67d1-4745-812e-243dbcde2c04",
+      "message": ""
+    },
+    "aiMode": "ai",
+    "generatedAt": "2026-09-12T22:41:27.887Z",
+    "items": [
+      {
+        "evidenceId": "s2-p10-q2",
+        "summary": "Temperatures, humidity and clouds may rise, and rain chances may increase over the weekend into early next week.",
+        "period": "Saturday, Sep 12 – Sunday, Sep 13",
+        "sourceQuote": "The result for our area will be an increase in temperatures, moisture and clouds and depending on the track and evolution of the upper low and coastal font, an uptick in rain chances over the weekend that could increase further early next week.",
+        "section": "DISCUSSION",
+        "sectionIssuedAt": "2026-09-12T18:40:00.000Z",
+        "validFrom": "2026-09-12T04:00:00.000Z",
+        "eventEnd": "2026-09-14T04:00:00.000Z",
+        "validUntil": "2026-09-13T06:40:00.000Z"
+      }
+    ]
+  },
+  "observedRefreshVisibility": [
+    {
+      "hidden": false,
+      "text": "Flooding rain: Marginal risk today. A few spots could flood."
+    },
+    {
+      "hidden": false,
+      "text": "Flooding rain: Marginal risk today. A few spots could flood."
+    },
+    {
+      "hidden": false,
+      "text": "Flooding rain: Marginal risk today. A few spots could flood."
+    },
+    {
+      "hidden": false,
+      "text": "Flooding rain: Marginal risk today. A few spots could flood."
+    },
+    {
+      "hidden": false,
+      "text": "Flooding rain: Marginal risk today. A few spots could flood."
+    },
+    {
+      "hidden": false,
+      "text": "Flooding rain: Marginal risk today. A few spots could flood."
+    },
+    {
+      "hidden": false,
+      "text": "Flooding rain: Marginal risk today. A few spots could flood."
+    }
+  ],
+  "distinctWeatherSignatures": 3,
+  "distinctForecastAssemblies": 3,
+  "distinctDiscussionChecks": 2,
+  "browserErrors": []
+}
