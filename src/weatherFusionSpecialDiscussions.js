@@ -2,7 +2,7 @@ const H=3600000;
 const ROOT='https://mapservices.weather.noaa.gov/vector/rest/services/outlooks/spc_mesoscale_discussion/MapServer/0/query';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 export function discussionUrl(value){
- try{const u=new URL(String(value).replace(/&amp;/g,'&'));return u.protocol==='https:'&&u.hostname==='www.spc.noaa.gov'&&!u.port&&!u.username&&!u.password&&/^\/products\/md\/(?:\d{4}\/)?md\d{4}\.(html|txt)$/.test(u.pathname)?u.href:null;}catch{return null;}
+ try{const u=new URL(String(value).replace(/&amp;/g,'&'));if(!['http:','https:'].includes(u.protocol)||u.hostname!=='www.spc.noaa.gov'||u.port||u.username||u.password||!/^\/products\/md\/(?:\d{4}\/)?md\d{4}\.(html|txt)$/.test(u.pathname))return null;u.protocol='https:';return u.href;}catch{return null;}
 }
 export function inDiscussionPolygon(longitude,latitude,rings){
  if(!finite(longitude)||!finite(latitude)||!Array.isArray(rings)||!rings.length)return false;
@@ -44,7 +44,7 @@ export function createSpecialDiscussionService({cached,now=Date.now}){
    if(data?.error||!Array.isArray(data?.features)||data.exceededTransferLimit)throw new Error('Special-discussion source returned incomplete data.');
    const features=data.features.filter(f=>inDiscussionPolygon(location.longitude,location.latitude,f.geometry?.rings));
    const results=await Promise.all(features.slice(0,20).map(async f=>{
-    const links=String(f.attributes?.popupinfo||'').match(/https:\/\/www\.spc\.noaa\.gov\/products\/md\/(?:\d{4}\/)?md\d{4}\.(?:html|txt)/g)||[];
+    const links=String(f.attributes?.popupinfo||'').match(/https?:\/\/www\.spc\.noaa\.gov\/products\/md\/(?:\d{4}\/)?md\d{4}\.(?:html|txt)/g)||[];
     const url=links.map(discussionUrl).find(Boolean);if(!url)throw new Error('A relevant discussion has no verified official source link.');
     const {data:text}=await cached(url,120000,{text:true,timeout:6000});return parseSpecialDiscussion(text,url,now());
    }));

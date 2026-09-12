@@ -60,6 +60,12 @@ humidity and wind with NWS heat-index/wind-chill calculations where applicable.
 It is labeled as a calculation, not an observed measurement. Sunrise/sunset are
 calculated astronomically without requiring a model account.
 
+The bulletin panel also checks the Aviation Weather Center's current Convective
+SIGMET feed and the Storm Prediction Center's mesoscale-discussion polygons. Only
+active polygons containing the selected point are shown. Convective SIGMETs are
+identified as aviation thunderstorm advisories—not public warnings—and retain the
+complete official wording and validity window.
+
 ## AI and Google
 
 The existing server-side `OPENAI_API_KEY` is reused. AI receives the calculated
@@ -142,6 +148,7 @@ workflow artifacts. Passing fixture tests alone does not establish live service 
 ## Primary documentation
 
 - https://www.weather.gov/documentation/services-web-API
+- https://aviationweather.gov/data/api/
 - https://www.nco.ncep.noaa.gov/pmb/products/hrrr/
 - https://www.nco.ncep.noaa.gov/pmb/products/blend/
 - https://www.ecmwf.int/en/forecasts/datasets/open-data

@@ -1,4 +1,4 @@
-export const BULLETIN_GROUPS={warning:'Warnings',watch:'Watches',statement:'Statements & advisories',discussion:'Special discussions'};
+export const BULLETIN_GROUPS={warning:'Warnings',watch:'Watches',statement:'Statements & advisories',discussion:'Convective advisories & discussions'};
 export function bulletinKind(event=''){
  if(/\bwarning\b/i.test(event))return 'warning';
  if(/\bwatch\b/i.test(event))return 'watch';
@@ -8,6 +8,7 @@ export function officialBulletinUrl(value){
  try{const u=new URL(value);if(u.protocol!=='https:'||u.username||u.password||u.port)return 'https://www.weather.gov/';
   if(u.hostname==='api.weather.gov'&&/^\/(alerts|products)\//.test(u.pathname))return u.href;
   if(u.hostname==='www.spc.noaa.gov'&&/^\/products\/md\/(?:\d{4}\/)?md\d{4}\.(html|txt)$/.test(u.pathname))return u.href;
+  if(u.hostname==='aviationweather.gov'&&/^\/gfa\/$/.test(u.pathname)&&u.hash==='#sigmet')return u.href;
  }catch{}
  return 'https://www.weather.gov/';
 }
@@ -28,6 +29,11 @@ export function bulletinFacts(forecast,now=Date.now()){
  for(const d of forecast?.specialDiscussions||[]){
   if(d.productType!=='SPC-MD'||d.applicable!==true||!(Date.parse(d.expires)>now)||!(Date.parse(d.sent)<=now+60000)||!d.description)continue;
   const item={id:String(d.id),kind:'discussion',title:d.event||'Special weather discussion',headline:'',area:d.areaDesc||'Special discussion covering this location; not an official warning.',issuedAt:d.sent,expires:d.expires,severity:'',description:d.description,instruction:d.instruction||'',url:officialBulletinUrl(d.url||d.id)};
+  item.sourceKey=bulletinSourceKey(item);byId.set(item.id,item);
+ }
+ for(const d of forecast?.convectiveSigmets||[]){
+  if(d.productType!=='AWC-CSIGMET'||d.applicable!==true||!(Date.parse(d.expires)>now)||!(Date.parse(d.sent)<=now+5*60000)||!d.description)continue;
+  const item={id:String(d.id),kind:'discussion',title:d.event||'Convective SIGMET',headline:'',area:d.areaDesc||'Aviation thunderstorm advisory covering this location; not a public warning.',issuedAt:d.sent,expires:d.expires,severity:'',description:d.description,instruction:d.instruction||'',url:officialBulletinUrl(d.url)};
   item.sourceKey=bulletinSourceKey(item);byId.set(item.id,item);
  }
  return [...byId.values()].sort((a,b)=>Object.keys(BULLETIN_GROUPS).indexOf(a.kind)-Object.keys(BULLETIN_GROUPS).indexOf(b.kind)||Date.parse(b.issuedAt)-Date.parse(a.issuedAt));

@@ -8,6 +8,7 @@ import {comfortWindow} from '../public/weather-fusion/comfort-outlook.js';
 import {dewpointGrossLevel,forecastGrossLevel} from '../public/weather-fusion/dewpoint-meter.js';
 import {bulletinFacts} from '../public/weather-fusion/bulletin-facts.js';
 import {inDiscussionPolygon,parseSpecialDiscussion,discussionUrl,createSpecialDiscussionService} from '../src/weatherFusionSpecialDiscussions.js';
+import {normalizeConvectiveSigmet,createConvectiveSigmetService} from '../src/weatherFusionConvectiveSigmets.js';
 import {buildForecast} from '../src/weatherFusion.js';
 import {testInputs} from './weatherFusion.fixtures.js';
 const H=3600000,now=Date.parse('2026-09-06T14:00:00Z'),location={latitude:35.787,longitude:-78.4806,timeZone:'America/New_York'};
@@ -97,6 +98,18 @@ test('empty verified special-discussion response differs from a failed feed',asy
  const success=createSpecialDiscussionService({now:()=>now,cached:async()=>({data:{features:[]},fetchedAt:new Date(now).toISOString()})});
  assert.equal((await success(location)).meta.status,'ready');assert.deepEqual((await success(location)).value,[]);
  const failure=createSpecialDiscussionService({now:()=>now,cached:async()=>{throw new Error('offline');}});assert.equal((await failure(location)).meta.status,'unavailable');
+});
+test('active Convective SIGMET covering the selected point becomes a distinct aviation advisory',()=>{
+ const item={icaoId:'KKCI',seriesId:'17E',airSigmetType:'SIGMET',hazard:'CONVECTIVE',validTimeFrom:(now-H)/1000,validTimeTo:(now+H)/1000,movementDir:190,movementSpd:15,altitudeHi1:45000,rawAirSigmet:'WSUS31 KKCI 061255\nSIGE\nCONVECTIVE SIGMET 17E\nVALID UNTIL 1500Z\nVA NC AND CSTL WTRS\nFROM RIC-ECG-RDU-RIC\nAREA TS MOV FROM 19015KT. TOPS ABV FL450.',coords:[{lon:-80,lat:34},{lon:-77,lat:34},{lon:-77,lat:37},{lon:-80,lat:37},{lon:-80,lat:34}]};
+ const advisory=normalizeConvectiveSigmet(item,location,now);assert.ok(advisory);assert.equal(advisory.event,'Convective SIGMET 17E');assert.equal(advisory.productType,'AWC-CSIGMET');assert.match(advisory.areaDesc,/Aviation thunderstorm advisory; not a public warning/);
+ const f={alerts:[],convectiveSigmets:[advisory]};assert.deepEqual(bulletinFacts(f,now).map(value=>value.title),['Convective SIGMET 17E']);
+ assert.equal(normalizeConvectiveSigmet({...item,coords:item.coords.map(point=>({lon:point.lon+20,lat:point.lat}))},location,now),null);
+ assert.equal(normalizeConvectiveSigmet({...item,validTimeTo:(now-H/2)/1000},location,now),null);
+});
+test('Convective SIGMET feed distinguishes a clear result from an outage',async()=>{
+ const success=createConvectiveSigmetService({now:()=>now,cached:async()=>({data:[],fetchedAt:new Date(now).toISOString()})});
+ assert.equal((await success(location)).meta.status,'ready');assert.deepEqual((await success(location)).value,[]);
+ const failure=createConvectiveSigmetService({now:()=>now,cached:async()=>{throw new Error('offline');}});assert.equal((await failure(location)).meta.status,'unavailable');
 });
 test('waving figures have faces and honor reduced-motion preferences',()=>{
  const read=p=>readFileSync(new URL('../public/weather-fusion/'+p,import.meta.url),'utf8');
