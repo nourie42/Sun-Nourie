@@ -65,9 +65,11 @@ test('cache de-duplicates in-flight requests, expires entries and bounds size', 
 test('NWS fallback keeps probability separate and uses the remaining precipitation window', () => {
   const f = buildForecast(inputs);
   assert.equal(f.days[0].high, 84); assert.equal(f.days[0].low, 65);
-  assert.equal(f.days[0].popDay, 0); assert.equal(f.days[0].pop, 30); assert.equal(f.days[0].qpf, .079);
+  assert.equal(f.days[0].popDay, 0); assert.equal(f.days[0].pop, 30); assert.equal(f.days[0].qpf, .0792);
+  const rainRows=f.rainTimeline.filter(h=>Date.parse(h.time)>=Date.parse(f.days[0].qpfWindow.start)&&Date.parse(h.end)<=Date.parse(f.days[0].qpfWindow.end));
+  assert.equal(f.days[0].qpf,Number(rainRows.reduce((sum,h)=>sum+h.precipitation,0).toFixed(4)));
   assert.equal(f.current.type, 'observation'); assert.equal(f.days[0].qpfWindow.end, '2026-09-06T11:00:00.000Z');
-  assert.equal(f.hours[0].pop, 0); assert.equal(f.hours[0].precipitation, .004);
+  assert.equal(f.hours[0].pop, 0); assert.equal(f.hours[0].precipitation, .00416667);
   assert.ok(Date.parse(f.solar.sunset) > Date.parse('2026-09-05T23:30:00Z'));
   assert.ok(Date.parse(f.solar.sunset) < Date.parse('2026-09-05T23:45:00Z'));
 });

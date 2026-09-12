@@ -1,4 +1,4 @@
-import {finite,thermalHumidity} from './weather-math.js?v=clear-weather-daygraph-v3';
+import {finite,thermalHumidity} from './weather-math.js?v=forecast-trace-v40';
 const H=3600000;
 /** Preserve the station air reading. Fill only absent wind/moisture from the
  * current forecast hour, and retain per-field provenance. Never borrow a future

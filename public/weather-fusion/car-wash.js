@@ -1,5 +1,5 @@
-import {finite} from './weather-math.js?v=forecast-story-v39';
-import {weatherIcon} from './weather-display.js?v=car-wash-v39';
+import {finite,rainChanceValue} from './weather-math.js?v=forecast-trace-v40';
+import {weatherIcon} from './weather-display.js?v=forecast-trace-v40';
 import {weatherState} from './weather-state.js';
 
 export const CAR_WASH_RAIN_LIMIT = 25;
@@ -12,29 +12,32 @@ export function isExperimentalWeatherPage(pathname = globalThis.location?.pathna
 }
 
 export function dailyRainChance(day = {}, phase = 'whole') {
-  if (phase === 'overnight') {
-    return validChance(day.popNightLikelihood?.value) ?? validChance(day.popNight);
+  if (phase === 'overnight' || phase === 'daytime') {
+    const field = phase === 'overnight' ? 'popNightLikelihood' : 'popDayLikelihood';
+    return Object.hasOwn(day,field) ? rainChanceValue(day[field]) : validChance(day[phase === 'overnight' ? 'popNight' : 'popDay']);
   }
-  const direct = validChance(day.rainLikelihood?.value);
-  if (direct !== null) return direct;
-  const periods = [validChance(day.popDayLikelihood?.value),validChance(day.popNightLikelihood?.value)];
-  if (periods.every(value => value !== null)) return Math.max(...periods);
+  if (Object.hasOwn(day,'rainLikelihood')) return rainChanceValue(day.rainLikelihood);
+  const periods = [rainChanceValue(day.popDayLikelihood),rainChanceValue(day.popNightLikelihood)];
+  if (Object.hasOwn(day,'popDayLikelihood') || Object.hasOwn(day,'popNightLikelihood')) {
+    return periods.every(value => value !== null) ? Math.max(...periods) : null;
+  }
   const official = [validChance(day.popDay),validChance(day.popNight)];
   return official.every(value => value !== null) ? Math.max(...official) : null;
 }
 
 export function hourlyRainChance(hour = {}) {
-  return validChance(hour.rainLikelihood?.value) ?? validChance(hour.pop);
+  return Object.hasOwn(hour,'rainLikelihood') ? rainChanceValue(hour.rainLikelihood) : validChance(hour.pop);
 }
 
 function localHour(now, zone) {
   return Number(new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',hourCycle:'h23'}).format(new Date(now)));
 }
 
-export function carWashDayDecision(days = [], index = 0, options = {}) {
+export function carWashDayDecision(days = [], index = 0) {
   const stretch = days.slice(index, index + 3);
-  const zone = options.zone || 'America/New_York', useRemainingNight = options.remainingToday && index === 0 && localHour(options.now ?? Date.now(),zone) >= 15;
-  const chances = stretch.map((day,offset) => dailyRainChance(day,useRemainingNight && offset === 0 ? 'overnight' : 'whole'));
+  // The canonical whole-day window already excludes elapsed hours. Changing
+  // the displayed card to Tonight must not discard rain later this afternoon.
+  const chances = stretch.map(day => dailyRainChance(day,'whole'));
   const currentChance = chances[0] ?? null;
   if (stretch.length < 3 || chances.some(value => value === null)) {
     return {index, state:'check', canWash:false, chance:currentChance, chances, reason:'Three complete forecast days are not available yet.'};
@@ -79,7 +82,7 @@ function windowLabel(start, end, zone, targetDate, now) {
 
 export function bestWashWindow(forecast, targetIndex = 0, now = Date.now()) {
   const day = forecast?.days?.[targetIndex], zone = forecast?.location?.timeZone || 'America/New_York';
-  if (!day?.date || !carWashDayDecision(forecast.days,targetIndex,{now,zone,remainingToday:targetIndex===0}).canWash) return null;
+  if (!day?.date || !carWashDayDecision(forecast.days,targetIndex).canWash) return null;
   const candidates = (forecast.hours || []).filter(hour => {
     const epoch = Date.parse(hour.time), chance = hourlyRainChance(hour);
     return Number.isFinite(epoch) && epoch >= now && dateKey(epoch,zone) === day.date && hour.isDay !== false && chance !== null && chance < CAR_WASH_RAIN_LIMIT;
@@ -125,7 +128,8 @@ function supportingFacts(forecast, targetIndex, window) {
 
 export function carWashSummary(forecast, now = Date.now()) {
   const days = forecast?.days || [], zone = forecast?.location?.timeZone || 'America/New_York';
-  const decisions = Array.from({length:Math.min(5,days.length)},(_,index) => carWashDayDecision(days,index,{now,zone,remainingToday:index===0}));
+  const tonight = localHour(now,zone) >= 15;
+  const decisions = Array.from({length:Math.min(5,days.length)},(_,index) => carWashDayDecision(days,index));
   const activeKind = weatherState(forecast?.current?.condition).kind;
   const rainingNow = ['rain','storm','snow'].includes(activeKind) && forecast?.current?.type === 'observation';
   if (decisions[0] && rainingNow) decisions[0] = {...decisions[0],state:'wait',canWash:false,reason:'Rain or wintry weather is happening now.',activeWeather:true};
@@ -138,19 +142,22 @@ export function carWashSummary(forecast, now = Date.now()) {
   const primary = decisions[0] || {state:'check',canWash:false,chance:null,chances:[],reason:'Forecast data is still loading.'};
   // The hero always answers "today", so its supporting wind and temperature
   // must stay on today's forecast even when the next safe wash day is later.
-  const facts = supportingFacts(forecast,0,primary.canWash && firstWash?.index === 0 ? window : null);
+  const facts = supportingFacts(forecast,0,null);
   const lowRainDays = primary.chances.filter(value => value !== null && value < CAR_WASH_RAIN_LIMIT).length;
   const best = primary.canWash
     ? window ? {title:window.label,note:`${window.hours} forecast hours below ${CAR_WASH_RAIN_LIMIT}% rain chance.`} : {title:'No reliable hourly window yet',note:'The three-day outlook is dry enough, but hourly timing is incomplete.'}
     : firstWash ? {title:`Try ${dayName(days[firstWash.index].date,zone,true)}`,note:window?`${window.label} looks best.`:'Hourly timing will appear closer to that day.'}
       : {title:'Wait for a three-day dry stretch',note:primary.reason};
-  return {state:primary.state,canWash:primary.canWash,chance:primary.chance,reason:primary.reason,lowRainDays,decisions,window,best,facts,
-    days:decisions.map((decision,index) => ({...decision,date:days[index]?.date,label:index===0?'Today':dayName(days[index]?.date,zone),stamp:dayStamp(days[index]?.date),low:days[index]?.low,high:days[index]?.high,
-      condition:index===0&&localHour(now,zone)>=15?(days[index]?.nightCondition||days[index]?.condition||'Forecast unavailable'):(days[index]?.condition||'Forecast unavailable')}))};
+  // Display the same Today/Tonight period as the main card; eligibility still
+  // checks the entire remaining three-day stretch, including tonight's risk.
+  const visibleChance = dailyRainChance(days[0],tonight?'overnight':'daytime');
+  return {state:primary.state,canWash:primary.canWash,chance:visibleChance,reason:primary.reason,lowRainDays,decisions,window,best,facts,
+    days:decisions.map((decision,index) => ({...decision,chance:index===0?visibleChance:decision.chance,date:days[index]?.date,label:index===0?(tonight?'Tonight':'Today'):dayName(days[index]?.date,zone),isDay:index!==0||!tonight,stamp:dayStamp(days[index]?.date),low:days[index]?.low,high:days[index]?.high,
+      condition:index===0&&tonight?(days[index]?.nightCondition||days[index]?.condition||'Forecast unavailable'):(days[index]?.condition||'Forecast unavailable')}))};
 }
 
 function verdictLabel(state) {
-  return state === 'wash' ? 'YES' : state === 'check' ? 'CHECK' : 'WAIT';
+  return state === 'wash' ? 'YES' : state === 'check' ? 'CHECK' : 'WAIT!';
 }
 
 function fact(icon, title, detail, good = false) {
@@ -160,16 +167,15 @@ function fact(icon, title, detail, good = false) {
 export function carWashHTML(summary) {
   const label = verdictLabel(summary.state), good = summary.canWash;
   const cards = summary.days.map(day => `<article class="car-wash-day" data-car-wash-state="${day.state}">
-    <strong>${esc(day.label)}</strong><small>${esc(day.stamp)}</small>${weatherIcon(day.condition,true,42)}
+    <strong>${esc(day.label)}</strong><small>${esc(day.stamp)}</small>${weatherIcon(day.condition,day.isDay!==false,42)}
     <span class="car-wash-temps">${finite(day.low)?Math.round(day.low)+'°':'—'} <i>|</i> ${finite(day.high)?Math.round(day.high)+'°':'—'}</span>
     <span class="car-wash-chance">💧 ${day.chance===null?'—':Math.round(day.chance)+'%'}</span><b class="car-wash-day-verdict">${verdictLabel(day.state)}</b>
   </article>`).join('');
-  return `<img class="car-wash-art" src="/weather-fusion/car-wash-background.webp" alt="" aria-hidden="true">
-    <div class="car-wash-overlay" aria-hidden="true"></div>
-    <header class="car-wash-header"><span class="car-wash-logo" aria-hidden="true">💧🚙</span><span><h2 id="car-wash-title">Car Wash Forecast</h2><p>Plan the perfect time for a showroom shine</p></span><em>Clean rides.<br>Brighter days.</em></header>
-    <div class="car-wash-hero"><div class="car-wash-answer"><h3>Can I Wash<br>My Car Today?</h3><strong class="car-wash-verdict ${summary.state}" role="status" aria-live="polite" aria-atomic="true"><span aria-hidden="true">${good?'✓':'!'}</span> ${label}</strong><p>${esc(summary.reason)}</p></div>
-      <div class="car-wash-checks">${fact('💧',summary.chance===null?'Rain chance unavailable':`${Math.round(summary.chance)}% rain chance`,'Weather Nourie blend',summary.chance!==null&&summary.chance<CAR_WASH_RAIN_LIMIT)}${fact('☀',`${summary.lowRainDays} of 3 low-rain days`,`Each day must stay below ${CAR_WASH_RAIN_LIMIT}%`,summary.lowRainDays===3)}${fact('≋',summary.facts.wind,'Forecast wind')}${fact('♨',summary.facts.temperature,'Forecast temperatures')}${fact(good?'✓':'!',good?'Good to go!':summary.state==='check'?'Check again soon':'Better to wait',summary.state==='check'?'Forecast incomplete':'Three-day rule applied',good)}</div>
+  return `<header class="car-wash-header"><span class="car-wash-logo" aria-hidden="true">💧🚙</span><span><h2 id="car-wash-title">Car Wash Forecast</h2><p>Plan the perfect time for a showroom shine</p></span><em>Clean rides.<br>Brighter days.</em></header>
+    <div class="car-wash-hero"><div class="car-wash-answer"><h3>Can I Wash<br>My Car Today?</h3><strong class="car-wash-verdict ${summary.state}" role="status" aria-live="polite" aria-atomic="true">${good?'<span aria-hidden="true">✓</span> ':''}${label}</strong><p>${esc(summary.reason)}</p></div>
+      <div class="car-wash-checks">${fact('💧',summary.chance===null?'—':`${Math.round(summary.chance)}%`,'Rain chance',summary.chance!==null&&summary.chance<CAR_WASH_RAIN_LIMIT)}${fact('☀',`${summary.lowRainDays} of 3 days`,`Below ${CAR_WASH_RAIN_LIMIT}% rain`,summary.lowRainDays===3)}${fact('≋',summary.facts.wind,'Wind')}${fact('♨',summary.facts.temperature,'Low / high')}</div>
     </div>
+    <div class="car-wash-photo"><img class="car-wash-art" src="/weather-fusion/car-wash-corvette-hood.webp" alt="Cherry-red Corvette C8 with a black carbon-fiber hood graphic, fully visible on a driveway" loading="lazy" decoding="async"></div>
     <div class="car-wash-days-wrap"><h3>Next 5 Days</h3><div class="car-wash-days">${cards}</div></div>
     <div class="car-wash-window"><span class="car-wash-spark" aria-hidden="true">✦</span><span><small>Best Washing Window</small><strong>${esc(summary.best.title)}</strong><em>${esc(summary.best.note)}</em></span><span class="car-wash-tip">☀ <small>Avoid hot<br>midday sun</small></span><span class="car-wash-tip">≋ <small>Light wind<br>helps drying</small></span><span class="car-wash-tip">🚙 <small>Enjoy that<br>clean shine</small></span></div>
     <div class="car-wash-footer">WEATHER NOURIE · CLEAN RIDES, BRIGHTER DAYS</div>`;

@@ -1,8 +1,8 @@
 import {weatherState} from './weather-state.js';
-import {dailyDisplay,finite} from './weather-math.js?v=rain-consensus-v24';
+import {dailyDisplay,dailyRainPeriod,finite} from './weather-math.js?v=forecast-trace-v40';
 import {dailyFeels,degrees,timeAt} from './hourly-feels.js?v=weather-art-labels-v10';
 import {uvCategory} from './daily-uv.js?v=weather-art-labels-v10';
-import {weatherIcon,weatherMetricIcon} from './weather-display.js?v=rain-consensus-v24';
+import {weatherIcon,weatherMetricIcon} from './weather-display.js?v=forecast-trace-v40';
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const reading=(value,unit='')=>finite(value)?`${Math.round(value)}${unit}`:'—';
 export function periodWeatherStats(forecast,now=Date.now()){
@@ -25,9 +25,7 @@ export function shortForecastCondition(condition){
 }
 export function todaySkyProfile(day={},tonight=false){
  const condition=String(tonight?(day.nightCondition||day.condition):day.condition||''),detail=String(tonight?(day.nightDetail||day.detail):day.detail||'');
- const preferred=tonight?day.popNightLikelihood?.value:day.popDayLikelihood?.value;
- const fallback=tonight?day.popNight:day.popDay;
- const state=weatherState(condition),pop=finite(preferred)?preferred:finite(fallback)?fallback:(finite(day.rainLikelihood?.value)?day.rainLikelihood.value:(finite(day.pop)?day.pop:0));
+ const state=weatherState(condition),pop=dailyRainPeriod(day,tonight?'overnight':'daytime').value;
  const lift=/\b(lift|ascent|unstable|instability|cape|convection|convective|updraft|forcing)\b/i.test(`${condition} ${detail}`);
  let scene='clear';
  if(state.kind==='storm'&&(pop>=55||!/chance|possible|isolated|scattered/i.test(condition)))scene='storm';

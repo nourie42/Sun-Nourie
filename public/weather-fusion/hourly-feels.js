@@ -1,4 +1,4 @@
-import {finite} from './weather-math.js?v=clear-weather-daygraph-v3';
+import {finite} from './weather-math.js?v=forecast-trace-v40';
 const H=3600000;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export const degrees=v=>finite(v)?`${Math.round(v)}°`:'—';

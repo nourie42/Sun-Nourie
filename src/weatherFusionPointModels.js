@@ -34,8 +34,12 @@ export function validatePointModel(data,meta,id,location,now){
 }
 export function createPointModels({fetchImpl=globalThis.fetch,now=Date.now}={}){
  const cache=new Map(),pending=new Map();
+ const remember=(key,value)=>{
+  cache.delete(key);cache.set(key,{value,until:now()+5*60000});while(cache.size>96)cache.delete(cache.keys().next().value);
+  return value;
+ };
  async function json(url){
-  const response=await fetchImpl(url,{headers:{Accept:'application/json','User-Agent':'Sun-Nourie-WeatherFusion/3.0'},redirect:'error',signal:AbortSignal.timeout(18000)});
+  const response=await fetchImpl(url,{cache:'no-store',headers:{Accept:'application/json','Cache-Control':'no-cache',Pragma:'no-cache','User-Agent':'Sun-Nourie-WeatherFusion/3.0'},redirect:'error',signal:AbortSignal.timeout(18000)});
   if(!response.ok)throw new Error(`Named model request returned HTTP ${response.status}.`);
   const text=await response.text();if(text.length>2500000)throw new Error('Named model response too large.');return JSON.parse(text);
  }
@@ -51,9 +55,16 @@ export function createPointModels({fetchImpl=globalThis.fetch,now=Date.now}={}){
    try{
     const [data,metadata]=await Promise.all([json(`https://api.open-meteo.com/v1/forecast?${query}`),json(`https://api.open-meteo.com/data/${model.domain}/static/meta.json`)]);
     const value=validatePointModel(data,metadata,id,location,now());
-    cache.delete(key);cache.set(key,{value,until:now()+5*60000});while(cache.size>96)cache.delete(cache.keys().next().value);
-    return value;
-   }catch(error){if(fresh(hit?.value))return {...hit.value,refreshWarning:'Refresh failed; retaining the previously verified, still-fresh model data.'};throw error;}
+    if(hit?.value&&Date.parse(value.runAt)<Date.parse(hit.value.runAt)){
+     if(!fresh(hit.value))throw new Error('Provider returned an older model initialization and the previously verified newer data is no longer valid.');
+     return remember(key,{...hit.value,checkedAt:new Date(now()).toISOString(),retrievalStatus:'last-verified',refreshWarning:'Provider returned an older initialization; retaining the previously verified, still-valid newer model data.'});
+    }
+    const fetchedAt=new Date(now()).toISOString();
+    return remember(key,{...value,fetchedAt,checkedAt:fetchedAt,retrievalStatus:'fresh'});
+   }catch(error){
+    if(fresh(hit?.value))return remember(key,{...hit.value,checkedAt:new Date(now()).toISOString(),retrievalStatus:'last-verified',refreshWarning:'Refresh failed; retaining the previously verified, still-fresh model data.'});
+    throw error;
+   }
   })().finally(()=>pending.delete(key));pending.set(key,task);return task;
  };
 }

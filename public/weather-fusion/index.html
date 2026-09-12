@@ -15,8 +15,9 @@
   <link rel="stylesheet" href="/weather-fusion/weather-repair.css?v=compact-weather-v21">
   <link rel="stylesheet" href="/weather-fusion/forecast-cards.css?v=hrrr-rain-signal-v27">
   <link rel="stylesheet" href="/weather-fusion/scenario-layout.css?v=scenario-weather-v29">
-  <link rel="stylesheet" href="/weather-fusion/car-wash.css?v=car-wash-v39">
-  <script type="module" src="/weather-fusion/app.js?v=experimental-car-wash-v39"></script>
+  <link rel="stylesheet" href="/weather-fusion/car-wash.css?v=forecast-trace-v40">
+  <link rel="stylesheet" href="/weather-fusion/model-explanation.css?v=forecast-trace-v40">
+  <script type="module" src="/weather-fusion/app.js?v=forecast-trace-v40"></script>
 
 </head>
 <body data-sky="day">
@@ -78,6 +79,7 @@
       <div class="forecast-grid">
         <section class="glass daily-panel" aria-labelledby="daily-title"><div class="section-top"><h2 id="daily-title">▦ &nbsp; 7-DAY FORECAST</h2><span>Tap a day for details</span></div><div id="daily"><p class="muted">Daily data is loading.</p></div><p class="daily-footnote">Low on the left, high on the right. The bar ends at the high. After 3 PM, the first row shows tonight’s low.</p></section>
       </div>
+      <section class="glass" id="model-explanation" aria-labelledby="model-explanation-title" hidden></section>
       <div class="metrics-heading"><h2>Your day, at a glance</h2><p>Tap any tile to explore its forecast.</p></div>
       <section class="metrics" id="metrics" aria-label="Weather details"></section>
         <section class="glass map-panel" id="map-panel" aria-labelledby="map-title">

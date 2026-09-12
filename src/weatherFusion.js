@@ -10,6 +10,7 @@ import {pressureTrendFromObservations} from './weatherFusionPressure.js';
 import {eveningPeriod} from './weatherFusionPolicy.js';
 import { addExperience, gridSample, PLAIN_OUTLOOK_INSTRUCTIONS } from './weatherFusionExperience.js';
 import { solarTimes } from './weatherFusionDirect.js';
+import {forecastPeriodSummary} from '../public/weather-fusion/forecast-story.js';
 /** Weather Fusion: isolated, dependency-free Express route registration.
  * Numeric forecasts stay deterministic. AI explains supplied facts; it cannot edit them.
  * Source contracts and deployment requirements: docs/weather-fusion.md.
@@ -259,7 +260,7 @@ export function buildForecast({ location, point, forecast, hourly, grid, discuss
     solar: { sunrise: models.ecmwf?.daily?.sunrise?.[solarIndex] ? iso(models.ecmwf.daily.sunrise[solarIndex] * 1000) : null,
       sunset: models.ecmwf?.daily?.sunset?.[solarIndex] ? iso(models.ecmwf.daily.sunset[solarIndex] * 1000) : null },
     methodology: 'NWS temperatures, conditions and precipitation probabilities are primary. NWS grid precipitation is integrated over local 7 AM–7 AM windows. Model guidance is supplementary and not a verified skill-weighted forecast. Model high/low comparisons use calendar days; the NWS low is overnight. Precipitation includes liquid-equivalent snow/ice. Daily forecast confidence is a relative index, not a probability; it uses lead time, NWS/model high-temperature spread, rainfall-guidance spread, usable guidance coverage, and NWS day/night availability.' };
-  enhanceForecast(output, { models, grid, periods: forecast?.periods || [], now, gridQpf, localTime, nextDate, dateKey });
+  enhanceForecast(output, { models, grid, periods: forecast?.periods || [], hourlyPeriods: hourly?.periods || [], now, gridQpf, localTime, nextDate, dateKey });
   Object.assign(output.current,resolveCurrentWeather(output.current,output.hours,now,gridSample(grid,'skyCover',now,'percent')));
   addExperience(output, {models, grid, periods:forecast?.periods || [], now, solarTimes, nextDate});
   addExposureWeather(output,exposureWeather);
@@ -268,7 +269,7 @@ export function buildForecast({ location, point, forecast, hourly, grid, discuss
   output.weatherDisplayVersion='weather-nourie-sky-consistency-v1';
   // Hash all forecast facts and source issuance, not just rainfall. Retrieval time is not model run time.
   output.signature = hash({ danTakeVersion:DAN_TAKE_VERSION, experienceVersion: output.experienceVersion, metricForecasts:output.metricForecasts, version: VERSION, location: output.location, current:output.current, days, hours, discussion, specialDiscussions:output.specialDiscussions, riskOutlooks:output.riskOutlooks,
-    precipitation: output.precipitation, modelContributions: output.modelContributions, alerts: output.alerts.map((a) => [a.id, a.sent, a.expires]), feeds: feeds.map((f) => [f.id, f.status, f.issuedAt]) });
+    precipitation: output.precipitation, rainTimeline:output.rainTimeline, modelContributions: output.modelContributions, alerts: output.alerts.map((a) => [a.id, a.sent, a.expires]), feeds: feeds.map((f) => [f.id, f.status, f.issuedAt]) });
   return output;
 }
 
@@ -385,10 +386,11 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
   }
   function fallback(data, reason) {
     const evening = Number(new Intl.DateTimeFormat('en-US',{timeZone:data.location.timeZone,hour:'numeric',hourCycle:'h23'}).format(new Date(now()))) >= 15;
+    const currentStory=forecastPeriodSummary(data,0,evening?'overnight':'daytime',now());
     return { mode: 'nws-summary', signature: data.signature, generatedAt: iso(now()), reason,
-      headline: evening ? 'Your evening outlook' : data.days[0]?.condition || 'Forecast update', summary: (evening ? data.days[0]?.nightDetail : data.days[0]?.detail) || data.days[0]?.detail || 'The forecast is temporarily unavailable. Check the National Weather Service for the latest update.',
-      nearTerm: data.days[0]?.nightDetail || '', extended: data.days[1]?.detail || '',
-      uncertainty: '', ...approveDanTake([],data,now()), danTake:retainedTake(data), sources: data.discussion ? ['nws','afd'] : ['nws'] };
+      headline: evening ? 'Your evening outlook' : data.days[0]?.condition || 'Forecast update', summary: currentStory.summary,
+      nearTerm: forecastPeriodSummary(data,0,'overnight',now()).summary, extended: forecastPeriodSummary(data,1,'overall',now()).summary,
+      uncertainty: '', ...approveDanTake([],data,now()), danTake:retainedTake(data), sources: [...(data.discussion ? ['nws','afd'] : ['nws']),...(data.modelContributions||[]).map(model=>model.id)] };
   }
   async function getBriefing(query) {
     const data = await getForecast(query);
@@ -491,7 +493,8 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
   });
   for (const name of [
-    'app.js','bulletin-facts.js','bulletins.js','car-wash.js','car-wash.css','car-wash-background.webp',
+    'app.js','bulletin-facts.js','bulletins.js','car-wash.js','car-wash.css','car-wash-background.webp','car-wash-corvette-hood.webp',
+    'model-explanation.js','model-explanation.css',
     'comfort-cinematic.css','comfort-effects.css','comfort-outlook.js','current-inputs.js','current-temperature.js',
     'daily-uv.js','dans-summary.js','dans-take.js','day-graph.js','dewpoint-meter.js','dewpoint-meter.css',
     'experience.js','exposure-scene.js','forecast-cards.css','forecast-confidence.js','forecast-layout.css','forecast-story.js',

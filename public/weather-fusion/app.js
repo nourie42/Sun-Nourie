@@ -1,19 +1,20 @@
 import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText,rebindDanTake} from './dans-take.js?v=weather-art-labels-v10';
 import {danCard} from './dans-summary.js?v=dans-take-alerts-v11';
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
-import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './weather-display.js?v=rain-consensus-v24';
-import {dayGraphHTML,installDayGraph} from './day-graph.js?v=weather-art-labels-v10';
+import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './weather-display.js?v=forecast-trace-v40';
+import {dayGraphHTML,dayGraphPoints,installDayGraph} from './day-graph.js?v=weather-art-labels-v10';
 import {degrees,feelsAt} from './hourly-feels.js?v=weather-art-labels-v10';
 import {createFramePlayer} from './frame-player.js';
-import {renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=consistent-rain-scenes-v36';
-import {dailyDisplay} from './weather-math.js?v=rain-consensus-v24';
+import {renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=forecast-trace-v40';
+import {dailyDisplay} from './weather-math.js?v=forecast-trace-v40';
 import {currentHero} from './current-temperature.js?v=weather-art-labels-v10';
 import {renderBulletins} from './bulletins.js?v=weather-art-labels-v10';
 import {modelFreshnessText} from './personal-details.js?v=consistent-rain-scenes-v35';
 import {renderDewpointMeter} from './dewpoint-meter.js?v=car-wash-order-v31';
 import {renderWeatherPanel} from './render-safety.js';
-import {forecastPeriodSummary} from './forecast-story.js?v=forecast-story-v39';
-import {isExperimentalWeatherPage,renderCarWashForecast,resetCarWashForecast} from './car-wash.js?v=car-wash-v39';
+import {forecastPeriodSummary} from './forecast-story.js?v=forecast-trace-v40';
+import {isExperimentalWeatherPage,renderCarWashForecast,resetCarWashForecast} from './car-wash.js?v=forecast-trace-v40';
+import {renderModelExplanation,resetModelExplanation} from './model-explanation.js?v=forecast-trace-v40';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);
 const experimentalPage = isExperimentalWeatherPage();
@@ -33,6 +34,7 @@ let frames = [], frameIndex = 0, radarTimer = null, selectedLayer = 'radar', rad
 let modelCatalog = null, modelFetched = 0, modelFrames = [], modelIndex = 0, modelLayer = null, mapSelectionToken = 0, modelFrameToken = 0;
 let framePlayer=null;
 let lastRadarFetch = 0, currentBriefing = null, requestController = null;
+let activeDayDetail = null;
 function configurePageMode() {
   document.documentElement.dataset.weatherPage=experimentalPage?'experimental':'main';
   if(experimentalPage)document.title='Experimental Weather · Weather Nourie';
@@ -43,6 +45,7 @@ function configurePageMode() {
     }
   }
   const carWash=$('car-wash-forecast');if(carWash)carWash.hidden=!experimentalPage;
+  const modelExplanation=$('model-explanation');if(modelExplanation)modelExplanation.hidden=!experimentalPage;
 }
 configurePageMode();
 const readSaved = () => {
@@ -57,7 +60,7 @@ function query(extra = {}) {
   return new URLSearchParams({ latitude: place.latitude, longitude: place.longitude, ...(presets[place.id] ? { location: place.id } : {}), ...extra });
 }
 async function api(path, params = '', signal) {
-  const response = await fetch(`/api/weather-fusion/${path}${params ? `?${params}` : ''}`, { signal, headers: { Accept: 'application/json' } });
+  const response = await fetch(`/api/weather-fusion/${path}${params ? `?${params}` : ''}`, { signal, cache: 'no-store', headers: { Accept: 'application/json' } });
   const data = await response.json();
   if (!response.ok) throw Object.assign(new Error(data.error || 'Weather service unavailable.'), { status: response.status });
   return data;
@@ -103,11 +106,13 @@ function render(data) {
   draw('skin-exposure', 'Feels-like outlook', () => renderComfort(data));
   if(experimentalPage)draw('car-wash-forecast', 'Car Wash Forecast', () => renderCarWashForecast(data));
   draw('dewpoint-gross-meter', 'Dew Point Gross Meter', () => renderDewpointMeter(data));
+  if(experimentalPage)draw('model-explanation', 'Forecast model explanation', () => renderModelExplanation(data));
   draw('metrics', 'Weather details', () => renderMetrics(data));
   draw('scientific-stuff', 'Source details', () => renderEvidence(data));
+  draw('day-content', 'Forecast details', () => refreshOpenDay());
   if (currentBriefing?.signature !== data.signature) {
-    draw('briefing-summary', 'Local outlook', () => renderBriefing({ mode: 'nws-summary', signature: data.signature, headline: currentDay.tonight ? 'Your evening outlook' : d.condition, summary: currentDay.detail || 'The official forecast is temporarily unavailable.', nearTerm: d.nightDetail, extended: data.days[1]?.detail,
-      uncertainty: '', danTake:data.danTake||rebindDanTake(currentBriefing?.danTake||currentBriefing,data), reason: data.aiConfigured ? 'Updating your local outlook…' : 'National Weather Service forecast', sources: ['nws'] }));
+    draw('briefing-summary', 'Local outlook', () => renderBriefing({ mode: 'nws-summary', signature: data.signature, headline: currentDay.tonight ? 'Your evening outlook' : d.condition, summary: forecastPeriodSummary(data,0,currentDay.tonight?'overnight':'daytime').summary, nearTerm: forecastPeriodSummary(data,0,'overnight').summary, extended: forecastPeriodSummary(data,1,'overall').summary,
+      uncertainty: '', danTake:data.danTake||rebindDanTake(currentBriefing?.danTake||currentBriefing,data), reason: data.aiConfigured ? 'Updating your local outlook…' : 'Weather Nourie forecast', sources: ['nws',...(data.modelContributions||[]).map(model=>model.id)] }));
   }
   if (map) { marker?.setLatLng([place.latitude, place.longitude]); renderMapWarnings(data); }
   const unavailable = data.feeds.filter((f) => ['unavailable', 'stale', 'not-configured'].includes(f.status));
@@ -161,7 +166,7 @@ function renderBriefing(data) {
   const takeDisplay=card.text;
   $('briefing-title').textContent = data.headline || 'Local forecast';
   $('briefing-summary').textContent = data.summary || 'The source forecast is currently unavailable.';
-  $('ai-label').textContent = data.mode === 'ai' ? 'YOUR LOCAL OUTLOOK' : 'NWS FORECAST';
+  $('ai-label').textContent = data.mode === 'ai' ? 'YOUR LOCAL OUTLOOK' : 'WEATHER NOURIE FORECAST';
   const refs = (data.sources || []).filter((id) => ['nws', 'afd', 'hrrr', 'ecmwf', 'nbm'].includes(id)).map((id) => {
     const f = forecast?.feeds.find((s) => s.id === id);
     const url = id === 'afd' ? forecast?.discussion?.url : f?.url;
@@ -176,9 +181,9 @@ function renderBriefing(data) {
     if(todayUncertaintyText.style)todayUncertaintyText.style.whiteSpace='pre-line';
     todayUncertainty.hidden = !takeDisplay;
   }
-  $('briefing-stamp').textContent = data.mode === 'ai' ? `Updated ${clock(data.generatedAt)} · based on your local NWS discussion` : 'National Weather Service forecast';
+  $('briefing-stamp').textContent = data.mode === 'ai' ? `Updated ${clock(data.generatedAt)} · based on your local NWS discussion` : 'Weather Nourie forecast';
   const discussionItems=takeItems.filter(item=>!item.official);
-  $('outlook-science').innerHTML = `<p>Summary type: ${esc(data.mode === 'ai' ? 'AI plain-language paraphrase of the local discussion, checked against the point forecast and available model data' : 'Official NWS forecast fallback; not an AI paraphrase')}. ${esc(data.reason || '')}</p><p>Sources used: ${refs.join(' · ') || 'Waiting for the local outlook'}</p><p>Take status: ${takeItems.some(item=>item.official)?'An active official local notice or point-specific risk outlook is displayed.':takeItems.length?'An explicitly supported, still-upcoming discussion change is displayed.':'No displayed change: '+(data.danTakeStatus==='discussion-not-current'?'the local discussion is missing or stale.':data.danTakeStatus==='no-explicit-future-change'?'the current discussion identifies no dated upcoming uncertainty.':data.reason||'the current discussion has not produced an approved explanation yet.')}</p>${discussionItems.map(item=>`<details><summary>${esc(item.period)} · source evidence</summary><p>${esc(item.sourceQuote)}</p><p>Original section: ${esc(item.section)} · issued ${esc(clock(item.sectionIssuedAt,{month:'short',day:'numeric'}))}. Applies through ${esc(clock(item.eventEnd,{month:'short',day:'numeric'}))}.</p></details>`).join('')}`;
+  $('outlook-science').innerHTML = `<p>Summary type: ${esc(data.mode === 'ai' ? 'AI plain-language paraphrase of the local discussion, checked against the point forecast and available model data' : 'Shared Weather Nourie hourly summary; not an AI paraphrase')}. ${esc(data.reason || '')}</p><p>Sources used: ${refs.join(' · ') || 'Waiting for the local outlook'}</p><p>Take status: ${takeItems.some(item=>item.official)?'An active official local notice or point-specific risk outlook is displayed.':takeItems.length?'An explicitly supported, still-upcoming discussion change is displayed.':'No displayed change: '+(data.danTakeStatus==='discussion-not-current'?'the local discussion is missing or stale.':data.danTakeStatus==='no-explicit-future-change'?'the current discussion identifies no dated upcoming uncertainty.':data.reason||'the current discussion has not produced an approved explanation yet.')}</p>${discussionItems.map(item=>`<details><summary>${esc(item.period)} · source evidence</summary><p>${esc(item.sourceQuote)}</p><p>Original section: ${esc(item.section)} · issued ${esc(clock(item.sectionIssuedAt,{month:'short',day:'numeric'}))}. Applies through ${esc(clock(item.eventEnd,{month:'short',day:'numeric'}))}.</p></details>`).join('')}`;
 
 }
 async function load({ moveMap = false, refreshModels = false, briefingRetry = 0 } = {}) {
@@ -249,21 +254,39 @@ function chooseLocation(value) {
   $('afd-link').href = 'https://www.weather.gov/';
   $('source-register').replaceChildren();
   resetCarWashForecast();
+  resetModelExplanation();
   renderBriefing({ headline: 'Preparing your local outlook.', summary: 'Loading the latest NWS forecast and local discussion for this location.', sources: [] });
   $('search-results').hidden = true; $('city-search').value = ''; $('city-search').setAttribute('aria-expanded', 'false');
   try { localStorage.setItem('weather-fusion-place', JSON.stringify(place)); } catch { /* nonessential */ }
   warningLayer?.clearLayers();
   void load({ moveMap: true });
 }
-function showDay(index) {
+function refreshOpenDay() {
+  if (!$('day-dialog').open || !activeDayDetail) return;
+  const index = forecast?.days?.findIndex(day => day.date === activeDayDetail.date) ?? -1;
+  if (index < 0) { $('day-dialog').close(); activeDayDetail = null; return; }
+  showDay(index, { preserve: true });
+}
+function showDay(index, { preserve = false } = {}) {
   const d=forecast?.days[index]; if(!d) return;
-  const p=dailyDisplay(d,index,Date.now(),forecast.location.timeZone);
-  const now=Date.now(),phase=p.tonight?'overnight':index===0?'daytime':'overall';
+  const now=Date.now(),p=dailyDisplay(d,index,now,forecast.location.timeZone),phase=p.tonight?'overnight':index===0?'daytime':'overall';
+  const root=$('day-content'),dialog=$('day-dialog'),oldInput=root.querySelector('#day-graph-hour');
+  const selectedTime=preserve&&oldInput?activeDayDetail?.graphTimes[Number(oldInput.value)]:null;
+  const scrollTop=preserve?dialog.scrollTop:0,confidenceOpen=preserve&&root.querySelector('.dialog-confidence')?.open;
+  const focused=preserve&&root.contains(document.activeElement)?document.activeElement:null;
+  const focusedId=focused?.id,focusedSummary=focused?.matches('.dialog-confidence > summary');
   const story=forecastPeriodSummary(forecast,index,phase,now),overnight=phase==='daytime'?forecastPeriodSummary(forecast,index,'overnight',now):null;
   const condition=phase==='overall'?`Day: ${d.condition||'forecast unavailable'} · Night: ${d.nightCondition||'forecast unavailable'}`:p.condition;
-  $('day-content').innerHTML=`<div class="dialog-eyebrow">WEATHER NOURIE</div><h2 id="day-title" class="dialog-title">${esc(p.label)}</h2><p class="dialog-condition">${esc(condition)}</p><div class="dialog-temps">${temperature(p.primary)}<span>${p.primaryLabel.toLowerCase()}${!p.tonight&&finite(p.secondary)?` · ${temperature(p.secondary)} low`:''}</span></div>${dayGraphHTML(forecast,index,p.tonight)}<div class="dialog-stats"><div><strong>${percent(story.chance)}</strong><small>${p.tonight?'Rain chance tonight':phase==='overall'?'Day and night rain chance':'Rain chance today'}</small></div><div><strong>${inches(story.amount)}</strong><small>${p.tonight?'Forecast rain through morning':phase==='overall'?'Forecast rain through next morning':'Expected rain today'}</small></div></div><p class="dialog-prose">${esc(story.summary)}</p><p class="dialog-data-note">${esc(story.sourceNote)}</p>${overnight?`<h3 class="dialog-subtitle">Overnight · ${percent(overnight.chance)} rain chance</h3><p class="dialog-prose">${esc(overnight.summary)}</p><p class="dialog-data-note">${esc(overnight.sourceNote)}</p>`:''}${d.confidence?`<details class="dialog-confidence" data-confidence="${esc(d.confidence.key)}"><summary>Forecast confidence: ${esc(d.confidence.label)} · ${d.confidence.sourceCount??'?'} source${d.confidence.sourceCount===1?'':'s'}</summary><p>${esc(d.confidence.factors.join(' · '))}</p><small>${esc(d.confidence.note)}</small></details>`:''}<a href="#scientific-stuff" class="science-link" id="day-science-link">Scientific stuff ↓</a>`;
-  installDayGraph($('day-content'),forecast,index,p.tonight);
-  $('day-dialog').showModal();
+  root.innerHTML=`<div class="dialog-eyebrow">WEATHER NOURIE</div><h2 id="day-title" class="dialog-title">${esc(p.label)}</h2><p class="dialog-condition">${esc(condition)}</p><div class="dialog-temps">${temperature(p.primary)}<span>${p.primaryLabel.toLowerCase()}${!p.tonight&&finite(p.secondary)?` · ${temperature(p.secondary)} low`:''}</span></div>${dayGraphHTML(forecast,index,p.tonight,now)}<div class="dialog-stats"><div><strong>${percent(story.chance)}</strong><small>${p.tonight?'Rain chance tonight':phase==='overall'?'Day and night rain chance':'Rain chance today'}</small></div><div><strong>${inches(story.amount)}</strong><small>${p.tonight?'Forecast rain through morning':phase==='overall'?'Forecast rain through next morning':'Expected rain today'}</small></div></div><p class="dialog-prose">${esc(story.summary)}</p>${overnight?`<h3 class="dialog-subtitle">Overnight · ${percent(overnight.chance)} rain chance</h3><p class="dialog-prose">${esc(overnight.summary)}</p>`:''}${d.confidence?`<details class="dialog-confidence" data-confidence="${esc(d.confidence.key)}"><summary>Forecast confidence: ${esc(d.confidence.label)} · ${d.confidence.sourceCount??'?'} source${d.confidence.sourceCount===1?'':'s'}</summary><p>${esc(d.confidence.factors.join(' · '))}</p><small>${esc(d.confidence.note)}</small></details>`:''}<a href="#scientific-stuff" class="science-link" id="day-science-link">Scientific stuff ↓</a>`;
+  installDayGraph(root,forecast,index,p.tonight,now);
+  const graphTimes=dayGraphPoints(forecast,index,p.tonight,now).map(point=>point.time),input=root.querySelector('#day-graph-hour');
+  if (selectedTime && input) { input.value=String(Math.max(0,graphTimes.indexOf(selectedTime))); input.dispatchEvent(new Event('input')); }
+  activeDayDetail={date:d.date,graphTimes};
+  if(confidenceOpen&&root.querySelector('.dialog-confidence'))root.querySelector('.dialog-confidence').open=true;
+  if(!dialog.open)dialog.showModal();
+  const focusTarget=focusedId?$(focusedId):focusedSummary?root.querySelector('.dialog-confidence > summary'):null;
+  if(focusTarget&&root.contains(focusTarget))focusTarget.focus({preventScroll:true});
+  dialog.scrollTop=scrollTop;
   $('day-science-link').addEventListener('click',()=>$('day-dialog').close());
 }
 
@@ -451,6 +474,8 @@ $('locate').addEventListener('click', () => {
   navigator.geolocation.getCurrentPosition((p) => chooseLocation({ id: '', name: 'My location', latitude: Number(p.coords.latitude.toFixed(3)), longitude: Number(p.coords.longitude.toFixed(3)) }), () => { $('status').textContent = 'Location access was unavailable. Use city search or a saved location.'; }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 });
 });
 document.addEventListener('visibilitychange', () => { if (document.hidden) stopRadar(); else if (!busy) void load(); });
+window.addEventListener('online', () => { if (!document.hidden && !busy) void load(); });
+window.addEventListener('pageshow', (event) => { if (event.persisted && !document.hidden && !busy) void load(); });
 // The site refreshes while open; this is not a push-alert system or background task.
 setInterval(() => { if (!document.hidden && !busy) void load(); }, 60000);
 installExperience();

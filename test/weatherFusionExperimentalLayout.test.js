@@ -45,8 +45,11 @@ test('car-wash panel is below real-feel cards and the Gross Meter anchors below 
   assert.match(dewpoint,/document\.getElementById\('car-wash-forecast'\)\s*\|\|\s*host/);
 });
 
-test('car-wash visual remains a compact phone card with five equal day columns',()=>{
-  assert.match(carWashCss,/\.car-wash-forecast\{[^}]*aspect-ratio:697\/716/);
+test('car-wash phone layout reserves a separate unobstructed photo band and five equal day columns',()=>{
+  assert.match(carWashCss,/\.car-wash-forecast\{[^}]*display:flex;flex-direction:column/);
+  assert.doesNotMatch(carWashCss,/position:absolute|grid-template-rows:12%/);
+  assert.match(carWashCss,/\.car-wash-photo\{[^}]*aspect-ratio:3\/2/);
+  assert.match(carWashCss,/\.car-wash-art\{[^}]*position:static;[^}]*object-fit:contain/);
   assert.match(carWashCss,/container-type:inline-size/);
   assert.match(carWashCss,/\.car-wash-days\{[^}]*grid-template-columns:repeat\(5,minmax\(0,1fr\)\)/);
   assert.match(carWashCss,/@media\(max-width:760px\)\{[\s\S]*\.car-wash-forecast\{width:100%/);
@@ -55,18 +58,18 @@ test('car-wash visual remains a compact phone card with five equal day columns',
   assert.match(carWashCss,/\.car-wash-footer\{/);
   assert.doesNotMatch(carWashCss,/\.car-wash-forecast footer\{/);
   for (const size of [320,360,390,430]) {
-    const height = size * 716 / 697;
-    assert.ok(height < size * 1.04,`${size}px card stays nearly square`);
+    const photoHeight = size * 2 / 3;
+    assert.ok(photoHeight >= 213,`${size}px card gives the car its own visible photo band`);
   }
 });
 
 test('generated car background is a real lightweight WebP served as a static asset',()=>{
-  const asset = new URL('../public/weather-fusion/car-wash-background.webp',import.meta.url);
+  const asset = new URL('../public/weather-fusion/car-wash-corvette-hood.webp',import.meta.url);
   const bytes = readFileSync(asset);
   assert.equal(bytes.subarray(0,4).toString(),'RIFF');
   assert.equal(bytes.subarray(8,12).toString(),'WEBP');
-  assert.ok(statSync(asset).size < 300000);
-  assert.match(read('car-wash.js'),/src="\/weather-fusion\/car-wash-background\.webp"/);
+  assert.ok(statSync(asset).size < 600000);
+  assert.match(read('car-wash.js'),/src="\/weather-fusion\/car-wash-corvette-hood\.webp"/);
 });
 
 test('the explicit server allowlist covers the weather shell dependency closure',()=>{

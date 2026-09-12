@@ -68,3 +68,13 @@ test('Today and Tonight prefer their matching blended rain likelihood',()=>{
  assert.match(todayForecastHTML(f,now),/>8%<\/strong><small>Rain chance/);
  assert.match(todayForecastHTML(f,Date.parse('2026-09-11T23:00:00Z')),/>3%<\/strong><small>Rain chance/);
 });
+test('unavailable canonical rain never silently changes to the NWS percentage or sky intensity',()=>{
+ const f=fixture(),missing={value:null,aggregation:'maximum-hourly',coverage:{complete:false}};
+ f.days[0].popDay=80;f.days[0].popNight=70;f.days[0].popDayLikelihood=missing;f.days[0].popNightLikelihood=missing;
+ assert.match(todayForecastHTML(f,now),/>—<\/strong><small>Rain chance/);
+ assert.match(todayForecastHTML(f,Date.parse('2026-09-11T23:00:00Z')),/>—<\/strong><small>Rain chance/);
+ assert.equal(todaySkyProfile(f.days[0]).pop,null);assert.equal(todaySkyProfile(f.days[0],true).pop,null);
+ assert.doesNotMatch(hourlyRainHTML({pop:80,rainLikelihood:{value:null}}),/>80%</);
+ assert.match(hourlyRainHTML({pop:80,rainLikelihood:{value:null}}),/>—<\/small>/);
+ assert.match(hourlyRainHTML({pop:80,rainLikelihood:{value:0}}),/>0%</);
+});

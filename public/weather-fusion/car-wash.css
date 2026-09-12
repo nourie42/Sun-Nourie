@@ -1,53 +1,59 @@
-.car-wash-forecast{position:relative;isolation:isolate;display:grid;grid-template-rows:12% 39% 29% 16% 4%;width:min(100%,760px);aspect-ratio:697/716;margin:18px auto 24px;padding:0!important;overflow:hidden;border:1px solid #35c9ff8c!important;border-radius:22px!important;background:#031827!important;color:#f8fdff;box-shadow:inset 0 0 0 1px #9eeaff17,0 18px 50px #020a1685;container-type:inline-size;text-align:left}
-.car-wash-art{position:absolute;z-index:0;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 60%;filter:saturate(.98) contrast(1.02)}
-.car-wash-overlay{position:absolute;z-index:1;inset:0;background:linear-gradient(#001522f2 0 12%,#00152258 26%,transparent 39% 55%,#001420f1 75%),linear-gradient(90deg,#00131ce9 0 27%,transparent 47% 68%,#00131ced 100%)}
-.car-wash-forecast>:not(.car-wash-art):not(.car-wash-overlay){position:relative;z-index:2;min-width:0}
-.car-wash-header{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:1.6cqw;padding:1.6cqw 2.2cqw;border-bottom:1px solid #58d8ff52;background:linear-gradient(90deg,#05233ce8,#071b2dc7);box-shadow:0 5px 18px #0008}
+.car-wash-forecast{position:relative;isolation:isolate;display:flex;flex-direction:column;width:min(100%,760px);margin:18px auto 24px;padding:0!important;overflow:hidden;border:1px solid #35c9ff8c!important;border-radius:22px!important;background:#031827!important;color:#f8fdff;box-shadow:inset 0 0 0 1px #9eeaff17,0 18px 50px #020a1685;container-type:inline-size;text-align:left}
+.car-wash-forecast>*{flex:none;min-width:0}
+.car-wash-header{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:1.5cqw;padding:3cqw 3.2cqw;border-bottom:1px solid #58d8ff52;background:linear-gradient(90deg,#05233c,#071b2d)}
 .car-wash-logo{font-size:4.4cqw;filter:drop-shadow(0 0 7px #48d8ff80);white-space:nowrap}
-.car-wash-header h2{margin:0;font-size:5.2cqw;line-height:1;font-weight:900;letter-spacing:-.045em;color:#fff;text-shadow:0 2px 4px #000}
-.car-wash-header p{margin:.65cqw 0 0;font-size:clamp(8px,2.45cqw,18px);line-height:1.1;color:#bceaff;font-weight:500;white-space:nowrap}
-.car-wash-header em{font-family:"Segoe Script","Bradley Hand",cursive;font-size:clamp(8px,2.25cqw,17px);line-height:1.25;text-align:right;color:#fff;font-weight:600;transform:rotate(-3deg);text-shadow:0 2px 4px #000}
-.car-wash-hero{display:grid;grid-template-columns:37% 1fr;align-items:center;padding:2cqw 2.2cqw 1.2cqw}
-.car-wash-answer{align-self:start;padding-top:.9cqw;text-shadow:0 2px 7px #000}
-.car-wash-answer h3{margin:0 0 1.4cqw;font-size:4.25cqw;line-height:1.02;font-weight:900;letter-spacing:-.035em}
-.car-wash-verdict{display:inline-flex;align-items:center;gap:1.2cqw;min-width:22cqw;justify-content:center;padding:1.05cqw 1.5cqw;border-radius:2cqw;font-size:5.2cqw;line-height:1;font-weight:950;border:1px solid #ff806e;background:linear-gradient(#ff4750,#bf1725);box-shadow:0 0 1.4cqw #ff364f,0 2px 4px #0008;text-shadow:0 2px 2px #0007}
+.car-wash-header h2{margin:0;font-size:clamp(20px,5.1cqw,38px);line-height:1.06;font-weight:900;letter-spacing:-.045em;color:#fff;text-shadow:0 2px 4px #000}
+.car-wash-header p{margin:1cqw 0 0;font-size:clamp(10px,2.35cqw,17px);line-height:1.2;color:#bceaff;font-weight:500}
+.car-wash-header em{font-family:"Segoe Script","Bradley Hand",cursive;font-size:clamp(10px,2.15cqw,16px);line-height:1.3;text-align:right;color:#fff;font-weight:600;transform:rotate(-3deg);text-shadow:0 2px 4px #000}
+.car-wash-hero{display:grid;grid-template-columns:minmax(0,.95fr) minmax(0,1.05fr);align-items:center;gap:3cqw;padding:3cqw 3.2cqw;background:linear-gradient(135deg,#05243a,#031827)}
+.car-wash-answer{text-shadow:0 2px 7px #000}
+.car-wash-answer h3{margin:0 0 2cqw;font-size:clamp(18px,4.5cqw,32px);line-height:1.05;font-weight:900;letter-spacing:-.035em}
+.car-wash-verdict{display:inline-flex;align-items:center;gap:1.2cqw;min-width:28cqw;justify-content:center;padding:1.5cqw 2cqw;border-radius:2cqw;font-size:clamp(26px,6.2cqw,46px);line-height:1;font-weight:950;border:1px solid #ff806e;background:linear-gradient(#ff4750,#bf1725);box-shadow:0 0 1.4cqw #ff364f,0 2px 4px #0008;text-shadow:0 2px 2px #0007}
 .car-wash-verdict.wash{border-color:#81ff92;background:linear-gradient(#42ef67,#0b9c35);box-shadow:0 0 1.6cqw #31ff68,0 2px 4px #0008}
 .car-wash-verdict.check{border-color:#ffd97c;background:linear-gradient(#ffc953,#b87400);box-shadow:0 0 1.4cqw #ffc64a99,0 2px 4px #0008}
-.car-wash-answer p{max-width:25cqw;margin:1.2cqw 0 0;font-size:clamp(8px,2.15cqw,16px);line-height:1.18;color:#e6f4fb;font-weight:650}
-.car-wash-checks{align-self:start;justify-self:end;width:28.5cqw;margin-top:.2cqw;padding:1.4cqw 1.3cqw;border:1px solid #66c9f25c;border-radius:1.6cqw;background:#051b2ee6;box-shadow:0 5px 15px #0008}
-.car-wash-fact{display:grid;grid-template-columns:3.2cqw minmax(0,1fr);align-items:center;gap:.9cqw;min-height:6.2cqw;color:#dcecf5}
-.car-wash-fact i{font-style:normal;font-size:2.8cqw;text-align:center;color:#65dfff}
+.car-wash-answer p{margin:2cqw 0 0;font-size:clamp(11px,2.4cqw,17px);line-height:1.3;color:#d8eaf4;font-weight:600;overflow-wrap:break-word}
+.car-wash-checks{display:grid;grid-template-columns:minmax(0,1fr);gap:1.2cqw;align-self:center;padding:2cqw;border:1px solid #66c9f25c;border-radius:2cqw;background:#071f32}
+.car-wash-fact{display:grid;grid-template-columns:4cqw minmax(0,1fr);align-items:center;gap:1.5cqw;color:#dcecf5}
+.car-wash-fact i{font-style:normal;font-size:clamp(16px,3.4cqw,24px);text-align:center;color:#65dfff}
 .car-wash-fact span{display:flex;flex-direction:column;min-width:0}
-.car-wash-fact b{font-size:clamp(7px,1.95cqw,15px);line-height:1.12;white-space:normal}
-.car-wash-fact small{font-size:clamp(6px,1.55cqw,12px);line-height:1.15;color:#b6d1df}
-.car-wash-fact.good:last-child{color:#7dff91}
-.car-wash-days-wrap{align-self:stretch;padding:0 1.6cqw 1.1cqw;background:linear-gradient(180deg,#00131b50,#00121ff0)}
-.car-wash-days-wrap>h3{height:4.4cqw;margin:0;font-size:3.1cqw;line-height:4.4cqw;font-weight:900;text-shadow:0 2px 4px #000}
-.car-wash-days{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.75cqw;height:calc(100% - 4.4cqw)}
-.car-wash-day{display:flex;flex-direction:column;align-items:center;min-width:0;padding:.7cqw .25cqw .6cqw;border:1px solid #5cb8df5b;border-radius:1.45cqw;background:linear-gradient(180deg,#071c30ed,#061424f2);box-shadow:inset 0 1px #c6efff16;text-align:center}
+.car-wash-fact b{font-size:clamp(12px,2.9cqw,20px);line-height:1.2;font-weight:800;overflow-wrap:break-word}
+.car-wash-fact small{font-size:clamp(10px,2.15cqw,15px);line-height:1.25;color:#b6d1df}
+.car-wash-fact.good b{color:#8df4ab}
+.car-wash-photo{display:block;width:100%;aspect-ratio:3/2;background:#071722;overflow:hidden;border-block:1px solid #58d8ff52}
+.car-wash-art{display:block;position:static;width:100%;height:100%;object-fit:contain;object-position:center}
+.car-wash-days-wrap{padding:2.4cqw 2.4cqw 1.4cqw;background:#041a2b}
+.car-wash-days-wrap>h3{margin:0 0 1.6cqw;font-size:clamp(16px,3.4cqw,25px);line-height:1.15;font-weight:900}
+.car-wash-days{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:1cqw}
+.car-wash-day{display:flex;flex-direction:column;align-items:center;min-width:0;padding:1.7cqw .5cqw 1cqw;border:1px solid #5cb8df5b;border-radius:1.6cqw;background:linear-gradient(180deg,#071c30,#061424);box-shadow:inset 0 1px #c6efff16;text-align:center}
 .car-wash-day[data-car-wash-state="wash"]{border-color:#55ff7a;box-shadow:inset 0 0 1.2cqw #21e95f27,0 0 .8cqw #20fa554d}
-.car-wash-day>strong{font-size:clamp(7px,1.85cqw,14px);line-height:1;font-weight:900;text-transform:uppercase;white-space:nowrap}
-.car-wash-day>small{font-size:clamp(6px,1.5cqw,11px);line-height:1.1;color:#bdced9;margin-top:.25cqw}
-.car-wash-day svg{width:5.2cqw;height:5.2cqw;margin:.45cqw auto}
-.car-wash-temps{font-size:clamp(8px,2cqw,15px);line-height:1;font-weight:850;white-space:nowrap}.car-wash-temps i{font-style:normal;color:#7d99ad;font-weight:400}
-.car-wash-chance{font-size:clamp(6px,1.55cqw,12px);line-height:1;color:#8edfff;margin:.65cqw 0 .55cqw;white-space:nowrap}
-.car-wash-day-verdict{display:block;width:calc(100% - .7cqw);margin-top:auto;padding:.38cqw .1cqw;border-radius:.65cqw;background:#e73142;color:#fff;font-size:clamp(7px,1.65cqw,13px);line-height:1;font-weight:950;box-shadow:0 0 .8cqw #ff364f66}
+.car-wash-day>strong{font-size:clamp(10px,2.4cqw,17px);line-height:1.15;font-weight:900;text-transform:uppercase;white-space:nowrap}
+.car-wash-day>small{font-size:clamp(9px,2.05cqw,14px);line-height:1.2;color:#bdced9;margin-top:.4cqw}
+.car-wash-day svg{width:8cqw;height:8cqw;margin:1.3cqw auto}
+.car-wash-temps{font-size:clamp(10px,2.5cqw,18px);line-height:1.2;font-weight:850;white-space:nowrap}.car-wash-temps i{font-style:normal;color:#7d99ad;font-weight:400}
+.car-wash-chance{font-size:clamp(10px,2.3cqw,16px);line-height:1.15;color:#8edfff;margin:1.3cqw 0 1.8cqw;white-space:nowrap}
+.car-wash-day-verdict{display:block;width:100%;margin-top:auto;padding:.9cqw .1cqw;border-radius:.8cqw;background:#e73142;color:#fff;font-size:clamp(10px,2.25cqw,16px);line-height:1.1;font-weight:950;box-shadow:0 0 .8cqw #ff364f66}
 .car-wash-day[data-car-wash-state="wash"] .car-wash-day-verdict{background:#38ed5d;color:#032b13;box-shadow:0 0 .8cqw #38ff6f80}
 .car-wash-day[data-car-wash-state="check"] .car-wash-day-verdict{background:#ffc94c;color:#3c2700;box-shadow:0 0 .8cqw #ffd45e73}
-.car-wash-window{display:grid;grid-template-columns:auto minmax(0,1.4fr) repeat(3,minmax(0,.55fr));align-items:center;gap:1.2cqw;margin:.7cqw 1.6cqw;padding:1.05cqw 1.3cqw;border:1px solid #48bde96e;border-radius:1.4cqw;background:#041a2bea;box-shadow:inset 0 1px #caf3ff14}
+.car-wash-window{display:grid;grid-template-columns:auto minmax(0,1.4fr) repeat(3,minmax(0,.55fr));align-items:center;gap:1.5cqw;margin:1.5cqw 2.4cqw;padding:2cqw;border:1px solid #48bde96e;border-radius:1.6cqw;background:#041a2b;box-shadow:inset 0 1px #caf3ff14}
 .car-wash-spark{font-size:4.2cqw;color:#74e7ff;text-shadow:0 0 1cqw #31d2ff}
 .car-wash-window>span:nth-child(2){display:flex;flex-direction:column;min-width:0}
-.car-wash-window small{font-size:clamp(6px,1.45cqw,11px);line-height:1.1;color:#d6e9f3;font-style:normal}
-.car-wash-window strong{font-size:clamp(10px,3cqw,23px);line-height:1.05;color:#54d8ff;font-weight:900;white-space:normal}
-.car-wash-window em{font-size:clamp(6px,1.35cqw,10px);line-height:1.1;color:#b9cfda;font-style:normal}
-.car-wash-tip{text-align:center;font-size:2.8cqw;color:#5fddff;border-left:1px solid #41addd55;padding-left:1cqw;line-height:1}
-.car-wash-tip small{display:block;margin-top:.45cqw;color:#cee1ea;line-height:1.12}
-.car-wash-footer{align-self:center;padding:0;text-align:center;font-size:clamp(5px,1.15cqw,9px);line-height:1;letter-spacing:.38cqw;color:#a8c2d0;white-space:nowrap}
+.car-wash-window small{font-size:clamp(10px,1.9cqw,14px);line-height:1.2;color:#d6e9f3;font-style:normal}
+.car-wash-window strong{margin:.5cqw 0;font-size:clamp(18px,3.6cqw,27px);line-height:1.1;color:#54d8ff;font-weight:900;overflow-wrap:break-word}
+.car-wash-window em{font-size:clamp(10px,1.8cqw,13px);line-height:1.3;color:#b9cfda;font-style:normal}
+.car-wash-tip{text-align:center;font-size:3cqw;color:#5fddff;border-left:1px solid #41addd55;padding-left:1cqw;line-height:1}
+.car-wash-tip small{display:block;margin-top:.7cqw;color:#cee1ea;line-height:1.15}
+.car-wash-footer{padding:1.6cqw 2cqw 2.4cqw;text-align:center;font-size:clamp(8px,1.4cqw,10px);line-height:1.3;letter-spacing:.2cqw;color:#a8c2d0}
 
 @media(max-width:760px){
  .car-wash-forecast{width:100%;border-radius:16px!important;margin:14px auto 20px}
 }
+@container(max-width:480px){
+ .car-wash-header{grid-template-columns:auto minmax(0,1fr)}.car-wash-header em{display:none}
+ .car-wash-header h2{font-size:6cqw}.car-wash-header p{font-size:3cqw}
+ .car-wash-window{grid-template-columns:auto minmax(0,1fr);gap:2cqw;padding:3cqw}
+ .car-wash-tip{display:none}
+}
 @media(max-width:359px){
- .car-wash-header p{font-size:8px}.car-wash-fact small{display:none}.car-wash-fact{min-height:5.8cqw}.car-wash-answer p{font-size:8px}.car-wash-window em{display:none}
+ .car-wash-answer h3{font-size:17px}.car-wash-fact b{font-size:11px}.car-wash-temps{font-size:9px}.car-wash-day>strong{font-size:9px}
 }
 @media(prefers-reduced-motion:reduce){.car-wash-forecast *{scroll-behavior:auto!important}}

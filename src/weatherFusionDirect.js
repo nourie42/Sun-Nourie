@@ -72,7 +72,7 @@ export function createDirectModels({ fetchImpl = globalThis.fetch, now = Date.no
         const native=validateSnapshot(await resource('models/hrrr.json'),id,location,now()).value;
         if(native){for(const field of ['reflectivity','nearby_reflectivity'])if(native.hourly[field])value.hourly[field]=value.hourly.time.map(t=>{const i=native.hourly.time.indexOf(t);return i>=0?native.hourly[field][i]:null;});value.reflectivityRunAt=native.runAt;}
       }catch{/* Optional native reflectivity must not discard verified point weather. */}
-      return {value,meta:{...meta,status:'ready',label:`${id.toUpperCase()} · ${value.resolution}`,transport:value.transport,url:value.sourceUrl,issuedAt:value.runAt,validUntil:value.validUntil,resolution:value.resolution,contributes:true,message:value.refreshWarning||value.runScope,modelGrid:value.modelGrid}};
+      return {value,meta:{...meta,status:'ready',label:`${id.toUpperCase()} · ${value.resolution}`,transport:value.transport,url:value.sourceUrl,issuedAt:value.runAt,fetchedAt:value.fetchedAt||null,checkedAt:value.checkedAt||null,retrievalStatus:value.retrievalStatus,validUntil:value.validUntil,resolution:value.resolution,contributes:true,message:value.refreshWarning||value.runScope,modelGrid:value.modelGrid}};
     }catch(error){pointFailure=String(error.message);}
     let nativeFailure;
     try {
@@ -135,14 +135,40 @@ export function precipitationLikelihood(nwsProbability, precipitationBlend, poli
     ecmwf: finite(amounts.ecmwf) ? (amounts.ecmwf >= RAIN_VOTE_THRESHOLD_IN ? 100 : 0) : null
   };
   const result = weighted(values, policy);
-  const rounded=finite(result.value)?Math.round(result.value):null;
+  const included=Object.entries(values).filter(([id,value])=>finite(value)&&policy[id]>0);
+  const totalWeight=included.reduce((sum,[id])=>sum+policy[id],0);
+  // Preserve arithmetic before whole-percent rounding, without binary-float noise at 10%.
+  const weightedValue=totalWeight?round(included.reduce((sum,[id,value])=>sum+value*policy[id],0)/totalWeight,8):null;
+  const rounded=finite(weightedValue)?Math.round(weightedValue):null;
   const sourceAmounts=Object.fromEntries(['nws','hrrr','ecmwf'].map(id=>[id,finite(amounts[id])?amounts[id]:null]));
   const drySources=Object.entries(sourceAmounts).filter(([,amount])=>finite(amount)&&amount<RAIN_VOTE_THRESHOLD_IN).map(([id])=>id);
   if(!finite(sourceAmounts.nws)&&finite(nwsProbability)&&nwsProbability<10&&!drySources.includes('nws'))drySources.push('nws');
-  const value=finite(rounded)&&rounded<10&&drySources.length>=2?0:rounded;
-  return {...result,value,rawValue:rounded,sourceValues:values,
+  const value=finite(weightedValue)&&weightedValue<10&&drySources.length>=2?0:rounded;
+  return {...result,value,rawValue:rounded,weightedValue,sourceValues:values,
     sourceAmounts,drySources,
     source:'Weather Nourie consensus · NWS probability + HRRR/ECMWF wet-dry guidance',calibrated:false,thresholdInches:RAIN_VOTE_THRESHOLD_IN};
+}
+/** A period card is the highest of its actual hourly scores, never a new vote on accumulated rain. */
+export function summarizeRainTimeline(timeline, start, end) {
+  const window={start:finite(start)?iso(start):null,end:finite(end)?iso(end):null};
+  const expected=finite(start)&&finite(end)&&end>start?(end-start)/H:0;
+  let cursor=start,covered=0,peak=null;
+  for(const row of [...(timeline||[])].sort((a,b)=>Date.parse(a.time)-Date.parse(b.time))) {
+    const a=Date.parse(row.time),b=Date.parse(row.end);
+    if(!finite(a)||!finite(b)||b<=a||b<=start||a>=end)continue;
+    const left=Math.max(start,a),right=Math.min(end,b);
+    if(!finite(row.rainLikelihood?.value))continue;
+    const span=Math.max(0,right-Math.max(cursor,left));
+    if(!span)continue;
+    covered+=span;cursor=right;
+    if(!peak||row.rainLikelihood.value>peak.rainLikelihood.value)peak=row;
+  }
+  const complete=expected>0&&covered>=end-start;
+  return {value:complete&&peak?peak.rainLikelihood.value:null,aggregation:'maximum-hourly',window,
+    coverage:{expectedHours:round(expected,3),availableHours:round(covered/H,3),complete},
+    peakTime:peak?.time||null,peakEnd:peak?.end||null,peak:peak?.rainLikelihood||null,
+    availablePeak:peak?.rainLikelihood?.value??null,sources:peak?.rainLikelihood?.sources||[],calibrated:false,
+    source:'Highest hourly Weather Nourie rain chance in this period'};
 }
 /** Backward-compatible API helper using the same all-weather Steadman equation as Weather Nourie. */
 export function feelsLike(t, rh, wind, dewpoint = null) {
@@ -178,17 +204,17 @@ export function solarTimes(date, latitude, longitude) {
   const rise=noon-w/(2*Math.PI),set=noon+w/(2*Math.PI);
   return finite(rise)&&finite(set)?{sunrise:iso((rise-2440587.5)*86400000),sunset:iso((set-2440587.5)*86400000),source:'Calculated astronomical times'}:{sunrise:null,sunset:null};
 }
-export function enhanceForecast(out, { models, grid, periods = [], now, gridQpf, localTime, nextDate, dateKey }) {
+export function enhanceForecast(out, { models, grid, periods = [], hourlyPeriods = [], now, gridQpf, localTime, nextDate, dateKey }) {
   const sourceModels = Object.fromEntries(Object.entries(models).filter(([,m]) => m?.direct||m?.verifiedModel));
   const active = Object.keys(sourceModels);
-  function qpf(start,end,index) {
+  function sourceQpf(start,end) {
     // Blend each time segment first. An 18-hour HRRR run must contribute where
     // covered rather than being discarded for not covering an entire 24h window.
     const totals={}, durations={}, sourceTotals={}, sourceCoverage={};
     let total=0, covered=0;
     for(let cursor=start; cursor<end; ) {
       const stop=Math.min(end,(Math.floor(cursor/H)+1)*H),span=stop-cursor;
-      const policy=precipitationPolicy(index===0 ? 0 : forecastDayIndex(cursor,now,out.location.timeZone));
+      const policy=precipitationPolicy(cursor-now<24*H?0:forecastDayIndex(cursor,now,out.location.timeZone));
       const values={nws:gridQpf(grid,cursor,stop,8)};
       for(const [id,m] of Object.entries(sourceModels))values[id]=intervalTotal(m.precipitationIntervals,cursor,stop,8);
       let result=weighted(values,policy);
@@ -199,11 +225,56 @@ export function enhanceForecast(out, { models, grid, periods = [], now, gridQpf,
       for(const src of result.sources){totals[src.id]=(totals[src.id]||0)+src.value*src.weight;durations[src.id]=(durations[src.id]||0)+src.weight*span;}
       cursor=stop;
     }
-    const sources=Object.keys(totals).map(id=>({id,weight:round(durations[id]/covered,6),value:round(sourceTotals[id],4),coverageHours:round(sourceCoverage[id]/H,1)}));
-    return {value:covered?round(total,3):null,sources,calibrated:false,start:iso(start),end:iso(end),
-      sourceValues:Object.fromEntries(['nws',...active].map(id=>[id,sourceCoverage[id]>=end-start?round(sourceTotals[id],4):null])),
+    const sources=Object.keys(totals).map(id=>({id,weight:round(durations[id]/covered,6),value:round(sourceTotals[id],8),coverageHours:round(sourceCoverage[id]/H,1)}));
+    return {value:covered?round(total,8):null,sources,calibrated:false,start:iso(start),end:iso(end),
+      sourceValues:Object.fromEntries(['nws',...active].map(id=>[id,sourceCoverage[id]>=end-start?round(sourceTotals[id],8):null])),
       source:sources.length?sources.map(s=>`${s.id.toUpperCase()} ${Math.round(s.weight*100)}%`).join(' / '):'Unavailable',
       weighting:'Per-hour blend; displayed weights are window-average contributions. HRRR contributes only within its published horizon.'};
+  }
+  // Score every forecast hour once, including the days beyond the 48-hour strip.
+  // NWS hourly probability is independent of NWS's longer day/night period PoP.
+  const officialHours=new Map((hourlyPeriods.length?hourlyPeriods:out.hours).map(row=>[
+    Date.parse(row.startTime||row.time),row
+  ]));
+  const sourceRun=id=>id==='nws'?(out.feeds?.find(f=>f.id==='hourly')?.issuedAt||null):sourceModels[id]?.runAt||null;
+  const timelineStart=Math.floor(now/H)*H;
+  const timelineEnd=Math.max(...out.days.map(day=>Date.parse(day.qpfWindow?.end)).filter(finite),timelineStart+48*H);
+  out.rainTimeline=[];
+  for(let time=timelineStart;time<timelineEnd;time+=H) {
+    const official=officialHours.get(time),raw=official?.probabilityOfPrecipitation?.value??official?.pop;
+    const officialPop=finite(raw)&&raw>=0&&raw<=100?raw:null;
+    const precipitationBlend=sourceQpf(time,time+H);
+    const rainLikelihood=precipitationLikelihood(officialPop,precipitationBlend,SAME_DAY_WEIGHTS);
+    rainLikelihood.sources=rainLikelihood.sources.map(source=>({...source,runAt:sourceRun(source.id)}));
+    precipitationBlend.sources=precipitationBlend.sources.map(source=>({...source,runAt:sourceRun(source.id)}));
+    out.rainTimeline.push({time:iso(time),end:iso(time+H),officialPop,rainLikelihood,
+      precipitation:precipitationBlend.value,precipitationBlend});
+  }
+  const timelineByTime=new Map(out.rainTimeline.map(row=>[Date.parse(row.time),row]));
+  // Amounts use the same hourly row as the graph; partial boundary hours are prorated.
+  function qpf(start,end) {
+    const totals={},durations={},sourceTotals={},sourceCoverage={};
+    let total=0,covered=0;
+    for(let cursor=start;cursor<end;) {
+      const time=Math.floor(cursor/H)*H,stop=Math.min(end,time+H),span=stop-cursor;
+      const row=timelineByTime.get(time),rain=row?.precipitationBlend;
+      if(!finite(row?.precipitation))return {value:null,sources:[],calibrated:false,start:iso(start),end:iso(end),sourceValues:{},source:'Incomplete forecast coverage'};
+      total+=row.precipitation*span/H;covered+=span;
+      for(const [id,value] of Object.entries(rain.sourceValues||{}))if(finite(value)){
+        sourceTotals[id]=(sourceTotals[id]||0)+value*span/H;sourceCoverage[id]=(sourceCoverage[id]||0)+span;
+      }
+      for(const source of rain.sources||[]){
+        totals[source.id]=(totals[source.id]||0)+source.value*source.weight*span/H;
+        durations[source.id]=(durations[source.id]||0)+source.weight*span;
+      }
+      cursor=stop;
+    }
+    const sources=Object.keys(totals).map(id=>({id,weight:round(durations[id]/covered,6),value:round(sourceTotals[id],4),
+      coverageHours:round(sourceCoverage[id]/H,1),runAt:sourceRun(id)}));
+    return {value:covered?round(total,4):null,sources,calibrated:false,start:iso(start),end:iso(end),
+      sourceValues:Object.fromEntries(['nws',...active].map(id=>[id,sourceCoverage[id]>=end-start?round(sourceTotals[id],4):null])),
+      source:sources.map(s=>`${s.id.toUpperCase()} ${Math.round(s.weight*100)}%`).join(' / ')||'Unavailable',
+      weighting:'Sum of the same canonical hourly precipitation amounts used by the graph; partial hours are prorated.'};
   }
   // For direct model forecasts align temperature samples to NWS day/night periods.
   for (const [index,d] of out.days.entries()) {
@@ -230,21 +301,24 @@ export function enhanceForecast(out, { models, grid, periods = [], now, gridQpf,
       d.lowLabel='Overnight low';
     }
     const fullStart=Date.parse(d.qpfWindow.start),end=Date.parse(d.qpfWindow.end);
-    const start=index===0?Math.max(fullStart,Math.ceil(now/H)*H):fullStart;
-    const rain=qpf(start,end,index);
-    d.fullWindowQpf=qpf(fullStart,end,index);
+    const start=index===0?Math.max(fullStart,now):fullStart;
+    const rain=qpf(start,end);
+    d.fullWindowQpf=qpf(fullStart,end);
     d.qpf=rain.value;d.qpfSource=rain.source;d.qpfBlend=rain;
     d.qpfWindow={start:iso(start),end:iso(end)};
     d.qpfWindowLabel=start>fullStart?'Remaining forecast through 7 AM':'7 AM–7 AM forecast';
-    const periodRain=period=>{
-      const a=Math.max(Date.parse(period?.startTime),index===0?Math.ceil(now/H)*H:0),b=Date.parse(period?.endTime);
-      return finite(a)&&finite(b)&&b>a?qpf(a,b,index):null;
+    const periodWindow=(period,nighttime)=>{
+      const fallbackStart=localTime(d.date,nighttime?19:7,out.location.timeZone);
+      const fallbackEnd=localTime(nighttime?nextDate(d.date):d.date,nighttime?7:19,out.location.timeZone);
+      const a=finite(Date.parse(period?.startTime))?Date.parse(period.startTime):fallbackStart;
+      const b=finite(Date.parse(period?.endTime))?Date.parse(period.endTime):fallbackEnd;
+      return {start:Math.max(a,index===0?now:a),end:b};
     };
-    const dayRain=periodRain(day),nightRain=periodRain(night);
+    const dayWindow=periodWindow(day,false),nightWindow=periodWindow(night,true);
     d.officialPop=d.pop;d.officialPopDay=d.popDay;d.officialPopNight=d.popNight;
-    d.rainLikelihood=precipitationLikelihood(d.pop,rain,SAME_DAY_WEIGHTS);
-    d.popDayLikelihood=precipitationLikelihood(d.popDay,dayRain||rain,SAME_DAY_WEIGHTS);
-    d.popNightLikelihood=precipitationLikelihood(d.popNight,nightRain||rain,SAME_DAY_WEIGHTS);
+    d.rainLikelihood=summarizeRainTimeline(out.rainTimeline,start,end);
+    d.popDayLikelihood=summarizeRainTimeline(out.rainTimeline,dayWindow.start,dayWindow.end);
+    d.popNightLikelihood=summarizeRainTimeline(out.rainTimeline,nightWindow.start,nightWindow.end);
     for(const [id,value] of Object.entries(rain.sourceValues)) if(id!=='nws') {d.guidance[id] ||= {};d.guidance[id].qpf=value;}
     // Confidence must describe the final period-aligned blend, not the earlier
     // calendar-day completeness check. Only positive-weight contributors count.
@@ -259,18 +333,18 @@ export function enhanceForecast(out, { models, grid, periods = [], now, gridQpf,
     d.confidence=forecastConfidence({dayIndex:index,highSpread:d.highSpread,qpfSpread:d.qpfSpread,guidanceCount:sourceIds.length,sourceIds,officialDay:!!day,officialNight:!!night});
     d.confidence.contributions={high:d.highBlend?.sources||[],low:d.lowBlend?.sources||[],rain:d.qpfBlend?.sources||[]};
   }
-  const from=Math.ceil(now/H)*H;
-  out.precipitation=qpf(from,from+24*H,0);
+  const from=now;
+  out.precipitation=qpf(from,from+24*H);
   out.precipitation.label='Next 24 hours';
   for (const hour of out.hours) {
     const time=Date.parse(hour.time),values={nws:hour.temperature};
     for(const [id,m] of Object.entries(sourceModels)) values[id]=sample(m,time,'temperature_2m');
     hour.officialTemperature=hour.temperature;
     if(active.length){hour.temperatureBlend=weighted(values,tempPolicy(forecastDayIndex(time,now,out.location.timeZone)));hour.temperature=round(hour.temperatureBlend.value,0);}
-    const rain=qpf(time,time+H,(time-now)/H<24?0:1);
-    hour.precipitation=rain.value;hour.precipitationSource=rain.source;hour.precipitationBlend=rain;
-    hour.officialPop=hour.pop;
-    hour.rainLikelihood=precipitationLikelihood(hour.pop,rain,SAME_DAY_WEIGHTS);
+    const row=timelineByTime.get(time),rain=row?.precipitationBlend;
+    hour.precipitation=row?.precipitation??null;hour.precipitationSource=rain?.source||'Unavailable';hour.precipitationBlend=rain;
+    hour.officialPop=row?.officialPop??null;
+    hour.rainLikelihood=row?.rainLikelihood||precipitationLikelihood(null,null);
     hour.reflectivity=sample(sourceModels.hrrr,time,'reflectivity');
     hour.nearbyReflectivity=sample(sourceModels.hrrr,time,'nearby_reflectivity');
   }
@@ -282,8 +356,8 @@ export function enhanceForecast(out, { models, grid, periods = [], now, gridQpf,
   out.convectiveGuidance=out.hours.filter(h=>finite(h.reflectivity)||finite(h.nearbyReflectivity)).slice(0,30).map(h=>({time:h.time,pointReflectivityDbz:h.reflectivity,nearby25kmMaxReflectivityDbz:h.nearbyReflectivity,runAt:sourceModels.hrrr?.reflectivityRunAt||sourceModels.hrrr?.runAt}));
   out.google={status:'access-required',contributes:false,label:'Google WeatherNext',message:'Not included: approved Google WeatherNext dataset access has not been configured.',url:'https://developers.google.com/weathernext/guides/access-forecast'};
   out.repairVersion=REPAIR_VERSION;
-  out.blendPolicy={sameDay:SAME_DAY_WEIGHTS,probability:'Weather Nourie hourly/daily consensus: NWS probability plus deterministic HRRR/ECMWF wet-dry votes; uncalibrated',lowDryConsensus:'Display 0% when at least two source rain amounts are dry and the weighted result is below 10%',partialCoverage:'Unavailable inputs are excluded and remaining weights renormalized'};
+  out.blendPolicy={sameDay:SAME_DAY_WEIGHTS,precipitation:'The first 24 forecast hours use NWS 40% / HRRR 40% / ECMWF 20%; later hours use the extended lead-day policy. Every amount is summed from that same hourly blend.',probability:'Hourly consensus: NWS hourly probability plus deterministic HRRR/ECMWF wet-dry votes; uncalibrated',periodProbability:'Highest canonical hourly score within the explicit period window, not an independently estimated all-day event probability',lowDryConsensus:'Display 0% when at least two source rain amounts are dry and the weighted result is below 10%',partialCoverage:'Unavailable inputs are excluded and remaining weights renormalized; a period with missing hourly scores is unavailable, not dry'};
   out.methodology='Numeric Weather Nourie blend: Current-day temperatures start at NWS 40% / HRRR 40% / ECMWF 20%. HRRR, ECMWF IFS and NBM contribute only where a fresh run fully covers the requested period. Current-day precipitation starts at NWS 40% / HRRR 40% / ECMWF 20%, blended per hour so a short HRRR run still contributes; extended precipitation at ECMWF 60% / NBM 25% / NWS 15%, with documented fallbacks. Available weights renormalize; missing values never become zero. These are uncalibrated starting weights, not a proven accuracy ranking. The hourly rain likelihood combines the official NWS probability with wet-or-dry votes from deterministic HRRR and ECMWF runs; it is a transparent consensus score, not a native calibrated probability from either deterministic model. Official warnings are never altered. Explicit HRRR, ECMWF IFS 0.25° and NBM point feeds cover the selected coordinates through Open-Meteo, with native extracts as a fallback. Point feeds can combine successive runs of the same named model; their initialization metadata refers to the latest published run. Temperature, dew point, wind, gust and cloud cover share the requested lead-day weights; humidity and feels-like are derived consistently. Pressure and visibility include only published fields. Station observations, UV and official text retain separate provenance. Coarser precipitation intervals are prorated at boundaries; interpolated hourly amounts do not establish storm arrival times. Today’s daily rain card covers only the remaining period when earlier forecast hours have passed; the main precipitation metric covers the next 24 hours.';
-  out.methodology=out.methodology.replace('The hourly rain likelihood','The hourly and daily rain likelihoods');
+  out.methodology=out.methodology.replace('The hourly rain likelihood','Each hourly rain likelihood')+' Daily, daytime and overnight rain percentages are the highest canonical hourly score inside their stated windows, not independently calculated full-period probabilities. The same complete hourly timeline supplies daily cards, forecast details, the hourly display, car-wash decisions and experimental source evidence. A missing hourly score leaves its period unavailable. Expected rainfall amounts are summed from that same timeline.';
   return out;
 }

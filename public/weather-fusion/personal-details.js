@@ -3,7 +3,7 @@ import {thermalRiskHTML} from './thermal-risk.js?v=weather-art-labels-v10';
 import {forecastGrossLevel} from './dewpoint-meter.js?v=centered-heading-v30';
 import {exposureScene} from './exposure-scene.js?v=rain-scene-thresholds-v30';
 import {outdoorExposure} from './outdoor-feels.js?v=clear-weather-daygraph-v3';
-import {solarElevation} from './weather-math.js?v=clear-weather-daygraph-v3';
+import {solarElevation} from './weather-math.js?v=forecast-trace-v40';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
 const HOUR=3600000;

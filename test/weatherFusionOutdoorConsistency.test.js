@@ -53,6 +53,14 @@ test('current readings keep the snapshot even when rendering happens later',()=>
  const f=make();assert.deepEqual(currentSample(f,now).comfort,currentSample(f,now+60000).comfort);
  assert.equal(currentSample(f,now).time,f.current.time);
 });
+test('current and future exposure samples preserve unavailable canonical rain instead of raw NWS chance',()=>{
+ const f=make();
+ for(const hour of f.hours){hour.pop=90;hour.rainLikelihood={value:null};}
+ assert.equal(currentSample(f,now).pop,null);
+ assert.equal(forecastSample(f,f.hours[1].time).pop,null);
+ f.hours[1].rainLikelihood.value=0;
+ assert.equal(forecastSample(f,f.hours[1].time).pop,0);
+});
 test('a rainy future hour does not reuse the sunny current observation',()=>{
  const f=make(),h=f.hours[1];h.condition='Rain';
  rebuildHourlyFeels(f,{now,temperatureAt:()=>({value:null}),humidityAt:()=>null});

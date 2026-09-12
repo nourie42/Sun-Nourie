@@ -2,7 +2,7 @@ import {hourlyUvValue,hourlyUvHTML} from './daily-uv.js?v=clear-weather-daygraph
 import {outdoorExposure} from './outdoor-feels.js?v=clear-weather-daygraph-v3';
 import {currentComfortInputs} from './current-inputs.js?v=clear-weather-daygraph-v3';
 import {weatherState} from './weather-state.js';
-import {thermalComfort, finite, solarElevation} from './weather-math.js?v=clear-weather-daygraph-v3';
+import {thermalComfort, finite, solarElevation,rainChanceValue} from './weather-math.js?v=forecast-trace-v40';
 import {feelsAt, forecastValue, degrees} from './hourly-feels.js?v=weather-art-labels-v10';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function weatherShapes(condition, isDay = true) {
@@ -40,12 +40,15 @@ export function hrrrRainAmount(row){
  return finite(value)&&value>=HRRR_RAIN_THRESHOLD_IN?value:null;
 }
 export function hourlyRainHTML(sample){
- const blend=sample.rainLikelihood,value=finite(blend?.value)?blend.value:sample.pop;
+ const blend=sample.rainLikelihood,value=sampleRainChance(sample);
  const votes=blend?.sourceValues||{},parts=[];
  if(finite(votes.nws))parts.push(`NWS ${Math.round(votes.nws)}%`);
  for(const id of ['hrrr','ecmwf'])if(finite(votes[id]))parts.push(`${id.toUpperCase()} ${votes[id]>=50?'wet':'dry'}`);
  const detail=parts.length?` Inputs: ${parts.join(', ')}.`:'';
  return `<span class="hour-rain" title="Weather Nourie rain likelihood.${detail}"><small class="hour-pop">${weatherMetricIcon('drop')}${finite(value)?`${Math.round(value)}%`:'—'}</small></span>`;
+}
+function sampleRainChance(sample){
+ return sample?.rainLikelihood&&Object.hasOwn(sample.rainLikelihood,'value')?rainChanceValue(sample.rainLikelihood):rainChanceValue(null,sample?.pop);
 }
 export function currentSample(forecast, now = Date.now()) {
   const current = currentComfortInputs(forecast,now), assembled = Date.parse(forecast?.assembledAt);
@@ -53,7 +56,7 @@ export function currentSample(forecast, now = Date.now()) {
   comfort.inputEvidence.estimatedFields=current.comfortEstimatedFields;
   comfort.inputEvidence.fallbackSources=current.comfortInputSources;
   const currentHour=forecast?.hours?.find(h=>Date.parse(h.time)<=now&&now<Date.parse(h.time)+3600000);
-  return {windDirection:current.windDirection,pop:currentHour?.rainLikelihood?.value??currentHour?.pop,officialPop:currentHour?.officialPop??currentHour?.pop,rainLikelihood:currentHour?.rainLikelihood,precipitationBlend:currentHour?.precipitationBlend,uvIndex:hourlyUvValue(forecast,now),id:'now', now:true, time:current.time, temperature:finite(current.temperature) ? current.temperature : null,
+  return {windDirection:current.windDirection,pop:sampleRainChance(currentHour),officialPop:currentHour?.officialPop??currentHour?.pop,rainLikelihood:currentHour?.rainLikelihood,precipitationBlend:currentHour?.precipitationBlend,uvIndex:hourlyUvValue(forecast,now),id:'now', now:true, time:current.time, temperature:finite(current.temperature) ? current.temperature : null,
     feels:outdoorExposure(comfort).value, exposure:outdoorExposure(comfort), comfort, condition:current.condition || 'Sky conditions unavailable',
     isDay:comfort.daylight ?? (solarElevation(now,forecast.location.latitude,forecast.location.longitude) > 0),
     source:current.type === 'observation' ? 'Station observation' : 'Current estimate', inputs:current};
@@ -70,7 +73,7 @@ export function forecastSample(forecast, time) {
   const comfort={...estimated,outdoors:value,shade:rounded(estimated.rawShade),sun:estimated.sun===null?null:value};
   return {windDirection:hour.windDirectionDegrees??hour.windDirection,uvIndex:hourlyUvValue(forecast,epoch),id:new Date(epoch).toISOString(), now:false, time:hour.time,
     temperature:forecastValue(forecast,'temperature',hour.time), feels:feelsAt(forecast,hour.time),
-    condition:inputs.condition, isDay:comfort.daylight, exposure:outdoorExposure(comfort), comfort, inputs, source:'Hourly forecast', pop:hour.rainLikelihood?.value??hour.pop,officialPop:hour.officialPop??hour.pop,rainLikelihood:hour.rainLikelihood,precipitationBlend:hour.precipitationBlend};
+    condition:inputs.condition, isDay:comfort.daylight, exposure:outdoorExposure(comfort), comfort, inputs, source:'Hourly forecast', pop:sampleRainChance(hour),officialPop:hour.officialPop??hour.pop,rainLikelihood:hour.rainLikelihood,precipitationBlend:hour.precipitationBlend};
 }
 export function hourlyDisplaySamples(forecast, now = Date.now()) {
   return [currentSample(forecast, now), ...(forecast?.hours || []).filter(hour => Date.parse(hour.time) > now)

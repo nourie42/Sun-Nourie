@@ -17,7 +17,7 @@ const iso = offset => new Date(start + offset * HOUR).toISOString();
 const dates = ['2026-09-12','2026-09-13','2026-09-14','2026-09-15','2026-09-16','2026-09-17','2026-09-18'];
 
 function day(date, chance, extra = {}) {
-  return {date,low:65,high:82,condition:'Mostly Sunny',rainLikelihood:{value:chance},...extra};
+  return {date,low:65,high:82,condition:'Mostly Sunny',rainLikelihood:{value:chance},popDayLikelihood:{value:chance},popNightLikelihood:{value:chance},...extra};
 }
 
 function fixture(chances = [10,10,10,30,10,10,10]) {
@@ -76,16 +76,58 @@ test('a whole-day fallback requires both day and night periods',()=>{
   ]).state,'check');
 });
 
-test('after 3 PM today uses the remaining tonight chance while earlier hours use the whole day',()=>{
+test('missing canonical chances never fall back to conflicting raw NWS values',()=>{
+  assert.equal(dailyRainChance({rainLikelihood:{value:null},popDay:70,popNight:80}),null);
+  assert.equal(dailyRainChance({popDayLikelihood:{value:null},popDay:70},'daytime'),null);
+  assert.equal(dailyRainChance({popNightLikelihood:{value:null},popNight:80},'overnight'),null);
+  assert.equal(hourlyRainChance({rainLikelihood:{value:null},pop:90}),null);
+  assert.equal(dailyRainChance({rainLikelihood:{value:5,aggregation:'maximum-hourly',coverage:{complete:false}},pop:90}),null);
+  assert.equal(carWashDayDecision([day(dates[0],null,{popDay:1,popNight:1}),day(dates[1],5),day(dates[2],5)]).state,'check');
+});
+
+test('visible Today chance matches the daytime card while the wash rule still includes tonight',()=>{
+  const forecast=fixture([65,8,8,8,8,8,8]);
+  forecast.days[0].popDayLikelihood={value:15};
+  forecast.days[0].popNightLikelihood={value:65};
+  const summary=carWashSummary(forecast,Date.parse('2026-09-12T12:00:00Z'));
+  assert.equal(summary.chance,15);
+  assert.equal(summary.days[0].chance,15);
+  assert.equal(summary.days[0].label,'Today');
+  assert.equal(summary.decisions[0].chance,65);
+  assert.equal(summary.state,'wait');
+});
+
+test('after 3 PM the visible Tonight chance does not discard remaining afternoon rain from wash eligibility',()=>{
   const forecast=fixture([70,8,8,8,8,8,8]);
   forecast.days[0].popNightLikelihood={value:8};
+  forecast.days[0].nightCondition='Clear';
   const before=carWashSummary(forecast,Date.parse('2026-09-12T14:59:00Z'));
   assert.equal(before.state,'wait');
   assert.equal(before.chance,70);
   const after=carWashSummary(forecast,Date.parse('2026-09-12T15:00:00Z'));
-  assert.equal(after.state,'wash');
+  assert.equal(after.state,'wait');
   assert.equal(after.chance,8);
-  assert.deepEqual(after.decisions[0].chances,[8,8,8]);
+  assert.equal(after.days[0].label,'Tonight');
+  assert.equal(after.days[0].isDay,false);
+  assert.equal(after.days[1].isDay,true);
+  assert.match(carWashHTML(after).match(/<article class="car-wash-day"[\s\S]*?<\/article>/)?.[0]||'',/sky-moon/);
+  assert.deepEqual(after.decisions[0].chances,[70,8,8]);
+});
+
+test('at 3:01 PM an 80% chance at 4 PM still means WAIT even with a dry night and next two days',()=>{
+  const forecast=fixture([80,0,0,0,0,0,0]);
+  const now=Date.parse('2026-09-12T15:01:00Z');
+  forecast.days[0].rainLikelihood={value:80,aggregation:'maximum-hourly',coverage:{complete:true},window:{start:new Date(now).toISOString(),end:'2026-09-13T07:00:00Z'},peakTime:'2026-09-12T16:00:00Z'};
+  forecast.days[0].popDayLikelihood={value:80,aggregation:'maximum-hourly',coverage:{complete:true}};
+  forecast.days[0].popNightLikelihood={value:0,aggregation:'maximum-hourly',coverage:{complete:true}};
+  forecast.hours.push({time:'2026-09-12T16:00:00Z',isDay:true,temperature:80,rainLikelihood:{value:80}});
+  const summary=carWashSummary(forecast,now);
+  assert.equal(summary.state,'wait');
+  assert.equal(summary.canWash,false);
+  assert.equal(summary.days[0].label,'Tonight');
+  assert.equal(summary.chance,0);
+  assert.deepEqual(summary.decisions[0].chances,[80,0,0]);
+  assert.equal(bestWashWindow(forecast,0,now),null);
 });
 
 test('low rain chance never rewrites the forecast condition or its weather icon',()=>{
@@ -119,6 +161,15 @@ test('today facts never switch to a later recommended wash day',()=>{
  assert.notEqual(summary.facts.temperature,'50°–60°');
 });
 
+test('the low/high fact stays on the daily temperatures even when the wash window is shorter',()=>{
+ const forecast=fixture([5,5,5,5,5,5,5]);
+ forecast.days[0].low=65;forecast.days[0].high=90;
+ const summary=carWashSummary(forecast,start);
+ assert.equal(summary.canWash,true);
+ assert.equal(summary.window.temperatureMin,72);
+ assert.equal(summary.facts.temperature,'65°–90°');
+});
+
 test('an observed shower overrides today even when the three-day outlook is dry',()=>{
   const forecast = fixture([5,5,5,5,5,5,5]);
   forecast.current = {type:'observation',condition:'Rain Showers'};
@@ -150,10 +201,21 @@ test('experimental detection is exact and car-wash markup is dynamic, five-day, 
   summary.reason = '<img src=x onerror=alert(1)>';
   const html = carWashHTML(summary);
   assert.match(html,/Car Wash Forecast/);
-  assert.match(html,/car-wash-background\.webp/);
+  assert.match(html,/car-wash-corvette-hood\.webp/);
   assert.equal((html.match(/class="car-wash-day"/g)||[]).length,5);
   assert.doesNotMatch(html,/<img src=x onerror/);
   assert.match(html,/&lt;img src=x onerror=alert\(1\)&gt;/);
   assert.match(html,/<div class="car-wash-footer">/);
   assert.doesNotMatch(html,/<footer>/);
+});
+
+test('WAIT punctuation is after the word and the Corvette photo has no text overlays',()=>{
+  const html=carWashHTML(carWashSummary(fixture([40,40,40,40,40,40,40]),start));
+  assert.match(html,/class="car-wash-verdict wait"[^>]*>WAIT!<\/strong>/);
+  assert.doesNotMatch(html,/>!<\/span>|! WAIT|!WAIT/);
+  assert.equal((html.match(/class="car-wash-day-verdict">WAIT!</g)||[]).length,5);
+  assert.match(html,/<div class="car-wash-photo"><img[^>]*src="\/weather-fusion\/car-wash-corvette-hood\.webp"[^>]*><\/div>/);
+  assert.ok(html.indexOf('class="car-wash-hero"')<html.indexOf('class="car-wash-photo"'));
+  assert.ok(html.indexOf('class="car-wash-photo"')<html.indexOf('class="car-wash-days-wrap"'));
+  assert.doesNotMatch(html,/car-wash-overlay|Weather Nourie blend|Three-day rule applied/);
 });

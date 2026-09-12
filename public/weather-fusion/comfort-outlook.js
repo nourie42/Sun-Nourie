@@ -1,5 +1,5 @@
 import {outdoorExposure} from './outdoor-feels.js?v=clear-weather-daygraph-v3';
-import {finite,localHour} from './weather-math.js?v=clear-weather-daygraph-v3';
+import {finite,localHour} from './weather-math.js?v=forecast-trace-v40';
 import {timeAt,summarizeFeels} from './hourly-feels.js?v=clear-weather-daygraph-v3';
 export function comfortMode(time,zone='America/New_York'){
  const hour=localHour(time,zone);return hour>=15?'overnight':hour<5?'predawn':'day';

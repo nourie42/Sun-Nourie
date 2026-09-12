@@ -9,13 +9,26 @@ const sat = t => 6.112 * Math.exp(17.67 * t / (t + 243.5));
 export function localHour(time, zone = 'America/New_York') {
   return Number(new Intl.DateTimeFormat('en-US', {timeZone:zone, hour:'numeric', hourCycle:'h23'}).format(new Date(time)));
 }
+export function rainChanceValue(likelihood, fallback = null) {
+  const chance=value=>finite(value)&&value>=0&&value<=100?value:null;
+  if(likelihood?.aggregation==='maximum-hourly')return likelihood.coverage?.complete===false?null:chance(likelihood.value);
+  if(likelihood&&Object.hasOwn(likelihood,'value'))return chance(likelihood.value);
+  return chance(likelihood?.value)??chance(fallback);
+}
+export function dailyRainPeriod(day, phase = 'overall') {
+  const field=phase==='daytime'?'popDayLikelihood':phase==='overnight'?'popNightLikelihood':'rainLikelihood';
+  const likelihood=day?.[field],canonical=likelihood?.aggregation==='maximum-hourly';
+  const fallback=phase==='daytime'?(day?.popDay??rainChanceValue(day?.rainLikelihood,day?.pop)):phase==='overnight'?day?.popNight:day?.pop;
+  return {phase,likelihood,canonical,value:rainChanceValue(likelihood,fallback),window:canonical?likelihood.window:null};
+}
 export function dailyDisplay(day, index, now, zone) {
   const tonight = index === 0 && localHour(now, zone) >= 15;
+  const rain=dailyRainPeriod(day,tonight?'overnight':index===0?'daytime':'overall');
   return {tonight, label:tonight?'Tonight':index===0?'Today':day.label,
     primary:tonight?day.low:day.high, secondary:tonight?null:day.low,
     primaryLabel:tonight?'Low':'High', condition:tonight?(day.nightCondition||day.condition):day.condition,
     detail:tonight?(day.nightDetail||day.detail):day.detail,
-    pop:tonight?(day.popNightLikelihood?.value??day.popNight):index===0?(day.popDayLikelihood?.value??day.popDay??day.rainLikelihood?.value??day.pop):(day.rainLikelihood?.value??day.pop)};
+    pop:rain.value,rainWindow:rain.window};
 }
 export function temperatureBar(value, floor, ceiling) {
   if (![value,floor,ceiling].every(finite)) return null;

@@ -34,16 +34,45 @@ test('named-model validation checks time, location, fields, units and initializa
 test('searched coordinates use explicit requested models, deduplicate and never reuse another city',async()=>{
  const calls=[];let clock=now,fail=false;
  const load=createPointModels({now:()=>clock,fetchImpl:async(url,options)=>{
-  calls.push(url);assert.equal(options.redirect,'error');if(fail)throw Error('offline');
+  calls.push(url);assert.equal(options.redirect,'error');assert.equal(options.cache,'no-store');assert.equal(options.headers['Cache-Control'],'no-cache');assert.equal(options.headers.Pragma,'no-cache');if(fail)throw Error('offline');
   const u=new URL(url);if(u.pathname.includes('/static/'))return response(metadata);
   assert.equal(u.searchParams.get('models'),'gfs_hrrr');assert.equal(u.searchParams.get('timeformat'),'unixtime');
   return response(raw('hrrr',{latitude:+u.searchParams.get('latitude'),longitude:+u.searchParams.get('longitude')}));
  }});
  const [a,b]=await Promise.all([load('hrrr',location),load('hrrr',location)]);assert.equal(a,b);assert.equal(calls.length,2);
- await load('hrrr',location);assert.equal(calls.length,2);
+ assert.equal(a.fetchedAt,new Date(clock).toISOString());assert.equal(a.checkedAt,a.fetchedAt);assert.equal(a.retrievalStatus,'fresh');
+ clock+=60000;const cached=await load('hrrr',location);assert.equal(calls.length,2);assert.equal(cached,a);assert.equal(cached.checkedAt,new Date(now).toISOString(),'A cache read must not claim a new provider check.');
  const other=await load('hrrr',{latitude:36.1,longitude:-79});assert.equal(other.latitude,36.1);assert.equal(calls.length,4);
  clock+=6*60000;fail=true;const kept=await load('hrrr',location);assert.match(kept.refreshWarning,/still-fresh/);
+ assert.equal(kept.fetchedAt,a.fetchedAt);assert.equal(kept.checkedAt,new Date(clock).toISOString());assert.equal(kept.retrievalStatus,'last-verified');
+ const failedCalls=calls.length;clock+=60000;assert.equal(await load('hrrr',location),kept);assert.equal(calls.length,failedCalls,'A failed refresh keeps the existing five-minute request cadence.');
  clock+=13*H;await assert.rejects(()=>load('hrrr',location),/offline/);
+});
+test('a regressed provider initialization cannot replace a newer verified run or inflate data freshness',async()=>{
+ let clock=now,run=metadata.last_run_initialisation_time,value=90;
+ const load=createPointModels({now:()=>clock,fetchImpl:async url=>{
+  if(url.includes('/static/'))return response({last_run_initialisation_time:run});
+  const data=raw();data.hourly.temperature_2m.fill(value);return response(data);
+ }});
+ const first=await load('hrrr',location);
+ clock+=6*60000;run-=3600;value=75;
+ const retained=await load('hrrr',location);
+ assert.equal(retained.runAt,first.runAt);assert.deepEqual(retained.hourly,first.hourly);assert.equal(retained.fetchedAt,first.fetchedAt);
+ assert.equal(retained.checkedAt,new Date(clock).toISOString());assert.equal(retained.retrievalStatus,'last-verified');assert.match(retained.refreshWarning,/older initialization/);
+ clock+=6*60000;run=metadata.last_run_initialisation_time+3600;value=93;
+ const updated=await load('hrrr',location);
+ assert.equal(updated.runAt,new Date(run*1000).toISOString());assert.equal(updated.hourly.temperature_2m[20],93);
+ assert.equal(updated.fetchedAt,new Date(clock).toISOString());assert.equal(updated.checkedAt,updated.fetchedAt);assert.equal(updated.retrievalStatus,'fresh');assert.equal(updated.refreshWarning,undefined);
+});
+test('expired newer coverage is not relabeled with an older provider run',async()=>{
+ let clock=now,run=metadata.last_run_initialisation_time,shortCoverage=true;
+ const load=createPointModels({now:()=>clock,fetchImpl:async url=>{
+  if(url.includes('/static/'))return response({last_run_initialisation_time:run});
+  const data=raw();if(shortCoverage)data.hourly.temperature_2m=data.hourly.time.map(t=>t*1000===now+H?90:null);return response(data);
+ }});
+ const first=await load('hrrr',location);assert.equal(first.validUntil,new Date(now+H).toISOString());
+ clock+=2*H;run-=3600;shortCoverage=false;
+ await assert.rejects(()=>load('hrrr',location),/older model initialization.*no longer valid/);
 });
 test('uncovered native point cannot impersonate searched location during provider outage',async()=>{
  const direct=createDirectModels({now:()=>now,fetchImpl:async url=>url.includes('/models/')?response(snapshot(url.includes('ecmwf')?'ecmwf':url.includes('nbm')?'nbm':'hrrr')):new Response('',{status:503})});

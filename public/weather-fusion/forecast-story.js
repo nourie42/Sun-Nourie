@@ -1,22 +1,20 @@
-import {finite} from './weather-math.js?v=forecast-story-v39';
+import {finite,dailyRainPeriod} from './weather-math.js?v=forecast-trace-v40';
 import {timeAt} from './hourly-feels.js?v=forecast-story-v39';
 
 const HOUR = 3600000;
 const RAIN_TIMING_THRESHOLD = 25;
 const validChance = value => finite(value) && value >= 0 && value <= 100 ? value : null;
 
-function periodChance(day, phase) {
-  if (phase === 'daytime') return validChance(day?.popDayLikelihood?.value) ?? validChance(day?.popDay);
-  if (phase === 'overnight') return validChance(day?.popNightLikelihood?.value) ?? validChance(day?.popNight);
-  return validChance(day?.rainLikelihood?.value) ?? validChance(day?.pop);
-}
-
 function nextDate(date) {
   const epoch = Date.parse(`${date}T12:00:00Z`);
   return Number.isFinite(epoch) ? new Date(epoch + 24 * HOUR).toISOString().slice(0,10) : null;
 }
 
-function periodWindow(day, phase, now, zone) {
+function periodWindow(day, phase, now, zone, rain) {
+  if(rain.canonical){
+    const start=Date.parse(rain.window?.start),end=Date.parse(rain.window?.end);
+    return Number.isFinite(start)&&Number.isFinite(end)&&end>start?{start,end}:{start:null,end:null};
+  }
   const source = phase === 'daytime' ? day?.highWindow : phase === 'overnight' ? day?.lowWindow : day?.qpfWindow;
   const following = nextDate(day?.date);
   const fallbackStart = phase === 'overnight' ? timeAt(day?.date,19,zone) : timeAt(day?.date,7,zone);
@@ -39,15 +37,19 @@ function rangeLabel(group, zone) {
 }
 
 function hourlyChance(hour) {
+  if(hour.canonicalRain)return validChance(hour?.rainLikelihood?.value);
   return validChance(hour?.rainLikelihood?.value) ?? validChance(hour?.pop);
 }
 
 function rowsFor(forecast, window) {
   if (!Number.isFinite(window.start) || !Number.isFinite(window.end)) return [];
-  return (forecast?.hours || []).filter(hour => {
+  const hourlyByTime=new Map((forecast?.hours||[]).map(hour=>[Date.parse(hour.time),hour]));
+  const series=Array.isArray(forecast?.rainTimeline)?forecast.rainTimeline.map(row=>({...hourlyByTime.get(Date.parse(row.time)),...row,rainLikelihood:row.rainLikelihood,precipitation:row.precipitation,canonicalRain:true})):(forecast?.hours||[]);
+  return [...new Map(series.filter(hour => {
     const time = Date.parse(hour.time);
-    return Number.isFinite(time) && time < window.end && time + HOUR > window.start;
-  }).sort((a,b) => Date.parse(a.time)-Date.parse(b.time));
+    const end=Number.isFinite(Date.parse(hour.end))?Date.parse(hour.end):time+HOUR;
+    return Number.isFinite(time) && time < window.end && end > window.start;
+  }).map(hour=>[Date.parse(hour.time),hour])).values()].sort((a,b) => Date.parse(a.time)-Date.parse(b.time));
 }
 
 function rainGroups(rows) {
@@ -62,8 +64,19 @@ function rainGroups(rows) {
   return groups;
 }
 
-function amountFor(rows, window) {
+function amountFor(rows, window, canonical = false) {
   if (!rows.length || !Number.isFinite(window.start) || !Number.isFinite(window.end)) return null;
+  if(canonical){
+    let cursor=window.start,total=0;
+    for(const row of rows){
+      const a=Date.parse(row.time),b=Number.isFinite(Date.parse(row.end))?Date.parse(row.end):a+HOUR;
+      const left=Math.max(window.start,a),right=Math.min(window.end,b);
+      if(left>cursor||!finite(row.precipitation)||row.precipitation<0)return null;
+      const overlap=Math.max(0,right-Math.max(cursor,left));
+      total+=row.precipitation*overlap/(b-a);cursor=Math.max(cursor,right);
+    }
+    return cursor>=window.end?total:null;
+  }
   const covered = rows.reduce((total,row) => {
     const start = Math.max(window.start,Date.parse(row.time)), end = Math.min(window.end,Date.parse(row.time)+HOUR);
     return total+Math.max(0,end-start);
@@ -98,12 +111,11 @@ function timingSentence(chance, rows, groups, zone) {
 
 export function forecastPeriodSummary(forecast, index = 0, phase = 'overall', now = Date.now()) {
   const day = forecast?.days?.[index] || {}, zone = forecast?.location?.timeZone || 'America/New_York';
-  const window = periodWindow(day,phase,now,zone), rows = rowsFor(forecast,window), chance = periodChance(day,phase), groups = rainGroups(rows);
-  const timing = timingSentence(chance,rows,groups,zone), temperatures = temperatureSentence(rows);
-  const intro = chance === null ? 'The rain chance is not available yet.' : `The Weather Nourie rain chance for this period is ${Math.round(chance)}%.`;
-  const hourlyAmount = amountFor(rows,window);
-  const amount = hourlyAmount ?? (phase === 'overall' && finite(day.qpf) && day.qpf >= 0 ? day.qpf : null);
+  const rain=dailyRainPeriod(day,phase),window = periodWindow(day,phase,now,zone,rain), rows = rowsFor(forecast,window), chance = rain.value, groups = rainGroups(rows);
+  const timing = timingSentence(chance,rows,groups,zone), temperatures = rain.canonical&&rows.some(row=>!finite(row.temperature))?'':temperatureSentence(rows);
+  const intro = chance === null ? 'The rain chance is not available yet.' : rain.canonical?`Rain chance peaks at ${Math.round(chance)}%.`:`The Weather Nourie rain chance for this period is ${Math.round(chance)}%.`;
+  const hourlyAmount = amountFor(rows,window,rain.canonical);
+  const amount = hourlyAmount ?? (!rain.canonical && phase === 'overall' && finite(day.qpf) && day.qpf >= 0 ? day.qpf : null);
   return {phase,chance,amount,window,rows,groups,
-    summary:[intro,timing,temperatures].filter(Boolean).join(' '),
-    sourceNote:'This wording uses the same hour-by-hour Weather Nourie rain chances shown in the hourly forecast.'};
+    summary:[intro,timing,temperatures].filter(Boolean).join(' ')};
 }
