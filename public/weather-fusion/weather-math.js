@@ -22,9 +22,9 @@ export function dailyRainPeriod(day, phase = 'overall') {
   return {phase,likelihood,canonical,value:rainChanceValue(likelihood,fallback),window:canonical?likelihood.window:null};
 }
 export function dailyDisplay(day, index, now, zone) {
-  const tonight = index === 0 && localHour(now, zone) >= 15;
+  const hour=localHour(now,zone),tonight=index===0&&hour>=15,remainder=index===0&&hour>=12&&!tonight;
   const rain=dailyRainPeriod(day,tonight?'overnight':index===0?'daytime':'overall');
-  return {tonight, label:tonight?'Tonight':index===0?'Today':day.label,
+  return {tonight,remainder,label:tonight?'Tonight':remainder?'Remainder of Today':index===0?'Today':day.label,
     primary:tonight?day.low:day.high, secondary:tonight?null:day.low,
     primaryLabel:tonight?'Low':'High', condition:tonight?(day.nightCondition||day.condition):day.condition,
     detail:tonight?(day.nightDetail||day.detail):day.detail,

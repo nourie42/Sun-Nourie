@@ -16,6 +16,12 @@ test('Today metrics use their forecast period and never substitute current condi
  assert.doesNotMatch(html,/>Humidity<|>Precipitation</);
  assert.match(html,/data-today-forecast/);assert.doesNotMatch(html,/99 mph|99%|Sunrise|Sunset/);
 });
+test('main card says Remainder of Today from local noon until the Tonight switch',()=>{
+ const noon=Date.parse('2026-09-11T16:00:00Z'),html=todayForecastHTML(fixture(),noon);
+ assert.match(html,/class="today-weather-card today-remainder"/);
+ assert.match(html,/>Remainder of Today<\/span>/);
+ assert.doesNotMatch(html,/class="today-weather-card today-remainder"[\s\S]*>Tonight<\/span>/);
+});
 test('Today sky adds clouds and precipitation by forecast scenario',()=>{
  assert.equal(todaySkyProfile({condition:'Mostly Sunny',pop:10}).scene,'clear');
  assert.equal(todaySkyProfile({condition:'Mostly Sunny',pop:22}).scene,'few-clouds');

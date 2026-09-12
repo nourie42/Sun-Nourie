@@ -256,6 +256,7 @@ body[data-sky="night"] .evidence-panel{
 #today-forecast .today-scene-shade{position:absolute;z-index:1;inset:0 0 114px;background:linear-gradient(90deg,rgba(1,43,79,.78) 0,rgba(1,54,94,.45) 34%,transparent 65%),linear-gradient(0deg,rgba(0,40,64,.22),transparent 45%)}
 #today-forecast .today-copy{position:relative;z-index:2;grid-row:1;align-self:stretch;display:flex;flex-direction:column;width:48%;padding:24px 0 16px 25px;box-sizing:border-box}
 #today-forecast .day-name{font-size:clamp(44px,7vw,74px);line-height:.92}
+#today-forecast .today-remainder .day-name{max-width:10ch;font-size:clamp(30px,4.8vw,52px);line-height:1}
 #today-forecast .today-condition{max-width:17ch;margin-top:14px;color:#c5efff;font-size:clamp(18px,2.3vw,28px);font-weight:700;line-height:1.16}
 #today-forecast .today-temperatures{display:flex;align-items:center;gap:12px;margin-top:auto;text-align:left}
 #today-forecast .today-low,#today-forecast .today-high{display:flex;flex-direction:column;align-items:center}
@@ -288,6 +289,7 @@ body[data-sky="night"] .evidence-panel{
  #today-forecast .today-scene-shade{inset:0 0 76px}
  #today-forecast .today-copy{width:57%;padding:12px 0 7px 14px}
  #today-forecast .day-name{font-size:39px}
+ #today-forecast .today-remainder .day-name{font-size:25px;line-height:1.02}
  #today-forecast .today-condition{margin-top:5px;font-size:14px;line-height:1.12;max-width:18ch}
  #today-forecast .today-temperatures{gap:6px}
  #today-forecast .today-low>strong,#today-forecast .today-high>strong{font-size:36px}

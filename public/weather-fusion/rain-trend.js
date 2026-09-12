@@ -1,4 +1,4 @@
-import {dailyDisplay,finite} from './weather-math.js?v=forecast-trace-v40';
+import {dailyDisplay,finite} from './weather-math.js?v=remainder-today-v41';
 
 const STORAGE_KEY='weather-nourie-rain-history-v1';
 const MAX_SAMPLES=12;

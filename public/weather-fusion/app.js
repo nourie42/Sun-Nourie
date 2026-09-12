@@ -5,8 +5,8 @@ import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './wea
 import {dayGraphHTML,dayGraphPoints,installDayGraph} from './day-graph.js?v=weather-art-labels-v10';
 import {degrees,feelsAt} from './hourly-feels.js?v=weather-art-labels-v10';
 import {createFramePlayer} from './frame-player.js';
-import {renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=pet-static-shake-v47';
-import {dailyDisplay} from './weather-math.js?v=forecast-trace-v40';
+import {renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=remainder-today-v48';
+import {dailyDisplay} from './weather-math.js?v=remainder-today-v41';
 import {currentHero} from './current-temperature.js?v=radar-now-v47';
 import {renderBulletins} from './bulletins.js?v=weather-art-labels-v10';
 import {modelFreshnessText} from './personal-details.js?v=pet-static-shake-v37';
@@ -15,7 +15,7 @@ import {renderWeatherPanel} from './render-safety.js';
 import {forecastPeriodSummary} from './forecast-story.js?v=forecast-trace-v40';
 import {isExperimentalWeatherPage,renderCarWashForecast,resetCarWashForecast} from './car-wash.js?v=radar-now-v47';
 import {renderModelExplanation,resetModelExplanation} from './model-explanation.js?v=nbm-blend-v45';
-import {updateRainTrend} from './rain-trend.js?v=rain-consensus-v41';
+import {updateRainTrend} from './rain-trend.js?v=remainder-today-v42';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);
 const experimentalPage = isExperimentalWeatherPage();
