@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {buildForecast} from '../src/weatherFusion.js';
-import {temperaturePolicy,eveningPeriod,forecastDayIndex,REPAIR_VERSION} from '../src/weatherFusionPolicy.js';
+import {temperaturePolicy,precipitationPolicy,eveningPeriod,forecastDayIndex,REPAIR_VERSION} from '../src/weatherFusionPolicy.js';
 import {validateSnapshot} from '../src/weatherFusionDirect.js';
 import {testInputs,snapshot} from './weatherFusion.fixtures.js';
 import {alignComfortHours} from '../src/weatherFusionNowcast.js';
@@ -16,6 +16,9 @@ test('today uses requested 40/30/10/20 in daily high and every same-calendar-day
  const out=buildForecast({...testInputs,models:models()});
  assert.equal(out.repairVersion,REPAIR_VERSION);
  assert.deepEqual(temperaturePolicy(0),{nws:.4,hrrr:.3,ecmwf:.1,nbm:.2});
+ assert.deepEqual(temperaturePolicy(6),temperaturePolicy(0));
+ assert.deepEqual(precipitationPolicy(6),temperaturePolicy(0));
+ assert.deepEqual(out.blendPolicy.allForecastHours,temperaturePolicy(0));
  assert.equal(out.days[0].high,85); // .4*84 + .3*90 + .1*80 + .2*80 = 84.6
  for(const h of out.hours){if(forecastDayIndex(Date.parse(h.time),now,zone)!==0)continue;
   assert.deepEqual(h.temperatureBlend.sources.map(s=>[s.id,s.weight]),[['nws',.4],['hrrr',.3],['ecmwf',.1],['nbm',.2]]);

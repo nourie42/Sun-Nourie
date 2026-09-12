@@ -105,8 +105,8 @@ export function addExperience(out,{models={},grid,periods=[],now,solarTimes,next
    dewpointHorizonHours:valid.length?Math.max(0,(Date.parse(valid.at(-1).time)-start)/H):0,
    notes:{pressure:'Mean sea-level forecast pressure is separate from observed station pressure.',visibility:'Available NWS/model visibility uses the lead-day blend; missing intervals stay blank.',
      feels:'Same all-weather equation for every forecast hour. Temperature, dew point and wind are blended consistently. A bounded near-term station residual fades out over three hours; raw inputs and the adjustment are retained. Not a measured skin temperature or guaranteed forecast.',
-     dewpoint:'Current dew point is a station observation. The graph is forecast data, not a replay of that observation. Current day starts at NWS 40% / HRRR 30% / ECMWF 10% / NBM 20%; absent inputs are renormalized. Coarse model samples are interpolated, not independent hourly predictions.',
-     precipitation:'Hourly liquid-equivalent amounts; coarse source intervals are apportioned uniformly, not minute-exact timing.',wind:'NWS, HRRR, ECMWF and NBM numeric speeds; current-day starting weights 40/30/10/20, renormalized for missing sources.',solar:'Astronomical sunrise and sunset, not sunshine duration.'}};
+     dewpoint:'Current dew point is a station observation. The graph is forecast data, not a replay of that observation. Forecast hours start at NWS 40% / HRRR 30% / ECMWF 10% / NBM 20%; absent inputs are renormalized. Coarse model samples are interpolated, not independent hourly predictions.',
+     precipitation:'Hourly liquid-equivalent amounts; coarse source intervals are apportioned uniformly, not minute-exact timing.',wind:'NWS, HRRR, ECMWF and NBM numeric speeds; forecast starting weights 40/30/10/20, renormalized for missing sources.',solar:'Astronomical sunrise and sunset, not sunshine duration.'}};
  out.comfort=thermalComfort(out.current,out.location,now);
  out.experienceVersion=EXPERIENCE_VERSION;
  for(const d of out.days)d.nightCondition=eveningPeriod(periods,d.date,zone,now)?.shortForecast||'';

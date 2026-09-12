@@ -94,8 +94,8 @@ test('actual four-source weights change temperature, moisture, wind, clouds, gus
  assert.notEqual(f.days[0].high,g.days[0].high);assert.notEqual(f.days[0].low,g.days[0].low);assert.notEqual(f.hours[1].feelsLike,g.hours[1].feelsLike);assert.notEqual(f.hours[1].humidity,g.hours[1].humidity);
  assert.equal(f.hours[1].feelsLikeInputs.dewpoint,f.hours[1].dewpoint);assert.equal(f.hours[1].feelsLikeInputs.skyCover,f.metricForecasts.series.cloud[1].value);
  assert.equal(f.current.temperature,testInputs.observation.temperature,'Observations are not forecasts');
- assert.deepEqual(f.days[1].highBlend.sources.map(s=>[s.id,s.weight]),[['nws',.6],['hrrr',.1],['ecmwf',.2],['nbm',.1]]);
- assert.deepEqual(f.days[2].highBlend.sources.map(s=>[s.id,s.weight]),[['nws',.6],['ecmwf',.25],['nbm',.15]]);
+ assert.deepEqual(f.days[1].highBlend.sources.map(s=>[s.id,s.weight]),[['nws',.4],['hrrr',.3],['ecmwf',.1],['nbm',.2]]);
+ assert.deepEqual(f.days[2].highBlend.sources.map(s=>[s.id,s.weight]),[['nws',.571429],['ecmwf',.142857],['nbm',.285714]]);
 });
 test('surface danger and uncertainty warnings sit above the walker, with no safe claim',()=>{
  const result=(value,high)=>({status:'estimated',concrete:{value:value-10,high:high-10},asphalt:{value,high}});
