@@ -106,6 +106,19 @@ test('five displayed days each apply the same rolling three-day rule',()=>{
   ]);
 });
 
+test('today facts never switch to a later recommended wash day',()=>{
+ const forecast=fixture();
+ forecast.days[0].low=70;forecast.days[0].high=90;
+ forecast.days[0].rainLikelihood={value:40};forecast.days[0].popDayLikelihood={value:40};forecast.days[0].popNightLikelihood={value:40};
+ forecast.days[1].rainLikelihood={value:40};forecast.days[1].popDayLikelihood={value:40};forecast.days[1].popNightLikelihood={value:40};
+ forecast.days[2].rainLikelihood={value:40};forecast.days[2].popDayLikelihood={value:40};forecast.days[2].popNightLikelihood={value:40};
+ forecast.days[3].low=50;forecast.days[3].high=60;
+ const summary=carWashSummary(forecast,Date.parse('2026-09-12T12:00:00Z'));
+ assert.equal(summary.state,'wait');
+ assert.equal(summary.facts.temperature,'70°–90°');
+ assert.notEqual(summary.facts.temperature,'50°–60°');
+});
+
 test('an observed shower overrides today even when the three-day outlook is dry',()=>{
   const forecast = fixture([5,5,5,5,5,5,5]);
   forecast.current = {type:'observation',condition:'Rain Showers'};

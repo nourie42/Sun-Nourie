@@ -136,7 +136,9 @@ export function carWashSummary(forecast, now = Date.now()) {
     if (candidate) { firstWash = decision; window = candidate; break; }
   }
   const primary = decisions[0] || {state:'check',canWash:false,chance:null,chances:[],reason:'Forecast data is still loading.'};
-  const facts = supportingFacts(forecast,firstWash?.index ?? 0,window);
+  // The hero always answers "today", so its supporting wind and temperature
+  // must stay on today's forecast even when the next safe wash day is later.
+  const facts = supportingFacts(forecast,0,primary.canWash && firstWash?.index === 0 ? window : null);
   const lowRainDays = primary.chances.filter(value => value !== null && value < CAR_WASH_RAIN_LIMIT).length;
   const best = primary.canWash
     ? window ? {title:window.label,note:`${window.hours} forecast hours below ${CAR_WASH_RAIN_LIMIT}% rain chance.`} : {title:'No reliable hourly window yet',note:'The three-day outlook is dry enough, but hourly timing is incomplete.'}
