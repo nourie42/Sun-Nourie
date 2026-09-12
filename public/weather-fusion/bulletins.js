@@ -7,14 +7,22 @@ export function renderBulletins(forecast,result=null,now=Date.now()){
  // The bulletin card is message-driven, not feed-health-driven. Source outages still
  // appear in Scientific Stuff, but an empty alert/special-discussion list shows no card.
  if(panel)panel.hidden=!items.length;
- const open=new Set([...root.querySelectorAll('details[open]')].map(d=>d.dataset.bulletinId));
  const summaries=result?.signature===forecast.signature&&result?.mode==='ai'?result.summaries||[]:[];
  const time=value=>{const t=Date.parse(value);return Number.isFinite(t)?new Intl.DateTimeFormat('en-US',{timeZone:forecast.location?.timeZone||'America/New_York',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}).format(new Date(t)):'unavailable';};
- const counts=Object.entries(BULLETIN_GROUPS).map(([kind,label])=>{const count=items.filter(x=>x.kind===kind).length;return count?`<span class="bulletin-count count-${kind}">${esc(label)} <strong>${count}</strong></span>`:'';}).join('');
  const notes=(status!=='ready'?'<p class="bulletin-unavailable">Live alert status is unavailable or stale. An empty list does not establish that there are no warnings. Check the NWS.</p>':'')+(discussionStatus!=='ready'?'<p class="bulletin-unavailable">The special-discussion feed is unavailable or stale. Routine forecast discussions are not listed here.</p>':'');
- root.innerHTML=`${counts?`<div class="bulletin-counts">${counts}</div>`:''}${notes}${items.map(item=>{
+ root.innerHTML=`${notes}${items.map((item,index)=>`<button type="button" class="bulletin-banner bulletin-${item.kind}" data-bulletin-index="${index}" aria-haspopup="dialog"><span class="bulletin-symbol" aria-hidden="true">!</span><span class="bulletin-banner-copy"><strong>${esc(item.title)}</strong><small>${esc(item.area)}${item.expires?` · Until ${esc(time(item.expires))}`:''}</small></span><span class="bulletin-banner-action">View <b aria-hidden="true">›</b></span></button>`).join('')}`;
+ const dialog=document.getElementById('bulletin-dialog'),content=document.getElementById('bulletin-dialog-content');
+ root.querySelectorAll('[data-bulletin-index]').forEach(button=>button.addEventListener('click',()=>{
+  const item=items[Number(button.dataset.bulletinIndex)];if(!item||!dialog||!content)return;
   const summary=summaries.find(s=>s.id===item.id&&s.sourceKey===item.sourceKey);
-  const fallback=item.kind==='discussion'?(result?'AI summary unavailable. The complete official discussion is below.':'Preparing a plain-language explanation of the special weather discussion…'):item.description.slice(0,650)+(item.description.length>650?'…':'');
-  return `<article class="bulletin-item bulletin-${item.kind}"><h3>${esc(item.title)}</h3><p class="bulletin-area">${esc(item.area)}</p><p class="bulletin-time">${item.kind==='discussion'?'Valid from':'Issued'} ${esc(time(item.issuedAt))}${item.expires?` · expires ${esc(time(item.expires))}`:''}</p><span class="bulletin-mode">${summary?'AI plain-language summary':item.kind==='discussion'?'NWS special weather discussion':'Official NWS wording'}</span><p class="bulletin-summary">${esc(summary?.summary||fallback)}</p>${item.instruction?`<p class="bulletin-instruction"><strong>Official instructions:</strong> ${esc(item.instruction)}</p>`:''}<details data-bulletin-id="${esc(item.id)}"${open.has(item.id)?' open':''}><summary>Read the complete official bulletin</summary>${item.headline?`<p>${esc(item.headline)}</p>`:''}<pre>${esc(item.description)}</pre>${item.instruction?`<p>${esc(item.instruction)}</p>`:''}</details><a href="${esc(item.url)}" target="_blank" rel="noopener noreferrer">Original NWS source ↗</a></article>`;
- }).join('')}${!items.length&&status==='ready'?'<p class="bulletin-time">No active notices were returned for this point at the latest check.</p>':''}<p class="bulletin-footnote">Official NWS alerts and instructions take priority over the AI explanation. Checked ${esc(time(forecast.assembledAt))}.</p>`;
+  content.innerHTML=`<div class="dialog-eyebrow">${esc(BULLETIN_GROUPS[item.kind]||'NWS bulletin')}</div><h2 id="bulletin-dialog-title" class="dialog-title">${esc(item.title)}</h2><p class="dialog-condition">${esc(item.area)}</p><p class="bulletin-dialog-time">${item.kind==='discussion'?'Valid from':'Issued'} ${esc(time(item.issuedAt))}${item.expires?` · expires ${esc(time(item.expires))}`:''}</p>${summary?`<div class="bulletin-dialog-summary"><strong>Quick summary</strong><p>${esc(summary.summary)}</p></div>`:''}${item.instruction?`<div class="bulletin-dialog-instruction"><strong>Official instructions</strong><p>${esc(item.instruction)}</p></div>`:''}<h3 class="dialog-subtitle">Complete official wording</h3>${item.headline?`<p class="dialog-prose">${esc(item.headline)}</p>`:''}<pre class="bulletin-dialog-wording">${esc(item.description)}</pre><a class="bulletin-dialog-source" href="${esc(item.url)}" target="_blank" rel="noopener noreferrer">Open original NWS bulletin ↗</a>`;
+  dialog.dataset.bulletinId=item.id;if(!dialog.open)dialog.showModal();document.body.classList.add('dialog-open');
+ }));
+ if(dialog?.open&&dialog.dataset.bulletinId&&!items.some(item=>item.id===dialog.dataset.bulletinId))dialog.close();
+ if(dialog&&!dialog.dataset.installed){
+  dialog.dataset.installed='true';
+  document.getElementById('close-bulletin')?.addEventListener('click',()=>dialog.close());
+  dialog.addEventListener('close',()=>{delete dialog.dataset.bulletinId;document.body.classList.remove('dialog-open');});
+  dialog.addEventListener('click',event=>{if(event.target===dialog){const box=dialog.getBoundingClientRect();if(event.clientX<box.left||event.clientX>box.right||event.clientY<box.top||event.clientY>box.bottom)dialog.close();}});
+ }
 }

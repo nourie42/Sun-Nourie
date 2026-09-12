@@ -117,8 +117,9 @@ test('Gross Meter heading stays centered and bold without changing chart geometr
  assert.match(css,/#gross-title\{text-align:center;font-weight:800\}/);assert.match(meterCss,/\.gross-eyebrow\{width:calc\(100% \+ 86px\);[^}]*text-align:center/);assert.match(meterCss,/@media\(max-width:760px\)[\s\S]*\.gross-eyebrow\{width:calc\(100% \+ 62px\)\}/);assert.ok(!/\.gross-(scroll|chart)\s*\{/.test(css));
 });
 test('changed assets are cache-busted and late briefing responses stay guarded',()=>{
- assert.match(html,/style\.css\?v=car-wash-icon-back-v46/);assert.match(html,/forecast-layout\.css\?v=weather-art-labels-v10/);assert.match(html,/app\.js\?v=current-validation-v52/);assert.match(html,/car-wash\.css\?v=rain-consensus-v41/);assert.match(html,/forecast-cards\.css\?v=remainder-today-v42/);assert.match(html,/scenario-layout\.css\?v=scenario-weather-v29/);
+ assert.match(html,/style\.css\?v=car-wash-icon-back-v46/);assert.match(html,/forecast-layout\.css\?v=weather-art-labels-v10/);assert.match(html,/personal-details\.css\?v=bulletin-banner-v11/);assert.match(html,/app\.js\?v=bulletin-banner-v53/);assert.match(html,/car-wash\.css\?v=rain-consensus-v41/);assert.match(html,/forecast-cards\.css\?v=remainder-today-v42/);assert.match(html,/scenario-layout\.css\?v=scenario-weather-v29/);
  assert.match(app,/dans-take\.js\?v=weather-art-labels-v10/);
+ assert.match(app,/bulletins\.js\?v=bulletin-banner-v11/);
  assert.match(app,/experience\.js\?v=local-current-v49/);
  assert.match(app,/personal-details\.js\?v=pet-static-shake-v37/);
  assert.match(app,/forecast-story\.js\?v=forecast-trace-v40/);

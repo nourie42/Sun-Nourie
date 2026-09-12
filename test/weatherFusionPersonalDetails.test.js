@@ -90,7 +90,7 @@ test('production integration and cache-busting cover every new component',()=>{
  const read=p=>readFileSync(new URL('../'+p,import.meta.url),'utf8');
  const app=read('public/weather-fusion/app.js'),html=read('public/weather-fusion/index.html'),server=read('src/weatherFusion.js');
  assert.match(app,/const hero = currentHero\(data, day\)/);assert.match(app,/dayGraphHTML\(forecast,index,p\.tonight,now\)/);assert.match(app,/api\('bulletins'/);
- assert.match(html,/Dan's take/);assert.match(html,/Current temperature/);assert.match(html,/Because Apple, Google and Samsung weather suck/);assert.match(html,/personal-details\.css\?v=weather-art-labels-v10/);
+ assert.match(html,/Dan's take/);assert.match(html,/Current temperature/);assert.match(html,/Because Apple, Google and Samsung weather suck/);assert.match(html,/personal-details\.css\?v=bulletin-banner-v11/);assert.match(html,/id="bulletin-dialog"/);
  assert.ok(html.indexOf('id="today-uncertainty"')<html.indexOf('id="nws-bulletins"'));assert.ok(html.indexOf('id="nws-bulletins"')<html.indexOf('id="hourly-title"'));
  assert.equal((html.match(/id="alerts"/g)||[]).length,1);assert.match(server,/\/api\/weather-fusion\/bulletins/);assert.match(server,/pressureTrendFromObservations/);
 });

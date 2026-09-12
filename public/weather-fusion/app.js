@@ -8,7 +8,7 @@ import {createFramePlayer} from './frame-player.js';
 import {renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=local-current-v49';
 import {dailyDisplay} from './weather-math.js?v=remainder-today-v41';
 import {currentHero} from './current-temperature.js?v=radar-now-v47';
-import {renderBulletins} from './bulletins.js?v=weather-art-labels-v10';
+import {renderBulletins} from './bulletins.js?v=bulletin-banner-v11';
 import {modelFreshnessText} from './personal-details.js?v=pet-static-shake-v37';
 import {renderDewpointMeter} from './dewpoint-meter.js?v=car-wash-order-v31';
 import {renderWeatherPanel} from './render-safety.js';
@@ -217,7 +217,7 @@ async function load({ moveMap = false, refreshModels = false, briefingRetry = 0 
       }).catch((error) => {
         if (id !== generation || error.name === 'AbortError') return;
         if(error.status===409&&briefingRetry<2){void load({briefingRetry:briefingRetry+1});return;}
-        $('briefing-stamp').textContent = error.status === 409 ? 'Sources changed while the briefing was prepared. The next refresh will use the new forecast.' : 'AI synthesis is unavailable. Official NWS wording remains visible.';
+        $('briefing-stamp').textContent = error.status === 409 ? 'Sources changed while the briefing was prepared. The next refresh will use the new forecast.' : 'AI synthesis is unavailable. Official NWS wording remains available in bulletin details.';
       });
     }
   } catch (e) {
@@ -256,6 +256,7 @@ function chooseLocation(value) {
   $('afd-stamp').textContent = 'Checking the selected location’s forecast office…';
   $('afd-link').href = 'https://www.weather.gov/';
   $('source-register').replaceChildren();
+  if($('bulletin-dialog').open)$('bulletin-dialog').close();
   resetCarWashForecast();
   resetModelExplanation();
   renderBriefing({ headline: 'Preparing your local outlook.', summary: 'Loading the latest NWS forecast and local discussion for this location.', sources: [] });
