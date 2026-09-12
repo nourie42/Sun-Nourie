@@ -53,13 +53,19 @@ test('current readings keep the snapshot even when rendering happens later',()=>
  const f=make();assert.deepEqual(currentSample(f,now).comfort,currentSample(f,now+60000).comfort);
  assert.equal(currentSample(f,now).time,f.current.time);
 });
-test('current and future exposure samples preserve unavailable canonical rain instead of raw NWS chance',()=>{
+test('Now reports the observed precipitation state while future hours preserve canonical rain',()=>{
  const f=make();
  for(const hour of f.hours){hour.pop=90;hour.rainLikelihood={value:null};}
- assert.equal(currentSample(f,now).pop,null);
+ assert.equal(currentSample(f,now).pop,0);
+ assert.deepEqual(currentSample(f,now).currentPrecipitation,{active:false,label:'Dry now',source:'Current station reports no precipitation.'});
  assert.equal(forecastSample(f,f.hours[1].time).pop,null);
  f.hours[1].rainLikelihood.value=0;
  assert.equal(forecastSample(f,f.hours[1].time).pop,0);
+ f.current.condition='Rain';
+ assert.equal(currentSample(f,now).pop,100);
+ assert.equal(currentSample(f,now).currentPrecipitation.label,'Rain now');
+ f.current.type='forecast';
+ assert.equal(currentSample(f,now).pop,null,'without a station observation Now retains the canonical current-hour estimate');
 });
 test('a rainy future hour does not reuse the sunny current observation',()=>{
  const f=make(),h=f.hours[1];h.condition='Rain';

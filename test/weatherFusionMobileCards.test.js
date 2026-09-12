@@ -63,6 +63,11 @@ test('hourly card shows the Weather Nourie consensus rather than relabeling NWS 
  assert.doesNotMatch(hourlyRainHTML({pop:21,rainLikelihood:{value:48,sourceValues:{nws:21,hrrr:100,ecmwf:0}}}),/% NWS|HRRR: rain/);
  assert.match(hourlyRainHTML({pop:22}),/>22%</);
 });
+test('Now labels the observed precipitation state instead of a whole-hour forecast probability',()=>{
+ const dry={now:true,currentPrecipitation:{active:false,label:'Dry now',source:'Current station reports no precipitation.'},rainLikelihood:{value:28}};
+ assert.match(hourlyRainHTML(dry),/>Dry now</);assert.doesNotMatch(hourlyRainHTML(dry),/28%/);
+ assert.match(hourlyRainHTML({now:true,currentPrecipitation:{active:true,label:'Rain now',source:'Current station reports precipitation.'}}),/>Rain now</);
+});
 test('Today and Tonight prefer their matching blended rain likelihood',()=>{
  const f=fixture();f.days[0].popDayLikelihood={value:8};f.days[0].popNightLikelihood={value:3};f.days[0].rainLikelihood={value:12};
  assert.match(todayForecastHTML(f,now),/>8%<\/strong><small>Rain chance/);

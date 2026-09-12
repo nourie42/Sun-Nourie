@@ -40,6 +40,10 @@ export function hrrrRainAmount(row){
  return finite(value)&&value>=HRRR_RAIN_THRESHOLD_IN?value:null;
 }
 export function hourlyRainHTML(sample){
+ if(sample?.now&&sample.currentPrecipitation){
+  const status=sample.currentPrecipitation;
+  return `<span class="hour-rain" title="${esc(status.source)}"><small class="hour-pop">${weatherMetricIcon('drop')}${esc(status.label)}</small></span>`;
+ }
  const blend=sample.rainLikelihood,value=sampleRainChance(sample);
  const votes=blend?.sourceValues||{},parts=[];
  if(finite(votes.nws))parts.push(`NWS ${Math.round(votes.nws)}%`);
@@ -56,7 +60,11 @@ export function currentSample(forecast, now = Date.now()) {
   comfort.inputEvidence.estimatedFields=current.comfortEstimatedFields;
   comfort.inputEvidence.fallbackSources=current.comfortInputSources;
   const currentHour=forecast?.hours?.find(h=>Date.parse(h.time)<=now&&now<Date.parse(h.time)+3600000);
-  return {windDirection:current.windDirection,pop:sampleRainChance(currentHour),officialPop:currentHour?.officialPop??currentHour?.pop,rainLikelihood:currentHour?.rainLikelihood,precipitationBlend:currentHour?.precipitationBlend,uvIndex:hourlyUvValue(forecast,now),id:'now', now:true, time:current.time, temperature:finite(current.temperature) ? current.temperature : null,
+  const kind=weatherState(current.condition).kind,stationCondition=current.type==='observation'&&!/forecast/i.test(current.conditionSource||'')&&kind!=='unknown';
+  const activePrecipitation=stationCondition&&['rain','storm','snow'].includes(kind);
+  const currentPrecipitation=stationCondition?{active:activePrecipitation,label:activePrecipitation?(kind==='snow'?'Snow now':'Rain now'):'Dry now',source:`Current station reports ${activePrecipitation?'precipitation':'no precipitation'}.`}:null;
+  const currentLikelihood=stationCondition?{value:activePrecipitation?100:0,source:'Current station observation'}:currentHour?.rainLikelihood;
+  return {windDirection:current.windDirection,pop:rainChanceValue(currentLikelihood),officialPop:currentHour?.officialPop??currentHour?.pop,rainLikelihood:currentLikelihood,currentPrecipitation,precipitationBlend:currentHour?.precipitationBlend,uvIndex:hourlyUvValue(forecast,now),id:'now', now:true, time:current.time, temperature:finite(current.temperature) ? current.temperature : null,
     feels:outdoorExposure(comfort).value, exposure:outdoorExposure(comfort), comfort, condition:current.condition || 'Sky conditions unavailable',
     isDay:comfort.daylight ?? (solarElevation(now,forecast.location.latitude,forecast.location.longitude) > 0),
     source:current.type === 'observation' ? 'Station observation' : 'Current estimate', inputs:current};
