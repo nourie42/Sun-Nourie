@@ -17,6 +17,12 @@ test('hero stays current in daylight and at night, independently of daily low',(
  for(const day of [true,false]){const v=currentHero(f,day);assert.equal(v.temperature,75);assert.equal(v.tonight,false);assert.equal(v.condition,'Cloudy');}
  assert.equal(currentHero({current:{temperature:null}}).temperature,null);
 });
+test('dry observed radar removes forecast rain from the current hero',()=>{
+ const f={current:{temperature:79,type:'guidance',condition:'Chance Showers And Thunderstorms',conditionSource:'Selected-location current-hour forecast',radarPrecipitation:{status:'ready',atLocation:false,nearby:false}},hours:[{skyCover:58}]};
+ assert.equal(currentHero(f,false).condition,'Partly cloudy');
+ f.current.radarPrecipitation.atLocation=true;
+ assert.equal(currentHero(f,false).condition,'Rain on radar');
+});
 test('pressure is converted once; raw Pa avoids loss from rounded inches',()=>{
  assert.equal(stationPressureMb({pressurePa:101300,pressure:29.91}),1013);
  assert.ok(Math.abs(pressureMb(29.91)-1012.87)<.05);

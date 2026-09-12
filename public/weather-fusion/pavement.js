@@ -1,7 +1,7 @@
 import {finite,solarElevation,thermalHumidity} from './weather-math.js?v=forecast-trace-v40';
-import {clothingForFeels,referenceScene,precipitationActivity} from './exposure-scene.js?v=pet-static-shake-v32';
+import {clothingForFeels,referenceScene,precipitationActivity} from './exposure-scene.js?v=radar-dry-v34';
 import {thermalRisk} from './thermal-risk.js?v=weather-art-labels-v10';
-import {weatherShapes} from './weather-display.js?v=rain-consensus-v41';
+import {weatherShapes} from './weather-display.js?v=radar-dry-v50';
 import {weatherState} from './weather-state.js';
 const H=3600000,SIGMA=5.670374419e-8,clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 const c=f=>(f-32)/1.8,f=c=>c*1.8+32;

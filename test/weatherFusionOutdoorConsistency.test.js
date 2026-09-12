@@ -65,7 +65,15 @@ test('Now reports the observed precipitation state while future hours preserve c
  assert.equal(currentSample(f,now).pop,100);
  assert.equal(currentSample(f,now).currentPrecipitation.label,'Rain now');
  f.current.type='forecast';
- assert.equal(currentSample(f,now).pop,null,'without a station observation Now retains the canonical current-hour estimate');
+ assert.equal(currentSample(f,now).pop,null,'without an observation Now does not present an unconfirmed forecast chance as current rain');
+ assert.equal(currentSample(f,now).currentPrecipitation.label,'Checking radar');
+ f.current.condition='Chance Showers And Thunderstorms';
+ f.hours[0].skyCover=58;
+ f.current.radarPrecipitation={status:'ready',observedAt:new Date(now).toISOString(),atLocation:false,nearby:false,scanRadiusMiles:12};
+ const dryRadar=currentSample(f,now);
+ assert.equal(dryRadar.pop,0);
+ assert.equal(dryRadar.currentPrecipitation.label,'Dry now');
+ assert.equal(dryRadar.condition,'Partly cloudy');
 });
 test('fresh observed radar overrides a dry station label and keeps nearby rain distinct',()=>{
  const f=make('Cloudy');

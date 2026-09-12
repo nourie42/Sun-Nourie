@@ -623,7 +623,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     'today-card.js','rain-trend.js','utci.js','weather-display.js','weather-math.js','weather-repair.css','weather-state.js',
     'comfort-reference-scenes.png','comfort-reference-scenes.webp','comfort-reference-scenes-cold.webp',
     'comfort-reference-scenes-dawn.webp','comfort-reference-scenes-fog.webp','comfort-reference-scenes-hot.webp',
-    'comfort-reference-scenes-rain.webp','comfort-reference-scenes-umbrella.png','comfort-reference-scenes-watch.webp',
+    'comfort-reference-scenes-rain.webp','comfort-reference-scenes-umbrella.png','comfort-reference-scenes-umbrella.webp','comfort-reference-scenes-watch.webp',
     'poodle-walk.png','poodle-walk-cold.png','poodle-walk-hot.png','poodle-walk-mild.png',
     'today-sky-clear.webp','today-sky-clouds.webp','today-sky-night-v2.webp','today-sky-night.webp',
     'today-sky-rain.webp','today-sky-storm.webp',

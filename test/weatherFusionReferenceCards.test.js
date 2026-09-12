@@ -56,6 +56,14 @@ test('active rain pauses pavement heat warnings',()=>{
  assert.match(pavementHTML(result,92,{condition:'Rain'}),/Wet pavement · heat warning paused/);
 });
 
+test('dry radar state never renders rain artwork or a wet-pavement claim',()=>{
+ const scene=referenceScene(1,false,'Partly cloudy',82,{pop:0});
+ assert.match(scene,/data-scene="dawn"/);
+ assert.doesNotMatch(scene,/comfort-reference-scenes-(rain|umbrella)\.webp/);
+ const pavement=pavementHTML({status:'estimated',activePrecipitation:false,daylight:false,concrete:{value:82},asphalt:{value:84}},82,{condition:'Partly cloudy',pop:0});
+ assert.doesNotMatch(pavement,/Wet pavement|Rain occurring|data-scene="rain"/);
+});
+
 test('forecast pavement uses the selected hour while freshness uses the actual update time',()=>{
  const now=Date.parse('2026-09-10T18:00:00Z'),H=3600000;
  const f={assembledAt:new Date(now).toISOString(),location:{latitude:35.78,longitude:-78.48},exposureWeather:{rows:Array.from({length:61},(_,i)=>({time:new Date(now+(i-48)*H).toISOString(),temperature:85,dewpoint:65,wind:5,skyCover:10}))}};
