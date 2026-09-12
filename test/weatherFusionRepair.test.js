@@ -12,14 +12,14 @@ import {dewpointPoints,graphGeometry} from '../public/weather-fusion/dewpoint-me
 import {createFramePlayer} from '../public/weather-fusion/frame-player.js';
 const H=3600000,now=testInputs.now,zone='America/New_York';
 const models=()=>Object.fromEntries(['hrrr','ecmwf','nbm'].map(id=>[id,validateSnapshot(snapshot(id),id,testInputs.location,now).value]));
-test('today uses requested 40/40/20 in daily high and every same-calendar-day hour',()=>{
+test('today uses requested 40/30/10/20 in daily high and every same-calendar-day hour',()=>{
  const out=buildForecast({...testInputs,models:models()});
  assert.equal(out.repairVersion,REPAIR_VERSION);
- assert.deepEqual(temperaturePolicy(0),{nws:.4,hrrr:.4,ecmwf:.2});
- assert.equal(out.days[0].high,86); // .4*84 + .4*90 + .2*80 = 85.6
+ assert.deepEqual(temperaturePolicy(0),{nws:.4,hrrr:.3,ecmwf:.1,nbm:.2});
+ assert.equal(out.days[0].high,85); // .4*84 + .3*90 + .1*80 + .2*80 = 84.6
  for(const h of out.hours){if(forecastDayIndex(Date.parse(h.time),now,zone)!==0)continue;
-  assert.deepEqual(h.temperatureBlend.sources.map(s=>[s.id,s.weight]),[['nws',.4],['hrrr',.4],['ecmwf',.2]]);
-  assert.equal(h.temperature,Math.round(.4*h.officialTemperature+.4*90+.2*80));
+  assert.deepEqual(h.temperatureBlend.sources.map(s=>[s.id,s.weight]),[['nws',.4],['hrrr',.3],['ecmwf',.1],['nbm',.2]]);
+  assert.equal(h.temperature,Math.round(.4*h.officialTemperature+.3*90+.1*80+.2*80));
  }
  assert.equal(out.hours[0].pop,testInputs.hourly.periods[0].probabilityOfPrecipitation.value);
 });
@@ -29,7 +29,7 @@ test('partial HRRR rain horizon contributes in covered hours, not discarded from
  m.ecmwf.precipitationIntervals=Array.from({length:24},(_,i)=>({start:start+i*3600,end:start+(i+1)*3600,value:.2}));
  const grid={quantitativePrecipitation:{uom:'wmoUnit:in',values:[{validTime:new Date(now).toISOString()+'/PT24H',value:2.4}]}};
  const out=buildForecast({...testInputs,models:m,grid});
- assert.ok(Math.abs(out.precipitation.value-(4*.2+20*(.1*2/3+.2/3)))<.001);
+ assert.ok(Math.abs(out.precipitation.value-(4*.152+20*(.1*4/7+.2/7+.01*2/7)))<.001);
  assert.equal(out.precipitation.sources.find(s=>s.id==='hrrr').coverageHours,4);
  assert.ok(out.precipitation.sources.some(s=>s.id==='nws'));
 });

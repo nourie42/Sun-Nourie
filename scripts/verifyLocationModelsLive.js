@@ -22,15 +22,15 @@ try{
  for(const place of locations){
   const query=new URLSearchParams(place.id?{location:place.id}:place);
   const f=local?await service.getForecast(Object.fromEntries(query)):await fetch(`${base}/api/weather-fusion/forecast?${query}`,{signal:AbortSignal.timeout(55000)}).then(r=>r.json());
-  assert.deepEqual(f.days[0].confidence.sourceIds,['nws','hrrr','ecmwf'],f.location?.name+' actual today sources');
+  assert.deepEqual(f.days[0].confidence.sourceIds,['nws','hrrr','ecmwf','nbm'],f.location?.name+' actual today sources');
   assert.equal(f.modelContributions.length,3);assert.ok(f.feeds.filter(x=>['hrrr','ecmwf','nbm'].includes(x.id)).every(x=>x.status==='ready'));
-  for(const kind of ['high','low'])if(f.days[0][kind+'Blend']?.sources.length)assert.deepEqual(f.days[0][kind+'Blend'].sources.map(s=>[s.id,s.weight]),[['nws',.4],['hrrr',.4],['ecmwf',.2]],kind);
+  for(const kind of ['high','low'])if(f.days[0][kind+'Blend']?.sources.length)assert.deepEqual(f.days[0][kind+'Blend'].sources.map(s=>[s.id,s.weight]),[['nws',.4],['hrrr',.3],['ecmwf',.1],['nbm',.2]],kind);
   const time=f.hours.find(h=>Date.parse(h.time)>Date.now()&&new Intl.DateTimeFormat('en-CA',{timeZone:f.location.timeZone}).format(new Date(h.time))===new Intl.DateTimeFormat('en-CA',{timeZone:f.location.timeZone}).format(new Date()))?.time;
   assert.ok(time,'A same-day future hour exists');
   const fields={};
   for(const field of ['temperature','dewpoint','wind','gust','cloud']){
    const p=f.metricForecasts.series[field].find(p=>Date.parse(p.time)===Date.parse(time));assert.ok(Number.isFinite(p.value),field);
-   assert.deepEqual(p.sources.map(s=>[s.id,s.weight]),[['nws',.4],['hrrr',.4],['ecmwf',.2]],f.location.name+' '+field);
+   assert.deepEqual(p.sources.map(s=>[s.id,s.weight]),[['nws',.4],['hrrr',.3],['ecmwf',.1],['nbm',.2]],f.location.name+' '+field);
    const expected=p.sources.reduce((sum,s)=>sum+s.value*s.weight,0);assert.ok(Math.abs(p.value-expected)<(field==='temperature'?.51:.11),field+' weighted numeric value');fields[field]=p;
   }
   const hour=f.hours.find(h=>h.time===time);assert.equal(hour.feelsLikeInputs.temperature,hour.temperature);assert.equal(hour.feelsLikeInputs.wind,fields.wind.value);assert.equal(hour.feelsLikeInputs.dewpoint,fields.dewpoint.value);assert.equal(hour.feelsLikeInputs.skyCover,fields.cloud.value);
@@ -58,10 +58,10 @@ try{
    if(expectedWarning){assert.equal(await page.locator('.pavement-warning').innerText(),expectedWarning.label);assert.ok(await page.locator('.pavement-warning').evaluate(el=>el.getBoundingClientRect().bottom<=document.querySelector('.poodle-walk').getBoundingClientRect().top));}
    await page.locator('.exposure-cards').screenshot({path:output+'/live-'+(place.id||f.location.office)+'-comfort.png'});
    await page.locator('#daily [data-day="0"]').click();await page.locator('#day-dialog[open]').waitFor();
-   assert.match(await page.locator('.dialog-confidence summary').innerText(),/3 sources/);
+   assert.match(await page.locator('.dialog-confidence summary').innerText(),/4 sources/);
    assert.equal(await page.locator('.day-graph [data-series]').count(),4);
    assert.equal(await page.locator('#day-content .thermal-risk').count(),0);
-   await page.locator('.dialog-confidence summary').click();assert.match(await page.locator('.dialog-confidence').innerText(),/NWS, HRRR, ECMWF/);
+   await page.locator('.dialog-confidence summary').click();assert.match(await page.locator('.dialog-confidence').innerText(),/NWS, HRRR, ECMWF, NBM/);
    await page.locator('#day-content').screenshot({path:output+'/live-'+(place.id||f.location.office)+'-confidence.png'});
    result.renderedConfidence=await page.locator('.dialog-confidence').innerText();assert.deepEqual(errors,[]);await context.close();
   }

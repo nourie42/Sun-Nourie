@@ -34,9 +34,9 @@ function matchingRows(data,summary) {
 test('trace drizzle cannot create an inflated daily score',()=>{
   const data=buildForecast(inputs());
   const day=data.days[1],rows=matchingRows(data,day.rainLikelihood);
-  assert.equal(day.rainLikelihood.value,26);
+  assert.equal(day.rainLikelihood.value,0);
   assert.equal(day.rainLikelihood.value,Math.max(...rows.map(row=>row.rainLikelihood.value)));
-  assert.deepEqual(new Set(rows.map(row=>row.rainLikelihood.value)),new Set([0,26]));
+  assert.deepEqual(new Set(rows.map(row=>row.rainLikelihood.value)),new Set([0]));
   assert.equal(day.rainLikelihood.coverage.complete,true);
   assert.equal(day.officialPop,39,'raw NWS period probability remains separate');
 });
@@ -69,7 +69,7 @@ test('daily peak beyond the 48-hour strip remains auditable on the full hourly t
   assert.equal(forecast.hours.length,48);
   assert.ok(forecast.rainTimeline.length>48);
   assert.equal(day.rainLikelihood.peakTime,iso(peakTime));
-  assert.equal(day.rainLikelihood.value,54);
+  assert.equal(day.rainLikelihood.value,46);
   assert.equal(day.rainLikelihood.peak.sourceValues.nws,81);
   assert.equal(day.rainLikelihood.peak.sources.find(source=>source.id==='nws').runAt,iso(now-H));
   assert.equal(day.rainLikelihood.peak.sources.find(source=>source.id==='ecmwf').runAt,forecast.modelContributions.find(source=>source.id==='ecmwf').runAt);
@@ -123,15 +123,15 @@ test('two dry sources and a score below 10 yield zero consistently in hourly and
 });
 
 test('weak uncorroborated guidance stays zero until the blend reaches 25',()=>{
-  const dryAmounts={sourceValues:{nws:.01,hrrr:0,ecmwf:0}};
+  const dryAmounts={sourceValues:{nws:.01,hrrr:0,ecmwf:0,nbm:0}};
   const below=precipitationLikelihood(62,dryAmounts),boundary=precipitationLikelihood(62.5,dryAmounts);
   assert.equal(below.weightedValue,24.8);
   assert.equal(below.rawValue,25);
   assert.equal(below.value,0);
   assert.equal(boundary.weightedValue,25);
   assert.equal(boundary.value,25);
-  assert.deepEqual(below.drySources,['hrrr','ecmwf']);
-  assert.equal(precipitationLikelihood(9,{sourceValues:{nws:.01,hrrr:null,ecmwf:null}}).value,9,'one source is not two dry models');
+  assert.deepEqual(below.drySources,['hrrr','ecmwf','nbm']);
+  assert.equal(precipitationLikelihood(9,{sourceValues:{nws:.01,hrrr:null,ecmwf:null,nbm:null}}).value,9,'one source is not two dry models');
 });
 
 test('source evidence preserves exact amounts, trace threshold and normalized arithmetic',()=>{
@@ -142,9 +142,9 @@ test('source evidence preserves exact amounts, trace threshold and normalized ar
   assert.equal(score.qpfSupport.ecmwf,16);
   assert.equal(score.sourceValues.ecmwf,6.24);
   assert.equal(score.sourceAmounts.ecmwf,.016);
-  assert.equal(score.weightedValue,28.08);
-  assert.equal(score.value,28);
-  assert.deepEqual(score.sources.map(row=>[row.id,row.weight]),[['nws',.666667],['ecmwf',.333333]]);
+  assert.equal(score.weightedValue,32.448);
+  assert.equal(score.value,32);
+  assert.deepEqual(score.sources.map(row=>[row.id,row.weight]),[['nws',.8],['ecmwf',.2]]);
   assert.equal(precipitationLikelihood(39,{sourceValues:{ecmwf:.0049}}).sourceValues.ecmwf,0);
   const data=buildForecast(inputs({amount:.001})),row=data.rainTimeline[0];
   assert.equal(row.precipitationBlend.sourceValues.hrrr,.001);

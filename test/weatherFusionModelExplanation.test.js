@@ -9,8 +9,8 @@ const at = offset => new Date(now+offset*HOUR).toISOString();
 
 function likelihood(value, options = {}) {
   return {value,rawValue:value,weightedValue:value,
-    sourceValues:{nws:value/.4,hrrr:0,ecmwf:0},sourceAmounts:{nws:.01,hrrr:0,ecmwf:.004},qpfSupport:{hrrr:0,ecmwf:0},drySources:['hrrr','ecmwf'],wetSources:['nws'],traceThresholdInches:.01,signalFullScaleInches:.1,uncorroboratedDisplayLimit:25,
-    sources:[{id:'nws',value:value/.4,weight:.4,runAt:at(-1)},{id:'hrrr',value:0,weight:.4,runAt:at(-2)},{id:'ecmwf',value:0,weight:.2,runAt:at(-5)}],...options};
+    sourceValues:{nws:value/.4,hrrr:0,ecmwf:0,nbm:0},sourceAmounts:{nws:.01,hrrr:0,ecmwf:.004,nbm:0},qpfSupport:{hrrr:0,ecmwf:0,nbm:0},drySources:['hrrr','ecmwf','nbm'],wetSources:['nws'],traceThresholdInches:.01,signalFullScaleInches:.1,uncorroboratedDisplayLimit:25,
+    sources:[{id:'nws',value:value/.4,weight:.4,runAt:at(-1)},{id:'hrrr',value:0,weight:.3,runAt:at(-2)},{id:'ecmwf',value:0,weight:.1,runAt:at(-5)},{id:'nbm',value:0,weight:.2,runAt:at(-3)}],...options};
 }
 
 function fixture() {
@@ -21,10 +21,10 @@ function fixture() {
   }
   return {location:{timeZone:'America/New_York'},rainTimeline,hours:rainTimeline.slice(0,48),
     days:[0,1,2].map(index=>({date:`2026-09-${12+index}`,rainLikelihood:period(index*24,index*24+24),popDayLikelihood:period(index*24,index*24+12),popNightLikelihood:period(index*24+12,index*24+24),
-      high:86,highBlend:{value:85.6,sources:[{id:'nws',value:86,weight:.4},{id:'hrrr',value:88,weight:.4},{id:'ecmwf',value:80,weight:.2}]},
+      high:86,highBlend:{value:85.6,sources:[{id:'nws',value:86,weight:.4},{id:'hrrr',value:88,weight:.3},{id:'ecmwf',value:80,weight:.1},{id:'nbm',value:84,weight:.2}]},
       low:70,lowBlend:{value:70.2,sources:[{id:'nws',value:71,weight:.6},{id:'ecmwf',value:69,weight:.4}]}})),
-    modelContributions:[{id:'hrrr',runAt:at(-2),runScope:'Successive runs of HRRR'},{id:'ecmwf',runAt:at(-5)}],
-    feeds:[{id:'nws',status:'ready',issuedAt:at(-1),fetchedAt:at(0)},{id:'hrrr',status:'ready'},{id:'ecmwf',status:'ready'}]};
+    modelContributions:[{id:'hrrr',runAt:at(-2),runScope:'Successive runs of HRRR'},{id:'ecmwf',runAt:at(-5)},{id:'nbm',runAt:at(-3)}],
+    feeds:[{id:'nws',status:'ready',issuedAt:at(-1),fetchedAt:at(0)},{id:'hrrr',status:'ready'},{id:'ecmwf',status:'ready'},{id:'nbm',status:'ready'}]};
 }
 
 test('model explanation defaults to the same Today/ Tonight period as the main card',()=>{
@@ -54,14 +54,16 @@ test('NWS probability and model rain-amount signals are explicitly different inp
   const html=modelExplanationHTML(fixture(),{now});
   assert.match(html,/30% probability/);
   assert.match(html,/0\.004 in/);
+  assert.match(html,/<th scope="row">NBM<\/th><td>0 in<small>QPF support: 0\/100 · NWS-anchored input: 0%<\/small><\/td><td>20%<\/td>/);
   assert.match(html,/QPF support: 0\/100 · NWS-anchored input: 0%/);
-  assert.match(html,/HRRR and ECMWF supply rain amounts, not probabilities/);
+  assert.match(html,/HRRR, ECMWF and NBM supply rain amounts, not probabilities/);
+  assert.match(html,/starting weights are NWS 40%, HRRR 30%, ECMWF 10% and NBM 20%/);
   assert.match(html,/below 0\.01 in supplies 0 support/);
   assert.match(html,/0\.01 to 0\.1 in scale from partial to full support/);
   assert.match(html,/cannot raise the weighted result above NWS/);
   assert.match(html,/uncalibrated blend, not a proven model-accuracy ranking/);
   assert.match(html,/not a separate probability of rain at any time/);
-  assert.doesNotMatch(html,/ECMWF probability|HRRR probability/);
+  assert.doesNotMatch(html,/ECMWF probability|HRRR probability|NBM probability/);
 });
 
 test('weights and arithmetic come from the exact used sources rather than fixed starting weights',()=>{
@@ -140,7 +142,7 @@ test('NWS hourly source time never borrows the different daily forecast issuance
 test('temperatures disclose only the recorded source values and applied weights',()=>{
   const html=modelExplanationHTML(fixture(),{now});
   assert.match(html,/High: 86°F/);
-  assert.match(html,/86 × 0\.4 \+ 88 × 0\.4 \+ 80 × 0\.2 = 85\.6°F → 86°F/);
+  assert.match(html,/86 × 0\.4 \+ 88 × 0\.3 \+ 80 × 0\.1 \+ 84 × 0\.2 = 85\.6°F → 86°F/);
   assert.match(html,/Low: 70°F/);
   const forecast=fixture();delete forecast.days[0].highBlend;delete forecast.days[0].lowBlend;
   assert.doesNotMatch(modelExplanationHTML(forecast,{now}),/Temperature calculations/);
