@@ -13,9 +13,9 @@ test('illustrated weather stays synchronized across outdoor and pet scenes',()=>
   assert.match(referenceScene(panel,true,'Rain',88),/comfort-reference-scenes-rain\.webp/);
   assert.doesNotMatch(referenceScene(panel,true,'Rain',88),/class="sky-sun"/);
   if(panel===2){
-   assert.match(referenceScene(panel,true,'Rain',88),/data-pet-motion="shake-off"/);
    assert.match(referenceScene(panel,true,'Rain',88),/dog shakes rainwater from its fur/);
-  }else assert.doesNotMatch(referenceScene(panel,true,'Rain',88),/data-pet-motion=/);
+   assert.doesNotMatch(referenceScene(panel,true,'Rain',88),/data-pet-motion=|pet-rain-shake/,'the shake-off is a still image, not an animation layer');
+  }
  }
  assert.doesNotMatch(referenceScene(2,true,'Clear',88),/data-pet-motion=/,'dry pet scenes stay still');
  assert.doesNotMatch(referenceScene(2,true,'Chance Showers',88,{pop:50}),/data-pet-motion=/,'umbrella-only scenes stay still');

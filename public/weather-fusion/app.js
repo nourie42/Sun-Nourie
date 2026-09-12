@@ -5,11 +5,11 @@ import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './wea
 import {dayGraphHTML,dayGraphPoints,installDayGraph} from './day-graph.js?v=weather-art-labels-v10';
 import {degrees,feelsAt} from './hourly-feels.js?v=weather-art-labels-v10';
 import {createFramePlayer} from './frame-player.js';
-import {renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=pet-rain-shake-v46';
+import {renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=pet-static-shake-v47';
 import {dailyDisplay} from './weather-math.js?v=forecast-trace-v40';
 import {currentHero} from './current-temperature.js?v=radar-now-v47';
 import {renderBulletins} from './bulletins.js?v=weather-art-labels-v10';
-import {modelFreshnessText} from './personal-details.js?v=pet-rain-shake-v36';
+import {modelFreshnessText} from './personal-details.js?v=pet-static-shake-v37';
 import {renderDewpointMeter} from './dewpoint-meter.js?v=car-wash-order-v31';
 import {renderWeatherPanel} from './render-safety.js';
 import {forecastPeriodSummary} from './forecast-story.js?v=forecast-trace-v40';

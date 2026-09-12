@@ -185,14 +185,5 @@ export function referenceScene(panel,daylight=true,condition='Clear',feels=null,
  const symbol=scene.key!=='normal'||panel===0?'':daylight&&weather.kind==='clear'
   ?sunGlyph(id,248,57,.64)
   :`<g transform="translate(214 20) scale(1.5)">${weatherShapes(condition,daylight)}</g>`;
- const petShake=panel===2&&scene.key==='rain'?`<g class="pet-rain-shake" data-pet-motion="shake-off" aria-hidden="true">
-  <defs><clipPath id="${id}-pet-shake"><rect x="168" y="158" width="132" height="142" rx="25"/></clipPath></defs>
-  <g class="pet-rain-dog-copy" clip-path="url(#${id}-pet-shake)"><image href="/weather-fusion/${scene.asset}" x="${-300*panel}" y="0" width="900" height="300" preserveAspectRatio="none"/></g>
-  <g class="pet-shake-marks" fill="none" stroke="#dff5ff" stroke-linecap="round">
-   <path d="M178 199Q164 207 174 217"/><path d="M181 230Q164 238 176 248"/>
-   <path d="M287 190Q299 199 290 210"/><path d="M286 225Q300 234 289 245"/>
-  </g>
-  <g class="pet-shake-drops" fill="#dff5ff"><ellipse cx="171" cy="189" rx="2" ry="5"/><ellipse cx="291" cy="181" rx="2" ry="5"/><ellipse cx="294" cy="218" rx="1.7" ry="4"/><ellipse cx="176" cy="257" rx="1.7" ry="4"/></g>
- </g>`:'';
- return `<svg class="reference-scene${panel===2?' poodle-scene':''}" viewBox="0 0 300 300" preserveAspectRatio="xMidYMid slice" role="img" aria-label="${label}" data-scene="${scene.key}" data-outfit="${clothingForFeels(feels)}" data-daylight="${daylight}" data-weather="${weather.kind}">${sharedDefs(id,sky)}<image class="reference-art" href="/weather-fusion/${scene.asset}" x="${-300*panel}" y="0" width="900" height="300" preserveAspectRatio="none"/>${petShake}${tint?`<rect width="300" height="300" fill="${tint}" class="reference-weather-tint" opacity="${daylight?'.06':'.18'}"/>`:''}${symbol}</svg>`;
+ return `<svg class="reference-scene${panel===2?' poodle-scene':''}" viewBox="0 0 300 300" preserveAspectRatio="xMidYMid slice" role="img" aria-label="${label}" data-scene="${scene.key}" data-outfit="${clothingForFeels(feels)}" data-daylight="${daylight}" data-weather="${weather.kind}">${sharedDefs(id,sky)}<image class="reference-art" href="/weather-fusion/${scene.asset}" x="${-300*panel}" y="0" width="900" height="300" preserveAspectRatio="none"/>${tint?`<rect width="300" height="300" fill="${tint}" class="reference-weather-tint" opacity="${daylight?'.06':'.18'}"/>`:''}${symbol}</svg>`;
 }
