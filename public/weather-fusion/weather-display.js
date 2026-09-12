@@ -34,7 +34,7 @@ export function hourlyWindHTML(sample){
  const speed=sample.inputs?.wind,direction=windDirectionLabel(sample.windDirection);
  return `<span class="hour-wind" title="${sample.now?'Current':'Forecast'} wind">${weatherMetricIcon('wind')}<b>${finite(speed)&&speed>=0?`${Math.round(speed)} mph`:'— mph'}</b><small>${speed===0?'Calm':direction}</small></span>`;
 }
-export const HRRR_RAIN_THRESHOLD_IN=.005;
+export const HRRR_RAIN_THRESHOLD_IN=.01;
 export function hrrrRainAmount(row){
  const value=row?.precipitationBlend?.sourceValues?.hrrr??row?.qpfBlend?.sourceValues?.hrrr;
  return finite(value)&&value>=HRRR_RAIN_THRESHOLD_IN?value:null;
@@ -43,7 +43,7 @@ export function hourlyRainHTML(sample){
  const blend=sample.rainLikelihood,value=sampleRainChance(sample);
  const votes=blend?.sourceValues||{},parts=[];
  if(finite(votes.nws))parts.push(`NWS ${Math.round(votes.nws)}%`);
- for(const id of ['hrrr','ecmwf'])if(finite(votes[id]))parts.push(`${id.toUpperCase()} ${votes[id]>=50?'wet':'dry'}`);
+ for(const id of ['hrrr','ecmwf'])if(finite(votes[id]))parts.push(`${id.toUpperCase()} QPF evidence ${Math.round(votes[id])}/100`);
  const detail=parts.length?` Inputs: ${parts.join(', ')}.`:'';
  return `<span class="hour-rain" title="Weather Nourie rain likelihood.${detail}"><small class="hour-pop">${weatherMetricIcon('drop')}${finite(value)?`${Math.round(value)}%`:'—'}</small></span>`;
 }

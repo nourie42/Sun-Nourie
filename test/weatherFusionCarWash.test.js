@@ -33,6 +33,7 @@ function fixture(chances = [10,10,10,30,10,10,10]) {
     metricForecasts:{series:{
       wind:hours.map((hour,index) => ({time:hour.time,value:4+index%3})),
       temperature:hours.map(hour => ({time:hour.time,value:hour.temperature})),
+      dewpoint:hours.map(hour => ({time:hour.time,value:68})),
     }},
   };
 }
@@ -228,4 +229,11 @@ test('WAIT punctuation is after the word and the Corvette photo has no text over
   assert.ok(html.indexOf('class="car-wash-hero"')<html.indexOf('class="car-wash-photo"'));
   assert.ok(html.indexOf('class="car-wash-photo"')<html.indexOf('class="car-wash-days-wrap"'));
   assert.doesNotMatch(html,/car-wash-overlay|Weather Nourie blend|Three-day rule applied/);
+});
+
+test('car-wash facts include the same Gross Meter scale used by the dew-point card',()=>{
+  const summary=carWashSummary(fixture([5,5,5,5,5,5,5]),start),html=carWashHTML(summary);
+  assert.deepEqual(summary.facts.gross,{title:'68° · GROSS',detail:'Gross Meter at wash time',value:68,level:'gross'});
+  assert.match(html,/68° · GROSS/);
+  assert.match(html,/Gross Meter at wash time/);
 });

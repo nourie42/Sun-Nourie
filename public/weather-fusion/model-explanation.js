@@ -75,7 +75,7 @@ function sourceTable(likelihood, caption = 'Inputs for the highest hour') {
     const input = source.id === 'nws'
       ? source.value === null ? 'Unavailable' : `${number(source.value)}% probability`
       : source.amount === null ? 'Unavailable' : `${number(source.amount,8)} in`;
-    const signal = source.id === 'nws' ? '' : source.value === null ? '' : `<small>${source.value >= 100 ? 'Wet' : 'Dry'} score: ${number(source.value)}/100</small>`;
+    const signal = source.id === 'nws' ? '' : source.value === null ? '' : `<small>QPF evidence: ${number(source.value)}/100</small>`;
     return `<tr><th scope="row">${names[source.id]}</th><td>${input}${signal}</td><td>${source.weight === null?'Not used':`${number(source.weight*100,4)}%`}</td><td>${source.points === null?'—':number(source.points,6)}</td></tr>`;
   }).join('');
   return `<table class="model-inputs"><caption>${esc(caption)}</caption><thead><tr><th scope="col">Source</th><th scope="col">Rain input</th><th scope="col">Weight</th><th scope="col">Points</th></tr></thead><tbody>${rows}</tbody></table>`;
@@ -89,10 +89,10 @@ function arithmetic(likelihood) {
   const weightedValue = finite(likelihood.weightedValue) ? likelihood.weightedValue : null;
   const rounded = finite(likelihood.rawValue) ? likelihood.rawValue : null;
   const zeroed = rounded !== null && rounded !== likelihood.value && likelihood.value === 0;
-  const dry = (likelihood.drySources || []).map(id=>names[id]||id);
+  const wet = (likelihood.wetSources || []).map(id=>names[id]||id);
   return `<div class="model-calculation"><p class="model-formula">${esc(formula)}${weightedValue===null?'':` ≈ ${number(weightedValue,8)}`}</p>
     <p>${rounded===null?'':`Rounded: <b>${number(rounded)}%</b>. `}Shown: <b>${percent(likelihood.value)}</b>.</p>
-    ${zeroed?`<p class="model-zero-rule">Shown as 0% because the unrounded blend is below 10% and at least two sources are dry (${esc(dry.join(', '))}).</p>`:''}</div>`;
+    ${zeroed?`<p class="model-zero-rule">Shown as 0% because the blend is below ${number(likelihood.uncorroboratedDisplayLimit)}% and fewer than two available sources support rain${wet.length?` (${esc(wet.join(', '))} only)`:''}.</p>`:''}</div>`;
 }
 
 function temperatureBlend(day, kind) {
@@ -117,7 +117,8 @@ export function modelExplanationHTML(forecast, options = {}) {
   const view = modelExplanationView(forecast,options), {day,zone,period,rows,peak,phase} = view;
   const choices = (forecast?.days || []).map((row,index)=>`<option value="${index}"${index===view.index?' selected':''}>${esc(dayLabel(row.date,index))}</option>`).join('');
   const phaseOptions = Object.entries(phaseNames).map(([key,name])=>`<option value="${key}"${key===phase?' selected':''}>${name}</option>`).join('');
-  const threshold = finite(peak?.thresholdInches) ? number(peak.thresholdInches,8) : null;
+  const threshold = finite(peak?.traceThresholdInches) ? number(peak.traceThresholdInches,8) : null;
+  const fullScale = finite(peak?.signalFullScaleInches) ? number(peak.signalFullScaleInches,8) : null;
   const temperatures = temperatureBlend(day,'high')+temperatureBlend(day,'low');
   const audit = rows.map(row=>`<details class="model-hour-audit" data-model-detail="hour-${esc(row.time)}"${row.time===view.peakTime?' data-peak="true"':''}><summary><span>${esc(stamp(row.time,zone))}</span><strong>${percent(row.rainLikelihood?.value)}</strong></summary>${sourceTable(row.rainLikelihood,'Hourly inputs')}${arithmetic(row.rainLikelihood)}</details>`).join('');
   return `<div class="model-explanation-heading"><h2 id="model-explanation-title">Why this forecast</h2><div class="model-selectors"><label>Day<select aria-label="Day" data-model-day>${choices}</select></label><label>Period<select aria-label="Period" data-model-phase>${phaseOptions}</select></label></div></div>
@@ -127,7 +128,7 @@ export function modelExplanationHTML(forecast, options = {}) {
     ${!view.complete?`<p class="model-data-warning">Incomplete coverage: ${number(period.coverage?.availableHours)} of ${number(period.coverage?.expectedHours)} hours. The period estimate stays unavailable.${view.maximum===null?'':` Highest available hour: ${percent(view.maximum)}.`}</p>`:''}
     ${view.peakTime?`<h3>Highest hour: ${esc(stamp(view.peakTime,zone))}–${esc(stamp(view.peakEnd,zone,false))}</h3>`:''}
     ${sourceTable(peak)}${arithmetic(peak)}
-    <details class="model-method" data-model-detail="method"><summary>How the inputs are used</summary><p>NWS supplies an official rain probability. HRRR and ECMWF supply rain amounts, not their own probabilities.${threshold===null?'':` An hourly amount of at least ${threshold} in gets a wet score of 100; a smaller amount gets 0.`}</p><p>The listed weights are the weights actually used for this hour. Missing sources are excluded, not counted as dry, and the remaining weights are rescaled. This is an uncalibrated blend, not a proven model-accuracy ranking.</p><p>If the unrounded blend is below 10% and at least two available sources are dry, the displayed estimate becomes 0%.</p></details>
+    <details class="model-method" data-model-detail="method"><summary>How the inputs are used</summary><p>NWS supplies an official rain probability. HRRR and ECMWF supply rain amounts, not their own probabilities.${threshold===null?'':` An hourly amount below ${threshold} in is treated as trace-only and gets 0 evidence points.`}${fullScale===null?'':` Amounts from ${threshold} to ${fullScale} in scale from 10 to 100 evidence points; larger amounts stay at 100.`}</p><p>The listed weights are the weights actually used for this hour. Missing sources are excluded, not counted as dry, and the remaining weights are rescaled. This is an uncalibrated blend, not a proven model-accuracy ranking.</p><p>A weak blend below 25% is displayed as 0% unless at least two available sources support rain. This prevents one trace or low-probability input from putting rain on an otherwise dry hour.</p></details>
     <details class="model-hourly-list" data-model-detail="hours"><summary>All ${rows.length} forecast hours in this period</summary>${audit||'<p>No hourly calculation data was supplied.</p>'}</details>
     ${temperatures?`<details class="model-temperature-list" data-model-detail="temperatures"><summary>Temperature calculations</summary>${temperatures}</details>`:''}
     <details class="model-source-list" data-model-detail="sources"><summary>Source runs and availability</summary>${sourceStatus(forecast,view)}</details>`;

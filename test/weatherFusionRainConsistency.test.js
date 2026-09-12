@@ -31,14 +31,12 @@ function matchingRows(data,summary) {
   return data.rainTimeline.filter(row=>Date.parse(row.time)<end&&Date.parse(row.end)>start);
 }
 
-test('daily drizzle cannot create a 59% score from hourly chances of 16–26%',()=>{
+test('trace drizzle cannot create an inflated daily score',()=>{
   const data=buildForecast(inputs());
   const day=data.days[1],rows=matchingRows(data,day.rainLikelihood);
-  const oldDaily=precipitationLikelihood(39,{sourceValues:{nws:.024,hrrr:null,ecmwf:.024}});
-  assert.equal(oldDaily.value,59,'reproduces the removed accumulated-rain voting bug');
   assert.equal(day.rainLikelihood.value,26);
   assert.equal(day.rainLikelihood.value,Math.max(...rows.map(row=>row.rainLikelihood.value)));
-  assert.deepEqual(new Set(rows.map(row=>row.rainLikelihood.value)),new Set([16,26]));
+  assert.deepEqual(new Set(rows.map(row=>row.rainLikelihood.value)),new Set([0,26]));
   assert.equal(day.rainLikelihood.coverage.complete,true);
   assert.equal(day.officialPop,39,'raw NWS period probability remains separate');
 });
@@ -124,26 +122,27 @@ test('two dry sources and a score below 10 yield zero consistently in hourly and
   for(const day of data.days)assert.equal(day.rainLikelihood.value,0);
 });
 
-test('the strict below-10 dry rule is applied before rounding, never at exactly 10',()=>{
+test('weak uncorroborated guidance stays zero until the blend reaches 25',()=>{
   const dryAmounts={sourceValues:{nws:.01,hrrr:0,ecmwf:0}};
-  const below=precipitationLikelihood(24,dryAmounts),boundary=precipitationLikelihood(25,dryAmounts);
-  assert.equal(below.weightedValue,9.6);
-  assert.equal(below.rawValue,10);
+  const below=precipitationLikelihood(62,dryAmounts),boundary=precipitationLikelihood(62.5,dryAmounts);
+  assert.equal(below.weightedValue,24.8);
+  assert.equal(below.rawValue,25);
   assert.equal(below.value,0);
-  assert.equal(boundary.weightedValue,10);
-  assert.equal(boundary.value,10);
+  assert.equal(boundary.weightedValue,25);
+  assert.equal(boundary.value,25);
   assert.deepEqual(below.drySources,['hrrr','ecmwf']);
   assert.equal(precipitationLikelihood(9,{sourceValues:{nws:.01,hrrr:null,ecmwf:null}}).value,9,'one source is not two dry models');
 });
 
-test('source evidence preserves exact amounts, wet-vote threshold and normalized arithmetic',()=>{
-  const score=precipitationLikelihood(39,{sourceValues:{nws:.001,hrrr:null,ecmwf:.005}});
-  assert.equal(score.thresholdInches,.005);
+test('source evidence preserves exact amounts, trace threshold and normalized arithmetic',()=>{
+  const score=precipitationLikelihood(39,{sourceValues:{nws:.001,hrrr:null,ecmwf:.016}});
+  assert.equal(score.traceThresholdInches,.01);
+  assert.equal(score.signalFullScaleInches,.1);
   assert.equal(score.sourceValues.hrrr,null);
-  assert.equal(score.sourceValues.ecmwf,100);
-  assert.equal(score.sourceAmounts.ecmwf,.005);
-  assert.equal(score.weightedValue,59.33333333);
-  assert.equal(score.value,59);
+  assert.equal(score.sourceValues.ecmwf,16);
+  assert.equal(score.sourceAmounts.ecmwf,.016);
+  assert.equal(score.weightedValue,31.33333333);
+  assert.equal(score.value,31);
   assert.deepEqual(score.sources.map(row=>[row.id,row.weight]),[['nws',.666667],['ecmwf',.333333]]);
   assert.equal(precipitationLikelihood(39,{sourceValues:{ecmwf:.0049}}).sourceValues.ecmwf,0);
   const data=buildForecast(inputs({amount:.001})),row=data.rainTimeline[0];
@@ -196,14 +195,14 @@ test('an in-progress rainy hour stays in Today at 12:01 and its remaining amount
   assert.equal(buildForecast({...data,now:now+H}).days[0].popDayLikelihood.value,0);
 });
 
-test('new model rain at the same hour changes both the hourly and period result with its actual run stamp',()=>{
-  const dry=inputs({chance:10,amount:0}),wet=structuredClone(dry);
+test('corroborated new model rain changes both the hourly and period result with its actual run stamp',()=>{
+  const dry=inputs({chance:30,amount:0}),wet=structuredClone(dry);
   wet.models.hrrr.runAt=iso(now);
   wet.models.hrrr.precipitationIntervals.find(row=>row.start*1000===now).value=.02;
   const first=buildForecast(dry),updated=buildForecast(wet);
   assert.equal(first.hours[0].rainLikelihood.value,0);
-  assert.equal(updated.hours[0].rainLikelihood.value,44);
-  assert.equal(updated.days[0].popDayLikelihood.value,44);
+  assert.equal(updated.hours[0].rainLikelihood.value,20);
+  assert.equal(updated.days[0].popDayLikelihood.value,20);
   assert.equal(updated.days[0].popDayLikelihood.peak.sources.find(source=>source.id==='hrrr').runAt,iso(now));
   assert.notEqual(first.signature,updated.signature);
 });

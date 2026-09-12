@@ -9,7 +9,7 @@ const at = offset => new Date(now+offset*HOUR).toISOString();
 
 function likelihood(value, options = {}) {
   return {value,rawValue:value,weightedValue:value,
-    sourceValues:{nws:value/.4,hrrr:0,ecmwf:0},sourceAmounts:{nws:.01,hrrr:0,ecmwf:.004},drySources:['hrrr','ecmwf'],thresholdInches:.005,
+    sourceValues:{nws:value/.4,hrrr:0,ecmwf:0},sourceAmounts:{nws:.01,hrrr:0,ecmwf:.004},drySources:['hrrr','ecmwf'],wetSources:['nws'],traceThresholdInches:.01,signalFullScaleInches:.1,uncorroboratedDisplayLimit:25,
     sources:[{id:'nws',value:value/.4,weight:.4,runAt:at(-1)},{id:'hrrr',value:0,weight:.4,runAt:at(-2)},{id:'ecmwf',value:0,weight:.2,runAt:at(-5)}],...options};
 }
 
@@ -54,9 +54,10 @@ test('NWS probability and model rain-amount signals are explicitly different inp
   const html=modelExplanationHTML(fixture(),{now});
   assert.match(html,/30% probability/);
   assert.match(html,/0\.004 in/);
-  assert.match(html,/Dry score: 0\/100/);
+  assert.match(html,/QPF evidence: 0\/100/);
   assert.match(html,/HRRR and ECMWF supply rain amounts, not their own probabilities/);
-  assert.match(html,/at least 0\.005 in gets a wet score of 100/);
+  assert.match(html,/below 0\.01 in is treated as trace-only/);
+  assert.match(html,/0\.01 to 0\.1 in scale from 10 to 100 evidence points/);
   assert.match(html,/uncalibrated blend, not a proven model-accuracy ranking/);
   assert.match(html,/not a separate probability of rain at any time/);
   assert.doesNotMatch(html,/ECMWF probability|HRRR probability/);
@@ -74,13 +75,13 @@ test('weights and arithmetic come from the exact used sources rather than fixed 
   assert.match(html,/<th scope="row">HRRR<\/th><td>Unavailable<\/td><td>Not used<\/td><td>—/);
 });
 
-test('below-ten dry consensus explains raw and shown values without inventing model probabilities',()=>{
-  const forecast=fixture(),zero=likelihood(0,{weightedValue:8,rawValue:8,sourceValues:{nws:20,hrrr:0,ecmwf:0},sources:[{id:'nws',value:20,weight:.4},{id:'hrrr',value:0,weight:.4},{id:'ecmwf',value:0,weight:.2}]});
+test('weak uncorroborated consensus explains raw and shown values without inventing model probabilities',()=>{
+  const forecast=fixture(),zero=likelihood(0,{weightedValue:8,rawValue:8,sourceValues:{nws:20,hrrr:0,ecmwf:0},wetSources:['nws'],consensusSuppressed:true,sources:[{id:'nws',value:20,weight:.4},{id:'hrrr',value:0,weight:.4},{id:'ecmwf',value:0,weight:.2}]});
   for(const row of forecast.rainTimeline)row.rainLikelihood=zero;
   Object.assign(forecast.days[0].popDayLikelihood,{value:0,peak:zero});
   const html=modelExplanationHTML(forecast,{now});
   assert.match(html,/Rounded: <b>8%<\/b>\. Shown: <b>0%/);
-  assert.match(html,/below 10% and at least two sources are dry \(HRRR, ECMWF\)/);
+  assert.match(html,/below 25% and fewer than two available sources support rain \(NWS only\)/);
   assert.doesNotMatch(html,/Data mismatch/);
 });
 
@@ -121,8 +122,7 @@ test('source status distinguishes a checked-but-failed refresh from the last dat
   assert.match(html,/Last check: Sat, Sep 12, 8 AM/);
   assert.match(html,/Using last verified data; the latest refresh did not succeed/);
   assert.match(html,/Latest fetch unavailable; retaining the verified run/);
-  assert.match(html,/If the unrounded blend is below 10%/);
-  assert.doesNotMatch(html,/If the rounded blend is below 10%/);
+  assert.match(html,/A weak blend below 25% is displayed as 0%/);
 });
 
 test('NWS hourly source time never borrows the different daily forecast issuance',()=>{

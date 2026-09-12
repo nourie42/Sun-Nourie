@@ -500,7 +500,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     'experience.js','exposure-scene.js','forecast-cards.css','forecast-confidence.js','forecast-layout.css','forecast-story.js',
     'frame-player.js','hero-mode.js','hourly-feels.js','hourly-feels.css','nav.js','outdoor-feels.js','pavement.js',
     'personal-details.js','personal-details.css','render-safety.js','scenario-layout.css','style.css','thermal-risk.js',
-    'today-card.js','utci.js','weather-display.js','weather-math.js','weather-repair.css','weather-state.js',
+    'today-card.js','rain-trend.js','utci.js','weather-display.js','weather-math.js','weather-repair.css','weather-state.js',
     'comfort-reference-scenes.png','comfort-reference-scenes.webp','comfort-reference-scenes-cold.webp',
     'comfort-reference-scenes-dawn.webp','comfort-reference-scenes-fog.webp','comfort-reference-scenes-hot.webp',
     'comfort-reference-scenes-rain.webp','comfort-reference-scenes-umbrella.png','comfort-reference-scenes-watch.webp',

@@ -1,4 +1,4 @@
-import {weatherShapes} from './weather-display.js?v=forecast-trace-v40';
+import {weatherShapes} from './weather-display.js?v=rain-consensus-v41';
 import {weatherState} from './weather-state.js';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 
