@@ -2,7 +2,7 @@ import {weatherState} from './weather-state.js';
 import {dailyDisplay,finite} from './weather-math.js?v=weather-art-labels-v10';
 import {dailyFeels,degrees,timeAt} from './hourly-feels.js?v=weather-art-labels-v10';
 import {uvCategory} from './daily-uv.js?v=weather-art-labels-v10';
-import {weatherIcon,weatherMetricIcon,hrrrRainAmount} from './weather-display.js?v=hrrr-rain-signal-v22';
+import {weatherIcon,weatherMetricIcon,hrrrRainAmount} from './weather-display.js?v=rain-consensus-v23';
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const reading=(value,unit='')=>finite(value)?`${Math.round(value)}${unit}`:'—';
 export function periodWeatherStats(forecast,now=Date.now()){

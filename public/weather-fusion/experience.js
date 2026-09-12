@@ -3,7 +3,7 @@ import {FORECAST_CONFIDENCE_VERSION} from './forecast-confidence.js?v=weather-ar
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
 import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=scenario-weather-v29';
 import {weatherState} from './weather-state.js';
-import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=hrrr-rain-signal-v22';
+import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=rain-consensus-v23';
 import {degrees,feelsAt,dailyFeels,forecastValue,peakFeelsHTML} from './hourly-feels.js?v=weather-art-labels-v10';
 import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=day-night-card-title-v34';
 import {comfortMode,comfortWindow,comfortNarrative,warmestTodayWindow} from './comfort-outlook.js?v=weather-art-labels-v10';

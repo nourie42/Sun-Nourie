@@ -40,9 +40,12 @@ export function hrrrRainAmount(row){
  return finite(value)&&value>=HRRR_RAIN_THRESHOLD_IN?value:null;
 }
 export function hourlyRainHTML(sample){
- const amount=hrrrRainAmount(sample),nws=finite(sample.pop)?`${Math.round(sample.pop)}% NWS`:'— NWS';
- const detail=finite(amount)?` HRRR models ${amount<.01?'less than 0.01':amount.toFixed(2)} inches of rain this hour.`:'';
- return `<span class="hour-rain" title="NWS forecast rain chance.${detail}"><small class="hour-pop">${weatherMetricIcon('drop')}${nws}</small>${finite(amount)?'<small class="hour-hrrr-rain">HRRR: rain</small>':''}</span>`;
+ const blend=sample.rainLikelihood,value=finite(blend?.value)?blend.value:sample.pop;
+ const votes=blend?.sourceValues||{},parts=[];
+ if(finite(votes.nws))parts.push(`NWS ${Math.round(votes.nws)}%`);
+ for(const id of ['hrrr','ecmwf'])if(finite(votes[id]))parts.push(`${id.toUpperCase()} ${votes[id]>=50?'wet':'dry'}`);
+ const detail=parts.length?` Inputs: ${parts.join(', ')}.`:'';
+ return `<span class="hour-rain" title="Weather Nourie rain likelihood.${detail}"><small class="hour-pop">${weatherMetricIcon('drop')}${finite(value)?`${Math.round(value)}%`:'—'}</small></span>`;
 }
 export function currentSample(forecast, now = Date.now()) {
   const current = currentComfortInputs(forecast,now), assembled = Date.parse(forecast?.assembledAt);
@@ -50,7 +53,7 @@ export function currentSample(forecast, now = Date.now()) {
   comfort.inputEvidence.estimatedFields=current.comfortEstimatedFields;
   comfort.inputEvidence.fallbackSources=current.comfortInputSources;
   const currentHour=forecast?.hours?.find(h=>Date.parse(h.time)<=now&&now<Date.parse(h.time)+3600000);
-  return {windDirection:current.windDirection,pop:currentHour?.pop,precipitationBlend:currentHour?.precipitationBlend,uvIndex:hourlyUvValue(forecast,now),id:'now', now:true, time:current.time, temperature:finite(current.temperature) ? current.temperature : null,
+  return {windDirection:current.windDirection,pop:currentHour?.pop,rainLikelihood:currentHour?.rainLikelihood,precipitationBlend:currentHour?.precipitationBlend,uvIndex:hourlyUvValue(forecast,now),id:'now', now:true, time:current.time, temperature:finite(current.temperature) ? current.temperature : null,
     feels:outdoorExposure(comfort).value, exposure:outdoorExposure(comfort), comfort, condition:current.condition || 'Sky conditions unavailable',
     isDay:comfort.daylight ?? (solarElevation(now,forecast.location.latitude,forecast.location.longitude) > 0),
     source:current.type === 'observation' ? 'Station observation' : 'Current estimate', inputs:current};
@@ -67,7 +70,7 @@ export function forecastSample(forecast, time) {
   const comfort={...estimated,outdoors:value,shade:rounded(estimated.rawShade),sun:estimated.sun===null?null:value};
   return {windDirection:hour.windDirectionDegrees??hour.windDirection,uvIndex:hourlyUvValue(forecast,epoch),id:new Date(epoch).toISOString(), now:false, time:hour.time,
     temperature:forecastValue(forecast,'temperature',hour.time), feels:feelsAt(forecast,hour.time),
-    condition:inputs.condition, isDay:comfort.daylight, exposure:outdoorExposure(comfort), comfort, inputs, source:'Hourly forecast', pop:hour.pop,precipitationBlend:hour.precipitationBlend};
+    condition:inputs.condition, isDay:comfort.daylight, exposure:outdoorExposure(comfort), comfort, inputs, source:'Hourly forecast', pop:hour.pop,rainLikelihood:hour.rainLikelihood,precipitationBlend:hour.precipitationBlend};
 }
 export function hourlyDisplaySamples(forecast, now = Date.now()) {
   return [currentSample(forecast, now), ...(forecast?.hours || []).filter(hour => Date.parse(hour.time) > now)

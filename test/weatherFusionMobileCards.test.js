@@ -57,12 +57,8 @@ test('compact descriptions preserve uncertainty and the complete forecast is acc
  assert.match(todayForecastHTML(fixture(),now),/title="Slight Chance Showers And Thunderstorms"/);
  const f=fixture();f.days[0].condition='<script>alert(1)</script>';assert.doesNotMatch(todayForecastHTML(f,now),/<script>/);
 });
-test('NWS probability and deterministic HRRR rain stay separate and compact',()=>{
- const f=fixture();f.days[0].qpfBlend={sourceValues:{hrrr:.071}};
- const today=todayForecastHTML(f,now);
- assert.match(today,/23%/);assert.match(today,/NWS chance/);assert.match(today,/HRRR: rain today/);
- assert.match(hourlyRainHTML({pop:21,precipitationBlend:{sourceValues:{hrrr:.071}}}),/21% NWS/);
- assert.match(hourlyRainHTML({pop:21,precipitationBlend:{sourceValues:{hrrr:.071}}}),/HRRR: rain/);
- assert.doesNotMatch(hourlyRainHTML({pop:22,precipitationBlend:{sourceValues:{hrrr:.001}}}),/HRRR: rain/);
- assert.doesNotMatch(hourlyRainHTML({pop:22}),/HRRR: rain/);
+test('hourly card shows the Weather Nourie consensus rather than relabeling NWS as the blend',()=>{
+ assert.match(hourlyRainHTML({pop:21,rainLikelihood:{value:48,sourceValues:{nws:21,hrrr:100,ecmwf:0}}}),/>48%</);
+ assert.doesNotMatch(hourlyRainHTML({pop:21,rainLikelihood:{value:48,sourceValues:{nws:21,hrrr:100,ecmwf:0}}}),/% NWS|HRRR: rain/);
+ assert.match(hourlyRainHTML({pop:22}),/>22%</);
 });

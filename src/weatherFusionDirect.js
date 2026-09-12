@@ -125,6 +125,20 @@ export function weighted(values, policy) {
   return { value: sum ? round(sources.reduce((n,s) => n+s.value*s.weight,0)/sum,4) : null,
     sources: sources.map((s) => ({ ...s, weight: round(s.weight/sum,6) })), calibrated: false };
 }
+const RAIN_VOTE_THRESHOLD_IN = .005;
+/** NWS supplies probability; deterministic HRRR/ECMWF supply wet/dry votes. */
+export function precipitationLikelihood(nwsProbability, precipitationBlend, policy = SAME_DAY_WEIGHTS) {
+  const amounts = precipitationBlend?.sourceValues || {};
+  const values = {
+    nws: finite(nwsProbability) ? Math.max(0, Math.min(100, nwsProbability)) : null,
+    hrrr: finite(amounts.hrrr) ? (amounts.hrrr >= RAIN_VOTE_THRESHOLD_IN ? 100 : 0) : null,
+    ecmwf: finite(amounts.ecmwf) ? (amounts.ecmwf >= RAIN_VOTE_THRESHOLD_IN ? 100 : 0) : null
+  };
+  const result = weighted(values, policy);
+  return {...result,value:finite(result.value)?Math.round(result.value):null,sourceValues:values,
+    sourceAmounts:{hrrr:finite(amounts.hrrr)?amounts.hrrr:null,ecmwf:finite(amounts.ecmwf)?amounts.ecmwf:null},
+    source:'Weather Nourie consensus · NWS probability + HRRR/ECMWF wet-dry guidance',calibrated:false,thresholdInches:RAIN_VOTE_THRESHOLD_IN};
+}
 /** Backward-compatible API helper using the same all-weather Steadman equation as Weather Nourie. */
 export function feelsLike(t, rh, wind, dewpoint = null) {
   const result=shadeFeelsLike(t,rh,wind,dewpoint);
@@ -241,6 +255,8 @@ export function enhanceForecast(out, { models, grid, periods = [], now, gridQpf,
     if(active.length){hour.temperatureBlend=weighted(values,tempPolicy(forecastDayIndex(time,now,out.location.timeZone)));hour.temperature=round(hour.temperatureBlend.value,0);}
     const rain=qpf(time,time+H,(time-now)/H<24?0:1);
     hour.precipitation=rain.value;hour.precipitationSource=rain.source;hour.precipitationBlend=rain;
+    hour.officialPop=hour.pop;
+    hour.rainLikelihood=precipitationLikelihood(hour.pop,rain,(time-now)/H<24?SAME_DAY_WEIGHTS:precipitationPolicy(forecastDayIndex(time,now,out.location.timeZone)));
     hour.reflectivity=sample(sourceModels.hrrr,time,'reflectivity');
     hour.nearbyReflectivity=sample(sourceModels.hrrr,time,'nearby_reflectivity');
   }
@@ -252,7 +268,7 @@ export function enhanceForecast(out, { models, grid, periods = [], now, gridQpf,
   out.convectiveGuidance=out.hours.filter(h=>finite(h.reflectivity)||finite(h.nearbyReflectivity)).slice(0,30).map(h=>({time:h.time,pointReflectivityDbz:h.reflectivity,nearby25kmMaxReflectivityDbz:h.nearbyReflectivity,runAt:sourceModels.hrrr?.reflectivityRunAt||sourceModels.hrrr?.runAt}));
   out.google={status:'access-required',contributes:false,label:'Google WeatherNext',message:'Not included: approved Google WeatherNext dataset access has not been configured.',url:'https://developers.google.com/weathernext/guides/access-forecast'};
   out.repairVersion=REPAIR_VERSION;
-  out.blendPolicy={sameDay:SAME_DAY_WEIGHTS,probability:'NWS only; deterministic rain amounts are not probabilities',partialCoverage:'Unavailable inputs are excluded and remaining weights renormalized'};
-  out.methodology='Numeric Weather Nourie blend: Current-day temperatures start at NWS 40% / HRRR 40% / ECMWF 20%. HRRR, ECMWF IFS and NBM contribute only where a fresh run fully covers the requested period. Current-day precipitation starts at NWS 40% / HRRR 40% / ECMWF 20%, blended per hour so a short HRRR run still contributes; extended precipitation at ECMWF 60% / NBM 25% / NWS 15%, with documented fallbacks. Available weights renormalize; missing values never become zero. These are uncalibrated starting weights, not a proven accuracy ranking. NWS precipitation probability remains separate and official warnings are never altered. Explicit HRRR, ECMWF IFS 0.25° and NBM point feeds cover the selected coordinates through Open-Meteo, with native extracts as a fallback. Point feeds can combine successive runs of the same named model; their initialization metadata refers to the latest published run. Temperature, dew point, wind, gust and cloud cover share the requested lead-day weights; humidity and feels-like are derived consistently. Pressure and visibility include only published fields. Station observations, UV, NWS probabilities and official text retain separate provenance. Coarser precipitation intervals are prorated at boundaries; interpolated hourly amounts do not establish storm arrival times. Today’s daily rain card covers only the remaining period when earlier forecast hours have passed; the main precipitation metric covers the next 24 hours.';
+  out.blendPolicy={sameDay:SAME_DAY_WEIGHTS,probability:'Hourly Weather Nourie consensus: NWS probability plus deterministic HRRR/ECMWF wet-dry votes; uncalibrated',partialCoverage:'Unavailable inputs are excluded and remaining weights renormalized'};
+  out.methodology='Numeric Weather Nourie blend: Current-day temperatures start at NWS 40% / HRRR 40% / ECMWF 20%. HRRR, ECMWF IFS and NBM contribute only where a fresh run fully covers the requested period. Current-day precipitation starts at NWS 40% / HRRR 40% / ECMWF 20%, blended per hour so a short HRRR run still contributes; extended precipitation at ECMWF 60% / NBM 25% / NWS 15%, with documented fallbacks. Available weights renormalize; missing values never become zero. These are uncalibrated starting weights, not a proven accuracy ranking. The hourly rain likelihood combines the official NWS probability with wet-or-dry votes from deterministic HRRR and ECMWF runs; it is a transparent consensus score, not a native calibrated probability from either deterministic model. Official warnings are never altered. Explicit HRRR, ECMWF IFS 0.25° and NBM point feeds cover the selected coordinates through Open-Meteo, with native extracts as a fallback. Point feeds can combine successive runs of the same named model; their initialization metadata refers to the latest published run. Temperature, dew point, wind, gust and cloud cover share the requested lead-day weights; humidity and feels-like are derived consistently. Pressure and visibility include only published fields. Station observations, UV and official text retain separate provenance. Coarser precipitation intervals are prorated at boundaries; interpolated hourly amounts do not establish storm arrival times. Today’s daily rain card covers only the remaining period when earlier forecast hours have passed; the main precipitation metric covers the next 24 hours.';
   return out;
 }
