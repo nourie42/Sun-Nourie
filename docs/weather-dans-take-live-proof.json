@@ -1,0 +1,184 @@
+{
+  "checkedAt": "2026-09-12T01:47:24.519Z",
+  "commit": "7df5188648f619e081be79b6215196016b2a96cf",
+  "base": "https://sun-nourie-live.onrender.com",
+  "fixture": false,
+  "success": true,
+  "locations": [
+    {
+      "place": "Knightdale / Raleigh",
+      "verifiedAt": "2026-09-12T01:47:49.003Z",
+      "aiMode": "ai",
+      "aiReason": null,
+      "takeStatus": "no-explicit-future-change",
+      "source": {
+        "id": "3f74352a-342e-4a02-9c0c-2f9e09d56b51",
+        "office": "RAH",
+        "issuedAt": "2026-09-12T00:06:00+00:00",
+        "locationKey": "35.787,-78.4806",
+        "expiresAt": "2026-09-12T12:06:00.000Z"
+      },
+      "eligibleExcerpts": [],
+      "displayed": {
+        "text": "Flooding rain: Marginal risk today. A few spots could flood.",
+        "hidden": false,
+        "headingCount": 1,
+        "bodyHasLabel": false,
+        "fullOutlookSections": 0,
+        "overflow": false
+      },
+      "approvedChanges": [],
+      "discussion": {
+        "id": "3f74352a-342e-4a02-9c0c-2f9e09d56b51",
+        "office": "RAH",
+        "issuedAt": "2026-09-12T00:06:00+00:00",
+        "url": "https://api.weather.gov/products/3f74352a-342e-4a02-9c0c-2f9e09d56b51",
+        "text": "\n000\nFXUS62 KRAH 120006\nAFDRAH\n\nArea Forecast Discussion\nNational Weather Service Raleigh NC\n806 PM EDT Fri Sep 11 2026\n\n.WHAT HAS CHANGED...\n\n* Minor PoP adjustments for this weekend, otherwise no major changes.\n\n&&\n\n.KEY MESSAGES...\nAs of 245 PM Friday...\n\n1) Unsettled wx pattern this weekend, potentially wet at times later \nSaturday. \n\n2) Mainly dry with temps closer to seasonable values much of next \nweek. \n\n&&\n\n.DISCUSSION...\nAs of 245 PM Friday...\n\n1) Unsettled wx pattern this weekend, potentially wet at times later \nSaturday. \n\nAn upper short wave trough currently moving across the Miss Valley \nwill lift NE across the TN Valley tomorrow and exit off the Mid-\nAtlantic coast by mid-day Sunday.  In response, we'll see several \nopportunities for showers and tstms through early Sunday, the first \nof which being widely scattered showers and tstms the rest of today, \na few of which could include an isolated strong or possibly damaging \nwind gust (see SWODY1 for additional details).  \n\nSaturday, particularly later in the day and early night, appears to \nbe the most unsettled part of the weekend as the trough approaches \nand begins moving across. While a shower/tstm will be possible any \ntime Saturday, the most likely time and best coverage will likely be \nlate in the day from mid-afternoon hours through the late evening \nhours. It's worth noting that central NC is included in the Days 1 \nand 2 ERO, so any of the heavier downpours could results in isold \nflooding of the typical spots that are more sensitive to heavy \ndownpours, such as urban and low-lying areas. \n\nWhile the bulk of the prefrontal shower/tstm activity should be to \nour east by daybreak Sunday morning, we can't rule out a few \nadditional showers or tstms assoc with the actual frontal passage \nwhich will occur later Sunday, thus the reason for the ongoing \nelevated PoPs Sunday afternoon; however, coverage and intensity \nshould be much less compared to the previous day.  \n\n2) Mainly dry with temps closer to seasonable values much of next \nweek.  \n\nMost of next week will be dry thanks to an upper ridge that will be \npositioned to our west much of the time and resulting dry northerly \nflow. In addition, the airmass... while still a few deg above \nnormal... will at least be closer to normal with highs each day \ngenerally in the 80s.  It's worth noting that a closed upper trough, \nbroken off from a larger-scale trough moving off the Northeast \nstates early next week, will drift south parallel to the East Coast. \n Today's NWP models forecast it to remain far enough offshore so \nthat our only impact from it will be occasional gusty NE winds at \ntimes during the mid-week period. \n\n&&\n\n.AVIATION /00Z SATURDAY THROUGH WEDNESDAY/... \nAs of 800 PM Friday...\n\nVFR will largely prevail across central NC through this evening, \nwith mostly mid and high clouds. Isolated showers and storms have \ndeveloped across mainly far northern and far southern parts of the \nregion, along with a developing cluster near RDU. Brief heavy rain, \nlightning, and gusty winds will be possible with any storm, but \nother than what is currently happening around RDU, the chances of a \nstorm directly impacting a terminal are low. \n\nOvernight tonight after about 06z, low stratus will begin to spread \ninto central NC from north to south, with all terminals likely to \nexperience IFR conditions. A period of LIFR is even possible around \ndaybreak, along with patchy MVFR/IFR visibilities. VFR will return to \nmost areas by midday on Saturday, but MVFR may linger into early \nafternoon around the Triad. Showers and storms are then expected to \ndevelop in the afternoon across the region, and they should be more \nwidespread compared to today. Brief gusty winds and sub-VFR \nconditions will be possible with any storms.\n\nOutlook: Shower and thunderstorm chances will continue through \nSaturday evening as a cold front makes its way through central NC.\nLow stratus and/or fog may develop and cause sub-VFR restrictions \nagain on Sunday and Monday mornings as well. \n\n&&\n\n.RAH WATCHES/WARNINGS/ADVISORIES...\nNone.\n\n&&\n\n$$\n\nDISCUSSION...np \nAVIATION...Danco/Helock\n"
+      }
+    },
+    {
+      "place": "White Lake, NC",
+      "verifiedAt": "2026-09-12T01:47:51.318Z",
+      "aiMode": "ai",
+      "aiReason": null,
+      "takeStatus": "no-explicit-future-change",
+      "source": {
+        "id": "aec422be-7ad2-4ef8-81b7-c8601740581f",
+        "office": "ILM",
+        "issuedAt": "2026-09-12T00:02:00+00:00",
+        "locationKey": "34.6385,-78.5025",
+        "expiresAt": "2026-09-12T12:02:00.000Z"
+      },
+      "eligibleExcerpts": [],
+      "displayed": {
+        "text": "",
+        "hidden": true,
+        "headingCount": 1,
+        "bodyHasLabel": false,
+        "fullOutlookSections": 0,
+        "overflow": false
+      },
+      "approvedChanges": [],
+      "discussion": {
+        "id": "aec422be-7ad2-4ef8-81b7-c8601740581f",
+        "office": "ILM",
+        "issuedAt": "2026-09-12T00:02:00+00:00",
+        "url": "https://api.weather.gov/products/aec422be-7ad2-4ef8-81b7-c8601740581f",
+        "text": "\n000\nFXUS62 KILM 120002\nAFDILM\n\nArea Forecast Discussion\nNational Weather Service Wilmington NC\n800 PM EDT Fri Sep 11 2026\n\n.WHAT HAS CHANGED...\nAviation section updated. \n\n&&\n\n.KEY MESSAGES...\n1) Deep Gulf moisture and a break in the ridge aloft will \nmaintain good chances for showers and thunderstorms through \nSunday.\n\n2) Well-above normal temperatures and high humidity will \nmaintain daytime heat indices at or above 100 degrees through \nMonday.\n\n3) A modified Canadian airmass should bring near-normal \ntemperatures beginning Tuesday.\n\n&&\n\n.DISCUSSION...\nKEY MESSAGE 1...Deep Gulf moisture and a break in the ridge aloft will \nmaintain good chances for showers and thunderstorms through \nSunday.\n\nThis morning's 12z CHS weather balloon measured a precipitable \nwater of 2.35 inches. That's one-third of an inch above the 90th\nclimatological percentile and near the daily max for this time \nof year. Deep Gulf moisture will continue to stream northeastward\nacross the eastern Carolinas through Sunday morning between a \nmid level ridge east of the Bahamas and a trough over the Mid-\nMississippi Valley.\n\nSurface-based CAPE near 2000 J/kg, forecast 0-6 km bulk shear\naround 10 knots, and little-to-no dry air aloft argues for\nsingle-cell storm development on Saturday with heavy rain \npotential. Some loose storm organization could occur along the \nseabreeze front and any outflow boundaries, but severe weather \nrisk should remain very low. HREF ensemble 24-hr max precip of \n3-5 inches implies there will be a few isolated heavy totals \nwithin the sea of 0.25 to 0.50 inch weekend amounts.\n\nThe upper trough producing the break in the ridge should slide \neastward across the Carolinas on Sunday, perhaps enhancing bulk\nshear to around 20 knots. Multicells should become possible, \nperhaps bringing better potential for gusty winds. The upper \ntrough should shift offshore Sunday night ahead of rising mid \nand upper level heights spreading eastward from the Mid South.\n\n\nKEY MESSAGE 2...Well-above normal temperatures and high humidity will \nmaintain daytime heat indices at or above 100 degrees through \nMonday.\n\n850 mb temps in the +18C to +19C range should continue through\nthe weekend. This is at or above the 90th climatological \npercentile for mid September. If it weren't for the increased \ncloudiness and convection expected this weekend we'd probably be\nlooking at Heat Advisory-level conditions. \n\nAs it stands now, forecast highs in the upper 80s to around 90 \ncoupled with dewpoints well into the 70s should yield heat \nindices in the 100-103 range through Monday.\n\nNWS ILM has never issued a Heat Advisory later than September 5\nsince the introduction of VTEC product codes twenty years ago.\n(and that latest advisory was earlier this month)\n\n\nKEY MESSAGE 3...A modified Canadian airmass should bring near-normal \ntemperatures beginning Tuesday.\n\nModels have all come into line over the past 24 hours showing\nthe strongest Canadian high we've seen since last Spring moving\nacross New England Tuesday into Wednesday. This should push a\ncold front southward across the eastern Carolinas Monday night,\nallowing a modified Canadian airmass to spread across the area\nTuesday into Wednesday. This won't be crisp, dry Canadian air by\nany means given its long passage across water temps in the 70s \nand 80s, but it should bring cooler air across the area knocking\ntemperatures back down closer to normal for mid September.\n\nForecast lows in particular look refreshing with 60s expected\nfor all but east-facing beaches Tuesday night and Wednesday\nnight. Some inland locations could conceivably dip to 60\ndegrees.\n\n&&\n\n.AVIATION /00Z SATURDAY THROUGH WEDNESDAY/...\n\nVFR for most of tonight until we head towards the predawn hours.\nLate tonight there is a moderate potential for LIFR ceilings to\ndevelop over KFLO and KLBT mainly after 10z, lingering through 13-\n14z much like we saw this morning. Guidance has backed off slightly \non both but given not only the ambient moisture in place but the \nwidespread rainfall we saw these solutions have not been favored and \nthe forecast remains rather pessimistic. The low clouds should limit \nfog vsby restrictions to MVFR. These low stratus clouds should lift \ninto a cumulus cloud deck with bases 2500-3500 feet AGL after 14-15z \nSaturday with another round of showers and thunderstorms anticipated \nto develop during the heat of the day.\n\nExtended Outlook...Scattered showers and thunderstorms bringing\nbrief MVFR/IFR conditions are expected Saturday afternoon and\nagain Sunday afternoon. There is also a low potential for late \nnight/early morning stratus or ground fog affecting KLBT and \nKFLO late Saturday night and again late Sunday night. VFR\nconditions should prevail Monday through Wednesday as a more\nstable and drier Canadian airmass builds in from the northeast.\n\n&&\n\n.MARINE...\nTonight through Tuesday night...Models continue to consistently\nshow a cold front stalling across interior North Carolina \ntonight, then lifting back north on Saturday with no direct \nimpact on our weather or winds this far south. Light to moderate\nsouthwesterly winds are expected to continue through the \nweekend along with multiple waves of showers and thunderstorms \nSaturday through Sunday night. \n\nDrier weather should develop on Monday as high pressure\nstrengthens aloft over the Carolinas. The strongest Canadian\nhigh we've seen since last Spring should move across New England\nTuesday and Wednesday, pushing a cold front southward across the\nCarolina coastal waters Monday night. Northeast winds behind the\nfront should increase to a solid 20 knots offshore and 15-20 \nknots nearshore Tuesday into Tuesday night. Seas within 20 \nmiles of shore could build to 4-6 feet with dominant wave\nperiods near 6 seconds.\n\n&&\n\n.ILM WATCHES/WARNINGS/ADVISORIES...\nNC...Coastal Flood Advisory from 9 PM this evening to 1 AM EDT \n     Saturday for NCZ107.\nSC...None.\nMARINE...None.\n\n&&\n\n$$\n\nWHAT HAS CHANGED...MBB\nKEY MESSAGES...TRA \nDISCUSSION...TRA \nAVIATION...MBB/TRA\nMARINE...TRA\n"
+      }
+    },
+    {
+      "place": "Jacksonville, FL",
+      "verifiedAt": "2026-09-12T01:48:15.729Z",
+      "aiMode": "nws-summary",
+      "aiReason": "AI synthesis is temporarily unavailable; the verified source forecast remains visible.",
+      "takeStatus": "no-approved-change",
+      "source": {
+        "id": "707d0ba3-1ffe-4105-8637-45f35814c0f8",
+        "office": "JAX",
+        "issuedAt": "2026-09-11T23:29:00+00:00",
+        "locationKey": "30.3322,-81.6557",
+        "expiresAt": "2026-09-12T11:29:00.000Z"
+      },
+      "eligibleExcerpts": [
+        {
+          "id": "s2-p3-q0",
+          "quote": "Convection is expected to be less widespread on Sunday as the high pressure ridge shifts northward and crosses over the forecast area, with the prevailing flow gradually shifting to a more northeasterly onshore flow by the beginning of next week.",
+          "context": "Convection is expected to be less widespread on Sunday as the high pressure ridge shifts northward and crosses over the forecast area, with the prevailing flow gradually shifting to a more northeasterly onshore flow by the beginning of next week. Overall, precipitation chances will be about 20-40% across much of the area, with higher chances over north central Florida.",
+          "section": "SHORT TERM",
+          "sourcePeriod": "6 AM SATURDAY MORNING THROUGH SUNDAY NIGHT",
+          "sectionIssuedAt": "2026-09-11T23:29:00.000Z",
+          "period": "This coming week — Sunday, Sep 13",
+          "validFrom": "2026-09-13T04:00:00.000Z",
+          "eventEnd": "2026-09-14T04:00:00.000Z",
+          "validUntil": "2026-09-12T11:29:00.000Z"
+        }
+      ],
+      "displayed": {
+        "text": "",
+        "hidden": true,
+        "headingCount": 1,
+        "bodyHasLabel": false,
+        "fullOutlookSections": 0,
+        "overflow": false
+      },
+      "approvedChanges": [],
+      "discussion": {
+        "id": "707d0ba3-1ffe-4105-8637-45f35814c0f8",
+        "office": "JAX",
+        "issuedAt": "2026-09-11T23:29:00+00:00",
+        "url": "https://api.weather.gov/products/707d0ba3-1ffe-4105-8637-45f35814c0f8",
+        "text": "\n000\nFXUS62 KJAX 112329\nAFDJAX\n\nArea Forecast Discussion\nNational Weather Service Jacksonville FL\n729 PM EDT Fri Sep 11 2026\n\n.KEY MESSAGES...\n\nFor the latest NE FL and SE GA Daily Key Messages please visit:\nhttps:/www.weather.gov/media/jax/briefings/nws-jax-briefing.pdf\n\n- Moderate Rip Current Risk all Local Beaches Today and Friday.\nElevated Risk Returns Early Next Week\n\n- Daily Heat Index up to 107 through Sunday\n\n- Daily Afternoon & Evening Thunderstorms. Main Hazards: Locally\nHeavy Rain, Lightning & Gusty Winds Up to 40-50 mph\n\n&&\n\n.NEAR TERM /UNTIL 6 AM SATURDAY MORNING/...\nMain Highlights:\n\n- Numerous Afternoon and Evening Thunderstorms Expected through \nSaturday. Strong Storm Potential Along the I-95 Corridor   During \nthe Late Afternoon Hours. Stronger Storms May Produce   Wind Gusts \nof 40-55 mph, Frequent Lightning Strikes, and   Torrential Downpours \nthat Could Result in Localized Flooding.\n\n- Daily Peak Heat Index Values of 104-108 Degrees Expected. through \nMonday.\n\n- Moderate Rip Current Risk Continues at All Area Beaches through \nMonday. High Risk Likely from Tuesday through Thursday. \n\nAfternoon surface analysis depicts weakening Atlantic high pressure \n(1019 millibars) situated off the southeastern seaboard, with this \nfeature extending its axis westward across north central FL. \nMeanwhile, a frontal boundary stretching from North Carolina's Outer \nBanks westward across the Tennessee Valley and the Ozarks was in the \nprocess of stalling as another weak high pressure center stretches \nacross the Great Lakes, Mid-Atlantic states and New England in the \nwake of this boundary. Aloft...deep-layered ridging was centered \njust northeast of the Bahamas, which was directing a shortwave \ntrough  located on the western periphery of this feature north-\nnortheastward across western portions of the FL panhandle. \nOtherwise, a potent shortwave trough was digging eastward across the \nOzarks towards the Tennessee Valley. Latest GOES-East derived Total \nPrecipitable Water imagery indicates that deep tropical moisture \nremains in place area-wide, with PWAT values generally in the 2 - \n2.3 inch range across our area. Convection on the leading edge of \nthe shortwave trough that was crossing western portions of the FL \npanhandle has crossed the Alapaha and Suwannee Rivers, with only \nisolated showers located elsewhere, mainly at inland locations. \nTemperatures at 18Z were generally in the upper 80s and lower 90s, \nwith dewpoints mostly in the low to mid 70s creating heat index \nvalues mostly around 100. \n\nAbundant tropical moisture and continued slow cooling of \ntemperatures aloft should allow for showers and thunderstorms to \nbecome numerous across our region as the afternoon progresses, with \nsouthwesterly steering flow bringing convection towards the I-95 \ncorridor late this afternoon, where activity could linger into the \nearly evening hours. The presence of a pinned Atlantic sea breeze \nboundary along the I-95 corridor and other mesoscale boundary \ncollisions should allow for storms to \"pulse\" and potentially become \nstrong later this afternoon, especially as convection intersects the \nAtlantic sea breeze boundary that should be positioned near I-95. \nStorms that pulse and become strong will be capable of producing \ndownburst winds of 40-50 mph, along with frequent lightning strikes \nand torrential downpours. Given the deep tropical moisture in place, \nany storms that \"back-build\" along mesoscale boundaries such as the \nAtlantic sea breeze could result in localized flooding, especially \nif this potential event occurs at urban or low-lying, normally flood \nprone locations. \n\nConvection could linger into the early to mid evening hours tonight, \nespecially along the I-95 corridor in southeast GA, where convection \nmay not arrive until later this afternoon. Otherwise, debris cloud \ncover will thin out after midnight, with deepening southwesterly \nflow likely developing a greater coverage of predawn convection over \nApalachee Bay than what was observed this morning. Some of this \nactivity could move onshore along the FL Big Bend and Nature Coasts \ntowards sunrise, but activity should remain west of the Suwannee \nRiver and north central FL through the early morning hours on \nSaturday. Lows will fall to the low and mid 70s across most of our \narea.\n\n&&\n\n.SHORT TERM /6 AM SATURDAY MORNING THROUGH SUNDAY NIGHT/...\nMain Highlights This Period:\n\n- Potential for isolated strong thunderstorms and localized flooding \non Saturday\n\nSouthwest steering flow continues to bring in enhanced moisture \n(PWATs 2.2-2.4\") across the area, prompting numerous showers and \nstorms Saturday afternoon and evening. The Gulf sea breeze will push \nfurther inland, meeting the Atlantic sea breeze closer to the east \ncoast/I-95 corridor, which is where our best chance for strong \nthunderstorm development will be. Gusty winds will be the primary \nthreat with any strong storms, but also heavy rainfall may cause \nlocalized flooding concerns, especially in urban and typically flood \nprone areas. High temperatures Saturday will be in the low 90s, with \nmax afternoon heat index values peaking around 104-107 for portions \nof northeast Florida.\n\nConvection is expected to be less widespread on Sunday as the high \npressure ridge shifts northward and crosses over the forecast area, \nwith the prevailing flow gradually shifting to a more northeasterly \nonshore flow by the beginning of next week. Overall, precipitation \nchances will be about 20-40% across much of the area, with higher \nchances over north central Florida. Similar high temperatures are \nexpected Sunday, in the lower 90s.\n\n&&\n\n.LONG TERM /MONDAY THROUGH FRIDAY/...\nMain Highlights This Period Monday through Thursday: \n\n- Daily Thunderstorms Potential Each Day Next Week\n\n- Elevated Rip Current Risk Next Week \n\nNorthwesterly flow Monday gradually shifts to northeasterly Tuesday, \nbeginning a few day period of stronger onshore flow through \nThursday. Tuesday through Thursday, those breezy easterly surface \nwinds will bring showers and isolated thunderstorms onshore in the \nmornings, with coverage expanding inland throughout the day. For \ndaily afternoon and evening storms, the focus will be generally \nsouth of I-10 each day. High temperatures gradually lower throughout \nthe week, Monday highs will be in the lower to mid 90s, and by \nThursday areas closer to the east coast will peak in the mid 80s.\n\n&&\n\n.AVIATION /00Z SATURDAY THROUGH 00Z SUNDAY/...\nConvection/TSRA activity ending early this evening as line of storms \npushes into the Atlantic waters with just lingering IFR conds at SSI \nuntil 01Z. Otherwise mostly VFR conds this evening with mid/high \nclouds slowly dissipating, then the usual chances of LIFR CIGS and \nIFR VSBYS in low stratus/fog at VQQ/GNV from 08-12Z, with much lower \nchances at the coastal TAF sites towards sunrise. Light SW flow and \ndiurnal heating will trigger afternoon showers and storms at all TAF \nsites Saturday afternoon and for now have added PROB30 groups at all \nterminals from 17-23Z for TSRA activity with gusty winds and MVFR \nconds for now, with timing to be refined in later TAF forecasts.\n\n&&\n\n.MARINE...\n\n\nWeakening high pressure situated off the southeastern seaboard will \ncontinue to shift southward as a frontal boundary stalls across the \nTennessee Valley and the Carolinas. The axis of this feature will \nremain south of our local waters through the weekend, resulting in \nprevailing south to southwest winds, with the afternoon sea breeze \nproviding onshore winds for the near shore waters. Thunderstorms \nwill likely develop over coastal locations during the mid to late \nafternoon hours that will generally progress eastward across our \nlocal waters during the late afternoon and evening hours through the \nweekend, with a few stronger storms containing strong wind gusts, \nfrequent lightning strikes, and torrential downpours possible each \nafternoon and evening. Meanwhile, high pressure strengthening over \nthe Great Lakes region in the wake of a cold front on Sunday and \nMonday will wedge down the southeastern seaboard by Tuesday and \nWednesday. Onshore winds will develop across our local waters on \nMonday night, followed by northeasterly winds strengthening on \nTuesday and especially Tuesday night and Wednesday, when a period of \nSmall Craft Advisory conditions will be possible, accompanied by \nbuilding seas that will likely persist through Thursday.\n\nRip Currents: Offshore winds during the morning hours through \nMonday will tend to reduce the rip current risk at area beaches. The \nafternoon sea breeze will create breakers of 2-3 feet at the \nnortheast FL beaches, which will combine with a lingering easterly \nocean swell to create a lower end moderate risk, especially during \nthe outgoing tide. Breakers of only 1-2 feet at the southeast GA \nbeaches will likely yield a low risk through Monday. Northeasterly \nwinds will develop on Monday night and will likely become breezy on \nTuesday, likely resulting in a high risk at all area beaches from \nthe afternoon hours through at least Thursday as breakers build.\n\n&&\n\n.FIRE WEATHER...\n\nDiurnal southwesterly winds will persist through the end of the week \nand through the weekend. As a result of the moist southwesterly \nflow, the diurnal east coast sea breeze will be pinned near the \nshoreline and not reach inland much past the I-95 corridor. Flow \npattern is expected to shift to become more onshore by the beginning \nof next week.\n\nFog Potential: Gusty and erratic wind shifts will occur from \nthunderstorm activity. Patchy fog is expected across inland areas \nthe next couple of mornings, with widespread dense fog unlikely.\n\n&&\n\n.HYDROLOGY...\nAs far as coastal water levels, coastal water levels will remain \nnear and below action stage despite the new moon phase today.\n\nAs far as rainfall again today, isolated pockets of up to 3-4 inches \nare possible mainly the St Johns River Basin northward to near or \njust south of Waycross and Nahunta. These storms may cause temporary \nflooding, especially in any poor drainage or urbanized areas.\n\n&&\n\n.PRELIMINARY POINT TEMPS/POPS...\nAMG  72  92  73  92 /  40  50  30  20 \nSSI  77  88  76  91 /  50  50  30  30 \nJAX  74  91  74  92 /  40  60  30  40 \nSGJ  74  90  74  91 /  40  60  30  40 \nGNV  73  92  73  91 /  30  60  30  40 \nOCF  73  92  73  92 /  30  60  30  70 \n\n&&\n\n.JAX WATCHES/WARNINGS/ADVISORIES...\nFL...None.\nGA...None.\nMARINE...None.\n\n&&\n\n$$\n"
+      }
+    },
+    {
+      "place": "Denver, CO",
+      "verifiedAt": "2026-09-12T01:48:16.348Z",
+      "aiMode": "ai",
+      "aiReason": null,
+      "takeStatus": "supported",
+      "source": {
+        "id": "560f99bb-ca50-4f07-9d1e-7e6a0375fdab",
+        "office": "BOU",
+        "issuedAt": "2026-09-12T00:05:00+00:00",
+        "locationKey": "39.7392,-104.9903",
+        "expiresAt": "2026-09-12T12:05:00.000Z"
+      },
+      "eligibleExcerpts": [
+        {
+          "id": "s1-p3-q3",
+          "quote": "There will be some better instability in place across the northeast plains that if tapped into, could allow for some stronger to severe storms in the afternoon/evening.",
+          "context": "Either way, it will still be hot for the second week of September. There will be some better instability in place across the northeast plains that if tapped into, could allow for some stronger to severe storms in the afternoon/evening.",
+          "section": "DISCUSSION",
+          "sourcePeriod": "Through Friday",
+          "sectionIssuedAt": "2026-09-11T18:45:00.000Z",
+          "period": "Friday, Sep 11",
+          "validFrom": "2026-09-11T06:00:00.000Z",
+          "eventEnd": "2026-09-12T06:00:00.000Z",
+          "validUntil": "2026-09-12T06:00:00.000Z"
+        }
+      ],
+      "displayed": {
+        "text": "Friday, Sep 11: Storms over the northeast plains may become stronger to severe in the afternoon and evening.",
+        "hidden": false,
+        "headingCount": 1,
+        "bodyHasLabel": false,
+        "fullOutlookSections": 0,
+        "overflow": false
+      },
+      "approvedChanges": [
+        {
+          "evidenceId": "s1-p3-q3",
+          "summary": "Storms over the northeast plains may become stronger to severe in the afternoon and evening.",
+          "period": "Friday, Sep 11",
+          "sourceQuote": "There will be some better instability in place across the northeast plains that if tapped into, could allow for some stronger to severe storms in the afternoon/evening.",
+          "section": "DISCUSSION",
+          "sectionIssuedAt": "2026-09-11T18:45:00.000Z",
+          "validFrom": "2026-09-11T06:00:00.000Z",
+          "eventEnd": "2026-09-12T06:00:00.000Z",
+          "validUntil": "2026-09-12T06:00:00.000Z"
+        }
+      ],
+      "discussion": {
+        "id": "560f99bb-ca50-4f07-9d1e-7e6a0375fdab",
+        "office": "BOU",
+        "issuedAt": "2026-09-12T00:05:00+00:00",
+        "url": "https://api.weather.gov/products/560f99bb-ca50-4f07-9d1e-7e6a0375fdab",
+        "text": "\n000\nFXUS65 KBOU 120005\nAFDBOU\n\nArea Forecast Discussion\nNational Weather Service Denver/Boulder CO\n605 PM MDT Fri Sep 11 2026\n\n.KEY MESSAGES...\n\n- Very warm today with only isolated high based showers/virga \n  late this afternoon and evening.\n\n- Slight increase in shower/storm coverage this weekend. Cooler\n  Saturday, then warmer Sunday.\n\n- Unsettled pattern next week, with multiple cold fronts expected\n  to bring a few more noticeable cooldowns.\n\n&&\n\n.DISCUSSION /Through Friday/...\nIssued at 1245 PM MDT Fri Sep 11 2026\n\nThis morning's wave cloud kept some heat relief in place for the \nnorthern corridor for the first half of the day. Now that the \ncloud has dissipated, temperatures are quickly heating, with KLMO \nseeing an eight degree warming in the past hour alone.\nTemperatures were adjusted slightly to account for the cooler \nmorning, but we are still expecting a hot day across the lower \nelevations due to downsloping winds and a slight warming in \ntemperatures aloft. Water vapor imagery shows moisture has\nslightly increased in the westerly flow aloft through the morning.\nWe still expect some isolated high-based showers to develop this \nafternoon over the higher elevations, with some virga showers\nexpected to bring gusty outflows to the lower elevations. We may\nmanage to squeeze a few sprinkles out of some of them, but mostly\njust expect 30-40 mph winds as virga passes over for areas east of\nthe mountains. \n\nA cold front is expected late tonight/early Saturday morning that\nwill bring some gusty northerly winds across the plains and \ncooler temperatures for Saturday. A slight increase in moisture \nis expected with the front as well. Afternoon showers and a few\nstorms will be possible, with the best chances being over the\nnorthern mountains where instability will be greatest, but can't\nrule out some holding together long enough to push off the higher\nelevations. Have added a mention of at least slight chance for\nPoPs to the forecast across the northern plains and areas along \nthe Palmer Divide. \n\nSunday is still on track to be the hottest day of the week in\nbetween cold fronts. While the NBM seems to have a warm bias, most\nguidance does show afternoon highs in the low to mid 90s, so\nafternoon highs were trimmed back slightly to be more in line with\nthe majority of guidance. Either way, it will still be hot for the\nsecond week of September. There will be some better instability \nin place across the northeast plains that if tapped into, could \nallow for some stronger to severe storms in the afternoon/evening. \n\nNot much has changed in the long term forecast today, with the\nnorthern tier still expected to remain active over the next week.\nA few cold fronts are still progged to bring a few more cooldowns\nthrough the week, and afternoon showers and storms will be \npossible each afternoon. \n\n&&\n\n.AVIATION /00Z TAFS through 00Z Sunday/...\nIssued at 603 PM MDT Fri Sep 11 2026\n\nVFR expected through the TAF period. Current radar imagery shows a \npush of WNW winds moving through the Denver metro as well as a few \nmicrobursts in the vicinity of KDEN. Virga showers and gusty \noutflows will continue to be possible through 02Z this evening. \nWinds will become southerly later tonight before a cold front tracks \nthrough the terminals between 09Z and 11Z, bringing a N-NE wind \nshift. \n\nAnother round of virga showers will be possible tomorrow afternoon, \nlikely starting at ~22Z. Although conditions look slightly less \nfavorable than today, a few microbursts with gusty winds up to \n30KT cannot be ruled out, particularly near KAPA and KBJC. We \nhave kept a PROB30 out of the TAF for KDEN at this time given low \nconfidence in convection being able to survive off of the \nfoothills and Palmer Divide, but it may need to be added if \nfuture guidance suggests otherwise. \n\n&&\n\n.BOU WATCHES/WARNINGS/ADVISORIES...\nNone.\n\n&&\n\n$$\n\nDISCUSSION...9\nAVIATION...AA\n"
+      }
+    }
+  ],
+  "deployed": {
+    "version": "weather-nourie-dans-take-kid-clear-v10",
+    "exactAssets": {
+      "index.html": "74081d38f4eae556183954ee8c82b2a21ff5bd3c0fe3efe8c498ab27d3b89bf4",
+      "app.js": "8a05fa153fedab045386b42c2e8020855c3f26d0cfba9260a9333bdc16270398",
+      "dans-summary.js": "8a10571c35be1c5670dad17589e22702af6a41b1b20568d0e6b00a613c6a1cd0",
+      "current-inputs.js": "9f2c99ef54d53152d389a9b2186113ae702bdc7c091c082e10fbc108958f7125",
+      "pavement.js": "184a8ea37dacf8d0c0b5dced9a32d633d41d324917335914b157ca221c5cc55f",
+      "daily-uv.js": "4327bb7ab8a9bac7d21abbcafe674a13849d40a54c0c73966ee2e9a78a98e2e8",
+      "dans-take.js": "5da354860928555d55010a026466988d6962f11cbea1f3dbabb4a47fd61c6f9b"
+    }
+  },
+  "actualAIGenerations": 3
+}
