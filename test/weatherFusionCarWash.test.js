@@ -43,21 +43,23 @@ test('the wash blocker names its actual peak hour rather than confusing daytime 
   f.days[0].popDayLikelihood={value:44};
   f.days[0].rainLikelihood.peakTime='2026-09-12T21:00:00Z';
   const summary=carWashSummary(f,start);
-  assert.equal(summary.chance,44);
+  assert.equal(summary.chance,49);
   assert.equal(summary.reason,'Rain chance reaches 49% Sat 9 PM.');
   assert.equal(summary.canWash,false);
 });
 
-test('car-wash threshold is strict: three days below 25% wash, exactly 25% waits',()=>{
+test('car-wash threshold allows exactly 25% and blocks only values above it',()=>{
   assert.equal(CAR_WASH_RAIN_LIMIT,25);
   assert.deepEqual(carWashDayDecision([day(dates[0],24),day(dates[1],24),day(dates[2],24)]),{
-    index:0,state:'wash',canWash:true,chance:24,chances:[24,24,24],reason:'Three low-rain days are lined up.'
+    index:0,state:'wash',canWash:true,chance:24,chances:[24,24,24],reason:'Three days at or below 25% are lined up.'
   });
   const exact = carWashDayDecision([day(dates[0],24),day(dates[1],25),day(dates[2],0)]);
-  assert.equal(exact.state,'wait');
-  assert.equal(exact.canWash,false);
-  assert.equal(exact.blocker,1);
+  assert.equal(exact.state,'wash');
+  assert.equal(exact.canWash,true);
   assert.match(exact.reason,/25%/);
+  const above = carWashDayDecision([day(dates[0],24),day(dates[1],26),day(dates[2],0)]);
+  assert.equal(above.state,'wait');
+  assert.equal(above.blocker,1);
 });
 
 test('incomplete three-day data stays CHECK instead of inventing a wash forecast',()=>{
@@ -96,19 +98,34 @@ test('missing canonical chances never fall back to conflicting raw NWS values',(
   assert.equal(carWashDayDecision([day(dates[0],null,{popDay:1,popNight:1}),day(dates[1],5),day(dates[2],5)]).state,'check');
 });
 
-test('visible Today chance matches the daytime card while the wash rule still includes tonight',()=>{
+test('visible car-wash chance is the exact whole-period value used by its three-day rule',()=>{
   const forecast=fixture([65,8,8,8,8,8,8]);
   forecast.days[0].popDayLikelihood={value:15};
   forecast.days[0].popNightLikelihood={value:65};
   const summary=carWashSummary(forecast,Date.parse('2026-09-12T12:00:00Z'));
-  assert.equal(summary.chance,15);
-  assert.equal(summary.days[0].chance,15);
+  assert.equal(summary.chance,65);
+  assert.equal(summary.days[0].chance,65);
   assert.equal(summary.days[0].label,'Today');
   assert.equal(summary.decisions[0].chance,65);
   assert.equal(summary.state,'wait');
 });
 
-test('after 3 PM the visible Tonight chance does not discard remaining afternoon rain from wash eligibility',()=>{
+test('the displayed three chances exactly explain the inclusive 25% count and verdict',()=>{
+  const forecast=fixture([25,0,0,0,0,0,0]);
+  forecast.days[0].popDayLikelihood={value:24};
+  forecast.days[0].popNightLikelihood={value:25};
+  forecast.days[0].rainLikelihood={value:25,peakTime:'2026-09-13T01:00:00Z'};
+  const summary=carWashSummary(forecast,Date.parse('2026-09-12T12:00:00Z'));
+  assert.deepEqual(summary.days.slice(0,3).map(day=>day.chance),[25,0,0]);
+  assert.deepEqual(summary.decisions[0].chances,[25,0,0]);
+  assert.equal(summary.chance,25);assert.equal(summary.lowRainDays,3);assert.equal(summary.state,'wash');
+  assert.equal(summary.reason,'Three days at or below 25% are lined up.');
+  const html=carWashHTML(summary);
+  assert.match(html,/3 of 3 days/);
+  assert.match(html,/25% or less rain/);
+});
+
+test('after 3 PM the visible Tonight card keeps the exact remaining-period decision chance',()=>{
   const forecast=fixture([70,8,8,8,8,8,8]);
   forecast.days[0].popNightLikelihood={value:8};
   forecast.days[0].nightCondition='Clear';
@@ -117,7 +134,7 @@ test('after 3 PM the visible Tonight chance does not discard remaining afternoon
   assert.equal(before.chance,70);
   const after=carWashSummary(forecast,Date.parse('2026-09-12T15:00:00Z'));
   assert.equal(after.state,'wait');
-  assert.equal(after.chance,8);
+  assert.equal(after.chance,70);
   assert.equal(after.days[0].label,'Tonight');
   assert.equal(after.days[0].isDay,false);
   assert.equal(after.days[1].isDay,true);
@@ -136,7 +153,7 @@ test('at 3:01 PM an 80% chance at 4 PM still means WAIT even with a dry night an
   assert.equal(summary.state,'wait');
   assert.equal(summary.canWash,false);
   assert.equal(summary.days[0].label,'Tonight');
-  assert.equal(summary.chance,0);
+  assert.equal(summary.chance,80);
   assert.deepEqual(summary.decisions[0].chances,[80,0,0]);
   assert.equal(bestWashWindow(forecast,0,now),null);
 });

@@ -13,7 +13,7 @@ import {modelFreshnessText} from './personal-details.js?v=consistent-rain-scenes
 import {renderDewpointMeter} from './dewpoint-meter.js?v=car-wash-order-v31';
 import {renderWeatherPanel} from './render-safety.js';
 import {forecastPeriodSummary} from './forecast-story.js?v=forecast-trace-v40';
-import {isExperimentalWeatherPage,renderCarWashForecast,resetCarWashForecast} from './car-wash.js?v=rain-consensus-v41';
+import {isExperimentalWeatherPage,renderCarWashForecast,resetCarWashForecast} from './car-wash.js?v=car-wash-consistency-v44';
 import {renderModelExplanation,resetModelExplanation} from './model-explanation.js?v=weighted-rain-v43';
 import {updateRainTrend} from './rain-trend.js?v=rain-consensus-v41';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
