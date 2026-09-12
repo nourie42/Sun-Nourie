@@ -130,6 +130,13 @@ export function carWashSummary(forecast, now = Date.now()) {
   const days = forecast?.days || [], zone = forecast?.location?.timeZone || 'America/New_York';
   const tonight = localHour(now,zone) >= 15;
   const decisions = Array.from({length:Math.min(5,days.length)},(_,index) => carWashDayDecision(days,index));
+  for(const decision of decisions){
+    const blocked=days[decision.blocker],peak=blocked?.rainLikelihood;
+    if(decision.state==='wait'&&finite(peak?.value)&&Number.isFinite(Date.parse(peak?.peakTime))){
+      const when=new Intl.DateTimeFormat('en-US',{timeZone:zone,weekday:'short',hour:'numeric'}).format(new Date(peak.peakTime));
+      decision.reason=`Rain chance reaches ${Math.round(peak.value)}% ${when}.`;
+    }
+  }
   const activeKind = weatherState(forecast?.current?.condition).kind;
   const rainingNow = ['rain','storm','snow'].includes(activeKind) && forecast?.current?.type === 'observation';
   if (decisions[0] && rainingNow) decisions[0] = {...decisions[0],state:'wait',canWash:false,reason:'Rain or wintry weather is happening now.',activeWeather:true};

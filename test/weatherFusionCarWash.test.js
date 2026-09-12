@@ -37,6 +37,16 @@ function fixture(chances = [10,10,10,30,10,10,10]) {
   };
 }
 
+test('the wash blocker names its actual peak hour rather than confusing daytime with overnight',()=>{
+  const f=fixture([49,22,41,0,0,0,0]);
+  f.days[0].popDayLikelihood={value:44};
+  f.days[0].rainLikelihood.peakTime='2026-09-12T21:00:00Z';
+  const summary=carWashSummary(f,start);
+  assert.equal(summary.chance,44);
+  assert.equal(summary.reason,'Rain chance reaches 49% Sat 9 PM.');
+  assert.equal(summary.canWash,false);
+});
+
 test('car-wash threshold is strict: three days below 25% wash, exactly 25% waits',()=>{
   assert.equal(CAR_WASH_RAIN_LIMIT,25);
   assert.deepEqual(carWashDayDecision([day(dates[0],24),day(dates[1],24),day(dates[2],24)]),{
