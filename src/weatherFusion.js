@@ -19,6 +19,7 @@ import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { createDirectModels, enhanceForecast } from './weatherFusionDirect.js';
+import {validateCurrentConditions} from './weatherFusionCurrent.js';
 
 export const PRESETS = [
   { id: 'knightdale', name: 'Knightdale / Raleigh', latitude: 35.787, longitude: -78.4806 },
@@ -28,7 +29,6 @@ export const RADAR_URL = 'https://opengeo.ncep.noaa.gov/geoserver/conus/conus_br
 export const RADAR_NEARBY_MILES = 12;
 const HOUR = 3600000;
 const MINUTE = 60000;
-export const MAX_DIRECT_STATION_DISTANCE_KM = 16.1;
 const VERSION = 'weather-fusion-v2-direct';
 const PUBLIC_DIR = fileURLToPath(new URL('../public/weather-fusion/', import.meta.url));
 const finite = (v) => typeof v === 'number' && Number.isFinite(v);
@@ -44,58 +44,6 @@ const hasUngroundedNumbers = (value, facts) => { const claims=[...String(value).
 const iso = (ms) => new Date(ms).toISOString();
 const hash = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex').slice(0, 24);
 const errorWithStatus = (text, status = 503) => Object.assign(new Error(text), { status });
-
-/** A station many miles away can sit outside a small rain-cooled pocket. Do not
- * present that airport reading as the selected point's current temperature.
- * Prefer the current-hour NBM grid at the selected coordinates; retain the
- * station only as explicit reference provenance. */
-export function localizeDistantObservation(current, hours, modelRows, now) {
-  if (current?.type !== 'observation' || !finite(current.stationDistanceKm) || current.stationDistanceKm <= MAX_DIRECT_STATION_DISTANCE_KM) return current;
-  const epoch = Math.floor(now / HOUR) * HOUR;
-  const currentHour = hours.find((hour) => {
-    const start = Date.parse(hour.time);
-    return finite(start) && start <= now && now < start + HOUR;
-  }) || hours[0];
-  const choices = ['nbm', 'hrrr', 'ecmwf'].map((id) => ({ id, row: modelRows[id]?.find((row) => row.time === epoch) })).filter((item) => finite(item.row?.temperature_2m));
-  const selected = choices[0];
-  const temperature = selected?.row?.temperature_2m ?? currentHour?.temperature;
-  if (!finite(temperature)) return current;
-  const row = selected?.row || {};
-  const source = selected?.id === 'nbm' ? 'NOAA National Blend · 2.5 km' : selected?.id ? selected.id.toUpperCase() : 'Selected-location hourly forecast';
-  return {
-    type: 'guidance',
-    temperature: rounded(temperature, 1),
-    condition: currentHour?.condition || 'Current conditions estimated',
-    conditionSource: 'Selected-location current-hour forecast',
-    time: iso(epoch),
-    station: null,
-    stationName: null,
-    stationDistanceKm: null,
-    humidity: rounded(row.relative_humidity_2m, 1),
-    dewpoint: rounded(row.dew_point_2m, 1),
-    wind: rounded(row.wind_speed_10m, 1),
-    gust: rounded(row.wind_gusts_10m, 1),
-    windDirection: rounded(row.wind_direction_10m, 1),
-    visibility: rounded(row.visibility, 1),
-    pressure: rounded(row.pressure_msl, 2),
-    pressurePa: null,
-    pressureTrend: { status: 'unavailable', direction: 'unknown' },
-    apparent: rounded(row.apparent_temperature, 1),
-    apparentSource: `${source} selected-location estimate`,
-    localEstimate: {
-      source,
-      validAt: iso(epoch),
-      reason: 'The nearest fresh official station is more than 10 miles from the selected location.',
-      referenceStation: {
-        station: current.station || null,
-        stationName: current.stationName || null,
-        distanceKm: current.stationDistanceKm,
-        temperature: current.temperature,
-        observedAt: current.time || null,
-      },
-    },
-  };
-}
 
 export function coordinates(query = {}) {
   const preset = PRESETS.find((p) => p.id === query.location);
@@ -350,7 +298,7 @@ export function buildForecast({ location, point, forecast, hourly, grid, discuss
       sunset: models.ecmwf?.daily?.sunset?.[solarIndex] ? iso(models.ecmwf.daily.sunset[solarIndex] * 1000) : null },
     methodology: 'NWS temperatures, conditions and precipitation probabilities are primary. NWS grid precipitation is integrated over local 7 AM–7 AM windows. Model guidance is supplementary and not a verified skill-weighted forecast. Model high/low comparisons use calendar days; the NWS low is overnight. Precipitation includes liquid-equivalent snow/ice. Daily forecast confidence is a relative index, not a probability; it uses lead time, NWS/model high-temperature spread, rainfall-guidance spread, usable guidance coverage, and NWS day/night availability.' };
   enhanceForecast(output, { models, grid, periods: forecast?.periods || [], hourlyPeriods: hourly?.periods || [], now, gridQpf, localTime, nextDate, dateKey });
-  output.current=localizeDistantObservation(output.current,output.hours,rows,now);
+  output.current=validateCurrentConditions(output.current,output.hours,rows,now);
   Object.assign(output.current,resolveCurrentWeather(output.current,output.hours,now,gridSample(grid,'skyCover',now,'percent')));
   addExperience(output, {models, grid, periods:forecast?.periods || [], now, solarTimes, nextDate});
   addExposureWeather(output,exposureWeather);

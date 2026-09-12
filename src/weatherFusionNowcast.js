@@ -4,8 +4,8 @@
  * local correction, not a promise of accuracy or a measured skin temperature.
  */
 import {finite, humidityFromDewpoint, shadeFeelsLike} from '../public/weather-fusion/weather-math.js';
+import {MAX_DIRECT_STATION_DISTANCE_KM} from './weatherFusionCurrent.js';
 const H=3600000, clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
-const MAX_LOCAL_STATION_KM=16.1;
 function at(rows, time, field) {
   const sorted=rows.filter(r=>finite(r[field])).sort((a,b)=>a.epoch-b.epoch);
   const a=sorted.findLast(r=>r.epoch<=time),b=sorted.find(r=>r.epoch>=time);
@@ -16,7 +16,7 @@ function at(rows, time, field) {
 export function alignComfortHours(raw,current,now) {
   const observedAt=Date.parse(current?.time), age=now-observedAt;
   const eligible=current?.type==='observation'&&finite(observedAt)&&age>=-300000&&age<=90*60000&&
-    finite(current.stationDistanceKm)&&current.stationDistanceKm<=MAX_LOCAL_STATION_KM;
+    finite(current.stationDistanceKm)&&current.stationDistanceKm<=MAX_DIRECT_STATION_DISTANCE_KM;
   const residuals={};
   for(const [key,bound] of [['temperature',6],['dewpoint',6],['wind',8]]) {
     const baseline=at(raw,observedAt,key),obs=current?.[key];

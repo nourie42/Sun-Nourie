@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {buildForecast,MAX_DIRECT_STATION_DISTANCE_KM} from '../src/weatherFusion.js';
+import {buildForecast} from '../src/weatherFusion.js';
+import {validateCurrentConditions,MAX_DIRECT_STATION_DISTANCE_KM} from '../src/weatherFusionCurrent.js';
 import {temperaturePolicy,precipitationPolicy,eveningPeriod,forecastDayIndex,REPAIR_VERSION} from '../src/weatherFusionPolicy.js';
 import {validateSnapshot} from '../src/weatherFusionDirect.js';
 import {testInputs,snapshot} from './weatherFusion.fixtures.js';
@@ -96,6 +97,21 @@ test('a distant airport reading is reference data, not the selected location cur
  assert.deepEqual(out.current.localEstimate.referenceStation,{station:'KJNX',stationName:'Smithfield, Johnston County Airport',distanceKm:28.6,temperature:88,observedAt:input.observation.time});
  assert.equal(out.metricForecasts.comfortAlignment.status,'not-applied');
  assert.notEqual(out.current.feelsLike,thermalComfort(input.observation,input.location,now).outdoors);
+});
+test('current-source validation applies to every coordinate, not named locations',()=>{
+ const epoch=Math.floor(now/H)*H,row={time:epoch,temperature_2m:80,dew_point_2m:64,relative_humidity_2m:58,wind_speed_10m:6};
+ const hours=[{time:new Date(epoch).toISOString(),temperature:81,condition:'Cloudy'}],models={nbm:[row]};
+ const observation={type:'observation',temperature:88,time:new Date(now-20*60000).toISOString(),station:'TEST',stationName:'Generic station'};
+ const at=(distance,patch={})=>validateCurrentConditions({...observation,stationDistanceKm:distance,...patch},hours,models,now);
+ assert.equal(at(4).type,'observation','a very close fresh station remains the measurement even when guidance differs');
+ assert.equal(at(12,{temperature:84}).type,'observation','a moderately close station that agrees remains the measurement');
+ assert.equal(at(12).type,'guidance','a moderately close station with a large disagreement is rejected');
+ assert.equal(at(20).type,'guidance','a distant station is rejected even when fresh');
+ assert.equal(at(4,{time:new Date(now-76*60000).toISOString()}).type,'guidance','an old station report is rejected even when close');
+ const fallback=validateCurrentConditions({...observation,stationDistanceKm:20},hours,{},now);
+ assert.equal(fallback.temperature,81);assert.equal(fallback.localEstimate.source,'Selected-location hourly forecast');
+ const reference=validateCurrentConditions({...observation,stationDistanceKm:20},[],{},now);
+ assert.equal(reference.type,'unavailable');assert.equal(reference.temperature,null);assert.equal(reference.sourceValidation.accepted,false);assert.equal(reference.referenceObservation.temperature,88);
 });
 function fakePlayer(){
  const layers=new Set(),made=[],map={removeLayer:l=>layers.delete(l)};

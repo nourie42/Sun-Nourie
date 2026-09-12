@@ -100,7 +100,7 @@ function render(data) {
   if($('hero-uv'))$('hero-uv').innerHTML=dailyUvHTML(data.days[0]?.uvMax,'Peak UV today');
   $('condition').textContent = hero.tonight ? `Tonight · ${hero.condition}` : hero.condition;
   $('high-low').textContent = hero.tonight ? 'Overnight low' : hero.range;
-  $('observation-label').textContent = hero.tonight ? `Tonight’s forecast · updated ${clock(data.assembledAt)}` : (c.radarPrecipitation?.status==='ready'&&c.radarPrecipitation.atLocation===true ? `NOAA radar at this location · temperature is a local grid estimate` : c.localEstimate ? `Selected-location estimate · valid ${clock(c.time)}` : c.type === 'observation' ? `Nearby weather station · updated ${clock(c.time)}` : 'Estimated current conditions');
+  $('observation-label').textContent = hero.tonight ? `Tonight’s forecast · updated ${clock(data.assembledAt)}` : (c.radarPrecipitation?.status==='ready'&&c.radarPrecipitation.atLocation===true&&c.localEstimate ? `NOAA radar at this location · temperature is a local grid estimate` : c.localEstimate ? `Selected-location estimate · valid ${clock(c.time)}` : c.type === 'observation' ? `Nearby weather station · updated ${clock(c.time)}` : c.type==='unavailable' ? 'Current local reading unavailable' : 'Estimated current conditions');
   $('hero-scene').innerHTML = icon(hero.condition, hero.isDay, 120);
   document.querySelectorAll('[data-place]').forEach((button) => { const active = button.dataset.place === place.id; button.classList.toggle('active', active); button.setAttribute('aria-pressed', String(active)); });
   draw('alerts', 'Official alerts', () => renderAlerts(data));
