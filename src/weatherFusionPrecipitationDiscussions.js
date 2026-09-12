@@ -2,6 +2,7 @@ import {inDiscussionPolygon} from './weatherFusionSpecialDiscussions.js';
 
 const HOUR=3600000;
 const INDEX_URL='https://www.wpc.ncep.noaa.gov/metwatch/metwatch_mpd.php';
+const RSS_URL='https://www.wpc.ncep.noaa.gov/metwatch/mdrss.xml';
 const finite=value=>typeof value==='number'&&Number.isFinite(value);
 const clean=value=>String(value||'').replace(/<[^>]*>/g,' ').replace(/&(?:nbsp|amp|lt|gt|quot|#39);/g,match=>({'&nbsp;':' ','&amp;':'&','&lt;':'<','&gt;':'>','&quot;':'"','&#39;':"'"}[match])).replace(/\s+/g,' ').trim();
 
@@ -59,12 +60,19 @@ export function createPrecipitationDiscussionService({cached,now=Date.now}){
  return async location=>{
   const meta={id:'precipitation-discussions',label:'WPC heavy-rain discussions',status:'unavailable',fetchedAt:null,issuedAt:null,url:INDEX_URL};
   try{
-   const response=await cached(INDEX_URL,120000,{text:true,timeout:12000}),html=String(response.data);
-   const links=[...html.matchAll(/href=["']([^"']*metwatch_mpd_multi\.php\?md=\d{4}(?:&amp;|&)yr=20\d{2})/gi)].map(match=>precipitationDiscussionUrl(match[1].replace(/&amp;/g,'&'))).filter(Boolean);
+   const sources=await Promise.allSettled([cached(RSS_URL,60000,{text:true,timeout:12000}),cached(INDEX_URL,60000,{text:true,timeout:12000})]);
+   const rss=sources[0].status==='fulfilled'?String(sources[0].value.data):'',html=sources[1].status==='fulfilled'?String(sources[1].value.data):'';
+   const validRss=/<title>WPC Mesoscale Precipitation Discussions<\/title>/i.test(rss),validIndex=/Current Mesoscale Precipitation Discussions \(MPDs\)/i.test(html);
+   if(!validRss&&!validIndex)throw new Error('WPC discussion indexes were unavailable.');
+   const rssLinks=[...rss.matchAll(/<guid[^>]*>[^<]*metwatch_mpd_multi\.php\?md=(\d{4})\/(20\d{2})\d{4}<\/guid>/gi)].map(match=>precipitationDiscussionUrl(`${INDEX_URL.replace('metwatch_mpd.php','metwatch_mpd_multi.php')}?md=${match[1]}&yr=${match[2]}`)).filter(Boolean);
+   const pageLinks=[...html.matchAll(/href=["']([^"']*metwatch_mpd_multi\.php\?md=\d{4}(?:&amp;|&)yr=20\d{2})/gi)].map(match=>precipitationDiscussionUrl(match[1].replace(/&amp;/g,'&'))).filter(Boolean);
+   const links=[...rssLinks,...pageLinks];
    const unique=[...new Set(links)];if(unique.length>20)throw new Error('WPC discussion index returned too many products.');
-   const products=await Promise.all(unique.map(async url=>{const page=await cached(url,120000,{text:true,timeout:12000});return parsePrecipitationDiscussion(page.data,url,location,now());}));
-   const value=products.filter(Boolean);
-   return {value,meta:{...meta,status:'ready',fetchedAt:response.fetchedAt,issuedAt:value.reduce((latest,item)=>Date.parse(item.sent)>Date.parse(latest||0)?item.sent:latest,null)}};
+   const products=await Promise.allSettled(unique.map(async url=>{const page=await cached(url,60000,{text:true,timeout:12000});return parsePrecipitationDiscussion(page.data,url,location,now());}));
+   if(unique.length&&products.every(result=>result.status==='rejected'))throw new Error('WPC discussions could not be retrieved.');
+   const value=products.flatMap(result=>result.status==='fulfilled'&&result.value?[result.value]:[]);
+   const fetchedAt=sources.flatMap(result=>result.status==='fulfilled'?[result.value.fetchedAt]:[]).sort().at(-1)||null;
+   return {value,meta:{...meta,status:'ready',fetchedAt,issuedAt:value.reduce((latest,item)=>Date.parse(item.sent)>Date.parse(latest||0)?item.sent:latest,null)}};
   }catch{return {value:null,meta:{...meta,message:'Heavy-rain discussions could not be checked. Official public warnings remain independent.'}};}
  };
 }

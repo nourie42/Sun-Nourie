@@ -108,9 +108,12 @@ test('active WPC precipitation discussion becomes a plain-language heavy-rain bu
  assert.equal(simplifyPrecipitationSummary('Storms will be capable of producing flash flood concerns.'),'Storms could produce flash-flood risk.');
 });
 test('WPC precipitation-discussion feed distinguishes a clear result from an outage',async()=>{
- const index='<a href="/metwatch/metwatch_mpd_multi.php?md=1263&amp;yr=2026">MPD</a>',page='<pre>Mesoscale Precipitation Discussion 1263\nAreas affected...North Carolina\n\nConcerning...Heavy rainfall...Flash flooding possible\n\nValid 061300Z - 061600Z\n\nSUMMARY...Heavy rain could cause flash flooding.\n\nDISCUSSION...Technical details.\nLAT...LON 37008000 37007700 34007700 34008000</pre>';
+ const index='Current Mesoscale Precipitation Discussions (MPDs)<a href="/metwatch/metwatch_mpd_multi.php?md=1263&amp;yr=2026">MPD</a>',page='<pre>Mesoscale Precipitation Discussion 1263\nAreas affected...North Carolina\n\nConcerning...Heavy rainfall...Flash flooding possible\n\nValid 061300Z - 061600Z\n\nSUMMARY...Heavy rain could cause flash flooding.\n\nDISCUSSION...Technical details.\nLAT...LON 37008000 37007700 34007700 34008000</pre>';
  const success=createPrecipitationDiscussionService({now:()=>now,cached:async url=>({data:url.includes('multi.php')?page:index,fetchedAt:new Date(now).toISOString()})});
  const result=await success(location);assert.equal(result.meta.status,'ready');assert.equal(result.value.length,1);
+ const rss='<?xml version="1.0"?><rss><channel><title>WPC Mesoscale Precipitation Discussions</title><item><guid>http://www.wpc.ncep.noaa.gov/metwatch/metwatch_mpd_multi.php?md=1263/20260906</guid></item></channel></rss>';
+ const rssFallback=createPrecipitationDiscussionService({now:()=>now,cached:async url=>({data:url.includes('mdrss.xml')?rss:url.includes('multi.php')?page:'Current Mesoscale Precipitation Discussions (MPDs)',fetchedAt:new Date(now).toISOString()})});
+ const rescued=await rssFallback(location);assert.equal(rescued.meta.status,'ready');assert.equal(rescued.value.length,1);
  const failure=createPrecipitationDiscussionService({now:()=>now,cached:async()=>{throw new Error('offline');}});assert.equal((await failure(location)).meta.status,'unavailable');
  const bulletins=readFileSync(new URL('../public/weather-fusion/bulletins.js',import.meta.url),'utf8');assert.match(bulletins,/item\.plainSummary/);assert.match(bulletins,/Show full official discussion/);
 });
