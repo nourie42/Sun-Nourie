@@ -1,14 +1,14 @@
 import {todayForecastHTML} from './today-card.js?v=rain-consensus-v25';
 import {FORECAST_CONFIDENCE_VERSION} from './forecast-confidence.js?v=weather-art-labels-v10';
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
-import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=scenario-weather-v29';
+import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=rain-scene-thresholds-v30';
 import {weatherState} from './weather-state.js';
 import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=rain-consensus-v24';
 import {degrees,feelsAt,dailyFeels,forecastValue,peakFeelsHTML} from './hourly-feels.js?v=weather-art-labels-v10';
-import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=day-night-card-title-v34';
+import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=consistent-rain-scenes-v35';
 import {comfortMode,comfortWindow,comfortNarrative,warmestTodayWindow} from './comfort-outlook.js?v=weather-art-labels-v10';
 import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js?v=rain-consensus-v24';
-import {resetDewpointMeter} from './dewpoint-meter.js?v=scenario-weather-v29';
+import {resetDewpointMeter} from './dewpoint-meter.js?v=centered-heading-v30';
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const number=(n,d=0)=>finite(n)?n.toFixed(d):'—';

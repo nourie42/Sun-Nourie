@@ -5,12 +5,12 @@ import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './wea
 import {dayGraphHTML,installDayGraph} from './day-graph.js?v=weather-art-labels-v10';
 import {degrees,feelsAt} from './hourly-feels.js?v=weather-art-labels-v10';
 import {createFramePlayer} from './frame-player.js';
-import {renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=hrrr-rain-signal-v35';
+import {renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=consistent-rain-scenes-v36';
 import {dailyDisplay} from './weather-math.js?v=rain-consensus-v24';
 import {currentHero} from './current-temperature.js?v=weather-art-labels-v10';
 import {renderBulletins} from './bulletins.js?v=weather-art-labels-v10';
-import {modelFreshnessText} from './personal-details.js?v=day-night-card-title-v34';
-import {renderDewpointMeter} from './dewpoint-meter.js?v=scenario-weather-v29';
+import {modelFreshnessText} from './personal-details.js?v=consistent-rain-scenes-v35';
+import {renderDewpointMeter} from './dewpoint-meter.js?v=centered-heading-v30';
 import {renderWeatherPanel} from './render-safety.js';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);

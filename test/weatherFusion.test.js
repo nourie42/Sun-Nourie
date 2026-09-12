@@ -149,6 +149,7 @@ test('fresh NWS forecast and AFD are required for AI', async () => {
 test('weather routes register without changing any existing route', () => {
   const routes = []; registerWeatherFusionRoutes({ get: (...args) => routes.push(args) }, { env: {}, fetchImpl: mockFetch });
   assert.ok(routes.some(([p]) => Array.isArray(p) && p.includes('/weather-fusion')));
+  assert.ok(routes.some(([p]) => p === '/weather-fusion/experimental-weather.html'));
   assert.ok(routes.some(([p]) => p === '/api/weather-fusion/forecast'));
   assert.ok(!routes.some(([p]) => p === '/'));
 });

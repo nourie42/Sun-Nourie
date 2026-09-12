@@ -132,11 +132,16 @@ export function exposureScene(sun,daylight=true,condition='Clear',feels=null,con
 }
 
 export function precipitationActivity(condition='',context={}){
- const weather=weatherState(condition),amount=context.precipitation,pop=context.pop;
+ const weather=weatherState(condition),pop=context.pop;
  if(!['rain','storm'].includes(weather.kind))return 'none';
+ // Forecast artwork follows the same displayed probability at every hour.
+ // Observed rain without a probability can still use the active-rain scene.
+ if(finite(pop)){
+  if(pop>61)return 'active';
+  if(pop>=50)return 'umbrella';
+  return 'possible';
+ }
  if(!weather.chance)return 'active';
- if(finite(amount)&&amount>=.05)return 'active';
- if(finite(pop)&&pop>=60)return 'active';
  return 'possible';
 }
 
@@ -144,6 +149,7 @@ export function comfortSceneState(daylight=true,condition='Clear',feels=null,con
  const kind=weatherState(condition).kind,precipitation=precipitationActivity(condition,context);
  if(kind==='snow'||(finite(feels)&&feels<40))return {key:'cold',asset:'comfort-reference-scenes-cold.webp'};
  if(precipitation==='active')return {key:'rain',asset:'comfort-reference-scenes-rain.webp'};
+ if(precipitation==='umbrella')return {key:'umbrella',asset:'comfort-reference-scenes-umbrella.png'};
  if(kind==='fog')return {key:'fog',asset:'comfort-reference-scenes-fog.webp'};
  if(!daylight)return {key:'dawn',asset:'comfort-reference-scenes-dawn.webp'};
  if(precipitation==='possible'||kind==='cloudy')return {key:'watch',asset:'comfort-reference-scenes-watch.webp'};
@@ -151,7 +157,7 @@ export function comfortSceneState(daylight=true,condition='Clear',feels=null,con
  return {key:'normal',asset:'comfort-reference-scenes.webp'};
 }
 
-const comfortSceneAssets=['comfort-reference-scenes.webp','comfort-reference-scenes-hot.webp','comfort-reference-scenes-rain.webp','comfort-reference-scenes-cold.webp','comfort-reference-scenes-fog.webp','comfort-reference-scenes-watch.webp','comfort-reference-scenes-dawn.webp'];
+const comfortSceneAssets=['comfort-reference-scenes.webp','comfort-reference-scenes-hot.webp','comfort-reference-scenes-rain.webp','comfort-reference-scenes-umbrella.png','comfort-reference-scenes-cold.webp','comfort-reference-scenes-fog.webp','comfort-reference-scenes-watch.webp','comfort-reference-scenes-dawn.webp'];
 export function preloadComfortScenes(){
  if(typeof Image==='undefined')return false;
  for(const asset of comfortSceneAssets){const image=new Image();image.decoding='async';image.src=`/weather-fusion/${asset}`;}
@@ -171,7 +177,7 @@ export function referenceScene(panel,daylight=true,condition='Clear',feels=null,
  const sky=skyPalette(weather,daylight);
  const subject=panel===0?'A boy sitting beneath a shade tree':panel===1?'A boy outdoors':'A woman walking a light brown toy poodle';
  const normalClothing={hot:'light hot-weather clothing',warm:'light warm-weather clothing',mild:'everyday mild-weather clothing',cool:'a jacket and long pants',cold:'a coat, scarf and warm hat'}[clothingForFeels(feels)];
- const action={hot:'visibly reacting to extreme heat in light hot-weather clothing',rain:'using rain gear and an umbrella in steady rain',cold:'wearing a coat, scarf and warm hat for cold weather',fog:'clearly visible in diffuse fog with no direct sunlight',watch:'looking at a cloudy sky because rain is possible but not occurring',dawn:'clearly visible outdoors before sunrise with no direct sunlight',normal:`outdoors in ${normalClothing}`}[scene.key];
+ const action={hot:'visibly reacting to extreme heat in light hot-weather clothing',rain:'using rain gear and an umbrella in steady rain',umbrella:'holding an umbrella under a cloudy sky before any rain begins',cold:'wearing a coat, scarf and warm hat for cold weather',fog:'clearly visible in diffuse fog with no direct sunlight',watch:'looking at a cloudy sky because rain is possible but not occurring',dawn:'clearly visible outdoors before sunrise with no direct sunlight',normal:`outdoors in ${normalClothing}`}[scene.key];
  const label=`${subject}, ${action}`;
  const tint=null;
  const symbol=scene.key!=='normal'||panel===0?'':daylight&&weather.kind==='clear'
