@@ -200,6 +200,9 @@ async function load({ moveMap = false, refreshModels = false, briefingRetry = 0 
     const data = await api('forecast', query(), requestController.signal);
     if (id !== generation) return;
     receivedForecast = true;
+    const radarAge=Date.now()-Date.parse(radarMeta?.precipitation?.observedAt);
+    const sameRadarPlace=finite(radarMeta?.location?.latitude)&&finite(radarMeta?.location?.longitude)&&Math.abs(radarMeta.location.latitude-place.latitude)<.00011&&Math.abs(radarMeta.location.longitude-place.longitude)<.00011;
+    if(sameRadarPlace&&radarMeta?.precipitation&&radarAge>=0&&radarAge<=10*60000)data.current.radarPrecipitation=radarMeta.precipitation;
     render(data);
     // Official notices are rendered synchronously; AI explanations never delay them.
     api('bulletins', query({ signature: data.signature }), requestController.signal).then((bulletins) => {
