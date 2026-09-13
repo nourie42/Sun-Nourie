@@ -1,10 +1,13 @@
 const HOUR = 3600000;
+const GRAPHCAST_FEED = 'https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/graphcast.json';
+const GRAPHCAST_SOURCE = 'https://nvidia.github.io/earth2studio/main/modules/generated/models/px/GraphCastOperational/';
 const finite = value => typeof value === 'number' && Number.isFinite(value);
 const chance = value => finite(value) && value >= 0 && value <= 100 ? value : null;
-const esc = value => String(value ?? '').replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
-const names = {nws:'NWS',hrrr:'HRRR',ecmwf:'ECMWF',nbm:'NBM'};
+const esc = value => String(value ?? '').replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[character]));
+const names = {nws:'NWS',hrrr:'HRRR',ecmwf:'ECMWF',nbm:'NBM',graphcast:'GraphCast'};
 const phaseNames = {overall:'Full day',daytime:'Daytime',overnight:'Overnight'};
 let latest = null, latestNow = 0, selectedDate = null, selectedPhase = null;
+let graphcastState = {key:null,status:'idle',point:null,runAt:null,checkedAt:0,message:''};
 
 function zoneFor(forecast) {
   const zone = forecast?.location?.timeZone || 'America/New_York';
@@ -84,7 +87,7 @@ function sourceTable(likelihood, caption = 'Inputs for the highest hour') {
     const weight=source.weight===null?(source.id==='nws'&&source.value===null?'Unavailable':'Not used'):`${number(source.weight*100,4)}%`;
     return `<tr><th scope="row">${names[source.id]}</th><td>${input}${signal}</td><td>${weight}</td><td>${source.points === null?'—':number(source.points,6)}</td></tr>`;
   }).join('');
-  return `<table class="model-inputs"><caption>${esc(caption)}</caption><thead><tr><th scope="col">Source</th><th scope="col">Rain input</th><th scope="col">Weight</th><th scope="col">Points</th></tr></thead><tbody>${rows}</tbody></table>`;
+  return `<div class="model-table-scroll"><table class="model-inputs"><caption>${esc(caption)}</caption><thead><tr><th scope="col">Source</th><th scope="col">Rain input</th><th scope="col">Weight</th><th scope="col">Points</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 function arithmetic(likelihood) {
@@ -104,7 +107,7 @@ function temperatureBlend(day, kind) {
   if (!sources.length || !finite(day?.[kind])) return '';
   const rows = sources.map(source=>`<tr><th scope="row">${esc(names[source.id]||source.id)}</th><td>${number(source.value,4)}°F</td><td>${number(source.weight*100,4)}%</td></tr>`).join('');
   const formula = sources.map(source=>`${number(source.value,4)} × ${number(source.weight,6)}`).join(' + ');
-  return `<div class="model-temperature"><h4>${kind==='high'?'High':'Low'}: ${Math.round(day[kind])}°F</h4><table class="model-inputs"><thead><tr><th scope="col">Source</th><th scope="col">Temperature</th><th scope="col">Weight</th></tr></thead><tbody>${rows}</tbody></table><p class="model-formula">${esc(formula)}${finite(blend.value)?` = ${number(blend.value,4)}°F`:''} → ${Math.round(day[kind])}°F</p></div>`;
+  return `<div class="model-temperature"><h4>${kind==='high'?'High':'Low'}: ${Math.round(day[kind])}°F</h4><div class="model-table-scroll"><table class="model-inputs"><thead><tr><th scope="col">Source</th><th scope="col">Temperature</th><th scope="col">Weight</th></tr></thead><tbody>${rows}</tbody></table></div><p class="model-formula">${esc(formula)}${finite(blend.value)?` = ${number(blend.value,4)}°F`:''} → ${Math.round(day[kind])}°F</p></div>`;
 }
 
 function sourceStatus(forecast, view) {
@@ -117,6 +120,69 @@ function sourceStatus(forecast, view) {
   }).join('')}</dl>`;
 }
 
+function graphcastKey(forecast) {
+  const lat=forecast?.location?.latitude,lon=forecast?.location?.longitude;
+  return finite(lat)&&finite(lon)?`${lat.toFixed(4)},${lon.toFixed(4)}`:null;
+}
+
+function graphcastPoint(payload, forecast) {
+  const lat=forecast?.location?.latitude,lon=forecast?.location?.longitude,points=Array.isArray(payload?.points)?payload.points:[];
+  if(!finite(lat)||!finite(lon)||!points.length)return null;
+  let best=null,distance=Infinity;
+  for(const point of points){
+    if(!finite(point?.latitude)||!finite(point?.longitude))continue;
+    const d=Math.hypot(point.latitude-lat,(point.longitude-lon)*Math.cos(lat*Math.PI/180));
+    if(d<distance){distance=d;best=point;}
+  }
+  return distance<=.35?best:null;
+}
+
+function graphcastWindows(point) {
+  const rows=Array.isArray(point?.windows)?point.windows:Array.isArray(point?.intervals)?point.intervals:[];
+  return rows.flatMap(row=>{
+    const start=Date.parse(row.start),end=Date.parse(row.end);
+    if(!finite(start)||!finite(end)||end<=start)return [];
+    const rain=finite(row.precipitationInches)?Math.max(0,row.precipitationInches):null;
+    const temperature=finite(row.temperatureF)?row.temperatureF:null,wind=finite(row.windMph)?Math.max(0,row.windMph):null;
+    return [{start,end,rain,temperature,wind}];
+  }).sort((a,b)=>a.start-b.start);
+}
+
+function graphcastCard(forecast, view) {
+  const state=graphcastState,key=graphcastKey(forecast),same=key&&state.key===key,zone=view.zone;
+  let body='';
+  if(!same||state.status==='idle'||state.status==='loading'){
+    body='<div class="graphcast-state">Checking the latest GraphCast / WeatherNext 1-Graph guidance for this location…</div>';
+  }else if(state.status==='ready'){
+    const windows=graphcastWindows(state.point).filter(row=>!finite(view.start)||!finite(view.end)||(row.start<view.end&&row.end>view.start));
+    const cards=windows.slice(0,6).map(row=>`<div class="graphcast-window"><time>${esc(stamp(row.start,zone))}–${esc(stamp(row.end,zone,false))}</time><strong>${row.rain===null?'—':`${number(row.rain,2)} in`}</strong><span>${row.temperature===null?'Temperature unavailable':`${Math.round(row.temperature)}°F`} · ${row.wind===null?'wind unavailable':`${Math.round(row.wind)} mph wind`}</span></div>`).join('');
+    body=`<div class="graphcast-meta"><div><small>Latest run</small><strong>${esc(stamp(state.runAt,zone))}</strong></div><div><small>Time step</small><strong>6-hour guidance</strong></div><div><small>Rain blend weight</small><strong>0% · comparison only</strong></div></div>${cards?`<div class="graphcast-windows">${cards}</div>`:'<div class="graphcast-state">This GraphCast feed does not contain a 6-hour window for the selected period.</div>'}`;
+  }else if(state.status==='not-covered'){
+    body='<div class="graphcast-state">The current GraphCast feed does not yet include this selected point. Your normal forecast remains unchanged.</div>';
+  }else{
+    body='<div class="graphcast-state">GraphCast is installed on the experimental page, but a current GPU-generated feed has not been published yet. It contributes 0 points and cannot change the displayed rain chance.</div>';
+  }
+  return `<section class="graphcast-card" aria-label="GraphCast experimental comparison"><div class="graphcast-head"><div><h3 class="graphcast-title"><span class="graphcast-orb" aria-hidden="true">G</span>GraphCast Operational</h3><p class="graphcast-copy">WeatherNext 1-Graph · 0.25° global AI guidance. Its 6-hour precipitation windows stay separate from the hourly NWS/HRRR/ECMWF/NBM percentage until the time-resolution handling is validated.</p></div><div class="graphcast-badges"><span class="graphcast-badge">Experimental</span><span class="graphcast-badge safe">Comparison only</span></div></div>${body}<p><a class="graphcast-link" href="${GRAPHCAST_SOURCE}" target="_blank" rel="noopener noreferrer">About the Earth2Studio GraphCast model ↗</a></p></section>`;
+}
+
+function queueGraphCastLoad(forecast) {
+  if(typeof window==='undefined'||typeof fetch!=='function')return;
+  const key=graphcastKey(forecast);if(!key)return;
+  const retry=Date.now()-(graphcastState.checkedAt||0)>5*60000;
+  if(graphcastState.key===key&&(graphcastState.status==='loading'||(!retry&&graphcastState.status!=='idle')))return;
+  graphcastState={key,status:'loading',point:null,runAt:null,checkedAt:Date.now(),message:''};
+  fetch(GRAPHCAST_FEED,{cache:'no-store',headers:{Accept:'application/json'}}).then(async response=>{
+    if(!response.ok)throw new Error(`HTTP ${response.status}`);
+    const payload=await response.json();
+    const point=graphcastPoint(payload,forecast);
+    graphcastState={key,status:point?'ready':'not-covered',point,runAt:payload?.runAt||point?.runAt||null,checkedAt:Date.now(),message:''};
+  }).catch(error=>{
+    graphcastState={key,status:'pending',point:null,runAt:null,checkedAt:Date.now(),message:String(error?.message||error)};
+  }).finally(()=>{
+    if(latest===forecast&&experimentalPath())renderModelExplanation(latest,latestNow);
+  });
+}
+
 export function modelExplanationHTML(forecast, options = {}) {
   const view = modelExplanationView(forecast,options), {day,zone,period,rows,peak,phase} = view;
   const choices = (forecast?.days || []).map((row,index)=>`<option value="${index}"${index===view.index?' selected':''}>${esc(dayLabel(row.date,index))}</option>`).join('');
@@ -126,11 +192,12 @@ export function modelExplanationHTML(forecast, options = {}) {
   return `<div class="model-explanation-heading"><h2 id="model-explanation-title">Why this forecast</h2><div class="model-selectors"><label>Day<select aria-label="Day" data-model-day>${choices}</select></label><label>Period<select aria-label="Period" data-model-phase>${phaseOptions}</select></label></div></div>
     <div class="model-period"><strong>${percent(view.value)}</strong><span>${phaseNames[phase]} · highest hourly blended estimate<small>${esc(stamp(period.window?.start,zone))} – ${esc(stamp(period.window?.end,zone))}</small></span></div>
     <p class="model-definition">This number is the highest hourly estimate in this period, not a separate probability of rain at any time during the whole period.</p>
+    ${graphcastCard(forecast,view)}
     ${view.mismatch?`<p class="model-data-warning">Data mismatch: the period shows ${percent(view.value)}, but the highest supplied hour is ${percent(view.maximum)}.</p>`:''}
     ${!view.complete?`<p class="model-data-warning">Incomplete coverage: ${number(period.coverage?.availableHours)} of ${number(period.coverage?.expectedHours)} hours. The period estimate stays unavailable.${view.maximum===null?'':` Highest available hour: ${percent(view.maximum)}.`}</p>`:''}
     ${view.peakTime?`<h3>Highest hour: ${esc(stamp(view.peakTime,zone))}–${esc(stamp(view.peakEnd,zone,false))}</h3>`:''}
     ${sourceTable(peak)}${arithmetic(peak)}
-    <details class="model-method" data-model-detail="method"><summary>How the inputs are used</summary><p>The NWS hourly probability fills its 40-point share proportionally. A 40% NWS chance contributes 16 points. HRRR is worth 30 points, ECMWF 10, and NBM 20. A positive model amount below 0.10 in gets 30% of that model's points. Exactly 0.10 in or more gets full points. Zero rain gets zero points.</p><p>The points are added and the result is capped at 100%. For example, NWS 7% contributes 2.8 points; ECMWF at 0.004 in contributes 3 points; and NBM at 0.012 in contributes 6 points. The total is 11.8%, shown as 12%. Rainfall amount is calculated separately. An unavailable model adds no points. This is an uncalibrated estimate, not a proven model-accuracy ranking.</p></details>
+    <details class="model-method" data-model-detail="method"><summary>How the inputs are used</summary><p>The NWS hourly probability fills its 40-point share proportionally. A 40% NWS chance contributes 16 points. HRRR is worth 30 points, ECMWF 10, and NBM 20. A positive model amount below 0.10 in gets 30% of that model's points. Exactly 0.10 in or more gets full points. Zero rain gets zero points.</p><p>The points are added and the result is capped at 100%. For example, NWS 7% contributes 2.8 points; ECMWF at 0.004 in contributes 3 points; and NBM at 0.012 in contributes 6 points. The total is 11.8%, shown as 12%. Rainfall amount is calculated separately. An unavailable model adds no points. This is an uncalibrated estimate, not a proven model-accuracy ranking. GraphCast is displayed separately and contributes 0 points while its 6-hour precipitation timing is validated.</p></details>
     <details class="model-hourly-list" data-model-detail="hours"><summary>All ${rows.length} forecast hours in this period</summary>${audit||'<p>No hourly calculation data was supplied.</p>'}</details>
     ${temperatures?`<details class="model-temperature-list" data-model-detail="temperatures"><summary>Temperature calculations</summary>${temperatures}</details>`:''}
     <details class="model-source-list" data-model-detail="sources"><summary>Source runs and availability</summary>${sourceStatus(forecast,view)}</details>`;
@@ -138,6 +205,17 @@ export function modelExplanationHTML(forecast, options = {}) {
 
 function experimentalPath() {
   return /\/weather-fusion\/experimental-weather\.html\/?$/.test(globalThis.location?.pathname || '');
+}
+
+function installGraphCastMapControl() {
+  if(typeof document==='undefined'||!experimentalPath())return;
+  const tabs=document.querySelector?.('.map-tabs');
+  if(!tabs||tabs.querySelector?.('[data-graphcast-map]'))return;
+  const button=document.createElement('button');
+  button.type='button';button.disabled=true;button.className='graphcast-map-pending';button.dataset.graphcastMap='pending';
+  button.textContent='GraphCast rain';button.title='GraphCast uses 6-hour precipitation windows. The map activates after GPU-generated frames are published.';
+  button.setAttribute('aria-label','GraphCast rain map pending GPU forecast frames');
+  tabs.append(button);
 }
 
 export function renderModelExplanation(forecast, now = Date.now()) {
@@ -170,6 +248,8 @@ export function renderModelExplanation(forecast, now = Date.now()) {
     renderModelExplanation(latest,latestNow);
     panel.querySelector(key)?.focus();
   };
+  installGraphCastMapControl();
+  queueGraphCastLoad(forecast);
   return view;
 }
 
@@ -179,3 +259,5 @@ export function resetModelExplanation() {
   if (!panel) return;
   panel.hidden = true; panel.innerHTML = ''; panel.onchange = null;
 }
+
+if(typeof document!=='undefined')installGraphCastMapControl();
