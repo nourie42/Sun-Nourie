@@ -1,5 +1,5 @@
 import {finite,solarElevation,thermalHumidity} from './weather-math.js?v=weather-qa-v65';
-import {clothingForFeels,referenceScene,precipitationActivity} from './exposure-scene.js?v=radar-dry-v34';
+import {clothingForFeels,referenceScene,precipitationActivity} from './exposure-scene.js?v=carry-umbrella-v1';
 import {thermalRisk} from './thermal-risk.js?v=weather-art-labels-v10';
 import {weatherShapes} from './weather-display.js?v=weather-qa-v65';
 import {weatherState} from './weather-state.js';
