@@ -7,6 +7,7 @@ import {degrees,feelsAt} from './hourly-feels.js?v=weather-art-labels-v10';
 import {createFramePlayer} from './frame-player.js';
 import {renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=qpf-trace-v54';
 import {dailyDisplay} from './weather-math.js?v=qpf-trace-v43';
+import {conditionForRainChance} from './weather-state.js?v=qpf-trace-v3';
 import {currentHero} from './current-temperature.js?v=radar-dry-v48';
 import {renderBulletins} from './bulletins.js?v=wpc-mpd-v1';
 import {modelFreshnessText} from './personal-details.js?v=comfort-rain-v38';
@@ -125,7 +126,7 @@ function render(data) {
   draw('scientific-stuff', 'Source details', () => renderEvidence(data));
   draw('day-content', 'Forecast details', () => refreshOpenDay());
   if (currentBriefing?.signature !== data.signature) {
-    draw('briefing-summary', 'Local outlook', () => renderBriefing({ mode: 'nws-summary', signature: data.signature, headline: currentDay.tonight ? 'Your evening outlook' : d.condition, summary: forecastPeriodSummary(data,0,currentDay.tonight?'overnight':'daytime').summary, nearTerm: forecastPeriodSummary(data,0,'overnight').summary, extended: forecastPeriodSummary(data,1,'overall').summary,
+    draw('briefing-summary', 'Local outlook', () => renderBriefing({ mode: 'nws-summary', signature: data.signature, headline: currentDay.tonight ? 'Your evening outlook' : currentDay.condition, summary: forecastPeriodSummary(data,0,currentDay.tonight?'overnight':'daytime').summary, nearTerm: forecastPeriodSummary(data,0,'overnight').summary, extended: forecastPeriodSummary(data,1,'overall').summary,
       uncertainty: '', danTake:data.danTake||rebindDanTake(currentBriefing?.danTake||currentBriefing,data), reason: data.aiConfigured ? 'Updating your local outlook…' : 'Weather Nourie forecast', sources: ['nws',...(data.modelContributions||[]).map(model=>model.id)] }));
   }
   if (map) { marker?.setLatLng([place.latitude, place.longitude]); renderMapWarnings(data); }
@@ -178,7 +179,8 @@ function renderBriefing(data) {
   const card=danCard(data,forecast,Date.now());
   const takeItems=card.items||[];
   const takeDisplay=card.text;
-  $('briefing-title').textContent = data.headline || 'Local forecast';
+  const displayedDay=forecast?.days?.[0]?dailyDisplay(forecast.days[0],0,Date.now(),forecast.location?.timeZone||'America/New_York'):null;
+  $('briefing-title').textContent = conditionForRainChance(data.headline || 'Local forecast',displayedDay?.pop);
   $('briefing-summary').textContent = data.summary || 'The source forecast is currently unavailable.';
   $('ai-label').textContent = data.mode === 'ai' ? 'YOUR LOCAL OUTLOOK' : 'WEATHER NOURIE FORECAST';
   const refs = (data.sources || []).filter((id) => ['nws', 'afd', 'hrrr', 'ecmwf', 'nbm'].includes(id)).map((id) => {

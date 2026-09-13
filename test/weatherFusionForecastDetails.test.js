@@ -4,6 +4,7 @@ import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
 import {collectDanTakeEvidence,approveDanTake,visibleDanTakeItems,danTakeText} from '../public/weather-fusion/dans-take.js';
 import {danCard} from '../public/weather-fusion/dans-summary.js';
+import {conditionForRainChance} from '../public/weather-fusion/weather-state.js';
 const read=name=>readFileSync(new URL(`../public/weather-fusion/${name}`,import.meta.url),'utf8');
 const app=read('app.js'),html=read('index.html'),css=read('forecast-layout.css');
 const start=app.indexOf('function renderBriefing(data) {'),end=app.indexOf('\nasync function load(',start);
@@ -21,7 +22,7 @@ function harness({missingNote=false}={}){
  if(missingNote){delete elements['today-uncertainty'];delete elements['today-uncertainty-text'];}
  let time=now;
  class Clock extends Date{constructor(...args){super(...(args.length?args:[time]));}static now(){return time;}}
- const context={$:id=>elements[id]??null,forecast:structuredClone(source),currentBriefing:null,esc:escape,clock:()=>'12:00 PM',visibleDanTakeItems,danTakeText,danCard,Date:Clock};
+ const context={$:id=>elements[id]??null,forecast:structuredClone(source),currentBriefing:null,esc:escape,clock:()=>'12:00 PM',visibleDanTakeItems,danTakeText,danCard,dailyDisplay:()=>({pop:null}),conditionForRainChance,Date:Clock};
  runInNewContext(`${renderer}\nthis.renderBriefing=renderBriefing;`,context);
  return {elements,context,render:context.renderBriefing,setTime:t=>{time=t;}};
 }
@@ -41,6 +42,12 @@ test('NWS fallback shows only a short explicit possible change',()=>{
  assert.match(elements['today-uncertainty-text'].textContent,/front timing remains uncertain/);assert.doesNotMatch(elements['today-uncertainty-text'].textContent,/Warm with a chance of rain/);assert.equal(elements['today-uncertainty'].hidden,false);
  assert.ok(!elements['briefing-detail'].innerHTML.includes('data-dans-take'));
  assert.equal(elements['briefing-summary'].textContent,'Warm with a chance of rain.');
+});
+test('local outlook cannot retain thunder wording below the display threshold',()=>{
+ const {elements,context,render}=harness();
+ context.dailyDisplay=()=>({pop:32});
+ render({mode:'nws-summary',headline:'Scattered Showers And Thunderstorms then Partly Sunny',summary:'Rain is possible.'});
+ assert.equal(elements['briefing-title'].textContent,'Slight Chance Showers then Partly Sunny');
 });
 test('only approved dated AI changes appear in both places, without duplicates',()=>{
  const {elements,render}=harness(),note=elements['today-uncertainty'];
@@ -117,7 +124,7 @@ test('Gross Meter heading stays centered and bold without changing chart geometr
  assert.match(css,/#gross-title\{text-align:center;font-weight:800\}/);assert.match(meterCss,/\.gross-eyebrow\{width:calc\(100% \+ 86px\);[^}]*text-align:center/);assert.match(meterCss,/@media\(max-width:760px\)[\s\S]*\.gross-eyebrow\{width:calc\(100% \+ 62px\)\}/);assert.ok(!/\.gross-(scroll|chart)\s*\{/.test(css));
 });
 test('changed assets are cache-busted and late briefing responses stay guarded',()=>{
- assert.match(html,/style\.css\?v=car-wash-icon-back-v46/);assert.match(html,/forecast-layout\.css\?v=weather-art-labels-v10/);assert.match(html,/personal-details\.css\?v=wpc-mpd-v12/);assert.match(html,/app\.js\?v=qpf-trace-v63/);assert.match(html,/car-wash\.css\?v=rain-consensus-v41/);assert.match(html,/forecast-cards\.css\?v=remainder-today-v42/);assert.match(html,/scenario-layout\.css\?v=scenario-weather-v29/);
+ assert.match(html,/style\.css\?v=car-wash-icon-back-v46/);assert.match(html,/forecast-layout\.css\?v=weather-art-labels-v10/);assert.match(html,/personal-details\.css\?v=wpc-mpd-v12/);assert.match(html,/app\.js\?v=qpf-trace-v64/);assert.match(html,/car-wash\.css\?v=rain-consensus-v41/);assert.match(html,/forecast-cards\.css\?v=remainder-today-v42/);assert.match(html,/scenario-layout\.css\?v=scenario-weather-v29/);
  assert.match(app,/dans-take\.js\?v=weather-art-labels-v10/);
  assert.match(app,/bulletins\.js\?v=wpc-mpd-v1/);
  assert.match(app,/experience\.js\?v=qpf-trace-v54/);
