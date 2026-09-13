@@ -10,12 +10,12 @@ import {dailyDisplay} from './weather-math.js?v=weather-qa-v65';
 import {conditionForRainChance} from './weather-state.js?v=weather-qa-v65';
 import {currentHero} from './current-temperature.js?v=radar-dry-v48';
 import {renderBulletins} from './bulletins.js?v=wpc-mpd-v1';
-import {modelFreshnessText} from './personal-details.js?v=comfort-rain-v38';
+import {modelFreshnessText} from './personal-details.js?v=carry-umbrella-v1';
 import {renderDewpointMeter} from './dewpoint-meter.js?v=weather-qa-v65';
 import {renderWeatherPanel} from './render-safety.js';
 import {forecastPeriodSummary} from './forecast-story.js?v=forecast-trace-v40';
 import {isExperimentalWeatherPage,renderCarWashForecast,resetCarWashForecast} from './car-wash.js?v=weather-qa-v65';
-import {renderModelExplanation,resetModelExplanation} from './model-explanation.js?v=qpf-trace-v50';
+import {renderModelExplanation,resetModelExplanation} from './model-explanation.js?v=qpf-light-v51';
 import {updateRainTrend} from './rain-trend.js?v=remainder-today-v42';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);
