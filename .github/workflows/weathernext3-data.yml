@@ -1,0 +1,75 @@
+name: WeatherNext 3 point forecast data
+
+on:
+  schedule:
+    # Main 00/06/12/18 UTC runs reach BigQuery about 8h10m later.
+    - cron: '25 2,8,14,20 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: weathernext3-point-data
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      WEATHERNEXT_BQ_TABLE: ${{ vars.WEATHERNEXT_BQ_TABLE }}
+      HAS_WEATHERNEXT_CREDS: ${{ secrets.WEATHERNEXT_GCP_CREDENTIALS != '' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Explain missing setup
+        if: env.HAS_WEATHERNEXT_CREDS != 'true' || env.WEATHERNEXT_BQ_TABLE == ''
+        run: |
+          echo "WeatherNext 3 is ready in the site but Google access is not configured."
+          echo "Add repository variable WEATHERNEXT_BQ_TABLE and secret WEATHERNEXT_GCP_CREDENTIALS after allowlist approval."
+
+      - uses: actions/setup-python@v5
+        if: env.HAS_WEATHERNEXT_CREDS == 'true' && env.WEATHERNEXT_BQ_TABLE != ''
+        with:
+          python-version: '3.12'
+
+      - name: Authenticate to Google Cloud
+        if: env.HAS_WEATHERNEXT_CREDS == 'true' && env.WEATHERNEXT_BQ_TABLE != ''
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.WEATHERNEXT_GCP_CREDENTIALS }}
+
+      - name: Install BigQuery client
+        if: env.HAS_WEATHERNEXT_CREDS == 'true' && env.WEATHERNEXT_BQ_TABLE != ''
+        run: pip install 'google-cloud-bigquery>=3.25,<4'
+
+      - name: Open isolated public-weather data worktree
+        if: env.HAS_WEATHERNEXT_CREDS == 'true' && env.WEATHERNEXT_BQ_TABLE != ''
+        shell: bash
+        run: |
+          DATA="$RUNNER_TEMP/weather-fusion-publish"
+          git fetch --depth=1 origin weather-fusion-data
+          git worktree add --detach "$DATA" FETCH_HEAD
+          git -C "$DATA" config user.name 'github-actions[bot]'
+          git -C "$DATA" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          echo "WEATHER_DATA_DIR=$DATA" >> "$GITHUB_ENV"
+
+      - name: Query hosted WeatherNext 3
+        if: env.HAS_WEATHERNEXT_CREDS == 'true' && env.WEATHERNEXT_BQ_TABLE != ''
+        run: |
+          python scripts/weather_weathernext3_collect.py \
+            --table "$WEATHERNEXT_BQ_TABLE" \
+            --output "$WEATHER_DATA_DIR/models/weathernext3.json"
+
+      - name: Publish compact WeatherNext 3 feed
+        if: env.HAS_WEATHERNEXT_CREDS == 'true' && env.WEATHERNEXT_BQ_TABLE != ''
+        shell: bash
+        run: |
+          cd "$WEATHER_DATA_DIR"
+          git add -- models/weathernext3.json
+          if ! git diff --cached --quiet; then
+            git commit -m 'Refresh Google WeatherNext 3 point forecasts'
+            git push origin HEAD:weather-fusion-data
+          fi
