@@ -3,7 +3,7 @@ import {dailyDisplay,dailyRainPeriod,finite} from './weather-math.js?v=weather-q
 import {dailyFeels,degrees,timeAt} from './hourly-feels.js?v=weather-art-labels-v10';
 import {uvCategory} from './daily-uv.js?v=weather-art-labels-v10';
 import {weatherIcon,weatherMetricIcon} from './weather-display.js?v=weather-qa-v65';
-const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
+const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const reading=(value,unit='')=>finite(value)?`${Math.round(value)}${unit}`:'—';
 const HOUR=3600000;
 export function periodWeatherStats(forecast,now=Date.now()){
