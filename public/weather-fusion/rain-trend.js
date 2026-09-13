@@ -1,4 +1,4 @@
-import {dailyDisplay,finite} from './weather-math.js?v=qpf-trace-v42';
+import {dailyDisplay,finite} from './weather-math.js?v=qpf-trace-v43';
 
 const STORAGE_KEY='weather-nourie-rain-history-v1';
 const MAX_SAMPLES=12;

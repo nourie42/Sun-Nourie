@@ -1,4 +1,4 @@
-import {weatherShapes} from './weather-display.js?v=qpf-trace-v53';
+import {weatherShapes} from './weather-display.js?v=qpf-trace-v54';
 import {weatherState} from './weather-state.js';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 

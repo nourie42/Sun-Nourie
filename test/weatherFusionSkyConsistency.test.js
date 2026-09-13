@@ -89,8 +89,8 @@ test('same, lower and higher later readings are labeled honestly and never chang
 });
 test('a low blended rain chance cannot retain thunder wording or a lightning icon',()=>{
  assert.equal(conditionForRainChance('Scattered Showers And Thunderstorms then Partly Sunny',26),'Slight Chance Showers then Partly Sunny');
- assert.equal(conditionForRainChance('Thunderstorms',29),'Slight Chance Showers');
- assert.equal(conditionForRainChance('Thunderstorms',30),'Thunderstorms');
+ assert.equal(conditionForRainChance('Thunderstorms',39),'Slight Chance Showers');
+ assert.equal(conditionForRainChance('Thunderstorms',40),'Thunderstorms');
  assert.equal(weatherState(conditionForRainChance('Thunderstorms',26)).kind,'rain');
  assert.doesNotMatch(weatherIcon(conditionForRainChance('Thunderstorms',26)),/sky-lightning/);
  assert.equal(conditionForRainChance('Thunderstorms then Partly Sunny',0),'Partly Sunny');

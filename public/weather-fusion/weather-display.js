@@ -1,8 +1,8 @@
 import {hourlyUvValue,hourlyUvHTML} from './daily-uv.js?v=clear-weather-daygraph-v3';
 import {outdoorExposure} from './outdoor-feels.js?v=clear-weather-daygraph-v3';
 import {currentComfortInputs} from './current-inputs.js?v=clear-weather-daygraph-v3';
-import {weatherState,conditionForRainChance} from './weather-state.js?v=qpf-trace-v2';
-import {thermalComfort, finite, solarElevation,rainChanceValue} from './weather-math.js?v=qpf-trace-v42';
+import {weatherState,conditionForRainChance} from './weather-state.js?v=qpf-trace-v3';
+import {thermalComfort, finite, solarElevation,rainChanceValue} from './weather-math.js?v=qpf-trace-v43';
 import {feelsAt, forecastValue, degrees} from './hourly-feels.js?v=weather-art-labels-v10';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function weatherShapes(condition, isDay = true) {
