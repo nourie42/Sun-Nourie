@@ -133,15 +133,16 @@ export function exposureScene(sun,daylight=true,condition='Clear',feels=null,con
 
 export function precipitationActivity(condition='',context={}){
  const weather=weatherState(condition),pop=context.pop;
- if(finite(pop)&&pop>=80&&weather.kind!=='storm')return 'active';
- if(!['rain','storm'].includes(weather.kind))return 'none';
  // Forecast artwork follows the same displayed probability at every hour.
+ // A rainy probability should still affect the people scene even when the
+ // short condition text says fog/clouds instead of repeating rain.
  // Observed rain without a probability can still use the active-rain scene.
  if(finite(pop)){
-  if(pop>61)return 'active';
+  if(pop>=80)return 'active';
   if(pop>=50)return 'umbrella';
-  return 'possible';
+  if(pop>0)return 'possible';
  }
+ if(!['rain','storm'].includes(weather.kind))return 'none';
  if(!weather.chance)return 'active';
  return 'possible';
 }
@@ -160,7 +161,7 @@ export function comfortSceneState(daylight=true,condition='Clear',feels=null,con
 }
 
 const comfortSceneAssets=['comfort-reference-scenes.webp','comfort-reference-scenes-hot.webp','comfort-reference-scenes-rain.webp','comfort-reference-scenes-umbrella.webp','comfort-reference-scenes-carry-umbrella.svg','comfort-reference-scenes-cold.webp','comfort-reference-scenes-fog.webp','comfort-reference-scenes-watch.webp','comfort-reference-scenes-dawn.webp'];
-const comfortSceneUrl=asset=>`/weather-fusion/${asset}${asset==='comfort-reference-scenes-umbrella.webp'?'?v=umbrella-repair-v1':asset==='comfort-reference-scenes-carry-umbrella.svg'?'?v=carry-umbrella-v1':''}`;
+const comfortSceneUrl=asset=>`/weather-fusion/${asset}${asset==='comfort-reference-scenes-umbrella.webp'?'?v=umbrella-repair-v2':asset==='comfort-reference-scenes-carry-umbrella.svg'?'?v=carry-umbrella-v2':''}`;
 export function preloadComfortScenes(){
  if(typeof Image==='undefined')return false;
  for(const asset of comfortSceneAssets){const image=new Image();image.decoding='async';image.src=comfortSceneUrl(asset);}
