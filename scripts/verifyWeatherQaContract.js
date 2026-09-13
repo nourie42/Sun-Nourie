@@ -10,16 +10,17 @@ import {precipitationActivity,comfortSceneState} from '../public/weather-fusion/
 const close=(a,b)=>Math.abs(a-b)<1e-8;
 
 assert.equal(deterministicRainSignal(0),0);
-assert.ok(close(deterministicRainSignal(0.004),100/3));
-assert.ok(close(deterministicRainSignal(0.010),100/3));
-assert.equal(deterministicRainSignal(0.0101),100);
+assert.equal(deterministicRainSignal(0.004),30);
+assert.equal(deterministicRainSignal(0.010),30);
+assert.equal(deterministicRainSignal(0.099),30);
+assert.equal(deterministicRainSignal(0.10),100);
 
 const boundary=precipitationLikelihood(7,{sourceValues:{hrrr:0,ecmwf:0.004,nbm:0.010}});
-assert.equal(boundary.value,13);
+assert.equal(boundary.value,12);
 assert.ok(close(boundary.sourcePoints.nws,2.8));
 assert.equal(boundary.sourcePoints.hrrr,0);
-assert.ok(close(boundary.sourcePoints.ecmwf,10/3));
-assert.ok(close(boundary.sourcePoints.nbm,20/3));
+assert.equal(boundary.sourcePoints.ecmwf,3);
+assert.equal(boundary.sourcePoints.nbm,6);
 
 assert.equal(conditionForRainChance('Rain',100),'Rain');
 assert.equal(weatherState(conditionForRainChance('Rain',100)).kind,'rain');
@@ -34,6 +35,9 @@ assert.equal(todaySkyProfile({condition:'Slight Chance Showers And Thunderstorms
 assert.equal(precipitationActivity('Fog',{pop:100}),'active');
 assert.deepEqual(comfortSceneState(true,'Fog',65,{pop:100}),{key:'rain',asset:'comfort-reference-scenes-rain.webp'});
 assert.deepEqual(comfortSceneState(true,'Fog',65,{pop:0}),{key:'fog',asset:'comfort-reference-scenes-fog.webp'});
+assert.equal(precipitationActivity('Chance Showers',{pop:23}),'possible');
+assert.deepEqual(comfortSceneState(true,'Chance Showers',70,{pop:23}),{key:'carry-umbrella',asset:'comfort-reference-scenes-carry-umbrella.svg'});
+assert.deepEqual(comfortSceneState(true,'Chance Showers',70,{pop:50}),{key:'umbrella',asset:'comfort-reference-scenes-umbrella.webp'});
 
 assert.match(confidenceBannerHTML({confidence:{key:'low',factors:['8.0°F high-temperature spread','0.40 in rainfall-guidance spread']}}),/Lower confidence today[\s\S]*Click for details/);
 assert.equal(confidenceBannerHTML({confidence:{key:'high',factors:[]}}),'');
