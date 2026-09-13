@@ -52,11 +52,12 @@ export function modelExplanationView(forecast, {index = 0,phase = null,now = Dat
   }).sort((a,b) => Date.parse(a.time)-Date.parse(b.time));
   const available = rows.filter(row => chance(row.rainLikelihood?.value) !== null);
   const maximum = available.length ? Math.max(...available.map(row=>row.rainLikelihood.value)) : null;
-  const peakRow = available.find(row => row.time === period.peakTime && row.rainLikelihood.value === maximum) || available.find(row => row.rainLikelihood.value === maximum) || null;
-  const value = chance(period.value), complete = period.coverage?.complete === true;
-  const mismatch = value !== null && maximum !== null && (value !== maximum || (period.peakTime && !available.some(row=>row.time===period.peakTime && row.rainLikelihood.value===value)));
-  return {index:safeIndex,day,zone,phase:selected,period,start,end,rows,maximum,peakRow,value,complete,mismatch,
-    peak:peakRow?.rainLikelihood || period.peak || null,peakTime:peakRow?.time || period.peakTime || null,
+  const peakRow = available.find(row => row.time === period.peakTime) || available.find(row => row.rainLikelihood.value === maximum) || null;
+  const value = chance(period.value), complete = period.coverage?.complete === true, periodEvent=period.aggregation==='period-event';
+  const mismatch = !periodEvent && value !== null && maximum !== null && (value !== maximum || (period.peakTime && !available.some(row=>row.time===period.peakTime && row.rainLikelihood.value===value)));
+  const peak=peakRow?.rainLikelihood || period.peak || null, evidence=periodEvent?period:peak;
+  return {index:safeIndex,day,zone,phase:selected,period,start,end,rows,maximum,peakRow,value,complete,mismatch,periodEvent,evidence,
+    peak,peakTime:peakRow?.time || period.peakTime || null,
     peakEnd:peakRow?.end || period.peakEnd || (peakRow ? new Date(Date.parse(peakRow.time)+HOUR).toISOString() : null)};
 }
 
@@ -71,16 +72,23 @@ function sourceRows(likelihood) {
   });
 }
 
-function sourceTable(likelihood, caption = 'Inputs for the highest hour') {
+function sourceTable(likelihood, caption = 'Inputs') {
+  const measurable=finite(likelihood?.measurableQpfThresholdInches)?likelihood.measurableQpfThresholdInches:.01;
+  const rolling=finite(likelihood?.rollingQpfThresholdInches)?likelihood.rollingQpfThresholdInches:.1;
+  const reducedPercent=finite(likelihood?.reducedPointFraction)?Math.round(likelihood.reducedPointFraction*100):30;
+  const rollingFull=new Set(likelihood?.rollingFullSources||[]);
   const rows = sourceRows(likelihood).map(source => {
     const input = source.id === 'nws'
       ? source.value === null ? 'Unavailable' : `${number(source.officialProbability)}% probability`
       : source.amount === null ? 'Unavailable' : `${number(source.amount,8)} in`;
-    const reducedThreshold=finite(likelihood?.reducedQpfThresholdInches)?likelihood.reducedQpfThresholdInches:.1;
-    const reducedPercent=finite(likelihood?.reducedPointFraction)?Math.round(likelihood.reducedPointFraction*100):30;
-    const signal = source.id==='nws'||source.value === null ? ''
-      : source.amount>0&&source.amount<reducedThreshold ? `<small>Light rain forecast: ${reducedPercent}% points</small>`
-        : `<small>Rain forecast: ${source.value>0?'Yes':'No'}</small>`;
+    let signal='';
+    if(source.id!=='nws'&&source.value!==null){
+      if(source.amount<=0)signal='<small>Rain forecast: No</small>';
+      else if(source.value>=100)signal=rollingFull.has(source.id)
+        ? `<small>Full support: rolling 3/6-hour rain ≥ ${number(rolling,2)} in</small>`
+        : `<small>Measurable rain ≥ ${number(measurable,2)} in: full points</small>`;
+      else signal=`<small>Trace rain: ${reducedPercent}% points</small>`;
+    }
     const weight=source.weight===null?(source.id==='nws'&&source.value===null?'Unavailable':'Not used'):`${number(source.weight*100,4)}%`;
     return `<tr><th scope="row">${names[source.id]}</th><td>${input}${signal}</td><td>${weight}</td><td>${source.points === null?'—':number(source.points,6)}</td></tr>`;
   }).join('');
@@ -88,7 +96,7 @@ function sourceTable(likelihood, caption = 'Inputs for the highest hour') {
 }
 
 function arithmetic(likelihood) {
-  if (!likelihood || chance(likelihood.value) === null) return '<p class="model-calculation">This hour does not have a usable rain estimate.</p>';
+  if (!likelihood || chance(likelihood.value) === null) return '<p class="model-calculation">This forecast period does not have a usable rain estimate.</p>';
   const sources = sourceRows(likelihood).filter(source => source.weight !== null);
   if (!sources.length) return '<p class="model-calculation">The calculation inputs were not supplied.</p>';
   const formula = sources.map(source=>number(source.points)).join(' + ');
@@ -108,29 +116,35 @@ function temperatureBlend(day, kind) {
 }
 
 function sourceStatus(forecast, view) {
-  const peakSources = sourceRows(view.peak), models = forecast?.modelContributions || [], feeds = forecast?.feeds || [];
+  const evidenceSources = sourceRows(view.evidence), models = forecast?.modelContributions || [], feeds = forecast?.feeds || [];
+  const scope=view.periodEvent?'period':'highest hour';
   return `<dl class="model-runs">${['nws','hrrr','ecmwf','nbm'].map(id => {
-    const source = peakSources.find(row=>row.id===id), model = models.find(row=>row.id===id), feed = feeds.find(row=>row.id===(id==='nws'?'hourly':id)) || feeds.find(row=>row.id===id);
+    const source = evidenceSources.find(row=>row.id===id), model = models.find(row=>row.id===id), feed = feeds.find(row=>row.id===(id==='nws'?'hourly':id)) || feeds.find(row=>row.id===id);
     const used = source?.weight !== null, issued = source?.runAt || (id === 'nws' ? feed?.id==='hourly'?feed.issuedAt:null : model?.runAt || feed?.issuedAt);
     const kind = id === 'nws' ? 'Issued' : 'Latest published run';
-    return `<div><dt>${names[id]} <span>${used?'Used at peak':'Not used at peak'}</span></dt><dd>${kind}: ${esc(stamp(issued,view.zone))}${model?.runScope?`<small>${esc(model.runScope)}</small>`:''}${feed?.fetchedAt?`<small>Data fetched: ${esc(stamp(feed.fetchedAt,view.zone))}</small>`:''}${feed?.checkedAt?`<small>Last check: ${esc(stamp(feed.checkedAt,view.zone))}</small>`:''}${feed?.retrievalStatus==='last-verified'?'<small>Using last verified data; the latest refresh did not succeed.</small>':''}${feed?.refreshWarning?`<small>${esc(feed.refreshWarning)}</small>`:''}${feed?.status&&feed.status!=='ready'?`<small>Feed: ${esc(feed.status)}</small>`:''}</dd></div>`;
+    return `<div><dt>${names[id]} <span>${used?`Used for ${scope}`:`Not used for ${scope}`}</span></dt><dd>${kind}: ${esc(stamp(issued,view.zone))}${model?.runScope?`<small>${esc(model.runScope)}</small>`:''}${feed?.fetchedAt?`<small>Data fetched: ${esc(stamp(feed.fetchedAt,view.zone))}</small>`:''}${feed?.checkedAt?`<small>Last check: ${esc(stamp(feed.checkedAt,view.zone))}</small>`:''}${feed?.retrievalStatus==='last-verified'?'<small>Using last verified data; the latest refresh did not succeed.</small>':''}${feed?.refreshWarning?`<small>${esc(feed.refreshWarning)}</small>`:''}${feed?.status&&feed.status!=='ready'?`<small>Feed: ${esc(feed.status)}</small>`:''}</dd></div>`;
   }).join('')}</dl>`;
 }
 
 export function modelExplanationHTML(forecast, options = {}) {
-  const view = modelExplanationView(forecast,options), {day,zone,period,rows,peak,phase} = view;
+  const view = modelExplanationView(forecast,options), {day,zone,period,rows,phase} = view;
   const choices = (forecast?.days || []).map((row,index)=>`<option value="${index}"${index===view.index?' selected':''}>${esc(dayLabel(row.date,index))}</option>`).join('');
   const phaseOptions = Object.entries(phaseNames).map(([key,name])=>`<option value="${key}"${key===phase?' selected':''}>${name}</option>`).join('');
   const temperatures = temperatureBlend(day,'high')+temperatureBlend(day,'low');
   const audit = rows.map(row=>`<details class="model-hour-audit" data-model-detail="hour-${esc(row.time)}"${row.time===view.peakTime?' data-peak="true"':''}><summary><span>${esc(stamp(row.time,zone))}</span><strong>${percent(row.rainLikelihood?.value)}</strong></summary>${sourceTable(row.rainLikelihood,'Hourly inputs')}${arithmetic(row.rainLikelihood)}</details>`).join('');
+  const periodLabel=view.periodEvent?'period rain estimate':'highest hourly blended estimate';
+  const definition=view.periodEvent
+    ? 'This is the estimated chance of measurable rain occurring at least once during this period. Hourly chances are correlated, so they are not added together.'
+    : 'This number is the highest hourly estimate in this period, not a separate probability of rain at any time during the whole period.';
+  const evidenceCaption=view.periodEvent?'Inputs for this period':'Inputs for the highest hour';
   return `<div class="model-explanation-heading"><h2 id="model-explanation-title">Why this forecast</h2><div class="model-selectors"><label>Day<select aria-label="Day" data-model-day>${choices}</select></label><label>Period<select aria-label="Period" data-model-phase>${phaseOptions}</select></label></div></div>
-    <div class="model-period"><strong>${percent(view.value)}</strong><span>${phaseNames[phase]} · highest hourly blended estimate<small>${esc(stamp(period.window?.start,zone))} – ${esc(stamp(period.window?.end,zone))}</small></span></div>
-    <p class="model-definition">This number is the highest hourly estimate in this period, not a separate probability of rain at any time during the whole period.</p>
+    <div class="model-period"><strong>${percent(view.value)}</strong><span>${phaseNames[phase]} · ${periodLabel}<small>${esc(stamp(period.window?.start,zone))} – ${esc(stamp(period.window?.end,zone))}</small></span></div>
+    <p class="model-definition">${definition}</p>
     ${view.mismatch?`<p class="model-data-warning">Data mismatch: the period shows ${percent(view.value)}, but the highest supplied hour is ${percent(view.maximum)}.</p>`:''}
     ${!view.complete?`<p class="model-data-warning">Incomplete coverage: ${number(period.coverage?.availableHours)} of ${number(period.coverage?.expectedHours)} hours. The period estimate stays unavailable.${view.maximum===null?'':` Highest available hour: ${percent(view.maximum)}.`}</p>`:''}
-    ${view.peakTime?`<h3>Highest hour: ${esc(stamp(view.peakTime,zone))}–${esc(stamp(view.peakEnd,zone,false))}</h3>`:''}
-    ${sourceTable(peak)}${arithmetic(peak)}
-    <details class="model-method" data-model-detail="method"><summary>How the inputs are used</summary><p>The NWS hourly probability fills its 40-point share proportionally. A 40% NWS chance contributes 16 points. HRRR is worth 30 points, ECMWF 10, and NBM 20. A positive model amount below 0.10 in gets 30% of that model's points. Exactly 0.10 in or more gets full points. Zero rain gets zero points.</p><p>The points are added and the result is capped at 100%. For example, NWS 7% contributes 2.8 points; ECMWF at 0.004 in contributes 3 points; and NBM at 0.012 in contributes 6 points. The total is 11.8%, shown as 12%. Rainfall amount is calculated separately. An unavailable model adds no points. This is an uncalibrated estimate, not a proven model-accuracy ranking.</p></details>
+    ${sourceTable(view.evidence,evidenceCaption)}${arithmetic(view.evidence)}
+    ${view.peakTime?`<h3>Highest hourly chance: ${percent(view.maximum)} · ${esc(stamp(view.peakTime,zone))}–${esc(stamp(view.peakEnd,zone,false))}</h3>`:''}
+    <details class="model-method" data-model-detail="method"><summary>How the inputs are used</summary><p>For a daytime, overnight or full-day period, the NWS period probability fills its 40-point share proportionally. HRRR is worth 30 points, ECMWF 10, and NBM 20. Each model contributes once if it forecasts measurable rain somewhere in that period. Hourly probabilities are correlated and are never added together.</p><p>For each hourly card, 0.01 in or more in that hour gives a model its full points. A smaller positive trace gets 30% of that model's points unless a complete rolling 3-hour or 6-hour window containing the hour totals at least 0.10 in, which restores full points. Zero rain gets zero points. The total is capped at 100%. Rainfall amount is calculated separately. This is a transparent, uncalibrated estimate, not a proven model-accuracy ranking.</p></details>
     <details class="model-hourly-list" data-model-detail="hours"><summary>All ${rows.length} forecast hours in this period</summary>${audit||'<p>No hourly calculation data was supplied.</p>'}</details>
     ${temperatures?`<details class="model-temperature-list" data-model-detail="temperatures"><summary>Temperature calculations</summary>${temperatures}</details>`:''}
     <details class="model-source-list" data-model-detail="sources"><summary>Source runs and availability</summary>${sourceStatus(forecast,view)}</details>`;
