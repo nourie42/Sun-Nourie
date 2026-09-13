@@ -76,8 +76,10 @@ function sourceTable(likelihood, caption = 'Inputs for the highest hour') {
     const input = source.id === 'nws'
       ? source.value === null ? 'Unavailable' : `${number(source.officialProbability)}% probability`
       : source.amount === null ? 'Unavailable' : `${number(source.amount,8)} in`;
+    const reducedThreshold=finite(likelihood?.reducedQpfThresholdInches)?likelihood.reducedQpfThresholdInches:.1;
+    const reducedPercent=finite(likelihood?.reducedPointFraction)?Math.round(likelihood.reducedPointFraction*100):30;
     const signal = source.id==='nws'||source.value === null ? ''
-      : source.amount>0&&source.amount<.01 ? '<small>Trace rain forecast: one-third points</small>'
+      : source.amount>0&&source.amount<reducedThreshold ? `<small>Light rain forecast: ${reducedPercent}% points</small>`
         : `<small>Rain forecast: ${source.value>0?'Yes':'No'}</small>`;
     const weight=source.weight===null?(source.id==='nws'&&source.value===null?'Unavailable':'Not used'):`${number(source.weight*100,4)}%`;
     return `<tr><th scope="row">${names[source.id]}</th><td>${input}${signal}</td><td>${weight}</td><td>${source.points === null?'—':number(source.points,6)}</td></tr>`;
@@ -128,7 +130,7 @@ export function modelExplanationHTML(forecast, options = {}) {
     ${!view.complete?`<p class="model-data-warning">Incomplete coverage: ${number(period.coverage?.availableHours)} of ${number(period.coverage?.expectedHours)} hours. The period estimate stays unavailable.${view.maximum===null?'':` Highest available hour: ${percent(view.maximum)}.`}</p>`:''}
     ${view.peakTime?`<h3>Highest hour: ${esc(stamp(view.peakTime,zone))}–${esc(stamp(view.peakEnd,zone,false))}</h3>`:''}
     ${sourceTable(peak)}${arithmetic(peak)}
-    <details class="model-method" data-model-detail="method"><summary>How the inputs are used</summary><p>The NWS hourly probability fills its 40-point share proportionally. A 40% NWS chance contributes 16 points. HRRR is worth 30 points, ECMWF 10, and NBM 20. A positive model amount below 0.010 in gets one-third of that model's points. Exactly 0.010 in or more gets full points. Zero rain gets zero points.</p><p>The points are added and the result is capped at 100%. For example, NWS 7% contributes 2.8 points; ECMWF at 0.004 in contributes 3.33 points; and NBM at 0.012 in contributes 20 points. The total is 26.13%, shown as 26%. Rainfall amount is calculated separately. An unavailable model adds no points. This is an uncalibrated estimate, not a proven model-accuracy ranking.</p></details>
+    <details class="model-method" data-model-detail="method"><summary>How the inputs are used</summary><p>The NWS hourly probability fills its 40-point share proportionally. A 40% NWS chance contributes 16 points. HRRR is worth 30 points, ECMWF 10, and NBM 20. A positive model amount below 0.10 in gets 30% of that model's points. Exactly 0.10 in or more gets full points. Zero rain gets zero points.</p><p>The points are added and the result is capped at 100%. For example, NWS 7% contributes 2.8 points; ECMWF at 0.004 in contributes 3 points; and NBM at 0.012 in contributes 6 points. The total is 11.8%, shown as 12%. Rainfall amount is calculated separately. An unavailable model adds no points. This is an uncalibrated estimate, not a proven model-accuracy ranking.</p></details>
     <details class="model-hourly-list" data-model-detail="hours"><summary>All ${rows.length} forecast hours in this period</summary>${audit||'<p>No hourly calculation data was supplied.</p>'}</details>
     ${temperatures?`<details class="model-temperature-list" data-model-detail="temperatures"><summary>Temperature calculations</summary>${temperatures}</details>`:''}
     <details class="model-source-list" data-model-detail="sources"><summary>Source runs and availability</summary>${sourceStatus(forecast,view)}</details>`;
