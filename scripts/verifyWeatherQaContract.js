@@ -11,16 +11,18 @@ const close=(a,b)=>Math.abs(a-b)<1e-8;
 
 assert.equal(deterministicRainSignal(0),0);
 assert.equal(deterministicRainSignal(0.004),30);
-assert.equal(deterministicRainSignal(0.010),30);
-assert.equal(deterministicRainSignal(0.099),30);
-assert.equal(deterministicRainSignal(0.10),100);
+assert.equal(deterministicRainSignal(0.0099),30);
+assert.equal(deterministicRainSignal(0.010),100);
+assert.equal(deterministicRainSignal(0.099),100);
+assert.equal(deterministicRainSignal(0.004,{threeHour:.1}),100);
+assert.equal(deterministicRainSignal(0.004,{sixHour:.1}),100);
 
 const boundary=precipitationLikelihood(7,{sourceValues:{hrrr:0,ecmwf:0.004,nbm:0.010}});
-assert.equal(boundary.value,12);
+assert.equal(boundary.value,26);
 assert.ok(close(boundary.sourcePoints.nws,2.8));
 assert.equal(boundary.sourcePoints.hrrr,0);
 assert.equal(boundary.sourcePoints.ecmwf,3);
-assert.equal(boundary.sourcePoints.nbm,6);
+assert.equal(boundary.sourcePoints.nbm,20);
 
 assert.equal(conditionForRainChance('Rain',100),'Rain');
 assert.equal(weatherState(conditionForRainChance('Rain',100)).kind,'rain');

@@ -5,6 +5,7 @@ import {uvCategory} from './daily-uv.js?v=weather-art-labels-v10';
 import {weatherIcon,weatherMetricIcon} from './weather-display.js?v=weather-qa-v65';
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const reading=(value,unit='')=>finite(value)?`${Math.round(value)}${unit}`:'—';
+const HOUR=3600000;
 export function periodWeatherStats(forecast,now=Date.now()){
  const day=forecast.days?.[0];if(!day)return {wind:null,humidity:null};
  if(!/^\d{4}-\d{2}-\d{2}$/.test(day.date||''))return {wind:null,humidity:null};
@@ -23,7 +24,23 @@ export function shortForecastCondition(condition){
   return part.charAt(0).toUpperCase()+part.slice(1).toLowerCase();
  }).map((part,i)=>i?part.charAt(0).toLowerCase()+part.slice(1):part).join(', then ');
 }
-export function todaySkyProfile(day={},tonight=false){
+function currentCloudCover(forecast,now){
+ if(finite(forecast?.current?.skyCover)&&forecast.current.skyCover>=0&&forecast.current.skyCover<=100)return forecast.current.skyCover;
+ const rows=forecast?.metricForecasts?.series?.cloud||[];
+ const same=rows.find(row=>{const t=Date.parse(row.time);return finite(t)&&t<=now&&now<t+HOUR&&finite(row.value)&&row.value>=0&&row.value<=100;});
+ if(same)return same.value;
+ const next=rows.find(row=>{const t=Date.parse(row.time);return finite(t)&&t>now&&t<=now+HOUR&&finite(row.value)&&row.value>=0&&row.value<=100;});
+ return next?.value??null;
+}
+/** Selected-location current sky used only to correct a broad sunny period phrase. */
+export function todayCurrentSky(forecast,now=Date.now()){
+ const current=forecast?.current||{},observed=weatherState(current.condition,current.skyCover);
+ if(current.type==='observation'&&observed.known&&['rain','storm','snow','fog','cloudy'].includes(observed.kind))return {...observed,source:current.conditionSource||'Current station sky'};
+ const cover=currentCloudCover(forecast,now);
+ if(finite(cover)){const state=weatherState('',cover);return {...state,cover,source:'Selected-location current-hour cloud-cover blend'};}
+ return observed.known?{...observed,source:current.conditionSource||'Current sky description'}:null;
+}
+export function todaySkyProfile(day={},tonight=false,skyOverride=null){
  const condition=String(tonight?(day.nightCondition||day.condition):day.condition||''),detail=String(tonight?(day.nightDetail||day.detail):day.detail||'');
  const state=weatherState(condition),pop=dailyRainPeriod(day,tonight?'overnight':'daytime').value;
  const lift=/\b(lift|ascent|unstable|instability|cape|convection|convective|updraft|forcing)\b/i.test(`${condition} ${detail}`);
@@ -36,7 +53,11 @@ export function todaySkyProfile(day={},tonight=false){
  else if(['rain','snow'].includes(state.kind)&&pop>=50)scene='overcast-rain';
  else if(state.kind==='cloudy'||pop>=45)scene='cloudy';
  else if(state.kind==='partly-cloudy'||state.kind==='fog'||pop>=15)scene='few-clouds';
- return {scene,pop,night:tonight,state:state.kind,lift,explicitThunder};
+ if(!tonight&&skyOverride?.known&&!['storm','overcast-rain','building'].includes(scene)){
+  if(['cloudy','fog'].includes(skyOverride.kind))scene='cloudy';
+  else if(skyOverride.kind==='partly-cloudy'&&scene==='clear')scene='few-clouds';
+ }
+ return {scene,pop,night:tonight,state:state.kind,lift,explicitThunder,skyOverride:skyOverride?.kind||null};
 }
 export function moonPhaseAt(epoch=Date.now()){
  const d=(epoch-Date.UTC(2000,0,1,12))/86400000,rad=Math.PI/180;
@@ -77,12 +98,16 @@ export function todayForecastHTML(forecast,now=Date.now()){
  const p=dailyDisplay(day,0,now,forecast.location.timeZone),feel=dailyFeels(forecast,0,now),stats=periodWeatherStats(forecast,now);
  const uv=uvCategory(day.uvMax),confidence=day.confidence?.label||'Unavailable';
  const metric=(kind,value,label,note)=>`<span class="today-metric" title="${esc(note)}">${weatherMetricIcon(kind)}<span><strong>${value}</strong><small>${label}</small></span></span>`;
- const profile=todaySkyProfile(day,p.tonight),feelValue=p.tonight?feel.low?.low?.value:feel.high?.high?.value;
+ const currentSky=p.tonight?null:todayCurrentSky(forecast,now),periodState=weatherState(p.condition);
+ const contradictsSunny=currentSky?.known&&['cloudy','fog'].includes(currentSky.kind)&&['clear','partly-cloudy'].includes(periodState.kind);
+ const displayCondition=contradictsSunny?`${currentSky.label} now`:shortForecastCondition(p.condition);
+ const iconCondition=contradictsSunny?currentSky.label:p.condition;
+ const profile=todaySkyProfile(day,p.tonight,contradictsSunny?currentSky:null),feelValue=p.tonight?feel.low?.low?.value:feel.high?.high?.value;
  const trend=forecast.rainTrend?.direction==='down'&&finite(forecast.rainTrend.change)?`<em>↓ Down ${Math.round(forecast.rainTrend.change)} points</em>`:'';
  const banner=confidenceBannerHTML(day);
- return `${banner}<button type="button" class="today-weather-card ${p.tonight?'today-night':p.remainder?'today-remainder':''}" data-today-forecast aria-haspopup="dialog" aria-label="${esc(p.label)}, ${esc(p.condition)}, ${p.primaryLabel} ${reading(p.primary)} degrees${finite(p.secondary)?`, low ${reading(p.secondary)} degrees`:''}. Forecast confidence ${esc(confidence)}. Open details.">
- ${todaySkySceneHTML(profile,now)}<span class="today-scene-shade"></span><span class="today-copy"><span class="day-name">${esc(p.label)}</span><span class="today-condition" title="${esc(p.condition)}">${esc(shortForecastCondition(p.condition))}</span><span class="today-temperatures">${p.tonight?'':`<span class="today-low"><strong>${degrees(p.secondary)}</strong><small>Low</small></span><i>—</i>`}<span class="today-high"><strong>${degrees(p.primary)}</strong><small>${p.primaryLabel}</small></span></span><span class="today-feels">Feels like <b>${degrees(feelValue)}</b></span></span>
- <span class="today-symbol">${weatherIcon(p.condition,!p.tonight,80)}<strong>${reading(p.pop,'%')}</strong><small>Rain chance</small>${trend}</span>
+ return `${banner}<button type="button" class="today-weather-card ${p.tonight?'today-night':p.remainder?'today-remainder':''}" data-today-forecast aria-haspopup="dialog" aria-label="${esc(p.label)}, ${esc(displayCondition)}, ${p.primaryLabel} ${reading(p.primary)} degrees${finite(p.secondary)?`, low ${reading(p.secondary)} degrees`:''}. Forecast confidence ${esc(confidence)}. Open details.">
+ ${todaySkySceneHTML(profile,now)}<span class="today-scene-shade"></span><span class="today-copy"><span class="day-name">${esc(p.label)}</span><span class="today-condition" title="${esc(contradictsSunny?`${p.condition} · ${currentSky.source}`:p.condition)}">${esc(displayCondition)}</span><span class="today-temperatures">${p.tonight?'':`<span class="today-low"><strong>${degrees(p.secondary)}</strong><small>Low</small></span><i>—</i>`}<span class="today-high"><strong>${degrees(p.primary)}</strong><small>${p.primaryLabel}</small></span></span><span class="today-feels">Feels like <b>${degrees(feelValue)}</b></span></span>
+ <span class="today-symbol">${weatherIcon(iconCondition,!p.tonight,80)}<strong>${reading(p.pop,'%')}</strong><small>Rain chance</small>${trend}</span>
  <span class="today-metrics">${metric('wind',reading(stats.wind,' mph'),'Wind','Average available wind forecast for this period')}${metric('sun',`${uv.value===null?'—':uv.index}`,'UV Index','Peak UV forecast today')}</span><span class="today-more">Click for more details <b aria-hidden="true">›</b></span></button>`;
 }
 
