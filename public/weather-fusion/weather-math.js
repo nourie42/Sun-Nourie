@@ -1,4 +1,4 @@
-import {weatherState,weatherTransmission} from './weather-state.js';
+import {weatherState,weatherTransmission,conditionForRainChance} from './weather-state.js?v=qpf-trace-v2';
 import {utciF} from './utci.js?v=clear-weather-daygraph-v3';
 /* Pure presentation math shared by the weather API, browser and tests. */
 export const EXPERIENCE_VERSION = 'weather-nourie-friendly-v1';
@@ -24,9 +24,10 @@ export function dailyRainPeriod(day, phase = 'overall') {
 export function dailyDisplay(day, index, now, zone) {
   const hour=localHour(now,zone),tonight=index===0&&hour>=15,remainder=index===0&&hour>=12&&!tonight;
   const rain=dailyRainPeriod(day,tonight?'overnight':index===0?'daytime':'overall');
+  const rawCondition=tonight?(day.nightCondition||day.condition):day.condition;
   return {tonight,remainder,label:tonight?'Tonight':remainder?'Remainder of Today':index===0?'Today':day.label,
     primary:tonight?day.low:day.high, secondary:tonight?null:day.low,
-    primaryLabel:tonight?'Low':'High', condition:tonight?(day.nightCondition||day.condition):day.condition,
+    primaryLabel:tonight?'Low':'High', condition:conditionForRainChance(rawCondition,rain.value),
     detail:tonight?(day.nightDetail||day.detail):day.detail,
     pop:rain.value,rainWindow:rain.window};
 }

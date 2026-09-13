@@ -1,20 +1,20 @@
 import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText,rebindDanTake} from './dans-take.js?v=weather-art-labels-v10';
 import {danCard} from './dans-summary.js?v=dans-take-alerts-v11';
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
-import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './weather-display.js?v=radar-dry-v50';
+import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './weather-display.js?v=qpf-trace-v53';
 import {dayGraphHTML,dayGraphPoints,installDayGraph} from './day-graph.js?v=weather-art-labels-v10';
 import {degrees,feelsAt} from './hourly-feels.js?v=weather-art-labels-v10';
 import {createFramePlayer} from './frame-player.js';
-import {renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=radar-dry-v51';
-import {dailyDisplay} from './weather-math.js?v=remainder-today-v41';
+import {renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=qpf-trace-v53';
+import {dailyDisplay} from './weather-math.js?v=qpf-trace-v42';
 import {currentHero} from './current-temperature.js?v=radar-dry-v48';
 import {renderBulletins} from './bulletins.js?v=wpc-mpd-v1';
 import {modelFreshnessText} from './personal-details.js?v=comfort-rain-v38';
 import {renderDewpointMeter} from './dewpoint-meter.js?v=car-wash-order-v31';
 import {renderWeatherPanel} from './render-safety.js';
 import {forecastPeriodSummary} from './forecast-story.js?v=forecast-trace-v40';
-import {isExperimentalWeatherPage,renderCarWashForecast,resetCarWashForecast} from './car-wash.js?v=radar-now-v47';
-import {renderModelExplanation,resetModelExplanation} from './model-explanation.js?v=nws-weight-v48';
+import {isExperimentalWeatherPage,renderCarWashForecast,resetCarWashForecast} from './car-wash.js?v=qpf-trace-v48';
+import {renderModelExplanation,resetModelExplanation} from './model-explanation.js?v=qpf-trace-v50';
 import {updateRainTrend} from './rain-trend.js?v=remainder-today-v42';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);
@@ -81,6 +81,15 @@ function isDaylight() {
   const h = Number(new Intl.DateTimeFormat('en-US', { timeZone: forecast?.location.timeZone || 'America/New_York', hour: 'numeric', hourCycle: 'h23' }).format(new Date()));
   return h >= 7 && h < 19;
 }
+function radarObservationLabel(current) {
+  const radar=current?.radarPrecipitation;
+  if(radar?.status!=='ready')return '';
+  if(radar.atLocation===true)return 'NOAA radar shows rain at this location';
+  if(radar.nearby!==true&&radar.inArea!==true)return '';
+  const direction={N:'north',NE:'northeast',E:'east',SE:'southeast',S:'south',SW:'southwest',W:'west',NW:'northwest'}[radar.nearestRainDirection];
+  const distance=finite(radar.nearestRainMiles)?` about ${Math.round(radar.nearestRainMiles)} mi${direction?` ${direction}`:''}`:'';
+  return `NOAA radar shows rain${distance}`;
+}
 function render(data) {
   data.rainTrend=updateRainTrend(data,Date.now());
   forecast = data;
@@ -100,7 +109,9 @@ function render(data) {
   if($('hero-uv'))$('hero-uv').innerHTML=dailyUvHTML(data.days[0]?.uvMax,'Peak UV today');
   $('condition').textContent = hero.tonight ? `Tonight · ${hero.condition}` : hero.condition;
   $('high-low').textContent = hero.tonight ? 'Overnight low' : hero.range;
-  $('observation-label').textContent = hero.tonight ? `Tonight’s forecast · updated ${clock(data.assembledAt)}` : (c.radarPrecipitation?.status==='ready'&&c.radarPrecipitation.atLocation===true&&c.localEstimate ? `NOAA radar at this location · temperature is a local grid estimate` : c.localEstimate ? `Selected-location estimate · valid ${clock(c.time)}` : c.type === 'observation' ? `Nearby weather station · updated ${clock(c.time)}` : c.type==='unavailable' ? 'Current local reading unavailable' : 'Estimated current conditions');
+  const sourceLabel=c.localEstimate?`Selected-location estimate · valid ${clock(c.time)}`:c.type==='observation'?`Nearby weather station · updated ${clock(c.time)}`:c.type==='unavailable'?'Current local reading unavailable':'Estimated current conditions';
+  const radarLabel=radarObservationLabel(c);
+  $('observation-label').textContent = radarLabel ? `${sourceLabel} · ${radarLabel}` : sourceLabel;
   $('hero-scene').innerHTML = icon(hero.condition, hero.isDay, 120);
   document.querySelectorAll('[data-place]').forEach((button) => { const active = button.dataset.place === place.id; button.classList.toggle('active', active); button.setAttribute('aria-pressed', String(active)); });
   draw('alerts', 'Official alerts', () => renderAlerts(data));

@@ -61,7 +61,8 @@ test('missing metrics remain blank while real zero wind and humidity are retaine
 });
 test('compact descriptions preserve uncertainty and the complete forecast is accessible',()=>{
  assert.equal(shortForecastCondition('Mostly Sunny then Slight Chance Showers And Thunderstorms'),'Mostly sunny, then storms possible');
- assert.match(todayForecastHTML(fixture(),now),/title="Slight Chance Showers And Thunderstorms"/);
+ assert.match(todayForecastHTML(fixture(),now),/title="Slight Chance Showers"/);
+ assert.doesNotMatch(todayForecastHTML(fixture(),now),/data-weather-kind="storm"|sky-lightning/);
  const f=fixture();f.days[0].condition='<script>alert(1)</script>';assert.doesNotMatch(todayForecastHTML(f,now),/<script>/);
 });
 test('hourly card shows the Weather Nourie consensus rather than relabeling NWS as the blend',()=>{

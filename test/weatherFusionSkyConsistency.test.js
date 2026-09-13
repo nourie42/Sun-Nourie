@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {weatherState,stationWeather,resolveCurrentWeather,weatherTransmission} from '../public/weather-fusion/weather-state.js';
+import {weatherState,stationWeather,resolveCurrentWeather,weatherTransmission,conditionForRainChance} from '../public/weather-fusion/weather-state.js';
 import {thermalComfort,shadeFeelsLike} from '../public/weather-fusion/weather-math.js';
 import {weatherShapes,weatherIcon,currentSample,forecastSample,hourlyDisplaySamples,peakComparison,peakComparisonHTML,renderHourlyWeather} from '../public/weather-fusion/weather-display.js';
 const now=Date.parse('2026-09-06T15:14:00Z'),H=3600000,location={latitude:35.787,longitude:-78.4806,timeZone:'America/New_York'};
@@ -86,6 +86,14 @@ test('same, lower and higher later readings are labeled honestly and never chang
    assert.doesNotMatch(peakComparisonHTML(summary,85),/later peak/);
   }
  }
+});
+test('a low blended rain chance cannot retain thunder wording or a lightning icon',()=>{
+ assert.equal(conditionForRainChance('Scattered Showers And Thunderstorms then Partly Sunny',26),'Slight Chance Showers then Partly Sunny');
+ assert.equal(conditionForRainChance('Thunderstorms',29),'Slight Chance Showers');
+ assert.equal(conditionForRainChance('Thunderstorms',30),'Thunderstorms');
+ assert.equal(weatherState(conditionForRainChance('Thunderstorms',26)).kind,'rain');
+ assert.doesNotMatch(weatherIcon(conditionForRainChance('Thunderstorms',26)),/sky-lightning/);
+ assert.equal(conditionForRainChance('Thunderstorms then Partly Sunny',0),'Partly Sunny');
 });
 test('hourly renderer preserves scroll and escapes provider text',()=>{
  const f=fixture();f.current.condition='<img src=x onerror=alert(1)>';

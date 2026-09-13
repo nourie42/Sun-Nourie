@@ -31,12 +31,12 @@ function matchingRows(data,summary) {
   return data.rainTimeline.filter(row=>Date.parse(row.time)<end&&Date.parse(row.end)>start);
 }
 
-test('any positive model amount adds that model full fixed points',()=>{
+test('positive model amounts below .010 inch add one-third of fixed points',()=>{
   const data=buildForecast(inputs());
   const day=data.days[1],rows=matchingRows(data,day.rainLikelihood);
-  assert.equal(day.rainLikelihood.value,76);
+  assert.equal(day.rainLikelihood.value,36);
   assert.equal(day.rainLikelihood.value,Math.max(...rows.map(row=>row.rainLikelihood.value)));
-  assert.deepEqual(new Set(rows.map(row=>row.rainLikelihood.value)),new Set([46,76]),'hours beyond HRRR coverage lose only HRRR’s 30 points');
+  assert.deepEqual(new Set(rows.map(row=>row.rainLikelihood.value)),new Set([26,36]),'hours beyond HRRR coverage lose HRRR’s one-third trace contribution');
   assert.equal(day.rainLikelihood.coverage.complete,true);
   assert.equal(day.officialPop,39,'raw NWS period probability remains separate');
 });
@@ -135,7 +135,7 @@ test('NWS is scaled within its share and model points are neither scaled nor ren
   assert.equal(precipitationLikelihood(9,{sourceValues:{nws:.01,hrrr:null,ecmwf:null,nbm:null}}).value,4,'missing models do not inflate the weighted NWS contribution');
 });
 
-test('source evidence preserves exact amounts while vote arithmetic stays binary',()=>{
+test('source evidence preserves exact amounts and trace-QPF point tiers',()=>{
   const score=precipitationLikelihood(39,{sourceValues:{nws:.001,hrrr:null,ecmwf:.016}});
   assert.equal(score.sourceValues.hrrr,null);
   assert.equal(score.sourceValues.ecmwf,100);
@@ -143,7 +143,7 @@ test('source evidence preserves exact amounts while vote arithmetic stays binary
   assert.equal(score.weightedValue,25.6);
   assert.equal(score.value,26);
   assert.deepEqual(score.sources.map(row=>[row.id,row.weight]),[['nws',.4],['ecmwf',.1]]);
-  assert.equal(precipitationLikelihood(39,{sourceValues:{ecmwf:.0049}}).sourceValues.ecmwf,100);
+  assert.ok(Math.abs(precipitationLikelihood(39,{sourceValues:{ecmwf:.0049}}).sourceValues.ecmwf-100/3)<1e-12);
   const data=buildForecast(inputs({amount:.001})),row=data.rainTimeline[0];
   assert.equal(row.precipitationBlend.sourceValues.hrrr,.001);
   assert.equal(row.precipitationBlend.sourceValues.ecmwf,.001);
@@ -152,8 +152,9 @@ test('source evidence preserves exact amounts while vote arithmetic stays binary
   assert.ok(row.precipitationBlend.sources.every(source=>source.runAt!==undefined));
   const below=buildForecast(inputs({chance:0,amount:.00499})).rainTimeline[0];
   assert.equal(below.rainLikelihood.sourceAmounts.hrrr,.00499);
-  assert.equal(below.rainLikelihood.sourceValues.hrrr,100,'any positive forecast amount is a full wet vote');
-  assert.equal(below.rainLikelihood.value,60);
+  assert.ok(Math.abs(below.rainLikelihood.sourceValues.hrrr-100/3)<1e-12,'trace forecast amounts receive one-third of model points');
+  assert.equal(below.rainLikelihood.sourcePoints.hrrr,10);
+  assert.equal(below.rainLikelihood.value,20);
 });
 
 test('expired peak hours leave the remaining forecast when the current hour advances',()=>{

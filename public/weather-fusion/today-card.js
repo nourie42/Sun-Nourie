@@ -1,8 +1,8 @@
 import {weatherState} from './weather-state.js';
-import {dailyDisplay,dailyRainPeriod,finite} from './weather-math.js?v=remainder-today-v41';
+import {dailyDisplay,dailyRainPeriod,finite} from './weather-math.js?v=qpf-trace-v42';
 import {dailyFeels,degrees,timeAt} from './hourly-feels.js?v=weather-art-labels-v10';
 import {uvCategory} from './daily-uv.js?v=weather-art-labels-v10';
-import {weatherIcon,weatherMetricIcon} from './weather-display.js?v=rain-consensus-v41';
+import {weatherIcon,weatherMetricIcon} from './weather-display.js?v=qpf-trace-v53';
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const reading=(value,unit='')=>finite(value)?`${Math.round(value)}${unit}`:'—';
 export function periodWeatherStats(forecast,now=Date.now()){

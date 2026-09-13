@@ -28,6 +28,7 @@ export const PRESETS = [
 ];
 export const RADAR_URL = 'https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows';
 export const RADAR_NEARBY_MILES = 12;
+export const RADAR_AREA_MILES = 36;
 const HYDROMETEOR_COLORS = [
   ['biological',[156,156,156]],['ground-clutter',[118,118,118]],['ice-crystals',[255,176,176]],
   ['dry-snow',[0,255,255]],['wet-snow',[0,144,255]],['rain',[0,251,144]],['heavy-rain',[0,187,0]],
@@ -181,7 +182,14 @@ export function radarSampleLocations(location) {
   const latitude = Number(location?.latitude), longitude = Number(location?.longitude);
   if (!finite(latitude) || !finite(longitude)) return [];
   const points = [{ latitude, longitude, distanceMiles: 0, bearing: null }];
-  for (const [radius, bearings] of [[RADAR_NEARBY_MILES / 2, [0, 90, 180, 270]], [RADAR_NEARBY_MILES, [0, 45, 90, 135, 180, 225, 270, 315]]]) {
+  const compassBearings = [0, 45, 90, 135, 180, 225, 270, 315];
+  for (const [radius, bearings] of [
+    [RADAR_NEARBY_MILES / 2, [0, 90, 180, 270]],
+    [RADAR_NEARBY_MILES, compassBearings],
+    [18, compassBearings],
+    [24, compassBearings],
+    [RADAR_AREA_MILES, compassBearings],
+  ]) {
     const north = radius / 69, east = radius / (69 * Math.cos(latitude * Math.PI / 180));
     for (const bearing of bearings) {
       const angle = bearing * Math.PI / 180;
@@ -225,28 +233,34 @@ export function radarHydrometeorUrl(station, request = 'GetCapabilities', point 
   return `${base}?${new URLSearchParams({service:'WMS',version:'1.3.0',request:'GetFeatureInfo',layers:layer,query_layers:layer,styles:'radar_bdhc',crs:'CRS:84',bbox:[point.longitude-halfDegree,point.latitude-halfDegree,point.longitude+halfDegree,point.latitude+halfDegree].join(','),width:'3',height:'3',i:'1',j:'1',info_format:'application/json',time})}`;
 }
 
-function coherentNearbyPrecipitation(samples) {
-  const active = samples.filter(sample => sample.distanceMiles > 0 && sample.active === true && finite(sample.bearing));
-  // A single spoke or a couple of isolated pixels are common radar artifacts.
-  // Require three distinct bearings across both sampling rings within one 90-degree sector.
-  if(active.length<3||new Set(active.map(sample=>sample.distanceMiles)).size<2)return false;
-  return active.some(({bearing})=>{
-    const sector=active.filter(sample=>((sample.bearing-bearing+360)%360)<=90);
-    return new Set(sector.map(sample=>sample.bearing)).size>=3&&new Set(sector.map(sample=>sample.distanceMiles)).size>=2;
-  });
+function coherentPrecipitation(samples, maximumMiles) {
+  const active = samples.filter(sample => sample.distanceMiles > 0 && sample.distanceMiles <= maximumMiles && sample.active === true && finite(sample.bearing));
+  // A lone classified pixel can still be a rendering artifact. Two confirmed
+  // precipitation samples must be geographically close enough to form a cell/band.
+  return active.some((sample,index)=>active.slice(index+1).some(other=>{
+    const angle=Math.abs(sample.bearing-other.bearing),separation=Math.min(angle,360-angle)*Math.PI/180;
+    const miles=Math.sqrt(sample.distanceMiles**2+other.distanceMiles**2-2*sample.distanceMiles*other.distanceMiles*Math.cos(separation));
+    return miles<=Math.max(10,maximumMiles*.75);
+  }));
+}
+
+function radarDirection(bearing) {
+  return finite(bearing) ? ['N','NE','E','SE','S','SW','W','NW'][Math.round(bearing/45)%8] : null;
 }
 
 export function summarizeRadarPresence(samples, observedAt) {
   const available = samples.filter(sample => typeof sample.active === 'boolean');
   const active = available.filter(sample => sample.active);
   const center = samples.find(sample => sample.distanceMiles === 0);
-  const nearby = coherentNearbyPrecipitation(samples);
-  const accepted = active.filter(sample => sample.distanceMiles === 0 || nearby);
+  const atLocation = typeof center?.active === 'boolean' ? center.active : null;
+  const nearby = coherentPrecipitation(samples,RADAR_NEARBY_MILES);
+  const inArea = nearby || coherentPrecipitation(samples,RADAR_AREA_MILES);
+  const accepted = active.filter(sample => sample.distanceMiles === 0 || (nearby && sample.distanceMiles <= RADAR_NEARBY_MILES) || (inArea && sample.distanceMiles <= RADAR_AREA_MILES));
+  const nearest = accepted.reduce((best,sample)=>!best||sample.distanceMiles<best.distanceMiles?sample:best,null);
   return {status:available.length ? 'ready' : 'unavailable',observedAt,
-    atLocation:typeof center?.active === 'boolean' ? center.active : null,
-    nearby,
-    nearestRainMiles:accepted.length ? Math.min(...accepted.map(sample => sample.distanceMiles)) : null,
-    scanRadiusMiles:RADAR_NEARBY_MILES,source:'NOAA MRMS reflectivity checked against local NEXRAD dual-polarization classification'};
+    atLocation,nearby,inArea,
+    nearestRainMiles:nearest?.distanceMiles??null,nearestRainDirection:radarDirection(nearest?.bearing),
+    nearbyRadiusMiles:RADAR_NEARBY_MILES,scanRadiusMiles:RADAR_AREA_MILES,source:'NOAA MRMS reflectivity checked against local NEXRAD dual-polarization classification'};
 }
 
 /** Bounded in-process cache with concurrent request de-duplication and no stale fallback. */
@@ -556,7 +570,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
     ]);
     const frames = result.value || [];
     const status = frames.length ? (now() - Date.parse(frames.at(-1)) > 20 * MINUTE ? 'stale' : 'ready') : 'unavailable';
-    let precipitation = {status:'unavailable',observedAt:frames.at(-1)||null,atLocation:null,nearby:false,nearestRainMiles:null,scanRadiusMiles:RADAR_NEARBY_MILES,source:'NOAA MRMS reflectivity checked against local NEXRAD dual-polarization classification'};
+    let precipitation = {status:'unavailable',observedAt:frames.at(-1)||null,atLocation:null,nearby:false,inArea:false,nearestRainMiles:null,nearestRainDirection:null,nearbyRadiusMiles:RADAR_NEARBY_MILES,scanRadiusMiles:RADAR_AREA_MILES,source:'NOAA MRMS reflectivity checked against local NEXRAD dual-polarization classification'};
     if (status === 'ready') {
       const observedAt = frames.at(-1), points = radarSampleLocations(location);
       const radarStation=pointResult?.data?.properties?.radarStation;

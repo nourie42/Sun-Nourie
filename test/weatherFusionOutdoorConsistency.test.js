@@ -81,6 +81,8 @@ test('fresh observed radar overrides a dry station label and keeps nearby rain d
  let sample=currentSample(f,now);assert.equal(sample.currentPrecipitation.label,'Rain on radar');assert.equal(sample.currentPrecipitation.active,true);assert.equal(sample.condition,'Rain');
  f.current.radarPrecipitation.atLocation=false;
  sample=currentSample(f,now);assert.equal(sample.currentPrecipitation.label,'Rain nearby');assert.equal(sample.currentPrecipitation.active,false);assert.equal(sample.currentPrecipitation.nearby,true);assert.equal(sample.condition,'Cloudy');
+ f.current.radarPrecipitation={status:'ready',atLocation:false,nearby:false,inArea:true,nearestRainMiles:18,nearestRainDirection:'W',scanRadiusMiles:36};
+ sample=currentSample(f,now);assert.equal(sample.currentPrecipitation.label,'Rain in area');assert.equal(sample.currentPrecipitation.active,false);assert.equal(sample.currentPrecipitation.inArea,true);assert.match(sample.currentPrecipitation.source,/18 miles west/);assert.equal(sample.condition,'Cloudy');
 });
 test('a rainy future hour does not reuse the sunny current observation',()=>{
  const f=make(),h=f.hours[1];h.condition='Rain';

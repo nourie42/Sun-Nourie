@@ -36,7 +36,7 @@ test('missing blend inputs are excluded rather than filled with zero',()=>{
  assert.equal(weighted({hrrr:null,ecmwf:1},{hrrr:.6,ecmwf:.4}).value,1);
  assert.equal(weighted({hrrr:null,ecmwf:null},{hrrr:.6,ecmwf:.4}).value,null);
 });
-test('hourly rain likelihood scales the NWS share and adds full wet-model points',()=>{
+test('hourly rain likelihood scales the NWS share and tiers wet-model points',()=>{
  const dry=precipitationLikelihood(10,{sourceValues:{nws:0,hrrr:0,ecmwf:0,nbm:0}});
  assert.equal(dry.rawValue,4);assert.equal(dry.value,4);
  assert.deepEqual(dry.sourceValues,{nws:10,hrrr:0,ecmwf:0,nbm:0});
@@ -51,7 +51,10 @@ test('hourly rain likelihood scales the NWS share and adds full wet-model points
  assert.equal(missing.value,4);
  const lowOfficialAndDryEcmwf=precipitationLikelihood(5,{sourceValues:{nws:null,hrrr:null,ecmwf:0,nbm:null}});
  assert.equal(lowOfficialAndDryEcmwf.rawValue,2);assert.equal(lowOfficialAndDryEcmwf.value,2);
- assert.equal(deterministicRainSignal(.0099),100);
+ assert.equal(deterministicRainSignal(0),0);
+ assert.ok(Math.abs(deterministicRainSignal(.004)-100/3)<1e-12);
+ assert.ok(Math.abs(deterministicRainSignal(.009999)-100/3)<1e-12);
+ assert.equal(deterministicRainSignal(.01),100);
  assert.equal(deterministicRainSignal(.016),100);
  assert.equal(deterministicRainSignal(.1),100);
  assert.equal(deterministicRainSignal(.4),100);
@@ -63,6 +66,11 @@ test('hourly rain likelihood scales the NWS share and adds full wet-model points
  const requested=precipitationLikelihood(13,{sourceValues:{hrrr:0,ecmwf:1,nbm:0}});
  assert.equal(requested.value,15);
  assert.deepEqual(requested.sourcePoints,{nws:5.2,hrrr:0,ecmwf:10,nbm:0});
+ const screenshot=precipitationLikelihood(7,{sourceValues:{hrrr:0,ecmwf:.004,nbm:.012}});
+ assert.equal(screenshot.value,26);
+ assert.equal(screenshot.weightedValue,26.13333333);
+ assert.deepEqual(screenshot.sourcePoints,{nws:2.8,hrrr:0,ecmwf:3.33333333,nbm:20});
+ assert.deepEqual(screenshot.reducedSources,['ecmwf']);
 });
 test('API feels-like helper uses the same Steadman equation family in hot mild and cold weather',()=>{
  const hot=feelsLike(95,47,5,72),mild=feelsLike(70,50,8,50),cold=feelsLike(30,70,15,20);

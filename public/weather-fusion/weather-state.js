@@ -17,6 +17,15 @@ export function weatherState(condition = '', skyCover = null) {
   return {kind, label, condition: text || label, known: kind !== 'unknown',
     chance: /chance|possible|isolated|scattered (?:showers|storms)/.test(lower)};
 }
+/** Keep low blended rain chances from inheriting a thunderstorm label or icon. */
+export function conditionForRainChance(condition = '', chance = null, skyCover = null) {
+  const state=weatherState(condition,skyCover);
+  if(state.kind!=='storm'||!finite(chance)||chance>=30)return condition||state.label;
+  const parts=String(condition||'').split(/\s+then\s+/i);
+  const dryTail=parts.slice(1).reverse().find(part=>!['storm','rain','snow'].includes(weatherState(part).kind));
+  if(chance<=0)return dryTail||weatherState('',skyCover).label;
+  return dryTail?`Slight Chance Showers then ${dryTail}`:'Slight Chance Showers';
+}
 export function stationWeather(observation = {}) {
   const text = String(observation.textDescription || '').trim();
   if (weatherState(text).known) return {condition: text, conditionSource: 'Station weather report', conditionTime: observation.timestamp || null};

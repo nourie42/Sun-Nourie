@@ -1,8 +1,8 @@
 import {hourlyUvValue,hourlyUvHTML} from './daily-uv.js?v=clear-weather-daygraph-v3';
 import {outdoorExposure} from './outdoor-feels.js?v=clear-weather-daygraph-v3';
 import {currentComfortInputs} from './current-inputs.js?v=clear-weather-daygraph-v3';
-import {weatherState} from './weather-state.js';
-import {thermalComfort, finite, solarElevation,rainChanceValue} from './weather-math.js?v=forecast-trace-v40';
+import {weatherState,conditionForRainChance} from './weather-state.js?v=qpf-trace-v2';
+import {thermalComfort, finite, solarElevation,rainChanceValue} from './weather-math.js?v=qpf-trace-v42';
 import {feelsAt, forecastValue, degrees} from './hourly-feels.js?v=weather-art-labels-v10';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function weatherShapes(condition, isDay = true) {
@@ -64,15 +64,19 @@ export function currentSample(forecast, now = Date.now()) {
   const kind=weatherState(current.condition).kind,stationCondition=current.type==='observation'&&!/forecast/i.test(current.conditionSource||'')&&kind!=='unknown';
   const activePrecipitation=stationCondition&&['rain','storm','snow'].includes(kind);
   const radar=current.radarPrecipitation,radarReady=radar?.status==='ready';
-  const radarHere=radarReady&&radar.atLocation===true,radarNearby=radarReady&&radar.nearby===true;
+  const radarHere=radarReady&&radar.atLocation===true,radarNearby=radarReady&&radar.nearby===true,radarArea=radarReady&&radar.inArea===true;
+  const direction={N:'north',NE:'northeast',E:'east',SE:'southeast',S:'south',SW:'southwest',W:'west',NW:'northwest'}[radar?.nearestRainDirection];
+  const areaDistance=finite(radar?.nearestRainMiles)?` about ${Math.round(radar.nearestRainMiles)} miles${direction?` ${direction}`:''}`:'';
   const currentPrecipitation=activePrecipitation
     ? {active:true,label:kind==='snow'?'Snow now':'Rain now',source:'Current station reports precipitation.'}
     : radarHere
       ? {active:true,label:'Rain on radar',source:'NOAA observed radar shows precipitation at the selected location.'}
       : radarNearby
         ? {active:false,nearby:true,label:'Rain nearby',source:'NOAA observed radar shows precipitation near the selected location.'}
-        : radarReady
-          ? {active:false,label:'Dry now',source:'NOAA observed radar shows no precipitation at or near the selected location.'}
+        : radarArea
+          ? {active:false,inArea:true,label:'Rain in area',source:`NOAA observed radar shows precipitation${areaDistance} of the selected location.`}
+          : radarReady
+            ? {active:false,label:'Dry now',source:'NOAA observed radar shows no precipitation at or near the selected location.'}
         : stationCondition
           ? {active:false,label:'Dry at station',source:'The nearby station reports no precipitation; radar is checked separately.'}
           : radar
@@ -92,15 +96,19 @@ export function forecastSample(forecast, time) {
   const epoch = Date.parse(time), hour = forecast?.hours?.find(row => Date.parse(row.time) === epoch);
   const point = forecast?.metricForecasts?.series?.feels?.find(row => Date.parse(row.time) === epoch);
   if (!hour || !point) return null;
-  const inputs = {...point.inputs, condition:hour.condition || point.condition || 'Sky conditions unavailable', type:'guidance'};
-  const estimated = thermalComfort(inputs, forecast.location, epoch);
+  const pop=sampleRainChance(hour);
+  const rawCondition=hour.condition || point.condition || 'Sky conditions unavailable';
+  const condition=conditionForRainChance(rawCondition,pop,hour.skyCover);
+  const rawInputs = {...point.inputs, condition:rawCondition, type:'guidance'};
+  const estimated = thermalComfort(rawInputs, forecast.location, epoch);
+  const inputs={...rawInputs,condition};
   const rounded=v=>finite(v)?Number(v.toFixed(1)):null;
   const value=rounded(estimated.rawOutdoors);
   if(finite(value)!==finite(point.value)||(finite(value)&&Math.abs(value-point.value)>.11))return null;
-  const comfort={...estimated,outdoors:value,shade:rounded(estimated.rawShade),sun:estimated.sun===null?null:value};
+  const comfort={...estimated,weatherKind:weatherState(condition).kind,outdoors:value,shade:rounded(estimated.rawShade),sun:estimated.sun===null?null:value};
   return {windDirection:hour.windDirectionDegrees??hour.windDirection,uvIndex:hourlyUvValue(forecast,epoch),id:new Date(epoch).toISOString(), now:false, time:hour.time,
     temperature:forecastValue(forecast,'temperature',hour.time), feels:feelsAt(forecast,hour.time),
-    condition:inputs.condition, isDay:comfort.daylight, exposure:outdoorExposure(comfort), comfort, inputs, source:'Hourly forecast', pop:sampleRainChance(hour),officialPop:hour.officialPop??hour.pop,rainLikelihood:hour.rainLikelihood,precipitationBlend:hour.precipitationBlend};
+    condition:inputs.condition, isDay:comfort.daylight, exposure:outdoorExposure(comfort), comfort, inputs, source:'Hourly forecast', pop,officialPop:hour.officialPop??hour.pop,rainLikelihood:hour.rainLikelihood,precipitationBlend:hour.precipitationBlend};
 }
 export function hourlyDisplaySamples(forecast, now = Date.now()) {
   return [currentSample(forecast, now), ...(forecast?.hours || []).filter(hour => Date.parse(hour.time) > now)

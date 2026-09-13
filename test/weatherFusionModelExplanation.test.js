@@ -52,15 +52,15 @@ test('every daily estimate is tied to its canonical peak hour including beyond t
   assert.match(html,/data-peak="true"/);
 });
 
-test('rain inputs scale the NWS share and use fixed model points',()=>{
+test('rain inputs scale the NWS share and explain full and one-third model points',()=>{
   const html=modelExplanationHTML(fixture(),{now});
   assert.match(html,/30% probability/);
   assert.match(html,/<th scope="row">NBM<\/th><td>0 in<small>Rain forecast: No<\/small><\/td><td>20%<\/td><td>0<\/td>/);
   assert.doesNotMatch(html,/QPF support|NWS-anchored input/);
   assert.match(html,/NWS hourly probability fills its 40-point share proportionally/);
   assert.match(html,/40% NWS chance contributes 16 points/);
-  assert.match(html,/HRRR adds 30 points when it forecasts any rain, ECMWF adds 10, and NBM adds 20/);
-  assert.match(html,/amount of rain does not change these points/);
+  assert.match(html,/positive model amount below 0\.010 in gets one-third/);
+  assert.match(html,/Exactly 0\.010 in or more gets full points/);
   assert.match(html,/result is capped at 100%/);
   assert.match(html,/uncalibrated estimate, not a proven model-accuracy ranking/);
   assert.match(html,/not a separate probability of rain at any time/);
@@ -76,6 +76,16 @@ test('rain inputs scale the NWS share and use fixed model points',()=>{
   assert.match(unanimous,/0\.012 in<small>Rain forecast: Yes<\/small><\/td><td>20%<\/td><td>20<\/td>/);
   assert.match(unanimous,/Shown: <b>81%/);
   assert.match(unanimous,/21\.2 \+ 30 \+ 10 \+ 20 = 81\.2/);
+
+  const trace=likelihood(26,{officialProbability:7,rawTotal:26.13333333,weightedValue:26.13333333,rawValue:26,
+    sourceValues:{nws:7,hrrr:0,ecmwf:100/3,nbm:100},sourcePoints:{nws:2.8,hrrr:0,ecmwf:3.33333333,nbm:20},sourceAmounts:{nws:0,hrrr:0,ecmwf:.004,nbm:.012},
+    sources:[{id:'nws',value:7,weight:.4,points:2.8},{id:'hrrr',value:0,weight:.3,points:0},{id:'ecmwf',value:100/3,weight:.1,points:3.33333333},{id:'nbm',value:100,weight:.2,points:20}],drySources:['hrrr'],wetSources:['ecmwf','nbm'],reducedSources:['ecmwf']});
+  forecast.rainTimeline[0].rainLikelihood=trace;
+  Object.assign(forecast.days[0].popDayLikelihood,{value:26,peak:trace,peakTime:at(0)});
+  const traceHtml=modelExplanationHTML(forecast,{now});
+  assert.match(traceHtml,/0\.004 in<small>Trace rain forecast: one-third points<\/small><\/td><td>10%<\/td><td>3\.333333<\/td>/);
+  assert.match(traceHtml,/2\.8 \+ 0 \+ 3\.3333 \+ 20 = 26\.13333333/);
+  assert.match(traceHtml,/Shown: <b>26%/);
 });
 
 test('missing models do not renormalize the NWS base or remaining model points',()=>{

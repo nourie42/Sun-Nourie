@@ -1,6 +1,6 @@
-import {finite,rainChanceValue} from './weather-math.js?v=forecast-trace-v40';
-import {weatherIcon} from './weather-display.js?v=rain-consensus-v41';
-import {weatherState} from './weather-state.js';
+import {finite,rainChanceValue} from './weather-math.js?v=qpf-trace-v42';
+import {weatherIcon} from './weather-display.js?v=qpf-trace-v53';
+import {weatherState,conditionForRainChance} from './weather-state.js?v=qpf-trace-v2';
 import {forecastGrossLevel} from './dewpoint-meter.js?v=rain-consensus-v41';
 
 export const CAR_WASH_RAIN_LIMIT = 25;
@@ -180,7 +180,7 @@ export function carWashSummary(forecast, now = Date.now()) {
   facts.gross=grossMeterFact(forecast,firstWash?.index??0,window);
   return {state:primary.state,canWash:primary.canWash,chance:visibleChance,reason:primary.reason,lowRainDays,decisions,window,best,facts,
     days:decisions.map((decision,index) => ({...decision,chance:decision.chance,date:days[index]?.date,label:index===0?(tonight?'Tonight':'Today'):dayName(days[index]?.date,zone),isDay:index!==0||!tonight,stamp:dayStamp(days[index]?.date),low:days[index]?.low,high:days[index]?.high,
-      condition:index===0&&tonight?(days[index]?.nightCondition||days[index]?.condition||'Forecast unavailable'):(days[index]?.condition||'Forecast unavailable')}))};
+      condition:conditionForRainChance(index===0&&tonight?(days[index]?.nightCondition||days[index]?.condition||'Forecast unavailable'):(days[index]?.condition||'Forecast unavailable'),decision.chance)}))};
 }
 
 function verdictLabel(state) {
