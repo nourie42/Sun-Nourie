@@ -30,10 +30,10 @@ export function todaySkyProfile(day={},tonight=false){
  const explicitThunder=/thunder|\btstm\b|\bstorms?\b/i.test(condition);
  const wet=finite(pop)&&pop>=70;
  let scene='clear';
- if(explicitThunder&&state.kind==='storm'&&(pop>=55||!/chance|possible|isolated|scattered/i.test(condition)))scene='storm';
+ if(explicitThunder&&state.kind==='storm'&&pop>=55&&!/chance|possible|isolated|scattered/i.test(condition))scene='storm';
+ else if(wet)scene='overcast-rain';
  else if(explicitThunder&&state.kind==='storm')scene='building';
  else if(['rain','snow'].includes(state.kind)&&pop>=50)scene='overcast-rain';
- else if(wet)scene='overcast-rain';
  else if(state.kind==='cloudy'||pop>=45)scene='cloudy';
  else if(state.kind==='partly-cloudy'||state.kind==='fog'||pop>=15)scene='few-clouds';
  return {scene,pop,night:tonight,state:state.kind,lift,explicitThunder};

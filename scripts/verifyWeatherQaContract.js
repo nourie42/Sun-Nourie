@@ -29,6 +29,7 @@ assert.match(weatherIcon(conditionForRainChance('Thunderstorms',20)),/sky-lightn
 assert.equal(todaySkyProfile({condition:'Rain',pop:100}).scene,'overcast-rain');
 assert.notEqual(todaySkyProfile({condition:'Rain',pop:100}).scene,'storm');
 assert.equal(todaySkyProfile({condition:'Thunderstorms',pop:70}).scene,'storm');
+assert.equal(todaySkyProfile({condition:'Slight Chance Showers And Thunderstorms then Patchy Fog',pop:100}).scene,'overcast-rain');
 
 assert.equal(precipitationActivity('Fog',{pop:100}),'active');
 assert.deepEqual(comfortSceneState(true,'Fog',65,{pop:100}),{key:'rain',asset:'comfort-reference-scenes-rain.webp'});

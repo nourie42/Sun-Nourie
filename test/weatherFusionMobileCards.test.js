@@ -29,6 +29,7 @@ test('Today sky adds clouds and precipitation by forecast scenario',()=>{
  assert.equal(todaySkyProfile({condition:'Slight Chance Thunderstorms',pop:22,detail:'Atmospheric lift may support a storm.'}).scene,'building');
  assert.equal(todaySkyProfile({condition:'Chance Thunderstorms',pop:40,detail:'Atmospheric lift may support a storm.'}).scene,'building');
  assert.equal(todaySkyProfile({condition:'Thunderstorms',pop:75}).scene,'storm');
+ assert.equal(todaySkyProfile({condition:'Slight Chance Showers And Thunderstorms then Patchy Fog',pop:100}).scene,'overcast-rain');
  assert.equal(todaySkyProfile({condition:'Overcast with Rain',pop:80}).scene,'overcast-rain');
  assert.match(todaySkySceneHTML(todaySkyProfile({condition:'Thunderstorms',pop:75})),/today-sky-storm\.webp/);
  assert.match(todaySkySceneHTML(todaySkyProfile({condition:'Overcast with Rain',pop:80})),/today-sky-rain\.webp/);
