@@ -43,11 +43,11 @@ test('NWS fallback shows only a short explicit possible change',()=>{
  assert.ok(!elements['briefing-detail'].innerHTML.includes('data-dans-take'));
  assert.equal(elements['briefing-summary'].textContent,'Warm with a chance of rain.');
 });
-test('local outlook cannot retain thunder wording below the display threshold',()=>{
+test('local outlook keeps official thunder wording when the condition says thunder',()=>{
  const {elements,context,render}=harness();
  context.dailyDisplay=()=>({pop:32});
  render({mode:'nws-summary',headline:'Scattered Showers And Thunderstorms then Partly Sunny',summary:'Rain is possible.'});
- assert.equal(elements['briefing-title'].textContent,'Slight Chance Showers then Partly Sunny');
+ assert.equal(elements['briefing-title'].textContent,'Scattered Showers And Thunderstorms then Partly Sunny');
 });
 test('only approved dated AI changes appear in both places, without duplicates',()=>{
  const {elements,render}=harness(),note=elements['today-uncertainty'];
@@ -124,13 +124,13 @@ test('Gross Meter heading stays centered and bold without changing chart geometr
  assert.match(css,/#gross-title\{text-align:center;font-weight:800\}/);assert.match(meterCss,/\.gross-eyebrow\{width:calc\(100% \+ 86px\);[^}]*text-align:center/);assert.match(meterCss,/@media\(max-width:760px\)[\s\S]*\.gross-eyebrow\{width:calc\(100% \+ 62px\)\}/);assert.ok(!/\.gross-(scroll|chart)\s*\{/.test(css));
 });
 test('changed assets are cache-busted and late briefing responses stay guarded',()=>{
- assert.match(html,/style\.css\?v=car-wash-icon-back-v46/);assert.match(html,/forecast-layout\.css\?v=weather-art-labels-v10/);assert.match(html,/personal-details\.css\?v=wpc-mpd-v12/);assert.match(html,/app\.js\?v=qpf-trace-v64/);assert.match(html,/car-wash\.css\?v=rain-consensus-v41/);assert.match(html,/forecast-cards\.css\?v=remainder-today-v42/);assert.match(html,/scenario-layout\.css\?v=scenario-weather-v29/);
+ assert.match(html,/style\.css\?v=car-wash-icon-back-v46/);assert.match(html,/forecast-layout\.css\?v=weather-art-labels-v10/);assert.match(html,/personal-details\.css\?v=wpc-mpd-v12/);assert.match(html,/app\.js\?v=weather-qa-v65/);assert.match(html,/car-wash\.css\?v=rain-consensus-v41/);assert.match(html,/forecast-cards\.css\?v=weather-qa-v65/);assert.match(html,/scenario-layout\.css\?v=scenario-weather-v29/);
  assert.match(app,/dans-take\.js\?v=weather-art-labels-v10/);
  assert.match(app,/bulletins\.js\?v=wpc-mpd-v1/);
- assert.match(app,/experience\.js\?v=qpf-trace-v54/);
+ assert.match(app,/experience\.js\?v=weather-qa-v65/);
  assert.match(app,/personal-details\.js\?v=comfort-rain-v38/);
  assert.match(app,/forecast-story\.js\?v=forecast-trace-v40/);
- assert.match(app,/weather-display\.js\?v=qpf-trace-v54/);assert.match(app,/current-temperature\.js\?v=radar-dry-v48/);assert.match(app,/car-wash\.js\?v=qpf-trace-v49/);
+ assert.match(app,/weather-display\.js\?v=weather-qa-v65/);assert.match(app,/current-temperature\.js\?v=radar-dry-v48/);assert.match(app,/car-wash\.js\?v=weather-qa-v65/);
  assert.match(app,/model-explanation\.js\?v=qpf-trace-v50/);
  assert.match(app,/if \(id === generation && briefing\.signature === forecast\?\.signature\) renderBriefing\(briefing\)/);
 });

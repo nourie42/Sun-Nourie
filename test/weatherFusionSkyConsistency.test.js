@@ -87,13 +87,13 @@ test('same, lower and higher later readings are labeled honestly and never chang
   }
  }
 });
-test('a low blended rain chance cannot retain thunder wording or a lightning icon',()=>{
- assert.equal(conditionForRainChance('Scattered Showers And Thunderstorms then Partly Sunny',26),'Slight Chance Showers then Partly Sunny');
- assert.equal(conditionForRainChance('Thunderstorms',39),'Slight Chance Showers');
- assert.equal(conditionForRainChance('Thunderstorms',40),'Thunderstorms');
- assert.equal(weatherState(conditionForRainChance('Thunderstorms',26)).kind,'rain');
- assert.doesNotMatch(weatherIcon(conditionForRainChance('Thunderstorms',26)),/sky-lightning/);
- assert.equal(conditionForRainChance('Thunderstorms then Partly Sunny',0),'Partly Sunny');
+test('thunder icons follow thunder wording, not rain percentage',()=>{
+ assert.equal(conditionForRainChance('Scattered Showers And Thunderstorms then Partly Sunny',26),'Scattered Showers And Thunderstorms then Partly Sunny');
+ assert.equal(conditionForRainChance('Rain',100),'Rain');
+ assert.equal(weatherState(conditionForRainChance('Rain',100)).kind,'rain');
+ assert.doesNotMatch(weatherIcon(conditionForRainChance('Rain',100)),/sky-lightning/);
+ assert.equal(weatherState(conditionForRainChance('Thunderstorms',26)).kind,'storm');
+ assert.match(weatherIcon(conditionForRainChance('Thunderstorms',26)),/sky-lightning/);
 });
 test('hourly renderer preserves scroll and escapes provider text',()=>{
  const f=fixture();f.current.condition='<img src=x onerror=alert(1)>';

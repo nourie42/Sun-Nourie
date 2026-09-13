@@ -1,4 +1,4 @@
-import {weatherState,weatherTransmission,conditionForRainChance} from './weather-state.js?v=qpf-trace-v3';
+import {weatherState,weatherTransmission,conditionForRainChance} from './weather-state.js?v=weather-qa-v65';
 import {utciF} from './utci.js?v=clear-weather-daygraph-v3';
 /* Pure presentation math shared by the weather API, browser and tests. */
 export const EXPERIENCE_VERSION = 'weather-nourie-friendly-v1';

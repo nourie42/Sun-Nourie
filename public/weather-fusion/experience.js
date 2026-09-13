@@ -1,13 +1,13 @@
-import {todayForecastHTML} from './today-card.js?v=remainder-today-v42';
+import {todayForecastHTML} from './today-card.js?v=weather-qa-v65';
 import {FORECAST_CONFIDENCE_VERSION} from './forecast-confidence.js?v=weather-art-labels-v10';
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
 import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=radar-dry-v33';
 import {weatherState} from './weather-state.js';
-import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=qpf-trace-v54';
+import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=weather-qa-v65';
 import {degrees,feelsAt,dailyFeels,forecastValue,peakFeelsHTML} from './hourly-feels.js?v=weather-art-labels-v10';
 import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=comfort-rain-v38';
 import {comfortMode,comfortWindow,comfortNarrative,warmestTodayWindow} from './comfort-outlook.js?v=weather-art-labels-v10';
-import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js?v=qpf-trace-v43';
+import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js?v=weather-qa-v65';
 import {resetDewpointMeter} from './dewpoint-meter.js?v=centered-heading-v30';
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -134,12 +134,11 @@ export function renderDailyRows(forecast,icon) {
  const today=$('today-forecast');
  if(today){
   today.innerHTML=todayForecastHTML(forecast);
-  const button=today.querySelector('[data-today-forecast]');
-  if(button){
+  today.querySelectorAll('[data-today-forecast]').forEach(button=>{
    button.setAttribute('data-today-forecast','');
    button.setAttribute('aria-haspopup','dialog');
    button.addEventListener('click',()=>$('daily')?.querySelector('[data-day="0"]')?.click());
-  }
+  });
  }
 }
 export function renderMetricTiles(forecast,smallIcon) {

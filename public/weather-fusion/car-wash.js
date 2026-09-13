@@ -1,7 +1,7 @@
-import {finite,rainChanceValue} from './weather-math.js?v=qpf-trace-v43';
-import {weatherIcon} from './weather-display.js?v=qpf-trace-v54';
-import {weatherState,conditionForRainChance} from './weather-state.js?v=qpf-trace-v3';
-import {forecastGrossLevel} from './dewpoint-meter.js?v=rain-consensus-v41';
+import {finite,rainChanceValue} from './weather-math.js?v=weather-qa-v65';
+import {weatherIcon} from './weather-display.js?v=weather-qa-v65';
+import {weatherState,conditionForRainChance} from './weather-state.js?v=weather-qa-v65';
+import {forecastGrossLevel} from './dewpoint-meter.js?v=weather-qa-v65';
 
 export const CAR_WASH_RAIN_LIMIT = 25;
 const HOUR = 3600000;

@@ -54,7 +54,7 @@ test('hourly rain likelihood scales the NWS share and tiers wet-model points',()
  assert.equal(deterministicRainSignal(0),0);
  assert.ok(Math.abs(deterministicRainSignal(.004)-100/3)<1e-12);
  assert.ok(Math.abs(deterministicRainSignal(.009999)-100/3)<1e-12);
- assert.equal(deterministicRainSignal(.01),100);
+ assert.ok(Math.abs(deterministicRainSignal(.01)-100/3)<1e-12);
  assert.equal(deterministicRainSignal(.016),100);
  assert.equal(deterministicRainSignal(.1),100);
  assert.equal(deterministicRainSignal(.4),100);
@@ -68,6 +68,9 @@ test('hourly rain likelihood scales the NWS share and tiers wet-model points',()
  assert.deepEqual(requested.sourcePoints,{nws:5.2,hrrr:0,ecmwf:10,nbm:0});
  const screenshot=precipitationLikelihood(7,{sourceValues:{hrrr:0,ecmwf:.004,nbm:.012}});
  assert.equal(screenshot.value,26);
+ const boundary=precipitationLikelihood(7,{sourceValues:{hrrr:0,ecmwf:.004,nbm:.010}});
+ assert.equal(boundary.value,13);
+ assert.deepEqual(boundary.sourcePoints,{nws:2.8,hrrr:0,ecmwf:3.33333333,nbm:6.66666667});
  assert.equal(screenshot.weightedValue,26.13333333);
  assert.deepEqual(screenshot.sourcePoints,{nws:2.8,hrrr:0,ecmwf:3.33333333,nbm:20});
  assert.deepEqual(screenshot.reducedSources,['ecmwf']);

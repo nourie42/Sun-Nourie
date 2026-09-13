@@ -26,7 +26,7 @@ test('Today sky adds clouds and precipitation by forecast scenario',()=>{
  assert.equal(todaySkyProfile({condition:'Mostly Sunny',pop:10}).scene,'clear');
  assert.equal(todaySkyProfile({condition:'Mostly Sunny',pop:22}).scene,'few-clouds');
  assert.equal(todaySkyProfile({condition:'Mostly Cloudy',pop:48}).scene,'cloudy');
- assert.equal(todaySkyProfile({condition:'Slight Chance Thunderstorms',pop:22,detail:'Atmospheric lift may support a storm.'}).scene,'few-clouds');
+ assert.equal(todaySkyProfile({condition:'Slight Chance Thunderstorms',pop:22,detail:'Atmospheric lift may support a storm.'}).scene,'building');
  assert.equal(todaySkyProfile({condition:'Chance Thunderstorms',pop:40,detail:'Atmospheric lift may support a storm.'}).scene,'building');
  assert.equal(todaySkyProfile({condition:'Thunderstorms',pop:75}).scene,'storm');
  assert.equal(todaySkyProfile({condition:'Overcast with Rain',pop:80}).scene,'overcast-rain');
@@ -61,8 +61,8 @@ test('missing metrics remain blank while real zero wind and humidity are retaine
 });
 test('compact descriptions preserve uncertainty and the complete forecast is accessible',()=>{
  assert.equal(shortForecastCondition('Mostly Sunny then Slight Chance Showers And Thunderstorms'),'Mostly sunny, then storms possible');
- assert.match(todayForecastHTML(fixture(),now),/title="Slight Chance Showers"/);
- assert.doesNotMatch(todayForecastHTML(fixture(),now),/data-weather-kind="storm"|sky-lightning/);
+ assert.match(todayForecastHTML(fixture(),now),/title="Slight Chance Showers And Thunderstorms"/);
+ assert.match(todayForecastHTML(fixture(),now),/data-weather-kind="storm"|sky-lightning/);
  const f=fixture();f.days[0].condition='<script>alert(1)</script>';assert.doesNotMatch(todayForecastHTML(f,now),/<script>/);
 });
 test('hourly card shows the Weather Nourie consensus rather than relabeling NWS as the blend',()=>{

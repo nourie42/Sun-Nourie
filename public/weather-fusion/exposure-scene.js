@@ -1,4 +1,4 @@
-import {weatherShapes} from './weather-display.js?v=qpf-trace-v54';
+import {weatherShapes} from './weather-display.js?v=weather-qa-v65';
 import {weatherState} from './weather-state.js';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 
@@ -133,6 +133,7 @@ export function exposureScene(sun,daylight=true,condition='Clear',feels=null,con
 
 export function precipitationActivity(condition='',context={}){
  const weather=weatherState(condition),pop=context.pop;
+ if(finite(pop)&&pop>=80&&weather.kind!=='storm')return 'active';
  if(!['rain','storm'].includes(weather.kind))return 'none';
  // Forecast artwork follows the same displayed probability at every hour.
  // Observed rain without a probability can still use the active-rain scene.

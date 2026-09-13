@@ -158,22 +158,22 @@ test('at 3:01 PM an 80% chance at 4 PM still means WAIT even with a dry night an
   assert.equal(bestWashWindow(forecast,0,now),null);
 });
 
-test('nonzero low rain chance removes thunder wording and lightning from its weather icon',()=>{
+test('car-wash thunder icons follow thunder wording, not rain percentage',()=>{
   const forecast=fixture([5,5,5,5,5,5,5]);
   forecast.days[0].condition='Slight Chance Thunderstorms';
   const summary=carWashSummary(forecast,start);
-  assert.equal(summary.days[0].condition,'Slight Chance Showers');
+  assert.equal(summary.days[0].condition,'Slight Chance Thunderstorms');
   const firstCard=carWashHTML(summary).match(/<article class="car-wash-day"[\s\S]*?<\/article>/)?.[0]||'';
-  assert.match(firstCard,/data-weather-kind="rain"/);
-  assert.doesNotMatch(firstCard,/sky-lightning/);
+  assert.match(firstCard,/data-weather-kind="storm"/);
+  assert.match(firstCard,/sky-lightning/);
 });
 
-test('a car-wash card displayed as 0% never shows rain, lightning, or snow',()=>{
+test('a car-wash card displayed as 0% keeps dry artwork even when full text has slight thunder',()=>{
   const forecast=fixture([0.4,0,0,0,0,0,0]);
   forecast.days[0].condition='Slight Chance Thunderstorms';
   const summary=carWashSummary(forecast,start);
   assert.equal(Math.round(summary.days[0].chance),0);
-  assert.equal(summary.days[0].condition,'Slight Chance Showers','low blended chance cannot retain thunder wording');
+  assert.equal(summary.days[0].condition,'Slight Chance Thunderstorms');
   const firstCard=carWashHTML(summary).match(/<article class="car-wash-day"[\s\S]*?<\/article>/)?.[0]||'';
   assert.match(firstCard,/data-weather-kind="partly-cloudy"/);
   assert.doesNotMatch(firstCard,/sky-(?:rain|lightning|snow)/);
