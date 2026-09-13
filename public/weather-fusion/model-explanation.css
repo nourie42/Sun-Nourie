@@ -45,14 +45,14 @@
 #model-explanation .model-runs dd{margin:3px 0 0;color:#c1deeb;overflow-wrap:anywhere}
 #model-explanation .model-runs small{display:block;margin-top:3px;font-size:11px;color:#a6cedf}
 
-/* GraphCast AI model section */
+/* Google WeatherNext 3 AI model section */
 #model-explanation .graphcast-card{position:relative;isolation:isolate;margin:22px 0 18px;padding:22px;border:1px solid rgba(164,151,255,.42);border-radius:26px;background:radial-gradient(circle at 100% 0%,rgba(109,87,255,.28),transparent 38%),radial-gradient(circle at 0% 100%,rgba(41,190,255,.12),transparent 42%),linear-gradient(145deg,rgba(17,25,57,.98),rgba(10,18,44,.98));box-shadow:0 20px 48px rgba(3,9,28,.28),inset 0 1px 0 rgba(255,255,255,.09);overflow:hidden}
-#model-explanation .graphcast-card::before{content:'GRAPHCAST AI FORECAST';display:inline-flex;align-items:center;min-height:24px;margin:0 0 16px;padding:4px 9px;border:1px solid rgba(180,168,255,.3);border-radius:999px;background:rgba(120,100,255,.13);color:#cfc8ff;font-size:10px;font-weight:850;letter-spacing:.11em;text-transform:uppercase}
+#model-explanation .graphcast-card::before{content:'WEATHERNEXT 3 FORECAST';display:inline-flex;align-items:center;min-height:24px;margin:0 0 16px;padding:4px 9px;border:1px solid rgba(180,168,255,.3);border-radius:999px;background:rgba(120,100,255,.13);color:#cfc8ff;font-size:10px;font-weight:850;letter-spacing:.11em;text-transform:uppercase}
 #model-explanation .graphcast-card::after{content:'';position:absolute;z-index:-1;right:-90px;top:-100px;width:240px;height:240px;border-radius:50%;background:radial-gradient(circle,rgba(133,112,255,.24),rgba(93,72,230,.08) 48%,transparent 72%);filter:blur(2px);pointer-events:none}
 #model-explanation .graphcast-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px}
 #model-explanation .graphcast-head>div:first-child{flex:1}
 #model-explanation .graphcast-title{display:flex;align-items:center;gap:12px;margin:0;font-size:clamp(22px,4vw,30px);font-weight:900;color:#fff;letter-spacing:-.045em;line-height:1.05}
-#model-explanation .graphcast-orb{position:relative;display:inline-grid;place-items:center;flex:0 0 auto;width:46px;height:46px;border:1px solid rgba(214,207,255,.44);border-radius:15px;background:radial-gradient(circle at 32% 26%,#efeaff 0 8%,#a99cff 28%,#6e5be9 58%,#352774 100%);box-shadow:0 10px 28px rgba(95,72,238,.34),inset 0 1px 1px rgba(255,255,255,.45);color:#fff;font-size:20px;font-weight:900;text-shadow:0 1px 5px rgba(0,0,0,.25)}
+#model-explanation .graphcast-orb{position:relative;display:inline-grid;place-items:center;flex:0 0 auto;width:46px;height:46px;border:1px solid rgba(214,207,255,.44);border-radius:15px;background:radial-gradient(circle at 32% 26%,#efeaff 0 8%,#a99cff 28%,#6e5be9 58%,#352774 100%);box-shadow:0 10px 28px rgba(95,72,238,.34),inset 0 1px 1px rgba(255,255,255,.45);color:#fff;font-size:16px;font-weight:900;text-shadow:0 1px 5px rgba(0,0,0,.25)}
 #model-explanation .graphcast-copy{max-width:760px;margin:10px 0 0;color:#c6cdea;font-size:13px;line-height:1.55}
 #model-explanation .graphcast-badges{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:7px;max-width:220px}
 #model-explanation .graphcast-badge{display:inline-flex;align-items:center;justify-content:center;min-height:29px;padding:5px 10px;border:1px solid rgba(174,160,255,.34);border-radius:999px;background:rgba(105,86,225,.2);color:#ddd8ff;font-size:10px;font-weight:850;letter-spacing:.045em;text-transform:uppercase;white-space:nowrap;box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
@@ -63,17 +63,19 @@
 #model-explanation .graphcast-meta strong{display:block;color:#fff;font-size:15px;font-weight:850;line-height:1.25;overflow-wrap:anywhere}
 #model-explanation .graphcast-windows{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}
 #model-explanation .graphcast-window{position:relative;min-height:105px;padding:14px 15px;border:1px solid rgba(151,139,255,.17);border-radius:17px;background:linear-gradient(145deg,rgba(6,18,46,.82),rgba(12,27,59,.62));overflow:hidden}
-#model-explanation .graphcast-window::after{content:'6H';position:absolute;right:11px;top:11px;color:rgba(201,195,255,.44);font-size:9px;font-weight:900;letter-spacing:.08em}
+#model-explanation .graphcast-window::after{content:'1H';position:absolute;right:11px;top:11px;color:rgba(201,195,255,.44);font-size:9px;font-weight:900;letter-spacing:.08em}
 #model-explanation .graphcast-window time{display:block;max-width:80%;margin-bottom:12px;color:#9faad3;font-size:11px;font-weight:750;line-height:1.35}
 #model-explanation .graphcast-window strong{display:block;color:#fff;font-size:27px;font-weight:900;line-height:1;letter-spacing:-.04em}
 #model-explanation .graphcast-window span{display:block;margin-top:8px;color:#afbadc;font-size:11px;font-weight:650;line-height:1.4}
-#model-explanation .graphcast-state{position:relative;margin:16px 0 0;padding:15px 16px 15px 44px;border:1px solid rgba(166,154,255,.2);border-radius:16px;background:linear-gradient(145deg,rgba(8,22,54,.9),rgba(12,27,61,.7));color:#ccd5f3;font-size:12px;line-height:1.55}
-#model-explanation .graphcast-state::before{content:'G';position:absolute;left:14px;top:14px;display:grid;place-items:center;width:21px;height:21px;border-radius:7px;background:rgba(121,101,255,.24);color:#cfc8ff;font-size:10px;font-weight:900}
+#model-explanation .graphcast-window span small{display:block;margin-top:5px;color:#919dc7;font-size:10px;font-weight:700}
+#model-explanation .graphcast-state{position:relative;margin:16px 0 0;padding:15px 16px 15px 48px;border:1px solid rgba(166,154,255,.2);border-radius:16px;background:linear-gradient(145deg,rgba(8,22,54,.9),rgba(12,27,61,.7));color:#ccd5f3;font-size:12px;line-height:1.55}
+#model-explanation .graphcast-state::before{content:'W3';position:absolute;left:14px;top:14px;display:grid;place-items:center;width:26px;height:21px;border-radius:7px;background:rgba(121,101,255,.24);color:#cfc8ff;font-size:9px;font-weight:900}
 #model-explanation .graphcast-card>p:last-child{margin:15px 0 0;padding-top:13px;border-top:1px solid rgba(163,151,255,.14)}
 #model-explanation .graphcast-link{display:inline-flex;align-items:center;min-height:32px;color:#c8efff;text-decoration:none;font-size:12px;font-weight:800;transition:opacity .18s ease,transform .18s ease}
 #model-explanation .graphcast-link:hover{opacity:.84;transform:translateX(2px)}
+#model-explanation .weathernext-access{margin-left:14px}
 .map-tabs .graphcast-map-pending{opacity:.58;cursor:not-allowed}
-.map-tabs .graphcast-map-pending::after{content:' · 6h';font-size:.78em;opacity:.75}
+.map-tabs .graphcast-map-pending::after{content:' · AI';font-size:.78em;opacity:.75}
 
 @media(max-width:620px){
   #model-explanation{padding:16px;border-radius:21px}
@@ -83,7 +85,7 @@
   #model-explanation .graphcast-card::before{margin-bottom:14px}
   #model-explanation .graphcast-head{display:block}
   #model-explanation .graphcast-title{font-size:24px}
-  #model-explanation .graphcast-orb{width:42px;height:42px;border-radius:14px;font-size:18px}
+  #model-explanation .graphcast-orb{width:42px;height:42px;border-radius:14px;font-size:14px}
   #model-explanation .graphcast-copy{font-size:12px;line-height:1.5}
   #model-explanation .graphcast-badges{justify-content:flex-start;max-width:none;margin-top:13px}
   #model-explanation .graphcast-meta{grid-template-columns:repeat(3,minmax(132px,1fr));overflow-x:auto;scroll-snap-type:x proximity;overscroll-behavior-inline:contain;margin-right:-17px;padding:0 17px 4px 0;-webkit-overflow-scrolling:touch;scrollbar-width:none}
@@ -114,4 +116,5 @@
   #model-explanation .graphcast-windows{margin-right:-15px;padding-right:15px}
   #model-explanation .graphcast-window{flex-basis:78vw;padding:14px}
   #model-explanation .graphcast-window strong{font-size:28px}
+  #model-explanation .weathernext-access{margin-left:8px}
 }
