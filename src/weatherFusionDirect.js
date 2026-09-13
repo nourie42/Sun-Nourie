@@ -125,18 +125,18 @@ export function weighted(values, policy) {
   return { value: sum ? round(sources.reduce((n,s) => n+s.value*s.weight,0)/sum,4) : null,
     sources: sources.map((s) => ({ ...s, weight: round(s.weight/sum,6) })), calibrated: false };
 }
-export const TRACE_QPF_THRESHOLD_INCHES = .01;
-export const TRACE_QPF_POINT_FRACTION = 1/3;
-/** A positive amount at or below .010 inch contributes one-third of a model's points. */
+export const TRACE_QPF_THRESHOLD_INCHES = .1;
+export const TRACE_QPF_POINT_FRACTION = .3;
+/** A positive amount below .10 inch contributes 30% of a model's points. */
 export function deterministicRainSignal(amount) {
   if (!finite(amount)) return null;
   if (amount <= 0) return 0;
-  return amount <= TRACE_QPF_THRESHOLD_INCHES ? 100*TRACE_QPF_POINT_FRACTION : 100;
+  return amount < TRACE_QPF_THRESHOLD_INCHES ? 100*TRACE_QPF_POINT_FRACTION : 100;
 }
 /**
  * Fill the NWS 40-point share in proportion to its official probability, then
- * add one-third of a deterministic model's fixed weight for trace QPF at or
- * below .010 inch, or its full weight for more than .010 inch.
+ * add 30% of a deterministic model's fixed weight for QPF below .10 inch,
+ * or its full weight for .10 inch or more.
  * Rainfall inches stay separate.
  */
 export function precipitationLikelihood(nwsProbability, precipitationBlend, policy = SAME_DAY_WEIGHTS) {
@@ -160,7 +160,7 @@ export function precipitationLikelihood(nwsProbability, precipitationBlend, poli
   const sourceAmounts=Object.fromEntries(['nws','hrrr','ecmwf','nbm'].map(id=>[id,finite(amounts[id])?amounts[id]:null]));
   const drySources=['hrrr','ecmwf','nbm'].filter(id=>values[id]===0);
   const wetSources=['hrrr','ecmwf','nbm'].filter(id=>finite(values[id])&&values[id]>0);
-  const reducedSources=['hrrr','ecmwf','nbm'].filter(id=>finite(amounts[id])&&amounts[id]>0&&amounts[id]<=TRACE_QPF_THRESHOLD_INCHES);
+  const reducedSources=['hrrr','ecmwf','nbm'].filter(id=>finite(amounts[id])&&amounts[id]>0&&amounts[id]<TRACE_QPF_THRESHOLD_INCHES);
   const sources=included.map(id=>({id,value:values[id],weight:policy[id],points:sourcePoints[id]}));
   return {value,rawValue:value,weightedValue:rawTotal,rawTotal,sourceValues:values,sourcePoints,
     sourceAmounts,officialProbability:nws,drySources,wetSources,reducedSources,sources,
@@ -375,8 +375,8 @@ export function enhanceForecast(out, { models, grid, periods = [], hourlyPeriods
   out.convectiveGuidance=out.hours.filter(h=>finite(h.reflectivity)||finite(h.nearbyReflectivity)).slice(0,30).map(h=>({time:h.time,pointReflectivityDbz:h.reflectivity,nearby25kmMaxReflectivityDbz:h.nearbyReflectivity,runAt:sourceModels.hrrr?.reflectivityRunAt||sourceModels.hrrr?.runAt}));
   out.google={status:'access-required',contributes:false,label:'Google WeatherNext',message:'Not included: approved Google WeatherNext dataset access has not been configured.',url:'https://developers.google.com/weathernext/guides/access-forecast'};
   out.repairVersion=REPAIR_VERSION;
-  out.blendPolicy={allForecastHours:SAME_DAY_WEIGHTS,sameDay:SAME_DAY_WEIGHTS,precipitation:'Rainfall amount is calculated separately in inches from the hourly source amounts.',probability:'The NWS hourly probability fills its 40-point share proportionally. A model QPF above zero through 0.010 inch adds one-third of that model\'s points; more than 0.010 inch adds full points; zero adds zero. Cap the total at 100%.',periodProbability:'Highest canonical hourly score within the explicit period window, not an independently estimated all-day event probability',partialCoverage:'An unavailable deterministic model adds no points; a period with missing canonical hourly scores is unavailable, not dry'};
-  out.methodology='Numeric Weather Nourie blend: The official NWS hourly probability fills its 40-point share proportionally. HRRR is worth 30 points, ECMWF 10 points and NBM 20 points. A model amount above zero through 0.010 inch contributes one-third of that model\'s points; more than 0.010 inch contributes its full points; zero contributes zero. The total is capped at 100%. Rainfall amount is calculated separately in inches. Unavailable deterministic inputs add no points and are never treated as observed dry weather. This is a transparent, uncalibrated estimate, not a proven accuracy ranking. Official warnings are never altered. Explicit HRRR, ECMWF IFS 0.25° and NBM point feeds cover the selected coordinates through Open-Meteo, with native extracts as a fallback. Point feeds can combine successive runs of the same named model; their initialization metadata refers to the latest published run. Temperature, dew point, wind, gust and cloud cover use their separate requested weighted-average policy; humidity and feels-like are derived consistently. Pressure and visibility include only published fields. Station observations, UV and official text retain separate provenance. Coarser precipitation intervals are prorated at boundaries; interpolated hourly amounts do not establish storm arrival times. Today’s daily rain card covers only the remaining period when earlier forecast hours have passed; the main precipitation metric covers the next 24 hours.';
+  out.blendPolicy={allForecastHours:SAME_DAY_WEIGHTS,sameDay:SAME_DAY_WEIGHTS,precipitation:'Rainfall amount is calculated separately in inches from the hourly source amounts.',probability:'The NWS hourly probability fills its 40-point share proportionally. A model QPF above zero but below 0.10 inch adds 30% of that model\'s points; 0.10 inch or more adds full points; zero adds zero. Cap the total at 100%.',periodProbability:'Highest canonical hourly score within the explicit period window, not an independently estimated all-day event probability',partialCoverage:'An unavailable deterministic model adds no points; a period with missing canonical hourly scores is unavailable, not dry'};
+  out.methodology='Numeric Weather Nourie blend: The official NWS hourly probability fills its 40-point share proportionally. HRRR is worth 30 points, ECMWF 10 points and NBM 20 points. A model amount above zero but below 0.10 inch contributes 30% of that model\'s points; 0.10 inch or more contributes its full points; zero contributes zero. The total is capped at 100%. Rainfall amount is calculated separately in inches. Unavailable deterministic inputs add no points and are never treated as observed dry weather. This is a transparent, uncalibrated estimate, not a proven accuracy ranking. Official warnings are never altered. Explicit HRRR, ECMWF IFS 0.25° and NBM point feeds cover the selected coordinates through Open-Meteo, with native extracts as a fallback. Point feeds can combine successive runs of the same named model; their initialization metadata refers to the latest published run. Temperature, dew point, wind, gust and cloud cover use their separate requested weighted-average policy; humidity and feels-like are derived consistently. Pressure and visibility include only published fields. Station observations, UV and official text retain separate provenance. Coarser precipitation intervals are prorated at boundaries; interpolated hourly amounts do not establish storm arrival times. Today’s daily rain card covers only the remaining period when earlier forecast hours have passed; the main precipitation metric covers the next 24 hours.';
   out.methodology=out.methodology.replace('The hourly rain likelihood','Each hourly rain likelihood')+' Daily, daytime and overnight rain percentages are the highest canonical hourly score inside their stated windows, not independently calculated full-period probabilities. The same complete hourly timeline supplies daily cards, forecast details, the hourly display, car-wash decisions and experimental source evidence. A missing hourly score leaves its period unavailable. Expected rainfall amounts are summed from that same timeline.';
   return out;
 }
