@@ -35,6 +35,8 @@ assert.equal(todaySkyProfile({condition:'Slight Chance Showers And Thunderstorms
 assert.equal(precipitationActivity('Fog',{pop:100}),'active');
 assert.deepEqual(comfortSceneState(true,'Fog',65,{pop:100}),{key:'rain',asset:'comfort-reference-scenes-rain.webp'});
 assert.deepEqual(comfortSceneState(true,'Fog',65,{pop:0}),{key:'fog',asset:'comfort-reference-scenes-fog.webp'});
+assert.deepEqual(comfortSceneState(true,'Fog',65,{pop:48}),{key:'carry-umbrella',asset:'comfort-reference-scenes-carry-umbrella.svg'});
+assert.deepEqual(comfortSceneState(true,'Fog',65,{pop:65}),{key:'umbrella',asset:'comfort-reference-scenes-umbrella.webp'});
 assert.equal(precipitationActivity('Chance Showers',{pop:23}),'possible');
 assert.deepEqual(comfortSceneState(true,'Chance Showers',70,{pop:23}),{key:'carry-umbrella',asset:'comfort-reference-scenes-carry-umbrella.svg'});
 assert.deepEqual(comfortSceneState(true,'Chance Showers',70,{pop:50}),{key:'umbrella',asset:'comfort-reference-scenes-umbrella.webp'});
