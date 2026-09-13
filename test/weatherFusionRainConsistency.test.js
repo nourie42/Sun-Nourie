@@ -31,12 +31,12 @@ function matchingRows(data,summary) {
   return data.rainTimeline.filter(row=>Date.parse(row.time)<end&&Date.parse(row.end)>start);
 }
 
-test('positive model amounts below .010 inch add one-third of fixed points',()=>{
+test('positive model amounts below .10 inch add 30 percent of fixed points',()=>{
   const data=buildForecast(inputs());
   const day=data.days[1],rows=matchingRows(data,day.rainLikelihood);
-  assert.equal(day.rainLikelihood.value,36);
+  assert.equal(day.rainLikelihood.value,34);
   assert.equal(day.rainLikelihood.value,Math.max(...rows.map(row=>row.rainLikelihood.value)));
-  assert.deepEqual(new Set(rows.map(row=>row.rainLikelihood.value)),new Set([26,36]),'hours beyond HRRR coverage lose HRRR’s one-third trace contribution');
+  assert.deepEqual(new Set(rows.map(row=>row.rainLikelihood.value)),new Set([25,34]),'hours beyond HRRR coverage lose HRRR’s reduced light-QPF contribution');
   assert.equal(day.rainLikelihood.coverage.complete,true);
   assert.equal(day.officialPop,39,'raw NWS period probability remains separate');
 });
@@ -138,12 +138,12 @@ test('NWS is scaled within its share and model points are neither scaled nor ren
 test('source evidence preserves exact amounts and trace-QPF point tiers',()=>{
   const score=precipitationLikelihood(39,{sourceValues:{nws:.001,hrrr:null,ecmwf:.016}});
   assert.equal(score.sourceValues.hrrr,null);
-  assert.equal(score.sourceValues.ecmwf,100);
+  assert.equal(score.sourceValues.ecmwf,30);
   assert.equal(score.sourceAmounts.ecmwf,.016);
-  assert.equal(score.weightedValue,25.6);
-  assert.equal(score.value,26);
+  assert.equal(score.weightedValue,18.6);
+  assert.equal(score.value,19);
   assert.deepEqual(score.sources.map(row=>[row.id,row.weight]),[['nws',.4],['ecmwf',.1]]);
-  assert.ok(Math.abs(precipitationLikelihood(39,{sourceValues:{ecmwf:.0049}}).sourceValues.ecmwf-100/3)<1e-12);
+  assert.equal(precipitationLikelihood(39,{sourceValues:{ecmwf:.0049}}).sourceValues.ecmwf,30);
   const data=buildForecast(inputs({amount:.001})),row=data.rainTimeline[0];
   assert.equal(row.precipitationBlend.sourceValues.hrrr,.001);
   assert.equal(row.precipitationBlend.sourceValues.ecmwf,.001);
@@ -152,9 +152,9 @@ test('source evidence preserves exact amounts and trace-QPF point tiers',()=>{
   assert.ok(row.precipitationBlend.sources.every(source=>source.runAt!==undefined));
   const below=buildForecast(inputs({chance:0,amount:.00499})).rainTimeline[0];
   assert.equal(below.rainLikelihood.sourceAmounts.hrrr,.00499);
-  assert.ok(Math.abs(below.rainLikelihood.sourceValues.hrrr-100/3)<1e-12,'trace forecast amounts receive one-third of model points');
-  assert.equal(below.rainLikelihood.sourcePoints.hrrr,10);
-  assert.equal(below.rainLikelihood.value,20);
+  assert.equal(below.rainLikelihood.sourceValues.hrrr,30,'trace forecast amounts receive 30% of model points');
+  assert.equal(below.rainLikelihood.sourcePoints.hrrr,9);
+  assert.equal(below.rainLikelihood.value,18);
 });
 
 test('expired peak hours leave the remaining forecast when the current hour advances',()=>{
@@ -201,8 +201,8 @@ test('corroborated new model rain changes both the hourly and period result with
   wet.models.hrrr.precipitationIntervals.find(row=>row.start*1000===now).value=.02;
   const first=buildForecast(dry),updated=buildForecast(wet);
   assert.equal(first.hours[0].rainLikelihood.value,12);
-  assert.equal(updated.hours[0].rainLikelihood.value,42);
-  assert.equal(updated.days[0].popDayLikelihood.value,42);
+  assert.equal(updated.hours[0].rainLikelihood.value,21);
+  assert.equal(updated.days[0].popDayLikelihood.value,21);
   assert.equal(updated.days[0].popDayLikelihood.peak.sources.find(source=>source.id==='hrrr').runAt,iso(now));
   assert.notEqual(first.signature,updated.signature);
 });
