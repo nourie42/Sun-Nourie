@@ -23,9 +23,8 @@ export function validateSnapshot(data, id, location, now) {
   if (data?.schema !== DIRECT_SCHEMA || data.model !== id || data.complete !== true || !Array.isArray(data.points)) throw new Error('Model snapshot schema/identity is invalid.');
   const status = modelStatus(id, data.runAt, data.validUntil, now);
   if (status !== 'ready') return { value: null, status, message: 'The model run is too old or has expired; it is excluded from the forecast.' };
-  // Never relabel one saved city's data as an arbitrary map point.
   const point = data.points.find((p) => Math.abs(p.latitude-location.latitude) < 0.0002 && Math.abs(p.longitude-location.longitude) < 0.0002);
-  if (!point) return { value: null, status: 'not-covered', message: 'Direct model collection currently covers the two saved locations. This location uses NWS only.' };
+  if (!point) return { status: 'not-covered', value: null, message: 'Direct model collection currently covers the two saved locations. This location uses NWS only.' };
   const h = point.hourly, u = point.hourly_units, run = Date.parse(data.runAt)/1000;
   if (!Array.isArray(h?.time) || h.time.length < 12 || h.time.length > 500 || u?.temperature_2m !== '°F' || u.precipitation !== 'inch' || u.wind_speed_10m !== 'mp/h') throw new Error('Invalid model units or time axis.');
   if (h.time.some((t,i) => !finite(t) || t < run || (i > 0 && t-h.time[i-1] !== 3600))) throw new Error('The model time axis is not a continuous hourly axis.');
@@ -61,17 +60,13 @@ export function createDirectModels({ fetchImpl = globalThis.fetch, now = Date.no
   }
   async function load(id, location) {
     const meta = { id, label: LABELS[id], url: SOURCE[id], issuedAt: null, fetchedAt: iso(now()), transport: 'Native GRIB2 → verified snapshot', contributes: false };
-    // The named point feed covers ALL supported search locations and all-weather
-    // variables. Native extracts remain a verified fallback, never a city proxy.
     let pointFailure;
     try {
       const point=await pointModel(id,location),value={...point,hourly:{...point.hourly}};
-      // Preserve the independently decoded simulated reflectivity used by the
-      // local outlook. It is not supplied by the point API; never invent it.
       if(id==='hrrr')try{
         const native=validateSnapshot(await resource('models/hrrr.json'),id,location,now()).value;
         if(native){for(const field of ['reflectivity','nearby_reflectivity'])if(native.hourly[field])value.hourly[field]=value.hourly.time.map(t=>{const i=native.hourly.time.indexOf(t);return i>=0?native.hourly[field][i]:null;});value.reflectivityRunAt=native.runAt;}
-      }catch{/* Optional native reflectivity must not discard verified point weather. */}
+      }catch{}
       return {value,meta:{...meta,status:'ready',label:`${id.toUpperCase()} · ${value.resolution}`,transport:value.transport,url:value.sourceUrl,issuedAt:value.runAt,fetchedAt:value.fetchedAt||null,checkedAt:value.checkedAt||null,retrievalStatus:value.retrievalStatus,validUntil:value.validUntil,resolution:value.resolution,contributes:true,message:value.refreshWarning||value.runScope,modelGrid:value.modelGrid}};
     }catch(error){pointFailure=String(error.message);}
     let nativeFailure;
@@ -103,7 +98,6 @@ export function createDirectModels({ fetchImpl = globalThis.fetch, now = Date.no
   }
   return { load, maps };
 }
-/** Integrate a complete native QPF interval window; gaps and overlaps never become zero. */
 export function intervalTotal(intervals, start, end, precision = 4) {
   if (!(finite(start) && finite(end) && end > start)) return null;
   let cursor = start/1000, total = 0;
@@ -129,11 +123,6 @@ export const MEASURABLE_QPF_THRESHOLD_INCHES = .01;
 export const ROLLING_QPF_FULL_SUPPORT_INCHES = .1;
 export const TRACE_QPF_THRESHOLD_INCHES = MEASURABLE_QPF_THRESHOLD_INCHES;
 export const TRACE_QPF_POINT_FRACTION = .3;
-/**
- * Measurable rain (>= .01 inch in the hour) is a full deterministic wet vote.
- * A smaller positive trace keeps 30% support unless a complete rolling 3h/6h
- * window containing that hour totals >= .10 inch, which confirms a real rain event.
- */
 export function deterministicRainSignal(amount, windows = {}) {
   if (!finite(amount)) return null;
   if (amount <= 0) return 0;
@@ -142,12 +131,6 @@ export function deterministicRainSignal(amount, windows = {}) {
       (finite(windows.sixHour)&&windows.sixHour>=ROLLING_QPF_FULL_SUPPORT_INCHES)) return 100;
   return 100*TRACE_QPF_POINT_FRACTION;
 }
-/**
- * Fill the NWS 40-point share in proportion to its official probability. A
- * deterministic model earns its full fixed share when it forecasts measurable
- * rain for the hour, or when a trace hour sits inside a >= .10 inch rolling
- * 3h/6h rain event. Smaller isolated traces earn 30% of that model's share.
- */
 export function precipitationLikelihood(nwsProbability, precipitationBlend, policy = SAME_DAY_WEIGHTS, sourceWindows = {}) {
   const amounts = precipitationBlend?.sourceValues || {};
   const nws=finite(nwsProbability)?Math.max(0,Math.min(100,nwsProbability)):null;
@@ -180,7 +163,6 @@ export function precipitationLikelihood(nwsProbability, precipitationBlend, poli
     reducedQpfThresholdInches:MEASURABLE_QPF_THRESHOLD_INCHES,reducedPointFraction:TRACE_QPF_POINT_FRACTION,
     source:'Weighted NWS probability plus measurable-rain model points',calibrated:false};
 }
-/** Backward-compatible audit helper: the highest actual hourly score in a window. */
 export function summarizeRainTimeline(timeline, start, end) {
   const window={start:finite(start)?iso(start):null,end:finite(end)?iso(end):null};
   const expected=finite(start)&&finite(end)&&end>start?(end-start)/H:0;
@@ -202,13 +184,6 @@ export function summarizeRainTimeline(timeline, start, end) {
     availablePeak:peak?.rainLikelihood?.value??null,sources:peak?.rainLikelihood?.sources||[],calibrated:false,
     source:'Highest hourly Weather Nourie rain chance in this period'};
 }
-/**
- * Period event probability. Hourly chances are correlated and are never added.
- * NWS contributes its official period PoP; each deterministic model contributes
- * once when it forecasts measurable rain anywhere in the period. A positive
- * model forecast can contribute even with a partial horizon; an incomplete dry
- * horizon is treated as unknown, never as a dry vote.
- */
 export function summarizePeriodRainTimeline(timeline, start, end, nwsProbability = null, policy = SAME_DAY_WEIGHTS) {
   const window={start:finite(start)?iso(start):null,end:finite(end)?iso(end):null};
   const expected=finite(start)&&finite(end)&&end>start?(end-start)/H:0;
@@ -248,7 +223,6 @@ export function summarizePeriodRainTimeline(timeline, start, end, nwsProbability
     availablePeak:peak?.rainLikelihood?.value??null,
     source:'Probability of measurable rain at least once during this period; hourly chances are correlated and not added'};
 }
-/** Backward-compatible API helper using the same all-weather Steadman equation as Weather Nourie. */
 export function feelsLike(t, rh, wind, dewpoint = null) {
   const result=shadeFeelsLike(t,rh,wind,dewpoint);
   return {value:finite(result.value)?round(result.value,0):null,method:result.method};
@@ -268,7 +242,6 @@ function sample(payload, time, field) {
   const h = payload?.hourly, i = h?.time?.indexOf(time/1000);
   return i >= 0 && finite(h[field]?.[i]) ? h[field][i] : null;
 }
-/** Astronomical sunrise/sunset, independent of model availability. */
 export function solarTimes(date, latitude, longitude) {
   if (!finite(latitude) || !finite(longitude)) return { sunrise:null,sunset:null };
   const rad = Math.PI/180, lw=-longitude*rad, phi=latitude*rad;
@@ -286,8 +259,6 @@ export function enhanceForecast(out, { models, grid, periods = [], hourlyPeriods
   const sourceModels = Object.fromEntries(Object.entries(models).filter(([,m]) => m?.direct||m?.verifiedModel));
   const active = Object.keys(sourceModels);
   function sourceQpf(start,end) {
-    // Blend each time segment first. An 18-hour HRRR run must contribute where
-    // covered rather than being discarded for not covering an entire 24h window.
     const totals={}, durations={}, sourceTotals={}, sourceCoverage={};
     let total=0, covered=0;
     for(let cursor=start; cursor<end; ) {
@@ -306,11 +277,9 @@ export function enhanceForecast(out, { models, grid, periods = [], hourlyPeriods
     const sources=Object.keys(totals).map(id=>({id,weight:round(durations[id]/covered,6),value:round(sourceTotals[id],8),coverageHours:round(sourceCoverage[id]/H,1)}));
     return {value:covered?round(total,8):null,sources,calibrated:false,start:iso(start),end:iso(end),
       sourceValues:Object.fromEntries(['nws',...active].map(id=>[id,sourceCoverage[id]>=end-start?round(sourceTotals[id],8):null])),
-      source:sources.length?sources.map(s=>`${s.id.toUpperCase()} ${Math.round(s.weight*100)}%`).join(' / ')||'Unavailable',
+      source:sources.length?sources.map(s=>`${s.id.toUpperCase()} ${Math.round(s.weight*100)}%`).join(' / '):'Unavailable',
       weighting:'Per-hour blend; displayed weights are window-average contributions. HRRR contributes only within its published horizon.'};
   }
-  // Score every forecast hour once, including the days beyond the 48-hour strip.
-  // NWS hourly probability is independent of NWS's longer day/night period PoP.
   const officialHours=new Map((hourlyPeriods.length?hourlyPeriods:out.hours).map(row=>[
     Date.parse(row.startTime||row.time),row
   ]));
@@ -345,7 +314,6 @@ export function enhanceForecast(out, { models, grid, periods = [], hourlyPeriods
     row.rainLikelihood=rainLikelihood;
   }
   const timelineByTime=new Map(out.rainTimeline.map(row=>[Date.parse(row.time),row]));
-  // Amounts use the same hourly row as the graph; partial boundary hours are prorated.
   function qpf(start,end) {
     const totals={},durations={},sourceTotals={},sourceCoverage={};
     let total=0,covered=0;
@@ -370,7 +338,6 @@ export function enhanceForecast(out, { models, grid, periods = [], hourlyPeriods
       source:sources.map(s=>`${s.id.toUpperCase()} ${Math.round(s.weight*100)}%`).join(' / ')||'Unavailable',
       weighting:'Sum of the same canonical hourly precipitation amounts used by the graph; partial hours are prorated.'};
   }
-  // For direct model forecasts align temperature samples to NWS day/night periods.
   for (const [index,d] of out.days.entries()) {
     const day = periods.find((p)=>p.isDaytime && Date.parse(p.endTime)>now && dateKey(Date.parse(p.startTime),out.location.timeZone)===d.date);
     const night = eveningPeriod(periods,d.date,out.location.timeZone,now);
@@ -414,8 +381,6 @@ export function enhanceForecast(out, { models, grid, periods = [], hourlyPeriods
     d.popDayLikelihood=summarizePeriodRainTimeline(out.rainTimeline,dayWindow.start,dayWindow.end,d.popDay,SAME_DAY_WEIGHTS);
     d.popNightLikelihood=summarizePeriodRainTimeline(out.rainTimeline,nightWindow.start,nightWindow.end,d.popNight,SAME_DAY_WEIGHTS);
     for(const [id,value] of Object.entries(rain.sourceValues)) if(id!=='nws') {d.guidance[id] ||= {};d.guidance[id].qpf=value;}
-    // Confidence must describe the final period-aligned blend, not the earlier
-    // calendar-day completeness check. Only positive-weight contributors count.
     for(const [kind,period] of [['high',day],['low',night]])if(!d[`${kind}Blend`]&&finite(period?.temperature))d[`${kind}Blend`]={value:d[kind],sources:[{id:'nws',weight:1,value:d[kind]}]};
     const contributors=[...(d.highBlend?.sources||[]),...(d.lowBlend?.sources||[]),...(d.qpfBlend?.sources||[])].filter(s=>s.weight>0&&finite(s.value));
     const sourceIds=['nws','hrrr','ecmwf','nbm'].filter(id=>contributors.some(s=>s.id===id));
