@@ -28,6 +28,7 @@ export const PRESETS = [
 ];
 export const RADAR_URL = 'https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows';
 export const RADAR_NEARBY_MILES = 12;
+export const RADAR_CLOSE_MILES = 5;
 export const RADAR_AREA_MILES = 36;
 const HYDROMETEOR_COLORS = [
   ['biological',[156,156,156]],['ground-clutter',[118,118,118]],['ice-crystals',[255,176,176]],
@@ -184,7 +185,7 @@ export function radarSampleLocations(location) {
   const points = [{ latitude, longitude, distanceMiles: 0, bearing: null }];
   const compassBearings = [0, 45, 90, 135, 180, 225, 270, 315];
   for (const [radius, bearings] of [
-    [RADAR_NEARBY_MILES / 2, [0, 90, 180, 270]],
+    [RADAR_CLOSE_MILES, compassBearings],
     [RADAR_NEARBY_MILES, compassBearings],
     [18, compassBearings],
     [24, compassBearings],
@@ -253,14 +254,24 @@ export function summarizeRadarPresence(samples, observedAt) {
   const active = available.filter(sample => sample.active);
   const center = samples.find(sample => sample.distanceMiles === 0);
   const atLocation = typeof center?.active === 'boolean' ? center.active : null;
-  const nearby = coherentPrecipitation(samples,RADAR_NEARBY_MILES);
+  const close = atLocation===true||coherentPrecipitation(samples,RADAR_CLOSE_MILES);
+  const nearby = close||coherentPrecipitation(samples,RADAR_NEARBY_MILES);
   const inArea = nearby || coherentPrecipitation(samples,RADAR_AREA_MILES);
-  const accepted = active.filter(sample => sample.distanceMiles === 0 || (nearby && sample.distanceMiles <= RADAR_NEARBY_MILES) || (inArea && sample.distanceMiles <= RADAR_AREA_MILES));
+  const accepted = active.filter(sample => sample.distanceMiles === 0 || (close&&sample.distanceMiles<=RADAR_CLOSE_MILES) || (nearby && sample.distanceMiles <= RADAR_NEARBY_MILES) || (inArea && sample.distanceMiles <= RADAR_AREA_MILES));
   const nearest = accepted.reduce((best,sample)=>!best||sample.distanceMiles<best.distanceMiles?sample:best,null);
   return {status:available.length ? 'ready' : 'unavailable',observedAt,
-    atLocation,nearby,inArea,
+    atLocation,close,nearby,inArea,
     nearestRainMiles:nearest?.distanceMiles??null,nearestRainDirection:radarDirection(nearest?.bearing),
-    nearbyRadiusMiles:RADAR_NEARBY_MILES,scanRadiusMiles:RADAR_AREA_MILES,source:'NOAA MRMS reflectivity checked against local NEXRAD dual-polarization classification'};
+    closeRadiusMiles:RADAR_CLOSE_MILES,nearbyRadiusMiles:RADAR_NEARBY_MILES,scanRadiusMiles:RADAR_AREA_MILES,source:'NOAA MRMS reflectivity checked against local NEXRAD dual-polarization classification'};
+}
+
+export function summarizeRadarMotion(current,previous){
+ const currentDistance=current?.nearestRainMiles,previousDistance=previous?.nearestRainMiles;
+ const currentTime=Date.parse(current?.observedAt),previousTime=Date.parse(previous?.observedAt);
+ const minutes=(currentTime-previousTime)/MINUTE;
+ const distanceChange=finite(currentDistance)&&finite(previousDistance)?Number((previousDistance-currentDistance).toFixed(1)):null;
+ const approaching=current?.inArea===true&&previous?.inArea===true&&minutes>=5&&minutes<=30&&finite(distanceChange)&&distanceChange>=3;
+ return {approaching,previousObservedAt:finite(previousTime)?iso(previousTime):null,previousNearestRainMiles:finite(previousDistance)?previousDistance:null,distanceChangeMiles:distanceChange};
 }
 
 /** Bounded in-process cache with concurrent request de-duplication and no stale fallback. */
@@ -570,7 +581,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
     ]);
     const frames = result.value || [];
     const status = frames.length ? (now() - Date.parse(frames.at(-1)) > 20 * MINUTE ? 'stale' : 'ready') : 'unavailable';
-    let precipitation = {status:'unavailable',observedAt:frames.at(-1)||null,atLocation:null,nearby:false,inArea:false,nearestRainMiles:null,nearestRainDirection:null,nearbyRadiusMiles:RADAR_NEARBY_MILES,scanRadiusMiles:RADAR_AREA_MILES,source:'NOAA MRMS reflectivity checked against local NEXRAD dual-polarization classification'};
+    let precipitation = {status:'unavailable',observedAt:frames.at(-1)||null,atLocation:null,close:false,nearby:false,inArea:false,approaching:false,nearestRainMiles:null,nearestRainDirection:null,closeRadiusMiles:RADAR_CLOSE_MILES,nearbyRadiusMiles:RADAR_NEARBY_MILES,scanRadiusMiles:RADAR_AREA_MILES,source:'NOAA MRMS reflectivity checked against local NEXRAD dual-polarization classification'};
     if (status === 'ready') {
       const observedAt = frames.at(-1), points = radarSampleLocations(location);
       const radarStation=pointResult?.data?.properties?.radarStation;
@@ -578,12 +589,14 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
       const hydrometeorTimes=hydrometeorCapabilitiesUrl
         ? cached(hydrometeorCapabilitiesUrl,2*MINUTE,{text:true}).then(({data})=>parseRadarTimes(data,now())).catch(()=>[])
         : Promise.resolve([]);
-      const [reflectivitySamples,hydrometeorFrames] = await Promise.all([Promise.all(points.map(async point => {
+      const previousObservedAt=[...frames].reverse().find(time=>Date.parse(observedAt)-Date.parse(time)>=8*MINUTE)||null;
+      const loadReflectivity=time=>Promise.all(points.map(async point => {
         try {
-          const {data} = await cached(radarFeatureInfoUrl(point,observedAt),2*MINUTE);
+          const {data} = await cached(radarFeatureInfoUrl(point,time),2*MINUTE);
           return {...point,reflectivityActive:radarFeatureActive(data)};
         } catch { return {...point,reflectivityActive:null}; }
-      })),hydrometeorTimes]);
+      }));
+      const [reflectivitySamples,previousReflectivitySamples,hydrometeorFrames] = await Promise.all([loadReflectivity(observedAt),previousObservedAt?loadReflectivity(previousObservedAt):Promise.resolve([]),hydrometeorTimes]);
       const latestHydrometeor=hydrometeorFrames.at(-1);
       const hydrometeorObservedAt=latestHydrometeor&&now()-Date.parse(latestHydrometeor)<=20*MINUTE?latestHydrometeor:null;
       const samples=await Promise.all(reflectivitySamples.map(async sample=>{
@@ -596,7 +609,9 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
           return {...sample,hydrometeor,active:hydrometeor===null?null:PRECIPITATION_HYDROMETEORS.has(hydrometeor)};
         }catch{return {...sample,hydrometeor:null,active:null};}
       }));
-      precipitation = {...summarizeRadarPresence(samples,observedAt),classification:{station:radarStation||null,observedAt:hydrometeorObservedAt}};
+      const currentPresence=summarizeRadarPresence(samples,observedAt);
+      const previousPresence=previousObservedAt?summarizeRadarPresence(previousReflectivitySamples.map(sample=>({...sample,active:sample.reflectivityActive})),previousObservedAt):null;
+      precipitation = {...currentPresence,...summarizeRadarMotion(currentPresence,previousPresence),classification:{station:radarStation||null,observedAt:hydrometeorObservedAt}};
     }
     return { frames, url: RADAR_URL, layer: 'conus_bref_qcd', status,
       location:{latitude:location.latitude,longitude:location.longitude},precipitation,
@@ -636,6 +651,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     'personal-details.js','personal-details.css','render-safety.js','scenario-layout.css','style.css','thermal-risk.js',
     'today-card.js','rain-trend.js','utci.js','weather-display.js','weather-math.js','weather-repair.css','weather-state.js',
     'comfort-reference-scenes.png','comfort-reference-scenes.webp','comfort-reference-scenes-cold.webp',
+    'comfort-reference-scenes-carry-umbrella.svg',
     'comfort-reference-scenes-dawn.webp','comfort-reference-scenes-fog.webp','comfort-reference-scenes-hot.webp',
     'comfort-reference-scenes-rain.webp','comfort-reference-scenes-umbrella.png','comfort-reference-scenes-umbrella.webp','comfort-reference-scenes-watch.webp',
     'poodle-walk.png','poodle-walk-cold.png','poodle-walk-hot.png','poodle-walk-mild.png',

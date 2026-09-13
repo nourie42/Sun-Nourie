@@ -1,11 +1,11 @@
 import {todayForecastHTML} from './today-card.js?v=weather-qa-v65';
 import {FORECAST_CONFIDENCE_VERSION} from './forecast-confidence.js?v=weather-art-labels-v10';
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
-import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=radar-dry-v33';
+import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=rain-around-v66';
 import {weatherState} from './weather-state.js';
-import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=weather-qa-v65';
+import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=rain-around-v66';
 import {degrees,feelsAt,dailyFeels,forecastValue,peakFeelsHTML} from './hourly-feels.js?v=weather-art-labels-v10';
-import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=comfort-rain-v38';
+import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=rain-around-v66';
 import {comfortMode,comfortWindow,comfortNarrative,warmestTodayWindow} from './comfort-outlook.js?v=weather-art-labels-v10';
 import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js?v=weather-qa-v65';
 import {resetDewpointMeter} from './dewpoint-meter.js?v=centered-heading-v30';
@@ -41,7 +41,7 @@ export function overnightComfort(forecast,now=Date.now()){
 }
 function valuesThrough(series,now,end){return (series||[]).filter(p=>{const t=Date.parse(p.time);return finite(t)&&t>=now&&t<=Date.parse(end)&&finite(p.value);}).map(p=>p.value);}
 export function comfortWeatherKind(forecast,now=Date.now()){
- const current=forecast?.current||{},weather=weatherState(current.condition),elevation=solarElevation(now,forecast?.location?.latitude,forecast?.location?.longitude),hour=localMinutes(now)/60;
+ const current=currentSample(forecast,now),weather=weatherState(current.condition),elevation=solarElevation(now,forecast?.location?.latitude,forecast?.location?.longitude),hour=localMinutes(now)/60;
  if(weather.kind==='storm')return 'storm';
  if(weather.kind==='rain')return 'rain';
  if(weather.kind==='snow')return 'snow';
@@ -96,7 +96,7 @@ export function renderComfort(forecast) {
  if(!sample){comfortPreview=null;return renderComfort(forecast);}
  const c=sample.comfort,zone=forecast.location.timeZone,summary=comfortWindow(forecast,now+1);
  const precipitation=forecastValue(forecast,'precipitation',sample.time);
- const sceneContext={forecast:!sample.now,condition:sample.condition,pop:sample.pop,precipitation};
+ const sceneContext={forecast:!sample.now,condition:sample.condition,pop:sample.pop,precipitation,rainAround:sample.rainAround===true,radarThreat:sample.radarThreat===true};
  const pavement=pavementEstimate(forecast,sample.inputs,sample.now?now:Date.parse(sample.time),{checkedAt:now,...sceneContext});
  const kicker=$('skin-kicker');if(kicker)kicker.textContent=sample.now?'How it actually feels right now':`How will it feel outside at ${formatTime(sample.time)}?`;
  const preview=sample.now?'':'<div class="comfort-preview-heading"><button type="button" data-comfort-reset>Back to now</button></div>';

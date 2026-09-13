@@ -133,14 +133,15 @@ export function exposureScene(sun,daylight=true,condition='Clear',feels=null,con
 
 export function precipitationActivity(condition='',context={}){
  const weather=weatherState(condition),pop=context.pop;
+ if(context.rainAround===true||context.radarThreat===true)return 'active';
  // Forecast artwork follows the same displayed probability at every hour.
  // A rainy probability should still affect the people scene even when the
  // short condition text says fog/clouds instead of repeating rain.
  // Observed rain without a probability can still use the active-rain scene.
  if(finite(pop)){
-  if(pop>=80)return 'active';
-  if(pop>=50)return 'umbrella';
-  if(pop>0)return 'possible';
+  if(pop>=81)return 'active';
+  if(pop>=20)return 'possible';
+  return 'none';
  }
  if(!['rain','storm'].includes(weather.kind))return 'none';
  if(!weather.chance)return 'active';
@@ -151,7 +152,6 @@ export function comfortSceneState(daylight=true,condition='Clear',feels=null,con
  const kind=weatherState(condition).kind,precipitation=precipitationActivity(condition,context);
  if(kind==='snow'||(finite(feels)&&feels<40))return {key:'cold',asset:'comfort-reference-scenes-cold.webp'};
  if(precipitation==='active')return {key:'rain',asset:'comfort-reference-scenes-rain.webp'};
- if(precipitation==='umbrella')return {key:'umbrella',asset:'comfort-reference-scenes-umbrella.webp'};
  if(precipitation==='possible')return {key:'carry-umbrella',asset:'comfort-reference-scenes-carry-umbrella.svg'};
  if(kind==='fog')return {key:'fog',asset:'comfort-reference-scenes-fog.webp'};
  if(!daylight)return {key:'dawn',asset:'comfort-reference-scenes-dawn.webp'};

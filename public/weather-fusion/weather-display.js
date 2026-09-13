@@ -64,13 +64,13 @@ export function currentSample(forecast, now = Date.now()) {
   const kind=weatherState(current.condition).kind,stationCondition=current.type==='observation'&&!/forecast/i.test(current.conditionSource||'')&&kind!=='unknown';
   const activePrecipitation=stationCondition&&['rain','storm','snow'].includes(kind);
   const radar=current.radarPrecipitation,radarReady=radar?.status==='ready';
-  const radarHere=radarReady&&radar.atLocation===true,radarNearby=radarReady&&radar.nearby===true,radarArea=radarReady&&radar.inArea===true;
+  const radarHere=radarReady&&radar.atLocation===true,radarClose=radarReady&&(radar.close===true||(finite(radar.nearestRainMiles)&&radar.nearestRainMiles<=5)),radarApproaching=radarReady&&radar.approaching===true,radarThreat=radarHere||radarClose||radarApproaching,radarNearby=radarReady&&radar.nearby===true,radarArea=radarReady&&radar.inArea===true;
   const direction={N:'north',NE:'northeast',E:'east',SE:'southeast',S:'south',SW:'southwest',W:'west',NW:'northwest'}[radar?.nearestRainDirection];
   const areaDistance=finite(radar?.nearestRainMiles)?` about ${Math.round(radar.nearestRainMiles)} miles${direction?` ${direction}`:''}`:'';
   const currentPrecipitation=activePrecipitation
     ? {active:true,label:kind==='snow'?'Snow now':'Rain now',source:'Current station reports precipitation.'}
-    : radarHere
-      ? {active:true,label:'Rain on radar',source:'NOAA observed radar shows precipitation at the selected location.'}
+    : radarThreat
+      ? {active:true,nearby:!radarHere,label:'Rain Around',source:radarHere?'NOAA observed radar shows rain at the selected location.':radarClose?'NOAA observed radar shows rain within 5 miles of the selected location.':'NOAA observed radar shows rain moving toward the selected location.'}
       : radarNearby
         ? {active:false,nearby:true,label:'Rain nearby',source:'NOAA observed radar shows precipitation near the selected location.'}
         : radarArea
@@ -82,12 +82,12 @@ export function currentSample(forecast, now = Date.now()) {
           : radar
             ? {active:false,label:'Radar unavailable',source:'Current precipitation could not be confirmed.'}
             : {active:false,label:'Checking radar',source:'Waiting for the latest NOAA observed radar.'};
-  const currentLikelihood=activePrecipitation||radarHere?{value:100,source:activePrecipitation?'Current station observation':'NOAA observed radar'}:stationCondition?{value:0,source:'Current station observation'}:radarReady?{value:0,source:'NOAA observed radar'}:{value:null,source:'Current precipitation not yet confirmed'};
-  const dryRadarSky=radarReady&&!radarHere&&!stationCondition&&['rain','storm','snow'].includes(kind)
+  const currentLikelihood=activePrecipitation||radarThreat?{value:100,source:activePrecipitation?'Current station observation':'NOAA observed radar'}:stationCondition?{value:0,source:'Current station observation'}:radarReady?{value:0,source:'NOAA observed radar'}:{value:null,source:'Current precipitation not yet confirmed'};
+  const dryRadarSky=radarReady&&!radarThreat&&!stationCondition&&['rain','storm','snow'].includes(kind)
     ? weatherState('',currentHour?.skyCover).label
     : current.condition;
-  const displayCondition=radarHere&&!activePrecipitation?'Rain':dryRadarSky;
-  return {windDirection:current.windDirection,pop:rainChanceValue(currentLikelihood),officialPop:currentHour?.officialPop??currentHour?.pop,rainLikelihood:currentLikelihood,currentPrecipitation,precipitationBlend:currentHour?.precipitationBlend,uvIndex:hourlyUvValue(forecast,now),id:'now', now:true, time:current.time, temperature:finite(current.temperature) ? current.temperature : null,
+  const displayCondition=radarThreat&&!activePrecipitation?'Rain Around':dryRadarSky;
+  return {windDirection:current.windDirection,pop:rainChanceValue(currentLikelihood),officialPop:currentHour?.officialPop??currentHour?.pop,rainLikelihood:currentLikelihood,currentPrecipitation,rainAround:radarThreat,radarThreat,precipitationBlend:currentHour?.precipitationBlend,uvIndex:hourlyUvValue(forecast,now),id:'now', now:true, time:current.time, temperature:finite(current.temperature) ? current.temperature : null,
     feels:outdoorExposure(comfort).value, exposure:outdoorExposure(comfort), comfort, condition:displayCondition || 'Sky conditions unavailable',
     isDay:comfort.daylight ?? (solarElevation(now,forecast.location.latitude,forecast.location.longitude) > 0),
     source:current.type === 'observation' ? 'Station observation' : 'Current estimate', inputs:current};

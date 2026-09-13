@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { coordinates, localTime, dateKey, nextDate, durationMs, sumHourly, gridQpf, guidanceBlend, normalizeModel, parseRadarTimes, radarSampleLocations, radarFeatureActive, radarHydrometeorClass, radarHydrometeorUrl, summarizeRadarPresence, Cache, buildForecast, createWeatherService, registerWeatherFusionRoutes } from '../src/weatherFusion.js';
+import { coordinates, localTime, dateKey, nextDate, durationMs, sumHourly, gridQpf, guidanceBlend, normalizeModel, parseRadarTimes, radarSampleLocations, radarFeatureActive, radarHydrometeorClass, radarHydrometeorUrl, summarizeRadarPresence, summarizeRadarMotion, Cache, buildForecast, createWeatherService, registerWeatherFusionRoutes } from '../src/weatherFusion.js';
 import {H,now,base,times,model,periods,hourlyPeriods,grid,inputs,snapshot} from './weatherFusion.fixtures.js';
 test('coordinate validation is finite, bounded, and rejects coercion and arrays', () => {
   assert.equal(coordinates({ location: 'greenville' }).longitude, -77.3664);
@@ -158,7 +158,7 @@ test('weather routes register without changing any existing route', () => {
 });
 test('live radar distinguishes the selected point from precipitation nearby', async () => {
   const points=radarSampleLocations({latitude:35.787,longitude:-78.4806});
-  assert.equal(points.length,37);assert.equal(points[0].distanceMiles,0);assert.equal(Math.max(...points.map(point=>point.distanceMiles)),36);
+  assert.equal(points.length,41);assert.equal(points[0].distanceMiles,0);assert.ok(points.some(point=>point.distanceMiles===5));assert.equal(Math.max(...points.map(point=>point.distanceMiles)),36);
   assert.equal(radarFeatureActive({features:[{properties:{ALPHA_BAND:255}}]}),true);
   assert.equal(radarFeatureActive({features:[{properties:{ALPHA_BAND:0}}]}),false);
   assert.equal(radarFeatureActive({features:[]}),null);
@@ -166,10 +166,13 @@ test('live radar distinguishes the selected point from precipitation nearby', as
   assert.equal(radarHydrometeorClass({features:[{properties:{RED_BAND:0,GREEN_BAND:251,BLUE_BAND:144,ALPHA_BAND:255}}]}),'rain');
   assert.equal(radarHydrometeorClass({features:[{properties:{RED_BAND:0,GREEN_BAND:0,BLUE_BAND:0,ALPHA_BAND:0}}]}),null);
   assert.match(radarHydrometeorUrl('KRAX'),/krax\/krax_bdhc/);assert.equal(radarHydrometeorUrl('../bad'),null);
-  let summary=summarizeRadarPresence(points.map((point,index)=>({...point,active:index===8})),new Date(now).toISOString());
+  let summary=summarizeRadarPresence(points.map((point,index)=>({...point,active:index===12})),new Date(now).toISOString());
   assert.equal(summary.atLocation,false);assert.equal(summary.nearby,false);assert.equal(summary.nearestRainMiles,null);
-  summary=summarizeRadarPresence(points.map((point,index)=>({...point,active:[1,6,7].includes(index)})),new Date(now).toISOString());
-  assert.equal(summary.nearby,true);assert.equal(summary.nearestRainMiles,6);
+  summary=summarizeRadarPresence(points.map(point=>({...point,active:point.distanceMiles===5&&[0,45].includes(point.bearing)})),new Date(now).toISOString());
+  assert.equal(summary.close,true);assert.equal(summary.nearby,true);assert.equal(summary.nearestRainMiles,5);
+  const previous=summarizeRadarPresence(points.map(point=>({...point,active:point.distanceMiles===18&&[0,45].includes(point.bearing)})),new Date(now-10*60000).toISOString());
+  const current=summarizeRadarPresence(points.map(point=>({...point,active:point.distanceMiles===12&&[0,45].includes(point.bearing)})),new Date(now).toISOString());
+  assert.deepEqual(summarizeRadarMotion(current,previous),{approaching:true,previousObservedAt:new Date(now-10*60000).toISOString(),previousNearestRainMiles:18,distanceChangeMiles:6});
   summary=summarizeRadarPresence(points.map(point=>({...point,active:(point.distanceMiles===18&&point.bearing===270)||(point.distanceMiles===24&&point.bearing===315)})),new Date(now).toISOString());
   assert.equal(summary.nearby,false);assert.equal(summary.inArea,true);assert.equal(summary.nearestRainMiles,18);assert.equal(summary.nearestRainDirection,'W');
   const xml=`<Dimension name="time">${new Date(now-2*60000).toISOString()}</Dimension>`;

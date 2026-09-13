@@ -75,11 +75,15 @@ test('Now reports the observed precipitation state while future hours preserve c
  assert.equal(dryRadar.currentPrecipitation.label,'Dry now');
  assert.equal(dryRadar.condition,'Partly cloudy');
 });
-test('fresh observed radar overrides a dry station label and keeps nearby rain distinct',()=>{
+test('fresh observed radar forces Rain Around within five miles or when approaching',()=>{
  const f=make('Cloudy');
  f.current.radarPrecipitation={status:'ready',observedAt:new Date(now).toISOString(),atLocation:true,nearby:true,scanRadiusMiles:12};
- let sample=currentSample(f,now);assert.equal(sample.currentPrecipitation.label,'Rain on radar');assert.equal(sample.currentPrecipitation.active,true);assert.equal(sample.condition,'Rain');
- f.current.radarPrecipitation.atLocation=false;
+ let sample=currentSample(f,now);assert.equal(sample.currentPrecipitation.label,'Rain Around');assert.equal(sample.currentPrecipitation.active,true);assert.equal(sample.condition,'Rain Around');assert.equal(sample.rainAround,true);
+ f.current.radarPrecipitation={status:'ready',atLocation:false,close:true,nearby:true,nearestRainMiles:5};
+ sample=currentSample(f,now);assert.equal(sample.currentPrecipitation.label,'Rain Around');assert.equal(sample.currentPrecipitation.active,true);assert.equal(sample.condition,'Rain Around');
+ f.current.radarPrecipitation={status:'ready',atLocation:false,close:false,approaching:true,nearby:false,inArea:true,nearestRainMiles:18};
+ sample=currentSample(f,now);assert.equal(sample.currentPrecipitation.label,'Rain Around');assert.equal(sample.currentPrecipitation.active,true);assert.equal(sample.condition,'Rain Around');
+ f.current.radarPrecipitation={status:'ready',atLocation:false,close:false,approaching:false,nearby:true,nearestRainMiles:6};
  sample=currentSample(f,now);assert.equal(sample.currentPrecipitation.label,'Rain nearby');assert.equal(sample.currentPrecipitation.active,false);assert.equal(sample.currentPrecipitation.nearby,true);assert.equal(sample.condition,'Cloudy');
  f.current.radarPrecipitation={status:'ready',atLocation:false,nearby:false,inArea:true,nearestRainMiles:18,nearestRainDirection:'W',scanRadiusMiles:36};
  sample=currentSample(f,now);assert.equal(sample.currentPrecipitation.label,'Rain in area');assert.equal(sample.currentPrecipitation.active,false);assert.equal(sample.currentPrecipitation.inArea,true);assert.match(sample.currentPrecipitation.source,/18 miles west/);assert.equal(sample.condition,'Cloudy');
