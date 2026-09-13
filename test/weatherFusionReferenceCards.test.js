@@ -43,7 +43,8 @@ test('scene policy distinguishes fog, low rain chance, active rain and pre-sunri
  assert.equal(precipitationActivity('Rain',{pop:20}),'possible');
  assert.equal(precipitationActivity('Rain',{}),'active');
  assert.deepEqual(comfortSceneState(true,'Foggy',77,{pop:0}),{key:'fog',asset:'comfort-reference-scenes-fog.webp'});
- assert.deepEqual(comfortSceneState(true,'Slight Chance Thunderstorms',92,{pop:20}),{key:'watch',asset:'comfort-reference-scenes-watch.webp'});
+ assert.deepEqual(comfortSceneState(true,'Slight Chance Thunderstorms',92,{pop:20}),{key:'carry-umbrella',asset:'comfort-reference-scenes-carry-umbrella.svg'});
+ assert.deepEqual(comfortSceneState(true,'Chance Showers',70,{pop:49}),{key:'carry-umbrella',asset:'comfort-reference-scenes-carry-umbrella.svg'});
  assert.deepEqual(comfortSceneState(true,'Chance Thunderstorms',92,{pop:50}),{key:'umbrella',asset:'comfort-reference-scenes-umbrella.webp'});
  assert.deepEqual(comfortSceneState(true,'Chance Thunderstorms',92,{pop:61}),{key:'umbrella',asset:'comfort-reference-scenes-umbrella.webp'});
  assert.deepEqual(comfortSceneState(true,'Slight Chance Thunderstorms',92,{pop:70}),{key:'rain',asset:'comfort-reference-scenes-rain.webp'});
