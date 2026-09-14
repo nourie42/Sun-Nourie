@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#07111f">
+  <meta name="description" content="Create custom AI bots and let them talk to each other in roundtables, debates, and collaborative rooms.">
+  <title>AI Council · Bot Studio</title>
+  <style>
+    :root{
+      --bg:#07111f;--panel:#0d1a2b;--panel2:#102239;--line:#223651;--text:#f5f8fc;--muted:#9eb0c7;
+      --accent:#7dd3fc;--accent2:#a78bfa;--good:#86efac;--warn:#fde68a;--bad:#fca5a5;--shadow:0 24px 70px rgba(0,0,0,.34)
+    }
+    *{box-sizing:border-box}html{background:var(--bg)}
+    body{margin:0;min-height:100vh;color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:
+      radial-gradient(circle at 12% -8%,rgba(125,211,252,.14),transparent 33rem),radial-gradient(circle at 95% 5%,rgba(167,139,250,.13),transparent 31rem),linear-gradient(180deg,#07111f,#071522 55%,#06101b)}
+    button,input,textarea,select{font:inherit}button{cursor:pointer}a{color:inherit}.hidden{display:none!important}
+    .shell{width:min(1280px,calc(100% - 28px));margin:0 auto;padding:20px 0 72px}
+    .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+    .navgroup{display:flex;gap:9px;flex-wrap:wrap}.navlink{display:inline-flex;align-items:center;gap:7px;text-decoration:none;color:var(--muted);font-size:13px;font-weight:900;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:rgba(9,20,35,.76)}
+    .navlink.active,.navlink:hover{color:#fff;border-color:#47698e;background:#11263e}.secure{display:inline-flex;align-items:center;gap:7px;color:var(--muted);font-size:12px;font-weight:850}.secure:before{content:"";width:8px;height:8px;border-radius:50%;background:var(--good);box-shadow:0 0 16px rgba(134,239,172,.65)}
+    .hero{border:1px solid var(--line);border-radius:24px;padding:27px;background:linear-gradient(145deg,rgba(18,37,60,.96),rgba(10,23,40,.94));box-shadow:var(--shadow);position:relative;overflow:hidden}
+    .hero:after{content:"";position:absolute;right:-100px;bottom:-150px;width:380px;height:380px;border-radius:50%;background:radial-gradient(circle,rgba(167,139,250,.16),transparent 67%)}
+    .eyebrow{color:var(--accent);font-size:11px;font-weight:950;text-transform:uppercase;letter-spacing:.14em}.hero h1{margin:9px 0 10px;font-size:clamp(38px,6vw,66px);letter-spacing:-.05em;line-height:1}.hero p{margin:0;max-width:850px;color:#c1cee0;font-size:clamp(16px,2vw,19px);line-height:1.55}
+    .heroActions{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px;position:relative;z-index:2}.primary,.secondary,.danger,.ghost{border-radius:12px;padding:11px 15px;font-weight:900;border:1px solid transparent}.primary{color:#06101b;background:linear-gradient(135deg,#7dd3fc,#a78bfa);box-shadow:0 10px 24px rgba(125,211,252,.14)}.secondary{background:#122840;color:#e8f4ff;border-color:#34516f}.ghost{background:#0a1727;color:#aebed1;border-color:var(--line)}.danger{background:rgba(252,165,165,.08);color:#ffc5c5;border-color:rgba(252,165,165,.24)}.primary:disabled,.secondary:disabled,.ghost:disabled{opacity:.45;cursor:not-allowed}
+    .status{margin-top:14px;color:var(--muted);font-size:12px;position:relative;z-index:2}.status strong{color:#dbe9f8}.warning{margin-top:14px;border:1px solid rgba(253,230,138,.26);background:rgba(253,230,138,.08);color:#f3dfa2;border-radius:13px;padding:11px 13px;font-size:13px;line-height:1.45}
+    .section{margin-top:22px}.sectionHeader{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;margin-bottom:12px;flex-wrap:wrap}.sectionHeader h2{margin:0;font-size:26px;letter-spacing:-.035em}.sectionHeader p{margin:4px 0 0;color:var(--muted);font-size:13px}.sectionActions{display:flex;gap:8px;flex-wrap:wrap}
+    .layout{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(330px,.85fr);gap:14px}.panel{border:1px solid var(--line);border-radius:20px;background:linear-gradient(180deg,rgba(14,29,48,.97),rgba(9,21,37,.97));padding:17px;box-shadow:0 16px 44px rgba(0,0,0,.18)}
+    .botGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}.empty{grid-column:1/-1;border:1px dashed #304967;border-radius:16px;padding:28px 18px;text-align:center;color:var(--muted);background:#0a1727}.empty strong{display:block;color:#e2edf8;margin-bottom:6px}.botCard{border:1px solid var(--line);border-radius:16px;background:#0a1829;padding:14px;transition:.16s ease}.botCard.selected{border-color:#547ca7;box-shadow:inset 0 0 0 1px rgba(125,211,252,.08),0 10px 26px rgba(0,0,0,.18)}.botTop{display:flex;gap:10px;align-items:flex-start;justify-content:space-between}.botIdentity{display:flex;gap:10px;min-width:0}.avatar{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;font-size:12px;font-weight:950;background:linear-gradient(145deg,#183452,#33265a);border:1px solid #3a5472;flex:0 0 auto}.botName{font-weight:950;font-size:16px;line-height:1.2}.botRole{color:var(--muted);font-size:12px;margin-top:3px;line-height:1.35}.botProvider{margin-top:10px;display:inline-flex;align-items:center;gap:6px;border:1px solid #2a425f;border-radius:999px;padding:6px 8px;color:#b9cae0;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.05em}.botProvider:before{content:"";width:7px;height:7px;border-radius:50%;background:var(--good)}.botText{margin-top:10px;color:#9fb1c8;font-size:12px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}.botButtons{display:flex;gap:6px;margin-top:12px}.mini{border:1px solid var(--line);background:#0f2136;color:#bed0e4;border-radius:9px;padding:7px 9px;font-size:11px;font-weight:850}.selectBtn{margin-left:auto}.selectBtn.on{border-color:#557ca6;color:#dff4ff;background:#15304e}
+    .formTitle{font-size:18px;font-weight:950;margin-bottom:13px}.formGrid{display:grid;grid-template-columns:1fr 1fr;gap:11px}.field{display:flex;flex-direction:column;gap:6px}.field.full{grid-column:1/-1}.field label{color:#95a9c1;font-size:10px;font-weight:950;text-transform:uppercase;letter-spacing:.08em}.field input,.field select,.field textarea{width:100%;border:1px solid #29405d;border-radius:11px;background:#081524;color:#f4f8fc;padding:11px 12px;outline:0}.field input:focus,.field select:focus,.field textarea:focus{border-color:#4b7098;box-shadow:0 0 0 3px rgba(125,211,252,.07)}.field textarea{min-height:176px;resize:vertical;line-height:1.5}.help{font-size:11px;color:#7389a2;line-height:1.4}.formButtons{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+    .room{padding:18px}.roomGrid{display:grid;grid-template-columns:1fr 180px 130px;gap:11px}.roomTopic{grid-column:1/-1}.roomTopic textarea{min-height:115px}.checks{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-top:12px;color:#b2c2d5;font-size:12px}.check{display:flex;gap:7px;align-items:center}.check input{accent-color:#7dd3fc}.accessRow{display:grid;grid-template-columns:minmax(220px,360px) auto;gap:10px;align-items:end;margin-top:14px}.runBtn{min-height:44px}.selectedLine{margin-top:11px;color:#8ca1ba;font-size:11px}.selectedLine strong{color:#d7e6f5}
+    .conversation{display:none;margin-top:16px}.conversation.show{display:block}.roundLabel{text-align:center;margin:18px 0 10px;color:#728aa4;font-size:10px;text-transform:uppercase;letter-spacing:.12em;font-weight:950}.turn{display:grid;grid-template-columns:44px minmax(0,1fr);gap:10px;margin:10px 0}.turnAvatar{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(145deg,#173553,#34275f);border:1px solid #3b5677;font-size:11px;font-weight:950}.bubble{border:1px solid var(--line);border-radius:15px;background:#0a1829;padding:13px 14px}.bubble.failed{border-color:rgba(252,165,165,.25)}.bubbleHead{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:8px}.speaker{font-weight:950}.speakerMeta{color:#7f94ad;font-size:10px;margin-top:2px}.latency{color:#637991;font-size:10px}.turnText{white-space:pre-wrap;color:#cfdbeb;font-size:13.5px;line-height:1.6;overflow-wrap:anywhere}.turnText.error{color:var(--bad)}.sources{margin-top:11px;padding-top:9px;border-top:1px solid var(--line)}.sources a{display:block;color:#9edfff;font-size:11px;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:4px}.summary{margin-top:17px;border:1px solid #3b5b80;border-radius:17px;padding:17px;background:linear-gradient(145deg,#102844,#151f39)}.summary h3{margin:0 0 9px;font-size:19px}.summaryText{white-space:pre-wrap;color:#dbe7f5;font-size:13.5px;line-height:1.6}.roomFooter{margin-top:11px;text-align:center;color:#6d8299;font-size:10px}
+    .fileInput{display:none}
+    @media(max-width:920px){.layout{grid-template-columns:1fr}.botGrid{grid-template-columns:1fr 1fr}.roomGrid{grid-template-columns:1fr 1fr}.roomTopic{grid-column:1/-1}}
+    @media(max-width:650px){.shell{width:min(100% - 18px,1280px);padding-top:12px}.hero{padding:20px;border-radius:19px}.hero h1{font-size:43px}.botGrid{grid-template-columns:1fr}.formGrid,.roomGrid,.accessRow{grid-template-columns:1fr}.roomTopic{grid-column:1}.turn{grid-template-columns:36px minmax(0,1fr)}.turnAvatar{width:34px;height:34px;border-radius:10px}.panel{padding:14px}.sectionHeader h2{font-size:23px}.primary,.secondary,.ghost,.danger{padding:10px 12px}}
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <div class="topbar">
+      <div class="navgroup">
+        <a class="navlink" href="/">← Fuel IQ</a>
+        <a class="navlink" href="/ai-council/">AI Council</a>
+        <a class="navlink active" href="/ai-council/bots/">Bot Studio</a>
+      </div>
+      <div class="secure">API keys stay on the server</div>
+    </div>
+
+    <section class="hero">
+      <div class="eyebrow">Reusable AI personalities + multi-bot rooms</div>
+      <h1>Bot Studio</h1>
+      <p>Create your own bots with different jobs and personalities, choose which AI powers each one, then put them in a room where they can challenge, respond to, and build on each other's ideas.</p>
+      <div class="heroActions">
+        <button class="primary" id="newBotBtn" type="button">+ Create Bot</button>
+        <button class="secondary" id="starterBtn" type="button">Create Starter Team</button>
+        <button class="ghost" id="exportBtn" type="button">Export Bots</button>
+        <button class="ghost" id="importBtn" type="button">Import Bots</button>
+        <input class="fileInput" id="importFile" type="file" accept="application/json,.json">
+      </div>
+      <div class="status" id="statusText">Checking available AI providers…</div>
+      <div class="warning hidden" id="warningBox"></div>
+    </section>
+
+    <section class="section">
+      <div class="sectionHeader">
+        <div><h2>Your Bots</h2><p>Saved locally in this browser. Select bots here to add them to the room below.</p></div>
+        <div class="sectionActions"><button class="ghost" id="clearSelectionBtn" type="button">Clear Room Selection</button></div>
+      </div>
+      <div class="layout">
+        <div class="panel"><div class="botGrid" id="botGrid"></div></div>
+        <div class="panel" id="editorPanel">
+          <div class="formTitle" id="formTitle">Create a Bot</div>
+          <div class="formGrid">
+            <div class="field full"><label for="botName">Bot name</label><input id="botName" maxlength="60" placeholder="Example: Deal Skeptic"></div>
+            <div class="field"><label for="botRole">Role</label><input id="botRole" maxlength="180" placeholder="Example: Critical deal reviewer"></div>
+            <div class="field"><label for="botProvider">AI provider</label><select id="botProvider"></select></div>
+            <div class="field full"><label for="botInstructions">Custom instructions</label><textarea id="botInstructions" maxlength="3500" placeholder="Tell this bot exactly how to think, what to focus on, what to avoid, how detailed to be, and how it should interact with other bots."></textarea><div class="help">These instructions are sent only when this bot speaks. The bot will also see the room topic and the conversation so far.</div></div>
+          </div>
+          <div class="formButtons"><button class="ghost" id="cancelEditBtn" type="button">Clear</button><button class="primary" id="saveBotBtn" type="button">Save Bot</button></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="sectionHeader"><div><h2>Bot Room</h2><p>Pick at least two bots. Each bot hears the bots before it and can respond directly.</p></div></div>
+      <div class="panel room">
+        <div class="roomGrid">
+          <div class="field roomTopic"><label for="roomTopic">What should the bots discuss?</label><textarea id="roomTopic" maxlength="6000" placeholder="Example: Compare these three acquisition targets and decide which one deserves deeper diligence. Challenge each other's assumptions before reaching a conclusion."></textarea></div>
+          <div class="field"><label for="roomMode">Conversation mode</label><select id="roomMode"><option value="roundtable">Roundtable</option><option value="debate">Debate</option><option value="collaborate">Collaborate</option></select></div>
+          <div class="field"><label for="roomRounds">Rounds</label><select id="roomRounds"><option value="1">1 round</option><option value="2" selected>2 rounds</option><option value="3">3 rounds</option></select></div>
+          <div class="field"><label for="roomSummary">Moderator</label><select id="roomSummary"><option value="yes" selected>Final summary</option><option value="no">No summary</option></select></div>
+        </div>
+        <div class="checks"><label class="check"><input type="checkbox" id="autoScroll" checked> Auto-scroll as results appear</label></div>
+        <div class="accessRow"><div class="field"><label for="accessCode">Owner access code</label><input id="accessCode" type="password" autocomplete="off" placeholder="Same code as AI Council"></div><button class="primary runBtn" id="runRoomBtn" type="button">Start Bot Room</button></div>
+        <div class="selectedLine" id="selectedLine">No bots selected.</div>
+        <div class="conversation" id="conversation"><div id="turns"></div><div class="summary hidden" id="summaryBox"><h3>Moderator Summary</h3><div class="summaryText" id="summaryText"></div></div><div class="roomFooter" id="roomFooter"></div></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const STORAGE_KEY='ai-council-bots-v1';
+    const SELECTED_KEY='ai-council-selected-bots-v1';
+    const providerLabels={openai:'OpenAI',anthropic:'Claude',gemini:'Gemini',xai:'Grok',perplexity:'Perplexity'};
+    const els={
+      statusText:document.getElementById('statusText'),warningBox:document.getElementById('warningBox'),newBotBtn:document.getElementById('newBotBtn'),starterBtn:document.getElementById('starterBtn'),exportBtn:document.getElementById('exportBtn'),importBtn:document.getElementById('importBtn'),importFile:document.getElementById('importFile'),clearSelectionBtn:document.getElementById('clearSelectionBtn'),botGrid:document.getElementById('botGrid'),formTitle:document.getElementById('formTitle'),botName:document.getElementById('botName'),botRole:document.getElementById('botRole'),botProvider:document.getElementById('botProvider'),botInstructions:document.getElementById('botInstructions'),cancelEditBtn:document.getElementById('cancelEditBtn'),saveBotBtn:document.getElementById('saveBotBtn'),roomTopic:document.getElementById('roomTopic'),roomMode:document.getElementById('roomMode'),roomRounds:document.getElementById('roomRounds'),roomSummary:document.getElementById('roomSummary'),accessCode:document.getElementById('accessCode'),runRoomBtn:document.getElementById('runRoomBtn'),selectedLine:document.getElementById('selectedLine'),conversation:document.getElementById('conversation'),turns:document.getElementById('turns'),summaryBox:document.getElementById('summaryBox'),summaryText:document.getElementById('summaryText'),roomFooter:document.getElementById('roomFooter'),autoScroll:document.getElementById('autoScroll')
+    };
+    let providers=[];let bots=loadBots();let selected=new Set(loadSelected());let editingId=null;let running=false;let enabled=false;
+    try{els.accessCode.value=sessionStorage.getItem('ai-council-access')||''}catch{}
+
+    function uid(){return `bot-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`}
+    function safeArray(value){return Array.isArray(value)?value:[]}
+    function loadBots(){try{const parsed=JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]');return safeArray(parsed).filter(b=>b&&b.id&&b.name&&b.provider).slice(0,50)}catch{return[]}}
+    function loadSelected(){try{return safeArray(JSON.parse(localStorage.getItem(SELECTED_KEY)||'[]'))}catch{return[]}}
+    function saveState(){localStorage.setItem(STORAGE_KEY,JSON.stringify(bots));localStorage.setItem(SELECTED_KEY,JSON.stringify([...selected]));}
+    function configuredProviders(){return providers.filter(p=>p.configured)}
+    function providerFor(...ids){const available=configuredProviders();for(const id of ids){const match=available.find(p=>p.id===id);if(match)return match.id}return available[0]?.id||''}
+    function initials(name){return String(name||'B').split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toUpperCase()}
+    function setWarning(text){els.warningBox.textContent=text||'';els.warningBox.classList.toggle('hidden',!text)}
+    function setStatus(html){els.statusText.innerHTML=html}
+    function resetEditor(){editingId=null;els.formTitle.textContent='Create a Bot';els.botName.value='';els.botRole.value='';els.botInstructions.value='';if(els.botProvider.options.length)els.botProvider.selectedIndex=0}
+    function populateProviderSelect(){els.botProvider.replaceChildren();for(const p of configuredProviders()){const option=document.createElement('option');option.value=p.id;option.textContent=`${p.label} · ${p.model}`;els.botProvider.append(option)}if(!els.botProvider.options.length){const option=document.createElement('option');option.value='';option.textContent='No providers configured';els.botProvider.append(option)}els.saveBotBtn.disabled=!configuredProviders().length}
+
+    function renderBots(){
+      selected=new Set([...selected].filter(id=>bots.some(b=>b.id===id)));saveState();els.botGrid.replaceChildren();
+      if(!bots.length){const empty=document.createElement('div');empty.className='empty';empty.innerHTML='<strong>No bots yet</strong>Create one from the editor or use “Create Starter Team” to make three useful bots automatically.';els.botGrid.append(empty)}
+      for(const bot of bots){
+        const card=document.createElement('article');card.className=`botCard${selected.has(bot.id)?' selected':''}`;
+        const top=document.createElement('div');top.className='botTop';const identity=document.createElement('div');identity.className='botIdentity';const avatar=document.createElement('div');avatar.className='avatar';avatar.textContent=initials(bot.name);const info=document.createElement('div');const name=document.createElement('div');name.className='botName';name.textContent=bot.name;const role=document.createElement('div');role.className='botRole';role.textContent=bot.role||'General expert';info.append(name,role);identity.append(avatar,info);top.append(identity);card.append(top);
+        const provider=document.createElement('div');provider.className='botProvider';provider.textContent=providerLabels[bot.provider]||bot.provider;card.append(provider);const text=document.createElement('div');text.className='botText';text.textContent=bot.instructions;card.append(text);
+        const buttons=document.createElement('div');buttons.className='botButtons';const edit=document.createElement('button');edit.className='mini';edit.type='button';edit.textContent='Edit';edit.onclick=()=>editBot(bot.id);const del=document.createElement('button');del.className='mini';del.type='button';del.textContent='Delete';del.onclick=()=>deleteBot(bot.id);const select=document.createElement('button');select.className=`mini selectBtn${selected.has(bot.id)?' on':''}`;select.type='button';select.textContent=selected.has(bot.id)?'✓ In Room':'+ Add to Room';select.onclick=()=>toggleSelected(bot.id);buttons.append(edit,del,select);card.append(buttons);els.botGrid.append(card)
+      }
+      renderSelectedLine();
+    }
+
+    function renderSelectedLine(){const chosen=bots.filter(b=>selected.has(b.id));els.selectedLine.innerHTML=chosen.length?`<strong>${chosen.length} selected:</strong> ${chosen.map(b=>escapeHtml(b.name)).join(' · ')}`:'No bots selected.';els.runRoomBtn.disabled=running||!enabled||chosen.length<2}
+    function escapeHtml(text){return String(text).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+    function toggleSelected(id){selected.has(id)?selected.delete(id):selected.add(id);saveState();renderBots()}
+    function editBot(id){const bot=bots.find(b=>b.id===id);if(!bot)return;editingId=id;els.formTitle.textContent=`Edit ${bot.name}`;els.botName.value=bot.name;els.botRole.value=bot.role||'';els.botInstructions.value=bot.instructions||'';els.botProvider.value=bot.provider;document.getElementById('editorPanel').scrollIntoView({behavior:'smooth',block:'center'})}
+    function deleteBot(id){const bot=bots.find(b=>b.id===id);if(!bot||!confirm(`Delete ${bot.name}?`))return;bots=bots.filter(b=>b.id!==id);selected.delete(id);if(editingId===id)resetEditor();saveState();renderBots()}
+    function saveBot(){const name=els.botName.value.trim();const role=els.botRole.value.trim();const provider=els.botProvider.value;const instructions=els.botInstructions.value.trim();if(!name)return setWarning('Give the bot a name first.');if(!provider)return setWarning('No AI provider is available for this bot yet.');if(!instructions)return setWarning('Add custom instructions so the bot knows how it should behave.');setWarning('');const record={id:editingId||uid(),name:name.slice(0,60),role:(role||'General expert').slice(0,180),provider,instructions:instructions.slice(0,3500)};const idx=bots.findIndex(b=>b.id===record.id);if(idx>=0)bots[idx]=record;else bots.unshift(record);saveState();resetEditor();renderBots()}
+
+    function createStarterTeam(){
+      if(!configuredProviders().length)return setWarning('Configure at least one AI provider first.');
+      const starter=[
+        {name:'Researcher',role:'Evidence finder and fact checker',provider:providerFor('perplexity','gemini','openai','anthropic','xai'),instructions:'Find the strongest factual basis for the topic. Separate known facts from assumptions, surface missing information, and cite sources when your provider supplies them. When another bot makes a claim, test whether the evidence actually supports it.'},
+        {name:'Skeptic',role:'Critical reviewer and red-team analyst',provider:providerFor('openai','anthropic','gemini','xai','perplexity'),instructions:'Look for weak assumptions, overconfidence, missing alternatives, hidden costs, and downside risk. Challenge the other bots directly but fairly. Do not disagree for the sake of disagreeing; acknowledge strong arguments when they hold up.'},
+        {name:'Strategist',role:'Decision maker and practical synthesizer',provider:providerFor('anthropic','openai','gemini','xai','perplexity'),instructions:'Turn the discussion into a practical decision. Weigh evidence, tradeoffs, timing, risk, and next actions. Build on good points from the other bots and push the room toward a clear recommendation without hiding uncertainty.'}
+      ].map(x=>({...x,id:uid()}));
+      bots=[...starter,...bots];starter.forEach(b=>selected.add(b.id));saveState();renderBots();setWarning('');
+    }
+
+    function exportBots(){const blob=new Blob([JSON.stringify({version:1,exportedAt:new Date().toISOString(),bots},null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='ai-council-bots.json';document.body.append(a);a.click();a.remove();URL.revokeObjectURL(url)}
+    async function importBots(file){try{const data=JSON.parse(await file.text());const incoming=safeArray(data.bots||data).filter(b=>b&&b.name&&b.provider&&b.instructions).map(b=>({id:uid(),name:String(b.name).slice(0,60),role:String(b.role||'General expert').slice(0,180),provider:String(b.provider),instructions:String(b.instructions).slice(0,3500)}));if(!incoming.length)throw new Error('No valid bots found');bots=[...incoming,...bots].slice(0,50);saveState();renderBots();setWarning(`${incoming.length} bot${incoming.length===1?'':'s'} imported.`)}catch(e){setWarning(`Import failed: ${e.message||'invalid file'}`)}}
+
+    function renderConversation(data){
+      els.turns.replaceChildren();let lastRound=0;for(const turn of data.turns||[]){if(turn.round!==lastRound){lastRound=turn.round;const label=document.createElement('div');label.className='roundLabel';label.textContent=`Round ${turn.round}`;els.turns.append(label)}const row=document.createElement('article');row.className='turn';const avatar=document.createElement('div');avatar.className='turnAvatar';avatar.textContent=initials(turn.name);const bubble=document.createElement('div');bubble.className=`bubble${turn.ok?'':' failed'}`;const head=document.createElement('div');head.className='bubbleHead';const left=document.createElement('div');const speaker=document.createElement('div');speaker.className='speaker';speaker.textContent=turn.name;const meta=document.createElement('div');meta.className='speakerMeta';meta.textContent=`${turn.role} · ${turn.providerLabel} · ${turn.model}`;left.append(speaker,meta);const latency=document.createElement('div');latency.className='latency';latency.textContent=`${(turn.latencyMs/1000).toFixed(1)}s`;head.append(left,latency);const text=document.createElement('div');text.className=`turnText${turn.ok?'':' error'}`;text.textContent=turn.ok?turn.text:(turn.error||'Bot failed to answer');bubble.append(head,text);if(Array.isArray(turn.citations)&&turn.citations.length){const sources=document.createElement('div');sources.className='sources';turn.citations.forEach((url,i)=>{const a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener noreferrer';a.textContent=`Source ${i+1}: ${url}`;sources.append(a)});bubble.append(sources)}row.append(avatar,bubble);els.turns.append(row)}
+      const summary=data.summary?.text||'';els.summaryText.textContent=summary;els.summaryBox.classList.toggle('hidden',!summary);els.roomFooter.textContent=`${data.successfulTurns} of ${data.totalTurns} bot turns completed in ${(data.totalLatencyMs/1000).toFixed(1)} seconds.`;els.conversation.classList.add('show');if(els.autoScroll.checked)els.conversation.scrollIntoView({behavior:'smooth',block:'start'})
+    }
+
+    async function runRoom(){
+      const chosen=bots.filter(b=>selected.has(b.id));const topic=els.roomTopic.value.trim();const code=els.accessCode.value.trim();if(chosen.length<2)return setWarning('Select at least two bots for the room.');if(!topic)return setWarning('Enter a topic for the bots to discuss.');if(!code)return setWarning('Enter the owner access code.');const turns=chosen.length*Number(els.roomRounds.value);if(turns>12)return setWarning(`That room would use ${turns} AI turns. With the current safe limit, use fewer bots or fewer rounds.`);
+      try{sessionStorage.setItem('ai-council-access',code)}catch{}setWarning('');running=true;renderSelectedLine();els.runRoomBtn.textContent='Bots are talking…';els.conversation.classList.remove('show');setStatus(`<strong>Room running:</strong> ${chosen.length} bots · ${els.roomRounds.value} round${els.roomRounds.value==='1'?'':'s'} · ${turns} AI turns`);
+      try{const response=await fetch('/api/ai-council/bots/run',{method:'POST',headers:{'Content-Type':'application/json','x-ai-council-code':code},body:JSON.stringify({topic,bots:chosen,mode:els.roomMode.value,rounds:Number(els.roomRounds.value),includeSummary:els.roomSummary.value==='yes'})});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||`Request failed (${response.status})`);renderConversation(data);setStatus(`<strong>Room complete.</strong> ${data.successfulTurns} successful turns.`)}catch(e){setWarning(e.message||'The bot room failed to run.');setStatus('Bot room stopped.')}finally{running=false;els.runRoomBtn.textContent='Start Bot Room';renderSelectedLine()}
+    }
+
+    async function loadStatus(){
+      try{const response=await fetch('/api/ai-council/status',{cache:'no-store'});const data=await response.json();providers=data.providers||[];enabled=Boolean(data.enabled);populateProviderSelect();const count=configuredProviders().length;setStatus(`<strong>${count} of ${providers.length}</strong> AI providers connected for Bot Studio.`);if(!enabled)setWarning('Owner setup is not finished. Add AI_COUNCIL_ACCESS_CODE to the server environment before paid bot conversations can run.');else if(!count)setWarning('No AI provider API keys are configured yet. You can design bots now, but they cannot speak until at least one provider is connected.');renderBots()}catch{enabled=false;populateProviderSelect();setWarning('Could not load the AI provider status from the server.');setStatus('Provider check failed.');renderBots()}
+    }
+
+    els.newBotBtn.onclick=()=>{resetEditor();document.getElementById('editorPanel').scrollIntoView({behavior:'smooth',block:'center'});els.botName.focus()};
+    els.starterBtn.onclick=createStarterTeam;els.exportBtn.onclick=exportBots;els.importBtn.onclick=()=>els.importFile.click();els.importFile.onchange=()=>{const file=els.importFile.files?.[0];if(file)importBots(file);els.importFile.value=''};els.clearSelectionBtn.onclick=()=>{selected.clear();saveState();renderBots()};els.cancelEditBtn.onclick=resetEditor;els.saveBotBtn.onclick=saveBot;els.runRoomBtn.onclick=runRoom;
+    loadStatus();
+  </script>
+</body>
+</html>
