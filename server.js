@@ -16,6 +16,7 @@ import { registerSiteResearchReportEnhancements } from "./src/siteResearchReport
 import { registerFuelAtlasRoutes } from "./src/fuelAtlasRoutes.js";
 import { registerFuelAtlasLocationCompanyBridge } from "./src/fuelAtlasLocationCompanyBridge.js";
 import { registerWeatherFusionRoutes } from "./src/weatherFusion.js";
+import { registerAiCouncilRoutes } from "./src/aiCouncil.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -78,6 +79,7 @@ registerSiteEnhancementRoutes(app, {
 registerFuelAtlasLocationCompanyBridge(app);
 registerFuelAtlasRoutes(app, { googleApiKey: process.env.GOOGLE_API_KEY || "" });
 registerWeatherFusionRoutes(app);
+registerAiCouncilRoutes(app);
 
 app.get("/fuel-atlas", (_req, res) => res.redirect(302, "/fuel-atlas.html"));
 app.get("/fuel-atlas.html", (_req, res) => {
@@ -202,6 +204,7 @@ app.get("/health", (_req, res) => {
     wordSourceTableMarginFix: true,
     basicWordMarginFix: true,
     webSearchJsonModeCompatibility: true,
+    aiCouncil: true,
     legacyServerReady: legacyReady,
   });
 });
@@ -274,7 +277,7 @@ function proxyToLegacy(req, res) {
 app.use(proxyToLegacy);
 
 const server = app.listen(publicPort, "0.0.0.0", () => {
-  console.log(`Fuel IQ gateway with server-rendered Site Analyzer, Fuel Distributor Atlas, expanded AADT coverage, 1.5-mile competition verification, Word export, Distributor Intelligence, and multi-pass Site Research listening on :${publicPort}`);
+  console.log(`Fuel IQ gateway with server-rendered Site Analyzer, Fuel Distributor Atlas, expanded AADT coverage, 1.5-mile competition verification, Word export, Distributor Intelligence, AI Council, and multi-pass Site Research listening on :${publicPort}`);
 });
 
 function shutdown(signal) {
