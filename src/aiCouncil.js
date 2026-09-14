@@ -331,6 +331,9 @@ export function registerAiCouncilRoutes(app) {
     });
   });
 
-  app.get("/ai-council", (_req, res) => res.redirect(302, "/ai-council/"));
-  app.use("/ai-council", express.static(publicDir, { index: "index.html", maxAge: 0, etag: true }));
+  app.get(["/ai-council", "/ai-council/"], (_req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    res.sendFile(path.join(publicDir, "index.html"));
+  });
+  app.use("/ai-council", express.static(publicDir, { index: false, redirect: false, maxAge: 0, etag: true }));
 }
