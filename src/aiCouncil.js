@@ -54,6 +54,24 @@ function rateLimit(req) {
   return { allowed: true, remaining: limit - bucket.count };
 }
 
+function requireCouncilAccess(req, res, accessCode) {
+  if (!accessCode) {
+    res.status(503).json({ ok: false, error: "AI Council is locked until AI_COUNCIL_ACCESS_CODE is configured on the server." });
+    return false;
+  }
+  if (cleanText(req.headers["x-ai-council-code"], 200) !== accessCode) {
+    res.status(401).json({ ok: false, error: "Incorrect AI Council access code." });
+    return false;
+  }
+  const limiter = rateLimit(req);
+  res.setHeader("X-AI-Council-Remaining", String(limiter.remaining));
+  if (!limiter.allowed) {
+    res.status(429).json({ ok: false, error: "AI Council hourly request limit reached. Try again later." });
+    return false;
+  }
+  return true;
+}
+
 async function fetchJson(url, init, timeoutMs = 90000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -232,8 +250,50 @@ async function buildVerdict(question, answers) {
   return { text: result.text || "Council synthesis returned no text.", chair };
 }
 
+function normalizeBot(raw, index) {
+  const id = cleanText(raw?.id, 80) || `bot-${index + 1}`;
+  const name = cleanText(raw?.name, 60) || `Bot ${index + 1}`;
+  const role = cleanText(raw?.role, 180) || "General expert";
+  const instructions = cleanText(raw?.instructions, 3500) || "Give useful, accurate answers and engage constructively with the other bots.";
+  const provider = cleanText(raw?.provider, 30).toLowerCase();
+  if (!PROVIDERS.some((item) => item.id === provider)) return null;
+  return { id, name, role, instructions, provider };
+}
+
+function roomModeInstruction(mode) {
+  if (mode === "debate") {
+    return "This is a debate. Challenge weak assumptions, identify evidence gaps, directly address other bots' claims, and change your view when another bot makes a stronger case.";
+  }
+  if (mode === "collaborate") {
+    return "This is a collaboration. Build on useful ideas from other bots, resolve disagreements, divide the problem into parts when helpful, and work toward a stronger shared solution.";
+  }
+  return "This is a roundtable. Add a distinct useful perspective, respond to important points raised by other bots, and avoid repeating what has already been said.";
+}
+
+function transcriptForPrompt(turns, maxChars = 22000) {
+  const text = turns.map((turn) => `${turn.name}: ${turn.text}`).join("\n\n");
+  return text.length > maxChars ? text.slice(text.length - maxChars) : text;
+}
+
+async function summarizeBotRoom(topic, mode, turns) {
+  const chairOrder = ["openai", "anthropic", "gemini", "xai"].filter((id) => providerKey(id));
+  const chair = chairOrder[0];
+  if (!chair || turns.length < 2) return { text: "", chair: null };
+
+  const system = [
+    "You are the moderator of a multi-bot discussion.",
+    "Summarize the strongest conclusions from the transcript without pretending consensus exists when it does not.",
+    "Separate agreement from unresolved disagreement and call out anything that still needs verification.",
+    "Do not invent claims that were not present in the room.",
+    "Use the headings: Room Conclusion, Strongest Points, Remaining Disagreements, What To Do Next.",
+  ].join(" ");
+  const prompt = `Topic:\n${topic}\n\nRoom mode: ${mode}\n\nTranscript:\n${transcriptForPrompt(turns, 28000)}`;
+  const result = await callProvider(chair, prompt, system, 1200);
+  return { text: result.text || "", chair };
+}
+
 export function registerAiCouncilRoutes(app) {
-  const json = express.json({ limit: "40kb" });
+  const json = express.json({ limit: "80kb" });
   const accessCode = cleanText(process.env.AI_COUNCIL_ACCESS_CODE, 200);
 
   app.get("/api/ai-council/status", (_req, res) => {
@@ -245,24 +305,13 @@ export function registerAiCouncilRoutes(app) {
       accessRequired: true,
       providers,
       configuredCount: providers.filter((provider) => provider.configured).length,
+      botStudio: true,
     });
   });
 
   app.post("/api/ai-council/ask", json, async (req, res) => {
     res.setHeader("Cache-Control", "no-store");
-
-    if (!accessCode) {
-      return res.status(503).json({ ok: false, error: "AI Council is locked until AI_COUNCIL_ACCESS_CODE is configured on the server." });
-    }
-    if (cleanText(req.headers["x-ai-council-code"], 200) !== accessCode) {
-      return res.status(401).json({ ok: false, error: "Incorrect AI Council access code." });
-    }
-
-    const limiter = rateLimit(req);
-    res.setHeader("X-AI-Council-Remaining", String(limiter.remaining));
-    if (!limiter.allowed) {
-      return res.status(429).json({ ok: false, error: "AI Council hourly request limit reached. Try again later." });
-    }
+    if (!requireCouncilAccess(req, res, accessCode)) return;
 
     const question = cleanText(req.body?.question, 6000);
     if (question.length < 2) return res.status(400).json({ ok: false, error: "Enter a question first." });
@@ -331,9 +380,131 @@ export function registerAiCouncilRoutes(app) {
     });
   });
 
+  app.post("/api/ai-council/bots/run", json, async (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    if (!requireCouncilAccess(req, res, accessCode)) return;
+
+    const topic = cleanText(req.body?.topic, 6000);
+    if (topic.length < 2) return res.status(400).json({ ok: false, error: "Enter a room topic first." });
+
+    const rawBots = Array.isArray(req.body?.bots) ? req.body.bots.slice(0, 6) : [];
+    const bots = rawBots.map(normalizeBot).filter(Boolean);
+    if (bots.length < 2) return res.status(400).json({ ok: false, error: "Choose at least two valid bots for the room." });
+
+    const unavailable = bots.filter((bot) => !providerKey(bot.provider));
+    if (unavailable.length) {
+      return res.status(400).json({
+        ok: false,
+        error: `These bots use providers that are not configured: ${unavailable.map((bot) => bot.name).join(", ")}.`,
+      });
+    }
+
+    const mode = ["roundtable", "debate", "collaborate"].includes(req.body?.mode) ? req.body.mode : "roundtable";
+    const rounds = Math.max(1, Math.min(3, Number(req.body?.rounds || 2)));
+    const includeSummary = req.body?.includeSummary !== false;
+    const maxTurns = Math.max(4, Math.min(18, Number(process.env.AI_COUNCIL_BOT_MAX_TURNS || 12)));
+    const requestedTurns = bots.length * rounds;
+    if (requestedTurns > maxTurns) {
+      return res.status(400).json({
+        ok: false,
+        error: `This room would use ${requestedTurns} AI turns. The server limit is ${maxTurns}. Use fewer bots or fewer rounds.`,
+      });
+    }
+
+    const roomInstruction = roomModeInstruction(mode);
+    const turns = [];
+    const startedAt = Date.now();
+
+    for (let round = 1; round <= rounds; round += 1) {
+      for (const bot of bots) {
+        const transcript = transcriptForPrompt(turns);
+        const system = [
+          `You are ${bot.name}, a reusable custom bot participating in a multi-bot room.`,
+          `Your role: ${bot.role}.`,
+          `Your custom instructions: ${bot.instructions}`,
+          roomInstruction,
+          "Stay in your assigned role while remaining factual and useful.",
+          "You may address other bots by name and explicitly agree, disagree, refine, or build on their points.",
+          "Do not impersonate other bots, fabricate statements they did not make, or claim private communication with them.",
+          "Avoid repeating the transcript. Focus on the most valuable next contribution.",
+        ].join(" ");
+        const prompt = [
+          `Room topic:\n${topic}`,
+          `Round ${round} of ${rounds}.`,
+          transcript ? `Conversation so far:\n${transcript}` : "You are opening the discussion; no bot has spoken yet.",
+          `It is now ${bot.name}'s turn. Respond to the room in your own voice.`,
+        ].join("\n\n");
+
+        const turnStarted = Date.now();
+        try {
+          const result = await callProvider(bot.provider, prompt, system, 900);
+          const text = cleanText(result.text, 16000);
+          if (!text) throw new Error("No text returned");
+          turns.push({
+            round,
+            botId: bot.id,
+            name: bot.name,
+            role: bot.role,
+            provider: bot.provider,
+            providerLabel: PROVIDERS.find((item) => item.id === bot.provider)?.label || bot.provider,
+            model: providerModel(bot.provider),
+            text,
+            citations: result.citations || [],
+            latencyMs: Date.now() - turnStarted,
+            ok: true,
+          });
+        } catch (error) {
+          console.error(`AI Council bot ${bot.name} failed:`, error?.message || error);
+          turns.push({
+            round,
+            botId: bot.id,
+            name: bot.name,
+            role: bot.role,
+            provider: bot.provider,
+            providerLabel: PROVIDERS.find((item) => item.id === bot.provider)?.label || bot.provider,
+            model: providerModel(bot.provider),
+            text: "",
+            citations: [],
+            latencyMs: Date.now() - turnStarted,
+            ok: false,
+            error: `Bot response failed${error?.name === "AbortError" ? " (timeout)" : ""}`,
+          });
+        }
+      }
+    }
+
+    let summary = { text: "", chair: null };
+    if (includeSummary) {
+      try {
+        summary = await summarizeBotRoom(topic, mode, turns.filter((turn) => turn.ok));
+      } catch (error) {
+        console.error("AI Council bot-room summary failed:", error?.message || error);
+        summary = { text: "The bots finished talking, but the moderator summary could not be generated.", chair: null };
+      }
+    }
+
+    const successfulTurns = turns.filter((turn) => turn.ok).length;
+    return res.json({
+      ok: successfulTurns > 0,
+      topic,
+      mode,
+      rounds,
+      bots: bots.map((bot) => ({ ...bot, model: providerModel(bot.provider) })),
+      turns,
+      summary,
+      successfulTurns,
+      totalTurns: turns.length,
+      totalLatencyMs: Date.now() - startedAt,
+    });
+  });
+
   app.get(["/ai-council", "/ai-council/"], (_req, res) => {
     res.setHeader("Cache-Control", "no-store");
     res.sendFile(path.join(publicDir, "index.html"));
+  });
+  app.get(["/ai-council/bots", "/ai-council/bots/"], (_req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    res.sendFile(path.join(publicDir, "bots.html"));
   });
   app.use("/ai-council", express.static(publicDir, { index: false, redirect: false, maxAge: 0, etag: true }));
 }
