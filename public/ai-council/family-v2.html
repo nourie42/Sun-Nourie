@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0d0d0f">
+  <meta name="color-scheme" content="dark">
+  <title>Family AI</title>
+  <link rel="stylesheet" href="/ai-council/ai-v2.css?v=1">
+</head>
+<body>
+<section class="lock-screen" id="lockScreen">
+  <div class="lock-card">
+    <div class="ai-orb">AI</div>
+    <h1 id="lockTitle">Private AI</h1>
+    <p id="lockText">Your secret key protects your bots and chats on this device.</p>
+    <div id="setupBox" class="hidden">
+      <div class="field"><label>Create your secret key</label><input id="setupSecret" type="password" autocomplete="new-password"></div>
+      <div class="field"><label>Type it again</label><input id="setupConfirm" type="password" autocomplete="new-password"></div>
+      <div class="field"><label>Family setup code · one time</label><input id="ownerCode" type="password" autocomplete="off"></div>
+      <div class="actions"><button class="primary" id="createVaultBtn" type="button">Create My AI</button></div>
+    </div>
+    <div id="unlockBox" class="hidden">
+      <div class="field"><label>Secret key</label><input id="unlockSecret" type="password" autocomplete="current-password"></div>
+      <div class="actions"><button class="primary" id="unlockBtn" type="button">Unlock</button></div>
+    </div>
+    <div id="lockNotice"></div>
+    <div class="actions"><button class="secondary" id="restoreLockBtn" type="button">Restore Backup</button><input id="restoreFile" type="file" accept="application/json,.json" hidden></div>
+  </div>
+</section>
+
+<div class="ai-app hidden" id="workspace">
+  <main class="ai-shell">
+    <header class="ai-header">
+      <div class="brand-wrap"><div class="ai-orb" id="memberOrb">AI</div><div><div class="brand-title" id="memberTitle">My AI</div><div class="brand-sub" id="memberStatus">Connecting…</div></div></div>
+      <div class="header-actions"><button class="pill-btn" id="lockBtn" type="button">Lock</button></div>
+    </header>
+    <nav class="family-nav">
+      <button class="active" data-family-view="chat" type="button">💬 Chat</button>
+      <button data-family-view="bots" type="button">🤖 My Bots</button>
+      <button data-family-view="council" type="button">☷ Council</button>
+      <button data-family-view="settings" type="button">⚙ Settings</button>
+    </nav>
+
+    <section class="panel active" id="familyChatPanel">
+      <div class="chat-empty" id="familyEmpty"><div class="mark">✦</div><h1>How can I help?</h1><p>Choose an AI, or let us pick the best one for you.</p></div>
+      <div class="messages" id="familyMessages"></div>
+    </section>
+
+    <section class="panel" id="familyBotsPanel">
+      <div class="page-nav"><button class="back-btn" data-back-chat type="button">← Back to Chat</button><button id="familyAddBotBtn" type="button">＋ Create Bot</button></div>
+      <div class="bot-list" id="familyBotList"></div>
+    </section>
+
+    <section class="panel" id="familyBotChatPanel">
+      <div class="page-nav"><button class="back-btn" id="backToFamilyBotsBtn" type="button">← My Bots</button><button data-back-chat type="button">AI Chat</button></div>
+      <div class="section-card"><h2 id="familyBotChatTitle">Bot</h2><p id="familyBotChatSub"></p><div id="familyBotToolBadges" class="tool-badges"></div></div>
+      <div class="messages" id="familyBotMessages"></div>
+    </section>
+
+    <section class="panel" id="familyCouncilPanel">
+      <div class="page-nav"><button class="back-btn" data-back-chat type="button">← Back to Chat</button></div>
+      <div class="section-card"><h2>AI Council</h2><p>Ask several AIs the same question.</p><textarea class="big-text" id="familyCouncilQuestion" placeholder="What should the Council help with?"></textarea><div class="provider-checks" id="familyCouncilChecks"></div><button class="primary" id="familyCouncilRunBtn" type="button">Ask the Council</button><div id="familyCouncilNotice"></div><div class="council-results" id="familyCouncilResults"></div></div>
+    </section>
+
+    <section class="panel" id="familySettingsPanel">
+      <div class="page-nav"><button class="back-btn" data-back-chat type="button">← Back to Chat</button></div>
+      <div class="section-card"><h2>Settings</h2><p>Keep your secret key private. Backups stay encrypted.</p><div class="actions" style="justify-content:flex-start"><button class="secondary" id="changeSecretBtn" type="button">Change Secret Key</button><button class="secondary" id="backupBtn" type="button">Encrypted Backup</button><button class="secondary" id="restoreBtn" type="button">Restore Backup</button><button class="danger" id="settingsLockBtn" type="button">Lock Now</button></div></div>
+    </section>
+  </main>
+
+  <div class="composer-wrap" id="familyComposerWrap"><div class="composer"><div class="composer-tools"><button class="tool-chip" id="familyProviderBtn" type="button">⭐ Pick the best for me</button><button class="tool-chip active" id="familyWebBtn" type="button">🌐 Search web when needed</button></div><div class="compose-row"><textarea id="familyPrompt" rows="1" placeholder="Message AI…"></textarea><button class="send-btn" id="familySendBtn" type="button">↑</button></div></div></div>
+
+  <div class="composer-wrap hidden" id="familyBotComposerWrap"><div class="composer"><div class="composer-tools"><span class="tool-chip active" id="familyBotProviderChip">AI</span><span class="tool-chip hidden" id="familyBotWebChip">🌐 Internet Search</span></div><div class="compose-row"><textarea id="familyBotPrompt" rows="1" placeholder="Message this bot…"></textarea><button class="send-btn" id="familyBotSendBtn" type="button">↑</button></div></div></div>
+</div>
+
+<div class="sheet-backdrop" id="familyProviderBack"></div><aside class="sheet" id="familyProviderSheet" aria-hidden="true"><div class="sheet-handle"></div><h2 class="sheet-title">Choose an AI</h2><div class="choice-list" id="familyProviderChoices"></div></aside>
+
+<div class="sheet-backdrop" id="familyEditorBack"></div>
+<aside class="sheet" id="familyEditorSheet" aria-hidden="true">
+  <div class="sheet-handle"></div><h2 class="sheet-title" id="familyEditorTitle">Create Bot</h2>
+  <div class="field"><label>Bot name</label><input id="familyBotName" maxlength="60"></div>
+  <div class="field"><label>What is this bot's job?</label><input id="familyBotRole" maxlength="220"></div>
+  <div class="field"><label>Which AI powers it?</label><select id="familyBotProvider"></select></div>
+  <div class="field"><label>How should it behave?</label><textarea id="familyBotInstructions" maxlength="5000"></textarea></div>
+  <div class="section-card"><h3>Tools</h3><label class="toggle-line"><input id="familyToolWeb" type="checkbox"><span><b>🌐 Internet Search</b><small>Works now.</small></span></label><label class="toggle-line"><input id="familyToolGmail" type="checkbox"><span><b>✉ Gmail</b><small>Will work after Gmail is connected.</small></span></label><label class="toggle-line"><input id="familyToolBrowser" type="checkbox"><span><b>◎ Browser / Computer</b><small>Will work after browser access is connected.</small></span></label><label class="toggle-line"><input id="familyToolShopping" type="checkbox"><span><b>🛒 Shopping / Cart</b><small>Product research works with Internet Search. Cart actions need browser access and approval.</small></span></label></div>
+  <div class="actions"><button class="danger hidden" id="familyDeleteBotBtn" type="button">Delete</button><button class="secondary" id="familyCancelBotBtn" type="button">Cancel</button><button class="primary" id="familySaveBotBtn" type="button">Save Bot</button></div>
+</aside>
+
+<script src="/ai-council/family-v2.js?v=1" defer></script>
+</body>
+</html>
