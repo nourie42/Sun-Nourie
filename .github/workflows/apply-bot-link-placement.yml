@@ -1,0 +1,74 @@
+name: Apply bot link placement
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-bot-link-placement.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply requested UI changes
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          nav = Path('public/home-navigation.js')
+          s = nav.read_text()
+          original = s
+          s = re.sub(r"\n\s*let botStudio = document\.getElementById\('aiBotStudioTop'\);.*?botStudio\.setAttribute\('title', 'Create AI bots and multi-bot rooms'\);\n", "\n", s, flags=re.S)
+          s = re.sub(r"\n\s*let botChat = document\.getElementById\('aiBotChatTop'\);.*?botChat\.setAttribute\('title', 'Chat privately with one bot'\);\n", "\n", s, flags=re.S)
+          s = s.replace("      if (council.nextElementSibling !== botStudio) council.insertAdjacentElement('afterend', botStudio);\n", "")
+          s = s.replace("      if (botStudio.nextElementSibling !== botChat) botStudio.insertAdjacentElement('afterend', botChat);\n", "")
+          if s == original:
+              raise SystemExit('Fuel IQ navigation patch did not match')
+          nav.write_text(s)
+
+          weather = Path('public/weather-fusion/index.html')
+          w = weather.read_text()
+          back = '    <a class="experimental-back" id="experimental-back" href="/weather-fusion/" hidden><span aria-hidden="true">←</span> Back to regular weather</a>'
+          bot_link = '    <a class="experimental-bots-link" id="experimental-bots-link" href="/ai-council/bots/" aria-label="Open AI Bots"><span aria-hidden="true">🤖</span> AI Bots</a>'
+          if bot_link not in w:
+              if back not in w:
+                  raise SystemExit('Experimental back-link anchor not found')
+              w = w.replace(back, back + '\n' + bot_link, 1)
+          css = '''\n  <style id="experimental-bots-link-style">\n    .experimental-bots-link{display:none;align-items:center;gap:.45rem;width:max-content;margin:.55rem 0 0;padding:.55rem .85rem;border:1px solid rgba(255,255,255,.22);border-radius:999px;background:rgba(11,24,43,.78);color:#f7fbff;text-decoration:none;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.18)}\n    html[data-weather-page="experimental"] .experimental-bots-link{display:inline-flex}\n    .experimental-bots-link:hover{background:rgba(24,48,82,.92);border-color:rgba(255,255,255,.35)}\n  </style>\n'''
+          if 'experimental-bots-link-style' not in w:
+              w = w.replace('\n</head>', css + '\n</head>', 1)
+          weather.write_text(w)
+
+          bots = Path('public/ai-council/bots.html')
+          b = bots.read_text()
+          banner_css = '''\n    .construction-banner{width:min(780px,calc(100% - 28px));margin:12px auto 2px;padding:12px 16px;border:1px solid rgba(255,193,7,.5);border-radius:14px;background:linear-gradient(135deg,rgba(255,193,7,.18),rgba(255,109,0,.12));color:#ffe7a3;text-align:center;font-size:13px;font-weight:950;letter-spacing:.08em;text-transform:uppercase;box-shadow:0 10px 28px rgba(0,0,0,.2)}\n'''
+          if '.construction-banner{' not in b:
+              b = b.replace('\n  </style>', banner_css + '\n  </style>', 1)
+          banner = '  <div class="construction-banner" role="status">🚧 Under Construction</div>'
+          if banner not in b:
+              b = b.replace('<div class="app">', '<div class="app">\n' + banner, 1)
+          bots.write_text(b)
+
+          wf = Path('.github/workflows/apply-bot-link-placement.yml')
+          wf.unlink()
+
+          assert 'let botStudio =' not in nav.read_text()
+          assert 'let botChat =' not in nav.read_text()
+          assert '/ai-council/bots/' in weather.read_text()
+          assert 'Under Construction' in bots.read_text()
+          PY
+      - name: Commit and push
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/home-navigation.js public/weather-fusion/index.html public/ai-council/bots.html .github/workflows/apply-bot-link-placement.yml
+          git commit -m "Move AI Bots link to experimental weather"
+          git push origin HEAD:main
