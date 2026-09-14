@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0d0d0f">
+  <meta name="color-scheme" content="dark">
+  <title>AI Bots</title>
+  <link rel="stylesheet" href="/ai-council/ai-v2.css?v=1">
+</head>
+<body>
+<div class="ai-app">
+  <main class="ai-shell" style="padding-bottom:110px">
+    <div class="under-construction">🚧 Under Construction</div>
+    <header class="ai-header">
+      <div class="brand-wrap">
+        <a class="ai-orb" href="/ai-council/" aria-label="Back to AI Chat">AI</a>
+        <div><div class="brand-title">Bots</div><div class="brand-sub" id="botStatus">Connecting to your AIs…</div></div>
+      </div>
+      <div class="header-actions">
+        <a class="back-btn" href="/ai-council/">← Chat</a>
+        <button class="icon-btn" id="searchBtn" type="button" aria-label="Search bots">⌕</button>
+        <button class="icon-btn" id="addBotBtn" type="button" aria-label="Create bot">＋</button>
+      </div>
+    </header>
+
+    <section class="panel active" id="botsPanel">
+      <div id="searchWrap" class="hidden" style="margin:4px 0 12px"><input id="searchInput" style="width:100%;border:1px solid #303036;background:#151518;color:#fff;border-radius:14px;padding:12px" placeholder="Search bots"></div>
+      <div class="page-nav">
+        <button id="starterBtn" type="button">Create Starter Team</button>
+        <button id="exportBtn" type="button">Export</button>
+        <button id="importBtn" type="button">Import</button>
+        <input id="importFile" type="file" accept="application/json,.json" hidden>
+      </div>
+      <div class="bot-list" id="botList"></div>
+    </section>
+
+    <section class="panel" id="hotPanel">
+      <div class="page-nav"><a class="back-btn" href="/ai-council/">← Back to Chat</a></div>
+      <div class="section-card">
+        <h2>🔥 Hot Room</h2>
+        <p>Pick two or more bots and give them one job. They can work together, debate, or compare ideas.</p>
+        <div id="hotPicker"></div>
+        <div class="field"><label>What should the bots work on?</label><textarea id="roomTopic" placeholder="Example: Find the best cordless vacuum for low-pile carpet and explain why"></textarea></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div class="field"><label>Team style</label><select id="roomMode"><option value="collaborate">Work together</option><option value="roundtable">Roundtable</option><option value="debate">Debate</option></select></div>
+          <div class="field"><label>Rounds</label><select id="roomRounds"><option value="1">1 round</option><option value="2">2 rounds</option><option value="3">3 rounds</option></select></div>
+        </div>
+        <button class="primary" id="runRoomBtn" type="button" style="margin-top:12px">Start Hot Room</button>
+        <div id="roomNotice"></div>
+        <div id="roomResults"></div>
+      </div>
+    </section>
+
+    <section class="panel" id="councilPanel">
+      <div class="page-nav"><a class="back-btn" href="/ai-council/">← Back to Chat</a></div>
+      <div class="section-card">
+        <h2>☷ AI Council</h2>
+        <p>Use the Council when you want multiple AIs to answer the same question and compare them.</p>
+        <a class="primary" href="/ai-council/?view=council" style="display:inline-flex;text-decoration:none">Open AI Council</a>
+      </div>
+    </section>
+
+    <section class="panel" id="historyPanel">
+      <div class="page-nav"><a class="back-btn" href="/ai-council/">← Back to Chat</a></div>
+      <div class="section-card"><h2>History</h2><p>Your recent Hot Room sessions are saved on this device.</p><div id="historyList"></div></div>
+    </section>
+  </main>
+
+  <nav class="bottom-nav" aria-label="Bot navigation">
+    <button class="active" data-view="bots" type="button">●<br>Bots</button>
+    <button data-view="hot" type="button">🔥<br>Hot Room</button>
+    <button data-view="council" type="button">☷<br>Council</button>
+    <button data-view="history" type="button">↻<br>History</button>
+  </nav>
+</div>
+
+<div class="sheet-backdrop" id="editorBack"></div>
+<aside class="sheet" id="editorSheet" aria-hidden="true">
+  <div class="sheet-handle"></div>
+  <h2 class="sheet-title" id="editorTitle">Create Bot</h2>
+  <div class="field"><label>Bot name</label><input id="botName" maxlength="60" placeholder="Shopping Helper"></div>
+  <div class="field"><label>What is this bot's job?</label><input id="botRole" maxlength="220" placeholder="Find the best products for me"></div>
+  <div class="field"><label>Which AI powers it?</label><select id="botProvider"></select></div>
+  <div class="field"><label>How should it behave?</label><textarea id="botInstructions" maxlength="5000" placeholder="Example: Search carefully, compare customer reviews, explain things simply, and never recommend something just because it is popular."></textarea></div>
+  <div class="section-card" style="margin-top:14px">
+    <h3>Tools</h3><p>Turn on only what this bot should be allowed to use.</p>
+    <label class="toggle-line"><input id="toolWeb" type="checkbox"><span><b>🌐 Internet Search</b><small>Works now. The bot can search the current web when the question needs it.</small></span></label>
+    <label class="toggle-line"><input id="toolGmail" type="checkbox"><span><b>✉ Gmail</b><small>Permission saved for this bot. It will work after Gmail is connected.</small></span></label>
+    <label class="toggle-line"><input id="toolBrowser" type="checkbox"><span><b>◎ Browser / Computer</b><small>Permission saved for this bot. It will work after a browser agent is connected.</small></span></label>
+    <label class="toggle-line"><input id="toolShopping" type="checkbox"><span><b>🛒 Shopping / Cart</b><small>Can research products now if Internet Search is on. Cart and checkout need browser access and approval.</small></span></label>
+  </div>
+  <div class="field"><label>Bot color</label><div id="colorPalette" style="display:flex;gap:8px;flex-wrap:wrap"></div></div>
+  <div class="actions"><button class="danger hidden" id="deleteBotBtn" type="button">Delete</button><button class="secondary" id="cancelBotBtn" type="button">Cancel</button><button class="primary" id="saveBotBtn" type="button">Save Bot</button></div>
+</aside>
+
+<div class="sheet-backdrop" id="accessBack"></div>
+<aside class="sheet" id="accessSheet" aria-hidden="true">
+  <div class="sheet-handle"></div><h2 class="sheet-title">Access code</h2>
+  <div class="field"><label>Access code</label><input id="accessCode" type="password" autocomplete="off"></div>
+  <div class="actions"><button class="secondary" id="cancelAccessBtn" type="button">Cancel</button><button class="primary" id="saveAccessBtn" type="button">Save</button></div>
+</aside>
+
+<script src="/ai-council/bots-v2.js?v=1" defer></script>
+</body>
+</html>

@@ -16,6 +16,7 @@ import { registerSiteResearchReportEnhancements } from "./src/siteResearchReport
 import { registerFuelAtlasRoutes } from "./src/fuelAtlasRoutes.js";
 import { registerFuelAtlasLocationCompanyBridge } from "./src/fuelAtlasLocationCompanyBridge.js";
 import { registerWeatherFusionRoutes } from "./src/weatherFusion.js";
+import { registerAiAgentRoutes } from "./src/aiAgent.js";
 import { registerAiCouncilRoutes } from "./src/aiCouncil.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -79,6 +80,7 @@ registerSiteEnhancementRoutes(app, {
 registerFuelAtlasLocationCompanyBridge(app);
 registerFuelAtlasRoutes(app, { googleApiKey: process.env.GOOGLE_API_KEY || "" });
 registerWeatherFusionRoutes(app);
+registerAiAgentRoutes(app);
 registerAiCouncilRoutes(app);
 
 app.get("/fuel-atlas", (_req, res) => res.redirect(302, "/fuel-atlas.html"));
@@ -205,6 +207,7 @@ app.get("/health", (_req, res) => {
     basicWordMarginFix: true,
     webSearchJsonModeCompatibility: true,
     aiCouncil: true,
+    aiAgent: true,
     legacyServerReady: legacyReady,
   });
 });
