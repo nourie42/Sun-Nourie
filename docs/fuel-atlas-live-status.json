@@ -2,8 +2,8 @@
   "ok": true,
   "classificationRule": "NAICS qualifies inclusion; explicit facility wording determines terminal or bulk-plant labels. Oil companies, wholesalers, suppliers and fuel dealers default to Distributor when no physical terminal/bulk wording is present. Heating-oil and propane dealers are also included in Distributor.",
   "filterVersion": "verified-distributor-categories-v3",
-  "verifiedAt": "2026-09-05T15:20:24.555Z",
-  "verifiedCommit": "0027375ab51ee5171393ede3664b3a2c4b20d33f",
+  "verifiedAt": "2026-09-14T00:19:18.883Z",
+  "verifiedCommit": "17a92c9af0b735f441bc9138b1ee6557d89bc195",
   "liveUrl": "https://sun-nourie-live.onrender.com",
   "successfulSearches": 8,
   "attemptedSearches": 8,
@@ -49,7 +49,7 @@
         "terminal": 1,
         "propane": 0
       },
-      "elapsedMs": 102,
+      "elapsedMs": 3590,
       "sources": [
         "OpenStreetMap / Overpass",
         "EPA ECHO / FRS NAICS"
@@ -130,7 +130,7 @@
         "terminal": 15,
         "propane": 0
       },
-      "elapsedMs": 12770,
+      "elapsedMs": 12799,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
@@ -140,8 +140,8 @@
           "name": "APEX TERMINAL",
           "codes": [
             "424710",
-            "457210",
-            "454312"
+            "454312",
+            "457210"
           ],
           "primary": "terminal",
           "categories": [
@@ -281,8 +281,8 @@
         {
           "name": "KM SELMA-II DISTILLATE FUELS TERMINAL",
           "codes": [
-            "493190",
-            "424710"
+            "424710",
+            "493190"
           ],
           "primary": "terminal",
           "categories": [
@@ -343,7 +343,8 @@
         {
           "name": "SELMA TERMINAL",
           "codes": [
-            "424710"
+            "424710",
+            "457120"
           ],
           "primary": "terminal",
           "categories": [
@@ -387,7 +388,7 @@
         "terminal": 121,
         "propane": 5
       },
-      "elapsedMs": 12787,
+      "elapsedMs": 12981,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
@@ -639,7 +640,7 @@
         "terminal": 13,
         "propane": 0
       },
-      "elapsedMs": 12775,
+      "elapsedMs": 12800,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
@@ -648,8 +649,8 @@
         {
           "name": "BAKER PETROLITE EDDYSTONE WHSE",
           "codes": [
-            "424720",
-            "213112"
+            "213112",
+            "424720"
           ],
           "primary": "distributor",
           "categories": [
@@ -697,11 +698,11 @@
           "codes": [
             "221112",
             "493190",
-            "324110",
             "424710",
-            "325120",
+            "324110",
             "324191",
-            "221119"
+            "221119",
+            "325120"
           ],
           "primary": "terminal",
           "categories": [
@@ -731,9 +732,9 @@
         {
           "name": "ENERGY TRANSFER PHILADELPHIA TERMINAL",
           "codes": [
+            "213112",
             "493190",
-            "424710",
-            "213112"
+            "424710"
           ],
           "primary": "terminal",
           "categories": [
@@ -748,8 +749,8 @@
         {
           "name": "ERGON ASPHALT PARTNERS, LP",
           "codes": [
-            "324121",
-            "424710"
+            "424710",
+            "324121"
           ],
           "primary": "distributor",
           "categories": [
@@ -857,8 +858,8 @@
           "codes": [
             "324110",
             "424710",
-            "488119",
-            "238910"
+            "238910",
+            "488119"
           ],
           "primary": "terminal",
           "categories": [
@@ -903,7 +904,7 @@
         "terminal": 26,
         "propane": 1
       },
-      "elapsedMs": 12765,
+      "elapsedMs": 12798,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
@@ -977,8 +978,8 @@
             "562211",
             "493190",
             "493110",
-            "562212",
-            "424710"
+            "424710",
+            "562212"
           ],
           "primary": "terminal",
           "categories": [
@@ -1014,11 +1015,11 @@
             "493110",
             "488320",
             "211130",
+            "488310",
             "483113",
-            "221210",
             "424710",
-            "541990",
-            "488310"
+            "221210",
+            "541990"
           ],
           "primary": "terminal",
           "categories": [
@@ -1053,9 +1054,9 @@
             "493190",
             "484110",
             "493110",
-            "424710",
             "221112",
-            "325199"
+            "325199",
+            "424710"
           ],
           "primary": "terminal",
           "categories": [
@@ -1176,7 +1177,7 @@
         "terminal": 15,
         "propane": 0
       },
-      "elapsedMs": 24304,
+      "elapsedMs": 12813,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
@@ -1201,8 +1202,8 @@
           "name": "APPROVED OIL COMPANY OF BROOKLYN INC",
           "codes": [
             "238220",
-            "811411",
-            "454310"
+            "454310",
+            "811411"
           ],
           "primary": "distributor",
           "categories": [
@@ -1234,8 +1235,8 @@
           "codes": [
             "424710",
             "454311",
-            "493110",
-            "493190"
+            "493190",
+            "493110"
           ],
           "primary": "terminal",
           "categories": [
@@ -1300,10 +1301,10 @@
         {
           "name": "BUCKEYE TERMINALS LLC-BROOKLYN TERMINAL",
           "codes": [
-            "424710",
             "493190",
-            "531120",
-            "457210"
+            "424710",
+            "457210",
+            "531120"
           ],
           "primary": "terminal",
           "categories": [
@@ -1441,7 +1442,7 @@
         "terminal": 4,
         "propane": 0
       },
-      "elapsedMs": 12773,
+      "elapsedMs": 12797,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
@@ -1511,8 +1512,8 @@
           "name": "ARGO TERMINAL CO",
           "codes": [
             "424710",
-            "484220",
-            "484230"
+            "484230",
+            "484220"
           ],
           "primary": "terminal",
           "categories": [
@@ -1693,7 +1694,7 @@
         "terminal": 23,
         "propane": 1
       },
-      "elapsedMs": 12785,
+      "elapsedMs": 12796,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
@@ -1779,9 +1780,9 @@
           "name": "CHEM OIL CARSON TANK FARM",
           "codes": [
             "424710",
+            "324110",
             "493190",
-            "486910",
-            "324110"
+            "486910"
           ],
           "primary": "terminal",
           "categories": [
@@ -1845,9 +1846,9 @@
           "name": "DEFENSE FUEL SUPPORT POINT NORWALK DFSP",
           "codes": [
             "424710",
-            "486910",
             "111419",
-            "928110"
+            "928110",
+            "486910"
           ],
           "primary": "distributor",
           "categories": [
@@ -1924,8 +1925,8 @@
         {
           "name": "KINDER MORGAN ENERGY PARTNERS, LP, ORANGE TERMINAL, SANTA FE PACIFIC PIPELINE",
           "codes": [
-            "493190",
-            "424710"
+            "424710",
+            "493190"
           ],
           "primary": "terminal",
           "categories": [
