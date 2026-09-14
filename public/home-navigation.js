@@ -10,7 +10,8 @@
     style.id = 'maProspectorNavigationStyles';
     style.textContent = `
       #fuelDistributorIntelligenceTop.fiq-matched-tool-link,
-      #fuelLocationAtlasTop.fiq-matched-tool-link {
+      #fuelLocationAtlasTop.fiq-matched-tool-link,
+      #aiCouncilTop.fiq-matched-tool-link {
         display:inline-flex!important;
         align-items:center!important;
         justify-content:center!important;
@@ -35,7 +36,9 @@
       #fuelDistributorIntelligenceTop.fiq-matched-tool-link:hover,
       #fuelDistributorIntelligenceTop.fiq-matched-tool-link:focus-visible,
       #fuelLocationAtlasTop.fiq-matched-tool-link:hover,
-      #fuelLocationAtlasTop.fiq-matched-tool-link:focus-visible {
+      #fuelLocationAtlasTop.fiq-matched-tool-link:focus-visible,
+      #aiCouncilTop.fiq-matched-tool-link:hover,
+      #aiCouncilTop.fiq-matched-tool-link:focus-visible {
         transform:translateY(-1px)!important;
         filter:brightness(1.06)!important;
         box-shadow:0 0 0 3px rgba(251,191,36,.22),0 10px 24px rgba(245,158,11,.34)!important;
@@ -84,7 +87,8 @@
       }
       @media(max-width:720px) {
         #fuelDistributorIntelligenceTop.fiq-matched-tool-link,
-        #fuelLocationAtlasTop.fiq-matched-tool-link {
+        #fuelLocationAtlasTop.fiq-matched-tool-link,
+        #aiCouncilTop.fiq-matched-tool-link {
           width:auto!important;
           min-height:42px!important;
           padding:9px 13px!important;
@@ -212,7 +216,19 @@
       atlas.setAttribute('aria-label', 'Open M&A Prospector');
       atlas.setAttribute('title', 'Open M&A Prospector');
 
+      let council = document.getElementById('aiCouncilTop');
+      if (!council) {
+        council = document.createElement('a');
+        council.id = 'aiCouncilTop';
+        council.href = '/ai-council/';
+      }
+      council.className = 'fiq-matched-tool-link';
+      council.textContent = 'AI Council';
+      council.setAttribute('aria-label', 'Open AI Council');
+      council.setAttribute('title', 'Open AI Council');
+
       if (distributor.nextElementSibling !== atlas) distributor.insertAdjacentElement('afterend', atlas);
+      if (atlas.nextElementSibling !== council) atlas.insertAdjacentElement('afterend', council);
     } finally {
       applying = false;
     }
