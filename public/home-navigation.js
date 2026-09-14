@@ -12,7 +12,8 @@
       #fuelDistributorIntelligenceTop.fiq-matched-tool-link,
       #fuelLocationAtlasTop.fiq-matched-tool-link,
       #aiCouncilTop.fiq-matched-tool-link,
-      #aiBotStudioTop.fiq-matched-tool-link {
+      #aiBotStudioTop.fiq-matched-tool-link,
+      #aiBotChatTop.fiq-matched-tool-link {
         display:inline-flex!important;
         align-items:center!important;
         justify-content:center!important;
@@ -41,7 +42,9 @@
       #aiCouncilTop.fiq-matched-tool-link:hover,
       #aiCouncilTop.fiq-matched-tool-link:focus-visible,
       #aiBotStudioTop.fiq-matched-tool-link:hover,
-      #aiBotStudioTop.fiq-matched-tool-link:focus-visible {
+      #aiBotStudioTop.fiq-matched-tool-link:focus-visible,
+      #aiBotChatTop.fiq-matched-tool-link:hover,
+      #aiBotChatTop.fiq-matched-tool-link:focus-visible {
         transform:translateY(-1px)!important;
         filter:brightness(1.06)!important;
         box-shadow:0 0 0 3px rgba(251,191,36,.22),0 10px 24px rgba(245,158,11,.34)!important;
@@ -92,7 +95,8 @@
         #fuelDistributorIntelligenceTop.fiq-matched-tool-link,
         #fuelLocationAtlasTop.fiq-matched-tool-link,
         #aiCouncilTop.fiq-matched-tool-link,
-        #aiBotStudioTop.fiq-matched-tool-link {
+        #aiBotStudioTop.fiq-matched-tool-link,
+        #aiBotChatTop.fiq-matched-tool-link {
           width:auto!important;
           min-height:42px!important;
           padding:9px 13px!important;
@@ -238,13 +242,25 @@
         botStudio.href = '/ai-council/bots/';
       }
       botStudio.className = 'fiq-matched-tool-link';
-      botStudio.textContent = 'Bot Studio';
-      botStudio.setAttribute('aria-label', 'Open AI Bot Studio');
+      botStudio.textContent = 'Bots & Hot Room';
+      botStudio.setAttribute('aria-label', 'Open AI Bots and Hot Room');
       botStudio.setAttribute('title', 'Create AI bots and multi-bot rooms');
+
+      let botChat = document.getElementById('aiBotChatTop');
+      if (!botChat) {
+        botChat = document.createElement('a');
+        botChat.id = 'aiBotChatTop';
+        botChat.href = '/ai-council/chat.html';
+      }
+      botChat.className = 'fiq-matched-tool-link';
+      botChat.textContent = 'Bot Chat';
+      botChat.setAttribute('aria-label', 'Open one-on-one Bot Chat');
+      botChat.setAttribute('title', 'Chat privately with one bot');
 
       if (distributor.nextElementSibling !== atlas) distributor.insertAdjacentElement('afterend', atlas);
       if (atlas.nextElementSibling !== council) atlas.insertAdjacentElement('afterend', council);
       if (council.nextElementSibling !== botStudio) council.insertAdjacentElement('afterend', botStudio);
+      if (botStudio.nextElementSibling !== botChat) botStudio.insertAdjacentElement('afterend', botChat);
     } finally {
       applying = false;
     }
