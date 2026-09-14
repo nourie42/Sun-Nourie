@@ -1,3 +1,4 @@
+# trigger: main bot tools mirror
 name: Apply main bot tools
 on:
   workflow_dispatch:
