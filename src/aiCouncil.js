@@ -11,7 +11,6 @@ const PROVIDERS = [
   { id: "anthropic", label: "Claude", defaultModel: "claude-opus-5" },
   { id: "gemini", label: "Gemini", defaultModel: "gemini-3.1-pro-preview" },
   { id: "xai", label: "Grok", defaultModel: "grok-4.6" },
-  { id: "perplexity", label: "Perplexity", defaultModel: "sonar-pro" },
 ];
 
 const requestBuckets = new Map();
@@ -30,7 +29,6 @@ function providerKey(id) {
   if (id === "anthropic") return process.env.ANTHROPIC_API_KEY || "";
   if (id === "gemini") return process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY || "";
   if (id === "xai") return process.env.XAI_API_KEY || "";
-  if (id === "perplexity") return process.env.PERPLEXITY_API_KEY || "";
   return "";
 }
 
@@ -198,35 +196,11 @@ async function callXai(question, system) {
   return { text: extractResponsesText(data), citations: [] };
 }
 
-async function callPerplexity(question, system, maxOutputTokens = 1800) {
-  const data = await fetchJson("https://api.perplexity.ai/v1/sonar", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${providerKey("perplexity")}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: providerModel("perplexity"),
-      max_tokens: maxOutputTokens,
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: question },
-      ],
-    }),
-  });
-  const text = cleanText(data?.choices?.[0]?.message?.content, 30000);
-  const citations = Array.isArray(data?.citations)
-    ? data.citations.filter((url) => typeof url === "string" && /^https?:\/\//i.test(url)).slice(0, 12)
-    : [];
-  return { text, citations };
-}
-
 async function callProvider(id, question, system, maxOutputTokens = 1800) {
   if (id === "openai") return callOpenAi(question, system, maxOutputTokens);
   if (id === "anthropic") return callAnthropic(question, system, maxOutputTokens);
   if (id === "gemini") return callGemini(question, system, maxOutputTokens);
   if (id === "xai") return callXai(question, system, maxOutputTokens);
-  if (id === "perplexity") return callPerplexity(question, system, maxOutputTokens);
   throw new Error("Unknown provider");
 }
 
