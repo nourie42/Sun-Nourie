@@ -19,12 +19,19 @@
   <link rel="stylesheet" href="/weather-fusion/model-explanation.css?v=rain-consensus-v41">
   <script type="module" src="/weather-fusion/app.js?v=rain-around-v66"></script>
 
+  <style id="experimental-bots-link-style">
+    .experimental-bots-link{display:none;align-items:center;gap:.45rem;width:max-content;margin:.55rem 0 0;padding:.55rem .85rem;border:1px solid rgba(255,255,255,.22);border-radius:999px;background:rgba(11,24,43,.78);color:#f7fbff;text-decoration:none;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.18)}
+    html[data-weather-page="experimental"] .experimental-bots-link{display:inline-flex}
+    .experimental-bots-link:hover{background:rgba(24,48,82,.92);border-color:rgba(255,255,255,.35)}
+  </style>
+
 </head>
 <body data-sky="day">
   <a class="skip-link" href="#forecast">Skip to forecast</a>
   <div class="atmosphere" aria-hidden="true"><div class="sky-glow"></div><div class="cloud cloud-one"></div><div class="cloud cloud-two"></div><div class="stars"></div></div>
   <div class="shell">
     <a class="experimental-back" id="experimental-back" href="/weather-fusion/" hidden><span aria-hidden="true">←</span> Back to regular weather</a>
+    <a class="experimental-bots-link" id="experimental-bots-link" href="/ai-council/bots/" aria-label="Open AI Bots"><span aria-hidden="true">🤖</span> AI Bots</a>
     <header class="topbar">
       <a class="brand" href="/weather-fusion/experimental-weather.html" aria-label="Open Experimental Weather"><span class="brand-sun" aria-hidden="true">◒</span><span>Weather <b>Nourie</b><small>Because Apple, Google and Samsung weather suck</small></span></a>
       <nav aria-label="Page tools"><button class="icon-button" id="refresh" title="Refresh weather" aria-label="Refresh weather">↻</button></nav>

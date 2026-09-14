@@ -235,32 +235,8 @@
       council.setAttribute('aria-label', 'Open AI Council');
       council.setAttribute('title', 'Open AI Council');
 
-      let botStudio = document.getElementById('aiBotStudioTop');
-      if (!botStudio) {
-        botStudio = document.createElement('a');
-        botStudio.id = 'aiBotStudioTop';
-        botStudio.href = '/ai-council/bots/';
-      }
-      botStudio.className = 'fiq-matched-tool-link';
-      botStudio.textContent = 'Bots & Hot Room';
-      botStudio.setAttribute('aria-label', 'Open AI Bots and Hot Room');
-      botStudio.setAttribute('title', 'Create AI bots and multi-bot rooms');
-
-      let botChat = document.getElementById('aiBotChatTop');
-      if (!botChat) {
-        botChat = document.createElement('a');
-        botChat.id = 'aiBotChatTop';
-        botChat.href = '/ai-council/chat.html';
-      }
-      botChat.className = 'fiq-matched-tool-link';
-      botChat.textContent = 'Bot Chat';
-      botChat.setAttribute('aria-label', 'Open one-on-one Bot Chat');
-      botChat.setAttribute('title', 'Chat privately with one bot');
-
       if (distributor.nextElementSibling !== atlas) distributor.insertAdjacentElement('afterend', atlas);
       if (atlas.nextElementSibling !== council) atlas.insertAdjacentElement('afterend', council);
-      if (council.nextElementSibling !== botStudio) council.insertAdjacentElement('afterend', botStudio);
-      if (botStudio.nextElementSibling !== botChat) botStudio.insertAdjacentElement('afterend', botChat);
     } finally {
       applying = false;
     }
