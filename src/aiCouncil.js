@@ -7,7 +7,7 @@ const __dirname = path.dirname(__filename);
 const publicDir = path.join(__dirname, "..", "public", "ai-council");
 
 const PROVIDERS = [
-  { id: "openai", label: "OpenAI", defaultModel: "gpt-5.6-sol" },
+  { id: "openai", label: "OpenAI", defaultModel: "gpt-5.6" },
   { id: "anthropic", label: "Claude", defaultModel: "claude-opus-5" },
   { id: "gemini", label: "Gemini", defaultModel: "gemini-3.1-pro-preview" },
   { id: "xai", label: "Grok", defaultModel: "grok-4.6" },
@@ -72,6 +72,13 @@ function requireCouncilAccess(req, res, accessCode) {
   return true;
 }
 
+function providerErrorMessage(error) {
+  if (error?.name === "AbortError") return "Provider request timed out";
+  const raw = cleanText(error?.message || error || "Unknown provider error", 320);
+  if (!raw) return "Provider request failed";
+  return `Provider request failed — ${raw}`;
+}
+
 async function fetchJson(url, init, timeoutMs = 90000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -81,8 +88,22 @@ async function fetchJson(url, init, timeoutMs = 90000) {
     let data = null;
     try { data = text ? JSON.parse(text) : {}; } catch { data = {}; }
     if (!response.ok) {
-      const message = cleanText(data?.error?.message || data?.message || "", 220);
-      throw new Error(`${response.status}${message ? `: ${message}` : ""}`);
+      const message = cleanText(
+        data?.error?.message ||
+        data?.error?.detail ||
+        data?.error?.type ||
+        data?.message ||
+        text ||
+        response.statusText ||
+        "",
+        260,
+      );
+      const code = cleanText(data?.error?.code || data?.code || "", 80);
+      const suffix = [code, message].filter(Boolean).join(" — ");
+      const error = new Error(`${response.status}${suffix ? `: ${suffix}` : ""}`);
+      error.status = response.status;
+      error.providerBody = data;
+      throw error;
     }
     return data;
   } finally {
@@ -158,7 +179,11 @@ async function callGemini(question, system, maxOutputTokens = 1800) {
   return { text, citations: [] };
 }
 
-async function callXai(question, system, maxOutputTokens = 1800) {
+async function callXai(question, system) {
+  const input = [
+    system ? `System instructions:\n${system}` : "",
+    `User question:\n${question}`,
+  ].filter(Boolean).join("\n\n");
   const data = await fetchJson("https://api.x.ai/v1/responses", {
     method: "POST",
     headers: {
@@ -167,11 +192,7 @@ async function callXai(question, system, maxOutputTokens = 1800) {
     },
     body: JSON.stringify({
       model: providerModel("xai"),
-      input: [
-        { role: "system", content: system },
-        { role: "user", content: question },
-      ],
-      max_output_tokens: maxOutputTokens,
+      input,
     }),
   });
   return { text: extractResponsesText(data), citations: [] };
@@ -337,7 +358,7 @@ export function registerAiCouncilRoutes(app) {
       const started = Date.now();
       try {
         const result = await callProvider(id, question, system);
-        if (!result.text) throw new Error("No text returned");
+        if (!result.text) throw new Error("No text returned by provider");
         return {
           id,
           label: provider.label,
@@ -354,7 +375,7 @@ export function registerAiCouncilRoutes(app) {
           label: provider.label,
           model,
           ok: false,
-          error: `Provider request failed${error?.name === "AbortError" ? " (timeout)" : ""}`,
+          error: providerErrorMessage(error),
           latencyMs: Date.now() - started,
           citations: [],
         };
@@ -367,7 +388,7 @@ export function registerAiCouncilRoutes(app) {
       verdict = await buildVerdict(question, successful);
     } catch (error) {
       console.error("AI Council synthesis failed:", error?.message || error);
-      verdict = { text: "The independent answers loaded, but the Council Verdict could not be generated for this request.", chair: null };
+      verdict = { text: `The independent answers loaded, but the Council Verdict could not be generated. ${providerErrorMessage(error)}`, chair: null };
     }
 
     return res.json({
@@ -439,7 +460,7 @@ export function registerAiCouncilRoutes(app) {
         try {
           const result = await callProvider(bot.provider, prompt, system, 900);
           const text = cleanText(result.text, 16000);
-          if (!text) throw new Error("No text returned");
+          if (!text) throw new Error("No text returned by provider");
           turns.push({
             round,
             botId: bot.id,
@@ -467,7 +488,7 @@ export function registerAiCouncilRoutes(app) {
             citations: [],
             latencyMs: Date.now() - turnStarted,
             ok: false,
-            error: `Bot response failed${error?.name === "AbortError" ? " (timeout)" : ""}`,
+            error: providerErrorMessage(error),
           });
         }
       }
@@ -479,7 +500,7 @@ export function registerAiCouncilRoutes(app) {
         summary = await summarizeBotRoom(topic, mode, turns.filter((turn) => turn.ok));
       } catch (error) {
         console.error("AI Council bot-room summary failed:", error?.message || error);
-        summary = { text: "The bots finished talking, but the moderator summary could not be generated.", chair: null };
+        summary = { text: `The bots finished talking, but the moderator summary could not be generated. ${providerErrorMessage(error)}`, chair: null };
       }
     }
 
