@@ -274,7 +274,7 @@ function proxyToLegacy(req, res) {
     });
   });
 
-  req.pipe(proxyToLegacy);
+  req.pipe(proxyRequest);
 }
 
 app.use(proxyToLegacy);

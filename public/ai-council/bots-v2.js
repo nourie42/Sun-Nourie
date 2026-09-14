@@ -347,5 +347,7 @@
   });
 
   renderBots(); renderHistory(); loadStatus();
-  const edit = new URLSearchParams(location.search).get('edit'); if (edit) setTimeout(() => openEditor(edit), 250);
+  const params = new URLSearchParams(location.search);
+  const requestedView = params.get('view'); if (['bots','hot','council','history'].includes(requestedView)) setView(requestedView);
+  const edit = params.get('edit'); if (edit) setTimeout(() => openEditor(edit), 250);
 })();
