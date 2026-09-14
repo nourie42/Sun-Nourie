@@ -17,9 +17,21 @@ assert.match(html, /id="runRoomBtn"/);
 assert.match(html, /\/api\/ai-council\/bots\/run/);
 assert.match(html, /localStorage\.setItem\(STORAGE_KEY/);
 assert.match(html, /Create Starter Team/);
+assert.match(html, /Hot Room/);
+assert.match(html, /data-tab="bots"/);
+assert.match(html, /data-tab="hotroom"/);
+assert.match(html, /data-tab="council"/);
+assert.match(html, /data-tab="history"/);
+assert.match(html, /data-mode="collaborate"/);
+assert.match(html, /data-mode="roundtable"/);
+assert.match(html, /data-mode="debate"/);
+assert.match(html, /data-mode="critique"/);
+assert.match(html, /data-mode="research"/);
+assert.match(html, /data-mode="manager"/);
+assert.match(html, /ai-council-bot-room-history-v1/);
 
 const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((match) => match[1]);
-assert.ok(scripts.length > 0, "Bot Studio must contain client JavaScript");
+assert.ok(scripts.length > 0, "AI Bots must contain client JavaScript");
 for (const [index, source] of scripts.entries()) {
   new vm.Script(source, { filename: `public/ai-council/bots.html#script-${index + 1}` });
 }
@@ -27,4 +39,4 @@ for (const [index, source] of scripts.entries()) {
 assert.match(homeNavigation, /aiBotStudioTop/);
 assert.match(homeNavigation, /\/ai-council\/bots\//);
 
-console.log("AI Council Bot Studio validation passed.");
+console.log("AI Council Bots inbox and Hot Room validation passed.");
