@@ -1,10 +1,84 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0d0d0f"><meta name="color-scheme" content="dark"><title>AI Search</title><style>
-:root{--bg:#0d0d0f;--panel:#151518;--line:#2b2b31;--text:#f5f5f7;--muted:#8e8e97}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}.shell{width:min(820px,100%);margin:0 auto;padding:16px 16px 120px}.top{position:sticky;top:0;z-index:10;background:linear-gradient(180deg,var(--bg) 78%,transparent);padding:6px 0 14px}.brand{font-size:28px;font-weight:950;letter-spacing:-.04em}.sub{font-size:11px;color:var(--muted);margin-top:3px}.nav{display:flex;gap:7px;flex-wrap:wrap;margin:8px 0 18px}.nav button,.nav a{border:1px solid #303036;background:#17171b;color:#aaa;border-radius:999px;padding:9px 12px;font-size:11px;font-weight:850;text-decoration:none}.nav .active{background:#f3f3f5;color:#111}.view{display:none}.view.active{display:block}.hero{padding:22px 0 12px}.hero h1{font-size:clamp(34px,7vw,58px);margin:0;letter-spacing:-.055em}.hero p{color:var(--muted);font-size:15px;line-height:1.55;max-width:620px}.providers{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:18px 0}.provider{border:1px solid #303036;background:#151518;color:#bbb;border-radius:17px;padding:14px 10px;text-align:left}.provider strong{display:block;color:#fff;font-size:14px}.provider small{display:block;color:#74747d;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.provider.active{border-color:#6b6b78;background:#222228}.provider.off{opacity:.42}.messages{display:flex;flex-direction:column;gap:12px;margin:14px 0 30px}.msg{max-width:88%;padding:13px 15px;border-radius:18px;white-space:pre-wrap;line-height:1.55;font-size:14px}.msg.user{align-self:flex-end;background:#f2f2f4;color:#111}.msg.ai{align-self:flex-start;background:#18181c;border:1px solid #292930}.composer{position:fixed;left:50%;bottom:max(10px,env(safe-area-inset-bottom));transform:translateX(-50%);width:min(790px,calc(100% - 16px));background:rgba(21,21,24,.97);backdrop-filter:blur(18px);border:1px solid #303037;border-radius:22px;padding:9px;z-index:20}.compose{display:grid;grid-template-columns:1fr auto;gap:8px}.compose textarea{border:0;outline:0;background:transparent;color:#fff;min-height:50px;max-height:150px;resize:none;padding:12px;font:inherit}.send{width:50px;height:50px;border:0;border-radius:16px;background:#f3f3f5;color:#111;font-size:20px;font-weight:950}.composeBottom{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:4px 6px 1px}.code{width:100%;border:1px solid #2c2c32;background:#101013;color:#ddd;border-radius:10px;padding:8px 9px;font-size:11px}.status{font-size:10px;color:#74747d}.councilBox{border:1px solid #2d2d34;background:#151518;border-radius:20px;padding:17px}.councilBox textarea{width:100%;min-height:105px;background:#101013;color:#fff;border:1px solid #303036;border-radius:14px;padding:12px;resize:vertical}.checks{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.checks label{border:1px solid #303036;border-radius:999px;padding:8px 10px;font-size:11px;color:#aaa}.answers{display:grid;gap:10px;margin-top:16px}.answer{border:1px solid #2a2a30;border-radius:16px;padding:14px;background:#161619}.answer h3{margin:0 0 7px;font-size:14px}.answer pre{margin:0;white-space:pre-wrap;font:inherit;line-height:1.5;color:#d7d7dc}.error{color:#ff8da1;font-size:11px;margin-top:8px}@media(max-width:620px){.providers{grid-template-columns:1fr 1fr}.msg{max-width:94%}}
-</style></head><body><main class="shell"><header class="top"><div class="brand">AI Search</div><div class="sub" id="status">Checking AI providers…</div></header><nav class="nav"><button id="searchTab" class="active">AI Search</button><button id="councilTab">AI Council</button><a href="/ai-council/bots/">Bots & Hot Room</a></nav><section id="searchView" class="view active"><div class="hero"><h1>Ask one AI.</h1><p>Pick OpenAI, Claude, Gemini, or Grok and ask your question.</p></div><div class="providers" id="providers"></div><div class="messages" id="messages"></div></section><section id="councilView" class="view"><div class="hero"><h1>AI Council</h1><p>Ask the same question to multiple AIs and compare their answers.</p></div><div class="councilBox"><textarea id="councilQuestion" placeholder="Ask the Council…"></textarea><div class="checks" id="councilChecks"></div><button class="send" id="runCouncil" style="width:auto;padding:0 18px">Ask</button><div class="error" id="councilError"></div><div class="answers" id="councilAnswers"></div></div></section></main><div class="composer" id="composer"><div class="compose"><textarea id="prompt" placeholder="Ask anything…"></textarea><button class="send" id="send">↑</button></div><div class="composeBottom"><input class="code" id="accessCode" type="password" placeholder="Owner access code"><span class="status" id="modelLabel"></span></div></div><script>
-const IDS=['openai','anthropic','gemini','xai'];const NAMES={openai:'OpenAI',anthropic:'Claude',gemini:'Gemini',xai:'Grok'};const KEY='ai-search-history-v1';let providers=[],selected='openai',history=load(),sending=false;const $=id=>document.getElementById(id);try{$('accessCode').value=sessionStorage.getItem('ai-council-access')||''}catch{}function load(){try{return JSON.parse(localStorage.getItem(KEY)||'{}')||{}}catch{return{}}}function save(){localStorage.setItem(KEY,JSON.stringify(history))}function provider(){return providers.find(p=>p.id===selected)}function renderProviders(){$('providers').replaceChildren();for(const id of IDS){const p=providers.find(x=>x.id===id),b=document.createElement('button');b.className='provider'+(selected===id?' active':'')+(!p?.configured?' off':'');b.disabled=!p?.configured;b.innerHTML='<strong>'+NAMES[id]+'</strong><small>'+(p?.configured?p.model:'Not connected')+'</small>';b.onclick=()=>{selected=id;renderProviders();renderMessages();label()};$('providers').append(b)}if(!provider()?.configured){const f=providers.find(p=>p.configured);if(f){selected=f.id;renderProviders()}}}function label(){const p=provider();$('modelLabel').textContent=p?.configured?p.label+' · '+p.model:'Not connected'}function renderMessages(){$('messages').replaceChildren();for(const m of history[selected]||[]){const d=document.createElement('div');d.className='msg '+(m.role==='user'?'user':'ai');d.textContent=m.text;$('messages').append(d)}requestAnimationFrame(()=>scrollTo({top:document.body.scrollHeight,behavior:'smooth'}))}async function send(){if(sending)return;const text=$('prompt').value.trim(),code=$('accessCode').value.trim(),p=provider();if(!text||!code||!p?.configured)return;try{sessionStorage.setItem('ai-council-access',code)}catch{}history[selected]??=[];history[selected].push({role:'user',text});$('prompt').value='';save();renderMessages();sending=true;$('send').disabled=true;try{const transcript=history[selected].slice(-12).map(m=>(m.role==='user'?'User':NAMES[selected])+': '+m.text).join('
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0d0d0f">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="Simple AI chat with OpenAI, Claude, Gemini, Grok, and AI Council.">
+  <title>AI Chat</title>
+  <link rel="stylesheet" href="/ai-council/ai-v2.css?v=1">
+</head>
+<body>
+<div class="ai-app">
+  <main class="ai-shell">
+    <header class="ai-header">
+      <div class="brand-wrap">
+        <div class="ai-orb" aria-hidden="true">AI</div>
+        <div><div class="brand-title">AI Chat</div><div class="brand-sub" id="statusText">Connecting to your AIs…</div></div>
+      </div>
+      <div class="header-actions">
+        <button class="pill-btn" id="newChatBtn" type="button">＋ New</button>
+        <a class="pill-btn" href="/ai-council/bots/">🤖 Bots</a>
+        <button class="pill-btn" id="councilBtn" type="button">☷ Council</button>
+        <button class="icon-btn" id="settingsBtn" type="button" aria-label="AI settings">⚙</button>
+      </div>
+    </header>
 
-');const r=await fetch('/api/ai-council/ask',{method:'POST',headers:{'Content-Type':'application/json','x-ai-council-code':code},body:JSON.stringify({question:'You are '+NAMES[selected]+'. Continue this conversation naturally.
+    <section class="panel active" id="chatPanel">
+      <div class="chat-empty" id="emptyState">
+        <div class="mark">✦</div>
+        <h1>How can I help?</h1>
+        <p>Pick an AI yourself, or choose <b>Pick the best for me</b> and we'll do it for you.</p>
+      </div>
+      <div class="messages" id="messages" aria-live="polite"></div>
+    </section>
 
-'+transcript,providers:[selected]})});const d=await r.json().catch(()=>({})),a=(d.answers||[]).find(x=>x.id===selected&&x.ok);if(!r.ok||!a)throw new Error((d.answers||[])[0]?.error||d.error||'AI request failed.');history[selected].push({role:'ai',text:a.text})}catch(e){history[selected].push({role:'ai',text:'Error: '+e.message})}save();renderMessages();sending=false;$('send').disabled=false}function checks(){$('councilChecks').replaceChildren();for(const id of IDS){const p=providers.find(x=>x.id===id),l=document.createElement('label'),c=document.createElement('input');c.type='checkbox';c.value=id;c.checked=!!p?.configured;c.disabled=!p?.configured;l.append(c,document.createTextNode(' '+NAMES[id]));$('councilChecks').append(l)}}async function runCouncil(){const q=$('councilQuestion').value.trim(),code=$('accessCode').value.trim(),ids=[...$('councilChecks').querySelectorAll('input:checked')].map(x=>x.value);$('councilError').textContent='';$('councilAnswers').replaceChildren();if(!q||!code||!ids.length)return;const r=await fetch('/api/ai-council/ask',{method:'POST',headers:{'Content-Type':'application/json','x-ai-council-code':code},body:JSON.stringify({question:q,providers:ids})}),d=await r.json().catch(()=>({}));if(!r.ok){$('councilError').textContent=d.error||'Council request failed.';return}for(const a of d.answers||[]){const box=document.createElement('div'),h=document.createElement('h3'),pre=document.createElement('pre');box.className='answer';h.textContent=a.label+' · '+a.model;pre.textContent=a.ok?a.text:a.error;box.append(h,pre);$('councilAnswers').append(box)}if(d.verdict?.text){const box=document.createElement('div'),h=document.createElement('h3'),pre=document.createElement('pre');box.className='answer';h.textContent='Council Verdict';pre.textContent=d.verdict.text;box.append(h,pre);$('councilAnswers').append(box)}}function mode(council){$('searchView').classList.toggle('active',!council);$('councilView').classList.toggle('active',council);$('searchTab').classList.toggle('active',!council);$('councilTab').classList.toggle('active',council);$('composer').style.display=council?'none':'block'}$('searchTab').onclick=()=>mode(false);$('councilTab').onclick=()=>mode(true);$('send').onclick=send;$('prompt').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}});$('runCouncil').onclick=runCouncil;fetch('/api/ai-council/status',{cache:'no-store'}).then(r=>r.json()).then(d=>{providers=(d.providers||[]).filter(p=>IDS.includes(p.id));$('status').textContent=providers.filter(p=>p.configured).length+' of 4 AIs connected';renderProviders();renderMessages();checks();label();if(new URLSearchParams(location.search).get('mode')==='council')mode(true)}).catch(()=>{$('status').textContent='Provider status unavailable'});
-</script></body></html>
+    <section class="panel" id="councilPanel">
+      <div class="page-nav"><button class="back-btn" id="backToChatBtn" type="button">← Back to Chat</button><a href="/ai-council/bots/">Bots</a></div>
+      <div class="section-card">
+        <h2>AI Council</h2>
+        <p>Ask one question and let several AIs answer it. Then the Council creates one combined verdict.</p>
+        <textarea class="big-text" id="councilQuestion" placeholder="What should the Council help with?"></textarea>
+        <div class="provider-checks" id="councilChecks"></div>
+        <button class="primary" id="runCouncilBtn" type="button">Ask the Council</button>
+        <div id="councilNotice"></div>
+        <div class="council-results" id="councilResults"></div>
+      </div>
+    </section>
+  </main>
+
+  <div class="composer-wrap" id="composerWrap">
+    <div class="composer">
+      <div class="composer-tools">
+        <button class="tool-chip" id="providerBtn" type="button">⭐ Pick the best for me</button>
+        <button class="tool-chip active" id="webBtn" type="button">🌐 Search web when needed</button>
+      </div>
+      <div class="compose-row">
+        <textarea id="prompt" rows="1" placeholder="Message AI…" aria-label="Message AI"></textarea>
+        <button class="send-btn" id="sendBtn" type="button" aria-label="Send">↑</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="sheet-backdrop" id="providerBack"></div>
+<aside class="sheet" id="providerSheet" aria-hidden="true">
+  <div class="sheet-handle"></div>
+  <h2 class="sheet-title">Choose an AI</h2>
+  <div class="choice-list" id="providerChoices"></div>
+</aside>
+
+<div class="sheet-backdrop" id="settingsBack"></div>
+<aside class="sheet" id="settingsSheet" aria-hidden="true">
+  <div class="sheet-handle"></div>
+  <h2 class="sheet-title">AI Settings</h2>
+  <p style="color:#8b8b94;font-size:12px;line-height:1.5">Your access code stays only in this browser session. It is not shown on the main chat screen.</p>
+  <div class="field"><label>Access code</label><input id="accessCode" type="password" autocomplete="off" placeholder="Enter access code"></div>
+  <div class="actions"><button class="secondary" id="closeSettingsBtn" type="button">Cancel</button><button class="primary" id="saveSettingsBtn" type="button">Save</button></div>
+  <div id="settingsNotice"></div>
+</aside>
+
+<script src="/ai-council/main-chat-v2.js?v=1" defer></script>
+</body>
+</html>
