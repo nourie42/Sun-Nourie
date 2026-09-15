@@ -48,10 +48,8 @@ if old_body not in s:
     raise SystemExit('runRoom body anchor not found')
 s = s.replace(old_body, new_body, 1)
 
-# Make generic network failures useful instead of showing only "Failed to fetch".
-old_catch = '''    } catch (error) {\n      notice(els.roomNotice, error.message || String(error), 'error');\n    } finally {\n'''
-new_catch = '''    } catch (error) {\n      const raw = error?.message || String(error);\n      const message = raw === 'Failed to fetch'\n        ? 'The connection to the AI service closed before the Hot Room finished. Your files are still attached. Try again; if it repeats, attach the files one at a time.'\n        : raw;\n      notice(els.roomNotice, message, 'error');\n    } finally {\n'''
-# Only replace the first catch after runRoom by scoping from function position.
+old_catch = '''    } catch (error) {\n      notice(els.roomNotice, error.message || String(error), 'error');\n    } finally { els.runRoomBtn.disabled = false; }\n'''
+new_catch = '''    } catch (error) {\n      const raw = error?.message || String(error);\n      const message = raw === 'Failed to fetch'\n        ? 'The connection to the AI service closed before the Hot Room finished. Your files are still attached. Try again; if it repeats, attach the files one at a time.'\n        : raw;\n      notice(els.roomNotice, message, 'error');\n    } finally { els.runRoomBtn.disabled = false; }\n'''
 pos = s.find('  async function runRoom()')
 if pos < 0:
     raise SystemExit('runRoom not found after patch')
