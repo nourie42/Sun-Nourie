@@ -1,0 +1,44 @@
+name: Apply AI context upgrade
+on:
+  push:
+    paths:
+      - 'scripts/apply_ai_context_upgrade.py'
+      - '.github/workflows/apply-ai-context-upgrade.yml'
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply context upgrade
+        run: python scripts/apply_ai_context_upgrade.py
+      - name: Syntax check
+        run: |
+          node --check src/aiAgent.js
+          node --check src/aiCouncil.js
+          node --check public/ai-council/ai-context-v1.js
+          node --check public/ai-council/main-chat-v2.js
+          node --check public/ai-council/bot-chat-v2.js
+          node --check public/ai-council/bots-v2.js
+          node --check public/ai-council/family-v2.js
+      - name: Verify context features
+        run: |
+          grep -q 'ai-context-v1.js' public/ai-council/index.html
+          grep -q 'ai-context-v1.js' public/ai-council/bot-chat-v2.html
+          grep -q 'ai-context-v1.js' public/ai-council/bots-v2.html
+          grep -q 'ai-context-v1.js' public/ai-council/family-v2.html
+          grep -q '/api/ai-agent/location' src/aiAgent.js
+          grep -q 'prepareAiContext' src/aiAgent.js
+          grep -q 'attachments' public/ai-council/main-chat-v2.js
+          grep -q 'Internet is automatic' public/ai-council/main-chat-v2.js
+      - name: Commit changes
+        run: |
+          git config user.name 'nourie42'
+          git config user.email 'nourie42@gmail.com'
+          git add src/aiAgent.js src/aiCouncil.js public/ai-council/ai-v2.css public/ai-council/index.html public/ai-council/bot-chat-v2.html public/ai-council/bots-v2.html public/ai-council/family-v2.html public/ai-council/main-chat-v2.js public/ai-council/bot-chat-v2.js public/ai-council/bots-v2.js public/ai-council/family-v2.js
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Add attachments, location context, and automatic web access'
+          git push
