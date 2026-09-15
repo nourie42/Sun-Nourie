@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - 'scripts/apply_ai_context_upgrade.py'
+      - 'scripts/run_ai_context_upgrade.py'
       - '.github/workflows/apply-ai-context-upgrade.yml'
 permissions:
   contents: write
@@ -14,7 +15,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Apply context upgrade
-        run: python scripts/apply_ai_context_upgrade.py
+        run: python scripts/run_ai_context_upgrade.py
       - name: Syntax check
         run: |
           node --check src/aiAgent.js
