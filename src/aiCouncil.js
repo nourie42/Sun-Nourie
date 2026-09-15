@@ -1,6 +1,7 @@
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
+import { prepareAiContext } from "./aiAgent.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -288,7 +289,7 @@ async function summarizeBotRoom(topic, mode, turns) {
 }
 
 export function registerAiCouncilRoutes(app) {
-  const json = express.json({ limit: "80kb" });
+  const json = express.json({ limit: "20mb" });
   const accessCode = cleanText(process.env.AI_COUNCIL_ACCESS_CODE, 200);
 
   app.get("/api/ai-council/status", (_req, res) => {
@@ -309,7 +310,18 @@ export function registerAiCouncilRoutes(app) {
     if (!requireCouncilAccess(req, res, accessCode)) return;
 
     const question = cleanText(req.body?.question, 6000);
-    if (question.length < 2) return res.status(400).json({ ok: false, error: "Enter a question first." });
+    const hasAttachments = Array.isArray(req.body?.attachments) && req.body.attachments.length > 0;
+    if (question.length < 2 && !hasAttachments) return res.status(400).json({ ok: false, error: "Enter a question or attach a file first." });
+    const prepared = await prepareAiContext({ question, attachments: req.body?.attachments, location: req.body?.location, webSearch: "auto" });
+    const effectiveQuestion = [
+      question || "Review the attached file(s).",
+      prepared.locationText ? `User location context:
+${prepared.locationText}` : "",
+      prepared.attachmentText ? `Attached file context:
+${prepared.attachmentText}` : "",
+      prepared.research.text ? `Current web research gathered automatically:
+${prepared.research.text}` : "",
+    ].filter(Boolean).join("\n\n");
 
     const requested = Array.isArray(req.body?.providers) ? req.body.providers.map((id) => cleanText(id, 30)) : [];
     const selectedIds = PROVIDERS.map((provider) => provider.id).filter((id) => !requested.length || requested.includes(id));
@@ -331,7 +343,7 @@ export function registerAiCouncilRoutes(app) {
       }
       const started = Date.now();
       try {
-        const result = await callProvider(id, question, system);
+        const result = await callProvider(id, effectiveQuestion, system);
         if (!result.text) throw new Error("No text returned by provider");
         return {
           id,
@@ -339,7 +351,7 @@ export function registerAiCouncilRoutes(app) {
           model,
           ok: true,
           text: result.text,
-          citations: result.citations || [],
+          citations: [...new Set([...(prepared.research.citations || []), ...(result.citations || [])])].slice(0, 12),
           latencyMs: Date.now() - started,
         };
       } catch (error) {
@@ -359,7 +371,7 @@ export function registerAiCouncilRoutes(app) {
     const successful = results.filter((result) => result.ok);
     let verdict = { text: "", chair: null };
     try {
-      verdict = await buildVerdict(question, successful);
+      verdict = await buildVerdict(effectiveQuestion, successful);
     } catch (error) {
       console.error("AI Council synthesis failed:", error?.message || error);
       verdict = { text: `The independent answers loaded, but the Council Verdict could not be generated. ${providerErrorMessage(error)}`, chair: null };
@@ -372,6 +384,10 @@ export function registerAiCouncilRoutes(app) {
       verdict,
       successfulCount: successful.length,
       totalLatencyMs: Date.now() - startedAt,
+      attachments: prepared.attachments,
+      location: prepared.location,
+      webSearchUsed: prepared.webSearchUsed,
+      webSearchError: prepared.webSearchError,
     });
   });
 

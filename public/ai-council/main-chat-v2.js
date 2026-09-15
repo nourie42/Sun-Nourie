@@ -14,7 +14,7 @@
   const WEB_KEY = 'ai-main-web-v2';
   let providers = [];
   let selected = localStorage.getItem(PREF_KEY) || 'best';
-  let webOn = localStorage.getItem(WEB_KEY) !== 'off';
+  let webOn = true;
   let messages = loadMessages();
   let sending = false;
   let pendingAction = null;
@@ -28,6 +28,10 @@
     settingsBack: $('settingsBack'), settingsSheet: $('settingsSheet'), accessCode: $('accessCode'), closeSettingsBtn: $('closeSettingsBtn'), saveSettingsBtn: $('saveSettingsBtn'), settingsNotice: $('settingsNotice'),
     councilQuestion: $('councilQuestion'), councilChecks: $('councilChecks'), runCouncilBtn: $('runCouncilBtn'), councilNotice: $('councilNotice'), councilResults: $('councilResults'),
   };
+
+  const attachmentCtl = window.AIContext?.setupAttachmentController({ textareaId: 'prompt', key: 'main-chat' }) || { get:()=>[], clear:()=>{}, has:()=>false, names:()=>[] };
+  const councilAttachmentCtl = window.AIContext?.setupAttachmentController({ textareaId: 'councilQuestion', key: 'main-council' }) || { get:()=>[], clear:()=>{}, has:()=>false, names:()=>[] };
+  const locationContext = () => window.AIContext?.getLocationContext?.() || Promise.resolve({ timezone:Intl.DateTimeFormat().resolvedOptions().timeZone || '', locale:navigator.language || '' });
 
   function loadMessages() {
     try {
@@ -62,8 +66,8 @@
   function renderProviderButton() {
     els.providerBtn.textContent = currentProviderLabel();
     els.providerBtn.classList.toggle('active', selected === 'best' || configured(selected));
-    els.webBtn.textContent = webOn ? '🌐 Search web when needed' : '🌐 Web search off';
-    els.webBtn.classList.toggle('active', webOn);
+    els.webBtn.textContent = '🌐 Internet is automatic';
+    els.webBtn.classList.add('active');
   }
 
   function renderProviderChoices() {
@@ -104,6 +108,11 @@
       const bubble = document.createElement('div');
       bubble.className = `message ${m.role === 'user' ? 'user' : 'assistant'}`;
       bubble.textContent = m.text;
+      if (Array.isArray(m.attachments) && m.attachments.length) {
+        const files = document.createElement('div'); files.className = 'message-attachments';
+        m.attachments.forEach((name) => { const chip=document.createElement('span'); chip.textContent=`📎 ${name}`; files.append(chip); });
+        bubble.prepend(files);
+      }
       if (Array.isArray(m.citations) && m.citations.length) {
         const sources = document.createElement('div');
         sources.className = 'sources';
@@ -146,7 +155,7 @@
   async function sendMessage() {
     if (sending) return;
     const text = els.prompt.value.trim();
-    if (!text) return;
+    if (!text && !attachmentCtl.has()) return;
     if (!accessCode()) return showSettings(sendMessage);
     if (!configured(selected)) {
       selected = 'best';
@@ -155,9 +164,14 @@
     }
 
     const historyForApi = messages.slice(-14).map((m) => ({ role: m.role, text: m.text }));
-    messages.push({ role: 'user', text, at: Date.now() });
+    const attachments = attachmentCtl.get();
+    const attachmentNames = attachmentCtl.names();
+    const userText = text || 'Please help with the attached file(s).';
+    const location = await locationContext();
+    messages.push({ role: 'user', text: userText, attachments: attachmentNames, at: Date.now() });
     saveMessages();
     els.prompt.value = '';
+    attachmentCtl.clear();
     renderMessages();
     sending = true;
     els.sendBtn.disabled = true;
@@ -167,7 +181,7 @@
       const response = await fetch('/api/ai-agent/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-ai-council-code': accessCode() },
-        body: JSON.stringify({ question: text, provider: selected, history: historyForApi, webSearch: webOn ? 'auto' : 'off' }),
+        body: JSON.stringify({ question: userText, provider: selected, history: historyForApi, webSearch: 'auto', attachments, location }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.ok) throw new Error(data.error || `AI request failed (${response.status})`);
@@ -216,9 +230,11 @@
 
   async function runCouncil() {
     const question = els.councilQuestion.value.trim();
-    if (!question) return councilNotice('Type a question for the Council.', 'error');
+    if (!question && !councilAttachmentCtl.has()) return councilNotice('Type a question or attach a file for the Council.', 'error');
     if (!accessCode()) return showSettings(runCouncil);
     const ids = [...els.councilChecks.querySelectorAll('input:checked')].map((input) => input.value);
+    const attachments = councilAttachmentCtl.get();
+    const location = await locationContext();
     if (ids.length < 2) return councilNotice('Pick at least two connected AIs.', 'error');
     els.runCouncilBtn.disabled = true;
     els.councilResults.replaceChildren();
@@ -227,7 +243,7 @@
       const response = await fetch('/api/ai-council/ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-ai-council-code': accessCode() },
-        body: JSON.stringify({ question, providers: ids }),
+        body: JSON.stringify({ question: question || 'Review the attached file(s).', providers: ids, attachments, location }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || `Council request failed (${response.status})`);
@@ -251,6 +267,7 @@
         card.append(strong, pre);
         els.councilResults.prepend(card);
       }
+      councilAttachmentCtl.clear();
       councilNotice(`${data.successfulCount || 0} AI${data.successfulCount === 1 ? '' : 's'} answered.`, 'success');
     } catch (error) {
       councilNotice(error.message || String(error), 'error');
@@ -280,7 +297,7 @@
 
   els.providerBtn.addEventListener('click', () => openSheet(els.providerSheet, els.providerBack));
   els.providerBack.addEventListener('click', () => closeSheet(els.providerSheet, els.providerBack));
-  els.webBtn.addEventListener('click', () => { webOn = !webOn; localStorage.setItem(WEB_KEY, webOn ? 'auto' : 'off'); renderProviderButton(); });
+  els.webBtn.addEventListener('click', () => { webOn = true; renderProviderButton(); });
   els.sendBtn.addEventListener('click', sendMessage);
   els.prompt.addEventListener('keydown', (event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendMessage(); } });
   els.newChatBtn.addEventListener('click', () => { if (!messages.length || confirm('Start a new chat?')) { messages = []; saveMessages(); renderMessages(); setView('chat'); } });
