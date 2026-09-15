@@ -1,0 +1,43 @@
+name: Apply staged AI attachment transport
+on:
+  push:
+    paths:
+      - 'scripts/fix_ai_attachment_transport.py'
+      - '.github/workflows/apply-staged-attachment-transport.yml'
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply patch
+        run: python scripts/fix_ai_attachment_transport.py
+      - name: Syntax check
+        run: |
+          node --check src/aiAgent.js
+          node --check src/aiCouncil.js
+          node --check public/ai-council/ai-context-v1.js
+          node --check public/ai-council/main-chat-v2.js
+          node --check public/ai-council/bot-chat-v2.js
+          node --check public/ai-council/bots-v2.js
+          node --check public/ai-council/family-v2.js
+      - name: Verify staged transport
+        run: |
+          grep -q '/api/ai-agent/attachments/prepare' src/aiAgent.js
+          grep -q 'prepareAttachments' public/ai-council/ai-context-v1.js
+          grep -q 'attachmentContexts' public/ai-council/main-chat-v2.js
+          grep -q 'attachmentContexts' public/ai-council/bot-chat-v2.js
+          grep -q 'attachmentContexts' public/ai-council/bots-v2.js
+          grep -q 'attachmentContexts' public/ai-council/family-v2.js
+          grep -q 'attachmentContexts' src/aiCouncil.js
+      - name: Commit changes
+        run: |
+          git config user.name 'nourie42'
+          git config user.email 'nourie42@gmail.com'
+          git add src/aiAgent.js src/aiCouncil.js public/ai-council/ai-context-v1.js public/ai-council/main-chat-v2.js public/ai-council/bot-chat-v2.js public/ai-council/bots-v2.js public/ai-council/family-v2.js
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Stage attachment processing before AI requests'
+          git push
