@@ -27,6 +27,8 @@
     accessBack: $('accessBack'), accessSheet: $('accessSheet'), accessCode: $('accessCode'), cancelAccessBtn: $('cancelAccessBtn'), saveAccessBtn: $('saveAccessBtn'),
   };
 
+  const roomAttachmentCtl=window.AIContext?.setupAttachmentController({textareaId:'roomTopic',key:'hot-room'})||{get:()=>[],clear:()=>{},has:()=>false,names:()=>[]};
+  const locationContext=()=>window.AIContext?.getLocationContext?.()||Promise.resolve({timezone:Intl.DateTimeFormat().resolvedOptions().timeZone||'',locale:navigator.language||''});
   function loadArray(key) { try { const v = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } }
   function loadObject(key) { try { const v = JSON.parse(localStorage.getItem(key) || '{}'); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch { return {}; } }
   function saveBots() { localStorage.setItem(BOT_KEY, JSON.stringify(bots.slice(0, 50))); }
@@ -40,7 +42,7 @@
   function provider(id) { return providers.find((p) => p.id === id); }
   function providerLabel(id) { return provider(id)?.label || ({ openai:'OpenAI', anthropic:'Claude', gemini:'Gemini', xai:'Grok' }[id] || id); }
   function configured(id) { return provider(id)?.configured === true; }
-  function toolsOf(bot) { return { webSearch: !!bot?.tools?.webSearch, gmail: !!bot?.tools?.gmail, browser: !!bot?.tools?.browser, shopping: !!bot?.tools?.shopping }; }
+  function toolsOf(bot) { return { webSearch: true, gmail: !!bot?.tools?.gmail, browser: !!bot?.tools?.browser, shopping: !!bot?.tools?.shopping }; }
   function currentPreview(bot) { return activity[bot.id]?.preview || bot.role || 'Tap to chat'; }
   function fmt(ts) { if (!ts) return ''; const d = new Date(ts), n = new Date(); return d.toDateString() === n.toDateString() ? d.toLocaleTimeString([], { hour:'numeric', minute:'2-digit' }) : d.toLocaleDateString([], { weekday:'short' }); }
   function openSheet(sheet, back) { back.classList.add('show'); sheet.classList.add('show'); sheet.setAttribute('aria-hidden', 'false'); }
@@ -148,7 +150,7 @@
     els.botRole.value = bot?.role || '';
     els.botInstructions.value = bot?.instructions || '';
     const t = toolsOf(bot);
-    els.toolWeb.checked = t.webSearch;
+    els.toolWeb.checked = true; els.toolWeb.disabled = true;
     els.toolGmail.checked = t.gmail;
     els.toolBrowser.checked = t.browser;
     els.toolShopping.checked = t.shopping;
@@ -171,7 +173,7 @@
       provider: providerId,
       instructions: els.botInstructions.value.trim() || 'Be accurate, helpful, easy to understand, and follow the user’s request.',
       color: selectedColor,
-      tools: { webSearch: els.toolWeb.checked, gmail: els.toolGmail.checked, browser: els.toolBrowser.checked, shopping: els.toolShopping.checked },
+      tools: { webSearch: true, gmail: els.toolGmail.checked, browser: els.toolBrowser.checked, shopping: els.toolShopping.checked },
     };
     const index = bots.findIndex((b) => b.id === editingId);
     if (index >= 0) bots[index] = record; else bots.unshift(record);
@@ -204,7 +206,7 @@
     bots.unshift(
       { id:`research-${now}`, name:'Researcher', role:'Find facts and current information', provider:providerId, color:COLORS[0], instructions:'Research carefully. Separate facts from guesses. Explain the answer simply and include the most useful evidence.', tools:{webSearch:true,gmail:false,browser:false,shopping:false} },
       { id:`shop-${now}`, name:'Shopping Helper', role:'Find and compare products', provider:providerId, color:COLORS[3], instructions:'Find products that match exactly what the user asks for. Compare real features, price, availability, and customer feedback. Explain the best choice clearly.', tools:{webSearch:true,gmail:false,browser:false,shopping:true} },
-      { id:`helper-${now}`, name:'Everyday Helper', role:'Help with everyday questions and tasks', provider:providerId, color:COLORS[2], instructions:'Be friendly, practical, clear, and easy to understand. Ask a question only when you truly need more information.', tools:{webSearch:false,gmail:false,browser:false,shopping:false} },
+      { id:`helper-${now}`, name:'Everyday Helper', role:'Help with everyday questions and tasks', provider:providerId, color:COLORS[2], instructions:'Be friendly, practical, clear, and easy to understand. Ask a question only when you truly need more information.', tools:{webSearch:true,gmail:false,browser:false,shopping:false} },
     );
     saveBots(); renderBots(); renderHotPicker();
   }
@@ -245,8 +247,9 @@
     const chosen = bots.filter((b) => selected.has(b.id)).slice(0, 6);
     const topic = els.roomTopic.value.trim();
     if (chosen.length < 2) return notice(els.roomNotice, 'Pick at least two bots.', 'error');
-    if (!topic) return notice(els.roomNotice, 'Tell the bots what to work on.', 'error');
+    if (!topic && !roomAttachmentCtl.has()) return notice(els.roomNotice, 'Tell the bots what to work on or attach a file.', 'error');
     if (!code()) return requestAccess(runRoom);
+    const attachments=roomAttachmentCtl.get(); const location=await locationContext();
     els.runRoomBtn.disabled = true;
     els.roomResults.replaceChildren();
     notice(els.roomNotice, 'The bots are working together…');
@@ -254,7 +257,7 @@
       const response = await fetch('/api/ai-agent/bots/run', {
         method: 'POST',
         headers: { 'Content-Type':'application/json', 'x-ai-council-code': code() },
-        body: JSON.stringify({ topic, bots: chosen, mode: els.roomMode.value, rounds: Number(els.roomRounds.value) }),
+        body: JSON.stringify({ topic: topic || 'Review the attached file(s).', bots: chosen, mode: els.roomMode.value, rounds: Number(els.roomRounds.value), attachments, location }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.ok) throw new Error(data.error || 'Hot Room failed.');

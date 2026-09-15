@@ -208,6 +208,152 @@ function normalizeHistory(history) {
   })).filter((m) => m.text);
 }
 
+function normalizeAttachments(raw) {
+  const out = [];
+  let totalBytes = 0;
+  for (const item of Array.isArray(raw) ? raw.slice(0, 6) : []) {
+    const name = cleanText(item?.name, 160) || "attachment";
+    const type = cleanText(item?.type, 120) || "application/octet-stream";
+    const data = cleanText(item?.data, 9_000_000).replace(/\s+/g, "");
+    const size = Math.max(0, Number(item?.size || 0));
+    if (!data || size > 6 * 1024 * 1024) continue;
+    totalBytes += size || Math.floor(data.length * 0.75);
+    if (totalBytes > 16 * 1024 * 1024) break;
+    out.push({ name, type, data, size });
+  }
+  return out;
+}
+
+function textLikeAttachment(file) {
+  const type = String(file?.type || "").toLowerCase();
+  const name = String(file?.name || "").toLowerCase();
+  return type.startsWith("text/") || /\.(txt|md|csv|json|xml|yaml|yml|log)$/i.test(name);
+}
+
+function decodeTextAttachment(file) {
+  try {
+    return Buffer.from(file.data, "base64").toString("utf8").replace(/\u0000/g, "").slice(0, 18000);
+  } catch { return ""; }
+}
+
+async function analyzeBinaryAttachments(files) {
+  if (!files.length) return "";
+  if (!providerKey("openai")) throw new Error("Photo and document attachments need OPENAI_API_KEY for file understanding.");
+  const content = [{ type: "input_text", text: "Read the attached files. Extract the information, text, tables, objects, and visual details that may matter to the user's request. Be accurate and concise. Do not answer the user's request yet; create attachment context for another AI." }];
+  for (const file of files) {
+    if (String(file.type).toLowerCase().startsWith("image/")) {
+      content.push({ type: "input_image", image_url: `data:${file.type};base64,${file.data}`, detail: "auto" });
+    } else {
+      content.push({ type: "input_file", filename: file.name, file_data: file.data });
+    }
+  }
+  const data = await fetchJson("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${providerKey("openai")}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: providerModel("openai"),
+      input: [{ role: "user", content }],
+      max_output_tokens: 2200,
+    }),
+  }, 120000);
+  return extractResponsesText(data);
+}
+
+function normalizeLocation(raw) {
+  const location = raw && typeof raw === "object" ? raw : {};
+  const lat = Number(location.lat);
+  const lon = Number(location.lon);
+  return {
+    country: cleanText(location.country, 100),
+    area: cleanText(location.area || location.region || location.state, 160),
+    city: cleanText(location.city, 120),
+    timezone: cleanText(location.timezone, 120),
+    locale: cleanText(location.locale, 80),
+    lat: Number.isFinite(lat) ? Math.round(lat * 10000) / 10000 : null,
+    lon: Number.isFinite(lon) ? Math.round(lon * 10000) / 10000 : null,
+    accuracy: Math.max(0, Math.round(Number(location.accuracy || 0))) || null,
+    source: cleanText(location.source, 80),
+  };
+}
+
+function locationDescription(raw) {
+  const location = normalizeLocation(raw);
+  const place = [location.city, location.area, location.country].filter(Boolean).join(", ");
+  const parts = [
+    place ? `Approximate user area: ${place}` : "",
+    location.timezone ? `Time zone: ${location.timezone}` : "",
+    location.locale ? `Browser locale: ${location.locale}` : "",
+    location.lat != null && location.lon != null ? `Approximate coordinates: ${location.lat}, ${location.lon}${location.accuracy ? ` (accuracy about ${location.accuracy} m)` : ""}` : "",
+  ].filter(Boolean);
+  return { location, text: parts.join(". ") };
+}
+
+async function reverseGeocode(raw) {
+  const base = normalizeLocation(raw);
+  if (base.lat == null || base.lon == null) return base;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 4500);
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(base.lat)}&lon=${encodeURIComponent(base.lon)}&zoom=10&addressdetails=1`;
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: { "User-Agent": "Sun-Nourie-AI/1.0", "Accept-Language": base.locale || "en-US" },
+    });
+    if (!response.ok) return base;
+    const data = await response.json();
+    const a = data?.address || {};
+    return {
+      ...base,
+      city: cleanText(a.city || a.town || a.village || a.municipality || a.county || base.city, 120),
+      area: cleanText(a.state || a.region || a.county || base.area, 160),
+      country: cleanText(a.country || a.country_code?.toUpperCase() || base.country, 100),
+    };
+  } catch { return base; }
+  finally { clearTimeout(timer); }
+}
+
+export async function prepareAiContext({ question = "", attachments = [], location = {}, webSearch: webMode = "auto" } = {}) {
+  const files = normalizeAttachments(attachments);
+  const textFiles = files.filter(textLikeAttachment);
+  const binaryFiles = files.filter((file) => !textLikeAttachment(file));
+  const textSections = textFiles.map((file) => {
+    const text = decodeTextAttachment(file);
+    return text ? `Attachment: ${file.name}\n${text}` : `Attachment: ${file.name} (could not decode as text)`;
+  });
+  let attachmentAnalysis = "";
+  let attachmentError = "";
+  if (binaryFiles.length) {
+    try { attachmentAnalysis = await analyzeBinaryAttachments(binaryFiles); }
+    catch (error) { attachmentError = cleanText(error?.message || error, 320); }
+  }
+  const attachmentText = [
+    ...textSections,
+    attachmentAnalysis ? `Attachment analysis:\n${attachmentAnalysis}` : "",
+    attachmentError ? `Attachment processing note: ${attachmentError}` : "",
+  ].filter(Boolean).join("\n\n");
+
+  const loc = locationDescription(location);
+  const mode = webMode === false || webMode === "off" ? "off" : webMode === true || webMode === "on" ? "on" : "auto";
+  const searchInput = [question, attachmentText, loc.text].filter(Boolean).join("\n\n");
+  const useWeb = mode === "on" || (mode === "auto" && shouldSearchWeb(searchInput));
+  let research = { text: "", citations: [] };
+  let webSearchError = "";
+  if (useWeb) {
+    try { research = await webSearch(searchInput); }
+    catch (error) { webSearchError = cleanText(error?.message || error, 320); }
+  }
+  return {
+    location: loc.location,
+    locationText: loc.text,
+    attachmentText,
+    attachmentError,
+    attachments: files.map(({ name, type, size }) => ({ name, type, size })),
+    research,
+    webSearchUsed: Boolean(research.text),
+    webSearchError,
+  };
+}
+
 function personaSystem(persona, providerLabel) {
   const name = cleanText(persona?.name, 60);
   const role = cleanText(persona?.role, 240);
@@ -241,8 +387,16 @@ function normalizeBot(raw, index) {
 }
 
 export function registerAiAgentRoutes(app) {
-  const json = express.json({ limit: "120kb" });
+  const json = express.json({ limit: "20mb" });
   const accessCode = cleanText(process.env.AI_COUNCIL_ACCESS_CODE, 200);
+
+  app.post("/api/ai-agent/location", express.json({ limit: "8kb" }), async (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    const location = await reverseGeocode(req.body || {});
+    const headerCountry = cleanText(req.headers["cf-ipcountry"] || req.headers["x-vercel-ip-country"] || req.headers["x-country-code"], 20);
+    if (!location.country && headerCountry) location.country = headerCountry;
+    res.json({ ok: true, location });
+  });
 
   app.get("/api/ai-agent/status", (_req, res) => {
     const providers = publicProviders();
@@ -254,6 +408,8 @@ export function registerAiAgentRoutes(app) {
       configuredCount: providers.filter((p) => p.configured).length,
       tools: {
         webSearch: Boolean(providerKey("openai")),
+        attachments: Boolean(providerKey("openai")),
+        location: true,
         gmail: false,
         browser: false,
         shopping: false,
@@ -266,32 +422,33 @@ export function registerAiAgentRoutes(app) {
     if (!requireAccess(req, res, accessCode)) return;
 
     const question = cleanText(req.body?.question, 6000);
-    if (question.length < 1) return res.status(400).json({ ok: false, error: "Type a message first." });
+    const rawAttachments = Array.isArray(req.body?.attachments) ? req.body.attachments : [];
+    if (question.length < 1 && rawAttachments.length < 1) return res.status(400).json({ ok: false, error: "Type a message or attach a file first." });
 
+    const pickText = question || rawAttachments.map((item) => cleanText(item?.name, 120)).filter(Boolean).join(" ") || "attachment help";
     const requested = cleanText(req.body?.provider, 30).toLowerCase() || "best";
-    const best = chooseBestProvider(question);
+    const best = chooseBestProvider(pickText);
     const providerId = requested === "best" ? best.id : requested;
     const provider = PROVIDERS.find((p) => p.id === providerId);
     if (!provider) return res.status(400).json({ ok: false, error: "Choose an AI first." });
     if (!providerKey(providerId)) return res.status(400).json({ ok: false, error: `${provider.label} is not connected yet.` });
 
-    const webMode = req.body?.webSearch === true || req.body?.webSearch === "on" ? "on" : req.body?.webSearch === false || req.body?.webSearch === "off" ? "off" : "auto";
-    const useWeb = webMode === "on" || (webMode === "auto" && shouldSearchWeb(question));
-    let research = { text: "", citations: [] };
-    let webSearchError = "";
-    if (useWeb) {
-      try { research = await webSearch(question); }
-      catch (error) { webSearchError = cleanText(error?.message || error, 300); }
-    }
-
+    const prepared = await prepareAiContext({
+      question,
+      attachments: rawAttachments,
+      location: req.body?.location,
+      webSearch: req.body?.webSearch ?? "auto",
+    });
     const history = normalizeHistory(req.body?.history);
     const transcript = history.map((m) => `${m.role}: ${m.text}`).join("\n\n");
-    const system = personaSystem(req.body?.persona, provider.label);
+    const system = personaSystem(req.body?.persona, provider.label) + (prepared.locationText ? ` Use this user context when relevant: ${prepared.locationText}.` : "");
     const prompt = [
       transcript ? `Conversation so far:\n${transcript}` : "",
-      `User's new message:\n${question}`,
-      research.text ? `Current web research gathered for this request:\n${research.text}` : "",
-      webSearchError ? `Web search was requested but unavailable: ${webSearchError}. Do not pretend that you searched the web.` : "",
+      `User's new message:\n${question || "Please help with the attached file(s)."}`,
+      prepared.locationText ? `User location context:\n${prepared.locationText}` : "",
+      prepared.attachmentText ? `Attached file context:\n${prepared.attachmentText}` : "",
+      prepared.research.text ? `Current web research gathered automatically for this request:\n${prepared.research.text}` : "",
+      prepared.webSearchError ? `Automatic web research was unavailable: ${prepared.webSearchError}. Do not pretend that you searched the web.` : "",
     ].filter(Boolean).join("\n\n");
 
     const candidates = requested === "best"
@@ -309,9 +466,11 @@ export function registerAiAgentRoutes(app) {
           providerLabel: current.label,
           model: providerModel(id),
           answer: answer.text,
-          citations: [...new Set([...(research.citations || []), ...(answer.citations || [])])].slice(0, 12),
-          webSearchUsed: Boolean(research.text),
-          webSearchError,
+          citations: [...new Set([...(prepared.research.citations || []), ...(answer.citations || [])])].slice(0, 12),
+          webSearchUsed: prepared.webSearchUsed,
+          webSearchError: prepared.webSearchError,
+          attachments: prepared.attachments,
+          location: prepared.location,
           pickedForMe: requested === "best",
           pickReason: id === best.id ? best.reason : `${best.reason}; the first choice was unavailable so ${current.label} was used instead`,
         });
@@ -335,10 +494,8 @@ export function registerAiAgentRoutes(app) {
 
     const rounds = Math.max(1, Math.min(3, Number(req.body?.rounds || 1)));
     const mode = ["debate", "collaborate", "roundtable"].includes(req.body?.mode) ? req.body.mode : "collaborate";
-    let sharedResearch = { text: "", citations: [] };
-    if (bots.some((b) => b.tools.webSearch)) {
-      try { sharedResearch = await webSearch(topic); } catch {}
-    }
+    const prepared = await prepareAiContext({ question: topic, attachments: req.body?.attachments, location: req.body?.location, webSearch: "auto" });
+    const sharedResearch = prepared.research;
     const turns = [];
     for (let round = 1; round <= rounds; round += 1) {
       for (const bot of bots) {
@@ -367,7 +524,7 @@ export function registerAiAgentRoutes(app) {
         summary = result.text;
       } catch {}
     }
-    res.json({ ok: turns.some((t) => t.ok), topic, mode, rounds, turns, summary, citations: sharedResearch.citations });
+    res.json({ ok: turns.some((t) => t.ok), topic, mode, rounds, turns, summary, citations: sharedResearch.citations, attachments: prepared.attachments, location: prepared.location, webSearchUsed: prepared.webSearchUsed });
   });
 
   // Friendly UI routes are registered before the legacy Council routes.

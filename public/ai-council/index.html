@@ -52,7 +52,7 @@
     <div class="composer">
       <div class="composer-tools">
         <button class="tool-chip" id="providerBtn" type="button">⭐ Pick the best for me</button>
-        <button class="tool-chip active" id="webBtn" type="button">🌐 Search web when needed</button>
+        <button class="tool-chip active" id="webBtn" type="button" aria-disabled="true">🌐 Internet is automatic</button>
       </div>
       <div class="compose-row">
         <textarea id="prompt" rows="1" placeholder="Message AI…" aria-label="Message AI"></textarea>
@@ -79,6 +79,7 @@
   <div id="settingsNotice"></div>
 </aside>
 
+<script src="/ai-council/ai-context-v1.js?v=1" defer></script>
 <script src="/ai-council/main-chat-v2.js?v=1" defer></script>
 </body>
 </html>
