@@ -243,6 +243,30 @@
     setTimeout(() => els.accessCode.focus(), 150);
   }
 
+  async function prepareRoomAttachments(attachments) {
+    if (!attachments.length) return { text: "", meta: [] };
+    const texts = [];
+    const meta = [];
+    for (let i = 0; i < attachments.length; i += 1) {
+      notice(els.roomNotice, `Reading attachment ${i + 1} of ${attachments.length}…`);
+      let response;
+      try {
+        response = await fetch('/api/ai-agent/attachment/prepare', {
+          method: 'POST',
+          headers: { 'Content-Type':'application/json', 'x-ai-council-code': code() },
+          body: JSON.stringify({ attachment: attachments[i] }),
+        });
+      } catch (error) {
+        throw new Error(`The connection closed while uploading ${attachments[i].name}. Try that file again or use a smaller copy.`);
+      }
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) throw new Error(data.error || `Could not read ${attachments[i].name}.`);
+      if (data.attachmentText) texts.push(data.attachmentText);
+      if (Array.isArray(data.attachments)) meta.push(...data.attachments);
+    }
+    return { text: texts.join('\n\n'), meta };
+  }
+
   async function runRoom() {
     const chosen = bots.filter((b) => selected.has(b.id)).slice(0, 6);
     const topic = els.roomTopic.value.trim();
@@ -252,12 +276,13 @@
     const attachments=roomAttachmentCtl.get(); const location=await locationContext();
     els.runRoomBtn.disabled = true;
     els.roomResults.replaceChildren();
-    notice(els.roomNotice, 'The bots are working together…');
     try {
+      const preparedFiles = await prepareRoomAttachments(attachments);
+      notice(els.roomNotice, 'The bots are working together…');
       const response = await fetch('/api/ai-agent/bots/run', {
         method: 'POST',
         headers: { 'Content-Type':'application/json', 'x-ai-council-code': code() },
-        body: JSON.stringify({ topic: topic || 'Review the attached file(s).', bots: chosen, mode: els.roomMode.value, rounds: Number(els.roomRounds.value), attachments, location }),
+        body: JSON.stringify({ topic: topic || 'Review the attached file(s).', bots: chosen, mode: els.roomMode.value, rounds: Number(els.roomRounds.value), preparedAttachmentText: preparedFiles.text, preparedAttachments: preparedFiles.meta, location }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.ok) throw new Error(data.error || 'Hot Room failed.');
@@ -277,7 +302,11 @@
       saveHistory(); renderHistory();
       notice(els.roomNotice, 'Hot Room finished.', 'success');
     } catch (error) {
-      notice(els.roomNotice, error.message || String(error), 'error');
+      const raw = error?.message || String(error);
+      const message = raw === 'Failed to fetch'
+        ? 'The connection to the AI service closed before the Hot Room finished. Your files are still attached. Try again; if it repeats, attach the files one at a time.'
+        : raw;
+      notice(els.roomNotice, message, 'error');
     } finally { els.runRoomBtn.disabled = false; }
   }
 

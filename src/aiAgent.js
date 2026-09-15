@@ -417,6 +417,23 @@ export function registerAiAgentRoutes(app) {
     });
   });
 
+  app.post("/api/ai-agent/attachment/prepare", json, async (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    if (!requireAccess(req, res, accessCode)) return;
+    const attachment = req.body?.attachment;
+    if (!attachment) return res.status(400).json({ ok: false, error: "Choose a file first." });
+    try {
+      const prepared = await prepareAiContext({ question: "", attachments: [attachment], location: {}, webSearch: "off" });
+      if (!prepared.attachmentText) {
+        return res.status(422).json({ ok: false, error: prepared.attachmentError || "That file could not be read." });
+      }
+      return res.json({ ok: true, attachmentText: prepared.attachmentText, attachments: prepared.attachments });
+    } catch (error) {
+      console.error("AI attachment preparation failed:", error?.message || error);
+      return res.status(502).json({ ok: false, error: `Could not read the attachment. ${cleanText(error?.message || error, 320)}` });
+    }
+  });
+
   app.post("/api/ai-agent/chat", json, async (req, res) => {
     res.setHeader("Cache-Control", "no-store");
     if (!requireAccess(req, res, accessCode)) return;
@@ -494,7 +511,24 @@ export function registerAiAgentRoutes(app) {
 
     const rounds = Math.max(1, Math.min(3, Number(req.body?.rounds || 1)));
     const mode = ["debate", "collaborate", "roundtable"].includes(req.body?.mode) ? req.body.mode : "collaborate";
-    const prepared = await prepareAiContext({ question: topic, attachments: req.body?.attachments, location: req.body?.location, webSearch: "auto" });
+    const preparedAttachmentText = cleanText(req.body?.preparedAttachmentText, 42000);
+    const preparedAttachments = Array.isArray(req.body?.preparedAttachments)
+      ? req.body.preparedAttachments.slice(0, 6).map((item) => ({
+          name: cleanText(item?.name, 160),
+          type: cleanText(item?.type, 120),
+          size: Math.max(0, Number(item?.size || 0)),
+        }))
+      : [];
+    const prepared = await prepareAiContext({
+      question: [topic, preparedAttachmentText].filter(Boolean).join("\n\n"),
+      attachments: preparedAttachmentText ? [] : req.body?.attachments,
+      location: req.body?.location,
+      webSearch: "auto",
+    });
+    if (preparedAttachmentText) {
+      prepared.attachmentText = preparedAttachmentText;
+      prepared.attachments = preparedAttachments;
+    }
     const sharedResearch = prepared.research;
     const turns = [];
     for (let round = 1; round <= rounds; round += 1) {
@@ -505,7 +539,9 @@ export function registerAiAgentRoutes(app) {
           `Team task: ${topic}`,
           `Round ${round} of ${rounds}`,
           transcript ? `Conversation so far:\n${transcript}` : "You are the first speaker.",
-          bot.tools.webSearch && sharedResearch.text ? `Current web research:\n${sharedResearch.text}` : "",
+          prepared.locationText ? `User location context:\n${prepared.locationText}` : "",
+          prepared.attachmentText ? `Attached file context:\n${prepared.attachmentText}` : "",
+          sharedResearch.text ? `Current web research gathered automatically:\n${sharedResearch.text}` : "",
           `Now respond as ${bot.name}.`,
         ].filter(Boolean).join("\n\n");
         try {
