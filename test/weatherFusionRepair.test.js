@@ -19,7 +19,7 @@ test('today uses 40/30/10/20 while later rain excludes HRRR',()=>{
  assert.deepEqual(temperaturePolicy(0),{nws:.4,hrrr:.3,ecmwf:.1,nbm:.2});
  assert.deepEqual(temperaturePolicy(6),temperaturePolicy(0));
  assert.deepEqual(precipitationPolicy(0),temperaturePolicy(0));
- assert.deepEqual(precipitationPolicy(1),{nws:.15,ecmwf:.6,nbm:.25});
+ assert.deepEqual(precipitationPolicy(1),{nws:1});
  assert.deepEqual(precipitationPolicy(6),precipitationPolicy(1));
  assert.deepEqual(out.blendPolicy.sameDay,temperaturePolicy(0));
  assert.deepEqual(out.blendPolicy.extendedRain,precipitationPolicy(1));

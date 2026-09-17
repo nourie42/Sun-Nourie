@@ -49,7 +49,6 @@ test('an isolated later-day model rain hour matches the NWS probability',()=>{
   for(const id of ['ecmwf','nbm'])for(const interval of data.models[id].precipitationIntervals)if(interval.start*1000===target)interval.value=.012;
   const forecast=buildForecast(data),row=forecast.rainTimeline.find(item=>Date.parse(item.time)===target);
   assert.equal(row.rainLikelihood.value,49);
-  assert.equal(row.rainLikelihood.fallbackReason,'no-sustained-model-precipitation');
   assert.deepEqual(row.rainLikelihood.sourcePoints,{nws:49,hrrr:null,ecmwf:null,nbm:null});
   assert.deepEqual(row.rainLikelihood.sources.map(source=>source.id),['nws']);
 });
@@ -61,17 +60,17 @@ test('adjacent later-day 0.01-inch model hours still match NWS',()=>{
   const forecast=buildForecast(data),rows=forecast.rainTimeline.filter(item=>[target,target+H].includes(Date.parse(item.time)));
   assert.equal(rows.length,2);
   assert.ok(rows.every(row=>row.rainLikelihood.value===49));
-  assert.ok(rows.every(row=>row.rainLikelihood.fallbackReason==='no-sustained-model-precipitation'));
+  assert.ok(rows.every(row=>row.rainLikelihood.sources.map(source=>source.id).join(',')==='nws'));
 });
 
-test('adjacent later-day meaningful model rain hours retain the extended blend',()=>{
+test('adjacent later-day meaningful model rain still confirms rather than inflates NWS',()=>{
   const data=inputs({chance:49,amount:0});
   const target=now+36*H;
   for(const id of ['ecmwf','nbm'])for(const interval of data.models[id].precipitationIntervals)if([target,target+H].includes(interval.start*1000))interval.value=.03;
   const forecast=buildForecast(data),rows=forecast.rainTimeline.filter(item=>[target,target+H].includes(Date.parse(item.time)));
   assert.equal(rows.length,2);
-  assert.ok(rows.every(row=>row.rainLikelihood.value===92));
-  assert.ok(rows.every(row=>row.rainLikelihood.fallbackReason===undefined));
+  assert.ok(rows.every(row=>row.rainLikelihood.value===49));
+  assert.ok(rows.every(row=>row.rainLikelihood.sourcePoints.ecmwf===null&&row.rainLikelihood.sourcePoints.nbm===null));
 });
 
 test('every day and night percentage is the peak of identical canonical hourly evidence',()=>{
