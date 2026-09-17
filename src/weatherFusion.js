@@ -12,6 +12,7 @@ import {eveningPeriod} from './weatherFusionPolicy.js';
 import { addExperience, gridSample, PLAIN_OUTLOOK_INSTRUCTIONS } from './weatherFusionExperience.js';
 import { solarTimes } from './weatherFusionDirect.js';
 import {forecastPeriodSummary} from '../public/weather-fusion/forecast-story.js';
+import {isTonightPeriod} from '../public/weather-fusion/weather-math.js';
 /** Weather Fusion: isolated, dependency-free Express route registration.
  * Numeric forecasts stay deterministic. AI explains supplied facts; it cannot edit them.
  * Source contracts and deployment requirements: docs/weather-fusion.md.
@@ -495,7 +496,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
     return {...snapshot,danTake:retainedTake(snapshot)};
   }
   function fallback(data, reason) {
-    const evening = Number(new Intl.DateTimeFormat('en-US',{timeZone:data.location.timeZone,hour:'numeric',hourCycle:'h23'}).format(new Date(now()))) >= 15;
+    const evening = isTonightPeriod(now(),data.location.timeZone);
     const currentStory=forecastPeriodSummary(data,0,evening?'overnight':'daytime',now());
     return { mode: 'nws-summary', signature: data.signature, generatedAt: iso(now()), reason,
       headline: evening ? 'Your evening outlook' : data.days[0]?.condition || 'Forecast update', summary: currentStory.summary,

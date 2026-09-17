@@ -13,17 +13,17 @@ const base=`http://127.0.0.1:${server.address().port}`;
 const browser=await chromium.launch({headless:true});const report={data:'Fixture weather, not a live forecast',checks:[],browserErrors:[]};
 try {
  const page=await browser.newPage({viewport:{width:390,height:844}});page.on('pageerror',e=>report.browserErrors.push(e.message));
- await page.addInitScript(()=>{window.testNow=Date.parse('2026-09-05T18:59:59Z');Date.now=()=>window.testNow;});
+ await page.addInitScript(()=>{window.testNow=Date.parse('2026-09-05T21:59:59Z');Date.now=()=>window.testNow;});
  await page.goto(base+'/weather-fusion/',{waitUntil:'domcontentloaded'});
- await page.waitForSelector('[data-metric="feels"]');assert.equal(await page.locator('[data-day="0"] .day-name').innerText(),'Today');
- await page.evaluate(()=>window.testNow=Date.parse('2026-09-05T19:00:00Z'));await page.locator('#refresh').click();await page.waitForFunction(()=>document.querySelector('[data-day="0"] .day-name').textContent==='Tonight');
+ await page.waitForSelector('[data-metric="feels"]');assert.equal(await page.locator('[data-day="0"] .day-name').innerText(),'Remainder of Today');
+ await page.evaluate(()=>window.testNow=Date.parse('2026-09-05T22:00:00Z'));await page.locator('#refresh').click();await page.waitForFunction(()=>document.querySelector('[data-day="0"] .day-name').textContent==='Tonight');
  assert.ok(!(await page.locator('[data-day="0"]').innerText()).includes('—'));
  const left=await page.locator('[data-day="1"] .day-high').boundingBox(),right=await page.locator('[data-day="1"] .day-low').boundingBox();assert.ok(left.x<right.x);
  assert.ok((await page.locator('[data-day="1"] .temp-fill').getAttribute('style')).includes('left:0;'));
  assert.equal(await page.locator('.back-link').count(),0);assert.ok(!(await page.locator('body').innerText()).includes('Weather Fusion'));
  assert.match(await page.locator('#skin-exposure').innerText(),/How’s it really gonna feel/);
  assert.ok(!(await page.locator('#skin-exposure').innerText()).includes('wet bulb'));
- report.checks.push('3 PM boundary','high-first days','Tonight low','Weather Nourie branding','plain top section');
+ report.checks.push('6 PM boundary','high-first days','Tonight low','Weather Nourie branding','plain top section');
  for(const key of ['feels','precipitation','wind','humidity','pop','visibility','pressure','solar']) {
   await page.locator(`[data-metric="${key}"]`).click();assert.ok(await page.locator('#metric-dialog').isVisible());
   assert.ok(!(await page.locator('#chart-value').innerText()).includes('Not available'));

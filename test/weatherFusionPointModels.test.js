@@ -115,9 +115,9 @@ test('forecast directions cross north correctly; opposed directions are unresolv
  const north=mixWindDirection({nws:350,hrrr:10},{nws:.5,hrrr:.5}).value;
  assert.ok(Math.min(north,360-north)<.001);assert.equal(mixWindDirection({nws:0,hrrr:180},{nws:.5,hrrr:.5}).value,null);
 });
-test('afternoon warmest card stays a same-day high and retains its clock time after 3 PM',()=>{
- const forecast={location:{timeZone:'America/New_York'},metricForecasts:{series:{feels:[{time:'2026-09-05T20:00:00Z',value:99},{time:'2026-09-05T21:00:00Z',value:96},{time:'2026-09-06T10:00:00Z',value:71}]}}};
- const summary=warmestTodayWindow(forecast,Date.parse('2026-09-05T19:30:00Z'));
- assert.equal(summary.chosen.value,99);assert.match(peakComparisonHTML(summary,95),/Warmest feels like today/);assert.match(peakComparisonHTML(summary,95),/4:00 PM/);
+test('evening warmest card stays a same-day high and retains its clock time after the 6 PM transition',()=>{
+ const forecast={location:{timeZone:'America/New_York'},metricForecasts:{series:{feels:[{time:'2026-09-05T23:00:00Z',value:99},{time:'2026-09-06T01:00:00Z',value:96},{time:'2026-09-06T10:00:00Z',value:71}]}}};
+ const summary=warmestTodayWindow(forecast,Date.parse('2026-09-05T22:30:00Z'));
+ assert.equal(summary.chosen.value,99);assert.match(peakComparisonHTML(summary,95),/Warmest feels like today/);assert.match(peakComparisonHTML(summary,95),/7:00 PM/);
  assert.match(peakComparisonHTML(null,85,'America/New_York',Date.parse('2026-09-06T03:30:00Z')),/11:30 PM/);
 });

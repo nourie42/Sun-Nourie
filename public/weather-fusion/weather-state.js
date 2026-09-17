@@ -17,10 +17,15 @@ export function weatherState(condition = '', skyCover = null) {
   return {kind, label, condition: text || label, known: kind !== 'unknown',
     chance: /chance|possible|isolated|scattered (?:showers|storms)/.test(lower)};
 }
-/** Display exactly the selected forecast condition. Probability is not thunder evidence. */
+/** Keep thunder tied to forecast wording while letting dominant rain replace dry-only artwork. */
 export const THUNDER_DISPLAY_CHANCE = null;
+export const RAIN_DOMINANT_CHANCE = 70;
 export function conditionForRainChance(condition = '', chance = null, skyCover = null) {
   const state=weatherState(condition,skyCover);
+  // A dominant rain score must not retain sunny, fog-only, or generic-cloud
+  // artwork. Preserve explicit thunder and frozen-precipitation wording so
+  // lightning and snow still come only from the displayed condition itself.
+  if(finite(chance)&&chance>=RAIN_DOMINANT_CHANCE&&!['rain','storm','snow'].includes(state.kind))return 'Rain';
   return condition||state.label;
 }
 export function stationWeather(observation = {}) {

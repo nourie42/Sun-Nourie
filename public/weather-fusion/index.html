@@ -8,16 +8,16 @@
   <title>Weather Nourie</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
   <link rel="stylesheet" href="/weather-fusion/style.css?v=car-wash-icon-back-v46">
-  <link rel="stylesheet" href="/weather-fusion/forecast-layout.css?v=weather-art-labels-v10">
+  <link rel="stylesheet" href="/weather-fusion/forecast-layout.css?v=weather-qa-v67">
   <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <link rel="stylesheet" href="/weather-fusion/personal-details.css?v=wpc-mpd-v12">
   <link rel="stylesheet" href="/weather-fusion/hourly-feels.css?v=weather-art-labels-v10">
   <link rel="stylesheet" href="/weather-fusion/weather-repair.css?v=compact-weather-v21">
   <link rel="stylesheet" href="/weather-fusion/forecast-cards.css?v=weather-qa-v65">
-  <link rel="stylesheet" href="/weather-fusion/scenario-layout.css?v=scenario-weather-v29">
+  <link rel="stylesheet" href="/weather-fusion/scenario-layout.css?v=weather-qa-v67">
   <link rel="stylesheet" href="/weather-fusion/car-wash.css?v=rain-consensus-v41">
   <link rel="stylesheet" href="/weather-fusion/model-explanation.css?v=rain-consensus-v41">
-  <script type="module" src="/weather-fusion/app.js?v=rain-around-v66"></script>
+  <script type="module" src="/weather-fusion/app.js?v=weather-qa-v67"></script>
 
   <style id="experimental-bots-link-style">
     .experimental-bots-link{display:none;align-items:center;gap:.45rem;width:max-content;margin:.55rem 0 0;padding:.55rem .85rem;border:1px solid rgba(255,255,255,.22);border-radius:999px;background:rgba(11,24,43,.78);color:#f7fbff;text-decoration:none;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.18)}
@@ -85,7 +85,7 @@
         <div class="briefing-bottom"><span id="briefing-stamp">Based on your local forecasters</span><button id="expand-briefing" class="text-button" aria-expanded="false" aria-controls="briefing-detail">Read full outlook <span aria-hidden="true">↗</span></button></div>
       </section>
       <div class="forecast-grid">
-        <section class="glass daily-panel" aria-labelledby="daily-title"><div class="section-top"><h2 id="daily-title">▦ &nbsp; 7-DAY FORECAST</h2><span>Tap a day for details</span></div><div id="daily"><p class="muted">Daily data is loading.</p></div><p class="daily-footnote">Low on the left, high on the right. The bar ends at the high. After 3 PM, the first row shows tonight’s low.</p></section>
+        <section class="glass daily-panel" aria-labelledby="daily-title"><div class="section-top"><h2 id="daily-title">▦ &nbsp; 7-DAY FORECAST</h2><span>Tap a day for details</span></div><div id="daily"><p class="muted">Daily data is loading.</p></div><p class="daily-footnote">Low on the left, high on the right. The bar ends at the high. At 6 PM, the first row switches to tonight’s low.</p></section>
       </div>
       <section class="glass" id="model-explanation" aria-labelledby="model-explanation-title" hidden></section>
       <div class="metrics-heading"><h2>Your day, at a glance</h2><p>Tap any tile to explore its forecast.</p></div>
@@ -118,7 +118,7 @@
         <details class="evidence-detail"><summary>Latest local NWS forecast discussion <span id="afd-office"></span></summary><p id="afd-stamp" class="muted"></p><pre id="afd-text">The local office discussion is loading.</pre><a id="afd-link" href="https://www.weather.gov/" target="_blank" rel="noopener noreferrer">Read the original NWS discussion ↗</a></details>
         <details class="evidence-detail"><summary>How the feels-like estimates work</summary><div id="thermal-input-evidence"></div><p id="skin-science">Waiting for the latest weather.</p><div id="comfort-extra-science"></div><p id="skin-explanation"></p>
           <p>Human risk banners use the site's estimated UTCI, not NWS Heat Index or an official warning. Strong heat stress begins at 89.6°F UTCI (32°C), very strong at 100.4°F (38°C), and extreme at 114.8°F (46°C). Strong cold stress begins at 8.6°F UTCI (−13°C), very strong at −16.6°F (−27°C), and extreme at −40°F (−40°C). We include the boundary conservatively and classify before display rounding. <a href="https://confluence.ecmwf.int/spaces/FUG/pages/673551030/Section+8.1.18+Thermal+parameters" target="_blank" rel="noopener noreferrer">ECMWF UTCI stress categories</a>. Shade displays its modeled feels-like temperature and has no risk banner. Sun uses its matching feels-like estimate. Risk banners appear only above the outdoor-weather and For Pets graphics. These broad estimates are not a diagnosis or a guarantee of safety; activity, exposure duration and individual vulnerability matter. Missing readings receive no invented category. Pet pavement banners use the separate surface-heat method below.</p>
-          <p>Warmest feels like today compares the current estimate with the remaining hourly forecasts before local midnight. The time is the highest remaining forecast hour; when the current estimate is warmer, both Now and the later forecast peak time are shown. This is not a history of earlier station readings. Missing future hours are disclosed; the card does not substitute tomorrow morning's low after 3 PM.</p>
+          <p>Warmest feels like today compares the current estimate with the remaining hourly forecasts before local midnight. The time is the highest remaining forecast hour; when the current estimate is warmer, both Now and the later forecast peak time are shown. This is not a history of earlier station readings. Missing future hours are disclosed; the card does not substitute tomorrow morning's low after 6 PM.</p>
           <p>The number under the current temperature is an <strong>equivalent outdoor apparent temperature</strong>, not a claim that a person’s skin is physically at that temperature. Actual skin temperature depends on physiology, clothing, activity, acclimatization and exposure time.</p>
           <div class="thermal-grid">
             <div><strong>One all-season fallback</strong><p>Weather Nourie follows the attached Real-Feel Skin Temperature research Tier 3 approach: UTCI is the primary all-season fallback, using air temperature, moisture, wind and an estimated mean-radiant environment instead of switching between Heat Index and Wind Chill.</p></div>

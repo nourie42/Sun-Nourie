@@ -1,13 +1,17 @@
-import {weatherState,weatherTransmission,conditionForRainChance} from './weather-state.js?v=weather-qa-v65';
+import {weatherState,weatherTransmission,conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
 import {utciF} from './utci.js?v=clear-weather-daygraph-v3';
 /* Pure presentation math shared by the weather API, browser and tests. */
 export const EXPERIENCE_VERSION = 'weather-nourie-friendly-v1';
 export const finite = n => typeof n === 'number' && Number.isFinite(n);
+export const TONIGHT_START_HOUR = 18;
 const fToC = f => (f - 32) / 1.8;
 const cToF = c => c * 1.8 + 32;
 const sat = t => 6.112 * Math.exp(17.67 * t / (t + 243.5));
 export function localHour(time, zone = 'America/New_York') {
   return Number(new Intl.DateTimeFormat('en-US', {timeZone:zone, hour:'numeric', hourCycle:'h23'}).format(new Date(time)));
+}
+export function isTonightPeriod(time, zone = 'America/New_York') {
+  return localHour(time,zone) >= TONIGHT_START_HOUR;
 }
 export function rainChanceValue(likelihood, fallback = null) {
   const chance=value=>finite(value)&&value>=0&&value<=100?value:null;
@@ -22,7 +26,7 @@ export function dailyRainPeriod(day, phase = 'overall') {
   return {phase,likelihood,canonical,value:rainChanceValue(likelihood,fallback),window:canonical?likelihood.window:null};
 }
 export function dailyDisplay(day, index, now, zone) {
-  const hour=localHour(now,zone),tonight=index===0&&hour>=15,remainder=index===0&&hour>=12&&!tonight;
+  const hour=localHour(now,zone),tonight=index===0&&isTonightPeriod(now,zone),remainder=index===0&&hour>=12&&!tonight;
   const rain=dailyRainPeriod(day,tonight?'overnight':index===0?'daytime':'overall');
   const rawCondition=tonight?(day.nightCondition||day.condition):day.condition;
   return {tonight,remainder,label:tonight?'Tonight':remainder?'Remainder of Today':index===0?'Today':day.label,

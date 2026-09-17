@@ -1,7 +1,7 @@
-import {finite,rainChanceValue} from './weather-math.js?v=weather-qa-v65';
-import {weatherIcon} from './weather-display.js?v=weather-qa-v65';
-import {weatherState,conditionForRainChance} from './weather-state.js?v=weather-qa-v65';
-import {forecastGrossLevel} from './dewpoint-meter.js?v=weather-qa-v65';
+import {dailyDisplay,finite,rainChanceValue} from './weather-math.js?v=weather-qa-v67';
+import {weatherIcon} from './weather-display.js?v=weather-qa-v67';
+import {weatherState,conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
+import {forecastGrossLevel} from './dewpoint-meter.js?v=weather-qa-v67';
 
 export const CAR_WASH_RAIN_LIMIT = 25;
 const HOUR = 3600000;
@@ -143,7 +143,7 @@ function grossMeterFact(forecast, targetIndex, window) {
 
 export function carWashSummary(forecast, now = Date.now()) {
   const days = forecast?.days || [], zone = forecast?.location?.timeZone || 'America/New_York';
-  const tonight = localHour(now,zone) >= 15;
+  const displayedPeriod = days[0] ? dailyDisplay(days[0],0,now,zone) : null;
   const decisions = Array.from({length:Math.min(5,days.length)},(_,index) => carWashDayDecision(days,index));
   for(const decision of decisions){
     const blocked=days[decision.blocker],peak=blocked?.rainLikelihood;
@@ -173,14 +173,20 @@ export function carWashSummary(forecast, now = Date.now()) {
     ? window ? {title:window.label,note:`${window.hours} forecast hours at or below ${CAR_WASH_RAIN_LIMIT}% rain chance.`} : {title:'No reliable hourly window yet',note:'The three-day outlook is dry enough, but hourly timing is incomplete.'}
     : firstWash ? {title:`Try ${dayName(days[firstWash.index].date,zone,true)}`,note:window?`${window.label} looks best.`:'Hourly timing will appear closer to that day.'}
       : {title:'Wait for a three-day dry stretch',note:primary.reason};
-  // Every visible car-wash percentage must be the exact value used by the
-  // three-day decision. For Today that includes the coming overnight because
-  // rain after a wash still matters; never show a lower daytime-only number.
-  const visibleChance = primary.chance;
+  // The visible percentage and first forecast card describe the same active
+  // Today/Tonight period as the featured forecast. The wash decision remains
+  // conservative and can still use the whole-day value, including overnight
+  // rain after a daytime wash.
+  const visibleChance = displayedPeriod?.pop ?? null;
   facts.gross=grossMeterFact(forecast,firstWash?.index??0,window);
   return {state:primary.state,canWash:primary.canWash,chance:visibleChance,reason:primary.reason,lowRainDays,decisions,window,best,facts,
-    days:decisions.map((decision,index) => ({...decision,chance:decision.chance,date:days[index]?.date,label:index===0?(tonight?'Tonight':'Today'):dayName(days[index]?.date,zone),isDay:index!==0||!tonight,stamp:dayStamp(days[index]?.date),low:days[index]?.low,high:days[index]?.high,
-      condition:conditionForRainChance(index===0&&tonight?(days[index]?.nightCondition||days[index]?.condition||'Forecast unavailable'):(days[index]?.condition||'Forecast unavailable'),decision.chance)}))};
+    days:decisions.map((decision,index) => ({...decision,
+      chance:index===0?visibleChance:decision.chance,
+      date:days[index]?.date,
+      label:index===0?(displayedPeriod?.label||'Today'):dayName(days[index]?.date,zone),
+      isDay:index!==0||displayedPeriod?.tonight!==true,
+      stamp:dayStamp(days[index]?.date),low:days[index]?.low,high:days[index]?.high,
+      condition:index===0?(displayedPeriod?.condition||'Forecast unavailable'):conditionForRainChance(days[index]?.condition||'Forecast unavailable',decision.chance)}))};
 }
 
 function verdictLabel(state) {

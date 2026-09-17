@@ -1,5 +1,6 @@
 import {plainDanWording,hasDanJargon,collectDanTakeEvidence,visibleDanTakeItems,danTakeText,discussionPeriod,sectionAnchor,explicitForecastUncertainty} from './dans-take.js?v=clear-weather-daygraph-v3';
 import {bulletinFacts} from './bulletin-facts.js';
+import {isTonightPeriod} from './weather-math.js?v=weather-qa-v67';
 const norm=v=>String(v||'').replace(/\s+/g,' ').trim();
 const dateKey=(time,zone)=>new Intl.DateTimeFormat('en-CA',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(time));
 function anchoredText(text,anchor,zone,now){
@@ -28,8 +29,7 @@ export function danOverview(briefing,forecast,now=Date.now()){
   const currentSentences=(norm(synopsis).match(/[^.!?]+[.!?]+|[^.!?]+$/g)||[]).filter(s=>{const period=discussionPeriod(s,anchor,zone);return !period||period.end>now;}).join(' ');
   if(brief(currentSentences))return {text:plain(anchoredText(brief(currentSentences),anchor,zone,now)),source:'Local NWS discussion summary'};
  }
- const hour=Number(new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',hourCycle:'h23'}).format(new Date(now)));
- const day=forecast.days?.[0],text=brief((hour>=15?day?.nightDetail:day?.detail)||day?.detail||'');
+ const day=forecast.days?.[0],text=brief((isTonightPeriod(now,zone)?day?.nightDetail:day?.detail)||day?.detail||'');
  return {text:text||'The local forecast is temporarily unavailable. Please check the National Weather Service for the latest weather.',source:'NWS forecast · discussion summary unavailable'};
 }
 export function danCard(briefing,forecast,now=Date.now()){

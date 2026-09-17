@@ -13,6 +13,7 @@ test('Today metrics use their forecast period and never substitute current condi
  const html=todayForecastHTML(f,now);
  for(const value of ['Today','95°','74°','103°','23%','6 mph','UV Index','Click for more details'])assert.ok(html.includes(value),value);
  assert.match(html,/Rain chance/);assert.doesNotMatch(html,/NWS chance/);
+ assert.match(html,/aria-label="[^"]*Rain chance 23 percent\./);
  assert.doesNotMatch(html,/>Humidity<|>Precipitation</);
  assert.match(html,/data-today-forecast/);assert.doesNotMatch(html,/99 mph|99%|Sunrise|Sunset/);
 });
@@ -31,9 +32,17 @@ test('Today sky adds clouds and precipitation by forecast scenario',()=>{
  assert.equal(todaySkyProfile({condition:'Thunderstorms',pop:75}).scene,'storm');
  assert.equal(todaySkyProfile({condition:'Slight Chance Showers And Thunderstorms then Patchy Fog',pop:100}).scene,'overcast-rain');
  assert.equal(todaySkyProfile({condition:'Overcast with Rain',pop:80}).scene,'overcast-rain');
+ assert.equal(todaySkyProfile({condition:'Rain',pop:20}).scene,'cloudy','a rainy displayed condition never uses sunny artwork');
+ assert.equal(todaySkyProfile({condition:'Chance Rain',pop:40}).scene,'cloudy','chance-rain days never use sunny artwork');
  assert.match(todaySkySceneHTML(todaySkyProfile({condition:'Thunderstorms',pop:75})),/today-sky-storm\.webp/);
  assert.match(todaySkySceneHTML(todaySkyProfile({condition:'Overcast with Rain',pop:80})),/today-sky-rain\.webp/);
  assert.match(todaySkySceneHTML(todaySkyProfile({condition:'Clear',pop:0},true)),/today-sky-night-v2\.webp/);
+ const rainyTonight=todaySkySceneHTML(todaySkyProfile({nightCondition:'Rain',popNight:100},true));
+ assert.match(rainyTonight,/today-sky-rain\.webp/,'a rainy night uses rain artwork');
+ assert.doesNotMatch(rainyTonight,/today-sky-night-v2|today-moon|sky-lightning/,'plain rain does not show clear-night or lightning imagery');
+ const stormyTonight=todaySkySceneHTML(todaySkyProfile({nightCondition:'Thunderstorms',popNight:100},true));
+ assert.match(stormyTonight,/today-sky-rain\.webp/,'a stormy night avoids the daytime storm image and its sun');
+ assert.doesNotMatch(stormyTonight,/today-sky-storm|today-moon/);
 });
 test('Tonight moon follows the astronomical phase for the displayed date',()=>{
  const phases=[
@@ -70,6 +79,14 @@ test('hourly card shows the Weather Nourie consensus rather than relabeling NWS 
  assert.match(hourlyRainHTML({pop:21,rainLikelihood:{value:48,sourceValues:{nws:21,hrrr:100,ecmwf:0}}}),/>48%</);
  assert.doesNotMatch(hourlyRainHTML({pop:21,rainLikelihood:{value:48,sourceValues:{nws:21,hrrr:100,ecmwf:0}}}),/% NWS|HRRR: rain/);
  assert.match(hourlyRainHTML({pop:22}),/>22%</);
+});
+test('hourly rain tooltip reports the points actually awarded to each source',()=>{
+ const html=hourlyRainHTML({rainLikelihood:{value:15,sourceValues:{nws:7,hrrr:30,ecmwf:30,nbm:0},sourcePoints:{nws:2.8,hrrr:9,ecmwf:3,nbm:0}}});
+ assert.match(html,/NWS base 7% \(\+2\.8 points\)/);
+ assert.match(html,/HRRR rain yes \(\+9 points\)/);
+ assert.match(html,/ECMWF rain yes \(\+3 points\)/);
+ assert.match(html,/NBM rain no \(\+0 points\)/);
+ assert.doesNotMatch(html,/HRRR rain yes \(\+30 points\)|ECMWF rain yes \(\+10 points\)/);
 });
 test('Now labels the observed precipitation state instead of a whole-hour forecast probability',()=>{
  const dry={now:true,currentPrecipitation:{active:false,label:'Dry now',source:'Current station reports no precipitation.'},rainLikelihood:{value:28}};

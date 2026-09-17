@@ -1,9 +1,9 @@
 import {hourlyUvValue,hourlyUvHTML} from './daily-uv.js?v=clear-weather-daygraph-v3';
-import {outdoorExposure} from './outdoor-feels.js?v=clear-weather-daygraph-v3';
-import {currentComfortInputs} from './current-inputs.js?v=clear-weather-daygraph-v3';
-import {weatherState,conditionForRainChance} from './weather-state.js?v=weather-qa-v65';
-import {thermalComfort, finite, solarElevation,rainChanceValue} from './weather-math.js?v=weather-qa-v65';
-import {feelsAt, forecastValue, degrees} from './hourly-feels.js?v=weather-art-labels-v10';
+import {outdoorExposure} from './outdoor-feels.js?v=weather-qa-v67';
+import {currentComfortInputs} from './current-inputs.js?v=weather-qa-v67';
+import {weatherState,conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
+import {thermalComfort, finite, solarElevation,rainChanceValue} from './weather-math.js?v=weather-qa-v67';
+import {feelsAt, forecastValue, degrees} from './hourly-feels.js?v=weather-qa-v67';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function weatherShapes(condition, isDay = true) {
   const weather = weatherState(condition);
@@ -45,10 +45,15 @@ export function hourlyRainHTML(sample){
   return `<span class="hour-rain" title="${esc(status.source)}"><small class="hour-pop">${weatherMetricIcon('drop')}${esc(status.label)}</small></span>`;
  }
  const blend=sample.rainLikelihood,value=sampleRainChance(sample);
- const votes=blend?.sourceValues||{},parts=[];
- if(finite(votes.nws))parts.push(`NWS base ${Math.round(votes.nws)}%`);
- const points={hrrr:30,ecmwf:10,nbm:20};
- for(const id of ['hrrr','ecmwf','nbm'])if(finite(votes[id]))parts.push(`${id.toUpperCase()} rain ${votes[id]>0?`yes (+${points[id]} points)`:'no (+0 points)'}`);
+ const votes=blend?.sourceValues||{},awarded=blend?.sourcePoints||{},parts=[];
+ const pointText=points=>String(Math.round(points*100)/100);
+ const fullPoints={nws:40,hrrr:30,ecmwf:10,nbm:20};
+ const pointsFor=id=>finite(awarded[id])?awarded[id]:finite(votes[id])?votes[id]/100*fullPoints[id]:null;
+ if(finite(votes.nws))parts.push(`NWS base ${Math.round(votes.nws)}% (+${pointText(pointsFor('nws'))} points)`);
+ for(const id of ['hrrr','ecmwf','nbm'])if(finite(votes[id])){
+  const points=pointsFor(id);
+  parts.push(`${id.toUpperCase()} rain ${votes[id]>0?`yes (+${pointText(points)} points)`:'no (+0 points)'}`);
+ }
  const detail=parts.length?` Inputs: ${parts.join(', ')}.`:'';
  return `<span class="hour-rain" title="Weather Nourie rain likelihood.${detail}"><small class="hour-pop">${weatherMetricIcon('drop')}${finite(value)?`${Math.round(value)}%`:'—'}</small></span>`;
 }

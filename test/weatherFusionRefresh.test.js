@@ -25,6 +25,7 @@ function harness() {
     $:id=>id==='day-graph-hour'?root.input:elements[id],document:{activeElement:null},forecast:{location:{timeZone:'UTC'},days:[day('2026-09-12'),day('2026-09-13')]},activeDayDetail:null,
     Date,Event:class {constructor(type){this.type=type;}},finite:Number.isFinite,esc:String,temperature:value=>`${value}°`,percent:value=>`${value}%`,inches:value=>`${value} in`,
     dailyDisplay:d=>({label:d.label,condition:d.condition,tonight:false,primary:d.high,secondary:d.low,primaryLabel:'High'}),
+    dailyConfidenceNoticeHTML:()=>'',
     forecastPeriodSummary:(f,index)=>({chance:f.days[index].chance,amount:.1,summary:`Updated chance ${f.days[index].chance}%.`}),
     dayGraphHTML:()=>'<section></section>',installDayGraph(){},
     dayGraphPoints:(f,index)=>[7,8,9].map(hour=>({time:`${f.days[index].date}T0${hour}:00:00Z`})),

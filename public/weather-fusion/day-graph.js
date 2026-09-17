@@ -1,6 +1,6 @@
-import {timeAt,forecastValue,degrees} from './hourly-feels.js?v=weather-art-labels-v10';
+import {timeAt,forecastValue,degrees} from './hourly-feels.js?v=weather-qa-v67';
 import {hourlyUvValue,uvCategory} from './daily-uv.js?v=clear-weather-daygraph-v3';
-import {forecastGrossLevel} from './dewpoint-meter.js?v=clear-weather-daygraph-v3';
+import {forecastGrossLevel} from './dewpoint-meter.js?v=weather-qa-v67';
 const H=3600000,finite=Number.isFinite;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function dayGraphPoints(f,index,tonight=false,now=Date.now()){

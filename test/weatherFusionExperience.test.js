@@ -6,19 +6,19 @@ import {gridSample,parseWind,PLAIN_OUTLOOK_INSTRUCTIONS} from '../src/weatherFus
 import {buildForecast} from '../src/weatherFusion.js';
 import {testInputs} from './weatherFusion.fixtures.js';
 const day={label:'Today',high:86,low:68,pop:60,popNight:30,condition:'Sunny',nightCondition:'Chance Showers',nightDetail:'A few showers overnight.'};
-test('first row becomes Remainder of Today at noon and Tonight at 3 PM in the LOCATION timezone',()=>{
+test('first row becomes Remainder of Today at noon and Tonight at 6 PM in the LOCATION timezone',()=>{
  assert.equal(dailyDisplay(day,0,Date.parse('2026-09-05T15:59:59Z'),'America/New_York').label,'Today');
  assert.equal(dailyDisplay(day,0,Date.parse('2026-09-05T16:00:00Z'),'America/New_York').label,'Remainder of Today');
- assert.equal(dailyDisplay(day,0,Date.parse('2026-09-05T18:59:59Z'),'America/New_York').label,'Remainder of Today');
- const p=dailyDisplay(day,0,Date.parse('2026-09-05T19:00:00Z'),'America/New_York');
+ assert.equal(dailyDisplay(day,0,Date.parse('2026-09-05T21:59:59Z'),'America/New_York').label,'Remainder of Today');
+ const p=dailyDisplay(day,0,Date.parse('2026-09-05T22:00:00Z'),'America/New_York');
  assert.equal(p.label,'Tonight');assert.equal(p.primary,68);assert.equal(p.secondary,null);assert.equal(p.pop,30);assert.equal(p.condition,'Chance Showers');
- assert.equal(dailyDisplay(day,0,Date.parse('2026-09-05T19:00:00Z'),'America/Los_Angeles').label,'Remainder of Today');
+ assert.equal(dailyDisplay(day,0,Date.parse('2026-09-05T22:00:00Z'),'America/Los_Angeles').label,'Remainder of Today');
  assert.equal(dailyDisplay(day,1,Date.parse('2026-09-05T23:00:00Z'),'America/New_York').primary,86);
 });
 test('daily display consistently prefers the blended rain likelihood',()=>{
  const blended={...day,popDay:60,popDayLikelihood:{value:24},popNightLikelihood:{value:12},rainLikelihood:{value:32}};
  assert.equal(dailyDisplay(blended,0,Date.parse('2026-09-05T18:00:00Z'),'America/New_York').pop,24);
- assert.equal(dailyDisplay(blended,0,Date.parse('2026-09-05T20:00:00Z'),'America/New_York').pop,12);
+ assert.equal(dailyDisplay(blended,0,Date.parse('2026-09-05T22:00:00Z'),'America/New_York').pop,12);
  assert.equal(dailyDisplay(blended,1,Date.parse('2026-09-05T20:00:00Z'),'America/New_York').pop,32);
 });
 test('Tonight never invents or relabels a missing high',()=>{

@@ -90,8 +90,14 @@ test('same, lower and higher later readings are labeled honestly and never chang
 test('thunder icons follow thunder wording, not rain percentage',()=>{
  assert.equal(conditionForRainChance('Scattered Showers And Thunderstorms then Partly Sunny',26),'Scattered Showers And Thunderstorms then Partly Sunny');
  assert.equal(conditionForRainChance('Rain',100),'Rain');
+ assert.equal(conditionForRainChance('Sunny',100),'Rain');
+ assert.equal(conditionForRainChance('Fog',100),'Rain');
+ assert.equal(conditionForRainChance('Cloudy',70),'Rain');
+ assert.equal(conditionForRainChance('Sunny',69),'Sunny');
+ assert.equal(conditionForRainChance('Snow',100),'Snow');
  assert.equal(weatherState(conditionForRainChance('Rain',100)).kind,'rain');
  assert.doesNotMatch(weatherIcon(conditionForRainChance('Rain',100)),/sky-lightning/);
+ assert.doesNotMatch(weatherIcon(conditionForRainChance('Sunny',100)),/sky-lightning|data-weather-kind="clear"/);
  assert.equal(weatherState(conditionForRainChance('Thunderstorms',26)).kind,'storm');
  assert.match(weatherIcon(conditionForRainChance('Thunderstorms',26)),/sky-lightning/);
 });

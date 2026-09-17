@@ -1,7 +1,7 @@
 import {buildForecast} from '../src/weatherFusion.js';
 import {testInputs,snapshot} from '../test/weatherFusion.fixtures.js';
 import {validateSnapshot} from '../src/weatherFusionDirect.js';
-export function fixture(location='knightdale',time=Date.parse('2026-09-05T19:00:00Z')) {
+export function fixture(location='knightdale',time=Date.parse('2026-09-05T22:00:00Z')) {
  const input=structuredClone(testInputs);input.now=time;
  input.location=location==='knightdale'?input.location:{id:'greenville',name:'Greenville, NC',latitude:35.6127,longitude:-77.3664};
  input.point.cwa=location==='knightdale'?'RAH':'MHX';input.discussion.office=input.point.cwa;

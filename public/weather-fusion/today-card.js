@@ -1,8 +1,8 @@
 import {weatherState} from './weather-state.js';
-import {dailyDisplay,dailyRainPeriod,finite} from './weather-math.js?v=weather-qa-v65';
-import {dailyFeels,degrees,timeAt} from './hourly-feels.js?v=weather-art-labels-v10';
+import {dailyDisplay,dailyRainPeriod,finite} from './weather-math.js?v=weather-qa-v67';
+import {dailyFeels,degrees,timeAt} from './hourly-feels.js?v=weather-qa-v67';
 import {uvCategory} from './daily-uv.js?v=weather-art-labels-v10';
-import {weatherIcon,weatherMetricIcon} from './weather-display.js?v=weather-qa-v65';
+import {weatherIcon,weatherMetricIcon} from './weather-display.js?v=weather-qa-v67';
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const reading=(value,unit='')=>finite(value)?`${Math.round(value)}${unit}`:'—';
 export function periodWeatherStats(forecast,now=Date.now()){
@@ -33,7 +33,8 @@ export function todaySkyProfile(day={},tonight=false){
  if(explicitThunder&&state.kind==='storm'&&pop>=55&&!/chance|possible|isolated|scattered/i.test(condition))scene='storm';
  else if(wet)scene='overcast-rain';
  else if(explicitThunder&&state.kind==='storm')scene='building';
- else if(['rain','snow'].includes(state.kind)&&pop>=50)scene='overcast-rain';
+ else if(state.kind==='rain')scene=finite(pop)&&pop>=50?'overcast-rain':'cloudy';
+ else if(state.kind==='snow'&&pop>=50)scene='overcast-rain';
  else if(state.kind==='cloudy'||pop>=45)scene='cloudy';
  else if(state.kind==='partly-cloudy'||state.kind==='fog'||pop>=15)scene='few-clouds';
  return {scene,pop,night:tonight,state:state.kind,lift,explicitThunder};
@@ -68,9 +69,10 @@ export function moonPhaseHTML(epoch=Date.now()){
 }
 export function todaySkySceneHTML(profile,epoch=Date.now()){
  const {scene,night}=profile;
- const asset=night?'night':['clear','few-clouds'].includes(scene)?'clear':scene==='cloudy'?'clouds':scene==='overcast-rain'?'rain':'storm';
- const src=night?'/weather-fusion/today-sky-night-v2.webp':`/weather-fusion/today-sky-${asset}.webp`;
- return `<img class="today-sky" data-scene="${scene}" src="${src}" alt="" aria-hidden="true">${night?moonPhaseHTML(epoch):''}`;
+ const rainyNight=night&&['overcast-rain','storm'].includes(scene);
+ const asset=rainyNight?'rain':night?'night':['clear','few-clouds'].includes(scene)?'clear':scene==='cloudy'?'clouds':scene==='overcast-rain'?'rain':'storm';
+ const src=asset==='night'?'/weather-fusion/today-sky-night-v2.webp':`/weather-fusion/today-sky-${asset}.webp`;
+ return `<img class="today-sky" data-scene="${scene}" src="${src}" alt="" aria-hidden="true">${night&&!rainyNight?moonPhaseHTML(epoch):''}`;
 }
 export function todayForecastHTML(forecast,now=Date.now()){
  const day=forecast.days?.[0];if(!day)return '<p class="muted">Daily forecast is unavailable.</p>';
@@ -80,19 +82,26 @@ export function todayForecastHTML(forecast,now=Date.now()){
  const profile=todaySkyProfile(day,p.tonight),feelValue=p.tonight?feel.low?.low?.value:feel.high?.high?.value;
  const trend=forecast.rainTrend?.direction==='down'&&finite(forecast.rainTrend.change)?`<em>↓ Down ${Math.round(forecast.rainTrend.change)} points</em>`:'';
  const banner=confidenceBannerHTML(day);
- return `${banner}<button type="button" class="today-weather-card ${p.tonight?'today-night':p.remainder?'today-remainder':''}" data-today-forecast aria-haspopup="dialog" aria-label="${esc(p.label)}, ${esc(p.condition)}, ${p.primaryLabel} ${reading(p.primary)} degrees${finite(p.secondary)?`, low ${reading(p.secondary)} degrees`:''}. Forecast confidence ${esc(confidence)}. Open details.">
+ return `${banner}<button type="button" class="today-weather-card ${p.tonight?'today-night':p.remainder?'today-remainder':''}" data-today-forecast aria-haspopup="dialog" aria-label="${esc(p.label)}, ${esc(p.condition)}, ${p.primaryLabel} ${reading(p.primary)} degrees${finite(p.secondary)?`, low ${reading(p.secondary)} degrees`:''}. ${finite(p.pop)?`Rain chance ${reading(p.pop)} percent.`:'Rain chance unavailable.'} Forecast confidence ${esc(confidence)}. Open details.">
  ${todaySkySceneHTML(profile,now)}<span class="today-scene-shade"></span><span class="today-copy"><span class="day-name">${esc(p.label)}</span><span class="today-condition" title="${esc(p.condition)}">${esc(shortForecastCondition(p.condition))}</span><span class="today-temperatures">${p.tonight?'':`<span class="today-low"><strong>${degrees(p.secondary)}</strong><small>Low</small></span><i>—</i>`}<span class="today-high"><strong>${degrees(p.primary)}</strong><small>${p.primaryLabel}</small></span></span><span class="today-feels">Feels like <b>${degrees(feelValue)}</b></span></span>
  <span class="today-symbol">${weatherIcon(p.condition,!p.tonight,80)}<strong>${reading(p.pop,'%')}</strong><small>Rain chance</small>${trend}</span>
  <span class="today-metrics">${metric('wind',reading(stats.wind,' mph'),'Wind','Average available wind forecast for this period')}${metric('sun',`${uv.value===null?'—':uv.index}`,'UV Index','Peak UV forecast today')}</span><span class="today-more">Click for more details <b aria-hidden="true">›</b></span></button>`;
 }
 
 export function confidenceBannerHTML(day={}){
- const c=day.confidence;
- if(!c||!['low','very-low'].includes(c.key))return '';
+ const notice=confidenceNotice(day.confidence,'today');
+ if(!notice)return '';
+ return `<button type="button" class="today-confidence-banner" data-today-forecast aria-haspopup="dialog"><strong>${esc(notice.title)}</strong><span>${esc(notice.text)}</span></button>`;
+}
+
+export function confidenceNotice(confidence,subject='forecast'){
+ const c=confidence;
+ if(!c||!['low','very-low'].includes(c.key))return null;
  const factors=Array.isArray(c.factors)?c.factors.join(' '):'';
  const reasons=[];
  if(/spread|disagreement|rainfall/i.test(factors))reasons.push('the forecast sources do not line up cleanly');
  if(/limited|unavailable|1 usable|0 usable|one NWS/i.test(factors))reasons.push('some usual forecast inputs are missing or limited');
- if(!reasons.length)reasons.push('today has more uncertainty than normal');
- return `<button type="button" class="today-confidence-banner" data-today-forecast aria-haspopup="dialog"><strong>Lower confidence today</strong><span>${esc(reasons.slice(0,2).join(', '))}. Click for details.</span></button>`;
+ if(!reasons.length)reasons.push(`${subject==='today'?'today':'this forecast'} has more uncertainty than normal`);
+ const title=c.key==='very-low'?`Very low confidence ${subject}`:`Lower confidence ${subject}`;
+ return {title,text:`${reasons.slice(0,2).join(', ')}. Click for details.`};
 }

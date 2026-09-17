@@ -27,6 +27,14 @@ export function dewpointPoints(forecast,now,hours=240){
  }
  return [...unique.values()].sort((a,b)=>a.epoch-b.epoch);
 }
+export function currentDewpointValue(forecast,now=Date.now()){
+ const observed=forecast?.current?.dewpoint;
+ if(finite(observed))return observed;
+ const currentHour=(forecast?.metricForecasts?.series?.dewpoint||[]).find(point=>{
+  const start=Date.parse(point.time);return finite(point.value)&&finite(start)&&start<=now&&now<start+HOUR;
+ });
+ return finite(currentHour?.value)?currentHour.value:null;
+}
 function styles(){
  if(document.getElementById('weather-nourie-dewpoint-meter-css'))return;
  const l=document.createElement('link');l.id='weather-nourie-dewpoint-meter-css';l.rel='stylesheet';l.href='/weather-fusion/dewpoint-meter.css?v=centered-heading-v30';
@@ -76,8 +84,7 @@ export function renderDewpointMeter(forecast,now=Date.now()){
  let panel=document.getElementById('dewpoint-gross-meter');
  if(!panel){const anchor=document.getElementById('car-wash-forecast')||host;panel=document.createElement('section');panel.id='dewpoint-gross-meter';panel.className='glass dewpoint-gross-meter';panel.setAttribute('aria-labelledby','gross-title');anchor.insertAdjacentElement('afterend',panel);}
  const all=dewpointPoints(forecast,now,240),pts=dewpointPoints(forecast,now,horizon),valid=pts.filter(p=>finite(p.value));
- const currentHour=pts.find(p=>p.epoch<=now&&now<p.epoch+HOUR)||pts.find(p=>p.epoch>=Math.floor(now/HOUR)*HOUR);
- const zone=forecast.location.timeZone||'America/New_York',dp=finite(forecast.current.dewpoint)?forecast.current.dewpoint:currentHour?.value,level=dewpointGrossLevel(dp,forecast.current.wind);
+ const zone=forecast.location.timeZone||'America/New_York',dp=currentDewpointValue(forecast,now),level=dewpointGrossLevel(dp,forecast.current.wind);
  const worst=valid.reduce((best,p)=>!best||p.value>best.value?p:best,null),coverage=all.filter(p=>finite(p.value)).at(-1);
  const hoursAvailable=coverage?Math.max(0,Math.floor((coverage.epoch-now)/HOUR)):0;
  const box=window.getComputedStyle(panel);

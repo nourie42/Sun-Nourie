@@ -1,8 +1,8 @@
-import {outdoorExposure} from './outdoor-feels.js?v=clear-weather-daygraph-v3';
-import {finite,localHour} from './weather-math.js?v=forecast-trace-v40';
-import {timeAt,summarizeFeels} from './hourly-feels.js?v=clear-weather-daygraph-v3';
+import {outdoorExposure} from './outdoor-feels.js?v=weather-qa-v67';
+import {finite,isTonightPeriod,localHour} from './weather-math.js?v=weather-qa-v67';
+import {timeAt,summarizeFeels} from './hourly-feels.js?v=weather-qa-v67';
 export function comfortMode(time,zone='America/New_York'){
- const hour=localHour(time,zone);return hour>=15?'overnight':hour<5?'predawn':'day';
+ const hour=localHour(time,zone);return isTonightPeriod(time,zone)?'overnight':hour<5?'predawn':'day';
 }
 const dateAt=(t,z)=>new Intl.DateTimeFormat('en-CA',{timeZone:z,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(t));
 /** The requested warmest card remains a same-day high after the daily row has

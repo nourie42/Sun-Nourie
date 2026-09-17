@@ -1,4 +1,4 @@
-import {weatherShapes} from './weather-display.js?v=weather-qa-v65';
+import {weatherShapes} from './weather-display.js?v=weather-qa-v67';
 import {weatherState} from './weather-state.js';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 
@@ -150,8 +150,9 @@ export function precipitationActivity(condition='',context={}){
 
 export function comfortSceneState(daylight=true,condition='Clear',feels=null,context={}){
  const kind=weatherState(condition).kind,precipitation=precipitationActivity(condition,context);
- if(kind==='snow'||(finite(feels)&&feels<40))return {key:'cold',asset:'comfort-reference-scenes-cold.webp'};
+ if(kind==='snow')return {key:'cold',asset:'comfort-reference-scenes-cold.webp'};
  if(precipitation==='active')return {key:'rain',asset:'comfort-reference-scenes-rain.webp'};
+ if(finite(feels)&&feels<40)return {key:'cold',asset:'comfort-reference-scenes-cold.webp'};
  if(precipitation==='possible')return {key:'carry-umbrella',asset:'comfort-reference-scenes-carry-umbrella.svg'};
  if(kind==='fog')return {key:'fog',asset:'comfort-reference-scenes-fog.webp'};
  if(!daylight)return {key:'dawn',asset:'comfort-reference-scenes-dawn.webp'};
@@ -181,7 +182,8 @@ export function referenceScene(panel,daylight=true,condition='Clear',feels=null,
  const sky=skyPalette(weather,daylight);
  const subject=panel===0?'A boy sitting beneath a shade tree':panel===1?'A boy outdoors':'A woman walking a light brown toy poodle';
  const normalClothing={hot:'light hot-weather clothing',warm:'light warm-weather clothing',mild:'everyday mild-weather clothing',cool:'a jacket and long pants',cold:'a coat, scarf and warm hat'}[clothingForFeels(feels)];
- const action={hot:'visibly reacting to extreme heat in light hot-weather clothing',rain:'using rain gear and an umbrella in steady rain',umbrella:'holding an open umbrella under a cloudy sky before rain begins', 'carry-umbrella':'carrying a closed umbrella under a cloudy sky because rain is possible but not likely enough to open it',cold:'wearing a coat, scarf and warm hat for cold weather',fog:'clearly visible in diffuse fog with no direct sunlight',watch:'looking at a cloudy sky with no rain gear needed',dawn:'clearly visible outdoors before sunrise with no direct sunlight',normal:`outdoors in ${normalClothing}`}[scene.key];
+ const rainAction=panel===0?'sheltering beneath a leafy tree as steady rain falls nearby':'using rain gear and an umbrella in steady rain';
+ const action={hot:'visibly reacting to extreme heat in light hot-weather clothing',rain:rainAction,umbrella:'holding an open umbrella under a cloudy sky before rain begins', 'carry-umbrella':'carrying a closed umbrella under a cloudy sky because rain is possible but not likely enough to open it',cold:'wearing a coat, scarf and warm hat for cold weather',fog:'clearly visible in diffuse fog with no direct sunlight',watch:'looking at a cloudy sky with no rain gear needed',dawn:'clearly visible outdoors before sunrise with no direct sunlight',normal:`outdoors in ${normalClothing}`}[scene.key];
  const label=panel===2&&scene.key==='rain'
   ?'A woman in rain gear walking a light brown toy poodle as the dog shakes rainwater from its fur'
   :`${subject}, ${action}`;

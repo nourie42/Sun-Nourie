@@ -33,7 +33,7 @@ try{
  await page.goto(root+'/weather-fusion/',{waitUntil:'domcontentloaded'});await page.waitForSelector('#gross-scrubber');
  assert.doesNotMatch(await page.locator('#skin-exposure').innerText(),/tonight|overnight/i);
  assert.match(await page.locator('#skin-values').innerText(),/right now.*warmest today/s);
- assert.equal(await page.locator('[data-day="0"] .day-name').innerText(),'Today');
+ assert.equal(await page.locator('[data-day="0"] .day-name').innerText(),'Remainder of Today');
  const center=await page.locator('.gross-number').boundingBox(),tile=await page.locator('#dewpoint-gross-meter').boundingBox();
  assert.ok(Math.abs(center.x+center.width/2-tile.x-tile.width/2)<2,'Dewpoint number must be centered');
  for(const range of [24,48,168,240]){
@@ -69,12 +69,12 @@ try{
   await page.locator('#chart-scrubber').fill('3');await page.keyboard.press('Escape');
  }
  await page.locator('[data-place="greenville"]').click();await page.waitForFunction(()=>document.querySelector('#city-name').textContent.includes('Greenville')&&document.querySelector('#gross-scrubber'));
- now=Date.parse('2026-09-06T18:59:59Z');await page.clock.setFixedTime(new Date(now));await page.locator('#refresh').click();await page.waitForTimeout(500);
+ now=Date.parse('2026-09-06T21:59:59Z');await page.clock.setFixedTime(new Date(now));await page.locator('#refresh').click();await page.waitForTimeout(500);
  assert.equal(await page.locator('[data-day="0"] .day-name').innerText(),'Today');
- now=Date.parse('2026-09-06T19:00:00Z');await page.clock.setFixedTime(new Date(now));await page.locator('#refresh').click();await page.waitForFunction(()=>document.querySelector('#condition').textContent.includes('Tonight'));
+ now=Date.parse('2026-09-06T22:00:00Z');await page.clock.setFixedTime(new Date(now));await page.locator('#refresh').click();await page.waitForFunction(()=>document.querySelector('[data-day="0"] .day-name').textContent==='Tonight');
  assert.equal(await page.locator('[data-day="0"] .day-name').innerText(),'Tonight');
  assert.match(await page.locator('#skin-values').innerText(),/coolest tonight/);
- report.checks.push('all eight metric dialogs','location switching','14:59:59 -> 15:00 local boundary');
+ report.checks.push('all eight metric dialogs','location switching','17:59:59 -> 18:00 local boundary');
  assert.deepEqual(report.errors,[]);report.success=true;
 }finally{await fs.writeFile(dir+'/repair-report.json',JSON.stringify(report,null,2));await browser.close();await new Promise(r=>server.close(r));}
 console.log(JSON.stringify(report,null,2));

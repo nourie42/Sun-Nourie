@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {graphGeometry,dewpointPoints} from '../public/weather-fusion/dewpoint-meter.js';
+import {graphGeometry,dewpointPoints,currentDewpointValue} from '../public/weather-fusion/dewpoint-meter.js';
 const H=3600000,start=Date.parse('2026-09-06T11:00:00Z');
 const source=name=>readFileSync(new URL('../public/weather-fusion/'+name,import.meta.url),'utf8');
 for(const width of [240,280,310,375,600,768,1184]){
@@ -27,6 +27,19 @@ test('empty and missing dew-point values stay unavailable, not invented',()=>{
  const forecast={metricForecasts:{series:{dewpoint:[{time:new Date(start).toISOString(),value:null},{time:new Date(start+H).toISOString(),value:65}]}}};
  const points=dewpointPoints(forecast,start,240);assert.equal(points.length,2);assert.equal(points[0].value,null);
 });
+test('Gross Meter prefers an observation, then the in-progress forecast hour, and never borrows the next hour',()=>{
+ const now=start+23*60000;
+ const forecast={current:{dewpoint:null},metricForecasts:{series:{dewpoint:[
+  {time:new Date(start).toISOString(),value:64},
+  {time:new Date(start+H).toISOString(),value:72}
+ ]}}};
+ assert.equal(currentDewpointValue(forecast,now),64);
+ forecast.current.dewpoint=61;assert.equal(currentDewpointValue(forecast,now),61);
+ forecast.current.dewpoint=null;forecast.metricForecasts.series.dewpoint.unshift({time:new Date(start).toISOString(),value:null});
+ assert.equal(currentDewpointValue(forecast,now),64,'a missing duplicate cannot hide an available current-hour value');
+ forecast.metricForecasts.series.dewpoint.find(point=>point.value===64).value=null;
+ assert.equal(currentDewpointValue(forecast,now),null);
+});
 test('current temperature, active NWS bulletins, Today and hourly forecast precede comfort panels',()=>{
  const html=source('index.html'),ids=['id="temperature"','id="nws-bulletins"','id="today-forecast"','id="hourly"','id="skin-exposure"'];
  const positions=ids.map(id=>html.indexOf(id));assert.ok(positions.every(i=>i>=0));
@@ -49,4 +62,9 @@ test('today summary keeps the daily timing policy and existing detail handler',(
  assert.match(source('today-card.js'),/dailyDisplay\(day,0,now,forecast.location.timeZone\)/);
  assert.match(js,/\$\('daily'\)\?\.querySelector\('\[data-day="0"\]'\)\?\.click\(\)/);
  assert.match(js,/\$\('daily'\)\.innerHTML=rows\.join\(''\)/);
+});
+test('rainy Tonight artwork has an explicit dark night treatment',()=>{
+ const css=source('forecast-layout.css');
+ assert.match(css,/\.today-night \.today-sky\[data-scene="overcast-rain"\][^\{]*\{filter:brightness\(\.38\)[^}]*saturate\(\.72\)/);
+ assert.match(css,/\.today-night \.today-sky\[data-scene="overcast-rain"\]\+\.today-scene-shade[^\{]*\{background:linear-gradient/);
 });

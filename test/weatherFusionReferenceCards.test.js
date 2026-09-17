@@ -4,6 +4,9 @@ import {comfortSceneState,precipitationActivity,referenceScene} from '../public/
 import {pavementHTML,pavementEstimate} from '../public/weather-fusion/pavement.js';
 
 test('illustrated weather stays synchronized across outdoor and pet scenes',()=>{
+ const shadedRain=referenceScene(0,true,'Rain',88);
+ assert.match(shadedRain,/sheltering beneath a leafy tree as steady rain falls nearby/);
+ assert.doesNotMatch(shadedRain,/using rain gear and an umbrella/);
  for(const panel of [1,2]){
   assert.match(referenceScene(panel,true,'Clear',88),/data-scene="hot"/);
   assert.match(referenceScene(panel,true,'Clear',88),/comfort-reference-scenes-hot\.webp/);
@@ -52,6 +55,7 @@ test('scene policy distinguishes fog, low rain chance, active rain and pre-sunri
  assert.deepEqual(comfortSceneState(true,'Foggy',77,{pop:80}),{key:'carry-umbrella',asset:'comfort-reference-scenes-carry-umbrella.svg'});
  assert.deepEqual(comfortSceneState(true,'Foggy',77,{pop:81}),{key:'rain',asset:'comfort-reference-scenes-rain.webp'});
  assert.deepEqual(comfortSceneState(true,'Cloudy',77,{pop:0,rainAround:true}),{key:'rain',asset:'comfort-reference-scenes-rain.webp'});
+ assert.deepEqual(comfortSceneState(true,'Rain',35,{pop:100}),{key:'rain',asset:'comfort-reference-scenes-rain.webp'},'active rain takes precedence over generic cold styling');
  assert.deepEqual(comfortSceneState(true,'Slight Chance Thunderstorms',92,{pop:20}),{key:'carry-umbrella',asset:'comfort-reference-scenes-carry-umbrella.svg'});
  assert.deepEqual(comfortSceneState(true,'Chance Showers',70,{pop:49}),{key:'carry-umbrella',asset:'comfort-reference-scenes-carry-umbrella.svg'});
  assert.deepEqual(comfortSceneState(true,'Chance Thunderstorms',92,{pop:50}),{key:'carry-umbrella',asset:'comfort-reference-scenes-carry-umbrella.svg'});

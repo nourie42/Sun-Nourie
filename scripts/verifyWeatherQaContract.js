@@ -10,21 +10,26 @@ import {precipitationActivity,comfortSceneState} from '../public/weather-fusion/
 const close=(a,b)=>Math.abs(a-b)<1e-8;
 
 assert.equal(deterministicRainSignal(0),0);
-assert.equal(deterministicRainSignal(0.004),30);
-assert.equal(deterministicRainSignal(0.010),30);
-assert.equal(deterministicRainSignal(0.099),30);
+assert.ok(close(deterministicRainSignal(0.004),100/3));
+assert.ok(close(deterministicRainSignal(0.010),100/3));
+assert.equal(deterministicRainSignal(0.0100001),100);
+assert.equal(deterministicRainSignal(0.099),100);
 assert.equal(deterministicRainSignal(0.10),100);
 
 const boundary=precipitationLikelihood(7,{sourceValues:{hrrr:0,ecmwf:0.004,nbm:0.010}});
-assert.equal(boundary.value,12);
+assert.equal(boundary.value,13);
 assert.ok(close(boundary.sourcePoints.nws,2.8));
 assert.equal(boundary.sourcePoints.hrrr,0);
-assert.equal(boundary.sourcePoints.ecmwf,3);
-assert.equal(boundary.sourcePoints.nbm,6);
+assert.ok(close(boundary.sourcePoints.ecmwf,10/3));
+assert.ok(close(boundary.sourcePoints.nbm,20/3));
 
 assert.equal(conditionForRainChance('Rain',100),'Rain');
+assert.equal(conditionForRainChance('Sunny',100),'Rain');
+assert.equal(conditionForRainChance('Fog',100),'Rain');
+assert.equal(conditionForRainChance('Sunny',69),'Sunny');
 assert.equal(weatherState(conditionForRainChance('Rain',100)).kind,'rain');
 assert.doesNotMatch(weatherIcon(conditionForRainChance('Rain',100)),/sky-lightning/);
+assert.doesNotMatch(weatherIcon(conditionForRainChance('Sunny',100)),/sky-lightning|data-weather-kind="clear"/);
 assert.match(weatherIcon(conditionForRainChance('Thunderstorms',20)),/sky-lightning/);
 
 assert.equal(todaySkyProfile({condition:'Rain',pop:100}).scene,'overcast-rain');

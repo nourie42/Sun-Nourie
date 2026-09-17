@@ -137,7 +137,8 @@ test('canonical day and overnight text, card values and peaks use the identical 
     assert.doesNotMatch(story.summary,/but no available hourly reading|70%|60%|Raw NWS/);
   }
   assert.equal(dailyDisplay(f.days[0],0,now,'UTC').pop,55);
-  assert.equal(dailyDisplay(f.days[0],0,base+4*HOUR,'UTC').pop,9);
+  assert.equal(dailyDisplay(f.days[0],0,base+4*HOUR,'UTC').pop,55);
+  assert.equal(dailyDisplay(f.days[0],0,base+6*HOUR,'UTC').pop,9);
   assert.equal(dailyDisplay(f.days[0],1,now,'UTC').pop,55);
 });
 

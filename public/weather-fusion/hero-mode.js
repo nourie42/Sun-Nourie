@@ -1,10 +1,10 @@
-import {solarElevation} from './weather-math.js?v=forecast-trace-v40';
+import {isTonightPeriod,solarElevation} from './weather-math.js?v=weather-qa-v67';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 export function localHour(time=Date.now(),zone='America/New_York'){
   return Number(new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',hourCycle:'h23'}).format(new Date(time)));
 }
 export function heroWeather(data,time=Date.now()){
-  const zone=data?.location?.timeZone||'America/New_York',hour=localHour(time,zone),tonight=hour>=15;
+  const zone=data?.location?.timeZone||'America/New_York',tonight=isTonightPeriod(time,zone);
   const c=data?.current||{},d=data?.days?.[0]||{},hourly=data?.hours?.[0]||{};
   if(tonight){
     return {

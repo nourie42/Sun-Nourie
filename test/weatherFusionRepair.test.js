@@ -62,14 +62,15 @@ test('5:40 AM is today, never tonight or the previous overnight minimum',()=>{
  const summary=comfortWindow(f,t);assert.equal(summary.label,'Forecast feels-like peak ahead');assert.equal(summary.chosen.value,91);
  assert.equal(heroWeather(f,t).tonight,false);
  assert.doesNotMatch(comfortNarrative({temperature:73,dewpoint:73,wind:0},{shade:82},summary,zone),/tonight|overnight|bottoms out/i);
- assert.equal(comfortMode(Date.parse('2026-09-06T19:00Z'),zone),'overnight');
+ assert.equal(comfortMode(Date.parse('2026-09-06T19:00Z'),zone),'day');
+ assert.equal(comfortMode(Date.parse('2026-09-06T22:00Z'),zone),'overnight');
 });
 test('night low is the coming evening, not the predawn period with the same calendar date',()=>{
  const early={startTime:'2026-09-06T04:00:00Z',endTime:'2026-09-06T10:00:00Z',isDaytime:false,temperature:69};
  const night={startTime:'2026-09-06T22:00:00Z',endTime:'2026-09-07T10:00:00Z',isDaytime:false,temperature:65};
  assert.equal(eveningPeriod([early,night],'2026-09-06',zone,Date.parse('2026-09-06T09:40Z')),night);
  const f={location:{timeZone:zone},current:{temperature:82},days:[{low:null}]};
- assert.equal(heroWeather(f,Date.parse('2026-09-06T19:00Z')).temperature,null,'Do not relabel current temperature as tonight low');
+ assert.equal(heroWeather(f,Date.parse('2026-09-06T22:00Z')).temperature,null,'Do not relabel current temperature as tonight low');
 });
 test('bounded thermal observation alignment fades from the actual observation, not each refresh',()=>{
  const time=Date.parse('2026-09-06T09:41Z'),obs=Date.parse('2026-09-06T09:15Z');

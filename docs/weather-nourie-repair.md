@@ -18,7 +18,7 @@ These are user-selected weights, not a verified accuracy ranking.
 Only the future evening beginning on a forecast date supplies that day's overnight
 low. A pre-dawn NWS period with the same date is not mistakenly selected as tonight.
 At 5 AM local time the comfort card shifts to today. Before 5 AM it uses pre-dawn
-wording. At 3 PM both the main display and comfort outlook shift to tonight.
+wording. At 6 PM both the main display and comfort outlook shift to tonight.
 
 ## Near-term thermal continuity
 

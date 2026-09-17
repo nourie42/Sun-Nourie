@@ -12,7 +12,7 @@ function likelihood(value, options = {}) {
   const sourcePoints={nws:12,hrrr:hrrrWet?30:0,ecmwf:0,nbm:0};
   return {value,rawValue:value,weightedValue:value,rawTotal:value,
     officialProbability:30,sourceValues,sourcePoints,sourceAmounts:{nws:.01,hrrr:hrrrWet?.02:0,ecmwf:0,nbm:0},drySources:['hrrr','ecmwf','nbm'],wetSources:hrrrWet?['hrrr']:[],
-    reducedQpfThresholdInches:.1,reducedPointFraction:.3,
+    reducedQpfThresholdInches:.010,reducedPointFraction:1/3,
     sources:[{id:'nws',value:30,weight:.4,points:12,runAt:at(-1)},{id:'hrrr',value:sourceValues.hrrr,weight:.3,points:sourcePoints.hrrr,runAt:at(-2)},{id:'ecmwf',value:0,weight:.1,points:0,runAt:at(-5)},{id:'nbm',value:0,weight:.2,points:0,runAt:at(-3)}],...options};
 }
 
@@ -33,7 +33,8 @@ function fixture() {
 test('model explanation defaults to the same Today/ Tonight period as the main card',()=>{
   const forecast=fixture();
   assert.equal(modelExplanationView(forecast,{now}).phase,'daytime');
-  assert.equal(modelExplanationView(forecast,{now:Date.parse('2026-09-12T19:00:00Z')}).phase,'overnight');
+  assert.equal(modelExplanationView(forecast,{now:Date.parse('2026-09-12T21:59:59Z')}).phase,'daytime');
+  assert.equal(modelExplanationView(forecast,{now:Date.parse('2026-09-12T22:00:00Z')}).phase,'overnight');
   assert.equal(modelExplanationView(forecast,{index:1,now}).phase,'overall');
   assert.equal(modelExplanationView(forecast,{index:0,phase:'overall',now}).phase,'overall');
 });
@@ -60,34 +61,34 @@ test('rain inputs scale the NWS share and explain full and reduced model points'
   assert.doesNotMatch(html,/QPF support|NWS-anchored input/);
   assert.match(html,/NWS hourly probability fills its 40-point share proportionally/);
   assert.match(html,/40% NWS chance contributes 16 points/);
-  assert.match(html,/positive model amount below 0\.10 in gets 30%/);
-  assert.match(html,/Exactly 0\.10 in or more gets full points/);
+  assert.match(html,/positive model amount through 0\.010 in gets exactly one-third/);
+  assert.match(html,/above 0\.010 in gets full points/);
   assert.match(html,/result is capped at 100%/);
   assert.match(html,/uncalibrated estimate, not a proven model-accuracy ranking/);
   assert.match(html,/not a separate probability of rain at any time/);
-  const forecast=fixture(),allWet=likelihood(60,{officialProbability:53,rawTotal:60.2,weightedValue:60.2,rawValue:60,
-    sourceValues:{nws:53,hrrr:100,ecmwf:30,nbm:30},sourcePoints:{nws:21.2,hrrr:30,ecmwf:3,nbm:6},sourceAmounts:{nws:.02,hrrr:.157,ecmwf:.016,nbm:.012},
-    sources:[{id:'nws',value:53,weight:.4,points:21.2},{id:'hrrr',value:100,weight:.3,points:30},{id:'ecmwf',value:30,weight:.1,points:3},{id:'nbm',value:30,weight:.2,points:6}],drySources:[],wetSources:['hrrr','ecmwf','nbm'],reducedSources:['ecmwf','nbm']});
+  const forecast=fixture(),allWet=likelihood(81,{officialProbability:53,rawTotal:81.2,weightedValue:81.2,rawValue:81,
+    sourceValues:{nws:53,hrrr:100,ecmwf:100,nbm:100},sourcePoints:{nws:21.2,hrrr:30,ecmwf:10,nbm:20},sourceAmounts:{nws:.02,hrrr:.157,ecmwf:.016,nbm:.012},
+    sources:[{id:'nws',value:53,weight:.4,points:21.2},{id:'hrrr',value:100,weight:.3,points:30},{id:'ecmwf',value:100,weight:.1,points:10},{id:'nbm',value:100,weight:.2,points:20}],drySources:[],wetSources:['hrrr','ecmwf','nbm'],reducedSources:[]});
   forecast.rainTimeline[0].rainLikelihood=allWet;
-  Object.assign(forecast.days[0].popDayLikelihood,{value:60,peak:allWet,peakTime:at(0)});
+  Object.assign(forecast.days[0].popDayLikelihood,{value:81,peak:allWet,peakTime:at(0)});
   const unanimous=modelExplanationHTML(forecast,{now});
   assert.match(unanimous,/53% probability<\/td><td>40%<\/td><td>21\.2<\/td>/);
   assert.match(unanimous,/0\.157 in<small>Rain forecast: Yes<\/small><\/td><td>30%<\/td><td>30<\/td>/);
-  assert.match(unanimous,/0\.016 in<small>Light rain forecast: 30% points<\/small><\/td><td>10%<\/td><td>3<\/td>/);
-  assert.match(unanimous,/0\.012 in<small>Light rain forecast: 30% points<\/small><\/td><td>20%<\/td><td>6<\/td>/);
-  assert.match(unanimous,/Shown: <b>60%/);
-  assert.match(unanimous,/21\.2 \+ 30 \+ 3 \+ 6 = 60\.2/);
+  assert.match(unanimous,/0\.016 in<small>Rain forecast: Yes<\/small><\/td><td>10%<\/td><td>10<\/td>/);
+  assert.match(unanimous,/0\.012 in<small>Rain forecast: Yes<\/small><\/td><td>20%<\/td><td>20<\/td>/);
+  assert.match(unanimous,/Shown: <b>81%/);
+  assert.match(unanimous,/21\.2 \+ 30 \+ 10 \+ 20 = 81\.2/);
 
-  const trace=likelihood(12,{officialProbability:7,rawTotal:11.8,weightedValue:11.8,rawValue:12,
-    sourceValues:{nws:7,hrrr:0,ecmwf:30,nbm:30},sourcePoints:{nws:2.8,hrrr:0,ecmwf:3,nbm:6},sourceAmounts:{nws:0,hrrr:0,ecmwf:.004,nbm:.012},
-    sources:[{id:'nws',value:7,weight:.4,points:2.8},{id:'hrrr',value:0,weight:.3,points:0},{id:'ecmwf',value:30,weight:.1,points:3},{id:'nbm',value:30,weight:.2,points:6}],drySources:['hrrr'],wetSources:['ecmwf','nbm'],reducedSources:['ecmwf','nbm']});
+  const trace=likelihood(13,{officialProbability:7,rawTotal:12.8,weightedValue:12.8,rawValue:13,
+    sourceValues:{nws:7,hrrr:0,ecmwf:100/3,nbm:100/3},sourcePoints:{nws:2.8,hrrr:0,ecmwf:3.33333333,nbm:6.66666667},sourceAmounts:{nws:0,hrrr:0,ecmwf:.004,nbm:.010},
+    sources:[{id:'nws',value:7,weight:.4,points:2.8},{id:'hrrr',value:0,weight:.3,points:0},{id:'ecmwf',value:100/3,weight:.1,points:3.33333333},{id:'nbm',value:100/3,weight:.2,points:6.66666667}],drySources:['hrrr'],wetSources:['ecmwf','nbm'],reducedSources:['ecmwf','nbm']});
   forecast.rainTimeline[0].rainLikelihood=trace;
-  Object.assign(forecast.days[0].popDayLikelihood,{value:12,peak:trace,peakTime:at(0)});
+  Object.assign(forecast.days[0].popDayLikelihood,{value:13,peak:trace,peakTime:at(0)});
   const traceHtml=modelExplanationHTML(forecast,{now});
-  assert.match(traceHtml,/0\.004 in<small>Light rain forecast: 30% points<\/small><\/td><td>10%<\/td><td>3<\/td>/);
-  assert.match(traceHtml,/0\.012 in<small>Light rain forecast: 30% points<\/small><\/td><td>20%<\/td><td>6<\/td>/);
-  assert.match(traceHtml,/2\.8 \+ 0 \+ 3 \+ 6 = 11\.8/);
-  assert.match(traceHtml,/Shown: <b>12%/);
+  assert.match(traceHtml,/0\.004 in<small>Light rain forecast: one-third of model points<\/small><\/td><td>10%<\/td><td>3\.333333<\/td>/);
+  assert.match(traceHtml,/0\.01 in<small>Light rain forecast: one-third of model points<\/small><\/td><td>20%<\/td><td>6\.666667<\/td>/);
+  assert.match(traceHtml,/2\.8 \+ 0 \+ 3\.3333 \+ 6\.6667 = 12\.8/);
+  assert.match(traceHtml,/Shown: <b>13%/);
 });
 
 test('missing models do not renormalize the NWS base or remaining model points',()=>{
@@ -225,7 +226,7 @@ test('refresh preserves open hourly calculations and focused details while auto 
     assert.equal(details.find(detail=>detail.dataset.modelDetail===key).open,true);
     assert.equal(details.find(detail=>detail.dataset.modelDetail==='hours').open,true);
     assert.equal(focused,key);
-    assert.equal(renderModelExplanation(fixture(),Date.parse('2026-09-12T19:00:00Z')).phase,'overnight');
+    assert.equal(renderModelExplanation(fixture(),Date.parse('2026-09-12T22:00:00Z')).phase,'overnight');
     resetModelExplanation();
   }finally{globalThis.document=oldDocument;globalThis.location=oldLocation;}
 });

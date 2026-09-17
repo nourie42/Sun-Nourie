@@ -3,7 +3,7 @@ import {temperaturePolicy,forecastDayIndex,eveningPeriod} from './weatherFusionP
 import {weighted} from './weatherFusionDirect.js';
 import {alignComfortHours} from './weatherFusionNowcast.js';
 /** Actual forecast series for the tap-to-explore cards. No invented or held-flat data. */
-import {EXPERIENCE_VERSION, finite, thermalComfort, shadeFeelsLike, humidityFromDewpoint, rainChanceValue} from '../public/weather-fusion/weather-math.js';
+import {EXPERIENCE_VERSION, TONIGHT_START_HOUR, finite, thermalComfort, shadeFeelsLike, humidityFromDewpoint, rainChanceValue} from '../public/weather-fusion/weather-math.js';
 const H=3600000;
 const num=n=>finite(n)?n:null;
 const round=(n,d=1)=>finite(n)?Number(n.toFixed(d)):null;
@@ -111,7 +111,7 @@ export function addExperience(out,{models={},grid,periods=[],now,solarTimes,next
  out.experienceVersion=EXPERIENCE_VERSION;
  for(const d of out.days)d.nightCondition=eveningPeriod(periods,d.date,zone,now)?.shortForecast||'';
  const hour=Number(new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',hourCycle:'h23'}).format(new Date(now)));
- if(hour<15&&!finite(out.days[0]?.high)) {
+ if(hour<TONIGHT_START_HOUR&&!finite(out.days[0]?.high)) {
    const high=gridSample(grid,'maxTemperature',now,'temperature');
    if(finite(high)){out.days[0].high=Math.round(high);out.days[0].temperatureSource='NWS maximum-temperature grid';}
  }

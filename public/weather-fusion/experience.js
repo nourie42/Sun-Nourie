@@ -1,14 +1,14 @@
-import {todayForecastHTML} from './today-card.js?v=weather-qa-v65';
+import {confidenceNotice,todayForecastHTML} from './today-card.js?v=weather-qa-v67';
 import {FORECAST_CONFIDENCE_VERSION} from './forecast-confidence.js?v=weather-art-labels-v10';
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
-import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=rain-around-v66';
+import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=weather-qa-v67';
 import {weatherState} from './weather-state.js';
-import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=rain-around-v66';
-import {degrees,feelsAt,dailyFeels,forecastValue,peakFeelsHTML} from './hourly-feels.js?v=weather-art-labels-v10';
-import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=rain-around-v66';
-import {comfortMode,comfortWindow,comfortNarrative,warmestTodayWindow} from './comfort-outlook.js?v=weather-art-labels-v10';
-import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js?v=weather-qa-v65';
-import {resetDewpointMeter} from './dewpoint-meter.js?v=centered-heading-v30';
+import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=weather-qa-v67';
+import {degrees,feelsAt,dailyFeels,forecastValue,peakFeelsHTML} from './hourly-feels.js?v=weather-qa-v67';
+import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=weather-qa-v67';
+import {comfortMode,comfortWindow,comfortNarrative,warmestTodayWindow} from './comfort-outlook.js?v=weather-qa-v67';
+import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js?v=weather-qa-v67';
+import {resetDewpointMeter} from './dewpoint-meter.js?v=weather-qa-v67';
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const number=(n,d=0)=>finite(n)?n.toFixed(d):'—';
@@ -115,11 +115,14 @@ export function renderDailyRows(forecast,icon) {
  const rows=forecast.days.map((d,i)=>{
   const p=dailyDisplay(d,i,Date.now(),forecast.location.timeZone),bar=temperatureBar(p.primary,lo,hi),feel=dailyFeels(forecast,i,Date.now());
   const confidence=d.confidence||{label:'Unavailable',score:null,key:'unavailable',factors:[],note:'Forecast confidence data is unavailable.'};
+  const plainConfidenceNotice=confidenceNotice(confidence);
+  const confidenceNoticeHTML=dailyConfidenceNoticeHTML(confidence);
   const confidenceTitle=`Forecast confidence: ${confidence.label}. ${confidence.factors?.join('; ')||confidence.note||''} ${confidence.note||''}`.trim();
   const low=p.tonight?p.primary:p.secondary,high=p.tonight?null:p.primary;
   const lowFeels=feel.low?.low?.value,highFeels=p.tonight?lowFeels:feel.high?.high?.value;
   const feelsText=p.tonight?degrees(highFeels):`${degrees(lowFeels)} / ${degrees(highFeels)}`;
-  return `<button class="day-row ${p.tonight?'tonight-row':''}" data-day="${i}" aria-label="${esc(p.label)}, ${p.primaryLabel} ${number(p.primary)} degrees${finite(p.secondary)?`, low ${number(p.secondary)} degrees`:''}. Forecast confidence ${esc(confidence.label)}. Open details.">
+  const confidenceAria=plainConfidenceNotice?` ${plainConfidenceNotice.title}. ${plainConfidenceNotice.text}`:'';
+  return `<button class="day-row ${p.tonight?'tonight-row':''}" data-day="${i}" aria-label="${esc(p.label)}, ${esc(p.condition)}. ${finite(p.pop)?`Rain chance ${number(p.pop)} percent.`:'Rain chance unavailable.'} ${p.primaryLabel} ${number(p.primary)} degrees${finite(p.secondary)?`, low ${number(p.secondary)} degrees`:''}. Forecast confidence ${esc(confidence.label)}.${esc(confidenceAria)} Open details.">
    <span class="day-name">${esc(p.label)}</span>
    <span class="day-icon">${icon(p.condition,!p.tonight)}<small>${finite(p.pop)?`${number(p.pop)}%`:''}</small></span>
    <span class="day-low">${temp(low)}<small>Low</small></span>
@@ -127,6 +130,7 @@ export function renderDailyRows(forecast,icon) {
    <span class="day-high">${finite(high)?`<strong>${temp(high)}</strong><small>High</small>`:''}</span>
    <span class="day-feels-summary"><small>Feels like</small><b>${feelsText}</b></span>
    <span class="day-meta"><span class="forecast-confidence" data-confidence="${esc(confidence.key)}" title="${esc(confidenceTitle)}"><span>Forecast confidence</span><b>${esc(confidence.label)}</b>${finite(confidence.score)?`<i class="confidence-meter" aria-hidden="true"><em style="width:${confidence.score}%"></em></i>`:''}</span>${dailyUvHTML(d.uvMax,p.tonight?'Peak UV today':'Peak UV')}</span>
+   ${confidenceNoticeHTML}
   </button>`;
  });
  $('daily').innerHTML=rows.join('');
@@ -140,6 +144,14 @@ export function renderDailyRows(forecast,icon) {
    button.addEventListener('click',()=>$('daily')?.querySelector('[data-day="0"]')?.click());
   });
  }
+}
+
+export function dailyConfidenceNoticeHTML(confidence,dialog=false){
+ const notice=confidenceNotice(confidence);
+ if(!notice)return '';
+ const tag=dialog?'div':'span';
+ const text=dialog?notice.text.replace(/Click for details\.$/,'Confidence details are below.'):notice.text;
+ return `<${tag} class="${dialog?'dialog-confidence-notice':'forecast-confidence-notice'}" data-confidence="${esc(confidence.key)}"><strong>${esc(notice.title)}</strong><span>${esc(text)}</span></${tag}>`;
 }
 export function renderMetricTiles(forecast,smallIcon) {
  data=forecast;

@@ -12,10 +12,10 @@ const baseData={
  hours:[{condition:'Partly Cloudy'}],
 };
 
-test('after 3 PM the hero shows only tonight low and nighttime condition',()=>{
- const before=heroWeather(baseData,Date.parse('2026-09-05T18:59:59Z'));
+test('at 6 PM the hero shows only tonight low and nighttime condition',()=>{
+ const before=heroWeather(baseData,Date.parse('2026-09-05T21:59:59Z'));
  assert.equal(before.tonight,false);assert.equal(before.temperature,79);assert.match(before.range,/High 86°/);
- const after=heroWeather(baseData,Date.parse('2026-09-05T19:00:00Z'));
+ const after=heroWeather(baseData,Date.parse('2026-09-05T22:00:00Z'));
  assert.equal(after.tonight,true);assert.equal(after.temperature,70);assert.equal(after.condition,'Mostly Clear');assert.equal(after.isDay,false);
  assert.ok(!after.range.includes('70°'),'Tonight temperature must not be duplicated under the hero');
 });

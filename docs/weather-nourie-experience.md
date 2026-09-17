@@ -2,7 +2,7 @@
 
 The public brand is Weather Nourie. The `/weather-fusion/` URL stays compatible with existing bookmarks. No homepage, business tool, server launcher or package setting is changed.
 
-The seven-day list places daytime highs on the left and overnight lows on the right. The bar starts at a common weekly temperature baseline and ends at the high. At 3 PM **in the selected location's timezone**, the first row becomes Tonight: the primary value is explicitly the overnight low, with a cool-colored bar and no invented daytime high. Night condition and rain chance are used for that row. Other rows remain high-first.
+The seven-day list places daytime highs on the left and overnight lows on the right. The bar starts at a common weekly temperature baseline and ends at the high. At 6 PM **in the selected location's timezone**, the first row becomes Tonight: the primary value is explicitly the overnight low, with a cool-colored bar and no invented daytime high. Night condition and rain chance are used for that row. Other rows remain high-first.
 
 The local outlook prompts AI to paraphrase the latest local NWS Area Forecast Discussion in everyday language, checked against the local forecast and available numerical models. Technical model names/weights stay in source metadata and the bottom section. The current local date and time are supplied, source attribution is validated, and jargon triggers a retry. The fallback remains official NWS forecast wording, visibly identified as such; the application does not pretend a template is an AI paraphrase. Official alerts remain separate and unaltered.
 
