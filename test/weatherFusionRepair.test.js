@@ -13,18 +13,25 @@ import {dewpointPoints,graphGeometry} from '../public/weather-fusion/dewpoint-me
 import {createFramePlayer} from '../public/weather-fusion/frame-player.js';
 const H=3600000,now=testInputs.now,zone='America/New_York';
 const models=()=>Object.fromEntries(['hrrr','ecmwf','nbm'].map(id=>[id,validateSnapshot(snapshot(id),id,testInputs.location,now).value]));
-test('today uses requested 40/30/10/20 in daily high and every same-calendar-day hour',()=>{
+test('today uses 40/30/10/20 while later rain excludes HRRR',()=>{
  const out=buildForecast({...testInputs,models:models()});
  assert.equal(out.repairVersion,REPAIR_VERSION);
  assert.deepEqual(temperaturePolicy(0),{nws:.4,hrrr:.3,ecmwf:.1,nbm:.2});
  assert.deepEqual(temperaturePolicy(6),temperaturePolicy(0));
- assert.deepEqual(precipitationPolicy(6),temperaturePolicy(0));
- assert.deepEqual(out.blendPolicy.allForecastHours,temperaturePolicy(0));
+ assert.deepEqual(precipitationPolicy(0),temperaturePolicy(0));
+ assert.deepEqual(precipitationPolicy(1),{nws:.15,ecmwf:.6,nbm:.25});
+ assert.deepEqual(precipitationPolicy(6),precipitationPolicy(1));
+ assert.deepEqual(out.blendPolicy.sameDay,temperaturePolicy(0));
+ assert.deepEqual(out.blendPolicy.extendedRain,precipitationPolicy(1));
  assert.equal(out.days[0].high,85); // .4*84 + .3*90 + .1*80 + .2*80 = 84.6
  for(const h of out.hours){if(forecastDayIndex(Date.parse(h.time),now,zone)!==0)continue;
   assert.deepEqual(h.temperatureBlend.sources.map(s=>[s.id,s.weight]),[['nws',.4],['hrrr',.3],['ecmwf',.1],['nbm',.2]]);
   assert.equal(h.temperature,Math.round(.4*h.officialTemperature+.3*90+.1*80+.2*80));
  }
+ const later=out.rainTimeline.find(row=>forecastDayIndex(Date.parse(row.time),now,zone)>0);
+ assert.ok(later,'fixture must include a later local day');
+ assert.equal(later.rainLikelihood.sourcePoints.hrrr,null);
+ assert.ok(!later.rainLikelihood.sources.some(source=>source.id==='hrrr'));
  assert.equal(out.hours[0].pop,testInputs.hourly.periods[0].probabilityOfPrecipitation.value);
 });
 test('partial HRRR rain horizon contributes in covered hours, not discarded from whole-day totals',()=>{
@@ -33,9 +40,11 @@ test('partial HRRR rain horizon contributes in covered hours, not discarded from
  m.ecmwf.precipitationIntervals=Array.from({length:24},(_,i)=>({start:start+i*3600,end:start+(i+1)*3600,value:.2}));
  const grid={quantitativePrecipitation:{uom:'wmoUnit:in',values:[{validTime:new Date(now).toISOString()+'/PT24H',value:2.4}]}};
  const out=buildForecast({...testInputs,models:m,grid});
- assert.ok(Math.abs(out.precipitation.value-(4*.152+20*(.1*4/7+.2/7+.01*2/7)))<.001);
+ const canonical=out.rainTimeline.filter(row=>Date.parse(row.time)>=Date.parse(out.precipitation.start)&&Date.parse(row.end)<=Date.parse(out.precipitation.end)).reduce((sum,row)=>sum+row.precipitation,0);
+ assert.ok(Math.abs(out.precipitation.value-canonical)<.001);
  assert.equal(out.precipitation.sources.find(s=>s.id==='hrrr').coverageHours,4);
  assert.ok(out.precipitation.sources.some(s=>s.id==='nws'));
+ assert.ok(out.rainTimeline.filter(row=>forecastDayIndex(Date.parse(row.time),now,zone)>0).every(row=>!row.precipitationBlend.sources.some(source=>source.id==='hrrr')));
 });
 test('new model initialization invalidates forecast signature even if values are unchanged',()=>{
  const m=models(),a=buildForecast({...testInputs,models:m});m.hrrr.runAt='2026-09-05T13:00:00Z';

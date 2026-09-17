@@ -31,12 +31,14 @@ function matchingRows(data,summary) {
   return data.rainTimeline.filter(row=>Date.parse(row.time)<end&&Date.parse(row.end)>start);
 }
 
-test('positive model amounts through .010 inch add one-third of fixed points',()=>{
+test('later-day trace amounts use the extended policy without HRRR',()=>{
   const data=buildForecast(inputs());
   const day=data.days[1],rows=matchingRows(data,day.rainLikelihood);
-  assert.equal(day.rainLikelihood.value,36);
+  assert.equal(day.rainLikelihood.value,34);
   assert.equal(day.rainLikelihood.value,Math.max(...rows.map(row=>row.rainLikelihood.value)));
-  assert.deepEqual(new Set(rows.map(row=>row.rainLikelihood.value)),new Set([26,36]),'hours beyond HRRR coverage lose HRRR’s reduced light-QPF contribution');
+  assert.deepEqual(new Set(rows.map(row=>row.rainLikelihood.value)),new Set([34]));
+  assert.ok(rows.every(row=>row.rainLikelihood.sourcePoints.hrrr===null));
+  assert.ok(rows.every(row=>!row.rainLikelihood.sources.some(source=>source.id==='hrrr')));
   assert.equal(day.rainLikelihood.coverage.complete,true);
   assert.equal(day.officialPop,39,'raw NWS period probability remains separate');
 });
@@ -69,7 +71,7 @@ test('daily peak beyond the 48-hour strip remains auditable on the full hourly t
   assert.equal(forecast.hours.length,48);
   assert.ok(forecast.rainTimeline.length>48);
   assert.equal(day.rainLikelihood.peakTime,iso(peakTime));
-  assert.equal(day.rainLikelihood.value,32);
+  assert.equal(day.rainLikelihood.value,12);
   assert.equal(day.rainLikelihood.peak.sourceValues.nws,81);
   assert.equal(day.rainLikelihood.peak.officialProbability,81);
   assert.equal(day.rainLikelihood.peak.sources.find(source=>source.id==='nws').runAt,iso(now-H));

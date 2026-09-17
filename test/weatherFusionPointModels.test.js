@@ -83,10 +83,12 @@ function forecast(patch){
  const grid={...testInputs.grid,...Object.fromEntries([['skyCover','percent',30],['windGust','mi_h-1',16],['dewpoint','degF',68],['windSpeed','mi_h-1',10]].map(([k,u,v])=>[k,{uom:'wmoUnit:'+u,values:[{validTime:'2026-09-05T00:00:00Z/P10D',value:v}]}]))};
  return buildForecast({...testInputs,location:{...location,name:'Durham'},models,grid,now});
 }
-test('actual four-source weights change temperature, moisture, wind, clouds, gusts and feels—not just rain',()=>{
+test('four-source weather fields remain while later-day rain excludes HRRR',()=>{
  const f=forecast(),g=forecast(d=>{for(const [field,change] of Object.entries({temperature_2m:8,dew_point_2m:5,wind_speed_10m:6,wind_gusts_10m:9,cloud_cover:50,precipitation:.1}))d.hourly[field]=d.hourly[field].map(v=>v+change);});
  assert.deepEqual(f.days[0].confidence.sourceIds,['nws','hrrr','ecmwf','nbm']);assert.equal(f.days[0].confidence.sourceCount,4);
- for(const part of ['high','low','rain'])assert.deepEqual(f.days[0].confidence.contributions[part].map(s=>[s.id,s.weight]),[['nws',.4],['hrrr',.3],['ecmwf',.1],['nbm',.2]]);
+ for(const part of ['high','low'])assert.deepEqual(f.days[0].confidence.contributions[part].map(s=>[s.id,s.weight]),[['nws',.4],['hrrr',.3],['ecmwf',.1],['nbm',.2]]);
+ assert.ok(f.days[0].confidence.contributions.rain.some(source=>source.id==='hrrr'));
+ assert.ok(!f.days[1].confidence.contributions.rain.some(source=>source.id==='hrrr'));
  for(const field of ['temperature','dewpoint','wind','gust','cloud']){
   const a=f.metricForecasts.series[field].find(p=>Date.parse(p.time)===now+H),b=g.metricForecasts.series[field].find(p=>Date.parse(p.time)===now+H);
   assert.deepEqual(a.sources.map(s=>[s.id,s.weight]),[['nws',.4],['hrrr',.3],['ecmwf',.1],['nbm',.2]],field);assert.notEqual(a.value,b.value,field);
