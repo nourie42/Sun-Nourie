@@ -43,6 +43,27 @@ test('later-day trace amounts use the extended policy without HRRR',()=>{
   assert.equal(day.officialPop,39,'raw NWS period probability remains separate');
 });
 
+test('an isolated later-day model rain hour matches the NWS probability',()=>{
+  const data=inputs({chance:49,amount:0});
+  const target=now+36*H;
+  for(const id of ['ecmwf','nbm'])for(const interval of data.models[id].precipitationIntervals)if(interval.start*1000===target)interval.value=.012;
+  const forecast=buildForecast(data),row=forecast.rainTimeline.find(item=>Date.parse(item.time)===target);
+  assert.equal(row.rainLikelihood.value,49);
+  assert.equal(row.rainLikelihood.fallbackReason,'no-sustained-model-precipitation');
+  assert.deepEqual(row.rainLikelihood.sourcePoints,{nws:49,hrrr:null,ecmwf:null,nbm:null});
+  assert.deepEqual(row.rainLikelihood.sources.map(source=>source.id),['nws']);
+});
+
+test('adjacent later-day model rain hours retain the extended blend',()=>{
+  const data=inputs({chance:49,amount:0});
+  const target=now+36*H;
+  for(const id of ['ecmwf','nbm'])for(const interval of data.models[id].precipitationIntervals)if([target,target+H].includes(interval.start*1000))interval.value=.012;
+  const forecast=buildForecast(data),rows=forecast.rainTimeline.filter(item=>[target,target+H].includes(Date.parse(item.time)));
+  assert.equal(rows.length,2);
+  assert.ok(rows.every(row=>row.rainLikelihood.value===92));
+  assert.ok(rows.every(row=>row.rainLikelihood.fallbackReason===undefined));
+});
+
 test('every day and night percentage is the peak of identical canonical hourly evidence',()=>{
   const data=buildForecast(inputs({chance:45,amount:.008}));
   for(const day of data.days)for(const name of ['rainLikelihood','popDayLikelihood','popNightLikelihood']) {
@@ -62,7 +83,7 @@ test('every day and night percentage is the peak of identical canonical hourly e
   }
 });
 
-test('daily peak beyond the 48-hour strip remains auditable on the full hourly timeline',()=>{
+test('NWS-only daily peak beyond the 48-hour strip remains auditable on the full hourly timeline',()=>{
   const data=inputs({chance:0,amount:0});
   const peakTime=localTime('2026-09-08',16,zone);
   const peak=data.hourly.periods.find(row=>Date.parse(row.startTime)===peakTime);
@@ -71,11 +92,11 @@ test('daily peak beyond the 48-hour strip remains auditable on the full hourly t
   assert.equal(forecast.hours.length,48);
   assert.ok(forecast.rainTimeline.length>48);
   assert.equal(day.rainLikelihood.peakTime,iso(peakTime));
-  assert.equal(day.rainLikelihood.value,12);
+  assert.equal(day.rainLikelihood.value,81);
   assert.equal(day.rainLikelihood.peak.sourceValues.nws,81);
   assert.equal(day.rainLikelihood.peak.officialProbability,81);
   assert.equal(day.rainLikelihood.peak.sources.find(source=>source.id==='nws').runAt,iso(now-H));
-  assert.equal(day.rainLikelihood.peak.sources.find(source=>source.id==='ecmwf').runAt,forecast.modelContributions.find(source=>source.id==='ecmwf').runAt);
+  assert.deepEqual(day.rainLikelihood.peak.sources.map(source=>source.id),['nws']);
   assert.equal(day.rainLikelihood.peak.calibrated,false);
 });
 
