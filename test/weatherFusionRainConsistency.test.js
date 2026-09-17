@@ -31,12 +31,12 @@ function matchingRows(data,summary) {
   return data.rainTimeline.filter(row=>Date.parse(row.time)<end&&Date.parse(row.end)>start);
 }
 
-test('later-day trace amounts use the extended policy without HRRR',()=>{
+test('later-day trace amounts match NWS without HRRR',()=>{
   const data=buildForecast(inputs());
   const day=data.days[1],rows=matchingRows(data,day.rainLikelihood);
-  assert.equal(day.rainLikelihood.value,34);
+  assert.equal(day.rainLikelihood.value,39);
   assert.equal(day.rainLikelihood.value,Math.max(...rows.map(row=>row.rainLikelihood.value)));
-  assert.deepEqual(new Set(rows.map(row=>row.rainLikelihood.value)),new Set([34]));
+  assert.deepEqual(new Set(rows.map(row=>row.rainLikelihood.value)),new Set([39]));
   assert.ok(rows.every(row=>row.rainLikelihood.sourcePoints.hrrr===null));
   assert.ok(rows.every(row=>!row.rainLikelihood.sources.some(source=>source.id==='hrrr')));
   assert.equal(day.rainLikelihood.coverage.complete,true);
@@ -54,10 +54,20 @@ test('an isolated later-day model rain hour matches the NWS probability',()=>{
   assert.deepEqual(row.rainLikelihood.sources.map(source=>source.id),['nws']);
 });
 
-test('adjacent later-day model rain hours retain the extended blend',()=>{
+test('adjacent later-day 0.01-inch model hours still match NWS',()=>{
   const data=inputs({chance:49,amount:0});
   const target=now+36*H;
   for(const id of ['ecmwf','nbm'])for(const interval of data.models[id].precipitationIntervals)if([target,target+H].includes(interval.start*1000))interval.value=.012;
+  const forecast=buildForecast(data),rows=forecast.rainTimeline.filter(item=>[target,target+H].includes(Date.parse(item.time)));
+  assert.equal(rows.length,2);
+  assert.ok(rows.every(row=>row.rainLikelihood.value===49));
+  assert.ok(rows.every(row=>row.rainLikelihood.fallbackReason==='no-sustained-model-precipitation'));
+});
+
+test('adjacent later-day meaningful model rain hours retain the extended blend',()=>{
+  const data=inputs({chance:49,amount:0});
+  const target=now+36*H;
+  for(const id of ['ecmwf','nbm'])for(const interval of data.models[id].precipitationIntervals)if([target,target+H].includes(interval.start*1000))interval.value=.03;
   const forecast=buildForecast(data),rows=forecast.rainTimeline.filter(item=>[target,target+H].includes(Date.parse(item.time)));
   assert.equal(rows.length,2);
   assert.ok(rows.every(row=>row.rainLikelihood.value===92));
