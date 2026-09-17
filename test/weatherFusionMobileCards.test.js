@@ -88,6 +88,12 @@ test('hourly rain tooltip reports the points actually awarded to each source',()
  assert.match(html,/NBM rain no \(\+0 points\)/);
  assert.doesNotMatch(html,/HRRR rain yes \(\+30 points\)|ECMWF rain yes \(\+10 points\)/);
 });
+test('hourly rain tooltip omits a model explicitly marked unused',()=>{
+ const html=hourlyRainHTML({rainLikelihood:{value:19,sourceValues:{nws:7,hrrr:100,ecmwf:30,nbm:0},sourcePoints:{nws:1.05,hrrr:null,ecmwf:18,nbm:0}}});
+ assert.doesNotMatch(html,/HRRR rain/);
+ assert.match(html,/NWS base 7% \(\+1\.05 points\)/);
+ assert.match(html,/ECMWF rain yes \(\+18 points\)/);
+});
 test('Now labels the observed precipitation state instead of a whole-hour forecast probability',()=>{
  const dry={now:true,currentPrecipitation:{active:false,label:'Dry now',source:'Current station reports no precipitation.'},rainLikelihood:{value:28}};
  assert.match(hourlyRainHTML(dry),/>Dry now</);assert.doesNotMatch(hourlyRainHTML(dry),/28%/);

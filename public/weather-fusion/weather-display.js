@@ -48,9 +48,9 @@ export function hourlyRainHTML(sample){
  const votes=blend?.sourceValues||{},awarded=blend?.sourcePoints||{},parts=[];
  const pointText=points=>String(Math.round(points*100)/100);
  const fullPoints={nws:40,hrrr:30,ecmwf:10,nbm:20};
- const pointsFor=id=>finite(awarded[id])?awarded[id]:finite(votes[id])?votes[id]/100*fullPoints[id]:null;
+ const pointsFor=id=>Object.hasOwn(awarded,id)?(finite(awarded[id])?awarded[id]:null):finite(votes[id])?votes[id]/100*fullPoints[id]:null;
  if(finite(votes.nws))parts.push(`NWS base ${Math.round(votes.nws)}% (+${pointText(pointsFor('nws'))} points)`);
- for(const id of ['hrrr','ecmwf','nbm'])if(finite(votes[id])){
+ for(const id of ['hrrr','ecmwf','nbm'])if(finite(votes[id])&&pointsFor(id)!==null){
   const points=pointsFor(id);
   parts.push(`${id.toUpperCase()} rain ${votes[id]>0?`yes (+${pointText(points)} points)`:'no (+0 points)'}`);
  }
