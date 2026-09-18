@@ -210,4 +210,24 @@ test('live radar distinguishes the selected point from precipitation nearby', as
   assert.equal(reflectivityOnly.precipitation.status,'ready');
   assert.equal(reflectivityOnly.precipitation.atLocation,true,'MRMS reflectivity over the exact point remains precipitation when dual-pol classification is delayed');
   assert.equal(reflectivityOnly.precipitation.classification.reflectivityFallback,true);
+
+  let staleClassificationQueries=0;
+  const staleHydrometeorXml=`<Dimension name="time">${new Date(now-15*60000).toISOString()}</Dimension>`;
+  const staleHydrometeorFetch=async value=>{
+    const url=new URL(value),request=url.searchParams.get('request')?.toLowerCase();
+    if(url.pathname.startsWith('/points/'))return response({properties:{radarStation:'KRAX'}});
+    if(request==='getcapabilities'){
+      if(url.pathname.includes('_bdhc'))return new Response(staleHydrometeorXml,{status:200,headers:{'content-type':'application/xml'}});
+      return new Response(xml,{status:200,headers:{'content-type':'application/xml'}});
+    }
+    if(request==='getfeatureinfo'){
+      if(url.pathname.includes('_bdhc')){staleClassificationQueries++;return response({features:[{properties:{RED_BAND:156,GREEN_BAND:156,BLUE_BAND:156,ALPHA_BAND:255}}]});}
+      return response({features:[{properties:{RED_BAND:255,GREEN_BAND:80,BLUE_BAND:0,ALPHA_BAND:255}}]});
+    }
+    throw new Error('Unexpected radar request');
+  };
+  const staleClassification=await createWeatherService({fetchImpl:staleHydrometeorFetch,now:()=>now}).radar({location:'knightdale'});
+  assert.equal(staleClassification.precipitation.atLocation,true,'a 15-minute-old non-precip classification cannot erase current MRMS rain');
+  assert.equal(staleClassification.precipitation.classification.reflectivityFallback,true);
+  assert.equal(staleClassificationQueries,0,'stale dual-pol frame is ignored instead of queried');
 });
