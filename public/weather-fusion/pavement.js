@@ -50,7 +50,7 @@ export function integrateSurface(rows,location,{albedo=.3,k=2,capacity=2.2e6,win
  }
  return f(ts);
 }
-export function pavementEstimate(forecast,current,now=Date.now(),{checkedAt=now,condition='',pop=null,precipitation=null}={}){
+export function pavementEstimate(forecast,current,now=Date.now(),{checkedAt=now,condition='',pop=null,precipitation=null,rainAround=false,radarThreat=false}={}){
  const assembled=Date.parse(forecast?.assembledAt),raw=forecast?.exposureWeather?.rows;
  const elevation=solarElevation(now,forecast?.location?.latitude,forecast?.location?.longitude),daylight=finite(elevation)?elevation>0:null;
  const missing=reason=>({version:PAVEMENT_VERSION,status:'unavailable',reason,concrete:null,asphalt:null,daylight});
@@ -77,7 +77,7 @@ export function pavementEstimate(forecast,current,now=Date.now(),{checkedAt=now,
   if(![center,cool,warm].every(finite))return missing('Surface-weather data has gaps; a reliable estimate cannot be calculated.');
   results[id]={value:Math.round(center),low:Math.floor((Math.min(center,cool,warm)-4)/5)*5,high:Math.ceil((Math.max(center,cool,warm)+4)/5)*5};
  }
- const activePrecipitation=precipitationActivity(condition,{pop,precipitation})==='active';
+ const activePrecipitation=precipitationActivity(condition,{pop,precipitation,rainAround,radarThreat})==='active';
  const wet=activePrecipitation||rows.slice(-4).some(r=>finite(r.rain)&&r.rain>0),frozen=current.temperature<=32;
  return {version:PAVEMENT_VERSION,status:'estimated',...results,historyHours:(now-rows[0].epoch)/H,wet,activePrecipitation,frozen,airTemperature:Math.round(last.temperature),skyCover:last.skyCover,time:new Date(now).toISOString(),daylight,
   note:frozen?'Snow, ice and freezing change surface behavior; these dry-surface estimates are unreliable in these conditions.':wet?'Recent modeled rain may mean wet surfaces. These are dry-surface estimates; wet pavement can be cooler.':'Estimated dry, exposed surfaces. Shade, color and local shelter can change the actual temperature.',
@@ -105,7 +105,7 @@ export function petSurfaceSubtitle(result){
 }
 export function pavementHTML(result,feels,context={}){
  const walker=walkerOutfit(feels);
- const activelyWet=result?.activePrecipitation===true||precipitationActivity(context.condition,{pop:context.pop,precipitation:context.precipitation})==='active';
+ const activelyWet=result?.activePrecipitation===true||precipitationActivity(context.condition,{pop:context.pop,precipitation:context.precipitation,rainAround:context.rainAround===true,radarThreat:context.radarThreat===true})==='active';
  const surfaceWarning=pavementWarning(result),weatherWarning=petWeatherWarning(feels),warning=activelyWet?null:(surfaceWarning||weatherWarning);
  const value=r=>r?`${r.value}°`:'—',night=result?.daylight===false;
  let sky=night
