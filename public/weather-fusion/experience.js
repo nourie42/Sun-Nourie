@@ -1,4 +1,4 @@
-import {confidenceNotice,todayForecastHTML} from './today-card.js?v=weather-qa-v67';
+import {confidenceNotice,todayForecastHTML} from './today-card.js?v=weather-qa-v70';
 import {FORECAST_CONFIDENCE_VERSION} from './forecast-confidence.js?v=weather-art-labels-v10';
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
 import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=weather-qa-v67';
