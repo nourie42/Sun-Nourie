@@ -100,16 +100,15 @@ try {
     return nativeFetch(url, init);
   };
 
-  const noCreditHealthRes = await nativeFetch(`${base}/api/ai-agent/provider-health`, {
-    method: "POST",
-    headers: { "content-type": "application/json", "x-ai-council-code": "ux-smoke-test-code" },
-    body: JSON.stringify({ providers: ["openai"], force: true }),
-  });
-  assert.equal(noCreditHealthRes.status, 200);
-  const noCreditHealth = await noCreditHealthRes.json();
-  assert.equal(noCreditHealth.checked[0].status, "no_credits");
-  assert.match(noCreditHealth.checked[0].label, /No credits/i);
-  assert.equal(providerCalls, 1);
+  const autoCheckedStatusRes = await nativeFetch(`${base}/api/ai-agent/status`);
+  assert.equal(autoCheckedStatusRes.status, 200);
+  const autoCheckedStatus = await autoCheckedStatusRes.json();
+  const openAiStatus = autoCheckedStatus.providers.find((p) => p.id === "openai");
+  assert.equal(autoCheckedStatus.autoChecked, true);
+  assert.equal(openAiStatus.healthStatus, "no_credits");
+  assert.match(openAiStatus.healthLabel, /No credits/i);
+  assert.ok(autoCheckedStatus.providers.filter((p) => p.configured).every((p) => p.healthStatus !== "unchecked"));
+  assert.equal(providerCalls, 1, "status load should automatically probe the configured provider once");
 
   const blockedChatRes = await nativeFetch(`${base}/api/ai-agent/chat`, {
     method: "POST",
