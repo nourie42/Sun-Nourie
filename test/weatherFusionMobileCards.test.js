@@ -18,9 +18,14 @@ test('Today metrics use their forecast period and never substitute current condi
  assert.match(html,/data-today-forecast/);assert.doesNotMatch(html,/99 mph|99%|Sunrise|Sunset/);
 });
 test('main card says Remainder of Today from local noon until the Tonight switch',()=>{
- const noon=Date.parse('2026-09-11T16:00:00Z'),html=todayForecastHTML(fixture(),noon);
+ const noon=Date.parse('2026-09-11T16:00:00Z'),f=fixture();
+ f.days[0].popDayLikelihood={value:30};
+ f.days[0].popNightLikelihood={value:60};
+ f.days[0].rainLikelihood={value:60};
+ const html=todayForecastHTML(f,noon);
  assert.match(html,/class="today-weather-card today-remainder"/);
  assert.match(html,/>Remainder of Today<\/span>/);
+ assert.match(html,/>60%<\/strong><small>Rain chance/,'the remainder tile includes the higher chance later tonight');
  assert.doesNotMatch(html,/class="today-weather-card today-remainder"[\s\S]*>Tonight<\/span>/);
 });
 test('Today sky adds clouds and precipitation by forecast scenario',()=>{
@@ -103,6 +108,17 @@ test('Today and Tonight prefer their matching blended rain likelihood',()=>{
  const f=fixture();f.days[0].popDayLikelihood={value:8};f.days[0].popNightLikelihood={value:3};f.days[0].rainLikelihood={value:12};
  assert.match(todayForecastHTML(f,now),/>8%<\/strong><small>Rain chance/);
  assert.match(todayForecastHTML(f,Date.parse('2026-09-11T23:00:00Z')),/>3%<\/strong><small>Rain chance/);
+});
+test('Today tile always states how rain chance changed since the last update',()=>{
+ const f=fixture();
+ f.rainTrend={direction:'up',change:20,delta:20,from:40,to:60};
+ assert.match(todayForecastHTML(f,Date.parse('2026-09-11T16:00:00Z')),/↑ \+20 pts · was 40%/);
+ f.rainTrend={direction:'down',change:10,delta:-10,from:60,to:50};
+ assert.match(todayForecastHTML(f,Date.parse('2026-09-11T16:00:00Z')),/↓ −10 pts · was 60%/);
+ f.rainTrend={direction:'same',change:0,delta:0,from:50,to:50};
+ assert.match(todayForecastHTML(f,Date.parse('2026-09-11T16:00:00Z')),/↔ 0 pts · unchanged/);
+ delete f.rainTrend;
+ assert.match(todayForecastHTML(f,Date.parse('2026-09-11T16:00:00Z')),/Change: — · first update/);
 });
 test('unavailable canonical rain never silently changes to the NWS percentage or sky intensity',()=>{
  const f=fixture(),missing={value:null,aggregation:'maximum-hourly',coverage:{complete:false}};
