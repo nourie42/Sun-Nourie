@@ -178,26 +178,26 @@ function extractOpenAiCitations(data) {
   return urls.slice(0, 12);
 }
 
-async function callOpenAi(question, system, maxOutputTokens = 2200) {
+async function callOpenAi(question, system, maxOutputTokens = 2200, timeoutMs = 90000) {
   const data = await fetchJson("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: { Authorization: `Bearer ${providerKey("openai")}`, "Content-Type": "application/json" },
     body: JSON.stringify({ model: providerModel("openai"), instructions: system, input: question, max_output_tokens: maxOutputTokens }),
-  });
+  }, timeoutMs);
   return { text: extractResponsesText(data), citations: extractOpenAiCitations(data) };
 }
 
-async function callAnthropic(question, system, maxOutputTokens = 2200) {
+async function callAnthropic(question, system, maxOutputTokens = 2200, timeoutMs = 90000) {
   const data = await fetchJson("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "x-api-key": providerKey("anthropic"), "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
     body: JSON.stringify({ model: providerModel("anthropic"), max_tokens: maxOutputTokens, system, messages: [{ role: "user", content: question }] }),
-  });
+  }, timeoutMs);
   const text = (Array.isArray(data?.content) ? data.content : []).filter((p) => p?.type === "text").map((p) => cleanText(p.text, 30000)).filter(Boolean).join("\n\n");
   return { text, citations: [] };
 }
 
-async function callGemini(question, system, maxOutputTokens = 2200) {
+async function callGemini(question, system, maxOutputTokens = 2200, timeoutMs = 90000) {
   const model = providerModel("gemini");
   const key = encodeURIComponent(providerKey("gemini"));
   const data = await fetchJson(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${key}`, {
@@ -208,26 +208,26 @@ async function callGemini(question, system, maxOutputTokens = 2200) {
       contents: [{ role: "user", parts: [{ text: question }] }],
       generationConfig: { maxOutputTokens },
     }),
-  });
+  }, timeoutMs);
   const text = (data?.candidates?.[0]?.content?.parts || []).map((p) => cleanText(p?.text, 30000)).filter(Boolean).join("\n\n");
   return { text, citations: [] };
 }
 
-async function callXai(question, system) {
+async function callXai(question, system, _maxOutputTokens = 2200, timeoutMs = 90000) {
   const input = [system ? `System instructions:\n${system}` : "", `User request:\n${question}`].filter(Boolean).join("\n\n");
   const data = await fetchJson("https://api.x.ai/v1/responses", {
     method: "POST",
     headers: { Authorization: `Bearer ${providerKey("xai")}`, "Content-Type": "application/json" },
     body: JSON.stringify({ model: providerModel("xai"), input }),
-  });
+  }, timeoutMs);
   return { text: extractResponsesText(data), citations: [] };
 }
 
-async function callProvider(id, question, system, maxOutputTokens = 2200) {
-  if (id === "openai") return callOpenAi(question, system, maxOutputTokens);
-  if (id === "anthropic") return callAnthropic(question, system, maxOutputTokens);
-  if (id === "gemini") return callGemini(question, system, maxOutputTokens);
-  if (id === "xai") return callXai(question, system, maxOutputTokens);
+async function callProvider(id, question, system, maxOutputTokens = 2200, timeoutMs = 90000) {
+  if (id === "openai") return callOpenAi(question, system, maxOutputTokens, timeoutMs);
+  if (id === "anthropic") return callAnthropic(question, system, maxOutputTokens, timeoutMs);
+  if (id === "gemini") return callGemini(question, system, maxOutputTokens, timeoutMs);
+  if (id === "xai") return callXai(question, system, maxOutputTokens, timeoutMs);
   throw new Error("Unknown AI provider.");
 }
 
@@ -243,6 +243,7 @@ async function probeProvider(id, { force = false } = {}) {
       "Reply only with OK.",
       "This is a tiny availability check. Reply only with OK.",
       16,
+      15000,
     );
     if (!cleanText(result?.text, 80)) throw new Error("Provider returned no text during availability check");
     providerHealthCache.set(id, {
@@ -487,15 +488,19 @@ export function registerAiAgentRoutes(app) {
     res.json({ ok: true, location });
   });
 
-  app.get("/api/ai-agent/status", (_req, res) => {
-    const providers = publicProviders();
+  app.get("/api/ai-agent/status", async (_req, res) => {
     res.setHeader("Cache-Control", "no-store");
+    const configuredIds = PROVIDERS.filter((p) => providerKey(p.id)).map((p) => p.id);
+    await Promise.all(configuredIds.map((id) => probeProvider(id)));
+    const providers = publicProviders();
     res.json({
       ok: true,
       enabled: Boolean(accessCode),
       providers,
       configuredCount: providers.filter((p) => p.configured).length,
       readyCount: providers.filter((p) => p.healthStatus === "ready").length,
+      checkedCount: providers.filter((p) => p.healthStatus !== "unchecked").length,
+      autoChecked: true,
       tools: {
         webSearch: Boolean(providerKey("openai")),
         attachments: Boolean(providerKey("openai")),
