@@ -213,12 +213,12 @@ async function callGemini(question, system, maxOutputTokens = 2200) {
   return { text, citations: [] };
 }
 
-async function callXai(question, system, maxOutputTokens = 2200) {
+async function callXai(question, system) {
   const input = [system ? `System instructions:\n${system}` : "", `User request:\n${question}`].filter(Boolean).join("\n\n");
   const data = await fetchJson("https://api.x.ai/v1/responses", {
     method: "POST",
     headers: { Authorization: `Bearer ${providerKey("xai")}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model: providerModel("xai"), input, max_output_tokens: maxOutputTokens }),
+    body: JSON.stringify({ model: providerModel("xai"), input }),
   });
   return { text: extractResponsesText(data), citations: [] };
 }
