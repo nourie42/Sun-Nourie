@@ -412,29 +412,30 @@
       renderCouncilChecks();
       renderSettingsProviderStatus();
       renderConnectionSummary();
-      if (accessCode()) {
-        try { await checkProviderHealth(); }
-        catch (error) { showHomeNotice(error.message || String(error)); }
-      }
     } catch (error) {
       els.statusText.textContent = 'Could not connect to AI status · tap ⚙ to check access';
       renderProviderButton();
     }
   }
 
-  els.providerBtn.addEventListener('click', () => openSheet(els.providerSheet, els.providerBack));
+  els.providerBtn.addEventListener('click', async () => {
+    openSheet(els.providerSheet, els.providerBack);
+    try { await loadStatus(); } catch {}
+  });
   els.bestModeBtn?.addEventListener('click', async () => {
     selected = 'best';
     localStorage.setItem(PREF_KEY, selected);
     showHomeNotice('Best AI mode selected. We will only use a model that passes the availability check.');
     renderProviderButton();
     renderProviderChoices();
-    if (accessCode()) {
-      try { await checkProviderHealth(); }
-      catch (error) { showHomeNotice(error.message || String(error)); }
-    }
+    try { await loadStatus(); }
+    catch (error) { showHomeNotice(error.message || String(error)); }
   });
-  els.chooseModelBtn?.addEventListener('click', () => openSheet(els.providerSheet, els.providerBack));
+  els.chooseModelBtn?.addEventListener('click', async () => {
+    openSheet(els.providerSheet, els.providerBack);
+    try { await loadStatus(); }
+    catch (error) { showHomeNotice(error.message || String(error)); }
+  });
   els.providerBack.addEventListener('click', () => closeSheet(els.providerSheet, els.providerBack));
   els.webBtn.addEventListener('click', () => { webOn = true; renderProviderButton(); });
   els.sendBtn.addEventListener('click', sendMessage);
@@ -460,16 +461,13 @@
   els.settingsBack.addEventListener('click', () => closeSheet(els.settingsSheet, els.settingsBack));
   els.closeSettingsBtn.addEventListener('click', () => { pendingAction = null; closeSheet(els.settingsSheet, els.settingsBack); });
   els.checkModelsBtn?.addEventListener('click', async () => {
-    const value = els.accessCode.value.trim();
-    if (value) saveAccessCode(value);
-    if (!accessCode()) {
-      els.settingsNotice.innerHTML = '<div class="notice error">Enter the access code first.</div>';
-      return;
-    }
-    els.settingsNotice.innerHTML = '<div class="notice">Checking model credits and availability…</div>';
+    els.settingsNotice.innerHTML = '<div class="notice">Checking all AI models now…</div>';
     try {
-      await checkProviderHealth([], { force:true });
-      els.settingsNotice.innerHTML = '<div class="notice success">Model check finished.</div>';
+      await loadStatus();
+      const unavailable = providers.filter((p) => p.configured && p.healthStatus !== 'ready');
+      els.settingsNotice.innerHTML = unavailable.length
+        ? `<div class="notice">Check finished. ${unavailable.map((p) => `${escapeHtml(p.label)}: ${escapeHtml(healthLabel(p.id))}`).join(' · ')}</div>`
+        : '<div class="notice success">Check finished. All connected AI models are ready.</div>';
     } catch (error) {
       els.settingsNotice.innerHTML = `<div class="notice error">${escapeHtml(error.message || String(error))}</div>`;
     }
