@@ -86,8 +86,9 @@ function isDaylight() {
 function radarObservationLabel(current) {
   const radar=current?.radarPrecipitation;
   if(radar?.status!=='ready')return '';
-  const rainAround=radar.atLocation===true||radar.close===true||(finite(radar.nearestRainMiles)&&radar.nearestRainMiles<=5)||radar.approaching===true;
-  if(rainAround)return radar.approaching===true&&!radar.close&&!radar.atLocation?'Rain Around · moving toward you':'Rain Around · within 5 miles';
+  if(radar.atLocation===true)return 'Rain now · observed radar over this location';
+  const rainAround=radar.close===true||(finite(radar.nearestRainMiles)&&radar.nearestRainMiles<=5)||radar.approaching===true;
+  if(rainAround)return radar.approaching===true&&!radar.close?'Rain Around · moving toward you':'Rain Around · within 5 miles';
   if(radar.nearby!==true&&radar.inArea!==true)return '';
   const direction={N:'north',NE:'northeast',E:'east',SE:'southeast',S:'south',SW:'southwest',W:'west',NW:'northwest'}[radar.nearestRainDirection];
   const distance=finite(radar.nearestRainMiles)?` about ${Math.round(radar.nearestRainMiles)} mi${direction?` ${direction}`:''}`:'';
