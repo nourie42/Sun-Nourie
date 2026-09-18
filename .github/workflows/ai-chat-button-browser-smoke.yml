@@ -86,4 +86,5 @@ jobs:
         env:
           AI_CHAT_BASE_URL: https://sun-nourie-live.onrender.com
           AI_CHAT_EXPECT_USABLE_MODELS: '1'
+          AI_CHAT_EXPECT_ANTHROPIC_READY: '1'
         run: node scripts/aiChatButtonBrowserSmoke.mjs
