@@ -38,6 +38,19 @@ try {
   await page.waitForSelector('#chooseModelBtn');
   await snapshot('INITIAL');
 
+  const providerStatus = await page.evaluate(async () => {
+    const response = await fetch('/api/ai-agent/status', { cache: 'no-store' });
+    return response.json();
+  });
+  console.log('PROVIDER_STATUS', JSON.stringify(providerStatus.providers || []));
+  const uncheckedConfigured = (providerStatus.providers || []).filter((p) => p.configured && p.healthStatus === 'unchecked');
+  if (uncheckedConfigured.length) {
+    throw new Error('Configured AI models were left unchecked: ' + uncheckedConfigured.map((p) => p.label).join(', '));
+  }
+  if (expectUsableModels && !(providerStatus.providers || []).some((p) => p.healthStatus === 'ready')) {
+    throw new Error('No AI model passed the automatic availability check on the live site.');
+  }
+
   await page.click('#chooseModelBtn');
   await page.waitForFunction(() => document.getElementById('providerSheet')?.classList.contains('show'));
   await page.waitForSelector('#providerChoices .choice');
@@ -45,6 +58,7 @@ try {
 
   const modelChoices = await page.evaluate(() => [...document.querySelectorAll('#providerChoices .choice')].map((button) => ({
     label: button.querySelector('strong')?.textContent?.trim() || '',
+    state: button.querySelector('.model-state')?.textContent?.trim() || '',
     disabled: button.disabled,
   })));
   console.log('MODEL_CHOICES', JSON.stringify(modelChoices));

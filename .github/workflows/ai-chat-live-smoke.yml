@@ -31,10 +31,12 @@ jobs:
               && printf '%s' "$home" | grep -Fq 'Pick the AI model myself' \
               && printf '%s' "$home" | grep -Fq 'id="newChatBtn"' \
               && printf '%s' "$home" | grep -Fq '⚙ Settings' \
+              && printf '%s' "$home" | grep -Fq '/ai-council/main-chat-v2.js?v=4' \
               && printf '%s' "$bots" | grep -Fq '<a href="/ai-council/?view=council">☷<br>Council</a>' \
               && ! printf '%s' "$bots" | grep -Fq 'Under Construction' \
-              && printf '%s' "$status" | grep -Fq '"healthStatus"'; then
-              echo "Live AI Chat is serving the new simple model chooser and provider-health status."
+              && printf '%s' "$status" | grep -Fq '"autoChecked":true' \
+              && ! printf '%s' "$status" | grep -Fq '"healthStatus":"unchecked"'; then
+              echo "Live AI Chat is automatically checking every configured provider and none are left unchecked."
               exit 0
             fi
 
@@ -46,6 +48,6 @@ jobs:
           printf '%s' "$home" | grep -Eo 'Pick the best AI for me|Pick the AI model myself|newChatBtn|Settings' | sort -u || true
           echo "Bots Council marker:"
           printf '%s' "$bots" | grep -F '<a href="/ai-council/?view=council">☷<br>Council</a>' || true
-          echo "Provider health marker:"
-          printf '%s' "$status" | grep -F '"healthStatus"' || true
+          echo "Provider health markers:"
+          printf '%s' "$status" | grep -Eo '"autoChecked":(true|false)|"healthStatus":"[^"]+"' || true
           exit 1
