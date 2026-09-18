@@ -14,8 +14,8 @@ import {modelFreshnessText} from './personal-details.js?v=weather-qa-v67';
 import {renderDewpointMeter} from './dewpoint-meter.js?v=weather-qa-v67';
 import {renderWeatherPanel} from './render-safety.js';
 import {forecastPeriodSummary} from './forecast-story.js?v=weather-qa-v67';
-import {forecastOutlookDetails} from './outlook-details.js?v=weather-outlook-v1';
-import {isExperimentalWeatherPage,renderCarWashForecast,resetCarWashForecast} from './car-wash.js?v=weather-qa-v67';
+import {forecastOutlookDetails} from './outlook-details.js?v=weather-qa-v70';
+import {isExperimentalWeatherPage,renderCarWashForecast,resetCarWashForecast} from './car-wash.js?v=weather-qa-v70';
 import {renderModelExplanation,resetModelExplanation} from './model-explanation.js?v=weather-qa-v70';
 import {updateRainTrend} from './rain-trend.js?v=weather-qa-v70';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
