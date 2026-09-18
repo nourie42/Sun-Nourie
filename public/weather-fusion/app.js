@@ -10,7 +10,7 @@ import {dailyDisplay} from './weather-math.js?v=weather-qa-v70';
 import {conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
 import {currentHero} from './current-temperature.js?v=rain-now-v71';
 import {renderBulletins} from './bulletins.js?v=wpc-mpd-v1';
-import {modelFreshnessText} from './personal-details.js?v=weather-qa-v67';
+import {modelFreshnessText} from './personal-details.js?v=rain-now-v71';
 import {renderDewpointMeter} from './dewpoint-meter.js?v=weather-qa-v67';
 import {renderWeatherPanel} from './render-safety.js';
 import {forecastPeriodSummary} from './forecast-story.js?v=weather-qa-v67';
