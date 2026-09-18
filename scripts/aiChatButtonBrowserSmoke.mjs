@@ -3,8 +3,10 @@ import puppeteer from 'puppeteer';
 const base = String(process.env.AI_CHAT_BASE_URL || 'https://sun-nourie-live.onrender.com').replace(/\/$/, '');
 const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox','--disable-setuid-sandbox'] });
 const page = await browser.newPage();
-await page.setViewport({ width: 412, height: 915, deviceScaleFactor: 1 });
+await page.setUserAgent('Mozilla/5.0 (Linux; Android 17; SM-S948U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0 Mobile Safari/537.36');
+await page.setViewport({ width: 412, height: 915, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
 page.setDefaultTimeout(30000);
+const expectUsableModels = process.env.AI_CHAT_EXPECT_USABLE_MODELS === '1';
 
 const errors = [];
 const logs = [];
@@ -38,10 +40,31 @@ try {
 
   await page.click('#chooseModelBtn');
   await page.waitForFunction(() => document.getElementById('providerSheet')?.classList.contains('show'));
+  await page.waitForSelector('#providerChoices .choice');
   await snapshot('AFTER_CHOOSE_MODEL');
 
-  await page.click('#providerBack');
-  await page.waitForFunction(() => !document.getElementById('providerSheet')?.classList.contains('show'));
+  const modelChoices = await page.evaluate(() => [...document.querySelectorAll('#providerChoices .choice')].map((button) => ({
+    label: button.querySelector('strong')?.textContent?.trim() || '',
+    disabled: button.disabled,
+  })));
+  console.log('MODEL_CHOICES', JSON.stringify(modelChoices));
+
+  const usableExactModel = modelChoices.find((item) => !item.disabled && item.label !== 'Pick the best for me');
+  if (expectUsableModels && !usableExactModel) throw new Error('Live site has no enabled exact AI model to choose.');
+  if (usableExactModel) {
+    await page.evaluate((label) => {
+      const buttons = [...document.querySelectorAll('#providerChoices .choice')];
+      const target = buttons.find((button) => !button.disabled && button.querySelector('strong')?.textContent?.trim() === label);
+      target?.click();
+    }, usableExactModel.label);
+    await page.waitForFunction(() => !document.getElementById('providerSheet')?.classList.contains('show'));
+    const selectedModel = await page.$eval('#providerBtn', (element) => element.textContent || '');
+    console.log('SELECTED_MODEL_BUTTON', selectedModel);
+    if (!selectedModel.includes(usableExactModel.label)) throw new Error(`Selecting ${usableExactModel.label} did not update the model button.`);
+  } else {
+    await page.click('#providerBack');
+    await page.waitForFunction(() => !document.getElementById('providerSheet')?.classList.contains('show'));
+  }
 
   await page.click('#settingsBtn');
   await page.waitForFunction(() => document.getElementById('settingsSheet')?.classList.contains('show'));
@@ -49,6 +72,12 @@ try {
 
   await page.click('#settingsBack');
   await page.waitForFunction(() => !document.getElementById('settingsSheet')?.classList.contains('show'));
+
+  await page.click('#newChatBtn');
+  await page.waitForFunction(() => document.getElementById('chatPanel')?.classList.contains('active'));
+  const newChatProvider = await page.$eval('#providerBtn', (element) => element.textContent || '');
+  console.log('AFTER_NEW_CHAT_PROVIDER', newChatProvider);
+  if (!/Pick the best/i.test(newChatProvider)) throw new Error('New Chat did not reset the AI choice to Pick the best.');
 
   await page.click('#councilBtn');
   await page.waitForFunction(() => document.getElementById('councilPanel')?.classList.contains('active'));
