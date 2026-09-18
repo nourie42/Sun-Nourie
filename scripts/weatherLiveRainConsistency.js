@@ -6,6 +6,10 @@ const radarResponse=await fetch(base+'/api/weather-fusion/radar?location=knightd
 assert.equal(radarResponse.ok,true,'Live radar API failed: '+radarResponse.status);
 const radar=await radarResponse.json();
 const precipitation=radar.precipitation||{};
+assert.equal(radar.status,'ready','Live radar must have a current NOAA frame');
+assert.equal(radar.detectionSource,'noaa-arcgis-mrms','Current-rain detection must use the NOAA ArcGIS MRMS service');
+assert.equal(precipitation.status,'ready','Current precipitation detection must be available');
+assert.ok(Number.isFinite(Date.parse(precipitation.observedAt))&&Date.now()-Date.parse(precipitation.observedAt)<20*60*1000,'Live radar observation is stale or missing');
 
 const browser=await chromium.launch({headless:true});
 try{

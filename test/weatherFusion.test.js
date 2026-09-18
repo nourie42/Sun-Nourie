@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { coordinates, localTime, dateKey, nextDate, durationMs, sumHourly, gridQpf, guidanceBlend, normalizeModel, parseRadarTimes, radarSampleLocations, radarFeatureActive, radarHydrometeorClass, radarHydrometeorUrl, summarizeRadarPresence, summarizeRadarMotion, Cache, buildForecast, createWeatherService, registerWeatherFusionRoutes } from '../src/weatherFusion.js';
+import { coordinates, localTime, dateKey, nextDate, durationMs, sumHourly, gridQpf, guidanceBlend, normalizeModel, parseRadarTimes, radarSampleLocations, radarFeatureActive, radarArcgisActive, radarArcgisTimes, radarHydrometeorClass, radarHydrometeorUrl, summarizeRadarPresence, summarizeRadarMotion, Cache, buildForecast, createWeatherService, registerWeatherFusionRoutes } from '../src/weatherFusion.js';
 import {H,now,base,times,model,periods,hourlyPeriods,grid,inputs,snapshot} from './weatherFusion.fixtures.js';
 test('coordinate validation is finite, bounded, and rejects coercion and arrays', () => {
   assert.equal(coordinates({ location: 'greenville' }).longitude, -77.3664);
@@ -156,6 +156,49 @@ test('weather routes register without changing any existing route', () => {
   assert.ok(routes.some(([p]) => p === '/api/weather-fusion/forecast'));
   assert.ok(!routes.some(([p]) => p === '/'));
 });
+test('NOAA ArcGIS radar pixel parsing treats rendered alpha as live reflectivity',()=>{
+  assert.equal(radarArcgisActive({value:'255, 71, 0, 255'}),true);
+  assert.equal(radarArcgisActive({value:'0 0 0 0'}),false);
+  assert.equal(radarArcgisActive({value:'NoData'}),false);
+  assert.equal(radarArcgisActive({}),null);
+  const current=Date.parse('2026-09-18T22:10:00Z');
+  const payload={features:[
+    {attributes:{idp_validtime:current-2*60000}},
+    {attributes:{idp_validtime:current-4*60000}},
+    {attributes:{idp_validtime:current-7*3600000}},
+  ]};
+  assert.deepEqual(radarArcgisTimes(payload,current),[
+    new Date(current-4*60000).toISOString(),
+    new Date(current-2*60000).toISOString(),
+  ]);
+});
+
+test('ArcGIS MRMS keeps current rain working when GeoServer capabilities are unavailable',async()=>{
+  const current=Date.parse('2026-09-18T22:06:30Z'),valid=current-19000;
+  let identifyCalls=0;
+  const fetchImpl=async value=>{
+    const url=new URL(value);
+    if(url.pathname.startsWith('/points/'))return response({properties:{radarStation:'KRAX'}});
+    if(url.hostname==='opengeo.ncep.noaa.gov')throw new Error('GeoServer unavailable');
+    if(url.hostname==='mapservices.weather.noaa.gov'&&url.pathname.endsWith('/query')){
+      return response({features:[{attributes:{objectid:1,name:'CONUS_L2_BREF_QCD_TEST',idp_validtime:valid,idp_validendtime:valid,idp_ingestdate:valid}}]});
+    }
+    if(url.hostname==='mapservices.weather.noaa.gov'&&url.pathname.endsWith('/identify')){
+      identifyCalls++;
+      return response({value:'255, 71, 0, 255'});
+    }
+    throw new Error('Unexpected radar request '+url);
+  };
+  const live=await createWeatherService({fetchImpl,now:()=>current}).radar({location:'knightdale'});
+  assert.equal(live.status,'ready');
+  assert.equal(live.detectionSource,'noaa-arcgis-mrms');
+  assert.equal(live.precipitation.status,'ready');
+  assert.equal(live.precipitation.atLocation,true);
+  assert.equal(live.precipitation.close,true);
+  assert.equal(live.precipitation.classification.source,'arcgis-mrms-qcd');
+  assert.equal(identifyCalls,1,'an active center pixel avoids unnecessary neighborhood requests');
+});
+
 test('live radar distinguishes the selected point from precipitation nearby', async () => {
   const points=radarSampleLocations({latitude:35.787,longitude:-78.4806});
   assert.equal(points.length,41);assert.equal(points[0].distanceMiles,0);assert.ok(points.some(point=>point.distanceMiles===5));assert.equal(Math.max(...points.map(point=>point.distanceMiles)),36);
