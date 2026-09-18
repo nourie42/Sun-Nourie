@@ -73,6 +73,11 @@ try {
   if (errors.length) console.error('BROWSER_ERRORS\n' + errors.join('\n'));
   if (logs.length) console.error('BROWSER_LOGS\n' + logs.join('\n'));
   throw error;
+} catch (error) {
+  console.error('SMOKE_FAILURE', error?.stack || error?.message || String(error));
+  if (errors.length) console.error('BROWSER_ERRORS\n' + errors.join('\n'));
+  if (logs.length) console.error('BROWSER_LOGS\n' + logs.join('\n'));
+  throw error;
 } finally {
   await browser.close();
 }
