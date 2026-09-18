@@ -43,7 +43,7 @@
   function providerLabel(id) { return provider(id)?.label || ({ openai:'OpenAI', anthropic:'Claude', gemini:'Gemini', xai:'Grok' }[id] || id); }
   function configured(id) { return provider(id)?.configured === true; }
   function healthStatus(id) { return provider(id)?.healthStatus || (configured(id) ? 'unchecked' : 'not_connected'); }
-  function healthBlocked(id) { return ['no_credits','auth_error','model_error','error','busy','not_connected'].includes(healthStatus(id)); }
+  function healthBlocked(id) { return ['no_credits','auth_error','workspace_required','model_error','error','busy','not_connected'].includes(healthStatus(id)); }
   function healthLabel(id) { return provider(id)?.healthLabel || (configured(id) ? 'Credits not checked' : 'Not connected'); }
   async function checkHealth(ids = [], force = false) {
     if (!code()) return { ok:false, requiresAccess:true, checked:[] };
