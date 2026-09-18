@@ -124,7 +124,7 @@ test('Gross Meter heading stays centered and bold without changing chart geometr
  assert.match(css,/#gross-title\{text-align:center;font-weight:800\}/);assert.match(meterCss,/\.gross-eyebrow\{width:calc\(100% \+ 86px\);[^}]*text-align:center/);assert.match(meterCss,/@media\(max-width:760px\)[\s\S]*\.gross-eyebrow\{width:calc\(100% \+ 62px\)\}/);assert.ok(!/\.gross-(scroll|chart)\s*\{/.test(css));
 });
 test('changed assets are cache-busted and late briefing responses stay guarded',()=>{
- assert.match(html,/style\.css\?v=car-wash-icon-back-v46/);assert.match(html,/forecast-layout\.css\?v=weather-qa-v67/);assert.match(html,/personal-details\.css\?v=wpc-mpd-v12/);assert.match(html,/app\.js\?v=weather-qa-v68/);assert.match(html,/car-wash\.css\?v=rain-consensus-v41/);assert.match(html,/forecast-cards\.css\?v=weather-qa-v65/);assert.match(html,/scenario-layout\.css\?v=weather-qa-v67/);
+ assert.match(html,/style\.css\?v=car-wash-icon-back-v46/);assert.match(html,/forecast-layout\.css\?v=weather-qa-v67/);assert.match(html,/personal-details\.css\?v=wpc-mpd-v12/);assert.match(html,/app\.js\?v=weather-qa-v69/);assert.match(html,/car-wash\.css\?v=rain-consensus-v41/);assert.match(html,/forecast-cards\.css\?v=weather-qa-v65/);assert.match(html,/scenario-layout\.css\?v=weather-qa-v67/);
  assert.match(app,/dans-take\.js\?v=weather-art-labels-v10/);
  assert.match(app,/bulletins\.js\?v=wpc-mpd-v1/);
  assert.match(app,/experience\.js\?v=weather-qa-v67/);
@@ -132,6 +132,7 @@ test('changed assets are cache-busted and late briefing responses stay guarded',
  assert.match(app,/forecast-story\.js\?v=weather-qa-v67/);
  assert.match(app,/weather-display\.js\?v=weather-qa-v68/);assert.match(app,/current-temperature\.js\?v=rain-around-v66/);assert.match(app,/car-wash\.js\?v=weather-qa-v67/);
  assert.match(app,/model-explanation\.js\?v=weather-qa-v67/);
+ assert.match(app,/outlook-details\.js\?v=weather-outlook-v1/);
  for(const module of ['dans-summary','day-graph','hourly-feels','weather-math','dewpoint-meter','rain-trend'])assert.match(app,new RegExp(`${module}\\.js\\?v=weather-qa-v67`));
  assert.match(app,/if \(id === generation && briefing\.signature === forecast\?\.signature\) renderBriefing\(briefing\)/);
 });
