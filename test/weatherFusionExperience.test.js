@@ -17,7 +17,8 @@ test('first row becomes Remainder of Today at noon and Tonight at 6 PM in the LO
 });
 test('daily display consistently prefers the blended rain likelihood',()=>{
  const blended={...day,popDay:60,popDayLikelihood:{value:24},popNightLikelihood:{value:12},rainLikelihood:{value:32}};
- assert.equal(dailyDisplay(blended,0,Date.parse('2026-09-05T18:00:00Z'),'America/New_York').pop,24);
+ assert.equal(dailyDisplay(blended,0,Date.parse('2026-09-05T15:59:00Z'),'America/New_York').pop,24,'before local noon Today uses the daytime window');
+ assert.equal(dailyDisplay(blended,0,Date.parse('2026-09-05T18:00:00Z'),'America/New_York').pop,32,'Remainder of Today uses the full remaining window including tonight');
  assert.equal(dailyDisplay(blended,0,Date.parse('2026-09-05T22:00:00Z'),'America/New_York').pop,12);
  assert.equal(dailyDisplay(blended,1,Date.parse('2026-09-05T20:00:00Z'),'America/New_York').pop,32);
 });
