@@ -1,0 +1,31 @@
+name: AI Chat Button Browser Smoke
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "public/ai-council/**"
+      - "src/aiAgent.js"
+      - "src/aiCouncil.js"
+      - "scripts/aiChatButtonBrowserSmoke.mjs"
+      - ".github/workflows/ai-chat-button-browser-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  browser-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install browser
+        run: |
+          npm install --no-audit --no-fund
+          npm install --no-save --no-audit --no-fund puppeteer@24
+      - name: Test live mobile AI Chat buttons
+        env:
+          AI_CHAT_BASE_URL: https://sun-nourie-live.onrender.com
+        run: node scripts/aiChatButtonBrowserSmoke.mjs
