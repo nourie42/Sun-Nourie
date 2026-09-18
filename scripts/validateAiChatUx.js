@@ -34,6 +34,8 @@ assert.match(botsJs, /addBotBtn\.classList\.toggle\('hidden', view !== 'bots'\)/
 assert.match(agent, /\/api\/ai-agent\/provider-health/);
 assert.match(agent, /status: "no_credits"/);
 assert.match(agent, /probeProvider/);
+assert.match(agent, /ANTHROPIC_WORKSPACE_ID/);
+assert.match(agent, /anthropic-workspace-id/);
 
 const app = express();
 registerAiAgentRoutes(app);
@@ -119,9 +121,64 @@ try {
   const blockedChat = await blockedChatRes.json();
   assert.match(blockedChat.error, /No credits|billing/i);
   assert.equal(providerCalls, 1, "blocked chat must not make a second full provider request");
+
+  delete process.env.OPENAI_API_KEY;
+  process.env.ANTHROPIC_API_KEY = "fake-anthropic-key";
+  delete process.env.ANTHROPIC_WORKSPACE_ID;
+  let anthropicCalls = 0;
+  globalThis.fetch = async (url, init) => {
+    const target = String(url);
+    if (target.startsWith("https://api.anthropic.com/v1/messages")) {
+      anthropicCalls += 1;
+      const headers = new Headers(init?.headers || {});
+      const workspaceId = headers.get("anthropic-workspace-id");
+      if (!workspaceId) {
+        return new Response(JSON.stringify({
+          error: {
+            message: "This API key is not scoped to a workspace, so this request must include the anthropic-workspace-id header with the ID of the workspace to use.",
+          },
+        }), {
+          status: 400,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      assert.equal(workspaceId, "wrkspc_test_workspace");
+      return new Response(JSON.stringify({
+        content: [{ type: "text", text: "OK" }],
+      }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }
+    return nativeFetch(url, init);
+  };
+
+  const missingWorkspaceRes = await nativeFetch(`${base}/api/ai-agent/provider-health`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-ai-council-code": "ux-smoke-test-code" },
+    body: JSON.stringify({ providers: ["anthropic"], force: true }),
+  });
+  assert.equal(missingWorkspaceRes.status, 200);
+  const missingWorkspace = await missingWorkspaceRes.json();
+  assert.equal(missingWorkspace.checked[0].status, "workspace_required");
+  assert.match(missingWorkspace.checked[0].label, /Workspace ID required/i);
+
+  process.env.ANTHROPIC_WORKSPACE_ID = "wrkspc_test_workspace";
+  const anthropicReadyRes = await nativeFetch(`${base}/api/ai-agent/provider-health`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-ai-council-code": "ux-smoke-test-code" },
+    body: JSON.stringify({ providers: ["anthropic"], force: true }),
+  });
+  assert.equal(anthropicReadyRes.status, 200);
+  const anthropicReady = await anthropicReadyRes.json();
+  assert.equal(anthropicReady.checked[0].status, "ready");
+  assert.equal(anthropicReady.providers.find((p) => p.id === "anthropic")?.workspaceConfigured, true);
+  assert.equal(anthropicCalls, 2);
 } finally {
   globalThis.fetch = nativeFetch;
   delete process.env.OPENAI_API_KEY;
+  delete process.env.ANTHROPIC_API_KEY;
+  delete process.env.ANTHROPIC_WORKSPACE_ID;
   await new Promise((resolve) => server.close(resolve));
 }
 
