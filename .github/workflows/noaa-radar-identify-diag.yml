@@ -1,0 +1,20 @@
+name: NOAA Radar Identify Diagnostic
+on:
+  push:
+    branches: ["diag/noaa-radar-identify"]
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Query NOAA ArcGIS radar services
+        run: |
+          set -x
+          BASE='https://mapservices.weather.noaa.gov/eventdriven/rest/services/radar/radar_base_reflectivity_time/ImageServer'
+          curl -fsSL --max-time 30 "$BASE?f=pjson" | head -c 12000
+          echo
+          curl -fsSL --max-time 30 "$BASE/identify?geometry=%7B%22x%22%3A-78.4806%2C%22y%22%3A35.787%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPoint&returnGeometry=false&returnCatalogItems=true&returnAllPixelValues=true&f=pjson" | head -c 20000
+          echo
+          curl -fsSL --max-time 30 "$BASE/query?where=1%3D1&outFields=objectid%2Cname%2Cidp_validtime%2Cidp_validendtime%2Cidp_ingestdate&orderByFields=idp_validtime%20DESC&resultRecordCount=3&returnGeometry=false&f=pjson" | head -c 20000
+          echo
+          NEX='https://opengeo.ncep.noaa.gov/geoserver/krax/krax_sr_bref/ows?service=WMS&version=1.3.0&request=GetCapabilities'
+          curl -i -L --max-time 30 "$NEX" | head -c 10000 || true
