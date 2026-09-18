@@ -1,0 +1,35 @@
+name: Weather Today Tile Browser Smoke
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "public/weather-fusion/**"
+      - "src/weatherFusion.js"
+      - "src/weatherFusionDirect.js"
+      - "scripts/weatherNourieBrowserSmoke.js"
+      - ".github/workflows/weather-today-tile-browser-smoke.yml"
+  push:
+    branches: [main]
+    paths:
+      - "public/weather-fusion/**"
+      - "src/weatherFusion.js"
+      - "src/weatherFusionDirect.js"
+      - "scripts/weatherNourieBrowserSmoke.js"
+      - ".github/workflows/weather-today-tile-browser-smoke.yml"
+
+jobs:
+  today-tile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm install --no-save --package-lock=false playwright@1.55.0
+      - run: npx playwright install --with-deps chromium
+      - name: Verify Today tile mobile layout and rain-change UI
+        run: node scripts/weatherNourieBrowserSmoke.js
