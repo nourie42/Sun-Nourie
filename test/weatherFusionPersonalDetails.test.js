@@ -21,7 +21,7 @@ test('dry observed radar removes forecast rain from the current hero',()=>{
  const f={current:{temperature:79,type:'guidance',condition:'Chance Showers And Thunderstorms',conditionSource:'Selected-location current-hour forecast',radarPrecipitation:{status:'ready',atLocation:false,nearby:false}},hours:[{skyCover:58}]};
  assert.equal(currentHero(f,false).condition,'Partly cloudy');
  f.current.radarPrecipitation.atLocation=true;
- assert.equal(currentHero(f,false).condition,'Rain Around');
+ assert.equal(currentHero(f,false).condition,'Rain now');
 });
 test('pressure is converted once; raw Pa avoids loss from rounded inches',()=>{
  assert.equal(stationPressureMb({pressurePa:101300,pressure:29.91}),1013);
