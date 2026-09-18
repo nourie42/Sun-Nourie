@@ -9,12 +9,54 @@ on:
       - "src/aiCouncil.js"
       - "scripts/aiChatButtonBrowserSmoke.mjs"
       - ".github/workflows/ai-chat-button-browser-smoke.yml"
+  push:
+    branches: [main]
+    paths:
+      - "public/ai-council/**"
+      - "src/aiAgent.js"
+      - "src/aiCouncil.js"
+      - "scripts/aiChatButtonBrowserSmoke.mjs"
+      - ".github/workflows/ai-chat-button-browser-smoke.yml"
   workflow_dispatch:
 
 jobs:
-  browser-smoke:
+  local-browser-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install app and browser
+        run: |
+          npm install --no-audit --no-fund
+          npm install --no-save --no-audit --no-fund puppeteer@24
+      - name: Start local app
+        run: |
+          PORT=3211 NODE_ENV=test AI_COUNCIL_ACCESS_CODE=browser-smoke node server.js >/tmp/ai-chat-server.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl -fsS --max-time 2 http://127.0.0.1:3211/ai-council/ >/dev/null; then
+              exit 0
+            fi
+            sleep 0.5
+          done
+          cat /tmp/ai-chat-server.log
+          exit 1
+      - name: Click every important AI Chat control
+        env:
+          AI_CHAT_BASE_URL: http://127.0.0.1:3211
+        run: node scripts/aiChatButtonBrowserSmoke.mjs
+      - name: Show local server log on failure
+        if: failure()
+        run: cat /tmp/ai-chat-server.log || true
+
+  live-browser-smoke:
+    if: github.event_name == 'push'
+    needs: local-browser-smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -25,7 +67,22 @@ jobs:
         run: |
           npm install --no-audit --no-fund
           npm install --no-save --no-audit --no-fund puppeteer@24
-      - name: Test live mobile AI Chat buttons
+      - name: Wait for fixed assets on Render
+        env:
+          LIVE_URL: https://sun-nourie-live.onrender.com
+        run: |
+          for attempt in $(seq 1 90); do
+            home="$(curl -fsSL --max-time 20 "$LIVE_URL/ai-council/?deploy=$GITHUB_SHA&n=$attempt" 2>/dev/null || true)"
+            if printf '%s' "$home" | grep -Fq '/ai-council/ai-context-v1.js?v=2' && printf '%s' "$home" | grep -Fq '/ai-council/main-chat-v2.js?v=3'; then
+              echo "Fixed AI Chat assets are live."
+              exit 0
+            fi
+            echo "Waiting for Render deployment ($attempt/90)"
+            sleep 10
+          done
+          echo "Render did not deploy the fixed AI Chat assets in time."
+          exit 1
+      - name: Click every important control on live mobile AI Chat
         env:
           AI_CHAT_BASE_URL: https://sun-nourie-live.onrender.com
         run: node scripts/aiChatButtonBrowserSmoke.mjs
