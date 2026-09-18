@@ -125,7 +125,7 @@
       ? providers.filter((p) => p.configured).map((p) => p.id)
       : [selected];
     try {
-      await checkProviderHealth(ids);
+      await checkProviderHealth(ids, { force:true });
     } catch (error) {
       showHomeNotice(error.message || String(error));
       els.statusText.textContent = error.message || 'AI availability check failed.';
@@ -338,7 +338,7 @@
     let ids = [...els.councilChecks.querySelectorAll('input:checked')].map((input) => input.value);
     if (ids.length < 2) return councilNotice('Pick at least two available AI models.', 'error');
     try {
-      await checkProviderHealth(ids);
+      await checkProviderHealth(ids, { force:true });
     } catch (error) {
       return councilNotice(error.message || String(error), 'error');
     }

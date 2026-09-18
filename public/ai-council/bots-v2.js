@@ -304,7 +304,7 @@
     if (!code()) return requestAccess(runRoom);
     const modelIds = [...new Set(chosen.map((b) => b.provider))];
     try {
-      await checkHealth(modelIds);
+      await checkHealth(modelIds, true);
     } catch (error) {
       return notice(els.roomNotice, error.message || String(error), 'error');
     }
