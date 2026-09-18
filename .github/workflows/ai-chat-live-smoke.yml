@@ -31,7 +31,7 @@ jobs:
               && printf '%s' "$home" | grep -Fq 'Pick the AI model myself' \
               && printf '%s' "$home" | grep -Fq 'id="newChatBtn"' \
               && printf '%s' "$home" | grep -Fq '⚙ Settings' \
-              && printf '%s' "$home" | grep -Fq '/ai-council/main-chat-v2.js?v=5' \
+              && printf '%s' "$home" | grep -Fq '/ai-council/main-chat-v2.js?v=6' \
               && printf '%s' "$bots" | grep -Fq '<a href="/ai-council/?view=council">☷<br>Council</a>' \
               && ! printf '%s' "$bots" | grep -Fq 'Under Construction' \
               && printf '%s' "$status" | grep -Fq '"autoChecked":true' \
