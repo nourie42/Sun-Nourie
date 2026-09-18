@@ -14,6 +14,7 @@ import {modelFreshnessText} from './personal-details.js?v=weather-qa-v67';
 import {renderDewpointMeter} from './dewpoint-meter.js?v=weather-qa-v67';
 import {renderWeatherPanel} from './render-safety.js';
 import {forecastPeriodSummary} from './forecast-story.js?v=weather-qa-v67';
+import {forecastOutlookDetails} from './outlook-details.js?v=weather-outlook-v1';
 import {isExperimentalWeatherPage,renderCarWashForecast,resetCarWashForecast} from './car-wash.js?v=weather-qa-v67';
 import {renderModelExplanation,resetModelExplanation} from './model-explanation.js?v=weather-qa-v67';
 import {updateRainTrend} from './rain-trend.js?v=weather-qa-v67';
@@ -127,7 +128,8 @@ function render(data) {
   draw('scientific-stuff', 'Source details', () => renderEvidence(data));
   draw('day-content', 'Forecast details', () => refreshOpenDay());
   if (currentBriefing?.signature !== data.signature) {
-    draw('briefing-summary', 'Local outlook', () => renderBriefing({ mode: 'nws-summary', signature: data.signature, headline: currentDay.tonight ? 'Your evening outlook' : currentDay.condition, summary: forecastPeriodSummary(data,0,currentDay.tonight?'overnight':'daytime').summary, nearTerm: forecastPeriodSummary(data,0,'overnight').summary, extended: forecastPeriodSummary(data,1,'overall').summary,
+    const outlook=forecastOutlookDetails(data,Date.now());
+    draw('briefing-summary', 'Local outlook', () => renderBriefing({ mode: 'nws-summary', signature: data.signature, headline: currentDay.tonight ? 'Your evening outlook' : currentDay.condition, summary: outlook.summary, nearTerm: outlook.nearTerm, extended: outlook.extended,
       uncertainty: '', danTake:data.danTake||rebindDanTake(currentBriefing?.danTake||currentBriefing,data), reason: data.aiConfigured ? 'Updating your local outlook…' : 'Weather Nourie forecast', sources: ['nws',...(data.modelContributions||[]).map(model=>model.id)] }));
   }
   if (map) { marker?.setLatLng([place.latitude, place.longitude]); renderMapWarnings(data); }
@@ -181,15 +183,20 @@ function renderBriefing(data) {
   const takeItems=card.items||[];
   const takeDisplay=card.text;
   const displayedDay=forecast?.days?.[0]?dailyDisplay(forecast.days[0],0,Date.now(),forecast.location?.timeZone||'America/New_York'):null;
+  const localDetails=forecast?.days?.length>1&&(forecast?.hours?.length||forecast?.rainTimeline?.length)?forecastOutlookDetails(forecast,Date.now()):null;
+  const summary=localDetails?.summary||data.summary||'The source forecast is currently unavailable.';
+  const nearTerm=localDetails?.nearTerm||data.nearTerm||'See the hourly forecast below.';
+  const extended=localDetails?.extended||data.extended||'More details will appear with the next update.';
+  const detailHTML=value=>esc(value).replace(/\n/g,'<br>');
   $('briefing-title').textContent = conditionForRainChance(data.headline || 'Local forecast',displayedDay?.pop);
-  $('briefing-summary').textContent = data.summary || 'The source forecast is currently unavailable.';
+  $('briefing-summary').textContent = summary;
   $('ai-label').textContent = data.mode === 'ai' ? 'YOUR LOCAL OUTLOOK' : 'WEATHER NOURIE FORECAST';
   const refs = (data.sources || []).filter((id) => ['nws', 'afd', 'hrrr', 'ecmwf', 'nbm'].includes(id)).map((id) => {
     const f = forecast?.feeds.find((s) => s.id === id);
     const url = id === 'afd' ? forecast?.discussion?.url : f?.url;
     return url && /^https:\/\/(api\.weather\.gov|www\.nco\.ncep\.noaa\.gov|www\.ecmwf\.int)\//.test(url) ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(f?.label || id)} ↗</a>` : esc(f?.label || id);
   });
-  $('briefing-detail').innerHTML = `<div><strong>Tonight & tomorrow</strong><p>${esc(data.nearTerm || 'See the hourly forecast below.')}</p></div><div><strong>The week ahead</strong><p>${esc(data.extended || 'More details will appear with the next update.')}</p></div>`;
+  $('briefing-detail').innerHTML = `<div><strong>Tonight & tomorrow</strong><p>${detailHTML(nearTerm)}</p></div><div><strong>The week ahead</strong><p>${detailHTML(extended)}</p></div>`;
   // The Today card owns the single public Dan's take heading. Keep it visible
   // even when there is no approved change, and put only content/status in its body.
   const todayUncertainty = $('today-uncertainty'), todayUncertaintyText = $('today-uncertainty-text');
@@ -200,7 +207,7 @@ function renderBriefing(data) {
   }
   $('briefing-stamp').textContent = data.mode === 'ai' ? `Updated ${clock(data.generatedAt)} · based on your local NWS discussion` : 'Weather Nourie forecast';
   const discussionItems=takeItems.filter(item=>!item.official);
-  $('outlook-science').innerHTML = `<p>Summary type: ${esc(data.mode === 'ai' ? 'AI plain-language paraphrase of the local discussion, checked against the point forecast and available model data' : 'Shared Weather Nourie hourly summary; not an AI paraphrase')}. ${esc(data.reason || '')}</p><p>Sources used: ${refs.join(' · ') || 'Waiting for the local outlook'}</p><p>Take status: ${takeItems.some(item=>item.official)?'An active official local notice or point-specific risk outlook is displayed.':takeItems.length?'An explicitly supported, still-upcoming discussion change is displayed.':'No displayed change: '+(data.danTakeStatus==='discussion-not-current'?'the local discussion is missing or stale.':data.danTakeStatus==='no-explicit-future-change'?'the current discussion identifies no dated upcoming uncertainty.':data.reason||'the current discussion has not produced an approved explanation yet.')}</p>${discussionItems.map(item=>`<details><summary>${esc(item.period)} · source evidence</summary><p>${esc(item.sourceQuote)}</p><p>Original section: ${esc(item.section)} · issued ${esc(clock(item.sectionIssuedAt,{month:'short',day:'numeric'}))}. Applies through ${esc(clock(item.eventEnd,{month:'short',day:'numeric'}))}.</p></details>`).join('')}`;
+  $('outlook-science').innerHTML = `<p>Summary type: ${esc(localDetails ? 'Plain-language Weather Nourie point forecast with named days and timing from the same forecast data shown elsewhere' : data.mode === 'ai' ? 'AI plain-language paraphrase of the local discussion, checked against the point forecast and available model data' : 'Shared Weather Nourie hourly summary; not an AI paraphrase')}. ${esc(data.reason || '')}</p><p>Sources used: ${refs.join(' · ') || 'Waiting for the local outlook'}</p><p>Take status: ${takeItems.some(item=>item.official)?'An active official local notice or point-specific risk outlook is displayed.':takeItems.length?'An explicitly supported, still-upcoming discussion change is displayed.':'No displayed change: '+(data.danTakeStatus==='discussion-not-current'?'the local discussion is missing or stale.':data.danTakeStatus==='no-explicit-future-change'?'the current discussion identifies no dated upcoming uncertainty.':data.reason||'the current discussion has not produced an approved explanation yet.')}</p>${discussionItems.map(item=>`<details><summary>${esc(item.period)} · source evidence</summary><p>${esc(item.sourceQuote)}</p><p>Original section: ${esc(item.section)} · issued ${esc(clock(item.sectionIssuedAt,{month:'short',day:'numeric'}))}. Applies through ${esc(clock(item.eventEnd,{month:'short',day:'numeric'}))}.</p></details>`).join('')}`;
 
 }
 async function load({ moveMap = false, refreshModels = false, briefingRetry = 0 } = {}) {
