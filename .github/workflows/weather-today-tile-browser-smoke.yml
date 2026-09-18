@@ -8,6 +8,7 @@ on:
       - "src/weatherFusion.js"
       - "src/weatherFusionDirect.js"
       - "scripts/weatherTodayTileSmoke.js"
+      - "scripts/weatherTodayTileLiveSmoke.js"
       - ".github/workflows/weather-today-tile-browser-smoke.yml"
   push:
     branches: [main]
@@ -15,7 +16,8 @@ on:
       - "public/weather-fusion/**"
       - "src/weatherFusion.js"
       - "src/weatherFusionDirect.js"
-      - "scripts/weatherNourieBrowserSmoke.js"
+      - "scripts/weatherTodayTileSmoke.js"
+      - "scripts/weatherTodayTileLiveSmoke.js"
       - ".github/workflows/weather-today-tile-browser-smoke.yml"
 
 jobs:
@@ -33,3 +35,37 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Verify Today tile mobile layout and rain-change UI
         run: node scripts/weatherTodayTileSmoke.js
+
+  live-today-tile:
+    if: github.event_name == 'push'
+    needs: today-tile
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm install --no-save --package-lock=false playwright@1.55.0
+      - run: npx playwright install --with-deps chromium
+      - name: Wait for Weather Nourie deployment
+        env:
+          LIVE_URL: https://sun-nourie-live.onrender.com
+        run: |
+          for attempt in $(seq 1 90); do
+            home="$(curl -fsSL --max-time 20 "$LIVE_URL/weather-fusion/?deploy=$GITHUB_SHA&n=$attempt" 2>/dev/null || true)"
+            if printf '%s' "$home" | grep -Fq '/weather-fusion/app.js?v=weather-qa-v70' && printf '%s' "$home" | grep -Fq '/weather-fusion/forecast-cards.css?v=weather-qa-v70'; then
+              echo "Weather Today tile build is live."
+              exit 0
+            fi
+            echo "Waiting for Render deployment ($attempt/90)"
+            sleep 10
+          done
+          echo "Render did not deploy the expected Today tile assets in time."
+          exit 1
+      - name: Verify live Today tile data and mobile geometry
+        env:
+          WEATHER_TODAY_BASE_URL: https://sun-nourie-live.onrender.com
+        run: node scripts/weatherTodayTileLiveSmoke.js
