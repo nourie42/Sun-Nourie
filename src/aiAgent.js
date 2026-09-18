@@ -20,19 +20,23 @@ const PROVIDER_HEALTH_TTL_MS = 10 * 60 * 1000;
 function providerHealthFailure(error) {
   const raw = cleanText(error?.message || error, 500);
   const q = raw.toLowerCase();
+  const detail = raw.replace(/(sk|xai)-[a-z0-9_-]+/gi, "[redacted]").slice(0, 180);
   if (/insufficient[_\s-]*quota|credit balance|no credits|credits? (?:remaining|available)|billing|payment required|spend limit|quota exceeded|resource_exhausted|budget (?:is )?exceeded/.test(q)) {
     return { status: "no_credits", label: "No credits / billing issue", reason: "This model cannot be used until credits or billing are restored." };
   }
   if (/rate limit|too many requests|\b429\b/.test(q)) {
-    return { status: "busy", label: "Temporarily busy", reason: "This model is rate-limited right now. Try again shortly." };
+    return { status: "busy", label: "Temporarily busy", reason: `The provider is rate-limited right now. ${detail}`.trim() };
+  }
+  if (/overloaded|overloaded_error|service unavailable|temporar(?:ily)? unavailable|\b500\b|\b502\b|\b503\b|\b504\b|\b529\b|aborterror|aborted|timed out|timeout/.test(q)) {
+    return { status: "busy", label: "Temporarily unavailable", reason: `The provider had a temporary server or timeout error. ${detail}`.trim() };
   }
   if (/model.{0,40}(?:not found|does not exist|unavailable)|invalid.{0,20}model|unsupported.{0,20}model|\b404\b/.test(q)) {
-    return { status: "model_error", label: "Model unavailable", reason: "The configured model name is unavailable and needs to be changed." };
+    return { status: "model_error", label: "Model unavailable", reason: `The configured model is unavailable. ${detail}`.trim() };
   }
   if (/invalid api key|authentication|unauthorized|forbidden|permission|\b401\b|\b403\b/.test(q)) {
-    return { status: "auth_error", label: "Connection needs attention", reason: "The provider key or account permission needs attention." };
+    return { status: "auth_error", label: "Connection needs attention", reason: `The provider key or account permission needs attention. ${detail}`.trim() };
   }
-  return { status: "error", label: "Unavailable", reason: "This model did not pass the availability check." };
+  return { status: "error", label: "Unavailable", reason: `The provider check failed. ${detail}`.trim() };
 }
 
 function cachedProviderHealth(id) {
@@ -237,26 +241,41 @@ async function probeProvider(id, { force = false } = {}) {
   const cached = force ? null : cachedProviderHealth(id);
   if (cached) return publicProviderHealth(id);
 
-  try {
-    const result = await callProvider(
-      id,
-      "Reply only with OK.",
-      "This is a tiny availability check. Reply only with OK.",
-      16,
-      15000,
-    );
-    if (!cleanText(result?.text, 80)) throw new Error("Provider returned no text during availability check");
-    providerHealthCache.set(id, {
-      status: "ready",
-      label: "Ready",
-      reason: "Credits and model access are available.",
-      checkedAt: Date.now(),
-    });
-  } catch (error) {
-    const classified = providerHealthFailure(error);
-    console.warn(`AI provider health check failed for ${id}:`, cleanText(error?.message || error, 500));
-    providerHealthCache.set(id, { ...classified, checkedAt: Date.now() });
+  const timeoutMs = id === "anthropic" ? 45000 : 30000;
+  let lastClassified = null;
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      const result = await callProvider(
+        id,
+        "Reply only with OK.",
+        "This is a small availability check. Reply only with OK.",
+        32,
+        timeoutMs,
+      );
+      if (!cleanText(result?.text, 80)) throw new Error("Provider returned no text during availability check");
+      providerHealthCache.set(id, {
+        status: "ready",
+        label: "Ready",
+        reason: "API key, model access, and text generation are working.",
+        checkedAt: Date.now(),
+      });
+      return publicProviderHealth(id);
+    } catch (error) {
+      lastError = error;
+      lastClassified = providerHealthFailure(error);
+      console.warn(`AI provider health check failed for ${id} (attempt ${attempt}):`, cleanText(error?.message || error, 500));
+      const retryable = lastClassified.status === "busy" || lastClassified.status === "error";
+      if (!retryable || attempt >= 2) break;
+      await new Promise((resolve) => setTimeout(resolve, 900));
+    }
   }
+
+  providerHealthCache.set(id, {
+    ...(lastClassified || providerHealthFailure(lastError)),
+    checkedAt: Date.now(),
+  });
   return publicProviderHealth(id);
 }
 
