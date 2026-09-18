@@ -599,7 +599,12 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
       }));
       const [reflectivitySamples,previousReflectivitySamples,hydrometeorFrames] = await Promise.all([loadReflectivity(observedAt),previousObservedAt?loadReflectivity(previousObservedAt):Promise.resolve([]),hydrometeorTimes]);
       const latestHydrometeor=hydrometeorFrames.at(-1);
-      const hydrometeorObservedAt=latestHydrometeor&&now()-Date.parse(latestHydrometeor)<=20*MINUTE?latestHydrometeor:null;
+      const hydrometeorAge=latestHydrometeor?now()-Date.parse(latestHydrometeor):Infinity;
+      const hydrometeorOffset=latestHydrometeor?Math.abs(Date.parse(observedAt)-Date.parse(latestHydrometeor)):Infinity;
+      // Never let an older classification frame erase newer MRMS reflectivity
+      // from a fast-moving storm. Use dual-pol only when it is both fresh and
+      // closely aligned with the reflectivity frame.
+      const hydrometeorObservedAt=latestHydrometeor&&hydrometeorAge<=20*MINUTE&&hydrometeorOffset<=8*MINUTE?latestHydrometeor:null;
       const samples=await Promise.all(reflectivitySamples.map(async sample=>{
         if(sample.reflectivityActive===false)return {...sample,hydrometeor:null,active:false,evidence:'mrms-dry'};
         if(sample.reflectivityActive!==true)return {...sample,hydrometeor:null,active:null,evidence:'mrms-unavailable'};
