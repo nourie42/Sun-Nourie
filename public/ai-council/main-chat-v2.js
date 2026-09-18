@@ -55,7 +55,7 @@
   function providerStatus(id) { return providers.find((p) => p.id === id); }
   function configured(id) { return id === 'best' ? providers.some((p) => p.configured) : providerStatus(id)?.configured === true; }
   function healthStatus(id) { return providerStatus(id)?.healthStatus || (configured(id) ? 'unchecked' : 'not_connected'); }
-  function healthBlocked(id) { return ['no_credits','auth_error','model_error','error','busy','not_connected'].includes(healthStatus(id)); }
+  function healthBlocked(id) { return ['no_credits','auth_error','workspace_required','model_error','error','busy','not_connected'].includes(healthStatus(id)); }
   function usable(id) { return id === 'best' ? providers.some((p) => p.configured && !healthBlocked(p.id)) : configured(id) && !healthBlocked(id); }
   function healthLabel(id) {
     const p = providerStatus(id);

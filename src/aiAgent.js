@@ -30,6 +30,13 @@ function providerHealthFailure(error) {
   if (/overloaded|overloaded_error|service unavailable|temporar(?:ily)? unavailable|\b500\b|\b502\b|\b503\b|\b504\b|\b529\b|aborterror|aborted|timed out|timeout/.test(q)) {
     return { status: "busy", label: "Temporarily unavailable", reason: `The provider had a temporary server or timeout error. ${detail}`.trim() };
   }
+  if (/not scoped to a workspace|anthropic-workspace-id|workspace id header|workspace.*header/.test(q)) {
+    return {
+      status: "workspace_required",
+      label: "Workspace ID required",
+      reason: "The Anthropic API key is valid but is not scoped to a workspace. Add ANTHROPIC_WORKSPACE_ID in Render (for example, wrkspc_...) or replace the key with a workspace-scoped API key.",
+    };
+  }
   if (/model.{0,40}(?:not found|does not exist|unavailable)|invalid.{0,20}model|unsupported.{0,20}model|\b404\b/.test(q)) {
     return { status: "model_error", label: "Model unavailable", reason: `The configured model is unavailable. ${detail}`.trim() };
   }
@@ -85,6 +92,21 @@ function providerKey(id) {
   return "";
 }
 
+function anthropicWorkspaceId() {
+  return cleanText(process.env.ANTHROPIC_WORKSPACE_ID, 200);
+}
+
+function anthropicHeaders() {
+  const headers = {
+    "x-api-key": providerKey("anthropic"),
+    "anthropic-version": "2023-06-01",
+    "Content-Type": "application/json",
+  };
+  const workspaceId = anthropicWorkspaceId();
+  if (workspaceId) headers["anthropic-workspace-id"] = workspaceId;
+  return headers;
+}
+
 function publicProviders() {
   return PROVIDERS.map((p) => {
     const health = publicProviderHealth(p.id);
@@ -93,6 +115,7 @@ function publicProviders() {
       label: p.label,
       model: providerModel(p.id),
       configured: Boolean(providerKey(p.id)),
+      workspaceConfigured: p.id === "anthropic" ? Boolean(anthropicWorkspaceId()) : undefined,
       healthStatus: health.status,
       healthLabel: health.label,
       healthReason: health.reason,
@@ -194,7 +217,7 @@ async function callOpenAi(question, system, maxOutputTokens = 2200, timeoutMs = 
 async function callAnthropic(question, system, maxOutputTokens = 2200, timeoutMs = 90000) {
   const data = await fetchJson("https://api.anthropic.com/v1/messages", {
     method: "POST",
-    headers: { "x-api-key": providerKey("anthropic"), "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
+    headers: anthropicHeaders(),
     body: JSON.stringify({ model: providerModel("anthropic"), max_tokens: maxOutputTokens, system, messages: [{ role: "user", content: question }] }),
   }, timeoutMs);
   const text = (Array.isArray(data?.content) ? data.content : []).filter((p) => p?.type === "text").map((p) => cleanText(p.text, 30000)).filter(Boolean).join("\n\n");
