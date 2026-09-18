@@ -205,56 +205,133 @@ function extractOpenAiCitations(data) {
   return urls.slice(0, 12);
 }
 
-async function callOpenAi(question, system, maxOutputTokens = 2200, timeoutMs = 90000) {
+function extractAnthropicCitations(data) {
+  const urls = [];
+  const add = (url) => {
+    const value = cleanText(url, 1200);
+    if (/^https?:\/\//i.test(value) && !urls.includes(value)) urls.push(value);
+  };
+  for (const part of Array.isArray(data?.content) ? data.content : []) {
+    for (const citation of Array.isArray(part?.citations) ? part.citations : []) {
+      add(citation?.url);
+      add(citation?.source?.url);
+    }
+    for (const result of Array.isArray(part?.content) ? part.content : []) add(result?.url);
+  }
+  return urls.slice(0, 12);
+}
+
+function extractGeminiCitations(data) {
+  const urls = [];
+  const add = (url) => {
+    const value = cleanText(url, 1200);
+    if (/^https?:\/\//i.test(value) && !urls.includes(value)) urls.push(value);
+  };
+  const metadata = data?.candidates?.[0]?.groundingMetadata || data?.candidates?.[0]?.grounding_metadata || {};
+  for (const chunk of Array.isArray(metadata?.groundingChunks) ? metadata.groundingChunks : Array.isArray(metadata?.grounding_chunks) ? metadata.grounding_chunks : []) {
+    add(chunk?.web?.uri);
+    add(chunk?.web?.url);
+  }
+  return urls.slice(0, 12);
+}
+
+function responsesUsedWeb(data) {
+  return (Array.isArray(data?.output) ? data.output : []).some((item) =>
+    item?.type === "web_search_call" || item?.type === "web_search"
+  );
+}
+
+function anthropicUsedWeb(data) {
+  return (Array.isArray(data?.content) ? data.content : []).some((part) =>
+    part?.type === "server_tool_use" && part?.name === "web_search" ||
+    part?.type === "web_search_tool_result"
+  );
+}
+
+async function callOpenAi(question, system, maxOutputTokens = 2200, timeoutMs = 90000, useWebSearch = false) {
+  const body = { model: providerModel("openai"), instructions: system, input: question, max_output_tokens: maxOutputTokens };
+  if (useWebSearch) body.tools = [{ type: "web_search" }];
   const data = await fetchJson("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: { Authorization: `Bearer ${providerKey("openai")}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model: providerModel("openai"), instructions: system, input: question, max_output_tokens: maxOutputTokens }),
+    body: JSON.stringify(body),
   }, timeoutMs);
-  return { text: extractResponsesText(data), citations: extractOpenAiCitations(data) };
+  return {
+    text: extractResponsesText(data),
+    citations: extractOpenAiCitations(data),
+    webSearchUsed: useWebSearch && responsesUsedWeb(data),
+  };
 }
 
-async function callAnthropic(question, system, maxOutputTokens = 2200, timeoutMs = 90000) {
+async function callAnthropic(question, system, maxOutputTokens = 2200, timeoutMs = 90000, useWebSearch = false) {
+  const body = {
+    model: providerModel("anthropic"),
+    max_tokens: maxOutputTokens,
+    system,
+    messages: [{ role: "user", content: question }],
+  };
+  if (useWebSearch) body.tools = [{ type: "web_search_20250305", name: "web_search", max_uses: 4 }];
   const data = await fetchJson("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: anthropicHeaders(),
-    body: JSON.stringify({ model: providerModel("anthropic"), max_tokens: maxOutputTokens, system, messages: [{ role: "user", content: question }] }),
+    body: JSON.stringify(body),
   }, timeoutMs);
-  const text = (Array.isArray(data?.content) ? data.content : []).filter((p) => p?.type === "text").map((p) => cleanText(p.text, 30000)).filter(Boolean).join("\n\n");
-  return { text, citations: [] };
+  const text = (Array.isArray(data?.content) ? data.content : [])
+    .filter((p) => p?.type === "text")
+    .map((p) => cleanText(p.text, 30000))
+    .filter(Boolean)
+    .join("\n\n");
+  return {
+    text,
+    citations: extractAnthropicCitations(data),
+    webSearchUsed: useWebSearch && anthropicUsedWeb(data),
+  };
 }
 
-async function callGemini(question, system, maxOutputTokens = 2200, timeoutMs = 90000) {
+async function callGemini(question, system, maxOutputTokens = 2200, timeoutMs = 90000, useWebSearch = false) {
   const model = providerModel("gemini");
   const key = encodeURIComponent(providerKey("gemini"));
+  const body = {
+    systemInstruction: { parts: [{ text: system }] },
+    contents: [{ role: "user", parts: [{ text: question }] }],
+    generationConfig: { maxOutputTokens },
+  };
+  if (useWebSearch) body.tools = [{ google_search: {} }];
   const data = await fetchJson(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${key}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: system }] },
-      contents: [{ role: "user", parts: [{ text: question }] }],
-      generationConfig: { maxOutputTokens },
-    }),
+    body: JSON.stringify(body),
   }, timeoutMs);
   const text = (data?.candidates?.[0]?.content?.parts || []).map((p) => cleanText(p?.text, 30000)).filter(Boolean).join("\n\n");
-  return { text, citations: [] };
+  const grounding = data?.candidates?.[0]?.groundingMetadata || data?.candidates?.[0]?.grounding_metadata;
+  return {
+    text,
+    citations: extractGeminiCitations(data),
+    webSearchUsed: useWebSearch && Boolean(grounding),
+  };
 }
 
-async function callXai(question, system, _maxOutputTokens = 2200, timeoutMs = 90000) {
+async function callXai(question, system, _maxOutputTokens = 2200, timeoutMs = 90000, useWebSearch = false) {
   const input = [system ? `System instructions:\n${system}` : "", `User request:\n${question}`].filter(Boolean).join("\n\n");
+  const body = { model: providerModel("xai"), input };
+  if (useWebSearch) body.tools = [{ type: "web_search" }];
   const data = await fetchJson("https://api.x.ai/v1/responses", {
     method: "POST",
     headers: { Authorization: `Bearer ${providerKey("xai")}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model: providerModel("xai"), input }),
+    body: JSON.stringify(body),
   }, timeoutMs);
-  return { text: extractResponsesText(data), citations: [] };
+  return {
+    text: extractResponsesText(data),
+    citations: extractOpenAiCitations(data),
+    webSearchUsed: useWebSearch && responsesUsedWeb(data),
+  };
 }
 
-async function callProvider(id, question, system, maxOutputTokens = 2200, timeoutMs = 90000) {
-  if (id === "openai") return callOpenAi(question, system, maxOutputTokens, timeoutMs);
-  if (id === "anthropic") return callAnthropic(question, system, maxOutputTokens, timeoutMs);
-  if (id === "gemini") return callGemini(question, system, maxOutputTokens, timeoutMs);
-  if (id === "xai") return callXai(question, system, maxOutputTokens, timeoutMs);
+async function callProvider(id, question, system, maxOutputTokens = 2200, timeoutMs = 90000, useWebSearch = false) {
+  if (id === "openai") return callOpenAi(question, system, maxOutputTokens, timeoutMs, useWebSearch);
+  if (id === "anthropic") return callAnthropic(question, system, maxOutputTokens, timeoutMs, useWebSearch);
+  if (id === "gemini") return callGemini(question, system, maxOutputTokens, timeoutMs, useWebSearch);
+  if (id === "xai") return callXai(question, system, maxOutputTokens, timeoutMs, useWebSearch);
   throw new Error("Unknown AI provider.");
 }
 
@@ -276,6 +353,7 @@ async function probeProvider(id, { force = false } = {}) {
         "This is a small availability check. Reply only with OK.",
         32,
         timeoutMs,
+        false,
       );
       if (!cleanText(result?.text, 80)) throw new Error("Provider returned no text during availability check");
       providerHealthCache.set(id, {
@@ -544,7 +622,8 @@ export function registerAiAgentRoutes(app) {
       checkedCount: providers.filter((p) => p.healthStatus !== "unchecked").length,
       autoChecked: true,
       tools: {
-        webSearch: Boolean(providerKey("openai")),
+        webSearch: PROVIDERS.some((p) => Boolean(providerKey(p.id))),
+        nativeWebSearch: Object.fromEntries(PROVIDERS.map((p) => [p.id, Boolean(providerKey(p.id))])),
         attachments: Boolean(providerKey("openai")),
         location: true,
         gmail: false,
@@ -629,22 +708,25 @@ export function registerAiAgentRoutes(app) {
     }
     if (!providerKey(providerId)) return res.status(400).json({ ok: false, error: `${provider.label} is not connected yet.` });
 
+    const internetEnabled = req.body?.webSearch !== false && req.body?.webSearch !== "off";
     const prepared = await prepareAiContext({
       question,
       attachments: rawAttachments,
       location: req.body?.location,
-      webSearch: req.body?.webSearch ?? "auto",
+      webSearch: "off",
     });
     const history = normalizeHistory(req.body?.history);
     const transcript = history.map((m) => `${m.role}: ${m.text}`).join("\n\n");
-    const system = personaSystem(req.body?.persona, provider.label) + (prepared.locationText ? ` Use this user context when relevant: ${prepared.locationText}.` : "");
+    const system = [
+      personaSystem(req.body?.persona, provider.label),
+      prepared.locationText ? `Use this user context when relevant: ${prepared.locationText}.` : "",
+      internetEnabled ? "You have live internet access through a server-side web search tool on this request. For current or time-sensitive information, use it. Never claim you lack internet access when this tool is available." : "",
+    ].filter(Boolean).join(" ");
     const prompt = [
       transcript ? `Conversation so far:\n${transcript}` : "",
       `User's new message:\n${question || "Please help with the attached file(s)."}`,
       prepared.locationText ? `User location context:\n${prepared.locationText}` : "",
       prepared.attachmentText ? `Attached file context:\n${prepared.attachmentText}` : "",
-      prepared.research.text ? `Current web research gathered automatically for this request:\n${prepared.research.text}` : "",
-      prepared.webSearchError ? `Automatic web research was unavailable: ${prepared.webSearchError}. Do not pretend that you searched the web.` : "",
     ].filter(Boolean).join("\n\n");
 
     const candidates = requested === "best"
@@ -654,7 +736,11 @@ export function registerAiAgentRoutes(app) {
     for (const id of candidates) {
       try {
         const current = PROVIDERS.find((p) => p.id === id);
-        const answer = await callProvider(id, prompt, personaSystem(req.body?.persona, current.label));
+        const providerSystem = [
+          personaSystem(req.body?.persona, current.label),
+          internetEnabled ? "You have live internet access through a server-side web search tool. Use it whenever the request needs current information. Never say you cannot access the internet when the tool is available." : "",
+        ].filter(Boolean).join(" ");
+        const answer = await callProvider(id, prompt, providerSystem, 2200, 90000, internetEnabled);
         if (!answer.text) throw new Error("The AI returned an empty response.");
         return res.json({
           ok: true,
@@ -662,9 +748,9 @@ export function registerAiAgentRoutes(app) {
           providerLabel: current.label,
           model: providerModel(id),
           answer: answer.text,
-          citations: [...new Set([...(prepared.research.citations || []), ...(answer.citations || [])])].slice(0, 12),
-          webSearchUsed: prepared.webSearchUsed,
-          webSearchError: prepared.webSearchError,
+          citations: [...new Set(answer.citations || [])].slice(0, 12),
+          webSearchUsed: Boolean(answer.webSearchUsed),
+          webSearchError: "",
           attachments: prepared.attachments,
           location: prepared.location,
           pickedForMe: requested === "best",
@@ -717,13 +803,12 @@ export function registerAiAgentRoutes(app) {
       question: [topic, preparedAttachmentText].filter(Boolean).join("\n\n"),
       attachments: preparedAttachmentText ? [] : req.body?.attachments,
       location: req.body?.location,
-      webSearch: "auto",
+      webSearch: "off",
     });
     if (preparedAttachmentText) {
       prepared.attachmentText = preparedAttachmentText;
       prepared.attachments = preparedAttachments;
     }
-    const sharedResearch = prepared.research;
     const turns = [];
     for (let round = 1; round <= rounds; round += 1) {
       for (const bot of bots) {
@@ -735,12 +820,25 @@ export function registerAiAgentRoutes(app) {
           transcript ? `Conversation so far:\n${transcript}` : "You are the first speaker.",
           prepared.locationText ? `User location context:\n${prepared.locationText}` : "",
           prepared.attachmentText ? `Attached file context:\n${prepared.attachmentText}` : "",
-          sharedResearch.text ? `Current web research gathered automatically:\n${sharedResearch.text}` : "",
           `Now respond as ${bot.name}.`,
         ].filter(Boolean).join("\n\n");
         try {
-          const result = await callProvider(bot.provider, prompt, system, 1000);
-          turns.push({ round, botId: bot.id, name: bot.name, provider: bot.provider, model: providerModel(bot.provider), ok: true, text: result.text, citations: bot.tools.webSearch ? sharedResearch.citations : [] });
+          const botSystem = [
+            system,
+            bot.tools.webSearch ? "Live internet search is enabled for this bot. Use the server-side web search tool when current information would help. Never claim you lack internet access when this tool is enabled." : "",
+          ].filter(Boolean).join(" ");
+          const result = await callProvider(bot.provider, prompt, botSystem, 1000, 90000, bot.tools.webSearch);
+          turns.push({
+            round,
+            botId: bot.id,
+            name: bot.name,
+            provider: bot.provider,
+            model: providerModel(bot.provider),
+            ok: true,
+            text: result.text,
+            citations: result.citations || [],
+            webSearchUsed: Boolean(result.webSearchUsed),
+          });
         } catch (error) {
           turns.push({ round, botId: bot.id, name: bot.name, provider: bot.provider, model: providerModel(bot.provider), ok: false, text: "", error: cleanText(error?.message || error, 300), citations: [] });
         }
@@ -750,11 +848,22 @@ export function registerAiAgentRoutes(app) {
     const chair = PROVIDERS.find((p) => providerKey(p.id));
     if (chair && turns.some((t) => t.ok)) {
       try {
-        const result = await callProvider(chair.id, `Task: ${topic}\n\nTeam transcript:\n${turns.filter((t) => t.ok).map((t) => `${t.name}: ${t.text}`).join("\n\n")}`, "Summarize the team's strongest answer, important disagreements, and next steps. Be concise and practical.", 1100);
+        const result = await callProvider(chair.id, `Task: ${topic}\n\nTeam transcript:\n${turns.filter((t) => t.ok).map((t) => `${t.name}: ${t.text}`).join("\n\n")}`, "Summarize the team's strongest answer, important disagreements, and next steps. Be concise and practical.", 1100, 90000, false);
         summary = result.text;
       } catch {}
     }
-    res.json({ ok: turns.some((t) => t.ok), topic, mode, rounds, turns, summary, citations: sharedResearch.citations, attachments: prepared.attachments, location: prepared.location, webSearchUsed: prepared.webSearchUsed });
+    res.json({
+      ok: turns.some((t) => t.ok),
+      topic,
+      mode,
+      rounds,
+      turns,
+      summary,
+      citations: [...new Set(turns.flatMap((t) => t.citations || []))].slice(0, 12),
+      attachments: prepared.attachments,
+      location: prepared.location,
+      webSearchUsed: turns.some((t) => t.webSearchUsed),
+    });
   });
 
   // Friendly UI routes are registered before the legacy Council routes.

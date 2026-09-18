@@ -174,11 +174,144 @@ try {
   assert.equal(anthropicReady.checked[0].status, "ready");
   assert.equal(anthropicReady.providers.find((p) => p.id === "anthropic")?.workspaceConfigured, true);
   assert.equal(anthropicCalls, 2);
+
+  // Verify Council and Chat actually send provider-native internet tools instead
+  // of depending on OpenAI to gather shared research.
+  process.env.GEMINI_API_KEY = "fake-gemini-key";
+  process.env.XAI_API_KEY = "fake-xai-key";
+  const internetRequests = [];
+  globalThis.fetch = async (url, init) => {
+    const target = String(url);
+    if (target.startsWith(base)) return nativeFetch(url, init);
+
+    const body = init?.body ? JSON.parse(String(init.body)) : {};
+    internetRequests.push({ target, body, headers: new Headers(init?.headers || {}) });
+
+    if (target.startsWith("https://api.anthropic.com/v1/messages")) {
+      return new Response(JSON.stringify({
+        content: [
+          { type: "server_tool_use", name: "web_search" },
+          { type: "text", text: "Claude live weather result", citations: [{ url: "https://weather.gov/" }] },
+        ],
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    }
+    if (target.startsWith("https://generativelanguage.googleapis.com/")) {
+      return new Response(JSON.stringify({
+        candidates: [{
+          content: { parts: [{ text: "Gemini live weather result" }] },
+          groundingMetadata: {
+            groundingChunks: [{ web: { uri: "https://weather.gov/" } }],
+          },
+        }],
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    }
+    if (target.startsWith("https://api.x.ai/v1/responses")) {
+      return new Response(JSON.stringify({
+        output: [
+          { type: "web_search_call" },
+          { type: "message", content: [{ type: "output_text", text: "Grok live weather result", annotations: [{ url: "https://weather.gov/" }] }] },
+        ],
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    }
+    if (target.startsWith("https://api.openai.com/v1/responses")) {
+      return new Response(JSON.stringify({
+        output: [
+          { type: "web_search_call" },
+          { type: "message", content: [{ type: "output_text", text: "OpenAI live weather result", annotations: [{ url: "https://weather.gov/" }] }] },
+        ],
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    }
+    return nativeFetch(url, init);
+  };
+
+  for (const provider of ["anthropic", "gemini", "xai"]) {
+    internetRequests.length = 0;
+    const councilRes = await nativeFetch(`${base}/api/ai-council/ask`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-ai-council-code": "ux-smoke-test-code" },
+      body: JSON.stringify({
+        question: "What is the current weather today?",
+        providers: [provider],
+        location: { city: "Knightdale", area: "North Carolina", country: "US", timezone: "America/New_York" },
+      }),
+    });
+    assert.equal(councilRes.status, 200);
+    const council = await councilRes.json();
+    assert.equal(council.answers[0].ok, true);
+    assert.equal(council.answers[0].webSearchUsed, true);
+    assert.ok(council.answers[0].citations.includes("https://weather.gov/"));
+
+    const providerRequest = internetRequests.find((entry) => {
+      if (provider === "anthropic") return entry.target.startsWith("https://api.anthropic.com/v1/messages");
+      if (provider === "gemini") return entry.target.startsWith("https://generativelanguage.googleapis.com/");
+      return entry.target.startsWith("https://api.x.ai/v1/responses");
+    });
+    assert.ok(providerRequest, `Council did not call ${provider}`);
+    if (provider === "anthropic") {
+      assert.equal(providerRequest.body.tools?.[0]?.type, "web_search_20250305");
+      assert.equal(providerRequest.body.tools?.[0]?.name, "web_search");
+      assert.equal(providerRequest.headers.get("anthropic-workspace-id"), "wrkspc_test_workspace");
+    } else if (provider === "gemini") {
+      assert.deepEqual(providerRequest.body.tools, [{ google_search: {} }]);
+    } else {
+      assert.deepEqual(providerRequest.body.tools, [{ type: "web_search" }]);
+    }
+  }
+
+  // Main Chat with Gemini must also use Gemini's own Google Search grounding.
+  internetRequests.length = 0;
+  const mainChatRes = await nativeFetch(`${base}/api/ai-agent/chat`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-ai-council-code": "ux-smoke-test-code" },
+    body: JSON.stringify({
+      question: "What is the current weather today?",
+      provider: "gemini",
+      webSearch: "auto",
+      location: { city: "Knightdale", area: "North Carolina", country: "US", timezone: "America/New_York" },
+    }),
+  });
+  assert.equal(mainChatRes.status, 200);
+  const mainChat = await mainChatRes.json();
+  assert.equal(mainChat.provider, "gemini");
+  assert.equal(mainChat.webSearchUsed, true);
+  const mainGeminiSearch = internetRequests.find((entry) =>
+    entry.target.startsWith("https://generativelanguage.googleapis.com/") &&
+    Array.isArray(entry.body.tools)
+  );
+  assert.deepEqual(mainGeminiSearch?.body?.tools, [{ google_search: {} }]);
+
+  // A bot with Internet Search enabled must pass the native search tool too.
+  internetRequests.length = 0;
+  const botRoomRes = await nativeFetch(`${base}/api/ai-agent/bots/run`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-ai-council-code": "ux-smoke-test-code" },
+    body: JSON.stringify({
+      topic: "What is today's weather?",
+      rounds: 1,
+      mode: "collaborate",
+      bots: [
+        { id: "g1", name: "Grok One", role: "Weather helper", provider: "xai", instructions: "Use current data.", tools: { webSearch: true } },
+        { id: "g2", name: "Grok Two", role: "Weather helper", provider: "xai", instructions: "Use current data.", tools: { webSearch: true } },
+      ],
+      location: { city: "Knightdale", area: "North Carolina", country: "US", timezone: "America/New_York" },
+    }),
+  });
+  assert.equal(botRoomRes.status, 200);
+  const botRoom = await botRoomRes.json();
+  assert.equal(botRoom.webSearchUsed, true);
+  assert.ok(botRoom.turns.every((turn) => turn.webSearchUsed === true));
+  const xaiSearchCalls = internetRequests.filter((entry) =>
+    entry.target.startsWith("https://api.x.ai/v1/responses") &&
+    entry.body.tools?.[0]?.type === "web_search"
+  );
+  assert.ok(xaiSearchCalls.length >= 2, "Bot room did not give Grok native web search");
 } finally {
   globalThis.fetch = nativeFetch;
   delete process.env.OPENAI_API_KEY;
   delete process.env.ANTHROPIC_API_KEY;
   delete process.env.ANTHROPIC_WORKSPACE_ID;
+  delete process.env.GEMINI_API_KEY;
+  delete process.env.XAI_API_KEY;
   await new Promise((resolve) => server.close(resolve));
 }
 

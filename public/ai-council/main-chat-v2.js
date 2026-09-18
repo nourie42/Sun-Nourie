@@ -217,7 +217,8 @@
       if (m.role !== 'user' && m.providerLabel) {
         const badge = document.createElement('span');
         badge.className = 'answer-badge';
-        badge.textContent = m.pickedForMe ? `⭐ Picked ${m.providerLabel}` : m.providerLabel;
+        const baseLabel = m.pickedForMe ? `⭐ Picked ${m.providerLabel}` : m.providerLabel;
+        badge.textContent = m.webSearchUsed ? `${baseLabel} · 🌐 Live web` : baseLabel;
         row.append(badge);
       }
       const bubble = document.createElement('div');
@@ -298,7 +299,7 @@
       if (!response.ok || !data.ok) throw new Error(data.error || `AI request failed (${response.status})`);
       messages.push({
         role: 'assistant', text: data.answer, provider: data.provider, providerLabel: data.providerLabel,
-        model: data.model, citations: data.citations || [], pickedForMe: data.pickedForMe, pickReason: data.pickedForMe ? data.pickReason : '', at: Date.now(),
+        model: data.model, citations: data.citations || [], webSearchUsed: Boolean(data.webSearchUsed), pickedForMe: data.pickedForMe, pickReason: data.pickedForMe ? data.pickReason : '', at: Date.now(),
       });
       saveMessages();
     } catch (error) {
@@ -374,10 +375,21 @@
         const card = document.createElement('div');
         card.className = 'result-card';
         const strong = document.createElement('strong');
-        strong.textContent = `${answer.label} · ${answer.model}`;
+        strong.textContent = `${answer.label} · ${answer.model}${answer.webSearchUsed ? ' · 🌐 Live web' : ''}`;
         const pre = document.createElement('pre');
         pre.textContent = answer.ok ? answer.text : answer.error;
         card.append(strong, pre);
+        if (Array.isArray(answer.citations) && answer.citations.length) {
+          const sources = document.createElement('div');
+          sources.className = 'sources';
+          answer.citations.slice(0, 6).forEach((url, i) => {
+            const a = document.createElement('a');
+            a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+            a.textContent = `Source ${i + 1}: ${url}`;
+            sources.append(a);
+          });
+          card.append(sources);
+        }
         els.councilResults.append(card);
       }
       if (data.verdict?.text) {

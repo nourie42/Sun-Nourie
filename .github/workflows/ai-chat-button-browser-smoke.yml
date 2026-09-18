@@ -73,7 +73,7 @@ jobs:
         run: |
           for attempt in $(seq 1 90); do
             home="$(curl -fsSL --max-time 20 "$LIVE_URL/ai-council/?deploy=$GITHUB_SHA&n=$attempt" 2>/dev/null || true)"
-            if printf '%s' "$home" | grep -Fq '/ai-council/ai-context-v1.js?v=2' && printf '%s' "$home" | grep -Fq '/ai-council/main-chat-v2.js?v=5'; then
+            if printf '%s' "$home" | grep -Fq '/ai-council/ai-context-v1.js?v=2' && printf '%s' "$home" | grep -Fq '/ai-council/main-chat-v2.js?v=6'; then
               echo "Fixed AI Chat assets are live."
               exit 0
             fi

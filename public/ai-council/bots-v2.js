@@ -332,7 +332,7 @@
       }
       (data.turns || []).forEach((turn) => {
         const card = document.createElement('div'); card.className = 'room-turn';
-        const strong = document.createElement('strong'); strong.textContent = `${turn.name} · ${providerLabel(turn.provider)} · Round ${turn.round}`;
+        const strong = document.createElement('strong'); strong.textContent = `${turn.name} · ${providerLabel(turn.provider)} · Round ${turn.round}${turn.webSearchUsed ? ' · 🌐 Live web' : ''}`;
         const p = document.createElement('p'); p.textContent = turn.ok ? turn.text : `Error: ${turn.error}`;
         card.append(strong, p); els.roomResults.append(card);
         if (turn.ok) activity[turn.botId] = { at: Date.now(), preview: String(turn.text).slice(0, 150) };

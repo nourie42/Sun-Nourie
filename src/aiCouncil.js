@@ -33,6 +33,21 @@ function providerKey(id) {
   return "";
 }
 
+function anthropicWorkspaceId() {
+  return cleanText(process.env.ANTHROPIC_WORKSPACE_ID, 200);
+}
+
+function anthropicHeaders() {
+  const headers = {
+    "x-api-key": providerKey("anthropic"),
+    "anthropic-version": "2023-06-01",
+    "Content-Type": "application/json",
+  };
+  const workspaceId = anthropicWorkspaceId();
+  if (workspaceId) headers["anthropic-workspace-id"] = workspaceId;
+  return headers;
+}
+
 function clientKey(req) {
   const forwarded = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim();
   return forwarded || req.socket?.remoteAddress || "unknown";
@@ -121,87 +136,170 @@ function extractResponsesText(data) {
   return parts.join("\n\n").trim();
 }
 
-async function callOpenAi(question, system, maxOutputTokens = 1800) {
+function extractResponseCitations(data) {
+  const urls = [];
+  const add = (url) => {
+    const value = cleanText(url, 1200);
+    if (/^https?:\/\//i.test(value) && !urls.includes(value)) urls.push(value);
+  };
+  for (const item of Array.isArray(data?.output) ? data.output : []) {
+    for (const part of Array.isArray(item?.content) ? item.content : []) {
+      for (const annotation of Array.isArray(part?.annotations) ? part.annotations : []) {
+        add(annotation?.url);
+        add(annotation?.url_citation?.url);
+      }
+    }
+  }
+  return urls.slice(0, 12);
+}
+
+function extractAnthropicCitations(data) {
+  const urls = [];
+  const add = (url) => {
+    const value = cleanText(url, 1200);
+    if (/^https?:\/\//i.test(value) && !urls.includes(value)) urls.push(value);
+  };
+  for (const part of Array.isArray(data?.content) ? data.content : []) {
+    for (const citation of Array.isArray(part?.citations) ? part.citations : []) {
+      add(citation?.url);
+      add(citation?.source?.url);
+    }
+    for (const result of Array.isArray(part?.content) ? part.content : []) add(result?.url);
+  }
+  return urls.slice(0, 12);
+}
+
+function extractGeminiCitations(data) {
+  const urls = [];
+  const add = (url) => {
+    const value = cleanText(url, 1200);
+    if (/^https?:\/\//i.test(value) && !urls.includes(value)) urls.push(value);
+  };
+  const metadata = data?.candidates?.[0]?.groundingMetadata || data?.candidates?.[0]?.grounding_metadata || {};
+  const chunks = Array.isArray(metadata?.groundingChunks) ? metadata.groundingChunks : Array.isArray(metadata?.grounding_chunks) ? metadata.grounding_chunks : [];
+  for (const chunk of chunks) {
+    add(chunk?.web?.uri);
+    add(chunk?.web?.url);
+  }
+  return urls.slice(0, 12);
+}
+
+function responsesUsedWeb(data) {
+  return (Array.isArray(data?.output) ? data.output : []).some((item) =>
+    item?.type === "web_search_call" || item?.type === "web_search"
+  );
+}
+
+function anthropicUsedWeb(data) {
+  return (Array.isArray(data?.content) ? data.content : []).some((part) =>
+    (part?.type === "server_tool_use" && part?.name === "web_search") ||
+    part?.type === "web_search_tool_result"
+  );
+}
+
+async function callOpenAi(question, system, maxOutputTokens = 1800, useWebSearch = false) {
+  const body = {
+    model: providerModel("openai"),
+    instructions: system,
+    input: question,
+    max_output_tokens: maxOutputTokens,
+  };
+  if (useWebSearch) body.tools = [{ type: "web_search" }];
   const data = await fetchJson("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${providerKey("openai")}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      model: providerModel("openai"),
-      instructions: system,
-      input: question,
-      max_output_tokens: maxOutputTokens,
-    }),
+    body: JSON.stringify(body),
   });
-  return { text: extractResponsesText(data), citations: [] };
+  return {
+    text: extractResponsesText(data),
+    citations: extractResponseCitations(data),
+    webSearchUsed: useWebSearch && responsesUsedWeb(data),
+  };
 }
 
-async function callAnthropic(question, system, maxOutputTokens = 1800) {
+async function callAnthropic(question, system, maxOutputTokens = 1800, useWebSearch = false) {
+  const body = {
+    model: providerModel("anthropic"),
+    max_tokens: maxOutputTokens,
+    system,
+    messages: [{ role: "user", content: question }],
+  };
+  if (useWebSearch) body.tools = [{ type: "web_search_20250305", name: "web_search", max_uses: 4 }];
   const data = await fetchJson("https://api.anthropic.com/v1/messages", {
     method: "POST",
-    headers: {
-      "x-api-key": providerKey("anthropic"),
-      "anthropic-version": "2023-06-01",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: providerModel("anthropic"),
-      max_tokens: maxOutputTokens,
-      system,
-      messages: [{ role: "user", content: question }],
-    }),
+    headers: anthropicHeaders(),
+    body: JSON.stringify(body),
   });
   const text = (Array.isArray(data?.content) ? data.content : [])
     .filter((part) => part?.type === "text" && typeof part?.text === "string")
     .map((part) => part.text.trim())
     .filter(Boolean)
     .join("\n\n");
-  return { text, citations: [] };
+  return {
+    text,
+    citations: extractAnthropicCitations(data),
+    webSearchUsed: useWebSearch && anthropicUsedWeb(data),
+  };
 }
 
-async function callGemini(question, system, maxOutputTokens = 1800) {
+async function callGemini(question, system, maxOutputTokens = 1800, useWebSearch = false) {
   const model = providerModel("gemini");
   const key = encodeURIComponent(providerKey("gemini"));
+  const body = {
+    systemInstruction: { parts: [{ text: system }] },
+    contents: [{ role: "user", parts: [{ text: question }] }],
+    generationConfig: { maxOutputTokens },
+  };
+  if (useWebSearch) body.tools = [{ google_search: {} }];
   const data = await fetchJson(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${key}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: system }] },
-      contents: [{ role: "user", parts: [{ text: question }] }],
-      generationConfig: { maxOutputTokens },
-    }),
+    body: JSON.stringify(body),
   });
   const parts = data?.candidates?.[0]?.content?.parts || [];
   const text = parts.map((part) => typeof part?.text === "string" ? part.text.trim() : "").filter(Boolean).join("\n\n");
-  return { text, citations: [] };
+  const grounding = data?.candidates?.[0]?.groundingMetadata || data?.candidates?.[0]?.grounding_metadata;
+  return {
+    text,
+    citations: extractGeminiCitations(data),
+    webSearchUsed: useWebSearch && Boolean(grounding),
+  };
 }
 
-async function callXai(question, system) {
+async function callXai(question, system, maxOutputTokens = 1800, useWebSearch = false) {
   const input = [
     system ? `System instructions:\n${system}` : "",
     `User question:\n${question}`,
   ].filter(Boolean).join("\n\n");
+  const body = {
+    model: providerModel("xai"),
+    input,
+    max_output_tokens: maxOutputTokens,
+  };
+  if (useWebSearch) body.tools = [{ type: "web_search" }];
   const data = await fetchJson("https://api.x.ai/v1/responses", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${providerKey("xai")}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      model: providerModel("xai"),
-      input,
-    }),
+    body: JSON.stringify(body),
   });
-  return { text: extractResponsesText(data), citations: [] };
+  return {
+    text: extractResponsesText(data),
+    citations: extractResponseCitations(data),
+    webSearchUsed: useWebSearch && responsesUsedWeb(data),
+  };
 }
 
-async function callProvider(id, question, system, maxOutputTokens = 1800) {
-  if (id === "openai") return callOpenAi(question, system, maxOutputTokens);
-  if (id === "anthropic") return callAnthropic(question, system, maxOutputTokens);
-  if (id === "gemini") return callGemini(question, system, maxOutputTokens);
-  if (id === "xai") return callXai(question, system, maxOutputTokens);
+async function callProvider(id, question, system, maxOutputTokens = 1800, useWebSearch = false) {
+  if (id === "openai") return callOpenAi(question, system, maxOutputTokens, useWebSearch);
+  if (id === "anthropic") return callAnthropic(question, system, maxOutputTokens, useWebSearch);
+  if (id === "gemini") return callGemini(question, system, maxOutputTokens, useWebSearch);
+  if (id === "xai") return callXai(question, system, maxOutputTokens, useWebSearch);
   throw new Error("Unknown provider");
 }
 
@@ -211,6 +309,7 @@ function publicProviders() {
     label: provider.label,
     model: providerModel(provider.id),
     configured: Boolean(providerKey(provider.id)),
+    nativeWebSearch: Boolean(providerKey(provider.id)),
   }));
 }
 
@@ -242,7 +341,7 @@ async function buildVerdict(question, answers) {
     "Use exactly these headings: Council Verdict, Where They Agree, Important Disagreements, Best-Supported Takeaways, Confidence.",
   ].join(" ");
   const prompt = `Original question:\n${question}\n\nIndependent answers:\n${transcript}`;
-  const result = await callProvider(chair, prompt, system, 1400);
+  const result = await callProvider(chair, prompt, system, 1400, false);
   return { text: result.text || "Council synthesis returned no text.", chair };
 }
 
@@ -284,7 +383,7 @@ async function summarizeBotRoom(topic, mode, turns) {
     "Use the headings: Room Conclusion, Strongest Points, Remaining Disagreements, What To Do Next.",
   ].join(" ");
   const prompt = `Topic:\n${topic}\n\nRoom mode: ${mode}\n\nTranscript:\n${transcriptForPrompt(turns, 28000)}`;
-  const result = await callProvider(chair, prompt, system, 1200);
+  const result = await callProvider(chair, prompt, system, 1200, false);
   return { text: result.text || "", chair };
 }
 
@@ -312,15 +411,13 @@ export function registerAiCouncilRoutes(app) {
     const question = cleanText(req.body?.question, 6000);
     const hasAttachments = Array.isArray(req.body?.attachments) && req.body.attachments.length > 0;
     if (question.length < 2 && !hasAttachments) return res.status(400).json({ ok: false, error: "Enter a question or attach a file first." });
-    const prepared = await prepareAiContext({ question, attachments: req.body?.attachments, location: req.body?.location, webSearch: "auto" });
+    const prepared = await prepareAiContext({ question, attachments: req.body?.attachments, location: req.body?.location, webSearch: "off" });
     const effectiveQuestion = [
       question || "Review the attached file(s).",
       prepared.locationText ? `User location context:
 ${prepared.locationText}` : "",
       prepared.attachmentText ? `Attached file context:
 ${prepared.attachmentText}` : "",
-      prepared.research.text ? `Current web research gathered automatically:
-${prepared.research.text}` : "",
     ].filter(Boolean).join("\n\n");
 
     const requested = Array.isArray(req.body?.providers) ? req.body.providers.map((id) => cleanText(id, 30)) : [];
@@ -332,6 +429,7 @@ ${prepared.research.text}` : "",
       "Prioritize factual accuracy and clearly distinguish uncertainty from fact.",
       "Do not mention the AI Council or speculate about what other models might say.",
       "Keep the answer readable and reasonably concise while including the reasoning or evidence needed to support the conclusion.",
+      "You have live internet access through a server-side web search tool on this request. For current, local, or time-sensitive information, use it. Never claim you lack internet access while this tool is available.",
     ].join(" ");
 
     const startedAt = Date.now();
@@ -343,7 +441,7 @@ ${prepared.research.text}` : "",
       }
       const started = Date.now();
       try {
-        const result = await callProvider(id, effectiveQuestion, system);
+        const result = await callProvider(id, effectiveQuestion, system, 1800, true);
         if (!result.text) throw new Error("No text returned by provider");
         return {
           id,
@@ -351,7 +449,8 @@ ${prepared.research.text}` : "",
           model,
           ok: true,
           text: result.text,
-          citations: [...new Set([...(prepared.research.citations || []), ...(result.citations || [])])].slice(0, 12),
+          citations: [...new Set(result.citations || [])].slice(0, 12),
+          webSearchUsed: Boolean(result.webSearchUsed),
           latencyMs: Date.now() - started,
         };
       } catch (error) {
@@ -386,8 +485,8 @@ ${prepared.research.text}` : "",
       totalLatencyMs: Date.now() - startedAt,
       attachments: prepared.attachments,
       location: prepared.location,
-      webSearchUsed: prepared.webSearchUsed,
-      webSearchError: prepared.webSearchError,
+      webSearchUsed: successful.some((result) => result.webSearchUsed),
+      webSearchError: "",
     });
   });
 
@@ -438,6 +537,7 @@ ${prepared.research.text}` : "",
           "You may address other bots by name and explicitly agree, disagree, refine, or build on their points.",
           "Do not impersonate other bots, fabricate statements they did not make, or claim private communication with them.",
           "Avoid repeating the transcript. Focus on the most valuable next contribution.",
+          "Live internet search is available through a server-side tool. Use it when current or time-sensitive information would help, and never claim you lack internet access while the tool is available.",
         ].join(" ");
         const prompt = [
           `Room topic:\n${topic}`,
@@ -448,7 +548,7 @@ ${prepared.research.text}` : "",
 
         const turnStarted = Date.now();
         try {
-          const result = await callProvider(bot.provider, prompt, system, 900);
+          const result = await callProvider(bot.provider, prompt, system, 900, true);
           const text = cleanText(result.text, 16000);
           if (!text) throw new Error("No text returned by provider");
           turns.push({
