@@ -31,8 +31,16 @@
     councilQuestion: $('councilQuestion'), councilChecks: $('councilChecks'), runCouncilBtn: $('runCouncilBtn'), councilNotice: $('councilNotice'), councilResults: $('councilResults'),
   };
 
-  const attachmentCtl = window.AIContext?.setupAttachmentController({ textareaId: 'prompt', key: 'main-chat' }) || { get:()=>[], clear:()=>{}, has:()=>false, names:()=>[] };
-  const councilAttachmentCtl = window.AIContext?.setupAttachmentController({ textareaId: 'councilQuestion', key: 'main-council' }) || { get:()=>[], clear:()=>{}, has:()=>false, names:()=>[] };
+  const emptyAttachmentCtl = () => ({ get:()=>[], clear:()=>{}, has:()=>false, names:()=>[] });
+  function safeAttachmentController(options) {
+    try { return window.AIContext?.setupAttachmentController(options) || emptyAttachmentCtl(); }
+    catch (error) {
+      console.error('Attachment UI setup failed:', error);
+      return emptyAttachmentCtl();
+    }
+  }
+  const attachmentCtl = safeAttachmentController({ textareaId: 'prompt', key: 'main-chat' });
+  const councilAttachmentCtl = safeAttachmentController({ textareaId: 'councilQuestion', key: 'main-council' });
   const locationContext = () => window.AIContext?.getLocationContext?.() || Promise.resolve({ timezone:Intl.DateTimeFormat().resolvedOptions().timeZone || '', locale:navigator.language || '' });
 
   function loadMessages() {
