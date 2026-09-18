@@ -7,6 +7,7 @@ await page.setUserAgent('Mozilla/5.0 (Linux; Android 17; SM-S948U) AppleWebKit/5
 await page.setViewport({ width: 412, height: 915, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
 page.setDefaultTimeout(30000);
 const expectUsableModels = process.env.AI_CHAT_EXPECT_USABLE_MODELS === '1';
+const expectAnthropicReady = process.env.AI_CHAT_EXPECT_ANTHROPIC_READY === '1';
 
 const errors = [];
 const logs = [];
@@ -49,6 +50,13 @@ try {
   }
   if (expectUsableModels && !(providerStatus.providers || []).some((p) => p.healthStatus === 'ready')) {
     throw new Error('No AI model passed the automatic availability check on the live site.');
+  }
+  if (expectAnthropicReady) {
+    const anthropic = (providerStatus.providers || []).find((p) => p.id === 'anthropic');
+    if (!anthropic) throw new Error('Anthropic is missing from provider status.');
+    if (anthropic.healthStatus !== 'ready') {
+      throw new Error(`Anthropic is not ready: ${anthropic.healthLabel || anthropic.healthStatus}. ${anthropic.healthReason || ''}`);
+    }
   }
 
   await page.click('#chooseModelBtn');
