@@ -5,7 +5,7 @@ import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './wea
 import {dayGraphHTML,dayGraphPoints,installDayGraph} from './day-graph.js?v=weather-qa-v67';
 import {degrees,feelsAt} from './hourly-feels.js?v=weather-qa-v67';
 import {createFramePlayer} from './frame-player.js';
-import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=weather-qa-v67';
+import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=weather-qa-v70';
 import {dailyDisplay} from './weather-math.js?v=weather-qa-v67';
 import {conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
 import {currentHero} from './current-temperature.js?v=rain-around-v66';
