@@ -1,0 +1,38 @@
+name: AI Chat UX Smoke
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "public/ai-council/**"
+      - "src/aiAgent.js"
+      - "src/aiCouncil.js"
+      - "scripts/validateAiChatUx.js"
+      - ".github/workflows/ai-chat-ux-smoke.yml"
+  push:
+    branches: [main, "fix/**"]
+    paths:
+      - "public/ai-council/**"
+      - "src/aiAgent.js"
+      - "src/aiCouncil.js"
+      - "scripts/validateAiChatUx.js"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm install --no-audit --no-fund
+      - name: Parse changed AI code
+        run: |
+          node --check src/aiAgent.js
+          node --check public/ai-council/main-chat-v2.js
+          node --check public/ai-council/bots-v2.js
+          node --check public/ai-council/bot-chat-v2.js
+          node --check scripts/validateAiChatUx.js
+      - name: Run AI Chat UX smoke tests
+        run: node scripts/validateAiChatUx.js
