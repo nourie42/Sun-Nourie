@@ -6,7 +6,7 @@ import {dayGraphHTML,dayGraphPoints,installDayGraph} from './day-graph.js?v=weat
 import {degrees,feelsAt} from './hourly-feels.js?v=weather-qa-v67';
 import {createFramePlayer} from './frame-player.js';
 import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=weather-qa-v70';
-import {dailyDisplay} from './weather-math.js?v=weather-qa-v67';
+import {dailyDisplay} from './weather-math.js?v=weather-qa-v70';
 import {conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
 import {currentHero} from './current-temperature.js?v=rain-around-v66';
 import {renderBulletins} from './bulletins.js?v=wpc-mpd-v1';
