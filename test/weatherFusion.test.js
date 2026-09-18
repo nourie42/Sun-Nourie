@@ -193,4 +193,21 @@ test('live radar distinguishes the selected point from precipitation nearby', as
   const live=await createWeatherService({fetchImpl,now:()=>now}).radar({location:'knightdale'});
   assert.equal(live.precipitation.status,'ready');assert.equal(live.precipitation.atLocation,false);assert.equal(live.precipitation.nearby,true);assert.equal(live.precipitation.inArea,true);
   assert.equal(live.precipitation.classification.station,'KRAX');
+
+  const reflectivityOnlyFetch=async value=>{
+    const url=new URL(value),request=url.searchParams.get('request')?.toLowerCase();
+    if(url.pathname.startsWith('/points/'))return response({properties:{radarStation:'KRAX'}});
+    if(request==='getcapabilities'){
+      if(url.pathname.includes('_bdhc'))throw new Error('Dual-pol classification delayed');
+      return new Response(xml,{status:200,headers:{'content-type':'application/xml'}});
+    }
+    if(request==='getfeatureinfo'&&!url.pathname.includes('_bdhc')){
+      return response({features:[{properties:{RED_BAND:255,GREEN_BAND:80,BLUE_BAND:0,ALPHA_BAND:255}}]});
+    }
+    throw new Error('Unexpected radar request');
+  };
+  const reflectivityOnly=await createWeatherService({fetchImpl:reflectivityOnlyFetch,now:()=>now}).radar({location:'knightdale'});
+  assert.equal(reflectivityOnly.precipitation.status,'ready');
+  assert.equal(reflectivityOnly.precipitation.atLocation,true,'MRMS reflectivity over the exact point remains precipitation when dual-pol classification is delayed');
+  assert.equal(reflectivityOnly.precipitation.classification.reflectivityFallback,true);
 });
