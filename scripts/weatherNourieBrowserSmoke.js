@@ -16,6 +16,10 @@ try {
  await page.addInitScript(()=>{window.testNow=Date.parse('2026-09-05T21:59:59Z');Date.now=()=>window.testNow;});
  await page.goto(base+'/weather-fusion/',{waitUntil:'domcontentloaded'});
  await page.waitForSelector('[data-metric="feels"]');assert.equal(await page.locator('[data-day="0"] .day-name').innerText(),'Remainder of Today');
+ const feelsBox=await page.locator('#today-forecast .today-feels').boundingBox(),metricsBox=await page.locator('#today-forecast .today-metrics').boundingBox();
+ assert.ok(feelsBox&&metricsBox&&feelsBox.y+feelsBox.height<=metricsBox.y-2,'Today tile metrics must not cover the feels-like reading');
+ assert.ok(await page.locator('#today-forecast [data-rain-trend]').isVisible(),'Today tile must always show rain chance change');
+ report.checks.push('Remainder Today feels-like remains visible above metrics','rain update change always visible');
  await page.evaluate(()=>window.testNow=Date.parse('2026-09-05T22:00:00Z'));await page.locator('#refresh').click();await page.waitForFunction(()=>document.querySelector('[data-day="0"] .day-name').textContent==='Tonight');
  assert.ok(!(await page.locator('[data-day="0"]').innerText()).includes('—'));
  const left=await page.locator('[data-day="1"] .day-high').boundingBox(),right=await page.locator('[data-day="1"] .day-low').boundingBox();assert.ok(left.x<right.x);
