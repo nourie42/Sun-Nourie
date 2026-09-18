@@ -20,7 +20,7 @@
   const els = {
     status: $('botStatus'), searchBtn: $('searchBtn'), addBotBtn: $('addBotBtn'), searchWrap: $('searchWrap'), searchInput: $('searchInput'), botList: $('botList'),
     starterBtn: $('starterBtn'), exportBtn: $('exportBtn'), importBtn: $('importBtn'), importFile: $('importFile'),
-    botsPanel: $('botsPanel'), hotPanel: $('hotPanel'), councilPanel: $('councilPanel'), historyPanel: $('historyPanel'),
+    botsPanel: $('botsPanel'), hotPanel: $('hotPanel'), historyPanel: $('historyPanel'),
     hotPicker: $('hotPicker'), roomTopic: $('roomTopic'), roomMode: $('roomMode'), roomRounds: $('roomRounds'), runRoomBtn: $('runRoomBtn'), roomNotice: $('roomNotice'), roomResults: $('roomResults'), historyList: $('historyList'),
     editorBack: $('editorBack'), editorSheet: $('editorSheet'), editorTitle: $('editorTitle'), botName: $('botName'), botRole: $('botRole'), botProvider: $('botProvider'), botInstructions: $('botInstructions'),
     toolWeb: $('toolWeb'), toolGmail: $('toolGmail'), toolBrowser: $('toolBrowser'), toolShopping: $('toolShopping'), colorPalette: $('colorPalette'), deleteBotBtn: $('deleteBotBtn'), cancelBotBtn: $('cancelBotBtn'), saveBotBtn: $('saveBotBtn'),
@@ -42,6 +42,34 @@
   function provider(id) { return providers.find((p) => p.id === id); }
   function providerLabel(id) { return provider(id)?.label || ({ openai:'OpenAI', anthropic:'Claude', gemini:'Gemini', xai:'Grok' }[id] || id); }
   function configured(id) { return provider(id)?.configured === true; }
+  function healthStatus(id) { return provider(id)?.healthStatus || (configured(id) ? 'unchecked' : 'not_connected'); }
+  function healthBlocked(id) { return ['no_credits','auth_error','model_error','error','busy','not_connected'].includes(healthStatus(id)); }
+  function healthLabel(id) { return provider(id)?.healthLabel || (configured(id) ? 'Credits not checked' : 'Not connected'); }
+  async function checkHealth(ids = [], force = false) {
+    if (!code()) return { ok:false, requiresAccess:true, checked:[] };
+    const response = await fetch('/api/ai-agent/provider-health', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-ai-council-code':code()},
+      body:JSON.stringify({providers:ids,force}),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.ok) throw new Error(data.error || 'Could not check AI model availability.');
+    providers = Array.isArray(data.providers) ? data.providers : providers;
+    renderProviderSelect();
+    renderBots();
+    renderHotPicker();
+    renderStatusText();
+    return data;
+  }
+  function renderStatusText() {
+    const connected = providers.filter((p) => p.configured).length;
+    const ready = providers.filter((p) => p.healthStatus === 'ready').length;
+    const blocked = providers.filter((p) => p.configured && healthBlocked(p.id)).length;
+    const checked = providers.some((p) => p.healthStatus && p.healthStatus !== 'unchecked' && p.healthStatus !== 'not_connected');
+    els.status.textContent = checked
+      ? `${ready} AI model${ready === 1 ? '' : 's'} ready${blocked ? ` · ${blocked} unavailable` : ''}`
+      : `${connected} of 4 AI providers connected · credits checked before use`;
+  }
   function toolsOf(bot) { return { webSearch: true, gmail: !!bot?.tools?.gmail, browser: !!bot?.tools?.browser, shopping: !!bot?.tools?.shopping }; }
   function currentPreview(bot) { return activity[bot.id]?.preview || bot.role || 'Tap to chat'; }
   function fmt(ts) { if (!ts) return ''; const d = new Date(ts), n = new Date(); return d.toDateString() === n.toDateString() ? d.toLocaleTimeString([], { hour:'numeric', minute:'2-digit' }) : d.toLocaleDateString([], { weekday:'short' }); }
@@ -86,7 +114,8 @@
       name.textContent = bot.name;
       const preview = document.createElement('div');
       preview.className = 'bot-preview';
-      preview.textContent = `${providerLabel(bot.provider)} · ${currentPreview(bot)}`;
+      const state = healthStatus(bot.provider);
+      preview.textContent = `${providerLabel(bot.provider)}${state === 'ready' ? '' : ` · ${healthLabel(bot.provider)}`} · ${currentPreview(bot)}`;
       main.append(name, preview);
       const t = toolsOf(bot);
       const labels = [];
@@ -123,12 +152,12 @@
     providers.forEach((p) => {
       const option = document.createElement('option');
       option.value = p.id;
-      option.disabled = !p.configured;
-      option.textContent = `${p.label}${p.configured ? ` · ${p.model}` : ' · not connected'}`;
+      option.disabled = !p.configured || healthBlocked(p.id);
+      option.textContent = `${p.label}${p.configured ? ` · ${p.model} · ${healthLabel(p.id)}` : ' · not connected'}`;
       els.botProvider.append(option);
     });
-    const fallback = providers.find((p) => p.configured)?.id || 'openai';
-    els.botProvider.value = preferred && providers.some((p) => p.id === preferred && p.configured) ? preferred : fallback;
+    const fallback = providers.find((p) => p.configured && !healthBlocked(p.id))?.id || providers.find((p) => p.configured)?.id || 'openai';
+    els.botProvider.value = preferred && providers.some((p) => p.id === preferred && p.configured && !healthBlocked(p.id)) ? preferred : fallback;
   }
 
   function renderPalette() {
@@ -220,7 +249,7 @@
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
       checkbox.checked = selected.has(bot.id);
-      checkbox.disabled = !configured(bot.provider);
+      checkbox.disabled = !configured(bot.provider) || healthBlocked(bot.provider);
       checkbox.addEventListener('change', () => {
         if (checkbox.checked) {
           if (selected.size >= 6) { checkbox.checked = false; return alert('Hot Room can use up to 6 bots.'); }
@@ -229,7 +258,7 @@
         saveSelected();
       });
       const text = document.createElement('span');
-      text.innerHTML = `<b>${bot.name}</b><small>${providerLabel(bot.provider)} · ${bot.role || ''}</small>`;
+      text.innerHTML = `<b>${bot.name}</b><small>${providerLabel(bot.provider)} · ${healthLabel(bot.provider)} · ${bot.role || ''}</small>`;
       label.append(checkbox, text);
       els.hotPicker.append(label);
     });
@@ -273,6 +302,17 @@
     if (chosen.length < 2) return notice(els.roomNotice, 'Pick at least two bots.', 'error');
     if (!topic && !roomAttachmentCtl.has()) return notice(els.roomNotice, 'Tell the bots what to work on or attach a file.', 'error');
     if (!code()) return requestAccess(runRoom);
+    const modelIds = [...new Set(chosen.map((b) => b.provider))];
+    try {
+      await checkHealth(modelIds);
+    } catch (error) {
+      return notice(els.roomNotice, error.message || String(error), 'error');
+    }
+    const blockedModels = modelIds.filter((id) => healthStatus(id) !== 'ready');
+    if (blockedModels.length) {
+      const detail = blockedModels.map((id) => `${providerLabel(id)}: ${healthLabel(id)}`).join('; ');
+      return notice(els.roomNotice, `Hot Room was not started. ${detail}`, 'error');
+    }
     const attachments=roomAttachmentCtl.get(); const location=await locationContext();
     els.runRoomBtn.disabled = true;
     els.roomResults.replaceChildren();
@@ -322,9 +362,12 @@
   }
 
   function setView(view) {
-    const map = { bots: els.botsPanel, hot: els.hotPanel, council: els.councilPanel, history: els.historyPanel };
+    const map = { bots: els.botsPanel, hot: els.hotPanel, history: els.historyPanel };
+    if (!map[view]) view = 'bots';
     Object.entries(map).forEach(([key, panel]) => panel.classList.toggle('active', key === view));
     document.querySelectorAll('.bottom-nav button').forEach((button) => button.classList.toggle('active', button.dataset.view === view));
+    els.searchBtn.classList.toggle('hidden', view !== 'bots');
+    els.addBotBtn.classList.toggle('hidden', view !== 'bots');
     if (view === 'hot') renderHotPicker();
     if (view === 'history') renderHistory();
   }
@@ -351,9 +394,11 @@
       const response = await fetch('/api/ai-agent/status', { cache:'no-store' });
       const data = await response.json();
       providers = Array.isArray(data.providers) ? data.providers : [];
-      const count = providers.filter((p) => p.configured).length;
-      els.status.textContent = `${count} of 4 AI providers connected${data.tools?.webSearch ? ' · internet search ready' : ''}`;
-      renderProviderSelect(); renderBots(); renderHotPicker();
+      renderProviderSelect(); renderBots(); renderHotPicker(); renderStatusText();
+      if (code()) {
+        try { await checkHealth(); }
+        catch (error) { els.status.textContent = error.message || 'AI model availability check failed'; }
+      }
     } catch { els.status.textContent = 'AI provider status unavailable'; }
   }
 
@@ -380,6 +425,8 @@
 
   renderBots(); renderHistory(); loadStatus();
   const params = new URLSearchParams(location.search);
-  const requestedView = params.get('view'); if (['bots','hot','council','history'].includes(requestedView)) setView(requestedView);
+  const requestedView = params.get('view');
+  if (requestedView === 'council') location.href = '/ai-council/?view=council';
+  else if (['bots','hot','history'].includes(requestedView)) setView(requestedView);
   const edit = params.get('edit'); if (edit) setTimeout(() => openEditor(edit), 250);
 })();

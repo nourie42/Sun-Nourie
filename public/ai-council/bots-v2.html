@@ -6,12 +6,11 @@
   <meta name="theme-color" content="#0d0d0f">
   <meta name="color-scheme" content="dark">
   <title>AI Bots</title>
-  <link rel="stylesheet" href="/ai-council/ai-v2.css?v=1">
+  <link rel="stylesheet" href="/ai-council/ai-v2.css?v=2">
 </head>
 <body>
 <div class="ai-app">
   <main class="ai-shell" style="padding-bottom:110px">
-    <div class="under-construction">🚧 Under Construction</div>
     <header class="ai-header">
       <div class="brand-wrap">
         <a class="ai-orb" href="/ai-council/" aria-label="Back to AI Chat">AI</a>
@@ -52,15 +51,6 @@
       </div>
     </section>
 
-    <section class="panel" id="councilPanel">
-      <div class="page-nav"><a class="back-btn" href="/ai-council/">← Back to Chat</a></div>
-      <div class="section-card">
-        <h2>☷ AI Council</h2>
-        <p>Use the Council when you want multiple AIs to answer the same question and compare them.</p>
-        <a class="primary" href="/ai-council/?view=council" style="display:inline-flex;text-decoration:none">Open AI Council</a>
-      </div>
-    </section>
-
     <section class="panel" id="historyPanel">
       <div class="page-nav"><a class="back-btn" href="/ai-council/">← Back to Chat</a></div>
       <div class="section-card"><h2>History</h2><p>Your recent Hot Room sessions are saved on this device.</p><div id="historyList"></div></div>
@@ -70,7 +60,7 @@
   <nav class="bottom-nav" aria-label="Bot navigation">
     <button class="active" data-view="bots" type="button">●<br>Bots</button>
     <button data-view="hot" type="button">🔥<br>Hot Room</button>
-    <button data-view="council" type="button">☷<br>Council</button>
+    <a href="/ai-council/?view=council">☷<br>Council</a>
     <button data-view="history" type="button">↻<br>History</button>
   </nav>
 </div>
@@ -102,6 +92,6 @@
 </aside>
 
 <script src="/ai-council/ai-context-v1.js?v=1" defer></script>
-<script src="/ai-council/bots-v2.js?v=1" defer></script>
+<script src="/ai-council/bots-v2.js?v=2" defer></script>
 </body>
 </html>

@@ -14,6 +14,55 @@ const PROVIDERS = [
 ];
 
 const requestBuckets = new Map();
+const providerHealthCache = new Map();
+const PROVIDER_HEALTH_TTL_MS = 10 * 60 * 1000;
+
+function providerHealthFailure(error) {
+  const raw = cleanText(error?.message || error, 500);
+  const q = raw.toLowerCase();
+  if (/insufficient[_\s-]*quota|credit balance|no credits|credits? (?:remaining|available)|billing|payment required|spend limit|quota exceeded|resource_exhausted|budget (?:is )?exceeded/.test(q)) {
+    return { status: "no_credits", label: "No credits / billing issue", reason: "This model cannot be used until credits or billing are restored." };
+  }
+  if (/rate limit|too many requests|\b429\b/.test(q)) {
+    return { status: "busy", label: "Temporarily busy", reason: "This model is rate-limited right now. Try again shortly." };
+  }
+  if (/model.{0,40}(?:not found|does not exist|unavailable)|invalid.{0,20}model|unsupported.{0,20}model|\b404\b/.test(q)) {
+    return { status: "model_error", label: "Model unavailable", reason: "The configured model name is unavailable and needs to be changed." };
+  }
+  if (/invalid api key|authentication|unauthorized|forbidden|permission|\b401\b|\b403\b/.test(q)) {
+    return { status: "auth_error", label: "Connection needs attention", reason: "The provider key or account permission needs attention." };
+  }
+  return { status: "error", label: "Unavailable", reason: "This model did not pass the availability check." };
+}
+
+function cachedProviderHealth(id) {
+  const item = providerHealthCache.get(id);
+  if (!item) return null;
+  if (Date.now() - item.checkedAt > PROVIDER_HEALTH_TTL_MS) {
+    providerHealthCache.delete(id);
+    return null;
+  }
+  return item;
+}
+
+function publicProviderHealth(id) {
+  const provider = PROVIDERS.find((p) => p.id === id);
+  if (!provider) return { id, status: "unknown", label: "Unknown model", reason: "Unknown AI provider.", checkedAt: 0 };
+  if (!providerKey(id)) {
+    return { id, status: "not_connected", label: "Not connected", reason: "No API key is configured for this provider.", checkedAt: 0 };
+  }
+  const cached = cachedProviderHealth(id);
+  if (!cached) {
+    return { id, status: "unchecked", label: "Credits not checked", reason: "Availability will be checked before this model is used.", checkedAt: 0 };
+  }
+  return { id, status: cached.status, label: cached.label, reason: cached.reason, checkedAt: cached.checkedAt };
+}
+
+function providerAllowedByHealth(id) {
+  if (!providerKey(id)) return false;
+  const cached = cachedProviderHealth(id);
+  return !cached || cached.status === "ready";
+}
 
 function cleanText(value, max = 12000) {
   return String(value ?? "").replace(/\u0000/g, "").trim().slice(0, max);
@@ -33,7 +82,19 @@ function providerKey(id) {
 }
 
 function publicProviders() {
-  return PROVIDERS.map((p) => ({ id: p.id, label: p.label, model: providerModel(p.id), configured: Boolean(providerKey(p.id)) }));
+  return PROVIDERS.map((p) => {
+    const health = publicProviderHealth(p.id);
+    return {
+      id: p.id,
+      label: p.label,
+      model: providerModel(p.id),
+      configured: Boolean(providerKey(p.id)),
+      healthStatus: health.status,
+      healthLabel: health.label,
+      healthReason: health.reason,
+      healthCheckedAt: health.checkedAt,
+    };
+  });
 }
 
 function clientKey(req) {
@@ -170,6 +231,34 @@ async function callProvider(id, question, system, maxOutputTokens = 2200) {
   throw new Error("Unknown AI provider.");
 }
 
+async function probeProvider(id, { force = false } = {}) {
+  const provider = PROVIDERS.find((p) => p.id === id);
+  if (!provider || !providerKey(id)) return publicProviderHealth(id);
+  const cached = force ? null : cachedProviderHealth(id);
+  if (cached) return publicProviderHealth(id);
+
+  try {
+    const result = await callProvider(
+      id,
+      "Reply only with OK.",
+      "This is a tiny availability check. Reply only with OK.",
+      16,
+    );
+    if (!cleanText(result?.text, 80)) throw new Error("Provider returned no text during availability check");
+    providerHealthCache.set(id, {
+      status: "ready",
+      label: "Ready",
+      reason: "Credits and model access are available.",
+      checkedAt: Date.now(),
+    });
+  } catch (error) {
+    const classified = providerHealthFailure(error);
+    console.warn(`AI provider health check failed for ${id}:`, cleanText(error?.message || error, 500));
+    providerHealthCache.set(id, { ...classified, checkedAt: Date.now() });
+  }
+  return publicProviderHealth(id);
+}
+
 async function webSearch(query) {
   if (!providerKey("openai")) throw new Error("Internet search needs OPENAI_API_KEY.");
   const data = await fetchJson("https://api.openai.com/v1/responses", {
@@ -191,7 +280,7 @@ function shouldSearchWeb(text) {
 }
 
 function chooseBestProvider(question) {
-  const available = new Set(PROVIDERS.filter((p) => providerKey(p.id)).map((p) => p.id));
+  const available = new Set(PROVIDERS.filter((p) => providerAllowedByHealth(p.id)).map((p) => p.id));
   const q = cleanText(question, 5000).toLowerCase();
   const choose = (id, reason) => available.has(id) ? { id, reason } : null;
   if (/\b(x|twitter|tweet|trending|social media|grok)\b/.test(q)) return choose("xai", "Grok is a strong fit for this kind of social/current-web question") || choose("openai", "OpenAI is the best available general option");
@@ -406,6 +495,7 @@ export function registerAiAgentRoutes(app) {
       enabled: Boolean(accessCode),
       providers,
       configuredCount: providers.filter((p) => p.configured).length,
+      readyCount: providers.filter((p) => p.healthStatus === "ready").length,
       tools: {
         webSearch: Boolean(providerKey("openai")),
         attachments: Boolean(providerKey("openai")),
@@ -414,6 +504,24 @@ export function registerAiAgentRoutes(app) {
         browser: false,
         shopping: false,
       },
+    });
+  });
+
+  app.post("/api/ai-agent/provider-health", express.json({ limit: "8kb" }), async (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    if (!requireAccess(req, res, accessCode)) return;
+    const requested = Array.isArray(req.body?.providers)
+      ? req.body.providers.map((id) => cleanText(id, 30).toLowerCase()).filter(Boolean)
+      : [];
+    const ids = PROVIDERS.map((p) => p.id).filter((id) => !requested.length || requested.includes(id));
+    if (!ids.length) return res.status(400).json({ ok: false, error: "Choose at least one valid AI model." });
+    const force = req.body?.force === true;
+    const health = await Promise.all(ids.map((id) => probeProvider(id, { force })));
+    return res.json({
+      ok: true,
+      providers: publicProviders(),
+      checked: health,
+      readyCount: health.filter((item) => item.status === "ready").length,
     });
   });
 
@@ -444,10 +552,34 @@ export function registerAiAgentRoutes(app) {
 
     const pickText = question || rawAttachments.map((item) => cleanText(item?.name, 120)).filter(Boolean).join(" ") || "attachment help";
     const requested = cleanText(req.body?.provider, 30).toLowerCase() || "best";
+    if (requested !== "best" && !PROVIDERS.some((p) => p.id === requested)) {
+      return res.status(400).json({ ok: false, error: "Choose a valid AI model first." });
+    }
+
+    const idsToCheck = requested === "best"
+      ? PROVIDERS.filter((p) => providerKey(p.id)).map((p) => p.id)
+      : [requested];
+    const checkedHealth = await Promise.all(idsToCheck.map((id) => probeProvider(id)));
+    if (requested !== "best") {
+      const selectedHealth = checkedHealth[0];
+      if (selectedHealth?.status !== "ready") {
+        const status = selectedHealth?.status === "no_credits" ? 402 : 503;
+        return res.status(status).json({
+          ok: false,
+          error: `${PROVIDERS.find((p) => p.id === requested)?.label || "That AI"} cannot be used right now: ${selectedHealth?.label || "Unavailable"}. ${selectedHealth?.reason || ""}`.trim(),
+          providerHealth: selectedHealth,
+        });
+      }
+    }
+
     const best = chooseBestProvider(pickText);
     const providerId = requested === "best" ? best.id : requested;
     const provider = PROVIDERS.find((p) => p.id === providerId);
-    if (!provider) return res.status(400).json({ ok: false, error: "Choose an AI first." });
+    if (!provider) {
+      const noCredits = checkedHealth.filter((item) => item.status === "no_credits").map((item) => PROVIDERS.find((p) => p.id === item.id)?.label).filter(Boolean);
+      const extra = noCredits.length ? ` No credits are available for: ${noCredits.join(", ")}.` : "";
+      return res.status(noCredits.length ? 402 : 503).json({ ok: false, error: `No usable AI model is available right now.${extra}` });
+    }
     if (!providerKey(providerId)) return res.status(400).json({ ok: false, error: `${provider.label} is not connected yet.` });
 
     const prepared = await prepareAiContext({
@@ -469,7 +601,7 @@ export function registerAiAgentRoutes(app) {
     ].filter(Boolean).join("\n\n");
 
     const candidates = requested === "best"
-      ? [providerId, ...PROVIDERS.map((p) => p.id).filter((id) => id !== providerId && providerKey(id))]
+      ? [providerId, ...PROVIDERS.map((p) => p.id).filter((id) => id !== providerId && providerAllowedByHealth(id))]
       : [providerId];
     let lastError = null;
     for (const id of candidates) {
@@ -508,6 +640,21 @@ export function registerAiAgentRoutes(app) {
     if (bots.length < 2) return res.status(400).json({ ok: false, error: "Pick at least two bots." });
     const unavailable = bots.filter((b) => !providerKey(b.provider));
     if (unavailable.length) return res.status(400).json({ ok: false, error: `${unavailable.map((b) => b.name).join(", ")} uses an AI that is not connected.` });
+
+    const roomProviderIds = [...new Set(bots.map((b) => b.provider))];
+    const roomHealth = await Promise.all(roomProviderIds.map((id) => probeProvider(id)));
+    const blocked = roomHealth.filter((item) => item.status !== "ready");
+    if (blocked.length) {
+      const details = blocked.map((item) => {
+        const label = PROVIDERS.find((p) => p.id === item.id)?.label || item.id;
+        return `${label}: ${item.label}`;
+      }).join("; ");
+      return res.status(blocked.some((item) => item.status === "no_credits") ? 402 : 503).json({
+        ok: false,
+        error: `Hot Room was not started because one or more AI models are unavailable. ${details}`,
+        providerHealth: blocked,
+      });
+    }
 
     const rounds = Math.max(1, Math.min(3, Number(req.body?.rounds || 1)));
     const mode = ["debate", "collaborate", "roundtable"].includes(req.body?.mode) ? req.body.mode : "collaborate";

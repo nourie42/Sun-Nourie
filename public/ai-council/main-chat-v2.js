@@ -23,9 +23,11 @@
   const els = {
     statusText: $('statusText'), chatPanel: $('chatPanel'), councilPanel: $('councilPanel'), emptyState: $('emptyState'), messages: $('messages'),
     newChatBtn: $('newChatBtn'), councilBtn: $('councilBtn'), backToChatBtn: $('backToChatBtn'), settingsBtn: $('settingsBtn'),
+    bestModeBtn: $('bestModeBtn'), chooseModelBtn: $('chooseModelBtn'), homeNotice: $('homeNotice'),
     composerWrap: $('composerWrap'), providerBtn: $('providerBtn'), webBtn: $('webBtn'), prompt: $('prompt'), sendBtn: $('sendBtn'),
     providerBack: $('providerBack'), providerSheet: $('providerSheet'), providerChoices: $('providerChoices'),
     settingsBack: $('settingsBack'), settingsSheet: $('settingsSheet'), accessCode: $('accessCode'), closeSettingsBtn: $('closeSettingsBtn'), saveSettingsBtn: $('saveSettingsBtn'), settingsNotice: $('settingsNotice'),
+    checkModelsBtn: $('checkModelsBtn'), settingsProviderStatus: $('settingsProviderStatus'),
     councilQuestion: $('councilQuestion'), councilChecks: $('councilChecks'), runCouncilBtn: $('runCouncilBtn'), councilNotice: $('councilNotice'), councilResults: $('councilResults'),
   };
 
@@ -44,6 +46,14 @@
   function saveAccessCode(value) { try { sessionStorage.setItem('ai-council-access', value); } catch {} }
   function providerStatus(id) { return providers.find((p) => p.id === id); }
   function configured(id) { return id === 'best' ? providers.some((p) => p.configured) : providerStatus(id)?.configured === true; }
+  function healthStatus(id) { return providerStatus(id)?.healthStatus || (configured(id) ? 'unchecked' : 'not_connected'); }
+  function healthBlocked(id) { return ['no_credits','auth_error','model_error','error','busy','not_connected'].includes(healthStatus(id)); }
+  function usable(id) { return id === 'best' ? providers.some((p) => p.configured && !healthBlocked(p.id)) : configured(id) && !healthBlocked(id); }
+  function healthLabel(id) {
+    const p = providerStatus(id);
+    if (!p?.configured) return 'Not connected';
+    return p.healthLabel || (p.healthStatus === 'ready' ? 'Ready' : 'Credits not checked');
+  }
   function escapeHtml(value) { return String(value).replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c])); }
 
   function openSheet(sheet, back) { back.classList.add('show'); sheet.classList.add('show'); sheet.setAttribute('aria-hidden', 'false'); }
@@ -52,22 +62,110 @@
     pendingAction = after || null;
     els.accessCode.value = accessCode();
     els.settingsNotice.innerHTML = '';
+    renderSettingsProviderStatus();
     openSheet(els.settingsSheet, els.settingsBack);
     setTimeout(() => els.accessCode.focus(), 180);
+  }
+
+  function showHomeNotice(text) {
+    if (els.homeNotice) els.homeNotice.textContent = text || '';
+  }
+
+  function renderConnectionSummary() {
+    const connected = providers.filter((p) => p.configured).length;
+    const ready = providers.filter((p) => p.healthStatus === 'ready').length;
+    const blocked = providers.filter((p) => p.configured && healthBlocked(p.id)).length;
+    const checked = providers.some((p) => p.healthStatus && p.healthStatus !== 'unchecked' && p.healthStatus !== 'not_connected');
+    if (checked) {
+      els.statusText.textContent = `${ready} AI model${ready === 1 ? '' : 's'} ready${blocked ? ` · ${blocked} unavailable` : ''}`;
+    } else {
+      els.statusText.textContent = `${connected} of 4 AIs connected · credits checked before use`;
+    }
+  }
+
+  function renderSettingsProviderStatus() {
+    if (!els.settingsProviderStatus) return;
+    els.settingsProviderStatus.replaceChildren();
+    if (!providers.length) {
+      els.settingsProviderStatus.textContent = 'AI status is still loading.';
+      return;
+    }
+    providers.forEach((p) => {
+      const row = document.createElement('div');
+      row.className = 'settings-provider-row';
+      const name = document.createElement('span');
+      name.textContent = `${p.label} · ${p.model}`;
+      const state = document.createElement('strong');
+      state.textContent = healthLabel(p.id);
+      row.append(name, state);
+      els.settingsProviderStatus.append(row);
+    });
+  }
+
+  async function checkProviderHealth(ids = [], { force = false } = {}) {
+    if (!accessCode()) return { ok:false, requiresAccess:true, checked:[] };
+    const response = await fetch('/api/ai-agent/provider-health', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', 'x-ai-council-code': accessCode() },
+      body: JSON.stringify({ providers: ids, force }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.ok) throw new Error(data.error || 'Could not check AI model availability.');
+    providers = Array.isArray(data.providers) ? data.providers : providers;
+    renderProviderButton();
+    renderProviderChoices();
+    renderCouncilChecks();
+    renderSettingsProviderStatus();
+    renderConnectionSummary();
+    return data;
+  }
+
+  async function preflightSelection() {
+    const ids = selected === 'best'
+      ? providers.filter((p) => p.configured).map((p) => p.id)
+      : [selected];
+    try {
+      await checkProviderHealth(ids);
+    } catch (error) {
+      showHomeNotice(error.message || String(error));
+      els.statusText.textContent = error.message || 'AI availability check failed.';
+      return false;
+    }
+    if (selected === 'best') {
+      if (!providers.some((p) => p.healthStatus === 'ready')) {
+        const noCredits = providers.filter((p) => p.healthStatus === 'no_credits').map((p) => p.label);
+        const message = noCredits.length
+          ? `No usable AI has credits right now. No credits: ${noCredits.join(', ')}.`
+          : 'No AI model is available right now. Open the model list for details.';
+        showHomeNotice(message);
+        openSheet(els.providerSheet, els.providerBack);
+        return false;
+      }
+      return true;
+    }
+    if (healthStatus(selected) !== 'ready') {
+      const message = `${PROVIDER_INFO[selected]?.label || 'That AI'} cannot be used: ${healthLabel(selected)}.`;
+      showHomeNotice(message);
+      openSheet(els.providerSheet, els.providerBack);
+      return false;
+    }
+    return true;
   }
 
   function currentProviderLabel() {
     const info = PROVIDER_INFO[selected] || PROVIDER_INFO.best;
     if (selected === 'best') return `${info.icon} ${info.label}`;
     const p = providerStatus(selected);
-    return `${info.icon} ${info.label}${p?.configured ? '' : ' · not connected'}`;
+    const state = p?.configured ? healthLabel(selected) : 'Not connected';
+    return `${info.icon} ${info.label} · ${state}`;
   }
 
   function renderProviderButton() {
     els.providerBtn.textContent = currentProviderLabel();
-    els.providerBtn.classList.toggle('active', selected === 'best' || configured(selected));
+    els.providerBtn.classList.toggle('active', selected === 'best' ? providers.some((p) => p.configured) : usable(selected));
     els.webBtn.textContent = '🌐 Internet is automatic';
     els.webBtn.classList.add('active');
+    if (els.bestModeBtn) els.bestModeBtn.classList.toggle('primary-choice', selected === 'best');
   }
 
   function renderProviderChoices() {
@@ -75,19 +173,28 @@
     for (const id of PROVIDER_ORDER) {
       const info = PROVIDER_INFO[id];
       const p = id === 'best' ? null : providerStatus(id);
-      const isOn = configured(id);
+      const isOn = id === 'best' ? providers.some((item) => item.configured && !healthBlocked(item.id)) : configured(id) && !healthBlocked(id);
       const button = document.createElement('button');
       button.type = 'button';
       button.className = `choice${isOn ? '' : ' off'}`;
       button.disabled = !isOn;
-      const model = id === 'best' ? 'Uses whichever connected AI best fits the question' : (p?.configured ? p.model : 'Not connected');
-      button.innerHTML = `<span class="choice-icon">${escapeHtml(info.icon)}</span><span><strong>${escapeHtml(info.label)}</strong><small>${escapeHtml(info.desc)}<br>${escapeHtml(model)}</small></span><span class="check">${selected === id ? '✓' : ''}</span>`;
-      button.addEventListener('click', () => {
+      const model = id === 'best' ? 'Automatically picks among models that pass the availability check' : (p?.configured ? p.model : 'Not connected');
+      const state = id === 'best'
+        ? (providers.some((item) => item.healthStatus === 'ready') ? 'Ready' : 'Checks models before use')
+        : healthLabel(id);
+      const stateClass = id === 'best' || state === 'Ready' ? 'ready' : (healthBlocked(id) ? 'blocked' : 'check');
+      button.innerHTML = `<span class="choice-icon">${escapeHtml(info.icon)}</span><span><strong>${escapeHtml(info.label)}</strong><small>${escapeHtml(info.desc)}<br>${escapeHtml(model)}</small><span class="model-state ${stateClass}">${escapeHtml(state)}</span></span><span class="check">${selected === id ? '✓' : ''}</span>`;
+      button.addEventListener('click', async () => {
         selected = id;
         localStorage.setItem(PREF_KEY, selected);
+        showHomeNotice(id === 'best' ? 'Best AI mode selected.' : `${info.label} selected.`);
         renderProviderButton();
         renderProviderChoices();
         closeSheet(els.providerSheet, els.providerBack);
+        if (id !== 'best' && accessCode() && healthStatus(id) === 'unchecked') {
+          try { await checkProviderHealth([id]); }
+          catch (error) { showHomeNotice(error.message || String(error)); }
+        }
       });
       els.providerChoices.append(button);
     }
@@ -157,11 +264,7 @@
     const text = els.prompt.value.trim();
     if (!text && !attachmentCtl.has()) return;
     if (!accessCode()) return showSettings(sendMessage);
-    if (!configured(selected)) {
-      selected = 'best';
-      localStorage.setItem(PREF_KEY, selected);
-      renderProviderButton();
-    }
+    if (!(await preflightSelection())) return;
 
     const historyForApi = messages.slice(-14).map((m) => ({ role: m.role, text: m.text }));
     const attachments = attachmentCtl.get();
@@ -217,9 +320,9 @@
       const input = document.createElement('input');
       input.type = 'checkbox';
       input.value = p.id;
-      input.checked = p.configured;
-      input.disabled = !p.configured;
-      label.append(input, document.createTextNode(` ${p.label}`));
+      input.checked = p.configured && !healthBlocked(p.id);
+      input.disabled = !p.configured || healthBlocked(p.id);
+      label.append(input, document.createTextNode(` ${p.label} · ${p.model} · ${healthLabel(p.id)}`));
       els.councilChecks.append(label);
     }
   }
@@ -232,10 +335,22 @@
     const question = els.councilQuestion.value.trim();
     if (!question && !councilAttachmentCtl.has()) return councilNotice('Type a question or attach a file for the Council.', 'error');
     if (!accessCode()) return showSettings(runCouncil);
-    const ids = [...els.councilChecks.querySelectorAll('input:checked')].map((input) => input.value);
+    let ids = [...els.councilChecks.querySelectorAll('input:checked')].map((input) => input.value);
+    if (ids.length < 2) return councilNotice('Pick at least two available AI models.', 'error');
+    try {
+      await checkProviderHealth(ids);
+    } catch (error) {
+      return councilNotice(error.message || String(error), 'error');
+    }
+    const blockedIds = ids.filter((id) => healthStatus(id) !== 'ready');
+    if (blockedIds.length) {
+      const detail = blockedIds.map((id) => `${PROVIDER_INFO[id]?.label || id}: ${healthLabel(id)}`).join('; ');
+      return councilNotice(`Council was not started. ${detail}`, 'error');
+    }
+    ids = ids.filter((id) => healthStatus(id) === 'ready');
     const attachments = councilAttachmentCtl.get();
     const location = await locationContext();
-    if (ids.length < 2) return councilNotice('Pick at least two connected AIs.', 'error');
+    if (ids.length < 2) return councilNotice('At least two AI models must be ready.', 'error');
     els.runCouncilBtn.disabled = true;
     els.councilResults.replaceChildren();
     councilNotice('The Council is asking each AI…');
@@ -283,12 +398,16 @@
       const data = await response.json();
       if (!response.ok || !data.ok) throw new Error(data.error || 'Provider status failed');
       providers = Array.isArray(data.providers) ? data.providers : [];
-      const connected = providers.filter((p) => p.configured).length;
-      els.statusText.textContent = `${connected} of 4 AIs connected${data.tools?.webSearch ? ' · web search ready' : ''}`;
       if (!configured(selected)) selected = 'best';
       renderProviderButton();
       renderProviderChoices();
       renderCouncilChecks();
+      renderSettingsProviderStatus();
+      renderConnectionSummary();
+      if (accessCode()) {
+        try { await checkProviderHealth(); }
+        catch (error) { showHomeNotice(error.message || String(error)); }
+      }
     } catch (error) {
       els.statusText.textContent = 'Could not connect to AI status · tap ⚙ to check access';
       renderProviderButton();
@@ -296,25 +415,71 @@
   }
 
   els.providerBtn.addEventListener('click', () => openSheet(els.providerSheet, els.providerBack));
+  els.bestModeBtn?.addEventListener('click', async () => {
+    selected = 'best';
+    localStorage.setItem(PREF_KEY, selected);
+    showHomeNotice('Best AI mode selected. We will only use a model that passes the availability check.');
+    renderProviderButton();
+    renderProviderChoices();
+    if (accessCode()) {
+      try { await checkProviderHealth(); }
+      catch (error) { showHomeNotice(error.message || String(error)); }
+    }
+  });
+  els.chooseModelBtn?.addEventListener('click', () => openSheet(els.providerSheet, els.providerBack));
   els.providerBack.addEventListener('click', () => closeSheet(els.providerSheet, els.providerBack));
   els.webBtn.addEventListener('click', () => { webOn = true; renderProviderButton(); });
   els.sendBtn.addEventListener('click', sendMessage);
   els.prompt.addEventListener('keydown', (event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendMessage(); } });
-  els.newChatBtn.addEventListener('click', () => { if (!messages.length || confirm('Start a new chat?')) { messages = []; saveMessages(); renderMessages(); setView('chat'); } });
+  els.newChatBtn.addEventListener('click', () => {
+    if (messages.length && !confirm('Start a new chat?')) return;
+    messages = [];
+    selected = 'best';
+    localStorage.setItem(PREF_KEY, selected);
+    saveMessages();
+    attachmentCtl.clear();
+    els.prompt.value = '';
+    renderMessages();
+    renderProviderButton();
+    setView('chat');
+    showHomeNotice('New chat started. Pick the best AI or choose a model.');
+    setTimeout(() => els.prompt.focus(), 80);
+  });
   els.councilBtn.addEventListener('click', () => setView('council'));
   els.backToChatBtn.addEventListener('click', () => setView('chat'));
   els.runCouncilBtn.addEventListener('click', runCouncil);
   els.settingsBtn.addEventListener('click', () => showSettings());
   els.settingsBack.addEventListener('click', () => closeSheet(els.settingsSheet, els.settingsBack));
   els.closeSettingsBtn.addEventListener('click', () => { pendingAction = null; closeSheet(els.settingsSheet, els.settingsBack); });
-  els.saveSettingsBtn.addEventListener('click', () => {
+  els.checkModelsBtn?.addEventListener('click', async () => {
+    const value = els.accessCode.value.trim();
+    if (value) saveAccessCode(value);
+    if (!accessCode()) {
+      els.settingsNotice.innerHTML = '<div class="notice error">Enter the access code first.</div>';
+      return;
+    }
+    els.settingsNotice.innerHTML = '<div class="notice">Checking model credits and availability…</div>';
+    try {
+      await checkProviderHealth([], { force:true });
+      els.settingsNotice.innerHTML = '<div class="notice success">Model check finished.</div>';
+    } catch (error) {
+      els.settingsNotice.innerHTML = `<div class="notice error">${escapeHtml(error.message || String(error))}</div>`;
+    }
+  });
+  els.saveSettingsBtn.addEventListener('click', async () => {
     const value = els.accessCode.value.trim();
     if (!value) { els.settingsNotice.innerHTML = '<div class="notice error">Enter the access code first.</div>'; return; }
     saveAccessCode(value);
-    els.settingsNotice.innerHTML = '<div class="notice success">Saved for this browser session.</div>';
-    const after = pendingAction;
-    pendingAction = null;
-    setTimeout(() => { closeSheet(els.settingsSheet, els.settingsBack); if (after) after(); }, 180);
+    els.settingsNotice.innerHTML = '<div class="notice">Saved. Checking AI models…</div>';
+    try {
+      await checkProviderHealth([], { force:true });
+      els.settingsNotice.innerHTML = '<div class="notice success">Saved. AI model status is up to date.</div>';
+      const after = pendingAction;
+      pendingAction = null;
+      setTimeout(() => { closeSheet(els.settingsSheet, els.settingsBack); if (after) after(); }, 220);
+    } catch (error) {
+      els.settingsNotice.innerHTML = `<div class="notice error">${escapeHtml(error.message || String(error))}</div>`;
+    }
   });
 
   renderMessages();
