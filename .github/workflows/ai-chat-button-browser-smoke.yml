@@ -82,7 +82,8 @@ jobs:
           done
           echo "Render did not deploy the fixed AI Chat assets in time."
           exit 1
-      - name: Click every important control on live mobile AI Chat
+      - name: Click every important control on live Android AI Chat
         env:
           AI_CHAT_BASE_URL: https://sun-nourie-live.onrender.com
+          AI_CHAT_EXPECT_USABLE_MODELS: '1'
         run: node scripts/aiChatButtonBrowserSmoke.mjs
