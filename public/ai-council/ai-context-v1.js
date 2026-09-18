@@ -29,7 +29,8 @@
     if (!textarea) return { get: () => [], clear: () => {}, has: () => false };
     const state = [];
     const host = textarea.closest('.composer, .section-card, .sheet, .form-card, .room-card') || textarea.parentElement;
-    const row = textarea.closest('.compose-row') || textarea.parentElement;
+    const composeRow = textarea.closest('.compose-row');
+    const row = composeRow && composeRow !== host ? composeRow : null;
     const input = document.createElement('input');
     input.type = 'file';
     input.multiple = true;
@@ -85,8 +86,19 @@
     if (row) {
       const send = row.querySelector('.send-btn, .primary, button[type="submit"]');
       if (send) row.insertBefore(button, send); else row.append(button);
-    } else if (host) host.append(button);
-    if (host) host.insertBefore(strip, row || host.firstChild);
+    } else if (textarea.parentElement) {
+      textarea.insertAdjacentElement('afterend', button);
+    } else if (host) {
+      host.append(button);
+    }
+
+    if (host) {
+      const directRow = row && row.parentElement === host ? row : null;
+      const directTextarea = textarea.parentElement === host ? textarea : null;
+      const anchor = directRow || directTextarea || host.firstChild;
+      if (anchor && anchor.parentElement === host) host.insertBefore(strip, anchor);
+      else host.append(strip);
+    }
     document.body.append(input);
 
     return {
