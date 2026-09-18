@@ -94,8 +94,12 @@ export function currentSample(forecast, now = Date.now()) {
     ? weatherState('',currentHour?.skyCover).label
     : current.condition;
   const displayCondition=radarHere&&!activePrecipitation?'Rain':radarThreat&&!activePrecipitation?'Rain Around':dryRadarSky;
+  const displayComfort=radarThreat
+    ? {...comfort,weatherKind:weatherState(displayCondition).kind,radiantCondition:displayCondition,condition:displayCondition}
+    : comfort;
+  const exposure=outdoorExposure(displayComfort);
   return {windDirection:current.windDirection,pop:rainChanceValue(currentLikelihood),officialPop:currentHour?.officialPop??currentHour?.pop,rainLikelihood:currentLikelihood,currentPrecipitation,rainAround:radarThreat,radarThreat,precipitationBlend:currentHour?.precipitationBlend,uvIndex:hourlyUvValue(forecast,now),id:'now', now:true, time:current.time, temperature:finite(current.temperature) ? current.temperature : null,
-    feels:outdoorExposure(comfort).value, exposure:outdoorExposure(comfort), comfort, condition:displayCondition || 'Sky conditions unavailable',
+    feels:exposure.value, exposure, comfort:displayComfort, condition:displayCondition || 'Sky conditions unavailable',
     isDay:comfort.daylight ?? (solarElevation(now,forecast.location.latitude,forecast.location.longitude) > 0),
     source:current.type === 'observation' ? 'Station observation' : 'Current estimate', inputs:current};
 }
