@@ -6,28 +6,23 @@ jobs:
   diag:
     runs-on: ubuntu-latest
     steps:
-      - name: Probe reflectivity feature info
+      - name: Probe NOAA ArcGIS radar pixels at storm time
         run: |
           python - <<'PY'
-          import requests, json
-          def q(base,layer,style,lat,lon,time,fmt='application/json',n=3):
-              p=dict(service='WMS',version='1.3.0',request='GetFeatureInfo',layers=layer,query_layers=layer,styles=style,crs='CRS:84',
-                     bbox=f'{lon-.05},{lat-.05},{lon+.05},{lat+.05}',width=str(n),height=str(n),i=str(n//2),j=str(n//2),info_format=fmt,time=time)
-              r=requests.get(base,params=p,timeout=20); return r.status_code,r.text
-          time='2026-09-18T22:02:18.000Z'
-          con='https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows'
-          local='https://opengeo.ncep.noaa.gov/geoserver/krax/krax_sr_bref/ows'
-          for lat in [35.70,35.75,35.787,35.82,35.87]:
-            for lon in [-78.62,-78.55,-78.4806,-78.42,-78.35]:
-              for name,base,layer,style in [('CONUS',con,'conus_bref_qcd','radar_reflectivity'),('KRAX',local,'krax_sr_bref','radar_reflectivity')]:
-                st,txt=q(base,layer,style,lat,lon,time)
-                try:
-                  d=json.loads(txt); props=(d.get('features') or [{}])[0].get('properties',{})
-                except Exception: props={'raw':txt[:200]}
-                print(name,lat,lon,st,props)
-          for style in ['radar_reflectivity','']:
-            for fmt in ['application/json','text/plain']:
-              for n in [3,101]:
-                st,txt=q(local,'krax_sr_bref',style,35.787,-78.4806,'2026-09-18T21:59:40.000Z',fmt,n)
-                print('VARIANT',repr(style),fmt,n,st,txt[:1200])
+          import requests, json, datetime
+          base='https://mapservices.weather.noaa.gov/eventdriven/rest/services/radar/radar_base_reflectivity_time/ImageServer'
+          times=['2026-09-18T21:58:15Z','2026-09-18T22:02:18Z','2026-09-18T22:06:11Z','2026-09-18T22:18:10Z']
+          coords=[(35.70,-78.62),(35.75,-78.55),(35.787,-78.4806),(35.82,-78.42),(35.87,-78.35)]
+          for iso in times:
+            epoch=int(datetime.datetime.fromisoformat(iso.replace('Z','+00:00')).timestamp()*1000)
+            print('=== TIME',iso,epoch,'===')
+            for lat,lon in coords:
+              geom=json.dumps({'x':lon,'y':lat,'spatialReference':{'wkid':4326}},separators=(',',':'))
+              p={'geometry':geom,'geometryType':'esriGeometryPoint','time':str(epoch),'returnGeometry':'false','returnCatalogItems':'true','returnAllPixelValues':'true','f':'pjson'}
+              r=requests.get(base+'/identify',params=p,timeout=20)
+              d=r.json()
+              props=d.get('properties') or {}
+              feats=((d.get('catalogItems') or {}).get('features') or [])
+              attrs=feats[0].get('attributes',{}) if feats else {}
+              print(lat,lon,'value=',d.get('value'),'Values=',props.get('Values'),'name=',attrs.get('name'),'valid=',attrs.get('idp_validtime'))
           PY
