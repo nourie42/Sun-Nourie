@@ -99,13 +99,13 @@ test('missing canonical chances never fall back to conflicting raw NWS values',(
   assert.equal(carWashDayDecision([day(dates[0],null,{popDay:1,popNight:1}),day(dates[1],5),day(dates[2],5)]).state,'check');
 });
 
-test('visible car-wash chance matches Today while its decision still protects against overnight rain',()=>{
+test('visible car-wash chance matches Remainder of Today including overnight rain',()=>{
   const forecast=fixture([65,8,8,8,8,8,8]);
   forecast.days[0].popDayLikelihood={value:15};
   forecast.days[0].popNightLikelihood={value:65};
   const summary=carWashSummary(forecast,Date.parse('2026-09-12T12:00:00Z'));
-  assert.equal(summary.chance,15);
-  assert.equal(summary.days[0].chance,15);
+  assert.equal(summary.chance,65);
+  assert.equal(summary.days[0].chance,65);
   assert.equal(summary.days[0].label,'Remainder of Today');
   assert.equal(summary.decisions[0].chance,65);
   assert.deepEqual(summary.decisions[0].chances,[65,8,8]);
@@ -133,9 +133,9 @@ test('the conservative three-day chances still drive the inclusive 25% count and
   forecast.days[0].popNightLikelihood={value:25};
   forecast.days[0].rainLikelihood={value:25,peakTime:'2026-09-13T01:00:00Z'};
   const summary=carWashSummary(forecast,Date.parse('2026-09-12T12:00:00Z'));
-  assert.deepEqual(summary.days.slice(0,3).map(day=>day.chance),[24,0,0]);
+  assert.deepEqual(summary.days.slice(0,3).map(day=>day.chance),[25,0,0]);
   assert.deepEqual(summary.decisions[0].chances,[25,0,0]);
-  assert.equal(summary.chance,24);assert.equal(summary.lowRainDays,3);assert.equal(summary.state,'wash');
+  assert.equal(summary.chance,25);assert.equal(summary.lowRainDays,3);assert.equal(summary.state,'wash');
   assert.equal(summary.reason,'Three days at or below 25% are lined up.');
   const html=carWashHTML(summary);
   assert.match(html,/3 of 3 days/);
