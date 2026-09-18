@@ -12,8 +12,7 @@ export function rainTrendSample(forecast,now=Date.now()) {
   const day=forecast?.days?.[0];if(!day)return null;
   const display=dailyDisplay(day,0,now,forecast.location?.timeZone||'America/New_York');
   if(!finite(display.pop))return null;
-  const hrrr=forecast.modelContributions?.find(source=>source.id==='hrrr');
-  const runAt=hrrr?.runAt||forecast.assembledAt;
+  const runAt=forecast.assembledAt;
   if(!Number.isFinite(Date.parse(runAt)))return null;
   return {key:`${locationKey(forecast)}|${day.date}|${display.tonight?'night':'day'}`,runAt,chance:Math.round(display.pop)};
 }
@@ -26,8 +25,9 @@ export function updateRainTrend(forecast,now=Date.now(),storage=globalThis.local
     if(existing>=0)history[existing]=sample;else history.push(sample);
     history.sort((a,b)=>Date.parse(a.runAt)-Date.parse(b.runAt));
     const recent=history.slice(-MAX_SAMPLES);saved[sample.key]=recent;storage.setItem(STORAGE_KEY,JSON.stringify(saved));
-    if(recent.length<2)return null;
-    const current=recent.at(-1),previous=recent.at(-2),change=previous.chance-current.chance;
-    return change>0?{direction:'down',change,from:previous.chance,to:current.chance,previousRunAt:previous.runAt,currentRunAt:current.runAt}:null;
+    const current=recent.at(-1);
+    if(recent.length<2)return {direction:'first',change:null,delta:null,from:null,to:current.chance,previousRunAt:null,currentRunAt:current.runAt};
+    const previous=recent.at(-2),delta=current.chance-previous.chance,change=Math.abs(delta);
+    return {direction:delta>0?'up':delta<0?'down':'same',change,delta,from:previous.chance,to:current.chance,previousRunAt:previous.runAt,currentRunAt:current.runAt};
   } catch { return null; }
 }
