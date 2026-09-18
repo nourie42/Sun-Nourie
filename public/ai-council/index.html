@@ -7,7 +7,7 @@
   <meta name="color-scheme" content="dark">
   <meta name="description" content="Simple AI chat with OpenAI, Claude, Gemini, Grok, and AI Council.">
   <title>AI Chat</title>
-  <link rel="stylesheet" href="/ai-council/ai-v2.css?v=1">
+  <link rel="stylesheet" href="/ai-council/ai-v2.css?v=2">
 </head>
 <body>
 <div class="ai-app">
@@ -29,7 +29,12 @@
       <div class="chat-empty" id="emptyState">
         <div class="mark">✦</div>
         <h1>How can I help?</h1>
-        <p>Pick an AI yourself, or choose <b>Pick the best for me</b> and we'll do it for you.</p>
+        <p>Choose the easy option, or pick the exact AI model you want.</p>
+        <div class="home-model-actions" aria-label="Choose how AI is selected">
+          <button class="home-choice primary-choice" id="bestModeBtn" type="button">⭐ Pick the best AI for me<span>We choose the best available model for your question.</span></button>
+          <button class="home-choice" id="chooseModelBtn" type="button">▦ Pick the AI model myself<span>Choose OpenAI, Claude, Gemini, or Grok before you send.</span></button>
+        </div>
+        <div class="home-notice" id="homeNotice" aria-live="polite"></div>
       </div>
       <div class="messages" id="messages" aria-live="polite"></div>
     </section>
@@ -65,7 +70,8 @@
 <div class="sheet-backdrop" id="providerBack"></div>
 <aside class="sheet" id="providerSheet" aria-hidden="true">
   <div class="sheet-handle"></div>
-  <h2 class="sheet-title">Choose an AI</h2>
+  <h2 class="sheet-title">Choose the AI model</h2>
+  <p class="sheet-help">Models that cannot be used are clearly marked before you send anything.</p>
   <div class="choice-list" id="providerChoices"></div>
 </aside>
 
@@ -75,11 +81,15 @@
   <h2 class="sheet-title">AI Settings</h2>
   <p style="color:#8b8b94;font-size:12px;line-height:1.5">Your access code stays only in this browser session. It is not shown on the main chat screen.</p>
   <div class="field"><label>Access code</label><input id="accessCode" type="password" autocomplete="off" placeholder="Enter access code"></div>
-  <div class="actions"><button class="secondary" id="closeSettingsBtn" type="button">Cancel</button><button class="primary" id="saveSettingsBtn" type="button">Save</button></div>
+  <div class="settings-models">
+    <div class="settings-models-head"><strong>AI model status</strong><button class="secondary compact" id="checkModelsBtn" type="button">Check now</button></div>
+    <div id="settingsProviderStatus" class="settings-provider-status">Save your access code to check model credits and availability.</div>
+  </div>
+  <div class="actions"><button class="secondary" id="closeSettingsBtn" type="button">Cancel</button><button class="primary" id="saveSettingsBtn" type="button">Save & Check</button></div>
   <div id="settingsNotice"></div>
 </aside>
 
 <script src="/ai-council/ai-context-v1.js?v=1" defer></script>
-<script src="/ai-council/main-chat-v2.js?v=1" defer></script>
+<script src="/ai-council/main-chat-v2.js?v=2" defer></script>
 </body>
 </html>
