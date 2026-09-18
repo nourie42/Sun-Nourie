@@ -440,9 +440,9 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
       const get = (id, label, url, ttl, transform) => url ? feed(id, label, url, ttl, transform) : unavailable(id, label);
       const jobs = {
         exposureWeather: feed('exposure','UV and surface-weather forecast',exposureWeatherUrl(location,point?.timeZone),30*MINUTE,normalizeExposureWeather),
-        forecast: get('nws', 'NWS forecast', point?.forecast, 10 * MINUTE, (d) => d.properties?.periods?.length ? d.properties : null),
-        hourly: get('hourly', 'NWS hourly', point?.forecastHourly, 10 * MINUTE, (d) => d.properties?.periods?.length ? d.properties : null),
-        grid: get('grid', 'NWS precipitation grid', point?.forecastGridData, 10 * MINUTE, (d) => d.properties),
+        forecast: get('nws', 'NWS forecast', point?.forecast, 2 * MINUTE, (d) => d.properties?.periods?.length ? d.properties : null),
+        hourly: get('hourly', 'NWS hourly', point?.forecastHourly, 2 * MINUTE, (d) => d.properties?.periods?.length ? d.properties : null),
+        grid: get('grid', 'NWS precipitation grid', point?.forecastGridData, 2 * MINUTE, (d) => d.properties),
         alerts: feed('alerts', 'Official NWS alerts', `https://api.weather.gov/alerts/active?point=${key}`, MINUTE, (d) => Array.isArray(d.features) ? d.features.filter((f) => f.properties?.status === 'Actual' && f.properties?.messageType !== 'Cancel' && Date.parse(f.properties?.expires) > now()).map((f) => ({ id: f.id, geometry: f.geometry, ...f.properties })) : null),
         discussion: loadDiscussion(point?.cwa),
         observation: point?.observationStations ? feed('observation', 'Nearby station observation', point.observationStations, 5 * MINUTE, async (d) => {
