@@ -33,7 +33,8 @@ function fixture() {
 test('model explanation defaults to the same Today/ Tonight period as the main card',()=>{
   const forecast=fixture();
   assert.equal(modelExplanationView(forecast,{now}).phase,'daytime');
-  assert.equal(modelExplanationView(forecast,{now:Date.parse('2026-09-12T21:59:59Z')}).phase,'daytime');
+  assert.equal(modelExplanationView(forecast,{now:Date.parse('2026-09-12T15:59:59Z')}).phase,'daytime');
+  assert.equal(modelExplanationView(forecast,{now:Date.parse('2026-09-12T16:00:00Z')}).phase,'overall','after local noon the explanation matches Remainder of Today');
   assert.equal(modelExplanationView(forecast,{now:Date.parse('2026-09-12T22:00:00Z')}).phase,'overnight');
   assert.equal(modelExplanationView(forecast,{index:1,now}).phase,'overall');
   assert.equal(modelExplanationView(forecast,{index:0,phase:'overall',now}).phase,'overall');

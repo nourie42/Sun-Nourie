@@ -1,5 +1,5 @@
 import {weatherState} from './weather-state.js';
-import {dailyDisplay,dailyRainPeriod,finite} from './weather-math.js?v=weather-qa-v67';
+import {dailyDisplay,dailyRainPeriod,finite} from './weather-math.js?v=weather-qa-v70';
 import {dailyFeels,degrees,timeAt} from './hourly-feels.js?v=weather-qa-v67';
 import {uvCategory} from './daily-uv.js?v=weather-art-labels-v10';
 import {weatherIcon,weatherMetricIcon} from './weather-display.js?v=weather-qa-v67';
@@ -80,7 +80,12 @@ export function todayForecastHTML(forecast,now=Date.now()){
  const uv=uvCategory(day.uvMax),confidence=day.confidence?.label||'Unavailable';
  const metric=(kind,value,label,note)=>`<span class="today-metric" title="${esc(note)}">${weatherMetricIcon(kind)}<span><strong>${value}</strong><small>${label}</small></span></span>`;
  const profile=todaySkyProfile(day,p.tonight),feelValue=p.tonight?feel.low?.low?.value:feel.high?.high?.value;
- const trend=forecast.rainTrend?.direction==='down'&&finite(forecast.rainTrend.change)?`<em>↓ Down ${Math.round(forecast.rainTrend.change)} points</em>`:'';
+ const rt=forecast.rainTrend;
+ const trend=!rt||rt.direction==='first'
+  ? '<em data-rain-trend>Change: — · first update</em>'
+  : rt.direction==='same'
+    ? '<em data-rain-trend>↔ 0 pts · unchanged</em>'
+    : `<em data-rain-trend>${rt.direction==='up'?'↑ +':'↓ −'}${Math.round(rt.change)} pts · was ${Math.round(rt.from)}%</em>`;
  const banner=confidenceBannerHTML(day);
  return `${banner}<button type="button" class="today-weather-card ${p.tonight?'today-night':p.remainder?'today-remainder':''}" data-today-forecast aria-haspopup="dialog" aria-label="${esc(p.label)}, ${esc(p.condition)}, ${p.primaryLabel} ${reading(p.primary)} degrees${finite(p.secondary)?`, low ${reading(p.secondary)} degrees`:''}. ${finite(p.pop)?`Rain chance ${reading(p.pop)} percent.`:'Rain chance unavailable.'} Forecast confidence ${esc(confidence)}. Open details.">
  ${todaySkySceneHTML(profile,now)}<span class="today-scene-shade"></span><span class="today-copy"><span class="day-name">${esc(p.label)}</span><span class="today-condition" title="${esc(p.condition)}">${esc(shortForecastCondition(p.condition))}</span><span class="today-temperatures">${p.tonight?'':`<span class="today-low"><strong>${degrees(p.secondary)}</strong><small>Low</small></span><i>—</i>`}<span class="today-high"><strong>${degrees(p.primary)}</strong><small>${p.primaryLabel}</small></span></span><span class="today-feels">Feels like <b>${degrees(feelValue)}</b></span></span>

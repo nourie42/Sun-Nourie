@@ -1,4 +1,4 @@
-import {dailyDisplay,finite,rainChanceValue} from './weather-math.js?v=weather-qa-v67';
+import {dailyDisplay,finite,rainChanceValue} from './weather-math.js?v=weather-qa-v70';
 import {weatherIcon} from './weather-display.js?v=weather-qa-v67';
 import {weatherState,conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
 import {forecastGrossLevel} from './dewpoint-meter.js?v=weather-qa-v67';

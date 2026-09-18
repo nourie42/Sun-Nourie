@@ -1,4 +1,4 @@
-import {isTonightPeriod} from './weather-math.js?v=weather-qa-v67';
+import {isTonightPeriod,localHour} from './weather-math.js?v=weather-qa-v70';
 const HOUR = 3600000;
 const WEATHERNEXT_FEED = 'https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/weathernext3.json';
 const WEATHERNEXT_SOURCE = 'https://developers.google.com/weathernext/guides/models';
@@ -30,7 +30,8 @@ function number(value, precision = 4) { return finite(value) ? Number(value.toFi
 function percent(value) { return chance(value) === null ? '—' : `${Math.round(value)}%`; }
 function defaultPhase(index, now, zone) {
   if (index !== 0) return 'overall';
-  return isTonightPeriod(now,zone) ? 'overnight' : 'daytime';
+  if (isTonightPeriod(now,zone)) return 'overnight';
+  return localHour(now,zone) >= 12 ? 'overall' : 'daytime';
 }
 function periodFor(day, phase) {
   return (phase === 'daytime' ? day?.popDayLikelihood : phase === 'overnight' ? day?.popNightLikelihood : day?.rainLikelihood) || {};

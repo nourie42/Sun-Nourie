@@ -5,8 +5,8 @@ import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './wea
 import {dayGraphHTML,dayGraphPoints,installDayGraph} from './day-graph.js?v=weather-qa-v67';
 import {degrees,feelsAt} from './hourly-feels.js?v=weather-qa-v67';
 import {createFramePlayer} from './frame-player.js';
-import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=weather-qa-v67';
-import {dailyDisplay} from './weather-math.js?v=weather-qa-v67';
+import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=weather-qa-v70';
+import {dailyDisplay} from './weather-math.js?v=weather-qa-v70';
 import {conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
 import {currentHero} from './current-temperature.js?v=rain-around-v66';
 import {renderBulletins} from './bulletins.js?v=wpc-mpd-v1';
@@ -14,10 +14,10 @@ import {modelFreshnessText} from './personal-details.js?v=weather-qa-v67';
 import {renderDewpointMeter} from './dewpoint-meter.js?v=weather-qa-v67';
 import {renderWeatherPanel} from './render-safety.js';
 import {forecastPeriodSummary} from './forecast-story.js?v=weather-qa-v67';
-import {forecastOutlookDetails} from './outlook-details.js?v=weather-outlook-v1';
-import {isExperimentalWeatherPage,renderCarWashForecast,resetCarWashForecast} from './car-wash.js?v=weather-qa-v67';
-import {renderModelExplanation,resetModelExplanation} from './model-explanation.js?v=weather-qa-v67';
-import {updateRainTrend} from './rain-trend.js?v=weather-qa-v67';
+import {forecastOutlookDetails} from './outlook-details.js?v=weather-qa-v70';
+import {isExperimentalWeatherPage,renderCarWashForecast,resetCarWashForecast} from './car-wash.js?v=weather-qa-v70';
+import {renderModelExplanation,resetModelExplanation} from './model-explanation.js?v=weather-qa-v70';
+import {updateRainTrend} from './rain-trend.js?v=weather-qa-v70';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);
 const experimentalPage = isExperimentalWeatherPage();
