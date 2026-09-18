@@ -74,8 +74,10 @@ export function currentSample(forecast, now = Date.now()) {
   const areaDistance=finite(radar?.nearestRainMiles)?` about ${Math.round(radar.nearestRainMiles)} miles${direction?` ${direction}`:''}`:'';
   const currentPrecipitation=activePrecipitation
     ? {active:true,label:kind==='snow'?'Snow now':'Rain now',source:'Current station reports precipitation.'}
-    : radarThreat
-      ? {active:true,nearby:!radarHere,label:'Rain Around',source:radarHere?'NOAA observed radar shows rain at the selected location.':radarClose?'NOAA observed radar shows rain within 5 miles of the selected location.':'NOAA observed radar shows rain moving toward the selected location.'}
+    : radarHere
+      ? {active:true,nearby:false,label:'Rain now',source:'NOAA observed radar shows precipitation over the selected location.'}
+      : radarThreat
+        ? {active:true,nearby:true,label:'Rain Around',source:radarClose?'NOAA observed radar shows rain within 5 miles of the selected location.':'NOAA observed radar shows rain moving toward the selected location.'}
       : radarNearby
         ? {active:false,nearby:true,label:'Rain nearby',source:'NOAA observed radar shows precipitation near the selected location.'}
         : radarArea
@@ -91,9 +93,13 @@ export function currentSample(forecast, now = Date.now()) {
   const dryRadarSky=radarReady&&!radarThreat&&!stationCondition&&['rain','storm','snow'].includes(kind)
     ? weatherState('',currentHour?.skyCover).label
     : current.condition;
-  const displayCondition=radarThreat&&!activePrecipitation?'Rain Around':dryRadarSky;
+  const displayCondition=radarHere&&!activePrecipitation?'Rain':radarThreat&&!activePrecipitation?'Rain Around':dryRadarSky;
+  const displayComfort=radarThreat
+    ? {...comfort,weatherKind:weatherState(displayCondition).kind,radiantCondition:displayCondition,condition:displayCondition}
+    : comfort;
+  const exposure=outdoorExposure(displayComfort);
   return {windDirection:current.windDirection,pop:rainChanceValue(currentLikelihood),officialPop:currentHour?.officialPop??currentHour?.pop,rainLikelihood:currentLikelihood,currentPrecipitation,rainAround:radarThreat,radarThreat,precipitationBlend:currentHour?.precipitationBlend,uvIndex:hourlyUvValue(forecast,now),id:'now', now:true, time:current.time, temperature:finite(current.temperature) ? current.temperature : null,
-    feels:outdoorExposure(comfort).value, exposure:outdoorExposure(comfort), comfort, condition:displayCondition || 'Sky conditions unavailable',
+    feels:exposure.value, exposure, comfort:displayComfort, condition:displayCondition || 'Sky conditions unavailable',
     isDay:comfort.daylight ?? (solarElevation(now,forecast.location.latitude,forecast.location.longitude) > 0),
     source:current.type === 'observation' ? 'Station observation' : 'Current estimate', inputs:current};
 }

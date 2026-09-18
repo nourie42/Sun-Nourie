@@ -1,16 +1,16 @@
 import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText,rebindDanTake} from './dans-take.js?v=weather-art-labels-v10';
 import {danCard} from './dans-summary.js?v=weather-qa-v67';
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
-import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './weather-display.js?v=weather-qa-v68';
+import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './weather-display.js?v=rain-now-v71';
 import {dayGraphHTML,dayGraphPoints,installDayGraph} from './day-graph.js?v=weather-qa-v67';
 import {degrees,feelsAt} from './hourly-feels.js?v=weather-qa-v67';
 import {createFramePlayer} from './frame-player.js';
-import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=weather-qa-v70';
+import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=rain-now-v71';
 import {dailyDisplay} from './weather-math.js?v=weather-qa-v70';
 import {conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
-import {currentHero} from './current-temperature.js?v=rain-around-v66';
+import {currentHero} from './current-temperature.js?v=rain-now-v71';
 import {renderBulletins} from './bulletins.js?v=wpc-mpd-v1';
-import {modelFreshnessText} from './personal-details.js?v=weather-qa-v67';
+import {modelFreshnessText} from './personal-details.js?v=rain-now-v71';
 import {renderDewpointMeter} from './dewpoint-meter.js?v=weather-qa-v67';
 import {renderWeatherPanel} from './render-safety.js';
 import {forecastPeriodSummary} from './forecast-story.js?v=weather-qa-v67';
@@ -86,8 +86,9 @@ function isDaylight() {
 function radarObservationLabel(current) {
   const radar=current?.radarPrecipitation;
   if(radar?.status!=='ready')return '';
-  const rainAround=radar.atLocation===true||radar.close===true||(finite(radar.nearestRainMiles)&&radar.nearestRainMiles<=5)||radar.approaching===true;
-  if(rainAround)return radar.approaching===true&&!radar.close&&!radar.atLocation?'Rain Around · moving toward you':'Rain Around · within 5 miles';
+  if(radar.atLocation===true)return 'Rain now · observed radar over this location';
+  const rainAround=radar.close===true||(finite(radar.nearestRainMiles)&&radar.nearestRainMiles<=5)||radar.approaching===true;
+  if(rainAround)return radar.approaching===true&&!radar.close?'Rain Around · moving toward you':'Rain Around · within 5 miles';
   if(radar.nearby!==true&&radar.inArea!==true)return '';
   const direction={N:'north',NE:'northeast',E:'east',SE:'southeast',S:'south',SW:'southwest',W:'west',NW:'northwest'}[radar.nearestRainDirection];
   const distance=finite(radar.nearestRainMiles)?` about ${Math.round(radar.nearestRainMiles)} mi${direction?` ${direction}`:''}`:'';

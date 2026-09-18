@@ -599,20 +599,39 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
       }));
       const [reflectivitySamples,previousReflectivitySamples,hydrometeorFrames] = await Promise.all([loadReflectivity(observedAt),previousObservedAt?loadReflectivity(previousObservedAt):Promise.resolve([]),hydrometeorTimes]);
       const latestHydrometeor=hydrometeorFrames.at(-1);
-      const hydrometeorObservedAt=latestHydrometeor&&now()-Date.parse(latestHydrometeor)<=20*MINUTE?latestHydrometeor:null;
+      const hydrometeorAge=latestHydrometeor?now()-Date.parse(latestHydrometeor):Infinity;
+      const hydrometeorOffset=latestHydrometeor?Math.abs(Date.parse(observedAt)-Date.parse(latestHydrometeor)):Infinity;
+      // Never let an older classification frame erase newer MRMS reflectivity
+      // from a fast-moving storm. Use dual-pol only when it is both fresh and
+      // closely aligned with the reflectivity frame.
+      const hydrometeorObservedAt=latestHydrometeor&&hydrometeorAge<=20*MINUTE&&hydrometeorOffset<=8*MINUTE?latestHydrometeor:null;
       const samples=await Promise.all(reflectivitySamples.map(async sample=>{
-        if(sample.reflectivityActive===false)return {...sample,hydrometeor:null,active:false};
-        if(sample.reflectivityActive!==true||!hydrometeorObservedAt)return {...sample,hydrometeor:null,active:null};
+        if(sample.reflectivityActive===false)return {...sample,hydrometeor:null,active:false,evidence:'mrms-dry'};
+        if(sample.reflectivityActive!==true)return {...sample,hydrometeor:null,active:null,evidence:'mrms-unavailable'};
+        // MRMS base reflectivity is already quality controlled. Dual-pol
+        // hydrometeor classification is used to reject biological/clutter echoes
+        // when it is available, but a delayed/missing classification must not turn
+        // obvious reflectivity over the selected point into "unknown" or "dry".
+        if(!hydrometeorObservedAt)return {...sample,hydrometeor:null,active:true,evidence:'mrms-reflectivity'};
         try{
           const url=radarHydrometeorUrl(radarStation,'GetFeatureInfo',sample,hydrometeorObservedAt);
           const {data}=await cached(url,2*MINUTE);
           const hydrometeor=radarHydrometeorClass(data);
-          return {...sample,hydrometeor,active:hydrometeor===null?null:PRECIPITATION_HYDROMETEORS.has(hydrometeor)};
-        }catch{return {...sample,hydrometeor:null,active:null};}
+          if(hydrometeor===null)return {...sample,hydrometeor:null,active:true,evidence:'mrms-reflectivity'};
+          return {...sample,hydrometeor,active:PRECIPITATION_HYDROMETEORS.has(hydrometeor),evidence:'dual-pol'};
+        }catch{return {...sample,hydrometeor:null,active:true,evidence:'mrms-reflectivity'};}
       }));
       const currentPresence=summarizeRadarPresence(samples,observedAt);
       const previousPresence=previousObservedAt?summarizeRadarPresence(previousReflectivitySamples.map(sample=>({...sample,active:sample.reflectivityActive})),previousObservedAt):null;
-      precipitation = {...currentPresence,...summarizeRadarMotion(currentPresence,previousPresence),classification:{station:radarStation||null,observedAt:hydrometeorObservedAt}};
+      precipitation = {
+        ...currentPresence,
+        ...summarizeRadarMotion(currentPresence,previousPresence),
+        classification:{
+          station:radarStation||null,
+          observedAt:hydrometeorObservedAt,
+          reflectivityFallback:samples.some(sample=>sample.active===true&&sample.evidence==='mrms-reflectivity'),
+        },
+      };
     }
     return { frames, url: RADAR_URL, layer: 'conus_bref_qcd', status,
       location:{latitude:location.latitude,longitude:location.longitude},precipitation,

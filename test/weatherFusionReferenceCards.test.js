@@ -69,6 +69,13 @@ test('active rain pauses pavement heat warnings',()=>{
  assert.equal(pavementHTML(result,92,{condition:'Rain'}).includes('Hot pavement possible'),false);
  assert.match(pavementHTML(result,92,{condition:'Rain'}),/Wet pavement · heat warning paused/);
 });
+test('live radar threat forces rainy pet art and pauses pavement heat warnings',()=>{
+ const result={status:'estimated',activePrecipitation:false,daylight:true,concrete:{value:110,high:140},asphalt:{value:118,high:145}};
+ const html=pavementHTML(result,92,{condition:'Cloudy',pop:0,radarThreat:true,rainAround:true});
+ assert.match(html,/Wet pavement · heat warning paused/);
+ assert.match(html,/data-scene="rain"/);
+ assert.doesNotMatch(html,/comfort-reference-scenes-hot\.webp|Hot pavement possible/);
+});
 
 test('dry radar state never renders rain artwork or a wet-pavement claim',()=>{
  const scene=referenceScene(1,false,'Partly cloudy',82,{pop:0});

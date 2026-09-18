@@ -75,10 +75,12 @@ test('Now reports the observed precipitation state while future hours preserve c
  assert.equal(dryRadar.currentPrecipitation.label,'Dry now');
  assert.equal(dryRadar.condition,'Partly cloudy');
 });
-test('fresh observed radar forces Rain Around within five miles or when approaching',()=>{
+test('fresh observed radar says Rain now at the point and Rain Around nearby or approaching',()=>{
  const f=make('Cloudy');
  f.current.radarPrecipitation={status:'ready',observedAt:new Date(now).toISOString(),atLocation:true,nearby:true,scanRadiusMiles:12};
- let sample=currentSample(f,now);assert.equal(sample.currentPrecipitation.label,'Rain Around');assert.equal(sample.currentPrecipitation.active,true);assert.equal(sample.condition,'Rain Around');assert.equal(sample.rainAround,true);
+ let sample=currentSample(f,now);assert.equal(sample.currentPrecipitation.label,'Rain now');assert.equal(sample.currentPrecipitation.active,true);assert.equal(sample.condition,'Rain');assert.equal(sample.rainAround,true);assert.equal(sample.pop,100);assert.match(sample.exposure.label,/rain/i);
+ const liveRainHtml=sunShadeHTML(sample.comfort,f.location,now,{compact:true,condition:sample.condition,pop:sample.pop,rainAround:sample.rainAround,radarThreat:sample.radarThreat});
+ assert.match(liveRainHtml,/data-scene="rain"/);assert.match(liveRainHtml,/exposure-label">Rain</);assert.match(liveRainHtml,/Raining now/);assert.doesNotMatch(liveRainHtml,/comfort-reference-scenes-hot\.webp/);
  f.current.radarPrecipitation={status:'ready',atLocation:false,close:true,nearby:true,nearestRainMiles:5};
  sample=currentSample(f,now);assert.equal(sample.currentPrecipitation.label,'Rain Around');assert.equal(sample.currentPrecipitation.active,true);assert.equal(sample.condition,'Rain Around');
  f.current.radarPrecipitation={status:'ready',atLocation:false,close:false,approaching:true,nearby:false,inArea:true,nearestRainMiles:18};

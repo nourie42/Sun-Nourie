@@ -9,6 +9,8 @@ on:
       - "src/weatherFusionDirect.js"
       - "scripts/weatherTodayTileSmoke.js"
       - "scripts/weatherTodayTileLiveSmoke.js"
+      - "scripts/weatherRainNowSmoke.js"
+      - "scripts/weatherLiveRainConsistency.js"
       - ".github/workflows/weather-today-tile-browser-smoke.yml"
   push:
     branches: [main]
@@ -18,6 +20,8 @@ on:
       - "src/weatherFusionDirect.js"
       - "scripts/weatherTodayTileSmoke.js"
       - "scripts/weatherTodayTileLiveSmoke.js"
+      - "scripts/weatherRainNowSmoke.js"
+      - "scripts/weatherLiveRainConsistency.js"
       - ".github/workflows/weather-today-tile-browser-smoke.yml"
 
 jobs:
@@ -35,6 +39,8 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Verify Today tile mobile layout and rain-change UI
         run: node scripts/weatherTodayTileSmoke.js
+      - name: Verify live-radar Rain now UI
+        run: node scripts/weatherRainNowSmoke.js
 
   live-today-tile:
     if: github.event_name == 'push'
@@ -56,7 +62,7 @@ jobs:
         run: |
           for attempt in $(seq 1 90); do
             home="$(curl -fsSL --max-time 20 "$LIVE_URL/weather-fusion/?deploy=$GITHUB_SHA&n=$attempt" 2>/dev/null || true)"
-            if printf '%s' "$home" | grep -Fq '/weather-fusion/app.js?v=weather-qa-v70' && printf '%s' "$home" | grep -Fq '/weather-fusion/forecast-cards.css?v=weather-qa-v70'; then
+            if printf '%s' "$home" | grep -Fq '/weather-fusion/app.js?v=rain-now-v71' && printf '%s' "$home" | grep -Fq '/weather-fusion/forecast-cards.css?v=weather-qa-v70'; then
               echo "Weather Today tile build is live."
               exit 0
             fi
@@ -69,3 +75,7 @@ jobs:
         env:
           WEATHER_TODAY_BASE_URL: https://sun-nourie-live.onrender.com
         run: node scripts/weatherTodayTileLiveSmoke.js
+      - name: Verify live radar and current-weather UI agree
+        env:
+          WEATHER_TODAY_BASE_URL: https://sun-nourie-live.onrender.com
+        run: node scripts/weatherLiveRainConsistency.js
