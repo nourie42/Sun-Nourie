@@ -31,3 +31,6 @@
   .home-choice{min-height:76px}
   .chat-empty{padding-top:18px}
 }
+
+.bottom-nav a{border:0;background:transparent;color:#686870;border-radius:15px;padding:9px 5px;font-size:10px;font-weight:850;text-align:center;text-decoration:none;line-height:1.35}
+.bottom-nav a:active{background:#29292f;color:#fff}
