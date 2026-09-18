@@ -803,13 +803,12 @@ export function registerAiAgentRoutes(app) {
       question: [topic, preparedAttachmentText].filter(Boolean).join("\n\n"),
       attachments: preparedAttachmentText ? [] : req.body?.attachments,
       location: req.body?.location,
-      webSearch: "auto",
+      webSearch: "off",
     });
     if (preparedAttachmentText) {
       prepared.attachmentText = preparedAttachmentText;
       prepared.attachments = preparedAttachments;
     }
-    const sharedResearch = prepared.research;
     const turns = [];
     for (let round = 1; round <= rounds; round += 1) {
       for (const bot of bots) {
@@ -821,7 +820,6 @@ export function registerAiAgentRoutes(app) {
           transcript ? `Conversation so far:\n${transcript}` : "You are the first speaker.",
           prepared.locationText ? `User location context:\n${prepared.locationText}` : "",
           prepared.attachmentText ? `Attached file context:\n${prepared.attachmentText}` : "",
-          sharedResearch.text ? `Current web research gathered automatically:\n${sharedResearch.text}` : "",
           `Now respond as ${bot.name}.`,
         ].filter(Boolean).join("\n\n");
         try {
@@ -830,7 +828,17 @@ export function registerAiAgentRoutes(app) {
             bot.tools.webSearch ? "Live internet search is enabled for this bot. Use the server-side web search tool when current information would help. Never claim you lack internet access when this tool is enabled." : "",
           ].filter(Boolean).join(" ");
           const result = await callProvider(bot.provider, prompt, botSystem, 1000, 90000, bot.tools.webSearch);
-          turns.push({ round, botId: bot.id, name: bot.name, provider: bot.provider, model: providerModel(bot.provider), ok: true, text: result.text, citations: bot.tools.webSearch ? sharedResearch.citations : [] });
+          turns.push({
+            round,
+            botId: bot.id,
+            name: bot.name,
+            provider: bot.provider,
+            model: providerModel(bot.provider),
+            ok: true,
+            text: result.text,
+            citations: result.citations || [],
+            webSearchUsed: Boolean(result.webSearchUsed),
+          });
         } catch (error) {
           turns.push({ round, botId: bot.id, name: bot.name, provider: bot.provider, model: providerModel(bot.provider), ok: false, text: "", error: cleanText(error?.message || error, 300), citations: [] });
         }
@@ -844,7 +852,18 @@ export function registerAiAgentRoutes(app) {
         summary = result.text;
       } catch {}
     }
-    res.json({ ok: turns.some((t) => t.ok), topic, mode, rounds, turns, summary, citations: sharedResearch.citations, attachments: prepared.attachments, location: prepared.location, webSearchUsed: prepared.webSearchUsed });
+    res.json({
+      ok: turns.some((t) => t.ok),
+      topic,
+      mode,
+      rounds,
+      turns,
+      summary,
+      citations: [...new Set(turns.flatMap((t) => t.citations || []))].slice(0, 12),
+      attachments: prepared.attachments,
+      location: prepared.location,
+      webSearchUsed: turns.some((t) => t.webSearchUsed),
+    });
   });
 
   // Friendly UI routes are registered before the legacy Council routes.
