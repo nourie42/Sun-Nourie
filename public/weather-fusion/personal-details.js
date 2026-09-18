@@ -1,7 +1,7 @@
 import {weatherState} from './weather-state.js';
 import {thermalRiskHTML} from './thermal-risk.js?v=weather-art-labels-v10';
 import {forecastGrossLevel} from './dewpoint-meter.js?v=weather-qa-v67';
-import {exposureScene} from './exposure-scene.js?v=weather-qa-v67';
+import {exposureScene} from './exposure-scene.js?v=rain-now-v71';
 import {outdoorExposure} from './outdoor-feels.js?v=weather-qa-v67';
 import {solarElevation} from './weather-math.js?v=weather-qa-v67';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
