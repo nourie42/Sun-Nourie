@@ -57,5 +57,5 @@ test('week ahead is truly multi-day and says which day each forecast belongs to'
   for(const day of ['Friday','Saturday','Sunday','Monday','Tuesday','Wednesday']) {
     assert.ok(lines.some(line=>line.startsWith(`${day}:`)),`missing named ${day} forecast`);
   }
-  assert.match(details.extended,/Sunday:.*Rain chance: 30%.*Sunday 3 PM to Sunday 6 PM/s);
+  assert.match(details.extended,/Sunday:.*Rain chance: 30%.*Best window: 3 PM to 6 PM/s);
 });
