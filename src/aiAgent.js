@@ -599,6 +599,13 @@ function normalizeBot(raw, index) {
 export function registerAiAgentRoutes(app) {
   const json = express.json({ limit: "20mb" });
   const accessCode = cleanText(process.env.AI_COUNCIL_ACCESS_CODE, 200);
+  const hotRoomJobs = new Map();
+  const HOT_ROOM_JOB_TTL_MS = 30 * 60 * 1000;
+  const hotRoomJobId = () => `room-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+  const pruneHotRoomJobs = () => {
+    const cutoff = Date.now() - HOT_ROOM_JOB_TTL_MS;
+    for (const [id, job] of hotRoomJobs) if ((job.updatedAt || job.createdAt) < cutoff) hotRoomJobs.delete(id);
+  };
 
   app.post("/api/ai-agent/location", express.json({ limit: "8kb" }), async (req, res) => {
     res.setHeader("Cache-Control", "no-store");
@@ -764,9 +771,159 @@ export function registerAiAgentRoutes(app) {
     return res.status(502).json({ ok: false, error: `The AI could not answer. ${cleanText(lastError?.message || lastError, 320)}` });
   });
 
+  async function runHotRoomJob(job, input) {
+    const { topic, bots, rounds, mode, preparedAttachmentText, preparedAttachments, attachments, location } = input;
+    try {
+      job.status = "running";
+      job.updatedAt = Date.now();
+      job.progress = { phase: "preparing", round: 0, rounds, completedTurns: 0, totalTurns: bots.length * rounds, message: "Preparing the Hot Room…" };
+
+      const prepared = await prepareAiContext({
+        question: [topic, preparedAttachmentText].filter(Boolean).join("\n\n"),
+        attachments: preparedAttachmentText ? [] : attachments,
+        location,
+        webSearch: "off",
+      });
+      if (preparedAttachmentText) {
+        prepared.attachmentText = preparedAttachmentText;
+        prepared.attachments = preparedAttachments;
+      }
+
+      const turns = [];
+      for (let round = 1; round <= rounds; round += 1) {
+        const priorTranscript = turns.slice(-18).filter((t) => t.ok).map((t) => `${t.name}: ${t.text}`).join("\n\n");
+        job.progress = {
+          phase: "round",
+          round,
+          rounds,
+          completedTurns: turns.length,
+          totalTurns: bots.length * rounds,
+          message: `Round ${round} of ${rounds} · asking ${bots.length} bots…`,
+        };
+        job.updatedAt = Date.now();
+
+        const roundTurns = await Promise.all(bots.map(async (bot) => {
+          const system = personaSystem(bot, bot.name) + ` This is a ${mode} with other bots. Build on useful ideas and disagree clearly when needed.`;
+          const prompt = [
+            `Team task: ${topic}`,
+            `Round ${round} of ${rounds}`,
+            priorTranscript ? `Earlier rounds:\n${priorTranscript}` : "This is the first round. Give your own best answer.",
+            prepared.locationText ? `User location context:\n${prepared.locationText}` : "",
+            prepared.attachmentText ? `Attached file context:\n${prepared.attachmentText}` : "",
+            `Now respond as ${bot.name}.`,
+          ].filter(Boolean).join("\n\n");
+          const startedAt = Date.now();
+          try {
+            const botSystem = [
+              system,
+              bot.tools.webSearch ? "Live internet search is enabled for this bot. Use the server-side web search tool when current information would help. Never claim you lack internet access when this tool is enabled." : "",
+            ].filter(Boolean).join(" ");
+            const result = await callProvider(bot.provider, prompt, botSystem, 1000, 90000, bot.tools.webSearch);
+            return {
+              round,
+              botId: bot.id,
+              name: bot.name,
+              provider: bot.provider,
+              model: providerModel(bot.provider),
+              ok: true,
+              text: result.text,
+              citations: result.citations || [],
+              webSearchUsed: Boolean(result.webSearchUsed),
+              latencyMs: Date.now() - startedAt,
+            };
+          } catch (error) {
+            return {
+              round,
+              botId: bot.id,
+              name: bot.name,
+              provider: bot.provider,
+              model: providerModel(bot.provider),
+              ok: false,
+              text: "",
+              error: cleanText(error?.message || error, 300),
+              citations: [],
+              webSearchUsed: false,
+              latencyMs: Date.now() - startedAt,
+            };
+          }
+        }));
+
+        turns.push(...roundTurns);
+        job.progress = {
+          phase: "round",
+          round,
+          rounds,
+          completedTurns: turns.length,
+          totalTurns: bots.length * rounds,
+          message: `Round ${round} of ${rounds} finished · ${turns.length} of ${bots.length * rounds} bot turns complete.`,
+        };
+        job.updatedAt = Date.now();
+      }
+
+      let summary = "";
+      const successful = turns.filter((t) => t.ok);
+      if (successful.length) {
+        const chairId = [...new Set(successful.map((t) => t.provider))].find((id) => providerAllowedByHealth(id)) || successful[0].provider;
+        job.progress = {
+          phase: "summary",
+          round: rounds,
+          rounds,
+          completedTurns: turns.length,
+          totalTurns: bots.length * rounds,
+          message: "Bots finished · building the team answer…",
+        };
+        job.updatedAt = Date.now();
+        try {
+          const result = await callProvider(
+            chairId,
+            `Task: ${topic}\n\nTeam transcript:\n${successful.map((t) => `${t.name}: ${t.text}`).join("\n\n")}`,
+            "Summarize the team's strongest answer, important disagreements, and next steps. Be concise and practical.",
+            1100,
+            60000,
+            false,
+          );
+          summary = result.text;
+        } catch (error) {
+          console.warn("Hot Room summary failed:", cleanText(error?.message || error, 300));
+        }
+      }
+
+      job.result = {
+        ok: turns.some((t) => t.ok),
+        topic,
+        mode,
+        rounds,
+        turns,
+        summary,
+        citations: [...new Set(turns.flatMap((t) => t.citations || []))].slice(0, 12),
+        attachments: prepared.attachments,
+        location: prepared.location,
+        webSearchUsed: turns.some((t) => t.webSearchUsed),
+      };
+      job.status = "complete";
+      job.progress = {
+        phase: "complete",
+        round: rounds,
+        rounds,
+        completedTurns: turns.length,
+        totalTurns: bots.length * rounds,
+        message: "Hot Room finished.",
+      };
+      job.updatedAt = Date.now();
+    } catch (error) {
+      job.status = "failed";
+      job.error = cleanText(error?.message || error, 500) || "Hot Room failed.";
+      job.progress = { ...(job.progress || {}), phase: "failed", message: job.error };
+      job.updatedAt = Date.now();
+      console.error("Hot Room background job failed:", error?.message || error);
+    }
+  }
+
   app.post("/api/ai-agent/bots/run", json, async (req, res) => {
     res.setHeader("Cache-Control", "no-store");
     if (!requireAccess(req, res, accessCode)) return;
+    pruneHotRoomJobs();
+
     const topic = cleanText(req.body?.topic, 6000);
     if (!topic) return res.status(400).json({ ok: false, error: "Tell the bots what to work on." });
     const bots = (Array.isArray(req.body?.bots) ? req.body.bots : []).slice(0, 6).map(normalizeBot).filter(Boolean);
@@ -799,72 +956,58 @@ export function registerAiAgentRoutes(app) {
           size: Math.max(0, Number(item?.size || 0)),
         }))
       : [];
-    const prepared = await prepareAiContext({
-      question: [topic, preparedAttachmentText].filter(Boolean).join("\n\n"),
+
+    const id = hotRoomJobId();
+    const job = {
+      id,
+      status: "queued",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      progress: { phase: "queued", round: 0, rounds, completedTurns: 0, totalTurns: bots.length * rounds, message: "Hot Room queued…" },
+      result: null,
+      error: "",
+    };
+    hotRoomJobs.set(id, job);
+
+    const input = {
+      topic,
+      bots,
+      rounds,
+      mode,
+      preparedAttachmentText,
+      preparedAttachments,
       attachments: preparedAttachmentText ? [] : req.body?.attachments,
       location: req.body?.location,
-      webSearch: "off",
-    });
-    if (preparedAttachmentText) {
-      prepared.attachmentText = preparedAttachmentText;
-      prepared.attachments = preparedAttachments;
-    }
-    const turns = [];
-    for (let round = 1; round <= rounds; round += 1) {
-      for (const bot of bots) {
-        const transcript = turns.slice(-12).map((t) => `${t.name}: ${t.text}`).join("\n\n");
-        const system = personaSystem(bot, bot.name) + ` This is a ${mode} with other bots. Build on useful ideas and disagree clearly when needed.`;
-        const prompt = [
-          `Team task: ${topic}`,
-          `Round ${round} of ${rounds}`,
-          transcript ? `Conversation so far:\n${transcript}` : "You are the first speaker.",
-          prepared.locationText ? `User location context:\n${prepared.locationText}` : "",
-          prepared.attachmentText ? `Attached file context:\n${prepared.attachmentText}` : "",
-          `Now respond as ${bot.name}.`,
-        ].filter(Boolean).join("\n\n");
-        try {
-          const botSystem = [
-            system,
-            bot.tools.webSearch ? "Live internet search is enabled for this bot. Use the server-side web search tool when current information would help. Never claim you lack internet access when this tool is enabled." : "",
-          ].filter(Boolean).join(" ");
-          const result = await callProvider(bot.provider, prompt, botSystem, 1000, 90000, bot.tools.webSearch);
-          turns.push({
-            round,
-            botId: bot.id,
-            name: bot.name,
-            provider: bot.provider,
-            model: providerModel(bot.provider),
-            ok: true,
-            text: result.text,
-            citations: result.citations || [],
-            webSearchUsed: Boolean(result.webSearchUsed),
-          });
-        } catch (error) {
-          turns.push({ round, botId: bot.id, name: bot.name, provider: bot.provider, model: providerModel(bot.provider), ok: false, text: "", error: cleanText(error?.message || error, 300), citations: [] });
-        }
-      }
-    }
-    let summary = "";
-    const chair = PROVIDERS.find((p) => providerKey(p.id));
-    if (chair && turns.some((t) => t.ok)) {
-      try {
-        const result = await callProvider(chair.id, `Task: ${topic}\n\nTeam transcript:\n${turns.filter((t) => t.ok).map((t) => `${t.name}: ${t.text}`).join("\n\n")}`, "Summarize the team's strongest answer, important disagreements, and next steps. Be concise and practical.", 1100, 90000, false);
-        summary = result.text;
-      } catch {}
-    }
-    res.json({
-      ok: turns.some((t) => t.ok),
-      topic,
-      mode,
-      rounds,
-      turns,
-      summary,
-      citations: [...new Set(turns.flatMap((t) => t.citations || []))].slice(0, 12),
-      attachments: prepared.attachments,
-      location: prepared.location,
-      webSearchUsed: turns.some((t) => t.webSearchUsed),
+    };
+    void runHotRoomJob(job, input);
+
+    return res.status(202).json({
+      ok: true,
+      accepted: true,
+      jobId: id,
+      status: job.status,
+      progress: job.progress,
+      pollUrl: `/api/ai-agent/bots/run/${encodeURIComponent(id)}`,
     });
   });
+
+  app.get("/api/ai-agent/bots/run/:jobId", (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    if (!requireAccess(req, res, accessCode)) return;
+    pruneHotRoomJobs();
+    const id = cleanText(req.params?.jobId, 120);
+    const job = hotRoomJobs.get(id);
+    if (!job) return res.status(404).json({ ok: false, error: "That Hot Room session is no longer available. Start it again." });
+    return res.json({
+      ok: true,
+      jobId: job.id,
+      status: job.status,
+      progress: job.progress,
+      result: job.status === "complete" ? job.result : null,
+      error: job.status === "failed" ? job.error : "",
+    });
+  });
+
 
   // Friendly UI routes are registered before the legacy Council routes.
   app.get(["/ai-council", "/ai-council/"], (_req, res) => res.sendFile(path.join(publicDir, "index.html")));
