@@ -143,8 +143,7 @@ function grossMeterFact(forecast, targetIndex, window, now = Date.now()) {
     if(finite(forecast.current?.dewpoint)){
       peak={time:forecast.current.time||new Date(now).toISOString(),value:forecast.current.dewpoint,current:true};
     }else{
-      peak=dewpoints.filter(point=>finite(Date.parse(point.time))&&finite(point.value))
-        .sort((a,b)=>Math.abs(Date.parse(a.time)-now)-Math.abs(Date.parse(b.time)-now))[0]||null;
+      peak=dewpoints.find(point=>{const start=Date.parse(point.time);return finite(start)&&start<=now&&now<start+HOUR&&finite(point.value);})||null;
     }
   }
   if(!peak)return {title:'Unavailable',detail:'Gross Meter'};
