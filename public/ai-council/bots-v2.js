@@ -296,6 +296,48 @@
     return { text: texts.join('\n\n'), meta };
   }
 
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  function hotRoomProgressText(progress = {}) {
+    if (progress.message) return progress.message;
+    if (progress.phase === 'summary') return 'Bots finished · building the team answer…';
+    if (progress.phase === 'round') return `Round ${progress.round || 1} of ${progress.rounds || 1} · ${progress.completedTurns || 0} of ${progress.totalTurns || 0} bot turns complete…`;
+    return 'The bots are working together…';
+  }
+
+  async function waitForHotRoom(jobId) {
+    const deadline = Date.now() + 12 * 60 * 1000;
+    let connectionFailures = 0;
+    while (Date.now() < deadline) {
+      await sleep(1200);
+      let response;
+      try {
+        response = await fetch(`/api/ai-agent/bots/run/${encodeURIComponent(jobId)}`, {
+          method: 'GET',
+          headers: { 'x-ai-council-code': code() },
+          cache: 'no-store',
+        });
+      } catch {
+        connectionFailures += 1;
+        notice(els.roomNotice, `Reconnecting to the Hot Room… (${connectionFailures})`);
+        if (connectionFailures >= 8) throw new Error('The page could not reconnect to the Hot Room. The bots may still be finishing in the background. Wait a moment, then try again.');
+        continue;
+      }
+
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.ok) throw new Error(payload.error || `Hot Room status check failed (${response.status}).`);
+      connectionFailures = 0;
+      notice(els.roomNotice, hotRoomProgressText(payload.progress));
+
+      if (payload.status === 'complete') {
+        if (!payload.result?.ok) throw new Error(payload.result?.error || 'The Hot Room finished without a usable answer.');
+        return payload.result;
+      }
+      if (payload.status === 'failed') throw new Error(payload.error || payload.progress?.message || 'Hot Room failed.');
+    }
+    throw new Error('The Hot Room is taking longer than 12 minutes. Your topic and files are still here; try again in a moment.');
+  }
+
   async function runRoom() {
     const chosen = bots.filter((b) => selected.has(b.id)).slice(0, 6);
     const topic = els.roomTopic.value.trim();
@@ -324,8 +366,13 @@
         headers: { 'Content-Type':'application/json', 'x-ai-council-code': code() },
         body: JSON.stringify({ topic: topic || 'Review the attached file(s).', bots: chosen, mode: els.roomMode.value, rounds: Number(els.roomRounds.value), preparedAttachmentText: preparedFiles.text, preparedAttachments: preparedFiles.meta, location }),
       });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data.ok) throw new Error(data.error || 'Hot Room failed.');
+      const start = await response.json().catch(() => ({}));
+      if (!response.ok || !start.ok) throw new Error(start.error || 'Hot Room failed.');
+      let data = start;
+      if (response.status === 202 && start.jobId) {
+        notice(els.roomNotice, hotRoomProgressText(start.progress));
+        data = await waitForHotRoom(start.jobId);
+      }
       if (data.summary) {
         const card = document.createElement('div'); card.className = 'room-turn'; card.innerHTML = '<strong>Team Answer</strong>';
         const p = document.createElement('p'); p.textContent = data.summary; card.append(p); els.roomResults.append(card);
@@ -344,7 +391,7 @@
     } catch (error) {
       const raw = error?.message || String(error);
       const message = raw === 'Failed to fetch'
-        ? 'The connection to the AI service closed before the Hot Room finished. Your files are still attached. Try again; if it repeats, attach the files one at a time.'
+        ? 'The connection dropped while starting the Hot Room. Your topic and files are still here. Check your connection and tap Start Hot Room again.'
         : raw;
       notice(els.roomNotice, message, 'error');
     } finally { els.runRoomBtn.disabled = false; }
