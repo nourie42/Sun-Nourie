@@ -315,7 +315,7 @@ test('Gross Meter falls back to current dew point after the daytime wash window 
   forecast.current={type:'guidance',condition:'Cloudy',time:new Date(now).toISOString(),dewpoint:70,wind:4};
   forecast.metricForecasts.series.dewpoint=[{time:'2026-09-12T20:00:00Z',value:68}];
   const summary=carWashSummary(forecast,now);
-  assert.deepEqual(summary.facts.gross,{title:'70° · GROSS',detail:'Gross Meter now',value:70,level:'gross'});
-  assert.match(carWashHTML(summary),/70° · GROSS/);
+  assert.deepEqual(summary.facts.gross,{title:'70° · NO-GO',detail:'Gross Meter now',value:70,level:'nogo'});
+  assert.match(carWashHTML(summary),/70° · NO-GO/);
   assert.doesNotMatch(carWashHTML(summary),/Unavailable<\/b><small>Gross Meter/);
 });
