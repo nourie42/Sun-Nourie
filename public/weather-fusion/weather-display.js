@@ -66,7 +66,7 @@ export function currentSample(forecast, now = Date.now()) {
   comfort.inputEvidence.estimatedFields=current.comfortEstimatedFields;
   comfort.inputEvidence.fallbackSources=current.comfortInputSources;
   const currentHour=forecast?.hours?.find(h=>Date.parse(h.time)<=now&&now<Date.parse(h.time)+3600000);
-  const kind=weatherState(current.condition).kind,stationCondition=current.type==='observation'&&!/forecast/i.test(current.conditionSource||'')&&kind!=='unknown';
+  const kind=weatherState(current.condition).kind,stationCondition=(current.type==='observation'||(/observation/i.test(current.conditionSource||'')&&!/forecast \(sky only\)/i.test(current.conditionSource||'')))&&kind!=='unknown';
   const activePrecipitation=stationCondition&&['rain','storm','snow'].includes(kind);
   const radar=current.radarPrecipitation,radarReady=radar?.status==='ready';
   const radarHere=radarReady&&radar.atLocation===true,radarClose=radarReady&&(radar.close===true||(finite(radar.nearestRainMiles)&&radar.nearestRainMiles<=5)),radarApproaching=radarReady&&radar.approaching===true,radarThreat=radarHere||radarClose||radarApproaching,radarNearby=radarReady&&radar.nearby===true,radarArea=radarReady&&radar.inArea===true;
