@@ -8,6 +8,7 @@ on:
       - "src/aiAgent.js"
       - "src/aiCouncil.js"
       - "scripts/aiChatButtonBrowserSmoke.mjs"
+      - "scripts/hotRoomBrowserSmoke.mjs"
       - ".github/workflows/ai-chat-button-browser-smoke.yml"
   push:
     branches: [main]
@@ -16,6 +17,7 @@ on:
       - "src/aiAgent.js"
       - "src/aiCouncil.js"
       - "scripts/aiChatButtonBrowserSmoke.mjs"
+      - "scripts/hotRoomBrowserSmoke.mjs"
       - ".github/workflows/ai-chat-button-browser-smoke.yml"
   workflow_dispatch:
 
@@ -48,6 +50,10 @@ jobs:
         env:
           AI_CHAT_BASE_URL: http://127.0.0.1:3211
         run: node scripts/aiChatButtonBrowserSmoke.mjs
+      - name: Run Hot Room through background polling on Android layout
+        env:
+          AI_CHAT_BASE_URL: http://127.0.0.1:3211
+        run: node scripts/hotRoomBrowserSmoke.mjs
       - name: Show local server log on failure
         if: failure()
         run: cat /tmp/ai-chat-server.log || true
@@ -73,8 +79,11 @@ jobs:
         run: |
           for attempt in $(seq 1 90); do
             home="$(curl -fsSL --max-time 20 "$LIVE_URL/ai-council/?deploy=$GITHUB_SHA&n=$attempt" 2>/dev/null || true)"
-            if printf '%s' "$home" | grep -Fq '/ai-council/ai-context-v1.js?v=2' && printf '%s' "$home" | grep -Fq '/ai-council/main-chat-v2.js?v=6'; then
-              echo "Fixed AI Chat assets are live."
+            bots="$(curl -fsSL --max-time 20 "$LIVE_URL/ai-council/bots/?deploy=$GITHUB_SHA&n=$attempt" 2>/dev/null || true)"
+            if printf '%s' "$home" | grep -Fq '/ai-council/ai-context-v1.js?v=2' \
+              && printf '%s' "$home" | grep -Fq '/ai-council/main-chat-v2.js?v=6' \
+              && printf '%s' "$bots" | grep -Fq '/ai-council/bots-v2.js?v=5'; then
+              echo "Fixed AI Chat and Hot Room assets are live."
               exit 0
             fi
             echo "Waiting for Render deployment ($attempt/90)"
