@@ -127,18 +127,30 @@ function supportingFacts(forecast, targetIndex, window) {
   return {wind:range(winds,' mph'), temperature:range(temperatures,'°')};
 }
 
-function grossMeterFact(forecast, targetIndex, window) {
+function grossMeterFact(forecast, targetIndex, window, now = Date.now()) {
   const day=forecast.days?.[targetIndex]||{},zone=forecast.location?.timeZone||'America/New_York';
-  const points=(forecast.metricForecasts?.series?.dewpoint||[]).filter(point=>{
+  const dewpoints=forecast.metricForecasts?.series?.dewpoint||[];
+  const points=dewpoints.filter(point=>{
     const epoch=Date.parse(point.time);if(!finite(epoch)||!finite(point.value))return false;
     if(window)return epoch>=window.start&&epoch<window.end;
     return dateKey(epoch,zone)===day.date&&localHour(epoch,zone)>=7&&localHour(epoch,zone)<19;
   });
-  const peak=points.reduce((best,point)=>!best||point.value>best.value?point:best,null);
+  let peak=points.reduce((best,point)=>!best||point.value>best.value?point:best,null);
+  // After the daytime wash window closes, the card still needs a useful Gross
+  // Meter. Prefer the current observation/guidance dew point, then the nearest
+  // current forecast-hour dew point, instead of incorrectly showing Unavailable.
+  if(!peak&&targetIndex===0){
+    if(finite(forecast.current?.dewpoint)){
+      peak={time:forecast.current.time||new Date(now).toISOString(),value:forecast.current.dewpoint,current:true};
+    }else{
+      peak=dewpoints.find(point=>{const start=Date.parse(point.time);return finite(start)&&start<=now&&now<start+HOUR&&finite(point.value);})||null;
+    }
+  }
   if(!peak)return {title:'Unavailable',detail:'Gross Meter'};
-  const wind=seriesValue(forecast,'wind',peak.time),level=forecastGrossLevel(peak.value,wind);
+  const wind=peak.current&&finite(forecast.current?.wind)?forecast.current.wind:seriesValue(forecast,'wind',peak.time);
+  const level=forecastGrossLevel(peak.value,wind);
   const score={dry:'DRY',nice:'NOT BAD','nice-breeze':'NOT BAD',humid:'HUMID',gross:'GROSS',nogo:'NO-GO',nope:'NOPE'}[level.key]||'UNAVAILABLE';
-  return {title:`${Math.round(peak.value)}° · ${score}`,detail:'Gross Meter at wash time',value:peak.value,level:level.key};
+  return {title:`${Math.round(peak.value)}° · ${score}`,detail:peak.current?'Gross Meter now':'Gross Meter at wash time',value:peak.value,level:level.key};
 }
 
 export function carWashSummary(forecast, now = Date.now()) {
@@ -153,7 +165,7 @@ export function carWashSummary(forecast, now = Date.now()) {
     }
   }
   const activeKind = weatherState(forecast?.current?.condition).kind;
-  const stationPrecipitation = ['rain','storm','snow'].includes(activeKind) && forecast?.current?.type === 'observation';
+  const stationPrecipitation = ['rain','storm','snow'].includes(activeKind) && (forecast?.current?.type === 'observation' || /observation/i.test(forecast?.current?.conditionSource || ''));
   const radar=forecast?.current?.radarPrecipitation,radarPrecipitation=radar?.status === 'ready' && radar.atLocation === true;
   const radarNearby=radar?.status === 'ready' && radar.nearby === true;
   if (decisions[0] && (stationPrecipitation || radarPrecipitation || radarNearby)) decisions[0] = {...decisions[0],state:'wait',canWash:false,
@@ -178,7 +190,7 @@ export function carWashSummary(forecast, now = Date.now()) {
   // conservative and can still use the whole-day value, including overnight
   // rain after a daytime wash.
   const visibleChance = displayedPeriod?.pop ?? null;
-  facts.gross=grossMeterFact(forecast,firstWash?.index??0,window);
+  facts.gross=grossMeterFact(forecast,firstWash?.index??0,window,now);
   return {state:primary.state,canWash:primary.canWash,chance:visibleChance,reason:primary.reason,lowRainDays,decisions,window,best,facts,
     days:decisions.map((decision,index) => ({...decision,
       chance:index===0?visibleChance:decision.chance,

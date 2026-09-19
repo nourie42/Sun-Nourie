@@ -151,3 +151,21 @@ test('daytime outlook before sunrise does not draw a sun on the comfort tile',as
  assert.equal(comfortWeatherKind(f,Date.parse('2026-09-06T09:40:00Z')),'night');
  assert.equal(comfortWeatherKind(f,Date.parse('2026-09-06T16:00:00Z')),'sun');
 });
+
+
+test('fresh nearby precipitation condition survives a rejected station temperature',()=>{
+ const epoch=Math.floor(now/H)*H,row={time:epoch,temperature_2m:80,dew_point_2m:64,relative_humidity_2m:58,wind_speed_10m:6};
+ const hours=[{time:new Date(epoch).toISOString(),temperature:80,condition:'Partly Cloudy'}];
+ const observation={type:'observation',temperature:88,condition:'Light Rain',time:new Date(now-20*60000).toISOString(),station:'TEST',stationName:'Generic station',stationDistanceKm:12};
+ const current=validateCurrentConditions(observation,hours,{nbm:[row]},now);
+ assert.equal(current.type,'guidance');
+ assert.equal(current.temperature,80);
+ assert.equal(current.condition,'Light Rain');
+ assert.match(current.conditionSource,/observation/i);
+});
+
+test('public methodology states that future rain chance uses NWS directly',()=>{
+ const out=buildForecast({...testInputs,models:models()});
+ assert.match(out.methodology,/displayed rain chance uses the official NWS hourly probability directly/i);
+ assert.doesNotMatch(out.methodology,/extended policy uses NWS 15%, ECMWF 60% and NBM 25%/i);
+});

@@ -307,3 +307,15 @@ test('car-wash facts include the same Gross Meter scale used by the dew-point ca
   assert.match(html,/68° · GROSS/);
   assert.match(html,/Gross Meter at wash time/);
 });
+
+
+test('Gross Meter falls back to current dew point after the daytime wash window closes',()=>{
+  const forecast=fixture([5,5,5,5,5,5,5]);
+  const now=Date.parse('2026-09-12T19:00:00Z');
+  forecast.current={type:'guidance',condition:'Cloudy',time:new Date(now).toISOString(),dewpoint:70,wind:4};
+  forecast.metricForecasts.series.dewpoint=[{time:'2026-09-12T20:00:00Z',value:68}];
+  const summary=carWashSummary(forecast,now);
+  assert.deepEqual(summary.facts.gross,{title:'70° · NO-GO',detail:'Gross Meter now',value:70,level:'nogo'});
+  assert.match(carWashHTML(summary),/70° · NO-GO/);
+  assert.doesNotMatch(carWashHTML(summary),/Unavailable<\/b><small>Gross Meter/);
+});
