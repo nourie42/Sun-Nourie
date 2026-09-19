@@ -180,6 +180,9 @@ try {
   process.env.GEMINI_API_KEY = "fake-gemini-key";
   process.env.XAI_API_KEY = "fake-xai-key";
   const internetRequests = [];
+  let delayHotRoomXai = false;
+  let activeHotRoomXai = 0;
+  let maxActiveHotRoomXai = 0;
   globalThis.fetch = async (url, init) => {
     const target = String(url);
     if (target.startsWith(base)) return nativeFetch(url, init);
@@ -206,6 +209,12 @@ try {
       }), { status: 200, headers: { "content-type": "application/json" } });
     }
     if (target.startsWith("https://api.x.ai/v1/responses")) {
+      if (delayHotRoomXai && body.tools?.[0]?.type === "web_search") {
+        activeHotRoomXai += 1;
+        maxActiveHotRoomXai = Math.max(maxActiveHotRoomXai, activeHotRoomXai);
+        await new Promise((resolve) => setTimeout(resolve, 120));
+        activeHotRoomXai -= 1;
+      }
       return new Response(JSON.stringify({
         output: [
           { type: "web_search_call" },
@@ -280,8 +289,13 @@ try {
   );
   assert.deepEqual(mainGeminiSearch?.body?.tools, [{ google_search: {} }]);
 
-  // A bot with Internet Search enabled must pass the native search tool too.
+  // Hot Room must return immediately with a job id, keep working after that
+  // request ends, run same-round bots in parallel, and expose short polling calls.
   internetRequests.length = 0;
+  delayHotRoomXai = true;
+  activeHotRoomXai = 0;
+  maxActiveHotRoomXai = 0;
+  const hotRoomStartedAt = Date.now();
   const botRoomRes = await nativeFetch(`${base}/api/ai-agent/bots/run`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-ai-council-code": "ux-smoke-test-code" },
@@ -296,10 +310,33 @@ try {
       location: { city: "Knightdale", area: "North Carolina", country: "US", timezone: "America/New_York" },
     }),
   });
-  assert.equal(botRoomRes.status, 200);
-  const botRoom = await botRoomRes.json();
+  const hotRoomStartMs = Date.now() - hotRoomStartedAt;
+  assert.equal(botRoomRes.status, 202);
+  const startJob = await botRoomRes.json();
+  assert.equal(startJob.accepted, true);
+  assert.match(startJob.jobId, /^room-/);
+  assert.ok(hotRoomStartMs < 1000, `Hot Room start request was held open for ${hotRoomStartMs}ms`);
+
+  let botRoom = null;
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    const poll = await nativeFetch(`${base}/api/ai-agent/bots/run/${encodeURIComponent(startJob.jobId)}`, {
+      headers: { "x-ai-council-code": "ux-smoke-test-code" },
+    });
+    assert.equal(poll.status, 200);
+    const state = await poll.json();
+    assert.equal(state.ok, true);
+    if (state.status === "failed") throw new Error(state.error || "Hot Room background job failed");
+    if (state.status === "complete") {
+      botRoom = state.result;
+      break;
+    }
+  }
+  delayHotRoomXai = false;
+  assert.ok(botRoom, "Hot Room background job did not complete");
   assert.equal(botRoom.webSearchUsed, true);
   assert.ok(botRoom.turns.every((turn) => turn.webSearchUsed === true));
+  assert.ok(maxActiveHotRoomXai >= 2, "Same-round Hot Room bots were not run in parallel");
   const xaiSearchCalls = internetRequests.filter((entry) =>
     entry.target.startsWith("https://api.x.ai/v1/responses") &&
     entry.body.tools?.[0]?.type === "web_search"
