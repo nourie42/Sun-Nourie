@@ -43,7 +43,7 @@ export function validateCurrentConditions(current,hours=[],modelRows={},now=Date
  if(!close)reasons.push('the station is more than 10 miles away');
  if(!agrees)reasons.push('the station differs too much from selected-location guidance');
  const reason=`The station was not used because ${reasons.join(' and ')}.`;
- const observedWeather=fresh&&close&&/thunder|\\btstm\\b|\\bstorm|rain|shower|drizzle|snow|sleet|flurr|ice pellets|freezing rain/i.test(current.condition||'')?current.condition:null;
+ const observedWeather=fresh&&close&&/thunder|\btstm\b|\bstorm\b|rain|shower|drizzle|snow|sleet|flurr|ice pellets|freezing rain/i.test(current.condition||'')?current.condition:null;
  return {type:'guidance',temperature:round(localTemperature),condition:observedWeather||currentHour?.condition||'Current conditions estimated',conditionSource:observedWeather?'Nearby station observation (weather); selected-location guidance (measurements)':'Selected-location current-hour forecast',time:iso(epoch),
   station:null,stationName:null,stationDistanceKm:null,humidity:round(row.relative_humidity_2m),dewpoint:round(row.dew_point_2m),wind:round(row.wind_speed_10m),gust:round(row.wind_gusts_10m),windDirection:round(row.wind_direction_10m),
   visibility:round(row.visibility),pressure:round(row.pressure_msl,2),pressurePa:null,pressureTrend:{status:'unavailable',direction:'unknown'},apparent:round(row.apparent_temperature),apparentSource:`${source} selected-location estimate`,
