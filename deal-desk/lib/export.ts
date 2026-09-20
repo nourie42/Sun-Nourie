@@ -65,6 +65,9 @@ export async function exportModel(deal:Deal,review:Review|null,sites:Site[],peri
  const styles=parse(await zip.file('xl/styles.xml')!.async('string'));
  readableRows(model,styles,6,34,[43,19,19,22,60,28]);
  readableRows(evidenceSheet,styles,6,34,[38,19,19,22,45,38,60,32,22,85,50,28]);
+ // Cents-per-gallon assumptions need decimals; currency totals can stay whole dollars.
+ const xfs=styles.getElementsByTagNameNS('*','cellXfs')[0];
+ for(const key of ['fuelCpg','procurement','freight','commission']){const c=cell(model,`B${fields.findIndex(f=>f.key===key)+6}`);const xf=xfs.children[Number(c.getAttribute('s')||0)].cloneNode(true) as Element;xf.setAttribute('numFmtId','2');xf.setAttribute('applyNumberFormat','1');c.setAttribute('s',String(xfs.children.length));xfs.appendChild(xf);}xfs.setAttribute('count',String(xfs.children.length));
  docs.forEach((doc,i)=>zip.file(`xl/worksheets/sheet${i+1}.xml`,serialize(doc)));zip.file('xl/styles.xml',serialize(styles));await calculationMode(zip);
  return zip.generateAsync({type:'blob',compression:'DEFLATE',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
 }
