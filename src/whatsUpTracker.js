@@ -153,6 +153,12 @@ export function formatWindowLabel(start, end, zone) {
   return `${formatClock(start, zone)}–${formatClock(end, zone)}`;
 }
 
+export function rangeText(min, max, suffix = '') {
+  if (!finite(min) && !finite(max)) return '';
+  if (!finite(max) || min === max) return `${finite(min) ? min : max}${suffix}`;
+  return `${min}–${max}${suffix}`;
+}
+
 export function groupRuns(items, predicate) {
   const runs = [];
   let current = [];
@@ -167,6 +173,34 @@ export function groupRuns(items, predicate) {
   return runs;
 }
 
+function rangeOf(hours, key) {
+  const values = hours.map((hour) => hour[key]).filter(finite);
+  if (!values.length) return { min: null, max: null };
+  return { min: Math.round(Math.min(...values)), max: Math.round(Math.max(...values)) };
+}
+
+export function windowWeather(hours = []) {
+  const temperature = rangeOf(hours, 'temperature');
+  const dewpoint = rangeOf(hours, 'dewpoint');
+  const wind = rangeOf(hours, 'windMph');
+  const rain = rangeOf(hours, 'rainChance');
+  const mid = hours[Math.floor(hours.length / 2)] || hours[0] || {};
+  return {
+    temperatureMin: temperature.min,
+    temperatureMax: temperature.max,
+    dewpointMin: dewpoint.min,
+    dewpointMax: dewpoint.max,
+    windMin: wind.min,
+    windMax: wind.max,
+    rainMin: rain.min,
+    rainMax: rain.max,
+    rainPeak: rain.max,
+    condition: mid.condition || mid.sky || '',
+    sky: mid.sky?.label || mid.sky || '',
+    isDay: hours.some((hour) => hour.isDay),
+  };
+}
+
 function windowFromHours(hours, zone, extra = {}) {
   const start = Date.parse(hours[0].time);
   const last = hours[hours.length - 1];
@@ -176,6 +210,7 @@ function windowFromHours(hours, zone, extra = {}) {
     end: new Date(end).toISOString(),
     label: formatWindowLabel(start, end, zone),
     hourCount: hours.length,
+    ...windowWeather(hours),
     ...extra,
   };
 }
@@ -223,7 +258,6 @@ function summarizeDayHours(hours, zone) {
   const temps = hours.map((hour) => hour.temperature).filter(finite);
   const perfectWindows = groupRuns(hours, (hour) => hour.perfect).map((run) => windowFromHours(run, zone, {
     kind: 'perfect',
-    rule: run.some((hour) => hour.perfect === 'B') && run.some((hour) => hour.perfect === 'A') ? 'A+B' : run[0].perfect,
     hours: run.map((hour) => hour.label),
   }));
   const stormWindows = groupRuns(hours, (hour) => hour.storm).map((run) => windowFromHours(run, zone, {
@@ -303,6 +337,10 @@ export function buildTrackerView({
           kind: 'storm',
           level,
           peakChance: chance,
+          rainPeak: chance,
+          rainMin: chance,
+          rainMax: chance,
+          condition: String(period.shortForecast || '').trim(),
           hours: [],
           source: 'NWS period forecast',
         });
@@ -330,7 +368,8 @@ export function buildTrackerView({
         sky: hour.sky.label,
         rainChance: hour.rainChance,
         rainSource: hour.rainSource,
-        perfect: hour.perfect,
+        isDay: hour.isDay,
+        perfect: Boolean(hour.perfect),
         storm: hour.storm,
       })),
     });
@@ -341,7 +380,6 @@ export function buildTrackerView({
   const nextStormRun = groupRuns(upcomingHours, (hour) => hour.storm)[0] || null;
   const nextPerfect = nextPerfectRun ? windowFromHours(nextPerfectRun, zone, {
     kind: 'perfect',
-    rule: nextPerfectRun[0].perfect,
     dayLabel: weekdayLabel(Date.parse(nextPerfectRun[0].time), zone, today),
   }) : null;
   const nextStorm = nextStormRun ? windowFromHours(nextStormRun, zone, {
@@ -353,16 +391,17 @@ export function buildTrackerView({
 
   const nwsReady = classified.length > 0 || periodForecasts.length > 0;
   const headline = nextPerfect
-    ? `Next perfect window: ${nextPerfect.dayLabel} ${nextPerfect.label}`
+    ? `Pleasant stretch ${nextPerfect.dayLabel} ${nextPerfect.label}`
     : nextStorm
-      ? `No perfect window yet · next storm ${nextStorm.dayLabel} ${nextStorm.label}`
+      ? `Next stormy stretch ${nextStorm.dayLabel} ${nextStorm.label}`
       : nwsReady
-        ? 'No qualifying perfect or storm-level hours in the hourly forecast'
+        ? 'No standout pleasant or stormy stretch in the hourly forecast'
         : 'Forecast is not available';
-  const detail = [
-    nextPerfect ? `Perfect hours use Rule ${nextPerfect.rule}.` : 'No upcoming hour currently meets the perfect-weather tests.',
-    nextStorm ? `Next storm window is ${nextStorm.level === 'definite' ? 'definitely stormy' : 'elevated'} at ${nextStorm.peakChance}% rain chance.` : 'No hour currently reaches a 75% storm-level rain chance.',
-  ].join(' ');
+  const detail = nextPerfect
+    ? [rangeText(nextPerfect.temperatureMin, nextPerfect.temperatureMax, '°'), nextPerfect.condition].filter(Boolean).join(' · ')
+    : nextStorm
+      ? `${nextStorm.rainPeak ?? nextStorm.peakChance}% rain chance · ${nextStorm.condition || 'wet weather'}`
+      : '';
 
   return {
     version: TRACKER_VERSION,
@@ -389,7 +428,6 @@ export function buildTrackerView({
     },
     summary: { headline, detail, nextPerfect, nextStorm },
     days,
-    assumptions: ASSUMPTIONS,
     sources: [
       { id: 'geocode', label: place.source || 'ZIP geocoder', status: 'ready' },
       { id: 'nws', label: 'NWS points / hourly / period forecast', status: nwsReady ? 'ready' : 'unavailable' },

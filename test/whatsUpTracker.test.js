@@ -118,8 +118,16 @@ test('tracker view names perfect and storm windows from hourly NWS periods', () 
   assert.equal(view.days.length, 1);
   assert.equal(view.days[0].perfectWindows.length, 1);
   assert.match(view.days[0].perfectWindows[0].label, /2pm–4pm/);
+  assert.equal(view.days[0].perfectWindows[0].temperatureMin, 72);
+  assert.equal(view.days[0].perfectWindows[0].temperatureMax, 73);
+  assert.equal(view.days[0].perfectWindows[0].dewpointMin, 54);
+  assert.equal(view.days[0].perfectWindows[0].windMax, 5);
   assert.equal(view.days[0].stormWindows[0].level, 'elevated');
-  assert.match(view.summary.headline, /perfect window/i);
+  assert.equal(view.days[0].stormWindows[0].rainPeak, 80);
+  assert.match(view.summary.headline, /pleasant stretch/i);
+  assert.doesNotMatch(view.summary.headline, /rule/i);
+  assert.doesNotMatch(JSON.stringify(view), /Rule A|Rule B|Executive Summary/i);
+  assert.equal(view.assumptions, undefined);
   assert.equal(view.status.nws, 'ready');
 });
 
@@ -184,7 +192,8 @@ test('API validates ZIP and returns classified hours from NWS + fusion', async (
     assert.equal(body.place.office, 'RAH');
     assert.equal(body.place.geocodeSource, 'U.S. Census TIGERweb ZCTA');
     assert.equal(body.status.rainFusion, 'ready');
-    assert.equal(body.days[0].hours[0].perfect, 'A');
+    assert.equal(body.days[0].hours[0].perfect, true);
+    assert.equal(body.days[0].hours[0].temperature, 72);
     assert.equal(body.days[0].hours[0].rainChance, 12);
   } finally {
     await new Promise((resolve) => server.close(resolve));

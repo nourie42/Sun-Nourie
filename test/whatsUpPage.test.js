@@ -25,6 +25,13 @@ const client = read("public/whats-up/tracker.js");
 assert.match(client, /localStorage/);
 assert.match(client, /\/api\/whats-up\/tracker/);
 assert.match(client, /whats-up-zip/);
+assert.match(client, /AT A GLANCE/);
+assert.match(client, /Dewpoint/);
+assert.match(client, /<svg/);
+assert.doesNotMatch(client, /EXECUTIVE SUMMARY/);
+assert.doesNotMatch(client, /Rule A|Rule B/);
+assert.doesNotMatch(client, /How hours are classified/);
+assert.doesNotMatch(client, /dewpoint must all qualify/);
 
 const home = read("public/index.html");
 assert.match(home, /Sunoco, LP Fuel IQ/);
