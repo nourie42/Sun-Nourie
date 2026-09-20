@@ -17,35 +17,49 @@ import type {SourceFile,Review,Site} from '@/lib/types';
 export default function Home(){
  const [deal,setDeal]=useState<Deal>(emptyDeal()),[tab,setTab]=useState('intake'),[files,setFiles]=useState<SourceFile[]>([]),[notes,setNotes]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[ai,setAi]=useState('Checking AI connection…'),[readyAI,setReadyAI]=useState(false),[review,setReview]=useState<Review|null>(null);
  const [passcode,setPasscode]=useState(''),[accessRequired,setAccessRequired]=useState(false),[period,setPeriod]=useState(''),[company,setCompany]=useState(''),[hint,setHint]=useState('');
+ const [actionMode,setActionMode]=useState<'analyze'|'research'|null>(null),[lastAction,setLastAction]=useState<'analyze'|'research'|null>(null);
  const [siteRecords,setSiteRecords]=useState<Site[]>([]),[complete,setComplete]=useState(false),[sitePage,setSitePage]=useState(0);
  const [original,setOriginal]=useState<File|null>(null),[originalInfo,setOriginalInfo]=useState<SourceFile|null>(null),[mappings,setMappings]=useState<CellMapping[]>([]);
  const [previousDraft,setPreviousDraft]=useState<any>(null);
- const uploadRef=useRef<HTMLInputElement>(null),modelRef=useRef<HTMLInputElement>(null),draftRef=useRef<HTMLInputElement>(null);
+ const uploadRef=useRef<HTMLInputElement>(null),modelRef=useRef<HTMLInputElement>(null),draftRef=useRef<HTMLInputElement>(null),passcodeRef=useRef<HTMLInputElement>(null);
  const r=useMemo(()=>calculate(deal),[deal]),sites=useMemo(()=>mergeSites([siteRecords]),[siteRecords]);
- useEffect(()=>{fetch('/api/deal-desk/status').then(x=>x.json()).then(x=>{setReadyAI(!!x.ready);setAccessRequired(!!x.passcodeRequired);setAi(x.ready?'AI configured · ready to analyze':x.message||'AI connection needed');}).catch(()=>setAi('AI connection unavailable'));},[]);
+ useEffect(()=>{
+  try{setPasscode(sessionStorage.getItem('deal-desk-access')||sessionStorage.getItem('ai-council-access')||'');}catch{}
+  fetch('/api/deal-desk/status').then(x=>x.json()).then(x=>{setReadyAI(!!x.ready);setAccessRequired(!!x.passcodeRequired);setAi(x.ready?'AI configured · ready to analyze':x.message||'AI connection needed');}).catch(()=>setAi('AI connection unavailable'));
+ },[]);
  const headers=()=>({'Content-Type':'application/json','x-deal-desk-passcode':passcode});
+ function updatePasscode(value:string){setPasscode(value);try{sessionStorage.setItem('deal-desk-access',value);sessionStorage.setItem('ai-council-access',value);}catch{}}
+ function requireAccess(prefix=''){if(accessRequired&&!passcode.trim()){setMessage((prefix?prefix+' ':'')+'Enter your workspace access code once. Then the uploaded files or company search will run automatically.');passcodeRef.current?.focus();return true;}return false;}
  function update(key:string,value:any){setDeal(d=>({...d,[key]:value}));if(key==='name')setReview(null);}
  async function upload(list:FileList|null){
-  if(!list||busy)return;setBusy(true);const accepted:SourceFile[]=[],errors:string[]=[];
+  if(!list||busy)return;setBusy(true);setActionMode('analyze');setLastAction('analyze');setMessage('Reading every uploaded file…');const accepted:SourceFile[]=[],errors:string[]=[];
   for(const file of Array.from(list)){try{if(files.length+accepted.length>=20)throw Error('Use at most 20 files per packet.');const s=await readSourceFile(file);accepted.push(s);}catch(e:any){errors.push(file.name+': '+e.message);}}
-  setFiles(old=>[...old,...accepted]);setSiteRecords(old=>[...old,...accepted.flatMap(f=>f.sites||[])]);setComplete(false);
-  setMessage(accepted.length+' file(s) read. '+accepted.reduce((n,s)=>n+(s.sites?.length||0),0)+' site rows retained. '+errors.join(' '));setBusy(false);if(uploadRef.current)uploadRef.current.value='';
+  const nextFiles=[...files,...accepted];setFiles(nextFiles);setSiteRecords(old=>[...old,...accepted.flatMap(f=>f.sites||[])]);setComplete(false);
+  if(uploadRef.current)uploadRef.current.value='';
+  if(!accepted.length){setMessage(errors.join(' ')||'No readable files were selected.');setBusy(false);setActionMode(null);return;}
+  const readMessage=accepted.length+' file(s) read. '+accepted.reduce((n,s)=>n+(s.sites?.length||0),0)+' site rows retained.'+(errors.length?' '+errors.join(' '):'');
+  setMessage(readMessage);
+  setBusy(false);setActionMode(null);
+  if(requireAccess(readMessage))return;
+  if(!readyAI){setMessage('The AI connection is not ready. Your files are retained so you can run them when the connection is restored.');return;}
+  await run('analyze',nextFiles);
  }
- async function run(mode:'analyze'|'research'){
-  setBusy(true);setMessage(mode==='research'?'Starting company search…':'Starting document analysis…');
+ async function run(mode:'analyze'|'research',sourceFiles=files){
+  if(busy||requireAccess())return;
+  setBusy(true);setActionMode(mode);setLastAction(mode);setMessage(mode==='research'?`Searching for ${company.trim()} and building the acquisition screen…`:'Reading the files and filling the acquisition screen…');
   try{
    validateImport(deal);
-   const response=await fetch('/api/deal-desk/'+mode,{method:'POST',headers:headers(),body:JSON.stringify(mode==='research'?{deal,company,hint,period}:{deal,files:requestSources(files),notes,period})});
+   const response=await fetch('/api/deal-desk/'+mode,{method:'POST',headers:headers(),body:JSON.stringify(mode==='research'?{deal,company,hint,period}:{deal,files:requestSources(sourceFiles),notes,period})});
    let data=await response.json();if(!response.ok)throw Error(data.error||'Analysis could not start.');
    const id=data.jobId,deadline=Date.now()+18*60*1000;
    while(Date.now()<deadline){await new Promise(resolve=>setTimeout(resolve,1500));const poll=await fetch('/api/deal-desk/jobs/'+id,{headers:headers()});data=await poll.json();if(!poll.ok||data.state==='failed')throw Error(data.error||'Analysis failed.');setMessage(data.phase||'Reviewing…');if(data.state==='complete')break;}
    if(data.state!=='complete')throw Error('The analysis is taking longer than expected. Your draft is preserved; try a smaller packet.');
    const differentCompany=mode==='research'&&company.trim().toLowerCase()!==deal.name.trim().toLowerCase();if(differentCompany){setPreviousDraft({deal,review,files,siteRecords,notes,period});setFiles([]);setNotes('');setComplete(false);}const next=data.result as Review;setDeal(validateImport(next.deal));setReview(next);setPeriod(p=>p||next.company?.period||'');
    // Spreadsheet/Word table rows already exist. Only add AI rows from other sources.
-   const structured=new Set(files.filter(f=>f.sites?.length).map(f=>f.id));
+   const structured=new Set(sourceFiles.filter(f=>f.sites?.length).map(f=>f.id));
    setSiteRecords(old=>differentCompany?next.sites:[...old.filter(s=>!next.sources.some(x=>x.id===s.sourceId)||structured.has(s.sourceId)),...next.sites.filter(s=>!structured.has(s.sourceId))]);
    setAi('AI analysis completed');setMessage('Source-supported inputs filled. Review the company summary, unresolved figures and site records.');setTab('report');
-  }catch(e:any){setMessage(e.message);}finally{setBusy(false);}
+  }catch(e:any){setMessage(e.message);if(/password|access code/i.test(e.message))passcodeRef.current?.focus();}finally{setBusy(false);setActionMode(null);}
  }
  async function excel(){try{downloadBlob(safeName()+'_Deal_Model.xlsx',await exportModel(deal,review,sites,period,files));setMessage('Filled workbook downloaded with formulas, company summary, all site rows and evidence.');}catch(e:any){setMessage(e.message);}}
  function safeName(){return deal.name.replace(/[^a-z0-9_-]+/gi,'_').slice(0,90)||'Company';}
@@ -69,13 +83,14 @@ export default function Home(){
  {message&&<div role="status" className="notice" aria-live="polite">{message}</div>}
  <Tabs value={tab} onValueChange={setTab}><TabsList className="main-tabs"><TabsTrigger value="intake">01 · Deal inputs</TabsTrigger><TabsTrigger value="economics">02 · Economics</TabsTrigger><TabsTrigger value="report">03 · Company summary</TabsTrigger><TabsTrigger value="sites">04 · Sites & sources</TabsTrigger><TabsTrigger value="playbook">05 · Synergy playbook</TabsTrigger></TabsList>
  <TabsContent value="intake"><div className="intake-grid"><section className="panel"><h2>Bring in the deal</h2><p className="subtle">Upload seller documents, research a company, or enter verified figures.</p>
- {accessRequired&&<><label className="block-label" htmlFor="passcode">Workspace access code</label><Input id="passcode" type="password" autoComplete="current-password" value={passcode} onChange={e=>setPasscode(e.target.value)} placeholder="Deal Desk password or existing AI Council access code"/></>}
- <div className="search-company"><h3>Search a company</h3><label className="block-label" htmlFor="company">Company name</label><Input id="company" value={company} onChange={e=>setCompany(e.target.value)} placeholder="Company to acquire"/><label className="block-label" htmlFor="hint">Website or location (optional)</label><Input id="hint" value={hint} onChange={e=>setHint(e.target.value)} placeholder="Helps distinguish companies with similar names"/><Button disabled={busy||!readyAI||!company.trim()} onClick={()=>run('research')}><Search size={16}/> Search a company</Button><p className="helper">Searches public company and Sunoco sources. A different company starts a fresh draft; your previous draft can be restored. Unavailable private data stays blank.</p></div>
+ {accessRequired&&<><label className="block-label" htmlFor="passcode">Workspace access code</label><Input ref={passcodeRef} id="passcode" type="password" autoComplete="current-password" value={passcode} onChange={e=>updatePasscode(e.target.value)} placeholder="Deal Desk password or existing AI Council access code"/></>}
+ <div className="search-company"><h3>Search a company</h3><label className="block-label" htmlFor="company">Company name</label><Input id="company" value={company} onChange={e=>setCompany(e.target.value)} placeholder="Company to acquire"/><label className="block-label" htmlFor="hint">Website or location (optional)</label><Input id="hint" value={hint} onChange={e=>setHint(e.target.value)} placeholder="Helps distinguish companies with similar names"/><Button disabled={busy||!readyAI||!company.trim()} onClick={()=>run('research')}><Search size={16}/> {actionMode==='research'?'Searching & filling model…':'Search company & fill model'}</Button>{lastAction==='research'&&message&&<p className="action-status" role="status" aria-live="polite">{message}</p>}<p className="helper">One search researches public sources, fills supported model inputs, builds the company summary and lists what still needs confirmation.</p></div>
  <div className="dropzone" onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();upload(e.dataTransfer.files);}}><Upload size={30}/><h3>Drop seller files here</h3><p>PDFs and scans · Word · Excel / CSV · images<br/>PowerPoint · OpenDocument · text / JSON<br/>20 MB per file · 20 files per analysis</p><Button variant="outline" disabled={busy} onClick={()=>uploadRef.current?.click()}>Choose files</Button><input ref={uploadRef} id="source-files" hidden type="file" multiple onChange={e=>upload(e.target.files)}/></div>
- <p className="helper">AI reads source documents when you analyze. Every PDF page is included; scans and ambiguous figures need confirmation. Unreadable formats are reported. Save a draft before leaving.</p>
+ {lastAction==='analyze'&&message&&<p className="action-status" role="status" aria-live="polite">{message}</p>}
+ <p className="helper">Choose or drop the files once. Deal Desk reads them, fills supported model inputs, builds the company summary and retains every detected site row. Scans and ambiguous figures are flagged for confirmation.</p>
  {files.map(f=><div key={f.id}><div className="file-row"><FileSpreadsheet size={18}/><span>{f.name}<small>{f.pages?f.pages+' pages · ':''}{f.sites?.length?f.sites.length+' site rows · ':''}{f.text.length.toLocaleString()} text characters</small></span><button disabled={busy} aria-label={'Remove '+f.name} onClick={()=>{setFiles(old=>old.filter(x=>x.id!==f.id));setSiteRecords(old=>old.filter(s=>s.sourceId!==f.id));setComplete(false);}}>×</button></div>{f.warnings.map((w,i)=><p className="helper" key={i}>{w}</p>)}</div>)}
  <label className="block-label" htmlFor="notes">Deal context and contract terms</label><Textarea id="notes" value={notes} rows={5} onChange={e=>setNotes(e.target.value)} placeholder="Acquisition perimeter, seller context, quoted Sunoco terms and source dates."/>
- <div className="actions"><Button disabled={busy||!readyAI||(!files.length&&!notes.trim())} onClick={()=>run('analyze')}>{busy?'Analysis in progress…':'Analyze files & fill model'}<ArrowUpRight size={16}/></Button></div>
+ {(files.length||notes.trim())&&<div className="actions"><Button disabled={busy||!readyAI} onClick={()=>run('analyze')}>{actionMode==='analyze'?'Analysis in progress…':'Run analysis again'}<ArrowUpRight size={16}/></Button></div>}
  <div className="actions"><Button variant="outline" onClick={saveDraft}>Save draft</Button>{previousDraft&&<Button variant="outline" disabled={busy} onClick={()=>{setDeal(previousDraft.deal);setReview(previousDraft.review);setFiles(previousDraft.files);setSiteRecords(previousDraft.siteRecords);setNotes(previousDraft.notes);setPeriod(previousDraft.period);setPreviousDraft(null);setMessage("Previous company draft restored.");}}>Restore previous company</Button>}<Button variant="outline" disabled={busy} onClick={()=>draftRef.current?.click()}>Open saved draft</Button><input ref={draftRef} id="draft-file" type="file" accept=".json" hidden onChange={e=>loadDraft(e.target.files?.[0])}/></div>
  </section><section className="panel"><h2>Confirm the inputs</h2><p className="subtle">Annual portfolio USD totals unless stated otherwise. Blank means unknown. Enter costs as positive values. Improvements may be negative.</p><label className="block-label" htmlFor="name">Deal name</label><Input id="name" disabled={busy} value={deal.name} onChange={e=>update('name',e.target.value)}/><label className="block-label" htmlFor="period">Financial period</label><Input id="period" disabled={busy} value={period} onChange={e=>setPeriod(e.target.value)} placeholder="e.g. FY2025 or TTM June 2026"/>
  <div className="form-groups">{[...new Set(fields.map(f=>f.group))].map(g=><details key={g} open={g==='Seller baseline'}><summary>{g}<small>{fields.filter(f=>f.group===g&&deal[f.key]!==null).length}/{fields.filter(f=>f.group===g).length}</small></summary><div className="field-grid">{fields.filter(f=>f.group===g).map(f=><label className="field" key={f.key} htmlFor={f.key}><span>{f.label}<small>{f.unit}</small></span><Input id={f.key} disabled={busy} type="number" step="any" value={deal[f.key]??''} placeholder="Unknown" onChange={e=>update(f.key,e.target.value===''?null:Number(e.target.value))}/><small>{f.note}</small>{evidence.find(e=>e.field===f.key&&e.value!==null)&&<small className="evidence-tag">{evidence.find(e=>e.field===f.key)?.value===deal[f.key]?evidence.find(e=>e.field===f.key)?.status:'Review proposed value in Company summary'}</small>}</label>)}</div></details>)}</div>

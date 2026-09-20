@@ -61,13 +61,15 @@ try{
   await page.screenshot({path:output+'/'+viewport.width+'-sites.png',fullPage:true});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
   if(!live){
    await page.getByRole('tab',{name:'01 · Deal inputs'}).click();await page.getByLabel('Workspace access code').fill('test-code');
-   await page.getByRole('button',{name:'Analyze files & fill model'}).click();await page.getByText('Fictional Fuel operates 10 sites. Dealer commission terms and conversion costs remain to be confirmed.',{exact:true}).waitFor({timeout:20000});
+   await page.getByRole('button',{name:'Run analysis again'}).click();await page.getByText('Fictional Fuel operates 10 sites. Dealer commission terms and conversion costs remain to be confirmed.',{exact:true}).waitFor({timeout:20000});
    assert.equal(await page.getByRole('button',{name:'Confirm value',exact:true}).count(),0);
    await page.screenshot({path:output+'/'+viewport.width+'-summary.png',fullPage:true});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
    const report=await download(page.getByRole('button',{name:'Download summary PDF'}),viewport.width+'-summary.pdf');assert.equal(report.subarray(0,5).toString(),'%PDF-');
    await page.getByRole('tab',{name:'01 · Deal inputs'}).click();assert.equal(await page.locator('#sites').inputValue(),'10');
-   await page.getByLabel('Company name',{exact:true}).fill('Fictional Fuel');await page.getByRole('button',{name:'Search a company',exact:true}).click();await page.locator('a[href="https://example.com/company"]').waitFor({timeout:20000});
-   await page.getByRole('tab',{name:'01 · Deal inputs'}).click();await page.getByLabel('Workspace access code').fill('wrong');await page.getByRole('button',{name:'Analyze files & fill model'}).click();await page.getByRole('status').filter({hasText:'Enter your Deal Desk password'}).waitFor();assert.equal(await page.locator('#sites').inputValue(),'10');
+   await page.getByLabel('Company name',{exact:true}).fill('Fictional Fuel');await page.getByRole('button',{name:'Search company & fill model',exact:true}).click();await page.locator('a[href="https://example.com/company"]').waitFor({timeout:20000});
+   await page.getByRole('tab',{name:'01 · Deal inputs'}).click();await page.getByLabel('Workspace access code').fill('wrong');await page.getByRole('button',{name:'Run analysis again'}).click();await page.getByRole('status').filter({hasText:'Enter your Deal Desk password'}).waitFor();assert.equal(await page.locator('#sites').inputValue(),'10');
+   await page.getByLabel('Workspace access code').fill('test-code');await page.locator('#source-files').setInputFiles({name:'automatic.txt',mimeType:'text/plain',buffer:Buffer.from('Fictional Fuel automatic upload check.')});
+   await page.getByRole('status').filter({hasText:'Source-supported inputs filled.'}).waitFor({timeout:20000});assert.equal(await page.getByRole('tab',{name:'03 · Company summary'}).getAttribute('data-state'),'active');
   }
   assert.ok(errors.every(e=>/401/.test(e)),errors.join('\n'));console.log(JSON.stringify({viewport:viewport.width,mixedFiles:['PDF','DOCX','CSV'],siteRecords:122,formulas:true,blankNotZero:true,originalFormulaProtection:true,sourceVerifiedAutofill:!live,companySearch:live?'not invoked':'mocked provider passed',noOverflow:true}));
   await page.close();
