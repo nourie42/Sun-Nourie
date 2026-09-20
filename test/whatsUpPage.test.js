@@ -36,9 +36,12 @@ assert.doesNotMatch(client, /dewpoint must all qualify/);
 const home = read("public/index.html");
 assert.match(home, /Sunoco, LP Fuel IQ/);
 assert.doesNotMatch(home, /whats-up/);
+assert.doesNotMatch(home, /perfect-weather-alert/);
 
 const weather = read("public/weather-fusion/index.html");
-assert.doesNotMatch(weather, /whats-up/);
+assert.match(weather, /class="perfect-weather-alert" href="\/whats-up"/);
+assert.match(weather, /Perfect weather alert — see pleasant hours/);
+assert.doesNotMatch(home, /href="\/whats-up"/);
 
 const routes = read("src/whatsUpRoutes.js");
 assert.match(routes, /\['\/whats-up', '\/whats-up\/'\]/);

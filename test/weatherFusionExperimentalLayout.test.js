@@ -20,6 +20,13 @@ test('main HTML ships radar only while experimental mode adds every model contro
   assert.match(app,/if\(layer==='radar'\)/,'radar remains the normal main-page path');
 });
 
+test('shared weather shell shows a red perfect-weather alert to /whats-up',()=>{
+  assert.match(html,/class="perfect-weather-alert" href="\/whats-up"/);
+  assert.match(html,/Perfect weather alert — see pleasant hours/);
+  const style = read('style.css');
+  assert.match(style,/\.perfect-weather-alert\{[^}]*background:linear-gradient\(90deg,#9b1818/);
+});
+
 test('main and experimental URLs are served by one shared app shell',()=>{
   const routes = [];
   registerWeatherFusionRoutes({get:(...args)=>routes.push(args)},{env:{},fetchImpl:async()=>{throw new Error('not called');}});
