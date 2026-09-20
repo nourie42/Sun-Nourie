@@ -45,8 +45,8 @@ export default function Home(){
   await run('analyze',nextFiles);
  }
  async function run(mode:'analyze'|'research',sourceFiles=files){
-  if(busy||requireAccess())return;
-  setBusy(true);setActionMode(mode);setLastAction(mode);setMessage(mode==='research'?`Searching for ${company.trim()} and building the acquisition screen…`:'Reading the files and filling the acquisition screen…');
+  if(busy)return;setLastAction(mode);if(requireAccess())return;
+  setBusy(true);setActionMode(mode);setMessage(mode==='research'?`Searching for ${company.trim()} and building the acquisition screen…`:'Reading the files and filling the acquisition screen…');
   try{
    validateImport(deal);
    const response=await fetch('/api/deal-desk/'+mode,{method:'POST',headers:headers(),body:JSON.stringify(mode==='research'?{deal,company,hint,period}:{deal,files:requestSources(sourceFiles),notes,period})});
