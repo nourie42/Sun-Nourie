@@ -32,8 +32,8 @@ export async function exportModel(deal:Deal,review:Review|null,sites:Site[],peri
  validateImport(deal);const result=calculate(deal);const zip=await JSZip.loadAsync(template.base64,{base64:true});
  const docs=await Promise.all([1,2,3,4,5].map(async n=>parse(await zip.file(`xl/worksheets/sheet${n}.xml`)!.async('string'))));
  const [summary,model,siteSheet,evidenceSheet,opps]=docs;
- put(summary,'A3',deal.name);put(summary,'A6',review?.summary||`Company background has not yet been researched for ${deal.name}.`);put(summary,'B14',period||review?.company?.period||'Not confirmed');put(summary,'B15',new Date().toISOString());
- fields.forEach((f,i)=>{const e=review?.evidence.find(e=>e.field===f.key),matches=e?.value===deal[f.key];put(model,`B${i+6}`,deal[f.key]);put(model,`D${i+6}`,deal[f.key]===null?'Missing':matches?e!.status:'User-entered / confirm source');put(model,`E${i+6}`,matches?`${sources.find(s=>s.id===e!.sourceId)?.name||e!.sourceId} ${e!.locator}`:'');put(model,`F${i+6}`,matches?e!.period:period);});
+ const estimated=review?.evidence.filter(e=>e.status==='Estimated'&&e.value===deal[e.field])||[];put(summary,'A3',deal.name);put(summary,'A4',estimated.length?`ESTIMATED SCREENING CASE — ${estimated.length} inputs estimated. See Model status and Source Evidence for every basis.`:'Source-based screening case');put(summary,'A6',review?.summary||`Company background has not yet been researched for ${deal.name}.`);put(summary,'B14',period||review?.company?.period||'Not confirmed');put(summary,'B15',new Date().toISOString());
+ fields.forEach((f,i)=>{const e=review?.evidence.find(e=>e.field===f.key),matches=e?.value===deal[f.key];put(model,`B${i+6}`,deal[f.key]);put(model,`D${i+6}`,deal[f.key]===null?'Missing':matches?e!.status:'User-entered / confirm source');put(model,`E${i+6}`,matches?`${sources.find(s=>s.id===e!.sourceId)?.name||e!.sourceId} ${e!.locator}${e!.status==='Estimated'?' — '+e!.reason:''}`:'');put(model,`F${i+6}`,matches?e!.period:period);});
  put(model,'B36',result.errors.length?'Correct invalid inputs':'Valid',true);
  [result.seller,result.supply,result.commission,result.costs,result.sun,result.dealer,result.combined,result.lift,result.systemCostReduction,result.investment,result.npv,result.irr].forEach((v,i)=>put(model,`B${38+i}`,v,true));
  for(let i=0;i<11;i++)put(model,`${col(i+1)}54`,result.cashflows[i]??null,true);
@@ -43,7 +43,7 @@ export async function exportModel(deal:Deal,review:Review|null,sites:Site[],peri
  rows(evidenceSheet,fields.map(f=>{const e=review?.evidence.find(x=>x.field===f.key);const source=sources.find(s=>s.id===e?.sourceId);return [f.label,deal[f.key],e?.value,e?.value===deal[f.key]?e?.status:deal[f.key]===null?'Missing':'User-entered / confirm source',source?.name,e?.locator,e?.quote,e?.period,e?.sourceUnit,e?.reason,source?.url,review?.generatedAt];}));
  const sourceRows=sources.map(s=>[s.name,s.url||s.kind,s.id]);rows(evidenceSheet,[['Source register','URL / type','Source ID'],...sourceRows],38);
  rows(opps,(review?.opportunities||[]).map(o=>[o.idea,o.formula,o.evidenceNeeded,o.owner,'Unquantified',o.sourceIds?.join(', ')]));
- const missing=fields.filter(f=>deal[f.key]===null).map(f=>f.label);rows(summary,[['Outstanding information',missing.join('; ')||'All fields entered — confirm sources and commercial approval.'],...(review?.warnings||[]).map(w=>['Review item',w])],32);
+ const missing=fields.filter(f=>deal[f.key]===null).map(f=>f.label);rows(summary,[['Outstanding information',missing.join('; ')||'All fields filled — review estimates in Source Evidence and confirm commercial terms.'],...(review?.warnings||[]).map(w=>['Review item',w])],32);
  docs.forEach((doc,i)=>zip.file(`xl/worksheets/sheet${i+1}.xml`,serialize(doc)));await calculationMode(zip);
  return zip.generateAsync({type:'blob',compression:'DEFLATE',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
 }

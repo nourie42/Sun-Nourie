@@ -8,9 +8,10 @@ import PDFDocument from 'pdfkit';
 import {validateImport,calculate,fields,money,percent,emptyDeal} from './dealDeskModel.js';
 import {normalizeReview,safeUrl,restoreSourceQuotes} from './dealDeskReview.js';
 import {extractBoundedAnalysis,verifyBoundedAnalysis,extractSitePages} from './dealDeskProcessing.js';
+import {applyIndustryEstimates} from '../deal-desk/lib/estimates.js';
 
 const root=path.join(path.dirname(fileURLToPath(import.meta.url)),'..','public','deal-desk');
-export const DEAL_DESK_VERSION='deal-intake-v4.1-quote-recovery';
+export const DEAL_DESK_VERSION='deal-intake-v5-industry-estimates';
 const sameSecret=(a,b)=>timingSafeEqual(createHash('sha256').update(String(a||'')).digest(),createHash('sha256').update(String(b||'')).digest());
 const plain=(s,n=4000)=>typeof s==='string'?s.slice(0,n):'';
 const flattenRtf=node=>typeof node==='string'?node:node?.value||((node?.content||[]).map(flattenRtf).join('\n'));
@@ -78,7 +79,7 @@ export function registerDealDeskRoutes(app,{env=process.env,fetchImpl=globalThis
  async function research(name,hint,phase){
   phase('Searching official company and Sunoco sources…');
   // Only the public company query is sent to search. Uploaded documents and notes never enter this request.
-  const messages=[{role:'user',content:`Research the public company ${JSON.stringify(name)}. Disambiguation: ${JSON.stringify(hint)}. Use web search. Prefer company filings, SEC, company sites and official announcements. Find factual company overview, geography, owned/leased/company-operated/wholesale site counts, annual gallons, gross profit, expenses and acquisition consideration only where actually disclosed. Identify one consistent annual reporting period, units, currency, and exact perimeter. Also search current official Sunoco disclosures for relevant integration mechanisms and risks, clearly separate Sunoco group data from target data. Never apply corporate synergy percentages to this target. Private company data may not be public; say what is unavailable. Cite every factual claim with the native web citations. Do not guess addresses or internal Sunoco margins.`}];
+  const messages=[{role:'user',content:`Research the public company ${JSON.stringify(name)}. Disambiguation: ${JSON.stringify(hint)}. Use web search. Prefer company filings, SEC, company sites and official announcements. This is a hypothetical acquisition screen requested by the user; it does not require an announced Sunoco transaction. Focus the model on the target company-operated retail portfolio, separating wholesale and dealer-only businesses. Find factual company overview, geography, owned/leased/company-operated/wholesale site counts, annual retail gallons, retail gross profit and retail expenses. Cite the exact short numeric source passages for every figure, with period and unit. Do not substitute historical capital spending for a proposed acquisition price. Identify one consistent annual reporting period, units, currency, and exact perimeter. Also search current official Sunoco disclosures for relevant integration mechanisms and risks, clearly separate Sunoco group data from target data. Never apply corporate synergy percentages to this target. Private company data may not be public; say what is unavailable. Cite every factual claim with the native web citations. Do not guess addresses or internal Sunoco margins.`}];
   let data;
   for(let n=0;n<3;n++){
    data=await ask(messages,{tools:[{type:'web_search_20250305',name:'web_search',max_uses:6}]});
@@ -108,7 +109,7 @@ export function registerDealDeskRoutes(app,{env=process.env,fetchImpl=globalThis
   else{phase('Reading source documents…');sources=await prepareSources(body.files);if(body.notes?.trim())sources.push({id:'user-notes',name:'User-provided notes',kind:'text',text:body.notes,warnings:[]});}
   phase('Extracting company facts, site records and model inputs…');
   const content=sourceContent(sources);
-  const raw=await extractBoundedAnalysis({ask:analysisAsk,content,current,notes:isSearch?'Public company search':plain(body.notes,30000),period,narrative,phase});
+  const raw=await extractBoundedAnalysis({ask:analysisAsk,content,current,notes:isSearch?'Hypothetical acquisition screening of the identified company-operated retail portfolio. No announced Sunoco transaction is required. Source the existing retail portfolio; commercial terms will be separately labeled estimates.':plain(body.notes,30000),period,narrative,phase});
   restoreSourceQuotes(raw,sources);
   phase('Checking source quotes, units, periods and conflicts…');
   const verification=await verifyBoundedAnalysis({ask:analysisAsk,content,raw,period,phase});
@@ -116,7 +117,9 @@ export function registerDealDeskRoutes(app,{env=process.env,fetchImpl=globalThis
   raw.sites=siteResult.sites;raw.warnings.push(...siteResult.warnings);
   const result=normalizeReview(raw,sources,current,verification,period);
   result.warnings.push(...sources.flatMap(s=>(s.warnings||[]).map(w=>`${s.name}: ${w}`)));
-  result.searchUsed=isSearch;return result;
+  result.searchUsed=isSearch;
+  if(body.estimateMissing===true){phase('Filling missing inputs with labeled industry-based screening estimates…');const estimated=applyIndustryEstimates(result);validateImport(estimated.deal);return estimated;}
+  return result;
  }
  function queue(isSearch){return async(q,r)=>{
   for(const [id,j]of jobs)if(Date.now()-j.created>20*60*1000)jobs.delete(id);
@@ -148,10 +151,13 @@ export function registerDealDeskRoutes(app,{env=process.env,fetchImpl=globalThis
   p(`Company and acquisition summary • ${new Date().toISOString().slice(0,10)}`);
   p(plain(review.summary,14000)||`No source-backed company profile has been completed for ${deal.name}.`);
   p(`Reporting period: ${plain(q.body.period,80)||plain(review.company?.period,80)||'Not confirmed'}`);
+  const estimated=(review.evidence||[]).filter(e=>e.status==='Estimated'&&e.value===deal[e.field]);
+  if(estimated.length)p(`ESTIMATED SCREENING CASE: ${estimated.length} inputs use estimates. Results are not a fully sourced valuation.`);
   p('Company-controlled sites with commission dealer operations. Fee ownership and retained leases require confirmation.');
   for(const [label,value]of [['Seller EBITDA',money(result.seller)],['Sunoco run-rate EBITDA',money(result.sun)],['Change versus seller',money(result.lift)],['Dealer EBITDA',money(result.dealer)],['Combined Sunoco + dealer EBITDA',money(result.combined)],['Initial investment',money(result.investment)],['NPV',money(result.npv)],['Pretax screening IRR',percent(result.irr)]])p(`${label}: ${value}`);
   p('Screen assumes a company-operated seller converted to commission dealers. Flat operations for 10 years; Year 1 phased conversion; explicit Year 10 proceeds. Excludes taxes, financing and growth. Incomplete inputs leave outputs blank. These are screening estimates, not approved savings.');
   const missing=fields.filter(f=>deal[f.key]===null);p('Outstanding information',14);p(missing.length?missing.map(f=>f.label).join('; '):'All numerical fields are entered; source and commercial approval still apply.');
+  if(estimated.length){p('Estimated inputs and basis',14);for(const e of estimated)p(`${fields.find(f=>f.key===e.field)?.label||e.field}: ${e.value}. ${plain(e.reason,2000)}`);}
   if(Array.isArray(review.opportunities)){p('Potential improvements — unquantified until supported',14);for(const o of review.opportunities.slice(0,30))p(`${plain(o.idea)}\nCalculation: ${plain(o.formula)}\nEvidence needed: ${plain(o.evidenceNeeded)}`);}
   if(Array.isArray(review.warnings)){p('Items to resolve',14);for(const w of review.warnings.slice(0,50))p(plain(w));}
   p('Sources',14);for(const s of (Array.isArray(review.sources)?review.sources:[]).slice(0,100))p(`${plain(s.name,250)}${safeUrl(s.url)?' — '+safeUrl(s.url):''}`);

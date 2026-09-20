@@ -5,7 +5,7 @@ import {once} from 'node:events';
 import {registerDealDeskRoutes} from '../src/dealDeskRoutes.js';
 import {calculate,emptyDeal,exampleDeal,validateImport} from '../src/dealDeskModel.js';
 import {normalizeReview,restoreSourceQuotes} from '../src/dealDeskReview.js';
-import {sitesFromRows,mergeSites,aggregateSites} from '../src/dealDeskSites.js';
+import {sitesFromRows,mergeSites,aggregateSites,consolidateWorkbookSites} from '../src/dealDeskSites.js';
 import {fields} from '../src/dealDeskModel.js';
 import {extractSitePages} from '../src/dealDeskProcessing.js';
 const env={ANTHROPIC_API_KEY:'test-not-real',AI_COUNCIL_ACCESS_CODE:'test-code'};
@@ -17,6 +17,13 @@ const proposal={company:{name:'Fictional Fuel',overview:'Fictional Fuel operates
  {field:'fuelCpg',value:35,sourceId:'f1',locator:'line 1',quote:'0.35',period:'FY2025',sourceUnit:'USD/gallon',status:'sourced',confidence:'high'}
 ]};
 const verification={approvedFields:['sites','gallons','fuelCpg'],companySupported:true,summarySupported:true};
+test('accounting currency spaces do not reject an independently verified source value',()=>{
+ const raw={company:{name:'Test',period:'FY2025',sourceIds:['w']},summary:'Test',deal:{insideGp:1795974},evidence:[{field:'insideGp',value:1795974,sourceId:'w',quote:'$1,795,974',period:'FY2025',sourceUnit:'USD',status:'sourced',confidence:'high'}]};
+ const sources=[{id:'w',kind:'text',text:'B52: $ 1,795,974 [cached formula: B25-B46]'}];
+ const check={approvedFields:['insideGp'],companySupported:true,summarySupported:true};
+ assert.equal(normalizeReview(raw,sources,emptyDeal(),check,'FY2025').deal.insideGp,1795974);
+ assert.equal(normalizeReview({...raw,deal:{insideGp:1795975}},sources,emptyDeal(),check,'FY2025').deal.insideGp,null);
+});
 const ai=x=>Response.json({stop_reason:'end_turn',content:[{type:'text',text:JSON.stringify(x)}]});
 const packet=()=>({deal:emptyDeal(),files:[source],notes:'',period:'FY2025'});
 test('shortened quotes restore only a unique complete uploaded source line',()=>{
@@ -63,7 +70,7 @@ test("missing inputs stay unknown, and capital is excluded from EBITDA", () => {
 
 test('static app retains hidden route and status does not expose secrets',async t=>{
  const f=await fixture(t);for(const route of ['/deal-desk','/deal-desk/','/deal-desk/index.html']){const r=await f.request(route);assert.equal(r.status,200);assert.match(await r.text(),/\/deal-desk\/assets\/index-/);assert.match(r.headers.get('content-security-policy'),/worker-src 'self' blob:/);assert.match(r.headers.get('x-robots-tag'),/noindex/);}
- const status=await(await f.request('/api/deal-desk/status')).json();assert.equal(status.version,'deal-intake-v4.1-quote-recovery');assert.equal(status.ready,true);assert.doesNotMatch(JSON.stringify(status),/test-code|test-not-real/);assert.equal((await f.request('/')).status,404);
+ const status=await(await f.request('/api/deal-desk/status')).json();assert.equal(status.version,'deal-intake-v5-industry-estimates');assert.equal(status.ready,true);assert.doesNotMatch(JSON.stringify(status),/test-code|test-not-real/);assert.equal((await f.request('/')).status,404);
 });
 test('authentication protects analysis, research, jobs and summary',async t=>{
  const f=await fixture(t);for(const [route,body]of [['/analyze',packet()],['/research',{deal:emptyDeal(),company:'X'}],['/jobs/invalid',undefined],['/summary',{deal:emptyDeal()}]])assert.equal((await f.request('/api/deal-desk'+route,body,{'x-deal-desk-passcode':'bad'})).status,401);
@@ -197,4 +204,18 @@ test('site totals require complete perimeter, consistent period, no duplicates a
  assert.deepEqual(aggregateSites(sites,'FY2025',true),{sites:2,gallons:400,insideGp:3000,fuelCpg:35});
  const duplicate=mergeSites([sites,[{...sites[0],id:'copy'}]]);assert.equal(duplicate.length,3);assert.equal(duplicate.filter(s=>s.duplicate).length,2);assert.deepEqual(aggregateSites(duplicate,'FY2025',true),{});
  assert.deepEqual(aggregateSites([{...sites[0],reviewRequired:true}],'FY2025',true),{});
+});
+test('workbook schedules join explicit store identities and exclude totals without losing source columns',()=>{
+ const header=['Store #','Address','City','State','ZIP','Custom'];
+ const rows=[header,['1301','7209 E Grand Ave','Lonsdale','AR','72087','roster'],[32,'Total Stores'],[32,'Totals']];
+ const roster=sitesFromRows(rows,'workbook','Roster');
+ const performance=sitesFromRows([header,['1301','7209 E Grand Ave','Lonsdale','AR','72087','performance']],'workbook','Performance');
+ assert.equal(roster.length,1);
+ const joined=consolidateWorkbookSites([...roster,...performance]);
+ assert.equal(joined.length,1);assert.equal(joined[0].id,'1301');
+ assert.equal(joined[0].raw['Roster / Custom'],'roster');
+ assert.equal(joined[0].raw['Performance / Custom'],'performance');
+ assert.equal(consolidateWorkbookSites([...roster,...roster]).length,2);
+ assert.equal(consolidateWorkbookSites([...roster,{...performance[0],id:'1302'}]).length,2);
+ assert.equal(consolidateWorkbookSites([...roster,{...performance[0],sourceId:'another-file'}]).length,2);
 });

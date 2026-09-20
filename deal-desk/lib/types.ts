@@ -11,7 +11,7 @@ export type Site = {
 };
 export type Evidence = {
  field:string; value:number|null; sourceId:string; locator:string; quote:string;
- period:string; sourceUnit:string; status:string; reason:string; confidence?:string;
+ period:string; sourceUnit:string; status:string; reason:string; confidence?:string; low?:number; high?:number;
 };
 export type Review = {
  deal:any; company:any; summary:string; evidence:Evidence[]; sites:Site[];

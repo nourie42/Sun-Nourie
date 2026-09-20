@@ -35,9 +35,44 @@ export function sitesFromRows(rows, sourceId, sheet) {
                 site[key] = String(row[i]);
         });
         // Totals and empty address rows remain in the source; they are not new sites.
-        if (!site.address || /^(total|grand total|subtotal)$/i.test(site.address.trim()))
+        if (!site.address || /^(?:(?:grand |sub)?totals?)(?:\s+(?:stores?|sites?|locations?))?$/i.test(site.address.trim()))
             return [];
         return [site];
+    });
+}
+// A workbook often repeats its roster on performance and capital schedules.
+// Join only the same explicit store ID and address in different sheets of one file.
+// Keep every original column under its source locator, including conflicting values.
+export function consolidateWorkbookSites(sites) {
+    const groups = new Map();
+    for (const site of sites) {
+        const sheet = site.locator.split('!row ')[0];
+        const key = site.id && site.address ? `${site.sourceId}|${norm(site.id)}|${norm(site.address)}|${norm(site.city)}|${norm(site.state)}|${norm(site.zip)}` : site.locator;
+        const group = groups.get(key) || [];
+        if (group.some(s => s.locator.split('!row ')[0] === sheet)) {
+            groups.set(`${key}|${site.locator}`, [site]);
+            continue;
+        }
+        group.push(site);
+        groups.set(key, group);
+    }
+    return [...groups.values()].map(group => {
+        if (group.length === 1)
+            return group[0];
+        const combined = { ...group[0], raw: {}, locator: group.map(s => s.locator).join('; ') };
+        for (const site of group) {
+            for (const [key, value] of Object.entries(site.raw))
+                combined.raw[`${site.locator.split('!row ')[0]} / ${key}`] = value;
+            for (const key of ['name', 'ownership', 'brand', 'period', 'gallons', 'fuelCpg', 'insideGp', 'sellerOpex']) {
+                if (site[key] === undefined)
+                    continue;
+                if (combined[key] === undefined)
+                    combined[key] = site[key];
+                else if (norm(combined[key]) !== norm(site[key]))
+                    combined.reviewRequired = true;
+            }
+        }
+        return combined;
     });
 }
 export function mergeSites(lists) {

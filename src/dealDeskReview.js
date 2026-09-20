@@ -1,6 +1,6 @@
 // Generated from deal-desk/lib/review.ts.
 import { fields, emptyDeal, validateImport } from './dealDeskModel.js';
-const norm = (s) => String(s ?? '').normalize('NFKC').replace(/\s+/g, ' ').trim().toLowerCase();
+const norm = (s) => String(s ?? '').normalize('NFKC').replace(/\s+/g, ' ').replace(/([$£€])\s+(?=[\d(])/g, '$1').trim().toLowerCase();
 // Restore a shortened quote only when all fragments identify one original line.
 // This does not approve a value; independent verification and unit checks follow.
 export function restoreSourceQuotes(raw, sources) {
@@ -49,6 +49,7 @@ warnings:[], missingQuestions:[].
 OUTPUT BUDGET: Return compact JSON, not markdown. NEVER reproduce individual site rows, addresses, raw workbook columns, tables or document text in this response. Site rows are handled separately without consuming the financial-analysis output budget. Return at most one evidence entry per requested field (flag conflicting values in its reason); omit evidence for missing fields. Each quote and reason must be at most 160 characters. Summary at most 180 words; company attributes at most 80 words each; at most 5 concise opportunities and 8 warnings/questions. ${includeCompany ? 'Include the company profile.' : 'This is a financial-field batch only: omit company, summary, opportunities and siteSourceIds.'}
 A financial source must identify period, currency, scale, and cost responsibility. SourceUnit must reflect the ORIGINAL quoted unit (USD, USD millions, cents/gallon, USD/gallon, percent, gallons, count). CPG inputs are CENTS. Source quotes must be exact short excerpts, with file/page/row/cell locators. Quote at most 25 words total per public web source; use short numeric fragments. Missing fields need no invented quote. Annualize only if the source explicitly states annual data. Derived or assumed values require review; do not label them sourced. Return ONLY these numeric fields (${selectedFields.length}):
 ${selectedFields.map(f => `${f.key}: ${f.label}; ${f.unit}; ${f.note}`).join('\n')}
+For workbooks, a reported cached formula result is a source-reported figure, not a new calculation you derived. Quote the reported cell value exactly, preserving accounting spaces. Different reporting periods are NOT conflicting values: choose the common annual period and compare only values for that period. A year-to-date period must not invalidate an independently reported full year. Put ONLY the chosen period in company.period, e.g. FY2025; put other periods and caveats in warnings. Historical acquisition costs and capex spent do not establish the proposed transaction consideration or future conversion costs. A non-Sunoco brand alone does not establish a committed conversion plan.
 Current draft (preserve user values; flag conflicts): ${JSON.stringify(deal)}
 Requested financial period: ${period || 'Select one common reported annual period and identify it explicitly.'}
 User context: ${notes}

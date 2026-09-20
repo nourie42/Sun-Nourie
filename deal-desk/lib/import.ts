@@ -1,5 +1,5 @@
 import {unzipSync, strFromU8} from 'fflate';
-import {sitesFromRows} from './sites';
+import {sitesFromRows,consolidateWorkbookSites} from './sites';
 import type {SourceFile} from './types';
 
 const MAX_FILE=20*1024*1024;
@@ -67,6 +67,7 @@ export async function readSourceFile(file:File):Promise<SourceFile>{
    }
    source.sites.push(...sitesFromRows(rows,source.id,name));source.workbook.push({name,cells});
   }
+  source.sites=consolidateWorkbookSites(source.sites);
   if(source.workbook.some(s=>Object.values(s.cells).some(c=>c.formula)))source.warnings.push('Workbook formula values are cached; source formulas have not been recalculated.');
   return finish(source);
  }
