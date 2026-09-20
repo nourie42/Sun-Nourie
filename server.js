@@ -218,7 +218,7 @@ app.get("/health", (_req, res) => {
     aiAgent: true,
     dealDesk: true,
     dealDeskAiConfigured: Boolean(process.env.ANTHROPIC_API_KEY),
-    dealDeskPasscodeRequired: Boolean(process.env.DEAL_DESK_PASSWORD),
+    dealDeskPasscodeRequired: Boolean(process.env.DEAL_DESK_PASSWORD || process.env.AI_COUNCIL_ACCESS_CODE),
     legacyServerReady: legacyReady,
   });
 });
