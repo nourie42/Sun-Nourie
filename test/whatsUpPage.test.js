@@ -15,6 +15,7 @@ const html = read("public/whats-up/index.html");
 assert.match(html, /what's up/i);
 assert.match(html, /name="viewport"/);
 assert.match(html, /id="zip"/);
+assert.match(html, /id="storm"/);
 assert.match(html, /Perfect weather/);
 assert.match(html, /weather-fusion\/style\.css/);
 assert.doesNotMatch(html, /Just checking in/);
@@ -37,10 +38,15 @@ const home = read("public/index.html");
 assert.match(home, /Sunoco, LP Fuel IQ/);
 assert.doesNotMatch(home, /whats-up/);
 assert.doesNotMatch(home, /perfect-weather-alert/);
+assert.doesNotMatch(home, /weather-alert-banner/);
+assert.doesNotMatch(home, /Click for Details/);
 
 const weather = read("public/weather-fusion/index.html");
-assert.match(weather, /class="perfect-weather-alert" href="\/whats-up"/);
-assert.match(weather, /Perfect weather alert — see pleasant hours/);
+assert.match(weather, /id="perfect-weather-banner"[^>]*href="\/whats-up"/);
+assert.match(weather, /id="storm-weather-banner"[^>]*href="\/whats-up#storm"/);
+assert.match(weather, /Perfect weather alert — Click for Details/);
+assert.match(weather, /High rain chance alert — Click for Details/);
+assert.equal([...weather.matchAll(/Click for Details/g)].length, 2);
 assert.doesNotMatch(home, /href="\/whats-up"/);
 
 const routes = read("src/whatsUpRoutes.js");
