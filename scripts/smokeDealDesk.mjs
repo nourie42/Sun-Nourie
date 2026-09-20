@@ -26,10 +26,15 @@ if (!live) {
   base = `http://127.0.0.1:${server.address().port}`;
 }
 await mkdir(output, {recursive: true});
-const browser = await chromium.launch({headless: true, executablePath: process.env.CHROMIUM_EXECUTABLE_PATH || undefined, args: ['--no-sandbox']});
+const browser = await chromium.launch({
+  headless: true,
+  executablePath: process.env.CHROMIUM_EXECUTABLE_PATH || undefined,
+  proxy: process.env.DEAL_DESK_PROXY ? {server: process.env.DEAL_DESK_PROXY} : undefined,
+  args: ['--no-sandbox'],
+});
 try {
   for (const viewport of [{width: 1440, height: 1050}, {width: 390, height: 844}]) {
-    const page = await browser.newPage({viewport});
+    const page = await browser.newPage({viewport, ignoreHTTPSErrors: process.env.DEAL_DESK_TEST_IGNORE_HTTPS_ERRORS === '1'});
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
     page.on('console', msg => {if (msg.type() === 'error') errors.push(msg.text());});
