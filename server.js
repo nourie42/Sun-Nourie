@@ -16,6 +16,7 @@ import { registerSiteResearchReportEnhancements } from "./src/siteResearchReport
 import { registerFuelAtlasRoutes } from "./src/fuelAtlasRoutes.js";
 import { registerFuelAtlasLocationCompanyBridge } from "./src/fuelAtlasLocationCompanyBridge.js";
 import { registerWeatherFusionRoutes } from "./src/weatherFusion.js";
+import { registerWhatsUpRoutes } from "./src/whatsUpRoutes.js";
 import { registerAiAgentRoutes } from "./src/aiAgent.js";
 import { registerAiCouncilRoutes } from "./src/aiCouncil.js";
 import { registerDealDeskRoutes } from "./src/dealDeskRoutes.js";
@@ -80,16 +81,11 @@ registerSiteEnhancementRoutes(app, {
 });
 registerFuelAtlasLocationCompanyBridge(app);
 registerFuelAtlasRoutes(app, { googleApiKey: process.env.GOOGLE_API_KEY || "" });
-registerWeatherFusionRoutes(app);
+const weatherFusion = registerWeatherFusionRoutes(app);
+registerWhatsUpRoutes(app, { getForecast: (query) => weatherFusion.getForecast(query) });
 registerAiAgentRoutes(app);
 registerAiCouncilRoutes(app);
 registerDealDeskRoutes(app);
-
-app.get(["/whats-up", "/whats-up/"], (_req, res) => {
-  res.setHeader("Cache-Control", "no-store");
-  res.sendFile(path.join(__dirname, "public", "whats-up", "index.html"));
-});
-app.get("/whatsup", (_req, res) => res.redirect(302, "/whats-up"));
 
 app.get("/fuel-atlas", (_req, res) => res.redirect(302, "/fuel-atlas.html"));
 app.get("/fuel-atlas.html", (_req, res) => {

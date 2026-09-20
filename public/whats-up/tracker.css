@@ -1,0 +1,58 @@
+/* What's Up tracker — Weather Nourie density, not a separate product skin. */
+.whats-up-page .zip-bar{display:flex;justify-content:flex-end;margin:0 0 6px}
+.whats-up-page .search-wrap{min-width:min(100%,340px);max-width:420px}
+.whats-up-page .search-wrap input{padding:10px 8px;font-size:13px;letter-spacing:.04em}
+.whats-up-page .search-wrap>button{font-size:12px;font-weight:650;letter-spacing:.08em;text-transform:uppercase;padding:0 16px;color:#e7f2ff}
+.whats-up-page .tracker-hero{min-height:0;padding:6px 0 18px;text-align:left}
+.whats-up-page .tracker-hero h1{font-size:clamp(28px,5vw,42px);font-weight:450;letter-spacing:-.7px;margin:0 0 8px}
+.whats-up-page .tracker-hero .hero-condition{margin-top:0;max-width:46rem;color:#d5e2f3}
+
+.summary-grid{display:grid;grid-template-columns:1.2fr .8fr;gap:17px;margin:0 0 17px}
+.summary-card h3{font-size:22px;letter-spacing:-.45px;font-weight:550;margin:0 0 10px}
+.summary-card p{font-size:14px;line-height:1.7;color:#e0e7f3;margin:0}
+.summary-stat{padding:18px 20px;min-height:132px}
+.summary-stat .eyebrow{margin-bottom:8px}
+.summary-stat strong{display:block;font-size:22px;font-weight:550;letter-spacing:-.4px;line-height:1.25}
+.summary-stat span{display:block;margin-top:8px;font-size:12px;color:#c3d2e6;line-height:1.6}
+.summary-stat.empty strong{color:#c9d6e8;font-weight:450}
+
+.day-card{padding:19px 22px;margin-bottom:17px}
+.day-card .section-top{align-items:flex-end}
+.day-temps{font-size:13px;color:#d4deee;font-weight:600}
+.day-temps span{margin-left:12px;color:#b7c6dd;font-weight:400}
+.day-condition{margin:12px 0 0;font-size:15px;color:#e8eef8}
+.window-list{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 4px}
+.window-chip{display:inline-flex;flex-direction:column;gap:2px;padding:8px 12px;border-radius:12px;border:1px solid #d8e6fc24;background:#0b1a2c20;min-width:140px}
+.window-chip b{font-size:13px;font-weight:600}
+.window-chip small{font-size:10px;color:#c3d2e6;letter-spacing:.04em}
+.window-chip.perfect{border-color:#ffdc9555;background:#ffdc9514;color:#ffe7b4}
+.window-chip.storm{border-color:#ffafb055;background:#7c3b4828;color:#ffd4c8}
+.window-chip.storm.definite{border-color:#ffafb08c;background:#7c3b486e}
+.empty-windows{margin:12px 0 0;font-size:12px;color:#b7c6dd}
+
+.hour-strip{display:flex;gap:8px;overflow:auto;scrollbar-width:thin;scrollbar-color:#d1e4ff44 transparent;padding:14px 0 4px;scroll-snap-type:x proximity}
+.hour-chip{flex:0 0 76px;scroll-snap-align:start;text-align:center;padding:10px 6px 9px;border-radius:16px;border:1px solid #d7e7ff18;background:#06142724}
+.hour-chip>span{display:block;font-size:11px;color:#d5dfef;white-space:nowrap}
+.hour-chip>strong{display:block;font-size:18px;font-weight:500;margin:6px 0 4px}
+.hour-chip small{display:block;font-size:10px;color:var(--blue);line-height:1.35}
+.hour-chip.perfect{border-color:#ffdc9566;background:#ffdc9518}
+.hour-chip.storm{border-color:#ffafb066;background:#7c3b4833}
+.hour-chip.storm.definite{background:#7c3b486e}
+
+.assumptions{padding:20px 24px;margin:6px 0 23px}
+.assumptions p{font-size:12px;line-height:1.8;color:#c4d4e9;margin:8px 0}
+.assumptions strong{display:block;font-size:12px;color:#eef3ff;margin-top:12px}
+
+.skeleton-card{padding:22px;margin-bottom:17px;min-height:120px}
+.skeleton-line{height:14px;border-radius:8px;margin:10px 0}
+.skeleton-line.wide{width:72%}
+.skeleton-line.mid{width:48%}
+.skeleton-line.short{width:28%}
+
+@media(max-width:760px){
+  .whats-up-page .zip-bar{justify-content:stretch}
+  .whats-up-page .search-wrap{width:100%;max-width:none;min-width:0}
+  .summary-grid{grid-template-columns:1fr;gap:14px}
+  .day-card{padding:18px 16px}
+  .hour-chip{flex-basis:70px}
+}
