@@ -29,7 +29,7 @@ export default function Home(){
   try{setPasscode(sessionStorage.getItem('deal-desk-access')||'');}catch{}
   fetch('/api/deal-desk/status').then(x=>x.json()).then(x=>{setReadyAI(!!x.ready);setAccessRequired(!!x.passcodeRequired);setAi(x.ready?'Deal Desk ready':x.message||'Deal Desk connection needed');}).catch(()=>setAi('Deal Desk connection unavailable'));
  },[]);
- useEffect(()=>{if(readyAI&&passcode.trim()&&queuedFilesRef.current&&!busy){const pending=queuedFilesRef.current;queuedFilesRef.current=null;void run('analyze',pending);}},[readyAI]);
+ useEffect(()=>{if(readyAI&&queuedFilesRef.current&&!busy){const pending=queuedFilesRef.current;queuedFilesRef.current=null;void run('analyze',pending);}},[readyAI,busy]);
  const headers=()=>({'Content-Type':'application/json','x-deal-desk-passcode':passcode});
  function updatePasscode(value:string){setPasscode(value);try{sessionStorage.setItem('deal-desk-access',value);}catch{}}
  function requireAccess(prefix=''){if(accessRequired&&!passcode.trim()){const text=(prefix?prefix+' ':'')+'ANALYSIS HAS NOT RUN. Enter the workspace access code above, then tap Analyze files & fill model. Your uploaded files are retained.';setAnalysisState('blocked');setAnalysisMessage(text);setMessage('');setTimeout(()=>analysisRef.current?.scrollIntoView({behavior:'smooth',block:'center'}),0);passcodeRef.current?.focus();return true;}return false;}
