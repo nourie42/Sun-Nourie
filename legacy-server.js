@@ -25,6 +25,12 @@ const __dirname = path.dirname(__filename);
 const DATA_DIR = path.join(__dirname, "data");
 const NORMALIZED_FILE = path.join(DATA_DIR, "normalized-addresses.json");
 
+app.get(["/whats-up", "/whats-up/"], (_req, res) => {
+  res.set("Cache-Control", "no-store");
+  res.sendFile(path.join(__dirname, "public", "whats-up", "index.html"));
+});
+app.get("/whatsup", (_req, res) => res.redirect(302, "/whats-up"));
+
 app.use(
   express.static(path.join(__dirname, "public"), {
     etag: false,
