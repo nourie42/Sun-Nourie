@@ -109,7 +109,7 @@ export function normalizeReview(raw, sources, current, verification, period) {
         }
         else if (currentDeal[f.key] === null && supported)
             deal[f.key] = value;
-        evidence.push({ field: f.key, value: hasNumber ? value : null, sourceId: source?.id || '', locator: String(e.locator || ''), quote: hasQuote ? e.quote.slice(0, 800) : '', period: actualPeriod, sourceUnit: String(e.sourceUnit || ''), status, reason });
+        evidence.push({ field: f.key, value: hasNumber ? value : null, sourceId: source?.id || '', locator: String(e.locator || ''), quote: hasQuote ? e.quote.slice(0, 800) : '', period: actualPeriod, sourceUnit: String(e.sourceUnit || ''), status, reason, estimateEligible: direct && periodMatches && !conflicting && approved.has(f.key) });
     }
     // Invalid counts, rates, or signs may never enter the model through extraction.
     try {

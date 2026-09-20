@@ -26,6 +26,24 @@ function put(doc:Document,address:string,value:any,formulaCache=false){
  else{c.setAttribute('t','inlineStr');const i=doc.createElementNS(ns,'is'),t=doc.createElementNS(ns,'t');t.setAttribute('xml:space','preserve');t.textContent=String(value);i.appendChild(t);c.appendChild(i);}
 }
 function rows(doc:Document,items:any[][],start=6){items.forEach((row,r)=>row.forEach((v,c)=>put(doc,`${col(c)}${r+start}`,v)));const d=doc.getElementsByTagNameNS('*','dimension')[0];if(d)d.setAttribute('ref',`A1:${col(Math.max(11,...items.map(r=>r.length-1)))}${Math.max(60,items.length+start-1)}`);}
+function readableRows(doc:Document,styles:Document,start:number,end:number,widths:number[]){
+ const cols=doc.getElementsByTagNameNS('*','cols')[0];
+ if(cols){const previous=Array.from(cols.children);cols.replaceChildren();widths.forEach((width,i)=>{const original=previous.find(c=>Number(c.getAttribute('min'))<=i+1&&Number(c.getAttribute('max'))>=i+1);const c=original?.cloneNode(true) as Element||doc.createElementNS(ns,'col');c.setAttribute('min',String(i+1));c.setAttribute('max',String(i+1));c.setAttribute('width',String(width));c.setAttribute('customWidth','1');cols.appendChild(c);});}
+ const xfs=styles.getElementsByTagNameNS('*','cellXfs')[0],wrapped=new Map<string,string>();
+ for(let r=start;r<=end;r++){
+  const row=doc.querySelector(`row[r="${r}"]`);if(!row)continue;let height=28;
+  for(const c of Array.from(row.children)){
+   const letters=c.getAttribute('r')?.match(/[A-Z]+/)?.[0]||'A',index=letters.split('').reduce((n,l)=>n*26+l.charCodeAt(0)-64,0)-1;
+   const text=c.querySelector('is')?.textContent||c.querySelector('v')?.textContent||'';
+   height=Math.max(height,Math.ceil(text.length/Math.max(10,(widths[index]||19)*.85))*14+12);
+   const old=c.getAttribute('s')||'0';let style=wrapped.get(old);
+   if(!style){const xf=xfs.children[Number(old)].cloneNode(true) as Element;let a=xf.querySelector('alignment');if(!a){a=styles.createElementNS(ns,'alignment');xf.appendChild(a);}a.setAttribute('wrapText','1');a.setAttribute('vertical','top');xf.setAttribute('applyAlignment','1');style=String(xfs.children.length);xfs.appendChild(xf);wrapped.set(old,style);}
+   c.setAttribute('s',style);
+  }
+  row.setAttribute('ht',String(Math.min(409,height)));row.setAttribute('customHeight','1');
+ }
+ xfs.setAttribute('count',String(xfs.children.length));
+}
 async function calculationMode(zip:JSZip){const file='xl/workbook.xml',doc=parse(await zip.file(file)!.async('string'));let calc=doc.querySelector('calcPr');if(!calc){calc=doc.createElementNS(ns,'calcPr');doc.documentElement.appendChild(calc);}calc.setAttribute('calcMode','auto');calc.setAttribute('fullCalcOnLoad','1');calc.setAttribute('forceFullCalc','1');zip.file(file,serialize(doc));}
 export async function exportModel(deal:Deal,review:Review|null,sites:Site[],period:string,files:any[]=[]){
  const sources=[...(review?.sources||[]),...files.filter(f=>!review?.sources.some(s=>s.id===f.id)).map(f=>({id:f.id,name:f.name,kind:f.kind}))];
@@ -44,7 +62,10 @@ export async function exportModel(deal:Deal,review:Review|null,sites:Site[],peri
  const sourceRows=sources.map(s=>[s.name,s.url||s.kind,s.id]);rows(evidenceSheet,[['Source register','URL / type','Source ID'],...sourceRows],38);
  rows(opps,(review?.opportunities||[]).map(o=>[o.idea,o.formula,o.evidenceNeeded,o.owner,'Unquantified',o.sourceIds?.join(', ')]));
  const missing=fields.filter(f=>deal[f.key]===null).map(f=>f.label);rows(summary,[['Outstanding information',missing.join('; ')||'All fields filled — review estimates in Source Evidence and confirm commercial terms.'],...(review?.warnings||[]).map(w=>['Review item',w])],32);
- docs.forEach((doc,i)=>zip.file(`xl/worksheets/sheet${i+1}.xml`,serialize(doc)));await calculationMode(zip);
+ const styles=parse(await zip.file('xl/styles.xml')!.async('string'));
+ readableRows(model,styles,6,34,[43,19,19,22,60,28]);
+ readableRows(evidenceSheet,styles,6,34,[38,19,19,22,45,38,60,32,22,85,50,28]);
+ docs.forEach((doc,i)=>zip.file(`xl/worksheets/sheet${i+1}.xml`,serialize(doc)));zip.file('xl/styles.xml',serialize(styles));await calculationMode(zip);
  return zip.generateAsync({type:'blob',compression:'DEFLATE',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
 }
 export type CellMapping={field:string;sheet:string;cell:string;scale:number};

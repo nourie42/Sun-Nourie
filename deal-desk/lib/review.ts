@@ -76,7 +76,7 @@ export function normalizeReview(raw:any, sources:any[], current:any, verificatio
   deal[f.key]=currentDeal[f.key];
   if(currentDeal[f.key]!==null&&hasNumber&&currentDeal[f.key]!==value){status='conflicting';reason='Conflicts with the current model input.';conflicts.push({field:f.key,current:currentDeal[f.key],proposed:value});}
   else if(currentDeal[f.key]===null&&supported)deal[f.key]=value;
-  evidence.push({field:f.key,value:hasNumber?value:null,sourceId:source?.id||'',locator:String(e.locator||''),quote:hasQuote?e.quote.slice(0,800):'',period:actualPeriod,sourceUnit:String(e.sourceUnit||''),status,reason});
+  evidence.push({field:f.key,value:hasNumber?value:null,sourceId:source?.id||'',locator:String(e.locator||''),quote:hasQuote?e.quote.slice(0,800):'',period:actualPeriod,sourceUnit:String(e.sourceUnit||''),status,reason,estimateEligible:direct&&periodMatches&&!conflicting&&approved.has(f.key)});
  }
  // Invalid counts, rates, or signs may never enter the model through extraction.
  try{validateImport(deal);}catch(error:any){warnings.push(error.message);for(const f of fields)deal[f.key]=currentDeal[f.key];for(const e of evidence)if(e.status==='supported')e.status='needs review';}

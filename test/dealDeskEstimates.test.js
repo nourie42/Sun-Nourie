@@ -19,3 +19,7 @@ test('unavailable company size is explicitly a one-site scenario, never an inven
  assert.equal(result.deal.sites,1);assert.match(result.evidence.find(e=>e.field==='sites').reason,/NOT the company/);
  assert.equal(result.estimates.length,29);assert.equal(calculate(validateImport(result.deal)).investReady,true);
 });
+test('an independently checked target-specific proposal takes priority over generic estimates',()=>{
+ const result=applyIndustryEstimates({deal:{...emptyDeal(),sites:32},company:{},evidence:[{field:'fuelCpg',value:21.1,estimateEligible:true,sourceId:'seller',quote:'$ 0.211',sourceUnit:'USD/gallon',locator:'B59',reason:'Unit conversion needs classification review.'}],sources:[{id:'seller'}],warnings:[]});
+ assert.equal(result.deal.fuelCpg,21.1);const e=result.evidence.find(e=>e.field==='fuelCpg');assert.equal(e.status,'Estimated');assert.equal(e.sourceId,'seller');assert.equal(e.quote,'$ 0.211');
+});

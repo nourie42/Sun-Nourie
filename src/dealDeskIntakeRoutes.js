@@ -11,7 +11,7 @@ import {extractBoundedAnalysis,verifyBoundedAnalysis,extractSitePages} from './d
 import {applyIndustryEstimates} from '../deal-desk/lib/estimates.js';
 
 const root=path.join(path.dirname(fileURLToPath(import.meta.url)),'..','public','deal-desk');
-export const DEAL_DESK_VERSION='deal-intake-v5-industry-estimates';
+export const DEAL_DESK_VERSION='deal-intake-v5.1-source-estimates';
 const sameSecret=(a,b)=>timingSafeEqual(createHash('sha256').update(String(a||'')).digest(),createHash('sha256').update(String(b||'')).digest());
 const plain=(s,n=4000)=>typeof s==='string'?s.slice(0,n):'';
 const flattenRtf=node=>typeof node==='string'?node:node?.value||((node?.content||[]).map(flattenRtf).join('\n'));

@@ -15,6 +15,13 @@ export function applyIndustryEstimates(review){
   const i=evidence.findIndex(e=>e.field===field);if(i>=0)evidence[i]=e;else evidence.push(e);
   deal[field]=value;estimates.push(e);
  }
+ // A checked numerical proposal may still need assumptions about classification.
+ // Prefer that target-specific basis over a generic industry fallback, but retain
+ // its Estimated status and original source rather than claiming a verified fact.
+ for(const e of [...evidence])if(e.estimateEligible&&Number.isFinite(e.value)&&deal[e.field]===null){
+  fill(e.field,e.value,`Source-based screening value: ${e.reason||'Reported value needs classification confirmation.'}`,e.sourceId);
+  const applied=evidence.find(x=>x.field===e.field);if(applied){applied.quote=e.quote;applied.locator=e.locator;applied.sourceUnit=e.sourceUnit;}
+ }
  fill('sites',1,'Acquired count unavailable: model one illustrative site, NOT the company’s actual portfolio size.',undefined,0);
  const n=deal.sites;
  fill('gallons',n*(476.3e9/3.11/122620),'Sites × (2025 industry fuel sales $476.3bn ÷ $3.11/gallon ÷ 122,620 fuel stores). Derived national-average proxy; not target volume.',benchmarkSource.id);
@@ -53,5 +60,5 @@ export function applyIndustryEstimates(review){
  fill('terminal',deal.price*.8,'Assume Year 10 net exit proceeds equal 80% of entry consideration, with no appreciation. Residual-value scenario, not an appraisal.',undefined,.25);
  const sources=[...(review.sources||[])];for(const s of [benchmarkSource,assumptionSource])if(estimates.some(e=>e.sourceId===s.id)&&!sources.some(x=>x.id===s.id))sources.push(s);
  const warning=`Screening case includes ${estimates.length} estimated inputs. NACS 2025 national benchmarks are proxies; staffing, margin, valuation and commercial terms are analyst assumptions. Estimates are editable and are not target facts or approved Sunoco terms.`;
- return {...review,deal,evidence,sources,estimates,missing:Object.keys(deal).filter(k=>deal[k]===null),warnings:[...(review.warnings||[]),...(estimates.length?[warning]:[])]};
+ return {...review,deal,evidence,sources,estimates,missing:Object.keys(deal).filter(k=>deal[k]===null),warnings:[...(review.warnings||[]).map(w=>w.replace(/(?:left null|left blank)/gi,'not source-provided; screening estimate shown separately')),...(estimates.length?[warning]:[])]};
 }
