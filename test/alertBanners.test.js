@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { bannerStateFromForecast, updateAlertBanners } from '../public/weather-fusion/alert-banners.js';
+import { bannerStateFromForecast, bannerStateFromNwsPeriods, updateAlertBanners } from '../public/weather-fusion/alert-banners.js';
 import { classifyHour } from '../src/whatsUpTracker.js';
+import { buildForecast } from '../src/weatherFusion.js';
+import { inputs, now as fixtureNow, H } from './weatherFusion.fixtures.js';
 
 const now = Date.parse('2026-09-20T16:00:00Z');
 const later = (hours) => new Date(now + hours * 3600000).toISOString();
@@ -59,4 +61,54 @@ test('updateAlertBanners shows both stacked links when both apply', () => {
   assert.equal(perfect.hidden, false);
   assert.equal(storm.hidden, false);
   assert.equal(stack.hidden, false);
+});
+
+test('server alertBanners flag unhides purple even when displayed hours miss Friday', () => {
+  const perfect = { hidden: true };
+  const storm = { hidden: true };
+  const stack = { hidden: true };
+  const root = {
+    getElementById(id) {
+      return { 'perfect-weather-banner': perfect, 'storm-weather-banner': storm, 'weather-alert-banners': stack }[id];
+    },
+  };
+  const state = updateAlertBanners({ hours: [quietHour], alertBanners: { perfect: true, storm: false } }, now, root);
+  assert.deepEqual(state, { perfect: true, storm: false });
+  assert.equal(perfect.hidden, false);
+  assert.equal(storm.hidden, true);
+  assert.equal(stack.hidden, false);
+});
+
+test('NWS hourly periods beyond the 48-hour fusion slice still set banners', () => {
+  const friday = {
+    startTime: later(5 * 24),
+    endTime: later(5 * 24 + 1),
+    isDaytime: true,
+    temperature: 72,
+    temperatureUnit: 'F',
+    shortForecast: 'Mostly Sunny',
+    windSpeed: '4 mph',
+    dewpoint: { value: 54, unitCode: 'wmoUnit:degF' },
+    probabilityOfPrecipitation: { value: 10 },
+  };
+  assert.deepEqual(bannerStateFromNwsPeriods([friday], { hours: [] }, now), { perfect: true, storm: false });
+  assert.deepEqual(bannerStateFromForecast({ hours: [quietHour], hourlyPeriods: [friday] }, now), { perfect: true, storm: false });
+});
+
+test('buildForecast attaches alertBanners from full NWS hourly, not just 48 display hours', () => {
+  const friday = {
+    startTime: new Date(fixtureNow + 5 * 24 * H).toISOString(),
+    endTime: new Date(fixtureNow + 5 * 24 * H + H).toISOString(),
+    isDaytime: true,
+    temperature: 72,
+    temperatureUnit: 'F',
+    shortForecast: 'Mostly Sunny',
+    windSpeed: '4 mph',
+    dewpoint: { value: 54, unitCode: 'wmoUnit:degF' },
+    probabilityOfPrecipitation: { value: 10 },
+    relativeHumidity: { value: 50 },
+  };
+  const out = buildForecast({ ...inputs, hourly: { periods: [...inputs.hourly.periods, friday] } });
+  assert.equal(out.hours.length, 48);
+  assert.equal(out.alertBanners.perfect, true);
 });

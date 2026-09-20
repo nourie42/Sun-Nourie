@@ -21,6 +21,7 @@ import {
   stormLevel,
   hourRainChance,
   classifyHour,
+  normalizeNwsHour,
 } from '../public/weather-fusion/whats-up-classify.js';
 
 export const TRACKER_VERSION = 'whats-up-tracker-v1';
@@ -41,6 +42,7 @@ export {
   stormLevel,
   hourRainChance,
   classifyHour,
+  normalizeNwsHour,
 };
 
 export const ASSUMPTIONS = Object.freeze({
@@ -145,25 +147,6 @@ function windowFromHours(hours, zone, extra = {}) {
     hourCount: hours.length,
     ...windowWeather(hours),
     ...extra,
-  };
-}
-
-export function normalizeNwsHour(period, fusionHour = null) {
-  const officialPop = periodPop(period);
-  return {
-    time: period.startTime,
-    end: period.endTime,
-    temperature: periodTemperature(period),
-    dewpoint: toFahrenheit(period.dewpoint),
-    wind: period.windSpeed,
-    windDirection: period.windDirection,
-    humidity: finite(period.relativeHumidity?.value) ? period.relativeHumidity.value : null,
-    condition: String(period.shortForecast || '').trim(),
-    isDay: !!period.isDaytime,
-    officialPop,
-    pop: officialPop,
-    skyCover: finite(fusionHour?.skyCover) ? fusionHour.skyCover : null,
-    rainLikelihood: fusionHour?.rainLikelihood || null,
   };
 }
 

@@ -72,6 +72,25 @@ export function hourRainChance(hour = {}) {
   return { value: null, official: null, source: 'unavailable', detail: 'No usable rain probability for this hour' };
 }
 
+export function normalizeNwsHour(period, fusionHour = null) {
+  const officialPop = periodPop(period);
+  return {
+    time: period.startTime,
+    end: period.endTime,
+    temperature: periodTemperature(period),
+    dewpoint: toFahrenheit(period.dewpoint),
+    wind: period.windSpeed,
+    windDirection: period.windDirection,
+    humidity: finite(period.relativeHumidity?.value) ? period.relativeHumidity.value : null,
+    condition: String(period.shortForecast || '').trim(),
+    isDay: !!period.isDaytime,
+    officialPop,
+    pop: officialPop,
+    skyCover: finite(fusionHour?.skyCover) ? fusionHour.skyCover : null,
+    rainLikelihood: fusionHour?.rainLikelihood || null,
+  };
+}
+
 export function classifyHour(hour = {}) {
   const sky = weatherState(hour.condition, hour.skyCover);
   const temperature = finite(hour.temperature) ? hour.temperature : periodTemperature(hour);

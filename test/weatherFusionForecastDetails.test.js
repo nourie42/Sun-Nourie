@@ -135,7 +135,7 @@ test('changed assets are cache-busted and late briefing responses stay guarded',
  assert.match(app,/outlook-details\.js\?v=weather-qa-v70/);
  for(const module of ['dans-summary','day-graph','hourly-feels','dewpoint-meter'])assert.match(app,new RegExp(`${module}\\.js\\?v=weather-qa-v67`));
  assert.match(app,/weather-math\.js\?v=weather-qa-v70/);assert.match(app,/rain-trend\.js\?v=weather-qa-v70/);
- assert.match(app,/alert-banners\.js\?v=alert-banners-v1/);
+ assert.match(app,/alert-banners\.js\?v=alert-banners-v2/);
  assert.match(app,/if \(id === generation && briefing\.signature === forecast\?\.signature\) renderBriefing\(briefing\)/);
 });
 test('Weather Nourie title quietly opens the shared experimental weather app',()=>{

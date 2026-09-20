@@ -18,7 +18,7 @@ import {forecastOutlookDetails} from './outlook-details.js?v=weather-qa-v70';
 import {isExperimentalWeatherPage,renderCarWashForecast,resetCarWashForecast} from './car-wash.js?v=weather-qa-v70';
 import {renderModelExplanation,resetModelExplanation} from './model-explanation.js?v=weather-qa-v70';
 import {updateRainTrend} from './rain-trend.js?v=weather-qa-v70';
-import {updateAlertBanners} from './alert-banners.js?v=alert-banners-v1';
+import {updateAlertBanners} from './alert-banners.js?v=alert-banners-v2';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);
 const experimentalPage = isExperimentalWeatherPage();

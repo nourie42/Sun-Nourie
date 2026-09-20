@@ -13,6 +13,7 @@ import { addExperience, gridSample, PLAIN_OUTLOOK_INSTRUCTIONS } from './weather
 import { solarTimes } from './weatherFusionDirect.js';
 import {forecastPeriodSummary} from '../public/weather-fusion/forecast-story.js';
 import {isTonightPeriod} from '../public/weather-fusion/weather-math.js';
+import {bannerStateFromNwsPeriods} from '../public/weather-fusion/alert-banners.js';
 /** Weather Fusion: isolated, dependency-free Express route registration.
  * Numeric forecasts stay deterministic. AI explains supplied facts; it cannot edit them.
  * Source contracts and deployment requirements: docs/weather-fusion.md.
@@ -376,6 +377,7 @@ export function buildForecast({ location, point, forecast, hourly, grid, discuss
   output.danTakeVersion=DAN_TAKE_VERSION;
   output.forecastConfidenceVersion=FORECAST_CONFIDENCE_VERSION;
   output.weatherDisplayVersion='weather-nourie-sky-consistency-v1';
+  output.alertBanners = bannerStateFromNwsPeriods(hourly?.periods || [], output, now);
   // Hash all forecast facts and source issuance, not just rainfall. Retrieval time is not model run time.
   output.signature = hash({ danTakeVersion:DAN_TAKE_VERSION, experienceVersion: output.experienceVersion, metricForecasts:output.metricForecasts, version: VERSION, location: output.location, current:output.current, days, hours, discussion, specialDiscussions:output.specialDiscussions, precipitationDiscussions:output.precipitationDiscussions, riskOutlooks:output.riskOutlooks,
     precipitation: output.precipitation, rainTimeline:output.rainTimeline, modelContributions: output.modelContributions, alerts: output.alerts.map((a) => [a.id, a.sent, a.expires]), feeds: feeds.map((f) => [f.id, f.status, f.issuedAt]) });
