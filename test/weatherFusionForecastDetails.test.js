@@ -124,7 +124,7 @@ test('Gross Meter heading stays centered and bold without changing chart geometr
  assert.match(css,/#gross-title\{text-align:center;font-weight:800\}/);assert.match(meterCss,/\.gross-eyebrow\{width:calc\(100% \+ 86px\);[^}]*text-align:center/);assert.match(meterCss,/@media\(max-width:760px\)[\s\S]*\.gross-eyebrow\{width:calc\(100% \+ 62px\)\}/);assert.ok(!/\.gross-(scroll|chart)\s*\{/.test(css));
 });
 test('changed assets are cache-busted and late briefing responses stay guarded',()=>{
- assert.match(html,/style\.css\?v=alert-banners-v1/);assert.match(html,/forecast-layout\.css\?v=weather-qa-v67/);assert.match(html,/personal-details\.css\?v=wpc-mpd-v12/);assert.match(html,/app\.js\?v=rain-now-v71/);assert.match(html,/car-wash\.css\?v=rain-consensus-v41/);assert.match(html,/forecast-cards\.css\?v=weather-qa-v70/);assert.match(html,/scenario-layout\.css\?v=weather-qa-v67/);
+ assert.match(html,/style\.css\?v=experimental-whats-up-v1/);assert.match(html,/forecast-layout\.css\?v=weather-qa-v67/);assert.match(html,/personal-details\.css\?v=wpc-mpd-v12/);assert.match(html,/app\.js\?v=rain-now-v71/);assert.match(html,/car-wash\.css\?v=rain-consensus-v41/);assert.match(html,/forecast-cards\.css\?v=weather-qa-v70/);assert.match(html,/scenario-layout\.css\?v=weather-qa-v67/);
  assert.match(app,/dans-take\.js\?v=weather-art-labels-v10/);
  assert.match(app,/bulletins\.js\?v=wpc-mpd-v1/);
  assert.match(app,/experience\.js\?v=rain-now-v71/);
@@ -135,7 +135,7 @@ test('changed assets are cache-busted and late briefing responses stay guarded',
  assert.match(app,/outlook-details\.js\?v=weather-qa-v70/);
  for(const module of ['dans-summary','day-graph','hourly-feels','dewpoint-meter'])assert.match(app,new RegExp(`${module}\\.js\\?v=weather-qa-v67`));
  assert.match(app,/weather-math\.js\?v=weather-qa-v70/);assert.match(app,/rain-trend\.js\?v=weather-qa-v70/);
- assert.match(app,/alert-banners\.js\?v=alert-banners-v2/);
+ assert.doesNotMatch(app,/updateAlertBanners/);
  assert.match(app,/if \(id === generation && briefing\.signature === forecast\?\.signature\) renderBriefing\(briefing\)/);
 });
 test('Weather Nourie title quietly opens the shared experimental weather app',()=>{
