@@ -18,6 +18,7 @@ import { registerFuelAtlasLocationCompanyBridge } from "./src/fuelAtlasLocationC
 import { registerWeatherFusionRoutes } from "./src/weatherFusion.js";
 import { registerAiAgentRoutes } from "./src/aiAgent.js";
 import { registerAiCouncilRoutes } from "./src/aiCouncil.js";
+import { registerDealDeskRoutes } from "./src/dealDeskRoutes.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -82,6 +83,7 @@ registerFuelAtlasRoutes(app, { googleApiKey: process.env.GOOGLE_API_KEY || "" })
 registerWeatherFusionRoutes(app);
 registerAiAgentRoutes(app);
 registerAiCouncilRoutes(app);
+registerDealDeskRoutes(app);
 
 app.get("/fuel-atlas", (_req, res) => res.redirect(302, "/fuel-atlas.html"));
 app.get("/fuel-atlas.html", (_req, res) => {
@@ -208,6 +210,9 @@ app.get("/health", (_req, res) => {
     webSearchJsonModeCompatibility: true,
     aiCouncil: true,
     aiAgent: true,
+    dealDesk: true,
+    dealDeskAiConfigured: Boolean(process.env.ANTHROPIC_API_KEY),
+    dealDeskPasscodeRequired: Boolean(process.env.DEAL_DESK_PASSWORD),
     legacyServerReady: legacyReady,
   });
 });
