@@ -46,7 +46,11 @@ export async function extractBoundedAnalysis({ask,content,current,notes,period,n
 }
 
 export async function verifyBoundedAnalysis({ask,content,raw,period,phase}){
- const request=async proposal=>parseAnalysis(await ask([{role:'user',content:[{type:'text',text:`Independently verify this proposed company analysis against the supplied sources. Return compact JSON only {approvedFields:[],companySupported:boolean,summarySupported:boolean,rejected:[{field,reason}]}. At most one rejection per field, reason at most 120 characters. Do not repeat source text, site rows or the proposal. Approve a field ONLY if its exact value, original unit/scale, period, currency USD and acquired perimeter are explicit, the quote matches, the field meaning/cost responsibility is correct, and no source conflicts. Reject assumptions, derived values, scanned/image values without reliable text, annualization, wrong periods, and prefilled legacy examples. Approve company/summary only when all facts are supported, hypotheses clearly labeled, and numbers do not imply unapproved synergies. Proposed analysis: ${JSON.stringify(proposal)}\nSelected period: ${period||'one common reported annual period'}`},...content]}],{max_tokens:6000}));
+ const request=async proposal=>{
+  const value=parseAnalysis(await ask([{role:'user',content:[{type:'text',text:`Independently verify this proposed company analysis against the supplied sources. Return compact JSON only {approvedFields:[],companySupported:boolean,summarySupported:boolean,rejected:[{field,reason}]}. approvedFields MUST contain only exact internal field-key strings, such as "sites" or "gallons", never labels or objects. Allowed keys: ${fields.map(f=>f.key).join(', ')}. Every proposed numeric field must be either approved or rejected with a specific reason. At most one rejection per field, reason at most 120 characters. Do not repeat source text, site rows or the proposal. Approve a field ONLY if its exact value, original unit/scale, period, currency USD and acquired perimeter are explicit, the quote matches, the field meaning/cost responsibility is correct, and no source conflicts. Reject assumptions, derived values, scanned/image values without reliable text, annualization, wrong periods, and prefilled legacy examples. Approve company/summary only when all facts are supported, hypotheses clearly labeled, and numbers do not imply unapproved synergies. Proposed analysis: ${JSON.stringify(proposal)}\nSelected period: ${period||'one common reported annual period'}`},...content]}],{max_tokens:6000}));
+  if(!Array.isArray(value.approvedFields)||value.approvedFields.some(k=>!fields.some(f=>f.key===k))||typeof value.companySupported!=='boolean'||typeof value.summarySupported!=='boolean')throw new SyntaxError('Invalid source-check response.');
+  return value;
+ };
  try{return await request(raw);}catch(e){if(!retryable(e))return null;}
  phase('Checking the smaller financial batches against the original sources…');
  const checks=[];
@@ -56,7 +60,7 @@ export async function verifyBoundedAnalysis({ask,content,raw,period,phase}){
   const proposal={company:raw.company,summary:raw.summary,deal:Object.fromEntries(keys.map(k=>[k,raw.deal?.[k]])),evidence:(raw.evidence||[]).filter(e=>keys.includes(e.field))};
   try{const v=await request(proposal);checks.push({...v,approvedFields:(v.approvedFields||[]).filter(k=>keys.includes(k))});}catch{return null;}
  }
- return {approvedFields:checks.flatMap(c=>c.approvedFields),companySupported:checks.every(c=>c.companySupported===true),summarySupported:checks.every(c=>c.summarySupported===true)};
+ return {approvedFields:checks.flatMap(c=>c.approvedFields),companySupported:checks.every(c=>c.companySupported===true),summarySupported:checks.every(c=>c.summarySupported===true),rejected:checks.flatMap(c=>Array.isArray(c.rejected)?c.rejected:[])};
 }
 
 // Paginate only unstructured site evidence. Spreadsheet/Word-table rows never

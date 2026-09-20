@@ -64,8 +64,10 @@ export function normalizeReview(raw, sources, current, verification, period) {
             reason = 'Check the quoted value, original scale, and units.';
         else if (hasNumber && !periodMatches)
             reason = 'Source period is missing or differs from the selected model period.';
-        else if (hasNumber && !approved.has(f.key))
-            reason = 'The independent verification pass did not approve this value.';
+        else if (hasNumber && !approved.has(f.key)) {
+            const rejected = Array.isArray(verification?.rejected) ? verification.rejected.find((x) => x?.field === f.key) : null;
+            reason = typeof rejected?.reason === 'string' ? 'Source check: ' + rejected.reason : 'The independent verification pass did not approve this value.';
+        }
         if (conflicting) {
             status = 'conflicting';
             reason = 'Sources report conflicting values.';

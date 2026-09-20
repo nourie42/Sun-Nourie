@@ -52,7 +52,7 @@ export function normalizeReview(raw:any, sources:any[], current:any, verificatio
   if(hasNumber&&!textMatches)reason='Source quote could not be matched to extracted text; confirm the original page/image.';
   else if(hasNumber&&!direct)reason='Check the quoted value, original scale, and units.';
   else if(hasNumber&&!periodMatches)reason='Source period is missing or differs from the selected model period.';
-  else if(hasNumber&&!approved.has(f.key))reason='The independent verification pass did not approve this value.';
+  else if(hasNumber&&!approved.has(f.key)){const rejected=Array.isArray(verification?.rejected)?verification.rejected.find((x:any)=>x?.field===f.key):null;reason=typeof rejected?.reason==='string'?'Source check: '+rejected.reason:'The independent verification pass did not approve this value.';}
   if(conflicting){status='conflicting';reason='Sources report conflicting values.';}
   deal[f.key]=currentDeal[f.key];
   if(currentDeal[f.key]!==null&&hasNumber&&currentDeal[f.key]!==value){status='conflicting';reason='Conflicts with the current model input.';conflicts.push({field:f.key,current:currentDeal[f.key],proposed:value});}

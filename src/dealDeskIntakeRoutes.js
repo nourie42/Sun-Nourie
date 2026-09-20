@@ -10,7 +10,7 @@ import {normalizeReview,safeUrl} from './dealDeskReview.js';
 import {extractBoundedAnalysis,verifyBoundedAnalysis,extractSitePages} from './dealDeskProcessing.js';
 
 const root=path.join(path.dirname(fileURLToPath(import.meta.url)),'..','public','deal-desk');
-export const DEAL_DESK_VERSION='deal-intake-v3-batched';
+export const DEAL_DESK_VERSION='deal-intake-v4-reconnect';
 const sameSecret=(a,b)=>timingSafeEqual(createHash('sha256').update(String(a||'')).digest(),createHash('sha256').update(String(b||'')).digest());
 const plain=(s,n=4000)=>typeof s==='string'?s.slice(0,n):'';
 const flattenRtf=node=>typeof node==='string'?node:node?.value||((node?.content||[]).map(flattenRtf).join('\n'));
@@ -119,6 +119,10 @@ export function registerDealDeskRoutes(app,{env=process.env,fetchImpl=globalThis
  }
  function queue(isSearch){return async(q,r)=>{
   for(const [id,j]of jobs)if(Date.now()-j.created>20*60*1000)jobs.delete(id);
+  const requestId=q.body?.requestId;
+  if(requestId!==undefined&&(typeof requestId!=='string'||! /^[a-zA-Z0-9-]{16,100}$/.test(requestId)))return r.status(400).json({error:'Invalid analysis request identifier.'});
+  const requestHash=requestId?createHash('sha256').update(JSON.stringify({isSearch,body:q.body})).digest('hex'):null;
+  if(requestId){const existing=[...jobs.entries()].find(([_id,j])=>j.requestId===requestId);if(existing){if(existing[1].requestHash!==requestHash)return r.status(409).json({error:'Analysis request identifier was reused with different files.'});return r.status(202).json({jobId:existing[0]});}}
   if(!providerKey())return r.status(503).json({error:'Deal Desk document processing is not configured.'});
   if(calls>=30||[...jobs.values()].filter(j=>j.state==='running').length>=2)return r.status(429).json({error:'Analysis capacity reached. Wait for the current job or try later; your draft is preserved.'});
   try{
@@ -127,13 +131,13 @@ export function registerDealDeskRoutes(app,{env=process.env,fetchImpl=globalThis
    if(!isSearch&&(!Array.isArray(q.body.files)||q.body.files.length>20||(!q.body.files.length&&!plain(q.body.notes,30000).trim())))throw Error('Upload files or enter deal notes first.');
    if(q.body.notes!==undefined&&(typeof q.body.notes!=='string'||q.body.notes.length>30000))throw Error('Deal notes exceed 30,000 characters.');
   }catch(e){return r.status(400).json({error:e.message});}
-  calls++;const id=randomUUID();const job={created:Date.now(),state:'running',phase:'Starting…'};jobs.set(id,job);
+  calls++;const id=randomUUID();const job={created:Date.now(),state:'running',phase:'Starting…',requestId,requestHash};jobs.set(id,job);
   r.status(202).json({jobId:id});
   analyze(q.body,isSearch,p=>{job.phase=p;}).then(result=>Object.assign(job,{state:'complete',result})).catch(e=>Object.assign(job,{state:'failed',error:e.name==='TimeoutError'?'Document processing timed out. Your draft is preserved; retry the analysis.':e instanceof SyntaxError||e.code==='OUTPUT_LIMIT'?'Document processing did not return valid data after automatic smaller-batch retries. Your files are retained; retry the analysis.':e.message}));
  };}
  api.post('/analyze',auth,express.json({limit:'30mb'}),queue(false));
  api.post('/research',auth,express.json({limit:'1mb'}),queue(true));
- api.get('/jobs/:id',auth,(q,r)=>{const job=jobs.get(q.params.id);if(!job||Date.now()-job.created>20*60*1000)return r.status(404).json({error:'This job expired or the service restarted. Run it again; your browser draft is preserved.'});r.json(job);});
+ api.get('/jobs/:id',auth,(q,r)=>{const job=jobs.get(q.params.id);if(!job||Date.now()-job.created>20*60*1000)return r.status(404).json({error:'This job expired or the service restarted. Run it again; your browser draft is preserved.'});const {requestId,requestHash,...publicJob}=job;r.json(publicJob);});
  api.post('/summary',auth,express.json({limit:'2mb'}),(q,r)=>{
   let deal;try{deal=validateImport(q.body.deal);}catch(e){return r.status(400).json({error:e.message});}
   const review=q.body.review||{},result=calculate(deal);const doc=new PDFDocument({margin:48,size:'LETTER'});

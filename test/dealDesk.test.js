@@ -57,12 +57,19 @@ test("missing inputs stay unknown, and capital is excluded from EBITDA", () => {
 
 test('static app retains hidden route and status does not expose secrets',async t=>{
  const f=await fixture(t);for(const route of ['/deal-desk','/deal-desk/','/deal-desk/index.html']){const r=await f.request(route);assert.equal(r.status,200);assert.match(await r.text(),/\/deal-desk\/assets\/index-/);assert.match(r.headers.get('content-security-policy'),/worker-src 'self' blob:/);assert.match(r.headers.get('x-robots-tag'),/noindex/);}
- const status=await(await f.request('/api/deal-desk/status')).json();assert.equal(status.version,'deal-intake-v3-batched');assert.equal(status.ready,true);assert.doesNotMatch(JSON.stringify(status),/test-code|test-not-real/);assert.equal((await f.request('/')).status,404);
+ const status=await(await f.request('/api/deal-desk/status')).json();assert.equal(status.version,'deal-intake-v4-reconnect');assert.equal(status.ready,true);assert.doesNotMatch(JSON.stringify(status),/test-code|test-not-real/);assert.equal((await f.request('/')).status,404);
 });
 test('authentication protects analysis, research, jobs and summary',async t=>{
  const f=await fixture(t);for(const [route,body]of [['/analyze',packet()],['/research',{deal:emptyDeal(),company:'X'}],['/jobs/invalid',undefined],['/summary',{deal:emptyDeal()}]])assert.equal((await f.request('/api/deal-desk'+route,body,{'x-deal-desk-passcode':'bad'})).status,401);
  const closed=await fixture(t,{env:{ANTHROPIC_API_KEY:'test'}});assert.equal((await closed.post(packet())).status,503);
  const override=await fixture(t,{env:{...env,DEAL_DESK_PASSWORD:'other'}});assert.equal((await override.post(packet())).status,401);
+});
+test('replayed submissions reuse one job and reject changed payloads',async t=>{
+ let calls=0;const f=await fixture(t,{fetchImpl:async()=>ai(++calls===1?proposal:verification)});
+ const p={...packet(),requestId:'safe-repeat-request-12345'};
+ const first=await(await f.post(p)).json(),second=await(await f.post(p)).json();assert.equal(first.jobId,second.jobId);
+ const job=await f.job(await f.post(p));assert.equal(job.state,'complete');assert.equal(calls,2);assert.equal(job.requestHash,undefined);
+ assert.equal((await f.post({...p,notes:'different packet'})).status,409);
 });
 test('two passes fill supported facts, normalize millions/cents and keep unknowns blank',async t=>{
  const sent=[];const f=await fixture(t,{fetchImpl:async(_u,o)=>{sent.push(JSON.parse(o.body));return ai(sent.length===1?proposal:verification);}});

@@ -11,6 +11,7 @@ import {readSourceFile,requestSources} from '@/lib/import';
 import {mergeSites,aggregateSites} from '@/lib/sites';
 import {exportModel,exportOriginal,downloadBlob,type CellMapping} from '@/lib/export';
 import {safeUrl} from '@/lib/review';
+import {requestJson,runAnalysisJob} from '@/lib/connection';
 import {sources,ideas} from '@/lib/reference';
 import type {SourceFile,Review,Site} from '@/lib/types';
 
@@ -27,7 +28,7 @@ export default function Home(){
  const canExport=analysisState==='complete'||r.ready;
  useEffect(()=>{
   try{setPasscode(sessionStorage.getItem('deal-desk-access')||'');}catch{}
-  fetch('/api/deal-desk/status').then(x=>x.json()).then(x=>{setReadyAI(!!x.ready);setAccessRequired(!!x.passcodeRequired);setAi(x.ready?'Deal Desk ready':x.message||'Deal Desk connection needed');}).catch(()=>setAi('Deal Desk connection unavailable'));
+  requestJson('/api/deal-desk/status',{}, {onReconnect:setAi}).then(x=>{setReadyAI(!!x.ready);setAccessRequired(!!x.passcodeRequired);setAi(x.ready?'Deal Desk ready':x.message||'Deal Desk connection needed');}).catch(()=>setAi('Deal Desk connection unavailable. Reconnect and reload this page.'));
  },[]);
  useEffect(()=>{if(readyAI&&queuedFilesRef.current&&!busy){const pending=queuedFilesRef.current;queuedFilesRef.current=null;void run('analyze',pending);}},[readyAI,busy]);
  const headers=()=>({'Content-Type':'application/json','x-deal-desk-passcode':passcode});
@@ -52,12 +53,8 @@ export default function Home(){
   setBusy(true);setActionMode(mode);setAnalysisState('running');setAnalysisMessage(mode==='research'?`Searching for ${company.trim()}, checking sources and filling the model…`:'Analyzing every uploaded file and filling the model…');setMessage('');
   try{
    validateImport(currentDeal);
-   const response=await fetch('/api/deal-desk/'+mode,{method:'POST',headers:headers(),body:JSON.stringify(mode==='research'?{deal:currentDeal,company,hint,period}:{deal:currentDeal,files:requestSources(sourceFiles),notes,period})});
-   let data=await response.json();if(!response.ok)throw Error(data.error||'Analysis could not start.');
-   const id=data.jobId,deadline=Date.now()+18*60*1000;
-   while(Date.now()<deadline){await new Promise(resolve=>setTimeout(resolve,1500));const poll=await fetch('/api/deal-desk/jobs/'+id,{headers:headers()});data=await poll.json();if(!poll.ok||data.state==='failed')throw Error(data.error||'Analysis failed.');setAnalysisMessage(data.phase||'Reviewing…');if(data.state==='complete')break;}
-   if(data.state!=='complete')throw Error('The analysis is taking longer than expected. Your files are retained; retry the analysis.');
-   const differentCompany=mode==='research'&&company.trim().toLowerCase()!==deal.name.trim().toLowerCase();if(differentCompany){setPreviousDraft({deal,review,files,siteRecords,notes,period});setFiles([]);setNotes('');setComplete(false);}const next=data.result as Review;setDeal(validateImport(next.deal));setReview(next);setPeriod(p=>p||next.company?.period||'');
+   const next=await runAnalysisJob(mode,mode==='research'?{deal:currentDeal,company,hint,period}:{deal:currentDeal,files:requestSources(sourceFiles),notes,period},headers(),{onPhase:setAnalysisMessage,onReconnect:setAnalysisMessage}) as Review;
+   const differentCompany=mode==='research'&&company.trim().toLowerCase()!==deal.name.trim().toLowerCase();if(differentCompany){setPreviousDraft({deal,review,files,siteRecords,notes,period});setFiles([]);setNotes('');setComplete(false);}setDeal(validateImport(next.deal));setReview(next);setPeriod(p=>p||next.company?.period||'');
    // Spreadsheet/Word table rows already exist. Only add AI rows from other sources.
    const structured=new Set(sourceFiles.filter(f=>f.sites?.length).map(f=>f.id));
    setSiteRecords(old=>differentCompany?next.sites:[...old.filter(s=>!next.sources.some(x=>x.id===s.sourceId)||structured.has(s.sourceId)),...next.sites.filter(s=>!structured.has(s.sourceId))]);
