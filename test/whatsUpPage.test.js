@@ -46,11 +46,11 @@ assert.doesNotMatch(home, /weather-alert-banner/);
 assert.doesNotMatch(home, /Click for Details/);
 
 const weather = read("public/weather-fusion/index.html");
-assert.match(weather, /id="perfect-weather-banner"[^>]*href="\/whats-up"/);
-assert.match(weather, /id="storm-weather-banner"[^>]*href="\/whats-up#storm"/);
-assert.match(weather, /Perfect weather alert — Click for Details/);
-assert.match(weather, /High rain chance alert — Click for Details/);
-assert.equal([...weather.matchAll(/Click for Details/g)].length, 2);
+assert.doesNotMatch(weather, /weather-alert-banner/);
+assert.doesNotMatch(weather, /id="perfect-weather-banner"/);
+assert.doesNotMatch(weather, /id="storm-weather-banner"/);
+assert.match(weather, /id="experimental-whats-up-link" href="\/whats-up"/);
+assert.match(weather, /Perfect weather tracker/);
 assert.doesNotMatch(home, /href="\/whats-up"/);
 
 const routes = read("src/whatsUpRoutes.js");

@@ -20,15 +20,13 @@ test('main HTML ships radar only while experimental mode adds every model contro
   assert.match(app,/if\(layer==='radar'\)/,'radar remains the normal main-page path');
 });
 
-test('shared weather shell stacks purple perfect and red storm banners to /whats-up',()=>{
-  assert.match(html,/id="perfect-weather-banner"[^>]*href="\/whats-up"/);
-  assert.match(html,/id="storm-weather-banner"[^>]*href="\/whats-up#storm"/);
-  assert.match(html,/Perfect weather alert — Click for Details/);
-  assert.match(html,/High rain chance alert — Click for Details/);
+test('experimental weather keeps a /whats-up tracker link while main pages do not show alert banners',()=>{
+  assert.doesNotMatch(html,/weather-alert-banner/);
+  assert.match(html,/id="experimental-whats-up-link" href="\/whats-up"/);
+  assert.match(html,/Perfect weather tracker/);
   const style = read('style.css');
-  assert.match(style,/\.weather-alert-banner--perfect\{[^}]*background:linear-gradient\(90deg,#4c1d95/);
-  assert.match(style,/\.weather-alert-banner--storm\{[^}]*background:linear-gradient\(90deg,#9b1818/);
-  assert.match(app,/updateAlertBanners\(data\)/);
+  assert.match(style,/\.experimental-whats-up-link\{/);
+  assert.match(app,/const tracker=\$\('experimental-whats-up-link'\);if\(tracker\)tracker\.hidden=!experimentalPage/);
 });
 
 test('main and experimental URLs are served by one shared app shell',()=>{
