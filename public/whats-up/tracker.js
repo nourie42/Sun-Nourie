@@ -129,21 +129,22 @@ function chartSvg(hours, { title, kind }) {
 }
 
 function windowCard(window, kind) {
+  const eyebrow = kind === 'perfect' ? 'Perfect weather alert' : 'High rain chance alert';
   if (!window) {
-    return `<article class="glass summary-stat empty">
-      <div class="eyebrow">${kind === 'perfect' ? 'NEXT PLEASANT STRETCH' : 'NEXT STORMY STRETCH'}</div>
+    return `<article class="glass summary-stat empty ${kind}">
+      <div class="eyebrow">${eyebrow}</div>
       <strong>None in the hourly forecast</strong>
     </article>`;
   }
   const icon = weatherIcon(window.condition || window.sky, window.isDay !== false, 42);
-  const stormNote = kind === 'storm'
-    ? (window.level === 'definite' ? 'Stormy' : 'Wet stretch')
-    : 'Pleasant';
+  const note = kind === 'storm'
+    ? (window.level === 'definite' ? 'Stormy' : 'Elevated rain')
+    : (window.condition || '');
   return `<article class="glass summary-stat ${kind}">
-    <div class="eyebrow">${kind === 'perfect' ? 'NEXT PLEASANT STRETCH' : 'NEXT STORMY STRETCH'}</div>
+    <div class="eyebrow">${eyebrow}</div>
     <div class="window-head">${icon}<div>
       <strong>${esc(`${window.dayLabel ? `${window.dayLabel} · ` : ''}${window.label}`)}</strong>
-      <span>${esc(stormNote)}${window.condition ? ` · ${esc(window.condition)}` : ''}</span>
+      <span>${esc(note)}</span>
     </div></div>
     <dl class="weather-metrics">
       <div><dt>Temp</dt><dd>${esc(rangeText(window.temperatureMin, window.temperatureMax, '°'))}</dd></div>
@@ -156,9 +157,15 @@ function windowCard(window, kind) {
 
 function outlook(data) {
   const hours = data.days.flatMap((day) => day.hours).slice(0, 36);
+  const highlight = data.summary.nextPerfect ? 'perfect' : data.summary.nextStorm ? 'storm' : '';
+  const title = data.summary.nextPerfect
+    ? 'Perfect weather alert'
+    : data.summary.nextStorm
+      ? 'High rain chance alert'
+      : 'Outlook';
   return `
-    <section class="glass briefing outlook-card" aria-labelledby="outlook-title">
-      <div class="section-top"><h2 id="outlook-title">AT A GLANCE</h2><span class="pill">${esc(data.status.nws === 'ready' ? 'NWS' : 'NWS OFFLINE')}</span></div>
+    <section class="glass briefing outlook-card ${highlight}" aria-labelledby="outlook-title">
+      <div class="section-top"><h2 id="outlook-title">${title}</h2><span class="pill">${esc(data.status.nws === 'ready' ? 'NWS' : 'NWS OFFLINE')}</span></div>
       <h3>${esc(data.summary.headline)}</h3>
       <p>${esc(data.summary.detail || weatherLine(data.summary.nextPerfect || data.summary.nextStorm))}</p>
     </section>

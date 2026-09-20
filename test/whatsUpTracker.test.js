@@ -124,7 +124,8 @@ test('tracker view names perfect and storm windows from hourly NWS periods', () 
   assert.equal(view.days[0].perfectWindows[0].windMax, 5);
   assert.equal(view.days[0].stormWindows[0].level, 'elevated');
   assert.equal(view.days[0].stormWindows[0].rainPeak, 80);
-  assert.match(view.summary.headline, /pleasant stretch/i);
+  assert.match(view.summary.headline, /Today 2pm–4pm/);
+  assert.doesNotMatch(view.summary.headline, /pleasant stretch/i);
   assert.doesNotMatch(view.summary.headline, /rule/i);
   assert.doesNotMatch(JSON.stringify(view), /Rule A|Rule B|Executive Summary/i);
   assert.equal(view.assumptions, undefined);
