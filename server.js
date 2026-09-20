@@ -85,6 +85,12 @@ registerAiAgentRoutes(app);
 registerAiCouncilRoutes(app);
 registerDealDeskRoutes(app);
 
+app.get(["/whats-up", "/whats-up/"], (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.sendFile(path.join(__dirname, "public", "whats-up", "index.html"));
+});
+app.get("/whatsup", (_req, res) => res.redirect(302, "/whats-up"));
+
 app.get("/fuel-atlas", (_req, res) => res.redirect(302, "/fuel-atlas.html"));
 app.get("/fuel-atlas.html", (_req, res) => {
   res.setHeader("Cache-Control", "no-store");
