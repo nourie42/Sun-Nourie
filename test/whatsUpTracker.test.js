@@ -125,8 +125,8 @@ test('tracker view names perfect and storm windows from hourly NWS periods', () 
 
 test('API validates ZIP and returns classified hours from NWS + fusion', async () => {
   const responses = {
-    'https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?address=27609&benchmark=Public_AR_Current&format=json': {
-      result: { addressMatches: [{ coordinates: { x: -78.64, y: 35.83 }, addressComponents: { city: 'Raleigh', state: 'NC' }, matchedAddress: 'RALEIGH, NC, 27609' }] },
+    "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/2/query?where=ZCTA5%3D%2727609%27&returnGeometry=true&returnExtentOnly=true&outSR=4326&f=json": {
+      extent: { xmin: -78.645, xmax: -78.635, ymin: 35.825, ymax: 35.835 },
     },
     'https://api.weather.gov/points/35.83,-78.64': {
       properties: {
@@ -182,6 +182,7 @@ test('API validates ZIP and returns classified hours from NWS + fusion', async (
     assert.equal(ok.status, 200);
     const body = await ok.json();
     assert.equal(body.place.office, 'RAH');
+    assert.equal(body.place.geocodeSource, 'U.S. Census TIGERweb ZCTA');
     assert.equal(body.status.rainFusion, 'ready');
     assert.equal(body.days[0].hours[0].perfect, 'A');
     assert.equal(body.days[0].hours[0].rainChance, 12);

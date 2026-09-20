@@ -22,7 +22,7 @@ export const ASSUMPTIONS = Object.freeze({
   perfectB: 'Rule B — warm and breezy: temperature 70–82°F, wind breezy (8–18 mph), and sky sunny or partly cloudy. Dewpoint is not required for Rule B.',
   storm: 'Storm timing uses the Weather Nourie rain-likelihood score when that hour is available (same fusion as the experimental Weather Fusion page: NWS hourly PoP plus same-day model QPF points). Otherwise the official NWS hourly or period probability of precipitation is used. ≥ 75% is stormy / elevated. 90–100% is definitely stormy.',
   exclusions: 'An hour cannot be perfect if rain chance is already storm-level, the sky is overcast/rainy/foggy, a required reading is missing, or wind is stronger than a breeze. Period forecasts never invent perfect hours.',
-  sources: 'Place: U.S. Census geocoder (ZIP). Forecast: api.weather.gov points, hourly, and period forecasts. Rain fusion is computed by the existing Weather Fusion service when that feed is ready.',
+  sources: 'Place: U.S. Census TIGERweb ZIP Code Tabulation Area (ZCTA) centroid, with a public ZIP fallback if Census is down. Forecast: api.weather.gov points, hourly, and period forecasts. Rain fusion is computed by the existing Weather Fusion service when that feed is ready.',
 });
 
 export function trackerError(message, status = 502, code = 'source') {
@@ -391,7 +391,7 @@ export function buildTrackerView({
     days,
     assumptions: ASSUMPTIONS,
     sources: [
-      { id: 'census', label: 'U.S. Census geocoder', status: 'ready' },
+      { id: 'geocode', label: place.source || 'ZIP geocoder', status: 'ready' },
       { id: 'nws', label: 'NWS points / hourly / period forecast', status: nwsReady ? 'ready' : 'unavailable' },
       { id: 'rain-fusion', label: 'Weather Nourie rain likelihood', status: rainFusionReady ? 'ready' : 'unavailable' },
     ],

@@ -151,8 +151,13 @@ async function track(zip, persist = true) {
     const fusion = data.status.rainFusion === 'ready' ? 'Rain fusion ready' : 'NWS PoP only';
     setStatus(`${data.place.name} · NWS ${data.status.nws} · ${fusion}`);
   } catch (error) {
-    byId('results').innerHTML = '';
-    setStatus(error.message || 'Weather data is temporarily unavailable. Please retry.', true);
+    const message = error.message || 'Weather data is temporarily unavailable. Please retry.';
+    byId('results').innerHTML = `<section class="glass briefing summary-card" role="alert">
+      <div class="section-top"><h2>FORECAST UNAVAILABLE</h2></div>
+      <h3>Could not load this ZIP</h3>
+      <p>${esc(message)}</p>
+    </section>`;
+    setStatus(message, true);
   } finally {
     button.disabled = false;
   }

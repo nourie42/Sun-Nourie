@@ -61,55 +61,23 @@ export function createWhatsUpService({
 
   async function geocodeZip(zip) {
     return cached(`zip:${zip}`, 24 * HOUR, async () => {
-      const censusUrl = `https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?${new URLSearchParams({
-        address: zip,
-        benchmark: 'Public_AR_Current',
-        format: 'json',
-      })}`;
       try {
-        const data = await request(censusUrl, { timeout: 10000 });
-        const match = data?.result?.addressMatches?.[0];
-        const x = Number(match?.coordinates?.x);
-        const y = Number(match?.coordinates?.y);
-        if (match && finite(x) && finite(y)) {
-          const city = clean(match.addressComponents?.city || match.matchedAddress);
-          const state = clean(match.addressComponents?.state);
-          return {
-            latitude: Number(y.toFixed(4)),
-            longitude: Number(x.toFixed(4)),
-            name: [city, state, zip].filter(Boolean).join(', '),
-            source: 'U.S. Census geocoder',
-          };
-        }
-      } catch (error) {
-        if (error.status === 400) throw error;
-      }
-
-      try {
-        const tigerUrl = `https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/8/query?${new URLSearchParams({
+        const tigerUrl = `https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/2/query?${new URLSearchParams({
           where: `ZCTA5='${zip}'`,
-          outFields: 'ZCTA5,NAME',
           returnGeometry: 'true',
+          returnExtentOnly: 'true',
           outSR: '4326',
           f: 'json',
         })}`;
         const tiger = await request(tigerUrl, { timeout: 10000 });
-        const feature = tiger?.features?.[0];
-        const extent = tiger?.features?.[0] ? feature?.attributes : null;
-        const rings = feature?.geometry?.rings?.[0];
-        if (Array.isArray(rings) && rings.length) {
-          const xs = rings.map((p) => p[0]).filter(finite);
-          const ys = rings.map((p) => p[1]).filter(finite);
-          if (xs.length && ys.length) {
-            const longitude = (Math.min(...xs) + Math.max(...xs)) / 2;
-            const latitude = (Math.min(...ys) + Math.max(...ys)) / 2;
-            return {
-              latitude: Number(latitude.toFixed(4)),
-              longitude: Number(longitude.toFixed(4)),
-              name: `${clean(extent?.NAME) || 'ZIP'} ${zip}`.trim(),
-              source: 'U.S. Census TIGERweb ZCTA',
-            };
-          }
+        const extent = tiger?.extent;
+        if ([extent?.xmin, extent?.xmax, extent?.ymin, extent?.ymax].every(finite)) {
+          return {
+            latitude: Number(((extent.ymin + extent.ymax) / 2).toFixed(4)),
+            longitude: Number(((extent.xmin + extent.xmax) / 2).toFixed(4)),
+            name: `ZIP ${zip}`,
+            source: 'U.S. Census TIGERweb ZCTA',
+          };
         }
       } catch {
         /* try public ZIP fallback next */
@@ -174,7 +142,7 @@ export function createWhatsUpService({
       ...geo,
       timeZone: properties.timeZone || 'America/New_York',
       office: properties.cwa || null,
-      name: geo.name || [properties.relativeLocation?.properties?.city, properties.relativeLocation?.properties?.state, zip].filter(Boolean).join(', '),
+      name: [properties.relativeLocation?.properties?.city, properties.relativeLocation?.properties?.state, zip].filter(Boolean).join(', ') || geo.name,
     };
     const [hourly, forecast, fusion] = await Promise.all([
       nwsJson(properties.forecastHourly, 'NWS hourly forecast'),
