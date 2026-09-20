@@ -105,4 +105,4 @@ export async function readSourceFile(file:File):Promise<SourceFile>{
  throw Error('This format cannot be read safely. Upload a PDF, Word, Excel, CSV, PowerPoint, OpenDocument, image, or text version.');
 }
 export async function readDealFile(file:File){return (await readSourceFile(file)).text;}
-export function requestSources(files:SourceFile[]){return files.flatMap(({workbook,sites,children,...source})=>[source,...(children||[])]);}
+export function requestSources(files:SourceFile[]){return files.flatMap(({workbook,sites,children,...source})=>[{...source,structuredSiteCount:sites?.length||0},...(children||[])]);}

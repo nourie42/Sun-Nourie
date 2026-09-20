@@ -6,6 +6,8 @@ import {registerDealDeskRoutes} from '../src/dealDeskRoutes.js';
 import {calculate,emptyDeal,exampleDeal,validateImport} from '../src/dealDeskModel.js';
 import {normalizeReview} from '../src/dealDeskReview.js';
 import {sitesFromRows,mergeSites,aggregateSites} from '../src/dealDeskSites.js';
+import {fields} from '../src/dealDeskModel.js';
+import {extractSitePages} from '../src/dealDeskProcessing.js';
 const env={ANTHROPIC_API_KEY:'test-not-real',AI_COUNCIL_ACCESS_CODE:'test-code'};
 const headers={'content-type':'application/json','x-deal-desk-passcode':'test-code'};
 const source={id:'f1',name:'Fictional seller.txt',kind:'text',text:'Fictional Fuel operates 10 sites. FY2025 annual gallons 15 million. Fuel margin USD/gallon 0.35.',warnings:[]};
@@ -55,7 +57,7 @@ test("missing inputs stay unknown, and capital is excluded from EBITDA", () => {
 
 test('static app retains hidden route and status does not expose secrets',async t=>{
  const f=await fixture(t);for(const route of ['/deal-desk','/deal-desk/','/deal-desk/index.html']){const r=await f.request(route);assert.equal(r.status,200);assert.match(await r.text(),/\/deal-desk\/assets\/index-/);assert.match(r.headers.get('content-security-policy'),/worker-src 'self' blob:/);assert.match(r.headers.get('x-robots-tag'),/noindex/);}
- const status=await(await f.request('/api/deal-desk/status')).json();assert.equal(status.version,'deal-intake-v2');assert.equal(status.ready,true);assert.doesNotMatch(JSON.stringify(status),/test-code|test-not-real/);assert.equal((await f.request('/')).status,404);
+ const status=await(await f.request('/api/deal-desk/status')).json();assert.equal(status.version,'deal-intake-v3-batched');assert.equal(status.ready,true);assert.doesNotMatch(JSON.stringify(status),/test-code|test-not-real/);assert.equal((await f.request('/')).status,404);
 });
 test('authentication protects analysis, research, jobs and summary',async t=>{
  const f=await fixture(t);for(const [route,body]of [['/analyze',packet()],['/research',{deal:emptyDeal(),company:'X'}],['/jobs/invalid',undefined],['/summary',{deal:emptyDeal()}]])assert.equal((await f.request('/api/deal-desk'+route,body,{'x-deal-desk-passcode':'bad'})).status,401);
@@ -81,10 +83,61 @@ test('verification failure retains proposed values for review without autofill',
  let n=0;const f=await fixture(t,{fetchImpl:async()=>++n===1?ai(proposal):Response.json({},{status:503})});
  const j=await f.job(await f.post(packet()));assert.equal(j.state,'complete');assert.equal(j.result.verified,false);assert.equal(j.result.deal.gallons,null);assert.equal(j.result.evidence.find(e=>e.field==='gallons').value,15000000);assert.match(j.result.warnings.join(' '),/verification/);
 });
-test('provider errors and incomplete responses remain visible job failures',async t=>{
- for(const response of [Response.json({},{status:401}),Response.json({stop_reason:'max_tokens'}),Response.json({content:[{type:'text',text:'invalid JSON'}]})]){
-  const f=await fixture(t,{fetchImpl:async()=>response});const j=await f.job(await f.post(packet()));assert.equal(j.state,'failed');assert.equal(typeof j.error,'string');
+test('provider errors and persistently incomplete responses remain visible job failures',async t=>{
+ for(const response of [()=>Response.json({},{status:401}),()=>Response.json({stop_reason:'max_tokens'}),()=>Response.json({content:[{type:'text',text:'invalid JSON'}]})]){
+  const f=await fixture(t,{fetchImpl:async()=>response()});const j=await f.job(await f.post(packet()));assert.equal(j.state,'failed');assert.equal(typeof j.error,'string');assert.doesNotMatch(j.error,/Split the packet|Try a smaller packet/);
  }
+});
+test('179k-character workbook with 99 retained rows recovers from output limit automatically',async t=>{
+ const sent=[];
+ const f=await fixture(t,{fetchImpl:async(_u,o)=>{
+  const body=JSON.parse(o.body);sent.push(body);
+  if(sent.length===1)return Response.json({stop_reason:'max_tokens',content:[{type:'text',text:'{"sites":['}]});
+  return ai(JSON.stringify(body).includes('Independently verify')?verification:{...proposal,sites:Array.from({length:99},(_,i)=>({id:String(i),sourceId:'f1',address:'Unwanted duplicate'})),siteSourceIds:['f1']});
+ }});
+ const large={...source,name:'99-site seller.xlsx',structuredSiteCount:99,text:source.text+'\n'+Array.from({length:3000},(_,i)=>`A${i+1}=record | B${i+1}=other attributes retained from original workbook`).join('\n')};
+ assert.ok(large.text.length>179835);
+ const j=await f.job(await f.post({...packet(),deal:{...emptyDeal(),sites:99},files:[large]}));
+ assert.equal(j.state,'complete');assert.equal(j.result.deal.sites,99);assert.equal(j.result.deal.gallons,15000000);assert.equal(j.result.deal.fuelCpg,35);assert.equal(j.result.deal.commission,null);
+ assert.equal(j.result.sites.length,0);assert.equal(j.result.summary,proposal.summary);assert.equal(sent.length,7);
+ for(const call of sent){const body=JSON.stringify(call);assert.match(body,/STRUCTURED SITE ROWS ALREADY RETAINED: 99/);assert.ok(body.includes('record | B3000=other attributes'));}
+ assert.match(sent[0].messages[0].content[0].text,/NEVER reproduce individual site rows/);
+ const batchPrompts=sent.slice(2,-1).map(c=>c.messages[0].content[0].text);
+ for(const field of fields)assert.equal(batchPrompts.filter(p=>p.includes(field.key+': '+field.label)).length,1);
+});
+test('malformed full extraction retries bounded batches, but unverified figures stay blank',async t=>{
+ let n=0;const f=await fixture(t,{fetchImpl:async(_u,o)=>{
+  const b=JSON.parse(o.body);n++;
+  if(n===1)return Response.json({content:[{type:'text',text:'{"deal":'}]});
+  return ai(JSON.stringify(b).includes('Independently verify')?{...verification,approvedFields:[]}:proposal);
+ }});
+ const j=await f.job(await f.post(packet()));assert.equal(j.state,'complete');assert.equal(j.result.deal.gallons,null);assert.equal(j.result.evidence.find(e=>e.field==='gallons').value,15000000);assert.equal(n,7);
+});
+test('verification output limit is automatically retried without bypassing approval',async t=>{
+ let n=0;const f=await fixture(t,{fetchImpl:async()=>{
+  n++;if(n===2)return Response.json({stop_reason:'max_tokens'});return ai(n===1?proposal:verification);
+ }});
+ const j=await f.job(await f.post(packet()));assert.equal(j.state,'complete');assert.equal(n,6);assert.equal(j.result.deal.gallons,15000000);assert.equal(j.result.verified,true);
+});
+test('standalone Deal Desk credentials work without any AI Council configuration',async t=>{
+ let n=0;const f=await fixture(t,{env:{DEAL_DESK_PASSWORD:'test-code',DEAL_DESK_API_KEY:'desk-test-key',DEAL_DESK_MODEL:'desk-model'},fetchImpl:async(_u,o)=>{
+  assert.equal(o.headers['x-api-key'],'desk-test-key');assert.equal(JSON.parse(o.body).model,'desk-model');return ai(++n===1?proposal:verification);
+ }});
+ assert.equal((await(await f.request('/api/deal-desk/status')).json()).ready,true);
+ const j=await f.job(await f.post(packet()));assert.equal(j.state,'complete');assert.equal(j.result.deal.gallons,15000000);
+});
+test('unstructured site extraction reduces overflowing batches and retains every returned attribute',async()=>{
+ const requests=[];const rows=Array.from({length:9},(_,i)=>({id:String(i+1),address:`${i+1} Main St`,sourceId:'f1',locator:`row ${i+1}`,raw:{'Original custom column':'value-'+(i+1)}}));
+ const result=await extractSitePages({sources:[source],sourceIds:['f1'],sourceContent:()=>[],phase:()=>{},ask:async(messages)=>{
+  const text=messages[0].content[0].text;requests.push(text);
+  if(requests.length===1)return {stop_reason:'max_tokens'};
+  const second=requests.length===2;return {content:[{type:'text',text:JSON.stringify({sites:second?rows.slice(0,7):rows.slice(7),hasMore:second,nextCursor:second?'row 7':''})}]};
+ }});
+ assert.equal(result.sites.length,9);assert.equal(result.sites[8].raw['Original custom column'],'value-9');assert.deepEqual(result.warnings,[]);assert.match(requests[1],/at most 7 records/);assert.match(requests[2],/AFTER locator "row 7"/);
+});
+test('site extraction stalls are visible, never claimed as a complete perimeter',async()=>{
+ const result=await extractSitePages({sources:[source],sourceIds:['f1'],sourceContent:()=>[],phase:()=>{},ask:async()=>({content:[{type:'text',text:JSON.stringify({sites:[],hasMore:true,nextCursor:''})}]})});
+ assert.match(result.warnings.join(' '),/incomplete/);
 });
 test('PDFs sent as native documents in both passes, images cannot be text-verified',async t=>{
  const calls=[];const f=await fixture(t,{fetchImpl:async(_u,o)=>{calls.push(JSON.parse(o.body));return ai(calls.length===1?proposal:verification);}});
