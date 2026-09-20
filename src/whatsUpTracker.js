@@ -307,11 +307,11 @@ export function buildTrackerView({
 
   const nwsReady = classified.length > 0 || periodForecasts.length > 0;
   const headline = nextPerfect
-    ? `Pleasant stretch ${nextPerfect.dayLabel} ${nextPerfect.label}`
+    ? `${nextPerfect.dayLabel} ${nextPerfect.label}`
     : nextStorm
-      ? `Next stormy stretch ${nextStorm.dayLabel} ${nextStorm.label}`
+      ? `${nextStorm.dayLabel} ${nextStorm.label}`
       : nwsReady
-        ? 'No standout pleasant or stormy stretch in the hourly forecast'
+        ? 'No perfect weather or high rain chance in the hourly forecast'
         : 'Forecast is not available';
   const detail = nextPerfect
     ? [rangeText(nextPerfect.temperatureMin, nextPerfect.temperatureMax, '°'), nextPerfect.condition].filter(Boolean).join(' · ')
