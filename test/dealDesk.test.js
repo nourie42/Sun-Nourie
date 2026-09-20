@@ -4,7 +4,7 @@ import express from 'express';
 import {once} from 'node:events';
 import {registerDealDeskRoutes} from '../src/dealDeskRoutes.js';
 import {calculate,emptyDeal,exampleDeal,validateImport} from '../src/dealDeskModel.js';
-import {normalizeReview} from '../src/dealDeskReview.js';
+import {normalizeReview,restoreSourceQuotes} from '../src/dealDeskReview.js';
 import {sitesFromRows,mergeSites,aggregateSites} from '../src/dealDeskSites.js';
 import {fields} from '../src/dealDeskModel.js';
 import {extractSitePages} from '../src/dealDeskProcessing.js';
@@ -19,6 +19,12 @@ const proposal={company:{name:'Fictional Fuel',overview:'Fictional Fuel operates
 const verification={approvedFields:['sites','gallons','fuelCpg'],companySupported:true,summarySupported:true};
 const ai=x=>Response.json({stop_reason:'end_turn',content:[{type:'text',text:JSON.stringify(x)}]});
 const packet=()=>({deal:emptyDeal(),files:[source],notes:'',period:'FY2025'});
+test('shortened quotes restore only a unique complete uploaded source line',()=>{
+ const line='Seller fuel margin before dealer commission and card fees: 35 cents/gallon.';
+ const proposal={evidence:[{sourceId:'q',quote:'Seller fuel margin ... 35 cents/gallon.'}]};
+ assert.equal(restoreSourceQuotes(structuredClone(proposal),[{id:'q',kind:'text',text:line}]).evidence[0].quote,line);
+ for(const source of [{id:'q',kind:'web',text:line},{id:'q',kind:'text',text:line+'\n'+line},{id:'q',kind:'text',text:line.replace('35','45')}])assert.equal(restoreSourceQuotes(structuredClone(proposal),[source]).evidence[0].quote,proposal.evidence[0].quote);
+});
 async function fixture(t,opts={}){
  const app=express();registerDealDeskRoutes(app,{env,...opts});const server=app.listen(0,'127.0.0.1');await once(server,'listening');t.after(()=>new Promise(r=>{server.close(r);server.closeAllConnections();}));
  const base='http://127.0.0.1:'+server.address().port;
@@ -57,7 +63,7 @@ test("missing inputs stay unknown, and capital is excluded from EBITDA", () => {
 
 test('static app retains hidden route and status does not expose secrets',async t=>{
  const f=await fixture(t);for(const route of ['/deal-desk','/deal-desk/','/deal-desk/index.html']){const r=await f.request(route);assert.equal(r.status,200);assert.match(await r.text(),/\/deal-desk\/assets\/index-/);assert.match(r.headers.get('content-security-policy'),/worker-src 'self' blob:/);assert.match(r.headers.get('x-robots-tag'),/noindex/);}
- const status=await(await f.request('/api/deal-desk/status')).json();assert.equal(status.version,'deal-intake-v4-reconnect');assert.equal(status.ready,true);assert.doesNotMatch(JSON.stringify(status),/test-code|test-not-real/);assert.equal((await f.request('/')).status,404);
+ const status=await(await f.request('/api/deal-desk/status')).json();assert.equal(status.version,'deal-intake-v4.1-quote-recovery');assert.equal(status.ready,true);assert.doesNotMatch(JSON.stringify(status),/test-code|test-not-real/);assert.equal((await f.request('/')).status,404);
 });
 test('authentication protects analysis, research, jobs and summary',async t=>{
  const f=await fixture(t);for(const [route,body]of [['/analyze',packet()],['/research',{deal:emptyDeal(),company:'X'}],['/jobs/invalid',undefined],['/summary',{deal:emptyDeal()}]])assert.equal((await f.request('/api/deal-desk'+route,body,{'x-deal-desk-passcode':'bad'})).status,401);

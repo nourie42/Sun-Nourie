@@ -1,6 +1,34 @@
 // Generated from deal-desk/lib/review.ts.
 import { fields, emptyDeal, validateImport } from './dealDeskModel.js';
 const norm = (s) => String(s ?? '').normalize('NFKC').replace(/\s+/g, ' ').trim().toLowerCase();
+// Restore a shortened quote only when all fragments identify one original line.
+// This does not approve a value; independent verification and unit checks follow.
+export function restoreSourceQuotes(raw, sources) {
+    for (const e of Array.isArray(raw?.evidence) ? raw.evidence : []) {
+        const s = sources.find(s => s.id === e?.sourceId);
+        if (!s || s.kind === 'web' || typeof e.quote !== 'string' || norm(s.text).includes(norm(e.quote)))
+            continue;
+        const pieces = e.quote.split(/\.{3}|…/).map(norm).filter(Boolean);
+        if (pieces.length < 2)
+            continue;
+        const matches = String(s.text || '').split(/\r?\n/).filter(line => {
+            if (line.length > 800)
+                return false;
+            const text = norm(line);
+            let at = 0;
+            for (const piece of pieces) {
+                const found = text.indexOf(piece, at);
+                if (found < 0)
+                    return false;
+                at = found + piece.length;
+            }
+            return true;
+        });
+        if (matches.length === 1)
+            e.quote = matches[0].trim();
+    }
+    return raw;
+}
 export const safeUrl = (s) => { try {
     const u = new URL(String(s));
     return ['https:', 'http:'].includes(u.protocol) ? u.href : '';

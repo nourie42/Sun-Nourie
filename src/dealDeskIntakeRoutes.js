@@ -6,11 +6,11 @@ import WordExtractor from 'word-extractor';
 import rtf from 'rtf-parser';
 import PDFDocument from 'pdfkit';
 import {validateImport,calculate,fields,money,percent,emptyDeal} from './dealDeskModel.js';
-import {normalizeReview,safeUrl} from './dealDeskReview.js';
+import {normalizeReview,safeUrl,restoreSourceQuotes} from './dealDeskReview.js';
 import {extractBoundedAnalysis,verifyBoundedAnalysis,extractSitePages} from './dealDeskProcessing.js';
 
 const root=path.join(path.dirname(fileURLToPath(import.meta.url)),'..','public','deal-desk');
-export const DEAL_DESK_VERSION='deal-intake-v4-reconnect';
+export const DEAL_DESK_VERSION='deal-intake-v4.1-quote-recovery';
 const sameSecret=(a,b)=>timingSafeEqual(createHash('sha256').update(String(a||'')).digest(),createHash('sha256').update(String(b||'')).digest());
 const plain=(s,n=4000)=>typeof s==='string'?s.slice(0,n):'';
 const flattenRtf=node=>typeof node==='string'?node:node?.value||((node?.content||[]).map(flattenRtf).join('\n'));
@@ -109,6 +109,7 @@ export function registerDealDeskRoutes(app,{env=process.env,fetchImpl=globalThis
   phase('Extracting company facts, site records and model inputs…');
   const content=sourceContent(sources);
   const raw=await extractBoundedAnalysis({ask:analysisAsk,content,current,notes:isSearch?'Public company search':plain(body.notes,30000),period,narrative,phase});
+  restoreSourceQuotes(raw,sources);
   phase('Checking source quotes, units, periods and conflicts…');
   const verification=await verifyBoundedAnalysis({ask:analysisAsk,content,raw,period,phase});
   const siteResult=await extractSitePages({ask:analysisAsk,sources,sourceContent,sourceIds:Array.isArray(raw.siteSourceIds)?raw.siteSourceIds:[],phase});
