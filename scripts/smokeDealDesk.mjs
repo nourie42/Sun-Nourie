@@ -53,6 +53,7 @@ try{
   await page.getByRole('button',{name:'Clear inputs',exact:true}).click();
   await page.locator('#source-files').setInputFiles([{name:'seller.pdf',mimeType:'application/pdf',buffer:pdf},{name:'sites.csv',mimeType:'text/csv',buffer:Buffer.from(csv)},{name:'terms.docx',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',buffer:word}]);
   await page.getByRole('status').filter({hasText:'3 file(s) read. 122 site rows retained.'}).waitFor({timeout:30000});
+  assert.equal(await page.getByRole('button',{name:'Analysis required before download'}).isEnabled(),false);assert.equal(await page.locator('#sites').inputValue(),'122');
   assert.equal(await page.locator('.file-row').count(),3);assert.match(await page.locator('.file-row').filter({hasText:'seller.pdf'}).innerText(),/2 pages/);
   await page.getByLabel('Financial period',{exact:true}).fill('FY2025');await page.getByRole('tab',{name:'04 · Sites & sources'}).click();
   assert.equal(await page.locator('tbody tr').count(),50);await page.getByRole('button',{name:'Next 50'}).click();await page.getByRole('button',{name:'Next 50'}).click();assert.equal(await page.locator('tbody tr').count(),22);
@@ -61,7 +62,7 @@ try{
   await page.screenshot({path:output+'/'+viewport.width+'-sites.png',fullPage:true});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
   if(!live){
    await page.getByRole('tab',{name:'01 · Deal inputs'}).click();await page.getByLabel('Workspace access code').fill('test-code');
-   await page.getByRole('button',{name:'Run analysis again'}).click();await page.getByText('Fictional Fuel operates 10 sites. Dealer commission terms and conversion costs remain to be confirmed.',{exact:true}).waitFor({timeout:20000});
+   await page.getByRole('button',{name:'Analyze files & fill model'}).click();await page.getByText('Fictional Fuel operates 10 sites. Dealer commission terms and conversion costs remain to be confirmed.',{exact:true}).waitFor({timeout:20000});
    assert.equal(await page.getByRole('button',{name:'Confirm value',exact:true}).count(),0);
    await page.screenshot({path:output+'/'+viewport.width+'-summary.png',fullPage:true});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
    const report=await download(page.getByRole('button',{name:'Download summary PDF'}),viewport.width+'-summary.pdf');assert.equal(report.subarray(0,5).toString(),'%PDF-');
