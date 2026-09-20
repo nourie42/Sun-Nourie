@@ -29,7 +29,7 @@ export default function Home(){
  },[]);
  const headers=()=>({'Content-Type':'application/json','x-deal-desk-passcode':passcode});
  function updatePasscode(value:string){setPasscode(value);try{sessionStorage.setItem('deal-desk-access',value);sessionStorage.setItem('ai-council-access',value);}catch{}}
- function requireAccess(prefix=''){if(accessRequired&&!passcode.trim()){setMessage((prefix?prefix+' ':'')+'Enter your workspace access code once. Then the uploaded files or company search will run automatically.');passcodeRef.current?.focus();return true;}return false;}
+ function requireAccess(prefix=''){if(accessRequired&&!passcode.trim()){setMessage((prefix?prefix+' ':'')+'Enter your workspace access code once, then try this action again. Uploaded files are retained; future uploads and searches run automatically.');passcodeRef.current?.focus();return true;}return false;}
  function update(key:string,value:any){setDeal(d=>({...d,[key]:value}));if(key==='name')setReview(null);}
  async function upload(list:FileList|null){
   if(!list||busy)return;setBusy(true);setActionMode('analyze');setLastAction('analyze');setMessage('Reading every uploaded file…');const accepted:SourceFile[]=[],errors:string[]=[];
