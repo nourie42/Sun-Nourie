@@ -4,9 +4,9 @@ export async function requestJson(url,options={},hooks={}){
  for(let attempt=0;attempt<6;attempt++){
   try{
    const response=await fetcher(url,{...options,signal:AbortSignal.timeout(30000)});
-   if([408,429,502,503,504].includes(response.status))throw Object.assign(new Error('Service temporarily unavailable.'),{retryable:true});
+   if([408,502,503,504].includes(response.status))throw Object.assign(new Error('Service temporarily unavailable.'),{retryable:true});
    let data;try{data=await response.json();}catch{throw Object.assign(new Error('Service returned an unreadable response.'),{retryable:response.ok||response.status>=500});}
-   if(!response.ok)throw Object.assign(new Error(data.error||`Request failed (${response.status}).`),{status:response.status});
+   if(!response.ok)throw Object.assign(new Error(data.error||`Request failed (${response.status}).`),{status:response.status,retryAfter:response.headers.get('retry-after')});
    return data;
   }catch(error){
    if(!(error instanceof TypeError||error.name==='TimeoutError'||error.name==='AbortError'||error.retryable))throw error;
@@ -21,13 +21,14 @@ export async function runAnalysisJob(mode,payload,headers,hooks={}){
  const options={method:'POST',headers,body:JSON.stringify({...payload,requestId})};
  const wait=hooks.wait||sleep,now=hooks.now||Date.now;
  const submit=()=>requestJson('/api/deal-desk/'+mode,options,hooks);
- let job=await submit(),restarts=0;
+ let job=hooks.jobId?{jobId:hooks.jobId}:await submit(),restarts=0;
  const deadline=now()+18*60*1000;
  hooks.onJob?.(job.jobId);
  while(now()<deadline){
   await wait(1500);
   let data;
   try{data=await requestJson('/api/deal-desk/jobs/'+job.jobId,{headers},hooks);}catch(error){
+   if(error.connectionLost){error.jobId=job.jobId;error.message='Connection interrupted while checking progress. Run again to reconnect to this analysis; your inputs and files are retained.';throw error;}
    if(error.status!==404||restarts++>=1)throw error;
    hooks.onReconnect?.('The service restarted. Resubmitting your retained files automatically…');
    job=await submit();hooks.onJob?.(job.jobId);continue;

@@ -16,7 +16,7 @@ import {purchaseRecommendation,synergyRows,channelResults} from '../deal-desk/li
 import {applyIndustryEstimates} from '../deal-desk/lib/estimates.js';
 
 const root=path.join(path.dirname(fileURLToPath(import.meta.url)),'..','public','deal-desk');
-export const DEAL_DESK_VERSION='deal-intake-v10-workbook-cells';
+export const DEAL_DESK_VERSION='deal-intake-v11-search-periods';
 const sameSecret=(a,b)=>timingSafeEqual(createHash('sha256').update(String(a||'')).digest(),createHash('sha256').update(String(b||'')).digest());
 const plain=(s,n=4000)=>typeof s==='string'?s.slice(0,n):'';
 const flattenRtf=node=>typeof node==='string'?node:node?.value||((node?.content||[]).map(flattenRtf).join('\n'));
@@ -83,9 +83,9 @@ export function registerDealDeskRoutes(app,{env=process.env,fetchImpl=globalThis
  }
  async function research(name,hint,phase,period){
   phase('Searching official company and Sunoco sources…');
-  if(/^(arko(?:\s+corp(?:oration)?\.?)?|gpm(?:\s+investments)?)$/i.test(name.trim())&&period==='FY2025'){
+  if(/^(arko(?:\s+corp(?:oration)?\.?)?|gpm(?:\s+investments)?)$/i.test(name.trim())&&['FY2025','FY2024'].includes(period)){
    const direct=await expandPublicSources([{id:'arko-issuer-fy2025',name:'ARKO Corp. Reports Fourth Quarter and Full Year 2025 Results — issuer release',url:'https://www.globenewswire.com/news-release/2026/02/25/3245001/0/en/ARKO-Corp-Reports-Fourth-Quarter-and-Full-Year-2025-Results.html',kind:'web',text:'',warnings:[]}],fetchImpl);
-   if(direct[0]?.text.length>10000&&!direct[0].warnings.length)return {sources:direct,narrative:'Direct issuer-published FY2025 results for ARKO Corp. Use the full-year columns, not fourth-quarter columns. Main model is company-operated retail, with existing wholesale/dealer and fleet operations in separate schedules. Purely intersegment GPMP fees must not be counted a second time.'};
+   if(direct[0]?.text.length>10000&&!direct[0].warnings.length)return {sources:direct,narrative:`Direct issuer-published ${period} results for ARKO Corp. Use the requested full-year columns, not fourth-quarter columns. Main model is company-operated retail, with existing wholesale/dealer and fleet operations in separate schedules. Purely intersegment GPMP fees must not be counted a second time.`};
   }
   // Only the public company query is sent to search. Uploaded documents and notes never enter this request.
   const messages=[{role:'user',content:`Research the public company ${JSON.stringify(name)}. Disambiguation: ${JSON.stringify(hint)}. Use web search. Prefer company filings, SEC, company sites and official announcements. Find the issuer's earnings-release financial tables for the requested period, including an accessible issuer-distributed release on GlobeNewswire or Business Wire if SEC/IR pages cannot be read. This is a hypothetical acquisition screen requested by the user; it does not require an announced Sunoco transaction. Cover ALL business channels: company-operated retail, existing dealers, wholesale supply, fleet and other reported segments. Distinguish operated stores from supplied dealer locations and cardlock locations; do not omit non-retail segments. Requested reporting basis: ${period}. Retrieve official earnings tables or SEC filings for this period, not just narrative snippets. Find retail fuel gallons/margin/merchandise gross profit/site operating expense AND separate dealer/wholesale/fleet volume, margin, income, expenses and site counts. Include corporate G&A separately; never allocate all company G&A to every segment. Find factual company overview, geography, owned/leased/company-operated/wholesale site counts, annual retail gallons, retail gross profit and retail expenses. Cite the exact short numeric source passages for every figure, with period and unit. Do not substitute historical capital spending for a proposed acquisition price. Identify one consistent annual reporting period, units, currency, and exact perimeter. Also search current official Sunoco disclosures for relevant integration mechanisms and risks, clearly separate Sunoco group data from target data. Never apply corporate synergy percentages to this target. Private company data may not be public; say what is unavailable. Cite every factual claim with the native web citations. Do not guess addresses or internal Sunoco margins.`}];
@@ -108,7 +108,7 @@ export function registerDealDeskRoutes(app,{env=process.env,fetchImpl=globalThis
   }
   if(!sources.length)throw Error('Search returned no traceable cited sources. No facts were applied.');
   // Known issuer release fallback: fetch the original published tables, never hardcode financial values.
-  if(/^(arko(?:\s+corp(?:oration)?\.?)?|gpm(?:\s+investments)?)$/i.test(name.trim())&&period==='FY2025'&&!sources.some(s=>s.url.includes('/3245001/')))sources.unshift({id:'arko-issuer-fy2025',name:'ARKO Corp. Reports Fourth Quarter and Full Year 2025 Results — issuer release',url:'https://www.globenewswire.com/news-release/2026/02/25/3245001/0/en/ARKO-Corp-Reports-Fourth-Quarter-and-Full-Year-2025-Results.html',kind:'web',text:'',warnings:[]});
+  if(/^(arko(?:\s+corp(?:oration)?\.?)?|gpm(?:\s+investments)?)$/i.test(name.trim())&&['FY2025','FY2024'].includes(period)&&!sources.some(s=>s.url.includes('/3245001/')))sources.unshift({id:'arko-issuer-fy2025',name:'ARKO Corp. Reports Fourth Quarter and Full Year 2025 Results — issuer release',url:'https://www.globenewswire.com/news-release/2026/02/25/3245001/0/en/ARKO-Corp-Reports-Fourth-Quarter-and-Full-Year-2025-Results.html',kind:'web',text:'',warnings:[]});
   phase('Reading the financial tables behind public citations…');
   return {sources:await expandPublicSources(sources,fetchImpl),narrative};
  }
@@ -145,7 +145,8 @@ export function registerDealDeskRoutes(app,{env=process.env,fetchImpl=globalThis
   const requestHash=requestId?createHash('sha256').update(JSON.stringify({isSearch,body:q.body})).digest('hex'):null;
   if(requestId){const existing=[...jobs.entries()].find(([_id,j])=>j.requestId===requestId);if(existing){if(existing[1].requestHash!==requestHash)return r.status(409).json({error:'Analysis request identifier was reused with different files.'});return r.status(202).json({jobId:existing[0]});}}
   if(!providerKey())return r.status(503).json({error:'Deal Desk document processing is not configured.'});
-  if(calls>=30||[...jobs.values()].filter(j=>j.state==='running').length>=2)return r.status(429).json({error:'Analysis capacity reached. Wait for the current job or try later; your draft is preserved.'});
+  if(calls>=30)return r.set('Retry-After',String(Math.max(1,Math.ceil((start+3600000-Date.now())/1000)))).status(429).json({error:'The workspace has reached 30 analyses this hour. Try after the hourly limit resets; your draft is preserved.'});
+  if([...jobs.values()].filter(j=>j.state==='running').length>=2)return r.set('Retry-After','30').status(429).json({error:'Two analyses are already running in this workspace. Wait for one to finish before starting another; your draft is preserved.'});
   try{
    validateImport(q.body?.deal);
    if(isSearch&&(!plain(q.body.company,160).trim()||q.body.company.length>160))throw Error('Enter a company name (up to 160 characters).');

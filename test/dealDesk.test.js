@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
+import fs from 'node:fs';
 import {once} from 'node:events';
 import {registerDealDeskRoutes} from '../src/dealDeskRoutes.js';
 import {calculate,emptyDeal,exampleDeal,validateImport} from '../src/dealDeskModel.js';
@@ -80,7 +81,7 @@ test("missing inputs stay unknown, and capital is excluded from EBITDA", () => {
 
 test('static app retains hidden route and status does not expose secrets',async t=>{
  const f=await fixture(t);for(const route of ['/deal-desk','/deal-desk/','/deal-desk/index.html']){const r=await f.request(route);assert.equal(r.status,200);assert.match(await r.text(),/\/deal-desk\/assets\/index-/);assert.match(r.headers.get('content-security-policy'),/worker-src 'self' blob:/);assert.match(r.headers.get('x-robots-tag'),/noindex/);}
- const status=await(await f.request('/api/deal-desk/status')).json();assert.equal(status.version,'deal-intake-v10-workbook-cells');assert.equal(status.ready,true);assert.doesNotMatch(JSON.stringify(status),/test-code|test-not-real/);assert.equal((await f.request('/')).status,404);
+ const status=await(await f.request('/api/deal-desk/status')).json();assert.equal(status.version,'deal-intake-v11-search-periods');assert.equal(status.ready,true);assert.doesNotMatch(JSON.stringify(status),/test-code|test-not-real/);assert.equal((await f.request('/')).status,404);
 });
 test('authentication protects analysis, research, jobs and summary',async t=>{
  const f=await fixture(t);for(const [route,body]of [['/analyze',packet()],['/research',{deal:emptyDeal(),company:'X'}],['/jobs/invalid',undefined],['/summary',{deal:emptyDeal()}]])assert.equal((await f.request('/api/deal-desk'+route,body,{'x-deal-desk-passcode':'bad'})).status,401);
@@ -93,6 +94,14 @@ test('replayed submissions reuse one job and reject changed payloads',async t=>{
  const first=await(await f.post(p)).json(),second=await(await f.post(p)).json();assert.equal(first.jobId,second.jobId);
  const job=await f.job(await f.post(p));assert.equal(job.state,'complete');assert.equal(calls,4);assert.equal(job.requestHash,undefined);
  assert.equal((await f.post({...p,notes:'different packet'})).status,409);
+});
+test('busy workspace rejects a new analysis with an actionable capacity response',async t=>{
+ const release=[];let released=false;
+ const f=await fixture(t,{fetchImpl:async()=>{if(!released)await new Promise(r=>release.push(r));return ai(proposal);}});
+ assert.equal((await f.post(packet())).status,202);assert.equal((await f.post(packet())).status,202);
+ const busy=await f.request('/api/deal-desk/research',{deal:emptyDeal(),company:'Example'});
+ assert.equal(busy.status,429);assert.equal(busy.headers.get('retry-after'),'30');assert.match((await busy.json()).error,/Two analyses are already running/);
+ released=true;release.forEach(r=>r());
 });
 test('two passes fill supported facts, normalize millions/cents and keep unknowns blank',async t=>{
  const sent=[];const f=await fixture(t,{fetchImpl:async(_u,o)=>{sent.push(JSON.parse(o.body));return ai(sent.length===1?proposal:verification);}});
@@ -195,6 +204,15 @@ test('search without actual tool use or with tool error cannot claim success',as
 test('researching a different company cannot reuse the previous company financials',async t=>{
  const f=await fixture(t,{fetchImpl:async(_u,o)=>{const b=JSON.parse(o.body);if(b.tools)return Response.json({content:[{type:'server_tool_use',name:'web_search'},{type:'text',text:'Fictional Fuel operates 10 sites.',citations:[{url:'https://example.com/filing',title:'Company',cited_text:source.text}]}]});return ai(JSON.stringify(b).includes('Independently verify')?verification:JSON.parse(JSON.stringify(proposal).replaceAll('f1','web-1')));}});
  const j=await f.job(await f.request('/api/deal-desk/research',{deal:exampleDeal(),company:'Fictional Fuel',period:'FY2025'}));assert.equal(j.state,'complete');assert.equal(j.result.deal.price,null);assert.equal(j.result.deal.commission,null);assert.equal(j.result.deal.sites,10);
+});
+test('ARKO searches for both annual selections read issuer tables without AI extraction',async t=>{
+ const text=fs.readFileSync(new URL('./fixtures/arko-fy2025-tables.txt',import.meta.url),'utf8');let publicCalls=0;
+ const f=await fixture(t,{fetchImpl:async url=>{assert.match(url,/globenewswire.com/);publicCalls++;return new Response(text,{headers:{'content-type':'text/plain'}});}});
+ for(const [reportingYear,sites]of [[2025,1389],[2026,1118]]){
+  const j=await f.job(await f.request('/api/deal-desk/research',{deal:exampleDeal(),company:'Arko',periodBasis:'lastYear',reportingYear,estimateMissing:true}));
+  assert.equal(j.state,'complete',j.error);assert.equal(j.result.deal.sites,sites);assert.equal(j.result.company.period,`FY${reportingYear-1}`);assert.equal(j.result.searchUsed,true);assert.equal(j.result.verified,true);assert.ok(j.result.deal.price>0);assert.equal(j.result.sources[0].id,'arko-issuer-fy2025');
+ }
+ assert.equal(publicCalls,2);
 });
 test('invalid inputs, too many sources, oversized text and wrong origin are blocked',async t=>{
  let calls=0;const f=await fixture(t,{fetchImpl:async()=>{calls++;return ai(proposal);}});

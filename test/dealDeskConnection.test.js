@@ -2,6 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {requestJson,runAnalysisJob} from '../deal-desk/lib/connection.js';
 const ok=x=>Response.json(x),wait=async()=>{};
+test('workspace capacity errors show the actual reason without five fake reconnects',async()=>{
+ let calls=0;const messages=[];
+ await assert.rejects(requestJson('/test',{}, {wait,onReconnect:m=>messages.push(m),fetchImpl:async()=>{calls++;return Response.json({error:'Two analyses are already running.'},{status:429,headers:{'Retry-After':'30'}});}}),e=>e.status===429&&e.retryAfter==='30'&&/Two analyses/.test(e.message));
+ assert.equal(calls,1);assert.deepEqual(messages,[]);
+});
+test('an interrupted research poll can resume its existing job without submitting again',async()=>{
+ let lost;try{await runAnalysisJob('research',{company:'Example'},{},{wait,fetchImpl:async url=>{if(url.endsWith('/research'))return ok({jobId:'retained-job'});throw new TypeError('Offline');}});}catch(e){lost=e;}
+ assert.equal(lost.jobId,'retained-job');assert.equal(lost.connectionLost,true);
+ const urls=[];const result=await runAnalysisJob('research',{company:'Example'},{},{wait,jobId:lost.jobId,fetchImpl:async url=>{urls.push(url);return ok({state:'complete',result:{done:true}});}});
+ assert.equal(result.done,true);assert.deepEqual(urls,['/api/deal-desk/jobs/retained-job']);
+});
 test('a lost poll reconnects to the same job without another analysis',async()=>{
  const urls=[],messages=[];let polls=0;
  const result=await runAnalysisJob('analyze',{files:[]},{},{wait,onReconnect:m=>messages.push(m),fetchImpl:async url=>{
