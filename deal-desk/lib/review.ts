@@ -62,6 +62,14 @@ export function numberSupported(value:number, quote:string, sourceUnit:string, k
  const tokens=quote.match(/[-+]?\d[\d,]*(?:\.\d+)?/g)||[];
  const unit=sourceUnit.toLowerCase();
  if(!unit||/\b(cad|eur|gbp|aud)\b/.test(unit))return false;
+ // Narrative site counts may be written in words. Keep this limited to counts;
+ // the exact-source match and independent perimeter verifier still apply.
+ if(['sites','convertSites'].includes(key)&&/\b(count|sites?|stores?|locations?)\b/.test(unit)){
+  const words:Record<string,number>={zero:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12,thirteen:13,fourteen:14,fifteen:15,sixteen:16,seventeen:17,eighteen:18,nineteen:19,twenty:20,thirty:30,forty:40,fifty:50,sixty:60,seventy:70,eighty:80,ninety:90};
+  const word='(?:'+Object.keys(words).join('|')+'|hundred|thousand)';
+  const phrases=quote.toLowerCase().match(new RegExp('\\b'+word+'(?:[ -]+(?:and[ -]+)?'+word+')*\\b','g'))||[];
+  for(const phrase of phrases){let total=0,group=0;for(const token of phrase.split(/[ -]+/)){if(token==='hundred')group=(group||1)*100;else if(token==='thousand'){total+=(group||1)*1000;group=0;}else if(token!=='and')group+=words[token];}if(total+group===value)return true;}
+ }
  let scale=/billion/.test(unit)?1e9:/million/.test(unit)?1e6:/thousand|000s|000's|\b000\b|1,000/.test(unit)?1e3:1;
  if(['fuelCpg','commission','procurement','freight'].includes(key)&&/(usd|dollar|\$)\s*(\/|per)\s*(gal|gallon)/.test(unit))scale*=100;
  return tokens.some(t=>Math.abs(Number(t.replaceAll(',',''))*scale-value)<=Math.max(0.000001,Math.abs(value)*1e-9));

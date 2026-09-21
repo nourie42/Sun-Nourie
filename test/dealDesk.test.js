@@ -17,6 +17,16 @@ const proposal={channels:[],company:{name:'Fictional Fuel',overview:'Fictional F
  {field:'fuelCpg',value:35,sourceId:'f1',locator:'line 1',quote:'0.35',period:'FY2025',sourceUnit:'USD/gallon',status:'sourced',confidence:'high'}
 ]};
 const verification={channels:[],approvedFields:['sites','gallons','fuelCpg'],companySupported:true,summarySupported:true};
+test('written site counts retain reported status only after independent source verification',()=>{
+ for(const [quote,count] of [['twelve company-operated retail sites',12],['twenty-one sites',21],['one hundred and twelve locations',112]]){
+  const raw={deal:{sites:count},evidence:[{field:'sites',value:count,sourceId:'w',quote,period:'FY2025',sourceUnit:'count',status:'sourced'}]};
+  const sources=[{id:'w',kind:'text',text:quote}];
+  const result=normalizeReview(raw,sources,emptyDeal(),{approvedFields:['sites']},'FY2025');
+  assert.equal(result.deal.sites,count);assert.equal(result.evidence.find(e=>e.field==='sites').status,'supported');
+  assert.equal(normalizeReview(raw,sources,emptyDeal(),{approvedFields:[]},'FY2025').deal.sites,null);
+  assert.equal(normalizeReview({...raw,deal:{sites:count+1}},sources,emptyDeal(),{approvedFields:['sites']},'FY2025').deal.sites,null);
+ }
+});
 test('accounting currency spaces do not reject an independently verified source value',()=>{
  const raw={company:{name:'Test',period:'FY2025',sourceIds:['w']},summary:'Test',deal:{insideGp:1795974},evidence:[{field:'insideGp',value:1795974,sourceId:'w',quote:'$1,795,974',period:'FY2025',sourceUnit:'USD',status:'sourced',confidence:'high'}]};
  const sources=[{id:'w',kind:'text',text:'B52: $ 1,795,974 [cached formula: B25-B46]'}];
@@ -70,7 +80,7 @@ test("missing inputs stay unknown, and capital is excluded from EBITDA", () => {
 
 test('static app retains hidden route and status does not expose secrets',async t=>{
  const f=await fixture(t);for(const route of ['/deal-desk','/deal-desk/','/deal-desk/index.html']){const r=await f.request(route);assert.equal(r.status,200);assert.match(await r.text(),/\/deal-desk\/assets\/index-/);assert.match(r.headers.get('content-security-policy'),/worker-src 'self' blob:/);assert.match(r.headers.get('x-robots-tag'),/noindex/);}
- const status=await(await f.request('/api/deal-desk/status')).json();assert.equal(status.version,'deal-intake-v8-synergy-audit');assert.equal(status.ready,true);assert.doesNotMatch(JSON.stringify(status),/test-code|test-not-real/);assert.equal((await f.request('/')).status,404);
+ const status=await(await f.request('/api/deal-desk/status')).json();assert.equal(status.version,'deal-intake-v9-source-counts');assert.equal(status.ready,true);assert.doesNotMatch(JSON.stringify(status),/test-code|test-not-real/);assert.equal((await f.request('/')).status,404);
 });
 test('authentication protects analysis, research, jobs and summary',async t=>{
  const f=await fixture(t);for(const [route,body]of [['/analyze',packet()],['/research',{deal:emptyDeal(),company:'X'}],['/jobs/invalid',undefined],['/summary',{deal:emptyDeal()}]])assert.equal((await f.request('/api/deal-desk'+route,body,{'x-deal-desk-passcode':'bad'})).status,401);
