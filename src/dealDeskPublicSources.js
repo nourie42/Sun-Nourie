@@ -5,7 +5,7 @@ export async function fetchPublicSource(url,fetchImpl=fetch){
  for(let redirects=0;redirects<4;redirects++){
   const u=new URL(url);if(u.protocol!=='https:'||u.username||u.password||(u.port&&u.port!=='443')||isIP(u.hostname))throw Error('Unsupported source URL');
   const addresses=await lookup(u.hostname,{all:true});if(!addresses.length||addresses.some(a=>!publicAddress(a.address)))throw Error('Non-public source URL');
-  const response=await fetchImpl(u.href,{redirect:'manual',headers:{'User-Agent':'DealDesk research contact admin@nourie42.com','Accept':'text/html,text/plain,application/xhtml+xml'},signal:AbortSignal.timeout(20000)});
+  const response=await fetchImpl(u.href,{redirect:'manual',headers:{'User-Agent':'DealDesk/1.0 public-document-reader','Accept':'text/html,text/plain,application/xhtml+xml'},signal:AbortSignal.timeout(20000)});
   if(response.status>=300&&response.status<400){url=new URL(response.headers.get('location'),u).href;continue;}
   if(!response.ok||!/(text\/|xhtml|xml|json)/i.test(response.headers.get('content-type')||''))throw Error('Source unavailable as text');
   const reader=response.body.getReader();let size=0,parts=[];
@@ -15,5 +15,5 @@ export async function fetchPublicSource(url,fetchImpl=fetch){
  throw Error('Too many source redirects');
 }
 export async function expandPublicSources(sources,fetchImpl){
- return Promise.all(sources.slice(0,6).map(async s=>{try{const text=await fetchPublicSource(s.url,fetchImpl);if(text.length>650000)throw Error('Source too large');return {...s,text:s.text+'\nFULL SOURCE TABLES AND CONTEXT:\n'+text};}catch{return {...s,warnings:[...(s.warnings||[]),'Full page unavailable; extracted figures must match the available cited passages.']};}}));
+ return Promise.all(sources.slice(0,4).map(async s=>{try{const text=await fetchPublicSource(s.url,fetchImpl);if(text.length>650000)throw Error('Source too large');return {...s,text:s.text+'\nFULL SOURCE TABLES AND CONTEXT:\n'+text};}catch{return {...s,warnings:[...(s.warnings||[]),'Full page unavailable; extracted figures must match the available cited passages.']};}}));
 }

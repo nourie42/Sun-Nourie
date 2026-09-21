@@ -53,7 +53,7 @@ export function applyIndustryEstimates(review){
  fill('price',n*2000000,'Assume $2 million/site blended asset/business consideration. Illustrative valuation anchor, not an asking price or appraisal.',undefined,.5);
  fill('convertSites',n,'Assume all acquired sites need some operating/IT transition, including already branded sites.',undefined,0);
  fill('conversion',75000,'Assume $75,000 per converted site for imaging/IT/transition. Excludes major tank replacement or remediation.',undefined,.5);
- fill('oneTime',deal.price*.02,'Assume transaction/integration/upfront working-capital allowance of 2% of consideration.',undefined,.5);
+ fill('oneTime',deal.price*.02,`Assume transaction/integration/upfront working-capital allowance of 2% of the initial consideration anchor ($${deal.price.toLocaleString()}). This fixed cost allowance is held constant when comparing purchase prices; edit it for the actual transaction scope.`,undefined,.5);
  fill('maintenanceCapex',n*20000,'Assume $20,000/site/year maintenance capital, separately deducted from cash flow. Major catch-up capital excluded.',undefined,.5);
  fill('yearOne',50,'Assume uniform conversion through Year 1: 50% average realization.',undefined,0);
  fill('hurdle',15,'Assumed 15% pretax screening hurdle; not Sunoco’s approved hurdle.',undefined,0);

@@ -61,11 +61,14 @@ export async function exportModel(deal:Deal,review:Review|null,sites:Site[],peri
  rows(model,[['Channel','Locations','Gallons','Margin cents','Other GP/rent','Cash Opex','G&A','Procurement cents','Eligible %','Savings','Capex','Annual EBITDA'],...channels.map((c:any)=>[c.name,c.sites,c.gallons,c.fuelCpg,c.other,c.opex,c.ga,c.procurement,c.eligible,c.savings,c.capex,c.ebitda])],85);
  channels.forEach((c:any,i:number)=>formula(`L${86+i}`,`C${86+i}*D${86+i}/100+E${86+i}-F${86+i}-G${86+i}+C${86+i}*H${86+i}/100*I${86+i}/100+J${86+i}`,c.ebitda));
  if(channels.length){const end=85+channels.length;formula('B79',channels.map((_:any,i:number)=>`C${86+i}*D${86+i}/100+E${86+i}-F${86+i}-G${86+i}`).join('+'),channels.reduce((n:any,c:any)=>n+c.baseline,0));formula('B80',`SUM(L86:L${end})`,channels.reduce((n:any,c:any)=>n+c.ebitda,0));formula('B81',`SUM(K86:K${end})`,channels.reduce((n:any,c:any)=>n+c.capex,0));}
+ rows(model,[['Terminal recovery %',deal.exitRecovery??80],['Operating cash-flow present value'],['Return-supported price ceiling'],['Estimated opening purchase recommendation'],['Estimated low price'],['Estimated high price']],66);
+ formula('B67','NPV(B33/100,C54:L54)-B34/(1+B33/100)^10',null);formula('B68','MAX(0,(B67-B28*B29-B30)/(1-B66/100/(1+B33/100)^10))',recommendation.capacity);formula('B69','ROUND(B68*0.9,0)',recommendation.value);formula('B70','ROUND(B68*0.8,0)',recommendation.low);formula('B71','ROUND(B68,0)',recommendation.high);
  const editFormula=(address:string,from:string,to:string)=>{const f=cell(model,address).querySelector('f');if(f)f.textContent=f.textContent!.replace(from,to);};
- editFormula('B38','-B12-B13','-B12-B13+B79');editFormula('B42','-B40-B41','-B40-B41+B80+SUM(B62:B65)');
+ editFormula('B36','B6>0','B6>=0');editFormula('B46','-B41-B26','-B41-B26+SUM(B62:B65)'+(channels.length?'+SUM(J86:J'+(85+channels.length)+')':''));editFormula('B38','-B12-B13','-B12-B13+B79');editFormula('B42','-B40-B41','-B40-B41+B80+SUM(B62:B65)');
  for(let i=2;i<12;i++)editFormula(`${col(i)}54`,'-B31','-B31-B81');
  rows(summary,[['Estimated opening purchase price',recommendation.value],['Estimated price range',`${recommendation.low} – ${recommendation.high}`],['Return-supported price ceiling',recommendation.capacity],['Recommendation basis',recommendation.basis]],8);
  rows(summary,[['Dealer EBITDA per applicable retail site',result.dealerPerSite]],25);
+ for(const [address,expression,cached] of [['B8','Model!B69',recommendation.value],['B10','Model!B68',recommendation.capacity],['B25','IFERROR(Model!B43/Model!B6,"")',result.dealerPerSite]] as any[]){const c=cell(summary,address);const f=summary.createElementNS(ns,'f');f.textContent=expression;c.appendChild(f);put(summary,address,cached,true);}
  put(model,'B36',result.errors.length?'Correct invalid inputs':'Valid',true);
  [result.seller,result.supply,result.commission,result.costs,result.sun,result.dealer,result.combined,result.lift,result.systemCostReduction,result.investment,result.npv,result.irr].forEach((v,i)=>put(model,`B${38+i}`,v,true));
  for(let i=0;i<11;i++)put(model,`${col(i+1)}54`,result.cashflows[i]??null,true);

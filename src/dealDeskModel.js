@@ -70,8 +70,8 @@ export function calculate(d) {
             errors.push(`${k} cannot exceed 100%.`);
     if (d.hurdle > 100)
         errors.push('Hurdle cannot exceed 100%.');
-    if (d.sites !== null && (!Number.isInteger(d.sites) || d.sites <= 0))
-        errors.push('Sites must be a positive integer.');
+    if (d.sites !== null && (!Number.isInteger(d.sites) || d.sites < 0))
+        errors.push('Retail sites must be a nonnegative integer; enter existing dealer and wholesale locations in their channel schedules.');
     if (d.convertSites !== null && (!Number.isInteger(d.convertSites) || (d.sites !== null && d.convertSites > d.sites)))
         errors.push('Conversion sites must be an integer within the total site count.');
     const ready = !missing.length && !errors.length;
@@ -86,7 +86,7 @@ export function calculate(d) {
     const seller = retailSeller + channelSeller, sun = retailSun + channelSun + extraSavings(d);
     const combined = sun + dealer;
     const lift = sun - seller;
-    const systemCostReduction = d.sellerOpex + d.sellerGa - costs - d.dealerOpex;
+    const systemCostReduction = d.sellerOpex + d.sellerGa - costs - d.dealerOpex + extraSavings(d) + channels.reduce((n, c) => n + c.savings, 0);
     const investReady = ready && fields.filter(f => f.group === 'Investment screen').every(f => d[f.key] !== null);
     const investment = d.price + d.convertSites * d.conversion + d.oneTime;
     const cashflows = [-investment, ...Array.from({ length: 10 }, (_, i) => (i === 0 ? seller + (sun - seller) * d.yearOne / 100 : sun) - d.maintenanceCapex - channelCapex + (i === 9 ? d.terminal : 0))];

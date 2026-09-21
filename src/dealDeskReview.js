@@ -27,6 +27,40 @@ export function restoreSourceQuotes(raw, sources) {
         if (matches.length === 1)
             e.quote = matches[0].trim();
     }
+    // Table extractions often join nonadjacent label/value cells into a quote.
+    // Recover an exact original numeric row; the independent verifier still decides
+    // whether that row belongs to the requested field, period and perimeter.
+    for (const e of Array.isArray(raw?.evidence) ? raw.evidence : []) {
+        if (!Number.isFinite(e.value) || typeof e.quote !== 'string')
+            continue;
+        const original = sources.find(s => s.id === e.sourceId);
+        if (original && norm(original.text).includes(norm(e.quote)))
+            continue;
+        const field = fields.find(f => f.key === e.field);
+        if (!field)
+            continue;
+        const words = [...new Set((e.quote + ' ' + field.label).toLowerCase().match(/[a-z]{4,}/g) || [])].filter(w => !['year', 'ended', 'december', 'annual', 'total', 'dollars', 'thousands', 'millions', 'reported', 'period', 'value'].includes(w));
+        const candidates = [];
+        for (const source of sources)
+            for (const line of String(source.text || '').split(/\r?\n/)) {
+                if (line.length > 2500 || !numberSupported(e.value, line, String(e.sourceUnit || ''), e.field))
+                    continue;
+                const score = words.filter(w => norm(line).includes(w)).length;
+                if (score < 1)
+                    continue;
+                candidates.push({ source, line, score });
+            }
+        candidates.sort((a, b) => b.score - a.score);
+        const best = candidates[0];
+        if (!best)
+            continue;
+        const ties = candidates.filter(c => c.score === best.score);
+        if (new Set(ties.map(c => norm(c.line))).size > 1)
+            continue;
+        e.quote = best.line.trim();
+        e.sourceId = best.source.id;
+        e.locator = 'Exact reported table row: ' + String(e.locator || '');
+    }
     return raw;
 }
 export const safeUrl = (s) => { try {
