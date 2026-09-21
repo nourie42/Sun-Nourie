@@ -15,5 +15,6 @@ export async function fetchPublicSource(url,fetchImpl=fetch){
  throw Error('Too many source redirects');
 }
 export async function expandPublicSources(sources,fetchImpl){
- return Promise.all(sources.slice(0,4).map(async s=>{try{const text=await fetchPublicSource(s.url,fetchImpl);if(text.length>650000)throw Error('Source too large');return {...s,text:s.text+'\nFULL SOURCE TABLES AND CONTEXT:\n'+text};}catch{return {...s,warnings:[...(s.warnings||[]),'Full page unavailable; extracted figures must match the available cited passages.']};}}));
+ const priority=s=>/reports.*results|earnings|quarter.*results/i.test(s.name)?2:/10-k|10-q|annual report/i.test(s.name)?1:0;const expanded=new Set([...sources].sort((a,b)=>priority(b)-priority(a)).slice(0,4).map(s=>s.id));
+ return Promise.all(sources.map(async s=>{if(!expanded.has(s.id))return s;try{const text=await fetchPublicSource(s.url,fetchImpl);if(text.length>650000)throw Error('Source too large');return {...s,text:s.text+'\nFULL SOURCE TABLES AND CONTEXT:\n'+text};}catch{return {...s,warnings:[...(s.warnings||[]),'Full page unavailable; extracted figures must match the available cited passages.']};}}));
 }
