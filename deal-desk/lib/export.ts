@@ -1,4 +1,5 @@
 import JSZip from 'jszip';
+import {purchaseRecommendation,synergyRows,channelResults,extraSavings} from './screening.js';
 import template from './model-template.json';
 import {fields,calculate,validateImport} from './deal';
 import type {Deal} from './deal';
@@ -50,8 +51,21 @@ export async function exportModel(deal:Deal,review:Review|null,sites:Site[],peri
  validateImport(deal);const result=calculate(deal);const zip=await JSZip.loadAsync(template.base64,{base64:true});
  const docs=await Promise.all([1,2,3,4,5].map(async n=>parse(await zip.file(`xl/worksheets/sheet${n}.xml`)!.async('string'))));
  const [summary,model,siteSheet,evidenceSheet,opps]=docs;
+ for(const m of Array.from(summary.getElementsByTagNameNS('*','mergeCell'))){const ref=m.getAttribute('ref')||'';if(/^A6:/.test(ref))m.setAttribute('ref','A6:L7');if(/^A(?:8|9|10|11):/.test(ref))m.remove();}
  const estimated=review?.evidence.filter(e=>e.status==='Estimated'&&e.value===deal[e.field])||[];put(summary,'A3',deal.name);put(summary,'A4',estimated.length?`ESTIMATED SCREENING CASE — ${estimated.length} inputs estimated. See Model status and Source Evidence for every basis.`:'Source-based screening case');put(summary,'A6',review?.summary||`Company background has not yet been researched for ${deal.name}.`);put(summary,'B14',period||review?.company?.period||'Not confirmed');put(summary,'B15',new Date().toISOString());
  fields.forEach((f,i)=>{const e=review?.evidence.find(e=>e.field===f.key),matches=e?.value===deal[f.key];put(model,`B${i+6}`,deal[f.key]);put(model,`D${i+6}`,deal[f.key]===null?'Missing':matches?e!.status:'User-entered / confirm source');put(model,`E${i+6}`,matches?`${sources.find(s=>s.id===e!.sourceId)?.name||e!.sourceId} ${e!.locator}${e!.status==='Estimated'?' — '+e!.reason:''}`:'');put(model,`F${i+6}`,matches?e!.period:period);});
+ const channels=channelResults(deal),synergies=synergyRows(deal),recommendation=purchaseRecommendation(deal,result);
+ const formula=(address:string,expression:string,value:any)=>{const c=cell(model,address);c.querySelector('f')?.remove();const f=model.createElementNS(ns,'f');f.textContent=expression;c.appendChild(f);put(model,address,value,true);};
+ rows(model,[['Additional G&A savings',deal.gaSavings||0],['Additional card savings',deal.cardSavings||0],['Additional maintenance savings',deal.maintenanceSavings||0],['Other recurring savings',deal.otherSavings||0]],62);
+ rows(model,[['Existing channels: baseline EBITDA',channels.reduce((n:any,c:any)=>n+c.baseline,0)],['Existing channels: post-synergy EBITDA',channels.reduce((n:any,c:any)=>n+c.ebitda,0)],['Existing channels: annual capital',channels.reduce((n:any,c:any)=>n+c.capex,0)]],79);
+ rows(model,[['Channel','Locations','Gallons','Margin cents','Other GP/rent','Cash Opex','G&A','Procurement cents','Eligible %','Savings','Capex','Annual EBITDA'],...channels.map((c:any)=>[c.name,c.sites,c.gallons,c.fuelCpg,c.other,c.opex,c.ga,c.procurement,c.eligible,c.savings,c.capex,c.ebitda])],85);
+ channels.forEach((c:any,i:number)=>formula(`L${86+i}`,`C${86+i}*D${86+i}/100+E${86+i}-F${86+i}-G${86+i}+C${86+i}*H${86+i}/100*I${86+i}/100+J${86+i}`,c.ebitda));
+ if(channels.length){const end=85+channels.length;formula('B79',channels.map((_:any,i:number)=>`C${86+i}*D${86+i}/100+E${86+i}-F${86+i}-G${86+i}`).join('+'),channels.reduce((n:any,c:any)=>n+c.baseline,0));formula('B80',`SUM(L86:L${end})`,channels.reduce((n:any,c:any)=>n+c.ebitda,0));formula('B81',`SUM(K86:K${end})`,channels.reduce((n:any,c:any)=>n+c.capex,0));}
+ const editFormula=(address:string,from:string,to:string)=>{const f=cell(model,address).querySelector('f');if(f)f.textContent=f.textContent!.replace(from,to);};
+ editFormula('B38','-B12-B13','-B12-B13+B79');editFormula('B42','-B40-B41','-B40-B41+B80+SUM(B62:B65)');
+ for(let i=2;i<12;i++)editFormula(`${col(i)}54`,'-B31','-B31-B81');
+ rows(summary,[['Estimated opening purchase price',recommendation.value],['Estimated price range',`${recommendation.low} – ${recommendation.high}`],['Return-supported price ceiling',recommendation.capacity],['Recommendation basis',recommendation.basis]],8);
+ rows(summary,[['Dealer EBITDA per applicable retail site',result.dealerPerSite]],25);
  put(model,'B36',result.errors.length?'Correct invalid inputs':'Valid',true);
  [result.seller,result.supply,result.commission,result.costs,result.sun,result.dealer,result.combined,result.lift,result.systemCostReduction,result.investment,result.npv,result.irr].forEach((v,i)=>put(model,`B${38+i}`,v,true));
  for(let i=0;i<11;i++)put(model,`${col(i+1)}54`,result.cashflows[i]??null,true);
@@ -60,10 +74,13 @@ export async function exportModel(deal:Deal,review:Review|null,sites:Site[],peri
  rows(siteSheet,[['Record ID','Site name','Address','City','State','ZIP','Ownership','Brand','Period','Source','Locator','Review status',...rawKeys.map(k=>'Source: '+k)],...sites.map(s=>[s.id,s.name,s.address,s.city,s.state,s.zip,s.ownership,s.brand,s.period,sources.find(x=>x.id===s.sourceId)?.name||s.sourceId,s.locator,s.duplicate?'Possible duplicate':s.reviewRequired?'Confirm original':'Parsed record',...rawKeys.map(k=>s.raw?.[k])])],5);
  rows(evidenceSheet,fields.map(f=>{const e=review?.evidence.find(x=>x.field===f.key);const source=sources.find(s=>s.id===e?.sourceId);return [f.label,deal[f.key],e?.value,e?.value===deal[f.key]?e?.status:deal[f.key]===null?'Missing':'User-entered / confirm source',source?.name,e?.locator,e?.quote,e?.period,e?.sourceUnit,e?.reason,source?.url,review?.generatedAt];}));
  const sourceRows=sources.map(s=>[s.name,s.url||s.kind,s.id]);rows(evidenceSheet,[['Source register','URL / type','Source ID'],...sourceRows],38);
- rows(opps,(review?.opportunities||[]).map(o=>[o.idea,o.formula,o.evidenceNeeded,o.owner,'Unquantified',o.sourceIds?.join(', ')]));
+ rows(opps,[['Synergy','Annual amount','Scope','Included?','Calculation / basis'],...synergies.map((x:any)=>[x.name,x.amount,x.scope,x.included?'Included':'Not included',x.basis]),[],['Unquantified opportunities'],...(review?.opportunities||[]).map(o=>[o.idea,null,o.owner,'Not included',o.formula+' Evidence needed: '+o.evidenceNeeded])],5);
+ rows(evidenceSheet,channels.flatMap((c:any)=>Object.entries(c.metricEvidence||{}).map(([key,e]:any)=>[c.name+' / '+key,c[key],e.value,e.status,sources.find(s=>s.id===e.sourceId)?.name,e.locator,e.quote,e.period,e.sourceUnit,e.reason||c.basis,sources.find(s=>s.id===e.sourceId)?.url])),55);
  const missing=fields.filter(f=>deal[f.key]===null).map(f=>f.label);rows(summary,[['Outstanding information',missing.join('; ')||'All fields filled — review estimates in Source Evidence and confirm commercial terms.'],...(review?.warnings||[]).map(w=>['Review item',w])],32);
  const styles=parse(await zip.file('xl/styles.xml')!.async('string'));
- readableRows(model,styles,6,34,[43,19,19,22,60,28]);
+ readableRows(model,styles,6,100,[43,19,19,22,60,28,20,20,20,20,20,20]);
+ readableRows(opps,styles,5,40,[38,20,35,20,85,25]);
+ readableRows(summary,styles,8,11,[43,85]);
  readableRows(evidenceSheet,styles,6,34,[38,19,19,22,45,38,60,32,22,85,50,28]);
  // Cents-per-gallon assumptions need decimals; currency totals can stay whole dollars.
  const xfs=styles.getElementsByTagNameNS('*','cellXfs')[0];

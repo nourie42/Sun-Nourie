@@ -70,7 +70,7 @@ test("missing inputs stay unknown, and capital is excluded from EBITDA", () => {
 
 test('static app retains hidden route and status does not expose secrets',async t=>{
  const f=await fixture(t);for(const route of ['/deal-desk','/deal-desk/','/deal-desk/index.html']){const r=await f.request(route);assert.equal(r.status,200);assert.match(await r.text(),/\/deal-desk\/assets\/index-/);assert.match(r.headers.get('content-security-policy'),/worker-src 'self' blob:/);assert.match(r.headers.get('x-robots-tag'),/noindex/);}
- const status=await(await f.request('/api/deal-desk/status')).json();assert.equal(status.version,'deal-intake-v5.1-source-estimates');assert.equal(status.ready,true);assert.doesNotMatch(JSON.stringify(status),/test-code|test-not-real/);assert.equal((await f.request('/')).status,404);
+ const status=await(await f.request('/api/deal-desk/status')).json();assert.equal(status.version,'deal-intake-v6-periods-channels');assert.equal(status.ready,true);assert.doesNotMatch(JSON.stringify(status),/test-code|test-not-real/);assert.equal((await f.request('/')).status,404);
 });
 test('authentication protects analysis, research, jobs and summary',async t=>{
  const f=await fixture(t);for(const [route,body]of [['/analyze',packet()],['/research',{deal:emptyDeal(),company:'X'}],['/jobs/invalid',undefined],['/summary',{deal:emptyDeal()}]])assert.equal((await f.request('/api/deal-desk'+route,body,{'x-deal-desk-passcode':'bad'})).status,401);
@@ -81,12 +81,12 @@ test('replayed submissions reuse one job and reject changed payloads',async t=>{
  let calls=0;const f=await fixture(t,{fetchImpl:async()=>ai(++calls===1?proposal:verification)});
  const p={...packet(),requestId:'safe-repeat-request-12345'};
  const first=await(await f.post(p)).json(),second=await(await f.post(p)).json();assert.equal(first.jobId,second.jobId);
- const job=await f.job(await f.post(p));assert.equal(job.state,'complete');assert.equal(calls,2);assert.equal(job.requestHash,undefined);
+ const job=await f.job(await f.post(p));assert.equal(job.state,'complete');assert.equal(calls,4);assert.equal(job.requestHash,undefined);
  assert.equal((await f.post({...p,notes:'different packet'})).status,409);
 });
 test('two passes fill supported facts, normalize millions/cents and keep unknowns blank',async t=>{
  const sent=[];const f=await fixture(t,{fetchImpl:async(_u,o)=>{sent.push(JSON.parse(o.body));return ai(sent.length===1?proposal:verification);}});
- const j=await f.job(await f.post(packet()));assert.equal(j.state,'complete');assert.equal(sent.length,2);assert.equal(j.result.deal.sites,10);assert.equal(j.result.deal.gallons,15000000);assert.equal(j.result.deal.fuelCpg,35);assert.equal(j.result.deal.commission,null);assert.equal(j.result.summary,proposal.summary);assert.match(sent[0].messages[0].content[0].text,/CPG inputs are CENTS/);assert.doesNotMatch(JSON.stringify(j.result.sources),/annual gallons/);
+ const j=await f.job(await f.post(packet()));assert.equal(j.state,'complete');assert.equal(sent.length,4);assert.equal(j.result.deal.sites,10);assert.equal(j.result.deal.gallons,15000000);assert.equal(j.result.deal.fuelCpg,35);assert.equal(j.result.deal.commission,null);assert.equal(j.result.summary,proposal.summary);assert.match(sent[0].messages[0].content[0].text,/CPG inputs are CENTS/);assert.doesNotMatch(JSON.stringify(j.result.sources),/annual gallons/);
 });
 test('mismatched periods, unsupported quotes, conflicts and verifier rejection cannot autofill',()=>{
  const variants=[
@@ -119,10 +119,10 @@ test('179k-character workbook with 99 retained rows recovers from output limit a
  assert.ok(large.text.length>179835);
  const j=await f.job(await f.post({...packet(),deal:{...emptyDeal(),sites:99},files:[large]}));
  assert.equal(j.state,'complete');assert.equal(j.result.deal.sites,99);assert.equal(j.result.deal.gallons,15000000);assert.equal(j.result.deal.fuelCpg,35);assert.equal(j.result.deal.commission,null);
- assert.equal(j.result.sites.length,0);assert.equal(j.result.summary,proposal.summary);assert.equal(sent.length,7);
+ assert.equal(j.result.sites.length,0);assert.equal(j.result.summary,proposal.summary);assert.equal(sent.length,9);
  for(const call of sent){const body=JSON.stringify(call);assert.match(body,/STRUCTURED SITE ROWS ALREADY RETAINED: 99/);assert.ok(body.includes('record | B3000=other attributes'));}
  assert.match(sent[0].messages[0].content[0].text,/NEVER reproduce individual site rows/);
- const batchPrompts=sent.slice(2,-1).map(c=>c.messages[0].content[0].text);
+ const batchPrompts=sent.slice(2,6).map(c=>c.messages[0].content[0].text);
  for(const field of fields)assert.equal(batchPrompts.filter(p=>p.includes(field.key+': '+field.label)).length,1);
 });
 test('malformed full extraction retries bounded batches, but unverified figures stay blank',async t=>{
@@ -131,13 +131,13 @@ test('malformed full extraction retries bounded batches, but unverified figures 
   if(n===1)return Response.json({content:[{type:'text',text:'{"deal":'}]});
   return ai(JSON.stringify(b).includes('Independently verify')?{...verification,approvedFields:[]}:proposal);
  }});
- const j=await f.job(await f.post(packet()));assert.equal(j.state,'complete');assert.equal(j.result.deal.gallons,null);assert.equal(j.result.evidence.find(e=>e.field==='gallons').value,15000000);assert.equal(n,7);
+ const j=await f.job(await f.post(packet()));assert.equal(j.state,'complete');assert.equal(j.result.deal.gallons,null);assert.equal(j.result.evidence.find(e=>e.field==='gallons').value,15000000);assert.equal(n,9);
 });
 test('verification output limit is automatically retried without bypassing approval',async t=>{
  let n=0;const f=await fixture(t,{fetchImpl:async()=>{
   n++;if(n===2)return Response.json({stop_reason:'max_tokens'});return ai(n===1?proposal:verification);
  }});
- const j=await f.job(await f.post(packet()));assert.equal(j.state,'complete');assert.equal(n,6);assert.equal(j.result.deal.gallons,15000000);assert.equal(j.result.verified,true);
+ const j=await f.job(await f.post(packet()));assert.equal(j.state,'complete');assert.equal(n,8);assert.equal(j.result.deal.gallons,15000000);assert.equal(j.result.verified,true);
 });
 test('standalone Deal Desk credentials work without any AI Council configuration',async t=>{
  let n=0;const f=await fixture(t,{env:{DEAL_DESK_PASSWORD:'test-code',DEAL_DESK_API_KEY:'desk-test-key',DEAL_DESK_MODEL:'desk-model'},fetchImpl:async(_u,o)=>{
@@ -188,7 +188,7 @@ test('researching a different company cannot reuse the previous company financia
 });
 test('invalid inputs, too many sources, oversized text and wrong origin are blocked',async t=>{
  let calls=0;const f=await fixture(t,{fetchImpl:async()=>{calls++;return ai(proposal);}});
- for(const p of [{...packet(),deal:{gallons:'bad'}},{...packet(),files:Array(21).fill(source)},{...packet(),notes:'x'.repeat(31000)}])assert.equal((await f.post(p)).status,400);
+ for(const p of [{...packet(),deal:{gallons:'bad'}},{...packet(),files:Array(101).fill(source)},{...packet(),notes:'x'.repeat(31000)}])assert.equal((await f.post(p)).status,400);
  assert.equal((await f.post(packet(),{origin:'https://example.invalid'})).status,403);
  const j=await f.job(await f.post({...packet(),files:[{...source,text:'x'.repeat(650001)}]}));assert.equal(j.state,'failed');assert.equal(calls,0);
 });

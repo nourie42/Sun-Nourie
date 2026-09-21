@@ -6,7 +6,7 @@ const result = ts.transpileModule(source, {
   compilerOptions: {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022},
 });
 await writeFile(new URL('../src/dealDeskModel.js', import.meta.url),
-  '// Generated from deal-desk/lib/deal.ts; run npm run build in deal-desk.\n' + result.outputText);
+  '// Generated from deal-desk/lib/deal.ts; run npm run build in deal-desk.\n' + result.outputText.replace("from './screening.js'","from '../deal-desk/lib/screening.js'"));
 
 const review = await readFile(new URL('./lib/review.ts', import.meta.url), 'utf8');
 const reviewResult = ts.transpileModule(review, {

@@ -12,9 +12,14 @@ function finish(source:SourceFile){if(source.text.length>MAX_TEXT)throw Error('F
 
 export async function readSourceFile(file:File):Promise<SourceFile>{
  if(file.size>MAX_FILE)throw Error('20 MB per file maximum. Split large packets before uploading.');
- const buffer=await file.arrayBuffer(),bytes=new Uint8Array(buffer),ext=file.name.split('.').pop()?.toLowerCase()||'';
+ const buffer=await file.arrayBuffer(),bytes=new Uint8Array(buffer),originalExt=file.name.split('.').pop()?.toLowerCase()||'';
+ let ext=originalExt;
  const source:SourceFile={id:crypto.randomUUID(),name:file.name,kind:'text',text:'',warnings:[]};
  const head=new TextDecoder().decode(bytes.slice(0,8));
+ const prefix=decode(buffer.slice(0,512)).trim();
+ if(['ppt','pptx','pptm','docx','docm','odt','odp'].includes(ext)&&/^(?:<!doctype html|<html|<\?xml|\{\s*")/i.test(prefix)){source.text=decode(buffer);if(/<html|<!doctype/i.test(prefix)){const doc=new DOMParser().parseFromString(source.text,'text/html');doc.querySelectorAll('script,style').forEach(n=>n.remove());source.text=doc.body.textContent||'';}source.warnings.push('File extension does not match its text/HTML contents; extracted the actual content.');return finish(source);}
+ if(ext==='pptm')ext='pptx';if(ext==='docm')ext='docx';
+ if(bytes[0]===0xd0&&bytes[1]===0xcf&&['ppt','pptx'].includes(ext)){const XLSX=await import('xlsx');const cfb=XLSX.CFB.read(bytes,{type:'array'});if(cfb.FullPaths.some((p:string)=>/EncryptedPackage/i.test(p)))throw Error('This Office file is encrypted. Upload an unlocked copy.');const entry=XLSX.CFB.find(cfb,'PowerPoint Document');if(!entry?.content)throw Error('Legacy PowerPoint stream is missing or damaged.');const data=new Uint8Array(entry.content),view=new DataView(data.buffer,data.byteOffset,data.byteLength);let records=0;function walk(start:number,end:number,depth=0){if(depth>30)throw Error('PowerPoint nesting is invalid.');for(let pos=start;pos+8<=end;){const options=view.getUint16(pos,true),type=view.getUint16(pos+2,true),len=view.getUint32(pos+4,true),next=pos+8+len;if(next>end)throw Error('PowerPoint record is truncated.');if(++records>100000)throw Error('PowerPoint contains too many records.');if((options&15)===15)walk(pos+8,next,depth+1);else if(type===4000||type===4008){source.text+=`\nPowerPoint text record ${records}: `+new TextDecoder(type===4000?'utf-16le':'windows-1252').decode(data.slice(pos+8,next));}pos=next;}}walk(0,data.length);source.warnings.push('Legacy PowerPoint text extracted. Embedded charts/images without text need a PDF or image copy for visual verification.');if(!source.text.trim())throw Error('No text in this legacy presentation; supply its PDF or slide images.');return finish(source);}
  if(head.startsWith('%PDF-')||ext==='pdf'){
   if(!head.startsWith('%PDF-'))throw Error('This file is not a valid PDF.');
   source.kind='pdf';source.mediaType='application/pdf';source.data=b64(buffer);
@@ -71,8 +76,8 @@ export async function readSourceFile(file:File):Promise<SourceFile>{
   if(source.workbook.some(s=>Object.values(s.cells).some(c=>c.formula)))source.warnings.push('Workbook formula values are cached; source formulas have not been recalculated.');
   return finish(source);
  }
- if(['docx','pptx','odt'].includes(ext)){
-  const z=unzip(buffer);
+ if(['docx','pptx','odt','odp','ott','otp'].includes(ext)){
+  let z:ReturnType<typeof unzip>;try{z=unzip(buffer);}catch{throw Error('This file is not a readable Office ZIP document. It may be incomplete, encrypted, or renamed. Re-download the original or upload its PDF copy.');}
   if(ext==='docx'){
    const document=z['word/document.xml'];if(!document)throw Error('Word document is damaged or encrypted.');
    const body=xml(strFromU8(document)).getElementsByTagNameNS('*','body')[0];let p=0,t=0;
@@ -90,12 +95,12 @@ export async function readSourceFile(file:File):Promise<SourceFile>{
    for(const path of Object.keys(z).filter(p=>/^ppt\/slides\/slide\d+\.xml$/.test(p)).sort((a,b)=>Number(a.match(/slide(\d+)\.xml/)![1])-Number(b.match(/slide(\d+)\.xml/)![1]))){
     source.text+=`\nSLIDE ${path.match(/slide(\d+)\.xml/)![1]}\n`+Array.from(xml(strFromU8(z[path])).getElementsByTagNameNS('*','t')).map(n=>n.textContent).join('\n');
    }
-   source.warnings.push('Embedded slide charts/images require a PDF copy or image upload for visual extraction.');
+   source.children=[];for(const path of Object.keys(z).filter(p=>/^ppt\/media\//.test(p))){const kind=path.split('.').pop()!.toLowerCase();if(imageTypes[kind]&&z[path].length<=5*1024*1024)source.children.push({id:crypto.randomUUID(),name:file.name+' / '+path,kind:'image',mediaType:imageTypes[kind],data:b64(z[path].slice().buffer),text:'',warnings:['Embedded slide image; verify visual figures.']});}for(const path of Object.keys(z).filter(p=>/^ppt\/(notesSlides|charts)\/.*\.xml$/.test(p)))source.text+='\n'+path+'\n'+Array.from(xml(strFromU8(z[path])).getElementsByTagNameNS('*','t')).concat(Array.from(xml(strFromU8(z[path])).getElementsByTagNameNS('*','v'))).map(n=>n.textContent).join(' | ');
   }else{
    if(!z['content.xml'])throw Error('Invalid OpenDocument file.');
    source.text=Array.from(xml(strFromU8(z['content.xml'])).getElementsByTagNameNS('*','p')).map((p,i)=>`Paragraph ${i+1}: ${p.textContent}`).join('\n');
   }
-  if(!source.text.trim())throw Error('No readable text. Upload a PDF or images of the document.');
+  if(!source.text.trim()&&!source.children?.length)throw Error('No readable text. Upload a PDF or images of the document.');
   return finish(source);
  }
  if(['txt','md','json','html','htm','xml','eml','log'].includes(ext)||file.type.startsWith('text/')){

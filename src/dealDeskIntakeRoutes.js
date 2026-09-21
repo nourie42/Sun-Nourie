@@ -1,4 +1,6 @@
 import express from 'express';
+import {expandPublicSources} from './dealDeskPublicSources.js';
+import {extractChannels, applyPeriodBasis} from './dealDeskChannels.js';
 import path from 'node:path';
 import {createHash,timingSafeEqual,randomUUID} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
@@ -8,16 +10,17 @@ import PDFDocument from 'pdfkit';
 import {validateImport,calculate,fields,money,percent,emptyDeal} from './dealDeskModel.js';
 import {normalizeReview,safeUrl,restoreSourceQuotes} from './dealDeskReview.js';
 import {extractBoundedAnalysis,verifyBoundedAnalysis,extractSitePages} from './dealDeskProcessing.js';
+import {purchaseRecommendation,synergyRows,channelResults} from '../deal-desk/lib/screening.js';
 import {applyIndustryEstimates} from '../deal-desk/lib/estimates.js';
 
 const root=path.join(path.dirname(fileURLToPath(import.meta.url)),'..','public','deal-desk');
-export const DEAL_DESK_VERSION='deal-intake-v5.1-source-estimates';
+export const DEAL_DESK_VERSION='deal-intake-v6-periods-channels';
 const sameSecret=(a,b)=>timingSafeEqual(createHash('sha256').update(String(a||'')).digest(),createHash('sha256').update(String(b||'')).digest());
 const plain=(s,n=4000)=>typeof s==='string'?s.slice(0,n):'';
 const flattenRtf=node=>typeof node==='string'?node:node?.value||((node?.content||[]).map(flattenRtf).join('\n'));
 
 async function prepareSources(files){
- if(!Array.isArray(files)||files.length>20)throw Error('Use up to 20 files per analysis.');
+ if(!Array.isArray(files)||files.length>100)throw Error('Use up to 20 files per analysis.');
  const ids=new Set();let pages=0,total=0;
  const out=[];
  for(const f of files){
@@ -76,13 +79,13 @@ export function registerDealDeskRoutes(app,{env=process.env,fetchImpl=globalThis
   if(!response.ok)throw Error(`AI provider rejected the request (${response.status}). Check key, model access, billing, and web-search permissions.`);
   const data=await response.json();if(data.error)throw Error('AI provider returned an error.');return data;
  }
- async function research(name,hint,phase){
+ async function research(name,hint,phase,period){
   phase('Searching official company and Sunoco sources…');
   // Only the public company query is sent to search. Uploaded documents and notes never enter this request.
-  const messages=[{role:'user',content:`Research the public company ${JSON.stringify(name)}. Disambiguation: ${JSON.stringify(hint)}. Use web search. Prefer company filings, SEC, company sites and official announcements. This is a hypothetical acquisition screen requested by the user; it does not require an announced Sunoco transaction. Focus the model on the target company-operated retail portfolio, separating wholesale and dealer-only businesses. Find factual company overview, geography, owned/leased/company-operated/wholesale site counts, annual retail gallons, retail gross profit and retail expenses. Cite the exact short numeric source passages for every figure, with period and unit. Do not substitute historical capital spending for a proposed acquisition price. Identify one consistent annual reporting period, units, currency, and exact perimeter. Also search current official Sunoco disclosures for relevant integration mechanisms and risks, clearly separate Sunoco group data from target data. Never apply corporate synergy percentages to this target. Private company data may not be public; say what is unavailable. Cite every factual claim with the native web citations. Do not guess addresses or internal Sunoco margins.`}];
+  const messages=[{role:'user',content:`Research the public company ${JSON.stringify(name)}. Disambiguation: ${JSON.stringify(hint)}. Use web search. Prefer company filings, SEC, company sites and official announcements. This is a hypothetical acquisition screen requested by the user; it does not require an announced Sunoco transaction. Cover ALL business channels: company-operated retail, existing dealers, wholesale supply, fleet and other reported segments. Distinguish operated stores from supplied dealer locations and cardlock locations; do not omit non-retail segments. Requested reporting basis: ${period}. Retrieve official earnings tables or SEC filings for this period, not just narrative snippets. Find retail fuel gallons/margin/merchandise gross profit/site operating expense AND separate dealer/wholesale/fleet volume, margin, income, expenses and site counts. Include corporate G&A separately; never allocate all company G&A to every segment. Find factual company overview, geography, owned/leased/company-operated/wholesale site counts, annual retail gallons, retail gross profit and retail expenses. Cite the exact short numeric source passages for every figure, with period and unit. Do not substitute historical capital spending for a proposed acquisition price. Identify one consistent annual reporting period, units, currency, and exact perimeter. Also search current official Sunoco disclosures for relevant integration mechanisms and risks, clearly separate Sunoco group data from target data. Never apply corporate synergy percentages to this target. Private company data may not be public; say what is unavailable. Cite every factual claim with the native web citations. Do not guess addresses or internal Sunoco margins.`}];
   let data;
   for(let n=0;n<3;n++){
-   data=await ask(messages,{tools:[{type:'web_search_20250305',name:'web_search',max_uses:6}]});
+   data=await ask(messages,{tools:[{type:'web_search_20250305',name:'web_search',max_uses:10}]});
    messages.push({role:'assistant',content:data.content});if(data.stop_reason!=='pause_turn')break;
   }
   const blocks=messages.filter(x=>x.role==='assistant').flatMap(x=>x.content);
@@ -98,27 +101,30 @@ export function registerDealDeskRoutes(app,{env=process.env,fetchImpl=globalThis
    }
   }
   if(!sources.length)throw Error('Search returned no traceable cited sources. No facts were applied.');
-  return {sources,narrative};
+  phase('Reading the financial tables behind public citations…');
+  return {sources:await expandPublicSources(sources,fetchImpl),narrative};
  }
  async function analyze(body,isSearch,phase){
   let processingCalls=0;const deadline=Date.now()+17*60*1000;
   const analysisAsk=(...args)=>{if(++processingCalls>32||Date.now()>deadline)throw Error('Analysis reached its processing limit. Your files are retained.');return ask(...args);};
-  let sources,narrative='';let current=validateImport(body.deal);const period=plain(body.period,80);
-  if(isSearch&&current.name.trim().toLowerCase()!==body.company.trim().toLowerCase())current={...emptyDeal(),name:body.company};
-  if(isSearch){const found=await research(body.company,plain(body.hint,400),phase);sources=found.sources;narrative=found.narrative;current.name=body.company;}
+  let sources,narrative='';let current=validateImport(body.deal);const basis=['lastYear','ttm','ytd'].includes(body.periodBasis)?body.periodBasis:'lastYear';const months=Number(body.reportingMonths);if(basis==='ytd'&&(!Number.isInteger(months)||months<1||months>12))throw Error('Choose 1–12 reporting months.');const year=Number(body.reportingYear)||new Date().getUTCFullYear();const period=basis==='lastYear'?`FY${year-1}`:basis==='ytd'?`${year} YTD ${months} months`:'TTM ending latest reported quarter';
+  if(isSearch)current={...emptyDeal(),name:body.company};
+  if(isSearch){const found=await research(body.company,plain(body.hint,400),phase,period);sources=found.sources;narrative=found.narrative;current.name=body.company;}
   else{phase('Reading source documents…');sources=await prepareSources(body.files);if(body.notes?.trim())sources.push({id:'user-notes',name:'User-provided notes',kind:'text',text:body.notes,warnings:[]});}
   phase('Extracting company facts, site records and model inputs…');
   const content=sourceContent(sources);
-  const raw=await extractBoundedAnalysis({ask:analysisAsk,content,current,notes:isSearch?'Hypothetical acquisition screening of the identified company-operated retail portfolio. No announced Sunoco transaction is required. Source the existing retail portfolio; commercial terms will be separately labeled estimates.':plain(body.notes,30000),period,narrative,phase});
+  const raw=await extractBoundedAnalysis({ask:analysisAsk,content,current,notes:isSearch?'Hypothetical acquisition of the entire identified company. Main model fields cover company-operated retail ONLY; separate existing dealer, wholesale, fleet and other segments are extracted in channel schedules. Report retail allocated G&A if available, otherwise leave null; corporate G&A must appear once. Source the requested period. For TTM calculate latest full year + current YTD − prior comparable YTD only when all operands are reported; attach component evidence. No announced transaction required.':plain(body.notes,30000),period,narrative,phase});
   restoreSourceQuotes(raw,sources);
   phase('Checking source quotes, units, periods and conflicts…');
   const verification=await verifyBoundedAnalysis({ask:analysisAsk,content,raw,period,phase});
   const siteResult=await extractSitePages({ask:analysisAsk,sources,sourceContent,sourceIds:Array.isArray(raw.siteSourceIds)?raw.siteSourceIds:[],phase});
   raw.sites=siteResult.sites;raw.warnings.push(...siteResult.warnings);
-  const result=normalizeReview(raw,sources,current,verification,period);
+  let result=normalizeReview(raw,sources,current,verification,period);
+  phase('Separating existing dealer, wholesale and other channels…');try{result=await extractChannels({ask:analysisAsk,content,sources,review:result,period});}catch{result.warnings.push('Non-retail channel extraction did not finish. The channel schedule is incomplete; add missing channels before relying on an entire-company valuation.');}
+  result=applyPeriodBasis(result,{basis,months,year});
   result.warnings.push(...sources.flatMap(s=>(s.warnings||[]).map(w=>`${s.name}: ${w}`)));
   result.searchUsed=isSearch;
-  if(body.estimateMissing===true){phase('Filling missing inputs with labeled industry-based screening estimates…');const estimated=applyIndustryEstimates(result);validateImport(estimated.deal);return estimated;}
+  if(body.estimateMissing===true){phase('Filling missing inputs with labeled industry-based screening estimates…');const estimated=applyIndustryEstimates(result);const priceEvidence=estimated.evidence.find(e=>e.field==='price');if(priceEvidence?.status==='Estimated'){const recommendation=purchaseRecommendation(estimated.deal,calculate(estimated.deal));if(recommendation.value!==null){estimated.deal.price=recommendation.value;priceEvidence.value=recommendation.value;priceEvidence.low=recommendation.low;priceEvidence.high=recommendation.high;priceEvidence.reason='ESTIMATED — '+recommendation.basis;const terminalEvidence=estimated.evidence.find(e=>e.field==='terminal');if(terminalEvidence?.status==='Estimated'){estimated.deal.terminal=recommendation.value*.8;terminalEvidence.value=estimated.deal.terminal;terminalEvidence.low=estimated.deal.terminal*.75;terminalEvidence.high=estimated.deal.terminal*1.25;}}}validateImport(estimated.deal);return estimated;}
   return result;
  }
  function queue(isSearch){return async(q,r)=>{
@@ -132,7 +138,7 @@ export function registerDealDeskRoutes(app,{env=process.env,fetchImpl=globalThis
   try{
    validateImport(q.body?.deal);
    if(isSearch&&(!plain(q.body.company,160).trim()||q.body.company.length>160))throw Error('Enter a company name (up to 160 characters).');
-   if(!isSearch&&(!Array.isArray(q.body.files)||q.body.files.length>20||(!q.body.files.length&&!plain(q.body.notes,30000).trim())))throw Error('Upload files or enter deal notes first.');
+   if(!isSearch&&(!Array.isArray(q.body.files)||q.body.files.length>100||(!q.body.files.length&&!plain(q.body.notes,30000).trim())))throw Error('Upload files or enter deal notes first.');
    if(q.body.notes!==undefined&&(typeof q.body.notes!=='string'||q.body.notes.length>30000))throw Error('Deal notes exceed 30,000 characters.');
   }catch(e){return r.status(400).json({error:e.message});}
   calls++;const id=randomUUID();const job={created:Date.now(),state:'running',phase:'Starting…',requestId,requestHash};jobs.set(id,job);
@@ -150,6 +156,7 @@ export function registerDealDeskRoutes(app,{env=process.env,fetchImpl=globalThis
   p('SUNOCO ACQUISITION WORKSPACE',10);doc.font('Helvetica-Bold').fontSize(24).text(deal.name).moveDown(.5);
   p(`Company and acquisition summary • ${new Date().toISOString().slice(0,10)}`);
   p(plain(review.summary,14000)||`No source-backed company profile has been completed for ${deal.name}.`);
+  const recommendation=purchaseRecommendation(deal,calculate(deal));p(`Estimated purchase recommendation: ${money(recommendation.value)}; return-supported ceiling ${money(recommendation.capacity)}`);p(recommendation.basis);
   p(`Reporting period: ${plain(q.body.period,80)||plain(review.company?.period,80)||'Not confirmed'}`);
   const estimated=(review.evidence||[]).filter(e=>e.status==='Estimated'&&e.value===deal[e.field]);
   if(estimated.length)p(`ESTIMATED SCREENING CASE: ${estimated.length} inputs use estimates. Results are not a fully sourced valuation.`);
@@ -158,6 +165,7 @@ export function registerDealDeskRoutes(app,{env=process.env,fetchImpl=globalThis
   p('Screen assumes a company-operated seller converted to commission dealers. Flat operations for 10 years; Year 1 phased conversion; explicit Year 10 proceeds. Excludes taxes, financing and growth. Incomplete inputs leave outputs blank. These are screening estimates, not approved savings.');
   const missing=fields.filter(f=>deal[f.key]===null);p('Outstanding information',14);p(missing.length?missing.map(f=>f.label).join('; '):'All numerical fields are entered; source and commercial approval still apply.');
   if(estimated.length){p('Estimated inputs and basis',14);for(const e of estimated)p(`${fields.find(f=>f.key===e.field)?.label||e.field}: ${e.value}. ${plain(e.reason,2000)}`);}
+  p('Included and excluded synergies',14);for(const row of synergyRows(deal))p(`${row.name}: ${row.included?'Included':'Not included'}; ${money(row.amount)}; ${row.scope}. ${row.basis}`);p('Channel calculations',14);for(const c of channelResults(deal))p(`${c.name}: ${c.sites} locations; EBITDA ${money(c.ebitda)}. ${c.basis}`);p(`Dealer EBITDA per retail site: ${money(result.dealerPerSite)}`);
   if(Array.isArray(review.opportunities)){p('Potential improvements — unquantified until supported',14);for(const o of review.opportunities.slice(0,30))p(`${plain(o.idea)}\nCalculation: ${plain(o.formula)}\nEvidence needed: ${plain(o.evidenceNeeded)}`);}
   if(Array.isArray(review.warnings)){p('Items to resolve',14);for(const w of review.warnings.slice(0,50))p(plain(w));}
   p('Sources',14);for(const s of (Array.isArray(review.sources)?review.sources:[]).slice(0,100))p(`${plain(s.name,250)}${safeUrl(s.url)?' — '+safeUrl(s.url):''}`);
