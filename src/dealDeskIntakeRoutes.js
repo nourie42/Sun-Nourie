@@ -1,5 +1,6 @@
 import express from 'express';
 import {arkoAnnualTables} from './dealDeskIssuerTables.js';
+import {importWorkbookTables} from './dealDeskWorkbookTables.js';
 import {expandPublicSources} from './dealDeskPublicSources.js';
 import {extractChannels, applyPeriodBasis} from './dealDeskChannels.js';
 import path from 'node:path';
@@ -15,7 +16,7 @@ import {purchaseRecommendation,synergyRows,channelResults} from '../deal-desk/li
 import {applyIndustryEstimates} from '../deal-desk/lib/estimates.js';
 
 const root=path.join(path.dirname(fileURLToPath(import.meta.url)),'..','public','deal-desk');
-export const DEAL_DESK_VERSION='deal-intake-v9-source-counts';
+export const DEAL_DESK_VERSION='deal-intake-v10-workbook-cells';
 const sameSecret=(a,b)=>timingSafeEqual(createHash('sha256').update(String(a||'')).digest(),createHash('sha256').update(String(b||'')).digest());
 const plain=(s,n=4000)=>typeof s==='string'?s.slice(0,n):'';
 const flattenRtf=node=>typeof node==='string'?node:node?.value||((node?.content||[]).map(flattenRtf).join('\n'));
@@ -118,7 +119,7 @@ export function registerDealDeskRoutes(app,{env=process.env,fetchImpl=globalThis
   if(isSearch)current={...emptyDeal(),name:body.company};
   if(isSearch){const found=await research(body.company,plain(body.hint,400),phase,period);sources=found.sources;narrative=found.narrative;current.name=body.company;}
   else{phase('Reading source documents…');sources=await prepareSources(body.files);if(body.notes?.trim())sources.push({id:'user-notes',name:'User-provided notes',kind:'text',text:body.notes,warnings:[]});}
-  let result=isSearch?arkoAnnualTables(sources,period):null;
+  let result=isSearch?arkoAnnualTables(sources,period):importWorkbookTables(sources,{basis,year,months,current});
   if(!result){
   phase('Extracting company facts, site records and model inputs…');
   const content=sourceContent(sources);
@@ -130,7 +131,7 @@ export function registerDealDeskRoutes(app,{env=process.env,fetchImpl=globalThis
   raw.sites=siteResult.sites;raw.warnings.push(...siteResult.warnings);
   result=normalizeReview(raw,sources,current,verification,period);
   phase('Separating existing dealer, wholesale and other channels…');try{result=await extractChannels({ask:analysisAsk,content,sources,review:result,period,phase});}catch(error){result.warnings.push('Non-retail channel extraction did not finish ('+(error.code==='OUTPUT_LIMIT'?'response exceeded its output budget':error instanceof SyntaxError?'invalid structured response':error.name==='TimeoutError'?'source processing timed out':'processing error')+'). The channel schedule is incomplete; add missing channels before relying on an entire-company valuation.');}
-  }else phase('Published issuer tables imported. Calculating channel economics…');
+  }else phase(isSearch?'Published issuer tables imported. Calculating channel economics…':'Workbook cells reconciled. Calculating financials and channel economics…');
   result=applyPeriodBasis(result,{basis,months,year});
   result.warnings.push(...sources.flatMap(s=>(s.warnings||[]).map(w=>`${s.name}: ${w}`)));
   result.searchUsed=isSearch;

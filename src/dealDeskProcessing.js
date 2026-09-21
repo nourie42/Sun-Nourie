@@ -6,7 +6,14 @@ import {extractionPrompt} from './dealDeskReview.js';
 export function parseAnalysis(data){
  if(data.stop_reason==='max_tokens')throw Object.assign(new Error('Analysis response needs a smaller batch.'),{code:'OUTPUT_LIMIT'});
  const text=(data.content||[]).filter(x=>x.type==='text').map(x=>x.text).join('\n');
- const value=JSON.parse(text.replace(/^```(?:json)?\s*|\s*```$/g,''));
+ let value;
+ try{value=JSON.parse(text.replace(/^```(?:json)?\s*|\s*```$/g,''));}catch(error){
+  // Accept one complete JSON object inside explanatory text. Never repair a
+  // truncated response or combine separate objects.
+  const start=text.indexOf('{'),end=text.lastIndexOf('}');
+  if(start<0||end<start)throw error;
+  value=JSON.parse(text.slice(start,end+1));
+ }
  if(!value||typeof value!=='object'||Array.isArray(value))throw new SyntaxError('Expected an analysis object.');
  return value;
 }
@@ -15,7 +22,8 @@ export async function extractBoundedAnalysis({ask,content,current,notes,period,n
  const request=async(selected,profile)=>{
   const prompt=extractionPrompt(current,notes,period,selected,profile)+(narrative?`\nRESEARCH NARRATIVE (use only facts supported by the cited source excerpts below):\n${narrative}`:'');
   const raw=parseAnalysis(await ask([{role:'user',content:[{type:'text',text:prompt},...content]}]));
-  if(!raw.deal||typeof raw.deal!=='object'||Array.isArray(raw.deal)||!Array.isArray(raw.evidence))throw new SyntaxError('Financial extraction is incomplete.');
+  if(selected.length&&(!raw.deal||typeof raw.deal!=='object'||Array.isArray(raw.deal)||!Array.isArray(raw.evidence)))throw new SyntaxError('Financial extraction is incomplete.');
+  if(!selected.length){raw.deal={};raw.evidence=[];}
   if(profile&&(!raw.company||typeof raw.summary!=='string'))throw new SyntaxError('Company extraction is incomplete.');
   // Enforce the task boundary even if the provider ignores it.
   return {...(profile?raw:{}),deal:Object.fromEntries(selected.map(f=>[f.key,raw.deal[f.key]??null])),
