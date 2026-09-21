@@ -126,7 +126,7 @@ export function registerDealDeskRoutes(app,{env=process.env,fetchImpl=globalThis
   const siteResult=await extractSitePages({ask:analysisAsk,sources,sourceContent,sourceIds:Array.isArray(raw.siteSourceIds)?raw.siteSourceIds:[],phase});
   raw.sites=siteResult.sites;raw.warnings.push(...siteResult.warnings);
   let result=normalizeReview(raw,sources,current,verification,period);
-  phase('Separating existing dealer, wholesale and other channels…');try{result=await extractChannels({ask:analysisAsk,content,sources,review:result,period});}catch{result.warnings.push('Non-retail channel extraction did not finish. The channel schedule is incomplete; add missing channels before relying on an entire-company valuation.');}
+  phase('Separating existing dealer, wholesale and other channels…');try{result=await extractChannels({ask:analysisAsk,content,sources,review:result,period});}catch(error){result.warnings.push('Non-retail channel extraction did not finish ('+(error.code==='OUTPUT_LIMIT'?'response exceeded its output budget':error instanceof SyntaxError?'invalid structured response':error.name==='TimeoutError'?'source processing timed out':'processing error')+'). The channel schedule is incomplete; add missing channels before relying on an entire-company valuation.');}
   result=applyPeriodBasis(result,{basis,months,year});
   result.warnings.push(...sources.flatMap(s=>(s.warnings||[]).map(w=>`${s.name}: ${w}`)));
   result.searchUsed=isSearch;

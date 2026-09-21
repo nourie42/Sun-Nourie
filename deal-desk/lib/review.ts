@@ -32,7 +32,8 @@ export function restoreSourceQuotes(raw:any,sources:any[]){
   }
   candidates.sort((a,b)=>b.score-a.score);
   const best=candidates[0];if(!best)continue;
-  const ties=candidates.filter(c=>c.score===best.score);if(new Set(ties.map(c=>norm(c.line))).size>1)continue;
+  // Repeated issuer tables can contain the same metric in several rows.
+  // Select a matching row for the independent period/perimeter verifier; this is not approval.
   e.quote=best.line.trim();e.sourceId=best.source.id;e.locator='Exact reported table row: '+String(e.locator||'');
  }
  return raw;
@@ -61,7 +62,7 @@ export function numberSupported(value:number, quote:string, sourceUnit:string, k
  const tokens=quote.match(/[-+]?\d[\d,]*(?:\.\d+)?/g)||[];
  const unit=sourceUnit.toLowerCase();
  if(!unit||/\b(cad|eur|gbp|aud)\b/.test(unit))return false;
- let scale=/billion/.test(unit)?1e9:/million/.test(unit)?1e6:/thousand/.test(unit)?1e3:1;
+ let scale=/billion/.test(unit)?1e9:/million/.test(unit)?1e6:/thousand|000s|000's|\b000\b|1,000/.test(unit)?1e3:1;
  if(['fuelCpg','commission','procurement','freight'].includes(key)&&/(usd|dollar|\$)\s*(\/|per)\s*(gal|gallon)/.test(unit))scale*=100;
  return tokens.some(t=>Math.abs(Number(t.replaceAll(',',''))*scale-value)<=Math.max(0.000001,Math.abs(value)*1e-9));
 }

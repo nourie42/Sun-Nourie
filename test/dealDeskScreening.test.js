@@ -19,3 +19,15 @@ test('nonadjacent financial table quotes recover exact source rows without accep
 });
 test('listed synergies reconcile to combined EBITDA change, including existing channels',()=>{const d=exampleDeal();d.gaSavings=100000;d.channels=[{name:'Existing dealer',sites:20,gallons:10000000,fuelCpg:5,other:0,opex:100000,ga:0,capex:20000,procurement:1,eligible:100,savings:20000}];const r=calculate(d);assert.equal(synergyRows(d).reduce((n,x)=>n+x.amount,0),r.combined-r.seller);});
 test('reported fuel gross profit and gallons derive a weighted channel margin',async()=>{const {derivedSupported}=await import('../src/dealDeskReview.js');const sources=[{id:'f',text:'Fuel contribution 50,000\nFuel gallons 1,000,000'}];const e={operation:'ratioCpg',components:[{value:50000000,quote:'50,000',sourceId:'f',sourceUnit:'USD thousands'},{value:1000000000,quote:'1,000,000',sourceId:'f',sourceUnit:'gallons thousands'}]};assert.ok(derivedSupported(e,5,sources,'fuelCpg'));assert.ok(!derivedSupported(e,35,sources,'fuelCpg'));});
+test('repeated issuer rows and 000s units still reach independent verification',async()=>{
+ const {restoreSourceQuotes,numberSupported}=await import('../src/dealDeskReview.js');
+ const raw={evidence:[{field:'gallons',value:922726000,quote:'Fuel gallons sold FY2025 922,726',sourceUnit:'gallons (000s)',sourceId:'issuer'}]};
+ restoreSourceQuotes(raw,[{id:'issuer',text:'Fuel gallons sold | 922,726 | 1,080,990\nFuel gallons sold | 218,739 | 922,726'}]);
+ assert.match(raw.evidence[0].quote,/\|/);assert.ok(numberSupported(922726000,raw.evidence[0].quote,raw.evidence[0].sourceUnit,'gallons'));
+});
+test('channel output limits retry one channel at a time',async()=>{
+ const {extractChannels}=await import('../src/dealDeskChannels.js');let n=0;
+ const answers=[{stop_reason:'max_tokens'}, {names:['Wholesale']},{channels:[{name:'Wholesale',type:'wholesale',metrics:{sites:{value:2099,quote:'Sites 2,099',sourceId:'s',sourceUnit:'count',period:'FY2025'},ga:0}}]}, {approved:['0.sites']}];
+ const r=await extractChannels({ask:async()=>{const a=answers[n++];return a.stop_reason?a:{content:[{type:'text',text:JSON.stringify(a)}]};},content:[],sources:[{id:'s',text:'Sites 2,099'}],period:'FY2025',review:{deal:{},evidence:[]}});
+ assert.equal(r.deal.channels[0].sites,2099);assert.equal(n,4);
+});

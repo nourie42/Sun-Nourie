@@ -11,12 +11,12 @@ import {extractSitePages} from '../src/dealDeskProcessing.js';
 const env={ANTHROPIC_API_KEY:'test-not-real',AI_COUNCIL_ACCESS_CODE:'test-code'};
 const headers={'content-type':'application/json','x-deal-desk-passcode':'test-code'};
 const source={id:'f1',name:'Fictional seller.txt',kind:'text',text:'Fictional Fuel operates 10 sites. FY2025 annual gallons 15 million. Fuel margin USD/gallon 0.35.',warnings:[]};
-const proposal={company:{name:'Fictional Fuel',overview:'Fictional Fuel operates 10 sites.',period:'FY2025',sourceIds:['f1']},summary:'Fictional Fuel operates 10 sites.',deal:{name:'Fictional Fuel',sites:10,gallons:15000000,fuelCpg:35},evidence:[
+const proposal={channels:[],company:{name:'Fictional Fuel',overview:'Fictional Fuel operates 10 sites.',period:'FY2025',sourceIds:['f1']},summary:'Fictional Fuel operates 10 sites.',deal:{name:'Fictional Fuel',sites:10,gallons:15000000,fuelCpg:35},evidence:[
  {field:'sites',value:10,sourceId:'f1',locator:'line 1',quote:'10 sites',period:'FY2025',sourceUnit:'count',status:'sourced',confidence:'high'},
  {field:'gallons',value:15000000,sourceId:'f1',locator:'line 1',quote:'15 million',period:'FY2025',sourceUnit:'gallons millions',status:'sourced',confidence:'high'},
  {field:'fuelCpg',value:35,sourceId:'f1',locator:'line 1',quote:'0.35',period:'FY2025',sourceUnit:'USD/gallon',status:'sourced',confidence:'high'}
 ]};
-const verification={approvedFields:['sites','gallons','fuelCpg'],companySupported:true,summarySupported:true};
+const verification={channels:[],approvedFields:['sites','gallons','fuelCpg'],companySupported:true,summarySupported:true};
 test('accounting currency spaces do not reject an independently verified source value',()=>{
  const raw={company:{name:'Test',period:'FY2025',sourceIds:['w']},summary:'Test',deal:{insideGp:1795974},evidence:[{field:'insideGp',value:1795974,sourceId:'w',quote:'$1,795,974',period:'FY2025',sourceUnit:'USD',status:'sourced',confidence:'high'}]};
  const sources=[{id:'w',kind:'text',text:'B52: $ 1,795,974 [cached formula: B25-B46]'}];
