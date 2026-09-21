@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import {purchaseRecommendation,synergyRows,channelResults,extraSavings} from './screening.js';
+import {purchaseRecommendation,synergyRows,channelResults,extraSavings,customSavings} from './screening.js';
 import template from './model-template.json';
 import {fields,calculate,validateImport} from './deal';
 import type {Deal} from './deal';
@@ -61,12 +61,18 @@ export async function exportModel(deal:Deal,review:Review|null,sites:Site[],peri
  rows(model,[['Channel','Locations','Gallons','Margin cents','Other GP/rent','Cash Opex','G&A','Procurement cents','Eligible %','Savings','Capex','Annual EBITDA'],...channels.map((c:any)=>[c.name,c.sites,c.gallons,c.fuelCpg,c.other,c.opex,c.ga,c.procurement,c.eligible,c.savings,c.capex,c.ebitda])],85);
  channels.forEach((c:any,i:number)=>formula(`L${86+i}`,`C${86+i}*D${86+i}/100+E${86+i}-F${86+i}-G${86+i}+C${86+i}*H${86+i}/100*I${86+i}/100+J${86+i}`,c.ebitda));
  if(channels.length){const end=85+channels.length;formula('B79',channels.map((_:any,i:number)=>`C${86+i}*D${86+i}/100+E${86+i}-F${86+i}-G${86+i}`).join('+'),channels.reduce((n:any,c:any)=>n+c.baseline,0));formula('B80',`SUM(L86:L${end})`,channels.reduce((n:any,c:any)=>n+c.ebitda,0));formula('B81',`SUM(K86:K${end})`,channels.reduce((n:any,c:any)=>n+c.capex,0));}
+ const custom=deal.customSynergies||[],customStart=Math.max(100,89+channels.length);
+ rows(model,[['Custom synergy','Annual amount','Beneficiary','Scope','Include (1/0)','Calculation / evidence','Sunoco amount','Dealer amount'],...custom.map((s:any)=>[s.name,s.amount,s.beneficiary,s.scope,s.enabled?1:0,s.basis,s.enabled&&s.beneficiary==='sunoco'?s.amount:0,s.enabled&&s.beneficiary==='dealer'?s.amount:0])],customStart);
+ custom.forEach((s:any,i:number)=>{const row=customStart+i+1;formula('G'+row,'IF(AND(C'+row+'="sunoco",E'+row+'=1),B'+row+',0)',s.enabled&&s.beneficiary==='sunoco'?s.amount:0);formula('H'+row,'IF(AND(C'+row+'="dealer",E'+row+'=1),B'+row+',0)',s.enabled&&s.beneficiary==='dealer'?s.amount:0);});
+ rows(model,[['Custom Sunoco recurring synergies',customSavings(deal)],['Custom dealer recurring synergies',customSavings(deal,'dealer')]],73);
+ if(custom.length){formula('B73','SUM(G'+(customStart+1)+':G'+(customStart+custom.length)+')',customSavings(deal));formula('B74','SUM(H'+(customStart+1)+':H'+(customStart+custom.length)+')',customSavings(deal,'dealer'));}
  rows(model,[['Terminal recovery %',deal.exitRecovery??80],['Operating cash-flow present value'],['Return-supported price ceiling'],['Estimated opening purchase recommendation'],['Estimated low price'],['Estimated high price']],66);
- formula('B67','NPV(B33/100,C54:L54)-B34/(1+B33/100)^10',result.investReady?result.cashflows.slice(1).reduce((n:number,v:number,i:number)=>n+v/(1+deal.hurdle/100)**(i+1),0)-deal.terminal/(1+deal.hurdle/100)**10:null);formula('B68','MAX(0,(B67-B28*B29-B30)/(1-B66/100/(1+B33/100)^10))',recommendation.capacity);formula('B69','ROUND(B68*0.9,0)',recommendation.value);formula('B70','ROUND(B68*0.8,0)',recommendation.low);formula('B71','ROUND(B68,0)',recommendation.high);
+ formula('B67','NPV(B33/100,C54:L54)-B34/(1+B33/100)^10',result.investReady?result.cashflows.slice(1).reduce((n:number,v:number,i:number)=>n+v/(1+deal.hurdle/100)**(i+1),0)-deal.terminal/(1+deal.hurdle/100)**10:null);formula('B68','IF(1-B66/100/(1+B33/100)^10>0,MAX(0,(B67-B28*B29-B30)/(1-B66/100/(1+B33/100)^10)),"")',recommendation.capacity);formula('B69','ROUND(B68*0.9,0)',recommendation.value);formula('B70','ROUND(B68*0.8,0)',recommendation.low);formula('B71','ROUND(B68,0)',recommendation.high);
  const editFormula=(address:string,from:string,to:string)=>{const f=cell(model,address).querySelector('f');if(f)f.textContent=f.textContent!.replace(from,to);};
- editFormula('B36','B6>0','B6>=0');editFormula('B46','-B41-B26','-B41-B26+SUM(B62:B65)'+(channels.length?'+SUM(J86:J'+(85+channels.length)+')':''));editFormula('B38','-B12-B13','-B12-B13+B79');editFormula('B42','-B40-B41','-B40-B41+B80+SUM(B62:B65)');
+ editFormula('B36','B6>0','B6>=0');editFormula('B46','-B41-B26','-B41-B26+SUM(B62:B65)+B73+B74'+(channels.length?'+SUM(J86:J'+(85+channels.length)+')':''));editFormula('B38','-B12-B13','-B12-B13+B79');editFormula('B42','-B40-B41','-B40-B41+B80+SUM(B62:B65)+B73');
+ editFormula('B43','-B26','-B26+B74');
  for(let i=2;i<12;i++)editFormula(`${col(i)}54`,'-B31','-B31-B81');
- rows(summary,[['Estimated opening purchase price',recommendation.value],['Estimated price range',`${recommendation.low} – ${recommendation.high}`],['Return-supported price ceiling',recommendation.capacity],['Recommendation basis',recommendation.basis]],8);
+ rows(summary,[['Estimated opening purchase price',recommendation.value],['Estimated price range',recommendation.low===null?'Unavailable':`${recommendation.low} – ${recommendation.high}`],['Return-supported price ceiling',recommendation.capacity],['Recommendation basis',recommendation.basis]],8);
  rows(summary,[['Dealer EBITDA per applicable retail site',result.dealerPerSite]],25);
  for(const [address,expression,cached] of [['B8','Model!B69',recommendation.value],['B10','Model!B68',recommendation.capacity],['B25','IFERROR(Model!B43/Model!B6,"")',result.dealerPerSite]] as any[]){const c=cell(summary,address);const f=summary.createElementNS(ns,'f');f.textContent=expression;c.appendChild(f);put(summary,address,cached,true);}
  put(model,'B36',result.errors.length?'Correct invalid inputs':'Valid',true);
@@ -77,12 +83,12 @@ export async function exportModel(deal:Deal,review:Review|null,sites:Site[],peri
  rows(siteSheet,[['Record ID','Site name','Address','City','State','ZIP','Ownership','Brand','Period','Source','Locator','Review status',...rawKeys.map(k=>'Source: '+k)],...sites.map(s=>[s.id,s.name,s.address,s.city,s.state,s.zip,s.ownership,s.brand,s.period,sources.find(x=>x.id===s.sourceId)?.name||s.sourceId,s.locator,s.duplicate?'Possible duplicate':s.reviewRequired?'Confirm original':'Parsed record',...rawKeys.map(k=>s.raw?.[k])])],5);
  rows(evidenceSheet,fields.map(f=>{const e=review?.evidence.find(x=>x.field===f.key);const source=sources.find(s=>s.id===e?.sourceId);return [f.label,deal[f.key],e?.value,e?.value===deal[f.key]?e?.status:deal[f.key]===null?'Missing':'User-entered / confirm source',source?.name,e?.locator,e?.quote,e?.period,e?.sourceUnit,e?.reason,source?.url,review?.generatedAt];}));
  const sourceRows=sources.map(s=>[s.name,s.url||s.kind,s.id]);rows(evidenceSheet,[['Source register','URL / type','Source ID'],...sourceRows],38);
- rows(opps,[['Synergy','Annual amount','Scope','Included?','Calculation / basis'],...synergies.map((x:any)=>[x.name,x.amount,x.scope,x.included?'Included':'Not included',x.basis]),[],['Unquantified opportunities'],...(review?.opportunities||[]).map(o=>[o.idea,null,o.owner,'Not included',o.formula+' Evidence needed: '+o.evidenceNeeded])],5);
+ rows(opps,[['Synergy','Annual amount used','Scope','Included?','Calculation / basis','Proposed amount','Beneficiary'],...synergies.map((x:any)=>[x.name,x.amount,x.scope,!x.available?'Needs inputs':x.included?'Included':'Not included',x.basis,x.proposed??x.amount,x.beneficiary||x.scope]),[],['Unquantified opportunities'],...(review?.opportunities||[]).map(o=>[o.idea,null,o.owner,'Not included',o.formula+' Evidence needed: '+o.evidenceNeeded])],5);
  rows(evidenceSheet,channels.flatMap((c:any)=>Object.entries(c.metricEvidence||{}).map(([key,e]:any)=>[c.name+' / '+key,c[key],e.value,e.status,sources.find(s=>s.id===e.sourceId)?.name,e.locator,e.quote,e.period,e.sourceUnit,e.reason||c.basis,sources.find(s=>s.id===e.sourceId)?.url])),55);
  const missing=fields.filter(f=>deal[f.key]===null).map(f=>f.label);rows(summary,[['Outstanding information',missing.join('; ')||'All fields filled — review estimates in Source Evidence and confirm commercial terms.'],...(review?.warnings||[]).map(w=>['Review item',w])],32);
  const styles=parse(await zip.file('xl/styles.xml')!.async('string'));
- readableRows(model,styles,6,100,[43,19,19,22,60,28,20,20,20,20,20,20]);
- readableRows(opps,styles,5,40,[38,20,35,20,85,25]);
+ readableRows(model,styles,6,Math.max(100,customStart+custom.length),[43,19,19,22,60,28,20,20,20,20,20,20]);
+ readableRows(opps,styles,5,Math.max(40,8+synergies.length+(review?.opportunities.length||0)),[38,20,35,20,85,25]);
  readableRows(summary,styles,8,11,[43,85]);
  readableRows(evidenceSheet,styles,6,34,[38,19,19,22,45,38,60,32,22,85,50,28]);
  // Cents-per-gallon assumptions need decimals; currency totals can stay whole dollars.
@@ -106,4 +112,6 @@ export async function exportOriginal(file:File,deal:Deal,mappings:CellMapping[])
  for(const name of Object.keys(zip.files).filter(n=>/^xl\/worksheets\/sheet\d+\.xml$/.test(n))){const doc=parse(await zip.file(name)!.async('string'));for(const f of Array.from(doc.getElementsByTagNameNS('*','f'))){const c=f.parentElement!;c.querySelector('v')?.remove();c.removeAttribute('t');}zip.file(name,serialize(doc));}
  await calculationMode(zip);return zip.generateAsync({type:'blob',compression:'DEFLATE',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
 }
-export function downloadBlob(name:string,data:Blob){const url=URL.createObjectURL(data);const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+// Keep a real, user-clickable fallback alive until the app replaces it. Some
+// mobile/embedded browsers block automatic downloads after asynchronous work.
+export function downloadBlob(name:string,data:Blob){const url=URL.createObjectURL(data);const a=document.createElement('a');a.href=url;a.download=name;a.hidden=true;document.body.appendChild(a);a.click();a.remove();return url;}

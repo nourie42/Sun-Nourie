@@ -47,8 +47,9 @@ export async function extractChannels({ask,content,sources,review,period,phase=(
 }
 export function applyPeriodBasis(review,{basis,months,year}){
  if(basis!=='ytd'){review.periodSelection={basis,year};return review;}
+ if(!Number.isInteger(months)||months<1||months>12)throw Error('Choose 1–12 reporting months.');
  const keys=['gallons','insideGp','transferredOther','other','sellerOpex','sellerGa'];
  for(const k of keys){const e=review.evidence.find(e=>e.field===k);if(review.deal[k]===null||!e||!['supported','Calculated from reported figures'].includes(e.status))continue;const reported=review.deal[k];review.deal[k]=reported/months*12;e.value=review.deal[k];e.status='Annualized from reported figures';e.reason=`Reported ${reported} ÷ ${months} reporting months × 12 = ${e.value}. Simple run rate; no seasonality adjustment.`;}
- for(const c of review.deal.channels||[])for(const k of ['gallons','other','opex','ga','capex']){if(c.metricEvidence?.[k]?.status==='Reported'){const reported=c[k];c[k]=reported/months*12;c.metricEvidence[k].status='Annualized from reported figures';c.metricEvidence[k].reason=`${reported} ÷ ${months} × 12`;}}
+ for(const c of review.deal.channels||[])for(const k of ['gallons','other','opex','ga','capex']){if(['Reported','supported','Calculated from reported figures'].includes(c.metricEvidence?.[k]?.status)){const reported=c[k];c[k]=reported/months*12;c.metricEvidence[k].reportedValue=reported;c.metricEvidence[k].value=c[k];c.metricEvidence[k].status='Annualized from reported figures';c.metricEvidence[k].reason=`${reported} ÷ ${months} × 12 = ${c[k]}; source period ${c.metricEvidence[k].period||'reported YTD'}.`;}}
  review.periodSelection={basis,months,year};review.company.period=`${year} YTD ${months} months annualized`;review.warnings.push(`Annualized reported YTD flows by ÷ ${months} × 12; counts and rates unchanged. This is a run-rate estimate, not a seasonal forecast.`);return review;
 }

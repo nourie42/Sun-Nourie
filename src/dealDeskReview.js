@@ -100,6 +100,9 @@ export function numberSupported(value, quote, sourceUnit, key) {
 }
 export function normalizeReview(raw, sources, current, verification, period) {
     const currentDeal = validateImport(current), deal = emptyDeal();
+    for (const key of ['gaSavings', 'cardSavings', 'maintenanceSavings', 'otherSavings', 'exitRecovery', 'customSynergies'])
+        if (currentDeal[key] !== undefined)
+            deal[key] = currentDeal[key];
     deal.name = typeof raw?.company?.name === 'string' ? raw.company.name.slice(0, 160) : typeof raw?.deal?.name === 'string' ? raw.deal.name.slice(0, 160) : currentDeal.name;
     const registry = new Map(sources.map(s => [s.id, s]));
     const approved = new Set(Array.isArray(verification?.approvedFields) ? verification.approvedFields : []);

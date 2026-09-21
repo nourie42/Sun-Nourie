@@ -14,6 +14,8 @@ export async function readSourceFile(file:File):Promise<SourceFile>{
  if(file.size>MAX_FILE)throw Error('20 MB per file maximum. Split large packets before uploading.');
  const buffer=await file.arrayBuffer(),bytes=new Uint8Array(buffer),originalExt=file.name.split('.').pop()?.toLowerCase()||'';
  let ext=originalExt;
+ const aliases:Record<string,string>={pps:'ppt',pot:'ppt',ppsx:'pptx',ppsm:'pptx',potx:'pptx',potm:'pptx',pptm:'pptx',dot:'doc',dotx:'docx',dotm:'docx',docm:'docx',xlt:'xls',xltx:'xlsx',xltm:'xlsx',xlam:'xlsx'};
+ ext=aliases[ext]||ext;
  const source:SourceFile={id:crypto.randomUUID(),name:file.name,kind:'text',text:'',warnings:[]};
  const head=new TextDecoder().decode(bytes.slice(0,8));
  const prefix=decode(buffer.slice(0,512)).trim();
@@ -108,7 +110,10 @@ export async function readSourceFile(file:File):Promise<SourceFile>{
   if(ext==='html'||ext==='htm'){const doc=new DOMParser().parseFromString(source.text,'text/html');doc.querySelectorAll('script,style').forEach(n=>n.remove());source.text=doc.body.textContent||'';}
   return finish(source);
  }
- throw Error('This format cannot be read safely. Upload a PDF, Word, Excel, CSV, PowerPoint, OpenDocument, image, or text version.');
+ // Plain UTF-8 exports can have vendor-specific extensions. Inspect content before
+ // accepting them; binary data must never become misleading financial text.
+ try{const text=new TextDecoder('utf-8',{fatal:true}).decode(buffer);if(text.trim()&&!/[\x00-\x08\x0e-\x1f]/.test(text)){source.text=text;source.warnings.push('Read as UTF-8 text based on file contents.');return finish(source);}}catch{}
+ throw Error(`Cannot extract this ${originalExt||'unknown'} file. Supported: PDF; DOC/DOCX/RTF; XLS/XLSX/XLSB/XLSM/CSV/TSV/ODS; PPT/PPTX and slide-show/template variants; ODT/ODP; JPG/PNG/GIF/WebP; HTML/XML/JSON/email/plain text. Encrypted or damaged files need an unlocked, readable copy.`);
 }
 export async function readDealFile(file:File){return (await readSourceFile(file)).text;}
 export function requestSources(files:SourceFile[]){return files.flatMap(({workbook,sites,children,...source})=>[{...source,structuredSiteCount:sites?.length||0},...(children||[])]);}

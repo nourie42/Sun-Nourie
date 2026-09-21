@@ -31,3 +31,25 @@ test('channel output limits retry one channel at a time',async()=>{
  const r=await extractChannels({ask:async()=>{const a=answers[n++];return a.stop_reason?a:{content:[{type:'text',text:JSON.stringify(a)}]};},content:[],sources:[{id:'s',text:'Sites 2,099'}],period:'FY2025',review:{deal:{},evidence:[]}});
  assert.equal(r.deal.channels[0].sites,2099);assert.equal(n,4);
 });
+
+test('custom synergies affect only their beneficiary, excluded rows remain auditable, and survive a draft reload',()=>{
+ const d=exampleDeal(),base=calculate(d);d.customSynergies=[{id:'owner',name:'IT consolidation',amount:120000,beneficiary:'sunoco',scope:'Corporate',basis:'Four contracts',enabled:true},{id:'dealer',name:'Inside assortment',amount:50000,beneficiary:'dealer',enabled:true},{id:'off',name:'Unapproved fee savings',amount:999999,beneficiary:'sunoco',enabled:false},{id:'cost',name:'Recurring integration support',amount:-20000,beneficiary:'sunoco',enabled:true}];
+ const restored=validateImport(JSON.parse(JSON.stringify(d))),r=calculate(restored);
+ assert.equal(r.sun-base.sun,100000);assert.equal(r.dealer-base.dealer,50000);assert.equal(r.dealerPerSite,100000);assert.equal(r.combined-base.combined,150000);
+ assert.equal(synergyRows(restored).reduce((n,x)=>n+x.amount,0),r.combined-r.seller);
+ assert.equal(synergyRows(restored).find(x=>x.name==='Unapproved fee savings').proposed,999999);assert.equal(synergyRows(restored).find(x=>x.name==='Unapproved fee savings').included,false);
+ const onlyDealer={...d,customSynergies:[d.customSynergies[1]]};assert.equal(purchaseRecommendation(onlyDealer,calculate(onlyDealer)).value,purchaseRecommendation(exampleDeal(),base).value);
+});
+
+test('invalid live channel and valuation edits cannot produce an apparently valid recommendation',()=>{
+ for(const overrides of [{exitRecovery:101},{exitRecovery:-1},{gaSavings:NaN},{channels:[{name:'Bad channel',sites:2.5,eligible:150}]}]){const d={...exampleDeal(),...overrides};assert.equal(calculate(d).ready,false);assert.equal(purchaseRecommendation(d,calculate(d)).value,null);assert.throws(()=>validateImport(d));}
+ const d={...exampleDeal(),hurdle:0,exitRecovery:100};assert.equal(purchaseRecommendation(d,calculate(d)).value,null);assert.match(purchaseRecommendation(d,calculate(d)).basis,/no finite price ceiling/);
+});
+
+test('YTD channel annualization includes derived reported flows, preserves rates, and never scales twice',()=>{
+ const review={deal:{channels:[{name:'Wholesale',sites:30,gallons:600000,other:20000,opex:10000,ga:1000,capex:2000,fuelCpg:5,metricEvidence:Object.fromEntries(['gallons','other','opex','ga','capex'].map(k=>[k,{status:k==='gallons'?'Calculated from reported figures':'Reported',period:'2026 YTD 6 months'}]))}]},evidence:[],company:{},warnings:[]};
+ applyPeriodBasis(review,{basis:'ytd',months:6,year:2026});const c=review.deal.channels[0];assert.equal(c.gallons,1200000);assert.equal(c.sites,30);assert.equal(c.fuelCpg,5);assert.equal(c.metricEvidence.gallons.value,1200000);assert.equal(c.metricEvidence.gallons.reportedValue,600000);assert.equal(c.capex,4000);
+ applyPeriodBasis(review,{basis:'ytd',months:6,year:2026});assert.equal(c.gallons,1200000);assert.throws(()=>applyPeriodBasis(review,{basis:'ytd',months:0,year:2026}));
+});
+
+test('supply sensitivities remove channel benefits as well as retail benefits',()=>{const d=exampleDeal();d.channels=[{name:'Wholesale',sites:10,gallons:1000000,fuelCpg:5,other:0,opex:0,ga:0,capex:0,procurement:2,eligible:100,savings:0}];const r=calculate(d);assert.equal(r.sun-r.scenarios[0].sun,r.supply+20000);assert.equal(r.sun-r.scenarios[2].sun,(r.supply+20000)/2);});

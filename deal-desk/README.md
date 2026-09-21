@@ -1,5 +1,24 @@
 # Deal Desk
 
+The purchase recommendation is the first results panel. Reporting choices are
+last full year, trailing twelve months, and reported YTD flows divided by reported
+months times twelve. Counts and rates are never annualized. Changing the choice
+marks the old results and requires source analysis again; Rerun economics validates
+edits to the current period without calling an AI provider.
+
+The Synergies tab lists included, excluded, and unquantified opportunities. Named
+custom rows retain their proposed amount when excluded and identify the affected
+channel, evidence, and whether Sunoco or converted retail dealers receive the
+benefit. Dealer-only benefits do not increase Sunoco purchase capacity. These
+rows persist in saved drafts and editable Excel formulas.
+
+Run all Deal Desk regressions with Node 24 after installing both the root and
+deal-desk dependencies: `node --test test/dealDesk*.test.js`. Document checks
+exercise binary PPT/PPS/POT, PPTX presentation/template variants, Word, OpenDocument,
+XLS/XLSX/XLSB/ODS/CSV, and custom-synergy exports. Encrypted, damaged, or unsupported
+binary files fail visibly; image-only legacy PPT files still require PDF or slide
+images. Failed files remain visible even when other files complete analysis.
+
 The original React Deal Desk runs at `/deal-desk` inside the existing Express
 service. No other navigation is changed. This is not a separate deployment.
 
