@@ -1,0 +1,325 @@
+| Source:
+Retail
+| For the Three Months Ended December 31, |   |   | For the Year Ended December 31, |   |
+| 2025 |   |   | 2024 |   |   | 2025 |   |   | 2024 |   |
+| (in thousands) |   |
+Fuel gallons sold |   | 218,739 |   |   |   | 258,856 |   |   |   | 922,726 |   |   |   | 1,080,990 |   |
+Same store fuel gallons sold decrease (%) 1 |   | (4.1% | )  |   |   | (4.4% | )  |   |   | (5.4% | )  |   |   | (6.1% | )  |
+Fuel contribution 2 | $ | 97,436 |   |   | $ | 100,212 |   |   | $ | 394,708 |   |   | $ | 428,216 |   |
+Fuel margin, cents per gallon 3 |   | 44.5 |   |   |   | 38.7 |   |   |   | 42.8 |   |   |   | 39.6 |   |
+Same store fuel contribution 1,2 | $ | 95,409 |   |   | $ | 88,535 |   |   | $ | 384,986 |   |   | $ | 383,453 |   |
+Same store merchandise sales decrease (%) 1 |   | (3.0% | )  |   |   | (4.3% | )  |   |   | (4.1% | )  |   |   | (5.4% | )  |
+Same store merchandise sales excluding cigarettes decrease (%) 1 |   | (1.8% | )  |   |   | (2.1% | )  |   |   | (2.7% | )  |   |   | (3.8% | )  |
+Merchandise revenue | $ | 338,116 |   |   | $ | 408,826 |   |   | $ | 1,482,454 |   |   | $ | 1,767,345 |   |
+Merchandise contribution 4 | $ | 116,247 |   |   | $ | 134,873 |   |   | $ | 499,781 |   |   | $ | 579,569 |   |
+Merchandise margin 5 |   | 34.4% |   |   |   | 33.0% |   |   |   | 33.7% |   |   |   | 32.8% |   |
+Same store merchandise contribution 1,4 | $ | 113,773 |   |   | $ | 114,058 |   |   | $ | 486,069 |   |   | $ | 497,325 |   |
+Same store site operating expenses 1 | $ | 153,411 |   |   | $ | 152,528 |   |   | $ | 657,534 |   |   | $ | 657,394 |   |
+|   |   |   |   |   |   |   |   |   |   |   |
+1 Same store is a common metric used in the convenience store industry. The Company considers a store a same store beginning in the first quarter in which the store had a full quarter of activity in the prior year. Refer to Use of Non-GAAP Measures below for discussion of this measure. |   |
+2 Calculated as fuel revenue less fuel costs; excludes the estimated fixed margin or fixed fee paid to the GPMP segment for the cost of fuel. |   |
+3 Calculated as fuel contribution divided by fuel gallons sold. |   |
+4 Calculated as merchandise revenue less merchandise costs. |   |
+5 Calculated as merchandise contribution divided by merchandise revenue. |   |
+|   |
+Wholesale
+| For the Three Months Ended December 31, |   |   | For the Year Ended December 31, |   |
+| 2025 |   |   | 2024 |   |   | 2025 |   |   | 2024 |   |
+| (in thousands) |   |
+Fuel gallons sold – fuel supply locations |   | 211,406 |   |   |   | 201,317 |   |   |   | 836,232 |   |   |   | 794,796 |   |
+Fuel gallons sold – consignment agent locations |   | 37,204 |   |   |   | 38,563 |   |   |   | 152,839 |   |   |   | 154,560 |   |
+Fuel contribution 1 – fuel supply locations | $ | 13,656 |   |   | $ | 12,004 |   |   | $ | 52,510 |   |   | $ | 47,930 |   |
+Fuel contribution 1 – consignment agent locations | $ | 10,372 |   |   | $ | 10,270 |   |   | $ | 42,022 |   |   | $ | 42,420 |   |
+Fuel margin, cents per gallon 2 – fuel supply locations |   | 6.5 |   |   |   | 6.0 |   |   |   | 6.3 |   |   |   | 6.0 |   |
+Fuel margin, cents per gallon 2 – consignment agent locations |   | 27.9 |   |   |   | 26.6 |   |   |   | 27.5 |   |   |   | 27.4 |   |
+|   |   |   |   |   |   |   |   |   |   |   |
+1 Calculated as fuel revenue less fuel costs; excludes the estimated fixed margin or fixed fee paid to the GPMP segment for the cost of fuel. |   |
+2 Calculated as fuel contribution divided by fuel gallons sold. |   |
+Note: Information disclosed on a "comparable wholesale sites" basis excludes wholesale sites added through acquisitions and retail stores converted to dealer locations, until the first quarter in which these sites had a full quarter of wholesale activity in the prior year. Refer to " Use of Non-GAAP Measures " below. |   |
+|   |
+Fleet Fueling
+| For the Three Months Ended December 31, |   |   | For the Year Ended December 31, |   |
+| 2025 |   |   | 2024 |   |   | 2025 |   |   | 2024 |   |
+| (in thousands) |   |
+Fuel gallons sold – proprietary cardlock locations |   | 31,420 |   |   |   | 32,888 |   |   |   | 129,459 |   |   |   | 136,104 |   |
+Fuel gallons sold – third-party cardlock locations |   | 3,463 |   |   |   | 3,239 |   |   |   | 13,389 |   |   |   | 12,814 |   |
+Fuel contribution 1 – proprietary cardlock locations | $ | 15,423 |   |   | $ | 15,823 |   |   | $ | 63,408 |   |   | $ | 62,612 |   |
+Fuel contribution 1 – third-party cardlock locations | $ | 500 |   |   | $ | 509 |   |   | $ | 2,325 |   |   | $ | 1,677 |   |
+Fuel margin, cents per gallon 2 – proprietary cardlock locations |   | 49.1 |   |   |   | 48.1 |   |   |   | 49.0 |   |   |   | 46.0 |   |
+Fuel margin, cents per gallon 2 – third-party cardlock locations |   | 14.4 |   |   |   | 15.8 |   |   |   | 17.4 |   |   |   | 13.1 |   |
+|   |   |   |   |   |   |   |   |   |   |   |
+1 Calculated as fuel revenue less fuel costs; excludes the estimated fixed fee paid to the GPMP segment for the cost of fuel. |   |
+2 Calculated as fuel contribution divided by fuel gallons sold. |   |
+|   |
+| For the Three Months Ended December 31, |   |   | For the Year Ended December 31, |   |
+Retail Segment | 2025 |   |   | 2024 |   |   | 2025 |   |   | 2024 |   |
+Number of sites at beginning of period |   | 1,182 |   |   |   | 1,491 |   |   |   | 1,389 |   |   |   | 1,543 |   |
+Acquired sites |   | — |   |   |   | — |   |   |   | — |   |   |   | 21 |   |
+Newly opened or reopened sites |   | — |   |   |   | 1 |   |   |   | 3 |   |   |   | 3 |   |
+Company-controlled sites converted to consignment or fuel supply locations, net |   | (62 | ) |   |   | (102 | ) |   |   | (256 | ) |   |   | (153 | ) |
+Sites closed, divested or converted to rentals |   | (2 | ) |   |   | (1 | ) |   |   | (18 | ) |   |   | (25 | ) |
+Number of sites at end of period |   | 1,118 |   |   |   | 1,389 |   |   |   | 1,118 |   |   |   | 1,389 |   |
+|   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |
+| For the Three Months Ended December 31, |   |   | For the Year Ended December 31, |   |
+Wholesale Segment 1 | 2025 |   |   | 2024 |   |   | 2025 |   |   | 2024 |   |
+Number of sites at beginning of period |   | 2,053 |   |   |   | 1,832 |   |   |   | 1,922 |   |   |   | 1,825 |   |
+Newly opened or reopened sites 2 |   | 10 |   |   |   | 9 |   |   |   | 26 |   |   |   | 39 |   |
+Consignment or fuel supply locations converted from Company-controlled sites, net |   | 62 |   |   |   | 102 |   |   |   | 256 |   |   |   | 153 |   |
+Closed or divested sites |   | (26 | ) |   |   | (21 | ) |   |   | (105 | ) |   |   | (95 | ) |
+Number of sites at end of period |   | 2,099 |   |   |   | 1,922 |   |   |   | 2,099 |   |   |   | 1,922 |   |
+|   |   |   |   |   |   |   |   |   |   |   |
+1 Excludes bulk and spot purchasers. |   |
+2 Includes all signed fuel supply agreements irrespective of fuel distribution commencement date. |   |
+|   |
+| For the Three Months Ended December 31, |   |   | For the Year Ended December 31, |   |
+Fleet Fueling Segment | 2025 |   |   | 2024 |   |   | 2025 |   |   | 2024 |   |
+Number of sites at beginning of period |   | 288 |   |   |   | 281 |   |   |   | 280 |   |   |   | 298 |   |
+Acquired sites |   | 2 |   |   |   | — |   |   |   | 2 |   |   |   | - |   |
+Newly opened or reopened sites |   | 5 |   |   |   | — |   |   |   | 16 |   |   |   | 1 |   |
+Closed or divested sites |   | — |   |   |   | (1 | ) |   |   | (3 | ) |   |   | (19 | ) |
+Number of sites at end of period |   | 295 |   |   |   | 280 |   |   |   | 295 |   |   |   | 280 |   |
+|   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |
+|   |   |
+| Consolidated Statements of Operations |   |
+| For the Three Months Ended December 31, |   |   | For the Year Ended December 31, |   |
+| 2025 |   |   | 2024 |   |   | 2025 |   |   | 2024 |   |
+| (in thousands) |   |
+Revenues: |   |   |   |   |   |   |   |   |   |   |   |
+Fuel revenue | $ | 1,422,486 |   |   | $ | 1,556,185 |   |   | $ | 6,038,934 |   |   | $ | 6,858,919 |   |
+Merchandise revenue |   | 338,116 |   |   |   | 408,826 |   |   |   | 1,482,454 |   |   |   | 1,767,345 |   |
+Other revenues, net |   | 33,612 |   |   |   | 27,098 |   |   |   | 122,083 |   |   |   | 105,698 |   |
+Total revenues |   | 1,794,214 |   |   |   | 1,992,109 |   |   |   | 7,643,471 |   |   |   | 8,731,962 |   |
+Operating expenses: |   |   |   |   |   |   |   |   |   |   |   |
+Fuel costs |   | 1,284,057 |   |   |   | 1,416,234 |   |   |   | 5,479,934 |   |   |   | 6,271,696 |   |
+Merchandise costs |   | 221,869 |   |   |   | 273,953 |   |   |   | 982,673 |   |   |   | 1,187,776 |   |
+Site operating expenses |   | 184,436 |   |   |   | 209,906 |   |   |   | 785,361 |   |   |   | 875,272 |   |
+General and administrative expenses |   | 43,308 |   |   |   | 39,690 |   |   |   | 165,711 |   |   |   | 162,920 |   |
+Depreciation and amortization |   | 33,018 |   |   |   | 33,989 |   |   |   | 134,451 |   |   |   | 132,414 |   |
+Total operating expenses |   | 1,766,688 |   |   |   | 1,973,772 |   |   |   | 7,548,130 |   |   |   | 8,630,078 |   |
+Other expenses (income), net |   | 6,074 |   |   |   | 3,962 |   |   |   | (6,961 | ) |   |   | 7,858 |   |
+Operating income |   | 21,452 |   |   |   | 14,375 |   |   |   | 102,302 |   |   |   | 94,026 |   |
+Interest and other financial income |   | 3,134 |   |   |   | 4,229 |   |   |   | 19,531 |   |   |   | 30,591 |   |
+Interest and other financial expenses |   | (22,944 | ) |   |   | (23,942 | ) |   |   | (92,855 | ) |   |   | (97,752 | ) |
+Income (loss) before income taxes |   | 1,642 |   |   |   | (5,338 | ) |   |   | 28,978 |   |   |   | 26,865 |   |
+Income tax benefit (expense) |   | 204 |   |   |   | 2,995 |   |   |   | (6,342 | ) |   |   | (6,144 | ) |
+Income from equity investment |   | 13 |   |   |   | 45 |   |   |   | 108 |   |   |   | 124 |   |
+Net income (loss) | $ | 1,859 |   |   | $ | (2,298 | ) |   | $ | 22,744 |   |   | $ | 20,845 |   |
+Less: Net income attributable to non-controlling interests |   | — |   |   |   | — |   |   |   | — |   |   |   | — |   |
+Net income (loss) attributable to ARKO Corp. | $ | 1,859 |   |   | $ | (2,298 | ) |   | $ | 22,744 |   |   | $ | 20,845 |   |
+Series A redeemable preferred stock dividends |   | (1,449 | ) |   |   | (1,445 | ) |   |   | (5,750 | ) |   |   | (5,750 | ) |
+Net income (loss) attributable to common shareholders | $ | 410 |   |   | $ | (3,743 | ) |   | $ | 16,994 |   |   | $ | 15,095 |   |
+Net income (loss) per share attributable to common shareholders - basic | $ | 0.00 |   |   | $ | (0.03 | ) |   | $ | 0.15 |   |   | $ | 0.13 |   |
+Net income (loss) per share attributable to common shareholders - diluted | $ | 0.00 |   |   | $ | (0.03 | ) |   | $ | 0.15 |   |   | $ | 0.13 |   |
+Weighted average shares outstanding: |   |   |   |   |   |   |   |   |   |   |   |
+Basic |   | 110,681 |   |   |   | 115,771 |   |   |   | 113,312 |   |   |   | 116,139 |   |
+Diluted |   | 113,457 |   |   |   | 115,771 |   |   |   | 114,976 |   |   |   | 116,949 |   |
+|   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |
+| Consolidated Balance Sheets |   |
+| December 31, 2025 |   |   | December 31, 2024 |   |
+| (in thousands) |   |
+Assets |   |   |   |   |   |
+Current assets: |   |   |   |   |   |
+Cash and cash equivalents | $ | 305,004 |   |   | $ | 261,758 |   |
+Restricted cash |   | 18,710 |   |   |   | 30,650 |   |
+Short-term investments |   | 6,465 |   |   |   | 5,330 |   |
+Trade receivables, net |   | 87,331 |   |   |   | 95,832 |   |
+Inventory |   | 190,707 |   |   |   | 231,225 |   |
+Other current assets |   | 109,520 |   |   |   | 97,413 |   |
+Total current assets |   | 717,737 |   |   |   | 722,208 |   |
+Non-current assets: |   |   |   |   |   |
+Property and equipment, net |   | 739,570 |   |   |   | 747,548 |   |
+Right-of-use assets under operating leases |   | 1,340,450 |   |   |   | 1,386,244 |   |
+Right-of-use assets under financing leases, net |   | 144,601 |   |   |   | 157,999 |   |
+Goodwill |   | 299,973 |   |   |   | 299,973 |   |
+Intangible assets, net |   | 160,136 |   |   |   | 182,355 |   |
+Equity investment |   | 3,117 |   |   |   | 3,009 |   |
+Deferred tax asset |   | 62,625 |   |   |   | 67,689 |   |
+Other non-current assets |   | 66,603 |   |   |   | 53,633 |   |
+Total assets | $ | 3,534,812 |   |   | $ | 3,620,658 |   |
+Liabilities |   |   |   |   |   |
+Current liabilities: |   |   |   |   |   |
+Long-term debt, current portion | $ | 36,676 |   |   | $ | 12,944 |   |
+Accounts payable |   | 156,616 |   |   |   | 190,212 |   |
+Other current liabilities |   | 148,340 |   |   |   | 159,239 |   |
+Operating leases, current portion |   | 78,162 |   |   |   | 71,580 |   |
+Financing leases, current portion |   | 13,239 |   |   |   | 11,515 |   |
+Total current liabilities |   | 433,033 |   |   |   | 445,490 |   |
+Non-current liabilities: |   |   |   |   |   |
+Long-term debt, net |   | 875,469 |   |   |   | 868,055 |   |
+Asset retirement obligation |   | 89,304 |   |   |   | 87,375 |   |
+Operating leases |   | 1,374,101 |   |   |   | 1,408,293 |   |
+Financing leases |   | 199,691 |   |   |   | 211,051 |   |
+Other non-current liabilities |   | 195,975 |   |   |   | 223,528 |   |
+Total liabilities |   | 3,167,573 |   |   |   | 3,243,792 |   |
+|   |   |   |   |   |
+Series A redeemable preferred stock |   | 100,000 |   |   |   | 100,000 |   |
+|   |   |   |   |   |
+Shareholders' equity: |   |   |   |   |   |
+Common stock |   | 11 |   |   |   | 12 |   |
+Treasury stock |   | (134,293 | ) |   |   | (106,123 | ) |
+Additional paid-in capital |   | 291,853 |   |   |   | 276,681 |   |
+Accumulated other comprehensive income |   | 9,119 |   |   |   | 9,119 |   |
+Retained earnings |   | 100,549 |   |   |   | 97,177 |   |
+Total shareholders' equity |   | 267,239 |   |   |   | 276,866 |   |
+Total liabilities, redeemable preferred stock and shareholders' equity | $ | 3,534,812 |   |   | $ | 3,620,658 |   |
+|   |   |   |   |   |   |   |
+| Consolidated Statements of Cash Flows |   |
+| For the Three Months Ended December 31, |   |   | For the Year Ended December 31, |   |
+| 2025 |   |   | 2024 |   |   | 2025 |   |   | 2024 |   |
+| (in thousands) |   |
+Cash flows from operating activities: |   |   |   |   |   |   |   |   |   |   |   |
+Net income (loss) | $ | 1,859 |   |   | $ | (2,298 | ) |   | $ | 22,744 |   |   | $ | 20,845 |   |
+Adjustments to reconcile net income (loss) to net cash provided by operating activities: |   |   |   |   |   |   |   |   |   |   |   |
+Depreciation and amortization |   | 33,018 |   |   |   | 33,989 |   |   |   | 134,451 |   |   |   | 132,414 |   |
+Deferred income taxes |   | (559 | ) |   |   | (9,136 | ) |   |   | 5,064 |   |   |   | (12,796 | ) |
+Loss on disposal of assets and impairment charges |   | 3,145 |   |   |   | 1,661 |   |   |   | 8,631 |   |   |   | 6,798 |   |
+Gain from sale-leaseback |   | — |   |   |   | — |   |   |   | (20,777 | ) |   |   | — |   |
+Foreign currency (gain) loss |   | (10 | ) |   |   | (6 | ) |   |   | (86 | ) |   |   | 35 |   |
+Gain from issuance of shares as payment of deferred consideration related to business acquisition |   | — |   |   |   | — |   |   |   | — |   |   |   | (2,681 | ) |
+Gain from settlement related to business acquisition |   | — |   |   |   | — |   |   |   | — |   |   |   | (6,356 | ) |
+Amortization of deferred financing costs and debt discount |   | 749 |   |   |   | 669 |   |   |   | 2,856 |   |   |   | 2,669 |   |
+Amortization of deferred income |   | (6,414 | ) |   |   | (4,351 | ) |   |   | (21,758 | ) |   |   | (14,477 | ) |
+Accretion of asset retirement obligation |   | 652 |   |   |   | 661 |   |   |   | 2,529 |   |   |   | 2,532 |   |
+Non-cash rent |   | 2,727 |   |   |   | 3,530 |   |   |   | 12,132 |   |   |   | 14,335 |   |
+Charges to allowance for credit losses |   | (64 | ) |   |   | 112 |   |   |   | 755 |   |   |   | 845 |   |
+Income from equity investment |   | (13 | ) |   |   | (45 | ) |   |   | (108 | ) |   |   | (124 | ) |
+Share-based compensation |   | 4,294 |   |   |   | 4,077 |   |   |   | 15,172 |   |   |   | 12,339 |   |
+Fair value adjustment of financial assets and liabilities |   | (586 | ) |   |   | (222 | ) |   |   | (9,695 | ) |   |   | (10,985 | ) |
+Other operating activities, net |   | (790 | ) |   |   | (627 | ) |   |   | (981 | ) |   |   | 125 |   |
+Changes in assets and liabilities: |   |   |   |   |   |   |   |   |   |   |   |
+Decrease in trade receivables |   | 25,076 |   |   |   | 21,946 |   |   |   | 7,746 |   |   |   | 38,058 |   |
+Decrease in inventory |   | 12,409 |   |   |   | 5,262 |   |   |   | 40,627 |   |   |   | 22,689 |   |
+(Increase) decrease in other assets |   | (5,367 | ) |   |   | (16 | ) |   |   | (14,907 | ) |   |   | 13,893 |   |
+Decrease in accounts payable |   | (24,470 | ) |   |   | (18,032 | ) |   |   | (33,976 | ) |   |   | (24,169 | ) |
+(Decrease) increase in other current liabilities |   | (8,262 | ) |   |   | (20,664 | ) |   |   | 8,280 |   |   |   | (2,820 | ) |
+Decrease in asset retirement obligation |   | — |   |   |   | (634 | ) |   |   | (604 | ) |   |   | (917 | ) |
+Increase in non-current liabilities |   | 7,182 |   |   |   | 6,852 |   |   |   | 34,490 |   |   |   | 29,606 |   |
+Net cash provided by operating activities |   | 44,576 |   |   |   | 22,728 |   |   |   | 192,585 |   |   |   | 221,858 |   |
+Cash flows from investing activities: |   |   |   |   |   |   |   |   |   |   |   |
+Purchase of property and equipment |   | (29,645 | ) |   |   | (36,133 | ) |   |   | (127,286 | ) |   |   | (113,914 | ) |
+Purchase of intangible assets |   | (83 | ) |   |   | — |   |   |   | (83 | ) |   |   | — |   |
+Proceeds from sale of property and equipment |   | 3,330 |   |   |   | 2,196 |   |   |   | 7,198 |   |   |   | 53,549 |   |
+Business and asset acquisitions, net of cash |   | (242 | ) |   |   | — |   |   |   | (242 | ) |   |   | (54,549 | ) |
+Loans to equity investment, net |   | 573 |   |   |   | 14 |   |   |   | 621 |   |   |   | 56 |   |
+Net cash used in investing activities |   | (26,067 | ) |   |   | (33,923 | ) |   |   | (119,792 | ) |   |   | (114,858 | ) |
+Cash flows from financing activities: |   |   |   |   |   |   |   |   |   |   |   |
+Receipt of long-term debt, net |   | 1,536 |   |   |   | — |   |   |   | 38,838 |   |   |   | 47,556 |   |
+Repayment of debt |   | (5,478 | ) |   |   | (5,794 | ) |   |   | (24,102 | ) |   |   | (26,357 | ) |
+Principal payments on financing leases |   | (1,389 | ) |   |   | (1,360 | ) |   |   | (5,704 | ) |   |   | (4,940 | ) |
+Early settlement of deferred consideration related to business acquisition |   | — |   |   |   | — |   |   |   | — |   |   |   | (17,155 | ) |
+Payment of Additional Consideration |   | (3,210 | ) |   |   | (3,354 | ) |   |   | (3,210 | ) |   |   | (3,354 | ) |
+Common stock repurchased |   | (7,191 | ) |   |   | — |   |   |   | (27,964 | ) |   |   | (31,989 | ) |
+Dividends paid on common stock |   | (3,334 | ) |   |   | (3,473 | ) |   |   | (13,622 | ) |   |   | (14,015 | ) |
+Dividends paid on redeemable preferred stock |   | (1,449 | ) |   |   | (1,445 | ) |   |   | (5,750 | ) |   |   | (5,750 | ) |
+Net cash used in financing activities |   | (20,515 | ) |   |   | (15,426 | ) |   |   | (41,514 | ) |   |   | (56,004 | ) |
+Net (decrease) increase in cash and cash equivalents and restricted cash |   | (2,006 | ) |   |   | (26,621 | ) |   |   | 31,279 |   |   |   | 50,996 |   |
+Effect of exchange rate on cash and cash equivalents and restricted cash |   | (9 | ) |   |   | 18 |   |   |   | 27 |   |   |   | (9 | ) |
+Cash and cash equivalents and restricted cash, beginning of period |   | 325,729 |   |   |   | 319,011 |   |   |   | 292,408 |   |   |   | 241,421 |   |
+Cash and cash equivalents and restricted cash, end of period | $ | 323,714 |   |   | $ | 292,408 |   |   | $ | 323,714 |   |   | $ | 292,408 |   |
+|   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |
+|   | Reconciliation of Net income (loss) to EBITDA and Adjusted EBITDA |   |
+|   | For the Three Months Ended December 31, |   |   | For the Year Ended December 31, |   |
+|   | 2025 |   |   | 2024 |   |   | 2025 |   |   | 2024 |   |
+|   | (in thousands) |   |
+Net income (loss), including net income attributable to non-controlling interests |   | $ | 1,859 |   |   | $ | (2,298 | ) |   | $ | 22,744 |   |   | $ | 20,845 |   |
+Interest and other financing expenses, net |   |   | 19,810 |   |   |   | 19,713 |   |   |   | 73,324 |   |   |   | 67,161 |   |
+Income tax (benefit) expense |   |   | (204 | ) |   |   | (2,995 | ) |   |   | 6,342 |   |   |   | 6,144 |   |
+Depreciation and amortization |   |   | 33,018 |   |   |   | 33,989 |   |   |   | 134,451 |   |   |   | 132,414 |   |
+EBITDA |   |   | 54,483 |   |   |   | 48,409 |   |   |   | 236,861 |   |   |   | 226,564 |   |
+Acquisition and divestiture costs (a) |   |   | 2,804 |   |   |   | 1,249 |   |   |   | 6,545 |   |   |   | 5,168 |   |
+APC IPO costs (b) |   |   | 541 |   |   |   | — |   |   |   | 1,897 |   |   |   | — |   |
+Loss (gain) on disposal of assets and impairment charges (c) |   |   | 3,145 |   |   |   | 1,661 |   |   |   | (12,146 | ) |   |   | 6,798 |   |
+Share-based compensation expense (d) |   |   | 4,294 |   |   |   | 4,077 |   |   |   | 15,172 |   |   |   | 12,339 |   |
+Income from equity investment (e) |   |   | (13 | ) |   |   | (45 | ) |   |   | (108 | ) |   |   | (124 | ) |
+Taxes paid (received) in arrears (f) |   |   | 235 |   |   |   | — |   |   |   | 305 |   |   |   | (1,427 | ) |
+Adjustment to contingent consideration (g) |   |   | (391 | ) |   |   | 978 |   |   |   | (2,207 | ) |   |   | (20 | ) |
+Expenses related to wage and hour claim settlement (h) |   |   | 466 |   |   |   | — |   |   |   | 2,517 |   |   |   | — |   |
+Other (i) |   |   | 135 |   |   |   | 519 |   |   |   | (183 | ) |   |   | (438 | ) |
+Adjusted EBITDA |   | $ | 65,699 |   |   | $ | 56,848 |   |   | $ | 248,653 |   |   | $ | 248,860 |   |
+|   |   |   |   |   |   |   |   |   |   |   |   |
+Additional information |   |   |   |   |   |   |   |   |   |   |   |   |
+Non-cash rent expense (j) |   |   | 2,727 |   |   |   | 3,530 |   |   |   | 12,132 |   |   |   | 14,335 |   |
+|   |   |   |   |   |   |   |   |   |   |   |   |
+(a) Eliminates costs incurred that are directly attributable to business acquisitions and divestitures (including conversion of retail stores to dealer locations) and salaries of employees whose primary job function is to execute the Company's acquisition and divestiture strategy and facilitate integration of acquired operations. |   |
+(b) Eliminates one-time costs incurred related to the APC IPO, which closed on February 13, 2026. |   |
+(c) Eliminates the non-cash loss from the sale or disposal of property and equipment, the loss recognized upon the sale of related leased assets, and impairment charges on property and equipment and right-of-use assets related to closed and non-performing sites, and a $20.8 million gain related to the expiration in the second quarter of 2025 of a real estate purchase option acquired in 2021 that was accounted for as a sale-leaseback. |   |
+(d) Eliminates non-cash share-based compensation expense related to the equity incentive program in place to incentivize, retain, and motivate the Company's employees and members of the Board. |   |
+(e) Eliminates the Company's share of income attributable to its unconsolidated equity investment. |   |
+(f) Eliminates the payment (receipt) of historical fuel, franchise and other tax amounts for multiple prior periods. |   |
+(g) Eliminates fair value adjustments primarily related to the contingent consideration owed to the seller for the 2020 Empire acquisition. |   |
+(h) Eliminates non-recurring expenses accrued in net income related to a wage and hour collective action settlement. |   |
+(i) Eliminates other unusual or non-recurring items that the Company does not consider to be meaningful in assessing operating performance. |   |
+(j) Non-cash rent expense reflects the extent to which GAAP rent expense recognized exceeded (or was less than) cash rent payments. GAAP rent expense varies depending on the terms of the Company's lease portfolio. For newer leases, rent expense recognized typically exceeds cash rent payments, whereas, for more mature leases, rent expense recognized is typically less than cash rent payments. |   |
+|   |
+Supplemental Disclosures of Segment Information
+Retail Segment
+| For the Three Months Ended December 31, |   |   | For the Year Ended December 31, |   |
+| 2025 |   |   | 2024 |   |   | 2025 |   |   | 2024 |   |
+| (in thousands) |   |
+Revenues: |   |   |   |   |   |   |   |   |   |   |   |
+Fuel revenue | $ | 652,467 |   |   | $ | 779,352 |   |   | $ | 2,835,661 |   |   | $ | 3,509,935 |   |
+Merchandise revenue |   | 338,116 |   |   |   | 408,826 |   |   |   | 1,482,454 |   |   |   | 1,767,345 |   |
+Other revenues, net |   | 15,136 |   |   |   | 15,768 |   |   |   | 59,020 |   |   |   | 65,264 |   |
+Total revenues |   | 1,005,719 |   |   |   | 1,203,946 |   |   |   | 4,377,135 |   |   |   | 5,342,544 |   |
+Operating expenses: |   |   |   |   |   |   |   |   |   |   |   |
+Fuel costs 1 |   | 555,031 |   |   |   | 679,140 |   |   |   | 2,440,953 |   |   |   | 3,081,719 |   |
+Merchandise costs |   | 221,869 |   |   |   | 273,953 |   |   |   | 982,673 |   |   |   | 1,187,776 |   |
+Site operating expenses |   | 158,445 |   |   |   | 187,981 |   |   |   | 685,144 |   |   |   | 790,645 |   |
+Total operating expenses |   | 935,345 |   |   |   | 1,141,074 |   |   |   | 4,108,770 |   |   |   | 5,060,140 |   |
+Operating income | $ | 70,374 |   |   | $ | 62,872 |   |   | $ | 268,365 |   |   | $ | 282,404 |   |
+|   |   |   |   |   |   |   |   |   |   |   |
+1 Excludes the estimated fixed margin or fixed fee paid to the GPMP segment for the cost of fuel. |   |
+|   |
+Wholesale Segment
+| For the Three Months Ended December 31, |   |   | For the Year Ended December 31, |   |
+| 2025 |   |   | 2024 |   |   | 2025 |   |   | 2024 |   |
+| (in thousands) |   |
+Revenues: |   |   |   |   |   |   |   |   |   |   |   |
+Fuel revenue | $ | 648,685 |   |   | $ | 652,016 |   |   | $ | 2,700,838 |   |   | $ | 2,799,869 |   |
+Other revenues, net |   | 15,720 |   |   |   | 8,681 |   |   |   | 52,270 |   |   |   | 29,140 |   |
+Total revenues |   | 664,405 |   |   |   | 660,697 |   |   |   | 2,753,108 |   |   |   | 2,829,009 |   |
+Operating expenses: |   |   |   |   |   |   |   |   |   |   |   |
+Fuel costs 1 |   | 624,657 |   |   |   | 629,742 |   |   |   | 2,606,306 |   |   |   | 2,709,519 |   |
+Site operating expenses |   | 16,352 |   |   |   | 10,997 |   |   |   | 57,406 |   |   |   | 39,679 |   |
+Total operating expenses |   | 641,009 |   |   |   | 640,739 |   |   |   | 2,663,712 |   |   |   | 2,749,198 |   |
+Operating income | $ | 23,396 |   |   | $ | 19,958 |   |   | $ | 89,396 |   |   | $ | 79,811 |   |
+|   |   |   |   |   |   |   |   |   |   |   |
+1 Excludes the estimated fixed margin or fixed fee paid to the GPMP segment for the cost of fuel. |   |
+|   |
+Fleet Fueling Segment
+| For the Three Months Ended December 31, |   |   | For the Year Ended December 31, |   |
+| 2025 |   |   | 2024 |   |   | 2025 |   |   | 2024 |   |
+| (in thousands) |   |
+Revenues: |   |   |   |   |   |   |   |   |   |   |   |
+Fuel revenue | $ | 115,577 |   |   | $ | 117,196 |   |   | $ | 474,796 |   |   | $ | 515,462 |   |
+Other revenues, net |   | 2,380 |   |   |   | 2,131 |   |   |   | 8,983 |   |   |   | 9,135 |   |
+Total revenues |   | 117,957 |   |   |   | 119,327 |   |   |   | 483,779 |   |   |   | 524,597 |   |
+Operating expenses: |   |   |   |   |   |   |   |   |   |   |   |
+Fuel costs 1 |   | 99,654 |   |   |   | 100,864 |   |   |   | 409,063 |   |   |   | 451,173 |   |
+Site operating expenses |   | 5,989 |   |   |   | 6,056 |   |   |   | 26,120 |   |   |   | 24,917 |   |
+Total operating expenses |   | 105,643 |   |   |   | 106,920 |   |   |   | 435,183 |   |   |   | 476,090 |   |
+Operating income | $ | 12,314 |   |   | $ | 12,407 |   |   | $ | 48,596 |   |   | $ | 48,507 |   |
+|   |   |   |   |   |   |   |   |   |   |   |
+1 Excludes the estimated fixed fee paid to the GPMP segment for the cost of fuel. |   |
+|   |
+GPMP Segment
+| For the Three Months Ended December 31, |   |   | For the Year Ended December 31, |   |
+| 2025 |   |   | 2024 |   |   | 2025 |   |   | 2024 |   |
+| (in thousands) |   |
+Revenues: |   |   |   |   |   |   |   |   |   |   |   |
+Fuel revenue – inter-segment 1 | $ | 1,122,980 |   |   | $ | 1,265,623 |   |   | $ | 4,835,588 |   |   | $ | 5,607,388 |   |
+Fuel revenue – external customers |   | — |   |   |   | 607 |   |   |   | 849 |   |   |   | 3,624 |   |
+Other revenues, net |   | 187 |   |   |   | 200 |   |   |   | 727 |   |   |   | 838 |   |
+Other revenues, net – inter-segment 1 |   | 2,783 |   |   |   | 2,840 |   |   |   | 11,120 |   |   |   | 11,236 |   |
+Total revenues |   | 1,125,950 |   |   |   | 1,269,270 |   |   |   | 4,848,284 |   |   |   | 5,623,086 |   |
+Operating expenses: |   |   |   |   |   |   |   |   |   |   |   |
+Fuel costs |   | 1,100,602 |   |   |   | 1,242,091 |   |   |   | 4,744,771 |   |   |   | 5,513,092 |   |
+General and administrative expenses |   | 780 |   |   |   | 960 |   |   |   | 3,244 |   |   |   | 3,585 |   |
+Depreciation and amortization |   | 1,840 |   |   |   | 1,840 |   |   |   | 7,359 |   |   |   | 7,371 |   |
+Total operating expenses |   | 1,103,222 |   |   |   | 1,244,891 |   |   |   | 4,755,374 |   |   |   | 5,524,048 |   |
+Operating income | $ | 22,728 |   |   | $ | 24,379 |   |   | $ | 92,910 |   |   | $ | 99,038 |   |
+|   |   |   |   |   |   |   |   |   |   |   |
+1 Includes the estimated fixed margin or fixed fee paid to the GPMP segment for the cost of fuel. |   |
+|   |
+|
+|
