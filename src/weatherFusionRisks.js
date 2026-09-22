@@ -145,7 +145,7 @@ const CWA_KEYS={
  DTX:['detroit','michigan'],
 };
 const PLACE_REGIONS=[
- {keys:['carolinas','carolina','north carolina','south carolina','mid-atlantic'],south:32,north:37.6,west:-85,east:-75.2},
+ {keys:['carolinas','carolina','north carolina','south carolina','nc','sc','va','virginia','raleigh','mid-atlantic'],south:32,north:37.6,west:-85,east:-75.2},
  {keys:['mid-atlantic','virginia','maryland','delaware'],south:36.4,north:41.6,west:-80.8,east:-73.8},
  {keys:['northeast','new england','new york'],south:40.5,north:47.5,west:-80,east:-66.8},
  {keys:['ohio valley','ohio','west virginia','kentucky'],south:36.5,north:42.2,west:-89,east:-80.2},
@@ -205,11 +205,21 @@ export function excerptOutlookDiscussion(discussion,location){
  if(!chosen)return null;
  const heading=chosen.heading||'Local outlook wording';
  const paras=String(chosen.body||'').split(/\n{2,}/).map(part=>part.trim()).filter(Boolean);
- const localParas=paras.filter(part=>sectionScore({heading:null,body:part},keys)>0);
+ const corridorKeys=keys.filter(key=>/carolina|raleigh|knightdale|^nc$|^sc$|^va$|virginia/.test(key));
+ const corridor=paras.filter(part=>sectionScore({heading:null,body:part},corridorKeys.length?corridorKeys:keys)>0);
+ const localParas=corridor.length?corridor:paras.filter(part=>sectionScore({heading:null,body:part},keys)>0);
  const body=(localParas.length?localParas:paras).join('\n\n');
  const excerpt=[heading,body].filter(Boolean).join('\n\n').trim();
  if(!excerpt)return null;
  return {heading,excerpt:excerpt.slice(0,8000),region:heading,score:chosen.score,keys};
+}
+export function localOutlookPlain(excerpt,level){
+ const text=String(excerpt||'');
+ if(/New Mexico|West Texas/i.test(text)&&!/Carolina|Virginia|Mid-Atlantic/i.test(text))return null;
+ if(/southeast VA into SC|Virginia into SC/i.test(text))return `${level||'Elevated'} flooding-rain risk includes a corridor from southeast Virginia into South Carolina, covering this location.`;
+ if(/Carolina|Raleigh|Knightdale/i.test(text))return `${level||'Elevated'} flooding-rain risk in the official wording covering this Carolina location.`;
+ if(/Mid-Atlantic/i.test(text))return `${level||'Elevated'} flooding-rain risk in the Mid-Atlantic wording that covers this location.`;
+ return null;
 }
 function featureBBox(geometry,box=null){
  const polygons=geometry?.type==='Polygon'?[geometry.coordinates]:geometry?.type==='MultiPolygon'?geometry.coordinates:[];
@@ -229,13 +239,11 @@ function boxesOverlap(a,b){
  return a&&b&&a.south<=b.north&&a.north>=b.south&&a.west<=b.east&&a.east>=b.west;
 }
 export function localOutlookFeatures(features,location){
- const area=localOutlookBounds(location);
+ const covering=(features||[]).filter(feature=>feature?.geometry&&inGeoJson(location?.longitude,location?.latitude,feature.geometry));
+ if(covering.length)return covering;
+ const area=localOutlookBounds(location,2.2);
  if(!area)return [];
- return (features||[]).filter(feature=>{
-  if(!feature?.geometry)return false;
-  if(inGeoJson(location.longitude,location.latitude,feature.geometry))return true;
-  return boxesOverlap(featureBBox(feature.geometry),area);
- });
+ return (features||[]).filter(feature=>feature?.geometry&&boxesOverlap(featureBBox(feature.geometry),area));
 }
 function localRiskLevel(features,location){
  const covering=(features||[]).filter(feature=>inGeoJson(location?.longitude,location?.latitude,feature.geometry));
@@ -300,20 +308,30 @@ function detailBase(kind,location){
   sourceUrl:kind==='wpc'?WPC_PAGE:SPC_PAGE,
  };
 }
+export function sanitizeOutlookDetail(detail={}){
+ const clean={...detail};
+ delete clean.discussion;
+ if(typeof clean.excerpt==='string'&&/SOUTHERN NEW MEXICO|NEW MEXICO AND WEST TEXAS/i.test(clean.excerpt)&&!/Carolina|Virginia|Mid-Atlantic/i.test(clean.excerpt)){
+  clean.excerpt=null;
+  clean.mode='unavailable';
+  clean.error='The official discussion does not include wording for this location.';
+ }
+ return clean;
+}
 async function attachLocalOutlook(detail,location,{request,env}={}){
  const all=detail.features||[];
  detail.features=localOutlookFeatures(all,location);
  detail.level=localRiskLevel(all,location);
  const local=excerptOutlookDiscussion(detail.discussion,location);
- delete detail.discussion;
  if(!local){
   detail.mode='unavailable';
   detail.error='The official discussion does not include wording for this location.';
-  return detail;
+  return sanitizeOutlookDetail(detail);
  }
  detail.excerpt=local.excerpt;
  detail.region=local.region;
  detail.mode='excerpt';
+ detail.summary=localOutlookPlain(local.excerpt,detail.level);
  if(request&&env?.OPENAI_API_KEY){
   try{
    const ai=await extractLocalOutlookAi({excerpt:local.excerpt,location,level:detail.level,request,env});
@@ -322,7 +340,7 @@ async function attachLocalOutlook(detail,location,{request,env}={}){
    detail.mode='excerpt';
   }
  }
- return detail;
+ return sanitizeOutlookDetail(detail);
 }
 export function createOutlookDetailService({cached,now=Date.now,request=null,env={}}){
  return async ({kind,location}={})=>{
