@@ -180,6 +180,9 @@
     });
   }
 
+  const BOT_STUDIO_HREF = '/ai-council/bots/';
+  const BOT_CHAT_HREF = '/ai-council/chat.html';
+
   function applyNavigation() {
     if (applying) return;
     applying = true;
@@ -189,6 +192,10 @@
       applySingleMapLayout();
       limitAadtTableToFive();
       moveGptSummaryBelowEstimate();
+      const studio = document.getElementById('aiBotStudioTop');
+      if (studio) studio.href = BOT_STUDIO_HREF;
+      const chat = document.getElementById('aiBotChatTop');
+      if (chat) chat.href = BOT_CHAT_HREF;
 
       const header = document.querySelector('header');
       if (!header) return;
