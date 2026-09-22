@@ -1,4 +1,4 @@
-import {dailyDisplay,finite} from './weather-math.js?v=weather-qa-v70';
+import {dailyDisplay,finite} from './weather-math.js?v=full-day-rain-v1';
 
 const STORAGE_KEY='weather-nourie-rain-history-v1';
 const MAX_SAMPLES=12;

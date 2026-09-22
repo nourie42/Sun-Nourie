@@ -43,9 +43,9 @@ test('the wash blocker names its actual peak hour rather than confusing daytime 
   f.days[0].popDayLikelihood={value:44};
   f.days[0].rainLikelihood.peakTime='2026-09-12T21:00:00Z';
   const summary=carWashSummary(f,start);
-  assert.equal(summary.chance,44);
+  assert.equal(summary.chance,49);
   assert.equal(summary.decisions[0].chance,49);
-  assert.equal(summary.reason,'Rain chance reaches 49% Sat 9 PM.');
+  assert.match(summary.reason,/Rain chance reaches 49% Sat,? 9 PM\./);
   assert.equal(summary.canWash,false);
 });
 
@@ -112,19 +112,19 @@ test('visible car-wash chance matches Remainder of Today including overnight rai
   assert.equal(summary.state,'wait');
 });
 
-test('the reported one-versus-two-percent regression uses one percent everywhere visible',()=>{
+test('visible car-wash chance uses the full-day high rather than the daytime-only peak',()=>{
   const forecast=fixture([2,0,0,0,0,0,0]);
   forecast.days[0].popDayLikelihood={value:1};
   forecast.days[0].popNightLikelihood={value:2};
   const summary=carWashSummary(forecast,Date.parse('2026-09-12T08:00:00Z'));
   const html=carWashHTML(summary);
   const firstCard=html.match(/<article class="car-wash-day"[\s\S]*?<\/article>/)?.[0]||'';
-  assert.equal(summary.chance,1);
-  assert.equal(summary.days[0].chance,1);
+  assert.equal(summary.chance,2);
+  assert.equal(summary.days[0].chance,2);
   assert.equal(summary.decisions[0].chance,2);
-  assert.match(html,/class="car-wash-fact good"[\s\S]*?<b>1%<\/b><small>Rain chance<\/small>/);
-  assert.match(firstCard,/class="car-wash-chance">💧 1%<\/span>/);
-  assert.doesNotMatch(firstCard,/💧 2%/);
+  assert.match(html,/class="car-wash-fact good"[\s\S]*?<b>2%<\/b><small>Rain chance<\/small>/);
+  assert.match(firstCard,/class="car-wash-chance">💧 2%<\/span>/);
+  assert.doesNotMatch(firstCard,/💧 1%/);
 });
 
 test('the conservative three-day chances still drive the inclusive 25% count and verdict',()=>{

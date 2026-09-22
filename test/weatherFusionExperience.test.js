@@ -17,10 +17,19 @@ test('first row becomes Remainder of Today at noon and Tonight at 6 PM in the LO
 });
 test('daily display consistently prefers the blended rain likelihood',()=>{
  const blended={...day,popDay:60,popDayLikelihood:{value:24},popNightLikelihood:{value:12},rainLikelihood:{value:32}};
- assert.equal(dailyDisplay(blended,0,Date.parse('2026-09-05T15:59:00Z'),'America/New_York').pop,24,'before local noon Today uses the daytime window');
+ assert.equal(dailyDisplay(blended,0,Date.parse('2026-09-05T15:59:00Z'),'America/New_York').pop,32,'Today uses the full-day maximum, not the daytime-only peak');
  assert.equal(dailyDisplay(blended,0,Date.parse('2026-09-05T18:00:00Z'),'America/New_York').pop,32,'Remainder of Today uses the full remaining window including tonight');
  assert.equal(dailyDisplay(blended,0,Date.parse('2026-09-05T22:00:00Z'),'America/New_York').pop,12);
  assert.equal(dailyDisplay(blended,1,Date.parse('2026-09-05T20:00:00Z'),'America/New_York').pop,32);
+});
+test('Today card rain chance is the full-day high when the peak is overnight',()=>{
+ const evening={...day,popDayLikelihood:{value:57},popNightLikelihood:{value:88},rainLikelihood:{value:88,peakTime:'2026-09-05T23:00:00Z'}};
+ const morning=dailyDisplay(evening,0,Date.parse('2026-09-05T14:00:00Z'),'America/New_York');
+ assert.equal(morning.label,'Today');
+ assert.equal(morning.phase,'overall');
+ assert.equal(morning.pop,88);
+ assert.equal(morning.peakNote,'Peak this evening');
+ assert.equal(dailyDisplay(evening,0,Date.parse('2026-09-05T22:00:00Z'),'America/New_York').pop,88);
 });
 test('Tonight never invents or relabels a missing high',()=>{
  const p=dailyDisplay({...day,high:null},0,Date.parse('2026-09-05T23:00:00Z'),'America/New_York');assert.equal(p.primary,68);assert.equal(p.primaryLabel,'Low');
