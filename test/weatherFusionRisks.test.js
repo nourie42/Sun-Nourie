@@ -82,6 +82,7 @@ test('Knightdale excerpt keeps Mid-Atlantic wording and drops the national NM le
  assert.match(knightdale.excerpt,/Mid-Atlantic/);
  assert.match(knightdale.excerpt,/southeast VA into SC/);
  assert.doesNotMatch(knightdale.excerpt,/high impact multi-day/);
+ assert.doesNotMatch(knightdale.excerpt,/inverted trough/);
  assert.doesNotMatch(knightdale.heading,/New Mexico/);
  const albuquerque=excerptOutlookDiscussion(nationalDiscussion,{latitude:35.1,longitude:-106.6,name:'Albuquerque',office:'ABQ'});
  assert.match(albuquerque.excerpt,/New Mexico and West Texas/);

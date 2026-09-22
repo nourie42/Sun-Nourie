@@ -92,7 +92,7 @@ export function parseSpcDiscussion(text){
  return {product:'Day 1 Convective Outlook',office:'NWS Storm Prediction Center Norman OK',issued:null,validLabel:'Day 1 convective outlook',discussion:clean.slice(0,20000)};
 }
 const CWA_KEYS={
- RAH:['raleigh','knightdale','north carolina','carolina','carolinas','nc','mid-atlantic','central north carolina'],
+ RAH:['raleigh','knightdale','north carolina','carolina','carolinas','nc','mid-atlantic','central north carolina','virginia','va','south carolina','sc'],
  ILM:['wilmington','north carolina','carolina','carolinas','nc'],
  MHX:['newport','outer banks','north carolina','carolina','nc'],
  GSP:['greenville','spartanburg','south carolina','carolina','carolinas','sc'],
@@ -204,7 +204,9 @@ export function excerptOutlookDiscussion(discussion,location){
  const chosen=ranked[0];
  if(!chosen)return null;
  const heading=chosen.heading||'Local outlook wording';
- const body=chosen.body||'';
+ const paras=String(chosen.body||'').split(/\n{2,}/).map(part=>part.trim()).filter(Boolean);
+ const localParas=paras.filter(part=>sectionScore({heading:null,body:part},keys)>0);
+ const body=(localParas.length?localParas:paras).join('\n\n');
  const excerpt=[heading,body].filter(Boolean).join('\n\n').trim();
  if(!excerpt)return null;
  return {heading,excerpt:excerpt.slice(0,8000),region:heading,score:chosen.score,keys};
