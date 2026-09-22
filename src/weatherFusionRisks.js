@@ -80,7 +80,7 @@ export function parseWpcDiscussion(html){
  const text=decodeEntities(pre).replace(/<[^>]+>/g,'').replace(/\r/g,'').replace(/[ \t]+\n/g,'\n').trim();
  if(!/Excessive Rainfall Discussion/i.test(text))return null;
  const office=text.match(/NWS Weather Prediction Center[^\n]+/i)?.[0]?.trim()||'NWS Weather Prediction Center College Park MD';
- const issued=text.match(/\d{1,2}:\d{2}\s*[AP]M\s+[A-Z]{3,4}\s+\w{3}\s+\w+\s+\d{1,2}\s+\d{4}/i)?.[0]||null;
+ const issued=text.match(/(?:\d{1,2}:\d{2}|\d{3,4})\s*[AP]M\s+[A-Z]{3,4}\s+\w{3}\s+\w+\s+\d{1,2}\s+\d{4}/i)?.[0]||null;
  const valid=text.match(/Day 1\s*(?:\n\s*)?Valid\s+([^\n]+)/i)?.[1]?.trim()||null;
  const discussion=text.match(/Day 1\b[\s\S]*?(?=\nDay 2\b|\nDay 4\b|\n\$\$|$)/i)?.[0]?.trim()||null;
  if(!discussion)return null;

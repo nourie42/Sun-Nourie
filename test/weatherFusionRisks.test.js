@@ -35,6 +35,7 @@ test('WPC discussion parser keeps Day 1 excessive rainfall text and map levels',
  const parsed=parseWpcDiscussion(html);
  assert.equal(parsed.product,'Excessive Rainfall Discussion');
  assert.match(parsed.office,/College Park/);
+ assert.equal(parsed.issued,'418 AM EDT Tue Sep 22 2026');
  assert.match(parsed.validLabel,/Day 1 Valid 12Z Tue Sep 22/);
  assert.match(parsed.discussion,/SLIGHT RISK OF EXCESSIVE RAINFALL/);
  assert.doesNotMatch(parsed.discussion,/Day 2/);
