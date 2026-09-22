@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {inGeoJson,normalizeSpcRisk,normalizeWpcRisk,parseWpcDiscussion,outlookMapFeatures,excerptOutlookDiscussion,localOutlookFeatures,createOutlookDetailService} from '../src/weatherFusionRisks.js';
+import {inGeoJson,normalizeSpcRisk,normalizeWpcRisk,parseWpcDiscussion,outlookMapFeatures,excerptOutlookDiscussion,localOutlookFeatures,localOutlookPlain,sanitizeOutlookDetail,createOutlookDetailService} from '../src/weatherFusionRisks.js';
 import {danCard} from '../public/weather-fusion/dans-summary.js';
 import {activeRiskOutlooks,riskOutlookButtonHTML,outlookDetailHTML} from '../public/weather-fusion/risk-outlooks.js';
 import {registerWeatherFusionRoutes} from '../src/weatherFusion.js';
@@ -52,7 +52,7 @@ test('the location risk list uses the API level and opens an in-app outlook',()=
  assert.match(html,/data-risk-kind="wpc"/);
  assert.match(html,/Slight risk of flooding rain today/);
  assert.match(html,/View/);
- const detail=outlookDetailHTML(risks[0],{place:'Knightdale / Raleigh',level:'Slight',headline:'Slight flooding rain near Raleigh',summary:'Heavy rain could cause flooding from southeast Virginia into the Carolinas.',excerpt:'Ohio Valley and Mid-Atlantic\n\nThe first axis is from southeast VA into SC.',validLabel:'Day 1 Valid 12Z Tue Sep 22 2026 - 12Z Wed Sep 23 2026',issued:'418 AM EDT Tue Sep 22 2026',mode:'excerpt',features:[{level:'Slight',geometry:{type:'Polygon',coordinates:[[[-80,34],[-77,34],[-77,37],[-80,37],[-80,34]]]}}],sourceUrl:risks[0].url});
+ const detail=outlookDetailHTML(risks[0],{place:'Knightdale / Raleigh',level:'Slight',headline:'Slight flooding rain near Raleigh',summary:'Heavy rain could cause flooding from southeast Virginia into the Carolinas.',excerpt:'Ohio Valley and Mid-Atlantic\n\nThe first axis is from southeast VA into SC.',validLabel:'Day 1 Valid 12Z Tue Sep 22 2026 - 12Z Wed Sep 23 2026',issued:'418 AM EDT Tue Sep 22 2026',mode:'excerpt',location:{latitude:35.787,longitude:-78.4806,name:'Knightdale / Raleigh'},features:[{level:'Slight',geometry:{type:'Polygon',coordinates:[[[-80,34],[-77,34],[-77,37],[-80,37],[-80,34]]]}}],sourceUrl:risks[0].url});
  assert.match(detail,/Slight flooding rain near Raleigh|Slight risk for Knightdale/);
  assert.match(detail,/southeast Virginia into the Carolinas|Official wording for this area/);
  assert.doesNotMatch(detail,/New Mexico/);
@@ -60,7 +60,7 @@ test('the location risk list uses the API level and opens an in-app outlook',()=
  const mapSource=readFileSync(new URL('../public/weather-fusion/risk-outlooks.js',import.meta.url),'utf8');
  assert.match(mapSource,/basemap\.nationalmap\.gov/);
  assert.doesNotMatch(mapSource,/cartocdn/);
- assert.match(mapSource,/fitBounds/);
+ assert.match(mapSource,/setView\(center,7\)/);
 });
 const nationalDiscussion=`Day 1
 Valid 12Z Tue Sep 22 2026 - 12Z Wed Sep 23 2026
@@ -101,10 +101,19 @@ test('outlook detail API scopes the map and discussion to the selected place',as
  assert.equal(detail.level,'Slight');
  assert.equal(detail.features.length,1);
  assert.equal(detail.features[0].level,'Slight');
- assert.match(detail.excerpt,/Mid-Atlantic|southeast VA into SC/);
+ assert.match(detail.excerpt,/southeast VA into SC/);
  assert.doesNotMatch(detail.excerpt||'',/New Mexico and West Texas/);
+ assert.match(detail.summary,/Virginia into South Carolina|Carolina/);
  assert.equal(detail.discussion,undefined);
  assert.equal(detail.location.latitude,35.787);
+ const lonOnly=excerptOutlookDiscussion(nationalDiscussion,{latitude:35.787,longitude:-78.4806});
+ assert.match(lonOnly.excerpt,/southeast VA into SC/);
+ assert.doesNotMatch(lonOnly.excerpt,/high impact multi-day/);
+ assert.match(localOutlookPlain(lonOnly.excerpt,'Slight'),/Virginia into South Carolina/);
+ assert.equal(sanitizeOutlookDetail({discussion:'MODERATE RISK OF EXCESSIVE RAINFALL ACROSS PORTIONS OF SOUTHERN NEW MEXICO',excerpt:lonOnly.excerpt}).discussion,undefined);
+ const leaked=outlookDetailHTML({title:'Slight risk of flooding rain today',level:'Slight',kind:'wpc'},{discussion:'MODERATE RISK … SOUTHERN NEW MEXICO',excerpt:lonOnly.excerpt,summary:localOutlookPlain(lonOnly.excerpt,'Slight'),place:'Knightdale / Raleigh',level:'Slight'});
+ assert.doesNotMatch(leaked,/NEW MEXICO/);
+ assert.match(leaked,/Virginia into South Carolina|southeast VA into SC/);
  const localOnly=localOutlookFeatures(detail.features,{latitude:35.787,longitude:-78.4806});
  assert.equal(localOnly.length,1);
 });

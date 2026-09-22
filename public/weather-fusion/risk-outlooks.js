@@ -97,7 +97,7 @@ export function outlookDetailHTML(risk,detail={}){
  const level=detail.level||risk.level||'Risk';
  const title=detail.headline||risk.title||`${level} outlook`;
  const valid=[detail.validLabel,detail.issued].filter(Boolean).join(' · ');
- const showMap=Array.isArray(detail.features)&&detail.features.length;
+ const showMap=Array.isArray(detail.features)&&detail.features.length&&detail.location;
  const legend=showMap?(detail.legend||LEGEND[risk.kind]||LEGEND.wpc).map(item=>`<span><i style="background:${esc(item.color)}"></i>${esc(item.id)}</span>`).join(''):'';
  const local=detail.summary?`<p class="outlook-local-summary">${esc(detail.summary)}</p>`:'';
  const sourceNote=detail.mode==='ai'?'Plain-language extract from the official local discussion.':detail.mode==='excerpt'?'Official wording for this search area.':'';
@@ -137,8 +137,6 @@ function paintOutlookMap(detail){
  if(detail.location&&finite(detail.location.latitude))L.circleMarker(center,{radius:7,color:'#fff',weight:2,fillColor:'#4cc3ff',fillOpacity:1}).addTo(outlookMap);
  requestAnimationFrame(()=>{
   outlookMap?.invalidateSize();
-  const bounds=outlookLayer?.getBounds();
-  if(bounds?.isValid())outlookMap.fitBounds(bounds.pad(0.18),{maxZoom:8,minZoom:6});
-  else if(detail.location)outlookMap.setView(center,7);
+  if(detail.location)outlookMap.setView(center,7);
  });
 }
