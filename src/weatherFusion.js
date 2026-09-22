@@ -432,7 +432,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
   const loadSpecialDiscussions=createSpecialDiscussionService({cached,now});
   const loadPrecipitationDiscussions=createPrecipitationDiscussionService({cached,now});
   const loadRiskOutlooks=createRiskOutlookService({cached,now});
-  const loadOutlookDetail=createOutlookDetailService({cached,now});
+  const loadOutlookDetail=createOutlookDetailService({cached,now,request,env});
   const loadDiscussion=createDiscussionSource({request,now});
   async function getForecast(query) {
     const location = coordinates(query), key = `${location.latitude},${location.longitude}`;
@@ -643,6 +643,8 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
   const getBulletins=createBulletinService({getForecast,request,env,now});
   async function getOutlook(query){
     const location=coordinates(query);
+    if(typeof query.place==='string'&&query.place.trim())location.name=clean(query.place,80);
+    if(typeof query.office==='string'&&/^[A-Za-z]{3}$/.test(query.office.trim()))location.office=query.office.trim().toUpperCase();
     const kind=String(query.kind||'').toLowerCase();
     return loadOutlookDetail({kind,location});
   }

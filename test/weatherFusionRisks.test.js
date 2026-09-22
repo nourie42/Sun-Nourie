@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {inGeoJson,normalizeSpcRisk,normalizeWpcRisk,parseWpcDiscussion,outlookMapFeatures,createOutlookDetailService} from '../src/weatherFusionRisks.js';
+import {inGeoJson,normalizeSpcRisk,normalizeWpcRisk,parseWpcDiscussion,outlookMapFeatures,excerptOutlookDiscussion,localOutlookFeatures,createOutlookDetailService} from '../src/weatherFusionRisks.js';
 import {danCard} from '../public/weather-fusion/dans-summary.js';
 import {activeRiskOutlooks,riskOutlookButtonHTML,outlookDetailHTML} from '../public/weather-fusion/risk-outlooks.js';
 import {registerWeatherFusionRoutes} from '../src/weatherFusion.js';
@@ -52,23 +52,60 @@ test('the location risk list uses the API level and opens an in-app outlook',()=
  assert.match(html,/data-risk-kind="wpc"/);
  assert.match(html,/Slight risk of flooding rain today/);
  assert.match(html,/View/);
- const detail=outlookDetailHTML(risks[0],{product:'Excessive Rainfall Discussion',office:'NWS Weather Prediction Center College Park MD',issued:'418 AM EDT Tue Sep 22 2026',validLabel:'Day 1 Valid 12Z Tue Sep 22 2026 - 12Z Wed Sep 23 2026',discussion:'THERE IS A SLIGHT RISK OF EXCESSIVE RAINFALL',sourceUrl:risks[0].url});
- assert.match(detail,/id="outlook-map"/);
- assert.match(detail,/Excessive Rainfall Discussion/);
- assert.match(detail,/THERE IS A SLIGHT RISK OF EXCESSIVE RAINFALL/);
- assert.match(detail,/MRGL|SLGT|MDT|HIGH/);
+ const detail=outlookDetailHTML(risks[0],{place:'Knightdale / Raleigh',level:'Slight',headline:'Slight flooding rain near Raleigh',summary:'Heavy rain could cause flooding from southeast Virginia into the Carolinas.',excerpt:'Ohio Valley and Mid-Atlantic\n\nThe first axis is from southeast VA into SC.',validLabel:'Day 1 Valid 12Z Tue Sep 22 2026 - 12Z Wed Sep 23 2026',issued:'418 AM EDT Tue Sep 22 2026',mode:'excerpt',features:[{level:'Slight',geometry:{type:'Polygon',coordinates:[[[-80,34],[-77,34],[-77,37],[-80,37],[-80,34]]]}}],sourceUrl:risks[0].url});
+ assert.match(detail,/Slight flooding rain near Raleigh|Slight risk for Knightdale/);
+ assert.match(detail,/southeast Virginia into the Carolinas|Official wording for this area/);
+ assert.doesNotMatch(detail,/New Mexico/);
+ assert.match(detail,/outlook-map-local/);
  const mapSource=readFileSync(new URL('../public/weather-fusion/risk-outlooks.js',import.meta.url),'utf8');
  assert.match(mapSource,/basemap\.nationalmap\.gov/);
  assert.doesNotMatch(mapSource,/cartocdn/);
+ assert.match(mapSource,/fitBounds/);
 });
-test('outlook detail API uses cached WPC map and discussion',async()=>{
- const cached=async url=>({data:String(url).includes('qpferd')?'<pre>Excessive Rainfall Discussion\nNWS Weather Prediction Center College Park MD\n418 AM EDT Tue Sep 22 2026\nDay 1\nValid 12Z Tue Sep 22 2026 - 12Z Wed Sep 23 2026\n..THERE IS A SLIGHT RISK...\nDay 2\nValid later</pre>':{features:[{properties:{OUTLOOK:'Slight (At Least 15%)'},geometry:{type:'Polygon',coordinates:[[[-80,34],[-77,34],[-77,37],[-80,37],[-80,34]]]}}]},fetchedAt:'2026-09-22T08:00:00Z'});
- const detail=await createOutlookDetailService({cached,now:()=>now})({kind:'wpc',location:{latitude:35.787,longitude:-78.4806}});
+const nationalDiscussion=`Day 1
+Valid 12Z Tue Sep 22 2026 - 12Z Wed Sep 23 2026
+
+..THERE IS A MODERATE RISK OF EXCESSIVE RAINFALL ACROSS PORTIONS
+OF SOUTHERN NEW MEXICO...
+
+...New Mexico and West Texas...
+A potentially high impact multi-day heavy rainfall event is set to
+begin across NM and far southwest TX today into tonight.
+
+...Ohio Valley and Mid-Atlantic...
+A setup for heavy rainfall will unfold across the Mid-Atlantic
+today into tonight. The first axis is from southeast VA into SC.
+FFG neighborhood exceedance probabilities of 15-40% justify a Slight risk.
+`;
+test('Knightdale excerpt keeps Mid-Atlantic wording and drops the national NM lead',()=>{
+ const knightdale=excerptOutlookDiscussion(nationalDiscussion,{latitude:35.787,longitude:-78.4806,name:'Knightdale / Raleigh',office:'RAH'});
+ assert.match(knightdale.excerpt,/Mid-Atlantic/);
+ assert.match(knightdale.excerpt,/southeast VA into SC/);
+ assert.doesNotMatch(knightdale.excerpt,/high impact multi-day/);
+ assert.doesNotMatch(knightdale.heading,/New Mexico/);
+ const albuquerque=excerptOutlookDiscussion(nationalDiscussion,{latitude:35.1,longitude:-106.6,name:'Albuquerque',office:'ABQ'});
+ assert.match(albuquerque.excerpt,/New Mexico and West Texas/);
+ assert.doesNotMatch(albuquerque.excerpt,/southeast VA into SC/);
+});
+test('outlook detail API scopes the map and discussion to the selected place',async()=>{
+ const cached=async url=>({data:String(url).includes('qpferd')?`<pre>Excessive Rainfall Discussion\nNWS Weather Prediction Center College Park MD\n418 AM EDT Tue Sep 22 2026\n${nationalDiscussion}\nDay 2\nValid later</pre>`:{features:[
+  {properties:{OUTLOOK:'Moderate (At Least 15%)'},geometry:{type:'Polygon',coordinates:[[[-108,31],[-104,31],[-104,34],[-108,34],[-108,31]]]}},
+  {properties:{OUTLOOK:'Slight (At Least 15%)'},geometry:{type:'Polygon',coordinates:[[[-80,34],[-77,34],[-77,37],[-80,37],[-80,34]]]}}
+ ]},fetchedAt:'2026-09-22T08:00:00Z'});
+ const failedAi=async()=>{throw Object.assign(new Error('no AI'),{aiDiagnostic:'AI_PROVIDER_HTTP_401'});};
+ const detail=await createOutlookDetailService({cached,now:()=>now,request:failedAi,env:{OPENAI_API_KEY:'configured'}})({kind:'wpc',location:{latitude:35.787,longitude:-78.4806,name:'Knightdale / Raleigh',office:'RAH'}});
  assert.equal(detail.kind,'wpc');
- assert.equal(detail.title,'Outlooks');
+ assert.equal(detail.mode,'excerpt');
+ assert.notEqual(detail.mode,'ai');
+ assert.equal(detail.level,'Slight');
+ assert.equal(detail.features.length,1);
  assert.equal(detail.features[0].level,'Slight');
- assert.match(detail.discussion,/SLIGHT RISK/);
+ assert.match(detail.excerpt,/Mid-Atlantic|southeast VA into SC/);
+ assert.doesNotMatch(detail.excerpt||'',/New Mexico and West Texas/);
+ assert.equal(detail.discussion,undefined);
  assert.equal(detail.location.latitude,35.787);
+ const localOnly=localOutlookFeatures(detail.features,{latitude:35.787,longitude:-78.4806});
+ assert.equal(localOnly.length,1);
 });
 test('weather fusion registers the outlooks page and outlook API',()=>{
  const routes=[];
