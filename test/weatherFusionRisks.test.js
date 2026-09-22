@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {inGeoJson,normalizeSpcRisk,normalizeWpcRisk,parseWpcDiscussion,outlookMapFeatures,createOutlookDetailService} from '../src/weatherFusionRisks.js';
 import {danCard} from '../public/weather-fusion/dans-summary.js';
 import {activeRiskOutlooks,riskOutlookButtonHTML,outlookDetailHTML} from '../public/weather-fusion/risk-outlooks.js';
@@ -56,6 +57,9 @@ test('the location risk list uses the API level and opens an in-app outlook',()=
  assert.match(detail,/Excessive Rainfall Discussion/);
  assert.match(detail,/THERE IS A SLIGHT RISK OF EXCESSIVE RAINFALL/);
  assert.match(detail,/MRGL|SLGT|MDT|HIGH/);
+ const mapSource=readFileSync(new URL('../public/weather-fusion/risk-outlooks.js',import.meta.url),'utf8');
+ assert.match(mapSource,/basemap\.nationalmap\.gov/);
+ assert.doesNotMatch(mapSource,/cartocdn/);
 });
 test('outlook detail API uses cached WPC map and discussion',async()=>{
  const cached=async url=>({data:String(url).includes('qpferd')?'<pre>Excessive Rainfall Discussion\nNWS Weather Prediction Center College Park MD\n418 AM EDT Tue Sep 22 2026\nDay 1\nValid 12Z Tue Sep 22 2026 - 12Z Wed Sep 23 2026\n..THERE IS A SLIGHT RISK...\nDay 2\nValid later</pre>':{features:[{properties:{OUTLOOK:'Slight (At Least 15%)'},geometry:{type:'Polygon',coordinates:[[[-80,34],[-77,34],[-77,37],[-80,37],[-80,34]]]}}]},fetchedAt:'2026-09-22T08:00:00Z'});

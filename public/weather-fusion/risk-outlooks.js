@@ -117,16 +117,12 @@ function paintOutlookMap(detail){
  const host=document.getElementById('outlook-map');
  if(!host||!globalThis.L)return;
  const center=detail.location&&finite(detail.location.latitude)?[detail.location.latitude,detail.location.longitude]:[39.5,-98.35];
- outlookMap=L.map(host,{zoomControl:true,scrollWheelZoom:false,attributionControl:false}).setView(center,detail.location?6:4);
- L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:8}).addTo(outlookMap);
+ outlookMap=L.map(host,{zoomControl:true,scrollWheelZoom:false,attributionControl:false}).setView([39.5,-98.35],4);
+ L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}',{maxZoom:8,className:'outlook-basemap'}).addTo(outlookMap);
  const collection={type:'FeatureCollection',features:(detail.features||[]).map(row=>({type:'Feature',properties:{level:row.level},geometry:row.geometry}))};
  outlookLayer=L.geoJSON(collection,{
   style:feature=>({color:'#102033',weight:1,fillColor:COLORS[feature.properties?.level]||'#74d36a',fillOpacity:.45}),
  }).addTo(outlookMap);
  if(detail.location&&finite(detail.location.latitude))L.circleMarker(center,{radius:6,color:'#fff',weight:2,fillColor:'#4cc3ff',fillOpacity:1}).addTo(outlookMap);
- requestAnimationFrame(()=>{
-  outlookMap?.invalidateSize();
-  const bounds=outlookLayer?.getBounds();
-  if(bounds?.isValid())outlookMap.fitBounds(bounds.pad(0.08),{maxZoom:6});
- });
+ requestAnimationFrame(()=>outlookMap?.invalidateSize());
 }
