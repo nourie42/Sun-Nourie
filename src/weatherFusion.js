@@ -5,7 +5,7 @@ import {DAN_TAKE_VERSION,collectDanTakeEvidence,approveDanTake,visibleDanTakeIte
 import {stationWeather,resolveCurrentWeather} from '../public/weather-fusion/weather-state.js';
 import {createSpecialDiscussionService} from './weatherFusionSpecialDiscussions.js';
 import {createPrecipitationDiscussionService} from './weatherFusionPrecipitationDiscussions.js';
-import {createRiskOutlookService} from './weatherFusionRisks.js';
+import {createRiskOutlookService,createOutlookDetailService} from './weatherFusionRisks.js';
 import {createBulletinService} from './weatherFusionBulletins.js';
 import {pressureTrendFromObservations} from './weatherFusionPressure.js';
 import {eveningPeriod} from './weatherFusionPolicy.js';
@@ -432,6 +432,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
   const loadSpecialDiscussions=createSpecialDiscussionService({cached,now});
   const loadPrecipitationDiscussions=createPrecipitationDiscussionService({cached,now});
   const loadRiskOutlooks=createRiskOutlookService({cached,now});
+  const loadOutlookDetail=createOutlookDetailService({cached,now});
   const loadDiscussion=createDiscussionSource({request,now});
   async function getForecast(query) {
     const location = coordinates(query), key = `${location.latitude},${location.longitude}`;
@@ -640,7 +641,12 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
       fetchedAt: result.meta.fetchedAt, message: frames.length ? 'Observed radar mosaic; not a future forecast.' : 'Radar timestamps could not be verified. Use the official radar link.', officialUrl: 'https://radar.weather.gov/' };
   }
   const getBulletins=createBulletinService({getForecast,request,env,now});
-  return { getForecast, getBriefing, getBulletins, search, radar, modelMaps: direct.maps };
+  async function getOutlook(query){
+    const location=coordinates(query);
+    const kind=String(query.kind||'').toLowerCase();
+    return loadOutlookDetail({kind,location});
+  }
+  return { getForecast, getBriefing, getBulletins, getOutlook, search, radar, modelMaps: direct.maps };
 }
 
 export function registerWeatherFusionRoutes(app, options = {}) {
@@ -657,7 +663,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     try { return res.json(await handler(req.query || {})); }
     catch (e) { return res.status(e.status || 503).json({ error: e.status === 400 || e.status === 409 ? e.message : 'Weather data is temporarily unavailable. Please retry.' }); }
   };
-  app.get(['/weather', '/weather-fusion', '/weather-fusion/', '/weather-fusion/experimental-weather.html'], (_req, res) => {
+  app.get(['/weather', '/weather-fusion', '/weather-fusion/', '/weather-fusion/experimental-weather.html', '/weather-fusion/outlooks'], (_req, res) => {
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -670,7 +676,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     'daily-uv.js','dans-summary.js','dans-take.js','day-graph.js','dewpoint-meter.js','dewpoint-meter.css',
     'experience.js','exposure-scene.js','forecast-cards.css','forecast-confidence.js','forecast-layout.css','forecast-story.js','outlook-details.js',
     'frame-player.js','hero-mode.js','hourly-feels.js','hourly-feels.css','nav.js','outdoor-feels.js','pavement.js',
-    'personal-details.js','personal-details.css','render-safety.js','scenario-layout.css','style.css','thermal-risk.js',
+    'personal-details.js','personal-details.css','render-safety.js','risk-outlooks.js','risk-outlooks.css','scenario-layout.css','style.css','thermal-risk.js',
     'today-card.js','rain-trend.js','utci.js','weather-display.js','weather-math.js','weather-repair.css','weather-state.js','whats-up-classify.js',
     'comfort-reference-scenes.png','comfort-reference-scenes.webp','comfort-reference-scenes-cold.webp',
     'comfort-reference-scenes-carry-umbrella.svg',
@@ -686,6 +692,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
   app.get('/api/weather-fusion/forecast', route(service.getForecast));
   app.get('/api/weather-fusion/briefing', route(service.getBriefing));
   app.get('/api/weather-fusion/bulletins', route(service.getBulletins));
+  app.get('/api/weather-fusion/outlook', route(service.getOutlook));
   app.get('/api/weather-fusion/search', route((q) => service.search(q.q)));
   app.get('/api/weather-fusion/radar', route(service.radar));
   app.get('/api/weather-fusion/models', route(service.modelMaps));

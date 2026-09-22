@@ -17,7 +17,8 @@
   <link rel="stylesheet" href="/weather-fusion/scenario-layout.css?v=weather-qa-v67">
   <link rel="stylesheet" href="/weather-fusion/car-wash.css?v=rain-consensus-v41">
   <link rel="stylesheet" href="/weather-fusion/model-explanation.css?v=rain-consensus-v41">
-  <script type="module" src="/weather-fusion/app.js?v=full-day-rain-v1"></script>
+  <link rel="stylesheet" href="/weather-fusion/risk-outlooks.css?v=risk-outlooks-v2">
+  <script type="module" src="/weather-fusion/app.js?v=risk-outlooks-v2"></script>
 
   <style id="experimental-bots-link-style">
     .experimental-bots-link{display:none;align-items:center;gap:.45rem;width:max-content;margin:.55rem 0 0;padding:.55rem .85rem;border:1px solid rgba(255,255,255,.22);border-radius:999px;background:rgba(11,24,43,.78);color:#f7fbff;text-decoration:none;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.18)}
@@ -60,6 +61,10 @@
         <section class="glass bulletins-panel" id="nws-bulletins" aria-labelledby="bulletins-title">
           <div class="section-top"><h2 id="bulletins-title">NWS BULLETINS</h2></div>
           <div id="alerts" class="alerts" aria-label="Official NWS notices and explanations"><p class="bulletin-time">Checking local NWS notices…</p></div>
+        </section>
+        <section class="glass risk-outlooks-panel" id="risk-outlooks" hidden aria-labelledby="risk-outlooks-title">
+          <div class="section-top"><h2 id="risk-outlooks-title">OUTLOOKS</h2><span>Flood and storm risks for this location</span></div>
+          <div id="risk-outlook-list" class="risk-outlook-list"></div>
         </section>
         <section class="glass today-panel" aria-label="Today or tonight forecast">
           <div id="today-forecast"><p class="muted">Daily data is loading.</p></div>
@@ -137,6 +142,7 @@
   </div>
   <dialog id="day-dialog" aria-labelledby="day-title"><button id="close-day" class="dialog-close" aria-label="Close daily forecast">×</button><div id="day-content"></div></dialog>
   <dialog id="bulletin-dialog" aria-labelledby="bulletin-dialog-title"><button id="close-bulletin" class="dialog-close" aria-label="Close NWS bulletin">×</button><div id="bulletin-dialog-content"></div></dialog>
+  <dialog id="outlook-dialog" class="outlook-dialog" aria-labelledby="outlook-dialog-title"><button id="close-outlook" class="dialog-close" aria-label="Close outlook">×</button><div id="outlook-dialog-content"></div></dialog>
   <dialog id="metric-dialog" class="metric-dialog" aria-labelledby="chart-title">
     <button class="dialog-close" id="close-metric" aria-label="Close forecast graph">×</button>
     <div class="dialog-eyebrow" id="chart-location"></div><h2 id="chart-title">Forecast</h2>

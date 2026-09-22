@@ -35,6 +35,7 @@ test('main and experimental URLs are served by one shared app shell',()=>{
   const [paths,handler] = routes.find(([path]) => Array.isArray(path));
   assert.ok(paths.includes('/weather-fusion/'));
   assert.ok(paths.includes('/weather-fusion/experimental-weather.html'));
+  assert.ok(paths.includes('/weather-fusion/outlooks'));
   const headers = {},sent = [];
   handler({}, {setHeader:(name,value)=>{headers[name]=value;},sendFile:file=>sent.push(file)});
   assert.equal(sent.length,1);

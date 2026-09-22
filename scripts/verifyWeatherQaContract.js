@@ -54,7 +54,7 @@ assert.equal(confidenceBannerHTML({confidence:{key:'high',factors:[]}}),'');
 
 function walk(dir,files=[]){
   for(const name of readdirSync(dir)){
-    if(['node_modules','.git'].includes(name))continue;
+    if(['node_modules','.git','deal-desk'].includes(name))continue;
     const path=join(dir,name),stat=statSync(path);
     if(stat.isDirectory())walk(path,files);
     else files.push(path);

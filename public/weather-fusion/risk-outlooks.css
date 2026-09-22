@@ -1,0 +1,31 @@
+#risk-outlooks .section-top{margin-bottom:12px}
+#risk-outlooks h2{font-size:14px;font-weight:800;letter-spacing:1.4px}
+.risk-outlook-item{display:flex;align-items:center;gap:11px;width:100%;padding:12px 13px;margin:8px 0 0;border:1px solid #8fd3ff4d;border-left:4px solid #8fd3ff;border-radius:12px;background:#11243b70;color:#fff;text-align:left;box-shadow:0 7px 22px #0010221f}
+.risk-outlook-item:hover{background:#18324e8c}
+.risk-outlook-item.risk-slight{border-left-color:#f4e14a}
+.risk-outlook-item.risk-moderate{border-left-color:#e03b3b}
+.risk-outlook-item.risk-high{border-left-color:#d34cff}
+.risk-outlook-item.risk-enhanced{border-left-color:#e67a22}
+.risk-outlook-level{display:grid;place-items:center;min-width:54px;padding:6px 8px;border-radius:999px;background:#ffe3a326;color:#ffe9b8;font-size:11px;font-weight:850}
+.risk-slight .risk-outlook-level{background:#f4e14a33;color:#ffe98a}
+.risk-moderate .risk-outlook-level{background:#e03b3b33;color:#ffb3b3}
+.risk-high .risk-outlook-level{background:#d34cff33;color:#f0c6ff}
+.risk-outlook-copy{display:block;min-width:0;flex:1}
+.risk-outlook-copy strong{display:block;font-size:14px;line-height:1.25}
+.risk-outlook-copy small{display:block;margin-top:3px;color:#c7d9eb;font-size:12px;line-height:1.4}
+.risk-outlook-action{display:flex;align-items:center;gap:5px;flex:0 0 auto;color:#d9ebff;font-size:10px;font-weight:750;text-transform:uppercase;letter-spacing:.6px}
+.risk-outlook-action b{font-size:23px;line-height:1}
+.outlook-dialog{width:min(720px,calc(100vw - 24px));max-height:calc(100vh - 24px)}
+.outlook-map{height:min(42vh,320px);margin:12px 0 8px;border-radius:14px;background:#0b1b2d;overflow:hidden}
+.outlook-map .outlook-basemap{filter:grayscale(1) invert(1) brightness(.72) contrast(.95)}
+.outlook-legend{display:flex;flex-wrap:wrap;gap:10px 14px;margin:0 0 16px;color:#c7d9eb;font-size:11px;font-weight:750;letter-spacing:.4px}
+.outlook-legend span{display:inline-flex;align-items:center;gap:6px}
+.outlook-legend i{display:inline-block;width:12px;height:12px;border-radius:2px}
+.outlook-meta{white-space:pre-line;color:#c7d9eb;font-size:13px;line-height:1.45}
+.outlook-discussion{white-space:pre-wrap;margin:0 0 16px;padding:12px;border-radius:12px;background:#0b1b2d99;color:#e8f2ff;font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace}
+@media(max-width:600px){
+ #risk-outlooks{padding:13px 12px}
+ .risk-outlook-item{padding:11px 10px}
+ .risk-outlook-copy strong{font-size:13px}
+ .outlook-map{height:220px}
+}
