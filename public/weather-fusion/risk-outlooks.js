@@ -32,7 +32,7 @@ export function renderRiskOutlooks(forecast,now=Date.now()){
  if(take){
   take.onclick=risks[0]?()=>{void openRiskOutlook(risks[0],forecast);}:null;
   take.style.cursor=risks[0]?'pointer':'';
-  if(risks[0])take.setAttribute('title','Open outlook map and discussion');
+  if(risks[0])take.setAttribute('title','Open the local outlook for this place');
   else take.removeAttribute('title');
  }
  bindOutlookDialog();
@@ -69,12 +69,14 @@ export async function openRiskOutlook(risk,forecast){
  if(!dialog||!content||!risk?.kind)return null;
  bindOutlookDialog();
  pendingKind=risk.kind;
- content.innerHTML=`<div class="dialog-eyebrow">OUTLOOKS</div><h2 id="outlook-dialog-title" class="dialog-title">${esc(risk.title)}</h2><p class="dialog-condition">Loading the official map and discussion…</p>`;
+ content.innerHTML=`<div class="dialog-eyebrow">OUTLOOKS</div><h2 id="outlook-dialog-title" class="dialog-title">${esc(risk.title)}</h2><p class="dialog-condition">Loading the local outlook for this place…</p>`;
  if(!dialog.open)dialog.showModal();
  document.body.classList.add('dialog-open');
  const query=new URLSearchParams({kind:risk.kind});
  const lat=forecast?.location?.latitude,lon=forecast?.location?.longitude;
  if(finite(lat)&&finite(lon)){query.set('latitude',String(lat));query.set('longitude',String(lon));}
+ if(forecast?.location?.name)query.set('place',forecast.location.name);
+ if(forecast?.location?.office)query.set('office',forecast.location.office);
  try{
   const response=await fetch(`/api/weather-fusion/outlook?${query}`,{cache:'no-store',headers:{Accept:'application/json'}});
   const detail=await response.json();
@@ -91,16 +93,25 @@ export async function openRiskOutlook(risk,forecast){
 }
 
 export function outlookDetailHTML(risk,detail={}){
- const legend=(detail.legend||LEGEND[risk.kind]||LEGEND.wpc).map(item=>`<span><i style="background:${esc(item.color)}"></i>${esc(item.id)}</span>`).join('');
- const meta=[detail.office,detail.issued,detail.validLabel].filter(Boolean).join('\n');
+ const place=detail.place||detail.location?.name||'This location';
+ const level=detail.level||risk.level||'Risk';
+ const title=detail.headline||risk.title||`${level} outlook`;
+ const valid=[detail.validLabel,detail.issued].filter(Boolean).join(' · ');
+ const showMap=Array.isArray(detail.features)&&detail.features.length;
+ const legend=showMap?(detail.legend||LEGEND[risk.kind]||LEGEND.wpc).map(item=>`<span><i style="background:${esc(item.color)}"></i>${esc(item.id)}</span>`).join(''):'';
+ const local=detail.summary?`<p class="outlook-local-summary">${esc(detail.summary)}</p>`:'';
+ const sourceNote=detail.mode==='ai'?'Plain-language extract from the official local discussion.':detail.mode==='excerpt'?'Official wording for this search area.':'';
+ const excerpt=detail.excerpt?`<h3 class="dialog-subtitle">Official wording for this area</h3><pre class="outlook-discussion">${esc(detail.excerpt)}</pre>`:'';
+ const error=detail.error&&detail.mode!=='ai'?`<p class="outlook-error">${esc(detail.error)}</p>`:'';
+ const empty=!detail.summary&&!detail.excerpt&&!detail.error?`<p class="dialog-prose">Local outlook wording is unavailable for this place.</p>`:'';
  return `<div class="dialog-eyebrow">OUTLOOKS</div>
-  <h2 id="outlook-dialog-title" class="dialog-title">${esc(detail.product||risk.title)}</h2>
-  <div id="outlook-map" class="outlook-map" role="img" aria-label="Outlook risk contours"></div>
-  <div class="outlook-legend" aria-label="Risk legend">${legend}</div>
-  <h3 class="dialog-subtitle">${esc(detail.product||'Official discussion')}</h3>
-  <p class="outlook-meta">${esc(meta)}</p>
-  <pre class="outlook-discussion">${esc(detail.discussion||'Discussion text is temporarily unavailable.')}</pre>
-  <a class="bulletin-dialog-source" href="${esc(detail.sourceUrl||risk.url||'https://www.weather.gov/')}" target="_blank" rel="noopener noreferrer">Open official outlook ↗</a>`;
+  <h2 id="outlook-dialog-title" class="dialog-title">${esc(title)}</h2>
+  <p class="outlook-place">${esc(level)} risk for ${esc(place)}${detail.region?` · ${esc(detail.region)}`:''}</p>
+  <p class="outlook-meta">${esc(valid)}</p>
+  ${local}${sourceNote?`<p class="outlook-source-note">${esc(sourceNote)}</p>`:''}
+  ${error}${empty}${excerpt}
+  ${showMap?`<div id="outlook-map" class="outlook-map outlook-map-local" role="img" aria-label="Local outlook risk contours"></div><div class="outlook-legend" aria-label="Risk legend">${legend}</div>`:''}
+  <a class="bulletin-dialog-source" href="${esc(detail.sourceUrl||risk.url||'https://www.weather.gov/')}" target="_blank" rel="noopener noreferrer">Open full official outlook ↗</a>`;
 }
 
 function renderOutlookDetail(content,risk,detail){
@@ -117,12 +128,17 @@ function paintOutlookMap(detail){
  const host=document.getElementById('outlook-map');
  if(!host||!globalThis.L)return;
  const center=detail.location&&finite(detail.location.latitude)?[detail.location.latitude,detail.location.longitude]:[39.5,-98.35];
- outlookMap=L.map(host,{zoomControl:true,scrollWheelZoom:false,attributionControl:false}).setView([39.5,-98.35],4);
- L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}',{maxZoom:8,className:'outlook-basemap'}).addTo(outlookMap);
+ outlookMap=L.map(host,{zoomControl:true,scrollWheelZoom:false,attributionControl:false}).setView(center,detail.location?7:6);
+ L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}',{maxZoom:10,className:'outlook-basemap'}).addTo(outlookMap);
  const collection={type:'FeatureCollection',features:(detail.features||[]).map(row=>({type:'Feature',properties:{level:row.level},geometry:row.geometry}))};
  outlookLayer=L.geoJSON(collection,{
   style:feature=>({color:'#102033',weight:1,fillColor:COLORS[feature.properties?.level]||'#74d36a',fillOpacity:.45}),
  }).addTo(outlookMap);
- if(detail.location&&finite(detail.location.latitude))L.circleMarker(center,{radius:6,color:'#fff',weight:2,fillColor:'#4cc3ff',fillOpacity:1}).addTo(outlookMap);
- requestAnimationFrame(()=>outlookMap?.invalidateSize());
+ if(detail.location&&finite(detail.location.latitude))L.circleMarker(center,{radius:7,color:'#fff',weight:2,fillColor:'#4cc3ff',fillOpacity:1}).addTo(outlookMap);
+ requestAnimationFrame(()=>{
+  outlookMap?.invalidateSize();
+  const bounds=outlookLayer?.getBounds();
+  if(bounds?.isValid())outlookMap.fitBounds(bounds.pad(0.18),{maxZoom:8,minZoom:6});
+  else if(detail.location)outlookMap.setView(center,7);
+ });
 }
