@@ -1,4 +1,4 @@
-import {dailyDisplay,finite} from './weather-math.js?v=weather-qa-v70';
+import {dailyDisplay,finite} from './weather-math.js?v=full-day-rain-v1';
 import {conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
 import {forecastPeriodSummary} from './forecast-story.js?v=weather-qa-v67';
 

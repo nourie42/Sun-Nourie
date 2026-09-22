@@ -106,8 +106,18 @@ test('Now labels the observed precipitation state instead of a whole-hour foreca
 });
 test('Today and Tonight prefer their matching blended rain likelihood',()=>{
  const f=fixture();f.days[0].popDayLikelihood={value:8};f.days[0].popNightLikelihood={value:3};f.days[0].rainLikelihood={value:12};
- assert.match(todayForecastHTML(f,now),/>8%<\/strong><small>Rain chance/);
+ assert.match(todayForecastHTML(f,now),/>12%<\/strong><small>Rain chance/);
  assert.match(todayForecastHTML(f,Date.parse('2026-09-11T23:00:00Z')),/>3%<\/strong><small>Rain chance/);
+});
+test('Today tile shows the full-day rain high, not the daytime-only peak',()=>{
+ const f=fixture();
+ f.days[0].popDayLikelihood={value:57};
+ f.days[0].popNightLikelihood={value:88};
+ f.days[0].rainLikelihood={value:88,peakTime:'2026-09-11T23:00:00Z'};
+ const html=todayForecastHTML(f,now);
+ assert.match(html,/>88%<\/strong>/);
+ assert.doesNotMatch(html,/>57%<\/strong>/);
+ assert.match(html,/Rain chance · Peak this evening/);
 });
 test('Today tile always states how rain chance changed since the last update',()=>{
  const f=fixture();
@@ -122,7 +132,7 @@ test('Today tile always states how rain chance changed since the last update',()
 });
 test('unavailable canonical rain never silently changes to the NWS percentage or sky intensity',()=>{
  const f=fixture(),missing={value:null,aggregation:'maximum-hourly',coverage:{complete:false}};
- f.days[0].popDay=80;f.days[0].popNight=70;f.days[0].popDayLikelihood=missing;f.days[0].popNightLikelihood=missing;
+ f.days[0].popDay=80;f.days[0].popNight=70;f.days[0].popDayLikelihood=missing;f.days[0].popNightLikelihood=missing;f.days[0].rainLikelihood=missing;
  assert.match(todayForecastHTML(f,now),/>—<\/strong><small>Rain chance/);
  assert.match(todayForecastHTML(f,Date.parse('2026-09-11T23:00:00Z')),/>—<\/strong><small>Rain chance/);
  assert.equal(todaySkyProfile(f.days[0]).pop,null);assert.equal(todaySkyProfile(f.days[0],true).pop,null);

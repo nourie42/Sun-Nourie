@@ -25,16 +25,28 @@ export function dailyRainPeriod(day, phase = 'overall') {
   const fallback=phase==='daytime'?(day?.popDay??rainChanceValue(day?.rainLikelihood,day?.pop)):phase==='overnight'?day?.popNight:day?.pop;
   return {phase,likelihood,canonical,value:rainChanceValue(likelihood,fallback),window:canonical?likelihood.window:null};
 }
+export function rainPeakCaption(day, zone, tonight=false) {
+  if(tonight)return '';
+  const overall=dailyRainPeriod(day,'overall'),daytime=dailyRainPeriod(day,'daytime'),overnight=dailyRainPeriod(day,'overnight');
+  if(!finite(overall.value)||!finite(overnight.value)||overnight.value<overall.value)return '';
+  if(finite(daytime.value)&&daytime.value>=overnight.value)return '';
+  const peak=Date.parse(day?.rainLikelihood?.peakTime);
+  if(finite(peak)){
+    const hour=localHour(peak,zone);
+    if(hour>=21||hour<5)return 'Peak tonight';
+  }
+  return 'Peak this evening';
+}
 export function dailyDisplay(day, index, now, zone) {
   const hour=localHour(now,zone),tonight=index===0&&isTonightPeriod(now,zone),remainder=index===0&&hour>=12&&!tonight;
-  const phase=tonight?'overnight':remainder?'overall':index===0?'daytime':'overall';
+  const phase=tonight?'overnight':'overall';
   const rain=dailyRainPeriod(day,phase);
   const rawCondition=tonight?(day.nightCondition||day.condition):day.condition;
   return {tonight,remainder,phase,label:tonight?'Tonight':remainder?'Remainder of Today':index===0?'Today':day.label,
     primary:tonight?day.low:day.high, secondary:tonight?null:day.low,
     primaryLabel:tonight?'Low':'High', condition:conditionForRainChance(rawCondition,rain.value),
     detail:tonight?(day.nightDetail||day.detail):day.detail,
-    pop:rain.value,rainWindow:rain.window};
+    pop:rain.value,rainWindow:rain.window,peakNote:rainPeakCaption(day,zone,tonight)};
 }
 export function temperatureBar(value, floor, ceiling) {
   if (![value,floor,ceiling].every(finite)) return null;
