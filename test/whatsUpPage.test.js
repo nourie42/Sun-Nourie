@@ -44,6 +44,7 @@ assert.doesNotMatch(home, /whats-up/);
 assert.doesNotMatch(home, /perfect-weather-alert/);
 assert.doesNotMatch(home, /weather-alert-banner/);
 assert.doesNotMatch(home, /Click for Details/);
+assert.doesNotMatch(home, /risk-outlooks|outlook-dialog/);
 
 const weather = read("public/weather-fusion/index.html");
 assert.doesNotMatch(weather, /weather-alert-banner/);

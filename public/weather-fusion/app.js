@@ -18,6 +18,7 @@ import {forecastOutlookDetails} from './outlook-details.js?v=full-day-rain-v1';
 import {isExperimentalWeatherPage,renderCarWashForecast,resetCarWashForecast} from './car-wash.js?v=full-day-rain-v1';
 import {renderModelExplanation,resetModelExplanation} from './model-explanation.js?v=weather-qa-v70';
 import {updateRainTrend} from './rain-trend.js?v=full-day-rain-v1';
+import {renderRiskOutlooks,resetRiskOutlooks} from './risk-outlooks.js?v=risk-outlooks-v1';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);
 const experimentalPage = isExperimentalWeatherPage();
@@ -120,6 +121,7 @@ function render(data) {
   $('hero-scene').innerHTML = icon(hero.condition, hero.isDay, 120);
   document.querySelectorAll('[data-place]').forEach((button) => { const active = button.dataset.place === place.id; button.classList.toggle('active', active); button.setAttribute('aria-pressed', String(active)); });
   draw('alerts', 'Official alerts', () => renderAlerts(data));
+  draw('risk-outlook-list', 'Outlooks', () => renderRiskOutlooks(data));
   draw('hourly', 'Hourly forecast', () => renderHours(data));
   draw('daily', 'Daily forecast', () => renderDays(data));
   draw('skin-exposure', 'Feels-like outlook', () => renderComfort(data));
@@ -283,6 +285,7 @@ function chooseLocation(value) {
   $('afd-link').href = 'https://www.weather.gov/';
   $('source-register').replaceChildren();
   if($('bulletin-dialog').open)$('bulletin-dialog').close();
+  resetRiskOutlooks();
   resetCarWashForecast();
   resetModelExplanation();
   renderBriefing({ headline: 'Preparing your local outlook.', summary: 'Loading the latest NWS forecast and local discussion for this location.', sources: [] });
