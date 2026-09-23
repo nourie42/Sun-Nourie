@@ -58,6 +58,15 @@ test('regular and experimental weather share device-location, jump-nav, AQI and 
  assert.match(html,/Current local AQI \+ next 24 hours/);
 });
 
+test('phone daily row keeps the remainder label aligned and AQI uses the shared blue card treatment',()=>{
+ const experience=read('experience.js'),scenario=read('scenario-layout.css'),polish=read('weather-polish.css');
+ assert.match(experience,/day-name-mobile/);
+ assert.match(experience,/p\.remainder\?'Today':p\.label/);
+ assert.match(scenario,/\.day-name-full\{display:none\}/);
+ assert.match(scenario,/\.day-name-mobile\{display:inline;white-space:nowrap\}/);
+ assert.match(polish,/\.air-quality-panel\{[^}]*linear-gradient\(135deg,#104773,#073b63 60%,#073153\)/);
+});
+
 test('the server explicitly allows and adds the air-quality source',()=>{
  const server=readFileSync(new URL('../src/weatherFusion.js',import.meta.url),'utf8');
  assert.match(server,/air-quality-api\.open-meteo\.com/);
