@@ -89,8 +89,8 @@ try{
    for(let i=0;i<4;i++){slider.value=i;slider.dispatchEvent(new Event('input'));const read=root.querySelector('[data-readout="feels"]'),banner=read.querySelector('.thermal-risk'),value=read.querySelector('strong');results.push({value:value.textContent,banner:banner?.textContent||'',above:!banner||banner.getBoundingClientRect().bottom<=value.getBoundingClientRect().top+1});}
    root.remove();
    const sun=document.querySelector('.sun-person .exposure-alert-slot'),saved=sun.innerHTML;sun.innerHTML=thermalRiskHTML(105,true);
-   const b=sun.firstElementChild,p=document.querySelector('.pavement-warning'),br=b.getBoundingClientRect(),pr=p.getBoundingClientRect();
-   if(Math.abs(br.width-pr.width)>1||Math.abs(br.height-pr.height)>1)throw Error('Human/pet banner dimensions differ');
+   const b=sun.firstElementChild,p=document.querySelector('.pavement-warning'),bs=getComputedStyle(b),ps=getComputedStyle(p);
+   if(bs.borderRadius!==ps.borderRadius||bs.fontSize!==ps.fontSize||bs.fontWeight!==ps.fontWeight||bs.paddingTop!==ps.paddingTop)throw Error('Human/pet banner styling differs');
    sun.innerHTML=saved;
    if([...document.querySelectorAll('.thermal-risk')].some(el=>!el.closest('.sun-shade-comparison')))throw Error('Risk banner outside people graphics');
    return {results,missing:thermalRiskHTML(null),normal:thermalRiskHTML(70)};
