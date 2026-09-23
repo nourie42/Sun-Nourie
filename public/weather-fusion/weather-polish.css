@@ -6,7 +6,8 @@
 .device-location-status strong{font-size:13px}.device-location-status span{font-size:18px}
 #daily-panel,#your-day,#map-panel,#air-quality,#dewpoint-gross-meter{scroll-margin-top:16px}
 
-.air-quality-panel{padding:18px 22px;margin:0 0 17px;text-align:left}
+.air-quality-panel{padding:18px 22px;margin:0 0 17px;text-align:left;background:radial-gradient(ellipse at 25% 0,#1688b426,transparent 70%),linear-gradient(135deg,#104773,#073b63 60%,#073153);border-color:#58c7f16b;box-shadow:inset 0 1px 2px #a3e8ff20,0 12px 28px #041d3626;color:#f7fcff}
+body[data-sky="night"] .air-quality-panel{background:radial-gradient(ellipse at 25% 0,#174b762b,transparent 68%),linear-gradient(145deg,#072b4a,#051d36 62%,#04172c);border-color:#5ba8d052;box-shadow:inset 0 1px 1px #b0e9ff12,0 12px 30px #02091455}
 .air-quality-panel .section-top{margin-bottom:15px}
 .aqi-summary{display:grid;grid-template-columns:minmax(150px,.35fr) minmax(0,1fr);gap:22px;align-items:center}
 .aqi-reading{display:grid;grid-template-columns:auto 1fr;column-gap:12px;align-items:end}
