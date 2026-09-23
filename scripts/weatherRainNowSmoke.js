@@ -45,6 +45,9 @@ try{
   assert.match(await page.locator('#observation-label').innerText(),/Rain now · observed radar over this location/);
   assert.match(await page.locator('#hero-feels').innerText(),/In rain/i);
   assert.match(await page.locator('#hourly .hour-current').innerText(),/Rain now/);
+  assert.equal(await page.locator('#today-forecast .today-symbol>strong').innerText(),'100%');
+  assert.match(await page.locator('#today-forecast .today-symbol>small').innerText(),/Rain now/);
+  assert.equal(await page.locator('#today-forecast .today-sky').getAttribute('data-scene'),'overcast-rain');
 
   assert.equal(await page.locator('#skin-exposure .sun-person .exposure-label').innerText(),'Rain');
   assert.match(await page.locator('#skin-exposure .sun-person .exposure-subtitle').innerText(),/Raining now/);
@@ -66,6 +69,7 @@ try{
       'Radar source label says rain over this location',
       'Feels-like label says In rain',
       'Now hourly card says Rain now',
+      'Today card shows 100% after rain is observed',
       'Shade, outdoor, and pet cards all use rain artwork',
       'Pet card says Wet pavement'
     ]
