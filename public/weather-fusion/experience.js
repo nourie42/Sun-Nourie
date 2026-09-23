@@ -4,7 +4,7 @@ import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
 import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=rain-now-v71';
 import {weatherState} from './weather-state.js';
 import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=rain-now-v71';
-import {degrees,feelsAt,dailyFeels,forecastValue,peakFeelsHTML} from './hourly-feels.js?v=weather-qa-v67';
+import {degrees,feelsAt,displayedFeelsAt,dailyFeels,forecastValue,timeAt,peakFeelsHTML,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=dewpoint-floor-v1';
 import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=rain-now-v71';
 import {comfortMode,comfortWindow,comfortNarrative,warmestTodayWindow} from './comfort-outlook.js?v=weather-qa-v67';
 import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js?v=full-day-rain-v1';
@@ -76,6 +76,7 @@ function pointsFor(key, hours=48) {
  if(!data)return [];
  if(key==='solar')return (data.metricForecasts?.solar||[]).map(d=>({time:d.sunset,value:d.sunset?localMinutes(d.sunset):null,sunrise:d.sunrise,date:d.date})).filter(d=>d.time);
  const points=(data.metricForecasts?.series?.[defs[key].field]||[]).slice(0,hours);
+ if(key==='feels')return points.map(p=>({...p,rawValue:p.value,value:displayedFeelsAt(data,p.time)}));
  return key==='pressure'?points.map(p=>({...p,value:pressureMb(p.value)})):points;
 }
 function sparkline(points) {
@@ -109,7 +110,22 @@ export function renderComfort(forecast) {
  document.querySelectorAll('#hourly [data-comfort-time]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.comfortTime===(sample.now?'now':sample.id))));
  if($('comfort-extra-science'))$('comfort-extra-science').innerHTML=`<p>${esc(sampleCaption(sample,zone))}</p><p>Shade and outdoors are modeled feels-like temperatures from the same weather inputs. The outdoor number also includes radiant exposure, accounting for humidity, wind, clouds and sunlight. The sidewalk and asphalt readings are estimated surface temperatures, not air temperature or human feels-like. The dog walker’s outfit follows the selected outdoor feels-like estimate, not the pavement.</p>`;
  if($('pavement-current-science'))$('pavement-current-science').innerHTML=pavementDetailsHTML(pavement);
- $('skin-science').textContent=`${c.method}. ${sampleCaption(sample,zone)}. Air ${degrees(sample.temperature)}; dew point ${degrees(sample.inputs.dewpoint)}; wind ${number(sample.inputs.wind)} mph. ${c.note} Current observations and future forecasts are different sources; the Now card uses exactly the same observation as the hero. No temperature or peak is forced upward.`;
+ $('skin-science').textContent=`${c.method}. ${sampleCaption(sample,zone)}. Air ${degrees(sample.temperature)}; dew point ${degrees(sample.inputs.dewpoint)}; wind ${number(sample.inputs.wind)} mph${finite(sample.inputs.gust)?`; gust ${number(sample.inputs.gust)} mph`:''}. ${c.note} Current observations and future forecasts are different sources; the Now card uses exactly the same observation as the hero. The raw thermal calculation is unchanged. For display only, the primary outdoor feels-like is not shown below the same-hour dew point unless gusts reach ${GUSTY_FEELS_DISPLAY_MPH} mph.`;
+}
+function dailyWindSummary(forecast,day,display,index,now){
+ const zone=forecast?.location?.timeZone||'America/New_York';
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(day?.date||''))return {text:'Wind —',gust:null};
+ const next=new Date(Date.parse(day.date+'T12:00:00Z')+86400000).toISOString().slice(0,10);
+ const highStart=Date.parse(day.highWindow?.start),lowStart=Date.parse(day.lowWindow?.start),lowEnd=Date.parse(day.lowWindow?.end);
+ const start=display.tonight?Math.max(now,finite(lowStart)?lowStart:timeAt(day.date,19,zone))
+   : index===0?Math.max(now,finite(highStart)?highStart:timeAt(day.date,7,zone))
+   : finite(highStart)?highStart:timeAt(day.date,7,zone);
+ const end=finite(lowEnd)?lowEnd:timeAt(next,7,zone);
+ const values=(forecast.metricForecasts?.series?.wind||[]).filter(p=>{const t=Date.parse(p.time);return t>=start&&t<end&&finite(p.value)&&p.value>=0;}).map(p=>p.value);
+ const gusts=(forecast.metricForecasts?.series?.gust||[]).filter(p=>{const t=Date.parse(p.time);return t>=start&&t<end&&finite(p.value)&&p.value>=0;}).map(p=>p.value);
+ if(!values.length)return {text:'Wind —',gust:gusts.length?Math.round(Math.max(...gusts)):null};
+ const lo=Math.round(Math.min(...values)),hi=Math.round(Math.max(...values));
+ return {text:lo===hi?`Wind ${lo} mph`:`Wind ${lo}–${hi} mph`,gust:gusts.length?Math.round(Math.max(...gusts)):null};
 }
 export function renderDailyRows(forecast,icon) {
  const values=forecast.days.flatMap(d=>[d.high,d.low]).filter(finite),lo=values.length?Math.min(...values)-3:0,hi=values.length?Math.max(...values)+3:1;
@@ -122,6 +138,7 @@ export function renderDailyRows(forecast,icon) {
   const low=p.tonight?p.primary:p.secondary,high=p.tonight?null:p.primary;
   const lowFeels=feel.low?.low?.value,highFeels=p.tonight?lowFeels:feel.high?.high?.value;
   const feelsText=p.tonight?degrees(highFeels):`${degrees(lowFeels)} / ${degrees(highFeels)}`;
+  const wind=dailyWindSummary(forecast,d,p,i,now),gusty=finite(wind.gust)&&wind.gust>=GUSTY_FEELS_DISPLAY_MPH;
   const confidenceAria=plainConfidenceNotice?` ${plainConfidenceNotice.title}. ${plainConfidenceNotice.text}`:'';
   return `<button class="day-row ${p.tonight?'tonight-row':''}" data-day="${i}" aria-label="${esc(p.label)}, ${esc(rain.observed?'Rain now':p.condition)}. ${rain.observed?'Rain is observed now at this location.':finite(shownPop)?`Rain chance ${number(shownPop)} percent.`:'Rain chance unavailable.'} ${p.primaryLabel} ${number(p.primary)} degrees${finite(p.secondary)?`, low ${number(p.secondary)} degrees`:''}. Forecast confidence ${esc(confidence.label)}.${esc(confidenceAria)} Open details.">
    <span class="day-name" title="${esc(p.label)}"><span class="day-name-full">${esc(p.label)}</span><span class="day-name-mobile">${esc(p.remainder?'Today':p.label)}</span></span>
@@ -129,7 +146,7 @@ export function renderDailyRows(forecast,icon) {
    <span class="day-low">${temp(low)}<small>Low</small></span>
    <span class="temp-track" aria-hidden="true">${bar===null?'':`<span class="temp-fill" style="left:0;width:${bar}%"></span><i class="high-marker" style="left:clamp(4px,${bar}%,calc(100% - 4px))"></i>`}</span>
    <span class="day-high">${finite(high)?`<strong>${temp(high)}</strong><small>High</small>`:''}</span>
-   <span class="day-feels-summary"><small>Feels like</small><b>${feelsText}</b></span>
+   <span class="day-feels-summary"><small>Feels like</small><b>${feelsText}</b><span class="day-wind">${esc(wind.text)}</span>${gusty?`<span class="day-gust">Gust ${wind.gust} mph</span>`:''}</span>
    <span class="day-meta"><span class="forecast-confidence" data-confidence="${esc(confidence.key)}" title="${esc(confidenceTitle)}"><span>Forecast confidence</span><b>${esc(confidence.label)}</b>${finite(confidence.score)?`<i class="confidence-meter" aria-hidden="true"><em style="width:${confidence.score}%"></em></i>`:''}</span>${dailyUvHTML(d.uvMax,p.tonight?'Peak UV today':'Peak UV')}</span>
    ${confidenceNoticeHTML}
   </button>`;
@@ -170,7 +187,7 @@ export function renderMetricTiles(forecast,smallIcon) {
   ['solar','sun',data.solar.sunset?esc(formatTime(data.solar.sunset)):'—',data.solar.sunrise?`Sunrise ${formatTime(data.solar.sunrise)}.`:'Daylight through the week.'],
  ];
  $('metrics').innerHTML=tiles.map(([key,ic,value,note])=>`<button type="button" class="glass metric metric-${key}" data-metric="${key}"${key==='pressure'?` data-pressure-trend="${esc(c.pressureTrend?.direction||'unknown')}"`:''} aria-haspopup="dialog" aria-label="${defs[key].title}: open forecast graph"><span class="metric-title">${smallIcon(ic)}${defs[key].title}<span class="tile-arrow" aria-hidden="true">↗</span></span><span class="metric-value">${value}</span><span class="metric-note">${esc(note)}</span>${sparkline(pointsFor(key,24))}<span class="tile-hint">${key==='solar'?'See the week ahead':'Explore the forecast'} <span aria-hidden="true">→</span></span></button>`).join('');
- $('metric-science').innerHTML=`<p>Current cards use a fresh nearby station when it is within 10 miles. When the nearest station is farther away, they use selected-location hourly guidance and identify it as an estimate. Tap a card for separate future forecast data. Daily forecasts share one hour-by-hour graph: temperature, feels-like and Gross Meter dew point use the left Fahrenheit scale; UV uses the right index scale. Slide or tap to read all four at the same hour. Gaps mean missing data, not zero. Gross Meter describes humidity through dew point, not a second feels-like temperature. All displayed pressures use millibars (mb). A pressure trend is shown only for a station observation; forecast pressure has no observed trend.</p>${Object.entries(data.metricForecasts?.notes||{}).map(([key,note])=>`<p><strong>${esc(key)}:</strong> ${esc(note)}</p>`).join('')}`;
+ $('metric-science').innerHTML=`<p>Current cards use a fresh nearby station when it is within 10 miles. When the nearest station is farther away, they use selected-location hourly guidance and identify it as an estimate. Tap a card for separate future forecast data. Daily forecasts share one hour-by-hour graph: temperature, feels-like and Gross Meter dew point use the left Fahrenheit scale; UV uses the right index scale. Slide or tap to read all four at the same hour. Gaps mean missing data, not zero. Gross Meter describes humidity through dew point, not a second feels-like temperature. The raw UTCI/Tier-3 feels-like calculation remains unchanged; visible primary outdoor feels-like values use a display sanity floor at the same-hour dew point unless forecast gusts are at least ${GUSTY_FEELS_DISPLAY_MPH} mph. All displayed pressures use millibars (mb). A pressure trend is shown only for a station observation; forecast pressure has no observed trend.</p>${Object.entries(data.metricForecasts?.notes||{}).map(([key,note])=>`<p><strong>${esc(key)}:</strong> ${esc(note)}</p>`).join('')}`;
  if(active&&$('metric-dialog')?.open)drawChart();
 }
 function chartGrid(def,points) {
