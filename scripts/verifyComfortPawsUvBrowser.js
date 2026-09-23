@@ -23,7 +23,7 @@ const launch={headless:true};if(process.env.WEATHER_BROWSER_PATH)launch.executab
 const browser=await chromium.launch(launch),report={success:false,viewports:[],scenarios:[]};
 try{
  for(const width of [320,390,1440]){
-  const context=await browser.newContext({viewport:{width,height:1000},hasTouch:true}),page=await context.newPage(),errors=[];
+  const context=await browser.newContext({viewport:{width,height:1000},hasTouch:true,geolocation:{latitude:35.787,longitude:-78.4806},permissions:['geolocation']}),page=await context.newPage(),errors=[];
   page.on('pageerror',error=>errors.push(error.message));
   await page.addInitScript(time=>{const NativeDate=Date;window.__weatherTestNow=time;window.Date=class extends NativeDate{constructor(...args){super(...(args.length?args:[window.__weatherTestNow]));}static now(){return window.__weatherTestNow;}};},now);
   let delayLocation=false,failLocation=false;
@@ -150,7 +150,8 @@ try{
   assert.match(await page.locator('#today-forecast .daily-uv').innerText(),/Peak UV today 7/);
   // Location clearing is checked while delayed and then failed.
   delayLocation=true;failLocation=true;
-  await page.locator('[data-place="greenville"]').click();
+  await context.setGeolocation({latitude:35.6127,longitude:-77.3664});
+  await page.locator('#locate').click();
   assert.equal(await page.locator('#hero-uv').innerText(),'Peak UV today —');
   assert.equal(await page.locator('#pavement-content').count(),0);
   assert.doesNotMatch(await page.locator('#today-uncertainty-text').innerText(),/Hot and humid/);
