@@ -56,7 +56,7 @@ try{
   assert.match(await page.locator('.comfort-later small').innerText(),/\d{1,2}:\d{2} [AP]M/);
   assert.ok(await page.locator('#map-panel').evaluate(el=>el.getBoundingClientRect().top>=document.querySelector('#metrics').getBoundingClientRect().bottom));
   assert.equal(await page.locator('.pavement-warning').evaluate(el=>!!el.closest('.pavement-person .exposure-alert-slot')),true);
-  assert.equal(await page.locator('.pavement-warning').evaluate(el=>getComputedStyle(el).color),'rgb(67, 43, 6)');
+  assert.equal(await page.locator('.pavement-warning').evaluate(el=>getComputedStyle(el).color),'rgb(65, 43, 8)');
   assert.equal(await page.locator('#today-take-source').count(),0);
   const uvHours=await page.evaluate(async()=>{const {hourlyUvValue,uvCategory}=await import('/weather-fusion/daily-uv.js?v=clear-weather-daygraph-v3');const f=await fetch('/api/weather-fusion/forecast?location=knightdale').then(r=>r.json());return [...document.querySelectorAll('#hourly .hour')].map(el=>{const t=el.classList.contains('hour-current')?Date.now():Date.parse(el.dataset.time);return {shown:el.querySelector('.hour-uv b')?.textContent,expected:String(uvCategory(hourlyUvValue(f,t)).index??'—')};});});
   assert.equal(uvHours.length,1+data().hours.filter(h=>Date.parse(h.time)>now).length);for(const hour of uvHours)assert.equal(hour.shown,hour.expected);
