@@ -1,0 +1,55 @@
+/* Readability, device-location, jump navigation and air-quality polish shared by regular + experimental weather. */
+.weather-jump-nav{display:flex;gap:8px;margin:14px 0 2px;padding:4px 0 8px;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:thin}
+.weather-jump-nav a{flex:0 0 auto;min-height:40px;display:inline-flex;align-items:center;padding:8px 14px;border:1px solid #8bdcff55;border-radius:999px;background:#0b436d99;color:#f7fcff;font-size:13px;font-weight:750;white-space:nowrap}
+.weather-jump-nav a:hover,.weather-jump-nav a:focus-visible{background:#126393}
+.device-location-status{display:flex;align-items:center;gap:9px;min-height:40px;padding:8px 13px;border:1px solid #8bdcff40;border-radius:999px;background:#082f505e;color:#dff5ff;font-size:13px}
+.device-location-status strong{font-size:13px}.device-location-status span{font-size:18px}
+#daily-panel,#your-day,#map-panel,#air-quality,#dewpoint-gross-meter{scroll-margin-top:16px}
+
+.air-quality-panel{padding:18px 22px;margin:0 0 17px;text-align:left}
+.air-quality-panel .section-top{margin-bottom:15px}
+.aqi-summary{display:grid;grid-template-columns:minmax(150px,.35fr) minmax(0,1fr);gap:22px;align-items:center}
+.aqi-reading{display:grid;grid-template-columns:auto 1fr;column-gap:12px;align-items:end}
+.aqi-reading>span{grid-column:1/3;font-size:12px;font-weight:800;letter-spacing:.08em;color:#a8def7}
+.aqi-reading>strong{font-size:52px;line-height:.95;letter-spacing:-.04em;color:#fff}
+.aqi-reading>b{font-size:16px;line-height:1.2;padding-bottom:4px;color:#c9efff}
+.aqi-copy p{margin:0 0 5px;font-size:14px;line-height:1.5}.aqi-copy span{font-size:12px;color:#b9e2f4}
+.aqi-pollutants{display:flex;gap:10px;margin-top:15px}.aqi-pollutants>span{min-width:118px;padding:10px 12px;border:1px solid #58c7f13d;border-radius:13px;background:#042e543f}
+.aqi-pollutants b,.aqi-pollutants strong,.aqi-pollutants small{display:block}.aqi-pollutants b{font-size:12px;color:#a8def7}.aqi-pollutants strong{font-size:20px;color:#fff}.aqi-pollutants small{font-size:12px;color:#badff0}
+.aqi-source,.aqi-unavailable{margin:12px 0 0;font-size:12px;line-height:1.5;color:#b9d9ea}.aqi-source a{text-decoration:underline;color:#d9f4ff}
+.aqi-summary[data-aqi="moderate"] .aqi-reading>strong,.aqi-summary[data-aqi="sensitive"] .aqi-reading>strong{color:#ffe19b}
+.aqi-summary[data-aqi="unhealthy"] .aqi-reading>strong,.aqi-summary[data-aqi="very-unhealthy"] .aqi-reading>strong,.aqi-summary[data-aqi="hazardous"] .aqi-reading>strong{color:#ffb3b3}
+
+/* Visible body copy and labels should never shrink below 12px. */
+.shell small,
+.shell .status-line,.shell .eyebrow,.shell .observation-label,
+.shell .section-top h2,.shell .section-top>span,.shell .pill,.shell .briefing-bottom,.shell .text-button,
+.shell .briefing-detail strong,.shell .hour>span,.shell .hour small,.shell .day-icon small,.shell .daily-footnote,
+.shell .map-tabs,.shell .map-tabs button,.shell .map-error,.shell .radar-controls>span,.shell .radar-controls select,
+.shell .map-caption,.shell .radar-legend,.shell .metric-title,.shell .metric-note,.shell .tile-hint,
+.shell .feed-chip,.shell .source-item,.shell .alert-note,.shell footer p,.shell footer .privacy,
+.shell .dialog-eyebrow,.shell .comparison,.shell .comparison th,.shell .table-note,
+.shell .forecast-confidence,.shell .forecast-confidence b,.shell .forecast-confidence-notice strong,.shell .forecast-confidence-notice span,
+.shell .day-feels-summary small,.shell .day-feels-summary b,.shell .daily-uv,
+.shell .hour-feels,.shell .hour-feels b,.shell .hour-pop,.shell .hour-uv,.shell .hour-wind b,.shell .hour-wind small,
+.shell .gross-note,.shell .gross-now-label,.shell .gross-pill,.shell .gross-verdict,.shell .gross-current-labels span,.shell .gross-current-labels b,
+.shell .gross-coverage,.shell .gross-periods button,.shell .gross-selected-time,.shell .gross-selected-label,.shell .gross-scroll-hint,
+.shell .gross-slider-label,.shell .gross-scale span,.shell .gross-worst,.shell .gross-empty,.shell .gross-x,.shell .gross-y,
+.shell #model-explanation small,.shell #model-explanation .model-inputs,.shell .risk-outlook-level,.shell .risk-outlook-action,.shell .outlook-legend,
+.shell .car-wash-temps,.shell .car-wash-day>strong{font-size:12px!important;line-height:1.35}
+
+.leaflet-control-attribution{font-size:12px!important}
+.hero-temperature{font-size:clamp(78px,12vw,100px)!important}
+#today-forecast .day-name{font-size:clamp(28px,4vw,40px)!important}
+.gross-eyebrow strong{font-size:clamp(30px,3vw,38px)!important}
+.gross-eyebrow span{font-size:clamp(16px,1.7vw,20px)!important}
+.gross-number{font-size:clamp(42px,4.5vw,58px)!important}
+
+@media(max-width:760px){
+ .location-bar{align-items:stretch}.device-location-status{width:100%}.weather-jump-nav{margin-top:10px}
+ .hero-temperature{font-size:clamp(72px,22vw,88px)!important}
+ .air-quality-panel{padding:15px 14px}.aqi-summary{grid-template-columns:1fr;gap:8px}.aqi-reading>strong{font-size:44px}
+ .aqi-pollutants{display:grid;grid-template-columns:1fr 1fr}
+ .gross-scale{grid-template-columns:repeat(3,minmax(0,1fr))!important;row-gap:7px}
+ .gross-eyebrow strong{font-size:28px!important}.gross-number{font-size:42px!important}
+}
