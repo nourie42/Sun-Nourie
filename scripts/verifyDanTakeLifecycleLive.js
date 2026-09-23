@@ -45,7 +45,7 @@ try{
  console.log('LIVE_CURRENT_SOURCE',JSON.stringify({id:f.discussion.id,issuedAt:f.discussion.issuanceTime,items}));
  browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{})});
  const context=await browser.newContext({viewport:{width:390,height:1000}}),page=await context.newPage(),errors=[];
- await page.addInitScript(()=>localStorage.setItem('weather-fusion-place',JSON.stringify({id:'knightdale',name:'Knightdale / Raleigh',latitude:35.787,longitude:-78.4806})));
+ await page.addInitScript(()=>localStorage.setItem('weather-fusion-device-place',JSON.stringify({id:'knightdale',name:'Knightdale / Raleigh',latitude:35.787,longitude:-78.4806})));
  page.on('pageerror',e=>errors.push(e.message));
  let latestForecast=null;
  page.on('response',async r=>{if(r.url().includes('/api/weather-fusion/forecast?')&&r.ok()){try{latestForecast=await r.json();}catch{}}});
