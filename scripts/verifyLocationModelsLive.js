@@ -38,7 +38,7 @@ try{
   if(browser){
    const context=await browser.newContext({viewport:{width:place.id==='knightdale'?1440:390,height:950}}),page=await context.newPage(),errors=[];
    page.on('pageerror',e=>errors.push(e.message));
-   await page.addInitScript(place=>localStorage.setItem('weather-fusion-place',JSON.stringify(place)),f.location);
+   await page.addInitScript(place=>localStorage.setItem('weather-fusion-device-place',JSON.stringify(place)),f.location);
    const response=page.waitForResponse(r=>r.url().includes('/api/weather-fusion/forecast?')&&r.status()===200,{timeout:60000});
    await page.goto(base+'/weather-fusion/',{waitUntil:'domcontentloaded'});const shown=await(await response).json();
    await page.waitForSelector('#pavement-content');
