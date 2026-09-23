@@ -34,7 +34,7 @@
  .daily-panel .day-icon svg{width:32px;height:32px}.daily-panel .day-icon small{font-size:9px}.daily-panel .day-low{font-size:18px}.daily-panel .day-high strong{font-size:19px}
  .daily-panel .day-low small,.daily-panel .day-high small{font-size:8px}.daily-panel .temp-track{height:7px}.daily-panel .high-marker{width:11px;height:11px}
  .daily-panel .day-feels-summary{
-  grid-area:details;min-width:0;display:grid;grid-template-columns:auto auto;grid-template-areas:"feels-label feels-value" "wind wind" "gust gust";
+  grid-area:details;align-self:start;min-width:0;display:grid;grid-template-columns:auto auto;grid-template-areas:"feels-label feels-value" "wind wind" "gust gust";
   align-content:center;justify-content:start;column-gap:6px;row-gap:1px;padding:0 2px;color:#9edbf6;
  }
  .daily-panel .day-feels-summary>small{grid-area:feels-label;font-size:10px;line-height:1.1}
@@ -42,7 +42,7 @@
  .daily-panel .day-wind{grid-area:wind;min-width:0;margin:2px 0 0;font-size:10px;line-height:1.1;text-align:left;color:#bfe8fa;white-space:normal}
  .daily-panel .day-gust{grid-area:gust;margin:1px 0 0;font-size:10px;line-height:1.1;text-align:left;color:#ffe18a;font-weight:750}
  .daily-panel .day-meta{
-  grid-area:meta;min-width:0;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;margin:0;padding:0;color:#9edbf6;
+  grid-area:meta;align-self:start;min-width:0;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;margin:0;padding:0;color:#9edbf6;
  }
  .daily-panel .forecast-confidence{
   display:grid;grid-template-columns:auto auto;grid-template-areas:"confidence-label confidence-level" "confidence-meter confidence-meter";
