@@ -37,7 +37,7 @@ try{
   ['','Denver, CO',39.7392,-104.9903,1365]
  ]){
   const context=await browser.newContext({viewport:{width,height:1000}}),page=await context.newPage(),errors=[];
-  await page.addInitScript(place=>localStorage.setItem('weather-fusion-place',JSON.stringify(place)),{id,name,latitude,longitude});
+  await page.addInitScript(place=>localStorage.setItem('weather-fusion-device-place',JSON.stringify(place)),{id,name,latitude,longitude});
   page.on('pageerror',error=>errors.push(error.message));
   const forecastResponse=page.waitForResponse(r=>r.url().includes('/api/weather-fusion/forecast?')&&r.status()===200,{timeout:90000});
   await page.goto(base+'/weather-fusion/',{waitUntil:'domcontentloaded',timeout:90000});
