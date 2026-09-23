@@ -1,7 +1,15 @@
 /* Readability, device-location, jump navigation and air-quality polish shared by regular + experimental weather. */
-.weather-jump-nav{display:flex;gap:8px;margin:14px 0 2px;padding:4px 0 8px;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:thin}
-.weather-jump-nav a{flex:0 0 auto;min-height:40px;display:inline-flex;align-items:center;padding:8px 14px;border:1px solid #8bdcff55;border-radius:999px;background:#0b436d99;color:#f7fcff;font-size:13px;font-weight:750;white-space:nowrap}
-.weather-jump-nav a:hover,.weather-jump-nav a:focus-visible{background:#126393}
+.weather-jump-nav{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin:16px 0 6px;padding:2px 0 8px;overflow:visible}
+.weather-jump-card{position:relative;grid-column:span 2;min-width:0;min-height:82px;display:grid;grid-template-columns:50px minmax(0,1fr) 34px;align-items:center;gap:10px;padding:9px 10px;border:1px solid #5ad7ffb8;border-radius:22px;background:radial-gradient(circle at 18% 18%,#1bbdf034,transparent 40%),linear-gradient(145deg,#0d5e91,#084978 58%,#07395f);box-shadow:inset 0 0 0 1px #7ce8ff36,inset 0 0 24px #10bde52b,0 0 0 1px #0ce1ff2e,0 7px 18px #03233d75;color:#f7fcff;text-decoration:none;overflow:hidden}
+.weather-jump-card:nth-child(n+4){grid-column:span 3}
+.weather-jump-card::after{content:"";position:absolute;inset:1px;border-radius:20px;pointer-events:none;background:linear-gradient(180deg,#ffffff12,transparent 42%)}
+.weather-jump-card:hover,.weather-jump-card:focus-visible{transform:translateY(-1px);background:radial-gradient(circle at 18% 18%,#2ed6ff42,transparent 42%),linear-gradient(145deg,#116da4,#095483 60%,#074068);box-shadow:inset 0 0 0 1px #8cecff52,0 0 20px #13cfff4a,0 9px 22px #031d34a8}
+.weather-jump-card .jump-icon{width:50px;height:50px;display:grid;place-items:center;border-right:1px solid #7fdfff5c;padding-right:8px;box-sizing:content-box}
+.weather-jump-card .jump-emoji{font-size:36px;line-height:1;filter:drop-shadow(0 3px 5px #001b2f80)}
+.weather-jump-card .jump-label{position:relative;z-index:1;font-size:20px;font-weight:800;line-height:1.05;letter-spacing:-.01em;white-space:nowrap;text-align:left}
+.weather-jump-card .jump-arrow{position:relative;z-index:1;width:31px;height:31px;display:grid;place-items:center;border:1px solid #6bdcff80;border-radius:50%;background:#0b5b8eaa;box-shadow:inset 0 0 10px #1edcff2b;color:#fff;font-size:31px;font-weight:300;line-height:.8}
+.jump-radar{position:relative;border-radius:50%;overflow:hidden;background:radial-gradient(circle at 52% 52%,#efffff 0 3%,transparent 4%),repeating-radial-gradient(circle at 50% 50%,transparent 0 18%,#65efff55 19% 20%,transparent 21% 34%),conic-gradient(from 238deg,#06334b 0 9%,#056f83 10% 20%,#0ab36b 21% 32%,#c8d918 33% 39%,#ffb314 40% 45%,#ef3f18 46% 52%,#0b526c 53% 100%);box-shadow:inset 0 0 0 3px #c7f8ff7a,0 3px 8px #001a2d9e}
+.jump-radar::after{content:"";position:absolute;left:50%;top:50%;width:42%;height:2px;background:#aefaffc7;transform-origin:left center;transform:rotate(-28deg);box-shadow:0 0 6px #b8ffff}
 .device-location-status{display:flex;align-items:center;gap:9px;min-height:40px;padding:8px 13px;border:1px solid #8bdcff40;border-radius:999px;background:#082f505e;color:#dff5ff;font-size:13px}
 .device-location-status strong{font-size:13px}.device-location-status span{font-size:18px}
 #daily-panel,#your-day,#map-panel,#air-quality,#dewpoint-gross-meter{scroll-margin-top:16px}
@@ -48,10 +56,15 @@ body[data-sky="night"] .air-quality-panel{background:radial-gradient(ellipse at 
 
 @media(max-width:760px){
  .location-bar{align-items:stretch}.device-location-status{width:100%}
- .weather-jump-nav{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin:10px 0 4px;padding:2px 0 6px;overflow:visible}
- .weather-jump-nav a{display:flex;justify-content:center;min-width:0;min-height:44px;padding:9px 6px;text-align:center;font-size:12px;line-height:1.15;white-space:normal;border-radius:14px}
- .weather-jump-nav a:nth-child(-n+3){grid-column:span 2}
- .weather-jump-nav a:nth-child(n+4){grid-column:span 3}
+ .weather-jump-nav{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:11px 0 5px;padding:1px 0 7px}
+ .weather-jump-card,.weather-jump-card:nth-child(n+4){grid-column:span 1;min-height:76px;grid-template-columns:42px minmax(0,1fr) 28px;gap:7px;padding:8px 8px;border-radius:18px}
+ .weather-jump-card:nth-child(5){grid-column:1/-1}
+ .weather-jump-card::after{border-radius:17px}
+ .weather-jump-card .jump-icon{width:40px;height:40px;padding-right:6px}
+ .weather-jump-card .jump-emoji{font-size:30px}
+ .weather-jump-card .jump-label{font-size:15px;white-space:normal}
+ .weather-jump-card .jump-arrow{width:27px;height:27px;font-size:27px}
+ .jump-radar{box-shadow:inset 0 0 0 2px #c7f8ff7a,0 2px 6px #001a2d9e}
  .hero-temperature{font-size:clamp(72px,22vw,88px)!important}
  .air-quality-panel{padding:15px 14px}.aqi-summary{grid-template-columns:1fr;gap:8px}.aqi-reading>strong{font-size:44px}
  .aqi-pollutants{display:grid;grid-template-columns:1fr 1fr}
