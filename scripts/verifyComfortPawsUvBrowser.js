@@ -41,10 +41,10 @@ try{
   const result=await page.evaluate(()=>{
    const q=s=>document.querySelector(s),text=s=>q(s)?.textContent.trim();
    const row=q('#daily .day-row'),low=row.querySelector('.day-low').getBoundingClientRect(),high=row.querySelector('.day-high').getBoundingClientRect();
-   return {width:innerWidth,overflow:document.documentElement.scrollWidth>innerWidth+1,highRight:high.left>low.right,uvRows:document.querySelectorAll('#daily .daily-uv').length,heroUv:text('#hero-uv'),todayUv:text('#today-forecast .daily-uv'),todayTake:text('#today-uncertainty-text'),takeVisible:!q('#today-uncertainty').hidden,sun:text('.sun-person figcaption strong'),now:text('#hourly .hour-current .hour-feels b'),hero:text('#hero-feels strong'),metric:text('.metric-feels .metric-value'),caption:text('#comfort-extra-science'),image:!!q('.pavement-person .reference-art,.pavement-person .poodle-walk'),referenceScenes:document.querySelectorAll('.sun-shade-comparison .reference-scene').length};
+   return {width:innerWidth,overflow:document.documentElement.scrollWidth>innerWidth+1,highRight:high.left>low.right,uvRows:document.querySelectorAll('#daily .daily-uv').length,heroUv:text('#hero-uv'),todayUv:[...document.querySelectorAll('#today-forecast .today-metric')].find(el=>/UV Index/.test(el.textContent))?.textContent.trim(),todayTake:text('#today-uncertainty-text'),takeVisible:!q('#today-uncertainty').hidden,sun:text('.sun-person figcaption strong'),now:text('#hourly .hour-current .hour-feels b'),hero:text('#hero-feels strong'),metric:text('.metric-feels .metric-value'),caption:text('#comfort-extra-science'),image:!!q('.pavement-person .reference-art,.pavement-person .poodle-walk'),referenceScenes:document.querySelectorAll('.sun-shade-comparison .reference-scene').length};
   });
   assert.equal(result.overflow,false);assert.equal(result.highRight,true);assert.equal(result.uvRows,7);
-  assert.match(result.heroUv,/Peak UV today 7/);assert.match(result.todayUv,/Peak UV 7/);
+  assert.match(result.heroUv,/Peak UV today 7/);assert.match(result.todayUv,/7[\s\S]*UV Index/);
   assert.equal(result.sun,result.now);assert.equal(result.sun,result.hero);assert.equal(result.sun,result.metric);
   assert.doesNotMatch(result.sun,/Unavailable|—/);assert.match(result.caption,/current forecast hour/);
   assert.doesNotMatch(result.todayTake,/Hot and humid|cooler, rainy|NWS discussion/);assert.match(result.todayTake,/Sunday rainfall amounts remain uncertain/);assert.ok(result.todayTake.split(/\s+/).length<=55);
@@ -143,7 +143,7 @@ try{
   assert.equal(await page.locator('.sun-person figcaption strong').innerText(),result.sun);
   await page.evaluate(time=>window.__weatherTestNow=time,now+3*H);
   await page.locator('#refresh').click();await page.waitForFunction(()=>document.querySelector('#today-forecast .tonight-row'));
-  assert.match(await page.locator('#today-forecast .daily-uv').innerText(),/Peak UV today 7/);
+  assert.match(await page.locator('#today-forecast .today-metric').filter({hasText:'UV Index'}).innerText(),/7[\s\S]*UV Index/);
   // Location clearing is checked while delayed and then failed.
   delayLocation=true;failLocation=true;
   await context.setGeolocation({latitude:35.6127,longitude:-77.3664});
