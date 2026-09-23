@@ -4,7 +4,7 @@ import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
 import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=rain-now-v71';
 import {weatherState} from './weather-state.js';
 import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=feels-floor-wind-v1';
-import {degrees,feelsAt,displayedFeelsAt,dailyFeels,forecastValue,timeAt,peakFeelsHTML,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=dewpoint-floor-v1';
+import {degrees,displayedFeelsAt,dailyFeels,forecastValue,timeAt,peakFeelsHTML,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=dewpoint-floor-v1';
 import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=feels-floor-wind-v1';
 import {comfortMode,comfortWindow,comfortNarrative,warmestTodayWindow} from './comfort-outlook.js?v=feels-floor-wind-v1';
 import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js?v=full-day-rain-v1';
@@ -217,7 +217,7 @@ function selectPoint(i) {
  $('chart-value').textContent=displayValue(p.value,def);
  $('chart-time').textContent=formatTime(p.time,{weekday:'short',month:'short',day:'numeric'});
  const companion=$('chart-companion');
- if(companion){companion.hidden=!['temperature','feels'].includes(active);companion.innerHTML=active==='temperature'?`Feels like ${degrees(feelsAt(data,p.time))} outdoors at this hour`:active==='feels'?`Air temperature ${degrees(forecastValue(data,'temperature',p.time))} at this hour`:'';}
+ if(companion){companion.hidden=!['temperature','feels'].includes(active);companion.innerHTML=active==='temperature'?`Feels like ${degrees(displayedFeelsAt(data,p.time))} outdoors at this hour`:active==='feels'?`Air temperature ${degrees(forecastValue(data,'temperature',p.time))} at this hour`:'';}
  if(def.solar&&p.sunrise)$('chart-note').textContent=`Sunrise ${formatTime(p.sunrise)} · sunset ${formatTime(p.time)}.`;
  else if(active==='pressure')$('chart-note').textContent='Sea-level forecast in mb · separate from the station reading and its observed trend.';
  else $('chart-note').textContent=!finite(p.value)?'The forecast source has a gap at this time.':def.note;
