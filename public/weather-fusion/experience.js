@@ -6,7 +6,7 @@ import {weatherState} from './weather-state.js';
 import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=feels-floor-wind-v1';
 import {degrees,feelsAt,displayedFeelsAt,dailyFeels,forecastValue,timeAt,peakFeelsHTML,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=dewpoint-floor-v1';
 import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=feels-floor-wind-v1';
-import {comfortMode,comfortWindow,comfortNarrative,warmestTodayWindow} from './comfort-outlook.js?v=weather-qa-v67';
+import {comfortMode,comfortWindow,comfortNarrative,warmestTodayWindow} from './comfort-outlook.js?v=feels-floor-wind-v1';
 import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js?v=full-day-rain-v1';
 import {displayedRainChance} from './rain-display.js?v=rain-observed-v1';
 import {resetDewpointMeter} from './dewpoint-meter.js?v=weather-qa-v67';
