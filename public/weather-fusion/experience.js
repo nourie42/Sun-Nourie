@@ -117,7 +117,7 @@ function dailyWindSummary(forecast,day,display,index,now){
  if(!/^\d{4}-\d{2}-\d{2}$/.test(day?.date||''))return {text:'Wind —',gust:null};
  const next=new Date(Date.parse(day.date+'T12:00:00Z')+86400000).toISOString().slice(0,10);
  const highStart=Date.parse(day.highWindow?.start),lowStart=Date.parse(day.lowWindow?.start),lowEnd=Date.parse(day.lowWindow?.end);
- const start=display.tonight?Math.max(now,finite(lowStart)?lowStart:timeAt(day.date,19,zone))
+ const start=display.tonight?now
    : index===0?Math.max(now,finite(highStart)?highStart:timeAt(day.date,7,zone))
    : finite(highStart)?highStart:timeAt(day.date,7,zone);
  const end=finite(lowEnd)?lowEnd:timeAt(next,7,zone);
