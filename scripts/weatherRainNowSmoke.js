@@ -35,7 +35,8 @@ const server=await new Promise(resolve=>{const s=app.listen(0,'127.0.0.1',()=>re
 const base=`http://127.0.0.1:${server.address().port}`;
 const browser=await chromium.launch({headless:true});
 try{
-  const page=await browser.newPage({viewport:{width:390,height:844}});
+  const context=await browser.newContext({viewport:{width:390,height:844},geolocation:{latitude:35.787,longitude:-78.4806},permissions:['geolocation']});
+  const page=await context.newPage();
   await page.addInitScript(epoch=>{Date.now=()=>epoch;},now);
   await page.goto(base+'/weather-fusion/',{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>document.querySelector('#observation-label')?.textContent?.includes('Rain now'),null,{timeout:30000});
