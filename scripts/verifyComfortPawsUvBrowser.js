@@ -41,18 +41,18 @@ try{
   const result=await page.evaluate(()=>{
    const q=s=>document.querySelector(s),text=s=>q(s)?.textContent.trim();
    const row=q('#daily .day-row'),low=row.querySelector('.day-low').getBoundingClientRect(),high=row.querySelector('.day-high').getBoundingClientRect();
-   return {width:innerWidth,overflow:document.documentElement.scrollWidth>innerWidth+1,highRight:high.left>low.right,uvRows:document.querySelectorAll('#daily .daily-uv').length,heroUv:text('#hero-uv'),todayUv:text('#today-forecast .daily-uv'),todayTake:text('#today-uncertainty-text'),takeVisible:!q('#today-uncertainty').hidden,sun:text('.sun-person figcaption strong'),now:text('#hourly .hour-current .hour-feels b'),hero:text('#hero-feels strong'),metric:text('.metric-feels .metric-value'),caption:text('#comfort-extra-science'),image:!!q('.pavement-person .reference-art,.pavement-person .poodle-walk'),hands:[...document.querySelectorAll('.friendly-wave')].every(el=>getComputedStyle(el).animationName==='none'),lowerHands:document.querySelectorAll('.person-resting-hand').length};
+   return {width:innerWidth,overflow:document.documentElement.scrollWidth>innerWidth+1,highRight:high.left>low.right,uvRows:document.querySelectorAll('#daily .daily-uv').length,heroUv:text('#hero-uv'),todayUv:text('#today-forecast .daily-uv'),todayTake:text('#today-uncertainty-text'),takeVisible:!q('#today-uncertainty').hidden,sun:text('.sun-person figcaption strong'),now:text('#hourly .hour-current .hour-feels b'),hero:text('#hero-feels strong'),metric:text('.metric-feels .metric-value'),caption:text('#comfort-extra-science'),image:!!q('.pavement-person .reference-art,.pavement-person .poodle-walk'),referenceScenes:document.querySelectorAll('.sun-shade-comparison .reference-scene').length};
   });
   assert.equal(result.overflow,false);assert.equal(result.highRight,true);assert.equal(result.uvRows,7);
   assert.match(result.heroUv,/Peak UV today 7/);assert.match(result.todayUv,/Peak UV 7/);
   assert.equal(result.sun,result.now);assert.equal(result.sun,result.hero);assert.equal(result.sun,result.metric);
   assert.doesNotMatch(result.sun,/Unavailable|—/);assert.match(result.caption,/current forecast hour/);
   assert.doesNotMatch(result.todayTake,/Hot and humid|cooler, rainy|NWS discussion/);assert.match(result.todayTake,/Sunday rainfall amounts remain uncertain/);assert.ok(result.todayTake.split(/\s+/).length<=55);
-  assert.equal(result.takeVisible,true);assert.equal(result.image,true);assert.equal(result.hands,true);assert.equal(result.lowerHands,2);
+  assert.equal(result.takeVisible,true);assert.equal(result.image,true);assert.equal(result.referenceScenes,3);
   const placement=await page.evaluate(()=>{const q=s=>document.querySelector(s),a=q('.sun-person').getBoundingClientRect(),b=q('#pavement-content').getBoundingClientRect(),c=q('#skin-exposure').getBoundingClientRect();return {sameRow:Math.abs(a.top-b.top)<2,pawsRight:b.left>=a.right,inside:b.left>=c.left&&b.right<=c.right&&q('#skin-exposure').contains(q('#pavement-content')),three:q('.sun-shade-comparison').children.length,meta:[...document.querySelectorAll('.day-meta')].every(el=>{const f=el.querySelector('.forecast-confidence').getBoundingClientRect(),u=el.querySelector('.daily-uv').getBoundingClientRect();return u.left>=f.right&&Math.abs((u.top+u.bottom)/2-(f.top+f.bottom)/2)<2;})};});
   assert.deepEqual(placement,{sameRow:true,pawsRight:true,inside:true,three:3,meta:true});
   assert.equal(await page.locator('#skin-kicker').innerText(),'How it actually feels right now');
-  assert.deepEqual(await page.locator('#skin-values .exposure-label').allTextContents(),['Shade','Partly cloudy','For Pets']);
+  assert.deepEqual(await page.locator('#skin-values .exposure-label').allTextContents(),['Shade','Day','For Pets']);
   assert.match(await page.locator('.comfort-later small').innerText(),/\d{1,2}:\d{2} [AP]M/);
   assert.ok(await page.locator('#map-panel').evaluate(el=>el.getBoundingClientRect().top>=document.querySelector('#metrics').getBoundingClientRect().bottom));
   assert.ok(await page.locator('.pavement-warning').evaluate(el=>{const art=document.querySelector('.pavement-person .reference-scene,.pavement-person .poodle-walk');return !!art&&el.getBoundingClientRect().bottom<=art.getBoundingClientRect().top+1;}));
@@ -93,12 +93,12 @@ try{
    if(Math.abs(br.width-pr.width)>1||Math.abs(br.height-pr.height)>1)throw Error('Human/pet banner dimensions differ');
    sun.innerHTML=saved;
    if([...document.querySelectorAll('.thermal-risk')].some(el=>!el.closest('.sun-shade-comparison')))throw Error('Risk banner outside people graphics');
-   return {results,missing:thermalRiskHTML(null),normal:thermalRiskHTML(70),scale:[...document.querySelectorAll('.exposure-person-art')].map(el=>el.getAttribute('transform'))};
+   return {results,missing:thermalRiskHTML(null),normal:thermalRiskHTML(70)};
   });
   assert.equal(riskChecks.missing,'');assert.equal(riskChecks.normal,'');
   for(const r of riskChecks.results){assert.ok(r.above);assert.equal(r.banner,'');}
   assert.equal(new Set(riskChecks.results.map(r=>r.value)).size,4);
-  assert.ok(riskChecks.scale.every(t=>t.includes('scale(2.58)')));
+
   assert.equal(await page.locator('.shade-person .thermal-risk').count(),0);
   const sceneLayout=await page.evaluate(async()=>{
    const q=s=>document.querySelector(s),rect=s=>q(s)?.getBoundingClientRect();
@@ -121,10 +121,11 @@ try{
     document.querySelector('.sun-shade-comparison').outerHTML=sunShadeHTML(comfort,{latitude:35,longitude:-78},Date.now(),{compact:true,pavement});
    },{condition,kind});
    assert.equal(await page.locator('.sun-person .exposure-label').innerText(),title);
-   assert.equal(await page.locator('.shade-weather').count(),1,'Sky symbol exists above shade tree including sunny weather');
+   assert.equal(await page.locator('.sun-shade-comparison .reference-scene').count(),3);
    assert.equal(await page.locator('.shade-person .thermal-risk').count(),0);
-   assert.ok(await page.locator('.exposure-person-art').evaluateAll(els=>els.every(el=>{const m=el.transform.baseVal.consolidate().matrix;return Math.abs(m.a-m.d)<.001;})),'People preserve their original aspect ratio');
-   assert.ok(await page.locator('.shade-weather').evaluate(el=>el.getBoundingClientRect().bottom<document.querySelector('.exposure-tree').getBoundingClientRect().top));
+   assert.equal(await page.locator('.shade-person .reference-scene').getAttribute('data-weather'),kind);
+   assert.equal(await page.locator('.sun-person .reference-scene').getAttribute('data-weather'),kind);
+   assert.ok(await page.locator('.sun-shade-comparison').evaluate(el=>el.scrollWidth<=el.clientWidth+1));
    await page.locator('.exposure-cards').screenshot({path:output+'/checked-'+kind+'-'+width+'.png'});
   }
   await page.locator('.sun-shade-comparison').evaluate((el,html)=>el.outerHTML=html,originalScenes);
@@ -161,8 +162,9 @@ try{
  await page.goto(base+'/weather-fusion/',{waitUntil:'domcontentloaded'});
  await page.evaluate(async()=>{const {exposureScene}=await import('/weather-fusion/exposure-scene.js?v=clear-weather-daygraph-v3');document.body.innerHTML='<div id="outfits" style="display:flex;background:#304763;padding:20px">'+[25,48,65,80,96].map(t=>'<div style="width:200px">'+exposureScene(true,true,'Clear',t)+'</div>').join('')+'</div>';});
  await page.locator('#outfits').screenshot({path:`${output}/all-outfits.png`});
- assert.equal(await page.locator('.person-resting-hand').count(),5);assert.equal(await page.locator('.friendly-wave').count(),5);
- report.scenarios.push('All five clothing states have two hands');
+ assert.deepEqual(await page.locator('#outfits .reference-scene').evaluateAll(els=>els.map(e=>e.dataset.outfit)),['cold','cool','mild','warm','hot']);
+ assert.equal(await page.locator('#outfits .reference-art').count(),5);
+ report.scenarios.push('All five clothing states use the correct fixed reference artwork');
  await page.evaluate(async()=>{const {pavementHTML}=await import('/weather-fusion/pavement.js?v=clear-weather-daygraph-v3');document.body.innerHTML='<div id="walker-outfits" style="display:flex;background:#344f70;padding:20px">'+[30,48,65,80,104].map(t=>'<div style="width:220px"><h2>'+t+'° feels like</h2>'+pavementHTML({status:'estimated',concrete:{value:104},asphalt:{value:114}},t)+'</div>').join('')+'</div>';});
  await page.evaluate(async()=>Promise.all([...document.querySelectorAll('.poodle-scene .reference-art')].map(async el=>{const img=new Image();img.src=el.getAttribute('href');await img.decode();})));
  assert.deepEqual(await page.locator('.poodle-scene').evaluateAll(els=>els.map(e=>e.dataset.outfit)),['cold','cool','mild','warm','hot']);
