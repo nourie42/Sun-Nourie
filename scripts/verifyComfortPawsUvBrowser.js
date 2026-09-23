@@ -141,13 +141,14 @@ try{
   // Repeated renders must keep hands and use the same current estimate.
   for(let i=0;i<3;i++){await page.locator('#refresh').click();await page.waitForFunction(()=>!document.querySelector('#refresh').classList.contains('loading'));}
   assert.equal(await page.locator('.sun-person figcaption strong').innerText(),result.sun);
-  await page.evaluate(time=>window.__weatherTestNow=time,now+3*H);
+  await page.evaluate(time=>window.__weatherTestNow=time,now+6*H);
   await page.locator('#refresh').click();await page.waitForFunction(()=>document.querySelector('#today-forecast .today-night'));
   assert.match(await page.locator('#today-forecast .today-metric').filter({hasText:'UV Index'}).innerText(),/7[\s\S]*UV Index/);
   // Location clearing is checked while delayed and then failed.
   delayLocation=true;failLocation=true;
   await context.setGeolocation({latitude:35.6127,longitude:-77.3664});
   await page.locator('#locate').click();
+  await page.waitForFunction(()=>document.querySelector('#hero-uv')?.textContent==='Peak UV today —');
   assert.equal(await page.locator('#hero-uv').innerText(),'Peak UV today —');
   assert.equal(await page.locator('#pavement-content').count(),0);
   assert.doesNotMatch(await page.locator('#today-uncertainty-text').innerText(),/Hot and humid/);

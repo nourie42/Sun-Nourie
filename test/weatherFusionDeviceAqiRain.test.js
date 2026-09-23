@@ -31,18 +31,21 @@ test('air quality feed normalizes current US AQI and computes a next-24-hour pea
  addAirQuality(out,normalized);
  assert.equal(out.airQuality.next24HourPeak,88);
  assert.equal(aqiBand(72).label,'Moderate');
- assert.match(airQualityHTML({airQuality:out.airQuality}),/U\.S\. AQI/);
- assert.match(airQualityHTML({airQuality:out.airQuality}),/PM2\.5/);
+ const html=airQualityHTML({airQuality:out.airQuality,location:{name:'Knightdale, NC'}});
+ assert.match(html,/LOCAL AQI/);
+ assert.match(html,/Knightdale, NC/);
+ assert.doesNotMatch(html,/U\.S\. AQI/);
+ assert.match(html,/PM2\.5/);
 });
 
 test('regular and experimental weather share device-location, jump-nav, AQI and 12px readability assets',()=>{
  const html=read('index.html'),app=read('app.js'),css=read('weather-polish.css');
  assert.doesNotMatch(html,/data-place="knightdale"|data-place="greenville"|Knightdale \/ Raleigh|Greenville, NC/);
  assert.match(html,/id="device-location-label"/);
- assert.match(html,/href="#map-panel">Weather Map/);
+ assert.match(html,/href="#map-panel" aria-label="Weather Map">Map/);
  assert.match(html,/href="#dewpoint-gross-meter">Dew Point/);
  assert.match(html,/href="#your-day">Your Day/);
- assert.match(html,/href="#daily-panel">7-Day Forecast/);
+ assert.match(html,/href="#daily-panel" aria-label="7-Day Forecast">7-Day/);
  assert.match(html,/id="air-quality"/);
  assert.match(app,/startDeviceLocation\(\);/);
  assert.match(app,/navigator\.geolocation\.getCurrentPosition/);
@@ -50,6 +53,9 @@ test('regular and experimental weather share device-location, jump-nav, AQI and 
  assert.doesNotMatch(app,/presets\.knightdale|weather-fusion-place/);
  assert.match(css,/font-size:12px!important/);
  assert.match(css,/gross-number/);
+ assert.match(css,/grid-template-columns:repeat\(6,minmax\(0,1fr\)\)/);
+ assert.ok(html.indexOf('id="metrics"')<html.indexOf('id="air-quality"'),'Your Day cards must appear directly before local air quality');
+ assert.match(html,/Current local AQI \+ next 24 hours/);
 });
 
 test('the server explicitly allows and adds the air-quality source',()=>{
