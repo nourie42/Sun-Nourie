@@ -677,14 +677,14 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
   });
   for (const name of [
-    'alert-banners.js','app.js','bulletin-facts.js','bulletins.js','car-wash.js','car-wash.css','car-wash-background.webp','car-wash-corvette-hood.webp',
+    'air-quality.js','alert-banners.js','app.js','bulletin-facts.js','bulletins.js','car-wash.js','car-wash.css','car-wash-background.webp','car-wash-corvette-hood.webp',
     'model-explanation.js','model-explanation.css',
     'comfort-cinematic.css','comfort-effects.css','comfort-outlook.js','current-inputs.js','current-temperature.js',
     'daily-uv.js','dans-summary.js','dans-take.js','day-graph.js','dewpoint-meter.js','dewpoint-meter.css',
     'experience.js','exposure-scene.js','forecast-cards.css','forecast-confidence.js','forecast-layout.css','forecast-story.js','outlook-details.js',
     'frame-player.js','hero-mode.js','hourly-feels.js','hourly-feels.css','nav.js','outdoor-feels.js','pavement.js',
     'personal-details.js','personal-details.css','render-safety.js','risk-outlooks.js','risk-outlooks.css','scenario-layout.css','style.css','thermal-risk.js',
-    'today-card.js','rain-trend.js','utci.js','weather-display.js','weather-math.js','weather-repair.css','weather-state.js','whats-up-classify.js',
+    'today-card.js','rain-display.js','rain-trend.js','utci.js','weather-display.js','weather-math.js','weather-polish.css','weather-repair.css','weather-state.js','whats-up-classify.js',
     'comfort-reference-scenes.png','comfort-reference-scenes.webp','comfort-reference-scenes-cold.webp',
     'comfort-reference-scenes-carry-umbrella.svg',
     'comfort-reference-scenes-dawn.webp','comfort-reference-scenes-fog.webp','comfort-reference-scenes-hot.webp',
