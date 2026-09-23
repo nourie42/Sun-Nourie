@@ -113,7 +113,7 @@ for(const location of ['knightdale','greenville']){
 }
 const browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{})});
 try{
- const context=await browser.newContext({viewport:{width:1365,height:1000}});
+ const context=await browser.newContext({viewport:{width:1365,height:1000},geolocation:{latitude:35.787,longitude:-78.4806},permissions:['geolocation']});
  const page=await context.newPage();
  page.on('response',async response=>{try{if(response.ok()&&response.url().includes('/api/weather-fusion/forecast?'))page.weatherForecast=await response.json();if(response.ok()&&response.url().includes('/api/weather-fusion/briefing?'))page.weatherBriefing=await response.json();}catch{}});
  page.on('pageerror',error=>report.browserErrors.push(error.message));
@@ -183,7 +183,8 @@ try{
  assert.ok((await page.locator('#day-content').innerText()).includes('WEATHER NOURIE'));
  assert.equal(await page.locator('#day-content .day-graph').count(),1);
  await page.locator('#close-day').click();
- await page.locator('[data-place="greenville"]').click();
+ await context.setGeolocation({latitude:35.6127,longitude:-77.3664});
+ await page.locator('#locate').click();
  await page.waitForFunction(()=>document.querySelector('#city-name').textContent.includes('Greenville')&&document.querySelectorAll('#metrics .metric-value').length===8,null,{timeout:75000});
  await page.waitForFunction(()=>/°.*Shade/.test(document.querySelector('#skin-values')?.textContent||'')&&!/Updating/.test(document.querySelector('#skin-values')?.textContent||''),null,{timeout:30000});
  await page.waitForFunction(()=>document.querySelector('#dewpoint-gross-meter .gross-chart'),null,{timeout:30000});
