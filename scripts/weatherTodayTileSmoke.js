@@ -64,12 +64,34 @@ try {
   assert.match(await page.locator('#chart-title').innerText(),/Feels like/);
   await page.locator('#close-metric').click();
 
-  for (const width of [320,390,430]) {
-    await page.setViewportSize({width,height:844});
+  for (const width of [320,360,390,412,430]) {
+    await page.setViewportSize({width,height:900});
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `horizontal overflow at ${width}px`);
     const f = await page.locator('#today-forecast .today-feels').boundingBox();
     const m = await page.locator('#today-forecast .today-metrics').boundingBox();
     assert.ok(f && m && f.y + f.height <= m.y - 2, `Today tile overlap at ${width}px`);
+
+    const geometry=await page.evaluate(()=>{
+      const row=document.querySelector('#daily .day-row'),rr=row.getBoundingClientRect(),q=s=>row.querySelector(s)?.getBoundingClientRect();
+      const day=q('.day-name'),icon=q('.day-icon'),low=q('.day-low'),track=q('.temp-track'),high=q('.day-high'),feels=q('.day-feels-summary');
+      const meta=q('.day-meta'),confidence=q('.forecast-confidence'),wind=q('.day-wind-chip'),uv=q('.daily-uv');
+      const nav=document.querySelector('.weather-jump-nav'),cards=[...nav.querySelectorAll('.weather-jump-card')].map(el=>el.getBoundingClientRect()),nr=nav.getBoundingClientRect();
+      return {
+        rowFits:row.scrollWidth<=row.clientWidth+1,
+        compact:rr.height<=140,
+        topOrder:day.left<icon.left&&icon.left<low.left&&low.left<track.left&&track.left<high.left&&high.left<feels.left,
+        metaBelow:meta.top>=Math.max(day.bottom,icon.bottom,low.bottom,track.bottom,high.bottom,feels.bottom)-3,
+        lowerOrder:confidence.left<wind.left&&wind.left<uv.left,
+        lowerInside:[confidence,wind,uv].every(r=>r.left>=rr.left-1&&r.right<=rr.right+1),
+        navFits:nav.scrollWidth<=nav.clientWidth+1&&nr.left>=-1&&nr.right<=innerWidth+1,
+        navCards:cards.length===5&&cards.every(r=>r.left>=nr.left-1&&r.right<=nr.right+1&&r.height>=70),
+        navLabels:[...nav.querySelectorAll('.jump-label')].map(el=>el.textContent.trim()).join('|'),
+      };
+    });
+    assert.deepEqual(geometry,{
+      rowFits:true,compact:true,topOrder:true,metaBelow:true,lowerOrder:true,lowerInside:true,
+      navFits:true,navCards:true,navLabels:'Map|Gross Meter|Your Day|7-Day|Air Quality'
+    },`reference mobile layout at ${width}px`);
   }
 
   console.log(JSON.stringify({
@@ -80,7 +102,8 @@ try {
       'Rain chance updates 40% → 60%',
       'Rain chance change shows +20 pts and previous 40%',
       'Your Day feels-like card opens its forecast dialog when tapped',
-      'No overlap at 320, 390, or 430 px'
+      'Reference 7-day layout verified at 320, 360, 390, 412, and 430 px',
+      'Glossy Map / Gross Meter / Your Day / 7-Day / Air Quality jump cards verified at five phone widths'
     ]
   }, null, 2));
 } finally {
