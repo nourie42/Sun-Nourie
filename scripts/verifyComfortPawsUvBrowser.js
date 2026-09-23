@@ -148,6 +148,7 @@ try{
   delayLocation=true;failLocation=true;
   await context.setGeolocation({latitude:35.6127,longitude:-77.3664});
   await page.locator('#locate').click();
+  await page.waitForFunction(()=>document.querySelector('#hero-uv')?.textContent==='Peak UV today —');
   assert.equal(await page.locator('#hero-uv').innerText(),'Peak UV today —');
   assert.equal(await page.locator('#pavement-content').count(),0);
   assert.doesNotMatch(await page.locator('#today-uncertainty-text').innerText(),/Hot and humid/);
