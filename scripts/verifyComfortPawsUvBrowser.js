@@ -54,18 +54,20 @@ try{
    const top=['.day-name','.day-icon','.day-low','.temp-track','.day-high'].map(s=>rect(row.querySelector(s))).filter(Boolean);
    const details=rect(row.querySelector('.day-feels-summary')),meta=rect(row.querySelector('.day-meta'));
    const confidence=rect(row.querySelector('.forecast-confidence')),uv=rect(row.querySelector('.daily-uv'));
+   const rr=rect(row),panel=rect(document.querySelector('.daily-panel'));
    return {
     rowFits:row.scrollWidth<=row.clientWidth+1,
-    compactHeight:row.getBoundingClientRect().height<=132,
+    compactHeight:rr.height<=132,
     detailsBelow:details.top>=Math.max(...top.map(r=>r.bottom))-3,
     sameSecondRow:Math.abs(details.top-meta.top)<4,
-    detailsLeft:details.left<meta.left,
-    detailsInside:details.left>=rect(row).left&&details.right<=rect(row).right,
-    metaInside:meta.left>=rect(row).left&&meta.right<=rect(row).right,
+    confidenceLeft:meta.left<details.left&&confidence.left<=meta.left+2,
+    detailsInside:details.left>=rr.left&&details.right<=rr.right,
+    metaInside:meta.left>=rr.left&&meta.right<=rr.right,
     footerSeparated:uv.top>=confidence.bottom-1,
+    balancedMargins:Math.abs((rr.left-panel.left)-(panel.right-rr.right))<=3,
    };
   });
-  if(width<=760)assert.deepEqual(dailyLayout,{rowFits:true,compactHeight:true,detailsBelow:true,sameSecondRow:true,detailsLeft:true,detailsInside:true,metaInside:true,footerSeparated:true});
+  if(width<=760)assert.deepEqual(dailyLayout,{rowFits:true,compactHeight:true,detailsBelow:true,sameSecondRow:true,confidenceLeft:true,detailsInside:true,metaInside:true,footerSeparated:true,balancedMargins:true});
   const placement=await page.evaluate(()=>{const q=s=>document.querySelector(s),a=q('.sun-person').getBoundingClientRect(),b=q('#pavement-content').getBoundingClientRect(),c=q('#skin-exposure').getBoundingClientRect();return {sameRow:Math.abs(a.top-b.top)<2,pawsRight:b.left>=a.right,inside:b.left>=c.left&&b.right<=c.right&&q('#skin-exposure').contains(q('#pavement-content')),three:q('.sun-shade-comparison').children.length,meta:[...document.querySelectorAll('.day-meta')].every(el=>{const f=el.querySelector('.forecast-confidence').getBoundingClientRect(),u=el.querySelector('.daily-uv').getBoundingClientRect();return (u.left>=f.right-1&&Math.abs((u.top+u.bottom)/2-(f.top+f.bottom)/2)<2)||u.top>=f.bottom-1;})};});
   assert.deepEqual(placement,{sameRow:true,pawsRight:true,inside:true,three:3,meta:true});
   assert.equal(await page.locator('#skin-kicker').innerText(),'How it actually feels right now');
