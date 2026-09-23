@@ -62,7 +62,7 @@ jobs:
         run: |
           for attempt in $(seq 1 90); do
             home="$(curl -fsSL --max-time 20 "$LIVE_URL/weather-fusion/?deploy=$GITHUB_SHA&n=$attempt" 2>/dev/null || true)"
-            if printf '%s' "$home" | grep -Fq '/weather-fusion/app.js?v=daily-card-balance-v2' && printf '%s' "$home" | grep -Fq '/weather-fusion/forecast-cards.css?v=weather-qa-v70'; then
+            if printf '%s' "$home" | grep -Fq '/weather-fusion/app.js?v=daily-card-balance-v2' && printf '%s' "$home" | grep -Fq '/weather-fusion/scenario-layout.css?v=daily-card-compact-left-v3' && printf '%s' "$home" | grep -Fq '/weather-fusion/forecast-cards.css?v=weather-qa-v70'; then
               echo "Weather Today tile build is live."
               exit 0
             fi
