@@ -58,9 +58,10 @@ try {
   assert.match(await page.locator('#today-forecast .today-symbol').innerText(), /60%/);
   assert.match(await page.locator('#today-forecast [data-rain-trend]').innerText(), /↑ \+20 pts · was 40%/);
 
-  await page.locator('#metrics [data-metric="temperature"]').click();
+  await page.waitForSelector('#metrics [data-metric="feels"]');
+  await page.locator('#metrics [data-metric="feels"]').click();
   await page.waitForSelector('#metric-dialog[open]');
-  assert.match(await page.locator('#chart-title').innerText(),/Temperature/);
+  assert.match(await page.locator('#chart-title').innerText(),/Feels like/);
   await page.locator('#close-metric').click();
 
   for (const width of [320,390,430]) {
@@ -78,7 +79,7 @@ try {
       'Feels-like stays above wind/UV metrics',
       'Rain chance updates 40% → 60%',
       'Rain chance change shows +20 pts and previous 40%',
-      'Your Day temperature card opens its forecast dialog when tapped',
+      'Your Day feels-like card opens its forecast dialog when tapped',
       'No overlap at 320, 390, or 430 px'
     ]
   }, null, 2));
