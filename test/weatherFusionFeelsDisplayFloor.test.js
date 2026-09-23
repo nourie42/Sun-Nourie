@@ -32,8 +32,8 @@ test('raw thermal series stays unchanged while displayed hourly and daily summar
 test('long-term forecast markup includes sustained wind and optional gust context',()=>{
  const experience=readFileSync(new URL('../public/weather-fusion/experience.js',import.meta.url),'utf8');
  const css=readFileSync(new URL('../public/weather-fusion/scenario-layout.css',import.meta.url),'utf8');
- assert.match(experience,/class="day-wind"/);
+ assert.match(experience,/class="day-wind-chip"/);
  assert.match(experience,/Wind \$\{lo\}–\$\{hi\} mph/);
- assert.match(experience,/class="day-gust">Gust/);
- assert.match(css,/\.daily-panel \.day-wind,/);
+ assert.match(experience,/G\$\{wind\.gust\}/);
+ assert.match(css,/\.daily-panel \.day-wind-chip/);
 });
