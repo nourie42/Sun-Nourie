@@ -18,7 +18,8 @@
   <link rel="stylesheet" href="/weather-fusion/car-wash.css?v=rain-consensus-v41">
   <link rel="stylesheet" href="/weather-fusion/model-explanation.css?v=rain-consensus-v41">
   <link rel="stylesheet" href="/weather-fusion/risk-outlooks.css?v=risk-outlooks-v4">
-  <script type="module" src="/weather-fusion/app.js?v=risk-outlooks-v4"></script>
+  <link rel="stylesheet" href="/weather-fusion/weather-polish.css?v=device-aqi-rain-v1">
+  <script type="module" src="/weather-fusion/app.js?v=device-aqi-rain-v1"></script>
 
   <style id="experimental-bots-link-style">
     .experimental-bots-link{display:none;align-items:center;gap:.45rem;width:max-content;margin:.55rem 0 0;padding:.55rem .85rem;border:1px solid rgba(255,255,255,.22);border-radius:999px;background:rgba(11,24,43,.78);color:#f7fbff;text-decoration:none;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.18)}
@@ -39,18 +40,22 @@
       <nav aria-label="Page tools"><button class="icon-button" id="refresh" title="Refresh weather" aria-label="Refresh weather">↻</button></nav>
     </header>
     <div class="location-bar">
-      <div class="saved-locations" role="group" aria-label="Saved locations">
-        <button class="place-button active" data-place="knightdale" aria-pressed="true"><span aria-hidden="true">⌂</span> Knightdale / Raleigh</button>
-        <button class="place-button" data-place="greenville" aria-pressed="false"><span aria-hidden="true">◇</span> Greenville, NC</button>
-      </div>
-      <div class="search-wrap"><label for="city-search" class="sr-only">Search a U.S. city or ZIP code</label><span aria-hidden="true">⌕</span><input id="city-search" type="search" placeholder="Search city or ZIP" autocomplete="off" aria-controls="search-results" aria-expanded="false"><button id="locate" title="Use my location" aria-label="Use my location">⌖</button><div id="search-results" class="search-results" hidden></div></div>
+      <div class="device-location-status" aria-live="polite"><span aria-hidden="true">⌖</span><strong id="device-location-label">Getting device location…</strong></div>
+      <div class="search-wrap"><label for="city-search" class="sr-only">Search a U.S. city or ZIP code</label><span aria-hidden="true">⌕</span><input id="city-search" type="search" placeholder="Search city or ZIP" autocomplete="off" aria-controls="search-results" aria-expanded="false"><button id="locate" title="Refresh device location" aria-label="Refresh device location">⌖</button><div id="search-results" class="search-results" hidden></div></div>
     </div>
+    <nav class="weather-jump-nav" aria-label="Jump to weather section">
+      <a href="#map-panel">Weather Map</a>
+      <a href="#dewpoint-gross-meter">Dew Point</a>
+      <a href="#your-day">Your Day</a>
+      <a href="#daily-panel">7-Day Forecast</a>
+      <a href="#air-quality">Air Quality</a>
+    </nav>
     <main id="forecast">
       <div id="status" class="status-line" role="status" aria-live="polite">Connecting to weather sources…</div>
       <section class="hero" aria-labelledby="city-name">
         <div class="hero-scene" id="hero-scene" aria-hidden="true"></div>
         <div class="eyebrow" id="hero-date">YOUR WEATHER, IN FOCUS</div>
-        <h1 id="city-name">Knightdale / Raleigh</h1>
+        <h1 id="city-name">Your location</h1>
         <div class="current-temp-label">Current temperature</div>
         <div class="hero-temperature" id="temperature" role="button" tabindex="0" aria-label="Open temperature forecast graph" aria-haspopup="dialog">—<span>°</span></div>
         <div id="hero-feels" class="hero-feels" aria-live="polite">Feels like —</div>
@@ -91,10 +96,14 @@
         <div class="briefing-bottom"><span id="briefing-stamp">Based on your local forecasters</span><button id="expand-briefing" class="text-button" aria-expanded="false" aria-controls="briefing-detail">Read full outlook <span aria-hidden="true">↗</span></button></div>
       </section>
       <div class="forecast-grid">
-        <section class="glass daily-panel" aria-labelledby="daily-title"><div class="section-top"><h2 id="daily-title">▦ &nbsp; 7-DAY FORECAST</h2><span>Tap a day for details</span></div><div id="daily"><p class="muted">Daily data is loading.</p></div><p class="daily-footnote">Low on the left, high on the right. The bar ends at the high. At 6 PM, the first row switches to tonight’s low.</p></section>
+        <section class="glass daily-panel" id="daily-panel" aria-labelledby="daily-title"><div class="section-top"><h2 id="daily-title">▦ &nbsp; 7-DAY FORECAST</h2><span>Tap a day for details</span></div><div id="daily"><p class="muted">Daily data is loading.</p></div><p class="daily-footnote">Low on the left, high on the right. The bar ends at the high. At 6 PM, the first row switches to tonight’s low.</p></section>
       </div>
       <section class="glass" id="model-explanation" aria-labelledby="model-explanation-title" hidden></section>
-      <div class="metrics-heading"><h2>Your day, at a glance</h2><p>Tap any tile to explore its forecast.</p></div>
+      <div class="metrics-heading" id="your-day"><h2>Your day, at a glance</h2><p>Tap any tile to explore its forecast.</p></div>
+      <section class="glass air-quality-panel" id="air-quality" aria-labelledby="air-quality-title">
+        <div class="section-top"><h2 id="air-quality-title">AIR QUALITY</h2><span>Current U.S. AQI + next 24 hours</span></div>
+        <div id="air-quality-content"><p class="muted">Loading air quality…</p></div>
+      </section>
       <section class="metrics" id="metrics" aria-label="Weather details"></section>
         <section class="glass map-panel" id="map-panel" aria-labelledby="map-title">
           <div class="section-top"><h2 id="map-title">◎ &nbsp; WEATHER MAPS</h2><button id="fullscreen" class="text-button" aria-label="Expand weather map">⛶ Expand</button></div>
@@ -137,7 +146,7 @@
         </details>
         <details class="evidence-detail"><summary>Models, timing & forecast policy</summary><p id="methodology"></p><div class="policy-grid"><div><strong>Models actually used</strong><p>HRRR, ECMWF IFS and NOAA NBM are requested explicitly for the selected coordinates through Open-Meteo—not its automatic best-match model. Published initialization age, grid location, units and each hourly value are checked. These continuous point series may combine successive runs of the same named model; they are not a single pinned initialization. Verified native GRIB2 extracts remain a fallback for the two saved locations. Temperature, dew point, wind, gust and cloud cover use the requested lead-day weights wherever each field is available; humidity and feels-like are derived from those matching inputs. Pressure and visibility use only models publishing those fields. Current station readings remain observations. Official alerts, NWS rain probabilities and UV retain their own sources, because they are not interchangeable deterministic model quantities.</p></div><div><strong>AI explains the evidence</strong><p>The AI receives the blended numbers, individual model estimates, HRRR simulated reflectivity and latest local NWS discussion. It cannot change numeric cards or official alerts. Starting blend weights are not a statistically calibrated skill ranking.</p></div><div><strong>Forecast confidence</strong><p>Each daily Forecast confidence label is a relative index, not a probability. It starts with lead time and then uses the spread among NWS/model high temperatures, the spread in available rainfall guidance, the number of usable guidance sources, and whether official NWS day/night periods are present. Larger disagreement or missing coverage lowers confidence; a later day can rate better than an earlier day when the scientific guidance agrees better.</p></div><div><strong>Precipitation windows</strong><p>The main metric shows the next 24 hours. Daily cards show the remaining period through 7 AM, or complete 7 AM–7 AM future days. Totals are liquid equivalent, not measured rainfall. Interpolation within coarse model intervals does not establish storm arrival times.</p></div></div><p class="muted" id="google-status">Google WeatherNext is not currently included: approved forecast dataset access is required. A text-generation model is not a substitute for numerical weather data.</p><p class="muted">HRRR reflectivity is a forecast, not live radar. Its map uses a separately verified, timestamp-pinned NOAA HRRR tile source from Iowa State that covers the contiguous United States. ECMWF rain, NBM rain, temperature, wind and cloud raster maps are decoded from native contiguous-U.S. model data. Point-model availability is listed separately above.</p><p class="muted">External comparisons: <a href="https://weather.us/model-charts/rapid-us/north-carolina/radar-reflectivity.html" target="_blank" rel="noopener noreferrer">Weather.us HRRR ↗</a> · <a href="https://weather.us/model-charts/euro/north-carolina/acc-total-precipitation.html" target="_blank" rel="noopener noreferrer">Weather.us ECMWF ↗</a>. These references do not supply the numeric forecast and are not embedded.</p><div id="source-register"></div></details>
       </section>
-      <footer><div><span class="footer-brand">Weather Nourie</span><p>Your weather. A little clearer.</p></div><p>Not an official NWS product. Always follow official warnings.<br>Sources: NOAA / NWS · NOAA/NCEP HRRR & NBM · ECMWF Open Data (CC BY 4.0) · USGS The National Map</p><p class="privacy">Location searches and coordinates are sent to weather providers. AI briefings send the selected location and public forecast data to OpenAI; no Sun-Nourie business records are included. Weather model maps are generated from public provider data, not embedded third-party webpages. Your browser location is requested only when you choose the location button.</p></footer>
+      <footer><div><span class="footer-brand">Weather Nourie</span><p>Your weather. A little clearer.</p></div><p>Not an official NWS product. Always follow official warnings.<br>Sources: NOAA / NWS · NOAA/NCEP HRRR & NBM · ECMWF Open Data (CC BY 4.0) · Open-Meteo / CAMS air quality · USGS The National Map</p><p class="privacy">Location searches and coordinates are sent to weather providers. AI briefings send the selected location and public forecast data to OpenAI; no Sun-Nourie business records are included. Weather model maps are generated from public provider data, not embedded third-party webpages. Your browser location is requested when the weather page opens so the forecast can follow your device; use the location button to refresh it.</p></footer>
     </main>
   </div>
   <dialog id="day-dialog" aria-labelledby="day-title"><button id="close-day" class="dialog-close" aria-label="Close daily forecast">×</button><div id="day-content"></div></dialog>

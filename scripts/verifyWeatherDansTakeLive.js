@@ -31,7 +31,7 @@ try{
   {id:'',name:'Denver, CO',latitude:39.7392,longitude:-104.9903}
  ]){
   const context=await browser.newContext({viewport:{width:390,height:1000}}),page=await context.newPage(),errors=[];
-  await page.addInitScript(place=>localStorage.setItem('weather-fusion-place',JSON.stringify(place)),place);
+  await page.addInitScript(place=>localStorage.setItem('weather-fusion-device-place',JSON.stringify(place)),place);
   page.on('pageerror',e=>errors.push(e.message));
   let f,b,matched=false;
   for(let attempt=0;attempt<3&&!matched;attempt++){

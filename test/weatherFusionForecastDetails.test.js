@@ -22,7 +22,7 @@ function harness({missingNote=false}={}){
  if(missingNote){delete elements['today-uncertainty'];delete elements['today-uncertainty-text'];}
  let time=now;
  class Clock extends Date{constructor(...args){super(...(args.length?args:[time]));}static now(){return time;}}
- const context={$:id=>elements[id]??null,forecast:structuredClone(source),currentBriefing:null,esc:escape,clock:()=>'12:00 PM',visibleDanTakeItems,danTakeText,danCard,dailyDisplay:()=>({pop:null}),conditionForRainChance,Date:Clock};
+ const context={$:id=>elements[id]??null,forecast:structuredClone(source),currentBriefing:null,esc:escape,clock:()=>'12:00 PM',visibleDanTakeItems,danTakeText,danCard,dailyDisplay:()=>({pop:null}),displayedRainChance:(_forecast,chance)=>({value:chance,forecastValue:chance,observed:false}),conditionForRainChance,Date:Clock};
  runInNewContext(`${renderer}\nthis.renderBriefing=renderBriefing;`,context);
  return {elements,context,render:context.renderBriefing,setTime:t=>{time=t;}};
 }
@@ -88,7 +88,7 @@ for(const uncertainty of [undefined,null,'',' \n\t ',42,{},'Yesterday\'s front m
  assert.ok(!elements['briefing-detail'].innerHTML.includes('data-dans-take'));
 });
 test('location reset clears the old take immediately',()=>{
- const choose=app.slice(app.indexOf('function chooseLocation(value)'),app.indexOf('\nfunction showDay('));
+ const choose=app.slice(app.indexOf('function chooseLocation(value'),app.indexOf('\nfunction refreshOpenDay('));
  assert.match(choose,/renderBriefing\(\{ headline: 'Preparing your local outlook\.'/);
  const {elements,context,render}=harness();render(supported());context.forecast=null;render({headline:'Preparing your local outlook.',sources:[]});
  assert.equal(elements['today-uncertainty'].hidden,true);assert.equal(elements['today-uncertainty-text'].textContent,'');
@@ -124,7 +124,7 @@ test('Gross Meter heading stays centered and bold without changing chart geometr
  assert.match(css,/#gross-title\{text-align:center;font-weight:800\}/);assert.match(meterCss,/\.gross-eyebrow\{width:calc\(100% \+ 86px\);[^}]*text-align:center/);assert.match(meterCss,/@media\(max-width:760px\)[\s\S]*\.gross-eyebrow\{width:calc\(100% \+ 62px\)\}/);assert.ok(!/\.gross-(scroll|chart)\s*\{/.test(css));
 });
 test('changed assets are cache-busted and late briefing responses stay guarded',()=>{
- assert.match(html,/style\.css\?v=experimental-whats-up-v1/);assert.match(html,/forecast-layout\.css\?v=weather-qa-v67/);assert.match(html,/personal-details\.css\?v=wpc-mpd-v12/);assert.match(html,/app\.js\?v=risk-outlooks-v4/);assert.match(html,/car-wash\.css\?v=rain-consensus-v41/);assert.match(html,/forecast-cards\.css\?v=weather-qa-v70/);assert.match(html,/scenario-layout\.css\?v=weather-qa-v67/);assert.match(html,/risk-outlooks\.css\?v=risk-outlooks-v4/);
+ assert.match(html,/style\.css\?v=experimental-whats-up-v1/);assert.match(html,/forecast-layout\.css\?v=weather-qa-v67/);assert.match(html,/personal-details\.css\?v=wpc-mpd-v12/);assert.match(html,/app\.js\?v=device-aqi-rain-v1/);assert.match(html,/weather-polish\.css\?v=device-aqi-rain-v1/);assert.match(html,/car-wash\.css\?v=rain-consensus-v41/);assert.match(html,/forecast-cards\.css\?v=weather-qa-v70/);assert.match(html,/scenario-layout\.css\?v=weather-qa-v67/);assert.match(html,/risk-outlooks\.css\?v=risk-outlooks-v4/);
  assert.match(app,/dans-take\.js\?v=weather-art-labels-v10/);
  assert.match(app,/bulletins\.js\?v=wpc-mpd-v1/);
  assert.match(app,/experience\.js\?v=full-day-rain-v1/);

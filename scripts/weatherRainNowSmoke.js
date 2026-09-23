@@ -35,7 +35,8 @@ const server=await new Promise(resolve=>{const s=app.listen(0,'127.0.0.1',()=>re
 const base=`http://127.0.0.1:${server.address().port}`;
 const browser=await chromium.launch({headless:true});
 try{
-  const page=await browser.newPage({viewport:{width:390,height:844}});
+  const context=await browser.newContext({viewport:{width:390,height:844},geolocation:{latitude:35.787,longitude:-78.4806},permissions:['geolocation']});
+  const page=await context.newPage();
   await page.addInitScript(epoch=>{Date.now=()=>epoch;},now);
   await page.goto(base+'/weather-fusion/',{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>document.querySelector('#observation-label')?.textContent?.includes('Rain now'),null,{timeout:30000});
@@ -44,6 +45,9 @@ try{
   assert.match(await page.locator('#observation-label').innerText(),/Rain now · observed radar over this location/);
   assert.match(await page.locator('#hero-feels').innerText(),/In rain/i);
   assert.match(await page.locator('#hourly .hour-current').innerText(),/Rain now/);
+  assert.equal(await page.locator('#today-forecast .today-symbol>strong').innerText(),'100%');
+  assert.match(await page.locator('#today-forecast .today-symbol>small').innerText(),/Rain now/);
+  assert.equal(await page.locator('#today-forecast .today-sky').getAttribute('data-scene'),'overcast-rain');
 
   assert.equal(await page.locator('#skin-exposure .sun-person .exposure-label').innerText(),'Rain');
   assert.match(await page.locator('#skin-exposure .sun-person .exposure-subtitle').innerText(),/Raining now/);
@@ -65,6 +69,7 @@ try{
       'Radar source label says rain over this location',
       'Feels-like label says In rain',
       'Now hourly card says Rain now',
+      'Today card shows 100% after rain is observed',
       'Shade, outdoor, and pet cards all use rain artwork',
       'Pet card says Wet pavement'
     ]

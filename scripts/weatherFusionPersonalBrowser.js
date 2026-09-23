@@ -34,8 +34,8 @@ await new Promise(r=>server.listen(0,'127.0.0.1',r));const base=`http://127.0.0.
 const browser=await chromium.launch({headless:true});const results=[];
 try{
  for(const width of [320,360,390,514,768,1365]){
-  const context=await browser.newContext({viewport:{width,height:1000}}),page=await context.newPage();
-  await page.addInitScript(({location,epoch})=>{localStorage.setItem('weather-fusion-place',JSON.stringify(location));Date.now=()=>epoch;},{location,epoch});
+  const context=await browser.newContext({viewport:{width,height:1000},geolocation:{latitude:location.latitude,longitude:location.longitude},permissions:['geolocation']}),page=await context.newPage();
+  await page.addInitScript(({location,epoch})=>{localStorage.setItem('weather-fusion-device-place',JSON.stringify({...location,id:'device',source:'device'}));Date.now=()=>epoch;},{location,epoch});
   await page.goto(base+'/weather-fusion/#today-forecast',{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.querySelector('.sun-shade-comparison figure'));
   assert.equal((await page.locator('.brand small').innerText()).trim(),'Because Apple, Google and Samsung weather suck');
   assert.equal((await page.locator('#skin-kicker').innerText()).trim(),'How it actually feels right now');
@@ -43,9 +43,10 @@ try{
   assert.ok((await page.locator('#daily .forecast-confidence').allTextContents()).every(t=>t.includes('Forecast confidence')));
   const layout=await page.evaluate(()=>{
    const note=document.querySelector('#today-uncertainty'),graphic=document.querySelector('#today-forecast'),b=document.querySelector('#nws-bulletins'),h=document.querySelector('.hourly-panel'),title=document.querySelector('#gross-title'),gross=document.querySelector('#dewpoint-gross-meter');
-   return {noteAlign:getComputedStyle(note).textAlign,noteWeight:Number(getComputedStyle(note).fontWeight),noteFont:parseFloat(getComputedStyle(note).fontSize),graphicFont:parseFloat(getComputedStyle(graphic.querySelector('.day-name')).fontSize),bulletinsBelow:document.querySelector('.today-panel').nextElementSibling===b,hourlyAfter:b.nextElementSibling===h,grossTitleSize:parseFloat(getComputedStyle(title).fontSize),grossTitleWeight:Number(getComputedStyle(title).fontWeight),grossHeight:gross.getBoundingClientRect().height,noOverflow:document.documentElement.scrollWidth<=innerWidth+1};
+   const today=document.querySelector('.today-panel');
+   return {noteAlign:getComputedStyle(note).textAlign,noteWeight:Number(getComputedStyle(note).fontWeight),noteFont:parseFloat(getComputedStyle(note).fontSize),graphicFont:parseFloat(getComputedStyle(graphic.querySelector('.day-name')).fontSize),bulletinsBeforeToday:!!(b.compareDocumentPosition(today)&Node.DOCUMENT_POSITION_FOLLOWING),hourlyAfter:today.nextElementSibling===h,grossTitleSize:parseFloat(getComputedStyle(title).fontSize),grossTitleWeight:Number(getComputedStyle(title).fontWeight),grossHeight:gross.getBoundingClientRect().height,noOverflow:document.documentElement.scrollWidth<=innerWidth+1};
   });
-  assert.equal(layout.noteAlign,'center');assert.ok(layout.noteWeight>=700);assert.ok(layout.noteFont<layout.graphicFont);assert.ok(layout.bulletinsBelow&&layout.hourlyAfter);assert.ok(layout.grossTitleSize>=16&&layout.grossTitleWeight>=700);assert.ok(layout.grossHeight<910,'Gross Meter should be compact');assert.ok(layout.noOverflow,'Document must fit the viewport');
+  assert.equal(layout.noteAlign,'center');assert.ok(layout.noteWeight>=700);assert.ok(layout.noteFont<layout.graphicFont);assert.ok(layout.bulletinsBeforeToday&&layout.hourlyAfter);assert.ok(layout.grossTitleSize>=16&&layout.grossTitleWeight>=700);assert.ok(layout.grossHeight<910,'Gross Meter should be compact');assert.ok(layout.noOverflow,'Document must fit the viewport');
   assert.equal(await page.locator('.today-panel').evaluate(el=>el.scrollTop),0,'Anchoring to Today must not scroll or crop the inside of the card');
   assert.equal(await page.locator('.today-uncertainty-label').innerText(),"Dan's take");
   const knightdaleFixture=fixture(),knightdaleCurrent=currentSample(knightdaleFixture,epoch),knightdalePeak=comfortWindow(knightdaleFixture,epoch+1);
@@ -55,7 +56,7 @@ try{
   assert.ok(!/Unavailable|null°/.test(exposureText),'Cloudy weather must keep a numeric outdoor estimate');
   assert.equal(await page.locator('.sun-shade-comparison > figure[data-weather="cloudy"]').count(),2);
   const cloudyCard=await page.locator('.sun-person').innerText();
-  assert.match(cloudyCard,/Cloudy/);assert.match(cloudyCard,/Warm outdoors/);
+  assert.match(cloudyCard,/Day/);assert.match(cloudyCard,/Warm outdoors/);
   assert.equal(await page.locator('.sun-person .sky-sun').count(),0,'Cloudy exposure must not draw a direct-sun icon');
   assert.ok(!(await page.locator('#skin-exposure').innerText()).includes('~'));assert.ok(!(await page.locator('#skin-explanation').innerText()).includes('warmer than in shade'));
   const firstHourly=page.locator('#hourly .hour').first();
@@ -73,8 +74,9 @@ try{
   await page.locator('[data-comfort-reset]').click();assert.equal(await firstHourly.getAttribute('aria-pressed'),'true');
   await page.locator('[data-today-forecast]').click();assert.equal(await page.locator('#day-dialog').evaluate(el=>el.open),true);assert.equal(await page.locator('[data-readout="uv"] strong').count(),1);await page.keyboard.press('Escape');
 
-  assert.match(await page.locator('#alerts').innerText(),/Official NWS wording/);assert.match(await page.locator('#alerts').innerText(),/Move to higher ground now/);assert.equal(await page.locator('#alerts img').count(),0);
+  const bulletinText=await page.locator('#alerts').innerText();assert.doesNotMatch(bulletinText,/Move to higher ground now|Complete official wording/);assert.equal(await page.locator('#alerts img').count(),0);
   assert.equal(await page.locator('#alerts .bulletin-warning').count(),1);assert.equal(await page.locator('#alerts .bulletin-watch').count(),1);assert.equal(await page.locator('#alerts .bulletin-discussion').count(),1);
+  await page.locator('#alerts .bulletin-warning').click();assert.equal(await page.locator('#bulletin-dialog').evaluate(el=>el.open),true);assert.match(await page.locator('#bulletin-dialog-content').innerText(),/Complete official wording/);assert.match(await page.locator('#bulletin-dialog-content').innerText(),/Move to higher ground now/);await page.locator('#close-bulletin').click();
   for(const n of [24,48,168,240]){await page.locator(`[data-gross-hours="${n}"]`).click();assert.ok(await page.locator('.gross-scroll').evaluate(el=>el.scrollWidth<=el.clientWidth+1));assert.ok(await page.locator('.gross-chart').evaluate(el=>el.getBoundingClientRect().height<=230));await page.locator('#gross-scrubber').fill('12');assert.match(await page.locator('.gross-selected-time').innerText(),/forecast/);}
   await page.locator('[data-metric="pressure"]').click();assert.match(await page.locator('#chart-value').innerText(),/mb/);assert.ok(!(await page.locator('#chart-value').innerText()).includes('inHg'));await page.keyboard.press('Escape');
   assert.match(await page.locator('.metric-pressure .metric-value').innerText(),/1013.*mb/s);assert.match(await page.locator('.metric-pressure .metric-note').innerText(),/Dropping/);

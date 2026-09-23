@@ -23,7 +23,7 @@ const launch={headless:true};if(process.env.WEATHER_BROWSER_PATH)launch.executab
 const browser=await chromium.launch(launch),report={success:false,viewports:[],scenarios:[]};
 try{
  for(const width of [320,390,1440]){
-  const context=await browser.newContext({viewport:{width,height:1000},hasTouch:true}),page=await context.newPage(),errors=[];
+  const context=await browser.newContext({viewport:{width,height:1000},hasTouch:true,geolocation:{latitude:35.787,longitude:-78.4806},permissions:['geolocation']}),page=await context.newPage(),errors=[];
   page.on('pageerror',error=>errors.push(error.message));
   await page.addInitScript(time=>{const NativeDate=Date;window.__weatherTestNow=time;window.Date=class extends NativeDate{constructor(...args){super(...(args.length?args:[window.__weatherTestNow]));}static now(){return window.__weatherTestNow;}};},now);
   let delayLocation=false,failLocation=false;
@@ -41,22 +41,22 @@ try{
   const result=await page.evaluate(()=>{
    const q=s=>document.querySelector(s),text=s=>q(s)?.textContent.trim();
    const row=q('#daily .day-row'),low=row.querySelector('.day-low').getBoundingClientRect(),high=row.querySelector('.day-high').getBoundingClientRect();
-   return {width:innerWidth,overflow:document.documentElement.scrollWidth>innerWidth+1,highRight:high.left>low.right,uvRows:document.querySelectorAll('#daily .daily-uv').length,heroUv:text('#hero-uv'),todayUv:text('#today-forecast .daily-uv'),todayTake:text('#today-uncertainty-text'),takeVisible:!q('#today-uncertainty').hidden,sun:text('.sun-person figcaption strong'),now:text('#hourly .hour-current .hour-feels b'),hero:text('#hero-feels strong'),metric:text('.metric-feels .metric-value'),caption:text('#comfort-extra-science'),image:!!q('.poodle-walk').href.baseVal,hands:[...document.querySelectorAll('.friendly-wave')].every(el=>getComputedStyle(el).animationName==='none'),lowerHands:document.querySelectorAll('.person-resting-hand').length};
+   return {width:innerWidth,overflow:document.documentElement.scrollWidth>innerWidth+1,highRight:high.left>low.right,uvRows:document.querySelectorAll('#daily .daily-uv').length,heroUv:text('#hero-uv'),todayUv:[...document.querySelectorAll('#today-forecast .today-metric')].find(el=>/UV Index/.test(el.textContent))?.textContent.trim(),todayTake:text('#today-uncertainty-text'),takeVisible:!q('#today-uncertainty').hidden,sun:text('.sun-person figcaption strong'),now:text('#hourly .hour-current .hour-feels b'),hero:text('#hero-feels strong'),metric:text('.metric-feels .metric-value'),caption:text('#comfort-extra-science'),image:!!q('.pavement-person .reference-art,.pavement-person .poodle-walk'),referenceScenes:document.querySelectorAll('.sun-shade-comparison .reference-scene').length};
   });
   assert.equal(result.overflow,false);assert.equal(result.highRight,true);assert.equal(result.uvRows,7);
-  assert.match(result.heroUv,/Peak UV today 7/);assert.match(result.todayUv,/Peak UV 7/);
+  assert.match(result.heroUv,/Peak UV today 7/);assert.match(result.todayUv,/7[\s\S]*UV Index/);
   assert.equal(result.sun,result.now);assert.equal(result.sun,result.hero);assert.equal(result.sun,result.metric);
   assert.doesNotMatch(result.sun,/Unavailable|—/);assert.match(result.caption,/current forecast hour/);
   assert.doesNotMatch(result.todayTake,/Hot and humid|cooler, rainy|NWS discussion/);assert.match(result.todayTake,/Sunday rainfall amounts remain uncertain/);assert.ok(result.todayTake.split(/\s+/).length<=55);
-  assert.equal(result.takeVisible,true);assert.equal(result.image,true);assert.equal(result.hands,true);assert.equal(result.lowerHands,2);
+  assert.equal(result.takeVisible,true);assert.equal(result.image,true);assert.equal(result.referenceScenes,3);
   const placement=await page.evaluate(()=>{const q=s=>document.querySelector(s),a=q('.sun-person').getBoundingClientRect(),b=q('#pavement-content').getBoundingClientRect(),c=q('#skin-exposure').getBoundingClientRect();return {sameRow:Math.abs(a.top-b.top)<2,pawsRight:b.left>=a.right,inside:b.left>=c.left&&b.right<=c.right&&q('#skin-exposure').contains(q('#pavement-content')),three:q('.sun-shade-comparison').children.length,meta:[...document.querySelectorAll('.day-meta')].every(el=>{const f=el.querySelector('.forecast-confidence').getBoundingClientRect(),u=el.querySelector('.daily-uv').getBoundingClientRect();return u.left>=f.right&&Math.abs((u.top+u.bottom)/2-(f.top+f.bottom)/2)<2;})};});
   assert.deepEqual(placement,{sameRow:true,pawsRight:true,inside:true,three:3,meta:true});
   assert.equal(await page.locator('#skin-kicker').innerText(),'How it actually feels right now');
-  assert.deepEqual(await page.locator('#skin-values .exposure-label').allTextContents(),['Shade','Partly cloudy','For Pets']);
+  assert.deepEqual(await page.locator('#skin-values .exposure-label').allTextContents(),['Shade','Day','For Pets']);
   assert.match(await page.locator('.comfort-later small').innerText(),/\d{1,2}:\d{2} [AP]M/);
   assert.ok(await page.locator('#map-panel').evaluate(el=>el.getBoundingClientRect().top>=document.querySelector('#metrics').getBoundingClientRect().bottom));
-  assert.ok(await page.locator('.pavement-warning').evaluate(el=>el.getBoundingClientRect().bottom<=document.querySelector('.poodle-walk').getBoundingClientRect().top));
-  assert.equal(await page.locator('.pavement-warning').evaluate(el=>getComputedStyle(el).color),'rgb(67, 43, 6)');
+  assert.equal(await page.locator('.pavement-warning').evaluate(el=>!!el.closest('.pavement-person .exposure-alert-slot')),true);
+  assert.equal(await page.locator('.pavement-warning').evaluate(el=>getComputedStyle(el).color),'rgb(65, 43, 8)');
   assert.equal(await page.locator('#today-take-source').count(),0);
   const uvHours=await page.evaluate(async()=>{const {hourlyUvValue,uvCategory}=await import('/weather-fusion/daily-uv.js?v=clear-weather-daygraph-v3');const f=await fetch('/api/weather-fusion/forecast?location=knightdale').then(r=>r.json());return [...document.querySelectorAll('#hourly .hour')].map(el=>{const t=el.classList.contains('hour-current')?Date.now():Date.parse(el.dataset.time);return {shown:el.querySelector('.hour-uv b')?.textContent,expected:String(uvCategory(hourlyUvValue(f,t)).index??'—')};});});
   assert.equal(uvHours.length,1+data().hours.filter(h=>Date.parse(h.time)>now).length);for(const hour of uvHours)assert.equal(hour.shown,hour.expected);
@@ -89,36 +89,31 @@ try{
    for(let i=0;i<4;i++){slider.value=i;slider.dispatchEvent(new Event('input'));const read=root.querySelector('[data-readout="feels"]'),banner=read.querySelector('.thermal-risk'),value=read.querySelector('strong');results.push({value:value.textContent,banner:banner?.textContent||'',above:!banner||banner.getBoundingClientRect().bottom<=value.getBoundingClientRect().top+1});}
    root.remove();
    const sun=document.querySelector('.sun-person .exposure-alert-slot'),saved=sun.innerHTML;sun.innerHTML=thermalRiskHTML(105,true);
-   const b=sun.firstElementChild,p=document.querySelector('.pavement-warning'),br=b.getBoundingClientRect(),pr=p.getBoundingClientRect();
-   if(Math.abs(br.width-pr.width)>1||Math.abs(br.height-pr.height)>1)throw Error('Human/pet banner dimensions differ');
+   const b=sun.firstElementChild,p=document.querySelector('.pavement-warning'),bs=getComputedStyle(b),ps=getComputedStyle(p);
+   if(bs.borderRadius!==ps.borderRadius||bs.fontSize!==ps.fontSize||bs.fontWeight!==ps.fontWeight||bs.paddingTop!==ps.paddingTop)throw Error('Human/pet banner styling differs');
    sun.innerHTML=saved;
    if([...document.querySelectorAll('.thermal-risk')].some(el=>!el.closest('.sun-shade-comparison')))throw Error('Risk banner outside people graphics');
-   return {results,missing:thermalRiskHTML(null),normal:thermalRiskHTML(70),scale:[...document.querySelectorAll('.exposure-person-art')].map(el=>el.getAttribute('transform'))};
+   return {results,missing:thermalRiskHTML(null),normal:thermalRiskHTML(70)};
   });
   assert.equal(riskChecks.missing,'');assert.equal(riskChecks.normal,'');
   for(const r of riskChecks.results){assert.ok(r.above);assert.equal(r.banner,'');}
   assert.equal(new Set(riskChecks.results.map(r=>r.value)).size,4);
-  assert.ok(riskChecks.scale.every(t=>t.includes('scale(2.58)')));
-  const treeSize=await page.evaluate(()=>{const q=s=>document.querySelector(s).getBoundingClientRect(),t=q('.exposure-tree'),p=q('.shade-person .exposure-person-art'),b=q('.shade-person .exposure-alert-slot');return {ratio:t.height/p.height,top:t.top,personTop:p.top,bannerBottom:b.bottom};});
-  assert.ok(treeSize.ratio>1.4,'Tree is visibly taller than the person');
-  assert.ok(treeSize.top<treeSize.personTop-10,'Tree crown clears the person');
-  assert.ok(treeSize.top>=treeSize.bannerBottom,'Tree does not overlap the banner');
+
   assert.equal(await page.locator('.shade-person .thermal-risk').count(),0);
-  const art=await page.evaluate(async()=>{
-   const q=s=>document.querySelector(s),rect=s=>q(s).getBoundingClientRect(),cloud=rect('.shade-weather'),tree=rect('.exposure-tree'),banner=rect('.shade-person .exposure-alert-slot');
-   const img=new Image();img.src=q('.poodle-walk').href.baseVal;await img.decode();
-   const canvas=document.createElement('canvas');canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;const ctx=canvas.getContext('2d');ctx.drawImage(img,0,0);const px=ctx.getImageData(0,0,canvas.width,canvas.height).data;
-   let top=canvas.height,bottom=0;for(let y=0;y<470;y++)for(let x=180;x<445;x++)if(px[(y*canvas.width+x)*4+3]>128){top=Math.min(top,y);bottom=Math.max(bottom,y);}
-   const imageRect=rect('.poodle-walk'),visibleHeight=(bottom-top)/img.naturalHeight*imageRect.height,person=rect('.shade-person .exposure-person-art'),sun=rect('.sun-person .exposure-person-art');
-   return {cloudBottom:cloud.bottom,treeTop:tree.top,cloudTop:cloud.top,bannerBottom:banner.bottom,personHeight:person.height,walkerHeight:visibleHeight,sunHeight:sun.height};
+  const sceneLayout=await page.evaluate(async()=>{
+   const q=s=>document.querySelector(s),rect=s=>q(s)?.getBoundingClientRect();
+   const shade=rect('.shade-person .reference-scene'),sun=rect('.sun-person .reference-scene'),pet=rect('.pavement-person .reference-scene'),slot=q('.pavement-person .exposure-alert-slot'),petNode=q('.pavement-person .reference-scene');
+   const assets=[...document.querySelectorAll('.sun-shade-comparison .reference-art')].map(el=>el.getAttribute('href')).filter(Boolean);
+   await Promise.all(assets.map(src=>new Promise((resolve,reject)=>{const img=new Image();img.onload=resolve;img.onerror=reject;img.src=src;})));
+   return {shadeHeight:shade?.height??0,sunHeight:sun?.height??0,petHeight:pet?.height??0,slotRow:parseInt(getComputedStyle(slot).gridRowStart,10),petRow:parseInt(getComputedStyle(petNode).gridRowStart,10),assets:assets.length};
   });
-  assert.ok(art.cloudBottom<art.treeTop,'Shade cloud is above the tree crown');
-  assert.ok(art.cloudTop>=art.bannerBottom,'Shade cloud is below the banner slot');
-  assert.ok(Math.abs(art.personHeight/art.walkerHeight-1)<.1,'Visible human heights agree within 10%');
-  assert.ok(Math.abs(art.personHeight-art.sunHeight)<1);
-  report.scenarios.push({width,art});
+  assert.ok(sceneLayout.assets>=3,'All three fixed reference scenes load their artwork');
+  assert.ok([sceneLayout.shadeHeight,sceneLayout.sunHeight,sceneLayout.petHeight].every(v=>v>60),'All three reference scenes are visibly rendered');
+  assert.ok(Math.abs(sceneLayout.shadeHeight-sceneLayout.sunHeight)<2&&Math.abs(sceneLayout.sunHeight-sceneLayout.petHeight)<2,'Reference scenes stay aligned');
+  assert.ok(sceneLayout.slotRow<sceneLayout.petRow,'Pet alert slot occupies the grid row above the pet scene');
+  report.scenarios.push({width,sceneLayout});
   const originalScenes=await page.locator('.sun-shade-comparison').evaluate(el=>el.outerHTML);
-  for(const [condition,kind,title] of [['Sunny','clear','Sun'],['Mostly Cloudy','cloudy','Mostly cloudy'],['Partly Cloudy','partly-cloudy','Partly cloudy']]){
+  for(const [condition,kind,title] of [['Sunny','clear','Day'],['Mostly Cloudy','cloudy','Day'],['Partly Cloudy','partly-cloudy','Day']]){
    await page.evaluate(async({condition,kind})=>{
     const {sunShadeHTML}=await import('/weather-fusion/personal-details.js?v=natural-comfort-art-v12');
     const comfort={daylight:true,weatherKind:kind,radiantCondition:condition,shade:95,outdoors:98,inputEvidence:{temperature:91}};
@@ -126,10 +121,11 @@ try{
     document.querySelector('.sun-shade-comparison').outerHTML=sunShadeHTML(comfort,{latitude:35,longitude:-78},Date.now(),{compact:true,pavement});
    },{condition,kind});
    assert.equal(await page.locator('.sun-person .exposure-label').innerText(),title);
-   assert.equal(await page.locator('.shade-weather').count(),1,'Sky symbol exists above shade tree including sunny weather');
+   assert.equal(await page.locator('.sun-shade-comparison .reference-scene').count(),3);
    assert.equal(await page.locator('.shade-person .thermal-risk').count(),0);
-   assert.ok(await page.locator('.exposure-person-art').evaluateAll(els=>els.every(el=>{const m=el.transform.baseVal.consolidate().matrix;return Math.abs(m.a-m.d)<.001;})),'People preserve their original aspect ratio');
-   assert.ok(await page.locator('.shade-weather').evaluate(el=>el.getBoundingClientRect().bottom<document.querySelector('.exposure-tree').getBoundingClientRect().top));
+   assert.equal(await page.locator('.shade-person .reference-scene').getAttribute('data-weather'),kind);
+   assert.equal(await page.locator('.sun-person .reference-scene').getAttribute('data-weather'),kind);
+   assert.ok(await page.locator('.sun-shade-comparison').evaluate(el=>el.scrollWidth<=el.clientWidth+1));
    await page.locator('.exposure-cards').screenshot({path:output+'/checked-'+kind+'-'+width+'.png'});
   }
   await page.locator('.sun-shade-comparison').evaluate((el,html)=>el.outerHTML=html,originalScenes);
@@ -138,7 +134,7 @@ try{
   const concise=await page.locator('#skin-exposure').innerText();assert.doesNotMatch(concise,/station|paw care|source air temperature|Sidewalk ranges/i);
   assert.equal(await page.locator('#scientific-stuff #skin-explanation').count(),1);
   assert.equal(await page.locator('#scientific-stuff .pavement-details').count(),1);
-  const walker=await page.locator('.poodle-walk').getAttribute('data-outfit');assert.ok(['hot','warm'].includes(walker));
+  const walker=await page.locator('.pavement-person .poodle-scene').getAttribute('data-outfit');assert.ok(['hot','warm'].includes(walker));
   await page.locator('#hourly .forecast-hour').first().click();await page.waitForSelector('[data-comfort-reset]');
   assert.match(await page.locator('#skin-kicker').innerText(),/How will it feel/);
   await page.locator('[data-comfort-reset]').click();
@@ -146,11 +142,12 @@ try{
   for(let i=0;i<3;i++){await page.locator('#refresh').click();await page.waitForFunction(()=>!document.querySelector('#refresh').classList.contains('loading'));}
   assert.equal(await page.locator('.sun-person figcaption strong').innerText(),result.sun);
   await page.evaluate(time=>window.__weatherTestNow=time,now+3*H);
-  await page.locator('#refresh').click();await page.waitForFunction(()=>document.querySelector('#today-forecast .tonight-row'));
-  assert.match(await page.locator('#today-forecast .daily-uv').innerText(),/Peak UV today 7/);
+  await page.locator('#refresh').click();await page.waitForFunction(()=>document.querySelector('#today-forecast .today-night'));
+  assert.match(await page.locator('#today-forecast .today-metric').filter({hasText:'UV Index'}).innerText(),/7[\s\S]*UV Index/);
   // Location clearing is checked while delayed and then failed.
   delayLocation=true;failLocation=true;
-  await page.locator('[data-place="greenville"]').click();
+  await context.setGeolocation({latitude:35.6127,longitude:-77.3664});
+  await page.locator('#locate').click();
   assert.equal(await page.locator('#hero-uv').innerText(),'Peak UV today —');
   assert.equal(await page.locator('#pavement-content').count(),0);
   assert.doesNotMatch(await page.locator('#today-uncertainty-text').innerText(),/Hot and humid/);
@@ -165,11 +162,12 @@ try{
  await page.goto(base+'/weather-fusion/',{waitUntil:'domcontentloaded'});
  await page.evaluate(async()=>{const {exposureScene}=await import('/weather-fusion/exposure-scene.js?v=clear-weather-daygraph-v3');document.body.innerHTML='<div id="outfits" style="display:flex;background:#304763;padding:20px">'+[25,48,65,80,96].map(t=>'<div style="width:200px">'+exposureScene(true,true,'Clear',t)+'</div>').join('')+'</div>';});
  await page.locator('#outfits').screenshot({path:`${output}/all-outfits.png`});
- assert.equal(await page.locator('.person-resting-hand').count(),5);assert.equal(await page.locator('.friendly-wave').count(),5);
- report.scenarios.push('All five clothing states have two hands');
+ assert.deepEqual(await page.locator('#outfits .reference-scene').evaluateAll(els=>els.map(e=>e.dataset.outfit)),['cold','cool','mild','warm','hot']);
+ assert.equal(await page.locator('#outfits .reference-art').count(),5);
+ report.scenarios.push('All five clothing states use the correct fixed reference artwork');
  await page.evaluate(async()=>{const {pavementHTML}=await import('/weather-fusion/pavement.js?v=clear-weather-daygraph-v3');document.body.innerHTML='<div id="walker-outfits" style="display:flex;background:#344f70;padding:20px">'+[30,48,65,80,104].map(t=>'<div style="width:220px"><h2>'+t+'° feels like</h2>'+pavementHTML({status:'estimated',concrete:{value:104},asphalt:{value:114}},t)+'</div>').join('')+'</div>';});
- await page.evaluate(async()=>Promise.all([...document.querySelectorAll('.poodle-walk')].map(async el=>{const img=new Image();img.src=el.href.baseVal;await img.decode();})));
- assert.deepEqual(await page.locator('.poodle-walk').evaluateAll(els=>els.map(e=>e.dataset.outfit)),['cold','cool','mild','warm','hot']);
+ await page.evaluate(async()=>Promise.all([...document.querySelectorAll('.poodle-scene .reference-art')].map(async el=>{const img=new Image();img.src=el.getAttribute('href');await img.decode();})));
+ assert.deepEqual(await page.locator('.poodle-scene').evaluateAll(els=>els.map(e=>e.dataset.outfit)),['cold','cool','mild','warm','hot']);
  await page.locator('#walker-outfits').screenshot({path:output+'/walker-outfits.png'});
  report.scenarios.push('All walker outfits load and match human feels-like, independent of 104-degree pavement');report.success=true;
 }finally{await fs.writeFile(`${output}/browser-report.json`,JSON.stringify(report,null,2));await browser.close();if(server)await new Promise(resolve=>server.close(resolve));}

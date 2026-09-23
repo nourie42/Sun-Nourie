@@ -27,6 +27,7 @@ function harness() {
     dailyDisplay:d=>({label:d.label,condition:d.condition,tonight:false,primary:d.high,secondary:d.low,primaryLabel:'High'}),
     dailyConfidenceNoticeHTML:()=>'',
     forecastPeriodSummary:(f,index)=>({chance:f.days[index].chance,amount:.1,summary:`Updated chance ${f.days[index].chance}%.`}),
+    displayedRainChance:(_forecast,chance)=>({value:chance,forecastValue:chance,observed:false}),
     dayGraphHTML:()=>'<section></section>',installDayGraph(){},
     dayGraphPoints:(f,index)=>[7,8,9].map(hour=>({time:`${f.days[index].date}T0${hour}:00:00Z`})),
   };
@@ -41,10 +42,10 @@ test('the forecast API bypasses browser cache without changing source timestamps
 });
 
 test('both page modes refresh each minute, on return, restored page, and reconnect',()=>{
-  assert.match(app,/setInterval\(\(\) => \{ if \(!document\.hidden && !busy\) void load\(\); \}, 60000\)/);
-  assert.match(app,/visibilitychange[\s\S]*?else if \(!busy\) void load\(\)/);
-  assert.match(app,/window\.addEventListener\('online', \(\) => \{ if \(!document\.hidden && !busy\) void load\(\)/);
-  assert.match(app,/window\.addEventListener\('pageshow', \(event\) => \{ if \(event\.persisted && !document\.hidden && !busy\) void load\(\)/);
+  assert.match(app,/setInterval\(\(\) => \{ if \(validPlace\(place\)&&!document\.hidden&&!busy\) void load\(\); \}, 60000\)/);
+  assert.match(app,/visibilitychange[\s\S]*?else if \(validPlace\(place\)&&!busy\) void load\(\)/);
+  assert.match(app,/window\.addEventListener\('online', \(\) => \{ if \(validPlace\(place\)&&!document\.hidden&&!busy\) void load\(\)/);
+  assert.match(app,/window\.addEventListener\('pageshow', \(event\) => \{ if \(event\.persisted&&validPlace\(place\)&&!document\.hidden&&!busy\) void load\(\)/);
   assert.match(app,/draw\('day-content', 'Forecast details', \(\) => refreshOpenDay\(\)\)/);
 });
 

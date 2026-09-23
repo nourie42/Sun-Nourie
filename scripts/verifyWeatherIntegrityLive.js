@@ -39,7 +39,7 @@ try{
   {id:'',name:'Seattle, WA',latitude:47.6062,longitude:-122.3321}
  ]){
   const context=await browser.newContext({viewport:{width:390,height:1000}}),page=await context.newPage(),errors=[];
-  await page.addInitScript(p=>localStorage.setItem('weather-fusion-place',JSON.stringify(p)),place);
+  await page.addInitScript(p=>localStorage.setItem('weather-fusion-device-place',JSON.stringify(p)),place);
   page.on('pageerror',e=>errors.push(e.message));
   let f,b;
   for(let attempt=0;attempt<2;attempt++){

@@ -1,5 +1,6 @@
 import {createDiscussionSource,DISCUSSION_SOURCE_VERSION} from './weatherFusionDiscussionSource.js';
 import {exposureWeatherUrl,normalizeExposureWeather,addExposureWeather} from './weatherFusionExposure.js';
+import {airQualityUrl,normalizeAirQuality,addAirQuality} from './weatherFusionAirQuality.js';
 import {FORECAST_CONFIDENCE_VERSION,forecastConfidence} from '../public/weather-fusion/forecast-confidence.js';
 import {DAN_TAKE_VERSION,collectDanTakeEvidence,approveDanTake,visibleDanTakeItems,danTakeText,rebindDanTake} from '../public/weather-fusion/dans-take.js';
 import {stationWeather,resolveCurrentWeather} from '../public/weather-fusion/weather-state.js';
@@ -295,7 +296,7 @@ export class Cache {
   }
 }
 
-export function buildForecast({ location, point, forecast, hourly, grid, discussion, observation, alerts, specialDiscussions, precipitationDiscussions, riskOutlooks, exposureWeather, models, feeds, now }) {
+export function buildForecast({ location, point, forecast, hourly, grid, discussion, observation, alerts, specialDiscussions, precipitationDiscussions, riskOutlooks, exposureWeather, airQuality, models, feeds, now }) {
   const zone = point?.timeZone || models.ecmwf?.timezone || 'America/New_York';
   const today = dateKey(now, zone);
   const rows = Object.fromEntries(Object.entries(models).map(([key, value]) => [key, normalizeModel(value, now, key === 'hrrr' ? 48 : 240)]));
@@ -374,13 +375,14 @@ export function buildForecast({ location, point, forecast, hourly, grid, discuss
   Object.assign(output.current,resolveCurrentWeather(output.current,output.hours,now,gridSample(grid,'skyCover',now,'percent')));
   addExperience(output, {models, grid, periods:forecast?.periods || [], now, solarTimes, nextDate});
   addExposureWeather(output,exposureWeather);
+  addAirQuality(output,airQuality);
   output.danTakeVersion=DAN_TAKE_VERSION;
   output.forecastConfidenceVersion=FORECAST_CONFIDENCE_VERSION;
   output.weatherDisplayVersion='weather-nourie-sky-consistency-v1';
   output.alertBanners = bannerStateFromNwsPeriods(hourly?.periods || [], output, now);
   // Hash all forecast facts and source issuance, not just rainfall. Retrieval time is not model run time.
   output.signature = hash({ danTakeVersion:DAN_TAKE_VERSION, experienceVersion: output.experienceVersion, metricForecasts:output.metricForecasts, version: VERSION, location: output.location, current:output.current, days, hours, discussion, specialDiscussions:output.specialDiscussions, precipitationDiscussions:output.precipitationDiscussions, riskOutlooks:output.riskOutlooks,
-    precipitation: output.precipitation, rainTimeline:output.rainTimeline, modelContributions: output.modelContributions, alerts: output.alerts.map((a) => [a.id, a.sent, a.expires]), feeds: feeds.map((f) => [f.id, f.status, f.issuedAt]) });
+    precipitation: output.precipitation, rainTimeline:output.rainTimeline, airQuality:output.airQuality, modelContributions: output.modelContributions, alerts: output.alerts.map((a) => [a.id, a.sent, a.expires]), feeds: feeds.map((f) => [f.id, f.status, f.issuedAt]) });
   return output;
 }
 
@@ -401,7 +403,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
   const direct = createDirectModels({ fetchImpl, now });
   async function request(url, { text = false, body = null, timeout = 12000, revalidate = false } = {}) {
     const u = new URL(url);
-    const allowed = ['api.weather.gov', 'api.open-meteo.com', 'geocoding-api.open-meteo.com', 'opengeo.ncep.noaa.gov', 'api.openai.com', 'mapservices.weather.noaa.gov', 'www.spc.noaa.gov', 'www.wpc.ncep.noaa.gov'];
+    const allowed = ['api.weather.gov', 'api.open-meteo.com', 'air-quality-api.open-meteo.com', 'geocoding-api.open-meteo.com', 'opengeo.ncep.noaa.gov', 'api.openai.com', 'mapservices.weather.noaa.gov', 'www.spc.noaa.gov', 'www.wpc.ncep.noaa.gov'];
     if (u.protocol !== 'https:' || !allowed.includes(u.hostname) || u.port || u.username || u.password) throw errorWithStatus('Unexpected source URL.', 502);
     const minute = Math.floor(now() / MINUTE);
     if (apiMinute.minute !== minute) apiMinute = { minute, count: 0 };
@@ -443,6 +445,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
       const get = (id, label, url, ttl, transform) => url ? feed(id, label, url, ttl, transform) : unavailable(id, label);
       const jobs = {
         exposureWeather: feed('exposure','UV and surface-weather forecast',exposureWeatherUrl(location,point?.timeZone),30*MINUTE,normalizeExposureWeather),
+        airQuality: feed('air-quality','Air quality (U.S. AQI)',airQualityUrl(location),30*MINUTE,normalizeAirQuality),
         forecast: get('nws', 'NWS forecast', point?.forecast, 2 * MINUTE, (d) => d.properties?.periods?.length ? d.properties : null),
         hourly: get('hourly', 'NWS hourly', point?.forecastHourly, 2 * MINUTE, (d) => d.properties?.periods?.length ? d.properties : null),
         grid: get('grid', 'NWS precipitation grid', point?.forecastGridData, 2 * MINUTE, (d) => d.properties),
@@ -674,14 +677,14 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
   });
   for (const name of [
-    'alert-banners.js','app.js','bulletin-facts.js','bulletins.js','car-wash.js','car-wash.css','car-wash-background.webp','car-wash-corvette-hood.webp',
+    'air-quality.js','alert-banners.js','app.js','bulletin-facts.js','bulletins.js','car-wash.js','car-wash.css','car-wash-background.webp','car-wash-corvette-hood.webp',
     'model-explanation.js','model-explanation.css',
     'comfort-cinematic.css','comfort-effects.css','comfort-outlook.js','current-inputs.js','current-temperature.js',
     'daily-uv.js','dans-summary.js','dans-take.js','day-graph.js','dewpoint-meter.js','dewpoint-meter.css',
     'experience.js','exposure-scene.js','forecast-cards.css','forecast-confidence.js','forecast-layout.css','forecast-story.js','outlook-details.js',
     'frame-player.js','hero-mode.js','hourly-feels.js','hourly-feels.css','nav.js','outdoor-feels.js','pavement.js',
     'personal-details.js','personal-details.css','render-safety.js','risk-outlooks.js','risk-outlooks.css','scenario-layout.css','style.css','thermal-risk.js',
-    'today-card.js','rain-trend.js','utci.js','weather-display.js','weather-math.js','weather-repair.css','weather-state.js','whats-up-classify.js',
+    'today-card.js','rain-display.js','rain-trend.js','utci.js','weather-display.js','weather-math.js','weather-polish.css','weather-repair.css','weather-state.js','whats-up-classify.js',
     'comfort-reference-scenes.png','comfort-reference-scenes.webp','comfort-reference-scenes-cold.webp',
     'comfort-reference-scenes-carry-umbrella.svg',
     'comfort-reference-scenes-dawn.webp','comfort-reference-scenes-fog.webp','comfort-reference-scenes-hot.webp',

@@ -31,7 +31,8 @@ const base = `http://127.0.0.1:${server.address().port}`;
 const browser = await chromium.launch({headless:true});
 
 try {
-  const page = await browser.newPage({viewport:{width:390,height:844}});
+  const context=await browser.newContext({viewport:{width:390,height:844},geolocation:{latitude:35.787,longitude:-78.4806},permissions:['geolocation']});
+  const page = await context.newPage();
   await page.addInitScript(() => {
     window.testNow = Date.parse('2026-09-05T21:59:59Z');
     Date.now = () => window.testNow;
