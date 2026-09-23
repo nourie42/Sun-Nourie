@@ -26,7 +26,8 @@
 .today-uncertainty-label{display:block;font-size:inherit;font-weight:800}
 .today-uncertainty p{margin:4px 0 0;font-size:inherit;font-weight:700;line-height:inherit}
 /* This ID wins over the Gross Meter's asynchronously loaded eyebrow styles. */
-#gross-title{text-align:center;font-size:16px;font-weight:800}
+#gross-title{text-align:center;font-weight:800}
+#gross-title{font-size:16px}
 @media(max-width:600px){.today-uncertainty{font-size:13px;padding-top:10px}}
 
 /* Relative forecast confidence: evidence-based, explicitly not a probability. */
