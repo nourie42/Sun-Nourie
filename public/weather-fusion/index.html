@@ -14,12 +14,12 @@
   <link rel="stylesheet" href="/weather-fusion/hourly-feels.css?v=weather-art-labels-v10">
   <link rel="stylesheet" href="/weather-fusion/weather-repair.css?v=compact-weather-v21">
   <link rel="stylesheet" href="/weather-fusion/forecast-cards.css?v=weather-qa-v70">
-  <link rel="stylesheet" href="/weather-fusion/scenario-layout.css?v=restored-day-card-wind-v5">
+  <link rel="stylesheet" href="/weather-fusion/scenario-layout.css?v=reference-daily-v1">
   <link rel="stylesheet" href="/weather-fusion/car-wash.css?v=rain-consensus-v41">
   <link rel="stylesheet" href="/weather-fusion/model-explanation.css?v=rain-consensus-v41">
   <link rel="stylesheet" href="/weather-fusion/risk-outlooks.css?v=risk-outlooks-v4">
-  <link rel="stylesheet" href="/weather-fusion/weather-polish.css?v=daily-align-aqi-color-v3">
-  <script type="module" src="/weather-fusion/app.js?v=restored-day-card-wind-v5"></script>
+  <link rel="stylesheet" href="/weather-fusion/weather-polish.css?v=reference-nav-v1">
+  <script type="module" src="/weather-fusion/app.js?v=reference-daily-v1"></script>
 
   <style id="experimental-bots-link-style">
     .experimental-bots-link{display:none;align-items:center;gap:.45rem;width:max-content;margin:.55rem 0 0;padding:.55rem .85rem;border:1px solid rgba(255,255,255,.22);border-radius:999px;background:rgba(11,24,43,.78);color:#f7fbff;text-decoration:none;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.18)}
@@ -44,11 +44,11 @@
       <div class="search-wrap"><label for="city-search" class="sr-only">Search a U.S. city or ZIP code</label><span aria-hidden="true">⌕</span><input id="city-search" type="search" placeholder="Search city or ZIP" autocomplete="off" aria-controls="search-results" aria-expanded="false"><button id="locate" title="Refresh device location" aria-label="Refresh device location">⌖</button><div id="search-results" class="search-results" hidden></div></div>
     </div>
     <nav class="weather-jump-nav" aria-label="Jump to weather section">
-      <a href="#map-panel" aria-label="Weather Map">Map</a>
-      <a href="#dewpoint-gross-meter">Dew Point</a>
-      <a href="#your-day">Your Day</a>
-      <a href="#daily-panel" aria-label="7-Day Forecast">7-Day</a>
-      <a href="#air-quality">Air Quality</a>
+      <a href="#map-panel" class="weather-jump-card" aria-label="Weather Map"><span class="jump-icon jump-radar" aria-hidden="true"><i></i></span><span class="jump-label">Map</span><span class="jump-arrow" aria-hidden="true">›</span></a>
+      <a href="#dewpoint-gross-meter" class="weather-jump-card"><span class="jump-icon jump-emoji" aria-hidden="true">🥵</span><span class="jump-label">Gross Meter</span><span class="jump-arrow" aria-hidden="true">›</span></a>
+      <a href="#your-day" class="weather-jump-card"><span class="jump-icon jump-emoji" aria-hidden="true">🌤️</span><span class="jump-label">Your Day</span><span class="jump-arrow" aria-hidden="true">›</span></a>
+      <a href="#daily-panel" class="weather-jump-card" aria-label="7-Day Forecast"><span class="jump-icon jump-emoji" aria-hidden="true">🗓️</span><span class="jump-label">7-Day</span><span class="jump-arrow" aria-hidden="true">›</span></a>
+      <a href="#air-quality" class="weather-jump-card"><span class="jump-icon jump-emoji" aria-hidden="true">🤧</span><span class="jump-label">Air Quality</span><span class="jump-arrow" aria-hidden="true">›</span></a>
     </nav>
     <main id="forecast">
       <div id="status" class="status-line" role="status" aria-live="polite">Connecting to weather sources…</div>
