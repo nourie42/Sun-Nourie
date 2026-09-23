@@ -22,7 +22,7 @@ function harness({missingNote=false}={}){
  if(missingNote){delete elements['today-uncertainty'];delete elements['today-uncertainty-text'];}
  let time=now;
  class Clock extends Date{constructor(...args){super(...(args.length?args:[time]));}static now(){return time;}}
- const context={$:id=>elements[id]??null,forecast:structuredClone(source),currentBriefing:null,esc:escape,clock:()=>'12:00 PM',visibleDanTakeItems,danTakeText,danCard,dailyDisplay:()=>({pop:null}),conditionForRainChance,Date:Clock};
+ const context={$:id=>elements[id]??null,forecast:structuredClone(source),currentBriefing:null,esc:escape,clock:()=>'12:00 PM',visibleDanTakeItems,danTakeText,danCard,dailyDisplay:()=>({pop:null}),displayedRainChance:(_forecast,chance)=>({value:chance,forecastValue:chance,observed:false}),conditionForRainChance,Date:Clock};
  runInNewContext(`${renderer}\nthis.renderBriefing=renderBriefing;`,context);
  return {elements,context,render:context.renderBriefing,setTime:t=>{time=t;}};
 }
@@ -88,7 +88,7 @@ for(const uncertainty of [undefined,null,'',' \n\t ',42,{},'Yesterday\'s front m
  assert.ok(!elements['briefing-detail'].innerHTML.includes('data-dans-take'));
 });
 test('location reset clears the old take immediately',()=>{
- const choose=app.slice(app.indexOf('function chooseLocation(value)'),app.indexOf('\nfunction showDay('));
+ const choose=app.slice(app.indexOf('function chooseLocation(value'),app.indexOf('\nfunction refreshOpenDay('));
  assert.match(choose,/renderBriefing\(\{ headline: 'Preparing your local outlook\.'/);
  const {elements,context,render}=harness();render(supported());context.forecast=null;render({headline:'Preparing your local outlook.',sources:[]});
  assert.equal(elements['today-uncertainty'].hidden,true);assert.equal(elements['today-uncertainty-text'].textContent,'');
