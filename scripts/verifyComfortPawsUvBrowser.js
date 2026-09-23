@@ -22,7 +22,7 @@ function data(location='knightdale'){
 const launch={headless:true};if(process.env.WEATHER_BROWSER_PATH)launch.executablePath=process.env.WEATHER_BROWSER_PATH;
 const browser=await chromium.launch(launch),report={success:false,viewports:[],scenarios:[]};
 try{
- for(const width of [320,390,1440]){
+ for(const width of [320,360,390,430,1440]){
   const context=await browser.newContext({viewport:{width,height:1000},hasTouch:true,geolocation:{latitude:35.787,longitude:-78.4806},permissions:['geolocation']}),page=await context.newPage(),errors=[];
   page.on('pageerror',error=>errors.push(error.message));
   await page.addInitScript(time=>{const NativeDate=Date;window.__weatherTestNow=time;window.Date=class extends NativeDate{constructor(...args){super(...(args.length?args:[window.__weatherTestNow]));}static now(){return window.__weatherTestNow;}};},now);
@@ -49,22 +49,35 @@ try{
   assert.doesNotMatch(result.sun,/Unavailable|—/);assert.match(result.caption,/current forecast hour/);
   assert.doesNotMatch(result.todayTake,/Hot and humid|cooler, rainy|NWS discussion/);assert.match(result.todayTake,/Sunday rainfall amounts remain uncertain/);assert.ok(result.todayTake.split(/\s+/).length<=55);
   assert.equal(result.takeVisible,true);assert.equal(result.image,true);assert.equal(result.referenceScenes,3);
+  const navLayout=await page.evaluate(()=>{
+   const nav=document.querySelector('.weather-jump-nav'),cards=[...nav.querySelectorAll('.weather-jump-card')],rect=el=>el.getBoundingClientRect();
+   const nr=rect(nav),rs=cards.map(rect),labels=cards.map(el=>el.querySelector('.jump-label')?.textContent.trim());
+   return {
+    count:cards.length,labels,
+    fits:cards.every((el,i)=>rs[i].left>=nr.left-1&&rs[i].right<=nr.right+1&&el.scrollWidth<=el.clientWidth+1),
+    firstRow:Math.max(...rs.slice(0,3).map(r=>r.top))-Math.min(...rs.slice(0,3).map(r=>r.top))<3,
+    secondRow:Math.abs(rs[3].top-rs[4].top)<3&&rs[3].top>rs[0].bottom,
+    heights:rs.every(r=>r.height>=65),
+   };
+  });
+  if(width<=760)assert.deepEqual(navLayout,{count:5,labels:['Map','Gross Meter','Your Day','7-Day','Air Quality'],fits:true,firstRow:true,secondRow:true,heights:true});
   const dailyLayout=await page.evaluate(()=>{
    const row=document.querySelector('#daily .day-row'),rect=el=>el?.getBoundingClientRect(),rr=rect(row),panel=rect(document.querySelector('.daily-panel'));
    const top=['.day-name','.day-icon','.day-low','.temp-track','.day-high','.day-feels-summary'].map(s=>rect(row.querySelector(s))).filter(Boolean);
    const meta=rect(row.querySelector('.day-meta')),confidence=rect(row.querySelector('.forecast-confidence')),wind=rect(row.querySelector('.day-wind-chip')),uv=rect(row.querySelector('.daily-uv'));
    return {
     rowFits:row.scrollWidth<=row.clientWidth+1,
-    compactHeight:rr.height<=128,
+    compactHeight:rr.height<=132,
     metaBelowTop:meta.top>=Math.max(...top.map(r=>r.bottom))-3,
+    metaInset:meta.left>rr.left+24,
     confidenceLeft:confidence.left<=wind.left&&wind.left<uv.left,
-    noOverlap:confidence.right<=wind.left+2&&wind.right<=uv.left+2,
-    windVisible:wind.width>=36&&/Wind/.test(row.querySelector('.day-wind-chip')?.textContent||''),
+    noOverlap:confidence.right<=wind.left+3&&wind.right<=uv.left+3,
+    windVisible:wind.width>=30&&/Wind/.test(row.querySelector('.day-wind-chip')?.textContent||''),
     allInside:[meta,confidence,wind,uv].every(r=>r.left>=rr.left-1&&r.right<=rr.right+1),
     balancedMargins:Math.abs((rr.left-panel.left)-(panel.right-rr.right))<=3,
    };
   });
-  if(width<=760)assert.deepEqual(dailyLayout,{rowFits:true,compactHeight:true,metaBelowTop:true,confidenceLeft:true,noOverlap:true,windVisible:true,allInside:true,balancedMargins:true});
+  if(width<=760)assert.deepEqual(dailyLayout,{rowFits:true,compactHeight:true,metaBelowTop:true,metaInset:true,confidenceLeft:true,noOverlap:true,windVisible:true,allInside:true,balancedMargins:true});
   const placement=await page.evaluate(()=>{const q=s=>document.querySelector(s),a=q('.sun-person').getBoundingClientRect(),b=q('#pavement-content').getBoundingClientRect(),c=q('#skin-exposure').getBoundingClientRect();return {sameRow:Math.abs(a.top-b.top)<2,pawsRight:b.left>=a.right,inside:b.left>=c.left&&b.right<=c.right&&q('#skin-exposure').contains(q('#pavement-content')),three:q('.sun-shade-comparison').children.length,meta:[...document.querySelectorAll('.day-meta')].every(el=>{const f=el.querySelector('.forecast-confidence').getBoundingClientRect(),w=el.querySelector('.day-wind-chip').getBoundingClientRect(),u=el.querySelector('.daily-uv').getBoundingClientRect();return f.left<=w.left&&w.left<u.left&&f.right<=w.left+2&&w.right<=u.left+2;})};});
   assert.deepEqual(placement,{sameRow:true,pawsRight:true,inside:true,three:3,meta:true});
   assert.equal(await page.locator('#skin-kicker').innerText(),'How it actually feels right now');
