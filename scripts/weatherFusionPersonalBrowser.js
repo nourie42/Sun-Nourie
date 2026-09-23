@@ -34,8 +34,8 @@ await new Promise(r=>server.listen(0,'127.0.0.1',r));const base=`http://127.0.0.
 const browser=await chromium.launch({headless:true});const results=[];
 try{
  for(const width of [320,360,390,514,768,1365]){
-  const context=await browser.newContext({viewport:{width,height:1000}}),page=await context.newPage();
-  await page.addInitScript(({location,epoch})=>{localStorage.setItem('weather-fusion-place',JSON.stringify(location));Date.now=()=>epoch;},{location,epoch});
+  const context=await browser.newContext({viewport:{width,height:1000},geolocation:{latitude:location.latitude,longitude:location.longitude},permissions:['geolocation']}),page=await context.newPage();
+  await page.addInitScript(({location,epoch})=>{localStorage.setItem('weather-fusion-device-place',JSON.stringify({...location,id:'device',source:'device'}));Date.now=()=>epoch;},{location,epoch});
   await page.goto(base+'/weather-fusion/#today-forecast',{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.querySelector('.sun-shade-comparison figure'));
   assert.equal((await page.locator('.brand small').innerText()).trim(),'Because Apple, Google and Samsung weather suck');
   assert.equal((await page.locator('#skin-kicker').innerText()).trim(),'How it actually feels right now');
