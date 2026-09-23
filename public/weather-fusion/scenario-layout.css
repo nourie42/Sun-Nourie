@@ -24,25 +24,25 @@
 
 @media(max-width:760px){
  .gross-facts>span{column-gap:5px;padding:9px 3px}.gross-facts i{font-size:18px}.gross-facts b{font-size:14px}.gross-facts small{font-size:7px;white-space:normal;line-height:1.15}
- .daily-panel{padding:14px 11px}.daily-panel .section-top{padding:0 4px 12px}
+ .daily-panel{padding:14px 12px}.daily-panel .section-top{padding:0 2px 12px}
  .daily-panel .day-row{
-  grid-template-columns:48px 34px 42px minmax(78px,1fr) 42px;
-  grid-template-areas:"name icon low track high" "details details details meta meta";
-  column-gap:5px;row-gap:6px;min-height:116px;margin:8px 0;padding:11px 9px;border-radius:17px;
+  grid-template-columns:50px 35px 43px minmax(74px,1fr) 43px;
+  grid-template-areas:"name icon low track high" "meta meta meta details details";
+  column-gap:5px;row-gap:6px;min-height:116px;margin:8px 0;padding:11px 12px;border-radius:17px;
  }
  .daily-panel .day-name{font-size:14px;line-height:1.15}.daily-panel .day-name-full{display:none}.daily-panel .day-name-mobile{display:inline;white-space:nowrap}
  .daily-panel .day-icon svg{width:32px;height:32px}.daily-panel .day-icon small{font-size:9px}.daily-panel .day-low{font-size:18px}.daily-panel .day-high strong{font-size:19px}
  .daily-panel .day-low small,.daily-panel .day-high small{font-size:8px}.daily-panel .temp-track{height:7px}.daily-panel .high-marker{width:11px;height:11px}
  .daily-panel .day-feels-summary{
-  grid-area:details;align-self:start;min-width:0;display:grid;grid-template-columns:auto auto;grid-template-areas:"feels-label feels-value" "wind wind" "gust gust";
-  align-content:center;justify-content:start;column-gap:6px;row-gap:1px;padding:0 2px;color:#9edbf6;
+  grid-area:details;align-self:start;justify-self:stretch;min-width:0;display:grid;grid-template-columns:auto auto;grid-template-areas:"feels-label feels-value" "wind wind" "gust gust";
+  align-content:center;justify-content:start;column-gap:6px;row-gap:1px;padding:0 0 0 9px;border-left:1px solid #66c8ee2f;color:#9edbf6;
  }
  .daily-panel .day-feels-summary>small{grid-area:feels-label;font-size:10px;line-height:1.1}
  .daily-panel .day-feels-summary>b{grid-area:feels-value;font-size:10px;line-height:1.1;color:#e4f6ff;white-space:nowrap}
  .daily-panel .day-wind{grid-area:wind;min-width:0;margin:2px 0 0;font-size:10px;line-height:1.1;text-align:left;color:#bfe8fa;white-space:normal}
  .daily-panel .day-gust{grid-area:gust;margin:1px 0 0;font-size:10px;line-height:1.1;text-align:left;color:#ffe18a;font-weight:750}
  .daily-panel .day-meta{
-  grid-area:meta;align-self:start;min-width:0;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;margin:0;padding:0;color:#9edbf6;
+  grid-area:meta;align-self:start;justify-self:stretch;min-width:0;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:3px;margin:0;padding:0 8px 0 0;color:#9edbf6;
  }
  .daily-panel .forecast-confidence{
   display:grid;grid-template-columns:auto auto;grid-template-areas:"confidence-label confidence-level" "confidence-meter confidence-meter";
@@ -51,14 +51,14 @@
  .daily-panel .forecast-confidence>span{grid-area:confidence-label;white-space:nowrap}
  .daily-panel .forecast-confidence>b{grid-area:confidence-level;font-size:10px;white-space:nowrap}
  .daily-panel .confidence-meter{grid-area:confidence-meter;width:100%;max-width:74px;height:5px}
- .daily-panel .daily-uv{font-size:10px;line-height:1.1;text-align:left;white-space:normal}
+ .daily-panel .daily-uv{box-sizing:border-box;width:100%;margin-top:2px;padding-top:4px;border-top:1px solid #66c8ee24;font-size:10px;line-height:1.1;text-align:left;white-space:normal}
  .daily-panel .forecast-confidence-notice{flex-wrap:wrap;gap:2px 6px;padding:6px 8px;border-radius:10px}.daily-panel .forecast-confidence-notice strong{font-size:10px}.daily-panel .forecast-confidence-notice span{font-size:10px}
 }
 @media(max-width:359px){
- .daily-panel .day-row{grid-template-columns:44px 31px 38px minmax(66px,1fr) 38px;column-gap:4px;padding-inline:7px;min-height:116px}
+ .daily-panel .day-row{grid-template-columns:46px 31px 39px minmax(60px,1fr) 39px;column-gap:4px;padding-inline:9px;min-height:116px}
  .daily-panel .day-name{font-size:13px}
- .daily-panel .day-feels-summary{column-gap:5px;padding-left:0}
- .daily-panel .day-meta{padding-left:2px}
+ .daily-panel .day-feels-summary{column-gap:5px;padding-left:7px}
+ .daily-panel .day-meta{padding-right:6px}
  .daily-panel .forecast-confidence{column-gap:4px;font-size:9px}.daily-panel .forecast-confidence>b{font-size:9px}.daily-panel .daily-uv{font-size:9px}
  .gross-facts i{display:none}.gross-facts>span{grid-template-columns:1fr;text-align:center}
 }
