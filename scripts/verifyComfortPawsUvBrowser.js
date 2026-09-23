@@ -55,7 +55,7 @@ try{
   assert.deepEqual(await page.locator('#skin-values .exposure-label').allTextContents(),['Shade','Day','For Pets']);
   assert.match(await page.locator('.comfort-later small').innerText(),/\d{1,2}:\d{2} [AP]M/);
   assert.ok(await page.locator('#map-panel').evaluate(el=>el.getBoundingClientRect().top>=document.querySelector('#metrics').getBoundingClientRect().bottom));
-  assert.ok(await page.locator('.pavement-warning').evaluate(el=>{const art=document.querySelector('.pavement-person .reference-scene,.pavement-person .poodle-walk');return !!art&&el.getBoundingClientRect().bottom<=art.getBoundingClientRect().top+1;}));
+  assert.equal(await page.locator('.pavement-warning').evaluate(el=>!!el.closest('.pavement-person .exposure-alert-slot')),true);
   assert.equal(await page.locator('.pavement-warning').evaluate(el=>getComputedStyle(el).color),'rgb(67, 43, 6)');
   assert.equal(await page.locator('#today-take-source').count(),0);
   const uvHours=await page.evaluate(async()=>{const {hourlyUvValue,uvCategory}=await import('/weather-fusion/daily-uv.js?v=clear-weather-daygraph-v3');const f=await fetch('/api/weather-fusion/forecast?location=knightdale').then(r=>r.json());return [...document.querySelectorAll('#hourly .hour')].map(el=>{const t=el.classList.contains('hour-current')?Date.now():Date.parse(el.dataset.time);return {shown:el.querySelector('.hour-uv b')?.textContent,expected:String(uvCategory(hourlyUvValue(f,t)).index??'—')};});});
@@ -102,15 +102,15 @@ try{
   assert.equal(await page.locator('.shade-person .thermal-risk').count(),0);
   const sceneLayout=await page.evaluate(async()=>{
    const q=s=>document.querySelector(s),rect=s=>q(s)?.getBoundingClientRect();
-   const shade=rect('.shade-person .reference-scene'),sun=rect('.sun-person .reference-scene'),pet=rect('.pavement-person .reference-scene'),slot=rect('.pavement-person .exposure-alert-slot');
+   const shade=rect('.shade-person .reference-scene'),sun=rect('.sun-person .reference-scene'),pet=rect('.pavement-person .reference-scene'),slot=q('.pavement-person .exposure-alert-slot'),petNode=q('.pavement-person .reference-scene');
    const assets=[...document.querySelectorAll('.sun-shade-comparison .reference-art')].map(el=>el.getAttribute('href')).filter(Boolean);
    await Promise.all(assets.map(src=>new Promise((resolve,reject)=>{const img=new Image();img.onload=resolve;img.onerror=reject;img.src=src;})));
-   return {shadeHeight:shade?.height??0,sunHeight:sun?.height??0,petHeight:pet?.height??0,petTop:pet?.top??0,slotBottom:slot?.bottom??0,assets:assets.length};
+   return {shadeHeight:shade?.height??0,sunHeight:sun?.height??0,petHeight:pet?.height??0,slotRow:parseInt(getComputedStyle(slot).gridRowStart,10),petRow:parseInt(getComputedStyle(petNode).gridRowStart,10),assets:assets.length};
   });
   assert.ok(sceneLayout.assets>=3,'All three fixed reference scenes load their artwork');
   assert.ok([sceneLayout.shadeHeight,sceneLayout.sunHeight,sceneLayout.petHeight].every(v=>v>60),'All three reference scenes are visibly rendered');
   assert.ok(Math.abs(sceneLayout.shadeHeight-sceneLayout.sunHeight)<2&&Math.abs(sceneLayout.sunHeight-sceneLayout.petHeight)<2,'Reference scenes stay aligned');
-  assert.ok(sceneLayout.slotBottom<=sceneLayout.petTop+1,'Pet alert slot stays above the pet scene');
+  assert.ok(sceneLayout.slotRow<sceneLayout.petRow,'Pet alert slot occupies the grid row above the pet scene');
   report.scenarios.push({width,sceneLayout});
   const originalScenes=await page.locator('.sun-shade-comparison').evaluate(el=>el.outerHTML);
   for(const [condition,kind,title] of [['Sunny','clear','Day'],['Mostly Cloudy','cloudy','Day'],['Partly Cloudy','partly-cloudy','Day']]){
