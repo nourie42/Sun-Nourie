@@ -118,7 +118,7 @@ try{
   assert.ok(Math.abs(art.personHeight-art.sunHeight)<1);
   report.scenarios.push({width,art});
   const originalScenes=await page.locator('.sun-shade-comparison').evaluate(el=>el.outerHTML);
-  for(const [condition,kind,title] of [['Sunny','clear','Sun'],['Mostly Cloudy','cloudy','Mostly cloudy'],['Partly Cloudy','partly-cloudy','Partly cloudy']]){
+  for(const [condition,kind,title] of [['Sunny','clear','Day'],['Mostly Cloudy','cloudy','Day'],['Partly Cloudy','partly-cloudy','Day']]){
    await page.evaluate(async({condition,kind})=>{
     const {sunShadeHTML}=await import('/weather-fusion/personal-details.js?v=natural-comfort-art-v12');
     const comfort={daylight:true,weatherKind:kind,radiantCondition:condition,shade:95,outdoors:98,inputEvidence:{temperature:91}};
