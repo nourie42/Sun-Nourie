@@ -124,7 +124,7 @@ export function renderDailyRows(forecast,icon) {
   const feelsText=p.tonight?degrees(highFeels):`${degrees(lowFeels)} / ${degrees(highFeels)}`;
   const confidenceAria=plainConfidenceNotice?` ${plainConfidenceNotice.title}. ${plainConfidenceNotice.text}`:'';
   return `<button class="day-row ${p.tonight?'tonight-row':''}" data-day="${i}" aria-label="${esc(p.label)}, ${esc(rain.observed?'Rain now':p.condition)}. ${rain.observed?'Rain is observed now at this location.':finite(shownPop)?`Rain chance ${number(shownPop)} percent.`:'Rain chance unavailable.'} ${p.primaryLabel} ${number(p.primary)} degrees${finite(p.secondary)?`, low ${number(p.secondary)} degrees`:''}. Forecast confidence ${esc(confidence.label)}.${esc(confidenceAria)} Open details.">
-   <span class="day-name">${esc(p.label)}</span>
+   <span class="day-name" title="${esc(p.label)}"><span class="day-name-full">${esc(p.label)}</span><span class="day-name-mobile">${esc(p.remainder?'Today':p.label)}</span></span>
    <span class="day-icon">${icon(rain.observed?'Rain':p.condition,!p.tonight)}<small>${finite(shownPop)?`${number(shownPop)}%`:''}</small></span>
    <span class="day-low">${temp(low)}<small>Low</small></span>
    <span class="temp-track" aria-hidden="true">${bar===null?'':`<span class="temp-fill" style="left:0;width:${bar}%"></span><i class="high-marker" style="left:clamp(4px,${bar}%,calc(100% - 4px))"></i>`}</span>
