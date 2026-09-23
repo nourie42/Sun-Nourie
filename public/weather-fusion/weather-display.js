@@ -3,7 +3,7 @@ import {outdoorExposure} from './outdoor-feels.js?v=weather-qa-v67';
 import {currentComfortInputs} from './current-inputs.js?v=weather-qa-v67';
 import {weatherState,conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
 import {thermalComfort, finite, solarElevation,rainChanceValue} from './weather-math.js?v=weather-qa-v67';
-import {feelsAt, forecastValue, degrees} from './hourly-feels.js?v=weather-qa-v67';
+import {feelsAt,displayedFeelsAt,displayFeelsValue,forecastValue,degrees,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=dewpoint-floor-v1';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function weatherShapes(condition, isDay = true) {
   const weather = weatherState(condition);
@@ -97,11 +97,17 @@ export function currentSample(forecast, now = Date.now()) {
   const displayComfort=radarThreat
     ? {...comfort,weatherKind:weatherState(displayCondition).kind,radiantCondition:displayCondition,condition:displayCondition}
     : comfort;
-  const exposure=outdoorExposure(displayComfort);
+  const rawExposure=outdoorExposure(displayComfort);
+  const currentGust=finite(current.gust)?current.gust:(currentHour?forecastValue(forecast,'gust',currentHour.time):null);
+  const shownFeels=displayFeelsValue(rawExposure.value,current.dewpoint,currentGust);
+  const shownComfort=finite(shownFeels)&&shownFeels!==rawExposure.value
+    ? {...displayComfort,outdoors:shownFeels,displayFeelsGuard:{applied:true,raw:rawExposure.value,dewpoint:current.dewpoint,gust:currentGust,threshold:GUSTY_FEELS_DISPLAY_MPH}}
+    : displayComfort;
+  const exposure=outdoorExposure(shownComfort),shownInputs={...current,gust:currentGust};
   return {windDirection:current.windDirection,pop:rainChanceValue(currentLikelihood),officialPop:currentHour?.officialPop??currentHour?.pop,rainLikelihood:currentLikelihood,currentPrecipitation,rainAround:radarThreat,radarThreat,precipitationBlend:currentHour?.precipitationBlend,uvIndex:hourlyUvValue(forecast,now),id:'now', now:true, time:current.time, temperature:finite(current.temperature) ? current.temperature : null,
-    feels:exposure.value, exposure, comfort:displayComfort, condition:displayCondition || 'Sky conditions unavailable',
+    feels:exposure.value, exposure, comfort:shownComfort, condition:displayCondition || 'Sky conditions unavailable',
     isDay:comfort.daylight ?? (solarElevation(now,forecast.location.latitude,forecast.location.longitude) > 0),
-    source:current.type === 'observation' ? 'Station observation' : 'Current estimate', inputs:current};
+    source:current.type === 'observation' ? 'Station observation' : 'Current estimate', inputs:shownInputs};
 }
 export function forecastSample(forecast, time) {
   const epoch = Date.parse(time), hour = forecast?.hours?.find(row => Date.parse(row.time) === epoch);
@@ -112,13 +118,15 @@ export function forecastSample(forecast, time) {
   const condition=conditionForRainChance(rawCondition,pop,hour.skyCover);
   const rawInputs = {...point.inputs, condition:rawCondition, type:'guidance'};
   const estimated = thermalComfort(rawInputs, forecast.location, epoch);
-  const inputs={...rawInputs,condition};
+  const gust=forecastValue(forecast,'gust',hour.time),inputs={...rawInputs,condition,gust};
   const rounded=v=>finite(v)?Number(v.toFixed(1)):null;
   const value=rounded(estimated.rawOutdoors);
   if(finite(value)!==finite(point.value)||(finite(value)&&Math.abs(value-point.value)>.11))return null;
-  const comfort={...estimated,weatherKind:weatherState(condition).kind,outdoors:value,shade:rounded(estimated.rawShade),sun:estimated.sun===null?null:value};
+  const shown=displayFeelsValue(value,inputs.dewpoint,gust);
+  const comfort={...estimated,weatherKind:weatherState(condition).kind,outdoors:shown,shade:rounded(estimated.rawShade),sun:estimated.sun===null?null:shown,
+    ...(finite(shown)&&shown!==value?{displayFeelsGuard:{applied:true,raw:value,dewpoint:inputs.dewpoint,gust,threshold:GUSTY_FEELS_DISPLAY_MPH}}:{})};
   return {windDirection:hour.windDirectionDegrees??hour.windDirection,uvIndex:hourlyUvValue(forecast,epoch),id:new Date(epoch).toISOString(), now:false, time:hour.time,
-    temperature:forecastValue(forecast,'temperature',hour.time), feels:feelsAt(forecast,hour.time),
+    temperature:forecastValue(forecast,'temperature',hour.time), feels:displayedFeelsAt(forecast,hour.time),
     condition:inputs.condition, isDay:comfort.daylight, exposure:outdoorExposure(comfort), comfort, inputs, source:'Hourly forecast', pop,officialPop:hour.officialPop??hour.pop,rainLikelihood:hour.rainLikelihood,precipitationBlend:hour.precipitationBlend};
 }
 export function hourlyDisplaySamples(forecast, now = Date.now()) {

@@ -1,4 +1,4 @@
-import {timeAt,forecastValue,degrees} from './hourly-feels.js?v=weather-qa-v67';
+import {timeAt,forecastValue,displayedFeelsAt,degrees} from './hourly-feels.js?v=dewpoint-floor-v1';
 import {hourlyUvValue,uvCategory} from './daily-uv.js?v=clear-weather-daygraph-v3';
 import {forecastGrossLevel} from './dewpoint-meter.js?v=weather-qa-v67';
 const H=3600000,finite=Number.isFinite;
@@ -8,7 +8,7 @@ export function dayGraphPoints(f,index,tonight=false,now=Date.now()){
  const zone=f.location?.timeZone||'America/New_York',next=new Date(Date.parse(d.date+'T12:00Z')+24*H).toISOString().slice(0,10);
  const a=Date.parse(d[tonight?'lowWindow':'highWindow']?.start),b=Date.parse(d.lowWindow?.end);
  const start=Math.max(finite(a)?a:timeAt(d.date,tonight?19:7,zone),index===0?now:-Infinity),end=finite(b)?b:timeAt(next,7,zone),points=[];
- for(let t=Math.ceil(start/H)*H;t<end&&points.length<30;t+=H){const time=new Date(t).toISOString();points.push({time,temperature:forecastValue(f,'temperature',time),feels:forecastValue(f,'feels',time),dewpoint:forecastValue(f,'dewpoint',time),wind:forecastValue(f,'wind',time),uv:hourlyUvValue(f,t)});}
+ for(let t=Math.ceil(start/H)*H;t<end&&points.length<30;t+=H){const time=new Date(t).toISOString();points.push({time,temperature:forecastValue(f,'temperature',time),feels:displayedFeelsAt(f,time),dewpoint:forecastValue(f,'dewpoint',time),wind:forecastValue(f,'wind',time),uv:hourlyUvValue(f,t)});}
  return points;
 }
 const fields=[['temperature','Temp','#ffcd79'],['feels','Feels','#ff9caf'],['dewpoint','Gross · dew point','#83e3cc'],['uv','UV','#c8adff']];

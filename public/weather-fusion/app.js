@@ -1,16 +1,16 @@
 import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText,rebindDanTake} from './dans-take.js?v=weather-art-labels-v10';
 import {danCard} from './dans-summary.js?v=weather-qa-v67';
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
-import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './weather-display.js?v=rain-now-v71';
-import {dayGraphHTML,dayGraphPoints,installDayGraph} from './day-graph.js?v=weather-qa-v67';
-import {degrees,feelsAt} from './hourly-feels.js?v=weather-qa-v67';
+import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './weather-display.js?v=feels-floor-wind-v1';
+import {dayGraphHTML,dayGraphPoints,installDayGraph} from './day-graph.js?v=feels-floor-wind-v1';
+import {degrees,feelsAt,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=dewpoint-floor-v1';
 import {createFramePlayer} from './frame-player.js';
-import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=daily-row-mobile-v2';
+import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=feels-floor-wind-v1';
 import {dailyDisplay} from './weather-math.js?v=full-day-rain-v1';
 import {conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
 import {currentHero} from './current-temperature.js?v=rain-now-v71';
 import {renderBulletins} from './bulletins.js?v=wpc-mpd-v1';
-import {modelFreshnessText} from './personal-details.js?v=rain-now-v71';
+import {modelFreshnessText} from './personal-details.js?v=feels-floor-wind-v1';
 import {renderDewpointMeter} from './dewpoint-meter.js?v=weather-qa-v67';
 import {renderWeatherPanel} from './render-safety.js';
 import {forecastPeriodSummary} from './forecast-story.js?v=weather-qa-v67';
@@ -160,7 +160,7 @@ function renderEvidence(data) {
     const c=currentSample(data).inputs,e=currentSample(data).comfort.inputEvidence||{};
     const next=data.metricForecasts?.series?.feels?.find(p=>Date.parse(p.time)>Date.now());
     const n=(v,s='')=>finite(v)?`${Math.round(v*10)/10}${s}`:'Unavailable';
-    root.innerHTML=`<p><strong>Current thermal inputs:</strong> ${esc(c.localEstimate?.source||c.stationName||c.station||'Forecast estimate')}${finite(c.stationDistanceKm)?` · ${Math.round(c.stationDistanceKm/1.609344)} miles away`:''}; ${esc(c.time||'time unavailable')}. Air ${n(c.temperature,'°F')}, dew point ${n(c.dewpoint,'°F')}, wind ${n(c.wind,' mph')}. ${esc(c.localEstimate?.reason||c.comfortSourceNote||'')} Outdoor UTCI ${n(data.comfort?.rawOutdoors,'°F')}.</p>${next?`<p><strong>Next forecast hour — separate inputs:</strong> ${esc(next.time)}. Air ${n(next.inputs.temperature,'°F')}, dew point ${n(next.inputs.dewpoint,'°F')}, wind ${n(next.inputs.wind,' mph')}, cloud cover ${n(next.inputs.skyCover,'%')}. Outdoor UTCI ${n(next.value,'°F')}.</p>`:''}<p>${esc(e.windPolicy||'')} · ${esc(e.radiationBasis||'')}. Station estimates are not copied into future forecasts. No output is raised or lowered to make values match.</p>`;
+    root.innerHTML=`<p><strong>Current thermal inputs:</strong> ${esc(c.localEstimate?.source||c.stationName||c.station||'Forecast estimate')}${finite(c.stationDistanceKm)?` · ${Math.round(c.stationDistanceKm/1.609344)} miles away`:''}; ${esc(c.time||'time unavailable')}. Air ${n(c.temperature,'°F')}, dew point ${n(c.dewpoint,'°F')}, wind ${n(c.wind,' mph')}. ${esc(c.localEstimate?.reason||c.comfortSourceNote||'')} Outdoor UTCI ${n(data.comfort?.rawOutdoors,'°F')}.</p>${next?`<p><strong>Next forecast hour — separate inputs:</strong> ${esc(next.time)}. Air ${n(next.inputs.temperature,'°F')}, dew point ${n(next.inputs.dewpoint,'°F')}, wind ${n(next.inputs.wind,' mph')}, cloud cover ${n(next.inputs.skyCover,'%')}. Outdoor UTCI ${n(next.value,'°F')}.</p>`:''}<p>${esc(e.windPolicy||'')} · ${esc(e.radiationBasis||'')}. Station estimates are not copied into future forecasts. The raw thermal/UTCI calculation is retained unchanged. Visible primary outdoor feels-like values are floored at the same-hour dew point only when forecast gusts are below ${GUSTY_FEELS_DISPLAY_MPH} mph.</p>`;
   }
   const important = ['nws', 'afd', 'hrrr', 'ecmwf', 'nbm', 'air-quality', 'alerts'];
   const labels = { nws: 'NWS', afd: 'Local discussion', hrrr: 'HRRR', ecmwf: 'ECMWF IFS', nbm: 'National Blend', 'air-quality':'Air quality', alerts: 'Alerts' };

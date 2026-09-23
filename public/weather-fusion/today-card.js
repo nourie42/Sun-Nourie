@@ -1,6 +1,6 @@
 import {weatherState} from './weather-state.js';
 import {dailyDisplay,dailyRainPeriod,finite} from './weather-math.js?v=full-day-rain-v1';
-import {dailyFeels,degrees,timeAt} from './hourly-feels.js?v=weather-qa-v67';
+import {dailyFeels,degrees,timeAt} from './hourly-feels.js?v=dewpoint-floor-v1';
 import {uvCategory} from './daily-uv.js?v=weather-art-labels-v10';
 import {weatherIcon,weatherMetricIcon} from './weather-display.js?v=weather-qa-v67';
 import {displayedRainChance,observedRainLabel} from './rain-display.js?v=rain-observed-v1';
