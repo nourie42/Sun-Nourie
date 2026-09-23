@@ -49,6 +49,21 @@ try{
   assert.doesNotMatch(result.sun,/Unavailable|—/);assert.match(result.caption,/current forecast hour/);
   assert.doesNotMatch(result.todayTake,/Hot and humid|cooler, rainy|NWS discussion/);assert.match(result.todayTake,/Sunday rainfall amounts remain uncertain/);assert.ok(result.todayTake.split(/\s+/).length<=55);
   assert.equal(result.takeVisible,true);assert.equal(result.image,true);assert.equal(result.referenceScenes,3);
+  const dailyLayout=await page.evaluate(()=>{
+   const row=document.querySelector('#daily .day-row'),rect=el=>el?.getBoundingClientRect();
+   const top=['.day-name','.day-icon','.day-low','.temp-track','.day-high'].map(s=>rect(row.querySelector(s))).filter(Boolean);
+   const details=rect(row.querySelector('.day-feels-summary')),meta=rect(row.querySelector('.day-meta'));
+   const confidence=rect(row.querySelector('.forecast-confidence')),uv=rect(row.querySelector('.daily-uv'));
+   return {
+    rowFits:row.scrollWidth<=row.clientWidth+1,
+    detailsBelow:details.top>=Math.max(...top.map(r=>r.bottom))-2,
+    metaBelow:meta.top>=details.bottom-2,
+    detailsInside:details.left>=rect(row).left&&details.right<=rect(row).right,
+    metaInside:meta.left>=rect(row).left&&meta.right<=rect(row).right,
+    footerSeparated:uv.left>=confidence.right-1,
+   };
+  });
+  if(width<=760)assert.deepEqual(dailyLayout,{rowFits:true,detailsBelow:true,metaBelow:true,detailsInside:true,metaInside:true,footerSeparated:true});
   const placement=await page.evaluate(()=>{const q=s=>document.querySelector(s),a=q('.sun-person').getBoundingClientRect(),b=q('#pavement-content').getBoundingClientRect(),c=q('#skin-exposure').getBoundingClientRect();return {sameRow:Math.abs(a.top-b.top)<2,pawsRight:b.left>=a.right,inside:b.left>=c.left&&b.right<=c.right&&q('#skin-exposure').contains(q('#pavement-content')),three:q('.sun-shade-comparison').children.length,meta:[...document.querySelectorAll('.day-meta')].every(el=>{const f=el.querySelector('.forecast-confidence').getBoundingClientRect(),u=el.querySelector('.daily-uv').getBoundingClientRect();return u.left>=f.right&&Math.abs((u.top+u.bottom)/2-(f.top+f.bottom)/2)<2;})};});
   assert.deepEqual(placement,{sameRow:true,pawsRight:true,inside:true,three:3,meta:true});
   assert.equal(await page.locator('#skin-kicker').innerText(),'How it actually feels right now');
