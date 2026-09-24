@@ -18,7 +18,7 @@
   <link rel="stylesheet" href="/weather-fusion/car-wash.css?v=rain-consensus-v41">
   <link rel="stylesheet" href="/weather-fusion/model-explanation.css?v=weathernext-live-v1">
   <link rel="stylesheet" href="/weather-fusion/risk-outlooks.css?v=risk-outlooks-v4">
-  <link rel="stylesheet" href="/weather-fusion/weather-polish.css?v=nav-reference-final-v1">
+  <link rel="stylesheet" href="/weather-fusion/weather-polish.css?v=simple-nav-v1">
   <script type="module" src="/weather-fusion/app.js?v=weathernext-live-v1"></script>
 
   <style id="experimental-bots-link-style">
@@ -45,23 +45,18 @@
     </div>
     <nav class="weather-jump-nav" aria-label="Jump to weather section">
       <a class="weather-jump-card jump-map" href="#map-panel" aria-label="Weather Map">
-        <span class="jump-visual" aria-hidden="true"><svg class="jump-svg" viewBox="0 0 64 64"><defs><radialGradient id="rbg"><stop stop-color="#06334b"/><stop offset="1" stop-color="#031b31"/></radialGradient></defs><circle cx="32" cy="32" r="28" fill="url(#rbg)" stroke="#9af5ff" stroke-width="2"/><path d="M12 43c8-9 14-16 18-28 5 6 8 9 12 10 4 1 7 5 10 11-8 1-13 6-18 13-7-3-13-4-22-6z" fill="#18c76f"/><path d="M22 42c7-8 9-13 12-23 5 6 9 8 15 11-7 2-11 7-15 15-5-2-8-2-12-3z" fill="#f0dd18"/><path d="M31 39c4-6 6-10 7-16 5 4 8 6 12 8-5 2-8 5-11 11-3-1-5-2-8-3z" fill="#f04a22"/><g stroke="#5be9ff" stroke-width="1" opacity=".55"><circle cx="32" cy="32" r="19" fill="none"/><circle cx="32" cy="32" r="10" fill="none"/><path d="M32 5v54M5 32h54"/></g><circle cx="32" cy="32" r="3" fill="#fff" stroke="#28d9ff" stroke-width="2"/></svg></span>
         <span class="jump-label">Map</span><span class="jump-arrow" aria-hidden="true">›</span>
       </a>
       <a class="weather-jump-card jump-gross" href="#dewpoint-gross-meter">
-        <span class="jump-visual" aria-hidden="true"><svg class="jump-svg" viewBox="0 0 64 64"><path d="M16 25c0-12 8-20 18-20 11 0 18 8 18 20v15c0 11-8 19-18 19-10 0-18-8-18-19z" fill="#f2b58d"/><path d="M15 25C15 9 27 4 36 5c9 1 17 8 16 20-6-7-13-10-22-9-6 1-10 4-15 9z" fill="#171821"/><path d="M20 12c7-8 22-9 29 2-8-4-17-4-29-2z" fill="#2a2632"/><path d="M20 33c4 1 6 1 9-1M39 32c3 2 6 2 9 0" stroke="#35251f" stroke-width="2" stroke-linecap="round" fill="none"/><ellipse cx="34" cy="45" rx="6" ry="4" fill="#b95f58"/><path d="M48 15c8 1 10 5 9 13l-9 5-6-6z" fill="#fff" stroke="#d7eaf2"/><path d="M52 19l5 2M51 23l5 2M50 27l5 2" stroke="#cbdce4"/><path d="M11 30c-3 6-3 10 0 14M8 32c-2 4-2 7 0 10" stroke="#ff7049" stroke-width="2.5" stroke-linecap="round"/><path d="M24 22c-3 5-1 8 2 8s5-3 3-7zM42 20c-3 5-1 8 2 8s5-3 3-7z" fill="#66dcff"/></svg></span>
         <span class="jump-label">Gross Meter</span><span class="jump-arrow" aria-hidden="true">›</span>
       </a>
       <a class="weather-jump-card jump-day" href="#your-day">
-        <span class="jump-visual" aria-hidden="true"><svg class="jump-svg" viewBox="0 0 64 64"><circle cx="25" cy="25" r="13" fill="#ffcf25"/><g stroke="#ffcf25" stroke-width="3" stroke-linecap="round"><path d="M25 4v7M25 39v7M4 25h7M39 25h7M10 10l5 5M35 35l5 5M40 10l-5 5"/></g><path d="M18 48c0-7 6-12 13-12 2-7 8-11 15-11 9 0 16 7 16 16 0 1 0 3-1 4 2 2 3 4 3 7 0 5-4 9-9 9H27c-5 0-9-4-9-9z" fill="#eef7ff" stroke="#c8e6f8" stroke-width="1.5"/></svg></span>
         <span class="jump-label">Your Day</span><span class="jump-arrow" aria-hidden="true">›</span>
       </a>
       <a class="weather-jump-card jump-week" href="#daily-panel" aria-label="7-Day Forecast">
-        <span class="jump-visual" aria-hidden="true"><svg class="jump-svg" viewBox="0 0 64 64"><rect x="8" y="12" width="48" height="44" rx="7" fill="#eaf6ff" stroke="#9bdfff" stroke-width="2"/><path d="M8 23h48" stroke="#2d9ee8" stroke-width="5"/><path d="M18 8v10M46 8v10" stroke="#18334a" stroke-width="5" stroke-linecap="round"/><g fill="#9ab8cc"><rect x="15" y="30" width="8" height="8" rx="1"/><rect x="28" y="30" width="8" height="8" rx="1"/><rect x="41" y="30" width="8" height="8" rx="1"/><rect x="15" y="42" width="8" height="8" rx="1"/><rect x="28" y="42" width="8" height="8" rx="1"/></g><rect x="41" y="42" width="8" height="8" rx="1" fill="#0ca7ff"/></svg></span>
         <span class="jump-label">7-Day</span><span class="jump-arrow" aria-hidden="true">›</span>
       </a>
       <a class="weather-jump-card jump-air" href="#air-quality">
-        <span class="jump-visual" aria-hidden="true"><svg class="jump-svg" viewBox="0 0 64 64"><circle cx="28" cy="22" r="17" fill="#281b1b"/><circle cx="17" cy="24" r="8" fill="#2d2020"/><circle cx="39" cy="20" r="9" fill="#2d2020"/><circle cx="28" cy="31" r="15" fill="#8f5a3f"/><circle cx="22" cy="28" r="1.8" fill="#171313"/><circle cx="34" cy="28" r="1.8" fill="#171313"/><path d="M22 37c4 3 8 3 12 0" stroke="#321d18" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M31 32l16 5-11 12-12-8z" fill="#fff" stroke="#d8edf7"/><path d="M49 34l8-4M50 38l10 0M48 42l8 4" stroke="#dff8ff" stroke-width="2.5" stroke-linecap="round"/><path d="M14 47c4-6 10-9 18-9 8 0 14 3 18 9v12H14z" fill="#8049d8"/></svg></span>
         <span class="jump-label">Air Quality</span><span class="jump-arrow" aria-hidden="true">›</span>
       </a>
     </nav>
