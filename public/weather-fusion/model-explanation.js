@@ -135,6 +135,54 @@ function weatherNextHours(point) {
       rainP90:finite(row.precipitationP90Inches)?Math.max(0,row.precipitationP90Inches):null}];
   }).sort((a,b)=>a.time-b.time);
 }
+function weatherNextDayKey(epoch,zone){
+  const parts=new Intl.DateTimeFormat('en-US',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(epoch));
+  const get=type=>parts.find(part=>part.type===type)?.value;
+  return `${get('year')}-${get('month')}-${get('day')}`;
+}
+function weatherNextDaily(point,forecast,zone){
+  const hours=weatherNextHours(point),byDate=new Map();
+  for(const row of hours){
+    const key=weatherNextDayKey(row.time,zone);
+    if(!byDate.has(key))byDate.set(key,[]);
+    byDate.get(key).push(row);
+  }
+  return (forecast?.days||[]).slice(0,7).flatMap((day,index)=>{
+    const rows=byDate.get(day.date)||[];
+    if(!rows.length)return [];
+    const temps=rows.map(row=>row.temperature).filter(finite);
+    const lows=rows.map(row=>row.p10).filter(finite);
+    const highs=rows.map(row=>row.p90).filter(finite);
+    const rainRows=rows.filter(row=>finite(row.rain));
+    const rainTotal=rainRows.length?rainRows.reduce((sum,row)=>sum+row.rain,0):null;
+    const rainPeak=rows.map(row=>row.rainP90).filter(finite);
+    const winds=rows.map(row=>row.wind).filter(finite);
+    return [{
+      date:day.date,index,
+      label:dayLabel(day.date,index),
+      high:temps.length?Math.max(...temps):null,
+      low:temps.length?Math.min(...temps):null,
+      p10:lows.length?Math.min(...lows):null,
+      p90:highs.length?Math.max(...highs):null,
+      rainTotal,
+      rainPeakP90:rainPeak.length?Math.max(...rainPeak):null,
+      windMax:winds.length?Math.max(...winds):null,
+      fusionHigh:finite(day.high)?day.high:null,
+      fusionLow:finite(day.low)?day.low:null
+    }];
+  });
+}
+function weatherNextDailyHTML(point,forecast,view){
+  const days=weatherNextDaily(point,forecast,view.zone);
+  if(!days.length)return '';
+  const cards=days.map(day=>{
+    const highDelta=finite(day.high)&&finite(day.fusionHigh)?Math.round(day.high-day.fusionHigh):null;
+    const lowDelta=finite(day.low)&&finite(day.fusionLow)?Math.round(day.low-day.fusionLow):null;
+    const delta=value=>value===null?'':`<small>${value===0?'same as Fusion':`${value>0?'+':''}${value}° vs Fusion`}</small>`;
+    return `<article class="weathernext-day${day.index===view.index?' selected':''}"><div class="weathernext-day-head"><strong>${esc(day.label)}</strong>${day.index===view.index?'<span>Selected</span>':''}</div><div class="weathernext-day-temps"><div><small>High</small><b>${day.high===null?'—':`${Math.round(day.high)}°`}</b>${delta(highDelta)}</div><div><small>Low</small><b>${day.low===null?'—':`${Math.round(day.low)}°`}</b>${delta(lowDelta)}</div></div><div class="weathernext-day-details"><span>${day.rainTotal===null?'Rain —':`${number(day.rainTotal,2)} in mean rain`}</span><span>${day.windMax===null?'Wind —':`${Math.round(day.windMax)} mph max wind`}</span></div>${day.p10!==null&&day.p90!==null?`<div class="weathernext-range"><span>Ensemble temperature envelope</span><strong>${Math.round(day.p10)}–${Math.round(day.p90)}°</strong></div>`:''}${day.rainPeakP90===null?'':`<p>Wettest-hour P90: <b>${number(day.rainPeakP90,2)} in</b></p>`}</article>`;
+  }).join('');
+  return `<div class="weathernext-daily"><div class="weathernext-subhead"><div><small>7-day model view</small><strong>WeatherNext vs Weather Fusion</strong></div><span>Temperature comparison · precipitation amount, not PoP</span></div><div class="weathernext-day-grid">${cards}</div></div>`;
+}
 function weatherNextCard(forecast, view) {
   const state=weatherNextState,key=weatherNextKey(forecast),same=key&&state.key===key,zone=view.zone;
   const connected=same&&state.status==='ready';
@@ -142,10 +190,15 @@ function weatherNextCard(forecast, view) {
   if(!same||state.status==='idle'||state.status==='loading'){
     body='<div class="graphcast-state">Checking the latest hosted Google WeatherNext 3 forecast for this location…</div>';
   }else if(state.status==='ready'){
-    const hours=weatherNextHours(state.point).filter(row=>!finite(view.start)||!finite(view.end)||(row.time>=view.start&&row.time<view.end));
-    const visible=(hours.length?hours:weatherNextHours(state.point).filter(row=>row.time>=Date.now())).slice(0,12);
-    const cards=visible.map(row=>`<div class="graphcast-window"><time>${esc(stamp(row.time,zone))}</time><strong>${row.temperature===null?'—':`${Math.round(row.temperature)}°`}</strong><span>${row.rain===null?'Rain unavailable':`${number(row.rain,2)} in rain`} · ${row.wind===null?'wind unavailable':`${Math.round(row.wind)} mph wind`}${row.p10!==null&&row.p90!==null?`<small>${Math.round(row.p10)}–${Math.round(row.p90)}° ensemble range</small>`:''}</span></div>`).join('');
-    body=`<div class="graphcast-meta"><div><small>Latest run</small><strong>${esc(stamp(state.runAt,zone))}</strong></div><div><small>Forecast</small><strong>Hourly · up to 15 days</strong></div><div><small>Resolution</small><strong>0.1° surface grid · ensemble</strong></div></div>${cards?`<div class="graphcast-windows">${cards}</div>`:'<div class="graphcast-state">No WeatherNext 3 hours were published for the selected period.</div>'}`;
+    const allHours=weatherNextHours(state.point);
+    const hours=allHours.filter(row=>!finite(view.start)||!finite(view.end)||(row.time>=view.start&&row.time<view.end));
+    const visible=(hours.length?hours:allHours.filter(row=>row.time>=Date.now())).slice(0,12);
+    const cards=visible.map(row=>{
+      const spread=row.p10!==null&&row.p90!==null?Math.max(0,row.p90-row.p10):null;
+      return `<div class="graphcast-window"><time>${esc(stamp(row.time,zone))}</time><strong>${row.temperature===null?'—':`${Math.round(row.temperature)}°`}</strong><span class="graphcast-hour-stats"><b>${row.rain===null?'Rain —':`${number(row.rain,2)} in`}</b><b>${row.wind===null?'Wind —':`${Math.round(row.wind)} mph`}</b></span>${row.p10!==null&&row.p90!==null?`<span class="graphcast-ensemble">${Math.round(row.p10)}–${Math.round(row.p90)}° ensemble <small>${spread===null?'':`${number(spread,1)}° spread`}</small></span>`:''}</div>`;
+    }).join('');
+    const daily=weatherNextDailyHTML(state.point,forecast,view);
+    body=`<div class="graphcast-meta"><div><small>Latest run</small><strong>${esc(stamp(state.runAt,zone))}</strong></div><div><small>Forecast</small><strong>Hourly · 7 days published here</strong></div><div><small>Resolution</small><strong>0.1° surface grid · 64 members</strong></div></div>${daily}${cards?`<div class="weathernext-subhead hourly"><div><small>Selected period</small><strong>Hourly WeatherNext details</strong></div><span>Swipe →</span></div><div class="graphcast-windows">${cards}</div>`:'<div class="graphcast-state">No WeatherNext 3 hours were published for the selected period.</div>'}`;
   }else if(state.status==='not-covered'){
     body='<div class="graphcast-state">The published WeatherNext 3 feed does not yet include this selected location. Your normal forecast remains unchanged.</div>';
   }else{
