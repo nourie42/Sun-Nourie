@@ -20,7 +20,7 @@ try{
    const {sunShadeHTML}=await import('/weather-fusion/personal-details.js');
    const {pavementHTML}=await import('/weather-fusion/pavement.js');
    const comfort={shade:50,outdoors:60,sun:null,daylight:false,weatherKind:'cloudy'};
-   const context={condition:'Mostly Cloudy',pop:6};
+   const context={condition:'Mostly Cloudy',pop:6,compact:true};
    document.querySelector('#skin-values').innerHTML=sunShadeHTML(comfort,{latitude:35.787,longitude:-78.4806},Date.parse('2026-09-24T23:00Z'),context);
    document.querySelector('.sun-shade-comparison').insertAdjacentHTML('beforeend',pavementHTML({status:'estimated',daylight:false,concrete:{value:63,low:61,high:65},asphalt:{value:64,low:62,high:66}},60,context));
   });
@@ -28,6 +28,7 @@ try{
   assert.equal(await page.locator('.comfort-clothing').count(),3);
   assert.equal(await page.locator('.wardrobe-trousers').count(),3);
   assert.equal(await page.locator('.wardrobe-jacket').count(),3);
+  assert.deepEqual(await page.locator('.exposure-label').allTextContents(),['Shade','Night','For Pets']);
   assert.deepEqual(await page.locator('figcaption>strong').allTextContents(),['50°','60°','63°']);
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
   const geometry=await page.locator('.exposure-person').evaluateAll(es=>es.map(e=>({width:e.getBoundingClientRect().width,height:e.getBoundingClientRect().height})));
