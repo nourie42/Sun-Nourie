@@ -83,11 +83,13 @@ try {
         vectors:cards.every(card=>!!card.querySelector('svg.jump-svg')),
         rowFits:[...row.children].filter(el=>el.getClientRects().length).every(el=>{const r=rect(el);return r.left>=rr.left-1&&r.right<=rr.right+1;}),
         metaBelow:meta.top>=Math.max(...[...row.children].filter(el=>!el.classList.contains('day-meta')&&!el.classList.contains('forecast-confidence-notice')).map(el=>rect(el).bottom))-4,
-        confidenceLeft:confidence.left<wind.left&&wind.left<uv.left,
+        confidenceOwnRow:confidence.bottom<=Math.min(wind.top,uv.top)+2,
+        windLeftOfUv:wind.left<uv.left&&wind.right<=uv.left+2,
         lowerInside:[confidence,wind,uv].every(r=>r.left>=rr.left-1&&r.right<=rr.right+1),
+        gustInsideWind:!row.querySelector('.day-wind-chip em')||rect(row.querySelector('.day-wind-chip em')).right<=wind.right+1,
       };
     });
-    assert.deepEqual(layout,{navFits:true,fiveCards:true,labelsOneLine:true,arrowsClear:true,vectors:true,rowFits:true,metaBelow:true,confidenceLeft:true,lowerInside:true},`approved mobile layout at ${width}px`);
+    assert.deepEqual(layout,{navFits:true,fiveCards:true,labelsOneLine:true,arrowsClear:true,vectors:true,rowFits:true,metaBelow:true,confidenceOwnRow:true,windLeftOfUv:true,lowerInside:true,gustInsideWind:true},`approved mobile layout at ${width}px`);
   }
 
   console.log(JSON.stringify({
