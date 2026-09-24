@@ -17,11 +17,13 @@ jobs:
         with:
           node-version: '22'
       - run: npm ci --ignore-scripts
-      - name: Package tracked weather source and test dependencies
+      - name: Package tracked source and test dependencies
         run: |
           mkdir -p /tmp/weather-workspace
-          git archive HEAD public src test scripts package.json package-lock.json .github/workflows README.md | tar -x -C /tmp/weather-workspace
+          git archive HEAD | tar -x -C /tmp/weather-workspace
           cp -a node_modules /tmp/weather-workspace/node_modules
+          mkdir -p /tmp/weather-workspace/qa
+          curl -fsSL https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/weathernext3.json -o /tmp/weather-workspace/qa/weathernext-live.json
           tar -czf /tmp/weather-workspace.tar.gz -C /tmp/weather-workspace .
       - uses: actions/upload-artifact@v4
         with:
