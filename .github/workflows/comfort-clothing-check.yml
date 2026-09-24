@@ -1,0 +1,42 @@
+name: Comfort clothing visual checks
+on:
+  push:
+    branches: [weather/restore-temperature-clothing]
+    paths:
+      - .github/workflows/comfort-clothing-check.yml
+permissions:
+  contents: read
+jobs:
+  artwork:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install Pillow
+      - name: Render clothing artwork contact sheet
+        run: |
+          mkdir -p /tmp/clothing-qa
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageOps, ImageDraw
+          root=Path('public/weather-fusion')
+          names=['comfort-reference-scenes.webp','comfort-reference-scenes-cold.webp','comfort-reference-scenes-dawn.webp','comfort-reference-scenes-rain.webp','comfort-reference-scenes-fog.webp','comfort-reference-scenes-watch.webp','poodle-walk-cold.png','poodle-walk-mild.png','poodle-walk.png']
+          sheet=Image.new('RGB',(900,len(names)*275),'#193449')
+          draw=ImageDraw.Draw(sheet)
+          for i,name in enumerate(names):
+            draw.text((10,i*275+8),name,fill='white')
+            image=Image.open(root/name).convert('RGBA')
+            image.thumbnail((900,245))
+            sheet.paste(image,((900-image.width)//2,i*275+26),image)
+          sheet.save('/tmp/clothing-qa/artwork.jpg',quality=92)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: clothing-artwork-review
+          path: /tmp/clothing-qa/artwork.jpg
+          retention-days: 3
