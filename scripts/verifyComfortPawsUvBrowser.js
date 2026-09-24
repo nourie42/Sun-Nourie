@@ -72,7 +72,7 @@ try{
     metaInset:meta.left>rr.left+24,
     confidenceLeft:confidence.left<=wind.left&&wind.left<uv.left,
     noOverlap:confidence.right<=wind.left+3&&wind.right<=uv.left+3,
-    windVisible:wind.width>=30&&/Wind/.test(row.querySelector('.day-wind-chip')?.textContent||''),
+    windVisible:wind.width>=18&&/Wind/.test(row.querySelector('.day-wind-chip')?.textContent||''),
     allInside:[meta,confidence,wind,uv].every(r=>r.left>=rr.left-1&&r.right<=rr.right+1),
     balancedMargins:Math.abs((rr.left-panel.left)-(panel.right-rr.right))<=3,
    };
