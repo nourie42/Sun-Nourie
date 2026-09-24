@@ -55,12 +55,12 @@ try{
    return {
     count:cards.length,labels,
     fits:cards.every((el,i)=>rs[i].left>=nr.left-1&&rs[i].right<=nr.right+1&&el.scrollWidth<=el.clientWidth+1),
-    firstRow:Math.max(...rs.slice(0,3).map(r=>r.top))-Math.min(...rs.slice(0,3).map(r=>r.top))<3,
-    secondRow:Math.abs(rs[3].top-rs[4].top)<3&&rs[3].top>rs[0].bottom,
-    heights:rs.every(r=>r.height>=65),
+    oneRow:Math.max(...rs.map(r=>r.top))-Math.min(...rs.map(r=>r.top))<3,
+    noArrows:cards.every(card=>!card.querySelector('.jump-arrow')),
+    heights:rs.every(r=>r.height>=34&&r.height<=46),
    };
   });
-  if(width<=760)assert.deepEqual(navLayout,{count:5,labels:['Map','Gross Meter','Your Day','7-Day','Air Quality'],fits:true,firstRow:true,secondRow:true,heights:true});
+  if(width<=760)assert.deepEqual(navLayout,{count:5,labels:['Map','Gross Meter','Your Day','7-Day','Air Quality'],fits:true,oneRow:true,noArrows:true,heights:true});
   const dailyLayout=await page.evaluate(()=>{
    const row=document.querySelector('#daily .day-row'),rect=el=>el?.getBoundingClientRect(),rr=rect(row),panel=rect(document.querySelector('.daily-panel'));
    const top=['.day-name','.day-icon','.day-low','.temp-track','.day-high','.day-feels-summary'].map(s=>rect(row.querySelector(s))).filter(Boolean);
