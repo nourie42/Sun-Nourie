@@ -251,12 +251,11 @@ export function modelExplanationHTML(forecast, options = {}) {
   return `<div class="model-explanation-heading"><h2 id="model-explanation-title">Why this forecast</h2><div class="model-selectors"><label>Day<select aria-label="Day" data-model-day>${choices}</select></label><label>Period<select aria-label="Period" data-model-phase>${phaseOptions}</select></label></div></div>
     <div class="model-period"><strong>${percent(view.value)}</strong><span>${phaseNames[phase]} · highest hourly blended estimate<small>${esc(stamp(period.window?.start,zone))} – ${esc(stamp(period.window?.end,zone))}</small></span></div>
     <p class="model-definition">This number is the highest hourly estimate in this period, not a separate probability of rain at any time during the whole period.</p>
-    ${weatherNextCard(forecast,view)}
     ${view.mismatch?`<p class="model-data-warning">Data mismatch: the period shows ${percent(view.value)}, but the highest supplied hour is ${percent(view.maximum)}.</p>`:''}
     ${!view.complete?`<p class="model-data-warning">Incomplete coverage: ${number(period.coverage?.availableHours)} of ${number(period.coverage?.expectedHours)} hours. The period estimate stays unavailable.${view.maximum===null?'':` Highest available hour: ${percent(view.maximum)}.`}</p>`:''}
     ${view.peakTime?`<h3>Highest hour: ${esc(stamp(view.peakTime,zone))}–${esc(stamp(view.peakEnd,zone,false))}</h3>`:''}
     ${sourceTable(peak)}${arithmetic(peak)}
-    <details class="model-method" data-model-detail="method"><summary>How the inputs are used</summary><p>The NWS hourly probability fills its 40-point share proportionally. A 40% NWS chance contributes 16 points. HRRR is worth 30 points, ECMWF 10, and NBM 20. A positive model amount through 0.010 in gets exactly one-third of that model's points. An amount above 0.010 in gets full points. Zero rain gets zero points.</p><p>The points are added and the result is capped at 100%. For example, NWS 7% contributes 2.8 points; ECMWF at 0.004 in contributes 3.3333 points; and NBM at 0.010 in contributes 6.6667 points. The total is 12.8%, shown as 13%. Rainfall amount is calculated separately. An unavailable model adds no points. This is an uncalibrated estimate, not a proven model-accuracy ranking. WeatherNext 3 is displayed separately and contributes 0 points while its weighting is evaluated.</p></details>
+    <details class="model-method" data-model-detail="method"><summary>How the inputs are used</summary><p>The NWS hourly probability fills its 40-point share proportionally. A 40% NWS chance contributes 16 points. HRRR is worth 30 points, ECMWF 10, and NBM 20. A positive model amount through 0.010 in gets exactly one-third of that model's points. An amount above 0.010 in gets full points. Zero rain gets zero points.</p><p>The points are added and the result is capped at 100%. For example, NWS 7% contributes 2.8 points; ECMWF at 0.004 in contributes 3.3333 points; and NBM at 0.010 in contributes 6.6667 points. The total is 12.8%, shown as 13%. Rainfall amount is calculated separately. An unavailable model adds no points. This is an uncalibrated estimate, not a proven model-accuracy ranking.</p></details>
     <details class="model-hourly-list" data-model-detail="hours"><summary>All ${rows.length} forecast hours in this period</summary>${audit||'<p>No hourly calculation data was supplied.</p>'}</details>
     ${temperatures?`<details class="model-temperature-list" data-model-detail="temperatures"><summary>Temperature calculations</summary>${temperatures}</details>`:''}
     <details class="model-source-list" data-model-detail="sources"><summary>Source runs and availability</summary>${sourceStatus(forecast,view)}</details>`;
@@ -308,9 +307,6 @@ export function renderModelExplanation(forecast, now = Date.now()) {
     renderModelExplanation(latest,latestNow);
     panel.querySelector(key)?.focus();
   };
-  installWeatherNextMapControl();
-  syncWeatherNextStatus(forecast);
-  queueWeatherNextLoad(forecast);
   return view;
 }
 export function resetModelExplanation() {
@@ -319,4 +315,3 @@ export function resetModelExplanation() {
   if (!panel) return;
   panel.hidden = true; panel.innerHTML = ''; panel.onchange = null;
 }
-if(typeof document!=='undefined')installWeatherNextMapControl();
