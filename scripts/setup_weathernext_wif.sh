@@ -56,10 +56,24 @@ if ! gcloud iam workload-identity-pools providers describe "$PROVIDER_ID" \
     --attribute-condition="assertion.repository_owner=='$OWNER' && assertion.repository=='$REPO' && assertion.ref=='refs/heads/main'"
 fi
 
+PRINCIPAL_SET="principalSet://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/$POOL_ID/attribute.repository/$REPO"
+
+# Direct WIF: grant the tightly-scoped GitHub repository principal only the
+# BigQuery permissions needed by the WeatherNext collector.
+for role in roles/bigquery.jobUser roles/bigquery.dataViewer; do
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --member="$PRINCIPAL_SET" \
+    --role="$role" \
+    --condition=None \
+    --quiet >/dev/null
+done
+
+# Keep the service-account binding too so either supported WIF path remains
+# available without a long-lived JSON key.
 gcloud iam service-accounts add-iam-policy-binding "$SA_EMAIL" \
   --project="$PROJECT_ID" \
   --role="roles/iam.workloadIdentityUser" \
-  --member="principalSet://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/$POOL_ID/attribute.repository/$REPO" \
+  --member="$PRINCIPAL_SET" \
   --quiet >/dev/null
 
 PROVIDER_NAME="$(gcloud iam workload-identity-pools providers describe "$PROVIDER_ID" \
@@ -74,5 +88,6 @@ echo "Project: $PROJECT_ID"
 echo "Service account: $SA_EMAIL"
 echo "Provider: $PROVIDER_NAME"
 echo "Repository allowed: $REPO (main branch only)"
+echo "Direct BigQuery WIF access: configured"
 echo
 echo "Google notes that IAM/WIF changes can take a few minutes to propagate."
