@@ -40,6 +40,57 @@ export function todaySkyProfile(day={},tonight=false){
  else if(state.kind==='partly-cloudy'||state.kind==='fog'||pop>=15)scene='few-clouds';
  return {scene,pop,night:tonight,state:state.kind,lift,explicitThunder};
 }
+
+function hourlySkyKind(row={}){
+ const textState=weatherState(row.condition);
+ if(['storm','rain','snow','fog'].includes(textState.kind))return textState.kind;
+ if(finite(row.skyCover)&&row.skyCover>=0&&row.skyCover<=100)return weatherState('',row.skyCover).kind;
+ return textState.kind;
+}
+function skySceneFromKind(kind){
+ if(['storm','rain','snow','fog','cloudy'].includes(kind))return 'cloudy';
+ if(kind==='partly-cloudy')return 'few-clouds';
+ if(kind==='clear')return 'clear';
+ return null;
+}
+/** The large Today image should describe the weather that is actually left to experience,
+ * not an earlier broad daily phrase. Current sky plus the next several hourly forecasts
+ * are authoritative for Remainder of Today. */
+export function todaySkyProfileForForecast(forecast={},day={},display={},now=Date.now()){
+ const base=todaySkyProfile(day,display.tonight===true);
+ if(['storm','overcast-rain'].includes(base.scene))return base;
+ const zone=forecast?.location?.timeZone||'America/New_York';
+ const window=day?.[display.tonight?'lowWindow':'highWindow'];
+ const next=new Date(Date.parse(day?.date+'T12:00:00Z')+86400000).toISOString().slice(0,10);
+ const fallbackEnd=timeAt(display.tonight?next:day?.date,display.tonight?7:19,zone);
+ const end=Date.parse(window?.end)||fallbackEnd;
+ const samples=[];
+ if(!display.tonight){
+   const current=forecast?.current||{};
+   const currentTime=Date.parse(current.time||forecast?.assembledAt);
+   if(!finite(currentTime)||Math.abs(now-currentTime)<=3*3600000){
+     const kind=hourlySkyKind(current);if(kind!=='unknown')samples.push({kind,weight:2});
+   }
+ }
+ for(const row of forecast?.hours||[]){
+   const t=Date.parse(row?.time);
+   if(!finite(t)||t<now-15*60000||t>=end)continue;
+   const kind=hourlySkyKind(row);if(kind==='unknown')continue;
+   const lead=Math.max(0,(t-now)/3600000);
+   samples.push({kind,weight:lead<=3?1.5:1});
+   if(samples.length>=8)break;
+ }
+ if(!samples.length)return base;
+ let cloudy=0,partial=0,clear=0,total=0;
+ for(const sample of samples){
+   const scene=skySceneFromKind(sample.kind),w=sample.weight;total+=w;
+   if(scene==='cloudy')cloudy+=w;else if(scene==='few-clouds')partial+=w;else if(scene==='clear')clear+=w;
+ }
+ if(cloudy>=Math.max(partial+clear,total*.5))return {...base,scene:'cloudy',state:'cloudy',hourlySkyOverride:true};
+ if(cloudy+partial>clear)return {...base,scene:'few-clouds',state:'partly-cloudy',hourlySkyOverride:true};
+ if(clear>0)return {...base,scene:'clear',state:'clear',hourlySkyOverride:true};
+ return base;
+}
 export function moonPhaseAt(epoch=Date.now()){
  const d=(epoch-Date.UTC(2000,0,1,12))/86400000,rad=Math.PI/180;
  const solarMean=(357.5291+.98560028*d)*rad;
@@ -71,7 +122,8 @@ export function moonPhaseHTML(epoch=Date.now()){
 export function todaySkySceneHTML(profile,epoch=Date.now()){
  const {scene,night}=profile;
  const rainyNight=night&&['overcast-rain','storm'].includes(scene);
- const asset=rainyNight?'rain':night?'night':['clear','few-clouds'].includes(scene)?'clear':scene==='cloudy'?'clouds':scene==='overcast-rain'?'rain':'storm';
+ if(scene==='cloudy'&&!night)return '<span class="today-sky today-sky-overcast" data-scene="cloudy" aria-hidden="true"></span>';
+ const asset=rainyNight?'rain':night?'night':['clear','few-clouds'].includes(scene)?'clear':scene==='overcast-rain'?'rain':'storm';
  const src=asset==='night'?'/weather-fusion/today-sky-night-v2.webp':`/weather-fusion/today-sky-${asset}.webp`;
  return `<img class="today-sky" data-scene="${scene}" src="${src}" alt="" aria-hidden="true">${night&&!rainyNight?moonPhaseHTML(epoch):''}`;
 }
@@ -81,7 +133,7 @@ export function todayForecastHTML(forecast,now=Date.now()){
  const rain=displayedRainChance(forecast,p.pop,{now}),shownPop=rain.value,shownCondition=rain.observed?'Rain now':p.condition;
  const uv=uvCategory(day.uvMax),confidence=day.confidence?.label||'Unavailable';
  const metric=(kind,value,label,note)=>`<span class="today-metric" title="${esc(note)}">${weatherMetricIcon(kind)}<span><strong>${value}</strong><small>${label}</small></span></span>`;
- const baseProfile=todaySkyProfile(day,p.tonight),profile=rain.observed?{...baseProfile,scene:'overcast-rain',state:'rain'}:baseProfile,feelValue=p.tonight?feel.low?.low?.value:feel.high?.high?.value;
+ const baseProfile=todaySkyProfileForForecast(forecast,day,p,now),profile=rain.observed?{...baseProfile,scene:'overcast-rain',state:'rain'}:baseProfile,feelValue=p.tonight?feel.low?.low?.value:feel.high?.high?.value;
  const rt=forecast.rainTrend;
  const trend=rain.observed
   ? '<em data-rain-trend>Rain observed at this location</em>'
