@@ -177,3 +177,92 @@ body[data-sky="night"] .air-quality-panel{background:radial-gradient(ellipse at 
   .weather-jump-card .jump-label,.weather-jump-card.jump-gross .jump-label{font-size:7.1px;letter-spacing:-.04em}
   .weather-jump-card .jump-arrow{right:4px;width:11px;height:11px;font-size:11px;border-width:1px}
 }
+
+
+/* Phone nav FINAL: match the supplied compact 3-over-2 reference.
+   Short horizontal cards, large artwork, short divider, centered label, clear arrow. */
+@media(max-width:760px){
+  .weather-jump-nav{
+    grid-template-columns:repeat(6,minmax(0,1fr));
+    gap:6px;
+    margin:8px 0 5px;
+    padding:0 0 4px;
+  }
+  .weather-jump-card:nth-child(1),
+  .weather-jump-card:nth-child(2),
+  .weather-jump-card:nth-child(3){grid-column:span 2}
+  .weather-jump-card:nth-child(4),
+  .weather-jump-card:nth-child(5){grid-column:span 3}
+
+  .weather-jump-card{
+    min-height:54px;
+    height:54px;
+    grid-template-columns:36px minmax(0,1fr) 16px;
+    gap:4px;
+    padding:4px 5px;
+    border-width:2px;
+    border-radius:16px;
+  }
+  .weather-jump-card .jump-visual{
+    width:36px;
+    height:44px;
+    padding-right:6px;
+    border-right:1.5px solid #69dcff73;
+    background-position:left center;
+    background-repeat:no-repeat;
+    background-size:30px 30px;
+  }
+  .weather-jump-card.jump-map .jump-visual{
+    background-size:32px 32px;
+    border-radius:50% 0 0 50%;
+  }
+  .weather-jump-card.jump-gross .jump-visual{
+    background-size:36px 44px;
+  }
+  .weather-jump-card.jump-day .jump-visual{
+    background-size:31px 31px;
+  }
+  .weather-jump-card.jump-week .jump-visual{
+    background-size:31px 31px;
+  }
+  .weather-jump-card.jump-air .jump-visual{
+    background-size:36px 44px;
+  }
+
+  .weather-jump-card .jump-label,
+  .weather-jump-card.jump-gross .jump-label{
+    font-size:9.5px;
+    font-weight:850;
+    letter-spacing:-.025em;
+    line-height:1;
+    white-space:nowrap;
+    overflow:visible;
+  }
+  .weather-jump-card .jump-arrow{
+    position:static;
+    transform:none;
+    width:16px;
+    height:16px;
+    border-width:1.5px;
+    font-size:16px;
+    line-height:.8;
+  }
+}
+@media(max-width:359px){
+  .weather-jump-nav{gap:4px}
+  .weather-jump-card{
+    min-height:50px;
+    height:50px;
+    grid-template-columns:31px minmax(0,1fr) 14px;
+    gap:3px;
+    padding:3px 4px;
+    border-radius:14px;
+  }
+  .weather-jump-card .jump-visual{width:31px;height:40px;padding-right:5px;background-size:26px 26px}
+  .weather-jump-card.jump-map .jump-visual{background-size:28px 28px}
+  .weather-jump-card.jump-gross .jump-visual{background-size:31px 40px}
+  .weather-jump-card.jump-day .jump-visual,.weather-jump-card.jump-week .jump-visual{background-size:27px 27px}
+  .weather-jump-card.jump-air .jump-visual{background-size:31px 40px}
+  .weather-jump-card .jump-label,.weather-jump-card.jump-gross .jump-label{font-size:8.2px}
+  .weather-jump-card .jump-arrow{width:14px;height:14px;font-size:14px}
+}
