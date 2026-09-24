@@ -78,7 +78,7 @@ try {
       const nav=document.querySelector('.weather-jump-nav'),cards=[...nav.querySelectorAll('.weather-jump-card')].map(el=>el.getBoundingClientRect()),nr=nav.getBoundingClientRect();
       return {
         rowFits:row.scrollWidth<=row.clientWidth+1,
-        compact:rr.height<=140,
+        compact:rr.height<=160,
         topOrder:day.left<icon.left&&icon.left<low.left&&low.left<track.left&&track.left<high.left&&high.left<feels.left,
         metaBelow:meta.top>=Math.max(day.bottom,icon.bottom,low.bottom,track.bottom,high.bottom,feels.bottom)-3,
         lowerOrder:confidence.left<wind.left&&wind.left<uv.left,
