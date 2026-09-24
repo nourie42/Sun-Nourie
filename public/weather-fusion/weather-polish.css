@@ -53,14 +53,14 @@ body[data-sky="night"] .air-quality-panel{background:radial-gradient(ellipse at 
 
 @media(max-width:760px){
  .location-bar{align-items:stretch}.device-location-status{width:100%}
- .weather-jump-nav{grid-template-columns:repeat(6,minmax(0,1fr));gap:7px;margin:10px 0 5px;padding:2px 0 6px}
- .weather-jump-card{min-height:72px;grid-template-columns:30px minmax(0,1fr) 21px;gap:4px;padding:7px 6px;border-width:1.5px;border-radius:17px}
- .weather-jump-card:nth-child(-n+3){grid-column:span 2}.weather-jump-card:nth-child(n+4){grid-column:span 3}
- .weather-jump-card .jump-visual{width:30px;height:38px;padding-right:4px}
- .weather-jump-card .jump-svg{width:32px;height:32px}
- .weather-jump-card .jump-label{font-size:12px;white-space:nowrap}
- .weather-jump-card.jump-gross .jump-label{font-size:10.5px;letter-spacing:-.03em}
- .weather-jump-card .jump-arrow{width:20px;height:20px;border-width:1.5px;font-size:20px}
+ .weather-jump-nav{grid-template-columns:repeat(12,minmax(0,1fr));gap:7px;margin:10px 0 5px;padding:2px 0 6px}
+ .weather-jump-card{min-height:72px;grid-template-columns:26px minmax(0,1fr) 18px;gap:3px;padding:7px 5px;border-width:1.5px;border-radius:17px}
+ .weather-jump-card:nth-child(1){grid-column:span 3}.weather-jump-card:nth-child(2){grid-column:span 5}.weather-jump-card:nth-child(3){grid-column:span 4}.weather-jump-card:nth-child(4),.weather-jump-card:nth-child(5){grid-column:span 6}
+ .weather-jump-card .jump-visual{width:26px;height:36px;padding-right:3px}
+ .weather-jump-card .jump-svg{width:29px;height:29px}
+ .weather-jump-card .jump-label{font-size:11px;white-space:nowrap}
+ .weather-jump-card.jump-gross .jump-label{font-size:10.5px;letter-spacing:-.025em}
+ .weather-jump-card .jump-arrow{width:18px;height:18px;border-width:1.5px;font-size:18px}
  .hero-temperature{font-size:clamp(72px,22vw,88px)!important}
  .air-quality-panel{padding:15px 14px}.aqi-summary{grid-template-columns:1fr;gap:8px}.aqi-reading>strong{font-size:44px}
  .aqi-pollutants{display:grid;grid-template-columns:1fr 1fr}
@@ -68,10 +68,10 @@ body[data-sky="night"] .air-quality-panel{background:radial-gradient(ellipse at 
  .gross-eyebrow strong{font-size:28px!important}.gross-number{font-size:42px!important}
 }
 @media(max-width:359px){
- .weather-jump-nav{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
- .weather-jump-card,.weather-jump-card:nth-child(-n+3),.weather-jump-card:nth-child(n+4){grid-column:span 1;min-height:66px;grid-template-columns:30px minmax(0,1fr) 19px;gap:4px;padding:6px 6px;border-radius:15px}
- .weather-jump-card:nth-child(5){grid-column:1/-1}
- .weather-jump-card .jump-visual{width:30px;height:34px;padding-right:4px}.weather-jump-card .jump-svg{width:30px;height:30px}
- .weather-jump-card .jump-label,.weather-jump-card.jump-gross .jump-label{font-size:11px;white-space:nowrap}
- .weather-jump-card .jump-arrow{width:19px;height:19px;font-size:19px}
+ .weather-jump-nav{grid-template-columns:repeat(12,minmax(0,1fr));gap:5px}
+ .weather-jump-card,.weather-jump-card:nth-child(-n+3),.weather-jump-card:nth-child(n+4){min-height:66px;grid-template-columns:23px minmax(0,1fr) 16px;gap:2px;padding:6px 4px;border-radius:15px}
+ .weather-jump-card:nth-child(1){grid-column:span 3}.weather-jump-card:nth-child(2){grid-column:span 5}.weather-jump-card:nth-child(3){grid-column:span 4}.weather-jump-card:nth-child(4),.weather-jump-card:nth-child(5){grid-column:span 6}
+ .weather-jump-card .jump-visual{width:23px;height:32px;padding-right:2px}.weather-jump-card .jump-svg{width:25px;height:25px}
+ .weather-jump-card .jump-label{font-size:9.5px}.weather-jump-card.jump-gross .jump-label{font-size:9px}
+ .weather-jump-card .jump-arrow{width:16px;height:16px;font-size:16px}
 }
