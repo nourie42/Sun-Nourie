@@ -52,7 +52,7 @@ def latest_main_run(client: bigquery.Client, table: str):
     sql = f"""
       SELECT MAX(init_time) AS init_time
       FROM `{table}`
-      WHERE init_time <= CURRENT_TIMESTAMP()
+      WHERE init_time BETWEEN TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 2 DAY) AND CURRENT_TIMESTAMP()
         AND MOD(EXTRACT(HOUR FROM init_time), 6) = 0
     """
     row = next(iter(client.query(sql).result()), None)
