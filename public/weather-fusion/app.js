@@ -16,7 +16,7 @@ import {renderWeatherPanel} from './render-safety.js';
 import {forecastPeriodSummary} from './forecast-story.js?v=weather-qa-v67';
 import {forecastOutlookDetails} from './outlook-details.js?v=full-day-rain-v1';
 import {isExperimentalWeatherPage,renderCarWashForecast,resetCarWashForecast} from './car-wash.js?v=full-day-rain-v1';
-import {renderModelExplanation,resetModelExplanation} from './model-explanation.js?v=weather-qa-v70';
+import {renderModelExplanation,resetModelExplanation} from './model-explanation.js?v=weathernext-live-v1';
 import {updateRainTrend} from './rain-trend.js?v=full-day-rain-v1';
 import {renderRiskOutlooks,resetRiskOutlooks} from './risk-outlooks.js?v=risk-outlooks-v4';
 import {renderAirQuality} from './air-quality.js?v=air-quality-v1';
