@@ -1,0 +1,54 @@
+name: Verify deployed WeatherNext Material edition
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'public/weather-fusion/weathernext-site.html'
+      - '.github/workflows/weathernext-material-verify.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: weathernext-material-live-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify-live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Verify the new WeatherNext page is actually deployed
+        env:
+          LIVE_URL: https://sun-nourie-live.onrender.com
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/weathernext-material-live
+          for attempt in $(seq 1 40); do
+            if curl -fsSL --max-time 25 -D /tmp/weathernext-material-live/headers.txt "$LIVE_URL/weathernext/?verify=$GITHUB_SHA&attempt=$attempt" -o /tmp/weathernext-material-live/index.html \
+              && grep -Fq 'data-build="wn-material-20260924"' /tmp/weathernext-material-live/index.html \
+              && grep -Fq 'id="hour-strip"' /tmp/weathernext-material-live/index.html \
+              && grep -Fq 'id="scene"' /tmp/weathernext-material-live/index.html \
+              && grep -Fq 'id="theme"' /tmp/weathernext-material-live/index.html; then
+              echo 'The deployed page contains the new Material-edition build fingerprint and controls.'
+              break
+            fi
+            if [ "$attempt" = 40 ]; then
+              echo 'The new WeatherNext design was not confirmed on the live host.'
+              exit 1
+            fi
+            sleep 5
+          done
+          curl -fsSL --max-time 25 "$LIVE_URL/weather-fusion/weathernext-data.js?v=wn-site-v1" -o /tmp/weathernext-material-live/weathernext-data.mjs
+          curl -fsSL --max-time 25 "$LIVE_URL/weather-fusion/weathernext-catalog.json?v=wn-site-v1" -o /tmp/weathernext-material-live/catalog.json
+          node --check /tmp/weathernext-material-live/weathernext-data.mjs
+          node -e 'const fs=require("fs");const p="/tmp/weathernext-material-live/";const html=fs.readFileSync(p+"index.html","utf8");const scripts=[...html.matchAll(/<script type="module">([\s\S]*?)<\/script>/g)];if(scripts.length!==1)throw Error("Expected one inline application module");fs.writeFileSync(p+"application.mjs",scripts[0][1]);const c=JSON.parse(fs.readFileSync(p+"catalog.json","utf8"));if(c.fields.length!==21||c.statistics.length!==6)throw Error("Incomplete field catalog");'
+          node --check /tmp/weathernext-material-live/application.mjs
+          echo 'Verified live redesign, application syntax, display module, and 21-field/six-statistic catalog.' | tee /tmp/weathernext-material-live/result.txt
+          echo '### WeatherNext Material edition is deployed' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Confirmed the live build fingerprint wn-material-20260924, new page controls, application syntax, and required display/catalog assets. This check does not claim that model data is fresh or that every external provider is available.' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: weathernext-material-live-evidence
+          path: /tmp/weathernext-material-live
+          retention-days: 7
