@@ -148,7 +148,7 @@ export function renderDailyRows(forecast,icon) {
    <span class="temp-track" aria-hidden="true">${bar===null?'':`<span class="temp-fill" style="left:0;width:${bar}%"></span><i class="high-marker" style="left:clamp(4px,${bar}%,calc(100% - 4px))"></i>`}</span>
    <span class="day-high">${finite(high)?`<strong>${temp(high)}</strong><small>High</small>`:''}</span>
    <span class="day-feels-summary"><small>Feels like</small><b>${feelsText}</b></span>
-   <span class="day-meta"><span class="forecast-confidence" data-confidence="${esc(confidence.key)}" title="${esc(confidenceTitle)}"><span>Forecast confidence</span><b>${esc(confidence.label)}</b>${finite(confidence.score)?`<i class="confidence-meter" aria-hidden="true"><em style="width:${confidence.score}%"></em></i>`:''}</span><span class="day-wind-chip" title="${esc(wind.text)}${gusty?` · Gust ${wind.gust} mph`:'' }"><small>Wind</small><b>${esc(windSpeed)}</b>${gusty?`<em>G${wind.gust}</em>`:''}</span>${dailyUvHTML(d.uvMax,p.tonight?'Peak UV today':'Peak UV')}</span>
+   <span class="day-meta"><span class="forecast-confidence" data-confidence="${esc(confidence.key)}" title="${esc(confidenceTitle)}"><span>Forecast confidence</span><b>${esc(confidence.label)}</b>${finite(confidence.score)?`<i class="confidence-meter" aria-hidden="true"><em style="width:${confidence.score}%"></em></i>`:''}</span><span class="day-wind-chip" title="${esc(wind.text)}${gusty?` · Gust ${wind.gust} mph`:'' }"><span class="day-wind-label">Wind</span><b>${esc(windSpeed.replace(/\s*mph$/i,''))}</b><span class="day-wind-unit">mph</span>${gusty?`<em>G${wind.gust}</em>`:''}</span>${dailyUvHTML(d.uvMax,p.tonight?'Peak UV today':'Peak UV')}</span>
    ${confidenceNoticeHTML}
   </button>`;
  });
