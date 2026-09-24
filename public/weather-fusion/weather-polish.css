@@ -68,10 +68,10 @@ body[data-sky="night"] .air-quality-panel{background:radial-gradient(ellipse at 
  .gross-eyebrow strong{font-size:28px!important}.gross-number{font-size:42px!important}
 }
 @media(max-width:359px){
- .weather-jump-nav{grid-template-columns:repeat(12,minmax(0,1fr));gap:5px}
- .weather-jump-card,.weather-jump-card:nth-child(-n+3),.weather-jump-card:nth-child(n+4){min-height:66px;grid-template-columns:23px minmax(0,1fr) 16px;gap:2px;padding:6px 4px;border-radius:15px}
+ .weather-jump-nav{grid-template-columns:repeat(12,minmax(0,1fr));gap:4px}
+ .weather-jump-card,.weather-jump-card:nth-child(-n+3),.weather-jump-card:nth-child(n+4){min-height:64px;grid-template-columns:20px minmax(0,1fr) 14px;gap:2px;padding:5px 3px;border-radius:14px}
  .weather-jump-card:nth-child(1){grid-column:span 3}.weather-jump-card:nth-child(2){grid-column:span 5}.weather-jump-card:nth-child(3){grid-column:span 4}.weather-jump-card:nth-child(4),.weather-jump-card:nth-child(5){grid-column:span 6}
- .weather-jump-card .jump-visual{width:23px;height:32px;padding-right:2px}.weather-jump-card .jump-svg{width:25px;height:25px}
- .weather-jump-card .jump-label{font-size:9.5px}.weather-jump-card.jump-gross .jump-label{font-size:9px}
- .weather-jump-card .jump-arrow{width:16px;height:16px;font-size:16px}
+ .weather-jump-card .jump-visual{width:20px;height:30px;padding-right:2px}.weather-jump-card .jump-svg{width:22px;height:22px}
+ .weather-jump-card .jump-label{font-size:9px}.weather-jump-card.jump-gross .jump-label{font-size:8.5px}
+ .weather-jump-card .jump-arrow{width:14px;height:14px;font-size:14px}
 }
