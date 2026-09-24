@@ -40,10 +40,9 @@ test('Remainder of Today uses current and remaining hourly cloudiness instead of
  assert.equal(profile.scene,'cloudy');
  assert.equal(profile.hourlySkyOverride,true);
  const scene=todaySkySceneHTML(profile,t);
- assert.match(scene,/today-sky-overcast/);
- assert.match(scene,/<svg[^>]+today-sky-overcast/);
- assert.match(scene,/today-cloud-light|today-cloud-mid|today-cloud-dark/);
- assert.doesNotMatch(scene,/today-sky-clear\.webp|today-sky-clouds\.webp|sun/i);
+ assert.match(scene,/today-sky-clouds\.webp/);
+ assert.match(scene,/today-sky-clouds-day/);
+ assert.doesNotMatch(scene,/today-sky-clear\.webp|<svg/);
 });
 test('Today sky adds clouds and precipitation by forecast scenario',()=>{
  assert.equal(todaySkyProfile({condition:'Mostly Sunny',pop:10}).scene,'clear');
@@ -60,9 +59,9 @@ test('Today sky adds clouds and precipitation by forecast scenario',()=>{
  assert.match(todaySkySceneHTML(todaySkyProfile({condition:'Overcast with Rain',pop:80})),/today-sky-rain\.webp/);
  assert.match(todaySkySceneHTML(todaySkyProfile({condition:'Clear',pop:0},true)),/today-sky-night-v2\.webp/);
  const cloudyTonight=todaySkySceneHTML(todaySkyProfile({nightCondition:'Mostly Cloudy',popNight:6},true));
- assert.match(cloudyTonight,/today-sky-cloudy-night/,'mostly cloudy night uses cloud-heavy artwork');
- assert.match(cloudyTonight,/today-night-cloud-light|today-night-cloud-mid|today-night-cloud-dark/);
- assert.doesNotMatch(cloudyTonight,/today-sky-night-v2|today-moon/,'mostly cloudy night does not use clear-night moon artwork');
+ assert.match(cloudyTonight,/today-sky-clouds\.webp/,'mostly cloudy night uses actual cloud artwork');
+ assert.match(cloudyTonight,/today-sky-clouds-night/);
+ assert.doesNotMatch(cloudyTonight,/today-sky-night-v2|today-moon|<svg/,'mostly cloudy night does not use clear-night moon or generated gray SVG artwork');
  const rainyTonight=todaySkySceneHTML(todaySkyProfile({nightCondition:'Rain',popNight:100},true));
  assert.match(rainyTonight,/today-sky-rain\.webp/,'a rainy night uses rain artwork');
  assert.doesNotMatch(rainyTonight,/today-sky-night-v2|today-moon|sky-lightning/,'plain rain does not show clear-night or lightning imagery');
