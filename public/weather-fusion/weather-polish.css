@@ -1,12 +1,11 @@
 /* Readability, device-location, jump navigation and air-quality polish shared by regular + experimental weather. */
-.weather-jump-nav{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:14px;margin:14px 0 8px;padding:4px 0 8px;overflow:visible}
-.weather-jump-card{position:relative;box-sizing:border-box;min-width:0;min-height:136px;display:grid;grid-template-columns:104px minmax(0,1fr) 50px;align-items:center;gap:18px;padding:16px 20px;border:3px solid #24d9ff;border-radius:34px;background:radial-gradient(circle at 22% 16%,#19bff04f,transparent 42%),linear-gradient(145deg,#0d6398,#074873 62%,#06365d);box-shadow:inset 0 1px 2px #e6fbff45,inset 0 0 32px #0fc7ef30,0 0 0 1px #20d5ff44,0 10px 28px #03182e70;color:#fff;text-decoration:none;overflow:hidden}
-.weather-jump-card:nth-child(-n+3){grid-column:span 2}.weather-jump-card:nth-child(n+4){grid-column:span 3}
-.weather-jump-card:hover,.weather-jump-card:focus-visible{transform:translateY(-1px);background:radial-gradient(circle at 22% 16%,#27d4ff55,transparent 44%),linear-gradient(145deg,#1172a9,#095483 62%,#074069);box-shadow:inset 0 1px 2px #effcff55,0 0 0 2px #57e7ff55,0 12px 30px #02152882}
-.weather-jump-card .jump-visual{width:104px;height:94px;display:grid;place-items:center;padding-right:20px;border-right:2px solid #69dcff73;box-sizing:border-box;filter:drop-shadow(0 5px 7px #00162aa8)}
-.weather-jump-card .jump-svg{display:block;width:86px;height:86px;overflow:visible}
-.weather-jump-card .jump-label{min-width:0;font-size:28px;font-weight:850;line-height:1.02;letter-spacing:-.02em;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:clip;text-shadow:0 2px 7px #00182c88}
-.weather-jump-card .jump-arrow{width:46px;height:46px;display:grid;place-items:center;border:3px solid #38d2ff9e;border-radius:50%;background:#0a4f7dbd;box-shadow:inset 0 0 12px #48e3ff35;color:#fff;font-size:43px;font-weight:500;line-height:.78}
+.weather-jump-nav{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:9px;margin:12px 0 8px;padding:0}
+.weather-jump-card{box-sizing:border-box;min-width:0;min-height:52px;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 13px;border:1.5px solid #35dcff;border-radius:14px;background:linear-gradient(145deg,#0d6398,#074873 62%,#06365d);box-shadow:inset 0 1px 1px #e6fbff2b,0 5px 14px #03182e55;color:#fff;text-decoration:none}
+.weather-jump-card:nth-child(1),.weather-jump-card:nth-child(2),.weather-jump-card:nth-child(3){grid-column:span 2}
+.weather-jump-card:nth-child(4),.weather-jump-card:nth-child(5){grid-column:span 3}
+.weather-jump-card:hover,.weather-jump-card:focus-visible{transform:translateY(-1px);background:linear-gradient(145deg,#1172a9,#095483 62%,#074069);box-shadow:0 0 0 2px #57e7ff35,0 7px 18px #02152866}
+.weather-jump-card .jump-label{min-width:0;font-size:14px;font-weight:800;line-height:1;letter-spacing:-.01em;text-align:left;white-space:nowrap}
+.weather-jump-card .jump-arrow{flex:0 0 auto;width:22px;height:22px;display:grid;place-items:center;border:1.5px solid #57dfff8c;border-radius:50%;background:#0a4f7d99;color:#fff;font-size:21px;line-height:.8}
 .device-location-status{display:flex;align-items:center;gap:9px;min-height:40px;padding:8px 13px;border:1px solid #8bdcff40;border-radius:999px;background:#082f505e;color:#dff5ff;font-size:13px}
 .device-location-status strong{font-size:13px}.device-location-status span{font-size:18px}
 #daily-panel,#your-day,#map-panel,#air-quality,#dewpoint-gross-meter{scroll-margin-top:16px}
@@ -56,213 +55,17 @@ body[data-sky="night"] .air-quality-panel{background:radial-gradient(ellipse at 
  .aqi-pollutants{display:grid;grid-template-columns:1fr 1fr}
  .gross-scale{grid-template-columns:repeat(3,minmax(0,1fr))!important;row-gap:7px}
  .gross-eyebrow strong{font-size:28px!important}.gross-number{font-size:42px!important}
- .weather-jump-nav{grid-template-columns:repeat(12,minmax(0,1fr));gap:7px;margin:10px 0 5px;padding:2px 0 6px}
- .weather-jump-card{min-height:76px;grid-template-columns:20px minmax(0,1fr) 14px;gap:2px;padding:6px 3px;border-width:2px;border-radius:19px}
- .weather-jump-card:nth-child(1){grid-column:span 3}.weather-jump-card:nth-child(2){grid-column:span 5}.weather-jump-card:nth-child(3){grid-column:span 4}.weather-jump-card:nth-child(4),.weather-jump-card:nth-child(5){grid-column:span 6}
- .weather-jump-card .jump-visual{width:20px;height:38px;padding-right:2px;border-right-width:1px}
- .weather-jump-card .jump-svg{width:22px;height:22px}
- .weather-jump-card .jump-label{font-size:10.5px;letter-spacing:-.025em;white-space:nowrap}
- .weather-jump-card.jump-gross .jump-label{font-size:10px}
- .weather-jump-card .jump-arrow{width:14px;height:14px;border-width:1.5px;font-size:14px}
+ .weather-jump-nav{grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;margin:8px 0 6px;padding:0}
+ .weather-jump-card{min-height:46px;padding:8px 9px;border-width:1.5px;border-radius:12px}
+ .weather-jump-card:nth-child(1),.weather-jump-card:nth-child(2),.weather-jump-card:nth-child(3){grid-column:span 2}
+ .weather-jump-card:nth-child(4),.weather-jump-card:nth-child(5){grid-column:span 3}
+ .weather-jump-card .jump-label{font-size:11px}
+ .weather-jump-card.jump-gross .jump-label{font-size:10.5px}
+ .weather-jump-card .jump-arrow{width:18px;height:18px;font-size:18px}
 }
 @media(max-width:359px){
- .weather-jump-nav{grid-template-columns:repeat(12,minmax(0,1fr));gap:4px}
- .weather-jump-card{min-height:70px;grid-template-columns:22px minmax(0,1fr) 14px;gap:2px;padding:5px 3px;border-radius:16px}
- .weather-jump-card:nth-child(1){grid-column:span 3}.weather-jump-card:nth-child(2){grid-column:span 5}.weather-jump-card:nth-child(3){grid-column:span 4}.weather-jump-card:nth-child(4),.weather-jump-card:nth-child(5){grid-column:span 6}
- .weather-jump-card .jump-visual{width:22px;height:34px;padding-right:2px}.weather-jump-card .jump-svg{width:24px;height:24px}
- .weather-jump-card .jump-label{font-size:9px;letter-spacing:-.035em}.weather-jump-card.jump-gross .jump-label{font-size:8.5px}
- .weather-jump-card .jump-arrow{width:14px;height:14px;border-width:1.5px;font-size:14px}
-}
-
-
-/* Reference-matched navigation artwork and proportions */
-.weather-jump-card .jump-visual{
-  background-repeat:no-repeat;
-  background-position:center;
-  background-size:contain;
-}
-.weather-jump-card .jump-svg{opacity:0;pointer-events:none}
-.weather-jump-card.jump-map .jump-visual{background-image:url('/weather-fusion/nav-map.webp?v=approved-nav-art-v1')}
-.weather-jump-card.jump-gross .jump-visual{background-image:url('/weather-fusion/nav-gross.webp?v=approved-nav-art-v1')}
-.weather-jump-card.jump-day .jump-visual{background-image:url('/weather-fusion/nav-day.webp?v=approved-nav-art-v1')}
-.weather-jump-card.jump-week .jump-visual{background-image:url('/weather-fusion/nav-week.webp?v=approved-nav-art-v1')}
-.weather-jump-card.jump-air .jump-visual{background-image:url('/weather-fusion/nav-air.webp?v=approved-nav-art-v1')}
-
-@media(max-width:760px){
-  .weather-jump-nav{grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
-  .weather-jump-card,.weather-jump-card:nth-child(1),.weather-jump-card:nth-child(2),.weather-jump-card:nth-child(3),.weather-jump-card:nth-child(4),.weather-jump-card:nth-child(5){min-height:84px}
-  .weather-jump-card:nth-child(1),.weather-jump-card:nth-child(2),.weather-jump-card:nth-child(3){grid-column:span 2}
-  .weather-jump-card:nth-child(4),.weather-jump-card:nth-child(5){grid-column:span 3}
-  .weather-jump-card{grid-template-columns:42px minmax(0,1fr) 22px;gap:6px;padding:8px 7px;border-radius:20px}
-  .weather-jump-card .jump-visual{width:42px;height:56px;padding-right:8px}
-  .weather-jump-card .jump-label,.weather-jump-card.jump-gross .jump-label{font-size:12px;letter-spacing:-.025em;white-space:nowrap}
-  .weather-jump-card .jump-arrow{width:22px;height:22px;font-size:22px}
-}
-@media(max-width:359px){
-  .weather-jump-nav{gap:5px}
-  .weather-jump-card{min-height:78px;grid-template-columns:34px minmax(0,1fr) 18px;gap:4px;padding:6px 5px;border-radius:18px}
-  .weather-jump-card .jump-visual{width:34px;height:48px;padding-right:5px}
-  .weather-jump-card .jump-label{font-size:10px}.weather-jump-card.jump-gross .jump-label{font-size:9.5px}
-  .weather-jump-card .jump-arrow{width:18px;height:18px;font-size:18px}
-}
-
-/* Extra-narrow reference match: preserve all five labels on one line. */
-@media(max-width:359px){
-  .weather-jump-card{grid-template-columns:22px minmax(0,1fr) 12px;gap:2px;padding:5px 3px}
-  .weather-jump-card .jump-visual{width:22px;height:44px;padding-right:3px}
-  .weather-jump-card .jump-label,.weather-jump-card.jump-gross .jump-label{font-size:8.2px;letter-spacing:-.04em}
-  .weather-jump-card .jump-arrow{width:12px;height:12px;font-size:13px;border-width:1px}
-}
-
-/* Final phone proportions follow the approved reference: Map / Gross / Your Day,
-   with Gross intentionally wider, then two equal lower cards. */
-@media(max-width:760px){
-  .weather-jump-nav{grid-template-columns:repeat(12,minmax(0,1fr));gap:6px}
-  .weather-jump-card:nth-child(1){grid-column:span 3}
-  .weather-jump-card:nth-child(2){grid-column:span 5}
-  .weather-jump-card:nth-child(3){grid-column:span 4}
-  .weather-jump-card:nth-child(4),.weather-jump-card:nth-child(5){grid-column:span 6}
-  .weather-jump-card{min-height:84px;grid-template-columns:30px minmax(0,1fr) 18px;gap:4px;padding:7px 5px}
-  .weather-jump-card .jump-visual{width:30px;height:54px;padding-right:5px}
-  .weather-jump-card .jump-label{font-size:10.5px}
-  .weather-jump-card.jump-gross .jump-label{font-size:11px}
-  .weather-jump-card .jump-arrow{width:18px;height:18px;font-size:18px}
-}
-@media(max-width:359px){
-  .weather-jump-nav{gap:4px}
-  .weather-jump-card{min-height:76px;grid-template-columns:22px minmax(0,1fr) 13px;gap:2px;padding:5px 3px}
-  .weather-jump-card .jump-visual{width:22px;height:46px;padding-right:3px}
-  .weather-jump-card .jump-label{font-size:8.4px}
-  .weather-jump-card.jump-gross .jump-label{font-size:8.8px}
-  .weather-jump-card .jump-arrow{width:13px;height:13px;font-size:13px}
-}
-
-/* Verified reference geometry: three balanced top cards at normal phone widths.
-   Arrow is absolutely positioned so labels get the same breathing room as the mockup. */
-@media (min-width:360px) and (max-width:760px){
-  .weather-jump-nav{grid-template-columns:repeat(6,minmax(0,1fr));gap:7px}
-  .weather-jump-card:nth-child(1),.weather-jump-card:nth-child(2),.weather-jump-card:nth-child(3){grid-column:span 2}
-  .weather-jump-card:nth-child(4),.weather-jump-card:nth-child(5){grid-column:span 3}
-  .weather-jump-card{position:relative;min-height:84px;grid-template-columns:24px minmax(0,1fr);gap:3px;padding:7px 27px 7px 5px}
-  .weather-jump-card .jump-visual{width:24px;height:54px;padding-right:4px}
-  .weather-jump-card .jump-label,.weather-jump-card.jump-gross .jump-label{font-size:8.8px;letter-spacing:-.035em}
-  .weather-jump-card .jump-arrow{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:17px;height:17px;font-size:17px}
-}
-@media(max-width:359px){
-  .weather-jump-nav{grid-template-columns:repeat(12,minmax(0,1fr));gap:4px}
-  .weather-jump-card:nth-child(1){grid-column:span 3}
-  .weather-jump-card:nth-child(2){grid-column:span 5}
-  .weather-jump-card:nth-child(3){grid-column:span 4}
-  .weather-jump-card:nth-child(4),.weather-jump-card:nth-child(5){grid-column:span 6}
-  .weather-jump-card{position:relative;min-height:76px;grid-template-columns:18px minmax(0,1fr);gap:2px;padding:5px 20px 5px 3px}
-  .weather-jump-card .jump-visual{width:18px;height:46px;padding-right:2px}
-  .weather-jump-card .jump-label{font-size:7.8px}.weather-jump-card.jump-gross .jump-label{font-size:8.2px}
-  .weather-jump-card .jump-arrow{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:12px;height:12px;font-size:12px}
-}
-
-/* Hard final mobile reference match: equal 3-up / 2-up cards with compact chrome
-   so every label stays fully visible, including Gross Meter. */
-@media(max-width:760px){
-  .weather-jump-nav{grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
-  .weather-jump-card:nth-child(1),.weather-jump-card:nth-child(2),.weather-jump-card:nth-child(3){grid-column:span 2}
-  .weather-jump-card:nth-child(4),.weather-jump-card:nth-child(5){grid-column:span 3}
-  .weather-jump-card{position:relative;min-height:82px;grid-template-columns:24px minmax(0,1fr);gap:3px;padding:6px 21px 6px 4px}
-  .weather-jump-card .jump-visual{width:24px;height:52px;padding-right:4px}
-  .weather-jump-card .jump-label,.weather-jump-card.jump-gross .jump-label{font-size:7.8px;letter-spacing:-.035em;white-space:nowrap}
-  .weather-jump-card .jump-arrow{position:absolute;right:5px;top:50%;transform:translateY(-50%);width:14px;height:14px;font-size:14px;border-width:1.5px}
-}
-@media(max-width:359px){
-  .weather-jump-card{min-height:74px;grid-template-columns:20px minmax(0,1fr);gap:2px;padding:5px 17px 5px 3px}
-  .weather-jump-card .jump-visual{width:20px;height:46px;padding-right:3px}
-  .weather-jump-card .jump-label,.weather-jump-card.jump-gross .jump-label{font-size:7.1px;letter-spacing:-.04em}
-  .weather-jump-card .jump-arrow{right:4px;width:11px;height:11px;font-size:11px;border-width:1px}
-}
-
-
-/* Phone nav FINAL: match the supplied compact 3-over-2 reference.
-   Short horizontal cards, large artwork, short divider, centered label, clear arrow. */
-@media(max-width:760px){
-  .weather-jump-nav{
-    grid-template-columns:repeat(6,minmax(0,1fr));
-    gap:6px;
-    margin:8px 0 5px;
-    padding:0 0 4px;
-  }
-  .weather-jump-card:nth-child(1),
-  .weather-jump-card:nth-child(2),
-  .weather-jump-card:nth-child(3){grid-column:span 2}
-  .weather-jump-card:nth-child(4),
-  .weather-jump-card:nth-child(5){grid-column:span 3}
-
-  .weather-jump-card{
-    min-height:54px;
-    height:54px;
-    grid-template-columns:36px minmax(0,1fr) 16px;
-    gap:4px;
-    padding:4px 5px;
-    border-width:2px;
-    border-radius:16px;
-  }
-  .weather-jump-card .jump-visual{
-    width:36px;
-    height:44px;
-    padding-right:6px;
-    border-right:1.5px solid #69dcff73;
-    background-position:left center;
-    background-repeat:no-repeat;
-    background-size:30px 30px;
-  }
-  .weather-jump-card.jump-map .jump-visual{
-    background-size:32px 32px;
-    border-radius:50% 0 0 50%;
-  }
-  .weather-jump-card.jump-gross .jump-visual{
-    background-size:36px 44px;
-  }
-  .weather-jump-card.jump-day .jump-visual{
-    background-size:31px 31px;
-  }
-  .weather-jump-card.jump-week .jump-visual{
-    background-size:31px 31px;
-  }
-  .weather-jump-card.jump-air .jump-visual{
-    background-size:36px 44px;
-  }
-
-  .weather-jump-card .jump-label,
-  .weather-jump-card.jump-gross .jump-label{
-    font-size:9.5px;
-    font-weight:850;
-    letter-spacing:-.025em;
-    line-height:1;
-    white-space:nowrap;
-    overflow:visible;
-  }
-  .weather-jump-card .jump-arrow{
-    position:static;
-    transform:none;
-    width:16px;
-    height:16px;
-    border-width:1.5px;
-    font-size:16px;
-    line-height:.8;
-  }
-}
-@media(max-width:359px){
-  .weather-jump-nav{gap:4px}
-  .weather-jump-card{
-    min-height:50px;
-    height:50px;
-    grid-template-columns:31px minmax(0,1fr) 14px;
-    gap:3px;
-    padding:3px 4px;
-    border-radius:14px;
-  }
-  .weather-jump-card .jump-visual{width:31px;height:40px;padding-right:5px;background-size:26px 26px}
-  .weather-jump-card.jump-map .jump-visual{background-size:28px 28px}
-  .weather-jump-card.jump-gross .jump-visual{background-size:31px 40px}
-  .weather-jump-card.jump-day .jump-visual,.weather-jump-card.jump-week .jump-visual{background-size:27px 27px}
-  .weather-jump-card.jump-air .jump-visual{background-size:31px 40px}
-  .weather-jump-card .jump-label,.weather-jump-card.jump-gross .jump-label{font-size:8.2px}
-  .weather-jump-card .jump-arrow{width:14px;height:14px;font-size:14px}
+ .weather-jump-nav{gap:4px}
+ .weather-jump-card{min-height:44px;padding:7px 7px;border-radius:11px}
+ .weather-jump-card .jump-label{font-size:9.5px}.weather-jump-card.jump-gross .jump-label{font-size:9px}
+ .weather-jump-card .jump-arrow{width:16px;height:16px;font-size:16px}
 }
