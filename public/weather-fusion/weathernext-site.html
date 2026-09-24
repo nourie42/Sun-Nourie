@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+ <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+ <meta name="theme-color" content="#0d1727"><title>WeatherNext Forecast · Weather Nourie</title>
+ <meta name="description" content="Dedicated Google WeatherNext 3 surface forecasts, hourly ensembles, station-trained temperatures, precipitation, wind, clouds, pressure and solar guidance.">
+ <link rel="stylesheet" href="/weather-fusion/weathernext-site.css?v=wn-site-v1">
+ <script type="module" src="/weather-fusion/weathernext-site.js?v=wn-site-v1"></script>
+</head>
+<body>
+ <a class="skip" href="#forecast">Skip to forecast</a>
+ <div class="wn-shell">
+  <header class="masthead"><div><a class="back" href="/weather-fusion/experimental-weather.html">← Experimental Weather</a><p class="eyebrow">WEATHER NOURIE / GOOGLE MODEL FORECASTS</p><h1>WeatherNext<span> Forecast</span></h1><p class="intro">One model. The full surface picture.</p></div><span class="model-badge">Google WeatherNext 3</span></header>
+  <nav class="section-nav" aria-label="Forecast sections"><a href="#forecast">Forecast</a><a href="#explorer">Hourly explorer</a><a href="#conditions">All conditions</a><a href="#sources">Data & maps</a></nav>
+  <div id="status" class="status" role="status" aria-live="polite">Loading the published Google forecast…</div>
+  <form class="controls" ><label>Published location<select id="location" disabled><option>Knightdale / Raleigh, NC</option></select></label><label>Forecast run<select id="run" disabled><option>15-day main run</option></select></label><button id="refresh" type="button">Refresh data</button></form>
+  <p id="coverage" class="muted">This site uses a separate Google-only feed. Weather Fusion's forecast calculations are unchanged.</p>
+  <main id="forecast" hidden>
+   <section class="hero panel" aria-labelledby="location-title"><div class="hero-main"><p class="eyebrow">MODEL FORECAST · NOT A LIVE OBSERVATION</p><h2 id="location-title"></h2><p id="valid-time" class="time"></p><div class="hero-temp"><strong id="temperature">—</strong><span>°F</span></div><p id="temperature-range" class="range-note"></p></div><div class="hero-side"><div id="hero-metrics" class="metrics"></div><p id="run-stamp" class="muted"></p></div></section>
+   <section class="panel outlook" aria-labelledby="outlook-title"><div class="section-head"><div><p class="eyebrow">OUTLOOK</p><h2 id="outlook-title">Daily forecast</h2></div><p class="muted">Tap a day to explore its hours</p></div><div id="days" class="days"></div><p class="footnote">Daily highs/lows are extrema of hourly ensemble means. Rain totals sum hourly means only; partial days are labeled. These are model estimates, not measured totals or daily percentile bounds.</p></section>
+   <section id="explorer" class="panel"><div class="section-head"><div><p class="eyebrow">ENSEMBLE EXPLORER</p><h2>Every field. Every hour.</h2></div><button id="all-hours" type="button">Full horizon</button></div>
+    <div class="explorer-controls"><label>Forecast variable<select id="variable"></select></label><label>Center line<select id="statistic"><option value="mean">Ensemble mean</option><option value="p50">Median · P50</option></select></label></div>
+    <p id="field-description" class="muted"></p><p id="field-source" class="footnote"></p>
+    <div id="chart" class="chart"></div><div class="legend"><span class="outer">P10–P90</span><span class="inner">P25–P75</span><span class="line">Selected center</span></div>
+    <div class="time-control"><label for="hour">Forecast hour</label><output id="hour-label" for="hour"></output><input id="hour" type="range" min="0" max="0" value="0"></div>
+    <div id="percentiles" class="percentiles"></div><p class="footnote">Percentiles describe the ensemble distribution at each hour, not a calibrated confidence level. An amount percentile is not a probability of rain. Hourly percentiles cannot be added to produce a daily percentile.</p>
+    <details><summary>Hourly data table</summary><div id="hourly-table" class="table-scroll" tabindex="0" role="region" aria-label="Hourly ensemble statistics"></div></details>
+   </section>
+   <section id="conditions" class="panel"><div class="section-head"><div><p class="eyebrow">AT THE SELECTED HOUR</p><h2>All forecast conditions</h2></div><span id="conditions-time" class="muted"></span></div><div id="condition-groups" class="condition-groups"></div></section>
+   <section id="sources" class="panel"><p class="eyebrow">PROVENANCE & COVERAGE</p><h2>Know what you are looking at</h2><div id="source-cards" class="source-cards"></div><div class="downloads"><button id="download-csv" type="button">Download hourly CSV</button><button id="download-json" type="button">Download source JSON</button></div>
+    <details><summary>What is included—and what is not</summary><p>Google's BigQuery feed offers 19 gridded surface variables and two station-trained fields, each with mean, P10, P25, P50, P75 and P90 statistics. Available fields are discovered from the linked tables. This page never fills missing fields with another model or an invented estimate.</p><p>Main 00/06/12/18 UTC runs can extend to 360 forecast hours. Newer interim runs can extend to 48 hours. They are selectable separately: different runs are not silently joined. Model initialization, publication and the site's collection time are different timestamps.</p><p>The published locations are listed above. This is not an arbitrary-location global point API. Station-trained output is still a forecast—not a current station reading. Wind gusts, live radar, official warnings, UV index and a calibrated probability of rain are not supplied by this surface-statistics feed.</p><p>Raw 64-member trajectories, pressure-level fields and native six-hour accumulation products use Google's separate Cloud Storage feed. They are not reconstructed from percentiles here. Use the official resources below for those products and global forecast maps.</p></details>
+    <div class="resources"><a href="https://developers.google.com/weathernext/guides/weatherlab" target="_blank" rel="noopener noreferrer">Global maps & cyclone guidance<br><small>Open Google Weather Lab ↗</small></a><a href="https://developers.google.com/weathernext/guides/gcs" target="_blank" rel="noopener noreferrer">Full ensembles & upper air<br><small>Google Cloud Storage guide ↗</small></a><a href="https://developers.google.com/weathernext/guides/models" target="_blank" rel="noopener noreferrer">Model variables & limitations<br><small>Official model specifications ↗</small></a></div>
+   </section>
+  </main>
+  <footer><p>Forecast data: Google DeepMind / Google Research WeatherNext 3. This independent Weather Nourie site is not a Google product. Experimental model output is not an official watch or warning; follow the National Weather Service and local emergency authorities.</p><p><a href="https://developers.google.com/weathernext/guides/bigquery" target="_blank" rel="noopener noreferrer">Data documentation</a> · <a href="https://developers.google.com/weathernext/guides/disclaimers" target="_blank" rel="noopener noreferrer">Data terms & disclaimers</a></p></footer>
+ </div>
+</body></html>
