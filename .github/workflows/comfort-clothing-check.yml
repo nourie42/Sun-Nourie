@@ -2,7 +2,11 @@ name: Comfort clothing visual checks
 on:
   push:
     branches: [weather/restore-temperature-clothing]
-    paths: [.github/workflows/comfort-clothing-check.yml]
+    paths:
+      - .github/workflows/comfort-clothing-check.yml
+      - scripts/applyComfortClothing.py
+      - scripts/verifyComfortClothingBrowser.js
+      - public/weather-fusion/comfort-clothing.js
 permissions:
   contents: write
 jobs:
@@ -51,7 +55,7 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add public/weather-fusion src/weatherFusion.js test/weatherFusionForecastDetails.test.js
+          git add public/weather-fusion src/weatherFusion.js test/weatherFusionForecastDetails.test.js test/weatherFusionClearGraph.test.js
           git diff --cached --quiet && exit 0
           git commit -m 'Restore temperature-driven visible clothing for all comfort figures'
           git push origin HEAD:weather/restore-temperature-clothing
