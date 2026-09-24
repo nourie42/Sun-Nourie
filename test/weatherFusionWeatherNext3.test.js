@@ -23,6 +23,9 @@ test('WeatherNext 3 card exposes hourly hosted statistics and keeps map disabled
   assert.match(js, /precipitationP90Inches/);
   assert.match(js, /button\.disabled=true/);
   assert.match(js, /WeatherNext 3 map pending data access/);
+  assert.match(js, /Connected feed/);
+  assert.match(js, /syncWeatherNextStatus/);
+  assert.match(js, /comparison-only and does not change the NWS\/HRRR\/ECMWF\/NBM rain blend/);
 });
 
 test('WeatherNext collector reads BigQuery surface statistics without inventing PoP', async () => {
@@ -33,6 +36,7 @@ test('WeatherNext collector reads BigQuery surface statistics without inventing 
   assert.match(py, /total_precipitation_1hr_mean/);
   assert.match(py, /"comparisonOnly": True/);
   assert.match(py, /"timeStepHours": 1/);
+  assert.match(py, /TIMESTAMP_SUB\(CURRENT_TIMESTAMP\(\), INTERVAL 2 DAY\)/);
   assert.doesNotMatch(py, /probabilityOfPrecipitation|hourlyPop|rainChance/);
 });
 
