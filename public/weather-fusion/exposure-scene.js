@@ -1,12 +1,13 @@
 import {weatherShapes} from './weather-display.js?v=rain-now-v71';
 import {weatherState} from './weather-state.js';
+import {clothingArtwork} from './comfort-clothing.js?v=wardrobe-v1';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 
 export function clothingForFeels(value){
  if(!finite(value))return 'mild';
  if(value>=88)return 'hot';
  if(value>=74)return 'warm';
- if(value>=58)return 'mild';
+ if(value>=65)return 'mild';
  if(value>=42)return 'cool';
  return 'cold';
 }
@@ -126,7 +127,7 @@ export function exposureScene(sun,daylight=true,condition='Clear',feels=null,con
  const cloud=`<g fill="#fff" opacity=".8"><ellipse cx="222" cy="171" rx="48" ry="17"/><ellipse cx="255" cy="165" rx="31" ry="22"/><ellipse cx="191" cy="169" rx="26" ry="14"/></g>`;
  const background=`<rect width="300" height="360" rx="22" fill="url(#${id}-sky)"/>${daylight&&['clear','partly-cloudy'].includes(weather.kind)?cloud:''}${distantPark(id,p)}`;
  const art=sun?standingPerson(feels):shadeTree()+seatedPerson(feels);
- const clothing={hot:'light hot-weather clothing',warm:'light warm-weather clothing',mild:'everyday mild-weather clothing',cool:'a jacket and long pants',cold:'a coat, scarf and warm hat'}[clothingForFeels(feels)];
+ const clothing={hot:'light hot-weather clothing',warm:'light warm-weather clothing',mild:'a top and long pants',cool:'a jacket and long pants',cold:'a coat, scarf and warm hat'}[clothingForFeels(feels)];
  const label=sun?`A smiling person in ${clothing}, outdoors in ${weather.label.toLowerCase()} conditions`:`A smiling person in ${clothing}, sitting beneath a tall shade tree`;
  return `<svg viewBox="0 0 300 360" preserveAspectRatio="xMidYMid slice" role="img" aria-label="${label}" data-outfit="${clothingForFeels(feels)}">${defs}${background}${icon}${art}</svg>`;
 }
@@ -152,7 +153,7 @@ export function comfortSceneState(daylight=true,condition='Clear',feels=null,con
  const kind=weatherState(condition).kind,precipitation=precipitationActivity(condition,context);
  if(kind==='snow')return {key:'cold',asset:'comfort-reference-scenes-cold.webp'};
  if(precipitation==='active')return {key:'rain',asset:'comfort-reference-scenes-rain.webp'};
- if(finite(feels)&&feels<40)return {key:'cold',asset:'comfort-reference-scenes-cold.webp'};
+ if(finite(feels)&&feels<42)return {key:'cold',asset:'comfort-reference-scenes-cold.webp'};
  if(precipitation==='possible')return {key:'carry-umbrella',asset:'comfort-reference-scenes-carry-umbrella.svg'};
  if(kind==='fog')return {key:'fog',asset:'comfort-reference-scenes-fog.webp'};
  if(!daylight)return {key:'dawn',asset:'comfort-reference-scenes-dawn.webp'};
@@ -181,7 +182,7 @@ export function referenceScene(panel,daylight=true,condition='Clear',feels=null,
  const scene=comfortSceneState(daylight,condition,feels,context);
  const sky=skyPalette(weather,daylight);
  const subject=panel===0?'A boy sitting beneath a shade tree':panel===1?'A boy outdoors':'A woman walking a light brown toy poodle';
- const normalClothing={hot:'light hot-weather clothing',warm:'light warm-weather clothing',mild:'everyday mild-weather clothing',cool:'a jacket and long pants',cold:'a coat, scarf and warm hat'}[clothingForFeels(feels)];
+ const normalClothing={hot:'light hot-weather clothing',warm:'light warm-weather clothing',mild:'a top and long pants',cool:'a jacket and long pants',cold:'a coat, scarf and warm hat'}[clothingForFeels(feels)];
  const rainAction=panel===0?'sheltering beneath a leafy tree as steady rain falls nearby':'using rain gear and an umbrella in steady rain';
  const action={hot:'visibly reacting to extreme heat in light hot-weather clothing',rain:rainAction,umbrella:'holding an open umbrella under a cloudy sky before rain begins', 'carry-umbrella':'carrying a closed umbrella under a cloudy sky because rain is possible but not likely enough to open it',cold:'wearing a coat, scarf and warm hat for cold weather',fog:'clearly visible in diffuse fog with no direct sunlight',watch:'looking at a cloudy sky with no rain gear needed',dawn:'clearly visible outdoors before sunrise with no direct sunlight',normal:`outdoors in ${normalClothing}`}[scene.key];
  const label=panel===2&&scene.key==='rain'
@@ -191,5 +192,5 @@ export function referenceScene(panel,daylight=true,condition='Clear',feels=null,
  const symbol=scene.key!=='normal'||panel===0?'':daylight&&weather.kind==='clear'
   ?sunGlyph(id,248,57,.64)
   :`<g transform="translate(214 20) scale(1.5)">${weatherShapes(condition,daylight)}</g>`;
- return `<svg class="reference-scene${panel===2?' poodle-scene':''}" viewBox="0 0 300 300" preserveAspectRatio="xMidYMid slice" role="img" aria-label="${label}" data-scene="${scene.key}" data-outfit="${clothingForFeels(feels)}" data-daylight="${daylight}" data-weather="${weather.kind}">${sharedDefs(id,sky)}<image class="reference-art" href="${comfortSceneUrl(scene.asset)}" x="${-300*panel}" y="0" width="900" height="300" preserveAspectRatio="none"/>${tint?`<rect width="300" height="300" fill="${tint}" class="reference-weather-tint" opacity="${daylight?'.06':'.18'}"/>`:''}${symbol}</svg>`;
+ return `<svg class="reference-scene${panel===2?' poodle-scene':''}" viewBox="0 0 300 300" preserveAspectRatio="xMidYMid slice" role="img" aria-label="${label}; clothing: ${normalClothing}" data-scene="${scene.key}" data-outfit="${clothingForFeels(feels)}" data-daylight="${daylight}" data-weather="${weather.kind}">${sharedDefs(id,sky)}<image class="reference-art" href="${comfortSceneUrl(scene.asset)}" x="${-300*panel}" y="0" width="900" height="300" preserveAspectRatio="none"/>${tint?`<rect width="300" height="300" fill="${tint}" class="reference-weather-tint" opacity="${daylight?'.06':'.18'}"/>`:''}${clothingArtwork(panel,scene.key,clothingForFeels(feels),comfortSceneUrl(scene.asset))}${symbol}</svg>`;
 }
