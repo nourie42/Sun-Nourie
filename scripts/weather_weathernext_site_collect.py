@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Collect ALL documented BigQuery WeatherNext 3 surface statistics for the standalone site.
+"""Publish all available WeatherNext BigQuery surface statistics, without blending.
 
-No model blending, invented PoP, raw-member reconstruction, or live-observation claims.
-Schema is inspected before querying. Main cycles and interim cycles remain separate.
+Source schema is inspected. Main and interim cycles remain separate. Every query
+has a billing cap, initialization filter, and clustered geographic predicate.
 Docs: https://developers.google.com/weathernext/guides/bigquery
 """
 from __future__ import annotations
@@ -46,13 +46,25 @@ def query_config(parameters=None, maximum_bytes=2_000_000_000):
  from google.cloud import bigquery
  return bigquery.QueryJobConfig(query_parameters=parameters or [], maximum_bytes_billed=maximum_bytes)
 
+def execute(client,sql,config):
+ job=client.query(sql,job_config=config,location='US')
+ rows=list(job.result(timeout=180))
+ print(json.dumps({'queryJob':job.job_id,'bytesBilled':job.total_bytes_billed,'cacheHit':job.cache_hit,'rows':len(rows)}))
+ return rows
+
+def point_params(point):
+ from google.cloud import bigquery
+ return [bigquery.ScalarQueryParameter('longitude','FLOAT64',point['longitude']),bigquery.ScalarQueryParameter('latitude','FLOAT64',point['latitude'])]
+
 def latest_run(client, table, main, cap):
  mod='AND MOD(EXTRACT(HOUR FROM init_time), 6) = 0' if main else ''
  sql=f'''SELECT MAX(init_time) AS init_time FROM `{validate_table(table)}`
- WHERE init_time BETWEEN TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 2 DAY) AND CURRENT_TIMESTAMP() {mod}'''
- row=next(iter(client.query(sql,job_config=query_config(maximum_bytes=cap),location='US').result(timeout=120)),None)
- if not row or row.init_time is None: raise RuntimeError('No published initialization in the last two days.')
- return row.init_time
+ WHERE init_time BETWEEN TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 2 DAY) AND CURRENT_TIMESTAMP()
+ AND ST_DWITHIN(geography, ST_GEOGPOINT(@longitude,@latitude), 15000)
+ AND ST_INTERSECTS(geography_polygon, ST_GEOGPOINT(@longitude,@latitude)) {mod}'''
+ rows=execute(client,sql,query_config(point_params(POINTS[0]),cap))
+ if not rows or rows[0].init_time is None: raise RuntimeError('No published initialization at the saved location in the last two days.')
+ return rows[0].init_time
 
 def query_point(client,table,run,point,columns,cap):
  from google.cloud import bigquery
@@ -61,14 +73,13 @@ def query_point(client,table,run,point,columns,cap):
  ST_X(t.geography) AS grid_lon, ST_Y(t.geography) AS grid_lat, {selected}
  FROM `{validate_table(table)}` AS t, UNNEST(t.forecast) AS f
  WHERE t.init_time = @init_time
+ AND ST_DWITHIN(t.geography, ST_GEOGPOINT(@longitude,@latitude), 15000)
  AND ST_INTERSECTS(t.geography_polygon, ST_GEOGPOINT(@longitude,@latitude))
  AND f.hours BETWEEN 1 AND 360
  QUALIFY ROW_NUMBER() OVER(PARTITION BY f.time ORDER BY ST_DISTANCE(t.geography,ST_GEOGPOINT(@longitude,@latitude))) = 1
  ORDER BY f.time'''
- params=[bigquery.ScalarQueryParameter('init_time','TIMESTAMP',run),
-         bigquery.ScalarQueryParameter('longitude','FLOAT64',point['longitude']),
-         bigquery.ScalarQueryParameter('latitude','FLOAT64',point['latitude'])]
- rows=list(client.query(sql,job_config=query_config(params,cap),location='US').result(timeout=180))
+ params=[bigquery.ScalarQueryParameter('init_time','TIMESTAMP',run)]+point_params(point)
+ rows=execute(client,sql,query_config(params,cap))
  if not rows: raise RuntimeError('No point forecast for '+point['id'])
  hourly=[]
  for r in rows:
@@ -125,7 +136,6 @@ def main():
     sources[id]={'status':'not-newer','message':'The main run is also the newest available initialization.'};continue
    sources[id]=collect(client,t,r,grid,catalog['fields'],prev.get(id),cap,now)
   except Exception as e:
-   # Optional failures cannot erase the verified primary surface forecast.
    message=type(e).__name__+': '+str(e)[:300]
    warnings.append(id+': '+message)
    if prev.get(id,{}).get('points'):
