@@ -59,6 +59,10 @@ test('Today sky adds clouds and precipitation by forecast scenario',()=>{
  assert.match(todaySkySceneHTML(todaySkyProfile({condition:'Thunderstorms',pop:75})),/today-sky-storm\.webp/);
  assert.match(todaySkySceneHTML(todaySkyProfile({condition:'Overcast with Rain',pop:80})),/today-sky-rain\.webp/);
  assert.match(todaySkySceneHTML(todaySkyProfile({condition:'Clear',pop:0},true)),/today-sky-night-v2\.webp/);
+ const cloudyTonight=todaySkySceneHTML(todaySkyProfile({nightCondition:'Mostly Cloudy',popNight:6},true));
+ assert.match(cloudyTonight,/today-sky-cloudy-night/,'mostly cloudy night uses cloud-heavy artwork');
+ assert.match(cloudyTonight,/today-night-cloud-light|today-night-cloud-mid|today-night-cloud-dark/);
+ assert.doesNotMatch(cloudyTonight,/today-sky-night-v2|today-moon/,'mostly cloudy night does not use clear-night moon artwork');
  const rainyTonight=todaySkySceneHTML(todaySkyProfile({nightCondition:'Rain',popNight:100},true));
  assert.match(rainyTonight,/today-sky-rain\.webp/,'a rainy night uses rain artwork');
  assert.doesNotMatch(rainyTonight,/today-sky-night-v2|today-moon|sky-lightning/,'plain rain does not show clear-night or lightning imagery');
