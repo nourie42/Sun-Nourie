@@ -1,4 +1,5 @@
 name: WeatherNext 3 point forecast data
+# WIF setup verified
 
 on:
   push:
