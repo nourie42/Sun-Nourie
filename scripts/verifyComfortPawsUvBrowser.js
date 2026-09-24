@@ -70,15 +70,16 @@ try{
     compactHeight:rr.height<=180,
     metaBelowTop:meta.top>=Math.max(...top.map(r=>r.bottom))-3,
     confidenceNearLeft:confidence.left-rr.left<=18,
-    confidenceLeft:confidence.left<=wind.left&&wind.left<uv.left,
-    noOverlap:confidence.right<=wind.left+4&&wind.right<=uv.left+4,
+    confidenceOwnRow:confidence.bottom<=Math.min(wind.top,uv.top)+2,
+    windLeftOfUv:wind.left<uv.left&&wind.right<=uv.left+2,
+    noOverlap:confidence.bottom<=Math.min(wind.top,uv.top)+2&&wind.right<=uv.left+2,
     windVisible:wind.width>=12&&/Wind/.test(row.querySelector('.day-wind-chip')?.textContent||''),
     allInside:[meta,confidence,wind,uv].every(r=>r.left>=rr.left-1&&r.right<=rr.right+1),
     balancedMargins:Math.abs((rr.left-panel.left)-(panel.right-rr.right))<=3,
    };
   });
-  if(width<=760)assert.deepEqual(dailyLayout,{rowFits:true,compactHeight:true,metaBelowTop:true,confidenceNearLeft:true,confidenceLeft:true,noOverlap:true,windVisible:true,allInside:true,balancedMargins:true});
-  const placement=await page.evaluate(()=>{const q=s=>document.querySelector(s),a=q('.sun-person').getBoundingClientRect(),b=q('#pavement-content').getBoundingClientRect(),c=q('#skin-exposure').getBoundingClientRect();return {sameRow:Math.abs(a.top-b.top)<2,pawsRight:b.left>=a.right,inside:b.left>=c.left&&b.right<=c.right&&q('#skin-exposure').contains(q('#pavement-content')),three:q('.sun-shade-comparison').children.length,meta:[...document.querySelectorAll('.day-meta')].every(el=>{const f=el.querySelector('.forecast-confidence').getBoundingClientRect(),w=el.querySelector('.day-wind-chip').getBoundingClientRect(),u=el.querySelector('.daily-uv').getBoundingClientRect();return f.left<=w.left&&w.left<u.left&&f.right<=w.left+4&&w.right<=u.left+4;})};});
+  if(width<=760)assert.deepEqual(dailyLayout,{rowFits:true,compactHeight:true,metaBelowTop:true,confidenceNearLeft:true,confidenceOwnRow:true,windLeftOfUv:true,noOverlap:true,windVisible:true,allInside:true,balancedMargins:true});
+  const placement=await page.evaluate(()=>{const q=s=>document.querySelector(s),a=q('.sun-person').getBoundingClientRect(),b=q('#pavement-content').getBoundingClientRect(),c=q('#skin-exposure').getBoundingClientRect();return {sameRow:Math.abs(a.top-b.top)<2,pawsRight:b.left>=a.right,inside:b.left>=c.left&&b.right<=c.right&&q('#skin-exposure').contains(q('#pavement-content')),three:q('.sun-shade-comparison').children.length,meta:[...document.querySelectorAll('.day-meta')].every(el=>{const f=el.querySelector('.forecast-confidence').getBoundingClientRect(),w=el.querySelector('.day-wind-chip').getBoundingClientRect(),u=el.querySelector('.daily-uv').getBoundingClientRect();return f.bottom<=Math.min(w.top,u.top)+2&&w.left<u.left&&w.right<=u.left+2;})};});
   assert.deepEqual(placement,{sameRow:true,pawsRight:true,inside:true,three:3,meta:true});
   assert.equal(await page.locator('#skin-kicker').innerText(),'How it actually feels right now');
   assert.deepEqual(await page.locator('#skin-values .exposure-label').allTextContents(),['Shade','Day','For Pets']);
