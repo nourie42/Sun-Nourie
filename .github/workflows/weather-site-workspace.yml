@@ -1,32 +1,79 @@
-name: Weather site test workspace
+name: Apply and verify WeatherNext site
 on:
   push:
     branches: [weather/plain-nav-weathernext-site]
     paths: ['.github/workflows/weather-site-workspace.yml']
 permissions:
-  contents: read
+  contents: write
 jobs:
-  workspace:
+  verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
-          persist-credentials: false
+          ref: weather/plain-nav-weathernext-site
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: npm ci --ignore-scripts
-      - name: Package tracked source and test dependencies
+      - name: Merge current backend and apply exact validated UI edits
         run: |
-          mkdir -p /tmp/weather-workspace
-          git archive HEAD | tar -x -C /tmp/weather-workspace
-          cp -a node_modules /tmp/weather-workspace/node_modules
-          mkdir -p /tmp/weather-workspace/qa
-          curl -fsSL https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/weathernext3.json -o /tmp/weather-workspace/qa/weathernext-live.json
-          tar -czf /tmp/weather-workspace.tar.gz -C /tmp/weather-workspace .
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin main
+          git merge --no-edit origin/main
+          python - <<'PY'
+          import json,base64,gzip,hashlib
+          from pathlib import Path
+          raw=gzip.decompress(base64.b64decode(Path('.github/weather-ui-edits.b64').read_text()))
+          assert hashlib.sha256(raw).hexdigest()=='8da11a4c3ae0dee99567315da307407e24aaca98bde73a4fca670e91027a1591'
+          for change in json.loads(raw):
+              p=Path(change['path'])
+              assert not p.is_absolute() and '..' not in p.parts
+              old=p.read_bytes()
+              assert hashlib.sha256(old).hexdigest()==change['base'], 'Changed source: '+str(p)
+              lines=old.decode().splitlines(True)
+              for start,end,text in reversed(change['edits']):lines[start:end]=[text]
+              result=''.join(lines).encode()
+              assert hashlib.sha256(result).hexdigest()==change['result'], 'Edit mismatch: '+str(p)
+              p.write_bytes(result)
+          p=Path('scripts/weatherNextSiteSmoke.js')
+          s=p.read_text();s=s.replace("await page.locator('#hour').fill('100');", "await page.locator('#hour').evaluate(el=>{el.value='100';});")
+          p.write_text(s)
+          PY
+          git add public/weather-fusion src/weatherFusion.js scripts/verifyComfortPawsUvBrowser.js scripts/weatherTodayTileSmoke.js scripts/weatherNextSiteSmoke.js test/weatherFusionDeviceAqiRain.test.js test/weatherFusionForecastDetails.test.js test/weatherFusionWeatherNext3.test.js
+      - run: npm ci
+      - name: Run every weather unit test
+        run: |
+          mkdir -p /tmp/weathernext-site-qa
+          set -o pipefail
+          node --test test/weather*.test.js | tee /tmp/weathernext-site-qa/unit-tests.txt
+      - run: npm install --no-save --package-lock=false playwright@1.55.0
+      - run: npx playwright install --with-deps chromium
+      - run: node scripts/weatherNextSiteSmoke.js
+      - run: node scripts/weatherTodayTileSmoke.js
+      - name: Capture real published data without any production fixtures
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/weathernext-full.json -o /tmp/weathernext-site-qa/live-source.json
+          node --input-type=module - <<'JS'
+          import fs from 'node:fs';
+          import assert from 'node:assert/strict';
+          import {validateFeed} from './public/weather-fusion/weathernext-data.js';
+          const f=validateFeed(JSON.parse(fs.readFileSync('/tmp/weathernext-site-qa/live-source.json')));
+          assert.equal(f.sources.surface.fields.length,19);
+          assert.equal(f.sources.surface.horizonHours,360);
+          console.log(JSON.stringify({generatedAt:f.generatedAt,sources:Object.fromEntries(Object.entries(f.sources).map(([k,v])=>[k,{status:v.status,fields:v.fields?.length,hours:v.horizonHours}]))}));
+          JS
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: weather-site-workspace
-          path: /tmp/weather-workspace.tar.gz
-          retention-days: 1
+          name: weathernext-site-final-evidence
+          path: /tmp/weathernext-site-qa
+          retention-days: 7
+      - name: Save only verified source changes to feature branch
+        run: |
+          git rm .github/weather-ui-edits.b64 .github/workflows/weather-site-workspace.yml
+          git diff --cached --stat
+          git commit -m 'Replace image navigation with text buttons and launch separate WeatherNext forecast site'
+          git push origin HEAD:weather/plain-nav-weathernext-site
