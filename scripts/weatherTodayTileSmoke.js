@@ -79,9 +79,10 @@ try {
         navFits:nav.scrollWidth<=nav.clientWidth+1,
         fiveCards:cards.length===5,
         labelsOneLine:labels.every(el=>el.scrollWidth<=el.clientWidth+1&&getComputedStyle(el).whiteSpace==='nowrap'),
-        arrowsClear:cards.every(card=>{const l=rect(card.querySelector('.jump-label')),a=rect(card.querySelector('.jump-arrow'));return l.right<=a.left+1;}),
+        oneRow:Math.max(...cards.map(card=>rect(card).top))-Math.min(...cards.map(card=>rect(card).top))<3,
+        noArrows:cards.every(card=>!card.querySelector('.jump-arrow')),
         noArtwork:cards.every(card=>!card.querySelector('.jump-visual')&&!card.querySelector('svg.jump-svg')),
-        compactButtons:cards.every(card=>{const h=rect(card).height;return h>=42&&h<=56;}),
+        compactButtons:cards.every(card=>{const h=rect(card).height;return h>=34&&h<=46;}),
         rowFits:[...row.children].filter(el=>el.getClientRects().length).every(el=>{const r=rect(el);return r.left>=rr.left-1&&r.right<=rr.right+1;}),
         metaBelow:meta.top>=Math.max(...[...row.children].filter(el=>!el.classList.contains('day-meta')&&!el.classList.contains('forecast-confidence-notice')).map(el=>rect(el).bottom))-4,
         confidenceOwnRow:confidence.bottom<=Math.min(wind.top,uv.top)+2,
@@ -90,7 +91,7 @@ try {
         gustInsideWind:!row.querySelector('.day-wind-chip em')||rect(row.querySelector('.day-wind-chip em')).right<=wind.right+1,
       };
     });
-    assert.deepEqual(layout,{navFits:true,fiveCards:true,labelsOneLine:true,arrowsClear:true,noArtwork:true,compactButtons:true,rowFits:true,metaBelow:true,confidenceOwnRow:true,windLeftOfUv:true,lowerInside:true,gustInsideWind:true},`simple mobile button layout at ${width}px`);
+    assert.deepEqual(layout,{navFits:true,fiveCards:true,labelsOneLine:true,oneRow:true,noArrows:true,noArtwork:true,compactButtons:true,rowFits:true,metaBelow:true,confidenceOwnRow:true,windLeftOfUv:true,lowerInside:true,gustInsideWind:true},`flat one-row mobile button layout at ${width}px`);
   }
 
   console.log(JSON.stringify({
