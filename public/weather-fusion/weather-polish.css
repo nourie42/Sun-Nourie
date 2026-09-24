@@ -113,3 +113,26 @@ body[data-sky="night"] .air-quality-panel{background:radial-gradient(ellipse at 
   .weather-jump-card .jump-label,.weather-jump-card.jump-gross .jump-label{font-size:8.2px;letter-spacing:-.04em}
   .weather-jump-card .jump-arrow{width:12px;height:12px;font-size:13px;border-width:1px}
 }
+
+/* Final phone proportions follow the approved reference: Map / Gross / Your Day,
+   with Gross intentionally wider, then two equal lower cards. */
+@media(max-width:760px){
+  .weather-jump-nav{grid-template-columns:repeat(12,minmax(0,1fr));gap:6px}
+  .weather-jump-card:nth-child(1){grid-column:span 3}
+  .weather-jump-card:nth-child(2){grid-column:span 5}
+  .weather-jump-card:nth-child(3){grid-column:span 4}
+  .weather-jump-card:nth-child(4),.weather-jump-card:nth-child(5){grid-column:span 6}
+  .weather-jump-card{min-height:84px;grid-template-columns:30px minmax(0,1fr) 18px;gap:4px;padding:7px 5px}
+  .weather-jump-card .jump-visual{width:30px;height:54px;padding-right:5px}
+  .weather-jump-card .jump-label{font-size:10.5px}
+  .weather-jump-card.jump-gross .jump-label{font-size:11px}
+  .weather-jump-card .jump-arrow{width:18px;height:18px;font-size:18px}
+}
+@media(max-width:359px){
+  .weather-jump-nav{gap:4px}
+  .weather-jump-card{min-height:76px;grid-template-columns:22px minmax(0,1fr) 13px;gap:2px;padding:5px 3px}
+  .weather-jump-card .jump-visual{width:22px;height:46px;padding-right:3px}
+  .weather-jump-card .jump-label{font-size:8.4px}
+  .weather-jump-card.jump-gross .jump-label{font-size:8.8px}
+  .weather-jump-card .jump-arrow{width:13px;height:13px;font-size:13px}
+}
