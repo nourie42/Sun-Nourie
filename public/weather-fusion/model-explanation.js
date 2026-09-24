@@ -137,6 +137,7 @@ function weatherNextHours(point) {
 }
 function weatherNextCard(forecast, view) {
   const state=weatherNextState,key=weatherNextKey(forecast),same=key&&state.key===key,zone=view.zone;
+  const connected=same&&state.status==='ready';
   let body='';
   if(!same||state.status==='idle'||state.status==='loading'){
     body='<div class="graphcast-state">Checking the latest hosted Google WeatherNext 3 forecast for this location…</div>';
@@ -150,7 +151,23 @@ function weatherNextCard(forecast, view) {
   }else{
     body=`<div class="graphcast-state"><strong>Google access is not connected yet.</strong><br>WeatherNext 3 real-time data requires allowlist access and a linked Google Cloud dataset. Once that feed is published, this card fills automatically with real hourly WeatherNext temperatures, wind, precipitation and ensemble ranges.</div>`;
   }
-  return `<section class="graphcast-card weathernext-card" aria-label="Google WeatherNext 3 experimental comparison"><div class="graphcast-head"><div><h3 class="graphcast-title"><span class="graphcast-orb" aria-hidden="true">W3</span>Google WeatherNext 3</h3><p class="graphcast-copy">Google's current operational AI weather model · hourly surface forecasts with a 64-member ensemble. WeatherNext 3 is shown separately from the NWS/HRRR/ECMWF/NBM rain blend until we validate how it should be weighted for your site.</p></div><div class="graphcast-badges"><span class="graphcast-badge">Live hosted model</span><span class="graphcast-badge safe">Comparison only</span></div></div>${body}<p><a class="graphcast-link" href="${WEATHERNEXT_SOURCE}" target="_blank" rel="noopener noreferrer">About WeatherNext 3 ↗</a> <a class="graphcast-link weathernext-access" href="${WEATHERNEXT_ACCESS}" target="_blank" rel="noopener noreferrer">Access setup ↗</a></p></section>`;
+  return `<section class="graphcast-card weathernext-card" aria-label="Google WeatherNext 3 experimental comparison"><div class="graphcast-head"><div><h3 class="graphcast-title"><span class="graphcast-orb" aria-hidden="true">W3</span>Google WeatherNext 3</h3><p class="graphcast-copy">Google's current operational AI weather model · hourly surface forecasts with a 64-member ensemble. WeatherNext 3 is shown separately from the NWS/HRRR/ECMWF/NBM rain blend until we validate how it should be weighted for your site.</p></div><div class="graphcast-badges"><span class="graphcast-badge">${connected?'Connected feed':'Awaiting Google feed'}</span><span class="graphcast-badge safe">Comparison only</span></div></div>${body}<p><a class="graphcast-link" href="${WEATHERNEXT_SOURCE}" target="_blank" rel="noopener noreferrer">About WeatherNext 3 ↗</a> <a class="graphcast-link weathernext-access" href="${WEATHERNEXT_ACCESS}" target="_blank" rel="noopener noreferrer">Access setup ↗</a></p></section>`;
+}
+function syncWeatherNextStatus(forecast) {
+  if(typeof document==='undefined'||!experimentalPath())return;
+  const status=document.getElementById('google-status');
+  if(!status)return;
+  const key=weatherNextKey(forecast),same=key&&weatherNextState.key===key,state=weatherNextState;
+  if(!same||state.status==='idle'||state.status==='loading'){
+    status.textContent='Google WeatherNext 3: checking the authorized hosted feed for this location.';
+  }else if(state.status==='ready'){
+    const zone=zoneFor(forecast),run=stamp(state.runAt,zone);
+    status.textContent=`Google WeatherNext 3 is connected on Experimental Weather. Latest hosted run: ${run}. It is comparison-only and does not change the NWS/HRRR/ECMWF/NBM rain blend.`;
+  }else if(state.status==='not-covered'){
+    status.textContent='Google WeatherNext 3 is connected, but the published point feed does not cover this selected location yet. The normal forecast remains unchanged.';
+  }else{
+    status.textContent='Google WeatherNext 3 is not connected yet. Real-time WeatherNext data requires approved Google access plus the linked BigQuery feed configured in GitHub.';
+  }
 }
 function queueWeatherNextLoad(forecast) {
   if(typeof window==='undefined'||typeof fetch!=='function')return;
@@ -167,6 +184,7 @@ function queueWeatherNextLoad(forecast) {
   }).catch(error=>{
     weatherNextState={key,status:'access-required',point:null,runAt:null,generatedAt:null,checkedAt:Date.now(),message:String(error?.message||error)};
   }).finally(()=>{
+    syncWeatherNextStatus(forecast);
     if(latest===forecast&&experimentalPath())renderModelExplanation(latest,latestNow);
   });
 }
@@ -238,6 +256,7 @@ export function renderModelExplanation(forecast, now = Date.now()) {
     panel.querySelector(key)?.focus();
   };
   installWeatherNextMapControl();
+  syncWeatherNextStatus(forecast);
   queueWeatherNextLoad(forecast);
   return view;
 }
