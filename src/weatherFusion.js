@@ -30,6 +30,7 @@ export const PRESETS = [
   { id: 'greenville', name: 'Greenville, NC', latitude: 35.6127, longitude: -77.3664 },
 ];
 export const RADAR_URL = 'https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows';
+export const RADAR_ARCGIS_URL = 'https://mapservices.weather.noaa.gov/eventdriven/rest/services/radar/radar_base_reflectivity_time/ImageServer';
 export const RADAR_NEARBY_MILES = 12;
 export const RADAR_CLOSE_MILES = 5;
 export const RADAR_AREA_MILES = 36;
@@ -206,6 +207,46 @@ export function radarSampleLocations(location) {
 export function radarFeatureActive(payload) {
   const properties = payload?.features?.[0]?.properties;
   return finite(properties?.ALPHA_BAND) ? properties.ALPHA_BAND > 0 : null;
+}
+
+export function radarArcgisActive(payload) {
+  const raw = payload?.value;
+  if (raw === null || raw === undefined) return null;
+  if (/^nodata$/i.test(String(raw).trim())) return false;
+  const values = String(raw).split(/[\s,]+/).map(Number).filter(Number.isFinite);
+  if (values.length >= 4) return values.at(-1) > 0;
+  return values.length ? values.some(value => value !== 0) : null;
+}
+
+export function radarArcgisQueryUrl(limit = 3) {
+  return `${RADAR_ARCGIS_URL}/query?${new URLSearchParams({
+    where:"idp_subset='CONUS'",
+    outFields:'objectid,name,idp_validtime,idp_validendtime,idp_ingestdate',
+    orderByFields:'idp_validtime DESC',
+    resultRecordCount:String(limit),
+    returnGeometry:'false',
+    f:'json',
+  })}`;
+}
+
+export function radarArcgisTimes(payload, currentTime = Date.now()) {
+  const values = (payload?.features || []).map(feature => Number(feature?.attributes?.idp_validtime)).filter(value =>
+    finite(value) && value <= currentTime + 2 * MINUTE && value >= currentTime - 6 * HOUR
+  );
+  return [...new Set(values)].sort((a,b)=>a-b).map(iso);
+}
+
+export function radarArcgisIdentifyUrl(point, time) {
+  const geometry = JSON.stringify({x:point.longitude,y:point.latitude,spatialReference:{wkid:4326}});
+  return `${RADAR_ARCGIS_URL}/identify?${new URLSearchParams({
+    geometry,
+    geometryType:'esriGeometryPoint',
+    time:String(Date.parse(time)),
+    returnGeometry:'false',
+    returnCatalogItems:'false',
+    returnAllPixelValues:'false',
+    f:'json',
+  })}`;
 }
 
 export function radarHydrometeorClass(payload) {
@@ -582,21 +623,56 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
   async function radar(query = {}) {
     const location = coordinates(query);
     const pointUrl=`https://api.weather.gov/points/${location.latitude},${location.longitude}`;
-    const [result,pointResult] = await Promise.all([
+    const [result,pointResult,arcgisResult] = await Promise.all([
       feed('radar', 'NOAA radar mosaic', `${RADAR_URL}?service=WMS&version=1.3.0&request=GetCapabilities`, 2 * MINUTE, (xml) => parseRadarTimes(xml, now()), { text: true }),
       cached(pointUrl,24*HOUR).catch(()=>null),
+      cached(radarArcgisQueryUrl(),MINUTE,{timeout:12000}).catch(()=>null),
     ]);
-    const frames = result.value || [];
-    const status = frames.length ? (now() - Date.parse(frames.at(-1)) > 20 * MINUTE ? 'stale' : 'ready') : 'unavailable';
-    let precipitation = {status:'unavailable',observedAt:frames.at(-1)||null,atLocation:null,close:false,nearby:false,inArea:false,approaching:false,nearestRainMiles:null,nearestRainDirection:null,closeRadiusMiles:RADAR_CLOSE_MILES,nearbyRadiusMiles:RADAR_NEARBY_MILES,scanRadiusMiles:RADAR_AREA_MILES,source:'NOAA MRMS reflectivity checked against local NEXRAD dual-polarization classification'};
-    if (status === 'ready') {
-      const observedAt = frames.at(-1), points = radarSampleLocations(location);
-      const radarStation=pointResult?.data?.properties?.radarStation;
+    const wmsFrames = result.value || [];
+    const arcgisFrames = radarArcgisTimes(arcgisResult?.data,now());
+    const frames = [...new Set([...wmsFrames,...arcgisFrames])].sort((a,b)=>Date.parse(a)-Date.parse(b));
+    const latestWms=wmsFrames.at(-1)||null,latestArcgis=arcgisFrames.at(-1)||null;
+    const observedAt=[latestWms,latestArcgis].filter(Boolean).sort((a,b)=>Date.parse(a)-Date.parse(b)).at(-1)||null;
+    const age=observedAt?now()-Date.parse(observedAt):Infinity;
+    const status=observedAt?(age>20*MINUTE?'stale':'ready'):'unavailable';
+    const radarStation=pointResult?.data?.properties?.radarStation;
+    let precipitation = {
+      status:status==='ready'?'ready':status,
+      observedAt,
+      atLocation:null,close:false,nearby:false,inArea:false,approaching:false,
+      nearestRainMiles:null,nearestRainDirection:null,
+      closeRadiusMiles:RADAR_CLOSE_MILES,nearbyRadiusMiles:RADAR_NEARBY_MILES,scanRadiusMiles:RADAR_AREA_MILES,
+      source:'NOAA MRMS quality-controlled base reflectivity',
+      classification:{station:radarStation||null,observedAt:null,reflectivityFallback:false},
+    };
+
+    if (status === 'ready' && latestArcgis && now()-Date.parse(latestArcgis)<=20*MINUTE) {
+      const points=radarSampleLocations(location);
+      const loadPoint=async point=>{
+        try{
+          const {data}=await cached(radarArcgisIdentifyUrl(point,latestArcgis),2*MINUTE,{timeout:12000});
+          return {...point,active:radarArcgisActive(data),evidence:'noaa-arcgis-mrms'};
+        }catch{return {...point,active:null,evidence:'noaa-arcgis-unavailable'};}
+      };
+      const center=await loadPoint(points[0]);
+      const samples=center.active===true?[center]:[center,...await Promise.all(points.slice(1).map(loadPoint))];
+      const currentPresence=summarizeRadarPresence(samples,latestArcgis);
+      precipitation={
+        ...currentPresence,
+        ...summarizeRadarMotion(currentPresence,null),
+        source:'NOAA MRMS quality-controlled base reflectivity · NWS ArcGIS ImageServer',
+        classification:{station:radarStation||null,observedAt:null,reflectivityFallback:true,source:'arcgis-mrms-qcd'},
+      };
+    } else if (status === 'ready' && latestWms) {
+      // Legacy WMS fallback. The ArcGIS MRMS ImageServer above is preferred
+      // because GeoServer GetFeatureInfo has returned transparent pixels during
+      // verified precipitation events.
+      const observedAt=latestWms,points=radarSampleLocations(location);
       const hydrometeorCapabilitiesUrl=radarHydrometeorUrl(radarStation);
       const hydrometeorTimes=hydrometeorCapabilitiesUrl
         ? cached(hydrometeorCapabilitiesUrl,2*MINUTE,{text:true}).then(({data})=>parseRadarTimes(data,now())).catch(()=>[])
         : Promise.resolve([]);
-      const previousObservedAt=[...frames].reverse().find(time=>Date.parse(observedAt)-Date.parse(time)>=8*MINUTE)||null;
+      const previousObservedAt=[...wmsFrames].reverse().find(time=>Date.parse(observedAt)-Date.parse(time)>=8*MINUTE)||null;
       const loadReflectivity=time=>Promise.all(points.map(async point => {
         try {
           const {data} = await cached(radarFeatureInfoUrl(point,time),2*MINUTE);
@@ -607,17 +683,10 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
       const latestHydrometeor=hydrometeorFrames.at(-1);
       const hydrometeorAge=latestHydrometeor?now()-Date.parse(latestHydrometeor):Infinity;
       const hydrometeorOffset=latestHydrometeor?Math.abs(Date.parse(observedAt)-Date.parse(latestHydrometeor)):Infinity;
-      // Never let an older classification frame erase newer MRMS reflectivity
-      // from a fast-moving storm. Use dual-pol only when it is both fresh and
-      // closely aligned with the reflectivity frame.
       const hydrometeorObservedAt=latestHydrometeor&&hydrometeorAge<=20*MINUTE&&hydrometeorOffset<=8*MINUTE?latestHydrometeor:null;
       const samples=await Promise.all(reflectivitySamples.map(async sample=>{
         if(sample.reflectivityActive===false)return {...sample,hydrometeor:null,active:false,evidence:'mrms-dry'};
         if(sample.reflectivityActive!==true)return {...sample,hydrometeor:null,active:null,evidence:'mrms-unavailable'};
-        // MRMS base reflectivity is already quality controlled. Dual-pol
-        // hydrometeor classification is used to reject biological/clutter echoes
-        // when it is available, but a delayed/missing classification must not turn
-        // obvious reflectivity over the selected point into "unknown" or "dry".
         if(!hydrometeorObservedAt)return {...sample,hydrometeor:null,active:true,evidence:'mrms-reflectivity'};
         try{
           const url=radarHydrometeorUrl(radarStation,'GetFeatureInfo',sample,hydrometeorObservedAt);
@@ -629,20 +698,28 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
       }));
       const currentPresence=summarizeRadarPresence(samples,observedAt);
       const previousPresence=previousObservedAt?summarizeRadarPresence(previousReflectivitySamples.map(sample=>({...sample,active:sample.reflectivityActive})),previousObservedAt):null;
-      precipitation = {
+      precipitation={
         ...currentPresence,
         ...summarizeRadarMotion(currentPresence,previousPresence),
+        source:'NOAA MRMS reflectivity checked against local NEXRAD dual-polarization classification',
         classification:{
-          station:radarStation||null,
-          observedAt:hydrometeorObservedAt,
+          station:radarStation||null,observedAt:hydrometeorObservedAt,
           reflectivityFallback:samples.some(sample=>sample.active===true&&sample.evidence==='mrms-reflectivity'),
+          source:'geoserver-wms',
         },
       };
     }
-    return { frames, url: RADAR_URL, layer: 'conus_bref_qcd', status,
+
+    return {
+      frames,url:RADAR_URL,layer:'conus_bref_qcd',status,
       location:{latitude:location.latitude,longitude:location.longitude},precipitation,
-      fetchedAt: result.meta.fetchedAt, message: frames.length ? 'Observed radar mosaic; not a future forecast.' : 'Radar timestamps could not be verified. Use the official radar link.', officialUrl: 'https://radar.weather.gov/' };
+      fetchedAt:arcgisResult?.fetchedAt||result.meta.fetchedAt,
+      message:observedAt?'Observed radar; not a future forecast.':'Radar timestamps could not be verified. Use the official radar link.',
+      officialUrl:'https://radar.weather.gov/',
+      detectionSource:latestArcgis?'noaa-arcgis-mrms':'geoserver-wms',
+    };
   }
+
   const getBulletins=createBulletinService({getForecast,request,env,now});
   async function getOutlook(query){
     const location=coordinates(query);
