@@ -54,9 +54,9 @@ test('regular and experimental weather share device-location, jump-nav, AQI and 
  assert.doesNotMatch(app,/presets\.knightdale|weather-fusion-place/);
  assert.match(css,/font-size:12px!important/);
  assert.match(css,/gross-number/);
- assert.match(css,/\.weather-jump-nav\{display:grid;grid-template-columns:repeat\(6,minmax\(0,1fr\)\)/);
- assert.match(css,/\.weather-jump-card:nth-child\(-n\+3\)\{grid-column:span 2\}/);
- assert.match(css,/\.weather-jump-card:nth-child\(n\+4\)\{grid-column:span 3\}/);
+ assert.match(css,/\.weather-jump-nav\{display:grid;grid-template-columns:repeat\(5,minmax\(0,1fr\)\)/);
+ assert.match(css,/\.weather-jump-card\{[^}]*border:0;[^}]*background:rgba\(8,64,99/);
+ assert.match(css,/\.weather-jump-card:nth-child\(n\)\{grid-column:auto\}/);
  assert.ok(html.indexOf('id="metrics"')<html.indexOf('id="air-quality"'),'Your Day cards must appear directly before local air quality');
  assert.match(html,/Current local AQI \+ next 24 hours/);
 });
