@@ -32,11 +32,11 @@
  .daily-panel .day-low small,.daily-panel .day-high small{font-size:10px!important}.daily-panel .temp-track{height:7px}.daily-panel .high-marker{width:11px;height:11px}
  .daily-panel .day-feels-summary{align-self:center;min-width:0}.daily-panel .day-feels-summary small{font-size:9px!important}.daily-panel .day-feels-summary b{font-size:11px!important;white-space:nowrap}
  .daily-panel .day-meta{box-sizing:border-box;width:100%;display:grid;grid-template-columns:minmax(155px,1fr) 52px minmax(72px,auto);align-items:center;gap:8px;margin:0;padding:5px 0 0;border-top:0;color:#9edbf6;overflow:visible}
- .daily-panel .forecast-confidence{min-width:0;display:grid;grid-template-columns:auto auto minmax(38px,60px);align-items:center;justify-content:start;gap:4px;margin:0;font-size:9px!important;line-height:1.05;text-align:left;overflow:visible;transform:none}
+ .daily-panel .forecast-confidence{grid-column:1!important;min-width:0;display:grid;grid-template-columns:auto auto minmax(38px,60px);align-items:center;justify-content:start;gap:4px;margin:0;font-size:9px!important;line-height:1.05;text-align:left;overflow:visible;transform:none}
  .daily-panel .forecast-confidence>span{white-space:nowrap!important;font-size:9px!important}.daily-panel .forecast-confidence>b{font-size:10px!important;white-space:nowrap}.daily-panel .confidence-meter{width:100%;max-width:60px;height:5px}
- .daily-panel .day-wind-chip{min-width:0;display:flex;align-items:center;justify-content:center;gap:2px;padding:0;border:0;text-align:center;white-space:nowrap;overflow:visible}
+ .daily-panel .day-wind-chip{grid-column:2!important;min-width:0;display:flex;align-items:center;justify-content:center;gap:2px;padding:0;border:0;text-align:center;white-space:nowrap;overflow:visible}
  .daily-panel .day-wind-label{display:none}.daily-panel .day-wind-chip b,.daily-panel .day-wind-unit,.daily-panel .day-wind-chip em{font-size:9px!important;line-height:1;white-space:nowrap}.daily-panel .day-wind-chip b{color:#c8ecfc}.daily-panel .day-wind-unit{color:#9edbf6}.daily-panel .day-wind-chip em{color:#ffe18a;font-style:normal;font-weight:750}
- .daily-panel .daily-uv{min-width:0;margin:0;padding:0;font-size:9px!important;text-align:right;white-space:nowrap;line-height:1.05;overflow:visible}
+ .daily-panel .daily-uv{grid-column:3!important;min-width:0;margin:0;padding:0;font-size:9px!important;text-align:right;white-space:nowrap;line-height:1.05;overflow:visible}
  .daily-panel .daily-uv>span{display:inline;margin:0 3px 0 0;font-size:9px!important}
  .daily-panel .forecast-confidence-notice{display:none}
 }
