@@ -71,8 +71,6 @@ try {
     const m = await page.locator('#today-forecast .today-metrics').boundingBox();
     assert.ok(f && m && f.y + f.height <= m.y - 2, `Today tile overlap at ${width}px`);
 
-    const cardHeight=await page.locator('#daily .day-row').first().evaluate(el=>el.getBoundingClientRect().height);
-    console.log(`daily-card-height ${width}px ${cardHeight}`);
     const geometry=await page.evaluate(()=>{
       const row=document.querySelector('#daily .day-row'),rr=row.getBoundingClientRect(),q=s=>row.querySelector(s)?.getBoundingClientRect();
       const day=q('.day-name'),icon=q('.day-icon'),low=q('.day-low'),track=q('.temp-track'),high=q('.day-high'),feels=q('.day-feels-summary');
@@ -80,7 +78,7 @@ try {
       const nav=document.querySelector('.weather-jump-nav'),cards=[...nav.querySelectorAll('.weather-jump-card')].map(el=>el.getBoundingClientRect()),nr=nav.getBoundingClientRect();
       return {
         rowFits:row.scrollWidth<=row.clientWidth+1,
-        compact:rr.height<=240,
+        compact:rr.height<=190,
         topOrder:day.left<icon.left&&icon.left<low.left&&low.left<track.left&&track.left<high.left&&high.left<feels.left,
         metaBelow:meta.top>=Math.max(day.bottom,icon.bottom,low.bottom,track.bottom,high.bottom,feels.bottom)-3,
         lowerOrder:confidence.left<wind.left&&wind.left<uv.left,
