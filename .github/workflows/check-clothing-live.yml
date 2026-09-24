@@ -1,0 +1,39 @@
+name: Verify deployed comfort clothing
+on:
+  push:
+    branches: [weather/restore-temperature-clothing]
+    paths: [.github/workflows/check-clothing-live.yml]
+permissions:
+  contents: read
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Compare live clothing files with visually tested versions
+        run: |
+          python - <<'PY'
+          import hashlib,json,time,urllib.request
+          from pathlib import Path
+          base='https://sun-nourie-live.onrender.com'
+          names=['comfort-clothing.js','exposure-scene.js','personal-details.js','pavement.js','experience.js','app.js']
+          def read(path):
+              req=urllib.request.Request(base+path,headers={'Cache-Control':'no-cache'})
+              with urllib.request.urlopen(req,timeout=10) as response:return response.read()
+          expected={name:hashlib.sha256((Path('public/weather-fusion')/name).read_bytes()).hexdigest() for name in names}
+          for attempt in range(30):
+              try:
+                  page=read('/weather-fusion/?clothing-verify='+str(attempt)).decode()
+                  assert '/weather-fusion/app.js?v=wardrobe-v1' in page,'Waiting for updated page'
+                  observed={name:hashlib.sha256(read('/weather-fusion/'+name+'?clothing-verify='+str(attempt))).hexdigest() for name in names}
+                  assert observed==expected,'Waiting for matching deployed modules'
+                  print(json.dumps({'deployed':True,'version':'wardrobe-v1','verifiedModules':names}))
+                  break
+              except Exception as error:
+                  print('Deployment check:',str(error),flush=True)
+                  time.sleep(6)
+          else:raise SystemExit('Live clothing modules could not be verified within check window.')
+          PY
