@@ -55,7 +55,7 @@ try{
    const meta=rect(row.querySelector('.day-meta')),confidence=rect(row.querySelector('.forecast-confidence')),wind=rect(row.querySelector('.day-wind-chip')),uv=rect(row.querySelector('.daily-uv'));
    return {
     rowFits:row.scrollWidth<=row.clientWidth+1,
-    compactHeight:rr.height<=160,
+    compactHeight:rr.height<=190,
     metaBelowTop:meta.top>=Math.max(...top.map(r=>r.bottom))-3,
     confidenceLeft:confidence.left<=wind.left&&wind.left<uv.left,
     noOverlap:confidence.right<=wind.left+4&&wind.right<=uv.left+4,
