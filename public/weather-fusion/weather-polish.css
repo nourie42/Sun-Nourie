@@ -159,3 +159,21 @@ body[data-sky="night"] .air-quality-panel{background:radial-gradient(ellipse at 
   .weather-jump-card .jump-label{font-size:7.8px}.weather-jump-card.jump-gross .jump-label{font-size:8.2px}
   .weather-jump-card .jump-arrow{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:12px;height:12px;font-size:12px}
 }
+
+/* Hard final mobile reference match: equal 3-up / 2-up cards with compact chrome
+   so every label stays fully visible, including Gross Meter. */
+@media(max-width:760px){
+  .weather-jump-nav{grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
+  .weather-jump-card:nth-child(1),.weather-jump-card:nth-child(2),.weather-jump-card:nth-child(3){grid-column:span 2}
+  .weather-jump-card:nth-child(4),.weather-jump-card:nth-child(5){grid-column:span 3}
+  .weather-jump-card{position:relative;min-height:82px;grid-template-columns:24px minmax(0,1fr);gap:3px;padding:6px 21px 6px 4px}
+  .weather-jump-card .jump-visual{width:24px;height:52px;padding-right:4px}
+  .weather-jump-card .jump-label,.weather-jump-card.jump-gross .jump-label{font-size:7.8px;letter-spacing:-.035em;white-space:nowrap}
+  .weather-jump-card .jump-arrow{position:absolute;right:5px;top:50%;transform:translateY(-50%);width:14px;height:14px;font-size:14px;border-width:1.5px}
+}
+@media(max-width:359px){
+  .weather-jump-card{min-height:74px;grid-template-columns:20px minmax(0,1fr);gap:2px;padding:5px 17px 5px 3px}
+  .weather-jump-card .jump-visual{width:20px;height:46px;padding-right:3px}
+  .weather-jump-card .jump-label,.weather-jump-card.jump-gross .jump-label{font-size:7.1px;letter-spacing:-.04em}
+  .weather-jump-card .jump-arrow{right:4px;width:11px;height:11px;font-size:11px;border-width:1px}
+}
