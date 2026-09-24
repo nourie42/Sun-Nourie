@@ -81,7 +81,7 @@ try {
         labelsOneLine:labels.every(el=>el.scrollWidth<=el.clientWidth+1&&getComputedStyle(el).whiteSpace==='nowrap'),
         arrowsClear:cards.every(card=>{const l=rect(card.querySelector('.jump-label')),a=rect(card.querySelector('.jump-arrow'));return l.right<=a.left+1;}),
         vectors:cards.every(card=>!!card.querySelector('svg.jump-svg')),
-        rowFits:row.scrollWidth<=row.clientWidth+1,
+        rowFits:[...row.children].filter(el=>el.getClientRects().length).every(el=>{const r=rect(el);return r.left>=rr.left-1&&r.right<=rr.right+1;}),
         metaBelow:meta.top>=Math.max(...[...row.children].filter(el=>!el.classList.contains('day-meta')&&!el.classList.contains('forecast-confidence-notice')).map(el=>rect(el).bottom))-4,
         confidenceLeft:confidence.left<wind.left&&wind.left<uv.left,
         lowerInside:[confidence,wind,uv].every(r=>r.left>=rr.left-1&&r.right<=rr.right+1),
