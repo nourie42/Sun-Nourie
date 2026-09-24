@@ -4,11 +4,8 @@ on:
     branches: [main]
     paths:
       - scripts/weather_weathernext_site_collect.py
-      - scripts/weathernext_run_lookup.py
       - public/weather-fusion/weathernext-catalog.json
       - .github/workflows/weathernext-full-data.yml
-  schedule:
-    - cron: '37 * * * *'
   workflow_dispatch:
 permissions:
   contents: write
@@ -19,7 +16,7 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -38,15 +35,18 @@ jobs:
           git -C "$DATA" config user.name 'github-actions[bot]'
           git -C "$DATA" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           echo "WEATHER_DATA_DIR=$DATA" >> "$GITHUB_ENV"
-      - name: Query all available surface statistics and station-trained fields
+      - name: Collect bounded field batches and measure actual billing
         run: |
-          python scripts/weathernext_run_lookup.py --table homeassist-470415.weathernext_3.weathernext_3_0_0_0p1deg --output "$WEATHER_DATA_DIR/models/weathernext-full.json" --max-bytes-per-query 2000000000
-      - name: Publish only the dedicated WeatherNext feed
+          python -u scripts/weather_weathernext_site_collect.py --table homeassist-470415.weathernext_3.weathernext_3_0_0_0p1deg --output "$WEATHER_DATA_DIR/models/weathernext-full.json" --max-bytes-per-query 400000000000
+      - name: Preserve verified feed or cost-stop marker even after a failed collection
+        if: always() && env.WEATHER_DATA_DIR != ''
         run: |
           cd "$WEATHER_DATA_DIR"
-          git add -- models/weathernext-full.json
+          for FILE in models/weathernext-full.json models/weathernext-full-cost-stop.json; do
+            if test -f "$FILE"; then git add -- "$FILE"; fi
+          done
           git diff --cached --quiet && exit 0
-          git commit -m 'Refresh standalone WeatherNext surface forecasts'
+          git commit -m 'Update standalone WeatherNext feed and billing safety status'
           for attempt in 1 2 3 4 5; do
             git fetch origin weather-fusion-data
             git rebase FETCH_HEAD
