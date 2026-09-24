@@ -41,19 +41,19 @@
   gap:5px;width:100%;max-width:100%;min-width:0;overflow:hidden;margin:0;padding:8px 0 0;border-top:1px solid #63d3f52b;color:#9edbf6;
  }
  .daily-panel .forecast-confidence{
-  transform:translateX(-3px);align-self:center;min-width:0;display:grid;grid-template-columns:minmax(0,1fr) auto;
+  box-sizing:border-box;overflow:hidden;transform:translateX(-3px);align-self:center;min-width:0;display:grid;grid-template-columns:minmax(0,1fr) auto;
   grid-template-areas:"confidence-label confidence-level" "confidence-meter confidence-meter";
   gap:3px 6px;margin:0;font-size:12px;line-height:1.12;text-align:left;
  }
  .daily-panel .forecast-confidence>span{grid-area:confidence-label;white-space:normal}.daily-panel .forecast-confidence>b{grid-area:confidence-level;font-size:12px;white-space:nowrap}
  .daily-panel .confidence-meter{grid-area:confidence-meter;width:100%;max-width:84px;height:6px}
  .daily-panel .day-wind-chip{
-  align-self:stretch;display:grid;grid-template-columns:1fr;align-content:center;justify-items:center;gap:1px;
+  box-sizing:border-box;overflow:hidden;align-self:stretch;display:grid;grid-template-columns:1fr;align-content:center;justify-items:center;gap:1px;
   padding:0 4px;border-left:1px solid #63d3f52b;border-right:1px solid #63d3f52b;text-align:center;white-space:normal;
  }
  .daily-panel .day-wind-label,.daily-panel .day-wind-chip b,.daily-panel .day-wind-unit,.daily-panel .day-wind-chip em{font-size:12px;line-height:1.05;white-space:normal}
  .daily-panel .day-wind-label{color:#9edbf6}.daily-panel .day-wind-chip b{color:#fff}.daily-panel .day-wind-unit{color:#9edbf6}.daily-panel .day-wind-chip em{color:#ffe18a;font-style:normal;font-weight:750}
- .daily-panel .daily-uv{align-self:center;justify-self:end;min-width:0;max-width:72px;font-size:12px;text-align:right;white-space:normal;line-height:1.12}
+ .daily-panel .daily-uv{box-sizing:border-box;overflow:hidden;align-self:center;justify-self:end;min-width:0;max-width:72px;font-size:12px;text-align:right;white-space:normal;line-height:1.12}
  .daily-panel .daily-uv>span{display:block;margin-bottom:2px}
  .daily-panel .forecast-confidence-notice{display:none}
 }
