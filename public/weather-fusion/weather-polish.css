@@ -136,3 +136,26 @@ body[data-sky="night"] .air-quality-panel{background:radial-gradient(ellipse at 
   .weather-jump-card.jump-gross .jump-label{font-size:8.8px}
   .weather-jump-card .jump-arrow{width:13px;height:13px;font-size:13px}
 }
+
+/* Verified reference geometry: three balanced top cards at normal phone widths.
+   Arrow is absolutely positioned so labels get the same breathing room as the mockup. */
+@media (min-width:360px) and (max-width:760px){
+  .weather-jump-nav{grid-template-columns:repeat(6,minmax(0,1fr));gap:7px}
+  .weather-jump-card:nth-child(1),.weather-jump-card:nth-child(2),.weather-jump-card:nth-child(3){grid-column:span 2}
+  .weather-jump-card:nth-child(4),.weather-jump-card:nth-child(5){grid-column:span 3}
+  .weather-jump-card{position:relative;min-height:84px;grid-template-columns:24px minmax(0,1fr);gap:3px;padding:7px 27px 7px 5px}
+  .weather-jump-card .jump-visual{width:24px;height:54px;padding-right:4px}
+  .weather-jump-card .jump-label,.weather-jump-card.jump-gross .jump-label{font-size:8.8px;letter-spacing:-.035em}
+  .weather-jump-card .jump-arrow{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:17px;height:17px;font-size:17px}
+}
+@media(max-width:359px){
+  .weather-jump-nav{grid-template-columns:repeat(12,minmax(0,1fr));gap:4px}
+  .weather-jump-card:nth-child(1){grid-column:span 3}
+  .weather-jump-card:nth-child(2){grid-column:span 5}
+  .weather-jump-card:nth-child(3){grid-column:span 4}
+  .weather-jump-card:nth-child(4),.weather-jump-card:nth-child(5){grid-column:span 6}
+  .weather-jump-card{position:relative;min-height:76px;grid-template-columns:18px minmax(0,1fr);gap:2px;padding:5px 20px 5px 3px}
+  .weather-jump-card .jump-visual{width:18px;height:46px;padding-right:2px}
+  .weather-jump-card .jump-label{font-size:7.8px}.weather-jump-card.jump-gross .jump-label{font-size:8.2px}
+  .weather-jump-card .jump-arrow{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:12px;height:12px;font-size:12px}
+}
