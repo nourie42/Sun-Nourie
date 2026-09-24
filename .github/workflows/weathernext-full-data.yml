@@ -1,0 +1,55 @@
+name: WeatherNext full surface forecast feed
+on:
+  push:
+    branches: [main]
+    paths:
+      - scripts/weather_weathernext_site_collect.py
+      - public/weather-fusion/weathernext-catalog.json
+      - .github/workflows/weathernext-full-data.yml
+  schedule:
+    - cron: '37 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+  id-token: write
+concurrency:
+  group: weathernext-full-surface-data
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: google-github-actions/auth@v3
+        with:
+          project_id: homeassist-470415
+          workload_identity_provider: projects/269512183833/locations/global/workloadIdentityPools/github-actions/providers/sun-nourie
+      - run: pip install 'google-cloud-bigquery>=3.25,<4'
+      - name: Open isolated forecast data worktree
+        run: |
+          DATA="$RUNNER_TEMP/weathernext-publish"
+          git fetch --depth=1 origin weather-fusion-data
+          git worktree add --detach "$DATA" FETCH_HEAD
+          git -C "$DATA" config user.name 'github-actions[bot]'
+          git -C "$DATA" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          echo "WEATHER_DATA_DIR=$DATA" >> "$GITHUB_ENV"
+      - name: Query all available surface statistics and station-trained fields
+        run: |
+          python scripts/weather_weathernext_site_collect.py --table homeassist-470415.weathernext_3.weathernext_3_0_0_0p1deg --output "$WEATHER_DATA_DIR/models/weathernext-full.json" --max-bytes-per-query 2000000000
+      - name: Publish only the dedicated WeatherNext feed
+        run: |
+          cd "$WEATHER_DATA_DIR"
+          git add -- models/weathernext-full.json
+          git diff --cached --quiet && exit 0
+          git commit -m 'Refresh standalone WeatherNext surface forecasts'
+          for attempt in 1 2 3 4 5; do
+            git fetch origin weather-fusion-data
+            git rebase FETCH_HEAD
+            if git push origin HEAD:weather-fusion-data; then exit 0; fi
+            sleep 3
+          done
+          exit 1
