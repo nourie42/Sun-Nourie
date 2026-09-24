@@ -122,7 +122,7 @@ export function moonPhaseHTML(epoch=Date.now()){
 export function todaySkySceneHTML(profile,epoch=Date.now()){
  const {scene,night}=profile;
  const rainyNight=night&&['overcast-rain','storm'].includes(scene);
- if(scene==='cloudy'&&!night)return '<span class="today-sky today-sky-overcast" data-scene="cloudy" aria-hidden="true"></span>';
+ if(scene==='cloudy'&&!night)return '<span class="today-sky today-sky-overcast" data-scene="cloudy" aria-hidden="true" style="background:radial-gradient(ellipse at 18% 20%,rgba(214,226,234,.34),transparent 34%),radial-gradient(ellipse at 72% 28%,rgba(196,211,222,.28),transparent 38%),radial-gradient(ellipse at 48% 68%,rgba(164,184,200,.24),transparent 42%),linear-gradient(180deg,#6f879a 0%,#587186 44%,#3f5f78 100%)"></span>';
  const asset=rainyNight?'rain':night?'night':['clear','few-clouds'].includes(scene)?'clear':scene==='overcast-rain'?'rain':'storm';
  const src=asset==='night'?'/weather-fusion/today-sky-night-v2.webp':`/weather-fusion/today-sky-${asset}.webp`;
  return `<img class="today-sky" data-scene="${scene}" src="${src}" alt="" aria-hidden="true">${night&&!rainyNight?moonPhaseHTML(epoch):''}`;
