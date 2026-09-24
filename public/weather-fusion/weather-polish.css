@@ -69,7 +69,7 @@ body[data-sky="night"] .air-quality-panel{background:radial-gradient(ellipse at 
 }
 @media(max-width:359px){
  .weather-jump-nav{grid-template-columns:repeat(12,minmax(0,1fr));gap:4px}
- .weather-jump-card,.weather-jump-card:nth-child(-n+3),.weather-jump-card:nth-child(n+4){min-height:64px;grid-template-columns:20px minmax(0,1fr) 14px;gap:2px;padding:5px 3px;border-radius:14px}
+ .weather-jump-card,.weather-jump-card:nth-child(-n+3),.weather-jump-card:nth-child(n+4){min-height:66px;grid-template-columns:20px minmax(0,1fr) 14px;gap:2px;padding:5px 3px;border-radius:14px}
  .weather-jump-card:nth-child(1){grid-column:span 3}.weather-jump-card:nth-child(2){grid-column:span 5}.weather-jump-card:nth-child(3){grid-column:span 4}.weather-jump-card:nth-child(4),.weather-jump-card:nth-child(5){grid-column:span 6}
  .weather-jump-card .jump-visual{width:20px;height:30px;padding-right:2px}.weather-jump-card .jump-svg{width:22px;height:22px}
  .weather-jump-card .jump-label{font-size:9px}.weather-jump-card.jump-gross .jump-label{font-size:8.5px}
