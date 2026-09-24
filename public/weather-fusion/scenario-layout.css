@@ -30,10 +30,11 @@
   grid-template-areas:"name icon low track high feels" "meta meta meta meta meta meta";
   column-gap:4px;row-gap:6px;min-height:116px;margin:8px 0;padding:10px 9px;border-radius:17px;
  }
+ .daily-panel .day-row>*{min-width:0}
  .daily-panel .day-name{font-size:14px;line-height:1.15}.daily-panel .day-name-full{display:none}.daily-panel .day-name-mobile{display:inline;white-space:nowrap}
  .daily-panel .day-icon svg{width:34px;height:34px}.daily-panel .day-icon small{font-size:12px}.daily-panel .day-low{font-size:18px}.daily-panel .day-high strong{font-size:19px}
  .daily-panel .day-low small,.daily-panel .day-high small{font-size:12px}.daily-panel .temp-track{height:7px}.daily-panel .high-marker{width:11px;height:11px}
- .daily-panel .day-feels-summary{align-self:center}.daily-panel .day-feels-summary small{font-size:12px}.daily-panel .day-feels-summary b{font-size:12px}
+ .daily-panel .day-feels-summary{align-self:center;min-width:0}.daily-panel .day-feels-summary small{font-size:12px}.daily-panel .day-feels-summary b{font-size:12px;white-space:normal}
  .daily-panel .day-meta{
   box-sizing:border-box;width:100%;min-width:0;display:grid;grid-template-columns:minmax(136px,1fr) 50px minmax(70px,auto);
   align-items:center;justify-content:stretch;gap:5px;margin:0;padding:0;color:#9edbf6;
