@@ -64,12 +64,30 @@ try {
   assert.match(await page.locator('#chart-title').innerText(),/Feels like/);
   await page.locator('#close-metric').click();
 
-  for (const width of [320,390,430]) {
-    await page.setViewportSize({width,height:844});
+  for (const width of [320,360,390,412,430]) {
+    await page.setViewportSize({width,height:900});
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `horizontal overflow at ${width}px`);
     const f = await page.locator('#today-forecast .today-feels').boundingBox();
     const m = await page.locator('#today-forecast .today-metrics').boundingBox();
     assert.ok(f && m && f.y + f.height <= m.y - 2, `Today tile overlap at ${width}px`);
+    const layout=await page.evaluate(()=>{
+      const nav=document.querySelector('.weather-jump-nav'),cards=[...nav.querySelectorAll('.weather-jump-card')],row=document.querySelector('#daily .day-row');
+      const rect=el=>el.getBoundingClientRect(),rr=rect(row),meta=rect(row.querySelector('.day-meta'));
+      const confidence=rect(row.querySelector('.forecast-confidence')),wind=rect(row.querySelector('.day-wind-chip')),uv=rect(row.querySelector('.daily-uv'));
+      const labels=cards.map(card=>card.querySelector('.jump-label'));
+      return {
+        navFits:nav.scrollWidth<=nav.clientWidth+1,
+        fiveCards:cards.length===5,
+        labelsOneLine:labels.every(el=>el.scrollWidth<=el.clientWidth+1&&getComputedStyle(el).whiteSpace==='nowrap'),
+        arrowsClear:cards.every(card=>{const l=rect(card.querySelector('.jump-label')),a=rect(card.querySelector('.jump-arrow'));return l.right<=a.left+1;}),
+        vectors:cards.every(card=>!!card.querySelector('svg.jump-svg')),
+        rowFits:[...row.children].filter(el=>el.getClientRects().length).every(el=>{const r=rect(el);return r.left>=rr.left-1&&r.right<=rr.right+1;}),
+        metaBelow:meta.top>=Math.max(...[...row.children].filter(el=>!el.classList.contains('day-meta')&&!el.classList.contains('forecast-confidence-notice')).map(el=>rect(el).bottom))-4,
+        confidenceLeft:confidence.left<wind.left&&wind.left<uv.left,
+        lowerInside:[confidence,wind,uv].every(r=>r.left>=rr.left-1&&r.right<=rr.right+1),
+      };
+    });
+    assert.deepEqual(layout,{navFits:true,fiveCards:true,labelsOneLine:true,arrowsClear:true,vectors:true,rowFits:true,metaBelow:true,confidenceLeft:true,lowerInside:true},`approved mobile layout at ${width}px`);
   }
 
   console.log(JSON.stringify({

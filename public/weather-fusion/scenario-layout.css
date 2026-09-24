@@ -23,30 +23,45 @@
 .daily-panel .tonight-row .temp-fill{background:linear-gradient(90deg,#54d7f0,#8cceee)}.daily-panel .tonight-row .high-marker{background:#b7edff}
 
 @media(max-width:760px){
- .gross-facts>span{column-gap:5px;padding:9px 3px}.gross-facts i{font-size:18px}.gross-facts b{font-size:14px}.gross-facts small{font-size:7px;white-space:normal;line-height:1.15}
+ .gross-facts>span{column-gap:5px;padding:9px 3px}.gross-facts i{font-size:18px}.gross-facts b{font-size:14px}.gross-facts small{font-size:12px;white-space:normal;line-height:1.15}
  .daily-panel{padding:14px 11px}.daily-panel .section-top{padding:0 4px 12px}
- .daily-panel .day-row{grid-template-columns:43px 36px 39px minmax(30px,1fr) 39px 52px;gap:7px 5px;min-height:112px;margin:8px 0;padding:13px 9px;border-radius:17px}
+ .daily-panel .day-row{
+  grid-template-columns:43px 36px 39px minmax(44px,1fr) 39px 58px;
+  grid-template-areas:"name icon low track high feels" "meta meta meta meta meta meta";
+  gap:7px 5px;min-height:126px;margin:8px 0;padding:12px 10px;border-radius:17px;
+ }
+ .daily-panel .day-row>*{min-width:0}
  .daily-panel .day-name{font-size:14px;line-height:1.15}.daily-panel .day-name-full{display:none}.daily-panel .day-name-mobile{display:inline;white-space:nowrap}
- .daily-panel .day-icon svg{width:32px;height:32px}.daily-panel .day-icon small{font-size:9px}.daily-panel .day-low{font-size:18px}.daily-panel .day-high strong{font-size:19px}
- .daily-panel .day-low small,.daily-panel .day-high small{font-size:8px}.daily-panel .temp-track{height:7px}.daily-panel .high-marker{width:11px;height:11px}
- .daily-panel .day-feels-summary small{font-size:8px}.daily-panel .day-feels-summary b{font-size:10px}
- .daily-panel .day-meta{display:flex;align-items:center;justify-content:flex-start;gap:7px;width:100%;min-width:0;margin:0;color:#9edbf6}
- .daily-panel .forecast-confidence{flex:1 1 auto;min-width:0;grid-template-columns:auto auto 34px;gap:4px;margin:0;font-size:8px}
- .daily-panel .forecast-confidence>b{font-size:9px}.daily-panel .confidence-meter{height:5px}
- .daily-panel .day-wind-chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:2px;min-width:0;white-space:nowrap}
- .daily-panel .day-wind-label,.daily-panel .day-wind-chip b,.daily-panel .day-wind-unit,.daily-panel .day-wind-chip em{font-size:9px;line-height:1.05}
- .daily-panel .day-wind-chip em{color:#ffe18a;font-style:normal;font-weight:750}
- .daily-panel .daily-uv{flex:0 1 auto;min-width:0;margin-left:auto;font-size:8px;text-align:right;white-space:normal;line-height:1.1}
- .daily-panel .forecast-confidence-notice{flex-wrap:wrap;gap:2px 6px;padding:6px 8px;border-radius:10px}.daily-panel .forecast-confidence-notice strong{font-size:9px}.daily-panel .forecast-confidence-notice span{font-size:8px}
+ .daily-panel .day-icon svg{width:32px;height:32px}.daily-panel .day-icon small{font-size:12px}.daily-panel .day-low{font-size:18px}.daily-panel .day-high strong{font-size:19px}
+ .daily-panel .day-low small,.daily-panel .day-high small{font-size:12px}.daily-panel .temp-track{height:7px}.daily-panel .high-marker{width:11px;height:11px}
+ .daily-panel .day-feels-summary{align-self:center;min-width:0}.daily-panel .day-feels-summary small{font-size:12px}.daily-panel .day-feels-summary b{font-size:12px;white-space:nowrap}
+ .daily-panel .day-meta>*{min-width:0;max-width:100%}
+ .daily-panel .day-meta{
+  box-sizing:border-box;display:grid;grid-template-columns:minmax(104px,1fr) 54px minmax(66px,auto);align-items:stretch;
+  gap:12px;width:100%;max-width:100%;min-width:0;overflow:hidden;margin:0;padding:8px 0 0;border-top:1px solid #63d3f52b;color:#9edbf6;
+ }
+ .daily-panel .forecast-confidence{
+  box-sizing:border-box;overflow:hidden;transform:translateX(-3px);align-self:center;min-width:0;display:grid;grid-template-columns:minmax(0,1fr) auto;
+  grid-template-areas:"confidence-label confidence-level" "confidence-meter confidence-meter";
+  gap:3px 6px;margin:0;font-size:12px;line-height:1.12;text-align:left;
+ }
+ .daily-panel .forecast-confidence>span{grid-area:confidence-label;white-space:normal}.daily-panel .forecast-confidence>b{grid-area:confidence-level;font-size:12px;white-space:nowrap}
+ .daily-panel .confidence-meter{grid-area:confidence-meter;width:100%;max-width:84px;height:6px}
+ .daily-panel .day-wind-chip{
+  box-sizing:border-box;overflow:hidden;align-self:stretch;display:grid;grid-template-columns:1fr;align-content:center;justify-items:center;gap:1px;
+  padding:0 4px;border-left:1px solid #63d3f52b;border-right:1px solid #63d3f52b;text-align:center;white-space:normal;
+ }
+ .daily-panel .day-wind-label,.daily-panel .day-wind-chip b,.daily-panel .day-wind-unit,.daily-panel .day-wind-chip em{font-size:12px;line-height:1.05;white-space:normal}
+ .daily-panel .day-wind-label{color:#9edbf6}.daily-panel .day-wind-chip b{color:#fff}.daily-panel .day-wind-unit{color:#9edbf6}.daily-panel .day-wind-chip em{color:#ffe18a;font-style:normal;font-weight:750}
+ .daily-panel .daily-uv{box-sizing:border-box;overflow:hidden;align-self:center;justify-self:stretch;min-width:0;max-width:none;padding-left:6px;font-size:12px;text-align:right;white-space:normal;line-height:1.12}
+ .daily-panel .daily-uv>span{display:block;margin-bottom:2px}
+ .daily-panel .forecast-confidence-notice{display:none}
 }
 @media(max-width:359px){
- .daily-panel .day-row{grid-template-columns:39px 31px 35px minmax(22px,1fr) 35px 47px;gap:5px 3px;padding-inline:7px}
- .daily-panel .day-name{font-size:13px}.daily-panel .day-feels-summary b{font-size:9px}
- .daily-panel .day-meta{gap:4px}
- .daily-panel .forecast-confidence{grid-template-columns:auto auto 22px;gap:2px}
- .daily-panel .forecast-confidence>span{font-size:0!important}.daily-panel .forecast-confidence>span::after{content:"Conf.";font-size:11px}
- .daily-panel .day-wind-chip{gap:2px}.daily-panel .day-wind-label{font-size:0}.daily-panel .day-wind-label::after{content:"W";font-size:9px}.daily-panel .day-wind-unit{display:none}
- .daily-panel .day-wind-chip b,.daily-panel .day-wind-chip em{font-size:8px}
- .daily-panel .daily-uv>span{font-size:0!important}.daily-panel .daily-uv>span::after{content:"UV";font-size:11px}
+ .daily-panel .day-row{grid-template-columns:39px 31px 35px minmax(34px,1fr) 35px 52px;gap:5px 3px;padding:10px 7px;min-height:124px}
+ .daily-panel .day-name{font-size:13px}
+ .daily-panel .day-meta{grid-template-columns:minmax(94px,1fr) 48px minmax(58px,auto);gap:8px}
+ .daily-panel .forecast-confidence{transform:translateX(-2px);gap:2px 4px}.daily-panel .confidence-meter{max-width:70px}
+ .daily-panel .day-wind-chip{padding:0 4px}
  .gross-facts i{display:none}.gross-facts>span{grid-template-columns:1fr;text-align:center}
 }
