@@ -53,13 +53,13 @@
  .daily-panel .day-wind-chip small{grid-area:label}.daily-panel .day-wind-chip b{grid-area:speed}.daily-panel .day-wind-chip i{grid-area:unit}.daily-panel .day-wind-chip em{grid-area:gust}
  .daily-panel .daily-uv{justify-self:end;max-width:96px;font-size:12px;line-height:1.15;text-align:right;white-space:normal}
  .daily-panel .daily-uv>span{display:block;margin-bottom:1px}
- .daily-panel .forecast-confidence-notice{flex-wrap:wrap;gap:2px 6px;padding:6px 8px;border-radius:10px}.daily-panel .forecast-confidence-notice strong{font-size:12px}.daily-panel .forecast-confidence-notice span{font-size:12px}
+ .daily-panel .forecast-confidence-notice{display:none}
 }
 @media(max-width:359px){
- .daily-panel .day-row{grid-template-columns:40px 31px 36px minmax(48px,1fr) 36px 58px;column-gap:3px;padding-inline:7px;min-height:120px}
+ .daily-panel .day-row{grid-template-columns:38px 30px 34px minmax(38px,1fr) 34px 54px;column-gap:2px;padding-inline:6px;min-height:116px}
  .daily-panel .day-name{font-size:13px}
- .daily-panel .day-meta{grid-template-columns:minmax(126px,1fr) 48px minmax(68px,auto);gap:4px}
- .daily-panel .forecast-confidence{column-gap:4px}.daily-panel .confidence-meter{max-width:72px}
- .daily-panel .day-wind-chip{width:44px}.daily-panel .daily-uv{max-width:74px}
+ .daily-panel .day-meta{grid-template-columns:minmax(120px,1fr) 44px minmax(60px,auto);gap:3px}
+ .daily-panel .forecast-confidence{column-gap:3px}.daily-panel .confidence-meter{max-width:66px}
+ .daily-panel .day-wind-chip{width:40px}.daily-panel .daily-uv{max-width:68px}
  .gross-facts i{display:none}.gross-facts>span{grid-template-columns:1fr;text-align:center}
 }
