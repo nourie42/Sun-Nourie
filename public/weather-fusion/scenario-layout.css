@@ -40,19 +40,19 @@
   align-items:center;justify-content:stretch;gap:5px;margin:0;padding:0;color:#9edbf6;
  }
  .daily-panel .forecast-confidence{
-  min-width:0;width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"confidence-label confidence-level" "confidence-meter confidence-meter";
+  box-sizing:border-box;min-width:0;max-width:100%;width:100%;overflow:hidden;display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"confidence-label confidence-level" "confidence-meter confidence-meter";
   align-items:center;column-gap:6px;row-gap:3px;margin:0;font-size:12px;line-height:1.1;text-align:left;
  }
  .daily-panel .forecast-confidence>span{grid-area:confidence-label;min-width:0;white-space:normal}
  .daily-panel .forecast-confidence>b{grid-area:confidence-level;font-size:12px;white-space:nowrap}
  .daily-panel .confidence-meter{grid-area:confidence-meter;width:100%;max-width:92px;height:6px}
  .daily-panel .day-wind-chip{
-  justify-self:center;min-width:0;width:46px;display:grid;grid-template-columns:auto auto;grid-template-areas:"label gust" "speed unit";
+  box-sizing:border-box;justify-self:center;min-width:0;max-width:100%;width:46px;overflow:hidden;display:grid;grid-template-columns:auto auto;grid-template-areas:"label gust" "speed unit";
   align-items:center;justify-content:center;justify-items:center;gap:1px 2px;text-align:center;line-height:1.05;
  }
  .daily-panel .day-wind-chip small,.daily-panel .day-wind-chip b,.daily-panel .day-wind-chip i,.daily-panel .day-wind-chip em{font-size:12px;line-height:1.05}
  .daily-panel .day-wind-chip small{grid-area:label}.daily-panel .day-wind-chip b{grid-area:speed}.daily-panel .day-wind-chip i{grid-area:unit}.daily-panel .day-wind-chip em{grid-area:gust}
- .daily-panel .daily-uv{justify-self:end;min-width:0;max-width:84px;font-size:12px;line-height:1.15;text-align:right;white-space:normal}
+ .daily-panel .daily-uv{box-sizing:border-box;justify-self:end;min-width:0;max-width:84px;overflow-wrap:anywhere;font-size:12px;line-height:1.15;text-align:right;white-space:normal}
  .daily-panel .daily-uv>span{display:block;margin-bottom:1px}
  .daily-panel .forecast-confidence-notice{display:none}
 }
