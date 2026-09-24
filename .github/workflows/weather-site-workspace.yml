@@ -1,0 +1,30 @@
+name: Weather site test workspace
+on:
+  push:
+    branches: [weather/plain-nav-weathernext-site]
+    paths: ['.github/workflows/weather-site-workspace.yml']
+permissions:
+  contents: read
+jobs:
+  workspace:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts
+      - name: Package tracked weather source and test dependencies
+        run: |
+          mkdir -p /tmp/weather-workspace
+          git archive HEAD public src test scripts package.json package-lock.json .github/workflows README.md | tar -x -C /tmp/weather-workspace
+          cp -a node_modules /tmp/weather-workspace/node_modules
+          tar -czf /tmp/weather-workspace.tar.gz -C /tmp/weather-workspace .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: weather-site-workspace
+          path: /tmp/weather-workspace.tar.gz
+          retention-days: 1
