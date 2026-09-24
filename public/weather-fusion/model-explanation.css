@@ -61,6 +61,36 @@
 #model-explanation .graphcast-meta>div{position:relative;min-height:88px;padding:14px;border:1px solid rgba(169,157,255,.18);border-radius:17px;background:linear-gradient(155deg,rgba(255,255,255,.055),rgba(255,255,255,.018));box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
 #model-explanation .graphcast-meta small{display:block;margin-bottom:8px;color:#9ca8d3;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
 #model-explanation .graphcast-meta strong{display:block;color:#fff;font-size:15px;font-weight:850;line-height:1.25;overflow-wrap:anywhere}
+
+#model-explanation .weathernext-daily{margin-top:16px}
+#model-explanation .weathernext-subhead{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin:18px 0 10px}
+#model-explanation .weathernext-subhead>div{min-width:0}
+#model-explanation .weathernext-subhead small{display:block;color:#918cc2;font-size:9px;font-weight:850;letter-spacing:.1em;text-transform:uppercase}
+#model-explanation .weathernext-subhead strong{display:block;margin-top:3px;color:#fff;font-size:15px;font-weight:850;line-height:1.25}
+#model-explanation .weathernext-subhead>span{max-width:310px;color:#9da8cf;font-size:10px;font-weight:700;line-height:1.35;text-align:right}
+#model-explanation .weathernext-subhead.hourly{margin-top:20px}
+#model-explanation .weathernext-day-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+#model-explanation .weathernext-day{position:relative;padding:14px;border:1px solid rgba(151,139,255,.17);border-radius:17px;background:linear-gradient(145deg,rgba(7,18,45,.88),rgba(15,28,61,.66));box-shadow:inset 0 1px 0 rgba(255,255,255,.035)}
+#model-explanation .weathernext-day.selected{border-color:rgba(140,220,255,.5);box-shadow:0 0 0 1px rgba(91,201,239,.13),inset 0 1px 0 rgba(255,255,255,.06)}
+#model-explanation .weathernext-day-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+#model-explanation .weathernext-day-head>strong{color:#fff;font-size:13px;font-weight:850}
+#model-explanation .weathernext-day-head>span{padding:3px 7px;border:1px solid rgba(126,224,255,.28);border-radius:999px;background:rgba(63,173,214,.14);color:#a6efff;font-size:8px;font-weight:900;letter-spacing:.07em;text-transform:uppercase}
+#model-explanation .weathernext-day-temps{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:13px}
+#model-explanation .weathernext-day-temps>div{padding:10px;border-radius:13px;background:rgba(255,255,255,.035)}
+#model-explanation .weathernext-day-temps small{display:block;color:#8f9bc3;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.07em}
+#model-explanation .weathernext-day-temps b{display:block;margin-top:3px;color:#fff;font-size:24px;line-height:1;font-weight:900;letter-spacing:-.04em}
+#model-explanation .weathernext-day-temps b+small{margin-top:5px;color:#9da8cf;font-size:9px;font-weight:700;text-transform:none;letter-spacing:0}
+#model-explanation .weathernext-day-details{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:10px;color:#aeb9d8;font-size:10px;font-weight:700}
+#model-explanation .weathernext-range{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:10px;padding-top:9px;border-top:1px solid rgba(151,139,255,.12)}
+#model-explanation .weathernext-range span{color:#8f9bc3;font-size:9px;font-weight:700}
+#model-explanation .weathernext-range strong{color:#d9d5ff;font-size:11px;font-weight:850}
+#model-explanation .weathernext-day>p{margin:8px 0 0;color:#909bc3;font-size:9px}
+#model-explanation .weathernext-day>p b{color:#c7c2ff}
+#model-explanation .graphcast-hour-stats{display:flex!important;gap:7px!important;flex-wrap:wrap}
+#model-explanation .graphcast-hour-stats b{display:inline-flex;align-items:center;min-height:24px;padding:4px 7px;border:1px solid rgba(151,139,255,.14);border-radius:999px;background:rgba(255,255,255,.035);color:#cbd3ef;font-size:9px;font-weight:800}
+#model-explanation .graphcast-ensemble{margin-top:7px!important;color:#949fc7!important}
+#model-explanation .graphcast-ensemble small{display:inline!important;margin-left:4px!important;color:#7f89ae!important}
+
 #model-explanation .graphcast-windows{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}
 #model-explanation .graphcast-window{position:relative;min-height:105px;padding:14px 15px;border:1px solid rgba(151,139,255,.17);border-radius:17px;background:linear-gradient(145deg,rgba(6,18,46,.82),rgba(12,27,59,.62));overflow:hidden}
 #model-explanation .graphcast-window::after{content:'1H';position:absolute;right:11px;top:11px;color:rgba(201,195,255,.44);font-size:9px;font-weight:900;letter-spacing:.08em}
@@ -91,6 +121,11 @@
   #model-explanation .graphcast-meta{grid-template-columns:repeat(3,minmax(132px,1fr));overflow-x:auto;scroll-snap-type:x proximity;overscroll-behavior-inline:contain;margin-right:-17px;padding:0 17px 4px 0;-webkit-overflow-scrolling:touch;scrollbar-width:none}
   #model-explanation .graphcast-meta::-webkit-scrollbar{display:none}
   #model-explanation .graphcast-meta>div{scroll-snap-align:start;min-height:82px}
+  #model-explanation .weathernext-subhead{display:block;margin-top:16px}
+  #model-explanation .weathernext-subhead>span{display:block;max-width:none;margin-top:4px;text-align:left}
+  #model-explanation .weathernext-day-grid{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;overscroll-behavior-inline:contain;margin-right:-17px;padding:1px 17px 7px 0;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  #model-explanation .weathernext-day-grid::-webkit-scrollbar{display:none}
+  #model-explanation .weathernext-day{flex:0 0 min(82vw,300px);scroll-snap-align:start}
   #model-explanation .graphcast-windows{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;overscroll-behavior-inline:contain;margin-right:-17px;padding:1px 17px 7px 0;-webkit-overflow-scrolling:touch;scrollbar-width:none}
   #model-explanation .graphcast-windows::-webkit-scrollbar{display:none}
   #model-explanation .graphcast-window{flex:0 0 min(76vw,260px);scroll-snap-align:start;min-height:108px}
@@ -114,6 +149,9 @@
   #model-explanation .graphcast-badge{font-size:9px;padding:4px 8px}
   #model-explanation .graphcast-meta{grid-template-columns:repeat(3,minmax(125px,1fr));margin-right:-15px;padding-right:15px}
   #model-explanation .graphcast-windows{margin-right:-15px;padding-right:15px}
+  #model-explanation .weathernext-day-grid{margin-right:-15px;padding-right:15px}
+  #model-explanation .weathernext-day{flex-basis:84vw;padding:13px}
+  #model-explanation .weathernext-day-temps b{font-size:22px}
   #model-explanation .graphcast-window{flex-basis:78vw;padding:14px}
   #model-explanation .graphcast-window strong{font-size:28px}
   #model-explanation .weathernext-access{margin-left:8px}
