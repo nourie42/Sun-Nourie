@@ -37,7 +37,7 @@ jobs:
           echo "WEATHER_DATA_DIR=$DATA" >> "$GITHUB_ENV"
       - name: Collect bounded field batches and measure actual billing
         run: |
-          python -u scripts/weather_weathernext_site_collect.py --table homeassist-470415.weathernext_3.weathernext_3_0_0_0p1deg --output "$WEATHER_DATA_DIR/models/weathernext-full.json" --max-bytes-per-query 400000000000
+          python -u scripts/weather_weathernext_site_collect.py --table homeassist-470415.weathernext_3.weathernext_3_0_0_0p1deg --output "$WEATHER_DATA_DIR/models/weathernext-full.json" --max-bytes-per-query 700000000000
       - name: Preserve verified feed or cost-stop marker even after a failed collection
         if: always() && env.WEATHER_DATA_DIR != ''
         run: |
