@@ -2,41 +2,56 @@ name: Comfort clothing visual checks
 on:
   push:
     branches: [weather/restore-temperature-clothing]
-    paths:
-      - .github/workflows/comfort-clothing-check.yml
+    paths: [.github/workflows/comfort-clothing-check.yml]
 permissions:
-  contents: read
+  contents: write
 jobs:
-  artwork:
+  verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          persist-credentials: false
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - run: pip install Pillow
-      - name: Render clothing artwork contact sheet
+          node-version: '22'
+      - run: npm ci
+      - name: Record existing weather test results
         run: |
           mkdir -p /tmp/clothing-qa
+          node --test --test-reporter=tap $(find test -name 'weather*.test.js' ! -name 'weatherFusionClothingArtwork.test.js' | sort) > /tmp/clothing-qa/baseline-tests.txt 2>&1 || true
+      - name: Apply scoped garment integration
+        run: python scripts/applyComfortClothing.py
+      - name: Clothing regression tests
+        run: node --test test/weatherFusionClothingArtwork.test.js
+      - name: Check existing weather tests for regressions
+        run: |
+          node --test --test-reporter=tap $(find test -name 'weather*.test.js' ! -name 'weatherFusionClothingArtwork.test.js' | sort) > /tmp/clothing-qa/updated-tests.txt 2>&1 || true
           python - <<'PY'
+          import re,json
           from pathlib import Path
-          from PIL import Image, ImageOps, ImageDraw
-          root=Path('public/weather-fusion')
-          names=['comfort-reference-scenes.webp','comfort-reference-scenes-cold.webp','comfort-reference-scenes-dawn.webp','comfort-reference-scenes-rain.webp','comfort-reference-scenes-fog.webp','comfort-reference-scenes-watch.webp','poodle-walk-cold.png','poodle-walk-mild.png','poodle-walk.png']
-          sheet=Image.new('RGB',(900,len(names)*275),'#193449')
-          draw=ImageDraw.Draw(sheet)
-          for i,name in enumerate(names):
-            draw.text((10,i*275+8),name,fill='white')
-            image=Image.open(root/name).convert('RGBA')
-            image.thumbnail((900,245))
-            sheet.paste(image,((900-image.width)//2,i*275+26),image)
-          sheet.save('/tmp/clothing-qa/artwork.jpg',quality=92)
+          root=Path('/tmp/clothing-qa')
+          def failures(name):
+            return set(re.findall(r'^not ok \d+ - (.+)$',(root/name).read_text(),re.M))
+          before=failures('baseline-tests.txt');after=failures('updated-tests.txt')
+          result={'preExistingFailures':sorted(before),'remainingFailures':sorted(after),'newFailures':sorted(after-before)}
+          (root/'regression-status.json').write_text(json.dumps(result,indent=2))
+          print(json.dumps(result))
+          assert not result['newFailures'],'New weather regressions'
           PY
+      - run: npm install --no-save --package-lock=false playwright@1.55.0
+      - run: npx playwright install --with-deps chromium
+      - run: node scripts/verifyComfortClothingBrowser.js
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: clothing-artwork-review
-          path: /tmp/clothing-qa/artwork.jpg
+          name: clothing-rendered-proof
+          path: /tmp/clothing-qa
           retention-days: 3
+      - name: Save tested source on isolated branch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/weather-fusion src/weatherFusion.js test/weatherFusionForecastDetails.test.js
+          git diff --cached --quiet && exit 0
+          git commit -m 'Restore temperature-driven visible clothing for all comfort figures'
+          git push origin HEAD:weather/restore-temperature-clothing
