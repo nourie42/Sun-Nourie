@@ -54,13 +54,13 @@ body[data-sky="night"] .air-quality-panel{background:radial-gradient(ellipse at 
 @media(max-width:760px){
  .location-bar{align-items:stretch}.device-location-status{width:100%}
  .weather-jump-nav{grid-template-columns:repeat(12,minmax(0,1fr));gap:7px;margin:10px 0 5px;padding:2px 0 6px}
- .weather-jump-card{min-height:72px;grid-template-columns:26px minmax(0,1fr) 18px;gap:3px;padding:7px 5px;border-width:1.5px;border-radius:17px}
+ .weather-jump-card{min-height:72px;grid-template-columns:22px minmax(0,1fr) 16px;gap:2px;padding:7px 4px;border-width:1.5px;border-radius:17px}
  .weather-jump-card:nth-child(1){grid-column:span 3}.weather-jump-card:nth-child(2){grid-column:span 5}.weather-jump-card:nth-child(3){grid-column:span 4}.weather-jump-card:nth-child(4),.weather-jump-card:nth-child(5){grid-column:span 6}
- .weather-jump-card .jump-visual{width:26px;height:36px;padding-right:3px}
- .weather-jump-card .jump-svg{width:29px;height:29px}
- .weather-jump-card .jump-label{font-size:11px;white-space:nowrap}
- .weather-jump-card.jump-gross .jump-label{font-size:10.5px;letter-spacing:-.025em}
- .weather-jump-card .jump-arrow{width:18px;height:18px;border-width:1.5px;font-size:18px}
+ .weather-jump-card .jump-visual{width:22px;height:34px;padding-right:2px}
+ .weather-jump-card .jump-svg{width:24px;height:24px}
+ .weather-jump-card .jump-label{font-size:10.5px;white-space:nowrap}
+ .weather-jump-card.jump-gross .jump-label{font-size:10px;letter-spacing:-.025em}
+ .weather-jump-card .jump-arrow{width:16px;height:16px;border-width:1.5px;font-size:16px}
  .hero-temperature{font-size:clamp(72px,22vw,88px)!important}
  .air-quality-panel{padding:15px 14px}.aqi-summary{grid-template-columns:1fr;gap:8px}.aqi-reading>strong{font-size:44px}
  .aqi-pollutants{display:grid;grid-template-columns:1fr 1fr}
