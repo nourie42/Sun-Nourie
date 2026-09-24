@@ -1,8 +1,8 @@
 /* Readability, device-location, jump navigation and air-quality polish shared by regular + experimental weather. */
 .weather-jump-nav{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:9px;margin:12px 0 8px;padding:0}
 .weather-jump-card{box-sizing:border-box;min-width:0;min-height:52px;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 13px;border:1.5px solid #35dcff;border-radius:14px;background:linear-gradient(145deg,#0d6398,#074873 62%,#06365d);box-shadow:inset 0 1px 1px #e6fbff2b,0 5px 14px #03182e55;color:#fff;text-decoration:none}
-.weather-jump-card:nth-child(1),.weather-jump-card:nth-child(2),.weather-jump-card:nth-child(3){grid-column:span 2}
-.weather-jump-card:nth-child(4),.weather-jump-card:nth-child(5){grid-column:span 3}
+.weather-jump-card:nth-child(-n+3){grid-column:span 2}
+.weather-jump-card:nth-child(n+4){grid-column:span 3}
 .weather-jump-card:hover,.weather-jump-card:focus-visible{transform:translateY(-1px);background:linear-gradient(145deg,#1172a9,#095483 62%,#074069);box-shadow:0 0 0 2px #57e7ff35,0 7px 18px #02152866}
 .weather-jump-card .jump-label{min-width:0;font-size:14px;font-weight:800;line-height:1;letter-spacing:-.01em;text-align:left;white-space:nowrap}
 .weather-jump-card .jump-arrow{flex:0 0 auto;width:22px;height:22px;display:grid;place-items:center;border:1.5px solid #57dfff8c;border-radius:50%;background:#0a4f7d99;color:#fff;font-size:21px;line-height:.8}
@@ -57,8 +57,8 @@ body[data-sky="night"] .air-quality-panel{background:radial-gradient(ellipse at 
  .gross-eyebrow strong{font-size:28px!important}.gross-number{font-size:42px!important}
  .weather-jump-nav{grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;margin:8px 0 6px;padding:0}
  .weather-jump-card{min-height:46px;padding:8px 9px;border-width:1.5px;border-radius:12px}
- .weather-jump-card:nth-child(1),.weather-jump-card:nth-child(2),.weather-jump-card:nth-child(3){grid-column:span 2}
- .weather-jump-card:nth-child(4),.weather-jump-card:nth-child(5){grid-column:span 3}
+ .weather-jump-card:nth-child(-n+3){grid-column:span 2}
+ .weather-jump-card:nth-child(n+4){grid-column:span 3}
  .weather-jump-card .jump-label{font-size:11px}
  .weather-jump-card.jump-gross .jump-label{font-size:10.5px}
  .weather-jump-card .jump-arrow{width:18px;height:18px;font-size:18px}
