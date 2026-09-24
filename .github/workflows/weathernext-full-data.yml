@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - scripts/weather_weathernext_site_collect.py
+      - scripts/weathernext_run_lookup.py
       - public/weather-fusion/weathernext-catalog.json
       - .github/workflows/weathernext-full-data.yml
   schedule:
@@ -39,7 +40,7 @@ jobs:
           echo "WEATHER_DATA_DIR=$DATA" >> "$GITHUB_ENV"
       - name: Query all available surface statistics and station-trained fields
         run: |
-          python scripts/weather_weathernext_site_collect.py --table homeassist-470415.weathernext_3.weathernext_3_0_0_0p1deg --output "$WEATHER_DATA_DIR/models/weathernext-full.json" --max-bytes-per-query 2000000000
+          python scripts/weathernext_run_lookup.py --table homeassist-470415.weathernext_3.weathernext_3_0_0_0p1deg --output "$WEATHER_DATA_DIR/models/weathernext-full.json" --max-bytes-per-query 2000000000
       - name: Publish only the dedicated WeatherNext feed
         run: |
           cd "$WEATHER_DATA_DIR"
