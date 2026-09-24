@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {todayForecastHTML,periodWeatherStats,shortForecastCondition,todaySkyProfile,todaySkySceneHTML,moonPhaseAt,moonPhaseHTML} from '../public/weather-fusion/today-card.js';
+import {todayForecastHTML,periodWeatherStats,shortForecastCondition,todaySkyProfile,todaySkyProfileForForecast,todaySkySceneHTML,moonPhaseAt,moonPhaseHTML} from '../public/weather-fusion/today-card.js';
 import {hourlyRainHTML,hourlyWindHTML,windDirectionLabel} from '../public/weather-fusion/weather-display.js';
 const now=Date.parse('2026-09-11T12:00:00Z'),H=3600000;
 function fixture(){
@@ -27,6 +27,21 @@ test('main card says Remainder of Today from local noon until the Tonight switch
  assert.match(html,/>Remainder of Today<\/span>/);
  assert.match(html,/>60%<\/strong><small>Rain chance/,'the remainder tile includes the higher chance later tonight');
  assert.doesNotMatch(html,/class="today-weather-card today-remainder"[\s\S]*>Tonight<\/span>/);
+});
+test('Remainder of Today uses current and remaining hourly cloudiness instead of an earlier sunny daily phrase',()=>{
+ const t=Date.parse('2026-09-11T21:44:00Z'),f=fixture(),day=f.days[0];
+ day.condition='Mostly Sunny';day.highWindow={start:'2026-09-11T11:00:00Z',end:'2026-09-12T00:00:00Z'};
+ f.current={condition:'Cloudy',skyCover:100,time:new Date(t).toISOString()};
+ f.hours=[
+  {time:'2026-09-11T22:00:00Z',condition:'Cloudy',skyCover:100},
+  {time:'2026-09-11T23:00:00Z',condition:'Mostly Cloudy',skyCover:95}
+ ];
+ const profile=todaySkyProfileForForecast(f,day,{tonight:false,remainder:true},t);
+ assert.equal(profile.scene,'cloudy');
+ assert.equal(profile.hourlySkyOverride,true);
+ const scene=todaySkySceneHTML(profile,t);
+ assert.match(scene,/today-sky-overcast/);
+ assert.doesNotMatch(scene,/today-sky-clear\.webp|today-sky-clouds\.webp/);
 });
 test('Today sky adds clouds and precipitation by forecast scenario',()=>{
  assert.equal(todaySkyProfile({condition:'Mostly Sunny',pop:10}).scene,'clear');
