@@ -60,7 +60,7 @@ test('daily-row and dialog notices have responsive visual treatment',()=>{
  const scenario=readFileSync(new URL('../public/weather-fusion/scenario-layout.css',import.meta.url),'utf8');
  const layout=readFileSync(new URL('../public/weather-fusion/forecast-layout.css',import.meta.url),'utf8');
  assert.match(scenario,/\.daily-panel \.forecast-confidence-notice\{[^}]*grid-column:1\/-1;[^}]*width:100%;[^}]*border:/);
- assert.match(scenario,/@media\(max-width:760px\)[\s\S]*\.daily-panel \.forecast-confidence-notice\{[^}]*flex-wrap:wrap/);
+ assert.match(scenario,/@media\(max-width:760px\)[\s\S]*\.daily-panel \.forecast-confidence-notice\{display:none\}/,'phone daily cards keep the reference compact layout; confidence details remain in the day dialog and accessible name');
  assert.match(layout,/\.dialog-confidence-notice\{[^}]*border:[^}]*background:/);
  assert.match(layout,/@media\(max-width:600px\)[^\n]*\.dialog-confidence-notice\{/);
 });
