@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      WEATHERNEXT_BQ_TABLE: ${{ vars.WEATHERNEXT_BQ_TABLE }}
+      WEATHERNEXT_BQ_TABLE: homeassist-470415.weathernext_3.weathernext_3_0_0_0p1deg
       HAS_WEATHERNEXT_CREDS: ${{ secrets.WEATHERNEXT_GCP_CREDENTIALS != '' }}
 
     steps:
@@ -35,12 +35,8 @@ jobs:
         run: |
           echo "WeatherNext 3 is ready in the site but Google access is not configured."
           echo "Credential secret configured: $HAS_WEATHERNEXT_CREDS"
-          if [[ -n "$WEATHERNEXT_BQ_TABLE" ]]; then
-            echo "BigQuery table variable configured: true"
-          else
-            echo "BigQuery table variable configured: false"
-          fi
-          echo "Add repository variable WEATHERNEXT_BQ_TABLE and secret WEATHERNEXT_GCP_CREDENTIALS after allowlist approval."
+          echo "WeatherNext BigQuery table configured in workflow: true"
+          echo "Add repository secret WEATHERNEXT_GCP_CREDENTIALS to enable automated WeatherNext collection."
 
       - uses: actions/setup-python@v5
         if: env.HAS_WEATHERNEXT_CREDS == 'true' && env.WEATHERNEXT_BQ_TABLE != ''
