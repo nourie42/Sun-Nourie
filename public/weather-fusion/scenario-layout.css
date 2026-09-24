@@ -56,7 +56,7 @@
  .daily-panel .forecast-confidence-notice{display:none}
 }
 @media(max-width:359px){
- .daily-panel .day-row{grid-template-columns:38px 30px 34px minmax(38px,1fr) 34px 54px;column-gap:2px;padding-inline:6px;min-height:116px}
+ .daily-panel .day-row{grid-template-columns:38px 30px 34px minmax(38px,1fr) 34px 54px;column-gap:2px;row-gap:6px;padding:9px 6px;min-height:112px}
  .daily-panel .day-name{font-size:13px}
  .daily-panel .day-meta{grid-template-columns:minmax(120px,1fr) 44px minmax(60px,auto);gap:3px}
  .daily-panel .forecast-confidence{column-gap:3px}.daily-panel .confidence-meter{max-width:66px}
