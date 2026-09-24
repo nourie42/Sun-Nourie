@@ -692,7 +692,6 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     'poodle-walk.png','poodle-walk-cold.png','poodle-walk-hot.png','poodle-walk-mild.png',
     'today-sky-clear.webp','today-sky-clouds.webp','today-sky-night-v2.webp','today-sky-night.webp',
     'today-sky-rain.webp','today-sky-storm.webp',
-    'nav-map.webp','nav-gross.webp','nav-day.webp','nav-week.webp','nav-air.webp',
   ]) app.get(`/weather-fusion/${name}`, (_req, res) => {
     res.setHeader('Cache-Control', 'no-cache');
     res.sendFile(path.join(PUBLIC_DIR, name));
