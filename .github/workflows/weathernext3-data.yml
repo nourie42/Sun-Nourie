@@ -27,7 +27,6 @@ jobs:
     env:
       WEATHERNEXT_BQ_TABLE: homeassist-470415.weathernext_3.weathernext_3_0_0_0p1deg
       GOOGLE_PROJECT_ID: homeassist-470415
-      GOOGLE_SERVICE_ACCOUNT: weather-fusion-github@homeassist-470415.iam.gserviceaccount.com
       GOOGLE_WORKLOAD_IDENTITY_PROVIDER: projects/269512183833/locations/global/workloadIdentityPools/github-actions/providers/sun-nourie
 
     steps:
@@ -42,7 +41,6 @@ jobs:
         with:
           project_id: ${{ env.GOOGLE_PROJECT_ID }}
           workload_identity_provider: ${{ env.GOOGLE_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ env.GOOGLE_SERVICE_ACCOUNT }}
 
       - name: Install BigQuery client
         run: pip install 'google-cloud-bigquery>=3.25,<4'
