@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 concurrency:
   group: weathernext3-point-data
@@ -24,37 +25,28 @@ jobs:
     timeout-minutes: 20
     env:
       WEATHERNEXT_BQ_TABLE: homeassist-470415.weathernext_3.weathernext_3_0_0_0p1deg
-      HAS_WEATHERNEXT_CREDS: ${{ secrets.WEATHERNEXT_GCP_CREDENTIALS != '' }}
+      GOOGLE_PROJECT_ID: homeassist-470415
+      GOOGLE_SERVICE_ACCOUNT: weather-fusion-github@homeassist-470415.iam.gserviceaccount.com
+      GOOGLE_WORKLOAD_IDENTITY_PROVIDER: projects/269512183833/locations/global/workloadIdentityPools/github-actions/providers/sun-nourie
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Explain missing setup
-        if: env.HAS_WEATHERNEXT_CREDS != 'true' || env.WEATHERNEXT_BQ_TABLE == ''
-        shell: bash
-        run: |
-          echo "WeatherNext 3 is ready in the site but Google access is not configured."
-          echo "Credential secret configured: $HAS_WEATHERNEXT_CREDS"
-          echo "WeatherNext BigQuery table configured in workflow: true"
-          echo "Add repository secret WEATHERNEXT_GCP_CREDENTIALS to enable automated WeatherNext collection."
-
       - uses: actions/setup-python@v5
-        if: env.HAS_WEATHERNEXT_CREDS == 'true' && env.WEATHERNEXT_BQ_TABLE != ''
         with:
           python-version: '3.12'
 
       - name: Authenticate to Google Cloud
-        if: env.HAS_WEATHERNEXT_CREDS == 'true' && env.WEATHERNEXT_BQ_TABLE != ''
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@v3
         with:
-          credentials_json: ${{ secrets.WEATHERNEXT_GCP_CREDENTIALS }}
+          project_id: ${{ env.GOOGLE_PROJECT_ID }}
+          workload_identity_provider: ${{ env.GOOGLE_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.GOOGLE_SERVICE_ACCOUNT }}
 
       - name: Install BigQuery client
-        if: env.HAS_WEATHERNEXT_CREDS == 'true' && env.WEATHERNEXT_BQ_TABLE != ''
         run: pip install 'google-cloud-bigquery>=3.25,<4'
 
       - name: Open isolated public-weather data worktree
-        if: env.HAS_WEATHERNEXT_CREDS == 'true' && env.WEATHERNEXT_BQ_TABLE != ''
         shell: bash
         run: |
           DATA="$RUNNER_TEMP/weather-fusion-publish"
@@ -65,14 +57,12 @@ jobs:
           echo "WEATHER_DATA_DIR=$DATA" >> "$GITHUB_ENV"
 
       - name: Query hosted WeatherNext 3
-        if: env.HAS_WEATHERNEXT_CREDS == 'true' && env.WEATHERNEXT_BQ_TABLE != ''
         run: |
           python scripts/weather_weathernext3_collect.py \
             --table "$WEATHERNEXT_BQ_TABLE" \
             --output "$WEATHER_DATA_DIR/models/weathernext3.json"
 
       - name: Publish compact WeatherNext 3 feed
-        if: env.HAS_WEATHERNEXT_CREDS == 'true' && env.WEATHERNEXT_BQ_TABLE != ''
         shell: bash
         run: |
           cd "$WEATHER_DATA_DIR"
