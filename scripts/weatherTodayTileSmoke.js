@@ -80,10 +80,8 @@ try {
         fiveCards:cards.length===5,
         labelsOneLine:labels.every(el=>el.scrollWidth<=el.clientWidth+1&&getComputedStyle(el).whiteSpace==='nowrap'),
         arrowsClear:cards.every(card=>{const l=rect(card.querySelector('.jump-label')),a=rect(card.querySelector('.jump-arrow'));return l.right<=a.left+1;}),
-        vectors:cards.every(card=>!!card.querySelector('svg.jump-svg')),
-        approvedArtwork:cards.every(card=>getComputedStyle(card.querySelector('.jump-visual')).backgroundImage.includes('nav-')),
-        compactReferenceHeight:cards.every(card=>{const h=rect(card).height;return h>=48&&h<=58;}),
-        artworkLarge:cards.every(card=>rect(card.querySelector('.jump-visual')).height>=38),
+        noArtwork:cards.every(card=>!card.querySelector('.jump-visual')&&!card.querySelector('svg.jump-svg')),
+        compactButtons:cards.every(card=>{const h=rect(card).height;return h>=42&&h<=56;}),
         rowFits:[...row.children].filter(el=>el.getClientRects().length).every(el=>{const r=rect(el);return r.left>=rr.left-1&&r.right<=rr.right+1;}),
         metaBelow:meta.top>=Math.max(...[...row.children].filter(el=>!el.classList.contains('day-meta')&&!el.classList.contains('forecast-confidence-notice')).map(el=>rect(el).bottom))-4,
         confidenceOwnRow:confidence.bottom<=Math.min(wind.top,uv.top)+2,
@@ -92,7 +90,7 @@ try {
         gustInsideWind:!row.querySelector('.day-wind-chip em')||rect(row.querySelector('.day-wind-chip em')).right<=wind.right+1,
       };
     });
-    assert.deepEqual(layout,{navFits:true,fiveCards:true,labelsOneLine:true,arrowsClear:true,vectors:true,approvedArtwork:true,compactReferenceHeight:true,artworkLarge:true,rowFits:true,metaBelow:true,confidenceOwnRow:true,windLeftOfUv:true,lowerInside:true,gustInsideWind:true},`approved mobile layout at ${width}px`);
+    assert.deepEqual(layout,{navFits:true,fiveCards:true,labelsOneLine:true,arrowsClear:true,noArtwork:true,compactButtons:true,rowFits:true,metaBelow:true,confidenceOwnRow:true,windLeftOfUv:true,lowerInside:true,gustInsideWind:true},`simple mobile button layout at ${width}px`);
   }
 
   console.log(JSON.stringify({
