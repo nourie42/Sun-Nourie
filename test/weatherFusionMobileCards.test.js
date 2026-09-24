@@ -41,7 +41,9 @@ test('Remainder of Today uses current and remaining hourly cloudiness instead of
  assert.equal(profile.hourlySkyOverride,true);
  const scene=todaySkySceneHTML(profile,t);
  assert.match(scene,/today-sky-overcast/);
- assert.doesNotMatch(scene,/today-sky-clear\.webp|today-sky-clouds\.webp/);
+ assert.match(scene,/<svg[^>]+today-sky-overcast/);
+ assert.match(scene,/today-cloud-light|today-cloud-mid|today-cloud-dark/);
+ assert.doesNotMatch(scene,/today-sky-clear\.webp|today-sky-clouds\.webp|sun/i);
 });
 test('Today sky adds clouds and precipitation by forecast scenario',()=>{
  assert.equal(todaySkyProfile({condition:'Mostly Sunny',pop:10}).scene,'clear');
