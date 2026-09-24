@@ -23,6 +23,11 @@ const SLEEVES={
   ['M101 114 L94 132 Q79 124 74 113 Q75 96 86 77 L98 83 L91 108 Z','M166 121 L182 136 Q189 143 180 158 L169 173 L159 166 L169 150 L160 145 Z'],
   ['M65 94 Q72 88 80 93 L85 109 L68 137 L59 166 L44 163 L53 130 L61 104 Z','M110 95 Q119 103 121 120 L133 142 L148 155 L140 165 L123 150 L109 128 Z']
  ],
+ carry:[
+  ['M119 194 L135 203 L136 211 L126 216 L113 205 Z','M175 180 L185 171 Q192 181 197 199 L182 205 L177 193 Z'],
+  ['M102 115 L106 131 L116 136 L111 151 L94 148 L90 137 Z','M166 121 L182 136 Q189 143 180 158 L169 173 L159 166 L169 150 L160 145 Z'],
+  ['M65 94 Q72 88 80 93 L85 109 L68 137 L59 166 L44 163 L53 130 L61 104 Z','M110 95 Q119 103 121 120 L133 142 L148 155 L140 165 L123 150 L109 128 Z']
+ ],
  fog:[
   ['M117 198 L129 207 L121 216 L112 223 L102 217 Q101 207 117 198 Z','M188 174 Q202 171 208 160 L218 143 L228 148 Q224 171 210 185 L198 188 Z'],
   ['M101 115 L109 134 Q95 159 82 153 L73 144 L83 133 L92 136 Z','M163 121 L178 145 L184 176 L172 180 L160 149 Z'],
@@ -37,7 +42,7 @@ const safe=s=>String(s).replace(/[^a-z0-9_-]/gi,'');
 export function clothingArtwork(panel,scene,outfit,sourceHref){
  if(!Number.isInteger(panel)||panel<0||panel>2||!['cold','cool','mild'].includes(outfit)||scene==='cold')return '';
  const id=`wardrobe-${panel}-${safe(scene)}-${outfit}`;
- const rainy=scene==='rain',variant=scene==='watch'||scene==='carry-umbrella'?'watch':scene==='fog'?'fog':'normal';
+ const rainy=scene==='rain',variant=scene==='carry-umbrella'?'carry':scene==='watch'?'watch':scene==='fog'?'fog':'normal';
  const pants=rainy?RAIN_PANTS[panel]:panel===0?SEATED_PANTS:panel===1?[BOY_PANTS]:WALKER_PANTS;
  const layered=outfit!=='mild'&&(!rainy||panel===0);
  const torso=[SEATED_JACKET,BOY_JACKET,WALKER_JACKET][panel];
@@ -45,8 +50,9 @@ export function clothingArtwork(panel,scene,outfit,sourceHref){
  const seam=panel===0?'M187 205 Q192 216 206 235 M117 233 L140 249':panel===1?'M132 180 L132 200 M112 211 L107 235 M151 211 L158 238':'M82 177 L62 232 M101 186 L100 202 L117 244';
  const zipper=panel===0?'M157 190 L151 226':panel===1?'M135 123 L135 174':'M96 101 L95 146';
  const dark=panel===2?'#245a77':'#223e5c',light=panel===2?'#638eaa':'#527a9d';
+ const hands=variant==='carry'?(panel===0?[[143,213,9,11],[177,169,8,12]]:panel===1?[[110,141,11,8]]:[]):panel===0?[[129,223,12,8]]:[];
  const clip=(name,paths)=>`<clipPath id="${id}-${name}">${paths.map(d=>`<path d="${d}"/>`).join('')}</clipPath>`;
  const filter=(name,r,g,b)=>`<filter id="${id}-${name}" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="${.2126*r[0]} ${.7152*r[0]} ${.0722*r[0]} 0 ${r[1]} ${.2126*g[0]} ${.7152*g[0]} ${.0722*g[0]} 0 ${g[1]} ${.2126*b[0]} ${.7152*b[0]} ${.0722*b[0]} 0 ${b[1]} 0 0 0 1 0"/></filter>`;
- const image=(clipId,filterId)=>sourceHref?`<g clip-path="url(#${id}-${clipId})"><image href="${sourceHref}" x="${-300*panel}" y="0" width="900" height="300" preserveAspectRatio="none" filter="url(#${id}-${filterId})"/></g>`:'';
- return `<g class="comfort-clothing" data-visible-outfit="${outfit}" data-garment="${layered?'jacket-and-trousers':rainy?'rainwear-and-trousers':'long-trousers'}" aria-hidden="true"><defs>${clip('legs',pants)}${clip('sleeves',jacket)}${filter('denim',[.10,.13],[.12,.23],[.15,.34])}${panel===2?filter('fabric',[.34,.07],[.5,.25],[.47,.27]):filter('fabric',[.42,.10],[.51,.28],[.49,.41])}<linearGradient id="${id}-pants" x1="0" y1="0" x2="1" y2=".25"><stop stop-color="${dark}"/><stop offset=".48" stop-color="${light}"/><stop offset="1" stop-color="${dark}"/></linearGradient><linearGradient id="${id}-jacket" x1="0" y1="0" x2=".9" y2="1"><stop stop-color="${panel===2?'#77c4c1':'#81b5dd'}"/><stop offset=".4" stop-color="${panel===2?'#429896':'#4286bd'}"/><stop offset="1" stop-color="${panel===2?'#236a73':'#25547f'}"/></linearGradient></defs><g class="wardrobe-trousers" fill="url(#${id}-pants)" stroke="${dark}" stroke-width=".65" stroke-linejoin="round">${pants.map(d=>`<path d="${d}"/>`).join('')}</g><g opacity=".28">${image('legs','denim')}</g>${!rainy?`<path d="${seam}" fill="none" stroke="#96b5cf" stroke-width=".65" opacity=".35"/>`:''}${layered?`<g class="wardrobe-jacket" fill="url(#${id}-jacket)" stroke="${panel===2?'#286574':'#30577e'}" stroke-width=".6" stroke-linejoin="round">${jacket.map(d=>`<path d="${d}"/>`).join('')}</g>${image('sleeves','fabric')}<path d="${zipper}" fill="none" stroke="#d7eafa" stroke-width="1" opacity=".7"/>`:''}</g>`;
+ const image=(clipId,filterId)=>sourceHref?`<g clip-path="url(#${id}-${clipId})"><image href="${sourceHref}" x="${-300*panel}" y="0" width="900" height="300" preserveAspectRatio="none"${filterId?` filter="url(#${id}-${filterId})"`:''}/></g>`:'';
+ return `<g class="comfort-clothing" data-visible-outfit="${outfit}" data-garment="${layered?'jacket-and-trousers':rainy?'rainwear-and-trousers':'long-trousers'}" aria-hidden="true"><defs>${clip('legs',pants)}${clip('sleeves',jacket)}<clipPath id="${id}-hands">${hands.map(([x,y,rx,ry])=>`<ellipse cx="${x}" cy="${y}" rx="${rx}" ry="${ry}"/>`).join('')}</clipPath>${filter('denim',[.10,.13],[.12,.23],[.15,.34])}${panel===2?filter('fabric',[.34,.07],[.5,.25],[.47,.27]):filter('fabric',[.42,.10],[.51,.28],[.49,.41])}<linearGradient id="${id}-pants" x1="0" y1="0" x2="1" y2=".25"><stop stop-color="${dark}"/><stop offset=".48" stop-color="${light}"/><stop offset="1" stop-color="${dark}"/></linearGradient><linearGradient id="${id}-jacket" x1="0" y1="0" x2=".9" y2="1"><stop stop-color="${panel===2?'#77c4c1':'#81b5dd'}"/><stop offset=".4" stop-color="${panel===2?'#429896':'#4286bd'}"/><stop offset="1" stop-color="${panel===2?'#236a73':'#25547f'}"/></linearGradient></defs><g class="wardrobe-trousers" fill="url(#${id}-pants)" stroke="${dark}" stroke-width=".65" stroke-linejoin="round">${pants.map(d=>`<path d="${d}"/>`).join('')}</g><g opacity=".28">${image('legs','denim')}</g>${!rainy?`<path d="${seam}" fill="none" stroke="#96b5cf" stroke-width=".65" opacity=".35"/>`:''}${layered?`<g class="wardrobe-jacket" fill="url(#${id}-jacket)" stroke="${panel===2?'#286574':'#30577e'}" stroke-width=".6" stroke-linejoin="round">${jacket.map(d=>`<path d="${d}"/>`).join('')}</g>${image('sleeves','fabric')}<path d="${zipper}" fill="none" stroke="#d7eafa" stroke-width="1" opacity=".7"/>`:''}${hands.length?image('hands'):''}</g>`;
 }
