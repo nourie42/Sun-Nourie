@@ -42,10 +42,11 @@ test('regular and experimental weather share device-location, jump-nav, AQI and 
  const html=read('index.html'),app=read('app.js'),css=read('weather-polish.css');
  assert.doesNotMatch(html,/data-place="knightdale"|data-place="greenville"|Knightdale \/ Raleigh|Greenville, NC/);
  assert.match(html,/id="device-location-label"/);
- assert.match(html,/href="#map-panel" aria-label="Weather Map">Map/);
- assert.match(html,/href="#dewpoint-gross-meter">Dew Point/);
- assert.match(html,/href="#your-day">Your Day/);
- assert.match(html,/href="#daily-panel" aria-label="7-Day Forecast">7-Day/);
+ assert.match(html,/class="weather-jump-card jump-map"[^>]*href="#map-panel"/);
+ assert.match(html,/class="weather-jump-card jump-gross"[^>]*href="#dewpoint-gross-meter"[\s\S]*Gross Meter/);
+ assert.match(html,/class="weather-jump-card jump-day"[^>]*href="#your-day"[\s\S]*Your Day/);
+ assert.match(html,/class="weather-jump-card jump-week"[^>]*href="#daily-panel"[\s\S]*7-Day/);
+ assert.match(html,/class="weather-jump-card jump-air"[^>]*href="#air-quality"[\s\S]*Air Quality/);
  assert.match(html,/id="air-quality"/);
  assert.match(app,/startDeviceLocation\(\);/);
  assert.match(app,/navigator\.geolocation\.getCurrentPosition/);
@@ -53,7 +54,9 @@ test('regular and experimental weather share device-location, jump-nav, AQI and 
  assert.doesNotMatch(app,/presets\.knightdale|weather-fusion-place/);
  assert.match(css,/font-size:12px!important/);
  assert.match(css,/gross-number/);
- assert.match(css,/grid-template-columns:repeat\(6,minmax\(0,1fr\)\)/);
+ assert.match(css,/\.weather-jump-nav\{display:grid;grid-template-columns:repeat\(6,minmax\(0,1fr\)\)/);
+ assert.match(css,/\.weather-jump-card:nth-child\(-n\+3\)\{grid-column:span 2\}/);
+ assert.match(css,/\.weather-jump-card:nth-child\(n\+4\)\{grid-column:span 3\}/);
  assert.ok(html.indexOf('id="metrics"')<html.indexOf('id="air-quality"'),'Your Day cards must appear directly before local air quality');
  assert.match(html,/Current local AQI \+ next 24 hours/);
 });
