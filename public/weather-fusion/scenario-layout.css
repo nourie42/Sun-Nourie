@@ -53,7 +53,7 @@
  }
  .daily-panel .day-wind-label,.daily-panel .day-wind-chip b,.daily-panel .day-wind-unit,.daily-panel .day-wind-chip em{font-size:12px;line-height:1.05;white-space:normal}
  .daily-panel .day-wind-label{color:#9edbf6}.daily-panel .day-wind-chip b{color:#fff}.daily-panel .day-wind-unit{color:#9edbf6}.daily-panel .day-wind-chip em{color:#ffe18a;font-style:normal;font-weight:750}
- .daily-panel .daily-uv{box-sizing:border-box;overflow:hidden;align-self:center;justify-self:end;min-width:0;max-width:72px;font-size:12px;text-align:right;white-space:normal;line-height:1.12}
+ .daily-panel .daily-uv{box-sizing:border-box;overflow:hidden;align-self:center;justify-self:stretch;min-width:0;max-width:none;padding-left:6px;font-size:12px;text-align:right;white-space:normal;line-height:1.12}
  .daily-panel .daily-uv>span{display:block;margin-bottom:2px}
  .daily-panel .forecast-confidence-notice{display:none}
 }
