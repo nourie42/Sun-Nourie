@@ -31,8 +31,15 @@ jobs:
 
       - name: Explain missing setup
         if: env.HAS_WEATHERNEXT_CREDS != 'true' || env.WEATHERNEXT_BQ_TABLE == ''
+        shell: bash
         run: |
           echo "WeatherNext 3 is ready in the site but Google access is not configured."
+          echo "Credential secret configured: $HAS_WEATHERNEXT_CREDS"
+          if [[ -n "$WEATHERNEXT_BQ_TABLE" ]]; then
+            echo "BigQuery table variable configured: true"
+          else
+            echo "BigQuery table variable configured: false"
+          fi
           echo "Add repository variable WEATHERNEXT_BQ_TABLE and secret WEATHERNEXT_GCP_CREDENTIALS after allowlist approval."
 
       - uses: actions/setup-python@v5
