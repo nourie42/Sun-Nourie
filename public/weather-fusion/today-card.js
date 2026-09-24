@@ -122,48 +122,8 @@ export function moonPhaseHTML(epoch=Date.now()){
 export function todaySkySceneHTML(profile,epoch=Date.now()){
  const {scene,night}=profile;
  const rainyNight=night&&['overcast-rain','storm'].includes(scene);
- if(scene==='cloudy'&&!night)return `<svg class="today-sky today-sky-overcast" data-scene="cloudy" viewBox="0 0 1000 600" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-  <defs>
-    <linearGradient id="today-cloudy-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7f99ab"/><stop offset=".55" stop-color="#607d92"/><stop offset="1" stop-color="#48687f"/></linearGradient>
-    <linearGradient id="today-cloud-light" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eef3f6"/><stop offset="1" stop-color="#c7d2da"/></linearGradient>
-    <linearGradient id="today-cloud-mid" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d8e1e7"/><stop offset="1" stop-color="#aebdc8"/></linearGradient>
-    <linearGradient id="today-cloud-dark" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b8c6d0"/><stop offset="1" stop-color="#879ba9"/></linearGradient>
-  </defs>
-  <rect width="1000" height="600" fill="url(#today-cloudy-sky)"/>
-  <g fill="url(#today-cloud-light)" opacity=".96">
-    <ellipse cx="135" cy="165" rx="165" ry="72"/><ellipse cx="275" cy="145" rx="145" ry="90"/><ellipse cx="410" cy="175" rx="170" ry="78"/>
-    <ellipse cx="680" cy="120" rx="180" ry="80"/><ellipse cx="835" cy="155" rx="190" ry="95"/><ellipse cx="980" cy="185" rx="150" ry="70"/>
-  </g>
-  <g fill="url(#today-cloud-mid)" opacity=".96">
-    <ellipse cx="30" cy="300" rx="180" ry="82"/><ellipse cx="185" cy="285" rx="185" ry="105"/><ellipse cx="360" cy="315" rx="205" ry="92"/>
-    <ellipse cx="590" cy="275" rx="190" ry="100"/><ellipse cx="760" cy="300" rx="205" ry="112"/><ellipse cx="950" cy="325" rx="190" ry="88"/>
-  </g>
-  <g fill="url(#today-cloud-dark)" opacity=".94">
-    <ellipse cx="90" cy="455" rx="210" ry="105"/><ellipse cx="300" cy="440" rx="245" ry="135"/><ellipse cx="520" cy="470" rx="235" ry="110"/>
-    <ellipse cx="735" cy="435" rx="250" ry="140"/><ellipse cx="940" cy="470" rx="215" ry="108"/>
-  </g>
- </svg>`;
- if(scene==='cloudy'&&night)return `<svg class="today-sky today-sky-cloudy-night" data-scene="cloudy" viewBox="0 0 1000 600" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-  <defs>
-    <linearGradient id="today-night-cloudy-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#071b33"/><stop offset=".58" stop-color="#0a2b4b"/><stop offset="1" stop-color="#123a58"/></linearGradient>
-    <linearGradient id="today-night-cloud-light" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9eacb8"/><stop offset="1" stop-color="#677987"/></linearGradient>
-    <linearGradient id="today-night-cloud-mid" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#778896"/><stop offset="1" stop-color="#536675"/></linearGradient>
-    <linearGradient id="today-night-cloud-dark" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5e7180"/><stop offset="1" stop-color="#3f5364"/></linearGradient>
-  </defs>
-  <rect width="1000" height="600" fill="url(#today-night-cloudy-sky)"/>
-  <g fill="url(#today-night-cloud-light)" opacity=".88">
-    <ellipse cx="60" cy="125" rx="180" ry="78"/><ellipse cx="225" cy="145" rx="205" ry="98"/><ellipse cx="405" cy="125" rx="180" ry="82"/>
-    <ellipse cx="670" cy="145" rx="220" ry="100"/><ellipse cx="875" cy="130" rx="210" ry="90"/>
-  </g>
-  <g fill="url(#today-night-cloud-mid)" opacity=".95">
-    <ellipse cx="110" cy="300" rx="235" ry="115"/><ellipse cx="330" cy="285" rx="245" ry="125"/><ellipse cx="555" cy="315" rx="250" ry="118"/>
-    <ellipse cx="790" cy="292" rx="260" ry="130"/><ellipse cx="1010" cy="310" rx="215" ry="105"/>
-  </g>
-  <g fill="url(#today-night-cloud-dark)" opacity=".98">
-    <ellipse cx="50" cy="485" rx="220" ry="118"/><ellipse cx="270" cy="455" rx="270" ry="145"/><ellipse cx="520" cy="480" rx="270" ry="135"/>
-    <ellipse cx="770" cy="455" rx="275" ry="150"/><ellipse cx="1010" cy="485" rx="230" ry="120"/>
-  </g>
- </svg>`;
+ if(scene==='cloudy'&&!night)return '<img class="today-sky today-sky-real-clouds today-sky-clouds-day" data-scene="cloudy" src="/weather-fusion/today-sky-clouds.webp" alt="" aria-hidden="true">';
+ if(scene==='cloudy'&&night)return '<img class="today-sky today-sky-real-clouds today-sky-clouds-night" data-scene="cloudy" src="/weather-fusion/today-sky-clouds.webp" alt="" aria-hidden="true">';
  const asset=rainyNight?'rain':night?'night':['clear','few-clouds'].includes(scene)?'clear':scene==='overcast-rain'?'rain':'storm';
  const src=asset==='night'?'/weather-fusion/today-sky-night-v2.webp':`/weather-fusion/today-sky-${asset}.webp`;
  return `<img class="today-sky" data-scene="${scene}" src="${src}" alt="" aria-hidden="true">${night&&!rainyNight?moonPhaseHTML(epoch):''}`;
