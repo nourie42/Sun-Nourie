@@ -676,9 +676,15 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
   });
+  app.get(['/weathernext','/weathernext/','/weather-fusion/weathernext-site.html'], (_req,res) => {
+    res.setHeader('Cache-Control','no-cache');
+    res.setHeader('X-Content-Type-Options','nosniff');
+    res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');
+    res.sendFile(path.join(PUBLIC_DIR,'weathernext-site.html'));
+  });
   for (const name of [
     'air-quality.js','alert-banners.js','app.js','bulletin-facts.js','bulletins.js','car-wash.js','car-wash.css','car-wash-background.webp','car-wash-corvette-hood.webp',
-    'model-explanation.js','model-explanation.css',
+    'model-explanation.js','model-explanation.css','weathernext-site.html','weathernext-site.css','weathernext-site.js','weathernext-data.js','weathernext-catalog.json',
     'comfort-cinematic.css','comfort-effects.css','comfort-outlook.js','current-inputs.js','current-temperature.js',
     'daily-uv.js','dans-summary.js','dans-take.js','day-graph.js','dewpoint-meter.js','dewpoint-meter.css',
     'experience.js','exposure-scene.js','forecast-cards.css','forecast-confidence.js','forecast-layout.css','forecast-story.js','outlook-details.js',
