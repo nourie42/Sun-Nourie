@@ -105,3 +105,11 @@ body[data-sky="night"] .air-quality-panel{background:radial-gradient(ellipse at 
   .weather-jump-card .jump-label{font-size:10px}.weather-jump-card.jump-gross .jump-label{font-size:9.5px}
   .weather-jump-card .jump-arrow{width:18px;height:18px;font-size:18px}
 }
+
+/* Extra-narrow reference match: preserve all five labels on one line. */
+@media(max-width:359px){
+  .weather-jump-card{grid-template-columns:22px minmax(0,1fr) 12px;gap:2px;padding:5px 3px}
+  .weather-jump-card .jump-visual{width:22px;height:44px;padding-right:3px}
+  .weather-jump-card .jump-label,.weather-jump-card.jump-gross .jump-label{font-size:8.2px;letter-spacing:-.04em}
+  .weather-jump-card .jump-arrow{width:12px;height:12px;font-size:13px;border-width:1px}
+}
