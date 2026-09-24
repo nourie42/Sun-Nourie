@@ -1,6 +1,11 @@
 name: WeatherNext 3 point forecast data
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/weather_weathernext3_collect.py'
+      - '.github/workflows/weathernext3-data.yml'
   schedule:
     # Main 00/06/12/18 UTC runs reach BigQuery about 8h10m later.
     - cron: '25 2,8,14,20 * * *'
