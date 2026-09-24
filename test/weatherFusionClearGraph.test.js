@@ -25,7 +25,7 @@ test('combined graph aligns UTC instants, keeps zero UV, gaps and date windows',
  f.days[0].date='2026-10-31';assert.equal(dayGraphPoints(f,0,false,Date.parse('2026-10-31T00:00Z')).length,25);
 });
 test('dog outfits follow human feels-like thresholds, not pavement',()=>{
- for(const [feels,asset] of [[104,'hot'],[88,'hot'],[74,'hot'],[65,'mild'],[58,'mild'],[42,'cool'],[30,'cold']])assert.equal(walkerOutfit(feels).asset,asset==='cool'?'poodle-walk.png':`poodle-walk-${asset}.png`);
+ for(const [feels,asset] of [[104,'hot'],[88,'hot'],[74,'hot'],[65,'mild'],[58,'cool'],[42,'cool'],[30,'cold']])assert.equal(walkerOutfit(feels).asset,asset==='cool'?'poodle-walk.png':`poodle-walk-${asset}.png`);
 });
 test('Dan translates the screenshot uncertainty and rejects technical paraphrases',()=>{
  assert.equal(plainDanWording('Rain may be less widespread than some runs indicate because a dry layer could linger.'),'Rain may be less widespread than expected because dry air could linger.');

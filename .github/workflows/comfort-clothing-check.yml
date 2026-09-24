@@ -1,0 +1,83 @@
+name: Comfort clothing visual checks
+on:
+  push:
+    branches: [main]
+    paths:
+      - public/weather-fusion/**
+      - src/weatherFusion.js
+      - scripts/verifyComfortClothingBrowser.js
+      - test/weatherFusionClothingArtwork.test.js
+      - .github/workflows/comfort-clothing-check.yml
+  pull_request:
+    paths:
+      - public/weather-fusion/**
+      - src/weatherFusion.js
+      - scripts/verifyComfortClothingBrowser.js
+      - test/weatherFusionClothingArtwork.test.js
+      - .github/workflows/comfort-clothing-check.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: comfort-clothing-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - name: All weather unit tests
+        run: |
+          mkdir -p /tmp/clothing-qa
+          set -o pipefail
+          node --test test/weather*.test.js | tee /tmp/clothing-qa/tests.txt
+      - run: npm install --no-save --package-lock=false playwright@1.55.0
+      - run: npx playwright install --with-deps chromium
+      - name: Clothing, reading and geometry browser checks
+        run: node scripts/verifyComfortClothingBrowser.js
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: clothing-rendered-proof
+          path: /tmp/clothing-qa
+          retention-days: 7
+  live:
+    if: github.ref == 'refs/heads/main'
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify deployed wardrobe modules match the tested commit
+        run: |
+          python - <<'PY'
+          import hashlib,json,time,urllib.request
+          from pathlib import Path
+          base='https://sun-nourie-live.onrender.com'
+          names=['comfort-clothing.js','exposure-scene.js','personal-details.js','pavement.js','experience.js','app.js']
+          def read(path):
+              request=urllib.request.Request(base+path,headers={'Cache-Control':'no-cache'})
+              with urllib.request.urlopen(request,timeout=12) as response:return response.read()
+          expected={name:hashlib.sha256((Path('public/weather-fusion')/name).read_bytes()).hexdigest() for name in names}
+          for attempt in range(40):
+              try:
+                  page=read('/weather-fusion/?clothing-check='+str(attempt)).decode()
+                  assert '/weather-fusion/app.js?v=wardrobe-v1' in page,'Previous page build is still deployed'
+                  observed={name:hashlib.sha256(read('/weather-fusion/'+name+'?clothing-check='+str(attempt))).hexdigest() for name in names}
+                  assert observed==expected,'Waiting for all module versions to match'
+                  print(json.dumps({'deployed':True,'version':'wardrobe-v1','verifiedModules':names}))
+                  break
+              except Exception as error:
+                  print('Deployment check:',str(error),flush=True)
+                  time.sleep(8)
+          else:raise SystemExit('Live deployment did not match the tested clothing build within the check window.')
+          PY
