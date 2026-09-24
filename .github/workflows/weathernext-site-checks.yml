@@ -32,3 +32,32 @@ jobs:
           name: weathernext-site-browser-evidence
           path: /tmp/weathernext-site-qa
           retention-days: 7
+
+  live:
+    needs: browser
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - name: Wait for deployed flat navigation and WeatherNext site
+        env:
+          LIVE_URL: https://sun-nourie-live.onrender.com
+        run: |
+          for attempt in $(seq 1 90); do
+            main="$(curl -fsSL --max-time 20 "$LIVE_URL/weather-fusion/?deploy=$GITHUB_SHA&n=$attempt" 2>/dev/null || true)"
+            wn="$(curl -fsSL --max-time 20 "$LIVE_URL/weathernext/?deploy=$GITHUB_SHA&n=$attempt" 2>/dev/null || true)"
+            css="$(curl -fsSL --max-time 20 "$LIVE_URL/weather-fusion/weather-polish.css?v=flat-nav-v1&n=$attempt" 2>/dev/null || true)"
+            if printf '%s' "$main" | grep -Fq 'weather-polish.css?v=flat-nav-v1' \
+              && ! printf '%s' "$main" | grep -Fq 'jump-visual' \
+              && printf '%s' "$main" | grep -Fq 'id="weathernext-site-link" href="/weathernext/"' \
+              && printf '%s' "$wn" | grep -Fq 'WeatherNext Forecast' \
+              && printf '%s' "$wn" | grep -Fq 'Everything Google publishes for forecasting' \
+              && printf '%s' "$css" | grep -Fq 'grid-template-columns:repeat(5,minmax(0,1fr))' \
+              && printf '%s' "$css" | grep -Fq 'border:0'; then
+              echo "Live Weather Nourie flat navigation and dedicated WeatherNext site are deployed."
+              exit 0
+            fi
+            echo "Waiting for Render deployment ($attempt/90)"
+            sleep 10
+          done
+          echo "Render did not deploy the verified WeatherNext/navigation build in time."
+          exit 1
