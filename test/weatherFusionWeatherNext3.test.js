@@ -5,31 +5,21 @@ import {readFile} from 'node:fs/promises';
 const root = new URL('../', import.meta.url);
 const text = path => readFile(new URL(path, root), 'utf8');
 
-test('WeatherNext 3 is hosted and comparison-only, never part of the current PoP math', async () => {
+test('Experimental Weather links to the separate WeatherNext site without embedding WeatherNext content', async () => {
+  const html = await text('public/weather-fusion/index.html');
   const js = await text('public/weather-fusion/model-explanation.js');
-  assert.match(js, /Google WeatherNext 3/);
-  assert.match(js, /64-member ensemble/);
-  assert.match(js, /comparison only/i);
-  assert.match(js, /contributes 0 points/i);
-  assert.match(js, /models\/weathernext3\.json/);
-  assert.match(js, /return \['nws','hrrr','ecmwf','nbm'\]\.map/);
-  assert.doesNotMatch(js, /return \['nws','hrrr','ecmwf','nbm','weathernext'\]\.map/);
+  assert.match(html, /id="weathernext-site-link" href="\/weathernext\/"/);
+  assert.doesNotMatch(html, /id="google-status"/);
+  const explanation = js.slice(js.indexOf('export function modelExplanationHTML'), js.indexOf('function experimentalPath'));
+  assert.doesNotMatch(explanation, /weatherNextCard\(/);
+  const renderer = js.slice(js.indexOf('export function renderModelExplanation'), js.indexOf('export function resetModelExplanation'));
+  assert.doesNotMatch(renderer, /installWeatherNextMapControl|syncWeatherNextStatus|queueWeatherNextLoad/);
 });
 
-test('WeatherNext 3 card exposes hourly hosted statistics and keeps map disabled until configured', async () => {
+test('WeatherNext remains separate from the current PoP math', async () => {
   const js = await text('public/weather-fusion/model-explanation.js');
-  assert.match(js, /temperatureP10F/);
-  assert.match(js, /temperatureP90F/);
-  assert.match(js, /precipitationP90Inches/);
-  assert.match(js, /button\.disabled=true/);
-  assert.match(js, /WeatherNext 3 map pending data access/);
-  assert.match(js, /Connected feed/);
-  assert.match(js, /syncWeatherNextStatus/);
-  assert.match(js, /comparison-only and does not change the NWS\/HRRR\/ECMWF\/NBM rain blend/);
-  assert.match(js, /WeatherNext vs Weather Fusion/);
-  assert.match(js, /7-day model view/);
-  assert.match(js, /Ensemble temperature envelope/);
-  assert.match(js, /precipitation amount, not PoP/);
+  assert.match(js, /return \['nws','hrrr','ecmwf','nbm'\]\.map/);
+  assert.doesNotMatch(js, /return \['nws','hrrr','ecmwf','nbm','weathernext'\]\.map/);
 });
 
 test('WeatherNext collector reads BigQuery surface statistics without inventing PoP', async () => {
