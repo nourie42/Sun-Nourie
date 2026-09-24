@@ -1,0 +1,34 @@
+name: WeatherNext site and plain navigation checks
+on:
+  push:
+    branches: [main]
+    paths: ['public/weather-fusion/**','src/weatherFusion.js','test/weather*.test.js','scripts/weatherNext*.js','.github/workflows/weathernext-site-checks.yml']
+  pull_request:
+    paths: ['public/weather-fusion/**','src/weatherFusion.js','test/weather*.test.js','scripts/weatherNext*.js','.github/workflows/weathernext-site-checks.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: weathernext-site-checks-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: node --test test/weather*.test.js
+      - run: npm install --no-save --package-lock=false playwright@1.55.0
+      - run: npx playwright install --with-deps chromium
+      - run: node scripts/weatherNextSiteSmoke.js
+      - run: node scripts/weatherTodayTileSmoke.js
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: weathernext-site-browser-evidence
+          path: /tmp/weathernext-site-qa
+          retention-days: 7
