@@ -75,8 +75,7 @@ export function registerWeatherComparisonRoutes(app,{fetchImpl=globalThis.fetch,
  const fail=(res,e)=>res.status(e.status||503).json({error:e.message||'Comparison data unavailable.'});
  const config=async q=>{const source=q.source==='google'?'google':q.source==='fusion'?'fusion':null;if(!source)throw Object.assign(Error('Choose Fusion or Google.'),{status:400});const point=googlePoints(await getFeed()).find(p=>p.id===q.location);if(!point)throw Object.assign(Error('Choose a published comparison location.'),{status:404});return {source,point};};
  app.get(['/weather-fusion','/weather-fusion/'],async(_req,res,next)=>{
-  try{let html=await readFile(root+'index.html','utf8');const link='<a id="weather-compare-link" class="text-button" href="/weather-fusion/compare/" style="display:inline-flex;align-items:center;min-height:40px;padding:8px 11px;border-radius:10px;background:rgba(8,64,99,.32);font-weight:750;white-space:nowrap">Compare Google</a>';
-   html=html.replace('<nav class="weather-jump-nav"','<div style="display:flex;justify-content:flex-end;margin:6px 0">'+link+'</div><nav class="weather-jump-nav"');res.set('Cache-Control','no-cache').type('html').send(html);
+  try{const html=await readFile(root+'index.html','utf8');res.set('Cache-Control','no-cache').type('html').send(html);
   }catch(e){next(e);}
  });
  app.get(['/weather-fusion/compare','/weather-fusion/compare/'],(_req,res)=>res.set('Cache-Control','no-cache').sendFile(root+'compare.html'));
@@ -86,3 +85,4 @@ export function registerWeatherComparisonRoutes(app,{fetchImpl=globalThis.fetch,
  app.get('/weather-fusion/compare/pane',async(req,res)=>{try{const c=await config(req.query);let html=await readFile(root+'index.html','utf8');html=html.replace(/<script type="module" src="\/weather-fusion\/app\.js[^\"]*"><\/script>/,`<script type="module" src="/weather-fusion/compare/app.js?source=${c.source}&amp;location=${encodeURIComponent(c.point.id)}"></script>`);html=html.replace('</head>',`<link rel="stylesheet" href="/weather-fusion/compare.css?v=${version}"></head>`).replace('<body data-sky="day">',`<body data-sky="day" class="comparison-pane ${c.source==='google'?'google-pane':'fusion-pane'}">`);if(c.source==='google')html=html.replace(/<script defer src="https:\/\/unpkg.com\/leaflet[^>]*><\/script>/,'');res.set('Cache-Control','no-cache').type('html').send(html);}catch(e){fail(res,e);}});
  app.get('/weather-fusion/compare/app.js',async(req,res)=>{try{const c=await config(req.query);res.set('Cache-Control','no-cache').type('application/javascript').send(comparisonApp(await readFile(root+'app.js','utf8'),c));}catch(e){res.status(503).type('application/javascript').send("throw new Error('The comparison page could not be prepared. Refresh or return to the main forecast.');");}});
 }
+
