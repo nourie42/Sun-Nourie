@@ -9,7 +9,7 @@ export function airQualityUrl(location){
   longitude:String(location.longitude),
   current:'us_aqi,pm2_5,pm10,ozone,nitrogen_dioxide',
   hourly:'us_aqi',
-  forecast_days:'5',
+  forecast_days:'7',
   timezone:'GMT',
   timeformat:'unixtime'
  });

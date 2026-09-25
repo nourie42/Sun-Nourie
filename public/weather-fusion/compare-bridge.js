@@ -3,18 +3,17 @@ const sections=['city-name','today-forecast','hourly','skin-exposure','daily-pan
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function installComparisonPane(config,actions){
  const $=id=>document.getElementById(id);let suppress=0,scrollTimer=null;
- const post=payload=>parent.postMessage({...payload,source:config.source,location:config.point.id},location.origin);
+ const embedded=window.parent!==window;
+ const post=payload=>{if(embedded)parent.postMessage({...payload,source:config.source,location:config.point.id},location.origin);};
  function addNotice(id,title,text){const root=$(id);if(!root)return;let note=root.querySelector('.google-unavailable');if(!note){note=document.createElement('div');note.className='google-unavailable';root.append(note);}note.innerHTML=`<strong>${esc(title)}</strong>${esc(text)}`;}
- function sourceNote(data){let note=$('compare-source-note');if(!note){note=document.createElement('div');note.id='compare-source-note';note.className='compare-source-note';$('forecast').prepend(note);}const google=config.source==='google';note.dataset.stale=String((data.feeds||[]).some(f=>f.status==='stale'));note.innerHTML=google?'<strong>Forecast timing &amp; sources</strong>Model forecast—not a live observation. UV and AQI use separate supplemental feeds. Confidence describes ensemble temperature agreement, not an accuracy guarantee.':'<strong>Your Weather Fusion forecast</strong>Your normal forecast, observations, calculations and image tiles. Both panels use the same selected comparison point.';}
  function googleLabels(data){
-  const timing=$('compare-source-note'),run=data.current?.provenance?.runAt;
-  if(timing&&run){const age=(Date.now()-Date.parse(run))/3600000;const stamp=document.createElement('p');stamp.className='model-run-stamp';stamp.textContent=(age>36?'Older model run · ':'Model initialized ')+new Intl.DateTimeFormat('en-US',{timeZone:data.location.timeZone,month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZoneName:'short'}).format(new Date(run))+' · '+Math.round(age)+' hours old';timing.append(stamp);}
   document.title='Experimental NVIDIA AI Weather';
   $('observation-label').textContent='Model forecast · valid '+new Intl.DateTimeFormat('en-US',{timeZone:data.location.timeZone,month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}).format(new Date(data.current.time))+' · not a live station reading';
   const label=document.querySelector('.current-temp-label');if(label)label.textContent='Forecast temperature';
 
   if($('ai-label'))$('ai-label').textContent='LOCAL OUTLOOK';
   if($('briefing-stamp'))$('briefing-stamp').textContent='Weather Nourie forecast summary';
+  for(const id of ['briefing-summary','briefing-detail']){const root=$(id);if(root){const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let node;while(node=walker.nextNode())node.textContent=node.textContent.replaceAll('Rain chance is not available yet.','This model feed does not publish rain probabilities.');}}
   for(const button of document.querySelectorAll('#hourly [data-comfort-time]')){
    const time=button.dataset.comfortTime==='now'?data.current.time:button.dataset.comfortTime;
    const row=data.hours.find(h=>Date.parse(h.time)===Date.parse(time)),rain=button.querySelector('.hour-rain');
@@ -27,9 +26,9 @@ export function installComparisonPane(config,actions){
   science.innerHTML=`<p><strong>Source policy</strong><br>${esc(data.methodology.replaceAll('Google ','').replaceAll('Google-issued','model-issued').replace('No NWS, HRRR, ECMWF or Open-Meteo values enter this forecast.','Core weather fields use WeatherNext.'))}</p>${(data.comparison?.runs||[]).map(r=>`<p><strong>${r.id==='interimSurface'?'Short-range hourly run':r.id==='previousSurface'?'Previous main run':'Main run'}</strong><br>Initialized ${esc(r.runAt)}<br>Collected ${esc(r.fetchedAt||'not supplied')}<br>Status: ${esc(r.status)}</p>`).join('')}<p>Rain probability, gusts and live radar are not inferred. UV and AQI use independently attributed supplemental feeds. Forecast confidence is a relative temperature-ensemble indicator. Cloud/precipitation scenes are display categories. The ensemble’s hourly temperature spread is not a calibrated confidence percentage. Daily highs/lows summarize available hourly mean values—not an extreme-temperature ensemble distribution. Sunrise/sunset are astronomical calculations.</p><p><a href="/weathernext/" target="_top">Open WeatherNext dashboard ↗</a></p>`;
   let coverage=$('google-coverage-note');if(!coverage){coverage=document.createElement('p');coverage.id='google-coverage-note';coverage.className='google-coverage-note';$('today-forecast').after(coverage);}coverage.textContent=(data.days[0]?.detail||'Forecast coverage is unavailable.').replaceAll('Google ','');
  }
- function rendered(data){sourceNote(data);if(config.source==='google')googleLabels(data);post({type:'compare:forecast',current:{temperature:data.current.temperature,time:data.current.time,type:data.current.type},hours:(data.hours||[]).map(h=>({time:h.time,temperature:h.temperature,dewpoint:h.dewpoint,windMph:h.windMph??data.metricForecasts?.series?.wind?.find(p=>Date.parse(p.time)===Date.parse(h.time))?.value??null,skyCover:h.skyCover,precipitation:h.precipitation,feelsLike:displayedFeelsAt(data,h.time)}))});}
+ function rendered(data){if(config.source==='google')googleLabels(data);post({type:'compare:forecast',current:{temperature:data.current.temperature,time:data.current.time,type:data.current.type},hours:(data.hours||[]).map(h=>({time:h.time,temperature:h.temperature,dewpoint:h.dewpoint,windMph:h.windMph??data.metricForecasts?.series?.wind?.find(p=>Date.parse(p.time)===Date.parse(h.time))?.value??null,skyCover:h.skyCover,precipitation:h.precipitation,feelsLike:displayedFeelsAt(data,h.time)}))});}
  window.addEventListener('message',e=>{
-  if(e.origin!==location.origin||e.source!==parent||!e.data)return;const m=e.data;
+  if(!embedded||e.origin!==location.origin||e.source!==parent||!e.data)return;const m=e.data;
   if(m.type==='compare:refresh'){actions.refresh();return;}
   suppress=performance.now()+500;
   if(m.type==='compare:scroll'&&sections.includes(m.section)){const el=$(m.section);if(!el)return;const progress=Math.max(0,Math.min(1,Number(m.progress)||0)),i=sections.indexOf(m.section),next=sections.slice(i+1).map($).find(n=>n&&n.getBoundingClientRect().height>0);const top=el.getBoundingClientRect().top+scrollY,end=next?next.getBoundingClientRect().top+scrollY:document.documentElement.scrollHeight;scrollTo({top:Math.max(0,top-14+progress*Math.max(0,end-top)),behavior:'instant'});}

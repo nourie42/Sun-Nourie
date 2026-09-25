@@ -85,3 +85,21 @@ body[data-sky="night"] .air-quality-panel{background:radial-gradient(ellipse at 
  .daily-panel .day-aqi-chip{grid-area:aqi;justify-content:center}
  .forecast-compare-banner{padding:7px 3px;min-height:38px;border-radius:9px;background:rgba(8,64,99,.28);max-width:100%;font-size:12px}
 }
+.today-panel #today-forecast .today-metrics{grid-template-columns:repeat(3,minmax(0,1fr));align-items:center}
+.today-panel #today-forecast .today-metric{min-width:0;padding:4px;display:flex;justify-content:center;gap:5px}
+.today-panel #today-forecast .today-metric>span{min-width:0}
+.today-panel #today-forecast .today-metric strong{white-space:nowrap}
+.today-panel #today-forecast .today-metric svg{flex-shrink:0}
+.pavement-person figcaption{height:auto!important;min-height:100px;padding-bottom:12px!important;overflow:visible!important}
+.pavement-person figcaption>small:last-child{display:block;white-space:normal!important;overflow:visible!important;line-height:1.35!important;font-size:clamp(9px,1.5vw,12px)!important}
+.air-quality-panel[data-aqi="good"]{border-color:#76e0a8;background:linear-gradient(120deg,#155d49,#164c48);box-shadow:inset 0 1px 0 #aaf0c733}
+.air-quality-panel[data-aqi="moderate"]{border-color:#e5cb6e}
+.air-quality-panel[data-aqi="sensitive"]{border-color:#ed9737}
+.air-quality-panel[data-aqi="unhealthy"]{border-color:#ef746b}
+.air-quality-panel[data-aqi="very-unhealthy"],.air-quality-panel[data-aqi="hazardous"]{border-color:#c58eea}
+.aqi-expand{cursor:pointer;list-style:none}.aqi-expand::-webkit-details-marker{display:none}
+.aqi-expand-hint{display:block;margin-top:10px;color:#d2f5e4;font-size:12px}
+.aqi-week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;margin:16px 0}
+.aqi-week>div{display:flex;flex-direction:column;gap:5px;padding:10px 5px;border:1px solid #c9f6e530;border-radius:10px;text-align:center;min-width:0}
+.aqi-week small{font-size:10px;overflow-wrap:anywhere}
+@media(max-width:600px){.aqi-week{grid-template-columns:repeat(4,minmax(0,1fr))}.today-panel #today-forecast .today-metric{gap:3px}.today-panel #today-forecast .today-metric svg{width:16px;height:16px}.today-panel #today-forecast .today-metric strong{font-size:13px}.today-panel #today-forecast .today-metric small{font-size:10px}}
