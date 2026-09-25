@@ -1,5 +1,6 @@
 import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText,rebindDanTake} from './dans-take.js?v=weather-art-labels-v10';
-import {danCard} from './dans-summary.js?v=weather-qa-v67';
+import {danCard,danTakeDisplay} from './dans-summary.js?v=dan-visible-v1';
+import {fetchJsonWithDeadline} from './request-deadline.js?v=loading-recovery-v1';
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
 import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './weather-display.js?v=mobile-repair-v1';
 import {dayGraphHTML,dayGraphPoints,installDayGraph} from './day-graph.js?v=feels-floor-wind-v1';
@@ -72,10 +73,7 @@ function query(extra = {}) {
   return new URLSearchParams({ latitude: place.latitude, longitude: place.longitude, ...extra });
 }
 async function api(path, params = '', signal) {
-  const response = await fetch(`/api/weather-fusion/${path}${params ? `?${params}` : ''}`, { signal, cache: 'no-store', headers: { Accept: 'application/json' } });
-  const data = await response.json();
-  if (!response.ok) throw Object.assign(new Error(data.error || 'Weather service unavailable.'), { status: response.status });
-  return data;
+  return fetchJsonWithDeadline(`/api/weather-fusion/${path}${params ? `?${params}` : ''}`, { signal, timeoutMs:path==='briefing'?90000:45000, cache: 'no-store', headers: { Accept: 'application/json' } });
 }
 function icon(condition = '', isDay = true, size = 32) { return weatherIcon(condition,isDay,size); }
 function smallIcon(type) {
@@ -142,7 +140,7 @@ function render(data) {
   if (currentBriefing?.signature !== data.signature) {
     const outlook=forecastOutlookDetails(data,Date.now());
     draw('briefing-summary', 'Local outlook', () => renderBriefing({ mode: 'nws-summary', signature: data.signature, headline: currentDay.tonight ? 'Your evening outlook' : currentDay.condition, summary: outlook.summary, nearTerm: outlook.nearTerm, extended: outlook.extended,
-      uncertainty: '', danTake:data.danTake||rebindDanTake(currentBriefing?.danTake||currentBriefing,data), reason: data.aiConfigured ? 'Updating your local outlook…' : 'Weather Nourie forecast', sources: ['nws',...(data.modelContributions||[]).map(model=>model.id)] }));
+      uncertainty: '', danSummary:data.danSummary, danTake:data.danTake||rebindDanTake(currentBriefing?.danTake||currentBriefing,data), reason: data.aiConfigured ? 'Updating your local outlook…' : 'Weather Nourie forecast', sources: ['nws',...(data.modelContributions||[]).map(model=>model.id)] }));
   }
   if (map) { marker?.setLatLng([place.latitude, place.longitude]); renderMapWarnings(data); }
   const unavailable = data.feeds.filter((f) => ['unavailable', 'stale', 'not-configured'].includes(f.status));
@@ -193,7 +191,7 @@ function renderBriefing(data) {
   currentBriefing = data;
   const card=danCard(data,forecast,Date.now());
   const takeItems=card.items||[];
-  const takeDisplay=data.mode==='ai'&&data.danSummary?data.danSummary+(card.text?'\n\n'+card.text:''):card.text;
+  const takeDisplay=danTakeDisplay(data,forecast,Date.now());
   const displayedDay=forecast?.days?.[0]?dailyDisplay(forecast.days[0],0,Date.now(),forecast.location?.timeZone||'America/New_York'):null;
   const displayedRain=displayedRainChance(forecast,displayedDay?.pop,{now:Date.now()});
   const localDetails=data.mode!=='ai'&&forecast?.days?.length>1&&(forecast?.hours?.length||forecast?.rainTimeline?.length)?forecastOutlookDetails(forecast,Date.now()):null;
@@ -216,7 +214,7 @@ function renderBriefing(data) {
   if (todayUncertainty && todayUncertaintyText) {
     todayUncertaintyText.textContent = takeDisplay;
     if(todayUncertaintyText.style)todayUncertaintyText.style.whiteSpace='pre-line';
-    todayUncertainty.hidden = !takeDisplay;
+    todayUncertainty.hidden = false;
   }
   $('briefing-stamp').textContent = data.mode === 'ai' ? `Updated ${clock(data.generatedAt)} · based on your local NWS discussion` : 'Weather Nourie forecast';
   const discussionItems=takeItems.filter(item=>!item.official);
@@ -230,6 +228,7 @@ async function load({ moveMap = false, refreshModels = false, briefingRetry = 0 
   requestController?.abort();
   requestController = new AbortController();
   busy = true; $('refresh').classList.add('loading');
+  const slowNotice=setTimeout(()=>{if(id===generation&&busy)$('status').textContent='Weather sources are taking longer than usual. You can tap Refresh to retry.';},10000);
   $('status').textContent = 'Checking the latest source forecasts…';
   try {
     const data = await api('forecast', query(), requestController.signal);
@@ -264,13 +263,15 @@ async function load({ moveMap = false, refreshModels = false, briefingRetry = 0 
     $('status').textContent = receivedForecast
       ? 'The forecast arrived, but a display component failed. Use Refresh to retry.'
       : `Weather update failed. ${forecast ? `The displayed snapshot was checked at ${clock(forecast.assembledAt)} and may be stale.` : 'Please retry or check weather.gov.'}`;
+    if(e.name==='TimeoutError')$('status').textContent=e.message;
     $('status').classList.add('error');
     if(forecast)renderComfort(forecast);
     if (!receivedForecast) $('alerts').innerHTML = '<p class="alert-note warning">Live alert status could not be checked. Consult the official NWS forecast and warnings.</p>';
-  } finally { if (id === generation) { busy = false; $('refresh').classList.remove('loading'); } }
+  } finally { clearTimeout(slowNotice);if (id === generation) { busy = false; $('refresh').classList.remove('loading'); } }
 }
 function chooseLocation(value,{rememberDevice=false}={}) {
   if(!validPlace(value))return;
+  ++locationRequest;
   place = { ...value };
   const compareLink=document.querySelector('.forecast-compare-banner[href^="/weathernext/"]');
   if(compareLink)compareLink.href='/weathernext/?'+new URLSearchParams({latitude:value.latitude,longitude:value.longitude});
@@ -480,7 +481,7 @@ function selectLayer(layer){
 }
 function showSelectedFrame(index){if(selectedLayer==='radar')showFrame(index);else showModelFrame(index);}
 
-$('refresh').addEventListener('click', () => { if (!busy) { if(validPlace(place))void load({refreshModels:true}); else startDeviceLocation({explicit:true}); } });
+$('refresh').addEventListener('click', () => { if(validPlace(place))void load({refreshModels:true}); else startDeviceLocation({explicit:true}); });
 document.querySelectorAll('[data-layer]').forEach((button) => button.addEventListener('click', () => selectLayer(button.dataset.layer)));
 $('hourly').addEventListener('click',event=>{const button=event.target.closest('[data-comfort-time]');if(button)selectComfortHour(button.dataset.comfortTime);});
 $('daily').addEventListener('click', (event) => { const button = event.target.closest('[data-day]'); if (button) showDay(Number(button.dataset.day)); });
@@ -517,9 +518,12 @@ $('city-search').addEventListener('input', () => {
 });
 $('city-search').addEventListener('keydown', (e) => { if (e.key === 'Escape') { $('search-results').hidden = true; $('city-search').setAttribute('aria-expanded', 'false'); } if (e.key === 'ArrowDown') { e.preventDefault(); $('search-results').querySelector('button')?.focus(); } if (e.key === 'Enter') $('search-results').querySelector('button')?.click(); });
 document.addEventListener('click', (e) => { if (!e.target.closest('.search-wrap')) { $('search-results').hidden = true; $('city-search').setAttribute('aria-expanded', 'false'); } });
+let locationRequest=0;
 function startDeviceLocation({explicit=false}={}){
+ const request=++locationRequest;
  const cached=readDeviceLocation();
  const fallback=()=>{
+  if(request!==locationRequest)return;
   if(cached){
    setDeviceLocationLabel('Last device location');
    chooseLocation(cached);
@@ -532,7 +536,7 @@ function startDeviceLocation({explicit=false}={}){
  setDeviceLocationLabel('Getting device location…');
  $('status').textContent='Getting your device location…';
  navigator.geolocation.getCurrentPosition(
-  p=>chooseLocation({id:'device',name:'Device location',latitude:Number(p.coords.latitude.toFixed(4)),longitude:Number(p.coords.longitude.toFixed(4)),source:'device'},{rememberDevice:true}),
+  p=>{if(request===locationRequest)chooseLocation({id:'device',name:'Device location',latitude:Number(p.coords.latitude.toFixed(4)),longitude:Number(p.coords.longitude.toFixed(4)),source:'device'},{rememberDevice:true});},
   fallback,
   {enableHighAccuracy:true,timeout:12000,maximumAge:120000}
  );

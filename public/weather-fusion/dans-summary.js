@@ -32,6 +32,15 @@ export function danOverview(briefing,forecast,now=Date.now()){
  const day=forecast.days?.[0],text=brief((isTonightPeriod(now,zone)?day?.nightDetail:day?.detail)||day?.detail||'');
  return {text:text||'The local forecast is temporarily unavailable. Please check the National Weather Service for the latest weather.',source:'NWS forecast · discussion summary unavailable'};
 }
+export function danTakeDisplay(briefing,forecast,now=Date.now()){
+ if(forecast?.comparison?.source==='google')return 'Dan’s Take summarizes the NWS discussion on Dan’s Weather. This page shows the experimental model forecast.';
+ const card=danCard(briefing,forecast,now);
+ const summary=briefing?.signature===forecast?.signature&&typeof briefing?.danSummary==='string'?briefing.danSummary.trim():'';
+ if(summary)return summary+(card.text?'\n\n'+card.text:'');
+ const overview=danOverview(null,forecast,now);
+ const status=!forecast?'Preparing Dan’s Take.':briefing?.mode==='nws-summary'&&forecast.aiConfigured?'NWS summary — AI summary is temporarily unavailable.':'NWS summary — not AI-generated.';
+ return status+'\n'+overview.text+(card.text?'\n\n'+card.text:'');
+}
 export function danCard(briefing,forecast,now=Date.now()){
  const items=[],parts=[];
  const compact=value=>norm(value).replace(/^(?:dan\s*['’]?\s*s\s+take\b\s*[:\-—–.]?\s*)+/i,'');

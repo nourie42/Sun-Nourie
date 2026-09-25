@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
 import {collectDanTakeEvidence,approveDanTake,visibleDanTakeItems,danTakeText} from '../public/weather-fusion/dans-take.js';
-import {danCard} from '../public/weather-fusion/dans-summary.js';
+import {danCard,danTakeDisplay} from '../public/weather-fusion/dans-summary.js';
 import {conditionForRainChance} from '../public/weather-fusion/weather-state.js';
 const read=name=>readFileSync(new URL(`../public/weather-fusion/${name}`,import.meta.url),'utf8');
 const app=read('app.js'),html=read('index.html'),css=read('forecast-layout.css');
@@ -22,14 +22,14 @@ function harness({missingNote=false}={}){
  if(missingNote){delete elements['today-uncertainty'];delete elements['today-uncertainty-text'];}
  let time=now;
  class Clock extends Date{constructor(...args){super(...(args.length?args:[time]));}static now(){return time;}}
- const context={$:id=>elements[id]??null,forecast:structuredClone(source),currentBriefing:null,esc:escape,clock:()=>'12:00 PM',visibleDanTakeItems,danTakeText,danCard,dailyDisplay:()=>({pop:null}),displayedRainChance:(_forecast,chance)=>({value:chance,forecastValue:chance,observed:false}),conditionForRainChance,Date:Clock};
+ const context={$:id=>elements[id]??null,forecast:structuredClone(source),currentBriefing:null,esc:escape,clock:()=>'12:00 PM',visibleDanTakeItems,danTakeText,danCard,danTakeDisplay,dailyDisplay:()=>({pop:null}),displayedRainChance:(_forecast,chance)=>({value:chance,forecastValue:chance,observed:false}),conditionForRainChance,Date:Clock};
  runInNewContext(`${renderer}\nthis.renderBriefing=renderBriefing;`,context);
  return {elements,context,render:context.renderBriefing,setTime:t=>{time=t;}};
 }
 test('exactly one Dan take heading stays below daily graphic and ahead of hourly forecast',()=>{
  const panel=html.match(/<section class="glass today-panel"[^>]*>([\s\S]*?)<\/section>/)?.[1];
  assert.ok(panel);assert.ok(panel.indexOf('id="today-forecast"')<panel.indexOf('id="today-uncertainty"'));
- assert.match(panel,/id="today-uncertainty"[^>]*hidden/);
+ assert.doesNotMatch(panel,/id="today-uncertainty"[^>]*hidden/);
  assert.match(panel,/<strong class="today-uncertainty-label">Dan's take<\/strong>/);
  assert.equal((panel.match(/Dan's take/g)||[]).length,1);
  assert.doesNotMatch(panel,/Checking the latest forecast discussion|today-take-source/);
@@ -39,7 +39,7 @@ test('exactly one Dan take heading stays below daily graphic and ahead of hourly
 test('NWS fallback shows only a short explicit possible change',()=>{
  const {elements,render}=harness();
  render({mode:'nws-summary',summary:'Warm with a chance of rain.',uncertainty:'Forecasts can change, especially the timing of showers.'});
- assert.match(elements['today-uncertainty-text'].textContent,/front timing remains uncertain/);assert.doesNotMatch(elements['today-uncertainty-text'].textContent,/Warm with a chance of rain/);assert.equal(elements['today-uncertainty'].hidden,false);
+ assert.match(elements['today-uncertainty-text'].textContent,/front timing remains uncertain/);assert.match(elements['today-uncertainty-text'].textContent,/NWS summary/);assert.equal(elements['today-uncertainty'].hidden,false);
  assert.ok(!elements['briefing-detail'].innerHTML.includes('data-dans-take'));
  assert.equal(elements['briefing-summary'].textContent,'Warm with a chance of rain.');
 });
@@ -76,7 +76,7 @@ test('Dan displays at most two concise changes while retaining source evidence',
  const {elements,context,render,setTime}=harness();context.forecast=f;setTime(time);
  for(let refresh=0;refresh<2;refresh++){
   render(b);
-  const text=elements['today-uncertainty-text'].textContent;
+  const text=danCard(b,f,time).text;
   assert.equal((text.match(/This coming week/g)||[]).length,0);assert.ok(text.split(/\s+/).length<=55);assert.ok(text.length<=380);
   assert.equal(text,[`Friday, Sep 11: ${summaries[0]}`,`Saturday, Sep 12: ${summaries[1]}`].join(' '));assert.doesNotMatch(text,/Sunday/);
   assert.equal(elements['today-uncertainty'].hidden,false);
@@ -84,30 +84,30 @@ test('Dan displays at most two concise changes while retaining source evidence',
 });
 for(const uncertainty of [undefined,null,'',' \n\t ',42,{},'Yesterday\'s front might change the forecast.'])test('unverified legacy uncertainty never becomes take content: '+JSON.stringify(uncertainty),()=>{
  const {elements,render}=harness();render(supported());render({mode:'ai',signature:source.signature,uncertainty});
- assert.equal(elements['today-uncertainty'].hidden,true);assert.equal(elements['today-uncertainty-text'].textContent,'');assert.doesNotMatch(elements['today-uncertainty-text'].textContent,/No additional|Yesterday's front|<img/);
+ assert.equal(elements['today-uncertainty'].hidden,false);assert.ok(elements['today-uncertainty-text'].textContent.length>0);assert.doesNotMatch(elements['today-uncertainty-text'].textContent,/No additional|Yesterday's front|<img/);
  assert.ok(!elements['briefing-detail'].innerHTML.includes('data-dans-take'));
 });
 test('location reset clears the old take immediately',()=>{
  const choose=app.slice(app.indexOf('function chooseLocation(value'),app.indexOf('\nfunction refreshOpenDay('));
  assert.match(choose,/renderBriefing\(\{ headline: 'Preparing your local outlook\.'/);
  const {elements,context,render}=harness();render(supported());context.forecast=null;render({headline:'Preparing your local outlook.',sources:[]});
- assert.equal(elements['today-uncertainty'].hidden,true);assert.equal(elements['today-uncertainty-text'].textContent,'');
+ assert.equal(elements['today-uncertainty'].hidden,false);assert.ok(elements['today-uncertainty-text'].textContent.length>0);
 });
 test('source replacement removes previously valid take, even under the old signature',()=>{
  const {elements,context,render}=harness(),b=supported();render(b);
  context.forecast.discussion.text='.DISCUSSION...\nDry weather is expected this week.';render(b);
- assert.equal(elements['today-uncertainty'].hidden,true);assert.equal(elements['today-uncertainty-text'].textContent,'');assert.doesNotMatch(elements['today-uncertainty-text'].textContent,/No additional|Yesterday's front|<img/);
+ assert.equal(elements['today-uncertainty'].hidden,false);assert.ok(elements['today-uncertainty-text'].textContent.length>0);assert.doesNotMatch(elements['today-uncertainty-text'].textContent,/No additional|Yesterday's front|<img/);
 });
-test('source expiry hides the entire Dan card',()=>{
+test('source expiry removes old changes while keeping a fallback visible',()=>{
  const {elements,render,setTime}=harness(),b=supported();render(b);setTime(now+12*3600000);render(b);
- assert.equal(elements['today-uncertainty'].hidden,true);assert.equal(elements['today-uncertainty-text'].textContent,'');assert.doesNotMatch(elements['today-uncertainty-text'].textContent,/No additional|Yesterday's front|<img/);assert.ok(!elements['briefing-detail'].innerHTML.includes('data-dans-take'));
+ assert.equal(elements['today-uncertainty'].hidden,false);assert.ok(elements['today-uncertainty-text'].textContent.length>0);assert.doesNotMatch(elements['today-uncertainty-text'].textContent,/No additional|Yesterday's front|<img/);assert.ok(!elements['briefing-detail'].innerHTML.includes('data-dans-take'));
  assert.match(app,/setInterval\(.*renderBriefing\(currentBriefing\).*30000/);
  assert.match(app,/visibilitychange/);
 });
 test('untrusted text cannot execute HTML',()=>{
  const {elements,render}=harness();render({...supported(),uncertainty:'<img src=x onerror=alert(1)>',nearTerm:'<img src=x onerror=alert(1)>'});
  assert.ok(!elements['briefing-detail'].innerHTML.includes('<img'));assert.ok(elements['briefing-detail'].innerHTML.includes('&lt;img'));
- const b=supported();b.forecastChanges[0].summary='<img src=x onerror=alert(1)>';render(b);assert.equal(elements['today-uncertainty'].hidden,true);assert.equal(elements['today-uncertainty-text'].textContent,'');assert.doesNotMatch(elements['today-uncertainty-text'].textContent,/No additional|Yesterday's front|<img/);
+ const b=supported();b.forecastChanges[0].summary='<img src=x onerror=alert(1)>';render(b);assert.equal(elements['today-uncertainty'].hidden,false);assert.ok(elements['today-uncertainty-text'].textContent.length>0);assert.doesNotMatch(elements['today-uncertainty-text'].textContent,/No additional|Yesterday's front|<img/);
 });
 test('an older cached document without the optional note cannot break the outlook',()=>{
  const {elements,render}=harness({missingNote:true});assert.doesNotThrow(()=>render(supported()));
@@ -133,7 +133,7 @@ test('changed assets are cache-busted and late briefing responses stay guarded',
  assert.match(app,/weather-display\.js\?v=mobile-repair-v1/);assert.match(app,/current-temperature\.js\?v=rain-now-v71/);assert.match(app,/car-wash\.js\?v=full-day-rain-v1/);
  assert.match(app,/model-explanation\.js\?v=weathernext-live-v1/);
  assert.match(app,/outlook-details\.js\?v=full-day-rain-v1/);
- for(const module of ['dans-summary','dewpoint-meter'])assert.match(app,new RegExp(`${module}\\.js\\?v=weather-qa-v67`));
+ for(const module of ['dewpoint-meter'])assert.match(app,new RegExp(`${module}\\.js\\?v=weather-qa-v67`));
  assert.match(app,/day-graph\.js\?v=feels-floor-wind-v1/);assert.match(app,/hourly-feels\.js\?v=dewpoint-floor-v1/);
  assert.match(app,/weather-math\.js\?v=full-day-rain-v1/);assert.match(app,/rain-trend\.js\?v=full-day-rain-v1/);assert.match(app,/risk-outlooks\.js\?v=risk-outlooks-v4/);
  assert.doesNotMatch(app,/updateAlertBanners/);
