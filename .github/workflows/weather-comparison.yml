@@ -1,0 +1,51 @@
+name: Weather forecast comparison checks
+on:
+  push:
+    branches: [main, 'feature/weather-google-compare-20260925']
+    paths: ['src/weatherComparison*.js','public/weather-fusion/compare*','test/weatherComparison*.js','scripts/weatherComparison*.js','server.js','server-with-weather.js','.github/workflows/weather-comparison.yml']
+permissions:
+  contents: read
+concurrency:
+  group: weather-comparison-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  comparison:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: node --check server.js && node --check server-with-weather.js
+      - run: node --test test/weatherComparison*.test.js test/weatherNextSite.test.js
+      - run: npm install --no-save --package-lock=false playwright@1.55.0
+      - run: npx playwright install --with-deps chromium
+      - run: node scripts/weatherComparisonSmoke.js
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: weather-comparison-browser-evidence
+          path: /tmp/weather-comparison-qa
+          retention-days: 7
+  live:
+    if: github.ref == 'refs/heads/main'
+    needs: comparison
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm install --no-save --package-lock=false playwright@1.55.0
+      - run: npx playwright install --with-deps chromium
+      - run: node scripts/weatherComparisonLive.js
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: weather-comparison-live-evidence
+          path: /tmp/weather-comparison-live
+          retention-days: 7

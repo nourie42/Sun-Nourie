@@ -3,12 +3,14 @@ import express from 'express';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { registerWeatherFusionRoutes } from './src/weatherFusion.js';
+import { registerWeatherComparisonRoutes } from './src/weatherComparison.js';
 import { createWeatherGateway, gatewayPorts } from './src/weatherFusionGateway.js';
 
 const root = fileURLToPath(new URL('./', import.meta.url));
 const { publicPort, sitePort, legacyPort } = gatewayPorts();
 const weather = express();
 weather.disable('x-powered-by');
+registerWeatherComparisonRoutes(weather);
 registerWeatherFusionRoutes(weather);
 weather.get('/weather-fusion/index.html', (_req, res) => res.redirect(302, '/weather-fusion/'));
 weather.use((_req, res) => res.status(404).json({ error: 'Weather Fusion route not found.' }));
