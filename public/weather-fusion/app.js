@@ -57,6 +57,7 @@ function configurePageMode() {
   const modelExplanation=$('model-explanation');if(modelExplanation)modelExplanation.hidden=!experimentalPage;
   const back=$('experimental-back');if(back)back.hidden=!experimentalPage;
   const tracker=$('experimental-whats-up-link');if(tracker)tracker.hidden=!experimentalPage;
+  const experimentBanner=document.querySelector('.experimental-page-banner');if(experimentBanner)experimentBanner.hidden=!experimentalPage;
 }
 configurePageMode();
 function clock(value, options = {}) {
@@ -205,7 +206,7 @@ function renderBriefing(data) {
     const url = id === 'afd' ? forecast?.discussion?.url : f?.url;
     return url && /^https:\/\/(api\.weather\.gov|www\.nco\.ncep\.noaa\.gov|www\.ecmwf\.int)\//.test(url) ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(f?.label || id)} ↗</a>` : esc(f?.label || id);
   });
-  $('briefing-detail').innerHTML = `<div><strong>Tonight & tomorrow</strong><p>${detailHTML(nearTerm)}</p></div><div><strong>The week ahead</strong><p>${detailHTML(extended)}</p></div>`;
+  $('briefing-detail').innerHTML = `<div><strong>Later today & tomorrow</strong><p>${detailHTML(nearTerm)}</p></div><div><strong>Full week</strong><p>${detailHTML(extended)}</p></div>`;
   // The Today card owns the single public Dan's take heading. Keep it visible
   // even when there is no approved change, and put only content/status in its body.
   const todayUncertainty = $('today-uncertainty'), todayUncertaintyText = $('today-uncertainty-text');

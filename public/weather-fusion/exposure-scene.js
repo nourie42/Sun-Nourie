@@ -153,7 +153,8 @@ export function comfortSceneState(daylight=true,condition='Clear',feels=null,con
  const kind=weatherState(condition).kind,precipitation=precipitationActivity(condition,context);
  if(kind==='snow')return {key:'cold',asset:'comfort-reference-scenes-cold.webp'};
  if(precipitation==='active')return {key:'rain',asset:'comfort-reference-scenes-rain.webp'};
- if(finite(feels)&&feels<42)return {key:'cold',asset:'comfort-reference-scenes-cold.webp'};
+ // The cold reference contains visible snow. Never show it merely because the
+ // air feels chilly; reserve it for an actual snow condition.
  if(precipitation==='possible')return {key:'carry-umbrella',asset:'comfort-reference-scenes-carry-umbrella.svg'};
  if(kind==='fog')return {key:'fog',asset:'comfort-reference-scenes-fog.webp'};
  if(!daylight)return {key:'dawn',asset:'comfort-reference-scenes-dawn.webp'};
