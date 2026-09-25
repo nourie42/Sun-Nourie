@@ -687,9 +687,11 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
   });
   app.get(['/weathernext','/weathernext/','/weather-fusion/weathernext-site.html'], (_req,res) => {
-    res.setHeader('Cache-Control','no-cache');
+    res.setHeader('Cache-Control','no-store, max-age=0, must-revalidate');
+    res.setHeader('Pragma','no-cache');
     res.setHeader('X-Content-Type-Options','nosniff');
     res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');
+    res.setHeader('X-Weather-Nourie-Page','weathernext-standalone-20260925');
     res.sendFile(path.join(PUBLIC_DIR,'weathernext-site.html'));
   });
   for (const name of [
