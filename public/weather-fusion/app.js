@@ -5,7 +5,7 @@ import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './wea
 import {dayGraphHTML,dayGraphPoints,installDayGraph} from './day-graph.js?v=feels-floor-wind-v1';
 import {degrees,feelsAt,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=dewpoint-floor-v1';
 import {createFramePlayer} from './frame-player.js';
-import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=wardrobe-v1';
+import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=dashboard-v2';
 import {dailyDisplay} from './weather-math.js?v=full-day-rain-v1';
 import {conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
 import {currentHero} from './current-temperature.js?v=rain-now-v71';
@@ -21,6 +21,7 @@ import {updateRainTrend} from './rain-trend.js?v=full-day-rain-v1';
 import {renderRiskOutlooks,resetRiskOutlooks} from './risk-outlooks.js?v=risk-outlooks-v4';
 import {renderAirQuality} from './air-quality.js?v=air-quality-v1';
 import {displayedRainChance} from './rain-display.js?v=rain-observed-v1';
+import {weatherChangeMessages} from './weather-changes.js?v=dashboard-v2';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);
 const experimentalPage = isExperimentalWeatherPage();
@@ -37,6 +38,7 @@ const number = (n, decimals = 0) => finite(n) ? n.toFixed(decimals) : '—';
 const temperature = (n) => `${number(n)}°`;
 const inches = (n) => finite(n) ? `${n.toFixed(2)} in` : 'Unavailable';
 const percent = (n) => finite(n) ? `${Math.round(n)}%` : '—';
+function renderWeatherChanges(data){const root=$('weather-change-banner');if(!root)return;const messages=weatherChangeMessages(data);root.hidden=!messages.length;root.innerHTML=messages.length?`<strong>5-day weather change</strong><br>${messages.map(esc).join('<br>')}`:'';}
 let place = null, forecast = null, generation = 0, busy = false, searchGeneration = 0;
 let map = null, baseLayer = null, radarLayer = null, warningLayer = null, marker = null;
 let frames = [], frameIndex = 0, radarTimer = null, selectedLayer = 'radar', radarMeta = null, radarGeneration = 0;
@@ -124,6 +126,7 @@ function render(data) {
   const radarLabel=radarObservationLabel(c);
   $('observation-label').textContent = radarLabel ? `${sourceLabel} · ${radarLabel}` : sourceLabel;
   $('hero-scene').innerHTML = icon(hero.condition, hero.isDay, 120);
+  renderWeatherChanges(data);
   draw('alerts', 'Official alerts', () => renderAlerts(data));
   draw('risk-outlook-list', 'Outlooks', () => renderRiskOutlooks(data));
   draw('hourly', 'Hourly forecast', () => renderHours(data));
@@ -190,10 +193,10 @@ function renderBriefing(data) {
   currentBriefing = data;
   const card=danCard(data,forecast,Date.now());
   const takeItems=card.items||[];
-  const takeDisplay=card.text;
+  const takeDisplay=data.mode==='ai'&&data.danSummary?data.danSummary+(card.text?'\n\n'+card.text:''):card.text;
   const displayedDay=forecast?.days?.[0]?dailyDisplay(forecast.days[0],0,Date.now(),forecast.location?.timeZone||'America/New_York'):null;
   const displayedRain=displayedRainChance(forecast,displayedDay?.pop,{now:Date.now()});
-  const localDetails=forecast?.days?.length>1&&(forecast?.hours?.length||forecast?.rainTimeline?.length)?forecastOutlookDetails(forecast,Date.now()):null;
+  const localDetails=data.mode!=='ai'&&forecast?.days?.length>1&&(forecast?.hours?.length||forecast?.rainTimeline?.length)?forecastOutlookDetails(forecast,Date.now()):null;
   const summary=localDetails?.summary||data.summary||'The source forecast is currently unavailable.';
   const nearTerm=localDetails?.nearTerm||data.nearTerm||'See the hourly forecast below.';
   const extended=localDetails?.extended||data.extended||'More details will appear with the next update.';

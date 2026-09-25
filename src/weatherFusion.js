@@ -296,6 +296,9 @@ export class Cache {
   }
 }
 
+export function withoutAviation(text=''){
+ return text.replace(/(^|\n)\.(?:AVIATION)[^\n]*\n[\s\S]*?(?=\n\.[A-Z][A-Z /]*(?:\.\.\.|\s)|$)/gi,'').trim();
+}
 export function buildForecast({ location, point, forecast, hourly, grid, discussion, observation, alerts, specialDiscussions, precipitationDiscussions, riskOutlooks, exposureWeather, airQuality, models, feeds, now }) {
   const zone = point?.timeZone || models.ecmwf?.timezone || 'America/New_York';
   const today = dateKey(now, zone);
@@ -518,7 +521,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
     const previousFailure = failureCooldown.get(key);
     if (previousFailure?.until > now()) return { ...fallback(data, 'AI is cooling down after an unavailable response; official guidance is shown.'), diagnostic: previousFailure.diagnostic, retryAfter: iso(previousFailure.until) };
     const takeEvidence=collectDanTakeEvidence(data,now());
-    const briefingKey=`${DAN_TAKE_VERSION}:${data.signature}:${dateKey(now(),data.location.timeZone)}`;
+    const briefingKey=`dashboard-v2:${DAN_TAKE_VERSION}:${data.signature}:${dateKey(now(),data.location.timeZone)}`;
     const briefing = await aiCache.get(briefingKey, 30 * MINUTE, async () => {
       const day = new Date(now()).toISOString().slice(0, 10);
       if (aiBudget.day !== day) aiBudget = { day, count: 0 };
@@ -526,22 +529,22 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
       const limit = finite(rawLimit) ? Math.max(0, Math.min(500, rawLimit)) : 96;
       if (aiBudget.count >= limit) return fallback(data, 'The configured AI daily request limit has been reached.');
       let lastFailure = null;
-      const properties = Object.fromEntries(['headline', 'summary', 'nearTerm', 'extended', 'uncertainty'].map((k) => [k, { type: 'string' }]));
+      const properties = Object.fromEntries(['headline', 'summary', 'nearTerm', 'extended', 'uncertainty', 'danSummary'].map((k) => [k, { type: 'string' }]));
       properties.forecastChanges={type:'array',maxItems:2,items:{type:'object',additionalProperties:false,properties:{evidenceId:{type:'string',enum:takeEvidence.candidates.length?takeEvidence.candidates.map(c=>c.id):['no-eligible-evidence']},summary:{type:'string'}},required:['evidenceId','summary']}};
       const requiredSources=['nws','afd',...data.modelContributions.map(m=>m.id)];
       properties.sources = { type: 'array', items: { type: 'string', enum: requiredSources } };
-      const facts = { danTakeEvidence:takeEvidence, currentLocalTime: new Intl.DateTimeFormat('en-US',{timeZone:data.location.timeZone,dateStyle:'full',timeStyle:'short'}).format(new Date(now())), discussionPriority: 'Translate the latest local NWS discussion into everyday language; technical provenance is only for metadata.', blendPolicy: data.methodology, modelContributions: data.modelContributions, convectiveGuidance: data.convectiveGuidance, next24HoursPrecipitation: data.precipitation, location: data.location, localDate: dateKey(now(), data.location.timeZone), days: data.days, hours: data.hours.slice(0, 30), discussion: data.discussion, feedStatus: data.feeds.map((f) => ({ id: f.id, status: f.status, issuedAt: f.issuedAt })) };
+      const facts = { danTakeEvidence:takeEvidence, currentLocalTime: new Intl.DateTimeFormat('en-US',{timeZone:data.location.timeZone,dateStyle:'full',timeStyle:'short'}).format(new Date(now())), discussionPriority: 'Translate the latest local NWS discussion into everyday language; technical provenance is only for metadata.', blendPolicy: data.methodology, modelContributions: data.modelContributions, convectiveGuidance: data.convectiveGuidance, next24HoursPrecipitation: data.precipitation, location: data.location, localDate: dateKey(now(), data.location.timeZone), days: data.days, hours: data.hours.slice(0, 30), discussion: {...data.discussion,text:withoutAviation(data.discussion.text)}, feedStatus: data.feeds.map((f) => ({ id: f.id, status: f.status, issuedAt: f.issuedAt })) };
       for (let attempt = 0; attempt < 2 && aiBudget.count < limit; attempt += 1) {
       aiBudget.count += 1;
       try {
         const result = await request('https://api.openai.com/v1/responses', { timeout: 35000, body: {
           model: env.WEATHER_FUSION_AI_MODEL || 'gpt-5-mini', store: false, max_output_tokens: 4000, reasoning: { effort: 'low' },
-          instructions: PLAIN_OUTLOOK_INSTRUCTIONS,
+          instructions: PLAIN_OUTLOOK_INSTRUCTIONS + ' Local Outlook: briefly analyze the point forecast and name pleasant outdoor days, rainy days, and humid days when supported. DanSummary: summarize the supplied non-aviation NWS discussion in two or three short sentences for an eleven-year-old. Cover the main expected weather, timing, and uncertainty. Do not restrict danSummary to forecastChanges candidates; those remain a separate uncertainty list. Never discuss aviation or flying. Do not invent weather.',
           input: JSON.stringify({ ...facts, requiredSources, revisionInstruction: attempt ? 'The previous attempt failed automated validation. Use words a ten-year-old knows. In Dan\'s Take, state only what the weather may do; never copy scientific causes such as convergence or a trough. Return every required source ID exactly. Do not include numeric weather values or quantities. Clock times are the only numeric exception and must use h:mmam/pm form, such as 2:02pm. Keep headline, summary, nearTerm and extended nonempty and concise. Leave uncertainty empty; return forecastChanges=[] when no eligible source evidence supports an upcoming change. Do not issue weather warnings or promise safe conditions.' : 'Copy every required source ID into the sources array. Use short sentences and words a ten-year-old knows. In Dan\'s Take, explain what the weather may do, not the scientific cause. Write without numeric weather values or quantities. Clock times are allowed only in h:mmam/pm form, such as 2:02pm.' }), text: { format: { type: 'json_schema', name: 'weather_briefing', strict: true, schema: { type: 'object', additionalProperties: false, properties, required: Object.keys(properties) } } },
         } });
         const text = (result.output || []).flatMap((o) => o.content || []).filter((c) => c.type === 'output_text').map((c) => c.text).join('');
         const content = JSON.parse(text);
-        const fields = ['headline', 'summary', 'nearTerm', 'extended'];
+        const fields = ['headline', 'summary', 'nearTerm', 'extended', 'danSummary'];
         // Legacy free-text uncertainty is never trusted, even on a valid AI response.
         content.uncertainty='';
         if (result.status !== 'completed') throw Object.assign(new Error('AI response was incomplete.'), { aiDiagnostic: 'AI_RESPONSE_INCOMPLETE' });
@@ -683,7 +686,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     res.sendFile(path.join(PUBLIC_DIR,'weathernext-site.html'));
   });
   for (const name of [
-    'air-quality.js','alert-banners.js','app.js','bulletin-facts.js','bulletins.js','car-wash.js','car-wash.css','car-wash-background.webp','car-wash-corvette-hood.webp',
+    'weather-changes.js','air-quality.js','alert-banners.js','app.js','bulletin-facts.js','bulletins.js','car-wash.js','car-wash.css','car-wash-background.webp','car-wash-corvette-hood.webp',
     'model-explanation.js','model-explanation.css','weathernext-site.html','weathernext-site.css','weathernext-site.js','weathernext-data.js','weathernext-catalog.json',
     'comfort-cinematic.css','comfort-effects.css','comfort-outlook.js','current-inputs.js','current-temperature.js',
     'daily-uv.js','dans-summary.js','dans-take.js','day-graph.js','dewpoint-meter.js','dewpoint-meter.css',

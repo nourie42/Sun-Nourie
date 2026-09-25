@@ -2,8 +2,8 @@
 <html lang="en" data-build="wn-material-20260924">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#14233f"><title>WeatherNext Forecast · Weather Nourie</title>
-<meta name="description" content="Your day, beautifully forecast. A Google-inspired weather experience powered by the published Google WeatherNext 3 ensemble, with hourly outlooks and detailed model exploration.">
+<meta name="theme-color" content="#14233f"><title>Experimental NVIDIA AI Weather · Weather Nourie</title>
+<meta name="description" content="Experimental NVIDIA AI Weather using the published Google WeatherNext 3 ensemble data.">
 <link rel="stylesheet" href="/weather-fusion/style.css?v=wn-match-v1">
 <link rel="stylesheet" href="/weather-fusion/weather-polish.css?v=wn-match-v1">
 <link rel="stylesheet" href="/weather-fusion/weathernext-site.css?v=wn-match-v1">
@@ -15,7 +15,7 @@
 <header class="masthead">
   <a class="brand" href="/weathernext/" aria-label="Weather Nourie WeatherNext home">
     <span class="brand-sun" aria-hidden="true">◒</span>
-    <span>Weather <b>Nourie</b><small>GOOGLE WEATHERNEXT DATA</small></span>
+    <span>Weather <b>Nourie</b><small>EXPERIMENTAL NVIDIA AI WEATHER</small></span>
   </a>
   <div class="header-actions">
     <a class="back" href="/weather-fusion/"><span aria-hidden="true">←</span> Weather Fusion</a>
@@ -23,11 +23,12 @@
   </div>
 </header>
 <form class="toolbar"><label>LOCATION<select id="location" disabled><option>Knightdale / Raleigh, NC</option></select></label><label>MODEL RUN<select id="run" disabled><option>Main forecast</option></select></label><button id="refresh" type="button">↻ Refresh</button></form>
-<div id="status" class="status" role="status" aria-live="polite">Loading the published Google WeatherNext forecast…</div>
-<div id="loading" class="loading-card"><h2>Loading your Google WeatherNext forecast</h2><p>Same Weather Nourie experience, powered only by the published Google forecast feed.</p><div class="loading-bar" aria-hidden="true"></div></div>
+<div class="experimental-page-banner">EXPERIMENTAL NVIDIA AI WEATHER</div>
+<div id="status" class="status" role="status" aria-live="polite">Loading WeatherNext forecast data…</div>
+<div id="loading" class="loading-card"><h2>Loading Experimental NVIDIA AI Weather</h2><p>Weather Nourie layout powered by published WeatherNext data.</p><div class="loading-bar" aria-hidden="true"></div></div>
 <main id="forecast" hidden>
 <nav class="section-nav" aria-label="Forecast sections"><a href="#overview">Now</a><a href="#hourly">Hourly</a><a href="#outlook">7-Day</a><a href="#explorer">Details</a><a href="#sources">Google Data</a></nav>
-<section id="overview" class="hero" aria-labelledby="location-title"><div class="hero-copy"><span class="model-chip">GOOGLE WEATHERNEXT 3</span><h1 id="location-title"></h1><p id="valid-time" class="valid-time"></p><div class="hero-temperature"><strong id="temperature">—</strong><span>°F</span></div><p id="condition" class="condition"></p><p id="high-low" class="high-low"></p><p id="temperature-range" class="range-note"></p></div>
+<section id="overview" class="hero" aria-labelledby="location-title"><div class="hero-copy"><span class="model-chip">EXPERIMENTAL NVIDIA AI WEATHER · WEATHERNEXT DATA</span><h1 id="location-title"></h1><p id="valid-time" class="valid-time"></p><div class="hero-temperature"><strong id="temperature">—</strong><span>°F</span></div><p id="condition" class="condition"></p><p id="high-low" class="high-low"></p><p id="temperature-range" class="range-note"></p></div>
 <div id="scene" class="scene" data-sky="unknown" data-night="false" role="img" aria-label="Weather illustration follows the selected model forecast">
 <svg viewBox="0 0 560 360" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><g class="stars" fill="#f4f2d6"><circle cx="72" cy="40" r="2"/><circle cx="167" cy="67" r="1.7"/><circle cx="460" cy="55" r="2"/><circle cx="350" cy="30" r="1.5"/><circle cx="490" cy="144" r="1.8"/></g><circle class="sun-halo" cx="388" cy="94" r="65"/><circle class="sun" cx="388" cy="94" r="41"/><path class="moon" fill="#f4efd1" d="M393 50a43 43 0 1 0 34 63 37 37 0 0 1-34-63Z"/>
 <g class="cloud-bank cloud-back"><path d="M-30 96c0-18 16-31 34-28 1-22 20-34 40-28 13-28 57-28 69 2 30-10 55 13 52 35 32-2 48 23 36 39H-20Z"/><path d="M341 150c-8-21 12-42 33-38 4-24 38-32 52-10 22-8 46 4 47 23 23-3 43 19 34 34H342Z"/></g>

@@ -11,7 +11,7 @@ test('Today metrics use their forecast period and never substitute current condi
  const f=fixture();f.current={wind:99,humidity:99};
  assert.deepEqual(periodWeatherStats(f,now),{wind:6,humidity:68});
  const html=todayForecastHTML(f,now);
- for(const value of ['Today','95°','74°','103°','23%','6 mph','UV Index','Click for more details'])assert.ok(html.includes(value),value);
+ for(const value of ['Today','95°','74°','103°','23%','6 mph','Peak UV','Tap for more details'])assert.ok(html.includes(value),value);
  assert.match(html,/Rain chance/);assert.doesNotMatch(html,/NWS chance/);
  assert.match(html,/aria-label="[^"]*Rain chance 23 percent\./);
  assert.doesNotMatch(html,/>Humidity<|>Precipitation</);

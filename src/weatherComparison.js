@@ -7,8 +7,9 @@ import {rebuildHourlyFeels} from './weatherFusionHourlyFeels.js';
 import {humidityFromDewpoint,solarElevation} from '../public/weather-fusion/weather-math.js';
 import {timeAt} from '../public/weather-fusion/hourly-feels.js';
 import {GOOGLE_FEED,HOUR,finite,googlePoints,selectGoogleForecast,skyDescription} from './weatherComparisonData.js';
+import {ensembleConfidence,fetchComparisonCompanions,addComparisonCompanions} from './weatherComparisonCompanions.js';
 const root=fileURLToPath(new URL('../public/weather-fusion/',import.meta.url));
-const version='compare-v1-20260925';
+const version='compare-v2-20260925';
 const mean=a=>{const v=a.filter(finite);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null;};
 const extreme=(a,fn)=>{const v=a.filter(finite);return v.length?fn(...v):null;};
 const round=v=>finite(v)?Math.round(v*10)/10:null;
@@ -29,7 +30,6 @@ export function buildGoogleComparison(feed,pointId,now=Date.now()){
  const keys=['temperature','dewpoint','wind','humidity','pressure','cloud','precipitation','pop','gust','visibility'];
  const series=Object.fromEntries(keys.map(key=>[key,future.map(r=>({time:r.time,value:key==='cloud'?r.skyCover:r[key]??null,source:key==='temperature'?r.temperatureSource:key==='dewpoint'?r.dewpointSource:'Google WeatherNext',runAt:r.provenance.runAt,...(key==='precipitation'?{end:r.precipitationEnd,runAt:r.precipitationRunAt}: {})}))]));
  out.metricForecasts={series,notes:{},solar:[],version:out.experienceVersion};
- const missing={label:'Not scored',key:'unavailable',score:null,factors:[],note:'A single Google ensemble is not assigned the multi-model Fusion confidence score. Published P10–P90 ranges are ensemble spread, not calibrated confidence.'};
  const aggregate=(a,b)=>{const rows=all.filter(r=>r.epoch>=a&&r.epoch<b);return {rows,complete:rows.length===Math.round((b-a)/HOUR)};};
  const total=(a,b)=>{const q=aggregate(a,b);return q.complete&&q.rows.every(r=>finite(r.precipitation))?q.rows.reduce((s,r)=>s+r.precipitation,0):null;};
  out.days=out.days.map((day,index)=>{
@@ -38,7 +38,7 @@ export function buildGoogleComparison(feed,pointId,now=Date.now()){
   const high=extreme(daytime.rows.map(r=>r.temperature),Math.max),low=extreme(night.rows.map(r=>r.temperature),Math.min);
   const condition=skyDescription(cloud,extreme(daytime.rows.map(r=>r.precipitation),Math.max)),nightCondition=skyDescription(nCloud,extreme(night.rows.map(r=>r.precipitation),Math.max));
   const coverageNote=`High/low are extrema of available Google hourly means in 7am–7pm / 7pm–7am windows. ${daytime.complete&&night.complete?'Full':'Partial'} period coverage. Rain amount is a mean, not a probability.`;
-  return {...day,high:round(high),low:round(low),condition,nightCondition,detail:coverageNote,nightDetail:coverageNote,pop:null,popDay:null,popNight:null,popLabel:'Not published by this Google feed',rainLikelihood:{value:null},popDayLikelihood:{value:null},popNightLikelihood:{value:null},qpf:total(a,end),remainingQpf:index===0?total(Math.max(a,Math.ceil(now/HOUR)*HOUR),end):null,qpfWindow:{start:iso(a),end:iso(end)},qpfSource:'Google native hourly ensemble means',temperatureSource:'Google WeatherNext; station-trained when a matching run is published',lowLabel:'Overnight low',highWindow:{start:iso(a),end:iso(b)},lowWindow:{start:iso(b),end:iso(end)},confidence:{...missing},guidance:{},illustrativeBlend:null,agreement:'One Google ensemble',highSpread:null,qpfSpread:null,uvMax:null,wind:finite(mean(allDay.rows.map(r=>r.wind)))?`${round(mean(allDay.rows.map(r=>r.wind)))} mph`:null,windDirection:null,googleCoverage:{dayHours:daytime.rows.length,nightHours:night.rows.length,complete:daytime.complete&&night.complete}};
+  return {...day,high:round(high),low:round(low),condition,nightCondition,detail:coverageNote,nightDetail:coverageNote,pop:null,popDay:null,popNight:null,popLabel:'Not published by this Google feed',rainLikelihood:{value:null},popDayLikelihood:{value:null},popNightLikelihood:{value:null},qpf:total(a,end),remainingQpf:index===0?total(Math.max(a,Math.ceil(now/HOUR)*HOUR),end):null,qpfWindow:{start:iso(a),end:iso(end)},qpfSource:'Google native hourly ensemble means',temperatureSource:'Google WeatherNext; station-trained when a matching run is published',lowLabel:'Overnight low',highWindow:{start:iso(a),end:iso(b)},lowWindow:{start:iso(b),end:iso(end)},confidence:ensembleConfidence(allDay.rows,now,index),guidance:{},illustrativeBlend:null,agreement:'One Google ensemble',highSpread:null,qpfSpread:null,uvMax:null,wind:finite(mean(allDay.rows.map(r=>r.wind)))?`${round(mean(allDay.rows.map(r=>r.wind)))} mph`:null,windDirection:null,googleCoverage:{dayHours:daytime.rows.length,nightHours:night.rows.length,complete:daytime.complete&&night.complete}};
  });
  out.solar=solarTimes(dateKey(now,zone),p.latitude,p.longitude);
  out.metricForecasts.solar=out.days.map(d=>({date:d.date,...solarTimes(d.date,p.latitude,p.longitude)}));
@@ -64,7 +64,7 @@ export function comparisonApp(original,config){
  s=replaceOnce(s,'installExperience();\nstartDeviceLocation();',"const compareBridge=installComparisonPane(COMPARE,{selectHour:selectComfortHour,showDay,refresh:()=>load(),getForecast:()=>forecast});\ninstallExperience();\nchooseLocation({...COMPARE.point,source:'comparison'});");
  return s;
 }
-export function registerWeatherComparisonRoutes(app,{fetchImpl=globalThis.fetch,now=Date.now,feedProvider}={}){
+export function registerWeatherComparisonRoutes(app,{fetchImpl=globalThis.fetch,now=Date.now,feedProvider,companionProvider}={}){
  const cache=new Cache(12,now);
  const getFeed=()=>cache.get('feed',120000,async()=>{
   if(feedProvider)return feedProvider();
@@ -75,14 +75,23 @@ export function registerWeatherComparisonRoutes(app,{fetchImpl=globalThis.fetch,
  const fail=(res,e)=>res.status(e.status||503).json({error:e.message||'Comparison data unavailable.'});
  const config=async q=>{const source=q.source==='google'?'google':q.source==='fusion'?'fusion':null;if(!source)throw Object.assign(Error('Choose Fusion or Google.'),{status:400});const point=googlePoints(await getFeed()).find(p=>p.id===q.location);if(!point)throw Object.assign(Error('Choose a published comparison location.'),{status:404});return {source,point};};
  app.get(['/weather-fusion','/weather-fusion/'],async(_req,res,next)=>{
-  try{let html=await readFile(root+'index.html','utf8');const link='<a id="weather-compare-link" class="text-button" href="/weather-fusion/compare/" style="display:inline-flex;align-items:center;min-height:40px;padding:8px 11px;border-radius:10px;background:rgba(8,64,99,.32);font-weight:750;white-space:nowrap">Compare Google</a>';
-   html=html.replace('<nav class="weather-jump-nav"','<div style="display:flex;justify-content:flex-end;margin:6px 0">'+link+'</div><nav class="weather-jump-nav"');res.set('Cache-Control','no-cache').type('html').send(html);
+  try{const html=await readFile(root+'index.html','utf8');res.set('Cache-Control','no-cache').type('html').send(html);
   }catch(e){next(e);}
  });
- app.get(['/weather-fusion/compare','/weather-fusion/compare/'],(_req,res)=>res.set('Cache-Control','no-cache').sendFile(root+'compare.html'));
+ app.get(['/weathernext','/weathernext/','/weather-fusion/weathernext-site.html'],async(req,res)=>{try{
+  const points=googlePoints(await getFeed()),point=points.find(p=>p.id===req.query.location)||points[0];
+  let html=await readFile(root+'index.html','utf8');
+  html=html.replace(/<script type="module" src="\/weather-fusion\/app\.js[^"]*"><\/script>/, '<script type="module" src="/weather-fusion/compare/app.js?source=google&amp;location='+encodeURIComponent(point.id)+'"></script>');
+  html=html.replace('Because Apple, Google and Samsung weather suck','Your local weather, clearly explained').replace('<title>Weather Nourie</title>','<title>Experimental NVIDIA AI Weather</title>');
+  html=html.replace('</head>','<link rel="stylesheet" href="/weather-fusion/compare.css?v=dashboard-v3"></head>').replace('<body data-sky="day">','<body data-sky="day" class="google-pane weathernext-dashboard">');
+  html=html.replace('<main id="forecast">','<h1 class="weathernext-heading">Experimental NVIDIA AI Weather</h1><p class="weathernext-source">Experimental model forecast · UV and AQI from supplemental feeds</p><main id="forecast">');
+  html=html.replace('<div class="location-bar">','<div class="weathernext-locations"><label>Forecast location <select onchange="location.href=\'/weathernext/?location=\'+encodeURIComponent(this.value)">'+points.map(p=>'<option value="'+p.id+'"'+(p.id===point.id?' selected':'')+'>'+p.name+'</option>').join('')+'</select></label></div><div class="location-bar">');
+  res.set('Cache-Control','no-cache').type('html').send(html);
+ }catch(e){fail(res,e);}});
+ app.get(['/weather-fusion/compare','/weather-fusion/compare/','/weather-fusion/compare.html'],(req,res)=>res.set('Cache-Control','no-cache').redirect(302,'/weathernext/'+(typeof req.query.location==='string'?'?location='+encodeURIComponent(req.query.location):'')));
  for(const name of ['compare.css','compare.js','compare-bridge.js'])app.get('/weather-fusion/'+name,(_req,res)=>res.set('Cache-Control','no-cache').sendFile(root+name));
  app.get('/api/weather-fusion/compare/locations',async(_req,res)=>{try{res.set('Cache-Control','no-store').json({points:googlePoints(await getFeed())});}catch(e){fail(res,e);}});
- app.get('/api/weather-fusion/compare/google',async(req,res)=>{try{const feed=await getFeed();const point=googlePoints(feed).find(p=>(req.query.location&&p.id===req.query.location)||(!req.query.location&&Math.abs(p.latitude-Number(req.query.latitude))<.00011&&Math.abs(p.longitude-Number(req.query.longitude))<.00011));if(!point)throw Object.assign(Error('Google has no published forecast for this coordinate. No other location is substituted.'),{status:404});const result=await cache.get('forecast:'+point.id,45000,()=>buildGoogleComparison(feed,point.id,now()));res.set('Cache-Control','no-store').json(result);}catch(e){fail(res,e);}});
+ app.get('/api/weather-fusion/compare/google',async(req,res)=>{try{const feed=await getFeed();const point=googlePoints(feed).find(p=>(req.query.location&&p.id===req.query.location)||(!req.query.location&&Math.abs(p.latitude-Number(req.query.latitude))<.00011&&Math.abs(p.longitude-Number(req.query.longitude))<.00011));if(!point)throw Object.assign(Error('Google has no published forecast for this coordinate. No other location is substituted.'),{status:404});const result=await cache.get('forecast:'+point.id,45000,async()=>addComparisonCompanions(buildGoogleComparison(feed,point.id,now()),await (companionProvider?companionProvider(point):fetchComparisonCompanions(point,fetchImpl))));res.set('Cache-Control','no-store').json(result);}catch(e){fail(res,e);}});
  app.get('/weather-fusion/compare/pane',async(req,res)=>{try{const c=await config(req.query);let html=await readFile(root+'index.html','utf8');html=html.replace(/<script type="module" src="\/weather-fusion\/app\.js[^\"]*"><\/script>/,`<script type="module" src="/weather-fusion/compare/app.js?source=${c.source}&amp;location=${encodeURIComponent(c.point.id)}"></script>`);html=html.replace('</head>',`<link rel="stylesheet" href="/weather-fusion/compare.css?v=${version}"></head>`).replace('<body data-sky="day">',`<body data-sky="day" class="comparison-pane ${c.source==='google'?'google-pane':'fusion-pane'}">`);if(c.source==='google')html=html.replace(/<script defer src="https:\/\/unpkg.com\/leaflet[^>]*><\/script>/,'');res.set('Cache-Control','no-cache').type('html').send(html);}catch(e){fail(res,e);}});
  app.get('/weather-fusion/compare/app.js',async(req,res)=>{try{const c=await config(req.query);res.set('Cache-Control','no-cache').type('application/javascript').send(comparisonApp(await readFile(root+'app.js','utf8'),c));}catch(e){res.status(503).type('application/javascript').send("throw new Error('The comparison page could not be prepared. Refresh or return to the main forecast.');");}});
 }

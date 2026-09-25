@@ -7,7 +7,7 @@
   <meta name="description" content="Weather Nourie. Local NWS forecasts, professional AI briefings, model comparisons, thermal-exposure science and interactive weather maps.">
   <title>Weather Nourie</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-  <link rel="stylesheet" href="/weather-fusion/style.css?v=experimental-whats-up-v1">
+  <link rel="stylesheet" href="/weather-fusion/style.css?v=dashboard-v2">
   <link rel="stylesheet" href="/weather-fusion/forecast-layout.css?v=weather-qa-v67">
   <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <link rel="stylesheet" href="/weather-fusion/personal-details.css?v=wpc-mpd-v12">
@@ -18,8 +18,8 @@
   <link rel="stylesheet" href="/weather-fusion/car-wash.css?v=rain-consensus-v41">
   <link rel="stylesheet" href="/weather-fusion/model-explanation.css?v=weathernext-live-v1">
   <link rel="stylesheet" href="/weather-fusion/risk-outlooks.css?v=risk-outlooks-v4">
-  <link rel="stylesheet" href="/weather-fusion/weather-polish.css?v=flat-nav-v1">
-  <script type="module" src="/weather-fusion/app.js?v=wardrobe-v1"></script>
+  <link rel="stylesheet" href="/weather-fusion/weather-polish.css?v=dashboard-v3">
+  <script type="module" src="/weather-fusion/app.js?v=dashboard-v2"></script>
 
   <style id="experimental-bots-link-style">
     .experimental-bots-link,.experimental-weathernext-link{display:none;align-items:center;gap:.45rem;width:max-content;margin:.55rem .4rem 0 0;padding:.55rem .85rem;border:1px solid rgba(255,255,255,.22);border-radius:999px;background:rgba(11,24,43,.78);color:#f7fbff;text-decoration:none;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.18)}
@@ -61,12 +61,11 @@
         <span class="jump-label">Air Quality</span>
       </a>
     </nav>
-    <a class="forecast-compare-banner" href="/weather-fusion/compare.html" aria-label="Compare Dan's Forecast with Nvidia Advanced AI Forecast">
-      <span><b>Compare Nvidia Advanced AI Forecast</b><small>Switch quickly between Nvidia and Dan’s Forecast</small></span><strong aria-hidden="true">Compare&nbsp; ↗</strong>
-    </a>
+    <a class="forecast-compare-banner" href="/weathernext/" aria-label="Compare to Nvidia AI Forecast">Compare to Nvidia AI Forecast</a>
     <div class="experimental-page-banner" role="status">EXPERIMENTAL</div>
     <main id="forecast">
       <div id="status" class="status-line" role="status" aria-live="polite">Connecting to weather sources…</div>
+      <section id="weather-change-banner" class="weather-change-banner" role="status" hidden></section>
       <section class="hero" aria-labelledby="city-name">
         <div class="hero-scene" id="hero-scene" aria-hidden="true"></div>
         <div class="eyebrow" id="hero-date">YOUR WEATHER, IN FOCUS</div>
