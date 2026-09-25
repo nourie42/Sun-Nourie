@@ -18,7 +18,7 @@ try{
   await page.waitForFunction(()=>document.querySelector('#compare-status')?.textContent.includes('Both forecasts loaded'),null,{timeout:120000});
   for(const source of ['fusion','google']){const frame=page.frames().find(f=>f.url().includes('source='+source));assert.ok(frame);assert.equal(await frame.locator('.today-weather-card').count(),1);assert.ok(await frame.locator('.today-sky[src*="/weather-fusion/"]').count()>=1);}
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
-  await page.locator('[data-view="both"]').click();await page.locator('[data-section="today-forecast"]').click();await page.screenshot({path:`${dir}/live-${width}.png`,fullPage:false});
+  await page.locator('button[data-view="both"]').click();await page.locator('button[data-section="today-forecast"]').click();await page.screenshot({path:`${dir}/live-${width}.png`,fullPage:false});
   assert.deepEqual(errors,[]);report.viewports.push(width);await context.close();
  }
 }finally{await fs.writeFile(dir+'/report.json',JSON.stringify(report,null,2));await browser.close();}
