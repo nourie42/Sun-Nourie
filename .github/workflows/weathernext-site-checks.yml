@@ -21,7 +21,7 @@ jobs:
         with:
           node-version: '22'
       - run: npm ci
-      - run: node --test test/weather*.test.js
+      - run: node --test test/weatherNextSite.test.js test/weatherComparisonRepairs.test.js test/weatherDashboardChanges.test.js
       - run: npm install --no-save --package-lock=false playwright@1.55.0
       - run: npx playwright install --with-deps chromium
       - run: node scripts/weatherNextSiteSmoke.js
