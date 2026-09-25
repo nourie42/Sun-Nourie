@@ -1,5 +1,7 @@
 import {addExposureWeather,exposureWeatherUrl,normalizeExposureWeather} from './weatherFusionExposure.js';
 import {addAirQuality,airQualityUrl,normalizeAirQuality} from './weatherFusionAirQuality.js';
+import {fetchNwsRain,addNwsRain} from './weatherComparisonRain.js';
+import {createHash} from 'node:crypto';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 const HOUR=3600000;
 
@@ -19,13 +21,13 @@ export function ensembleConfidence(rows,now,leadDays=0){
 
 export async function fetchComparisonCompanions(point,fetchImpl=globalThis.fetch){
  const get=async(url,normalize)=>{const r=await fetchImpl(url,{signal:AbortSignal.timeout(12000),redirect:'error'});if(!r.ok)throw Error('Supplemental feed unavailable');return normalize(await r.json());};
- const results=await Promise.allSettled([get(exposureWeatherUrl(point,point.timeZone),normalizeExposureWeather),get(airQualityUrl(point),normalizeAirQuality)]);
- return {exposure:results[0].status==='fulfilled'?results[0].value:null,airQuality:results[1].status==='fulfilled'?results[1].value:null};
+ const results=await Promise.allSettled([get(exposureWeatherUrl(point,point.timeZone),normalizeExposureWeather),get(airQualityUrl(point),normalizeAirQuality),fetchNwsRain(point,fetchImpl)]);
+ return {exposure:results[0].status==='fulfilled'?results[0].value:null,airQuality:results[1].status==='fulfilled'?results[1].value:null,rain:results[2].status==='fulfilled'?results[2].value:null};
 }
 
-export function addComparisonCompanions(out,{exposure=null,airQuality=null}={}){
+export function addComparisonCompanions(out,{exposure=null,airQuality=null,rain=null}={}){
  // Keep the WeatherNext temperature, dew point, wind, rain and radiation.
- // Only UV and air quality come from these separately attributed feeds.
+ // UV, air quality and NWS rain probabilities are separately attributed.
  const modelExposure=out.exposureWeather;
  addExposureWeather(out,exposure);
  out.exposureWeather=modelExposure;
@@ -33,5 +35,7 @@ export function addComparisonCompanions(out,{exposure=null,airQuality=null}={}){
  addAirQuality(out,airQuality);
  out.comparison.missing=out.comparison.missing.filter(name=>!(name==='UV index'&&finite(out.uv.today))&&!(name==='Air quality'&&airQuality));
  out.methodology+=' UV is a separate Open-Meteo forecast; air quality is a separate Open-Meteo / CAMS forecast. Neither replaces the model weather fields.';
+ addNwsRain(out,rain);
+ out.signature=createHash('sha256').update(JSON.stringify({model:out.signature,uv:out.uv,aqi:out.airQuality,rain})).digest('hex').slice(0,24);
  return out;
 }
