@@ -19,7 +19,7 @@ test('Dan summary remains visible with no approved uncertainty, and fallback is 
  const forecast={signature:'current',location:{timeZone:'America/New_York'},days:[{detail:'Clouds will clear this afternoon.'}],feeds:[],aiConfigured:true};
  const text=danTakeDisplay({signature:'current',mode:'ai',danSummary:'Clouds will clear. Tomorrow looks dry.'},forecast);
  assert.match(text,/Tomorrow looks dry/);
- const fallback=danTakeDisplay({signature:'current',mode:'nws-summary'},forecast);assert.match(fallback,/AI summary is temporarily unavailable/);assert.match(fallback,/Clouds will clear/);
+ const fallback=danTakeDisplay({signature:'current',mode:'nws-summary'},forecast);assert.doesNotMatch(fallback,/NWS summary|AI summary is temporarily unavailable/);assert.match(fallback,/Clouds will clear/);
  assert.doesNotMatch(danTakeDisplay({signature:'other',mode:'ai',danSummary:'Stale text'},forecast),/Stale text/);
 });
 test('main markup never hides Dan Take and Refresh is not blocked by busy state',()=>{
