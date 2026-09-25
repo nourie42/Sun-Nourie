@@ -35,10 +35,10 @@ const readDeviceLocation=()=>{
 const saveDeviceLocation=p=>{try{localStorage.setItem(DEVICE_LOCATION_KEY,JSON.stringify({id:'device',name:'Device location',latitude:p.latitude,longitude:p.longitude,source:'device'}));}catch{/* nonessential */}};
 const setDeviceLocationLabel=text=>{const node=$('device-location-label');if(node)node.textContent=text;};
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const number = (n, decimals = 0) => finite(n) ? n.toFixed(decimals) : 'ΓÇö';
-const temperature = (n) => `${number(n)}┬░`;
+const number = (n, decimals = 0) => finite(n) ? n.toFixed(decimals) : '—';
+const temperature = (n) => `${number(n)}°`;
 const inches = (n) => finite(n) ? `${n.toFixed(2)} in` : 'Unavailable';
-const percent = (n) => finite(n) ? `${Math.round(n)}%` : 'ΓÇö';
+const percent = (n) => finite(n) ? `${Math.round(n)}%` : '—';
 function renderWeatherChanges(data){const root=$('weather-change-banner');if(!root)return;const messages=weatherChangeMessages(data);root.hidden=!messages.length;root.innerHTML=messages.length?`<strong>${WEATHER_CHANGE_TITLE}</strong><br>${messages.map(esc).join('<br>')}`:'';}
 let place = null, forecast = null, generation = 0, busy = false, searchGeneration = 0;
 let map = null, baseLayer = null, radarLayer = null, warningLayer = null, marker = null;
@@ -49,7 +49,7 @@ let lastRadarFetch = 0, currentBriefing = null, requestController = null;
 let activeDayDetail = null;
 function configurePageMode() {
   document.documentElement.dataset.weatherPage=experimentalPage?'experimental':'main';
-  if(experimentalPage)document.title='Experimental Weather ┬╖ Weather Nourie';
+  if(experimentalPage)document.title='Experimental Weather · Weather Nourie';
   const tabs=document.querySelector('.map-tabs');
   if(experimentalPage&&tabs&&!tabs.querySelector('[data-layer="hrrr"]')){
     for(const [layer,label] of [['hrrr','HRRR'],['ecmwf','ECMWF rain'],['nbm','NBM rain'],['temperature','Temperature'],['wind','Wind'],['clouds','Clouds']]){
@@ -92,9 +92,9 @@ function isDaylight() {
 function radarObservationLabel(current) {
   const radar=current?.radarPrecipitation;
   if(radar?.status!=='ready')return '';
-  if(radar.atLocation===true)return 'Rain now ┬╖ observed radar over this location';
+  if(radar.atLocation===true)return 'Rain now · observed radar over this location';
   const rainAround=radar.close===true||(finite(radar.nearestRainMiles)&&radar.nearestRainMiles<=5)||radar.approaching===true;
-  if(rainAround)return radar.approaching===true&&!radar.close?'Rain Around ┬╖ moving toward you':'Rain Around ┬╖ within 5 miles';
+  if(rainAround)return radar.approaching===true&&!radar.close?'Rain Around · moving toward you':'Rain Around · within 5 miles';
   if(radar.nearby!==true&&radar.inArea!==true)return '';
   const direction={N:'north',NE:'northeast',E:'east',SE:'southeast',S:'south',SW:'southwest',W:'west',NW:'northwest'}[radar.nearestRainDirection];
   const distance=finite(radar.nearestRainMiles)?` about ${Math.round(radar.nearestRainMiles)} mi${direction?` ${direction}`:''}`:'';
@@ -112,17 +112,17 @@ function render(data) {
   const hero = currentHero(data, day);
   document.body.dataset.sky = !day ? 'night' : /rain|storm|shower/i.test(hero.condition) ? 'rain' : 'day';
   $('city-name').textContent = data.location.name || place?.name || 'Your location';
-  if(place?.source?.startsWith('device'))setDeviceLocationLabel(`Device location ┬╖ ${data.location.name||'current position'}`);
+  if(place?.source?.startsWith('device'))setDeviceLocationLabel(`Device location · ${data.location.name||'current position'}`);
   $('hero-date').textContent = new Intl.DateTimeFormat('en-US', { timeZone: data.location.timeZone, weekday: 'long', month: 'long', day: 'numeric' }).format(new Date()).toUpperCase();
   const currentDay = dailyDisplay(d, 0, Date.now(), data.location.timeZone);
-  $('temperature').innerHTML = `${number(hero.temperature)}<span>┬░</span>`;
+  $('temperature').innerHTML = `${number(hero.temperature)}<span>°</span>`;
   if($('hero-feels'))$('hero-feels').innerHTML=heroFeelsHTML(currentSample(data));
   if($('hero-uv'))$('hero-uv').innerHTML=dailyUvHTML(data.days[0]?.uvMax,'Peak UV today');
-  $('condition').textContent = hero.tonight ? `Tonight ┬╖ ${hero.condition}` : hero.condition;
+  $('condition').textContent = hero.tonight ? `Tonight · ${hero.condition}` : hero.condition;
   $('high-low').textContent = hero.tonight ? 'Overnight low' : hero.range;
-  const sourceLabel=c.localEstimate?`Selected-location estimate ┬╖ valid ${clock(c.time)}`:c.type==='observation'?`Nearby weather station ┬╖ updated ${clock(c.time)}`:c.type==='unavailable'?'Current local reading unavailable':'Estimated current conditions';
+  const sourceLabel=c.localEstimate?`Selected-location estimate · valid ${clock(c.time)}`:c.type==='observation'?`Nearby weather station · updated ${clock(c.time)}`:c.type==='unavailable'?'Current local reading unavailable':'Estimated current conditions';
   const radarLabel=radarObservationLabel(c);
-  $('observation-label').textContent = radarLabel ? `${sourceLabel} ┬╖ ${radarLabel}` : sourceLabel;
+  $('observation-label').textContent = radarLabel ? `${sourceLabel} · ${radarLabel}` : sourceLabel;
   $('hero-scene').innerHTML = icon(hero.condition, hero.isDay, 120);
   renderWeatherChanges(data);
   draw('alerts', 'Official alerts', () => renderAlerts(data));
@@ -140,13 +140,13 @@ function render(data) {
   if (currentBriefing?.signature !== data.signature) {
     const outlook=forecastOutlookDetails(data,Date.now());
     draw('briefing-summary', 'Local outlook', () => renderBriefing({ mode: 'nws-summary', signature: data.signature, headline: currentDay.tonight ? 'Your evening outlook' : currentDay.condition, summary: outlook.summary, nearTerm: outlook.nearTerm, extended: outlook.extended,
-      uncertainty: '', danSummary:data.danSummary, danTake:data.danTake||rebindDanTake(currentBriefing?.danTake||currentBriefing,data), reason: data.aiConfigured ? 'Updating your local outlookΓÇª' : 'Weather Nourie forecast', sources: ['nws',...(data.modelContributions||[]).map(model=>model.id)] }));
+      uncertainty: '', danSummary:data.danSummary, danTake:data.danTake||rebindDanTake(currentBriefing?.danTake||currentBriefing,data), reason: data.aiConfigured ? 'Updating your local outlook…' : 'Weather Nourie forecast', sources: ['nws',...(data.modelContributions||[]).map(model=>model.id)] }));
   }
   if (map) { marker?.setLatLng([place.latitude, place.longitude]); renderMapWarnings(data); }
   const unavailable = data.feeds.filter((f) => ['unavailable', 'stale', 'not-configured'].includes(f.status));
   const locationLimited = data.feeds.filter((f) => f.status === 'not-covered');
-  const sourceNote = unavailable.length ? ' ┬╖ Some sources are unavailable or stale ΓÇö details in Scientific Stuff below' : locationLimited.length ? ' ┬╖ Some optional model details are limited for this location ΓÇö details below' : '';
-  $('status').textContent = `Updated ${clock(data.assembledAt)}${sourceNote}${failedPanels.length ? ` ┬╖ Display issue: ${failedPanels.join(', ')}. Other forecasts remain available; use Refresh to retry.` : ''}`;
+  const sourceNote = unavailable.length ? ' · Some sources are unavailable or stale — details in Scientific Stuff below' : locationLimited.length ? ' · Some optional model details are limited for this location — details below' : '';
+  $('status').textContent = `Updated ${clock(data.assembledAt)}${sourceNote}${failedPanels.length ? ` · Display issue: ${failedPanels.join(', ')}. Other forecasts remain available; use Refresh to retry.` : ''}`;
   $('status').classList.toggle('error', unavailable.length > 0 || failedPanels.length > 0);
 }
 function renderAlerts(data) { renderBulletins(data); }
@@ -162,20 +162,20 @@ function renderEvidence(data) {
     const c=currentSample(data).inputs,e=currentSample(data).comfort.inputEvidence||{};
     const next=data.metricForecasts?.series?.feels?.find(p=>Date.parse(p.time)>Date.now());
     const n=(v,s='')=>finite(v)?`${Math.round(v*10)/10}${s}`:'Unavailable';
-    root.innerHTML=`<p><strong>Current thermal inputs:</strong> ${esc(c.localEstimate?.source||c.stationName||c.station||'Forecast estimate')}${finite(c.stationDistanceKm)?` ┬╖ ${Math.round(c.stationDistanceKm/1.609344)} miles away`:''}; ${esc(c.time||'time unavailable')}. Air ${n(c.temperature,'┬░F')}, dew point ${n(c.dewpoint,'┬░F')}, wind ${n(c.wind,' mph')}. ${esc(c.localEstimate?.reason||c.comfortSourceNote||'')} Outdoor UTCI ${n(data.comfort?.rawOutdoors,'┬░F')}.</p>${next?`<p><strong>Next forecast hour ΓÇö separate inputs:</strong> ${esc(next.time)}. Air ${n(next.inputs.temperature,'┬░F')}, dew point ${n(next.inputs.dewpoint,'┬░F')}, wind ${n(next.inputs.wind,' mph')}, cloud cover ${n(next.inputs.skyCover,'%')}. Outdoor UTCI ${n(next.value,'┬░F')}.</p>`:''}<p>${esc(e.windPolicy||'')} ┬╖ ${esc(e.radiationBasis||'')}. Station estimates are not copied into future forecasts. The raw thermal/UTCI calculation is retained unchanged. Visible primary outdoor feels-like values are floored at the same-hour dew point only when forecast gusts are below ${GUSTY_FEELS_DISPLAY_MPH} mph.</p>`;
+    root.innerHTML=`<p><strong>Current thermal inputs:</strong> ${esc(c.localEstimate?.source||c.stationName||c.station||'Forecast estimate')}${finite(c.stationDistanceKm)?` · ${Math.round(c.stationDistanceKm/1.609344)} miles away`:''}; ${esc(c.time||'time unavailable')}. Air ${n(c.temperature,'°F')}, dew point ${n(c.dewpoint,'°F')}, wind ${n(c.wind,' mph')}. ${esc(c.localEstimate?.reason||c.comfortSourceNote||'')} Outdoor UTCI ${n(data.comfort?.rawOutdoors,'°F')}.</p>${next?`<p><strong>Next forecast hour — separate inputs:</strong> ${esc(next.time)}. Air ${n(next.inputs.temperature,'°F')}, dew point ${n(next.inputs.dewpoint,'°F')}, wind ${n(next.inputs.wind,' mph')}, cloud cover ${n(next.inputs.skyCover,'%')}. Outdoor UTCI ${n(next.value,'°F')}.</p>`:''}<p>${esc(e.windPolicy||'')} · ${esc(e.radiationBasis||'')}. Station estimates are not copied into future forecasts. The raw thermal/UTCI calculation is retained unchanged. Visible primary outdoor feels-like values are floored at the same-hour dew point only when forecast gusts are below ${GUSTY_FEELS_DISPLAY_MPH} mph.</p>`;
   }
   const important = ['nws', 'afd', 'hrrr', 'ecmwf', 'nbm', 'air-quality', 'alerts'];
   const labels = { nws: 'NWS', afd: 'Local discussion', hrrr: 'HRRR', ecmwf: 'ECMWF IFS', nbm: 'National Blend', 'air-quality':'Air quality', alerts: 'Alerts' };
-  const names = { ready: 'Available', unavailable: 'Unavailable', stale: 'Stale ΓÇö excluded', 'not-configured': 'Not configured', 'not-covered': 'Not collected for this location' };
+  const names = { ready: 'Available', unavailable: 'Unavailable', stale: 'Stale — excluded', 'not-configured': 'Not configured', 'not-covered': 'Not collected for this location' };
   const sourceIssues=data.feeds.filter(f=>['unavailable','stale','not-configured','not-covered'].includes(f.status));
   const sourceSummary=$('source-unavailable-summary');
   if(sourceSummary){
     if(!sourceIssues.length){sourceSummary.hidden=true;sourceSummary.innerHTML='';}
-    else{const issueNames={unavailable:'Unavailable',stale:'Stale and excluded','not-configured':'Not configured','not-covered':'Not collected for this location'};sourceSummary.innerHTML=`<strong>What is unavailable or limited</strong><ul>${sourceIssues.map(f=>`<li>${esc(f.label||f.id)} ΓÇö ${esc(issueNames[f.status]||f.status)}${f.message?`: ${esc(f.message)}`:''}</li>`).join('')}</ul>`;sourceSummary.hidden=false;}
+    else{const issueNames={unavailable:'Unavailable',stale:'Stale and excluded','not-configured':'Not configured','not-covered':'Not collected for this location'};sourceSummary.innerHTML=`<strong>What is unavailable or limited</strong><ul>${sourceIssues.map(f=>`<li>${esc(f.label||f.id)} — ${esc(issueNames[f.status]||f.status)}${f.message?`: ${esc(f.message)}`:''}</li>`).join('')}</ul>`;sourceSummary.hidden=false;}
   }
   $('feed-health').innerHTML = important.map((id) => {
     const f = data.feeds.find((s) => s.id === id);
-    return `<span class="feed-chip ${esc(f?.status || 'unavailable')}" title="${esc(f?.message || f?.label || '')}">${labels[id]} ┬╖ ${f?.contributes ? 'Contributing' : names[f?.status] || 'Unavailable'}${f?.contributes && f.issuedAt ? `<small>Run ${esc(clock(f.issuedAt, { month: 'short', day: 'numeric' }))}</small>` : ''}</span>`;
+    return `<span class="feed-chip ${esc(f?.status || 'unavailable')}" title="${esc(f?.message || f?.label || '')}">${labels[id]} · ${f?.contributes ? 'Contributing' : names[f?.status] || 'Unavailable'}${f?.contributes && f.issuedAt ? `<small>Run ${esc(clock(f.issuedAt, { month: 'short', day: 'numeric' }))}</small>` : ''}</span>`;
   }).join('');
   $('afd-office').textContent = data.discussion?.office ? `NWS ${data.discussion.office}` : '';
   $('afd-stamp').textContent = data.discussion ? `Issued ${clock(data.discussion.issuanceTime, { month: 'short', day: 'numeric' })}. Regional discussion; point forecasts may differ.` : 'No fresh discussion is available from the local forecast office.';
@@ -184,7 +184,7 @@ function renderEvidence(data) {
   $('methodology').textContent = data.methodology;
   $('source-register').innerHTML = data.feeds.map((f) => {
     const url = /^https:\/\/(api\.weather\.gov|www\.nco\.ncep\.noaa\.gov|www\.ecmwf\.int|open-meteo\.com|air-quality-api\.open-meteo\.com|www\.spc\.noaa\.gov|www\.wpc\.ncep\.noaa\.gov)\//.test(f.url || '') ? f.url : 'https://www.weather.gov/';
-    return `<div class="source-item"><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(f.label)} Γåù</a><span>${esc(names[f.status] || f.status)} ┬╖ retrieved ${f.fetchedAt ? esc(clock(f.fetchedAt)) : 'ΓÇö'}${f.issuedAt ? ` ┬╖ issued ${esc(clock(f.issuedAt, { month: 'short', day: 'numeric' }))}` : ' ┬╖ model run/issuance not supplied'}${f.message?` ┬╖ ${esc(f.message)}`:''}</span></div>`;
+    return `<div class="source-item"><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(f.label)} ↗</a><span>${esc(names[f.status] || f.status)} · retrieved ${f.fetchedAt ? esc(clock(f.fetchedAt)) : '—'}${f.issuedAt ? ` · issued ${esc(clock(f.issuedAt, { month: 'short', day: 'numeric' }))}` : ' · model run/issuance not supplied'}${f.message?` · ${esc(f.message)}`:''}</span></div>`;
   }).join('');
 }
 function renderBriefing(data) {
@@ -205,7 +205,7 @@ function renderBriefing(data) {
   const refs = (data.sources || []).filter((id) => ['nws', 'afd', 'hrrr', 'ecmwf', 'nbm'].includes(id)).map((id) => {
     const f = forecast?.feeds.find((s) => s.id === id);
     const url = id === 'afd' ? forecast?.discussion?.url : f?.url;
-    return url && /^https:\/\/(api\.weather\.gov|www\.nco\.ncep\.noaa\.gov|www\.ecmwf\.int)\//.test(url) ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(f?.label || id)} Γåù</a>` : esc(f?.label || id);
+    return url && /^https:\/\/(api\.weather\.gov|www\.nco\.ncep\.noaa\.gov|www\.ecmwf\.int)\//.test(url) ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(f?.label || id)} ↗</a>` : esc(f?.label || id);
   });
   $('briefing-detail').innerHTML = `<div><strong>Later today & tomorrow</strong><p>${detailHTML(nearTerm)}</p></div><div><strong>Full week</strong><p>${detailHTML(extended)}</p></div>`;
   // The Today card owns the single public Dan's take heading. Keep it visible
@@ -216,9 +216,9 @@ function renderBriefing(data) {
     if(todayUncertaintyText.style)todayUncertaintyText.style.whiteSpace='pre-line';
     todayUncertainty.hidden = false;
   }
-  $('briefing-stamp').textContent = data.mode === 'ai' ? `Updated ${clock(data.generatedAt)} ┬╖ based on your local NWS discussion` : 'Weather Nourie forecast';
+  $('briefing-stamp').textContent = data.mode === 'ai' ? `Updated ${clock(data.generatedAt)} · based on your local NWS discussion` : 'Weather Nourie forecast';
   const discussionItems=takeItems.filter(item=>!item.official);
-  $('outlook-science').innerHTML = `<p>Summary type: ${esc(localDetails ? 'Plain-language Weather Nourie point forecast with named days and timing from the same forecast data shown elsewhere' : data.mode === 'ai' ? 'AI plain-language paraphrase of the local discussion, checked against the point forecast and available model data' : 'Shared Weather Nourie hourly summary; not an AI paraphrase')}. ${esc(data.reason || '')}</p><p>Sources used: ${refs.join(' ┬╖ ') || 'Waiting for the local outlook'}</p><p>Take status: ${takeItems.some(item=>item.official)?'An active official local notice or point-specific risk outlook is displayed.':takeItems.length?'An explicitly supported, still-upcoming discussion change is displayed.':'No displayed change: '+(data.danTakeStatus==='discussion-not-current'?'the local discussion is missing or stale.':data.danTakeStatus==='no-explicit-future-change'?'the current discussion identifies no dated upcoming uncertainty.':data.reason||'the current discussion has not produced an approved explanation yet.')}</p>${discussionItems.map(item=>`<details><summary>${esc(item.period)} ┬╖ source evidence</summary><p>${esc(item.sourceQuote)}</p><p>Original section: ${esc(item.section)} ┬╖ issued ${esc(clock(item.sectionIssuedAt,{month:'short',day:'numeric'}))}. Applies through ${esc(clock(item.eventEnd,{month:'short',day:'numeric'}))}.</p></details>`).join('')}`;
+  $('outlook-science').innerHTML = `<p>Summary type: ${esc(localDetails ? 'Plain-language Weather Nourie point forecast with named days and timing from the same forecast data shown elsewhere' : data.mode === 'ai' ? 'AI plain-language paraphrase of the local discussion, checked against the point forecast and available model data' : 'Shared Weather Nourie hourly summary; not an AI paraphrase')}. ${esc(data.reason || '')}</p><p>Sources used: ${refs.join(' · ') || 'Waiting for the local outlook'}</p><p>Take status: ${takeItems.some(item=>item.official)?'An active official local notice or point-specific risk outlook is displayed.':takeItems.length?'An explicitly supported, still-upcoming discussion change is displayed.':'No displayed change: '+(data.danTakeStatus==='discussion-not-current'?'the local discussion is missing or stale.':data.danTakeStatus==='no-explicit-future-change'?'the current discussion identifies no dated upcoming uncertainty.':data.reason||'the current discussion has not produced an approved explanation yet.')}</p>${discussionItems.map(item=>`<details><summary>${esc(item.period)} · source evidence</summary><p>${esc(item.sourceQuote)}</p><p>Original section: ${esc(item.section)} · issued ${esc(clock(item.sectionIssuedAt,{month:'short',day:'numeric'}))}. Applies through ${esc(clock(item.eventEnd,{month:'short',day:'numeric'}))}.</p></details>`).join('')}`;
 
 }
 async function load({ moveMap = false, refreshModels = false, briefingRetry = 0 } = {}) {
@@ -229,7 +229,7 @@ async function load({ moveMap = false, refreshModels = false, briefingRetry = 0 
   requestController = new AbortController();
   busy = true; $('refresh').classList.add('loading');
   const slowNotice=setTimeout(()=>{if(id===generation&&busy)$('status').textContent='Weather sources are taking longer than usual. You can tap Refresh to retry.';},10000);
-  $('status').textContent = 'Checking the latest source forecastsΓÇª';
+  $('status').textContent = 'Checking the latest source forecasts…';
   try {
     const data = await api('forecast', query(), requestController.signal);
     if (id !== generation) return;
@@ -283,21 +283,21 @@ function chooseLocation(value,{rememberDevice=false}={}) {
   forecast = null;
   $('city-name').textContent = value.name || 'Your location';
   setDeviceLocationLabel(value.source?.startsWith('device')?'Using device location':`Viewing ${value.name||'searched location'}`);
-  $('temperature').innerHTML = 'ΓÇö<span>┬░</span>';
-  if($('hero-feels'))$('hero-feels').textContent='Feels like ΓÇö';
-  if($('hero-uv'))$('hero-uv').textContent='Peak UV today ΓÇö';
+  $('temperature').innerHTML = '—<span>°</span>';
+  if($('hero-feels'))$('hero-feels').textContent='Feels like —';
+  if($('hero-uv'))$('hero-uv').textContent='Peak UV today —';
   $('condition').textContent = 'Loading the selected location';
-  $('high-low').textContent = 'High ΓÇö┬░ ┬╖ Low ΓÇö┬░';
-  $('observation-label').textContent = 'Awaiting the new locationΓÇÖs sources';
-  $('alerts').innerHTML = '<p class="alert-note warning">Checking official alerts for the selected locationΓÇª</p>';
-  $('hourly').innerHTML = '<p class="muted">Loading hourly forecastΓÇª</p>';
-  $('daily').innerHTML = '<p class="muted">Loading daily forecastΓÇª</p>';
+  $('high-low').textContent = 'High —° · Low —°';
+  $('observation-label').textContent = 'Awaiting the new location’s sources';
+  $('alerts').innerHTML = '<p class="alert-note warning">Checking official alerts for the selected location…</p>';
+  $('hourly').innerHTML = '<p class="muted">Loading hourly forecast…</p>';
+  $('daily').innerHTML = '<p class="muted">Loading daily forecast…</p>';
   $('metrics').innerHTML = '';
-  if($('air-quality-content'))$('air-quality-content').innerHTML='<p class="muted">Loading air qualityΓÇª</p>';
+  if($('air-quality-content'))$('air-quality-content').innerHTML='<p class="muted">Loading air quality…</p>';
   $('feed-health').innerHTML = '';
-  $('afd-text').textContent = 'Loading the selected officeΓÇÖs discussionΓÇª';
+  $('afd-text').textContent = 'Loading the selected office’s discussion…';
   $('afd-office').textContent = '';
-  $('afd-stamp').textContent = 'Checking the selected locationΓÇÖs forecast officeΓÇª';
+  $('afd-stamp').textContent = 'Checking the selected location’s forecast office…';
   $('afd-link').href = 'https://www.weather.gov/';
   $('source-register').replaceChildren();
   if($('bulletin-dialog').open)$('bulletin-dialog').close();
@@ -325,8 +325,8 @@ function showDay(index, { preserve = false } = {}) {
   const focused=preserve&&root.contains(document.activeElement)?document.activeElement:null;
   const focusedId=focused?.id,focusedSummary=focused?.matches('.dialog-confidence > summary');
   const story=forecastPeriodSummary(forecast,index,phase,now),storyRain=displayedRainChance(forecast,story.chance,{dayIndex:index,now}),overnight=!p.tonight?forecastPeriodSummary(forecast,index,'overnight',now):null;
-  const condition=phase==='overall'?`Day: ${d.condition||'forecast unavailable'} ┬╖ Night: ${d.nightCondition||'forecast unavailable'}`:p.condition;
-  root.innerHTML=`<div class="dialog-eyebrow">WEATHER NOURIE</div><h2 id="day-title" class="dialog-title">${esc(p.label)}</h2><p class="dialog-condition">${esc(condition)}</p><div class="dialog-temps">${temperature(p.primary)}<span>${p.primaryLabel.toLowerCase()}${!p.tonight&&finite(p.secondary)?` ┬╖ ${temperature(p.secondary)} low`:''}</span></div>${dayGraphHTML(forecast,index,p.tonight,now)}<div class="dialog-stats"><div><strong>${percent(storyRain.value)}</strong><small>${storyRain.observed?'Rain observed now ┬╖ later hours remain forecasts':p.tonight?'Rain chance tonight':phase==='overall'?'Day and night rain chance':'Rain chance today'}</small></div><div><strong>${inches(story.amount)}</strong><small>${p.tonight?'Forecast rain through morning':phase==='overall'?'Forecast rain through next morning':'Expected rain today'}</small></div></div><p class="dialog-prose">${esc(story.summary)}</p>${overnight?`<h3 class="dialog-subtitle">Overnight ┬╖ ${percent(overnight.chance)} rain chance</h3><p class="dialog-prose">${esc(overnight.summary)}</p>`:''}${dailyConfidenceNoticeHTML(d.confidence,true)}${d.confidence?`<details class="dialog-confidence" data-confidence="${esc(d.confidence.key)}"><summary>Forecast confidence: ${esc(d.confidence.label)} ┬╖ ${d.confidence.sourceCount??'?'} source${d.confidence.sourceCount===1?'':'s'}</summary><p>${esc(d.confidence.factors.join(' ┬╖ '))}</p><small>${esc(d.confidence.note)}</small></details>`:''}<a href="#scientific-stuff" class="science-link" id="day-science-link">Scientific stuff Γåô</a>`;
+  const condition=phase==='overall'?`Day: ${d.condition||'forecast unavailable'} · Night: ${d.nightCondition||'forecast unavailable'}`:p.condition;
+  root.innerHTML=`<div class="dialog-eyebrow">WEATHER NOURIE</div><h2 id="day-title" class="dialog-title">${esc(p.label)}</h2><p class="dialog-condition">${esc(condition)}</p><div class="dialog-temps">${temperature(p.primary)}<span>${p.primaryLabel.toLowerCase()}${!p.tonight&&finite(p.secondary)?` · ${temperature(p.secondary)} low`:''}</span></div>${dayGraphHTML(forecast,index,p.tonight,now)}<div class="dialog-stats"><div><strong>${percent(storyRain.value)}</strong><small>${storyRain.observed?'Rain observed now · later hours remain forecasts':p.tonight?'Rain chance tonight':phase==='overall'?'Day and night rain chance':'Rain chance today'}</small></div><div><strong>${inches(story.amount)}</strong><small>${p.tonight?'Forecast rain through morning':phase==='overall'?'Forecast rain through next morning':'Expected rain today'}</small></div></div><p class="dialog-prose">${esc(story.summary)}</p>${overnight?`<h3 class="dialog-subtitle">Overnight · ${percent(overnight.chance)} rain chance</h3><p class="dialog-prose">${esc(overnight.summary)}</p>`:''}${dailyConfidenceNoticeHTML(d.confidence,true)}${d.confidence?`<details class="dialog-confidence" data-confidence="${esc(d.confidence.key)}"><summary>Forecast confidence: ${esc(d.confidence.label)} · ${d.confidence.sourceCount??'?'} source${d.confidence.sourceCount===1?'':'s'}</summary><p>${esc(d.confidence.factors.join(' · '))}</p><small>${esc(d.confidence.note)}</small></details>`:''}<a href="#scientific-stuff" class="science-link" id="day-science-link">Scientific stuff ↓</a>`;
   installDayGraph(root,forecast,index,p.tonight,now);
   const graphTimes=dayGraphPoints(forecast,index,p.tonight,now).map(point=>point.time),input=root.querySelector('#day-graph-hour');
   if (selectedTime && input) { input.value=String(Math.max(0,graphTimes.indexOf(selectedTime))); input.dispatchEvent(new Event('input')); }
@@ -349,7 +349,7 @@ function setBasemap() {
   pane.style.filter = selected === 'dark' ? 'grayscale(1) invert(1) brightness(.7) contrast(.9)' : '';
   baseLayer = window.L.tileLayer(`https://basemap.nationalmap.gov/arcgis/rest/services/${service}/MapServer/tile/{z}/{y}/{x}`, {
     pane: 'weather-base', maxZoom: 16, maxNativeZoom: 16, updateWhenIdle: true,
-    attribution: '<a href="https://www.usgs.gov/programs/national-geospatial-program/national-map" target="_blank" rel="noopener noreferrer">USGS The National Map</a> ┬╖ background map, not live clouds'
+    attribution: '<a href="https://www.usgs.gov/programs/national-geospatial-program/national-map" target="_blank" rel="noopener noreferrer">USGS The National Map</a> · background map, not live clouds'
   }).addTo(map);
   baseLayer.on('tileerror', () => mapMessage('The USGS background map could not load. Weather-model overlays and official source links remain available.'));
 }
@@ -365,7 +365,7 @@ function initMap() {
   setBasemap();
   marker = L.marker([place.latitude, place.longitude], { icon: L.divIcon({ className: 'map-marker', iconSize: [13, 13] }) }).addTo(map);
   warningLayer = L.geoJSON(null, { pane:'weather-warnings', style: { color: '#ffc1b4', weight: 2, fillOpacity: 0.1 }, onEachFeature: (f, layer) => {
-    const node = document.createElement('div'); node.textContent = `${f.properties?.event || 'NWS alert'} ΓÇö ${f.properties?.headline || ''}`; layer.bindPopup(node);
+    const node = document.createElement('div'); node.textContent = `${f.properties?.event || 'NWS alert'} — ${f.properties?.headline || ''}`; layer.bindPopup(node);
   } }).addTo(map);
   map.on('click', (e) => {
     const box = document.createElement('div'), label = document.createElement('p'), button = document.createElement('button');
@@ -406,20 +406,20 @@ function showFrame(index) {
   frameIndex=index;
   if(radarLayer){map.removeLayer(radarLayer);radarLayer.off();}
   const expected=frames[index];
-  radarLayer=window.L.tileLayer.wms(radarMeta.url,{pane:'weather-radar',layers:radarMeta.layer,format:'image/png',transparent:true,version:'1.1.1',opacity:.82,time:expected,attribution:'Observed radar ┬⌐ NOAA / NWS',updateWhenIdle:true,keepBuffer:3}).addTo(map);
-  $('radar-time').value=String(index);$('radar-stamp').textContent=`${clock(expected)} ┬╖ loading`;
+  radarLayer=window.L.tileLayer.wms(radarMeta.url,{pane:'weather-radar',layers:radarMeta.layer,format:'image/png',transparent:true,version:'1.1.1',opacity:.82,time:expected,attribution:'Observed radar © NOAA / NWS',updateWhenIdle:true,keepBuffer:3}).addTo(map);
+  $('radar-time').value=String(index);$('radar-stamp').textContent=`${clock(expected)} · loading`;
   const activeRadar=radarLayer;
   radarLayer.on('load',()=>{if(radarLayer===activeRadar&&selectedLayer==='radar'&&frames[frameIndex]===expected){$('radar-stamp').textContent=clock(expected);mapMessage(radarMeta.status==='stale'?'Radar is stale; check its timestamp.':'');}});
   radarLayer.on('tileerror',()=>{if(radarLayer===activeRadar&&selectedLayer==='radar'){stopRadar();mapMessage('A radar tile failed to load. Blank areas do not establish clear weather.');}});
 }
-function stopRadar(){if(radarTimer)clearInterval(radarTimer);radarTimer=null;$('radar-play').textContent='Γû╢';$('radar-play').setAttribute('aria-label','Play map animation');}
+function stopRadar(){if(radarTimer)clearInterval(radarTimer);radarTimer=null;$('radar-play').textContent='▶';$('radar-play').setAttribute('aria-label','Play map animation');}
 function modelCaption(layer,frame){
   const type=selectedLayer==='hrrr'?'Forecast reflectivity (not observed radar)':selectedLayer==='ecmwf'?'Accumulated precipitation since initialization':selectedLayer==='nbm'?'Interval precipitation':selectedLayer==='temperature'?'2 m temperature':selectedLayer==='wind'?'10 m wind speed':'Total cloud cover';
   const pointRun=forecast?.modelContributions?.find(m=>m.id===layer.model)?.runAt;
-  const mismatch=pointRun && Date.parse(pointRun)!==Date.parse(layer.runAt)?' ┬╖ Map and point forecast have different run times; refresh the forecast.':'';
-  const interval=frame.field==='precipitation'?` ┬╖ ${clock(frame.start,{month:'short',day:'numeric'})} ΓåÆ ${clock(frame.end,{month:'short',day:'numeric'})}`:'';
-  const coverage=layer.coverage?` ┬╖ ${layer.coverage}`:'';
-  return `${layer.label} ┬╖ ${type} ┬╖ ${frame.units}${interval} ┬╖ run ${clock(layer.runAt,{month:'short',day:'numeric'})}${coverage}${mismatch}`;
+  const mismatch=pointRun && Date.parse(pointRun)!==Date.parse(layer.runAt)?' · Map and point forecast have different run times; refresh the forecast.':'';
+  const interval=frame.field==='precipitation'?` · ${clock(frame.start,{month:'short',day:'numeric'})} → ${clock(frame.end,{month:'short',day:'numeric'})}`:'';
+  const coverage=layer.coverage?` · ${layer.coverage}`:'';
+  return `${layer.label} · ${type} · ${frame.units}${interval} · run ${clock(layer.runAt,{month:'short',day:'numeric'})}${coverage}${mismatch}`;
 }
 async function loadModelMap(force=false){
   const token=++mapSelectionToken,layerName=selectedLayer;
@@ -443,9 +443,9 @@ async function loadModelMap(force=false){
     configureFrames(modelFrames.length,0);
     if(!modelFrames.length){mapMessage('No verified current frames are available for this model. Other forecasts remain usable.');$('radar-stamp').textContent='Unavailable';return;}
     const nearest=modelFrames.findIndex(f=>Date.parse(f.time)>=Date.now());modelIndex=Math.max(0,nearest);
-    const legend={hrrr:'Forecast reflectivity ┬╖ 5 / 15 / 25 / 35 / 45 / 55 / 65 dBZ',ecmwf:'Precipitation ┬╖ 0.05 / 0.1 / 0.25 / 0.5 / 1 / 2 / 4 in',nbm:'Interval precipitation ┬╖ 0.05 / 0.1 / 0.25 / 0.5 / 1 / 2 / 4 in',temperature:'Temperature ┬╖ 20 / 32 / 45 / 60 / 75 / 85 / 95 / 105 ┬░F',wind:'Wind speed ┬╖ 5 / 10 / 15 / 20 / 30 / 40 / 60 mph',clouds:'Cloud cover ┬╖ 10 / 25 / 50 / 75 / 90%'};
+    const legend={hrrr:'Forecast reflectivity · 5 / 15 / 25 / 35 / 45 / 55 / 65 dBZ',ecmwf:'Precipitation · 0.05 / 0.1 / 0.25 / 0.5 / 1 / 2 / 4 in',nbm:'Interval precipitation · 0.05 / 0.1 / 0.25 / 0.5 / 1 / 2 / 4 in',temperature:'Temperature · 20 / 32 / 45 / 60 / 75 / 85 / 95 / 105 °F',wind:'Wind speed · 5 / 10 / 15 / 20 / 30 / 40 / 60 mph',clouds:'Cloud cover · 10 / 25 / 50 / 75 / 90%'};
     $('radar-legend').textContent=legend[layerName];
-    $('map-source').href=layer.sourceUrl;$('map-source').textContent='Official data source Γåù';
+    $('map-source').href=layer.sourceUrl;$('map-source').textContent='Official data source ↗';
     showModelFrame(modelIndex);
   }catch{if(token===mapSelectionToken){configureFrames(0);mapMessage('Model map data could not be loaded. Retry with Refresh.');}}
 }
@@ -456,9 +456,9 @@ async function showModelFrame(index){
     ? window.L.tileLayer(url,{...options,pane:'weather-model',maxZoom:12,minZoom:1,keepBuffer:3,updateWhenIdle:true})
     : window.L.imageOverlay(url,bounds,{...options,pane:'weather-model'})});
   const name=selectedLayer,token=++modelFrameToken;
-  $('radar-time').value=String(index);$('radar-stamp').textContent=`${clock(f.time,{weekday:'short'})} ┬╖ loading`;
-  if(!framePlayer.visible)mapMessage('Loading decoded model dataΓÇª');
-  return framePlayer.show(f,{pane:'weather-model',attribution:layer.model==='ecmwf'?'ECMWF Open Data ┬╖ CC BY 4.0':layer.provider?`${layer.provider} ┬╖ NOAA HRRR guidance`:'NOAA model guidance'},{
+  $('radar-time').value=String(index);$('radar-stamp').textContent=`${clock(f.time,{weekday:'short'})} · loading`;
+  if(!framePlayer.visible)mapMessage('Loading decoded model data…');
+  return framePlayer.show(f,{pane:'weather-model',attribution:layer.model==='ecmwf'?'ECMWF Open Data · CC BY 4.0':layer.provider?`${layer.provider} · NOAA HRRR guidance`:'NOAA model guidance'},{
     loaded:()=>{
       if(token!==modelFrameToken||selectedLayer!==name)return;
       modelIndex=index;
@@ -470,13 +470,13 @@ async function showModelFrame(index){
 }
 function selectLayer(layer){
   selectedLayer=layer;stopRadar();++mapSelectionToken;++modelFrameToken;
-  const freshness=$('model-freshness');if(freshness){freshness.hidden=layer==='radar';freshness.textContent=layer==='radar'?'':'Checking the latest published runΓÇª';freshness.dataset.delayed='false';}
+  const freshness=$('model-freshness');if(freshness){freshness.hidden=layer==='radar';freshness.textContent=layer==='radar'?'':'Checking the latest published run…';freshness.dataset.delayed='false';}
   document.querySelectorAll('[data-layer]').forEach(button=>{const active=button.dataset.layer===layer;button.classList.toggle('selected',active);button.setAttribute('aria-pressed',String(active));});
   if(radarLayer){map?.removeLayer(radarLayer);radarLayer.off();radarLayer=null;}framePlayer?.clear();
   $('radar-map').hidden=false;$('radar-map').style.display='';$('model-map').hidden=true;$('radar-controls').hidden=false;$('radar-controls').style.display='';$('radar-legend').hidden=false;$('radar-legend').style.display='';
   const official=$('model-official-source');if(official)official.hidden=true;
   mapMessage('');if(!map)initMap();map?.invalidateSize();
-  if(layer==='radar'){$('map-source').href='https://radar.weather.gov/';$('map-source').textContent='Official radar Γåù';$('map-caption').textContent='NOAA observed reflectivity ┬╖ past frames only';$('radar-legend').textContent='Observed reflectivity ┬╖ light ΓåÆ strong';configureFrames(frames.length,frameIndex);if(frames.length)showFrame(frameIndex);else void loadRadar();}
+  if(layer==='radar'){$('map-source').href='https://radar.weather.gov/';$('map-source').textContent='Official radar ↗';$('map-caption').textContent='NOAA observed reflectivity · past frames only';$('radar-legend').textContent='Observed reflectivity · light → strong';configureFrames(frames.length,frameIndex);if(frames.length)showFrame(frameIndex);else void loadRadar();}
   else{map?.setView([place.latitude,place.longitude],7,{animate:false});configureFrames(0);void loadModelMap();}
 }
 function showSelectedFrame(index){if(selectedLayer==='radar')showFrame(index);else showModelFrame(index);}
@@ -487,20 +487,20 @@ $('hourly').addEventListener('click',event=>{const button=event.target.closest('
 $('daily').addEventListener('click', (event) => { const button = event.target.closest('[data-day]'); if (button) showDay(Number(button.dataset.day)); });
 $('close-day').addEventListener('click', () => $('day-dialog').close());
 $('day-dialog').addEventListener('click', (e) => { if (e.target === $('day-dialog')) { const r = e.target.getBoundingClientRect(); if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) e.target.close(); } });
-$('expand-briefing').addEventListener('click', () => { const open = $('briefing-detail').hidden; $('briefing-detail').hidden = !open; $('expand-briefing').setAttribute('aria-expanded', String(open)); $('expand-briefing').textContent = open ? 'Less detail Γåù' : 'Read full outlook Γåù'; });
+$('expand-briefing').addEventListener('click', () => { const open = $('briefing-detail').hidden; $('briefing-detail').hidden = !open; $('expand-briefing').setAttribute('aria-expanded', String(open)); $('expand-briefing').textContent = open ? 'Less detail ↗' : 'Read full outlook ↗'; });
 $('basemap').addEventListener('change', setBasemap);
 $('radar-time').addEventListener('input', () => { stopRadar(); showSelectedFrame(Number($('radar-time').value)); });
 $('radar-play').addEventListener('click', () => {
   if (radarTimer) return stopRadar();
   if ((selectedLayer==='radar'?frames:modelFrames).length < 2) return;
-  $('radar-play').textContent = 'Γàí'; $('radar-play').setAttribute('aria-label', 'Pause radar animation');
+  $('radar-play').textContent = 'Ⅱ'; $('radar-play').setAttribute('aria-label', 'Pause radar animation');
   radarTimer = setInterval(() => { const count=(selectedLayer==='radar'?frames:modelFrames).length; const index=selectedLayer==='radar'?frameIndex:modelIndex; if(count&&!framePlayer?.loading)showSelectedFrame((index+1)%count); }, 1600);
 });
 $('fullscreen').addEventListener('click', async () => {
   try { if (document.fullscreenElement) await document.exitFullscreen(); else await $('map-panel').requestFullscreen(); }
   catch { mapMessage('Fullscreen is not supported in this browser. The interactive map remains available here.'); }
 });
-document.addEventListener('fullscreenchange', () => { $('fullscreen').textContent = document.fullscreenElement ? 'Γ¢╢ Collapse' : 'Γ¢╢ Expand'; setTimeout(() => map?.invalidateSize(), 100); });
+document.addEventListener('fullscreenchange', () => { $('fullscreen').textContent = document.fullscreenElement ? '⛶ Collapse' : '⛶ Expand'; setTimeout(() => map?.invalidateSize(), 100); });
 let searchTimer;
 $('city-search').addEventListener('input', () => {
   clearTimeout(searchTimer); const id = ++searchGeneration, q = $('city-search').value.trim();
@@ -533,8 +533,8 @@ function startDeviceLocation({explicit=false}={}){
   $('status').textContent=explicit?'Device location is unavailable. Check browser location permission or search for a city.':'Allow device location to load your local forecast, or search for a city.';
  };
  if(!navigator.geolocation){fallback();return;}
- setDeviceLocationLabel('Getting device locationΓÇª');
- $('status').textContent='Getting your device locationΓÇª';
+ setDeviceLocationLabel('Getting device location…');
+ $('status').textContent='Getting your device location…';
  navigator.geolocation.getCurrentPosition(
   p=>{if(request===locationRequest)chooseLocation({id:'device',name:'Device location',latitude:Number(p.coords.latitude.toFixed(4)),longitude:Number(p.coords.longitude.toFixed(4)),source:'device'},{rememberDevice:true});},
   fallback,
