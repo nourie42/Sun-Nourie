@@ -199,7 +199,7 @@ app.get("/health", (_req, res) => {
     siteResearchRadarLoading: true,
     siteResearchScrollToResults: true,
     siteResearchExpectedGallons: true,
-    siteResearchNotesRemovedFromUi: true,
+    siteNotesRemovedFromUi: true,
     basicGoogleRatingHidden: true,
     basicDevelopmentsHidden: true,
     combinedSiteAndAadtMaps: true,
