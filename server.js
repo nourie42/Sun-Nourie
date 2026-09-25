@@ -16,6 +16,7 @@ import { registerSiteResearchReportEnhancements } from "./src/siteResearchReport
 import { registerFuelAtlasRoutes } from "./src/fuelAtlasRoutes.js";
 import { registerFuelAtlasLocationCompanyBridge } from "./src/fuelAtlasLocationCompanyBridge.js";
 import { registerWeatherFusionRoutes } from "./src/weatherFusion.js";
+import { registerWeatherComparisonRoutes } from "./src/weatherComparison.js";
 import { registerWhatsUpRoutes } from "./src/whatsUpRoutes.js";
 import { registerAiAgentRoutes } from "./src/aiAgent.js";
 import { registerAiCouncilRoutes } from "./src/aiCouncil.js";
@@ -81,6 +82,7 @@ registerSiteEnhancementRoutes(app, {
 });
 registerFuelAtlasLocationCompanyBridge(app);
 registerFuelAtlasRoutes(app, { googleApiKey: process.env.GOOGLE_API_KEY || "" });
+registerWeatherComparisonRoutes(app);
 const weatherFusion = registerWeatherFusionRoutes(app);
 registerWhatsUpRoutes(app, { getForecast: (query) => weatherFusion.getForecast(query) });
 registerAiAgentRoutes(app);
@@ -197,7 +199,7 @@ app.get("/health", (_req, res) => {
     siteResearchRadarLoading: true,
     siteResearchScrollToResults: true,
     siteResearchExpectedGallons: true,
-    siteNotesRemovedFromUi: true,
+    siteResearchNotesRemovedFromUi: true,
     basicGoogleRatingHidden: true,
     basicDevelopmentsHidden: true,
     combinedSiteAndAadtMaps: true,
