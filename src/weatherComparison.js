@@ -84,7 +84,7 @@ export function registerWeatherComparisonRoutes(app,{fetchImpl=globalThis.fetch,
  const fail=(res,e)=>res.set('Cache-Control','no-store').status(e.status||503).json({error:e.message||'Comparison data unavailable.',code:e.code});
  const config=async q=>{const source=q.source==='google'?'google':q.source==='fusion'?'fusion':null;if(!source)throw Object.assign(Error('Choose Fusion or Google.'),{status:400});const coords=q.latitude!==undefined&&q.longitude!==undefined&&Number.isFinite(Number(q.latitude))&&Number.isFinite(Number(q.longitude))&&Math.abs(Number(q.latitude))<=90&&Math.abs(Number(q.longitude))<=180;const point=coords?{id:'selected',name:'Selected location',latitude:Number(q.latitude),longitude:Number(q.longitude)}:googlePoints(await getFeed()).find(p=>p.id===q.location);if(!point)throw Object.assign(Error('Choose a published comparison location.'),{status:404});return {source,point,explicitLocation:coords||q.explicit==='1'};};
  app.get(['/weather-fusion','/weather-fusion/'],async(_req,res,next)=>{
-  try{const html=(await readFile(root+'index.html','utf8')).replace('aria-label="Compare to Nvidia AI Forecast">Compare to Nvidia AI Forecast</a>','aria-label="Password required">Password required</a>');res.set('Cache-Control','no-cache').type('html').send(html);
+  try{const html=await readFile(root+'index.html','utf8');res.set('Cache-Control','no-cache').type('html').send(html);
   }catch(e){next(e);}
  });
  app.get(['/weathernext','/weathernext/','/weather-fusion/weathernext-site.html'],async(req,res)=>{try{
@@ -114,10 +114,10 @@ export function registerWeatherComparisonRoutes(app,{fetchImpl=globalThis.fetch,
  }
  app.get('/api/weather-fusion/compare/google',async(req,res)=>{try{
   const resolved=await resolveForecast(req.query);
-  if(!resolved.feed)return res.set('Cache-Control','no-store').status(401).json({error:'Password required',code:'PASSWORD_REQUIRED'});
+  if(!resolved.feed)return res.set('Cache-Control','no-store').status(409).json({error:'Load a forecast for your selected location.',code:'LOCATION_REQUIRED'});
   res.set('Cache-Control','no-store').json(await forecastFor(resolved));
  }catch(e){fail(res,e);}});
- app.post('/api/weather-fusion/compare/location',access.sameOrigin,access.requireAccess,express.json({limit:'2kb'}),async(req,res)=>{try{
+ app.post('/api/weather-fusion/compare/location',access.sameOrigin,express.json({limit:'2kb'}),async(req,res)=>{try{
   const point=locationPoint(req.body),resolved=await resolveForecast(point);
   if(resolved.feed)return res.set('Cache-Control','no-store').json(await forecastFor(resolved));
   if(!provider.configured)throw Object.assign(Error('Private location lookups are awaiting Google Cloud setup by the site owner.'),{status:503,code:'SETUP_REQUIRED'});
