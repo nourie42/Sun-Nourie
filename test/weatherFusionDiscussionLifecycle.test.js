@@ -100,6 +100,7 @@ for(const emptyReview of [false,true])test(emptyReview?'full service: successful
  assert.equal(b.forecastChanges.length,1);assert.equal(aiCalls,1);
  time+=11*M;
  const next=await service.getForecast({location:'knightdale'});assert.notEqual(next.signature,first.signature);assert.ok(next.danTake);
+ assert.equal(next.danSummary,b.danSummary,'same-discussion AI summary survives the numeric forecast refresh');
  assert.equal(visibleDanTakeItems(next.danTake,next,time).length,1);
  const fallback=await service.getBriefing({location:'knightdale',signature:next.signature});
  if(emptyReview){assert.equal(fallback.mode,'ai');assert.deepEqual(fallback.forecastChanges,[]);assert.equal(fallback.danTake,null);time+=2*M;const fresh=await service.getForecast({location:'knightdale'});assert.equal(fresh.danTake,null);assert.equal(aiCalls,2);}else{assert.equal(fallback.mode,'nws-summary');assert.match(fallback.reason,/limit/);assert.ok(fallback.danTake);assert.equal(aiCalls,1);}

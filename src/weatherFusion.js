@@ -393,6 +393,9 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
   const cache = new Cache(350, now), forecastCache = new Cache(100, now), aiCache = new Cache(100, now);
   const failureCooldown = new Map();
   const approvedTakes = new Map();
+  const approvedSummaries=new Map();
+  const summaryKey=data=>hash({location:data.location,discussion:data.discussion,date:dateKey(now(),data.location.timeZone)});
+  function retainedSummary(data){const saved=approvedSummaries.get(summaryKey(data));return saved&&now()-Date.parse(saved.danSummaryGeneratedAt)<6*HOUR?saved:{};}
   const takeKey=data=>`${data?.location?.latitude},${data?.location?.longitude}`;
   function retainedTake(data){return rebindDanTake(approvedTakes.get(takeKey(data)),data,now());}
   function rememberTake(data,briefing){
@@ -415,7 +418,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
     if(revalidate)headers['Cache-Control']='no-cache';
     if (body) { headers['Content-Type'] = 'application/json'; headers.Authorization = `Bearer ${env.OPENAI_API_KEY}`; }
     const response = await fetchImpl(url, { headers, method: body ? 'POST' : 'GET', body: body ? JSON.stringify(body) : undefined, redirect: 'error', signal: AbortSignal.timeout(timeout) });
-    if (!response.ok) { const error = errorWithStatus(`Source returned HTTP ${response.status}.`, 502); if (u.hostname === 'api.openai.com') { error.aiDiagnostic = `AI_PROVIDER_HTTP_${response.status}`; try { const detail = await response.json(); const parameter = detail.error?.param; if (typeof parameter === 'string' && /^[a-zA-Z0-9_.-]{1,60}$/.test(parameter)) error.aiDiagnostic += '_' + parameter; } catch {} } throw error; }
+    if (!response.ok) { const error = errorWithStatus(`Source returned HTTP ${response.status}.`, 502); if (u.hostname === 'api.openai.com') { error.aiDiagnostic = `AI_PROVIDER_HTTP_${response.status}`; try { const detail = await response.json(); const code=detail.error?.code;if(['insufficient_quota','rate_limit_exceeded','billing_hard_limit_reached'].includes(code))error.aiDiagnostic+='_'+code; const parameter = detail.error?.param; if (typeof parameter === 'string' && /^[a-zA-Z0-9_.-]{1,60}$/.test(parameter)) error.aiDiagnostic += '_' + parameter; } catch {} } throw error; }
     const size = Number(response.headers.get('content-length') || 0);
     if (size > 2500000) throw errorWithStatus('Source payload exceeded the safety limit.', 502);
     const raw = await response.text();
@@ -502,7 +505,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
       result.directModelStatus = result.modelContributions.length === 3 ? 'ready' : 'partial';
       return result;
     });
-    return {...snapshot,danTake:retainedTake(snapshot)};
+    return {...snapshot,danTake:retainedTake(snapshot),...retainedSummary(snapshot)};
   }
   function fallback(data, reason) {
     const evening = isTonightPeriod(now(),data.location.timeZone);
@@ -510,7 +513,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
     return { mode: 'nws-summary', signature: data.signature, generatedAt: iso(now()), reason,
       headline: evening ? 'Your evening outlook' : data.days[0]?.condition || 'Forecast update', summary: currentStory.summary,
       nearTerm: forecastPeriodSummary(data,0,'overnight',now()).summary, extended: forecastPeriodSummary(data,1,'overall',now()).summary,
-      uncertainty: '', ...approveDanTake([],data,now()), danTake:retainedTake(data), sources: [...(data.discussion ? ['nws','afd'] : ['nws']),...(data.modelContributions||[]).map(model=>model.id)] };
+      uncertainty: '', ...approveDanTake([],data,now()), danTake:retainedTake(data), ...retainedSummary(data), sources: [...(data.discussion ? ['nws','afd'] : ['nws']),...(data.modelContributions||[]).map(model=>model.id)] };
   }
   async function getBriefing(query) {
     const data = await getForecast(query);
@@ -521,7 +524,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
     const previousFailure = failureCooldown.get(key);
     if (previousFailure?.until > now()) return { ...fallback(data, 'AI is cooling down after an unavailable response; official guidance is shown.'), diagnostic: previousFailure.diagnostic, retryAfter: iso(previousFailure.until) };
     const takeEvidence=collectDanTakeEvidence(data,now());
-    const briefingKey=`dashboard-v2:${DAN_TAKE_VERSION}:${data.signature}:${dateKey(now(),data.location.timeZone)}`;
+    const briefingKey=`dan-visible-v1:${DAN_TAKE_VERSION}:${data.signature}:${dateKey(now(),data.location.timeZone)}`;
     const briefing = await aiCache.get(briefingKey, 30 * MINUTE, async () => {
       const day = new Date(now()).toISOString().slice(0, 10);
       if (aiBudget.day !== day) aiBudget = { day, count: 0 };
@@ -551,11 +554,15 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
         if (fields.some((k) => typeof content[k] !== 'string' || !content[k].trim() || content[k].length > 1600)) throw Object.assign(new Error('AI prose structure failed validation.'), { aiDiagnostic: 'AI_PROSE_STRUCTURE' });
         if (fields.some((k) => hasUngroundedNumbers(content[k], facts))) throw Object.assign(new Error('AI numerical prose failed validation.'), { aiDiagnostic: 'AI_PROSE_CONTAINS_NONCLOCK_DIGITS' });
         if (fields.some(k=>/\b(deterministic|HRRR|ECMWF|NBM|CAPE|QPF|synoptic|advection|guidance|Weather Fusion)\b/i.test(content[k]))) throw Object.assign(new Error('Outlook needs plain language.'),{aiDiagnostic:'AI_PROSE_JARGON'});
+        if(/\b(aviation|TAFs?|VFR|MVFR|IFR|LIFR|pilots?|runways?|flight conditions)\b/i.test(content.danSummary))throw Object.assign(new Error('Dan summary must exclude aviation.'),{aiDiagnostic:'AI_PROSE_AVIATION'});
         if (!Array.isArray(content.sources) || !['nws', 'afd', ...data.modelContributions.map(m=>m.id)].every((id) => content.sources.includes(id)) || content.sources.some((id) => !data.feeds.some((f) => f.id === id && f.status === 'ready'))) throw Object.assign(new Error('AI source attribution failed validation.'), { aiDiagnostic: 'AI_SOURCE_ATTRIBUTION' });
         if (/\b(all clear|no (?:active )?(?:warnings|severe weather)|guaranteed|perfectly safe)\b/i.test(fields.map((k) => content[k]).join(' '))) throw Object.assign(new Error('AI safety wording failed validation.'), { aiDiagnostic: 'AI_SAFETY_WORDING' });
         for (const k of fields) content[k] = normalizeClockTimes(content[k]);
         const take=approveDanTake(content.forecastChanges,data,now());
-        if(take.danTakeReview.proposedCount>take.danTakeReview.approvedCount)throw Object.assign(new Error('Dan\'s Take needs simpler, source-supported wording.'),{aiDiagnostic:'AI_DAN_TAKE_PLAIN_LANGUAGE'});
+        // Rejected uncertainty items are already omitted by approveDanTake.
+        // They must not discard an independently validated discussion summary.
+        if(approvedSummaries.size>=100)approvedSummaries.delete(approvedSummaries.keys().next().value);
+        approvedSummaries.set(summaryKey(data),{danSummary:content.danSummary,danSummaryGeneratedAt:iso(now())});
         rememberTake(data,{...take,mode:'ai',signature:data.signature,generatedAt:iso(now()),model:env.WEATHER_FUSION_AI_MODEL||'gpt-5-mini'});
         return { ...content, ...take, uncertainty:danTakeText(take.forecastChanges), mode: 'ai', signature: data.signature, generatedAt: iso(now()), model: env.WEATHER_FUSION_AI_MODEL || 'gpt-5-mini' };
       } catch (error) {
@@ -686,7 +693,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     res.sendFile(path.join(PUBLIC_DIR,'weathernext-site.html'));
   });
   for (const name of [
-    'weather-changes.js','air-quality.js','alert-banners.js','app.js','bulletin-facts.js','bulletins.js','car-wash.js','car-wash.css','car-wash-background.webp','car-wash-corvette-hood.webp',
+    'request-deadline.js','weather-changes.js','air-quality.js','alert-banners.js','app.js','bulletin-facts.js','bulletins.js','car-wash.js','car-wash.css','car-wash-background.webp','car-wash-corvette-hood.webp',
     'model-explanation.js','model-explanation.css','weathernext-site.html','weathernext-site.css','weathernext-site.js','weathernext-data.js','weathernext-catalog.json',
     'comfort-cinematic.css','comfort-effects.css','comfort-outlook.js','current-inputs.js','current-temperature.js',
     'daily-uv.js','dans-summary.js','dans-take.js','day-graph.js','dewpoint-meter.js','dewpoint-meter.css',
