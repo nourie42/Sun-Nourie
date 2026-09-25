@@ -38,8 +38,7 @@ export function danTakeDisplay(briefing,forecast,now=Date.now()){
  const summary=briefing?.signature===forecast?.signature&&typeof briefing?.danSummary==='string'?briefing.danSummary.trim():'';
  if(summary)return summary+(card.text?'\n\n'+card.text:'');
  const overview=danOverview(null,forecast,now);
- const status=!forecast?'Preparing Dan’s Take.':briefing?.mode==='nws-summary'&&forecast.aiConfigured?'NWS summary — AI summary is temporarily unavailable.':'NWS summary — not AI-generated.';
- return status+'\n'+overview.text+(card.text?'\n\n'+card.text:'');
+ return overview.text+(card.text?'\n\n'+card.text:'');
 }
 export function danCard(briefing,forecast,now=Date.now()){
  const items=[],parts=[];

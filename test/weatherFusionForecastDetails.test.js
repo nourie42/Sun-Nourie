@@ -39,7 +39,7 @@ test('exactly one Dan take heading stays below daily graphic and ahead of hourly
 test('NWS fallback shows only a short explicit possible change',()=>{
  const {elements,render}=harness();
  render({mode:'nws-summary',summary:'Warm with a chance of rain.',uncertainty:'Forecasts can change, especially the timing of showers.'});
- assert.match(elements['today-uncertainty-text'].textContent,/front timing remains uncertain/);assert.match(elements['today-uncertainty-text'].textContent,/NWS summary/);assert.equal(elements['today-uncertainty'].hidden,false);
+ assert.match(elements['today-uncertainty-text'].textContent,/front timing remains uncertain/);assert.doesNotMatch(elements['today-uncertainty-text'].textContent,/NWS summary/);assert.equal(elements['today-uncertainty'].hidden,false);
  assert.ok(!elements['briefing-detail'].innerHTML.includes('data-dans-take'));
  assert.equal(elements['briefing-summary'].textContent,'Warm with a chance of rain.');
 });
