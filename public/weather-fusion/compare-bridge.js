@@ -12,6 +12,11 @@ export function installComparisonPane(config,actions){
   if($('hero-uv'))$('hero-uv').textContent='UV index · not supplied by Google';
   if($('ai-label'))$('ai-label').textContent='GOOGLE-BASED OUTLOOK';
   if($('briefing-stamp'))$('briefing-stamp').textContent='Weather Nourie summary of the Google forecast, not a Google-issued narrative';
+  for(const button of document.querySelectorAll('#hourly [data-comfort-time]')){
+   const time=button.dataset.comfortTime==='now'?data.current.time:button.dataset.comfortTime;
+   const row=data.hours.find(h=>Date.parse(h.time)===Date.parse(time)),rain=button.querySelector('.hour-rain');
+   if(rain){rain.title='Google mean precipitation amount for this hour, not rain probability or observed radar.';rain.innerHTML=`<small class="hour-pop">${typeof row?.precipitation==='number'?row.precipitation.toFixed(2)+' in':'— in'}</small>`;}
+  }
   addNotice('nws-bulletins','Official alerts are not a Google forecast product','Google WeatherNext does not provide official warnings. Check the main Fusion page or the official NWS link above.');
   addNotice('air-quality','Air quality · not supplied by Google','This Google feed has no AQI values. Nothing from another provider is inserted into this panel.');
   addNotice('map-panel','Live radar · not supplied by Google','WeatherNext forecasts are not observed radar. Your normal live radar remains on the Fusion side; Google’s full model data remain in the separate explorer.');
@@ -23,16 +28,16 @@ export function installComparisonPane(config,actions){
  window.addEventListener('message',e=>{
   if(e.origin!==location.origin||e.source!==parent||!e.data)return;const m=e.data;
   if(m.type==='compare:refresh'){actions.refresh();return;}
-  suppress=Date.now()+500;
+  suppress=performance.now()+500;
   if(m.type==='compare:scroll'&&sections.includes(m.section)){const el=$(m.section);if(!el)return;const progress=Math.max(0,Math.min(1,Number(m.progress)||0)),i=sections.indexOf(m.section),next=sections.slice(i+1).map($).find(n=>n&&n.getBoundingClientRect().height>0);const top=el.getBoundingClientRect().top+scrollY,end=next?next.getBoundingClientRect().top+scrollY:document.documentElement.scrollHeight;scrollTo({top:Math.max(0,top-14+progress*Math.max(0,end-top)),behavior:'instant'});}
   if(m.type==='compare:hour'&&(m.time==='now'||actions.getForecast()?.hours?.some(h=>Date.parse(h.time)===Date.parse(m.time))))actions.selectHour(m.time);
   if(m.type==='compare:day'){const index=actions.getForecast()?.days?.findIndex(d=>d.date===m.date);if(index>=0)actions.showDay(index);}
   if(m.type==='compare:metric'&&typeof m.key==='string'&&/^[a-z]+$/.test(m.key))document.querySelector(`[data-metric="${m.key}"]`)?.click();
   if(m.type==='compare:close')document.querySelectorAll('dialog[open]').forEach(d=>d.close());
  });
- window.addEventListener('scroll',()=>{if(Date.now()<suppress)return;clearTimeout(scrollTimer);scrollTimer=setTimeout(()=>{if(Date.now()<suppress)return;let id=sections[0];for(const s of sections){const el=$(s);if(el&&el.getBoundingClientRect().height>0&&el.getBoundingClientRect().top<=35)id=s;}const el=$(id),i=sections.indexOf(id),next=sections.slice(i+1).map($).find(n=>n&&n.getBoundingClientRect().height>0);if(!el)return;const top=el.getBoundingClientRect().top+scrollY,end=next?next.getBoundingClientRect().top+scrollY:document.documentElement.scrollHeight;post({type:'compare:scroll',section:id,progress:Math.max(0,Math.min(1,(scrollY+14-top)/Math.max(1,end-top)))});},90);},{passive:true});
- document.addEventListener('click',e=>{if(Date.now()<suppress)return;const h=e.target.closest('[data-comfort-time]');if(h)post({type:'compare:hour',time:h.dataset.comfortTime});const b=e.target.closest('[data-day],[data-today-forecast]');if(b){const d=actions.getForecast()?.days?.[Number(b.dataset.day||0)];if(d)post({type:'compare:day',date:d.date});}const metric=e.target.closest('[data-metric]');if(metric)post({type:'compare:metric',key:metric.dataset.metric});});
- document.querySelectorAll('dialog').forEach(d=>d.addEventListener('close',()=>{if(Date.now()>=suppress)post({type:'compare:close'});}));
+ window.addEventListener('scroll',()=>{if(performance.now()<suppress)return;clearTimeout(scrollTimer);scrollTimer=setTimeout(()=>{if(performance.now()<suppress)return;let id=sections[0];for(const s of sections){const el=$(s);if(el&&el.getBoundingClientRect().height>0&&el.getBoundingClientRect().top<=35)id=s;}const el=$(id),i=sections.indexOf(id),next=sections.slice(i+1).map($).find(n=>n&&n.getBoundingClientRect().height>0);if(!el)return;const top=el.getBoundingClientRect().top+scrollY,end=next?next.getBoundingClientRect().top+scrollY:document.documentElement.scrollHeight;post({type:'compare:scroll',section:id,progress:Math.max(0,Math.min(1,(scrollY+14-top)/Math.max(1,end-top)))});},90);},{passive:true});
+ document.addEventListener('click',e=>{if(performance.now()<suppress)return;const h=e.target.closest('[data-comfort-time]');if(h)post({type:'compare:hour',time:h.dataset.comfortTime});const b=e.target.closest('[data-day],[data-today-forecast]');if(b){const d=actions.getForecast()?.days?.[Number(b.dataset.day||0)];if(d)post({type:'compare:day',date:d.date});}const metric=e.target.closest('[data-metric]');if(metric)post({type:'compare:metric',key:metric.dataset.metric});});
+ document.querySelectorAll('dialog').forEach(d=>d.addEventListener('close',()=>{if(performance.now()>=suppress)post({type:'compare:close'});}));
  new MutationObserver(()=>{const text=$('status')?.textContent||'';if(/Weather update failed|display component failed/i.test(text))post({type:'compare:error',message:text});}).observe($('status'),{childList:true,subtree:true,characterData:true});
  return {rendered};
 }
