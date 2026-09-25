@@ -39,7 +39,7 @@ test('main and experimental URLs are served by one shared app shell',()=>{
   const headers = {},sent = [];
   handler({}, {setHeader:(name,value)=>{headers[name]=value;},sendFile:file=>sent.push(file)});
   assert.equal(sent.length,1);
-  assert.match(sent[0],/public\/weather-fusion\/index\.html$/);
+  assert.match(sent[0].split(String.fromCharCode(92)).join('/'),/public\/weather-fusion\/index\.html$/);
   assert.equal(headers['Cache-Control'],'no-cache');
   assert.match(html,/href="\/weather-fusion\/experimental-weather\.html" aria-label="Open Experimental Weather"/);
 });
