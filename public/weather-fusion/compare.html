@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en" data-build="compare-v1-20260925">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#14233f">
+<title>Your forecast vs Google · Weather Nourie</title>
+<link rel="stylesheet" href="/weather-fusion/style.css?v=experimental-whats-up-v1"><link rel="stylesheet" href="/weather-fusion/weather-polish.css?v=flat-nav-v1"><link rel="stylesheet" href="/weather-fusion/compare.css?v=compare-v1-20260925">
+<script type="module" src="/weather-fusion/compare.js?v=compare-v1-20260925"></script>
+</head>
+<body class="weather-comparison" data-sky="day">
+<a class="skip-link" href="#compare-controls">Skip to comparison controls</a>
+<div class="atmosphere" aria-hidden="true"><div class="sky-glow"></div><div class="cloud cloud-one"></div><div class="cloud cloud-two"></div><div class="stars"></div></div>
+<div class="compare-shell">
+<header class="topbar"><a class="brand" href="/weather-fusion/"><span class="brand-sun" aria-hidden="true">◒</span><span>Weather <b>Nourie</b><small>YOUR FORECAST · GOOGLE FORECAST</small></span></a><a class="compare-back" href="/weather-fusion/">← Main weather</a></header>
+<main>
+<section id="compare-controls" class="compare-controls glass" aria-label="Forecast comparison controls">
+<div class="compare-topline"><div><h1>The same view. Two forecasts.</h1><p>Your familiar Today screen, hourly outlook and image tiles.</p></div><button id="compare-refresh" type="button">↻ Refresh both</button></div>
+<div class="compare-location"><label for="compare-location">Compare at</label><select id="compare-location" disabled><option>Loading published Google locations…</option></select><span id="compare-coordinates"></span></div>
+<div class="compare-switch" role="group" aria-label="Choose comparison layout"><button data-view="fusion" type="button" aria-pressed="true">Your forecast</button><button data-view="google" type="button" aria-pressed="false">Google forecast</button><button data-view="both" type="button" aria-pressed="false">Side by side</button></div>
+<div class="compare-options"><label><input type="checkbox" id="compare-sync" checked> Keep scrolling and selections together</label><span id="compare-view-note">Switch tabs without losing your place.</span></div>
+<nav class="compare-jumps" aria-label="Compare a weather section"><button data-section="today-forecast">Today</button><button data-section="hourly">Hourly</button><button data-section="daily-panel">7-Day</button><button data-section="skin-exposure">Feels like</button><button data-section="metrics">Your Day</button></nav>
+<p id="compare-status" role="status" aria-live="polite">Loading Google’s published locations…</p>
+</section>
+<section class="compare-match glass" aria-label="Same-hour forecast comparison" hidden>
+<div class="compare-match-head"><h2>Same-hour comparison</h2><label for="compare-hour">Forecast hour <select id="compare-hour"></select></label></div>
+<div id="compare-differences" class="compare-differences"></div>
+<p>Both forecasts use the selected point and exact forecast hour. Differences are not accuracy scores. The original Fusion hero may show an observation; the Google hero is a model forecast.</p>
+</section>
+<div class="compare-frames" data-view="fusion" hidden>
+<section class="compare-column" data-source="fusion"><div class="compare-column-title"><h2>Your Weather Fusion</h2><span>Your existing forecast blend</span></div><iframe id="fusion-frame" title="Your Weather Fusion forecast with original image tiles" loading="eager"></iframe></section>
+<section class="compare-column" data-source="google"><div class="compare-column-title"><h2>Google WeatherNext</h2><span>Google-only weather inputs · same layout</span></div><iframe id="google-frame" title="Google WeatherNext forecast using the same Weather Nourie layout and image tiles" loading="eager"></iframe></section>
+</div>
+<p class="compare-footnote">Both sides use the same selected published Google point; the Google feed does not yet cover every searched address. Missing Google rain probabilities, UV, air quality, gusts and radar are labeled—not replaced with another provider. Feels-like, humidity, clothing and pavement are your site’s derived estimates using that side’s inputs. <a href="https://www.weather.gov/" target="_blank" rel="noopener noreferrer">Official warnings ↗</a> · <a href="/weathernext/">Full Google data explorer ↗</a></p>
+</main></div></body></html>
