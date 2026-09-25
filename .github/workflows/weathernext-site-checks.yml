@@ -45,11 +45,11 @@ jobs:
           for attempt in $(seq 1 90); do
             main="$(curl -fsSL --max-time 20 "$LIVE_URL/weather-fusion/?deploy=$GITHUB_SHA&n=$attempt" 2>/dev/null || true)"
             wn="$(curl -fsSL --max-time 20 "$LIVE_URL/weathernext/?deploy=$GITHUB_SHA&n=$attempt" 2>/dev/null || true)"
-            css="$(curl -fsSL --max-time 20 "$LIVE_URL/weather-fusion/weather-polish.css?v=flat-nav-v1&n=$attempt" 2>/dev/null || true)"
-            if printf '%s' "$main" | grep -Fq 'weather-polish.css?v=flat-nav-v1' \
+            css="$(curl -fsSL --max-time 20 "$LIVE_URL/weather-fusion/weather-polish.css?v=mobile-repair-v1&n=$attempt" 2>/dev/null || true)"
+            if printf '%s' "$main" | grep -Fq 'weather-polish.css?v=mobile-repair-v1' \
               && ! printf '%s' "$main" | grep -Fq 'jump-visual' \
               && printf '%s' "$main" | grep -Fq 'id="weathernext-site-link" href="/weathernext/"' \
-              && printf '%s' "$wn" | grep -Fq 'WeatherNext Forecast' \
+              && printf '%s' "$wn" | grep -Fq 'data-build="wn-repair-20260925"' \
               && printf '%s' "$wn" | grep -Fq 'Everything Google publishes for forecasting' \
               && printf '%s' "$css" | grep -Fq 'grid-template-columns:repeat(5,minmax(0,1fr))' \
               && printf '%s' "$css" | grep -Fq 'border:0'; then
