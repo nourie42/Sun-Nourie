@@ -9,7 +9,7 @@ import {timeAt} from '../public/weather-fusion/hourly-feels.js';
 import {GOOGLE_FEED,HOUR,finite,googlePoints,selectGoogleForecast,skyDescription} from './weatherComparisonData.js';
 import {ensembleConfidence,fetchComparisonCompanions,addComparisonCompanions} from './weatherComparisonCompanions.js';
 const root=fileURLToPath(new URL('../public/weather-fusion/',import.meta.url));
-const version='compare-v2-20260925';
+const version='mobile-repair-v1';
 const mean=a=>{const v=a.filter(finite);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null;};
 const extreme=(a,fn)=>{const v=a.filter(finite);return v.length?fn(...v):null;};
 const round=v=>finite(v)?Math.round(v*10)/10:null;
@@ -57,11 +57,12 @@ function replaceOnce(text,needle,value){if(!text.includes(needle))throw Error('S
 export function comparisonApp(original,config){
  let s=original.replaceAll("from './","from '/weather-fusion/");
  s=`import {installComparisonPane} from '/weather-fusion/compare-bridge.js?v=${version}';\nconst COMPARE=${JSON.stringify(config)};\n`+s;
- s=replaceOnce(s,"async function api(path, params = '', signal) {","async function api(path, params = '', signal) {\n  if(COMPARE.source==='google'&&path!=='forecast')throw Object.assign(new Error('Not supplied by Google WeatherNext.'),{status:503});");
- s=replaceOnce(s,'`/api/weather-fusion/${path}${params ?',"`${COMPARE.source==='google'?'/api/weather-fusion/compare/google':'/api/weather-fusion/'+path}${params ?");
+ s=replaceOnce(s,"async function api(path, params = '', signal) {","async function api(path, params = '', signal) {\n  if(COMPARE.source==='google'&&!['forecast','search'].includes(path))throw Object.assign(new Error('Not supplied by Google WeatherNext.'),{status:503});");
+ s=replaceOnce(s,'`/api/weather-fusion/${path}${params ?',"`${COMPARE.source==='google'&&path==='forecast'?'/api/weather-fusion/compare/google':'/api/weather-fusion/'+path}${params ?");
  s=replaceOnce(s,'data.rainTrend=updateRainTrend(data,Date.now());',"data.rainTrend=COMPARE.source==='google'?null:updateRainTrend(data,Date.now());");
+ s=replaceOnce(s,"$('status').classList.add('error');","if(COMPARE.source==='google'&&e.status===404)$('status').textContent='WeatherNext is not yet connected for this location. Use Back to Dan’s Weather for your local forecast.';\n    $('status').classList.add('error');");
  s=replaceOnce(s,"$('status').classList.toggle('error', unavailable.length > 0 || failedPanels.length > 0);","$('status').classList.toggle('error', unavailable.length > 0 || failedPanels.length > 0);\n  compareBridge.rendered(data);");
- s=replaceOnce(s,'installExperience();\nstartDeviceLocation();',"const compareBridge=installComparisonPane(COMPARE,{selectHour:selectComfortHour,showDay,refresh:()=>load(),getForecast:()=>forecast});\ninstallExperience();\nchooseLocation({...COMPARE.point,source:'comparison'});");
+ s=replaceOnce(s,'installExperience();\nstartDeviceLocation();',"const compareBridge=installComparisonPane(COMPARE,{selectHour:selectComfortHour,showDay,refresh:()=>load(),getForecast:()=>forecast});\ninstallExperience();\nif(COMPARE.explicitLocation)chooseLocation({...COMPARE.point,source:'comparison'});else startDeviceLocation();");
  return s;
 }
 export function registerWeatherComparisonRoutes(app,{fetchImpl=globalThis.fetch,now=Date.now,feedProvider,companionProvider}={}){
@@ -73,7 +74,7 @@ export function registerWeatherComparisonRoutes(app,{fetchImpl=globalThis.fetch,
   const data=await r.json();googlePoints(data);return data;
  });
  const fail=(res,e)=>res.status(e.status||503).json({error:e.message||'Comparison data unavailable.'});
- const config=async q=>{const source=q.source==='google'?'google':q.source==='fusion'?'fusion':null;if(!source)throw Object.assign(Error('Choose Fusion or Google.'),{status:400});const point=googlePoints(await getFeed()).find(p=>p.id===q.location);if(!point)throw Object.assign(Error('Choose a published comparison location.'),{status:404});return {source,point};};
+ const config=async q=>{const source=q.source==='google'?'google':q.source==='fusion'?'fusion':null;if(!source)throw Object.assign(Error('Choose Fusion or Google.'),{status:400});const coords=q.latitude!==undefined&&q.longitude!==undefined&&Number.isFinite(Number(q.latitude))&&Number.isFinite(Number(q.longitude))&&Math.abs(Number(q.latitude))<=90&&Math.abs(Number(q.longitude))<=180;const point=coords?{id:'selected',name:'Selected location',latitude:Number(q.latitude),longitude:Number(q.longitude)}:googlePoints(await getFeed()).find(p=>p.id===q.location);if(!point)throw Object.assign(Error('Choose a published comparison location.'),{status:404});return {source,point,explicitLocation:coords||q.explicit==='1'};};
  app.get(['/weather-fusion','/weather-fusion/'],async(_req,res,next)=>{
   try{const html=await readFile(root+'index.html','utf8');res.set('Cache-Control','no-cache').type('html').send(html);
   }catch(e){next(e);}
@@ -81,11 +82,11 @@ export function registerWeatherComparisonRoutes(app,{fetchImpl=globalThis.fetch,
  app.get(['/weathernext','/weathernext/','/weather-fusion/weathernext-site.html'],async(req,res)=>{try{
   const points=googlePoints(await getFeed()),point=points.find(p=>p.id===req.query.location)||points[0];
   let html=await readFile(root+'index.html','utf8');
-  html=html.replace(/<script type="module" src="\/weather-fusion\/app\.js[^"]*"><\/script>/, '<script type="module" src="/weather-fusion/compare/app.js?source=google&amp;location='+encodeURIComponent(point.id)+'"></script>');
+  html=html.replace(/<script type="module" src="\/weather-fusion\/app\.js[^"]*"><\/script>/, '<script type="module" src="/weather-fusion/compare/app.js?source=google&amp;location='+encodeURIComponent(point.id)+(req.query.location?'&amp;explicit=1':'')+(req.query.latitude!==undefined&&req.query.longitude!==undefined?'&amp;latitude='+encodeURIComponent(req.query.latitude)+'&amp;longitude='+encodeURIComponent(req.query.longitude):'')+'"></script>');
   html=html.replace('Because Apple, Google and Samsung weather suck','Your local weather, clearly explained').replace('<title>Weather Nourie</title>','<title>Experimental NVIDIA AI Weather</title>');
-  html=html.replace('</head>','<link rel="stylesheet" href="/weather-fusion/compare.css?v=dashboard-v3"></head>').replace('<body data-sky="day">','<body data-sky="day" class="google-pane weathernext-dashboard">');
-  html=html.replace('<main id="forecast">','<h1 class="weathernext-heading">Experimental NVIDIA AI Weather</h1><p class="weathernext-source">Experimental model forecast · UV and AQI from supplemental feeds</p><main id="forecast">');
-  html=html.replace('<div class="location-bar">','<div class="weathernext-locations"><label>Forecast location <select onchange="location.href=\'/weathernext/?location=\'+encodeURIComponent(this.value)">'+points.map(p=>'<option value="'+p.id+'"'+(p.id===point.id?' selected':'')+'>'+p.name+'</option>').join('')+'</select></label></div><div class="location-bar">');
+  html=html.replace('</head>','<link rel="stylesheet" href="/weather-fusion/compare.css?v=mobile-repair-v1"></head>').replace('<body data-sky="day">','<body data-sky="day" class="google-pane weathernext-dashboard">');
+  html=html.replace('<main id="forecast">','<h1 class="weathernext-heading">Experimental NVIDIA AI Weather</h1><main id="forecast">');
+  html=html.replace('<a class="forecast-compare-banner" href="/weathernext/" aria-label="Compare to Nvidia AI Forecast">Compare to Nvidia AI Forecast</a>','<a class="forecast-compare-banner" href="/weather-fusion/">Back to Dan’s Weather</a>');
   res.set('Cache-Control','no-cache').type('html').send(html);
  }catch(e){fail(res,e);}});
  app.get(['/weather-fusion/compare','/weather-fusion/compare/','/weather-fusion/compare.html'],(req,res)=>res.set('Cache-Control','no-cache').redirect(302,'/weathernext/'+(typeof req.query.location==='string'?'?location='+encodeURIComponent(req.query.location):'')));

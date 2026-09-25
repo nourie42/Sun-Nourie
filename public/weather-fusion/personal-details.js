@@ -10,7 +10,7 @@ const HOUR=3600000;
 function ensureCinematicComfortStyles(){
  if(typeof document==='undefined'||document.getElementById('weather-nourie-cinematic-comfort'))return;
  const link=document.createElement('link');
- link.id='weather-nourie-cinematic-comfort';link.rel='stylesheet';link.href='/weather-fusion/comfort-cinematic.css?v=pet-static-shake-v29';
+ link.id='weather-nourie-cinematic-comfort';link.rel='stylesheet';link.href='/weather-fusion/comfort-cinematic.css?v=mobile-repair-v1';
  document.head.append(link);
 }
 export const pressureMb=value=>finite(value)?value*33.86389:null;

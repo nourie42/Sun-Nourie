@@ -99,7 +99,7 @@
 @media(max-width:540px){#skin-values .sun-shade-comparison .exposure-person[data-reading="unavailable"]>figcaption>strong{font-size:clamp(10px,2.9vw,15px)}}
 @media(max-width:540px){
  #skin-values .sun-shade-comparison .exposure-person,
- #skin-values .sun-shade-comparison .exposure-person:has(.reference-scene){grid-template-rows:28px 40px 22px auto 72px}
+ #skin-values .sun-shade-comparison .exposure-person:has(.reference-scene){grid-template-rows:28px 40px 22px auto minmax(100px,auto);aspect-ratio:auto}
  #skin-values .sun-shade-comparison .exposure-person>.exposure-alert-slot{top:auto;left:auto;right:auto;padding:0 2px}
  #skin-values .sun-shade-comparison .exposure-person>svg,
  #skin-values .sun-shade-comparison .pavement-person>.poodle-scene{grid-row:4}

@@ -1,11 +1,11 @@
-import {confidenceNotice,todayForecastHTML} from './today-card.js?v=dashboard-v2';
+import {confidenceNotice,todayForecastHTML} from './today-card.js?v=mobile-repair-v1';
 import {FORECAST_CONFIDENCE_VERSION} from './forecast-confidence.js?v=weather-art-labels-v10';
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
 import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=wardrobe-v1';
 import {weatherState} from './weather-state.js';
 import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=feels-floor-wind-v1';
 import {degrees,displayedFeelsAt,dailyFeels,forecastValue,timeAt,peakFeelsHTML,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=dewpoint-floor-v1';
-import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=wardrobe-v1';
+import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=mobile-repair-v1';
 import {comfortMode,comfortWindow,comfortNarrative,warmestTodayWindow} from './comfort-outlook.js?v=feels-floor-wind-v1';
 import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js?v=full-day-rain-v1';
 import {displayedRainChance} from './rain-display.js?v=rain-observed-v1';
@@ -145,7 +145,7 @@ export function renderDailyRows(forecast,icon) {
   const confidenceAria=plainConfidenceNotice?` ${plainConfidenceNotice.title}. ${plainConfidenceNotice.text}`:'';
   return `<button class="day-row ${p.tonight?'tonight-row':''}" data-day="${i}" aria-label="${esc(p.label)}, ${esc(rain.observed?'Rain now':p.condition)}. ${rain.observed?'Rain is observed now at this location.':finite(shownPop)?`Rain chance ${number(shownPop)} percent.`:'Rain chance unavailable.'} ${p.primaryLabel} ${number(p.primary)} degrees${finite(p.secondary)?`, low ${number(p.secondary)} degrees`:''}. ${esc(wind.text)}${gusty?`, gust ${wind.gust} mph`:''}. Forecast confidence ${esc(confidence.label)}.${esc(confidenceAria)} Open details.">
    <span class="day-name" title="${esc(p.label)}"><span class="day-name-full">${esc(p.label)}</span><span class="day-name-mobile">${esc(p.remainder?'Today':p.label)}</span></span>
-   <span class="day-icon">${icon(rain.observed?'Rain':p.condition,!p.tonight)}<small>${finite(shownPop)?`${number(shownPop)}%`:''}</small></span>
+   <span class="day-icon">${icon(rain.observed?'Rain':p.condition,!p.tonight)}<small title="${finite(shownPop)?'Rain chance':'Rain probability is not published by this forecast feed'}">${finite(shownPop)?`${number(shownPop)}%`:'Rain —'}</small></span>
    <span class="day-low">${temp(low)}<small>Low</small></span>
    <span class="temp-track" aria-hidden="true">${bar===null?'':`<span class="temp-fill" style="left:0;width:${bar}%"></span><i class="high-marker" style="left:clamp(4px,${bar}%,calc(100% - 4px))"></i>`}</span>
    <span class="day-high">${finite(high)?`<strong>${temp(high)}</strong><small>High</small>`:''}</span>
@@ -185,7 +185,6 @@ export function renderMetricTiles(forecast,smallIcon) {
  const tiles=[
   ['feels','temp',degrees(currentSample(forecast).feels),`${currentSample(forecast).exposure.label} · same outdoor estimate as Now.`],
   ['precipitation','drop',finite(data.precipitation?.value)?`${number(data.precipitation.value,2)}<small>in</small>`:'—','Expected over the next 24 hours.'],
-  ['airQuality','eye',aqValue===null?'—':`${aqValue}<small>AQI</small>`,aqValue===null?'Air-quality forecast unavailable.':`Next 24-hour peak ${finite(aq.next24HourPeak)?Math.round(aq.next24HourPeak):'unavailable'}.`],
   ['wind','wind',`${number(c.wind)}<small>mph</small>`,windText],
   ['humidity','drop',`${number(c.humidity)}<small>%</small>`,finite(c.dewpoint)&&c.dewpoint>=65?'The air feels muggy.':finite(c.humidity)?'Moisture in the air.':'Waiting for an update.'],
   ['pop','drop',finite(rain.value)?`${number(rain.value)}<small>%</small>`:'—',rain.observed?'Rain is observed at this location now. Future hourly percentages remain forecasts.':d.tonight?'Chance of rain tonight.':'Chance of rain today or tonight.'],
@@ -194,10 +193,7 @@ export function renderMetricTiles(forecast,smallIcon) {
   ['solar','sun',data.solar.sunset?esc(formatTime(data.solar.sunset)):'—',data.solar.sunrise?`Sunrise ${formatTime(data.solar.sunrise)}.`:'Daylight through the week.'],
  ];
  const aqiKey=aqValue===null?'unavailable':aqValue<=50?'good':aqValue<=100?'moderate':aqValue<=150?'sensitive':aqValue<=200?'unhealthy':aqValue<=300?'very-unhealthy':'hazardous';
- $('metrics').innerHTML=tiles.map(([key,ic,value,note])=>key==='airQuality'
-  ? `<button type="button" class="glass metric metric-air-quality" data-aqi="${aqiKey}" data-air-quality-details aria-expanded="false" aria-controls="air-quality"><span class="metric-title">${smallIcon(ic)}Air Quality</span><span class="metric-value">${value}</span><span class="metric-note">${esc(note)}</span><span class="tile-hint">Tap for air-quality details</span></button>`
-  : `<button type="button" class="glass metric metric-${key}" data-metric="${key}"${key==='pressure'?` data-pressure-trend="${esc(c.pressureTrend?.direction||'unknown')}"`:''} aria-haspopup="dialog" aria-label="${defs[key].title}: open forecast graph"><span class="metric-title">${smallIcon(ic)}${defs[key].title}</span><span class="metric-value">${value}</span><span class="metric-note">${esc(note)}</span>${sparkline(pointsFor(key,24))}<span class="tile-hint">${key==='solar'?'Tap for the week ahead':'Tap for forecast details'}</span></button>`).join('');
- $('metrics').querySelector('[data-air-quality-details]')?.addEventListener('click',event=>{const panel=$('air-quality');panel?.scrollIntoView({behavior:'smooth',block:'center'});event.currentTarget.setAttribute('aria-expanded','true');panel?.classList.add('aqi-highlight');setTimeout(()=>panel?.classList.remove('aqi-highlight'),1400);});
+ $('metrics').innerHTML=tiles.map(([key,ic,value,note])=>`<button type="button" class="glass metric metric-${key}" data-metric="${key}"${key==='pressure'?` data-pressure-trend="${esc(c.pressureTrend?.direction||'unknown')}"`:''} aria-haspopup="dialog" aria-label="${defs[key].title}: open forecast graph"><span class="metric-title">${smallIcon(ic)}${defs[key].title}</span><span class="metric-value">${value}</span><span class="metric-note">${esc(note)}</span>${sparkline(pointsFor(key,24))}<span class="tile-hint">${key==='solar'?'Tap for the week ahead':'Tap for forecast details'}</span></button>`).join('');
  $('metric-science').innerHTML=`<p>Current cards use a fresh nearby station when it is within 10 miles. When the nearest station is farther away, they use selected-location hourly guidance and identify it as an estimate. Tap a card for separate future forecast data. Daily forecasts share one hour-by-hour graph: temperature, feels-like and Gross Meter dew point use the left Fahrenheit scale; UV uses the right index scale. Slide or tap to read all four at the same hour. Gaps mean missing data, not zero. Gross Meter describes humidity through dew point, not a second feels-like temperature. The raw UTCI/Tier-3 feels-like calculation remains unchanged; visible primary outdoor feels-like values use a display sanity floor at the same-hour dew point unless forecast gusts are at least ${GUSTY_FEELS_DISPLAY_MPH} mph. All displayed pressures use millibars (mb). A pressure trend is shown only for a station observation; forecast pressure has no observed trend.</p>${Object.entries(data.metricForecasts?.notes||{}).map(([key,note])=>`<p><strong>${esc(key)}:</strong> ${esc(note)}</p>`).join('')}`;
  if(active&&$('metric-dialog')?.open)drawChart();
 }

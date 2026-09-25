@@ -1,11 +1,11 @@
 import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText,rebindDanTake} from './dans-take.js?v=weather-art-labels-v10';
 import {danCard} from './dans-summary.js?v=weather-qa-v67';
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
-import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './weather-display.js?v=feels-floor-wind-v1';
+import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './weather-display.js?v=mobile-repair-v1';
 import {dayGraphHTML,dayGraphPoints,installDayGraph} from './day-graph.js?v=feels-floor-wind-v1';
 import {degrees,feelsAt,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=dewpoint-floor-v1';
 import {createFramePlayer} from './frame-player.js';
-import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=dashboard-v2';
+import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=mobile-repair-v1';
 import {dailyDisplay} from './weather-math.js?v=full-day-rain-v1';
 import {conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
 import {currentHero} from './current-temperature.js?v=rain-now-v71';
@@ -19,7 +19,7 @@ import {isExperimentalWeatherPage,renderCarWashForecast,resetCarWashForecast} fr
 import {renderModelExplanation,resetModelExplanation} from './model-explanation.js?v=weathernext-live-v1';
 import {updateRainTrend} from './rain-trend.js?v=full-day-rain-v1';
 import {renderRiskOutlooks,resetRiskOutlooks} from './risk-outlooks.js?v=risk-outlooks-v4';
-import {renderAirQuality} from './air-quality.js?v=air-quality-v1';
+import {renderAirQuality} from './air-quality.js?v=mobile-repair-v1';
 import {displayedRainChance} from './rain-display.js?v=rain-observed-v1';
 import {weatherChangeMessages} from './weather-changes.js?v=dashboard-v2';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
@@ -272,6 +272,8 @@ async function load({ moveMap = false, refreshModels = false, briefingRetry = 0 
 function chooseLocation(value,{rememberDevice=false}={}) {
   if(!validPlace(value))return;
   place = { ...value };
+  const compareLink=document.querySelector('.forecast-compare-banner[href^="/weathernext/"]');
+  if(compareLink)compareLink.href='/weathernext/?'+new URLSearchParams({latitude:value.latitude,longitude:value.longitude});
   stopRadar();framePlayer?.clear();++modelFrameToken;++mapSelectionToken;++radarGeneration;lastRadarFetch=0;
   currentBriefing = null;
   resetExperience();

@@ -57,8 +57,8 @@ test('regular and experimental weather share device-location, jump-nav, AQI and 
  assert.match(css,/\.weather-jump-nav\{display:grid;grid-template-columns:repeat\(5,minmax\(0,1fr\)\)/);
  assert.match(css,/\.weather-jump-card\{[^}]*border:0;[^}]*background:rgba\(8,64,99/);
  assert.match(css,/\.weather-jump-card:nth-child\(n\)\{grid-column:auto\}/);
- assert.ok(html.indexOf('id="metrics"')<html.indexOf('id="air-quality"'),'Your Day cards must appear directly before local air quality');
- assert.match(html,/Current local AQI \+ next 24 hours/);
+ assert.ok(html.indexOf('id="air-quality"')<html.indexOf('id="your-day"'),'Air quality stays above the Your Day tile grid');
+ assert.match(html,/Local AQI \+ forecast details/);
 });
 
 test('phone daily row keeps the remainder label aligned and AQI uses the shared blue card treatment',()=>{
