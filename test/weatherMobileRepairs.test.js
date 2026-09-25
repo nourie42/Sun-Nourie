@@ -4,8 +4,8 @@ test('standalone comparison bridge cannot post to or scroll itself',()=>{
  const handlers={},clicks={};let posts=0,scrolls=0;
  const window={addEventListener:(name,fn)=>handlers[name]=fn,postMessage:()=>posts++};window.parent=window;
  const document={getElementById:()=>null,querySelectorAll:()=>[],addEventListener:(name,fn)=>clicks[name]=fn};
- const context={window,parent:window,document,location:{origin:'http://localhost'},performance:{now:()=>1000},MutationObserver:class{observe(){}},scrollTo:()=>scrolls++,setTimeout,clearTimeout};
- const source=readFileSync('public/weather-fusion/compare-bridge.js','utf8').replace(/^import .*\n/,'').replace('export function','function');
+ const context={window,parent:window,document,installWeatherNextAccess:()=>({}),location:{origin:'http://localhost'},performance:{now:()=>1000},MutationObserver:class{observe(){}},scrollTo:()=>scrolls++,setTimeout,clearTimeout};
+ const source=readFileSync('public/weather-fusion/compare-bridge.js','utf8').replace(/^import .*\r?\n/gm,'').replace('export function','function');
  vm.runInNewContext(source+"\ninstallComparisonPane({source:'google',point:{id:'test'}},{});",context);
  handlers.message({origin:'http://localhost',source:window,data:{type:'compare:scroll',section:'daily-panel',progress:1}});
  clicks.click({target:{closest:s=>s==='[data-comfort-time]'?{dataset:{comfortTime:'now'}}:null}});

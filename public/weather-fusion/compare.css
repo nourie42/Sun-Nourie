@@ -34,3 +34,11 @@
 .weathernext-locations select{background:#163d5c;color:white;border:1px solid #80bdce55;border-radius:9px;padding:8px;font:inherit}
 .weathernext-dashboard .experimental-weathernext-link{display:none!important}
 .weathernext-dashboard .compare-source-note{padding:10px 13px;margin:6px 0 10px;border-radius:12px;background:#092d4988;color:#d7edff;font-size:11px;line-height:1.55}.weathernext-dashboard .compare-source-note strong{display:block;margin-bottom:3px}
+.weather-access{margin:20px 0;padding:24px;border:1px solid #63cce055;border-radius:24px;background:#104663;color:#effaff}
+.weather-access h2{margin:0 0 12px;font-size:1.3rem}
+.weather-access p{line-height:1.5}
+.weather-access form{display:grid;gap:12px;max-width:420px}
+.weather-access input,.weather-access button{font:inherit;min-height:48px;border-radius:12px;padding:12px;border:1px solid #8dccdf;background:#073752;color:#fff;min-width:0}
+.weather-access button{background:#28647e;cursor:pointer;font-weight:700}
+.weather-access button:disabled{opacity:.65;cursor:wait}
+.weather-access [hidden],.weather-access[hidden],#forecast[hidden]{display:none!important}
