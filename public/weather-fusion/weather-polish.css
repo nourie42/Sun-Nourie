@@ -60,6 +60,8 @@ body[data-sky="night"] .air-quality-panel{background:radial-gradient(ellipse at 
  .weather-jump-card .jump-label,.weather-jump-card.jump-gross .jump-label{font-size:clamp(8px,2.45vw,11px)}
  .weather-jump-card .jump-arrow{display:none}
 }
+.forecast-compare-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0 4px;padding:13px 17px;border:1px solid #70d4ff70;border-radius:17px;background:linear-gradient(105deg,#075d8dcc,#0a416ccc);box-shadow:0 10px 28px #031c3540;color:#fff;text-decoration:none;text-align:left}.forecast-compare-banner span{display:flex;flex-direction:column;gap:3px;min-width:0}.forecast-compare-banner b{font-size:14px}.forecast-compare-banner small{color:#bfe8fa;font-size:10px}.forecast-compare-banner>strong{white-space:nowrap;font-size:11px}.experimental-page-banner{margin:10px 0;padding:9px;border:1px solid #ffdc7e80;border-radius:12px;background:#704e1666;color:#ffe49b;font-size:12px;font-weight:900;letter-spacing:.18em;text-align:center}.experimental-page-banner[hidden]{display:none}.air-quality-panel.aqi-highlight{outline:3px solid #7ee7ff;outline-offset:3px;transition:outline-color .3s}
+@media(max-width:600px){.forecast-compare-banner{padding:11px 13px}.forecast-compare-banner b{font-size:12px}.forecast-compare-banner small{font-size:9px}.forecast-compare-banner>strong{font-size:10px}.daily-panel .forecast-confidence{justify-self:start}.daily-panel .forecast-confidence>b{justify-self:end}.daily-panel .confidence-meter{justify-self:start}}
 @media(max-width:359px){
  .weather-jump-nav{grid-template-columns:repeat(5,minmax(0,1fr));gap:3px}
  .weather-jump-card{min-height:36px;padding:6px 2px;border:0;border-radius:8px}
