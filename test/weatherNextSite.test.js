@@ -81,6 +81,17 @@ test('Experimental Weather exposes only a link to WeatherNext, not the embedded 
   const view=model.slice(model.indexOf('export function modelExplanationHTML'),model.indexOf('function experimentalPath'));
   assert.doesNotMatch(view,/weatherNextCard\(/);
 });
+test('WeatherNext standalone page cannot regress to the shared weather shell or stale caching',()=>{
+  const server=read('src/weatherFusion.js');
+  const google=read('public/weather-fusion/weathernext-site.html');
+  const main=read('public/weather-fusion/index.html');
+  assert.match(server,/Cache-Control','no-store, max-age=0, must-revalidate/);
+  assert.match(server,/X-Weather-Nourie-Page','weathernext-standalone-/);
+  assert.match(server,/sendFile\(path\.join\(PUBLIC_DIR,'weathernext-site\.html'\)\)/);
+  assert.doesNotMatch(google,/\/weather-fusion\/app\.js/);
+  assert.match(google,/\/weather-fusion\/weathernext-data\.js\?v=/);
+  assert.doesNotMatch(main,/Low on the left, high on the right/i);
+});
 test('dedicated WeatherNext page documents live surface/station data plus full upper-air product coverage',()=>{
   const html=read('public/weather-fusion/weathernext-site.html');
   assert.match(html,/Everything Google publishes for forecasting/);
