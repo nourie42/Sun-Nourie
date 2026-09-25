@@ -9,7 +9,7 @@ import {timeAt} from '../public/weather-fusion/hourly-feels.js';
 import {GOOGLE_FEED,HOUR,finite,googlePoints,selectGoogleForecast,skyDescription} from './weatherComparisonData.js';
 import {ensembleConfidence,fetchComparisonCompanions,addComparisonCompanions} from './weatherComparisonCompanions.js';
 const root=fileURLToPath(new URL('../public/weather-fusion/',import.meta.url));
-const version='mobile-repair-v1';
+const version='nws-rain-v1';
 const mean=a=>{const v=a.filter(finite);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null;};
 const extreme=(a,fn)=>{const v=a.filter(finite);return v.length?fn(...v):null;};
 const round=v=>finite(v)?Math.round(v*10)/10:null;
