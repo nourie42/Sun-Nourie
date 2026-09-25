@@ -78,6 +78,16 @@ export function registerWeatherComparisonRoutes(app,{fetchImpl=globalThis.fetch,
   try{const html=await readFile(root+'index.html','utf8');res.set('Cache-Control','no-cache').type('html').send(html);
   }catch(e){next(e);}
  });
+ app.get(['/weathernext','/weathernext/','/weather-fusion/weathernext-site.html'],async(req,res)=>{try{
+  const points=googlePoints(await getFeed()),point=points.find(p=>p.id===req.query.location)||points[0];
+  let html=await readFile(root+'index.html','utf8');
+  html=html.replace(/<script type="module" src="\/weather-fusion\/app\.js[^"]*"><\/script>/, '<script type="module" src="/weather-fusion/compare/app.js?source=google&amp;location='+encodeURIComponent(point.id)+'"></script>');
+  html=html.replace('<title>Weather Nourie</title>','<title>Experimental NVIDIA AI Weather</title>');
+  html=html.replace('</head>','<link rel="stylesheet" href="/weather-fusion/compare.css?v=dashboard-v2"></head>').replace('<body data-sky="day">','<body data-sky="day" class="google-pane weathernext-dashboard">');
+  html=html.replace('<main id="forecast">','<h1 class="weathernext-heading">Experimental NVIDIA AI Weather</h1><p class="weathernext-source">Forecast data: Google WeatherNext</p><main id="forecast">');
+  html=html.replace('<div class="location-bar">','<div class="weathernext-locations"><label>Forecast location <select onchange="location.href=\'/weathernext/?location=\'+encodeURIComponent(this.value)">'+points.map(p=>'<option value="'+p.id+'"'+(p.id===point.id?' selected':'')+'>'+p.name+'</option>').join('')+'</select></label></div><div class="location-bar">');
+  res.set('Cache-Control','no-cache').type('html').send(html);
+ }catch(e){fail(res,e);}});
  app.get(['/weather-fusion/compare','/weather-fusion/compare/'],(_req,res)=>res.set('Cache-Control','no-cache').sendFile(root+'compare.html'));
  for(const name of ['compare.css','compare.js','compare-bridge.js'])app.get('/weather-fusion/'+name,(_req,res)=>res.set('Cache-Control','no-cache').sendFile(root+name));
  app.get('/api/weather-fusion/compare/locations',async(_req,res)=>{try{res.set('Cache-Control','no-store').json({points:googlePoints(await getFeed())});}catch(e){fail(res,e);}});
@@ -85,4 +95,3 @@ export function registerWeatherComparisonRoutes(app,{fetchImpl=globalThis.fetch,
  app.get('/weather-fusion/compare/pane',async(req,res)=>{try{const c=await config(req.query);let html=await readFile(root+'index.html','utf8');html=html.replace(/<script type="module" src="\/weather-fusion\/app\.js[^\"]*"><\/script>/,`<script type="module" src="/weather-fusion/compare/app.js?source=${c.source}&amp;location=${encodeURIComponent(c.point.id)}"></script>`);html=html.replace('</head>',`<link rel="stylesheet" href="/weather-fusion/compare.css?v=${version}"></head>`).replace('<body data-sky="day">',`<body data-sky="day" class="comparison-pane ${c.source==='google'?'google-pane':'fusion-pane'}">`);if(c.source==='google')html=html.replace(/<script defer src="https:\/\/unpkg.com\/leaflet[^>]*><\/script>/,'');res.set('Cache-Control','no-cache').type('html').send(html);}catch(e){fail(res,e);}});
  app.get('/weather-fusion/compare/app.js',async(req,res)=>{try{const c=await config(req.query);res.set('Cache-Control','no-cache').type('application/javascript').send(comparisonApp(await readFile(root+'app.js','utf8'),c));}catch(e){res.status(503).type('application/javascript').send("throw new Error('The comparison page could not be prepared. Refresh or return to the main forecast.');");}});
 }
-

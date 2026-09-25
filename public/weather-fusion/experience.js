@@ -1,4 +1,4 @@
-import {confidenceNotice,todayForecastHTML} from './today-card.js?v=real-clouds-v1';
+import {confidenceNotice,todayForecastHTML} from './today-card.js?v=dashboard-v2';
 import {FORECAST_CONFIDENCE_VERSION} from './forecast-confidence.js?v=weather-art-labels-v10';
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
 import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=wardrobe-v1';
@@ -139,6 +139,8 @@ export function renderDailyRows(forecast,icon) {
   const lowFeels=feel.low?.low?.value,highFeels=p.tonight?lowFeels:feel.high?.high?.value;
   const feelsText=p.tonight?degrees(highFeels):`${degrees(lowFeels)} / ${degrees(highFeels)}`;
   const wind=dailyWindSummary(forecast,d,p,i,now),gusty=finite(wind.gust)&&wind.gust>=GUSTY_FEELS_DISPLAY_MPH;
+  const aqRows=(forecast.airQuality?.hours||[]).filter(r=>new Intl.DateTimeFormat('en-CA',{timeZone:forecast.location.timeZone}).format(new Date(r.time))===d.date&&finite(r.aqi));
+  const dayAqi=aqRows.length?Math.max(...aqRows.map(r=>r.aqi)):null;
   const windSpeed=wind.text.replace(/^Wind\s*/,'');
   const confidenceAria=plainConfidenceNotice?` ${plainConfidenceNotice.title}. ${plainConfidenceNotice.text}`:'';
   return `<button class="day-row ${p.tonight?'tonight-row':''}" data-day="${i}" aria-label="${esc(p.label)}, ${esc(rain.observed?'Rain now':p.condition)}. ${rain.observed?'Rain is observed now at this location.':finite(shownPop)?`Rain chance ${number(shownPop)} percent.`:'Rain chance unavailable.'} ${p.primaryLabel} ${number(p.primary)} degrees${finite(p.secondary)?`, low ${number(p.secondary)} degrees`:''}. ${esc(wind.text)}${gusty?`, gust ${wind.gust} mph`:''}. Forecast confidence ${esc(confidence.label)}.${esc(confidenceAria)} Open details.">
@@ -148,7 +150,7 @@ export function renderDailyRows(forecast,icon) {
    <span class="temp-track" aria-hidden="true">${bar===null?'':`<span class="temp-fill" style="left:0;width:${bar}%"></span><i class="high-marker" style="left:clamp(4px,${bar}%,calc(100% - 4px))"></i>`}</span>
    <span class="day-high">${finite(high)?`<strong>${temp(high)}</strong><small>High</small>`:''}</span>
    <span class="day-feels-summary"><small>Feels like</small><b>${feelsText}</b></span>
-   <span class="day-meta"><span class="forecast-confidence" data-confidence="${esc(confidence.key)}" title="${esc(confidenceTitle)}"><span>Forecast confidence</span><b>${esc(confidence.label)}</b>${finite(confidence.score)?`<i class="confidence-meter" aria-hidden="true"><em style="width:${confidence.score}%"></em></i>`:''}</span><span class="day-wind-chip" title="${esc(wind.text)}${gusty?` · Gust ${wind.gust} mph`:'' }"><span class="day-wind-label">Wind</span><b>${esc(windSpeed.replace(/\s*mph$/i,''))}</b><span class="day-wind-unit">mph</span>${gusty?`<em>G${wind.gust}</em>`:''}</span>${dailyUvHTML(d.uvMax,p.tonight?'Peak UV today':'Peak UV')}</span>
+   <span class="day-meta"><span class="forecast-confidence" data-confidence="${esc(confidence.key)}" title="${esc(confidenceTitle)}"><span>Forecast confidence</span><b>${esc(confidence.label)}</b>${finite(confidence.score)?`<i class="confidence-meter" aria-hidden="true"><em style="width:${confidence.score}%"></em></i>`:''}</span><span class="day-wind-chip" title="${esc(wind.text)}${gusty?` · Gust ${wind.gust} mph`:'' }"><span class="day-wind-label">Wind</span><b>${esc(windSpeed.replace(/\s*mph$/i,''))}</b><span class="day-wind-unit">mph</span>${gusty?`<em>G${wind.gust}</em>`:''}</span><span class="day-aqi-chip" title="Peak available AQI forecast for this date"><span>AQI</span><b>${finite(dayAqi)?Math.round(dayAqi):'—'}</b></span>${dailyUvHTML(d.uvMax,p.tonight?'Peak UV today':'Peak UV')}</span>
    ${confidenceNoticeHTML}
   </button>`;
  });
@@ -179,7 +181,7 @@ export function renderMetricTiles(forecast,smallIcon) {
  const windText=finite(c.wind)?c.wind<3?'Hardly a breeze.':c.wind<12?'A light breeze.':c.wind<25?'A breezy day.':'Strong winds.':'';
  const aq=data.airQuality,aqValue=finite(aq?.aqi)?Math.round(aq.aqi):null;
  const pressureSeries=pointsFor('pressure',24),futurePressure=pressureSeries.find(p=>Date.parse(p.time)>now+2.5*3600000),observedPressure=stationPressureMb(c),currentPressure=observedPressure??pressureSeries.find(p=>finite(p.value))?.value??null;
- const pressureNote=c.pressureTrend?.status==='ready'?pressureTrendText(c):finite(currentPressure)&&finite(futurePressure?.value)?`${futurePressure.value>currentPressure+.2?'↑ Forecast to rise':futurePressure.value<currentPressure-.2?'↓ Forecast to drop':'→ Forecast nearly steady'} · next 3 hours${observedPressure===null?' (forecast baseline)':''}`:'Pressure forecast unavailable — waiting for a usable value.';
+ const pressureNote=c.pressureTrend?.status==='ready'?pressureTrendText(c):finite(currentPressure)&&finite(futurePressure?.value)?`${futurePressure.value>currentPressure+.2?'↑ Forecast to rise':futurePressure.value<currentPressure-.2?'↓ Forecast to drop':'→ Forecast nearly steady'} · next 3 hours${observedPressure===null?' (forecast baseline)':''}`:finite(currentPressure)?'Sea-level forecast pressure · observed trend unavailable.':'Pressure forecast unavailable — waiting for a usable value.';
  const tiles=[
   ['feels','temp',degrees(currentSample(forecast).feels),`${currentSample(forecast).exposure.label} · same outdoor estimate as Now.`],
   ['precipitation','drop',finite(data.precipitation?.value)?`${number(data.precipitation.value,2)}<small>in</small>`:'—','Expected over the next 24 hours.'],
@@ -291,4 +293,3 @@ export function installExperience() {
  $('chart-science-link').addEventListener('click',()=>$('metric-dialog').close());
  window.addEventListener('resize',()=>{if(active&&$('metric-dialog').open)drawChart();});
 }
-

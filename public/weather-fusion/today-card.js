@@ -167,4 +167,3 @@ export function confidenceNotice(confidence,subject='forecast'){
  const title=c.key==='very-low'?`Very low confidence ${subject}`:`Lower confidence ${subject}`;
  return {title,text:`${reasons.slice(0,2).join(', ')}. Click for details.`};
 }
-

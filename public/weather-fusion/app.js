@@ -5,7 +5,7 @@ import {weatherIcon,renderHourlyWeather,currentSample,heroFeelsHTML} from './wea
 import {dayGraphHTML,dayGraphPoints,installDayGraph} from './day-graph.js?v=feels-floor-wind-v1';
 import {degrees,feelsAt,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=dewpoint-floor-v1';
 import {createFramePlayer} from './frame-player.js';
-import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=wardrobe-v1';
+import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=dashboard-v2';
 import {dailyDisplay} from './weather-math.js?v=full-day-rain-v1';
 import {conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
 import {currentHero} from './current-temperature.js?v=rain-now-v71';
@@ -21,6 +21,7 @@ import {updateRainTrend} from './rain-trend.js?v=full-day-rain-v1';
 import {renderRiskOutlooks,resetRiskOutlooks} from './risk-outlooks.js?v=risk-outlooks-v4';
 import {renderAirQuality} from './air-quality.js?v=air-quality-v1';
 import {displayedRainChance} from './rain-display.js?v=rain-observed-v1';
+import {weatherChangeMessages} from './weather-changes.js?v=dashboard-v2';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);
 const experimentalPage = isExperimentalWeatherPage();
@@ -37,19 +38,6 @@ const number = (n, decimals = 0) => finite(n) ? n.toFixed(decimals) : '—';
 const temperature = (n) => `${number(n)}°`;
 const inches = (n) => finite(n) ? `${n.toFixed(2)} in` : 'Unavailable';
 const percent = (n) => finite(n) ? `${Math.round(n)}%` : '—';
-function weatherChangeMessages(data){
-  const days=(data.days||[]).slice(0,5),messages=[];
-  const averages=days.map(d=>finite(d.high)&&finite(d.low)?(d.high+d.low)/2:null);
-  const first=averages.find(finite),later=averages.filter(finite);
-  if(finite(first)&&later.some(value=>value-first>20))messages.push('A much warmer stretch is ahead: the average daytime temperature rises more than 20° within five days.');
-  const series=data.metricForecasts?.series?.dewpoint||[],now=Date.now(),future=series.filter(p=>Date.parse(p.time)>=now&&Date.parse(p.time)<=now+120*3600000&&finite(p.value)).map(p=>p.value),dew=data.current?.dewpoint;
-  if(finite(dew)&&future.some(value=>value-dew>20))messages.push('Gross meter detecting high humidity: dew point is forecast to climb more than 20°.');
-  else if(finite(dew)&&future.some(value=>dew-value>20))messages.push('Gross meter is tracking drier conditions: dew point is forecast to fall more than 20°.');
-  const wetDays=days.filter(d=>finite(d.pop)&&d.pop>=50).length;
-  const rainAhead=days.some(d=>finite(d.pop)&&d.pop>75&&finite(d.precipitation)&&d.precipitation>.25&&['moderate','high','very-high'].includes(d.confidence?.key));
-  if(wetDays>=2&&rainAhead)messages.push('More meaningful rain is possible after a wet stretch: over a 75% chance with more than a quarter inch forecast.');
-  return messages;
-}
 function renderWeatherChanges(data){const root=$('weather-change-banner');if(!root)return;const messages=weatherChangeMessages(data);root.hidden=!messages.length;root.innerHTML=messages.length?`<strong>5-day weather change</strong><br>${messages.map(esc).join('<br>')}`:'';}
 let place = null, forecast = null, generation = 0, busy = false, searchGeneration = 0;
 let map = null, baseLayer = null, radarLayer = null, warningLayer = null, marker = null;
@@ -205,10 +193,10 @@ function renderBriefing(data) {
   currentBriefing = data;
   const card=danCard(data,forecast,Date.now());
   const takeItems=card.items||[];
-  const takeDisplay=card.text;
+  const takeDisplay=data.mode==='ai'&&data.danSummary?data.danSummary+(card.text?'\n\n'+card.text:''):card.text;
   const displayedDay=forecast?.days?.[0]?dailyDisplay(forecast.days[0],0,Date.now(),forecast.location?.timeZone||'America/New_York'):null;
   const displayedRain=displayedRainChance(forecast,displayedDay?.pop,{now:Date.now()});
-  const localDetails=forecast?.days?.length>1&&(forecast?.hours?.length||forecast?.rainTimeline?.length)?forecastOutlookDetails(forecast,Date.now()):null;
+  const localDetails=data.mode!=='ai'&&forecast?.days?.length>1&&(forecast?.hours?.length||forecast?.rainTimeline?.length)?forecastOutlookDetails(forecast,Date.now()):null;
   const summary=localDetails?.summary||data.summary||'The source forecast is currently unavailable.';
   const nearTerm=localDetails?.nearTerm||data.nearTerm||'See the hourly forecast below.';
   const extended=localDetails?.extended||data.extended||'More details will appear with the next update.';
@@ -560,4 +548,3 @@ startDeviceLocation();
 setInterval(()=>{if(currentBriefing&&forecast)renderBriefing(currentBriefing);},30000);
 setInterval(()=>{if(forecast&&Date.now()-Date.parse(forecast.assembledAt)>90*60000)renderComfort(forecast);},30000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&currentBriefing&&forecast)renderBriefing(currentBriefing);});
-

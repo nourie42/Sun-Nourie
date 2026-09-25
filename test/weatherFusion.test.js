@@ -95,7 +95,7 @@ function mockFetch(url, options) {
   if (u.pathname === '/alerts/active') return response({ features: [] });
   if (u.pathname.includes('/products/types/AFD/')) return response({ '@graph': [{ '@id': 'https://api.weather.gov/products/test-afd', productCode: 'AFD', issuanceTime: '2026-09-05T14:00:00Z' }] });
   if (u.pathname === '/products/test-afd') return response({ id: 'test-afd', issuanceTime: '2026-09-05T14:00:00Z', productText: inputs.discussion.text });
-  if (u.hostname === 'api.openai.com') return response({ status: 'completed', output: [{ content: [{ type: 'output_text', text: JSON.stringify({ headline: 'A partly sunny day ahead', summary: 'Partly sunny conditions remain favored. A weak front could bring showers tomorrow.', nearTerm: 'Clouds will linger overnight.', extended: 'The next front brings a less settled pattern.', uncertainty: 'Shower coverage remains uncertain.', sources: ['nws', 'afd', 'hrrr', 'ecmwf', 'nbm'] }) }] }] });
+  if (u.hostname === 'api.openai.com') return response({ status: 'completed', output: [{ content: [{ type: 'output_text', text: JSON.stringify({ danSummary: 'Clouds may linger before rain arrives.', headline: 'A partly sunny day ahead', summary: 'Partly sunny conditions remain favored. A weak front could bring showers tomorrow.', nearTerm: 'Clouds will linger overnight.', extended: 'The next front brings a less settled pattern.', uncertainty: 'Shower coverage remains uncertain.', sources: ['nws', 'afd', 'hrrr', 'ecmwf', 'nbm'] }) }] }] });
   throw new Error(`Unexpected URL ${url}`);
 }
 test('service fetches latest matching AFD, exposes no credentials, and uses named models', async () => {
@@ -138,7 +138,7 @@ test('invalid numerical AI prose falls back to NWS text', async () => {
 });
 test('AI outlook allows clock times, normalizes them to h:mmam/pm, and still blocks weather numbers', async () => {
   const s = createWeatherService({ now: () => now, env: { OPENAI_API_KEY: 'TEST', WEATHER_FUSION_NONCOMMERCIAL: 'true' }, fetchImpl: async (url, options) => {
-    if (url.includes('api.openai.com')) return response({ status: 'completed', output: [{ content: [{ type: 'output_text', text: JSON.stringify({headline:'Sunday outlook',summary:'As of Sunday at 2:02 PM, clouds remain nearby.',nearTerm:'Showers may develop later.',extended:'The week starts quieter.',uncertainty:'Rain coverage remains uncertain.',sources:['nws','afd','hrrr','ecmwf','nbm']}) }] }] });
+    if (url.includes('api.openai.com')) return response({ status: 'completed', output: [{ content: [{ type: 'output_text', text: JSON.stringify({danSummary:'Clouds may linger before rain arrives.',headline:'Sunday outlook',summary:'As of Sunday at 2:02 PM, clouds remain nearby.',nearTerm:'Showers may develop later.',extended:'The week starts quieter.',uncertainty:'Rain coverage remains uncertain.',sources:['nws','afd','hrrr','ecmwf','nbm']}) }] }] });
     return mockFetch(url, options);
   } });
   const b = await s.getBriefing({ location: 'knightdale' }); assert.equal(b.mode, 'ai'); assert.match(b.summary,/2:02pm/); assert.ok(!b.summary.includes('2:02 PM'));

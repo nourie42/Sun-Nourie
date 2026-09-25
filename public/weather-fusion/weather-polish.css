@@ -68,4 +68,20 @@ body[data-sky="night"] .air-quality-panel{background:radial-gradient(ellipse at 
  .weather-jump-card .jump-label,.weather-jump-card.jump-gross .jump-label{font-size:8px}
  .weather-jump-card .jump-arrow{display:none}
 }
-
+/* Shared dashboard corrections, including phone confidence alignment. */
+.daily-panel .day-meta{flex-wrap:wrap}
+.daily-panel .forecast-confidence{display:flex!important;flex-wrap:nowrap;align-items:center;gap:7px;width:auto}
+.daily-panel .forecast-confidence>span{max-width:none}
+.daily-panel .forecast-confidence>b{white-space:nowrap}
+.daily-panel .forecast-confidence .confidence-meter{flex:0 0 52px;width:52px;height:6px}
+.day-aqi-chip{display:inline-flex;gap:5px;align-items:center;font-size:12px;white-space:nowrap}
+.briefing #briefing-summary,.briefing #briefing-detail p{font-family:inherit;font-size:14px;font-weight:400;line-height:1.7;text-align:left}
+.briefing #briefing-detail>div:last-child{text-align:left;font-weight:400}
+.metric-air-quality[data-aqi="sensitive"]{border-color:#ed973788;background:linear-gradient(145deg,#ed973725,#40301948)}
+.metric-air-quality[data-aqi="hazardous"]{border-color:#b64c7788;background:linear-gradient(145deg,#a8325828,#39142b48)}
+@media(max-width:600px){
+ .daily-panel .day-meta{grid-template-columns:1fr 1fr 1fr;grid-template-areas:"confidence confidence confidence" "wind aqi uv";column-gap:6px}
+ .daily-panel .forecast-confidence{justify-content:flex-start;width:100%}
+ .daily-panel .day-aqi-chip{grid-area:aqi;justify-content:center}
+ .forecast-compare-banner{padding:8px 12px;max-width:100%;font-size:12px}
+}

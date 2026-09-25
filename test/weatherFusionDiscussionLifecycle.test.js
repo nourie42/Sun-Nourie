@@ -83,7 +83,7 @@ for(const emptyReview of [false,true])test(emptyReview?'full service: successful
   const u=new URL(url);
   if(u.hostname==='api.openai.com'){
    aiCalls++;const facts=JSON.parse(JSON.parse(options.body).input),c=facts.danTakeEvidence.candidates[0];assert.ok(c);
-   return response({status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify({headline:'Local outlook',summary:'The forecast is based on the latest local discussion.',nearTerm:'Clouds may linger.',extended:'A front approaches.',uncertainty:'',forecastChanges:emptyReview&&aiCalls>1?[]:[{evidenceId:c.id,summary:'The front could arrive earlier or later than expected.'}],sources:facts.requiredSources})}]}]});
+   return response({status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify({danSummary:'A front may bring rain, but its timing could change.',headline:'Local outlook',summary:'The forecast is based on the latest local discussion.',nearTerm:'Clouds may linger.',extended:'A front approaches.',uncertainty:'',forecastChanges:emptyReview&&aiCalls>1?[]:[{evidenceId:c.id,summary:'The front could arrive earlier or later than expected.'}],sources:facts.requiredSources})}]}]});
   }
   if(u.hostname==='raw.githubusercontent.com'&&u.pathname.includes('/models/'))return response(snapshot(u.pathname.split('/').at(-1).replace('.json','')));
   if(u.pathname.startsWith('/points/'))return response({properties:{...inputs.point,forecast:'https://api.weather.gov/gridpoints/RAH/1,1/forecast',forecastHourly:'https://api.weather.gov/gridpoints/RAH/1,1/forecast/hourly',forecastGridData:'https://api.weather.gov/gridpoints/RAH/1,1'}});

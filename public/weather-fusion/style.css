@@ -55,4 +55,3 @@ body.dialog-open{overflow:hidden}.metric-dialog{padding:28px 30px 23px;backgroun
 
 /* Keep the decorative weather icon inside the hero on narrow screens. */
 @media(max-width:380px){.hero-scene{left:auto;right:2px;width:62px;height:62px}.hero-scene svg{width:60px;height:60px}}
-
