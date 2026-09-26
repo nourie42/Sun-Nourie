@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import {readFileSync} from 'node:fs';
 import {ensembleConfidence,addComparisonCompanions} from '../src/weatherComparisonCompanions.js';
-import {buildGoogleComparison,registerWeatherComparisonRoutes} from '../src/weatherComparison.js';
+import {buildGoogleComparison,comparisonApp,registerWeatherComparisonRoutes} from '../src/weatherComparison.js';
 import {feedFixture,now} from './weatherComparisonData.test.js';
 test('ensemble indicator responds to spread, age, lead and missing data',()=>{
  const rows=Array.from({length:24},()=>({temperatureP10:70,temperatureP90:74,provenance:{runAt:new Date(now).toISOString()}}));
@@ -22,6 +22,13 @@ test('supplemental UV and AQI never replace model weather fields',()=>{
  assert.equal(out.airQuality.aqi,30);assert.equal(out.exposureWeather,exposure);
  assert.equal(JSON.stringify(out.hours.map(({temperature,dewpoint,precipitation})=>({temperature,dewpoint,precipitation}))),before);
  assert.equal(out.days[1].uvMax,null);
+});
+test('comparison app adapter accepts the repository CRLF browser client',()=>{
+ const original=readFileSync('public/weather-fusion/app.js','utf8');
+ const transformed=comparisonApp(original,{source:'google',point:{id:'knightdale',name:'Knightdale / Raleigh',latitude:35.787,longitude:-78.4806},explicitLocation:true});
+ assert.match(transformed,/installComparisonPane/);
+ assert.match(transformed,/compareBridge\.requestForecast/);
+ assert.doesNotMatch(transformed,/startDeviceLocation\(\);/);
 });
 test('legacy comparison URLs redirect directly to standalone forecast preserving location',async t=>{
  const app=express();registerWeatherComparisonRoutes(app,{feedProvider:async()=>feedFixture(),now:()=>now,companionProvider:async()=>({})});
