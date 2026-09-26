@@ -701,6 +701,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     res.sendFile(path.join(PUBLIC_DIR,'weathernext-site.html'),{lastModified:false,cacheControl:false});
   });
   for (const name of [
+    'forecast-windows.js','forecast-window-banners.js','forecast-window-banners.css',
     'request-deadline.js','weather-changes.js','air-quality.js','alert-banners.js','app.js','bulletin-facts.js','bulletins.js','car-wash.js','car-wash.css','car-wash-background.webp','car-wash-corvette-hood.webp',
     'model-explanation.js','model-explanation.css','weathernext-site.html','weathernext-site.css','weathernext-site.js','weathernext-data.js','weathernext-catalog.json',
     'comfort-cinematic.css','comfort-effects.css','comfort-outlook.js','current-inputs.js','current-temperature.js',

@@ -19,7 +19,8 @@
   <link rel="stylesheet" href="/weather-fusion/model-explanation.css?v=weathernext-live-v1">
   <link rel="stylesheet" href="/weather-fusion/risk-outlooks.css?v=risk-outlooks-v4">
   <link rel="stylesheet" href="/weather-fusion/weather-polish.css?v=mobile-repair-v1">
-  <script type="module" src="/weather-fusion/app.js?v=mobile-repair-v1&amp;repair=dan-visible-v1"></script>
+  <link rel="stylesheet" href="/weather-fusion/forecast-window-banners.css?v=blend-windows-v1">
+  <script type="module" src="/weather-fusion/app.js?v=blend-windows-v1&amp;repair=dan-visible-v1"></script>
 
   <style id="experimental-bots-link-style">
     .experimental-bots-link,.experimental-weathernext-link{display:none;align-items:center;gap:.45rem;width:max-content;margin:.55rem .4rem 0 0;padding:.55rem .85rem;border:1px solid rgba(255,255,255,.22);border-radius:999px;background:rgba(11,24,43,.78);color:#f7fbff;text-decoration:none;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.18)}
@@ -33,7 +34,6 @@
   <div class="atmosphere" aria-hidden="true"><div class="sky-glow"></div><div class="cloud cloud-one"></div><div class="cloud cloud-two"></div><div class="stars"></div></div>
   <div class="shell">
     <a class="experimental-back" id="experimental-back" href="/weather-fusion/" hidden><span aria-hidden="true">←</span> Back to regular weather</a>
-    <a class="experimental-whats-up-link" id="experimental-whats-up-link" href="/whats-up" hidden>Perfect weather tracker</a>
     <a class="experimental-bots-link" id="experimental-bots-link" href="/ai-council/" aria-label="Open AI Chat"><span aria-hidden="true">🤖</span> AI Chat</a>
     <a class="experimental-weathernext-link" id="weathernext-site-link" href="/weathernext/">Google WeatherNext 3</a>
     <header class="topbar">
@@ -66,6 +66,7 @@
     <main id="forecast">
       <div id="status" class="status-line" role="status" aria-live="polite">Connecting to weather sources…</div>
       <section id="weather-change-banner" class="weather-change-banner" role="status" hidden></section>
+      <section id="forecast-window-banners" class="forecast-window-banners" aria-label="Upcoming weather windows" hidden></section>
       <section class="hero" aria-labelledby="city-name">
         <div class="hero-scene" id="hero-scene" aria-hidden="true"></div>
         <div class="eyebrow" id="hero-date">YOUR WEATHER, IN FOCUS</div>
@@ -163,6 +164,7 @@
       <footer><div><span class="footer-brand">Weather Nourie</span><p>Your weather. A little clearer.</p></div><p>Not an official NWS product. Always follow official warnings.<br>Sources: NOAA / NWS · NOAA/NCEP HRRR & NBM · ECMWF Open Data (CC BY 4.0) · Open-Meteo / CAMS air quality · USGS The National Map</p><p class="privacy">Location searches and coordinates are sent to weather providers. AI briefings send the selected location and public forecast data to OpenAI; no Sun-Nourie business records are included. Weather model maps are generated from public provider data, not embedded third-party webpages. Your browser location is requested when the weather page opens so the forecast can follow your device; use the location button to refresh it.</p></footer>
     </main>
   </div>
+  <dialog id="forecast-window-dialog" class="forecast-window-dialog" aria-labelledby="forecast-window-title"><button id="close-forecast-window" class="dialog-close" aria-label="Close forecast times">×</button><div id="forecast-window-content"></div></dialog>
   <dialog id="day-dialog" aria-labelledby="day-title"><button id="close-day" class="dialog-close" aria-label="Close daily forecast">×</button><div id="day-content"></div></dialog>
   <dialog id="bulletin-dialog" aria-labelledby="bulletin-dialog-title"><button id="close-bulletin" class="dialog-close" aria-label="Close NWS bulletin">×</button><div id="bulletin-dialog-content"></div></dialog>
   <dialog id="outlook-dialog" class="outlook-dialog" aria-labelledby="outlook-dialog-title"><button id="close-outlook" class="dialog-close" aria-label="Close outlook">×</button><div id="outlook-dialog-content"></div></dialog>

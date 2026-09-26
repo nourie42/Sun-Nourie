@@ -5,14 +5,19 @@ Fuel IQ, distributor, site-research, authentication or main-site route is change
 
 ## Forecast provenance
 
-Same-day temperature, dew point and wind start at NWS 40%, HRRR 40%, ECMWF 20%.
+Temperature, dew point and wind start at NWS 40%, HRRR 30%, ECMWF 10%, NBM 20%.
 Rain amount is blended in individual time segments before totals are summed, so
 an hourly HRRR run is not discarded merely because its horizon is shorter than
 the full rain-total window. A missing source is excluded, weights renormalize,
-and effective contributions are returned; it never secretly becomes zero. NBM
-continues to be available for extended guidance and fallback, not as a fourth
-input to the requested same-day policy. Deterministic rainfall inches are not
-converted into probability; NWS rain probabilities and warnings remain official.
+and effective contributions are returned; it never secretly becomes zero.
+Rainfall amount uses those four weights today and NWS 15%, ECMWF 60%, NBM 25%
+on later local dates. Rain likelihood is a separate, uncalibrated score: NWS's
+official probability contributes proportionally within its 40-point share today
+or 15-point share later; each deterministic model contributes one-third of its
+points for positive hourly QPF through 0.010 inch and full points above that.
+Zero QPF adds zero points, and unavailable models add no points without
+renormalizing the score. NWS probabilities remain separately attributed, and
+official warnings are unchanged.
 These are user-selected weights, not a verified accuracy ranking.
 
 Only the future evening beginning on a forecast date supplies that day's overnight

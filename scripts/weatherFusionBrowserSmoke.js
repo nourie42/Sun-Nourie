@@ -84,7 +84,7 @@ for(const location of ['knightdale','greenville']){
 
  assert.equal(data.repairVersion,REPAIR_VERSION);
  assert.deepEqual(data.blendPolicy.sameDay,{nws:.4,hrrr:.3,ecmwf:.1,nbm:.2});
- assert.deepEqual(data.blendPolicy.extendedRain,{nws:1});
+ assert.deepEqual(data.blendPolicy.extendedRain,{nws:.15,ecmwf:.6,nbm:.25});
  assert.deepEqual(data.blendPolicy.extendedAmount,{nws:.15,ecmwf:.6,nbm:.25});
  const dp=data.metricForecasts.series.dewpoint;
  assert.equal(dp.length,new Set(dp.map(p=>Date.parse(p.time))).size,'No duplicate dew-point instants');

@@ -20,13 +20,12 @@ test('main HTML ships radar only while experimental mode adds every model contro
   assert.match(app,/if\(layer==='radar'\)/,'radar remains the normal main-page path');
 });
 
-test('experimental weather keeps a /whats-up tracker link while main pages do not show alert banners',()=>{
-  assert.doesNotMatch(html,/weather-alert-banner/);
-  assert.match(html,/id="experimental-whats-up-link" href="\/whats-up"/);
-  assert.match(html,/Perfect weather tracker/);
-  const style = read('style.css');
-  assert.match(style,/\.experimental-whats-up-link\{/);
-  assert.match(app,/const tracker=\$\('experimental-whats-up-link'\);if\(tracker\)tracker\.hidden=!experimentalPage/);
+test('experimental weather uses conditional blend windows in place of the standalone tracker link',()=>{
+  assert.doesNotMatch(html,/id="experimental-whats-up-link"/);
+  assert.match(html,/id="forecast-window-banners"[^>]*hidden/);
+  assert.match(app,/if\(experimentalPage\)draw\('forecast-window-banners'/);
+  assert.match(html,/id="forecast-window-dialog"[^>]*aria-labelledby="forecast-window-title"/);
+  assert.match(app,/resetForecastWindowBanners\(\)/);
 });
 
 test('main and experimental URLs are served by one shared app shell',()=>{
