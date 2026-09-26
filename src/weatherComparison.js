@@ -18,6 +18,15 @@ const extreme=(a,fn)=>{const v=a.filter(finite);return v.length?fn(...v):null;};
 const round=v=>finite(v)?Math.round(v*10)/10:null;
 const compass=d=>finite(d)?['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'][Math.round(d/22.5)%16]:null;
 const iso=t=>new Date(t).toISOString();
+const pointDistanceMiles=(a,b)=>{
+ const lat=(a.latitude+b.latitude)*Math.PI/360;
+ return Math.hypot((a.latitude-b.latitude)*69,(a.longitude-b.longitude)*69*Math.cos(lat));
+};
+const nearbyPublishedPoint=(points,latitude,longitude,maxMiles=10)=>{
+ const requested={latitude:Number(latitude),longitude:Number(longitude)};
+ if(!finite(requested.latitude)||!finite(requested.longitude))return null;
+ return points.map(point=>({point,miles:pointDistanceMiles(point,requested)})).sort((a,b)=>a.miles-b.miles).find(x=>x.miles<=maxMiles)?.point||null;
+};
 export function buildGoogleComparison(feed,pointId,now=Date.now()){
  const selected=selectGoogleForecast(feed,pointId,now),p=selected.point,zone=p.timeZone,start=Math.floor(now/HOUR)*HOUR;
  // Empty structural template only. No non-Google forecast is supplied to this builder.
@@ -95,9 +104,12 @@ export function registerWeatherComparisonRoutes(app,{fetchImpl=globalThis.fetch,
   // conditional GET. This is the first /weathernext route registered by server.js.
   delete req.headers['if-none-match'];
   delete req.headers['if-modified-since'];
-  const points=googlePoints(await getFeed()),point=points.find(p=>p.id===req.query.location)||points[0];
+  const points=googlePoints(await getFeed());
+  const coordinatePoint=req.query.latitude!==undefined&&req.query.longitude!==undefined?nearbyPublishedPoint(points,req.query.latitude,req.query.longitude):null;
+  const point=points.find(p=>p.id===req.query.location)||coordinatePoint||points[0];
+  const useExactCoordinates=req.query.latitude!==undefined&&req.query.longitude!==undefined&&!coordinatePoint;
   let html=await readFile(root+'index.html','utf8');
-  html=html.replace(/<script type="module" src="\/weather-fusion\/app\.js[^"]*"><\/script>/, '<script type="module" src="/weather-fusion/compare/app.js?source=google&amp;location='+encodeURIComponent(point.id)+(req.query.location?'&amp;explicit=1':'')+(req.query.latitude!==undefined&&req.query.longitude!==undefined?'&amp;latitude='+encodeURIComponent(req.query.latitude)+'&amp;longitude='+encodeURIComponent(req.query.longitude):'')+'"></script>');
+  html=html.replace(/<script type="module" src="\/weather-fusion\/app\.js[^"]*"><\/script>/, '<script type="module" src="/weather-fusion/compare/app.js?source=google&amp;location='+encodeURIComponent(point.id)+((req.query.location||coordinatePoint)?'&amp;explicit=1':'')+(useExactCoordinates?'&amp;latitude='+encodeURIComponent(req.query.latitude)+'&amp;longitude='+encodeURIComponent(req.query.longitude):'')+'"></script>');
   html=html.replace('Because Apple, Google and Samsung weather suck','Your local weather, clearly explained').replace('<title>Weather Nourie</title>','<title>Experimental NVIDIA AI Weather</title>');
   html=html.replace('</head>','<link rel="stylesheet" href="/weather-fusion/compare.css?v=mobile-repair-v1"></head>').replace('<body data-sky="day">','<body data-sky="day" class="google-pane weathernext-dashboard">');
   html=html.replace('<main id="forecast">','<h1 class="weathernext-heading">Experimental NVIDIA AI Weather</h1><main id="forecast">');
