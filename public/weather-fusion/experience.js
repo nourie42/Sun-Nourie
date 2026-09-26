@@ -3,9 +3,10 @@ import {FORECAST_CONFIDENCE_VERSION} from './forecast-confidence.js?v=weather-ar
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
 import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=wardrobe-v1';
 import {weatherState} from './weather-state.js';
-import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=feels-floor-wind-v1';
+import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=sun-exposure-v1';
 import {degrees,displayedFeelsAt,dailyFeels,forecastValue,timeAt,peakFeelsHTML,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=dewpoint-floor-v1';
-import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=mobile-repair-v1';
+import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=sun-exposure-v1';
+import {sunExposureTemperature} from './outdoor-feels.js?v=sun-exposure-v1';
 import {comfortMode,comfortWindow,comfortNarrative,warmestTodayWindow} from './comfort-outlook.js?v=feels-floor-wind-v1';
 import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js?v=full-day-rain-v1';
 import {displayedRainChance} from './rain-display.js?v=rain-observed-v1';
@@ -97,20 +98,21 @@ export function renderComfort(forecast) {
  const sample=comfortPreview?forecastSample(forecast,comfortPreview):current;
  if(!sample){comfortPreview=null;return renderComfort(forecast);}
  const c=sample.comfort,zone=forecast.location.timeZone,summary=comfortWindow(forecast,now+1);
+ const sunDisplay=sunExposureTemperature(sample);
  const precipitation=forecastValue(forecast,'precipitation',sample.time);
  const sceneContext={forecast:!sample.now,condition:sample.condition,pop:sample.pop,precipitation,rainAround:sample.rainAround===true,radarThreat:sample.radarThreat===true};
  const pavement=pavementEstimate(forecast,sample.inputs,sample.now?now:Date.parse(sample.time),{checkedAt:now,...sceneContext});
- const kicker=$('skin-kicker');if(kicker)kicker.textContent=sample.now?'How it actually feels right now':`How will it feel outside at ${formatTime(sample.time)}?`;
+ const kicker=$('skin-kicker');if(kicker)kicker.textContent=sunDisplay.active?(sample.now?'Sun exposure and shade right now':`Sun exposure and shade at ${formatTime(sample.time)}`):sample.now?'How it actually feels right now':`How will it feel outside at ${formatTime(sample.time)}?`;
  const preview=sample.now?'':'<div class="comfort-preview-heading"><button type="button" data-comfort-reset>Back to now</button></div>';
- $('skin-values').innerHTML=`${preview}${sunShadeHTML(c,forecast.location,sample.now?now:Date.parse(sample.time),{...sceneContext,primaryFeels:sample.feels,compact:true,pavement:pavementHTML(pavement,sample.feels,sceneContext)})}${sample.now?peakComparisonHTML(warmestTodayWindow(forecast,now),current.feels,zone,now):''}`;
+ $('skin-values').innerHTML=`${preview}${sunShadeHTML(c,forecast.location,sample.now?now:Date.parse(sample.time),{...sceneContext,primaryFeels:sample.feels,sunExposure:sunDisplay.value,compact:true,pavement:pavementHTML(pavement,sample.feels,sceneContext)})}${sample.now?peakComparisonHTML(warmestTodayWindow(forecast,now),current.feels,zone,now):''}`;
  $('skin-values').querySelector('[data-comfort-reset]')?.addEventListener('click',()=>selectComfortHour('now'));
- $('skin-explanation').textContent=sample.now?comfortNarrative(sample.inputs,c,summary,zone):`${sample.condition}. This hour uses air ${degrees(sample.temperature)}, dew point ${degrees(sample.inputs.dewpoint)} and ${number(sample.inputs.wind)} mph wind. Outdoors feels like ${degrees(sample.feels)}; shade ${degrees(c.shade)}. The outdoor illustration and solar estimate use this same forecast hour.`;
+ $('skin-explanation').textContent=sample.now?comfortNarrative(sample.inputs,c,summary,zone):`${sample.condition}. This hour uses air ${degrees(sample.temperature)}, dew point ${degrees(sample.inputs.dewpoint)} and ${number(sample.inputs.wind)} mph wind. ${sunDisplay.active?`Estimated sun exposure ${degrees(sunDisplay.value)}; `:''}UTCI outdoors ${degrees(sample.feels)}; shade ${degrees(c.shade)}. The outdoor illustration and solar estimate use this same forecast hour.`;
  const tile=$('skin-exposure');tile.dataset.preview=sample.now?'current':'forecast';tile.dataset.weather=weatherState(sample.condition).kind;
  tile.querySelector('.comfort-weather-art')?.remove();
  document.querySelectorAll('#hourly [data-comfort-time]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.comfortTime===(sample.now?'now':sample.id))));
- if($('comfort-extra-science'))$('comfort-extra-science').innerHTML=`<p>${esc(sampleCaption(sample,zone))}</p><p>Shade and outdoors are modeled feels-like temperatures from the same weather inputs. The outdoor number also includes radiant exposure, accounting for humidity, wind, clouds and sunlight. The sidewalk and asphalt readings are estimated surface temperatures, not air temperature or human feels-like. The dog walker’s outfit follows the selected outdoor feels-like estimate, not the pavement.</p>`;
+ if($('comfort-extra-science'))$('comfort-extra-science').innerHTML=`<p>${esc(sampleCaption(sample,zone))}</p><p>${sunDisplay.active?'The sun figure is an estimated air temperature plus the model’s sun-versus-shade radiant increase. It is not a thermometer reading or UTCI. The shade figure is modeled UTCI.':'Shade and outdoors are modeled feels-like temperatures from the same weather inputs.'} The sidewalk and asphalt readings are estimated surface temperatures, not air temperature or human feels-like. The dog walker’s outfit follows the selected outdoor exposure estimate, not the pavement.</p>`;
  if($('pavement-current-science'))$('pavement-current-science').innerHTML=pavementDetailsHTML(pavement);
- $('skin-science').textContent=`${c.method}. ${sampleCaption(sample,zone)}. Air ${degrees(sample.temperature)}; dew point ${degrees(sample.inputs.dewpoint)}; wind ${number(sample.inputs.wind)} mph${finite(sample.inputs.gust)?`; gust ${number(sample.inputs.gust)} mph`:''}. ${c.note} Current observations and future forecasts are different sources; the Now card uses exactly the same observation as the hero. The raw thermal calculation is unchanged. For display only, the primary outdoor feels-like is not shown below the same-hour dew point unless gusts reach ${GUSTY_FEELS_DISPLAY_MPH} mph.`;
+ $('skin-science').textContent=`${c.method}. ${sampleCaption(sample,zone)}. Air ${degrees(sample.temperature)}; dew point ${degrees(sample.inputs.dewpoint)}; wind ${number(sample.inputs.wind)} mph${finite(sample.inputs.gust)?`; gust ${number(sample.inputs.gust)} mph`:''}. ${sunDisplay.active?`The sun-exposure display adds the modeled UTCI sun-minus-shade difference (${degrees(sunDisplay.solarLift)}) to air temperature; it is an estimate, not measured air temperature or UTCI. `:''}${c.note} Current observations and future forecasts are different sources; the Now card uses exactly the same observation as the hero. The raw thermal calculation is unchanged. For display only, the primary outdoor feels-like is not shown below the same-hour dew point unless gusts reach ${GUSTY_FEELS_DISPLAY_MPH} mph.`;
 }
 function dailyWindSummary(forecast,day,display,index,now){
  const zone=forecast?.location?.timeZone||'America/New_York';

@@ -89,7 +89,8 @@ export function sunShadeHTML(comfort,location,now=Date.now(),context={}){
  const shadeDisplay=finite(comfort?.shade)?comfort.shade:finite(context.primaryFeels)?context.primaryFeels:null;
  const shade=finite(shadeDisplay)?`${Math.round(shadeDisplay)}°`:'Unavailable';
  const exposure=outdoorExposure({...comfort,daylight,weatherKind:kind,condition});
- const outdoorValue=exposure.value,rawRiskValue=finite(comfort?.rawOutdoors)?comfort.rawOutdoors:outdoorValue;
+ const sunDisplay=finite(context.sunExposure)&&daylight&&['clear','partly-cloudy'].includes(kind);
+ const outdoorValue=sunDisplay?context.sunExposure:exposure.value,rawRiskValue=finite(comfort?.rawOutdoors)?comfort.rawOutdoors:exposure.value;
  const outside=finite(outdoorValue)?`${Math.round(outdoorValue)}°`:'Unavailable';
  const period=context.forecast?'forecast':'right now';
  const basis=comfort?.conditionSource?` · ${esc(comfort.conditionSource)}`:'';
@@ -103,10 +104,10 @@ export function sunShadeHTML(comfort,location,now=Date.now(),context={}){
   radarThreat:context.radarThreat===true,
  };
  const activeRain=precipitationActivity(condition,sceneContext)==='active';
- const compactSunTitle=!daylight?'Night':activeRain?'Rain':'Day';
+ const compactSunTitle=!daylight?'Night':activeRain?'Rain':kind==='clear'?'Sun':kind==='partly-cloudy'?'Sun breaks':'Day';
  const shadeSubtitle=activeRain?'Rain outside · sheltered':comfortSubtitle(shadeDisplay);
  const outdoorSubtitle=activeRain?'Raining now':sunSubtitle(outdoorValue,kind,daylight);
- return `<div class="sun-shade-comparison" role="group" aria-label="Shade, outdoor and pet temperatures"><figure class="exposure-person shade-person" data-reading="${finite(shadeDisplay)?'available':'unavailable'}" data-weather="${esc(kind)}">${context.compact?`<span class="exposure-label">Shade</span><span class="exposure-subtitle">${esc(shadeSubtitle)}</span><span class="exposure-alert-slot"></span>`:''}${exposureScene(false,daylight,condition,shadeDisplay,sceneContext)}<figcaption><strong>${shade}</strong>${context.compact?'':`<span>Modeled shade feels-like · ${period}</span>`}</figcaption></figure><figure class="exposure-person sun-person" data-reading="${finite(outdoorValue)?'available':'unavailable'}" data-weather="${esc(kind)}">${context.compact?`<span class="exposure-label">${esc(compactSunTitle)}</span><span class="exposure-subtitle">${esc(outdoorSubtitle)}</span><span class="exposure-alert-slot">${thermalRiskHTML(rawRiskValue,true)}</span>`:''}${exposureScene(true,daylight,condition,outdoorValue,sceneContext)}<figcaption>${context.compact?'':thermalRiskHTML(rawRiskValue,true)}<strong>${outside}</strong>${context.compact?'':`<span>${esc(exposure.label)} · ${period}</span>`}</figcaption></figure>${context.pavement||''}</div>${context.compact?'':`<small class="exposure-estimate">Estimated feels-like temperatures · °F${note}${basis}${shadeBasis}</small>`}`;
+ return `<div class="sun-shade-comparison" role="group" aria-label="Shade, outdoor and pet temperatures"><figure class="exposure-person shade-person" data-reading="${finite(shadeDisplay)?'available':'unavailable'}" data-weather="${esc(kind)}">${context.compact?`<span class="exposure-label">Shade</span><span class="exposure-subtitle">${esc(shadeSubtitle)}</span><span class="exposure-alert-slot"></span>`:''}${exposureScene(false,daylight,condition,shadeDisplay,sceneContext)}<figcaption><strong>${shade}</strong>${context.compact?'':`<span>Modeled shade feels-like · ${period}</span>`}</figcaption></figure><figure class="exposure-person sun-person" data-reading="${finite(outdoorValue)?'available':'unavailable'}" data-weather="${esc(kind)}">${context.compact?`<span class="exposure-label">${esc(compactSunTitle)}</span><span class="exposure-subtitle">${esc(outdoorSubtitle)}</span><span class="exposure-alert-slot">${thermalRiskHTML(rawRiskValue,true)}</span>`:''}${exposureScene(true,daylight,condition,outdoorValue,sceneContext)}<figcaption>${context.compact?'':thermalRiskHTML(rawRiskValue,true)}<strong>${outside}</strong>${context.compact?'':`<span>${sunDisplay?'Sun-exposure estimate':esc(exposure.label)} · ${period}</span>`}</figcaption></figure>${context.pavement||''}</div>${context.compact?'':`<small class="exposure-estimate">${sunDisplay?'Sun: modeled air plus solar uplift; shade: modeled UTCI.':'Estimated feels-like temperatures.'} · °F${note}${basis}${sunDisplay?'':shadeBasis}</small>`}`;
 }
 export function modelFreshnessText(layer,checkedAt,zone='America/New_York',now=Date.now()){
  if(!layer)return '';

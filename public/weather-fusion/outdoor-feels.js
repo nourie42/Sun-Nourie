@@ -23,3 +23,15 @@ export function outdoorExposure(comfort = {}) {
     : day && ['clear','partly-cloudy'].includes(kind) && finite(comfort.sun) ? comfort.sun : comfort.shade;
   return {value:finite(candidate)?candidate:null,label,shortLabel,basis:'outdoors'};
 }
+
+/** Air temperature plus the modeled radiant difference between sun and shade.
+ * This is a sun-exposure display estimate, not a thermometer reading or UTCI.
+ */
+export function sunExposureTemperature(sample = {}) {
+  const air=sample.temperature,comfort=sample.comfort||{};
+  const active=comfort.daylight===true&&['clear','partly-cloudy'].includes(comfort.weatherKind);
+  const shade=comfort.rawShade,sun=comfort.rawOutdoors;
+  if(!active||!finite(air)||!finite(shade)||!finite(sun))return {active:false,value:null,solarLift:null};
+  const solarLift=Math.max(0,sun-shade);
+  return {active:true,value:air+solarLift,solarLift};
+}

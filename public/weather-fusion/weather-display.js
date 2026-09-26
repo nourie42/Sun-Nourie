@@ -168,7 +168,7 @@ export function sampleCaption(sample, zone = 'America/New_York') {
     : `${time} forecast · air ${degrees(sample.temperature)} · feels like ${degrees(sample.feels)} ${sample.exposure.label.toLowerCase()}`;
 }
 
-export function heroFeelsHTML(sample) {
+export function heroFeelsHTML(sample,{sunExposure=false}={}) {
   const source = sample.source === 'Station observation' ? 'based on the current station reading'+(sample.inputs.comfortSourceNote?' · '+sample.inputs.comfortSourceNote:'') : 'estimated from forecast data';
-  return `Feels like <strong>${degrees(sample.feels)}</strong><small>${esc(sample.exposure.label)} · ${source}</small>`;
+  return `${sunExposure?'UTCI feels like':'Feels like'} <strong>${degrees(sample.feels)}</strong><small>${esc(sample.exposure.label)} · ${source}</small>`;
 }
