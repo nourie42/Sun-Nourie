@@ -38,7 +38,8 @@ assert.equal(dataResponse.status,200);
 const data=await dataResponse.json();
 assert.equal(data.comparison.source,'google');
 assert.ok(data.hours.some(h=>Date.parse(h.time)>=Date.now()&&Number.isFinite(h.temperature)));
-assert.ok(data.feeds.every(f=>f.id.startsWith('google-')));
+assert.ok(data.feeds.some(f=>f.id.startsWith('google-')),'At least one WeatherNext model feed must contribute.');
+assert.match(data.methodology,/Google WeatherNext only|Core weather fields use WeatherNext/i);
 
 const browser=await chromium.launch({headless:true});
 const report={deployed:true,liveData:true,point:point.id,runs:data.comparison.runs,viewports:[],deviceCoordinates:false};
