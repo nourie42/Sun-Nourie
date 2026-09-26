@@ -124,7 +124,7 @@ export function registerWeatherComparisonRoutes(app,{fetchImpl=globalThis.fetch,
   const feed=await getFeed();
   const point=googlePoints(feed).find(p=>requested?Math.abs(p.latitude-requested.latitude)<.00011&&Math.abs(p.longitude-requested.longitude)<.00011:p.id===query.location);
   if(point)return {feed,point};
-  if(!requested)throw Object.assign(Error('Choose a city or use your device location.'),{status:400});
+  if(!requested)throw Object.assign(Error(query.location?'Google has no published forecast for that location.':'Choose a city or use your device location.'),{status:query.location?404:400});
   const saved=localFeed(requested);
   return {feed:saved,point:saved?.points[0]||requested};
  }
