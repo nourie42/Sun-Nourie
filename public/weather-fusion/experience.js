@@ -102,7 +102,7 @@ export function renderComfort(forecast) {
  const precipitation=forecastValue(forecast,'precipitation',sample.time);
  const sceneContext={forecast:!sample.now,condition:sample.condition,pop:sample.pop,precipitation,rainAround:sample.rainAround===true,radarThreat:sample.radarThreat===true};
  const pavement=pavementEstimate(forecast,sample.inputs,sample.now?now:Date.parse(sample.time),{checkedAt:now,...sceneContext});
- const kicker=$('skin-kicker');if(kicker)kicker.textContent=sunDisplay.active?(sample.now?'Sun exposure and shade right now':`Sun exposure and shade at ${formatTime(sample.time)}`):sample.now?'How it actually feels right now':`How will it feel outside at ${formatTime(sample.time)}?`;
+ const kicker=$('skin-kicker');if(kicker)kicker.textContent=sample.now?'How it actually feels right now':`How will it feel outside at ${formatTime(sample.time)}?`;
  const preview=sample.now?'':'<div class="comfort-preview-heading"><button type="button" data-comfort-reset>Back to now</button></div>';
  $('skin-values').innerHTML=`${preview}${sunShadeHTML(c,forecast.location,sample.now?now:Date.parse(sample.time),{...sceneContext,primaryFeels:sample.feels,sunExposure:sunDisplay.value,compact:true,pavement:pavementHTML(pavement,sample.feels,sceneContext)})}${sample.now?peakComparisonHTML(warmestTodayWindow(forecast,now),current.feels,zone,now):''}`;
  $('skin-values').querySelector('[data-comfort-reset]')?.addEventListener('click',()=>selectComfortHour('now'));

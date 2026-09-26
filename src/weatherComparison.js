@@ -12,7 +12,7 @@ import express from 'express';
 import {createWeatherNextAccess} from './weatherNextAccess.js';
 import {createWeatherNextLocationProvider,locationPoint} from './weatherNextLocation.js';
 const root=fileURLToPath(new URL('../public/weather-fusion/',import.meta.url));
-const version='sun-exposure-v1';
+const version='air-hero-v1';
 const mean=a=>{const v=a.filter(finite);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null;};
 const extreme=(a,fn)=>{const v=a.filter(finite);return v.length?fn(...v):null;};
 const round=v=>finite(v)?Math.round(v*10)/10:null;

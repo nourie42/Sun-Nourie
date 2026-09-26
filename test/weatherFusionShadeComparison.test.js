@@ -30,7 +30,7 @@ test('Shade stays unavailable when the modeled shade value is unavailable',()=>{
   assert.equal(shade,'Unavailable','Do not silently substitute air temperature for a missing modeled shade feels-like');
 });
 
-test('main sun reading and the sun figure use one air-plus-radiant estimate',()=>{
+test('sun figure uses the air-plus-radiant estimate rather than the air reading',()=>{
   const sample={temperature:68,comfort:{daylight:true,weatherKind:'clear',rawShade:58,rawOutdoors:67,shade:58,outdoors:67,sun:67}};
   const display=sunExposureTemperature(sample);
   assert.deepEqual(display,{active:true,value:77,solarLift:9});

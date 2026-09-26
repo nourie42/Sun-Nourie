@@ -1,6 +1,4 @@
 import {displayedFeelsAt} from '/weather-fusion/hourly-feels.js?v=dewpoint-floor-v1';
-import {currentSample} from '/weather-fusion/weather-display.js?v=sun-exposure-v1';
-import {sunExposureTemperature} from '/weather-fusion/outdoor-feels.js?v=sun-exposure-v1';
 import {installWeatherNextAccess} from '/weather-fusion/weathernext-access.js?v=private-location-v1';
 const sections=['city-name','today-forecast','hourly','skin-exposure','daily-panel','metrics','air-quality','map-panel','scientific-stuff'];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -13,7 +11,7 @@ export function installComparisonPane(config,actions){
  function googleLabels(data){
   document.title='Experimental NVIDIA AI Weather';
   $('observation-label').textContent='Model forecast � valid '+new Intl.DateTimeFormat('en-US',{timeZone:data.location.timeZone,month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}).format(new Date(data.current.time))+' � not a live station reading';
-  const label=document.querySelector('.current-temp-label');if(label)label.textContent=sunExposureTemperature(currentSample(data)).active?'Forecast sun-exposure estimate':'Forecast air temperature';
+  const label=document.querySelector('.current-temp-label');if(label)label.textContent='Forecast air temperature';
 
   if($('ai-label'))$('ai-label').textContent='LOCAL OUTLOOK';
   if($('briefing-stamp'))$('briefing-stamp').textContent='Weather Nourie forecast summary';
