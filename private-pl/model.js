@@ -22,7 +22,7 @@ export function payrollDates(line,month) {
  if(!dateOK(line.anchor)) return [];
  let at=new Date(line.anchor+'T12:00:00Z'); const start=new Date(month+'-01T00:00:00Z');
  const end=new Date(shiftMonth(month,1)+'-01T00:00:00Z'); const interval=14*86400000;
- at=new Date(at.getTime()+Math.max(0,Math.ceil((start-at)/interval))*interval);
+ at=new Date(at.getTime()+Math.ceil((start-at)/interval)*interval);
  const result=[]; while(at<end){if(at>=start)result.push(at.toISOString().slice(0,10));at=new Date(at.getTime()+interval);} return result;
 }
 function lineSum(tx,key,month,pending=false) {
@@ -58,6 +58,7 @@ export function calculate(s) {
    return base;
   };
   if(!['variable','variable_new','none'].includes(line.method))estimate=base<0?Math.min(sofar,forecast(current)):Math.max(sofar,forecast(current));
+  if(own(s.overrides,line.key+'|'+current))estimate=s.overrides[line.key+'|'+current].amount;
   const values=columns.map(c=>c.type==='actual'?lineSum(tx,line.key,c.month):c.type==='estimate'?estimate:forecast(c.month));
   byKey[line.key]={...line,baseUsed:base,prev,posted,pending,estimate,values,total:values.slice(3).reduce((a,b)=>a+b,0)};
  }
