@@ -12,6 +12,19 @@ const icon = kind => kind === 'perfect'
   : '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M8 20a6 6 0 1 1 1-12 8 8 0 0 1 15 3 4.5 4.5 0 0 1 0 9H8ZM10 24l-2 4m10-4-2 4m10-4-2 4"/></svg>';
 let latest = null, currentView = null, selectedKind = null, boundDialog = null, refreshTimer = null;
 
+function ensureTrackerLink() {
+  if (!/\/weather-fusion\/experimental-weather\.html$/i.test(location.pathname)) return;
+  if (document.getElementById('experimental-whats-up-link')) return;
+  const back = document.getElementById('experimental-back'), shell = document.querySelector('.shell');
+  if (!back || !shell) return;
+  const link = document.createElement('a');
+  link.className = 'experimental-whats-up-link';
+  link.id = 'experimental-whats-up-link';
+  link.href = '/whats-up';
+  link.textContent = 'Perfect weather tracker';
+  back.after(link);
+}
+
 export function forecastWindowBannerHTML(view, kind, now = Date.now()) {
   const windows = view[kind] || [], first = windows[0];
   if (!first) return '';
@@ -27,7 +40,7 @@ export function forecastWindowDetailHTML(view, kind, place, now = Date.now()) {
   const headers = perfect ? '<th scope="col">Hour</th><th scope="col">Feels like</th><th scope="col">Dew point</th><th scope="col">Clouds</th><th scope="col">Rain</th>' : '<th scope="col">Hour</th><th scope="col">Rain likelihood</th><th scope="col">Outlook</th>';
   const row = h => `<tr data-forecast-hour="${esc(h.time)}"><th scope="row">${esc(clock(Date.parse(h.time),zone,true))}</th>${perfect ? `<td>${value(h.feels,'°')}</td><td>${value(h.dewpoint,'°')}</td><td>${value(h.cloud,'%')}</td><td>${value(h.rainChance,'%')}</td>` : `<td>${value(h.rainChance,'%')}</td><td>${h.thunder ? 'Thunderstorms possible' : finite(h.rainChance)&&h.rainChance>=80 ? 'High rain likelihood' : 'Rain likely'}</td>`}</tr>`;
   const period = w => `<div class="forecast-window-period"><h4>${esc(timeRange(w,zone,now))}${perfect?'':` <span>${esc(w.title)}</span>`}</h4><div class="forecast-window-table-wrap"><table class="forecast-window-table"><caption class="sr-only">${esc(heading)}: ${esc(dayLabel(w.start,zone,now))}, ${esc(timeRange(w,zone,now))}</caption><thead><tr>${headers}</tr></thead><tbody>${w.hours.map(row).join('')}</tbody></table></div></div>`;
-  return `<div class="dialog-eyebrow">${esc(place||'Your location')}</div><h2 id="forecast-window-title">${heading}</h2><p class="forecast-window-intro">All qualifying forecast times, in local time.</p>${[...groups.values()].map(group=>`<section class="forecast-window-day"><h3>${esc(dayLabel(group[0].start,zone,now))}</h3>${group.map(period).join('')}</section>`).join('')}`;
+  return `<div class="dialog-eyebrow">${esc(place||'Your location')}</div><h2 id="forecast-window-title">${heading}</h2><p class="forecast-window-intro">All qualifying forecast times in the next 5 days, in local time.</p>${[...groups.values()].map(group=>`<section class="forecast-window-day"><h3>${esc(dayLabel(group[0].start,zone,now))}</h3>${group.map(period).join('')}</section>`).join('')}`;
 }
 
 function bindDialog() {
@@ -47,6 +60,7 @@ function openWindow(kind, now = Date.now()) {
   document.body.classList.add('dialog-open');
 }
 export function renderForecastWindowBanners(data, now = Date.now()) {
+  ensureTrackerLink();
   const root=document.getElementById('forecast-window-banners');
   if(!root)return;
   latest=data;currentView=buildForecastWindows(data,now);
