@@ -686,10 +686,10 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
   });
-  app.get(['/weathernext','/weathernext/','/weather-fusion/weathernext-site.html'], (req,res) => {
-    // This route used to serve the shared Weather Fusion shell. Mobile browsers can
-    // retain that old HTML behind a conditional GET, so force a fresh 200 response
-    // until every client has moved to the dedicated WeatherNext page.
+  app.get('/weather-fusion/weathernext-site.html', (req,res) => {
+    // The standalone data explorer lives at its explicit file route. The public
+    // /weathernext dashboard is owned by weatherComparison.js so it can reuse
+    // the normal Weather Nourie layout with Google WeatherNext forecast data.
     delete req.headers['if-none-match'];
     delete req.headers['if-modified-since'];
     res.setHeader('Cache-Control','no-store, no-cache, max-age=0, must-revalidate');
@@ -697,7 +697,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     res.setHeader('Expires','0');
     res.setHeader('X-Content-Type-Options','nosniff');
     res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');
-    res.setHeader('X-Weather-Nourie-Page','weathernext-standalone-20260925-cachefix');
+    res.setHeader('X-Weather-Nourie-Page','weathernext-data-explorer-20260925');
     res.sendFile(path.join(PUBLIC_DIR,'weathernext-site.html'),{lastModified:false,cacheControl:false});
   });
   for (const name of [
