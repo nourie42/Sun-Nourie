@@ -29,6 +29,17 @@ const experimentalPage = isExperimentalWeatherPage();
 const finite = (n) => typeof n === 'number' && Number.isFinite(n);
 const DEVICE_LOCATION_KEY='weather-fusion-device-place';
 const validPlace=p=>p&&finite(p.latitude)&&finite(p.longitude)&&p.latitude>=24&&p.latitude<=50&&p.longitude>=-125&&p.longitude<=-66;
+const GOOGLE_PUBLISHED_POINTS=[
+  {id:'knightdale',latitude:35.787,longitude:-78.4806},
+  {id:'greenville',latitude:35.6127,longitude:-77.3664},
+];
+const milesBetween=(a,b)=>{
+  const lat=(a.latitude+b.latitude)*Math.PI/360;
+  const north=(a.latitude-b.latitude)*69;
+  const east=(a.longitude-b.longitude)*69*Math.cos(lat);
+  return Math.hypot(north,east);
+};
+const nearbyGooglePoint=value=>GOOGLE_PUBLISHED_POINTS.map(p=>({...p,miles:milesBetween(value,p)})).sort((a,b)=>a.miles-b.miles).find(p=>p.miles<=10)||null;
 const readDeviceLocation=()=>{
   try{const p=JSON.parse(localStorage.getItem(DEVICE_LOCATION_KEY));return validPlace(p)?{...p,id:'device',source:'device-cache'}:null;}catch{return null;}
 };
@@ -274,7 +285,10 @@ function chooseLocation(value,{rememberDevice=false}={}) {
   ++locationRequest;
   place = { ...value };
   const compareLink=document.querySelector('.forecast-compare-banner[href^="/weathernext/"]');
-  if(compareLink)compareLink.href='/weathernext/?'+new URLSearchParams({latitude:value.latitude,longitude:value.longitude});
+  if(compareLink){
+    const published=nearbyGooglePoint(value);
+    compareLink.href='/weathernext/?'+new URLSearchParams(published?{location:published.id}:{latitude:value.latitude,longitude:value.longitude});
+  }
   stopRadar();framePlayer?.clear();++modelFrameToken;++mapSelectionToken;++radarGeneration;lastRadarFetch=0;
   currentBriefing = null;
   resetExperience();
