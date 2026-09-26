@@ -19,7 +19,7 @@ test('today uses 40/30/10/20 while later rain excludes HRRR',()=>{
  assert.deepEqual(temperaturePolicy(0),{nws:.4,hrrr:.3,ecmwf:.1,nbm:.2});
  assert.deepEqual(temperaturePolicy(6),temperaturePolicy(0));
  assert.deepEqual(precipitationPolicy(0),temperaturePolicy(0));
- assert.deepEqual(precipitationPolicy(1),{nws:1});
+ assert.deepEqual(precipitationPolicy(1),{nws:.15,ecmwf:.6,nbm:.25});
  assert.deepEqual(precipitationPolicy(6),precipitationPolicy(1));
  assert.deepEqual(out.blendPolicy.sameDay,temperaturePolicy(0));
  assert.deepEqual(out.blendPolicy.extendedRain,precipitationPolicy(1));
@@ -164,8 +164,9 @@ test('fresh nearby precipitation condition survives a rejected station temperatu
  assert.match(current.conditionSource,/observation/i);
 });
 
-test('public methodology states that future rain chance uses NWS directly',()=>{
+test('public methodology states the restored extended rain blend',()=>{
  const out=buildForecast({...testInputs,models:models()});
- assert.match(out.methodology,/displayed rain chance uses the official NWS hourly probability directly/i);
- assert.doesNotMatch(out.methodology,/extended policy uses NWS 15%, ECMWF 60% and NBM 25%/i);
+ assert.match(out.methodology,/NWS hourly probability fills its 15-point share proportionally, ECMWF is worth 60 points and NBM 25 points/i);
+ assert.match(out.blendPolicy.probability,/NWS fills a 15-point share proportionally; ECMWF is worth 60 points and NBM 25/i);
+ assert.doesNotMatch(out.methodology,/displayed rain chance uses the official NWS hourly probability directly/i);
 });

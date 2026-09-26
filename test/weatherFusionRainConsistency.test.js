@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {buildForecast,localTime,nextDate} from '../src/weatherFusion.js';
-import {precipitationLikelihood,summarizeRainTimeline,validateSnapshot,solarTimes} from '../src/weatherFusionDirect.js';
+import {buildForecast,localTime,nextDate,dateKey,gridQpf} from '../src/weatherFusion.js';
+import {enhanceForecast,precipitationLikelihood,summarizeRainTimeline,validateSnapshot,solarTimes} from '../src/weatherFusionDirect.js';
 import {addExperience} from '../src/weatherFusionExperience.js';
 import {snapshot,testInputs} from './weatherFusion.fixtures.js';
 
@@ -31,46 +31,63 @@ function matchingRows(data,summary) {
   return data.rainTimeline.filter(row=>Date.parse(row.time)<end&&Date.parse(row.end)>start);
 }
 
-test('later-day trace amounts match NWS without HRRR',()=>{
+test('later-day trace amounts use the extended blend without HRRR',()=>{
   const data=buildForecast(inputs());
   const day=data.days[1],rows=matchingRows(data,day.rainLikelihood);
-  assert.equal(day.rainLikelihood.value,39);
+  assert.equal(day.rainLikelihood.value,34); // 39*.15 + 60/3 + 25/3
   assert.equal(day.rainLikelihood.value,Math.max(...rows.map(row=>row.rainLikelihood.value)));
-  assert.deepEqual(new Set(rows.map(row=>row.rainLikelihood.value)),new Set([39]));
+  assert.deepEqual(new Set(rows.map(row=>row.rainLikelihood.value)),new Set([34]));
   assert.ok(rows.every(row=>row.rainLikelihood.sourcePoints.hrrr===null));
   assert.ok(rows.every(row=>!row.rainLikelihood.sources.some(source=>source.id==='hrrr')));
   assert.equal(day.rainLikelihood.coverage.complete,true);
   assert.equal(day.officialPop,39,'raw NWS period probability remains separate');
 });
 
-test('an isolated later-day model rain hour matches the NWS probability',()=>{
+test('an isolated later-day model rain hour uses the extended blend',()=>{
   const data=inputs({chance:49,amount:0});
   const target=now+36*H;
   for(const id of ['ecmwf','nbm'])for(const interval of data.models[id].precipitationIntervals)if(interval.start*1000===target)interval.value=.012;
   const forecast=buildForecast(data),row=forecast.rainTimeline.find(item=>Date.parse(item.time)===target);
-  assert.equal(row.rainLikelihood.value,49);
-  assert.deepEqual(row.rainLikelihood.sourcePoints,{nws:49,hrrr:null,ecmwf:null,nbm:null});
-  assert.deepEqual(row.rainLikelihood.sources.map(source=>source.id),['nws']);
+  assert.equal(row.rainLikelihood.value,92); // 49*.15 + 60 + 25
+  assert.deepEqual(row.rainLikelihood.sourcePoints,{nws:7.35,hrrr:null,ecmwf:60,nbm:25});
+  assert.deepEqual(row.rainLikelihood.sources.map(source=>source.id),['nws','ecmwf','nbm']);
+  assert.equal(row.rainLikelihood.officialProbability,49);
+  assert.equal(row.rainLikelihood.fallbackReason,undefined);
 });
 
-test('adjacent later-day 0.01-inch model hours still match NWS',()=>{
+test('adjacent later-day 0.01-inch model hours each receive one-third model points',()=>{
   const data=inputs({chance:49,amount:0});
   const target=now+36*H;
-  for(const id of ['ecmwf','nbm'])for(const interval of data.models[id].precipitationIntervals)if([target,target+H].includes(interval.start*1000))interval.value=.012;
+  for(const id of ['ecmwf','nbm'])for(const interval of data.models[id].precipitationIntervals)if([target,target+H].includes(interval.start*1000))interval.value=.010;
   const forecast=buildForecast(data),rows=forecast.rainTimeline.filter(item=>[target,target+H].includes(Date.parse(item.time)));
   assert.equal(rows.length,2);
-  assert.ok(rows.every(row=>row.rainLikelihood.value===49));
-  assert.ok(rows.every(row=>row.rainLikelihood.sources.map(source=>source.id).join(',')==='nws'));
+  assert.ok(rows.every(row=>row.rainLikelihood.value===36)); // 49*.15 + 60/3 + 25/3
+  assert.ok(rows.every(row=>row.rainLikelihood.sourcePoints.ecmwf===20));
+  assert.ok(rows.every(row=>Math.abs(row.rainLikelihood.sourcePoints.nbm-25/3)<1e-8));
 });
 
-test('adjacent later-day meaningful model rain still confirms rather than inflates NWS',()=>{
+test('adjacent later-day meaningful model rain uses the same extended points as an isolated hour',()=>{
   const data=inputs({chance:49,amount:0});
   const target=now+36*H;
   for(const id of ['ecmwf','nbm'])for(const interval of data.models[id].precipitationIntervals)if([target,target+H].includes(interval.start*1000))interval.value=.03;
   const forecast=buildForecast(data),rows=forecast.rainTimeline.filter(item=>[target,target+H].includes(Date.parse(item.time)));
   assert.equal(rows.length,2);
-  assert.ok(rows.every(row=>row.rainLikelihood.value===49));
-  assert.ok(rows.every(row=>row.rainLikelihood.sourcePoints.ecmwf===null&&row.rainLikelihood.sourcePoints.nbm===null));
+  assert.ok(rows.every(row=>row.rainLikelihood.value===92));
+  assert.ok(rows.every(row=>row.rainLikelihood.sourcePoints.ecmwf===60&&row.rainLikelihood.sourcePoints.nbm===25));
+});
+
+test('extended rain policy changes at local midnight and missing models never restore full NWS probability',()=>{
+  const data=inputs({chance:80,amount:.02});
+  data.models={};
+  const forecast=buildForecast(data),midnight=localTime(nextDate('2026-09-05'),0,zone);
+  const before=forecast.rainTimeline.find(row=>Date.parse(row.time)===midnight-H);
+  const after=forecast.rainTimeline.find(row=>Date.parse(row.time)===midnight);
+  assert.equal(before.rainLikelihood.value,32);
+  assert.equal(after.rainLikelihood.value,12);
+  assert.deepEqual(before.rainLikelihood.sources.map(source=>[source.id,source.weight]),[['nws',.4]]);
+  assert.deepEqual(after.rainLikelihood.sources.map(source=>[source.id,source.weight]),[['nws',.15]]);
+  assert.equal(after.rainLikelihood.sourcePoints.ecmwf,null);
+  assert.equal(after.rainLikelihood.sourcePoints.nbm,null);
 });
 
 test('every day and night percentage is the peak of identical canonical hourly evidence',()=>{
@@ -92,7 +109,7 @@ test('every day and night percentage is the peak of identical canonical hourly e
   }
 });
 
-test('NWS-only daily peak beyond the 48-hour strip remains auditable on the full hourly timeline',()=>{
+test('weighted NWS daily peak beyond the 48-hour strip remains auditable on the full hourly timeline',()=>{
   const data=inputs({chance:0,amount:0});
   const peakTime=localTime('2026-09-08',16,zone);
   const peak=data.hourly.periods.find(row=>Date.parse(row.startTime)===peakTime);
@@ -101,12 +118,40 @@ test('NWS-only daily peak beyond the 48-hour strip remains auditable on the full
   assert.equal(forecast.hours.length,48);
   assert.ok(forecast.rainTimeline.length>48);
   assert.equal(day.rainLikelihood.peakTime,iso(peakTime));
-  assert.equal(day.rainLikelihood.value,81);
+  assert.equal(day.rainLikelihood.value,12); // 81*.15 with dry model inputs
   assert.equal(day.rainLikelihood.peak.sourceValues.nws,81);
   assert.equal(day.rainLikelihood.peak.officialProbability,81);
   assert.equal(day.rainLikelihood.peak.sources.find(source=>source.id==='nws').runAt,iso(now-H));
-  assert.deepEqual(day.rainLikelihood.peak.sources.map(source=>source.id),['nws']);
+  assert.deepEqual(day.rainLikelihood.peak.sources.map(source=>source.id),['nws','ecmwf','nbm']);
   assert.equal(day.rainLikelihood.peak.calibrated,false);
+});
+
+test('the full rain timeline retains actual hourly thunder beyond 48 hours without projecting coarse conditions',()=>{
+  const data=inputs({chance:80,amount:.02});
+  data.hourly.periods[60].shortForecast='Chance Showers And Thunderstorms';
+  data.hourly.periods[61].shortForecast='Thunderstorms';
+  data.hourly.periods[61].endTime=iso(now+64*H);
+  data.hourly.periods[65].shortForecast='Thunderstorms';
+  delete data.hourly.periods[65].endTime;
+  const forecast=buildForecast(data),at=index=>forecast.rainTimeline.find(row=>row.time===iso(now+index*H));
+  assert.equal(forecast.hours.length,48);
+  assert.equal(at(60).condition,'Chance Showers And Thunderstorms');
+  assert.equal(at(60).conditionSource,'NWS hourly forecast');
+  assert.equal(at(61).condition,null,'a three-hour condition does not establish hourly thunder timing');
+  assert.equal(at(61).conditionSource,null);
+  assert.equal(at(62).condition,'Partly Sunny','coarse thunder is not spread to adjacent hours');
+  assert.equal(at(65).condition,null,'raw source rows without a duration cannot establish hourly timing');
+});
+
+test('normalized hourly fallback preserves its condition but still rejects an explicitly coarse duration',()=>{
+  const data=inputs(),forecast=buildForecast(data);
+  forecast.hours[0].condition='Thunderstorms';
+  forecast.hours[1].condition='Thunderstorms';
+  forecast.hours[1].end=iso(now+4*H);
+  enhanceForecast(forecast,{models:data.models,grid:data.grid,now,gridQpf,localTime,nextDate,dateKey});
+  assert.equal(forecast.rainTimeline[0].condition,'Thunderstorms');
+  assert.equal(forecast.rainTimeline[0].conditionSource,'Hourly forecast condition');
+  assert.equal(forecast.rainTimeline[1].condition,null);
 });
 
 test('periods with an uncovered hour stay unavailable and retain the available peak for inspection',()=>{

@@ -2,7 +2,7 @@
 
 Before publishing weather changes, verify these rules against code, tests, and the live pages:
 
-- Rain chance math is not rainfall amount math. NWS probability contributes `NWS percent × 0.40`; HRRR contributes 30 points, ECMWF 10, and NBM 20 only when that model forecasts rain for that hour.
+- Rain chance math is not rainfall amount math. On the selected location's current local date, NWS probability contributes `NWS percent × 0.40`; HRRR has 30 points, ECMWF 10, and NBM 20. On later local dates, NWS contributes `NWS percent × 0.15`, ECMWF has 60 points, NBM 25, and HRRR contributes nothing. Every hour uses these same rules, including isolated rain hours.
 - Model QPF of exactly `0` gets `0` points. Model QPF above `0` through `0.010 in` gets exactly one-third of that model’s points. Model QPF above `0.010 in` gets full points.
 - Thunder/lightning appears only when the displayed forecast condition actually says thunder/storm/TSTM. A plain 100% rain forecast stays rain, not thunder.
 - Today’s background artwork follows the dominant displayed weather. Mostly rainy days use rain artwork; clear/sunny artwork is only for mostly clear/partly clear weather.

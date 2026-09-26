@@ -23,6 +23,7 @@ import {renderRiskOutlooks,resetRiskOutlooks} from './risk-outlooks.js?v=risk-ou
 import {renderAirQuality} from './air-quality.js?v=mobile-repair-v1';
 import {displayedRainChance} from './rain-display.js?v=rain-observed-v1';
 import {weatherChangeMessages,WEATHER_CHANGE_TITLE} from './weather-changes.js?v=large-change-v3';
+import {renderForecastWindowBanners,resetForecastWindowBanners} from './forecast-window-banners.js?v=blend-windows-v1';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);
 const experimentalPage = isExperimentalWeatherPage();
@@ -70,7 +71,6 @@ function configurePageMode() {
   const carWash=$('car-wash-forecast');if(carWash)carWash.hidden=!experimentalPage;
   const modelExplanation=$('model-explanation');if(modelExplanation)modelExplanation.hidden=!experimentalPage;
   const back=$('experimental-back');if(back)back.hidden=!experimentalPage;
-  const tracker=$('experimental-whats-up-link');if(tracker)tracker.hidden=!experimentalPage;
   const experimentBanner=document.querySelector('.experimental-page-banner');if(experimentBanner)experimentBanner.hidden=!experimentalPage;
 }
 configurePageMode();
@@ -136,6 +136,7 @@ function render(data) {
   $('observation-label').textContent = radarLabel ? `${sourceLabel} · ${radarLabel}` : sourceLabel;
   $('hero-scene').innerHTML = icon(hero.condition, hero.isDay, 120);
   renderWeatherChanges(data);
+  if(experimentalPage)draw('forecast-window-banners','Upcoming weather windows',()=>renderForecastWindowBanners(data));
   draw('alerts', 'Official alerts', () => renderAlerts(data));
   draw('risk-outlook-list', 'Outlooks', () => renderRiskOutlooks(data));
   draw('hourly', 'Hourly forecast', () => renderHours(data));
@@ -292,6 +293,7 @@ function chooseLocation(value,{rememberDevice=false}={}) {
   stopRadar();framePlayer?.clear();++modelFrameToken;++mapSelectionToken;++radarGeneration;lastRadarFetch=0;
   currentBriefing = null;
   resetExperience();
+  resetForecastWindowBanners();
   if ($('day-dialog').open) $('day-dialog').close();
   // Clear the previous location immediately, including its alerts and AI text.
   forecast = null;

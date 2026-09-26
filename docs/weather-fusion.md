@@ -33,17 +33,20 @@ Temperature starting weights (renormalized over complete available inputs):
 
 | Period | NWS | HRRR | ECMWF | NBM |
 |---|---:|---:|---:|---:|
-| Today | 60% | 20% | 10% | 10% |
-| Tomorrow | 60% | 10% | 20% | 10% |
-| Days 3–7 | 60% | — | 25% | 15% |
+| All forecast days | 40% | 30% | 10% | 20% |
 
 Model temperatures are aligned to remaining NWS daytime and overnight periods.
 Official NWS values remain separately visible in daily details.
 
-Near-term precipitation uses HRRR 60% / ECMWF 40%. Beyond that range the starting
-weights are ECMWF 60%, NBM 25%, NWS 15%. NBM/NWS provide labeled fallbacks when
-both near-term primary models lack complete coverage. The actual weights used are
-exposed, including renormalization. These are **uncalibrated starting weights**,
+Rainfall amount uses NWS 40%, HRRR 30%, ECMWF 10%, NBM 20% on the current local
+date. On later local dates it uses NWS 15%, ECMWF 60%, NBM 25%. The actual weights
+used are exposed, including renormalization over available amount inputs.
+Rain likelihood is a separate score using the same day-specific shares: NWS's
+official percentage fills its share proportionally; deterministic model QPF
+above zero through 0.010 inch receives one-third of that model's points, and
+QPF above 0.010 inch receives full points. Zero receives zero points; missing
+models add no points and do not cause score renormalization. Isolated and
+consecutive rain hours follow the same rule. These are **uncalibrated scores**,
 not a demonstrated ranking of accuracy or a statistical confidence interval.
 
 The precipitation metric shows the **next 24 hours starting at the next whole

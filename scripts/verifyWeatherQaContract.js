@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {readFileSync,readdirSync,statSync} from 'node:fs';
 import {join} from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {deterministicRainSignal,precipitationLikelihood} from '../src/weatherFusionDirect.js';
 import {weatherIcon} from '../public/weather-fusion/weather-display.js';
 import {conditionForRainChance,weatherState} from '../public/weather-fusion/weather-state.js';
@@ -62,7 +63,7 @@ function walk(dir,files=[]){
   return files;
 }
 const literalSecret=/sk-(?:proj-|live-|test-)?[A-Za-z0-9_-]{20,}/;
-for(const file of walk(new URL('..',import.meta.url).pathname)){
+for(const file of walk(fileURLToPath(new URL('..',import.meta.url)))){
   const text=readFileSync(file,'utf8');
   assert.doesNotMatch(text,literalSecret,`literal OpenAI-style secret found in ${file}`);
 }
