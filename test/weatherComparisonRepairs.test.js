@@ -28,7 +28,7 @@ test('comparison app adapter accepts the repository CRLF browser client',()=>{
  const transformed=comparisonApp(original,{source:'google',point:{id:'knightdale',name:'Knightdale / Raleigh',latitude:35.787,longitude:-78.4806},explicitLocation:true});
  assert.match(transformed,/installComparisonPane/);
  assert.match(transformed,/compareBridge\.requestForecast/);
- assert.doesNotMatch(transformed,/startDeviceLocation\(\);/);
+ assert.match(transformed,/if\(COMPARE\.explicitLocation\)chooseLocation\([\s\S]*else startDeviceLocation\(\);/);
 });
 test('legacy comparison URLs redirect directly to standalone forecast preserving location',async t=>{
  const app=express();registerWeatherComparisonRoutes(app,{feedProvider:async()=>feedFixture(),now:()=>now,companionProvider:async()=>({})});
