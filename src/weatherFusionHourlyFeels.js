@@ -28,7 +28,7 @@ export function rebuildHourlyFeels(out,{now,temperatureAt,humidityAt,skyAt=()=>n
   dewpoints.push({...rawDewpoint,time,value:dewpoint});
   humidities.push({time,value:humidity,source:'Same-hour temperature and dew point; NWS humidity only when dew point is missing'});
   const value=round(estimate.value);
-  const shadeValue=round(shade.value),sunValue=finite(sun.sun)?value:null;
+  const shadeValue=round(shade.value),sunValue=round(sun.sun);
   feels.push({time,value,inputs,condition,exposure:'outdoors',shadeValue,sunValue,daylight:sun.daylight,weatherKind:sun.weatherKind,source:estimate.method,inputEvidence:sun.inputEvidence,alignmentFactor:0,rawInputs:inputs});
   shades.push({time,value:shadeValue,inputs,condition,exposure:'shade',source:shade.method});
   suns.push({time,value:sunValue,inputs,source:'Estimated sun-exposed apparent temperature at this forecast hour',daylight:sun.daylight});
