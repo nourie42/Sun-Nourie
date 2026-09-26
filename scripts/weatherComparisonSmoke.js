@@ -16,7 +16,7 @@ try{
   await p.route('https://**',r=>r.abort());
   p.on('request',r=>{try{if(r.frame().url().includes('source=google')&&r.url().includes('/api/weather-fusion/'))googleRequests.push(r.url());}catch{}});
   await p.goto(base+'/weather-fusion/compare/',{waitUntil:'networkidle'});
-  await p.waitForFunction(()=>document.querySelector('#compare-status').textContent.includes('Both forecasts loaded'),null,{timeout:45000});
+  await p.waitForFunction(()=>document.querySelector('#compare-status')?.textContent?.includes('Both forecasts loaded')===true,null,{timeout:45000});
   const f=p.frames().find(f=>f.url().includes('source=fusion')),g=p.frames().find(f=>f.url().includes('source=google'));assert.ok(f&&g);
   for(const frame of [f,g]){assert.equal(await frame.locator('.today-weather-card').count(),1);assert.ok(await frame.locator('.today-sky[src*="/weather-fusion/"]').count()>=1);assert.ok(await frame.locator('#metrics button').count()>=5);assert.ok(!/NaN|undefined/.test(await frame.locator('#today-forecast').innerText()));}
   assert.ok(googleRequests.length>0);assert.ok(googleRequests.every(u=>u.includes('/compare/google')),googleRequests.join('\n'));
