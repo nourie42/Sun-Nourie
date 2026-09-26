@@ -39,5 +39,8 @@ test('legacy comparison URLs redirect directly to standalone forecast preserving
  }
  const html=await (await fetch(base+'/weathernext/')).text();
  assert.match(html,/Experimental NVIDIA AI Weather/);assert.doesNotMatch(html,/Forecast data: Google/);
+ const nearby=await (await fetch(base+'/weathernext/?latitude=35.7798&longitude=-78.5355')).text();
+ assert.match(nearby,/compare\/app\.js\?source=google&amp;location=knightdale&amp;explicit=1/);
+ assert.doesNotMatch(nearby,/&amp;latitude=35\.7798/);
  assert.match(readFileSync('public/weather-fusion/index.html','utf8'),/class="forecast-compare-banner" href="\/weathernext\/"/);
 });
