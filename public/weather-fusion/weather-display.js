@@ -123,7 +123,7 @@ export function forecastSample(forecast, time) {
   const value=rounded(estimated.rawOutdoors);
   if(finite(value)!==finite(point.value)||(finite(value)&&Math.abs(value-point.value)>.11))return null;
   const shown=displayFeelsValue(value,inputs.dewpoint,gust);
-  const comfort={...estimated,weatherKind:weatherState(condition).kind,outdoors:shown,shade:rounded(estimated.rawShade),sun:estimated.sun===null?null:shown,
+  const comfort={...estimated,weatherKind:weatherState(condition).kind,outdoors:shown,shade:point.shadeValue??rounded(estimated.rawShade),sun:point.sunValue??(estimated.sun===null?null:rounded(estimated.rawOutdoors)),
     ...(finite(shown)&&shown!==value?{displayFeelsGuard:{applied:true,raw:value,dewpoint:inputs.dewpoint,gust,threshold:GUSTY_FEELS_DISPLAY_MPH}}:{})};
   return {windDirection:hour.windDirectionDegrees??hour.windDirection,uvIndex:hourlyUvValue(forecast,epoch),id:new Date(epoch).toISOString(), now:false, time:hour.time,
     temperature:forecastValue(forecast,'temperature',hour.time), feels:displayedFeelsAt(forecast,hour.time),
