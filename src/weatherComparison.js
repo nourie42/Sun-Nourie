@@ -58,7 +58,10 @@ export function buildGoogleComparison(feed,pointId,now=Date.now()){
 }
 function replaceOnce(text,needle,value){if(!text.includes(needle))throw Error('Shared weather layout changed; comparison adapter requires review.');return text.replace(needle,value);}
 export function comparisonApp(original,config){
- let s=original.replaceAll("from './","from '/weather-fusion/");
+ // Repository browser assets are currently CRLF. Normalize before applying
+ // exact adapter edits so the generated Google dashboard script cannot fail
+ // just because of line-ending differences.
+ let s=original.replace(/\r\n?/g,'\n').replaceAll("from './","from '/weather-fusion/");
  s=`import {installComparisonPane} from '/weather-fusion/compare-bridge.js?v=${version}';\nconst COMPARE=${JSON.stringify(config)};\n`+s;
  s=replaceOnce(s,"async function api(path, params = '', signal) {","async function api(path, params = '', signal) {\n  if(COMPARE.source==='google'&&path==='forecast')return compareBridge.requestForecast(params,signal);");
  s=replaceOnce(s,"async function api(path, params = '', signal) {","async function api(path, params = '', signal) {\n  if(COMPARE.source==='google'&&!['forecast','search'].includes(path))throw Object.assign(new Error('Not supplied by Google WeatherNext.'),{status:503});");
@@ -88,6 +91,10 @@ export function registerWeatherComparisonRoutes(app,{fetchImpl=globalThis.fetch,
   }catch(e){next(e);}
  });
  app.get(['/weathernext','/weathernext/','/weather-fusion/weathernext-site.html'],async(req,res)=>{try{
+  // Do not let a stale pre-repair WeatherNext dashboard survive a mobile
+  // conditional GET. This is the first /weathernext route registered by server.js.
+  delete req.headers['if-none-match'];
+  delete req.headers['if-modified-since'];
   const points=googlePoints(await getFeed()),point=points.find(p=>p.id===req.query.location)||points[0];
   let html=await readFile(root+'index.html','utf8');
   html=html.replace(/<script type="module" src="\/weather-fusion\/app\.js[^"]*"><\/script>/, '<script type="module" src="/weather-fusion/compare/app.js?source=google&amp;location='+encodeURIComponent(point.id)+(req.query.location?'&amp;explicit=1':'')+(req.query.latitude!==undefined&&req.query.longitude!==undefined?'&amp;latitude='+encodeURIComponent(req.query.latitude)+'&amp;longitude='+encodeURIComponent(req.query.longitude):'')+'"></script>');
@@ -95,7 +102,7 @@ export function registerWeatherComparisonRoutes(app,{fetchImpl=globalThis.fetch,
   html=html.replace('</head>','<link rel="stylesheet" href="/weather-fusion/compare.css?v=mobile-repair-v1"></head>').replace('<body data-sky="day">','<body data-sky="day" class="google-pane weathernext-dashboard">');
   html=html.replace('<main id="forecast">','<h1 class="weathernext-heading">Experimental NVIDIA AI Weather</h1><main id="forecast">');
   html=html.replace('<a class="forecast-compare-banner" href="/weathernext/" aria-label="Compare to Nvidia AI Forecast">Compare to Nvidia AI Forecast</a>','<a class="forecast-compare-banner" href="/weather-fusion/">Back to Dan&#39;s Weather</a>');
-  res.set('Cache-Control','no-cache').type('html').send(html);
+  res.set('Cache-Control','no-store, no-cache, max-age=0, must-revalidate').set('Pragma','no-cache').set('Expires','0').set('X-Weather-Nourie-Page','google-dashboard-crlf-fix-20260925').type('html').send(html);
  }catch(e){fail(res,e);}});
  app.get(['/weather-fusion/compare','/weather-fusion/compare/','/weather-fusion/compare.html'],(req,res)=>res.set('Cache-Control','no-cache').redirect(302,'/weathernext/'+(typeof req.query.location==='string'?'?location='+encodeURIComponent(req.query.location):'')));
  for(const name of ['compare.css','compare.js','compare-bridge.js','weathernext-access.js'])app.get('/weather-fusion/'+name,(_req,res)=>res.set('Cache-Control','no-cache').sendFile(root+name));
@@ -135,5 +142,13 @@ export function registerWeatherComparisonRoutes(app,{fetchImpl=globalThis.fetch,
   res.set('Cache-Control','no-store').json(await forecastFor(await pending.get(point.id)));
  }catch(e){fail(res,e);}});
  app.get('/weather-fusion/compare/pane',async(req,res)=>{try{const c=await config(req.query);let html=await readFile(root+'index.html','utf8');html=html.replace(/<script type="module" src="\/weather-fusion\/app\.js[^\"]*"><\/script>/,`<script type="module" src="/weather-fusion/compare/app.js?source=${c.source}&amp;location=${encodeURIComponent(c.point.id)}"></script>`);html=html.replace('</head>',`<link rel="stylesheet" href="/weather-fusion/compare.css?v=${version}"></head>`).replace('<body data-sky="day">',`<body data-sky="day" class="comparison-pane ${c.source==='google'?'google-pane':'fusion-pane'}">`);if(c.source==='google')html=html.replace(/<script defer src="https:\/\/unpkg.com\/leaflet[^>]*><\/script>/,'');res.set('Cache-Control','no-cache').type('html').send(html);}catch(e){fail(res,e);}});
- app.get('/weather-fusion/compare/app.js',async(req,res)=>{try{const c=await config(req.query);res.set('Cache-Control','no-cache').type('application/javascript').send(comparisonApp(await readFile(root+'app.js','utf8'),c));}catch(e){res.status(503).type('application/javascript').send("throw new Error('The comparison page could not be prepared. Refresh or return to the main forecast.');");}});
+ app.get('/weather-fusion/compare/app.js',async(req,res)=>{try{
+  delete req.headers['if-none-match'];
+  delete req.headers['if-modified-since'];
+  const c=await config(req.query);
+  res.set('Cache-Control','no-store, no-cache, max-age=0, must-revalidate').set('Pragma','no-cache').set('Expires','0').type('application/javascript').send(comparisonApp(await readFile(root+'app.js','utf8'),c));
+ }catch(e){
+  console.error('WeatherNext comparison app generation failed:',e?.message||e);
+  res.set('Cache-Control','no-store').status(503).type('application/javascript').send("throw new Error('The Google weather page could not be prepared. Refresh or return to Dan\'s Weather.');");
+ }});
 }
