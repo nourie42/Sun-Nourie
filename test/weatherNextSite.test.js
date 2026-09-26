@@ -86,6 +86,8 @@ test('WeatherNext standalone page cannot regress to the shared weather shell or 
   const google=read('public/weather-fusion/weathernext-site.html');
   const main=read('public/weather-fusion/index.html');
   assert.match(server,/Cache-Control','no-store, max-age=0, must-revalidate/);
+  assert.match(server,/delete req\.headers\['if-none-match'\]/);
+  assert.match(server,/delete req\.headers\['if-modified-since'\]/);
   assert.match(server,/X-Weather-Nourie-Page','weathernext-standalone-/);
   assert.match(server,/sendFile\(path\.join\(PUBLIC_DIR,'weathernext-site\.html'\)\)/);
   assert.doesNotMatch(google,/\/weather-fusion\/app\.js/);
