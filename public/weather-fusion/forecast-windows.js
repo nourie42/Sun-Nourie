@@ -2,6 +2,7 @@ import {displayedFeelsAt} from './hourly-feels.js?v=dewpoint-floor-v1';
 import {finite,rainChanceValue,solarElevation} from './weather-math.js?v=full-day-rain-v1';
 
 const HOUR = 3600000;
+const WINDOW_DAYS = 5;
 const TITLES = {perfect:'Perfect weather',rain:'Rain likely',high:'High rain likelihood',thunder:'Thunderstorms possible'};
 const percentage = value => finite(value) && value >= 0 && value <= 100 ? value : null;
 const nonnegative = value => finite(value) && value >= 0 ? value : null;
@@ -28,6 +29,12 @@ function dateKey(time, formatter) {
   const parts = formatter.formatToParts(new Date(time));
   const get = type => parts.find(part => part.type === type).value;
   return `${get('year')}-${get('month')}-${get('day')}`;
+}
+
+function dayOffset(key, startKey) {
+  const value = Date.parse(`${key}T00:00:00Z`);
+  const start = Date.parse(`${startKey}T00:00:00Z`);
+  return finite(value) && finite(start) ? Math.round((value-start)/(24*HOUR)) : null;
 }
 
 function hourlyInterval(row, time) {
@@ -79,6 +86,7 @@ export function buildForecastWindows(forecast = {}, now = Date.now()) {
   const formatter = dateFormatter(forecast.location?.timeZone || 'America/New_York');
   const timeZone = formatter.resolvedOptions().timeZone;
   if (!finite(now)) return {perfect:[],rain:[],timeZone};
+  const startDate = dateKey(now,formatter);
   const hours = timeMap(forecast.hours);
   const series = forecast.metricForecasts?.series || {};
   const feels = timeMap(series.feels), dewpoints = timeMap(series.dewpoint);
@@ -88,6 +96,8 @@ export function buildForecastWindows(forecast = {}, now = Date.now()) {
   const rows = [];
   for (const time of times) {
     if (time+HOUR <= now) continue;
+    const offset = dayOffset(dateKey(time,formatter),startDate);
+    if (offset === null || offset < 0 || offset >= WINDOW_DAYS) continue;
     const hour = hours.get(time), feel = feels.get(time), wet = rain.get(time);
     // Explicit multi-hour intervals are not hourly evidence, including for
     // thunder timing. Never fill gaps using a day/night forecast or nearby row.
@@ -114,5 +124,5 @@ export function buildForecastWindows(forecast = {}, now = Date.now()) {
       perfect:perfect?'perfect':null,
       rain:thunder?'thunder':rainChance !== null && rainChance >= 80?'high':rainChance !== null && rainChance >= 60?'rain':null});
   }
-  return {perfect:groups(rows,'perfect',formatter,now),rain:groups(rows,'rain',formatter,now),timeZone};
+  return {perfect:groups(rows,'perfect',formatter,now),rain:groups(rows,'rain',formatter,now),timeZone,horizonDays:WINDOW_DAYS};
 }
