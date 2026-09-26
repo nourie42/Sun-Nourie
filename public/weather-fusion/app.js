@@ -2,7 +2,7 @@ import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText,rebindDanTake} from './
 import {danCard,danTakeDisplay} from './dans-summary.js?v=dan-visible-v1';
 import {fetchJsonWithDeadline} from './request-deadline.js?v=loading-recovery-v1';
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
-import {weatherIcon,renderHourlyWeather} from './weather-display.js?v=sun-exposure-v1';
+import {weatherIcon,renderHourlyWeather,currentSample} from './weather-display.js?v=sun-exposure-v1';
 import {dayGraphHTML,dayGraphPoints,installDayGraph} from './day-graph.js?v=feels-floor-wind-v1';
 import {degrees,feelsAt,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=dewpoint-floor-v1';
 import {createFramePlayer} from './frame-player.js';
