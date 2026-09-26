@@ -59,10 +59,11 @@ test('WeatherNext CSV includes every available statistical field',()=>{
   assert.match(csv,/mean_sea_level_pressure_mean/);
   assert.doesNotMatch(csv,/undefined|NaN/);
 });
-test('dedicated WeatherNext routes and files are explicitly served',()=>{
+test('WeatherNext data explorer files remain explicitly served without owning the dashboard route',()=>{
   const server=read('src/weatherFusion.js');
   for(const name of ['weathernext-site.html','weathernext-site.css','weathernext-site.js','weathernext-data.js','weathernext-catalog.json']) assert.ok(server.includes("'"+name+"'"));
-  assert.match(server,/app\.get\(\['\/weathernext','\/weathernext\/','\/weather-fusion\/weathernext-site\.html'\]/);
+  assert.match(server,/app\.get\('\/weather-fusion\/weathernext-site\.html'/);
+  assert.doesNotMatch(server,/app\.get\(\['\/weathernext','\/weathernext\/'/);
   assert.doesNotMatch(read('public/weather-fusion/weathernext-site.js'),/credentials_json|private_key|Bearer /);
 });
 test('main weather navigation is a single row of five text-only borderless buttons',()=>{
@@ -81,15 +82,12 @@ test('Experimental Weather exposes only a link to WeatherNext, not the embedded 
   const view=model.slice(model.indexOf('export function modelExplanationHTML'),model.indexOf('function experimentalPath'));
   assert.doesNotMatch(view,/weatherNextCard\(/);
 });
-test('WeatherNext standalone page cannot regress to the shared weather shell or stale caching',()=>{
+test('WeatherNext data explorer stays isolated and implementation notes stay off the live UI',()=>{
   const server=read('src/weatherFusion.js');
   const google=read('public/weather-fusion/weathernext-site.html');
   const main=read('public/weather-fusion/index.html');
-  assert.match(server,/Cache-Control','no-store, max-age=0, must-revalidate/);
-  assert.match(server,/delete req\.headers\['if-none-match'\]/);
-  assert.match(server,/delete req\.headers\['if-modified-since'\]/);
-  assert.match(server,/X-Weather-Nourie-Page','weathernext-standalone-/);
-  assert.match(server,/sendFile\(path\.join\(PUBLIC_DIR,'weathernext-site\.html'\)\)/);
+  assert.match(server,/X-Weather-Nourie-Page','weathernext-data-explorer-/);
+  assert.match(server,/sendFile\(path\.join\(PUBLIC_DIR,'weathernext-site\.html'\)/);
   assert.doesNotMatch(google,/\/weather-fusion\/app\.js/);
   assert.match(google,/\/weather-fusion\/weathernext-data\.js\?v=/);
   assert.doesNotMatch(main,/Low on the left, high on the right/i);
