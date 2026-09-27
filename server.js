@@ -20,7 +20,8 @@ import { registerWeatherComparisonRoutes } from "./src/weatherComparison.js";
 import { registerWhatsUpRoutes } from "./src/whatsUpRoutes.js";
 import { registerAiAgentRoutes } from "./src/aiAgent.js";
 import { registerAiCouncilRoutes } from "./src/aiCouncil.js";
-import { registerDealDeskRoutes } from "./src/dealDeskRoutes.js";\nimport { registerHouseholdPLRoutes } from "./src/householdPLRoutes.js";
+import { registerDealDeskRoutes } from "./src/dealDeskRoutes.js";
+import { registerHouseholdPLRoutes } from "./src/householdPLRoutes.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -87,7 +88,8 @@ const weatherFusion = registerWeatherFusionRoutes(app);
 registerWhatsUpRoutes(app, { getForecast: (query) => weatherFusion.getForecast(query) });
 registerAiAgentRoutes(app);
 registerAiCouncilRoutes(app);
-registerDealDeskRoutes(app);\nregisterHouseholdPLRoutes(app);
+registerDealDeskRoutes(app);
+registerHouseholdPLRoutes(app);
 
 app.get("/fuel-atlas", (_req, res) => res.redirect(302, "/fuel-atlas.html"));
 app.get("/fuel-atlas.html", (_req, res) => {
