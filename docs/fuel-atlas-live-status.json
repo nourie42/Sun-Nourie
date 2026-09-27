@@ -2,8 +2,8 @@
   "ok": true,
   "classificationRule": "NAICS qualifies inclusion; explicit facility wording determines terminal or bulk-plant labels. Oil companies, wholesalers, suppliers and fuel dealers default to Distributor when no physical terminal/bulk wording is present. Heating-oil and propane dealers are also included in Distributor.",
   "filterVersion": "verified-distributor-categories-v3",
-  "verifiedAt": "2026-09-25T09:19:56.185Z",
-  "verifiedCommit": "a24ff2dc3f6fca90b9b3ef59288ab17f75b4ad6b",
+  "verifiedAt": "2026-09-27T08:41:03.649Z",
+  "verifiedCommit": "5686b590020a29de69dd8707e635b58fb49aac85",
   "liveUrl": "https://sun-nourie-live.onrender.com",
   "successfulSearches": 8,
   "attemptedSearches": 8,
@@ -49,7 +49,7 @@
         "terminal": 1,
         "propane": 0
       },
-      "elapsedMs": 78,
+      "elapsedMs": 38,
       "sources": [
         "OpenStreetMap / Overpass",
         "EPA ECHO / FRS NAICS"
@@ -130,7 +130,7 @@
         "terminal": 15,
         "propane": 0
       },
-      "elapsedMs": 12855,
+      "elapsedMs": 12739,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
@@ -388,7 +388,7 @@
         "terminal": 121,
         "propane": 5
       },
-      "elapsedMs": 12819,
+      "elapsedMs": 12759,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
@@ -640,7 +640,7 @@
         "terminal": 13,
         "propane": 0
       },
-      "elapsedMs": 12785,
+      "elapsedMs": 12736,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
@@ -904,7 +904,7 @@
         "terminal": 25,
         "propane": 1
       },
-      "elapsedMs": 12777,
+      "elapsedMs": 12738,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
@@ -1178,7 +1178,7 @@
         "terminal": 16,
         "propane": 0
       },
-      "elapsedMs": 12781,
+      "elapsedMs": 12739,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
@@ -1442,7 +1442,7 @@
         "terminal": 4,
         "propane": 0
       },
-      "elapsedMs": 12789,
+      "elapsedMs": 12739,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
@@ -1694,7 +1694,7 @@
         "terminal": 23,
         "propane": 1
       },
-      "elapsedMs": 12788,
+      "elapsedMs": 12738,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
