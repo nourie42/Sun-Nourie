@@ -1,3 +1,4 @@
+import express from "express";
 import crypto from "crypto";
 import fs from "fs/promises";
 import path from "path";
@@ -52,7 +53,7 @@ export function registerHouseholdPLRoutes(app) {
     }
   });
 
-  app.post("/household-pl/login", app.urlencoded({extended:false,limit:"8kb"}), (req,res) => {
+  app.post("/household-pl/login", express.urlencoded({extended:false,limit:"8kb"}), (req,res) => {
     if (!password || !secret) return res.status(503).type("html").send(loginPage("Private access is not configured."));
     if (!safeEq(req.body?.password, password)) return res.status(401).type("html").send(loginPage("Incorrect password."));
     const value = token(password,secret);
