@@ -27,7 +27,7 @@ button,input{font:inherit}.topbar{position:sticky;top:0;z-index:100;background:r
 .cash{margin:14px 0 28px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px}.cash h2{font-size:16px;margin:0 0 4px}.cashgrid{display:grid;grid-template-columns:repeat(6,1fr);font-size:10px}.cashgrid div{padding:6px 5px;border-bottom:1px solid #20364f}.cashgrid .h{font-weight:800;color:#b8d7fb}
 @media(max-width:780px){
  .topbar{padding:8px 9px}.title{font-size:16px}.status{display:none}.nav{gap:4px;margin-top:7px}.nav button{font-size:10px;padding:7px 3px}.wrap{padding:9px}
- .kpis{grid-template-columns:1fr 1fr;gap:7px}.kpi{padding:10px}.kpi strong{font-size:19px}.section{top:91px}
+ .kpis{grid-template-columns:1fr 1fr;gap:7px}.kpi{padding:10px}.kpi strong{font-size:19px}.section{position:static;top:auto}
  .rowhead{grid-template-columns:1fr 1fr;gap:7px;padding:10px}.name{grid-column:1/-1;font-size:14px}.metric,.budgetWrap{background:#0b1929;border:1px solid #203a55;border-radius:9px;padding:7px}.metric strong{font-size:14px}.budget{font-size:14px}
  .actions{grid-column:1/-1;display:flex;gap:7px}.actions button{flex:1}.monthgrid{grid-template-columns:1fr 1fr 1fr}.tx{grid-template-columns:68px minmax(0,1fr)}.txamt{grid-column:2;text-align:left;color:#eaf4ff;margin-top:-2px}
  .graphGrid{grid-template-columns:1fr}.chart{height:210px}.cashgrid{grid-template-columns:1fr 1fr}.tableWrap{border-radius:10px}th,td{font-size:10px}
@@ -52,7 +52,7 @@ button,input{font:inherit}.topbar{position:sticky;top:0;z-index:100;background:r
    <div class="kpi"><b>September Net P/L</b><strong id="kn">—</strong></div>
    <div class="kpi"><b>Starting Bank Cash</b><input id="startCash" class="cashinput" type="number" step="100"></div>
   </div>
-  <div class="note">This Month is the main household P&L: actual income and spending, this month’s budget, variance to budget, and the rolling annual forecast. Tap Details to review transactions and edit monthly budgets.</div>
+  <div class="note">This Month is the main household P&L: September actual income and spending, September budget, variance to budget, and the rolling annual forecast. Tap Details to review September transactions and edit monthly budgets.</div>
   <div class="toolbar"><button id="save">Update P&L</button><span id="updateStatus" class="updateStatus"></span><button id="reset">Reset budgets</button><button id="restore">Restore deleted rows</button></div>
   <div id="quickBody"></div>
   <div class="cash"><h2>Bank Cash Forecast</h2><div class="note">Cash starts at the amount above. Savings transfers affect cash but remain outside P&L expenses.</div><div class="cashgrid" id="cashgrid"></div></div>
@@ -91,6 +91,18 @@ async function loadBase(){
 }
 (async function(){
  const BASE=await loadBase();
+ function hasBaseTx(date,account,amount,key){return (BASE.tx||[]).some(function(t){return t.d===date&&t.a===account&&Math.abs(Number(t.v||0)-amount)<0.001&&t.k===key})}
+ function reconcilePostedSnapshot(){
+   if(!hasBaseTx('2026-09-25','Checking 7885',432.90,'UPSTART1')){
+     const r=(BASE.rows||[]).find(function(x){return x.row===37});if(r)r.vals[1]=Math.round((Number(r.vals[1]||0)+432.90)*100)/100;
+     BASE.tx.push({d:'2026-09-25',s:'Posted',a:'Checking 7885',m:'Upstart',x:'Upstart Loan Payment',v:432.90,k:'UPSTART1'});
+   }
+   if(!hasBaseTx('2026-09-11','Robinhood Credit Card **3682',7.48,'SHOPPING')){
+     const r=(BASE.rows||[]).find(function(x){return x.row===88});if(r)r.vals[1]=Math.round((Number(r.vals[1]||0)+7.48)*100)/100;
+     BASE.tx.push({d:'2026-09-11',s:'Posted',a:'Robinhood Credit Card **3682',m:'Walmart',x:'Walmart',v:7.48,k:'SHOPPING'});
+   }
+ }
+ reconcilePostedSnapshot();
  const STORE='nourie-household-pl-v3',DEL='nourie-household-pl-deleted-v3';
  const saved=JSON.parse(localStorage.getItem(STORE)||'null')||{};
  let monthEdits=saved.monthEdits||{},startCash=Number(saved.startingCash==null?(BASE.startingCash||20000):saved.startingCash);
@@ -132,7 +144,7 @@ async function loadBase(){
    l.forEach(function(r){const v=i===0?actual(r):monthVal(r,i);if(isIncome(r))inc+=v;if(isExpense(r))exp+=v;if(isSavings(r))sav+=v});
    return {inc:inc,exp:exp,sav:sav,net:inc-exp};
  }
- function transactions(r){return (r.keys||[]).flatMap(function(k){return txByKey[k]||[]}).sort(function(a,b){return String(b.d).localeCompare(String(a.d))})}
+ function transactions(r,prefix){return (r.keys||[]).flatMap(function(k){return txByKey[k]||[]}).filter(function(t){return !prefix||String(t.d||'').startsWith(prefix)}).sort(function(a,b){return String(b.d).localeCompare(String(a.d))})}
  function lastTxDate(){let m='';(BASE.tx||[]).forEach(function(t){if(t.d&&String(t.d)>m)m=String(t.d)});return m||'snapshot'}
  function makeMonthGrid(r){
    let h='<div class="monthgrid">';
@@ -140,7 +152,7 @@ async function loadBase(){
    return h+'</div>';
  }
  function makeTxList(r){
-   const tx=transactions(r);if(!tx.length)return '<div class="empty">No linked transactions for this line yet.</div>';
+   const tx=transactions(r,'2026-09');if(!tx.length)return '<div class="empty">No September transactions posted for this line yet.</div>';
    return '<div class="txlist">'+tx.map(function(t){return '<div class="tx"><div class="txdate">'+String(t.d||'')+'</div><div class="txname"><b>'+String(t.m||t.x||'Transaction')+'</b><span class="txacct">'+String(t.a||'')+(t.x?' · '+String(t.x):'')+'</span></div><div class="txamt">'+fmt(t.v)+'</div></div>'}).join('')+'</div>';
  }
  function bindMonthInputs(root){
