@@ -69,3 +69,10 @@ test('an approved published WeatherNext point serves its exact nearby selected c
  const response=await fetch(base+'/api/weather-fusion/compare/location',{method:'POST',headers:{Origin:base,'Content-Type':'application/json','x-weathernext-request':'1'},body:JSON.stringify({latitude:35.78765,longitude:-78.48056})});
  assert.equal(response.status,200);const data=await response.json();assert.equal(data.comparison.point.id,'knightdale');
 });
+test('device location near Knightdale uses the approved published WeatherNext point without Render credentials',async t=>{
+ const app=express(),server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));t.after(()=>server.close());
+ const base='http://127.0.0.1:'+server.address().port;
+ registerWeatherComparisonRoutes(app,{feedProvider:async()=>feedFixture(),now:()=>now,companionProvider:async()=>({}),accessOptions:{origin:base},locationProvider:{configured:false}});
+ const response=await fetch(base+'/api/weather-fusion/compare/location',{method:'POST',headers:{Origin:base,'Content-Type':'application/json','x-weathernext-request':'1'},body:JSON.stringify({latitude:35.7798,longitude:-78.5352,name:'Device location'})});
+ assert.equal(response.status,200);const data=await response.json();assert.equal(data.comparison.point.id,'knightdale');assert.equal(data.location.name,'Knightdale / Raleigh');assert.ok(Array.isArray(data.hours)&&data.hours.length>0);
+});
