@@ -9,6 +9,9 @@ import {testInputs,snapshot} from './weatherFusion.fixtures.js';
 import {pavementWarning,pavementHTML} from '../public/weather-fusion/pavement.js';
 import {peakComparisonHTML} from '../public/weather-fusion/weather-display.js';
 import {warmestTodayWindow} from '../public/weather-fusion/comfort-outlook.js';
+import {forecastSample} from '../public/weather-fusion/weather-display.js';
+import {sunExposureTemperature} from '../public/weather-fusion/outdoor-feels.js';
+import {thermalComfort} from '../public/weather-fusion/weather-math.js';
 const now=Date.parse('2026-09-05T16:00:00Z'),H=3600000,location={latitude:35.99,longitude:-78.9};
 function raw(id='hrrr',point=location){
  const offset=id==='hrrr'?0:id==='ecmwf'?1:2;
@@ -117,9 +120,18 @@ test('forecast directions cross north correctly; opposed directions are unresolv
  const north=mixWindDirection({nws:350,hrrr:10},{nws:.5,hrrr:.5}).value;
  assert.ok(Math.min(north,360-north)<.001);assert.equal(mixWindDirection({nws:0,hrrr:180},{nws:.5,hrrr:.5}).value,null);
 });
-test('evening warmest card stays a same-day high and retains its clock time after the 6 PM transition',()=>{
- const forecast={location:{timeZone:'America/New_York'},metricForecasts:{series:{feels:[{time:'2026-09-05T23:00:00Z',value:99},{time:'2026-09-06T01:00:00Z',value:96},{time:'2026-09-06T10:00:00Z',value:71}]}}};
- const summary=warmestTodayWindow(forecast,Date.parse('2026-09-05T22:30:00Z'));
- assert.equal(summary.chosen.value,99);assert.match(peakComparisonHTML(summary,95),/Warmest feels like today/);assert.match(peakComparisonHTML(summary,95),/7:00 PM/);
- assert.match(peakComparisonHTML(null,85,'America/New_York',Date.parse('2026-09-06T03:30:00Z')),/11:30 PM/);
+test('warmest sun card uses the same sunny-hour estimate and says the exposure explicitly',()=>{
+ const location={latitude:35.99,longitude:-78.9,timeZone:'America/New_York'},forecast={location,hours:[],metricForecasts:{series:{feels:[],temperature:[],dewpoint:[],wind:[],gust:[]}}};
+ for(const [time,temperature,skyCover,condition] of [['2026-09-05T17:00:00Z',85,10,'Sunny'],['2026-09-05T19:00:00Z',82,30,'Partly cloudy'],['2026-09-05T21:00:00Z',95,95,'Cloudy']]){
+  const inputs={temperature,dewpoint:60,wind:3,humidity:55,skyCover,condition,type:'guidance'},sun=thermalComfort(inputs,location,Date.parse(time));
+  forecast.hours.push({time,condition});forecast.metricForecasts.series.feels.push({time,value:Number(sun.rawOutdoors.toFixed(1)),inputs,condition});
+  forecast.metricForecasts.series.temperature.push({time,value:temperature});forecast.metricForecasts.series.dewpoint.push({time,value:60});forecast.metricForecasts.series.wind.push({time,value:3});
+ }
+ const now=Date.parse('2026-09-05T16:00:00Z'),sunHours=forecast.hours.slice(0,2).map(hour=>({hour,sun:sunExposureTemperature(forecastSample(forecast,hour.time))}));
+ const expected=sunHours.reduce((a,b)=>a.sun.value>=b.sun.value?a:b),summary=warmestTodayWindow(forecast,now);
+ assert.equal(summary.chosen.time,expected.hour.time);assert.equal(summary.chosen.value,expected.sun.value);
+ assert.match(peakComparisonHTML(summary,null),/Warmest feels like in the sun today/);
+ assert.match(peakComparisonHTML(summary,summary.chosen.value+5),/data-comparison="now"/);
+ assert.match(peakComparisonHTML(null,85,'America/New_York',now),/Warmest feels like in the sun today/);
+ assert.doesNotMatch(peakComparisonHTML(null,85,'America/New_York',now),/Warmest feels like today/);
 });

@@ -140,21 +140,22 @@ export function renderHourlyWeather(forecast, now = Date.now()) {
   root.innerHTML = hourlyDisplaySamples(forecast,now).map(sample => `<button type="button" class="hour ${sample.now ? 'now hour-current' : 'forecast-hour'}" data-comfort-time="${esc(sample.id)}" data-time="${esc(sample.time)}" title="${esc(sample.condition)} · ${esc(sample.source)}" aria-label="${sample.now ? 'Now' : esc(hour(sample.time))}, ${esc(sample.condition)}, air ${degrees(sample.temperature)}, feels like ${degrees(sample.feels)} ${esc(sample.exposure.label.toLowerCase())}. Preview this weather."><span>${sample.now ? 'Now' : esc(hour(sample.time))}</span>${weatherIcon(sample.condition,sample.isDay)}<strong>${degrees(sample.temperature)}</strong><span class="hour-feels">Feels <b>${degrees(sample.feels)}</b><em class="hour-exposure sr-only">${esc(sample.exposure.shortLabel)}</em></span>${hourlyRainHTML(sample)}${hourlyUvHTML(sample.uvIndex)}${hourlyWindHTML(sample)}</button>`).join('');
   root.scrollLeft = scroll;
 }
-export function peakComparison(summary, currentShade) {
-  if (!summary) return {kind:'missing', label:'Warmest feels like today unavailable', value:null, time:null, now:false};
+export function peakComparison(summary, currentSun) {
+  const label='Warmest feels like in the sun today';
+  if (!summary) return {kind:'missing', label:`${label} unavailable`, value:null, time:null, now:false};
   const peak = summary.chosen.value;
-  if (summary.mode === 'day' && finite(currentShade) && currentShade > peak) {
-    return {kind:'now', label:'Warmest feels like today', value:currentShade, time:summary.chosen.time, now:true, later:peak};
+  if (summary.mode === 'day' && finite(currentSun) && currentSun > peak) {
+    return {kind:'now', label, value:currentSun, time:summary.chosen.time, now:true, later:peak};
   }
-  return {kind:'peak', label:summary.mode === 'day' ? 'Warmest feels like today' : summary.label, value:peak, time:summary.chosen.time, now:false};
+  return {kind:'peak', label, value:peak, time:summary.chosen.time, now:false};
 }
-export function peakComparisonHTML(summary, currentShade, zone = 'America/New_York', now=Date.now()) {
-  const comparison = peakComparison(summary,currentShade);
-  if(!summary&&finite(currentShade)){
+export function peakComparisonHTML(summary, currentSun, zone = 'America/New_York', now=Date.now()) {
+  const comparison = peakComparison(summary,currentSun);
+  if(!summary&&finite(currentSun)){
     const clock=new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',minute:'2-digit'}).format(new Date(now));
-    return `<div class="comfort-later" data-comparison="current-only"><span>Warmest feels like today</span><span class="peak-reading"><strong>${degrees(currentShade)}</strong></span><small>Now · ${esc(clock)} · later forecast unavailable</small></div>`;
+    return `<div class="comfort-later" data-comparison="current-only"><span>Warmest feels like in the sun today</span><span class="peak-reading"><strong>${degrees(currentSun)}</strong></span><small>Now · ${esc(clock)} · sunny forecast unavailable</small></div>`;
   }
-  if (!summary) return '<p class="comfort-later">Warmest feels like today unavailable. Missing readings stay blank.</p>';
+  if (!summary) return '<p class="comfort-later">Warmest feels like in the sun today unavailable. Missing readings stay blank.</p>';
   const clock=new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',minute:'2-digit'}).format(new Date(comparison.time));
   const time = comparison.now ? `Now is warmest · later high ${degrees(comparison.later)} at ${clock}` : `${clock} · hourly forecast`;
   return `<div class="comfort-later" data-peak-time="${esc(comparison.time)}" data-comparison="${comparison.kind}"><span>${esc(comparison.label)}${summary.partial ? ' · partial forecast' : ''}</span><span class="peak-reading"><strong>${degrees(comparison.value)}</strong></span><small>${esc(time)}</small></div>`;

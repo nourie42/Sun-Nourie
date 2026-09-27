@@ -55,7 +55,7 @@ test('requested current comfort heading is exact and daily renderer includes For
  const experience=fs.readFileSync(new URL('../public/weather-fusion/experience.js',import.meta.url),'utf8');
  const display=fs.readFileSync(new URL('../public/weather-fusion/weather-display.js',import.meta.url),'utf8');
  assert.match(html,/id="skin-kicker">How it actually feels right now<\/h2>/);
- assert.match(display,/label:'Warmest feels like today'/);
+ assert.match(display,/label='Warmest feels like in the sun today'/);
  assert.doesNotMatch(display,/Warmest from now on/);
  assert.match(experience,/Forecast confidence/);
  assert.match(html,/Forecast confidence<\/strong>/);

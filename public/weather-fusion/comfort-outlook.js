@@ -1,6 +1,8 @@
 import {outdoorExposure} from './outdoor-feels.js?v=weather-qa-v67';
 import {finite,isTonightPeriod,localHour} from './weather-math.js?v=weather-qa-v67';
-import {timeAt,summarizeFeels} from './hourly-feels.js?v=dewpoint-floor-v1';
+import {timeAt} from './hourly-feels.js?v=dewpoint-floor-v1';
+import {forecastSample} from './weather-display.js?v=warmest-sun-v1';
+import {sunExposureTemperature} from './outdoor-feels.js?v=sun-exposure-v1';
 export function comfortMode(time,zone='America/New_York'){
  const hour=localHour(time,zone);return isTonightPeriod(time,zone)?'overnight':hour<5?'predawn':'day';
 }
@@ -10,8 +12,16 @@ const dateAt=(t,z)=>new Intl.DateTimeFormat('en-CA',{timeZone:z,year:'numeric',m
 export function warmestTodayWindow(forecast,now=Date.now()){
  const zone=forecast?.location?.timeZone||'America/New_York',today=dateAt(now,zone);
  const tomorrow=new Date(Date.parse(today+'T12:00:00Z')+86400000).toISOString().slice(0,10);
- const summary=summarizeFeels(forecast,timeAt(today,0,zone),timeAt(tomorrow,0,zone),now);
- return summary?{...summary,mode:'day',chosen:summary.high,label:'Warmest feels like today'}:null;
+ const start=Math.max(timeAt(today,0,zone),Math.ceil(now/3600000)*3600000),end=timeAt(tomorrow,0,zone),points=[];
+ let available=0,expected=0;
+ for(const hour of forecast?.hours||[]){
+  const epoch=Date.parse(hour.time);if(!finite(epoch)||epoch<start||epoch>=end)continue;expected++;
+  const sample=forecastSample(forecast,hour.time);if(!sample)continue;available++;
+  const sun=sunExposureTemperature(sample);if(sun.active&&finite(sun.value))points.push({time:hour.time,epoch,value:sun.value,source:'Sun-exposure estimate'});
+ }
+ if(!points.length)return null;
+ const high=points.reduce((a,b)=>a.value>=b.value?a:b);
+ return {mode:'day',chosen:high,high,points,available,expected,partial:available<expected,label:'Warmest feels like in the sun today'};
 }
 export function comfortWindow(forecast,now=Date.now()){
  const zone=forecast?.location?.timeZone||'America/New_York',mode=comfortMode(now,zone),today=dateAt(now,zone),tomorrow=new Date(Date.parse(today+'T12:00:00Z')+86400000).toISOString().slice(0,10);
