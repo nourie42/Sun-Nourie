@@ -110,6 +110,11 @@ button,input{font:inherit}.topbar{position:sticky;top:0;z-index:100;background:r
    <div class="graphCard"><h3>Top 10 Variable Expenses</h3><p>Largest controllable lines by annual forecast.</p><canvas id="topVariableChart" class="chart"></canvas></div>
    <div class="graphCard"><h3>Savings Scenario</h3><p>Shows how annual net P&L changes if variable spending is reduced.</p><canvas id="savingsScenarioChart" class="chart"></canvas></div>
    <div class="graphCard"><h3>Monthly Expense Trend</h3><p>Total monthly expenses across the rolling year.</p><canvas id="expenseTrendChart" class="chart"></canvas></div>
+   <div class="graphCard"><h3>This Month: Actual vs Budget-to-Date</h3><p id="matchedBudgetNote">Compares actual spending only through completed full weeks with the matching share of this month’s budget.</p><canvas id="matchedBudgetChart" class="chart"></canvas></div>
+   <div class="graphCard"><h3>4-Month Matched-Time Spending Trend</h3><p id="matchedTrendNote">Current month versus the previous 3 months using the same number of completed full weeks.</p><canvas id="matchedTrendChart" class="chart"></canvas></div>
+   <div class="graphCard"><h3>Variable Spending: 4-Month Matched Trend</h3><p>Only controllable/variable expenses, using identical elapsed-month windows.</p><canvas id="matchedVariableChart" class="chart"></canvas></div>
+   <div class="graphCard"><h3>Budget Burn by Variable Line</h3><p>Actual matched-period spending versus matched-period budget for your largest variable lines.</p><div id="budgetBurnBars" class="graphList"></div></div>
+   <div class="graphCard"><h3>Cumulative Variable Spend</h3><p>Week-by-week current-month variable spending compared with the prior 3-month average.</p><canvas id="cumulativeVariableChart" class="chart"></canvas></div>
   </div>
  </section>
 </div>
@@ -307,7 +312,78 @@ async function loadBase(){
  function drawExpenseTrend(){
    const c=document.getElementById('expenseTrendChart'),s=canvasSize(c),data=[];for(let i=0;i<12;i++)data.push(monthTotals(i).exp);const max=Math.max.apply(null,data.concat([1]));drawAxes(s.ctx,s.w,s.h,max);const gap=(s.w-52)/11;s.ctx.strokeStyle='#ff8088';s.ctx.lineWidth=2;s.ctx.beginPath();data.forEach(function(v,i){const x=40+i*gap,y=14+(max-v)/max*(s.h-48);if(i===0)s.ctx.moveTo(x,y);else s.ctx.lineTo(x,y)});s.ctx.stroke();data.forEach(function(v,i){const x=40+i*gap,y=14+(max-v)/max*(s.h-48);s.ctx.fillStyle='#ff8088';s.ctx.beginPath();s.ctx.arc(x,y,2.5,0,Math.PI*2);s.ctx.fill();s.ctx.fillStyle='#8fa5bd';s.ctx.font='8px system-ui';s.ctx.fillText(shortLabels[i],x-6,s.h-10)});
  }
- function renderGraphs(){drawFlow();drawNet();drawCash();renderExpenseBars();renderVariableBars();drawMix();drawVariableMonth();renderVarianceBars();renderSubscriptionBars();drawTopVariable();drawSavingsScenario();drawExpenseTrend()}
+ function ymShift(year,month,delta){const d=new Date(year,month+delta,1);return {y:d.getFullYear(),m:d.getMonth()}}
+ function pad2(n){return String(n).padStart(2,'0')}
+ function datePrefix(y,m){return y+'-'+pad2(m+1)+'-'}
+ function completedWeeksInfo(){
+   const now=new Date(),day=now.getDate(),weeks=Math.floor(day/7),cutoff=Math.max(0,weeks*7);
+   return {year:now.getFullYear(),month:now.getMonth(),weeks:weeks,cutoff:cutoff};
+ }
+ function txAmountForRows(rowList,y,m,cutoffDay){
+   const keys=new Set();rowList.forEach(function(r){(r.keys||[]).forEach(function(k){keys.add(k)})});
+   const pref=datePrefix(y,m);let total=0;
+   (BASE.tx||[]).forEach(function(t){
+     if(!keys.has(t.k)||!String(t.d||'').startsWith(pref))return;
+     const dd=Number(String(t.d).slice(8,10));if(cutoffDay&&dd>cutoffDay)return;
+     total+=num(t.v);
+   });
+   return total;
+ }
+ function matchedMonthData(variableOnly){
+   const inf=completedWeeksInfo(),rowsToUse=activeLines().filter(variableOnly?isVariable:isExpense),arr=[];
+   for(let delta=-3;delta<=0;delta++){
+     const p=ymShift(inf.year,inf.month,delta),v=inf.cutoff?txAmountForRows(rowsToUse,p.y,p.m,inf.cutoff):0;
+     arr.push({label:new Date(p.y,p.m,1).toLocaleString('en-US',{month:'short'}),value:v,y:p.y,m:p.m});
+   }
+   return {info:inf,data:arr};
+ }
+ function currentMatchedBudget(variableOnly){
+   const inf=completedWeeksInfo(),daysInMonth=new Date(inf.year,inf.month+1,0).getDate(),ratio=daysInMonth?inf.cutoff/daysInMonth:0;
+   const rowsToUse=activeLines().filter(variableOnly?isVariable:isExpense);
+   const full=rowsToUse.reduce(function(a,r){return a+monthVal(r,0)},0);
+   return {matched:full*ratio,full:full,ratio:ratio,info:inf};
+ }
+ function drawSimpleBars(canvasId,labels,values,budgetLine){
+   const c=document.getElementById(canvasId),s=canvasSize(c),max=Math.max.apply(null,values.concat(budgetLine!=null?[budgetLine]:[]).concat([1])),gap=(s.w-50)/Math.max(labels.length,1),bw=Math.max(12,gap*.52),base=s.h-30,height=s.h-52;
+   s.ctx.clearRect(0,0,s.w,s.h);s.ctx.strokeStyle='#26425f';s.ctx.beginPath();s.ctx.moveTo(34,10);s.ctx.lineTo(34,base);s.ctx.lineTo(s.w-5,base);s.ctx.stroke();
+   values.forEach(function(v,i){const x=40+i*gap,h=v/max*height;s.ctx.fillStyle='#78b7ff';s.ctx.fillRect(x,base-h,bw,h);s.ctx.fillStyle='#8fa5bd';s.ctx.font='9px system-ui';s.ctx.fillText(labels[i],x-2,s.h-12)});
+   if(budgetLine!=null){const y=base-budgetLine/max*height;s.ctx.strokeStyle='#ffc56e';s.ctx.setLineDash([5,4]);s.ctx.beginPath();s.ctx.moveTo(35,y);s.ctx.lineTo(s.w-6,y);s.ctx.stroke();s.ctx.setLineDash([]);s.ctx.fillStyle='#ffc56e';s.ctx.font='9px system-ui';s.ctx.fillText('Budget-to-date',40,Math.max(10,y-4))}
+ }
+ function drawMatchedBudget(){
+   const m=matchedMonthData(false),b=currentMatchedBudget(false),actual=m.data[m.data.length-1].value;
+   document.getElementById('matchedBudgetNote').textContent=m.info.weeks+' completed full week'+(m.info.weeks===1?'':'s')+' ('+m.info.cutoff+' days) compared with the same share of September budget.';
+   drawSimpleBars('matchedBudgetChart',['Actual','Budget'],[actual,b.matched],null);
+ }
+ function drawMatchedTrend(){
+   const m=matchedMonthData(false);document.getElementById('matchedTrendNote').textContent='Each month uses days 1–'+m.info.cutoff+' only ('+m.info.weeks+' complete weeks).';
+   drawSimpleBars('matchedTrendChart',m.data.map(function(x){return x.label}),m.data.map(function(x){return x.value}),null);
+ }
+ function drawMatchedVariable(){
+   const m=matchedMonthData(true);drawSimpleBars('matchedVariableChart',m.data.map(function(x){return x.label}),m.data.map(function(x){return x.value}),null);
+ }
+ function renderBudgetBurn(){
+   const inf=completedWeeksInfo(),daysInMonth=new Date(inf.year,inf.month+1,0).getDate(),ratio=daysInMonth?inf.cutoff/daysInMonth:0,pref=datePrefix(inf.year,inf.month);
+   const arr=activeLines().filter(isVariable).map(function(r){
+     const actualMatched=transactions(r).filter(function(t){return String(t.d||'').startsWith(pref)&&Number(String(t.d).slice(8,10))<=inf.cutoff}).reduce(function(a,t){return a+num(t.v)},0);
+     const budgetMatched=monthVal(r,0)*ratio,pct=budgetMatched?actualMatched/budgetMatched:0;
+     return {name:r.label,actual:actualMatched,budget:budgetMatched,pct:pct};
+   }).sort(function(a,b){return b.actual-a.actual}).slice(0,12);
+   document.getElementById('budgetBurnBars').innerHTML=arr.map(function(x){const pct=Math.max(0,Math.min(180,x.pct*100));return '<div class="barrow"><div>'+x.name+'</div><div class="bartrack"><div class="barfill" style="width:'+Math.min(100,pct)+'%;background:'+(x.pct>1?'#ff8088':'#78b7ff')+'"></div></div><div class="barval '+(x.pct>1?'neg':'')+'">'+Math.round(x.pct*100)+'%</div></div>'}).join('')||'<div class="empty">No matched variable spending yet.</div>';
+ }
+ function drawCumulativeVariable(){
+   const inf=completedWeeksInfo(),weeks=Math.max(1,inf.weeks),currentRows=activeLines().filter(isVariable),current=[],priorAvg=[];
+   for(let w=1;w<=weeks;w++){
+     const cutoff=w*7;current.push(txAmountForRows(currentRows,inf.year,inf.month,cutoff));
+     let vals=[];for(let d=-3;d<=-1;d++){const p=ymShift(inf.year,inf.month,d);vals.push(txAmountForRows(currentRows,p.y,p.m,cutoff))}
+     priorAvg.push(vals.reduce(function(a,b){return a+b},0)/Math.max(1,vals.length));
+   }
+   const c=document.getElementById('cumulativeVariableChart'),s=canvasSize(c),max=Math.max.apply(null,current.concat(priorAvg).concat([1])),gap=(s.w-52)/Math.max(1,weeks-1),base=s.h-28,height=s.h-48;
+   s.ctx.clearRect(0,0,s.w,s.h);s.ctx.strokeStyle='#26425f';s.ctx.beginPath();s.ctx.moveTo(35,10);s.ctx.lineTo(35,base);s.ctx.lineTo(s.w-6,base);s.ctx.stroke();
+   function line(vals,color){s.ctx.strokeStyle=color;s.ctx.lineWidth=2;s.ctx.beginPath();vals.forEach(function(v,i){const x=40+(weeks===1?0:i*gap),y=base-v/max*height;if(i===0)s.ctx.moveTo(x,y);else s.ctx.lineTo(x,y)});s.ctx.stroke()}
+   line(priorAvg,'#9fb1c8');line(current,'#78b7ff');
+   for(let i=0;i<weeks;i++){const x=40+(weeks===1?0:i*gap);s.ctx.fillStyle='#8fa5bd';s.ctx.font='9px system-ui';s.ctx.fillText('W'+(i+1),x-5,s.h-10)}
+ }
+ function renderGraphs(){drawFlow();drawNet();drawCash();renderExpenseBars();renderVariableBars();drawMix();drawVariableMonth();renderVarianceBars();renderSubscriptionBars();drawTopVariable();drawSavingsScenario();drawExpenseTrend();drawMatchedBudget();drawMatchedTrend();drawMatchedVariable();renderBudgetBurn();drawCumulativeVariable()}
  function renderAll(){renderQuick();renderYear();renderLast();renderRecurring();renderVariable();document.getElementById('status').textContent='Transactions through '+lastTxDate();if(document.getElementById('graphs').classList.contains('active'))requestAnimationFrame(renderGraphs)}
  document.querySelectorAll('.nav button').forEach(function(btn){btn.onclick=function(){document.querySelectorAll('.nav button').forEach(function(b){b.classList.remove('active')});document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active')});btn.classList.add('active');document.getElementById(btn.dataset.view).classList.add('active');if(btn.dataset.view==='graphs')requestAnimationFrame(renderGraphs);window.scrollTo({top:0,behavior:'smooth'})}});
  let dirty=false;
