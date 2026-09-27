@@ -125,7 +125,11 @@ export function registerWeatherComparisonRoutes(app,{fetchImpl=globalThis.fetch,
  const points=feed?googlePoints(feed):[];
  const point=feed?(requested
   ?points.find(p=>Math.abs(p.latitude-requested.latitude)<.00011&&Math.abs(p.longitude-requested.longitude)<.00011)
-    ||points.map(p=>({point:p,miles:pointDistanceMiles(p,requested)})).filter(x=>x.miles<=1).sort((a,b)=>a.miles-b.miles)[0]?.point
+    // The approved feed is collected at named points on a 0.1° model grid.
+    // Use a nearby published point for the same local area instead of asking
+    // Render for a second, unconfigured BigQuery credential set. The rendered
+    // forecast keeps the published point's name so the approximation is clear.
+    ||points.map(p=>({point:p,miles:pointDistanceMiles(p,requested)})).filter(x=>x.miles<=5).sort((a,b)=>a.miles-b.miles)[0]?.point
   :points.find(p=>p.id===query.location)):null;
   if(point)return {feed,point};
   if(!requested)throw Object.assign(Error(query.location?'NVIDIA has no published forecast for that location.':'Choose a city or use your device location.'),{status:query.location?404:400});
