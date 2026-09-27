@@ -92,7 +92,7 @@ export function registerWeatherComparisonRoutes(app,{fetchImpl=globalThis.fetch,
   const coords=q.latitude!==undefined&&q.longitude!==undefined&&Number.isFinite(Number(q.latitude))&&Number.isFinite(Number(q.longitude))&&Math.abs(Number(q.latitude))<=90&&Math.abs(Number(q.longitude))<=180;
   const point=coords?{id:'selected',name:String(q.name||'Selected location').slice(0,100),latitude:Number(q.latitude),longitude:Number(q.longitude)}:googlePoints(await getFeed()).find(p=>p.id===q.location);
   if(!point)throw Object.assign(Error('Choose a published comparison location.'),{status:404});
-  return {source,point,explicitLocation:coords||q.explicit==='1'};
+  return {source,point,explicitLocation:coords||q.explicit==='1'||Boolean(q.location)};
  };
  app.get(['/weather-fusion','/weather-fusion/'],async(_req,res,next)=>{
   try{const html=await readFile(root+'index.html','utf8');res.set('Cache-Control','no-cache').type('html').send(html);

@@ -38,6 +38,10 @@ test('comparison URLs preserve side-by-side comparison and standalone forecast s
   const r=await fetch(base+path+'?location=knightdale',{redirect:'manual'});assert.equal(r.status,200);assert.match(await r.text(),/The same view\. Two forecasts\./);
  }
  const html=await (await fetch(base+'/weathernext/')).text();
+ const pane=await (await fetch(base+'/weather-fusion/compare/pane?source=google&location=knightdale')).text();
+ assert.match(pane,/compare\/app\.js\?source=google&amp;location=knightdale/);
+ const paneApp=await (await fetch(base+'/weather-fusion/compare/app.js?source=google&location=knightdale')).text();
+ assert.match(paneApp,/"explicitLocation":true/,'comparison panes must load the selected city instead of waiting for device location');
  assert.match(html,/NVIDIA Forecast/);assert.match(html,/Open NVIDIA forecast maps/);assert.doesNotMatch(html,/Experimental NVIDIA AI Weather|Forecast data: Google/);
  const nearby=await (await fetch(base+'/weathernext/?latitude=35.7798&longitude=-78.5355')).text();
  assert.match(nearby,/compare\/app\.js\?source=google&amp;location=selected&amp;explicit=1&amp;latitude=35\.7798&amp;longitude=-78\.5355/);
