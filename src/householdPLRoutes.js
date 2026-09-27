@@ -53,7 +53,7 @@ export function registerHouseholdPLRoutes(app) {
     }
   });
 
-  app.post("/household-pl/login", express.urlencoded({extended:false,limit:"8kb"}), (req,res) => {
+  app.get("/household-pl/login", (_req,res) => res.redirect(302,"/household-pl"));\n\n  app.post("/household-pl/login", express.urlencoded({extended:false,limit:"8kb"}), (req,res) => {
     if (!password || !secret) return res.status(503).type("html").send(loginPage("Private access is not configured."));
     if (!safeEq(req.body?.password, password)) return res.status(401).type("html").send(loginPage("Incorrect password."));
     const value = token(password,secret);
