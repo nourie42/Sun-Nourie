@@ -8,7 +8,7 @@ import {mixWindDirection} from '../src/weatherFusionExperience.js';
 import {testInputs,snapshot} from './weatherFusion.fixtures.js';
 import {pavementWarning,pavementHTML} from '../public/weather-fusion/pavement.js';
 import {peakComparisonHTML} from '../public/weather-fusion/weather-display.js';
-import {warmestTodayWindow} from '../public/weather-fusion/comfort-outlook.js';
+import {comfortWindow,warmestTodayWindow} from '../public/weather-fusion/comfort-outlook.js';
 import {forecastSample} from '../public/weather-fusion/weather-display.js';
 import {sunExposureTemperature} from '../public/weather-fusion/outdoor-feels.js';
 import {thermalComfort} from '../public/weather-fusion/weather-math.js';
@@ -129,6 +129,7 @@ test('warmest sun card uses the same sunny-hour estimate and says the exposure e
  }
  const now=Date.parse('2026-09-05T16:00:00Z'),sunHours=forecast.hours.slice(0,2).map(hour=>({hour,sun:sunExposureTemperature(forecastSample(forecast,hour.time))}));
  const expected=sunHours.reduce((a,b)=>a.sun.value>=b.sun.value?a:b),summary=warmestTodayWindow(forecast,now);
+ assert.ok(comfortWindow(forecast,now),'The feels-like outlook that accompanies the warmest card must keep rendering.');
  assert.equal(summary.chosen.time,expected.hour.time);assert.equal(summary.chosen.value,expected.sun.value);
  assert.match(peakComparisonHTML(summary,null),/Warmest feels like in the sun today/);
  assert.match(peakComparisonHTML(summary,summary.chosen.value+5),/data-comparison="now"/);
