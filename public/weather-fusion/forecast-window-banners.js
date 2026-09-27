@@ -31,3 +31,54 @@ export function forecastWindowBannerHTML(view, kind, now = Date.now()) {
   const title = perfect ? 'Perfect weather ahead' : 'Rain & storm outlook';
   const summary = first
     ? `${dayLabel(first.start,view.timeZone,now)} · ${timeRange(first,view.timeZone,now)}${windows.length > 1 ? ` · +${windows.length-1} more` : ''}`
+    : perfect ? 'Check sun-based opportunities for the next 5 days' : 'Check the next 5 days for rain and storm signals';
+  return `<button type="button" class="forecast-window-banner forecast-window-${kind}" data-forecast-window="${kind}" aria-haspopup="dialog" aria-controls="forecast-window-dialog"><span class="forecast-window-icon">${icon(kind)}</span><span class="forecast-window-copy"><strong>${esc(title)}</strong><span>${esc(summary)}</span></span><span class="forecast-window-action">View times <b aria-hidden="true">›</b></span></button>`;
+}
+
+export function forecastWindowDetailHTML(view, kind, place, now = Date.now()) {
+  const windows = view[kind] || [], zone = view.timeZone, perfect = kind === 'perfect';
+  const heading = perfect ? 'Perfect weather' : 'Rain and storm outlook', groups = new Map();
+  for (const w of windows) {if(!groups.has(w.date))groups.set(w.date,[]);groups.get(w.date).push(w);}
+  const headers = perfect ? '<th scope="col">Hour</th><th scope="col">Feels like in sun</th><th scope="col">Dew point</th><th scope="col">Clouds</th><th scope="col">Rain</th>' : '<th scope="col">Hour</th><th scope="col">Rain likelihood</th><th scope="col">Outlook</th>';
+  const row = h => `<tr data-forecast-hour="${esc(h.time)}"><th scope="row">${esc(clock(Date.parse(h.time),zone,true))}</th>${perfect ? `<td>${value(h.feels,'°')}</td><td>${value(h.dewpoint,'°')}</td><td>${value(h.cloud,'%')}</td><td>${value(h.rainChance,'%')}</td>` : `<td>${value(h.rainChance,'%')}</td><td>${h.thunder ? 'Thunderstorms possible' : finite(h.rainChance)&&h.rainChance>=80 ? 'High rain likelihood' : 'Rain likely'}</td>`}</tr>`;
+  const period = w => `<div class="forecast-window-period"><h4>${esc(timeRange(w,zone,now))}${perfect?'':` <span>${esc(w.title)}</span>`}</h4><div class="forecast-window-table-wrap"><table class="forecast-window-table"><caption class="sr-only">${esc(heading)}: ${esc(dayLabel(w.start,zone,now))}, ${esc(timeRange(w,zone,now))}</caption><thead><tr>${headers}</tr></thead><tbody>${w.hours.map(row).join('')}</tbody></table></div></div>`;
+  const content=[...groups.values()].map(group=>`<section class="forecast-window-day"><h3>${esc(dayLabel(group[0].start,zone,now))}</h3>${group.map(period).join('')}</section>`).join('');
+  return `<div class="dialog-eyebrow">${esc(place||'Your location')}</div><h2 id="forecast-window-title">${heading}</h2><p class="forecast-window-intro">All qualifying forecast times in the next 5 days, in local time.</p>${content||'<p class="forecast-window-empty">No matching hours in the next 5 days. Check again as the forecast updates.</p>'}`;
+}
+
+function bindDialog() {
+  const dialog = document.getElementById('forecast-window-dialog');
+  if (!dialog || boundDialog === dialog) return dialog;
+  boundDialog = dialog;
+  document.getElementById('close-forecast-window')?.addEventListener('click',()=>dialog.close());
+  dialog.addEventListener('close',()=>{selectedKind=null;if(!document.querySelector('dialog[open]'))document.body.classList.remove('dialog-open');});
+  return dialog;
+}
+function openWindow(kind, now = Date.now()) {
+  const dialog=bindDialog(), content=document.getElementById('forecast-window-content');
+  if(!dialog||!content||!currentView?.[kind])return;
+  selectedKind=kind;
+  content.innerHTML=forecastWindowDetailHTML(currentView,kind,latest?.location?.name,now);
+  if(!dialog.open)dialog.showModal();
+  document.body.classList.add('dialog-open');
+}
+export function renderForecastWindowBanners(data, now = Date.now()) {
+  ensureTrackerLink();
+  const root=document.getElementById('forecast-window-banners');
+  if(!root)return;
+  latest=data;currentView=buildForecastWindows(data,now);
+  const html=['perfect','rain'].map(kind=>forecastWindowBannerHTML(currentView,kind,now)).join('');
+  root.hidden=!html;root.innerHTML=html;
+  root.querySelectorAll('[data-forecast-window]').forEach(button=>button.addEventListener('click',()=>openWindow(button.dataset.forecastWindow)));
+  if(selectedKind)openWindow(selectedKind,now);
+  if(!refreshTimer)refreshTimer=setInterval(()=>{if(latest)renderForecastWindowBanners(latest);},60000);
+  return currentView;
+}
+export function resetForecastWindowBanners() {
+  latest=null;currentView=null;selectedKind=null;
+  if(refreshTimer)clearInterval(refreshTimer);refreshTimer=null;
+  const root=document.getElementById('forecast-window-banners');
+  if(root){root.hidden=true;root.innerHTML='';}
+  const dialog=document.getElementById('forecast-window-dialog');
+  if(dialog?.open)dialog.close();
+}
