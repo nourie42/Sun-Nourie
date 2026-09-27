@@ -1,26 +1,50 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {buildForecastWindows} from '../public/weather-fusion/forecast-windows.js';
+import {thermalComfort} from '../public/weather-fusion/weather-math.js';
 
 const HOUR = 3600000;
 const base = Date.parse('2026-09-26T12:00:00Z');
 const at = (hour, start=base) => new Date(start+hour*HOUR).toISOString();
+const location={timeZone:'America/New_York',latitude:35.79,longitude:-78.48};
+
+function refreshHour(data,index){
+  const hour=data.hours.find(row=>Date.parse(row.time)===Date.parse(data.metricForecasts.series.feels[index].time));
+  const point=data.metricForecasts.series.feels[index],inputs=point.inputs,time=Date.parse(point.time);
+  hour.temperature=inputs.temperature;hour.dewpoint=inputs.dewpoint;hour.skyCover=inputs.skyCover;hour.condition=inputs.condition;
+  const temperature=data.metricForecasts.series.temperature?.find(row=>Date.parse(row.time)===time);if(temperature)temperature.value=inputs.temperature;
+  const comfort=thermalComfort(inputs,data.location,time);
+  point.value=Number(comfort.rawOutdoors.toFixed(1));point.daylight=comfort.daylight;point.condition=inputs.condition;
+}
+function setSunTemperature(data,index,target){
+  const point=data.metricForecasts.series.feels[index],inputs=point.inputs,time=Date.parse(point.time);
+  let air=target;
+  for(let n=0;n<8;n++){
+    inputs.temperature=air;refreshHour(data,index);
+    const comfort=thermalComfort(inputs,data.location,time),sun=air+comfort.rawOutdoors-comfort.rawShade;
+    air+=target-sun;
+  }
+  inputs.temperature=air;refreshHour(data,index);
+}
 
 function fixture(count=4, start=base) {
   const hours = Array.from({length:count},(_,index) => ({time:at(index,start),isDay:true,
-    temperature:90,skyCover:20,dewpoint:50,condition:'Mostly sunny',windMph:40,gust:60,
+    temperature:70,skyCover:20,dewpoint:50,condition:'Clear',windMph:0,gust:5,
     precipitation:0,rainLikelihood:{value:10},pop:99}));
-  return {location:{timeZone:'UTC'},hours,
+  const data={location:{...location},hours,
     rainTimeline:hours.map(hour => ({time:hour.time,end:at(1,Date.parse(hour.time)),precipitation:0,rainLikelihood:{value:10},officialPop:99})),
     metricForecasts:{series:{
-      feels:hours.map(hour => ({time:hour.time,value:72,daylight:true,condition:hour.condition,inputs:{skyCover:20,wind:40}})),
+      temperature:hours.map(hour=>({time:hour.time,value:70})),
+      feels:hours.map(hour => ({time:hour.time,value:72,daylight:true,condition:hour.condition,inputs:{temperature:70,dewpoint:50,wind:0,skyCover:20,condition:hour.condition,type:'guidance'}})),
       dewpoint:hours.map(hour => ({time:hour.time,value:50})),
-      gust:hours.map(hour => ({time:hour.time,value:60})),
+      gust:hours.map(hour => ({time:hour.time,value:5})),
     }},
   };
+  for(let i=0;i<count;i++)setSunTemperature(data,i,72);
+  return data;
 }
 
-test('perfect uses displayed hourly feels, sunny sky and dry blend values with no wind restriction',()=>{
+test('perfect uses modeled feels in direct sun, same-hour sky and dry blend values',()=>{
   const data = fixture();
   const result = buildForecastWindows(data,base);
   assert.equal(result.perfect.length,1);
@@ -28,24 +52,23 @@ test('perfect uses displayed hourly feels, sunny sky and dry blend values with n
   assert.equal(result.perfect[0].start,base);
   assert.equal(result.perfect[0].end,base+4*HOUR);
   assert.equal(result.perfect[0].hours.length,4);
-  assert.equal(result.perfect[0].hours[0].feels,72);
-  data.metricForecasts.series.feels.forEach(row => row.value=76);
-  data.hours.forEach(row => row.temperature=72);
-  assert.deepEqual(buildForecastWindows(data,base).perfect,[],'Comfort uses feels-like rather than air temperature.');
+  assert.equal(Math.round(result.perfect[0].hours[0].feels),72);
+  data.metricForecasts.series.feels.forEach((_,index)=>setSunTemperature(data,index,76));
+  assert.deepEqual(buildForecastWindows(data,base).perfect,[],'Comfort uses air plus the matching sun exposure lift, not air or shade temperature alone.');
 });
 
 test('inclusive perfect boundaries work, and every individual limiting field is required',()=>{
   const accepted = fixture(2);
-  accepted.metricForecasts.series.feels[0].value=70;
-  accepted.metricForecasts.series.feels[1].value=75;
-  accepted.metricForecasts.series.feels.forEach(row => row.inputs.skyCover=25);
+  accepted.metricForecasts.series.feels.forEach((row,index)=>{row.inputs.skyCover=25;refreshHour(accepted,index);});
+  setSunTemperature(accepted,0,70);
+  setSunTemperature(accepted,1,75);
   accepted.metricForecasts.series.dewpoint.forEach(row => row.value=55);
   accepted.rainTimeline.forEach(row => {row.rainLikelihood.value=20;row.precipitation=.009;});
   assert.equal(buildForecastWindows(accepted,base).perfect.length,1);
   const cases = [
-    data => data.metricForecasts.series.feels[0].value=69.9,
-    data => data.metricForecasts.series.feels[0].value=75.1,
-    data => data.metricForecasts.series.feels[0].inputs.skyCover=25.1,
+    data => setSunTemperature(data,0,69.9),
+    data => setSunTemperature(data,0,75.1),
+    data => {data.metricForecasts.series.feels[0].inputs.skyCover=25.1;refreshHour(data,0);},
     data => data.metricForecasts.series.dewpoint[0].value=55.1,
     data => data.rainTimeline[0].rainLikelihood.value=20.1,
     data => data.rainTimeline[0].precipitation=.01,
@@ -82,13 +105,12 @@ test('explicit precipitation and obscured-sky wording prevent perfect even when 
   }
 });
 
-test('wind wording does not add a separate perfect-weather limit or imply thunderstorms',()=>{
-  for (const condition of ['Windy','Windstorm','Wind storm','Wind-storm']) {
-    const data=fixture(2);data.hours.forEach(row => row.condition=condition);
-    const result=buildForecastWindows(data,base);
-    assert.equal(result.perfect.length,1,condition);
-    assert.deepEqual(result.rain,[],condition);
-  }
+test('wind speed itself does not veto otherwise qualifying sun hours',()=>{
+  const data=fixture(2);
+  data.metricForecasts.series.feels.forEach((row,index)=>{row.inputs.wind=20;refreshHour(data,index);setSunTemperature(data,index,72);});
+  data.hours.forEach(row=>{row.windMph=20;row.gust=30;});
+  assert.equal(buildForecastWindows(data,base).perfect.length,1);
+  assert.deepEqual(buildForecastWindows(data,base).rain,[]);
 });
 
 test('perfect includes every future date and breaks on missing hours or failed conditions',()=>{
@@ -97,10 +119,9 @@ test('perfect includes every future date and breaks on missing hours or failed c
   data.metricForecasts.series.feels[4].value=null;
   data.hours=data.hours.slice(0,5);
   const windows=buildForecastWindows(data,base).perfect;
-  assert.deepEqual(windows.map(window => [window.date,window.hours.length]),[
-    ['2026-09-26',2],['2026-09-26',7],['2026-09-27',24],['2026-09-28',19],
-  ]);
-  assert.equal(windows[1].start,base+5*HOUR,'Isolated valid hours do not span failed or missing hours.');
+  assert.deepEqual(windows.map(window => [window.date,window.hours.length]),[['2026-09-26',2]]);
+  assert.equal(windows[0].end,base+2*HOUR,'An invalid/missing hour splits the sunny window.');
+  assert.ok(windows.every(window=>window.start<base+5*24*HOUR),'No window extends past the five-day horizon.');
 });
 
 test('rain uses canonical hourly scores, groups by risk, and allows a single-hour event',()=>{
@@ -127,12 +148,12 @@ test('only explicit thunder evidence labels thunderstorms, independently of rain
   assert.equal(Object.hasOwn(rain[0].hours[0],'stormChance'),false);
 });
 
-test('coarse condition wording attached to the feels series neither invents thunder hours nor vetoes the blend',()=>{
+test('coarse condition wording attached to feels data cannot replace missing hourly sun inputs',()=>{
   const data=fixture(3);
   data.hours=[];
   data.metricForecasts.series.feels.forEach(row => row.condition='Thunderstorms possible');
   assert.deepEqual(buildForecastWindows(data,base).rain,[]);
-  assert.equal(buildForecastWindows(data,base).perfect[0].hours.length,3);
+  assert.deepEqual(buildForecastWindows(data,base).perfect,[],'No hourly sample means no sun-exposure estimate.');
   data.rainTimeline[1].condition='Thunderstorms possible';
   const rain=buildForecastWindows(data,base).rain;
   assert.equal(rain.length,1);
@@ -143,7 +164,6 @@ test('coarse condition wording attached to the feels series neither invents thun
 
 test('broad later-day rain prose cannot override qualifying numeric blended hours',()=>{
   const start=base+72*HOUR,data=fixture(3,start);
-  data.hours=[];
   data.metricForecasts.series.feels.forEach(row => row.condition='Slight chance of rain during the day');
   const perfect=buildForecastWindows(data,base).perfect;
   assert.equal(perfect.length,1);
@@ -173,7 +193,7 @@ test('exact instants join across offset strings, repeated DST hours, and local-d
   data.metricForecasts.series.feels[0].time='2026-10-31T23:00:00-04:00';
   const rain=buildForecastWindows(data,start).rain;
   assert.deepEqual(rain.map(window => [window.date,window.hours.length]),[['2026-10-31',1],['2026-11-01',5]]);
-  assert.equal(rain[0].hours[0].feels,72);
+  assert.equal(rain[0].hours[0].feels,null,'Sun feels-like is not reported after sunset.');
   assert.equal(rain[1].end-rain[1].start,5*HOUR,'The two 1 AM hours remain separate real hours.');
 });
 

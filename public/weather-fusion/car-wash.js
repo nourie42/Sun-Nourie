@@ -238,7 +238,7 @@ export function carWashHTML(summary) {
 
 export function renderCarWashForecast(forecast, now = Date.now()) {
   const panel = document.getElementById('car-wash-forecast');
-  if (!panel || !isExperimentalWeatherPage()) return null;
+  if (!panel) return null;
   const summary = carWashSummary(forecast,now);
   panel.hidden = false;
   panel.dataset.verdict = summary.state;
@@ -249,6 +249,8 @@ export function renderCarWashForecast(forecast, now = Date.now()) {
 export function resetCarWashForecast() {
   const panel = document.getElementById('car-wash-forecast');
   if (!panel) return;
-  panel.hidden = !isExperimentalWeatherPage();
-  if (!panel.hidden) panel.innerHTML = '<p class="muted">Checking the next three days for a safe wash window…</p>';
+  panel.hidden = true;
+  const button=document.getElementById('open-car-wash');
+  if(button)button.setAttribute('aria-expanded','false');
+  panel.innerHTML = '';
 }

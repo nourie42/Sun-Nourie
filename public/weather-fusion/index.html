@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
   <link rel="stylesheet" href="/weather-fusion/style.css?v=dashboard-v2">
   <link rel="stylesheet" href="/weather-fusion/forecast-layout.css?v=weather-qa-v67">
-  <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script async src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" onload="window.dispatchEvent(new Event('weather-map-library-ready'))"></script>
   <link rel="stylesheet" href="/weather-fusion/personal-details.css?v=wpc-mpd-v12">
   <link rel="stylesheet" href="/weather-fusion/hourly-feels.css?v=weather-art-labels-v10">
   <link rel="stylesheet" href="/weather-fusion/weather-repair.css?v=compact-weather-v21">
@@ -18,9 +18,9 @@
   <link rel="stylesheet" href="/weather-fusion/car-wash.css?v=rain-consensus-v41">
   <link rel="stylesheet" href="/weather-fusion/model-explanation.css?v=weathernext-live-v1">
   <link rel="stylesheet" href="/weather-fusion/risk-outlooks.css?v=risk-outlooks-v4">
-  <link rel="stylesheet" href="/weather-fusion/weather-polish.css?v=mobile-repair-v1">
-  <link rel="stylesheet" href="/weather-fusion/forecast-window-banners.css?v=blend-windows-v1">
-  <script type="module" src="/weather-fusion/app.js?v=air-hero-v2&amp;repair=dan-visible-v1"></script>
+  <link rel="stylesheet" href="/weather-fusion/weather-polish.css?v=aqi-layout-nvidia-v2">
+  <link rel="stylesheet" href="/weather-fusion/forecast-window-banners.css?v=sun-window-main-v2">
+  <script type="module" src="/weather-fusion/app.js?v=sun-windows-main-v1&amp;repair=dan-visible-v1"></script>
 
   <style id="experimental-bots-link-style">
     .experimental-bots-link,.experimental-weathernext-link{display:none;align-items:center;gap:.45rem;width:max-content;margin:.55rem .4rem 0 0;padding:.55rem .85rem;border:1px solid rgba(255,255,255,.22);border-radius:999px;background:rgba(11,24,43,.78);color:#f7fbff;text-decoration:none;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.18)}
@@ -37,19 +37,19 @@
     <a class="experimental-bots-link" id="experimental-bots-link" href="/ai-council/" aria-label="Open AI Chat"><span aria-hidden="true">🤖</span> AI Chat</a>
     <a class="experimental-weathernext-link" id="weathernext-site-link" href="/weathernext/">Google WeatherNext 3</a>
     <header class="topbar">
-      <a class="brand" href="/weather-fusion/experimental-weather.html" aria-label="Open Experimental Weather"><span class="brand-sun" aria-hidden="true">◒</span><span>Weather <b>Nourie</b><small>Because Apple, Google and Samsung weather suck</small></span></a>
+      <a class="brand" href="/weather-fusion/experimental-weather.html" aria-label="Open Experimental Weather"><span class="brand-sun" aria-hidden="true">◒</span><span>Weather <b>Nourie</b></span></a>
       <nav aria-label="Page tools"><button class="icon-button" id="refresh" title="Refresh weather" aria-label="Refresh weather">↻</button></nav>
     </header>
     <div class="location-bar">
-      <div class="device-location-status" aria-live="polite"><span aria-hidden="true">⌖</span><strong id="device-location-label">Getting device location…</strong></div>
-      <div class="search-wrap"><label for="city-search" class="sr-only">Search a U.S. city or ZIP code</label><span aria-hidden="true">⌕</span><input id="city-search" type="search" placeholder="Search city or ZIP" autocomplete="off" aria-controls="search-results" aria-expanded="false"><button id="locate" title="Refresh device location" aria-label="Refresh device location">⌖</button><div id="search-results" class="search-results" hidden></div></div>
+      <div class="search-wrap"><label for="city-search" class="sr-only">Search a U.S. city or ZIP code, or use your location</label><span aria-hidden="true">⌕</span><input id="city-search" type="search" placeholder="Search city or ZIP" autocomplete="off" aria-controls="search-results" aria-expanded="false"><button id="locate" title="Use my device location" aria-label="Use my location">⌖</button><div id="search-results" class="search-results" hidden></div></div>
+      <span id="device-location-label" class="sr-only" aria-live="polite">Getting device location…</span>
     </div>
     <nav class="weather-jump-nav" aria-label="Jump to weather section">
       <a class="weather-jump-card jump-map" href="#map-panel" aria-label="Weather Map">
         <span class="jump-label">Map</span>
       </a>
-      <a class="weather-jump-card jump-gross" href="#dewpoint-gross-meter">
-        <span class="jump-label">Gross Meter</span>
+      <a class="weather-jump-card jump-gross" href="#dewpoint-gross-meter" aria-label="Dew Point Gross Meter">
+        <span class="jump-label">Gross</span>
       </a>
       <a class="weather-jump-card jump-day" href="#your-day">
         <span class="jump-label">Your Day</span>
@@ -57,12 +57,13 @@
       <a class="weather-jump-card jump-week" href="#daily-panel" aria-label="7-Day Forecast">
         <span class="jump-label">7-Day</span>
       </a>
-      <a class="weather-jump-card jump-air" href="#air-quality">
-        <span class="jump-label">Air Quality</span>
+      <a class="weather-jump-card jump-air" href="#air-quality" aria-label="Air Quality">
+        <span class="jump-label">AQI</span>
       </a>
+      <a class="weather-jump-card jump-next" href="/weathernext/" aria-label="Open NVIDIA forecast">NVIDIA</a>
+      <button class="weather-jump-card jump-car-wash" id="open-car-wash" type="button" aria-expanded="false" aria-controls="car-wash-forecast">Car Wash</button>
     </nav>
-    <a class="forecast-compare-banner" href="/weathernext/" aria-label="Compare to Nvidia AI Forecast">Compare to Nvidia AI Forecast</a>
-    <div class="experimental-page-banner" role="status">EXPERIMENTAL</div>
+    <div class="experimental-page-banner" role="status" hidden>EXPERIMENTAL</div>
     <main id="forecast">
       <div id="status" class="status-line" role="status" aria-live="polite">Connecting to weather sources…</div>
       <section id="weather-change-banner" class="weather-change-banner" role="status" hidden></section>
@@ -100,8 +101,8 @@
           <a class="science-link" href="#scientific-stuff">Scientific stuff further down ↓</a>
         </div>
         </div>
-        <section class="glass car-wash-forecast" id="car-wash-forecast" aria-labelledby="car-wash-title" hidden></section>
       </section>
+      <section class="glass car-wash-forecast" id="car-wash-forecast" aria-labelledby="car-wash-title" hidden></section>
       <section class="glass briefing" aria-labelledby="briefing-title">
         <div class="section-top"><h2><span class="sparkle" aria-hidden="true">✦</span> LOCAL OUTLOOK</h2><span id="ai-label" class="pill">YOUR LOCAL OUTLOOK</span></div>
         <h3 id="briefing-title">A clearer picture of what’s ahead.</h3>

@@ -1,12 +1,15 @@
+Warning: truncated output (original token count: 12652)
+Total output lines: 568
+
 import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText,rebindDanTake} from './dans-take.js?v=weather-art-labels-v10';
 import {danCard,danTakeDisplay} from './dans-summary.js?v=dan-visible-v1';
 import {fetchJsonWithDeadline} from './request-deadline.js?v=loading-recovery-v1';
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
-import {weatherIcon,renderHourlyWeather,currentSample} from './weather-display.js?v=sun-exposure-v1';
+import {weatherIcon,renderHourlyWeather,currentSample} from './weather-display.js?v=shade-sun-align-v2';
 import {dayGraphHTML,dayGraphPoints,installDayGraph} from './day-graph.js?v=feels-floor-wind-v1';
 import {degrees,feelsAt,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=dewpoint-floor-v1';
 import {createFramePlayer} from './frame-player.js';
-import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=sun-exposure-v1';
+import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=shade-linked-v2';
 import {dailyDisplay} from './weather-math.js?v=full-day-rain-v1';
 import {conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
 import {currentHero} from './current-temperature.js?v=rain-now-v71';
@@ -16,31 +19,20 @@ import {renderDewpointMeter} from './dewpoint-meter.js?v=weather-qa-v67';
 import {renderWeatherPanel} from './render-safety.js';
 import {forecastPeriodSummary} from './forecast-story.js?v=weather-qa-v67';
 import {forecastOutlookDetails} from './outlook-details.js?v=full-day-rain-v1';
-import {isExperimentalWeatherPage,renderCarWashForecast,resetCarWashForecast} from './car-wash.js?v=full-day-rain-v1';
+import {isExperimentalWeatherPage,renderCarWashForecast,resetCarWashForecast} from './car-wash.js?v=click-main-v2';
 import {renderModelExplanation,resetModelExplanation} from './model-explanation.js?v=weathernext-live-v1';
 import {updateRainTrend} from './rain-trend.js?v=full-day-rain-v1';
 import {renderRiskOutlooks,resetRiskOutlooks} from './risk-outlooks.js?v=risk-outlooks-v4';
 import {renderAirQuality} from './air-quality.js?v=mobile-repair-v1';
 import {displayedRainChance} from './rain-display.js?v=rain-observed-v1';
 import {weatherChangeMessages,WEATHER_CHANGE_TITLE} from './weather-changes.js?v=large-change-v3';
-import {renderForecastWindowBanners,resetForecastWindowBanners} from './forecast-window-banners.js?v=blend-windows-v1';
+import {renderForecastWindowBanners,resetForecastWindowBanners} from './forecast-window-banners.js?v=sun-window-main-v2';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);
 const experimentalPage = isExperimentalWeatherPage();
 const finite = (n) => typeof n === 'number' && Number.isFinite(n);
 const DEVICE_LOCATION_KEY='weather-fusion-device-place';
 const validPlace=p=>p&&finite(p.latitude)&&finite(p.longitude)&&p.latitude>=24&&p.latitude<=50&&p.longitude>=-125&&p.longitude<=-66;
-const GOOGLE_PUBLISHED_POINTS=[
-  {id:'knightdale',latitude:35.787,longitude:-78.4806},
-  {id:'greenville',latitude:35.6127,longitude:-77.3664},
-];
-const milesBetween=(a,b)=>{
-  const lat=(a.latitude+b.latitude)*Math.PI/360;
-  const north=(a.latitude-b.latitude)*69;
-  const east=(a.longitude-b.longitude)*69*Math.cos(lat);
-  return Math.hypot(north,east);
-};
-const nearbyGooglePoint=value=>GOOGLE_PUBLISHED_POINTS.map(p=>({...p,miles:milesBetween(value,p)})).sort((a,b)=>a.miles-b.miles).find(p=>p.miles<=10)||null;
 const readDeviceLocation=()=>{
   try{const p=JSON.parse(localStorage.getItem(DEVICE_LOCATION_KEY));return validPlace(p)?{...p,id:'device',source:'device-cache'}:null;}catch{return null;}
 };
@@ -68,7 +60,8 @@ function configurePageMode() {
       const button=document.createElement('button');button.type='button';button.dataset.layer=layer;button.setAttribute('aria-pressed','false');button.textContent=label;tabs.append(button);
     }
   }
-  const carWash=$('car-wash-forecast');if(carWash)carWash.hidden=!experimentalPage;
+  const carWash=$('car-wash-forecast');if(carWash)carWash.hidden=true;
+  const carWashButton=$('open-car-wash');if(carWashButton)carWashButton.hidden=experimentalPage;
   const modelExplanation=$('model-explanation');if(modelExplanation)modelExplanation.hidden=!experimentalPage;
   const back=$('experimental-back');if(back)back.hidden=!experimentalPage;
   const experimentBanner=document.querySelector('.experimental-page-banner');if(experimentBanner)experimentBanner.hidden=!experimentalPage;
@@ -136,13 +129,13 @@ function render(data) {
   $('observation-label').textContent = `${sourceLabel}${radarLabel?` · ${radarLabel}`:''}`;
   $('hero-scene').innerHTML = icon(hero.condition, hero.isDay, 120);
   renderWeatherChanges(data);
-  if(experimentalPage)draw('forecast-window-banners','Upcoming weather windows',()=>renderForecastWindowBanners(data));
+  draw('forecast-window-banners','Upcoming weather windows',()=>renderForecastWindowBanners(data));
   draw('alerts', 'Official alerts', () => renderAlerts(data));
   draw('risk-outlook-list', 'Outlooks', () => renderRiskOutlooks(data));
   draw('hourly', 'Hourly forecast', () => renderHours(data));
   draw('daily', 'Daily forecast', () => renderDays(data));
   draw('skin-exposure', 'Feels-like outlook', () => renderComfort(data));
-  if(experimentalPage)draw('car-wash-forecast', 'Car Wash Forecast', () => renderCarWashForecast(data));
+  if(!experimentalPage&&!$('car-wash-forecast').hidden)draw('car-wash-forecast', 'Car Wash Forecast', () => renderCarWashForecast(data));
   draw('dewpoint-gross-meter', 'Dew Point Gross Meter', () => renderDewpointMeter(data));
   if(experimentalPage)draw('model-explanation', 'Forecast model explanation', () => renderModelExplanation(data));
   draw('air-quality-content', 'Air quality', () => renderAirQuality(data));
@@ -261,46 +254,7 @@ async function load({ moveMap = false, refreshModels = false, briefingRetry = 0 
     if (selectedLayer !== 'radar' && (refreshModels || moveMap || Date.now()-modelFetched >= 55000)) void loadModelMap(refreshModels);
     if (Date.now() - lastRadarFetch > 2 * 60000) void loadRadar();
     if (data.aiConfigured && !(currentBriefing?.mode === 'ai' && currentBriefing.signature === data.signature)) {
-      api('briefing', query({ signature: data.signature }), requestController.signal).then((briefing) => {
-        if (id === generation && briefing.signature === forecast?.signature) renderBriefing(briefing);
-      }).catch((error) => {
-        if (id !== generation || error.name === 'AbortError') return;
-        if(error.status===409&&briefingRetry<2){void load({briefingRetry:briefingRetry+1});return;}
-        $('briefing-stamp').textContent = error.status === 409 ? 'Sources changed while the briefing was prepared. The next refresh will use the new forecast.' : 'AI synthesis is unavailable. Official NWS wording remains available in bulletin details.';
-      });
-    }
-  } catch (e) {
-    if (id !== generation || e.name === 'AbortError') return;
-    console.error(receivedForecast ? 'Weather Nourie display failed' : 'Weather Nourie request failed', e);
-    $('status').textContent = receivedForecast
-      ? 'The forecast arrived, but a display component failed. Use Refresh to retry.'
-      : `Weather update failed. ${forecast ? `The displayed snapshot was checked at ${clock(forecast.assembledAt)} and may be stale.` : 'Please retry or check weather.gov.'}`;
-    if(e.name==='TimeoutError')$('status').textContent=e.message;
-    $('status').classList.add('error');
-    if(forecast)renderComfort(forecast);
-    if (!receivedForecast) $('alerts').innerHTML = '<p class="alert-note warning">Live alert status could not be checked. Consult the official NWS forecast and warnings.</p>';
-  } finally { clearTimeout(slowNotice);if (id === generation) { busy = false; $('refresh').classList.remove('loading'); } }
-}
-function chooseLocation(value,{rememberDevice=false}={}) {
-  if(!validPlace(value))return;
-  ++locationRequest;
-  place = { ...value };
-  const compareLink=document.querySelector('.forecast-compare-banner[href^="/weathernext/"]');
-  if(compareLink){
-    const published=nearbyGooglePoint(value);
-    compareLink.href='/weathernext/?'+new URLSearchParams(published?{location:published.id}:{latitude:value.latitude,longitude:value.longitude});
-  }
-  stopRadar();framePlayer?.clear();++modelFrameToken;++mapSelectionToken;++radarGeneration;lastRadarFetch=0;
-  currentBriefing = null;
-  resetExperience();
-  resetForecastWindowBanners();
-  if ($('day-dialog').open) $('day-dialog').close();
-  // Clear the previous location immediately, including its alerts and AI text.
-  forecast = null;
-  $('city-name').textContent = value.name || 'Your location';
-  setDeviceLocationLabel(value.source?.startsWith('device')?'Using device location':`Viewing ${value.name||'searched location'}`);
-  $('temperature').innerHTML = '—<span>°</span>';
-  if($('hero-uv'))$('hero-uv').textContent='Peak UV today —';
+      api('briefing', query…652 tokens truncated…—';
   $('condition').textContent = 'Loading the selected location';
   $('high-low').textContent = 'High —° · Low —°';
   $('observation-label').textContent = 'Awaiting the new location’s sources';
@@ -391,6 +345,7 @@ function initMap() {
   });
   if (forecast) renderMapWarnings(forecast);
 }
+window.addEventListener('weather-map-library-ready',()=>{if(validPlace(place)){initMap();if(forecast)void loadRadar();}});
 function renderMapWarnings(data) {
   if (!warningLayer) return;
   warningLayer.clearLayers();
@@ -503,6 +458,13 @@ $('daily').addEventListener('click', (event) => { const button = event.target.cl
 $('close-day').addEventListener('click', () => $('day-dialog').close());
 $('day-dialog').addEventListener('click', (e) => { if (e.target === $('day-dialog')) { const r = e.target.getBoundingClientRect(); if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) e.target.close(); } });
 $('expand-briefing').addEventListener('click', () => { const open = $('briefing-detail').hidden; $('briefing-detail').hidden = !open; $('expand-briefing').setAttribute('aria-expanded', String(open)); $('expand-briefing').textContent = open ? 'Less detail ↗' : 'Read full outlook ↗'; });
+$('open-car-wash').addEventListener('click',()=>{
+  const panel=$('car-wash-forecast'),button=$('open-car-wash');
+  if(!panel||!forecast)return;
+  panel.hidden=false;button.setAttribute('aria-expanded','true');
+  renderWeatherPanel('car-wash-forecast','Car Wash Forecast',()=>renderCarWashForecast(forecast));
+  panel.scrollIntoView({behavior:'smooth',block:'start'});
+});
 $('basemap').addEventListener('change', setBasemap);
 $('radar-time').addEventListener('input', () => { stopRadar(); showSelectedFrame(Number($('radar-time').value)); });
 $('radar-play').addEventListener('click', () => {

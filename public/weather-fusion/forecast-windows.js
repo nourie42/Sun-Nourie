@@ -1,4 +1,5 @@
-import {displayedFeelsAt} from './hourly-feels.js?v=dewpoint-floor-v1';
+import {forecastSample} from './weather-display.js?v=shade-sun-align-v2';
+import {sunExposureTemperature} from './outdoor-feels.js?v=air-hero-v3';
 import {finite,rainChanceValue,solarElevation} from './weather-math.js?v=full-day-rain-v1';
 
 const HOUR = 3600000;
@@ -102,7 +103,9 @@ export function buildForecastWindows(forecast = {}, now = Date.now()) {
     // Explicit multi-hour intervals are not hourly evidence, including for
     // thunder timing. Never fill gaps using a day/night forecast or nearby row.
     if (!hourlyInterval(hour,time) || !hourlyInterval(feel,time) || !hourlyInterval(wet,time)) continue;
-    const value = displayedFeelsAt(forecast,new Date(time).toISOString());
+    const sample=forecastSample(forecast,new Date(time).toISOString());
+    const sun=sunExposureTemperature(sample||{});
+    const value=sun.active?Math.round(sun.value*10)/10:null;
     const dewpoint = dewpoints.has(time) ? dewpoints.get(time).value : hour?.dewpoint;
     const cloud = percentage(feel?.inputs && Object.hasOwn(feel.inputs,'skyCover') ? feel.inputs.skyCover : hour?.skyCover);
     const rainChance = rainChanceValue(wet?.rainLikelihood);
@@ -115,7 +118,7 @@ export function buildForecastWindows(forecast = {}, now = Date.now()) {
     const thunder = /thunder|\btstms?\b|\bt-?storms?\b/i.test(hourlyCondition);
     const adverseCondition = hourlyCondition.replace(/\bwind[ -]?storms?\b/gi,'');
     const adverse = /rain|shower|drizzle|thunder|\bstorms?\b|\btstms?\b|snow|sleet|flurr|ice pellets|fog|mist|haze|smoke|obscured/i.test(adverseCondition);
-    const perfect = finite(value) && value >= 70 && value <= 75
+    const perfect = sun.active && finite(value) && value >= 70 && value <= 75
       && finite(dewpoint) && dewpoint <= 55 && cloud !== null && cloud <= 25
       && rainChance !== null && rainChance <= 20
       && precipitation !== null && precipitation < .01 && !adverse

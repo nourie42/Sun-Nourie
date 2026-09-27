@@ -21,6 +21,9 @@ test('Shade and sun cards compare modeled feels-like values, never air temperatu
   const sun=html.match(/sun-person[\s\S]*?<figcaption><strong>([^<]+)<\/strong>/)?.[1];
   assert.equal(shade,'88°','Shade must display the modeled shade feels-like, not the 91° source air temperature');
   assert.equal(sun,'90°');
+  assert.match(html,/shade-person[^>]*data-temperature="88"/);
+  assert.match(html,/shade-person[\s\S]*?<strong>88°<\/strong><span class="shade-reading-label">Feels like in shade/);
+  assert.match(html,/shade-person[\s\S]*?data-outfit="hot"/,'The shade person’s clothing is selected from the same displayed shade value.');
   assert.ok(!html.includes('<strong>91°</strong>'),'Source air temperature must not be painted into the Shade comparison card');
 });
 

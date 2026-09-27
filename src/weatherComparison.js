@@ -18,15 +18,6 @@ const extreme=(a,fn)=>{const v=a.filter(finite);return v.length?fn(...v):null;};
 const round=v=>finite(v)?Math.round(v*10)/10:null;
 const compass=d=>finite(d)?['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'][Math.round(d/22.5)%16]:null;
 const iso=t=>new Date(t).toISOString();
-const pointDistanceMiles=(a,b)=>{
- const lat=(a.latitude+b.latitude)*Math.PI/360;
- return Math.hypot((a.latitude-b.latitude)*69,(a.longitude-b.longitude)*69*Math.cos(lat));
-};
-const nearbyPublishedPoint=(points,latitude,longitude,maxMiles=10)=>{
- const requested={latitude:Number(latitude),longitude:Number(longitude)};
- if(!finite(requested.latitude)||!finite(requested.longitude))return null;
- return points.map(point=>({point,miles:pointDistanceMiles(point,requested)})).sort((a,b)=>a.miles-b.miles).find(x=>x.miles<=maxMiles)?.point||null;
-};
 export function buildGoogleComparison(feed,pointId,now=Date.now()){
  const selected=selectGoogleForecast(feed,pointId,now),p=selected.point,zone=p.timeZone,start=Math.floor(now/HOUR)*HOUR;
  // Empty structural template only. No non-Google forecast is supplied to this builder.
@@ -94,7 +85,14 @@ export function registerWeatherComparisonRoutes(app,{fetchImpl=globalThis.fetch,
   const data=await r.json();googlePoints(data);return data;
  });
  const fail=(res,e)=>res.set('Cache-Control','no-store').status(e.status||503).json({error:e.message||'Comparison data unavailable.',code:e.code});
- const config=async q=>{const source=q.source==='google'?'google':q.source==='fusion'?'fusion':null;if(!source)throw Object.assign(Error('Choose Fusion or Google.'),{status:400});const coords=q.latitude!==undefined&&q.longitude!==undefined&&Number.isFinite(Number(q.latitude))&&Number.isFinite(Number(q.longitude))&&Math.abs(Number(q.latitude))<=90&&Math.abs(Number(q.longitude))<=180;const point=coords?{id:'selected',name:'Selected location',latitude:Number(q.latitude),longitude:Number(q.longitude)}:googlePoints(await getFeed()).find(p=>p.id===q.location);if(!point)throw Object.assign(Error('Choose a published comparison location.'),{status:404});return {source,point,explicitLocation:coords||q.explicit==='1'};};
+ const config=async q=>{
+  const source=q.source==='google'?'google':q.source==='fusion'?'fusion':null;
+  if(!source)throw Object.assign(Error('Choose Fusion or Google.'),{status:400});
+  const coords=q.latitude!==undefined&&q.longitude!==undefined&&Number.isFinite(Number(q.latitude))&&Number.isFinite(Number(q.longitude))&&Math.abs(Number(q.latitude))<=90&&Math.abs(Number(q.longitude))<=180;
+  const point=coords?{id:'selected',name:String(q.name||'Selected location').slice(0,100),latitude:Number(q.latitude),longitude:Number(q.longitude)}:googlePoints(await getFeed()).find(p=>p.id===q.location);
+  if(!point)throw Object.assign(Error('Choose a published comparison location.'),{status:404});
+  return {source,point,explicitLocation:coords||q.explicit==='1'};
+ };
  app.get(['/weather-fusion','/weather-fusion/'],async(_req,res,next)=>{
   try{const html=await readFile(root+'index.html','utf8');res.set('Cache-Control','no-cache').type('html').send(html);
   }catch(e){next(e);}
@@ -104,25 +102,26 @@ export function registerWeatherComparisonRoutes(app,{fetchImpl=globalThis.fetch,
   // conditional GET. This is the first /weathernext route registered by server.js.
   delete req.headers['if-none-match'];
   delete req.headers['if-modified-since'];
-  const points=googlePoints(await getFeed());
-  const coordinatePoint=req.query.latitude!==undefined&&req.query.longitude!==undefined?nearbyPublishedPoint(points,req.query.latitude,req.query.longitude):null;
-  const point=points.find(p=>p.id===req.query.location)||coordinatePoint||points[0];
-  const useExactCoordinates=req.query.latitude!==undefined&&req.query.longitude!==undefined&&!coordinatePoint;
+  const hasCoordinates=req.query.latitude!==undefined&&req.query.longitude!==undefined&&finite(Number(req.query.latitude))&&finite(Number(req.query.longitude))&&Math.abs(Number(req.query.latitude))<=90&&Math.abs(Number(req.query.longitude))<=180;
+  const points=hasCoordinates?[]:googlePoints(await getFeed());
+  const point=hasCoordinates?{id:'selected',name:String(req.query.name||'Selected location').slice(0,100),latitude:Number(req.query.latitude),longitude:Number(req.query.longitude)}:points.find(p=>p.id===req.query.location)||points[0];
+  if(!point)throw Object.assign(Error('Choose a city or use your device location.'),{status:400});
   let html=await readFile(root+'index.html','utf8');
-  html=html.replace(/<script type="module" src="\/weather-fusion\/app\.js[^"]*"><\/script>/, '<script type="module" src="/weather-fusion/compare/app.js?source=google&amp;location='+encodeURIComponent(point.id)+((req.query.location||coordinatePoint)?'&amp;explicit=1':'')+(useExactCoordinates?'&amp;latitude='+encodeURIComponent(req.query.latitude)+'&amp;longitude='+encodeURIComponent(req.query.longitude):'')+'"></script>');
-  html=html.replace('Because Apple, Google and Samsung weather suck','Your local weather, clearly explained').replace('<title>Weather Nourie</title>','<title>Experimental NVIDIA AI Weather</title>');
+  html=html.replace(/<script type="module" src="\/weather-fusion\/app\.js[^"]*"><\/script>/, '<script type="module" src="/weather-fusion/compare/app.js?source=google&amp;location='+encodeURIComponent(point.id)+'&amp;explicit=1'+(hasCoordinates?'&amp;latitude='+encodeURIComponent(req.query.latitude)+'&amp;longitude='+encodeURIComponent(req.query.longitude)+'&amp;name='+encodeURIComponent(point.name):'')+'"></script>');
+  html=html.replace('Because Apple, Google and Samsung weather suck','Your local weather, clearly explained').replace('<title>Weather Nourie</title>','<title>NVIDIA Forecast · Weather Nourie</title>');
   html=html.replace('</head>','<link rel="stylesheet" href="/weather-fusion/compare.css?v=mobile-repair-v1"></head>').replace('<body data-sky="day">','<body data-sky="day" class="google-pane weathernext-dashboard">');
-  html=html.replace('<main id="forecast">','<h1 class="weathernext-heading">Experimental NVIDIA AI Weather</h1><main id="forecast">');
-  html=html.replace('<a class="forecast-compare-banner" href="/weathernext/" aria-label="Compare to Nvidia AI Forecast">Compare to Nvidia AI Forecast</a>','<a class="forecast-compare-banner" href="/weather-fusion/">Back to Dan&#39;s Weather</a>');
-  res.set('Cache-Control','no-store, no-cache, max-age=0, must-revalidate').set('Pragma','no-cache').set('Expires','0').set('X-Weather-Nourie-Page','google-dashboard-crlf-fix-20260925').type('html').send(html);
+  html=html.replace('<main id="forecast">','<h1 class="weathernext-heading">NVIDIA Forecast</h1><main id="forecast">');
+  html=html.replace('<a class="weather-jump-card jump-next" href="/weathernext/" aria-label="Open NVIDIA forecast">NVIDIA</a>','<a class="weather-jump-card jump-main" href="/weather-fusion/" aria-label="Back to main forecast">Main</a>');
+  res.set('Cache-Control','no-store, no-cache, max-age=0, must-revalidate').set('Pragma','no-cache').set('Expires','0').set('X-Weather-Nourie-Page','nvidia-location-refresh-20260927').type('html').send(html);
  }catch(e){fail(res,e);}});
  app.get(['/weather-fusion/compare','/weather-fusion/compare/','/weather-fusion/compare.html'],(req,res)=>res.set('Cache-Control','no-cache').redirect(302,'/weathernext/'+(typeof req.query.location==='string'?'?location='+encodeURIComponent(req.query.location):'')));
  for(const name of ['compare.css','compare.js','compare-bridge.js','weathernext-access.js'])app.get('/weather-fusion/'+name,(_req,res)=>res.set('Cache-Control','no-cache').sendFile(root+name));
  app.get('/api/weather-fusion/compare/locations',async(_req,res)=>{try{res.set('Cache-Control','no-store').json({points:googlePoints(await getFeed())});}catch(e){fail(res,e);}});
  async function resolveForecast(query){
   const requested=query.latitude!==undefined||query.longitude!==undefined?locationPoint(query):null;
-  const feed=await getFeed();
-  const point=googlePoints(feed).find(p=>requested?Math.abs(p.latitude-requested.latitude)<.00011&&Math.abs(p.longitude-requested.longitude)<.00011:p.id===query.location);
+  let feed=null;
+  try{feed=await getFeed();}catch(error){if(!requested||!provider.configured)throw error;}
+  const point=feed?googlePoints(feed).find(p=>requested?Math.abs(p.latitude-requested.latitude)<.00011&&Math.abs(p.longitude-requested.longitude)<.00011:p.id===query.location):null;
   if(point)return {feed,point};
   if(!requested)throw Object.assign(Error(query.location?'Google has no published forecast for that location.':'Choose a city or use your device location.'),{status:query.location?404:400});
   const saved=localFeed(requested);

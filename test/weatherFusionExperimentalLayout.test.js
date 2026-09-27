@@ -20,10 +20,10 @@ test('main HTML ships radar only while experimental mode adds every model contro
   assert.match(app,/if\(layer==='radar'\)/,'radar remains the normal main-page path');
 });
 
-test('experimental weather uses conditional blend windows in place of the standalone tracker link',()=>{
+test('main and experimental weather share five-day sun-based forecast windows',()=>{
   assert.doesNotMatch(html,/id="experimental-whats-up-link"/);
   assert.match(html,/id="forecast-window-banners"[^>]*hidden/);
-  assert.match(app,/if\(experimentalPage\)draw\('forecast-window-banners'/);
+  assert.match(app,/draw\('forecast-window-banners'/);
   assert.match(html,/id="forecast-window-dialog"[^>]*aria-labelledby="forecast-window-title"/);
   assert.match(app,/resetForecastWindowBanners\(\)/);
 });
@@ -50,7 +50,9 @@ test('car-wash panel is below real-feel cards and the Gross Meter anchors below 
   assert.ok(feel>=0 && wash>feel && maps>wash);
   assert.match(html,/id="car-wash-forecast"[^>]*hidden/);
   assert.doesNotMatch(html,/id="car-wash-forecast"[^>]*aria-live/);
-  assert.match(app,/if\(experimentalPage\)draw\('car-wash-forecast'/);
+  assert.match(html,/id="open-car-wash"[^>]*aria-expanded="false"/);
+  assert.match(app,/if\(!experimentalPage&&!\$\('car-wash-forecast'\)\.hidden\)draw\('car-wash-forecast'/);
+  assert.match(app,/\$\('open-car-wash'\)\.addEventListener\('click'/);
   assert.match(dewpoint,/document\.getElementById\('car-wash-forecast'\)\s*\|\|\s*host/);
 });
 

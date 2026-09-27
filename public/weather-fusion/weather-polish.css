@@ -54,7 +54,7 @@ body[data-sky="night"] .air-quality-panel{background:radial-gradient(ellipse at 
  .aqi-pollutants{display:grid;grid-template-columns:1fr 1fr}
  .gross-scale{grid-template-columns:repeat(3,minmax(0,1fr))!important;row-gap:7px}
  .gross-eyebrow strong{font-size:28px!important}.gross-number{font-size:42px!important}
- .weather-jump-nav{grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;margin:7px 0 6px}
+ .weather-jump-nav{grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin:7px 0 6px}
  .weather-jump-card{min-height:38px;padding:7px 3px;border:0;border-radius:9px;background:rgba(8,64,99,.28)}
  .weather-jump-card:nth-child(n){grid-column:auto}
  .weather-jump-card .jump-label,.weather-jump-card.jump-gross .jump-label{font-size:clamp(8px,2.45vw,11px)}
@@ -63,7 +63,7 @@ body[data-sky="night"] .air-quality-panel{background:radial-gradient(ellipse at 
 .forecast-compare-banner{display:flex;align-items:center;justify-content:center;box-sizing:border-box;width:100%;min-height:40px;margin:10px 0 4px;padding:8px 5px;border:0;border-radius:10px;background:rgba(8,64,99,.32);box-shadow:none;color:#dff5ff;text-decoration:none;font-size:12px;font-weight:750}.weather-change-banner{margin:10px 0;padding:12px 15px;border:1px solid #f5cc7b8c;border-radius:14px;background:linear-gradient(105deg,#704f1c9c,#384f6478);color:#fff1c9;font-size:13px;line-height:1.45}.weather-change-banner strong{color:#fff;font-size:12px;letter-spacing:.06em;text-transform:uppercase}.experimental-page-banner{margin:10px 0;padding:9px;border:1px solid #ffdc7e80;border-radius:12px;background:#704e1666;color:#ffe49b;font-size:12px;font-weight:900;letter-spacing:.18em;text-align:center}.experimental-page-banner[hidden]{display:none}.air-quality-panel.aqi-highlight{outline:3px solid #7ee7ff;outline-offset:3px;transition:outline-color .3s}.metric-air-quality[data-aqi="good"]{border-color:#67d39188;background:linear-gradient(145deg,#54be7828,#193d3948)}.metric-air-quality[data-aqi="moderate"]{border-color:#f0d66f88;background:linear-gradient(145deg,#e2b95626,#40391948)}.metric-air-quality[data-aqi="sensitive"],.metric-air-quality[data-aqi="unhealthy"]{border-color:#ef8a7288;background:linear-gradient(145deg,#cf614d28,#45202848)}.metric-air-quality[data-aqi="very-unhealthy"],.metric-air-quality[data-aqi="hazardous"]{border-color:#c58eea88;background:linear-gradient(145deg,#8744ba28,#35194048)}
 @media(max-width:600px){.forecast-compare-banner{padding:11px 13px}.forecast-compare-banner b{font-size:12px}.forecast-compare-banner small{font-size:9px}.forecast-compare-banner>strong{font-size:10px}.daily-panel .forecast-confidence{justify-self:start}.daily-panel .forecast-confidence>b{justify-self:end}.daily-panel .confidence-meter{justify-self:start}}
 @media(max-width:359px){
- .weather-jump-nav{grid-template-columns:repeat(5,minmax(0,1fr));gap:3px}
+ .weather-jump-nav{grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}
  .weather-jump-card{min-height:36px;padding:6px 2px;border:0;border-radius:8px}
  .weather-jump-card .jump-label,.weather-jump-card.jump-gross .jump-label{font-size:8px}
  .weather-jump-card .jump-arrow{display:none}
@@ -103,3 +103,32 @@ body[data-sky="night"] .air-quality-panel{background:radial-gradient(ellipse at 
 .aqi-week>div{display:flex;flex-direction:column;gap:5px;padding:10px 5px;border:1px solid #c9f6e530;border-radius:10px;text-align:center;min-width:0}
 .aqi-week small{font-size:10px;overflow-wrap:anywhere}
 @media(max-width:600px){.aqi-week{grid-template-columns:repeat(4,minmax(0,1fr))}.today-panel #today-forecast .today-metric{gap:3px}.today-panel #today-forecast .today-metric svg{width:16px;height:16px}.today-panel #today-forecast .today-metric strong{font-size:13px}.today-panel #today-forecast .today-metric small{font-size:10px}}
+.topbar{padding-block:9px!important}
+.brand small{display:none!important}
+.location-bar{margin:6px 0!important;gap:0!important}
+.search-wrap{width:min(100%,560px);margin-inline:auto}
+.weather-jump-nav{grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;margin:6px 0 10px}
+.weather-jump-card{min-height:36px;padding:6px 3px;font-size:11px;font-weight:750;white-space:nowrap}
+.weather-jump-card.jump-next{color:#bceeff;background:rgba(19,103,139,.38)}
+.weather-jump-card.jump-car-wash{font-family:inherit;cursor:pointer}
+.weather-jump-card[hidden]{display:none!important}
+.air-quality-panel{box-sizing:border-box;width:100%;margin:16px 0!important;border-width:1px}
+.air-quality-panel[data-aqi="good"]{background:linear-gradient(125deg,#1b8057,#15533f 68%,#103d36)!important;border-color:#7ce5a6!important}
+.air-quality-panel[data-aqi="moderate"]{background:linear-gradient(125deg,#8a711d,#594816 68%,#3c3418)!important;border-color:#f1d56e!important}
+.air-quality-panel[data-aqi="sensitive"]{background:linear-gradient(125deg,#a55220,#73391d 68%,#4a281d)!important;border-color:#ffad55!important}
+.air-quality-panel[data-aqi="unhealthy"]{background:linear-gradient(125deg,#9b3939,#65272b 68%,#421d29)!important;border-color:#ff8178!important}
+.air-quality-panel[data-aqi="very-unhealthy"]{background:linear-gradient(125deg,#763a8c,#4d286e 68%,#321e52)!important;border-color:#cf96ef!important}
+.air-quality-panel[data-aqi="hazardous"]{background:linear-gradient(125deg,#702744,#491c3c 68%,#30162d)!important;border-color:#f07eae!important}
+.air-quality-panel[data-aqi="unavailable"]{background:linear-gradient(125deg,#24435e,#182c46)!important;border-color:#8eabc2!important}
+.shade-person figcaption .shade-reading-label{display:block;font-size:11px;line-height:1.3;color:#c8dcef}
+.metrics{row-gap:16px}
+.metric-air-quality{margin:0!important}
+.metric-air-quality[data-aqi="good"]{background:linear-gradient(140deg,#237c55,#17533f)!important;border-color:#84e4a8!important}
+.metric-air-quality[data-aqi="moderate"]{background:linear-gradient(140deg,#87731c,#5e4d16)!important;border-color:#f4db76!important}
+.metric-air-quality[data-aqi="sensitive"]{background:linear-gradient(140deg,#a25520,#713c1c)!important;border-color:#ffad55!important}
+.metric-air-quality[data-aqi="unhealthy"]{background:linear-gradient(140deg,#9c3d3d,#64272b)!important;border-color:#ff8980!important}
+.metric-air-quality[data-aqi="very-unhealthy"]{background:linear-gradient(140deg,#773d90,#4d2a6c)!important;border-color:#cf9af0!important}
+.metric-air-quality[data-aqi="hazardous"]{background:linear-gradient(140deg,#7a2c4c,#501d3c)!important;border-color:#f187af!important}
+.metric-air-quality[data-aqi="unavailable"]{background:linear-gradient(140deg,#34506a,#22354d)!important;border-color:#92abc2!important}
+@media(max-width:600px){.weather-jump-nav{grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}.weather-jump-card{min-height:34px;padding:5px 1px;font-size:9px}.weather-jump-card .jump-label,.weather-jump-card.jump-gross .jump-label{font-size:clamp(8px,2.2vw,10px)}}
+@media(max-width:359px){.weather-jump-nav{grid-template-columns:repeat(7,minmax(0,1fr));gap:2px}.weather-jump-card{font-size:8px}}

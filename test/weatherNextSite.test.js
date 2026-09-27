@@ -66,13 +66,15 @@ test('WeatherNext data explorer files remain explicitly served without owning th
   assert.doesNotMatch(server,/app\.get\(\['\/weathernext','\/weathernext\/'/);
   assert.doesNotMatch(read('public/weather-fusion/weathernext-site.js'),/credentials_json|private_key|Bearer /);
 });
-test('main weather navigation is a single row of five text-only borderless buttons',()=>{
+test('main weather navigation is one compact row with weather, NVIDIA and car-wash actions',()=>{
   const html=read('public/weather-fusion/index.html');
   const css=read('public/weather-fusion/weather-polish.css');
   const nav=html.match(/<nav class="weather-jump-nav"[\s\S]*?<\/nav>/)[0];
-  assert.equal((nav.match(/weather-jump-card/g)||[]).length,5);
+  assert.equal((nav.match(/weather-jump-card/g)||[]).length,7);
+  assert.match(nav,/href="\/weathernext\/" aria-label="Open NVIDIA forecast"/);
+  assert.match(nav,/id="open-car-wash" type="button"/);
   assert.doesNotMatch(nav,/<svg|<img|jump-visual|jump-arrow/);
-  assert.match(css,/grid-template-columns:repeat\(5,minmax\(0,1fr\)\)/);
+  assert.match(css,/grid-template-columns:repeat\(7,minmax\(0,1fr\)\)/);
   assert.match(css,/\.weather-jump-card\{[^}]*border:0/);
 });
 test('Experimental Weather exposes only a link to WeatherNext, not the embedded comparison card',()=>{

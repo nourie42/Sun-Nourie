@@ -1,4 +1,4 @@
-import {buildForecastWindows} from './forecast-windows.js?v=blend-windows-v1';
+import {buildForecastWindows} from './forecast-windows.js?v=sun-window-main-v2';
 
 const finite = n => typeof n === 'number' && Number.isFinite(n);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -37,7 +37,7 @@ export function forecastWindowDetailHTML(view, kind, place, now = Date.now()) {
   const windows = view[kind] || [], zone = view.timeZone, perfect = kind === 'perfect';
   const heading = perfect ? 'Perfect weather' : 'Rain and storm outlook', groups = new Map();
   for (const w of windows) {if(!groups.has(w.date))groups.set(w.date,[]);groups.get(w.date).push(w);}
-  const headers = perfect ? '<th scope="col">Hour</th><th scope="col">Feels like</th><th scope="col">Dew point</th><th scope="col">Clouds</th><th scope="col">Rain</th>' : '<th scope="col">Hour</th><th scope="col">Rain likelihood</th><th scope="col">Outlook</th>';
+  const headers = perfect ? '<th scope="col">Hour</th><th scope="col">Feels like in sun</th><th scope="col">Dew point</th><th scope="col">Clouds</th><th scope="col">Rain</th>' : '<th scope="col">Hour</th><th scope="col">Rain likelihood</th><th scope="col">Outlook</th>';
   const row = h => `<tr data-forecast-hour="${esc(h.time)}"><th scope="row">${esc(clock(Date.parse(h.time),zone,true))}</th>${perfect ? `<td>${value(h.feels,'°')}</td><td>${value(h.dewpoint,'°')}</td><td>${value(h.cloud,'%')}</td><td>${value(h.rainChance,'%')}</td>` : `<td>${value(h.rainChance,'%')}</td><td>${h.thunder ? 'Thunderstorms possible' : finite(h.rainChance)&&h.rainChance>=80 ? 'High rain likelihood' : 'Rain likely'}</td>`}</tr>`;
   const period = w => `<div class="forecast-window-period"><h4>${esc(timeRange(w,zone,now))}${perfect?'':` <span>${esc(w.title)}</span>`}</h4><div class="forecast-window-table-wrap"><table class="forecast-window-table"><caption class="sr-only">${esc(heading)}: ${esc(dayLabel(w.start,zone,now))}, ${esc(timeRange(w,zone,now))}</caption><thead><tr>${headers}</tr></thead><tbody>${w.hours.map(row).join('')}</tbody></table></div></div>`;
   return `<div class="dialog-eyebrow">${esc(place||'Your location')}</div><h2 id="forecast-window-title">${heading}</h2><p class="forecast-window-intro">All qualifying forecast times in the next 5 days, in local time.</p>${[...groups.values()].map(group=>`<section class="forecast-window-day"><h3>${esc(dayLabel(group[0].start,zone,now))}</h3>${group.map(period).join('')}</section>`).join('')}`;

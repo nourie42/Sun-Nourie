@@ -38,9 +38,20 @@ test('legacy comparison URLs redirect directly to standalone forecast preserving
   const r=await fetch(base+path+'?location=knightdale',{redirect:'manual'});assert.equal(r.status,302);assert.equal(r.headers.get('location'),'/weathernext/?location=knightdale');
  }
  const html=await (await fetch(base+'/weathernext/')).text();
- assert.match(html,/Experimental NVIDIA AI Weather/);assert.doesNotMatch(html,/Forecast data: Google/);
+ assert.match(html,/NVIDIA Forecast/);assert.doesNotMatch(html,/Experimental NVIDIA AI Weather|Forecast data: Google/);
  const nearby=await (await fetch(base+'/weathernext/?latitude=35.7798&longitude=-78.5355')).text();
- assert.match(nearby,/compare\/app\.js\?source=google&amp;location=knightdale&amp;explicit=1/);
- assert.doesNotMatch(nearby,/&amp;latitude=35\.7798/);
- assert.match(readFileSync('public/weather-fusion/index.html','utf8'),/class="forecast-compare-banner" href="\/weathernext\/"/);
+ assert.match(nearby,/compare\/app\.js\?source=google&amp;location=selected&amp;explicit=1&amp;latitude=35\.7798&amp;longitude=-78\.5355/);
+ assert.match(nearby,/name=Selected%20location/);
+ assert.match(nearby,/NVIDIA Forecast/);
+ assert.doesNotMatch(nearby,/Experimental NVIDIA AI Weather/);
+ assert.equal((nearby.match(/id="city-search"/g)||[]).length,1,'The NVIDIA page uses the same single location search.');
+ assert.equal((nearby.match(/id="locate"/g)||[]).length,1,'Device location is an action on that same search control.');
+ assert.match(readFileSync('public/weather-fusion/compare-bridge.js','utf8'),/https:\/\/deepmind\.google\.com\/science\/weatherlab/);
+ assert.match(readFileSync('public/weather-fusion/index.html','utf8'),/class="weather-jump-card jump-next" href="\/weathernext\/"/);
+});
+test('an exact-coordinate NVIDIA page does not wait for the published-location feed',async t=>{
+ let feedCalls=0;const app=express();registerWeatherComparisonRoutes(app,{feedProvider:async()=>{feedCalls++;throw new Error('published point feed unavailable');},now:()=>now});
+ const server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));t.after(()=>server.close());
+ const response=await fetch(`http://127.0.0.1:${server.address().port}/weathernext/?latitude=43.6532&longitude=-79.3832&name=Toronto`);
+ const html=await response.text();assert.equal(response.status,200);assert.equal(feedCalls,0);assert.match(html,/name=Toronto/);assert.match(html,/NVIDIA Forecast/);
 });
