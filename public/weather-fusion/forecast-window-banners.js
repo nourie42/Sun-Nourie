@@ -1,4 +1,4 @@
-import {buildForecastWindows} from './forecast-windows.js?v=sun-window-main-v3';
+import {buildForecastWindows} from './forecast-windows.js?v=sun-window-main-v4';
 
 const finite = n => typeof n === 'number' && Number.isFinite(n);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

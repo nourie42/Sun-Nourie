@@ -66,18 +66,18 @@ test('perfect uses modeled feels in direct sun, same-hour sky and dry blend valu
   assert.deepEqual(buildForecastWindows(data,base).perfect,[],'Comfort uses air plus the matching sun exposure lift, not air or shade temperature alone.');
 });
 
-test('sun feels-like boundaries work, and every individual limiting field is required',()=>{
+test('sun feels-like must be 70–75°F inclusive, and every individual limiting field is required',()=>{
   const accepted = fixture(1);
   accepted.metricForecasts.series.feels.forEach((row,index)=>{row.inputs.skyCover=40;refreshHour(accepted,index);});
   setSunTemperature(accepted,0,70);
   accepted.metricForecasts.series.dewpoint.forEach(row => row.value=60);
   accepted.rainTimeline.forEach(row => {row.rainLikelihood.value=20;row.precipitation=.009;});
   assert.equal(buildForecastWindows(accepted,base).perfect.length,1);
-  const upper=structuredClone(accepted);setSunTemperature(upper,0,80);
+  const upper=structuredClone(accepted);setSunTemperature(upper,0,75);
   assert.equal(buildForecastWindows(upper,base).perfect.length,1);
   const cases = [
     data => setSunTemperature(data,0,69.9),
-    data => setSunTemperature(data,0,80.1),
+    data => setSunTemperature(data,0,75.1),
     data => {data.metricForecasts.series.feels[0].inputs.skyCover=40.1;refreshHour(data,0);},
     data => data.metricForecasts.series.dewpoint[0].value=60.1,
     data => data.rainTimeline[0].rainLikelihood.value=20.1,

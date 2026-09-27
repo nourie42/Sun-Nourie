@@ -4,6 +4,7 @@ import {finite,rainChanceValue,solarElevation} from './weather-math.js?v=full-da
 
 const HOUR = 3600000;
 const WINDOW_DAYS = 5;
+const PERFECT_SUN_TEMP_F = Object.freeze({min:70,max:75});
 const TITLES = {perfect:'Perfect weather',rain:'Rain likely',high:'High rain likelihood',thunder:'Thunderstorms possible'};
 const percentage = value => finite(value) && value >= 0 && value <= 100 ? value : null;
 const nonnegative = value => finite(value) && value >= 0 ? value : null;
@@ -120,7 +121,7 @@ export function buildForecastWindows(forecast = {}, now = Date.now()) {
     const thunder = /thunder|\btstms?\b|\bt-?storms?\b/i.test(hourlyCondition);
     const adverseCondition = hourlyCondition.replace(/\bwind[ -]?storms?\b/gi,'');
     const adverse = /rain|shower|drizzle|thunder|\bstorms?\b|\btstms?\b|snow|sleet|flurr|ice pellets|fog|mist|haze|smoke|obscured/i.test(adverseCondition);
-    const perfect = sun.active && finite(value) && value >= 70 && value <= 80
+    const perfect = sun.active && finite(value) && value >= PERFECT_SUN_TEMP_F.min && value <= PERFECT_SUN_TEMP_F.max
       && finite(dewpoint) && dewpoint <= 60 && cloud !== null && cloud <= 40
       && rainChance !== null && rainChance <= 20
       && precipitation !== null && precipitation < .01 && !adverse
