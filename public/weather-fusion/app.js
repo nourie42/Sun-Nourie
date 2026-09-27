@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 12652)
-Total output lines: 568
-
 import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText,rebindDanTake} from './dans-take.js?v=weather-art-labels-v10';
 import {danCard,danTakeDisplay} from './dans-summary.js?v=dan-visible-v1';
 import {fetchJsonWithDeadline} from './request-deadline.js?v=loading-recovery-v1';
@@ -254,7 +251,45 @@ async function load({ moveMap = false, refreshModels = false, briefingRetry = 0 
     if (selectedLayer !== 'radar' && (refreshModels || moveMap || Date.now()-modelFetched >= 55000)) void loadModelMap(refreshModels);
     if (Date.now() - lastRadarFetch > 2 * 60000) void loadRadar();
     if (data.aiConfigured && !(currentBriefing?.mode === 'ai' && currentBriefing.signature === data.signature)) {
-      api('briefing', query…652 tokens truncated…—';
+      api('briefing', query({ signature: data.signature }), requestController.signal).then((briefing) => {
+        if (id === generation && briefing.signature === forecast?.signature) renderBriefing(briefing);
+      }).catch((error) => {
+        if (id !== generation || error.name === 'AbortError') return;
+        if(error.status===409&&briefingRetry<2){void load({briefingRetry:briefingRetry+1});return;}
+        $('briefing-stamp').textContent = error.status === 409 ? 'Sources changed while the briefing was prepared. The next refresh will use the new forecast.' : 'AI synthesis is unavailable. Official NWS wording remains available in bulletin details.';
+      });
+    }
+  } catch (e) {
+    if (id !== generation || e.name === 'AbortError') return;
+    console.error(receivedForecast ? 'Weather Nourie display failed' : 'Weather Nourie request failed', e);
+    $('status').textContent = receivedForecast
+      ? 'The forecast arrived, but a display component failed. Use Refresh to retry.'
+      : `Weather update failed. ${forecast ? `The displayed snapshot was checked at ${clock(forecast.assembledAt)} and may be stale.` : 'Please retry or check weather.gov.'}`;
+    if(e.name==='TimeoutError')$('status').textContent=e.message;
+    $('status').classList.add('error');
+    if(forecast)renderComfort(forecast);
+    if (!receivedForecast) $('alerts').innerHTML = '<p class="alert-note warning">Live alert status could not be checked. Consult the official NWS forecast and warnings.</p>';
+  } finally { clearTimeout(slowNotice);if (id === generation) { busy = false; $('refresh').classList.remove('loading'); } }
+}
+function chooseLocation(value,{rememberDevice=false}={}) {
+  if(!validPlace(value))return;
+  ++locationRequest;
+  place = { ...value };
+  const compareLink=document.querySelector('.jump-next');
+  if(compareLink){
+    compareLink.href='/weathernext/?'+new URLSearchParams({latitude:value.latitude,longitude:value.longitude,name:value.name||'Selected location'});
+  }
+  stopRadar();framePlayer?.clear();++modelFrameToken;++mapSelectionToken;++radarGeneration;lastRadarFetch=0;
+  currentBriefing = null;
+  resetExperience();
+  resetForecastWindowBanners();
+  if ($('day-dialog').open) $('day-dialog').close();
+  // Clear the previous location immediately, including its alerts and AI text.
+  forecast = null;
+  $('city-name').textContent = value.name || 'Your location';
+  setDeviceLocationLabel(value.source?.startsWith('device')?'Using device location':`Viewing ${value.name||'searched location'}`);
+  $('temperature').innerHTML = '—<span>°</span>';
+  if($('hero-uv'))$('hero-uv').textContent='Peak UV today —';
   $('condition').textContent = 'Loading the selected location';
   $('high-low').textContent = 'High —° · Low —°';
   $('observation-label').textContent = 'Awaiting the new location’s sources';
