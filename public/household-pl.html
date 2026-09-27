@@ -9,7 +9,7 @@
 *{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}body{min-height:100vh}
 button,input{font:inherit}.topbar{position:sticky;top:0;z-index:100;background:rgba(7,17,31,.97);backdrop-filter:blur(14px);border-bottom:1px solid var(--line);padding:9px 12px}
 .toprow{max-width:1280px;margin:auto;display:flex;align-items:center;gap:10px}.title{font-size:19px;font-weight:850;letter-spacing:-.02em;flex:1}.status{font-size:11px;color:var(--muted);white-space:nowrap}.lock{border:1px solid #365678;background:#10243b;color:#fff;border-radius:10px;padding:7px 10px}
-.nav{max-width:1280px;margin:8px auto 0;display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.nav button{border:1px solid #315272;background:#0d1c2d;color:#a9bdd3;border-radius:10px;padding:8px 6px;font-size:12px;font-weight:750}.nav button.active{background:#1a4d7d;color:#fff;border-color:#4a83b9}
+.nav{max-width:1280px;margin:8px auto 0;display:grid;grid-template-columns:repeat(6,1fr);gap:6px}.nav button{border:1px solid #315272;background:#0d1c2d;color:#a9bdd3;border-radius:10px;padding:8px 6px;font-size:12px;font-weight:750}.nav button.active{background:#1a4d7d;color:#fff;border-color:#4a83b9}
 .wrap{max-width:1280px;margin:auto;padding:12px}.view{display:none}.view.active{display:block}
 .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}.kpi{background:linear-gradient(180deg,#12243a,#0f1d2e);border:1px solid var(--line);border-radius:15px;padding:12px}.kpi b{display:block;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}.kpi strong{font-size:21px;letter-spacing:-.03em}.neg{color:var(--red)!important}.pos{color:var(--green)!important}
 .cashinput{width:100%;max-width:150px;background:#0b1929;border:1px solid #3a5879;color:#fff;border-radius:9px;padding:6px 8px;font-weight:800}.note{color:var(--muted);font-size:11px;line-height:1.4;margin:4px 2px 10px}
@@ -24,9 +24,9 @@ button,input{font:inherit}.topbar{position:sticky;top:0;z-index:100;background:r
 .lastCard{background:var(--panel);border:1px solid var(--line);border-radius:12px;margin:6px 0;padding:10px;display:flex;align-items:center;gap:10px}.lastName{flex:1;font-weight:740}.lastAmt{font-size:16px;font-weight:850}.lastSection{background:#173d67;border:1px solid #2b5984;border-radius:10px;padding:8px 10px;font-weight:850;margin:10px 0 6px}.lastTotal{border-top:2px solid #55799f;background:#10253c}
 .graphGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.graphCard{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;min-width:0}.graphCard h3{margin:0 0 3px;font-size:15px}.graphCard p{margin:0 0 8px;color:var(--muted);font-size:10px}.chart{width:100%;height:230px;display:block}.legend{display:flex;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:10px;margin-top:5px}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px}.incomeDot{background:#65d99b}.expenseDot{background:#ff8088}.netDot{background:#78b7ff}
 .graphList{display:grid;gap:5px;margin-top:7px}.oppSummary{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px}.oppBox{background:#0b1929;border:1px solid #203a55;border-radius:9px;padding:9px}.oppBox b{display:block;color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:3px}.oppBox strong{font-size:16px}.barrow{display:grid;grid-template-columns:minmax(100px,1.4fr) 3fr 82px;gap:7px;align-items:center;font-size:10px}.bartrack{height:8px;background:#0a1624;border-radius:20px;overflow:hidden}.barfill{height:100%;background:#78b7ff;border-radius:20px}.barval{text-align:right;font-weight:750}
-.cash{margin:14px 0 28px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px}.cash h2{font-size:16px;margin:0 0 4px}.cashgrid{display:grid;grid-template-columns:repeat(6,1fr);font-size:10px}.cashgrid div{padding:6px 5px;border-bottom:1px solid #20364f}.cashgrid .h{font-weight:800;color:#b8d7fb}
+.addPanel{display:none;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;margin:8px 0 12px}.addPanel.open{display:block}.addGrid{display:grid;grid-template-columns:2fr repeat(4,1fr);gap:7px}.addGrid input,.addGrid select{width:100%;background:#0a1828;color:#fff;border:1px solid #385a7e;border-radius:8px;padding:7px}.addActions{display:flex;gap:7px;margin-top:8px}.addActions button{border:1px solid #365678;background:#10243b;color:#fff;border-radius:8px;padding:7px 10px}@media(max-width:780px){.addGrid{grid-template-columns:1fr 1fr}.addGrid .wide{grid-column:1/-1}}.cash{margin:14px 0 28px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px}.cash h2{font-size:16px;margin:0 0 4px}.cashgrid{display:grid;grid-template-columns:repeat(6,1fr);font-size:10px}.cashgrid div{padding:6px 5px;border-bottom:1px solid #20364f}.cashgrid .h{font-weight:800;color:#b8d7fb}
 @media(max-width:780px){
- .topbar{padding:8px 9px}.title{font-size:16px}.status{display:none}.nav{gap:4px;margin-top:7px}.nav button{font-size:10px;padding:7px 3px}.wrap{padding:9px}
+ .topbar{padding:8px 9px}.title{font-size:16px}.status{display:none}.nav{grid-template-columns:repeat(3,1fr);gap:4px;margin-top:7px}.nav button{font-size:10px;padding:7px 3px}.wrap{padding:9px}
  .kpis{grid-template-columns:1fr 1fr;gap:7px}.kpi{padding:10px}.kpi strong{font-size:19px}.section{position:static;top:auto}
  .rowhead{grid-template-columns:1fr 1fr;gap:7px;padding:10px}.name{grid-column:1/-1;font-size:14px}.metric,.budgetWrap{background:#0b1929;border:1px solid #203a55;border-radius:9px;padding:7px}.metric strong{font-size:14px}.budget{font-size:14px}
  .actions{grid-column:1/-1;display:flex;gap:7px}.actions button{flex:1}.monthgrid{grid-template-columns:1fr 1fr 1fr}.tx{grid-template-columns:68px minmax(0,1fr)}.txamt{grid-column:2;text-align:left;color:#eaf4ff;margin-top:-2px}
@@ -41,7 +41,7 @@ button,input{font:inherit}.topbar{position:sticky;top:0;z-index:100;background:r
   <button data-view="quick" class="active">This Month</button>
   <button data-view="year">Full Year P&L</button>
   <button data-view="last">Last Month</button>
-  <button data-view="graphs">Graphs</button>
+  <button data-view="graphs">Graphs</button><button data-view="recurring">Recurring</button><button data-view="variable">Variable</button>
  </div>
 </div>
 <div class="wrap">
@@ -53,11 +53,29 @@ button,input{font:inherit}.topbar{position:sticky;top:0;z-index:100;background:r
    <div class="kpi"><b>Starting Bank Cash</b><input id="startCash" class="cashinput" type="number" step="100"></div>
   </div>
   <div class="note">This Month is the main household P&L: September actual income and spending, September budget, variance to budget, and the rolling annual forecast. Tap Details to review September transactions and edit monthly budgets.</div>
-  <div class="toolbar"><button id="save">Update P&L</button><span id="updateStatus" class="updateStatus"></span><button id="reset">Reset budgets</button><button id="restore">Restore deleted rows</button></div>
+  <div class="toolbar"><button id="save">Update P&L</button><span id="updateStatus" class="updateStatus"></span><button id="addLineBtn">+ Add Line Item</button><button id="reset">Reset budgets</button><button id="restore">Restore deleted rows</button></div>
+  <div id="addPanel" class="addPanel">
+   <div class="addGrid">
+    <input id="newName" class="wide" placeholder="Line item name">
+    <select id="newKind"><option value="expense">Expense</option><option value="income">Income</option></select>
+    <select id="newClass"><option value="recurring">Recurring</option><option value="variable">Variable</option><option value="fixed">Fixed</option></select>
+    <select id="newFrequency"><option value="monthly">Monthly</option><option value="one-time">One-time</option></select>
+    <select id="newMonth"><option value="0">Sep 26</option><option value="1">Oct 26</option><option value="2">Nov 26</option><option value="3">Dec 26</option><option value="4">Jan 27</option><option value="5">Feb 27</option><option value="6">Mar 27</option><option value="7">Apr 27</option><option value="8">May 27</option><option value="9">Jun 27</option><option value="10">Jul 27</option><option value="11">Aug 27</option></select>
+    <input id="newAmount" inputmode="decimal" placeholder="Budget amount">
+   </div>
+   <div class="addActions"><button id="createLine">Add to P&L</button><button id="cancelLine">Cancel</button></div>
+  </div>
   <div id="quickBody"></div>
   <div class="cash"><h2>Bank Cash Forecast</h2><div class="note">Cash starts at the amount above. Savings transfers affect cash but remain outside P&L expenses.</div><div class="cashgrid" id="cashgrid"></div></div>
  </section>
  <section id="year" class="view">
+  <div class="kpis">
+   <div class="kpi"><b>12-mo Income</b><strong id="yearInc">—</strong></div>
+   <div class="kpi"><b>12-mo Expenses</b><strong id="yearExp">—</strong></div>
+   <div class="kpi"><b>12-mo Net P/L</b><strong id="yearNet">—</strong></div>
+   <div class="kpi"><b>Ending Cash</b><strong id="yearCash">—</strong></div>
+  </div>
+  <div class="toolbar"><button id="yearUpdate">Update P&L</button><span id="yearUpdateStatus" class="updateStatus"></span></div>
   <div class="note">Full rolling 12-month P&L. Every monthly line-item value is editable. Changes immediately flow into monthly totals, annual totals, Quick View, cash forecast and graphs.</div>
   <div class="tableWrap"><table><thead id="yearHead"></thead><tbody id="yearBody"></tbody></table></div>
  </section>
@@ -69,6 +87,14 @@ button,input{font:inherit}.topbar{position:sticky;top:0;z-index:100;background:r
    <div class="kpi"><b>Period</b><strong>Aug 2026</strong></div>
   </div>
   <div id="lastBody"></div>
+ </section>
+ <section id="recurring" class="view">
+  <div class="kpis"><div class="kpi"><b>Recurring Monthly</b><strong id="recMonth">—</strong></div><div class="kpi"><b>Recurring Annual</b><strong id="recAnnual">—</strong></div><div class="kpi"><b>Recurring % of Expenses</b><strong id="recPct">—</strong></div><div class="kpi"><b>Recurring Lines</b><strong id="recCount">—</strong></div></div>
+  <div class="note">Bills and expected repeating expenses only. Edit the month-by-month budget from Details or Full Year P&L.</div><div id="recurringBody"></div>
+ </section>
+ <section id="variable" class="view">
+  <div class="kpis"><div class="kpi"><b>Variable This Month</b><strong id="varMonth">—</strong></div><div class="kpi"><b>Variable Annual</b><strong id="varAnnual">—</strong></div><div class="kpi"><b>10% Cut Saves</b><strong id="varSave10">—</strong></div><div class="kpi"><b>20% Cut Saves</b><strong id="varSave20">—</strong></div></div>
+  <div class="note">Controllable expenses only, ranked by annual forecast so the biggest savings opportunities are easiest to find.</div><div id="variableBody"></div>
  </section>
  <section id="graphs" class="view">
   <div class="graphGrid">
@@ -105,17 +131,17 @@ async function loadBase(){
  reconcilePostedSnapshot();
  const STORE='nourie-household-pl-v3',DEL='nourie-household-pl-deleted-v3';
  const saved=JSON.parse(localStorage.getItem(STORE)||'null')||{};
- let monthEdits=saved.monthEdits||{},startCash=Number(saved.startingCash==null?(BASE.startingCash||20000):saved.startingCash);
+ let monthEdits=saved.monthEdits||{},startCash=Number(saved.startingCash==null?(BASE.startingCash||20000):saved.startingCash),manualRows=saved.manualRows||[];
  let deleted=new Set(JSON.parse(localStorage.getItem(DEL)||'[]'));
- const rows=structuredClone(BASE.rows||[]);
+ const rows=structuredClone(BASE.rows||[]).concat(manualRows);
  const txByKey={};(BASE.tx||[]).forEach(function(t){if(!txByKey[t.k])txByKey[t.k]=[];txByKey[t.k].push(t)});
  const monthLabels=['Sep 26','Oct 26','Nov 26','Dec 26','Jan 27','Feb 27','Mar 27','Apr 27','May 27','Jun 27','Jul 27','Aug 27'];
  const shortLabels=['Sep','Oct','Nov','Dec','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug'];
  const fmt=function(n){return new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(Number(n||0))};
  const num=function(v){return Number(v||0)};
  const cls=function(n){return num(n)<0?'neg':num(n)>0?'pos':''};
- const isIncome=function(r){return r.type==='line'&&r.row<19};
- const isExpense=function(r){return r.type==='line'&&r.row>19&&r.row<143};
+ const isIncome=function(r){return r.type==='line'&&(r.kind==='income'||(!r.kind&&r.row<19))};
+ const isExpense=function(r){return r.type==='line'&&(r.kind==='expense'||(!r.kind&&r.row>19&&r.row<143))};
  const isSavings=function(r){return r.type==='line'&&r.row===146};
  const activeLines=function(){return rows.filter(function(r){return r.type==='line'&&!deleted.has(r.row)})};
  function round2(v){return Math.round(num(v)*100)/100}
@@ -156,7 +182,7 @@ async function loadBase(){
    return '<div class="txlist">'+tx.map(function(t){return '<div class="tx"><div class="txdate">'+String(t.d||'')+'</div><div class="txname"><b>'+String(t.m||t.x||'Transaction')+'</b><span class="txacct">'+String(t.a||'')+(t.x?' · '+String(t.x):'')+'</span></div><div class="txamt">'+fmt(t.v)+'</div></div>'}).join('')+'</div>';
  }
  function bindMonthInputs(root){
-   root.querySelectorAll('[data-mi]').forEach(function(input){input.onchange=function(e){const r=rows.find(function(x){return x.row===Number(e.target.dataset.row)});setMonth(r,Number(e.target.dataset.mi),e.target.value);renderAll()}});
+   root.querySelectorAll('[data-mi]').forEach(function(input){input.onchange=function(e){const r=rows.find(function(x){return x.row===Number(e.target.dataset.row)});setMonth(r,Number(e.target.dataset.mi),e.target.value);e.target.value=clean(e.target.value);markDirty()}});
  }
  function renderQuick(){
    const body=document.getElementById('quickBody');body.innerHTML='';
@@ -169,7 +195,7 @@ async function loadBase(){
      body.appendChild(card);
      card.querySelector('.detailsBtn').onclick=function(){card.classList.toggle('open')};
      card.querySelector('.name').onclick=function(){card.classList.toggle('open')};
-     card.querySelector('.budget').onchange=function(e){setMonth(r,0,e.target.value);renderAll()};
+     card.querySelector('.budget').onchange=function(e){setMonth(r,0,e.target.value);e.target.value=clean(e.target.value);markDirty()};
      card.querySelector('.deleteBtn').onclick=function(){deleted.add(r.row);localStorage.setItem(DEL,JSON.stringify(Array.from(deleted)));renderAll()};
      bindMonthInputs(card);
    });
@@ -191,6 +217,7 @@ async function loadBase(){
    addTotal('TOTAL INCOME',isIncome);addTotal('TOTAL EXPENSES',isExpense);
    const tr=document.createElement('tr');tr.className='fullTotal';let h='<td>NET PROFIT / (LOSS)</td>',nt=0;for(let i=0;i<12;i++){let inc=activeLines().filter(isIncome).reduce(function(s,r){return s+monthVal(r,i)},0),exp=activeLines().filter(isExpense).reduce(function(s,r){return s+monthVal(r,i)},0),v=inc-exp;nt+=v;h+='<td class="'+cls(v)+'">'+fmt(v)+'</td>'}h+='<td class="'+cls(nt)+'">'+fmt(nt)+'</td>';tr.innerHTML=h;body.appendChild(tr);
    bindMonthInputs(body);
+   const yt=totals();document.getElementById('yearInc').textContent=fmt(yt.inc);document.getElementById('yearExp').textContent=fmt(yt.exp);const yn=document.getElementById('yearNet');yn.textContent=fmt(yt.net);yn.className=cls(yt.net);const cs=cashSeries();document.getElementById('yearCash').textContent=fmt(cs[cs.length-1]||startCash);
  }
  function renderLast(){
    const body=document.getElementById('lastBody');body.innerHTML='';let inc=0,exp=0;
@@ -219,7 +246,8 @@ async function loadBase(){
    const c=document.getElementById('netChart'),s=canvasSize(c),data=monthLabels.map(function(_,i){return monthTotals(i).net}),max=Math.max.apply(null,data.map(function(v){return Math.abs(v)}).concat([1]));s.ctx.clearRect(0,0,s.w,s.h);const mid=(s.h-32)/2;s.ctx.strokeStyle='#36516c';s.ctx.beginPath();s.ctx.moveTo(35,mid);s.ctx.lineTo(s.w-8,mid);s.ctx.stroke();const gap=(s.w-50)/12,bw=Math.max(6,gap*.55),scale=(mid-16)/max;data.forEach(function(v,i){const x=39+i*gap,h=Math.abs(v)*scale;s.ctx.fillStyle=v>=0?'#65d99b':'#ff8088';s.ctx.fillRect(x,v>=0?mid-h:mid,bw,h);s.ctx.fillStyle='#8fa5bd';s.ctx.font='8px system-ui';s.ctx.fillText(shortLabels[i],x-2,s.h-10)});s.ctx.fillStyle='#8fa5bd';s.ctx.font='9px system-ui';s.ctx.fillText(fmt(max),1,12);s.ctx.fillText('-'+fmt(max),1,s.h-34)}
  function drawCash(){
    const c=document.getElementById('cashChart'),s=canvasSize(c),data=cashSeries(),min=Math.min.apply(null,data.concat([startCash])),max=Math.max.apply(null,data.concat([startCash])),range=Math.max(1,max-min);s.ctx.clearRect(0,0,s.w,s.h);s.ctx.strokeStyle='#26425f';s.ctx.beginPath();s.ctx.moveTo(36,12);s.ctx.lineTo(36,s.h-28);s.ctx.lineTo(s.w-8,s.h-28);s.ctx.stroke();const gap=(s.w-52)/11;s.ctx.strokeStyle='#78b7ff';s.ctx.lineWidth=2;s.ctx.beginPath();data.forEach(function(v,i){const x=40+i*gap,y=14+(max-v)/range*(s.h-50);if(i===0)s.ctx.moveTo(x,y);else s.ctx.lineTo(x,y)});s.ctx.stroke();data.forEach(function(v,i){const x=40+i*gap,y=14+(max-v)/range*(s.h-50);s.ctx.fillStyle='#78b7ff';s.ctx.beginPath();s.ctx.arc(x,y,2.5,0,Math.PI*2);s.ctx.fill();s.ctx.fillStyle='#8fa5bd';s.ctx.font='8px system-ui';s.ctx.fillText(shortLabels[i],x-6,s.h-10)});s.ctx.fillStyle='#8fa5bd';s.ctx.font='9px system-ui';s.ctx.fillText(fmt(max),1,12);s.ctx.fillText(fmt(min),1,s.h-32)}
- function isVariable(r){const t=String(r.timing||'').toLowerCase(),n=String(r.label||'').toLowerCase();return isExpense(r)&&(t.includes('variable')||/grocer|dining|takeout|retail|shopping|pet food|entertain|travel|clothing|household purchase|misc|personal care/.test(n))}
+ function isVariable(r){const t=String(r.timing||'').toLowerCase(),n=String(r.label||'').toLowerCase();return isExpense(r)&&(r.spendClass==='variable'||t.includes('variable')||/grocer|dining|takeout|retail|shopping|pet food|entertain|travel|clothing|household purchase|misc|personal care/.test(n))}
+ function isRecurring(r){const t=String(r.timing||'').toLowerCase();return isExpense(r)&&(r.spendClass==='recurring'||r.spendClass==='fixed'||(!r.spendClass&&!isVariable(r)&&(t.includes('month')||t.includes('every')||t.includes('weekly')||t.includes('14 days')||/mortgage|loan|insurance|internet|utility|subscription|membership|tuition|phone/.test(String(r.label||'').toLowerCase()))))}
  function renderExpenseBars(){
    const arr=activeLines().filter(isExpense).map(function(r){return {name:r.label,val:forecastAnnual(r)}}).sort(function(a,b){return b.val-a.val}).slice(0,10),max=Math.max.apply(null,arr.map(function(x){return x.val}).concat([1]));
    document.getElementById('expenseBars').innerHTML=arr.map(function(x){return '<div class="barrow"><div>'+x.name+'</div><div class="bartrack"><div class="barfill" style="width:'+Math.max(1,(x.val/max)*100)+'%"></div></div><div class="barval">'+fmt(x.val)+'</div></div>'}).join('');
@@ -236,11 +264,42 @@ async function loadBase(){
  function drawVariableMonth(){
    const c=document.getElementById('variableMonthChart'),s=canvasSize(c),data=[];for(let i=0;i<12;i++)data.push(activeLines().filter(isVariable).reduce(function(x,r){return x+(i===0?actual(r):monthVal(r,i))},0));const max=Math.max.apply(null,data.concat([1]));drawAxes(s.ctx,s.w,s.h,max);const gap=(s.w-52)/12,bw=Math.max(5,gap*.55),base=s.h-29,height=s.h-48;data.forEach(function(v,i){const x=40+i*gap;s.ctx.fillStyle='#78b7ff';s.ctx.fillRect(x,base-(v/max)*height,bw,(v/max)*height);s.ctx.fillStyle='#8fa5bd';s.ctx.font='8px system-ui';s.ctx.fillText(shortLabels[i],x-2,s.h-12)});
  }
+ function simpleSpendCard(r){
+   const a=actual(r),mb=monthVal(r,0),an=forecastAnnual(r),variance=mb-a;
+   return '<div class="row"><div class="rowhead"><div class="name">'+r.label+'<div class="timing">'+(r.timing||r.spendClass||'')+'</div></div><div class="metric"><label>This month actual</label><strong>'+fmt(a)+'</strong></div><div class="metric"><label>This month budget</label><strong>'+fmt(mb)+'</strong></div><div class="metric"><label>Variance</label><strong class="'+cls(variance)+'">'+fmt(variance)+'</strong></div><div class="metric"><label>12-mo forecast</label><strong>'+fmt(an)+'</strong></div></div></div>'
+ }
+ function renderRecurring(){
+   const list=activeLines().filter(isRecurring),annual=list.reduce(function(s,r){return s+forecastAnnual(r)},0),month=list.reduce(function(s,r){return s+monthVal(r,0)},0),allExp=activeLines().filter(isExpense).reduce(function(s,r){return s+forecastAnnual(r)},0);
+   document.getElementById('recMonth').textContent=fmt(month);document.getElementById('recAnnual').textContent=fmt(annual);document.getElementById('recPct').textContent=(allExp?Math.round(annual/allExp*100):0)+'%';document.getElementById('recCount').textContent=list.length;
+   document.getElementById('recurringBody').innerHTML=list.sort(function(a,b){return forecastAnnual(b)-forecastAnnual(a)}).map(simpleSpendCard).join('')||'<div class="empty">No recurring expenses identified.</div>';
+ }
+ function renderVariable(){
+   const list=activeLines().filter(isVariable),annual=list.reduce(function(s,r){return s+forecastAnnual(r)},0),month=list.reduce(function(s,r){return s+actual(r)},0);
+   document.getElementById('varMonth').textContent=fmt(month);document.getElementById('varAnnual').textContent=fmt(annual);document.getElementById('varSave10').textContent=fmt(annual*.10);document.getElementById('varSave20').textContent=fmt(annual*.20);
+   document.getElementById('variableBody').innerHTML=list.sort(function(a,b){return forecastAnnual(b)-forecastAnnual(a)}).map(simpleSpendCard).join('')||'<div class="empty">No variable expenses identified.</div>';
+ }
  function renderGraphs(){drawFlow();drawNet();drawCash();renderExpenseBars();renderVariableBars();drawMix();drawVariableMonth()}
- function renderAll(){renderQuick();renderYear();renderLast();document.getElementById('status').textContent='Transactions through '+lastTxDate();if(document.getElementById('graphs').classList.contains('active'))requestAnimationFrame(renderGraphs)}
+ function renderAll(){renderQuick();renderYear();renderLast();renderRecurring();renderVariable();document.getElementById('status').textContent='Transactions through '+lastTxDate();if(document.getElementById('graphs').classList.contains('active'))requestAnimationFrame(renderGraphs)}
  document.querySelectorAll('.nav button').forEach(function(btn){btn.onclick=function(){document.querySelectorAll('.nav button').forEach(function(b){b.classList.remove('active')});document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active')});btn.classList.add('active');document.getElementById(btn.dataset.view).classList.add('active');if(btn.dataset.view==='graphs')requestAnimationFrame(renderGraphs);window.scrollTo({top:0,behavior:'smooth'})}});
- document.getElementById('startCash').onchange=function(e){startCash=num(e.target.value);renderAll()};
- document.getElementById('save').onclick=function(){localStorage.setItem(STORE,JSON.stringify({monthEdits:monthEdits,startingCash:startCash}));renderAll();const el=document.getElementById('updateStatus');el.textContent='Updated ✓ '+new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});setTimeout(function(){el.textContent=''},5000)};
+ let dirty=false;
+ function markDirty(){dirty=true;document.querySelectorAll('.updateStatus').forEach(function(el){el.textContent='Changes not updated'})}
+ function saveAndRender(){
+   manualRows=rows.filter(function(r){return r.manual});
+   localStorage.setItem(STORE,JSON.stringify({monthEdits:monthEdits,startingCash:startCash,manualRows:manualRows}));
+   dirty=false;renderAll();const txt='Updated ✓ '+new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});document.querySelectorAll('.updateStatus').forEach(function(el){el.textContent=txt});setTimeout(function(){document.querySelectorAll('.updateStatus').forEach(function(el){if(!dirty)el.textContent=''})},5000)
+ }
+ document.getElementById('startCash').onchange=function(e){startCash=num(e.target.value);markDirty()};
+ document.getElementById('save').onclick=saveAndRender;
+ document.getElementById('yearUpdate').onclick=saveAndRender;
+ document.getElementById('addLineBtn').onclick=function(){document.getElementById('addPanel').classList.add('open')};
+ document.getElementById('cancelLine').onclick=function(){document.getElementById('addPanel').classList.remove('open')};
+ document.getElementById('createLine').onclick=function(){
+   const name=document.getElementById('newName').value.trim(),kind=document.getElementById('newKind').value,spendClass=document.getElementById('newClass').value,freq=document.getElementById('newFrequency').value,start=Number(document.getElementById('newMonth').value),amt=round2(document.getElementById('newAmount').value);
+   if(!name||!Number.isFinite(amt)||amt===0){alert('Enter a name and amount.');return}
+   const id=10000+Date.now(),vals=Array(16).fill(0);for(let i=0;i<12;i++){const v=(freq==='monthly'&&i>=start)||(freq==='one-time'&&i===start)?amt:0;vals[i+2]=v}vals[1]=0;
+   rows.push({row:id,type:'line',label:name,timing:freq==='monthly'?'Expected monthly':'Expected one-time',vals:vals,keys:[],kind:kind,spendClass:spendClass,manual:true});
+   document.getElementById('newName').value='';document.getElementById('newAmount').value='';document.getElementById('addPanel').classList.remove('open');markDirty();renderAll()
+ };
  document.getElementById('reset').onclick=function(){monthEdits={};localStorage.removeItem(STORE);renderAll()};
  document.getElementById('restore').onclick=function(){deleted.clear();localStorage.removeItem(DEL);renderAll()};
  window.addEventListener('resize',function(){if(document.getElementById('graphs').classList.contains('active'))renderGraphs()});
