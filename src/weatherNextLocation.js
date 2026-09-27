@@ -25,7 +25,7 @@ export function createWeatherNextLocationProvider({env=process.env,fetchImpl=glo
  let auth=null,authPending=null,runCache=null,lookups=[];
  async function json(url,options={}){
   const response=await fetchImpl(url,{...options,redirect:'error',signal:AbortSignal.timeout(25000)});
-  if(!response.ok)throw failure('WeatherNext could not complete the request. The site owner should check Google Cloud access and query limits.');
+  if(!response.ok)throw failure('WeatherNext could not complete the request. The site owner should check forecast-service access and query limits.');
   return response.json();
  }
  async function accessToken(){
@@ -36,7 +36,7 @@ export function createWeatherNextLocationProvider({env=process.env,fetchImpl=glo
    const unsigned=enc({alg:'RS256',typ:'JWT'})+'.'+enc({iss:credentials.client_email,scope:'https://www.googleapis.com/auth/bigquery',aud:'https://oauth2.googleapis.com/token',iat,exp:iat+3600});
    const assertion=unsigned+'.'+createSign('RSA-SHA256').update(unsigned).sign(credentials.private_key,'base64url');
    const data=await json('https://oauth2.googleapis.com/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'urn:ietf:params:oauth:grant-type:jwt-bearer',assertion}).toString()});
-   if(typeof data.access_token!=='string')throw failure('Google Cloud authentication is unavailable.');
+   if(typeof data.access_token!=='string')throw failure('WeatherNext authentication is unavailable.');
    auth={value:data.access_token,expires:now()+Math.min(Number(data.expires_in)||3600,3600)*1000};return auth.value;
   })();
   try{return await authPending;}finally{authPending=null;}

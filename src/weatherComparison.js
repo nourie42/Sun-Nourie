@@ -25,14 +25,14 @@ export function buildGoogleComparison(feed,pointId,now=Date.now()){
  const out=buildForecast({location:p,point:{timeZone:zone},models:{},feeds:[],grid:{},forecast:{periods:[]},hourly:{periods:[]},now});
  const all=selected.rows.map(r=>({...r,humidity:humidityFromDewpoint(r.temperature,r.dewpoint)}));
  const future=all.filter(r=>r.epoch>=start),map=new Map(all.map(r=>[r.epoch,r]));
- const hour=r=>({...r,windMph:r.wind,wind:finite(r.wind)?`${round(r.wind)} mph`:null,windDirectionDegrees:r.windDirection,windDirection:compass(r.windDirection),isDay:solarElevation(r.epoch,p.latitude,p.longitude)>0,precipitationSource:'Google WeatherNext model-native ensemble mean',rainLikelihood:{value:null,source:'Not published by this Google feed'},temperatureBlend:{value:r.temperature,sources:[{id:'google',weight:1,value:r.temperature}]}});
+ const hour=r=>({...r,windMph:r.wind,wind:finite(r.wind)?`${round(r.wind)} mph`:null,windDirectionDegrees:r.windDirection,windDirection:compass(r.windDirection),isDay:solarElevation(r.epoch,p.latitude,p.longitude)>0,precipitationSource:'WeatherNext model ensemble mean',rainLikelihood:{value:null,source:'Not published by this forecast feed'},temperatureBlend:{value:r.temperature,sources:[{id:'google',weight:1,value:r.temperature}]}});
  out.hours=future.slice(0,49).map(hour);out.rainTimeline=future.map(hour);
  const current=map.get(start);
- out.current=current?{...current,type:'guidance',station:null,stationName:null,wind:current.wind,humidity:current.humidity,apparent:null,skySource:'Google WeatherNext',precipitationSource:'Google WeatherNext',radarPrecipitation:null}:{type:'unavailable',time:iso(start),temperature:null,dewpoint:null,humidity:null,wind:null,gust:null,skyCover:null,condition:'Google forecast unavailable for this hour',radarPrecipitation:null};
+ out.current=current?{...current,type:'guidance',station:null,stationName:null,wind:current.wind,humidity:current.humidity,apparent:null,skySource:'WeatherNext',precipitationSource:'WeatherNext',radarPrecipitation:null}:{type:'unavailable',time:iso(start),temperature:null,dewpoint:null,humidity:null,wind:null,gust:null,skyCover:null,condition:'NVIDIA forecast unavailable for this hour',radarPrecipitation:null};
  out.current.pressure=null;
- out.current.apparentSource='Weather Nourie calculation using Google-only inputs';
+ out.current.apparentSource='Weather Nourie estimate using WeatherNext forecast inputs';
  const keys=['temperature','dewpoint','wind','humidity','pressure','cloud','precipitation','pop','gust','visibility'];
- const series=Object.fromEntries(keys.map(key=>[key,future.map(r=>({time:r.time,value:key==='cloud'?r.skyCover:r[key]??null,source:key==='temperature'?r.temperatureSource:key==='dewpoint'?r.dewpointSource:'Google WeatherNext',runAt:r.provenance.runAt,...(key==='precipitation'?{end:r.precipitationEnd,runAt:r.precipitationRunAt}: {})}))]));
+ const series=Object.fromEntries(keys.map(key=>[key,future.map(r=>({time:r.time,value:key==='cloud'?r.skyCover:r[key]??null,source:key==='temperature'?r.temperatureSource:key==='dewpoint'?r.dewpointSource:'WeatherNext',runAt:r.provenance.runAt,...(key==='precipitation'?{end:r.precipitationEnd,runAt:r.precipitationRunAt}: {})}))]));
  out.metricForecasts={series,notes:{},solar:[],version:out.experienceVersion};
  const aggregate=(a,b)=>{const rows=all.filter(r=>r.epoch>=a&&r.epoch<b);return {rows,complete:rows.length===Math.round((b-a)/HOUR)};};
  const total=(a,b)=>{const q=aggregate(a,b);return q.complete&&q.rows.every(r=>finite(r.precipitation))?q.rows.reduce((s,r)=>s+r.precipitation,0):null;};
@@ -41,18 +41,18 @@ export function buildGoogleComparison(feed,pointId,now=Date.now()){
   const daytime=aggregate(a,b),night=aggregate(b,end),allDay=aggregate(a,end),cloud=mean(daytime.rows.map(r=>r.skyCover)),nCloud=mean(night.rows.map(r=>r.skyCover));
   const high=extreme(daytime.rows.map(r=>r.temperature),Math.max),low=extreme(night.rows.map(r=>r.temperature),Math.min);
   const condition=skyDescription(cloud,extreme(daytime.rows.map(r=>r.precipitation),Math.max)),nightCondition=skyDescription(nCloud,extreme(night.rows.map(r=>r.precipitation),Math.max));
-  const coverageNote=`High/low are extrema of available Google hourly means in 7am–7pm / 7pm–7am windows. ${daytime.complete&&night.complete?'Full':'Partial'} period coverage. Rain amount is a mean, not a probability.`;
-  return {...day,high:round(high),low:round(low),condition,nightCondition,detail:coverageNote,nightDetail:coverageNote,pop:null,popDay:null,popNight:null,popLabel:'Not published by this Google feed',rainLikelihood:{value:null},popDayLikelihood:{value:null},popNightLikelihood:{value:null},qpf:total(a,end),remainingQpf:index===0?total(Math.max(a,Math.ceil(now/HOUR)*HOUR),end):null,qpfWindow:{start:iso(a),end:iso(end)},qpfSource:'Google native hourly ensemble means',temperatureSource:'Google WeatherNext; station-trained when a matching run is published',lowLabel:'Overnight low',highWindow:{start:iso(a),end:iso(b)},lowWindow:{start:iso(b),end:iso(end)},confidence:ensembleConfidence(allDay.rows,now,index),guidance:{},illustrativeBlend:null,agreement:'One Google ensemble',highSpread:null,qpfSpread:null,uvMax:null,wind:finite(mean(allDay.rows.map(r=>r.wind)))?`${round(mean(allDay.rows.map(r=>r.wind)))} mph`:null,windDirection:null,googleCoverage:{dayHours:daytime.rows.length,nightHours:night.rows.length,complete:daytime.complete&&night.complete}};
+  const coverageNote=`High/low summarize available WeatherNext hourly means in 7am–7pm / 7pm–7am windows. ${daytime.complete&&night.complete?'Full':'Partial'} period coverage. Rain amount is a mean, not a probability.`;
+  return {...day,high:round(high),low:round(low),condition,nightCondition,detail:coverageNote,nightDetail:coverageNote,pop:null,popDay:null,popNight:null,popLabel:'Not supplied by WeatherNext',rainLikelihood:{value:null},popDayLikelihood:{value:null},popNightLikelihood:{value:null},qpf:total(a,end),remainingQpf:index===0?total(Math.max(a,Math.ceil(now/HOUR)*HOUR),end):null,qpfWindow:{start:iso(a),end:iso(end)},qpfSource:'WeatherNext hourly ensemble means',temperatureSource:'WeatherNext model; station-trained when a matching run is published',lowLabel:'Overnight low',highWindow:{start:iso(a),end:iso(b)},lowWindow:{start:iso(b),end:iso(end)},confidence:ensembleConfidence(allDay.rows,now,index),guidance:{},illustrativeBlend:null,agreement:'One WeatherNext ensemble',highSpread:null,qpfSpread:null,uvMax:null,wind:finite(mean(allDay.rows.map(r=>r.wind)))?`${round(mean(allDay.rows.map(r=>r.wind)))} mph`:null,windDirection:null,googleCoverage:{dayHours:daytime.rows.length,nightHours:night.rows.length,complete:daytime.complete&&night.complete}};
  });
  out.solar=solarTimes(dateKey(now,zone),p.latitude,p.longitude);
  out.metricForecasts.solar=out.days.map(d=>({date:d.date,...solarTimes(d.date,p.latitude,p.longitude)}));
- out.exposureWeather={source:'Google WeatherNext',url:'https://developers.google.com/weathernext',timezone:zone,rows:all.map(r=>({...r,rain:finite(r.precipitation)?r.precipitation*25.4:null,uvIndex:null})),uv:[],historyBasis:'Published Google model trajectories, not measured historical weather',radiationBasis:'Google hourly-average solar irradiance; not instantaneous radiation or UV index'};
- out.uv={source:'Not published by this Google feed',today:null,hourly:[]};
+ out.exposureWeather={source:'WeatherNext forecast',url:'https://developers.google.com/weathernext',timezone:zone,rows:all.map(r=>({...r,rain:finite(r.precipitation)?r.precipitation*25.4:null,uvIndex:null})),uv:[],historyBasis:'Published model trajectories, not measured historical weather',radiationBasis:'Hourly-average solar irradiance; not instantaneous radiation or UV index'};
+ out.uv={source:'Not supplied by WeatherNext',today:null,hourly:[]};
  out.airQuality=null;out.discussion=null;out.alerts=[];out.specialDiscussions=[];out.precipitationDiscussions=[];out.riskOutlooks=[];out.danTake=null;out.aiConfigured=false;out.modelContributions=[];
- out.feeds=selected.runs.map(r=>({id:`google-${r.id}`,label:`Google WeatherNext ${r.id==='interimSurface'?'short-range hourly run':'main run'}`,status:r.status==='last-verified'||now-Date.parse(r.runAt)>36*HOUR?'stale':'ready',contributes:true,issuedAt:r.runAt,fetchedAt:r.fetchedAt,url:'https://developers.google.com/weathernext',message:'Newest published applicable initialization, not a claim of proven local superiority.'}));
- out.methodology='Google WeatherNext only. For each valid time, use the newest published applicable surface initialization; within 48 hours this may be the interim hourly run. A matching station-trained run supplies temperature/dew point where available; otherwise the same Google surface run is used. No NWS, HRRR, ECMWF or Open-Meteo values enter this forecast. Feels-like, humidity, clothing and pavement are Weather Nourie-derived estimates, not Google-issued products. Missing data remain missing. Sunrise/sunset are astronomical calculations. Precipitation intervals are aligned to the following hour for comparison.';
- rebuildHourlyFeels(out,{now,temperatureAt:t=>({value:map.get(t)?.temperature??null,source:'Google WeatherNext'}),humidityAt:t=>map.get(t)?.humidity??null,skyAt:t=>({value:map.get(t)?.skyCover??null,source:'Google WeatherNext'})});
- out.metricForecasts.notes={...out.metricForecasts.notes,humidity:'Derived from Google temperature and dew point.',feels:'Weather Nourie outdoor/shade calculation applied only to same-hour Google forecast inputs. Not a Google-issued feels-like product.',precipitation:'Mean amount during [hour, hour+1); Google ending-hour accumulations are shifted to their actual interval.',solar:'Astronomical sunrise/sunset, not a Google model variable.'};
+ out.feeds=selected.runs.map(r=>({id:`google-${r.id}`,label:`NVIDIA WeatherNext ${r.id==='interimSurface'?'short-range hourly run':'main run'}`,status:r.status==='last-verified'||now-Date.parse(r.runAt)>36*HOUR?'stale':'ready',contributes:true,issuedAt:r.runAt,fetchedAt:r.fetchedAt,url:'https://developers.google.com/weathernext',message:'Newest published applicable initialization.'}));
+ out.methodology='WeatherNext forecast feed. For each valid time, use the newest published applicable surface initialization; within 48 hours this may be the interim hourly run. A station-trained run supplies temperature and dew point where available; otherwise the surface run is used. Missing values remain missing. Feels-like, humidity, clothing and pavement are Weather Nourie estimates. Sunrise and sunset are astronomical calculations. Precipitation intervals are aligned to the following hour for comparison.';
+ rebuildHourlyFeels(out,{now,temperatureAt:t=>({value:map.get(t)?.temperature??null,source:'WeatherNext'}),humidityAt:t=>map.get(t)?.humidity??null,skyAt:t=>({value:map.get(t)?.skyCover??null,source:'WeatherNext'})});
+ out.metricForecasts.notes={...out.metricForecasts.notes,humidity:'Derived from forecast temperature and dew point.',feels:'Weather Nourie outdoor and shade calculation applied only to same-hour forecast inputs.',precipitation:'Mean amount during [hour, hour+1); ending-hour accumulations are shifted to their actual interval.',solar:'Astronomical sunrise and sunset.'};
  out.comparison={source:'google',point:p,runs:selected.runs,policy:'Freshest applicable published run; matching station-trained temperature/dew point when available',missing:['Rain probability','UV index','Air quality','Wind gusts','Live radar','Official warnings'],history:'No observations used',currentValidTime:out.current.time};
  out.signature=createHash('sha256').update(JSON.stringify({point:p,runs:selected.runs,hours:out.hours,now:start})).digest('hex').slice(0,24);
  return out;
@@ -65,7 +65,7 @@ export function comparisonApp(original,config){
  let s=original.replace(/\r\n?/g,'\n').replaceAll("from './","from '/weather-fusion/");
  s=`import {installComparisonPane} from '/weather-fusion/compare-bridge.js?v=${version}';\nconst COMPARE=${JSON.stringify(config)};\n`+s;
  s=replaceOnce(s,"async function api(path, params = '', signal) {","async function api(path, params = '', signal) {\n  if(COMPARE.source==='google'&&path==='forecast')return compareBridge.requestForecast(params,signal);");
- s=replaceOnce(s,"async function api(path, params = '', signal) {","async function api(path, params = '', signal) {\n  if(COMPARE.source==='google'&&!['forecast','search'].includes(path))throw Object.assign(new Error('Not supplied by Google WeatherNext.'),{status:503});");
+ s=replaceOnce(s,"async function api(path, params = '', signal) {","async function api(path, params = '', signal) {\n  if(COMPARE.source==='google'&&!['forecast','search'].includes(path))throw Object.assign(new Error('Not supplied by NVIDIA WeatherNext.'),{status:503});");
  s=replaceOnce(s,'`/api/weather-fusion/${path}${params ?',"`${COMPARE.source==='google'&&path==='forecast'?'/api/weather-fusion/compare/google':'/api/weather-fusion/'+path}${params ?");
  s=replaceOnce(s,'data.rainTrend=updateRainTrend(data,Date.now());',"data.rainTrend=COMPARE.source==='google'?null:updateRainTrend(data,Date.now());");
  s=replaceOnce(s,"$('status').classList.add('error');","if(COMPARE.source==='google'&&e.status===404)$('status').textContent='WeatherNext is not yet connected for this location. Use the main weather page for your local forecast.';\n    $('status').classList.add('error');");
@@ -82,16 +82,16 @@ export function registerWeatherComparisonRoutes(app,{fetchImpl=globalThis.fetch,
  const getFeed=()=>cache.get('feed',120000,async()=>{
   if(feedProvider)return feedProvider();
   const r=await fetchImpl(GOOGLE_FEED,{signal:AbortSignal.timeout(25000),redirect:'error',headers:{Accept:'application/json'}});
-  if(!r.ok)throw Object.assign(Error('The Google feed could not be refreshed.'),{status:503});
+  if(!r.ok)throw Object.assign(Error('The NVIDIA forecast feed could not be refreshed.'),{status:503});
   const data=await r.json();googlePoints(data);return data;
  });
  const fail=(res,e)=>res.set('Cache-Control','no-store').status(e.status||503).json({error:e.message||'Comparison data unavailable.',code:e.code});
  const config=async q=>{
   const source=q.source==='google'?'google':q.source==='fusion'?'fusion':null;
-  if(!source)throw Object.assign(Error('Choose Fusion or Google.'),{status:400});
+  if(!source)throw Object.assign(Error('Choose Dan’s Forecast or NVIDIA.'),{status:400});
   const coords=q.latitude!==undefined&&q.longitude!==undefined&&Number.isFinite(Number(q.latitude))&&Number.isFinite(Number(q.longitude))&&Math.abs(Number(q.latitude))<=90&&Math.abs(Number(q.longitude))<=180;
   const point=coords?{id:'selected',name:String(q.name||'Selected location').slice(0,100),latitude:Number(q.latitude),longitude:Number(q.longitude)}:googlePoints(await getFeed()).find(p=>p.id===q.location);
-  if(!point)throw Object.assign(Error('Choose a published comparison location.'),{status:404});
+  if(!point)throw Object.assign(Error('Choose an available forecast location.'),{status:404});
   return {source,point,explicitLocation:coords||q.explicit==='1'||Boolean(q.location)};
  };
  app.get(['/weather-fusion','/weather-fusion/'],async(_req,res,next)=>{
@@ -110,7 +110,7 @@ export function registerWeatherComparisonRoutes(app,{fetchImpl=globalThis.fetch,
   let html=await readFile(root+'index.html','utf8');
   html=html.replace(/<script type="module" src="\/weather-fusion\/app\.js[^"]*"><\/script>/, '<script type="module" src="/weather-fusion/compare/app.js?source=google&amp;location='+encodeURIComponent(point.id)+'&amp;explicit=1'+(hasCoordinates?'&amp;latitude='+encodeURIComponent(req.query.latitude)+'&amp;longitude='+encodeURIComponent(req.query.longitude)+'&amp;name='+encodeURIComponent(point.name):'')+'"></script>');
   html=html.replace('Because Apple, Google and Samsung weather suck','Your local weather, clearly explained').replace('<title>Weather Nourie</title>','<title>NVIDIA Forecast · Weather Nourie</title>');
-  html=html.replace('</head>','<link rel="stylesheet" href="/weather-fusion/compare.css?v=mobile-repair-v1"></head>').replace('<body data-sky="day">','<body data-sky="day" class="google-pane weathernext-dashboard">');
+  html=html.replace('</head>','<link rel="stylesheet" href="/weather-fusion/compare.css?v=nvidia-mobile-sync-v2"></head>').replace('<body data-sky="day">','<body data-sky="day" class="google-pane weathernext-dashboard">');
   html=html.replace('<main id="forecast">','<h1 class="weathernext-heading">NVIDIA Forecast</h1><p class="weathernext-map-shortcut"><a href="https://deepmind.google.com/science/weatherlab" target="_blank" rel="noopener noreferrer">Open NVIDIA forecast maps ↗</a></p><main id="forecast">');
   html=html.replace('<a class="weather-jump-card jump-next" href="/weathernext/" aria-label="Open NVIDIA forecast">NVIDIA</a>','<a class="weather-jump-card jump-main" href="/weather-fusion/" aria-label="Back to main forecast">Main</a>');
   res.set('Cache-Control','no-store, no-cache, max-age=0, must-revalidate').set('Pragma','no-cache').set('Expires','0').set('X-Weather-Nourie-Page','nvidia-location-refresh-20260927').type('html').send(html);
@@ -128,7 +128,7 @@ export function registerWeatherComparisonRoutes(app,{fetchImpl=globalThis.fetch,
     ||points.map(p=>({point:p,miles:pointDistanceMiles(p,requested)})).filter(x=>x.miles<=1).sort((a,b)=>a.miles-b.miles)[0]?.point
   :points.find(p=>p.id===query.location)):null;
   if(point)return {feed,point};
-  if(!requested)throw Object.assign(Error(query.location?'Google has no published forecast for that location.':'Choose a city or use your device location.'),{status:query.location?404:400});
+  if(!requested)throw Object.assign(Error(query.location?'NVIDIA has no published forecast for that location.':'Choose a city or use your device location.'),{status:query.location?404:400});
   const saved=localFeed(requested);
   return {feed:saved,point:saved?.points[0]||requested};
  }
@@ -143,7 +143,7 @@ export function registerWeatherComparisonRoutes(app,{fetchImpl=globalThis.fetch,
  app.post('/api/weather-fusion/compare/location',access.sameOrigin,express.json({limit:'2kb'}),async(req,res)=>{try{
   const point=locationPoint(req.body),resolved=await resolveForecast(point);
   if(resolved.feed)return res.set('Cache-Control','no-store').json(await forecastFor(resolved));
-  if(!provider.configured)throw Object.assign(Error('Private location lookups are awaiting Google Cloud setup by the site owner.'),{status:503,code:'SETUP_REQUIRED'});
+  if(!provider.configured)throw Object.assign(Error('New-location WeatherNext lookups are awaiting setup by the site owner.'),{status:503,code:'SETUP_REQUIRED'});
   if(!pending.has(point.id)){
    if(pending.size>=2)throw Object.assign(Error('Location queries are busy. Please try again shortly.'),{status:429});
    const job=provider.lookup(point).then(feed=>{
@@ -165,6 +165,6 @@ export function registerWeatherComparisonRoutes(app,{fetchImpl=globalThis.fetch,
   res.set('Cache-Control','no-store, no-cache, max-age=0, must-revalidate').set('Pragma','no-cache').set('Expires','0').type('application/javascript').send(comparisonApp(await readFile(root+'app.js','utf8'),c));
  }catch(e){
   console.error('WeatherNext comparison app generation failed:',e?.message||e);
-  res.set('Cache-Control','no-store').status(503).type('application/javascript').send("throw new Error('The Google weather page could not be prepared. Refresh or return to Dan\'s Weather.');");
+  res.set('Cache-Control','no-store').status(503).type('application/javascript').send("throw new Error('The NVIDIA weather page could not be prepared. Refresh or return to Dan\'s Weather.');");
  }});
 }

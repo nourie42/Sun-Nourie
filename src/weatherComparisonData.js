@@ -11,7 +11,7 @@ const validTime=t=>Number.isFinite(Date.parse(t));
 const allowed=['surface','interimSurface','previousSurface'];
 const stationFor={surface:'station',interimSurface:'interimStation',previousSurface:'previousStation'};
 export function googlePoints(feed){
- if(!feed||!Array.isArray(feed.points)||!feed.sources)throw Error('The published Google forecast is unavailable or invalid.');
+ if(!feed||!Array.isArray(feed.points)||!feed.sources)throw Error('The published NVIDIA forecast is unavailable or invalid.');
  return feed.points.filter(p=>p&&typeof p.id==='string'&&finite(p.latitude)&&finite(p.longitude)&&p.latitude>=24&&p.latitude<=50&&p.longitude>=-125&&p.longitude<=-66).map(p=>({id:p.id,name:p.name||p.id,latitude:p.latitude,longitude:p.longitude,timeZone:p.timeZone||'America/New_York'}));
 }
 export function skyDescription(cloud,rain){
@@ -21,7 +21,7 @@ export function skyDescription(cloud,rain){
 }
 export function selectGoogleForecast(feed,pointId,now=Date.now()){
  const point=googlePoints(feed).find(p=>p.id===pointId);
- if(!point)throw Object.assign(Error('Google has no published forecast for that location. Choose a listed comparison location.'),{status:404});
+ if(!point)throw Object.assign(Error('NVIDIA has no published forecast for that location. Choose a listed comparison location.'),{status:404});
  const chosen=new Map(),stationMaps=new Map(),used=new Map();
  for(const id of allowed){
   const source=feed.sources[id],init=Date.parse(source?.runAt),p=source?.points?.find(p=>p.id===pointId);
@@ -37,7 +37,7 @@ export function selectGoogleForecast(feed,pointId,now=Date.now()){
    if(!old||init>old.init||(init===old.init&&id==='surface'))chosen.set(time,{id,source,row,init,point:p});
   }
  }
- if(![...chosen.keys()].some(t=>t>=Math.floor(now/HOUR)*HOUR))throw Object.assign(Error('No Google forecast covers the current or upcoming hours. Older data is not presented as current.'),{status:503});
+ if(![...chosen.keys()].some(t=>t>=Math.floor(now/HOUR)*HOUR))throw Object.assign(Error('No NVIDIA forecast covers the current or upcoming hours. Older data is not presented as current.'),{status:503});
  const rows=[...chosen].sort((a,b)=>a[0]-b[0]).map(([time,c])=>{
   const sr=stationMaps.get(c.id)?.get(time);
   const stationTemp=at(sr,'station_head_temperature_2m')??at(sr,'temperature_2m');
@@ -61,8 +61,8 @@ export function selectGoogleForecast(feed,pointId,now=Date.now()){
    precipitationStart:new Date(time).toISOString(),precipitationEnd:new Date(time+HOUR).toISOString(),
    precipitationRunAt:next?.source.runAt??null,condition:skyDescription(skyCover,precipitation),
    pop:null,gust:null,visibility:null,uvIndex:null,
-   temperatureSource:finite(stationTemp)?'Google WeatherNext station-trained':'Google WeatherNext surface',
-   dewpointSource:finite(stationDew)?'Google WeatherNext station-trained':'Google WeatherNext surface',
+   temperatureSource:finite(stationTemp)?'WeatherNext station-trained':'WeatherNext surface model',
+   dewpointSource:finite(stationDew)?'WeatherNext station-trained':'WeatherNext surface model',
    temperatureP10:f(finite(stationTemp)?(at(sr,'station_head_temperature_2m','p10')??at(sr,'temperature_2m','p10')):at(c.row,'temperature_2m','p10')),
    temperatureP90:f(finite(stationTemp)?(at(sr,'station_head_temperature_2m','p90')??at(sr,'temperature_2m','p90')):at(c.row,'temperature_2m','p90')),
    provenance:meta};

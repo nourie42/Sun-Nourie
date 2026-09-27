@@ -96,7 +96,7 @@ test('WeatherNext data explorer stays isolated and implementation notes stay off
 });
 test('dedicated WeatherNext page documents live surface/station data plus full upper-air product coverage',()=>{
   const html=read('public/weather-fusion/weathernext-site.html');
-  assert.match(html,/Everything Google publishes for forecasting/);
+  assert.match(html,/WeatherNext forecast fields/);
   assert.match(html,/0\.05° station-trained output/);
   assert.match(html,/0\.1° gridded surface output/);
   assert.match(html,/0\.25° 3D atmosphere/);

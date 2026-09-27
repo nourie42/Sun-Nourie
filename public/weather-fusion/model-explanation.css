@@ -45,7 +45,7 @@
 #model-explanation .model-runs dd{margin:3px 0 0;color:#c1deeb;overflow-wrap:anywhere}
 #model-explanation .model-runs small{display:block;margin-top:3px;font-size:11px;color:#a6cedf}
 
-/* Google WeatherNext 3 AI model section */
+/* NVIDIA WeatherNext model section */
 #model-explanation .graphcast-card{position:relative;isolation:isolate;margin:22px 0 18px;padding:22px;border:1px solid rgba(164,151,255,.42);border-radius:26px;background:radial-gradient(circle at 100% 0%,rgba(109,87,255,.28),transparent 38%),radial-gradient(circle at 0% 100%,rgba(41,190,255,.12),transparent 42%),linear-gradient(145deg,rgba(17,25,57,.98),rgba(10,18,44,.98));box-shadow:0 20px 48px rgba(3,9,28,.28),inset 0 1px 0 rgba(255,255,255,.09);overflow:hidden}
 #model-explanation .graphcast-card::before{content:'WEATHERNEXT 3 FORECAST';display:inline-flex;align-items:center;min-height:24px;margin:0 0 16px;padding:4px 9px;border:1px solid rgba(180,168,255,.3);border-radius:999px;background:rgba(120,100,255,.13);color:#cfc8ff;font-size:10px;font-weight:850;letter-spacing:.11em;text-transform:uppercase}
 #model-explanation .graphcast-card::after{content:'';position:absolute;z-index:-1;right:-90px;top:-100px;width:240px;height:240px;border-radius:50%;background:radial-gradient(circle,rgba(133,112,255,.24),rgba(93,72,230,.08) 48%,transparent 72%);filter:blur(2px);pointer-events:none}

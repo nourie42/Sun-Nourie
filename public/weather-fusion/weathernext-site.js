@@ -46,7 +46,7 @@ function render(){
  $('download-csv').disabled=!indexedRows(fieldSource(field())).length;
  renderReadout();renderChart();renderTable();renderSources();
  const age=(Date.now()-Date.parse(src.runAt))/HOUR,stale=Date.now()-Date.parse(src.fetchedAt)>6*HOUR||age>36||src.status!=='ready';
- setStatus(stale?'Showing the last published forecast. Check initialization and collection times below; this run may be old.':`Published Google forecast loaded · ${src.fields.length} surface fields · ${feed.ensembleMembers} ensemble members represented by six statistics.`,stale);
+ setStatus(stale?'Showing the last published forecast. Check initialization and collection times below; this run may be old.':`Published NVIDIA WeatherNext forecast loaded · ${src.fields.length} surface fields · ${feed.ensembleMembers} ensemble members represented by six statistics.`,stale);
 }
 function renderReadout(){
  const rows=visibleRows(),r=rows[hourIndex];if(!r)return;
