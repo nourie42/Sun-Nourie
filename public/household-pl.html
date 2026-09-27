@@ -1,19 +1,212 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Nourie Household P&L</title>
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Nourie Household P&L</title>
 <style>
-:root{--card:#101d2e;--line:#253a55;--text:#eef5ff;--muted:#9fb1c8;--green:#58d68d;--red:#ff7b7b}
-*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#07101d,#0b1626);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}.wrap{max-width:1700px;margin:auto;padding:18px}h1{margin:0 0 4px;font-size:clamp(25px,4vw,40px)}.sub{color:var(--muted);margin-bottom:16px}.kpis{display:grid;grid-template-columns:repeat(4,minmax(170px,1fr));gap:10px;margin:14px 0}.kpi{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px}.kpi b{display:block;color:var(--muted);font-size:12px}.kpi span{font-size:24px;font-weight:800}button,input{background:#13243a;color:var(--text);border:1px solid #34506f;border-radius:9px;padding:7px 9px}button{cursor:pointer}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.toolbar form{margin-left:auto}.scroll{overflow:auto;border:1px solid var(--line);border-radius:14px;background:var(--card)}table{border-collapse:separate;border-spacing:0;min-width:1500px;width:100%}th,td{padding:8px 9px;border-bottom:1px solid #1d3047;border-right:1px solid #1d3047;text-align:right;white-space:nowrap}th:first-child,td:first-child{position:sticky;left:0;background:#101d2e;text-align:left;z-index:2;min-width:300px}th:nth-child(2),td:nth-child(2){text-align:left;min-width:130px}thead th{position:sticky;top:0;background:#173152;z-index:3}thead th:first-child{z-index:4;background:#173152}.section td{background:#17365d!important;font-weight:800;text-align:left}.total td{font-weight:800;border-top:2px solid #55799f}.net td{background:#12283f}.lineclick{color:#cfe6ff;text-decoration:underline;cursor:pointer}.neg{color:var(--red)}.pos{color:var(--green)}.edit{min-width:82px;width:100%;text-align:right;padding:4px 6px}.del{padding:4px 7px;color:#ff9b9b}.details td{background:#0a1524!important;text-align:left!important;white-space:normal}.tx{display:grid;grid-template-columns:92px 75px minmax(140px,1fr) minmax(160px,1.2fr) 100px;gap:8px;padding:6px 0;border-bottom:1px solid #1d3047}.tx .amt{text-align:right;font-weight:700}.empty{color:var(--muted)}.cash{margin-top:16px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}.cashgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;font-size:13px}.cashgrid div{padding:6px;border-bottom:1px solid #21364e}.h{font-weight:800;color:#b9d8ff}@media(max-width:800px){.wrap{padding:10px}.kpis{grid-template-columns:1fr 1fr}.kpi span{font-size:19px}.tx{grid-template-columns:1fr 1fr}.cashgrid{grid-template-columns:1fr 1fr}}
-</style></head><body><div class="wrap"><h1>Nourie Household P&L</h1><div class="sub">Income → Expenses → Net Profit/(Loss). Starting bank cash is separate from profit. Click a line item to see its transactions.</div>
-<div class="kpis"><div class="kpi"><b>12-Month Income</b><span id="ki"></span></div><div class="kpi"><b>12-Month Expenses</b><span id="ke"></span></div><div class="kpi"><b>12-Month Net P/L</b><span id="kn"></span></div><div class="kpi"><b>Starting Bank Cash</b><span><input id="startCash" type="number" step="100" style="font-size:20px;font-weight:800;width:145px"></span></div></div>
-<div class="toolbar"><button id="save">Save edits</button><button id="reset">Reset to weekly base</button><button id="restore">Restore deleted rows</button><form method="post" action="/household-pl/logout"><button type="submit">Lock</button></form></div>
-<div class="scroll"><table><thead><tr><th>Income / Expense</th><th>Timing</th><th></th><th>Aug Actual</th><th>Sep MTD</th><th>Sep Est</th><th>Oct 26</th><th>Nov 26</th><th>Dec 26</th><th>Jan 27</th><th>Feb 27</th><th>Mar 27</th><th>Apr 27</th><th>May 27</th><th>Jun 27</th><th>Jul 27</th><th>Aug 27</th><th>Sep 27</th><th>12-mo Total</th></tr></thead><tbody id="body"></tbody></table></div>
-<div class="cash"><h2>Bank Cash Forecast</h2><div class="sub">Starts at $20,000. Savings transfers reduce bank cash but are not P&L expenses.</div><div class="cashgrid" id="cashgrid"></div></div></div>
+:root{--bg:#07111f;--panel:#0f1e31;--panel2:#132843;--line:#284360;--text:#f2f7ff;--muted:#9fb1c8;--blue:#78b7ff;--green:#65d99b;--red:#ff8088;--amber:#ffc56e}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+body{min-height:100vh}
+button,input{font:inherit}
+.topbar{position:sticky;top:0;z-index:100;background:rgba(7,17,31,.96);backdrop-filter:blur(14px);border-bottom:1px solid var(--line);padding:10px 14px}
+.toprow{max-width:1200px;margin:auto;display:flex;align-items:center;gap:10px}
+.title{font-size:20px;font-weight:850;letter-spacing:-.02em;flex:1}
+.status{font-size:11px;color:var(--muted);white-space:nowrap}
+.lock{border:1px solid #365678;background:#10243b;color:#fff;border-radius:10px;padding:7px 10px}
+.wrap{max-width:1200px;margin:auto;padding:14px}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.kpi{background:linear-gradient(180deg,#12243a,#0f1d2e);border:1px solid var(--line);border-radius:16px;padding:13px}
+.kpi b{display:block;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
+.kpi strong{font-size:22px;letter-spacing:-.03em}
+.neg{color:var(--red)!important}.pos{color:var(--green)!important}
+.cashinput{width:100%;max-width:150px;background:#0b1929;border:1px solid #3a5879;color:#fff;border-radius:10px;padding:6px 8px;font-weight:800}
+.note{color:var(--muted);font-size:12px;line-height:1.35;margin:4px 2px 12px}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.toolbar button{border:1px solid #365678;background:#10243b;color:#fff;border-radius:10px;padding:8px 10px;font-weight:650}
+.section{position:sticky;top:58px;z-index:50;background:#173d67;border:1px solid #2b5984;border-radius:12px;padding:9px 12px;font-weight:850;margin:12px 0 7px;box-shadow:0 5px 12px rgba(0,0,0,.18)}
+.row{background:var(--panel);border:1px solid var(--line);border-radius:14px;margin:7px 0;overflow:hidden}
+.rowhead{display:grid;grid-template-columns:minmax(240px,2fr) 140px 170px 150px 120px 78px;gap:8px;align-items:center;padding:11px 12px}
+.name{font-weight:760;min-width:0}
+.timing{font-size:12px;color:var(--muted);margin-top:2px}
+.metric label{display:block;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.04em}
+.metric strong{display:block;font-size:16px;margin-top:2px}
+.budget{width:100%;background:#0a1828;color:#fff;border:1px solid #385a7e;border-radius:9px;padding:7px 8px;text-align:right;font-weight:750}
+.budget::placeholder{color:#7790ad}
+.detailsBtn,.deleteBtn{border:1px solid #365678;background:#10243b;color:#d9eaff;border-radius:9px;padding:7px 8px}
+.deleteBtn{color:#ff9da3;border-color:#68404c}
+.detail{display:none;border-top:1px solid #20364f;background:#091525;padding:10px 12px}
+.row.open .detail{display:block}
+.monthgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:10px}
+.month{background:#0d1c2d;border:1px solid #203a55;border-radius:9px;padding:7px}
+.month b{display:block;font-size:10px;color:var(--muted);margin-bottom:3px}.month span{font-size:13px;font-weight:750}
+.txlist{display:grid;gap:6px}
+.tx{display:grid;grid-template-columns:84px minmax(0,1fr) 95px;gap:8px;align-items:start;background:#0c1a2b;border:1px solid #20364f;border-radius:9px;padding:8px}
+.txdate{color:var(--muted);font-size:11px}
+.txname{min-width:0;overflow-wrap:anywhere;font-size:12px}
+.txacct{display:block;color:var(--muted);font-size:10px;margin-top:2px}
+.txamt{text-align:right;font-weight:800;font-size:12px}
+.empty{color:var(--muted);font-size:12px;padding:7px 0}
+.cash{margin:16px 0 30px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px}
+.cash h2{font-size:17px;margin:0 0 4px}
+.cashgrid{display:grid;grid-template-columns:repeat(6,1fr);font-size:12px}
+.cashgrid div{padding:7px 6px;border-bottom:1px solid #20364f}
+.cashgrid .h{font-weight:800;color:#b8d7fb}
+@media(max-width:780px){
+ .topbar{padding:9px 10px}.title{font-size:17px}.status{display:none}.wrap{padding:10px}
+ .kpis{grid-template-columns:1fr 1fr;gap:8px}.kpi{padding:11px}.kpi strong{font-size:20px}
+ .note{font-size:11px}
+ .section{top:52px;margin-top:10px;border-radius:10px}
+ .rowhead{grid-template-columns:1fr 1fr;gap:8px;padding:11px}
+ .name{grid-column:1/-1;font-size:15px}
+ .metric{background:#0b1929;border:1px solid #203a55;border-radius:10px;padding:8px}
+ .metric strong{font-size:15px}
+ .budgetWrap{background:#0b1929;border:1px solid #2b4968;border-radius:10px;padding:8px}
+ .budgetWrap label{display:block;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
+ .budget{font-size:15px;padding:6px}
+ .actions{grid-column:1/-1;display:flex;gap:8px}
+ .actions button{flex:1}
+ .monthgrid{grid-template-columns:1fr 1fr 1fr}
+ .tx{grid-template-columns:72px minmax(0,1fr);padding:8px}
+ .txamt{grid-column:2;text-align:left;color:#eaf4ff;margin-top:-3px}
+ .cashgrid{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="toprow">
+    <div class="title">Nourie Household P&L</div>
+    <div class="status" id="status"></div>
+    <form method="post" action="/household-pl/logout"><button class="lock" type="submit">Lock</button></form>
+  </div>
+</div>
+<div class="wrap">
+  <div class="kpis">
+    <div class="kpi"><b>12-mo Income</b><strong id="ki">—</strong></div>
+    <div class="kpi"><b>12-mo Expenses</b><strong id="ke">—</strong></div>
+    <div class="kpi"><b>12-mo Net P/L</b><strong id="kn">—</strong></div>
+    <div class="kpi"><b>Starting Bank Cash</b><input id="startCash" class="cashinput" type="number" step="100"></div>
+  </div>
+  <div class="note">Current month actuals are included in the rolling 12-month forecast. Enter an Annual Budget Override beside any line item to replace its automatic rolling forecast. Tap a line to see transactions and monthly detail.</div>
+  <div class="toolbar">
+    <button id="save">Save edits</button>
+    <button id="reset">Reset budgets</button>
+    <button id="restore">Restore deleted rows</button>
+  </div>
+  <div id="body"></div>
+  <div class="cash">
+    <h2>Bank Cash Forecast</h2>
+    <div class="note">Cash starts at the amount above. Savings transfers affect cash but are kept outside P&L expenses.</div>
+    <div class="cashgrid" id="cashgrid"></div>
+  </div>
+</div>
 <script>
 const Z=__HOUSEHOLD_PL_DATA__;
-async function loadBase(){const b=Uint8Array.from(atob(Z),c=>c.charCodeAt(0));const s=new DecompressionStream('gzip');const t=await new Response(new Blob([b]).stream().pipeThrough(s)).text();return JSON.parse(t)}
-(async()=>{const BASE=await loadBase();const STORE='nourie-household-pl-v1',DEL='nourie-household-pl-deleted-v1';const fmt=n=>n==null?'':new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(Number(n));let saved=JSON.parse(localStorage.getItem(STORE)||'null'),deleted=new Set(JSON.parse(localStorage.getItem(DEL)||'[]')),model=saved?.rows||structuredClone(BASE.rows),startCash=Number(saved?.startingCash??BASE.startingCash);const txByKey={};for(const t of BASE.tx)(txByKey[t.k]??=[]).push(t);const cls=n=>Number(n)<0?'neg':Number(n)>0?'pos':'';
-function sumRow(row){const r=model.find(x=>x.row===row);return r?r.vals.map(Number):Array(16).fill(0)}
-function details(tr,r){let n=tr.nextElementSibling;if(n?.classList.contains('details')){n.remove();return}const tx=(r.keys||[]).flatMap(k=>txByKey[k]||[]),d=document.createElement('tr');d.className='details';const c=document.createElement('td');c.colSpan=19;c.innerHTML=tx.length?tx.map(t=>`<div class="tx"><div>${t.d}</div><div>${t.s}</div><div>${t.a}</div><div><b>${t.m}</b><br><small>${t.x}</small></div><div class="amt">${fmt(t.v)}</div></div>`).join(''):'<div class="empty">No historical transaction currently linked.</div>';d.appendChild(c);tr.after(d)}
-function recalc(){const income=sumRow(19),exp=sumRow(143),net=sumRow(145),sav=sumRow(146);ki.textContent=fmt(income[15]);ke.textContent=fmt(exp[15]);kn.textContent=fmt(net[15]);kn.className=cls(net[15]);startCashEl.value=startCash;const months=['Oct 26','Nov 26','Dec 26','Jan 27','Feb 27','Mar 27','Apr 27','May 27','Jun 27','Jul 27','Aug 27','Sep 27'];let bal=startCash,h='<div class="h">Month</div><div class="h">Start</div><div class="h">Net P/L</div><div class="h">Savings</div><div class="h">Cash Change</div><div class="h">End</div>';for(let i=0;i<12;i++){const np=Number(net[i+3]||0),sv=Number(sav[i+3]||0),chg=np-sv,end=bal+chg;h+=`<div>${months[i]}</div><div>${fmt(bal)}</div><div>${fmt(np)}</div><div>${fmt(sv)}</div><div>${fmt(chg)}</div><div>${fmt(end)}</div>`;bal=end}cashgrid.innerHTML=h}
-function render(){body.innerHTML='';for(const r of model){if(r.type==='section'){const tr=document.createElement('tr');tr.className='section';tr.innerHTML=`<td colspan="19">${r.label}</td>`;body.appendChild(tr);continue}if(deleted.has(r.row))continue;const tr=document.createElement('tr');tr.className=(r.type==='total'?'total ':'')+(r.row===145?'net':'');const edit=r.type==='line'&&r.row!==146;let h=`<td><span class="lineclick">${r.label}</span></td><td>${r.timing??''}</td><td>${edit?'<button class="del">Delete</button>':''}</td>`;r.vals.forEach((v,i)=>h+=edit?`<td><input class="edit" data-i="${i}" value="${v??''}"></td>`:`<td class="${cls(v)}">${fmt(v)}</td>`);tr.innerHTML=h;body.appendChild(tr);tr.querySelector('.lineclick').onclick=()=>details(tr,r);tr.querySelectorAll('.edit').forEach(x=>x.onchange=e=>{r.vals[+e.target.dataset.i]=e.target.value===''?null:Number(e.target.value);recalc()});const d=tr.querySelector('.del');if(d)d.onclick=()=>{deleted.add(r.row);localStorage.setItem(DEL,JSON.stringify([...deleted]));render()}}recalc()}
-const ki=document.getElementById('ki'),ke=document.getElementById('ke'),kn=document.getElementById('kn'),body=document.getElementById('body'),cashgrid=document.getElementById('cashgrid'),startCashEl=document.getElementById('startCash');startCashEl.onchange=e=>{startCash=Number(e.target.value||0);recalc()};save.onclick=()=>{localStorage.setItem(STORE,JSON.stringify({rows:model,startingCash:startCash}));alert('Saved on this device.')};reset.onclick=()=>{localStorage.removeItem(STORE);model=structuredClone(BASE.rows);startCash=BASE.startingCash;render()};restore.onclick=()=>{deleted.clear();localStorage.removeItem(DEL);render()};render()})();
-</script></body></html>
+async function loadBase(){
+  const b=Uint8Array.from(atob(Z),c=>c.charCodeAt(0));
+  const s=new DecompressionStream('gzip');
+  return JSON.parse(await new Response(new Blob([b]).stream().pipeThrough(s)).text());
+}
+(async()=>{
+ const BASE=await loadBase();
+ const STORE='nourie-household-pl-v2', DEL='nourie-household-pl-deleted-v2';
+ const saved=JSON.parse(localStorage.getItem(STORE)||'null')||{};
+ let overrides=saved.overrides||{}, startCash=Number(saved.startingCash??BASE.startingCash??20000);
+ let deleted=new Set(JSON.parse(localStorage.getItem(DEL)||'[]'));
+ const rows=structuredClone(BASE.rows||[]);
+ const txByKey={}; for(const t of (BASE.tx||[]))(txByKey[t.k]??=[]).push(t);
+ const fmt=n=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(Number(n||0));
+ const num=v=>Number(v||0);
+ const cls=n=>num(n)<0?'neg':num(n)>0?'pos':'';
+ const futureLabels=['Oct','Nov','Dec','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug'];
+ const lineRows=()=>rows.filter(r=>r.type==='line'&&!deleted.has(r.row));
+ const isIncome=r=>r.row<19;
+ const isExpense=r=>r.row>19&&r.row<143;
+ const isSavings=r=>r.row===146;
+ const actual=r=>num(r.vals?.[1]);
+ function baseFuture(r){return Array.from({length:11},(_,i)=>num(r.vals?.[i+3]));}
+ function autoAnnual(r){return actual(r)+baseFuture(r).reduce((a,b)=>a+b,0);}
+ function annual(r){const v=overrides[r.row];return v===undefined||v===''?autoAnnual(r):num(v);}
+ function scaledFuture(r){
+   const base=baseFuture(r), ov=overrides[r.row];
+   if(ov===undefined||ov==='') return base;
+   const remaining=annual(r)-actual(r), baseSum=base.reduce((a,b)=>a+b,0);
+   if(Math.abs(baseSum)<0.01) return base.map((_,i)=>i===0?remaining:0);
+   return base.map(v=>remaining*(v/baseSum));
+ }
+ function currentTotals(){
+   const l=lineRows();
+   const inc=l.filter(isIncome).reduce((s,r)=>s+annual(r),0);
+   const exp=l.filter(isExpense).reduce((s,r)=>s+annual(r),0);
+   const incM=l.filter(isIncome).reduce((s,r)=>s+actual(r),0);
+   const expM=l.filter(isExpense).reduce((s,r)=>s+actual(r),0);
+   return {inc,exp,net:inc-exp,incM,expM};
+ }
+ function transactions(r){return (r.keys||[]).flatMap(k=>txByKey[k]||[]).sort((a,b)=>String(b.d).localeCompare(String(a.d)));}
+ function lastTxDate(){let m='';for(const t of (BASE.tx||[]))if(t.d&&String(t.d)>m)m=String(t.d);return m||'snapshot';}
+ function makeDetail(r){
+   const div=document.createElement('div');div.className='detail';
+   const fut=scaledFuture(r);
+   let mg='<div class="monthgrid"><div class="month"><b>Current actual</b><span>'+fmt(actual(r))+'</span></div>';
+   futureLabels.forEach((m,i)=>mg+='<div class="month"><b>'+m+'</b><span>'+fmt(fut[i])+'</span></div>');
+   mg+='</div>';
+   const tx=transactions(r);
+   let tl='<div class="txlist">';
+   tl+=tx.length?tx.map(t=>'<div class="tx"><div class="txdate">'+String(t.d||'')+'</div><div class="txname"><b>'+String(t.m||t.x||'Transaction')+'</b><span class="txacct">'+String(t.a||'')+(t.x?' · '+String(t.x):'')+'</span></div><div class="txamt">'+fmt(t.v)+'</div></div>').join(''):'<div class="empty">No linked transactions for this line yet.</div>';
+   tl+='</div>';div.innerHTML=mg+tl;return div;
+ }
+ function render(){
+   const body=document.getElementById('body'); body.innerHTML='';
+   for(const r of rows){
+     if(r.type==='section'){
+       const sec=document.createElement('div');sec.className='section';sec.textContent=r.label;body.appendChild(sec);continue;
+     }
+     if(r.type!=='line'||deleted.has(r.row)) continue;
+     const card=document.createElement('div');card.className='row';
+     const isPnl=isIncome(r)||isExpense(r), a=actual(r), an=annual(r), variance=an-a;
+     card.innerHTML='<div class="rowhead">'+
+       '<div class="name">'+r.label+'<div class="timing">'+(r.timing||'')+'</div></div>'+
+       '<div class="metric"><label>Current actual</label><strong>'+fmt(a)+'</strong></div>'+
+       '<div class="budgetWrap"><label>Annual budget override</label><input class="budget" inputmode="decimal" data-row="'+r.row+'" placeholder="'+fmt(autoAnnual(r)).replace('$','')+'" value="'+(overrides[r.row]??'')+'"></div>'+
+       '<div class="metric"><label>12-mo forecast</label><strong class="'+cls(isExpense(r)?-an:an)+'">'+fmt(an)+'</strong></div>'+
+       '<div class="metric"><label>Remaining</label><strong>'+fmt(variance)+'</strong></div>'+
+       '<div class="actions"><button class="detailsBtn">Details</button><button class="deleteBtn">Delete</button></div>'+
+       '</div>';
+     const detail=makeDetail(r);card.appendChild(detail);body.appendChild(card);
+     card.querySelector('.detailsBtn').onclick=()=>card.classList.toggle('open');
+     card.querySelector('.name').onclick=()=>card.classList.toggle('open');
+     const input=card.querySelector('.budget');
+     input.onchange=e=>{const v=e.target.value.trim();if(v==='')delete overrides[r.row];else overrides[r.row]=Number(v);render()};
+     card.querySelector('.deleteBtn').onclick=()=>{deleted.add(r.row);localStorage.setItem(DEL,JSON.stringify([...deleted]));render()};
+   }
+   recalc();
+ }
+ function recalc(){
+   const t=currentTotals();
+   const ki=document.getElementById('ki'),ke=document.getElementById('ke'),kn=document.getElementById('kn');
+   ki.textContent=fmt(t.inc);ke.textContent=fmt(t.exp);kn.textContent=fmt(t.net);kn.className=cls(t.net);
+   document.getElementById('startCash').value=startCash;
+   document.getElementById('status').textContent='Transactions through '+lastTxDate();
+   const l=lineRows(), savings=l.filter(isSavings).reduce((s,r)=>s+annual(r),0);
+   const months=['Sep','Oct','Nov','Dec','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug'];
+   let bal=startCash,h='<div class="h">Month</div><div class="h">Start</div><div class="h">Income</div><div class="h">Expenses</div><div class="h">Savings</div><div class="h">End</div>';
+   for(let i=0;i<12;i++){
+     const inc=l.filter(isIncome).reduce((s,r)=>s+(i===0?actual(r):scaledFuture(r)[i-1]||0),0);
+     const exp=l.filter(isExpense).reduce((s,r)=>s+(i===0?actual(r):scaledFuture(r)[i-1]||0),0);
+     const sav=i===0?0:(savings/11);
+     const end=bal+inc-exp-sav;
+     h+='<div>'+months[i]+'</div><div>'+fmt(bal)+'</div><div>'+fmt(inc)+'</div><div>'+fmt(exp)+'</div><div>'+fmt(sav)+'</div><div>'+fmt(end)+'</div>';
+     bal=end;
+   }
+   document.getElementById('cashgrid').innerHTML=h;
+ }
+ document.getElementById('startCash').onchange=e=>{startCash=Number(e.target.value||0);recalc()};
+ document.getElementById('save').onclick=()=>{localStorage.setItem(STORE,JSON.stringify({overrides,startingCash:startCash}));alert('Saved on this device.')};
+ document.getElementById('reset').onclick=()=>{overrides={};localStorage.removeItem(STORE);render()};
+ document.getElementById('restore').onclick=()=>{deleted.clear();localStorage.removeItem(DEL);render()};
+ render();
+})().catch(err=>{document.body.innerHTML='<div style="padding:20px;color:white;font-family:system-ui">P&L failed to load. Please refresh.<br><small>'+String(err)+'</small></div>';console.error(err)});
+</script>
+</body></html>
