@@ -16,7 +16,7 @@ button,input{font:inherit}.topbar{position:sticky;top:0;z-index:100;background:r
 .toolbar{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:10px}.updateStatus{font-size:11px;color:var(--green);font-weight:750;min-width:90px}.toolbar button{border:1px solid #365678;background:#10243b;color:#fff;border-radius:9px;padding:7px 9px;font-weight:650;font-size:12px}
 .section{position:sticky;top:101px;z-index:45;background:#173d67;border:1px solid #2b5984;border-radius:10px;padding:8px 10px;font-weight:850;margin:10px 0 6px;box-shadow:0 5px 12px rgba(0,0,0,.18)}
 .row{background:var(--panel);border:1px solid var(--line);border-radius:13px;margin:6px 0;overflow:hidden}.rowhead{display:grid;grid-template-columns:minmax(230px,2fr) 135px 155px 140px 105px 76px;gap:7px;align-items:center;padding:10px 11px}.name{font-weight:760;min-width:0}.timing{font-size:11px;color:var(--muted);margin-top:2px}
-.metric label,.budgetWrap label{display:block;color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:.04em}.metric strong{display:block;font-size:15px;margin-top:2px}.budgetWrap{min-width:0}.budget{width:100%;background:#0a1828;color:#fff;border:1px solid #385a7e;border-radius:8px;padding:6px 7px;text-align:right;font-weight:750}.detailsBtn,.deleteBtn{border:1px solid #365678;background:#10243b;color:#d9eaff;border-radius:8px;padding:6px 7px;font-size:11px}.deleteBtn{color:#ff9da3;border-color:#68404c}
+.metric label,.budgetWrap label{display:block;color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:.04em}.metric strong{display:block;font-size:15px;margin-top:2px}.budgetWrap{min-width:0}.budget{width:100%;background:#0a1828;color:#fff;border:1px solid #385a7e;border-radius:8px;padding:6px 7px;text-align:right;font-weight:750}.lineBudgetTools{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}.lineBudgetTool{background:#0b1929;border:1px solid #203a55;border-radius:9px;padding:7px}.lineBudgetTool label{display:block;color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px}.lineBudgetTool .applyRow{display:flex;gap:5px}.lineBudgetTool input{min-width:0;width:100%;background:#081522;color:#fff;border:1px solid #2a4967;border-radius:7px;padding:5px 6px;text-align:right;font-weight:750}.lineBudgetTool button{border:1px solid #365678;background:#10243b;color:#fff;border-radius:7px;padding:5px 7px;font-size:10px;font-weight:750}.detailsBtn,.deleteBtn{border:1px solid #365678;background:#10243b;color:#d9eaff;border-radius:8px;padding:6px 7px;font-size:11px}.deleteBtn{color:#ff9da3;border-color:#68404c}
 .detail{display:none;border-top:1px solid #20364f;background:#091525;padding:10px 11px}.row.open .detail{display:block}.monthgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px}.monthEdit{background:#0d1c2d;border:1px solid #203a55;border-radius:9px;padding:7px}.monthEdit label{display:block;font-size:9px;color:var(--muted);margin-bottom:3px}.monthEdit input{width:100%;background:#081522;color:#fff;border:1px solid #2a4967;border-radius:7px;padding:5px 6px;text-align:right;font-weight:750;font-size:12px}
 .txlist{display:grid;gap:5px}.tx{display:grid;grid-template-columns:80px minmax(0,1fr) 90px;gap:7px;align-items:start;background:#0c1a2b;border:1px solid #20364f;border-radius:8px;padding:7px}.txdate{color:var(--muted);font-size:10px}.txname{min-width:0;overflow-wrap:anywhere;font-size:11px}.txacct{display:block;color:var(--muted);font-size:9px;margin-top:2px}.txamt{text-align:right;font-weight:800;font-size:11px}
 .empty{color:var(--muted);font-size:11px;padding:7px 0}
@@ -41,7 +41,7 @@ button,input{font:inherit}.topbar{position:sticky;top:0;z-index:100;background:r
   <button data-view="quick" class="active">This Month</button>
   <button data-view="year">Full Year P&L</button>
   <button data-view="last">Last Month</button>
-  <button data-view="graphs">Graphs</button><button data-view="recurring">Recurring</button><button data-view="variable">Variable</button>
+  <button data-view="graphs">Graphs</button><button data-view="recurring">Subscriptions</button><button data-view="variable">Variable</button>
  </div>
 </div>
 <div class="wrap">
@@ -58,7 +58,7 @@ button,input{font:inherit}.topbar{position:sticky;top:0;z-index:100;background:r
    <div class="addGrid">
     <input id="newName" class="wide" placeholder="Line item name">
     <select id="newKind"><option value="expense">Expense</option><option value="income">Income</option></select>
-    <select id="newClass"><option value="recurring">Recurring</option><option value="variable">Variable</option><option value="fixed">Fixed</option></select>
+    <select id="newClass"><option value="subscription">Subscription</option><option value="variable">Variable</option><option value="fixed">Fixed</option></select>
     <select id="newFrequency"><option value="monthly">Monthly</option><option value="one-time">One-time</option></select>
     <select id="newMonth"><option value="0">Sep 26</option><option value="1">Oct 26</option><option value="2">Nov 26</option><option value="3">Dec 26</option><option value="4">Jan 27</option><option value="5">Feb 27</option><option value="6">Mar 27</option><option value="7">Apr 27</option><option value="8">May 27</option><option value="9">Jun 27</option><option value="10">Jul 27</option><option value="11">Aug 27</option></select>
     <input id="newAmount" inputmode="decimal" placeholder="Budget amount">
@@ -89,8 +89,8 @@ button,input{font:inherit}.topbar{position:sticky;top:0;z-index:100;background:r
   <div id="lastBody"></div>
  </section>
  <section id="recurring" class="view">
-  <div class="kpis"><div class="kpi"><b>Recurring Monthly</b><strong id="recMonth">—</strong></div><div class="kpi"><b>Recurring Annual</b><strong id="recAnnual">—</strong></div><div class="kpi"><b>Recurring % of Expenses</b><strong id="recPct">—</strong></div><div class="kpi"><b>Recurring Lines</b><strong id="recCount">—</strong></div></div>
-  <div class="note">Bills and expected repeating expenses only. Edit the month-by-month budget from Details or Full Year P&L.</div><div id="recurringBody"></div>
+  <div class="kpis"><div class="kpi"><b>Subscriptions Monthly</b><strong id="recMonth">—</strong></div><div class="kpi"><b>Subscriptions Annual</b><strong id="recAnnual">—</strong></div><div class="kpi"><b>Subscriptions % of Expenses</b><strong id="recPct">—</strong></div><div class="kpi"><b>Subscriptions</b><strong id="recCount">—</strong></div></div>
+  <div class="note">Subscriptions and memberships only. Mortgage, auto loans, utilities, insurance and other repeating bills are intentionally excluded from this section.</div><div id="recurringBody"></div>
  </section>
  <section id="variable" class="view">
   <div class="kpis"><div class="kpi"><b>Variable This Month</b><strong id="varMonth">—</strong></div><div class="kpi"><b>Variable Annual</b><strong id="varAnnual">—</strong></div><div class="kpi"><b>10% Cut Saves</b><strong id="varSave10">—</strong></div><div class="kpi"><b>20% Cut Saves</b><strong id="varSave20">—</strong></div></div>
@@ -105,6 +105,11 @@ button,input{font:inherit}.topbar{position:sticky;top:0;z-index:100;background:r
    <div class="graphCard"><h3>Variable Spending Opportunities</h3><p>Ranks non-fixed expense lines so you can see where reductions would have the biggest effect.</p><div id="variableBars" class="graphList"></div><div class="oppSummary"><div class="oppBox"><b>10% variable-spend cut</b><strong id="save10">—</strong></div><div class="oppBox"><b>20% variable-spend cut</b><strong id="save20">—</strong></div></div></div>
    <div class="graphCard"><h3>Fixed vs Variable Expenses</h3><p>Shows how much of the annual expense forecast is realistically controllable.</p><canvas id="mixChart" class="chart"></canvas><div class="legend"><span><i class="dot expenseDot"></i>Fixed</span><span><i class="dot netDot"></i>Variable</span></div></div>
    <div class="graphCard"><h3>Variable Spending by Month</h3><p>Highlights months where controllable spending is expected to be highest.</p><canvas id="variableMonthChart" class="chart"></canvas></div>
+   <div class="graphCard"><h3>This Month: Budget vs Actual</h3><p>Largest current-month budget overruns and underspends.</p><div id="varianceBars" class="graphList"></div></div>
+   <div class="graphCard"><h3>Subscription Cost Breakdown</h3><p>Annual subscription and membership spend only.</p><div id="subscriptionBars" class="graphList"></div></div>
+   <div class="graphCard"><h3>Top 10 Variable Expenses</h3><p>Largest controllable lines by annual forecast.</p><canvas id="topVariableChart" class="chart"></canvas></div>
+   <div class="graphCard"><h3>Savings Scenario</h3><p>Shows how annual net P&L changes if variable spending is reduced.</p><canvas id="savingsScenarioChart" class="chart"></canvas></div>
+   <div class="graphCard"><h3>Monthly Expense Trend</h3><p>Total monthly expenses across the rolling year.</p><canvas id="expenseTrendChart" class="chart"></canvas></div>
   </div>
  </section>
 </div>
@@ -153,9 +158,11 @@ async function loadBase(){
  function budgetAnnual(r){let s=0;for(let i=0;i<12;i++)s+=monthVal(r,i);return s}
  function forecastAnnual(r){let s=actual(r);for(let i=1;i<12;i++)s+=monthVal(r,i);return s}
  function setAnnual(r,total){
-   total=round2(total);const remaining=total-actual(r);let base=[];for(let i=1;i<12;i++)base.push(monthVal(r,i));
-   let baseSum=base.reduce(function(a,b){return a+b},0);
-   for(let i=1;i<12;i++){let v=baseSum===0?(i===1?remaining:0):remaining*(base[i-1]/baseSum);setMonth(r,i,v)}
+   total=round2(total);const per=total/12;
+   for(let i=0;i<12;i++)setMonth(r,i,per);
+ }
+ function setMonthlyAll(r,monthly){
+   monthly=round2(monthly);for(let i=0;i<12;i++)setMonth(r,i,monthly);
  }
  function totals(){
    const l=activeLines();let inc=0,exp=0; l.forEach(function(r){if(isIncome(r))inc+=forecastAnnual(r);if(isExpense(r))exp+=forecastAnnual(r)});
@@ -191,12 +198,14 @@ async function loadBase(){
      if(r.type!=='line'||deleted.has(r.row))return;
      const card=document.createElement('div');card.className='row';
      const a=actual(r),mb=monthVal(r,0),variance=isExpense(r)?mb-a:a-mb,an=forecastAnnual(r);
-     card.innerHTML='<div class="rowhead"><div class="name">'+r.label+'<div class="timing">'+(r.timing||'')+'</div></div><div class="metric"><label>This month actual</label><strong>'+fmt(a)+'</strong></div><div class="budgetWrap"><label>This month budget</label><input class="budget monthBudget" inputmode="decimal" value="'+clean(mb)+'"></div><div class="metric"><label>Budget variance</label><strong class="'+cls(variance)+'">'+fmt(variance)+'</strong></div><div class="metric"><label>12-mo forecast</label><strong>'+fmt(an)+'</strong></div><div class="actions"><button class="detailsBtn">Details</button><button class="deleteBtn">Delete</button></div></div><div class="detail">'+makeMonthGrid(r)+makeTxList(r)+'</div>';
+     card.innerHTML='<div class="rowhead"><div class="name">'+r.label+'<div class="timing">'+(r.timing||'')+'</div></div><div class="metric"><label>This month actual</label><strong>'+fmt(a)+'</strong></div><div class="budgetWrap"><label>This month budget</label><input class="budget monthBudget" inputmode="decimal" value="'+clean(mb)+'"></div><div class="metric"><label>Budget variance</label><strong class="'+cls(variance)+'">'+fmt(variance)+'</strong></div><div class="metric"><label>12-mo forecast</label><strong>'+fmt(an)+'</strong></div><div class="actions"><button class="detailsBtn">Details</button><button class="deleteBtn">Delete</button></div></div><div class="detail"><div class="lineBudgetTools"><div class="lineBudgetTool"><label>Set every month</label><div class="applyRow"><input class="setMonthlyInput" inputmode="decimal" placeholder="Monthly"><button class="setMonthlyBtn">Apply</button></div></div><div class="lineBudgetTool"><label>Set annual budget</label><div class="applyRow"><input class="setAnnualInput" inputmode="decimal" placeholder="Annual"><button class="setAnnualBtn">Apply</button></div></div></div>'+makeMonthGrid(r)+makeTxList(r)+'</div>';
      body.appendChild(card);
      card.querySelector('.detailsBtn').onclick=function(){card.classList.toggle('open')};
      card.querySelector('.name').onclick=function(){card.classList.toggle('open')};
      card.querySelector('.budget').onchange=function(e){setMonth(r,0,e.target.value);e.target.value=clean(e.target.value);markDirty()};
      card.querySelector('.deleteBtn').onclick=function(){deleted.add(r.row);localStorage.setItem(DEL,JSON.stringify(Array.from(deleted)));renderAll()};
+     card.querySelector('.setMonthlyBtn').onclick=function(){const v=card.querySelector('.setMonthlyInput').value;if(v==='')return;setMonthlyAll(r,v);markDirty();renderAll();const fresh=[...document.querySelectorAll('.row')].find(function(x){return x.querySelector('.name')&&x.querySelector('.name').textContent.startsWith(r.label)});if(fresh)fresh.classList.add('open')};
+     card.querySelector('.setAnnualBtn').onclick=function(){const v=card.querySelector('.setAnnualInput').value;if(v==='')return;setAnnual(r,v);markDirty();renderAll();const fresh=[...document.querySelectorAll('.row')].find(function(x){return x.querySelector('.name')&&x.querySelector('.name').textContent.startsWith(r.label)});if(fresh)fresh.classList.add('open')};
      bindMonthInputs(card);
    });
    const t=currentActualTotals();document.getElementById('ki').textContent=fmt(t.inc);document.getElementById('ke').textContent=fmt(t.exp);const kn=document.getElementById('kn');kn.textContent=fmt(t.net);kn.className=cls(t.net);document.getElementById('startCash').value=startCash;
@@ -247,7 +256,7 @@ async function loadBase(){
  function drawCash(){
    const c=document.getElementById('cashChart'),s=canvasSize(c),data=cashSeries(),min=Math.min.apply(null,data.concat([startCash])),max=Math.max.apply(null,data.concat([startCash])),range=Math.max(1,max-min);s.ctx.clearRect(0,0,s.w,s.h);s.ctx.strokeStyle='#26425f';s.ctx.beginPath();s.ctx.moveTo(36,12);s.ctx.lineTo(36,s.h-28);s.ctx.lineTo(s.w-8,s.h-28);s.ctx.stroke();const gap=(s.w-52)/11;s.ctx.strokeStyle='#78b7ff';s.ctx.lineWidth=2;s.ctx.beginPath();data.forEach(function(v,i){const x=40+i*gap,y=14+(max-v)/range*(s.h-50);if(i===0)s.ctx.moveTo(x,y);else s.ctx.lineTo(x,y)});s.ctx.stroke();data.forEach(function(v,i){const x=40+i*gap,y=14+(max-v)/range*(s.h-50);s.ctx.fillStyle='#78b7ff';s.ctx.beginPath();s.ctx.arc(x,y,2.5,0,Math.PI*2);s.ctx.fill();s.ctx.fillStyle='#8fa5bd';s.ctx.font='8px system-ui';s.ctx.fillText(shortLabels[i],x-6,s.h-10)});s.ctx.fillStyle='#8fa5bd';s.ctx.font='9px system-ui';s.ctx.fillText(fmt(max),1,12);s.ctx.fillText(fmt(min),1,s.h-32)}
  function isVariable(r){const t=String(r.timing||'').toLowerCase(),n=String(r.label||'').toLowerCase();return isExpense(r)&&(r.spendClass==='variable'||t.includes('variable')||/grocer|dining|takeout|retail|shopping|pet food|entertain|travel|clothing|household purchase|misc|personal care/.test(n))}
- function isRecurring(r){const t=String(r.timing||'').toLowerCase();return isExpense(r)&&(r.spendClass==='recurring'||r.spendClass==='fixed'||(!r.spendClass&&!isVariable(r)&&(t.includes('month')||t.includes('every')||t.includes('weekly')||t.includes('14 days')||/mortgage|loan|insurance|internet|utility|subscription|membership|tuition|phone/.test(String(r.label||'').toLowerCase()))))}
+ function isRecurring(r){const n=String(r.label||'').toLowerCase(),t=String(r.timing||'').toLowerCase();return isExpense(r)&&(r.spendClass==='subscription'||/subscription|membership|netflix|hulu|disney|spotify|youtube|prime|amazon prime|walmart\+|uber one|oura|icloud|google one|apple|paramount|peacock|max|hbo|audible|chatgpt|openai|xai|grok|adobe|microsoft 365|office 365|dropbox|ring|life360/.test(n)||t.includes('subscription'))}
  function renderExpenseBars(){
    const arr=activeLines().filter(isExpense).map(function(r){return {name:r.label,val:forecastAnnual(r)}}).sort(function(a,b){return b.val-a.val}).slice(0,10),max=Math.max.apply(null,arr.map(function(x){return x.val}).concat([1]));
    document.getElementById('expenseBars').innerHTML=arr.map(function(x){return '<div class="barrow"><div>'+x.name+'</div><div class="bartrack"><div class="barfill" style="width:'+Math.max(1,(x.val/max)*100)+'%"></div></div><div class="barval">'+fmt(x.val)+'</div></div>'}).join('');
@@ -278,7 +287,27 @@ async function loadBase(){
    document.getElementById('varMonth').textContent=fmt(month);document.getElementById('varAnnual').textContent=fmt(annual);document.getElementById('varSave10').textContent=fmt(annual*.10);document.getElementById('varSave20').textContent=fmt(annual*.20);
    document.getElementById('variableBody').innerHTML=list.sort(function(a,b){return forecastAnnual(b)-forecastAnnual(a)}).map(simpleSpendCard).join('')||'<div class="empty">No variable expenses identified.</div>';
  }
- function renderGraphs(){drawFlow();drawNet();drawCash();renderExpenseBars();renderVariableBars();drawMix();drawVariableMonth()}
+ function renderVarianceBars(){
+   const arr=activeLines().filter(isExpense).map(function(r){return {name:r.label,val:actual(r)-monthVal(r,0)}}).sort(function(a,b){return Math.abs(b.val)-Math.abs(a.val)}).slice(0,12),max=Math.max.apply(null,arr.map(function(x){return Math.abs(x.val)}).concat([1]));
+   document.getElementById('varianceBars').innerHTML=arr.map(function(x){const over=x.val>0;return '<div class="barrow"><div>'+x.name+'</div><div class="bartrack"><div class="barfill" style="width:'+Math.max(1,Math.abs(x.val)/max*100)+'%;background:'+(over?'#ff8088':'#65d99b')+'"></div></div><div class="barval '+(over?'neg':'pos')+'">'+(over?'+':'')+fmt(x.val)+'</div></div>'}).join('');
+ }
+ function renderSubscriptionBars(){
+   const arr=activeLines().filter(isRecurring).map(function(r){return {name:r.label,val:forecastAnnual(r)}}).sort(function(a,b){return b.val-a.val}),max=Math.max.apply(null,arr.map(function(x){return x.val}).concat([1]));
+   document.getElementById('subscriptionBars').innerHTML=arr.map(function(x){return '<div class="barrow"><div>'+x.name+'</div><div class="bartrack"><div class="barfill" style="width:'+Math.max(1,x.val/max*100)+'%"></div></div><div class="barval">'+fmt(x.val)+'</div></div>'}).join('')||'<div class="empty">No subscriptions identified.</div>';
+ }
+ function drawHorizontalBars(canvasId,items){
+   const c=document.getElementById(canvasId),s=canvasSize(c),max=Math.max.apply(null,items.map(function(x){return x.val}).concat([1])),left=105,top=10,rowH=Math.max(16,(s.h-20)/Math.max(items.length,1));
+   s.ctx.clearRect(0,0,s.w,s.h);items.forEach(function(x,i){const y=top+i*rowH,w=(s.w-left-12)*(x.val/max);s.ctx.fillStyle='#78b7ff';s.ctx.fillRect(left,y+3,w,Math.max(7,rowH-8));s.ctx.fillStyle='#cfe1f5';s.ctx.font='9px system-ui';s.ctx.fillText(x.name.slice(0,18),4,y+12);s.ctx.fillStyle='#8fa5bd';s.ctx.fillText(fmt(x.val),left+Math.min(w+4,s.w-left-55),y+12)});
+ }
+ function drawTopVariable(){const arr=activeLines().filter(isVariable).map(function(r){return {name:r.label,val:forecastAnnual(r)}}).sort(function(a,b){return b.val-a.val}).slice(0,10);drawHorizontalBars('topVariableChart',arr)}
+ function drawSavingsScenario(){
+   const c=document.getElementById('savingsScenarioChart'),s=canvasSize(c),t=totals(),varAnnual=activeLines().filter(isVariable).reduce(function(a,r){return a+forecastAnnual(r)},0),data=[{l:'Current',v:t.net},{l:'10% cut',v:t.net+varAnnual*.10},{l:'20% cut',v:t.net+varAnnual*.20},{l:'30% cut',v:t.net+varAnnual*.30}],max=Math.max.apply(null,data.map(function(x){return Math.abs(x.v)}).concat([1])),mid=s.h-35,gap=(s.w-45)/4,bw=Math.max(22,gap*.55),scale=(s.h-60)/max;
+   s.ctx.clearRect(0,0,s.w,s.h);s.ctx.strokeStyle='#36516c';s.ctx.beginPath();s.ctx.moveTo(30,mid);s.ctx.lineTo(s.w-6,mid);s.ctx.stroke();data.forEach(function(x,i){const h=Math.abs(x.v)*scale,xx=35+i*gap;s.ctx.fillStyle=x.v>=0?'#65d99b':'#ff8088';s.ctx.fillRect(xx,x.v>=0?mid-h:mid,bw,h);s.ctx.fillStyle='#9fb1c8';s.ctx.font='9px system-ui';s.ctx.fillText(x.l,xx-2,s.h-12)});
+ }
+ function drawExpenseTrend(){
+   const c=document.getElementById('expenseTrendChart'),s=canvasSize(c),data=[];for(let i=0;i<12;i++)data.push(monthTotals(i).exp);const max=Math.max.apply(null,data.concat([1]));drawAxes(s.ctx,s.w,s.h,max);const gap=(s.w-52)/11;s.ctx.strokeStyle='#ff8088';s.ctx.lineWidth=2;s.ctx.beginPath();data.forEach(function(v,i){const x=40+i*gap,y=14+(max-v)/max*(s.h-48);if(i===0)s.ctx.moveTo(x,y);else s.ctx.lineTo(x,y)});s.ctx.stroke();data.forEach(function(v,i){const x=40+i*gap,y=14+(max-v)/max*(s.h-48);s.ctx.fillStyle='#ff8088';s.ctx.beginPath();s.ctx.arc(x,y,2.5,0,Math.PI*2);s.ctx.fill();s.ctx.fillStyle='#8fa5bd';s.ctx.font='8px system-ui';s.ctx.fillText(shortLabels[i],x-6,s.h-10)});
+ }
+ function renderGraphs(){drawFlow();drawNet();drawCash();renderExpenseBars();renderVariableBars();drawMix();drawVariableMonth();renderVarianceBars();renderSubscriptionBars();drawTopVariable();drawSavingsScenario();drawExpenseTrend()}
  function renderAll(){renderQuick();renderYear();renderLast();renderRecurring();renderVariable();document.getElementById('status').textContent='Transactions through '+lastTxDate();if(document.getElementById('graphs').classList.contains('active'))requestAnimationFrame(renderGraphs)}
  document.querySelectorAll('.nav button').forEach(function(btn){btn.onclick=function(){document.querySelectorAll('.nav button').forEach(function(b){b.classList.remove('active')});document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active')});btn.classList.add('active');document.getElementById(btn.dataset.view).classList.add('active');if(btn.dataset.view==='graphs')requestAnimationFrame(renderGraphs);window.scrollTo({top:0,behavior:'smooth'})}});
  let dirty=false;
