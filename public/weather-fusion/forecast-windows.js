@@ -108,7 +108,8 @@ export function buildForecastWindows(forecast = {}, now = Date.now()) {
     if (!hourlyInterval(hour,time) || !hourlyInterval(feel,time) || !hourlyInterval(wet,time)) continue;
     const sample=forecastSample(forecast,new Date(time).toISOString());
     const sun=sunExposureTemperature(sample||{});
-    const value=sun.active?Math.round(sun.value*10)/10:null;
+    const rawSunValue=sun.active&&finite(sun.value)?sun.value:null;
+    const value=finite(rawSunValue)?Math.round(rawSunValue*10)/10:null;
     const dewpoint = dewpoints.has(time) ? dewpoints.get(time).value : hour?.dewpoint;
     const cloud = percentage(feel?.inputs && Object.hasOwn(feel.inputs,'skyCover') ? feel.inputs.skyCover : hour?.skyCover);
     const rainChance = rainChanceValue(wet?.rainLikelihood);
@@ -121,7 +122,7 @@ export function buildForecastWindows(forecast = {}, now = Date.now()) {
     const thunder = /thunder|\btstms?\b|\bt-?storms?\b/i.test(hourlyCondition);
     const adverseCondition = hourlyCondition.replace(/\bwind[ -]?storms?\b/gi,'');
     const adverse = /rain|shower|drizzle|thunder|\bstorms?\b|\btstms?\b|snow|sleet|flurr|ice pellets|fog|mist|haze|smoke|obscured/i.test(adverseCondition);
-    const perfect = sun.active && finite(value) && value >= PERFECT_SUN_TEMP_F.min && value <= PERFECT_SUN_TEMP_F.max
+    const perfect = finite(rawSunValue) && rawSunValue >= PERFECT_SUN_TEMP_F.min && rawSunValue <= PERFECT_SUN_TEMP_F.max + 1e-6
       && finite(dewpoint) && dewpoint <= 60 && cloud !== null && cloud <= 40
       && rainChance !== null && rainChance <= 20
       && precipitation !== null && precipitation < .01 && !adverse

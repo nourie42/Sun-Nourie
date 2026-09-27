@@ -77,6 +77,7 @@ test('sun feels-like must be 70–75°F inclusive, and every individual limiting
   assert.equal(buildForecastWindows(upper,base).perfect.length,1);
   const cases = [
     data => setSunTemperature(data,0,69.9),
+    data => setSunTemperature(data,0,75.01),
     data => setSunTemperature(data,0,75.1),
     data => {data.metricForecasts.series.feels[0].inputs.skyCover=40.1;refreshHour(data,0);},
     data => data.metricForecasts.series.dewpoint[0].value=60.1,
