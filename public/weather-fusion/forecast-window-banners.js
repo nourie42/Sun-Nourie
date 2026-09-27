@@ -27,11 +27,10 @@ function ensureTrackerLink() {
 
 export function forecastWindowBannerHTML(view, kind, now = Date.now()) {
   const windows = view[kind] || [], first = windows[0];
+  if (!first) return '';
   const perfect = kind === 'perfect';
   const title = perfect ? 'Perfect weather ahead' : 'Rain & storm outlook';
-  const summary = first
-    ? `${dayLabel(first.start,view.timeZone,now)} · ${timeRange(first,view.timeZone,now)}${windows.length > 1 ? ` · +${windows.length-1} more` : ''}`
-    : perfect ? 'Check sun-based opportunities for the next 5 days' : 'Check the next 5 days for rain and storm signals';
+  const summary = `${dayLabel(first.start,view.timeZone,now)} · ${timeRange(first,view.timeZone,now)}${windows.length > 1 ? ` · +${windows.length-1} more` : ''}`;
   return `<button type="button" class="forecast-window-banner forecast-window-${kind}" data-forecast-window="${kind}" aria-haspopup="dialog" aria-controls="forecast-window-dialog"><span class="forecast-window-icon">${icon(kind)}</span><span class="forecast-window-copy"><strong>${esc(title)}</strong><span>${esc(summary)}</span></span><span class="forecast-window-action">View times <b aria-hidden="true">›</b></span></button>`;
 }
 
@@ -67,7 +66,7 @@ export function renderForecastWindowBanners(data, now = Date.now()) {
   const root=document.getElementById('forecast-window-banners');
   if(!root)return;
   latest=data;currentView=buildForecastWindows(data,now);
-  const html=['perfect','rain'].map(kind=>forecastWindowBannerHTML(currentView,kind,now)).join('');
+  const html=['perfect','rain'].map(kind=>forecastWindowBannerHTML(currentView,kind,now)).filter(Boolean).join('');
   root.hidden=!html;root.innerHTML=html;
   root.querySelectorAll('[data-forecast-window]').forEach(button=>button.addEventListener('click',()=>openWindow(button.dataset.forecastWindow)));
   if(selectedKind)openWindow(selectedKind,now);

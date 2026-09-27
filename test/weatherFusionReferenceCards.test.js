@@ -24,7 +24,8 @@ test('illustrated weather stays synchronized across outdoor and pet scenes',()=>
  assert.doesNotMatch(referenceScene(2,true,'Chance Showers',88,{pop:50}),/data-pet-motion=/,'umbrella-only scenes stay still');
  assert.match(referenceScene(1,true,'Clear',70),/class="sky-sun"/);
  assert.match(referenceScene(1,true,'Snow',30),/data-scene="cold"/);
- assert.match(referenceScene(1,true,'Clear',30),/comfort-reference-scenes-cold\.webp/);
+ assert.match(referenceScene(1,true,'Clear',30),/data-visible-outfit="cold"/);
+ assert.match(referenceScene(1,true,'Clear',30),/data-garment="jacket-and-trousers"/);
  assert.deepEqual(comfortSceneState(true,'Clear',95),{key:'hot',asset:'comfort-reference-scenes-hot.webp'});
  assert.deepEqual(comfortSceneState(true,'Thunderstorms',95),{key:'rain',asset:'comfort-reference-scenes-rain.webp'},'observed rain without a probability takes precedence over heat');
  assert.deepEqual(comfortSceneState(false,'Clear',95),{key:'dawn',asset:'comfort-reference-scenes-dawn.webp'},'night uses visible pre-sunrise art, never a daytime heat-sun scene');

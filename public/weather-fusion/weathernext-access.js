@@ -26,9 +26,19 @@ export function installWeatherNextAccess({refresh}){
  });
  async function requestForecast(params,signal){
   const id=++generation;pending=String(params);
-  const response=await fetch('/api/weather-fusion/compare/google?'+params,{signal,cache:'no-store',credentials:'same-origin'});
-  const data=await response.json();
+  let response=await fetch('/api/weather-fusion/compare/google?'+params,{signal,cache:'no-store',credentials:'same-origin'});
+  let data=await response.json();
   if(id!==generation)throw new DOMException('Location changed','AbortError');
+  if(!response.ok&&response.status===409&&data.code==='LOCATION_REQUIRED'){
+   panel.hidden=false;forecast.hidden=true;form.hidden=true;
+   document.getElementById('weathernext-access-title').textContent='Loading forecast for your location';
+   message.textContent='Loading the NVIDIA forecast…';
+   await post('location',Object.fromEntries(new URLSearchParams(params)));
+   if(id!==generation)throw new DOMException('Location changed','AbortError');
+   response=await fetch('/api/weather-fusion/compare/google?'+params,{signal,cache:'no-store',credentials:'same-origin'});
+   data=await response.json();
+   if(id!==generation)throw new DOMException('Location changed','AbortError');
+  }
   if(!response.ok){
    panel.hidden=false;forecast.hidden=true;form.hidden=data.code!=='LOCATION_REQUIRED';
    document.getElementById('weathernext-access-title').textContent=data.code==='LOCATION_REQUIRED'?'Forecast for your location':'Forecast unavailable';

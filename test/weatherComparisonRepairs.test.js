@@ -30,15 +30,15 @@ test('comparison app adapter accepts the repository CRLF browser client',()=>{
  assert.match(transformed,/compareBridge\.requestForecast/);
  assert.match(transformed,/if\(COMPARE\.explicitLocation\)chooseLocation\([\s\S]*else startDeviceLocation\(\);/);
 });
-test('legacy comparison URLs redirect directly to standalone forecast preserving location',async t=>{
+test('comparison URLs preserve side-by-side comparison and standalone forecast stays separate',async t=>{
  const app=express();registerWeatherComparisonRoutes(app,{feedProvider:async()=>feedFixture(),now:()=>now,companionProvider:async()=>({})});
  const server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));t.after(()=>server.close());
  const base='http://127.0.0.1:'+server.address().port;
  for(const path of ['/weather-fusion/compare','/weather-fusion/compare/','/weather-fusion/compare.html']){
-  const r=await fetch(base+path+'?location=knightdale',{redirect:'manual'});assert.equal(r.status,302);assert.equal(r.headers.get('location'),'/weathernext/?location=knightdale');
+  const r=await fetch(base+path+'?location=knightdale',{redirect:'manual'});assert.equal(r.status,200);assert.match(await r.text(),/The same view\. Two forecasts\./);
  }
  const html=await (await fetch(base+'/weathernext/')).text();
- assert.match(html,/NVIDIA Forecast/);assert.doesNotMatch(html,/Experimental NVIDIA AI Weather|Forecast data: Google/);
+ assert.match(html,/NVIDIA Forecast/);assert.match(html,/Open NVIDIA forecast maps/);assert.doesNotMatch(html,/Experimental NVIDIA AI Weather|Forecast data: Google/);
  const nearby=await (await fetch(base+'/weathernext/?latitude=35.7798&longitude=-78.5355')).text();
  assert.match(nearby,/compare\/app\.js\?source=google&amp;location=selected&amp;explicit=1&amp;latitude=35\.7798&amp;longitude=-78\.5355/);
  assert.match(nearby,/name=Selected%20location/);

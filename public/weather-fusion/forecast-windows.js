@@ -76,7 +76,9 @@ function groups(rows, key, formatter, now) {
       windows.push({date,start,end,hours:[hour],level,title:TITLES[level]});
     }
   }
-  return key === 'perfect' ? windows.filter(window => window.end-window.start >= 2*HOUR) : windows;
+  // Keep every qualifying sunny hour, including short windows. The control
+  // is hidden when no qualifying hours exist.
+  return windows;
 }
 
 /** Classify the existing blend's exact hourly values without fetching another
@@ -118,8 +120,8 @@ export function buildForecastWindows(forecast = {}, now = Date.now()) {
     const thunder = /thunder|\btstms?\b|\bt-?storms?\b/i.test(hourlyCondition);
     const adverseCondition = hourlyCondition.replace(/\bwind[ -]?storms?\b/gi,'');
     const adverse = /rain|shower|drizzle|thunder|\bstorms?\b|\btstms?\b|snow|sleet|flurr|ice pellets|fog|mist|haze|smoke|obscured/i.test(adverseCondition);
-    const perfect = sun.active && finite(value) && value >= 70 && value <= 75
-      && finite(dewpoint) && dewpoint <= 55 && cloud !== null && cloud <= 25
+    const perfect = sun.active && finite(value) && value >= 70 && value <= 80
+      && finite(dewpoint) && dewpoint <= 60 && cloud !== null && cloud <= 40
       && rainChance !== null && rainChance <= 20
       && precipitation !== null && precipitation < .01 && !adverse
       && daylightFor(forecast,hour,feel,Math.max(time,now),time+HOUR);

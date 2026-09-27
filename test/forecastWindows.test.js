@@ -9,11 +9,10 @@ const base = Date.parse('2026-09-26T12:00:00Z');
 const at = (hour, start=base) => new Date(start+hour*HOUR).toISOString();
 const location={timeZone:'America/New_York',latitude:35.79,longitude:-78.48};
 
-test('main-page forecast and storm controls remain visible without a qualifying window',()=>{
+test('perfect and rain outlook controls stay hidden without matching forecast hours',()=>{
   const view=buildForecastWindows({},base);
   const perfect=forecastWindowBannerHTML(view,'perfect',base),rain=forecastWindowBannerHTML(view,'rain',base);
-  assert.match(perfect,/data-forecast-window="perfect"/);assert.match(perfect,/Perfect weather ahead/);
-  assert.match(rain,/data-forecast-window="rain"/);assert.match(rain,/Rain &amp; storm outlook/);
+  assert.equal(perfect,'');assert.equal(rain,'');
   assert.match(forecastWindowDetailHTML(view,'perfect','Knightdale',base),/No matching hours in the next 5 days/);
   assert.match(forecastWindowDetailHTML(view,'rain','Knightdale',base),/No matching hours in the next 5 days/);
 });
@@ -63,23 +62,24 @@ test('perfect uses modeled feels in direct sun, same-hour sky and dry blend valu
   assert.equal(result.perfect[0].end,base+4*HOUR);
   assert.equal(result.perfect[0].hours.length,4);
   assert.equal(Math.round(result.perfect[0].hours[0].feels),72);
-  data.metricForecasts.series.feels.forEach((_,index)=>setSunTemperature(data,index,76));
+  data.metricForecasts.series.feels.forEach((_,index)=>setSunTemperature(data,index,81));
   assert.deepEqual(buildForecastWindows(data,base).perfect,[],'Comfort uses air plus the matching sun exposure lift, not air or shade temperature alone.');
 });
 
-test('inclusive perfect boundaries work, and every individual limiting field is required',()=>{
-  const accepted = fixture(2);
-  accepted.metricForecasts.series.feels.forEach((row,index)=>{row.inputs.skyCover=25;refreshHour(accepted,index);});
+test('sun feels-like boundaries work, and every individual limiting field is required',()=>{
+  const accepted = fixture(1);
+  accepted.metricForecasts.series.feels.forEach((row,index)=>{row.inputs.skyCover=40;refreshHour(accepted,index);});
   setSunTemperature(accepted,0,70);
-  setSunTemperature(accepted,1,75);
-  accepted.metricForecasts.series.dewpoint.forEach(row => row.value=55);
+  accepted.metricForecasts.series.dewpoint.forEach(row => row.value=60);
   accepted.rainTimeline.forEach(row => {row.rainLikelihood.value=20;row.precipitation=.009;});
   assert.equal(buildForecastWindows(accepted,base).perfect.length,1);
+  const upper=structuredClone(accepted);setSunTemperature(upper,0,80);
+  assert.equal(buildForecastWindows(upper,base).perfect.length,1);
   const cases = [
     data => setSunTemperature(data,0,69.9),
-    data => setSunTemperature(data,0,75.1),
-    data => {data.metricForecasts.series.feels[0].inputs.skyCover=25.1;refreshHour(data,0);},
-    data => data.metricForecasts.series.dewpoint[0].value=55.1,
+    data => setSunTemperature(data,0,80.1),
+    data => {data.metricForecasts.series.feels[0].inputs.skyCover=40.1;refreshHour(data,0);},
+    data => data.metricForecasts.series.dewpoint[0].value=60.1,
     data => data.rainTimeline[0].rainLikelihood.value=20.1,
     data => data.rainTimeline[0].precipitation=.01,
     data => data.metricForecasts.series.feels[0].daylight=false,
@@ -103,14 +103,14 @@ test('missing required same-hour values never borrow a nearby value or raw proba
     data => {delete data.metricForecasts.series.feels[0].daylight;delete data.hours[0].isDay;},
   ];
   for (const change of changes) {
-    const data=fixture(2);change(data);
+    const data=fixture(1);change(data);
     assert.deepEqual(buildForecastWindows(data,base).perfect,[]);
   }
 });
 
 test('explicit precipitation and obscured-sky wording prevent perfect even when numeric values are dry',()=>{
   for (const condition of ['Rain','Chance showers','Drizzle','Thunderstorms possible','Snow','Sleet','Fog','Mist']) {
-    const data=fixture(2);data.hours[0].condition=condition;
+    const data=fixture(1);data.hours[0].condition=condition;
     assert.deepEqual(buildForecastWindows(data,base).perfect,[],condition);
   }
 });
@@ -129,7 +129,7 @@ test('perfect includes every future date and breaks on missing hours or failed c
   data.metricForecasts.series.feels[4].value=null;
   data.hours=data.hours.slice(0,5);
   const windows=buildForecastWindows(data,base).perfect;
-  assert.deepEqual(windows.map(window => [window.date,window.hours.length]),[['2026-09-26',2]]);
+  assert.deepEqual(windows.map(window => [window.date,window.hours.length]),[['2026-09-26',2],['2026-09-26',1]]);
   assert.equal(windows[0].end,base+2*HOUR,'An invalid/missing hour splits the sunny window.');
   assert.ok(windows.every(window=>window.start<base+5*24*HOUR),'No window extends past the five-day horizon.');
 });
@@ -181,10 +181,11 @@ test('broad later-day rain prose cannot override qualifying numeric blended hour
   assert.equal(perfect[0].hours.length,3);
 });
 
-test('elapsed hours disappear and current hour is clipped without promising two full hours',()=>{
+test('elapsed hours disappear and a qualifying current hour is shown clipped',()=>{
   const data=fixture(4);
   const now=base+2.5*HOUR;
-  assert.deepEqual(buildForecastWindows(data,now).perfect,[]);
+  const perfect=buildForecastWindows(data,now).perfect;
+  assert.equal(perfect.length,1);assert.equal(perfect[0].start,now);
   const ongoing=buildForecastWindows(data,base+.5*HOUR).perfect[0];
   assert.equal(ongoing.start,base+.5*HOUR);
   assert.equal(ongoing.hours[0].time,at(.5));
@@ -216,7 +217,8 @@ test('coarse intervals are never expanded into hourly opportunities',()=>{
   assert.equal(rain[1].start,base+2*HOUR);
   const coarse=fixture(2);
   coarse.hours[0].end=at(3);
-  assert.deepEqual(buildForecastWindows(coarse,base).perfect,[]);
+  const perfect=buildForecastWindows(coarse,base).perfect;
+  assert.equal(perfect.length,1);assert.equal(perfect[0].hours.length,1);
 });
 
 test('without a canonical timeline, blend hourly scores work and raw NWS values never substitute',()=>{
@@ -228,7 +230,7 @@ test('without a canonical timeline, blend hourly scores work and raw NWS values 
 });
 
 test('sunset prevents an hourly perfect window from extending into darkness',()=>{
-  const data=fixture(3,Date.parse('2026-09-26T22:00:00Z'));
+  const data=fixture(3,Date.parse('2026-09-26T23:00:00Z'));
   data.location={timeZone:'America/New_York',latitude:35.7931,longitude:-78.481};
   assert.deepEqual(buildForecastWindows(data,Date.parse(data.hours[0].time)).perfect,[]);
 });
