@@ -76,3 +76,11 @@ test('device location near Knightdale uses the approved published WeatherNext po
  const response=await fetch(base+'/api/weather-fusion/compare/location',{method:'POST',headers:{Origin:base,'Content-Type':'application/json','x-weathernext-request':'1'},body:JSON.stringify({latitude:35.7798,longitude:-78.5352,name:'Device location'})});
  assert.equal(response.status,200);const data=await response.json();assert.equal(data.comparison.point.id,'knightdale');assert.equal(data.location.name,'Knightdale / Raleigh');assert.ok(Array.isArray(data.hours)&&data.hours.length>0);
 });
+test('the active WeatherNext 3 point feed loads through NVIDIA location lookup',async t=>{
+ const activeNow=Date.parse('2026-09-27T08:00:00Z'),feed={schema:'weather-nourie-weathernext3-v1',model:'Google WeatherNext 3',sourceTable:'approved-table',runAt:'2026-09-27T06:00:00Z',generatedAt:'2026-09-27T07:30:00Z',points:[{id:'knightdale',name:'Knightdale / Raleigh',latitude:35.787,longitude:-78.4806,hourly:[{time:'2026-09-27T07:00:00Z',temperatureF:56,temperatureP10F:54,temperatureP90F:58,windMph:4,precipitationInches:0},{time:'2026-09-27T08:00:00Z',temperatureF:58,temperatureP10F:55,temperatureP90F:61,windMph:5,precipitationInches:.02},{time:'2026-09-27T09:00:00Z',temperatureF:60,temperatureP10F:57,temperatureP90F:63,windMph:6,precipitationInches:0}]}]};
+ const app=express(),server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));t.after(()=>server.close());
+ const base='http://127.0.0.1:'+server.address().port;
+ registerWeatherComparisonRoutes(app,{feedProvider:async()=>feed,now:()=>activeNow,companionProvider:async()=>({}),accessOptions:{origin:base},locationProvider:{configured:false}});
+ const response=await fetch(base+'/api/weather-fusion/compare/location',{method:'POST',headers:{Origin:base,'Content-Type':'application/json','x-weathernext-request':'1'},body:JSON.stringify({latitude:35.7798,longitude:-78.5352,name:'Device location'})});
+ assert.equal(response.status,200);const data=await response.json();assert.equal(data.comparison.point.id,'knightdale');assert.equal(data.hours.find(r=>r.time==='2026-09-27T08:00:00.000Z').temperature,58);assert.equal(data.hours.find(r=>r.time==='2026-09-27T08:00:00.000Z').dewpoint,null);assert.equal(data.hours.find(r=>r.time==='2026-09-27T08:00:00.000Z').skyCover,null);
+});
