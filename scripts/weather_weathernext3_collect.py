@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -26,6 +27,7 @@ POINTS = [
 K_TO_F_SCALE = 9 / 5
 MS_TO_MPH = 2.2369362920544
 METERS_TO_INCHES = 39.37007874015748
+PA_TO_INHG = 1 / 3386.389
 
 
 def f_temp(k):
@@ -38,6 +40,19 @@ def mph(ms):
 
 def inches(m):
     return None if m is None else round(max(0.0, float(m)) * METERS_TO_INCHES, 4)
+
+
+def percent(value):
+    if value is None:
+        return None
+    value = float(value)
+    return round(max(0.0, min(100.0, value * 100 if value <= 1 else value)), 1)
+
+
+def wind_direction(u, v):
+    if u is None or v is None or math.hypot(float(u), float(v)) == 0:
+        return None
+    return round((math.degrees(math.atan2(-float(u), -float(v))) + 360) % 360, 1)
 
 
 def iso(value):
@@ -69,7 +84,13 @@ def query_point(client: bigquery.Client, table: str, init_time, point):
         f.temperature_2m_mean AS temperature_2m_mean,
         f.temperature_2m_p10 AS temperature_2m_p10,
         f.temperature_2m_p90 AS temperature_2m_p90,
+        f.dewpoint_temperature_2m_mean AS dewpoint_temperature_2m_mean,
         f.wind_speed_10m_mean AS wind_speed_10m_mean,
+        f.u_component_of_wind_10m_mean AS u_component_of_wind_10m_mean,
+        f.v_component_of_wind_10m_mean AS v_component_of_wind_10m_mean,
+        f.total_cloud_cover_mean AS total_cloud_cover_mean,
+        f.mean_sea_level_pressure_mean AS mean_sea_level_pressure_mean,
+        f.surface_solar_radiation_downwards_1hr_mean AS surface_solar_radiation_downwards_1hr_mean,
         f.total_precipitation_1hr_mean AS total_precipitation_1hr_mean,
         f.total_precipitation_1hr_p90 AS total_precipitation_1hr_p90
       FROM `{table}` AS t, t.forecast AS f
@@ -94,7 +115,12 @@ def query_point(client: bigquery.Client, table: str, init_time, point):
             "temperatureF": f_temp(row.temperature_2m_mean),
             "temperatureP10F": f_temp(row.temperature_2m_p10),
             "temperatureP90F": f_temp(row.temperature_2m_p90),
+            "dewpointF": f_temp(row.dewpoint_temperature_2m_mean),
             "windMph": mph(row.wind_speed_10m_mean),
+            "windDirectionDegrees": wind_direction(row.u_component_of_wind_10m_mean, row.v_component_of_wind_10m_mean),
+            "skyCoverPercent": percent(row.total_cloud_cover_mean),
+            "pressureInHg": None if row.mean_sea_level_pressure_mean is None else round(float(row.mean_sea_level_pressure_mean) * PA_TO_INHG, 3),
+            "solarWm2": None if row.surface_solar_radiation_downwards_1hr_mean is None else round(max(0.0, float(row.surface_solar_radiation_downwards_1hr_mean)) / 3600, 1),
             "precipitationInches": inches(row.total_precipitation_1hr_mean),
             "precipitationP90Inches": inches(row.total_precipitation_1hr_p90),
         })
@@ -128,6 +154,11 @@ def main():
         "units": {
             "temperature": "degF",
             "wind": "mph",
+            "windDirection": "degree",
+            "dewpoint": "degF",
+            "cloudCover": "percent",
+            "pressure": "inHg",
+            "solarRadiation": "W/m2",
             "precipitation": "inch per 1-hour window",
         },
         "points": points,

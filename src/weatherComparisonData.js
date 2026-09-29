@@ -30,13 +30,14 @@ export function selectGoogleForecast(feed,pointId,now=Date.now()){
   const rows=input.hourly.flatMap(row=>{
    const epoch=Date.parse(row?.time);
    if(!Number.isFinite(epoch)||epoch<=init||epoch<now-72*HOUR||epoch>now+360*HOUR)return [];
-   const temperature=n(row.temperatureF),precipitation=n(row.precipitationInches);
+   const temperature=n(row.temperatureF),dewpoint=n(row.dewpointF),precipitation=n(row.precipitationInches);
+   const skyCover=n(row.skyCoverPercent),windDirection=n(row.windDirectionDegrees),pressure=n(row.pressureInHg),solar=n(row.solarWm2);
    const meta={id:'weathernext3',runAt:feed.runAt,fetchedAt:feed.generatedAt||null,status:'ready',sourceTable:feed.sourceTable};
-   return [{time:new Date(epoch).toISOString(),epoch,temperature,dewpoint:null,wind:n(row.windMph),windDirection:null,skyCover:null,
-    pressure:null,solar:null,precipitation,precedingPrecipitation:precipitation,
+   return [{time:new Date(epoch).toISOString(),epoch,temperature,dewpoint,wind:n(row.windMph),windDirection,skyCover,
+    pressure,solar,precipitation,precedingPrecipitation:precipitation,
     precipitationStart:new Date(epoch).toISOString(),precipitationEnd:new Date(epoch+HOUR).toISOString(),
-    precipitationRunAt:feed.runAt,condition:skyDescription(null,precipitation),pop:null,gust:null,visibility:null,uvIndex:null,
-    temperatureSource:'WeatherNext 3 ensemble mean',dewpointSource:'Not supplied by WeatherNext 3 point feed',
+    precipitationRunAt:feed.runAt,condition:skyDescription(skyCover,precipitation),pop:null,gust:null,visibility:null,uvIndex:null,
+    temperatureSource:'WeatherNext 3 ensemble mean',dewpointSource:finite(dewpoint)?'WeatherNext 3 ensemble mean':'Not supplied by WeatherNext 3 point feed',
     temperatureP10:n(row.temperatureP10F),temperatureP90:n(row.temperatureP90F),provenance:meta}];
   }).sort((a,b)=>a.epoch-b.epoch);
   if(!rows.some(row=>row.epoch>=Math.floor(now/HOUR)*HOUR))throw Object.assign(Error('No NVIDIA forecast covers the current or upcoming hours. Older data is not presented as current.'),{status:503});
