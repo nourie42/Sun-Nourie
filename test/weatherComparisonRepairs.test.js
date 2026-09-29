@@ -42,7 +42,7 @@ test('comparison URLs preserve side-by-side comparison and standalone forecast s
  assert.match(pane,/compare\/app\.js\?source=google&amp;location=knightdale/);
  const paneApp=await (await fetch(base+'/weather-fusion/compare/app.js?source=google&location=knightdale')).text();
  assert.match(paneApp,/"explicitLocation":true/,'comparison panes must load the selected city instead of waiting for device location');
- assert.match(html,/NVIDIA Forecast/);assert.match(html,/Open NVIDIA forecast maps/);assert.doesNotMatch(html,/Experimental NVIDIA AI Weather|Forecast data: Google/);
+ assert.match(html,/<title>NVIDIA Forecast · Weather Nourie<\/title>/);assert.doesNotMatch(html,/weathernext-heading|weathernext-map-shortcut|Experimental NVIDIA AI Weather|Forecast data: Google/);
  assert.match(html,/id="today-forecast"/);assert.match(html,/id="hourly"/);assert.match(html,/class="weather-jump-card jump-main"/,'The NVIDIA destination keeps the shared main forecast layout and a return path.');
  assert.doesNotMatch(readFileSync('public/weather-fusion/compare.html','utf8').replace(/<[^>]*>/g,' '),/Google/i,'Visible comparison labels use NVIDIA branding.');
  assert.match(readFileSync('public/weather-fusion/compare.css','utf8'),/@media\(max-width:850px\)[\s\S]*compare-switch \[data-view=both\]\{display:none\}[\s\S]*compare-differences\{grid-template-columns:repeat\(2/,'Mobile comparison uses forecast tabs and a compact metric grid.');
@@ -50,7 +50,7 @@ test('comparison URLs preserve side-by-side comparison and standalone forecast s
  const nearby=await (await fetch(base+'/weathernext/?latitude=35.7798&longitude=-78.5355')).text();
  assert.match(nearby,/compare\/app\.js\?source=google&amp;location=selected&amp;explicit=1&amp;latitude=35\.7798&amp;longitude=-78\.5355/);
  assert.match(nearby,/name=Selected%20location/);
- assert.match(nearby,/NVIDIA Forecast/);
+ assert.match(nearby,/<title>NVIDIA Forecast · Weather Nourie<\/title>/);
  assert.doesNotMatch(nearby,/Experimental NVIDIA AI Weather/);
  assert.equal((nearby.match(/id="city-search"/g)||[]).length,1,'The NVIDIA page uses the same single location search.');
  assert.equal((nearby.match(/id="locate"/g)||[]).length,1,'Device location is an action on that same search control.');

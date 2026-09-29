@@ -111,7 +111,9 @@ export function registerWeatherComparisonRoutes(app,{fetchImpl=globalThis.fetch,
   html=html.replace(/<script type="module" src="\/weather-fusion\/app\.js[^"]*"><\/script>/, '<script type="module" src="/weather-fusion/compare/app.js?source=google&amp;location='+encodeURIComponent(point.id)+'&amp;explicit=1'+(hasCoordinates?'&amp;latitude='+encodeURIComponent(req.query.latitude)+'&amp;longitude='+encodeURIComponent(req.query.longitude)+'&amp;name='+encodeURIComponent(point.name):'')+'"></script>');
   html=html.replace('Because Apple, Google and Samsung weather suck','Your local weather, clearly explained').replace('<title>Weather Nourie</title>','<title>NVIDIA Forecast · Weather Nourie</title>');
   html=html.replace('</head>','<link rel="stylesheet" href="/weather-fusion/compare.css?v=nvidia-mobile-sync-v2"></head>').replace('<body data-sky="day">','<body data-sky="day" class="google-pane weathernext-dashboard">');
-  html=html.replace('<main id="forecast">','<h1 class="weathernext-heading">NVIDIA Forecast</h1><p class="weathernext-map-shortcut"><a href="https://deepmind.google.com/science/weatherlab" target="_blank" rel="noopener noreferrer">Open NVIDIA forecast maps ↗</a></p><main id="forecast">');
+  // Keep the standalone NVIDIA destination visually identical to the main
+  // forecast. Source-specific wording belongs inside the shared cards rather
+  // than in an extra page heading or shortcut above the forecast.
   html=html.replace('<a class="weather-jump-card jump-next" href="/weathernext/" aria-label="Open NVIDIA forecast">NVIDIA</a>','<a class="weather-jump-card jump-main" href="/weather-fusion/" aria-label="Back to main forecast">Main</a>');
   res.set('Cache-Control','no-store, no-cache, max-age=0, must-revalidate').set('Pragma','no-cache').set('Expires','0').set('X-Weather-Nourie-Page','nvidia-location-refresh-20260927').type('html').send(html);
  }catch(e){fail(res,e);}});

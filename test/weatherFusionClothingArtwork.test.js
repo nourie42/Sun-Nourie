@@ -33,7 +33,7 @@ test('mild weather still uses long pants and warm weather removes extra garments
 test('winter artwork and missing readings are handled without covering existing winter clothes',()=>{
  assert.equal(clothingArtwork(0,'cold','cold'), '');
  assert.match(referenceScene(0,false,'Snow',30),/comfort-reference-scenes-cold.webp/);
- assert.equal(referenceScene(0,true,'Clear',null),null);
+ assert.match(referenceScene(0,true,'Clear',null),/comfort-reference-scenes.webp/,'missing NVIDIA feels-like values keep the same people artwork instead of switching to a fallback person');
  assert.equal(clothingArtwork(-1,'normal','cool'), '');
 });
 test('screenshot regression: shade 50, outdoors 60 and warm pavement do not produce shorts',()=>{

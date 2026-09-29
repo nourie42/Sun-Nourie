@@ -140,8 +140,10 @@ export function precipitationActivity(condition='',context={}){
  // short condition text says fog/clouds instead of repeating rain.
  // Observed rain without a probability can still use the active-rain scene.
  if(finite(pop)){
-  if(pop>=81)return 'active';
-  if(pop>=20)return 'possible';
+  // Keep the main and NVIDIA pages on the same people/umbrella contract:
+  // below 50% no umbrella, 50–60% carry one, 61%+ active rain scene.
+  if(pop>=61)return 'active';
+  if(pop>=50)return 'possible';
   return 'none';
  }
  if(!['rain','storm'].includes(weather.kind))return 'none';
@@ -178,7 +180,6 @@ if(typeof window!=='undefined'){
 // Text and readings remain HTML. The selected sprite changes with the same
 // current/hourly condition and feels-like value used everywhere else.
 export function referenceScene(panel,daylight=true,condition='Clear',feels=null,context={}){
- if(!finite(feels))return null;
  const weather=weatherState(condition),id=`reference-scene-${panel}`;
  const scene=comfortSceneState(daylight,condition,feels,context);
  const sky=skyPalette(weather,daylight);
