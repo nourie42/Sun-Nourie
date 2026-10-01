@@ -44,9 +44,10 @@ used are exposed, including renormalization over available amount inputs.
 Rain likelihood is a separate score using the same day-specific shares: NWS's
 official percentage fills its share proportionally; deterministic model QPF
 above zero through 0.010 inch receives one-third of that model's points, and
-QPF above 0.010 inch receives full points. Zero receives zero points; missing
-models add no points and do not cause score renormalization. Isolated and
-consecutive rain hours follow the same rule. These are **uncalibrated scores**,
+QPF above 0.010 inch receives full points only when NWS is at least 20% or
+another included model also exceeds 0.010 inch; otherwise it receives one-third. Zero receives zero points; missing
+models add no points and do not cause score renormalization. Repeating or interpolating one model
+interval across consecutive hours does not establish corroboration. These are **uncalibrated scores**,
 not a demonstrated ranking of accuracy or a statistical confidence interval.
 
 The precipitation metric shows the **next 24 hours starting at the next whole

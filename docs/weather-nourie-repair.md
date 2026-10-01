@@ -14,7 +14,9 @@ Rainfall amount uses those four weights today and NWS 15%, ECMWF 60%, NBM 25%
 on later local dates. Rain likelihood is a separate, uncalibrated score: NWS's
 official probability contributes proportionally within its 40-point share today
 or 15-point share later; each deterministic model contributes one-third of its
-points for positive hourly QPF through 0.010 inch and full points above that.
+points for positive hourly QPF through 0.010 inch. Above that, full points
+require NWS at least 20% or another included model above 0.010 inch;
+uncorroborated signals receive one-third.
 Zero QPF adds zero points, and unavailable models add no points without
 renormalizing the score. NWS probabilities remain separately attributed, and
 official warnings are unchanged.

@@ -24,6 +24,10 @@
 #model-explanation .model-inputs th{font-weight:750;color:#eafaff}
 #model-explanation .model-inputs thead th{font-size:11px;color:#a9dcf0}
 #model-explanation .model-inputs small{display:block;font-size:10px;line-height:1.35;color:#a0d5e9;margin-top:3px}
+#model-explanation .model-inputs.model-rain-inputs{min-width:0}
+#model-explanation .model-rain-inputs th:first-child{width:22%}
+#model-explanation .model-rain-inputs th:nth-child(2){width:48%}
+#model-explanation .model-rain-inputs th:nth-child(3){width:30%}
 #model-explanation .model-calculation{padding:10px 12px;margin:8px 0 14px;background:#021e3494;border:1px solid #72d2f32d;border-radius:12px}
 #model-explanation .model-calculation p{margin:3px 0}
 #model-explanation .model-calculation b{color:#8ceaff}

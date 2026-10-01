@@ -66,16 +66,16 @@ test('hourly rain likelihood scales the NWS share and tiers wet-model points',()
  assert.deepEqual(unanimous.sources.map(source=>source.points),[21.2,30,10,20]);
  assert.equal(unanimous.officialProbability,53);
  const requested=precipitationLikelihood(13,{sourceValues:{hrrr:0,ecmwf:1,nbm:0}});
- assert.equal(requested.value,15);
- assert.deepEqual(requested.sourcePoints,{nws:5.2,hrrr:0,ecmwf:10,nbm:0});
+ assert.equal(requested.value,9);
+ assert.deepEqual(requested.sourcePoints,{nws:5.2,hrrr:0,ecmwf:3.33333333,nbm:0});
  const screenshot=precipitationLikelihood(7,{sourceValues:{hrrr:0,ecmwf:.004,nbm:.012}});
- assert.equal(screenshot.value,26);
+ assert.equal(screenshot.value,13);
  const boundary=precipitationLikelihood(7,{sourceValues:{hrrr:0,ecmwf:.004,nbm:.010}});
  assert.equal(boundary.value,13);
  assert.deepEqual(boundary.sourcePoints,{nws:2.8,hrrr:0,ecmwf:3.33333333,nbm:6.66666667});
- assert.equal(screenshot.weightedValue,26.13333333);
- assert.deepEqual(screenshot.sourcePoints,{nws:2.8,hrrr:0,ecmwf:3.33333333,nbm:20});
- assert.deepEqual(screenshot.reducedSources,['ecmwf']);
+ assert.equal(screenshot.weightedValue,12.8);
+ assert.deepEqual(screenshot.sourcePoints,{nws:2.8,hrrr:0,ecmwf:3.33333333,nbm:6.66666667});
+ assert.deepEqual(screenshot.reducedSources,['ecmwf','nbm']);
  assert.deepEqual(boundary.reducedSources,['ecmwf','nbm']);
 });
 test('API feels-like helper uses the same Steadman equation family in hot mild and cold weather',()=>{

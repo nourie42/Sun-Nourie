@@ -62,6 +62,7 @@ function sourceRows(likelihood) {
     const value = finite(likelihood?.sourceValues?.[id]) ? likelihood.sourceValues[id] : used?.value;
     return {id,value:finite(value)?value:null,amount:finite(likelihood?.sourceAmounts?.[id])?likelihood.sourceAmounts[id]:null,
       officialProbability:id==='nws'&&finite(likelihood?.officialProbability)?likelihood.officialProbability:null,
+      reductionReason:likelihood?.reductionReasons?.[id]||used?.reductionReason||null,
       weight:used?.weight ?? null,points:finite(likelihood?.sourcePoints?.[id])?likelihood.sourcePoints[id]:finite(used?.points)?used.points:used ? used.value*used.weight : null,runAt:used?.runAt || null};
   });
 }
@@ -72,12 +73,13 @@ function sourceTable(likelihood, caption = 'Inputs for the highest hour') {
       : source.amount === null ? 'Unavailable' : `${number(source.amount,8)} in`;
     const reducedThreshold=finite(likelihood?.reducedQpfThresholdInches)?likelihood.reducedQpfThresholdInches:.010;
     const signal = source.id==='nws'||source.value === null ? ''
-      : source.amount>0&&source.amount<=reducedThreshold ? '<small>Light rain forecast: one-third of model points</small>'
+      : source.reductionReason==='uncorroborated' ? '<small>Uncorroborated rain: one-third of model points</small>'
+        : source.amount>0&&source.amount<=reducedThreshold ? '<small>Light rain forecast: one-third of model points</small>'
         : `<small>Rain forecast: ${source.value>0?'Yes':'No'}</small>`;
-    const weight=source.weight===null?(source.id==='nws'&&source.value===null?'Unavailable':'Not used'):`${number(source.weight*100,4)}%`;
-    return `<tr><th scope="row">${names[source.id]}</th><td>${input}${signal}</td><td>${weight}</td><td>${source.points === null?'—':number(source.points,6)}</td></tr>`;
+    const points=source.weight===null?(source.id==='nws'&&source.value===null?'Unavailable':'Not used'):`${number(source.points,6)}<small>of ${number(source.weight*100,4)} max</small>`;
+    return `<tr><th scope="row">${names[source.id]}</th><td>${input}${signal}</td><td>${points}</td></tr>`;
   }).join('');
-  return `<div class="model-table-scroll"><table class="model-inputs"><caption>${esc(caption)}</caption><thead><tr><th scope="col">Source</th><th scope="col">Rain input</th><th scope="col">Weight</th><th scope="col">Points</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  return `<div class="model-table-scroll"><table class="model-inputs model-rain-inputs"><caption>${esc(caption)}</caption><thead><tr><th scope="col">Source</th><th scope="col">Rain input</th><th scope="col">Points</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 function arithmetic(likelihood) {
   if (!likelihood || chance(likelihood.value) === null) return '<p class="model-calculation">This hour does not have a usable rain estimate.</p>';
@@ -255,7 +257,7 @@ export function modelExplanationHTML(forecast, options = {}) {
     ${!view.complete?`<p class="model-data-warning">Incomplete coverage: ${number(period.coverage?.availableHours)} of ${number(period.coverage?.expectedHours)} hours. The period estimate stays unavailable.${view.maximum===null?'':` Highest available hour: ${percent(view.maximum)}.`}</p>`:''}
     ${view.peakTime?`<h3>Highest hour: ${esc(stamp(view.peakTime,zone))}–${esc(stamp(view.peakEnd,zone,false))}</h3>`:''}
     ${sourceTable(peak)}${arithmetic(peak)}
-    <details class="model-method" data-model-detail="method"><summary>How the inputs are used</summary><p>For today at the selected location, the NWS hourly probability fills its 40-point share proportionally. A 40% NWS chance contributes 16 points. HRRR is worth 30 points, ECMWF 10, and NBM 20. For later days, NWS fills a 15-point share, ECMWF 60, and NBM 25; HRRR is excluded. A positive model amount through 0.010 in gets exactly one-third of that model's points. An amount above 0.010 in gets full points. Zero rain gets zero points.</p><p>The points are added and the result is capped at 100%. For example, using today's shares, NWS 7% contributes 2.8 points; ECMWF at 0.004 in contributes 3.3333 points; and NBM at 0.010 in contributes 6.6667 points. The total is 12.8%, shown as 13%. Rainfall amount is calculated separately. An unavailable model adds no points. This is an uncalibrated estimate, not a proven model-accuracy ranking.</p></details>
+    <details class="model-method" data-model-detail="method"><summary>How the inputs are used</summary><p>For today at the selected location, the NWS hourly probability fills its 40-point share proportionally. A 40% NWS chance contributes 16 points. HRRR is worth 30 points, ECMWF 10, and NBM 20. For later days, NWS fills a 15-point share, ECMWF 60, and NBM 25; HRRR is excluded. A positive model amount through 0.010 in gets exactly one-third of that model's points. An amount above 0.010 in gets full points only if NWS is at least 20% or another included model also exceeds 0.010 in. Otherwise it gets one-third: an unsupported ECMWF signal on a later day adds 20 points, not 60. Repeated hours from the same model do not count as corroboration. Zero rain gets zero points.</p><p>The points are added and the result is capped at 100%. For example, using today's shares, NWS 7% contributes 2.8 points; ECMWF at 0.004 in contributes 3.3333 points; and NBM at 0.010 in contributes 6.6667 points. The total is 12.8%, shown as 13%. Rainfall amount is calculated separately. An unavailable model adds no points. This is an uncalibrated estimate, not a proven model-accuracy ranking.</p></details>
     <details class="model-hourly-list" data-model-detail="hours"><summary>All ${rows.length} forecast hours in this period</summary>${audit||'<p>No hourly calculation data was supplied.</p>'}</details>
     ${temperatures?`<details class="model-temperature-list" data-model-detail="temperatures"><summary>Temperature calculations</summary>${temperatures}</details>`:''}
     <details class="model-source-list" data-model-detail="sources"><summary>Source runs and availability</summary>${sourceStatus(forecast,view)}</details>`;

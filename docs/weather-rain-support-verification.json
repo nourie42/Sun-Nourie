@@ -1,0 +1,291 @@
+{
+  "version": "weather-nourie-rain-support-v12",
+  "verifiedAt": "2026-10-01T23:21:26.257Z",
+  "mode": "captured-live-input-replay",
+  "cities": [
+    {
+      "city": "greenville",
+      "location": {
+        "latitude": 35.6127,
+        "longitude": -77.3664,
+        "name": "Greenville, NC",
+        "id": "",
+        "timeZone": "America/New_York",
+        "office": "MHX"
+      },
+      "sourceAssembledAt": "2026-10-01T22:58:40.913Z",
+      "hours": 157,
+      "changedHours": 0,
+      "friday": {
+        "old": 0,
+        "new": 0
+      },
+      "supportedHours": 18,
+      "amountsUnchanged": true,
+      "changes": []
+    },
+    {
+      "city": "raleigh",
+      "location": {
+        "latitude": 35.7796,
+        "longitude": -78.6382,
+        "name": "Raleigh, NC",
+        "id": "",
+        "timeZone": "America/New_York",
+        "office": "RAH"
+      },
+      "sourceAssembledAt": "2026-10-01T22:58:41.648Z",
+      "hours": 157,
+      "changedHours": 6,
+      "friday": {
+        "old": 61,
+        "new": 21
+      },
+      "supportedHours": 18,
+      "amountsUnchanged": true,
+      "changes": [
+        {
+          "time": "2026-10-03T09:00:00.000Z",
+          "old": 60,
+          "new": 20,
+          "amounts": {
+            "nws": 0,
+            "hrrr": 0,
+            "ecmwf": 0.047,
+            "nbm": 0
+          },
+          "reductionReasons": {
+            "ecmwf": "uncorroborated"
+          }
+        },
+        {
+          "time": "2026-10-03T10:00:00.000Z",
+          "old": 61,
+          "new": 21,
+          "amounts": {
+            "nws": 0,
+            "hrrr": 0,
+            "ecmwf": 0.047,
+            "nbm": 0
+          },
+          "reductionReasons": {
+            "ecmwf": "uncorroborated"
+          }
+        },
+        {
+          "time": "2026-10-03T11:00:00.000Z",
+          "old": 61,
+          "new": 21,
+          "amounts": {
+            "nws": 0,
+            "hrrr": 0,
+            "ecmwf": 0.047,
+            "nbm": 0
+          },
+          "reductionReasons": {
+            "ecmwf": "uncorroborated"
+          }
+        },
+        {
+          "time": "2026-10-03T15:00:00.000Z",
+          "old": 48,
+          "new": 31,
+          "amounts": {
+            "nws": 0,
+            "hrrr": 0,
+            "ecmwf": 0.008,
+            "nbm": 0.02
+          },
+          "reductionReasons": {
+            "ecmwf": "trace",
+            "nbm": "uncorroborated"
+          }
+        },
+        {
+          "time": "2026-10-03T16:00:00.000Z",
+          "old": 48,
+          "new": 31,
+          "amounts": {
+            "nws": 0,
+            "hrrr": 0,
+            "ecmwf": 0.008,
+            "nbm": 0.02
+          },
+          "reductionReasons": {
+            "ecmwf": "trace",
+            "nbm": "uncorroborated"
+          }
+        },
+        {
+          "time": "2026-10-03T17:00:00.000Z",
+          "old": 48,
+          "new": 31,
+          "amounts": {
+            "nws": 0,
+            "hrrr": 0,
+            "ecmwf": 0.008,
+            "nbm": 0.02
+          },
+          "reductionReasons": {
+            "ecmwf": "trace",
+            "nbm": "uncorroborated"
+          }
+        }
+      ]
+    },
+    {
+      "city": "knightdale",
+      "location": {
+        "latitude": 35.787,
+        "longitude": -78.4806,
+        "name": "Knightdale, NC",
+        "id": "",
+        "timeZone": "America/New_York",
+        "office": "RAH"
+      },
+      "sourceAssembledAt": "2026-10-01T22:58:42.421Z",
+      "hours": 157,
+      "changedHours": 9,
+      "friday": {
+        "old": 61,
+        "new": 21
+      },
+      "supportedHours": 24,
+      "amountsUnchanged": true,
+      "changes": [
+        {
+          "time": "2026-10-03T09:00:00.000Z",
+          "old": 60,
+          "new": 20,
+          "amounts": {
+            "nws": 0,
+            "hrrr": 0,
+            "ecmwf": 0.055,
+            "nbm": 0
+          },
+          "reductionReasons": {
+            "ecmwf": "uncorroborated"
+          }
+        },
+        {
+          "time": "2026-10-03T10:00:00.000Z",
+          "old": 61,
+          "new": 21,
+          "amounts": {
+            "nws": 0,
+            "hrrr": 0,
+            "ecmwf": 0.055,
+            "nbm": 0
+          },
+          "reductionReasons": {
+            "ecmwf": "uncorroborated"
+          }
+        },
+        {
+          "time": "2026-10-03T11:00:00.000Z",
+          "old": 61,
+          "new": 21,
+          "amounts": {
+            "nws": 0,
+            "hrrr": 0,
+            "ecmwf": 0.055,
+            "nbm": 0
+          },
+          "reductionReasons": {
+            "ecmwf": "uncorroborated"
+          }
+        },
+        {
+          "time": "2026-10-03T12:00:00.000Z",
+          "old": 48,
+          "new": 31,
+          "amounts": {
+            "nws": 0,
+            "hrrr": 0,
+            "ecmwf": 0.004,
+            "nbm": 0.012
+          },
+          "reductionReasons": {
+            "ecmwf": "trace",
+            "nbm": "uncorroborated"
+          }
+        },
+        {
+          "time": "2026-10-03T13:00:00.000Z",
+          "old": 48,
+          "new": 31,
+          "amounts": {
+            "nws": 0,
+            "hrrr": 0,
+            "ecmwf": 0.004,
+            "nbm": 0.012
+          },
+          "reductionReasons": {
+            "ecmwf": "trace",
+            "nbm": "uncorroborated"
+          }
+        },
+        {
+          "time": "2026-10-03T14:00:00.000Z",
+          "old": 48,
+          "new": 31,
+          "amounts": {
+            "nws": 0,
+            "hrrr": 0,
+            "ecmwf": 0.004,
+            "nbm": 0.012
+          },
+          "reductionReasons": {
+            "ecmwf": "trace",
+            "nbm": "uncorroborated"
+          }
+        },
+        {
+          "time": "2026-10-03T15:00:00.000Z",
+          "old": 48,
+          "new": 31,
+          "amounts": {
+            "nws": 0,
+            "hrrr": 0,
+            "ecmwf": 0.008,
+            "nbm": 0.012
+          },
+          "reductionReasons": {
+            "ecmwf": "trace",
+            "nbm": "uncorroborated"
+          }
+        },
+        {
+          "time": "2026-10-03T16:00:00.000Z",
+          "old": 48,
+          "new": 31,
+          "amounts": {
+            "nws": 0,
+            "hrrr": 0,
+            "ecmwf": 0.008,
+            "nbm": 0.012
+          },
+          "reductionReasons": {
+            "ecmwf": "trace",
+            "nbm": "uncorroborated"
+          }
+        },
+        {
+          "time": "2026-10-03T17:00:00.000Z",
+          "old": 48,
+          "new": 31,
+          "amounts": {
+            "nws": 0,
+            "hrrr": 0,
+            "ecmwf": 0.008,
+            "nbm": 0.012
+          },
+          "reductionReasons": {
+            "ecmwf": "trace",
+            "nbm": "uncorroborated"
+          }
+        }
+      ]
+    }
+  ]
+}
