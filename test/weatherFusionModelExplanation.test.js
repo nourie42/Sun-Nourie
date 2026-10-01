@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {modelExplanationView,modelExplanationHTML,renderModelExplanation,resetModelExplanation} from '../public/weather-fusion/model-explanation.js';
+import {precipitationLikelihood} from '../src/weatherFusionDirect.js';
 
 const HOUR = 3600000;
 const now = Date.parse('2026-09-12T11:00:00Z');
@@ -58,12 +59,12 @@ test('every daily estimate is tied to its canonical peak hour including beyond t
 test('rain inputs scale the NWS share and explain full and reduced model points',()=>{
   const html=modelExplanationHTML(fixture(),{now});
   assert.match(html,/30% probability/);
-  assert.match(html,/<th scope="row">NBM<\/th><td>0 in<small>Rain forecast: No<\/small><\/td><td>20%<\/td><td>0<\/td>/);
+  assert.match(html,/<th scope="row">NBM<\/th><td>0 in<small>Rain forecast: No<\/small><\/td><td>0<small>of 20 max<\/small><\/td>/);
   assert.doesNotMatch(html,/QPF support|NWS-anchored input/);
   assert.match(html,/NWS hourly probability fills its 40-point share proportionally/);
   assert.match(html,/40% NWS chance contributes 16 points/);
   assert.match(html,/positive model amount through 0\.010 in gets exactly one-third/);
-  assert.match(html,/above 0\.010 in gets full points/);
+  assert.match(html,/above 0\.010 in gets full points only if NWS is at least 20%/);
   assert.match(html,/result is capped at 100%/);
   assert.match(html,/uncalibrated estimate, not a proven model-accuracy ranking/);
   assert.match(html,/not a separate probability of rain at any time/);
@@ -73,10 +74,10 @@ test('rain inputs scale the NWS share and explain full and reduced model points'
   forecast.rainTimeline[0].rainLikelihood=allWet;
   Object.assign(forecast.days[0].popDayLikelihood,{value:81,peak:allWet,peakTime:at(0)});
   const unanimous=modelExplanationHTML(forecast,{now});
-  assert.match(unanimous,/53% probability<\/td><td>40%<\/td><td>21\.2<\/td>/);
-  assert.match(unanimous,/0\.157 in<small>Rain forecast: Yes<\/small><\/td><td>30%<\/td><td>30<\/td>/);
-  assert.match(unanimous,/0\.016 in<small>Rain forecast: Yes<\/small><\/td><td>10%<\/td><td>10<\/td>/);
-  assert.match(unanimous,/0\.012 in<small>Rain forecast: Yes<\/small><\/td><td>20%<\/td><td>20<\/td>/);
+  assert.match(unanimous,/53% probability<\/td><td>21\.2<small>of 40 max<\/small><\/td>/);
+  assert.match(unanimous,/0\.157 in<small>Rain forecast: Yes<\/small><\/td><td>30<small>of 30 max<\/small><\/td>/);
+  assert.match(unanimous,/0\.016 in<small>Rain forecast: Yes<\/small><\/td><td>10<small>of 10 max<\/small><\/td>/);
+  assert.match(unanimous,/0\.012 in<small>Rain forecast: Yes<\/small><\/td><td>20<small>of 20 max<\/small><\/td>/);
   assert.match(unanimous,/Shown: <b>81%/);
   assert.match(unanimous,/21\.2 \+ 30 \+ 10 \+ 20 = 81\.2/);
 
@@ -86,8 +87,8 @@ test('rain inputs scale the NWS share and explain full and reduced model points'
   forecast.rainTimeline[0].rainLikelihood=trace;
   Object.assign(forecast.days[0].popDayLikelihood,{value:13,peak:trace,peakTime:at(0)});
   const traceHtml=modelExplanationHTML(forecast,{now});
-  assert.match(traceHtml,/0\.004 in<small>Light rain forecast: one-third of model points<\/small><\/td><td>10%<\/td><td>3\.333333<\/td>/);
-  assert.match(traceHtml,/0\.01 in<small>Light rain forecast: one-third of model points<\/small><\/td><td>20%<\/td><td>6\.666667<\/td>/);
+  assert.match(traceHtml,/0\.004 in<small>Light rain forecast: one-third of model points<\/small><\/td><td>3\.333333<small>of 10 max<\/small><\/td>/);
+  assert.match(traceHtml,/0\.01 in<small>Light rain forecast: one-third of model points<\/small><\/td><td>6\.666667<small>of 20 max<\/small><\/td>/);
   assert.match(traceHtml,/2\.8 \+ 0 \+ 3\.3333 \+ 6\.6667 = 12\.8/);
   assert.match(traceHtml,/Shown: <b>13%/);
 });
@@ -100,15 +101,15 @@ test('missing models do not renormalize the NWS base or remaining model points',
   const html=modelExplanationHTML(forecast,{now});
   assert.match(html,/8 \+ 10 = 18/);
   assert.match(html,/Rounded: <b>18%<\/b>\. Shown: <b>18%/);
-  assert.match(html,/<th scope="row">HRRR<\/th><td>Unavailable<\/td><td>Not used<\/td><td>—/);
+  assert.match(html,/<th scope="row">HRRR<\/th><td>Unavailable<\/td><td>Not used<\/td>/);
 });
 
-test('a single wet vote keeps its exact points without low-score suppression',()=>{
-  const forecast=fixture(),single=likelihood(20,{officialProbability:0,weightedValue:20,rawTotal:20,rawValue:20,sourceValues:{nws:0,hrrr:0,ecmwf:0,nbm:100},sourcePoints:{nws:0,hrrr:0,ecmwf:0,nbm:20},wetSources:['nbm'],sources:[{id:'nws',value:0,weight:.4,points:0},{id:'hrrr',value:0,weight:.3,points:0},{id:'ecmwf',value:0,weight:.1,points:0},{id:'nbm',value:100,weight:.2,points:20}]});
+test('a reduced wet vote keeps its exact points without hiding a low score',()=>{
+  const forecast=fixture(),single=precipitationLikelihood(0,{sourceValues:{hrrr:0,ecmwf:0,nbm:.02}});
   for(const row of forecast.rainTimeline)row.rainLikelihood=single;
-  Object.assign(forecast.days[0].popDayLikelihood,{value:20,peak:single});
+  Object.assign(forecast.days[0].popDayLikelihood,{value:7,peak:single});
   const html=modelExplanationHTML(forecast,{now});
-  assert.match(html,/Rounded: <b>20%<\/b>\. Shown: <b>20%/);
+  assert.match(html,/Rounded: <b>7%<\/b>\. Shown: <b>7%/);
   assert.doesNotMatch(html,/fewer than two available sources|below 25%/);
   assert.doesNotMatch(html,/Data mismatch/);
 });
@@ -235,6 +236,7 @@ test('refresh preserves open hourly calculations and focused details while auto 
 test('mobile styles have bounded tables, readable controls and scoped selectors',async()=>{
   const css=await readFile(new URL('../public/weather-fusion/model-explanation.css',import.meta.url),'utf8');
   assert.match(css,/table-layout:fixed/);
+  assert.match(css,/\.model-inputs\.model-rain-inputs\{min-width:0\}/);
   assert.match(css,/min-height:44px/);
   assert.match(css,/overflow-wrap:anywhere/);
   assert.match(css,/@media\(max-width:400px\)/);
