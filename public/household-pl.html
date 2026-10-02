@@ -47,12 +47,12 @@ button,input{font:inherit}.topbar{position:sticky;top:0;z-index:100;background:r
 <div class="wrap">
  <section id="quick" class="view active">
   <div class="kpis">
-   <div class="kpi"><b>September Income</b><strong id="ki">—</strong></div>
-   <div class="kpi"><b>September Expenses</b><strong id="ke">—</strong></div>
-   <div class="kpi"><b>September Net P/L</b><strong id="kn">—</strong></div>
+   <div class="kpi"><b id="kiLabel">Current Month Income</b><strong id="ki">—</strong></div>
+   <div class="kpi"><b id="keLabel">Current Month Expenses</b><strong id="ke">—</strong></div>
+   <div class="kpi"><b id="knLabel">Current Month Net P/L</b><strong id="kn">—</strong></div>
    <div class="kpi"><b>Starting Bank Cash</b><input id="startCash" class="cashinput" type="number" step="100"></div>
   </div>
-  <div class="note">This Month is the main household P&L: September actual income and spending, September budget, variance to budget, and the rolling annual forecast. Tap Details to review September transactions and edit monthly budgets.</div>
+  <div class="note">This Month is the main household P&L: current-month actual income and spending, current-month budget, variance to budget, and the rolling annual forecast. Tap Details to review current-month transactions and edit monthly budgets.</div>
   <div id="quickCatNav" class="catNav"></div><div class="toolbar"><button id="save">Update P&L</button><span id="updateStatus" class="updateStatus"></span><button id="addLineBtn">+ Add Line Item</button><button id="reset">Reset budgets</button><button id="restore">Restore deleted rows</button></div>
   <div id="addPanel" class="addPanel">
    <div class="addGrid">
@@ -81,10 +81,10 @@ button,input{font:inherit}.topbar{position:sticky;top:0;z-index:100;background:r
  </section>
  <section id="last" class="view">
   <div class="kpis">
-   <div class="kpi"><b>August Income</b><strong id="lastInc">—</strong></div>
-   <div class="kpi"><b>August Expenses</b><strong id="lastExp">—</strong></div>
-   <div class="kpi"><b>August Net P/L</b><strong id="lastNet">—</strong></div>
-   <div class="kpi"><b>Period</b><strong>Aug 2026</strong></div>
+   <div class="kpi"><b id="lastIncLabel">Last Month Income</b><strong id="lastInc">—</strong></div>
+   <div class="kpi"><b id="lastExpLabel">Last Month Expenses</b><strong id="lastExp">—</strong></div>
+   <div class="kpi"><b id="lastNetLabel">Last Month Net P/L</b><strong id="lastNet">—</strong></div>
+   <div class="kpi"><b>Period</b><strong id="lastPeriod">—</strong></div>
   </div>
   <div id="lastBody"></div>
  </section>
@@ -146,14 +146,31 @@ async function loadBase(){
    }
  }
  reconcilePostedSnapshot();
+ const BASE_ANCHOR='2026-09';
+ function monthId(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')}
+ function monthDelta(a,b){const aa=a.split('-').map(Number),bb=b.split('-').map(Number);return (bb[0]-aa[0])*12+(bb[1]-aa[1])}
+ function shiftRowOne(r){
+   if(r.type!=='line'||!Array.isArray(r.vals))return;
+   r.vals[0]=Number(r.vals[1]||0);r.vals[1]=0;
+   const b=[];for(let i=0;i<12;i++)b.push(Number(r.vals[i+2]||0));
+   const tail=b.length?b[b.length-1]:0;
+   for(let i=0;i<11;i++)r.vals[i+2]=b[i+1]||0;
+   r.vals[13]=tail;
+ }
+ const TARGET_MONTH=monthId(new Date()),baseSteps=Math.max(0,monthDelta(BASE.anchorMonth||BASE_ANCHOR,TARGET_MONTH));
+ for(let n=0;n<baseSteps;n++)(BASE.rows||[]).forEach(shiftRowOne);
+ BASE.anchorMonth=TARGET_MONTH;
  const STORE='nourie-household-pl-v3',DEL='nourie-household-pl-deleted-v3';
  const saved=JSON.parse(localStorage.getItem(STORE)||'null')||{};
  let monthEdits=saved.monthEdits||{},startCash=Number(saved.startingCash==null?(BASE.startingCash||20000):saved.startingCash),manualRows=saved.manualRows||[];
  let deleted=new Set(JSON.parse(localStorage.getItem(DEL)||'[]'));
  const rows=structuredClone(BASE.rows||[]).concat(manualRows);
  const txByKey={};(BASE.tx||[]).forEach(function(t){if(!txByKey[t.k])txByKey[t.k]=[];txByKey[t.k].push(t)});
- const monthLabels=['Sep 26','Oct 26','Nov 26','Dec 26','Jan 27','Feb 27','Mar 27','Apr 27','May 27','Jun 27','Jul 27','Aug 27'];
- const shortLabels=['Sep','Oct','Nov','Dec','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug'];
+ const ap=TARGET_MONTH.split('-').map(Number),anchorDate=new Date(ap[0],ap[1]-1,1);
+ const monthLabels=Array.from({length:12},function(_,i){return new Date(anchorDate.getFullYear(),anchorDate.getMonth()+i,1).toLocaleString('en-US',{month:'short',year:'2-digit'})});
+ const shortLabels=Array.from({length:12},function(_,i){return new Date(anchorDate.getFullYear(),anchorDate.getMonth()+i,1).toLocaleString('en-US',{month:'short'})});
+ const currentMonthPrefix=TARGET_MONTH,currentMonthName=anchorDate.toLocaleString('en-US',{month:'long'});
+ const lastMonthDate=new Date(anchorDate.getFullYear(),anchorDate.getMonth()-1,1),lastMonthName=lastMonthDate.toLocaleString('en-US',{month:'long'}),lastPeriodLabel=lastMonthDate.toLocaleString('en-US',{month:'short',year:'numeric'});
  const fmt=function(n){return new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(Number(n||0))};
  const num=function(v){return Number(v||0)};
  const cls=function(n){return num(n)<0?'neg':num(n)>0?'pos':''};
@@ -203,7 +220,7 @@ async function loadBase(){
    return h+'</div>';
  }
  function makeTxList(r){
-   const tx=transactions(r,'2026-09');if(!tx.length)return '<div class="empty">No September transactions posted for this line yet.</div>';
+   const tx=transactions(r,currentMonthPrefix);if(!tx.length)return '<div class="empty">No '+currentMonthName+' transactions posted for this line yet.</div>';
    return '<div class="txlist">'+tx.map(function(t){return '<div class="tx"><div class="txdate">'+String(t.d||'')+'</div><div class="txname"><b>'+String(t.m||t.x||'Transaction')+'</b><span class="txacct">'+String(t.a||'')+(t.x?' · '+String(t.x):'')+'</span></div><div class="txamt">'+fmt(t.v)+'</div></div>'}).join('')+'</div>';
  }
  function bindMonthInputs(root){
@@ -416,7 +433,11 @@ async function loadBase(){
    s.ctx.clearRect(0,0,s.w,s.h);s.ctx.strokeStyle='#26425f';s.ctx.beginPath();s.ctx.moveTo(35,10);s.ctx.lineTo(35,base);s.ctx.lineTo(s.w-6,base);s.ctx.stroke();s.ctx.strokeStyle='#78b7ff';s.ctx.lineWidth=2;s.ctx.beginPath();data.forEach(function(v,i){const x=40+(data.length===1?0:i*gap),y=base-v/max*height;if(i===0)s.ctx.moveTo(x,y);else s.ctx.lineTo(x,y)});s.ctx.stroke();data.forEach(function(v,i){const x=40+(data.length===1?0:i*gap),y=base-v/max*height;s.ctx.fillStyle='#78b7ff';s.ctx.beginPath();s.ctx.arc(x,y,2.5,0,Math.PI*2);s.ctx.fill();s.ctx.fillStyle='#8fa5bd';s.ctx.font='8px system-ui';s.ctx.fillText(labels[i],x-6,s.h-10)});
  }
  function renderGraphs(){drawFlow();drawNet();drawCash();renderExpenseBars();renderVariableBars();drawMix();drawVariableMonth();renderVarianceBars();renderSubscriptionBars();drawTopVariable();drawSavingsScenario();drawExpenseTrend();drawMatchedBudget();drawMatchedTrend();drawMatchedVariable();renderBudgetBurn();drawCumulativeVariable();renderYtdBars('ytdExpenseBars',isExpense);renderYtdBars('ytdVariableBars',isVariable);drawYtdTrend('ytdExpenseTrendChart',isExpense);drawYtdTrend('ytdVariableTrendChart',isVariable)}
- function renderAll(){renderQuick();renderYear();renderLast();renderRecurring();renderVariable();document.getElementById('status').textContent='Transactions through '+lastTxDate();if(document.getElementById('graphs').classList.contains('active'))requestAnimationFrame(renderGraphs)}
+ function renderAll(){
+   document.getElementById('kiLabel').textContent=currentMonthName+' Income';document.getElementById('keLabel').textContent=currentMonthName+' Expenses';document.getElementById('knLabel').textContent=currentMonthName+' Net P/L';
+   document.getElementById('lastIncLabel').textContent=lastMonthName+' Income';document.getElementById('lastExpLabel').textContent=lastMonthName+' Expenses';document.getElementById('lastNetLabel').textContent=lastMonthName+' Net P/L';document.getElementById('lastPeriod').textContent=lastPeriodLabel;
+   renderQuick();renderYear();renderLast();renderRecurring();renderVariable();document.getElementById('status').textContent='Transactions through '+lastTxDate();if(document.getElementById('graphs').classList.contains('active'))requestAnimationFrame(renderGraphs)
+ }
  document.querySelectorAll('.nav button').forEach(function(btn){btn.onclick=function(){document.querySelectorAll('.nav button').forEach(function(b){b.classList.remove('active')});document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active')});btn.classList.add('active');document.getElementById(btn.dataset.view).classList.add('active');if(btn.dataset.view==='graphs')requestAnimationFrame(renderGraphs);window.scrollTo({top:0,behavior:'smooth'})}});
  let dirty=false;
  function markDirty(){dirty=true;document.querySelectorAll('.updateStatus').forEach(function(el){el.textContent='Changes not updated'})}
