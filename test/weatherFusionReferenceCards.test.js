@@ -3,6 +3,18 @@ import assert from 'node:assert/strict';
 import {comfortSceneState,precipitationActivity,referenceScene} from '../public/weather-fusion/exposure-scene.js';
 import {pavementHTML,pavementEstimate} from '../public/weather-fusion/pavement.js';
 
+test('partial cloud cover uses cloudy artwork for people and pets even in heat',()=>{
+ for(const feels of [77,95])for(const panel of [0,1,2]){
+  const scene=referenceScene(panel,true,'Partly Cloudy',feels,{pop:0});
+  assert.match(scene,/data-scene="watch"/);
+  assert.match(scene,/comfort-reference-scenes-watch\.webp/);
+  assert.doesNotMatch(scene,/class="sky-sun"|comfort-reference-scenes-hot\.webp/);
+ }
+ assert.match(referenceScene(2,true,'Partly Cloudy',77,{pop:70}),/data-scene="rain"/);
+ assert.match(referenceScene(2,false,'Partly Cloudy',77,{pop:0}),/data-scene="dawn"/);
+ assert.match(pavementHTML({status:'unavailable',daylight:true},77,{condition:'Partly Cloudy',pop:0}),/data-scene="watch"/);
+});
+
 test('illustrated weather stays synchronized across outdoor and pet scenes',()=>{
  const shadedRain=referenceScene(0,true,'Rain',88);
  assert.match(shadedRain,/sheltering beneath a leafy tree as steady rain falls nearby/);
