@@ -160,7 +160,9 @@ export function comfortSceneState(daylight=true,condition='Clear',feels=null,con
  if(precipitation==='possible')return {key:'carry-umbrella',asset:'comfort-reference-scenes-carry-umbrella.svg'};
  if(kind==='fog')return {key:'fog',asset:'comfort-reference-scenes-fog.webp'};
  if(!daylight)return {key:'dawn',asset:'comfort-reference-scenes-dawn.webp'};
- if(kind==='cloudy')return {key:'watch',asset:'comfort-reference-scenes-watch.webp'};
+ // Partial cloud cover does not establish a sunny break at the user's location.
+ // Use the cloudy scene across all three panels until the sky state is clear.
+ if(['cloudy','partly-cloudy'].includes(kind))return {key:'watch',asset:'comfort-reference-scenes-watch.webp'};
  if(finite(feels)&&feels>=88&&['clear','partly-cloudy'].includes(kind))return {key:'hot',asset:'comfort-reference-scenes-hot.webp'};
  return {key:'normal',asset:'comfort-reference-scenes.webp'};
 }
