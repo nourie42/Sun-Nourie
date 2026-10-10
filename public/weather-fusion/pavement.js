@@ -1,5 +1,5 @@
 import {finite,solarElevation,thermalHumidity} from './weather-math.js?v=weather-qa-v67';
-import {clothingForFeels,referenceScene,precipitationActivity} from './exposure-scene.js?v=wardrobe-v1';
+import {clothingForFeels,referenceScene,precipitationActivity} from './exposure-scene.js?v=rain-area-umbrella-v1';
 import {thermalRisk} from './thermal-risk.js?v=weather-art-labels-v10';
 import {weatherShapes} from './weather-display.js?v=rain-now-v71';
 import {weatherState} from './weather-state.js';
@@ -105,7 +105,7 @@ export function petSurfaceSubtitle(result){
 }
 export function pavementHTML(result,feels,context={}){
  const walker=walkerOutfit(feels);
- const activelyWet=result?.activePrecipitation===true||precipitationActivity(context.condition,{pop:context.pop,precipitation:context.precipitation,rainAround:context.rainAround===true,radarThreat:context.radarThreat===true})==='active';
+ const activelyWet=result?.activePrecipitation===true||precipitationActivity(context.condition,{pop:context.pop,precipitation:context.precipitation,rainAround:context.rainAround===true,radarThreat:context.radarThreat===true,rainNearby:context.rainNearby===true,rainInArea:context.rainInArea===true})==='active';
  const surfaceWarning=pavementWarning(result),weatherWarning=petWeatherWarning(feels),warning=activelyWet?null:(surfaceWarning||weatherWarning);
  const value=r=>r?`${r.value}°`:'—',night=result?.daylight===false;
  let sky=night
@@ -126,6 +126,6 @@ export function pavementWarning(result){
  return null;
 }
 export function pavementDetailsHTML(result){
- const range=(r,label)=>r?`${label}: ${r.low}–${r.high}°F.`:`${label}: unavailable.`;
+ const range=(r,label)=>r?`${r.low}–${r.high}°F.`:`${label}: unavailable.`;
  return `<details class="pavement-details"><summary>Sidewalk ranges & paw care</summary><p>${range(result.concrete,'Concrete')}${' '}${range(result.asphalt,'Dark asphalt')}</p><p>${result.note||result.reason}</p><p>${result.advice||'Check the actual surface before walking. Choose grass or a cooler route when it feels hot.'}</p><a href="#pavement-science">How the sidewalk estimate works ↓</a></details>`;
 }

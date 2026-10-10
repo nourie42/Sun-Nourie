@@ -6,6 +6,16 @@ import {sunExposureTemperature} from '../public/weather-fusion/outdoor-feels.js'
 const now=Date.parse('2026-09-10T18:00:00Z');
 const location={latitude:35.787,longitude:-78.4806,timeZone:'America/New_York'};
 
+test('partly cloudy current weather does not claim a sunny break',()=>{
+  const comfort={daylight:true,weatherKind:'partly-cloudy',shade:77,outdoors:77,sun:77};
+  const html=sunShadeHTML(comfort,location,now,{compact:true,condition:'Partly Cloudy',sunExposure:80});
+  assert.match(html,/<span class="exposure-label">Outdoors<\/span>/);
+  assert.match(html,/Comfortable outdoors/);
+  assert.match(html,/sun-person[\s\S]*?<figcaption><strong>77°<\/strong>/);
+  assert.equal((html.match(/data-scene="watch"/g)||[]).length,2);
+  assert.doesNotMatch(html,/Sun breaks|sunny breaks|Estimated feels like in sun|class="sky-sun"/);
+});
+
 test('Shade and sun cards compare modeled feels-like values, never air temperature versus feels-like',()=>{
   const comfort={
     daylight:true,
