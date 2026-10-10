@@ -104,7 +104,7 @@ export function currentSample(forecast, now = Date.now()) {
     ? {...displayComfort,outdoors:shownFeels,displayFeelsGuard:{applied:true,raw:rawExposure.value,dewpoint:current.dewpoint,gust:currentGust,threshold:GUSTY_FEELS_DISPLAY_MPH}}
     : displayComfort;
   const exposure=outdoorExposure(shownComfort),shownInputs={...current,gust:currentGust};
-  return {windDirection:current.windDirection,pop:rainChanceValue(currentLikelihood),officialPop:currentHour?.officialPop??currentHour?.pop,rainLikelihood:currentLikelihood,currentPrecipitation,rainAround:radarThreat,radarThreat,precipitationBlend:currentHour?.precipitationBlend,uvIndex:hourlyUvValue(forecast,now),id:'now', now:true, time:current.time, temperature:finite(current.temperature) ? current.temperature : null,
+  return {windDirection:current.windDirection,pop:rainChanceValue(currentLikelihood),officialPop:currentHour?.officialPop??currentHour?.pop,rainLikelihood:currentLikelihood,currentPrecipitation,rainAround:radarThreat,radarThreat,rainNearby:currentPrecipitation.nearby===true,rainInArea:currentPrecipitation.inArea===true,precipitationBlend:currentHour?.precipitationBlend,uvIndex:hourlyUvValue(forecast,now),id:'now', now:true, time:current.time, temperature:finite(current.temperature) ? current.temperature : null,
     feels:exposure.value, exposure, comfort:shownComfort, condition:displayCondition || 'Sky conditions unavailable',
     isDay:comfort.daylight ?? (solarElevation(now,forecast.location.latitude,forecast.location.longitude) > 0),
     source:current.type === 'observation' ? 'Station observation' : 'Current estimate', inputs:shownInputs};
@@ -141,7 +141,7 @@ export function renderHourlyWeather(forecast, now = Date.now()) {
   root.scrollLeft = scroll;
 }
 export function peakComparison(summary, currentSun) {
-  const label='Warmest feels like in the sun today';
+  const label=summary?.label||'Warmest feels like in the sun today';
   if (!summary) return {kind:'missing', label:`${label} unavailable`, value:null, time:null, now:false};
   const peak = summary.chosen.value;
   if (summary.mode === 'day' && finite(currentSun) && currentSun > peak) {
