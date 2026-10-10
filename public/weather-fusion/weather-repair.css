@@ -33,5 +33,8 @@
 .comfort-later .peak-reading{grid-column:2;grid-row:1 / span 2;align-self:center;display:flex;flex-direction:column;align-items:center}
 .comfort-later .peak-reading strong{display:block}
 #skin-values .comfort-later .peak-reading strong{font-size:30px;margin:0}
+#skin-values .comfort-later[data-comparison="no-direct-sun"]{grid-template-columns:minmax(0,1fr);text-align:center;justify-items:center;column-gap:0}
+#skin-values .comfort-later[data-comparison="no-direct-sun"]::before{display:none}
+#skin-values .comfort-later[data-comparison="no-direct-sun"]>span:first-child,#skin-values .comfort-later[data-comparison="no-direct-sun"]>small{grid-column:1;width:100%;text-align:center}
 @media(max-width:600px){.exposure-cards .skin-exposure{padding:16px 8px}.day-meta{gap:10px}.day-meta .forecast-confidence{gap:4px;text-align:left}.day-meta .confidence-meter{width:28px}.day-meta .daily-uv{font-size:10px}}
 @media(max-width:360px){.day-meta{gap:8px}.day-meta .forecast-confidence>span{max-width:52px}.day-meta .confidence-meter{width:22px}.day-meta .daily-uv{font-size:9px}}
