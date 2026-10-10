@@ -1,0 +1,140 @@
+{
+  "commit": "06c3d7900d102ff6fd9f2e95a7fd004962172c5d",
+  "checkedAt": "2026-10-10T20:58:30.436Z",
+  "fixture": false,
+  "success": true,
+  "checks": [
+    {
+      "label": "initial-page",
+      "checkedAt": "2026-10-10T20:58:53.590Z",
+      "assembledAt": "2026-10-10T20:58:39.269Z",
+      "sourceCheckedAt": "2026-10-10T20:58:38.469Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "077f507b2092f2581972765a",
+      "discussionId": "30d075bf-05ab-4e35-a950-3307a2f737d2",
+      "issuedAt": "2026-10-10T18:29:00+00:00",
+      "cachedItems": [],
+      "visible": true,
+      "text": "Rain from Isaias is moving through tonight, so expect wet and windy weather. Scattered storms could form Sunday and a few may be briefly strong with a small tornado risk in parts of the area. Next week will be warmer and more humid, though Friday may or may not get much hotter depending on how the pattern unfolds."
+    },
+    {
+      "label": "refresh-1",
+      "checkedAt": "2026-10-10T20:59:59.551Z",
+      "assembledAt": "2026-10-10T20:59:42.236Z",
+      "sourceCheckedAt": "2026-10-10T20:58:38.469Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "e212ab411d9a3c130050e89b",
+      "discussionId": "30d075bf-05ab-4e35-a950-3307a2f737d2",
+      "issuedAt": "2026-10-10T18:29:00+00:00",
+      "cachedItems": [],
+      "visible": true,
+      "text": "Rain from Isaias is moving through tonight, so expect wet and windy weather. Scattered storms could form Sunday and a few may be briefly strong with a small tornado risk in parts of the area. Next week will be warmer and more humid, though Friday may or may not get much hotter depending on how the pattern unfolds."
+    },
+    {
+      "label": "refresh-2",
+      "checkedAt": "2026-10-10T21:01:05.743Z",
+      "assembledAt": "2026-10-10T21:00:47.097Z",
+      "sourceCheckedAt": "2026-10-10T21:00:40.668Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "2acc0d5808855b53dd79b9fe",
+      "discussionId": "30d075bf-05ab-4e35-a950-3307a2f737d2",
+      "issuedAt": "2026-10-10T18:29:00+00:00",
+      "cachedItems": [],
+      "visible": true,
+      "text": "Rain from the remnant system will last tonight. Showers and storms Sunday can be strong and may produce brief tornadoes in some spots. Next week should be unseasonably warm, but how warm late in the week is not settled."
+    },
+    {
+      "label": "full-page-reload",
+      "checkedAt": "2026-10-10T21:01:07.212Z",
+      "assembledAt": "2026-10-10T21:00:47.097Z",
+      "sourceCheckedAt": "2026-10-10T21:00:40.668Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "2acc0d5808855b53dd79b9fe",
+      "discussionId": "30d075bf-05ab-4e35-a950-3307a2f737d2",
+      "issuedAt": "2026-10-10T18:29:00+00:00",
+      "cachedItems": [],
+      "visible": true,
+      "text": "Rain from the remnant system will last tonight. Showers and storms Sunday can be strong and may produce brief tornadoes in some spots. Next week should be unseasonably warm, but how warm late in the week is not settled."
+    }
+  ],
+  "deployed": {
+    "sourceVersion": "nws-afd-monotonic-v1",
+    "danTakeVersion": "weather-nourie-dans-take-kid-clear-v10",
+    "assets": {
+      "index.html": "8c8fb997f27fba76a27d11f1285c8efaabf83cf0992c8f7b7de02c6ef3dfb584",
+      "app.js": "f434ee2db00d646a10495e0d446395c08230b6dfa9c2f89ce6616c29494c62cb",
+      "dans-summary.js": "2559a8687cfce05db5845182df3f21372b2ae813007565ec76d6f200f32d70af",
+      "current-inputs.js": "9864785afc53c6b0d7f36f7e0a82eb30d2e69989a1dd7cd9f056b12d60dd5984",
+      "pavement.js": "319ca9f6914c5e6e339611d202fc2e89821206c9504431c3d59d80360b9ca881",
+      "daily-uv.js": "4327bb7ab8a9bac7d21abbcafe674a13849d40a54c0c73966ee2e9a78a98e2e8",
+      "dans-take.js": "5da354860928555d55010a026466988d6962f11cbea1f3dbabb4a47fd61c6f9b"
+    }
+  },
+  "independentOfficialLatest": {
+    "id": "30d075bf-05ab-4e35-a950-3307a2f737d2",
+    "issuedAt": "2026-10-10T18:29:00+00:00"
+  },
+  "initial": {
+    "discussion": {
+      "id": "30d075bf-05ab-4e35-a950-3307a2f737d2",
+      "office": "RAH",
+      "issuanceTime": "2026-10-10T18:29:00+00:00",
+      "text": "\n000\nFXUS62 KRAH 101829\nAFDRAH\n\nArea Forecast Discussion\nNational Weather Service Raleigh NC\n229 PM EDT Sat Oct 10 2026\n\n.WHAT HAS CHANGED...\n\n* Although a brief, short-track tornado threat will exist anywhere \n  in central NC between 10 AM and 7 PM Sunday, the locally greater \n  risk will likely be from the Triad, to the Triangle, into the \n  northern Coastal Plain (Rocky Mount) and northward into Virginia.\n\n* A slower cold frontal passage mid-week results in unseasonably \n  warm conditions Tues continuing into Wed when upper 80s to near 90 \n  degrees return to the forecast. \n\n&&\n\n.KEY MESSAGES...\nAs of 229 PM Saturday...\n\n1) Isaias remnants and resulting rains underway, continuing tonight. \n \n2) Scattered to locally numerous showers/storms late Sun morning \ninto the early evening hours will be capable of brief, short-tracked \ntornadoes and strong to severe wind gusts.\n\n3) Unseasonably warm Monday through Wednesday night for mid-October.\n\n&&\n\n.DISCUSSION...\nAs of 229 PM Saturday... \n\nKEY MESSAGE 1... Isaias remnants and resulting rains underway, \ncontinuing tonight. \n\nThe large-scale circulation and pattern assoc with Isaias remnants \nis resulting in patchy light rain across central NC attm. Meanwhile, \ncentral NC remains under the influence of a stable wedge airmass, \nthus the reason for the lack of convection so far.  NWP thermodynamic \nfields suggest that the low level wedge will remain in place most of \ntonight, while the H8 front will lift north across central NC early \nthis evening with vigorous and warming H8 flow overnight. This \noverrunning setup suggests that the patchy rain we're seeing now may \nbecome more occasional tonight, with perhaps some elevated \nconvection at times which could result in scattered heavier \ndownpours and heavier rain rates.  But in terms of surface-based \nconvection... that should hold off until the daytime Sunday. So in \nsummary, look for ongoing likelihood for rain tonight, with some \nscattered pockets of heavier rain and even a few rumbles of thunder \npossible. It's also worth noting that NE to E sfc wind gusts of 20-\n25 mph will remain possible through this evening before relaxing a \nbit overnight.  \n\nKEY MESSAGE 2... Scattered to locally numerous showers/storms late \nSun morning into the early evening hours will be capable of brief, \nshort-tracked tornadoes and strong to severe wind gusts.\n\nA staked low, containing the remnants of post-tropical cyclone \nIsaias, will be positioned over KY/TN by 12z Sun morning. CAD \nerosion should be well underway Sun morning with a west-northwest \npositioning of the surface low relative to central NC and retreating \nsurface high over the Canadian maritimes. This configuration should \nsupport a warm front lifting northward through NC Sun morning and \ninto VA by Sun afternoon; although given the close proximity of the \nprimary surface low, wouldn't be surprised to see the CAD wedge hold \nover the far NW Piedmont and Foothills of the NC/VA mountains as \nsecondary cyclogenesis develops along the warm front from Mt. Airy \ninto northern/central VA.\n\nWidespread multi-layered cloud cover may limit destabilization a \nbit, but theta-e advection within the warm sector should be able to \novercome this limitation as surface dew points surge into the \nlow/mid 70s and supports 500-1500 SBCAPE. Convection is expected to \ndevelop along and ahead of the trailing cold front late Sun morning \nand may continue into early Sun evening (10 AM until 8 PM). A belt \nof 40-60 kt southwesterly mid-lvl winds will overspread the \nCarolinas into VA throughout the daylight hours and support a \nkinematic environment favorable for organized convection given \nadequate thermodynamic parameters. Shear vectors oriented roughly 45 \ndegrees to the initiating boundary, trailing cold front, would \nsupport discrete supercellular storm mode given limited storm \ncollisions/interactions.\n\nA stout 25-35 kt low-lvl jet at 925mb overtop of the warm sector \nwill provide elongation of the low-lvl hodograph and support 100-150 \nm2/s2 0-1 km SRH across most locations, which is a bit on the low-\nend but could still produce a short-lived tornado anywhere within \nthe warm sector. The greater localized tornado threat will likely \noccur where surface winds back from the south to more of a southeast \ndirection and results in +200 m2/s2 0-1km SRH. This is most likely \nto materialize along and just south of the warm front and nearest \nthe triple point with the secondary surface low (as far west as the \nTriad, across the northern Piedmont into the Triangle and continuing \ninto the northern Coastal Plain and more likely northward into VA).\n\nThe big caveat will be the intrusion of drier air in the mid/upper \nlvls over the Carolinas. Already limited instability would be \nfurther truncated by dry air intrusion into updrafts and greatly \nlimiting their updraft strength, which may not survive the strong \nshear in place. Deep convection will be more likely further south \ninto the moderate instability across the Sandhills, up into the \nTriangle and across the Coastal Plain which may more likely overcome \nthe dry air aloft, but is farther removed from the more favorable \nlow-lvl kinematics to support anything more than a quick spinup and \nshort-track tornado threat.\n\nKEY MESSAGE 3... Unseasonably warm Monday through Wednesday night \nfor mid-October.\n\nIn between the departing mid/upper level low over the Atlantic, \nwhich absorbed TC Isaias, and closed low expected to develop/deepen \nover the Central Intermountain West, mid/upper level subtropical \nridge will bubble northeastward from the ArkLaTex region into the \nSoutheast Tues into Thurs. A low-amplitude disturbance, and \nassociated area of surface low pressure, racing across the \nInternational Border with Canada Tues through Wed will also spread \nanomalously warm H850 temperatures in place over the MS and western \nOH Valley's on Mon over the Mid-Atlantic on Tues before shifting \nsouth over the Carolinas ahead of dry frontal passage on Thurs.\n\nA slower translation eastward with the aforementioned surface low to \nour north in recent model guidance will keep a band of mid-level \nclouds, as well as the surface cold front, confined to Virginias \nduring peak heating and result in much warmer temperatures on Wed \ncompared to previous forecasts. Low-level thickness 45-60m above \nnormal for mid-October will support maximum temperatures 10-20 \ndegrees above normal, warmest on Wed. There are significant \ndifferences on how/if the pattern will rebound Fri/Fri-night with \nthe GFS and CMC suite of guidance returning a stout southerly \nsurface flow as a surface low tracks across the Mid-MS Valley and \nnorthern OH Valley on Fri, while the ECMWF suite and its AI \ncounterpart remain void of such a solution due to differences in \nphasing of the aforementioned mid/upper level low over the \nIntermountain West as the week progresses.\n\n&&\n\n.AVIATION /18Z SATURDAY THROUGH THURSDAY/...\nAs of 229 PM Saturday...\n\nThrough 18Z Sunday: The remnants of Isaias will continue to move \nnorthward over the next 24 hours, tracking from central AL into the \neastern TN valley and southern Appalachians. The current mixture of \nlow-VFR and MVFR conditions that we're seeing across central NC attm \nwill gradually lower becoming LIFR/IFR between 06-10Z tonight as \nrain continues and perhaps increases in coverage and intensity a \nbit. Current wind gusts of 15-25 kt will weaken after 03z tonight to \nthe 15-20 kt range. The risk for convection and associated reduced \nflight conditions, heavy downpours and gusty wind will increase \nacross central NC after 12z Sun.  \n\nOutlook: A return to VFR conditions is expected Mon, although some \ngusty NW winds will exist. VFR should prevail into midweek.\n\n&&\n\n.RAH WATCHES/WARNINGS/ADVISORIES...\nNone.\n\n&&\n\n$$\n\nDISCUSSION...np/AS \nAVIATION...np\n",
+      "url": "https://api.weather.gov/products/30d075bf-05ab-4e35-a950-3307a2f737d2"
+    },
+    "feed": {
+      "id": "afd",
+      "label": "NWS RAH discussion",
+      "url": "https://api.weather.gov/products/types/AFD/locations/RAH/latest",
+      "status": "ready",
+      "sourceVersion": "nws-afd-monotonic-v1",
+      "retrievalStatus": "verified-latest",
+      "fetchedAt": "2026-10-10T20:58:38.469Z",
+      "checkedAt": "2026-10-10T20:58:38.469Z",
+      "issuedAt": "2026-10-10T18:29:00+00:00",
+      "productUrl": "https://api.weather.gov/products/30d075bf-05ab-4e35-a950-3307a2f737d2",
+      "message": ""
+    },
+    "aiMode": "ai",
+    "generatedAt": "2026-10-10T20:58:51.136Z",
+    "items": []
+  },
+  "observedRefreshVisibility": [
+    {
+      "hidden": false,
+      "text": "Rain from Isaias is moving through tonight, so expect wet and windy weather. Scattered storms could form Sunday and a few may be briefly strong with a small tornado risk in parts of the area. Next week will be warmer and more humid, though Friday may or may not get much hotter depending on how the pattern unfolds."
+    },
+    {
+      "hidden": false,
+      "text": "Rain from Isaias is moving through tonight, so expect wet and windy weather. Scattered storms could form Sunday and a few may be briefly strong with a small tornado risk in parts of the area. Next week will be warmer and more humid, though Friday may or may not get much hotter depending on how the pattern unfolds."
+    },
+    {
+      "hidden": false,
+      "text": "Rain from Isaias is moving through tonight, so expect wet and windy weather. Scattered storms could form Sunday and a few may be briefly strong with a small tornado risk in parts of the area. Next week will be warmer and more humid, though Friday may or may not get much hotter depending on how the pattern unfolds."
+    },
+    {
+      "hidden": false,
+      "text": "Rain from Isaias remnants will keep skies gray tonight and may bring some heavy downpours. Showers and storms could be scattered to widespread Sunday and a few storms could spin up briefly. Temperatures will climb into an unseasonably warm stretch early next week, though how warm Friday night might be is unclear."
+    },
+    {
+      "hidden": false,
+      "text": "Rain from Isaias remnants will keep skies gray tonight and may bring some heavy downpours. Showers and storms could be scattered to widespread Sunday and a few storms could spin up briefly. Temperatures will climb into an unseasonably warm stretch early next week, though how warm Friday night might be is unclear."
+    },
+    {
+      "hidden": false,
+      "text": "Rain from Isaias remnants will keep skies gray tonight and may bring some heavy downpours. Showers and storms could be scattered to widespread Sunday and a few storms could spin up briefly. Temperatures will climb into an unseasonably warm stretch early next week, though how warm Friday night might be is unclear."
+    },
+    {
+      "hidden": false,
+      "text": "Rain from Isaias remnants will keep skies gray tonight and may bring some heavy downpours. Showers and storms could be scattered to widespread Sunday and a few storms could spin up briefly. Temperatures will climb into an unseasonably warm stretch early next week, though how warm Friday night might be is unclear."
+    },
+    {
+      "hidden": false,
+      "text": "Rain from the remnant system will last tonight. Showers and storms Sunday can be strong and may produce brief tornadoes in some spots. Next week should be unseasonably warm, but how warm late in the week is not settled."
+    }
+  ],
+  "distinctWeatherSignatures": 3,
+  "distinctForecastAssemblies": 3,
+  "distinctDiscussionChecks": 2,
+  "browserErrors": []
+}
