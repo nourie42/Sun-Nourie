@@ -142,7 +142,7 @@ export function renderHourlyWeather(forecast, now = Date.now()) {
 }
 export function peakComparison(summary, currentSun) {
   const label='Warmest feels like in the sun today';
-  if (!summary) return {kind:'missing', label:`${label} unavailable`, value:null, time:null, now:false};
+  if (!summary) return {kind:'missing', label:'No direct sun in the remaining forecast today', value:null, time:null, now:false};
   const peak = summary.chosen.value;
   if (summary.mode === 'day' && finite(currentSun) && currentSun > peak) {
     return {kind:'now', label, value:currentSun, time:summary.chosen.time, now:true, later:peak};
@@ -155,7 +155,7 @@ export function peakComparisonHTML(summary, currentSun, zone = 'America/New_York
     const clock=new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',minute:'2-digit'}).format(new Date(now));
     return `<div class="comfort-later" data-comparison="current-only"><span>Warmest feels like in the sun today</span><span class="peak-reading"><strong>${degrees(currentSun)}</strong></span><small>Now · ${esc(clock)} · sunny forecast unavailable</small></div>`;
   }
-  if (!summary) return '<p class="comfort-later">Warmest feels like in the sun today unavailable. Missing readings stay blank.</p>';
+  if (!summary) return '<p class="comfort-later" data-comparison="no-direct-sun"><span>No direct sun in the remaining forecast today</span><small>Clouds, rain, night, or missing sky inputs can remove the sunny-hour estimate.</small></p>';
   const clock=new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',minute:'2-digit'}).format(new Date(comparison.time));
   const time = comparison.now ? `Now is warmest · later high ${degrees(comparison.later)} at ${clock}` : `${clock} · hourly forecast`;
   return `<div class="comfort-later" data-peak-time="${esc(comparison.time)}" data-comparison="${comparison.kind}"><span>${esc(comparison.label)}${summary.partial ? ' · partial forecast' : ''}</span><span class="peak-reading"><strong>${degrees(comparison.value)}</strong></span><small>${esc(time)}</small></div>`;
