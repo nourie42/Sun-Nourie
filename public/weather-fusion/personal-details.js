@@ -1,7 +1,7 @@
 import {weatherState} from './weather-state.js';
 import {thermalRiskHTML} from './thermal-risk.js?v=weather-art-labels-v10';
 import {forecastGrossLevel} from './dewpoint-meter.js?v=weather-qa-v67';
-import {exposureScene,precipitationActivity} from './exposure-scene.js?v=cloudy-people-v1';
+import {exposureScene,precipitationActivity} from './exposure-scene.js?v=rain-area-umbrella-v1';
 import {outdoorExposure} from './outdoor-feels.js?v=weather-qa-v67';
 import {solarElevation} from './weather-math.js?v=weather-qa-v67';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
@@ -102,11 +102,13 @@ export function sunShadeHTML(comfort,location,now=Date.now(),context={}){
   forecast:context.forecast,
   rainAround:context.rainAround===true,
   radarThreat:context.radarThreat===true,
+  rainNearby:context.rainNearby===true,
+  rainInArea:context.rainInArea===true,
  };
- const activeRain=precipitationActivity(condition,sceneContext)==='active';
- const compactSunTitle=!daylight?'Night':activeRain?'Rain':kind==='clear'?'Sun':kind==='partly-cloudy'?'Outdoors':'Day';
- const shadeSubtitle=activeRain?'Rain outside · sheltered':comfortSubtitle(shadeDisplay);
- const outdoorSubtitle=sunDisplay?'Estimated feels like in sun':activeRain?'Raining now':sunSubtitle(outdoorValue,kind,daylight);
+ const rainActivity=precipitationActivity(condition,sceneContext),activeRain=rainActivity==='active',possibleRain=rainActivity==='possible';
+ const compactSunTitle=activeRain?'Rain':possibleRain?'Umbrella':!daylight?'Night':kind==='clear'?'Sun':kind==='partly-cloudy'?'Outdoors':'Day';
+ const shadeSubtitle=activeRain?'Rain outside · sheltered':possibleRain?'Rain nearby · sheltered':comfortSubtitle(shadeDisplay);
+ const outdoorSubtitle=sunDisplay?'Estimated feels like in sun':activeRain?'Raining now':possibleRain?'Keep rain gear handy':sunSubtitle(outdoorValue,kind,daylight);
  return `<div class="sun-shade-comparison" role="group" aria-label="Shade, outdoor and pet temperatures"><figure class="exposure-person shade-person" data-reading="${finite(shadeDisplay)?'available':'unavailable'}" data-temperature="${finite(shadeDisplay)?Math.round(shadeDisplay):''}" data-weather="${esc(kind)}">${context.compact?`<span class="exposure-label">Shade</span><span class="exposure-subtitle">${esc(shadeSubtitle)}</span><span class="exposure-alert-slot"></span>`:''}${exposureScene(false,daylight,condition,shadeDisplay,sceneContext)}<figcaption><strong>${shade}</strong><span class="shade-reading-label">Feels like in shade</span>${context.compact?'':`<span>Modeled shade feels-like · ${period}</span>`}</figcaption></figure><figure class="exposure-person sun-person" data-reading="${finite(outdoorValue)?'available':'unavailable'}" data-weather="${esc(kind)}">${context.compact?`<span class="exposure-label">${esc(compactSunTitle)}</span><span class="exposure-subtitle">${esc(outdoorSubtitle)}</span><span class="exposure-alert-slot">${thermalRiskHTML(rawRiskValue,true)}</span>`:''}${exposureScene(true,daylight,condition,outdoorValue,sceneContext)}<figcaption>${context.compact?'':thermalRiskHTML(rawRiskValue,true)}<strong>${outside}</strong>${context.compact?'':`<span>${sunDisplay?'Sun-exposure estimate':esc(exposure.label)} · ${period}</span>`}</figcaption></figure>${context.pavement||''}</div>${context.compact?'':`<small class="exposure-estimate">${sunDisplay?'Sun: modeled air plus solar uplift; shade: modeled UTCI.':'Estimated feels-like temperatures.'} · °F${note}${basis}${sunDisplay?'':shadeBasis}</small>`}`;
 }
 export function modelFreshnessText(layer,checkedAt,zone='America/New_York',now=Date.now()){
