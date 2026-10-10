@@ -134,5 +134,7 @@ test('warmest sun card uses the same sunny-hour estimate and says the exposure e
  assert.match(peakComparisonHTML(summary,null),/Warmest feels like in the sun today/);
  assert.match(peakComparisonHTML(summary,summary.chosen.value+5),/data-comparison="now"/);
  assert.match(peakComparisonHTML(null,85,'America/New_York',now),/Warmest feels like in the sun today/);
+ assert.match(peakComparisonHTML(null,null,'America/New_York',now),/No direct sun in the remaining forecast today/);
+ assert.doesNotMatch(peakComparisonHTML(null,null,'America/New_York',now),/unavailable/i);
  assert.doesNotMatch(peakComparisonHTML(null,85,'America/New_York',now),/Warmest feels like today/);
 });
