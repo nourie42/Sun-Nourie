@@ -135,6 +135,7 @@ export function exposureScene(sun,daylight=true,condition='Clear',feels=null,con
 export function precipitationActivity(condition='',context={}){
  const weather=weatherState(condition),pop=context.pop;
  if(context.rainAround===true||context.radarThreat===true)return 'active';
+ if(context.rainNearby===true||context.rainInArea===true)return 'possible';
  // Forecast artwork follows the same displayed probability at every hour.
  // A rainy probability should still affect the people scene even when the
  // short condition text says fog/clouds instead of repeating rain.
