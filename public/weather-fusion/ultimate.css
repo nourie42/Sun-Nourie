@@ -188,14 +188,14 @@ body{min-height:100vh;color:var(--ink);background:#070d1a;-webkit-font-smoothing
 #discussion::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15);border-radius:3px}
 
 /* Precip chart */
-.precip-chart{display:flex;align-items:flex-end;gap:5px;height:110px;padding:10px 4px 0}
-.precip-bar{flex:1;min-width:8px;border-radius:6px 6px 3px 3px;
-  background:linear-gradient(180deg,#6aa8ff,rgba(106,168,255,.25));
-  transition:.2s;position:relative}
-.precip-bar:hover{filter:brightness(1.3)}
-.precip-bar span{position:absolute;top:-18px;left:50%;transform:translateX(-50%);
-  font-size:9px;color:var(--rain);font-weight:700;white-space:nowrap;opacity:0;transition:.2s}
-.precip-bar:hover span{opacity:1}
+.precip-chart{display:flex;align-items:flex-end;gap:4px;height:150px;padding:10px 4px 0}
+.pbar-wrap{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
+.precip-bar{width:100%;max-width:22px;border-radius:6px 6px 3px 3px;
+  background:linear-gradient(180deg,#6aa8ff,rgba(106,168,255,.2));
+  transition:.2s;min-height:3px}
+.precip-bar:hover{filter:brightness(1.4)}
+.pbar-t{font-size:8px;color:var(--ink-faint);margin-top:5px;white-space:nowrap}
+.pbar-p{font-size:9px;color:var(--rain);font-weight:700;min-height:12px}
 
 .error{background:rgba(60,10,8,.55);border:1px solid rgba(255,120,90,.5);color:#ffd9cd;
   border-radius:18px;padding:14px 18px;font-size:13px}

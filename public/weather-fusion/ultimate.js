@@ -78,7 +78,10 @@ function renderHero() {
   el('now-cond').textContent = c.condition;
   el('now-feels').textContent = `Feels ${Math.round(c.feelsLike || c.apparent || c.temperature)}°`;
   const d0 = forecast.days?.[0];
-  if (d0) el('now-hilo').textContent = `H ${Math.round(d0.high)}° / L ${Math.round(d0.low)}°`;
+  if (d0) {
+    const hi = finite(d0.high) ? Math.round(d0.high) + '°' : '—';
+    el('now-hilo').textContent = `H ${hi} / L ${Math.round(d0.low)}°`;
+  }
 
   // Insights (best of Glance)
   const insights = [];
@@ -107,33 +110,37 @@ function renderOverview() {
     const t = new Date(h.time);
     const isNow = t.getHours() === nowH && Math.abs(Date.now() - t.getTime()) < 3600000;
     const label = isNow ? 'Now' : t.toLocaleTimeString('en-US', { hour: 'numeric' }).replace(' ', '');
-    const wd = h.windDirection ? `<div class="wd">${windArrow(h.windDirection)} ${Math.round(h.wind || 0)}</div>` : '';
+    const wd = h.windDirection ? `<div class="wd">${h.windDirection} ${Math.round(h.windMph || 0)}</div>` : '';
     return `<div class="hour${isNow ? ' now' : ''}"><div class="t">${label}</div><div class="ic">${iconFor(h.condition)}</div><div class="tp">${Math.round(h.temperature)}°</div><div class="pp">${h.pop >= 15 ? Math.round(h.pop) + '%' : ''}</div>${wd}</div>`;
   }).join('');
 
-  // Precipitation chart
-  const maxPop = Math.max(...hrs.map((h) => h.pop || 0), 1);
-  el('precip-chart').innerHTML = hrs.map((h) => {
-    const pct = Math.round(h.pop || 0);
-    const ht = Math.max(4, (pct / 100) * 100);
-    const t = new Date(h.time).toLocaleTimeString('en-US', { hour: 'numeric' }).replace(' ', '');
-    return `<div class="precip-bar" style="height:${ht}%" title="${t}: ${pct}%"><span>${pct}%</span></div>`;
-  }).join('');
+  // Precipitation chart — bars with labels
+  const pch = el('precip-chart');
+  if (pch) {
+    pch.innerHTML = hrs.map((h) => {
+      const pct = Math.round(h.pop || 0);
+      const ht = pct > 0 ? Math.max(8, pct) : 3;
+      const t = new Date(h.time).toLocaleTimeString('en-US', { hour: 'numeric' }).replace(/\s?[AP]M/i, '');
+      return `<div class="pbar-wrap"><div class="precip-bar" style="height:${ht}%" title="${t}: ${pct}%"></div><div class="pbar-t">${t}</div><div class="pbar-p">${pct > 0 ? pct + '%' : ''}</div></div>`;
+    }).join('');
+  }
 
   // 7-day — rich cards
   const days = (forecast.days || []).slice(0, 7);
-  const gHi = Math.max(...days.map((d) => d.high));
-  const gLo = Math.min(...days.map((d) => d.low));
+  const gHi = Math.max(...days.map((d) => d.high).filter(finite));
+  const gLo = Math.min(...days.map((d) => d.low).filter(finite));
   el('day-cards').innerHTML = days.map((d, i) => {
     const dt = new Date(d.date + 'T12:00:00');
     const name = i === 0 ? 'Today' : dt.toLocaleDateString('en-US', { weekday: 'short' });
-    const l = ((d.low - gLo) / Math.max(1, gHi - gLo)) * 100;
-    const w = Math.max(8, ((d.high - d.low) / Math.max(1, gHi - gLo)) * 100);
+    const hi = finite(d.high) ? d.high : (i === 0 ? forecast.current.temperature : d.high);
+    const hiTxt = finite(hi) ? Math.round(hi) + '°' : '—';
+    const l = finite(d.low) && finite(hi) ? ((d.low - gLo) / Math.max(1, gHi - gLo)) * 100 : 0;
+    const w = finite(d.low) && finite(hi) ? Math.max(8, ((hi - d.low) / Math.max(1, gHi - gLo)) * 100) : 0;
     return `<div class="day-card"><div class="d">${name}</div><div class="ic">${iconFor(d.condition)}</div>
-      <div class="temps"><span class="hi">${Math.round(d.high)}°</span><span class="lo">${Math.round(d.low)}°</span></div>
+      <div class="temps"><span class="hi">${hiTxt}</span><span class="lo">${finite(d.low) ? Math.round(d.low) + '°' : ''}</span></div>
       <div class="bar"><i style="left:${l.toFixed(1)}%;width:${w.toFixed(1)}%"></i></div>
-      <div class="pp">${d.pop >= 15 ? '💧 ' + Math.round(d.pop) + '%' : '&nbsp;'}</div>
-      <div class="wind">${d.wind ? windArrow(d.windDirection || 0) + ' ' + Math.round(d.wind) + ' mph' : ''}</div></div>`;
+      <div class="pp">${(d.pop || 0) >= 15 ? '💧 ' + Math.round(d.pop) + '%' : '&nbsp;'}</div>
+      <div class="wind">${d.windDirection || ''} ${typeof d.wind === 'string' ? d.wind : ''}</div></div>`;
   }).join('');
 
   // Metrics — vibrant with icons
