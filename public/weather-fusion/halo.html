@@ -36,6 +36,7 @@
       <p class="hero-temp"><span id="now-temp">--</span><span class="deg">°</span></p>
       <p class="hero-cond" id="now-cond">&nbsp;</p>
       <p class="hero-hilo" id="now-hilo">&nbsp;</p>
+      <p class="hero-pill" id="hero-pill" aria-live="polite"></p>
     </section>
 
     <p id="error" class="error" role="alert" hidden></p>
@@ -52,6 +53,19 @@
         <div class="hourly-scroll" tabindex="0" aria-label="Hourly forecast, scrollable">
           <ol class="hourly-row" id="hourly"></ol>
         </div>
+      </section>
+
+      <section class="card rain-card" aria-labelledby="rain-title">
+        <h2 class="card-title" id="rain-title"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c-3 5-6 8-6 12a6 6 0 0 0 12 0c0-4-3-7-6-12Z"/></svg>Rain, next 48 hours</h2>
+        <p class="rain-sentence" id="rain-sentence"></p>
+        <div class="rain-band" id="rain-band" role="img" aria-label="Hourly chance of rain for the next 48 hours"></div>
+        <div class="rain-axis" id="rain-axis" aria-hidden="true"></div>
+        <ul class="rain-windows" id="rain-windows"></ul>
+      </section>
+
+      <section class="card insights-card" aria-labelledby="insights-title">
+        <h2 class="card-title" id="insights-title"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8v.01"/></svg>What to know</h2>
+        <ul class="insight-list" id="insight-list"></ul>
       </section>
 
       <section class="card daily" aria-labelledby="daily-title">

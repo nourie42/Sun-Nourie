@@ -7,6 +7,7 @@
 import { weatherIcon, windDirectionLabel } from './weather-display.js?v=weather-qa-v67';
 import { weatherState } from './weather-state.js?v=weather-qa-v67';
 import { finite, rainChanceValue } from './weather-math.js?v=weather-qa-v67';
+import { rainWindows, nextRainSentence, dayChangeSentence, confidenceExplanation, alertGuidance, uvWindow, nextTwelveSentence } from './halo-insights.js?v=halo-insights-v1';
 
 export const H = 3600000;
 const round = (n) => (finite(n) ? Math.round(n) : null);
@@ -291,6 +292,7 @@ export function buildModel(data, nowMs = Date.now()) {
       chance: round(rainChanceValue(d.rainLikelihood, d.pop)),
       qpf: finite(d.qpfBlend?.value) ? d.qpfBlend.value : (finite(d.qpf) ? d.qpf : null),
       condition: d.condition || '', detail: d.detail || '',
+      confidence: d.confidence?.label || null, why: confidenceExplanation(d.confidence),
     };
   });
   const temps = days.flatMap((d) => [d.low, d.high]).filter(finite).concat(finite(temp) ? [temp] : []);
@@ -357,8 +359,26 @@ export function buildModel(data, nowMs = Date.now()) {
       highs: SOURCES.map(([id, label, color]) => ({ id, label, color, value: id === 'nws' ? round(rawDays[0]?.official?.high ?? rawDays[0]?.high) : round(guidance[id]?.high) })),
       note: (data?.modelContributions || []).length ? 'Weights renormalize over the sources reporting for this place and hour. Rain chance is a blended score, not a calibrated probability.' : 'Only the NWS forecast is available for this place right now, so it carries the full weight.',
     },
-    alerts: (data?.alerts || []).slice(0, 4).map((a) => ({ event: a.event || 'Weather alert', headline: a.headline || '', severe: /warning|emergency/i.test(a.event || '') })),
+    alerts: (data?.alerts || []).slice(0, 4).map((a) => ({ event: a.event || 'Weather alert', headline: a.headline || '', severe: /warning|emergency/i.test(a.event || ''), guidance: alertGuidance(a.event || '') })),
+    insights: buildInsights({ series, hours, days, nowMs, tz, uv: series.uv }),
     discussion: disc ? { office: data.discussion.office || '', issued: Date.parse(data.discussion.issuanceTime), excerpt: discussionExcerpt(disc), full: disc } : null,
+  };
+}
+
+/* Derived explanations for the Insights card and the rain timeline. */
+function buildInsights({ series, hours, days, nowMs, tz, uv }) {
+  const end = nowMs + 48 * H;
+  const windows = rainWindows(series.precip, nowMs, end, 30);
+  const span = series.precip.filter((p) => p.t >= nowMs - H && p.t < end);
+  return {
+    windows,
+    spanStart: Math.floor(nowMs / H) * H,
+    spanEnd: end,
+    precipPoints: span.map((p) => ({ t: p.t, v: p.v })),
+    nextRain: nextRainSentence(windows, nowMs, tz),
+    twelve: nextTwelveSentence(hours),
+    change: dayChangeSentence(days[0], days[1], 'tomorrow'),
+    uv: uvWindow(uv, nowMs, tz),
   };
 }
 
@@ -489,6 +509,7 @@ function renderHero(m, place) {
   countUp($('now-temp'), m.hero.temp);
   $('now-cond').textContent = m.hero.condition;
   $('now-hilo').textContent = m.hero.high != null ? `H:${m.hero.high}°  L:${m.hero.low ?? '--'}°` : '';
+  $('hero-pill').textContent = m.insights?.nextRain || '';
   $('compact-place').textContent = name;
   $('compact-line').textContent = `${m.hero.temp ?? '--'}° | ${m.hero.condition}`;
 }
@@ -583,12 +604,48 @@ function renderBlend(m) {
   $('blend-note').textContent = m.blend.note;
 }
 
+/* ---------- Rain timeline & insights ---------- */
+const windowLabel = (t, tz, now) => (t - now > 12 * H ? `${fmt(t, tz, { weekday: 'short' })} ` : '') + hourShort(t, tz);
+function renderRain(m) {
+  const I = m.insights, now = Date.now();
+  $('rain-sentence').textContent = I.nextRain;
+  const band = $('rain-band'), t0 = I.spanStart, t1 = I.spanEnd, span = t1 - t0;
+  const pts = I.precipPoints;
+  const cells = pts.map((p) => {
+    const v = finite(p.v) ? p.v : 0, left = ((p.t - t0) / span) * 100, width = (H / span) * 100;
+    const alpha = (0.08 + Math.min(v, 100) / 100 * 0.85).toFixed(2);
+    const past = p.t + H <= now ? ' past' : '';
+    return `<i class="rb${past}" style="left:${left.toFixed(3)}%;width:${width.toFixed(3)}%;--a:${alpha}" title="${Math.round(v)}% at ${hourShort(p.t, m.tz)}"></i>`;
+  }).join('');
+  const nowLeft = ((now - t0) / span) * 100;
+  band.innerHTML = `${cells}<span class="rb-now" style="left:${Math.min(100, Math.max(0, nowLeft)).toFixed(3)}%"></span>`;
+  const axis = [];
+  for (let t = Math.ceil(t0 / H) * H; t <= t1; t += 12 * H) {
+    axis.push(`<span style="left:${(((t - t0) / span) * 100).toFixed(2)}%">${esc(fmt(t, m.tz, { weekday: 'short' }) + ' ' + hourShort(t, m.tz))}</span>`);
+  }
+  $('rain-axis').innerHTML = axis.join('');
+  $('rain-windows').innerHTML = I.windows.length
+    ? I.windows.map((w) => `<li><b>${esc(windowLabel(w.start, m.tz, now))} – ${esc(hourShort(w.end, m.tz))}</b><span>${Math.round(w.peak)}% peak${w.amount >= 0.01 ? ` · ${inches(w.amount)}` : ''}</span></li>`).join('')
+    : '<li class="none">No window of 30% or more chance of rain in the next 48 hours.</li>';
+}
+
+function renderInsights(m) {
+  const I = m.insights, items = [];
+  if (I.twelve) items.push(['Next 12 hours', I.twelve]);
+  if (I.change) items.push(['Tomorrow', I.change]);
+  if (I.uv) items.push(['Sun protection', `UV peaks at ${Math.round(I.uv.peak)} around ${hourShort(I.uv.peakAt, m.tz)}. Protection is most useful from ${hourShort(I.uv.from, m.tz)} to ${hourShort(I.uv.to, m.tz)}.`]);
+  const d0 = m.days[0];
+  if (d0?.why) items.push([`Confidence today: ${d0.confidence}`, d0.why]);
+  $('insight-list').innerHTML = items.map(([k, v]) => `<li><b>${esc(k)}</b><span>${esc(v)}</span></li>`).join('');
+}
+
 function renderAlerts(m) {
   const card = $('alert-card');
   card.hidden = !m.alerts.length;
   if (!m.alerts.length) return;
   $('alert-title').textContent = m.alerts.some((a) => a.severe) ? 'Severe weather' : 'Weather alert';
   $('alert-body').innerHTML = m.alerts.map((a) => `<p class="alert-row${a.severe ? ' severe' : ''}"><strong>${esc(a.event)}</strong>${a.headline ? ` ${esc(a.headline.startsWith(a.event) ? a.headline.slice(a.event.length).replace(/^[\s:,-]+/, '') : a.headline)}` : ''}</p>`).join('') + '<p class="fine">National Weather Service</p>';
+  for (const a of m.alerts) if (a.guidance) $('alert-body').insertAdjacentHTML('beforeend', `<p class="alert-advice">${esc(a.guidance)}</p>`);
 }
 
 function renderDiscussion(m) {
@@ -615,6 +672,8 @@ function render(m, place) {
   renderAlerts(m);
   renderHourly(m);
   renderDaily(m);
+  renderRain(m);
+  renderInsights(m);
   renderTrend(m);
   renderTiles(m);
   renderBlend(m);

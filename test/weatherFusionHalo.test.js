@@ -93,3 +93,53 @@ test('Halo page and assets are served by the password-protected weather routes',
   const index = await readFile(new URL('../public/weather-fusion/index.html', import.meta.url), 'utf8');
   assert.match(index, /href="\/weather-fusion\/halo\.html"/);
 });
+
+import { rainWindows, nextRainSentence, dayChangeSentence, confidenceExplanation, alertGuidance, uvWindow, nextTwelveSentence } from '../public/weather-fusion/halo-insights.js';
+
+test('rain windows group contiguous wet hours and keep peak and amount', () => {
+  const t0 = now;
+  const pts = [0, 1, 2, 3, 6, 7].map((i) => ({ t: t0 + i * H, v: [10, 40, 65, 35, 80, 30][[0, 1, 2, 3, 6, 7].indexOf(i)], amt: 0.05 }));
+  const w = rainWindows(pts, t0, t0 + 12 * H, 30);
+  assert.equal(w.length, 2, 'a dry gap of more than 1.5 hours splits windows');
+  assert.equal(w[0].peak, 65);
+  assert.ok(Math.abs(w[0].amount - 0.15) < 1e-9);
+  assert.equal(w[1].peak, 80);
+});
+
+test('next rain sentence says when rain starts, or that none is coming', () => {
+  assert.equal(nextRainSentence([], now, tz), 'No rain is expected in the next 48 hours.');
+  const w = [{ start: now + 2 * H, end: now + 4 * H, peak: 60, amount: 0.2 }];
+  assert.match(nextRainSentence(w, now, tz), /^Rain starts around \d+(AM|PM) and runs to about \d+(AM|PM), peaking at 60%, about 0\.20 in total\.$/);
+  const live = [{ start: now - H, end: now + H, peak: 45, amount: 0 }];
+  assert.match(nextRainSentence(live, now, tz), /^Rain is in the forecast now/);
+});
+
+test('day change reads as plain language about warming, cooling and rain', () => {
+  assert.equal(dayChangeSentence({ high: 80, chance: 10 }, { high: 84, chance: 10 }), 'Highs will be 4° warmer tomorrow.');
+  assert.equal(dayChangeSentence({ high: 80, chance: 10 }, { high: 79, chance: 60 }), 'Highs will be about as warm tomorrow with rain chances rising.');
+  assert.equal(dayChangeSentence({ high: 80, chance: 60 }, { high: 70, chance: 10 }), 'Highs will be 10° cooler tomorrow and drier.');
+  assert.equal(dayChangeSentence(null, { high: 70 }), '');
+});
+
+test('confidence and alert guidance only restate documented categories', () => {
+  assert.match(confidenceExplanation({ label: 'Low', factors: ['1 forecast source: NWS'] }), /^Models disagree; plans may change\. Basis: only one forecast source\.$/);
+  assert.equal(confidenceExplanation({}), '');
+  assert.match(alertGuidance('Flash Flood Warning'), /higher ground/);
+  assert.match(alertGuidance('Flood Watch'), /possible/);
+  assert.equal(alertGuidance('Special Weather Statement'), '');
+});
+
+test('UV window spans today\'s protective hours and reports the peak', () => {
+  const day0 = Date.parse('2026-10-11T12:00:00Z');
+  const pts = Array.from({ length: 10 }, (_, i) => ({ t: day0 + (i - 2) * H, v: [1, 2, 3, 5, 7, 8, 7, 5, 2, 1][i] }));
+  const w = uvWindow(pts, day0, tz);
+  assert.ok(w && w.peak === 8);
+  assert.ok(w.to > w.from);
+  assert.equal(uvWindow([], now, tz), null);
+});
+
+test('next-twelve sentence reports range and direction', () => {
+  const hours = Array.from({ length: 12 }, (_, i) => ({ temp: 60 + i }));
+  assert.equal(nextTwelveSentence(hours), 'Over the next 12 hours, temperatures stay between 60° and 71°, warming.');
+  assert.equal(nextTwelveSentence([]), '');
+});
