@@ -64,8 +64,8 @@ try{
    await shell.waitForSelector('.weather-jump-card');
    await shell.waitForFunction(()=>document.documentElement.dataset.weatherPage);
    const nav=await shell.locator('.weather-jump-nav').evaluate(el=>{const cards=[...el.children],rects=cards.map(e=>e.getBoundingClientRect());return {count:cards.length,art:el.querySelectorAll('svg,img,picture,.jump-visual,.jump-arrow').length,overflow:el.scrollWidth>el.clientWidth+1,labels:[...el.querySelectorAll('.jump-label')].map(e=>e.textContent),heights:rects.map(r=>r.height),fonts:[...el.querySelectorAll('.jump-label')].map(e=>parseFloat(getComputedStyle(e).fontSize)),oneRow:Math.max(...rects.map(r=>r.top))-Math.min(...rects.map(r=>r.top))<3,borders:cards.map(e=>parseFloat(getComputedStyle(e).borderTopWidth))}});
-   assert.equal(nav.count,5);assert.equal(nav.art,0);assert.equal(nav.overflow,false);assert.equal(nav.oneRow,true);assert.ok(nav.heights.every(v=>v>=34&&v<=46));assert.ok(nav.fonts.every(v=>v>=8));assert.ok(nav.borders.every(v=>v===0));
-   assert.deepEqual(nav.labels,['Map','Gross Meter','Your Day','7-Day','Air Quality']);
+   assert.equal(nav.count,7);assert.equal(nav.art,0);assert.equal(nav.overflow,false);assert.equal(nav.oneRow,true);assert.ok(nav.heights.every(v=>v>=34&&v<=46));assert.ok(nav.fonts.every(v=>v>=8));assert.ok(nav.borders.every(v=>v===0));
+   assert.deepEqual(nav.labels,['Map','Gross','Your Day','7-Day','AQI']);
    assert.equal(await shell.locator('#weathernext-site-link').isVisible(),path.includes('experimental'));
    assert.equal(await shell.locator('.weathernext-card,[data-model="weathernext3"],#google-status').count(),0);
   }
