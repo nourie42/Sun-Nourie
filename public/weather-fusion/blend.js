@@ -60,7 +60,9 @@ export function buildBlendModel(forecast, wnFeed, locationId, nowMs = Date.now()
 
   const series = hours.map((h) => {
     const src = Object.fromEntries((h.temperatureBlend?.sources || []).map((s) => [s.id, s.value]));
+    const gsrc = Object.fromEntries((h.gustBlend?.sources || []).map((s) => [s.id, s.value]));
     const wn = wnAt(h.time);
+    const popSrc = h.rainLikelihood?.sourceValues || {};
     return {
       time: h.time,
       blend: finite(h.temperatureBlend?.value) ? h.temperatureBlend.value : h.temperature,
@@ -69,6 +71,12 @@ export function buildBlendModel(forecast, wnFeed, locationId, nowMs = Date.now()
       wnP10: wn && finite(wn.temperatureP10F) ? wn.temperatureP10F : null,
       wnP90: wn && finite(wn.temperatureP90F) ? wn.temperatureP90F : null,
       pop: finite(h.rainLikelihood?.value) ? Math.round(h.rainLikelihood.value) : (finite(h.pop) ? Math.round(h.pop) : null),
+      popModels: Object.fromEntries(MODELS.map((m) => [m.id, finite(popSrc[m.id]) ? Math.round(popSrc[m.id]) : null])),
+      dewpoint: finite(h.dewpoint) ? h.dewpoint : null,
+      wnDewpoint: wn && finite(wn.dewpointF) ? wn.dewpointF : null,
+      gust: finite(h.gustBlend?.value) ? h.gustBlend.value : (finite(h.gust) ? h.gust : null),
+      gustModels: Object.fromEntries(MODELS.map((m) => [m.id, gsrc[m.id] ?? null])),
+      wnWind: wn && finite(wn.windMph) ? wn.windMph : null,
     };
   });
 
@@ -135,7 +143,50 @@ export function buildBlendModel(forecast, wnFeed, locationId, nowMs = Date.now()
   };
 }
 
-/* ---- blend arc SVG (pure) ---- */
+/* ---- compare charts (pure) ----
+ * One chart engine, four variables: temperature, rain chance, dew point, wind.
+ * Each shows the house blend against the individual models (and WeatherNext
+ * AI where it publishes that variable). */
+export const CHART_VARS = [
+  { id: 'temp', label: 'Temperature', unit: '°', sub: 'The white line is the house blend. Thin lines are the models. The violet band is Google WeatherNext AI\u2019s uncertainty range.' },
+  { id: 'rain', label: 'Rain chance', unit: '%', sub: 'Each model\u2019s own rain probability for the hour, against the blended chance (white).' },
+  { id: 'dewpoint', label: 'Dew point', unit: '°', sub: 'Blended dew point against Google WeatherNext AI\u2019s call — watch the gap for mugginess.' },
+  { id: 'wind', label: 'Wind gusts', unit: ' mph', sub: 'Each model\u2019s gust call against the blend. Dashed violet is WeatherNext AI\u2019s sustained wind.' },
+];
+
+function chartSeries(model, varId) {
+  const pts = model.series || [];
+  switch (varId) {
+    case 'rain':
+      return {
+        blend: pts.map((p) => p.pop),
+        models: MODELS.map((m) => ({ ...m, vals: pts.map((p) => p.popModels[m.id]) })),
+        band: null, extra: null,
+      };
+    case 'dewpoint':
+      return {
+        blend: pts.map((p) => p.dewpoint),
+        models: [],
+        band: null,
+        extra: [{ vals: pts.map((p) => p.wnDewpoint), cls: 'arc-wn-mean', label: 'WeatherNext AI' }],
+      };
+    case 'wind':
+      return {
+        blend: pts.map((p) => p.gust),
+        models: MODELS.map((m) => ({ ...m, vals: pts.map((p) => p.gustModels[m.id]) })),
+        band: null,
+        extra: [{ vals: pts.map((p) => p.wnWind), cls: 'arc-wn-mean', label: 'WeatherNext AI' }],
+      };
+    default:
+      return {
+        blend: pts.map((p) => p.blend),
+        models: MODELS.map((m) => ({ ...m, vals: pts.map((p) => p.models[m.id]) })),
+        band: { lo: pts.map((p) => p.wnP10), hi: pts.map((p) => p.wnP90), mean: pts.map((p) => p.wnMean) },
+        extra: null,
+      };
+  }
+}
+
 function smoothPath(xy) {
   let d = `M ${xy[0][0].toFixed(1)} ${xy[0][1].toFixed(1)}`;
   for (let i = 0; i < xy.length - 1; i++) {
@@ -147,19 +198,22 @@ function smoothPath(xy) {
   return d;
 }
 
-export function buildBlendArc(model) {
-  const pts = (model.series || []).filter((s) => finite(s.blend));
-  if (pts.length < 4) return '';
+export function buildChart(model, varId = 'temp') {
+  const pts = (model.series || []).filter((s) => Number.isFinite(s.time));
+  const cfg = CHART_VARS.find((c) => c.id === varId) || CHART_VARS[0];
+  const s = chartSeries(model, varId);
+  const hasBlend = s.blend.some(finite);
+  if (!hasBlend || pts.length < 4) return '';
   const W = 640, H = 250, PL = 12, PR = 12, PT = 30, PB = 42;
-  const all = [];
-  for (const p of pts) {
-    all.push(p.blend);
-    for (const m of MODELS) if (finite(p.models[m.id])) all.push(p.models[m.id]);
-    if (finite(p.wnP10)) all.push(p.wnP10);
-    if (finite(p.wnP90)) all.push(p.wnP90);
-  }
-  let lo = Math.min(...all), hi = Math.max(...all);
-  if (hi - lo < 6) { const mid = (hi + lo) / 2; lo = mid - 3; hi = mid + 3; }
+  const all = [...s.blend];
+  for (const m of s.models) all.push(...m.vals);
+  if (s.band) { all.push(...s.band.lo, ...s.band.hi); }
+  if (s.extra) for (const e of s.extra) all.push(...e.vals);
+  const nums = all.filter(finite);
+  if (!nums.length) return '';
+  let lo = Math.min(...nums), hi = Math.max(...nums);
+  if (varId === 'rain') { lo = 0; hi = Math.max(hi, 20); }
+  else if (hi - lo < 6) { const mid = (hi + lo) / 2; lo = mid - 3; hi = mid + 3; }
   const X = (i) => PL + (i * (W - PL - PR)) / (pts.length - 1);
   const Y = (t) => PT + (1 - (t - lo) / (hi - lo)) * (H - PT - PB);
   const line = (vals) => {
@@ -167,34 +221,41 @@ export function buildBlendArc(model) {
     vals.forEach((v, i) => { if (finite(v)) xy.push([X(i), Y(v)]); });
     return xy.length >= 2 ? smoothPath(xy) : '';
   };
-  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Model blend over the next 24 hours">`;
-  // WeatherNext uncertainty band
-  const top = [], bot = [];
-  pts.forEach((p, i) => {
-    if (finite(p.wnP10) && finite(p.wnP90)) { top.push([X(i), Y(p.wnP90)]); bot.unshift([X(i), Y(p.wnP10)]); }
-  });
-  if (top.length >= 2) {
-    svg += `<polygon class="arc-wn-band" points="${top.map((p) => p.map((n) => n.toFixed(1)).join(',')).join(' ')} ${bot.map((p) => p.map((n) => n.toFixed(1)).join(',')).join(' ')}"/>`;
-    const meanD = line(pts.map((p) => p.wnMean));
-    if (meanD) svg += `<path class="arc-wn-mean" d="${meanD}"/>`;
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${cfg.label} model comparison over 24 hours">`;
+  if (s.band) {
+    const top = [], bot = [];
+    pts.forEach((p, i) => {
+      if (finite(s.band.lo[i]) && finite(s.band.hi[i])) { top.push([X(i), Y(s.band.hi[i])]); bot.unshift([X(i), Y(s.band.lo[i])]); }
+    });
+    if (top.length >= 2) {
+      svg += `<polygon class="arc-wn-band" points="${top.map((p) => p.map((n) => n.toFixed(1)).join(',')).join(' ')} ${bot.map((p) => p.map((n) => n.toFixed(1)).join(',')).join(' ')}"/>`;
+      const meanD = line(s.band.mean);
+      if (meanD) svg += `<path class="arc-wn-mean" d="${meanD}"/>`;
+    }
   }
-  // Model lines
-  for (const m of MODELS) {
-    const d = line(pts.map((p) => p.models[m.id]));
+  for (const m of s.models) {
+    const d = line(m.vals);
     if (d) svg += `<path class="arc-line" d="${d}" style="stroke:${m.color}"/>`;
   }
-  // Blend on top
-  const bd = line(pts.map((p) => p.blend));
+  if (s.extra) for (const e of s.extra) {
+    const d = line(e.vals);
+    if (d) svg += `<path class="${e.cls}" d="${d}"/>`;
+  }
+  const bd = line(s.blend);
   if (bd) svg += `<path class="arc-blend" d="${bd}"/>`;
-  // Now marker + hour labels
+  const b0 = s.blend.find(finite);
   svg += `<line class="arc-now" x1="${X(0).toFixed(1)}" y1="${PT - 6}" x2="${X(0).toFixed(1)}" y2="${H - PB}"/>`
-    + `<circle class="arc-now-dot" cx="${X(0).toFixed(1)}" cy="${Y(pts[0].blend).toFixed(1)}" r="5"/>`;
+    + `<circle class="arc-now-dot" cx="${X(0).toFixed(1)}" cy="${Y(b0).toFixed(1)}" r="5"/>`;
   for (let i = 0; i < pts.length; i += 4) {
     svg += `<text x="${X(i).toFixed(1)}" y="${(H - 24).toFixed(1)}" text-anchor="middle">${hourLabel(pts[i].time, model.timeZone)}</text>`;
-    svg += `<text class="arc-temp" x="${X(i).toFixed(1)}" y="${(Y(pts[i].blend) - 10).toFixed(1)}" text-anchor="middle">${Math.round(pts[i].blend)}°</text>`;
+    const bv = s.blend[i];
+    if (finite(bv)) svg += `<text class="arc-temp" x="${X(i).toFixed(1)}" y="${(Y(bv) - 10).toFixed(1)}" text-anchor="middle">${Math.round(bv)}${cfg.unit === ' mph' ? '' : cfg.unit}</text>`;
   }
   return svg + '</svg>';
 }
+
+/* Back-compat: temperature chart */
+export function buildBlendArc(model) { return buildChart(model, 'temp'); }
 
 /* ---------- DOM wiring (browser only) ---------- */
 function el(id) { return document.getElementById(id); }
@@ -234,6 +295,60 @@ function fmtRunAt(iso) {
   return 'run ' + new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' }).format(new Date(t));
 }
 
+/* Chart tabs: one engine, four variables */
+function chartLegends(model, varId) {
+  const w = model.weights;
+  const wp = (id) => `${Math.round((w[id] || 0) * 100)}%`;
+  switch (varId) {
+    case 'rain':
+      return [{ color: '#fff', label: 'Blended chance' },
+        ...MODELS.map((m) => ({ color: m.color, label: `${m.label} ${wp(m.id)}` }))];
+    case 'dewpoint':
+      return [{ color: '#fff', label: 'Blended dew point' }, { color: '#b48cff', label: 'WeatherNext AI', dashed: true }];
+    case 'wind':
+      return [{ color: '#fff', label: 'Blended gust' },
+        ...MODELS.map((m) => ({ color: m.color, label: `${m.label} ${wp(m.id)}` })),
+        { color: '#b48cff', label: 'WeatherNext AI wind', dashed: true }];
+    default:
+      return [{ color: '#fff', label: 'House blend' },
+        ...MODELS.map((m) => ({ color: m.color, label: `${m.label} ${wp(m.id)}` })),
+        { band: true, label: 'WeatherNext AI uncertainty' }];
+  }
+}
+
+function renderChartTabs(model, activeId) {
+  const tabs = el('chart-tabs');
+  tabs.innerHTML = '';
+  for (const v of CHART_VARS) {
+    const b = document.createElement('button');
+    b.className = 'tab';
+    b.setAttribute('role', 'tab');
+    b.setAttribute('aria-selected', v.id === activeId ? 'true' : 'false');
+    b.textContent = v.label;
+    b.addEventListener('click', () => renderChartTabs(model, v.id));
+    tabs.appendChild(b);
+  }
+  const cfg = CHART_VARS.find((c) => c.id === activeId) || CHART_VARS[0];
+  el('chart-sub').textContent = cfg.sub;
+  el('blend-arc').innerHTML = buildChart(model, activeId);
+  const legend = el('blend-legend');
+  legend.innerHTML = '';
+  for (const item of chartLegends(model, activeId)) {
+    const s = document.createElement('span');
+    if (item.band) {
+      const sw = document.createElement('span'); sw.className = 'sw-band'; s.appendChild(sw);
+    } else {
+      const sw = document.createElement('i');
+      sw.style.background = item.dashed
+        ? `repeating-linear-gradient(90deg,${item.color} 0 6px,transparent 6px 10px)`
+        : item.color;
+      s.appendChild(sw);
+    }
+    s.appendChild(document.createTextNode(item.label));
+    legend.appendChild(s);
+  }
+}
+
 export function render(model) {
   setSky(model.sky);
   countUp(el('now-temp'), model.hero.temp);
@@ -241,23 +356,8 @@ export function render(model) {
   const w = model.weights;
   el('blend-line').textContent = `House blend · NWS ${Math.round(w.nws * 100)} · HRRR ${Math.round(w.hrrr * 100)} · NBM ${Math.round(w.nbm * 100)} · ECMWF ${Math.round(w.ecmwf * 100)}`;
   el('now-hilo').textContent = model.hero.high != null ? `H ${model.hero.high}°  ·  L ${model.hero.low ?? '--'}°` : '';
-  el('blend-arc').innerHTML = buildBlendArc(model);
-  const legend = el('blend-legend');
-  legend.innerHTML = '';
-  const addLegend = (color, label, dashed, band) => {
-    const s = document.createElement('span');
-    const sw = document.createElement(band ? 'span' : 'i');
-    if (band) { sw.className = 'sw-band'; }
-    else { sw.style.background = color; if (dashed) sw.style.background = `repeating-linear-gradient(90deg,${color} 0 6px,transparent 6px 10px)`; }
-    s.appendChild(sw);
-    s.appendChild(document.createTextNode(label));
-    legend.appendChild(s);
-  };
-  addLegend('#fff', 'House blend');
-  for (const m of model.modelCards) {
-    if (m.ai) addLegend(null, `${m.label} AI uncertainty`, false, true);
-    else addLegend(m.color, `${m.label} ${Math.round((m.weight || 0) * 100)}%`);
-  }
+  renderChartTabs(model, 'temp');
+
   const cards = el('model-cards');
   cards.innerHTML = '';
   for (const m of model.modelCards) {

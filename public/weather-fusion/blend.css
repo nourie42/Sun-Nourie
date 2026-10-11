@@ -42,6 +42,9 @@ section h2{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:va
 .ai-tag{color:var(--violet);border-color:rgba(180,140,255,.4)}
 
 .arc-card,.rain-card,.ai-week,.models{background:var(--card);border:1px solid var(--card-edge);border-radius:var(--radius);padding:1.1rem 1.1rem 1rem;backdrop-filter:blur(10px)}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:2px 0 12px}
+.tab{appearance:none;border:1px solid var(--card-edge);background:rgba(255,255,255,.05);color:var(--ink-dim);font-weight:800;font-size:13px;padding:.5rem .9rem;border-radius:999px;cursor:pointer}
+.tab[aria-selected="true"]{background:rgba(127,212,255,.16);border-color:rgba(127,212,255,.5);color:var(--ink)}
 .arc{width:100%;overflow:hidden}
 .arc svg{display:block;width:100%;height:auto}
 .arc .arc-line{fill:none;stroke-width:2;stroke-linecap:round;opacity:.85}
