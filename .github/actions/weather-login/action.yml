@@ -6,7 +6,7 @@ inputs:
     required: false
     default: 'https://sun-nourie-live.onrender.com'
   password:
-    description: 'Weather site password (pass ${{ secrets.WEATHER_SITE_PASSWORD }})'
+    description: 'Weather site password (pass the WEATHER_SITE_PASSWORD secret)'
     required: true
   cookie-jar:
     description: 'Path where the curl cookie jar is saved'
