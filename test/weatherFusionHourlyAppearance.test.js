@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {forecastWeatherArtwork,renderHourlyWeather} from '../public/weather-fusion/weather-display.js';
+import {weatherIcon,renderHourlyWeather} from '../public/weather-fusion/weather-display.js';
 import {sevenDayForecast,sevenDayCardHTML} from '../public/weather-fusion/seven-day.js';
 import {danTakeDisplay} from '../public/weather-fusion/dans-summary.js';
 import {preview,now} from './weatherFusion.fixtures.js';
@@ -13,47 +13,44 @@ function rendered(experimental) {
   finally {delete globalThis.document;}
 }
 
-test('experimental artwork changes neither hourly values nor preview targets',()=>{
+test('experimental hourly uses the original markup, values and preview targets',()=>{
   const regular=rendered(false),experimental=rendered(true);
-  const withoutArt=html=>html.replace(/<svg[^>]*data-weather-kind="[^"]*"[^>]*>[\s\S]*?<\/svg>|<span class="seven-day-art"[^>]*><\/span>/g,'');
-  assert.equal(withoutArt(experimental.innerHTML),withoutArt(regular.innerHTML));
+  assert.equal(experimental.innerHTML,regular.innerHTML);
   assert.equal(experimental.scrollLeft,92);
-  assert.match(experimental.innerHTML,/<svg width="44" height="44"/);
+  assert.match(experimental.innerHTML,/<svg width="32" height="32"/);
   assert.doesNotMatch(experimental.innerHTML,/class="seven-day-art"/);
   assert.doesNotMatch(regular.innerHTML,/class="seven-day-art"/);
 });
 
-test('daily and hourly use identical artwork, including night and missing sky',()=>{
+test('daily keeps flat icons without modifying original hourly artwork',()=>{
   const day=sevenDayForecast(preview,now)[0];
   for(const condition of ['Sunny','Mostly Sunny','Partly Cloudy','Rain','Thunderstorms','Snow','Fog',''])for(const isDay of [true,false]) {
-    const art=forecastWeatherArtwork(condition,isDay);
+    const art=weatherIcon(condition,isDay,44);
     assert.ok(sevenDayCardHTML({...day,condition,isDay}).includes(art));
     assert.match(art,/data-weather-kind=/);
   }
-  assert.match(forecastWeatherArtwork('Sunny',false),/class="sky-moon"/);
-  assert.doesNotMatch(forecastWeatherArtwork('Sunny',false),/class="sky-sun"/);
-  assert.doesNotMatch(forecastWeatherArtwork('',true),/seven-day-art/);
+  assert.match(weatherIcon('Sunny',false,44),/class="sky-moon"/);
+  assert.doesNotMatch(weatherIcon('',true,44),/seven-day-art/);
 });
 
-test('hourly styling and artwork are scoped to the experimental page',()=>{
+test('seven-day styling never overrides the original hourly forecast',()=>{
   const css=readFileSync(new URL('../public/weather-fusion/seven-day.css',import.meta.url),'utf8');
   const week=readFileSync(new URL('../public/weather-fusion/seven-day.js',import.meta.url),'utf8');
   const app=readFileSync(new URL('../public/weather-fusion/app.js',import.meta.url),'utf8');
-  assert.match(css,/html\[data-weather-page="experimental"\] #hourly button\.hour\{[^}]*border:1px solid #437b93/);
+  assert.doesNotMatch(css,/#hourly|\.hourly-panel|\.hour-feels|\.hour-uv|\.hour-wind/);
   assert.doesNotMatch(week,/experimental-week-art|seven-day-art\.css/);
-  assert.match(app,/renderHourlyWeather\(data,Date\.now\(\),\{experimental:experimentalPage\}\)/);
+  assert.match(app,/renderHourlyWeather\(data,Date\.now\(\)\)/);
 });
 
-test('quiet forecasts reserve emphasis for headings and temperatures',()=>{
+test('quiet daily cards reserve emphasis for headings and temperatures',()=>{
   const css=readFileSync(new URL('../public/weather-fusion/seven-day.css',import.meta.url),'utf8');
   assert.match(css,/\.seven-day-heading h2\{[^}]*font-weight:600/);
   assert.match(css,/\.seven-day-temperatures strong\{[^}]*font-weight:600/);
   assert.match(css,/\.seven-day-metric strong\{[^}]*font-weight:400/);
-  assert.match(css,/\.seven-day-confidence-label strong\{[^}]*font-weight:500/);
+  assert.match(css,/\.seven-day-confidence-label strong\{[^}]*font-weight:400/);
   assert.match(css,/\.seven-day-card\{[^}]*border-radius:8px;background:#073550/);
   assert.match(css,/\.seven-day-card\[aria-pressed="true"\]\{[^}]*box-shadow:none/);
   assert.match(css,/#today-uncertainty p\{font-weight:400\}/);
-  assert.match(css,/#hourly \.hour-uv>b\{font-weight:400\}/);
   assert.doesNotMatch(css,/font-weight:(?:700|750|800|850)/);
 });
 
