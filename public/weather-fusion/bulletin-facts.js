@@ -13,7 +13,7 @@ export function officialBulletinUrl(value){
  return 'https://www.weather.gov/';
 }
 export function bulletinSourceKey(item){
- let h=2166136261;for(const c of JSON.stringify([item.id,item.title,item.plainSummary,item.description,item.instruction,item.issuedAt,item.expires,item.area]))h=Math.imul(h^c.charCodeAt(0),16777619);
+ let h=2166136261;for(const c of JSON.stringify([item.id,item.title,item.plainSummary,item.description,item.instruction,item.issuedAt,item.expires,item.area,item.scope,item.detection]))h=Math.imul(h^c.charCodeAt(0),16777619);
  return (h>>>0).toString(16);
 }
 export function bulletinFacts(forecast,now=Date.now()){
@@ -21,7 +21,9 @@ export function bulletinFacts(forecast,now=Date.now()){
  for(const a of forecast?.alerts||[]){
   if(!a.id||a.status&&a.status!=='Actual'||a.messageType==='Cancel'||!(Date.parse(a.expires)>now)||Date.parse(a.sent)>now+60000)continue;
   if(a.ends&&Date.parse(a.ends)<=now)continue;
-  const item={id:String(a.id),kind:bulletinKind(a.event),title:a.event||'NWS notice',headline:a.headline||'',area:a.areaDesc||'',issuedAt:a.sent||'',expires:a.expires,severity:a.severity||'',description:a.description||'',instruction:a.instruction||'',url:officialBulletinUrl(a.id)};
+  const detection=a.parameters?.tornadoDetection?.[0]||'';
+  const emergency=/tornado warning/i.test(a.event||'')&&(/tornado emergency/i.test(`${a.headline||''} ${a.description||''}`)||a.parameters?.tornadoDamageThreat?.includes('CATASTROPHIC'));
+  const item={id:String(a.id),kind:bulletinKind(a.event),title:a.event||'NWS notice',headline:a.headline||'',area:a.areaDesc||'',issuedAt:a.sent||'',expires:a.expires,severity:a.severity||'',description:a.description||'',instruction:a.instruction||'',scope:a.scope||'point',detection,emergency,url:officialBulletinUrl(a.url||a.id)};
   item.sourceKey=bulletinSourceKey(item);byId.set(item.id,item);
  }
  // Routine Area Forecast Discussions stay behind the local outlook and science
@@ -36,5 +38,6 @@ export function bulletinFacts(forecast,now=Date.now()){
   const item={id:String(d.id),kind:'discussion',title:d.event||'Heavy Rain & Flash Flooding Discussion',headline:'',area:d.areaDesc||'Heavy-rain discussion covering this location.',issuedAt:d.sent,expires:d.expires,severity:'',plainSummary:d.plainSummary,description:d.description,instruction:d.instruction||'',url:officialBulletinUrl(d.url)};
   item.sourceKey=bulletinSourceKey(item);byId.set(item.id,item);
  }
- return [...byId.values()].sort((a,b)=>Object.keys(BULLETIN_GROUPS).indexOf(a.kind)-Object.keys(BULLETIN_GROUPS).indexOf(b.kind)||Date.parse(b.issuedAt)-Date.parse(a.issuedAt));
+ const priority=item=>/tornado warning/i.test(item.title)?item.emergency?0:item.detection==='OBSERVED'?1:2:/flash flood warning/i.test(item.title)?3:item.kind==='warning'?4:/tornado watch/i.test(item.title)?5:item.kind==='watch'?6:item.kind==='statement'?7:8;
+ return [...byId.values()].sort((a,b)=>priority(a)-priority(b)||Date.parse(b.issuedAt)-Date.parse(a.issuedAt));
 }

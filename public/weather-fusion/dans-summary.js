@@ -1,5 +1,5 @@
 import {plainDanWording,hasDanJargon,collectDanTakeEvidence,visibleDanTakeItems,danTakeText,discussionPeriod,sectionAnchor,explicitForecastUncertainty} from './dans-take.js?v=clear-weather-daygraph-v3';
-import {bulletinFacts} from './bulletin-facts.js';
+import {bulletinFacts} from './bulletin-facts.js?v=county-warnings-v1';
 import {isTonightPeriod} from './weather-math.js?v=weather-qa-v67';
 const norm=v=>String(v||'').replace(/\s+/g,' ').trim();
 const dateKey=(time,zone)=>new Intl.DateTimeFormat('en-CA',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(time));
@@ -53,7 +53,7 @@ export function danCard(briefing,forecast,now=Date.now()){
  const bulletin=bulletinFacts(forecast,now).find(item=>item.kind!=='discussion');
  if(bulletin){
   const advice=bulletin.kind==='warning'?'Take action now and follow the official warning.':bulletin.kind==='watch'?'Be ready to act if a warning is issued.':'Check the official notice for local details.';
-  const text=`${bulletin.title}. ${advice}`;
+  const text=`${bulletin.title}${bulletin.scope==='county'?' in your county - check the official warning area':''}. ${advice}`;
   return {text,changes:text,items:[{...bulletin,summary:text,period:'Right now',official:true}],sourceExcerpt:null,source:'Official NWS alert'};
  }
  const risks=(forecast?.riskOutlooks||[]).filter(r=>Date.parse(r.expires)>now).sort((a,b)=>(b.rank||0)-(a.rank||0));

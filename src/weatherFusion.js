@@ -8,6 +8,7 @@ import {createSpecialDiscussionService} from './weatherFusionSpecialDiscussions.
 import {createPrecipitationDiscussionService} from './weatherFusionPrecipitationDiscussions.js';
 import {createRiskOutlookService,createOutlookDetailService,sanitizeOutlookDetail} from './weatherFusionRisks.js';
 import {createBulletinService} from './weatherFusionBulletins.js';
+import {createAlertService} from './weatherFusionAlerts.js';
 import {pressureTrendFromObservations} from './weatherFusionPressure.js';
 import {eveningPeriod} from './weatherFusionPolicy.js';
 import { addExperience, gridSample, PLAIN_OUTLOOK_INSTRUCTIONS } from './weatherFusionExperience.js';
@@ -442,8 +443,15 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
   const loadRiskOutlooks=createRiskOutlookService({cached,now});
   const loadOutlookDetail=createOutlookDetailService({cached,now,request,env});
   const loadDiscussion=createDiscussionSource({request,now});
+  const loadAlerts=createAlertService({request,cache:new Cache(200,now),now});
+  async function getAlerts(query){
+    const location=coordinates(query),key=`${location.latitude},${location.longitude}`;
+    const point=await feed('point','NWS location',`https://api.weather.gov/points/${key}`,24*HOUR,d=>d.properties);
+    return loadAlerts(location,point.value);
+  }
   async function getForecast(query) {
     const location = coordinates(query), key = `${location.latitude},${location.longitude}`;
+    const liveAlerts=getAlerts(query);
     const snapshot=await forecastCache.get(key, MINUTE, async () => {
       const pointFeed = await feed('point', 'NWS location', `https://api.weather.gov/points/${key}`, 24 * HOUR, (d) => d.properties);
       const point = pointFeed.value;
@@ -455,7 +463,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
         forecast: get('nws', 'NWS forecast', point?.forecast, 2 * MINUTE, (d) => d.properties?.periods?.length ? d.properties : null),
         hourly: get('hourly', 'NWS hourly', point?.forecastHourly, 2 * MINUTE, (d) => d.properties?.periods?.length ? d.properties : null),
         grid: get('grid', 'NWS precipitation grid', point?.forecastGridData, 2 * MINUTE, (d) => d.properties),
-        alerts: feed('alerts', 'Official NWS alerts', `https://api.weather.gov/alerts/active?point=${key}`, MINUTE, (d) => Array.isArray(d.features) ? d.features.filter((f) => f.properties?.status === 'Actual' && f.properties?.messageType !== 'Cancel' && Date.parse(f.properties?.expires) > now()).map((f) => ({ id: f.id, geometry: f.geometry, ...f.properties })) : null),
+        alerts: liveAlerts.then(data=>({value:data.alerts,meta:data.feeds[0]})),
         discussion: loadDiscussion(point?.cwa),
         observation: point?.observationStations ? feed('observation', 'Nearby station observation', point.observationStations, 5 * MINUTE, async (d) => {
           const distance = (s) => { const c=s.geometry?.coordinates; return c ? (c[1]-location.latitude)**2+((c[0]-location.longitude)*Math.cos(location.latitude*Math.PI/180))**2 : Infinity; };
@@ -494,7 +502,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
         nbm: loadModel('nbm', location),
       };
       const values = Object.fromEntries(await Promise.all(Object.entries(jobs).map(async ([id, promise]) => [id, await promise])));
-      const data = Object.fromEntries(Object.entries(values).map(([id, f]) => [id, Array.isArray(f.meta)?f.value:(f.meta.status === 'ready' ? f.value : null)]));
+      const data = Object.fromEntries(Object.entries(values).map(([id, f]) => [id, id==='alerts'||Array.isArray(f.meta)?f.value:(f.meta.status === 'ready' ? f.value : null)]));
       const feedMeta=[pointFeed.meta,...Object.values(values).flatMap(f=>Array.isArray(f.meta)?f.meta:[f.meta])];
       const result = buildForecast({ ...data, point, location, models: { hrrr: data.hrrr, ecmwf: data.ecmwf, nbm: data.nbm }, feeds: feedMeta, now: now() });
       // Access never exposes the provider credential or a made-up model run timestamp.
@@ -505,7 +513,10 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
       result.directModelStatus = result.modelContributions.length === 3 ? 'ready' : 'partial';
       return result;
     });
-    return {...snapshot,danTake:retainedTake(snapshot),...retainedSummary(snapshot)};
+    const alerts=await liveAlerts;
+    const current={...snapshot,alerts:alerts.alerts,feeds:[...snapshot.feeds.filter(f=>f.id!=='alerts'),...alerts.feeds]};
+    current.signature=hash({forecast:snapshot.signature,alerts:current.alerts,alertStatus:alerts.feeds[0].status});
+    return {...current,danTake:retainedTake(current),...retainedSummary(current)};
   }
   function fallback(data, reason) {
     const evening = isTonightPeriod(now(),data.location.timeZone);
@@ -663,7 +674,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
     const kind=String(query.kind||'').toLowerCase();
     return sanitizeOutlookDetail(await loadOutlookDetail({kind,location}));
   }
-  return { getForecast, getBriefing, getBulletins, getOutlook, search, radar, modelMaps: direct.maps };
+  return { getForecast, getAlerts, getBriefing, getBulletins, getOutlook, search, radar, modelMaps: direct.maps };
 }
 
 export function registerWeatherFusionRoutes(app, options = {}) {
@@ -701,7 +712,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     res.sendFile(path.join(PUBLIC_DIR,'weathernext-site.html'),{lastModified:false,cacheControl:false});
   });
   for (const name of [
-    'forecast-windows.js','forecast-window-banners.js','forecast-window-banners.css','forecast-status.js',
+    'forecast-windows.js','forecast-window-banners.js','forecast-window-banners.css','forecast-status.js','live-alerts.js','urgent-alerts.css',
     'seven-day.js','seven-day.css','seven-day-art.css',
     'request-deadline.js','weather-changes.js','air-quality.js','alert-banners.js','app.js','bulletin-facts.js','bulletins.js','car-wash.js','car-wash.css','car-wash-background.webp','car-wash-corvette-hood.webp',
     'model-explanation.js','model-explanation.css','weathernext-site.html','weathernext-site.css','weathernext-site.js','weathernext-data.js','weathernext-catalog.json',
@@ -723,6 +734,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     res.sendFile(path.join(PUBLIC_DIR, name));
   });
   app.get('/api/weather-fusion/forecast', route(service.getForecast));
+  app.get('/api/weather-fusion/alerts', route(service.getAlerts));
   app.get('/api/weather-fusion/briefing', route(service.getBriefing));
   app.get('/api/weather-fusion/bulletins', route(service.getBulletins));
   app.get('/api/weather-fusion/outlook', route(service.getOutlook));
