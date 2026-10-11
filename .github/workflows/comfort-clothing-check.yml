@@ -79,10 +79,10 @@ jobs:
           for attempt in range(40):
               try:
                   page=read('/weather-fusion/?clothing-check='+str(attempt)).decode()
-                  assert '/weather-fusion/app.js?v=wardrobe-v1' in page,'Previous page build is still deployed'
+                  assert '/weather-fusion/app.js?v=county-warnings-v14' in page,'Previous page build is still deployed'
                   observed={name:hashlib.sha256(read('/weather-fusion/'+name+'?clothing-check='+str(attempt))).hexdigest() for name in names}
                   assert observed==expected,'Waiting for all module versions to match'
-                  print(json.dumps({'deployed':True,'version':'wardrobe-v1','verifiedModules':names}))
+                  print(json.dumps({'deployed':True,'version':'county-warnings-v14','verifiedModules':names}))
                   break
               except Exception as error:
                   print('Deployment check:',str(error),flush=True)

@@ -8,9 +8,11 @@ import fs from 'node:fs/promises';
 const base=process.env.WEATHER_BASE_URL || 'http://127.0.0.1:3123';
 const live=process.env.WEATHER_LIVE_CHECK==='true';
 const dir=process.env.WEATHER_REPORT_DIR || '/tmp/weather-browser-results';
+const siteCookie=process.env.WEATHER_SITE_COOKIE||'';
+const siteHeaders=siteCookie?{Cookie:`weather_site_auth=${siteCookie}`}:{};
 await fs.mkdir(dir,{recursive:true});
 async function json(path){
- const res=await fetch(base+path,{signal:AbortSignal.timeout(75000)});
+ const res=await fetch(base+path,{headers:siteHeaders,signal:AbortSignal.timeout(75000)});
  assert.ok(res.ok,`${path}: HTTP ${res.status}`);return res.json();
 }
 // Do not mistake a previous deployment with the same old schema for this repair.
@@ -22,7 +24,7 @@ if(live){
    try{
      const d=await json('/api/weather-fusion/forecast?location=knightdale');
      if(d.repairVersion===REPAIR_VERSION){
-       const actual=await Promise.all(paths.map(async p=>{const res=await fetch(base+'/weather-fusion/'+p+'?verify='+Date.now(),{cache:'no-store',signal:AbortSignal.timeout(15000)});if(!res.ok)return false;return createHash('sha256').update(await res.text()).digest('hex')===wanted[p];}));
+       const actual=await Promise.all(paths.map(async p=>{const res=await fetch(base+'/weather-fusion/'+p+'?verify='+Date.now(),{headers:siteHeaders,cache:'no-store',signal:AbortSignal.timeout(15000)});if(!res.ok)return false;return createHash('sha256').update(await res.text()).digest('hex')===wanted[p];}));
        deployed=actual.every(Boolean);
      }
    }catch{}
