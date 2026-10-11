@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {Cache,createWeatherService} from '../src/weatherFusion.js';
 import {createAlertService,mergeOfficialAlerts} from '../src/weatherFusionAlerts.js';
 import {bulletinFacts} from '../public/weather-fusion/bulletin-facts.js';
-import {withLiveAlerts,alertHealth} from '../public/weather-fusion/live-alerts.js';
+import {withLiveAlerts,alertHealth,alertLocationKey} from '../public/weather-fusion/live-alerts.js';
 import {danCard} from '../public/weather-fusion/dans-summary.js';
 const now=Date.parse('2026-10-11T17:38:00Z');
 const location={latitude:35.787,longitude:-78.4806};
@@ -83,6 +83,12 @@ test('alert endpoint operates without invoking any slow model or forecast provid
   throw Error('Forecast/model fetch must not run');
  }});
  const data=await s.getAlerts(location);assert.equal(data.alerts.length,1);assert.equal(calls.length,3);
+});
+test('searched coordinates match the NWS four-decimal normalization without losing warnings',()=>{
+ const searched={latitude:35.787123,longitude:-78.480645},normalized={latitude:35.7871,longitude:-78.4806};
+ assert.equal(alertLocationKey(searched),alertLocationKey(normalized));assert.equal(alertLocationKey({}),null);
+ const f={location:searched,alerts:[],feeds:[]},live={location:normalized,alerts:[feature().properties],feeds:[{id:'alerts',status:'ready',fetchedAt:new Date(now).toISOString()}]};
+ assert.equal(withLiveAlerts(f,live).alerts.length,1);
 });
 test('warnings remain available during a cached full-forecast interval',async()=>{
  let time=now,warn=false;const s=createWeatherService({now:()=>time,env:{},fetchImpl:async url=>{
