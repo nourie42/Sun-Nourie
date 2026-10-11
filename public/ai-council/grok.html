@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0a0a0b">
+  <meta name="color-scheme" content="dark">
+  <title>Grok-style AI Chat</title>
+  <link rel="stylesheet" href="/ai-council/grok.css">
+</head>
+<body>
+<div class="grok-app">
+  <!-- Sidebar -->
+  <aside class="grok-side" id="sidebar">
+    <div class="grok-side-head">
+      <button class="grok-new" id="newChatBtn"><span class="plus">＋</span> New chat</button>
+    </div>
+    <div class="grok-hist" id="history">
+      <div class="grok-hist-title">Recent</div>
+      <div id="histList"></div>
+    </div>
+    <div class="grok-side-foot">
+      <a class="grok-bots-link" href="/ai-council/bots/">🤖 <span>My Bots</span></a>
+    </div>
+  </aside>
+  <div class="grok-scrim" id="scrim"></div>
+
+  <!-- Main -->
+  <div class="grok-main">
+    <header class="grok-top">
+      <div style="display:flex;align-items:center;gap:4px">
+        <button class="grok-icon grok-menu-btn" id="menuBtn" aria-label="Menu">☰</button>
+        <button class="grok-model" id="modelBtn"><span id="modelName">Grok AI</span><span class="chev">▾</span></button>
+      </div>
+      <div class="grok-actions">
+        <button class="grok-icon" id="shareBtn" aria-label="Share">⤴</button>
+      </div>
+    </header>
+
+    <div class="grok-messages" id="messages">
+      <div class="grok-empty" id="emptyState">
+        <div class="mark">✦</div>
+        <h1>What do you want to know?</h1>
+        <p>Ask anything. I'll pick the best AI for your question.</p>
+        <div class="grok-suggest">
+          <button data-q="Explain something complex simply">Explain something complex<small>Pick a topic, I'll break it down</small></button>
+          <button data-q="Help me write something">Help me write<small>Emails, docs, messages</small></button>
+          <button data-q="What happened in the news today?">Today's news<small>Catch me up quickly</small></button>
+          <button data-q="Give me an interesting fact">Surprise me<small>Something I didn't know</small></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="grok-compose">
+      <div class="grok-compose-inner">
+        <div class="grok-input">
+          <textarea id="prompt" rows="1" placeholder="Ask anything"></textarea>
+          <div class="grok-input-bar">
+            <div class="grok-tools">
+              <button class="grok-tool on" id="webBtn">🌐 Web</button>
+              <button class="grok-tool" id="thinkBtn">🧠 Think</button>
+            </div>
+            <button class="grok-send" id="sendBtn" disabled>↑</button>
+          </div>
+        </div>
+        <div class="grok-fine">AI can make mistakes. Verify important info.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Model picker sheet -->
+<div class="grok-scrim" id="modelScrim"></div>
+<aside class="sheet" id="modelSheet" style="position:fixed;left:50%;top:50%;transform:translate(-50%,-50%) scale(.96);opacity:0;pointer-events:none;transition:.18s;width:min(420px,calc(100% - 32px));background:#161618;border:1px solid #2c2c31;border-radius:20px;padding:8px;z-index:60">
+  <div id="modelList"></div>
+</aside>
+
+<script type="module" src="/ai-council/grok.js"></script>
+</body>
+</html>
