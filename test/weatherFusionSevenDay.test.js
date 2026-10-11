@@ -52,9 +52,21 @@ test('observed rain follows the current-day policy and never spreads to later ca
   assert.ok(days.slice(1).every(day=>!day.observed));
 });
 
-test('the regular page does not mount a carousel or touch the document',()=>{
-  assert.equal(createSevenDayCarousel({experimental:false}),null);
-  assert.equal(createSevenDayCarousel({experimental:true}),null);
+test('the shared carousel is safe to import without a browser document',()=>{
+  assert.equal(createSevenDayCarousel(),null);
+  assert.equal(createSevenDayCarousel({onOpenDay:()=>{}}),null);
+});
+
+test('main and experimental pages share an ungated carousel below the weather take',()=>{
+  const app=readFileSync(new URL('../public/weather-fusion/app.js',import.meta.url),'utf8');
+  assert.match(app,/const sevenDayCarousel=createSevenDayCarousel\(\{onOpenDay:index=>showDay\(index\)\}\)/);
+  const anchors=[];
+  globalThis.document={querySelector:selector=>{anchors.push(selector);return null;}};
+  try {
+    assert.equal(createSevenDayCarousel(),null);
+    assert.equal(createSevenDayCarousel({onOpenDay:()=>{}}),null);
+    assert.deepEqual(anchors,['.hero .today-panel','.hero .today-panel']);
+  }finally{delete globalThis.document;}
 });
 
 test('day cards open the existing details dialog without an inline details row',()=>{
