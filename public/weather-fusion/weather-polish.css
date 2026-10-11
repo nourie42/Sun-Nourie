@@ -140,8 +140,8 @@ body[data-sky="night"] .air-quality-panel{background:radial-gradient(ellipse at 
 [data-confidence="low"],[data-confidence="very-low"]{--confidence-color:var(--confidence-low)}
 [data-confidence="unavailable"]{--confidence-color:#b9cce3}
 .forecast-confidence[data-confidence]>b,#today-forecast .forecast-confidence[data-confidence]>b,.dialog-confidence[data-confidence]>summary{color:var(--confidence-color,#b9cce3)}
-.confidence-meter{background:var(--confidence-scale)}
+.confidence-meter{background:var(--confidence-scale);overflow:visible;margin-inline:7px}
 .confidence-meter em{position:relative;background:transparent;border-radius:0}
-.confidence-meter em::after{content:"";position:absolute;right:0;top:0;box-sizing:border-box;width:5px;height:100%;border:1px solid #fff;border-radius:4px;background:var(--confidence-color,#b9cce3)}
+.confidence-meter em::after{content:"";position:absolute;right:0;top:50%;box-sizing:border-box;width:14px;height:14px;border:2px solid #fff;border-radius:50%;background:var(--confidence-color,#b9cce3);box-shadow:0 0 0 1px #052f4f,0 1px 3px #00152299;transform:translate(50%,-50%)}
 .forecast-confidence-notice[data-confidence],.dialog-confidence-notice[data-confidence],.today-confidence-banner{border-color:var(--confidence-color,var(--confidence-low));background:linear-gradient(135deg,#ff777b20,#134b7820)}
 .forecast-confidence-notice[data-confidence]>strong,.dialog-confidence-notice[data-confidence]>strong,.today-confidence-banner>strong{color:var(--confidence-color,var(--confidence-low))}
