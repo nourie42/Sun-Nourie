@@ -6,6 +6,7 @@ import {dailyDisplay} from '../public/weather-fusion/weather-math.js';
 import {displayedRainChance} from '../public/weather-fusion/rain-display.js';
 import {forecastPeriodSummary} from '../public/weather-fusion/forecast-story.js';
 import {preview,now,H} from './weatherFusion.fixtures.js';
+import {confidenceMeterPosition} from '../public/weather-fusion/forecast-confidence.js';
 
 test('seven day cards share the existing daily timing, rain, totals and confidence',()=>{
   const days=sevenDayForecast(preview,now);
@@ -66,15 +67,15 @@ test('compact cards retain every forecast reading and the absolute confidence sc
     assert.match(html,/Wind/);
     assert.ok(html.includes(`data-confidence="${key}"`));
     assert.ok(html.includes(`aria-valuenow="${score}"`));
-    assert.ok(html.includes(`--confidence:${score}%`));
+    assert.ok(html.includes(`--confidence:${confidenceMeterPosition(day.confidence)}%`));
   }
 });
 
-test('all confidence meters share a fading red-yellow-green absolute scale',()=>{
+test('all confidence meters share fading red-yellow-green category segments',()=>{
   const polish=readFileSync(new URL('../public/weather-fusion/weather-polish.css',import.meta.url),'utf8');
   const week=readFileSync(new URL('../public/weather-fusion/seven-day.css',import.meta.url),'utf8');
   assert.match(polish,/--confidence-scale:linear-gradient\(90deg,var\(--confidence-low\).*var\(--confidence-medium\).*var\(--confidence-high\)/);
-  assert.match(polish,/--confidence-scale:linear-gradient\(90deg,var\(--confidence-low\) 0%,var\(--confidence-medium\) 40%,var\(--confidence-high\) 60%,var\(--confidence-high\) 100%\)/);
+  assert.match(polish,/--confidence-scale:linear-gradient\(90deg,var\(--confidence-low\) 0%,var\(--confidence-low\) 30%,var\(--confidence-medium\) 40%,var\(--confidence-medium\) 60%,var\(--confidence-high\) 70%,var\(--confidence-high\) 100%\)/);
   assert.doesNotMatch(polish,/var\(--confidence-low\) 55%/);
   assert.match(polish,/\[data-confidence="high"\]\{--confidence-color:var\(--confidence-high\)/);
   assert.match(polish,/\[data-confidence="moderate"\]\{--confidence-color:var\(--confidence-medium\)/);
@@ -83,6 +84,40 @@ test('all confidence meters share a fading red-yellow-green absolute scale',()=>
   assert.match(polish,/\.confidence-meter em\{position:relative;background:transparent/);
   assert.match(week,/\.seven-day-meter\{[^}]*background:var\(--confidence-scale\)/);
   assert.match(week,/height:var\(--week-height,/);
+});
+
+test('confidence dots stay in their label color range, including category boundaries',()=>{
+  for(const [key,scores,min,max] of [
+    ['very-low',[0,35,50],0,30],
+    ['low',[55,60,65,69.99],0,30],
+    ['moderate',[70,75,80,84.99],40,60],
+    ['high',[85,90,95,100],70,100]
+  ]){
+    let previous=-1;
+    for(const score of scores){
+      const confidence={key,score};
+      const position=confidenceMeterPosition(confidence);
+      assert.ok(position>=min&&position<=max,`${key} ${score}: ${position}`);
+      assert.ok(position>=previous);previous=position;
+      assert.equal(confidence.score,score);
+    }
+  }
+  assert.equal(confidenceMeterPosition({key:'low',score:65}),27.86);
+  assert.equal(confidenceMeterPosition({key:'moderate',score:75}),46.67);
+  assert.equal(confidenceMeterPosition({key:'high',score:95}),90);
+  assert.equal(confidenceMeterPosition({key:'high',score:75}),70,'alternate model labels remain authoritative');
+  assert.equal(confidenceMeterPosition({key:'moderate',score:50}),40);
+  assert.equal(confidenceMeterPosition({key:'high',score:150}),100);
+  assert.equal(confidenceMeterPosition({key:'low',score:-1}),0);
+  for(const confidence of [null,{}, {key:'unavailable',score:70},{key:'low',score:null},{key:'high',score:NaN}])assert.equal(confidenceMeterPosition(confidence),null);
+});
+
+test('confidence labels use normal weight across daily cards and the day dialog',()=>{
+  const polish=readFileSync(new URL('../public/weather-fusion/weather-polish.css',import.meta.url),'utf8');
+  const week=readFileSync(new URL('../public/weather-fusion/seven-day.css',import.meta.url),'utf8');
+  assert.match(week,/\.seven-day-confidence-label strong\{[^}]*font-weight:400/);
+  assert.match(polish,/\.dialog-confidence\[data-confidence\]>summary\{[^}]*font-weight:400/);
+  assert.match(polish,/\.forecast-confidence,\.forecast-confidence>span\{font-weight:400\}/);
 });
 
 test('card widths follow hourly geometry and confidence dots remain large and outlined',()=>{
