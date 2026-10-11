@@ -46,7 +46,7 @@ function confidenceHTML(confidence) {
 export function sevenDayCardHTML(day,selected=false) {
   const description=`${day.label}, ${day.dateLabel}, ${day.condition}. High ${reading(day.high)} degrees, low ${reading(day.low)} degrees. Rain chance ${reading(day.pop,'%')}. Total precipitation ${reading(day.amount,' inches',2)}. Wind ${reading(day.wind,' mph')}. Forecast confidence ${day.confidence?.label||'unavailable'}.`;
   const metric=(kind,label,value)=>`<span class="seven-day-metric">${weatherMetricIcon(kind)}<span>${label}</span><strong>${value}</strong></span>`;
-  return `<button type="button" class="seven-day-card" data-week-day="${day.index}" data-date="${esc(day.date)}" aria-pressed="${selected}" aria-controls="seven-day-detail" aria-label="${esc(description)}"><span class="seven-day-name">${esc(day.label)}</span><span class="seven-day-date">${esc(day.dateLabel)}</span>${artHTML(day)}<span class="seven-day-condition" title="${esc(day.condition)}">${esc(day.shortCondition)}</span><span class="seven-day-temperatures"><span><strong>${reading(day.high,'\u00b0')}</strong><small>High</small></span><span><strong>${reading(day.low,'\u00b0')}</strong><small>Low</small></span></span><span class="seven-day-metrics">${metric('drop',day.observed?'Rain now':'Rain chance',reading(day.pop,'%'))}${metric('drop','Total precip',reading(day.amount,' in',2))}${metric('wind','Wind',reading(day.wind,' mph'))}</span>${confidenceHTML(day.confidence)}</button>`;
+  return `<button type="button" class="seven-day-card" data-week-day="${day.index}" data-date="${esc(day.date)}" aria-pressed="${selected}" aria-controls="seven-day-detail" aria-label="${esc(description)}"><span class="seven-day-card-heading"><span class="seven-day-name">${esc(day.label)}</span><span class="seven-day-date">${esc(day.dateLabel)}</span></span><span class="seven-day-weather">${artHTML(day)}<span class="seven-day-condition" title="${esc(day.condition)}">${esc(day.shortCondition)}</span></span><span class="seven-day-temperatures"><span><strong>${reading(day.high,'\u00b0')}</strong><small>High</small></span><span><strong>${reading(day.low,'\u00b0')}</strong><small>Low</small></span></span><span class="seven-day-metrics">${metric('drop',day.observed?'Rain now':'Rain chance',reading(day.pop,'%'))}${metric('drop','Total precip',reading(day.amount,' in',2))}${metric('wind','Wind',reading(day.wind,' mph'))}</span>${confidenceHTML(day.confidence)}</button>`;
 }
 
 function detailHTML(day) {
@@ -58,10 +58,10 @@ export function createSevenDayCarousel({experimental=false,onOpenDay=()=>{}}={})
   const anchor=document.querySelector('.hero .today-panel');if(!anchor)return null;
   for(const [id,name] of [['experimental-week-styles','seven-day.css'],['experimental-week-art','seven-day-art.css']]) {
     if(document.getElementById(id))continue;
-    const link=document.createElement('link');link.id=id;link.rel='stylesheet';link.href=`/weather-fusion/${name}?v=experimental-week-v1`;document.head.append(link);
+    const link=document.createElement('link');link.id=id;link.rel='stylesheet';link.href=`/weather-fusion/${name}?v=compact-week-v2`;document.head.append(link);
   }
   const root=document.createElement('section');root.id='experimental-week';root.className='experimental-week';root.hidden=true;root.setAttribute('aria-labelledby','seven-day-title');
-  root.innerHTML=`<div class="seven-day-carousel"><div class="seven-day-heading"><div><h2 id="seven-day-title">7-Day Forecast</h2><p>Swipe for all 7 days <span aria-hidden="true">\u2192</span></p></div><div class="seven-day-controls"><button type="button" data-week-step="-1" aria-label="Previous forecast days" title="Previous forecast days" aria-controls="seven-day-rail" disabled>${chevron('left')}</button><button type="button" data-week-step="1" aria-label="Next forecast days" title="Next forecast days" aria-controls="seven-day-rail" disabled>${chevron('right')}</button></div></div><div id="seven-day-rail" class="seven-day-rail" tabindex="0" aria-label="Seven-day forecast"></div><input type="range" class="seven-day-scroll" min="0" max="1000" value="0" aria-label="Scroll seven-day forecast" aria-controls="seven-day-rail" disabled><p class="seven-day-caption">Tap a day for details</p></div><div id="seven-day-detail" class="seven-day-detail" aria-live="polite" aria-atomic="true" hidden></div>`;
+  root.innerHTML=`<div class="seven-day-carousel"><div class="seven-day-heading"><h2 id="seven-day-title">7-Day Forecast</h2><div class="seven-day-controls"><button type="button" data-week-step="-1" aria-label="Previous forecast days" title="Previous forecast days" aria-controls="seven-day-rail" disabled>${chevron('left')}</button><button type="button" data-week-step="1" aria-label="Next forecast days" title="Next forecast days" aria-controls="seven-day-rail" disabled>${chevron('right')}</button></div></div><div id="seven-day-rail" class="seven-day-rail" tabindex="0" aria-label="Seven-day forecast"></div><input type="range" class="seven-day-scroll" min="0" max="1000" value="0" aria-label="Scroll seven-day forecast" aria-controls="seven-day-rail" disabled></div><div id="seven-day-detail" class="seven-day-detail" aria-live="polite" aria-atomic="true" hidden></div>`;
   anchor.after(root);
   const rail=root.querySelector('.seven-day-rail'),slider=root.querySelector('.seven-day-scroll'),detail=root.querySelector('.seven-day-detail');
   const previous=root.querySelector('[data-week-step="-1"]'),next=root.querySelector('[data-week-step="1"]');
@@ -78,7 +78,12 @@ export function createSevenDayCarousel({experimental=false,onOpenDay=()=>{}}={})
     rail.querySelectorAll('[data-week-day]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.date===selectedDate)));
     detail.innerHTML=detailHTML(day);detail.hidden=false;
     detail.querySelector('.seven-day-open').addEventListener('click',()=>onOpenDay(day.index));
-    if(focus){const button=rail.querySelector(`[data-week-day="${index}"]`);button?.focus({preventScroll:true});button?.scrollIntoView({block:'nearest',inline:'nearest',behavior:reducedMotion()?'auto':'smooth'});}
+    if(focus){
+      const button=rail.querySelector(`[data-week-day="${index}"]`),behavior=reducedMotion()?'auto':'smooth';
+      button?.focus({preventScroll:true});
+      if(index===0||index===days.length-1)rail.scrollTo({left:index===0?0:rail.scrollWidth-rail.clientWidth,behavior});
+      else button?.scrollIntoView({block:'nearest',inline:'nearest',behavior});
+    }
   }
   root.querySelectorAll('[data-week-step]').forEach(button=>button.addEventListener('click',()=>{
     const card=rail.querySelector('.seven-day-card');
@@ -106,7 +111,15 @@ export function createSevenDayCarousel({experimental=false,onOpenDay=()=>{}}={})
   });
   const endDrag=()=>{drag=null;rail.classList.remove('is-dragging');};
   rail.addEventListener('pointerup',endDrag);rail.addEventListener('pointercancel',endDrag);rail.addEventListener('lostpointercapture',endDrag);
-  if(typeof ResizeObserver!=='undefined')new ResizeObserver(updateScroll).observe(rail);
+  const hourly=document.querySelector('.hero .hourly-panel');
+  const matchHourlyHeight=()=>{
+    const height=hourly?.getBoundingClientRect().height;
+    if(height>0)root.style.setProperty('--week-height',`${height}px`);
+  };
+  if(typeof ResizeObserver!=='undefined'){
+    new ResizeObserver(updateScroll).observe(rail);
+    if(hourly)new ResizeObserver(matchHourlyHeight).observe(hourly);
+  }
   return {
     render(forecast,now=Date.now()) {
       const key=`${forecast.location?.latitude},${forecast.location?.longitude}`,left=key===locationKey?rail.scrollLeft:0;
@@ -117,7 +130,7 @@ export function createSevenDayCarousel({experimental=false,onOpenDay=()=>{}}={})
       rail.innerHTML=days.map(day=>sevenDayCardHTML(day,day.date===selectedDate)).join('');
       rail.scrollLeft=left;select(days.find(day=>day.date===selectedDate).index);
       if(focusedDate){const button=[...rail.children].find(value=>value.dataset.date===focusedDate);button?.focus({preventScroll:true});}
-      updateScroll();requestAnimationFrame(updateScroll);
+      matchHourlyHeight();updateScroll();requestAnimationFrame(()=>{matchHourlyHeight();updateScroll();});
     },
     reset() {days=[];selectedDate=null;locationKey=null;root.hidden=true;rail.replaceChildren();detail.replaceChildren();detail.hidden=true;rail.scrollLeft=0;updateScroll();}
   };
