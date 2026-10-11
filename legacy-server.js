@@ -14,8 +14,10 @@ import { fileURLToPath } from "url";
 import crypto from "crypto";
 import PDFDocument from "pdfkit";
 import { adjustCompetitionCounts } from "./src/competition.js";
+import { registerWeatherSiteAccess } from "./src/weatherSiteAccess.js";
 
 const app = express();
+registerWeatherSiteAccess(app);
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
 
