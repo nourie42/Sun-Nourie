@@ -98,7 +98,7 @@ export function registerWeatherComparisonRoutes(app,{fetchImpl=globalThis.fetch,
   try{const html=await readFile(root+'index.html','utf8');res.set('Cache-Control','no-cache').type('html').send(html);
   }catch(e){next(e);}
  });
- app.get(['/weathernext','/weathernext/','/weather-fusion/weathernext-site.html'],async(req,res)=>{try{
+ app.get(['/weathernext','/weathernext/'],async(req,res)=>{try{
   // Do not let a stale pre-repair WeatherNext dashboard survive a mobile
   // conditional GET. This is the first /weathernext route registered by server.js.
   delete req.headers['if-none-match'];

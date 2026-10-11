@@ -32,7 +32,7 @@ jobs:
           set -euo pipefail
           mkdir -p /tmp/weathernext-material-live
           for attempt in $(seq 1 40); do
-            if curl -fsSL -b /tmp/weather-site-cookies.txt --max-time 25 -D /tmp/weathernext-material-live/headers.txt "$LIVE_URL/weathernext/?verify=$GITHUB_SHA&attempt=$attempt" -o /tmp/weathernext-material-live/index.html \
+            if curl -fsSL -b /tmp/weather-site-cookies.txt --max-time 25 -D /tmp/weathernext-material-live/headers.txt "$LIVE_URL/weather-fusion/weathernext-site.html?verify=$GITHUB_SHA&attempt=$attempt" -o /tmp/weathernext-material-live/index.html \
               && grep -Fq 'data-build="wn-repair-20260925"' /tmp/weathernext-material-live/index.html \
               && grep -Fq 'id="hour-strip"' /tmp/weathernext-material-live/index.html \
               && grep -Fq 'id="scene"' /tmp/weathernext-material-live/index.html \
