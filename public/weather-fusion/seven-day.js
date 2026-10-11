@@ -58,7 +58,7 @@ export function createSevenDayCarousel({experimental=false,onOpenDay=()=>{}}={})
   const anchor=document.querySelector('.hero .today-panel');if(!anchor)return null;
   for(const [id,name] of [['experimental-week-styles','seven-day.css'],['experimental-week-art','seven-day-art.css']]) {
     if(document.getElementById(id))continue;
-    const link=document.createElement('link');link.id=id;link.rel='stylesheet';link.href=`/weather-fusion/${name}?v=compact-week-v2`;document.head.append(link);
+    const link=document.createElement('link');link.id=id;link.rel='stylesheet';link.href=`/weather-fusion/${name}?v=compact-week-v3`;document.head.append(link);
   }
   const root=document.createElement('section');root.id='experimental-week';root.className='experimental-week';root.hidden=true;root.setAttribute('aria-labelledby','seven-day-title');
   root.innerHTML=`<div class="seven-day-carousel"><div class="seven-day-heading"><h2 id="seven-day-title">7-Day Forecast</h2><div class="seven-day-controls"><button type="button" data-week-step="-1" aria-label="Previous forecast days" title="Previous forecast days" aria-controls="seven-day-rail" disabled>${chevron('left')}</button><button type="button" data-week-step="1" aria-label="Next forecast days" title="Next forecast days" aria-controls="seven-day-rail" disabled>${chevron('right')}</button></div></div><div id="seven-day-rail" class="seven-day-rail" tabindex="0" aria-label="Seven-day forecast"></div><input type="range" class="seven-day-scroll" min="0" max="1000" value="0" aria-label="Scroll seven-day forecast" aria-controls="seven-day-rail" disabled></div><div id="seven-day-detail" class="seven-day-detail" aria-live="polite" aria-atomic="true" hidden></div>`;
