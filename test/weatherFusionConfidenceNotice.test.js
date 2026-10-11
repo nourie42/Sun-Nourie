@@ -44,6 +44,8 @@ test('daily rows give every low-confidence future period a visible click-for-det
  assert.match(rows[1],/data-condition="Rain"/,'dominant rain replaces sunny-only icon artwork');
  assert.match(rows[2],/class="forecast-confidence-notice"[\s\S]*Very low confidence forecast[\s\S]*Click for details\./);
  assert.doesNotMatch(rows[3],/forecast-confidence-notice|Click for details/);
+ assert.match(rows[1],/data-confidence-score="60"><em style="width:25\.71%"/,'Low confidence is shown on the red left segment, not at the raw-score midpoint');
+ assert.match(rows[2],/data-confidence-score="45"><em style="width:19\.29%"/);
 });
 
 test('the open-day dialog uses a distinct, styled lower-confidence notice',()=>{

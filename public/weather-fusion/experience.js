@@ -1,5 +1,5 @@
 import {confidenceNotice,todayForecastHTML} from './today-card.js?v=mobile-repair-v1';
-import {FORECAST_CONFIDENCE_VERSION} from './forecast-confidence.js?v=weather-art-labels-v10';
+import {FORECAST_CONFIDENCE_VERSION,confidenceMeterPosition} from './forecast-confidence.js?v=category-meter-v1';
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
 import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=wardrobe-v1';
 import {weatherState} from './weather-state.js';
@@ -134,6 +134,7 @@ export function renderDailyRows(forecast,icon) {
  const rows=forecast.days.map((d,i)=>{
   const now=Date.now(),p=dailyDisplay(d,i,now,forecast.location.timeZone),rain=displayedRainChance(forecast,p.pop,{dayIndex:i,now}),shownPop=rain.value,bar=temperatureBar(p.primary,lo,hi),feel=dailyFeels(forecast,i,now);
   const confidence=d.confidence||{label:'Unavailable',score:null,key:'unavailable',factors:[],note:'Forecast confidence data is unavailable.'};
+  const confidencePosition=confidenceMeterPosition(confidence);
   const plainConfidenceNotice=confidenceNotice(confidence);
   const confidenceNoticeHTML=dailyConfidenceNoticeHTML(confidence);
   const confidenceTitle=`Forecast confidence: ${confidence.label}. ${confidence.factors?.join('; ')||confidence.note||''} ${confidence.note||''}`.trim();
@@ -152,7 +153,7 @@ export function renderDailyRows(forecast,icon) {
    <span class="temp-track" aria-hidden="true">${bar===null?'':`<span class="temp-fill" style="left:0;width:${bar}%"></span><i class="high-marker" style="left:clamp(4px,${bar}%,calc(100% - 4px))"></i>`}</span>
    <span class="day-high">${finite(high)?`<strong>${temp(high)}</strong><small>High</small>`:''}</span>
    <span class="day-feels-summary"><small>Feels like</small><b>${feelsText}</b></span>
-   <span class="day-meta"><span class="forecast-confidence" data-confidence="${esc(confidence.key)}" title="${esc(confidenceTitle)}"><span>Forecast confidence</span><b>${esc(confidence.label)}</b>${finite(confidence.score)?`<i class="confidence-meter" aria-hidden="true"><em style="width:${confidence.score}%"></em></i>`:''}</span><span class="day-wind-chip" title="${esc(wind.text)}${gusty?` · Gust ${wind.gust} mph`:'' }"><span class="day-wind-label">Wind</span><b>${esc(windSpeed.replace(/\s*mph$/i,''))}</b><span class="day-wind-unit">mph</span>${gusty?`<em>G${wind.gust}</em>`:''}</span><span class="day-aqi-chip" title="Peak available AQI forecast for this date"><span>AQI</span><b>${finite(dayAqi)?Math.round(dayAqi):'—'}</b></span>${dailyUvHTML(d.uvMax,p.tonight?'Peak UV today':'Peak UV')}</span>
+   <span class="day-meta"><span class="forecast-confidence" data-confidence="${esc(confidence.key)}" title="${esc(confidenceTitle)}"><span>Forecast confidence</span><b>${esc(confidence.label)}</b>${confidencePosition!==null?`<i class="confidence-meter" aria-hidden="true" data-confidence-score="${confidence.score}"><em style="width:${confidencePosition}%"></em></i>`:''}</span><span class="day-wind-chip" title="${esc(wind.text)}${gusty?` · Gust ${wind.gust} mph`:'' }"><span class="day-wind-label">Wind</span><b>${esc(windSpeed.replace(/\s*mph$/i,''))}</b><span class="day-wind-unit">mph</span>${gusty?`<em>G${wind.gust}</em>`:''}</span><span class="day-aqi-chip" title="Peak available AQI forecast for this date"><span>AQI</span><b>${finite(dayAqi)?Math.round(dayAqi):'—'}</b></span>${dailyUvHTML(d.uvMax,p.tonight?'Peak UV today':'Peak UV')}</span>
    ${confidenceNoticeHTML}
   </button>`;
  });
