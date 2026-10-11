@@ -3,142 +3,176 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#0a1730">
+  <meta name="theme-color" content="#2f6fb8">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Halo · Weather Nourie</title>
-  <meta name="description" content="Halo: the Weather Nourie forecast blend, presented as a living sky.">
+  <meta name="description" content="Halo: the Weather Nourie forecast blend in a beautiful, interactive weather app.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,200;9..144,300;9..144,500&family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700&display=swap">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
   <link rel="stylesheet" href="/weather-fusion/halo.css">
+  <script async src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" onload="window.dispatchEvent(new Event('halo-leaflet-ready'))"></script>
 </head>
 <body data-phase="day" data-weather="clear">
   <div class="sky" aria-hidden="true">
     <div class="sky-gradient"></div>
+    <div class="sky-overcast"></div>
     <div class="sky-glow"></div>
-    <div class="sky-clouds"><span></span><span></span><span></span><span></span></div>
+    <div class="sky-clouds"><span></span><span></span><span></span><span></span><span></span><span></span></div>
     <canvas id="sky-canvas" class="sky-canvas"></canvas>
-    <div class="sky-grain"></div>
   </div>
 
-  <div class="page">
-    <header class="topbar">
-      <a class="brand" href="/weather-fusion/" aria-label="Back to Weather Nourie">
-        <span class="brand-ring" aria-hidden="true"></span>
-        <span>Halo</span>
-      </a>
-      <div class="place" id="place">
-        <button class="place-btn" id="place-btn" type="button" aria-haspopup="dialog" aria-expanded="false">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21Z"/><circle cx="12" cy="9.5" r="2.4"/></svg>
-          <span id="place-name">Knightdale / Raleigh</span>
-          <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
-        </button>
-        <div class="place-panel" id="place-panel" role="dialog" aria-label="Choose a location" hidden>
-          <div class="place-presets">
-            <button type="button" data-location="knightdale">Knightdale / Raleigh</button>
-            <button type="button" data-location="greenville">Greenville, NC</button>
-          </div>
-          <label class="place-search">
-            <span class="sr-only">Search U.S. places</span>
-            <input id="place-input" type="search" placeholder="Search any U.S. city…" autocomplete="off" maxlength="80">
-          </label>
-          <ul class="place-results" id="place-results"></ul>
-          <p class="place-note">Saved places include HRRR, NBM and ECMWF guidance. Searched places use the NWS forecast.</p>
-        </div>
-      </div>
-    </header>
+  <header class="compact" id="compact" aria-hidden="true">
+    <span class="compact-place" id="compact-place"></span>
+    <span class="compact-line" id="compact-line"></span>
+  </header>
 
-    <div id="alerts" class="alerts" hidden></div>
+  <div class="app">
+    <section class="hero" id="hero" aria-label="Current conditions">
+      <p class="hero-kicker" id="hero-kicker">Weather Nourie</p>
+      <h1 class="hero-place" id="hero-place">Loading…</h1>
+      <p class="hero-temp"><span id="now-temp">--</span><span class="deg">°</span></p>
+      <p class="hero-cond" id="now-cond">&nbsp;</p>
+      <p class="hero-hilo" id="now-hilo">&nbsp;</p>
+    </section>
+
     <p id="error" class="error" role="alert" hidden></p>
 
-    <main id="main" aria-busy="true">
-      <section class="hero" aria-label="Current conditions">
-        <p class="hero-eyebrow"><span id="hero-time">—</span></p>
-        <h1 class="hero-temp"><span id="now-temp">--</span><span class="deg">°</span></h1>
-        <p class="hero-cond" id="now-cond">Reading the sky…</p>
-        <p class="hero-meta">
-          <span id="now-feels"></span>
-          <span id="now-hilo"></span>
-        </p>
-        <p class="hero-story" id="story"></p>
+    <main class="cards" id="cards" aria-busy="true">
+      <section class="card alert-card" id="alert-card" hidden>
+        <h2 class="card-title"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 21h20L12 3Z"/><path d="M12 10v5M12 18v.01"/></svg><span id="alert-title">Severe weather</span></h2>
+        <div id="alert-body"></div>
       </section>
 
       <section class="card hourly" aria-labelledby="hourly-title">
-        <header class="card-head">
-          <h2 id="hourly-title">Next 24 hours</h2>
-          <p class="card-sub" id="hourly-sub">Temperature and blended rain chance</p>
-        </header>
-        <div class="hourly-scroll" id="hourly-scroll" tabindex="0" aria-label="Hourly forecast, scrollable">
-          <div class="hourly-track" id="hourly"></div>
+        <p class="hourly-summary" id="hourly-summary"></p>
+        <h2 class="card-title" id="hourly-title"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Hourly forecast</h2>
+        <div class="hourly-scroll" tabindex="0" aria-label="Hourly forecast, scrollable">
+          <ol class="hourly-row" id="hourly"></ol>
         </div>
       </section>
 
-      <div class="grid">
-        <section class="card week" aria-labelledby="week-title">
-          <header class="card-head">
-            <h2 id="week-title">The week ahead</h2>
-            <p class="card-sub">Blended highs, lows and rain chance</p>
-          </header>
-          <ol class="week-list" id="week"></ol>
-        </section>
+      <section class="card daily" aria-labelledby="daily-title">
+        <h2 class="card-title" id="daily-title"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span id="daily-count">10-day forecast</span></h2>
+        <ol class="daily-list" id="daily"></ol>
+      </section>
 
-        <section class="card sun" aria-labelledby="sun-title">
-          <header class="card-head">
-            <h2 id="sun-title">Daylight</h2>
-            <p class="card-sub" id="sun-sub"></p>
-          </header>
-          <div class="sun-arc" id="sun-arc"></div>
-          <div class="sun-times">
-            <div><span class="k">Sunrise</span><span class="v" id="sunrise">—</span></div>
-            <div><span class="k">Sunset</span><span class="v" id="sunset">—</span></div>
+      <section class="card trends" aria-labelledby="trends-title">
+        <h2 class="card-title" id="trends-title"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l5-6 4 4 8-9"/><path d="M3 21h18"/></svg>Next 48 hours</h2>
+        <div class="seg" id="trend-seg" role="tablist" aria-label="Choose a graph">
+          <button role="tab" data-metric="temperature" aria-selected="true">Temp</button>
+          <button role="tab" data-metric="feels">Feels</button>
+          <button role="tab" data-metric="precip">Rain</button>
+          <button role="tab" data-metric="wind">Wind</button>
+          <button role="tab" data-metric="humidity">Humidity</button>
+        </div>
+        <div class="readout"><span class="readout-v" id="trend-v">--</span><span class="readout-t" id="trend-t"></span></div>
+        <div class="chart" id="trend-chart"></div>
+        <button class="more" type="button" id="trend-more">Open conditions <span aria-hidden="true">›</span></button>
+      </section>
+
+      <section class="card map-card" id="map-card" aria-labelledby="map-title">
+        <h2 class="card-title" id="map-title"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Z"/><path d="M9 4v14M15 6v14"/></svg>Precipitation radar</h2>
+        <div class="map-wrap">
+          <div id="map" class="map" role="img" aria-label="Observed NOAA radar around this location"></div>
+          <div class="map-hud">
+            <button type="button" class="map-btn" id="map-play" aria-label="Pause radar loop">❚❚</button>
+            <div class="map-timeline"><i id="map-progress"></i></div>
+            <span class="map-time" id="map-time">—</span>
+            <button type="button" class="map-btn" id="map-expand" aria-label="Expand map">⤢</button>
           </div>
-        </section>
-      </div>
+          <p class="map-msg" id="map-msg" hidden></p>
+        </div>
+      </section>
 
-      <section class="tiles" id="tiles" aria-label="Conditions in detail"></section>
+      <div class="tiles" id="tiles"></div>
 
       <section class="card blend" aria-labelledby="blend-title">
-        <header class="card-head">
-          <h2 id="blend-title">How this forecast is made</h2>
-          <p class="card-sub">The same Weather Nourie blend as the main site</p>
-        </header>
+        <h2 class="card-title" id="blend-title"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="9" r="5"/><circle cx="16" cy="9" r="5"/><circle cx="12" cy="16" r="5"/></svg>How this forecast is made</h2>
         <div class="blend-body">
-          <div class="blend-col">
-            <h3>Today</h3>
-            <div class="blend-bar" id="blend-today"></div>
-            <ul class="blend-legend" id="blend-today-legend"></ul>
-          </div>
-          <div class="blend-col">
-            <h3>Later days · rain</h3>
-            <div class="blend-bar" id="blend-later"></div>
-            <ul class="blend-legend" id="blend-later-legend"></ul>
-          </div>
-          <div class="blend-col">
-            <h3>Today's high, by source</h3>
-            <ul class="model-highs" id="model-highs"></ul>
-          </div>
+          <div><h3>Today's blend</h3><div class="blend-bar" id="blend-today"></div><ul class="legend" id="blend-today-legend"></ul></div>
+          <div><h3>Later days · rain</h3><div class="blend-bar" id="blend-later"></div><ul class="legend" id="blend-later-legend"></ul></div>
+          <div><h3>Today's high by source</h3><ul class="legend" id="model-highs"></ul></div>
         </div>
-        <p class="blend-note" id="blend-note"></p>
+        <p class="fine" id="blend-note"></p>
       </section>
 
       <section class="card discussion" id="discussion" aria-labelledby="disc-title" hidden>
-        <header class="card-head">
-          <h2 id="disc-title">From the forecasters</h2>
-          <p class="card-sub" id="disc-sub"></p>
-        </header>
-        <blockquote id="disc-quote"></blockquote>
-        <details>
-          <summary>Read the full discussion</summary>
-          <pre id="disc-full"></pre>
-        </details>
+        <h2 class="card-title" id="disc-title"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H8l-4 4V5Z"/></svg><span id="disc-sub">Forecaster notes</span></h2>
+        <p class="disc-quote" id="disc-quote"></p>
+        <details><summary>Read the full NWS discussion</summary><pre id="disc-full"></pre></details>
       </section>
     </main>
 
     <footer class="foot">
       <p id="updated" aria-live="polite"></p>
-      <p>Forecast: official NWS data blended with NOAA HRRR, NOAA NBM and ECMWF IFS guidance. Rain chances are uncalibrated blend scores, not certified probabilities. Official NWS warnings are shown unmodified.</p>
-      <p class="links"><a href="/weather-fusion/">Full Weather Nourie →</a> <a href="/weather-fusion/glance.html">Glance →</a> <a href="/weather-fusion/blend.html">Blend →</a></p>
+      <p>Official NWS data blended with NOAA HRRR, NOAA NBM and ECMWF IFS guidance — the same Weather Nourie calculations as the main site. Rain chances are uncalibrated blend scores. NWS warnings are shown unmodified.</p>
+      <p class="links"><a href="/weather-fusion/">Full Weather Nourie</a><a href="/weather-fusion/glance.html">Glance</a><a href="/weather-fusion/blend.html">Blend</a></p>
     </footer>
   </div>
+
+  <nav class="toolbar" aria-label="Locations">
+    <button type="button" class="tool" id="tool-map" aria-label="Jump to radar map"><svg viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Z"/><path d="M9 4v14M15 6v14"/></svg></button>
+    <div class="dots" id="dots" role="tablist" aria-label="Saved locations"></div>
+    <button type="button" class="tool" id="tool-list" aria-label="Show locations"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/></svg></button>
+  </nav>
+
+  <dialog class="sheet" id="sheet" aria-labelledby="sheet-title">
+    <div class="sheet-inner">
+      <header class="sheet-head">
+        <span class="sheet-grab" aria-hidden="true"></span>
+        <h2 id="sheet-title">Conditions</h2>
+        <button type="button" class="close" data-close aria-label="Close">✕</button>
+      </header>
+      <div class="day-strip" id="day-strip" role="tablist" aria-label="Choose a day"></div>
+      <p class="sheet-date" id="sheet-date"></p>
+      <div class="sheet-top">
+        <div class="readout big"><span class="readout-v" id="sheet-v">--</span><span class="readout-t" id="sheet-t"></span></div>
+        <label class="metric-pick">
+          <span class="sr-only">Metric</span>
+          <select id="sheet-metric">
+            <option value="temperature">Temperature</option>
+            <option value="feels">Feels Like</option>
+            <option value="precip">Precipitation</option>
+            <option value="wind">Wind</option>
+            <option value="humidity">Humidity</option>
+            <option value="dewpoint">Dew Point</option>
+            <option value="uv">UV Index</option>
+          </select>
+        </label>
+      </div>
+      <div class="chart tall" id="sheet-chart"></div>
+      <section class="sheet-sum">
+        <h3>Daily summary</h3>
+        <p id="sheet-summary"></p>
+      </section>
+      <section class="sheet-sum" id="sheet-compare-wrap">
+        <h3>Day comparison</h3>
+        <div id="sheet-compare"></div>
+      </section>
+      <p class="fine" id="sheet-note"></p>
+    </div>
+  </dialog>
+
+  <dialog class="sheet places" id="places" aria-labelledby="places-title">
+    <div class="sheet-inner">
+      <header class="sheet-head">
+        <span class="sheet-grab" aria-hidden="true"></span>
+        <h2 id="places-title" class="places-title">Weather</h2>
+        <button type="button" class="close" data-close aria-label="Close">✕</button>
+      </header>
+      <label class="search">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+        <span class="sr-only">Search for a city</span>
+        <input id="place-input" type="search" placeholder="Search for a U.S. city" autocomplete="off" maxlength="80">
+      </label>
+      <ul class="results" id="place-results"></ul>
+      <ul class="place-cards" id="place-cards"></ul>
+      <p class="fine">Saved places with direct model coverage use HRRR, NBM and ECMWF guidance; other U.S. places use the NWS forecast.</p>
+    </div>
+  </dialog>
 
   <script type="module" src="/weather-fusion/halo.js"></script>
 </body>
