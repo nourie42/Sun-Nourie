@@ -22,7 +22,7 @@ try{
   let offline=false;
   await page.route('**/models/weathernext-full.json',route=>route.fulfill({status:offline?503:200,contentType:'application/json',body:offline?'{}':JSON.stringify(weatherNextFixture(catalog))}));
   await page.addInitScript(()=>{Date.now=()=>Date.parse('2026-09-24T13:00:00Z');});
-  await page.goto(base+'/weathernext/',{waitUntil:'networkidle'});
+  await page.goto(base+'/weather-fusion/weathernext-site.html',{waitUntil:'networkidle'});
   await page.waitForSelector('#forecast:not([hidden])');
   assert.equal(await page.locator('#variable option').count(),21);
   assert.equal(await page.locator('#hour').getAttribute('max'),'359');
@@ -76,7 +76,7 @@ try{
  // A first-load failure must not display fabricated or placeholder forecast values.
  const context=await browser.newContext();const p=await context.newPage();
  await p.route('**/models/weathernext-full.json',r=>r.fulfill({status:503,body:'{}'}));
- await p.goto(base+'/weathernext/',{waitUntil:'networkidle'});
+ await p.goto(base+'/weather-fusion/weathernext-site.html',{waitUntil:'networkidle'});
  assert.equal(await p.locator('#forecast').isVisible(),false);assert.match(await p.locator('#status').innerText(),/No forecast loaded/);await context.close();
  report.success=true;report.checks=['All 21 field selectors and six ensemble statistics','360-hour main and separate 48-hour interim runs','Hour slider and daily/full-horizon navigation','Location selection','CSV actual download and 360 records','Refresh failure retains original values and timestamps','First-load failure displays no invented forecast','Five borderless image-free buttons in one row at all six widths','Experimental-only link and no embedded WeatherNext card','Production static route allowlist','No horizontal overflow or JavaScript errors'];
 }finally{await fs.writeFile(output+'/report.json',JSON.stringify(report,null,2));await browser.close();await new Promise(r=>server.close(r));}
