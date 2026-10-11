@@ -2,7 +2,8 @@ import {dailyDisplay,finite} from './weather-math.js?v=full-day-rain-v1';
 import {displayedRainChance} from './rain-display.js?v=rain-observed-v1';
 import {forecastPeriodSummary} from './forecast-story.js?v=weather-qa-v67';
 import {shortForecastCondition} from './today-card.js?v=mobile-repair-v1';
-import {forecastWeatherArtwork,weatherMetricIcon} from './weather-display.js?v=quiet-forecasts-v6';
+import {weatherIcon,weatherMetricIcon} from './weather-display.js?v=restore-hourly-v7';
+import {confidenceMeterPosition} from './forecast-confidence.js?v=category-meter-v1';
 
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const reading=(value,unit='',digits=0)=>finite(value)?`${value.toFixed(digits)}${unit}`:'\u2014';
@@ -31,13 +32,14 @@ export function sevenDayForecast(forecast,now=Date.now()) {
 }
 
 function artHTML(day) {
-  return forecastWeatherArtwork(day.condition,day.isDay);
+  return weatherIcon(day.condition,day.isDay,44);
 }
 
 function confidenceHTML(confidence) {
   const score=finite(confidence?.score)?Math.max(0,Math.min(100,confidence.score)):null;
+  const position=confidenceMeterPosition(confidence);
   const title=[...(confidence?.factors||[]),confidence?.note].filter(Boolean).join(' \u00b7 ');
-  return `<span class="seven-day-confidence" data-confidence="${esc(confidence?.key||'unavailable')}" title="${esc(title)}"><span class="seven-day-confidence-label"><span>Confidence</span><strong>${esc(confidence?.label||'Unavailable')}</strong></span>${score===null?'<span class="seven-day-confidence-missing">\u2014</span>':`<span class="seven-day-meter" role="meter" aria-label="Relative forecast confidence" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${score}" aria-valuetext="${esc(confidence.label)}"><span style="--confidence:${score}%"></span></span>`}</span>`;
+  return `<span class="seven-day-confidence" data-confidence="${esc(confidence?.key||'unavailable')}" title="${esc(title)}"><span class="seven-day-confidence-label"><span>Confidence</span><strong>${esc(confidence?.label||'Unavailable')}</strong></span>${position===null?'<span class="seven-day-confidence-missing">\u2014</span>':`<span class="seven-day-meter" role="meter" aria-label="Relative forecast confidence" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${score}" aria-valuetext="${esc(confidence.label)}"><span style="--confidence:${position}%"></span></span>`}</span>`;
 }
 
 export function sevenDayCardHTML(day,selected=false) {
@@ -56,7 +58,7 @@ export function createSevenDayCarousel({experimental=false,onOpenDay=()=>{}}={})
   const anchor=document.querySelector('.hero .today-panel');if(!anchor)return null;
   for(const [id,name] of [['experimental-week-styles','seven-day.css']]) {
     if(document.getElementById(id))continue;
-    const link=document.createElement('link');link.id=id;link.rel='stylesheet';link.href=`/weather-fusion/${name}?v=quiet-forecasts-v6`;document.head.append(link);
+    const link=document.createElement('link');link.id=id;link.rel='stylesheet';link.href=`/weather-fusion/${name}?v=restore-hourly-v7`;document.head.append(link);
   }
   const root=document.createElement('section');root.id='experimental-week';root.className='experimental-week';root.hidden=true;root.setAttribute('aria-labelledby','seven-day-title');
   root.innerHTML=`<div class="seven-day-carousel"><div class="seven-day-heading"><h2 id="seven-day-title">7-Day Forecast</h2><div class="seven-day-controls"><button type="button" data-week-step="-1" aria-label="Previous forecast days" title="Previous forecast days" aria-controls="seven-day-rail" disabled>${chevron('left')}</button><button type="button" data-week-step="1" aria-label="Next forecast days" title="Next forecast days" aria-controls="seven-day-rail" disabled>${chevron('right')}</button></div></div><div id="seven-day-detail" class="seven-day-detail" aria-live="polite" aria-atomic="true" hidden></div><div id="seven-day-rail" class="seven-day-rail" tabindex="0" aria-label="Seven-day forecast"></div><input type="range" class="seven-day-scroll" min="0" max="1000" value="0" aria-label="Scroll seven-day forecast" aria-controls="seven-day-rail" disabled></div>`;
