@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Glance · Weather Nourie</title>
+  <meta name="description" content="Weather Nourie at a glance: right now, rain timing, and the next hours.">
+  <link rel="stylesheet" href="/weather-fusion/glance.css">
+</head>
+<body data-sky="day">
+  <div class="sky" aria-hidden="true"><div class="sky-glow"></div></div>
+  <div class="wrap">
+    <header class="topbar">
+      <a class="brand" href="/weather-fusion/" aria-label="Back to Weather Nourie"><span class="brand-sun" aria-hidden="true">◒</span><span>Weather <b>Nourie</b></span></a>
+      <span class="page-tag">Glance</span>
+    </header>
+
+    <div class="loc-row">
+      <label class="loc-label" for="loc-select">Location</label>
+      <select id="loc-select" class="loc-select" aria-label="Choose location">
+        <option value="knightdale">Knightdale / Raleigh</option>
+        <option value="greenville">Greenville, NC</option>
+      </select>
+      <span id="updated" class="updated" aria-live="polite"></span>
+    </div>
+
+    <div id="alert-strip" class="alert-strip" hidden></div>
+
+    <main id="glance" class="glance" aria-live="polite">
+      <section class="hero" aria-label="Current conditions">
+        <div class="hero-temp"><span id="now-temp">--</span><span class="deg">°</span></div>
+        <div class="hero-sub">
+          <div id="now-cond" class="hero-cond">Loading…</div>
+          <div class="hero-meta"><span id="now-feels"></span><span id="now-hilo" class="hilo"></span></div>
+        </div>
+      </section>
+
+      <section id="rain-line" class="rain-line" aria-label="Rain outlook">
+        <span class="rain-dot" aria-hidden="true"></span>
+        <p id="rain-text">Checking rain…</p>
+      </section>
+
+      <section class="hours" aria-label="Next hours">
+        <h2>Next hours</h2>
+        <div id="hour-strip" class="hour-strip"></div>
+      </section>
+
+      <section class="days" aria-label="Today and tomorrow">
+        <h2>Today &amp; tomorrow</h2>
+        <div id="day-cards" class="day-cards"></div>
+      </section>
+
+      <section class="details" aria-label="Details">
+        <h2>Details</h2>
+        <dl id="detail-list" class="detail-list"></dl>
+      </section>
+    </main>
+
+    <p id="error" class="error" role="alert" hidden></p>
+
+    <footer class="foot">
+      <p>Data: National Weather Service. Alerts shown verbatim — verify with NWS for safety decisions.</p>
+      <p><a href="/weather-fusion/">Full Weather Nourie →</a> · <a href="/weather-fusion/experimental-weather.html">Experimental →</a></p>
+    </footer>
+  </div>
+  <script type="module" src="/weather-fusion/glance.js"></script>
+</body>
+</html>
