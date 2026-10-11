@@ -57,6 +57,18 @@ test('the regular page does not mount a carousel or touch the document',()=>{
   assert.equal(createSevenDayCarousel({experimental:true}),null);
 });
 
+test('day cards open the existing details dialog without an inline details row',()=>{
+  const html=sevenDayCardHTML(sevenDayForecast(preview,now)[0]);
+  const module=readFileSync(new URL('../public/weather-fusion/seven-day.js',import.meta.url),'utf8');
+  const css=readFileSync(new URL('../public/weather-fusion/seven-day.css',import.meta.url),'utf8');
+  assert.match(html,/aria-controls="day-dialog" aria-haspopup="dialog"/);
+  assert.doesNotMatch(module,/seven-day-detail|seven-day-open|detailHTML/);
+  assert.doesNotMatch(css,/seven-day-detail|seven-day-open/);
+  assert.match(module,/if\(button\)\{const index=Number\(button\.dataset\.weekDay\);select\(index\);onOpenDay\(index\);\}/);
+  assert.match(module,/if\(suppressClick\)\{event\.preventDefault\(\);suppressClick=false;return;\}/);
+  assert.match(module,/rail\.addEventListener\('keydown',[\s\S]*?\{focus:true\}/);
+});
+
 test('compact cards retain every forecast reading and the absolute confidence score',()=>{
   for(const [key,label,score] of [['high','High',95],['moderate','Moderate',75],['low','Low',60],['very-low','Very low',35]]){
     const day={...sevenDayForecast(preview,now)[0],confidence:{key,label,score,factors:[],note:'Relative index'}};
