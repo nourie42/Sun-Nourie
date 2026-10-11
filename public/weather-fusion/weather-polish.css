@@ -133,15 +133,16 @@ body[data-sky="night"] .air-quality-panel{background:radial-gradient(ellipse at 
 @media(max-width:600px){.weather-jump-nav{grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}.weather-jump-card{min-height:34px;padding:5px 1px;font-size:9px}.weather-jump-card .jump-label,.weather-jump-card.jump-gross .jump-label{font-size:clamp(8px,2.2vw,10px)}}
 @media(max-width:359px){.weather-jump-nav{grid-template-columns:repeat(7,minmax(0,1fr));gap:2px}.weather-jump-card{font-size:8px}}
 
-/* Keep every confidence meter on the same absolute index scale. */
-:root{--confidence-low:#ff777b;--confidence-medium:#f6d365;--confidence-high:#6ee7a0;--confidence-scale:linear-gradient(90deg,var(--confidence-low) 0%,var(--confidence-medium) 40%,var(--confidence-high) 60%,var(--confidence-high) 100%)}
+/* Match meter positions to the confidence categories while preserving source scores. */
+:root{--confidence-low:#ff777b;--confidence-medium:#f6d365;--confidence-high:#6ee7a0;--confidence-scale:linear-gradient(90deg,var(--confidence-low) 0%,var(--confidence-low) 30%,var(--confidence-medium) 40%,var(--confidence-medium) 60%,var(--confidence-high) 70%,var(--confidence-high) 100%)}
 [data-confidence="high"]{--confidence-color:var(--confidence-high)}
 [data-confidence="moderate"]{--confidence-color:var(--confidence-medium)}
 [data-confidence="low"],[data-confidence="very-low"]{--confidence-color:var(--confidence-low)}
 [data-confidence="unavailable"]{--confidence-color:#b9cce3}
-.forecast-confidence[data-confidence]>b,#today-forecast .forecast-confidence[data-confidence]>b,.dialog-confidence[data-confidence]>summary{color:var(--confidence-color,#b9cce3)}
+.forecast-confidence[data-confidence]>b,#today-forecast .forecast-confidence[data-confidence]>b,.dialog-confidence[data-confidence]>summary{color:var(--confidence-color,#b9cce3);font-weight:400}
+.forecast-confidence,.forecast-confidence>span{font-weight:400}
 .confidence-meter{background:var(--confidence-scale);overflow:visible;margin-inline:7px}
 .confidence-meter em{position:relative;background:transparent;border-radius:0}
 .confidence-meter em::after{content:"";position:absolute;right:0;top:50%;box-sizing:border-box;width:14px;height:14px;border:2px solid #fff;border-radius:50%;background:var(--confidence-color,#b9cce3);box-shadow:0 0 0 1px #052f4f,0 1px 3px #00152299;transform:translate(50%,-50%)}
 .forecast-confidence-notice[data-confidence],.dialog-confidence-notice[data-confidence],.today-confidence-banner{border-color:var(--confidence-color,var(--confidence-low));background:linear-gradient(135deg,#ff777b20,#134b7820)}
-.forecast-confidence-notice[data-confidence]>strong,.dialog-confidence-notice[data-confidence]>strong,.today-confidence-banner>strong{color:var(--confidence-color,var(--confidence-low))}
+.forecast-confidence-notice[data-confidence]>strong,.dialog-confidence-notice[data-confidence]>strong,.today-confidence-banner>strong{color:var(--confidence-color,var(--confidence-low));font-weight:400}
