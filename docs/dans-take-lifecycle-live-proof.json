@@ -1,0 +1,249 @@
+{
+  "commit": "6c817b4c514c8b4d071ee03fd8e6892df88f5daa",
+  "checkedAt": "2026-10-11T13:15:37.408Z",
+  "fixture": false,
+  "success": true,
+  "checks": [
+    {
+      "label": "initial-page",
+      "checkedAt": "2026-10-11T13:15:55.596Z",
+      "assembledAt": "2026-10-11T13:15:46.053Z",
+      "sourceCheckedAt": "2026-10-11T13:15:45.364Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "242d016940c3019e11dc5f5f",
+      "discussionId": "18553124-bb92-41ff-be20-ca5eb0244b7f",
+      "issuedAt": "2026-10-11T10:39:00+00:00",
+      "cachedItems": [
+        {
+          "evidenceId": "s2-p3-q1",
+          "summary": "How widespread the showers and storms will be is uncertain, so some places may stay dry while others get storms.",
+          "period": "Sunday, Oct 11 – Monday, Oct 12",
+          "sourceQuote": "The main uncertainty lies in overall coverage of scattered showers and storms.",
+          "section": "DISCUSSION",
+          "sectionIssuedAt": "2026-10-11T07:08:00.000Z",
+          "validFrom": "2026-10-11T22:00:00.000Z",
+          "eventEnd": "2026-10-12T10:00:00.000Z",
+          "validUntil": "2026-10-11T22:39:00.000Z"
+        }
+      ],
+      "visible": true,
+      "text": "Scattered showers and storms are likely today, with the strongest chances late morning into the evening. Some storms could have very strong wind gusts and brief tornadoes. Next week will start warm and mostly dry, then it should turn much cooler near the weekend.\n\nSevere storms: Slight risk today. Severe storms are possible; stay weather-aware."
+    },
+    {
+      "label": "refresh-1",
+      "checkedAt": "2026-10-11T13:17:01.619Z",
+      "assembledAt": "2026-10-11T13:16:51.781Z",
+      "sourceCheckedAt": "2026-10-11T13:15:45.364Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "2b9fec1032ed5723f1db3c29",
+      "discussionId": "18553124-bb92-41ff-be20-ca5eb0244b7f",
+      "issuedAt": "2026-10-11T10:39:00+00:00",
+      "cachedItems": [
+        {
+          "evidenceId": "s2-p3-q1",
+          "summary": "How widespread the showers and storms will be is still uncertain.",
+          "period": "Sunday, Oct 11 – Monday, Oct 12",
+          "sourceQuote": "The main uncertainty lies in overall coverage of scattered showers and storms.",
+          "section": "DISCUSSION",
+          "sectionIssuedAt": "2026-10-11T07:08:00.000Z",
+          "validFrom": "2026-10-11T22:00:00.000Z",
+          "eventEnd": "2026-10-12T10:00:00.000Z",
+          "validUntil": "2026-10-11T22:39:00.000Z"
+        },
+        {
+          "evidenceId": "s2-p7-q2",
+          "summary": "Exact timing of a stronger cold front late in the week is uncertain.",
+          "period": "This coming week — Friday, Oct 16 – Saturday, Oct 17",
+          "sourceQuote": "The low will drag a much stronger cold front through central NC, but the exact timing is still uncertain, sometime on Friday or Saturday.",
+          "section": "DISCUSSION",
+          "sectionIssuedAt": "2026-10-11T07:08:00.000Z",
+          "validFrom": "2026-10-16T04:00:00.000Z",
+          "eventEnd": "2026-10-18T04:00:00.000Z",
+          "validUntil": "2026-10-11T22:39:00.000Z"
+        }
+      ],
+      "visible": true,
+      "text": "Scattered showers and storms are expected late this morning into the early evening and could include brief tornadoes or strong wind gusts in some places. Most of next week looks warm and dry before a cooler change may arrive at the end of the week.\n\nSevere storms: Slight risk today. Severe storms are possible; stay weather-aware."
+    },
+    {
+      "label": "refresh-2",
+      "checkedAt": "2026-10-11T13:18:07.696Z",
+      "assembledAt": "2026-10-11T13:17:55.177Z",
+      "sourceCheckedAt": "2026-10-11T13:17:55.110Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "3a53a97197e2b3e1e4e9246c",
+      "discussionId": "18553124-bb92-41ff-be20-ca5eb0244b7f",
+      "issuedAt": "2026-10-11T10:39:00+00:00",
+      "cachedItems": [
+        {
+          "evidenceId": "s2-p3-q1",
+          "summary": "How widespread the showers and storms will be is uncertain; rain could be more scattered than expected.",
+          "period": "Sunday, Oct 11 – Monday, Oct 12",
+          "sourceQuote": "The main uncertainty lies in overall coverage of scattered showers and storms.",
+          "section": "DISCUSSION",
+          "sectionIssuedAt": "2026-10-11T07:08:00.000Z",
+          "validFrom": "2026-10-11T22:00:00.000Z",
+          "eventEnd": "2026-10-12T10:00:00.000Z",
+          "validUntil": "2026-10-11T22:39:00.000Z"
+        },
+        {
+          "evidenceId": "s2-p7-q2",
+          "summary": "The timing of a stronger cold front later in the week is uncertain and could arrive Friday or Saturday.",
+          "period": "This coming week — Friday, Oct 16 – Saturday, Oct 17",
+          "sourceQuote": "The low will drag a much stronger cold front through central NC, but the exact timing is still uncertain, sometime on Friday or Saturday.",
+          "section": "DISCUSSION",
+          "sectionIssuedAt": "2026-10-11T07:08:00.000Z",
+          "validFrom": "2026-10-16T04:00:00.000Z",
+          "eventEnd": "2026-10-18T04:00:00.000Z",
+          "validUntil": "2026-10-11T22:39:00.000Z"
+        }
+      ],
+      "visible": true,
+      "text": "Showers and storms are likely this morning into the early evening. Some storms could have strong wind gusts or brief tornadoes during the late morning to afternoon. Next week will feel warm and mostly dry, but a cooler change may come at the end of the week.\n\nSevere storms: Slight risk today. Severe storms are possible; stay weather-aware."
+    },
+    {
+      "label": "full-page-reload",
+      "checkedAt": "2026-10-11T13:18:08.946Z",
+      "assembledAt": "2026-10-11T13:17:55.177Z",
+      "sourceCheckedAt": "2026-10-11T13:17:55.110Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "3a53a97197e2b3e1e4e9246c",
+      "discussionId": "18553124-bb92-41ff-be20-ca5eb0244b7f",
+      "issuedAt": "2026-10-11T10:39:00+00:00",
+      "cachedItems": [
+        {
+          "evidenceId": "s2-p3-q1",
+          "summary": "How widespread the showers and storms will be is uncertain; rain could be more scattered than expected.",
+          "period": "Sunday, Oct 11 – Monday, Oct 12",
+          "sourceQuote": "The main uncertainty lies in overall coverage of scattered showers and storms.",
+          "section": "DISCUSSION",
+          "sectionIssuedAt": "2026-10-11T07:08:00.000Z",
+          "validFrom": "2026-10-11T22:00:00.000Z",
+          "eventEnd": "2026-10-12T10:00:00.000Z",
+          "validUntil": "2026-10-11T22:39:00.000Z"
+        },
+        {
+          "evidenceId": "s2-p7-q2",
+          "summary": "The timing of a stronger cold front later in the week is uncertain and could arrive Friday or Saturday.",
+          "period": "This coming week — Friday, Oct 16 – Saturday, Oct 17",
+          "sourceQuote": "The low will drag a much stronger cold front through central NC, but the exact timing is still uncertain, sometime on Friday or Saturday.",
+          "section": "DISCUSSION",
+          "sectionIssuedAt": "2026-10-11T07:08:00.000Z",
+          "validFrom": "2026-10-16T04:00:00.000Z",
+          "eventEnd": "2026-10-18T04:00:00.000Z",
+          "validUntil": "2026-10-11T22:39:00.000Z"
+        }
+      ],
+      "visible": true,
+      "text": "Showers and storms are likely this morning into the early evening. Some storms could have strong wind gusts or brief tornadoes during the late morning to afternoon. Next week will feel warm and mostly dry, but a cooler change may come at the end of the week.\n\nSevere storms: Slight risk today. Severe storms are possible; stay weather-aware."
+    }
+  ],
+  "deployed": {
+    "sourceVersion": "nws-afd-monotonic-v1",
+    "danTakeVersion": "weather-nourie-dans-take-kid-clear-v10",
+    "assets": {
+      "index.html": "a9e072ed904663c5bbc41b141cbee3a005c9d194ca3f0a267a2c6ad5b9f65c4f",
+      "app.js": "5856a07e69f2f3d542261d47edbf378dfb17b8316cb3993b001304bf1078a518",
+      "dans-summary.js": "2559a8687cfce05db5845182df3f21372b2ae813007565ec76d6f200f32d70af",
+      "current-inputs.js": "9864785afc53c6b0d7f36f7e0a82eb30d2e69989a1dd7cd9f056b12d60dd5984",
+      "pavement.js": "319ca9f6914c5e6e339611d202fc2e89821206c9504431c3d59d80360b9ca881",
+      "daily-uv.js": "4327bb7ab8a9bac7d21abbcafe674a13849d40a54c0c73966ee2e9a78a98e2e8",
+      "dans-take.js": "5da354860928555d55010a026466988d6962f11cbea1f3dbabb4a47fd61c6f9b"
+    }
+  },
+  "independentOfficialLatest": {
+    "id": "18553124-bb92-41ff-be20-ca5eb0244b7f",
+    "issuedAt": "2026-10-11T10:39:00+00:00"
+  },
+  "initial": {
+    "discussion": {
+      "id": "18553124-bb92-41ff-be20-ca5eb0244b7f",
+      "office": "RAH",
+      "issuanceTime": "2026-10-11T10:39:00+00:00",
+      "text": "\n000\nFXUS62 KRAH 111039\nAFDRAH\n\nArea Forecast Discussion\nNational Weather Service Raleigh NC\n640 AM EDT Sun Oct 11 2026\n\n.WHAT HAS CHANGED...\n\n* The greatest risk for short-track tornadoes appears to be from the \n  Triangle to the north and east, roughly from Raleigh to Goldsboro \n  to Rocky Mount/Henderson and northeast into Roanoke Rapids.\n\n* The main severe threat is favored from 11 AM to 6 PM today.\n\n&&\n\n.KEY MESSAGES...\nAs of 308 AM Sunday...\n\n1) Scattered to locally numerous showers/storms late this morning \ninto the early evening hours will be capable of brief, short-track \ntornadoes and strong to severe wind gusts.\n\n2) Much of next week will be unseasonably warm, before a significant \ncooldown next weekend. Little if any precipitation is expected \nthrough the period.\n\n&&\n\n.DISCUSSION...\nAs of 308 AM Sunday... \n\nKEY MESSAGE 1... Scattered to locally numerous showers/storms late \nthis morning into the early evening hours will be capable of brief, \nshort-track tornadoes and strong to severe wind gusts.\n\nThe remnants of Isaias are presently across eastern TN. With time, \nthis area of low pressure will track into the Mid-Atlantic this \nevening and eventually off New England overnight tonight. A \nsecondary area of low pressure is forecast to develop near Charlotte \nthis morning, tracking into the NW Piedmont this afternoon before \nreaching central VA this evening. As this does so, a warm front \npresently across SC will lift north this morning, ahead of a strong \ncold front that will sweep through this afternoon and early evening.\n\nOverall, there has been minimal change to the going forecast through \ntonight. The main uncertainty lies in overall coverage of scattered \nshowers and storms. SPC has maintained a Level 2 Slight Risk for \neastern areas of central NC, from the Triangle/Sandhills eastward \nand a Level 1 Marginal Risk across the western and southern \nPiedmont. The latest HREF/REFS solutions are indicating a more \nfocused tornado threat across the far northeast Piedmont into VA, \ncloser to the triple point and area of low pressure. However, in \nthis environment with strong deep-layer shear and clockwise turning, \na brief tornado threat will exist nearly anywhere in central NC.\n\nThe greatest severe risk is favored from 11 AM to 6 PM today, based \non a suite of ensemble/model guidance and the timing of the cold \nfront/dry slot. Ahead of the front, a moisture-rich environment will \nexist with low/mid 70s dewpoints, supporting 1000-1500 J/kg of \nMLCAPE. This axis of instability and shear overlaps most favorably \nfrom the Triangle/Sandhills into the central/northern Coastal Plain. \nCAM solutions indicate a broken band of showers and storms moving \neast-northeast in this time frame. Although an isolated tornado \ncould happen anywhere, the greatest risk for short-track tornadoes \nappears to be from the Triangle to the north and east, roughly from \nRaleigh to Goldsboro to Rocky Mount/Henderson and northeast into \nRoanoke Rapids. In this region, forecast soundings indicate long \ncurved hodographs supportive of discrete supercells. Outside of the \ntornado risk, strong to severe wind gusts will be possible across \nall of central NC. The severe threat should greatly diminish after 6 \nPM as activity races NE into the Mid-Atlantic coast.\n\n\nKEY MESSAGE 2... Much of next week will be unseasonably warm, before \na significant cooldown next weekend. Little if any precipitation is \nexpected through the period.\n\nBroad mid/upper ridging over the Southeastern US (in between \ntroughing over the North Atlantic that will absorb the remnants of \nIsaias and a closed low over the Intermountain West) will bring \nmostly sunny and dry weather to central NC for much of the upcoming \nworkweek. At the surface, a low will track east from the Great Lakes \ninto northern New England from Tuesday into early Wednesday, \ndropping a backdoor cold front southward into the Mid-Atlantic. \nSoutherly flow ahead of the front will bring increasing temperatures \nto start the week, with highs in the upper-70s to lower-80s on \nMonday and lower-to-mid-80s on Tuesday. Due to a slower trend with \nthe low's translation eastward, the front now doesn't look like it \nwill cross central NC until Wednesday night or Thursday. This \nresults in a much warmer forecast for Wednesday and potential record \nor near record highs, which are now expected to be in the mid-to-\nupper-80s, and lows in the lower-to-mid-60s. Thursday's temperatures \nwill depend on the exact timing of the front, but they should turn \nat least a bit more seasonable, albeit still warmer than normal. The \nfront will be moisture-starved and devoid of any upper support for \nprecipitation with the ridge in place, so it should be mainly dry \nwith just some associated cloud cover.\n\nA more vigorous northern stream shortwave will then dive down from \nCanada in the northern Plains and Great Lakes region late in the \nweek and potentially interact with the Western US trough, which \nshould help suppress the Southeast US ridge over the weekend. \nGuidance is in better agreement that the low will help lift the \naforementioned boundary back north as a warm front on Friday, but \nsignificant differences in the pattern still exist, with the GFS \ncontinuing to show a phasing solution that results in a much \ndeeper/slower trough (and associated surface low) compared to the \nECMWF. The low will drag a much stronger cold front through central \nNC, but the exact timing is still uncertain, sometime on Friday or \nSaturday. Regardless the best forcing looks to be well to our north \nso any associated precipitation would be light, and POPs are only \nslight chance at best. A significant cooldown to below-normal \ntemperatures appears likely behind the front as Canadian high \npressure builds in, and patchy frost may even be a concern on \nSaturday night and/or Sunday night.\n\n&&\n\n.AVIATION /12Z SUNDAY THROUGH THURSDAY/...\nAs of 640 AM Sunday...\n\nA mixture of LIFR/IFR conditions are expected to dominate the near-\nterm of the TAF period. These conditions are likely to remain in \nplace until 15-18z, slowest to rise to MVFR in the Triad terminals \n(GSO/INT) and earliest at FAY. Isolated to scattered showers are \naround the region. Two focus areas in the near term include those \nstorms moving out of CLT into the Triad terminals, and a second area \nmoving into FAY/RWI into mid-morning. Given upstream lightning and \nfavorable instability lifting north with a warm front, opted to \nintroduce a TEMPO group for TSRA at all terminals but RDU this \nmorning. Storms this morning may reach RDU but most current radar \ntrends suggest a slight miss to the east. An area of low pressure \nwill track through the region this afternoon, with a corresponding \ncold front. Most high-res model solutions indicate development of a \nbroken line of showers and storms tracking eastward ahead of the \nfront roughly between 15-21z. Confidence is high enough to include a \nTEMPO group for storms this afternoon, though the most coverage \nshould be near RDU/FAY/RWI. As the front approaches, MVFR will lift \nto VFR and prevail through the end of the TAF period. Gusty winds \nwill exist times in the 20-30 kt range, starting out east-southeast \nand switching around to west-southwest late in the period. Some \nguidance suggests the potential for low-end MVFR early Mon across \nthe Triad terminals, but confidence is too low to include at this \ntime.\n\nOutlook: A return to VFR conditions is expected this evening, \npersisting through much of the upcoming week.\n\n&&\n\n.RAH WATCHES/WARNINGS/ADVISORIES...\nNone.\n\n&&\n\n$$\n\nDISCUSSION...Kren/JD \nAVIATION...Kren\n",
+      "url": "https://api.weather.gov/products/18553124-bb92-41ff-be20-ca5eb0244b7f"
+    },
+    "feed": {
+      "id": "afd",
+      "label": "NWS RAH discussion",
+      "url": "https://api.weather.gov/products/types/AFD/locations/RAH/latest",
+      "status": "ready",
+      "sourceVersion": "nws-afd-monotonic-v1",
+      "retrievalStatus": "verified-latest",
+      "fetchedAt": "2026-10-11T13:15:45.364Z",
+      "checkedAt": "2026-10-11T13:15:45.364Z",
+      "issuedAt": "2026-10-11T10:39:00+00:00",
+      "productUrl": "https://api.weather.gov/products/18553124-bb92-41ff-be20-ca5eb0244b7f",
+      "message": ""
+    },
+    "aiMode": "ai",
+    "generatedAt": "2026-10-11T13:15:53.662Z",
+    "items": [
+      {
+        "evidenceId": "s2-p3-q1",
+        "summary": "How widespread the showers and storms will be is uncertain, so some places may stay dry while others get storms.",
+        "period": "Sunday, Oct 11 – Monday, Oct 12",
+        "sourceQuote": "The main uncertainty lies in overall coverage of scattered showers and storms.",
+        "section": "DISCUSSION",
+        "sectionIssuedAt": "2026-10-11T07:08:00.000Z",
+        "validFrom": "2026-10-11T22:00:00.000Z",
+        "eventEnd": "2026-10-12T10:00:00.000Z",
+        "validUntil": "2026-10-11T22:39:00.000Z"
+      }
+    ]
+  },
+  "observedRefreshVisibility": [
+    {
+      "hidden": false,
+      "text": "Scattered showers and storms are likely today, with the strongest chances late morning into the evening. Some storms could have very strong wind gusts and brief tornadoes. Next week will start warm and mostly dry, then it should turn much cooler near the weekend.\n\nSevere storms: Slight risk today. Severe storms are possible; stay weather-aware."
+    },
+    {
+      "hidden": false,
+      "text": "Scattered showers and storms are likely today, with the strongest chances late morning into the evening. Some storms could have very strong wind gusts and brief tornadoes. Next week will start warm and mostly dry, then it should turn much cooler near the weekend.\n\nSevere storms: Slight risk today. Severe storms are possible; stay weather-aware."
+    },
+    {
+      "hidden": false,
+      "text": "Scattered showers and storms are likely today, with the strongest chances late morning into the evening. Some storms could have very strong wind gusts and brief tornadoes. Next week will start warm and mostly dry, then it should turn much cooler near the weekend.\n\nSevere storms: Slight risk today. Severe storms are possible; stay weather-aware."
+    },
+    {
+      "hidden": false,
+      "text": "Scattered to locally numerous showers/storms late this morning into the early evening hours will be capable of brief, short-track tornadoes and strong to severe wind gusts. Much of next week will be unseasonably warm, before a significant cooldown next weekend.\n\nSevere storms: Slight risk today. Severe storms are possible; stay weather-aware."
+    },
+    {
+      "hidden": false,
+      "text": "Scattered showers and storms are expected late this morning into the early evening and could include brief tornadoes or strong wind gusts in some places. Most of next week looks warm and dry before a cooler change may arrive at the end of the week.\n\nSevere storms: Slight risk today. Severe storms are possible; stay weather-aware."
+    },
+    {
+      "hidden": false,
+      "text": "Scattered showers and storms are expected late this morning into the early evening and could include brief tornadoes or strong wind gusts in some places. Most of next week looks warm and dry before a cooler change may arrive at the end of the week.\n\nSevere storms: Slight risk today. Severe storms are possible; stay weather-aware."
+    },
+    {
+      "hidden": false,
+      "text": "Scattered showers and storms are expected late this morning into the early evening and could include brief tornadoes or strong wind gusts in some places. Most of next week looks warm and dry before a cooler change may arrive at the end of the week.\n\nSevere storms: Slight risk today. Severe storms are possible; stay weather-aware."
+    },
+    {
+      "hidden": false,
+      "text": "Scattered showers and storms are expected late this morning into the early evening and could include brief tornadoes or strong wind gusts in some places. Most of next week looks warm and dry before a cooler change may arrive at the end of the week.\n\nSevere storms: Slight risk today. Severe storms are possible; stay weather-aware."
+    },
+    {
+      "hidden": false,
+      "text": "Scattered showers and storms are expected late this morning into the early evening and could include brief tornadoes or strong wind gusts in some places. Most of next week looks warm and dry before a cooler change may arrive at the end of the week.\n\nSevere storms: Slight risk today. Severe storms are possible; stay weather-aware."
+    },
+    {
+      "hidden": false,
+      "text": "Scattered showers and storms are expected late this morning into the early evening and could include brief tornadoes or strong wind gusts in some places. Most of next week looks warm and dry before a cooler change may arrive at the end of the week.\n\nSevere storms: Slight risk today. Severe storms are possible; stay weather-aware."
+    },
+    {
+      "hidden": false,
+      "text": "Showers and storms are likely this morning into the early evening. Some storms could have strong wind gusts or brief tornadoes during the late morning to afternoon. Next week will feel warm and mostly dry, but a cooler change may come at the end of the week.\n\nSevere storms: Slight risk today. Severe storms are possible; stay weather-aware."
+    },
+    {
+      "hidden": false,
+      "text": "Showers and storms are likely this morning into the early evening. Some storms could have strong wind gusts or brief tornadoes during the late morning to afternoon. Next week will feel warm and mostly dry, but a cooler change may come at the end of the week.\n\nSevere storms: Slight risk today. Severe storms are possible; stay weather-aware."
+    }
+  ],
+  "distinctWeatherSignatures": 3,
+  "distinctForecastAssemblies": 3,
+  "distinctDiscussionChecks": 2,
+  "browserErrors": []
+}
