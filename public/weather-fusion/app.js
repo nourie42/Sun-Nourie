@@ -11,7 +11,7 @@ import {dailyDisplay} from './weather-math.js?v=full-day-rain-v1';
 import {conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
 import {currentHero} from './current-temperature.js?v=rain-now-v71';
 import {renderBulletins} from './bulletins.js?v=county-warnings-v1';
-import {withLiveAlerts,alertLocationKey,ALERT_REFRESH_MS} from './live-alerts.js?v=county-warnings-v2';
+import {withLiveAlerts,retainUnverifiedAlerts,alertLocationKey,ALERT_REFRESH_MS} from './live-alerts.js?v=county-warnings-v3';
 import {modelFreshnessText} from './personal-details.js?v=wardrobe-v1';
 import {renderDewpointMeter} from './dewpoint-meter.js?v=weather-qa-v67';
 import {renderWeatherPanel} from './render-safety.js';
@@ -90,7 +90,7 @@ async function refreshAlerts(){
     const data=await api('alerts',new URLSearchParams({latitude:location.latitude,longitude:location.longitude}),controller.signal);
     if(!stillCurrent())return;
     if(alertLocationKey(data.location)!==key||!Array.isArray(data.alerts)||!data.feeds?.some(f=>f.id==='alerts'))throw new Error('The warnings did not match the selected location.');
-    alertSnapshot=data;
+    alertSnapshot=retainUnverifiedAlerts(alertSnapshot||forecast,data);
   }catch(error){
     if(!stillCurrent()||error.name==='AbortError')return;
     alertSnapshot={location,alerts:alertSnapshot?.alerts||forecast?.alerts||[],feeds:[{...(alertSnapshot||forecast)?.feeds?.find(f=>f.id==='alerts'),id:'alerts',label:'Official NWS point and county alerts',status:'unavailable',message:'Independent warning refresh failed.'}]};
