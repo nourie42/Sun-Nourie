@@ -721,6 +721,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     'halo.html','halo.css','halo.js',
     'blend.html','blend.css','blend.js',
     'today.html','today.css','today.js',
+    'wn.html','wn.css','wn.js',
     'experimental-sky.js',
     'comfort-cinematic.css','comfort-effects.css','comfort-outlook.js','current-inputs.js','current-temperature.js',
     'daily-uv.js','dans-summary.js','dans-take.js','day-graph.js','dewpoint-meter.js','dewpoint-meter.css',
