@@ -26,12 +26,13 @@ function harness({missingNote=false}={}){
  runInNewContext(`${renderer}\nthis.renderBriefing=renderBriefing;`,context);
  return {elements,context,render:context.renderBriefing,setTime:t=>{time=t;}};
 }
-test('exactly one Dan take heading stays below daily graphic and ahead of hourly forecast',()=>{
+test('exactly one Nourie Weather Take heading stays below daily graphic and ahead of hourly forecast',()=>{
  const panel=html.match(/<section class="glass today-panel"[^>]*>([\s\S]*?)<\/section>/)?.[1];
  assert.ok(panel);assert.ok(panel.indexOf('id="today-forecast"')<panel.indexOf('id="today-uncertainty"'));
  assert.doesNotMatch(panel,/id="today-uncertainty"[^>]*hidden/);
- assert.match(panel,/<strong class="today-uncertainty-label">Dan's take<\/strong>/);
- assert.equal((panel.match(/Dan's take/g)||[]).length,1);
+ assert.match(panel,/<strong class="today-uncertainty-label">Nourie Weather Take<\/strong>/);
+ assert.equal((panel.match(/Nourie Weather Take/g)||[]).length,1);
+ assert.doesNotMatch(panel,/Dan['’]s take/i);
  assert.doesNotMatch(panel,/Checking the latest forecast discussion|today-take-source/);
  assert.match(html,/<\/section>\s*<section class="glass hourly-panel"/);
  for(const id of ['today-forecast','today-uncertainty','today-uncertainty-text','hourly'])assert.equal(html.split(`id="${id}"`).length-1,1);
@@ -124,13 +125,13 @@ test('Gross Meter heading stays centered and bold without changing chart geometr
  assert.match(css,/#gross-title\{text-align:center;font-weight:800\}/);assert.match(meterCss,/\.gross-eyebrow\{width:calc\(100% \+ 86px\);[^}]*text-align:center/);assert.match(meterCss,/@media\(max-width:760px\)[\s\S]*\.gross-eyebrow\{width:calc\(100% \+ 62px\)\}/);assert.ok(!/\.gross-(scroll|chart)\s*\{/.test(css));
 });
 test('changed assets are cache-busted and late briefing responses stay guarded',()=>{
- assert.match(html,/style\.css\?v=dashboard-v2/);assert.match(html,/forecast-layout\.css\?v=weather-qa-v67/);assert.match(html,/personal-details\.css\?v=wpc-mpd-v12/);assert.match(html,/app\.js\?v=rain-support-v12/);assert.match(html,/weather-polish\.css\?v=aqi-layout-nvidia-v2/);assert.match(html,/car-wash\.css\?v=rain-consensus-v41/);assert.match(html,/forecast-cards\.css\?v=real-clouds-v2/);assert.match(html,/scenario-layout\.css\?v=gust-safe-daily-v1/);assert.match(html,/risk-outlooks\.css\?v=risk-outlooks-v4/);
+ assert.match(html,/style\.css\?v=dashboard-v2/);assert.match(html,/forecast-layout\.css\?v=weather-qa-v67/);assert.match(html,/personal-details\.css\?v=wpc-mpd-v12/);assert.match(html,/app\.js\?v=matching-hourly-v5/);assert.match(html,/weather-polish\.css\?v=confidence-markers-v4/);assert.match(html,/car-wash\.css\?v=rain-consensus-v41/);assert.match(html,/forecast-cards\.css\?v=real-clouds-v2/);assert.match(html,/scenario-layout\.css\?v=gust-safe-daily-v1/);assert.match(html,/risk-outlooks\.css\?v=risk-outlooks-v4/);
  assert.match(app,/dans-take\.js\?v=weather-art-labels-v10/);
  assert.match(app,/bulletins\.js\?v=wpc-mpd-v1/);
- assert.match(app,/experience\.js\?v=shade-linked-v3/);
+ assert.match(app,/experience\.js\?v=warmest-sun-explain-v1/);
  assert.match(app,/personal-details\.js\?v=wardrobe-v1/);
  assert.match(app,/forecast-story\.js\?v=weather-qa-v67/);
- assert.match(app,/weather-display\.js\?v=shade-sun-align-v2/);assert.match(app,/current-temperature\.js\?v=rain-now-v71/);assert.match(app,/car-wash\.js\?v=click-main-v2/);
+ assert.match(app,/weather-display\.js\?v=matching-hourly-v5/);assert.match(app,/current-temperature\.js\?v=rain-now-v71/);assert.match(app,/car-wash\.js\?v=click-main-v2/);
  assert.match(app,/model-explanation\.js\?v=rain-support-v12/);
  assert.match(app,/outlook-details\.js\?v=full-day-rain-v1/);
  for(const module of ['dewpoint-meter'])assert.match(app,new RegExp(`${module}\\.js\\?v=weather-qa-v67`));

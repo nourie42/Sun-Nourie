@@ -1,8 +1,8 @@
 import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText,rebindDanTake} from './dans-take.js?v=weather-art-labels-v10';
-import {danCard,danTakeDisplay} from './dans-summary.js?v=dan-visible-v1';
+import {danCard,danTakeDisplay} from './dans-summary.js?v=nourie-weather-take-v2';
 import {fetchJsonWithDeadline} from './request-deadline.js?v=loading-recovery-v1';
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
-import {weatherIcon,renderHourlyWeather,currentSample} from './weather-display.js?v=shade-sun-align-v2';
+import {weatherIcon,renderHourlyWeather,currentSample} from './weather-display.js?v=matching-hourly-v5';
 import {dayGraphHTML,dayGraphPoints,installDayGraph} from './day-graph.js?v=feels-floor-wind-v1';
 import {degrees,feelsAt,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=dewpoint-floor-v1';
 import {createFramePlayer} from './frame-player.js';
@@ -24,7 +24,7 @@ import {renderAirQuality} from './air-quality.js?v=mobile-repair-v1';
 import {displayedRainChance} from './rain-display.js?v=rain-observed-v1';
 import {weatherChangeMessages,WEATHER_CHANGE_TITLE} from './weather-changes.js?v=large-change-v3';
 import {renderForecastWindowBanners,resetForecastWindowBanners} from './forecast-window-banners.js?v=sun-window-main-v4';
-import {createSevenDayCarousel} from './seven-day.js?v=hourly-width-week-v4';
+import {createSevenDayCarousel} from './seven-day.js?v=matching-hourly-v5';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);
 const experimentalPage = isExperimentalWeatherPage();
@@ -155,7 +155,7 @@ function render(data) {
   $('status').classList.toggle('error', unavailable.length > 0 || failedPanels.length > 0);
 }
 function renderAlerts(data) { renderBulletins(data); }
-function renderHours(data) { renderHourlyWeather(data,Date.now()); }
+function renderHours(data) { renderHourlyWeather(data,Date.now(),{experimental:experimentalPage}); }
 function renderDays(data) { renderDailyRows(data, icon); }
 function compass(degrees) {
   return finite(degrees) ? ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'][Math.round(degrees / 22.5) % 16] : 'Direction unavailable';
@@ -213,7 +213,7 @@ function renderBriefing(data) {
     return url && /^https:\/\/(api\.weather\.gov|www\.nco\.ncep\.noaa\.gov|www\.ecmwf\.int)\//.test(url) ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(f?.label || id)} ↗</a>` : esc(f?.label || id);
   });
   $('briefing-detail').innerHTML = `<div><strong>Later today & tomorrow</strong><p>${detailHTML(nearTerm)}</p></div><div><strong>Full week</strong><p>${detailHTML(extended)}</p></div>`;
-  // The Today card owns the single public Dan's take heading. Keep it visible
+  // The Today card owns the single public Nourie Weather Take heading. Keep it visible
   // even when there is no approved change, and put only content/status in its body.
   const todayUncertainty = $('today-uncertainty'), todayUncertaintyText = $('today-uncertainty-text');
   if (todayUncertainty && todayUncertaintyText) {

@@ -33,7 +33,7 @@ export function danOverview(briefing,forecast,now=Date.now()){
  return {text:text||'The local forecast is temporarily unavailable. Please check the National Weather Service for the latest weather.',source:'NWS forecast · discussion summary unavailable'};
 }
 export function danTakeDisplay(briefing,forecast,now=Date.now()){
- if(forecast?.comparison?.source==='google')return 'Dan’s Take summarizes the NWS discussion on Dan’s Weather. This page shows the experimental model forecast.';
+ if(forecast?.comparison?.source==='google')return 'Nourie Weather Take summarizes the NWS discussion on the regular weather page. This page shows the experimental model forecast.';
  const card=danCard(briefing,forecast,now);
  const summary=briefing?.signature===forecast?.signature&&typeof briefing?.danSummary==='string'?briefing.danSummary.trim():'';
  if(summary)return summary+(card.text?'\n\n'+card.text:'');
