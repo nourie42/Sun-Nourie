@@ -25,6 +25,7 @@ import {displayedRainChance} from './rain-display.js?v=rain-observed-v1';
 import {weatherChangeMessages,WEATHER_CHANGE_TITLE} from './weather-changes.js?v=large-change-v3';
 import {renderForecastWindowBanners,resetForecastWindowBanners} from './forecast-window-banners.js?v=sun-window-main-v4';
 import {createSevenDayCarousel} from './seven-day.js?v=main-week-v10';
+import {forecastSourceHealth} from './forecast-status.js?v=source-health-v1';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);
 const experimentalPage = isExperimentalWeatherPage();
@@ -148,9 +149,9 @@ function render(data) {
       uncertainty: '', danSummary:data.danSummary, danTake:data.danTake||rebindDanTake(currentBriefing?.danTake||currentBriefing,data), reason: data.aiConfigured ? 'Updating your local outlook…' : 'Weather Nourie forecast', sources: ['nws',...(data.modelContributions||[]).map(model=>model.id)] }));
   }
   if (map) { marker?.setLatLng([place.latitude, place.longitude]); renderMapWarnings(data); }
-  const unavailable = data.feeds.filter((f) => ['unavailable', 'stale', 'not-configured'].includes(f.status));
-  const locationLimited = data.feeds.filter((f) => f.status === 'not-covered');
-  const sourceNote = unavailable.length ? ' · Some sources are unavailable or stale — details in Scientific Stuff below' : locationLimited.length ? ' · Some optional model details are limited for this location — details below' : '';
+  const sourceHealth = forecastSourceHealth(data);
+  const unavailable = sourceHealth.requiredIssues;
+  const sourceNote = sourceHealth.note;
   $('status').textContent = `Updated ${clock(data.assembledAt)}${sourceNote}${failedPanels.length ? ` · Display issue: ${failedPanels.join(', ')}. Other forecasts remain available; use Refresh to retry.` : ''}`;
   $('status').classList.toggle('error', unavailable.length > 0 || failedPanels.length > 0);
 }
