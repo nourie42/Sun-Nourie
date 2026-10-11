@@ -24,6 +24,7 @@ import {renderAirQuality} from './air-quality.js?v=mobile-repair-v1';
 import {displayedRainChance} from './rain-display.js?v=rain-observed-v1';
 import {weatherChangeMessages,WEATHER_CHANGE_TITLE} from './weather-changes.js?v=large-change-v3';
 import {renderForecastWindowBanners,resetForecastWindowBanners} from './forecast-window-banners.js?v=sun-window-main-v4';
+import {createSevenDayCarousel} from './seven-day.js?v=experimental-week-v1';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);
 const experimentalPage = isExperimentalWeatherPage();
@@ -64,6 +65,7 @@ function configurePageMode() {
   const experimentBanner=document.querySelector('.experimental-page-banner');if(experimentBanner)experimentBanner.hidden=!experimentalPage;
 }
 configurePageMode();
+const sevenDayCarousel=createSevenDayCarousel({experimental:experimentalPage,onOpenDay:index=>showDay(index)});
 function clock(value, options = {}) {
   const t = new Date(value);
   return Number.isFinite(t.getTime()) ? new Intl.DateTimeFormat('en-US', { timeZone: forecast?.location.timeZone || 'America/New_York', hour: 'numeric', minute: '2-digit', ...options }).format(t) : 'Unavailable';
@@ -131,6 +133,7 @@ function render(data) {
   draw('risk-outlook-list', 'Outlooks', () => renderRiskOutlooks(data));
   draw('hourly', 'Hourly forecast', () => renderHours(data));
   draw('daily', 'Daily forecast', () => renderDays(data));
+  if(sevenDayCarousel)draw('experimental-week','Seven-day forecast',()=>sevenDayCarousel.render(data));
   draw('skin-exposure', 'Feels-like outlook', () => renderComfort(data));
   if(!experimentalPage&&!$('car-wash-forecast').hidden)draw('car-wash-forecast', 'Car Wash Forecast', () => renderCarWashForecast(data));
   draw('dewpoint-gross-meter', 'Dew Point Gross Meter', () => renderDewpointMeter(data));
@@ -296,6 +299,7 @@ function chooseLocation(value,{rememberDevice=false}={}) {
   $('alerts').innerHTML = '<p class="alert-note warning">Checking official alerts for the selected location…</p>';
   $('hourly').innerHTML = '<p class="muted">Loading hourly forecast…</p>';
   $('daily').innerHTML = '<p class="muted">Loading daily forecast…</p>';
+  sevenDayCarousel?.reset();
   $('metrics').innerHTML = '';
   if($('air-quality-content'))$('air-quality-content').innerHTML='<p class="muted">Loading air quality…</p>';
   $('feed-health').innerHTML = '';
