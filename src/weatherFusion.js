@@ -697,6 +697,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
   });
+  app.get(['/weather-fusion/halo', '/weather-fusion/halo/'], (_req, res) => res.redirect(302, '/weather-fusion/halo.html'));
   app.get('/weather-fusion/weathernext-site.html', (req,res) => {
     // The standalone data explorer lives at its explicit file route. The public
     // /weathernext dashboard is owned by weatherComparison.js so it can reuse
@@ -717,6 +718,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     'request-deadline.js','weather-changes.js','air-quality.js','alert-banners.js','app.js','bulletin-facts.js','bulletins.js','car-wash.js','car-wash.css','car-wash-background.webp','car-wash-corvette-hood.webp',
     'model-explanation.js','model-explanation.css','weathernext-site.html','weathernext-site.css','weathernext-site.js','weathernext-data.js','weathernext-catalog.json',
     'glance.html','glance.css','glance.js',
+    'halo.html','halo.css','halo.js',
     'blend.html','blend.css','blend.js',
     'today.html','today.css','today.js',
     'experimental-sky.js',
