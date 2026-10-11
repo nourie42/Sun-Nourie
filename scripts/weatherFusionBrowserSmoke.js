@@ -24,7 +24,7 @@ if(live){
    try{
      const d=await json('/api/weather-fusion/forecast?location=knightdale');
      if(d.repairVersion===REPAIR_VERSION){
-       const actual=await Promise.all(paths.map(async p=>{const res=await fetch(base+'/weather-fusion/'+p+'?verify='+Date.now(),{headers:siteHeaders,cache:'no-store',signal:AbortSignal.timeout(15000)});if(!res.ok)return false;return createHash('sha256').update(await res.text()).digest('hex')===wanted[p];}));
+       const actual=await Promise.all(paths.map(async p=>{const res=await fetch(base+'/weather-fusion/'+p+'?verify='+Date.now(),{headers:siteHeaders,cache:'no-store',signal:AbortSignal.timeout(15000)});if(!res.ok)return false;return createHash('sha256').update((await res.text()).replace(/\r\n/g,'\n')).digest('hex')===wanted[p];}));
        deployed=actual.every(Boolean);
      }
    }catch{}
