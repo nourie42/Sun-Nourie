@@ -23,9 +23,7 @@ export function weatherIcon(condition = '', isDay = true, size = 32) {
   return `<svg width="${size}" height="${size}" viewBox="0 0 50 50" aria-hidden="true" data-weather-kind="${weatherState(condition).kind}">${weatherShapes(condition, isDay)}</svg>`;
 }
 export function forecastWeatherArtwork(condition = '', isDay = true) {
-  const kind=weatherState(condition).kind;
-  const position=({clear:isDay?(/mostly|few clouds/i.test(condition)?[1,0]:[0,0]):[1,2],'partly-cloudy':isDay?[1,0]:[2,2],cloudy:[2,0],rain:[0,1],storm:[1,1],snow:[2,1],fog:[0,2]})[kind];
-  return position?`<span class="seven-day-art" data-weather-kind="${esc(kind)}" style="--art-x:${position[0]*50}%;--art-y:${position[1]*50}%" aria-hidden="true"></span>`:weatherIcon(condition,isDay,72);
+  return weatherIcon(condition,isDay,44);
 }
 export function weatherMetricIcon(kind){
  const paths={eye:'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12ZM9 12a3 3 0 1 0 6 0 3 3 0 1 0-6 0',wind:'M3 8h12c5 0 5-6 1-6M3 12h16c5 0 5 6 1 6M3 16h7c4 0 4 6 0 6',drop:'M12 2C9 7 5 12 5 16a7 7 0 0 0 14 0c0-4-4-9-7-14Z',sun:'M12 3V1M12 23v-2M3 12H1M23 12h-2M4 4l2 2M18 18l2 2M4 20l2-2M18 6l2-2M17 12a5 5 0 1 1-10 0 5 5 0 0 1 10 0',humidity:'M12 2C9 7 5 12 5 16a7 7 0 0 0 14 0c0-4-4-9-7-14ZM9 18l6-7M9 12h.01M15 18h.01'};

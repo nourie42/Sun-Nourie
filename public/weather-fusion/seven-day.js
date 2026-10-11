@@ -2,7 +2,7 @@ import {dailyDisplay,finite} from './weather-math.js?v=full-day-rain-v1';
 import {displayedRainChance} from './rain-display.js?v=rain-observed-v1';
 import {forecastPeriodSummary} from './forecast-story.js?v=weather-qa-v67';
 import {shortForecastCondition} from './today-card.js?v=mobile-repair-v1';
-import {forecastWeatherArtwork,weatherMetricIcon} from './weather-display.js?v=matching-hourly-v5';
+import {forecastWeatherArtwork,weatherMetricIcon} from './weather-display.js?v=quiet-forecasts-v6';
 
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const reading=(value,unit='',digits=0)=>finite(value)?`${value.toFixed(digits)}${unit}`:'\u2014';
@@ -54,9 +54,9 @@ function detailHTML(day) {
 export function createSevenDayCarousel({experimental=false,onOpenDay=()=>{}}={}) {
   if(!experimental||typeof document==='undefined')return null;
   const anchor=document.querySelector('.hero .today-panel');if(!anchor)return null;
-  for(const [id,name] of [['experimental-week-styles','seven-day.css'],['experimental-week-art','seven-day-art.css']]) {
+  for(const [id,name] of [['experimental-week-styles','seven-day.css']]) {
     if(document.getElementById(id))continue;
-    const link=document.createElement('link');link.id=id;link.rel='stylesheet';link.href=`/weather-fusion/${name}?v=matching-hourly-v5`;document.head.append(link);
+    const link=document.createElement('link');link.id=id;link.rel='stylesheet';link.href=`/weather-fusion/${name}?v=quiet-forecasts-v6`;document.head.append(link);
   }
   const root=document.createElement('section');root.id='experimental-week';root.className='experimental-week';root.hidden=true;root.setAttribute('aria-labelledby','seven-day-title');
   root.innerHTML=`<div class="seven-day-carousel"><div class="seven-day-heading"><h2 id="seven-day-title">7-Day Forecast</h2><div class="seven-day-controls"><button type="button" data-week-step="-1" aria-label="Previous forecast days" title="Previous forecast days" aria-controls="seven-day-rail" disabled>${chevron('left')}</button><button type="button" data-week-step="1" aria-label="Next forecast days" title="Next forecast days" aria-controls="seven-day-rail" disabled>${chevron('right')}</button></div></div><div id="seven-day-detail" class="seven-day-detail" aria-live="polite" aria-atomic="true" hidden></div><div id="seven-day-rail" class="seven-day-rail" tabindex="0" aria-label="Seven-day forecast"></div><input type="range" class="seven-day-scroll" min="0" max="1000" value="0" aria-label="Scroll seven-day forecast" aria-controls="seven-day-rail" disabled></div>`;
