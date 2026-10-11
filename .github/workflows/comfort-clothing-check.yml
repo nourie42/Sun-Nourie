@@ -16,7 +16,6 @@ on:
       - scripts/verifyComfortClothingBrowser.js
       - test/weatherFusionClothingArtwork.test.js
       - .github/workflows/comfort-clothing-check.yml
-  workflow_dispatch:
 permissions:
   contents: read
 concurrency:
