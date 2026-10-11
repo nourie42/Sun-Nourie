@@ -91,7 +91,15 @@ function points() {
 
 function currentRows() {
   const rows = rowsFor(feed, 'surface', state.point);
-  return rows.filter((r) => Date.parse(r.time) >= Date.now() - 3600000);
+  // Show all available hours; the feed may be from a past model run
+  return rows;
+}
+
+function feedAge() {
+  const runAt = Date.parse(feed?.sources?.surface?.runAt);
+  if (!Number.isFinite(runAt)) return null;
+  const days = (Date.now() - runAt) / 86400000;
+  return days;
 }
 
 function fieldDef() {
@@ -188,6 +196,7 @@ function render() {
   const f = fieldDef();
   const s = series(rows);
   const unit = UNITS[state.field];
+  const age = feedAge();
 
   // Hero
   el('hero-var-name').textContent = f?.label || SHORT[state.field];
@@ -195,7 +204,11 @@ function render() {
   el('hero-value').textContent = fmt(s[0]?.mean) + (unit === '°F' ? '°' : '');
   const p10 = s[0]?.p10, p90 = s[0]?.p90;
   el('hero-range').textContent = finite(p10) && finite(p90) ? `Likely range ${fmt(p10)}–${fmt(p90)} ${unit}` : '';
-  el('hero-meta').textContent = `${rows.length} hourly steps · ensemble of 6`;
+  const ageTxt = age !== null && age > 1 ? ` · ⚠ model run ${Math.round(age)}d ago` : '';
+  el('hero-meta').textContent = `${rows.length} hourly steps · ensemble of 6${ageTxt}`;
+  if (age !== null && age > 2) {
+    el('hero-meta').style.color = '#ffcf8a';
+  }
 
   // Chart
   renderChart(s);
@@ -234,6 +247,7 @@ function renderChart(s) {
   el('chart-title').textContent = `${SHORT[state.field] || f?.label} · ${state.range === 48 ? '48 hours' : state.range === 168 ? '7 days' : '15 days'}`;
 
   const line = (key) => data.map((d, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)},${Y(d[key] ?? d.mean).toFixed(1)}`).join('');
+  const areaUnder = data.map((d, i) => `${X(i).toFixed(1)},${Y(d.mean).toFixed(1)}`).join(' ') + ` ${X(data.length - 1).toFixed(1)},${(H - PB).toFixed(1)} ${X(0).toFixed(1)},${(H - PB).toFixed(1)}`;
   const band = (k1, k2) => {
     const top = data.map((d, i) => `${X(i).toFixed(1)},${Y(d[k1] ?? d.mean).toFixed(1)}`).join(' ');
     const bot = data.map((d, i) => `${X(i).toFixed(1)},${Y(d[k2] ?? d.mean).toFixed(1)}`).reverse().join(' ');
@@ -256,9 +270,21 @@ function renderChart(s) {
   }
 
   el('chart').innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${f?.label} forecast chart">
+    <defs>
+      <linearGradient id="wn-mean-fill" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#7fd4ff" stop-opacity=".35"/>
+        <stop offset="100%" stop-color="#7fd4ff" stop-opacity="0"/>
+      </linearGradient>
+      <linearGradient id="wn-mean-line" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#7fd4ff"/>
+        <stop offset="50%" stop-color="#b48cff"/>
+        <stop offset="100%" stop-color="#7fd4ff"/>
+      </linearGradient>
+    </defs>
     <polygon points="${band('p90', 'p10')}" fill="rgba(127,212,255,.14)"/>
     <polygon points="${band('p75', 'p25')}" fill="rgba(127,212,255,.22)"/>
-    <path d="${line('mean')}" fill="none" stroke="#7fd4ff" stroke-width="2.5" stroke-linejoin="round"/>
+    <polygon points="${areaUnder}" fill="url(#wn-mean-fill)"/>
+    <path d="${line('mean')}" fill="none" stroke="url(#wn-mean-line)" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
     ${labels}
   </svg>`;
 }
@@ -273,20 +299,27 @@ function renderDaily(rows) {
   }
   const f = fieldDef();
   const unit = UNITS[state.field];
+  const allV = rows.map((r) => value(r, f, 'mean')).filter(finite);
+  const gmn = Math.min(...allV), gmx = Math.max(...allV);
   const cards = [...groups].slice(0, 15).map(([date, hrs]) => {
     const vals = hrs.map((r) => value(r, f, 'mean')).filter(finite);
     if (!vals.length) return '';
     const mn = Math.min(...vals), mx = Math.max(...vals);
     const d = new Date(date + 'T12:00:00');
     const label = d.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' });
-    // Bar position relative to 15-day min/max
-    const allV = rows.map((r) => value(r, f, 'mean')).filter(finite);
-    const gmn = Math.min(...allV), gmx = Math.max(...allV);
     const l = gmx > gmn ? ((mn - gmn) / (gmx - gmn)) * 100 : 0;
     const w = gmx > gmn ? Math.max(6, ((mx - mn) / (gmx - gmn)) * 100) : 100;
+    // Sparkline
+    const sw = 100, sh = 28;
+    const pts = hrs.map((r, i) => {
+      const v = value(r, f, 'mean');
+      const x = (i / Math.max(1, hrs.length - 1)) * sw;
+      const y = gmx > gmn ? sh - ((v - gmn) / (gmx - gmn)) * sh : sh / 2;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ');
     const precip = state.field.includes('precipitation')
       ? hrs.reduce((a, r) => a + (value(r, f, 'mean') || 0), 0) : null;
-    return `<div class="day-card"><div class="d">${label}</div><div class="r">${fmt(mx)}<small> / ${fmt(mn)}°</small></div><div class="bar"><i style="left:${l}%;width:${w}%"></i></div><div class="p">${precip !== null ? fmt(precip) + ' ' + unit + ' total' : unit}</div></div>`;
+    return `<div class="day-card"><div class="d">${label}</div><svg class="spark" viewBox="0 0 ${sw} ${sh}" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="#7fd4ff" stroke-width="2" stroke-linecap="round"/></svg><div class="r">${fmt(mx)}<small> / ${fmt(mn)}°</small></div><div class="bar"><i style="left:${l}%;width:${w}%"></i></div><div class="p">${precip !== null ? fmt(precip) + ' ' + unit + ' total' : unit}</div></div>`;
   }).join('');
   el('day-cards').innerHTML = cards;
 }
