@@ -82,3 +82,23 @@ test('all confidence meters share a fading red-yellow-green absolute scale',()=>
   assert.match(week,/\.seven-day-meter\{[^}]*background:var\(--confidence-scale\)/);
   assert.match(week,/height:var\(--week-height,/);
 });
+
+test('card widths follow hourly geometry and confidence dots remain large and outlined',()=>{
+  const module=readFileSync(new URL('../public/weather-fusion/seven-day.js',import.meta.url),'utf8');
+  const week=readFileSync(new URL('../public/weather-fusion/seven-day.css',import.meta.url),'utf8');
+  const polish=readFileSync(new URL('../public/weather-fusion/weather-polish.css',import.meta.url),'utf8');
+  assert.match(module,/hourly\?\.querySelector\('button\.hour'\)\?\.getBoundingClientRect\(\)\.width/);
+  assert.match(module,/setProperty\('--week-card',/);
+  assert.match(week,/\.seven-day-meter>span\{[^}]*width:14px;height:14px;border:2px solid #fff/);
+  assert.match(polish,/\.confidence-meter em::after\{[^}]*width:14px;height:14px;border:2px solid #fff/);
+  assert.match(polish,/\.confidence-meter\{[^}]*overflow:visible/);
+});
+
+test('narrow cards retain large and negative readings with their original units',()=>{
+  const day={...sevenDayForecast(preview,now)[0],high:121,low:-45,amount:12.34,wind:150};
+  const html=sevenDayCardHTML(day);
+  assert.match(html,/121\u00b0/);assert.match(html,/-45\u00b0/);
+  assert.match(html,/12\.34 in/);assert.match(html,/150 mph/);
+  assert.match(html,/--narrow-temp-size:14px/);
+  assert.match(html,/font-size:10px/);
+});
