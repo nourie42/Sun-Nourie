@@ -1,5 +1,5 @@
 import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText,rebindDanTake} from './dans-take.js?v=weather-art-labels-v10';
-import {danCard,danTakeDisplay} from './dans-summary.js?v=nourie-weather-take-v2';
+import {danCard,danTakeDisplay} from './dans-summary.js?v=county-warnings-v1';
 import {fetchJsonWithDeadline} from './request-deadline.js?v=loading-recovery-v1';
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
 import {weatherIcon,renderHourlyWeather,currentSample} from './weather-display.js?v=restore-hourly-v7';
@@ -10,7 +10,8 @@ import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRow
 import {dailyDisplay} from './weather-math.js?v=full-day-rain-v1';
 import {conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
 import {currentHero} from './current-temperature.js?v=rain-now-v71';
-import {renderBulletins} from './bulletins.js?v=wpc-mpd-v1';
+import {renderBulletins} from './bulletins.js?v=county-warnings-v1';
+import {withLiveAlerts,ALERT_REFRESH_MS} from './live-alerts.js?v=county-warnings-v1';
 import {modelFreshnessText} from './personal-details.js?v=wardrobe-v1';
 import {renderDewpointMeter} from './dewpoint-meter.js?v=weather-qa-v67';
 import {renderWeatherPanel} from './render-safety.js';
@@ -50,6 +51,7 @@ let modelCatalog = null, modelFetched = 0, modelFrames = [], modelIndex = 0, mod
 let framePlayer=null;
 let lastRadarFetch = 0, currentBriefing = null, requestController = null;
 let activeDayDetail = null;
+let alertSnapshot=null,alertController=null,alertBusy=false;
 function configurePageMode() {
   document.documentElement.dataset.weatherPage=experimentalPage?'experimental':'main';
   if(experimentalPage)document.title='Experimental Weather · Weather Nourie';
@@ -77,7 +79,30 @@ function query(extra = {}) {
   return new URLSearchParams({ latitude: place.latitude, longitude: place.longitude, ...extra });
 }
 async function api(path, params = '', signal) {
-  return fetchJsonWithDeadline(`/api/weather-fusion/${path}${params ? `?${params}` : ''}`, { signal, timeoutMs:path==='briefing'?90000:45000, cache: 'no-store', headers: { Accept: 'application/json' } });
+  return fetchJsonWithDeadline(`/api/weather-fusion/${path}${params ? `?${params}` : ''}`, { signal, timeoutMs:path==='alerts'?15000:path==='briefing'?90000:45000, cache: 'no-store', headers: { Accept: 'application/json' } });
+}
+async function refreshAlerts(){
+  if(!validPlace(place)||alertBusy)return;
+  const location={...place},key=`${location.latitude},${location.longitude}`;
+  const controller=new AbortController();alertController=controller;alertBusy=true;
+  const stillCurrent=()=>alertController===controller&&key===`${place?.latitude},${place?.longitude}`;
+  try{
+    const data=await api('alerts',new URLSearchParams({latitude:location.latitude,longitude:location.longitude}),controller.signal);
+    if(!stillCurrent())return;
+    if(`${data.location?.latitude},${data.location?.longitude}`!==key||!Array.isArray(data.alerts)||!data.feeds?.some(f=>f.id==='alerts'))throw new Error('The warnings did not match the selected location.');
+    alertSnapshot=data;
+  }catch(error){
+    if(!stillCurrent()||error.name==='AbortError')return;
+    alertSnapshot={location,alerts:alertSnapshot?.alerts||forecast?.alerts||[],feeds:[{...(alertSnapshot||forecast)?.feeds?.find(f=>f.id==='alerts'),id:'alerts',label:'Official NWS point and county alerts',status:'unavailable',message:'Independent warning refresh failed.'}]};
+  }finally{
+    if(stillCurrent()){
+      alertBusy=false;
+      if(alertSnapshot){
+        if(forecast){forecast=withLiveAlerts(forecast,alertSnapshot);renderAlerts(forecast);if(map)renderMapWarnings(forecast);if(currentBriefing)renderBriefing(currentBriefing);}
+        else renderBulletins(alertSnapshot);
+      }
+    }
+  }
 }
 function icon(condition = '', isDay = true, size = 32) { return weatherIcon(condition,isDay,size); }
 function smallIcon(type) {
@@ -105,6 +130,7 @@ function radarObservationLabel(current) {
   return `NOAA radar shows rain${distance}`;
 }
 function render(data) {
+  data=withLiveAlerts(data,alertSnapshot);
   data.rainTrend=updateRainTrend(data,Date.now());
   forecast = data;
   const failedPanels = [];
@@ -272,13 +298,14 @@ async function load({ moveMap = false, refreshModels = false, briefingRetry = 0 
     if(e.name==='TimeoutError')$('status').textContent=e.message;
     $('status').classList.add('error');
     if(forecast)renderComfort(forecast);
-    if (!receivedForecast) $('alerts').innerHTML = '<p class="alert-note warning">Live alert status could not be checked. Consult the official NWS forecast and warnings.</p>';
+    if (!receivedForecast&&!alertSnapshot) renderBulletins({location:place,alerts:[],feeds:[]});
   } finally { clearTimeout(slowNotice);if (id === generation) { busy = false; $('refresh').classList.remove('loading'); } }
 }
 function chooseLocation(value,{rememberDevice=false}={}) {
   if(!validPlace(value))return;
   ++locationRequest;
   place = { ...value };
+  alertController?.abort();alertController=null;alertBusy=false;alertSnapshot=null;
   const compareLink=document.querySelector('.jump-next');
   if(compareLink){
     compareLink.href='/weathernext/?'+new URLSearchParams({latitude:value.latitude,longitude:value.longitude,name:value.name||'Selected location'});
@@ -317,6 +344,8 @@ function chooseLocation(value,{rememberDevice=false}={}) {
   $('search-results').hidden = true; $('city-search').value = ''; $('city-search').setAttribute('aria-expanded', 'false');
   if(rememberDevice)saveDeviceLocation(place);
   warningLayer?.clearLayers();
+  renderBulletins({location:place,alerts:[],feeds:[]});
+  void refreshAlerts();
   void load({ moveMap: true });
 }
 function refreshOpenDay() {
@@ -559,10 +588,11 @@ function startDeviceLocation({explicit=false}={}){
  );
 }
 $('locate').addEventListener('click', () => startDeviceLocation({explicit:true}));
-document.addEventListener('visibilitychange', () => { if (document.hidden) stopRadar(); else if (validPlace(place)&&!busy) void load(); });
-window.addEventListener('online', () => { if (validPlace(place)&&!document.hidden&&!busy) void load(); });
-window.addEventListener('pageshow', (event) => { if (event.persisted&&validPlace(place)&&!document.hidden&&!busy) void load(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) stopRadar(); else {void refreshAlerts();if (validPlace(place)&&!busy) void load();} });
+window.addEventListener('online', () => { if(!document.hidden)void refreshAlerts();if (validPlace(place)&&!document.hidden&&!busy) void load(); });
+window.addEventListener('pageshow', (event) => { if(event.persisted&&!document.hidden)void refreshAlerts();if (event.persisted&&validPlace(place)&&!document.hidden&&!busy) void load(); });
 // The site refreshes while open; this is not a push-alert system or background task.
+setInterval(()=>{if(validPlace(place)&&!document.hidden){if(forecast)renderAlerts(forecast);else if(alertSnapshot)renderBulletins(alertSnapshot);void refreshAlerts();}},ALERT_REFRESH_MS);
 setInterval(() => { if (validPlace(place)&&!document.hidden&&!busy) void load(); }, 60000);
 installExperience();
 startDeviceLocation();

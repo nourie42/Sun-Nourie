@@ -65,7 +65,7 @@ export function comparisonApp(original,config){
  let s=original.replace(/\r\n?/g,'\n').replaceAll("from './","from '/weather-fusion/");
  s=`import {installComparisonPane} from '/weather-fusion/compare-bridge.js?v=${version}';\nconst COMPARE=${JSON.stringify(config)};\n`+s;
  s=replaceOnce(s,"async function api(path, params = '', signal) {","async function api(path, params = '', signal) {\n  if(COMPARE.source==='google'&&path==='forecast')return compareBridge.requestForecast(params,signal);");
- s=replaceOnce(s,"async function api(path, params = '', signal) {","async function api(path, params = '', signal) {\n  if(COMPARE.source==='google'&&!['forecast','search'].includes(path))throw Object.assign(new Error('Not supplied by NVIDIA WeatherNext.'),{status:503});");
+ s=replaceOnce(s,"async function api(path, params = '', signal) {","async function api(path, params = '', signal) {\n  if(COMPARE.source==='google'&&!['forecast','search','alerts'].includes(path))throw Object.assign(new Error('Not supplied by NVIDIA WeatherNext.'),{status:503});");
  s=replaceOnce(s,'`/api/weather-fusion/${path}${params ?',"`${COMPARE.source==='google'&&path==='forecast'?'/api/weather-fusion/compare/google':'/api/weather-fusion/'+path}${params ?");
  s=replaceOnce(s,'data.rainTrend=updateRainTrend(data,Date.now());',"data.rainTrend=COMPARE.source==='google'?null:updateRainTrend(data,Date.now());");
  s=replaceOnce(s,"$('status').classList.add('error');","if(COMPARE.source==='google'&&e.status===404)$('status').textContent='WeatherNext is not yet connected for this location. Use the main weather page for your local forecast.';\n    $('status').classList.add('error');");
