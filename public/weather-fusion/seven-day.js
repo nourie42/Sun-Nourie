@@ -2,8 +2,7 @@ import {dailyDisplay,finite} from './weather-math.js?v=full-day-rain-v1';
 import {displayedRainChance} from './rain-display.js?v=rain-observed-v1';
 import {forecastPeriodSummary} from './forecast-story.js?v=weather-qa-v67';
 import {shortForecastCondition} from './today-card.js?v=mobile-repair-v1';
-import {weatherState} from './weather-state.js?v=weather-qa-v67';
-import {weatherIcon,weatherMetricIcon} from './weather-display.js?v=warmest-sun-explain-v1';
+import {forecastWeatherArtwork,weatherMetricIcon} from './weather-display.js?v=matching-hourly-v5';
 
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const reading=(value,unit='',digits=0)=>finite(value)?`${value.toFixed(digits)}${unit}`:'\u2014';
@@ -32,9 +31,7 @@ export function sevenDayForecast(forecast,now=Date.now()) {
 }
 
 function artHTML(day) {
-  const kind=weatherState(day.condition).kind;
-  const position=({clear:day.isDay?(/mostly|few clouds/i.test(day.condition)?[1,0]:[0,0]):[1,2],'partly-cloudy':day.isDay?[1,0]:[2,2],cloudy:[2,0],rain:[0,1],storm:[1,1],snow:[2,1],fog:[0,2]})[kind];
-  return position?`<span class="seven-day-art" data-weather-kind="${esc(kind)}" style="--art-x:${position[0]*50}%;--art-y:${position[1]*50}%" aria-hidden="true"></span>`:weatherIcon(day.condition,day.isDay,72);
+  return forecastWeatherArtwork(day.condition,day.isDay);
 }
 
 function confidenceHTML(confidence) {
@@ -59,7 +56,7 @@ export function createSevenDayCarousel({experimental=false,onOpenDay=()=>{}}={})
   const anchor=document.querySelector('.hero .today-panel');if(!anchor)return null;
   for(const [id,name] of [['experimental-week-styles','seven-day.css'],['experimental-week-art','seven-day-art.css']]) {
     if(document.getElementById(id))continue;
-    const link=document.createElement('link');link.id=id;link.rel='stylesheet';link.href=`/weather-fusion/${name}?v=hourly-width-week-v4`;document.head.append(link);
+    const link=document.createElement('link');link.id=id;link.rel='stylesheet';link.href=`/weather-fusion/${name}?v=matching-hourly-v5`;document.head.append(link);
   }
   const root=document.createElement('section');root.id='experimental-week';root.className='experimental-week';root.hidden=true;root.setAttribute('aria-labelledby','seven-day-title');
   root.innerHTML=`<div class="seven-day-carousel"><div class="seven-day-heading"><h2 id="seven-day-title">7-Day Forecast</h2><div class="seven-day-controls"><button type="button" data-week-step="-1" aria-label="Previous forecast days" title="Previous forecast days" aria-controls="seven-day-rail" disabled>${chevron('left')}</button><button type="button" data-week-step="1" aria-label="Next forecast days" title="Next forecast days" aria-controls="seven-day-rail" disabled>${chevron('right')}</button></div></div><div id="seven-day-detail" class="seven-day-detail" aria-live="polite" aria-atomic="true" hidden></div><div id="seven-day-rail" class="seven-day-rail" tabindex="0" aria-label="Seven-day forecast"></div><input type="range" class="seven-day-scroll" min="0" max="1000" value="0" aria-label="Scroll seven-day forecast" aria-controls="seven-day-rail" disabled></div>`;
