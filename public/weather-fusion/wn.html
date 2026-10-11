@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b1526">
+  <title>WeatherNext AI · Weather Nourie</title>
+  <meta name="description" content="Explore everything Google WeatherNext AI forecasts: 21 variables, 15 days, full ensemble uncertainty.">
+  <link rel="stylesheet" href="/weather-fusion/wn.css">
+</head>
+<body>
+  <div class="sky" aria-hidden="true">
+    <div id="sky-a" class="sky-layer"></div>
+    <div id="sky-b" class="sky-layer"></div>
+    <div class="sky-shade"></div>
+  </div>
+  <div class="wrap">
+    <header class="topbar">
+      <a class="brand" href="/weather-fusion/" aria-label="Back to Weather Nourie"><span class="brand-sun" aria-hidden="true">◒</span><span>Weather <b>Nourie</b></span></a>
+      <span class="page-tag">WeatherNext AI</span>
+    </header>
+
+    <div class="loc-row">
+      <label class="loc-label" for="loc-select">Location</label>
+      <select id="loc-select" class="loc-select" aria-label="Choose location"></select>
+      <span id="run-info" class="updated" aria-live="polite"></span>
+    </div>
+
+    <main id="wn" class="wn" aria-live="polite">
+      <section class="hero glass" aria-label="Current value">
+        <div class="hero-var"><span id="hero-var-name">Loading…</span><span id="hero-var-unit" class="hero-unit"></span></div>
+        <div class="hero-temp"><span id="hero-value">--</span></div>
+        <div class="hero-sub">
+          <div id="hero-range" class="hero-range"></div>
+          <div id="hero-meta" class="hero-meta"></div>
+        </div>
+      </section>
+
+      <section class="glass var-picker" aria-label="Choose variable">
+        <h2>Variable <span id="var-count"></span></h2>
+        <div id="cat-tabs" class="cat-tabs" role="tablist" aria-label="Variable categories"></div>
+        <div id="var-grid" class="var-grid"></div>
+      </section>
+
+      <section class="glass chart-card" aria-label="Forecast chart">
+        <div class="chart-head">
+          <h2 id="chart-title">Forecast</h2>
+          <div id="range-tabs" class="range-tabs" role="tablist" aria-label="Time range">
+            <button data-range="48" class="on">48h</button>
+            <button data-range="168">7d</button>
+            <button data-range="360">15d</button>
+          </div>
+        </div>
+        <div id="chart" class="chart"></div>
+        <div class="legend">
+          <span><i class="sw band"></i>P10–P90 range</span>
+          <span><i class="sw band50"></i>P25–P75</span>
+          <span><i class="sw mean"></i>Mean</span>
+        </div>
+      </section>
+
+      <section class="stats" aria-label="Key statistics">
+        <div id="stat-tiles" class="stat-tiles"></div>
+      </section>
+
+      <section class="glass days-card" aria-label="Daily outlook">
+        <h2>15-day daily outlook</h2>
+        <div id="day-cards" class="day-cards"></div>
+      </section>
+
+      <section class="glass table-card" aria-label="Hourly values">
+        <details id="hourly-details">
+          <summary><h2>Hourly values <span id="hourly-sub"></span></h2></summary>
+          <div class="table-wrap"><table id="hourly-table">
+            <thead><tr><th>Time</th><th>Mean</th><th>P10</th><th>P25</th><th>P50</th><th>P75</th><th>P90</th></tr></thead>
+            <tbody id="hourly-body"></tbody>
+          </table></div>
+        </details>
+      </section>
+
+      <section class="glass about-card" aria-label="About this model">
+        <h2>About WeatherNext</h2>
+        <p id="about-text"></p>
+      </section>
+    </main>
+
+    <p id="error" class="error" role="alert" hidden></p>
+
+    <footer class="foot">
+      <p>Data: Google WeatherNext AI via NVIDIA. 21 variables, 360 hours, 6 ensemble statistics. Values converted from SI for display; downloads remain SI.</p>
+      <p><a href="/weather-fusion/">Full Weather Nourie →</a> · <a href="/weather-fusion/blend.html">Blend →</a> · <a href="/weather-fusion/today.html">Today →</a></p>
+    </footer>
+  </div>
+  <script type="module" src="/weather-fusion/wn.js"></script>
+</body>
+</html>
