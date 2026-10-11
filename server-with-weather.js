@@ -4,12 +4,14 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { registerWeatherFusionRoutes } from './src/weatherFusion.js';
 import { registerWeatherComparisonRoutes } from './src/weatherComparison.js';
+import { registerWeatherSiteAccess, weatherSiteCookieSecret } from './src/weatherSiteAccess.js';
 import { createWeatherGateway, gatewayPorts } from './src/weatherFusionGateway.js';
 
 const root = fileURLToPath(new URL('./', import.meta.url));
 const { publicPort, sitePort, legacyPort } = gatewayPorts();
 const weather = express();
 weather.disable('x-powered-by');
+registerWeatherSiteAccess(weather);
 registerWeatherComparisonRoutes(weather);
 registerWeatherFusionRoutes(weather);
 weather.get('/weather-fusion/index.html', (_req, res) => res.redirect(302, '/weather-fusion/'));
@@ -20,7 +22,7 @@ const gateway = createWeatherGateway({ sitePort, weatherHandler: weather });
 // Only its listening ports are moved behind the weather front door.
 const site = spawn(process.execPath, [fileURLToPath(new URL('./server.js', import.meta.url))], {
   cwd: root,
-  env: { ...process.env, PORT: String(sitePort), LEGACY_PORT: String(legacyPort) },
+  env: { ...process.env, PORT: String(sitePort), LEGACY_PORT: String(legacyPort), WEATHER_SITE_COOKIE_SECRET: weatherSiteCookieSecret },
   stdio: ['ignore', 'inherit', 'inherit'],
 });
 let stopping = false;
