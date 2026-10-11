@@ -143,9 +143,14 @@ function renderOverview() {
       <div class="wind">${d.windDirection || ''} ${typeof d.wind === 'string' ? d.wind : ''}</div></div>`;
   }).join('');
 
-  // Metrics — vibrant with icons
-  const c = forecast.current;
+  // Metrics — vibrant with icons (fall back to hour 0 for live values)
   const mhrs = forecast.hours || [];
+  const h0 = mhrs[0] || {};
+  const c = Object.assign({}, h0, forecast.current);
+  // Prefer non-null current values, else hour 0
+  for (const k of ['wind','windMph','windDirection','humidity','dewpoint','gust','pressure','visibility']) {
+    if (c[k] == null && h0[k] != null) c[k] = h0[k];
+  }
   const t6 = mhrs[6]?.temperature, t0 = mhrs[0]?.temperature;
   const tTrend = finite(t6) && finite(t0) ? (t6 > t0 + 1 ? ['↗ Rising', 'up'] : t6 < t0 - 1 ? ['↘ Falling', 'down'] : ['→ Steady', 'flat']) : ['', ''];
   const metrics = [
