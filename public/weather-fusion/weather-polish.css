@@ -1,5 +1,5 @@
 /* Readability, device-location, jump navigation and air-quality polish shared by regular + experimental weather. */
-.weather-jump-nav{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;margin:10px 0 7px;padding:0}
+.weather-jump-nav{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;margin:10px 0 7px;padding:0}
 .weather-jump-card{box-sizing:border-box;min-width:0;min-height:40px;display:flex;align-items:center;justify-content:center;padding:8px 5px;border:0;border-radius:10px;background:rgba(8,64,99,.32);box-shadow:none;color:#dff5ff;text-decoration:none}
 .weather-jump-card:nth-child(n){grid-column:auto}
 .weather-jump-card:hover,.weather-jump-card:focus-visible{transform:none;background:rgba(16,93,137,.46);box-shadow:none;color:#fff}
