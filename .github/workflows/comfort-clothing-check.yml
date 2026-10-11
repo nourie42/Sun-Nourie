@@ -57,15 +57,23 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Sign in to the live weather site
+        id: login
+        uses: ./.github/actions/weather-login
+        with:
+          password: ${{ secrets.WEATHER_SITE_PASSWORD }}
       - name: Verify deployed wardrobe modules match the tested commit
+        env:
+          WEATHER_SITE_COOKIE: ${{ steps.login.outputs.cookie }}
         run: |
           python - <<'PY'
-          import hashlib,json,time,urllib.request
+          import hashlib,json,os,time,urllib.request
           from pathlib import Path
           base='https://sun-nourie-live.onrender.com'
+          cookie='weather_site_auth='+os.environ['WEATHER_SITE_COOKIE']
           names=['comfort-clothing.js','exposure-scene.js','personal-details.js','pavement.js','experience.js','app.js']
           def read(path):
-              request=urllib.request.Request(base+path,headers={'Cache-Control':'no-cache'})
+              request=urllib.request.Request(base+path,headers={'Cache-Control':'no-cache','Cookie':cookie})
               with urllib.request.urlopen(request,timeout=12) as response:return response.read()
           expected={name:hashlib.sha256((Path('public/weather-fusion')/name).read_bytes()).hexdigest() for name in names}
           for attempt in range(40):

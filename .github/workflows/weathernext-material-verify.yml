@@ -16,6 +16,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Sign in to the live weather site
+        id: login
+        uses: ./.github/actions/weather-login
+        with:
+          password: ${{ secrets.WEATHER_SITE_PASSWORD }}
       - name: Verify the new WeatherNext page is actually deployed
         env:
           LIVE_URL: https://sun-nourie-live.onrender.com
@@ -24,7 +32,7 @@ jobs:
           set -euo pipefail
           mkdir -p /tmp/weathernext-material-live
           for attempt in $(seq 1 40); do
-            if curl -fsSL --max-time 25 -D /tmp/weathernext-material-live/headers.txt "$LIVE_URL/weathernext/?verify=$GITHUB_SHA&attempt=$attempt" -o /tmp/weathernext-material-live/index.html \
+            if curl -fsSL -b /tmp/weather-site-cookies.txt --max-time 25 -D /tmp/weathernext-material-live/headers.txt "$LIVE_URL/weathernext/?verify=$GITHUB_SHA&attempt=$attempt" -o /tmp/weathernext-material-live/index.html \
               && grep -Fq 'data-build="wn-repair-20260925"' /tmp/weathernext-material-live/index.html \
               && grep -Fq 'id="hour-strip"' /tmp/weathernext-material-live/index.html \
               && grep -Fq 'id="scene"' /tmp/weathernext-material-live/index.html \
@@ -38,8 +46,8 @@ jobs:
             fi
             sleep 5
           done
-          curl -fsSL --max-time 25 "$LIVE_URL/weather-fusion/weathernext-data.js?v=wn-repair-20260925" -o /tmp/weathernext-material-live/weathernext-data.mjs
-          curl -fsSL --max-time 25 "$LIVE_URL/weather-fusion/weathernext-catalog.json?v=wn-repair-20260925" -o /tmp/weathernext-material-live/catalog.json
+          curl -fsSL -b /tmp/weather-site-cookies.txt --max-time 25 "$LIVE_URL/weather-fusion/weathernext-data.js?v=wn-repair-20260925" -o /tmp/weathernext-material-live/weathernext-data.mjs
+          curl -fsSL -b /tmp/weather-site-cookies.txt --max-time 25 "$LIVE_URL/weather-fusion/weathernext-catalog.json?v=wn-repair-20260925" -o /tmp/weathernext-material-live/catalog.json
           node --check /tmp/weathernext-material-live/weathernext-data.mjs
           node -e 'const fs=require("fs");const p="/tmp/weathernext-material-live/";const html=fs.readFileSync(p+"index.html","utf8");const scripts=[...html.matchAll(/<script type="module">([\s\S]*?)<\/script>/g)];if(scripts.length!==1)throw Error("Expected one inline application module");fs.writeFileSync(p+"application.mjs",scripts[0][1]);const c=JSON.parse(fs.readFileSync(p+"catalog.json","utf8"));if(c.fields.length!==21||c.statistics.length!==6)throw Error("Incomplete field catalog");'
           node --check /tmp/weathernext-material-live/application.mjs

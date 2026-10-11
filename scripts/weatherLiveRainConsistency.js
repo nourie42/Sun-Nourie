@@ -2,7 +2,9 @@ import {chromium} from 'playwright';
 import assert from 'node:assert/strict';
 
 const base=String(process.env.WEATHER_TODAY_BASE_URL||'https://sun-nourie-live.onrender.com').replace(/\/$/,'');
-const radarResponse=await fetch(base+'/api/weather-fusion/radar?location=knightdale&live-rain='+Date.now(),{cache:'no-store'});
+const siteCookie=process.env.WEATHER_SITE_COOKIE||'';
+const siteHeaders=siteCookie?{Cookie:`weather_site_auth=${siteCookie}`}:{};
+const radarResponse=await fetch(base+'/api/weather-fusion/radar?location=knightdale&live-rain='+Date.now(),{cache:'no-store',headers:siteHeaders});
 assert.equal(radarResponse.ok,true,'Live radar API failed: '+radarResponse.status);
 const radar=await radarResponse.json();
 const precipitation=radar.precipitation||{};
@@ -10,6 +12,7 @@ const precipitation=radar.precipitation||{};
 const browser=await chromium.launch({headless:true});
 try{
   const page=await browser.newPage({viewport:{width:390,height:844}});
+  if(siteCookie)await page.context().addCookies([{name:'weather_site_auth',value:siteCookie,domain:new URL(base).hostname,path:'/',httpOnly:true,secure:true,sameSite:'Strict'}]);
   await page.goto(base+'/weather-fusion/?live-rain='+Date.now(),{waitUntil:'domcontentloaded',timeout:60000});
   await page.waitForSelector('#hourly .hour-current',{timeout:60000});
   // Let the separate live-radar request finish and re-render the page.

@@ -114,6 +114,7 @@ for(const location of ['knightdale','greenville']){
 const browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{})});
 try{
  const context=await browser.newContext({viewport:{width:1365,height:1000},geolocation:{latitude:35.787,longitude:-78.4806},permissions:['geolocation']});
+ if(process.env.WEATHER_SITE_COOKIE)await context.addCookies([{name:'weather_site_auth',value:process.env.WEATHER_SITE_COOKIE,domain:'sun-nourie-live.onrender.com',path:'/',httpOnly:true,secure:true,sameSite:'Strict'}]);
  const page=await context.newPage();
  page.on('response',async response=>{try{if(response.ok()&&response.url().includes('/api/weather-fusion/forecast?'))page.weatherForecast=await response.json();if(response.ok()&&response.url().includes('/api/weather-fusion/briefing?'))page.weatherBriefing=await response.json();}catch{}});
  page.on('pageerror',error=>report.browserErrors.push(error.message));

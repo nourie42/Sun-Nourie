@@ -38,14 +38,22 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 18
     steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Sign in to the live weather site
+        id: login
+        uses: ./.github/actions/weather-login
+        with:
+          password: ${{ secrets.WEATHER_SITE_PASSWORD }}
       - name: Wait for deployed flat navigation and WeatherNext site
         env:
           LIVE_URL: https://sun-nourie-live.onrender.com
         run: |
           for attempt in $(seq 1 90); do
-            main="$(curl -fsSL --max-time 20 "$LIVE_URL/weather-fusion/?deploy=$GITHUB_SHA&n=$attempt" 2>/dev/null || true)"
-            wn="$(curl -fsSL --max-time 20 "$LIVE_URL/weathernext/?deploy=$GITHUB_SHA&n=$attempt" 2>/dev/null || true)"
-            css="$(curl -fsSL --max-time 20 "$LIVE_URL/weather-fusion/weather-polish.css?v=mobile-repair-v1&n=$attempt" 2>/dev/null || true)"
+            main="$(curl -fsSL -b /tmp/weather-site-cookies.txt --max-time 20 "$LIVE_URL/weather-fusion/?deploy=$GITHUB_SHA&n=$attempt" 2>/dev/null || true)"
+            wn="$(curl -fsSL -b /tmp/weather-site-cookies.txt --max-time 20 "$LIVE_URL/weathernext/?deploy=$GITHUB_SHA&n=$attempt" 2>/dev/null || true)"
+            css="$(curl -fsSL -b /tmp/weather-site-cookies.txt --max-time 20 "$LIVE_URL/weather-fusion/weather-polish.css?v=mobile-repair-v1&n=$attempt" 2>/dev/null || true)"
             if printf '%s' "$main" | grep -Fq 'weather-polish.css?v=mobile-repair-v1' \
               && ! printf '%s' "$main" | grep -Fq 'jump-visual' \
               && printf '%s' "$main" | grep -Fq 'id="weathernext-site-link" href="/weathernext/"' \

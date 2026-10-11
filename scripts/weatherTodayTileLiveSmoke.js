@@ -2,9 +2,11 @@ import {chromium} from 'playwright';
 import assert from 'node:assert/strict';
 
 const base=String(process.env.WEATHER_TODAY_BASE_URL||'https://sun-nourie-live.onrender.com').replace(/\/$/,'');
+const siteCookie=process.env.WEATHER_SITE_COOKIE||'';
 const browser=await chromium.launch({headless:true});
 try{
   const page=await browser.newPage({viewport:{width:390,height:844}});
+  if(siteCookie)await page.context().addCookies([{name:'weather_site_auth',value:siteCookie,domain:new URL(base).hostname,path:'/',httpOnly:true,secure:true,sameSite:'Strict'}]);
   await page.goto(base+'/weather-fusion/?today-live-smoke='+Date.now(),{waitUntil:'domcontentloaded',timeout:60000});
   await page.waitForSelector('#today-forecast .today-weather-card',{timeout:60000});
   await page.waitForFunction(()=>document.querySelector('#today-forecast .today-symbol strong')?.textContent?.includes('%'));

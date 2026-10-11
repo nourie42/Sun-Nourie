@@ -22,13 +22,21 @@ jobs:
       - run: npm ci
       - run: npm install --no-save --package-lock=false playwright@1.55.0
       - run: npx playwright install --with-deps chromium
+      - name: Sign in to the live weather site
+        id: login
+        uses: ./.github/actions/weather-login
+        with:
+          password: ${{ secrets.WEATHER_SITE_PASSWORD }}
       - name: Wait for additive weather deployment
+        env:
+          WEATHER_SITE_COOKIE: ${{ steps.login.outputs.cookie }}
         run: |
           node --input-type=module - <<'JS'
           const delay=ms=>new Promise(r=>setTimeout(r,ms));
+          const headers={Cookie:`weather_site_auth=${process.env.WEATHER_SITE_COOKIE}`};
           let ready=false;
           for(let i=0;i<40;i++){
-            try{const r=await fetch('https://sun-nourie-live.onrender.com/api/weather-fusion/forecast?location=knightdale',{signal:AbortSignal.timeout(45000)});const d=await r.json();if(d.humidFeelsVersion==='weather-nourie-humid-v1'){ready=true;break;}}
+            try{const r=await fetch('https://sun-nourie-live.onrender.com/api/weather-fusion/forecast?location=knightdale',{headers,signal:AbortSignal.timeout(45000)});const d=await r.json();if(d.humidFeelsVersion==='weather-nourie-humid-v1'){ready=true;break;}}
             catch{}
             await delay(15000);
           }
@@ -39,6 +47,7 @@ jobs:
           WEATHER_BASE_URL: https://sun-nourie-live.onrender.com
           WEATHER_LIVE_CHECK: 'true'
           WEATHER_REPORT_DIR: /tmp/weather-browser-results
+          WEATHER_SITE_COOKIE: ${{ steps.login.outputs.cookie }}
         run: node scripts/weatherFusionBrowserSmoke.js
       - uses: actions/upload-artifact@v4
         if: always()

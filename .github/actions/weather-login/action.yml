@@ -1,0 +1,46 @@
+name: 'Weather site login'
+description: 'Signs in to the password-gated live weather site and exposes the session cookie for subsequent steps'
+inputs:
+  base-url:
+    description: 'Live site base URL'
+    required: false
+    default: 'https://sun-nourie-live.onrender.com'
+  password:
+    description: 'Weather site password (pass ${{ secrets.WEATHER_SITE_PASSWORD }})'
+    required: true
+  cookie-jar:
+    description: 'Path where the curl cookie jar is saved'
+    required: false
+    default: '/tmp/weather-site-cookies.txt'
+outputs:
+  cookie:
+    description: 'Value of the weather_site_auth session cookie'
+    value: ${{ steps.login.outputs.cookie }}
+  cookie-jar:
+    description: 'Path of the saved curl cookie jar'
+    value: ${{ inputs.cookie-jar }}
+runs:
+  using: 'composite'
+  steps:
+    - id: login
+      shell: bash
+      run: |
+        set -euo pipefail
+        jar="${{ inputs.cookie-jar }}"
+        rm -f "$jar"
+        curl -fsSL --max-time 30 -c "$jar" \
+          --data-urlencode "password=${{ inputs.password }}" \
+          --data-urlencode "returnTo=/weather-fusion/" \
+          "${{ inputs.base-url }}/weather-fusion/login" -o /dev/null
+        code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 -b "$jar" "${{ inputs.base-url }}/weather-fusion/?login-check=1")"
+        if [ "$code" != "200" ]; then
+          echo "Login verification failed (HTTP $code)" >&2
+          exit 1
+        fi
+        value="$(awk '$6=="weather_site_auth" {print $7}' "$jar" | tail -n 1)"
+        if [ -z "$value" ]; then
+          echo "No weather_site_auth cookie captured" >&2
+          exit 1
+        fi
+        echo "cookie=$value" >> "$GITHUB_OUTPUT"
+        echo "Signed in to the live weather site."
