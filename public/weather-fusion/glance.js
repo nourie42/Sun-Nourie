@@ -1,6 +1,7 @@
 /* Glance — Weather Nourie at a glance.
  * One API call (/api/weather-fusion/forecast) drives the whole page.
- * Pure view-model builders are exported for testing; DOM wiring runs in browser. */
+ * Pure builders (feelsLike, skyImage, buildArc, insights, buildGlanceModel)
+ * are exported for testing; DOM wiring runs in the browser. */
 
 const finite = (n) => typeof n === 'number' && Number.isFinite(n);
 const round = (n) => (finite(n) ? Math.round(n) : null);
@@ -24,8 +25,113 @@ export function feelsLike(tempF, humidityPct, windMph) {
   return round(tempF);
 }
 
+function hourAt(hours, nowMs) {
+  return (hours || []).find((h) => h.time <= nowMs && nowMs < h.time + 3600000) || hours?.[0] || null;
+}
+
+export function skyImage(hours, nowMs) {
+  const h = hourAt(hours, nowMs);
+  const cond = String(h?.condition || '').toLowerCase();
+  if (h?.isDay === false) return 'today-sky-night-v2.webp';
+  if (/thunder|storm|tornado|hail/.test(cond)) return 'today-sky-storm.webp';
+  if (/rain|shower|drizzle/.test(cond) || (h?.pop ?? 0) >= 40) return 'today-sky-rain.webp';
+  if (/cloud|overcast|fog|mist|haze/.test(cond)) return 'today-sky-clouds.webp';
+  return 'today-sky-clear.webp';
+}
+
 function hourLabel(timeMs, timeZone) {
   return new Intl.DateTimeFormat('en-US', { timeZone, hour: 'numeric' }).format(new Date(timeMs));
+}
+function timeLabel(timeMs, timeZone) {
+  return new Intl.DateTimeFormat('en-US', { timeZone, hour: 'numeric', minute: '2-digit' }).format(new Date(timeMs));
+}
+
+/* ---- 24-hour temperature arc (pure SVG builder) ---- */
+export function buildArc(hours, solar, timeZone, nowMs) {
+  const pts = (hours || []).slice(0, 24).filter((h) => finite(h.time) && finite(h.temperature));
+  if (pts.length < 4) return '';
+  const W = 600, H = 230, PL = 10, PR = 10, PT = 34, PB = 40;
+  const temps = pts.map((p) => p.temperature);
+  let lo = Math.min(...temps), hi = Math.max(...temps);
+  if (hi - lo < 6) { const mid = (hi + lo) / 2; lo = mid - 3; hi = mid + 3; }
+  const X = (i) => PL + (i * (W - PL - PR)) / (pts.length - 1);
+  const Y = (t) => PT + (1 - (t - lo) / (hi - lo)) * (H - PT - PB);
+  const xy = pts.map((p, i) => [X(i), Y(p.temperature)]);
+  // Catmull-Rom smoothing
+  let d = `M ${xy[0][0].toFixed(1)} ${xy[0][1].toFixed(1)}`;
+  for (let i = 0; i < xy.length - 1; i++) {
+    const p0 = xy[Math.max(0, i - 1)], p1 = xy[i], p2 = xy[i + 1], p3 = xy[Math.min(xy.length - 1, i + 2)];
+    const c1x = p1[0] + (p2[0] - p0[0]) / 6, c1y = p1[1] + (p2[1] - p0[1]) / 6;
+    const c2x = p2[0] - (p3[0] - p1[0]) / 6, c2y = p2[1] - (p3[1] - p1[1]) / 6;
+    d += ` C ${c1x.toFixed(1)} ${c1y.toFixed(1)}, ${c2x.toFixed(1)} ${c2y.toFixed(1)}, ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;
+  }
+  const area = `${d} L ${xy[xy.length - 1][0].toFixed(1)} ${H - PB} L ${xy[0][0].toFixed(1)} ${H - PB} Z`;
+  // Rain shading per hour segment
+  let rain = '';
+  for (let i = 0; i < pts.length; i++) {
+    const pop = pts[i].pop;
+    if (finite(pop) && pop >= 30) {
+      const x0 = i === 0 ? X(0) : (X(i - 1) + X(i)) / 2;
+      const x1 = i === pts.length - 1 ? X(i) : (X(i) + X(i + 1)) / 2;
+      rain += `<rect class="arc-rain" x="${x0.toFixed(1)}" y="${PT}" width="${(x1 - x0).toFixed(1)}" height="${H - PT - PB}" rx="4" opacity="${(0.25 + Math.min(pop, 100) / 160).toFixed(2)}"/>`;
+    }
+  }
+  // Now marker
+  const nowMark = `<line class="arc-now" x1="${X(0).toFixed(1)}" y1="${PT - 6}" x2="${X(0).toFixed(1)}" y2="${H - PB}"/><circle class="arc-now-dot" cx="${X(0).toFixed(1)}" cy="${Y(pts[0].temperature).toFixed(1)}" r="5"/>`;
+  // Sunrise / sunset markers
+  let sunMarks = '';
+  const t0 = pts[0].time, tN = pts[pts.length - 1].time + 3600000;
+  for (const [key, glyph] of [['sunrise', '↑'], ['sunset', '↓']]) {
+    const t = solar?.[key] ? Date.parse(solar[key]) : NaN;
+    if (Number.isFinite(t) && t >= t0 && t <= tN) {
+      const frac = pts.findIndex((p) => p.time + 3600000 > t);
+      const i = Math.max(0, frac);
+      const pA = pts[i], pB = pts[Math.min(pts.length - 1, i + 1)];
+      const f = Math.min(1, Math.max(0, (t - pA.time) / 3600000));
+      const x = X(i) + f * ((pB ? X(Math.min(pts.length - 1, i + 1)) : X(i)) - X(i));
+      sunMarks += `<text class="arc-sun" x="${x.toFixed(1)}" y="${(H - 8).toFixed(1)}" text-anchor="middle">${glyph} ${hourLabel(t, timeZone)}</text>`;
+    }
+  }
+  // Labels every 3 hours
+  let labels = '';
+  for (let i = 0; i < pts.length; i += 3) {
+    labels += `<text x="${X(i).toFixed(1)}" y="${(H - 22).toFixed(1)}" text-anchor="middle">${hourLabel(pts[i].time, timeZone)}</text>`;
+    labels += `<text class="arc-temp" x="${X(i).toFixed(1)}" y="${(Y(pts[i].temperature) - 10).toFixed(1)}" text-anchor="middle">${Math.round(pts[i].temperature)}°</text>`;
+  }
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Temperature over the next 24 hours">`
+    + `<defs><linearGradient id="arcGrad" x1="0" y1="0" x2="0" y2="1">`
+    + `<stop offset="0" stop-color="#7fd4ff" stop-opacity=".55"/><stop offset="1" stop-color="#7fd4ff" stop-opacity="0"/>`
+    + `</linearGradient></defs>`
+    + rain + `<path class="arc-fill" d="${area}"/>` + `<path class="arc-line" d="${d}"/>`
+    + nowMark + sunMarks + labels + `</svg>`;
+}
+
+/* ---- Smart insights (pure) ---- */
+export function insights(hours, timeZone) {
+  const out = [];
+  const h12 = (hours || []).slice(0, 12);
+  // Driest window: longest run of pop < 20 within 12h
+  let best = null, run = null;
+  h12.forEach((h, i) => {
+    if (finite(h.pop) && h.pop < 20) {
+      run = run || { start: i, len: 0 };
+      run.len++;
+      if (!best || run.len > best.len) best = { ...run };
+    } else run = null;
+  });
+  if (best && best.len >= 2) {
+    out.push({ k: 'Driest window', v: `${hourLabel(h12[best.start].time, timeZone)} – ${hourLabel(h12[best.start + best.len - 1].time + 3600000, timeZone)}` });
+  }
+  // Rain start
+  const wet = (hours || []).slice(0, 24).find((h) => finite(h.pop) && h.pop >= 40);
+  if (wet) out.push({ k: 'Rain from', v: `${hourLabel(wet.time, timeZone)} · ${Math.round(wet.pop)}%` });
+  // Peak temp
+  const h24 = (hours || []).slice(0, 24).filter((h) => finite(h.temperature));
+  if (h24.length) {
+    const peak = h24.reduce((a, b) => (b.temperature > a.temperature ? b : a));
+    out.push({ k: 'Warmest', v: `${Math.round(peak.temperature)}° around ${hourLabel(peak.time, timeZone)}` });
+  }
+  return out.slice(0, 3);
 }
 
 export function rainOutlook(hours, timeZone) {
@@ -37,12 +143,14 @@ export function rainOutlook(hours, timeZone) {
   return { wet: true, text: `Chance of rain around ${when} (${Math.round(first.pop)}%).` };
 }
 
-export function skyClass(hours, nowMs) {
-  const h = (hours || []).find((x) => x.time <= nowMs && nowMs < x.time + 3600000) || hours?.[0];
-  if (!h) return 'day';
-  if (h.isDay === false) return 'night';
-  if (finite(h.pop) && h.pop >= 40) return 'rain';
-  return 'day';
+function uvNow(uv, nowMs) {
+  const list = (uv?.hourly || []).filter((e) => Number.isFinite(Date.parse(e.time)));
+  let best = null;
+  for (const e of list) {
+    const t = Date.parse(e.time);
+    if (t <= nowMs && (!best || t > Date.parse(best.time))) best = e;
+  }
+  return best && finite(best.value) ? Math.round(best.value * 10) / 10 : null;
 }
 
 export function buildGlanceModel(data, nowMs = Date.now()) {
@@ -52,33 +160,32 @@ export function buildGlanceModel(data, nowMs = Date.now()) {
   const allHours = (data?.hours || [])
     .map((h) => ({ ...h, time: Date.parse(h.time) }))
     .filter((h) => Number.isFinite(h.time));
-  const hours = allHours.filter((h) => h.time + 3600000 > nowMs).slice(0, 12);
-  const days = (data?.days || []).slice(0, 2);
+  const hours = allHours.filter((h) => h.time + 3600000 > nowMs).slice(0, 24);
+  const days = (data?.days || []).slice(0, 3);
   const feels = finite(cur.feelsLike) ? round(cur.feelsLike) : feelsLike(cur.temperature, cur.humidity, cur.wind);
-  const rain = rainOutlook(hours, timeZone);
+  const solar = data?.solar || null;
+  const sun = (key) => (solar?.[key] ? timeLabel(Date.parse(solar[key]), timeZone) : null);
   const alerts = (data?.alerts || []).slice(0, 3).map((a) => ({
     event: a.event || 'Weather alert',
-    headline: a.headline || a.description?.slice(0, 140) || '',
+    headline: a.headline || (a.description || '').slice(0, 140),
     watch: /watch/i.test(a.event || ''),
   }));
   return {
     place: loc.name || 'Knightdale / Raleigh',
     updatedAt: nowMs,
-    sky: skyClass(allHours, nowMs),
+    sky: skyImage(allHours, nowMs),
     hero: {
       temp: round(cur.temperature),
       condition: cur.condition || 'Conditions unavailable',
       feels,
       high: round(days[0]?.high),
       low: round(days[0]?.low),
-      station: cur.stationName || cur.station || null,
+      sunrise: sun('sunrise'),
+      sunset: sun('sunset'),
     },
-    rain,
-    hours: hours.map((h) => ({
-      label: hourLabel(h.time, timeZone),
-      temp: round(h.temperature),
-      pop: finite(h.pop) ? Math.round(h.pop) : null,
-    })),
+    rain: rainOutlook(hours, timeZone),
+    insightList: insights(hours, timeZone),
+    arc: buildArc(hours, solar, timeZone, nowMs),
     days: days.map((d) => ({
       label: d.label || '',
       high: round(d.high),
@@ -91,6 +198,8 @@ export function buildGlanceModel(data, nowMs = Date.now()) {
       ['Dew point', finite(cur.dewpoint) ? `${Math.round(cur.dewpoint)}°` : '—'],
       ['Wind', finite(cur.wind) ? `${Math.round(cur.wind)} mph` : '—'],
       ['Gusts', finite(cur.gust) ? `${Math.round(cur.gust)} mph` : '—'],
+      ['UV index', (() => { const u = uvNow(data?.uv, nowMs); return u != null ? String(u) : '—'; })()],
+      ['Air quality', finite(data?.airQuality?.aqi) ? `AQI ${Math.round(data.airQuality.aqi)}` : '—'],
       ['Visibility', finite(cur.visibility) ? `${cur.visibility} mi` : '—'],
       ['Pressure', finite(cur.pressure) ? `${cur.pressure} in` : '—'],
     ],
@@ -100,64 +209,98 @@ export function buildGlanceModel(data, nowMs = Date.now()) {
 
 /* ---------- DOM wiring (browser only) ---------- */
 function el(id) { return document.getElementById(id); }
+const reducedMotion = () => typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-function renderAlerts(alerts) {
-  const strip = el('alert-strip');
-  if (!alerts.length) { strip.hidden = true; strip.innerHTML = ''; return; }
-  strip.hidden = false;
-  strip.innerHTML = '';
-  for (const a of alerts) {
-    const div = document.createElement('div');
-    div.className = 'alert-chip' + (a.watch ? ' watch' : '');
-    div.textContent = a.headline ? `${a.event}: ${a.headline}` : a.event;
-    strip.appendChild(div);
-  }
+let skyFlip = false;
+function setSky(image) {
+  const url = `/weather-fusion/${image}`;
+  const show = skyFlip ? el('sky-a') : el('sky-b');
+  const hide = skyFlip ? el('sky-b') : el('sky-a');
+  if (show.dataset.img === image) return;
+  const pre = new Image();
+  pre.onload = () => {
+    show.style.backgroundImage = `url("${url}")`;
+    show.dataset.img = image;
+    show.classList.add('on');
+    hide.classList.remove('on');
+    skyFlip = !skyFlip;
+  };
+  pre.onerror = () => {};
+  pre.src = url;
+}
+
+function countUp(node, target) {
+  if (!node || !finite(target)) { if (node) node.textContent = target ?? '--'; return; }
+  if (reducedMotion()) { node.textContent = target; return; }
+  const t0 = performance.now(), dur = 900;
+  const step = (t) => {
+    const f = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - f, 3);
+    node.textContent = Math.round(target * e);
+    if (f < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
 }
 
 export function render(model) {
-  document.body.dataset.sky = model.sky;
-  el('now-temp').textContent = model.hero.temp ?? '--';
+  setSky(model.sky);
+  countUp(el('now-temp'), model.hero.temp);
   el('now-cond').textContent = model.hero.condition;
   el('now-feels').textContent = model.hero.feels != null && model.hero.temp != null && model.hero.feels !== model.hero.temp
-    ? `Feels like ${model.hero.feels}°` : model.hero.station ? `Via ${model.hero.station}` : '';
-  el('now-hilo').textContent = model.hero.high != null
-    ? `H ${model.hero.high}°  ·  L ${model.hero.low ?? '--'}°` : '';
+    ? `Feels like ${model.hero.feels}°` : '';
+  el('now-hilo').textContent = model.hero.high != null ? `H ${model.hero.high}°  ·  L ${model.hero.low ?? '--'}°` : '';
+  el('sun-times').textContent = model.hero.sunrise ? `↑ ${model.hero.sunrise}   ↓ ${model.hero.sunset}` : '';
   const rain = el('rain-line');
   el('rain-text').textContent = model.rain.text;
   rain.classList.toggle('wet', model.rain.wet);
-  const strip = el('hour-strip');
-  strip.innerHTML = '';
-  for (const h of model.hours) {
+  const row = el('insight-row');
+  row.innerHTML = '';
+  for (const ins of model.insightList) {
     const d = document.createElement('div');
-    d.className = 'hour';
-    const pop = document.createElement('div');
-    pop.className = 'p' + (h.pop != null && h.pop >= 20 ? '' : ' dry');
-    pop.textContent = h.pop != null && h.pop >= 20 ? `${h.pop}%` : '';
-    d.innerHTML = `<div class="h">${h.label}</div><div class="t">${h.temp ?? '--'}°</div>`;
-    d.appendChild(pop);
-    strip.appendChild(d);
+    d.className = 'insight';
+    const k = document.createElement('div'); k.className = 'k'; k.textContent = ins.k;
+    const v = document.createElement('div'); v.className = 'v'; v.textContent = ins.v;
+    d.append(k, v);
+    row.appendChild(d);
   }
+  el('arc').innerHTML = model.arc;
   const cards = el('day-cards');
   cards.innerHTML = '';
   for (const d of model.days) {
     const c = document.createElement('div');
     c.className = 'day-card';
-    c.innerHTML = `<div class="d">${d.label}</div>
-      <div class="hl">${d.high ?? '--'}° <small>/ ${d.low ?? '--'}°</small></div>
-      <div class="c">${d.condition}</div>
-      ${d.pop != null && d.pop >= 20 ? `<div class="rp">Rain ${d.pop}%</div>` : ''}`;
+    const k = document.createElement('div'); k.className = 'd'; k.textContent = d.label; c.appendChild(k);
+    const hl = document.createElement('div'); hl.className = 'hl';
+    hl.innerHTML = ''; hl.append(document.createTextNode(`${d.high ?? '--'}° `));
+    const sm = document.createElement('small'); sm.textContent = `/ ${d.low ?? '--'}°`; hl.appendChild(sm); c.appendChild(hl);
+    const cc = document.createElement('div'); cc.className = 'c'; cc.textContent = d.condition; c.appendChild(cc);
+    if (d.pop != null && d.pop >= 20) {
+      const rp = document.createElement('div'); rp.className = 'rp'; rp.textContent = `Rain ${d.pop}%`; c.appendChild(rp);
+    }
     cards.appendChild(c);
   }
   const dl = el('detail-list');
   dl.innerHTML = '';
   for (const [k, v] of model.details) {
     const wrap = document.createElement('div');
-    wrap.innerHTML = `<dt>${k}</dt><dd>${v}</dd>`;
+    const dt = document.createElement('dt'); dt.textContent = k;
+    const dd = document.createElement('dd'); dd.textContent = v;
+    wrap.append(dt, dd);
     dl.appendChild(wrap);
   }
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   el('updated').textContent = 'Updated ' + new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz }).format(new Date(model.updatedAt));
-  renderAlerts(model.alerts);
+  const strip = el('alert-strip');
+  strip.innerHTML = '';
+  if (!model.alerts.length) { strip.hidden = true; }
+  else {
+    strip.hidden = false;
+    for (const a of model.alerts) {
+      const div = document.createElement('div');
+      div.className = 'alert-chip' + (a.watch ? ' watch' : '');
+      div.textContent = a.headline ? `${a.event}: ${a.headline}` : a.event;
+      strip.appendChild(div);
+    }
+  }
 }
 
 async function load(location) {
