@@ -1,6 +1,17 @@
 export const FORECAST_CONFIDENCE_VERSION='weather-nourie-confidence-actual-blend-v2';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const MODERATE_SCORE=70,HIGH_SCORE=85;
+// The meter's color segments represent categories, not equal raw-score ranges.
+// Keep the source score intact; alternate model labels remain authoritative.
+export function confidenceMeterPosition(confidence){
+ const score=confidence?.score,key=confidence?.key;
+ if(!finite(score))return null;
+ const position=key==='high'?clamp(70+(score-HIGH_SCORE)/(100-HIGH_SCORE)*30,70,100):
+  key==='moderate'?clamp(40+(score-MODERATE_SCORE)/(HIGH_SCORE-MODERATE_SCORE)*20,40,60):
+  key==='low'||key==='very-low'?clamp(score/MODERATE_SCORE*30,0,30):null;
+ return position===null?null:Math.round(position*100)/100;
+}
 /** Relative forecast-confidence index, deliberately NOT a probability.
  * Inputs are scientific forecast-quality signals already available in the app:
  * lead time, temperature spread, liquid-precipitation spread, number of usable
@@ -13,7 +24,7 @@ export function forecastConfidence({dayIndex=0,highSpread=null,qpfSpread=null,gu
  const officialPenalty=officialDay&&officialNight?0:officialDay||officialNight?5:12;
  const raw=100-leadPenalty-temperaturePenalty-precipitationPenalty-guidancePenalty-officialPenalty;
  const score=clamp(Math.round(raw/5)*5,35,100);
- const label=score>=85?'High':score>=70?'Moderate':score>=55?'Low':'Very low';
+ const label=score>=HIGH_SCORE?'High':score>=MODERATE_SCORE?'Moderate':score>=55?'Low':'Very low';
  const key=label.toLowerCase().replace(/\s+/g,'-');
  const factors=[];
  factors.push(dayIndex===0?'same-day lead time':`${dayIndex}-day lead time`);
