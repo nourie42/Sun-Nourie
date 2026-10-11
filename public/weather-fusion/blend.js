@@ -122,6 +122,46 @@ export function buildBlendModel(forecast, wnFeed, locationId, nowMs = Date.now()
     });
   }
 
+  // 7-day daily model comparison (from days[].highBlend/lowBlend/guidance + WN daily aggregates)
+  const wnByDay = new Map();
+  if (point) {
+    for (const r of point.hourly || []) {
+      const t = Date.parse(r.time);
+      if (!Number.isFinite(t)) continue;
+      const key = new Intl.DateTimeFormat('en-US', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(t));
+      if (!wnByDay.has(key)) wnByDay.set(key, { temps: [], winds: [], sample: t });
+      const g = wnByDay.get(key);
+      if (finite(r.temperatureF)) g.temps.push(r.temperatureF);
+      if (finite(r.windMph)) g.winds.push(r.windMph);
+    }
+  }
+  const wnDayFor = (dateStr) => {
+    // match a day by its local date string (YYYY-MM-DD from the API is local)
+    for (const [key, g] of wnByDay) {
+      const asYMD = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(g.sample));
+      if (asYMD === dateStr) return g;
+    }
+    return null;
+  };
+  const week = (forecast?.days || []).slice(0, 7).map((d) => {
+    const mh = Object.fromEntries(((d.highBlend || {}).sources || []).map((s) => [s.id, s.value]));
+    const ml = Object.fromEntries(((d.lowBlend || {}).sources || []).map((s) => [s.id, s.value]));
+    const gd = d.guidance || {};
+    const wnd = wnDayFor(d.date);
+    return {
+      label: d.label || d.date,
+      blendHigh: finite(d.highBlend?.value) ? d.highBlend.value : (finite(d.high) ? d.high : null),
+      modelHighs: Object.fromEntries(MODELS.map((m) => [m.id, mh[m.id] ?? null])),
+      blendLow: finite(d.lowBlend?.value) ? d.lowBlend.value : (finite(d.low) ? d.low : null),
+      modelLows: Object.fromEntries(MODELS.map((m) => [m.id, ml[m.id] ?? null])),
+      pop: finite(d.rainLikelihood?.value) ? Math.round(d.rainLikelihood.value) : (finite(d.pop) ? Math.round(d.pop) : null),
+      gusts: Object.fromEntries(MODELS.map((m) => [m.id, finite(gd[m.id]?.gust) ? gd[m.id].gust : null])),
+      wnHigh: wnd && wnd.temps.length ? Math.max(...wnd.temps) : null,
+      wnLow: wnd && wnd.temps.length ? Math.min(...wnd.temps) : null,
+      wnWind: wnd && wnd.winds.length ? Math.max(...wnd.winds) : null,
+    };
+  });
+
   return {
     place: loc.name || 'Knightdale / Raleigh',
     updatedAt: nowMs,
@@ -133,6 +173,7 @@ export function buildBlendModel(forecast, wnFeed, locationId, nowMs = Date.now()
       low: round(forecast?.days?.[0]?.low),
     },
     series,
+    week,
     modelCards,
     weights,
     rainHours: series.slice(0, 12).map((s) => ({ time: s.time, pop: s.pop })),
@@ -153,8 +194,46 @@ export const CHART_VARS = [
   { id: 'dewpoint', label: 'Dew point', unit: '°', sub: 'Blended dew point against Google WeatherNext AI\u2019s call — watch the gap for mugginess.' },
   { id: 'wind', label: 'Wind gusts', unit: ' mph', sub: 'Each model\u2019s gust call against the blend. Dashed violet is WeatherNext AI\u2019s sustained wind.' },
 ];
+export const WEEK_VARS = [
+  { id: 'highs', label: 'Highs', unit: '°', sub: 'Each model\u2019s daily high against the blended high, 7 days out. Dashed violet is WeatherNext AI.' },
+  { id: 'lows', label: 'Lows', unit: '°', sub: 'Each model\u2019s overnight low against the blended low, 7 days out.' },
+  { id: 'rain', label: 'Rain', unit: '%', sub: 'Blended daily rain chance for the next 7 days.', bars: true },
+  { id: 'wind', label: 'Wind', unit: ' mph', sub: 'Each model\u2019s daily gust call, 7 days out. Dashed violet is WeatherNext AI\u2019s peak wind.' },
+];
+export const RANGES = [
+  { id: 'day', label: '24 hours' },
+  { id: 'week', label: '7 days' },
+];
 
-function chartSeries(model, varId) {
+function chartSeries(model, varId, range) {
+  if (range === 'week') {
+    const wk = model.week || [];
+    switch (varId) {
+      case 'lows':
+        return {
+          blend: wk.map((d) => d.blendLow),
+          models: MODELS.map((m) => ({ ...m, vals: wk.map((d) => d.modelLows[m.id]) })),
+          band: null,
+          extra: [{ vals: wk.map((d) => d.wnLow), cls: 'arc-wn-mean', label: 'WeatherNext AI' }],
+        };
+      case 'rain':
+        return { blend: wk.map((d) => d.pop), models: [], band: null, extra: null };
+      case 'wind':
+        return {
+          blend: [],
+          models: MODELS.map((m) => ({ ...m, vals: wk.map((d) => d.gusts[m.id]) })),
+          band: null,
+          extra: [{ vals: wk.map((d) => d.wnWind), cls: 'arc-wn-mean', label: 'WeatherNext AI' }],
+        };
+      default:
+        return {
+          blend: wk.map((d) => d.blendHigh),
+          models: MODELS.map((m) => ({ ...m, vals: wk.map((d) => d.modelHighs[m.id]) })),
+          band: null,
+          extra: [{ vals: wk.map((d) => d.wnHigh), cls: 'arc-wn-mean', label: 'WeatherNext AI' }],
+        };
+    }
+  }
   const pts = model.series || [];
   switch (varId) {
     case 'rain':
@@ -198,58 +277,79 @@ function smoothPath(xy) {
   return d;
 }
 
-export function buildChart(model, varId = 'temp') {
-  const pts = (model.series || []).filter((s) => Number.isFinite(s.time));
-  const cfg = CHART_VARS.find((c) => c.id === varId) || CHART_VARS[0];
-  const s = chartSeries(model, varId);
-  const hasBlend = s.blend.some(finite);
-  if (!hasBlend || pts.length < 4) return '';
+export function buildChart(model, varId = 'temp', range = 'day') {
+  const isWeek = range === 'week';
+  const pts = isWeek
+    ? (model.week || [])
+    : (model.series || []).filter((s) => Number.isFinite(s.time));
+  const varList = isWeek ? WEEK_VARS : CHART_VARS;
+  const cfg = varList.find((c) => c.id === varId) || varList[0];
+  const s = chartSeries(model, cfg.id, range);
   const W = 640, H = 250, PL = 12, PR = 12, PT = 30, PB = 42;
   const all = [...s.blend];
   for (const m of s.models) all.push(...m.vals);
   if (s.band) { all.push(...s.band.lo, ...s.band.hi); }
   if (s.extra) for (const e of s.extra) all.push(...e.vals);
   const nums = all.filter(finite);
-  if (!nums.length) return '';
+  if (!nums.length || pts.length < (isWeek ? 3 : 4)) return '';
   let lo = Math.min(...nums), hi = Math.max(...nums);
-  if (varId === 'rain') { lo = 0; hi = Math.max(hi, 20); }
+  if (cfg.id === 'rain') { lo = 0; hi = Math.max(hi, 20); }
   else if (hi - lo < 6) { const mid = (hi + lo) / 2; lo = mid - 3; hi = mid + 3; }
-  const X = (i) => PL + (i * (W - PL - PR)) / (pts.length - 1);
+  const X = (i) => PL + (i * (W - PL - PR)) / Math.max(1, pts.length - 1);
   const Y = (t) => PT + (1 - (t - lo) / (hi - lo)) * (H - PT - PB);
+  const base = H - PB;
   const line = (vals) => {
     const xy = [];
     vals.forEach((v, i) => { if (finite(v)) xy.push([X(i), Y(v)]); });
     return xy.length >= 2 ? smoothPath(xy) : '';
   };
-  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${cfg.label} model comparison over 24 hours">`;
-  if (s.band) {
-    const top = [], bot = [];
-    pts.forEach((p, i) => {
-      if (finite(s.band.lo[i]) && finite(s.band.hi[i])) { top.push([X(i), Y(s.band.hi[i])]); bot.unshift([X(i), Y(s.band.lo[i])]); }
+  const xLabel = (i) => isWeek ? pts[i].label : hourLabel(pts[i].time, model.timeZone);
+  const vLabel = (v) => `${Math.round(v)}${cfg.unit === ' mph' ? '' : cfg.unit}`;
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${cfg.label} model comparison, ${isWeek ? '7 days' : '24 hours'}">`;
+  if (cfg.bars) {
+    const bw = (W - PL - PR) / pts.length;
+    s.blend.forEach((v, i) => {
+      if (!finite(v)) return;
+      const h = Math.max(2, base - Y(v));
+      const fill = v >= 30 ? '#6aa8ff' : 'rgba(106,168,255,.45)';
+      svg += `<rect x="${(PL + i * bw + bw * 0.2).toFixed(1)}" y="${(base - h).toFixed(1)}" width="${(bw * 0.6).toFixed(1)}" height="${h.toFixed(1)}" rx="5" fill="${fill}"/>`;
     });
-    if (top.length >= 2) {
-      svg += `<polygon class="arc-wn-band" points="${top.map((p) => p.map((n) => n.toFixed(1)).join(',')).join(' ')} ${bot.map((p) => p.map((n) => n.toFixed(1)).join(',')).join(' ')}"/>`;
-      const meanD = line(s.band.mean);
-      if (meanD) svg += `<path class="arc-wn-mean" d="${meanD}"/>`;
+  } else {
+    if (s.band) {
+      const top = [], bot = [];
+      pts.forEach((p, i) => {
+        if (finite(s.band.lo[i]) && finite(s.band.hi[i])) { top.push([X(i), Y(s.band.hi[i])]); bot.unshift([X(i), Y(s.band.lo[i])]); }
+      });
+      if (top.length >= 2) {
+        svg += `<polygon class="arc-wn-band" points="${top.map((p) => p.map((n) => n.toFixed(1)).join(',')).join(' ')} ${bot.map((p) => p.map((n) => n.toFixed(1)).join(',')).join(' ')}"/>`;
+        const meanD = line(s.band.mean);
+        if (meanD) svg += `<path class="arc-wn-mean" d="${meanD}"/>`;
+      }
     }
+    for (const m of s.models) {
+      const d = line(m.vals);
+      if (d) svg += `<path class="arc-line" d="${d}" style="stroke:${m.color}"/>`;
+    }
+    if (s.extra) for (const e of s.extra) {
+      const d = line(e.vals);
+      if (d) svg += `<path class="${e.cls}" d="${d}"/>`;
+    }
+    const bd = line(s.blend);
+    if (bd) svg += `<path class="arc-blend" d="${bd}"/>`;
   }
-  for (const m of s.models) {
-    const d = line(m.vals);
-    if (d) svg += `<path class="arc-line" d="${d}" style="stroke:${m.color}"/>`;
+  if (!isWeek) {
+    const b0 = s.blend.find(finite);
+    svg += `<line class="arc-now" x1="${X(0).toFixed(1)}" y1="${PT - 6}" x2="${X(0).toFixed(1)}" y2="${base}"/>`;
+    if (finite(b0)) svg += `<circle class="arc-now-dot" cx="${X(0).toFixed(1)}" cy="${Y(b0).toFixed(1)}" r="5"/>`;
   }
-  if (s.extra) for (const e of s.extra) {
-    const d = line(e.vals);
-    if (d) svg += `<path class="${e.cls}" d="${d}"/>`;
-  }
-  const bd = line(s.blend);
-  if (bd) svg += `<path class="arc-blend" d="${bd}"/>`;
-  const b0 = s.blend.find(finite);
-  svg += `<line class="arc-now" x1="${X(0).toFixed(1)}" y1="${PT - 6}" x2="${X(0).toFixed(1)}" y2="${H - PB}"/>`
-    + `<circle class="arc-now-dot" cx="${X(0).toFixed(1)}" cy="${Y(b0).toFixed(1)}" r="5"/>`;
-  for (let i = 0; i < pts.length; i += 4) {
-    svg += `<text x="${X(i).toFixed(1)}" y="${(H - 24).toFixed(1)}" text-anchor="middle">${hourLabel(pts[i].time, model.timeZone)}</text>`;
+  const step = isWeek ? 1 : 4;
+  for (let i = 0; i < pts.length; i += step) {
+    svg += `<text x="${X(i).toFixed(1)}" y="${(H - 24).toFixed(1)}" text-anchor="middle">${xLabel(i)}</text>`;
     const bv = s.blend[i];
-    if (finite(bv)) svg += `<text class="arc-temp" x="${X(i).toFixed(1)}" y="${(Y(bv) - 10).toFixed(1)}" text-anchor="middle">${Math.round(bv)}${cfg.unit === ' mph' ? '' : cfg.unit}</text>`;
+    if (finite(bv)) {
+      const vy = cfg.bars ? (base - Math.max(2, base - Y(bv)) - 8) : (Y(bv) - 10);
+      svg += `<text class="arc-temp" x="${X(i).toFixed(1)}" y="${vy.toFixed(1)}" text-anchor="middle">${vLabel(bv)}</text>`;
+    }
   }
   return svg + '</svg>';
 }
@@ -296,9 +396,26 @@ function fmtRunAt(iso) {
 }
 
 /* Chart tabs: one engine, four variables */
-function chartLegends(model, varId) {
+function chartLegends(model, varId, range) {
   const w = model.weights;
   const wp = (id) => `${Math.round((w[id] || 0) * 100)}%`;
+  if (range === 'week') {
+    switch (varId) {
+      case 'lows':
+        return [{ color: '#fff', label: 'Blended low' },
+          ...MODELS.map((m) => ({ color: m.color, label: m.label })),
+          { color: '#b48cff', label: 'WeatherNext AI', dashed: true }];
+      case 'rain':
+        return [{ color: '#6aa8ff', label: 'Blended daily chance' }];
+      case 'wind':
+        return [...MODELS.map((m) => ({ color: m.color, label: m.label })),
+          { color: '#b48cff', label: 'WeatherNext AI', dashed: true }];
+      default:
+        return [{ color: '#fff', label: 'Blended high' },
+          ...MODELS.map((m) => ({ color: m.color, label: m.label })),
+          { color: '#b48cff', label: 'WeatherNext AI', dashed: true }];
+    }
+  }
   switch (varId) {
     case 'rain':
       return [{ color: '#fff', label: 'Blended chance' },
@@ -316,24 +433,32 @@ function chartLegends(model, varId) {
   }
 }
 
-function renderChartTabs(model, activeId) {
+function renderChartTabs(model, range, activeId) {
   const tabs = el('chart-tabs');
   tabs.innerHTML = '';
-  for (const v of CHART_VARS) {
+  const mkBtn = (label, selected, onClick, cls) => {
     const b = document.createElement('button');
-    b.className = 'tab';
+    b.className = cls;
     b.setAttribute('role', 'tab');
-    b.setAttribute('aria-selected', v.id === activeId ? 'true' : 'false');
-    b.textContent = v.label;
-    b.addEventListener('click', () => renderChartTabs(model, v.id));
+    b.setAttribute('aria-selected', selected ? 'true' : 'false');
+    b.textContent = label;
+    b.addEventListener('click', onClick);
     tabs.appendChild(b);
-  }
-  const cfg = CHART_VARS.find((c) => c.id === activeId) || CHART_VARS[0];
+    return b;
+  };
+  for (const r of RANGES) mkBtn(r.label, r.id === range, () => renderChartTabs(model, r.id, r.id === 'week' ? 'highs' : 'temp'), 'tab range-tab');
+  const sep = document.createElement('span');
+  sep.className = 'tab-sep';
+  sep.setAttribute('aria-hidden', 'true');
+  tabs.appendChild(sep);
+  const varList = range === 'week' ? WEEK_VARS : CHART_VARS;
+  for (const v of varList) mkBtn(v.label, v.id === activeId, () => renderChartTabs(model, range, v.id), 'tab');
+  const cfg = varList.find((c) => c.id === activeId) || varList[0];
   el('chart-sub').textContent = cfg.sub;
-  el('blend-arc').innerHTML = buildChart(model, activeId);
+  el('blend-arc').innerHTML = buildChart(model, cfg.id, range);
   const legend = el('blend-legend');
   legend.innerHTML = '';
-  for (const item of chartLegends(model, activeId)) {
+  for (const item of chartLegends(model, cfg.id, range)) {
     const s = document.createElement('span');
     if (item.band) {
       const sw = document.createElement('span'); sw.className = 'sw-band'; s.appendChild(sw);
@@ -356,7 +481,7 @@ export function render(model) {
   const w = model.weights;
   el('blend-line').textContent = `House blend · NWS ${Math.round(w.nws * 100)} · HRRR ${Math.round(w.hrrr * 100)} · NBM ${Math.round(w.nbm * 100)} · ECMWF ${Math.round(w.ecmwf * 100)}`;
   el('now-hilo').textContent = model.hero.high != null ? `H ${model.hero.high}°  ·  L ${model.hero.low ?? '--'}°` : '';
-  renderChartTabs(model, 'temp');
+  renderChartTabs(model, 'day', 'temp');
 
   const cards = el('model-cards');
   cards.innerHTML = '';
