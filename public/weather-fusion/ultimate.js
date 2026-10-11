@@ -100,34 +100,66 @@ function renderHero() {
 }
 
 function renderOverview() {
-  // Hourly strip
+  // Hourly strip — rich
   const hrs = (forecast.hours || []).slice(0, 24);
+  const nowH = new Date().getHours();
   el('hourly-strip').innerHTML = hrs.map((h) => {
     const t = new Date(h.time);
-    const label = t.toLocaleTimeString('en-US', { hour: 'numeric' }).replace(' ', '');
-    return `<div class="hour"><div class="t">${label}</div><div class="ic">${iconFor(h.condition)}</div><div class="tp">${Math.round(h.temperature)}°</div><div class="pp">${h.pop ? Math.round(h.pop) + '%' : ''}</div></div>`;
+    const isNow = t.getHours() === nowH && Math.abs(Date.now() - t.getTime()) < 3600000;
+    const label = isNow ? 'Now' : t.toLocaleTimeString('en-US', { hour: 'numeric' }).replace(' ', '');
+    const wd = h.windDirection ? `<div class="wd">${windArrow(h.windDirection)} ${Math.round(h.wind || 0)}</div>` : '';
+    return `<div class="hour${isNow ? ' now' : ''}"><div class="t">${label}</div><div class="ic">${iconFor(h.condition)}</div><div class="tp">${Math.round(h.temperature)}°</div><div class="pp">${h.pop >= 15 ? Math.round(h.pop) + '%' : ''}</div>${wd}</div>`;
   }).join('');
 
-  // 7-day
-  el('day-cards').innerHTML = (forecast.days || []).slice(0, 7).map((d) => {
+  // Precipitation chart
+  const maxPop = Math.max(...hrs.map((h) => h.pop || 0), 1);
+  el('precip-chart').innerHTML = hrs.map((h) => {
+    const pct = Math.round(h.pop || 0);
+    const ht = Math.max(4, (pct / 100) * 100);
+    const t = new Date(h.time).toLocaleTimeString('en-US', { hour: 'numeric' }).replace(' ', '');
+    return `<div class="precip-bar" style="height:${ht}%" title="${t}: ${pct}%"><span>${pct}%</span></div>`;
+  }).join('');
+
+  // 7-day — rich cards
+  const days = (forecast.days || []).slice(0, 7);
+  const gHi = Math.max(...days.map((d) => d.high));
+  const gLo = Math.min(...days.map((d) => d.low));
+  el('day-cards').innerHTML = days.map((d, i) => {
     const dt = new Date(d.date + 'T12:00:00');
-    const name = dt.toLocaleDateString('en-US', { weekday: 'short' });
-    return `<div class="day-card"><div class="d">${name}</div><div class="hi">${Math.round(d.high)}°</div><div class="lo">${Math.round(d.low)}°</div><div class="pp">${d.pop ? Math.round(d.pop) + '%' : ''}</div></div>`;
+    const name = i === 0 ? 'Today' : dt.toLocaleDateString('en-US', { weekday: 'short' });
+    const l = ((d.low - gLo) / Math.max(1, gHi - gLo)) * 100;
+    const w = Math.max(8, ((d.high - d.low) / Math.max(1, gHi - gLo)) * 100);
+    return `<div class="day-card"><div class="d">${name}</div><div class="ic">${iconFor(d.condition)}</div>
+      <div class="temps"><span class="hi">${Math.round(d.high)}°</span><span class="lo">${Math.round(d.low)}°</span></div>
+      <div class="bar"><i style="left:${l.toFixed(1)}%;width:${w.toFixed(1)}%"></i></div>
+      <div class="pp">${d.pop >= 15 ? '💧 ' + Math.round(d.pop) + '%' : '&nbsp;'}</div>
+      <div class="wind">${d.wind ? windArrow(d.windDirection || 0) + ' ' + Math.round(d.wind) + ' mph' : ''}</div></div>`;
   }).join('');
 
-  // Metrics
+  // Metrics — vibrant with icons
   const c = forecast.current;
+  const mhrs = forecast.hours || [];
+  const t6 = mhrs[6]?.temperature, t0 = mhrs[0]?.temperature;
+  const tTrend = finite(t6) && finite(t0) ? (t6 > t0 + 1 ? ['↗ Rising', 'up'] : t6 < t0 - 1 ? ['↘ Falling', 'down'] : ['→ Steady', 'flat']) : ['', ''];
   const metrics = [
-    ['Wind', `${Math.round(c.wind || 0)} mph`],
-    ['Humidity', `${Math.round(c.humidity || 0)}%`],
-    ['Dew point', `${Math.round(c.dewpoint || 0)}°`],
-    ['Pressure', `${c.pressure ? c.pressure.toFixed(2) : '—'} in`],
-    ['Visibility', `${c.visibility ? Math.round(c.visibility) : '—'} mi`],
-    ['UV index', forecast.uv?.index ?? '—'],
+    ['💨 Wind', `${Math.round(c.wind || 0)}<small> mph</small>`, c.gust ? `Gusts ${Math.round(c.gust)}` : (c.windDirection ? windArrow(c.windDirection) : ''), ''],
+    ['💧 Humidity', `${Math.round(c.humidity || 0)}<small>%</small>`, `Dew ${Math.round(c.dewpoint || 0)}°`, ''],
+    ['🌡 Feels like', `${Math.round(c.feelsLike || c.apparent || c.temperature)}<small>°</small>`, `Air ${Math.round(c.temperature)}°`, ''],
+    ['📊 Pressure', `${c.pressure ? c.pressure.toFixed(2) : '—'}<small> in</small>`, c.pressureTrend?.direction || '', ''],
+    ['👁 Visibility', `${c.visibility ? Math.round(c.visibility) : '—'}<small> mi</small>`, '', ''],
+    ['☀ UV index', `${forecast.uv?.index ?? '—'}`, forecast.uv?.label || '', ''],
+    ['🌅 Sunrise', forecast.solar?.sunrise ? new Date(forecast.solar.sunrise).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '—', '', ''],
+    ['🌇 Sunset', forecast.solar?.sunset ? new Date(forecast.solar.sunset).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '—', '', ''],
   ];
-  el('metric-grid').innerHTML = metrics.map(([k, v]) => `<div class="metric"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
+  el('metric-grid').innerHTML = metrics.map(([k, v, s, t]) =>
+    `<div class="metric"><div class="k">${k}</div><div class="v">${v}</div>${s ? `<div class="s">${s}</div>` : ''}${tTrend[0] && k.includes('Feels') ? `<div class="trend ${tTrend[1]}">${tTrend[0]}</div>` : ''}</div>`
+  ).join('');
 }
 
+function windArrow(deg) {
+  const dirs = ['↑', '↗', '→', '↘', '↓', '↙', '←', '↖'];
+  return dirs[Math.round((((deg % 360) + 360) % 360) / 45) % 8];
+}
 function iconFor(cond) {
   const c = (cond || '').toLowerCase();
   if (/thunder|storm/.test(c)) return '⛈';
