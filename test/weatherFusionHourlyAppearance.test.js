@@ -48,10 +48,31 @@ test('quiet daily cards reserve emphasis for headings and temperatures',()=>{
   assert.match(css,/\.seven-day-temperatures strong\{[^}]*font-weight:600/);
   assert.match(css,/\.seven-day-metric strong\{[^}]*font-weight:400/);
   assert.match(css,/\.seven-day-confidence-label strong\{[^}]*font-weight:400/);
-  assert.match(css,/\.seven-day-card\{[^}]*border-radius:8px;background:#073550/);
-  assert.match(css,/\.seven-day-card\[aria-pressed="true"\]\{[^}]*box-shadow:none/);
+  assert.match(css,/\.seven-day-card\{[^}]*border:1px solid #168cd645;border-radius:20px;background:linear-gradient\(160deg,#06477775,#07375777\)/);
+  assert.match(css,/\.seven-day-card\[aria-pressed="true"\]\{border-color:#31bcffa6;background:linear-gradient\(155deg,#087bc3,#084878 72%\);box-shadow:inset 0 0 15px #29b9ff18/);
   assert.match(css,/#today-uncertainty p\{font-weight:400\}/);
   assert.doesNotMatch(css,/font-weight:(?:700|750|800|850)/);
+});
+
+test('seven-day surfaces and temperatures use the surrounding forecast palette',()=>{
+  const css=readFileSync(new URL('../public/weather-fusion/seven-day.css',import.meta.url),'utf8');
+  const surrounding=readFileSync(new URL('../public/weather-fusion/forecast-cards.css',import.meta.url),'utf8');
+  const daily=readFileSync(new URL('../public/weather-fusion/scenario-layout.css',import.meta.url),'utf8');
+  for(const finish of [
+    'background:radial-gradient(ellipse at 25% 0,#1688b426,transparent 70%),linear-gradient(135deg,#104773,#073b63 60%,#073153)',
+    'background:radial-gradient(ellipse at 25% 0,#174b762b,transparent 68%),linear-gradient(145deg,#072b4a,#051d36 62%,#04172c)',
+    'border-color:#5ba8d052',
+    'box-shadow:inset 0 1px 2px #a3e8ff20,0 12px 28px #041d3626',
+    'border:1px solid #168cd645',
+    'background:linear-gradient(160deg,#06477775,#07375777)',
+    'background:linear-gradient(155deg,#087bc3,#084878 72%)'
+  ]){assert.ok(css.includes(finish),finish);assert.ok(surrounding.includes(finish),finish);}
+  assert.match(css,/--week-cyan:#9addf8/);assert.match(daily,/\.day-low\{[^}]*color:#9addf8/);
+  assert.match(css,/\.seven-day-temperatures strong\{[^}]*color:#fff/);
+  assert.match(css,/\.seven-day-metric\{[^}]*color:#71d7ff/);
+  assert.match(css,/\.seven-day-metric:last-child\{color:#97ddfa\}/);
+  assert.match(css,/\.seven-day-carousel\{[^}]*border-radius:28px/);
+  assert.match(css,/\.seven-day-carousel\{padding:6px 9px;border-radius:20px\}/);
 });
 
 test('Nourie Weather Take is also named correctly in model comparison text',()=>{
