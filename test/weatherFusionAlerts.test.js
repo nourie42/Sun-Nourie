@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {Cache,createWeatherService} from '../src/weatherFusion.js';
 import {createAlertService,mergeOfficialAlerts} from '../src/weatherFusionAlerts.js';
 import {bulletinFacts} from '../public/weather-fusion/bulletin-facts.js';
-import {withLiveAlerts,alertHealth,alertLocationKey} from '../public/weather-fusion/live-alerts.js';
+import {withLiveAlerts,retainUnverifiedAlerts,alertHealth,alertLocationKey} from '../public/weather-fusion/live-alerts.js';
 import {danCard} from '../public/weather-fusion/dans-summary.js';
 const now=Date.parse('2026-10-11T17:38:00Z');
 const location={latitude:35.787,longitude:-78.4806};
@@ -89,6 +89,21 @@ test('searched coordinates match the NWS four-decimal normalization without losi
  assert.equal(alertLocationKey(searched),alertLocationKey(normalized));assert.equal(alertLocationKey({}),null);
  const f={location:searched,alerts:[],feeds:[]},live={location:normalized,alerts:[feature().properties],feeds:[{id:'alerts',status:'ready',fetchedAt:new Date(now).toISOString()}]};
  assert.equal(withLiveAlerts(f,live).alerts.length,1);
+});
+test('partial refresh failures retain only unverified source warnings and preserve the last verified time',()=>{
+ const previous={location,alerts:[{...feature('county').properties,id:'county',scope:'county'},{...feature('point').properties,id:'point',scope:'point'}],feeds:[{id:'alerts',status:'ready',fetchedAt:new Date(now-30000).toISOString()}]};
+ for(const failed of ['county','point']){
+  const incoming={location,alerts:[],feeds:[{id:'alerts',status:'unavailable',pointStatus:failed==='point'?'unavailable':'ready',countyStatus:failed==='county'?'unavailable':'ready',fetchedAt:new Date(now).toISOString()}]};
+  const data=retainUnverifiedAlerts(previous,incoming);assert.deepEqual(data.alerts.map(a=>a.id),[failed]);assert.equal(data.feeds[0].fetchedAt,previous.feeds[0].fetchedAt);assert.equal(alertHealth(data,now).verified,false);
+  assert.deepEqual(withLiveAlerts(previous,incoming).alerts.map(a=>a.id),[failed]);
+ }
+ const verified={location,alerts:[],feeds:[{id:'alerts',status:'ready',fetchedAt:new Date(now).toISOString()}]};
+ assert.equal(retainUnverifiedAlerts(previous,verified),verified,'A verified empty refresh must remove ended or canceled warnings');
+});
+test('fresh updates supersede retained warnings even during a partial outage',()=>{
+ const previous={location,alerts:[{id:'https://api.weather.gov/alerts/old',scope:'county'}],feeds:[]};
+ const incoming={location,alerts:[{id:'https://api.weather.gov/alerts/new',scope:'point',references:[{'@id':'https://api.weather.gov/alerts/old'}]}],feeds:[{id:'alerts',status:'unavailable',countyStatus:'unavailable',pointStatus:'ready'}]};
+ assert.deepEqual(retainUnverifiedAlerts(previous,incoming).alerts.map(a=>a.id),['https://api.weather.gov/alerts/new']);
 });
 test('warnings remain available during a cached full-forecast interval',async()=>{
  let time=now,warn=false;const s=createWeatherService({now:()=>time,env:{},fetchImpl:async url=>{
