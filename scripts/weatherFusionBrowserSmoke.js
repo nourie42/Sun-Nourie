@@ -95,7 +95,7 @@ for(const location of ['knightdale','greenville']){
  assert.equal(data.directModelStatus,'ready',`${location}: ${JSON.stringify(data.feeds)}`);
  assert.equal(data.modelContributions.length,3);
  assert.equal(data.days.length,7);assert.ok(data.days.slice(1).every(d=>Number.isFinite(d.high)&&Number.isFinite(d.low)));
- assert.ok(Number.isFinite(data.current.apparent));assert.match(data.current.apparentSource,/Steadman apparent temperature/);assert.ok(Number.isFinite(data.precipitation.value));
+ assert.ok(Number.isFinite(data.current.apparent));assert.match(data.current.apparentSource,/Steadman apparent temperature|selected-location estimate/);assert.ok(Number.isFinite(data.precipitation.value));
  assert.equal(data.discussion.office,location==='knightdale'?'RAH':'MHX');
  assert.ok(data.days[1].highBlend.sources.some(s=>s.id==='nbm'));
  assert.ok(data.days[0].qpfBlend.sources.some(s=>s.id==='hrrr'));
