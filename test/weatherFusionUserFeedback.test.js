@@ -16,7 +16,9 @@ test('Dan take is location-discussion specific instead of seeded boilerplate',()
 });
 
 test('source limitations are explicitly listed in Scientific Stuff',()=>{
- assert.match(app,/Some optional model details are limited for this location — details below/);
+ assert.match(app,/forecastSourceHealth\(data\)/);
+ assert.match(app,/const unavailable = sourceHealth\.requiredIssues/);
+ assert.doesNotMatch(app,/Some sources are unavailable or stale/);
  assert.match(html,/id="source-unavailable-summary"/);
  assert.match(app,/What is unavailable or limited/);
  assert.match(app,/Not collected for this location/);
