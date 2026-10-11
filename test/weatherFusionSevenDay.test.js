@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {sevenDayForecast,sevenDayCardHTML,createSevenDayCarousel} from '../public/weather-fusion/seven-day.js';
 import {dailyDisplay} from '../public/weather-fusion/weather-math.js';
 import {displayedRainChance} from '../public/weather-fusion/rain-display.js';
@@ -53,4 +54,31 @@ test('observed rain follows the current-day policy and never spreads to later ca
 test('the regular page does not mount a carousel or touch the document',()=>{
   assert.equal(createSevenDayCarousel({experimental:false}),null);
   assert.equal(createSevenDayCarousel({experimental:true}),null);
+});
+
+test('compact cards retain every forecast reading and the absolute confidence score',()=>{
+  for(const [key,label,score] of [['high','High',95],['moderate','Moderate',75],['low','Low',60],['very-low','Very low',35]]){
+    const day={...sevenDayForecast(preview,now)[0],confidence:{key,label,score,factors:[],note:'Relative index'}};
+    const html=sevenDayCardHTML(day);
+    assert.match(html,/seven-day-card-heading/);
+    assert.match(html,/seven-day-weather/);
+    assert.match(html,/Total precip/);
+    assert.match(html,/Wind/);
+    assert.ok(html.includes(`data-confidence="${key}"`));
+    assert.ok(html.includes(`aria-valuenow="${score}"`));
+    assert.ok(html.includes(`--confidence:${score}%`));
+  }
+});
+
+test('all confidence meters share a fading red-yellow-green absolute scale',()=>{
+  const polish=readFileSync(new URL('../public/weather-fusion/weather-polish.css',import.meta.url),'utf8');
+  const week=readFileSync(new URL('../public/weather-fusion/seven-day.css',import.meta.url),'utf8');
+  assert.match(polish,/--confidence-scale:linear-gradient\(90deg,var\(--confidence-low\).*var\(--confidence-medium\).*var\(--confidence-high\)/);
+  assert.match(polish,/\[data-confidence="high"\]\{--confidence-color:var\(--confidence-high\)/);
+  assert.match(polish,/\[data-confidence="moderate"\]\{--confidence-color:var\(--confidence-medium\)/);
+  assert.match(polish,/\[data-confidence="low"\],\[data-confidence="very-low"\]\{--confidence-color:var\(--confidence-low\)/);
+  assert.match(polish,/\.confidence-meter\{background:var\(--confidence-scale\)/);
+  assert.match(polish,/\.confidence-meter em\{position:relative;background:transparent/);
+  assert.match(week,/\.seven-day-meter\{[^}]*background:var\(--confidence-scale\)/);
+  assert.match(week,/height:var\(--week-height,/);
 });
