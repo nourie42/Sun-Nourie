@@ -31,9 +31,9 @@
 .seven-day-metric svg{display:block;flex:none;width:10px;height:14px;color:var(--week-cyan)}
 .seven-day-metric strong{font-size:12px;font-weight:400;line-height:1.2;white-space:nowrap}
 .seven-day-confidence{display:block;margin:0;text-align:center;min-width:0}
-.seven-day-confidence-label{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;min-height:22px;line-height:1.1;color:var(--week-muted)}
+.seven-day-confidence-label{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;min-height:22px;line-height:1.1;font-weight:400;color:var(--week-muted)}
 .seven-day-confidence-label>span{font-size:9px;line-height:1.1;white-space:nowrap}
-.seven-day-confidence-label strong{font-size:11px;line-height:1.1;color:var(--confidence-color,#bce5f4);font-weight:500;white-space:nowrap}
+.seven-day-confidence-label strong{font-size:11px;line-height:1.1;color:var(--confidence-color,#bce5f4);font-weight:400;white-space:nowrap}
 .seven-day-meter{display:block;position:relative;height:6px;margin:6px 8px 0;border-radius:6px;background:var(--confidence-scale)}
 .seven-day-meter>span{display:block;position:absolute;box-sizing:border-box;top:50%;left:var(--confidence);width:14px;height:14px;border:2px solid #fff;border-radius:50%;background:var(--confidence-color,#bce5f4);box-shadow:0 0 0 1px #052f4f,0 1px 3px #00152299;transform:translate(-50%,-50%)}
 .seven-day-confidence-missing{display:block;color:var(--week-muted);height:6px}
@@ -51,50 +51,6 @@
 @media(max-width:359px){.seven-day-heading h2{font-size:15px}}
 @media(prefers-reduced-motion:reduce){.seven-day-rail{scroll-behavior:auto}}
 
-/* The experimental hourly forecast uses the same finish as its daily neighbor. */
-html[data-weather-page="experimental"] .hero .hourly-panel{display:flex;flex-direction:column;box-sizing:border-box;height:405px;padding:10px 14px;border:1px solid #437b93;border-radius:16px;background:#073b57;box-shadow:none;color:#f6fcff;text-align:left}
-html[data-weather-page="experimental"] .hero .hourly-panel .section-top{flex:none;min-height:32px;margin:0 0 4px;padding:0 0 4px;border-color:#2692b855}
-html[data-weather-page="experimental"] .hero .hourly-panel .section-top h2{font-size:20px!important;line-height:1.2;font-weight:600;letter-spacing:0}
-html[data-weather-page="experimental"] .hero .hourly-panel .section-top h2>span{display:none}
-html[data-weather-page="experimental"] .hero .hourly-panel .section-top>span{color:#bce5f4;letter-spacing:0;white-space:normal;text-align:right}
-html[data-weather-page="experimental"] #hourly.hourly-strip{flex:1;min-height:0;padding:2px 1px 4px;scrollbar-color:#69b8cb #086086}
-html[data-weather-page="experimental"] #hourly button.hour{display:grid;grid-template-rows:32px minmax(44px,1fr) 26px 24px 30px 24px 38px;gap:3px;padding:7px 5px;border:1px solid #437b93;border-radius:8px;background:#073550;color:#f6fcff;letter-spacing:0}
-html[data-weather-page="experimental"] #hourly button.hour[aria-pressed="true"]{border-color:#83bdcf;background:#0b4663;box-shadow:none}
-html[data-weather-page="experimental"] #hourly button.hour:hover{border-color:#83bdcf}
-html[data-weather-page="experimental"] #hourly button.hour:focus-visible{outline:2px solid #fff;outline-offset:-4px}
-html[data-weather-page="experimental"] #hourly button.hour>span:first-child{align-self:center;margin:0;font-size:16px!important;font-weight:500;line-height:1.15;color:#f6fcff}
-html[data-weather-page="experimental"] #hourly button.hour>.seven-day-art,html[data-weather-page="experimental"] #hourly button.hour>svg{display:block;align-self:center;justify-self:center;width:44px;height:44px;margin:0;background-size:300% 300%;background-position:var(--art-x) var(--art-y);background-repeat:no-repeat;filter:none}
-html[data-weather-page="experimental"] #hourly button.hour>strong{align-self:center;margin:0;font-size:20px;font-weight:600;line-height:1;letter-spacing:0}
-html[data-weather-page="experimental"] #hourly button.hour>strong::before{content:"Air ";font-size:10px;font-weight:500;color:#bce5f4}
-html[data-weather-page="experimental"] #hourly .hour-feels{align-self:center;margin:0;gap:2px;font-size:10px!important;font-weight:400;line-height:1.1;color:#bce5f4}
-html[data-weather-page="experimental"] #hourly .hour-feels>b{font-size:16px!important;font-weight:500;line-height:1;color:#a3dbe7}
-html[data-weather-page="experimental"] #hourly .hour-rain{min-height:0;justify-content:center;border-top:1px solid #2692b877;padding-top:3px}
-html[data-weather-page="experimental"] #hourly .hour-pop{min-height:0;max-width:100%;margin:0;font-size:12px!important;line-height:1.1;white-space:normal;overflow-wrap:anywhere;font-weight:400;color:#a3dbe7}
-html[data-weather-page="experimental"] #hourly .hour-pop>svg{flex:none;width:10px;height:14px;margin:0}
-html[data-weather-page="experimental"] #hourly .hour-current .hour-pop{display:block;overflow-wrap:normal;font-size:10px!important}
-html[data-weather-page="experimental"] #hourly .hour-current .hour-pop>svg{display:inline-block;width:8px;height:10px;vertical-align:middle;margin-right:1px}
-html[data-weather-page="experimental"] #hourly .hour-uv{align-self:center;margin:0;font-size:12px!important;font-weight:400;line-height:1.1;color:#bfd7e1}
-html[data-weather-page="experimental"] #hourly .hour-uv>b{font-weight:400}
-html[data-weather-page="experimental"] #hourly .hour-wind{display:grid;grid-template-columns:12px auto;justify-content:center;align-content:center;gap:2px;margin:0;padding-top:3px;border-top:1px solid #2692b877;color:#a3dbe7}
-html[data-weather-page="experimental"] #hourly .hour-wind>svg{width:12px;height:14px;margin:0}
-html[data-weather-page="experimental"] #hourly .hour-wind>b{font-size:12px!important;font-weight:400;line-height:1.2;color:#f6fcff}
-html[data-weather-page="experimental"] #hourly .hour-wind>small{grid-column:1/-1;margin:0;min-height:0;font-size:11px!important;font-weight:400;line-height:1.1;color:#bce5f4}
-@media(max-width:760px){
- html[data-weather-page="experimental"] .hero .hourly-panel{height:286px;padding:6px 9px}
- html[data-weather-page="experimental"] .hero .hourly-panel .section-top{min-height:28px}
- html[data-weather-page="experimental"] .hero .hourly-panel .section-top h2{font-size:16px!important}
- html[data-weather-page="experimental"] .hero .hourly-panel .section-top>span{font-size:11px!important}
- html[data-weather-page="experimental"] #hourly button.hour{grid-template-rows:28px minmax(31px,1fr) 22px 20px 28px 21px 32px;gap:1px;padding:3px 4px}
- html[data-weather-page="experimental"] #hourly button.hour>span:first-child{font-size:13px!important}
- html[data-weather-page="experimental"] #hourly button.hour>.seven-day-art,html[data-weather-page="experimental"] #hourly button.hour>svg{width:31px;height:31px}
- html[data-weather-page="experimental"] #hourly button.hour>strong{font-size:17px}
- html[data-weather-page="experimental"] #hourly .hour-feels>b{font-size:14px!important}
- html[data-weather-page="experimental"] #hourly .hour-pop{font-size:11px!important}
- html[data-weather-page="experimental"] #hourly .hour-wind{grid-template-columns:10px auto}
- html[data-weather-page="experimental"] #hourly .hour-wind>svg{width:10px}
- html[data-weather-page="experimental"] #hourly .hour-wind>b{font-size:11px!important}
-}
-@media(max-width:359px){html[data-weather-page="experimental"] .hero .hourly-panel .section-top h2{font-size:15px!important}}
 html[data-weather-page="experimental"] .hero .today-panel #today-uncertainty,html[data-weather-page="experimental"] .hero .today-panel #today-uncertainty p{font-weight:400}
 html[data-weather-page="experimental"] .hero .today-panel #today-uncertainty .today-uncertainty-label{font-weight:600}
-#experimental-week .seven-day-weather svg *,html[data-weather-page="experimental"] #hourly button.hour>svg *{animation:none;transition:none}
+#experimental-week .seven-day-weather svg *{animation:none;transition:none}
