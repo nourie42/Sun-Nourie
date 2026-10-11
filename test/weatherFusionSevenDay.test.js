@@ -74,6 +74,8 @@ test('all confidence meters share a fading red-yellow-green absolute scale',()=>
   const polish=readFileSync(new URL('../public/weather-fusion/weather-polish.css',import.meta.url),'utf8');
   const week=readFileSync(new URL('../public/weather-fusion/seven-day.css',import.meta.url),'utf8');
   assert.match(polish,/--confidence-scale:linear-gradient\(90deg,var\(--confidence-low\).*var\(--confidence-medium\).*var\(--confidence-high\)/);
+  assert.match(polish,/--confidence-scale:linear-gradient\(90deg,var\(--confidence-low\) 0%,var\(--confidence-medium\) 40%,var\(--confidence-high\) 60%,var\(--confidence-high\) 100%\)/);
+  assert.doesNotMatch(polish,/var\(--confidence-low\) 55%/);
   assert.match(polish,/\[data-confidence="high"\]\{--confidence-color:var\(--confidence-high\)/);
   assert.match(polish,/\[data-confidence="moderate"\]\{--confidence-color:var\(--confidence-medium\)/);
   assert.match(polish,/\[data-confidence="low"\],\[data-confidence="very-low"\]\{--confidence-color:var\(--confidence-low\)/);
