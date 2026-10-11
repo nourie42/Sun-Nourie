@@ -1,21 +1,21 @@
-.experimental-week{--week-cyan:#a3dbe7;--week-muted:#bfd7e1;--week-edge:#437b93;--week-card:128px;--week-gap:7px;box-sizing:border-box;height:var(--week-height,405px);min-width:0;width:100%;margin:0 0 16px;color:#f6fcff;letter-spacing:0;text-align:left}
+.experimental-week{--week-cyan:#9addf8;--week-muted:#a8d9f0;--week-edge:#58c7f16b;--week-card:128px;--week-gap:7px;box-sizing:border-box;height:var(--week-height,405px);min-width:0;width:100%;margin:0 0 16px;color:#f7fcff;letter-spacing:0;text-align:left}
 .experimental-week[hidden]{display:none}
-.seven-day-carousel{box-sizing:border-box;display:flex;flex-direction:column;height:100%;min-width:0;padding:10px 14px;border:1px solid var(--week-edge);border-radius:16px;background:#073b57;box-shadow:none;overflow:hidden}
+.seven-day-carousel{position:relative;isolation:isolate;box-sizing:border-box;display:flex;flex-direction:column;height:100%;min-width:0;padding:10px 14px;border:1px solid var(--week-edge);border-radius:28px;background:radial-gradient(ellipse at 25% 0,#1688b426,transparent 70%),linear-gradient(135deg,#104773,#073b63 60%,#073153);box-shadow:inset 0 1px 2px #a3e8ff20,0 12px 28px #041d3626;overflow:hidden}
 .seven-day-heading{display:flex;align-items:center;justify-content:space-between;flex:none;gap:10px;margin-bottom:4px}
 .seven-day-heading h2{margin:0;font-size:20px;line-height:1.2;font-weight:600;letter-spacing:0}
 .seven-day-controls{display:flex;gap:7px;flex-shrink:0}
-.seven-day-controls button{display:grid;place-items:center;flex:none;width:32px;height:32px;padding:5px;border:1px solid #558c9f;border-radius:50%;background:#0b4762;color:#e2edf2;box-shadow:none}
-.seven-day-controls button:disabled{background:#023653;color:#78c1dd;box-shadow:none}
+.seven-day-controls button{display:grid;place-items:center;flex:none;width:32px;height:32px;padding:5px;border:1px solid #168cd645;border-radius:50%;background:linear-gradient(160deg,#06477775,#07375777);color:#a0daf7;box-shadow:none}
+.seven-day-controls button:disabled{background:transparent;color:#a1dbf6;box-shadow:none}
 .seven-day-controls svg{width:20px;height:20px}
 .seven-day-rail{display:flex;flex:1;gap:var(--week-gap);min-width:0;min-height:0;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x proximity;scrollbar-width:none;touch-action:pan-x pan-y;cursor:grab;padding:2px 1px 4px}
 .seven-day-rail::-webkit-scrollbar{display:none}
 .seven-day-rail.is-dragging{scroll-snap-type:none;cursor:grabbing}
-.seven-day-card{display:grid;grid-template-rows:32px minmax(44px,1fr) 40px 60px 40px;flex:0 0 var(--week-card);min-width:0;box-sizing:border-box;gap:3px;margin:0;padding:7px 5px;scroll-snap-align:start;border:1px solid #437b93;border-radius:8px;background:#073550;color:#f6fcff;font:inherit;letter-spacing:0;text-align:center;user-select:none}
-.seven-day-card[aria-pressed="true"]{border-color:#83bdcf;background:#0b4663;box-shadow:none}
-.seven-day-card:hover{border-color:#83bdcf}
+.seven-day-card{display:grid;grid-template-rows:32px minmax(44px,1fr) 40px 60px 40px;flex:0 0 var(--week-card);min-width:0;box-sizing:border-box;gap:3px;margin:0;padding:7px 5px;scroll-snap-align:start;border:1px solid #168cd645;border-radius:20px;background:linear-gradient(160deg,#06477775,#07375777);color:#a0daf7;font:inherit;letter-spacing:0;text-align:center;user-select:none}
+.seven-day-card[aria-pressed="true"]{border-color:#31bcffa6;background:linear-gradient(155deg,#087bc3,#084878 72%);box-shadow:inset 0 0 15px #29b9ff18}
 .seven-day-card:focus-visible{outline:2px solid #fff;outline-offset:-4px}
 .seven-day-card-heading{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:0}
-.seven-day-name{font-size:16px;font-weight:500;line-height:1.15}
+.seven-day-name{font-size:16px;font-weight:500;line-height:1.15;color:#b0e5fd}
+.seven-day-card[aria-pressed="true"] .seven-day-name{color:#fff}
 .seven-day-date{color:var(--week-muted);font-size:11px;line-height:1.15;white-space:nowrap}
 .seven-day-weather{position:relative;display:flex;align-items:center;justify-content:center;min-width:0;min-height:0}
 .seven-day-art{display:block;flex:none;width:44px;height:44px;background-size:300% 300%;background-position:var(--art-x) var(--art-y);background-repeat:no-repeat}
@@ -24,32 +24,35 @@
 .seven-day-temperatures{display:grid;grid-template-rows:1fr 1fr;gap:0}
 .seven-day-temperatures>span{display:flex;flex-direction:row;align-items:center;justify-content:center;gap:2px;min-width:0}
 .seven-day-temperatures>span+span{color:var(--week-cyan)}
-.seven-day-temperatures strong{order:1;font-size:20px;font-weight:600;line-height:1;white-space:nowrap}
+.seven-day-temperatures strong{order:1;font-size:20px;font-weight:600;line-height:1;color:#fff;white-space:nowrap}
+.seven-day-temperatures>span+span strong{color:var(--week-cyan)}
 .seven-day-temperature-label{font-size:10px;font-weight:500;color:var(--week-muted);line-height:1}
-.seven-day-metrics{display:grid;gap:2px;padding:5px 0;border-top:1px solid #2692b877;border-bottom:1px solid #2692b877}
-.seven-day-metric{position:relative;display:flex;align-items:center;justify-content:center;gap:1px;min-height:14px;min-width:0}
-.seven-day-metric svg{display:block;flex:none;width:10px;height:14px;color:var(--week-cyan)}
+.seven-day-metrics{display:grid;gap:2px;padding:5px 0;border-top:1px solid #d6e6ff16;border-bottom:1px solid #d6e6ff16}
+.seven-day-metric{position:relative;display:flex;align-items:center;justify-content:center;gap:1px;min-height:14px;min-width:0;color:#71d7ff}
+.seven-day-metric:last-child{color:#97ddfa}
+.seven-day-metric svg{display:block;flex:none;width:10px;height:14px;color:inherit}
 .seven-day-metric strong{font-size:12px;font-weight:400;line-height:1.2;white-space:nowrap}
 .seven-day-confidence{display:block;margin:0;text-align:center;min-width:0}
-.seven-day-confidence-label{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;min-height:22px;line-height:1.1;font-weight:400;color:var(--week-muted)}
+.seven-day-confidence-label{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;min-height:22px;line-height:1.1;font-weight:400;color:#b9cce3}
 .seven-day-confidence-label>span{font-size:9px;line-height:1.1;white-space:nowrap}
 .seven-day-confidence-label strong{font-size:11px;line-height:1.1;color:var(--confidence-color,#bce5f4);font-weight:400;white-space:nowrap}
 .seven-day-meter{display:block;position:relative;height:6px;margin:6px 8px 0;border-radius:6px;background:var(--confidence-scale)}
 .seven-day-meter>span{display:block;position:absolute;box-sizing:border-box;top:50%;left:var(--confidence);width:14px;height:14px;border:2px solid #fff;border-radius:50%;background:var(--confidence-color,#bce5f4);box-shadow:0 0 0 1px #052f4f,0 1px 3px #00152299;transform:translate(-50%,-50%)}
 .seven-day-confidence-missing{display:block;color:var(--week-muted);height:6px}
-.seven-day-scroll{display:block;flex:none;appearance:none;-webkit-appearance:none;width:100%;height:5px;margin:4px 0 0;border:0;border-radius:6px;background:#086086;cursor:pointer;touch-action:pan-y}
-.seven-day-scroll::-webkit-slider-thumb{appearance:none;width:35%;height:5px;border:0;border-radius:6px;background:#69b8cb}
-.seven-day-scroll::-moz-range-thumb{width:35%;height:5px;border:0;border-radius:6px;background:#69b8cb}
-.seven-day-detail{display:grid;flex:none;grid-template-columns:auto minmax(0,1fr) 22px;align-items:center;gap:7px;height:24px;min-width:0;margin-bottom:4px;padding:0 2px;border-bottom:1px solid #2692b855}
+.seven-day-scroll{display:block;flex:none;appearance:none;-webkit-appearance:none;width:100%;height:5px;margin:4px 0 0;border:0;border-radius:6px;background:#082f50;cursor:pointer;touch-action:pan-y}
+.seven-day-scroll::-webkit-slider-thumb{appearance:none;width:35%;height:5px;border:0;border-radius:6px;background:#70c2e288}
+.seven-day-scroll::-moz-range-thumb{width:35%;height:5px;border:0;border-radius:6px;background:#70c2e288}
+.seven-day-detail{display:grid;flex:none;grid-template-columns:auto minmax(0,1fr) 22px;align-items:center;gap:7px;height:24px;min-width:0;margin-bottom:4px;padding:0 2px;border-bottom:1px solid #d6e6ff16}
 .seven-day-detail-weather,.seven-day-detail-precip,.seven-day-detail>.seven-day-confidence{display:none}
 .seven-day-detail-copy{display:contents}
 .seven-day-detail-copy>strong{font-size:11px;font-weight:500;line-height:1.2;white-space:nowrap}
 .seven-day-detail-copy>span{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:var(--week-muted);font-size:11px;line-height:1.3}
-.seven-day-open{display:grid;place-items:center;flex:none;width:22px;height:22px;padding:2px;background:transparent;color:var(--week-cyan);border-radius:6px}
+.seven-day-open{display:grid;place-items:center;flex:none;width:22px;height:22px;padding:2px;background:transparent;color:#98dffb;border-radius:6px}
 .seven-day-open svg{width:18px;height:18px}
-@media(max-width:760px){.experimental-week{--week-card:78px;--week-gap:5px;height:var(--week-height,286px)}.seven-day-carousel{padding:6px 9px}.seven-day-heading h2{font-size:16px}.seven-day-controls button{width:28px;height:28px;padding:4px}.seven-day-controls svg{width:18px;height:18px}.seven-day-card{grid-template-rows:28px minmax(31px,1fr) 36px 51px 36px;gap:1px;padding:3px 4px}.seven-day-name{font-size:13px}.seven-day-date{font-size:10px}.seven-day-art,.seven-day-weather>svg{width:31px;height:31px}.seven-day-temperatures strong{font-size:var(--narrow-temp-size,17px)}.seven-day-metrics{padding:3px 0;gap:1px}.seven-day-meter{margin-top:5px}.seven-day-detail{height:22px}.seven-day-confidence-label>span{font-size:8px}.seven-day-confidence-label strong{font-size:10px}}
+@media(max-width:760px){.experimental-week{--week-card:78px;--week-gap:5px;height:var(--week-height,286px)}.seven-day-carousel{padding:6px 9px;border-radius:20px}.seven-day-heading h2{font-size:16px}.seven-day-controls button{width:28px;height:28px;padding:4px}.seven-day-controls svg{width:18px;height:18px}.seven-day-card{grid-template-rows:28px minmax(31px,1fr) 36px 51px 36px;gap:1px;padding:3px 4px;border-radius:13px}.seven-day-name{font-size:13px}.seven-day-date{font-size:10px}.seven-day-art,.seven-day-weather>svg{width:31px;height:31px}.seven-day-temperatures strong{font-size:var(--narrow-temp-size,17px)}.seven-day-metrics{padding:3px 0;gap:1px}.seven-day-meter{margin-top:5px}.seven-day-detail{height:22px}.seven-day-confidence-label>span{font-size:8px}.seven-day-confidence-label strong{font-size:10px}}
 @media(max-width:359px){.seven-day-heading h2{font-size:15px}}
 @media(prefers-reduced-motion:reduce){.seven-day-rail{scroll-behavior:auto}}
+body[data-sky="night"] .seven-day-carousel{background:radial-gradient(ellipse at 25% 0,#174b762b,transparent 68%),linear-gradient(145deg,#072b4a,#051d36 62%,#04172c);border-color:#5ba8d052;box-shadow:inset 0 1px 1px #b0e9ff12,0 12px 30px #02091455}
 
 html[data-weather-page="experimental"] .hero .today-panel #today-uncertainty,html[data-weather-page="experimental"] .hero .today-panel #today-uncertainty p{font-weight:400}
 html[data-weather-page="experimental"] .hero .today-panel #today-uncertainty .today-uncertainty-label{font-weight:600}
