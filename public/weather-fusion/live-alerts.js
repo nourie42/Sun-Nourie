@@ -1,8 +1,8 @@
 export const ALERT_REFRESH_MS=30000;
 export const ALERT_STALE_MS=90000;
-const pointKey=location=>`${location?.latitude},${location?.longitude}`;
+export const alertLocationKey=location=>Number.isFinite(location?.latitude)&&Number.isFinite(location?.longitude)?`${Number(location.latitude.toFixed(4))},${Number(location.longitude.toFixed(4))}`:null;
 export function withLiveAlerts(forecast,snapshot){
-  if(!snapshot||pointKey(forecast?.location)!==pointKey(snapshot.location))return forecast;
+  if(!snapshot||!alertLocationKey(forecast?.location)||alertLocationKey(forecast.location)!==alertLocationKey(snapshot.location))return forecast;
   const live=snapshot.feeds?.find(f=>f.id==='alerts'),existing=forecast.feeds?.find(f=>f.id==='alerts');
   if(!live||live.status==='ready'&&Date.parse(live.fetchedAt)<Date.parse(existing?.fetchedAt))return forecast;
   return {...forecast,alerts:snapshot.alerts||[],feeds:[...(forecast.feeds||[]).filter(f=>f.id!=='alerts'),live]};

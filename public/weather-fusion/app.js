@@ -11,7 +11,7 @@ import {dailyDisplay} from './weather-math.js?v=full-day-rain-v1';
 import {conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
 import {currentHero} from './current-temperature.js?v=rain-now-v71';
 import {renderBulletins} from './bulletins.js?v=county-warnings-v1';
-import {withLiveAlerts,ALERT_REFRESH_MS} from './live-alerts.js?v=county-warnings-v1';
+import {withLiveAlerts,alertLocationKey,ALERT_REFRESH_MS} from './live-alerts.js?v=county-warnings-v2';
 import {modelFreshnessText} from './personal-details.js?v=wardrobe-v1';
 import {renderDewpointMeter} from './dewpoint-meter.js?v=weather-qa-v67';
 import {renderWeatherPanel} from './render-safety.js';
@@ -83,13 +83,13 @@ async function api(path, params = '', signal) {
 }
 async function refreshAlerts(){
   if(!validPlace(place)||alertBusy)return;
-  const location={...place},key=`${location.latitude},${location.longitude}`;
+  const location={...place},key=alertLocationKey(location);
   const controller=new AbortController();alertController=controller;alertBusy=true;
-  const stillCurrent=()=>alertController===controller&&key===`${place?.latitude},${place?.longitude}`;
+  const stillCurrent=()=>alertController===controller&&key===alertLocationKey(place);
   try{
     const data=await api('alerts',new URLSearchParams({latitude:location.latitude,longitude:location.longitude}),controller.signal);
     if(!stillCurrent())return;
-    if(`${data.location?.latitude},${data.location?.longitude}`!==key||!Array.isArray(data.alerts)||!data.feeds?.some(f=>f.id==='alerts'))throw new Error('The warnings did not match the selected location.');
+    if(alertLocationKey(data.location)!==key||!Array.isArray(data.alerts)||!data.feeds?.some(f=>f.id==='alerts'))throw new Error('The warnings did not match the selected location.');
     alertSnapshot=data;
   }catch(error){
     if(!stillCurrent()||error.name==='AbortError')return;
@@ -181,7 +181,10 @@ function render(data) {
   $('status').textContent = `Updated ${clock(data.assembledAt)}${sourceNote}${failedPanels.length ? ` · Display issue: ${failedPanels.join(', ')}. Other forecasts remain available; use Refresh to retry.` : ''}`;
   $('status').classList.toggle('error', unavailable.length > 0 || failedPanels.length > 0);
 }
-function renderAlerts(data) { renderBulletins(data); }
+function renderAlerts(data) {
+  const live=alertSnapshot&&alertLocationKey(alertSnapshot.location)===alertLocationKey(place)?alertSnapshot:null;
+  renderBulletins(data.comparison?.source==='google'&&live?{...data,...live}:withLiveAlerts(data,live));
+}
 function renderHours(data) { renderHourlyWeather(data,Date.now()); }
 function renderDays(data) { renderDailyRows(data, icon); }
 function compass(degrees) {
