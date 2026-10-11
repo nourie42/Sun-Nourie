@@ -134,7 +134,7 @@ body[data-sky="night"] .air-quality-panel{background:radial-gradient(ellipse at 
 @media(max-width:359px){.weather-jump-nav{grid-template-columns:repeat(7,minmax(0,1fr));gap:2px}.weather-jump-card{font-size:8px}}
 
 /* Keep every confidence meter on the same absolute index scale. */
-:root{--confidence-low:#ff777b;--confidence-medium:#f6d365;--confidence-high:#6ee7a0;--confidence-scale:linear-gradient(90deg,var(--confidence-low) 0%,var(--confidence-low) 55%,var(--confidence-medium) 72%,var(--confidence-high) 90%,var(--confidence-high) 100%)}
+:root{--confidence-low:#ff777b;--confidence-medium:#f6d365;--confidence-high:#6ee7a0;--confidence-scale:linear-gradient(90deg,var(--confidence-low) 0%,var(--confidence-medium) 40%,var(--confidence-high) 60%,var(--confidence-high) 100%)}
 [data-confidence="high"]{--confidence-color:var(--confidence-high)}
 [data-confidence="moderate"]{--confidence-color:var(--confidence-medium)}
 [data-confidence="low"],[data-confidence="very-low"]{--confidence-color:var(--confidence-low)}
