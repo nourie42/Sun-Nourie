@@ -718,6 +718,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     'model-explanation.js','model-explanation.css','weathernext-site.html','weathernext-site.css','weathernext-site.js','weathernext-data.js','weathernext-catalog.json',
     'glance.html','glance.css','glance.js',
     'blend.html','blend.css','blend.js',
+    'today.html','today.css','today.js',
     'comfort-cinematic.css','comfort-effects.css','comfort-outlook.js','current-inputs.js','current-temperature.js',
     'daily-uv.js','dans-summary.js','dans-take.js','day-graph.js','dewpoint-meter.js','dewpoint-meter.css',
     'experience.js','exposure-scene.js','comfort-clothing.js','forecast-cards.css','forecast-confidence.js','forecast-layout.css','forecast-story.js','outlook-details.js',

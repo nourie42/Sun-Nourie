@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b1526">
+  <title>Today · Weather Nourie</title>
+  <meta name="description" content="The complete Weather Nourie forecast — current conditions, hourly, 7-day, rain, comfort, alerts, and how the forecast is calculated.">
+  <link rel="stylesheet" href="/weather-fusion/today.css">
+</head>
+<body>
+  <div class="sky" aria-hidden="true">
+    <div id="sky-a" class="sky-layer"></div>
+    <div id="sky-b" class="sky-layer"></div>
+    <div class="sky-shade"></div>
+  </div>
+  <div class="wrap">
+    <header class="topbar">
+      <a class="brand" href="/weather-fusion/" aria-label="Back to Weather Nourie"><span class="brand-sun" aria-hidden="true">◒</span><span>Weather <b>Nourie</b></span></a>
+      <span class="page-tag">Today</span>
+    </header>
+
+    <div class="loc-row">
+      <label class="loc-label" for="loc-select">Location</label>
+      <select id="loc-select" class="loc-select" aria-label="Choose location">
+        <option value="knightdale">Knightdale / Raleigh</option>
+        <option value="greenville">Greenville, NC</option>
+      </select>
+      <span id="updated" class="updated" aria-live="polite"></span>
+    </div>
+
+    <main id="today" aria-live="polite">
+      <section class="hero" aria-label="Current conditions">
+        <div class="hero-temp"><span id="now-temp">--</span><span class="deg">°</span></div>
+        <div class="hero-sub">
+          <div id="now-cond" class="hero-cond">Loading…</div>
+          <div class="hero-meta">
+            <span id="now-feels"></span>
+            <span id="now-hilo" class="hilo"></span>
+            <span id="now-sun"></span>
+          </div>
+        </div>
+      </section>
+
+      <div id="alert-list" class="alert-list"></div>
+
+      <section class="card arc-card" aria-label="Temperature over the next 24 hours">
+        <h2>Next 24 hours</h2>
+        <div id="today-arc" class="arc"></div>
+        <div id="today-legend" class="legend"></div>
+      </section>
+
+      <section class="card" aria-label="Hourly forecast">
+        <h2>This evening &amp; tonight</h2>
+        <div id="hour-strip" class="hour-strip"></div>
+      </section>
+
+      <section class="card" aria-label="7-day forecast">
+        <h2>The week ahead</h2>
+        <div id="day-cards" class="day-cards"></div>
+      </section>
+
+      <section class="card" aria-label="Rain outlook">
+        <h2>Rain</h2>
+        <p class="sec-sub" id="rain-note"></p>
+        <div id="rain-bars" class="rain-bars"></div>
+      </section>
+
+      <section class="card" aria-label="Details">
+        <h2>Details</h2>
+        <div id="detail-grid" class="detail-grid"></div>
+      </section>
+
+      <section class="card" aria-label="What it feels like">
+        <h2>What it feels like</h2>
+        <div id="comfort" class="comfort"></div>
+      </section>
+
+      <section class="card" id="risk-section" aria-label="Severe weather outlook" hidden>
+        <h2>Severe weather outlook</h2>
+        <div id="risk-list" class="risk-list"></div>
+      </section>
+
+      <section class="card" aria-label="National Weather Service discussion">
+        <h2>Forecaster discussion</h2>
+        <details class="discuss">
+          <summary id="discuss-head">From the National Weather Service</summary>
+          <pre id="discuss-text" class="discuss-text"></pre>
+        </details>
+      </section>
+
+      <section class="card calc" aria-label="How the weather is calculated">
+        <h2>How the weather is calculated</h2>
+        <p class="sec-sub">Every number on this page is my own blend of four models — weighted by trust and freshness. These are my exact percentages.</p>
+        <div class="weight-bar" id="weight-bar" aria-hidden="true"></div>
+        <div id="calc-models" class="calc-models"></div>
+        <div class="calc-notes">
+          <div class="calc-note">
+            <h3>Rain is blended differently</h3>
+            <p id="rain-blend-note"></p>
+          </div>
+          <div class="calc-note">
+            <h3>WeatherNext AI watches from the sidelines</h3>
+            <p>Google's WeatherNext AI model runs alongside for comparison — you can see its uncertainty band on the <a href="/weather-fusion/blend.html">Blend page</a>. It never silently replaces the blend.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <p id="error" class="error" role="alert" hidden></p>
+
+    <footer class="foot">
+      <p><a href="/weather-fusion/">Full Weather Nourie →</a> · <a href="/weather-fusion/glance.html">Glance →</a> · <a href="/weather-fusion/blend.html">Blend →</a> · <a href="/weather-fusion/experimental-weather.html">Experimental →</a></p>
+    </footer>
+  </div>
+  <script type="module" src="/weather-fusion/today.js"></script>
+</body>
+</html>
