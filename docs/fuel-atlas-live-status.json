@@ -2,16 +2,16 @@
   "ok": true,
   "classificationRule": "NAICS qualifies inclusion; explicit facility wording determines terminal or bulk-plant labels. Oil companies, wholesalers, suppliers and fuel dealers default to Distributor when no physical terminal/bulk wording is present. Heating-oil and propane dealers are also included in Distributor.",
   "filterVersion": "verified-distributor-categories-v3",
-  "verifiedAt": "2026-10-11T18:20:33.531Z",
-  "verifiedCommit": "445b6ee2f7d8b88294f865796213b8185c9946e0",
+  "verifiedAt": "2026-10-12T08:11:42.991Z",
+  "verifiedCommit": "b6d1659cff44aa4c4d9b2e290e6853d7d8a8a5ed",
   "liveUrl": "https://sun-nourie-live.onrender.com",
   "successfulSearches": 8,
   "attemptedSearches": 8,
-  "totalFacilities": 567,
+  "totalFacilities": 566,
   "categoryTotals": {
-    "distributor": 304,
+    "distributor": 302,
     "heating_oil": 3,
-    "bulk_plant": 45,
+    "bulk_plant": 46,
     "terminal": 218,
     "propane": 7
   },
@@ -49,7 +49,7 @@
         "terminal": 1,
         "propane": 0
       },
-      "elapsedMs": 39,
+      "elapsedMs": 29,
       "sources": [
         "OpenStreetMap / Overpass",
         "EPA ECHO / FRS NAICS"
@@ -130,7 +130,7 @@
         "terminal": 15,
         "propane": 0
       },
-      "elapsedMs": 12747,
+      "elapsedMs": 12729,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
@@ -343,7 +343,8 @@
         {
           "name": "SELMA TERMINAL",
           "codes": [
-            "424710"
+            "424710",
+            "457120"
           ],
           "primary": "terminal",
           "categories": [
@@ -358,8 +359,7 @@
         {
           "name": "SELMA TERMINAL",
           "codes": [
-            "424710",
-            "457120"
+            "424710"
           ],
           "primary": "terminal",
           "categories": [
@@ -376,38 +376,23 @@
     {
       "region": "Virginia and Carolinas",
       "ok": true,
-      "count": 395,
+      "count": 394,
       "forbidden": 0,
       "unqualified": 0,
       "categoryErrors": 0,
       "categoryCounts": {
-        "distributor": 229,
+        "distributor": 227,
         "heating_oil": 2,
-        "bulk_plant": 45,
+        "bulk_plant": 46,
         "terminal": 121,
         "propane": 5
       },
-      "elapsedMs": 12773,
+      "elapsedMs": 12755,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
       "partial": true,
       "samples": [
-        {
-          "name": "2590 - RC MILLER OIL CO",
-          "codes": [
-            "424710"
-          ],
-          "primary": "distributor",
-          "categories": [
-            "distributor"
-          ],
-          "classificationBasis": "Explicit distributor, wholesaler, supplier or fuel-company role",
-          "qualification": "NAICS 424710",
-          "forbidden": false,
-          "qualified": true,
-          "categoryError": ""
-        },
         {
           "name": "A T WILLIAMS OIL CO - WINSTON SALEM",
           "codes": [
@@ -424,7 +409,7 @@
           "categoryError": ""
         },
         {
-          "name": "ABERCROMBIE OIL COMPANY",
+          "name": "ABERCOMBIE OIL COMPANY",
           "codes": [
             "424710"
           ],
@@ -622,6 +607,23 @@
           "forbidden": false,
           "qualified": true,
           "categoryError": ""
+        },
+        {
+          "name": "APEX OIL COMPANY ASPHALT - WILMINGTON TERMINAL",
+          "codes": [
+            "424710",
+            "493110",
+            "493190"
+          ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
         }
       ]
     },
@@ -639,7 +641,7 @@
         "terminal": 12,
         "propane": 0
       },
-      "elapsedMs": 12741,
+      "elapsedMs": 12389,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
@@ -678,6 +680,22 @@
           "categoryError": ""
         },
         {
+          "name": "CHELSEA TERMINAL",
+          "codes": [
+            "424710",
+            "486910"
+          ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
           "name": "EDDYSTONE MARINE AND RAIL TERMINAL COMPANY, LLC",
           "codes": [
             "424710"
@@ -702,6 +720,21 @@
             "325120",
             "424710",
             "493190"
+          ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "ENERGY TRANSFER MKT & TERM LP/TANK FARM 2",
+          "codes": [
+            "424710"
           ],
           "primary": "terminal",
           "categories": [
@@ -780,37 +813,6 @@
           "name": "KINDER MORGAN POINT BREEZE TERMINAL",
           "codes": [
             "424710"
-          ],
-          "primary": "terminal",
-          "categories": [
-            "terminal"
-          ],
-          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
-          "qualification": "NAICS 424710",
-          "forbidden": false,
-          "qualified": true,
-          "categoryError": ""
-        },
-        {
-          "name": "MARCUS HOOK TANK FARM 2",
-          "codes": [
-            "424710"
-          ],
-          "primary": "terminal",
-          "categories": [
-            "terminal"
-          ],
-          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
-          "qualification": "NAICS 424710",
-          "forbidden": false,
-          "qualified": true,
-          "categoryError": ""
-        },
-        {
-          "name": "MIPC LLC / CHELSEA TANK FARM",
-          "codes": [
-            "424710",
-            "486910"
           ],
           "primary": "terminal",
           "categories": [
@@ -904,7 +906,7 @@
         "terminal": 26,
         "propane": 1
       },
-      "elapsedMs": 12746,
+      "elapsedMs": 12732,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
@@ -923,21 +925,6 @@
           ],
           "classificationBasis": "Explicit propane or LPG dealer/supplier role",
           "qualification": "NAICS 424710",
-          "forbidden": false,
-          "qualified": true,
-          "categoryError": ""
-        },
-        {
-          "name": "BAYTOWN TERMINAL",
-          "codes": [
-            "457210"
-          ],
-          "primary": "terminal",
-          "categories": [
-            "terminal"
-          ],
-          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
-          "qualification": "NAICS 457210",
           "forbidden": false,
           "qualified": true,
           "categoryError": ""
@@ -1034,6 +1021,24 @@
         {
           "name": "GALENA PARK TERMINAL",
           "codes": [
+            "221112",
+            "424710",
+            "493110",
+            "493190"
+          ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "GALENA PARK TERMINAL",
+          "codes": [
             "424710"
           ],
           "primary": "terminal",
@@ -1074,6 +1079,21 @@
           ],
           "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
           "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "HMS 850 HOLDINGS BAYTOWN TERMINAL",
+          "codes": [
+            "457210"
+          ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
+          "qualification": "NAICS 457210",
           "forbidden": false,
           "qualified": true,
           "categoryError": ""
@@ -1144,22 +1164,6 @@
           "forbidden": false,
           "qualified": true,
           "categoryError": ""
-        },
-        {
-          "name": "KINDER MORGAN EXPORT TERMINAL",
-          "codes": [
-            "221112",
-            "424710"
-          ],
-          "primary": "terminal",
-          "categories": [
-            "terminal"
-          ],
-          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
-          "qualification": "NAICS 424710",
-          "forbidden": false,
-          "qualified": true,
-          "categoryError": ""
         }
       ]
     },
@@ -1177,7 +1181,7 @@
         "terminal": 16,
         "propane": 0
       },
-      "elapsedMs": 12746,
+      "elapsedMs": 12732,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
@@ -1441,7 +1445,7 @@
         "terminal": 4,
         "propane": 0
       },
-      "elapsedMs": 18766,
+      "elapsedMs": 12732,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
@@ -1693,7 +1697,7 @@
         "terminal": 23,
         "propane": 1
       },
-      "elapsedMs": 12746,
+      "elapsedMs": 12733,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
