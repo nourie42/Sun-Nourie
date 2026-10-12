@@ -1010,8 +1010,8 @@ export function registerAiAgentRoutes(app) {
 
 
   // Friendly UI routes are registered before the legacy Council routes.
-  app.get(["/ai-council", "/ai-council/"], (_req, res) => res.sendFile(path.join(publicDir, "index.html")));
-  app.get(["/ai-council/bots", "/ai-council/bots/", "/ai-council/bots.html"], (_req, res) => res.sendFile(path.join(publicDir, "bots-v2.html")));
+  app.get(["/ai-council", "/ai-council/"], (_req, res) => res.sendFile(path.join(publicDir, "grok.html")));
+  app.get(["/ai-council/bots", "/ai-council/bots/", "/ai-council/bots.html"], (_req, res) => res.sendFile(path.join(publicDir, "grok.html")));
   app.get(["/ai-council/chat", "/ai-council/chat/", "/ai-council/chat.html"], (_req, res) => res.sendFile(path.join(publicDir, "bot-chat-v2.html")));
   app.get(["/ai-council/grok", "/ai-council/grok/", "/ai-council/grok.html"], (_req, res) => res.sendFile(path.join(publicDir, "grok.html")));
   app.get(["/ai-council/christian.html", "/ai-council/alicia.html", "/ai-council/anaiya.html", "/ai-council/aiden.html"], (_req, res) => res.sendFile(path.join(publicDir, "family-v2.html")));

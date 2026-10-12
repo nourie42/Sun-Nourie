@@ -104,7 +104,7 @@ function renderHero() {
 
 function renderOverview() {
   // Hourly strip — rich
-  const hrs = (forecast.hours || []).slice(0, 24);
+  const hrs = (forecast.hours || []).slice(0, 12);
   const nowH = new Date().getHours();
   el('hourly-strip').innerHTML = hrs.map((h) => {
     const t = new Date(h.time);
@@ -113,6 +113,35 @@ function renderOverview() {
     const wd = h.windDirection ? `<div class="wd">${h.windDirection} ${Math.round(h.windMph || 0)}</div>` : '';
     return `<div class="hour${isNow ? ' now' : ''}"><div class="t">${label}</div><div class="ic">${iconFor(h.condition)}</div><div class="tp">${Math.round(h.temperature)}°</div><div class="pp">${h.pop >= 15 ? Math.round(h.pop) + '%' : ''}</div>${wd}</div>`;
   }).join('');
+
+  // Temperature curve — smooth SVG
+  const tcv = el('temp-curve');
+  if (tcv && hrs.length > 1) {
+    const temps = hrs.map((h) => h.temperature);
+    const tMin = Math.min(...temps), tMax = Math.max(...temps);
+    const W = 600, H = 120, P = 20;
+    const X = (i) => P + (i / (temps.length - 1)) * (W - 2 * P);
+    const Y = (t) => H - P - ((t - tMin) / Math.max(1, tMax - tMin)) * (H - 2 * P);
+    let d = `M ${X(0).toFixed(1)} ${Y(temps[0]).toFixed(1)}`;
+    for (let i = 1; i < temps.length; i++) {
+      const x0 = X(i - 1), y0 = Y(temps[i - 1]), x1 = X(i), y1 = Y(temps[i]);
+      const cx = (x0 + x1) / 2;
+      d += ` C ${cx.toFixed(1)} ${y0.toFixed(1)}, ${cx.toFixed(1)} ${y1.toFixed(1)}, ${x1.toFixed(1)} ${y1.toFixed(1)}`;
+    }
+    const area = `${d} L ${X(temps.length - 1).toFixed(1)} ${H} L ${X(0).toFixed(1)} ${H} Z`;
+    const dots = temps.map((t, i) => {
+      const lbl = i % 3 === 0 ? `<text x="${X(i).toFixed(0)}" y="${(Y(t) - 10).toFixed(0)}" text-anchor="middle" font-size="11" fill="#c9d4e8" font-weight="600">${Math.round(t)}°</text>` : '';
+      return `${lbl}<circle cx="${X(i).toFixed(1)}" cy="${Y(t).toFixed(1)}" r="3.5" fill="#7fd4ff"/>`;
+    }).join('');
+    tcv.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:120px;display:block">
+      <defs><linearGradient id="tcurveg" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#7fd4ff" stop-opacity=".35"/>
+        <stop offset="100%" stop-color="#7fd4ff" stop-opacity="0"/>
+      </linearGradient></defs>
+      <path d="${area}" fill="url(#tcurveg)"/>
+      <path d="${d}" fill="none" stroke="#7fd4ff" stroke-width="2.5" stroke-linecap="round"/>
+      ${dots}</svg>`;
+  }
 
   // Precipitation chart — bars with labels
   const pch = el('precip-chart');
