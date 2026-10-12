@@ -80,7 +80,8 @@ function renderHero() {
   const d0 = forecast.days?.[0];
   if (d0) {
     const hi = finite(d0.high) ? Math.round(d0.high) + '°' : '—';
-    el('now-hilo').textContent = `H ${hi} / L ${Math.round(d0.low)}°`;
+    el('hero-loc').textContent = forecast.location?.name || 'Knightdale';
+  el('now-hilo').textContent = `H ${hi} / L ${Math.round(d0.low)}°`;
   }
 
   // Insights (best of Glance)
@@ -103,6 +104,14 @@ function renderHero() {
 }
 
 function renderOverview() {
+  // Hourly description
+  const hr0 = hrs[0];
+  if (hr0) {
+    const maxPop = Math.max(...hrs.map((h) => h.pop || 0));
+    el('hourly-desc').textContent = maxPop < 20
+      ? `Clear conditions expected over the next 12 hours.`
+      : `Rain likely — up to ${Math.round(maxPop)}% chance in the next 12 hours.`;
+  }
   // Hourly strip — rich
   const hrs = (forecast.hours || []).slice(0, 12);
   const nowH = new Date().getHours();
@@ -114,62 +123,26 @@ function renderOverview() {
     return `<div class="hour${isNow ? ' now' : ''}"><div class="t">${label}</div><div class="ic">${iconFor(h.condition)}</div><div class="tp">${Math.round(h.temperature)}°</div><div class="pp">${h.pop >= 15 ? Math.round(h.pop) + '%' : ''}</div>${wd}</div>`;
   }).join('');
 
-  // Temperature curve — smooth SVG
-  const tcv = el('temp-curve');
-  if (tcv && hrs.length > 1) {
-    const temps = hrs.map((h) => h.temperature);
-    const tMin = Math.min(...temps), tMax = Math.max(...temps);
-    const W = 600, H = 120, P = 20;
-    const X = (i) => P + (i / (temps.length - 1)) * (W - 2 * P);
-    const Y = (t) => H - P - ((t - tMin) / Math.max(1, tMax - tMin)) * (H - 2 * P);
-    let d = `M ${X(0).toFixed(1)} ${Y(temps[0]).toFixed(1)}`;
-    for (let i = 1; i < temps.length; i++) {
-      const x0 = X(i - 1), y0 = Y(temps[i - 1]), x1 = X(i), y1 = Y(temps[i]);
-      const cx = (x0 + x1) / 2;
-      d += ` C ${cx.toFixed(1)} ${y0.toFixed(1)}, ${cx.toFixed(1)} ${y1.toFixed(1)}, ${x1.toFixed(1)} ${y1.toFixed(1)}`;
-    }
-    const area = `${d} L ${X(temps.length - 1).toFixed(1)} ${H} L ${X(0).toFixed(1)} ${H} Z`;
-    const dots = temps.map((t, i) => {
-      const lbl = i % 3 === 0 ? `<text x="${X(i).toFixed(0)}" y="${(Y(t) - 10).toFixed(0)}" text-anchor="middle" font-size="11" fill="#c9d4e8" font-weight="600">${Math.round(t)}°</text>` : '';
-      return `${lbl}<circle cx="${X(i).toFixed(1)}" cy="${Y(t).toFixed(1)}" r="3.5" fill="#7fd4ff"/>`;
-    }).join('');
-    tcv.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:120px;display:block">
-      <defs><linearGradient id="tcurveg" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#7fd4ff" stop-opacity=".35"/>
-        <stop offset="100%" stop-color="#7fd4ff" stop-opacity="0"/>
-      </linearGradient></defs>
-      <path d="${area}" fill="url(#tcurveg)"/>
-      <path d="${d}" fill="none" stroke="#7fd4ff" stroke-width="2.5" stroke-linecap="round"/>
-      ${dots}</svg>`;
-  }
 
-  // Precipitation chart — bars with labels
-  const pch = el('precip-chart');
-  if (pch) {
-    pch.innerHTML = hrs.map((h) => {
-      const pct = Math.round(h.pop || 0);
-      const ht = pct > 0 ? Math.max(8, pct) : 3;
-      const t = new Date(h.time).toLocaleTimeString('en-US', { hour: 'numeric' }).replace(/\s?[AP]M/i, '');
-      return `<div class="pbar-wrap"><div class="precip-bar" style="height:${ht}%" title="${t}: ${pct}%"></div><div class="pbar-t">${t}</div><div class="pbar-p">${pct > 0 ? pct + '%' : ''}</div></div>`;
-    }).join('');
-  }
-
-  // 7-day — rich cards
+  // 7-day — Apple-style list
   const days = (forecast.days || []).slice(0, 7);
   const gHi = Math.max(...days.map((d) => d.high).filter(finite));
   const gLo = Math.min(...days.map((d) => d.low).filter(finite));
-  el('day-cards').innerHTML = days.map((d, i) => {
+  if (days[0]) {
+    el('daily-desc').textContent = days[0].detail || `High ${Math.round(days[1]?.high || 0)}°, low ${Math.round(days[0].low || 0)}°.`;
+  }
+  el('day-list').innerHTML = days.map((d, i) => {
     const dt = new Date(d.date + 'T12:00:00');
     const name = i === 0 ? 'Today' : dt.toLocaleDateString('en-US', { weekday: 'short' });
-    const hi = finite(d.high) ? d.high : (i === 0 ? forecast.current.temperature : d.high);
-    const hiTxt = finite(hi) ? Math.round(hi) + '°' : '—';
-    const l = finite(d.low) && finite(hi) ? ((d.low - gLo) / Math.max(1, gHi - gLo)) * 100 : 0;
-    const w = finite(d.low) && finite(hi) ? Math.max(8, ((hi - d.low) / Math.max(1, gHi - gLo)) * 100) : 0;
-    return `<div class="day-card"><div class="d">${name}</div><div class="ic">${iconFor(d.condition)}</div>
-      <div class="temps"><span class="hi">${hiTxt}</span><span class="lo">${finite(d.low) ? Math.round(d.low) + '°' : ''}</span></div>
-      <div class="bar"><i style="left:${l.toFixed(1)}%;width:${w.toFixed(1)}%"></i></div>
-      <div class="pp">${(d.pop || 0) >= 15 ? '💧 ' + Math.round(d.pop) + '%' : '&nbsp;'}</div>
-      <div class="wind">${d.windDirection || ''} ${typeof d.wind === 'string' ? d.wind : ''}</div></div>`;
+    const hi = finite(d.high) ? d.high : null;
+    const hiTxt = hi != null ? Math.round(hi) : '—';
+    const loTxt = finite(d.low) ? Math.round(d.low) : '—';
+    const l = hi != null && finite(d.low) ? ((d.low - gLo) / Math.max(1, gHi - gLo)) * 100 : 0;
+    const w = hi != null && finite(d.low) ? Math.max(10, ((hi - d.low) / Math.max(1, gHi - gLo)) * 100) : 0;
+    const pop = (d.pop || 0) >= 20 ? `<div class="pp">💧 ${Math.round(d.pop)}%</div>` : '';
+    return `<div><div class="day-row"><div class="d">${name}</div><div class="ic">${iconFor(d.condition)}</div>`
+      + `<div class="lo">${loTxt}°</div><div class="bar"><i style="left:${l.toFixed(0)}%;width:${w.toFixed(0)}%"></i></div>`
+      + `<div class="hi">${hiTxt}°</div></div>${pop}</div>`;
   }).join('');
 
   // Metrics — vibrant with icons (fall back to hour 0 for live values)
@@ -191,8 +164,8 @@ function renderOverview() {
     ['🌅 Sunrise', forecast.solar?.sunrise ? new Date(forecast.solar.sunrise).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '—', '', ''],
     ['🌇 Sunset', forecast.solar?.sunset ? new Date(forecast.solar.sunset).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '—', '', ''],
   ];
-  el('metric-grid').innerHTML = metrics.map(([k, v, s, t]) =>
-    `<div class="metric"><div class="k">${k}</div><div class="v">${v}</div>${s ? `<div class="s">${s}</div>` : ''}${tTrend[0] && k.includes('Feels') ? `<div class="trend ${tTrend[1]}">${tTrend[0]}</div>` : ''}</div>`
+  el('metric-grid').innerHTML = metrics.map(([k, v, s]) =>
+    `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div>${s ? `<div class="s">${s}</div>` : ''}</div>`
   ).join('');
 }
 

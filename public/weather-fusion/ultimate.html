@@ -3,138 +3,115 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#0b1526">
-  <title>Ultimate Weather · Weather Nourie</title>
-  <meta name="description" content="Everything Weather Nourie does best, on one page: live conditions, hourly, 7-day, model blend, AI lab, and full details.">
-  <link rel="stylesheet" href="/weather-fusion/ultimate.css">
+  <meta name="theme-color" content="#0a1628">
+  <meta name="color-scheme" content="dark">
+  <title>Ultimate Weather</title>
+  <link rel="stylesheet" href="/weather-fusion/ultimate.css?v=4">
 </head>
 <body>
-  <div class="sky" aria-hidden="true">
-    <div id="sky-a" class="sky-layer"></div>
-    <div id="sky-b" class="sky-layer"></div>
-    <div class="sky-shade"></div>
+<div class="sky" id="sky"><div class="sky-shade"></div></div>
+<div class="wrap">
+  <header class="topbar">
+    <a class="brand" href="/weather-fusion/"><span>Weather <b>Nourie</b></span></a>
+    <span class="page-tag">Ultimate</span>
+  </header>
+
+  <div class="loc-row">
+    <select class="loc-select" id="loc-select" aria-label="Location">
+      <option value="knightdale">Knightdale / Raleigh</option>
+      <option value="greenville">Greenville, NC</option>
+    </select>
+    <span class="updated" id="updated"></span>
   </div>
-  <div class="wrap">
-    <header class="topbar">
-      <a class="brand" href="/weather-fusion/" aria-label="Back to Weather Nourie"><span class="brand-sun" aria-hidden="true">◒</span><span>Weather <b>Nourie</b></span></a>
-      <span class="page-tag">Ultimate</span>
-    </header>
+  <div id="alert-strip" class="alert-strip" hidden></div>
 
-    <div class="loc-row">
-      <label class="loc-label" for="loc-select">Location</label>
-      <select id="loc-select" class="loc-select" aria-label="Choose location">
-        <option value="knightdale">Knightdale / Raleigh</option>
-        <option value="greenville">Greenville, NC</option>
-      </select>
-      <span id="updated" class="updated" aria-live="polite"></span>
-    </div>
+  <!-- HERO — Apple style -->
+  <section class="hero">
+    <div class="hero-loc" id="hero-loc">Knightdale</div>
+    <div class="hero-temp"><span id="now-temp">--</span>°</div>
+    <div class="hero-cond" id="now-cond">Loading…</div>
+    <div class="hero-hilo" id="now-hilo">H --&nbsp;&nbsp;L --</div>
+  </section>
 
-    <div id="alert-strip" class="alert-strip" hidden></div>
+  <nav class="tab-bar glass">
+    <button data-tab="overview" class="on">Overview</button>
+    <button data-tab="models">Models</button>
+    <button data-tab="ailab">AI Lab</button>
+    <button data-tab="details">Details</button>
+  </nav>
 
-    <!-- Hero -->
-    <section class="hero" aria-label="Current conditions">
-      <div class="hero-temp"><span id="now-temp">--</span><span class="deg">°</span></div>
-      <div class="hero-sub">
-        <div id="now-cond" class="hero-cond">Loading…</div>
-        <div class="hero-meta">
-          <span id="now-feels"></span>
-          <span id="now-hilo" class="hilo"></span>
-        </div>
+  <main>
+    <section id="tab-overview" class="tab-panel on">
+      <div class="glass card">
+        <div class="card-desc" id="hourly-desc"></div>
+        <div class="divider"></div>
+        <div class="hourly-strip" id="hourly-strip"></div>
       </div>
-      <div id="insight-row" class="insight-row"></div>
+
+      <div class="glass card">
+        <div class="card-desc" id="daily-desc"></div>
+        <div class="divider"></div>
+        <div class="day-list" id="day-list"></div>
+      </div>
+
+      <div class="tile-grid" id="metric-grid"></div>
     </section>
 
-    <!-- Tab bar -->
-    <nav class="tab-bar glass" aria-label="Sections">
-      <button data-tab="overview" class="on">Overview</button>
-      <button data-tab="models">Models</button>
-      <button data-tab="ailab">AI Lab</button>
-      <button data-tab="details">Details</button>
-    </nav>
+    <section id="tab-models" class="tab-panel">
+      <div class="glass card">
+        <div class="card-head"><h2>Model Blend</h2><div class="blend-weights" id="blend-weights"></div></div>
+        <div class="divider"></div>
+        <div class="chart" id="blend-chart"></div>
+      </div>
+      <div class="glass card">
+        <h2>Per-Model Now</h2>
+        <div class="divider"></div>
+        <div class="tile-grid" id="model-cards"></div>
+      </div>
+      <div class="glass card">
+        <h2>WeatherNext AI</h2>
+        <div class="divider"></div>
+        <div class="chart" id="wn-chart"></div>
+        <p class="fine" id="wn-note"></p>
+      </div>
+    </section>
 
-    <main id="ultimate">
-      <!-- OVERVIEW -->
-      <section id="tab-overview" class="tab-panel on">
-        <div class="glass card">
-          <h2>Next 12 hours</h2>
-          <div id="temp-curve" class="chart" style="margin-bottom:12px"></div>
-          <div id="hourly-strip" class="hourly-strip"></div>
-        </div>
-        <div class="glass card">
-          <h2>Rain timing</h2>
-          <div id="precip-chart" class="precip-chart"></div>
-        </div>
-        <div class="glass card">
-          <h2>7-day outlook</h2>
-          <div id="day-cards" class="day-cards"></div>
-        </div>
-        <div class="glass card">
-          <h2>Key metrics</h2>
-          <div id="metric-grid" class="metric-grid"></div>
-        </div>
-      </section>
+    <section id="tab-ailab" class="tab-panel">
+      <div class="glass card">
+        <h2>WeatherNext Explorer</h2>
+        <div class="divider"></div>
+        <div class="var-grid" id="wn-var-grid"></div>
+      </div>
+      <div class="glass card">
+        <h2 id="wn-chart-title">AI Forecast</h2>
+        <div class="divider"></div>
+        <div class="chart" id="wn-chart2"></div>
+        <p class="fine" id="wn-age"></p>
+      </div>
+    </section>
 
-      <!-- MODELS -->
-      <section id="tab-models" class="tab-panel">
-        <div class="glass card">
-          <div class="card-head">
-            <h2>Model blend</h2>
-            <div class="blend-weights" id="blend-weights"></div>
-          </div>
-          <div id="blend-chart" class="chart"></div>
-          <div class="legend">
-            <span><i class="sw blend"></i>Blend</span>
-            <span><i class="sw band"></i>WN P10–P90</span>
-            <span id="model-legend"></span>
-          </div>
-        </div>
-        <div class="glass card">
-          <h2>Per-model right now</h2>
-          <div id="model-cards" class="model-cards"></div>
-        </div>
-      </section>
+    <section id="tab-details" class="tab-panel">
+      <div class="glass card">
+        <h2>Comfort</h2>
+        <div class="divider"></div>
+        <div id="comfort-box"></div>
+      </div>
+      <div class="glass card">
+        <h2>Details</h2>
+        <div class="divider"></div>
+        <dl class="detail-list" id="detail-list"></dl>
+      </div>
+      <div class="glass card">
+        <h2>Forecaster Discussion</h2>
+        <div class="divider"></div>
+        <div id="discussion"></div>
+      </div>
+    </section>
+  </main>
 
-      <!-- AI LAB -->
-      <section id="tab-ailab" class="tab-panel">
-        <div class="glass card">
-          <h2>WeatherNext AI variable explorer</h2>
-          <div id="wn-var-grid" class="var-grid"></div>
-        </div>
-        <div class="glass card">
-          <h2 id="wn-chart-title">AI forecast</h2>
-          <div id="wn-chart" class="chart"></div>
-          <div class="legend">
-            <span><i class="sw band"></i>P10–P90</span>
-            <span><i class="sw mean"></i>Mean</span>
-          </div>
-          <p id="wn-age" class="fine"></p>
-        </div>
-      </section>
-
-      <!-- DETAILS -->
-      <section id="tab-details" class="tab-panel">
-        <div class="glass card">
-          <h2>How it feels</h2>
-          <div id="comfort-box"></div>
-        </div>
-        <div class="glass card">
-          <h2>All details</h2>
-          <dl id="detail-list" class="detail-list"></dl>
-        </div>
-        <div class="glass card">
-          <h2>Forecaster discussion</h2>
-          <div id="discussion"></div>
-        </div>
-      </section>
-    </main>
-
-    <p id="error" class="error" role="alert" hidden></p>
-
-    <footer class="foot">
-      <p>Data: NWS, HRRR, NBM, ECMWF, Google WeatherNext AI. The best of every Weather Nourie page, together.</p>
-      <p><a href="/weather-fusion/">Full site →</a></p>
-    </footer>
-  </div>
-  <script type="module" src="/weather-fusion/ultimate.js"></script>
+  <p id="error" class="error" hidden></p>
+  <footer class="foot">Data: NWS, HRRR, NBM, ECMWF, Google WeatherNext AI.<br><a href="/weather-fusion/">All weather pages →</a></footer>
+</div>
+<script type="module" src="/weather-fusion/ultimate.js?v=4"></script>
 </body>
 </html>
