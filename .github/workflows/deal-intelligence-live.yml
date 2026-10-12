@@ -1,0 +1,55 @@
+name: Deal Intelligence verification
+on:
+  push:
+    branches: [main, codex/deal-intelligence-timeout-fix]
+    paths:
+      - 'src/dealIntelligenceRoutes.js'
+      - 'src/deal-intelligence/**'
+      - 'public/deal-intelligence/**'
+      - 'src/weatherSiteAccess.js'
+      - 'test/deal-intelligence*.test.mjs'
+      - 'scripts/buildDealIntelligence.mjs'
+      - 'scripts/smokeDealIntelligenceLive.mjs'
+      - '.github/workflows/deal-intelligence-live.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: deal-intelligence-verification-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - name: Build and check the branch
+        run: |
+          node scripts/buildDealIntelligence.mjs
+          node --check src/dealIntelligenceRoutes.js
+          node --check src/deal-intelligence/api.mjs
+          node --check src/deal-intelligence/ui/app.js
+          node --check scripts/smokeDealIntelligenceLive.mjs
+          node --test test/deal-intelligence*.test.mjs
+  live:
+    if: github.ref == 'refs/heads/main'
+    needs: unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm install --no-save --package-lock=false playwright@1.55.0
+      - run: npx playwright install --with-deps chromium
+      - name: Verify deployed browser discovery with real sourced AI
+        env:
+          DEAL_INTELLIGENCE_BASE_URL: https://sun-nourie-live.onrender.com
+          WEATHER_SITE_PASSWORD: ${{ secrets.WEATHER_SITE_PASSWORD }}
+        run: node scripts/smokeDealIntelligenceLive.mjs

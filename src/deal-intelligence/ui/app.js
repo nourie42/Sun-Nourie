@@ -42,12 +42,14 @@ let serverVersion;
 let saveInFlight=false;
 let savePending=false;
 let saveConflict=false;
+let lastSaveError=null;
 let toastTimer;
 let hunterResult = null;
 let analystResult = null;
 let watchResult = null;
 let currentBrief = null;
 let aiBusy = false;
+let aiProgress = null;
 let analysisBusy = false;
 let importedData = null;
 const localKey = 'sun-nourie.deal-intelligence.workspace.v1';
@@ -74,9 +76,9 @@ async function api(path, body, timeout = 90000) {
     const apiPath='/api/deal-intelligence'+path.slice(4);
     const response = await fetch(apiPath,{method:body===undefined?'GET':'POST',headers:body===undefined?{}:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),signal:controller.signal});
     const result = await response.json().catch(()=>({error:'The service returned an unreadable response.'}));
-    if (!response.ok) {const error=new Error(result.error || `Request failed (${response.status}).`);error.status=response.status;throw error;}
+    if (!response.ok) {const error=new Error(result.error || `Request failed (${response.status}).`);error.status=response.status;error.code=result.code;throw error;}
     return result;
-  } catch(error) { if(error.name==='AbortError') throw new Error('The request timed out. Your workspace data is still saved locally.'); throw error; }
+  } catch(error) { if(error.name==='AbortError') {const timeoutError=new Error('The request timed out. Your workspace data is still saved locally.');timeoutError.code='REQUEST_TIMEOUT';throw timeoutError;} throw error; }
   finally { clearTimeout(timer); }
 }
 function localSave() {
@@ -96,12 +98,13 @@ function commit(message) {
 }
 async function flushSave() {
   if(saveInFlight||!savePending||saveConflict)return;
-  saveInFlight=true;savePending=false;const sequence=saveSequence;const snapshot=JSON.parse(JSON.stringify(state));
+  saveInFlight=true;savePending=false;lastSaveError=null;const sequence=saveSequence;const snapshot=JSON.parse(JSON.stringify(state));
   try {
     const saved=await api('/api/state',{state:snapshot,expectedUpdatedAt:serverVersion},12000);
     storage=saved.storage||'durable';serverVersion=saved.state?.updatedAt||saved.updatedAt||serverVersion;if(saved.ai)ai=saved.ai;
     if(sequence===saveSequence){if(serverVersion)state.updatedAt=serverVersion;localSave();$('#save-status').textContent='All changes saved';}
   } catch(error) {
+    lastSaveError=error;
     if(error.status===409){saveConflict=true;$('#save-status').textContent='Local changes not synced · workspace changed elsewhere';toast('Workspace changed elsewhere. Export a full backup of your local edits, then reload to review the latest saved workspace.',true);}
     else {storage='browser';if(sequence===saveSequence)$('#save-status').textContent='Saved on this device';}
   } finally {saveInFlight=false;updateShell();if(savePending&&!saveConflict)flushSave();}
@@ -142,7 +145,7 @@ function signalRows(signals) {
 }
 function render() {
   const views={today:renderToday,hunter:renderHunter,targets:renderTargets,underwriting:renderUnderwriting,sites:renderSites,pipeline:renderPipeline,briefs:renderBriefs,watchtower:renderWatchtower,analyst:renderAnalyst};
-  $('#main').innerHTML=views[tab]();
+  $('#main').innerHTML=aiProgressMarkup()+views[tab]();
   if(tab==='underwriting'){bindFinance();calculateFinance();}
   if(tab==='pipeline')bindPipeline();
 }
@@ -181,7 +184,7 @@ function aiResponse(result) {
 function renderHunter() {
   const discovered=hunterResult?.data?.targets||[];
   return heading('FIND YOUR NEXT OPPORTUNITY','Acquisition hunter','Search for privately owned fuel marketers and convenience store operators.')+
-  `<div class="split-layout"><div><section class="research-intro"><div class="eyebrow">PURPOSEFUL DISCOVERY</div><h2>A focused search.<br>A better starting point.</h2><p>Describe the geography, footprint and ownership profile you want. Review the evidence before adding companies to your universe.</p></section><section class="panel"><div class="panel-header"><h2>What are you looking for?</h2>${badge(ai.connected?'AI connected':'Connection required',ai.connected?'green':'yellow')}</div><div class="panel-body"><form id="hunter-form" class="prompt-form"><textarea name="prompt" required aria-label="Describe target acquisition search" placeholder="Find private convenience retailers with 5–35 sites in North Carolina, South Carolina and Virginia. Prioritize identifiable owners and cite public sources.">${escape(state.settings.lastSearch||'')}</textarea><div class="prompt-examples"><button type="button" class="prompt-chip" data-prompt="Find family-owned fuel marketers with 10–30 locations in the Southeast. Identify the legal owner and cite each company’s official website.">Family-owned operators</button><button type="button" class="prompt-chip" data-prompt="Find independent convenience store groups in North Carolina, South Carolina and Virginia with 5–35 sites. Clearly distinguish verified facts from unknowns.">Carolinas & Virginia</button><button type="button" class="prompt-chip" data-prompt="Find private fuel distributors in Georgia and Tennessee. Separate wholesale accounts from company-operated stores and cite your sources.">Fuel distributors</button></div><div class="form-actions"><span class="help-text" style="margin-right:auto">Public evidence. No inferred seller intent.</span><button class="button primary" type="submit" ${aiBusy?'disabled':''}>${aiBusy?'Researching…':'✦ Discover targets'}</button></div></form>${aiBusy?'<div class="loading"><span class="spinner"></span>Searching and organizing public evidence…</div>':''}</div></section>${hunterResult?`<section class="panel"><div class="panel-header"><h2>Research results</h2>${discovered.length?`<button class="button primary small" data-action="save-discovered">Save ${discovered.length} target${discovered.length===1?'':'s'}</button>`:''}</div><div class="panel-body">${aiResponse(hunterResult)}${discovered.length?`<div style="margin-top:18px">${discovered.map(t=>targetRow({...t,id:'',states:t.states||[],stage:t.stage||'Research'})).join('')}</div><p class="help-text">Results are a research starting point. Saving merges duplicate company names and preserves your existing notes.</p>`:''}</div></section>`:''}</div>
+  `<div class="split-layout"><div><section class="research-intro"><div class="eyebrow">PURPOSEFUL DISCOVERY</div><h2>A focused search.<br>A better starting point.</h2><p>Describe the geography, footprint and ownership profile you want. Review the evidence before adding companies to your universe.</p></section><section class="panel"><div class="panel-header"><h2>What are you looking for?</h2>${badge(ai.connected?'AI connected':'Connection required',ai.connected?'green':'yellow')}</div><div class="panel-body"><form id="hunter-form" class="prompt-form"><textarea name="prompt" required aria-label="Describe target acquisition search" placeholder="Find private convenience retailers with 5–35 sites in North Carolina, South Carolina and Virginia. Prioritize identifiable owners and cite public sources.">${escape(state.settings.lastSearch||'')}</textarea><div class="prompt-examples"><button type="button" class="prompt-chip" data-prompt="Find family-owned fuel marketers with 10–30 locations in the Southeast. Identify the legal owner and cite each company’s official website.">Family-owned operators</button><button type="button" class="prompt-chip" data-prompt="Find independent convenience store groups in North Carolina, South Carolina and Virginia with 5–35 sites. Clearly distinguish verified facts from unknowns.">Carolinas & Virginia</button><button type="button" class="prompt-chip" data-prompt="Find private fuel distributors in Georgia and Tennessee. Separate wholesale accounts from company-operated stores and cite your sources.">Fuel distributors</button></div><div class="form-actions"><span class="help-text" style="margin-right:auto">Public evidence. No inferred seller intent.</span><button class="button primary" type="submit" ${aiBusy?'disabled':''}>${aiBusy?'Researching…':'✦ Discover targets'}</button></div></form></div></section>${hunterResult?`<section class="panel"><div class="panel-header"><h2>Research results</h2>${discovered.length?`<button class="button primary small" data-action="save-discovered">Save ${discovered.length} target${discovered.length===1?'':'s'}</button>`:''}</div><div class="panel-body">${aiResponse(hunterResult)}${discovered.length?`<div style="margin-top:18px">${discovered.map(t=>targetRow({...t,id:'',states:t.states||[],stage:t.stage||'Research'})).join('')}</div><p class="help-text">Results are a research starting point. Saving merges duplicate company names and preserves your existing notes.</p>`:''}</div></section>`:''}</div>
   <div><section class="panel"><div class="panel-header"><h2>Your search mandate</h2><button class="button ghost" data-action="settings">Edit →</button></div><div class="panel-body"><div class="research-fact"><strong>Geographic focus</strong><p>${escape((state.settings.targetStates||[]).join(' · ')||'Add focus states in workspace settings.')}</p></div><div class="research-fact"><strong>Footprint</strong><p>${number(state.settings.minSites)}–${number(state.settings.maxSites)} sites per target</p></div><div class="research-fact"><strong>Return threshold</strong><p>${percent(state.settings.targetIrrPercent??15)} target investment IRR · ${percent(state.settings.targetYieldPercent)} annual cash yield</p></div></div></section><section class="panel"><div class="panel-header"><h2>Research that holds up</h2></div><div class="panel-body"><div class="research-fact"><strong>01 · Establish the company</strong><p>Confirm legal names, operating geography and the retail versus wholesale footprint.</p></div><div class="research-fact"><strong>02 · Identify the owner</strong><p>Keep named decision makers and contact details only when backed by a source.</p></div><div class="research-fact"><strong>03 · Separate facts from signals</strong><p>Expansion, succession and property changes are clues. They do not establish willingness to sell.</p></div></div></section></div></div>`;
 }
 function fallbackFinance(input) {
@@ -257,7 +260,7 @@ function bindPipeline() {
 function renderBriefs() {
   const briefs=state.documents.filter(d=>d.type==='brief');
   return heading('MAKE THE INVESTMENT CASE','Investment briefs','A decision-ready summary grounded in your saved company facts and assumptions.')+
-  `<div class="split-layout"><div><section class="panel brief-controls"><div class="panel-header"><h2>Build a brief</h2><span class="panel-label">FROM YOUR WORKSPACE</span></div><div class="panel-body"><form id="brief-form"><div class="form-field"><label for="brief-target">Select target</label><select id="brief-target" name="targetId" required><option value="">Choose a company…</option>${state.targets.map(t=>`<option value="${escape(t.id)}" ${currentBrief?.targetId===t.id?'selected':''}>${escape(t.name)}</option>`).join('')}</select></div><div class="callout">The baseline brief uses your recorded facts and operating model. Missing evidence stays visible. AI enrichment requires a connected research service.</div><div class="form-actions"><button class="button secondary" type="button" data-action="ai-brief" ${aiBusy?'disabled':''}>✦ Research & enrich</button><button class="button primary" type="submit">Create baseline brief →</button></div></form>${aiBusy?'<div class="loading"><span class="spinner"></span>Building sourced analysis…</div>':''}</div></section>${currentBrief?`<div class="row-actions" style="justify-content:flex-end;margin-bottom:12px"><button class="button secondary small" data-action="download-brief">Download text ↧</button><button class="button secondary small" data-action="print-brief">Print</button><button class="button primary small" data-action="save-brief">Save brief</button></div><article class="brief-preview">${escape(currentBrief.text)}</article>`:empty('Choose a target to build conviction','Your brief will bring together the ownership picture, seller signals, operating economics, risks and next steps.')}</div><div><section class="panel"><div class="panel-header"><h2>Saved briefs <span class="count-badge">${briefs.length}</span></h2></div><div class="panel-body">${briefs.length?briefs.map(b=>`<div class="document-row"><div><h3>${escape(b.title)}</h3><p>${dateLabel(b.createdAt)} · ${escape(targetById(b.targetId)?.name||'Archived target')}</p></div><button class="button ghost" data-action="open-brief" data-id="${escape(b.id)}">Open →</button></div>`).join(''):empty('Your decision library','Save a brief to revisit your thesis as the evidence evolves.','',true)}</div></section><section class="panel"><div class="panel-header"><h2>What a useful brief answers</h2></div><div class="panel-body"><div class="research-fact"><strong>Why this company?</strong><p>The footprint, ownership picture and your investment hypothesis.</p></div><div class="research-fact"><strong>Do the economics work?</strong><p>Entered purchase price, operating cash flow and cash yield.</p></div><div class="research-fact"><strong>What must be proven?</strong><p>Evidence gaps, property and environmental questions, and concrete next actions.</p></div></div></section></div></div>`;
+  `<div class="split-layout"><div><section class="panel brief-controls"><div class="panel-header"><h2>Build a brief</h2><span class="panel-label">FROM YOUR WORKSPACE</span></div><div class="panel-body"><form id="brief-form"><div class="form-field"><label for="brief-target">Select target</label><select id="brief-target" name="targetId" required><option value="">Choose a company…</option>${state.targets.map(t=>`<option value="${escape(t.id)}" ${currentBrief?.targetId===t.id?'selected':''}>${escape(t.name)}</option>`).join('')}</select></div><div class="callout">The baseline brief uses your recorded facts and operating model. Missing evidence stays visible. AI enrichment requires a connected research service.</div><div class="form-actions"><button class="button secondary" type="button" data-action="ai-brief" ${aiBusy?'disabled':''}>✦ Research & enrich</button><button class="button primary" type="submit">Create baseline brief →</button></div></form></div></section>${currentBrief?`<div class="row-actions" style="justify-content:flex-end;margin-bottom:12px"><button class="button secondary small" data-action="download-brief">Download text ↧</button><button class="button secondary small" data-action="print-brief">Print</button><button class="button primary small" data-action="save-brief">Save brief</button></div><article class="brief-preview">${escape(currentBrief.text)}</article>`:empty('Choose a target to build conviction','Your brief will bring together the ownership picture, seller signals, operating economics, risks and next steps.')}</div><div><section class="panel"><div class="panel-header"><h2>Saved briefs <span class="count-badge">${briefs.length}</span></h2></div><div class="panel-body">${briefs.length?briefs.map(b=>`<div class="document-row"><div><h3>${escape(b.title)}</h3><p>${dateLabel(b.createdAt)} · ${escape(targetById(b.targetId)?.name||'Archived target')}</p></div><button class="button ghost" data-action="open-brief" data-id="${escape(b.id)}">Open →</button></div>`).join(''):empty('Your decision library','Save a brief to revisit your thesis as the evidence evolves.','',true)}</div></section><section class="panel"><div class="panel-header"><h2>What a useful brief answers</h2></div><div class="panel-body"><div class="research-fact"><strong>Why this company?</strong><p>The footprint, ownership picture and your investment hypothesis.</p></div><div class="research-fact"><strong>Do the economics work?</strong><p>Entered purchase price, operating cash flow and cash yield.</p></div><div class="research-fact"><strong>What must be proven?</strong><p>Evidence gaps, property and environmental questions, and concrete next actions.</p></div></div></section></div></div>`;
 }
 function modelInputs(t) {
   return {...defaults,...(t.siteCount>0?{siteCount:Number(t.siteCount)}:{}),...t.financials};
@@ -273,12 +276,12 @@ function baselineBrief(t) {
 function renderWatchtower() {
   const q=search.toLowerCase();const signals=[...state.signals].filter(s=>!q||[s.title,s.detail,targetById(s.targetId)?.name].join(' ').toLowerCase().includes(q)).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   return heading('STAY CLOSE TO YOUR UNIVERSE','Watchtower','Capture public changes and keep the evidence behind every seller signal.',`<div class="heading-actions"><button class="button secondary" data-action="check-updates" ${aiBusy?'disabled':''}>✦ Check for updates</button><button class="button primary" data-action="add-signal">＋ Save signal</button></div>`)+
-  `<div class="callout">Updates run when you click Check for updates. There is no scheduled monitoring. Public signals do not establish seller intent.</div><div class="split-layout"><div><section class="panel"><div class="panel-header"><div><h2>Saved signals <span class="count-badge">${signals.length}</span></h2><p>Evidence, dates and your confidence assessment.</p></div></div><div class="panel-body">${signals.length?signalRows(signals):empty('Keep the important changes','Record an ownership announcement, property transaction or operating change with its source.','<button class="button primary" data-action="add-signal">＋ Save signal</button>',true)}</div></section>${aiBusy?'<div class="loading"><span class="spinner"></span>Checking current public sources…</div>':''}${watchResult?`<section class="panel"><div class="panel-header"><h2>Latest check</h2>${(watchResult.data?.signals?.length||watchResult.data?.findings?.length)?'<button class="button primary small" data-action="save-ai-signals">Save reported signals</button>':''}</div><div class="panel-body">${aiResponse(watchResult)}</div></section>`:''}</div><div><section class="panel"><div class="panel-header"><h2>Seller signal breakdown</h2></div><div class="panel-body">${['Strong','Watch','Unknown'].map(s=>{const n=state.targets.filter(t=>(t.sellerSignal||'Unknown')===s).length;return `<div class="coverage-row"><span>${s}</span><span class="coverage-number">${n} target${n===1?'':'s'}</span></div><div class="coverage-bar"><span style="width:${state.targets.length?n/state.targets.length*100:0}%"></span></div>`;}).join('')}<p class="help-text" style="margin-top:17px">Manually recorded assessments. Add the reason and source on the target record.</p></div></section><section class="insight-card"><div class="insight-top"><span class="spark-icon">✦</span> Evidence before outreach</div><h3>A signal is the beginning<br>of a question.</h3><p>Confirm ownership, explain the context and build a thoughtful next action before you approach a business.</p><button class="button secondary" data-nav="targets">Review target universe →</button></section></div></div>`;
+  `<div class="callout">Updates run when you click Check for updates. There is no scheduled monitoring. Public signals do not establish seller intent.</div><div class="split-layout"><div><section class="panel"><div class="panel-header"><div><h2>Saved signals <span class="count-badge">${signals.length}</span></h2><p>Evidence, dates and your confidence assessment.</p></div></div><div class="panel-body">${signals.length?signalRows(signals):empty('Keep the important changes','Record an ownership announcement, property transaction or operating change with its source.','<button class="button primary" data-action="add-signal">＋ Save signal</button>',true)}</div></section>${watchResult?`<section class="panel"><div class="panel-header"><h2>Latest check</h2>${(watchResult.data?.signals?.length||watchResult.data?.findings?.length)?'<button class="button primary small" data-action="save-ai-signals">Save reported signals</button>':''}</div><div class="panel-body">${aiResponse(watchResult)}</div></section>`:''}</div><div><section class="panel"><div class="panel-header"><h2>Seller signal breakdown</h2></div><div class="panel-body">${['Strong','Watch','Unknown'].map(s=>{const n=state.targets.filter(t=>(t.sellerSignal||'Unknown')===s).length;return `<div class="coverage-row"><span>${s}</span><span class="coverage-number">${n} target${n===1?'':'s'}</span></div><div class="coverage-bar"><span style="width:${state.targets.length?n/state.targets.length*100:0}%"></span></div>`;}).join('')}<p class="help-text" style="margin-top:17px">Manually recorded assessments. Add the reason and source on the target record.</p></div></section><section class="insight-card"><div class="insight-top"><span class="spark-icon">✦</span> Evidence before outreach</div><h3>A signal is the beginning<br>of a question.</h3><p>Confirm ownership, explain the context and build a thoughtful next action before you approach a business.</p><button class="button secondary" data-nav="targets">Review target universe →</button></section></div></div>`;
 }
 function renderAnalyst() {
   return heading('A SECOND SET OF EYES','Your acquisition analyst','Review the workspace, challenge assumptions and investigate a focused question.')+
   `<div class="analyst-grid"><button class="analyst-tool" data-analysis="today"><span class="tool-icon">☑</span><h3>Prioritize next moves</h3><p>Review open tasks, stalled records and the next useful action.</p></button><button class="analyst-tool" data-analysis="audit"><span class="tool-icon">◇</span><h3>Audit the workspace</h3><p>Find missing ownership, sources and financial evidence.</p></button><button class="analyst-tool" data-analysis="coverage"><span class="tool-icon">◎</span><h3>Check research coverage</h3><p>See where your universe needs more site and owner research.</p></button></div>
-  <div class="split-layout"><div><section class="panel"><div class="panel-header"><div><h2>Ask a focused question</h2><p>Connected AI can research and analyze the context you provide.</p></div>${badge(ai.connected?'AI connected':'Connection required',ai.connected?'green':'yellow')}</div><div class="panel-body"><form id="analyst-form" class="prompt-form"><div class="form-field" style="margin-bottom:14px"><label for="analyst-target">Context</label><select id="analyst-target" name="targetId"><option value="">Full workspace</option>${state.targets.map(t=>`<option value="${escape(t.id)}">${escape(t.name)}</option>`).join('')}</select></div><textarea name="prompt" required aria-label="Question for acquisition analyst" placeholder="Which ownership facts and operating assumptions should I verify before approaching this company?"></textarea><div class="form-actions"><span class="help-text" style="margin-right:auto">Facts and uncertainty stay distinct.</span><button class="button primary" type="submit" ${aiBusy?'disabled':''}>✦ Ask analyst</button></div></form></div></section>${aiBusy||analysisBusy?'<div class="loading"><span class="spinner"></span>Reviewing your acquisition workspace…</div>':''}${analystResult?`<section class="panel"><div class="panel-header"><h2>${escape(analystResult.title||'Analyst findings')}</h2><button class="button ghost" data-action="export-analysis">Download ↧</button></div><div class="panel-body">${aiResponse(analystResult)}</div></section>`:''}</div><div><section class="panel"><div class="panel-header"><h2>A useful decision process</h2></div><div class="panel-body"><div class="research-fact"><strong>Start with evidence</strong><p>Ownership, legal identity, footprint and source dates form the foundation.</p></div><div class="research-fact"><strong>Stress the assumptions</strong><p>Small changes in fuel margin, operating costs and price can change the return materially.</p></div><div class="research-fact"><strong>Ask the next question</strong><p>Turn every uncertainty into a concrete research or diligence action.</p></div><div class="callout">The three workspace checks work without AI. They assess your saved records; they do not verify public facts.</div></div></section></div></div>`;
+  <div class="split-layout"><div><section class="panel"><div class="panel-header"><div><h2>Ask a focused question</h2><p>Connected AI can research and analyze the context you provide.</p></div>${badge(ai.connected?'AI connected':'Connection required',ai.connected?'green':'yellow')}</div><div class="panel-body"><form id="analyst-form" class="prompt-form"><div class="form-field" style="margin-bottom:14px"><label for="analyst-target">Context</label><select id="analyst-target" name="targetId"><option value="">Full workspace</option>${state.targets.map(t=>`<option value="${escape(t.id)}">${escape(t.name)}</option>`).join('')}</select></div><textarea name="prompt" required aria-label="Question for acquisition analyst" placeholder="Which ownership facts and operating assumptions should I verify before approaching this company?"></textarea><div class="form-actions"><span class="help-text" style="margin-right:auto">Facts and uncertainty stay distinct.</span><button class="button primary" type="submit" ${aiBusy?'disabled':''}>✦ Ask analyst</button></div></form></div></section>${analysisBusy?'<div class="loading"><span class="spinner"></span>Reviewing your acquisition workspace…</div>':''}${analystResult?`<section class="panel"><div class="panel-header"><h2>${escape(analystResult.title||'Analyst findings')}</h2><button class="button ghost" data-action="export-analysis">Download ↧</button></div><div class="panel-body">${aiResponse(analystResult)}</div></section>`:''}</div><div><section class="panel"><div class="panel-header"><h2>A useful decision process</h2></div><div class="panel-body"><div class="research-fact"><strong>Start with evidence</strong><p>Ownership, legal identity, footprint and source dates form the foundation.</p></div><div class="research-fact"><strong>Stress the assumptions</strong><p>Small changes in fuel margin, operating costs and price can change the return materially.</p></div><div class="research-fact"><strong>Ask the next question</strong><p>Turn every uncertainty into a concrete research or diligence action.</p></div><div class="callout">The three workspace checks work without AI. They assess your saved records; they do not verify public facts.</div></div></section></div></div>`;
 }
 function offlineAnalysis(mode) {
   const real=state.targets.filter(t=>!t.sample);const samples=state.targets.length-real.length;
@@ -387,11 +390,69 @@ function confirmImport() {
   if(importedData.documentRecord)state.documents.push(importedData.documentRecord);
   importedData=null;$('#modal').close();commit(`${added} targets added${duplicates?`, ${duplicates} matching records merged`:''}.`);navigate('targets');
 }
+const researchPause = milliseconds => new Promise(resolve=>setTimeout(resolve,milliseconds));
+function aiElapsed() {return `${Math.floor((Date.now()-(aiProgress?.startedAt||Date.now()))/1000)}s elapsed`;}
+function aiProgressMarkup() {
+  if(!aiBusy||!aiProgress)return '';
+  return `<section id="ai-progress" class="callout ai-progress" role="status" aria-live="polite"><span class="spinner" aria-hidden="true"></span><div><strong>Research in progress</strong><p data-ai-message>${escape(aiProgress.message)}</p><small data-ai-elapsed>${aiElapsed()}</small></div></section>`;
+}
+function updateAiProgress(message) {
+  if(!aiProgress)return;
+  aiProgress.message=message;
+  const messageNode=$('[data-ai-message]');if(messageNode)messageNode.textContent=message;
+  const elapsedNode=$('[data-ai-elapsed]');if(elapsedNode)elapsedNode.textContent=aiElapsed();
+}
+async function syncResearchWorkspace() {
+  if(saveConflict)throw new Error('Your workspace changed elsewhere. Export your local edits and reload before starting research.');
+  clearTimeout(saveTimer);
+  const deadline=Date.now()+15000;
+  while(saveInFlight){if(Date.now()>=deadline)throw new Error('Your latest workspace is still saving. Try research again shortly.');await researchPause(50);}
+  if(!savePending&&!lastSaveError&&serverVersion&&state.updatedAt===serverVersion)return;
+  savePending=true;
+  await flushSave();
+  while(saveInFlight||savePending){if(Date.now()>=deadline)throw new Error('Your latest workspace is still saving. Try research again shortly.');await researchPause(50);}
+  if(saveConflict)throw new Error('Your workspace changed elsewhere. Export your local edits and reload before starting research.');
+  if(lastSaveError)throw new Error(`Your latest workspace could not reach the research service. ${lastSaveError.message}`);
+}
 async function runAI(mode,prompt,targetId) {
   if(!ai.connected)throw new Error('AI research is not connected. Connect OpenAI in the hosted app’s environment settings, then check the connection in Workspace settings. Your saved data and underwriting remain available.');
-  return await api('/api/ai',{mode,prompt,targetId});
+  aiBusy=true;aiProgress={startedAt:Date.now(),message:'Starting research. Saving your latest workspace context…'};render();
+  try {
+    await syncResearchWorkspace();
+    updateAiProgress('Starting your research request…');
+    const job=await api('/api/ai/jobs',{mode,prompt,targetId},12000);
+    if(!job.jobId)throw new Error('The research service did not return a job identifier. Please try again.');
+    const deadline=Date.now()+210000;
+    let status=job.status;let transientFailures=0;let reconnecting=false;
+    while(Date.now()<deadline){
+      updateAiProgress(reconnecting?'Reconnecting to the research service. Your research may still be running.':status==='queued'?'Research queued. Waiting for the research service. You can keep using your workspace.':'Waiting for research to finish. You can keep using your workspace.');
+      await researchPause(Math.min(1800,Math.max(0,deadline-Date.now())));
+      const remaining=deadline-Date.now();if(remaining<=0)break;
+      let checked;
+      try {checked=await api(`/api/ai/jobs/${encodeURIComponent(job.jobId)}`,undefined,Math.min(10000,remaining));transientFailures=0;reconnecting=false;}
+      catch(error){
+        if(error.status===404||error.code==='JOB_NOT_FOUND')throw new Error('The research service restarted or this job expired. Run your search again; your saved workspace is preserved.');
+        if((!error.status||error.status>=500)&&++transientFailures<=3){reconnecting=true;continue;}
+        throw error;
+      }
+      if(checked.status==='completed'){
+        if(!checked.result||typeof checked.result!=='object')throw new Error('Research finished without a readable result. Please try again.');
+        return checked.result;
+      }
+      if(checked.status==='failed')throw new Error(checked.error||'The research service could not finish this request. Please try again.');
+      if(!['queued','running'].includes(checked.status))throw new Error('The research service returned an unknown job status. Please try again.');
+      status=checked.status;
+    }
+    throw new Error('Research has taken longer than expected. Run the search again; your saved workspace is preserved.');
+  } finally {
+    aiBusy=false;aiProgress=null;
+    $('#ai-progress')?.remove();
+    for(const button of $$('[data-action="ai-brief"], [data-action="check-updates"], #hunter-form button[type="submit"], #analyst-form button[type="submit"]'))button.disabled=false;
+    const hunterButton=$('#hunter-form button[type="submit"]');if(hunterButton)hunterButton.textContent='✦ Discover targets';
+  }
 }
 async function researchTarget(id) {
+  if(aiBusy)return;
   const t=targetById(id);if(!t)return;$('#modal').close();tab='analyst';location.hash='analyst';updateShell();aiBusy=true;analystResult=null;render();
   try {analystResult={...await runAI('research',`Research ${t.name}. Verify its legal identity, operating footprint, owners and sourced public contact details. Distinguish confirmed facts from gaps. Do not infer willingness to sell.`,id),title:`Research: ${t.name}`};}
   catch(error){analystResult={title:'Research connection',error:error.message};}aiBusy=false;if(tab==='analyst')render();
@@ -400,6 +461,7 @@ function saveBrief() {
   if(!currentBrief)return;if(state.documents.some(d=>d.id===currentBrief.id)){toast('This brief is already saved.');return;}state.documents.push({...currentBrief});commit('Investment brief saved.');render();
 }
 async function handleAction(action,id,button) {
+  if(aiBusy&&['ai-brief','check-updates','research-target'].includes(action))return;
   switch(action){
     case 'settings':showSettings();break;
     case 'close-modal':$('#modal').close();break;
@@ -453,6 +515,7 @@ document.addEventListener('change',event=>{
 });
 document.addEventListener('submit',async event=>{
   const form=event.target;if(!['target-form','task-form','signal-form','site-form','settings-form','hunter-form','analyst-form','brief-form'].includes(form.id))return;event.preventDefault();
+  if(aiBusy&&['hunter-form','analyst-form'].includes(form.id))return;
   const values=Object.fromEntries(new FormData(form));
   try {
     switch(form.id){

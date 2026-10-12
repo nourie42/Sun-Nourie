@@ -12,7 +12,7 @@ class Element {
   setAttribute(key,value){this.attributes.set(key,value);}
   querySelector(){return new Element();}
   querySelectorAll(){return [];}
-  focus(){} blur(){} click(){} showModal(){this.open=true;} close(){this.open=false;}
+  focus(){} blur(){} click(){} remove(){this.removed=true;} showModal(){this.open=true;} close(){this.open=false;}
   closest(){return null;}
 }
 async function workspace(cached, remoteFetch){
@@ -24,10 +24,11 @@ async function workspace(cached, remoteFetch){
     setTimeout(fn,delay){const id=++timerId;timers.set(id,{fn,delay});return id;},clearTimeout:id=>timers.delete(id),requestAnimationFrame:fn=>fn(),scrollTo(){},addEventListener(){},fetch:remoteFetch||(()=>{throw new Error('Network calls are not permitted in this test.');})};
   context.window=context;
   vm.runInNewContext(await readFile(new URL('../src/deal-intelligence/ui/app.js',import.meta.url),'utf8'),context,{timeout:3000});
-  const tick=async()=>{for(let i=0;i<12;i++)await Promise.resolve();};
+  const tick=async()=>{for(let i=0;i<32;i++)await Promise.resolve();};
   await tick();
   const click=async(dataset)=>{const target={dataset,closest(selector){return selector==='[data-nav]'&&dataset.nav||selector==='[data-action]'&&dataset.action||selector==='[data-analysis]'&&dataset.analysis?this:null;}};events.get('click')({target});await tick();};
-  return {nodes,storage,events,timers,tick,click,document};
+  const runTimer=async(delay)=>{const next=[...timers].find(([,timer])=>timer.delay===delay);assert.ok(next,`Expected a pending ${delay}ms timer`);timers.delete(next[0]);next[1].fn();await tick();};
+  return {nodes,storage,events,timers,tick,click,document,runTimer};
 }
 
 test('all nine offline workflows render and underwriting uses the exact IRR engine',async()=>{
@@ -88,4 +89,112 @@ test('live branch preserves cached records across temporary server resets and na
   assert.equal(remote.targets[0].id,'personal-a');
   assert.equal(JSON.parse(app.storage.get('sun-nourie.deal-intelligence.workspace.v1')).updatedAt,remote.updatedAt);
   assert.ok(paths.every(path=>path.startsWith('/api/deal-intelligence/')));
+});
+
+
+function researchService(pollResults) {
+  let remote=initialState();remote.updatedAt='2026-01-01T00:00:00.000Z';let version=0;const requests=[];
+  const fetch=async(path,options={})=>{
+    requests.push({path,method:options.method,body:options.body?JSON.parse(options.body):undefined});
+    if(path==='/api/deal-intelligence/finance')return Response.json({defaults:finance.defaultInputs,fields:finance.inputFields});
+    if(path==='/api/deal-intelligence/state'){
+      if(options.method==='POST'){
+        const saved=JSON.parse(options.body);assert.equal(saved.expectedUpdatedAt,remote.updatedAt);
+        remote={...saved.state,updatedAt:`2026-01-01T00:00:00.${String(++version).padStart(3,'0')}Z`};
+      }
+      return Response.json({state:remote,ai:{connected:true,model:'research'},storage:'browser'});
+    }
+    if(path==='/api/deal-intelligence/ai/jobs'){
+      assert.equal(options.method,'POST');
+      return Response.json({jobId:'job-1',status:'queued'},{status:202});
+    }
+    assert.equal(path,'/api/deal-intelligence/ai/jobs/job-1');
+    assert.equal(options.method,'GET');
+    const result=pollResults.shift();assert.ok(result,'Unexpected extra poll');
+    return result instanceof Response?result:Response.json({jobId:'job-1',...result});
+  };
+  return {fetch,requests,getRemote:()=>remote};
+}
+
+const researchForm=(id='hunter-form')=>({id,dataset:{},values:{prompt:'Verify ownership and cite public sources.',targetId:''}});
+
+test('research uses short background-job requests, shows progress and finishes after polling without duplicate starts',async()=>{
+  const service=researchService([{status:'running'},{status:'completed',result:{text:'Verified operating footprint from public evidence.',sources:[{url:'https://example.com/company',title:'Company website'}],data:{targets:[]}}}]);
+  const app=await workspace(undefined,service.fetch);await app.click({nav:'hunter'});
+  const submission=app.events.get('submit')({target:researchForm(),preventDefault(){}});
+  await app.tick();
+  assert.match(app.nodes.get('#main').innerHTML,/Research in progress/);
+  assert.match(app.nodes.get('#main').innerHTML,/role="status" aria-live="polite"/);
+  assert.match(app.nodes.get('[data-ai-message]').textContent,/Research queued/);
+  assert.match(app.nodes.get('[data-ai-elapsed]').textContent,/\d+s elapsed/);
+  assert.equal(service.requests.filter(r=>r.path.endsWith('/ai/jobs')).length,1);
+  assert.equal(service.requests.some(r=>r.path.endsWith('/state')&&r.method==='POST'),false,'An unchanged workspace does not need another save');
+  await app.events.get('submit')({target:researchForm(),preventDefault(){}});
+  assert.equal(service.requests.filter(r=>r.path.endsWith('/ai/jobs')).length,1);
+  await app.click({nav:'targets'});
+  assert.match(app.nodes.get('#main').innerHTML,/Targets & owners/);
+  assert.match(app.nodes.get('#main').innerHTML,/Research in progress/);
+  await app.runTimer(1800);
+  assert.match(app.nodes.get('[data-ai-message]').textContent,/Waiting for research/);
+  await app.runTimer(1800);await submission;await app.click({nav:'hunter'});
+  assert.match(app.nodes.get('#main').innerHTML,/Research results/);
+  assert.match(app.nodes.get('#main').innerHTML,/Verified operating footprint/);
+  assert.match(app.nodes.get('#main').innerHTML,/https:\/\/example.com\/company/);
+  assert.doesNotMatch(app.nodes.get('#main').innerHTML,/Research in progress/);
+  assert.equal(service.getRemote().targets.length,initialState().targets.length,'Research never adds records automatically');
+  assert.ok(service.requests.every(r=>!r.path.endsWith('/ai')),'Research does not use the long synchronous endpoint');
+  assert.equal([...app.timers.values()].some(timer=>timer.delay===1800),false);
+});
+
+test('a failed research job reports the server error and releases the research controls',async()=>{
+  const service=researchService([{status:'failed',code:'AI_TIMEOUT',httpStatus:504,error:'Public-source research exceeded its time budget. Please narrow the search.'}]);
+  const app=await workspace(undefined,service.fetch);await app.click({nav:'hunter'});
+  const submission=app.events.get('submit')({target:researchForm(),preventDefault(){}});await app.tick();
+  await app.runTimer(1800);await submission;
+  const html=app.nodes.get('#main').innerHTML;
+  assert.match(html,/Public-source research exceeded its time budget/);
+  assert.doesNotMatch(html,/Research in progress/);
+  assert.doesNotMatch(html,/type="submit" disabled/);
+  assert.equal(service.requests.filter(r=>r.path.endsWith('/jobs/job-1')).length,1);
+});
+
+test('an expired research job explains restart recovery without changing workspace records',async()=>{
+  const service=researchService([Response.json({code:'JOB_NOT_FOUND',error:'Job expired'},{status:404})]);
+  const app=await workspace(undefined,service.fetch);await app.click({nav:'hunter'});
+  const submission=app.events.get('submit')({target:researchForm(),preventDefault(){}});await app.tick();
+  await app.runTimer(1800);await submission;
+  assert.match(app.nodes.get('#main').innerHTML,/service restarted or this job expired/);
+  assert.match(app.nodes.get('#main').innerHTML,/saved workspace is preserved/);
+  assert.doesNotMatch(app.nodes.get('#main').innerHTML,/Research in progress/);
+  assert.equal(service.getRemote().targets.length,initialState().targets.length);
+  assert.equal(service.requests.filter(r=>r.path.endsWith('/jobs/job-1')).length,1);
+});
+
+
+test('a temporary polling connection failure retries the same research job without creating another request',async()=>{
+  const service=researchService([Response.json({error:'Temporary gateway error'},{status:503}),{status:'completed',result:{text:'Research recovered with public sources.',sources:[]}}]);
+  const app=await workspace(undefined,service.fetch);await app.click({nav:'hunter'});
+  const submission=app.events.get('submit')({target:researchForm(),preventDefault(){}});await app.tick();
+  await app.runTimer(1800);
+  assert.match(app.nodes.get('[data-ai-message]').textContent,/Reconnecting to the research service/);
+  await app.runTimer(1800);await submission;
+  assert.match(app.nodes.get('#main').innerHTML,/Research recovered/);
+  assert.equal(service.requests.filter(r=>r.path.endsWith('/ai/jobs')).length,1);
+  assert.equal(service.requests.filter(r=>r.path.endsWith('/jobs/job-1')).length,2);
+});
+
+
+test('queued local edits are synchronized before a context-based research job starts',async()=>{
+  const service=researchService([{status:'completed',result:{text:'Research with the latest target context.',sources:[]}}]);
+  const app=await workspace(undefined,service.fetch);
+  const form={id:'target-form',dataset:{},values:{name:'New personal target',legalName:'',type:'Fuel marketer',states:'NC',siteCount:'',stage:'Research',ownerName:'',ownerTitle:'',contactEmail:'',contactPhone:'',score:'',confidence:'Low',sellerSignal:'Unknown',sellerSignalReason:'',nextAction:'',dueDate:'',sourceUrls:'',notes:''}};
+  await app.events.get('submit')({target:form,preventDefault(){}});
+  await app.click({nav:'analyst'});
+  const submission=app.events.get('submit')({target:researchForm('analyst-form'),preventDefault(){}});await app.tick();
+  const saveIndex=service.requests.findIndex(r=>r.path.endsWith('/state')&&r.method==='POST');
+  const jobIndex=service.requests.findIndex(r=>r.path.endsWith('/ai/jobs'));
+  assert.ok(saveIndex>=0&&saveIndex<jobIndex);
+  assert.equal(service.getRemote().targets.at(-1).name,'New personal target');
+  await app.runTimer(1800);await submission;
+  assert.match(app.nodes.get('#main').innerHTML,/latest target context/);
 });

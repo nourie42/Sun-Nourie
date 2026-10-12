@@ -79,7 +79,7 @@ function validateState(state) {
   return state;
 }
 
-async function readBody(request) {
+export async function readBody(request) {
   const length = Number(request.headers.get('content-length'));
   if (Number.isFinite(length) && length > MAX_BODY) throw new ApiError(413, 'BODY_TOO_LARGE', 'The request exceeds the 2 MB workspace limit.');
   const type = request.headers.get('content-type') || '';
@@ -342,13 +342,19 @@ async function runAi(env, state, body) {
     ...(research ? { tools: [{ type: 'web_search' }], tool_choice: 'required', include: ['web_search_call.action.sources'] } : {}),
   };
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 45000);
+  const configuredTimeout = Number(env.OPENAI_REQUEST_TIMEOUT_MS);
+  const timeoutMs = Number.isFinite(configuredTimeout) && configuredTimeout > 0
+    ? Math.min(180000, Math.max(1000, configuredTimeout)) : 45000;
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   let response;
   try {
     response = await (env.fetchImpl || globalThis.fetch)('https://api.openai.com/v1/responses', { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${env.OPENAI_API_KEY}` }, body: JSON.stringify(payload), signal: controller.signal });
     let result;
     try { result = await response.json(); }
-    catch { throw new ApiError(502, 'AI_RESPONSE_INVALID', 'OpenAI returned a response that could not be read. Try again.'); }
+    catch (error) {
+      if (controller.signal.aborted) throw error;
+      throw new ApiError(502, 'AI_RESPONSE_INVALID', 'OpenAI returned a response that could not be read. Try again.');
+    }
     if (!response.ok) throw upstreamError(response.status, result);
     if (result.status === 'incomplete') throw new ApiError(502, 'AI_INCOMPLETE', 'The research response was incomplete. Narrow the question and try again.');
     const outputText = result.output_text || (result.output || []).flatMap(output => output.content || []).filter(part => part.type === 'output_text').map(part => part.text).join('\n');
@@ -396,7 +402,7 @@ async function runAi(env, state, body) {
     };
   } catch (error) {
     if (error instanceof ApiError) throw error;
-    if (error.name === 'AbortError') throw new ApiError(504, 'AI_TIMEOUT', 'Research exceeded the 45-second limit. Narrow the question and try again.');
+    if (controller.signal.aborted || error.name === 'AbortError') throw new ApiError(504, 'AI_TIMEOUT', `Research exceeded the ${Math.ceil(timeoutMs / 1000)}-second limit. Narrow the question and try again.`);
     throw new ApiError(502, 'AI_NETWORK', 'The server could not reach OpenAI. Check outbound network access and try again.');
   } finally { clearTimeout(timeout); }
 }

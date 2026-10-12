@@ -3,11 +3,15 @@ import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
-import { handleApi } from './deal-intelligence/api.mjs';
+import { randomUUID } from 'node:crypto';
+import { handleApi, readBody } from './deal-intelligence/api.mjs';
 
 const PAGE = '/deal-intelligence/';
 const API = '/api/deal-intelligence';
 const OWNER = 'sun-nourie-owner';
+const JOB_TTL = 15 * 60 * 1000;
+const MAX_JOBS = 100;
+const MAX_ACTIVE_JOBS = 2;
 const pageFile = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'deal-intelligence', 'index.html');
 const CSP = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'";
 
@@ -93,7 +97,7 @@ function webRequest(req) {
 }
 
 /** Shares the weather site's existing verified session; it creates no new login. */
-export function registerDealIntelligenceRoutes(app, { env = process.env, store, fetchImpl = globalThis.fetch } = {}) {
+export function registerDealIntelligenceRoutes(app, { env = process.env, store, fetchImpl = globalThis.fetch, logger = console } = {}) {
   const configured = env.DEAL_INTELLIGENCE_DATA_DIR || env.DATA_DIR;
   const directory = configured ? join(resolve(configured), 'deal-intelligence') : join(tmpdir(), 'deal-intelligence');
   const storage = configured ? env.DEAL_INTELLIGENCE_STORAGE_DURABLE === 'true' ? 'durable' : 'server' : 'browser';
@@ -105,8 +109,64 @@ export function registerDealIntelligenceRoutes(app, { env = process.env, store, 
     OPENAI_API_KEY: env.OPENAI_API_KEY,
     OPENAI_MODEL: env.OPENAI_MODEL || 'gpt-5-mini',
     OPENAI_RESEARCH_MODEL: env.OPENAI_RESEARCH_MODEL || 'gpt-5.5',
+    OPENAI_REQUEST_TIMEOUT_MS: env.OPENAI_REQUEST_TIMEOUT_MS,
     fetchImpl,
   };
+  const configuredResearchTimeout = Number(env.OPENAI_REQUEST_TIMEOUT_MS);
+  const researchEnv = {
+    ...apiEnv,
+    OPENAI_REQUEST_TIMEOUT_MS: Number.isFinite(configuredResearchTimeout) && configuredResearchTimeout > 0 ? configuredResearchTimeout : 180000,
+  };
+  const jobs = new Map();
+  const active = job => job.status === 'queued' || job.status === 'running';
+  function pruneJobs(makeRoom = false) {
+    const expiredBefore = Date.now() - JOB_TTL;
+    for (const [id, job] of jobs) if (!active(job) && job.finishedAt <= expiredBefore) jobs.delete(id);
+    if (makeRoom) for (const [id, job] of jobs) {
+      if (jobs.size < MAX_JOBS) break;
+      if (!active(job)) jobs.delete(id);
+    }
+  }
+  function publicJob(job) {
+    const { jobId, status, createdAt, updatedAt, result, error, code, httpStatus } = job;
+    return { jobId, status, createdAt, updatedAt, ...(result ? { result } : {}), ...(error ? { error, code, httpStatus } : {}) };
+  }
+  function researchBusy(res) {
+    res.setHeader('Retry-After', '5');
+    return res.status(429).json({ error: 'Two research requests are already running. Wait for one to finish before starting another.', code: 'AI_BUSY' });
+  }
+  async function completeResearch(job, request) {
+    job.status = 'running';
+    job.startedAt = Date.now();
+    job.updatedAt = new Date().toISOString();
+    try {
+      const response = await handleApi(request, researchEnv);
+      const payload = await response.json();
+      if (response.ok) {
+        job.result = payload;
+        job.status = 'completed';
+      } else {
+        job.error = payload.error || 'The research request could not be completed.';
+        job.code = payload.code || 'AI_ERROR';
+        job.httpStatus = response.status;
+        job.status = 'failed';
+      }
+    } catch {
+      job.error = 'The research request could not be completed. Try again.';
+      job.code = 'INTERNAL_ERROR';
+      job.httpStatus = 500;
+      job.status = 'failed';
+    } finally {
+      job.finishedAt = Date.now();
+      job.updatedAt = new Date(job.finishedAt).toISOString();
+      try {
+        logger?.info?.('Deal Intelligence research job finished.', {
+          mode: job.mode, status: job.status, code: job.code || 'OK',
+          durationMs: job.finishedAt - job.startedAt,
+        });
+      } catch {}
+    }
+  }
 
   const signedInPage = handler => async (req, res) => {
     privateHeaders(res);
@@ -138,10 +198,51 @@ export function registerDealIntelligenceRoutes(app, { env = process.env, store, 
     try { request = webRequest(req); }
     catch { return res.status(400).json({ error: 'Invalid workspace request.', code: 'INVALID_REQUEST' }); }
     try {
+      const url = new URL(request.url);
+      if (url.pathname === '/api/ai/jobs') {
+        if (request.method !== 'POST') {
+          res.setHeader('Allow', 'POST');
+          return res.status(405).json({ error: 'This HTTP method is not allowed.', code: 'METHOD_NOT_ALLOWED' });
+        }
+        const origin = request.headers.get('origin');
+        if (request.headers.get('sec-fetch-site') === 'cross-site' || origin && origin !== url.origin) return res.status(403).json({ error: 'Requests must come from this workspace.', code: 'ORIGIN_REJECTED' });
+        pruneJobs(true);
+        if ([...jobs.values()].filter(active).length >= MAX_ACTIVE_JOBS) return researchBusy(res);
+        // Fully consume the incoming stream before returning 202. Research uses
+        // this buffered request independently of the browser's connection.
+        let body;
+        try { body = await readBody(request); }
+        catch (error) {
+          const known = Number.isInteger(error.status) && error.status >= 400 && error.status < 500;
+          return res.status(known ? error.status : 400).json({ error: known ? error.message : 'The request must contain valid JSON.', code: known ? error.code : 'INVALID_JSON' });
+        }
+        // Concurrent request streams may finish together; enforce the limit
+        // again after buffering, with no await before reserving the job slot.
+        pruneJobs(true);
+        if ([...jobs.values()].filter(active).length >= MAX_ACTIVE_JOBS) return researchBusy(res);
+        const bufferedRequest = new Request(new URL('/api/ai', url), { method: 'POST', headers: request.headers, body: JSON.stringify(body) });
+        const mode = ['discover', 'research', 'analyst', 'brief', 'monitor'].includes(body.mode) ? body.mode : 'invalid';
+        const job = { jobId: randomUUID(), owner: OWNER, mode, status: 'queued', createdAt: new Date().toISOString() };
+        job.updatedAt = job.createdAt;
+        jobs.set(job.jobId, job);
+        const accepted = res.status(202).json(publicJob(job));
+        queueMicrotask(() => { void completeResearch(job, bufferedRequest); });
+        return accepted;
+      }
+      if (url.pathname.startsWith('/api/ai/jobs/')) {
+        if (request.method !== 'GET') {
+          res.setHeader('Allow', 'GET');
+          return res.status(405).json({ error: 'This HTTP method is not allowed.', code: 'METHOD_NOT_ALLOWED' });
+        }
+        pruneJobs();
+        const job = jobs.get(url.pathname.slice('/api/ai/jobs/'.length));
+        if (!job || job.owner !== OWNER) return res.status(404).json({ error: 'This research job expired or the service restarted. Run it again; your saved workspace is preserved.', code: 'JOB_NOT_FOUND' });
+        return res.json(publicJob(job));
+      }
       const response = await handleApi(request, apiEnv);
       let payload = await response.json();
       if (payload?.state) payload = { ...payload, storage, ...(warning ? { storageWarning: warning } : {}) };
-      if (new URL(request.url).pathname === '/api/health' && response.ok) payload = { ...payload, storage, ...(warning ? { storageWarning: warning } : {}) };
+      if (new URL(request.url).pathname === '/api/health' && response.ok) payload = { ...payload, storage, aiJobs: true, researchFlow: 'background-v1', ...(warning ? { storageWarning: warning } : {}) };
       for (const [name, value] of response.headers) {
         if (name !== 'cache-control' && name !== 'content-length' && name !== 'content-type') res.setHeader(name, value);
       }

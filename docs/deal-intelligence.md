@@ -16,11 +16,15 @@ node scripts/buildDealIntelligence.mjs
 
 The generated `public/deal-intelligence/index.html` contains all required frontend assets. The route adapter is `src/dealIntelligenceRoutes.js`; the existing access middleware gates its page and API before requests can reach legacy handlers.
 
+AI research starts a private background job through `POST /api/deal-intelligence/ai/jobs`. The browser polls its status through short requests and displays elapsed time while the rest of the workspace remains usable. Background requests have a three-minute upstream budget. Jobs live in the current server process and expire after fifteen minutes; a service restart requires starting the research again, while saved workspace records remain in the browser. The direct AI endpoint remains available with its original 45-second budget.
+
 Relevant checks:
 
 ```sh
 node test/deal-intelligence-routes.test.mjs
 node test/deal-intelligence-ui.test.mjs
 ```
+
+The Deal Intelligence live verification workflow signs in with the existing `WEATHER_SITE_PASSWORD` repository secret, waits for the background-job deployment, opens the page in Chromium, and exercises an actual sourced research request. It does not import results or change workspace records, and it logs only status and timing.
 
 Watchtower performs checks on demand. No unattended monitoring schedule is activated by this change.
