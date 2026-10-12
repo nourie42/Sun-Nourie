@@ -45,42 +45,14 @@
   </style>
 
 
-  <style id="uniform-tiles">
-    /* All tiles: same glass color, same spacing - v3 */
-    main section, .shell section,
-    main .glass, .shell .glass, section.glass,
-    #wn-compare-section, #dewpoint-gross-meter, #car-wash-forecast {
-      background: linear-gradient(145deg, rgba(30, 58, 95, 0.88), rgba(20, 40, 70, 0.88)) !important;
-      backdrop-filter: blur(20px) saturate(150%) !important;
-      -webkit-backdrop-filter: blur(20px) saturate(150%) !important;
-      border: 1px solid rgba(255, 255, 255, 0.18) !important;
-      border-radius: 24px !important;
-      margin-top: 0 !important;
+
+  <style id="tile-spacing">
+    /* Consistent spacing between tiles only - don't touch anything else */
+    main > section.glass {
       margin-bottom: 16px !important;
-      padding: 20px !important;
     }
-    /* Hero keeps its own style (not a tile) */
-    section.hero {
-      background: transparent !important;
-      border: none !important;
-      backdrop-filter: none !important;
-      -webkit-backdrop-filter: none !important;
-      padding: 12px 0 30px !important;
-    }
-    /* AQI tile keeps its dynamic color (exception) */
-    .glass.aqi-dynamic {
-      background: var(--aqi-bg) !important;
-    }
-    /* Inner cards (hourly, daily carousel) keep their own style but match fonts */
-    .hour, .day-card, .daily-carousel-card {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
-    }
-    .day-card strong, .daily-carousel-card strong {
-      font-size: 18px !important;
-      font-weight: 500 !important;
-    }
-    .day-card span, .daily-carousel-card span {
-      font-size: 11px !important;
+    main > section.glass:last-child {
+      margin-bottom: 0 !important;
     }
   </style>
 
