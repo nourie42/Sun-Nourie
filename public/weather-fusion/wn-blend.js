@@ -12,8 +12,6 @@ const VARIABLES = {
   wind:     { label: 'Wind',          unit: 'mph', fmt: (v) => `${Math.round(v)}` },
   dewpoint: { label: 'Dewpoint',      unit: '°F',  fmt: (v) => `${Math.round(v)}°` },
   humidity: { label: 'Humidity',      unit: '%',   fmt: (v) => `${Math.round(v)}%` },
-  uv:       { label: 'UV Index',      unit: '',    fmt: (v) => `${Math.round(v)}` },
-  aqi:      { label: 'AQI',           unit: '',    fmt: (v) => `${Math.round(v)}` },
 };
 let curVar = 'temp';
 
@@ -147,7 +145,7 @@ function buildSeries(fx, wn, varId) {
 
 function renderChart(container, built, varDef) {
   const { days } = built;
-  const H = 300, W = 900, PL = 56, PR = 16, PT = 30, PB = 36;
+  const H = 360, W = 1100, PL = 60, PR = 18, PT = 32, PB = 40;
   const series = { newBlend: [], oldBlend: [], nws: [], hrrr: [], nbm: [], ecmwf: [], wn: [], single: [] };
 
   if (built.perModel) {
@@ -188,7 +186,7 @@ function renderChart(container, built, varDef) {
     return `<text x="${X(i).toFixed(0)}" y="${H - 10}" text-anchor="middle" font-size="13" fill="#aebdd4">${name}</text>`;
   }).join('');
   const ylabels = [lo, (lo + hi) / 2, hi].map((v) =>
-    `<text x="8" y="${(Y(v) + 5).toFixed(0)}" font-size="12" fill="#aebdd4">${varDef.fmt(v)}</text>`).join('');
+    `<text x="8" y="${(Y(v) + 5).toFixed(0)}" font-size="14" fill="#aebdd4">${varDef.fmt(v)}</text>`).join('');
 
   let order;
   if (built.perModel) {
@@ -213,7 +211,7 @@ function renderChart(container, built, varDef) {
   const primary = built.perModel ? series.newBlend : series.single;
   const dots = primary.map((v, i) => v == null ? '' :
     `<circle cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="4" fill="${built.perModel ? COLORS.newBlend : COLORS.single}"/>`
-    + `<text x="${X(i).toFixed(0)}" y="${(Y(v) - 12).toFixed(0)}" text-anchor="middle" font-size="12" fill="#ffffff" font-weight="700">${varDef.fmt(v)}</text>`
+    + `<text x="${X(i).toFixed(0)}" y="${(Y(v) - 12).toFixed(0)}" text-anchor="middle" font-size="14" fill="#ffffff" font-weight="700">${varDef.fmt(v)}</text>`
   ).join('');
 
   let legend;
@@ -279,7 +277,7 @@ async function init() {
         `<button data-var="${id}" aria-pressed="${id === curVar}" style="background:${id === curVar ? 'rgba(127,212,255,.22)' : 'rgba(255,255,255,.07)'};border:1px solid rgba(255,255,255,.16);color:#fff;border-radius:999px;padding:9px 16px;font-size:14px;font-weight:600;cursor:pointer">${v.label}</button>`).join('')}
     </div>
     <p style="font-size:13px;color:#9fb0c8;margin:0 0 10px">NWS 36% · HRRR 27% · NBM 18% · ECMWF 9% · WN 10%</p>
-    <div id="wn-compare-chart"><p class="muted" style="font-size:14px">Loading comparison…</p></div>`;
+    <div id="wn-compare-chart" style="overflow-x:auto"><p class="muted" style="font-size:14px">Loading comparison…</p></div>`;
   hero.after(section);
 
   // Toggle like Car Wash
