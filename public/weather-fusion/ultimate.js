@@ -108,6 +108,7 @@ function renderHero() {
 }
 
 function renderOverview() {
+  const hrs = (forecast.hours || []).slice(0, 12);
   // Hourly description
   const hr0 = hrs[0];
   if (hr0) {
@@ -116,8 +117,6 @@ function renderOverview() {
       ? `Clear conditions expected over the next 12 hours.`
       : `Rain likely — up to ${Math.round(maxPop)}% chance in the next 12 hours.`;
   }
-  // Hourly strip — rich
-  const hrs = (forecast.hours || []).slice(0, 12);
   const nowH = new Date().getHours();
   el('hourly-strip').innerHTML = hrs.map((h) => {
     const t = new Date(h.time);
