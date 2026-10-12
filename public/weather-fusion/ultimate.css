@@ -22,7 +22,7 @@ body{min-height:100vh;color:var(--ink);background:#070d1a;-webkit-font-smoothing
   radial-gradient(120% 90% at 50% 0%,transparent 40%,rgba(5,10,22,.35) 100%),
   linear-gradient(180deg,rgba(5,10,22,.42) 0%,rgba(5,10,22,.18) 30%,rgba(5,10,22,.62) 72%,rgba(4,8,18,.94) 100%)}
 
-.wrap{position:relative;z-index:1;max-width:1120px;margin:0 auto;padding:0 20px 60px}
+.wrap{position:relative;z-index:1;max-width:1120px;margin:0 auto;padding:0 16px 48px}
 
 /* Topbar */
 .topbar{display:flex;align-items:center;justify-content:space-between;padding:26px 0 18px}
@@ -55,11 +55,11 @@ body{min-height:100vh;color:var(--ink);background:#070d1a;-webkit-font-smoothing
     0 16px 48px rgba(2,8,20,.35)}
 
 /* HERO — cinematic */
-.hero{padding:44px 36px 32px;text-align:center;margin-bottom:18px;position:relative;overflow:hidden}
+.hero{padding:36px 24px 28px;text-align:center;margin-bottom:16px;position:relative;overflow:hidden;width:100%}
 .hero::before{content:'';position:absolute;inset:0;
   background:radial-gradient(60% 50% at 50% 0%,rgba(127,212,255,.12),transparent 70%);
   pointer-events:none}
-.hero-temp{font-size:clamp(96px,18vw,160px);font-weight:100;letter-spacing:-.06em;line-height:1;
+.hero-temp{font-size:clamp(110px,28vw,180px);font-weight:100;letter-spacing:-.06em;line-height:.95;
   background:linear-gradient(165deg,#ffffff 20%,#c8e6ff 55%,#7fd4ff 80%,#b48cff);
   -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
   filter:drop-shadow(0 8px 40px rgba(127,212,255,.25));margin:8px 0 4px}
@@ -88,7 +88,7 @@ body{min-height:100vh;color:var(--ink);background:#070d1a;-webkit-font-smoothing
 @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 
 /* Cards */
-.card{padding:26px 28px}
+.card{padding:22px 20px}
 .card h2{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-dim);
   margin:0 0 18px;font-weight:800;display:flex;align-items:center;gap:10px}
 .card h2::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,rgba(255,255,255,.12),transparent)}
@@ -101,7 +101,7 @@ body{min-height:100vh;color:var(--ink);background:#070d1a;-webkit-font-smoothing
 /* Hourly — beautiful strip */
 .hourly-strip{display:flex;gap:6px;overflow-x:auto;padding:8px 2px 12px;scrollbar-width:thin;
   scrollbar-color:rgba(255,255,255,.2) transparent}
-.hour{min-width:72px;text-align:center;flex-shrink:0;border-radius:18px;padding:12px 8px;
+.hour{min-width:76px;text-align:center;flex-shrink:0;border-radius:18px;padding:14px 10px;
   background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);transition:.2s}
 .hour:hover{background:rgba(255,255,255,.09);transform:translateY(-2px)}
 .hour.now{background:linear-gradient(135deg,rgba(127,212,255,.22),rgba(180,140,255,.14));
@@ -113,7 +113,7 @@ body{min-height:100vh;color:var(--ink);background:#070d1a;-webkit-font-smoothing
 .hour .wd{font-size:9px;color:var(--ink-faint);margin-top:2px}
 
 /* Day cards — rich */
-.day-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(136px,1fr));gap:12px}
+.day-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
 .day-card{background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.09);
   border-radius:20px;padding:16px 14px;text-align:center;transition:.22s;position:relative;overflow:hidden}
 .day-card:hover{transform:translateY(-3px);background:rgba(255,255,255,.08);
@@ -202,8 +202,13 @@ body{min-height:100vh;color:var(--ink);background:#070d1a;-webkit-font-smoothing
 .foot{margin-top:32px;font-size:12px;color:var(--ink-faint);line-height:1.8;text-align:center}
 .foot a{color:var(--accent);text-decoration:none}
 @media(max-width:640px){
-  .hero{padding:32px 22px 26px}
-  .card{padding:20px 18px}
+  .hero{padding:28px 18px 24px}
+  .card{padding:18px 16px}
   .tab-bar{top:8px}
-  .day-cards{grid-template-columns:repeat(auto-fill,minmax(110px,1fr))}
+  .tab-bar button{padding:11px 4px;font-size:12px}
+  .day-cards{grid-template-columns:repeat(2,1fr);gap:10px}
+  .metric-grid{grid-template-columns:repeat(2,1fr);gap:10px}
+  .wrap{padding:0 12px 40px}
+  .topbar{padding:18px 0 12px}
+  .hero-temp{font-size:clamp(100px,26vw,140px)}
 }

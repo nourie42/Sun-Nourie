@@ -186,9 +186,8 @@ function renderOverview() {
     ['💨 Wind', `${Math.round(c.wind || 0)}<small> mph</small>`, c.gust ? `Gusts ${Math.round(c.gust)}` : (c.windDirection ? windArrow(c.windDirection) : ''), ''],
     ['💧 Humidity', `${Math.round(c.humidity || 0)}<small>%</small>`, `Dew ${Math.round(c.dewpoint || 0)}°`, ''],
     ['🌡 Feels like', `${Math.round(c.feelsLike || c.apparent || c.temperature)}<small>°</small>`, `Air ${Math.round(c.temperature)}°`, ''],
-    ['📊 Pressure', `${c.pressure ? c.pressure.toFixed(2) : '—'}<small> in</small>`, c.pressureTrend?.direction || '', ''],
     ['👁 Visibility', `${c.visibility ? Math.round(c.visibility) : '—'}<small> mi</small>`, '', ''],
-    ['☀ UV index', `${forecast.uv?.index ?? '—'}`, forecast.uv?.label || '', ''],
+    ['☀ UV index', `${forecast.uv?.today != null ? Math.round(forecast.uv.today) : '—'}`, forecast.uv?.today >= 6 ? 'High' : forecast.uv?.today >= 3 ? 'Moderate' : 'Low', ''],
     ['🌅 Sunrise', forecast.solar?.sunrise ? new Date(forecast.solar.sunrise).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '—', '', ''],
     ['🌇 Sunset', forecast.solar?.sunset ? new Date(forecast.solar.sunset).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '—', '', ''],
   ];
