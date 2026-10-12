@@ -46,22 +46,31 @@
 
 
   <style id="uniform-tiles">
-    /* All tiles: same glass color, same spacing */
-    .glass {
-      background: linear-gradient(145deg, rgba(30, 58, 95, 0.85), rgba(20, 40, 70, 0.85)) !important;
-      backdrop-filter: blur(20px) saturate(150%);
-      -webkit-backdrop-filter: blur(20px) saturate(150%);
+    /* All tiles: same glass color, same spacing - v2 */
+    main .glass, .shell .glass, section.glass {
+      background: linear-gradient(145deg, rgba(30, 58, 95, 0.88), rgba(20, 40, 70, 0.88)) !important;
+      backdrop-filter: blur(20px) saturate(150%) !important;
+      -webkit-backdrop-filter: blur(20px) saturate(150%) !important;
       border: 1px solid rgba(255, 255, 255, 0.18) !important;
       border-radius: 24px !important;
+      margin-top: 0 !important;
       margin-bottom: 16px !important;
+      padding: 20px !important;
     }
     /* AQI tile keeps its dynamic color (exception) */
     .glass.aqi-dynamic {
       background: var(--aqi-bg) !important;
     }
-    /* Remove extra margins that cause uneven spacing */
-    .glass + .glass {
-      margin-top: 0 !important;
+    /* Inner cards (hourly, daily carousel) keep their own style but match fonts */
+    .hour, .day-card, .daily-carousel-card {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+    }
+    .day-card strong, .daily-carousel-card strong {
+      font-size: 18px !important;
+      font-weight: 500 !important;
+    }
+    .day-card span, .daily-carousel-card span {
+      font-size: 11px !important;
     }
   </style>
 
@@ -101,12 +110,13 @@
         <span class="jump-label">Your Day</span>
       </a>
       <a class="weather-jump-card jump-week" href="#daily-panel" aria-label="10-Day Forecast">
-        <span class="jump-label">10-Day</span>
+        <span class="jump-label">7-Day</span>
       </a>
       <a class="weather-jump-card jump-air" href="#air-quality" aria-label="Air Quality">
         <span class="jump-label">AQI</span>
       </a>
       <button class="weather-jump-card jump-car-wash" id="open-car-wash" type="button" aria-expanded="false" aria-controls="car-wash-forecast">Car Wash</button>
+      <button class="weather-jump-card jump-compare" id="open-compare" type="button" aria-expanded="false" aria-controls="wn-compare-section">Compare</button>
     </nav>
     <div class="experimental-page-banner" role="status" hidden>EXPERIMENTAL</div>
     <main id="forecast">

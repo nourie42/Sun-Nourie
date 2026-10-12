@@ -263,6 +263,7 @@ async function init() {
 
   const section = document.createElement('section');
   section.id = 'wn-compare-section';
+  section.hidden = true;
   section.className = 'glass wn-blend-compare';
   section.style.padding = '18px';
   section.style.overflow = 'hidden';
@@ -278,6 +279,17 @@ async function init() {
     <p style="font-size:13px;color:#9fb0c8;margin:0 0 10px">NWS 36% · HRRR 27% · NBM 18% · ECMWF 9% · WN 10%</p>
     <div id="wn-compare-chart"><p class="muted" style="font-size:14px">Loading comparison…</p></div>`;
   hero.after(section);
+
+  // Toggle like Car Wash
+  const compareBtn = document.getElementById('open-compare');
+  if (compareBtn) {
+    compareBtn.onclick = () => {
+      const isHidden = section.hidden;
+      section.hidden = !isHidden;
+      compareBtn.setAttribute('aria-expanded', String(isHidden));
+      if (isHidden) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+  }
 
   document.getElementById('wn-var-picker').onclick = (e) => {
     const b = e.target.closest('button');
