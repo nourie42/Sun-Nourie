@@ -44,6 +44,27 @@
     @media(prefers-reduced-motion:reduce){.exp-sky-layer{transition:none}}
   </style>
 
+
+  <style id="uniform-tiles">
+    /* All tiles: same glass color, same spacing */
+    .glass {
+      background: linear-gradient(145deg, rgba(30, 58, 95, 0.85), rgba(20, 40, 70, 0.85)) !important;
+      backdrop-filter: blur(20px) saturate(150%);
+      -webkit-backdrop-filter: blur(20px) saturate(150%);
+      border: 1px solid rgba(255, 255, 255, 0.18) !important;
+      border-radius: 24px !important;
+      margin-bottom: 16px !important;
+    }
+    /* AQI tile keeps its dynamic color (exception) */
+    .glass.aqi-dynamic {
+      background: var(--aqi-bg) !important;
+    }
+    /* Remove extra margins that cause uneven spacing */
+    .glass + .glass {
+      margin-top: 0 !important;
+    }
+  </style>
+
 </head>
 <body data-sky="day">
   <a class="skip-link" href="#forecast">Skip to forecast</a>
