@@ -56,3 +56,10 @@ body.dialog-open{overflow:hidden}.metric-dialog{padding:28px 30px 23px;backgroun
 /* Keep the decorative weather icon inside the hero on narrow screens. */
 @media(max-width:380px){.hero-scene{left:auto;right:2px;width:62px;height:62px}.hero-scene svg{width:60px;height:60px}}
 .brand-logo{width:38px;height:38px;flex-shrink:0}
+.brand-premium{display:flex;align-items:center;gap:14px;text-decoration:none}
+.brand-mark{display:grid;place-items:center;width:52px;height:52px;border-radius:50%;background:radial-gradient(circle at 35% 30%,rgba(255,233,176,.22),rgba(20,40,70,.35));border:1px solid rgba(255,255,255,.22);box-shadow:0 4px 18px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.25)}
+.brand-mark .brand-logo{width:44px;height:44px}
+.brand-word{display:flex;flex-direction:column;line-height:1.05}
+.brand-kicker{font-size:10px;font-weight:700;letter-spacing:.42em;color:#9fb4d0}
+.brand-name{font-size:30px;font-weight:800;letter-spacing:-.02em;background:linear-gradient(100deg,#fff6dd 10%,#ffd479 55%,#f0b95a 90%);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:0 2px 18px rgba(255,212,121,.25)}
+@media(max-width:760px){.brand-mark{width:44px;height:44px}.brand-mark .brand-logo{width:36px;height:36px}.brand-name{font-size:25px}.brand-kicker{font-size:9px;letter-spacing:.34em}}

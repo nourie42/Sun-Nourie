@@ -1,7 +1,7 @@
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const HOUR=3600000;
-let horizon=48,selectedEpoch=null,latest=null,lastNow=0,resizeInstalled=false;
+let horizon=48,selectedEpoch=null,latest=null,lastNow=0,resizeInstalled=false,meterMode='gross';
 export function dewpointGrossLevel(dewpoint,wind=0){
   if(!finite(dewpoint))return {key:'unknown',label:'Waiting on the dew point',note:'We need a dew-point reading before calling it.'};
   if(dewpoint<50)return {key:'dry',label:'You’re either cold or you’re gettin’ ashy',note:'Very dry air. Moisture is not what is making the weather uncomfortable.'};
@@ -17,6 +17,21 @@ export function dewpointGrossLevel(dewpoint,wind=0){
 export function forecastGrossLevel(dewpoint,wind=0){
  const level=dewpointGrossLevel(dewpoint,wind);
  const labels={dry:'It will feel very dry',nice:'It should feel pretty comfortable','nice-breeze':'The breeze should make it feel comfortable',humid:'It will feel a bit humid',gross:'It will feel a bit gross',nogo:'It will feel very muggy',nope:'It will feel extremely muggy',unknown:'The dew-point forecast is unavailable'};
+ return {...level,label:labels[level.key]||labels.unknown};
+}
+
+export function dewpointDryLevel(dewpoint){
+ if(!finite(dewpoint))return {key:'unknown',label:'Waiting on the dew point',note:'We need a dew-point reading before calling it.'};
+ if(dewpoint<35)return {key:'parched',label:'Bone dry out there',note:'Very dry air — great for comfort, but lotion weather.'};
+ if(dewpoint<45)return {key:'crisp',label:'Crisp and dry',note:'That fresh, dry-air feeling. Excellent comfort.'};
+ if(dewpoint<55)return {key:'pleasant',label:'Pleasantly dry',note:'Low dew point — the air feels clean and easy.'};
+ if(dewpoint<60)return {key:'comfortable',label:'Comfortable',note:'Still on the dry side of comfortable.'};
+ if(dewpoint<65)return {key:'sticky',label:'Losing the dryness',note:'Dew point is climbing out of the dry zone.'};
+ return {key:'humid',label:'Not dry at all',note:'Too humid to call this dry — switch to the Gross Meter.'};
+}
+export function forecastDryLevel(dewpoint){
+ const level=dewpointDryLevel(dewpoint);
+ const labels={parched:'It will feel bone dry',crisp:'It should feel crisp and dry',pleasant:'It should feel pleasantly dry',comfortable:'It should feel comfortable',sticky:'It will feel a bit sticky',humid:'It will feel humid, not dry',unknown:'The dew-point forecast is unavailable'};
  return {...level,label:labels[level.key]||labels.unknown};
 }
 export function dewpointPoints(forecast,now,hours=240){
@@ -37,7 +52,7 @@ export function currentDewpointValue(forecast,now=Date.now()){
 }
 function styles(){
  if(document.getElementById('weather-nourie-dewpoint-meter-css'))return;
- const l=document.createElement('link');l.id='weather-nourie-dewpoint-meter-css';l.rel='stylesheet';l.href='/weather-fusion/dewpoint-meter.css?v=centered-heading-v30';
+ const l=document.createElement('link');l.id='weather-nourie-dewpoint-meter-css';l.rel='stylesheet';l.href='/weather-fusion/dewpoint-meter.css?v=dry-meter-v31';
  l.addEventListener('load',()=>{if(latest)renderDewpointMeter(latest,lastNow);},{once:true});document.head.append(l);
 }
 const hourText=(t,z)=>new Intl.DateTimeFormat('en-US',{timeZone:z,hour:'numeric',minute:'2-digit'}).format(new Date(t));
@@ -54,7 +69,9 @@ export function graphGeometry(points,hours,viewport=640,start=points[0]?.epoch??
 }
 function graph(points,hours,zone,width,start){
  const g=graphGeometry(points,hours,width,start),{W,height,L,R,T,B,min,max,x,y}=g;
- const bands=[[-Infinity,50,'dry','DRY'],[50,60,'nice','NOT BAD'],[60,65,'humid','HUMID'],[65,70,'gross','GROSS'],[70,75,'nogo','NO-GO'],[75,Infinity,'nope','NOPE']];
+ const bands=meterMode==='dry'
+  ?[[-Infinity,35,'dry-parched','PARCHED'],[35,45,'dry-crisp','CRISP'],[45,55,'dry-pleasant','PLEASANT'],[55,60,'dry-comfy','COMFY'],[60,65,'dry-sticky','STICKY'],[65,Infinity,'dry-humid','HUMID']]
+  :[[-Infinity,50,'dry','DRY'],[50,60,'nice','NOT BAD'],[60,65,'humid','HUMID'],[65,70,'gross','GROSS'],[70,75,'nogo','NO-GO'],[75,Infinity,'nope','NOPE']];
  const rects=bands.filter(([a,b])=>a<max&&b>min).map(([a,b,c])=>`<rect class="gross-band band-${c}" x="${L}" y="${y(Math.min(max,b))}" width="${W-L-R}" height="${y(Math.max(min,a))-y(Math.min(max,b))}"/>`).join('');
  const ticks=[];for(let v=min;v<=max;v+=5)ticks.push(`<line class="gross-threshold" x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}"/><text class="gross-y" x="${L-8}" y="${y(v)+4}" text-anchor="end">${v}°</text>`);
  // Both ends are always labeled. Interior labels adapt to the screen width;
@@ -84,8 +101,8 @@ export function renderDewpointMeter(forecast,now=Date.now()){
  let panel=document.getElementById('dewpoint-gross-meter');
  if(!panel){const anchor=document.getElementById('car-wash-forecast')||host;panel=document.createElement('section');panel.id='dewpoint-gross-meter';panel.className='glass dewpoint-gross-meter';panel.setAttribute('aria-labelledby','gross-title');anchor.insertAdjacentElement('afterend',panel);}
  const all=dewpointPoints(forecast,now,240),pts=dewpointPoints(forecast,now,horizon),valid=pts.filter(p=>finite(p.value));
- const zone=forecast.location.timeZone||'America/New_York',dp=currentDewpointValue(forecast,now),level=dewpointGrossLevel(dp,forecast.current.wind);
- const worst=valid.reduce((best,p)=>!best||p.value>best.value?p:best,null),coverage=all.filter(p=>finite(p.value)).at(-1);
+ const zone=forecast.location.timeZone||'America/New_York',dp=currentDewpointValue(forecast,now),level=meterMode==='dry'?dewpointDryLevel(dp):dewpointGrossLevel(dp,forecast.current.wind);
+ const extreme=valid.reduce((best,p)=>!best||(meterMode==='dry'?p.value<best.value:p.value>best.value)?p:best,null),coverage=all.filter(p=>finite(p.value)).at(-1);
  const hoursAvailable=coverage?Math.max(0,Math.floor((coverage.epoch-now)/HOUR)):0;
  const box=window.getComputedStyle(panel);
  const width=panel.clientWidth-(parseFloat(box.paddingLeft)||0)-(parseFloat(box.paddingRight)||0)-2;
@@ -95,17 +112,17 @@ export function renderDewpointMeter(forecast,now=Date.now()){
  const humidity=forecast.current.humidity,air=forecast.current.temperature,feels=forecast.comfort?.outdoors;
  panel.dataset.level=level.key;panel.dataset.hours=String(horizon);
  panel.innerHTML=`<div class="gross-summary">
-   <div class="gross-intro"><div class="gross-intro-copy"><div class="gross-eyebrow" id="gross-title"><strong>Dew Point</strong><span>Gross Meter</span></div><p class="gross-note">${esc(level.note)}</p></div><svg class="gross-drop" viewBox="0 0 64 76" aria-hidden="true"><path d="M32 3C23 20 10 36 10 51a22 22 0 0 0 44 0C54 36 41 20 32 3Z"/><path d="M53 26h8M53 38h8M53 50h8"/></svg></div>
+   <div class="gross-intro"><div class="gross-intro-copy"><div class="gross-eyebrow" id="gross-title"><strong>Dew Point</strong><span>${meterMode==='dry'?'Dry Meter':'Gross Meter'}</span></div><p class="gross-note">${esc(level.note)}</p></div><svg class="gross-drop" viewBox="0 0 64 76" aria-hidden="true"><path d="M32 3C23 20 10 36 10 51a22 22 0 0 0 44 0C54 36 41 20 32 3Z"/><path d="M53 26h8M53 38h8M53 50h8"/></svg></div>
    <div class="gross-now"><strong class="gross-number">${finite(dp)?Math.round(dp)+'°':'—'}</strong><small class="gross-now-label">Current dew point</small></div>
    <div class="gross-callout"><span class="gross-pill gross-${level.key}">${esc(pill)}</span><p class="gross-verdict">${esc(level.label)}</p></div>
    <div class="gross-current-scale" style="--gross-position:${marker}%"><div class="gross-current-track"><i></i></div><div class="gross-current-labels"><span><b>50°</b>Dry</span><span><b>60°</b>Not bad</span><span><b>70°</b>Humid</span><span><b>75°</b>Gross</span></div></div>
   </div>
-  <div class="gross-explore"><div class="gross-toolbar"><span>Explore the forecast</span><div class="gross-periods" role="group" aria-label="Dew-point graph time range">${[[24,'24h'],[48,'48h'],[168,'7 days'],[240,'10 days']].map(([n,l])=>`<button type="button" data-gross-hours="${n}" aria-pressed="${horizon===n}" class="${horizon===n?'selected':''}">${l}</button>`).join('')}</div><p class="gross-coverage">${hoursAvailable>=24?`${Math.floor(hoursAvailable/24)} days ${hoursAvailable%24} hours of forecast available`:'Forecast coverage is limited'}${hoursAvailable<horizon?' · Missing hours stay blank.':''}</p></div>
+  <div class="gross-explore"><div class="gross-toolbar"><span>Explore the forecast</span><div class="gross-mode-toggle" role="group" aria-label="Meter mode"><button type="button" data-meter-mode="gross" aria-pressed="${meterMode==='gross'}" class="${meterMode==='gross'?'selected':''}">Gross</button><button type="button" data-meter-mode="dry" aria-pressed="${meterMode==='dry'}" class="${meterMode==='dry'?'selected':''}">Dry</button></div><div class="gross-periods" role="group" aria-label="Dew-point graph time range">${[[24,'24h'],[48,'48h'],[168,'7 days'],[240,'10 days']].map(([n,l])=>`<button type="button" data-gross-hours="${n}" aria-pressed="${horizon===n}" class="${horizon===n?'selected':''}">${l}</button>`).join('')}</div><p class="gross-coverage">${hoursAvailable>=24?`${Math.floor(hoursAvailable/24)} days ${hoursAvailable%24} hours of forecast available`:'Forecast coverage is limited'}${hoursAvailable<horizon?' · Missing hours stay blank.':''}</p></div>
    <div class="gross-forecast-layout"><div class="gross-readout"><div class="gross-selection" aria-live="polite"><strong class="gross-selected-value">—</strong><span class="gross-selected-time"></span><span class="gross-selected-label"></span></div><p class="gross-scroll-hint">Full range shown · Tap the line or use the slider for details</p></div>
     <div class="gross-scroll" tabindex="0" role="region" aria-label="Full-range dew-point forecast chart">${built.html}</div></div>
    <label class="gross-slider-label" for="gross-scrubber">Explore each forecast hour</label><input id="gross-scrubber" type="range" min="0" max="${Math.max(0,pts.length-1)}" value="0" ${pts.length?'':'disabled'} aria-label="Forecast dew-point hour"/>
-   <div class="gross-scale"><span>Dry &lt;50°</span><span>Not bad 50–59°</span><span>Humid 60–64°</span><span>Gross 65–69°</span><span>No-go 70–74°</span><span>Nope 75°+</span></div>
-   ${worst?`<p class="gross-worst"><strong>Muggiest in this view:</strong> ${Math.round(worst.value)}° · ${esc(dayText(worst.time,zone))} at ${esc(hourText(worst.time,zone))}</p>`:'<p class="gross-empty">No dew-point forecast is available for these hours.</p>'}</div>
+   <div class="gross-scale">${meterMode==='dry'?'<span>Parched &lt;35°</span><span>Crisp 35–44°</span><span>Pleasant 45–54°</span><span>Comfy 55–59°</span><span>Sticky 60–64°</span><span>Humid 65°+</span>':'<span>Dry &lt;50°</span><span>Not bad 50–59°</span><span>Humid 60–64°</span><span>Gross 65–69°</span><span>No-go 70–74°</span><span>Nope 75°+</span>'}</div>
+   ${extreme?`<p class="gross-worst"><strong>${meterMode==='dry'?'Driest':'Muggiest'} in this view:</strong> ${Math.round(extreme.value)}° · ${esc(dayText(extreme.time,zone))} at ${esc(hourText(extreme.time,zone))}</p>`:'<p class="gross-empty">No dew-point forecast is available for these hours.</p>'}</div>
   <div class="gross-facts" aria-label="Current conditions supporting the Gross Meter">
    <span><i aria-hidden="true">●</i><b>${finite(dp)?Math.round(dp)+'°':'—'}</b><small>Dew point</small></span>
    <span><i aria-hidden="true">≋</i><b>${finite(humidity)?Math.round(humidity)+'%':'—'}</b><small>Humidity</small></span>
@@ -114,7 +131,7 @@ export function renderDewpointMeter(forecast,now=Date.now()){
   </div>`;
  const select=i=>{
   const p=pts[Math.max(0,Math.min(pts.length-1,i))];if(!p)return;selectedEpoch=p.epoch;
-  const v=forecastGrossLevel(p.value,pairedWind(forecast,p.time));
+  const v=meterMode==='dry'?forecastDryLevel(p.value):forecastGrossLevel(p.value,pairedWind(forecast,p.time));
   panel.querySelector('.gross-selected-value').textContent=finite(p.value)?Math.round(p.value)+'°':'Unavailable';
   panel.querySelector('.gross-selected-time').textContent=`${dayText(p.time,zone)} · ${hourText(p.time,zone)} forecast`;
   panel.querySelector('.gross-selected-label').textContent=v.label;
@@ -125,6 +142,7 @@ export function renderDewpointMeter(forecast,now=Date.now()){
  };
  const ix=pts.findIndex(p=>p.epoch===selectedEpoch);select(Math.max(0,ix));
  panel.querySelectorAll('[data-gross-hours]').forEach(button=>button.addEventListener('click',()=>{horizon=Number(button.dataset.grossHours);selectedEpoch=null;renderDewpointMeter(latest,lastNow);}));
+ panel.querySelectorAll('[data-meter-mode]').forEach(button=>button.addEventListener('click',()=>{meterMode=button.dataset.meterMode;selectedEpoch=null;renderDewpointMeter(latest,lastNow);}));
  panel.querySelector('#gross-scrubber').addEventListener('input',e=>select(Number(e.target.value)));
  const svg=panel.querySelector('.gross-chart');svg.addEventListener('click',e=>{
   const rect=svg.getBoundingClientRect(),x=(e.clientX-rect.left)/Math.max(1,rect.width)*built.g.W;
