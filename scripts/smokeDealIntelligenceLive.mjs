@@ -6,7 +6,7 @@ import { chromium } from 'playwright';
 // workspace records, research text, screenshots, or traces are written to logs.
 const base = new URL(process.env.DEAL_INTELLIGENCE_BASE_URL || 'https://sun-nourie-live.onrender.com').origin;
 const password = process.env.WEATHER_SITE_PASSWORD;
-const expectedFlow = 'background-v1';
+const expectedFlow = 'completion-budget-v2';
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const fingerprint = state => {
   // Context synchronization may save the search preference and version stamp.
@@ -97,7 +97,9 @@ async function main() {
   console.log('Browser loaded the private workspace and Acquisition hunter.');
 
   stage = 'real discovery through browser form';
-  const prompt = 'Find exactly one real, privately owned fuel marketer based in North Carolina. Use its official company website as an accessed public source, identify its fuel-marketing business and North Carolina location, and return a sourced research draft. Leave owner/contact/site-count facts unknown when unsupported. Do not save or import the target.';
+  // Reproduce the owner's ordinary query exactly. Artificially narrowing it to
+  // one company masked the provider's exhausted completion budget.
+  const prompt = 'M&A targets in NC';
   await page.locator('#hunter-form textarea[name="prompt"]').fill(prompt);
   const captures = [];
   const pending = new Set();
@@ -122,6 +124,7 @@ async function main() {
   const accepted = await acceptedPromise;
   stage = 'background job acceptance';
   assert.equal(accepted.status(), 202, 'Discovery did not use a background research job.');
+  assert.equal(accepted.request().postDataJSON()?.prompt, prompt, 'Browser discovery did not submit the original user query.');
   const job = await accepted.json();
   assert.ok(typeof job.jobId === 'string' && job.jobId.length > 10, 'Discovery did not return a job identifier.');
   assert.ok(['queued', 'running'].includes(job.status), 'Discovery returned an invalid initial job state.');

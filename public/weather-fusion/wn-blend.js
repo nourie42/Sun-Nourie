@@ -264,6 +264,8 @@ async function init() {
   const section = document.createElement('section');
   section.id = 'wn-compare-section';
   section.hidden = true;
+  section.style.marginTop = '16px';
+  section.style.marginBottom = '16px';
   section.className = 'glass wn-blend-compare';
   section.style.padding = '18px';
   section.style.overflow = 'hidden';

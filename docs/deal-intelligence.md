@@ -18,6 +18,8 @@ The generated `public/deal-intelligence/index.html` contains all required fronte
 
 AI research starts a private background job through `POST /api/deal-intelligence/ai/jobs`. The browser polls its status through short requests and displays elapsed time while the rest of the workspace remains usable. Background requests have a three-minute upstream budget. Jobs live in the current server process and expire after fifteen minutes; a service restart requires starting the research again, while saved workspace records remain in the browser. The direct AI endpoint remains available with its original 45-second budget.
 
+The completion budget includes both reasoning and visible results. Requests reserve 8,192 output tokens and use low reasoning effort on the known default models. A response exhausted specifically by its output limit gets one automatic retry with 16,384 tokens and a shorter shortlist, within the original request deadline. Partial JSON is never treated as a research result. Provider diagnostics log only status, limits, and token counts. The live browser check submits the ordinary query `M&A targets in NC` unchanged.
+
 Relevant checks:
 
 ```sh
