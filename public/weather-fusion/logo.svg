@@ -1,28 +1,59 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
   <defs>
-    <radialGradient id="sun-gold" cx="35%" cy="30%" r="80%">
-      <stop offset="0%" stop-color="#ffe9b0"/>
-      <stop offset="45%" stop-color="#ffd479"/>
-      <stop offset="100%" stop-color="#e8a83e"/>
+    <radialGradient id="sunCore" cx="38%" cy="32%" r="75%">
+      <stop offset="0%" stop-color="#fff6dd"/>
+      <stop offset="30%" stop-color="#ffe9a8"/>
+      <stop offset="65%" stop-color="#ffcf6e"/>
+      <stop offset="100%" stop-color="#e89b2e"/>
     </radialGradient>
-    <linearGradient id="wave-blue" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#7fb8ff"/>
-      <stop offset="50%" stop-color="#3d7dd8"/>
-      <stop offset="100%" stop-color="#1a3a7a"/>
+    <radialGradient id="sunGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffd479" stop-opacity=".55"/>
+      <stop offset="100%" stop-color="#ffd479" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="waveTop" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ffe9b0"/>
+      <stop offset="55%" stop-color="#f5c86e"/>
+      <stop offset="100%" stop-color="#d89b3a"/>
     </linearGradient>
-    <linearGradient id="ring" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#ffe9b0" stop-opacity=".9"/>
-      <stop offset="50%" stop-color="#7fb8ff" stop-opacity=".5"/>
-      <stop offset="100%" stop-color="#3d7dd8" stop-opacity=".9"/>
+    <linearGradient id="waveMid" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#a8d0ff" stop-opacity=".95"/>
+      <stop offset="45%" stop-color="#5b9ae8" stop-opacity=".9"/>
+      <stop offset="100%" stop-color="#2456a8" stop-opacity=".95"/>
+    </linearGradient>
+    <linearGradient id="waveBot" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#7fb8ff" stop-opacity=".85"/>
+      <stop offset="100%" stop-color="#1a3a7a" stop-opacity=".9"/>
+    </linearGradient>
+    <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffe9b0" stop-opacity=".7"/>
+      <stop offset="40%" stop-color="#7fb8ff" stop-opacity=".25"/>
+      <stop offset="100%" stop-color="#3d7dd8" stop-opacity=".6"/>
     </linearGradient>
   </defs>
-  <!-- Outer ring -->
-  <circle cx="60" cy="60" r="54" fill="none" stroke="url(#ring)" stroke-width="2.5"/>
-  <!-- Sun -->
-  <circle cx="74" cy="42" r="20" fill="url(#sun-gold)"/>
-  <!-- Waves -->
-  <path d="M14 72 Q34 58 54 70 T96 66 Q86 84 60 88 Q32 92 14 72 Z" fill="url(#wave-blue)" opacity=".95"/>
-  <path d="M20 84 Q40 74 58 82 T92 80 Q82 94 60 96 Q36 98 20 84 Z" fill="url(#wave-blue)" opacity=".7"/>
-  <!-- Sun glow arc over waves -->
-  <path d="M52 62 Q64 52 78 58" fill="none" stroke="#ffe9b0" stroke-width="3" stroke-linecap="round" opacity=".8"/>
+
+  <!-- Outer thin ring -->
+  <circle cx="100" cy="100" r="92" fill="none" stroke="url(#ringGrad)" stroke-width="2"/>
+
+  <!-- Sun glow -->
+  <circle cx="124" cy="68" r="44" fill="url(#sunGlow)"/>
+  <!-- Sun sphere -->
+  <circle cx="124" cy="68" r="30" fill="url(#sunCore)"/>
+  <!-- Sun highlight -->
+  <ellipse cx="114" cy="58" rx="10" ry="7" fill="#fff" opacity=".35" transform="rotate(-20 114 58)"/>
+
+  <!-- Top golden wave sweeping under sun -->
+  <path d="M28 108 Q62 84 96 96 Q128 107 168 88 Q150 112 112 118 Q70 124 28 108 Z"
+        fill="url(#waveTop)"/>
+  <path d="M34 104 Q62 88 94 97" fill="none" stroke="#fff" stroke-width="2"
+        opacity=".4" stroke-linecap="round"/>
+
+  <!-- Middle blue wave -->
+  <path d="M22 126 Q58 104 96 116 Q134 127 174 108 Q158 136 116 142 Q72 148 22 126 Z"
+        fill="url(#waveMid)"/>
+  <path d="M30 122 Q58 110 92 118" fill="none" stroke="#cfe6ff" stroke-width="2.5"
+        opacity=".5" stroke-linecap="round"/>
+
+  <!-- Bottom deep wave -->
+  <path d="M30 146 Q64 130 102 140 Q138 149 166 134 Q152 158 114 162 Q72 166 30 146 Z"
+        fill="url(#waveBot)" opacity=".9"/>
 </svg>
