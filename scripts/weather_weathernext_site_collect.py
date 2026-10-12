@@ -47,7 +47,7 @@ class Queries:
   print(json.dumps({'job':job.job_id,'estimatedBytes':estimate,'billedBytes':billed,'runBilledBytes':self.billed,'rows':len(rows),'cacheHit':job.cache_hit}),flush=True)
   # Spatial clustering's pre-execution estimate is an upper bound. Stop further
   # requests if actual billing disproves the expected small geographic scan.
-  if (not discovery and billed>250_000_000) or self.billed>5_000_000_000:
+  if (not discovery and billed>250_000_000) or self.billed>50_000_000_000:
    self.stop_path.parent.mkdir(parents=True,exist_ok=True)
    self.stop_path.write_text(json.dumps({'pausedAt':iso(datetime.now(timezone.utc)),'job':job.job_id,'billedBytes':billed,'runBilledBytes':self.billed,'reason':'Actual query billing exceeded the automatic collection safety threshold.'})+'\n')
    raise CostStop('Actual billing exceeded safety threshold. Further automatic collection has been paused.')
