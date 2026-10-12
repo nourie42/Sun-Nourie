@@ -305,7 +305,7 @@ export function buildForecast({ location, point, forecast, hourly, grid, discuss
   const today = dateKey(now, zone);
   const rows = Object.fromEntries(Object.entries(models).map(([key, value]) => [key, normalizeModel(value, now, key === 'hrrr' ? 48 : 240)]));
   const periods = (forecast?.periods || []).filter((p) => Date.parse(p.endTime) > now);
-  const days = Array.from({ length: 7 }, (_, index) => {
+  const days = Array.from({ length: 10 }, (_, index) => {
     const date = nextDate(today, index), start = localTime(date, 7, zone), end = localTime(nextDate(date), 7, zone);
     const midnight = localTime(date, 0, zone), nextMidnight = localTime(nextDate(date), 0, zone);
     const dayPeriods = periods.filter((p) => dateKey(Date.parse(p.startTime), zone) === date);

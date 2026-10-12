@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <defs>
+    <radialGradient id="sun-gold" cx="35%" cy="30%" r="80%">
+      <stop offset="0%" stop-color="#ffe9b0"/>
+      <stop offset="45%" stop-color="#ffd479"/>
+      <stop offset="100%" stop-color="#e8a83e"/>
+    </radialGradient>
+    <linearGradient id="wave-blue" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7fb8ff"/>
+      <stop offset="50%" stop-color="#3d7dd8"/>
+      <stop offset="100%" stop-color="#1a3a7a"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffe9b0" stop-opacity=".9"/>
+      <stop offset="50%" stop-color="#7fb8ff" stop-opacity=".5"/>
+      <stop offset="100%" stop-color="#3d7dd8" stop-opacity=".9"/>
+    </linearGradient>
+  </defs>
+  <!-- Outer ring -->
+  <circle cx="60" cy="60" r="54" fill="none" stroke="url(#ring)" stroke-width="2.5"/>
+  <!-- Sun -->
+  <circle cx="74" cy="42" r="20" fill="url(#sun-gold)"/>
+  <!-- Waves -->
+  <path d="M14 72 Q34 58 54 70 T96 66 Q86 84 60 88 Q32 92 14 72 Z" fill="url(#wave-blue)" opacity=".95"/>
+  <path d="M20 84 Q40 74 58 82 T92 80 Q82 94 60 96 Q36 98 20 84 Z" fill="url(#wave-blue)" opacity=".7"/>
+  <!-- Sun glow arc over waves -->
+  <path d="M52 62 Q64 52 78 58" fill="none" stroke="#ffe9b0" stroke-width="3" stroke-linecap="round" opacity=".8"/>
+</svg>

@@ -143,13 +143,13 @@ async function render() {
   const chartEl = document.getElementById('wn-compare-chart');
   if (!chartEl || !forecastCache) return;
   const varDef = VARIABLES[curVar];
-  const days = (forecastCache.days || []).slice(0, 7).map((d) => ({
+  const days = (forecastCache.days || []).slice(0, 10).map((d) => ({
     ...d, dateKey: d.date,
   }));
   const wnVals = wnDaily(wnCache?.hourly, varDef.wnKey, varDef.wnAgg, days);
   // Update title
   const title = document.getElementById('wn-compare-title');
-  if (title) title.textContent = `${varDef.label} — 7-day comparison`;
+  if (title) title.textContent = `${varDef.label} — 10-day comparison`;
   renderChart(chartEl, days, wnVals, varDef);
 
   // Stale warning
