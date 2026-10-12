@@ -201,7 +201,7 @@ function renderEvidence(data) {
   }
   const important = ['nws', 'afd', 'hrrr', 'ecmwf', 'nbm', 'air-quality', 'alerts'];
   const labels = { nws: 'NWS', afd: 'Local discussion', hrrr: 'HRRR', ecmwf: 'ECMWF IFS', nbm: 'National Blend', 'air-quality':'Air quality', alerts: 'Alerts' };
-  const names = { ready: 'Available', unavailable: 'Unavailable', stale: 'Stale — excluded', 'not-configured': 'Not configured', 'not-covered': 'Not collected for this location' };
+  const names = { ready: '✓ Working', unavailable: '✗ Unavailable', stale: '⚠ Stale — excluded', 'not-configured': 'Not configured', 'not-covered': 'Not collected for this location' };
   const sourceIssues=data.feeds.filter(f=>['unavailable','stale','not-configured','not-covered'].includes(f.status));
   const sourceSummary=$('source-unavailable-summary');
   if(sourceSummary){

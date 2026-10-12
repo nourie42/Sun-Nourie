@@ -47,9 +47,14 @@
 
 
   <style id="tile-spacing">
-    /* Consistent spacing between tiles only - don't touch anything else */
+    /* Consistent spacing + frosted glass on all tiles */
     main > section.glass {
       margin-bottom: 16px !important;
+      background: linear-gradient(145deg, rgba(255,255,255,0.14), rgba(255,255,255,0.04)) !important;
+      backdrop-filter: blur(24px) saturate(180%) !important;
+      -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+      border: 1px solid rgba(255,255,255,0.28) !important;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.25) !important;
     }
     main > section.glass:last-child {
       margin-bottom: 0 !important;
@@ -114,8 +119,8 @@
       margin-bottom: 2px !important;
     }
     .brand-name {
-      font-size: 42px !important;
-      font-weight: 800 !important;
+      font-size: 36px !important;
+      font-weight: 300 !important;
       letter-spacing: -0.5px !important;
       background: linear-gradient(180deg, #ffffff 20%, #ffe9b0 60%, #f5c86e 100%) !important;
       -webkit-background-clip: text !important;

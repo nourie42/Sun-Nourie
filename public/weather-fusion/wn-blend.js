@@ -11,7 +11,6 @@ const VARIABLES = {
   rain:     { label: 'Precipitation', unit: 'in',  fmt: (v) => `${v.toFixed(2)}"` },
   wind:     { label: 'Wind',          unit: 'mph', fmt: (v) => `${Math.round(v)}` },
   dewpoint: { label: 'Dewpoint',      unit: '°F',  fmt: (v) => `${Math.round(v)}°` },
-  humidity: { label: 'Humidity',      unit: '%',   fmt: (v) => `${Math.round(v)}%` },
 };
 let curVar = 'temp';
 
@@ -191,11 +190,11 @@ function renderChart(container, built, varDef) {
   let order;
   if (built.perModel) {
     order = [
-      { id: 'wn', w: 2, dash: '6,4', op: 0.9 },
-      { id: 'nws', w: 2, op: 0.75 }, { id: 'hrrr', w: 2, op: 0.75 },
-      { id: 'nbm', w: 2, op: 0.75 }, { id: 'ecmwf', w: 2, op: 0.75 },
-      { id: 'oldBlend', w: 2.5, dash: '9,5', op: 0.9 },
-      { id: 'newBlend', w: 3.5, op: 1 },
+      { id: 'wn', w: 3.5, dash: '7,5', op: 0.9 },
+      { id: 'nws', w: 3.5, op: 0.8 }, { id: 'hrrr', w: 3.5, op: 0.8 },
+      { id: 'nbm', w: 3.5, op: 0.8 }, { id: 'ecmwf', w: 3.5, op: 0.8 },
+      { id: 'oldBlend', w: 4, dash: '10,6', op: 0.9 },
+      { id: 'newBlend', w: 5.5, op: 1 },
     ];
   } else {
     order = [{ id: 'single', w: 3.5, op: 1 }];
@@ -210,8 +209,8 @@ function renderChart(container, built, varDef) {
   // Value labels on the primary line
   const primary = built.perModel ? series.newBlend : series.single;
   const dots = primary.map((v, i) => v == null ? '' :
-    `<circle cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="4" fill="${built.perModel ? COLORS.newBlend : COLORS.single}"/>`
-    + `<text x="${X(i).toFixed(0)}" y="${(Y(v) - 12).toFixed(0)}" text-anchor="middle" font-size="14" fill="#ffffff" font-weight="700">${varDef.fmt(v)}</text>`
+    `<circle cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="5.5" fill="${built.perModel ? COLORS.newBlend : COLORS.single}" stroke="#16283f" stroke-width="1.5"/>`
+    + `<text x="${X(i).toFixed(0)}" y="${(Y(v) - 15).toFixed(0)}" text-anchor="middle" font-size="16" fill="#ffffff" font-weight="800" stroke="#16283f" stroke-width="3" paint-order="stroke">${varDef.fmt(v)}</text>`
   ).join('');
 
   let legend;
