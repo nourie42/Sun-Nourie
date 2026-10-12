@@ -264,6 +264,8 @@ async function init() {
   const section = document.createElement('section');
   section.id = 'wn-compare-section';
   section.className = 'glass wn-blend-compare';
+  section.style.padding = '18px';
+  section.style.overflow = 'hidden';
   section.setAttribute('aria-label', 'Forecast model comparison');
   section.innerHTML = `
     <div class="section-top" style="border:0;padding-bottom:10px">
