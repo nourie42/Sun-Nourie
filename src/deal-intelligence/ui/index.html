@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#17282d">
+  <meta name="description" content="Your private workspace for finding, researching and underwriting fuel and convenience store acquisitions.">
+  <title>Deal Intelligence — Acquisition workspace</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to workspace</a>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Main navigation">
+      <a class="brand" href="#today" aria-label="Deal Intelligence home"><span class="brand-symbol">di<span>.</span></span><span>Deal<br>Intelligence<span class="brand-subtitle">YOUR ACQUISITION DESK</span></span></a>
+      <button id="mobile-menu" class="mobile-menu icon-button" aria-label="Toggle navigation" aria-expanded="false">☰</button>
+      <div class="sidebar-body">
+        <div class="workspace-label"><span class="workspace-avatar">M&A</span><div>Personal workspace<small>Fuel & convenience retail</small></div><span class="private-tag">Private</span></div>
+        <div class="nav-caption">WORKSPACE</div>
+        <nav id="nav"></nav>
+        <div class="sidebar-bottom">
+          <div class="sidebar-note"><span class="spark-icon">✦</span><strong>From signal to conviction.</strong><p>Keep your research, owners and acquisition decisions in one place.</p></div>
+          <button class="nav-item settings-nav" data-action="settings"><span class="nav-icon">⚙</span><span>Workspace settings</span></button>
+          <div class="profile"><span class="profile-avatar">You</span><div>Your acquisition desk<small id="storage-label">Connecting workspace…</small></div><span class="profile-dot"></span></div>
+        </div>
+      </div>
+    </aside>
+    <div class="workspace">
+      <header class="topbar">
+        <div class="breadcrumb"><a href="/weather-fusion/" style="color:inherit;text-decoration:none">← Sun Nourie</a> <span>/</span> <strong id="breadcrumb">Today</strong></div>
+        <div class="topbar-right"><span id="ai-status" class="connection-status"><span></span>Checking connection</span><button class="icon-button" data-action="settings" aria-label="Workspace settings" title="Workspace settings">⚙</button><span class="avatar">You</span></div>
+      </header>
+      <div class="toolbar">
+        <div class="search-wrap"><span class="search-icon" aria-hidden="true">⌕</span><input id="global-search" type="search" placeholder="Search targets, owners or states…" aria-label="Search workspace"><kbd>/</kbd><div id="search-results" class="search-results" hidden></div></div>
+        <div class="toolbar-actions"><button class="button secondary" data-action="import"><span aria-hidden="true">↥</span> Import</button><button class="button primary" data-action="add-target"><span aria-hidden="true">＋</span> Add target</button></div>
+      </div>
+      <div id="sample-banner" class="sample-banner" hidden><span><strong>Sample workspace</strong> · These fictional records demonstrate the workflow. They are not researched acquisition targets.</span><button data-action="settings">Manage sample data <span aria-hidden="true">→</span></button></div>
+      <main id="main" tabindex="-1" aria-live="polite"></main>
+      <footer class="workspace-footer"><span>Deal Intelligence <span class="footer-dot">·</span> Private acquisition workspace</span><span id="save-status">Ready</span></footer>
+    </div>
+  </div>
+  <dialog id="modal" aria-labelledby="modal-title"></dialog>
+  <div id="toast" class="toast" role="status" hidden></div>
+  <input id="import-file" type="file" accept=".csv,.json,.xlsx,application/json,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
+  <script src="./workbook.js"></script>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

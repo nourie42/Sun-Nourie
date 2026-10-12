@@ -13,7 +13,7 @@ const LOGIN = '/weather-fusion/login';
 const LOGOUT = '/weather-fusion/logout';
 const HOME = '/weather-fusion/';
 const SESSION_MS = 12 * 60 * 60 * 1000;
-const PREFIXES = ['/weather', '/weather-fusion', '/weathernext', '/api/weather-fusion', '/whats-up', '/whatsup', '/api/whats-up'];
+const PREFIXES = ['/weather', '/weather-fusion', '/weathernext', '/api/weather-fusion', '/whats-up', '/whatsup', '/api/whats-up', '/deal-intelligence', '/api/deal-intelligence'];
 
 // The gateway passes this private key to its child processes. It is never sent
 // to clients; a restart invalidates sessions unless an environment key is set.
@@ -142,9 +142,10 @@ export function registerWeatherSiteAccess(app, {
       });
     }
 
-    if (authenticated(req)) return next();
+    if (authenticated(req)) { req.weatherSiteAuthenticated = true; return next(); }
     if (pathname.startsWith('/api/')) return res.status(401).json({error: 'Weather site password required.', loginUrl: LOGIN});
     res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'");
     return res.status(401).type('html').send(loginPage(req.originalUrl));
   });
 }
+

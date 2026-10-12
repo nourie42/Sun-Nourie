@@ -13,7 +13,8 @@
       #fuelLocationAtlasTop.fiq-matched-tool-link,
       #aiCouncilTop.fiq-matched-tool-link,
       #aiBotStudioTop.fiq-matched-tool-link,
-      #aiBotChatTop.fiq-matched-tool-link {
+      #aiBotChatTop.fiq-matched-tool-link,
+      #dealIntelligenceTop.fiq-matched-tool-link {
         display:inline-flex!important;
         align-items:center!important;
         justify-content:center!important;
@@ -44,7 +45,9 @@
       #aiBotStudioTop.fiq-matched-tool-link:hover,
       #aiBotStudioTop.fiq-matched-tool-link:focus-visible,
       #aiBotChatTop.fiq-matched-tool-link:hover,
-      #aiBotChatTop.fiq-matched-tool-link:focus-visible {
+      #aiBotChatTop.fiq-matched-tool-link:focus-visible,
+      #dealIntelligenceTop.fiq-matched-tool-link:hover,
+      #dealIntelligenceTop.fiq-matched-tool-link:focus-visible {
         transform:translateY(-1px)!important;
         filter:brightness(1.06)!important;
         box-shadow:0 0 0 3px rgba(251,191,36,.22),0 10px 24px rgba(245,158,11,.34)!important;
@@ -96,7 +99,8 @@
         #fuelLocationAtlasTop.fiq-matched-tool-link,
         #aiCouncilTop.fiq-matched-tool-link,
         #aiBotStudioTop.fiq-matched-tool-link,
-        #aiBotChatTop.fiq-matched-tool-link {
+        #aiBotChatTop.fiq-matched-tool-link,
+        #dealIntelligenceTop.fiq-matched-tool-link {
           width:auto!important;
           min-height:42px!important;
           padding:9px 13px!important;
@@ -242,8 +246,20 @@
       council.setAttribute('aria-label', 'Open AI Council');
       council.setAttribute('title', 'Open AI Council');
 
+      let intelligence = document.getElementById('dealIntelligenceTop');
+      if (!intelligence) {
+        intelligence = document.createElement('a');
+        intelligence.id = 'dealIntelligenceTop';
+        intelligence.href = '/deal-intelligence/';
+      }
+      intelligence.className = 'fiq-matched-tool-link';
+      intelligence.textContent = 'Deal Intelligence';
+      intelligence.setAttribute('aria-label', 'Open Deal Intelligence M&A workspace');
+      intelligence.setAttribute('title', 'Open Deal Intelligence M&A workspace');
+
       if (distributor.nextElementSibling !== atlas) distributor.insertAdjacentElement('afterend', atlas);
       if (atlas.nextElementSibling !== council) atlas.insertAdjacentElement('afterend', council);
+      if (council.nextElementSibling !== intelligence) council.insertAdjacentElement('afterend', intelligence);
     } finally {
       applying = false;
     }
