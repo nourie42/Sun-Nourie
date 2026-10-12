@@ -1,5 +1,8 @@
 /** Ultimate Weather — the best of every page, together. */
 const el = (id) => document.getElementById(id);
+const opt = (id) => document.getElementById(id);
+function setText(id, txt) { const n = opt(id); if (n) n.textContent = txt; }
+function setHTML(id, html) { const n = opt(id); if (n) n.innerHTML = html; }
 const finite = (v) => typeof v === 'number' && Number.isFinite(v);
 const WN_FEED = 'https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/weathernext-full.json';
 
@@ -14,8 +17,8 @@ const WN_VARS = ['temperature_2m', 'dewpoint_temperature_2m', 'wind_speed_10m', 
 
 function setSky(img) {
   const url = `/weather-fusion/${img}`;
-  const show = skyFlip ? el('sky-a') : el('sky-b');
-  const hide = skyFlip ? el('sky-b') : el('sky-a');
+  const show = skyFlip ? opt('sky-a') : opt('sky-b');
+  const hide = skyFlip ? opt('sky-b') : opt('sky-a');
   if (show.dataset.img === img) return;
   const pre = new Image();
   pre.onload = () => {
@@ -51,7 +54,7 @@ async function load() {
     el('updated').textContent = `Updated ${new Date(forecast.assembledAt).toLocaleTimeString()}`;
     renderAll();
   } catch (e) {
-    const err = el('error');
+    const err = opt('error');
     err.hidden = false;
     err.textContent = `Couldn't load: ${e.message}`;
   }
@@ -76,7 +79,7 @@ function renderHero() {
   const c = forecast.current;
   el('now-temp').textContent = Math.round(c.temperature);
   el('now-cond').textContent = c.condition;
-  el('now-feels').textContent = `Feels ${Math.round(c.feelsLike || c.apparent || c.temperature)}°`;
+  setText('now-feels', `Feels ${Math.round(c.feelsLike || c.apparent || c.temperature)}°`);
   const d0 = forecast.days?.[0];
   if (d0) {
     const hi = finite(d0.high) ? Math.round(d0.high) + '°' : '—';
@@ -100,7 +103,7 @@ function renderHero() {
     insights.push(`🌡 Warmest at ${t} (${Math.round(warm.temperature)}°)`);
   }
   if (forecast.comfort?.outdoors) insights.push(`🫠 Feels ${Math.round(forecast.comfort.outdoors)}° outside`);
-  el('insight-row').innerHTML = insights.map((i) => `<span class="insight-chip">${i}</span>`).join('');
+  setHTML('insight-row', insights.map((i) => `<span class="insight-chip">${i}</span>`).join(''));
 }
 
 function renderOverview() {
@@ -226,7 +229,7 @@ function renderModels() {
     ${wnBand}
     <path d="${line}" fill="none" stroke="#fff" stroke-width="3" stroke-linejoin="round"/>
   </svg>`;
-  el('model-legend').innerHTML = legend;
+  setHTML('model-legend', legend);
 
   // Model cards
   el('model-cards').innerHTML = models.slice(0, 4).map((m) => `
@@ -248,7 +251,7 @@ function renderAILab() {
   };
 
   if (!wnFeed?.sources?.surface) {
-    el('wn-chart').innerHTML = '<p class="fine">WeatherNext feed unavailable.</p>';
+    el('wn-chart2').innerHTML = '<p class="fine">WeatherNext feed unavailable.</p>';
     return;
   }
   const pts = wnFeed.sources.surface.points.find((p) => p.id === loc);
@@ -275,8 +278,8 @@ function renderAILab() {
     data.map((d, i) => `${X(i).toFixed(1)},${Y(d.p10).toFixed(1)}`).reverse().join(' ');
   const line = data.map((d, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)},${Y(d.mean).toFixed(1)}`).join('');
 
-  el('wn-chart-title').textContent = `${WN_LABELS[wnField]} · 7-day AI forecast`;
-  el('wn-chart').innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="WeatherNext ${wnField}">
+  setText('wn-chart-title', `${WN_LABELS[wnField]} · 7-day AI forecast`);
+  el('wn-chart2').innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="WeatherNext ${wnField}">
     <defs><linearGradient id="uw-fill" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#b48cff" stop-opacity=".3"/><stop offset="100%" stop-color="#b48cff" stop-opacity="0"/>
     </linearGradient></defs>
@@ -286,7 +289,7 @@ function renderAILab() {
   </svg>`;
 
   const age = (Date.now() - Date.parse(wnFeed.sources.surface.runAt)) / 86400000;
-  el('wn-age').textContent = age > 1 ? `⚠ Model run ${Math.round(age)} days ago — data may be stale.` : 'Fresh model run.';
+  setText('wn-age', age > 1 ? `⚠ Model run ${Math.round(age)} days ago — data may be stale.` : 'Fresh model run.');
 }
 
 function renderDetails() {
