@@ -19,6 +19,7 @@ function setSky(img) {
   const url = `/weather-fusion/${img}`;
   const show = skyFlip ? opt('sky-a') : opt('sky-b');
   const hide = skyFlip ? opt('sky-b') : opt('sky-a');
+  if (!show || !hide) return;
   if (show.dataset.img === img) return;
   const pre = new Image();
   pre.onload = () => {
