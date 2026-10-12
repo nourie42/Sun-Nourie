@@ -130,8 +130,9 @@ function dailyWindSummary(forecast,day,display,index,now){
  return {text:lo===hi?`Wind ${lo} mph`:`Wind ${lo}–${hi} mph`,gust:gusts.length?Math.round(Math.max(...gusts)):null};
 }
 export function renderDailyRows(forecast,icon) {
- const values=forecast.days.flatMap(d=>[d.high,d.low]).filter(finite),lo=values.length?Math.min(...values)-3:0,hi=values.length?Math.max(...values)+3:1;
- const rows=forecast.days.map((d,i)=>{
+ const days=(forecast.days||[]).slice(0,7);
+ const values=days.flatMap(d=>[d.high,d.low]).filter(finite),lo=values.length?Math.min(...values)-3:0,hi=values.length?Math.max(...values)+3:1;
+ const rows=days.map((d,i)=>{
   const now=Date.now(),p=dailyDisplay(d,i,now,forecast.location.timeZone),rain=displayedRainChance(forecast,p.pop,{dayIndex:i,now}),shownPop=rain.value,bar=temperatureBar(p.primary,lo,hi),feel=dailyFeels(forecast,i,now);
   const confidence=d.confidence||{label:'Unavailable',score:null,key:'unavailable',factors:[],note:'Forecast confidence data is unavailable.'};
   const confidencePosition=confidenceMeterPosition(confidence);

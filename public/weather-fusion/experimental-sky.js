@@ -4,7 +4,8 @@
  * the regular page keeps its existing atmosphere. */
 (function () {
   function isExperimental() {
-    if (/\/weather-fusion\/experimental-weather\.html\/?$/.test(globalThis.location?.pathname || '')) return true;
+    const p = globalThis.location?.pathname || '';
+    if (/\/weather-fusion\/(experimental-weather\.html)?\/?$/.test(p)) return true;
     return document.documentElement?.dataset?.weatherPage === 'experimental';
   }
   // app.js sets data-weather-page after this module loads; refresh() re-checks
@@ -43,6 +44,7 @@
 
   async function refresh() {
     if (!isExperimental()) return;
+    document.documentElement.classList.add('sky-active');
     try {
       const params = new URLSearchParams(globalThis.location.search);
       const loc = params.get('location') || 'knightdale';
