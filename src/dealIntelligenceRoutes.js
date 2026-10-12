@@ -111,6 +111,10 @@ export function registerDealIntelligenceRoutes(app, { env = process.env, store, 
     OPENAI_RESEARCH_MODEL: env.OPENAI_RESEARCH_MODEL || 'gpt-5.5',
     OPENAI_REQUEST_TIMEOUT_MS: env.OPENAI_REQUEST_TIMEOUT_MS,
     fetchImpl,
+    onAiAttempt(metadata) {
+      try { logger?.info?.(`Deal Intelligence AI response: ${JSON.stringify(metadata)}`); }
+      catch {}
+    },
   };
   const configuredResearchTimeout = Number(env.OPENAI_REQUEST_TIMEOUT_MS);
   const researchEnv = {
@@ -242,7 +246,7 @@ export function registerDealIntelligenceRoutes(app, { env = process.env, store, 
       const response = await handleApi(request, apiEnv);
       let payload = await response.json();
       if (payload?.state) payload = { ...payload, storage, ...(warning ? { storageWarning: warning } : {}) };
-      if (new URL(request.url).pathname === '/api/health' && response.ok) payload = { ...payload, storage, aiJobs: true, researchFlow: 'background-v1', ...(warning ? { storageWarning: warning } : {}) };
+      if (new URL(request.url).pathname === '/api/health' && response.ok) payload = { ...payload, storage, aiJobs: true, researchFlow: 'completion-budget-v2', ...(warning ? { storageWarning: warning } : {}) };
       for (const [name, value] of response.headers) {
         if (name !== 'cache-control' && name !== 'content-length' && name !== 'content-type') res.setHeader(name, value);
       }

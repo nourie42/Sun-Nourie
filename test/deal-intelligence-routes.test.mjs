@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { PassThrough } from 'node:stream';
 import { registerDealIntelligenceRoutes } from '../src/dealIntelligenceRoutes.js';
 import { calculate } from '../src/deal-intelligence/finance.mjs';
+import { handleApi } from '../src/deal-intelligence/api.mjs';
 
 function app() {
   const routes = new Map();
@@ -49,6 +50,21 @@ function researchResponse() {
     status: 'completed', output_text: JSON.stringify({ text: 'Completed sourced research.', brief: '', targets: [], findings: [] }),
     output: [{ type: 'web_search_call', action: { sources: [{ url: 'https://official.example/company', title: 'Official source' }] } }],
   }), { headers: { 'content-type': 'application/json' } });
+}
+function incompleteResponse(reason = 'max_output_tokens') {
+  return new Response(JSON.stringify({
+    status: 'incomplete', incomplete_details: { reason },
+    usage: { output_tokens: 8192, output_tokens_details: { reasoning_tokens: 8000 } },
+    output_text: '{"text":"Private partial draft that must never be parsed',
+    output: [{ type: 'web_search_call', action: { sources: [{ url: 'https://partial-only.example/company', title: 'Incomplete attempt source' }] } }],
+  }), { headers: { 'content-type': 'application/json' } });
+}
+async function aiRequest(env, prompt = 'M&A targets in NC') {
+  const response = await handleApi(new Request('https://sun-nourie-live.onrender.com/api/ai', {
+    method: 'POST', headers: { 'content-type': 'application/json', 'oai-authenticated-user-id': 'sun-nourie-owner' },
+    body: JSON.stringify({ mode: 'discover', prompt }),
+  }), { STORE: memoryStore(), OPENAI_API_KEY: 'server-only-test-key', ...env });
+  return { statusCode: response.status, payload: await response.json() };
 }
 async function waitForJob(instance, id, status) {
   for (let attempt = 0; attempt < 30; attempt++) {
@@ -205,11 +221,15 @@ test('research jobs return immediately, remain private, and complete independent
   assert.equal(completed.headers['cache-control'], 'private, no-store');
   assert.doesNotMatch(JSON.stringify(completed.payload), /server-only-test-credential/);
   assert.deepEqual([...new Set(store.owners)], ['sun-nourie-owner']);
-  assert.equal(metadata.length, 1);
-  assert.deepEqual(Object.keys(metadata[0][1]).sort(), ['code', 'durationMs', 'mode', 'status']);
+  assert.equal(metadata.length, 2);
+  const upstreamMetadata = metadata.find(entry => entry[0].startsWith('Deal Intelligence AI response: '));
+  assert.ok(upstreamMetadata);
+  assert.doesNotMatch(upstreamMetadata[0], /Find an operator|credential|owner/);
+  const completionMetadata = metadata.find(entry => entry[0] === 'Deal Intelligence research job finished.');
+  assert.deepEqual(Object.keys(completionMetadata[1]).sort(), ['code', 'durationMs', 'mode', 'status']);
   const health = await api(instance, '/health');
   assert.equal(health.payload.aiJobs, true);
-  assert.equal(health.payload.researchFlow, 'background-v1');
+  assert.equal(health.payload.researchFlow, 'completion-budget-v2');
 });
 
 test('jobs fully buffer streamed POST bodies before acknowledging them and survive a subsequent disconnect', async () => {
@@ -310,4 +330,135 @@ test('completed jobs expire after fifteen minutes and do not survive a service r
   const expired = await api(instance, `/ai/jobs/${accepted.payload.jobId}`);
   assert.equal(expired.statusCode, 404);
   assert.equal(expired.payload.code, 'JOB_NOT_FOUND');
+});
+
+test('token-exhausted research automatically retries a compact NC search without parsing partial output', async () => {
+  const calls = [];
+  const diagnostics = [];
+  const result = await aiRequest({
+    onAiAttempt: entry => diagnostics.push(entry),
+    fetchImpl: async (_url, options) => {
+      calls.push({ payload: JSON.parse(options.body), signal: options.signal });
+      return calls.length === 1 ? incompleteResponse() : researchResponse();
+    },
+  });
+  assert.equal(result.statusCode, 200);
+  assert.equal(calls.length, 2);
+  assert.deepEqual(calls.map(call => call.payload.max_output_tokens), [8192, 16384]);
+  assert.deepEqual(calls.map(call => call.payload.reasoning), [{ effort: 'low' }, { effort: 'low' }]);
+  assert.equal(calls[0].signal, calls[1].signal);
+  assert.deepEqual(calls[0].payload.input[1], calls[1].payload.input[1]);
+  assert.match(calls[0].payload.input[1].content[0].text, /^Request: M&A targets in NC\n/);
+  assert.match(calls[1].payload.input[0].content[0].text, /at most two/);
+  assert.deepEqual(calls[0].payload.text, calls[1].payload.text);
+  assert.equal(calls[1].payload.tool_choice, 'required');
+  assert.deepEqual(calls[1].payload.include, ['web_search_call.action.sources']);
+  assert.equal(result.payload.text, 'Completed sourced research.');
+  assert.doesNotMatch(JSON.stringify(result.payload), /Private partial|partial-only/);
+  assert.deepEqual(diagnostics[0], { attempt: 1, maxOutputTokens: 8192, status: 'incomplete', incompleteReason: 'max_output_tokens', outputTokens: 8192, reasoningTokens: 8000 });
+  assert.deepEqual(Object.keys(diagnostics[1]).sort(), ['attempt', 'incompleteReason', 'maxOutputTokens', 'outputTokens', 'reasoningTokens', 'status']);
+  assert.doesNotMatch(JSON.stringify(diagnostics), /M&A|Private partial|partial-only|server-only/);
+});
+
+test('research never retries content filtering or a second token-exhausted response', async () => {
+  for (const reason of ['content_filter', 'max_output_tokens', 'unexpected_reason']) {
+    let calls = 0;
+    const result = await aiRequest({ fetchImpl: async () => { calls++; return incompleteResponse(reason); } });
+    assert.equal(result.statusCode, 502);
+    assert.equal(result.payload.code, 'AI_INCOMPLETE');
+    assert.equal(calls, reason === 'max_output_tokens' ? 2 : 1);
+    assert.doesNotMatch(JSON.stringify(result.payload), /Private partial|unexpected_reason|Narrow/);
+  }
+});
+
+test('retry cannot trust sources from an incomplete response and still enforces schema validation', async () => {
+  for (const invalidSchema of [false, true]) {
+    let calls = 0;
+    const result = await aiRequest({
+      fetchImpl: async () => {
+        if (++calls === 1) return incompleteResponse();
+        const parsed = { text: 'The complete research answer.', targets: [], findings: [], ...(invalidSchema ? {} : { brief: '' }) };
+        return new Response(JSON.stringify({ status: 'completed', output_text: JSON.stringify(parsed), output: [] }));
+      },
+    });
+    assert.equal(calls, 2);
+    assert.equal(result.statusCode, 502);
+    assert.equal(result.payload.code, invalidSchema ? 'AI_RESPONSE_INVALID' : 'AI_NO_SOURCES');
+    assert.doesNotMatch(JSON.stringify(result.payload), /partial-only/);
+  }
+});
+
+test('research metadata failures cannot break responses, and custom model overrides omit reasoning settings', async () => {
+  for (const model of ['gpt-5.5-2026-04-23', 'gpt-5-pro', 'custom-model']) {
+    const result = await aiRequest({
+      OPENAI_RESEARCH_MODEL: model,
+      onAiAttempt: () => { throw new Error('Private logger error'); },
+      fetchImpl: async (_url, options) => {
+        const payload = JSON.parse(options.body);
+        assert.equal(payload.model, model);
+        assert.deepEqual(payload.reasoning, model.startsWith('gpt-5.5-') ? { effort: 'low' } : undefined);
+        return researchResponse();
+      },
+    });
+    assert.equal(result.statusCode, 200);
+  }
+});
+
+test('one deadline covers both research attempts, including response-body reads', async () => {
+  let calls = 0;
+  let firstSignal;
+  const started = Date.now();
+  const result = await aiRequest({
+    OPENAI_REQUEST_TIMEOUT_MS: 1000,
+    fetchImpl: async (_url, options) => {
+      calls++;
+      if (calls === 1) {
+        firstSignal = options.signal;
+        await new Promise(resolve => setTimeout(resolve, 650));
+        return incompleteResponse();
+      }
+      assert.equal(options.signal, firstSignal);
+      return {
+        ok: true, status: 200,
+        json: async () => await new Promise((_resolve, reject) => {
+          if (options.signal.aborted) reject(new DOMException('Aborted', 'AbortError'));
+          else options.signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
+        }),
+      };
+    },
+  });
+  assert.equal(calls, 2);
+  assert.equal(result.statusCode, 504);
+  assert.equal(result.payload.code, 'AI_TIMEOUT');
+  assert.equal(firstSignal.aborted, true);
+  assert.ok(Date.now() - started < 1500, 'Retry must not reset the one-second deadline');
+});
+
+test('upstream credential and quota errors are safe and are never retried', async () => {
+  for (const [status, error, expectedCode] of [[401, { type: 'authentication_error' }, 'AI_AUTH'], [429, { code: 'insufficient_quota' }, 'AI_QUOTA']]) {
+    let calls = 0;
+    const result = await aiRequest({ fetchImpl: async () => {
+      calls++;
+      return new Response(JSON.stringify({ error: { ...error, message: 'Private server-only-test-key provider details' } }), { status });
+    } });
+    assert.equal(calls, 1);
+    assert.equal(result.payload.code, expectedCode);
+    assert.doesNotMatch(JSON.stringify(result.payload), /server-only|Private/);
+  }
+});
+
+test('HTTP success cannot accept sourced output unless the provider status is completed', async () => {
+  for (const status of ['failed', 'cancelled', 'queued', 'in_progress', 'unexpected_status', undefined]) {
+    let calls = 0;
+    const result = await aiRequest({ fetchImpl: async () => {
+      calls++;
+      const payload = await researchResponse().json();
+      payload.status = status;
+      return new Response(JSON.stringify(payload));
+    } });
+    assert.equal(calls, 1);
+    assert.equal(result.statusCode, 502);
+    assert.equal(result.payload.code, 'AI_UPSTREAM');
+    assert.doesNotMatch(JSON.stringify(result.payload), /Completed sourced research|official\.example|unexpected_status/);
+  }
 });
