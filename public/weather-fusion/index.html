@@ -56,6 +56,101 @@
     }
   </style>
 
+  <style id="banner-header">
+    /* Banner-style header matching Daniel's design */
+    .topbar {
+      padding: 16px 0 !important;
+      align-items: center !important;
+    }
+    .brand-premium {
+      display: flex !important;
+      align-items: center !important;
+      gap: 14px !important;
+      text-decoration: none !important;
+    }
+    .brand-mark {
+      width: 64px !important;
+      height: 64px !important;
+      border-radius: 50% !important;
+      background: radial-gradient(circle at 30% 25%, rgba(255,255,255,0.35), rgba(255,255,255,0.08) 50%, rgba(100,160,220,0.15)) !important;
+      backdrop-filter: blur(12px) !important;
+      -webkit-backdrop-filter: blur(12px) !important;
+      border: 1.5px solid rgba(255,255,255,0.35) !important;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.4) !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      flex-shrink: 0 !important;
+      position: relative !important;
+      overflow: hidden !important;
+    }
+    .brand-mark::before {
+      content: '' !important;
+      position: absolute !important;
+      top: 8% !important;
+      left: 12% !important;
+      width: 28% !important;
+      height: 18% !important;
+      background: radial-gradient(ellipse, rgba(255,255,255,0.7), transparent) !important;
+      border-radius: 50% !important;
+      transform: rotate(-20deg) !important;
+    }
+    .brand-mark img {
+      width: 44px !important;
+      height: 44px !important;
+      position: relative !important;
+      z-index: 1 !important;
+    }
+    .brand-word {
+      display: flex !important;
+      flex-direction: column !important;
+      line-height: 1 !important;
+    }
+    .brand-kicker {
+      font-size: 13px !important;
+      font-weight: 500 !important;
+      letter-spacing: 6px !important;
+      color: rgba(255,255,255,0.85) !important;
+      margin-bottom: 2px !important;
+    }
+    .brand-name {
+      font-size: 42px !important;
+      font-weight: 800 !important;
+      letter-spacing: -0.5px !important;
+      background: linear-gradient(180deg, #ffffff 20%, #ffe9b0 60%, #f5c86e 100%) !important;
+      -webkit-background-clip: text !important;
+      background-clip: text !important;
+      -webkit-text-fill-color: transparent !important;
+      color: transparent !important;
+      text-shadow: 0 2px 12px rgba(0,0,0,0.15) !important;
+    }
+    /* Glass bubble refresh button */
+    .topbar nav .icon-button {
+      width: 56px !important;
+      height: 56px !important;
+      border-radius: 50% !important;
+      background: radial-gradient(circle at 30% 25%, rgba(255,255,255,0.25), rgba(255,255,255,0.08) 50%, rgba(100,160,220,0.12)) !important;
+      backdrop-filter: blur(12px) !important;
+      -webkit-backdrop-filter: blur(12px) !important;
+      border: 1.5px solid rgba(255,255,255,0.3) !important;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.3) !important;
+      font-size: 24px !important;
+      color: #fff !important;
+      position: relative !important;
+    }
+    .topbar nav .icon-button::before {
+      content: '' !important;
+      position: absolute !important;
+      top: 10% !important;
+      left: 15% !important;
+      width: 25% !important;
+      height: 15% !important;
+      background: radial-gradient(ellipse, rgba(255,255,255,0.6), transparent) !important;
+      border-radius: 50% !important;
+      transform: rotate(-20deg) !important;
+    }
+  </style>
+
 </head>
 <body data-sky="day">
   <a class="skip-link" href="#forecast">Skip to forecast</a>
