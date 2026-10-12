@@ -46,8 +46,10 @@
 
 
   <style id="uniform-tiles">
-    /* All tiles: same glass color, same spacing - v2 */
-    main .glass, .shell .glass, section.glass {
+    /* All tiles: same glass color, same spacing - v3 */
+    main section, .shell section,
+    main .glass, .shell .glass, section.glass,
+    #wn-compare-section, #dewpoint-gross-meter, #car-wash-forecast {
       background: linear-gradient(145deg, rgba(30, 58, 95, 0.88), rgba(20, 40, 70, 0.88)) !important;
       backdrop-filter: blur(20px) saturate(150%) !important;
       -webkit-backdrop-filter: blur(20px) saturate(150%) !important;
@@ -56,6 +58,14 @@
       margin-top: 0 !important;
       margin-bottom: 16px !important;
       padding: 20px !important;
+    }
+    /* Hero keeps its own style (not a tile) */
+    section.hero {
+      background: transparent !important;
+      border: none !important;
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+      padding: 12px 0 30px !important;
     }
     /* AQI tile keeps its dynamic color (exception) */
     .glass.aqi-dynamic {
