@@ -95,3 +95,39 @@ export function nextTwelveSentence(hours) {
   const dir = Math.abs(trend) < 2 ? 'steady' : trend > 0 ? 'warming' : 'cooling';
   return `Over the next 12 hours, temperatures stay between ${lo}° and ${hi}°, ${dir}.`;
 }
+
+/* One slot per hour for the next 48 hours, for the time scrubber.
+ * Values come from the same blended series the charts use; the condition
+ * comes from the hourly rows, which only cover the next 24 to 48 hours. */
+export function buildScrub(series, hours, nowMs, tz) {
+  const hourStart = Math.floor(nowMs / H) * H;
+  const index = (pts) => {
+    const m = new Map();
+    for (const p of pts || []) if (finite(p.v) && Number.isFinite(p.t)) m.set(Math.floor(p.t / H) * H, p.v);
+    return m;
+  };
+  const T = index(series?.temperature), F = index(series?.feels), P = index(series?.precip);
+  const W = index(series?.wind), G = index(series?.gust), R = index(series?.humidity);
+  const C = new Map((hours || []).map((h) => [Math.floor(h.time / H) * H, h]));
+  const out = [];
+  for (let i = 0; i < 48; i++) {
+    const t = hourStart + i * H;
+    const h = C.get(t);
+    const temp = T.has(t) ? T.get(t) : (h && finite(h.temp) ? h.temp : null);
+    if (temp == null) continue;
+    const when = new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short', hour: 'numeric' }).format(new Date(t)).replace(' at', '').replace(',', '');
+    out.push({
+      t,
+      label: i === 0 ? 'Now' : when,
+      temp: Math.round(temp),
+      feels: F.has(t) ? Math.round(F.get(t)) : null,
+      chance: P.has(t) ? Math.round(P.get(t)) : (h && finite(h.chance) ? h.chance : null),
+      wind: W.has(t) ? Math.round(W.get(t)) : null,
+      gust: G.has(t) ? Math.round(G.get(t)) : null,
+      humidity: R.has(t) ? Math.round(R.get(t)) : null,
+      condition: h?.condition || '',
+      isDay: h ? h.isDay !== false : null,
+    });
+  }
+  return out;
+}

@@ -7,7 +7,7 @@
 import { weatherIcon, windDirectionLabel } from './weather-display.js?v=weather-qa-v67';
 import { weatherState } from './weather-state.js?v=weather-qa-v67';
 import { finite, rainChanceValue } from './weather-math.js?v=weather-qa-v67';
-import { rainWindows, nextRainSentence, dayChangeSentence, confidenceExplanation, alertGuidance, uvWindow, nextTwelveSentence } from './halo-insights.js?v=halo-insights-v1';
+import { rainWindows, nextRainSentence, dayChangeSentence, confidenceExplanation, alertGuidance, uvWindow, nextTwelveSentence, buildScrub } from './halo-insights.js?v=halo-insights-v2';
 
 export const H = 3600000;
 const round = (n) => (finite(n) ? Math.round(n) : null);
@@ -361,6 +361,7 @@ export function buildModel(data, nowMs = Date.now()) {
     },
     alerts: (data?.alerts || []).slice(0, 4).map((a) => ({ event: a.event || 'Weather alert', headline: a.headline || '', severe: /warning|emergency/i.test(a.event || ''), guidance: alertGuidance(a.event || '') })),
     insights: buildInsights({ series, hours, days, nowMs, tz, uv: series.uv }),
+    scrub: buildScrub(series, hours, nowMs, tz),
     discussion: disc ? { office: data.discussion.office || '', issued: Date.parse(data.discussion.issuanceTime), excerpt: discussionExcerpt(disc), full: disc } : null,
   };
 }
@@ -472,7 +473,7 @@ function fmtValue(metric, p, gust) {
 /* ---------- App state ---------- */
 const PRESETS = [{ id: 'knightdale', name: 'Knightdale / Raleigh' }, { id: 'greenville', name: 'Greenville, NC' }];
 const STORE = 'halo.places.v1';
-const state = { places: [], index: 0, model: null, metric: 'temperature', trend: 'temperature', sheetDay: 0, cache: new Map() };
+const state = { places: [], index: 0, model: null, metric: 'temperature', trend: 'temperature', sheetDay: 0, scrubIndex: 0, cache: new Map() };
 function loadPlaces() {
   let custom = [];
   try { custom = JSON.parse(localStorage.getItem(STORE) || '[]').filter((p) => p && finite(p.latitude) && finite(p.longitude) && typeof p.name === 'string').slice(0, 10); } catch { /* storage unavailable */ }
@@ -509,9 +510,59 @@ function renderHero(m, place) {
   countUp($('now-temp'), m.hero.temp);
   $('now-cond').textContent = m.hero.condition;
   $('now-hilo').textContent = m.hero.high != null ? `H:${m.hero.high}°  L:${m.hero.low ?? '--'}°` : '';
+  $('now-feels').textContent = m.hero.feels != null && m.hero.temp != null && m.hero.feels !== m.hero.temp ? `Feels like ${m.hero.feels}°` : '';
   $('hero-pill').textContent = m.insights?.nextRain || '';
   $('compact-place').textContent = name;
   $('compact-line').textContent = `${m.hero.temp ?? '--'}° | ${m.hero.condition}`;
+}
+
+/* ---------- 48-hour scrubber: drag to see any hour in the hero ---------- */
+function renderScrub(m) {
+  const slots = m.scrub || [], box = $('scrub'), input = $('scrub-input');
+  box.hidden = slots.length < 2;
+  if (box.hidden) { applyScrub(m, 0); return; }
+  input.max = String(slots.length - 1);
+  state.scrubIndex = Math.min(state.scrubIndex, slots.length - 1);
+  input.value = String(state.scrubIndex);
+  const span = slots.length - 1 || 1;
+  $('scrub-ticks').innerHTML = slots.map((sl, i) => (i % 6 === 0 && i > 0 ? `<span style="left:${((i / span) * 100).toFixed(2)}%">${esc(hourShort(sl.t, m.tz))}</span>` : '')).join('');
+  applyScrub(m, state.scrubIndex);
+}
+
+function applyScrub(m, idx) {
+  const slots = m.scrub || [], sl = slots[idx];
+  const input = $('scrub-input');
+  if (!sl || idx === 0) {
+    $('scrub-when').textContent = 'Now';
+    $('scrub-reset').hidden = true;
+    input.style.setProperty('--fill', '0%');
+    return;
+  }
+  const pct = (idx / (slots.length - 1)) * 100;
+  input.style.setProperty('--fill', `${pct.toFixed(2)}%`);
+  input.style.setProperty('--hot', tempColor(sl.temp));
+  $('scrub-reset').hidden = false;
+  $('scrub-when').textContent = `${fmt(sl.t, m.tz, { weekday: 'short' })} ${hourShort(sl.t, m.tz)}`;
+  $('now-temp').textContent = String(sl.temp);
+  $('now-cond').textContent = sl.condition || 'Forecast for this hour';
+  $('now-feels').textContent = sl.feels != null ? `Feels like ${sl.feels}°` : '';
+  $('now-hilo').textContent = [sl.chance != null ? `${sl.chance}% rain` : '', sl.wind != null ? `wind ${sl.wind} mph` : ''].filter(Boolean).join('  ·  ');
+  $('hero-kicker').textContent = `${fmt(sl.t, m.tz, { weekday: 'long' })}, ${hourShort(sl.t, m.tz)}`;
+  $('hero-pill').textContent = sl.chance != null && sl.chance >= 40
+    ? `Rain is likely around then (${sl.chance}%). Peak rain in the next 48 hours is shown below.`
+    : sl.chance != null ? `A ${sl.chance}% chance of rain at that hour.` : '';
+}
+
+function initScrub() {
+  $('scrub-input').addEventListener('input', (e) => {
+    state.scrubIndex = Number(e.target.value);
+    if (state.model) applyScrub(state.model, state.scrubIndex);
+  });
+  $('scrub-reset').addEventListener('click', () => {
+    state.scrubIndex = 0;
+    $('scrub-input').value = '0';
+    if (state.model) { renderHero(state.model, state.places[state.index]); applyScrub(state.model, 0); }
+  });
 }
 
 const SUN_ICONS = {
@@ -669,6 +720,7 @@ function render(m, place) {
   document.documentElement.style.setProperty('--sun-x', `${p != null ? 10 + p * 80 : 50}%`);
   document.documentElement.style.setProperty('--sun-y', `${p != null ? 30 - Math.sin(Math.PI * p) * 22 : 12}%`);
   renderHero(m, place);
+  renderScrub(m);
   renderAlerts(m);
   renderHourly(m);
   renderDaily(m);
@@ -851,7 +903,9 @@ const radar = (() => {
 /* ---------- Loading & navigation ---------- */
 let loadSeq = 0;
 async function select(index, { force = false } = {}) {
-  state.index = Math.max(0, Math.min(state.places.length - 1, index));
+  const nextIndex = Math.max(0, Math.min(state.places.length - 1, index));
+  if (nextIndex !== state.index) state.scrubIndex = 0;
+  state.index = nextIndex;
   const place = state.places[state.index];
   const url = new URL(window.location.href);
   url.search = place.id ? (state.index ? `?location=${place.id}` : '') : `?lat=${place.latitude}&lon=${place.longitude}&name=${encodeURIComponent(place.name)}`;
@@ -988,6 +1042,7 @@ function init() {
   $('map-expand').addEventListener('click', () => { $('map-card').classList.toggle('full'); document.body.classList.toggle('map-open'); radar.resize(); });
   if (chartRO) { chartRO.observe($('trend-chart')); chartRO.observe($('sheet-chart')); }
   initPlaces();
+  initScrub();
   initGestures();
   initCompactHeader();
   select(start);

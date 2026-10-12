@@ -143,3 +143,19 @@ test('next-twelve sentence reports range and direction', () => {
   assert.equal(nextTwelveSentence(hours), 'Over the next 12 hours, temperatures stay between 60° and 71°, warming.');
   assert.equal(nextTwelveSentence([]), '');
 });
+
+import { buildScrub } from '../public/weather-fusion/halo-insights.js';
+
+test('scrubber slots are hourly, start at the current hour and carry blended values', () => {
+  const start = Math.floor(now / H) * H;
+  const temps = Array.from({ length: 30 }, (_, i) => ({ t: start + i * H, v: 70 + i }));
+  const rows = [{ time: start, temp: 70, chance: 10, condition: 'Sunny', isDay: true }];
+  const slots = buildScrub({ temperature: temps, feels: [], precip: [{ t: start + 2 * H, v: 45 }], wind: [], gust: [], humidity: [] }, rows, now, tz);
+  assert.equal(slots[0].label, 'Now');
+  assert.equal(slots[0].temp, 70);
+  assert.equal(slots[0].condition, 'Sunny');
+  assert.equal(slots[2].chance, 45);
+  assert.equal(slots[1].condition, '');
+  assert.equal(slots.length, 30, 'only hours with a temperature are included');
+  assert.ok(slots.every((s, i) => i === 0 || s.t - slots[i - 1].t === H));
+});
