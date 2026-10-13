@@ -13,6 +13,18 @@ const LOGIN = '/weather-fusion/login';
 const LOGOUT = '/weather-fusion/logout';
 const HOME = '/weather-fusion/';
 const SESSION_MS = 12 * 60 * 60 * 1000;
+// The main weather page (/weather-fusion/) is public. Everything else behind
+// the gate (other weather pages, WeatherNext, What's Up, Deal Intelligence,
+// compare tools) still needs the password. Set WEATHER_FUSION_PUBLIC=0 to re-lock.
+const PUBLIC_PAGES = new Set(['/weather-fusion', '/weather-fusion/', '/weather-fusion/index.html']);
+const PUBLIC_ASSET = /^\/weather-fusion\/[a-z0-9][a-z0-9._-]*\.(?:js|css|webp|png|jpe?g|svg|json|ico)$/;
+const PUBLIC_APIS = new Set(['forecast', 'alerts', 'briefing', 'bulletins', 'outlook', 'search', 'radar', 'models'].map(name => `/api/weather-fusion/${name}`));
+export function isPublicWeatherPath(url, method = 'GET') {
+  if (!['GET', 'HEAD'].includes(String(method).toUpperCase())) return false;
+  let pathname;
+  try { pathname = canonicalPath(url); } catch { return false; }
+  return PUBLIC_PAGES.has(pathname) || PUBLIC_ASSET.test(pathname) || PUBLIC_APIS.has(pathname);
+}
 const PREFIXES = ['/weather', '/weather-fusion', '/weathernext', '/api/weather-fusion', '/whats-up', '/whatsup', '/api/whats-up', '/deal-intelligence', '/api/deal-intelligence'];
 
 // The gateway passes this private key to its child processes. It is never sent
@@ -58,6 +70,7 @@ export function registerWeatherSiteAccess(app, {
   env = process.env,
   secret = weatherSiteCookieSecret,
   now = Date.now,
+  publicMain = env.WEATHER_FUSION_PUBLIC !== '0',
 } = {}) {
   const expected = env.WEATHER_SITE_PASSWORD
     ? {salt: DEFAULT_PASSWORD.salt, digest: crypto.scryptSync(env.WEATHER_SITE_PASSWORD, DEFAULT_PASSWORD.salt, 32).toString('hex')}
@@ -143,6 +156,7 @@ export function registerWeatherSiteAccess(app, {
     }
 
     if (authenticated(req)) { req.weatherSiteAuthenticated = true; return next(); }
+    if (publicMain && isPublicWeatherPath(req.originalUrl, req.method)) return next();
     if (pathname.startsWith('/api/')) return res.status(401).json({error: 'Weather site password required.', loginUrl: LOGIN});
     res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'");
     return res.status(401).type('html').send(loginPage(req.originalUrl));

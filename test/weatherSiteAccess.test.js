@@ -2,11 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import express from 'express';
-import { isProtectedWeatherPath, registerWeatherSiteAccess } from '../src/weatherSiteAccess.js';
+import { isProtectedWeatherPath, isPublicWeatherPath, registerWeatherSiteAccess } from '../src/weatherSiteAccess.js';
 
 async function fixture(t, options = {}) {
   const app = express();
-  registerWeatherSiteAccess(app, {env: {}, secret: 'test-only-private-secret', ...options});
+  registerWeatherSiteAccess(app, {env: {}, secret: 'test-only-private-secret', publicMain: false, ...options});
   app.use((req, res) => res.set('Cache-Control', 'public, max-age=86400').json({allowed: true, path: req.originalUrl}));
   const server = app.listen(0, '127.0.0.1');
   await new Promise(resolve => server.once('listening', resolve));
@@ -158,4 +158,17 @@ test('configured server password overrides the emergency hash and invalidates ol
   assert.equal((await configured.login('changed-test-password')).status, 303);
   const cookie = (await original.login()).headers.get('set-cookie').split(';')[0];
   assert.equal((await configured.request('/weather-fusion/', {headers: {Cookie: cookie}})).status, 401);
+});
+
+test('only the main weather page, its assets and read-only APIs are public', async t => {
+  const {request} = await fixture(t, {publicMain: true});
+  for (const route of ['/weather-fusion/', '/weather-fusion/index.html', '/weather-fusion/app.js', '/weather-fusion/header-night.webp', '/api/weather-fusion/forecast?location=knightdale']) {
+    assert.equal((await request(route)).status, 200, route);
+  }
+  for (const route of ['/weather-fusion/experimental-weather.html', '/weather-fusion/glance.html', '/weather-fusion/compare', '/weathernext/', '/whats-up/', '/deal-intelligence/', '/api/weather-fusion/compare/google', '/api/whats-up/tracker', '/api/deal-intelligence/x', '/weather-fusion/sub/app.js']) {
+    assert.equal((await request(route)).status, 401, route);
+  }
+  assert.equal((await request('/api/weather-fusion/forecast', {method: 'POST'})).status, 401);
+  assert.equal(isPublicWeatherPath('/WEATHER-FUSION/', 'GET'), true);
+  assert.equal(isPublicWeatherPath('/weather-fusion/', 'DELETE'), false);
 });
