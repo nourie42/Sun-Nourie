@@ -24,8 +24,9 @@ import {renderRiskOutlooks,resetRiskOutlooks} from './risk-outlooks.js?v=risk-ou
 import {renderAirQuality} from './air-quality.js?v=mobile-repair-v1';
 import {displayedRainChance} from './rain-display.js?v=rain-observed-v1';
 import {weatherChangeMessages,WEATHER_CHANGE_TITLE} from './weather-changes.js?v=large-change-v3';
+import {renderSnowOutlook} from './snow-outlook.js?v=1';
 import {renderForecastWindowBanners,resetForecastWindowBanners} from './forecast-window-banners.js?v=sun-window-main-v4';
-import {createSevenDayCarousel} from './seven-day.js?v=rain-icon-v11';
+import {createSevenDayCarousel} from './seven-day.js?v=snow-v12';
 import {forecastSourceHealth} from './forecast-status.js?v=source-health-v1';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);
@@ -167,6 +168,7 @@ function render(data) {
   $('hero-scene').innerHTML = icon(hero.condition, hero.isDay, 120);
   renderWeatherChanges(data);
   draw('forecast-window-banners','Upcoming weather windows',()=>renderForecastWindowBanners(data));
+  draw('snow-outlook-banner','Snow outlook',()=>renderSnowOutlook(data));
   draw('alerts', 'Official alerts', () => renderAlerts(data));
   draw('risk-outlook-list', 'Outlooks', () => renderRiskOutlooks(data));
   draw('hourly', 'Hourly forecast', () => renderHours(data));

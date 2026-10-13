@@ -105,3 +105,14 @@ html body #air-quality .aqi-week>[data-aqi="moderate"]{border-color:rgba(255,215
 html body #air-quality .aqi-week>[data-aqi="sensitive"]{border-color:rgba(255,150,40,.95)!important}
 html body #air-quality .aqi-week>[data-aqi="unhealthy"],html body #air-quality .aqi-week>[data-aqi="very-unhealthy"],html body #air-quality .aqi-week>[data-aqi="hazardous"]{border-color:rgba(255,70,70,.95)!important}
 html:not(.week-open) #daily-panel{display:none!important}
+
+/* v11 snow outlook: uniform glass, subtle icy blue border */
+html body main .forecast-window-banner.forecast-window-snow{border-color:rgba(170,215,255,.75)!important}
+html body .forecast-window-snow .forecast-window-icon svg{fill:none;stroke:#d8efff;stroke-width:2;stroke-linecap:round}
+.snow-outlook-banners{margin-top:12px}
+.snow-table small{display:block;font-size:10px;opacity:.7;font-weight:400}
+.snow-table td,.snow-table th{font-size:12px;vertical-align:top}
+.snow-wssi{font-size:13px;margin:8px 0}
+.snow-wssi a{color:#cfe8ff}
+.hour-snow{display:block;font-size:11px;color:#d8efff;margin-top:2px}
+.seven-day-snow{color:#d8efff;font-weight:700;font-size:12px}

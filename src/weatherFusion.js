@@ -26,6 +26,7 @@ import path from 'node:path';
 import { createDirectModels, enhanceForecast } from './weatherFusionDirect.js';
 import {validateCurrentConditions} from './weatherFusionCurrent.js';
 import {applyObservedSky} from './weatherFusionObservedSky.js';
+import {addSnowOutlook,snowModelsUrl,normalizeSnowModels,createWpcWinterService} from './weatherFusionSnow.js';
 
 export const PRESETS = [
   { id: 'knightdale', name: 'Knightdale / Raleigh', latitude: 35.787, longitude: -78.4806 },
@@ -301,7 +302,7 @@ export class Cache {
 export function withoutAviation(text=''){
  return text.replace(/(^|\n)\.(?:AVIATION)[^\n]*\n[\s\S]*?(?=\n\.[A-Z][A-Z /]*(?:\.\.\.|\s)|$)/gi,'').trim();
 }
-export function buildForecast({ location, point, forecast, hourly, grid, discussion, observation, alerts, specialDiscussions, precipitationDiscussions, riskOutlooks, exposureWeather, airQuality, models, feeds, now }) {
+export function buildForecast({ location, point, forecast, hourly, grid, discussion, observation, alerts, specialDiscussions, precipitationDiscussions, riskOutlooks, snowModels, wpcWinter, exposureWeather, airQuality, models, feeds, now }) {
   const zone = point?.timeZone || models.ecmwf?.timezone || 'America/New_York';
   const today = dateKey(now, zone);
   const rows = Object.fromEntries(Object.entries(models).map(([key, value]) => [key, normalizeModel(value, now, key === 'hrrr' ? 48 : 240)]));
@@ -382,6 +383,7 @@ export function buildForecast({ location, point, forecast, hourly, grid, discuss
   addExperience(output, {models, grid, periods:forecast?.periods || [], now, solarTimes, nextDate});
   addExposureWeather(output,exposureWeather);
   addAirQuality(output,airQuality);
+  try{addSnowOutlook(output,{grid,periods:forecast?.periods||[],snowModels,wpcWinter,now});}catch{output.snow={version:'snow-outlook-v1',possible:false,days:[],error:'Snow outlook could not be built.'};}
   output.danTakeVersion=DAN_TAKE_VERSION;
   output.forecastConfidenceVersion=FORECAST_CONFIDENCE_VERSION;
   output.weatherDisplayVersion='weather-nourie-sky-consistency-v1';
@@ -429,6 +431,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
     return text ? raw : JSON.parse(raw);
   }
   const cached = (url, ttl, options) => cache.get(url, ttl, async () => ({ data: await request(url, options), fetchedAt: iso(now()) }));
+  const loadWpcWinter = createWpcWinterService({ cached });
   async function feed(id, label, url, ttl, transform = (d) => d, options) {
     try {
       const { data, fetchedAt } = await cached(url, ttl, options);
@@ -461,6 +464,8 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
       const get = (id, label, url, ttl, transform) => url ? feed(id, label, url, ttl, transform) : unavailable(id, label);
       const jobs = {
         exposureWeather: feed('exposure','UV and surface-weather forecast',exposureWeatherUrl(location,point?.timeZone),30*MINUTE,normalizeExposureWeather),
+        snowModels: feed('snow-models','Model snowfall (Open-Meteo ECMWF/GFS)',snowModelsUrl(location,point?.timeZone),60*MINUTE,normalizeSnowModels),
+        wpcWinter: loadWpcWinter(location),
         airQuality: feed('air-quality','Air quality (U.S. AQI)',airQualityUrl(location),30*MINUTE,normalizeAirQuality),
         forecast: get('nws', 'NWS forecast', point?.forecast, 2 * MINUTE, (d) => d.properties?.periods?.length ? d.properties : null),
         hourly: get('hourly', 'NWS hourly', point?.forecastHourly, 2 * MINUTE, (d) => d.properties?.periods?.length ? d.properties : null),
