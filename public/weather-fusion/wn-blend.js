@@ -177,15 +177,17 @@ function buildSeries(fx, wn, varId) {
   return out;
 }
 
+const hiddenModels = new Set();
+const LABELS = { newBlend: 'Weather Nourie blend', oldBlend: 'Current', nws: 'NWS 36%', hrrr: 'HRRR 27%', nbm: 'NBM 18%', ecmwf: 'ECMWF 9%', wn: 'WN 10%', single: '' };
+const NAMES = { newBlend: 'Weather Nourie', oldBlend: 'Current blend', nws: 'NWS', hrrr: 'HRRR', nbm: 'NBM', ecmwf: 'ECMWF', wn: 'WeatherNext', single: '' };
 function renderChart(container, built, varDef, varId) {
   const { days } = built;
   // Size the SVG to its real pixel width so text stays legible on phones.
   const W = Math.max(320, Math.round(container.clientWidth || 900));
   const phone = W < 600;
-  const H = phone ? 340 : 380, PL = phone ? 40 : 52, PR = phone ? 12 : 18, PT = 30, PB = 34;
-  const FS = phone ? 12 : 14;
+  const H = phone ? 340 : 380, PL = phone ? 38 : 52, PR = phone ? 10 : 18, PT = 30, PB = 34;
+  const FS = phone ? 11 : 14;
   const series = { newBlend: [], oldBlend: [], nws: [], hrrr: [], nbm: [], ecmwf: [], wn: [], single: [] };
-
   if (built.perModel) {
     days.forEach((d, i) => {
       const src = { ...built.modelMaps[i], wn: built.wnVals[i] };
@@ -197,79 +199,78 @@ function renderChart(container, built, varDef, varId) {
   } else {
     days.forEach((d, i) => series.single.push(built.single[i] ?? null));
   }
-
-  const allV = Object.values(series).flat().filter((v) => v != null);
-  if (!allV.length) {
+  const ids = built.perModel ? ['newBlend', 'oldBlend', 'nws', 'hrrr', 'nbm', 'ecmwf', 'wn'].filter((id) => series[id].some((v) => v != null)) : ['single'];
+  const visible = ids.filter((id) => !hiddenModels.has(id));
+  const allV = visible.flatMap((id) => series[id]).filter((v) => v != null);
+  if (!ids.length || !series[ids[0]].some((v) => v != null)) {
     container.innerHTML = '<p class="muted" style="font-size:14px">No data for this variable.</p>';
     return;
   }
-  let lo = Math.min(...allV), hi = Math.max(...allV);
+  let lo = allV.length ? Math.min(...allV) : 0, hi = allV.length ? Math.max(...allV) : 1;
   // Zoom the y-axis to the data range with a little padding
   const pad = Math.max(varDef.unit === 'in' ? 0.02 : 0.5, (hi - lo) * 0.1);
-  lo = varDef.unit === '%' || varDef.unit === '' ? Math.max(0, lo - pad) : lo - pad;
-  if (varDef.unit === 'in') lo = Math.max(0, lo);
+  lo = varDef.unit === '%' || varDef.unit === '' || varDef.unit === 'in' ? Math.max(0, lo - pad) : lo - pad;
   hi += pad;
-
   const n = days.length;
   const X = (i) => PL + (i / Math.max(1, n - 1)) * (W - PL - PR);
   const Y = (v) => PT + (1 - (v - lo) / (hi - lo)) * (H - PT - PB);
-  const path = (pts) => {
-    let d = '';
-    pts.forEach((p, i) => { if (p != null) d += `${d ? 'L' : 'M'}${X(i).toFixed(1)},${Y(p).toFixed(1)}`; });
-    return d;
-  };
-
-  const labels = days.map((d, i) => {
+  const path = (pts) => { let d = '', pen = false; pts.forEach((p, i) => { if (p != null) { d += `${pen ? 'L' : 'M'}${X(i).toFixed(1)},${Y(p).toFixed(1)}`; pen = true; } else pen = false; }); return d; };
+  const dayName = (d, i, long) => {
     const dt = new Date(d.date + 'T12:00:00');
-    const name = i === 0 ? 'Today' : dt.toLocaleDateString('en-US', { weekday: 'short' });
-    return (phone && i % 2) ? '' : `<text x="${X(i).toFixed(0)}" y="${H - 10}" text-anchor="middle" font-size="${FS}" font-weight="600" fill="#d5e1f2">${name}</text>`;
-  }).join('');
+    if (long) return dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    return i === 0 ? (phone ? 'Tdy' : 'Today') : dt.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, phone ? 2 : 3);
+  };
+  const labels = days.map((d, i) => `<text x="${X(i).toFixed(0)}" y="${H - 10}" text-anchor="middle" font-size="${FS}" font-weight="600" fill="#d5e1f2">${dayName(d, i)}</text>`).join('');
   const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => lo + f * (hi - lo));
   const ylabels = ticks.map((v) =>
     `<line x1="${PL}" x2="${W - PR}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}" stroke="rgba(255,255,255,.14)" stroke-width="1"/>`
     + `<text x="${PL - 6}" y="${(Y(v) + 4).toFixed(0)}" text-anchor="end" font-size="${FS}" fill="#d5e1f2">${varDef.fmt(v)}</text>`).join('');
-
-  let order;
-  if (built.perModel) {
-    order = [
-      { id: 'wn', w: 2, dash: '6,4', op: 0.9 },
-      { id: 'nws', w: 2.5, op: 0.8 }, { id: 'hrrr', w: 2.5, op: 0.8 },
-      { id: 'nbm', w: 2.5, op: 0.8 }, { id: 'ecmwf', w: 2.5, op: 0.8 },
-      { id: 'oldBlend', w: 2.5, dash: '9,5', op: 0.9 },
-      { id: 'newBlend', w: 4, op: 1 },
-    ];
-  } else {
-    order = [{ id: 'single', w: 3.5, op: 1 }];
-  }
-  const lines = order.map(({ id, w, dash, op }) => {
-    const dAttr = path(series[id]);
-    if (!dAttr) return '';
-    return `<path d="${dAttr}" fill="none" stroke="${COLORS[id]}" stroke-width="${w}"`
-      + `${dash ? ` stroke-dasharray="${dash}"` : ''} opacity="${op}" stroke-linecap="round" stroke-linejoin="round"/>`;
-  }).join('');
-
-  // Value labels on the primary line
-  const primary = built.perModel ? series.newBlend : series.single;
-  const dots = primary.map((v, i) => v == null ? '' :
-    `<circle cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="4.5" fill="${built.perModel ? COLORS.newBlend : COLORS.single}"/>`
-    + `<text x="${X(i).toFixed(0)}" y="${(Y(v) - 12).toFixed(0)}" text-anchor="middle" font-size="${FS}" fill="#ffffff" font-weight="700" paint-order="stroke" stroke="rgba(0,0,0,.45)" stroke-width="3">${(phone && i % 2) ? '' : varDef.fmt(v)}</text>`
-  ).join('');
-
-  let legend;
-  if (built.perModel) {
-    legend = [
-      ['newBlend', 'Weather Nourie blend'], ['oldBlend', 'Current'],
-      ['nws', 'NWS 36%'], ['hrrr', 'HRRR 27%'], ['nbm', 'NBM 18%'], ['ecmwf', 'ECMWF 9%'],
-      ...(series.wn.some((v) => v != null) ? [['wn', 'WN 10%']] : []),
-    ].map(([id, label]) =>
-      `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:999px;background:rgba(255,255,255,.07);font-size:11px;line-height:1.4;color:#d5deee;white-space:nowrap">`
-      + `<i style="width:12px;height:3px;border-radius:2px;background:${COLORS[id]};display:inline-block"></i>${label}</span>`).join('');
-  } else {
-    legend = `<span style="font-size:11px;color:#d5deee">${varId === 'aqi' ? 'Daily max AQI (Open-Meteo / CAMS)' : varId === 'uv' ? 'Daily max UV index' : ''}</span>`;
-  }
-
+  const style = { wn: { w: 2.5, dash: '6,4', op: 0.9 }, nws: { w: 2.5, op: 0.85 }, hrrr: { w: 2.5, op: 0.85 }, nbm: { w: 2.5, op: 0.85 }, ecmwf: { w: 2.5, op: 0.85 }, oldBlend: { w: 2.5, dash: '9,5', op: 0.9 }, newBlend: { w: 4, op: 1 }, single: { w: 4, op: 1 } };
+  const drawOrder = ['wn', 'nws', 'hrrr', 'nbm', 'ecmwf', 'oldBlend', 'newBlend', 'single'].filter((id) => visible.includes(id));
+  const lines = drawOrder.map((id) => { const s = style[id], d = path(series[id]); return d ? `<path d="${d}" fill="none" stroke="${COLORS[id]}" stroke-width="${s.w}"${s.dash ? ` stroke-dasharray="${s.dash}"` : ''} opacity="${s.op}" stroke-linecap="round" stroke-linejoin="round"/>` : ''; }).join('');
+  const primaryId = visible.includes('newBlend') ? 'newBlend' : visible.includes('single') ? 'single' : visible[0];
+  const dots = primaryId ? series[primaryId].map((v, i) => v == null ? '' :
+    `<circle cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="4" fill="${COLORS[primaryId]}"/>`
+    + ((phone && i % 2) ? '' : `<text x="${X(i).toFixed(0)}" y="${(Y(v) - 11).toFixed(0)}" text-anchor="middle" font-size="${FS}" fill="#fff" font-weight="700" paint-order="stroke" stroke="rgba(0,0,0,.45)" stroke-width="3">${varDef.fmt(v)}</text>`)).join('') : '';
+  const chip = (id) => { const off = hiddenModels.has(id);
+    return `<button type="button" class="wn-chip" data-model="${id}" aria-pressed="${!off}" style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:999px;border:1px solid ${off ? 'rgba(255,255,255,.12)' : COLORS[id] + '99'};background:${off ? 'transparent' : 'rgba(255,255,255,.10)'};font-family:inherit;font-size:11px;font-weight:600;line-height:1.4;color:${off ? '#7f8ca3' : '#e8eef8'};white-space:nowrap;cursor:pointer;${off ? 'text-decoration:line-through;' : ''}">`
+      + `<i style="width:12px;height:3px;border-radius:2px;background:${COLORS[id]};opacity:${off ? 0.3 : 1};display:inline-block"></i>${LABELS[id]}</button>`; };
+  const legend = built.perModel ? ids.map(chip).join('')
+    : `<span style="font-size:11px;color:#d5deee">${varId === 'aqi' ? 'Daily max AQI (Open-Meteo / CAMS)' : varId === 'uv' ? 'Daily max UV index' : ''}</span>`;
+  const note = built.perModel ? `<p style="font-size:11px;color:#9fb0c8;margin:6px 0 0">Tap a chip to show/hide a model · tap or drag the graph for values. Models drop out as their forecast range ends (HRRR ~2 days, NWS ~7 days).</p>` : '';
   container.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:4px;padding:2px 0 8px">${legend}</div>`
-    + `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="width:100%;height:auto;display:block" role="img" aria-label="${varDef.label} comparison chart">${ylabels}${labels}${lines}${dots}</svg>`;
+    + `<div class="wn-chart-wrap" style="position:relative;touch-action:pan-y">`
+    + `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="width:100%;height:auto;display:block;cursor:crosshair" role="img" aria-label="${varDef.label} comparison chart">${ylabels}${labels}${lines}${dots}`
+    + `<line class="wn-cross" x1="0" x2="0" y1="${PT - 10}" y2="${H - PB}" stroke="#fff" stroke-width="1.5" stroke-dasharray="3,3" opacity="0"/><g class="wn-cross-dots"></g></svg>`
+    + `<div class="wn-tip" role="status" aria-live="polite" style="position:absolute;top:4px;display:none;min-width:130px;padding:8px 10px;border-radius:12px;background:rgba(10,20,40,.88);border:1px solid rgba(255,255,255,.22);color:#fff;font-size:12px;line-height:1.45;pointer-events:none;box-shadow:0 6px 18px rgba(0,0,0,.35)"></div></div>${note}`;
+  container.querySelectorAll('.wn-chip').forEach((b) => b.addEventListener('click', () => {
+    const id = b.dataset.model; if (hiddenModels.has(id)) hiddenModels.delete(id); else hiddenModels.add(id);
+    renderChart(container, built, varDef, varId);
+  }));
+  const svg = container.querySelector('svg'), tip = container.querySelector('.wn-tip'), cross = container.querySelector('.wn-cross'), cdots = container.querySelector('.wn-cross-dots'), wrap = container.querySelector('.wn-chart-wrap');
+  const show = (clientX) => {
+    const r = svg.getBoundingClientRect(), sx = (clientX - r.left) * (W / r.width);
+    const i = Math.max(0, Math.min(n - 1, Math.round(((sx - PL) / (W - PL - PR)) * (n - 1))));
+    const x = X(i);
+    cross.setAttribute('x1', x); cross.setAttribute('x2', x); cross.setAttribute('opacity', '0.8');
+    const rows = visible.map((id) => [id, series[id][i]]).filter(([, v]) => v != null);
+    cdots.innerHTML = rows.map(([id, v]) => `<circle cx="${x}" cy="${Y(v).toFixed(1)}" r="5" fill="${COLORS[id]}" stroke="#0a1428" stroke-width="1.5"/>`).join('');
+    tip.innerHTML = `<b style="display:block;margin-bottom:3px">${dayName(days[i], i, true)}</b>`
+      + (rows.length ? rows.map(([id, v]) => `<span style="display:flex;justify-content:space-between;gap:10px"><span><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COLORS[id]};margin-right:5px"></i>${NAMES[id] || varDef.label}</span><b>${varDef.fmt(v)}</b></span>`).join('') : '<span>No model data</span>');
+    tip.style.display = 'block';
+    const px = (x / W) * r.width, tw = tip.offsetWidth;
+    tip.style.left = `${Math.max(0, Math.min(r.width - tw, px > r.width / 2 ? px - tw - 12 : px + 12))}px`;
+  };
+  const hide = () => { tip.style.display = 'none'; cross.setAttribute('opacity', '0'); cdots.innerHTML = ''; };
+  let dragging = false;
+  svg.addEventListener('pointerdown', (e) => { dragging = true; show(e.clientX); });
+  svg.addEventListener('pointermove', (e) => { if (dragging || e.pointerType === 'mouse') show(e.clientX); });
+  svg.addEventListener('pointerup', (e) => { dragging = false; if (e.pointerType === 'mouse') return; });
+  svg.addEventListener('pointerleave', (e) => { dragging = false; if (e.pointerType === 'mouse') hide(); });
+  svg.addEventListener('pointercancel', () => { dragging = false; });
+  wrap.addEventListener('touchmove', (e) => { if (dragging && e.touches[0]) { show(e.touches[0].clientX); e.preventDefault(); } }, { passive: false });
+  document.addEventListener('pointerdown', (e) => { if (!wrap.contains(e.target)) hide(); }, { once: true });
+  container._wnShow = show;
 }
 
 let forecastCache = null, wnCache = null, varId = 'temp';
