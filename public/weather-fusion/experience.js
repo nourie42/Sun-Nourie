@@ -9,7 +9,7 @@ import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './per
 import {sunExposureTemperature} from './outdoor-feels.js?v=sun-exposure-v1';
 import {comfortMode,comfortWindow,comfortNarrative,warmestTodayWindow} from './comfort-outlook.js?v=warmest-sun-explain-v1';
 import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js?v=full-day-rain-v1';
-import {displayedRainChance} from './rain-display.js?v=rain-observed-v1';
+import {displayedRainChance,rainAwareCondition} from './rain-display.js?v=rain-icon-v2';
 import {resetDewpointMeter} from './dewpoint-meter.js?v=weather-qa-v67';
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -133,7 +133,7 @@ export function renderDailyRows(forecast,icon) {
  const days=(forecast.days||[]).slice(0,7);
  const values=days.flatMap(d=>[d.high,d.low]).filter(finite),lo=values.length?Math.min(...values)-3:0,hi=values.length?Math.max(...values)+3:1;
  const rows=days.map((d,i)=>{
-  const now=Date.now(),p=dailyDisplay(d,i,now,forecast.location.timeZone),rain=displayedRainChance(forecast,p.pop,{dayIndex:i,now}),shownPop=rain.value,bar=temperatureBar(p.primary,lo,hi),feel=dailyFeels(forecast,i,now);
+  const now=Date.now(),p=dailyDisplay(d,i,now,forecast.location.timeZone),rain=displayedRainChance(forecast,p.pop,{dayIndex:i,now}),shownPop=rain.value,_rc=(p.condition=rainAwareCondition(p.condition,rain.value,d,p.tonight)),bar=temperatureBar(p.primary,lo,hi),feel=dailyFeels(forecast,i,now);
   const confidence=d.confidence||{label:'Unavailable',score:null,key:'unavailable',factors:[],note:'Forecast confidence data is unavailable.'};
   const confidencePosition=confidenceMeterPosition(confidence);
   const plainConfidenceNotice=confidenceNotice(confidence);

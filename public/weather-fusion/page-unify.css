@@ -75,7 +75,7 @@ html body:not([data-sky=night]) main :is(.glass,section.glass,.car-wash-forecast
 /* Local outlook tile removed from view */
 html body main section.glass.briefing{display:none!important}
 /* collapsible 7-day + Scientific stuff */
-.wn-collapsible:not(.is-open)>:not(.section-top):not(.wn-preview){display:none!important}.wn-collapsible.is-open>.wn-preview{display:none!important}
+.wn-collapsible:not(.is-open)>:not(.section-top){display:none!important}
 .wn-collapsible>.section-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .wn-collapsible .collapse-toggle{margin-left:auto;padding:5px 12px!important;border-radius:999px!important;border:1px solid rgba(255,255,255,.28)!important;background:rgba(255,255,255,.10)!important;color:#fff!important;font-size:12px!important;font-weight:700!important;cursor:pointer}
 /* alert colour rules (uniform glass fill; colour lives in the border) */
@@ -97,16 +97,6 @@ html body main #air-quality:is(:has(.aqi-summary[data-aqi=unhealthy]),:has(.aqi-
 /* 7-day carousel: no second glass layer inside #experimental-week (was darker than other tiles) */
 html body main #experimental-week .seven-day-carousel.glass{background:transparent!important;background-image:none!important;border:0!important;box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
 /* Collapsed 7-day preview row */
-html body main #daily-panel:not(.is-open){padding-bottom:12px!important}
-html body main #daily-panel:not(.is-open)>.section-top{margin-bottom:8px!important;border-bottom:0!important}
-.wn-week-preview{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;width:100%;margin:0;padding:6px 2px 2px;border:0;background:transparent;color:#fff;font:inherit;cursor:pointer;text-align:center}
-.wn-week-preview .wn-pday{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;border-radius:12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12)}
-.wn-week-preview .wn-pday b{font-size:12px;font-weight:700;letter-spacing:.02em}
-.wn-week-preview svg{width:28px;height:28px}
-.wn-week-preview .wn-phi{font-size:14px;font-weight:750}
-.wn-week-preview .wn-plo{font-size:12px;opacity:.72}
-.wn-week-preview .wn-preview-empty{grid-column:1/-1;opacity:.75;font-size:13px}
-.wn-week-preview:focus-visible{outline:2px solid #fff;outline-offset:2px;border-radius:12px}
 html body .collapse-toggle .collapse-chevron{margin-left:6px;font-size:11px;opacity:.85}
 /* AQI day cards: border by category (also when the details are open) */
 html body #air-quality .aqi-week>[data-aqi]{border:1px solid rgba(255,255,255,.18)!important}
@@ -114,4 +104,4 @@ html body #air-quality .aqi-week>[data-aqi="good"]{border-color:rgba(80,220,120,
 html body #air-quality .aqi-week>[data-aqi="moderate"]{border-color:rgba(255,215,70,.9)!important}
 html body #air-quality .aqi-week>[data-aqi="sensitive"]{border-color:rgba(255,150,40,.95)!important}
 html body #air-quality .aqi-week>[data-aqi="unhealthy"],html body #air-quality .aqi-week>[data-aqi="very-unhealthy"],html body #air-quality .aqi-week>[data-aqi="hazardous"]{border-color:rgba(255,70,70,.95)!important}
-html body main #daily-panel:not(.is-open)>.section-top>span{display:none!important}
+html:not(.week-open) #daily-panel{display:none!important}

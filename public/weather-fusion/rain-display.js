@@ -23,3 +23,21 @@ export function observedRainLabel(display){
   ? `Rain now · remaining forecast peak ${Math.round(display.forecastValue)}%`
   : 'Rain now · observed radar';
 }
+
+// Daily icon/condition must agree with the displayed rain chance. NWS daytime wording
+// ("Sunny") can sit beside a blended daily PoP driven by the night period; when the shown
+// chance is >= 35% and the wording is dry, say when the rain is expected (NWS day/night text).
+export const RAIN_ICON_CHANCE = 35;
+export function rainAwareCondition(condition = '', pop = null, day = {}, tonight = false) {
+  const text = String(condition || '');
+  if (!(typeof pop === 'number' && Number.isFinite(pop) && pop >= RAIN_ICON_CHANCE)) return text;
+  if (/thunder|\btstm\b|storm|rain|shower|drizzle|snow|sleet|flurr|ice|freezing/i.test(text)) return text;
+  const words = `${day?.detail || ''} ${day?.nightDetail || ''} ${day?.nightCondition || ''}`;
+  const kind = /thunder|storm/i.test(words) ? 'storms' : /snow/i.test(words) ? 'snow' : 'showers';
+  const nightWet = /thunder|storm|rain|shower|drizzle|snow/i.test(`${day?.nightDetail || ''} ${day?.nightCondition || ''}`);
+  const dayWet = /thunder|storm|rain|shower|drizzle|snow/i.test(day?.detail || '');
+  const base = text.replace(/\s+then\s+.*$/i, '') || 'Mixed';
+  if (tonight) return `Chance of ${kind}`;
+  if (nightWet && !dayWet) return `${base}, then ${kind} tonight`;
+  return `${base}, chance of ${kind}`;
+}
