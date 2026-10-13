@@ -12,7 +12,7 @@ function state() {
   if (/cloud|overcast|fog|mist|haze|smoke/i.test(text) && !/mostly sunny|mostly clear/i.test(text)) return 'cloudy';
   return 'clear';
 }
-function apply() { if (header) header.dataset.hdr = state(); }
+function apply() { const s = state(); if (header) header.dataset.hdr = s; document.documentElement.dataset.hdr = s; }
 apply();
 new MutationObserver(apply).observe(document.body, { attributes: true, attributeFilter: ['data-sky'] });
 if (cond) new MutationObserver(apply).observe(cond, { childList: true, characterData: true, subtree: true, attributes: true });
