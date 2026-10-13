@@ -475,7 +475,9 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
               const { data } = await cached(`https://api.weather.gov/stations/${id}/observations/latest`, 5 * MINUTE);
               const o = data.properties, time = Date.parse(o?.timestamp);
               if (!finite(time) || !finite(toF(o?.temperature)) || now() - time > 2 * HOUR || time > now() + 5 * MINUTE) return null;
-              return { temperature: toF(o.temperature), ...stationWeather(o), time: o.timestamp,
+              const rank={SKC:0,CLR:0,FEW:1,SCT:2,BKN:3,OVC:4,VV:5};const layers=(o.cloudLayers||[]).map(l=>l?.amount).filter(x=>x in rank);
+              const skyCover=layers.length?layers.reduce((m,x)=>rank[x]>rank[m]?x:m,layers[0]):null;
+              return { temperature: toF(o.temperature), ...stationWeather(o), skyCover, time: o.timestamp,
                 stationDistanceKm: rounded(Math.sqrt(distance(s))*111.2,1), station: id, stationName: clean(s.properties?.name, 140), humidity: numeric(o.relativeHumidity?.value), dewpoint: toF(o.dewpoint),
                 wind: toMph(o.windSpeed), gust: rounded(toMph(o.windGust)), windDirection: numeric(o.windDirection?.value),
                 visibility: o.visibility?.unitCode === 'wmoUnit:m' && finite(o.visibility.value) ? rounded(o.visibility.value / 1609.344, 1) : null,
