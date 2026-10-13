@@ -3,7 +3,7 @@ const header = document.querySelector('.topbar.sky-header');
 const cond = document.getElementById('condition');
 function state() {
   const sky = document.body.dataset.sky;
-  const text = (cond && !cond.hidden ? cond.textContent : '') || '';
+  const text = (cond ? cond.textContent : '') || '';
   const loaded = text && !/gathering/i.test(text);
   if (!loaded) { const h = new Date().getHours(); return h >= 7 && h < 19 ? 'clear' : 'night'; }
   if (sky === 'night') return 'night';

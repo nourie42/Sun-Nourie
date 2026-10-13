@@ -114,6 +114,10 @@ function smallIcon(type) {
     sun: 'M2 19h20M5 15a7 7 0 0 1 14 0M12 2v3M3 7l3 2M21 7l-3 2' };
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="${paths[type] || paths.temp}"/></svg>`;
 }
+// Single shared day/night state (sunrise/sunset). Header, background sky and page visuals all read body[data-sky].
+let lastHeroCondition = '';
+function syncSkyState() { if (!forecast) return; const day = isDaylight(), next = !day ? 'night' : /rain|storm|shower/i.test(lastHeroCondition) ? 'rain' : 'day'; if (document.body.dataset.sky !== next) document.body.dataset.sky = next; }
+setInterval(syncSkyState, 60000);
 function isDaylight() {
   // Prefer the forecast's calculated sunrise/sunset for the selected location.
   const rise = Date.parse(forecast?.solar?.sunrise), set = Date.parse(forecast?.solar?.sunset), now = Date.now();
@@ -147,6 +151,7 @@ function render(data) {
   const c = data.current, d = data.days[0], day = isDaylight();
   const hero = currentHero(data, day);
   document.body.dataset.sky = !day ? 'night' : /rain|storm|shower/i.test(hero.condition) ? 'rain' : 'day';
+  lastHeroCondition = hero.condition;
   $('city-name').textContent = data.location.name || place?.name || 'Your location';
   if(place?.source?.startsWith('device'))setDeviceLocationLabel(`Device location · ${data.location.name||'current position'}`);
   $('hero-date').textContent = new Intl.DateTimeFormat('en-US', { timeZone: data.location.timeZone, weekday: 'long', month: 'long', day: 'numeric' }).format(new Date()).toUpperCase();
