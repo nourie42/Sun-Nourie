@@ -281,7 +281,7 @@ function renderChart(container, built, varDef, varId) {
   };
   const legend = built.perModel ? ids.map(chip).join('')
     : `<span style="font-size:11px;color:#d5deee">${varId === 'aqi' ? 'Daily max AQI (Open-Meteo / CAMS)' : varId === 'uv' ? 'Daily max UV index' : ''}</span>`;
-  const note = built.perModel ? `<p style="font-size:11px;color:#9fb0c8;margin:6px 0 0">Tap a chip to show/hide a model (hidden models drop out of the Weather Nourie blend) · tap or drag the graph for values. Models drop out as their forecast range ends (HRRR ~2 days, NWS ~7 days).${built.fixedBlend ? ' Rain chance: NWS is its official probability; HRRR, NBM and ECMWF show each model’s rain signal at the day’s peak hour; the blend is the Weather Nourie rain chance.' : ''}${blendChanged ? ' <b style="color:#ffd479">Blend recalculated without hidden models.</b>' : ''}</p>` : '';
+  const note = built.perModel && !built.noBlend ? `<p style="font-size:11px;color:#9fb0c8;margin:6px 0 0">Tap a chip to show/hide a model (hidden models drop out of the Weather Nourie blend) · tap or drag the graph for values. Models drop out as their forecast range ends (HRRR ~2 days, NWS ~7 days).${built.fixedBlend ? ' Rain chance: NWS is its official probability; HRRR, NBM and ECMWF show each model’s rain signal at the day’s peak hour; the blend is the Weather Nourie rain chance.' : ''}${blendChanged ? ' <b style="color:#ffd479">Blend recalculated without hidden models.</b>' : ''}</p>` : '';
   container.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:4px;padding:2px 0 8px">${legend}</div>`
     + `<div class="wn-chart-wrap" style="position:relative;touch-action:pan-y">`
     + `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="width:100%;height:auto;display:block;cursor:crosshair" role="img" aria-label="${varDef.label} comparison chart">${ylabels}${labels}${lines}${dots}`
@@ -396,8 +396,11 @@ async function init() {
       fetchJSON(`/api/weather-fusion/forecast?location=${encodeURIComponent(loc)}`),
       loadWNFeed(),
     ]);
-    forecastCache = forecast;
-    wnCache = pickWN(wn, forecast);
+    wnFeed = wn;
+    // Prefer the page's own forecast (searched / located place) over the default location.
+    const pageFx = globalThis.__weatherNourieForecast;
+    forecastCache = pageFx?.days ? pageFx : forecast;
+    wnCache = pickWN(wn, forecastCache);
     render();
     let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(render, 200); });
     // the section starts hidden (width 0); re-render when it is opened
@@ -408,6 +411,14 @@ async function init() {
   }
 }
 
+// Reload the comparison whenever the page loads a forecast for a (new) location.
+let wnFeed = null;
+document.addEventListener('weather-nourie:forecast', (e) => {
+  const fx = e.detail; if (!fx?.days) return;
+  forecastCache = fx;
+  if (wnFeed) wnCache = pickWN(wnFeed, fx);
+  try { render(); } catch {}
+});
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', init);
 } else {
