@@ -24,6 +24,7 @@ const COLORS = {
 };
 const K2F = (k) => (k - 273.15) * 9 / 5 + 32;
 const MS2MPH = (ms) => ms * 2.23694;
+const M2IN = (m) => m * 39.3701; // WeatherNext/ECMWF precipitation is in metres
 const finite = (v) => typeof v === 'number' && Number.isFinite(v);
 
 async function fetchJSON(url) {
@@ -47,12 +48,30 @@ async function loadWNFeed() {
     const feed = await fetchJSON(WN_FEED);
     const src = feed.sources?.surface;
     const pts = src?.points || [];
-    const pt = pts.find((p) => (p.name || '').toLowerCase().includes('knightdale')) || pts[0];
-    if (!pt?.hourly?.length) return null;
-    const runAt = src?.runAt || feed.runAt;
-    const ageDays = runAt ? (Date.now() - new Date(runAt).getTime()) / MS_PER_DAY : null;
-    return { hourly: pt.hourly, runAt, ageDays };
+    return { pts, runAt: src?.runAt || feed.runAt };
   } catch { return null; }
+}
+// Pick the WeatherNext point for the forecast location; null if none is within ~25 km.
+function pickWN(raw, fx) {
+  if (!raw?.pts?.length) return null;
+  const la = fx?.location?.latitude, lo = fx?.location?.longitude;
+  let pt = null;
+  if (finite(la) && finite(lo)) {
+    let best = Infinity;
+    for (const p of raw.pts) {
+      if (!finite(p.latitude) || !finite(p.longitude)) continue;
+      const dy = (p.latitude - la) * 111, dx = (p.longitude - lo) * 111 * Math.cos(la * Math.PI / 180);
+      const dkm = Math.hypot(dx, dy);
+      if (dkm < best) { best = dkm; pt = p; }
+    }
+    if (best > 25) pt = null;
+  } else {
+    pt = raw.pts.find((p) => (p.name || '').toLowerCase().includes('knightdale')) || null;
+  }
+  if (!pt?.hourly?.length) return null;
+  const runAt = raw.runAt;
+  const ageDays = runAt ? (Date.now() - new Date(runAt).getTime()) / MS_PER_DAY : null;
+  return { hourly: pt.hourly, runAt, ageDays };
 }
 
 function blendVal(sources, weights) {
@@ -81,19 +100,26 @@ function dailySeriesMax(series, days, tz) {
 }
 
 // Aggregate WN hourly to daily
-function wnDaily(wnHourly, varKey, agg, days, tz, convert) {
+function wnDaily(wnHourly, varKey, agg, days, tz, convert, windows) {
   if (!wnHourly) return days.map(() => null);
   const byDay = {};
+  const hours = [];
   for (const h of wnHourly) {
     const v = h.values?.[varKey];
-    const raw = typeof v === 'object' ? v.mean : v;
+    const raw = v && typeof v === 'object' ? v.mean : v;
     if (!finite(raw)) continue;
     const val = convert ? convert(raw) : raw;
-    const key = localDateKey(Date.parse(h.time), tz);
+    const t = Date.parse(h.time);
+    hours.push([t, val]);
+    const key = localDateKey(t, tz);
     (byDay[key] = byDay[key] || []).push(val);
   }
-  return days.map((d) => {
-    const vals = byDay[d.dateKey];
+  return days.map((d, i) => {
+    const w = windows?.[i];
+    // hourly accumulations are labelled at the END of the hour, so (start, end]
+    const vals = w ? hours.filter(([t]) => t > w.start && t <= w.end).map(([, v]) => v) : byDay[d.dateKey];
+    if (w && hours.length && (hours[0][0] > w.start + 3600000 || hours[hours.length - 1][0] < w.end)) return null; // partial window
+    if (!vals?.length) return null;
     if (!vals?.length) return null;
     return agg === 'max' ? Math.max(...vals) : vals.reduce((a, b) => a + b, 0);
   });
@@ -127,8 +153,14 @@ function buildSeries(fx, wn, varId) {
       for (const s of ((fx.days[i] || {})[key]?.sources || [])) src[s.id] = s.value;
       out.modelMaps[i] = src;
     });
+    // Rain: sum WN over the same window the other models use for that day (qpfBlend start/end, 7am-7am)
+    const windows = varId === 'rain' ? days.map((d, i) => {
+      const q = (fx.days[i] || {}).qpfBlend || {}, w = (fx.days[i] || {}).qpfWindow || {};
+      const a = Date.parse(q.start || w.start), b = Date.parse(q.end || w.end);
+      return Number.isFinite(a) && Number.isFinite(b) ? { start: a, end: b } : null;
+    }) : null;
     out.wnVals = wnDaily(wn?.hourly, varId === 'temp' ? 'temperature_2m' : 'total_precipitation_1hr',
-      varId === 'temp' ? 'max' : 'sum', days, tz, varId === 'temp' ? K2F : (mm) => mm / 25.4);
+      varId === 'temp' ? 'max' : 'sum', days, tz, varId === 'temp' ? K2F : M2IN, windows);
   } else if (varId === 'wind' || varId === 'dewpoint' || varId === 'humidity') {
     const key = varId === 'wind' ? 'wind' : varId;
     out.modelMaps = dailySeriesMax(fx.metricForecasts?.series?.[key], days, tz);
@@ -145,9 +177,13 @@ function buildSeries(fx, wn, varId) {
   return out;
 }
 
-function renderChart(container, built, varDef) {
+function renderChart(container, built, varDef, varId) {
   const { days } = built;
-  const H = 300, W = 900, PL = 56, PR = 16, PT = 30, PB = 36;
+  // Size the SVG to its real pixel width so text stays legible on phones.
+  const W = Math.max(320, Math.round(container.clientWidth || 900));
+  const phone = W < 600;
+  const H = phone ? 340 : 380, PL = phone ? 40 : 52, PR = phone ? 12 : 18, PT = 30, PB = 34;
+  const FS = phone ? 12 : 14;
   const series = { newBlend: [], oldBlend: [], nws: [], hrrr: [], nbm: [], ecmwf: [], wn: [], single: [] };
 
   if (built.perModel) {
@@ -168,7 +204,8 @@ function renderChart(container, built, varDef) {
     return;
   }
   let lo = Math.min(...allV), hi = Math.max(...allV);
-  const pad = Math.max(varDef.unit === 'in' ? 0.05 : 1, (hi - lo) * 0.15);
+  // Zoom the y-axis to the data range with a little padding
+  const pad = Math.max(varDef.unit === 'in' ? 0.02 : 0.5, (hi - lo) * 0.1);
   lo = varDef.unit === '%' || varDef.unit === '' ? Math.max(0, lo - pad) : lo - pad;
   if (varDef.unit === 'in') lo = Math.max(0, lo);
   hi += pad;
@@ -185,19 +222,21 @@ function renderChart(container, built, varDef) {
   const labels = days.map((d, i) => {
     const dt = new Date(d.date + 'T12:00:00');
     const name = i === 0 ? 'Today' : dt.toLocaleDateString('en-US', { weekday: 'short' });
-    return `<text x="${X(i).toFixed(0)}" y="${H - 10}" text-anchor="middle" font-size="13" fill="#aebdd4">${name}</text>`;
+    return (phone && i % 2) ? '' : `<text x="${X(i).toFixed(0)}" y="${H - 10}" text-anchor="middle" font-size="${FS}" font-weight="600" fill="#d5e1f2">${name}</text>`;
   }).join('');
-  const ylabels = [lo, (lo + hi) / 2, hi].map((v) =>
-    `<text x="8" y="${(Y(v) + 5).toFixed(0)}" font-size="12" fill="#aebdd4">${varDef.fmt(v)}</text>`).join('');
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => lo + f * (hi - lo));
+  const ylabels = ticks.map((v) =>
+    `<line x1="${PL}" x2="${W - PR}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}" stroke="rgba(255,255,255,.14)" stroke-width="1"/>`
+    + `<text x="${PL - 6}" y="${(Y(v) + 4).toFixed(0)}" text-anchor="end" font-size="${FS}" fill="#d5e1f2">${varDef.fmt(v)}</text>`).join('');
 
   let order;
   if (built.perModel) {
     order = [
       { id: 'wn', w: 2, dash: '6,4', op: 0.9 },
-      { id: 'nws', w: 2, op: 0.75 }, { id: 'hrrr', w: 2, op: 0.75 },
-      { id: 'nbm', w: 2, op: 0.75 }, { id: 'ecmwf', w: 2, op: 0.75 },
+      { id: 'nws', w: 2.5, op: 0.8 }, { id: 'hrrr', w: 2.5, op: 0.8 },
+      { id: 'nbm', w: 2.5, op: 0.8 }, { id: 'ecmwf', w: 2.5, op: 0.8 },
       { id: 'oldBlend', w: 2.5, dash: '9,5', op: 0.9 },
-      { id: 'newBlend', w: 3.5, op: 1 },
+      { id: 'newBlend', w: 4, op: 1 },
     ];
   } else {
     order = [{ id: 'single', w: 3.5, op: 1 }];
@@ -212,25 +251,25 @@ function renderChart(container, built, varDef) {
   // Value labels on the primary line
   const primary = built.perModel ? series.newBlend : series.single;
   const dots = primary.map((v, i) => v == null ? '' :
-    `<circle cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="4" fill="${built.perModel ? COLORS.newBlend : COLORS.single}"/>`
-    + `<text x="${X(i).toFixed(0)}" y="${(Y(v) - 12).toFixed(0)}" text-anchor="middle" font-size="12" fill="#ffffff" font-weight="700">${varDef.fmt(v)}</text>`
+    `<circle cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="4.5" fill="${built.perModel ? COLORS.newBlend : COLORS.single}"/>`
+    + `<text x="${X(i).toFixed(0)}" y="${(Y(v) - 12).toFixed(0)}" text-anchor="middle" font-size="${FS}" fill="#ffffff" font-weight="700" paint-order="stroke" stroke="rgba(0,0,0,.45)" stroke-width="3">${(phone && i % 2) ? '' : varDef.fmt(v)}</text>`
   ).join('');
 
   let legend;
   if (built.perModel) {
     legend = [
-      ['newBlend', 'New blend (WN 10%)'], ['oldBlend', 'Current blend'],
-      ['nws', 'NWS'], ['hrrr', 'HRRR'], ['nbm', 'NBM'], ['ecmwf', 'ECMWF'],
-      ...(series.wn.some((v) => v != null) ? [['wn', 'WeatherNext']] : []),
+      ['newBlend', 'Weather Nourie blend'], ['oldBlend', 'Current'],
+      ['nws', 'NWS 36%'], ['hrrr', 'HRRR 27%'], ['nbm', 'NBM 18%'], ['ecmwf', 'ECMWF 9%'],
+      ...(series.wn.some((v) => v != null) ? [['wn', 'WN 10%']] : []),
     ].map(([id, label]) =>
-      `<span style="display:inline-flex;align-items:center;gap:7px;margin:0 12px 8px 0;font-size:13px;color:#d5deee">`
-      + `<i style="width:26px;height:4px;border-radius:2px;background:${COLORS[id]};display:inline-block"></i>${label}</span>`).join('');
+      `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:999px;background:rgba(255,255,255,.07);font-size:11px;line-height:1.4;color:#d5deee;white-space:nowrap">`
+      + `<i style="width:12px;height:3px;border-radius:2px;background:${COLORS[id]};display:inline-block"></i>${label}</span>`).join('');
   } else {
-    legend = `<span style="font-size:13px;color:#d5deee">${varId === 'aqi' ? 'Daily max AQI (Open-Meteo / CAMS)' : varId === 'uv' ? 'Daily max UV index' : ''}</span>`;
+    legend = `<span style="font-size:11px;color:#d5deee">${varId === 'aqi' ? 'Daily max AQI (Open-Meteo / CAMS)' : varId === 'uv' ? 'Daily max UV index' : ''}</span>`;
   }
 
-  container.innerHTML = `<div style="padding:6px 0 12px">${legend}</div>`
-    + `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block" role="img" aria-label="${varDef.label} comparison chart">${ylabels}${labels}${lines}${dots}</svg>`;
+  container.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:4px;padding:2px 0 8px">${legend}</div>`
+    + `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="width:100%;height:auto;display:block" role="img" aria-label="${varDef.label} comparison chart">${ylabels}${labels}${lines}${dots}</svg>`;
 }
 
 let forecastCache = null, wnCache = null, varId = 'temp';
@@ -243,7 +282,7 @@ async function render() {
   const built = buildSeries(forecastCache, wnCache, varId);
   const title = document.getElementById('wn-compare-title');
   if (title) title.textContent = `${varDef.label} — 10-day comparison`;
-  renderChart(chartEl, built, varDef);
+  renderChart(chartEl, built, varDef, varId);
 
   const oldWarn = document.getElementById('wn-stale-warn');
   if (oldWarn) oldWarn.remove();
@@ -274,11 +313,10 @@ async function init() {
     <div class="section-top" style="border:0;padding-bottom:10px">
       <h2 id="wn-compare-title">FORECAST COMPARISON</h2>
     </div>
-    <div id="wn-var-picker" role="group" aria-label="Pick a variable" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+    <div id="wn-var-picker" role="group" aria-label="Pick a variable" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
       ${Object.entries(VARIABLES).map(([id, v]) =>
-        `<button data-var="${id}" aria-pressed="${id === curVar}" style="background:${id === curVar ? 'rgba(127,212,255,.22)' : 'rgba(255,255,255,.07)'};border:1px solid rgba(255,255,255,.16);color:#fff;border-radius:999px;padding:9px 16px;font-size:14px;font-weight:600;cursor:pointer">${v.label}</button>`).join('')}
+        `<button data-var="${id}" aria-pressed="${id === curVar}" style="background:${id === curVar ? 'rgba(127,212,255,.22)' : 'rgba(255,255,255,.07)'};border:1px solid rgba(255,255,255,.16);color:#fff;border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer">${v.label}</button>`).join('')}
     </div>
-    <p style="font-size:13px;color:#9fb0c8;margin:0 0 10px">NWS 36% · HRRR 27% · NBM 18% · ECMWF 9% · WN 10%</p>
     <div id="wn-compare-chart"><p class="muted" style="font-size:14px">Loading comparison…</p></div>`;
   hero.after(section);
 
@@ -312,8 +350,11 @@ async function init() {
       loadWNFeed(),
     ]);
     forecastCache = forecast;
-    wnCache = wn;
+    wnCache = pickWN(wn, forecast);
     render();
+    let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(render, 200); });
+    // the section starts hidden (width 0); re-render when it is opened
+    if (compareBtn) compareBtn.addEventListener('click', () => setTimeout(render, 0));
   } catch (e) {
     document.getElementById('wn-compare-chart').innerHTML =
       `<p class="muted" style="font-size:14px">Couldn't load: ${e.message}</p>`;

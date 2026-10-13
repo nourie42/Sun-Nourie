@@ -1,0 +1,33 @@
+/* v3: header blends into the page, one uniform see-through glass for every tile, equal spacing */
+:root{--tile-gap:16px;--hdr-c1:#01112f;--hdr-c2:#01183f}
+html[data-hdr=clear]{--hdr-c1:#4795e8;--hdr-c2:#2d70cd}
+html[data-hdr=cloudy]{--hdr-c1:#66758a;--hdr-c2:#516073}
+html[data-hdr=rain]{--hdr-c1:#333c4c;--hdr-c2:#262c38}
+html[data-hdr=snow]{--hdr-c1:#93a2b7;--hdr-c2:#77869b}
+/* page sky continues the header's sky, then fades into the existing scene */
+body::before{content:"";position:absolute;left:0;right:0;top:0;height:520px;z-index:1;pointer-events:none;
+  background:linear-gradient(180deg,var(--hdr-c1) 0%,var(--hdr-c2) 30%,color-mix(in srgb,var(--hdr-c2) 55%,transparent) 62%,transparent 100%);transition:background 1.2s ease}
+/* header: no box, edges fade into the page, baked-in tile edge cropped off the bottom */
+.topbar.sky-header{aspect-ratio:1440/240!important;border-radius:0!important;box-shadow:none!important;border:0!important;background-color:transparent!important;
+  background-size:100% auto!important;background-position:center top!important;
+  -webkit-mask-image:linear-gradient(180deg,#000 62%,transparent 100%),linear-gradient(90deg,transparent 0,#000 7%,#000 93%,transparent 100%);
+  -webkit-mask-composite:source-in;mask-image:linear-gradient(180deg,#000 62%,transparent 100%),linear-gradient(90deg,transparent 0,#000 7%,#000 93%,transparent 100%);mask-composite:intersect;
+  margin:0 0 4px!important}
+.sky-header #refresh{top:18.2%!important}
+.sky-header .brand{top:16%!important;height:76%!important}
+/* uniform tiles: same fill everywhere, more see-through */
+main .glass,.shell .glass,section.glass,.glass.aqi-dynamic,.experimental-week,.exposure-cards,.weather-change-banner,.forecast-window-banner,.wn-blend-compare{
+  background:linear-gradient(180deg,rgba(255,255,255,.06) 0%,rgba(255,255,255,0) 40%),rgba(255,255,255,.07)!important;
+  backdrop-filter:blur(18px) saturate(160%)!important;-webkit-backdrop-filter:blur(18px) saturate(160%)!important;
+  border:1px solid rgba(255,255,255,.22)!important;border-radius:20px!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 8px 24px rgba(0,0,0,.18)!important;
+  text-shadow:0 1px 3px rgba(0,0,0,.55)}
+/* inner panels that painted their own opaque tint (e.g. Dew Point "explore", facts) */
+.gross-explore,.gross-facts,.exposure-cards>*,.experimental-week>*{background:rgba(255,255,255,.04)!important}
+/* identical spacing between every tile */
+main .glass,.shell .glass,section.glass,.experimental-week,.exposure-cards,.weather-change-banner,.forecast-window-banners,.wn-blend-compare{margin:0 0 var(--tile-gap)!important}
+.forecast-window-banners .forecast-window-banner{margin:0!important}
+.metrics{gap:var(--tile-gap)!important;margin:12px 0 var(--tile-gap)!important}
+.metrics>.glass{margin:0!important}
+.forecast-grid{gap:var(--tile-gap)!important}
+.forecast-grid>.glass:last-child{margin-bottom:var(--tile-gap)!important}

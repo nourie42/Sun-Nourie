@@ -115,6 +115,12 @@ function smallIcon(type) {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="${paths[type] || paths.temp}"/></svg>`;
 }
 function isDaylight() {
+  // Prefer the forecast's calculated sunrise/sunset for the selected location.
+  const rise = Date.parse(forecast?.solar?.sunrise), set = Date.parse(forecast?.solar?.sunset), now = Date.now();
+  if (Number.isFinite(rise) && Number.isFinite(set) && set > rise && set - rise < 86400000 && Math.abs(now - (rise + set) / 2) < 86400000) {
+    const day = 86400000, shift = Math.round(((rise + set) / 2 - now) / day) * day; // tolerate a stale solar date
+    return now >= rise - shift && now < set - shift;
+  }
   const h = Number(new Intl.DateTimeFormat('en-US', { timeZone: forecast?.location.timeZone || 'America/New_York', hour: 'numeric', hourCycle: 'h23' }).format(new Date()));
   return h >= 7 && h < 19;
 }
