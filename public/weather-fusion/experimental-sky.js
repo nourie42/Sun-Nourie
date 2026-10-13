@@ -11,20 +11,29 @@
   // app.js sets data-weather-page after this module loads; refresh() re-checks
   // each run so late activation still picks up the sky.
 
-  function pickSky(hours, nowMs) {
+  function sunDown(solar, nowMs, h) {
+    const rise = Date.parse(solar?.sunrise), set = Date.parse(solar?.sunset);
+    if (Number.isFinite(rise) && Number.isFinite(set)) { const day = 86400000, shift = Math.round(((rise + set) / 2 - nowMs) / day) * day; return !(nowMs >= rise - shift && nowMs < set - shift); }
+    return h?.isDay === false;
+  }
+  function pickSky(hours, nowMs, solar) {
     const h = (hours || []).find((x) => {
       const t = Date.parse(x.time);
       return Number.isFinite(t) && t <= nowMs && nowMs < t + 3600000;
     }) || hours?.[0] || null;
     const cond = String(h?.condition || '').toLowerCase();
-    if (h?.isDay === false) return 'today-sky-night-v2.webp';
+    // Day/night comes from the page's shared state (sunrise/sunset), not the NWS hourly
+    // isDaytime flag (NWS marks 6am-6pm as daytime regardless of the sun).
+    const shared = document.body?.dataset?.sky;
+    const night = shared ? shared === 'night' : sunDown(solar, nowMs, h);
+    if (night) return 'today-sky-night-v2.webp';
     if (/thunder|storm|tornado|hail/.test(cond)) return 'today-sky-storm.webp';
     if (/rain|shower|drizzle/.test(cond) || (h?.pop ?? 0) >= 40) return 'today-sky-rain.webp';
     if (/cloud|overcast|fog|mist|haze/.test(cond)) return 'today-sky-clouds.webp';
     return 'today-sky-clear.webp';
   }
 
-  let flip = false;
+  let flip = false, last = null;
   function setSky(image) {
     const show = document.getElementById(flip ? 'exp-sky-a' : 'exp-sky-b');
     const hide = document.getElementById(flip ? 'exp-sky-b' : 'exp-sky-a');
@@ -51,10 +60,15 @@
       const res = await fetch(`/api/weather-fusion/forecast?location=${encodeURIComponent(loc)}`, { credentials: 'same-origin' });
       if (!res.ok) return;
       const data = await res.json();
-      setSky(pickSky(data?.hours, Date.now()));
+      last = data;
+      setSky(pickSky(data?.hours, Date.now(), data?.solar));
     } catch { /* keep the previous sky */ }
   }
 
   refresh();
   setInterval(refresh, 10 * 60 * 1000);
+  // Follow the shared day/night state the moment it changes (e.g. at sunrise/sunset).
+  const repick = () => { if (last && isExperimental()) setSky(pickSky(last.hours, Date.now(), last.solar)); };
+  if (document.body) new MutationObserver(repick).observe(document.body, { attributes: true, attributeFilter: ['data-sky'] });
+  else document.addEventListener('DOMContentLoaded', () => new MutationObserver(repick).observe(document.body, { attributes: true, attributeFilter: ['data-sky'] }));
 })();
