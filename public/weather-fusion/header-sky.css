@@ -1,0 +1,53 @@
+/* Sky banner header (condition-aware) */
+.topbar.sky-header{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;min-height:118px;padding:18px 26px;margin:10px 0 16px;border-radius:24px;border:1px solid rgba(255,255,255,.14);box-shadow:0 14px 40px rgba(0,0,0,.28);isolation:isolate;transition:background 1.2s ease;
+  background:radial-gradient(120% 90% at 50% -20%,#0f2457 0%,#081639 55%,#050d26 100%)}
+.sky-header .hdr-layer{position:absolute;inset:0;pointer-events:none;z-index:-1;transition:opacity 1.2s ease}
+.sky-header .hdr-stars{opacity:1;background-image:
+  radial-gradient(1.4px 1.4px at 8% 30%,#fff,transparent),radial-gradient(1px 1px at 22% 78%,#cfe0ff,transparent),
+  radial-gradient(1.2px 1.2px at 35% 18%,#fff,transparent),radial-gradient(1px 1px at 47% 62%,#dbe7ff,transparent),
+  radial-gradient(1.5px 1.5px at 56% 24%,#fff,transparent),radial-gradient(1px 1px at 63% 82%,#cfe0ff,transparent),
+  radial-gradient(1.2px 1.2px at 71% 40%,#fff,transparent),radial-gradient(1px 1px at 83% 14%,#fff,transparent),
+  radial-gradient(1px 1px at 91% 70%,#dbe7ff,transparent),radial-gradient(1.2px 1.2px at 15% 55%,#fff,transparent),
+  radial-gradient(1px 1px at 40% 88%,#fff,transparent),radial-gradient(1.3px 1.3px at 77% 66%,#fff,transparent);animation:hdr-twinkle 4s ease-in-out infinite alternate}
+.sky-header .hdr-stars.b{background-image:radial-gradient(2px 2px at 74% 36%,#fff,transparent),radial-gradient(1.6px 1.6px at 29% 40%,#e8f0ff,transparent),radial-gradient(1.4px 1.4px at 52% 12%,#fff,transparent),radial-gradient(1.4px 1.4px at 88% 48%,#fff,transparent);animation-duration:2.7s;animation-delay:-1.3s}
+@keyframes hdr-twinkle{0%{opacity:.35}100%{opacity:1}}
+.sky-header .hdr-horizon{background:radial-gradient(70% 55% at 80% 150%,rgba(120,170,255,.38) 0%,rgba(70,120,230,.16) 45%,transparent 72%)}
+.sky-header .hdr-horizon::after{content:"";position:absolute;left:45%;right:-15%;bottom:-118%;height:150%;border-radius:50%;border-top:1.5px solid rgba(150,195,255,.55);box-shadow:0 -6px 22px rgba(120,170,255,.35)}
+.sky-header .hdr-clouds{opacity:.45;background:
+  radial-gradient(18% 34% at 86% 92%,rgba(150,175,220,.42),transparent 70%),radial-gradient(14% 30% at 76% 100%,rgba(140,165,215,.36),transparent 70%),radial-gradient(16% 28% at 95% 78%,rgba(150,175,220,.3),transparent 70%)}
+.sky-header .hdr-sun{opacity:0;background:radial-gradient(circle at 74% 22%,#fff6d6 0 18px,rgba(255,220,130,.75) 26px,rgba(255,200,90,.28) 60px,transparent 120px)}
+.sky-header .hdr-rain{opacity:0;background-image:repeating-linear-gradient(105deg,rgba(200,220,255,.0) 0 9px,rgba(200,220,255,.28) 9px 10px,transparent 10px 22px);background-size:220px 220px;animation:hdr-rain .6s linear infinite}
+@keyframes hdr-rain{to{background-position:-40px 220px}}
+.sky-header .hdr-snow{opacity:0;background-image:radial-gradient(2px 2px at 10% 20%,#fff,transparent),radial-gradient(2.5px 2.5px at 30% 60%,#fff,transparent),radial-gradient(2px 2px at 55% 35%,#fff,transparent),radial-gradient(2.5px 2.5px at 75% 75%,#fff,transparent),radial-gradient(2px 2px at 90% 25%,#fff,transparent);background-size:180px 120px;animation:hdr-snow 6s linear infinite}
+@keyframes hdr-snow{to{background-position:30px 120px}}
+/* Logo badge + refresh as glass circles */
+.sky-header .brand{display:flex;align-items:center;gap:18px;text-decoration:none;color:#fff}
+.sky-header .brand-mark,.sky-header #refresh{display:grid;place-items:center;width:84px;height:84px;border-radius:50%;flex:none;
+  background:radial-gradient(circle at 30% 25%,rgba(255,255,255,.22),rgba(255,255,255,.05) 60%);border:1px solid rgba(170,205,255,.45);
+  backdrop-filter:blur(14px) saturate(170%);-webkit-backdrop-filter:blur(14px) saturate(170%);box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 0 24px rgba(90,150,255,.35),0 8px 24px rgba(0,0,0,.3)}
+.sky-header .brand-mark svg{width:62px;height:62px}
+.sky-header #refresh{width:76px;height:76px;color:#cfe3ff;font-size:34px;cursor:pointer;padding:0}
+.sky-header #refresh:hover{border-color:rgba(200,225,255,.75)}
+.sky-header #refresh.loading{animation:hdr-spin 1s linear infinite}
+@keyframes hdr-spin{to{transform:rotate(360deg)}}
+.sky-header .brand-word{display:flex;flex-direction:column;line-height:1}
+.sky-header .brand-kicker{font-size:13px;font-weight:500;letter-spacing:.42em;color:rgba(220,232,255,.85);margin-bottom:6px}
+.sky-header .brand-name{font-size:46px;font-weight:800;letter-spacing:-.02em;background:linear-gradient(180deg,#fff 30%,#a9cfff 100%);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 2px 10px rgba(0,0,0,.35))}
+/* States */
+.sky-header[data-hdr=clear]{background:linear-gradient(170deg,#3f8fe6 0%,#2a6fc9 50%,#1b4f9c 100%)}
+.sky-header[data-hdr=clear] .hdr-sun{opacity:1}
+.sky-header[data-hdr=clear] .hdr-stars,.sky-header[data-hdr=cloudy] .hdr-stars,.sky-header[data-hdr=rain] .hdr-stars,.sky-header[data-hdr=snow] .hdr-stars{opacity:0;animation:none}
+.sky-header[data-hdr=clear] .hdr-horizon{opacity:.5}
+.sky-header[data-hdr=clear] .hdr-clouds{opacity:.55;filter:brightness(1.8)}
+.sky-header[data-hdr=cloudy]{background:linear-gradient(170deg,#5f7189 0%,#46576f 55%,#33425a 100%)}
+.sky-header[data-hdr=cloudy] .hdr-clouds{opacity:1;filter:brightness(1.5);background:radial-gradient(22% 45% at 18% 40%,rgba(210,220,235,.35),transparent 70%),radial-gradient(25% 50% at 60% 30%,rgba(200,212,230,.3),transparent 70%),radial-gradient(20% 40% at 88% 80%,rgba(200,212,230,.4),transparent 70%)}
+.sky-header[data-hdr=cloudy] .hdr-horizon{opacity:.25}
+.sky-header[data-hdr=rain]{background:linear-gradient(170deg,#36404f 0%,#252e3b 60%,#1a2029 100%)}
+.sky-header[data-hdr=rain] .hdr-rain{opacity:1}
+.sky-header[data-hdr=rain] .hdr-clouds{opacity:.8}
+.sky-header[data-hdr=rain] .hdr-horizon{opacity:.15}
+.sky-header[data-hdr=snow]{background:linear-gradient(170deg,#7d8ea6 0%,#5e6f88 60%,#46546b 100%)}
+.sky-header[data-hdr=snow] .hdr-snow{opacity:1}
+.sky-header[data-hdr=snow] .hdr-horizon{opacity:.2}
+@media(max-width:600px){.topbar.sky-header{min-height:92px;padding:12px 16px}.sky-header .brand-mark{width:62px;height:62px}.sky-header .brand-mark svg{width:46px;height:46px}.sky-header #refresh{width:56px;height:56px;font-size:26px}.sky-header .brand-name{font-size:32px}.sky-header .brand-kicker{font-size:10px}}
+@media(prefers-reduced-motion:reduce){.sky-header .hdr-layer,.sky-header #refresh.loading{animation:none!important}}
