@@ -199,11 +199,17 @@ function renderChart(container, built, varDef, varId) {
   const series = { newBlend: [], fullBlend: [], oldBlend: [], nws: [], hrrr: [], nbm: [], ecmwf: [], wn: [], single: [] };
   const activeW = Object.fromEntries(Object.entries(NEW_WEIGHTS).filter(([id]) => !hiddenModels.has(id)));
   const activeSum = Object.values(activeW).reduce((a, b) => a + b, 0);
-  const blendChanged = !built.fixedBlend && activeSum < 0.999;
+  // Is any model that feeds the blend (and has data for this variable) unchecked?
+  const hasData = (id) => built.perModel && (id === 'wn' ? (built.wnVals || []).some(finite) : (built.modelMaps || []).some((m) => finite(m?.[id])));
+  const blendChanged = Object.keys(NEW_WEIGHTS).some((id) => hiddenModels.has(id) && hasData(id));
   if (built.perModel) {
     days.forEach((d, i) => {
       const src = { ...built.modelMaps[i], wn: built.wnVals[i] };
-      if (built.fixedBlend) { series.newBlend.push(built.fixedBlend[i]); series.fullBlend.push(built.fixedBlend[i]); series.oldBlend.push(null); }
+      if (built.fixedBlend) {
+        // All checked: show the site's official rain chance. Any feeding model unchecked: weighted value of the visible models.
+        series.newBlend.push(blendChanged ? blendVal(src, activeW) : built.fixedBlend[i]);
+        series.fullBlend.push(built.fixedBlend[i]); series.oldBlend.push(null);
+      }
       else {
         // Unchecked models drop out of the Weather Nourie blend; remaining weights re-normalize.
         series.newBlend.push(blendVal(src, activeW));
@@ -254,13 +260,14 @@ function renderChart(container, built, varDef, varId) {
     return `<button type="button" class="wn-chip" data-model="${id}" aria-pressed="${!off}" style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:999px;border:1px solid ${off ? 'rgba(255,255,255,.12)' : COLORS[id] + '99'};background:${off ? 'transparent' : 'rgba(255,255,255,.10)'};font-family:inherit;font-size:11px;font-weight:600;line-height:1.4;color:${off ? '#7f8ca3' : '#e8eef8'};white-space:nowrap;cursor:pointer;${off ? 'text-decoration:line-through;' : ''}">`
       + `<i style="width:12px;height:3px;border-radius:2px;background:${COLORS[id]};opacity:${off ? 0.3 : 1};display:inline-block"></i>${chipLabel(id, off)}</button>`; };
   const chipLabel = (id, off) => {
-    if (!(id in NEW_WEIGHTS) || built.fixedBlend) return id in NEW_WEIGHTS ? NAMES[id] : LABELS[id];
+    if (!(id in NEW_WEIGHTS)) return LABELS[id];
+    if (built.fixedBlend && !blendChanged) return NAMES[id];
     if (off) return `${NAMES[id]} 0%`;
     return `${NAMES[id] === 'WeatherNext' ? 'WN' : NAMES[id]} ${Math.round((NEW_WEIGHTS[id] / (activeSum || 1)) * 100)}%`;
   };
   const legend = built.perModel ? ids.map(chip).join('')
     : `<span style="font-size:11px;color:#d5deee">${varId === 'aqi' ? 'Daily max AQI (Open-Meteo / CAMS)' : varId === 'uv' ? 'Daily max UV index' : ''}</span>`;
-  const note = built.perModel ? `<p style="font-size:11px;color:#9fb0c8;margin:6px 0 0">Tap a chip to show/hide a model${built.fixedBlend ? '' : ' (hidden models drop out of the Weather Nourie blend)'} · tap or drag the graph for values. Models drop out as their forecast range ends (HRRR ~2 days, NWS ~7 days).${built.fixedBlend ? ' Rain chance: NWS is its official probability; HRRR, NBM and ECMWF show each model’s rain signal at the day’s peak hour; the blend is the Weather Nourie rain chance.' : ''}${blendChanged ? ' <b style="color:#ffd479">Blend recalculated without hidden models.</b>' : ''}</p>` : '';
+  const note = built.perModel ? `<p style="font-size:11px;color:#9fb0c8;margin:6px 0 0">Tap a chip to show/hide a model (hidden models drop out of the Weather Nourie blend) · tap or drag the graph for values. Models drop out as their forecast range ends (HRRR ~2 days, NWS ~7 days).${built.fixedBlend ? ' Rain chance: NWS is its official probability; HRRR, NBM and ECMWF show each model’s rain signal at the day’s peak hour; the blend is the Weather Nourie rain chance.' : ''}${blendChanged ? ' <b style="color:#ffd479">Blend recalculated without hidden models.</b>' : ''}</p>` : '';
   container.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:4px;padding:2px 0 8px">${legend}</div>`
     + `<div class="wn-chart-wrap" style="position:relative;touch-action:pan-y">`
     + `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="width:100%;height:auto;display:block;cursor:crosshair" role="img" aria-label="${varDef.label} comparison chart">${ylabels}${labels}${lines}${dots}`
@@ -278,7 +285,7 @@ function renderChart(container, built, varDef, varId) {
     cross.setAttribute('x1', x); cross.setAttribute('x2', x); cross.setAttribute('opacity', '0.8');
     const rows = visible.map((id) => [id, series[id][i]]).filter(([, v]) => v != null);
     const fb = series.fullBlend[i], nb = series.newBlend[i];
-    const delta = blendChanged && fb != null && nb != null ? `<span style="display:block;color:#ffd479;font-size:11px;margin-top:3px">With all models: ${varDef.fmt(fb)} (${nb - fb >= 0 ? '+' : ''}${varId === 'rain' ? (nb - fb).toFixed(2) : Math.round(nb - fb)})</span>` : '';
+    const delta = blendChanged && fb != null && nb != null ? `<span style="display:block;color:#ffd479;font-size:11px;margin-top:3px">${built.fixedBlend ? 'Weighted from visible models. Official rain chance' : 'With all models'}: ${varDef.fmt(fb)} (${nb - fb >= 0 ? '+' : ''}${varId === 'rain' ? (nb - fb).toFixed(2) : Math.round(nb - fb)})</span>` : '';
     cdots.innerHTML = rows.map(([id, v]) => `<circle cx="${x}" cy="${Y(v).toFixed(1)}" r="5" fill="${COLORS[id]}" stroke="#0a1428" stroke-width="1.5"/>`).join('');
     tip.innerHTML = `<b style="display:block;margin-bottom:3px">${dayName(days[i], i, true)}</b>`
       + (rows.length ? rows.map(([id, v]) => `<span style="display:flex;justify-content:space-between;gap:10px"><span><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COLORS[id]};margin-right:5px"></i>${NAMES[id] || varDef.label}</span><b>${varDef.fmt(v)}</b></span>`).join('') : '<span>No model data</span>') + delta;
