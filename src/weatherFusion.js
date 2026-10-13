@@ -25,6 +25,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { createDirectModels, enhanceForecast } from './weatherFusionDirect.js';
 import {validateCurrentConditions} from './weatherFusionCurrent.js';
+import {applyObservedSky} from './weatherFusionObservedSky.js';
 
 export const PRESETS = [
   { id: 'knightdale', name: 'Knightdale / Raleigh', latitude: 35.787, longitude: -78.4806 },
@@ -377,6 +378,7 @@ export function buildForecast({ location, point, forecast, hourly, grid, discuss
   enhanceForecast(output, { models, grid, periods: forecast?.periods || [], hourlyPeriods: hourly?.periods || [], now, gridQpf, localTime, nextDate, dateKey });
   output.current=validateCurrentConditions(output.current,output.hours,rows,now);
   Object.assign(output.current,resolveCurrentWeather(output.current,output.hours,now,gridSample(grid,'skyCover',now,'percent')));
+  applyObservedSky(output,observation?.skyObservations,now);
   addExperience(output, {models, grid, periods:forecast?.periods || [], now, solarTimes, nextDate});
   addExposureWeather(output,exposureWeather);
   addAirQuality(output,airQuality);
@@ -486,6 +488,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
             } catch { return null; }
           }));
           const chosen=candidates.find(Boolean)||null;
+          if(chosen)chosen.skyObservations=candidates.slice(0,3).filter(Boolean).map(c=>({station:c.station,skyCover:c.skyCover,visibility:c.visibility,condition:c.condition,time:c.time,stationDistanceKm:c.stationDistanceKm}));
           if(chosen?.station&&finite(chosen.pressurePa)){
             try{
               const stamp=Date.parse(chosen.time);
