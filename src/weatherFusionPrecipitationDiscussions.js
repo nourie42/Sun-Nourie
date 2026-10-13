@@ -23,8 +23,12 @@ function nearestUtc(token,reference){
 
 function discussionPolygon(text){
  const block=String(text).match(/LAT\.\.\.LON\s+([\s\S]*?)$/i)?.[1]||'';
- const ring=[...block.matchAll(/\b(\d{4})(\d{4})\b/g)].map(match=>[Number(match[2])/-100,Number(match[1])/100]);
+ // NWS LAT...LON pairs: LLLLOOOO in hundredths; longitudes of 100°W or more drop the leading 1
+ // (e.g. 35690109 = 35.69N 101.09W), so a longitude below 50° must have 100 added back.
+ const ring=[...block.matchAll(/\b(\d{4})(\d{4})\b/g)].map(match=>{const raw=Number(match[2])/100;return [-(raw<50?raw+100:raw),Number(match[1])/100];});
  if(ring.length<3||!ring.flat().every(finite))return [];
+ const lons=ring.map(p=>p[0]),lats=ring.map(p=>p[1]);
+ if(Math.max(...lons)-Math.min(...lons)>20||Math.max(...lats)-Math.min(...lats)>15)return [];
  ring.push([...ring[0]]);return ring;
 }
 

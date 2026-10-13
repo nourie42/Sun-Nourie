@@ -164,7 +164,10 @@ function render(data) {
   $('high-low').textContent = hero.tonight ? 'Overnight low' : hero.range;
   const refObs=c.localEstimate?.referenceStation,sourceLabel=c.localEstimate?`Selected-location estimate · ${clock(c.time)} model hour${refObs?.observedAt?` · ${refObs.station||'station'} observed ${clock(refObs.observedAt)}`:''}`:c.type==='observation'?`Nearby weather station · updated ${clock(c.time)}`:c.type==='unavailable'?'Current local reading unavailable':'Estimated current conditions';
   const radarLabel=radarObservationLabel(c);
-  $('observation-label').textContent = `${sourceLabel}${radarLabel?` · ${radarLabel}`:''}`;
+  // No model/station provenance at the top; only a live radar note when there is one.
+  $('observation-label').textContent = radarLabel || '';
+  $('observation-label').title = sourceLabel;
+  $('observation-label').hidden = !radarLabel;
   $('hero-scene').innerHTML = icon(hero.condition, hero.isDay, 120);
   renderWeatherChanges(data);
   draw('forecast-window-banners','Upcoming weather windows',()=>renderForecastWindowBanners(data));
@@ -192,7 +195,10 @@ function render(data) {
   const sourceHealth = forecastSourceHealth(data);
   const unavailable = sourceHealth.requiredIssues;
   const sourceNote = sourceHealth.note;
-  $('status').textContent = `Updated ${clock(data.assembledAt)}${sourceNote}${failedPanels.length ? ` · Display issue: ${failedPanels.join(', ')}. Other forecasts remain available; use Refresh to retry.` : ''}`;
+  // Top of page: just the update time. Source/feed health lives in Scientific Stuff (and the tooltip).
+  const statusDetail=`Updated ${clock(data.assembledAt)}${sourceNote}${failedPanels.length ? ` · Display issue: ${failedPanels.join(', ')}. Other forecasts remain available; use Refresh to retry.` : ''}`;
+  $('status').textContent = `Updated ${clock(data.assembledAt)}${unavailable.length||failedPanels.length?' · Some data is temporarily unavailable; use Refresh to retry.':''}`;
+  $('status').title = statusDetail;
   $('status').classList.toggle('error', unavailable.length > 0 || failedPanels.length > 0);
 }
 function renderAlerts(data) {
