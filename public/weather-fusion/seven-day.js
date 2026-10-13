@@ -1,5 +1,5 @@
 import {dailyDisplay,finite} from './weather-math.js?v=full-day-rain-v1';
-import {displayedRainChance} from './rain-display.js?v=rain-observed-v1';
+import {displayedRainChance,rainAwareCondition} from './rain-display.js?v=rain-icon-v2';
 import {forecastPeriodSummary} from './forecast-story.js?v=weather-qa-v67';
 import {shortForecastCondition} from './today-card.js?v=mobile-repair-v1';
 import {weatherIcon,weatherMetricIcon} from './weather-display.js?v=restore-hourly-v7';
@@ -21,7 +21,7 @@ export function sevenDayForecast(forecast,now=Date.now()) {
     const date=Date.parse(`${day.date}T12:00:00Z`);
     const weekday=finite(date)?new Intl.DateTimeFormat('en-US',{timeZone:'UTC',weekday:'short'}).format(date):day.label;
     const dateLabel=finite(date)?new Intl.DateTimeFormat('en-US',{timeZone:'UTC',month:'short',day:'numeric'}).format(date):'';
-    const condition=rain.observed?'Rain now':display.condition;
+    const condition=rain.observed?'Rain now':rainAwareCondition(display.condition,rain.value,day,display.tonight);
     return {index,date:day.date,dateLabel,label:index===0?(display.tonight?'Tonight':'Today'):weekday,
       high:display.tonight?null:display.primary,low:display.tonight?display.primary:display.secondary,
       condition,shortCondition:shortForecastCondition(condition),isDay:!display.tonight,
