@@ -49,5 +49,23 @@
 .sky-header[data-hdr=snow]{background:linear-gradient(170deg,#7d8ea6 0%,#5e6f88 60%,#46546b 100%)}
 .sky-header[data-hdr=snow] .hdr-snow{opacity:1}
 .sky-header[data-hdr=snow] .hdr-horizon{opacity:.2}
-@media(max-width:600px){.topbar.sky-header{min-height:92px;padding:12px 16px}.sky-header .brand-mark{width:62px;height:62px}.sky-header .brand-mark svg{width:46px;height:46px}.sky-header #refresh{width:56px;height:56px;font-size:26px}.sky-header .brand-name{font-size:32px}.sky-header .brand-kicker{font-size:10px}}
-@media(prefers-reduced-motion:reduce){.sky-header .hdr-layer,.sky-header #refresh.loading{animation:none!important}}
+@media(prefers-reduced-motion:reduce){.sky-header .hdr-layer{animation:none!important}}
+/* v2: the user's own banner image is the header */
+.topbar.sky-header{display:block;min-height:0;height:auto;aspect-ratio:1440/273;padding:0;border:0;border-radius:20px;box-shadow:0 14px 40px rgba(0,0,0,.28);
+  background:#071433 url(/weather-fusion/header-night.jpg) center/100% 100% no-repeat;background-image:image-set(url(/weather-fusion/header-night.webp) type("image/webp"),url(/weather-fusion/header-night.jpg) type("image/jpeg"))}
+.sky-header[data-hdr=clear]{background-image:url(/weather-fusion/header-day.jpg);background-image:image-set(url(/weather-fusion/header-day.webp) type("image/webp"),url(/weather-fusion/header-day.jpg) type("image/jpeg"))}
+.sky-header[data-hdr=cloudy]{background-image:url(/weather-fusion/header-cloudy.jpg);background-image:image-set(url(/weather-fusion/header-cloudy.webp) type("image/webp"),url(/weather-fusion/header-cloudy.jpg) type("image/jpeg"))}
+.sky-header[data-hdr=rain]{background-image:url(/weather-fusion/header-rain.jpg);background-image:image-set(url(/weather-fusion/header-rain.webp) type("image/webp"),url(/weather-fusion/header-rain.jpg) type("image/jpeg"))}
+.sky-header[data-hdr=snow]{background-image:url(/weather-fusion/header-snow.jpg);background-image:image-set(url(/weather-fusion/header-snow.webp) type("image/webp"),url(/weather-fusion/header-snow.jpg) type("image/jpeg"))}
+.sky-header .hdr-stars,.sky-header .hdr-sun,.sky-header .hdr-horizon,.sky-header .hdr-clouds{display:none!important}
+.sky-header .hdr-layer{z-index:0}
+/* brand: invisible link over the image's logo+wordmark; text kept for screen readers */
+.sky-header .brand{position:absolute;left:3.5%;top:14%;width:37%;height:72%;z-index:2;border-radius:16px}
+.sky-header .brand-mark,.sky-header .brand-word{opacity:0}
+.sky-header nav{position:static}
+/* transparent refresh hotspot over the image's refresh circle */
+.sky-header #refresh{position:absolute;z-index:3;left:86%;top:16%;width:9.6%;height:auto;aspect-ratio:1;font-size:0;color:transparent;background:transparent!important;border:0!important;box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;border-radius:50%;cursor:pointer;padding:0}
+.sky-header #refresh:hover{background:rgba(255,255,255,.08)!important}
+.sky-header #refresh:focus-visible{outline:2px solid #9cc8ff;outline-offset:2px}
+.sky-header #refresh.loading{animation:none;background:rgba(255,255,255,.12)!important}
+@media(max-width:600px){.topbar.sky-header{border-radius:14px;margin:6px 0 12px}}
