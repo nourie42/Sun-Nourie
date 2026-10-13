@@ -169,6 +169,7 @@ function render(data) {
   renderWeatherChanges(data);
   draw('forecast-window-banners','Upcoming weather windows',()=>renderForecastWindowBanners(data));
   draw('snow-outlook-banner','Snow outlook',()=>renderSnowOutlook(data));
+  try{globalThis.__weatherNourieForecast=data;document.dispatchEvent(new CustomEvent('weather-nourie:forecast',{detail:data}));}catch{}
   draw('alerts', 'Official alerts', () => renderAlerts(data));
   draw('risk-outlook-list', 'Outlooks', () => renderRiskOutlooks(data));
   draw('hourly', 'Hourly forecast', () => renderHours(data));
