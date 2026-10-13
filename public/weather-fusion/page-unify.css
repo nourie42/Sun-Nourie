@@ -1,17 +1,17 @@
 /* v3: header blends into the page, one uniform see-through glass for every tile, equal spacing */
-:root{--tile-gap:16px;--hdr-c1:#01112f;--hdr-c2:#01183f}
-html[data-hdr=clear]{--hdr-c1:#4795e8;--hdr-c2:#2d70cd}
-html[data-hdr=cloudy]{--hdr-c1:#66758a;--hdr-c2:#516073}
-html[data-hdr=rain]{--hdr-c1:#333c4c;--hdr-c2:#262c38}
-html[data-hdr=snow]{--hdr-c1:#93a2b7;--hdr-c2:#77869b}
+:root{--tile-gap:16px;--hdr-c1:#01102e;--hdr-c2:#001437}
+html[data-hdr=clear]{--hdr-c1:#4996e9;--hdr-c2:#3b83da}
+html[data-hdr=cloudy]{--hdr-c1:#67768b;--hdr-c2:#5b6a7d}
+html[data-hdr=rain]{--hdr-c1:#333c4c;--hdr-c2:#2b3340}
+html[data-hdr=snow]{--hdr-c1:#93a2b7;--hdr-c2:#8493a8}
 /* page sky continues the header's sky, then fades into the existing scene */
 body::before{content:"";position:absolute;left:0;right:0;top:0;height:520px;z-index:1;pointer-events:none;
-  background:linear-gradient(180deg,var(--hdr-c1) 0%,var(--hdr-c2) 30%,color-mix(in srgb,var(--hdr-c2) 55%,transparent) 62%,transparent 100%);transition:background 1.2s ease}
+  background:linear-gradient(180deg,var(--hdr-c1) 0%,var(--hdr-c2) 26%,color-mix(in srgb,var(--hdr-c2) 60%,transparent) 55%,transparent 100%);transition:background 1.2s ease}
 /* header: no box, edges fade into the page, baked-in tile edge cropped off the bottom */
 .topbar.sky-header{aspect-ratio:1440/240!important;border-radius:0!important;box-shadow:none!important;border:0!important;background-color:transparent!important;
   background-size:100% auto!important;background-position:center top!important;
-  -webkit-mask-image:linear-gradient(180deg,#000 62%,transparent 100%),linear-gradient(90deg,transparent 0,#000 7%,#000 93%,transparent 100%);
-  -webkit-mask-composite:source-in;mask-image:linear-gradient(180deg,#000 62%,transparent 100%),linear-gradient(90deg,transparent 0,#000 7%,#000 93%,transparent 100%);mask-composite:intersect;
+  -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 10%,#000 55%,transparent 100%),linear-gradient(90deg,transparent 0,#000 6%,#000 94%,transparent 100%);
+  -webkit-mask-composite:source-in;mask-image:linear-gradient(180deg,transparent 0,#000 10%,#000 55%,transparent 100%),linear-gradient(90deg,transparent 0,#000 6%,#000 94%,transparent 100%);mask-composite:intersect;
   margin:10px 0 4px!important}
 .sky-header #refresh{top:18.2%!important}
 .sky-header .brand{top:16%!important;height:76%!important}
@@ -70,3 +70,25 @@ html body:not([data-sky=night]) main :is(.glass,section.glass,.car-wash-forecast
   background:rgba(15,25,45,.18) linear-gradient(180deg,rgba(255,255,255,.06) 0%,rgba(255,255,255,0) 40%)!important;
   backdrop-filter:blur(24px) saturate(150%)!important;-webkit-backdrop-filter:blur(24px) saturate(150%)!important;
   text-shadow:0 1px 4px rgba(0,0,0,.6),0 0 1px rgba(0,0,0,.5)}
+
+/* ---- v8 ---- */
+/* Local outlook tile removed from view */
+html body main section.glass.briefing{display:none!important}
+/* collapsible 7-day + Scientific stuff */
+.wn-collapsible:not(.is-open)>:not(.section-top){display:none!important}
+.wn-collapsible>.section-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.wn-collapsible .collapse-toggle{margin-left:auto;padding:5px 12px!important;border-radius:999px!important;border:1px solid rgba(255,255,255,.28)!important;background:rgba(255,255,255,.10)!important;color:#fff!important;font-size:12px!important;font-weight:700!important;cursor:pointer}
+/* alert colour rules (uniform glass fill; colour lives in the border) */
+html body .urgent-alert{border:1px solid rgba(255,70,70,.95)!important;box-shadow:0 0 0 1px rgba(255,70,70,.35)!important}
+html body .urgent-alert.urgent-alert-watch{border-color:rgba(255,150,40,.95)!important;box-shadow:0 0 0 1px rgba(255,150,40,.35)!important}
+html body main .bulletin-banner{border:1px solid rgba(255,215,70,.9)!important}
+html body main .bulletin-banner.bulletin-warning{border-color:rgba(255,70,70,.95)!important}
+html body main .bulletin-banner.bulletin-watch{border-color:rgba(255,150,40,.95)!important}
+html body main .risk-outlook-item{border:1px solid rgba(255,215,70,.9)!important}
+html body main .weather-change-banner{border-color:rgba(255,215,70,.9)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 8px 24px rgba(0,0,0,.18)!important}
+html body main .forecast-window-banner.forecast-window-perfect{border-color:rgba(190,130,255,.95)!important}
+html body main .forecast-window-banner.forecast-window-rain{border-color:rgba(255,110,110,.55)!important}
+html body main #air-quality:has(.aqi-summary[data-aqi=good]){border-color:rgba(80,220,120,.9)!important}
+html body main #air-quality:has(.aqi-summary[data-aqi=moderate]){border-color:rgba(255,215,70,.9)!important}
+html body main #air-quality:has(.aqi-summary[data-aqi=sensitive]){border-color:rgba(255,150,40,.95)!important}
+html body main #air-quality:is(:has(.aqi-summary[data-aqi=unhealthy]),:has(.aqi-summary[data-aqi=very-unhealthy]),:has(.aqi-summary[data-aqi=hazardous])){border-color:rgba(255,70,70,.95)!important}

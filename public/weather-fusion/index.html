@@ -21,7 +21,7 @@
   <link rel="stylesheet" href="/weather-fusion/risk-outlooks.css?v=risk-outlooks-v4">
   <link rel="stylesheet" href="/weather-fusion/weather-polish.css?v=aqi-bg-v2">
   <link rel="stylesheet" href="/weather-fusion/forecast-window-banners.css?v=sun-window-main-v2">
-  <script type="module" src="/weather-fusion/app.js?v=county-warnings-v14&amp;repair=nourie-weather-take-v2&amp;sky=v7"></script>
+  <script type="module" src="/weather-fusion/app.js?v=county-warnings-v14&amp;repair=nourie-weather-take-v2&amp;sky=v8"></script>
   <script type="module" src="/weather-fusion/experimental-sky.js?v=4"></script>
   <script type="module" src="/weather-fusion/wn-blend.js?v=8"></script>
 
@@ -105,9 +105,10 @@
   </style>
 
   <link rel="stylesheet" href="/weather-fusion/header-sky.css?v=3">
-  <link rel="stylesheet" href="/weather-fusion/page-unify.css?v=3">
+  <link rel="stylesheet" href="/weather-fusion/page-unify.css?v=5">
   <script type="module" src="/weather-fusion/gross-toggle.js?v=1"></script>
-  <script type="module" src="/weather-fusion/header-sky.js?v=2"></script>
+  <script type="module" src="/weather-fusion/collapse.js?v=1"></script>
+  <script type="module" src="/weather-fusion/header-sky.js?v=3"></script>
 </head>
 <body data-sky="day">
   <a class="skip-link" href="#forecast">Skip to forecast</a>
@@ -192,7 +193,7 @@
         </div>
       </section>
       <section class="glass car-wash-forecast" id="car-wash-forecast" aria-labelledby="car-wash-title" hidden></section>
-      <section class="glass briefing" aria-labelledby="briefing-title">
+      <section class="glass briefing" aria-labelledby="briefing-title" hidden>
         <div class="section-top"><h2><span class="sparkle" aria-hidden="true">✦</span> LOCAL OUTLOOK</h2><span id="ai-label" class="pill">YOUR LOCAL OUTLOOK</span></div>
         <h3 id="briefing-title">A clearer picture of what’s ahead.</h3>
         <p id="briefing-summary">What to expect, when it could change, and how to plan your day.</p>
