@@ -133,11 +133,16 @@ export function hourlyDisplaySamples(forecast, now = Date.now()) {
   return [currentSample(forecast, now), ...(forecast?.hours || []).filter(hour => Date.parse(hour.time) > now)
     .map(hour => forecastSample(forecast,hour.time)).filter(Boolean)];
 }
+export function hourlySnowHTML(forecast,sample){
+ const t=Date.parse(sample?.time),row=(forecast?.hours||[]).find(h=>{const s=Date.parse(h.time);return t>=s&&t<s+3600000;});
+ const v=row?.snowfall;
+ return finite(v)&&v>=0.05?`<small class="hour-snow" title="NWS gridpoint snowfall this hour">❄ ${v.toFixed(1)}"</small>`:'';
+}
 export function renderHourlyWeather(forecast, now = Date.now()) {
   const root = document.getElementById('hourly'); if (!root) return;
   const scroll = root.scrollLeft, zone = forecast.location.timeZone || 'America/New_York';
   const hour = time => new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric'}).format(new Date(time)).replace(' ','');
-  root.innerHTML = hourlyDisplaySamples(forecast,now).map(sample => `<button type="button" class="hour ${sample.now ? 'now hour-current' : 'forecast-hour'}" data-comfort-time="${esc(sample.id)}" data-time="${esc(sample.time)}" title="${esc(sample.condition)} · ${esc(sample.source)}" aria-label="${sample.now ? 'Now' : esc(hour(sample.time))}, ${esc(sample.condition)}, air ${degrees(sample.temperature)}, feels like ${degrees(sample.feels)} ${esc(sample.exposure.label.toLowerCase())}. Preview this weather."><span>${sample.now ? 'Now' : esc(hour(sample.time))}</span>${weatherIcon(sample.condition,sample.isDay)}<strong>${degrees(sample.temperature)}</strong><span class="hour-feels">Feels <b>${degrees(sample.feels)}</b><em class="hour-exposure sr-only">${esc(sample.exposure.shortLabel)}</em></span>${hourlyRainHTML(sample)}${hourlyUvHTML(sample.uvIndex)}${hourlyWindHTML(sample)}</button>`).join('');
+  root.innerHTML = hourlyDisplaySamples(forecast,now).map(sample => `<button type="button" class="hour ${sample.now ? 'now hour-current' : 'forecast-hour'}" data-comfort-time="${esc(sample.id)}" data-time="${esc(sample.time)}" title="${esc(sample.condition)} · ${esc(sample.source)}" aria-label="${sample.now ? 'Now' : esc(hour(sample.time))}, ${esc(sample.condition)}, air ${degrees(sample.temperature)}, feels like ${degrees(sample.feels)} ${esc(sample.exposure.label.toLowerCase())}. Preview this weather."><span>${sample.now ? 'Now' : esc(hour(sample.time))}</span>${weatherIcon(sample.condition,sample.isDay)}<strong>${degrees(sample.temperature)}</strong><span class="hour-feels">Feels <b>${degrees(sample.feels)}</b><em class="hour-exposure sr-only">${esc(sample.exposure.shortLabel)}</em></span>${hourlyRainHTML(sample)}${hourlySnowHTML(forecast,sample)}${hourlyUvHTML(sample.uvIndex)}${hourlyWindHTML(sample)}</button>`).join('');
   root.scrollLeft = scroll;
 }
 export function peakComparison(summary, currentSun) {

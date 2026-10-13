@@ -13,13 +13,14 @@ const VARIABLES = {
   dewpoint: { label: 'Dewpoint',      unit: '°F',  fmt: (v) => `${Math.round(v)}°` },
   pop:      { label: 'Rain chance',   unit: '%',   fmt: (v) => `${Math.round(v)}%` },
   uv:       { label: 'UV Index',      unit: '',    fmt: (v) => `${Math.round(v)}` },
+  snow:     { label: 'Snow',          unit: 'in',  fmt: (v) => `${v.toFixed(1)}"` },
   aqi:      { label: 'AQI',           unit: '',    fmt: (v) => `${Math.round(v)}` },
 };
 let curVar = 'temp';
 
 const COLORS = {
   newBlend: '#ffffff', oldBlend: '#8b98b0',
-  nws: '#7fd4ff', hrrr: '#ffb47d', nbm: '#7de8a8', ecmwf: '#b48cff', wn: '#ffd479',
+  nws: '#7fd4ff', hrrr: '#ffb47d', nbm: '#7de8a8', ecmwf: '#b48cff', wn: '#ffd479', gfs: '#ff8fc8',
   single: '#7fd4ff',
 };
 const K2F = (k) => (k - 273.15) * 9 / 5 + 32;
@@ -176,6 +177,16 @@ function buildSeries(fx, wn, varId) {
     if (varId === 'wind') out.wnVals = wnDaily(wn?.hourly, 'wind_speed_10m', 'max', days, tz, MS2MPH);
     if (varId === 'dewpoint') out.wnVals = wnDaily(wn?.hourly, 'dewpoint_temperature_2m', 'max', days, tz, K2F);
     // humidity: no WN feed
+  } else if (varId === 'snow') {
+    // Per-model daily snowfall (inches): NWS gridpoint, ECMWF and GFS via Open-Meteo. No blend line.
+    out.noBlend = true;
+    days.forEach((d, i) => {
+      const r = (fx.snow?.days || []).find((x) => x.date === d.date), src = {};
+      if (r && finite(r.nwsSnowfall)) src.nws = r.nwsSnowfall;
+      if (r && finite(r.models?.ecmwf)) src.ecmwf = r.models.ecmwf;
+      if (r && finite(r.models?.gfs)) src.gfs = r.models.gfs;
+      out.modelMaps[i] = src;
+    });
   } else if (varId === 'uv') {
     out.perModel = false;
     out.single = (fx.days || []).slice(0, 10).map((d) => (finite(d.uvMax) ? d.uvMax : null));
@@ -187,8 +198,8 @@ function buildSeries(fx, wn, varId) {
 }
 
 const hiddenModels = new Set();
-const LABELS = { newBlend: 'Weather Nourie blend', oldBlend: 'Current', nws: 'NWS 36%', hrrr: 'HRRR 27%', nbm: 'NBM 18%', ecmwf: 'ECMWF 9%', wn: 'WN 10%', single: '' };
-const NAMES = { newBlend: 'Weather Nourie', oldBlend: 'Current blend', nws: 'NWS', hrrr: 'HRRR', nbm: 'NBM', ecmwf: 'ECMWF', wn: 'WeatherNext', single: '' };
+const LABELS = { newBlend: 'Weather Nourie blend', oldBlend: 'Current', nws: 'NWS 36%', hrrr: 'HRRR 27%', nbm: 'NBM 18%', ecmwf: 'ECMWF 9%', wn: 'WN 10%', gfs: 'GFS', single: '' };
+const NAMES = { newBlend: 'Weather Nourie', oldBlend: 'Current blend', nws: 'NWS', hrrr: 'HRRR', nbm: 'NBM', ecmwf: 'ECMWF', wn: 'WeatherNext', gfs: 'GFS', single: '' };
 function renderChart(container, built, varDef, varId) {
   const { days } = built;
   // Size the SVG to its real pixel width so text stays legible on phones.
@@ -196,7 +207,7 @@ function renderChart(container, built, varDef, varId) {
   const phone = W < 600;
   const H = phone ? 340 : 380, PL = phone ? 38 : 52, PR = phone ? 10 : 18, PT = 30, PB = 34;
   const FS = phone ? 11 : 14;
-  const series = { newBlend: [], fullBlend: [], oldBlend: [], nws: [], hrrr: [], nbm: [], ecmwf: [], wn: [], single: [] };
+  const series = { newBlend: [], fullBlend: [], oldBlend: [], nws: [], hrrr: [], nbm: [], ecmwf: [], wn: [], gfs: [], single: [] };
   const activeW = Object.fromEntries(Object.entries(NEW_WEIGHTS).filter(([id]) => !hiddenModels.has(id)));
   const activeSum = Object.values(activeW).reduce((a, b) => a + b, 0);
   // Is any model that feeds the blend (and has data for this variable) unchecked?
@@ -205,7 +216,8 @@ function renderChart(container, built, varDef, varId) {
   if (built.perModel) {
     days.forEach((d, i) => {
       const src = { ...built.modelMaps[i], wn: built.wnVals[i] };
-      if (built.fixedBlend) {
+      if (built.noBlend) { series.newBlend.push(null); series.fullBlend.push(null); series.oldBlend.push(null); }
+      else if (built.fixedBlend) {
         // All checked: show the site's official rain chance. Any feeding model unchecked: weighted value of the visible models.
         series.newBlend.push(blendChanged ? blendVal(src, activeW) : built.fixedBlend[i]);
         series.fullBlend.push(built.fixedBlend[i]); series.oldBlend.push(null);
@@ -218,11 +230,12 @@ function renderChart(container, built, varDef, varId) {
       }
       for (const id of ['nws', 'hrrr', 'nbm', 'ecmwf']) series[id].push(finite(src[id]) ? src[id] : null);
       series.wn.push(finite(src.wn) ? src.wn : null);
+      series.gfs.push(finite(src.gfs) ? src.gfs : null);
     });
   } else {
     days.forEach((d, i) => series.single.push(built.single[i] ?? null));
   }
-  const ids = built.perModel ? ['newBlend', 'oldBlend', 'nws', 'hrrr', 'nbm', 'ecmwf', 'wn'].filter((id) => series[id].some((v) => v != null)) : ['single'];
+  const ids = built.perModel ? ['newBlend', 'oldBlend', 'nws', 'hrrr', 'nbm', 'ecmwf', 'wn', 'gfs'].filter((id) => series[id].some((v) => v != null)) : ['single'];
   const visible = ids.filter((id) => !hiddenModels.has(id));
   const allV = visible.flatMap((id) => series[id]).filter((v) => v != null);
   if (!ids.length || !series[ids[0]].some((v) => v != null)) {
@@ -249,8 +262,8 @@ function renderChart(container, built, varDef, varId) {
   const ylabels = ticks.map((v) =>
     `<line x1="${PL}" x2="${W - PR}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}" stroke="rgba(255,255,255,.14)" stroke-width="1"/>`
     + `<text x="${PL - 6}" y="${(Y(v) + 4).toFixed(0)}" text-anchor="end" font-size="${FS}" fill="#d5e1f2">${varDef.fmt(v)}</text>`).join('');
-  const style = { wn: { w: 2.5, dash: '6,4', op: 0.9 }, nws: { w: 2.5, op: 0.85 }, hrrr: { w: 2.5, op: 0.85 }, nbm: { w: 2.5, op: 0.85 }, ecmwf: { w: 2.5, op: 0.85 }, oldBlend: { w: 2.5, dash: '9,5', op: 0.9 }, newBlend: { w: 4, op: 1 }, single: { w: 4, op: 1 } };
-  const drawOrder = ['wn', 'nws', 'hrrr', 'nbm', 'ecmwf', 'oldBlend', 'newBlend', 'single'].filter((id) => visible.includes(id));
+  const style = { wn: { w: 2.5, dash: '6,4', op: 0.9 }, nws: { w: 2.5, op: 0.85 }, hrrr: { w: 2.5, op: 0.85 }, nbm: { w: 2.5, op: 0.85 }, ecmwf: { w: 2.5, op: 0.85 }, gfs: { w: 2.5, op: 0.85 }, oldBlend: { w: 2.5, dash: '9,5', op: 0.9 }, newBlend: { w: 4, op: 1 }, single: { w: 4, op: 1 } };
+  const drawOrder = ['wn', 'nws', 'hrrr', 'nbm', 'ecmwf', 'gfs', 'oldBlend', 'newBlend', 'single'].filter((id) => visible.includes(id));
   const lines = drawOrder.map((id) => { const s = style[id], d = path(series[id]); return d ? `<path d="${d}" fill="none" stroke="${COLORS[id]}" stroke-width="${s.w}"${s.dash ? ` stroke-dasharray="${s.dash}"` : ''} opacity="${s.op}" stroke-linecap="round" stroke-linejoin="round"/>` : ''; }).join('');
   const primaryId = visible.includes('newBlend') ? 'newBlend' : visible.includes('single') ? 'single' : visible[0];
   const dots = primaryId ? series[primaryId].map((v, i) => v == null ? '' :
@@ -260,6 +273,7 @@ function renderChart(container, built, varDef, varId) {
     return `<button type="button" class="wn-chip" data-model="${id}" aria-pressed="${!off}" style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:999px;border:1px solid ${off ? 'rgba(255,255,255,.12)' : COLORS[id] + '99'};background:${off ? 'transparent' : 'rgba(255,255,255,.10)'};font-family:inherit;font-size:11px;font-weight:600;line-height:1.4;color:${off ? '#7f8ca3' : '#e8eef8'};white-space:nowrap;cursor:pointer;${off ? 'text-decoration:line-through;' : ''}">`
       + `<i style="width:12px;height:3px;border-radius:2px;background:${COLORS[id]};opacity:${off ? 0.3 : 1};display:inline-block"></i>${chipLabel(id, off)}</button>`; };
   const chipLabel = (id, off) => {
+    if (built.noBlend) return NAMES[id];
     if (!(id in NEW_WEIGHTS)) return LABELS[id];
     if (built.fixedBlend && !blendChanged) return NAMES[id];
     if (off) return `${NAMES[id]} 0%`;
@@ -319,7 +333,7 @@ async function render() {
 
   const oldWarn = document.getElementById('wn-stale-warn');
   if (oldWarn) oldWarn.remove();
-  if (varId !== 'pop' && varId !== 'uv' && varId !== 'aqi' && wnCache?.ageDays != null && wnCache.ageDays > 2) {
+  if (varId !== 'pop' && varId !== 'snow' && varId !== 'uv' && varId !== 'aqi' && wnCache?.ageDays != null && wnCache.ageDays > 2) {
     const warn = document.createElement('p');
     warn.id = 'wn-stale-warn';
     warn.style.cssText = 'font-size:13px;color:#ffb47d;margin:10px 0 0';
