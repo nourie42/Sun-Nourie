@@ -104,6 +104,8 @@
     }
   </style>
 
+  <link rel="stylesheet" href="/weather-fusion/header-sky.css?v=1">
+  <script type="module" src="/weather-fusion/header-sky.js?v=1"></script>
 </head>
 <body data-sky="day">
   <a class="skip-link" href="#forecast">Skip to forecast</a>
@@ -120,8 +122,8 @@
     <a class="experimental-wn-link" id="ultimate-link" href="/weather-fusion/ultimate.html" aria-label="Open Ultimate weather, everything on one page"><span aria-hidden="true">⭐</span> Ultimate</a>
     <a class="experimental-wn-link" id="prerelease-link" href="https://sun-nourie-prerelease.onrender.com/weather-fusion/" aria-label="Open prerelease staging site"><span aria-hidden="true">🧪</span> Prerelease</a>
     <a class="experimental-wn-link" id="deal-intel-link" href="/deal-intelligence/" aria-label="Open Deal Intelligence M&A workspace"><span aria-hidden="true">💼</span> Deal Intel</a>
-    <header class="topbar">
-      <a class="brand brand-premium" href="/weather-fusion/experimental-weather.html" aria-label="Open Experimental Weather"><span class="brand-mark"><img class="brand-logo" src="/weather-fusion/logo.svg" alt="" width="44" height="44"></span><span class="brand-word"><span class="brand-kicker">WEATHER</span><span class="brand-name">Nourie</span></span></a>
+    <header class="topbar sky-header" data-hdr="night"><div class="hdr-layer hdr-stars" aria-hidden="true"></div><div class="hdr-layer hdr-stars b" aria-hidden="true"></div><div class="hdr-layer hdr-sun" aria-hidden="true"></div><div class="hdr-layer hdr-horizon" aria-hidden="true"></div><div class="hdr-layer hdr-clouds" aria-hidden="true"></div><div class="hdr-layer hdr-rain" aria-hidden="true"></div><div class="hdr-layer hdr-snow" aria-hidden="true"></div>
+      <a class="brand brand-premium" href="/weather-fusion/experimental-weather.html" aria-label="Open Experimental Weather"><span class="brand-mark"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><radialGradient id="hs-sun" cx=".4" cy=".35"><stop offset="0" stop-color="#fff3b0"/><stop offset="1" stop-color="#f5a623"/></radialGradient><linearGradient id="hs-cl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#bcd6f5"/></linearGradient><linearGradient id="hs-w" x1="0" x2="1"><stop offset="0" stop-color="#2f8cff"/><stop offset="1" stop-color="#7fd3ff"/></linearGradient></defs><circle cx="38" cy="22" r="12" fill="url(#hs-sun)"/><path d="M14 34a8 8 0 0 1 8-8 11 11 0 0 1 21 3 6 6 0 0 1 0 12H18a6 6 0 0 1-4-7z" fill="url(#hs-cl)"/><path d="M8 44c6-5 12 5 18 0s12 5 18 0 10 4 14 1" fill="none" stroke="url(#hs-w)" stroke-width="4" stroke-linecap="round"/><path d="M12 52c6-4 11 4 17 0s11 4 17 0" fill="none" stroke="#5fb4ff" stroke-width="3" stroke-linecap="round" opacity=".8"/></svg></span><span class="brand-word"><span class="brand-kicker">WEATHER</span><span class="brand-name">Nourie</span></span></a>
       <nav aria-label="Page tools"><button class="icon-button" id="refresh" title="Refresh weather" aria-label="Refresh weather">↻</button></nav>
     </header>
     <div class="location-bar">
