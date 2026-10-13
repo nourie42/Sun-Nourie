@@ -12,7 +12,7 @@ body::before{content:"";position:absolute;left:0;right:0;top:0;height:520px;z-in
   background-size:100% auto!important;background-position:center top!important;
   -webkit-mask-image:linear-gradient(180deg,#000 62%,transparent 100%),linear-gradient(90deg,transparent 0,#000 7%,#000 93%,transparent 100%);
   -webkit-mask-composite:source-in;mask-image:linear-gradient(180deg,#000 62%,transparent 100%),linear-gradient(90deg,transparent 0,#000 7%,#000 93%,transparent 100%);mask-composite:intersect;
-  margin:0 0 4px!important}
+  margin:10px 0 4px!important}
 .sky-header #refresh{top:18.2%!important}
 .sky-header .brand{top:16%!important;height:76%!important}
 /* uniform tiles: same fill everywhere, more see-through */

@@ -41,9 +41,9 @@ test('the forecast API bypasses browser cache without changing source timestamps
   assert.doesNotMatch(api,/assembledAt\s*=|issuedAt\s*=|runAt\s*=/);
 });
 
-test('both page modes refresh each minute, on return, restored page, and reconnect',()=>{
-  assert.match(app,/setInterval\(\(\) => \{ if \(validPlace\(place\)&&!document\.hidden&&!busy\) void load\(\); \}, 60000\)/);
-  assert.match(app,/visibilitychange[\s\S]*?void refreshAlerts\(\);if \(validPlace\(place\)&&!busy\) void load\(\)/);
+test('both page modes refresh every 10 minutes, on return (if older than 2 min), restored page, and reconnect',()=>{
+  assert.match(app,/setInterval\(\(\) => \{ if \(validPlace\(place\)&&!document\.hidden&&!busy&&forecastAgeMs\(\)>9\*60000\) void load\(\); \}, 60000\)/);
+  assert.match(app,/visibilitychange[\s\S]*?void refreshAlerts\(\);if \(validPlace\(place\)&&!busy&&forecastAgeMs\(\)>2\*60000\) void load\(\)/);
   assert.match(app,/window\.addEventListener\('online',[^\n]*void refreshAlerts\(\);if \(validPlace\(place\)&&!document\.hidden&&!busy\) void load\(\)/);
   assert.match(app,/window\.addEventListener\('pageshow',[^\n]*void refreshAlerts\(\);if \(event\.persisted&&validPlace\(place\)&&!document\.hidden&&!busy\) void load\(\)/);
   assert.match(app,/draw\('day-content', 'Forecast details', \(\) => refreshOpenDay\(\)\)/);

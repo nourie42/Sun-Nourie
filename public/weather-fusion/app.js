@@ -156,7 +156,7 @@ function render(data) {
   if($('hero-uv'))$('hero-uv').innerHTML=dailyUvHTML(data.days[0]?.uvMax,'Peak UV today');
   $('condition').textContent = hero.tonight ? `Tonight · ${hero.condition}` : hero.condition;
   $('high-low').textContent = hero.tonight ? 'Overnight low' : hero.range;
-  const sourceLabel=c.localEstimate?`Selected-location estimate · valid ${clock(c.time)}`:c.type==='observation'?`Nearby weather station · updated ${clock(c.time)}`:c.type==='unavailable'?'Current local reading unavailable':'Estimated current conditions';
+  const refObs=c.localEstimate?.referenceStation,sourceLabel=c.localEstimate?`Selected-location estimate · ${clock(c.time)} model hour${refObs?.observedAt?` · ${refObs.station||'station'} observed ${clock(refObs.observedAt)}`:''}`:c.type==='observation'?`Nearby weather station · updated ${clock(c.time)}`:c.type==='unavailable'?'Current local reading unavailable':'Estimated current conditions';
   const radarLabel=radarObservationLabel(c);
   $('observation-label').textContent = `${sourceLabel}${radarLabel?` · ${radarLabel}`:''}`;
   $('hero-scene').innerHTML = icon(hero.condition, hero.isDay, 120);
@@ -597,12 +597,15 @@ function startDeviceLocation({explicit=false}={}){
  );
 }
 $('locate').addEventListener('click', () => startDeviceLocation({explicit:true}));
-document.addEventListener('visibilitychange', () => { if (document.hidden) stopRadar(); else {void refreshAlerts();if (validPlace(place)&&!busy) void load();} });
+// Refetch on tab focus only if the data is older than 2 minutes.
+const forecastAgeMs=()=>forecast?.assembledAt?Date.now()-Date.parse(forecast.assembledAt):Infinity;
+document.addEventListener('visibilitychange', () => { if (document.hidden) stopRadar(); else {void refreshAlerts();if (validPlace(place)&&!busy&&forecastAgeMs()>2*60000) void load();} });
 window.addEventListener('online', () => { if(!document.hidden)void refreshAlerts();if (validPlace(place)&&!document.hidden&&!busy) void load(); });
 window.addEventListener('pageshow', (event) => { if(event.persisted&&!document.hidden)void refreshAlerts();if (event.persisted&&validPlace(place)&&!document.hidden&&!busy) void load(); });
 // The site refreshes while open; this is not a push-alert system or background task.
 setInterval(()=>{if(validPlace(place)&&!document.hidden){if(forecast)renderAlerts(forecast);else if(alertSnapshot)renderBulletins(alertSnapshot);void refreshAlerts();}},ALERT_REFRESH_MS);
-setInterval(() => { if (validPlace(place)&&!document.hidden&&!busy) void load(); }, 60000);
+// Forecast auto-refresh: every 10 minutes while visible (models update hourly; stations ~20-60 min).
+setInterval(() => { if (validPlace(place)&&!document.hidden&&!busy&&forecastAgeMs()>9*60000) void load(); }, 60000);
 installExperience();
 startDeviceLocation();
 
