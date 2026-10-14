@@ -20,3 +20,22 @@ test('warm locations get no snow outlook',()=>{
  assert.equal(out.snow.possible,false);
 });
 test('grid snowfall without interval data is not invented',()=>{ assert.equal(gridSnowHours({}),null); });
+
+test('NWS simple daily amount excludes elapsed hours and keeps incomplete coverage unknown',()=>{
+ const remaining=Date.parse('2026-10-14T12:00:00Z');
+ const output=()=>({location:{timeZone:'UTC'},days:[{date:'2026-10-14',label:'Wed'}],hours:[],riskOutlooks:[]});
+ const full=output();addSnowOutlook(full,{now:remaining,grid:{snowfallAmount:{uom:'wmoUnit:in',values:[{validTime:'2026-10-14T00:00:00Z/PT24H',value:1}]}}});
+ const r=full.snow.days[0];assert.equal(r.nwsSnowfall,1);assert.equal(r.displaySnowfall.value,.5);assert.equal(r.displaySnowfall.source,'NWS point forecast');assert.equal(r.displaySnowfall.remainingDay,true);assert.equal(r.displaySnowfall.start,'2026-10-14T12:00:00.000Z');assert.equal(r.displaySnowfall.expectedHours,12);
+ const elapsed=output();addSnowOutlook(elapsed,{now:remaining,grid:{snowfallAmount:{uom:'wmoUnit:in',values:[{validTime:'2026-10-14T00:00:00Z/PT6H',value:1}]}}});
+ assert.equal(elapsed.snow.days[0].displaySnowfall.value,null);assert.equal(elapsed.snow.days[0].snowExpected,false);assert.equal(elapsed.snow.possible,false);
+ const zero=output();addSnowOutlook(zero,{now:remaining,grid:{snowfallAmount:{uom:'wmoUnit:in',values:[{validTime:'2026-10-14T12:00:00Z/PT12H',value:0}]}}});
+ assert.equal(zero.snow.days[0].displaySnowfall.value,0);assert.equal(zero.snow.days[0].displaySnowfall.status,'ready');
+});
+
+test('snow event timing clips overnight NWS periods and rejects rain-only hours from coarse snowfall intervals',()=>{
+ const output={location:{timeZone:'UTC'},days:[{date:'2026-10-14',label:'Wed'},{date:'2026-10-15',label:'Thu'}],hours:[{time:'2026-10-14T23:00:00Z',condition:'Rain'},{time:'2026-10-15T00:00:00Z',condition:'Snow'},{time:'2026-10-15T01:00:00Z',condition:'Snow'}],riskOutlooks:[]};
+ addSnowOutlook(output,{now:Date.parse('2026-10-14T12:00:00Z'),grid:{snowfallAmount:{uom:'wmoUnit:in',values:[{validTime:'2026-10-14T23:00:00Z/PT3H',value:3}]}},periods:[{name:'Wednesday Night',startTime:'2026-10-14T23:00:00Z',endTime:'2026-10-15T06:00:00Z',shortForecast:'Snow',detailedForecast:'Snow overnight.'}]});
+ assert.equal(output.snow.days[1].snowExpected,true);assert.equal(output.snow.days[1].periods[0].name,'Wednesday Night');
+ assert.deepEqual(output.snow.days[1].snowEventWindows,[{start:'2026-10-15T00:00:00.000Z',end:'2026-10-15T02:00:00.000Z',source:'NWS snow hours'}]);
+ assert.equal(output.snow.days[0].snowEventWindows[0].source,'NWS snow forecast period');
+});

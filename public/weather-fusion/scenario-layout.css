@@ -1,10 +1,5 @@
-/* Scenario-aware comfort, reference Gross Meter and compact 7-day rows. */
-.pavement-person:has(>svg[data-scene="rain"]) figcaption strong,
-.pavement-person:has(>svg[data-scene="rain"]) figcaption .pavement-secondary,
-.pavement-person:has(>svg[data-scene="rain"]) figcaption>small:last-child{font-size:0!important}
-.pavement-person:has(>svg[data-scene="rain"]) figcaption strong::after{content:"WET";font-size:clamp(31px,5vw,58px)}
-.pavement-person:has(>svg[data-scene="rain"]) figcaption .pavement-secondary::after{content:"Rain occurring";font-size:clamp(10px,1.2vw,14px)}
-.pavement-person:has(>svg[data-scene="rain"]) figcaption>small:last-child::after{content:"Dry-surface estimate paused";font-size:clamp(8px,1vw,11px)}
+/* Scenario-aware comfort, Feel Meter and compact 7-day rows. */
+.pavement-person figcaption .wet-pavement-reading{font-size:clamp(31px,5vw,58px)}
 
 .gross-facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin-top:12px;border:1px solid #48bbed42;border-radius:17px;background:#042e542e;overflow:hidden}
 .gross-facts>span{display:grid;grid-template-columns:auto auto;grid-template-rows:auto auto;justify-content:center;align-items:center;column-gap:11px;padding:12px 8px;color:#72dcfb;min-width:0}

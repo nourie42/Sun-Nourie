@@ -1,4 +1,4 @@
-import {timeAt,forecastValue,displayedFeelsAt,degrees} from './hourly-feels.js?v=dewpoint-floor-v1';
+import {timeAt,forecastValue,displayedFeelsAt,degrees} from './hourly-feels.js?v=continuous-feels-v2';
 import {hourlyUvValue,uvCategory} from './daily-uv.js?v=clear-weather-daygraph-v3';
 import {forecastGrossLevel} from './dewpoint-meter.js?v=feel-v1';
 const H=3600000,finite=Number.isFinite;

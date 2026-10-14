@@ -1,7 +1,7 @@
 import {finite,solarElevation,thermalHumidity} from './weather-math.js?v=weather-qa-v67';
-import {clothingForFeels,referenceScene,precipitationActivity,winterSceneExpected} from './exposure-scene.js?v=integrated-art-v3';
+import {clothingForFeels,referenceScene,precipitationActivity,winterSceneExpected} from './exposure-scene.js?v=selected-hour-art-v4';
 import {thermalRisk} from './thermal-risk.js?v=weather-art-labels-v10';
-import {weatherShapes} from './weather-display.js?v=rain-now-v71';
+import {weatherShapes} from './weather-display.js?v=selected-hour-v5';
 import {weatherState} from './weather-state.js';
 const H=3600000,SIGMA=5.670374419e-8,clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 const c=f=>(f-32)/1.8,f=c=>c*1.8+32;
@@ -50,13 +50,13 @@ export function integrateSurface(rows,location,{albedo=.3,k=2,capacity=2.2e6,win
  }
  return f(ts);
 }
-export function pavementEstimate(forecast,current,now=Date.now(),{checkedAt=now,condition='',pop=null,precipitation=null,rainAround=false,radarThreat=false,snowExpected=false,snowfall=null,snowForecastOnly=false,clothingFeels=null}={}){
+export function pavementEstimate(forecast,current,now=Date.now(),{checkedAt=now,condition='',pop=null,precipitation=null,rainAround=false,radarThreat=false,snowExpected=null,snowfall=null,snowForecastOnly=false,clothingFeels=null,snowScope=null,airTemperature=null,forecast:forecastScene=false,now:currentScene=false}={}){
  const assembled=Date.parse(forecast?.assembledAt),raw=forecast?.exposureWeather?.rows;
  const elevation=solarElevation(now,forecast?.location?.latitude,forecast?.location?.longitude),daylight=finite(elevation)?elevation>0:null;
  const missing=reason=>({version:PAVEMENT_VERSION,status:'unavailable',reason,concrete:null,asphalt:null,daylight});
- if(winterSceneExpected(condition,{snowExpected,snowfall}))return {
-  version:PAVEMENT_VERSION,status:'winter',concrete:null,asphalt:null,daylight,snowExpected:true,snowForecastOnly,clothingFeels,
-  note:snowForecastOnly?'Snow is forecast for this day. Snow cover, ice and deicer change what paws encounter; the dry-pavement model cannot estimate a snow-covered surface.':'Snow and ice change surface behavior. The dry-pavement model cannot estimate a snow-covered surface.',
+ if(winterSceneExpected(condition,{snowExpected,snowfall,snowScope,airTemperature,forecast:forecastScene,now:currentScene}))return {
+  version:PAVEMENT_VERSION,status:'winter',concrete:null,asphalt:null,daylight,snowExpected:true,snowForecastOnly,clothingFeels,snowScope,airTemperature,forecast:forecastScene,now:currentScene,
+  note:snowForecastOnly?'Snow is forecast for this hour. Snow cover, ice and deicer change what paws encounter; the dry-pavement model cannot estimate a snow-covered surface.':'Snow and ice change surface behavior. The dry-pavement model cannot estimate a snow-covered surface.',
   advice:'Keep winter walks short. Consider well-fitting dog boots, check between the toes for packed snow or ice, and rinse and dry paws after contact with deicer. If your dog lifts a paw, limps or shivers, head inside.'
  };
  if(!finite(assembled)||checkedAt-assembled>90*60000||checkedAt<assembled-5*60000)return missing('The weather update is too old for a surface estimate.');
@@ -112,14 +112,14 @@ export function petSurfaceSubtitle(result){
 /** Human feels-like is context for a winter outing, never a paw temperature. */
 export function coldPawGuidance(feels,context={}){
  if(!winterSceneExpected(context.condition,context))return null;
- const value=finite(context.clothingFeels)?Math.min(finite(feels)?feels:context.clothingFeels,context.clothingFeels):feels;
+ const value=finite(feels)?feels:context.clothingFeels;
  return {level:finite(value)&&value<=8.6?'caution':'winter',label:'Cold paws · boots help',feels:finite(value)?Math.round(value):null,
   text:'Snow and ice can chill paws and collect between the toes. Keep outings short, consider dog boots, and rinse off deicer. Head inside if your dog lifts a paw, limps or shivers.'};
 }
 export function pavementHTML(result,feels,context={}){
  const walker=walkerOutfit(feels);
  const activelyWet=result?.activePrecipitation===true||precipitationActivity(context.condition,{pop:context.pop,precipitation:context.precipitation,rainAround:context.rainAround===true,radarThreat:context.radarThreat===true})==='active';
- const winter=coldPawGuidance(feels,{...context,snowExpected:result?.snowExpected===true||context.snowExpected===true,clothingFeels:context.clothingFeels??result?.clothingFeels});
+ const winter=coldPawGuidance(feels,{...context,snowExpected:context.snowExpected??result?.snowExpected,snowScope:context.snowScope??result?.snowScope,airTemperature:context.airTemperature??result?.airTemperature,now:context.now??result?.now,forecast:context.forecast??result?.forecast,clothingFeels:context.clothingFeels??result?.clothingFeels});
  const surfaceWarning=pavementWarning(result),weatherWarning=petWeatherWarning(feels),warning=winter?{level:winter.level,label:winter.label,source:'winter'}:activelyWet?null:(surfaceWarning||weatherWarning);
  const value=r=>r?`${r.value}°`:'—',night=result?.daylight===false;
  let sky=night
@@ -129,7 +129,7 @@ export function pavementHTML(result,feels,context={}){
  const illustrated=referenceScene(2,!night,context.condition||'Clear',feels,context);
  const horizon=night?'#173d4c':'#2d9b5d';
  const subtitle=winter?(context.snowForecastOnly||result?.snowForecastOnly?'Snow forecast · protect paws':'Snow & ice · protect paws'):activelyWet?'Wet pavement · heat warning paused':petSurfaceSubtitle(result);
- const reading=winter?'<strong class="winter-paw-reading">Cold paws</strong><small>Snow / ice · keep outings short</small><small>Check toes · rinse off deicer</small>':`<strong>${value(result.concrete)}</strong><small class="pavement-secondary">Asphalt ${value(result.asphalt)}</small><small>Est. surface temp · °F</small>`;
+ const reading=winter?'<strong class="winter-paw-reading">Cold paws</strong><small>Snow / ice · keep outings short</small><small>Check toes · rinse off deicer</small>':activelyWet?`<strong class="wet-pavement-reading">WET</strong><small>${context.forecast?'Rain forecast':'Rain occurring'}</small><small>Dry-surface estimate paused</small>`:`<strong>${value(result.concrete)}</strong><small class="pavement-secondary">Asphalt ${value(result.asphalt)}</small><small>Est. surface temp · °F</small>`;
  return `<figure class="exposure-person pavement-person" id="pavement-content" data-status="${winter?'winter':result.status}" data-daylight="${night?'false':'true'}" aria-label="${winter?'Winter paw care for dogs':'Estimated hard-surface temperature for dogs'} ${context.forecast?'at the selected forecast hour':'right now'}"><span class="exposure-label">For Pets</span><span class="exposure-subtitle">${subtitle}</span><span class="exposure-alert-slot">${warning?`<span class="pavement-warning${warning.source==='weather'?' pet-weather-warning':''}" data-risk="${warning.level}" role="status">${warning.label}</span>`:''}</span>${illustrated||`<svg class="poodle-scene" viewBox="0 0 300 360" preserveAspectRatio="xMidYMid slice" role="img" aria-label="A person walking a light brown toy poodle"><defs><linearGradient id="pet-road" x1="0" y1="0" x2="0" y2="1"><stop stop-color="${night?'#4f6170':'#7f929d'}"/><stop offset="1" stop-color="${night?'#293b49':'#405463'}"/></linearGradient><linearGradient id="pet-day-sky" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#078fe0"/><stop offset=".68" stop-color="#61d1fb"/><stop offset="1" stop-color="#9bdcf0"/></linearGradient><linearGradient id="pet-night-sky" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#071c46"/><stop offset=".58" stop-color="#123c69"/><stop offset="1" stop-color="#285e7b"/></linearGradient></defs>${sky}<g class="pet-horizon" fill="${horizon}" opacity=".92"><circle cx="22" cy="242" r="34"/><circle cx="61" cy="235" r="29"/><circle cx="248" cy="238" r="37"/><circle cx="288" cy="246" r="32"/></g><path d="M0 272Q77 257 153 271Q226 252 300 270V360H0Z" fill="url(#pet-road)"/><image class="poodle-walk" data-outfit="${walker.outfit}" href="/weather-fusion/${walker.asset}" x="-22" y="96" width="344" height="229.333" preserveAspectRatio="xMidYMid meet"/></svg>`}<figcaption>${reading}</figcaption></figure>`;
 }
 export function pavementWarning(result){

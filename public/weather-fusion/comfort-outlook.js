@@ -1,9 +1,9 @@
 import {outdoorExposure} from './outdoor-feels.js?v=weather-qa-v67';
 import {finite,isTonightPeriod,localHour} from './weather-math.js?v=weather-qa-v67';
-import {timeAt,summarizeFeels} from './hourly-feels.js?v=dewpoint-floor-v1';
-import {forecastSample} from './weather-display.js?v=warmest-sun-explain-v1';
-import {sunExposureTemperature} from './outdoor-feels.js?v=sun-exposure-v1';
-import {winterSceneExpected} from './exposure-scene.js?v=integrated-art-v3';
+import {timeAt,summarizeFeels} from './hourly-feels.js?v=continuous-feels-v2';
+import {forecastSample} from './weather-display.js?v=selected-hour-v5';
+import {weatherState} from './weather-state.js';
+import {winterSceneExpected,selectedHourSnowPhase} from './exposure-scene.js?v=selected-hour-art-v4';
 export function comfortMode(time,zone='America/New_York'){
  const hour=localHour(time,zone);return isTonightPeriod(time,zone)?'overnight':hour<5?'predawn':'day';
 }
@@ -18,7 +18,8 @@ export function warmestTodayWindow(forecast,now=Date.now()){
  for(const hour of forecast?.hours||[]){
   const epoch=Date.parse(hour.time);if(!finite(epoch)||epoch<start||epoch>=end)continue;expected++;
   const sample=forecastSample(forecast,hour.time);if(!sample)continue;available++;
-  const sun=sunExposureTemperature(sample);if(sun.active&&finite(sun.value))points.push({time:hour.time,epoch,value:sun.value,source:'Sun-exposure estimate'});
+  const sunny=sample.comfort?.daylight===true&&['clear','partly-cloudy'].includes(weatherState(sample.condition).kind),sun=sample.comfort?.sun;
+  if(sunny&&finite(sun))points.push({time:hour.time,epoch,value:sun,source:'Modeled UTCI in the sun'});
  }
  if(!points.length)return null;
  const high=points.reduce((a,b)=>a.value>=b.value?a:b);
@@ -32,27 +33,17 @@ export function comfortWindow(forecast,now=Date.now()){
  return {...summary,mode,chosen,low:summary.low.value,high:summary.high.value,lowTime:summary.low.time,highTime:summary.high.time,
   label:mode==='day'?'Forecast feels-like peak ahead':mode==='predawn'?'Forecast feels-like low before morning':'Forecast feels-like low tonight',end:summary.points.at(-1).time};
 }
-/** Keep forecast clothing separate from the current temperature reading and
- * match snow illustrations to the selected local day, never the whole week. */
+/** Scene evidence belongs to the selected hour. Daily snow totals and later
+ * feels-like lows never change current artwork or current paw guidance. */
 export function comfortArtworkContext(forecast,sample,now=Date.now()){
- const zone=forecast?.location?.timeZone||'America/New_York',selected=sample?.now?now:Date.parse(sample?.time);
+ const current=sample?.now===true,selected=current?now:Date.parse(sample?.time);
  if(!finite(selected))return {};
- const date=dateAt(selected,zone),day=(forecast?.snow?.days||[]).find(row=>row.date===date);
  const hour=(forecast?.hours||[]).find(row=>{const epoch=Date.parse(row.time);return finite(epoch)&&epoch<=selected&&selected<epoch+3600000;});
- const periodSnow=(day?.periods||[]).some(period=>/snow|flurr|blizzard/i.test(period.wording||''));
- const amounts=[day?.nwsSnowfall,day?.models?.ecmwf,day?.models?.gfs,day?.best];
- const dailySnow=typeof day?.snowExpected==='boolean'?day.snowExpected:typeof day?.snowPossible==='boolean'?day.snowPossible:periodSnow||amounts.some(amount=>finite(amount)&&amount>0);
- const snowExpected=winterSceneExpected(sample?.condition,{snowExpected:dailySnow,snowfall:hour?.snowfall});
- const values=[];
- if(finite(sample?.feels))values.push(sample.feels);
- if(sample?.now){
-  for(const row of forecast?.hours||[]){
-   const epoch=Date.parse(row.time);
-   if(!finite(epoch)||epoch<selected||dateAt(epoch,zone)!==date)continue;
-   const point=forecastSample(forecast,row.time);if(finite(point?.feels))values.push(point.feels);
-  }
- }
- return {snowExpected,snowForecastOnly:snowExpected&&!/snow|flurr|blizzard/i.test(sample?.condition||''),snowfall:hour?.snowfall??null,clothingFeels:values.length?Math.min(...values):null};
+ const condition=sample?.condition||(!current?hour?.condition:'')||'';
+ const airTemperature=finite(sample?.temperature)?sample.temperature:finite(sample?.inputs?.temperature)?sample.inputs.temperature:!current&&finite(hour?.temperature)?hour.temperature:null;
+ const evidence={snowScope:'hour',now:current,forecast:!current,airTemperature,hourSnowPhaseAllowed:!current?selectedHourSnowPhase(forecast,selected):null,snowfall:!current&&finite(hour?.snowfall)?hour.snowfall:null,snowChance:!current&&finite(hour?.snowChance)?hour.snowChance:null};
+ const snowExpected=winterSceneExpected(condition,evidence);
+ return {...evidence,snowExpected,snowForecastOnly:snowExpected&&!/snow|flurr|blizzard/i.test(condition),snowfall:snowExpected?evidence.snowfall:null,snowChance:snowExpected?evidence.snowChance:null,clothingFeels:finite(sample?.feels)?sample.feels:null};
 }
 export function comfortNarrative(current,comfort,summary,zone='America/New_York',context={}){
  const t=current?.temperature,dp=current?.dewpoint,wind=current?.wind,sentences=[],outdoor=outdoorExposure(comfort).value;
@@ -67,8 +58,8 @@ export function comfortNarrative(current,comfort,summary,zone='America/New_York'
   if(p.value<outdoor&&summary.mode==='day')sentences.push('Changing humidity, wind and sky conditions can make later hours feel cooler even if the air temperature rises.');
   if(summary.partial)sentences.push('Some forecast hours are unavailable, so this is the peak of the available readings only.');
  }
- if(context.snowExpected===true)sentences.push('Snow is in this day’s forecast: the people are bundled up for snow play. Keep dog outings short, check for ice between the toes, and rinse off deicer after a walk.');
- else if(finite(context.clothingFeels)&&context.clothingFeels<42)sentences.push(`The outfits account for a remaining feels-like low of ${Math.round(context.clothingFeels)}°: bring a heavy coat, hat and gloves.`);
+ if(context.snowExpected===true)sentences.push('Snow is reported or forecast for this hour: the people are bundled up for snow play. Keep dog outings short, check for ice between the toes, and rinse off deicer after a walk.');
+ else if(finite(context.clothingFeels)&&context.clothingFeels<42)sentences.push(`At this hour’s outdoor feels-like of ${Math.round(context.clothingFeels)}°, bring a heavy coat, hat and gloves.`);
  return sentences.join(' ');
 }
 

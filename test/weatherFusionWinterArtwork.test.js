@@ -7,7 +7,7 @@ import {sunShadeHTML} from '../public/weather-fusion/personal-details.js';
 
 test('snow artwork has real bundled people, snow play and a bounding dog in all three panels',()=>{
  for(const panel of [0,1,2]){
-  const html=referenceScene(panel,true,'Cloudy',52,{snowExpected:true,snowForecastOnly:true});
+  const html=referenceScene(panel,true,'Cloudy',22,{snowExpected:true,snowForecastOnly:true,snowScope:'hour',airTemperature:28,forecast:true});
   assert.match(html,/data-outfit="cold"/);
   assert.match(html,/data-garment="heavy-coat-and-trousers"/);
   assert.match(html,/warm hat, scarf, mittens and boots/);
@@ -24,13 +24,13 @@ test('snow artwork has real bundled people, snow play and a bounding dog in all 
 });
 test('cold dry days wear visible heavy coats without inventing snow',()=>{
  for(const panel of [0,1,2]){
-  const html=referenceScene(panel,true,'Clear',60,{clothingFeels:15});
+  const html=referenceScene(panel,true,'Clear',15);
   assert.match(html,/comfort-integrated-cold-normal\.webp/);
   assert.doesNotMatch(html,/wardrobe-|<path\b|clipPath/);
   assert.match(html,/data-garment="heavy-coat-and-trousers"/);
   assert.doesNotMatch(html,/snow-play-scene/);
  }
- assert.equal(clothingForFeels(70,{clothingFeels:35}),'cold');
+ assert.equal(clothingForFeels(70,{clothingFeels:35}),'mild','a later low cannot change clothing for an available selected-hour feels-like');
  assert.equal(clothingForFeels(70,{snowExpected:true}),'cold');
 });
 test('freezing rain and sleet alone do not become snowball artwork',()=>{
@@ -40,20 +40,21 @@ test('freezing rain and sleet alone do not become snowball artwork',()=>{
   assert.doesNotMatch(html,/snow-play-scene/);
   assert.match(html,/data-outfit="cold"/);
  }
- assert.equal(winterSceneExpected('Clear',{snowfall:.1}),true);
+ assert.equal(winterSceneExpected('Clear',{snowfall:.1}),false);
+ assert.equal(winterSceneExpected('Cloudy',{snowfall:.1,snowScope:'hour',airTemperature:30,forecast:true}),true);
  assert.equal(winterSceneExpected('Clear',{snowfall:0}),false);
  assert.equal(winterSceneExpected('Chance Snow Showers'),true);
 });
-test('daily snow forecast context uses the selected local date, and excludes ice-only risk and future days',()=>{
+test('daily snow flags and untimed wording do not become selected-hour artwork',()=>{
  const f={location:{timeZone:'America/Denver'},hours:[],snow:{possible:true,days:[
   {date:'2026-10-14',possible:true,snowExpected:false,periods:[{wording:'Freezing rain'}]},
   {date:'2026-10-15',possible:true,snowExpected:true}
  ]}};
  const sample={time:'2026-10-15T00:30:00Z',condition:'Cloudy',feels:25,now:false};
  assert.equal(comfortArtworkContext(f,sample).snowExpected,false,'UTC tomorrow is still local today');
- assert.equal(comfortArtworkContext(f,{...sample,time:'2026-10-15T18:00:00Z'}).snowExpected,true);
+ assert.equal(comfortArtworkContext(f,{...sample,time:'2026-10-15T18:00:00Z'}).snowExpected,false);
  const older={...f,snow:{days:[{date:'2026-10-14',possible:true,periods:[{wording:'Chance snow showers'}]}]}};
- assert.equal(comfortArtworkContext(older,sample).snowExpected,true);
+ assert.equal(comfortArtworkContext(older,sample).snowExpected,false);
 });
 test('winter paw tile stops showing dry-surface numbers and provides cold/snow/deicer care',()=>{
  const now=Date.parse('2026-10-14T18:00:00Z'),context={condition:'Snow',snowExpected:true,clothingFeels:15,forecast:true};
@@ -70,8 +71,8 @@ test('winter paw tile stops showing dry-surface numbers and provides cold/snow/d
 });
 test('snow context passes through the shade/outdoor pair while current readings stay unchanged',()=>{
  const html=sunShadeHTML({shade:45,outdoors:47,daylight:true,weatherKind:'cloudy'},
-  {latitude:40,longitude:-105},Date.parse('2026-10-14T18:00:00Z'),{condition:'Cloudy',compact:true,snowExpected:true,snowForecastOnly:true,clothingFeels:20});
+  {latitude:40,longitude:-105},Date.parse('2026-10-14T18:00:00Z'),{condition:'Cloudy',compact:true,snowExpected:true,snowForecastOnly:true,clothingFeels:20,snowScope:'hour',airTemperature:28,forecast:true});
  assert.equal((html.match(/snow-play-scene/g)||[]).length,2);
- assert.match(html,/Snow forecast · dress warmly/);
+ assert.match(html,/Snow · dress warmly/);
  assert.match(html,/>45°</);assert.match(html,/>47°</);
 });

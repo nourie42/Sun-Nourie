@@ -6,27 +6,30 @@ import {displayFeelsValue,displayedFeelsAt,feelsAt,summarizeFeels,GUSTY_FEELS_DI
 const H=3600000;
 const t='2026-09-23T22:00:00.000Z';
 
-test('display-only feels floor never drops below dew point unless gusts are truly gusty',()=>{
- assert.equal(GUSTY_FEELS_DISPLAY_MPH,25);
- assert.equal(displayFeelsValue(47,60,10),60);
- assert.equal(displayFeelsValue(47,60,24.9),60);
- assert.equal(displayFeelsValue(47,60,25),47);
- assert.equal(displayFeelsValue(62,60,5),62);
- assert.equal(displayFeelsValue(47,null,5),47);
+test('gusts and dew point do not replace or floor the physical thermal estimate',()=>{
+ assert.equal(GUSTY_FEELS_DISPLAY_MPH,25,'threshold remains only for highlighting wind chips');
+ for(const gust of [null,12,24.9,25,25.1,40]){
+  assert.equal(displayFeelsValue(33,50,gust),33);
+  assert.equal(displayFeelsValue(0,20,gust),0);
+ }
+ assert.equal(displayFeelsValue(null,50,10),null);
+ assert.equal(displayFeelsValue(Infinity,50,10),null);
 });
 
-test('raw thermal series stays unchanged while displayed hourly and daily summaries use the floor',()=>{
+test('visible hourly and daily summaries preserve the same calculated equivalent temperature',()=>{
  const forecast={metricForecasts:{series:{
-  feels:[{time:t,value:47}],
-  dewpoint:[{time:t,value:60}],
-  gust:[{time:t,value:12}],
+  feels:[{time:t,value:33}],
+  dewpoint:[{time:t,value:50}],
+  gust:[{time:t,value:24.9}],
  }}};
- assert.equal(feelsAt(forecast,t),47,'raw feels-like series remains the model output');
- assert.equal(displayedFeelsAt(forecast,t),60,'visible feels-like is floored at the dew point');
+ assert.equal(feelsAt(forecast,t),33);
+ assert.equal(displayedFeelsAt(forecast,t),33);
+ forecast.metricForecasts.series.gust[0].value=25.1;
+ assert.equal(displayedFeelsAt(forecast,t),33,'crossing the gust threshold cannot cause a thermal cliff');
  const summary=summarizeFeels(forecast,Date.parse(t)-H,Date.parse(t)+H,-Infinity);
- assert.equal(summary.low.value,60);
- assert.equal(summary.low.rawValue,47);
- assert.equal(forecast.metricForecasts.series.feels[0].value,47,'display rule must not mutate the API/model series');
+ assert.equal(summary.low.value,33);
+ assert.equal(summary.low.rawValue,33);
+ assert.equal(forecast.metricForecasts.series.feels[0].value,33);
 });
 
 test('long-term forecast markup includes sustained wind and optional gust context',()=>{

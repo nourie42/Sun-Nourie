@@ -2,7 +2,8 @@
 // have separate provenance. Missing guidance never means a zero chance of snow.
 import { WINTER_WEIGHTS, winterWeights, winterIntervalAmount, blendWinterAmounts } from './weatherFusionWinterModels.js';
 import {createWpcSnowAmountService} from './weatherFusionWpcSnowAmounts.js';
-export const SNOW_VERSION = 'snow-outlook-v3';
+import {nwsSnowPhaseWindows} from './weatherFusionNwsSnowTiming.js';
+export const SNOW_VERSION = 'snow-outlook-v4';
 const MM_PER_IN = 25.4, CM_PER_IN = 2.54, HOUR = 3600000;
 const finite = value => typeof value === 'number' && Number.isFinite(value);
 const round = (value, digits = 1) => finite(value) ? Number(value.toFixed(digits)) : null;
@@ -65,6 +66,35 @@ export function gridSnowHours(grid) {
     for (let index = 0; index < hours; index++) result.push({ time: row.start + index * HOUR, inches: row.value / hours * Math.min(1, hours - index) });
     return result;
   });
+}
+function phaseAwareNwsIntervals(intervals,periods,phases,zone){
+  return (intervals||[]).map(row=>{
+    const covering=periods.filter(period=>Date.parse(period.startTime)<row.end&&Date.parse(period.endTime)>row.start).sort((a,b)=>Date.parse(a.startTime)-Date.parse(b.startTime));
+    if(row.value===0||!covering.some(period=>phases.get(period)?.timed))return {row,adjusted:false,windows:[{start:row.start,end:row.end}]};
+    let through=row.start,gap=false;
+    for(const period of covering){const a=Math.max(row.start,Date.parse(period.startTime)),b=Math.min(row.end,Date.parse(period.endTime));if(a>through)gap=true;through=Math.max(through,b);}
+    const complete=!gap&&through>=row.end;
+    const windows=covering.flatMap(period=>phases.get(period)?.windows||[]).map(window=>({start:Math.max(row.start,window.start),end:Math.min(row.end,window.end)})).filter(window=>window.end>window.start);
+    const dates=new Set(windows.flatMap(window=>[dateKey(window.start,zone),dateKey(window.end-1,zone)]));
+    return {row,adjusted:true,windows,uncertain:!complete,date:complete&&dates.size===1?[...dates][0]:null};
+  });
+}
+function phaseAwareNwsDay(rows,start,end,date){
+  // Coverage belongs to the original NWS intervals. A narrowed phase changes
+  // which local day owns the WHOLE accumulation, never its published total.
+  const base=rows.map(({row,adjusted})=>({...row,value:adjusted?0:row.value}));
+  const integral=winterIntervalAmount(base,start,end);
+  let minimum=base.filter(row=>row.end>start&&row.start<end).reduce((sum,row)=>sum+row.value*(Math.min(end,row.end)-Math.max(start,row.start))/(row.end-row.start),0),uncertain=false,phaseSignal=false;
+  for(const source of rows.filter(source=>source.adjusted&&source.row.end>start&&source.row.start<end)){
+    const {row,windows}=source,inside=windows.filter(window=>window.end>start&&window.start<end);
+    if(source.uncertain){uncertain=true;phaseSignal||=inside.length>0;continue;}
+    if(!windows.length){uncertain=true;continue;} // Quantity contradicts the phase wording.
+    if(!inside.length)continue;
+    phaseSignal=true;
+    if(source.date===date&&windows.every(window=>window.start>=start&&window.end<=end))minimum+=row.value;
+    else uncertain=true; // No published split across dates or elapsed/future snow hours.
+  }
+  return {...integral,value:!uncertain&&finite(integral.value)?minimum:null,minimum:uncertain?null:minimum,uncertain,phaseSignal};
 }
 export const WPC_WINTER_ROOT = 'https://mapservices.weather.noaa.gov/vector/rest/services/precip/wpc_prob_winter_precip/MapServer';
 export const WPC_QPF_ROOT = 'https://mapservices.weather.noaa.gov/vector/rest/services/precip/wpc_qpf/MapServer';
@@ -167,11 +197,19 @@ function snowfallWindow(start, end, winterModels, wpcAmounts, now) {
 export function addSnowOutlook(output, { grid, periods = [], snowModels, winterModels = {}, wpcWinter, now = Date.now() }) {
   const forecastStart = Math.ceil(now / HOUR) * HOUR;
   const zone = output.location?.timeZone || 'America/New_York', gridHours = gridSnowHours(grid), gridIntervals = gridDepthIntervals(grid?.snowfallAmount);
+  const snowPhases = new Map(periods.map(period => [period,nwsSnowPhaseWindows(period,zone)]));
+  const nwsIntervals=phaseAwareNwsIntervals(gridIntervals,periods,snowPhases,zone);
   const wpcRows = Array.isArray(wpcWinter) ? wpcWinter : wpcWinter?.probabilities || [], wpcAmounts = wpcWinter?.amounts || [];
   const nbm = winterModels?.probabilities, wssi = (output.riskOutlooks || []).find(row => row.kind === 'wssi') || null;
   if (gridHours) for (const hour of output.hours || []) {
     const row = gridHours.find(row => row.time === Date.parse(hour.time));
-    hour.snowfall = row ? round(row.inches, 2) : null;
+    const time=Date.parse(hour.time),timed=periods.filter(period=>snowPhases.get(period)?.timed&&Date.parse(period.startTime)<time+HOUR&&Date.parse(period.endTime)>time);
+    const narrowed=nwsIntervals.filter(source=>source.adjusted&&source.row.start<time+HOUR&&source.row.end>time);
+    const phaseCompatible=narrowed.length?narrowed.some(source=>source.windows.some(window=>window.end>time&&window.start<time+HOUR)):timed.some(period=>snowPhases.get(period).windows.some(window=>window.end>time&&window.start<time+HOUR));
+    hour.snowfallRaw = row ? round(row.inches,2) : null;
+    // A coarse interval is not an hourly accumulation once its explicit snow
+    // phase narrows. Keep its raw diagnostic, and avoid a made-up hourly split.
+    hour.snowfall = timed.length||narrowed.length ? (narrowed.some(source=>source.uncertain)?null:!phaseCompatible?0:row?.inches>0?null:row?0:null) : row ? round(row.inches, 2) : null;
   }
   const published=wpcAmounts.filter(row=>finite(row.value)&&Date.parse(row.start)>=forecastStart&&Date.parse(row.end)>Date.parse(row.start)).sort((a,b)=>Date.parse(a.start)-Date.parse(b.start));
   const aligned=[];let through=-Infinity;
@@ -180,13 +218,15 @@ export function addSnowOutlook(output, { grid, periods = [], snowModels, winterM
   let blendedThrough=Math.max(...blendWindows.map(window=>Date.parse(window.end)));
   const rows = (output.days || []).slice(0, 7).filter(day => day.date).map((day, index) => {
     const midnight = localMidnight(day.date, zone), end = localMidnight(nextDate(day.date), zone), start = Math.max(forecastStart, midnight);
-    const matchingPeriods = periods.filter(period => finite(Date.parse(period.startTime)) && Date.parse(period.endTime || period.startTime) >= now && dateKey(Date.parse(period.startTime), zone) === day.date);
+    const matchingPeriods = periods.filter(period => finite(Date.parse(period.startTime)) && Date.parse(period.endTime || period.startTime) > start && Date.parse(period.startTime) < end);
     const per = matchingPeriods.map(period => {
       const wording = `${period.shortForecast || ''} ${period.detailedForecast || ''}`;
-      return { name: period.name, isDaytime: period.isDaytime, wording: period.shortForecast || '', detail: period.detailedForecast || '', snowWording: SNOW_WORDS.test(wording), freezingRainWording: FREEZING_WORDS.test(wording), sleetWording: SLEET_WORDS.test(wording), winterWording: WINTER_WORDS.test(wording), pop: finite(period.probabilityOfPrecipitation?.value) ? period.probabilityOfPrecipitation.value : null };
+      const phase=snowPhases.get(period),phaseWindows=(phase?.windows||[]).filter(row => row.end>start&&row.start<end).map(row=>({start:new Date(Math.max(start,row.start)).toISOString(),end:new Date(Math.min(end,row.end)).toISOString()}));
+      const hasValidPeriod=finite(Date.parse(period.endTime))&&Date.parse(period.endTime)>Date.parse(period.startTime);
+      return { name: period.name, isDaytime: period.isDaytime, start: period.startTime, end: period.endTime, wording: period.shortForecast || '', detail: period.detailedForecast || '', snowWording: SNOW_WORDS.test(wording)&&(!hasValidPeriod||phaseWindows.length>0), snowTimed:!!phase?.timed, snowPhaseWindows:phaseWindows, freezingRainWording: FREEZING_WORDS.test(wording), sleetWording: SLEET_WORDS.test(wording), winterWording: WINTER_WORDS.test(wording), pop: finite(period.probabilityOfPrecipitation?.value) ? period.probabilityOfPrecipitation.value : null };
     });
     const inDay = time => dateKey(time, zone) === day.date, gh = gridHours?.filter(row => inDay(row.time)) || [];
-    const officialIntegral = winterIntervalAmount(gridIntervals, start, end);
+    const officialIntegral = phaseAwareNwsDay(nwsIntervals,start,end,day.date);
     // Preserve historical NWS calendar-day diagnostics; complete coverage is
     // separately recorded, so an incomplete accumulation isn't called a full total.
     const nws = gh.length ? gh.reduce((sum, row) => sum + row.inches, 0) : null;
@@ -201,9 +241,31 @@ export function addSnowOutlook(output, { grid, periods = [], snowModels, winterM
     const values = [nws, ...Object.values(modelValues)].filter(finite), low = values.length ? Math.min(...values) : null, high = values.length ? Math.max(...values) : null;
     const wpc = wpcRows.filter(row => finite(Date.parse(row.start)) && finite(Date.parse(row.end)) && Date.parse(row.end) > now && inDay((Date.parse(row.start) + Date.parse(row.end)) / 2));
     const probs = Object.fromEntries(['snow', 'freezingRain', 'sleet'].map(kind => [kind, peakProbability(nbm, kind, start, end)]));
+    const snowHours = (gridHours || []).filter(row => row.inches > 0 && row.time < end && row.time + HOUR > start).filter(row => {
+      const hour = (output.hours || []).find(hour => Date.parse(hour.time) === row.time);
+      // Coarse depth intervals can straddle a change from rain to snow. An
+      // explicit rain/clear hourly forecast must not move the snow event.
+      return !hour?.condition || SNOW_WORDS.test(hour.condition);
+    }).flatMap(row=>{
+      const timed=per.filter(period=>period.snowTimed&&Date.parse(period.start)<row.time+HOUR&&Date.parse(period.end)>row.time);
+      const windows=timed.length?timed.flatMap(period=>period.snowPhaseWindows):[{start:new Date(row.time).toISOString(),end:new Date(row.time+HOUR).toISOString()}];
+      return windows.map(window=>({start:Math.max(start,row.time,Date.parse(window.start)),end:Math.min(end,row.time+HOUR,Date.parse(window.end))})).filter(window=>window.end>window.start);
+    });
+    const eventIntervals = snowHours.length
+      ? snowHours.map(row => ({ ...row, source: 'NWS snow hours' }))
+      : per.filter(row => row.snowWording).flatMap(row=>row.snowPhaseWindows.map(window=>({start:Date.parse(window.start),end:Date.parse(window.end),source:row.snowTimed?'NWS timed snow forecast':'NWS snow forecast period'})));
+    if (!eventIntervals.length && (probs.snow.value ?? 0) >= 10 && probs.snow.peakAt) {
+      const peak = Date.parse(probs.snow.peakAt);
+      eventIntervals.push({ start: Math.max(start,peak-HOUR), end: Math.min(end,peak), source: 'NWS NBM peak snow hour' });
+    }
+    const snowEventWindows = eventIntervals.filter(row => row.end > row.start).sort((a,b) => a.start-b.start).reduce((rows,row) => {
+      const last=rows.at(-1);
+      if(last && last.source===row.source && row.start<=last.end)last.end=Math.max(last.end,row.end);else rows.push({...row});
+      return rows;
+    }, []).map(row => ({ ...row, start: new Date(row.start).toISOString(), end: new Date(row.end).toISOString() }));
     const modelRows = Object.values(winterModels).filter(model => Array.isArray(model?.intervals)).flatMap(model => model.intervals.filter(row => row.end > start && row.start < end));
     const expectedWpc=wpcAmounts.filter(row=>Date.parse(row.end)>start&&Date.parse(row.start)<end);
-    const snowExpected = per.some(row => row.snowWording) || (finite(high) && high >= .1) || (probs.snow.value ?? 0) >= 10 || expectedWpc.some(row=>row.value>=.1) || wpc.some(row => (row.kind || 'snow') === 'snow' && (row.probabilityRange || wpcProbabilityRange(row.category))?.[0] >= 10);
+    const snowExpected = per.some(row => row.snowWording) || alignedValues.some(value => value >= .1) || (officialIntegral.minimum??0) >= .1 || officialIntegral.phaseSignal || (probs.snow.value ?? 0) >= 10 || expectedWpc.some(row=>row.value>=.1) || wpc.some(row => (row.kind || 'snow') === 'snow' && (row.probabilityRange || wpcProbabilityRange(row.category))?.[0] >= 10);
     const freezingRainPossible = per.some(row => row.freezingRainWording) || (probs.freezingRain.value ?? 0) >= 10 || modelRows.some(row => row.freezingRainSignal === true || [56, 57, 66, 67].includes(row.weatherCode)) || wpc.some(row => row.kind === 'ice' && (row.probabilityRange || wpcProbabilityRange(row.category))?.[0] >= 10);
     const sleetPossible = per.some(row => row.sleetWording) || (probs.sleet.value ?? 0) >= 10;
     const windows = start < end ? (start < forecastStart + 24 * HOUR && end > forecastStart + 24 * HOUR ? [[start, forecastStart + 24 * HOUR], [forecastStart + 24 * HOUR, end]] : [[start, end]]).map(([a, b]) => snowfallWindow(a, b, winterModels, wpcAmounts, forecastStart)) : [];
@@ -217,16 +279,37 @@ export function addSnowOutlook(output, { grid, periods = [], snowModels, winterM
     const coverageStatus = !hasEvidence ? 'unavailable' : Object.values(probs).every(prob => prob.status === 'ready') && windows.every(window => window.snowfall.status === 'ready') ? 'ready' : 'partial';
     const alignedLow = alignedValues.length ? Math.min(...alignedValues) : null, alignedHigh = alignedValues.length ? Math.max(...alignedValues) : null;
     const best = finite(blended) ? round(blended) : finite(officialIntegral.value) ? round(officialIntegral.value) : alignedValues.length ? round((alignedLow + alignedHigh) / 2) : null;
+    // The simple Snow view uses the NWS point forecast for this exact local-day
+    // interval. Legacy nwsSnowfall includes elapsed hours today and is a
+    // diagnostic, not the remaining-day total. Never use a WPC 12Z-to-12Z
+    // accumulation as if it were a local calendar-day amount.
+    const exactWpcBlend = windows.length === 1 && windows[0].snowfall.sources?.some(source => source.id === 'wpc' && finite(source.value));
+    const displaySnowfall = finite(officialIntegral.value)
+      ? { value: round(officialIntegral.value, 3), range: null, source: 'NWS point forecast', status: 'ready' }
+      : officialIntegral.uncertain
+        ? { value: null, range: null, source: 'NWS daily snowfall amount uncertain', status: 'unavailable' }
+      : (officialIntegral.minimum??0)>0
+        ? { value: round(officialIntegral.minimum,3), range: [round(officialIntegral.minimum,3),null], source: 'NWS partial point forecast', status: 'partial' }
+      : exactWpcBlend && finite(blended)
+        ? { value: round(blended), range: windows[0].snowfall.range || null, source: 'Winter snowfall blend', status: windows[0].snowfall.status }
+        : finite(blended)
+          ? { value: round(blended), range: null, source: 'Available model guidance', status: 'partial' }
+          : { value: null, range: null, source: null, status: 'unavailable' };
+    Object.assign(displaySnowfall, { unit: 'in', start: new Date(start).toISOString(), end: new Date(end).toISOString(), remainingDay: start > midnight, nwsCoveredHours: officialIntegral.coveredHours, expectedHours: officialIntegral.expectedHours });
     const probabilityCoverage = Object.fromEntries(Object.entries(probs).map(([kind, probability]) => [kind, { status: probability.status, availableHours: probability.availableHours, expectedHours: probability.expectedHours, peakAt: probability.peakAt }]));
     return { date: day.date, label: day.label, index, periods: per.filter(row => row.winterWording),
       // This PoP is chance of ANY precipitation while snow is mentioned, not snow-only chance.
       nwsSnowPop: per.filter(row => row.snowWording && finite(row.pop)).reduce((value, row) => value == null ? row.pop : Math.max(value, row.pop), null),
       nwsSnowPopLabel: 'NWS chance of precipitation in a period mentioning snow', nwsSnowfall: round(nws), nwsCovered: finite(officialIntegral.value),
+      nwsAmountUncertain:officialIntegral.uncertain,
+      nwsRawIntervals:(gridIntervals||[]).filter(row=>row.end>start&&row.start<end).map(row=>({start:new Date(row.start).toISOString(),end:new Date(row.end).toISOString(),value:round(row.value,3),unit:'in'})),
       models: { ecmwf: round(modelValues.ecmwf), gfs: round(modelValues.gfs) }, nearTermModels: { hrrr: round(modelValues.hrrr), nam: round(modelValues.nam) },
       range: alignedValues.length > 1 && alignedHigh - alignedLow >= .5 ? [round(alignedLow), round(alignedHigh)] : null,
       calendarRange: values.length > 1 && high - low >= .5 ? [round(low), round(high)] : null, best,
       amountSource: finite(blended) ? 'Experimental requested winter amount blend' : finite(officialIntegral.value) ? 'NWS snowfall guidance' : alignedValues.length ? 'Available same-interval model amount guidance' : 'Unavailable',
       amountWindow: { start: new Date(start).toISOString(), end: new Date(end).toISOString() },
+      displaySnowfall,
+      snowEventWindows,
       blend: windows.length === 1 ? { ...windows[0].snowfall, mode: windows[0].mode, window: { start: windows[0].start, end: windows[0].end } } : { mode: 'split', windows, coverage: windows.length ? Math.min(...windows.map(window => window.snowfall.coverage)) : 0, status: windows.some(window => window.snowfall.status !== 'unavailable') ? 'partial' : 'unavailable' },
       wpc: wpc.map(row => ({ ...row, kind: row.kind || 'snow', probabilityRange: row.probabilityRange || wpcProbabilityRange(row.category) })),
       snowChance: round(probs.snow.value, 0), freezingRainChance: round(probs.freezingRain.value, 0), sleetChance: round(probs.sleet.value, 0),

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {snowDetailHTML,snowBannerSummary,snowForecastPresent,winterOutlookState,safeWinterMapUrl,winterMapDescriptors,winterPointAmount,winterPointInBounds,winterPointPopupHTML} from '../public/weather-fusion/snow-outlook.js';
+import {snowDetailHTML,snowBannerSummary,snowForecastPresent,winterOutlookState,safeWinterMapUrl,winterMapDescriptors,winterPointAmount,winterPointInBounds,winterPointPopupHTML,winterSnowDays,winterSnowMapForDay,winterDayAmount,winterMapsHTML} from '../public/weather-fusion/snow-outlook.js';
 
 test('automatic winter tile requires snow while the Snow tab can still inspect ice guidance',()=>{
  const ice={status:'ready',snowExpected:false,possible:true,days:[{index:0,snowExpected:false,freezingRainPossible:true,freezingRainChance:60}]};
@@ -25,13 +25,15 @@ test('winter UI distinguishes checked no-snow guidance from absent or failed sou
  assert.match(snowDetailHTML(null,'Test town'),/Winter forecast unavailable/);
 });
 
-test('ice-only and sleet-only forecasts open winter details without inventing percentages',()=>{
+test('ice-only and sleet-only forecasts keep the simple no-snow view and retain collapsed winter details',()=>{
  for(const kind of ['freezingRain','sleet']){
   const data={status:'partial',possible:false,days:[{index:1,date:'2026-10-15',label:'Thursday',possible:false,[kind+'Possible']:true,best:null}]};
   assert.equal(winterOutlookState(data),'active');
   const html=snowDetailHTML(data,'Test town');
   assert.match(html,/Possible · percentage unavailable/);
-  assert.doesNotMatch(html,/No snow in the forecast\./);
+  assert.match(html,/No snow in the forecast\./);
+  assert.match(html,/<details class="winter-more"><summary>More winter details/);
+  assert.doesNotMatch(html.split('<details')[0],/winter-type-grid|winter-map|Snow amount/);
   assert.match(html,/Snow amount <strong>Unavailable/);
   assert.match(snowBannerSummary(data),/Thursday/);
  }
@@ -39,9 +41,9 @@ test('ice-only and sleet-only forecasts open winter details without inventing pe
 
 test('winter details honor blend coverage, escaping and official-map fallbacks',()=>{
  const injection='<img src=x onerror=alert(1)>';
- const data={status:'partial',possible:true,days:[{possible:true,date:'2026-10-15',label:injection,best:2,range:[injection,4],typeSignals:{snow:{label:injection}},periods:[{name:injection,wording:injection}]}],
+ const data={status:'partial',possible:true,days:[{possible:true,snowExpected:true,date:'2026-10-15',label:injection,best:2,amountWindow:{start:'2026-10-15T00:00:00Z',end:'2026-10-16T00:00:00Z'},range:[injection,4],typeSignals:{snow:{label:injection}},periods:[{name:injection,wording:injection}]}],
   blendWindows:[{label:injection,start:'2026-10-15T00:00:00Z',end:'2026-10-16T00:00:00Z',snowfall:{value:2,weights:{wpc:60,hrrr:25,nam:15},coverage:40,status:'partial',actualWeights:{wpc:0,hrrr:62.5,nam:37.5},sources:[{id:'hrrr',value:2,message:injection}]}}],
-  maps:[{id:injection,label:injection,sourceUrl:'javascript:alert(1)'}],notes:injection};
+  maps:[{id:injection,label:injection,kind:'geojson',quantity:'snowfall',start:'2026-10-15T00:00:00Z',end:'2026-10-16T00:00:00Z',sourceUrl:'javascript:alert(1)'}],notes:injection};
  const html=snowDetailHTML(data,injection,'Invalid/timezone');
  assert.doesNotMatch(html,/<img|onerror="|href="javascript:/);
  assert.match(html,/&lt;img/);
@@ -49,7 +51,7 @@ test('winter details honor blend coverage, escaping and official-map fallbacks',
  assert.match(html,/40% of requested weight/);
  assert.match(html,/Contributing weights/);
  assert.match(html,/href="https:\/\/www\.wpc\.ncep\.noaa\.gov/);
- assert.match(html,/role="region" aria-label="Winter precipitation forecast map"/);
+ assert.match(html,/role="region" aria-label="Official snowfall totals map"/);
  const complete=snowDetailHTML({...data,blendWindows:[{snowfall:{value:0,coverage:100,status:'ready',weights:{wpc:60,hrrr:25,nam:15}}}]},'Test town');
  assert.match(complete,/All requested sources available\./);
  const unavailable=snowDetailHTML({...data,blendWindows:[{snowfall:{value:null,coverage:0,status:'unavailable'}}]},'Test town');
@@ -113,4 +115,47 @@ test('backend winter output renders probabilities, real model coverage and match
  assert.match(html,/Probability period/);
  const clear=snowDetailHTML({status:'ready',possible:false,days:[],maps:winterMapDescriptors(snow)},'Test town');
  assert.match(clear,/No snow in the forecast\./);assert.doesNotMatch(clear,/id="winter-map"/);
+});
+
+test('simple snow view shows only snowy dates, one matching totals map and a separate advanced flow',()=>{
+ const area=(id,start,end)=>({id,kind:'geojson',quantity:'snowfall',start,end,sourceUrl:'https://www.wpc.ncep.noaa.gov/'});
+ const maps=[area('today','2026-10-14T12:00:00Z','2026-10-15T12:00:00Z'),area('tomorrow','2026-10-15T12:00:00Z','2026-10-16T12:00:00Z'),area('later','2026-10-16T12:00:00Z','2026-10-17T12:00:00Z'),{id:'qpf',kind:'arcgis',label:'QPF liquid precipitation',start:'2026-10-15T00:00:00Z',end:'2026-10-16T00:00:00Z'}];
+ const day=(date,index,snow)=>({date,index,label:['Wed','Thu','Fri','Sat'][index],snowExpected:snow,possible:snow,amountWindow:{start:date+'T00:00:00Z',end:new Date(Date.parse(date+'T00:00:00Z')+86400000).toISOString()},displaySnowfall:{value:index===1?1.2:2.3,range:null,source:'NWS point forecast'},range:[0,9],best:8});
+ const s={status:'partial',possible:true,maps,days:[day('2026-10-14',0,false),day('2026-10-15',1,true),day('2026-10-16',2,true),{...day('2026-10-17',3,false),freezingRainPossible:true}]};
+ assert.deepEqual(winterSnowDays(s).map(r=>r.date),['2026-10-15','2026-10-16']);
+ const primary=snowDetailHTML(s,'Test town','UTC').split('<details')[0];
+ assert.match(primary,/data-snow-date="2026-10-15" aria-pressed="true"/);
+ assert.match(primary,/data-map-id="tomorrow"/);
+ assert.match(primary,/<strong>1\.2″<\/strong>/);
+ assert.doesNotMatch(primary,/0–9|8\.0″|2026-10-14|2026-10-17|winter-type-grid|winter-map-select|QPF|Requested|probabilit|winter-blends/);
+ assert.equal((primary.match(/id="winter-map"/g)||[]).length,1);
+ const later=snowDetailHTML(s,'Test town','UTC','2026-10-16').split('<details')[0];
+ assert.match(later,/data-map-id="later"/);assert.match(later,/<strong>2\.3″<\/strong>/);assert.doesNotMatch(later,/data-map-id="today"/);
+ assert.match(snowDetailHTML(s,'Test town','UTC'),/<details class="winter-more"><summary>More winter details/);
+ const advanced=winterMapsHTML(s,'Test town');assert.match(advanced,/winter-map-select/);assert.match(advanced,/QPF liquid precipitation/);assert.match(advanced,/data-winter-back/);
+ const noMap=snowDetailHTML({...s,maps:[maps[0]]},'Test town','UTC','2026-10-16').split('<details')[0];
+ assert.match(noMap,/not available for this date/);assert.doesNotMatch(noMap,/id="winter-map"/);
+ assert.equal(winterDayAmount({best:8,displaySnowfall:{value:null,status:'unavailable'}}).value,null);
+});
+
+test('overnight snow selects the map covering the actual event before daily blank hours',()=>{
+ const before={id:'overnight',kind:'geojson',quantity:'snowfall',start:'2026-10-14T12:00:00Z',end:'2026-10-15T12:00:00Z'};
+ const after={id:'after-snow',kind:'geojson',quantity:'snowfall',start:'2026-10-15T12:00:00Z',end:'2026-10-16T12:00:00Z'};
+ const r={amountWindow:{start:'2026-10-15T07:00:00Z',end:'2026-10-16T07:00:00Z'},snowEventWindows:[{start:'2026-10-15T07:00:00Z',end:'2026-10-15T11:00:00Z'}]};
+ assert.equal(winterSnowMapForDay({maps:[after,before]},r)?.id,'overnight');
+ assert.equal(winterSnowMapForDay({maps:[after]},r),null);
+ // Without timing evidence, use the greatest overlap with the local-day interval.
+ assert.equal(winterSnowMapForDay({maps:[before,after]},{amountWindow:r.amountWindow})?.id,'after-snow');
+ assert.equal(winterSnowMapForDay({maps:[{...before,quantity:'precipitation'}]},r),null);
+});
+
+test('known zero NWS accumulation with only a weak NBM signal stays out of primary snow days and the tile',()=>{
+ const row={date:'2026-10-20',label:'Tue',snowExpected:true,snowPossible:true,possible:true,snowChance:16,best:0,periods:[],displaySnowfall:{value:0,range:null,source:'NWS point forecast',status:'ready'}};
+ const s={status:'partial',possible:true,snowExpected:true,days:[row]};
+ assert.deepEqual(winterSnowDays(s),[]);assert.equal(snowForecastPresent(s),false);
+ const html=snowDetailHTML(s,'Test town','UTC');assert.match(html.split('<details')[0],/No snow in the forecast/);assert.doesNotMatch(html.split('<details')[0],/2026-10-20|winter-map|0\.0″/);
+ assert.match(html.split('<details')[1],/16% peak hourly/);
+ const snowWording={...row,periods:[{wording:'Chance Snow Showers',snowWording:true}]};assert.equal(winterSnowDays({...s,days:[snowWording]}).length,1);
+ const trace={...row,displaySnowfall:{...row.displaySnowfall,value:.02}};assert.equal(winterSnowDays({...s,days:[trace]}).length,1);assert.match(snowDetailHTML({...s,days:[trace]},'Test town'),/&lt;0\.1″/);
+ const unknown={...row,displaySnowfall:{...row.displaySnowfall,value:null,status:'unavailable'}};assert.equal(winterSnowDays({...s,days:[unknown]}).length,1);assert.match(snowDetailHTML({...s,days:[unknown]},'Test town'),/Snowfall amount is not available yet/);
 });

@@ -22,12 +22,12 @@ test('compatibility wardrobe API cannot draw misaligned hats, mittens or trouser
   assert.equal(clothingArtwork(panel,scene,outfit,'/different-pose.webp'),'');
  }
 });
-test('today forecast coldest clothing and selected snow change the complete scene without altering readings',()=>{
- assert.equal(comfortSceneState(true,'Cloudy',70,{clothingFeels:20}).asset,'comfort-integrated-cold-watch.webp');
- assert.equal(comfortSceneState(true,'Cloudy',20,{snowExpected:true}).asset,'comfort-integrated-snow-play.webp');
- assert.equal(comfortSceneState(false,'Cloudy',20,{snowExpected:true}).asset,'comfort-integrated-snow-play-dawn.webp');
+test('selected-hour clothing and selected snow change the complete scene without borrowing later cold or snow',()=>{
+ assert.equal(comfortSceneState(true,'Cloudy',70,{clothingFeels:20}).asset,'comfort-integrated-mild-watch.webp');
+ assert.equal(comfortSceneState(true,'Cloudy',20,{snowExpected:true,snowScope:'hour',airTemperature:28,forecast:true}).asset,'comfort-integrated-snow-play.webp');
+ assert.equal(comfortSceneState(false,'Cloudy',20,{snowExpected:true,snowScope:'hour',airTemperature:28,forecast:true}).asset,'comfort-integrated-snow-play-dawn.webp');
  assert.equal(comfortSceneState(true,'Freezing Rain',20).asset,'comfort-integrated-cold-rain.webp');
  assert.equal(comfortSceneState(true,'Sleet',20).asset,'comfort-integrated-cold-watch.webp');
- assert.equal(comfortSceneState(true,'Clear',95,{clothingFeels:30}).asset,'comfort-integrated-cold-normal.webp');
+ assert.equal(comfortSceneState(true,'Clear',95,{clothingFeels:30}).asset,'comfort-reference-scenes-hot.webp');
  assert.doesNotMatch(referenceScene(1,true,'Freezing Rain',20),/snow-play-scene/);
 });

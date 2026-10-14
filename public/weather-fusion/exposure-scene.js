@@ -1,19 +1,43 @@
 import {weatherState} from './weather-state.js';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
-export const COMFORT_ART_VERSION='integrated-art-v3';
+export const COMFORT_ART_VERSION='selected-hour-art-v4';
+
+/** A precise NWS clock clause can rule out a coarse snow allocation before
+ * the stated transition. Null means no timed phase evidence is available.
+ * Daily flags and untimed wording never establish an hour's phase here. */
+export function selectedHourSnowPhase(forecast,time){
+ const epoch=typeof time==='number'?time:Date.parse(time);
+ if(!finite(epoch))return null;
+ const contains=(start,end)=>{const a=Date.parse(start),b=Date.parse(end);return finite(a)&&finite(b)&&a<=epoch&&epoch<b;};
+ let date=null;
+ try{date=new Intl.DateTimeFormat('en-CA',{timeZone:forecast?.location?.timeZone||'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(epoch));}catch{}
+ const periods=(forecast?.snow?.days||[]).filter(row=>{
+  const window=row.amountWindow||row.displaySnowfall;
+  return window?.start&&window?.end?contains(window.start,window.end):!row.date||row.date===date;
+ }).flatMap(row=>row.periods||[]).filter(period=>period.snowTimed===true&&Array.isArray(period.snowPhaseWindows)&&contains(period.start||period.startTime,period.end||period.endTime));
+ if(!periods.length)return null;
+ return periods.some(period=>period.snowPhaseWindows.some(window=>contains(window.start,window.end)));
+}
 
 /** Snow is distinct from sleet/freezing rain. Only snow evidence selects
  * snow-covered scenes; a low feels-like alone never paints snow. */
 export function winterSceneExpected(condition='',context={}){
- if(context.snowExpected===true||context.snowPossible===true)return true;
- if(finite(context.snowfall)&&context.snowfall>0)return true;
- if(finite(context.snowChance)&&context.snowChance>0)return true;
- if(context.winter?.snowExpected===true||context.winter?.snowPossible===true)return true;
- return /snow|flurr|blizzard/i.test(String(condition));
+ if(/snow|flurr|blizzard/i.test(String(condition)))return true;
+ if(context.snowExpected===false)return false;
+ if(context.hourSnowPhaseAllowed===false)return false;
+ // A liquid-rain, thunder, dry-sky or ice-only hour cannot become a snow scene
+ // because a daily total or coarse snow interval extends across that hour.
+ const kind=weatherState(condition).kind;
+ if(['rain','storm','clear','partly-cloudy','snow'].includes(kind))return false;
+ // Current scenes follow current reported conditions, not future snowfall.
+ // Numeric fallback is limited to a plausible, explicitly selected hour.
+ if(context.snowScope!=='hour'||context.now===true||context.forecast===false)return false;
+ if(!finite(context.airTemperature)||context.airTemperature>40)return false;
+ return context.snowExpected===true||(finite(context.snowfall)&&context.snowfall>0)||(finite(context.snowChance)&&context.snowChance>0);
 }
 export function clothingForFeels(value,context={}){
  if(context.snowExpected===true)return 'cold';
- if(finite(context.clothingFeels))value=finite(value)?Math.min(value,context.clothingFeels):context.clothingFeels;
+ if(!finite(value)&&finite(context.clothingFeels))value=context.clothingFeels;
  if(!finite(value))return 'mild';
  if(value>=88)return 'hot';
  if(value>=74)return 'warm';
@@ -32,7 +56,7 @@ export function precipitationActivity(condition='',context={}){
 const baseAssets={normal:'comfort-reference-scenes.webp',hot:'comfort-reference-scenes-hot.webp',rain:'comfort-reference-scenes-rain.webp','carry-umbrella':'comfort-reference-scenes-carry-umbrella.svg',fog:'comfort-reference-scenes-fog.webp',watch:'comfort-reference-scenes-watch.webp',dawn:'comfort-reference-scenes-dawn.webp'};
 const integratedKeys=['normal','watch','fog','dawn','rain','carry-umbrella'];
 const integratedAsset=(outfit,key)=>`comfort-integrated-${outfit}-${key}.webp`;
-export const COMFORT_SCENE_ASSETS=[...Object.values(baseAssets),...['cold','cool'].flatMap(outfit=>integratedKeys.map(key=>integratedAsset(outfit,key))),...integratedKeys.filter(key=>key!=='rain').map(key=>integratedAsset('mild',key)),'comfort-integrated-snow-play.webp','comfort-integrated-snow-play-dawn.webp'];
+export const COMFORT_SCENE_ASSETS=[...Object.values(baseAssets),...['cold','cool'].flatMap(outfit=>integratedKeys.map(key=>integratedAsset(outfit,key))),...integratedKeys.filter(key=>key!=='rain').map(key=>integratedAsset('mild',key)),'comfort-integrated-snow-play.webp','comfort-integrated-snow-play-dawn.webp','comfort-integrated-rain-night.webp'];
 
 /** Each selected asset is a complete image with garments rendered into the
  * characters. The renderer never adds separate clothing geometry. */
@@ -47,6 +71,7 @@ export function comfortSceneState(daylight=true,condition='Clear',feels=null,con
   // The integrated rain version includes full trousers as well as raincoats.
   asset=integratedAsset(outfit==='mild'&&key==='rain'?'cool':outfit,key==='hot'?'normal':key);
  }
+ if(key==='rain'&&!daylight&&['cold','cool','mild'].includes(outfit))asset='comfort-integrated-rain-night.webp';
  return {key,asset};
 }
 const comfortSceneUrl=asset=>`/weather-fusion/${asset}?v=${COMFORT_ART_VERSION}`;

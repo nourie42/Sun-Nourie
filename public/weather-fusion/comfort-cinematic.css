@@ -122,3 +122,9 @@ body[data-sky="night"] #skin-values .reference-scene .reference-weather-tint{opa
  #skin-values .sun-shade-comparison .exposure-person>svg.reference-scene{height:auto!important;aspect-ratio:1}
 }
 
+
+/* Keep the selected hour’s actual weather beside its comfort estimate. */
+#skin-values .comfort-hour-context{margin:0 auto 12px;max-width:1060px;text-align:center;line-height:1.4;color:#e6f4ff;font-size:14px}
+#skin-values .comfort-hour-context>span{display:block;font-weight:650}
+#skin-values .comfort-hour-context>small{display:block;margin-top:4px;font-size:12px;color:#c7ddef}
+@media(max-width:540px){#skin-values .comfort-hour-context{font-size:12px}#skin-values .comfort-hour-context>small{font-size:11px}}

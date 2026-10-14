@@ -10,7 +10,6 @@ import {pavementWarning,pavementHTML} from '../public/weather-fusion/pavement.js
 import {peakComparisonHTML} from '../public/weather-fusion/weather-display.js';
 import {comfortWindow,warmestTodayWindow} from '../public/weather-fusion/comfort-outlook.js';
 import {forecastSample} from '../public/weather-fusion/weather-display.js';
-import {sunExposureTemperature} from '../public/weather-fusion/outdoor-feels.js';
 import {thermalComfort} from '../public/weather-fusion/weather-math.js';
 const now=Date.parse('2026-09-05T16:00:00Z'),H=3600000,location={latitude:35.99,longitude:-78.9};
 function raw(id='hrrr',point=location){
@@ -127,10 +126,10 @@ test('warmest sun card uses the same sunny-hour estimate and says the exposure e
   forecast.hours.push({time,condition});forecast.metricForecasts.series.feels.push({time,value:Number(sun.rawOutdoors.toFixed(1)),inputs,condition});
   forecast.metricForecasts.series.temperature.push({time,value:temperature});forecast.metricForecasts.series.dewpoint.push({time,value:60});forecast.metricForecasts.series.wind.push({time,value:3});
  }
- const now=Date.parse('2026-09-05T16:00:00Z'),sunHours=forecast.hours.slice(0,2).map(hour=>({hour,sun:sunExposureTemperature(forecastSample(forecast,hour.time))}));
- const expected=sunHours.reduce((a,b)=>a.sun.value>=b.sun.value?a:b),summary=warmestTodayWindow(forecast,now);
+ const now=Date.parse('2026-09-05T16:00:00Z'),sunHours=forecast.hours.slice(0,2).map(hour=>({hour,sun:forecastSample(forecast,hour.time).comfort.sun}));
+ const expected=sunHours.reduce((a,b)=>a.sun>=b.sun?a:b),summary=warmestTodayWindow(forecast,now);
  assert.ok(comfortWindow(forecast,now),'The feels-like outlook that accompanies the warmest card must keep rendering.');
- assert.equal(summary.chosen.time,expected.hour.time);assert.equal(summary.chosen.value,expected.sun.value);
+ assert.equal(summary.chosen.time,expected.hour.time);assert.equal(summary.chosen.value,expected.sun);
  assert.match(peakComparisonHTML(summary,null),/Warmest feels like in the sun today/);
  assert.match(peakComparisonHTML(summary,summary.chosen.value+5),/data-comparison="now"/);
  assert.match(peakComparisonHTML(null,85,'America/New_York',now),/Warmest feels like in the sun today/);

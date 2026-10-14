@@ -5,7 +5,7 @@ const inch=n=>finite(n)&&n>=0?n>0&&n<.05?'<0.1″':`${n.toFixed(1)}″`:'Unavail
 const officialWinterUrl='https://www.wpc.ncep.noaa.gov/pwpf/wwd_accum_probs.php';
 const labels={wpc:'WPC winter',ecmwf:'ECMWF',weathernext:'Google WeatherNext',gfs:'GFS',hrrr:'HRRR',nam:'NAM'};
 const windowTitle=w=>w.label||(finite(w.snowfall?.sources?.find(s=>s.id==='wpc')?.value)?'WPC 24-hour snowfall blend':w.mode==='nearTerm'?'Next 24 forecast hours':w.mode==='extended'?'Later snowfall':'Winter blend');
-let latest=null,map=null,overlay=null,opened=false,initialized=false,pointLayer=null,pointHandler=null,pointRequest=null,areaRequest=null,selectedLayerId=null;
+let latest=null,map=null,overlay=null,opened=false,initialized=false,pointLayer=null,pointHandler=null,pointRequest=null,areaRequest=null,selectedLayerId=null,selectedSnowDate=null,snowView='forecast';
 const pointCache=new Map();
 const pointMarkers=new Map();
 const areaCache=new Map();
@@ -19,7 +19,16 @@ export function winterOutlookState(s){
  return known?'clear':'unavailable';
 }
 const active=s=>winterOutlookState(s)==='active';
-export const snowForecastPresent=s=>s?.snowExpected===true||(s?.days||[]).some(r=>r.snowExpected===true||r.snowPossible===true);
+export function winterSnowDays(s){return (s?.days||[]).filter(r=>{
+ const expected=r.snowExpected===true||r.snowPossible===true||(r.snowExpected==null&&r.snowPossible==null&&finite(r.snowChance)&&r.snowChance>=10);
+ if(!expected)return false;
+ const wording=(r.periods||[]).some(p=>p.snowWording===true||p.snowWording!==false&&/snow|flurr|blizzard/i.test(`${p.wording||''} ${p.detail||''}`));
+ const amount=winterDayAmount(r),boundedTrace=Array.isArray(amount.range)&&(amount.range[1]===null||finite(amount.range[1])&&amount.range[1]>0);
+ // A weak native probability alone is not an expected snowfall day when the
+ // point accumulation is known to be zero. Keep that chance in winter details.
+ return wording||amount.value!==0||boundedTrace;
+});}
+export const snowForecastPresent=s=>Array.isArray(s?.days)?winterSnowDays(s).length>0:s?.snowExpected===true;
 const stamp=(v,z='America/New_York')=>{
  if(!finite(Date.parse(v)))return 'Time unavailable';
  try{return new Intl.DateTimeFormat('en-US',{timeZone:z||'America/New_York',weekday:'short',hour:'numeric',minute:'2-digit'}).format(new Date(v));}catch{return new Intl.DateTimeFormat('en-US',{timeZone:'UTC',weekday:'short',hour:'numeric',minute:'2-digit',timeZoneName:'short'}).format(new Date(v));}
@@ -50,6 +59,27 @@ export function winterAmountText(value,range){
  }
  return inch(value);
 }
+export function winterDayAmount(r){
+ const a=r?.displaySnowfall;
+ if(a)return {value:finite(a.value)&&a.value>=0?a.value:null,range:a.range||null,source:a.source||'',remainingDay:!!a.remainingDay,start:a.start,end:a.end,status:a.status};
+ // Older cached responses do not expose a correctly clipped NWS daily total.
+ // Only a complete, explicitly same-period model amount is a usable fallback.
+ return {value:finite(r?.best)&&r.best>=0?r.best:null,range:null,source:r?.amountSource||'Forecast guidance',start:r?.amountWindow?.start,end:r?.amountWindow?.end};
+}
+export function winterSnowMapForDay(s,r){
+ const period=r?.amountWindow||r?.displaySnowfall,from=Date.parse(period?.start),to=Date.parse(period?.end);
+ if(!finite(from)||!finite(to)||to<=from)return null;
+ const events=(r.snowEventWindows||[]).map(w=>({start:Math.max(from,Date.parse(w.start)),end:Math.min(to,Date.parse(w.end))})).filter(w=>finite(w.start)&&finite(w.end)&&w.end>w.start);
+ const eventMiddle=events.length?(Math.min(...events.map(w=>w.start))+Math.max(...events.map(w=>w.end)))/2:(from+to)/2;
+ const rows=(s?.maps||[]).filter(d=>d.quantity==='snowfall'&&['geojson','official-image','image'].includes(d.kind)).map(d=>{
+  const start=Date.parse(d.start),end=Date.parse(d.end),dayOverlap=Math.max(0,Math.min(to,end)-Math.max(from,start));
+  const overlap=events.length?events.reduce((sum,w)=>sum+Math.max(0,Math.min(w.end,end)-Math.max(w.start,start)),0):dayOverlap;
+  return {d,start,overlap,dayOverlap,distance:Math.abs((start+end)/2-eventMiddle),duration:end-start};
+ }).filter(r=>finite(r.overlap)&&r.overlap>0&&r.duration>0);
+ // A map without overlap is a different forecast, not a default for this day.
+ rows.sort((a,b)=>b.overlap-a.overlap||a.distance-b.distance||b.dayOverlap-a.dayOverlap||a.duration-b.duration||b.start-a.start);
+ return rows[0]?.d||null;
+}
 export function winterPointAmount(s,d={}){
  const windows=(s?.blendWindows||[]).map((w,index)=>({w,index})).filter(({w})=>finite(Date.parse(w.start))&&finite(Date.parse(w.end))&&Date.parse(w.end)>Date.parse(w.start));
  const exact=windows.find(({w})=>Date.parse(w.start)===Date.parse(d.windowStart)&&Date.parse(w.end)===Date.parse(d.windowEnd));
@@ -65,7 +95,7 @@ export function winterPointPopupHTML(amount,place,zone='America/New_York'){
  return `<strong>${esc(place||'Local forecast point')}</strong><p class="winter-point-amount">${esc(winterAmountText(amount?.value,amount?.range))} snowfall</p>${amount?.start&&amount?.end?`<p>${esc(stamp(amount.start,zone))}–${esc(stamp(amount.end,zone))}</p>`:'<p>Forecast period unavailable.</p>'}<p>${finite(amount?.coverage)?`${Math.round(amount.coverage)}% of requested amount weight available. `:''}${amount?.status==='partial'?'Partial blend.':amount?.status==='unavailable'?'Compatible snowfall amounts unavailable.':''}</p>${amount?.actualWeights?`<p>${esc(weightsText(amount.actualWeights))}</p>`:''}${amount?.precision?`<p>${esc(amount.precision)}</p>`:''}<small>Local forecast point; this map is not a continuous snow grid. The times above belong to this point’s returned forecast.</small>`;
 }
 export function snowBannerSummary(s){
- const snowRows=(s?.days||[]).filter(r=>r.snowExpected===true||r.snowPossible===true);
+ const snowRows=winterSnowDays(s);
  const rows=snowRows.length?snowRows:(s?.days||[]).filter(dayActive);
  return rows.length?`${dayName(rows[0])}${rows.length>1?` · +${rows.length-1} more days`:''} · Snow, ice & sleet details`:s?.wssi?.title||'Winter precipitation possible';
 }
@@ -89,10 +119,7 @@ function sourceHTML(b){
  const all=['ready','complete'].includes(b?.status),missing=b?.status==='unavailable'||b?.coverage===0;
  return `<p class="winter-weights">Requested: ${esc(weightsText(b?.weights))}</p><p class="winter-coverage">${finite(b?.coverage)?`${Math.round(b.coverage)}% of requested weight has compatible data. `:''}${all?'All requested sources available.':missing?'No requested source has compatible accumulation data.':'Partial blend: only compatible available sources contribute.'}</p>${!all&&!missing&&b?.actualWeights?`<p class="winter-weights">Contributing weights: ${esc(weightsText(b.actualWeights))}</p>`:''}${b?.precision?`<p class="winter-coverage">${esc(b.precision)}</p>`:''}`;
 }
-export function snowDetailHTML(s,place,zone='America/New_York'){
- const head=`<div class="dialog-eyebrow" data-winter-outlook>${esc(place||'Your location')}</div><h2 id="forecast-window-title">Snow & winter weather</h2>`;
- if(!s)return head+`<p role="status">${place?'Winter forecast unavailable. We cannot confirm whether snow is expected.':'Choose a location first to check the winter forecast.'}</p>`;
- if(!active(s))return head+`<p class="winter-empty" role="status">${winterOutlookState(s)==='unavailable'?'Winter forecast unavailable. We cannot confirm whether snow is expected.':'No snow in the forecast.'}</p><p class="forecast-window-intro">${s.status==='partial'||s.coverageStatus==='partial'?'Coverage is limited; no winter precipitation signal appears in the available guidance. ':''}Winter details appear when the available forecast has a snow, sleet or freezing rain signal.</p>`;
+function winterTechnicalHTML(s,zone){
  const days=(s.days||[]).filter(dayActive).map(r=>`<article class="winter-day"><h3>${esc(dayName(r))}<small>${esc(r.date)}</small></h3><div class="winter-type-grid">${[['snow','Snow'],['freezingRain','Freezing rain'],['sleet','Sleet']].map(([key,label])=>`<div><span>${label}</span><strong>${signal(r,key)}</strong></div>`).join('')}</div>${probabilitySourceHTML(r,zone)}<p class="winter-amount">Snow amount <strong>${Array.isArray(r.range)&&r.range.length===2&&r.range.every(finite)?`${r.range[0]}–${r.range[1]}″`:esc(inch(r.best))}</strong></p><p class="winter-coverage">Local calendar-day guidance; WPC uses the separate 24-hour periods below.</p>${r.periods?.length?`<p>${r.periods.map(p=>`${esc(p.name)}: ${esc(p.wording)}`).join(' · ')}</p>`:''}${r.blend?sourceHTML(r.blend):''}</article>`).join('');
  const windows=(s.blendWindows||[]).map(w=>{
   const b=w.snowfall||w,raw=b.sources||w.sources;
@@ -101,9 +128,34 @@ export function snowDetailHTML(s,place,zone='America/New_York'){
  }).join('');
  const probs=(s.days||[]).flatMap(r=>r.wpc||[]).filter(p=>p.start&&p.end);
  const probability=probs.length?`<section class="winter-probabilities"><h3>WPC snowfall & ice probabilities</h3><p>Chances of exceeding the stated accumulation, separate from the chance of any snow or ice.</p><ul>${probs.map(p=>`<li><strong>${p.kind==='ice'?'Ice':'Snow'} ${p.kind==='ice'?'over':'at least'} ${esc(p.inches)}″: ${esc(p.probabilityRange?`${p.probabilityRange[0]}–${p.probabilityRange[1]}%`:p.category||'Unavailable')}</strong><span>${esc(stamp(p.start,zone))}–${esc(stamp(p.end,zone))}</span></li>`).join('')}</ul></section>`:'';
- const maps=winterMapDescriptors(s);
- const mapHTML=maps.length?`<section class="winter-map-panel"><h3>Winter precipitation maps</h3><label for="winter-map-select">Map layer</label><select id="winter-map-select">${maps.map(m=>`<option value="${esc(m.id)}">${esc(m.label)}</option>`).join('')}</select><div id="winter-map" class="winter-map" role="region" aria-label="Winter precipitation forecast map" aria-describedby="winter-map-status winter-map-legend" tabindex="0"></div><div id="winter-map-legend" class="winter-map-legend"></div><p id="winter-map-status" role="status"></p><a id="winter-map-source" href="${esc(safeWinterMapUrl(maps[0].sourceUrl)||officialWinterUrl)}" target="_blank" rel="noopener noreferrer">Open official map ↗</a></section>`:`<p>Winter map data is unavailable. <a href="${officialWinterUrl}" target="_blank" rel="noopener noreferrer">WPC snow totals guidance ↗</a></p>`;
- return head+`<p class="forecast-window-intro">Your separate winter outlook. Amounts and probabilities use their own valid periods; unavailable data stays unavailable.</p>${s.wssi?`<p class="winter-impact">${esc(s.wssi.title||'WPC winter storm impacts may be possible.')}</p>`:''}${days}<section class="winter-blends"><h3>Snow accumulation blend</h3><p>First 24 hours: WPC 60% · HRRR 25% · NAM 15%. Beyond 24 hours: WPC 60% · ECMWF 20% · Google WeatherNext 10% · GFS 10%.</p>${windows}</section>${probability}${mapHTML}<p class="aqi-source">${esc(s.notes||'Official NWS wording is separate from deterministic snowfall. A model snow forecast does not establish a snow-only probability.')}</p>`;
+ return `${s.wssi?`<p class="winter-impact">${esc(s.wssi.title||'WPC winter storm impacts may be possible.')}</p>`:''}${days}<section class="winter-blends"><h3>Snow accumulation blend</h3><p>First 24 hours: WPC 60% · HRRR 25% · NAM 15%. Beyond 24 hours: WPC 60% · ECMWF 20% · Google WeatherNext 10% · GFS 10%.</p>${windows}</section>${probability}${winterMapDescriptors(s).length?'<button type="button" class="winter-secondary-button" data-winter-maps>Explore winter precipitation maps</button>':''}<p class="aqi-source">${esc(s.notes||'Official NWS wording is separate from deterministic snowfall. A model snow forecast does not establish a snow-only probability.')}</p>`;
+}
+function mapPanelHTML(d,{technical=false,maps=[]}={}){
+ if(!d)return '<p class="winter-map-unavailable">An official snow totals map is not available for this date.</p>';
+ return `<section class="winter-map-panel"><h3>${technical?'Winter precipitation maps':'Snow totals map'}</h3>${technical?`<label for="winter-map-select">Map layer</label><select id="winter-map-select">${maps.map(m=>`<option value="${esc(m.id)}"${m.id===d.id?' selected':''}>${esc(m.label)}</option>`).join('')}</select>`:''}<div id="winter-map" data-map-id="${esc(d.id)}" class="winter-map" role="region" aria-label="${technical?'Winter precipitation forecast map':'Official snowfall totals map'}" aria-describedby="winter-map-status winter-map-legend" tabindex="0"></div><div id="winter-map-legend" class="winter-map-legend"></div><p id="winter-map-status" role="status"></p><a id="winter-map-source" href="${esc(safeWinterMapUrl(d.sourceUrl)||officialWinterUrl)}" target="_blank" rel="noopener noreferrer">${technical?'Open official map':'WPC snowfall map'} ↗</a></section>`;
+}
+export function snowDetailHTML(s,place,zone='America/New_York',selectedDate){
+ const head=`<div class="dialog-eyebrow" data-winter-outlook>${esc(place||'Your location')}</div><h2 id="forecast-window-title">Snow forecast</h2>`;
+ if(!s)return head+`<p role="status">${place?'Winter forecast unavailable. We cannot confirm whether snow is expected.':'Choose a location first to check the winter forecast.'}</p>`;
+ const rows=winterSnowDays(s),selected=rows.find(r=>r.date===selectedDate)||rows[0];
+ const technical=active(s)?`<details class="winter-more"><summary>More winter details</summary><div class="winter-more-content">${winterTechnicalHTML(s,zone)}</div></details>`:'';
+ if(!selected)return head+`<p class="winter-empty" role="status">${winterOutlookState(s)==='unavailable'?'Winter forecast unavailable. We cannot confirm whether snow is expected.':'No snow in the forecast.'}</p>${winterOutlookState(s)!=='unavailable'&&(s.status==='partial'||s.coverageStatus==='partial')?'<p class="winter-limited">Coverage is limited.</p>':''}${technical}`;
+ const amount=winterDayAmount(selected),descriptor=winterSnowMapForDay(s,selected);
+ const shortDate=r=>{
+  const time=Date.parse(r.date+'T12:00:00Z');if(!finite(time))return 'Date unavailable';
+  try{return new Intl.DateTimeFormat('en-US',{timeZone:zone,month:'short',day:'numeric'}).format(new Date(time));}
+  catch{return new Intl.DateTimeFormat('en-US',{timeZone:'UTC',month:'short',day:'numeric'}).format(new Date(time));}
+ };
+ const controls=rows.length>1?`<div class="winter-snow-days" role="group" aria-label="Days with snow in the forecast">${rows.map(r=>`<button type="button" data-snow-date="${esc(r.date)}" aria-pressed="${r===selected}"><span>${esc(dayName(r))}</span><small>${esc(shortDate(r))}</small></button>`).join('')}</div>`:'';
+ const events=(selected.snowEventWindows||[]).filter(w=>finite(Date.parse(w.start))&&finite(Date.parse(w.end)));
+ const wording=events.length?`Snow possible ${stamp(events[0].start,zone)}–${stamp(events.at(-1).end,zone)}`:'';
+ const estimated=amount.status==='partial'&&finite(amount.value)&&amount.value>0&&!amount.range;
+ const source=amount.source==='Available model guidance'?'Model estimate':amount.source;
+ return head+`<div class="winter-primary">${controls}<article class="winter-snow-summary" data-snow-day="${esc(selected.date)}"><h3>${esc(dayName(selected))}<small>${esc(shortDate(selected))}</small></h3><p class="winter-snow-amount"><strong>${estimated?'About ':''}${esc(winterAmountText(amount.value,amount.range))}</strong><span>of snow${amount.remainingDay?' for the rest of today':''}</span></p>${wording?`<p class="winter-snow-wording">${esc(wording)}</p>`:''}<p class="winter-snow-source">${finite(amount.value)?esc(source||'Forecast guidance'):'Snowfall amount is not available yet.'}</p></article>${mapPanelHTML(descriptor)}</div>${technical}`;
+}
+export function winterMapsHTML(s,place){
+ const maps=winterMapDescriptors(s),selected=maps.find(d=>d.id===selectedLayerId)||maps[0];
+ return `<div class="dialog-eyebrow" data-winter-outlook>${esc(place||'Your location')}</div><h2 id="forecast-window-title">Winter precipitation maps</h2><button type="button" class="winter-secondary-button" data-winter-back>← Back to snow forecast</button>${mapPanelHTML(selected,{technical:true,maps})}`;
 }
 function clearPointLayer(){
  areaRequest?.abort();areaRequest=null;
@@ -122,7 +174,7 @@ function ensureInteractiveMap(){
  const lat=latest?.location?.latitude,lon=latest?.location?.longitude,L=window.L;
  map=L.map('winter-map',{scrollWheelZoom:false,preferCanvas:true}).setView([finite(lat)?lat:39,finite(lon)?lon:-96],finite(lat)?6:4);
  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>',maxZoom:10}).addTo(map);
- if(finite(lat)&&finite(lon))L.circleMarker([lat,lon],{radius:5,color:'#fff',fillColor:'#87ccff',fillOpacity:1}).addTo(map).bindPopup(esc(latest.location.name||'Your location'));
+ if(finite(lat)&&finite(lon))L.circleMarker([lat,lon],{pane:'markerPane',radius:5,color:'#fff',fillColor:'#87ccff',fillOpacity:1}).addTo(map).bindTooltip(esc(latest.location.name||'Your location'),{permanent:true,direction:'top'}).bindPopup(esc(latest.location.name||'Your location'));
  requestAnimationFrame(()=>map?.invalidateSize());return true;
 }
 function officialMapImage(d,status){
@@ -174,13 +226,13 @@ async function loadWinterArea(d,status,legend){
  try{
   const cached=areaCache.get(url);let geo=cached&&Date.now()-cached.at<5*60000?cached.geo:null;
   if(!geo){const response=await fetch(url,{signal:controller.signal,headers:{Accept:'application/geo+json,application/json'}});if(!response.ok)throw new Error('Winter area map unavailable');geo=await response.json();}
-  if(geo.type!=='FeatureCollection'||!Array.isArray(geo.features)||geo.features.length>20000||geo.metadata?.quantity!=='snowfall'||geo.metadata?.unit!=='in'||geo.features.some(f=>f?.type!=='Feature'||f.geometry?.type!=='Polygon'||!finite(f.properties?.value)||f.properties.value<0))throw new Error('Unexpected snowfall map data');
+  if(geo.type!=='FeatureCollection'||!Array.isArray(geo.features)||geo.features.length>20000||geo.metadata?.quantity!=='snowfall'||geo.metadata?.unit!=='in'||Date.parse(geo.metadata.start)!==Date.parse(d.start)||Date.parse(geo.metadata.end)!==Date.parse(d.end)||geo.features.some(f=>f?.type!=='Feature'||f.geometry?.type!=='Polygon'||!finite(f.properties?.value)||f.properties.value<0))throw new Error('Unexpected snowfall map data');
   if(areaRequest!==controller||controller.signal.aborted||selectedLayerId!==d.id||!map)return;
   areaCache.set(url,{geo,at:Date.now()});if(areaCache.size>3)areaCache.delete(areaCache.keys().next().value);
   const zone=latest?.location?.timeZone,L=window.L;
   overlay=L.geoJSON(geo,{style:f=>({color:/^#[0-9a-f]{6}$/i.test(f.properties.color||'')?f.properties.color:'#d3e9f7',weight:0,fillColor:/^#[0-9a-f]{6}$/i.test(f.properties.color||'')?f.properties.color:'#d3e9f7',fillOpacity:finite(f.properties.opacity)?Math.max(.2,Math.min(.85,f.properties.opacity)):.5}),onEachFeature:(feature,layer)=>layer.bindPopup(`<strong>WPC expected snowfall</strong><p>${esc(inch(feature.properties.value))} contour · conservative lower bound</p><p>${esc(stamp(geo.metadata.start,zone))}–${esc(stamp(geo.metadata.end,zone))}</p><small>Official deterministic snowfall depth in inches. Actual amounts vary within the published contour band.</small>`)}).addTo(map);
   renderWinterLegend(geo.metadata.legend,legend);
-  status.textContent=`${stamp(geo.metadata.start,zone)}–${stamp(geo.metadata.end,zone)} · inches of snow. ${geo.metadata.precision}${geo.features.length?'':' No measurable snowfall contour is published in this product.'}`;
+  status.textContent=`Map period: ${stamp(geo.metadata.start,zone)}–${stamp(geo.metadata.end,zone)} · inches of snow.${snowView==='maps'?` ${geo.metadata.precision}`:''}${geo.features.length?'':' No measurable snowfall contour is published in this product.'}`;
  }catch{if(areaRequest===controller&&selectedLayerId===d.id)status.textContent=original+' The expected snow map could not load. Use the official source below; missing map data is not a zero snow forecast.';}
  finally{clearTimeout(deadline);if(areaRequest===controller)areaRequest=null;}
 }
@@ -190,7 +242,7 @@ function selectLayer(id){
  if(overlay)map.removeLayer(overlay);overlay=null;
  const status=document.getElementById('winter-map-status'),legend=document.getElementById('winter-map-legend');
  document.getElementById('winter-map-source').href=safeWinterMapUrl(d.sourceUrl)||officialWinterUrl;
- status.textContent=(d.start&&d.end?`${stamp(d.start,latest?.location?.timeZone)}–${stamp(d.end,latest?.location?.timeZone)} · ${d.unit||''}. `:'')+(d.description||'Official guidance; check issue and valid times on the source.');
+ status.textContent=(d.start&&d.end?`Map period: ${stamp(d.start,latest?.location?.timeZone)}–${stamp(d.end,latest?.location?.timeZone)} · ${snowView==='forecast'?'inches of snow':d.unit||''}. `:'')+(snowView==='maps'?(d.description||'Official guidance; check issue and valid times on the source.'):'');
  renderWinterLegend(d.legend,legend);
  if(d.kind==='geojson'&&d.quantity==='snowfall'){if(ensureInteractiveMap())void loadWinterArea(d,status,legend);return;}
  if(d.kind==='point-totals'){
@@ -223,12 +275,19 @@ function selectLayer(id){
 }
 function initializeMap(){
  if(!opened||!document.getElementById('winter-map'))return;
- const select=document.getElementById('winter-map-select');if(!select.dataset.winterBound){select.dataset.winterBound='true';select.addEventListener('change',()=>selectLayer(select.value));}selectLayer(select.value);
+ const select=document.getElementById('winter-map-select');if(select&&!select.dataset.winterBound){select.dataset.winterBound='true';select.addEventListener('change',()=>selectLayer(select.value));}selectLayer(select?.value||document.getElementById('winter-map').dataset.mapId);
+}
+function renderSnowView(){
+ const content=document.getElementById('forecast-window-content');if(!content)return;
+ disposeMap();
+ const rows=winterSnowDays(latest?.snow);if(!rows.some(r=>r.date===selectedSnowDate))selectedSnowDate=rows[0]?.date||null;
+ content.innerHTML=snowView==='maps'?winterMapsHTML(latest?.snow,latest?.location?.name):snowDetailHTML(latest?.snow,latest?.location?.name,latest?.location?.timeZone,selectedSnowDate);
+ initializeMap();
 }
 export function openSnowOutlook(){
  const dialog=document.getElementById('forecast-window-dialog'),content=document.getElementById('forecast-window-content');if(!dialog||!content)return;
- disposeMap();opened=true;dialog.classList.add('winter-dialog');content.innerHTML=snowDetailHTML(latest?.snow,latest?.location?.name,latest?.location?.timeZone);
- if(!dialog.open)dialog.showModal();document.body.classList.add('dialog-open');document.getElementById('open-snow')?.setAttribute('aria-expanded','true');initializeMap();
+ opened=true;snowView='forecast';dialog.classList.add('winter-dialog');
+ renderSnowView();if(!dialog.open)dialog.showModal();document.body.classList.add('dialog-open');document.getElementById('open-snow')?.setAttribute('aria-expanded','true');requestAnimationFrame(()=>map?.invalidateSize());
 }
 function install(){
  if(initialized||typeof document==='undefined')return;initialized=true;
@@ -236,19 +295,29 @@ function install(){
  document.getElementById('close-forecast-window')?.addEventListener('click',()=>document.getElementById('forecast-window-dialog')?.close());
  document.getElementById('forecast-window-dialog')?.addEventListener('close',()=>{releaseSnowView();if(!document.querySelector('dialog[open]'))document.body.classList.remove('dialog-open');});
  const content=document.getElementById('forecast-window-content');
+ content?.addEventListener('click',event=>{
+  if(!opened||!content.querySelector('[data-winter-outlook]'))return;
+  const day=event.target.closest('[data-snow-date]');
+  if(day&&winterSnowDays(latest?.snow).some(r=>r.date===day.dataset.snowDate)){
+   selectedSnowDate=day.dataset.snowDate;snowView='forecast';renderSnowView();content.querySelector('[data-snow-date][aria-pressed="true"]')?.focus({preventScroll:true});return;
+  }
+  if(event.target.closest('[data-winter-maps]')){snowView='maps';renderSnowView();content.querySelector('[data-winter-back]')?.focus({preventScroll:true});return;}
+  if(event.target.closest('[data-winter-back]')){snowView='forecast';renderSnowView();content.querySelector('.winter-more summary')?.focus({preventScroll:true});}
+ });
  if(content&&typeof MutationObserver!=='undefined')new MutationObserver(()=>{if(opened&&!content.querySelector('[data-winter-outlook]'))releaseSnowView();}).observe(content,{childList:true});
  window.addEventListener('weather-map-library-ready',initializeMap);
- const link=document.createElement('link');link.rel='stylesheet';link.href='/weather-fusion/winter-outlook.css?v=wpc-snow-v4';document.head.append(link);
+ const link=document.createElement('link');link.rel='stylesheet';link.href='/weather-fusion/winter-outlook.css?v=snow-simple-v5';document.head.append(link);
 }
 export function renderSnowOutlook(data){
  latest=data;install();let root=document.getElementById('snow-outlook-banner');
  if(!root){const anchor=document.getElementById('forecast-window-banners');if(!anchor)return;root=document.createElement('section');root.id='snow-outlook-banner';root.className='forecast-window-banners snow-outlook-banners';root.setAttribute('aria-label','Winter weather outlook');anchor.after(root);}
  root.hidden=!snowForecastPresent(data?.snow);root.innerHTML='';
  if(!root.hidden){root.innerHTML=`<button type="button" class="glass forecast-window-banner forecast-window-snow" data-snow-outlook aria-haspopup="dialog" aria-controls="forecast-window-dialog"><span class="forecast-window-icon" aria-hidden="true">❄</span><span class="forecast-window-copy"><strong>Snow & winter weather</strong><span>${esc(snowBannerSummary(data.snow))}</span></span><span class="forecast-window-action">View forecast <b aria-hidden="true">›</b></span></button>`;root.querySelector('[data-snow-outlook]').addEventListener('click',openSnowOutlook);}
- if(opened&&document.querySelector('#forecast-window-content [data-winter-outlook]'))openSnowOutlook();else if(opened)releaseSnowView();
+ if(opened&&document.querySelector('#forecast-window-content [data-winter-outlook]'))renderSnowView();else if(opened)releaseSnowView();
 }
 export function resetSnowOutlook(){
  latest=null;
+ selectedSnowDate=null;snowView='forecast';
  pointCache.clear();
  areaCache.clear();
  if(typeof document==='undefined')return;
