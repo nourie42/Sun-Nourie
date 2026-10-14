@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {modelExplanationView,modelExplanationHTML,renderModelExplanation,resetModelExplanation} from '../public/weather-fusion/model-explanation.js';
+import {modelExplanationView,modelExplanationHTML,renderModelExplanation,resetModelExplanation,weatherNextParticipation} from '../public/weather-fusion/model-explanation.js';
 import {precipitationLikelihood} from '../src/weatherFusionDirect.js';
 
 const HOUR = 3600000;
@@ -172,6 +172,30 @@ test('temperatures disclose only the recorded source values and applied weights'
   assert.match(html,/Low: 70°F/);
   const forecast=fixture();delete forecast.days[0].highBlend;delete forecast.days[0].lowBlend;
   assert.doesNotMatch(modelExplanationHTML(forecast,{now}),/Temperature calculations/);
+});
+
+test('NVIDIA participation and evidence reflect recorded backend contribution, not a separately connected feed',()=>{
+  const forecast=fixture();
+  forecast.google={status:'ready',contributes:true,label:'NVIDIA WeatherNext',requestedWeight:.1,runAt:at(-4)};
+  const peak=forecast.days[0].popDayLikelihood.peak;
+  peak.sources.push({id:'wn',value:100,weight:.1,points:10,runAt:at(-4)});
+  peak.sourceValues.wn=100;peak.sourceAmounts.wn=.04;peak.sourcePoints.wn=10;
+  forecast.days[0].highBlend.sources.push({id:'wn',value:82,weight:.1});
+  forecast.feeds.push({id:'wn',status:'ready',issuedAt:at(-4),fetchedAt:at(0)});
+  const html=modelExplanationHTML(forecast,{now});
+  assert.match(html,/<th scope="row">NVIDIA WeatherNext<\/th><td>0\.04 in<small>Rain forecast: Yes<\/small><\/td><td>10<small>of 10 max<\/small>/);
+  assert.match(html,/<th scope="row">NVIDIA WeatherNext<\/th><td>82°F<\/td><td>10%<\/td>/);
+  assert.match(html,/NVIDIA WeatherNext contributes a 10% share to the Weather Nourie blend/);
+  assert.match(html,/Missing or stale data is excluded/);
+  assert.match(html,/NVIDIA WeatherNext <span>Used at peak/);
+  assert.doesNotMatch(html,/comparison-only|Comparison only|not connected yet|40-point share/);
+  assert.equal(weatherNextParticipation(forecast).badge,'10% forecast share');
+
+  const separateOnly={google:{status:'unavailable',contributes:false,requestedWeight:.1,message:'Matching forecast data is stale.'},feeds:[{id:'wn',status:'ready'}]};
+  assert.equal(weatherNextParticipation(separateOnly).contributes,false);
+  assert.equal(weatherNextParticipation(separateOnly).badge,'Not used in this forecast');
+  assert.match(weatherNextParticipation(separateOnly).copy,/Matching forecast data is stale/);
+  assert.equal(weatherNextParticipation({google:{status:'unavailable',contributes:true,requestedWeight:.1}}).contributes,false,'a stale status cannot show the contributing badge');
 });
 
 test('provider data is escaped and malformed optional inputs do not crash the section',()=>{

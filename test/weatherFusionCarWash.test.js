@@ -45,8 +45,31 @@ test('the wash blocker names its actual peak hour rather than confusing daytime 
   const summary=carWashSummary(f,start);
   assert.equal(summary.chance,49);
   assert.equal(summary.decisions[0].chance,49);
-  assert.match(summary.reason,/Rain chance reaches 49% Sat,? 9 PM\./);
+  assert.equal(summary.reason,'Rain chance reaches 49% today at 9 PM.');
   assert.equal(summary.canWash,false);
+});
+
+test('a later-period blocker explains why a low-rain wash today should wait',()=>{
+  const forecast=fixture([0,0,64,0,0,0,0]);
+  forecast.location.timeZone='America/New_York';
+  forecast.days[2].rainLikelihood.peakTime='2026-09-15T09:00:00Z';
+  const summary=carWashSummary(forecast,Date.parse('2026-09-12T16:00:00Z'));
+  assert.equal(summary.state,'wait');
+  assert.equal(summary.canWash,false);
+  assert.equal(summary.chance,0);
+  assert.deepEqual(summary.decisions[0].chances,[0,0,64]);
+  assert.equal(summary.reason,'Rain within the next three days: 64% chance Tuesday at 5 AM.');
+  assert.match(carWashHTML(summary),/Plan for three days of low rain risk/);
+});
+
+test('wash wording determines today and peak time in the forecast location timezone',()=>{
+  const forecast=fixture([64,0,0,0,0,0,0]);
+  forecast.location.timeZone='America/Denver';
+  forecast.days[0].rainLikelihood.peakTime='2026-09-13T02:00:00Z';
+  const summary=carWashSummary(forecast,Date.parse('2026-09-13T01:00:00Z'));
+  assert.equal(summary.reason,'Rain chance reaches 64% today at 8 PM.');
+  assert.equal(summary.state,'wait');
+  assert.equal(summary.decisions[0].chance,64);
 });
 
 test('car-wash threshold allows exactly 25% and blocks only values above it',()=>{

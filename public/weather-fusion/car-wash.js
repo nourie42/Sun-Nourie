@@ -160,8 +160,14 @@ export function carWashSummary(forecast, now = Date.now()) {
   for(const decision of decisions){
     const blocked=days[decision.blocker],peak=blocked?.rainLikelihood;
     if(decision.state==='wait'&&finite(peak?.value)&&Number.isFinite(Date.parse(peak?.peakTime))){
-      const when=new Intl.DateTimeFormat('en-US',{timeZone:zone,weekday:'short',hour:'numeric'}).format(new Date(peak.peakTime));
-      decision.reason=`Rain chance reaches ${Math.round(peak.value)}% ${when}.`;
+      const peakDate=dateKey(peak.peakTime,zone);
+      const weekday=new Intl.DateTimeFormat('en-US',{timeZone:zone,weekday:'long'}).format(new Date(peak.peakTime));
+      const time=new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric'}).format(new Date(peak.peakTime));
+      // A later day's rain can block a wash today. Explain the three-day
+      // outlook instead of presenting that future peak as today's weather.
+      decision.reason=decision.index===0&&peakDate===dateKey(now,zone)
+        ? `Rain chance reaches ${Math.round(peak.value)}% today at ${time}.`
+        : `Rain within the next three days: ${Math.round(peak.value)}% chance ${weekday} at ${time}.`;
     }
   }
   const activeKind = weatherState(forecast?.current?.condition).kind;
@@ -230,7 +236,7 @@ export function carWashHTML(summary) {
     <span class="car-wash-temps">${finite(day.low)?Math.round(day.low)+'°':'—'} <i>|</i> ${finite(day.high)?Math.round(day.high)+'°':'—'}</span>
     <span class="car-wash-chance">💧 ${day.chance===null?'—':Math.round(day.chance)+'%'}</span><b class="car-wash-day-verdict">${verdictLabel(day.state)}</b>
   </article>`).join('');
-  return `<header class="car-wash-header"><span class="car-wash-logo" aria-hidden="true">💧🚙</span><span><h2 id="car-wash-title">Car Wash Forecast</h2><p>Plan the perfect time for a showroom shine</p></span><em>Clean rides.<br>Brighter days.</em></header>
+  return `<header class="car-wash-header"><span class="car-wash-logo" aria-hidden="true">💧🚙</span><span><h2 id="car-wash-title">Car Wash Forecast</h2><p>Plan for three days of low rain risk</p></span><em>Clean rides.<br>Brighter days.</em></header>
     <div class="car-wash-hero"><div class="car-wash-answer"><h3>Can I Wash<br>My Car Today?</h3><strong class="car-wash-verdict ${summary.state}" role="status" aria-live="polite" aria-atomic="true">${good?'<span aria-hidden="true">✓</span> ':''}${label}</strong><p>${esc(summary.reason)}</p></div>
       <div class="car-wash-checks">${fact('💧',summary.chance===null?'—':`${Math.round(summary.chance)}%`,'Rain chance',summary.chance!==null&&summary.chance<=CAR_WASH_RAIN_LIMIT)}${fact('☀',`${summary.lowRainDays} of 3 days`,`${CAR_WASH_RAIN_LIMIT}% or less rain`,summary.lowRainDays===3)}${fact('≋',summary.facts.wind,'Wind')}${fact('♨',summary.facts.temperature,'Low / high')}${fact('💦',summary.facts.gross.title,summary.facts.gross.detail)}</div>
     </div>

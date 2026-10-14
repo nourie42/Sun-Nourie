@@ -6,7 +6,8 @@ const WEATHERNEXT_ACCESS = 'https://developers.google.com/weathernext/guides/acc
 const finite = value => typeof value === 'number' && Number.isFinite(value);
 const chance = value => finite(value) && value >= 0 && value <= 100 ? value : null;
 const esc = value => String(value ?? '').replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
-const names = {nws:'NWS',hrrr:'HRRR',ecmwf:'ECMWF',nbm:'NBM'};
+const names = {nws:'NWS',hrrr:'HRRR',ecmwf:'ECMWF',nbm:'NBM',wn:'NVIDIA WeatherNext'};
+const sourceIds = ['nws','hrrr','ecmwf','nbm','wn'];
 const phaseNames = {overall:'Full day',daytime:'Daytime',overnight:'Overnight'};
 let latest = null, latestNow = 0, selectedDate = null, selectedPhase = null;
 let weatherNextState = {key:null,status:'idle',point:null,runAt:null,generatedAt:null,checkedAt:0,message:''};
@@ -57,7 +58,7 @@ export function modelExplanationView(forecast, {index = 0,phase = null,now = Dat
 
 function sourceRows(likelihood) {
   const sources = Array.isArray(likelihood?.sources) ? likelihood.sources : [];
-  return ['nws','hrrr','ecmwf','nbm'].map(id => {
+  return sourceIds.map(id => {
     const used = sources.find(source => source.id === id && finite(source.value) && finite(source.weight) && source.weight > 0);
     const value = finite(likelihood?.sourceValues?.[id]) ? likelihood.sourceValues[id] : used?.value;
     return {id,value:finite(value)?value:null,amount:finite(likelihood?.sourceAmounts?.[id])?likelihood.sourceAmounts[id]:null,
@@ -101,9 +102,9 @@ function temperatureBlend(day, kind) {
 }
 function sourceStatus(forecast, view) {
   const peakSources = sourceRows(view.peak), models = forecast?.modelContributions || [], feeds = forecast?.feeds || [];
-  return `<dl class="model-runs">${['nws','hrrr','ecmwf','nbm'].map(id => {
+  return `<dl class="model-runs">${sourceIds.map(id => {
     const source = peakSources.find(row=>row.id===id), model = models.find(row=>row.id===id), feed = feeds.find(row=>row.id===(id==='nws'?'hourly':id)) || feeds.find(row=>row.id===id);
-    const used = source?.weight !== null, issued = source?.runAt || (id === 'nws' ? feed?.id==='hourly'?feed.issuedAt:null : model?.runAt || feed?.issuedAt);
+    const used = source?.weight !== null, issued = source?.runAt || (id === 'nws' ? feed?.id==='hourly'?feed.issuedAt:null : model?.runAt || feed?.issuedAt || (id === 'wn' ? forecast?.google?.runAt : null));
     const kind = id === 'nws' ? 'Issued' : 'Latest published run';
     return `<div><dt>${names[id]} <span>${used?'Used at peak':'Not used at peak'}</span></dt><dd>${kind}: ${esc(stamp(issued,view.zone))}${model?.runScope?`<small>${esc(model.runScope)}</small>`:''}${feed?.fetchedAt?`<small>Data fetched: ${esc(stamp(feed.fetchedAt,view.zone))}</small>`:''}${feed?.checkedAt?`<small>Last check: ${esc(stamp(feed.checkedAt,view.zone))}</small>`:''}${feed?.retrievalStatus==='last-verified'?'<small>Using last verified data; the latest refresh did not succeed.</small>':''}${feed?.refreshWarning?`<small>${esc(feed.refreshWarning)}</small>`:''}${feed?.status&&feed.status!=='ready'?`<small>Feed: ${esc(feed.status)}</small>`:''}</dd></div>`;
   }).join('')}</dl>`;
@@ -185,9 +186,21 @@ function weatherNextDailyHTML(point,forecast,view){
   }).join('');
   return `<div class="weathernext-daily"><div class="weathernext-subhead"><div><small>7-day model view</small><strong>WeatherNext vs Weather Fusion</strong></div><span>Temperature comparison · precipitation amount, not PoP</span></div><div class="weathernext-day-grid">${cards}</div></div>`;
 }
+export function weatherNextParticipation(forecast) {
+  const canonical = forecast?.google;
+  const contributes = canonical?.status === 'ready' && canonical?.contributes === true;
+  const requestedWeight = finite(canonical?.requestedWeight) && canonical.requestedWeight > 0 && canonical.requestedWeight <= 1 ? canonical.requestedWeight : null;
+  const share = requestedWeight === null ? '' : `${number(requestedWeight * 100)}% `;
+  return {contributes,requestedWeight,runAt:canonical?.runAt || null,
+    badge:contributes ? `${share}forecast share` : 'Not used in this forecast',
+    copy:contributes
+      ? `NVIDIA WeatherNext contributes a ${share}share to the Weather Nourie blend where verified, matching forecast data is available. Missing or stale data is excluded.`
+      : `NVIDIA WeatherNext is excluded from this forecast because verified, matching data is unavailable.${canonical?.message ? ` ${canonical.message}` : ''}`};
+}
 function weatherNextCard(forecast, view) {
   const state=weatherNextState,key=weatherNextKey(forecast),same=key&&state.key===key,zone=view.zone;
   const connected=same&&state.status==='ready';
+  const participation=weatherNextParticipation(forecast);
   let body='';
   if(!same||state.status==='idle'||state.status==='loading'){
     body='<div class="graphcast-state">Checking the latest NVIDIA WeatherNext forecast for this location…</div>';
@@ -202,27 +215,18 @@ function weatherNextCard(forecast, view) {
     const daily=weatherNextDailyHTML(state.point,forecast,view);
     body=`<div class="graphcast-meta"><div><small>Latest run</small><strong>${esc(stamp(state.runAt,zone))}</strong></div><div><small>Forecast</small><strong>Hourly · 7 days published here</strong></div><div><small>Resolution</small><strong>0.1° surface grid · 64 members</strong></div></div>${daily}${cards?`<div class="weathernext-subhead hourly"><div><small>Selected period</small><strong>Hourly WeatherNext details</strong></div><span>Swipe →</span></div><div class="graphcast-windows">${cards}</div>`:'<div class="graphcast-state">No WeatherNext 3 hours were published for the selected period.</div>'}`;
   }else if(state.status==='not-covered'){
-    body='<div class="graphcast-state">The published WeatherNext 3 feed does not yet include this selected location. Your normal forecast remains unchanged.</div>';
+    body='<div class="graphcast-state">The separate published WeatherNext 3 point feed does not include this selected location. Forecast participation is reported by the Weather Nourie backend.</div>';
   }else{
-    body=`<div class="graphcast-state"><strong>NVIDIA WeatherNext is not connected yet.</strong><br>WeatherNext 3 real-time data requires allowlist access and a linked forecast data feed. Once that feed is published, this card fills automatically with real hourly WeatherNext temperatures, wind, precipitation and ensemble ranges.</div>`;
+    body='<div class="graphcast-state">Separate WeatherNext model details are temporarily unavailable. This details feed does not determine whether NVIDIA participates in the Weather Nourie blend.</div>';
   }
-  return `<section class="graphcast-card weathernext-card" aria-label="NVIDIA forecast using WeatherNext data"><div class="graphcast-head"><div><h3 class="graphcast-title"><span class="graphcast-orb" aria-hidden="true">W3</span>NVIDIA Forecast</h3><p class="graphcast-copy">WeatherNext model · hourly surface forecasts with a 64-member ensemble. This forecast is shown separately from the NWS/HRRR/ECMWF/NBM rain blend until we validate how it should be weighted for your site.</p></div><div class="graphcast-badges"><span class="graphcast-badge">${connected?'Connected feed':'Awaiting WeatherNext feed'}</span><span class="graphcast-badge safe">Comparison only</span></div></div>${body}<p><a class="graphcast-link" href="${WEATHERNEXT_SOURCE}" target="_blank" rel="noopener noreferrer">About WeatherNext ↗</a> <a class="graphcast-link weathernext-access" href="${WEATHERNEXT_ACCESS}" target="_blank" rel="noopener noreferrer">Access setup ↗</a></p></section>`;
+  return `<section class="graphcast-card weathernext-card" aria-label="NVIDIA forecast using WeatherNext data"><div class="graphcast-head"><div><h3 class="graphcast-title"><span class="graphcast-orb" aria-hidden="true">W3</span>NVIDIA Forecast</h3><p class="graphcast-copy">${esc(participation.copy)}</p></div><div class="graphcast-badges"><span class="graphcast-badge">${connected?'Model details available':'Model details unavailable'}</span><span class="graphcast-badge safe">${esc(participation.badge)}</span></div></div>${body}<p><a class="graphcast-link" href="${WEATHERNEXT_SOURCE}" target="_blank" rel="noopener noreferrer">About WeatherNext ↗</a> <a class="graphcast-link weathernext-access" href="${WEATHERNEXT_ACCESS}" target="_blank" rel="noopener noreferrer">Access setup ↗</a></p></section>`;
 }
 function syncWeatherNextStatus(forecast) {
   if(typeof document==='undefined'||!experimentalPath())return;
   const status=document.getElementById('google-status');
   if(!status)return;
-  const key=weatherNextKey(forecast),same=key&&weatherNextState.key===key,state=weatherNextState;
-  if(!same||state.status==='idle'||state.status==='loading'){
-    status.textContent='NVIDIA WeatherNext: checking the authorized hosted feed for this location.';
-  }else if(state.status==='ready'){
-    const zone=zoneFor(forecast),run=stamp(state.runAt,zone);
-    status.textContent=`NVIDIA WeatherNext is connected on Experimental Weather. Latest hosted run: ${run}. It is comparison-only and does not change the NWS/HRRR/ECMWF/NBM rain blend.`;
-  }else if(state.status==='not-covered'){
-    status.textContent='NVIDIA WeatherNext is connected, but the published point feed does not cover this selected location yet. The normal forecast remains unchanged.';
-  }else{
-    status.textContent='NVIDIA WeatherNext is not connected yet. Real-time WeatherNext data requires approved WeatherNext access and the linked forecast feed configured in GitHub.';
-  }
+  const participation=weatherNextParticipation(forecast),zone=zoneFor(forecast);
+  status.textContent=`${participation.copy}${participation.contributes && participation.runAt ? ` Forecast run: ${stamp(participation.runAt,zone)}.` : ''}`;
 }
 function queueWeatherNextLoad(forecast) {
   if(typeof window==='undefined'||typeof fetch!=='function')return;
@@ -244,11 +248,19 @@ function queueWeatherNextLoad(forecast) {
   });
 }
 
+function nvidiaRainMethod(forecast, peak) {
+  const participation = weatherNextParticipation(forecast);
+  if (participation.requestedWeight === null) return null;
+  const shares = sourceRows(peak).filter(source => source.weight !== null).map(source => `${names[source.id]} ${number(source.weight * 100,4)} points`).join(', ');
+  return `<details class="model-method" data-model-detail="method"><summary>How the inputs are used</summary><p>${esc(participation.copy)}${shares ? ` The selected highest hour uses these recorded shares: ${esc(shares)}.` : ''} The NWS hourly probability fills its recorded share proportionally. Each model's hourly precipitation amount supplies its own rain signal.</p><p>A positive model amount through 0.010 in gets exactly one-third of that model's points. An amount above 0.010 in gets full points only if NWS is at least 20% or another included model also exceeds 0.010 in. An uncorroborated signal gets one-third. Repeated hours from one model do not count as corroboration. Zero rain gets zero points. The points are added and the result is capped at 100%. Rainfall amount is calculated separately. An unavailable model adds no points. This is an uncalibrated estimate, not a proven model-accuracy ranking.</p></details>`;
+}
+
 export function modelExplanationHTML(forecast, options = {}) {
   const view = modelExplanationView(forecast,options), {day,zone,period,rows,peak,phase} = view;
   const choices = (forecast?.days || []).map((row,index)=>`<option value="${index}"${index===view.index?' selected':''}>${esc(dayLabel(row.date,index))}</option>`).join('');
   const phaseOptions = Object.entries(phaseNames).map(([key,name])=>`<option value="${key}"${key===phase?' selected':''}>${name}</option>`).join('');
   const temperatures = temperatureBlend(day,'high')+temperatureBlend(day,'low');
+  const nvidiaMethod = nvidiaRainMethod(forecast,peak);
   const audit = rows.map(row=>`<details class="model-hour-audit" data-model-detail="hour-${esc(row.time)}"${row.time===view.peakTime?' data-peak="true"':''}><summary><span>${esc(stamp(row.time,zone))}</span><strong>${percent(row.rainLikelihood?.value)}</strong></summary>${sourceTable(row.rainLikelihood,'Hourly inputs')}${arithmetic(row.rainLikelihood)}</details>`).join('');
   return `<div class="model-explanation-heading"><h2 id="model-explanation-title">Why this forecast</h2><div class="model-selectors"><label>Day<select aria-label="Day" data-model-day>${choices}</select></label><label>Period<select aria-label="Period" data-model-phase>${phaseOptions}</select></label></div></div>
     <div class="model-period"><strong>${percent(view.value)}</strong><span>${phaseNames[phase]} · highest hourly blended estimate<small>${esc(stamp(period.window?.start,zone))} – ${esc(stamp(period.window?.end,zone))}</small></span></div>
@@ -257,7 +269,7 @@ export function modelExplanationHTML(forecast, options = {}) {
     ${!view.complete?`<p class="model-data-warning">Incomplete coverage: ${number(period.coverage?.availableHours)} of ${number(period.coverage?.expectedHours)} hours. The period estimate stays unavailable.${view.maximum===null?'':` Highest available hour: ${percent(view.maximum)}.`}</p>`:''}
     ${view.peakTime?`<h3>Highest hour: ${esc(stamp(view.peakTime,zone))}–${esc(stamp(view.peakEnd,zone,false))}</h3>`:''}
     ${sourceTable(peak)}${arithmetic(peak)}
-    <details class="model-method" data-model-detail="method"><summary>How the inputs are used</summary><p>For today at the selected location, the NWS hourly probability fills its 40-point share proportionally. A 40% NWS chance contributes 16 points. HRRR is worth 30 points, ECMWF 10, and NBM 20. For later days, NWS fills a 15-point share, ECMWF 60, and NBM 25; HRRR is excluded. A positive model amount through 0.010 in gets exactly one-third of that model's points. An amount above 0.010 in gets full points only if NWS is at least 20% or another included model also exceeds 0.010 in. Otherwise it gets one-third: an unsupported ECMWF signal on a later day adds 20 points, not 60. Repeated hours from the same model do not count as corroboration. Zero rain gets zero points.</p><p>The points are added and the result is capped at 100%. For example, using today's shares, NWS 7% contributes 2.8 points; ECMWF at 0.004 in contributes 3.3333 points; and NBM at 0.010 in contributes 6.6667 points. The total is 12.8%, shown as 13%. Rainfall amount is calculated separately. An unavailable model adds no points. This is an uncalibrated estimate, not a proven model-accuracy ranking.</p></details>
+    ${nvidiaMethod || `<details class="model-method" data-model-detail="method"><summary>How the inputs are used</summary><p>For today at the selected location, the NWS hourly probability fills its 40-point share proportionally. A 40% NWS chance contributes 16 points. HRRR is worth 30 points, ECMWF 10, and NBM 20. For later days, NWS fills a 15-point share, ECMWF 60, and NBM 25; HRRR is excluded. A positive model amount through 0.010 in gets exactly one-third of that model's points. An amount above 0.010 in gets full points only if NWS is at least 20% or another included model also exceeds 0.010 in. Otherwise it gets one-third: an unsupported ECMWF signal on a later day adds 20 points, not 60. Repeated hours from the same model do not count as corroboration. Zero rain gets zero points.</p><p>The points are added and the result is capped at 100%. For example, using today's shares, NWS 7% contributes 2.8 points; ECMWF at 0.004 in contributes 3.3333 points; and NBM at 0.010 in contributes 6.6667 points. The total is 12.8%, shown as 13%. Rainfall amount is calculated separately. An unavailable model adds no points. This is an uncalibrated estimate, not a proven model-accuracy ranking.</p></details>`}
     <details class="model-hourly-list" data-model-detail="hours"><summary>All ${rows.length} forecast hours in this period</summary>${audit||'<p>No hourly calculation data was supplied.</p>'}</details>
     ${temperatures?`<details class="model-temperature-list" data-model-detail="temperatures"><summary>Temperature calculations</summary>${temperatures}</details>`:''}
     <details class="model-source-list" data-model-detail="sources"><summary>Source runs and availability</summary>${sourceStatus(forecast,view)}</details>`;

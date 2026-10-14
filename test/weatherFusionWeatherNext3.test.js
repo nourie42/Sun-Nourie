@@ -16,10 +16,12 @@ test('Experimental Weather links to the separate WeatherNext site without embedd
   assert.doesNotMatch(renderer, /installWeatherNextMapControl|syncWeatherNextStatus|queueWeatherNextLoad/);
 });
 
-test('WeatherNext remains separate from the current PoP math', async () => {
+test('NVIDIA evidence includes canonical WeatherNext inputs without inventing model PoP from the details feed', async () => {
   const js = await text('public/weather-fusion/model-explanation.js');
-  assert.match(js, /return \['nws','hrrr','ecmwf','nbm'\]\.map/);
-  assert.doesNotMatch(js, /return \['nws','hrrr','ecmwf','nbm','weathernext'\]\.map/);
+  assert.match(js, /sourceIds = \['nws','hrrr','ecmwf','nbm','wn'\]/);
+  assert.match(js, /canonical\?\.status === 'ready' && canonical\?\.contributes === true/);
+  const loader = js.slice(js.indexOf('function queueWeatherNextLoad'), js.indexOf('function nvidiaRainMethod'));
+  assert.doesNotMatch(loader, /forecast\.google\s*=|forecast\.feeds\s*=|forecast\.modelContributions\s*=/);
 });
 
 test('WeatherNext collector reads BigQuery surface statistics without inventing PoP', async () => {

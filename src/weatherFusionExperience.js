@@ -33,7 +33,7 @@ export function parseWind(text) {
 }
 function modelSample(models,time,field,ids) {
  for(const id of ids){const m=models[id];if(!m?.direct&&!m?.verifiedModel)continue;if(field==='pressure_msl'&&m.hourly_units?.pressure_msl!=='inHg')continue;if(field==='visibility'&&m.hourly_units?.visibility!=='mi')continue;const i=m.hourly?.time?.indexOf(time/1000);const value=i>=0?m.hourly[field]?.[i]:null;
-  if(finite(value))return {value,source:id.toUpperCase(),runAt:m.runAt};}
+  if(finite(value))return {value,source:id.toUpperCase(),runAt:m.hourlyProvenance?.[i]?.runAt||m.runAt};}
  return {value:null,source:null};
 }
 const COMPASS=['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
@@ -48,10 +48,12 @@ export function addExperience(out,{models={},grid,periods=[],now,solarTimes,next
  const source=(value,name)=>({value:num(value),source:finite(value)?name:null});
  const choose=(...items)=>items.find(x=>finite(x.value))||{value:null,source:null};
  const zone=out.location.timeZone;
+ const modelIds=['hrrr','ecmwf','nbm',...(models.wn?.verifiedModel?['wn']:[])];
  const mix=(official,time,field)=>{
    const values={nws:official};
-   for(const id of ['hrrr','ecmwf','nbm'])values[id]=modelSample(models,time,field,[id]).value;
-   const result=weighted(values,temperaturePolicy(forecastDayIndex(time,now,zone)));
+   for(const id of modelIds)values[id]=modelSample(models,time,field,[id]).value;
+   const result=weighted(values,temperaturePolicy(forecastDayIndex(time,now,zone),finite(values.wn)));
+   result.sources=result.sources.map(item=>item.id==='wn'?{...item,runAt:modelSample(models,time,field,['wn']).runAt}:item);
    return {...result,source:result.sources.map(s=>`${s.id.toUpperCase()} ${Math.round(s.weight*100)}%`).join(' / ')||null};
  };
  const raw=[];
@@ -68,8 +70,8 @@ export function addExperience(out,{models={},grid,periods=[],now,solarTimes,next
    const cloud=mix(gridSample(grid,'skyCover',epoch,'percent'),epoch,'cloud_cover');
    h.gust=round(gust.value);h.gustBlend=gust;
    const directions={nws:gridSample(grid,'windDirection',epoch,'direction')??(!modelGuidance&&COMPASS.includes(h.windDirection)?COMPASS.indexOf(h.windDirection)*22.5:null)};
-   for(const id of ['hrrr','ecmwf','nbm'])directions[id]=modelSample(models,epoch,'wind_direction_10m',[id]).value;
-   h.officialWindDirection=h.windDirection;h.windDirectionBlend=mixWindDirection(directions,temperaturePolicy(forecastDayIndex(epoch,now,zone)));
+   for(const id of modelIds)directions[id]=modelSample(models,epoch,'wind_direction_10m',[id]).value;
+   h.officialWindDirection=h.windDirection;h.windDirectionBlend=mixWindDirection(directions,temperaturePolicy(forecastDayIndex(epoch,now,zone),finite(directions.wn)));
    h.windDirectionDegrees=round(h.windDirectionBlend.value);h.windDirection=finite(h.windDirectionDegrees)?COMPASS[Math.round(h.windDirectionDegrees/22.5)%16]:null;
    raw.push({epoch,time,temperature:h.temperature,dewpoint:dewpoint.value,humidity,wind:wind.value});
    fieldsByTime.set(epoch,{temperature:{...source(h.temperature,'Forecast blend'),sources:h.temperatureBlend?.sources},dewpoint,wind,humidity:source(humidity,'Consistent forecast temperature + dew point'),gust,visibility,pressure,cloud,
@@ -108,6 +110,10 @@ export function addExperience(out,{models={},grid,periods=[],now,solarTimes,next
      feels:'Same all-weather equation for every forecast hour. Temperature, dew point and wind are blended consistently. A bounded near-term station residual fades out over three hours; raw inputs and the adjustment are retained. Not a measured skin temperature or guaranteed forecast.',
      dewpoint:'Current dew point is a station observation. The graph is forecast data, not a replay of that observation. Forecast hours start at NWS 40% / HRRR 30% / ECMWF 10% / NBM 20%; absent inputs are renormalized. Coarse model samples are interpolated, not independent hourly predictions.',
      precipitation:'Hourly liquid-equivalent amounts; coarse source intervals are apportioned uniformly, not minute-exact timing.',wind:'NWS, HRRR, ECMWF and NBM numeric speeds; forecast starting weights 40/30/10/20, renormalized for missing sources.',solar:'Astronomical sunrise and sunset, not sunshine duration.'}};
+ if(out.google?.contributes) {
+   out.metricForecasts.notes.dewpoint='Current dew point is a station observation. Matching forecast inputs start at NWS 36% / HRRR 27% / ECMWF 9% / NBM 18% / NVIDIA WeatherNext 10%. Missing NVIDIA hours use the existing available-model policy; unavailable fields remain missing.';
+   out.metricForecasts.notes.wind='Timestamp-matched numeric speeds include NVIDIA WeatherNext at a 10% starting share where verified data is available. Other model shares retain their relative proportions; missing inputs are excluded.';
+ }
  out.comfort=thermalComfort(out.current,out.location,now);
  out.experienceVersion=EXPERIENCE_VERSION;
  for(const d of out.days)d.nightCondition=eveningPeriod(periods,d.date,zone,now)?.shortForecast||'';
