@@ -5,6 +5,11 @@ on:
     paths:
       - scripts/weather_weathernext_site_collect.py
       - public/weather-fusion/weathernext-catalog.json
+      - .github/workflows/weathernext-full-data.yml
+  schedule:
+    # Main 00/06/12/18 UTC runs reach BigQuery about 8h10m later.
+    # Leave publication margin; GitHub may delay scheduled jobs.
+    - cron: '45 2,8,14,20 * * *'
   workflow_dispatch:
 permissions:
   contents: write

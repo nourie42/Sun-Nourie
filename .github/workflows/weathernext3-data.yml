@@ -69,5 +69,13 @@ jobs:
           git add -- models/weathernext3.json
           if ! git diff --cached --quiet; then
             git commit -m 'Refresh Google WeatherNext 3 point forecasts'
-            git push origin HEAD:weather-fusion-data
+            # Other collectors publish unrelated files to this shared branch.
+            # Rebase before retrying rather than losing a valid new forecast.
+            for attempt in 1 2 3 4 5; do
+              git fetch origin weather-fusion-data
+              git rebase FETCH_HEAD
+              if git push origin HEAD:weather-fusion-data; then exit 0; fi
+              sleep 3
+            done
+            exit 1
           fi
