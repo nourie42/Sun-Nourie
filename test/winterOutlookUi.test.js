@@ -1,6 +1,27 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {snowDetailHTML,snowBannerSummary,snowForecastPresent,winterOutlookState,safeWinterMapUrl,winterMapDescriptors,winterPointAmount,winterPointInBounds,winterPointPopupHTML,winterSnowDays,winterSnowMapForDay,winterDayAmount,winterMapsHTML} from '../public/weather-fusion/snow-outlook.js';
+import {snowDetailHTML,snowBannerSummary,snowForecastPresent,winterOutlookState,safeWinterMapUrl,winterMapDescriptors,winterPointAmount,winterPointInBounds,winterPointPopupHTML,winterSnowDays,winterSnowMapForDay,winterDayAmount,winterMapsHTML,winterAreaDataUrl} from '../public/weather-fusion/snow-outlook.js';
+
+test('Cortland model-estimate snow uses its exact daily regional field instead of a partial WPC period',()=>{
+ const start='2026-10-17T04:00:00.000Z',end='2026-10-18T04:00:00.000Z';
+ const day={date:'2026-10-17',label:'Sat',index:3,snowExpected:true,amountWindow:{start,end},displaySnowfall:{value:.1,source:'Available model guidance',status:'partial',start,end},snowEventWindows:[{start:'2026-10-17T06:00:00Z',end:'2026-10-17T18:00:00Z'}]};
+ const model={id:'model-saturday',source:'model-grid',kind:'geojson',quantity:'snowfall',start,end,sourceUrl:'https://open-meteo.com/en/docs'};
+ const snow={status:'partial',days:[day],maps:[{id:'wpc-partial',kind:'geojson',quantity:'snowfall',start:'2026-10-16T12:00:00Z',end:'2026-10-17T12:00:00Z'},model]};
+ assert.equal(winterSnowMapForDay(snow,day),model);
+ const html=snowDetailHTML(snow,'Cortland, NY','America/New_York');
+ assert.match(html,/data-map-id="model-saturday"/);assert.match(html,/Forecast snowfall totals map/);assert.match(html,/Model forecast data/);
+ assert.doesNotMatch(html,/WPC snowfall map/);
+});
+
+test('regional model map URLs preserve exact periods and reject unsupported or unbounded requests',()=>{
+ const start='2026-10-17T04:00:00.000Z',end='2026-10-18T04:00:00.000Z';
+ const params={kind:'model-grid',lat:'42.60118',lon:'-76.18048',start,end,segments:JSON.stringify([{start,end,models:['ecmwf','gfs']}])};
+ const url=changes=>'/api/weather-fusion/winter-map?'+new URLSearchParams({...params,...changes});
+ const accepted=winterAreaDataUrl(url({}));assert.ok(accepted);
+ assert.equal(new URL(accepted,'https://test.invalid').searchParams.get('segments'),params.segments);
+ for(const changes of [{lat:'90'},{end:'2026-10-20T04:00:00Z'},{segments:JSON.stringify([{start,end,models:['unapproved']}])},{segments:JSON.stringify([{start:'2026-10-17T05:00:00Z',end,models:['ecmwf']}])},{segments:'not json'}])assert.equal(winterAreaDataUrl(url(changes)),null);
+ assert.equal(winterAreaDataUrl('https://external.invalid'+url({})),null);
+});
 
 test('automatic winter tile requires snow while the Snow tab can still inspect ice guidance',()=>{
  const ice={status:'ready',snowExpected:false,possible:true,days:[{index:0,snowExpected:false,freezingRainPossible:true,freezingRainChance:60}]};

@@ -3,6 +3,7 @@
 import { WINTER_WEIGHTS, winterWeights, winterIntervalAmount, blendWinterAmounts } from './weatherFusionWinterModels.js';
 import {createWpcSnowAmountService} from './weatherFusionWpcSnowAmounts.js';
 import {nwsSnowPhaseWindows} from './weatherFusionNwsSnowTiming.js';
+import {modelSnowMapDescriptor} from './weatherFusionModelSnowMap.js';
 export const SNOW_VERSION = 'snow-outlook-v4';
 const MM_PER_IN = 25.4, CM_PER_IN = 2.54, HOUR = 3600000;
 const finite = value => typeof value === 'number' && Number.isFinite(value);
@@ -323,7 +324,7 @@ export function addSnowOutlook(output, { grid, periods = [], snowModels, winterM
   const status = known === 0 ? 'unavailable' : rows.every(row => row.coverageStatus === 'ready') ? 'ready' : 'partial';
   const sum = key => { const values = rows.map(key).filter(finite); return values.length ? round(values.reduce((total, value) => total + value, 0)) : null; };
   output.snow = { version: SNOW_VERSION, status, coverageStatus: status, possible: rows.some(row => row.possible) || !!wssi, snowExpected: rows.some(row => row.snowExpected), days: rows, wssi, blendWindows,
-    weights: WINTER_WEIGHTS, maps: Array.isArray(wpcWinter?.maps) ? wpcWinter.maps : [],
+    weights: WINTER_WEIGHTS, maps: [...rows.map(row=>modelSnowMapDescriptor(row,output.location)).filter(Boolean),...(Array.isArray(wpcWinter?.maps) ? wpcWinter.maps : [])],
     stormTotal: { nws: sum(row => row.nwsSnowfall), ecmwf: sum(row => row.models.ecmwf), gfs: sum(row => row.models.gfs) },
     sources: { nwsGrid: !!gridIntervals?.length, nwsGridThrough: gridIntervals?.length ? new Date(Math.max(...gridIntervals.map(row => row.end))).toISOString() : null, models: Object.values(winterModels).some(model => Array.isArray(model?.intervals)) || !!snowModels, wpcWinter: wpcRows.length > 0, wpcAmounts: wpcAmounts.length > 0, nbm: !!nbm, weathernextWinter: false },
     notes: 'Snow amounts and type probabilities are separate. Within 24 hours: WPC 60%, HRRR 25%, NAM 15%; later: WPC 60%, ECMWF 20%, WeatherNext 10%, GFS 10%. WPC expected deterministic snowfall uses its published 24-hour contour periods and conservative contour lower bounds, with contour uncertainty propagated. HRRR, NAM, ECMWF and GFS are integrated over exactly those periods. No hourly WPC allocation is invented. Calendar-day guidance remains separate when periods differ. Missing shares are shown and available amount weights normalized. WPC threshold probabilities are not snowfall amounts. WeatherNext winter phase may be unavailable. NWS NBM supplies supplemental native type probabilities as peak hourly chance, never a combined daily chance. Forecast amounts can change with snow-to-liquid ratios.' };

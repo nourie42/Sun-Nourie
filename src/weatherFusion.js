@@ -28,6 +28,7 @@ import {validateCurrentConditions} from './weatherFusionCurrent.js';
 import {applyObservedSky} from './weatherFusionObservedSky.js';
 import {addSnowOutlook,createWpcWinterService} from './weatherFusionSnow.js';
 import {createWinterModelService} from './weatherFusionWinterModels.js';
+import {createModelSnowMapService} from './weatherFusionModelSnowMap.js';
 import {COMFORT_SCENE_ASSETS} from '../public/weather-fusion/exposure-scene.js';
 
 export const PRESETS = [
@@ -436,6 +437,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
   const cached = (url, ttl, options) => cache.get(url, ttl, async () => ({ data: await request(url, options), fetchedAt: iso(now()) }));
   const loadWpcWinter = createWpcWinterService({ cached, now, fetchImpl });
   const loadWinterModels = createWinterModelService({ cached, now });
+  const loadModelSnowMap = createModelSnowMapService({ cached, now });
   async function feed(id, label, url, ttl, transform = (d) => d, options) {
     try {
       const { data, fetchedAt } = await cached(url, ttl, options);
@@ -688,7 +690,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
     const kind=String(query.kind||'').toLowerCase();
     return sanitizeOutlookDetail(await loadOutlookDetail({kind,location}));
   }
-  return { getForecast, getAlerts, getBriefing, getBulletins, getOutlook, search, radar, modelMaps: direct.maps, getWinterMap:loadWpcWinter.map };
+  return { getForecast, getAlerts, getBriefing, getBulletins, getOutlook, search, radar, modelMaps: direct.maps, getWinterMap:query=>query?.kind==='model-grid'?loadModelSnowMap(query):loadWpcWinter.map(query) };
 }
 
 export function registerWeatherFusionRoutes(app, options = {}) {
