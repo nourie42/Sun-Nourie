@@ -96,7 +96,7 @@ try{
   const before=report.externalRequests.length;await page.locator('[data-winter-map="snow"]').click();await page.locator('#winter-snow-period').waitFor();await page.waitForFunction(()=>/NWS 6-hour snow amount/.test(document.getElementById('winter-map-status').textContent));
   assert.ok(report.externalRequests.slice(before).some(url=>/GetCapabilities/i.test(url)));
   await page.waitForTimeout(300);const tiles=report.externalRequests.filter(url=>/GetMap/i.test(url)&&url.includes('/ndfd/snow/'));
-  assert.ok(tiles.length);await page.waitForFunction(()=>{const tiles=[...document.querySelectorAll('#winter-map-canvas .leaflet-tile')];return tiles.length>0&&tiles.every(img=>img.complete&&img.naturalWidth>0);});assert.ok(tiles.every(url=>new URL(url).searchParams.get('time')||new URL(url).searchParams.get('TIME')));
+  assert.ok(tiles.length);await page.waitForFunction(()=>{const tiles=[...document.querySelectorAll('#winter-map-canvas .leaflet-tile')];return tiles.length>0&&tiles.every(img=>img.complete&&img.naturalWidth>0&&Number(getComputedStyle(img).opacity)>.5);});assert.ok(tiles.every(url=>new URL(url).searchParams.get('time')||new URL(url).searchParams.get('TIME')));
   assert.match(await page.locator('#winter-map-legend').innerText(),/one interval, not the entire storm/);await page.locator('#winter-snow-period').selectOption(iso(8));await page.locator('#winter-map-canvas').scrollIntoViewIfNeeded();await page.waitForTimeout(300);await capture('390-snow-total-map',{fullPage:false});
  });
  await check('Expected precip and heavy snow risk keep correct units and provenance',async()=>{

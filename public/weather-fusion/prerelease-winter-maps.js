@@ -53,7 +53,7 @@ function setupMap({data,canvas,setMap,status,isCurrent}){
   const L=window.L,location=data?.location;
   if(!L||!finite(location?.latitude)||!finite(location?.longitude))throw new Error('Choose a forecast location and retry the map.');
   canvas.hidden=false;
-  const map=L.map(canvas,{scrollWheelZoom:false,zoomControl:true}).setView([location.latitude,location.longitude],6);
+  const map=L.map(canvas,{scrollWheelZoom:false,zoomControl:true,fadeAnimation:!window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches}).setView([location.latitude,location.longitude],6);
   setMap(map);addBase(map,L,status,isCurrent);
   L.circleMarker([location.latitude,location.longitude],{radius:6,color:'#12263a',weight:2,fillColor:'#fff',fillOpacity:1}).addTo(map).bindTooltip('Selected forecast location');
   requestAnimationFrame(()=>{if(isCurrent())map.invalidateSize();});
@@ -75,11 +75,11 @@ export async function loadOfficialWinterMap(options){
     const choose=time=>{
       if(layer)map.removeLayer(layer);failed=false;
       const end=Date.parse(time),period=`NWS 6-hour snow amount · ${clock(end-6*HOUR,zone)} to ${clock(end,zone)}`;
-      status.textContent=period+' · Loading';
+      status.textContent=period+' · Retrieved '+clock(now,zone)+' · Loading';
       const active=L.tileLayer.wms(url,{layers:'snow',styles:'nws_snow_accum',format:'image/png',transparent:true,version:'1.3.0',time,opacity:.85,attribution:'Snow forecast: NOAA / NWS NDFD'}).addTo(map);
       layer=active;
       active.on('tileerror',()=>{failed=true;if(isCurrent()&&layer===active)status.textContent=period+' · Some snow tiles are unavailable. Blank areas are not a no-snow forecast.';});
-      active.on('load',()=>{if(isCurrent()&&layer===active&&!failed)status.textContent=period;});
+      active.on('load',()=>{if(isCurrent()&&layer===active&&!failed)status.textContent=period+' · Retrieved '+clock(now,zone);});
     };
     choose(times[0]);legend.querySelector('select').addEventListener('change',event=>choose(event.target.value));
     return;
