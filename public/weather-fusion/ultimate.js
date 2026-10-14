@@ -8,7 +8,7 @@ const finite = (v) => typeof v === 'number' && Number.isFinite(v);
 const WN_FEED = 'https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/weathernext-full.json';
 
 let forecast = null, wnFeed = null, wnCatalog = null;
-let loc = 'knightdale';
+let loc = ['knightdale','greenville','hazen'].includes(new URLSearchParams(location.search).get('location'))?new URLSearchParams(location.search).get('location'):'knightdale';
 let wnField = 'temperature_2m';
 let skyFlip = false;
 
@@ -349,5 +349,6 @@ el('loc-select').addEventListener('change', (e) => {
   load();
 });
 
+el('loc-select').value=loc;
 load();
 if(typeof window!=='undefined')installForecastRefresh(load);

@@ -31,6 +31,7 @@ import {addSnowOutlook,snowModelsUrl,normalizeSnowModels,createWpcWinterService}
 export const PRESETS = [
   { id: 'knightdale', name: 'Knightdale / Raleigh', latitude: 35.787, longitude: -78.4806 },
   { id: 'greenville', name: 'Greenville, NC', latitude: 35.6127, longitude: -77.3664 },
+  { id: 'hazen', name: 'Hazen, ND', latitude: 47.2944, longitude: -101.6227 },
 ];
 export const RADAR_URL = 'https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows';
 export const RADAR_NEARBY_MILES = 12;
