@@ -15,7 +15,7 @@ export function weatherChangeMessages(data,now=Date.now()){
  for(let j=1;j<days.length;j++){
   for(let i=0;i<j;i++){
    if(finite(temps[i])&&finite(temps[j])&&Math.abs(temps[j]-temps[i])>20&&!messages.some(m=>m.kind==='temperature'))messages.push({kind:'temperature',text:`A ${temps[j]>temps[i]?'warmer':'colder'} stretch is ahead: average daytime temperatures ${temps[j]>temps[i]?'rise':'fall'} more than 20°F from ${label(days[i])} to ${label(days[j])}.`});
-   if(finite(dew[i])&&finite(dew[j])&&Math.abs(dew[j]-dew[i])>20&&!messages.some(m=>m.kind==='dewpoint'))messages.push({kind:'dewpoint',text:`${dew[j]>dew[i]?'Gross meter detecting high humidity':'Gross meter is tracking drier conditions'}: average daytime dew point ${dew[j]>dew[i]?'rises':'falls'} more than 20°F from ${label(days[i])} to ${label(days[j])}.`});
+   if(finite(dew[i])&&finite(dew[j])&&Math.abs(dew[j]-dew[i])>20&&!messages.some(m=>m.kind==='dewpoint'))messages.push({kind:'dewpoint',text:`${dew[j]>dew[i]?'Feel Meter detecting high humidity':'Feel Meter is tracking drier conditions'}: average daytime dew point ${dew[j]>dew[i]?'rises':'falls'} more than 20°F from ${label(days[i])} to ${label(days[j])}.`});
   }
   const d=days[j],before=days.slice(j-2,j);
   if(j>=2&&before.every(dry)&&consecutive(before[0],before[1])&&consecutive(before[1],d)&&finite(d.pop)&&d.pop>75&&finite(d.qpf)&&d.qpf>.25&&['moderate','high'].includes(d.confidence?.key)&&!messages.some(m=>m.kind==='rain'))messages.push({kind:'rain',text:`Rain returns ${label(d)} after two dry days: ${d.pop}% chance, with ${Number(d.qpf.toFixed(2))} inches expected and ${d.confidence.key} confidence.`});

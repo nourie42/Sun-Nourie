@@ -29,7 +29,9 @@ import {applyObservedSky} from './weatherFusionObservedSky.js';
 import {addSnowOutlook,createWpcWinterService} from './weatherFusionSnow.js';
 import {createWinterModelService} from './weatherFusionWinterModels.js';
 import {createModelSnowMapService} from './weatherFusionModelSnowMap.js';
+import {retainOfficialFeed,criticalOfficialUrl,validateOfficialPayload} from './weatherFusionOfficialRecovery.js';
 import {COMFORT_SCENE_ASSETS} from '../public/weather-fusion/exposure-scene.js';
+import {recoverForecastHours,recoverDailyConditions} from './weatherFusionFallback.js';
 
 export const PRESETS = [
   { id: 'knightdale', name: 'Knightdale / Raleigh', latitude: 35.787, longitude: -78.4806 },
@@ -284,20 +286,21 @@ export function summarizeRadarMotion(current,previous){
  return {approaching,previousObservedAt:finite(previousTime)?iso(previousTime):null,previousNearestRainMiles:finite(previousDistance)?previousDistance:null,distanceChangeMiles:distanceChange};
 }
 
-/** Bounded in-process cache with concurrent request de-duplication and no stale fallback. */
+/** Bounded cache; callers explicitly validate any retained value on failure. */
 export class Cache {
   constructor(limit = 350, now = Date.now) { this.values = new Map(); this.pending = new Map(); this.limit = limit; this.now = now; }
-  async get(key, ttl, load) {
+  async get(key, ttl, load, {onError} = {}) {
     const hit = this.values.get(key);
     if (hit && hit.expires > this.now()) return hit.value;
     if (this.pending.has(key)) return this.pending.get(key);
-    if (this.pending.size >= 50) throw errorWithStatus('Weather sources are busy. Please retry shortly.', 429);
+    const recover=error=>{if(hit&&onError)return onError(error,hit.value);throw error;};
+    if (this.pending.size >= 50) return recover(errorWithStatus('Weather sources are busy. Please retry shortly.', 429));
     const work = Promise.resolve().then(load).then((value) => {
       this.values.delete(key);
       if (this.values.size >= this.limit) this.values.delete(this.values.keys().next().value);
       this.values.set(key, { value, expires: this.now() + ttl });
       return value;
-    }).finally(() => this.pending.delete(key));
+    }).catch(recover).finally(() => this.pending.delete(key));
     this.pending.set(key, work);
     return work;
   }
@@ -307,7 +310,7 @@ export function withoutAviation(text=''){
  return text.replace(/(^|\n)\.(?:AVIATION)[^\n]*\n[\s\S]*?(?=\n\.[A-Z][A-Z /]*(?:\.\.\.|\s)|$)/gi,'').trim();
 }
 export function buildForecast({ location, point, forecast, hourly, grid, discussion, observation, alerts, specialDiscussions, precipitationDiscussions, riskOutlooks, snowModels, winterModels, wpcWinter, exposureWeather, airQuality, models, feeds, now }) {
-  const zone = point?.timeZone || models.ecmwf?.timezone || 'America/New_York';
+  const zone = point?.timeZone || exposureWeather?.timezone || models.ecmwf?.timezone || 'America/New_York';
   const today = dateKey(now, zone);
   const rows = Object.fromEntries(Object.entries(models).map(([key, value]) => [key, normalizeModel(value, now, key === 'hrrr' ? 48 : 240)]));
   const periods = (forecast?.periods || []).filter((p) => Date.parse(p.endTime) > now);
@@ -352,22 +355,25 @@ export function buildForecast({ location, point, forecast, hourly, grid, discuss
       wind: clean(day?.windSpeed || night?.windSpeed, 60), windDirection: clean(day?.windDirection || night?.windDirection, 20) };
   });
   const officialHours = (hourly?.periods || []).filter((p) => Date.parse(p.endTime) > now).slice(0, 48);
-  const hours = officialHours.map((p) => {
+  const officialRows = officialHours.map((p) => {
     const time = Date.parse(p.startTime);
     // NWS hourly period starts at t; model accumulation for that hour ends at t + 1h.
     const find = (key, at = time) => rows[key]?.find((r) => r.time === at);
     const primary = find('hrrr') || find('ecmwf') || find('nbm');
     const rain = find('hrrr', time + HOUR)?.precipitation ?? find('ecmwf', time + HOUR)?.precipitation ?? null;
-    return { time: p.startTime, temperature: rounded(periodTemp(p)), pop: periodPop(p), condition: clean(p.shortForecast, 100), isDay: !!p.isDaytime,
+    return { time: p.startTime, temperature: rounded(periodTemp(p)), temperatureSource:'NWS hourly forecast', pop: periodPop(p), condition: clean(p.shortForecast, 100), conditionSource:'NWS hourly forecast', isDay: !!p.isDaytime,
       wind: clean(p.windSpeed, 50), windDirection: clean(p.windDirection, 20), humidity: numeric(p.relativeHumidity?.value),
       dewpoint: rounded(toF(p.dewpoint)), precipitation: rain, precipitationSource: finite(find('hrrr', time + HOUR)?.precipitation) ? 'HRRR guidance' : 'ECMWF guidance',
       apparent: rounded(primary?.apparent_temperature), gust: rounded(primary?.wind_gusts_10m) };
   });
+  const forecastLocation={...location,timeZone:zone};
+  const hours=recoverForecastHours({hours:officialRows,models,rows,exposureWeather,location:forecastLocation,now});
+  recoverDailyConditions(days,{hours,models,rows,exposureWeather,location:forecastLocation,now});
   const currentIndex = Math.floor(now / HOUR) * HOUR;
   const modelNow = rows.hrrr?.find((r) => r.time === currentIndex) || rows.ecmwf?.find((r) => r.time === currentIndex);
   const current = observation ? { ...observation, type: 'observation' } : {
     type: 'guidance', temperature: rounded(modelNow?.temperature_2m ?? hours[0]?.temperature),
-    condition: hours[0]?.condition || 'Current observation unavailable', time: iso(currentIndex), station: null,
+    condition: hours[0]?.condition || 'Current observation unavailable', conditionSource:hours[0]?.conditionSource || null, time: iso(currentIndex), station: null,
     humidity: rounded(modelNow?.relative_humidity_2m), dewpoint: rounded(modelNow?.dew_point_2m),
     wind: rounded(modelNow?.wind_speed_10m), gust: rounded(modelNow?.wind_gusts_10m),
     windDirection: numeric(modelNow?.wind_direction_10m), visibility: null, pressure: null };
@@ -399,7 +405,7 @@ export function buildForecast({ location, point, forecast, hourly, grid, discuss
 }
 
 export function createWeatherService({ fetchImpl = globalThis.fetch, env = process.env, now = Date.now } = {}) {
-  const cache = new Cache(350, now), forecastCache = new Cache(100, now), aiCache = new Cache(100, now);
+  const cache = new Cache(350, now), officialCache = new Cache(150, now), forecastCache = new Cache(100, now), aiCache = new Cache(100, now);
   const failureCooldown = new Map();
   const approvedTakes = new Map();
   const approvedSummaries=new Map();
@@ -434,18 +440,23 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
     if (Buffer.byteLength(raw) > 2500000) throw errorWithStatus('Source payload exceeded the safety limit.', 502);
     return text ? raw : JSON.parse(raw);
   }
-  const cached = (url, ttl, options) => cache.get(url, ttl, async () => ({ data: await request(url, options), fetchedAt: iso(now()) }));
+  const cached = (url, ttl, options) => (criticalOfficialUrl(url)?officialCache:cache).get(url, ttl, async () => {const data=await request(url,options);validateOfficialPayload(url,data);return {data,fetchedAt:iso(now())};},{
+    onError:(error,saved)=>{
+      if(!retainOfficialFeed(url,saved,now()))throw error;
+      return {...saved,recovered:true,recoveryReason:clean(error.message,160)};
+    },
+  });
   const loadWpcWinter = createWpcWinterService({ cached, now, fetchImpl });
   const loadWinterModels = createWinterModelService({ cached, now });
   const loadModelSnowMap = createModelSnowMapService({ cached, now });
   async function feed(id, label, url, ttl, transform = (d) => d, options) {
     try {
-      const { data, fetchedAt } = await cached(url, ttl, options);
+      const { data, fetchedAt, recovered, recoveryReason } = await cached(url, ttl, options);
       const value = await transform(data);
       if (value == null) throw new Error('Source did not supply usable data.');
       const issuedAt = value.issuanceTime || value.updateTime || value.generatedAt || value.time || null;
       const age = issuedAt ? now() - Date.parse(issuedAt) : 0;
-      return { value, meta: { id, label, status: age > 24 * HOUR ? 'stale' : 'ready', fetchedAt, issuedAt, url: url.replace(/([?&])apikey=[^&]*(&?)/, '$1').replace(/[?&]$/, '') } };
+      return { value, meta: { id, label, status: recovered || age > 24 * HOUR ? 'stale' : 'ready', fetchedAt, issuedAt, ...(recovered?{recovered:true,message:`Refresh failed; using verified official guidance fetched ${fetchedAt}. ${recoveryReason}`} : {}), url: url.replace(/([?&])apikey=[^&]*(&?)/, '$1').replace(/[?&]$/, '') } };
     } catch (e) { return { value: null, meta: { id, label, status: 'unavailable', fetchedAt: null, issuedAt: null, message: clean(e.message, 160), url: url.split('?')[0] } }; }
   }
   async function loadModel(id, location) { return direct.load(id, location); }
@@ -469,13 +480,13 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
       const unavailable = (id, label) => Promise.resolve({ value: null, meta: { id, label, status: 'unavailable', message: 'NWS location lookup unavailable.', issuedAt: null } });
       const get = (id, label, url, ttl, transform) => url ? feed(id, label, url, ttl, transform) : unavailable(id, label);
       const jobs = {
-        exposureWeather: feed('exposure','UV and surface-weather forecast',exposureWeatherUrl(location,point?.timeZone),30*MINUTE,normalizeExposureWeather),
-        winterModels: loadWinterModels(location),
-        wpcWinter: loadWpcWinter(location),
-        airQuality: feed('air-quality','Air quality (U.S. AQI)',airQualityUrl(location),30*MINUTE,normalizeAirQuality),
         forecast: get('nws', 'NWS forecast', point?.forecast, 2 * MINUTE, (d) => d.properties?.periods?.length ? d.properties : null),
         hourly: get('hourly', 'NWS hourly', point?.forecastHourly, 2 * MINUTE, (d) => d.properties?.periods?.length ? d.properties : null),
         grid: get('grid', 'NWS precipitation grid', point?.forecastGridData, 2 * MINUTE, (d) => d.properties),
+        exposureWeather: feed('exposure','UV and surface-weather forecast',exposureWeatherUrl(location,point?.timeZone||'auto'),30*MINUTE,normalizeExposureWeather),
+        winterModels: loadWinterModels(location),
+        wpcWinter: loadWpcWinter(location),
+        airQuality: feed('air-quality','Air quality (U.S. AQI)',airQualityUrl(location),30*MINUTE,normalizeAirQuality),
         alerts: liveAlerts.then(data=>({value:data.alerts,meta:data.feeds[0]})),
         discussion: loadDiscussion(point?.cwa),
         observation: point?.observationStations ? feed('observation', 'Nearby station observation', point.observationStations, 5 * MINUTE, async (d) => {
@@ -518,7 +529,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
         nbm: loadModel('nbm', location),
       };
       const values = Object.fromEntries(await Promise.all(Object.entries(jobs).map(async ([id, promise]) => [id, await promise])));
-      const data = Object.fromEntries(Object.entries(values).map(([id, f]) => [id, id==='alerts'||Array.isArray(f.meta)?f.value:(f.meta.status === 'ready' ? f.value : null)]));
+      const data = Object.fromEntries(Object.entries(values).map(([id, f]) => [id, id==='alerts'||Array.isArray(f.meta)?f.value:(f.meta.status === 'ready'||f.meta.recovered===true ? f.value : null)]));
       const feedMeta=[pointFeed.meta,...Object.values(values).flatMap(f=>Array.isArray(f.meta)?f.meta:[f.meta])];
       const result = buildForecast({ ...data, point, location, models: { hrrr: data.hrrr, ecmwf: data.ecmwf, nbm: data.nbm }, feeds: feedMeta, now: now() });
       // Access never exposes the provider credential or a made-up model run timestamp.

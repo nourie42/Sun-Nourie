@@ -58,15 +58,16 @@ export function addExperience(out,{models={},grid,periods=[],now,solarTimes,next
  const fieldsByTime=new Map();
  for(const h of out.hours) {
    const epoch=Date.parse(h.time),time=new Date(epoch).toISOString();
-   const wind=mix(gridSample(grid,'windSpeed',epoch,'wind')??parseWind(h.wind),epoch,'wind_speed_10m');
-   const dewpoint=mix(gridSample(grid,'dewpoint',epoch,'temperature')??h.dewpoint,epoch,'dew_point_2m');
+   const modelGuidance=h.forecastSource==='model-guidance';
+   const wind=mix(gridSample(grid,'windSpeed',epoch,'wind')??(modelGuidance?null:parseWind(h.wind)),epoch,'wind_speed_10m');
+   const dewpoint=mix(gridSample(grid,'dewpoint',epoch,'temperature')??(modelGuidance?null:h.dewpoint),epoch,'dew_point_2m');
    const humidity=humidityFromDewpoint(h.temperature,finite(dewpoint.value)?Math.min(h.temperature,dewpoint.value):null)??gridSample(grid,'relativeHumidity',epoch,'percent')??h.humidity;
    const gust=mix(gridSample(grid,'windGust',epoch,'wind'),epoch,'wind_gusts_10m');
    const visibility=mix(gridSample(grid,'visibility',epoch,'distance'),epoch,'visibility');
    const pressure=mix(gridSample(grid,'pressure',epoch,'pressure'),epoch,'pressure_msl');
    const cloud=mix(gridSample(grid,'skyCover',epoch,'percent'),epoch,'cloud_cover');
    h.gust=round(gust.value);h.gustBlend=gust;
-   const directions={nws:gridSample(grid,'windDirection',epoch,'direction')??(COMPASS.includes(h.windDirection)?COMPASS.indexOf(h.windDirection)*22.5:null)};
+   const directions={nws:gridSample(grid,'windDirection',epoch,'direction')??(!modelGuidance&&COMPASS.includes(h.windDirection)?COMPASS.indexOf(h.windDirection)*22.5:null)};
    for(const id of ['hrrr','ecmwf','nbm'])directions[id]=modelSample(models,epoch,'wind_direction_10m',[id]).value;
    h.officialWindDirection=h.windDirection;h.windDirectionBlend=mixWindDirection(directions,temperaturePolicy(forecastDayIndex(epoch,now,zone)));
    h.windDirectionDegrees=round(h.windDirectionBlend.value);h.windDirection=finite(h.windDirectionDegrees)?COMPASS[Math.round(h.windDirectionDegrees/22.5)%16]:null;

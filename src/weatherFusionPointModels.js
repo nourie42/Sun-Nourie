@@ -23,6 +23,12 @@ export function validatePointModel(data,meta,id,location,now){
   hourly[field]=values.map((v,i)=>times[i]*1000>run+(id==='hrrr'?48:240)*H?null:v);
   hourly_units[field]=unit;
  }
+ // Weather code is optional for older native fixtures/providers. It carries
+ // phase and thunder timing without guessing those from air temperature.
+ if(Array.isArray(raw.weather_code)&&raw.weather_code.length===times.length&&units.weather_code==='wmo code'){
+  hourly.weather_code=raw.weather_code.map((value,i)=>times[i]*1000>run+(id==='hrrr'?48:240)*H?null:Number.isInteger(value)&&value>=0&&value<=99?value:null);
+  hourly_units.weather_code='wmo code';
+ }
  const future=times.filter((t,i)=>t*1000>now&&finite(hourly.temperature_2m[i]));
  if(!future.length)throw new Error('No future named-model temperatures.');
  hourly.pressure_msl=hourly.pressure_msl.map(v=>finite(v)?v/33.86389:null);hourly_units.pressure_msl='inHg';
@@ -40,7 +46,7 @@ export function createPointModels({fetchImpl=globalThis.fetch,now=Date.now}={}){
  };
  async function json(url){
   const response=await fetchImpl(url,{cache:'no-store',headers:{Accept:'application/json','Cache-Control':'no-cache',Pragma:'no-cache','User-Agent':'Sun-Nourie-WeatherFusion/3.0'},redirect:'error',signal:AbortSignal.timeout(18000)});
-  if(!response.ok)throw new Error(`Named model request returned HTTP ${response.status}.`);
+  if(!response.ok)throw Object.assign(new Error(`Named model request returned HTTP ${response.status}.`),{status:response.status});
   const text=await response.text();if(text.length>2500000)throw new Error('Named model response too large.');return JSON.parse(text);
  }
  return async function load(id,location){
@@ -51,9 +57,19 @@ export function createPointModels({fetchImpl=globalThis.fetch,now=Date.now}={}){
   if(pending.has(key))return pending.get(key);
   if(pending.size>=50)throw new Error('Named model sources are busy. Please retry.');
   const task=(async()=>{
-   const query=new URLSearchParams({latitude:String(location.latitude),longitude:String(location.longitude),models:model.name,hourly:Object.keys(FIELDS).join(','),temperature_unit:'fahrenheit',wind_speed_unit:'mph',precipitation_unit:'inch',timeformat:'unixtime',timezone:'GMT',forecast_days:'10'});
+   const query=new URLSearchParams({latitude:String(location.latitude),longitude:String(location.longitude),models:model.name,hourly:[...Object.keys(FIELDS),'weather_code'].join(','),temperature_unit:'fahrenheit',wind_speed_unit:'mph',precipitation_unit:'inch',timeformat:'unixtime',timezone:'GMT',forecast_days:'10'});
    try{
-    const [data,metadata]=await Promise.all([json(`https://api.open-meteo.com/v1/forecast?${query}`),json(`https://api.open-meteo.com/data/${model.domain}/static/meta.json`)]);
+    const forecast=async()=>{
+     try{return await json(`https://api.open-meteo.com/v1/forecast?${query}`);}
+     catch(error){
+      if(error.status!==400)throw error;
+      // An optional condition field must not discard otherwise usable named
+      // model measurements if a provider does not support that field.
+      const required=new URLSearchParams(query);required.set('hourly',Object.keys(FIELDS).join(','));
+      return json(`https://api.open-meteo.com/v1/forecast?${required}`);
+     }
+    };
+    const [data,metadata]=await Promise.all([forecast(),json(`https://api.open-meteo.com/data/${model.domain}/static/meta.json`)]);
     const value=validatePointModel(data,metadata,id,location,now());
     if(hit?.value&&Date.parse(value.runAt)<Date.parse(hit.value.runAt)){
      if(!fresh(hit.value))throw new Error('Provider returned an older model initialization and the previously verified newer data is no longer valid.');

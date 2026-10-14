@@ -1,5 +1,5 @@
 import {dailyDisplay,finite,rainChanceValue} from './weather-math.js?v=full-day-rain-v1';
-import {weatherIcon} from './weather-display.js?v=selected-hour-v5';
+import {weatherIcon} from './weather-display.js?v=forecast-recovery-v7';
 import {weatherState,conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
 import {forecastGrossLevel} from './dewpoint-meter.js?v=feel-auto-v2';
 

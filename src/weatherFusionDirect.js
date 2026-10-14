@@ -269,7 +269,7 @@ export function enhanceForecast(out, { models, grid, periods = [], hourlyPeriods
   // Score every forecast hour once, including the days beyond the 48-hour strip.
   // NWS hourly probability is independent of NWS's longer day/night period PoP.
   const normalizedHoursFallback=!hourlyPeriods.length;
-  const officialHours=new Map((normalizedHoursFallback?out.hours:hourlyPeriods).map(row=>[
+  const officialHours=new Map([...out.hours,...hourlyPeriods].map(row=>[
     Date.parse(row.startTime||row.time),row
   ]));
   const sourceRun=id=>id==='nws'?(out.feeds?.find(f=>f.id==='hourly')?.issuedAt||null):sourceModels[id]?.runAt||null;
@@ -293,7 +293,7 @@ export function enhanceForecast(out, { models, grid, periods = [], hourlyPeriods
     rainLikelihood.sources=rainLikelihood.sources.map(source=>({...source,runAt:sourceRun(source.id)}));
     precipitationBlend.sources=precipitationBlend.sources.map(source=>({...source,runAt:sourceRun(source.id)}));
     out.rainTimeline.push({time:iso(time),end:iso(time+H),officialPop,rainLikelihood,
-      condition,conditionSource:condition?(normalizedHoursFallback?'Hourly forecast condition':'NWS hourly forecast'):null,
+      condition,conditionSource:condition?(/model guidance/i.test(official?.conditionSource||'')?official.conditionSource:(normalizedHoursFallback?'Hourly forecast condition':'NWS hourly forecast')):null,
       precipitation:precipitationBlend.value,precipitationBlend});
   }
   const timelineByTime=new Map(out.rainTimeline.map(row=>[Date.parse(row.time),row]));
@@ -326,7 +326,8 @@ export function enhanceForecast(out, { models, grid, periods = [], hourlyPeriods
   for (const [index,d] of out.days.entries()) {
     const day = periods.find((p)=>p.isDaytime && Date.parse(p.endTime)>now && dateKey(Date.parse(p.startTime),out.location.timeZone)===d.date);
     const night = eveningPeriod(periods,d.date,out.location.timeZone,now);
-    d.official = { high:d.high,low:d.low,condition:d.condition,pop:d.pop,detail:d.detail,nightDetail:d.nightDetail };
+    const officialTemperature=period=>finite(period?.temperature)?(period.temperatureUnit==='C'?period.temperature*1.8+32:period.temperature):null;
+    d.official = { high:round(officialTemperature(day),0),low:round(officialTemperature(night),0),condition:day?.shortForecast||night?.shortForecast||null,pop:d.pop,detail:d.detail,nightDetail:d.nightDetail };
     if (active.length) {
       for (const [kind,period] of [['high',day],['low',night]]) {
         const defaultA = localTime(d.date,kind==='high'?7:19,out.location.timeZone);
@@ -383,9 +384,9 @@ export function enhanceForecast(out, { models, grid, periods = [], hourlyPeriods
   out.precipitation=qpf(from,from+24*H);
   out.precipitation.label='Next 24 hours';
   for (const hour of out.hours) {
-    const time=Date.parse(hour.time),values={nws:hour.temperature};
+    const time=Date.parse(hour.time),values={nws:hour.forecastSource==='model-guidance'?null:hour.temperature};
     for(const [id,m] of Object.entries(sourceModels)) values[id]=sample(m,time,'temperature_2m');
-    hour.officialTemperature=hour.temperature;
+    hour.officialTemperature=values.nws;
     if(active.length){hour.temperatureBlend=weighted(values,tempPolicy(forecastDayIndex(time,now,out.location.timeZone)));hour.temperature=round(hour.temperatureBlend.value,0);}
     const row=timelineByTime.get(time),rain=row?.precipitationBlend;
     hour.precipitation=row?.precipitation??null;hour.precipitationSource=rain?.source||'Unavailable';hour.precipitationBlend=rain;

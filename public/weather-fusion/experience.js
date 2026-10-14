@@ -3,10 +3,10 @@ import {FORECAST_CONFIDENCE_VERSION,confidenceMeterPosition} from './forecast-co
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
 import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=selected-hour-art-v4';
 import {weatherState} from './weather-state.js';
-import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=selected-hour-v5';
+import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=forecast-recovery-v7';
 import {degrees,displayedFeelsAt,dailyFeels,forecastValue,timeAt,peakFeelsHTML,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=continuous-feels-v2';
-import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=feel-auto-v6';
-import {comfortMode,comfortWindow,comfortNarrative,warmestTodayWindow,comfortArtworkContext} from './comfort-outlook.js?v=selected-hour-art-v4';
+import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=forecast-recovery-v7';
+import {comfortMode,comfortWindow,comfortNarrative,warmestTodayWindow,comfortArtworkContext} from './comfort-outlook.js?v=forecast-recovery-v7';
 import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js?v=full-day-rain-v1';
 import {displayedRainChance,rainAwareCondition} from './rain-display.js?v=rain-icon-v2';
 import {resetDewpointMeter} from './dewpoint-meter.js?v=feel-auto-v2';

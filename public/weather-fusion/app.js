@@ -2,17 +2,17 @@ import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText,rebindDanTake} from './
 import {danCard,danTakeDisplay} from './dans-summary.js?v=county-warnings-v1';
 import {fetchJsonWithDeadline} from './request-deadline.js?v=loading-recovery-v1';
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
-import {weatherIcon,renderHourlyWeather,currentSample} from './weather-display.js?v=selected-hour-v5';
+import {weatherIcon,renderHourlyWeather,currentSample} from './weather-display.js?v=forecast-recovery-v7';
 import {dayGraphHTML,dayGraphPoints,installDayGraph} from './day-graph.js?v=feel-auto-v6';
 import {degrees,feelsAt,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=continuous-feels-v2';
 import {createFramePlayer} from './frame-player.js';
-import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=feel-auto-v6';
+import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=forecast-recovery-v7';
 import {dailyDisplay} from './weather-math.js?v=full-day-rain-v1';
 import {conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
 import {currentHero} from './current-temperature.js?v=rain-now-v71';
 import {renderBulletins} from './bulletins.js?v=county-warnings-v1';
 import {withLiveAlerts,retainUnverifiedAlerts,alertLocationKey,ALERT_REFRESH_MS} from './live-alerts.js?v=county-warnings-v3';
-import {modelFreshnessText} from './personal-details.js?v=feel-auto-v6';
+import {modelFreshnessText} from './personal-details.js?v=forecast-recovery-v7';
 import {renderDewpointMeter} from './dewpoint-meter.js?v=feel-auto-v2';
 import {renderWeatherPanel} from './render-safety.js';
 import {forecastPeriodSummary} from './forecast-story.js?v=weather-qa-v67';
@@ -23,7 +23,7 @@ import {updateRainTrend} from './rain-trend.js?v=full-day-rain-v1';
 import {renderRiskOutlooks,resetRiskOutlooks} from './risk-outlooks.js?v=risk-outlooks-v5';
 import {renderAirQuality} from './air-quality.js?v=mobile-repair-v1';
 import {displayedRainChance} from './rain-display.js?v=rain-observed-v1';
-import {weatherChangeMessages,WEATHER_CHANGE_TITLE} from './weather-changes.js?v=large-change-v3';
+import {weatherChangeMessages,WEATHER_CHANGE_TITLE} from './weather-changes.js?v=feel-recovery-v7';
 import {renderSnowOutlook,resetSnowOutlook} from './snow-outlook.js?v=snow-grid-v6';
 import {renderForecastWindowBanners,resetForecastWindowBanners} from './forecast-window-banners.js?v=sun-window-main-v4';
 import {createSevenDayCarousel} from './seven-day.js?v=snow-v12';
@@ -197,7 +197,11 @@ function render(data) {
   const sourceNote = sourceHealth.note;
   // Top of page: just the update time. Source/feed health lives in Scientific Stuff (and the tooltip).
   const statusDetail=`Updated ${clock(data.assembledAt)}${sourceNote}${failedPanels.length ? ` · Display issue: ${failedPanels.join(', ')}. Other forecasts remain available; use Refresh to retry.` : ''}`;
-  $('status').textContent = `Updated ${clock(data.assembledAt)}${unavailable.length||failedPanels.length?' · Some data is temporarily unavailable; use Refresh to retry.':''}`;
+  const modelRecovery=(data.hours||[]).some(h=>h.forecastSource==='model-guidance')||(data.days||[]).some(d=>/model guidance/i.test(d.conditionSource||''));
+  const officialInterrupted=(data.feeds||[]).some(f=>['nws','hourly'].includes(f.id)&&f.status!=='ready'&&f.recovered!==true);
+  const retainedOfficial=(data.feeds||[]).some(f=>f.recovered===true);
+  const recoveryNotice=modelRecovery&&officialInterrupted?'Official forecast update interrupted; available model guidance is shown.':retainedOfficial?'Official update delayed; recently verified forecast guidance is shown.':unavailable.length||failedPanels.length?'Some data is temporarily unavailable; use Refresh to retry.':'';
+  $('status').textContent = `Updated ${clock(data.assembledAt)}${recoveryNotice?' · '+recoveryNotice:''}`;
   $('status').title = statusDetail;
   $('status').classList.toggle('error', unavailable.length > 0 || failedPanels.length > 0);
 }

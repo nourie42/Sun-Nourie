@@ -1,4 +1,4 @@
-import {forecastSample} from './weather-display.js?v=selected-hour-v5';
+import {forecastSample} from './weather-display.js?v=forecast-recovery-v7';
 import {sunExposureTemperature} from './outdoor-feels.js?v=air-hero-v3';
 import {finite,rainChanceValue,solarElevation} from './weather-math.js?v=full-day-rain-v1';
 

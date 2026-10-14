@@ -123,7 +123,7 @@ export function forecastSample(forecast, time) {
   const comfort={...estimated,weatherKind:weatherState(condition).kind,outdoors:value,shade:point.shadeValue??rounded(estimated.rawShade),sun:estimated.sun===null?null:value};
   return {windDirection:hour.windDirectionDegrees??hour.windDirection,uvIndex:hourlyUvValue(forecast,epoch),id:new Date(epoch).toISOString(), now:false, time:hour.time,
     temperature:forecastValue(forecast,'temperature',hour.time), feels:displayedFeelsAt(forecast,hour.time),
-    condition:inputs.condition, isDay:comfort.daylight, exposure:outdoorExposure(comfort), comfort, inputs, source:'Hourly forecast', pop,officialPop:hour.officialPop??hour.pop,rainLikelihood:hour.rainLikelihood,precipitationBlend:hour.precipitationBlend};
+    condition:inputs.condition, isDay:comfort.daylight, exposure:outdoorExposure(comfort), comfort, inputs, source:hour.forecastSource==='model-guidance'?'Model forecast':'Hourly forecast', pop,officialPop:hour.officialPop??hour.pop,rainLikelihood:hour.rainLikelihood,precipitationBlend:hour.precipitationBlend};
 }
 export function hourlyDisplaySamples(forecast, now = Date.now()) {
   return [currentSample(forecast, now), ...(forecast?.hours || []).filter(hour => Date.parse(hour.time) > now)
