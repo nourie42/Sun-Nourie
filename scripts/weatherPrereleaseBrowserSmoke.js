@@ -38,7 +38,7 @@ async function noOverflow(width){const box=await page.evaluate(()=>({viewport:in
 await mkdir(output,{recursive:true});await writeFile(path.join(output,'report.json'),JSON.stringify({passed:false,fixture:true,status:'browser-starting'}));
 try{
  const {chromium}=await import('playwright'),leaflet=path.dirname(require.resolve('leaflet/dist/leaflet.js'));
- const html=(await readFile(path.join(root,'public/weather-fusion/prerelease.html'),'utf8')).replaceAll('https://unpkg.com/leaflet@1.9.4/dist/','/__test_leaflet/').replace('</body>','<aside id="phone-test-banner" style="position:fixed;z-index:2147483647;bottom:6px;right:6px;max-width:calc(100vw - 12px);padding:6px 9px;border:2px solid #261b00;border-radius:6px;background:#ffe082;color:#261b00;font:700 11px/1.4 system-ui;pointer-events:none">TEST DATA · PHONE PREVIEW<br>Synthetic forecasts & map tiles · not live</aside></body>');
+ const html=(await readFile(path.join(root,'public/weather-fusion/prerelease.html'),'utf8')).replaceAll('https://unpkg.com/leaflet@1.9.4/dist/','/__test_leaflet/').replace('</head>','<style>dialog[open]::after{content:"TEST DATA · PHONE PREVIEW · not live";position:fixed;z-index:2147483647;bottom:6px;right:6px;max-width:calc(100vw - 12px);padding:6px 9px;border:2px solid #261b00;border-radius:6px;background:#ffe082;color:#261b00;font:700 11px/1.4 system-ui;pointer-events:none}</style></head>').replace('</body>','<aside id="phone-test-banner" style="position:fixed;z-index:2147483647;bottom:6px;right:6px;max-width:calc(100vw - 12px);padding:6px 9px;border:2px solid #261b00;border-radius:6px;background:#ffe082;color:#261b00;font:700 11px/1.4 system-ui;pointer-events:none">TEST DATA · PHONE PREVIEW<br>Synthetic forecasts & map tiles · not live</aside></body>');
  const app=express();
  app.get('/api/weather-fusion/search',(req,res)=>res.json({results:[/asheville/i.test(req.query.q||'')?secondary:primary]}));
  app.get('/api/weather-fusion/forecast',async(req,res)=>{report.forecastRequests.push({...req.query});if(req.query.latitude&&req.query.prereleaseWinter!=='1')return res.status(400).json({error:'TEST: canonical prerelease request omitted winter flag'});if(hold&&req.query.latitude)await new Promise(resolve=>release=resolve);if(!res.destroyed)res.json(fixtureFor(req.query));});
@@ -55,10 +55,10 @@ try{
   const url=new URL(route.request().url());if(url.href.startsWith(base+'/')||url.protocol==='data:')return route.continue();
   report.externalRequests.push(url.href);
   if(/mapservices.weather.noaa.gov/.test(url.hostname)){
-   if(winterOutage)return route.fulfill({status:503,body:'TEST outage'});
-   if(/GetCapabilities/i.test(url.search))return route.fulfill({contentType:'application/xml',body:`<WMS_Capabilities><Layer><Name>snow</Name><Dimension name="time" default="2015-04-10T00:00:00Z">${iso(2)},${iso(8)},${iso(14)}</Dimension></Layer></WMS_Capabilities>`});
-   if(url.pathname.endsWith('/query'))return route.fulfill({contentType:'application/json',body:JSON.stringify({features:[{attributes:{issue_time:iso(-3),start_time:iso(0),end_time:iso(url.pathname.includes('qpf')?72:24)}}]})});
-   if(url.pathname.endsWith('/legend'))return route.fulfill({contentType:'application/json',body:JSON.stringify({layers:[{layerId:9,legend:[{contentType:'image/png',imageData:png.toString('base64'),label:'TEST liquid equivalent'}]},{layerId:1,legend:[]}]})});
+   if(winterOutage)return route.fulfill({headers:{'access-control-allow-origin':'*'},status:503,body:'TEST outage'});
+   if(/GetCapabilities/i.test(url.search))return route.fulfill({headers:{'access-control-allow-origin':'*'},contentType:'application/xml',body:`<WMS_Capabilities><Layer><Name>snow</Name><Dimension name="time" default="2015-04-10T00:00:00Z">${iso(2)},${iso(8)},${iso(14)}</Dimension></Layer></WMS_Capabilities>`});
+   if(url.pathname.endsWith('/query'))return route.fulfill({headers:{'access-control-allow-origin':'*'},contentType:'application/json',body:JSON.stringify({features:[{attributes:{issue_time:iso(-3),start_time:iso(0),end_time:iso(url.pathname.includes('qpf')?72:24)}}]})});
+   if(url.pathname.endsWith('/legend'))return route.fulfill({headers:{'access-control-allow-origin':'*'},contentType:'application/json',body:JSON.stringify({layers:[{layerId:9,legend:[{contentType:'image/png',imageData:png.toString('base64'),label:'TEST liquid equivalent'}]},{layerId:1,legend:[]}]})});
    return route.fulfill({contentType:'image/png',body:png});
   }
   if(url.hostname==='basemap.nationalmap.gov')return route.fulfill({contentType:'image/png',body:png});
@@ -83,21 +83,21 @@ try{
   await page.locator('[data-meter-mode="dry"]').click();assert.match(await page.locator('.gross-verdict').innerText(),/doorknobs|static/i);
   for(const range of ['24','48','168','240']){await page.locator(`[data-gross-hours="${range}"]`).click();assert.equal(await page.locator(`[data-gross-hours="${range}"]`).getAttribute('aria-pressed'),'true');await noOverflow(390);}
   await page.locator('#gross-scrubber').focus();await page.keyboard.press('End');assert.ok(Number(await page.locator('#gross-scrubber').inputValue())>0);
-  const selected=await page.locator('#gross-scrubber').inputValue();await page.locator('[data-meter-mode="gross"]').click();assert.equal(await page.locator('#gross-scrubber').inputValue(),selected);await page.locator('[data-meter-mode="dry"]').click();
+  const selected=await page.locator('#gross-scrubber').inputValue();await page.locator('[data-meter-mode="humid"]').click();assert.equal(await page.locator('#gross-scrubber').inputValue(),selected);await page.locator('[data-meter-mode="dry"]').click();
   await page.locator('[data-gross-hours="48"]').click();await page.locator('#dewpoint-gross-meter').scrollIntoViewIfNeeded();await capture('390-feel-meter-dry',{fullPage:false});
  });
  await check('Missing dew point and winter feeds stay unavailable',async()=>{await setScenario('missing');assert.match(await page.locator('.gross-number').innerText(),/—/);await page.locator('#open-snow').click();assert.match(await page.locator('#winter-content').innerText(),/unavailable/i);assert.doesNotMatch(await page.locator('#winter-content').innerText(),/No snow in/);await page.locator('#close-winter').click();});
  await check('Upcoming snow shows heavy-coat snow play, qualified readings and matching tile',async()=>{
   await setScenario('snow');await page.locator('#prerelease-winter').waitFor({state:'visible'});assert.equal(await page.locator('#skin-values [data-scene="snow-play"]').count(),3);assert.equal(await page.locator('#skin-values [data-visible-outfit="cold"]').count(),3);assert.match(await page.locator('.comfort-outfit-note').innerText(),/previews that forecast/);assert.match(await page.locator('.pet-cold-caption').innerText(),/Paw care/);assert.doesNotMatch(await page.locator('.pet-cold-caption').innerText(),/\d+°/);
-  await page.locator('#skin-exposure').scrollIntoViewIfNeeded();await capture('390-snow-art');await capture('390-snow-art-top',{fullPage:false});
+  await page.locator('#skin-exposure').evaluate(node=>scrollTo(0,node.getBoundingClientRect().top+scrollY-10));await capture('390-snow-art');await capture('390-snow-art-top',{fullPage:false});await page.locator('.pet-cold-person').evaluate(node=>scrollTo(0,node.getBoundingClientRect().top+scrollY-10));await capture('390-snow-pet',{fullPage:false});
   await page.locator('#prerelease-winter button').click();assert.match(await page.locator('#winter-content').innerText(),/2.0 in/);await capture('390-snow-details',{fullPage:false});await page.locator('.winter-model-disclosure summary').first().click();assert.match(await page.locator('.winter-model-guidance').innerText(),/18\/24 hours/);assert.match(await page.locator('.winter-model-guidance').innerText(),/Latest feed run/);await page.locator('.winter-model-disclosure summary').first().click();
  });
  await check('Snow totals load only on click with explicit six-hour valid periods',async()=>{
   const before=report.externalRequests.length;await page.locator('[data-winter-map="snow"]').click();await page.locator('#winter-snow-period').waitFor();await page.waitForFunction(()=>/NWS 6-hour snow amount/.test(document.getElementById('winter-map-status').textContent));
   assert.ok(report.externalRequests.slice(before).some(url=>/GetCapabilities/i.test(url)));
   await page.waitForTimeout(300);const tiles=report.externalRequests.filter(url=>/GetMap/i.test(url)&&url.includes('/ndfd/snow/'));
-  assert.ok(tiles.length);assert.ok(tiles.every(url=>new URL(url).searchParams.get('time')||new URL(url).searchParams.get('TIME')));
-  assert.match(await page.locator('#winter-map-legend').innerText(),/one interval, not the entire storm/);await page.locator('#winter-snow-period').selectOption(iso(8));await page.locator('#winter-map-canvas').scrollIntoViewIfNeeded();await capture('390-snow-total-map',{fullPage:false});
+  assert.ok(tiles.length);await page.waitForFunction(()=>{const tiles=[...document.querySelectorAll('#winter-map-canvas .leaflet-tile')];return tiles.length>0&&tiles.every(img=>img.complete&&img.naturalWidth>0);});assert.ok(tiles.every(url=>new URL(url).searchParams.get('time')||new URL(url).searchParams.get('TIME')));
+  assert.match(await page.locator('#winter-map-legend').innerText(),/one interval, not the entire storm/);await page.locator('#winter-snow-period').selectOption(iso(8));await page.locator('#winter-map-canvas').scrollIntoViewIfNeeded();await page.waitForTimeout(300);await capture('390-snow-total-map',{fullPage:false});
  });
  await check('Expected precip and heavy snow risk keep correct units and provenance',async()=>{
   await page.locator('[data-winter-map="qpf"]').click();await page.waitForFunction(()=>/72-hour expected precipitation/.test(document.getElementById('winter-map-status').textContent));assert.match(await page.locator('#winter-map-legend').innerText(),/not snowfall depth/);

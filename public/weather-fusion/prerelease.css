@@ -222,7 +222,7 @@ html body.prerelease-page #wn-var-picker button, html body.prerelease-page #wn-c
   .prerelease-page .prerelease-badge { font-size: 7px; letter-spacing: .7px; }
   .prerelease-page .sky-header nav { gap: 6px; }
   .prerelease-page .weather-jump-nav { gap: 6px; }
-  .prerelease-page .weather-jump-card, .prerelease-page .weather-jump-card .jump-label { font-size: 11px; }
+  .prerelease-page .weather-jump-card, .prerelease-page .weather-jump-card .jump-label { font-size: 12px; }
   html body.prerelease-page main .glass { padding: 13px !important; }
   .prerelease-page .hero-scene { width: 51px; height: 51px; right: 0; }
   .prerelease-page .hero-scene svg { width: 51px; height: 51px; }
