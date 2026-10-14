@@ -1,0 +1,305 @@
+/* The main Weather Nourie experience, refined for phones only.
+   Keep every rule scoped: the production main page never loads these styles.
+   The 480px canvas also remains single-column on a larger screen. */
+body.prerelease-page {
+  --tile-gap: 14px;
+  --phone-edge: rgba(190, 220, 248, .23);
+  --phone-muted: #c3d7eb;
+  --phone-glass: rgba(12, 33, 59, .68);
+  color: #f4f9ff;
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-x: clip;
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+}
+.prerelease-page .shell {
+  width: 100%; max-width: 480px; margin-inline: auto;
+  padding: env(safe-area-inset-top, 0px) max(14px, env(safe-area-inset-right, 0px)) max(20px, env(safe-area-inset-bottom, 0px)) max(14px, env(safe-area-inset-left, 0px));
+}
+.prerelease-page :is(main, section, .hero, .forecast-grid, .metrics, .section-top, .today-panel, .exposure-cards) { min-width: 0; max-width: 100%; }
+.prerelease-page :is(button, input, select, summary) { font-family: inherit; }
+.prerelease-page :is(button, select, summary, a[role="button"]) { min-height: 44px; }
+.prerelease-page :is(button, a, input, select, summary, [tabindex]):focus-visible { outline: 2px solid #ffe0a2; outline-offset: 3px; }
+.prerelease-page :is(input[type="search"], select) { font-size: 16px; }
+.prerelease-page :is(button, a) { -webkit-tap-highlight-color: transparent; }
+.prerelease-page [hidden] { display: none !important; }
+.prerelease-page :is(section[id], div[id], .metrics-heading) { scroll-margin-top: 16px; }
+.prerelease-page .skip-link { min-height: 44px; }
+.prerelease-page .shell > :is(.experimental-back, [class^="experimental-"]) { display: none !important; }
+
+/* Real, accessible controls replace the tiny hotspots in the wide image header. */
+.prerelease-page .topbar.sky-header {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  height: auto; min-height: 84px; aspect-ratio: auto !important;
+  margin: 0 !important; padding: 16px 0 !important;
+  background: transparent !important; border: 0 !important; overflow: visible;
+  -webkit-mask-image: none !important; mask-image: none !important;
+  box-shadow: none !important;
+}
+.prerelease-page .sky-header .hdr-layer { display: none !important; }
+.prerelease-page .sky-header .brand { position: static; width: auto; height: auto !important; min-height: 44px; gap: 9px; }
+.prerelease-page .sky-header :is(.brand-mark, .brand-word) { opacity: 1; }
+.prerelease-page .sky-header .brand-mark { width: 43px; height: 43px; border-radius: 14px; background: #dbedff0b; border: 1px solid #d7eaff30; box-shadow: inset 0 1px 0 #ffffff1f; }
+.prerelease-page .sky-header .brand-mark svg { width: 38px; height: 38px; }
+.prerelease-page .sky-header .brand-kicker { font-size: 8px; letter-spacing: .25em; margin-bottom: 5px; color: #d2e3f2; }
+.prerelease-page .sky-header .brand-name { font-size: 27px; font-weight: 650; letter-spacing: -.8px; color: #fff; background: none; -webkit-text-fill-color: #fff; filter: none; }
+.prerelease-page .sky-header nav { position: static; gap: 10px; }
+.prerelease-page .prerelease-badge { font-size: 8px; letter-spacing: 1.2px; color: #d5e6f3; }
+.prerelease-page .sky-header #refresh {
+  position: static; width: 44px; height: 44px; min-width: 44px;
+  font-size: 26px; color: #e5f3ff; border-radius: 14px;
+  background: #d8eaff0d !important; border: 1px solid #d9edff30 !important;
+}
+.prerelease-page .sky-header #refresh.loading { opacity: .55; }
+.prerelease-page .location-bar { display: block; padding: 0; margin: 0 0 12px !important; }
+.prerelease-page .search-wrap { width: 100%; min-width: 0; max-width: 100%; border-radius: 15px; border: 1px solid #d9edff30; background: #0b244968; box-shadow: inset 0 1px 0 #ffffff0d; }
+.prerelease-page .search-wrap input { min-height: 48px; padding: 11px 8px; }
+.prerelease-page .search-wrap input::placeholder { color: #c7d9ed; }
+.prerelease-page .search-wrap > button { min-width: 48px; min-height: 48px; padding: 0; color: #b7e4ff; }
+.prerelease-page .search-results { width: 100%; max-width: 100%; top: 56px; background: #122c47; }
+.prerelease-page .search-results button { padding: 14px; font-size: 14px; }
+.prerelease-page .weather-jump-nav { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; margin: 0 0 12px; padding: 0; overflow: visible; }
+.prerelease-page .weather-jump-card {
+  min-width: 0; min-height: 44px; padding: 8px 3px;
+  border: 1px solid #c8e5fc25; border-radius: 12px;
+  background: #193b5d59; color: #edf7ff; font-size: 12px; font-weight: 600;
+  white-space: normal; line-height: 1.15; text-align: center;
+}
+.prerelease-page .weather-jump-card .jump-label { font-size: 12px; line-height: 1.15; letter-spacing: 0; font-weight: 600; white-space: normal; }
+.prerelease-page .weather-jump-card[aria-expanded="true"] { background: #bee6ff25; border-color: #b6e4ff80; }
+.prerelease-page .weather-jump-card.jump-snow { border-color: #b6e4ff55; color: #d9f1ff; background: #93cbef18; }
+.prerelease-page .weather-jump-card:is(:hover, :focus-visible) { background: #b6e4ff25; transform: none; }
+.prerelease-page .status-line { min-height: 0; padding: 6px 4px 12px; text-align: center; font-size: 11px; line-height: 1.5; color: #c7d9e8; overflow-wrap: anywhere; }
+.prerelease-page .status-line.error { color: #ffe0ac; }
+
+/* One legible glass treatment, with official warning colors left intact. */
+html body.prerelease-page main :is(.glass, section.glass, .car-wash-forecast, .dewpoint-gross-meter, .experimental-week, .exposure-cards, .wn-blend-compare, .metric) {
+  background: linear-gradient(150deg, #cce8ff0b, #cce8ff00 65%), var(--phone-glass) !important;
+  border: 1px solid var(--phone-edge) !important; border-radius: 20px !important;
+  padding: 16px !important; margin: 0 0 14px !important;
+  box-shadow: inset 0 1px 0 #e1f3ff19, 0 8px 24px #0312261c !important;
+  text-shadow: none !important;
+}
+.prerelease-page .section-top { gap: 8px; align-items: center; flex-wrap: wrap; }
+.prerelease-page .section-top h2 { margin: 0; font-size: 13px; line-height: 1.4; letter-spacing: .03em; font-weight: 650; color: #eaf5ff; }
+.prerelease-page .section-top > span { font-size: 11px; line-height: 1.4; color: var(--phone-muted); }
+.prerelease-page .hero { display: block; padding: 12px 0 0 !important; text-align: center; min-height: 0; }
+.prerelease-page .hero > .eyebrow { font-size: 10px; letter-spacing: .12em; margin: 4px 0 9px; }
+.prerelease-page .hero h1 { font-size: 28px; font-weight: 500; letter-spacing: -.7px; overflow-wrap: anywhere; margin: 0 auto 10px; }
+.prerelease-page .current-temp-label { margin: 0; font-size: 11px; color: #d8e7f5; font-weight: 450; }
+.prerelease-page .hero-temperature { position: relative; z-index: 1; width: max-content; max-width: 100%; margin: 0 auto; padding-left: 14px; font-size: 104px; font-weight: 250; line-height: 1.16; letter-spacing: -6px; }
+.prerelease-page .hero-temperature span { font-size: .58em; top: 12px; }
+.prerelease-page .hero-scene { left: auto; right: 4px; top: 100px; width: 64px; height: 64px; opacity: .8; }
+.prerelease-page .hero-scene svg { width: 64px; height: 64px; }
+.prerelease-page .hero-uv { font-size: 12px; margin: 0 0 8px; }
+.prerelease-page .hero-uv .daily-uv { font-size: 12px; }
+.prerelease-page .observation-label { margin: 0 0 24px; padding-inline: 8px; font-size: 11px; line-height: 1.5; color: #c3d7e9; }
+.prerelease-page .hero > section { text-align: left; }
+.prerelease-page #nws-bulletins h2 { font-size: 12px; letter-spacing: .08em; }
+.prerelease-page .bulletin-banner { min-height: 52px; }
+.prerelease-page .bulletin-banner-copy small { white-space: normal; }
+.prerelease-page .forecast-window-banners { gap: 10px; }
+.prerelease-page .forecast-window-banner { min-height: 56px; padding: 12px; }
+.prerelease-page #prerelease-winter { min-width: 0; margin-bottom: 14px; scroll-margin-top: 16px; }
+
+/* Keep the original scenic forecast graphic and useful readings. */
+html body.prerelease-page main .hero .today-panel { padding: 8px !important; display: block; }
+html body.prerelease-page #today-forecast .today-weather-card.today-weather-card { grid-template-rows: minmax(205px, auto) 68px 36px; min-height: 309px; border-radius: 15px !important; }
+html body.prerelease-page #today-forecast .today-weather-card.today-remainder { grid-template-rows: minmax(225px, auto) 68px 36px; min-height: 329px; }
+.prerelease-page #today-forecast .today-sky { inset-block: 0 104px; height: calc(100% - 104px); }
+.prerelease-page #today-forecast .today-scene-shade { inset: 0 0 104px; }
+.prerelease-page #today-forecast .today-copy { width: 60%; padding: 16px 0 14px 14px; }
+.prerelease-page #today-forecast .day-name { font-size: 35px; line-height: 1; }
+.prerelease-page #today-forecast .today-remainder .day-name { font-size: 25px; line-height: 1.08; }
+.prerelease-page #today-forecast .today-condition { margin-top: 7px; font-size: 14px; line-height: 1.3; max-width: 18ch; }
+.prerelease-page #today-forecast .today-temperatures { gap: 7px; margin-top: auto; }
+.prerelease-page #today-forecast :is(.today-low, .today-high) > strong { font-size: 37px; }
+.prerelease-page #today-forecast :is(.today-low, .today-high) > small { font-size: 11px; margin-top: 4px; }
+.prerelease-page #today-forecast .today-temperatures > i { font-size: 21px; }
+.prerelease-page #today-forecast .today-feels { font-size: 12px; margin-top: 7px; }
+.prerelease-page #today-forecast .today-feels b { font-size: 21px; }
+.prerelease-page #today-forecast .today-moon { top: 10px; left: 57%; width: 40px; }
+.prerelease-page #today-forecast .today-symbol { top: 15px; right: 8px; grid-template-columns: 55px 32px; gap: 0 3px; }
+.prerelease-page #today-forecast .today-symbol > svg { width: 32px; height: 32px; }
+.prerelease-page #today-forecast .today-symbol > strong { font-size: 26px; }
+.prerelease-page #today-forecast .today-symbol > small { font-size: 10px; max-width: 55px; }
+.prerelease-page #today-forecast .today-symbol > em { font-size: 9px; white-space: normal; }
+.prerelease-page #today-forecast .today-night .today-symbol { grid-template-columns: 55px 32px; }
+.prerelease-page #today-forecast .today-night .today-symbol > svg { width: 32px; height: 32px; }
+.prerelease-page #today-forecast .today-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0 7px; padding: 5px 0; border-radius: 12px; }
+.prerelease-page .today-panel #today-forecast .today-metric { flex-direction: column; gap: 2px; padding: 0 3px; text-align: center; }
+.prerelease-page .today-panel #today-forecast .today-metric svg { width: 17px; height: 17px; }
+.prerelease-page .today-panel #today-forecast .today-metric strong { font-size: 13px; white-space: normal; }
+.prerelease-page .today-panel #today-forecast .today-metric small { font-size: 10px; margin: 0; }
+.prerelease-page #today-forecast .today-more { margin: 4px 7px 0; font-size: 11px; }
+.prerelease-page #today-forecast .today-more b { font-size: 18px; }
+.prerelease-page .hero .today-panel .today-uncertainty { padding: 13px 8px 9px; margin: 8px 0 0; text-align: left; font-size: 13px; line-height: 1.65; color: #d9e8f6; border-left: 0; }
+.prerelease-page .hero .today-panel .today-uncertainty-label { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; font-weight: 650; color: #ffe0a1; }
+.prerelease-page #today-uncertainty p { margin-top: 6px; text-align: left; font-weight: 450; }
+.prerelease-page .today-confidence-banner :is(strong, span) { font-size: 11px; line-height: 1.5; }
+.prerelease-page .hero .hourly-panel .section-top { margin: 0 0 14px; gap: 6px; }
+.prerelease-page .hero .hourly-panel .section-top h2 { font-size: 17px; font-weight: 600; letter-spacing: -.3px; }
+.prerelease-page .hero .hourly-panel .section-top > span { font-size: 10px; white-space: normal; }
+.prerelease-page #hourly.hourly-strip { gap: 7px; padding: 0 0 7px; }
+.prerelease-page #hourly button.hour { flex: 0 0 73px; min-width: 73px; border-radius: 14px; padding: 12px 5px; }
+.prerelease-page #hourly button.hour > span:first-child { font-size: 12px; font-weight: 600; margin-bottom: 8px; }
+.prerelease-page #hourly button.hour > svg { width: 35px; height: 35px; margin-bottom: 7px; }
+.prerelease-page #hourly button.hour > strong { font-size: 27px; font-weight: 550; margin-bottom: 7px; }
+.prerelease-page #hourly :is(.hour-feels, .hour-feels > b, .hour-pop, .hour-uv, .hour-wind > b) { font-size: 11px; }
+.prerelease-page #hourly .hour-wind > small { font-size: 10px; }
+.prerelease-page #hourly .hour-wind > svg { width: 21px; height: 21px; }
+.prerelease-page .forecast-grid { display: block; }
+
+/* Dense details stay readable without ever widening the page. */
+.prerelease-page .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px !important; margin: 12px 0 14px !important; }
+html body.prerelease-page main .metrics > .metric { padding: 15px 12px !important; margin: 0 !important; min-width: 0; min-height: 148px; text-align: left; }
+.prerelease-page .metric h2 { font-size: 10px; letter-spacing: .03em; }
+.prerelease-page .metric-value { font-size: 29px; font-weight: 450; }
+.prerelease-page .metric p { font-size: 11px; max-width: 100%; }
+.prerelease-page .metric-wind .compass, .prerelease-page .sun-arc { display: none; }
+.prerelease-page .metric-wind .metric-value { padding-right: 0; }
+.prerelease-page .metric-sun .metric-value { font-size: 25px; }
+.prerelease-page .metrics-heading h2 { font-size: 22px; font-weight: 500; margin: 22px 0 5px; }
+.prerelease-page .metrics-heading p { margin: 0 0 15px; font-size: 12px; color: var(--phone-muted); }
+.prerelease-page :is(.policy-grid, .thermal-grid, .briefing-detail, .graphcast-meta, .weathernext-day-grid, .model-selectors) { grid-template-columns: minmax(0, 1fr) !important; }
+.prerelease-page :is(.source-item, .graphcast-head, .weathernext-subhead) { display: block; }
+.prerelease-page .source-item span { display: block; text-align: left; }
+.prerelease-page .source-item, .prerelease-page .evidence-detail p { overflow-wrap: anywhere; }
+.prerelease-page .evidence-detail summary { display: list-item; padding-block: 10px; line-height: 1.6; }
+.prerelease-page .evidence-detail pre { font-size: 12px; padding: 12px; }
+.prerelease-page .aqi-summary { gap: 12px; }
+.prerelease-page .aqi-week { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.prerelease-page .aqi-copy p { font-size: 13px; }
+.prerelease-page .gross-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.prerelease-page .gross-facts > span { padding: 10px 7px; }
+.prerelease-page .gross-facts small { white-space: normal; }
+.prerelease-page #model-explanation h2 { font-size: 25px; }
+.prerelease-page #model-explanation .graphcast-card { padding: 16px; }
+.prerelease-page #model-explanation .graphcast-badges { justify-content: flex-start; margin-top: 12px; }
+.prerelease-page .exposure-cards .skin-exposure { width: 100%; padding: 0; border: 0; }
+.prerelease-page .skin-kicker { font-size: 16px; font-weight: 600; letter-spacing: -.2px; }
+.prerelease-page #skin-values .sun-shade-comparison { grid-template-columns: minmax(0, 1fr); gap: 14px; max-width: 100%; }
+.prerelease-page #skin-values .sun-shade-comparison .exposure-person,
+.prerelease-page #skin-values .sun-shade-comparison .exposure-person:has(.reference-scene) { grid-template-rows: 30px 40px 24px 235px minmax(100px, auto); aspect-ratio: auto; border-radius: 16px; }
+.prerelease-page #skin-values .sun-shade-comparison .exposure-person > figcaption { font-size: 14px; }
+.prerelease-page #skin-values .sun-shade-comparison .exposure-person > figcaption > strong { font-size: 34px; }
+.prerelease-page #skin-values .comfort-later { grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding: 14px; }
+.prerelease-page #skin-values .comfort-later::before { display: none; }
+.prerelease-page #skin-values .comfort-later[data-comparison="no-direct-sun"] { grid-template-columns: minmax(0, 1fr); }
+.prerelease-page .science-link { display: inline-flex; align-items: center; min-height: 44px; font-size: 12px; }
+.prerelease-page .car-wash-grid, .prerelease-page .car-wash-top, .prerelease-page .car-wash-days { grid-template-columns: minmax(0, 1fr); }
+
+/* Tap-friendly radar, intentionally scrollable charts, and phone-size sheets. */
+.prerelease-page .map-tabs { flex-wrap: wrap; }
+.prerelease-page .map-tabs button { min-height: 44px; padding: 8px 12px; font-size: 12px; }
+.prerelease-page .map-stage { height: 320px; }
+.prerelease-page .radar-controls { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 8px; margin-top: 12px; }
+.prerelease-page .radar-controls .play-button { width: 44px; height: 44px; border-radius: 12px; background: #ceeaff0c; border: 1px solid #ceeaff30; }
+.prerelease-page .radar-controls input { min-width: 0; height: 44px; }
+.prerelease-page .radar-controls > span { grid-column: 1 / -1; grid-row: 2; font-size: 11px; white-space: normal; }
+.prerelease-page .radar-controls select { grid-column: 1 / -1; width: 100%; max-width: 100%; padding: 9px 12px; border-radius: 10px; }
+.prerelease-page .map-caption { display: block; font-size: 11px; line-height: 1.6; }
+.prerelease-page .map-caption > span { display: block; }
+.prerelease-page .map-caption a { display: inline-flex; align-items: center; min-height: 44px; white-space: normal; }
+.prerelease-page .leaflet-control-zoom a { width: 44px; height: 44px; line-height: 44px; }
+.prerelease-page :is(.wn-blend-scroll, .model-table-scroll, .chart-scroll, .snow-table-scroll) { max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; }
+.prerelease-page :is(#wn-compare-chart, #chart-content) { max-width: 100%; overflow-x: auto; }
+html body.prerelease-page #wn-var-picker button, html body.prerelease-page #wn-compare-chart .wn-chip { min-height: 44px !important; }
+.prerelease-page dialog { width: calc(100% - 20px); max-width: 460px; max-height: calc(100dvh - 24px); padding: 60px 18px 24px; border-radius: 22px; background: #142b44; overscroll-behavior: contain; }
+.prerelease-page .dialog-close { width: 44px; height: 44px; right: 12px; top: 10px; border: 1px solid #d9edff2e; border-radius: 50%; background: #e5f3ff0b; }
+.prerelease-page .chart-top { flex-wrap: wrap; gap: 12px; }
+.prerelease-page .chart-periods button { min-height: 44px; }
+.prerelease-page input[type="range"] { min-height: 44px; }
+.prerelease-page .comparison { font-size: 11px; table-layout: fixed; }
+.prerelease-page .comparison :is(td, th) { overflow-wrap: anywhere; }
+.prerelease-page footer { display: block; padding: 16px 4px 20px; }
+.prerelease-page footer .footer-brand { font-size: 19px; font-weight: 550; }
+.prerelease-page footer p { font-size: 11px; line-height: 1.7; max-width: 100%; color: #bdcfe1; }
+.prerelease-page footer > p { margin-top: 14px; }
+@media (max-width: 359px) {
+  .prerelease-page .shell { padding-inline: 10px; }
+  .prerelease-page .prerelease-badge { font-size: 7px; letter-spacing: .7px; }
+  .prerelease-page .sky-header nav { gap: 6px; }
+  .prerelease-page .weather-jump-nav { gap: 6px; }
+  .prerelease-page .weather-jump-card, .prerelease-page .weather-jump-card .jump-label { font-size: 11px; }
+  html body.prerelease-page main .glass { padding: 13px !important; }
+  .prerelease-page .hero-scene { width: 51px; height: 51px; right: 0; }
+  .prerelease-page .hero-scene svg { width: 51px; height: 51px; }
+  .prerelease-page #today-forecast .today-copy { padding-left: 11px; }
+  .prerelease-page #today-forecast .today-symbol { right: 3px; grid-template-columns: 45px 28px; }
+  .prerelease-page #today-forecast .today-symbol > svg { width: 28px; height: 28px; }
+  .prerelease-page #today-forecast .today-symbol > small { font-size: 9px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .prerelease-page *, .prerelease-page *::before, .prerelease-page *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+
+/* Full day names and all readings fit without squeezing a six-column desktop row. */
+.prerelease-page .daily-panel .day-row {
+  display: grid; grid-template-columns: 42px minmax(0, 1fr) minmax(0, 1fr) 42px;
+  grid-template-areas: "name name icon icon" "low track track high" "feels feels feels feels" "meta meta meta meta";
+  gap: 10px 8px; padding: 14px 12px; min-height: 0; margin: 10px 0;
+}
+.prerelease-page .daily-panel .day-row > * { min-width: 0; }
+.prerelease-page .daily-panel .day-name { font-size: 15px; line-height: 1.4; overflow-wrap: anywhere; }
+.prerelease-page .daily-panel .day-name-full { display: inline; }
+.prerelease-page .daily-panel .day-name-mobile { display: none; }
+.prerelease-page .daily-panel .day-icon { display: flex; align-items: center; justify-content: flex-end; gap: 7px; }
+.prerelease-page .daily-panel .day-icon svg { width: 32px; height: 32px; margin: 0; }
+.prerelease-page .daily-panel .day-icon small { font-size: 11px !important; }
+.prerelease-page .daily-panel .day-low, .prerelease-page .daily-panel .day-high strong { font-size: 23px; }
+.prerelease-page .daily-panel .day-low small, .prerelease-page .daily-panel .day-high small { font-size: 10px !important; }
+.prerelease-page .daily-panel .temp-track { height: 7px; }
+.prerelease-page .daily-panel .high-marker { width: 11px; height: 11px; }
+.prerelease-page .daily-panel .day-feels-summary { flex-direction: row; align-items: baseline; justify-content: flex-start; gap: 5px; }
+.prerelease-page .daily-panel .day-feels-summary small, .prerelease-page .daily-panel .day-feels-summary b { font-size: 11px !important; }
+.prerelease-page .daily-panel .day-meta {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-areas: "confidence confidence confidence" "wind aqi uv";
+  width: 100%; gap: 9px 5px; padding-top: 10px; margin: 0; border-top: 1px solid #b8daf024;
+}
+.prerelease-page .daily-panel .forecast-confidence {
+  grid-area: confidence !important; display: grid; grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "confidence-label confidence-level" "confidence-meter confidence-meter";
+  gap: 8px; width: 100%; text-align: left; margin: 0; font-size: 11px !important;
+}
+.prerelease-page .daily-panel .forecast-confidence > span { grid-area: confidence-label; white-space: normal !important; font-size: 11px !important; }
+.prerelease-page .daily-panel .forecast-confidence > b { grid-area: confidence-level; font-size: 11px !important; }
+.prerelease-page .daily-panel .confidence-meter { grid-area: confidence-meter; width: calc(100% - 14px); height: 5px; margin-bottom: 5px; }
+.prerelease-page .daily-panel .day-wind-chip { grid-area: wind; flex-wrap: wrap; white-space: normal; }
+.prerelease-page .daily-panel .day-aqi-chip { grid-area: aqi; font-size: 10px; justify-content: center; white-space: normal; }
+.prerelease-page .daily-panel .daily-uv { grid-area: uv; font-size: 10px; text-align: right; white-space: normal; }
+.prerelease-page .daily-panel .forecast-confidence-notice { flex-wrap: wrap; padding: 10px; }
+.prerelease-page #skin-exposure .skin-kicker { font-size: 20px; line-height: 1.3; margin: 0 0 16px; }
+.prerelease-page #skin-values .sun-shade-comparison .exposure-person > .exposure-label { font-size: 22px; }
+.prerelease-page #skin-values .sun-shade-comparison .exposure-person > .exposure-subtitle { font-size: 14px; }
+.prerelease-page #skin-values .sun-shade-comparison .exposure-person > svg,
+.prerelease-page #skin-values .sun-shade-comparison .pavement-person > .poodle-scene { height: 235px !important; aspect-ratio: auto !important; }
+.prerelease-page #skin-values .sun-shade-comparison .exposure-person > figcaption > small { font-size: 12px; line-height: 1.4; }
+.prerelease-page #skin-values .sun-shade-comparison .exposure-person > figcaption > .pavement-secondary { font-size: 14px; }
+.prerelease-page #skin-values .sun-shade-comparison .exposure-person .thermal-risk,
+.prerelease-page #skin-values .sun-shade-comparison .exposure-person .pavement-warning { font-size: 11px; white-space: normal; }
+.prerelease-page #skin-values .sun-shade-comparison .exposure-person[data-reading="unavailable"] > figcaption > strong { font-size: 22px; }
+
+.prerelease-page #skin-values .comfort-later > span:first-child, .prerelease-page #skin-values .comfort-later > small { grid-column: 1; }
+.prerelease-page #skin-values .comfort-later > .peak-reading { grid-column: 2; }
+.prerelease-page #skin-values .comfort-later > span:first-child { font-size: 16px; }
+.prerelease-page #skin-values .comfort-later > small { font-size: 12px; }
+
+.prerelease-page .aqi-summary { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.prerelease-page .aqi-pollutants { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.prerelease-page .aqi-pollutants > span { min-width: 0; padding: 10px; }
+.prerelease-page .car-wash-hero { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.prerelease-page .car-wash-checks { width: 100%; gap: 10px; padding: 12px; }
+.prerelease-page .car-wash-fact { grid-template-columns: 24px minmax(0, 1fr); gap: 8px; }
+.prerelease-page .car-wash-fact b { font-size: 14px; }
+.prerelease-page .car-wash-fact small, .prerelease-page .car-wash-answer p, .prerelease-page .car-wash-header p { font-size: 12px; line-height: 1.5; }
+.prerelease-page .car-wash-days { display: flex; overflow-x: auto; gap: 8px; padding-bottom: 8px; scroll-snap-type: x proximity; }
+.prerelease-page .car-wash-day { flex: 0 0 92px; padding: 12px 6px; scroll-snap-align: start; border-radius: 12px; }
+.prerelease-page .car-wash-day > strong, .prerelease-page .car-wash-temps, .prerelease-page .car-wash-chance { font-size: 12px; }
+.prerelease-page .car-wash-day > small, .prerelease-page .car-wash-day-verdict { font-size: 11px; }
+.prerelease-page .car-wash-day svg { width: 32px; height: 32px; }
+.prerelease-page .car-wash-window { grid-template-columns: 24px minmax(0, 1fr); }
+.prerelease-page .car-wash-tip { display: none; }
+.prerelease-page .car-wash-footer { font-size: 11px; line-height: 1.5; letter-spacing: 0; }

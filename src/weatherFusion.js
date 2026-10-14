@@ -1,3 +1,4 @@
+import {createPrereleaseWinterService} from './weatherFusionPrereleaseWinter.js';
 import {createDiscussionSource,DISCUSSION_SOURCE_VERSION} from './weatherFusionDiscussionSource.js';
 import {exposureWeatherUrl,normalizeExposureWeather,addExposureWeather} from './weatherFusionExposure.js';
 import {airQualityUrl,normalizeAirQuality,addAirQuality} from './weatherFusionAirQuality.js';
@@ -432,6 +433,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
   }
   const cached = (url, ttl, options) => cache.get(url, ttl, async () => ({ data: await request(url, options), fetchedAt: iso(now()) }));
   const loadWpcWinter = createWpcWinterService({ cached });
+  const loadPrereleaseWinter = createPrereleaseWinterService({cached,now});
   async function feed(id, label, url, ttl, transform = (d) => d, options) {
     try {
       const { data, fetchedAt } = await cached(url, ttl, options);
@@ -457,6 +459,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
   async function getForecast(query) {
     const location = coordinates(query), key = `${location.latitude},${location.longitude}`;
     const liveAlerts=getAlerts(query);
+    const prereleaseWinterTask=query?.prereleaseWinter==='1'?loadPrereleaseWinter(location):null;
     const snapshot=await forecastCache.get(key, MINUTE, async () => {
       const pointFeed = await feed('point', 'NWS location', `https://api.weather.gov/points/${key}`, 24 * HOUR, (d) => d.properties);
       const point = pointFeed.value;
@@ -526,7 +529,9 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
     const alerts=await liveAlerts;
     const current={...snapshot,alerts:alerts.alerts,feeds:[...snapshot.feeds.filter(f=>f.id!=='alerts'),...alerts.feeds]};
     current.signature=hash({forecast:snapshot.signature,alerts:current.alerts,alertStatus:alerts.feeds[0].status});
-    return {...current,danTake:retainedTake(current),...retainedSummary(current)};
+    const result={...current,danTake:retainedTake(current),...retainedSummary(current)};
+    if(prereleaseWinterTask){const supplement=await prereleaseWinterTask;result.prereleaseWinter={...supplement.value,feeds:supplement.meta};}
+    return result;
   }
   function fallback(data, reason) {
     const evening = isTonightPeriod(now(),data.location.timeZone);
@@ -687,6 +692,12 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
   return { getForecast, getAlerts, getBriefing, getBulletins, getOutlook, search, radar, modelMaps: direct.maps };
 }
 
+// Explicit staging opt-in only: the live main presentation stays the default.
+export function weatherPresentationFile(pathname, env = process.env) {
+  const mainPaths = new Set(['/weather', '/weather-fusion', '/weather-fusion/', '/weather-fusion/index.html']);
+  return env.WEATHER_FUSION_PRESENTATION === 'prerelease' && mainPaths.has(pathname) ? 'prerelease.html' : 'index.html';
+}
+
 export function registerWeatherFusionRoutes(app, options = {}) {
   const service = createWeatherService(options);
   const counters = new Map();
@@ -701,11 +712,11 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     try { return res.json(await handler(req.query || {})); }
     catch (e) { return res.status(e.status || 503).json({ error: e.status === 400 || e.status === 409 ? e.message : 'Weather data is temporarily unavailable. Please retry.' }); }
   };
-  app.get(['/weather', '/weather-fusion', '/weather-fusion/', '/weather-fusion/experimental-weather.html', '/weather-fusion/outlooks'], (_req, res) => {
+  app.get(['/weather', '/weather-fusion', '/weather-fusion/', '/weather-fusion/index.html', '/weather-fusion/experimental-weather.html', '/weather-fusion/outlooks'], (req, res) => {
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
+    res.sendFile(path.join(PUBLIC_DIR, weatherPresentationFile(req.path, options.env || process.env)));
   });
   app.get(['/weather-fusion/halo', '/weather-fusion/halo/'], (_req, res) => res.redirect(302, '/weather-fusion/halo.html'));
   app.get('/weather-fusion/weathernext-site.html', (req,res) => {
@@ -730,6 +741,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     'glance.html','glance.css','glance.js',
     'halo.html','halo.css','halo.js',
     'atlas.html','atlas.css','atlas.js',
+    'prerelease-app.js','prerelease-car-wash.js','prerelease-comfort-clothing.js','prerelease-comfort-heavy-coats.webp','prerelease-comfort-snow-play.webp','prerelease-comfort.css','prerelease-day-graph.js','prerelease-dewpoint-meter.js','prerelease-experience.js','prerelease-exposure-scene.js','prerelease-feel-meter.css','prerelease-pavement.js','prerelease-personal-details.js','prerelease-weather-changes.js','prerelease-winter-maps.js','prerelease-winter.css','prerelease-winter.js','prerelease.css','prerelease.html',
     'blend.html','blend.css','blend.js',
     'today.html','today.css','today.js',
     'wn.html','wn.css','wn.js',

@@ -1,0 +1,83 @@
+/* Keep the existing meter's visual structure. All additions target the isolated copy. */
+@import url('/weather-fusion/dewpoint-meter.css?v=dry-meter-v31');
+
+.prerelease-feel-meter .feel-meter-context {
+  margin: 0 2px 10px;
+  color: #c9e5f2;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.prerelease-feel-meter .gross-mode-toggle button:focus-visible,
+.prerelease-feel-meter #gross-scrubber:focus-visible {
+  outline: 2px solid #e0f5ff;
+  outline-offset: -2px;
+}
+.prerelease-feel-meter .gross-current-labels {
+  position: relative;
+  display: block;
+  height: 30px;
+}
+.prerelease-feel-meter .gross-current-labels span {
+  position: absolute;
+  left: var(--feel-label-position);
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+.prerelease-feel-meter .gross-current-labels span:first-child {
+  transform: none;
+  text-align: left;
+}
+.prerelease-feel-meter .gross-current-labels span:last-child {
+  transform: translateX(-100%);
+  text-align: right;
+}
+.prerelease-feel-meter[data-mode="dry"] .gross-current-track {
+  background: linear-gradient(90deg, #2e7fd9, #35a8d4 33%, #3fd0b8 55%, #7fd69a 70%, #e5c557 84%, #f49b46);
+}
+.prerelease-feel-meter .gross-number,
+.prerelease-feel-meter .gross-selected-value,
+.prerelease-feel-meter .gross-facts b {
+  overflow-wrap: anywhere;
+}
+.prerelease-feel-meter .gross-current-track i[hidden] { display: none; }
+
+@media (max-width: 760px) {
+  .prerelease-feel-meter .gross-summary { grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); }
+  .prerelease-feel-meter .gross-note { max-width: 36ch; }
+  .prerelease-feel-meter .gross-toolbar {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto auto;
+    gap: 8px;
+  }
+  .prerelease-feel-meter .gross-toolbar > span { grid-column: 1; grid-row: 1; }
+  .prerelease-feel-meter .gross-mode-toggle { grid-column: 1; grid-row: 2; }
+  .prerelease-feel-meter .gross-periods { grid-column: 1; grid-row: 3; }
+  .prerelease-feel-meter .gross-coverage {
+    grid-column: 1;
+    grid-row: 4;
+    max-width: none;
+    text-align: left;
+  }
+  .prerelease-feel-meter .gross-mode-toggle button,
+  .prerelease-feel-meter .gross-periods button {
+    min-height: 44px;
+    min-width: 0;
+    font-size: 12px;
+  }
+  .prerelease-feel-meter .gross-mode-toggle button { border-radius: 9px; }
+  .prerelease-feel-meter .gross-selection {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+    gap: 5px;
+  }
+  .prerelease-feel-meter .gross-selected-value { grid-row: 1; }
+  .prerelease-feel-meter .gross-selected-time { grid-row: 2; }
+  .prerelease-feel-meter .gross-selected-label { grid-row: 3; }
+  .prerelease-feel-meter .gross-scale {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px 6px;
+  }
+  .prerelease-feel-meter .gross-scale span { overflow-wrap: anywhere; }
+  .prerelease-feel-meter #gross-scrubber { height: 44px; }
+  .prerelease-feel-meter .gross-facts small { overflow-wrap: anywhere; }
+}

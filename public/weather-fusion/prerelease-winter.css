@@ -1,0 +1,60 @@
+/* Winter detail shares the prerelease glass tile, rather than an alert color. */
+.prerelease-page #prerelease-winter {padding:0!important;overflow:hidden}
+.prerelease-page .winter-open-tile {display:flex;align-items:center;gap:13px;padding:18px;width:100%;border:0;background:none;color:inherit;text-align:left;min-height:80px}
+.prerelease-page .winter-open-tile strong {display:block;font-size:17px;font-weight:650}
+.prerelease-page .winter-open-tile small {display:block;margin-top:5px;color:#b8c9d9;font-size:12px;line-height:1.5}
+.prerelease-page .winter-snowflake {font-size:32px;color:#b9e6f3}
+.prerelease-page .winter-open-tile>span:last-child {margin-left:auto;font-size:28px}
+.prerelease-page .winter-dialog {width:min(100% - 20px,460px);max-width:460px;max-height:calc(100dvh - 24px);padding:24px 18px;color:#edf4fa;background:#14263a;border:1px solid #9bb9d044;border-radius:22px;box-shadow:0 22px 80px #000a;overscroll-behavior:contain}
+.prerelease-page .winter-dialog::backdrop {background:#050c14b8;backdrop-filter:blur(5px)}
+.prerelease-page .winter-dialog h2 {font-size:25px;letter-spacing:-.6px;line-height:1.15;margin:12px 35px 12px 0}
+.prerelease-page .winter-dialog h3 {font-size:17px;margin:19px 0 10px}
+.prerelease-page .winter-dialog p {font-size:13px;line-height:1.65;color:#b6c9da}
+.prerelease-page .winter-dialog .dialog-close {position:absolute;top:10px;right:10px;min-width:44px;min-height:44px;color:#edf4fa;background:#ffffff0c;border:1px solid #c7d9e52b;border-radius:50%}
+.prerelease-page .winter-types {display:grid;gap:8px;margin:22px 0}
+.prerelease-page .winter-types>div {display:grid;grid-template-columns:100px 1fr;gap:3px 8px;padding:12px;border:1px solid #b2c9d52b;border-radius:12px;background:#ffffff05}
+.prerelease-page .winter-types strong {font-size:13px;grid-row:span 2}
+.prerelease-page .winter-types span {font-size:12px;color:#c6e1ec}
+.prerelease-page .winter-types small {font-size:11px;color:#97b0c3}
+.prerelease-page .winter-day {padding:2px 0 18px;border-bottom:1px solid #b2c9d52b}
+.prerelease-page .winter-day dl {display:grid;gap:8px;margin:12px 0}
+.prerelease-page .winter-day dl>div {display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.prerelease-page .winter-day dt {font-size:12px;color:#a9c0d3}
+.prerelease-page .winter-day dd {font-size:15px;font-weight:600;margin:0}
+.prerelease-page .winter-day>small {font-size:11px;line-height:1.55;color:#9bb2c5}
+.prerelease-page .winter-blend {margin:22px 0;padding:14px;border:1px solid #b2c9d52b;border-radius:14px}
+.prerelease-page .winter-blend summary {font-size:13px;font-weight:600;min-height:44px;display:flex;align-items:center;cursor:pointer;gap:9px}
+.prerelease-page .winter-blend summary::before {content:'+';font-size:22px;color:#a4d9df}
+.prerelease-page .winter-blend[open] summary::before {content:'−'}
+.prerelease-page .winter-shares {display:grid;gap:9px;font-size:12px}
+.prerelease-page .winter-shares>div {display:flex;justify-content:space-between;gap:10px}
+.prerelease-page .winter-shares span {color:#bdd0dd}
+.prerelease-page .winter-map-tabs {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:16px 0}
+.prerelease-page .winter-map-tabs button {min-height:48px;padding:7px 4px;border:1px solid #a8c8dc44;border-radius:10px;background:#ffffff08;color:#bdcfdd;font-size:11px;font-weight:600}
+.prerelease-page .winter-map-tabs button[aria-pressed=true] {color:#e6fafb;border-color:#8dd6df;background:#8dd6df18}
+.prerelease-page #winter-map-canvas {height:330px;width:100%;border-radius:14px;background:#101e2b;border:1px solid #c5d5e233}
+.prerelease-page #winter-map-status {min-height:42px;font-size:12px;color:#c4d9e8}
+.prerelease-page #winter-map-legend label {display:block;font-size:12px;margin-top:14px}
+.prerelease-page #winter-map-legend select {width:100%;min-height:46px;margin:7px 0;background:#1e354b;border:1px solid #abc9df66;border-radius:9px;color:#f4f8fa;font-size:14px;padding:7px}
+.prerelease-page .winter-legend-image {max-width:100%;height:auto;background:#fff;border-radius:8px;padding:8px}
+.prerelease-page .winter-legend-items {display:flex;flex-wrap:wrap;gap:8px 12px}
+.prerelease-page .winter-legend-items>span {display:flex;align-items:center;gap:5px;font-size:12px}
+.prerelease-page .winter-legend-items img {max-width:25px;max-height:25px}
+.prerelease-page #winter-map-source {display:inline-block;padding:14px 0;color:#a6dbe4;font-size:12px;line-height:1.5}
+.prerelease-page .winter-footnote {margin-top:22px;border-top:1px solid #b2c9d52b;padding-top:18px}
+.prerelease-page .winter-dialog :is(button,select,a,summary):focus-visible {outline:2px solid #f1c589;outline-offset:3px}
+.prerelease-page .winter-source-card{margin:9px 0;padding:12px;border:1px solid #b2c9d52b;border-radius:12px;background:#ffffff05}
+.prerelease-page .winter-source-card>div{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.prerelease-page .winter-source-card strong{font-size:12px;line-height:1.5}
+.prerelease-page .winter-source-card span{font-size:10px;color:#aed4da;text-transform:capitalize}
+.prerelease-page .winter-source-card p{font-size:12px;margin:7px 0}
+.prerelease-page .winter-source-card small{display:block;font-size:10px;line-height:1.5;color:#9bb2c5}
+.prerelease-page .winter-window{border-bottom:1px solid #b2c9d52b;padding:8px 0}
+.prerelease-page .winter-window summary{font-size:12px;min-height:44px;display:flex;align-items:center;cursor:pointer;color:#d8e7f0}
+.prerelease-page .winter-window summary::before{content:'+';margin-right:9px;color:#a4d9df;font-size:18px}
+.prerelease-page .winter-window[open] summary::before{content:'−'}
+.prerelease-page .winter-window p{font-size:11px;margin:3px 0 12px}
+.prerelease-page .winter-window dl>div{display:flex;justify-content:space-between;gap:12px;font-size:12px;line-height:1.6;margin:9px 0}
+.prerelease-page .winter-window dt{color:#a9c0d3}
+.prerelease-page .winter-window dd{margin:0;text-align:right}
+.prerelease-page .winter-window dd small{display:block;font-size:10px;color:#9bb2c5}

@@ -30,7 +30,7 @@ html body.atlas-page::before { display: none; }
 .atlas-page .atmosphere { background: radial-gradient(ellipse at 15% 0%, #24364738, transparent 46%); }
 .atlas-page .atmosphere::before { display: none; }
 .atlas-page .atmosphere > * { display: none !important; }
-.atlas-page .shell { max-width: 1512px; padding: 0 52px; }
+.atlas-page .shell { width: 100%; max-width: 480px; padding: 0 20px; margin-inline: auto; }
 .atlas-page :is(button, input, select) { font-family: inherit; }
 .atlas-page :is(button, a, input, select, summary):focus-visible { outline: 2px solid var(--atlas-sun); outline-offset: 4px; }
 .atlas-page a, .atlas-page button { -webkit-tap-highlight-color: transparent; }
@@ -239,35 +239,10 @@ html body.atlas-page main .metrics > .metric:hover { border-color: #9ccfe24d !im
 .atlas-page dialog::backdrop { background: #03080ed9; backdrop-filter: blur(7px); }
 .atlas-page .dialog-close { border: 1px solid #89a9c433; border-radius: 9px; background: #213648; color: #bcd2df; }
 .atlas-page .skip-link { z-index: 3000; background: #efbd76; color: #101820; }
-@media (min-width: 1600px) { .atlas-page .shell { padding: 0 40px; } }
-@media (max-width: 1200px) {
-  .atlas-page .shell { padding: 0 30px; }
-  .atlas-page .atlas-header-nav { margin-left: 16px; gap: 22px; }
-  .atlas-page main .hero { grid-template-columns: minmax(0, .8fr) minmax(0, 1.25fr); gap: 18px; }
-  html body.atlas-page main .hero > .atlas-current { padding: 25px; }
-  .atlas-page .atlas-current .hero-scene { right: 19px; width: 74px; height: 74px; }
-  .atlas-page .atlas-current .hero-scene svg { width: 74px; height: 74px; }
-  .atlas-page .map-tabs button { padding: 7px; font-size: 9px; }
-  .atlas-page .map-caption { display: block; }
-  .atlas-page .map-caption > span { display: block; }
-  .atlas-page .metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-@media (max-width: 960px) {
-  .atlas-page .atlas-header-nav { display: none; }
-  .atlas-page main .hero { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); }
-  .atlas-page .atlas-current h1 { font-size: 28px; }
-  .atlas-page .atlas-current .hero-scene { top: 238px; right: 15px; width: 60px; height: 60px; }
-  .atlas-page .atlas-current .hero-scene svg { width: 60px; height: 60px; }
-  .atlas-page .atlas-current .hero-temperature { font-size: 104px; }
-  .atlas-page .map-panel .radar-controls { grid-template-columns: 30px minmax(40px, 1fr) auto; }
-  .atlas-page .radar-controls select { grid-column: 3; }
-  .atlas-page .radar-controls > span { grid-column: 1 / 3; grid-row: 2; }
-  .atlas-page .atlas-current-bottom { flex-wrap: wrap; gap: 5px; }
-  .atlas-page .atlas-model-grid { grid-template-columns: 1fr; gap: 0; }
-  html body.atlas-page main .today-panel { grid-template-columns: 1fr; gap: 18px; }
-  .atlas-page .hero .today-panel .today-uncertainty { border-left: 0; border-top: 1px solid #afc5da1c; padding: 16px 0 0; }
-}
-@media (max-width: 740px) {
+
+
+
+@media all /* Phone layout at every viewport width. */ {
   html[data-atlas] { --tile-gap: 16px; }
   .atlas-page .shell { padding: 0 20px; }
   .atlas-page .topbar.atlas-header { min-height: 76px; padding: 17px 0; gap: 15px; }
@@ -359,7 +334,7 @@ html body.atlas-page main .metrics > .metric:hover { border-color: #9ccfe24d !im
 .atlas-page #hourly .hour-pop { color: #83d6e0; }
 .atlas-page .brand-name { background: none; -webkit-text-fill-color: initial; text-shadow: none; }
 .atlas-page .brand-mark { box-shadow: none; }
-@media(max-width:740px) {
+@media all /* Phone component proportions at every viewport width. */ {
   .atlas-page .hero .hourly-panel .section-top h2 { font-size: 12px; }
   .atlas-page .hero .hourly-panel .section-top > span { font-size: 9px; }
   .atlas-page #hourly button.hour > strong { font-size: 24px; }
@@ -428,7 +403,7 @@ html body.atlas-page main .metrics > .metric:hover { border-color: #9ccfe24d !im
 .atlas-page .atlas-confidence-reasons { padding: 2px 14px 14px; border-top: 1px solid #acc9df0d; color: #8fabbc; font-size: 12px; line-height: 1.7; }
 .atlas-page .atlas-confidence-reasons ul { margin: 8px 0 0; padding-left: 16px; }
 .atlas-page .atlas-confidence-reasons li + li { margin-top: 5px; }
-@media(max-width:740px) {
+@media all /* Phone component proportions at every viewport width. */ {
   .atlas-page .atlas-chart-tools { gap: 10px; }
   .atlas-page .atlas-chart-tools button { font-size: 11px; padding: 8px 10px; min-height: 38px; }
   .atlas-page .atlas-chart-tools > div { padding: 2px; gap: 2px; }
@@ -462,8 +437,175 @@ html body.atlas-page main .metrics > .metric:hover { border-color: #9ccfe24d !im
 .atlas-page .atlas-confidence-track > i[data-confidence="very-low"]{background:#db858c}
 .atlas-page .map-tabs button:disabled{opacity:.45;cursor:not-allowed}
 
-/* Long daily labels must not run into the weather icon on wide layouts. */
-@media(min-width:741px) {
-  .atlas-page .daily-panel .day-row { grid-template-columns:110px 60px 62px minmax(80px,1fr) 62px 88px; }
-  .atlas-page .daily-panel .day-name { font-size:16px; font-weight:550; line-height:1.35; overflow-wrap:anywhere; }
+
+
+
+/* Atlas is phone-only. A wide monitor shows the same narrow, one-column canvas. */
+html body.atlas-page { overflow-x: clip; -webkit-text-size-adjust: 100%; }
+.atlas-page .shell { width: 100%; max-width: 480px; margin-inline: auto; padding-top: env(safe-area-inset-top, 0px); padding-bottom: max(20px, env(safe-area-inset-bottom, 0px)); }
+.atlas-page :is(main, section, .atlas-panel, .atlas-model-grid, .section-top, .hero) { min-width: 0; max-width: 100%; }
+.atlas-page .atlas-header-nav { display: none; }
+.atlas-page .atlas-header-tools { gap: 12px; }
+.atlas-page .atlas-back-link { display: inline-flex; align-items: center; min-height: 44px; }
+.atlas-page .atlas-model-grid { grid-template-columns: minmax(0, 1fr); gap: 0; }
+html body.atlas-page main .today-panel { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+.atlas-page .hero .today-panel .today-uncertainty { border-left: 0; border-top: 1px solid #afc5da1c; padding: 16px 0 0; }
+.atlas-page .weather-jump-nav { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; overflow: visible; }
+.atlas-page .weather-jump-card { width: 100%; padding: 9px 4px; white-space: normal; font-size: 11px; }
+.atlas-page .weather-jump-card .jump-label { font-size: 11px; line-height: 1.3; white-space: normal; }
+body.atlas-page :is(button, select, summary, a[role="button"]) { min-height: 44px !important; }
+.atlas-page .icon-button { width: 44px; height: 44px; }
+.atlas-page .search-wrap input { font-size: 16px; min-height: 48px; }
+.atlas-page .search-wrap > button { min-width: 48px; }
+.atlas-page .section-top { flex-wrap: wrap; }
+.atlas-page .atlas-current-bottom { flex-wrap: wrap; }
+.atlas-page .atlas-current-bottom a { display: inline-flex; align-items: center; min-height: 44px; }
+.atlas-page .atlas-freshness, .atlas-page .status-line { font-size: 11px; }
+.atlas-page .atlas-status-details { overflow-wrap: anywhere; }
+.atlas-page .map-panel .radar-controls { grid-template-columns: 44px minmax(0, 1fr); gap: 8px; }
+.atlas-page .play-button { width: 44px; height: 44px; }
+.atlas-page .radar-controls input { height: 44px; }
+.atlas-page .radar-controls > span { grid-column: 1 / -1; grid-row: 2; white-space: normal; font-size: 11px; }
+.atlas-page .radar-controls select { grid-column: 1 / -1; width: 100%; max-width: 100%; font-size: 16px; padding: 9px 12px; }
+.atlas-page .map-caption { display: block; font-size: 11px; }
+.atlas-page .map-caption > span { display: block; }
+.atlas-page .map-caption a { display: inline-flex; align-items: center; min-height: 44px; white-space: normal; }
+.atlas-page .leaflet-control-zoom a { width: 44px; height: 44px; line-height: 44px; }
+.atlas-page .atlas-chart-tools { gap: 8px; }
+.atlas-page .atlas-chart-tools button { padding-inline: 10px; }
+.atlas-page .atlas-hour-slider { height: 44px; }
+.atlas-page .atlas-blend-picker select { width: 100%; font-size: 16px; }
+.atlas-page .atlas-inline-link { min-height: 44px; }
+.atlas-page :is(.policy-grid, .thermal-grid, .briefing-detail, .graphcast-meta, .weathernext-day-grid, .model-selectors) { grid-template-columns: minmax(0, 1fr) !important; }
+.atlas-page :is(.source-item, .graphcast-head, .weathernext-subhead) { display: block; }
+.atlas-page .source-item span { display: block; text-align: left; }
+.atlas-page .source-item { overflow-wrap: anywhere; }
+.atlas-page .aqi-week { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.atlas-page .gross-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.atlas-page .gross-facts small { white-space: normal; }
+.atlas-page .metric-wind .compass, .atlas-page .sun-arc { display: none; }
+.atlas-page .metric-wind .metric-value { padding-right: 0; }
+.atlas-page .metric p { max-width: 100%; }
+.atlas-page dialog { width: calc(100% - 20px); max-width: 460px; max-height: calc(100dvh - 24px); padding: 60px 18px 24px; }
+.atlas-page .dialog-close { width: 44px; height: 44px; top: 10px; right: 12px; }
+.atlas-page .chart-top { flex-wrap: wrap; }
+.atlas-page .comparison { table-layout: fixed; }
+.atlas-page .comparison :is(td, th) { overflow-wrap: anywhere; }
+.atlas-page input[type="range"] { min-height: 44px; }
+
+/* Keep the featured forecast's phone geometry even above desktop breakpoints. */
+html body.atlas-page #today-forecast .today-weather-card.today-weather-card { grid-template-rows: minmax(205px, auto) 68px 36px; min-height: 309px; }
+html body.atlas-page #today-forecast .today-weather-card.today-remainder { grid-template-rows: minmax(225px, auto) 68px 36px; min-height: 329px; }
+.atlas-page #today-forecast .today-sky { inset-block: 0 104px; height: calc(100% - 104px); }
+.atlas-page #today-forecast .today-scene-shade { inset: 0 0 104px; }
+.atlas-page #today-forecast .today-copy { width: 60%; padding: 15px 0 14px 12px; }
+.atlas-page #today-forecast .day-name { font-size: 34px; line-height: 1; }
+.atlas-page #today-forecast .today-remainder .day-name { font-size: 25px; line-height: 1.08; }
+.atlas-page #today-forecast .today-condition { margin-top: 6px; font-size: 14px; line-height: 1.3; max-width: 18ch; }
+.atlas-page #today-forecast .today-temperatures { gap: 6px; margin-top: auto; }
+.atlas-page #today-forecast :is(.today-low, .today-high) > strong { font-size: 36px; }
+.atlas-page #today-forecast :is(.today-low, .today-high) > small { font-size: 11px; margin-top: 4px; }
+.atlas-page #today-forecast .today-temperatures > i { font-size: 21px; }
+.atlas-page #today-forecast .today-feels { font-size: 12px; margin-top: 6px; }
+.atlas-page #today-forecast .today-feels b { font-size: 21px; }
+.atlas-page #today-forecast .today-moon { top: 10px; left: 57%; width: 40px; }
+.atlas-page #today-forecast .today-symbol { top: 15px; right: 5px; grid-template-columns: 52px 30px; gap: 0 3px; }
+.atlas-page #today-forecast .today-symbol > svg { width: 30px; height: 30px; }
+.atlas-page #today-forecast .today-symbol > strong { font-size: 26px; }
+.atlas-page #today-forecast .today-symbol > small { font-size: 10px; max-width: 52px; }
+.atlas-page #today-forecast .today-symbol > em { font-size: 9px; white-space: normal; }
+.atlas-page #today-forecast .today-night .today-symbol { grid-template-columns: 52px 30px; }
+.atlas-page #today-forecast .today-night .today-symbol > svg { width: 30px; height: 30px; }
+.atlas-page #today-forecast .today-metrics { margin: 0 6px; padding: 4px 0; border-radius: 12px; }
+.atlas-page .today-panel #today-forecast .today-metric { flex-direction: column; gap: 2px; padding: 0 2px; text-align: center; }
+.atlas-page .today-panel #today-forecast .today-metric svg { width: 17px; height: 17px; }
+.atlas-page .today-panel #today-forecast .today-metric strong { font-size: 13px; white-space: normal; }
+.atlas-page .today-panel #today-forecast .today-metric small { font-size: 10px; margin: 0; }
+.atlas-page #today-forecast .today-more { margin: 4px 6px 0; font-size: 11px; }
+.atlas-page #today-forecast .today-more b { font-size: 18px; }
+.atlas-page #skin-values .sun-shade-comparison { grid-template-columns: minmax(0, 1fr); gap: 14px; max-width: 100%; }
+.atlas-page #skin-values .sun-shade-comparison .exposure-person,
+.atlas-page #skin-values .sun-shade-comparison .exposure-person:has(.reference-scene) { grid-template-rows: 30px 40px 24px 235px minmax(100px, auto); aspect-ratio: auto; border-radius: 16px; }
+.atlas-page #skin-values .sun-shade-comparison .exposure-person > figcaption > strong { font-size: 34px; }
+.atlas-page #skin-values .comfort-later { grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding: 14px; }
+.atlas-page #skin-values .comfort-later::before { display: none; }
+.atlas-page #skin-values .comfort-later > span:first-child, .atlas-page #skin-values .comfort-later > small { grid-column: 1; }
+.atlas-page #skin-values .comfort-later > .peak-reading { grid-column: 2; }
+.atlas-page #skin-values .comfort-later > span:first-child { font-size: 16px; }
+.atlas-page #skin-values .comfort-later > small { font-size: 12px; }
+.atlas-page #skin-values .comfort-later[data-comparison="no-direct-sun"] { grid-template-columns: minmax(0, 1fr); }
+
+/* Full day names and all readings fit without squeezing a six-column desktop row. */
+.atlas-page .daily-panel .day-row {
+  display: grid; grid-template-columns: 42px minmax(0, 1fr) minmax(0, 1fr) 42px;
+  grid-template-areas: "name name icon icon" "low track track high" "feels feels feels feels" "meta meta meta meta";
+  gap: 10px 8px; padding: 14px 12px; min-height: 0; margin: 10px 0;
+}
+.atlas-page .daily-panel .day-row > * { min-width: 0; }
+.atlas-page .daily-panel .day-name { font-size: 15px; line-height: 1.4; overflow-wrap: anywhere; }
+.atlas-page .daily-panel .day-name-full { display: inline; }
+.atlas-page .daily-panel .day-name-mobile { display: none; }
+.atlas-page .daily-panel .day-icon { display: flex; align-items: center; justify-content: flex-end; gap: 7px; }
+.atlas-page .daily-panel .day-icon svg { width: 32px; height: 32px; margin: 0; }
+.atlas-page .daily-panel .day-icon small { font-size: 11px !important; }
+.atlas-page .daily-panel .day-low, .atlas-page .daily-panel .day-high strong { font-size: 23px; }
+.atlas-page .daily-panel .day-low small, .atlas-page .daily-panel .day-high small { font-size: 10px !important; }
+.atlas-page .daily-panel .temp-track { height: 7px; }
+.atlas-page .daily-panel .high-marker { width: 11px; height: 11px; }
+.atlas-page .daily-panel .day-feels-summary { flex-direction: row; align-items: baseline; justify-content: flex-start; gap: 5px; }
+.atlas-page .daily-panel .day-feels-summary small, .atlas-page .daily-panel .day-feels-summary b { font-size: 11px !important; }
+.atlas-page .daily-panel .day-meta {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-areas: "confidence confidence confidence" "wind aqi uv";
+  width: 100%; gap: 9px 5px; padding-top: 10px; margin: 0; border-top: 1px solid #b8daf024;
+}
+.atlas-page .daily-panel .forecast-confidence {
+  grid-area: confidence !important; display: grid; grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "confidence-label confidence-level" "confidence-meter confidence-meter";
+  gap: 8px; width: 100%; text-align: left; margin: 0; font-size: 11px !important;
+}
+.atlas-page .daily-panel .forecast-confidence > span { grid-area: confidence-label; white-space: normal !important; font-size: 11px !important; }
+.atlas-page .daily-panel .forecast-confidence > b { grid-area: confidence-level; font-size: 11px !important; }
+.atlas-page .daily-panel .confidence-meter { grid-area: confidence-meter; width: calc(100% - 14px); height: 5px; margin-bottom: 5px; }
+.atlas-page .daily-panel .day-wind-chip { grid-area: wind; flex-wrap: wrap; white-space: normal; }
+.atlas-page .daily-panel .day-aqi-chip { grid-area: aqi; font-size: 10px; justify-content: center; white-space: normal; }
+.atlas-page .daily-panel .daily-uv { grid-area: uv; font-size: 10px; text-align: right; white-space: normal; }
+.atlas-page .daily-panel .forecast-confidence-notice { flex-wrap: wrap; padding: 10px; }
+.atlas-page #skin-exposure .skin-kicker { font-size: 20px; line-height: 1.3; margin: 0 0 16px; }
+.atlas-page #skin-values .sun-shade-comparison .exposure-person > .exposure-label { font-size: 22px; }
+.atlas-page #skin-values .sun-shade-comparison .exposure-person > .exposure-subtitle { font-size: 14px; }
+.atlas-page #skin-values .sun-shade-comparison .exposure-person > svg,
+.atlas-page #skin-values .sun-shade-comparison .pavement-person > .poodle-scene { height: 235px !important; aspect-ratio: auto !important; }
+.atlas-page #skin-values .sun-shade-comparison .exposure-person > figcaption > small { font-size: 12px; line-height: 1.4; }
+.atlas-page #skin-values .sun-shade-comparison .exposure-person > figcaption > .pavement-secondary { font-size: 14px; }
+.atlas-page #skin-values .sun-shade-comparison .exposure-person .thermal-risk,
+.atlas-page #skin-values .sun-shade-comparison .exposure-person .pavement-warning { font-size: 11px; white-space: normal; }
+.atlas-page #skin-values .sun-shade-comparison .exposure-person[data-reading="unavailable"] > figcaption > strong { font-size: 22px; }
+
+.atlas-page .aqi-summary { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.atlas-page .aqi-pollutants { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.atlas-page .aqi-pollutants > span { min-width: 0; padding: 10px; }
+.atlas-page .car-wash-hero { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.atlas-page .car-wash-checks { width: 100%; gap: 10px; padding: 12px; }
+.atlas-page .car-wash-fact { grid-template-columns: 24px minmax(0, 1fr); gap: 8px; }
+.atlas-page .car-wash-fact b { font-size: 14px; }
+.atlas-page .car-wash-fact small, .atlas-page .car-wash-answer p, .atlas-page .car-wash-header p { font-size: 12px; line-height: 1.5; }
+.atlas-page .car-wash-days { display: flex; overflow-x: auto; gap: 8px; padding-bottom: 8px; scroll-snap-type: x proximity; }
+.atlas-page .car-wash-day { flex: 0 0 92px; padding: 12px 6px; scroll-snap-align: start; border-radius: 12px; }
+.atlas-page .car-wash-day > strong, .atlas-page .car-wash-temps, .atlas-page .car-wash-chance { font-size: 12px; }
+.atlas-page .car-wash-day > small, .atlas-page .car-wash-day-verdict { font-size: 11px; }
+.atlas-page .car-wash-day svg { width: 32px; height: 32px; }
+.atlas-page .car-wash-window { grid-template-columns: 24px minmax(0, 1fr); }
+.atlas-page .car-wash-tip { display: none; }
+.atlas-page .car-wash-footer { font-size: 11px; line-height: 1.5; letter-spacing: 0; }
+
+/* The condition icon shares the header row, never the large numeric reading. */
+.atlas-page .atlas-current .hero-scene { top: 16px; right: 22px; width: 44px; height: 44px; }
+.atlas-page .atlas-current .hero-scene svg { width: 44px; height: 44px; }
+.atlas-page .atlas-coordinate-mark { visibility: hidden; }
+html body.atlas-page #wn-var-picker button, html body.atlas-page #wn-compare-chart .wn-chip { min-height: 44px !important; }
+@media (max-width: 359px) {
+  .atlas-page .atlas-back-link { display: none; }
+  .atlas-page .atlas-status-row { display: block; }
+  .atlas-page .atlas-status-details { max-width: 100%; text-align: left; margin-top: 8px; }
 }

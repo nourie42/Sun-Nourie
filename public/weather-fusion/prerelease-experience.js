@@ -1,0 +1,337 @@
+import {hasSnowCondition} from './prerelease-exposure-scene.js?v=prerelease-winter-v1';
+import {confidenceNotice,todayForecastHTML} from './today-card.js?v=mobile-repair-v1';
+import {FORECAST_CONFIDENCE_VERSION,confidenceMeterPosition} from './forecast-confidence.js?v=category-meter-v1';
+import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
+import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './prerelease-pavement.js?v=wardrobe-v1';
+import {weatherState} from './weather-state.js';
+import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=warmest-sun-explain-v1';
+import {degrees,displayedFeelsAt,dailyFeels,forecastValue,timeAt,peakFeelsHTML,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=dewpoint-floor-v1';
+import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './prerelease-personal-details.js?v=shade-linked-v2';
+import {sunExposureTemperature} from './outdoor-feels.js?v=sun-exposure-v1';
+import {comfortMode,comfortWindow,comfortNarrative,warmestTodayWindow} from './comfort-outlook.js?v=warmest-sun-explain-v1';
+import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js?v=full-day-rain-v1';
+import {displayedRainChance,rainAwareCondition} from './rain-display.js?v=rain-icon-v2';
+import {resetDewpointMeter} from './prerelease-dewpoint-meter.js?v=weather-qa-v67';
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const number=(n,d=0)=>finite(n)?n.toFixed(d):'—';
+const temp=n=>`${number(n)}°`;
+const defs={
+ temperature:{title:'Temperature',unit:'°',field:'temperature',note:'How the air temperature is expected to change.',color:'#ffd58a'},
+ feels:{title:'Feels like',unit:'°',field:'feels',note:'Outdoor feels-like forecast using the sky and sunlight at each hour. The outdoor figure and hourly forecast use this same reading.',color:'#ffcf96'},
+ precipitation:{title:'Precipitation',unit:' in',field:'precipitation',note:'How much rain or melted snow is expected each hour.',color:'#8bcfff',digits:2,bars:true,zero:true},
+ wind:{title:'Wind',unit:' mph',field:'wind',note:'How breezy it is expected to be.',color:'#a7e5d1',zero:true},
+ humidity:{title:'Humidity',unit:'%',field:'humidity',note:'How damp the air is expected to be.',color:'#9edfff',zero:true,max:100},
+ pop:{title:'Rain chance',unit:'%',field:'pop',note:'The chance of rain during each forecast hour.',color:'#adcbff',zero:true,max:100},
+ visibility:{title:'Visibility',unit:' mi',field:'visibility',note:'How far you may be able to see clearly.',color:'#c5dcf1',digits:1,zero:true},
+ pressure:{title:'Pressure',unit:' mb',field:'pressure',note:'How sea-level pressure is expected to change.',color:'#c6bafa',digits:1},
+ solar:{title:'Sunset',unit:'',field:'solar',note:'When the sun is expected to set over the next week.',color:'#ffdc9b',solar:true},
+};
+let comfortPreview=null;
+let data=null, active=null, horizon=24, selected=0, graphPoints=[], graphGeometry=null;
+const formatTime=(v,options={})=>new Intl.DateTimeFormat('en-US',{timeZone:data?.location.timeZone||'America/New_York',hour:'numeric',minute:'2-digit',...options}).format(new Date(v));
+const localMinutes=v=>{const p=new Intl.DateTimeFormat('en-US',{timeZone:data?.location.timeZone||'America/New_York',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date(v));return Number(p.find(x=>x.type==='hour').value)*60+Number(p.find(x=>x.type==='minute').value);};
+const clockMinutes=n=>{const h=Math.floor(n/60)%24,m=Math.round(n%60);return `${h%12||12}:${String(m).padStart(2,'0')} ${h>=12?'PM':'AM'}`;};
+const displayValue=(v,def)=>!finite(v)?'Not available':def.solar?clockMinutes(v):`${number(v,def.digits||0)}${def.unit}`;
+function locationClock(time,zone='America/New_York'){
+ const parts=new Intl.DateTimeFormat('en-US',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date(time));
+ const get=type=>parts.find(p=>p.type===type)?.value;
+ return {day:`${get('year')}-${get('month')}-${get('day')}`,hour:Number(get('hour')),minute:Number(get('minute'))};
+}
+export function comfortDisplayMode(time=Date.now(),zone='America/New_York'){return comfortMode(time,zone);}
+export function overnightComfort(forecast,now=Date.now()){
+ const summary=comfortWindow(forecast,now);return summary&&summary.mode!=='day'?summary:null;
+}
+function valuesThrough(series,now,end){return (series||[]).filter(p=>{const t=Date.parse(p.time);return finite(t)&&t>=now&&t<=Date.parse(end)&&finite(p.value);}).map(p=>p.value);}
+export function comfortWeatherKind(forecast,now=Date.now()){
+ const current=currentSample(forecast,now),weather=weatherState(current.condition),elevation=solarElevation(now,forecast?.location?.latitude,forecast?.location?.longitude),hour=localMinutes(now)/60;
+ if(weather.kind==='storm')return 'storm';
+ if(weather.kind==='rain')return 'rain';
+ if(weather.kind==='snow')return 'snow';
+ if(weather.kind==='fog')return 'fog';
+ if((finite(elevation)&&elevation<=0)||(!finite(elevation)&&(hour<7||hour>=19)))return 'night';
+ if(['cloudy','partly-cloudy'].includes(weather.kind))return 'cloud';
+ return weather.kind==='clear'?'sun':'calm';
+}
+function weatherArt(kind){
+ const items=(cls,count,symbol='')=>Array.from({length:count},(_,i)=>`<i class="${cls}" style="--i:${i};--x:${7+(i*37)%89}%;--delay:-${((i*43)%170)/100}s">${symbol}</i>`).join('');
+ if(kind==='rain')return items('wx-drop',14);
+ if(kind==='storm')return `<i class="wx-flash"></i>${items('wx-drop',16)}`;
+ if(kind==='snow')return items('wx-flake',14,'✦');
+ if(kind==='night')return items('wx-star',12,'✦');
+ if(kind==='wind')return items('wx-wind-line',7);
+ if(kind==='fog')return items('wx-fog-line',5);
+ if(kind==='cloud')return '<i class="wx-cloud wx-cloud-a"></i><i class="wx-cloud wx-cloud-b"></i>';
+ if(kind==='sun')return '<i class="wx-sun-glow"></i><i class="wx-sun-ring"></i>';
+ return '';
+}
+function renderComfortArt(forecast,now){
+ const tile=$('skin-exposure');if(!tile)return;
+ let art=tile.querySelector('.comfort-weather-art');if(!art){art=document.createElement('div');art.className='comfort-weather-art';art.setAttribute('aria-hidden','true');tile.prepend(art);}
+ const kind=comfortWeatherKind(forecast,now);tile.dataset.weather=kind;art.className=`comfort-weather-art weather-${kind}`;art.innerHTML=weatherArt(kind);
+}
+/** Illustrations look ahead only within the selected location's current date.
+ * The canonical sample and all numeric cards stay untouched. */
+export function comfortClothingPlan(forecast,now=Date.now(),sample=null){
+ sample=sample||currentSample(forecast,now);
+ const zone=forecast?.location?.timeZone||'America/New_York';
+ const day=t=>locationClock(t,zone).day;
+ const today=day(now),currentTime=finite(Date.parse(sample.time))?Date.parse(sample.time):now;
+ const currentValues=[sample.feels,sample.comfort?.shade].filter(finite);
+ const initial=currentValues.length?Math.min(...currentValues):null;
+ let coldest=finite(initial)?{value:initial,time:new Date(currentTime).toISOString(),forecast:!sample.now}:null;
+ const points=sample.now?(forecast?.metricForecasts?.series?.feels||[]).filter(p=>{
+  const t=Date.parse(p.time);return finite(t)&&t>=now&&day(t)===today;
+ }):[];
+ const available=points.filter(p=>finite(displayedFeelsAt(forecast,p.time)));
+ for(const p of available){
+  const values=[displayedFeelsAt(forecast,p.time),p.shadeValue].filter(finite),value=Math.min(...values);
+  if(!coldest||value<coldest.value)coldest={value,time:p.time,forecast:true};
+ }
+ const selectedRow=(forecast?.hours||[]).find(h=>Date.parse(h.time)===Date.parse(sample.time));
+ const currentSnow=hasSnowCondition(sample.condition)||(!sample.now&&finite(selectedRow?.snowfall)&&selectedRow.snowfall>0);
+ const supplement=forecast?.prereleaseWinter,checked=Date.parse(supplement?.assembledAt);
+ const modelSnow=sample.now&&finite(checked)&&checked<=now+300000&&now-checked<=1800000?Object.values(supplement?.sources||{}).filter(source=>['ready','partial'].includes(source.status)).flatMap(source=>(source.intervals||[]).filter(row=>{const start=Date.parse(row.start),end=Date.parse(row.end);return finite(start)&&finite(end)&&end>now&&day(Math.max(start,now))===today&&finite(row.value)&&row.value>0;}).map(row=>({time:new Date(Math.max(Date.parse(row.start),now)).toISOString(),condition:'Chance snow',snowfall:row.value,modelSignal:true}))).sort((a,b)=>Date.parse(a.time)-Date.parse(b.time))[0]:null;
+ const futureSnow=(sample.now?(forecast?.hours||[]).filter(h=>{
+  const t=Date.parse(h.time);return finite(t)&&t>=now&&day(t)===today&&(hasSnowCondition(h.condition)||(finite(h.snowfall)&&h.snowfall>0));
+ }).sort((a,b)=>Date.parse(a.time)-Date.parse(b.time))[0]:null)||modelSnow;
+ const snow=currentSnow?{time:sample.time,condition:sample.condition,isDay:sample.isDay,possible:weatherState(sample.condition).chance,forecast:!sample.now||sample.currentPrecipitation?.label!=='Snow now'}:futureSnow?{
+  time:futureSnow.time,condition:futureSnow.condition,isDay:solarElevation(Date.parse(futureSnow.time),forecast.location?.latitude,forecast.location?.longitude)>0,
+  possible:weatherState(futureSnow.condition).chance||!(finite(futureSnow.snowfall)&&futureSnow.snowfall>0),forecast:true
+ }:null;
+ const clock=t=>new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',minute:'2-digit'}).format(new Date(t));
+ const clothingFeels=snow?Math.min(coldest?.value??32,32):coldest?.value??null;
+ const artForecast=!!snow?.forecast&&sample.now===true;
+ const coldForecast=!!coldest?.forecast&&sample.now===true;
+ const note=!sample.now?'Illustration and readings show the selected forecast hour.':artForecast?
+  `${snow.possible?'Snow possible':'Snow forecast'} at ${clock(snow.time)}. Winter illustration previews that forecast; the human temperature readings below are for now.`:
+  coldForecast?`Outfits plan for the coldest available hour today: ${Math.round(coldest.value)}° feels like at ${clock(coldest.time)}. The human temperature readings below are for now.`:
+  available.length?'Outfits cover current conditions and the available forecast for the rest of today. Temperature readings are for now.':'Outfits match current conditions. No later same-day feels-like forecast is available.';
+ return {clothingFeels,coldest,snow,snowArtwork:!!snow,artForecast,artDaylight:snow?.isDay,coldForecast,availableHours:available.length,note};
+}
+function ensureComfortStyles(){
+ if(!document.getElementById('weather-prerelease-comfort')){const extra=document.createElement('link');extra.id='weather-prerelease-comfort';extra.rel='stylesheet';extra.href='/weather-fusion/prerelease-comfort.css?v=winter-v1';document.head.append(extra);}
+ if(document.getElementById('weather-nourie-comfort-effects'))return;
+ const link=document.createElement('link');link.id='weather-nourie-comfort-effects';link.rel='stylesheet';link.href='/weather-fusion/comfort-effects.css?v=weather-art-labels-v10';document.head.append(link);
+}
+function pointsFor(key, hours=48) {
+ if(!data)return [];
+ if(key==='solar')return (data.metricForecasts?.solar||[]).map(d=>({time:d.sunset,value:d.sunset?localMinutes(d.sunset):null,sunrise:d.sunrise,date:d.date})).filter(d=>d.time);
+ const points=(data.metricForecasts?.series?.[defs[key].field]||[]).slice(0,hours);
+ if(key==='feels')return points.map(p=>({...p,rawValue:p.value,value:displayedFeelsAt(data,p.time)}));
+ return key==='pressure'?points.map(p=>({...p,value:pressureMb(p.value)})):points;
+}
+function sparkline(points) {
+ const values=points.map(p=>p.value).filter(finite);
+ if(values.length<2)return '';
+ const lo=Math.min(...values),hi=Math.max(...values),span=Math.max(1,hi-lo);
+ let drawing='',continuous=false;
+ points.forEach((p,i)=>{if(!finite(p.value)){continuous=false;return;}const x=2+i/Math.max(1,points.length-1)*116,y=29-(p.value-lo)/span*23;drawing+=`${continuous?'L':'M'}${x.toFixed(1)},${y.toFixed(1)} `;continuous=true;});
+ return `<svg class="tile-spark" viewBox="0 0 120 34" aria-hidden="true"><path d="${drawing}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
+export function selectComfortHour(time){
+ comfortPreview=time==='now'?null:time;
+ if(data)renderComfort(data);
+}
+export function renderComfort(forecast) {
+ data=forecast;ensureComfortStyles();
+ const now=Date.now(),current=currentSample(forecast,now);
+ const sample=comfortPreview?forecastSample(forecast,comfortPreview):current;
+ if(!sample){comfortPreview=null;return renderComfort(forecast);}
+ const c=sample.comfort,zone=forecast.location.timeZone,summary=comfortWindow(forecast,now+1);
+ const sunDisplay=sunExposureTemperature(sample);
+ const precipitation=forecastValue(forecast,'precipitation',sample.time);
+ const clothing=comfortClothingPlan(forecast,now,sample);
+ const sceneContext={...clothing,forecast:!sample.now,condition:sample.condition,pop:sample.pop,precipitation,rainAround:sample.rainAround===true,radarThreat:sample.radarThreat===true};
+ const pavement=pavementEstimate(forecast,sample.inputs,sample.now?now:Date.parse(sample.time),{checkedAt:now,...sceneContext});
+ const kicker=$('skin-kicker');if(kicker)kicker.textContent=sample.now?'How it’s gonna feel today':`How will it feel outside at ${formatTime(sample.time)}?`;
+ const preview=sample.now?'':'<div class="comfort-preview-heading"><button type="button" data-comfort-reset>Back to now</button></div>';
+ $('skin-values').innerHTML=`${preview}<p class="comfort-outfit-note" data-art-basis="${clothing.artForecast?'forecast':clothing.coldForecast?'coldest-today':'current'}">${esc(clothing.note)}</p>${sunShadeHTML(c,forecast.location,sample.now?now:Date.parse(sample.time),{...sceneContext,primaryFeels:sample.feels,sunExposure:sunDisplay.value,compact:true,pavement:pavementHTML(pavement,sample.feels,sceneContext)})}${sample.now?peakComparisonHTML(warmestTodayWindow(forecast,now),sunExposureTemperature(current).value,zone,now):''}`;
+ $('skin-values').querySelector('[data-comfort-reset]')?.addEventListener('click',()=>selectComfortHour('now'));
+ $('skin-explanation').textContent=sample.now?comfortNarrative(sample.inputs,c,summary,zone):`${sample.condition}. This hour uses air ${degrees(sample.temperature)}, dew point ${degrees(sample.inputs.dewpoint)} and ${number(sample.inputs.wind)} mph wind. ${sunDisplay.active?`Estimated sun exposure ${degrees(sunDisplay.value)}; `:''}UTCI outdoors ${degrees(sample.feels)}; shade ${degrees(c.shade)}. The illustration and solar estimate use this same forecast hour.`;
+ const tile=$('skin-exposure');tile.dataset.preview=sample.now?'current':'forecast';tile.dataset.weather=weatherState(sample.condition).kind;
+ tile.querySelector('.comfort-weather-art')?.remove();
+ document.querySelectorAll('#hourly [data-comfort-time]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.comfortTime===(sample.now?'now':sample.id))));
+ if($('comfort-extra-science'))$('comfort-extra-science').innerHTML=`<p>${esc(sampleCaption(sample,zone))}</p><p>${sunDisplay.active?'The sun figure is an estimated air temperature plus the model’s sun-versus-shade radiant increase. It is not a thermometer reading or UTCI. The shade figure is modeled UTCI.':'Shade and outdoors are modeled feels-like temperatures from the same weather inputs.'} When shown, sidewalk and asphalt readings are estimated surface temperatures, not air temperature, human feels-like or paw temperature. Cold-weather pet cards give qualitative exposure guidance. Outfits use the coldest available remaining same-day feels-like forecast; snow scenes are labeled when they preview a later forecast.</p>`;
+ if($('pavement-current-science'))$('pavement-current-science').innerHTML=pavementDetailsHTML(pavement,sceneContext);
+ $('skin-science').textContent=`${c.method}. ${sampleCaption(sample,zone)}. Air ${degrees(sample.temperature)}; dew point ${degrees(sample.inputs.dewpoint)}; wind ${number(sample.inputs.wind)} mph${finite(sample.inputs.gust)?`; gust ${number(sample.inputs.gust)} mph`:''}. ${sunDisplay.active?`The sun-exposure display adds the modeled UTCI sun-minus-shade difference (${degrees(sunDisplay.solarLift)}) to air temperature; it is an estimate, not measured air temperature or UTCI. `:''}${c.note} Current observations and future forecasts are different sources; the Now card uses exactly the same observation as the hero. The raw thermal calculation is unchanged. For display only, the primary outdoor feels-like is not shown below the same-hour dew point unless gusts reach ${GUSTY_FEELS_DISPLAY_MPH} mph.`;
+}
+function dailyWindSummary(forecast,day,display,index,now){
+ const zone=forecast?.location?.timeZone||'America/New_York';
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(day?.date||''))return {text:'Wind —',gust:null};
+ const next=new Date(Date.parse(day.date+'T12:00:00Z')+86400000).toISOString().slice(0,10);
+ const highStart=Date.parse(day.highWindow?.start),lowStart=Date.parse(day.lowWindow?.start),lowEnd=Date.parse(day.lowWindow?.end);
+ const start=display.tonight?now
+   : index===0?Math.max(now,finite(highStart)?highStart:timeAt(day.date,7,zone))
+   : finite(highStart)?highStart:timeAt(day.date,7,zone);
+ const end=finite(lowEnd)?lowEnd:timeAt(next,7,zone);
+ const values=(forecast.metricForecasts?.series?.wind||[]).filter(p=>{const t=Date.parse(p.time);return t>=start&&t<end&&finite(p.value)&&p.value>=0;}).map(p=>p.value);
+ const gusts=(forecast.metricForecasts?.series?.gust||[]).filter(p=>{const t=Date.parse(p.time);return t>=start&&t<end&&finite(p.value)&&p.value>=0;}).map(p=>p.value);
+ if(!values.length)return {text:'Wind —',gust:gusts.length?Math.round(Math.max(...gusts)):null};
+ const lo=Math.round(Math.min(...values)),hi=Math.round(Math.max(...values));
+ return {text:lo===hi?`Wind ${lo} mph`:`Wind ${lo}–${hi} mph`,gust:gusts.length?Math.round(Math.max(...gusts)):null};
+}
+export function renderDailyRows(forecast,icon) {
+ const days=(forecast.days||[]).slice(0,7);
+ const values=days.flatMap(d=>[d.high,d.low]).filter(finite),lo=values.length?Math.min(...values)-3:0,hi=values.length?Math.max(...values)+3:1;
+ const rows=days.map((d,i)=>{
+  const now=Date.now(),p=dailyDisplay(d,i,now,forecast.location.timeZone),rain=displayedRainChance(forecast,p.pop,{dayIndex:i,now}),shownPop=rain.value,_rc=(p.condition=rainAwareCondition(p.condition,rain.value,d,p.tonight)),bar=temperatureBar(p.primary,lo,hi),feel=dailyFeels(forecast,i,now);
+  const confidence=d.confidence||{label:'Unavailable',score:null,key:'unavailable',factors:[],note:'Forecast confidence data is unavailable.'};
+  const confidencePosition=confidenceMeterPosition(confidence);
+  const plainConfidenceNotice=confidenceNotice(confidence);
+  const confidenceNoticeHTML=dailyConfidenceNoticeHTML(confidence);
+  const confidenceTitle=`Forecast confidence: ${confidence.label}. ${confidence.factors?.join('; ')||confidence.note||''} ${confidence.note||''}`.trim();
+  const low=p.tonight?p.primary:p.secondary,high=p.tonight?null:p.primary;
+  const lowFeels=feel.low?.low?.value,highFeels=p.tonight?lowFeels:feel.high?.high?.value;
+  const feelsText=p.tonight?degrees(highFeels):`${degrees(lowFeels)} / ${degrees(highFeels)}`;
+  const wind=dailyWindSummary(forecast,d,p,i,now),gusty=finite(wind.gust)&&wind.gust>=GUSTY_FEELS_DISPLAY_MPH;
+  const aqRows=(forecast.airQuality?.hours||[]).filter(r=>new Intl.DateTimeFormat('en-CA',{timeZone:forecast.location.timeZone}).format(new Date(r.time))===d.date&&finite(r.aqi));
+  const dayAqi=aqRows.length?Math.max(...aqRows.map(r=>r.aqi)):null;
+  const windSpeed=wind.text.replace(/^Wind\s*/,'');
+  const confidenceAria=plainConfidenceNotice?` ${plainConfidenceNotice.title}. ${plainConfidenceNotice.text}`:'';
+  return `<button class="day-row ${p.tonight?'tonight-row':''}" data-day="${i}" aria-label="${esc(p.label)}, ${esc(rain.observed?'Rain now':p.condition)}. ${rain.observed?'Rain is observed now at this location.':finite(shownPop)?`Rain chance ${number(shownPop)} percent.`:'Rain chance unavailable.'} ${p.primaryLabel} ${number(p.primary)} degrees${finite(p.secondary)?`, low ${number(p.secondary)} degrees`:''}. ${esc(wind.text)}${gusty?`, gust ${wind.gust} mph`:''}. Forecast confidence ${esc(confidence.label)}.${esc(confidenceAria)} Open details.">
+   <span class="day-name" title="${esc(p.label)}"><span class="day-name-full">${esc(p.label)}</span><span class="day-name-mobile">${esc(p.remainder?'Today':p.label)}</span></span>
+   <span class="day-icon">${icon(rain.observed?'Rain':p.condition,!p.tonight)}<small title="${finite(shownPop)?'Rain chance':'Rain probability is not published by this forecast feed'}">${finite(shownPop)?`${number(shownPop)}%`:'Rain —'}</small></span>
+   <span class="day-low">${temp(low)}<small>Low</small></span>
+   <span class="temp-track" aria-hidden="true">${bar===null?'':`<span class="temp-fill" style="left:0;width:${bar}%"></span><i class="high-marker" style="left:clamp(4px,${bar}%,calc(100% - 4px))"></i>`}</span>
+   <span class="day-high">${finite(high)?`<strong>${temp(high)}</strong><small>High</small>`:''}</span>
+   <span class="day-feels-summary"><small>Feels like</small><b>${feelsText}</b></span>
+   <span class="day-meta"><span class="forecast-confidence" data-confidence="${esc(confidence.key)}" title="${esc(confidenceTitle)}"><span>Forecast confidence</span><b>${esc(confidence.label)}</b>${confidencePosition!==null?`<i class="confidence-meter" aria-hidden="true" data-confidence-score="${confidence.score}"><em style="width:${confidencePosition}%"></em></i>`:''}</span><span class="day-wind-chip" title="${esc(wind.text)}${gusty?` · Gust ${wind.gust} mph`:'' }"><span class="day-wind-label">Wind</span><b>${esc(windSpeed.replace(/\s*mph$/i,''))}</b><span class="day-wind-unit">mph</span>${gusty?`<em>G${wind.gust}</em>`:''}</span><span class="day-aqi-chip" title="Peak available AQI forecast for this date"><span>AQI</span><b>${finite(dayAqi)?Math.round(dayAqi):'—'}</b></span>${dailyUvHTML(d.uvMax,p.tonight?'Peak UV today':'Peak UV')}</span>
+   ${confidenceNoticeHTML}
+  </button>`;
+ });
+ $('daily').innerHTML=rows.join('');
+ // The featured card shares the daily timing policy and opens the same details.
+ const today=$('today-forecast');
+ if(today){
+  today.innerHTML=todayForecastHTML(forecast);
+  today.querySelectorAll('[data-today-forecast]').forEach(button=>{
+   button.setAttribute('data-today-forecast','');
+   button.setAttribute('aria-haspopup','dialog');
+   button.addEventListener('click',()=>$('daily')?.querySelector('[data-day="0"]')?.click());
+  });
+ }
+}
+
+export function dailyConfidenceNoticeHTML(confidence,dialog=false){
+ const notice=confidenceNotice(confidence);
+ if(!notice)return '';
+ const tag=dialog?'div':'span';
+ const text=dialog?notice.text.replace(/Click for details\.$/,'Confidence details are below.'):notice.text;
+ return `<${tag} class="${dialog?'dialog-confidence-notice':'forecast-confidence-notice'}" data-confidence="${esc(confidence.key)}"><strong>${esc(notice.title)}</strong><span>${esc(text)}</span></${tag}>`;
+}
+export function renderMetricTiles(forecast,smallIcon) {
+ data=forecast;
+ const now=Date.now(),c=data.current,d=dailyDisplay(data.days[0],0,now,data.location.timeZone),rain=displayedRainChance(data,d.pop,{now});
+ const currentComfort=data.comfort||thermalComfort(c,data.location,Date.parse(data.assembledAt));
+ const windText=finite(c.wind)?c.wind<3?'Hardly a breeze.':c.wind<12?'A light breeze.':c.wind<25?'A breezy day.':'Strong winds.':'';
+ const aq=data.airQuality,aqValue=finite(aq?.aqi)?Math.round(aq.aqi):null;
+ const pressureSeries=pointsFor('pressure',24),futurePressure=pressureSeries.find(p=>Date.parse(p.time)>now+2.5*3600000),observedPressure=stationPressureMb(c),currentPressure=observedPressure??pressureSeries.find(p=>finite(p.value))?.value??null;
+ const pressureNote=c.pressureTrend?.status==='ready'?pressureTrendText(c):finite(currentPressure)&&finite(futurePressure?.value)?`${futurePressure.value>currentPressure+.2?'↑ Forecast to rise':futurePressure.value<currentPressure-.2?'↓ Forecast to drop':'→ Forecast nearly steady'} · next 3 hours${observedPressure===null?' (forecast baseline)':''}`:finite(currentPressure)?'Sea-level forecast pressure · observed trend unavailable.':'Pressure forecast unavailable — waiting for a usable value.';
+ const tiles=[
+  ['feels','temp',degrees(currentSample(forecast).feels),`${currentSample(forecast).exposure.label} · same outdoor estimate as Now.`],
+  ['precipitation','drop',finite(data.precipitation?.value)?`${number(data.precipitation.value,2)}<small>in</small>`:'—','Expected over the next 24 hours.'],
+  ['wind','wind',`${number(c.wind)}<small>mph</small>`,windText],
+  ['humidity','drop',`${number(c.humidity)}<small>%</small>`,finite(c.dewpoint)&&c.dewpoint>=65?'The air feels muggy.':finite(c.humidity)?'Moisture in the air.':'Waiting for an update.'],
+  ['pop','drop',finite(rain.value)?`${number(rain.value)}<small>%</small>`:'—',rain.observed?'Rain is observed at this location now. Future hourly percentages remain forecasts.':d.tonight?'Chance of rain tonight.':'Chance of rain today or tonight.'],
+  ['visibility','eye',`${number(c.visibility,finite(c.visibility)&&Number.isInteger(c.visibility)?0:1)}<small>mi</small>`,'How far you can see clearly right now.'],
+  ['pressure','gauge',`${number(currentPressure,1)}<small>mb</small>`,pressureNote],
+  ['solar','sun',data.solar.sunset?esc(formatTime(data.solar.sunset)):'—',data.solar.sunrise?`Sunrise ${formatTime(data.solar.sunrise)}.`:'Daylight through the week.'],
+ ];
+ const aqiKey=aqValue===null?'unavailable':aqValue<=50?'good':aqValue<=100?'moderate':aqValue<=150?'sensitive':aqValue<=200?'unhealthy':aqValue<=300?'very-unhealthy':'hazardous';
+ $('metrics').innerHTML=tiles.map(([key,ic,value,note])=>`<button type="button" class="glass metric metric-${key}" data-metric="${key}"${key==='pressure'?` data-pressure-trend="${esc(c.pressureTrend?.direction||'unknown')}"`:''} aria-haspopup="dialog" aria-label="${defs[key].title}: open forecast graph"><span class="metric-title">${smallIcon(ic)}${defs[key].title}</span><span class="metric-value">${value}</span><span class="metric-note">${esc(note)}</span>${sparkline(pointsFor(key,24))}<span class="tile-hint">${key==='solar'?'Tap for the week ahead':'Tap for forecast details'}</span></button>`).join('');
+ $('metric-science').innerHTML=`<p>Current cards use a fresh nearby station when it is within 10 miles. When the nearest station is farther away, they use selected-location hourly guidance and identify it as an estimate. Tap a card for separate future forecast data. Daily forecasts share one hour-by-hour graph: temperature, feels-like and Feel Meter dew point use the left Fahrenheit scale; UV uses the right index scale. Slide or tap to read all four at the same hour. Gaps mean missing data, not zero. Feel Meter describes humidity through dew point, not a second feels-like temperature. The raw UTCI/Tier-3 feels-like calculation remains unchanged; visible primary outdoor feels-like values use a display sanity floor at the same-hour dew point unless forecast gusts are at least ${GUSTY_FEELS_DISPLAY_MPH} mph. All displayed pressures use millibars (mb). A pressure trend is shown only for a station observation; forecast pressure has no observed trend.</p>${Object.entries(data.metricForecasts?.notes||{}).map(([key,note])=>`<p><strong>${esc(key)}:</strong> ${esc(note)}</p>`).join('')}`;
+ if(active&&$('metric-dialog')?.open)drawChart();
+}
+function chartGrid(def,points) {
+ const W=window.innerWidth<600?360:660,H=268,L=48,R=16,T=22,B=34;
+ const vals=points.map(p=>p.value).filter(finite);
+ let low=vals.length?Math.min(...vals):0,high=vals.length?Math.max(...vals):1;
+ const delta=Math.max(def.digits?0.01:1,(high-low)*.18);
+ low=def.zero?0:low-delta;high=def.max??high+delta;
+ if(high<=low)high=low+1;
+ const a=points.length?Date.parse(points[0].time):0,b=points.length?Date.parse(points.at(-1).time):1;
+ const x=i=>L+(Date.parse(points[i].time)-a)/Math.max(1,b-a)*(W-L-R),y=v=>T+(high-v)/(high-low)*(H-T-B);
+ const ticks=Array.from({length:4},(_,i)=>{const v=low+(high-low)*i/3;const label=def.solar?clockMinutes(Math.round(v)):def.unit===' in'?v.toFixed(2):def.unit===' mb'?v.toFixed(1):Math.round(v)+ (def.unit==='°'?'°':'');return `<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" class="graph-grid"/><text x="${L-9}" y="${y(v)+4}" text-anchor="end" class="graph-axis">${label}</text>`;}).join('');
+ const tickCount=points.length<2?1:4;
+ const times=Array.from({length:tickCount},(_,i)=>{const ix=Math.round(i/Math.max(1,tickCount-1)*(points.length-1));return points[ix]?`<text x="${x(ix)}" y="${H-8}" text-anchor="${i===0?'start':i===tickCount-1?'end':'middle'}" class="graph-axis">${esc(def.solar?formatTime(points[ix].time,{weekday:'short',hour:undefined,minute:undefined}):formatTime(points[ix].time,{hour:'numeric',minute:undefined}))}</text>`:'';}).join('');
+ let lines='',areas='',segment=[];
+ function flush(){if(!segment.length)return;const path=segment.map(([xx,yy],i)=>`${i?'L':'M'}${xx},${yy}`).join(' ');lines+=`<path d="${path}" class="graph-line"/>`;if(segment.length>1)areas+=`<path d="${path} L${segment.at(-1)[0]},${H-B} L${segment[0][0]},${H-B} Z" fill="url(#chart-fill)"/>`;segment=[];}
+ points.forEach((p,i)=>{if(!finite(p.value)){flush();return;}segment.push([x(i),y(p.value)]);});flush();
+ const bw=Math.max(2,Math.min(24,(W-L-R)/Math.max(1,points.length)*.64));
+ const bars=def.bars?points.map((p,i)=>finite(p.value)?`<rect x="${x(i)-bw/2}" y="${y(p.value)}" width="${bw}" height="${Math.max(p.value===0?1:2,H-B-y(p.value))}" rx="2" fill="${def.color}" opacity=".83"/>`:'').join(''):'';
+ graphGeometry={W,H,L,R,x,y};
+ return `<svg id="forecast-graph" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(def.title)} forecast graph. Use the slider below for each value." style="--graph-color:${def.color}"><defs><linearGradient id="chart-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${def.color}" stop-opacity=".28"/><stop offset="100%" stop-color="${def.color}" stop-opacity="0"/></linearGradient></defs>${ticks}${def.bars?bars:areas+lines}${times}<line id="graph-cursor" y1="${T}" y2="${H-B}" class="graph-cursor"/><circle id="graph-point-halo" r="9" fill="${def.color}" opacity=".18"/><circle id="graph-point" r="4" fill="${def.color}" stroke="white" stroke-width="1.5"/></svg>`;
+}
+function selectPoint(i) {
+ const def=defs[active];if(!def)return;
+ selected=Math.max(0,Math.min(graphPoints.length-1,i));
+ const p=graphPoints[selected];if(!p)return;
+ $('chart-value').textContent=displayValue(p.value,def);
+ $('chart-time').textContent=formatTime(p.time,{weekday:'short',month:'short',day:'numeric'});
+ const companion=$('chart-companion');
+ if(companion){companion.hidden=!['temperature','feels'].includes(active);companion.innerHTML=active==='temperature'?`Feels like ${degrees(displayedFeelsAt(data,p.time))} outdoors at this hour`:active==='feels'?`Air temperature ${degrees(forecastValue(data,'temperature',p.time))} at this hour`:'';}
+ if(def.solar&&p.sunrise)$('chart-note').textContent=`Sunrise ${formatTime(p.sunrise)} · sunset ${formatTime(p.time)}.`;
+ else if(active==='pressure')$('chart-note').textContent='Sea-level forecast in mb · separate from the station reading and its observed trend.';
+ else $('chart-note').textContent=!finite(p.value)?'The forecast source has a gap at this time.':def.note;
+ const {x,y}=graphGeometry;
+ $('graph-cursor')?.setAttribute('x1',x(selected));$('graph-cursor')?.setAttribute('x2',x(selected));
+ for(const id of ['graph-point','graph-point-halo']){const el=$(id);if(!el)continue;el.style.display=finite(p.value)?'':'none';if(finite(p.value)){el.setAttribute('cx',x(selected));el.setAttribute('cy',y(p.value));}}
+ $('chart-scrubber').value=String(selected);
+ $('chart-scrubber').setAttribute('aria-valuetext',`${$('chart-time').textContent}: ${displayValue(p.value,def)}`);
+}
+function drawChart() {
+ const def=defs[active];graphPoints=pointsFor(active,horizon);
+ const valid=graphPoints.filter(p=>finite(p.value));
+ $('chart-title').textContent=def.title;
+ $('chart-location').textContent=data.location.name;
+ $('chart-periods').hidden=!!def.solar;
+ $('chart-week-label').hidden=!def.solar;
+ document.querySelectorAll('[data-hours]').forEach(b=>{const chosen=Number(b.dataset.hours)===horizon;b.setAttribute('aria-pressed',String(chosen));b.classList.toggle('selected',chosen);});
+ $('chart-content').innerHTML=chartGrid(def,graphPoints);
+ $('chart-empty').hidden=valid.length>=2;
+ $('chart-empty').textContent=valid.length?'Only a few forecast readings are available. Gaps are left blank.':'A forecast for this item isn’t available at this location yet. We won’t draw a made-up line.';
+ $('chart-scrubber').max=String(Math.max(0,graphPoints.length-1));$('chart-scrubber').disabled=!graphPoints.length;
+ const minimum=valid.length?Math.min(...valid.map(p=>p.value)):null,maximum=valid.length?Math.max(...valid.map(p=>p.value)):null;
+ $('chart-low').textContent=displayValue(minimum,def);$('chart-high').textContent=displayValue(maximum,def);
+ $('chart-coverage').textContent=`${valid.length} of ${graphPoints.length} ${def.solar?'days':'hours'} available`;
+ if(graphPoints.length)selectPoint(Math.min(selected,graphPoints.length-1));
+ else {if($('chart-companion')){$('chart-companion').hidden=true;$('chart-companion').textContent='';}$('chart-value').textContent='Not available';$('chart-time').textContent='No forecast data';$('chart-note').textContent=def.note;}
+ $('forecast-graph').addEventListener('pointermove',event=>{
+  if(event.pointerType==='touch'&&event.buttons===0)return;
+  const rect=event.currentTarget.getBoundingClientRect(),x=(event.clientX-rect.left)/rect.width*graphGeometry.W;
+  const nearest=graphPoints.reduce((best,_,i)=>Math.abs(graphGeometry.x(i)-x)<Math.abs(graphGeometry.x(best)-x)?i:best,0);
+  selectPoint(nearest);
+ });
+ $('forecast-graph').addEventListener('pointerdown',event=>{event.currentTarget.setPointerCapture?.(event.pointerId);const rect=event.currentTarget.getBoundingClientRect(),x=(event.clientX-rect.left)/rect.width*graphGeometry.W;selectPoint(graphPoints.reduce((best,_,i)=>Math.abs(graphGeometry.x(i)-x)<Math.abs(graphGeometry.x(best)-x)?i:best,0));});
+}
+export function openMetric(key) {
+ if(!defs[key]||!data)return;
+ active=key;horizon=24;selected=0;
+ $('metric-dialog').showModal();document.body.classList.add('dialog-open');drawChart();
+}
+export function resetExperience() {
+  data=null;active=null;comfortPreview=null;
+  if($('pavement-current-science'))$('pavement-current-science').textContent='Waiting for this location’s surface estimate.';
+  if($('comfort-extra-science'))$('comfort-extra-science').textContent='Waiting for this location’s weather.';
+ if($('today-forecast'))$('today-forecast').innerHTML='<p class="muted">Daily data is loading.</p>';
+ if($('skin-kicker'))$('skin-kicker').textContent='How it actually feels right now';
+ if($('metric-dialog').open)$('metric-dialog').close();
+ $('skin-values').textContent='Checking how it will feel…';$('skin-explanation').textContent='Getting the weather for this location.';
+ $('skin-science').textContent='Waiting for this location’s weather.';
+ const tile=$('skin-exposure');if(tile){delete tile.dataset.weather;tile.querySelector('.comfort-weather-art')?.remove();}
+ resetDewpointMeter();
+}
+export function installExperience() {
+ ensureComfortStyles();
+ $('metrics').addEventListener('click',e=>{const card=e.target.closest('[data-metric]');if(card)openMetric(card.dataset.metric);});
+ $('temperature').addEventListener('click',()=>openMetric('temperature'));
+ $('temperature').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openMetric('temperature');}});
+ $('close-metric').addEventListener('click',()=>$('metric-dialog').close());
+ $('metric-dialog').addEventListener('close',()=>{active=null;document.body.classList.remove('dialog-open');});
+ $('metric-dialog').addEventListener('click',e=>{if(e.target===$('metric-dialog')){const r=e.target.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)e.target.close();}});
+ $('chart-scrubber').addEventListener('input',e=>selectPoint(Number(e.target.value)));
+ $('chart-periods').addEventListener('click',e=>{const b=e.target.closest('[data-hours]');if(b){horizon=Number(b.dataset.hours);selected=0;drawChart();}});
+ $('chart-science-link').addEventListener('click',()=>$('metric-dialog').close());
+ window.addEventListener('resize',()=>{if(active&&$('metric-dialog').open)drawChart();});
+}
