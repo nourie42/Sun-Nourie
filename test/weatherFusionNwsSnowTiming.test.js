@@ -57,6 +57,17 @@ test('a coarse positive interval with snow on both local dates keeps its daily s
  for(const day of out.snow.days){assert.equal(day.snowExpected,true);assert.equal(day.nwsAmountUncertain,true);assert.equal(day.displaySnowfall.value,null);assert.equal(day.nwsRawIntervals[0].value,1.2);}
 });
 
+test('an unknown NWS daily split can still show an explicitly labeled same-day model estimate',()=>{
+ const split={...night,detailedForecast:'Rain before 11pm, then snow.'};
+ const start=Date.parse('2026-10-16T04:00:00Z'),end=Date.parse('2026-10-17T04:00:00Z');
+ const out={location:{timeZone:zone},days:[{date:'2026-10-16',label:'Fri'},{date:'2026-10-17',label:'Sat'}],hours:[],riskOutlooks:[]};
+ addSnowOutlook(out,{now:Date.parse('2026-10-14T12:00:00Z'),periods:[split],grid:{snowfallAmount:{uom:'wmoUnit:in',values:[{validTime:'2026-10-16T22:00:00Z/PT12H',value:1.2}]}},winterModels:{ecmwf:{intervals:[{start,end,value:.4}]},gfs:{intervals:[{start,end,value:.4}]}}});
+ const friday=out.snow.days[0];
+ assert.equal(friday.nwsAmountUncertain,true);assert.equal(friday.nwsRawIntervals[0].value,1.2);
+ assert.equal(friday.displaySnowfall.value,.4);assert.equal(friday.displaySnowfall.source,'Available model guidance');assert.equal(friday.displaySnowfall.status,'partial');
+ assert.equal(out.snow.days[1].displaySnowfall.value,null,'a day without model coverage remains unknown');
+});
+
 test('a 24-hour source interval is constrained by the fully covered union of rain and timed snow periods',()=>{
  const friday={name:'Friday',startTime:'2026-10-16T06:00:00-04:00',endTime:'2026-10-16T18:00:00-04:00',shortForecast:'Rain Showers',detailedForecast:'Rain showers.'};
  const output=()=>({location:{timeZone:zone},days:[{date:'2026-10-16',label:'Fri'},{date:'2026-10-17',label:'Sat'}],hours:[{time:'2026-10-16T17:00:00Z',condition:'Cloudy',temperature:32}],riskOutlooks:[]});

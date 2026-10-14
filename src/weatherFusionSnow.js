@@ -287,7 +287,7 @@ export function addSnowOutlook(output, { grid, periods = [], snowModels, winterM
     const exactWpcBlend = windows.length === 1 && windows[0].snowfall.sources?.some(source => source.id === 'wpc' && finite(source.value));
     const displaySnowfall = finite(officialIntegral.value)
       ? { value: round(officialIntegral.value, 3), range: null, source: 'NWS point forecast', status: 'ready' }
-      : officialIntegral.uncertain
+      : officialIntegral.uncertain && !finite(blended)
         ? { value: null, range: null, source: 'NWS daily snowfall amount uncertain', status: 'unavailable' }
       : (officialIntegral.minimum??0)>0
         ? { value: round(officialIntegral.minimum,3), range: [round(officialIntegral.minimum,3),null], source: 'NWS partial point forecast', status: 'partial' }
