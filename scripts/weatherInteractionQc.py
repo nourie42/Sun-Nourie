@@ -99,7 +99,10 @@ def graph_check(page, forecast):
     # Future day two includes Cortland's storm hours and Knightdale's Friday.
     index = min(2, len(forecast['days']) - 1)
     page.locator(f'#experimental-week [data-week-day="{index}"]').click()
-    page.wait_for_selector('#day-dialog[open] [data-series="rainChance"]')
+    # Unknown hourly rain legitimately produces an empty SVG path. Wait for
+    # the series to exist; requiring painted bounds would reject that valid
+    # unavailable-data state before the exact-value checks below can run.
+    page.wait_for_selector('#day-dialog[open] [data-series="rainChance"]', state='attached')
     check(page.locator('#day-dialog [data-readout="rainChance"]').count() == 1, 'Daily graph must include its rain readout')
     check(page.locator('#day-dialog [data-series]').count() == 5, 'Daily graph must have all five series')
     check('100%' in page.locator('#day-dialog svg').text_content(), 'Rain graph needs an independent zero to 100 percent scale')
@@ -227,6 +230,7 @@ def main():
                     report['assembledAt'] = forecast['assembledAt']
                     report['location'] = forecast['location']
                     (OUT / f'{city.lower()}-tested-backend.json').write_text(json.dumps(forecast, indent=2))
+                    (OUT / f'{city.lower()}-tested-backend-{width}.json').write_text(json.dumps(forecast, indent=2))
                     report['navigation'] = navigation_check(page)
                     screenshot(page, '.weather-jump-nav', f'{city.lower()}-navigation-{width}.png')
                     report['carWash'] = car_wash_check(page)
