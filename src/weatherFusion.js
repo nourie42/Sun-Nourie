@@ -729,6 +729,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     'model-explanation.js','model-explanation.css','weathernext-site.html','weathernext-site.css','weathernext-site.js','weathernext-data.js','weathernext-catalog.json',
     'glance.html','glance.css','glance.js',
     'halo.html','halo.css','halo.js',
+    'atlas.html','atlas.css','atlas.js',
     'blend.html','blend.css','blend.js',
     'today.html','today.css','today.js',
     'wn.html','wn.css','wn.js',

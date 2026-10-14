@@ -1,0 +1,71 @@
+name: Weather Atlas browser checks
+
+on:
+  pull_request:
+    paths:
+      - 'public/weather-fusion/**'
+      - 'src/weatherFusion*.js'
+      - 'src/weatherSiteAccess.js'
+      - 'test/weatherFusion.fixtures.js'
+      - 'test/weatherFusionAtlas.test.js'
+      - 'scripts/weatherAtlasBrowserSmoke.js'
+      - '.github/workflows/weather-atlas.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'public/weather-fusion/**'
+      - 'src/weatherFusion*.js'
+      - 'src/weatherSiteAccess.js'
+      - 'test/weatherFusion.fixtures.js'
+      - 'test/weatherFusionAtlas.test.js'
+      - 'scripts/weatherAtlasBrowserSmoke.js'
+      - '.github/workflows/weather-atlas.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: weather-atlas-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fixture-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Initialize failure report
+        env:
+          ATLAS_SMOKE_OUTPUT: ${{ runner.temp }}/weather-atlas-qa
+        run: |
+          mkdir -p "$ATLAS_SMOKE_OUTPUT"
+          printf '%s\n' '{"passed":false,"fixture":true,"status":"browser-not-run","note":"Setup or contract checks did not finish; no browser success is claimed."}' > "$ATLAS_SMOKE_OUTPUT/report.json"
+      - run: npm ci
+      - name: Install pinned local browser and map libraries
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0 leaflet@1.9.4
+          npx playwright install --with-deps chromium
+      - name: Check Atlas syntax and data contracts
+        run: |
+          node --check public/weather-fusion/atlas.js
+          node --check scripts/weatherAtlasBrowserSmoke.js
+          node --test test/weatherFusionAtlas.test.js test/weatherSiteAccess.test.js
+      - name: Exercise Atlas with clearly labelled fixture data
+        env:
+          ATLAS_SMOKE_OUTPUT: ${{ runner.temp }}/weather-atlas-qa
+        run: node scripts/weatherAtlasBrowserSmoke.js
+      - name: Upload fixture screenshots and browser report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: weather-atlas-fixture-${{ github.run_id }}
+          path: ${{ runner.temp }}/weather-atlas-qa/
+          if-no-files-found: warn
+          retention-days: 14
