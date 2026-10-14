@@ -23,6 +23,15 @@ test('compact adapter preserves initialization provenance and marks old models s
  assert.equal(selected.runs[0].status,'stale');assert.equal(selected.runs[0].runAt,runAt);
  assert.equal(selected.rows[0].provenance.status,'stale');
 });
+test('Hazen compact forecasts keep the local Central clock, including cached feeds without a zone',()=>{
+ const hazen={id:'hazen',name:'Hazen, ND',latitude:47.2944,longitude:-101.6227,hourly:[{time:'2026-10-14T10:00:00Z',temperatureF:34}]};
+ const feed={schema:'weather-nourie-weathernext3-v1',runAt:'2026-10-14T00:00:00Z',generatedAt:new Date(now).toISOString(),points:[hazen]};
+ for(const point of [hazen,{...hazen,timeZone:'America/North_Dakota/Beulah'}]){
+  const selected=selectGoogleForecast({...feed,points:[point]},'hazen',now);
+  assert.equal(selected.point.timeZone,'America/North_Dakota/Beulah');
+  assert.equal(new Intl.DateTimeFormat('en-US',{timeZone:selected.point.timeZone,hour:'numeric',minute:'2-digit'}).format(new Date(selected.rows[0].time)),'5:00 AM');
+ }
+});
 test('full collector remains cost guarded and refreshes on all four main model cycles',()=>{
  const full=readFileSync('.github/workflows/weathernext-full-data.yml','utf8');
  assert.match(full,/schedule:\s*\n(?:[^\n]*\n)*?\s*- cron: '45 2,8,14,20 \* \* \*'/);
