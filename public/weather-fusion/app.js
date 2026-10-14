@@ -26,7 +26,7 @@ import {displayedRainChance} from './rain-display.js?v=rain-observed-v1';
 import {weatherChangeMessages,WEATHER_CHANGE_TITLE} from './weather-changes.js?v=feel-recovery-v7';
 import {renderSnowOutlook,resetSnowOutlook} from './snow-outlook.js?v=snow-grid-v6';
 import {renderForecastWindowBanners,resetForecastWindowBanners} from './forecast-window-banners.js?v=sun-window-main-v4';
-import {createSevenDayCarousel} from './seven-day.js?v=snow-v12';
+import {createSevenDayCarousel} from './seven-day.js?v=canonical-comparison-v13';
 import {forecastSourceHealth} from './forecast-status.js?v=source-health-v1';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);

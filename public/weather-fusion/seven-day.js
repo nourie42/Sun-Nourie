@@ -9,9 +9,9 @@ const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;
 const reading=(value,unit='',digits=0)=>finite(value)?`${value.toFixed(digits)}${unit}`:'\u2014';
 const chevron=direction=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${direction==='left'?'m15 5-7 7 7 7':'m9 5 7 7-7 7'}"/></svg>`;
 
-export function sevenDayForecast(forecast,now=Date.now()) {
+export function dailyForecastReadings(forecast,now=Date.now(),limit=10) {
   const zone=forecast?.location?.timeZone||'America/New_York';
-  return (forecast?.days||[]).slice(0,7).map((day,index)=>{
+  return (forecast?.days||[]).slice(0,limit).map((day,index)=>{
     const display=dailyDisplay(day,index,now,zone),rain=displayedRainChance(forecast,display.pop,{dayIndex:index,now});
     const story=forecastPeriodSummary(forecast,index,display.phase,now);
     const winds=(forecast.metricForecasts?.series?.wind||[]).filter(point=>{
@@ -29,6 +29,10 @@ export function sevenDayForecast(forecast,now=Date.now()) {
       wind:winds.length?winds.reduce((sum,value)=>sum+value,0)/winds.length:null,
       snowfall:day.snowfall??null,snowRange:day.snowRange||null,snowPossible:!!day.snowPossible,windWindow:story.window,confidence:day.confidence||null,detail:display.detail||story.summary};
   });
+}
+
+export function sevenDayForecast(forecast,now=Date.now()) {
+  return dailyForecastReadings(forecast,now,7);
 }
 
 function artHTML(day) {

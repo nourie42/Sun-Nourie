@@ -1,9 +1,6 @@
-/** WN Blend comparison — 7-variable picker, 10-day daily view, glass tile.
- *  New weights: NWS 36%, HRRR 27%, NBM 18%, ECMWF 9%, WN 10%
- */
+/** Compare the published Weather Nourie forecast with individual model guidance. */
+import {dailyForecastReadings} from './seven-day.js?v=canonical-comparison-v13';
 const WN_FEED = 'https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/weathernext-full.json';
-const NEW_WEIGHTS = { nws: 0.36, hrrr: 0.27, nbm: 0.18, ecmwf: 0.09, wn: 0.10 };
-const OLD_WEIGHTS = { nws: 0.40, hrrr: 0.30, nbm: 0.20, ecmwf: 0.10 };
 const MS_PER_DAY = 86400000;
 
 const VARIABLES = {
@@ -19,7 +16,7 @@ const VARIABLES = {
 let curVar = 'temp';
 
 const COLORS = {
-  newBlend: '#ffffff', oldBlend: '#8b98b0',
+  nourie: '#ffffff',
   nws: '#7fd4ff', hrrr: '#ffb47d', nbm: '#7de8a8', ecmwf: '#b48cff', wn: '#ffd479', gfs: '#ff8fc8',
   single: '#7fd4ff',
 };
@@ -75,29 +72,26 @@ function pickWN(raw, fx) {
   return { hourly: pt.hourly, runAt, ageDays };
 }
 
-function blendVal(sources, weights) {
-  let sum = 0, wsum = 0;
-  for (const [id, w] of Object.entries(weights)) {
-    const v = sources[id];
-    if (finite(v)) { sum += v * w; wsum += w; }
-  }
-  return wsum > 0 ? sum / wsum : null;
+function seriesInWindow(series, window) {
+  return (series || []).filter(point => {
+    const time = Date.parse(point.time);
+    return finite(time) && window && time >= window.start && time < window.end;
+  });
 }
-
-// Aggregate a metricForecasts series (per-model sources) to daily max per model
-function dailySeriesMax(series, days, tz) {
-  const byDay = {};
-  for (const p of series || []) {
-    const t = Date.parse(p.time);
-    if (!Number.isFinite(t)) continue;
-    const key = localDateKey(t, tz);
-    const bucket = (byDay[key] = byDay[key] || {});
-    for (const s of p.sources || []) {
-      if (!finite(s.value)) continue;
-      if (!finite(bucket[s.id]) || s.value > bucket[s.id]) bucket[s.id] = s.value;
+function aggregate(values, method = 'max') {
+  const available = values.filter(finite);
+  if (!available.length) return null;
+  return method === 'mean' ? available.reduce((sum, value) => sum + value, 0) / available.length
+    : method === 'min' ? Math.min(...available) : Math.max(...available);
+}
+function dailySources(series, windows, method) {
+  return windows.map(window => {
+    const sources = {};
+    for (const point of seriesInWindow(series, window)) for (const source of point.sources || []) {
+      if (finite(source.value)) (sources[source.id] ||= []).push(source.value);
     }
-  }
-  return days.map((d) => byDay[d.dateKey] || {});
+    return Object.fromEntries(Object.entries(sources).map(([id, values]) => [id, aggregate(values, method)]));
+  });
 }
 
 // Aggregate WN hourly to daily
@@ -111,18 +105,31 @@ function wnDaily(wnHourly, varKey, agg, days, tz, convert, windows) {
     if (!finite(raw)) continue;
     const val = convert ? convert(raw) : raw;
     const t = Date.parse(h.time);
+    if (!finite(t) || !finite(val) || (agg === 'sum' && val < 0)) continue;
     hours.push([t, val]);
     const key = localDateKey(t, tz);
     (byDay[key] = byDay[key] || []).push(val);
   }
   return days.map((d, i) => {
     const w = windows?.[i];
+    if (w && (!finite(w.start) || !finite(w.end) || w.end <= w.start)) return null;
     // hourly accumulations are labelled at the END of the hour, so (start, end]
-    const vals = w ? hours.filter(([t]) => t > w.start && t <= w.end).map(([, v]) => v) : byDay[d.dateKey];
-    if (w && hours.length && (hours[0][0] > w.start + 3600000 || hours[hours.length - 1][0] < w.end)) return null; // partial window
+    const accumulation = agg === 'sum';
+    const selected = w ? hours.filter(([t]) => accumulation ? t > w.start && t - 3600000 < w.end : t >= w.start && t < w.end) : null;
+    const vals = selected ? selected.map(([, value]) => value) : byDay[d.dateKey];
+    if (w && accumulation) {
+      const intervals = [...new Map(selected).entries()].sort((a, b) => a[0] - b[0]);
+      let covered = w.start, total = 0;
+      for (const [end, value] of intervals) {
+        const start = Math.max(w.start, end - 3600000), stop = Math.min(w.end, end);
+        if (start > covered || stop <= start) return null;
+        total += value * (stop - Math.max(start, covered)) / 3600000;
+        covered = Math.max(covered, stop);
+      }
+      return covered >= w.end ? total : null;
+    }
     if (!vals?.length) return null;
-    if (!vals?.length) return null;
-    return agg === 'max' ? Math.max(...vals) : vals.reduce((a, b) => a + b, 0);
+    return accumulation ? vals.reduce((a, b) => a + b, 0) : aggregate(vals, agg);
   });
 }
 
@@ -142,44 +149,61 @@ function aqiDaily(aqHours, days, tz) {
   });
 }
 
-function buildSeries(fx, wn, varId) {
+export function buildSeries(fx, wn, varId, now = Date.now()) {
   const tz = fx.location?.timeZone || 'America/New_York';
-  const days = (fx.days || []).slice(0, 10).map((d) => ({ date: d.date, dateKey: d.date }));
-  const out = { days, perModel: true, wnVals: days.map(() => null), modelMaps: days.map(() => ({})) };
+  const readings = dailyForecastReadings(fx, now, 10);
+  const days = (fx.days || []).slice(0, 10).map((d, i) => ({ date: d.date, dateKey: d.date, tonight: readings[i].isDay === false }));
+  const windows = readings.map(day => day.windWindow);
+  const out = { days, perModel: true, wnVals: days.map(() => null), modelMaps: days.map(() => ({})), forecastValues: days.map(() => null), windows };
 
   if (varId === 'temp' || varId === 'rain') {
-    const key = varId === 'temp' ? 'highBlend' : 'qpfBlend';
+    out.forecastValues = readings.map(day => varId === 'temp' ? (day.isDay ? day.high : day.low) : day.amount);
     days.forEach((d, i) => {
-      const src = {};
-      for (const s of ((fx.days[i] || {})[key]?.sources || [])) src[s.id] = s.value;
+      const day = fx.days[i] || {}, key = varId === 'temp' ? (readings[i].isDay ? 'highBlend' : 'lowBlend') : 'qpfBlend';
+      const blend = day[key] || {}, src = {};
+      for (const source of blend.sources || []) {
+        // A partial model accumulation is not a complete daily rain total.
+        const value = varId === 'rain' && blend.sourceValues && Object.hasOwn(blend.sourceValues, source.id) ? blend.sourceValues[source.id] : source.value;
+        if (finite(value)) src[source.id] = value;
+      }
+      if (varId === 'rain' && readings[i].isDay === false) {
+        const points = seriesInWindow(fx.rainTimeline, windows[i]), bySource = {};
+        for (const point of points) for (const [id, value] of Object.entries(point.precipitationBlend?.sourceValues || {})) {
+          if (finite(value)) (bySource[id] ||= []).push(value);
+        }
+        const expected = Math.round((windows[i].end - windows[i].start) / 3600000);
+        for (const id of Object.keys(src)) delete src[id];
+        for (const [id, values] of Object.entries(bySource)) if (values.length === expected) src[id] = values.reduce((sum, value) => sum + value, 0);
+      }
       out.modelMaps[i] = src;
     });
-    // Rain: sum WN over the same window the other models use for that day (qpfBlend start/end, 7am-7am)
-    const windows = varId === 'rain' ? days.map((d, i) => {
-      const q = (fx.days[i] || {}).qpfBlend || {}, w = (fx.days[i] || {}).qpfWindow || {};
-      const a = Date.parse(q.start || w.start), b = Date.parse(q.end || w.end);
-      return Number.isFinite(a) && Number.isFinite(b) ? { start: a, end: b } : null;
-    }) : null;
+    const sourceWindows = varId === 'rain' ? windows : days.map((d, i) => {
+      const day = fx.days[i] || {}, window = readings[i].isDay ? day.highWindow : day.lowWindow;
+      const start = Date.parse(window?.start), end = Date.parse(window?.end);
+      return finite(start) && finite(end) ? {start, end} : windows[i];
+    });
     out.wnVals = wnDaily(wn?.hourly, varId === 'temp' ? 'temperature_2m' : 'total_precipitation_1hr',
-      varId === 'temp' ? 'max' : 'sum', days, tz, varId === 'temp' ? K2F : M2IN, windows);
+      varId === 'temp' ? 'max' : 'sum', days, tz, varId === 'temp' ? K2F : M2IN, sourceWindows);
+    if (varId === 'temp' && readings[0]?.isDay === false) out.wnVals[0] = wnDaily(wn?.hourly, 'temperature_2m', 'min', [days[0]], tz, K2F, [sourceWindows[0]])[0];
   } else if (varId === 'pop') {
     // Per-model rain chance at each day's peak hour (from the server's rain-likelihood blend).
     // NWS is a true probability; HRRR/NBM/ECMWF are each model's wet/dry rain signal. WeatherNext has no PoP field.
     days.forEach((d, i) => {
-      const sv = ((fx.days[i] || {}).rainLikelihood || {}).peak?.sourceValues || {};
+      const day = fx.days[i] || {}, likelihood = readings[i].isDay ? day.rainLikelihood : day.popNightLikelihood;
+      const sv = likelihood?.peak?.sourceValues || {};
       const src = {}; for (const [id, v] of Object.entries(sv)) if (finite(v)) src[id] = v;
       out.modelMaps[i] = src;
     });
-    out.fixedBlend = days.map((d, i) => { const v = (fx.days[i] || {}).rainLikelihood?.value; return finite(v) ? v : null; });
+    out.forecastValues = readings.map(day => day.pop);
   } else if (varId === 'wind' || varId === 'dewpoint' || varId === 'humidity') {
     const key = varId === 'wind' ? 'wind' : varId;
-    out.modelMaps = dailySeriesMax(fx.metricForecasts?.series?.[key], days, tz);
-    if (varId === 'wind') out.wnVals = wnDaily(wn?.hourly, 'wind_speed_10m', 'max', days, tz, MS2MPH);
-    if (varId === 'dewpoint') out.wnVals = wnDaily(wn?.hourly, 'dewpoint_temperature_2m', 'max', days, tz, K2F);
+    out.modelMaps = dailySources(fx.metricForecasts?.series?.[key], windows, varId === 'wind' ? 'mean' : 'max');
+    out.forecastValues = varId === 'wind' ? readings.map(day => day.wind) : windows.map(window => aggregate(seriesInWindow(fx.metricForecasts?.series?.[key], window).map(point => point.value)));
+    if (varId === 'wind') out.wnVals = wnDaily(wn?.hourly, 'wind_speed_10m', 'mean', days, tz, MS2MPH, windows);
+    if (varId === 'dewpoint') out.wnVals = wnDaily(wn?.hourly, 'dewpoint_temperature_2m', 'max', days, tz, K2F, windows);
     // humidity: no WN feed
   } else if (varId === 'snow') {
-    // Per-model daily snowfall (inches): NWS gridpoint, ECMWF and GFS via Open-Meteo. No blend line.
-    out.noBlend = true;
+    out.forecastValues = readings.map(day => finite(day.snowfall) ? day.snowfall : null);
     days.forEach((d, i) => {
       const r = (fx.snow?.days || []).find((x) => x.date === d.date), src = {};
       if (r && finite(r.nwsSnowfall)) src.nws = r.nwsSnowfall;
@@ -194,40 +218,24 @@ function buildSeries(fx, wn, varId) {
     out.perModel = false;
     out.single = aqiDaily(fx.airQuality?.hours, days, tz);
   }
+  out.forecastValues = out.forecastValues.map(value => finite(value) ? value : null);
   return out;
 }
 
 const hiddenModels = new Set();
-const LABELS = { newBlend: 'Weather Nourie blend', oldBlend: 'Current', nws: 'NWS 36%', hrrr: 'HRRR 27%', nbm: 'NBM 18%', ecmwf: 'ECMWF 9%', wn: 'WN 10%', gfs: 'GFS', single: '' };
-const NAMES = { newBlend: 'Weather Nourie', oldBlend: 'Current blend', nws: 'NWS', hrrr: 'HRRR', nbm: 'NBM', ecmwf: 'ECMWF', wn: 'WeatherNext', gfs: 'GFS', single: '' };
+const NAMES = { nourie: 'Weather Nourie blend', nws: 'NWS', hrrr: 'HRRR', nbm: 'NBM', ecmwf: 'ECMWF', wn: 'WeatherNext', gfs: 'GFS', single: '' };
 function renderChart(container, built, varDef, varId) {
   const { days } = built;
   // Size the SVG to its real pixel width so text stays legible on phones.
-  const W = Math.max(320, Math.round(container.clientWidth || 900));
+  const W = Math.max(240, Math.round(container.clientWidth || 900));
   const phone = W < 600;
   const H = phone ? 340 : 380, PL = phone ? 38 : 52, PR = phone ? 10 : 18, PT = 30, PB = 34;
   const FS = phone ? 11 : 14;
-  const series = { newBlend: [], fullBlend: [], oldBlend: [], nws: [], hrrr: [], nbm: [], ecmwf: [], wn: [], gfs: [], single: [] };
-  const activeW = Object.fromEntries(Object.entries(NEW_WEIGHTS).filter(([id]) => !hiddenModels.has(id)));
-  const activeSum = Object.values(activeW).reduce((a, b) => a + b, 0);
-  // Is any model that feeds the blend (and has data for this variable) unchecked?
-  const hasData = (id) => built.perModel && (id === 'wn' ? (built.wnVals || []).some(finite) : (built.modelMaps || []).some((m) => finite(m?.[id])));
-  const blendChanged = Object.keys(NEW_WEIGHTS).some((id) => hiddenModels.has(id) && hasData(id));
+  const series = { nourie: [], nws: [], hrrr: [], nbm: [], ecmwf: [], wn: [], gfs: [], single: [] };
   if (built.perModel) {
     days.forEach((d, i) => {
       const src = { ...built.modelMaps[i], wn: built.wnVals[i] };
-      if (built.noBlend) { series.newBlend.push(null); series.fullBlend.push(null); series.oldBlend.push(null); }
-      else if (built.fixedBlend) {
-        // All checked: show the site's official rain chance. Any feeding model unchecked: weighted value of the visible models.
-        series.newBlend.push(blendChanged ? blendVal(src, activeW) : built.fixedBlend[i]);
-        series.fullBlend.push(built.fixedBlend[i]); series.oldBlend.push(null);
-      }
-      else {
-        // Unchecked models drop out of the Weather Nourie blend; remaining weights re-normalize.
-        series.newBlend.push(blendVal(src, activeW));
-        series.fullBlend.push(blendVal(src, NEW_WEIGHTS));
-        series.oldBlend.push(blendVal(src, OLD_WEIGHTS));
-      }
+      series.nourie.push(finite(built.forecastValues[i]) ? built.forecastValues[i] : null);
       for (const id of ['nws', 'hrrr', 'nbm', 'ecmwf']) series[id].push(finite(src[id]) ? src[id] : null);
       series.wn.push(finite(src.wn) ? src.wn : null);
       series.gfs.push(finite(src.gfs) ? src.gfs : null);
@@ -235,10 +243,10 @@ function renderChart(container, built, varDef, varId) {
   } else {
     days.forEach((d, i) => series.single.push(built.single[i] ?? null));
   }
-  const ids = built.perModel ? ['newBlend', 'oldBlend', 'nws', 'hrrr', 'nbm', 'ecmwf', 'wn', 'gfs'].filter((id) => series[id].some((v) => v != null)) : ['single'];
-  const visible = ids.filter((id) => !hiddenModels.has(id));
+  const ids = built.perModel ? ['nourie', ...['nws', 'hrrr', 'nbm', 'ecmwf', 'wn', 'gfs'].filter((id) => series[id].some(finite))] : ['single'];
+  const visible = ids.filter((id) => id === 'nourie' || !hiddenModels.has(id));
   const allV = visible.flatMap((id) => series[id]).filter((v) => v != null);
-  if (!ids.length || !series[ids[0]].some((v) => v != null)) {
+  if (!ids.some(id => series[id].some(finite))) {
     container.innerHTML = '<p class="muted" style="font-size:14px">No data for this variable.</p>';
     return;
   }
@@ -254,40 +262,34 @@ function renderChart(container, built, varDef, varId) {
   const path = (pts) => { let d = '', pen = false; pts.forEach((p, i) => { if (p != null) { d += `${pen ? 'L' : 'M'}${X(i).toFixed(1)},${Y(p).toFixed(1)}`; pen = true; } else pen = false; }); return d; };
   const dayName = (d, i, long) => {
     const dt = new Date(d.date + 'T12:00:00');
-    if (long) return dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-    return i === 0 ? (phone ? 'Tdy' : 'Today') : dt.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, phone ? 2 : 3);
+    if (long) return `${d.tonight ? 'Tonight · ' : ''}${dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`;
+    return i === 0 ? (d.tonight ? (phone ? 'Tnt' : 'Tonight') : phone ? 'Tdy' : 'Today') : dt.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, phone ? 2 : 3);
   };
   const labels = days.map((d, i) => `<text x="${X(i).toFixed(0)}" y="${H - 10}" text-anchor="middle" font-size="${FS}" font-weight="600" fill="#d5e1f2">${dayName(d, i)}</text>`).join('');
   const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => lo + f * (hi - lo));
   const ylabels = ticks.map((v) =>
     `<line x1="${PL}" x2="${W - PR}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}" stroke="rgba(255,255,255,.14)" stroke-width="1"/>`
     + `<text x="${PL - 6}" y="${(Y(v) + 4).toFixed(0)}" text-anchor="end" font-size="${FS}" fill="#d5e1f2">${varDef.fmt(v)}</text>`).join('');
-  const style = { wn: { w: 2.5, dash: '6,4', op: 0.9 }, nws: { w: 2.5, op: 0.85 }, hrrr: { w: 2.5, op: 0.85 }, nbm: { w: 2.5, op: 0.85 }, ecmwf: { w: 2.5, op: 0.85 }, gfs: { w: 2.5, op: 0.85 }, oldBlend: { w: 2.5, dash: '9,5', op: 0.9 }, newBlend: { w: 4, op: 1 }, single: { w: 4, op: 1 } };
-  const drawOrder = ['wn', 'nws', 'hrrr', 'nbm', 'ecmwf', 'gfs', 'oldBlend', 'newBlend', 'single'].filter((id) => visible.includes(id));
-  const lines = drawOrder.map((id) => { const s = style[id], d = path(series[id]); return d ? `<path d="${d}" fill="none" stroke="${COLORS[id]}" stroke-width="${s.w}"${s.dash ? ` stroke-dasharray="${s.dash}"` : ''} opacity="${s.op}" stroke-linecap="round" stroke-linejoin="round"/>` : ''; }).join('');
-  const primaryId = visible.includes('newBlend') ? 'newBlend' : visible.includes('single') ? 'single' : visible[0];
+  const style = { wn: { w: 2.5, dash: '6,4', op: 0.9 }, nws: { w: 2.5, op: 0.85 }, hrrr: { w: 2.5, op: 0.85 }, nbm: { w: 2.5, op: 0.85 }, ecmwf: { w: 2.5, op: 0.85 }, gfs: { w: 2.5, op: 0.85 }, nourie: { w: 4, op: 1 }, single: { w: 4, op: 1 } };
+  const drawOrder = ['wn', 'nws', 'hrrr', 'nbm', 'ecmwf', 'gfs', 'nourie', 'single'].filter((id) => visible.includes(id));
+  const lines = drawOrder.map((id) => { const s = style[id], d = path(series[id]); return d ? `<path data-series="${id}" d="${d}" fill="none" stroke="${COLORS[id]}" stroke-width="${s.w}"${s.dash ? ` stroke-dasharray="${s.dash}"` : ''} opacity="${s.op}" stroke-linecap="round" stroke-linejoin="round"/>` : ''; }).join('');
+  const primaryId = visible.includes('nourie') ? 'nourie' : visible.includes('single') ? 'single' : visible[0];
   const dots = primaryId ? series[primaryId].map((v, i) => v == null ? '' :
-    `<circle cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="4" fill="${COLORS[primaryId]}"/>`
-    + ((phone && i % 2) ? '' : `<text x="${X(i).toFixed(0)}" y="${(Y(v) - 11).toFixed(0)}" text-anchor="middle" font-size="${FS}" fill="#fff" font-weight="700" paint-order="stroke" stroke="rgba(0,0,0,.45)" stroke-width="3">${varDef.fmt(v)}</text>`)).join('') : '';
+    `<circle data-series="${primaryId}" data-date="${days[i].date}" data-index="${i}" data-value="${v}" cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="4" fill="${COLORS[primaryId]}"/>`
+    + ((phone && i % 2) ? '' : `<text data-point-label="${i}" x="${X(i).toFixed(0)}" y="${(Y(v) - 11).toFixed(0)}" text-anchor="middle" font-size="${FS}" fill="#fff" font-weight="700" paint-order="stroke" stroke="rgba(0,0,0,.45)" stroke-width="3">${varDef.fmt(v)}</text>`)).join('') : '';
   const chip = (id) => { const off = hiddenModels.has(id);
-    return `<button type="button" class="wn-chip" data-model="${id}" aria-pressed="${!off}" style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:999px;border:1px solid ${off ? 'rgba(255,255,255,.12)' : COLORS[id] + '99'};background:${off ? 'transparent' : 'rgba(255,255,255,.10)'};font-family:inherit;font-size:11px;font-weight:600;line-height:1.4;color:${off ? '#7f8ca3' : '#e8eef8'};white-space:nowrap;cursor:pointer;${off ? 'text-decoration:line-through;' : ''}">`
-      + `<i style="width:12px;height:3px;border-radius:2px;background:${COLORS[id]};opacity:${off ? 0.3 : 1};display:inline-block"></i>${chipLabel(id, off)}</button>`; };
-  const chipLabel = (id, off) => {
-    if (built.noBlend) return NAMES[id];
-    if (!(id in NEW_WEIGHTS)) return LABELS[id];
-    if (built.fixedBlend && !blendChanged) return NAMES[id];
-    if (off) return `${NAMES[id]} 0%`;
-    return `${NAMES[id] === 'WeatherNext' ? 'WN' : NAMES[id]} ${Math.round((NEW_WEIGHTS[id] / (activeSum || 1)) * 100)}%`;
-  };
+    const tag = id === 'nourie' ? 'span' : 'button';
+    return `<${tag}${tag === 'button' ? ` type="button" aria-pressed="${!off}"` : ''} class="wn-chip" data-model="${id}" style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:999px;border:1px solid ${off ? 'rgba(255,255,255,.12)' : COLORS[id] + '99'};background:${off ? 'transparent' : 'rgba(255,255,255,.10)'};font-family:inherit;font-size:11px;font-weight:600;line-height:1.4;color:${off ? '#7f8ca3' : '#e8eef8'};white-space:nowrap;cursor:${tag === 'button' ? 'pointer' : 'default'};${off ? 'text-decoration:line-through;' : ''}">`
+      + `<i style="width:12px;height:3px;border-radius:2px;background:${COLORS[id]};opacity:${off ? 0.3 : 1};display:inline-block"></i>${NAMES[id]}</${tag}>`; };
   const legend = built.perModel ? ids.map(chip).join('')
     : `<span style="font-size:11px;color:#d5deee">${varId === 'aqi' ? 'Daily max AQI (Open-Meteo / CAMS)' : varId === 'uv' ? 'Daily max UV index' : ''}</span>`;
-  const note = built.perModel && !built.noBlend ? `<p style="font-size:11px;color:#9fb0c8;margin:6px 0 0">Tap a chip to show/hide a model (hidden models drop out of the Weather Nourie blend) · tap or drag the graph for values. Models drop out as their forecast range ends (HRRR ~2 days, NWS ~7 days).${built.fixedBlend ? ' Rain chance: NWS is its official probability; HRRR, NBM and ECMWF show each model’s rain signal at the day’s peak hour; the blend is the Weather Nourie rain chance.' : ''}${blendChanged ? ' <b style="color:#ffd479">Blend recalculated without hidden models.</b>' : ''}</p>` : '';
+  const note = built.perModel ? `<p style="font-size:11px;color:#c4d9ed;margin:6px 0 0">Weather Nourie blend is the forecast shown on this page. Other lines show individual models. Tap a model to show/hide its line, or tap the graph for values.${varId === 'rain' ? ' Rain totals use the same forecast period as the daily tiles, through 7 AM the next morning.' : varId === 'wind' ? ' Wind shows the average over that forecast period.' : varId === 'dewpoint' ? ' Dew point shows the highest reading over that forecast period.' : varId === 'pop' ? ' Individual model rain signals are not calibrated probabilities.' : ''}</p>` : '';
   container.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:4px;padding:2px 0 8px">${legend}</div>`
     + `<div class="wn-chart-wrap" style="position:relative;touch-action:pan-y">`
     + `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="width:100%;height:auto;display:block;cursor:crosshair" role="img" aria-label="${varDef.label} comparison chart">${ylabels}${labels}${lines}${dots}`
     + `<line class="wn-cross" x1="0" x2="0" y1="${PT - 10}" y2="${H - PB}" stroke="#fff" stroke-width="1.5" stroke-dasharray="3,3" opacity="0"/><g class="wn-cross-dots"></g></svg>`
     + `<div class="wn-tip" role="status" aria-live="polite" style="position:absolute;top:4px;display:none;min-width:130px;padding:8px 10px;border-radius:12px;background:rgba(10,20,40,.88);border:1px solid rgba(255,255,255,.22);color:#fff;font-size:12px;line-height:1.45;pointer-events:none;box-shadow:0 6px 18px rgba(0,0,0,.35)"></div></div>${note}`;
-  container.querySelectorAll('.wn-chip').forEach((b) => b.addEventListener('click', () => {
+  container.querySelectorAll('button.wn-chip').forEach((b) => b.addEventListener('click', () => {
     const id = b.dataset.model; if (hiddenModels.has(id)) hiddenModels.delete(id); else hiddenModels.add(id);
     renderChart(container, built, varDef, varId);
   }));
@@ -296,18 +298,17 @@ function renderChart(container, built, varDef, varId) {
     const r = svg.getBoundingClientRect(), sx = (clientX - r.left) * (W / r.width);
     const i = Math.max(0, Math.min(n - 1, Math.round(((sx - PL) / (W - PL - PR)) * (n - 1))));
     const x = X(i);
+    svg.querySelectorAll('[data-point-label]').forEach(label => { label.style.visibility = Number(label.dataset.pointLabel) === i ? 'hidden' : ''; });
     cross.setAttribute('x1', x); cross.setAttribute('x2', x); cross.setAttribute('opacity', '0.8');
-    const rows = visible.map((id) => [id, series[id][i]]).filter(([, v]) => v != null);
-    const fb = series.fullBlend[i], nb = series.newBlend[i];
-    const delta = blendChanged && fb != null && nb != null ? `<span style="display:block;color:#ffd479;font-size:11px;margin-top:3px">${built.fixedBlend ? 'Weighted from visible models. Official rain chance' : 'With all models'}: ${varDef.fmt(fb)} (${nb - fb >= 0 ? '+' : ''}${varId === 'rain' ? (nb - fb).toFixed(2) : Math.round(nb - fb)})</span>` : '';
-    cdots.innerHTML = rows.map(([id, v]) => `<circle cx="${x}" cy="${Y(v).toFixed(1)}" r="5" fill="${COLORS[id]}" stroke="#0a1428" stroke-width="1.5"/>`).join('');
+    const rows = visible.map((id) => [id, series[id][i]]).filter(([id, value]) => id === 'nourie' || finite(value));
+    cdots.innerHTML = rows.filter(([, value]) => finite(value)).map(([id, v]) => `<circle cx="${x}" cy="${Y(v).toFixed(1)}" r="5" fill="${COLORS[id]}" stroke="#0a1428" stroke-width="1.5"/>`).join('');
     tip.innerHTML = `<b style="display:block;margin-bottom:3px">${dayName(days[i], i, true)}</b>`
-      + (rows.length ? rows.map(([id, v]) => `<span style="display:flex;justify-content:space-between;gap:10px"><span><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COLORS[id]};margin-right:5px"></i>${NAMES[id] || varDef.label}</span><b>${varDef.fmt(v)}</b></span>`).join('') : '<span>No model data</span>') + delta;
+      + (rows.length ? rows.map(([id, v]) => `<span data-tip-series="${id}" style="display:flex;justify-content:space-between;gap:10px"><span><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COLORS[id]};margin-right:5px"></i>${NAMES[id] || varDef.label}</span><b>${finite(v) ? varDef.fmt(v) : 'Unavailable'}</b></span>`).join('') : '<span>No model data</span>');
     tip.style.display = 'block';
     const px = (x / W) * r.width, tw = tip.offsetWidth;
     tip.style.left = `${Math.max(0, Math.min(r.width - tw, px > r.width / 2 ? px - tw - 12 : px + 12))}px`;
   };
-  const hide = () => { tip.style.display = 'none'; cross.setAttribute('opacity', '0'); cdots.innerHTML = ''; };
+  const hide = () => { tip.style.display = 'none'; cross.setAttribute('opacity', '0'); cdots.innerHTML = ''; svg.querySelectorAll('[data-point-label]').forEach(label => { label.style.visibility = ''; }); };
   let dragging = false;
   svg.addEventListener('pointerdown', (e) => { dragging = true; show(e.clientX); });
   svg.addEventListener('pointermove', (e) => { if (dragging || e.pointerType === 'mouse') show(e.clientX); });
@@ -413,6 +414,7 @@ async function init() {
 
 // Reload the comparison whenever the page loads a forecast for a (new) location.
 let wnFeed = null;
+if (typeof document !== 'undefined') {
 document.addEventListener('weather-nourie:forecast', (e) => {
   const fx = e.detail; if (!fx?.days) return;
   forecastCache = fx;
@@ -423,4 +425,5 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', init);
 } else {
   init();
+}
 }
