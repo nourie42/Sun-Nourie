@@ -206,7 +206,8 @@ def validate_chart(page, forecast, expected, variable):
         if index < 7 and variable in ['temp', 'rain', 'pop', 'wind']:
             card = page.locator(f'#experimental-week [data-week-day="{index}"]')
             if variable == 'temp':
-                card_value = card.locator('.seven-day-temperatures>span>strong').first.inner_text()
+                temperature_cell = 1 if card.locator('.seven-day-name').inner_text() == 'Tonight' else 0
+                card_value = card.locator('.seven-day-temperatures>span>strong').nth(temperature_cell).inner_text()
                 expected_card = expected_text if expected_text is not None else '—°'
             else:
                 metric = {'rain': 'Total precip', 'pop': 'Rain chance', 'wind': 'Wind'}[variable]
