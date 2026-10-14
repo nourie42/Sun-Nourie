@@ -64,6 +64,8 @@ async function assertNoOverflow(width) {
   assert.ok(dimensions.document <= width + 1 && dimensions.body <= width + 1, `Page-level overflow: ${JSON.stringify(dimensions)}`);
   const invalid = await page.locator('#atlas-trend, #atlas-blend, #atlas-confidence').allTextContents();
   assert.doesNotMatch(invalid.join(' '), /NaN|undefined|Infinity/);
+  const labels = await page.locator('#daily .day-name').evaluateAll(nodes => nodes.map(node => ({text: node.textContent, width: node.clientWidth, content: node.scrollWidth})));
+  assert.ok(labels.every(label => label.content <= label.width + 1), `Daily labels overlap their column: ${JSON.stringify(labels)}`);
 }
 
 await mkdir(output, { recursive: true });

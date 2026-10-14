@@ -461,3 +461,9 @@ html body.atlas-page main .metrics > .metric:hover { border-color: #9ccfe24d !im
 .atlas-page .atlas-confidence-label{display:block;color:#829caf;font-size:10px;line-height:1.5;margin-top:2px}
 .atlas-page .atlas-confidence-track > i[data-confidence="very-low"]{background:#db858c}
 .atlas-page .map-tabs button:disabled{opacity:.45;cursor:not-allowed}
+
+/* Long daily labels must not run into the weather icon on wide layouts. */
+@media(min-width:741px) {
+  .atlas-page .daily-panel .day-row { grid-template-columns:110px 60px 62px minmax(80px,1fr) 62px 88px; }
+  .atlas-page .daily-panel .day-name { font-size:16px; font-weight:550; line-height:1.35; overflow-wrap:anywhere; }
+}
