@@ -46,7 +46,12 @@ test('comparison URLs preserve side-by-side comparison and standalone forecast s
  assert.match(html,/id="today-forecast"/);assert.match(html,/id="hourly"/);assert.match(html,/class="weather-jump-card jump-main"/,'The NVIDIA destination keeps the shared main forecast layout and a return path.');
  assert.doesNotMatch(readFileSync('public/weather-fusion/compare.html','utf8').replace(/<[^>]*>/g,' '),/Google/i,'Visible comparison labels use NVIDIA branding.');
  assert.match(readFileSync('public/weather-fusion/compare.css','utf8'),/@media\(max-width:850px\)[\s\S]*compare-switch \[data-view=both\]\{display:none\}[\s\S]*compare-differences\{grid-template-columns:repeat\(2/,'Mobile comparison uses forecast tabs and a compact metric grid.');
- assert.match(readFileSync('public/weather-fusion/index.html','utf8'),/class="weather-jump-card jump-next" href="\/weathernext\/"/,'The main NVIDIA button opens the standalone WeatherNext layout.');
+ const main=readFileSync('public/weather-fusion/index.html','utf8');
+ const nav=main.match(/<nav class="weather-jump-nav"[\s\S]*?<\/nav>/)[0];
+ assert.equal((nav.match(/weather-jump-card/g)||[]).length,8);
+ assert.deepEqual([...nav.matchAll(/<span class="jump-label">([^<]+)<\/span>/g)].map(m=>m[1]),['Map','Your Day','7-Day','AQI','Car Wash','Feel Meter','Snow','Compare']);
+ assert.match(nav,/id="open-compare"[^>]*aria-controls="wn-compare-section"/,'Compare opens the forecast comparison within the shared page.');
+ assert.match(main,/id="weathernext-site-link" href="\/weathernext\/"/,'The separate WeatherNext link still opens the standalone forecast.');
  const nearby=await (await fetch(base+'/weathernext/?latitude=35.7798&longitude=-78.5355')).text();
  assert.match(nearby,/compare\/app\.js\?source=google&amp;location=selected&amp;explicit=1&amp;latitude=35\.7798&amp;longitude=-78\.5355/);
  assert.match(nearby,/name=Selected%20location/);

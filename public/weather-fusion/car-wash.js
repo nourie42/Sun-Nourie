@@ -1,7 +1,7 @@
 import {dailyDisplay,finite,rainChanceValue} from './weather-math.js?v=full-day-rain-v1';
-import {weatherIcon} from './weather-display.js?v=weather-qa-v67';
+import {weatherIcon} from './weather-display.js?v=feel-chart-tabs-v9';
 import {weatherState,conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
-import {forecastGrossLevel} from './dewpoint-meter.js?v=weather-qa-v67';
+import {forecastGrossLevel} from './dewpoint-meter.js?v=feel-chart-v3';
 
 export const CAR_WASH_RAIN_LIMIT = 25;
 const HOUR = 3600000;
@@ -146,11 +146,11 @@ function grossMeterFact(forecast, targetIndex, window, now = Date.now()) {
       peak=dewpoints.find(point=>{const start=Date.parse(point.time);return finite(start)&&start<=now&&now<start+HOUR&&finite(point.value);})||null;
     }
   }
-  if(!peak)return {title:'Unavailable',detail:'Gross Meter'};
+  if(!peak)return {title:'Unavailable',detail:'Feel Meter'};
   const wind=peak.current&&finite(forecast.current?.wind)?forecast.current.wind:seriesValue(forecast,'wind',peak.time);
   const level=forecastGrossLevel(peak.value,wind);
-  const score={dry:'DRY',nice:'NOT BAD','nice-breeze':'NOT BAD',humid:'HUMID',gross:'GROSS',nogo:'NO-GO',nope:'NOPE'}[level.key]||'UNAVAILABLE';
-  return {title:`${Math.round(peak.value)}° · ${score}`,detail:peak.current?'Gross Meter now':'Gross Meter at wash time',value:peak.value,level:level.key};
+  const score={parched:'VERY DRY',crisp:'DRY',dry:'DRY',nice:'NOT BAD','nice-breeze':'NOT BAD',humid:'HUMID',gross:'GROSS',nogo:'NO-GO',nope:'NOPE'}[level.key]||'UNAVAILABLE';
+  return {title:`${Math.round(peak.value)}° · ${score}`,detail:peak.current?'Feel Meter now':'Feel Meter at wash time',value:peak.value,level:level.key};
 }
 
 export function carWashSummary(forecast, now = Date.now()) {
@@ -221,8 +221,12 @@ export function carWashIconCondition(day = {}) {
 
 export function carWashHTML(summary) {
   const label = verdictLabel(summary.state), good = summary.canWash;
+  // Keep the full forecast period for assistive text while using the same
+  // compact day heading as the other four cards. The period still controls
+  // the rain chance and verdict; this only prevents a long heading spilling
+  // into the next card on phones.
   const cards = summary.days.map(day => `<article class="car-wash-day" data-car-wash-state="${day.state}">
-    <strong>${esc(day.label)}</strong><small>${esc(day.stamp)}</small>${weatherIcon(carWashIconCondition(day),day.isDay!==false,42)}
+    <strong title="${esc(day.label)}" aria-label="${esc(day.label)}">${esc(day.label === 'Remainder of Today' ? 'Today' : day.label)}</strong><small>${esc(day.stamp)}</small>${weatherIcon(carWashIconCondition(day),day.isDay!==false,42)}
     <span class="car-wash-temps">${finite(day.low)?Math.round(day.low)+'°':'—'} <i>|</i> ${finite(day.high)?Math.round(day.high)+'°':'—'}</span>
     <span class="car-wash-chance">💧 ${day.chance===null?'—':Math.round(day.chance)+'%'}</span><b class="car-wash-day-verdict">${verdictLabel(day.state)}</b>
   </article>`).join('');
@@ -254,3 +258,4 @@ export function resetCarWashForecast() {
   if(button)button.setAttribute('aria-expanded','false');
   panel.innerHTML = '';
 }
+

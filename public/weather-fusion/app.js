@@ -2,29 +2,29 @@ import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText,rebindDanTake} from './
 import {danCard,danTakeDisplay} from './dans-summary.js?v=county-warnings-v1';
 import {fetchJsonWithDeadline} from './request-deadline.js?v=loading-recovery-v1';
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
-import {weatherIcon,renderHourlyWeather,currentSample} from './weather-display.js?v=restore-hourly-v7';
-import {dayGraphHTML,dayGraphPoints,installDayGraph} from './day-graph.js?v=feels-floor-wind-v1';
-import {degrees,feelsAt,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=dewpoint-floor-v1';
+import {weatherIcon,renderHourlyWeather,currentSample} from './weather-display.js?v=feel-chart-tabs-v9';
+import {dayGraphHTML,dayGraphPoints,installDayGraph} from './day-graph.js?v=rain-chance-v7';
+import {degrees,feelsAt,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=continuous-feels-v2';
 import {createFramePlayer} from './frame-player.js';
-import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=rain-icon-v2';
+import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=feel-chart-tabs-v9';
 import {dailyDisplay} from './weather-math.js?v=full-day-rain-v1';
 import {conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
 import {currentHero} from './current-temperature.js?v=rain-now-v71';
 import {renderBulletins} from './bulletins.js?v=county-warnings-v1';
 import {withLiveAlerts,retainUnverifiedAlerts,alertLocationKey,ALERT_REFRESH_MS} from './live-alerts.js?v=county-warnings-v3';
-import {modelFreshnessText} from './personal-details.js?v=wardrobe-v1';
-import {renderDewpointMeter} from './dewpoint-meter.js?v=weather-qa-v67';
+import {modelFreshnessText} from './personal-details.js?v=feel-chart-tabs-v9';
+import {renderDewpointMeter} from './dewpoint-meter.js?v=feel-chart-v3';
 import {renderWeatherPanel} from './render-safety.js';
 import {forecastPeriodSummary} from './forecast-story.js?v=weather-qa-v67';
 import {forecastOutlookDetails} from './outlook-details.js?v=full-day-rain-v1';
-import {isExperimentalWeatherPage,renderCarWashForecast,resetCarWashForecast} from './car-wash.js?v=click-main-v2';
+import {isExperimentalWeatherPage,renderCarWashForecast,resetCarWashForecast} from './car-wash.js?v=compact-day-v7';
 import {renderModelExplanation,resetModelExplanation} from './model-explanation.js?v=rain-support-v12';
 import {updateRainTrend} from './rain-trend.js?v=full-day-rain-v1';
 import {renderRiskOutlooks,resetRiskOutlooks} from './risk-outlooks.js?v=risk-outlooks-v5';
 import {renderAirQuality} from './air-quality.js?v=mobile-repair-v1';
 import {displayedRainChance} from './rain-display.js?v=rain-observed-v1';
-import {weatherChangeMessages,WEATHER_CHANGE_TITLE} from './weather-changes.js?v=large-change-v3';
-import {renderSnowOutlook} from './snow-outlook.js?v=1';
+import {weatherChangeMessages,WEATHER_CHANGE_TITLE} from './weather-changes.js?v=feel-recovery-v7';
+import {renderSnowOutlook,resetSnowOutlook} from './snow-outlook.js?v=snow-grid-v6';
 import {renderForecastWindowBanners,resetForecastWindowBanners} from './forecast-window-banners.js?v=sun-window-main-v4';
 import {createSevenDayCarousel} from './seven-day.js?v=snow-v12';
 import {forecastSourceHealth} from './forecast-status.js?v=source-health-v1';
@@ -180,7 +180,7 @@ function render(data) {
   if(sevenDayCarousel)draw('experimental-week','Seven-day forecast',()=>sevenDayCarousel.render(data));
   draw('skin-exposure', 'Feels-like outlook', () => renderComfort(data));
   if(!experimentalPage&&!$('car-wash-forecast').hidden)draw('car-wash-forecast', 'Car Wash Forecast', () => renderCarWashForecast(data));
-  draw('dewpoint-gross-meter', 'Dew Point Gross Meter', () => renderDewpointMeter(data));
+  draw('dewpoint-gross-meter', 'Dew Point Feel Meter', () => renderDewpointMeter(data));
   if(experimentalPage)draw('model-explanation', 'Forecast model explanation', () => renderModelExplanation(data));
   draw('air-quality-content', 'Air quality', () => renderAirQuality(data));
   draw('metrics', 'Weather details', () => renderMetrics(data));
@@ -197,7 +197,11 @@ function render(data) {
   const sourceNote = sourceHealth.note;
   // Top of page: just the update time. Source/feed health lives in Scientific Stuff (and the tooltip).
   const statusDetail=`Updated ${clock(data.assembledAt)}${sourceNote}${failedPanels.length ? ` · Display issue: ${failedPanels.join(', ')}. Other forecasts remain available; use Refresh to retry.` : ''}`;
-  $('status').textContent = `Updated ${clock(data.assembledAt)}${unavailable.length||failedPanels.length?' · Some data is temporarily unavailable; use Refresh to retry.':''}`;
+  const modelRecovery=(data.hours||[]).some(h=>h.forecastSource==='model-guidance')||(data.days||[]).some(d=>/model guidance/i.test(d.conditionSource||''));
+  const officialInterrupted=(data.feeds||[]).some(f=>['nws','hourly'].includes(f.id)&&f.status!=='ready'&&f.recovered!==true);
+  const retainedOfficial=(data.feeds||[]).some(f=>f.recovered===true);
+  const recoveryNotice=modelRecovery&&officialInterrupted?'Official forecast update interrupted; available model guidance is shown.':retainedOfficial?'Official update delayed; recently verified forecast guidance is shown.':unavailable.length||failedPanels.length?'Some data is temporarily unavailable; use Refresh to retry.':'';
+  $('status').textContent = `Updated ${clock(data.assembledAt)}${recoveryNotice?' · '+recoveryNotice:''}`;
   $('status').title = statusDetail;
   $('status').classList.toggle('error', unavailable.length > 0 || failedPanels.length > 0);
 }
@@ -217,7 +221,7 @@ function renderEvidence(data) {
     const c=currentSample(data).inputs,e=currentSample(data).comfort.inputEvidence||{};
     const next=data.metricForecasts?.series?.feels?.find(p=>Date.parse(p.time)>Date.now());
     const n=(v,s='')=>finite(v)?`${Math.round(v*10)/10}${s}`:'Unavailable';
-    root.innerHTML=`<p><strong>Current thermal inputs:</strong> ${esc(c.localEstimate?.source||c.stationName||c.station||'Forecast estimate')}${finite(c.stationDistanceKm)?` · ${Math.round(c.stationDistanceKm/1.609344)} miles away`:''}; ${esc(c.time||'time unavailable')}. Air ${n(c.temperature,'°F')}, dew point ${n(c.dewpoint,'°F')}, wind ${n(c.wind,' mph')}. ${esc(c.localEstimate?.reason||c.comfortSourceNote||'')} Outdoor UTCI ${n(data.comfort?.rawOutdoors,'°F')}.</p>${next?`<p><strong>Next forecast hour — separate inputs:</strong> ${esc(next.time)}. Air ${n(next.inputs.temperature,'°F')}, dew point ${n(next.inputs.dewpoint,'°F')}, wind ${n(next.inputs.wind,' mph')}, cloud cover ${n(next.inputs.skyCover,'%')}. Outdoor UTCI ${n(next.value,'°F')}.</p>`:''}<p>${esc(e.windPolicy||'')} · ${esc(e.radiationBasis||'')}. Station estimates are not copied into future forecasts. The raw thermal/UTCI calculation is retained unchanged. Visible primary outdoor feels-like values are floored at the same-hour dew point only when forecast gusts are below ${GUSTY_FEELS_DISPLAY_MPH} mph.</p>`;
+    root.innerHTML=`<p><strong>Current thermal inputs:</strong> ${esc(c.localEstimate?.source||c.stationName||c.station||'Forecast estimate')}${finite(c.stationDistanceKm)?` · ${Math.round(c.stationDistanceKm/1.609344)} miles away`:''}; ${esc(c.time||'time unavailable')}. Air ${n(c.temperature,'°F')}, dew point ${n(c.dewpoint,'°F')}, wind ${n(c.wind,' mph')}. ${esc(c.localEstimate?.reason||c.comfortSourceNote||'')} Outdoor UTCI ${n(data.comfort?.rawOutdoors,'°F')}.</p>${next?`<p><strong>Next forecast hour — separate inputs:</strong> ${esc(next.time)}. Air ${n(next.inputs.temperature,'°F')}, dew point ${n(next.inputs.dewpoint,'°F')}, wind ${n(next.inputs.wind,' mph')}, cloud cover ${n(next.inputs.skyCover,'%')}. Outdoor UTCI ${n(next.value,'°F')}.</p>`:''}<p>${esc(e.windPolicy||'')} · ${esc(e.radiationBasis||'')}. Station estimates are not copied into future forecasts. The raw thermal/UTCI calculation is retained unchanged. Dew point is a moisture input, not a lower bound on thermal comfort. Sustained wind is used consistently; gust thresholds do not switch the equation.</p>`;
   }
   const important = ['nws', 'afd', 'hrrr', 'ecmwf', 'nbm', 'air-quality', 'alerts'];
   const labels = { nws: 'NWS', afd: 'Local discussion', hrrr: 'HRRR', ecmwf: 'ECMWF IFS', nbm: 'National Blend', 'air-quality':'Air quality', alerts: 'Alerts' };
@@ -336,6 +340,7 @@ function chooseLocation(value,{rememberDevice=false}={}) {
   stopRadar();framePlayer?.clear();++modelFrameToken;++mapSelectionToken;++radarGeneration;lastRadarFetch=0;
   currentBriefing = null;
   resetExperience();
+  resetSnowOutlook();
   resetForecastWindowBanners();
   if ($('day-dialog').open) $('day-dialog').close();
   // Clear the previous location immediately, including its alerts and AI text.
@@ -627,3 +632,4 @@ startDeviceLocation();
 setInterval(()=>{if(currentBriefing&&forecast)renderBriefing(currentBriefing);},30000);
 setInterval(()=>{if(forecast&&Date.now()-Date.parse(forecast.assembledAt)>90*60000)renderComfort(forecast);},30000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&currentBriefing&&forecast)renderBriefing(currentBriefing);});
+

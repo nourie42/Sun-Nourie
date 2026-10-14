@@ -22,10 +22,10 @@ test('illustrated weather stays synchronized across outdoor and pet scenes',()=>
  }
  assert.doesNotMatch(referenceScene(2,true,'Clear',88),/data-pet-motion=/,'dry pet scenes stay still');
  assert.doesNotMatch(referenceScene(2,true,'Chance Showers',88,{pop:50}),/data-pet-motion=/,'umbrella-only scenes stay still');
- assert.match(referenceScene(1,true,'Clear',70),/class="sky-sun"/);
- assert.match(referenceScene(1,true,'Snow',30),/data-scene="cold"/);
+ assert.match(referenceScene(1,true,'Clear',70),/comfort-integrated-mild-normal\.webp/);
+ assert.match(referenceScene(1,true,'Snow',30),/data-scene="snow"/);
  assert.match(referenceScene(1,true,'Clear',30),/data-visible-outfit="cold"/);
- assert.match(referenceScene(1,true,'Clear',30),/data-garment="jacket-and-trousers"/);
+ assert.match(referenceScene(1,true,'Clear',30),/data-garment="heavy-coat-and-trousers"/);
  assert.deepEqual(comfortSceneState(true,'Clear',95),{key:'hot',asset:'comfort-reference-scenes-hot.webp'});
  assert.deepEqual(comfortSceneState(true,'Thunderstorms',95),{key:'rain',asset:'comfort-reference-scenes-rain.webp'},'observed rain without a probability takes precedence over heat');
  assert.deepEqual(comfortSceneState(false,'Clear',95),{key:'dawn',asset:'comfort-reference-scenes-dawn.webp'},'night uses visible pre-sunrise art, never a daytime heat-sun scene');
@@ -34,20 +34,20 @@ test('illustrated weather stays synchronized across outdoor and pet scenes',()=>
  assert.match(html,/data-scene="rain"/);
  assert.doesNotMatch(html,/sky-sun|Paw burn risk/);
  const cold=pavementHTML({status:'unavailable',daylight:true},30,{condition:'Snow'});
- assert.match(cold,/data-scene="cold"/);
+ assert.match(cold,/data-scene="snow"/);
  assert.doesNotMatch(cold,/class="sky-sun"/);
 });
 
 test('scene policy distinguishes fog, low rain chance, active rain and pre-sunrise hours',()=>{
- assert.equal(precipitationActivity('Chance Showers',{pop:19}),'none');
- assert.equal(precipitationActivity('Slight Chance Showers',{pop:20,precipitation:.2}),'none');
- assert.equal(precipitationActivity('Chance Showers',{pop:49,precipitation:.2}),'none');
+ assert.equal(precipitationActivity('Chance Showers',{pop:19}),'possible');
+ assert.equal(precipitationActivity('Slight Chance Showers',{pop:20,precipitation:.2}),'possible');
+ assert.equal(precipitationActivity('Chance Showers',{pop:49,precipitation:.2}),'possible');
  assert.equal(precipitationActivity('Chance Showers',{pop:50}),'possible');
  assert.equal(precipitationActivity('Chance Showers',{pop:60}),'possible');
  assert.equal(precipitationActivity('Chance Showers',{pop:61}),'active');
  assert.equal(precipitationActivity('Chance Showers',{pop:80}),'active');
  assert.equal(precipitationActivity('Chance Showers',{pop:81}),'active');
- assert.equal(precipitationActivity('Rain',{pop:20}),'none');
+ assert.equal(precipitationActivity('Rain',{pop:20}),'active');
  assert.equal(precipitationActivity('Fog',{pop:19}),'none');
  assert.equal(precipitationActivity('Fog',{pop:48}),'none');
  assert.equal(precipitationActivity('Fog',{pop:100}),'active');
@@ -58,9 +58,9 @@ test('scene policy distinguishes fog, low rain chance, active rain and pre-sunri
  assert.deepEqual(comfortSceneState(true,'Foggy',77,{pop:80}),{key:'rain',asset:'comfort-reference-scenes-rain.webp'});
  assert.deepEqual(comfortSceneState(true,'Foggy',77,{pop:81}),{key:'rain',asset:'comfort-reference-scenes-rain.webp'});
  assert.deepEqual(comfortSceneState(true,'Cloudy',77,{pop:0,rainAround:true}),{key:'rain',asset:'comfort-reference-scenes-rain.webp'});
- assert.deepEqual(comfortSceneState(true,'Rain',35,{pop:100}),{key:'rain',asset:'comfort-reference-scenes-rain.webp'},'active rain takes precedence over generic cold styling');
- assert.deepEqual(comfortSceneState(true,'Slight Chance Thunderstorms',92,{pop:20}),{key:'normal',asset:'comfort-reference-scenes.webp'});
- assert.deepEqual(comfortSceneState(true,'Chance Showers',70,{pop:49}),{key:'normal',asset:'comfort-reference-scenes.webp'});
+ assert.deepEqual(comfortSceneState(true,'Rain',35,{pop:100}),{key:'rain',asset:'comfort-integrated-cold-rain.webp'},'active rain uses complete cold rainwear without inventing snow');
+ assert.deepEqual(comfortSceneState(true,'Slight Chance Thunderstorms',92,{pop:20}),{key:'carry-umbrella',asset:'comfort-reference-scenes-carry-umbrella.svg'});
+ assert.deepEqual(comfortSceneState(true,'Chance Showers',70,{pop:49}),{key:'carry-umbrella',asset:'comfort-integrated-mild-carry-umbrella.webp'});
  assert.deepEqual(comfortSceneState(true,'Chance Thunderstorms',92,{pop:50}),{key:'carry-umbrella',asset:'comfort-reference-scenes-carry-umbrella.svg'});
  assert.deepEqual(comfortSceneState(true,'Slight Chance Thunderstorms',92,{pop:80}),{key:'rain',asset:'comfort-reference-scenes-rain.webp'});
  assert.deepEqual(comfortSceneState(true,'Slight Chance Thunderstorms',92,{pop:81}),{key:'rain',asset:'comfort-reference-scenes-rain.webp'});

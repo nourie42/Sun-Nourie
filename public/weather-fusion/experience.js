@@ -1,16 +1,15 @@
 import {confidenceNotice,todayForecastHTML} from './today-card.js?v=mobile-repair-v1';
 import {FORECAST_CONFIDENCE_VERSION,confidenceMeterPosition} from './forecast-confidence.js?v=category-meter-v1';
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
-import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=wardrobe-v1';
+import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=storm-scene-v5';
 import {weatherState} from './weather-state.js';
-import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=warmest-sun-explain-v1';
-import {degrees,displayedFeelsAt,dailyFeels,forecastValue,timeAt,peakFeelsHTML,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=dewpoint-floor-v1';
-import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=shade-linked-v2';
-import {sunExposureTemperature} from './outdoor-feels.js?v=sun-exposure-v1';
-import {comfortMode,comfortWindow,comfortNarrative,warmestTodayWindow} from './comfort-outlook.js?v=warmest-sun-explain-v1';
+import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=feel-chart-tabs-v9';
+import {degrees,displayedFeelsAt,dailyFeels,forecastValue,timeAt,peakFeelsHTML,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=continuous-feels-v2';
+import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=feel-chart-tabs-v9';
+import {comfortMode,comfortWindow,comfortNarrative,warmestTodayWindow,comfortArtworkContext} from './comfort-outlook.js?v=feel-chart-tabs-v9';
 import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js?v=full-day-rain-v1';
 import {displayedRainChance,rainAwareCondition} from './rain-display.js?v=rain-icon-v2';
-import {resetDewpointMeter} from './dewpoint-meter.js?v=weather-qa-v67';
+import {resetDewpointMeter} from './dewpoint-meter.js?v=feel-chart-v3';
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const number=(n,d=0)=>finite(n)?n.toFixed(d):'—';
@@ -92,27 +91,33 @@ export function selectComfortHour(time){
  comfortPreview=time==='now'?null:time;
  if(data)renderComfort(data);
 }
+/** Plain air/weather context accompanies the equivalent-temperature figure. */
+export function comfortInputsHTML(sample) {
+ const wind=sample?.inputs?.wind;
+ const thermalNote=finite(sample?.temperature)&&finite(sample?.feels)&&Math.abs(sample.temperature-sample.feels)>=10
+   ? '<small>Feels like is an estimated thermal comfort temperature.</small>' : '';
+ return `<p class="comfort-hour-context"><span>Air ${degrees(sample?.temperature)} · ${esc(sample?.condition||'Conditions unavailable')} · Wind ${finite(wind)&&wind>=0?`${Math.round(wind)} mph`:'unavailable'}</span>${thermalNote}</p>`;
+}
 export function renderComfort(forecast) {
  data=forecast;ensureComfortStyles();
  const now=Date.now(),current=currentSample(forecast,now);
  const sample=comfortPreview?forecastSample(forecast,comfortPreview):current;
  if(!sample){comfortPreview=null;return renderComfort(forecast);}
  const c=sample.comfort,zone=forecast.location.timeZone,summary=comfortWindow(forecast,now+1);
- const sunDisplay=sunExposureTemperature(sample);
  const precipitation=forecastValue(forecast,'precipitation',sample.time);
- const sceneContext={forecast:!sample.now,condition:sample.condition,pop:sample.pop,precipitation,rainAround:sample.rainAround===true,radarThreat:sample.radarThreat===true};
+ const sceneContext={...comfortArtworkContext(forecast,sample,now),forecast:!sample.now,condition:sample.condition,pop:sample.pop,precipitation,rainAround:sample.rainAround===true,radarThreat:sample.radarThreat===true};
  const pavement=pavementEstimate(forecast,sample.inputs,sample.now?now:Date.parse(sample.time),{checkedAt:now,...sceneContext});
- const kicker=$('skin-kicker');if(kicker)kicker.textContent=sample.now?'How it actually feels right now':`How will it feel outside at ${formatTime(sample.time)}?`;
+ const kicker=$('skin-kicker');if(kicker)kicker.textContent=sample.now?'How it feels outside right now':`How will it feel outside ${formatTime(sample.time,{weekday:'short'})}?`;
  const preview=sample.now?'':'<div class="comfort-preview-heading"><button type="button" data-comfort-reset>Back to now</button></div>';
- $('skin-values').innerHTML=`${preview}${sunShadeHTML(c,forecast.location,sample.now?now:Date.parse(sample.time),{...sceneContext,primaryFeels:sample.feels,sunExposure:sunDisplay.value,compact:true,pavement:pavementHTML(pavement,sample.feels,sceneContext)})}${sample.now?peakComparisonHTML(warmestTodayWindow(forecast,now),sunExposureTemperature(current).value,zone,now):''}`;
+ $('skin-values').innerHTML=`${preview}${comfortInputsHTML(sample)}${sunShadeHTML(c,forecast.location,sample.now?now:Date.parse(sample.time),{...sceneContext,primaryFeels:sample.feels,compact:true,pavement:pavementHTML(pavement,sample.feels,sceneContext)})}${sample.now?peakComparisonHTML(warmestTodayWindow(forecast,now),current.comfort.sun,zone,now):''}`;
  $('skin-values').querySelector('[data-comfort-reset]')?.addEventListener('click',()=>selectComfortHour('now'));
- $('skin-explanation').textContent=sample.now?comfortNarrative(sample.inputs,c,summary,zone):`${sample.condition}. This hour uses air ${degrees(sample.temperature)}, dew point ${degrees(sample.inputs.dewpoint)} and ${number(sample.inputs.wind)} mph wind. ${sunDisplay.active?`Estimated sun exposure ${degrees(sunDisplay.value)}; `:''}UTCI outdoors ${degrees(sample.feels)}; shade ${degrees(c.shade)}. The outdoor illustration and solar estimate use this same forecast hour.`;
+ $('skin-explanation').textContent=sample.now?comfortNarrative(sample.inputs,c,summary,zone,sceneContext):`${sample.condition}. This hour uses air ${degrees(sample.temperature)}, dew point ${degrees(sample.inputs.dewpoint)} and ${number(sample.inputs.wind)} mph wind. UTCI outdoors ${degrees(sample.feels)}; shade ${degrees(c.shade)}. The outdoor illustration and solar estimate use this same forecast hour.`;
  const tile=$('skin-exposure');tile.dataset.preview=sample.now?'current':'forecast';tile.dataset.weather=weatherState(sample.condition).kind;
  tile.querySelector('.comfort-weather-art')?.remove();
  document.querySelectorAll('#hourly [data-comfort-time]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.comfortTime===(sample.now?'now':sample.id))));
- if($('comfort-extra-science'))$('comfort-extra-science').innerHTML=`<p>${esc(sampleCaption(sample,zone))}</p><p>${sunDisplay.active?'The sun figure is an estimated air temperature plus the model’s sun-versus-shade radiant increase. It is not a thermometer reading or UTCI. The shade figure is modeled UTCI.':'Shade and outdoors are modeled feels-like temperatures from the same weather inputs.'} The sidewalk and asphalt readings are estimated surface temperatures, not air temperature or human feels-like. The dog walker’s outfit follows the selected outdoor exposure estimate, not the pavement.</p>`;
+ if($('comfort-extra-science'))$('comfort-extra-science').innerHTML=`<p>${esc(sampleCaption(sample,zone))}</p><p>Shade and outdoors are modeled feels-like temperatures from the same weather inputs. The outdoor reading matches this hour in the hourly forecast; shade excludes the direct-sun estimate. The sidewalk and asphalt readings are estimated surface temperatures, not air temperature or human feels-like. Clothing uses this selected hour's outdoor feels-like estimate. Snow scenes require snow at the selected hour; a snow chance later in the day does not change the current scene. Cold paw guidance applies to snow or cold conditions at this hour.</p>`;
  if($('pavement-current-science'))$('pavement-current-science').innerHTML=pavementDetailsHTML(pavement);
- $('skin-science').textContent=`${c.method}. ${sampleCaption(sample,zone)}. Air ${degrees(sample.temperature)}; dew point ${degrees(sample.inputs.dewpoint)}; wind ${number(sample.inputs.wind)} mph${finite(sample.inputs.gust)?`; gust ${number(sample.inputs.gust)} mph`:''}. ${sunDisplay.active?`The sun-exposure display adds the modeled UTCI sun-minus-shade difference (${degrees(sunDisplay.solarLift)}) to air temperature; it is an estimate, not measured air temperature or UTCI. `:''}${c.note} Current observations and future forecasts are different sources; the Now card uses exactly the same observation as the hero. The raw thermal calculation is unchanged. For display only, the primary outdoor feels-like is not shown below the same-hour dew point unless gusts reach ${GUSTY_FEELS_DISPLAY_MPH} mph.`;
+ $('skin-science').textContent=`${c.method}. ${sampleCaption(sample,zone)}. Air ${degrees(sample.temperature)}; dew point ${degrees(sample.inputs.dewpoint)}; wind ${number(sample.inputs.wind)} mph${finite(sample.inputs.gust)?`; gust ${number(sample.inputs.gust)} mph`:''}. ${c.note} Current observations and future forecasts are different sources; the Now card uses exactly the same observation as the hero. The modeled equivalent temperature can be below the air temperature or dew point. Sustained wind is used; gusts do not switch the calculation or impose a display floor.`;
 }
 function dailyWindSummary(forecast,day,display,index,now){
  const zone=forecast?.location?.timeZone||'America/New_York';
@@ -198,7 +203,7 @@ export function renderMetricTiles(forecast,smallIcon) {
  ];
  const aqiKey=aqValue===null?'unavailable':aqValue<=50?'good':aqValue<=100?'moderate':aqValue<=150?'sensitive':aqValue<=200?'unhealthy':aqValue<=300?'very-unhealthy':'hazardous';
  $('metrics').innerHTML=tiles.map(([key,ic,value,note])=>`<button type="button" class="glass metric metric-${key}" data-metric="${key}"${key==='pressure'?` data-pressure-trend="${esc(c.pressureTrend?.direction||'unknown')}"`:''} aria-haspopup="dialog" aria-label="${defs[key].title}: open forecast graph"><span class="metric-title">${smallIcon(ic)}${defs[key].title}</span><span class="metric-value">${value}</span><span class="metric-note">${esc(note)}</span>${sparkline(pointsFor(key,24))}<span class="tile-hint">${key==='solar'?'Tap for the week ahead':'Tap for forecast details'}</span></button>`).join('');
- $('metric-science').innerHTML=`<p>Current cards use a fresh nearby station when it is within 10 miles. When the nearest station is farther away, they use selected-location hourly guidance and identify it as an estimate. Tap a card for separate future forecast data. Daily forecasts share one hour-by-hour graph: temperature, feels-like and Gross Meter dew point use the left Fahrenheit scale; UV uses the right index scale. Slide or tap to read all four at the same hour. Gaps mean missing data, not zero. Gross Meter describes humidity through dew point, not a second feels-like temperature. The raw UTCI/Tier-3 feels-like calculation remains unchanged; visible primary outdoor feels-like values use a display sanity floor at the same-hour dew point unless forecast gusts are at least ${GUSTY_FEELS_DISPLAY_MPH} mph. All displayed pressures use millibars (mb). A pressure trend is shown only for a station observation; forecast pressure has no observed trend.</p>${Object.entries(data.metricForecasts?.notes||{}).map(([key,note])=>`<p><strong>${esc(key)}:</strong> ${esc(note)}</p>`).join('')}`;
+ $('metric-science').innerHTML=`<p>Current cards use a fresh nearby station when it is within 10 miles. When the nearest station is farther away, they use selected-location hourly guidance and identify it as an estimate. Tap a card for separate future forecast data. Daily forecasts share one hour-by-hour graph: temperature, feels-like and Feel Meter dew point use the left Fahrenheit scale; UV uses the right index scale; chance of rain has its own 0–100% scale below. Slide or tap to read all five at the same hour. Gaps mean missing data, not zero. Feel Meter describes humidity through dew point, not a second feels-like temperature. The same UTCI/Tier-3 equivalent temperature appears in the hourly forecast and outdoor figure. Dew point is a moisture input, not a display floor; gusts do not switch the equation. All displayed pressures use millibars (mb). A pressure trend is shown only for a station observation; forecast pressure has no observed trend.</p>${Object.entries(data.metricForecasts?.notes||{}).map(([key,note])=>`<p><strong>${esc(key)}:</strong> ${esc(note)}</p>`).join('')}`;
  if(active&&$('metric-dialog')?.open)drawChart();
 }
 function chartGrid(def,points) {
@@ -293,3 +298,4 @@ export function installExperience() {
  $('chart-science-link').addEventListener('click',()=>$('metric-dialog').close());
  window.addEventListener('resize',()=>{if(active&&$('metric-dialog').open)drawChart();});
 }
+

@@ -13,16 +13,16 @@
   <script async src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" onload="window.dispatchEvent(new Event('weather-map-library-ready'))"></script>
   <link rel="stylesheet" href="/weather-fusion/personal-details.css?v=wpc-mpd-v12">
   <link rel="stylesheet" href="/weather-fusion/urgent-alerts.css?v=county-warnings-v1">
-  <link rel="stylesheet" href="/weather-fusion/hourly-feels.css?v=weather-art-labels-v10">
+  <link rel="stylesheet" href="/weather-fusion/hourly-feels.css?v=rain-chance-v11">
   <link rel="stylesheet" href="/weather-fusion/weather-repair.css?v=center-no-direct-sun-v1">
   <link rel="stylesheet" href="/weather-fusion/forecast-cards.css?v=real-clouds-v2">
-  <link rel="stylesheet" href="/weather-fusion/scenario-layout.css?v=gust-safe-daily-v1">
-  <link rel="stylesheet" href="/weather-fusion/car-wash.css?v=rain-consensus-v41">
+  <link rel="stylesheet" href="/weather-fusion/scenario-layout.css?v=feel-auto-v6">
+  <link rel="stylesheet" href="/weather-fusion/car-wash.css?v=compact-days-v42">
   <link rel="stylesheet" href="/weather-fusion/model-explanation.css?v=rain-support-v12">
   <link rel="stylesheet" href="/weather-fusion/risk-outlooks.css?v=risk-outlooks-v4">
   <link rel="stylesheet" href="/weather-fusion/weather-polish.css?v=aqi-bg-v2">
   <link rel="stylesheet" href="/weather-fusion/forecast-window-banners.css?v=sun-window-main-v2">
-  <script type="module" src="/weather-fusion/app.js?v=county-warnings-v14&amp;repair=nourie-weather-take-v2&amp;sky=v12"></script>
+  <script type="module" src="/weather-fusion/app.js?v=feel-chart-tabs-v9"></script>
   <script type="module" src="/weather-fusion/experimental-sky.js?v=5"></script>
   <script type="module" src="/weather-fusion/wn-blend.js?v=10"></script>
 
@@ -106,8 +106,8 @@
   </style>
 
   <link rel="stylesheet" href="/weather-fusion/header-sky.css?v=3">
-  <link rel="stylesheet" href="/weather-fusion/page-unify.css?v=8">
-  <script type="module" src="/weather-fusion/gross-toggle.js?v=1"></script>
+  <link rel="stylesheet" href="/weather-fusion/page-unify.css?v=smaller-clear-tabs-v5">
+  <script type="module" src="/weather-fusion/gross-toggle.js?v=feel-v1"></script>
   <script type="module" src="/weather-fusion/week-toggle.js?v=1"></script>
   <script type="module" src="/weather-fusion/collapse.js?v=3"></script>
   <script type="module" src="/weather-fusion/header-sky.js?v=3"></script>
@@ -143,17 +143,18 @@
       <a class="weather-jump-card jump-day" href="#your-day">
         <span class="jump-label">Your Day</span>
       </a>
-      <a class="weather-jump-card jump-week" href="#daily-panel" aria-label="10-Day Forecast">
+      <a class="weather-jump-card jump-week" href="#daily-panel" aria-label="7-Day Forecast">
         <span class="jump-label">7-Day</span>
       </a>
       <a class="weather-jump-card jump-air" href="#air-quality" aria-label="Air Quality">
         <span class="jump-label">AQI</span>
       </a>
-      <button class="weather-jump-card jump-car-wash" id="open-car-wash" type="button" aria-expanded="false" aria-controls="car-wash-forecast">Car Wash</button>
-      <a class="weather-jump-card jump-gross" id="open-gross" href="#dewpoint-gross-meter" role="button" aria-expanded="false" aria-controls="dewpoint-gross-meter" aria-label="Dew Point Gross Meter">
-        <span class="jump-label">Gross</span>
+      <button class="weather-jump-card jump-car-wash" id="open-car-wash" type="button" aria-expanded="false" aria-controls="car-wash-forecast"><span class="jump-label">Car Wash</span></button>
+      <a class="weather-jump-card jump-gross" id="open-gross" href="#dewpoint-gross-meter" role="button" aria-expanded="false" aria-controls="dewpoint-gross-meter" aria-label="Feel Meter">
+        <span class="jump-label">Feel Meter</span>
       </a>
-      <button class="weather-jump-card jump-compare" id="open-compare" type="button" aria-expanded="false" aria-controls="wn-compare-section">Compare</button>
+      <button class="weather-jump-card jump-snow" id="open-snow" type="button" aria-haspopup="dialog" aria-controls="forecast-window-dialog"><span class="jump-label">Snow</span></button>
+      <button class="weather-jump-card jump-compare" id="open-compare" type="button" aria-expanded="false" aria-controls="wn-compare-section"><span class="jump-label">Compare</span></button>
     </nav>
     <div class="experimental-page-banner" role="status" hidden>EXPERIMENTAL</div>
     <main id="forecast">
@@ -273,4 +274,5 @@
   <noscript><p class="noscript">Weather Nourie requires JavaScript. Visit <a href="https://www.weather.gov/">weather.gov</a> for official forecasts and warnings.</p></noscript>
 </body>
 </html>
+
 

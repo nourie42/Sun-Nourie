@@ -99,7 +99,7 @@
 @media(max-width:540px){#skin-values .sun-shade-comparison .exposure-person[data-reading="unavailable"]>figcaption>strong{font-size:clamp(10px,2.9vw,15px)}}
 @media(max-width:540px){
  #skin-values .sun-shade-comparison .exposure-person,
- #skin-values .sun-shade-comparison .exposure-person:has(.reference-scene){grid-template-rows:28px 40px 22px auto minmax(100px,auto);aspect-ratio:auto}
+ #skin-values .sun-shade-comparison .exposure-person:has(.reference-scene){grid-template-rows:28px minmax(40px,auto) minmax(28px,auto) auto minmax(100px,auto);aspect-ratio:auto}
  #skin-values .sun-shade-comparison .exposure-person>.exposure-alert-slot{top:auto;left:auto;right:auto;padding:0 2px}
  #skin-values .sun-shade-comparison .exposure-person>svg,
  #skin-values .sun-shade-comparison .pavement-person>.poodle-scene{grid-row:4}
@@ -108,3 +108,33 @@
 /* Night scenes stay dark while faces and clothing remain readable. */
 body[data-sky="night"] #skin-values .reference-scene .reference-art{filter:brightness(1.18) saturate(1.02)}
 body[data-sky="night"] #skin-values .reference-scene .reference-weather-tint{opacity:.12}
+
+/* Winter paw care is a condition label, never a simulated paw thermometer. */
+#skin-values .sun-shade-comparison .exposure-person>figcaption>strong.winter-paw-reading{font-size:clamp(26px,4vw,46px);line-height:1.1;letter-spacing:-.025em}
+#skin-values .sun-shade-comparison .pavement-person[data-status="winter"] .pavement-warning{background:#d8edf8;color:#173c5b;border-color:#aacfe5}
+#skin-values .sun-shade-comparison .exposure-person>svg.snow-play-scene{background:#a3c7dd}
+@media(max-width:540px){#skin-values .sun-shade-comparison .exposure-person>figcaption>strong.winter-paw-reading{font-size:clamp(17px,5vw,25px)}}
+
+/* Give captions their own content-sized band so pet guidance stays visible. */
+@media(min-width:541px){
+ #skin-values .sun-shade-comparison .exposure-person,
+ #skin-values .sun-shade-comparison .exposure-person:has(.reference-scene){grid-template-rows:52px minmax(60px,auto) minmax(28px,auto) auto minmax(136px,auto);aspect-ratio:auto}
+ #skin-values .sun-shade-comparison .exposure-person>svg.reference-scene{height:auto!important;aspect-ratio:1}
+}
+
+/* Warning text has its own content-sized row; it cannot spill over the art. */
+#skin-values .sun-shade-comparison .exposure-person>.exposure-alert-slot{padding:3px 5px;box-sizing:border-box}
+#skin-values .sun-shade-comparison .exposure-person .thermal-risk,
+#skin-values .sun-shade-comparison .exposure-person .pavement-warning{box-sizing:border-box;max-width:100%;padding:3px 6px;font-size:10px;line-height:1.15;white-space:normal;text-align:center;box-shadow:0 2px 5px rgba(28,36,28,.12)}
+@media(max-width:540px){
+ #skin-values .sun-shade-comparison .exposure-person>.exposure-alert-slot{padding:3px 3px}
+ #skin-values .sun-shade-comparison .exposure-person .thermal-risk,
+ #skin-values .sun-shade-comparison .exposure-person .pavement-warning{padding:2px 4px;font-size:9px}
+}
+
+
+/* Keep the selected hour’s actual weather beside its comfort estimate. */
+#skin-values .comfort-hour-context{margin:0 auto 12px;max-width:1060px;text-align:center;line-height:1.4;color:#e6f4ff;font-size:14px}
+#skin-values .comfort-hour-context>span{display:block;font-weight:650}
+#skin-values .comfort-hour-context>small{display:block;margin-top:4px;font-size:12px;color:#c7ddef}
+@media(max-width:540px){#skin-values .comfort-hour-context{font-size:12px}#skin-values .comfort-hour-context>small{font-size:11px}}

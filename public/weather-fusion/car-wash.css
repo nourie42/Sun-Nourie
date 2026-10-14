@@ -26,7 +26,7 @@
 .car-wash-days{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:1cqw}
 .car-wash-day{display:flex;flex-direction:column;align-items:center;min-width:0;padding:1.7cqw .5cqw 1cqw;border:1px solid #5cb8df5b;border-radius:1.6cqw;background:linear-gradient(180deg,#071c30,#061424);box-shadow:inset 0 1px #c6efff16;text-align:center}
 .car-wash-day[data-car-wash-state="wash"]{border-color:#55ff7a;box-shadow:inset 0 0 1.2cqw #21e95f27,0 0 .8cqw #20fa554d}
-.car-wash-day>strong{font-size:clamp(10px,2.4cqw,17px);line-height:1.15;font-weight:900;text-transform:uppercase;white-space:nowrap}
+.car-wash-day>strong{width:100%;max-width:100%;font-size:clamp(10px,2.4cqw,17px);line-height:1.15;font-weight:900;text-transform:uppercase;white-space:normal;overflow-wrap:anywhere}
 .car-wash-day>small{font-size:clamp(9px,2.05cqw,14px);line-height:1.2;color:#bdced9;margin-top:.4cqw}
 .car-wash-day svg{width:8cqw;height:8cqw;margin:1.3cqw auto}
 .car-wash-temps{font-size:clamp(10px,2.5cqw,18px);line-height:1.2;font-weight:850;white-space:nowrap}.car-wash-temps i{font-style:normal;color:#7d99ad;font-weight:400}

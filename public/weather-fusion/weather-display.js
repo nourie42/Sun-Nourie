@@ -3,7 +3,8 @@ import {outdoorExposure} from './outdoor-feels.js?v=weather-qa-v67';
 import {currentComfortInputs} from './current-inputs.js?v=weather-qa-v67';
 import {weatherState,conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
 import {thermalComfort, finite, solarElevation,rainChanceValue} from './weather-math.js?v=weather-qa-v67';
-import {feelsAt,displayedFeelsAt,displayFeelsValue,forecastValue,degrees,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=dewpoint-floor-v1';
+import {displayedFeelsAt,forecastValue,degrees} from './hourly-feels.js?v=continuous-feels-v2';
+import {winterSceneExpected,selectedHourSnowPhase} from './exposure-scene.js?v=storm-scene-v5';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function weatherShapes(condition, isDay = true) {
   const weather = weatherState(condition);
@@ -97,15 +98,10 @@ export function currentSample(forecast, now = Date.now()) {
   const displayComfort=radarThreat
     ? {...comfort,weatherKind:weatherState(displayCondition).kind,radiantCondition:displayCondition,condition:displayCondition}
     : comfort;
-  const rawExposure=outdoorExposure(displayComfort);
   const currentGust=finite(current.gust)?current.gust:(currentHour?forecastValue(forecast,'gust',currentHour.time):null);
-  const shownFeels=displayFeelsValue(rawExposure.value,current.dewpoint,currentGust);
-  const shownComfort=finite(shownFeels)&&shownFeels!==rawExposure.value
-    ? {...displayComfort,outdoors:shownFeels,displayFeelsGuard:{applied:true,raw:rawExposure.value,dewpoint:current.dewpoint,gust:currentGust,threshold:GUSTY_FEELS_DISPLAY_MPH}}
-    : displayComfort;
-  const exposure=outdoorExposure(shownComfort),shownInputs={...current,gust:currentGust};
+  const exposure=outdoorExposure(displayComfort),shownInputs={...current,gust:currentGust};
   return {windDirection:current.windDirection,pop:rainChanceValue(currentLikelihood),officialPop:currentHour?.officialPop??currentHour?.pop,rainLikelihood:currentLikelihood,currentPrecipitation,rainAround:radarThreat,radarThreat,precipitationBlend:currentHour?.precipitationBlend,uvIndex:hourlyUvValue(forecast,now),id:'now', now:true, time:current.time, temperature:finite(current.temperature) ? current.temperature : null,
-    feels:exposure.value, exposure, comfort:shownComfort, condition:displayCondition || 'Sky conditions unavailable',
+    feels:exposure.value, exposure, comfort:displayComfort, condition:displayCondition || 'Sky conditions unavailable',
     isDay:comfort.daylight ?? (solarElevation(now,forecast.location.latitude,forecast.location.longitude) > 0),
     source:current.type === 'observation' ? 'Station observation' : 'Current estimate', inputs:shownInputs};
 }
@@ -115,37 +111,39 @@ export function forecastSample(forecast, time) {
   if (!hour || !point) return null;
   const pop=sampleRainChance(hour);
   const rawCondition=hour.condition || point.condition || 'Sky conditions unavailable';
-  const condition=conditionForRainChance(rawCondition,pop,hour.skyCover);
+  const described=conditionForRainChance(rawCondition,pop,hour.skyCover);
+  const snowEvidence=finite(hour.snowfall)&&hour.snowfall>0&&winterSceneExpected(described,{snowScope:'hour',forecast:true,airTemperature:hour.temperature,snowfall:hour.snowfall,hourSnowPhaseAllowed:selectedHourSnowPhase(forecast,epoch)});
+  const condition=snowEvidence&&weatherState(described).kind!=='snow'?'Snow possible':described;
   const rawInputs = {...point.inputs, condition:rawCondition, type:'guidance'};
   const estimated = thermalComfort(rawInputs, forecast.location, epoch);
   const gust=forecastValue(forecast,'gust',hour.time),inputs={...rawInputs,condition,gust};
   const rounded=v=>finite(v)?Number(v.toFixed(1)):null;
   const value=rounded(estimated.rawOutdoors);
   if(finite(value)!==finite(point.value)||(finite(value)&&Math.abs(value-point.value)>.11))return null;
-  const shown=displayFeelsValue(value,inputs.dewpoint,gust);
-  const comfort={...estimated,weatherKind:weatherState(condition).kind,outdoors:shown,shade:point.shadeValue??rounded(estimated.rawShade),sun:estimated.sun===null?null:shown,
-    ...(finite(shown)&&shown!==value?{displayFeelsGuard:{applied:true,raw:value,dewpoint:inputs.dewpoint,gust,threshold:GUSTY_FEELS_DISPLAY_MPH}}:{})};
+  const comfort={...estimated,weatherKind:weatherState(condition).kind,outdoors:value,shade:point.shadeValue??rounded(estimated.rawShade),sun:estimated.sun===null?null:value};
   return {windDirection:hour.windDirectionDegrees??hour.windDirection,uvIndex:hourlyUvValue(forecast,epoch),id:new Date(epoch).toISOString(), now:false, time:hour.time,
     temperature:forecastValue(forecast,'temperature',hour.time), feels:displayedFeelsAt(forecast,hour.time),
-    condition:inputs.condition, isDay:comfort.daylight, exposure:outdoorExposure(comfort), comfort, inputs, source:'Hourly forecast', pop,officialPop:hour.officialPop??hour.pop,rainLikelihood:hour.rainLikelihood,precipitationBlend:hour.precipitationBlend};
+    condition:inputs.condition, isDay:comfort.daylight, exposure:outdoorExposure(comfort), comfort, inputs, source:hour.forecastSource==='model-guidance'?'Model forecast':'Hourly forecast', pop,officialPop:hour.officialPop??hour.pop,rainLikelihood:hour.rainLikelihood,precipitationBlend:hour.precipitationBlend};
 }
 export function hourlyDisplaySamples(forecast, now = Date.now()) {
   return [currentSample(forecast, now), ...(forecast?.hours || []).filter(hour => Date.parse(hour.time) > now)
     .map(hour => forecastSample(forecast,hour.time)).filter(Boolean)];
 }
-// NWS grid snowfall > 0 for this hour overrides rain/t-storm-only wording with snow or mixed wording.
+// A broad accumulation interval cannot replace a warm rain or thunder hour.
 export function snowHourCondition(forecast,sample){
+ if(sample?.now)return null;
  const t=Date.parse(sample?.time),row=(forecast?.hours||[]).find(h=>{const s=Date.parse(h.time);return t>=s&&t<s+3600000;});
  if(!(finite(row?.snowfall)&&row.snowfall>0))return null;
  const kind=weatherState(sample.condition).kind;
  if(kind==='snow')return null;
- return kind==='storm'?'Snow / t-storms possible':kind==='rain'?'Rain / snow mix':'Snow possible';
+ return winterSceneExpected(sample.condition,{snowScope:'hour',forecast:true,airTemperature:sample.temperature,snowfall:row.snowfall,hourSnowPhaseAllowed:selectedHourSnowPhase(forecast,t)})?'Snow possible':null;
 }
 export function hourlySnowHTML(forecast,sample){
  const t=Date.parse(sample?.time),row=(forecast?.hours||[]).find(h=>{const s=Date.parse(h.time);return t>=s&&t<s+3600000;});
  const v=row?.snowfall;
  const mix=snowHourCondition(forecast,sample);
- return finite(v)&&v>0?`<small class="hour-snow" title="NWS gridpoint snowfall this hour${mix?` · ${mix}`:''}">❄ ${v>=0.05?`${v.toFixed(1)}"`:'trace'}${mix&&mix!=='Snow possible'?' mix':''}</small>`:'';
+ const compatible=!sample?.now&&winterSceneExpected(sample.condition,{snowScope:'hour',forecast:true,airTemperature:sample.temperature,snowfall:v,hourSnowPhaseAllowed:selectedHourSnowPhase(forecast,t)});
+ return compatible&&finite(v)&&v>0?`<small class="hour-snow" title="NWS estimated snowfall allocated to this hour${mix?` · ${mix}`:''}">❄ ${v>=0.05?`${v.toFixed(1)}"`:'trace'}</small>`:'';
 }
 export function renderHourlyWeather(forecast, now = Date.now()) {
   const root = document.getElementById('hourly'); if (!root) return;

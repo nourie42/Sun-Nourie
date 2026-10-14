@@ -20,18 +20,14 @@ export function forecastValue(f,key,time){
  return finite(p?.value)?p.value:null;
 }
 export function feelsAt(f,time){return forecastValue(f,'feels',time);}
+// Wind-chip highlighting only. Gusts do not select a different thermal model.
 export const GUSTY_FEELS_DISPLAY_MPH=25;
-/** Display-only sanity guard. The underlying UTCI/Tier-3 series is unchanged.
- * Unless the same-hour forecast has genuinely gusty wind, do not show the
- * primary outdoor feels-like below the same-hour dew point.
+/** Preserve the calculated equivalent temperature. Dew point is a moisture
+ * input, not a lower bound for human thermal sensation. A gust threshold must
+ * never cause a discontinuous change in the displayed feels-like reading.
  */
-export function displayFeelsValue(value,dewpoint,gust){
- if(!finite(value))return null;
- return finite(dewpoint)&&(!finite(gust)||gust<GUSTY_FEELS_DISPLAY_MPH)&&value<dewpoint?dewpoint:value;
-}
-export function displayedFeelsAt(f,time){
- return displayFeelsValue(feelsAt(f,time),forecastValue(f,'dewpoint',time),forecastValue(f,'gust',time));
-}
+export function displayFeelsValue(value){return finite(value)?value:null;}
+export function displayedFeelsAt(f,time){return displayFeelsValue(feelsAt(f,time));}
 export function summarizeFeels(f,start,end,now=-Infinity){
  const first=Math.max(start,Math.ceil(now/H)*H),unique=new Map();
  for(const p of f?.metricForecasts?.series?.feels||[]){const t=Date.parse(p.time);if(finite(t)&&t>=first&&t<end&&finite(p.value)){const time=new Date(t).toISOString(),shown=displayedFeelsAt(f,time);unique.set(t,{...p,rawValue:p.value,value:shown,time,epoch:t});}}
