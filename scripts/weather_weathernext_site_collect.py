@@ -103,8 +103,24 @@ def mark_freshness(source,checked_at):
  if source.get('status','ready')=='ready':source['status']='stale' if age>36 else 'ready'
  return source
 
+def covers_current_points(source):
+ # Initialization equality alone is insufficient: changing the configured
+ # locations must collect their actual grid cells, not only update the menu.
+ raw=source.get('points')
+ if not isinstance(raw,list) or len(raw)!=len(POINTS):return False
+ points={p.get('id'):p for p in raw if isinstance(p,dict)}
+ if set(points)!={p['id'] for p in POINTS}:return False
+ for expected in POINTS:
+  saved=points[expected['id']]
+  if not saved.get('hourly'):return False
+  for coordinate in ('latitude','longitude'):
+   try:a=numeric(saved.get(coordinate));b=numeric(expected.get(coordinate))
+   except (TypeError,ValueError):return False
+   if a is None or b is None or abs(a-b)>0.000001:return False
+ return True
+
 def collect(q,table,run,grid,fields,previous,now):
- if previous and previous.get('runAt')==iso(run) and previous.get('status') in ('ready','stale','last-verified') and previous.get('sourceTable')==table:
+ if previous and previous.get('runAt')==iso(run) and previous.get('status') in ('ready','stale','last-verified') and previous.get('sourceTable')==table and covers_current_points(previous):
   r=copy.deepcopy(previous);r['checkedAt']=now;return mark_freshness(r,now)
  expected=[f['id'] for f in fields if f['grid']==grid]
  schema=available_columns(q.client.get_table(table).schema)
