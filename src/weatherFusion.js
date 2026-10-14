@@ -28,10 +28,12 @@ import {validateCurrentConditions} from './weatherFusionCurrent.js';
 import {applyObservedSky} from './weatherFusionObservedSky.js';
 import {addSnowOutlook,createWpcWinterService} from './weatherFusionSnow.js';
 import {createWinterModelService} from './weatherFusionWinterModels.js';
+import {COMFORT_SCENE_ASSETS} from '../public/weather-fusion/exposure-scene.js';
 
 export const PRESETS = [
   { id: 'knightdale', name: 'Knightdale / Raleigh', latitude: 35.787, longitude: -78.4806 },
   { id: 'greenville', name: 'Greenville, NC', latitude: 35.6127, longitude: -77.3664 },
+  { id: 'hazen', name: 'Hazen, ND', latitude: 47.2944, longitude: -101.6227 },
 ];
 export const RADAR_URL = 'https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows';
 export const RADAR_NEARBY_MILES = 12;
@@ -432,7 +434,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
     return text ? raw : JSON.parse(raw);
   }
   const cached = (url, ttl, options) => cache.get(url, ttl, async () => ({ data: await request(url, options), fetchedAt: iso(now()) }));
-  const loadWpcWinter = createWpcWinterService({ cached, now });
+  const loadWpcWinter = createWpcWinterService({ cached, now, fetchImpl });
   const loadWinterModels = createWinterModelService({ cached, now });
   async function feed(id, label, url, ttl, transform = (d) => d, options) {
     try {
@@ -686,7 +688,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
     const kind=String(query.kind||'').toLowerCase();
     return sanitizeOutlookDetail(await loadOutlookDetail({kind,location}));
   }
-  return { getForecast, getAlerts, getBriefing, getBulletins, getOutlook, search, radar, modelMaps: direct.maps };
+  return { getForecast, getAlerts, getBriefing, getBulletins, getOutlook, search, radar, modelMaps: direct.maps, getWinterMap:loadWpcWinter.map };
 }
 
 export function registerWeatherFusionRoutes(app, options = {}) {
@@ -725,6 +727,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     res.sendFile(path.join(PUBLIC_DIR,'weathernext-site.html'),{lastModified:false,cacheControl:false});
   });
   for (const name of [
+    ...COMFORT_SCENE_ASSETS,
     'forecast-windows.js','forecast-window-banners.js','forecast-window-banners.css','forecast-status.js','live-alerts.js','urgent-alerts.css',
     'seven-day.js','seven-day.css','seven-day-art.css',
     'request-deadline.js','weather-changes.js','air-quality.js','alert-banners.js','app.js','bulletin-facts.js','bulletins.js','car-wash.js','car-wash.css','car-wash-background.webp','car-wash-corvette-hood.webp',
@@ -738,7 +741,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     'experimental-sky.js',
     'comfort-cinematic.css','comfort-effects.css','comfort-outlook.js','current-inputs.js','current-temperature.js',
     'daily-uv.js','dans-summary.js','dans-take.js','day-graph.js','dewpoint-meter.js','dewpoint-meter.css',
-    'experience.js','exposure-scene.js','comfort-clothing.js','forecast-cards.css','forecast-confidence.js','forecast-layout.css','forecast-story.js','outlook-details.js',
+    'experience.js','exposure-scene.js','comfort-clothing.js','snow-outlook.js','winter-outlook.css','forecast-cards.css','forecast-confidence.js','forecast-layout.css','forecast-story.js','outlook-details.js',
     'frame-player.js','hero-mode.js','hourly-feels.js','hourly-feels.css','nav.js','outdoor-feels.js','pavement.js',
     'personal-details.js','personal-details.css','render-safety.js','risk-outlooks.js','risk-outlooks.css','scenario-layout.css','style.css','thermal-risk.js',
     'today-card.js','rain-display.js','rain-trend.js','utci.js','weather-display.js','weather-math.js','weather-polish.css','weather-repair.css','weather-state.js','whats-up-classify.js',
@@ -761,6 +764,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
   app.get('/api/weather-fusion/search', route((q) => service.search(q.q)));
   app.get('/api/weather-fusion/radar', route(service.radar));
   app.get('/api/weather-fusion/models', route(service.modelMaps));
+  app.get('/api/weather-fusion/winter-map', route(service.getWinterMap));
   return service;
 }
 

@@ -18,7 +18,7 @@ const SESSION_MS = 12 * 60 * 60 * 1000;
 // compare tools) still needs the password. Set WEATHER_FUSION_PUBLIC=0 to re-lock.
 const PUBLIC_PAGES = new Set(['/weather-fusion', '/weather-fusion/', '/weather-fusion/index.html']);
 const PUBLIC_ASSET = /^\/weather-fusion\/[a-z0-9][a-z0-9._-]*\.(?:js|css|webp|png|jpe?g|svg|json|ico)$/;
-const PUBLIC_APIS = new Set(['forecast', 'alerts', 'briefing', 'bulletins', 'outlook', 'search', 'radar', 'models'].map(name => `/api/weather-fusion/${name}`));
+const PUBLIC_APIS = new Set(['forecast', 'alerts', 'briefing', 'bulletins', 'outlook', 'search', 'radar', 'models', 'winter-map'].map(name => `/api/weather-fusion/${name}`));
 export function isPublicWeatherPath(url, method = 'GET') {
   if (!['GET', 'HEAD'].includes(String(method).toUpperCase())) return false;
   let pathname;

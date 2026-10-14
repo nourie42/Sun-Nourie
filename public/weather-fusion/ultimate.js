@@ -1,4 +1,5 @@
 /** Ultimate Weather — the best of every page, together. */
+import {forecastRows,matchingForecastRows,installForecastRefresh} from './weathernext-data.js';
 const el = (id) => document.getElementById(id);
 const opt = (id) => document.getElementById(id);
 function setText(id, txt) { const n = opt(id); if (n) n.textContent = txt; }
@@ -7,7 +8,7 @@ const finite = (v) => typeof v === 'number' && Number.isFinite(v);
 const WN_FEED = 'https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/weathernext-full.json';
 
 let forecast = null, wnFeed = null, wnCatalog = null;
-let loc = 'knightdale';
+let loc = ['knightdale','greenville','hazen'].includes(new URLSearchParams(location.search).get('location'))?new URLSearchParams(location.search).get('location'):'knightdale';
 let wnField = 'temperature_2m';
 let skyFlip = false;
 
@@ -42,19 +43,23 @@ function pickSky() {
   return 'today-sky-clear.webp';
 }
 
+let latestRequest=0;
 async function load() {
+  const request=++latestRequest;
   try {
     const [fRes, wnRes, catRes] = await Promise.all([
       fetch(`/api/weather-fusion/forecast?location=${loc}`).then((r) => r.json()),
-      fetch(WN_FEED, { signal: AbortSignal.timeout(30000) }).then((r) => r.json()).catch(() => null),
+      fetch(WN_FEED, { cache:'no-store', signal: AbortSignal.timeout(30000) }).then((r) => r.json()).catch(() => null),
       fetch('/weather-fusion/weathernext-catalog.json').then((r) => r.json()).catch(() => null),
     ]);
+    if(request!==latestRequest)return;
     forecast = fRes;
     wnFeed = wnRes;
     wnCatalog = catRes;
     el('updated').textContent = `Updated ${new Date(forecast.assembledAt).toLocaleTimeString()}`;
     renderAll();
   } catch (e) {
+    if(request!==latestRequest)return;
     const err = opt('error');
     err.hidden = false;
     err.textContent = `Couldn't load: ${e.message}`;
@@ -193,7 +198,7 @@ function renderModels() {
   el('blend-weights').innerHTML = Object.entries(bp).map(([k, v]) => `<span><b>${k.toUpperCase()}</b> ${Math.round(v * 100)}%</span>`).join('');
 
   // Chart: blended line + per-model + WN band (best of Blend)
-  const hrs = (forecast.hours || []).slice(0, 48);
+  const hrs = forecastRows(forecast.hours).slice(0, 48);
   if (!hrs.length) return;
   const W = 900, H = 280, PL = 44, PR = 12, PT = 16, PB = 30;
   const allV = hrs.flatMap((h) => [h.temperature, h.temperatureBlend?.value]).filter(finite);
@@ -216,13 +221,20 @@ function renderModels() {
   let wnBand = '';
   if (wnFeed?.sources?.surface) {
     const pts = wnFeed.sources.surface.points.find((p) => p.id === loc);
-    const wh = (pts?.hourly || []).slice(0, 48);
-    if (wh.length) {
-      const conv = (v) => (v - 273.15) * 1.8 + 32;
-      const top = wh.map((r, i) => `${X(i).toFixed(1)},${Y(conv(r.values?.temperature_2m?.p90 ?? 0)).toFixed(1)}`).join(' ');
-      const bot = wh.map((r, i) => `${X(i).toFixed(1)},${Y(conv(r.values?.temperature_2m?.p10 ?? 0)).toFixed(1)}`).reverse().join(' ');
-      wnBand = `<polygon points="${top} ${bot}" fill="rgba(180,140,255,.16)"/>`;
+    const wh = matchingForecastRows(pts?.hourly,hrs.map(h=>h.time));
+    const segments=[];let segment=[];
+    for(const [i,r] of wh.entries()){
+      const low=r?.values?.temperature_2m?.p10,high=r?.values?.temperature_2m?.p90;
+      if(finite(low)&&finite(high)&&(!segment.length||Date.parse(hrs[i].time)-Date.parse(hrs[segment.at(-1).i].time)===3600000))segment.push({i,low,high});
+      else {if(segment.length)segments.push(segment);segment=finite(low)&&finite(high)?[{i,low,high}]:[];}
     }
+    if(segment.length)segments.push(segment);
+    wnBand=segments.filter(s=>s.length>1).map(wh=>{
+      const conv = (v) => (v - 273.15) * 1.8 + 32;
+      const top = wh.map(r => `${X(r.i).toFixed(1)},${Y(conv(r.high)).toFixed(1)}`).join(' ');
+      const bot = wh.map(r => `${X(r.i).toFixed(1)},${Y(conv(r.low)).toFixed(1)}`).reverse().join(' ');
+      return `<polygon points="${top} ${bot}" fill="rgba(180,140,255,.16)"/>`;
+    }).join('');
   }
 
   el('blend-chart').innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Model blend chart">
@@ -252,11 +264,16 @@ function renderAILab() {
 
   if (!wnFeed?.sources?.surface) {
     el('wn-chart2').innerHTML = '<p class="fine">WeatherNext feed unavailable.</p>';
+    setText('wn-age','No published forecast is available.');
     return;
   }
   const pts = wnFeed.sources.surface.points.find((p) => p.id === loc);
-  const rows = (pts?.hourly || []).slice(0, 168);
-  if (!rows.length) return;
+  const rows = forecastRows(pts?.hourly).slice(0, 168);
+  if (!rows.length) {
+    el('wn-chart2').innerHTML = '<p class="fine">No current or upcoming WeatherNext forecast hours in this run.</p>';
+    setText('wn-age','The published forecast has ended. A newer run is needed.');
+    return;
+  }
 
   const conv = { temperature_2m: (v) => (v - 273.15) * 1.8 + 32, dewpoint_temperature_2m: (v) => (v - 273.15) * 1.8 + 32, wind_speed_10m: (v) => v * 2.237, total_precipitation_1hr: (v) => v * 39.37, total_cloud_cover: (v) => v * 100 }[wnField];
   const data = rows.map((r) => ({
@@ -278,7 +295,7 @@ function renderAILab() {
     data.map((d, i) => `${X(i).toFixed(1)},${Y(d.p10).toFixed(1)}`).reverse().join(' ');
   const line = data.map((d, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)},${Y(d.mean).toFixed(1)}`).join('');
 
-  setText('wn-chart-title', `${WN_LABELS[wnField]} · 7-day AI forecast`);
+  setText('wn-chart-title', `${WN_LABELS[wnField]} · next ${rows.length} available model hours`);
   el('wn-chart2').innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="WeatherNext ${wnField}">
     <defs><linearGradient id="uw-fill" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#b48cff" stop-opacity=".3"/><stop offset="100%" stop-color="#b48cff" stop-opacity="0"/>
@@ -332,4 +349,6 @@ el('loc-select').addEventListener('change', (e) => {
   load();
 });
 
+el('loc-select').value=loc;
 load();
+if(typeof window!=='undefined')installForecastRefresh(load);

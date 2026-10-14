@@ -21,7 +21,7 @@ async function fixture(t, options = {}) {
 }
 
 const pages = ['/weather', '/weather/', '/weather-fusion', '/weather-fusion/', '/weather-fusion/index.html', '/weather-fusion/experimental-weather.html', '/weather-fusion/compare', '/weather-fusion/compare/pane', '/weathernext/', '/weather-fusion/weathernext-site.html', '/weather-fusion/app.js', '/weather-fusion/nav-week.webp', '/whats-up', '/whatsup', '/whats-up/index.html'];
-const apis = ['/api/weather-fusion/forecast', '/api/weather-fusion/alerts', '/api/weather-fusion/briefing', '/api/weather-fusion/bulletins', '/api/weather-fusion/radar', '/api/weather-fusion/models', '/api/weather-fusion/compare/google', '/api/weather-fusion/compare/location', '/api/whats-up/tracker'];
+const apis = ['/api/weather-fusion/forecast', '/api/weather-fusion/alerts', '/api/weather-fusion/briefing', '/api/weather-fusion/bulletins', '/api/weather-fusion/radar', '/api/weather-fusion/models', '/api/weather-fusion/winter-map', '/api/weather-fusion/compare/google', '/api/weather-fusion/compare/location', '/api/whats-up/tracker'];
 
 test('all weather pages, assets and API methods require a password', async t => {
   const {request} = await fixture(t);
@@ -162,7 +162,7 @@ test('configured server password overrides the emergency hash and invalidates ol
 
 test('only the main weather page, its assets and read-only APIs are public', async t => {
   const {request} = await fixture(t, {publicMain: true});
-  for (const route of ['/weather-fusion/', '/weather-fusion/index.html', '/weather-fusion/app.js', '/weather-fusion/header-night.webp', '/api/weather-fusion/forecast?location=knightdale']) {
+  for (const route of ['/weather-fusion/', '/weather-fusion/index.html', '/weather-fusion/app.js', '/weather-fusion/header-night.webp', '/api/weather-fusion/forecast?location=knightdale', '/api/weather-fusion/winter-map?file=ppp_co_24hr_expected_sn_in_2026101409f027.kmz']) {
     assert.equal((await request(route)).status, 200, route);
   }
   for (const route of ['/weather-fusion/experimental-weather.html', '/weather-fusion/glance.html', '/weather-fusion/compare', '/weathernext/', '/whats-up/', '/deal-intelligence/', '/api/weather-fusion/compare/google', '/api/whats-up/tracker', '/api/deal-intelligence/x', '/weather-fusion/sub/app.js']) {

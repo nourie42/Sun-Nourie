@@ -3,6 +3,7 @@
  * /api/weather-fusion/forecast with Google WeatherNext AI
  * (published feed, comparison only).
  * Pure builders are exported for testing; DOM wiring runs in browser. */
+import {localDate,forecastRows,installForecastRefresh} from './weathernext-data.js';
 
 const WN_FEED_URL = 'https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/weathernext3.json';
 
@@ -37,7 +38,7 @@ function wnHourMap(point) {
   const map = new Map();
   for (const r of point?.hourly || []) {
     const t = Date.parse(r.time);
-    if (Number.isFinite(t)) map.set(Math.floor(t / 3600000) * 3600000, r);
+    if (Number.isFinite(t)) map.set(t, r);
   }
   return map;
 }
@@ -55,8 +56,11 @@ export function buildBlendModel(forecast, wnFeed, locationId, nowMs = Date.now()
   const contrib = Object.fromEntries((forecast?.modelContributions || []).map((m) => [m.id, m]));
 
   const point = wnPoint(wnFeed, locationId);
-  const wnMap = wnHourMap(point);
-  const wnAt = (t) => wnMap.get(Math.floor(t / 3600000) * 3600000) || null;
+  const wnAvailable = forecastRows(point?.hourly,nowMs).length>0;
+  const wnRows = wnAvailable ? point.hourly : [];
+  const wnMap = wnHourMap({hourly:wnRows});
+  const wnAt = (t) => wnMap.get(t) || null;
+  const today = localDate(nowMs, timeZone);
 
   const series = hours.map((h) => {
     const src = Object.fromEntries((h.temperatureBlend?.sources || []).map((s) => [s.id, s.value]));
@@ -100,20 +104,23 @@ export function buildBlendModel(forecast, wnFeed, locationId, nowMs = Date.now()
   const aiDays = [];
   if (point) {
     const byDay = new Map();
-    for (const r of point.hourly || []) {
+    for (const r of wnRows) {
       const t = Date.parse(r.time);
       if (!Number.isFinite(t) || !finite(r.temperatureF)) continue;
-      const key = new Intl.DateTimeFormat('en-US', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(t));
-      if (!byDay.has(key)) byDay.set(key, { temps: [], p10: [], p90: [], sample: t });
+      const key = localDate(t, timeZone);
+      if (key < today) continue;
+      if (!byDay.has(key)) byDay.set(key, { temps: [], p10: [], p90: [], rows: [], sample: t });
       const g = byDay.get(key);
+      g.rows.push(r);
       g.temps.push(r.temperatureF);
       if (finite(r.temperatureP10F)) g.p10.push(r.temperatureP10F);
       if (finite(r.temperatureP90F)) g.p90.push(r.temperatureP90F);
     }
-    const sorted = [...byDay.entries()].sort((a, b) => a[1].sample - b[1].sample).slice(0, 7);
-    sorted.forEach(([key, g], i) => {
-      const label = i === 0 ? 'Today' : new Intl.DateTimeFormat('en-US', { timeZone, weekday: 'short' }).format(new Date(g.sample + 12 * 3600000));
+    const sorted = [...byDay.entries()].filter(([,g])=>forecastRows(g.rows,nowMs).length).sort((a, b) => a[1].sample - b[1].sample).slice(0, 7);
+    sorted.forEach(([key, g]) => {
+      const label = key === today ? 'Today' : new Intl.DateTimeFormat('en-US', { timeZone:'UTC', weekday: 'short' }).format(new Date(key+'T12:00:00Z'));
       aiDays.push({
+        date: key,
         label,
         high: round(Math.max(...g.temps)),
         low: round(Math.min(...g.temps)),
@@ -125,24 +132,19 @@ export function buildBlendModel(forecast, wnFeed, locationId, nowMs = Date.now()
   // 7-day daily model comparison (from days[].highBlend/lowBlend/guidance + WN daily aggregates)
   const wnByDay = new Map();
   if (point) {
-    for (const r of point.hourly || []) {
+    for (const r of wnRows) {
       const t = Date.parse(r.time);
       if (!Number.isFinite(t)) continue;
-      const key = new Intl.DateTimeFormat('en-US', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(t));
-      if (!wnByDay.has(key)) wnByDay.set(key, { temps: [], winds: [], sample: t });
+      const key = localDate(t, timeZone);
+      if (key < today) continue;
+      if (!wnByDay.has(key)) wnByDay.set(key, { temps: [], winds: [], rows: [], sample: t });
       const g = wnByDay.get(key);
+      g.rows.push(r);
       if (finite(r.temperatureF)) g.temps.push(r.temperatureF);
       if (finite(r.windMph)) g.winds.push(r.windMph);
     }
   }
-  const wnDayFor = (dateStr) => {
-    // match a day by its local date string (YYYY-MM-DD from the API is local)
-    for (const [key, g] of wnByDay) {
-      const asYMD = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(g.sample));
-      if (asYMD === dateStr) return g;
-    }
-    return null;
-  };
+  const wnDayFor = (dateStr) => {const day=wnByDay.get(dateStr);return day&&forecastRows(day.rows,nowMs).length?day:null;};
   const week = (forecast?.days || []).slice(0, 7).map((d) => {
     const mh = Object.fromEntries(((d.highBlend || {}).sources || []).map((s) => [s.id, s.value]));
     const ml = Object.fromEntries(((d.lowBlend || {}).sources || []).map((s) => [s.id, s.value]));
@@ -178,7 +180,7 @@ export function buildBlendModel(forecast, wnFeed, locationId, nowMs = Date.now()
     weights,
     rainHours: series.slice(0, 12).map((s) => ({ time: s.time, pop: s.pop })),
     aiDays,
-    wnAvailable: !!point,
+    wnAvailable,
     wnRunAt: wnFeed?.runAt || null,
     timeZone,
   };
@@ -528,14 +530,16 @@ export function render(model) {
   el('updated').textContent = 'Updated ' + new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz }).format(new Date(model.updatedAt));
 }
 
+let latestRequest=0;
 async function load(locationId) {
+  const request=++latestRequest;
   const err = el('error');
   err.hidden = true;
   el('now-cond').textContent = 'Loading…';
   try {
     const [fRes, wnRes] = await Promise.all([
       fetch(`/api/weather-fusion/forecast?location=${encodeURIComponent(locationId)}`, { credentials: 'same-origin' }),
-      fetch(WN_FEED_URL, { signal: AbortSignal.timeout(25000) }).catch(() => null),
+      fetch(WN_FEED_URL, { cache:'no-store', signal: AbortSignal.timeout(25000) }).catch(() => null),
     ]);
     if (fRes.status === 401) {
       location.href = '/weather-fusion/login?returnTo=' + encodeURIComponent('/weather-fusion/blend.html');
@@ -547,8 +551,9 @@ async function load(locationId) {
     if (wnRes && wnRes.ok) {
       try { wnFeed = await wnRes.json(); } catch { wnFeed = null; }
     }
-    render(buildBlendModel(forecast, wnFeed, locationId));
+    if(request===latestRequest)render(buildBlendModel(forecast, wnFeed, locationId));
   } catch (e) {
+    if(request!==latestRequest)return;
     err.hidden = false;
     err.textContent = 'Could not load the blend right now. Please retry in a bit.';
   }
@@ -566,6 +571,7 @@ function init() {
     load(select.value);
   });
   load(select.value);
+  installForecastRefresh(()=>load(select.value));
 }
 
 if (typeof document !== 'undefined') {

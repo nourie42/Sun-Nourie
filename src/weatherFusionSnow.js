@@ -1,7 +1,8 @@
 // Independent winter outlook: amount blends and precipitation-type probabilities
 // have separate provenance. Missing guidance never means a zero chance of snow.
 import { WINTER_WEIGHTS, winterWeights, winterIntervalAmount, blendWinterAmounts } from './weatherFusionWinterModels.js';
-export const SNOW_VERSION = 'snow-outlook-v2';
+import {createWpcSnowAmountService} from './weatherFusionWpcSnowAmounts.js';
+export const SNOW_VERSION = 'snow-outlook-v3';
 const MM_PER_IN = 25.4, CM_PER_IN = 2.54, HOUR = 3600000;
 const finite = value => typeof value === 'number' && Number.isFinite(value);
 const round = (value, digits = 1) => finite(value) ? Number(value.toFixed(digits)) : null;
@@ -83,8 +84,10 @@ function validWpcAttributes(attributes, now) {
   if (![start, end, issued].every(finite) || end <= start || end <= now || issued > now + 15 * 60000 || now - issued > 36 * HOUR) return null;
   return { ...values, start: new Date(start).toISOString(), end: new Date(end).toISOString(), issued: new Date(issued).toISOString() };
 }
-export function createWpcWinterService({ cached, now = Date.now }) {
-  return async location => {
+export function createWpcWinterService({ cached, now = Date.now,fetchImpl }) {
+  const expected=createWpcSnowAmountService({fetchImpl:fetchImpl||(()=>Promise.reject(new Error('WPC snow amount transport unavailable.'))),now});
+  const load=async location => {
+    const expectedTask=expected.load(location);
     const query = (root, layer, local) => {
       const params = new URLSearchParams({ f: 'json', where: '1=1', outFields: '*', returnGeometry: 'false', ...(local ? { geometry: `${location.longitude},${location.latitude}`, geometryType: 'esriGeometryPoint', inSR: '4326', spatialRel: 'esriSpatialRelIntersects' } : { resultRecordCount: '1' }) });
       return cached(`${root}/${layer}/query?${params}`, 30 * 60000, { timeout: 12000 });
@@ -122,10 +125,12 @@ export function createWpcWinterService({ cached, now = Date.now }) {
       } catch { return null; }
     }));
     maps.push(...qpfMaps.filter(Boolean));
-    maps.push({ id: 'wpc-snow-totals-portal', label: 'WPC expected snow totals and ice amounts', kind: 'official-link', url: 'https://www.wpc.ncep.noaa.gov/Prob_Precip/', sourceUrl: 'https://www.wpc.ncep.noaa.gov/Prob_Precip/', description: 'Official WPC Probabilistic Precipitation Portal. Expected snow amounts have not been decoded into this point forecast.' });
+    maps.push({ id: 'wpc-snow-totals-portal', label: 'WPC expected snow totals and ice amounts', kind: 'official-link', url: 'https://www.wpc.ncep.noaa.gov/Prob_Precip/', sourceUrl: 'https://www.wpc.ncep.noaa.gov/Prob_Precip/', description: 'Official WPC Probabilistic Precipitation Portal for expected amounts and uncertainty.' });
     const fetchedAt = probabilities.map(row => row.fetchedAt).filter(Boolean).sort().at(-1) || null;
-    return { value: { probabilities, amounts: [], maps, amountStatus: 'unavailable', amountMessage: 'WPC snow-depth point amounts are unavailable from the connected threshold service. WPC probability contours are not treated as snowfall amounts.' }, meta: { id: 'wpc-winter', label: 'WPC winter probability guidance', status: probabilities.length ? 'ready' : 'unavailable', fetchedAt, issuedAt: probabilities.map(row => row.issued).sort().at(-1) || null, url: WPC_PAGE, message: probabilities.length ? null : 'Current WPC winter probability windows could not be checked.' } };
+    const amount=await expectedTask;
+    return { value: { probabilities, amounts:amount.amounts, maps:[...amount.maps,...maps], amountStatus:amount.status, amountMessage:amount.message }, meta: { id: 'wpc-winter', label: 'WPC winter amounts and probability guidance', status: probabilities.length||amount.amounts.length ? 'ready' : 'unavailable', fetchedAt:fetchedAt||new Date(now()).toISOString(), issuedAt:amount.amounts[0]?.issuedAt||probabilities.map(row => row.issued).sort().at(-1) || null, url: WPC_PAGE, message:amount.status==='unavailable'?amount.message:null } };
   };
+  load.map=expected.getMap;return load;
 }
 function peakProbability(source, kind, start, end) {
   const rows = source?.rows?.filter(row => row.time > start && row.time <= end) || [];
@@ -139,7 +144,7 @@ function snowfallWindow(start, end, winterModels, wpcAmounts, now) {
     if (id === 'wpc') {
       const amount = wpcAmounts.find(row => Date.parse(row.start) === start && Date.parse(row.end) === end && finite(row.value));
       values[id] = amount?.value ?? null;
-      evidence[id] = { source: 'WPC winter snowfall', message: amount ? null : 'Compatible WPC snowfall depth is unavailable; threshold probabilities are not amounts.' };
+      evidence[id] = { source: 'WPC expected deterministic snowfall', message: amount?.method||'Compatible WPC snowfall depth is unavailable for this valid period; threshold probabilities are not amounts.',range:amount?.range||null,precision:amount?.precision||null,sourceUrl:amount?.sourceUrl||null,runAt:amount?.issuedAt||null };
     } else if (id === 'weathernext') {
       values[id] = null;
       evidence[id] = { source: 'Google WeatherNext', message: 'The available WeatherNext feed publishes total precipitation, without snowfall depth or precipitation-type probabilities. Its winter share is unavailable.' };
@@ -150,6 +155,12 @@ function snowfallWindow(start, end, winterModels, wpcAmounts, now) {
   }
   const amount = blendWinterAmounts(values, weights);
   amount.value = round(amount.value, 2);
+  const wpc=evidence.wpc;
+  if(wpc?.range&&finite(amount.value)){
+    const share=amount.actualWeights.wpc/100;
+    amount.range=[round(amount.value,2),finite(wpc.range[1])?round(amount.value+share*(wpc.range[1]-wpc.range[0]),2):null];
+    amount.precision='WPC contributes published snowfall contour lower bounds; the range propagates its contour band using the same actual weights. Other model values are same-period point amounts.';
+  }
   amount.sources = amount.sources.map(row => ({ ...row, ...evidence[row.id], actualWeight: amount.actualWeights[row.id], status: finite(row.value) ? 'ready' : 'unavailable' }));
   return { start: new Date(start).toISOString(), end: new Date(end).toISOString(), mode: 'hrrr' in weights ? 'nearTerm' : 'extended', snowfall: amount };
 }
@@ -162,7 +173,11 @@ export function addSnowOutlook(output, { grid, periods = [], snowModels, winterM
     const row = gridHours.find(row => row.time === Date.parse(hour.time));
     hour.snowfall = row ? round(row.inches, 2) : null;
   }
-  const blendWindows = [snowfallWindow(forecastStart, forecastStart + 24 * HOUR, winterModels, wpcAmounts, forecastStart)];
+  const published=wpcAmounts.filter(row=>finite(row.value)&&Date.parse(row.start)>=forecastStart&&Date.parse(row.end)>Date.parse(row.start)).sort((a,b)=>Date.parse(a.start)-Date.parse(b.start));
+  const aligned=[];let through=-Infinity;
+  for(const row of published){if(Date.parse(row.start)<through)continue;aligned.push(row);through=Date.parse(row.end);}
+  const blendWindows=aligned.length?aligned.map(row=>snowfallWindow(Date.parse(row.start),Date.parse(row.end),winterModels,wpcAmounts,forecastStart)):[snowfallWindow(forecastStart, forecastStart + 24 * HOUR, winterModels, wpcAmounts, forecastStart)];
+  let blendedThrough=Math.max(...blendWindows.map(window=>Date.parse(window.end)));
   const rows = (output.days || []).slice(0, 7).filter(day => day.date).map((day, index) => {
     const midnight = localMidnight(day.date, zone), end = localMidnight(nextDate(day.date), zone), start = Math.max(forecastStart, midnight);
     const matchingPeriods = periods.filter(period => finite(Date.parse(period.startTime)) && Date.parse(period.endTime || period.startTime) >= now && dateKey(Date.parse(period.startTime), zone) === day.date);
@@ -187,11 +202,16 @@ export function addSnowOutlook(output, { grid, periods = [], snowModels, winterM
     const wpc = wpcRows.filter(row => finite(Date.parse(row.start)) && finite(Date.parse(row.end)) && Date.parse(row.end) > now && inDay((Date.parse(row.start) + Date.parse(row.end)) / 2));
     const probs = Object.fromEntries(['snow', 'freezingRain', 'sleet'].map(kind => [kind, peakProbability(nbm, kind, start, end)]));
     const modelRows = Object.values(winterModels).filter(model => Array.isArray(model?.intervals)).flatMap(model => model.intervals.filter(row => row.end > start && row.start < end));
-    const snowExpected = per.some(row => row.snowWording) || (finite(high) && high >= .1) || (probs.snow.value ?? 0) >= 10 || wpc.some(row => (row.kind || 'snow') === 'snow' && (row.probabilityRange || wpcProbabilityRange(row.category))?.[0] >= 10);
+    const expectedWpc=wpcAmounts.filter(row=>Date.parse(row.end)>start&&Date.parse(row.start)<end);
+    const snowExpected = per.some(row => row.snowWording) || (finite(high) && high >= .1) || (probs.snow.value ?? 0) >= 10 || expectedWpc.some(row=>row.value>=.1) || wpc.some(row => (row.kind || 'snow') === 'snow' && (row.probabilityRange || wpcProbabilityRange(row.category))?.[0] >= 10);
     const freezingRainPossible = per.some(row => row.freezingRainWording) || (probs.freezingRain.value ?? 0) >= 10 || modelRows.some(row => row.freezingRainSignal === true || [56, 57, 66, 67].includes(row.weatherCode)) || wpc.some(row => row.kind === 'ice' && (row.probabilityRange || wpcProbabilityRange(row.category))?.[0] >= 10);
     const sleetPossible = per.some(row => row.sleetWording) || (probs.sleet.value ?? 0) >= 10;
     const windows = start < end ? (start < forecastStart + 24 * HOUR && end > forecastStart + 24 * HOUR ? [[start, forecastStart + 24 * HOUR], [forecastStart + 24 * HOUR, end]] : [[start, end]]).map(([a, b]) => snowfallWindow(a, b, winterModels, wpcAmounts, forecastStart)) : [];
-    blendWindows.push(...windows.filter(window => window.mode === 'extended'));
+    for(const window of windows.filter(window=>window.mode==='extended')){
+      const from=Math.max(blendedThrough,Date.parse(window.start)),to=Date.parse(window.end);
+      if(to<=from)continue;
+      blendWindows.push(snowfallWindow(from,to,winterModels,wpcAmounts,forecastStart));blendedThrough=to;
+    }
     const blended = windows.length && windows.every(window => finite(window.snowfall.value)) ? windows.reduce((sum, window) => sum + window.snowfall.value, 0) : null;
     const hasEvidence = matchingPeriods.length > 0 || finite(officialIntegral.value) || Object.values(modelValues).some(finite) || Object.values(probs).some(prob => finite(prob.value));
     const coverageStatus = !hasEvidence ? 'unavailable' : Object.values(probs).every(prob => prob.status === 'ready') && windows.every(window => window.snowfall.status === 'ready') ? 'ready' : 'partial';
@@ -223,7 +243,7 @@ export function addSnowOutlook(output, { grid, periods = [], snowModels, winterM
     weights: WINTER_WEIGHTS, maps: Array.isArray(wpcWinter?.maps) ? wpcWinter.maps : [],
     stormTotal: { nws: sum(row => row.nwsSnowfall), ecmwf: sum(row => row.models.ecmwf), gfs: sum(row => row.models.gfs) },
     sources: { nwsGrid: !!gridIntervals?.length, nwsGridThrough: gridIntervals?.length ? new Date(Math.max(...gridIntervals.map(row => row.end))).toISOString() : null, models: Object.values(winterModels).some(model => Array.isArray(model?.intervals)) || !!snowModels, wpcWinter: wpcRows.length > 0, wpcAmounts: wpcAmounts.length > 0, nbm: !!nbm, weathernextWinter: false },
-    notes: 'Snow amounts and type probabilities are separate. Next 24 hours: WPC 60%, HRRR 25%, NAM 15%; later: WPC 60%, ECMWF 20%, WeatherNext 10%, GFS 10%. Only compatible snowfall depths contribute; missing shares are shown and available amount weights normalized. WPC threshold categories are not amounts or any-snow probabilities. WeatherNext publishes total precipitation without winter phase in the connected feed. NWS NBM supplies supplemental native type probabilities as peak hourly chance, never a combined daily chance. Forecast amounts can change with snow-to-liquid ratios.' };
+    notes: 'Snow amounts and type probabilities are separate. Within 24 hours: WPC 60%, HRRR 25%, NAM 15%; later: WPC 60%, ECMWF 20%, WeatherNext 10%, GFS 10%. WPC expected deterministic snowfall uses its published 24-hour contour periods and conservative contour lower bounds, with contour uncertainty propagated. HRRR, NAM, ECMWF and GFS are integrated over exactly those periods. No hourly WPC allocation is invented. Calendar-day guidance remains separate when periods differ. Missing shares are shown and available amount weights normalized. WPC threshold probabilities are not snowfall amounts. WeatherNext winter phase may be unavailable. NWS NBM supplies supplemental native type probabilities as peak hourly chance, never a combined daily chance. Forecast amounts can change with snow-to-liquid ratios.' };
   for (const row of rows) {
     const day = output.days.find(day => day.date === row.date);
     if (day) { day.snowfall = row.best; day.snowRange = row.range; day.snowPossible = row.snowExpected; day.freezingRainPossible = row.freezingRainPossible; day.sleetPossible = row.sleetPossible; }

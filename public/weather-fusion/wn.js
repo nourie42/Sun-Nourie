@@ -1,5 +1,5 @@
 /** WeatherNext AI explorer — everything Google WeatherNext forecasts, in the cinematic layout. */
-import { convert, format, value, rowsFor, localDate, timeLabel, direction } from './weathernext-data.js';
+import { convert, format, value, rowsFor, localDate, timeLabel, direction, forecastRows, currentForecastRow, installForecastRefresh } from './weathernext-data.js';
 
 const FEED_URL = 'https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/weathernext-full.json';
 const SKY_IMG = { clear: 'today-sky-clear.webp', clouds: 'today-sky-clouds.webp', rain: 'today-sky-rain.webp', night: 'today-sky-night-v2.webp' };
@@ -36,9 +36,10 @@ const SHORT = {
   mean_sea_level_pressure: 'Pressure', sea_surface_temperature: 'Sea temp',
 };
 
-let feed = null, catalog = null;
+let feed = null, catalog = null, initialized = false, busy = false;
 let state = { point: 'knightdale', field: 'temperature_2m', cat: 'Temperature', range: 168 };
 let skyFlip = false;
+const zone = () => feed?.points?.find(p=>p.id===state.point)?.timeZone || 'America/New_York';
 
 function setSky(img) {
   const url = `/weather-fusion/${img}`;
@@ -57,7 +58,7 @@ function setSky(img) {
 }
 
 function pickSky(rows) {
-  const h = new Date().getHours();
+  const h = Number(new Intl.DateTimeFormat('en-US',{timeZone:zone(),hour:'numeric',hourCycle:'h23'}).format(new Date(rows[0].time)));
   if (h < 6 || h >= 20) return SKY_IMG.night;
   const cloud = value(rows[0], { id: 'total_cloud_cover', kind: 'fraction' }, 'mean') ?? 0;
   const rain = value(rows[0], { id: 'total_precipitation_1hr', kind: 'rain' }, 'mean') ?? 0;
@@ -67,21 +68,25 @@ function pickSky(rows) {
 }
 
 async function load() {
+  if(busy)return;busy=true;
   try {
     const [catRes, feedRes] = await Promise.all([
       fetch('/weather-fusion/weathernext-catalog.json').then((r) => r.json()),
-      fetch(FEED_URL, { signal: AbortSignal.timeout(30000) }).then((r) => r.json()),
+      fetch(FEED_URL, { cache:'no-store', signal: AbortSignal.timeout(30000) }).then((r) => r.json()),
     ]);
     catalog = catRes;
     if (feedRes?.schema !== 'weather-nourie-weathernext-site-v1' || !feedRes?.sources?.surface) {
       throw new Error('WeatherNext feed not published yet.');
     }
     feed = feedRes;
-    init();
+    if(!initialized){init();initialized=true;}else render();
+    el('error').hidden=true;
   } catch (e) {
     const err = el('error');
     err.hidden = false;
     err.textContent = `Couldn't load WeatherNext data: ${e.message}`;
+  } finally {
+    busy=false;
   }
 }
 
@@ -90,9 +95,7 @@ function points() {
 }
 
 function currentRows() {
-  const rows = rowsFor(feed, 'surface', state.point);
-  // Show all available hours; the feed may be from a past model run
-  return rows;
+  return forecastRows(rowsFor(feed, 'surface', state.point));
 }
 
 function feedAge() {
@@ -127,7 +130,7 @@ function init() {
 
   // Run info
   const runAt = feed.sources.surface.runAt;
-  el('run-info').textContent = runAt ? `Model run ${timeLabel(runAt)}` : '';
+  el('run-info').textContent = runAt ? `Model run ${timeLabel(runAt,zone())}` : '';
 
   // Categories
   renderCats();
@@ -190,13 +193,27 @@ function series(rows) {
 
 function render() {
   const rows = currentRows().slice(0, 360);
-  if (!rows.length) return;
+  el('hero-var-name').textContent = fieldDef()?.label || SHORT[state.field];
+  el('hero-var-unit').textContent = UNITS[state.field];
+  el('run-info').textContent = `Model run ${timeLabel(feed.sources.surface.runAt,zone())}`;
+  if (!rows.length) {
+    el('hero-value').textContent = '—';
+    el('hero-range').textContent = '';
+    el('hero-meta').textContent = 'This published run has no current or upcoming forecast hours.';
+    el('chart').innerHTML = '<p>No current or upcoming forecast data in this run.</p>';
+    el('stat-tiles').innerHTML = '';
+    el('day-cards').innerHTML = '';
+    el('hourly-body').innerHTML = '';
+    el('hourly-sub').textContent = '· no upcoming hours';
+    return;
+  }
   setSky(pickSky(rows));
 
   const f = fieldDef();
   const s = series(rows);
   const unit = UNITS[state.field];
   const age = feedAge();
+  const current = currentForecastRow(rows);
 
   // Hero
   el('hero-var-name').textContent = f?.label || SHORT[state.field];
@@ -205,7 +222,7 @@ function render() {
   const p10 = s[0]?.p10, p90 = s[0]?.p90;
   el('hero-range').textContent = finite(p10) && finite(p90) ? `Likely range ${fmt(p10)}–${fmt(p90)} ${unit}` : '';
   const ageTxt = age !== null && age > 1 ? ` · ⚠ model run ${Math.round(age)}d ago` : '';
-  el('hero-meta').textContent = `${rows.length} hourly steps · ensemble of 6${ageTxt}`;
+  el('hero-meta').textContent = `Forecast valid ${timeLabel(rows[0].time,zone())} · ${rows.length} hourly steps · ensemble of 6${ageTxt}`;
   if (age !== null && age > 2) {
     el('hero-meta').style.color = '#ffcf8a';
   }
@@ -217,9 +234,9 @@ function render() {
   const means = s.map((x) => x.mean).filter(finite);
   const spreads = s.map((x) => (finite(x.p90) && finite(x.p10) ? x.p90 - x.p10 : null)).filter(finite);
   const tiles = [
-    ['Now', fmt(s[0]?.mean) + (unit === '°F' ? '°' : ''), unit],
-    ['15-day high', fmt(Math.max(...means)), unit],
-    ['15-day low', fmt(Math.min(...means)), unit],
+    [current ? 'Now' : 'Next forecast', fmt(s[0]?.mean) + (unit === '°F' ? '°' : ''), unit],
+    ['Forecast high', fmt(Math.max(...means)), unit],
+    ['Forecast low', fmt(Math.min(...means)), unit],
     ['Avg uncertainty', spreads.length ? '±' + fmt(spreads.reduce((a, b) => a + b, 0) / spreads.length / 2) : '—', unit + ' spread'],
   ];
   el('stat-tiles').innerHTML = tiles.map(([k, v, u]) => `<div class="stat-tile"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${u}</div></div>`).join('');
@@ -259,7 +276,7 @@ function renderChart(s) {
   let labels = '';
   for (let i = 0; i < data.length; i += step) {
     const d = new Date(data[i].t);
-    const txt = d.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' });
+    const txt = d.toLocaleDateString('en-US', { timeZone:zone(), weekday: 'short', month: 'numeric', day: 'numeric' });
     labels += `<text x="${X(i)}" y="${H - 8}" text-anchor="middle" font-size="11" fill="#93a1bb">${txt}</text>`;
   }
   // Y labels
@@ -290,10 +307,10 @@ function renderChart(s) {
 }
 
 function renderDaily(rows) {
-  const zone = 'America/New_York';
+  const timeZone = zone();
   const groups = new Map();
   for (const r of rows) {
-    const k = localDate(Date.parse(r.time), zone);
+    const k = localDate(Date.parse(r.time), timeZone);
     if (!groups.has(k)) groups.set(k, []);
     groups.get(k).push(r);
   }
@@ -305,8 +322,8 @@ function renderDaily(rows) {
     const vals = hrs.map((r) => value(r, f, 'mean')).filter(finite);
     if (!vals.length) return '';
     const mn = Math.min(...vals), mx = Math.max(...vals);
-    const d = new Date(date + 'T12:00:00');
-    const label = d.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' });
+    const d = new Date(date + 'T12:00:00Z');
+    const label = d.toLocaleDateString('en-US', { timeZone:'UTC', weekday: 'short', month: 'numeric', day: 'numeric' });
     const l = gmx > gmn ? ((mn - gmn) / (gmx - gmn)) * 100 : 0;
     const w = gmx > gmn ? Math.max(6, ((mx - mn) / (gmx - gmn)) * 100) : 100;
     // Sparkline
@@ -327,9 +344,10 @@ function renderDaily(rows) {
 function renderTable(s) {
   el('hourly-sub').textContent = `· next ${s.length}h`;
   el('hourly-body').innerHTML = s.map((d) => {
-    const t = new Date(d.t).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', timeZone: 'America/New_York' });
+    const t = new Date(d.t).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', timeZone: zone() });
     return `<tr><td>${t}</td><td>${fmt(d.mean)}</td><td>${fmt(d.p10)}</td><td>${fmt(d.p25)}</td><td>${fmt(d.p50)}</td><td>${fmt(d.p75)}</td><td>${fmt(d.p90)}</td></tr>`;
   }).join('');
 }
 
 load();
+if(typeof window!=='undefined')installForecastRefresh(load);

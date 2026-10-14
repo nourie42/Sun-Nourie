@@ -1,4 +1,4 @@
-import {HOUR,finite,escapeHTML as esc,convert,format,value,localDate,timeLabel,rowsFor,validateFeed,direction,daysFrom,csvText} from './weathernext-data.js?v=wn-site-v1';
+import {HOUR,finite,escapeHTML as esc,convert,format,value,localDate,timeLabel,rowsFor,validateFeed,direction,daysFrom,csvText,forecastRows,installForecastRefresh} from './weathernext-data.js?v=wn-site-v1';
 const FEED='https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/weathernext-full.json';
 const $=id=>document.getElementById(id);
 const SOURCE_NAMES={surface:'Main surface forecast',station:'Station-trained forecast',interimSurface:'Latest short-range surface run',interimStation:'Latest short-range station run',previousSurface:'Previous main surface run'};
@@ -9,7 +9,7 @@ const zone=()=>point().timeZone||'America/New_York';
 let indexes=new Map();
 function indexedRows(id){return indexes.get(`${id}:${pointId}`)?.rows||[];}
 const allRows=()=>indexedRows(sourceId);
-const visibleRows=()=>allRows().filter(r=>!day||localDate(Date.parse(r.time)-1,zone())===day);
+const visibleRows=()=>forecastRows(allRows()).filter(r=>!day||localDate(Date.parse(r.time)-1,zone())===day);
 const field=()=>catalog.fields.find(f=>f.id===fieldId)||catalog.fields[0];
 const fieldSource=f=>f.grid==='station'?(sourceId==='interimSurface'?'interimStation':sourceId==='previousSurface'?'previousStation':'station'):sourceId;
 const fieldRow=(f,t)=>indexes.get(`${fieldSource(f)}:${pointId}`)?.byTime.get(t);
@@ -28,7 +28,7 @@ function activate(){
  $('variable').innerHTML=groups.map(g=>`<optgroup label="${esc(g)}">${catalog.fields.filter(f=>f.group===g).map(f=>`<option value="${esc(f.id)}">${esc(f.label)} (${esc(f.unit)})</option>`).join('')}</optgroup>`).join('');$('variable').value=fieldId;
  $('forecast').hidden=false;day=null;selectFirstFuture();render();
 }
-function selectFirstFuture(){const rows=visibleRows();const n=rows.findIndex(r=>Date.parse(r.time)>=Date.now());hourIndex=n<0?Math.max(0,rows.length-1):n;}
+function selectFirstFuture(){hourIndex=0;}
 function render(){
  const rows=visibleRows();hourIndex=Math.max(0,Math.min(hourIndex,rows.length-1));const src=source(),loc=point();
  $('location-title').textContent=loc.name;
@@ -46,10 +46,12 @@ function render(){
  $('download-csv').disabled=!indexedRows(fieldSource(field())).length;
  renderReadout();renderChart();renderTable();renderSources();
  const age=(Date.now()-Date.parse(src.runAt))/HOUR,stale=Date.now()-Date.parse(src.fetchedAt)>6*HOUR||age>36||src.status!=='ready';
- setStatus(stale?'Showing the last published forecast. Check initialization and collection times below; this run may be old.':`Published NVIDIA WeatherNext forecast loaded · ${src.fields.length} surface fields · ${feed.ensembleMembers} ensemble members represented by six statistics.`,stale);
+ setStatus(!rows.length?'No current or upcoming forecast hours are published for this location and run.':stale?'Showing the last published forecast. Check initialization and collection times below; this run may be old.':`Published NVIDIA WeatherNext forecast loaded · ${src.fields.length} surface fields · ${feed.ensembleMembers} ensemble members represented by six statistics.`,stale||!rows.length);
 }
 function renderReadout(){
- const rows=visibleRows(),r=rows[hourIndex];if(!r)return;
+ const rows=visibleRows(),r=rows[hourIndex];if(!r){
+  $('temperature').textContent='—';$('temperature-range').textContent='';$('valid-time').textContent='No current or upcoming forecast hour';$('conditions-time').textContent='';$('hour-label').textContent='No available hour';$('hero-metrics').innerHTML='';$('percentiles').innerHTML='';$('condition-groups').innerHTML='';return;
+ }
  const t=r.time,f=field(),fr=fieldRow(f,t),v=(id,s='mean')=>fieldValue(id,t,s);
  $('valid-time').textContent=timeLabel(t,zone());$('conditions-time').textContent=timeLabel(t,zone());$('hour-label').textContent=timeLabel(t,zone());
  $('hour').setAttribute('aria-valuetext',timeLabel(t,zone()));
@@ -110,3 +112,4 @@ $('hour').addEventListener('input',e=>{hourIndex=Number(e.target.value);renderRe
 $('download-csv').addEventListener('click',()=>{if(feed)download(csvText(feed,fieldSource(field()),pointId,catalog.fields),`weathernext-${pointId}-${sourceId}.csv`,'text/csv;charset=utf-8');});
 $('download-json').addEventListener('click',()=>{if(feed)download(JSON.stringify(feed,null,2),'weathernext-source.json','application/json');});
 load();
+installForecastRefresh(load);

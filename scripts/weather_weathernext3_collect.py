@@ -18,11 +18,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from google.cloud import bigquery
+from weather_weathernext_site_collect import mark_freshness
 
 SCHEMA = "weather-nourie-weathernext3-v1"
 POINTS = [
     {"id": "knightdale", "name": "Knightdale / Raleigh", "latitude": 35.787, "longitude": -78.4806},
     {"id": "greenville", "name": "Greenville, NC", "latitude": 35.6127, "longitude": -77.3664},
+    {"id": "hazen", "name": "Hazen, ND", "latitude": 47.2944, "longitude": -101.6227},
 ]
 K_TO_F_SCALE = 9 / 5
 MS_TO_MPH = 2.2369362920544
@@ -163,9 +165,12 @@ def main():
         },
         "points": points,
     }
+    mark_freshness(payload, payload["generatedAt"])
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(payload, separators=(",", ":"), ensure_ascii=False) + "\n", encoding="utf-8")
+    temporary = output.with_suffix(".tmp")
+    temporary.write_text(json.dumps(payload, separators=(",", ":"), ensure_ascii=False, allow_nan=False) + "\n", encoding="utf-8")
+    temporary.replace(output)
     print(f"Published {len(points)} WeatherNext 3 points from {iso(run)} to {output}")
 
 

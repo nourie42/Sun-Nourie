@@ -31,6 +31,28 @@ export function timeLabel(t,zone='America/New_York',date=true) {
 export function rowsFor(feed,sourceId,pointId) {
  return [...(feed?.sources?.[sourceId]?.points?.find(p=>p.id===pointId)?.hourly||[])].filter(r=>Number.isFinite(Date.parse(r.time))).sort((a,b)=>Date.parse(a.time)-Date.parse(b.time));
 }
+/** Keep the exact current model hour and upcoming valid times; never reuse an ended hour. */
+export function forecastRows(rows,now=Date.now()) {
+ const start=Math.floor(now/HOUR)*HOUR;
+ return [...(rows||[])].filter(r=>{const t=Date.parse(r?.time);return Number.isFinite(t)&&(t===start||t>=now);}).sort((a,b)=>Date.parse(a.time)-Date.parse(b.time));
+}
+export function currentForecastRow(rows,now=Date.now()) {
+ const start=Math.floor(now/HOUR)*HOUR;
+ return (rows||[]).find(r=>Date.parse(r?.time)===start)||null;
+}
+/** A model comparison needs identical valid times, including gaps. */
+export function matchingForecastRows(rows,times) {
+ const byTime=new Map((rows||[]).filter(r=>Number.isFinite(Date.parse(r?.time))).map(r=>[Date.parse(r.time),r]));
+ return times.map(t=>byTime.get(typeof t==='number'?t:Date.parse(t))||null);
+}
+/** Refresh published forecasts while visible and when returning to an open tab. */
+export function installForecastRefresh(refresh) {
+ const update=()=>{if(!document.hidden)void refresh();};
+ const timer=setInterval(update,10*60*1000);
+ document.addEventListener('visibilitychange',update);
+ window.addEventListener('online',update);
+ return ()=>{clearInterval(timer);document.removeEventListener('visibilitychange',update);window.removeEventListener('online',update);};
+}
 export function statsAt(feed,sourceId,pointId,time,field) {
  const row=rowsFor(feed,sourceId,pointId).find(r=>r.time===time);
  return Object.fromEntries(['mean','p10','p25','p50','p75','p90'].map(s=>[s,value(row,field,s)]));
@@ -47,6 +69,8 @@ export function direction(u,v) {
  return {degrees,compass:['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'][Math.round(degrees/22.5)%16]};
 }
 export function daysFrom(rows,zone,now=Date.now()) {
+ rows=[...(rows||[])].filter(r=>Number.isFinite(Date.parse(r?.time))).sort((a,b)=>Date.parse(a.time)-Date.parse(b.time));
+ if(!forecastRows(rows,now).length)return [];
  const groups=new Map();
  for(const row of rows){
   // Amounts cover the PRECEDING hour; temperature is instantaneous at valid time.
@@ -55,7 +79,7 @@ export function daysFrom(rows,zone,now=Date.now()) {
   if(!groups.has(k))groups.set(k,[]);
   groups.get(k).push(row);
  }
- return [...groups].slice(0,16).map(([date,hours])=>{
+ return [...groups].filter(([,hours])=>forecastRows(hours,now).length).slice(0,16).map(([date,hours])=>{
   const instant=rows.filter(r=>localDate(r.time,zone)===date);
   const sample=(rs,id,kind)=>rs.map(r=>convert(r.values?.[id]?.mean,kind)).filter(finite);
   const ts=sample(instant,'temperature_2m','temperature'),rain=sample(hours,'total_precipitation_1hr','rain'),winds=sample(instant,'wind_speed_10m','speed');

@@ -1,6 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {snowDetailHTML,snowBannerSummary,winterOutlookState,safeWinterMapUrl,winterMapDescriptors,winterPointAmount,winterPointInBounds,winterPointPopupHTML} from '../public/weather-fusion/snow-outlook.js';
+import {snowDetailHTML,snowBannerSummary,snowForecastPresent,winterOutlookState,safeWinterMapUrl,winterMapDescriptors,winterPointAmount,winterPointInBounds,winterPointPopupHTML} from '../public/weather-fusion/snow-outlook.js';
+
+test('automatic winter tile requires snow while the Snow tab can still inspect ice guidance',()=>{
+ const ice={status:'ready',snowExpected:false,possible:true,days:[{index:0,snowExpected:false,freezingRainPossible:true,freezingRainChance:60}]};
+ assert.equal(snowForecastPresent(ice),false);
+ assert.equal(winterOutlookState(ice),'active');
+ const snow={...ice,snowExpected:true,days:[...ice.days,{index:1,label:'Thu',snowExpected:true},{index:2,label:'Fri',snowExpected:true}]};
+ assert.equal(snowForecastPresent(snow),true);
+ assert.match(snowBannerSummary(snow),/^Thu · \+1 more days/);
+});
 import {addSnowOutlook} from '../src/weatherFusionSnow.js';
 
 test('winter UI distinguishes checked no-snow guidance from absent or failed sources',()=>{

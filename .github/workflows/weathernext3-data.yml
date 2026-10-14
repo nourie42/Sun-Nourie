@@ -7,6 +7,8 @@ on:
     branches: [main]
     paths:
       - 'scripts/weather_weathernext3_collect.py'
+      - 'scripts/weather_weathernext_site_collect.py'
+      - 'scripts/test_weathernext_collection.py'
       - '.github/workflows/weathernext3-data.yml'
   schedule:
     # Main 00/06/12/18 UTC runs reach BigQuery about 8h10m later.
@@ -46,6 +48,9 @@ jobs:
       - name: Install BigQuery client
         run: pip install 'google-cloud-bigquery>=3.25,<4'
 
+      - name: Check collector freshness and billing safeguards
+        run: python scripts/test_weathernext_collection.py
+
       - name: Open isolated public-weather data worktree
         shell: bash
         run: |
@@ -69,5 +74,13 @@ jobs:
           git add -- models/weathernext3.json
           if ! git diff --cached --quiet; then
             git commit -m 'Refresh Google WeatherNext 3 point forecasts'
-            git push origin HEAD:weather-fusion-data
+            # Other collectors publish unrelated files to this shared branch.
+            # Rebase before retrying rather than losing a valid new forecast.
+            for attempt in 1 2 3 4 5; do
+              git fetch origin weather-fusion-data
+              git rebase FETCH_HEAD
+              if git push origin HEAD:weather-fusion-data; then exit 0; fi
+              sleep 3
+            done
+            exit 1
           fi

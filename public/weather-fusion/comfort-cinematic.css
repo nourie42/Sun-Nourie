@@ -115,3 +115,10 @@ body[data-sky="night"] #skin-values .reference-scene .reference-weather-tint{opa
 #skin-values .sun-shade-comparison .exposure-person>svg.snow-play-scene{background:#a3c7dd}
 @media(max-width:540px){#skin-values .sun-shade-comparison .exposure-person>figcaption>strong.winter-paw-reading{font-size:clamp(17px,5vw,25px)}}
 
+/* Give captions their own content-sized band so pet guidance stays visible. */
+@media(min-width:541px){
+ #skin-values .sun-shade-comparison .exposure-person,
+ #skin-values .sun-shade-comparison .exposure-person:has(.reference-scene){grid-template-rows:52px 60px 32px auto minmax(136px,auto);aspect-ratio:auto}
+ #skin-values .sun-shade-comparison .exposure-person>svg.reference-scene{height:auto!important;aspect-ratio:1}
+}
+

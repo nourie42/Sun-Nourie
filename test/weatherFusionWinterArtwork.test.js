@@ -9,22 +9,24 @@ test('snow artwork has real bundled people, snow play and a bounding dog in all 
  for(const panel of [0,1,2]){
   const html=referenceScene(panel,true,'Cloudy',52,{snowExpected:true,snowForecastOnly:true});
   assert.match(html,/data-outfit="cold"/);
-  assert.match(html,/class="snow-heavy-coat"/);
+  assert.match(html,/data-garment="heavy-coat-and-trousers"/);
   assert.match(html,/warm hat, scarf, mittens and boots/);
   assert.match(html,/illustration of forecast snow/);
-  assert.doesNotMatch(html,/class="reference-art"/);
-  assert.match(html,/comfort-snowflakes/);
+  assert.match(html,/class="reference-art"/);
+  assert.match(html,/comfort-integrated-snow-play\.webp/);
+  assert.equal((html.match(/<image\b/g)||[]).length,1);
+  assert.doesNotMatch(html,/<(?:path|g|filter|clipPath|rect)\b/);
  }
- assert.match(referenceScene(0,true,'Snow',20),/snow-playing-child.*building-a-snowman/);
- assert.match(referenceScene(1,false,'Snow',20),/snowball-player.*playing-with-snowballs/);
- assert.match(referenceScene(2,true,'Snow',20),/snow-playing-dog.*bounding-through-snow/);
+ assert.match(referenceScene(0,true,'Snow',20),/building a snowman beneath a snowy tree/);
+ assert.match(referenceScene(1,false,'Snow',20),/playing with snowballs/);
+ assert.match(referenceScene(2,true,'Snow',20),/playing in the snow with a light brown poodle/);
+ assert.match(referenceScene(1,false,'Snow',20),/comfort-integrated-snow-play-dawn\.webp/);
 });
 test('cold dry days wear visible heavy coats without inventing snow',()=>{
  for(const panel of [0,1,2]){
   const html=referenceScene(panel,true,'Clear',60,{clothingFeels:15});
-  assert.match(html,/wardrobe-heavy-coat/);
-  assert.match(html,/wardrobe-winter-accessories/);
-  assert.match(html,/wardrobe-mittens/);
+  assert.match(html,/comfort-integrated-cold-normal\.webp/);
+  assert.doesNotMatch(html,/wardrobe-|<path\b|clipPath/);
   assert.match(html,/data-garment="heavy-coat-and-trousers"/);
   assert.doesNotMatch(html,/snow-play-scene/);
  }
@@ -59,7 +61,7 @@ test('winter paw tile stops showing dry-surface numbers and provides cold/snow/d
  assert.equal(result.status,'winter');
  assert.equal(result.concrete,null);assert.equal(result.asphalt,null);
  const html=pavementHTML(result,20,context);
- assert.match(html,/Cold paws/);assert.match(html,/snow-playing-dog/);
+ assert.match(html,/Cold paws/);assert.match(html,/playing in the snow with a light brown poodle/);
  assert.match(html,/rinse off deicer/);assert.doesNotMatch(html,/Est\. surface temp|Asphalt \d|\d+°/);
  const details=pavementDetailsHTML(result);
  assert.match(details,/Paw temperature and snow-covered surface temperature are not estimated/);

@@ -9,7 +9,7 @@ from datetime import datetime,timezone
 from pathlib import Path
 STATS=('mean','p10','p25','p50','p75','p90')
 SCHEMA='weather-nourie-weathernext-site-v1'
-POINTS=[{'id':'knightdale','name':'Knightdale / Raleigh, NC','latitude':35.787,'longitude':-78.4806,'timeZone':'America/New_York'},{'id':'greenville','name':'Greenville, NC','latitude':35.6127,'longitude':-77.3664,'timeZone':'America/New_York'}]
+POINTS=[{'id':'knightdale','name':'Knightdale / Raleigh, NC','latitude':35.787,'longitude':-78.4806,'timeZone':'America/New_York'},{'id':'greenville','name':'Greenville, NC','latitude':35.6127,'longitude':-77.3664,'timeZone':'America/New_York'},{'id':'hazen','name':'Hazen, ND','latitude':47.2944,'longitude':-101.6227,'timeZone':'America/North_Dakota/Beulah'}]
 class CostStop(RuntimeError):pass
 class EstimateCeiling(RuntimeError):pass
 
@@ -92,16 +92,43 @@ def query_point(q,table,run,point,columns):
     name,stat=c.rsplit('_',1);row['values'].setdefault(name,{})[stat]=numeric(r[c])
  return {**point,**grid,'hourly':[merged[t] for t in sorted(merged)]}
 
+def mark_freshness(source,checked_at):
+ # A newly checked/collected artifact does not create a newer model run.
+ if not source.get('runAt'):return source
+ run=datetime.fromisoformat(source['runAt'].replace('Z','+00:00'))
+ checked=datetime.fromisoformat(checked_at.replace('Z','+00:00'))
+ age=(checked-run).total_seconds()/3600
+ source['runAgeHours']=round(age,1)
+ source['freshnessStatus']='stale' if age>36 or source.get('status')=='last-verified' else 'ready'
+ if source.get('status','ready')=='ready':source['status']='stale' if age>36 else 'ready'
+ return source
+
+def covers_current_points(source):
+ # Initialization equality alone is insufficient: changing the configured
+ # locations must collect their actual grid cells, not only update the menu.
+ raw=source.get('points')
+ if not isinstance(raw,list) or len(raw)!=len(POINTS):return False
+ points={p.get('id'):p for p in raw if isinstance(p,dict)}
+ if set(points)!={p['id'] for p in POINTS}:return False
+ for expected in POINTS:
+  saved=points[expected['id']]
+  if not saved.get('hourly'):return False
+  for coordinate in ('latitude','longitude'):
+   try:a=numeric(saved.get(coordinate));b=numeric(expected.get(coordinate))
+   except (TypeError,ValueError):return False
+   if a is None or b is None or abs(a-b)>0.000001:return False
+ return True
+
 def collect(q,table,run,grid,fields,previous,now):
- if previous and previous.get('runAt')==iso(run) and previous.get('status')=='ready' and previous.get('sourceTable')==table:
-  r=copy.deepcopy(previous);r['checkedAt']=now;return r
+ if previous and previous.get('runAt')==iso(run) and previous.get('status') in ('ready','stale','last-verified') and previous.get('sourceTable')==table and covers_current_points(previous):
+  r=copy.deepcopy(previous);r['checkedAt']=now;return mark_freshness(r,now)
  expected=[f['id'] for f in fields if f['grid']==grid]
  schema=available_columns(q.client.get_table(table).schema)
  cols=[f'{name}_{s}' for name in expected for s in STATS if f'{name}_{s}' in schema]
  present=[name for name in expected if name+'_mean' in cols]
  if not present:raise RuntimeError('No documented statistical fields in linked table')
  points=[query_point(q,table,run,p,cols) for p in POINTS]
- return {'status':'ready','runAt':iso(run),'fetchedAt':now,'checkedAt':now,'sourceTable':table,'gridResolutionDegrees':.05 if grid=='station' else .1,'fields':present,'missingFields':[n for n in expected if n not in present],'statisticColumns':cols,'horizonHours':max(r['forecastHour'] for p in points for r in p['hourly']),'points':points}
+ return mark_freshness({'status':'ready','runAt':iso(run),'fetchedAt':now,'checkedAt':now,'sourceTable':table,'gridResolutionDegrees':.05 if grid=='station' else .1,'fields':present,'missingFields':[n for n in expected if n not in present],'statisticColumns':cols,'horizonHours':max(r['forecastHour'] for p in points for r in p['hourly']),'points':points},now)
 
 def main():
  from google.cloud import bigquery
@@ -126,7 +153,8 @@ def main():
   except Exception as e:
    msg=type(e).__name__+': '+str(e)[:300];warnings.append(id+': '+msg)
    sources[id]={**prev[id],'status':'last-verified','refreshWarning':msg,'checkedAt':now} if prev.get(id,{}).get('points') else {'status':'unavailable','message':msg,'checkedAt':now}
- payload={'schema':SCHEMA,'model':'Google WeatherNext 3','generatedAt':now,'ensembleMembers':64,'comparisonOnly':True,'timeStepHours':1,'points':POINTS,'sources':sources,'warnings':warnings,'sourceDocumentation':catalog['source'],'scope':'All available BigQuery surface statistics for published locations. Raw trajectories, upper-air and native six-hour products require the separate Google Cloud Storage feed.','rawUnits':{'temperature':'K','wind':'m/s','precipitation':'m per preceding hour','cloud':'fraction','pressure':'Pa','solar':'J/m² per preceding hour'},'collectionBytesBilled':q.billed}
+ for source in sources.values():mark_freshness(source,now)
+ payload={'schema':SCHEMA,'model':'Google WeatherNext 3','generatedAt':now,'latestPublishedMainRun':iso(run),'latestPublishedRun':iso(newest),'ensembleMembers':64,'comparisonOnly':True,'timeStepHours':1,'points':POINTS,'sources':sources,'warnings':warnings,'sourceDocumentation':catalog['source'],'scope':'All available BigQuery surface statistics for published locations. Raw trajectories, upper-air and native six-hour products require the separate Google Cloud Storage feed.','rawUnits':{'temperature':'K','wind':'m/s','precipitation':'m per preceding hour','cloud':'fraction','pressure':'Pa','solar':'J/m² per preceding hour'},'collectionBytesBilled':q.billed}
  out.parent.mkdir(parents=True,exist_ok=True);tmp=out.with_suffix('.tmp');tmp.write_text(json.dumps(payload,separators=(',',':'),allow_nan=False)+'\n');tmp.replace(out)
  print(json.dumps({'published':str(out),'bytesBilled':q.billed,'sources':{k:{'status':v['status'],'fields':len(v.get('fields',[])),'hours':v.get('horizonHours')} for k,v in sources.items()},'warnings':warnings}))
 if __name__=='__main__':main()

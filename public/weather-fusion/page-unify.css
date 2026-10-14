@@ -118,6 +118,10 @@ html body .forecast-window-snow .forecast-window-icon svg{fill:none;stroke:#d8ef
 .seven-day-snow{color:#d8efff;font-weight:700;font-size:12px}
 
 
-/* Eight forecast tools stay readable at phone widths. */
-.weather-jump-nav{grid-template-columns:repeat(8,minmax(0,1fr))!important}.weather-jump-nav .weather-jump-card{min-height:42px;font-size:12px;white-space:normal;line-height:1.2;text-align:center}
-@media(max-width:600px){.weather-jump-nav{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:7px!important}.weather-jump-nav .weather-jump-card{min-height:42px;font-size:12px!important}}
+/* All eight tools share one label style and one touch target size. */
+html body .weather-jump-nav{display:grid;grid-template-columns:repeat(8,minmax(0,1fr))!important;gap:8px!important;margin:12px 0 18px;padding:0}
+html body .weather-jump-nav>.weather-jump-card{box-sizing:border-box;display:flex;align-items:center;justify-content:center;min-width:0;height:46px;min-height:46px;padding:8px 6px;border:1px solid rgba(180,211,240,.15);border-radius:12px;background:rgba(6,44,77,.58);color:#e5f5ff;font-family:inherit!important;font-size:13px!important;font-weight:700!important;font-style:normal!important;line-height:1.15!important;letter-spacing:0!important;text-align:center;white-space:normal;cursor:pointer;appearance:none}
+html body .weather-jump-nav>.weather-jump-card .jump-label{display:block;font-family:inherit!important;font-size:inherit!important;font-weight:inherit!important;font-style:inherit!important;line-height:inherit!important;letter-spacing:inherit!important;white-space:normal!important;text-align:center}
+html body .weather-jump-nav>.weather-jump-card:hover{background:rgba(18,75,116,.72);border-color:rgba(180,211,240,.34)}
+html body .weather-jump-nav>.weather-jump-card:focus-visible{outline:2px solid #b8dfff;outline-offset:3px}
+@media(max-width:800px){html body .weather-jump-nav{grid-template-columns:repeat(4,minmax(0,1fr))!important}}

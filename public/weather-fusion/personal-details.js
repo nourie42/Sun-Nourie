@@ -1,7 +1,7 @@
 import {weatherState} from './weather-state.js';
 import {thermalRiskHTML} from './thermal-risk.js?v=weather-art-labels-v10';
 import {forecastGrossLevel} from './dewpoint-meter.js?v=feel-v1';
-import {exposureScene,precipitationActivity,winterSceneExpected} from './exposure-scene.js?v=winter-wardrobe-v2';
+import {exposureScene,precipitationActivity,winterSceneExpected} from './exposure-scene.js?v=integrated-art-v3';
 import {outdoorExposure} from './outdoor-feels.js?v=weather-qa-v67';
 import {solarElevation} from './weather-math.js?v=weather-qa-v67';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
@@ -10,7 +10,7 @@ const HOUR=3600000;
 function ensureCinematicComfortStyles(){
  if(typeof document==='undefined'||document.getElementById('weather-nourie-cinematic-comfort'))return;
  const link=document.createElement('link');
- link.id='weather-nourie-cinematic-comfort';link.rel='stylesheet';link.href='/weather-fusion/comfort-cinematic.css?v=winter-v2';
+ link.id='weather-nourie-cinematic-comfort';link.rel='stylesheet';link.href='/weather-fusion/comfort-cinematic.css?v=integrated-art-v3';
  document.head.append(link);
 }
 export const pressureMb=value=>finite(value)?value*33.86389:null;
