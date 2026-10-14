@@ -76,14 +76,21 @@ test('daily labels use the selected location date on both sides of UTC midnight'
   assert.deepEqual(result.aiDays.map(d=>[d.date,d.label]),[['2026-10-13','Today'],['2026-10-14','Wed']]);
 });
 
-function browserContext(source){
+function browserContext(source,search=''){
   const elements=new Map();
   const get=id=>{if(!elements.has(id))elements.set(id,{textContent:'',innerHTML:'',dataset:{},style:{},classList:{toggle(){}},addEventListener(){},setAttribute(){},querySelector(){return null;},querySelectorAll(){return [];}});return elements.get(id);};
-  const context={...display,forecastRows:rows=>display.forecastRows(rows,now),currentForecastRow:rows=>display.currentForecastRow(rows,now),daysFrom:(rows,zone)=>display.daysFrom(rows,zone,now),Date:class extends Date{static now(){return now;}},document:{getElementById:get,querySelector:get,querySelectorAll:()=>[],body:{dataset:{}}},console};
+  const context={...display,URLSearchParams,location:{search},forecastRows:rows=>display.forecastRows(rows,now),currentForecastRow:rows=>display.currentForecastRow(rows,now),daysFrom:(rows,zone)=>display.daysFrom(rows,zone,now),Date:class extends Date{static now(){return now;}},document:{getElementById:get,querySelector:get,querySelectorAll:()=>[],body:{dataset:{}}},console};
   vm.createContext(context);
   vm.runInContext(source.replace(/^import .*;\s*$/mg,'').replace(/\nload\(\);\s*(?:if\(typeof window!==\x27undefined\x27\)installForecastRefresh\(load\);)?\s*$/,''),context);
   return {context,get};
 }
+
+test('Ultimate selects the published Hazen point from its location URL',()=>{
+  const {context,get}=browserContext(read('ultimate.js'),'?location=hazen');
+  assert.equal(vm.runInContext('loc',context),'hazen');
+  assert.equal(get('loc-select').value,'hazen');
+  assert.equal(vm.runInContext('loc',browserContext(read('ultimate.js'),'?location=unknown').context),'knightdale');
+});
 
 test('WN explorer presents the current valid hour and clears values when its run ends',()=>{
   const {context,get}=browserContext(read('wn.js'));

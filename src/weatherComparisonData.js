@@ -15,7 +15,7 @@ const allowed=['surface','interimSurface','previousSurface'];
 const stationFor={surface:'station',interimSurface:'interimStation',previousSurface:'previousStation'};
 export function googlePoints(feed){
  if(!feed||!Array.isArray(feed.points)||(!feed.sources&&feed.schema!=='weather-nourie-weathernext3-v1'))throw Error('The published NVIDIA forecast is unavailable or invalid.');
- return feed.points.filter(p=>p&&typeof p.id==='string'&&finite(p.latitude)&&finite(p.longitude)&&p.latitude>=24&&p.latitude<=50&&p.longitude>=-125&&p.longitude<=-66).map(p=>({id:p.id,name:p.name||p.id,latitude:p.latitude,longitude:p.longitude,timeZone:p.timeZone||'America/New_York'}));
+ return feed.points.filter(p=>p&&typeof p.id==='string'&&finite(p.latitude)&&finite(p.longitude)&&p.latitude>=24&&p.latitude<=50&&p.longitude>=-125&&p.longitude<=-66).map(p=>({id:p.id,name:p.name||p.id,latitude:p.latitude,longitude:p.longitude,timeZone:p.timeZone||(p.id==='hazen'&&Math.abs(p.latitude-47.2944)<.02&&Math.abs(p.longitude+101.6227)<.02?'America/North_Dakota/Beulah':'America/New_York')}));
 }
 export function skyDescription(cloud,rain){
  if(finite(rain)&&rain>=.005)return 'Rain forecast';

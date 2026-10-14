@@ -22,9 +22,9 @@ from weather_weathernext_site_collect import mark_freshness
 
 SCHEMA = "weather-nourie-weathernext3-v1"
 POINTS = [
-    {"id": "knightdale", "name": "Knightdale / Raleigh", "latitude": 35.787, "longitude": -78.4806},
-    {"id": "greenville", "name": "Greenville, NC", "latitude": 35.6127, "longitude": -77.3664},
-    {"id": "hazen", "name": "Hazen, ND", "latitude": 47.2944, "longitude": -101.6227},
+    {"id": "knightdale", "name": "Knightdale / Raleigh", "latitude": 35.787, "longitude": -78.4806, "timeZone": "America/New_York"},
+    {"id": "greenville", "name": "Greenville, NC", "latitude": 35.6127, "longitude": -77.3664, "timeZone": "America/New_York"},
+    {"id": "hazen", "name": "Hazen, ND", "latitude": 47.2944, "longitude": -101.6227, "timeZone": "America/North_Dakota/Beulah"},
 ]
 K_TO_F_SCALE = 9 / 5
 MS_TO_MPH = 2.2369362920544
