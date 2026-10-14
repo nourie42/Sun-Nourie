@@ -30,9 +30,15 @@ test('mild weather still uses long pants and warm weather removes extra garments
   for(const t of [74,82,95])assert.doesNotMatch(referenceScene(panel,false,'Clear',t,{pop:0}),/class="comfort-clothing"/);
  }
 });
-test('winter artwork and missing readings are handled without covering existing winter clothes',()=>{
+test('winter artwork is bundled snow play and missing readings keep the normal scene',()=>{
  assert.equal(clothingArtwork(0,'cold','cold'), '');
- assert.match(referenceScene(0,false,'Snow',30),/comfort-reference-scenes-cold.webp/);
+ for(const panel of [0,1,2]){
+  const snow=referenceScene(panel,false,'Snow',30);
+  assert.match(snow,/class="reference-scene snow-play-scene/);
+  assert.match(snow,/data-garment="heavy-coat-and-trousers"/);
+  assert.match(snow,/warm hat, scarf, mittens and boots/);
+  assert.doesNotMatch(snow,/class="comfort-clothing"/);
+ }
  assert.match(referenceScene(0,true,'Clear',null),/comfort-reference-scenes.webp/,'missing NVIDIA feels-like values keep the same people artwork instead of switching to a fallback person');
  assert.equal(clothingArtwork(-1,'normal','cool'), '');
 });
@@ -47,3 +53,4 @@ test('screenshot regression: shade 50, outdoors 60 and warm pavement do not prod
  assert.match(pet,/data-visible-outfit="cool"/);assert.match(pet,/95°/);
  assert.deepEqual(comfort,copy);
 });
+

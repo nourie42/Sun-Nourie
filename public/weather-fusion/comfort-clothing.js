@@ -1,5 +1,5 @@
-/** Garments for the existing 300px illustrated panels. Preserve faces, poses,
- * weather, footwear and the pet. Outfit labels alone never change the picture. */
+/** Garments for the existing 300px illustrated panels. Preserve faces and
+ * poses while changing visible layers. Snow play uses its own complete art. */
 const BOY_PANTS='M108 171 Q134 177 161 173 L165 203 L169 240 Q160 246 147 241 L135 211 L120 242 Q110 245 99 239 L104 207 L100 205 Z';
 const SEATED_PANTS=[
  'M145 224 Q129 214 113 219 Q101 223 106 236 Q113 247 141 255 L151 244 Q133 235 133 232 L153 238 Z',
@@ -39,20 +39,27 @@ const RAIN_PANTS=[SEATED_PANTS,
  ['M87 159 L111 166 Q99 190 83 216 L69 227 L55 214 L74 187 Z','M80 201 L101 181 L102 200 L83 221 L71 216 Z','M94 159 L119 162 Q119 180 119 197 L127 223 L109 229 L100 209 L90 185 Z']
 ];
 const safe=s=>String(s).replace(/[^a-z0-9_-]/gi,'');
+function winterAccessories(panel,variant){
+ const [x,y]=[[155,148],[135,85],[96,65]][panel];
+ const [sx,sy]=[[155,178],[135,116],[96,96]][panel];
+ const glovePositions=panel===0?[[129,223],variant==='watch'||variant==='carry'?[185,204]:[222,142]]:panel===1?[variant==='watch'?[94,81]:variant==='carry'?[111,144]:variant==='fog'?[82,147]:[69,91],variant==='watch'||variant==='carry'?[170,168]:[176,179]]:[[49,167],[142,159]];
+ return `<g class="wardrobe-winter-accessories"><g transform="translate(${x} ${y})"><path d="M-20-7Q-21-31 0-33Q22-30 20-6Z" fill="#31577d" stroke="#223e5c" stroke-width=".8"/><path d="M-21-9Q0-15 21-9L21-3Q0-8-21-3Z" fill="#a0c3df"/><circle cy="-35" r="6" fill="#c3d9e9"/><path d="M-12-24L-13-12M0-27V-13M12-24L13-12" stroke="#83a9c9" stroke-width="1.2"/></g><g transform="translate(${sx} ${sy})"><path d="M-15-7Q0 6 15-7L16 1Q0 12-16 1Z" fill="#e8bc78"/><path d="M2 3L10 26L18 23L9 0Z" fill="#e8bc78"/><path d="M9 17L16 15" stroke="#c08c54" stroke-width="1.3"/></g><g class="wardrobe-mittens" fill="#4e7091" stroke="#284968" stroke-width=".8">${glovePositions.map(([gx,gy])=>`<ellipse cx="${gx}" cy="${gy}" rx="8" ry="9"/>`).join('')}</g></g>`;
+}
 export function clothingArtwork(panel,scene,outfit,sourceHref){
  if(!Number.isInteger(panel)||panel<0||panel>2||!['cold','cool','mild'].includes(outfit)||scene==='cold')return '';
  const id=`wardrobe-${panel}-${safe(scene)}-${outfit}`;
  const rainy=scene==='rain',variant=scene==='carry-umbrella'?'carry':scene==='watch'?'watch':scene==='fog'?'fog':'normal';
  const pants=rainy?RAIN_PANTS[panel]:panel===0?SEATED_PANTS:panel===1?[BOY_PANTS]:WALKER_PANTS;
- const layered=outfit!=='mild'&&(!rainy||panel===0);
+ const cold=outfit==='cold',layered=outfit!=='mild'&&(!rainy||panel===0||cold);
  const torso=[SEATED_JACKET,BOY_JACKET,WALKER_JACKET][panel];
  const jacket=layered?[...SLEEVES[variant][panel],torso]:[];
  const seam=panel===0?'M187 205 Q192 216 206 235 M117 233 L140 249':panel===1?'M132 180 L132 200 M112 211 L107 235 M151 211 L158 238':'M82 177 L62 232 M101 186 L100 202 L117 244';
  const zipper=panel===0?'M157 190 L151 226':panel===1?'M135 123 L135 174':'M96 101 L95 146';
  const dark=panel===2?'#245a77':'#223e5c',light=panel===2?'#638eaa':'#527a9d';
- const hands=variant==='carry'?(panel===0?[[143,213,9,11],[177,169,8,12]]:panel===1?[[110,141,11,8]]:[]):panel===0?[[129,223,12,8]]:[];
+ const hands=cold?[]:variant==='carry'?(panel===0?[[143,213,9,11],[177,169,8,12]]:panel===1?[[110,141,11,8]]:[]):panel===0?[[129,223,12,8]]:[];
  const clip=(name,paths)=>`<clipPath id="${id}-${name}">${paths.map(d=>`<path d="${d}"/>`).join('')}</clipPath>`;
  const filter=(name,r,g,b)=>`<filter id="${id}-${name}" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="${.2126*r[0]} ${.7152*r[0]} ${.0722*r[0]} 0 ${r[1]} ${.2126*g[0]} ${.7152*g[0]} ${.0722*g[0]} 0 ${g[1]} ${.2126*b[0]} ${.7152*b[0]} ${.0722*b[0]} 0 ${b[1]} 0 0 0 1 0"/></filter>`;
  const image=(clipId,filterId)=>sourceHref?`<g clip-path="url(#${id}-${clipId})"><image href="${sourceHref}" x="${-300*panel}" y="0" width="900" height="300" preserveAspectRatio="none"${filterId?` filter="url(#${id}-${filterId})"`:''}/></g>`:'';
- return `<g class="comfort-clothing" data-visible-outfit="${outfit}" data-garment="${layered?'jacket-and-trousers':rainy?'rainwear-and-trousers':'long-trousers'}" aria-hidden="true"><defs>${clip('legs',pants)}${clip('sleeves',jacket)}<clipPath id="${id}-hands">${hands.map(([x,y,rx,ry])=>`<ellipse cx="${x}" cy="${y}" rx="${rx}" ry="${ry}"/>`).join('')}</clipPath>${filter('denim',[.10,.13],[.12,.23],[.15,.34])}${panel===2?filter('fabric',[.34,.07],[.5,.25],[.47,.27]):filter('fabric',[.42,.10],[.51,.28],[.49,.41])}<linearGradient id="${id}-pants" x1="0" y1="0" x2="1" y2=".25"><stop stop-color="${dark}"/><stop offset=".48" stop-color="${light}"/><stop offset="1" stop-color="${dark}"/></linearGradient><linearGradient id="${id}-jacket" x1="0" y1="0" x2=".9" y2="1"><stop stop-color="${panel===2?'#77c4c1':'#81b5dd'}"/><stop offset=".4" stop-color="${panel===2?'#429896':'#4286bd'}"/><stop offset="1" stop-color="${panel===2?'#236a73':'#25547f'}"/></linearGradient></defs><g class="wardrobe-trousers" fill="url(#${id}-pants)" stroke="${dark}" stroke-width=".65" stroke-linejoin="round">${pants.map(d=>`<path d="${d}"/>`).join('')}</g><g opacity=".28">${image('legs','denim')}</g>${!rainy?`<path d="${seam}" fill="none" stroke="#96b5cf" stroke-width=".65" opacity=".35"/>`:''}${layered?`<g class="wardrobe-jacket" fill="url(#${id}-jacket)" stroke="${panel===2?'#286574':'#30577e'}" stroke-width=".6" stroke-linejoin="round">${jacket.map(d=>`<path d="${d}"/>`).join('')}</g>${image('sleeves','fabric')}<path d="${zipper}" fill="none" stroke="#d7eafa" stroke-width="1" opacity=".7"/>`:''}${hands.length?image('hands'):''}</g>`;
+ return `<g class="comfort-clothing" data-visible-outfit="${outfit}" data-garment="${cold?'heavy-coat-and-trousers':layered?'jacket-and-trousers':rainy?'rainwear-and-trousers':'long-trousers'}" aria-hidden="true"><defs>${clip('legs',pants)}${clip('sleeves',jacket)}<clipPath id="${id}-hands">${hands.map(([x,y,rx,ry])=>`<ellipse cx="${x}" cy="${y}" rx="${rx}" ry="${ry}"/>`).join('')}</clipPath>${filter('denim',[.10,.13],[.12,.23],[.15,.34])}${panel===2?filter('fabric',[.34,.07],[.5,.25],[.47,.27]):filter('fabric',[.42,.10],[.51,.28],[.49,.41])}<linearGradient id="${id}-pants" x1="0" y1="0" x2="1" y2=".25"><stop stop-color="${dark}"/><stop offset=".48" stop-color="${light}"/><stop offset="1" stop-color="${dark}"/></linearGradient><linearGradient id="${id}-jacket" x1="0" y1="0" x2=".9" y2="1"><stop stop-color="${panel===2?'#77c4c1':'#81b5dd'}"/><stop offset=".4" stop-color="${panel===2?'#429896':'#4286bd'}"/><stop offset="1" stop-color="${panel===2?'#236a73':'#25547f'}"/></linearGradient></defs><g class="wardrobe-trousers" fill="url(#${id}-pants)" stroke="${dark}" stroke-width=".65" stroke-linejoin="round">${pants.map(d=>`<path d="${d}"/>`).join('')}</g><g opacity=".28">${image('legs','denim')}</g>${!rainy?`<path d="${seam}" fill="none" stroke="#96b5cf" stroke-width=".65" opacity=".35"/>`:''}${layered?`<g class="wardrobe-jacket${cold?' wardrobe-heavy-coat':''}" fill="url(#${id}-jacket)" stroke="${panel===2?'#286574':'#30577e'}" stroke-width="${cold?'1.2':'.6'}" stroke-linejoin="round">${jacket.map(d=>`<path d="${d}"/>`).join('')}</g>${image('sleeves','fabric')}<path d="${zipper}" fill="none" stroke="#d7eafa" stroke-width="1" opacity=".7"/>`:''}${hands.length?image('hands'):''}${cold?winterAccessories(panel,variant):''}</g>`;
 }
+

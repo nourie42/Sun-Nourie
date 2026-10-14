@@ -1,7 +1,7 @@
 import {dailyDisplay,finite,rainChanceValue} from './weather-math.js?v=full-day-rain-v1';
 import {weatherIcon} from './weather-display.js?v=weather-qa-v67';
 import {weatherState,conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
-import {forecastGrossLevel} from './dewpoint-meter.js?v=weather-qa-v67';
+import {forecastGrossLevel} from './dewpoint-meter.js?v=feel-v1';
 
 export const CAR_WASH_RAIN_LIMIT = 25;
 const HOUR = 3600000;
@@ -146,11 +146,11 @@ function grossMeterFact(forecast, targetIndex, window, now = Date.now()) {
       peak=dewpoints.find(point=>{const start=Date.parse(point.time);return finite(start)&&start<=now&&now<start+HOUR&&finite(point.value);})||null;
     }
   }
-  if(!peak)return {title:'Unavailable',detail:'Gross Meter'};
+  if(!peak)return {title:'Unavailable',detail:'Feel Meter'};
   const wind=peak.current&&finite(forecast.current?.wind)?forecast.current.wind:seriesValue(forecast,'wind',peak.time);
   const level=forecastGrossLevel(peak.value,wind);
-  const score={dry:'DRY',nice:'NOT BAD','nice-breeze':'NOT BAD',humid:'HUMID',gross:'GROSS',nogo:'NO-GO',nope:'NOPE'}[level.key]||'UNAVAILABLE';
-  return {title:`${Math.round(peak.value)}° · ${score}`,detail:peak.current?'Gross Meter now':'Gross Meter at wash time',value:peak.value,level:level.key};
+  const score={parched:'VERY DRY',crisp:'DRY',dry:'DRY',nice:'NOT BAD','nice-breeze':'NOT BAD',humid:'HUMID',gross:'GROSS',nogo:'NO-GO',nope:'NOPE'}[level.key]||'UNAVAILABLE';
+  return {title:`${Math.round(peak.value)}° · ${score}`,detail:peak.current?'Feel Meter now':'Feel Meter at wash time',value:peak.value,level:level.key};
 }
 
 export function carWashSummary(forecast, now = Date.now()) {
@@ -254,3 +254,4 @@ export function resetCarWashForecast() {
   if(button)button.setAttribute('aria-expanded','false');
   panel.innerHTML = '';
 }
+

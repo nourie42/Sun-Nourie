@@ -3,6 +3,7 @@ import {finite,isTonightPeriod,localHour} from './weather-math.js?v=weather-qa-v
 import {timeAt,summarizeFeels} from './hourly-feels.js?v=dewpoint-floor-v1';
 import {forecastSample} from './weather-display.js?v=warmest-sun-explain-v1';
 import {sunExposureTemperature} from './outdoor-feels.js?v=sun-exposure-v1';
+import {winterSceneExpected} from './exposure-scene.js?v=winter-wardrobe-v2';
 export function comfortMode(time,zone='America/New_York'){
  const hour=localHour(time,zone);return isTonightPeriod(time,zone)?'overnight':hour<5?'predawn':'day';
 }
@@ -31,7 +32,29 @@ export function comfortWindow(forecast,now=Date.now()){
  return {...summary,mode,chosen,low:summary.low.value,high:summary.high.value,lowTime:summary.low.time,highTime:summary.high.time,
   label:mode==='day'?'Forecast feels-like peak ahead':mode==='predawn'?'Forecast feels-like low before morning':'Forecast feels-like low tonight',end:summary.points.at(-1).time};
 }
-export function comfortNarrative(current,comfort,summary,zone='America/New_York'){
+/** Keep forecast clothing separate from the current temperature reading and
+ * match snow illustrations to the selected local day, never the whole week. */
+export function comfortArtworkContext(forecast,sample,now=Date.now()){
+ const zone=forecast?.location?.timeZone||'America/New_York',selected=sample?.now?now:Date.parse(sample?.time);
+ if(!finite(selected))return {};
+ const date=dateAt(selected,zone),day=(forecast?.snow?.days||[]).find(row=>row.date===date);
+ const hour=(forecast?.hours||[]).find(row=>{const epoch=Date.parse(row.time);return finite(epoch)&&epoch<=selected&&selected<epoch+3600000;});
+ const periodSnow=(day?.periods||[]).some(period=>/snow|flurr|blizzard/i.test(period.wording||''));
+ const amounts=[day?.nwsSnowfall,day?.models?.ecmwf,day?.models?.gfs,day?.best];
+ const dailySnow=typeof day?.snowExpected==='boolean'?day.snowExpected:typeof day?.snowPossible==='boolean'?day.snowPossible:periodSnow||amounts.some(amount=>finite(amount)&&amount>0);
+ const snowExpected=winterSceneExpected(sample?.condition,{snowExpected:dailySnow,snowfall:hour?.snowfall});
+ const values=[];
+ if(finite(sample?.feels))values.push(sample.feels);
+ if(sample?.now){
+  for(const row of forecast?.hours||[]){
+   const epoch=Date.parse(row.time);
+   if(!finite(epoch)||epoch<selected||dateAt(epoch,zone)!==date)continue;
+   const point=forecastSample(forecast,row.time);if(finite(point?.feels))values.push(point.feels);
+  }
+ }
+ return {snowExpected,snowForecastOnly:snowExpected&&!/snow|flurr|blizzard/i.test(sample?.condition||''),snowfall:hour?.snowfall??null,clothingFeels:values.length?Math.min(...values):null};
+}
+export function comfortNarrative(current,comfort,summary,zone='America/New_York',context={}){
  const t=current?.temperature,dp=current?.dewpoint,wind=current?.wind,sentences=[],outdoor=outdoorExposure(comfort).value;
  if(!finite(outdoor))return 'A feels-like estimate needs temperature, moisture and wind readings. Some of those readings are missing.';
  if(finite(dp))sentences.push(dp>=68?`The ${Math.round(dp)}° dew point is keeping the air muggy.`:dp<50?`The ${Math.round(dp)}° dew point means dry air.`:`The ${Math.round(dp)}° dew point ${dp>=60?'adds some stickiness':'is fairly comfortable'}.`);
@@ -44,5 +67,8 @@ export function comfortNarrative(current,comfort,summary,zone='America/New_York'
   if(p.value<outdoor&&summary.mode==='day')sentences.push('Changing humidity, wind and sky conditions can make later hours feel cooler even if the air temperature rises.');
   if(summary.partial)sentences.push('Some forecast hours are unavailable, so this is the peak of the available readings only.');
  }
+ if(context.snowExpected===true)sentences.push('Snow is in this day’s forecast: the people are bundled up for snow play. Keep dog outings short, check for ice between the toes, and rinse off deicer after a walk.');
+ else if(finite(context.clothingFeels)&&context.clothingFeels<42)sentences.push(`The outfits account for a remaining feels-like low of ${Math.round(context.clothingFeels)}°: bring a heavy coat, hat and gloves.`);
  return sentences.join(' ');
 }
+

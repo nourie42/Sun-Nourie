@@ -1,9 +1,22 @@
 import {weatherShapes} from './weather-display.js?v=rain-now-v71';
 import {weatherState} from './weather-state.js';
-import {clothingArtwork} from './comfort-clothing.js?v=wardrobe-v1';
+import {clothingArtwork} from './comfort-clothing.js?v=winter-wardrobe-v2';
+import {snowPlayArtwork} from './snow-scene.js?v=winter-wardrobe-v2';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 
-export function clothingForFeels(value){
+/** Snow is separate from sleet/freezing rain even though the shared weather
+ * icon groups all three. Only evidence for snow gets snow-play artwork. */
+export function winterSceneExpected(condition='',context={}){
+ if(context.snowExpected===true||context.snowPossible===true)return true;
+ if(finite(context.snowfall)&&context.snowfall>0)return true;
+ if(finite(context.snowChance)&&context.snowChance>0)return true;
+ if(context.winter?.snowExpected===true||context.winter?.snowPossible===true)return true;
+ return /snow|flurr|blizzard/i.test(String(condition));
+}
+
+export function clothingForFeels(value,context={}){
+ if(context.snowExpected===true)return 'cold';
+ if(finite(context.clothingFeels))value=finite(value)?Math.min(value,context.clothingFeels):context.clothingFeels;
  if(!finite(value))return 'mild';
  if(value>=88)return 'hot';
  if(value>=74)return 'warm';
@@ -153,7 +166,7 @@ export function precipitationActivity(condition='',context={}){
 
 export function comfortSceneState(daylight=true,condition='Clear',feels=null,context={}){
  const kind=weatherState(condition).kind,precipitation=precipitationActivity(condition,context);
- if(kind==='snow')return {key:'cold',asset:'comfort-reference-scenes-cold.webp'};
+ if(winterSceneExpected(condition,context))return {key:'snow',asset:null};
  if(precipitation==='active')return {key:'rain',asset:'comfort-reference-scenes-rain.webp'};
  // The cold reference contains visible snow. Never show it merely because the
  // air feels chilly; reserve it for an actual snow condition.
@@ -180,11 +193,17 @@ if(typeof window!=='undefined'){
 // Text and readings remain HTML. The selected sprite changes with the same
 // current/hourly condition and feels-like value used everywhere else.
 export function referenceScene(panel,daylight=true,condition='Clear',feels=null,context={}){
+ if(!Number.isInteger(panel)||panel<0||panel>2)return '';
  const weather=weatherState(condition),id=`reference-scene-${panel}`;
  const scene=comfortSceneState(daylight,condition,feels,context);
+ const outfit=clothingForFeels(feels,{...context,snowExpected:scene.key==='snow'||weather.kind==='snow'});
+ if(scene.key==='snow'){
+  const label=panel===0?'A child in a heavy coat, warm hat, scarf, mittens and boots building a snowman beneath a snowy tree':panel===1?'A person in a heavy coat, warm hat, scarf, mittens and boots playing with snowballs':'A woman in a heavy coat, warm hat, scarf, mittens and boots playing in the snow with a light brown poodle';
+  return `<svg class="reference-scene snow-play-scene${panel===2?' poodle-scene':''}" viewBox="0 0 300 300" preserveAspectRatio="xMidYMid slice" role="img" aria-label="${label}; illustration of forecast snow" data-scene="snow" data-outfit="cold" data-visible-outfit="cold" data-garment="heavy-coat-and-trousers" data-daylight="${daylight}" data-weather="snow">${snowPlayArtwork(panel,id,daylight)}</svg>`;
+ }
  const sky=skyPalette(weather,daylight);
  const subject=panel===0?'A boy sitting beneath a shade tree':panel===1?'A boy outdoors':'A woman walking a light brown toy poodle';
- const normalClothing={hot:'light hot-weather clothing',warm:'light warm-weather clothing',mild:'a top and long pants',cool:'a jacket and long pants',cold:'a coat, scarf and warm hat'}[clothingForFeels(feels)];
+ const normalClothing={hot:'light hot-weather clothing',warm:'light warm-weather clothing',mild:'a top and long pants',cool:'a jacket and long pants',cold:'a heavy coat, scarf, warm hat and gloves'}[outfit];
  const rainAction=panel===0?'sheltering beneath a leafy tree as steady rain falls nearby':'using rain gear and an umbrella in steady rain';
  const action={hot:'visibly reacting to extreme heat in light hot-weather clothing',rain:rainAction,umbrella:'holding an open umbrella under a cloudy sky before rain begins', 'carry-umbrella':'carrying a closed umbrella under a cloudy sky because rain is possible but not likely enough to open it',cold:'wearing a coat, scarf and warm hat for cold weather',fog:'clearly visible in diffuse fog with no direct sunlight',watch:'looking at a cloudy sky with no rain gear needed',dawn:'clearly visible outdoors before sunrise with no direct sunlight',normal:`outdoors in ${normalClothing}`}[scene.key];
  const label=panel===2&&scene.key==='rain'
@@ -194,5 +213,6 @@ export function referenceScene(panel,daylight=true,condition='Clear',feels=null,
  const symbol=scene.key!=='normal'||panel===0?'':daylight&&weather.kind==='clear'
   ?sunGlyph(id,248,57,.64)
   :`<g transform="translate(214 20) scale(1.5)">${weatherShapes(condition,daylight)}</g>`;
- return `<svg class="reference-scene${panel===2?' poodle-scene':''}" viewBox="0 0 300 300" preserveAspectRatio="xMidYMid slice" role="img" aria-label="${label}; clothing: ${normalClothing}" data-scene="${scene.key}" data-outfit="${clothingForFeels(feels)}" data-daylight="${daylight}" data-weather="${weather.kind}">${sharedDefs(id,sky)}<image class="reference-art" href="${comfortSceneUrl(scene.asset)}" x="${-300*panel}" y="0" width="900" height="300" preserveAspectRatio="none"/>${tint?`<rect width="300" height="300" fill="${tint}" class="reference-weather-tint" opacity="${daylight?'.06':'.18'}"/>`:''}${clothingArtwork(panel,scene.key,clothingForFeels(feels),comfortSceneUrl(scene.asset))}${symbol}</svg>`;
+ return `<svg class="reference-scene${panel===2?' poodle-scene':''}" viewBox="0 0 300 300" preserveAspectRatio="xMidYMid slice" role="img" aria-label="${label}; clothing: ${normalClothing}" data-scene="${scene.key}" data-outfit="${outfit}" data-daylight="${daylight}" data-weather="${weather.kind}">${sharedDefs(id,sky)}<image class="reference-art" href="${comfortSceneUrl(scene.asset)}" x="${-300*panel}" y="0" width="900" height="300" preserveAspectRatio="none"/>${tint?`<rect width="300" height="300" fill="${tint}" class="reference-weather-tint" opacity="${daylight?'.06':'.18'}"/>`:''}${clothingArtwork(panel,scene.key,outfit,comfortSceneUrl(scene.asset))}${symbol}</svg>`;
 }
+

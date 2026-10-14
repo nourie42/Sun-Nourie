@@ -1,6 +1,6 @@
 import {timeAt,forecastValue,displayedFeelsAt,degrees} from './hourly-feels.js?v=dewpoint-floor-v1';
 import {hourlyUvValue,uvCategory} from './daily-uv.js?v=clear-weather-daygraph-v3';
-import {forecastGrossLevel} from './dewpoint-meter.js?v=weather-qa-v67';
+import {forecastGrossLevel} from './dewpoint-meter.js?v=feel-v1';
 const H=3600000,finite=Number.isFinite;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function dayGraphPoints(f,index,tonight=false,now=Date.now()){
@@ -11,7 +11,7 @@ export function dayGraphPoints(f,index,tonight=false,now=Date.now()){
  for(let t=Math.ceil(start/H)*H;t<end&&points.length<30;t+=H){const time=new Date(t).toISOString();points.push({time,temperature:forecastValue(f,'temperature',time),feels:displayedFeelsAt(f,time),dewpoint:forecastValue(f,'dewpoint',time),wind:forecastValue(f,'wind',time),uv:hourlyUvValue(f,t)});}
  return points;
 }
-const fields=[['temperature','Temp','#ffcd79'],['feels','Feels','#ff9caf'],['dewpoint','Gross · dew point','#83e3cc'],['uv','UV','#c8adff']];
+const fields=[['temperature','Temp','#ffcd79'],['feels','Feels','#ff9caf'],['dewpoint','Feel · dew point','#83e3cc'],['uv','UV','#c8adff']];
 export function dayGraphHTML(f,index,tonight=false,now=Date.now()){
  const points=dayGraphPoints(f,index,tonight,now),zone=f.location?.timeZone||'America/New_York';
  if(!points.length)return '<section class="day-graph"><h3>Hour by hour</h3><p>Hourly forecast unavailable.</p></section>';
@@ -19,7 +19,7 @@ export function dayGraphHTML(f,index,tonight=false,now=Date.now()){
  const x=i=>40+i/Math.max(1,points.length-1)*420,y=(v,k)=>170-(k==='uv'?v/uvMax:(v-lo)/(hi-lo))*140;
  const paths=fields.map(([k,,color])=>{let pen=false;const d=points.map((p,i)=>{if(!finite(p[k])){pen=false;return '';}const s=`${pen?'L':'M'}${x(i).toFixed(1)},${y(p[k],k).toFixed(1)}`;pen=true;return s;}).join(' ');return `<path data-series="${k}" d="${d}" fill="none" stroke="${color}" stroke-width="3" ${k==='uv'?'stroke-dasharray="5 4"':''}/>`;}).join('');
  const clock=time=>new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric'}).format(new Date(time));
- return `<section class="day-graph" aria-label="Temperature, feels-like, Gross Meter and UV hourly graph"><h3>Hour by hour <small>Slide to explore</small></h3><div class="day-graph-readout" aria-live="polite"></div><svg viewBox="0 0 500 210" role="img" aria-label="Shared time axis. Temperature, feels-like and Gross Meter dew point use the left Fahrenheit scale. UV uses the right scale."><text x="8" y="16">°F</text><text x="468" y="16">UV</text>${[0,.5,1].map(v=>`<path d="M40 ${170-v*140} H460" stroke="currentColor" opacity=".15"/><text x="4" y="${174-v*140}">${Math.round(lo+v*(hi-lo))}</text><text x="467" y="${174-v*140}">${Math.round(v*uvMax)}</text>`).join('')}${paths}<path class="day-graph-cursor" d="M40 25 V175" stroke="white" stroke-width="1" opacity=".7"/><text x="40" y="199">${esc(clock(points[0].time))}</text><text x="460" y="199" text-anchor="end">${esc(clock(points.at(-1).time))}</text></svg><label class="day-graph-time" for="day-graph-hour"></label><input id="day-graph-hour" aria-label="Forecast hour for all four graph values" type="range" min="0" max="${points.length-1}" value="0" step="1"></section>`;
+ return `<section class="day-graph" aria-label="Temperature, feels-like, Feel Meter and UV hourly graph"><h3>Hour by hour <small>Slide to explore</small></h3><div class="day-graph-readout" aria-live="polite"></div><svg viewBox="0 0 500 210" role="img" aria-label="Shared time axis. Temperature, feels-like and Feel Meter dew point use the left Fahrenheit scale. UV uses the right scale."><text x="8" y="16">°F</text><text x="468" y="16">UV</text>${[0,.5,1].map(v=>`<path d="M40 ${170-v*140} H460" stroke="currentColor" opacity=".15"/><text x="4" y="${174-v*140}">${Math.round(lo+v*(hi-lo))}</text><text x="467" y="${174-v*140}">${Math.round(v*uvMax)}</text>`).join('')}${paths}<path class="day-graph-cursor" d="M40 25 V175" stroke="white" stroke-width="1" opacity=".7"/><text x="40" y="199">${esc(clock(points[0].time))}</text><text x="460" y="199" text-anchor="end">${esc(clock(points.at(-1).time))}</text></svg><label class="day-graph-time" for="day-graph-hour"></label><input id="day-graph-hour" aria-label="Forecast hour for all four graph values" type="range" min="0" max="${points.length-1}" value="0" step="1"></section>`;
 }
 export function installDayGraph(root,f,index,tonight=false,now=Date.now()){
  const points=dayGraphPoints(f,index,tonight,now),input=root.querySelector('#day-graph-hour');if(!input)return;
@@ -32,3 +32,4 @@ export function installDayGraph(root,f,index,tonight=false,now=Date.now()){
  const point=e=>{const r=svg.getBoundingClientRect();input.value=String(Math.round(Math.max(0,Math.min(1,((e.clientX-r.left)/r.width*500-40)/420))*(points.length-1)));update();};
  svg.addEventListener('pointerdown',e=>{svg.setPointerCapture(e.pointerId);point(e);});svg.addEventListener('pointermove',e=>{if(e.pointerType==='mouse'||svg.hasPointerCapture(e.pointerId))point(e);});update();
 }
+

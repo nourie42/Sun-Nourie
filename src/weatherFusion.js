@@ -26,7 +26,8 @@ import path from 'node:path';
 import { createDirectModels, enhanceForecast } from './weatherFusionDirect.js';
 import {validateCurrentConditions} from './weatherFusionCurrent.js';
 import {applyObservedSky} from './weatherFusionObservedSky.js';
-import {addSnowOutlook,snowModelsUrl,normalizeSnowModels,createWpcWinterService} from './weatherFusionSnow.js';
+import {addSnowOutlook,createWpcWinterService} from './weatherFusionSnow.js';
+import {createWinterModelService} from './weatherFusionWinterModels.js';
 
 export const PRESETS = [
   { id: 'knightdale', name: 'Knightdale / Raleigh', latitude: 35.787, longitude: -78.4806 },
@@ -302,7 +303,7 @@ export class Cache {
 export function withoutAviation(text=''){
  return text.replace(/(^|\n)\.(?:AVIATION)[^\n]*\n[\s\S]*?(?=\n\.[A-Z][A-Z /]*(?:\.\.\.|\s)|$)/gi,'').trim();
 }
-export function buildForecast({ location, point, forecast, hourly, grid, discussion, observation, alerts, specialDiscussions, precipitationDiscussions, riskOutlooks, snowModels, wpcWinter, exposureWeather, airQuality, models, feeds, now }) {
+export function buildForecast({ location, point, forecast, hourly, grid, discussion, observation, alerts, specialDiscussions, precipitationDiscussions, riskOutlooks, snowModels, winterModels, wpcWinter, exposureWeather, airQuality, models, feeds, now }) {
   const zone = point?.timeZone || models.ecmwf?.timezone || 'America/New_York';
   const today = dateKey(now, zone);
   const rows = Object.fromEntries(Object.entries(models).map(([key, value]) => [key, normalizeModel(value, now, key === 'hrrr' ? 48 : 240)]));
@@ -383,14 +384,14 @@ export function buildForecast({ location, point, forecast, hourly, grid, discuss
   addExperience(output, {models, grid, periods:forecast?.periods || [], now, solarTimes, nextDate});
   addExposureWeather(output,exposureWeather);
   addAirQuality(output,airQuality);
-  try{addSnowOutlook(output,{grid,periods:forecast?.periods||[],snowModels,wpcWinter,now});}catch{output.snow={version:'snow-outlook-v1',possible:false,days:[],error:'Snow outlook could not be built.'};}
+  try{addSnowOutlook(output,{grid,periods:forecast?.periods||[],snowModels,winterModels,wpcWinter,now});}catch{output.snow={version:'snow-outlook-v2',possible:false,status:'unavailable',coverageStatus:'unavailable',days:[],error:'Snow outlook could not be built.'};}
   output.danTakeVersion=DAN_TAKE_VERSION;
   output.forecastConfidenceVersion=FORECAST_CONFIDENCE_VERSION;
   output.weatherDisplayVersion='weather-nourie-sky-consistency-v1';
   output.alertBanners = bannerStateFromNwsPeriods(hourly?.periods || [], output, now);
   // Hash all forecast facts and source issuance, not just rainfall. Retrieval time is not model run time.
   output.signature = hash({ danTakeVersion:DAN_TAKE_VERSION, experienceVersion: output.experienceVersion, metricForecasts:output.metricForecasts, version: VERSION, location: output.location, current:output.current, days, hours, discussion, specialDiscussions:output.specialDiscussions, precipitationDiscussions:output.precipitationDiscussions, riskOutlooks:output.riskOutlooks,
-    precipitation: output.precipitation, rainTimeline:output.rainTimeline, airQuality:output.airQuality, modelContributions: output.modelContributions, alerts: output.alerts.map((a) => [a.id, a.sent, a.expires]), feeds: feeds.map((f) => [f.id, f.status, f.issuedAt]) });
+    precipitation: output.precipitation, rainTimeline:output.rainTimeline, snow:output.snow, airQuality:output.airQuality, modelContributions: output.modelContributions, alerts: output.alerts.map((a) => [a.id, a.sent, a.expires]), feeds: feeds.map((f) => [f.id, f.status, f.issuedAt]) });
   return output;
 }
 
@@ -431,7 +432,8 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
     return text ? raw : JSON.parse(raw);
   }
   const cached = (url, ttl, options) => cache.get(url, ttl, async () => ({ data: await request(url, options), fetchedAt: iso(now()) }));
-  const loadWpcWinter = createWpcWinterService({ cached });
+  const loadWpcWinter = createWpcWinterService({ cached, now });
+  const loadWinterModels = createWinterModelService({ cached, now });
   async function feed(id, label, url, ttl, transform = (d) => d, options) {
     try {
       const { data, fetchedAt } = await cached(url, ttl, options);
@@ -464,7 +466,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
       const get = (id, label, url, ttl, transform) => url ? feed(id, label, url, ttl, transform) : unavailable(id, label);
       const jobs = {
         exposureWeather: feed('exposure','UV and surface-weather forecast',exposureWeatherUrl(location,point?.timeZone),30*MINUTE,normalizeExposureWeather),
-        snowModels: feed('snow-models','Model snowfall (Open-Meteo ECMWF/GFS)',snowModelsUrl(location,point?.timeZone),60*MINUTE,normalizeSnowModels),
+        winterModels: loadWinterModels(location),
         wpcWinter: loadWpcWinter(location),
         airQuality: feed('air-quality','Air quality (U.S. AQI)',airQualityUrl(location),30*MINUTE,normalizeAirQuality),
         forecast: get('nws', 'NWS forecast', point?.forecast, 2 * MINUTE, (d) => d.properties?.periods?.length ? d.properties : null),
@@ -761,3 +763,4 @@ export function registerWeatherFusionRoutes(app, options = {}) {
   app.get('/api/weather-fusion/models', route(service.modelMaps));
   return service;
 }
+

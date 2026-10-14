@@ -108,3 +108,10 @@
 /* Night scenes stay dark while faces and clothing remain readable. */
 body[data-sky="night"] #skin-values .reference-scene .reference-art{filter:brightness(1.18) saturate(1.02)}
 body[data-sky="night"] #skin-values .reference-scene .reference-weather-tint{opacity:.12}
+
+/* Winter paw care is a condition label, never a simulated paw thermometer. */
+#skin-values .sun-shade-comparison .exposure-person>figcaption>strong.winter-paw-reading{font-size:clamp(26px,4vw,46px);line-height:1.1;letter-spacing:-.025em}
+#skin-values .sun-shade-comparison .pavement-person[data-status="winter"] .pavement-warning{background:#d8edf8;color:#173c5b;border-color:#aacfe5}
+#skin-values .sun-shade-comparison .exposure-person>svg.snow-play-scene{background:#a3c7dd}
+@media(max-width:540px){#skin-values .sun-shade-comparison .exposure-person>figcaption>strong.winter-paw-reading{font-size:clamp(17px,5vw,25px)}}
+

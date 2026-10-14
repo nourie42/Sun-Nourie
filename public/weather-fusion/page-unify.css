@@ -116,3 +116,8 @@ html body .forecast-window-snow .forecast-window-icon svg{fill:none;stroke:#d8ef
 .snow-wssi a{color:#cfe8ff}
 .hour-snow{display:block;font-size:11px;color:#d8efff;margin-top:2px}
 .seven-day-snow{color:#d8efff;font-weight:700;font-size:12px}
+
+
+/* Eight forecast tools stay readable at phone widths. */
+.weather-jump-nav{grid-template-columns:repeat(8,minmax(0,1fr))!important}.weather-jump-nav .weather-jump-card{min-height:42px;font-size:12px;white-space:normal;line-height:1.2;text-align:center}
+@media(max-width:600px){.weather-jump-nav{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:7px!important}.weather-jump-nav .weather-jump-card{min-height:42px;font-size:12px!important}}
