@@ -24,6 +24,7 @@ import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { createDirectModels, enhanceForecast } from './weatherFusionDirect.js';
+import {createWeatherNextBlendSource} from './weatherFusionWeatherNext.js';
 import {validateCurrentConditions} from './weatherFusionCurrent.js';
 import {applyObservedSky} from './weatherFusionObservedSky.js';
 import {addSnowOutlook,createWpcWinterService} from './weatherFusionSnow.js';
@@ -422,6 +423,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
   let apiMinute = { minute: 0, count: 0 };
   const userAgent = env.WEATHER_FUSION_USER_AGENT || 'Sun-Nourie-WeatherFusion/1.0 (https://github.com/nourie42/Sun-Nourie)';
   const direct = createDirectModels({ fetchImpl, now });
+  const loadWeatherNext = createWeatherNextBlendSource({fetchImpl,now});
   async function request(url, { text = false, body = null, timeout = 12000, revalidate = false } = {}) {
     const u = new URL(url);
     const allowed = ['api.weather.gov', 'api.open-meteo.com', 'air-quality-api.open-meteo.com', 'geocoding-api.open-meteo.com', 'opengeo.ncep.noaa.gov', 'api.openai.com', 'mapservices.weather.noaa.gov', 'www.spc.noaa.gov', 'www.wpc.ncep.noaa.gov'];
@@ -527,17 +529,18 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
         hrrr: loadModel('hrrr', location),
         ecmwf: loadModel('ecmwf', location),
         nbm: loadModel('nbm', location),
+        wn: loadWeatherNext(location),
       };
       const values = Object.fromEntries(await Promise.all(Object.entries(jobs).map(async ([id, promise]) => [id, await promise])));
       const data = Object.fromEntries(Object.entries(values).map(([id, f]) => [id, id==='alerts'||Array.isArray(f.meta)?f.value:(f.meta.status === 'ready'||f.meta.recovered===true ? f.value : null)]));
       const feedMeta=[pointFeed.meta,...Object.values(values).flatMap(f=>Array.isArray(f.meta)?f.meta:[f.meta])];
-      const result = buildForecast({ ...data, point, location, models: { hrrr: data.hrrr, ecmwf: data.ecmwf, nbm: data.nbm }, feeds: feedMeta, now: now() });
+      const result = buildForecast({ ...data, point, location, models: { hrrr: data.hrrr, ecmwf: data.ecmwf, nbm: data.nbm, wn:data.wn }, feeds: feedMeta, now: now() });
       // Access never exposes the provider credential or a made-up model run timestamp.
       result.aiConfigured = !!env.OPENAI_API_KEY;
       result.integrityVersion='weather-nourie-integrity-v1';
       result.discussionSourceVersion=DISCUSSION_SOURCE_VERSION;
       result.modelAccessConfigured = true;
-      result.directModelStatus = result.modelContributions.length === 3 ? 'ready' : 'partial';
+      result.directModelStatus = ['hrrr','ecmwf','nbm'].every(id=>result.modelContributions.some(model=>model.id===id)) ? 'ready' : 'partial';
       return result;
     });
     const alerts=await liveAlerts;

@@ -84,9 +84,15 @@ Optional settings: `WEATHER_FUSION_AI_MODEL` (default `gpt-5-mini`),
 `WEATHER_FUSION_AI_DAILY_LIMIT` (default 96 per process, not a durable account-wide
 spending limit; zero disables AI), and `WEATHER_FUSION_USER_AGENT` for operator contact.
 
-**Google WeatherNext is not included.** Approved operational dataset access has not
-been configured. The page says so; Gemini prose and Google's ECMWF mirror are not
-substituted for genuine WeatherNext predictions.
+**NVIDIA WeatherNext contributes its established 10% starting share** using the
+existing published, full-precision point feed. Matching hourly temperature, dew
+point, wind, cloud, pressure and liquid precipitation enter the same canonical
+forecast used by all tiles and graphs. Actual initialization must be at most 36
+hours old. Missing hours or unmatched locations retain the prior available-model
+policy; no additional location queries are started. The current published feed
+covers Knightdale, Greenville and Hazen. WeatherNext precipitation is end-labelled
+and covers the preceding hour. It does not supply official rain probability,
+snowfall depth, gusts or visibility.
 
 ## Working maps
 

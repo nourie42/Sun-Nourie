@@ -182,9 +182,9 @@ export function buildSeries(fx, wn, varId, now = Date.now()) {
       const start = Date.parse(window?.start), end = Date.parse(window?.end);
       return finite(start) && finite(end) ? {start, end} : windows[i];
     });
-    out.wnVals = wnDaily(wn?.hourly, varId === 'temp' ? 'temperature_2m' : 'total_precipitation_1hr',
+    out.wnVals = wnDaily(fx.google?.contributes ? null : wn?.hourly, varId === 'temp' ? 'temperature_2m' : 'total_precipitation_1hr',
       varId === 'temp' ? 'max' : 'sum', days, tz, varId === 'temp' ? K2F : M2IN, sourceWindows);
-    if (varId === 'temp' && readings[0]?.isDay === false) out.wnVals[0] = wnDaily(wn?.hourly, 'temperature_2m', 'min', [days[0]], tz, K2F, [sourceWindows[0]])[0];
+    if (varId === 'temp' && readings[0]?.isDay === false) out.wnVals[0] = wnDaily(fx.google?.contributes ? null : wn?.hourly, 'temperature_2m', 'min', [days[0]], tz, K2F, [sourceWindows[0]])[0];
   } else if (varId === 'pop') {
     // Per-model rain chance at each day's peak hour (from the server's rain-likelihood blend).
     // NWS is a true probability; HRRR/NBM/ECMWF are each model's wet/dry rain signal. WeatherNext has no PoP field.
@@ -199,8 +199,8 @@ export function buildSeries(fx, wn, varId, now = Date.now()) {
     const key = varId === 'wind' ? 'wind' : varId;
     out.modelMaps = dailySources(fx.metricForecasts?.series?.[key], windows, varId === 'wind' ? 'mean' : 'max');
     out.forecastValues = varId === 'wind' ? readings.map(day => day.wind) : windows.map(window => aggregate(seriesInWindow(fx.metricForecasts?.series?.[key], window).map(point => point.value)));
-    if (varId === 'wind') out.wnVals = wnDaily(wn?.hourly, 'wind_speed_10m', 'mean', days, tz, MS2MPH, windows);
-    if (varId === 'dewpoint') out.wnVals = wnDaily(wn?.hourly, 'dewpoint_temperature_2m', 'max', days, tz, K2F, windows);
+    if (varId === 'wind') out.wnVals = wnDaily(fx.google?.contributes ? null : wn?.hourly, 'wind_speed_10m', 'mean', days, tz, MS2MPH, windows);
+    if (varId === 'dewpoint') out.wnVals = wnDaily(fx.google?.contributes ? null : wn?.hourly, 'dewpoint_temperature_2m', 'max', days, tz, K2F, windows);
     // humidity: no WN feed
   } else if (varId === 'snow') {
     out.forecastValues = readings.map(day => finite(day.snowfall) ? day.snowfall : null);
@@ -223,7 +223,7 @@ export function buildSeries(fx, wn, varId, now = Date.now()) {
 }
 
 const hiddenModels = new Set();
-const NAMES = { nourie: 'Weather Nourie blend', nws: 'NWS', hrrr: 'HRRR', nbm: 'NBM', ecmwf: 'ECMWF', wn: 'WeatherNext', gfs: 'GFS', single: '' };
+const NAMES = { nourie: 'Weather Nourie blend', nws: 'NWS', hrrr: 'HRRR', nbm: 'NBM', ecmwf: 'ECMWF', wn: 'NVIDIA WeatherNext', gfs: 'GFS', single: '' };
 function renderChart(container, built, varDef, varId) {
   const { days } = built;
   // Size the SVG to its real pixel width so text stays legible on phones.
@@ -234,7 +234,8 @@ function renderChart(container, built, varDef, varId) {
   const series = { nourie: [], nws: [], hrrr: [], nbm: [], ecmwf: [], wn: [], gfs: [], single: [] };
   if (built.perModel) {
     days.forEach((d, i) => {
-      const src = { ...built.modelMaps[i], wn: built.wnVals[i] };
+      const src = { ...built.modelMaps[i] };
+      if(!Object.hasOwn(src,'wn'))src.wn=built.wnVals[i];
       series.nourie.push(finite(built.forecastValues[i]) ? built.forecastValues[i] : null);
       for (const id of ['nws', 'hrrr', 'nbm', 'ecmwf']) series[id].push(finite(src[id]) ? src[id] : null);
       series.wn.push(finite(src.wn) ? src.wn : null);
