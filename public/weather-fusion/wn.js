@@ -123,7 +123,7 @@ function fmt(v) {
 function init() {
   // Locations
   const sel = el('loc-select');
-  sel.innerHTML = points().map((p) => `<option value="${p.id}">${p.label || p.id}</option>`).join('');
+  sel.innerHTML = points().map((p) => `<option value="${p.id}">${p.label || p.name || p.id}</option>`).join('');
   if (!points().some((p) => p.id === state.point)) state.point = points()[0]?.id;
   sel.value = state.point;
   sel.addEventListener('change', () => { state.point = sel.value; render(); });
@@ -222,7 +222,7 @@ function render() {
   const p10 = s[0]?.p10, p90 = s[0]?.p90;
   el('hero-range').textContent = finite(p10) && finite(p90) ? `Likely range ${fmt(p10)}–${fmt(p90)} ${unit}` : '';
   const ageTxt = age !== null && age > 1 ? ` · ⚠ model run ${Math.round(age)}d ago` : '';
-  el('hero-meta').textContent = `Forecast valid ${timeLabel(rows[0].time,zone())} · ${rows.length} hourly steps · ensemble of 6${ageTxt}`;
+  el('hero-meta').textContent = `Forecast valid ${timeLabel(rows[0].time,zone())} · ${rows.length} hourly steps · 6 ensemble statistics${ageTxt}`;
   if (age !== null && age > 2) {
     el('hero-meta').style.color = '#ffcf8a';
   }
