@@ -10,7 +10,7 @@ const root=fileURLToPath(new URL('..',import.meta.url)),output=path.resolve(proc
 const require=createRequire(import.meta.url),H=3600000;
 const primary={...preview.location,name:'TEST Knightdale, NC'},secondary={...preview.location,name:'TEST Asheville, NC',latitude:35.5951,longitude:-82.5515};
 const iso=h=>new Date(now+h*H).toISOString();
-const report={fixture:true,fixtureTime:iso(0),note:'All point forecasts and map images are synthetic test fixtures. No live forecasts, model runs, authentication or deployment are established by this browser test.',checks:[],screenshots:[],pageErrors:[],consoleErrors:[],externalRequests:[]};
+const report={fixture:true,fixtureTime:iso(0),note:'All point forecasts and map images are synthetic test fixtures. No live forecasts, model runs, authentication or deployment are established by this browser test.',checks:[],screenshots:[],pageErrors:[],consoleErrors:[],externalRequests:[],forecastRequests:[]};
 let browser,context,page,server,base,scenario='clear',winterOutage=false,hold=false,release=null;
 function fixtureFor(query){
  const data=structuredClone(preview);data.location={...((Number(query.latitude)-secondary.latitude)**2<.000001?secondary:primary)};data.signature=`phone-${scenario}-${data.location.name}`;
@@ -35,13 +35,13 @@ async function loaded(name=primary.name){await page.waitForFunction(name=>docume
 async function setScenario(value){scenario=value;await page.locator('#refresh').click();await page.waitForFunction(value=>globalThis.__weatherNourieForecast?.signature?.startsWith('phone-'+value)&&!document.getElementById('refresh')?.classList.contains('loading'),value);}
 async function search(query,name){await page.locator('#city-search').fill(query);await page.locator('#search-results button').filter({hasText:name}).click();}
 async function noOverflow(width){const box=await page.evaluate(()=>({viewport:innerWidth,html:document.documentElement.scrollWidth,body:document.body.scrollWidth,shell:document.querySelector('.shell').getBoundingClientRect().width}));assert.ok(box.html<=width+1&&box.body<=width+1,JSON.stringify(box));assert.ok(box.shell<=480.5,JSON.stringify(box));}
-await mkdir(output,{recursive:true});
+await mkdir(output,{recursive:true});await writeFile(path.join(output,'report.json'),JSON.stringify({passed:false,fixture:true,status:'browser-starting'}));
 try{
  const {chromium}=await import('playwright'),leaflet=path.dirname(require.resolve('leaflet/dist/leaflet.js'));
  const html=(await readFile(path.join(root,'public/weather-fusion/prerelease.html'),'utf8')).replaceAll('https://unpkg.com/leaflet@1.9.4/dist/','/__test_leaflet/').replace('</body>','<aside id="phone-test-banner" style="position:fixed;z-index:2147483647;bottom:6px;right:6px;max-width:calc(100vw - 12px);padding:6px 9px;border:2px solid #261b00;border-radius:6px;background:#ffe082;color:#261b00;font:700 11px/1.4 system-ui;pointer-events:none">TEST DATA · PHONE PREVIEW<br>Synthetic forecasts & map tiles · not live</aside></body>');
  const app=express();
  app.get('/api/weather-fusion/search',(req,res)=>res.json({results:[/asheville/i.test(req.query.q||'')?secondary:primary]}));
- app.get('/api/weather-fusion/forecast',async(req,res)=>{assert.equal(req.query.prereleaseWinter,'1');if(hold)await new Promise(resolve=>release=resolve);if(!res.destroyed)res.json(fixtureFor(req.query));});
+ app.get('/api/weather-fusion/forecast',async(req,res)=>{report.forecastRequests.push({...req.query});if(req.query.latitude&&req.query.prereleaseWinter!=='1')return res.status(400).json({error:'TEST: canonical prerelease request omitted winter flag'});if(hold&&req.query.latitude)await new Promise(resolve=>release=resolve);if(!res.destroyed)res.json(fixtureFor(req.query));});
  app.get('/api/weather-fusion/alerts',(req,res)=>res.json({location:Math.abs(Number(req.query.latitude)-secondary.latitude)<.001?secondary:primary,alerts:[],feeds:[{id:'alerts',status:'ready',fetchedAt:iso(0)}]}));
  app.get('/api/weather-fusion/bulletins',(req,res)=>res.json({mode:'official',signature:req.query.signature,items:[]}));
  app.get('/api/weather-fusion/radar',(req,res)=>res.json({location:primary,status:'unavailable',frames:[],message:'TEST: radar unavailable.'}));
@@ -50,7 +50,7 @@ try{
  app.get('/weather-fusion/prerelease.html',(_req,res)=>res.type('html').send(html));app.use('/__test_leaflet',express.static(leaflet));app.use('/weather-fusion',express.static(path.join(root,'public/weather-fusion')));
  server=await new Promise(resolve=>{const instance=app.listen(0,'127.0.0.1',()=>resolve(instance));});base='http://127.0.0.1:'+server.address().port;
  browser=await chromium.launch({headless:true});context=await browser.newContext({viewport:{width:390,height:844},reducedMotion:'reduce',timezoneId:'America/New_York'});
- const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==','base64');
+ const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGMoWrr1PwAGJQLMhkAL3AAAAABJRU5ErkJggg==','base64');
  await context.route('**/*',async route=>{
   const url=new URL(route.request().url());if(url.href.startsWith(base+'/')||url.protocol==='data:')return route.continue();
   report.externalRequests.push(url.href);
@@ -68,7 +68,7 @@ try{
  await page.addInitScript(()=>Object.defineProperty(navigator,'geolocation',{configurable:true,value:{getCurrentPosition(_success,error){setTimeout(()=>error({code:1,message:'TEST denied'}),0);}}}));
  await page.goto(base+'/weather-fusion/prerelease.html',{waitUntil:'load'});
  await check('Snow tab is available before location and never calls missing data no snow',async()=>{await page.locator('#open-snow').click();await page.locator('#prerelease-winter-dialog[open]').waitFor();assert.match(await page.locator('#winter-content').innerText(),/Snow forecast unavailable/);assert.doesNotMatch(await page.locator('#winter-content').innerText(),/No snow in/);await page.keyboard.press('Escape');});
- await check('Phone search loads canonical forecast and complete no-snow state',async()=>{await search('Knightdale',primary.name);await loaded();await page.locator('#open-snow').click();assert.match(await page.locator('#winter-content').innerText(),/No snow in the available forecast/);assert.equal(await page.locator('#prerelease-winter').isVisible(),false);assert.equal(report.externalRequests.filter(url=>url.includes('mapservices.weather.noaa.gov')).length,0);await page.locator('#close-winter').click();});
+ await check('Phone search loads canonical forecast and complete no-snow state',async()=>{await search('Knightdale',primary.name);await loaded();assert.ok(report.forecastRequests.some(query=>query.latitude&&query.prereleaseWinter==='1'));await page.locator('#open-snow').click();assert.match(await page.locator('#winter-content').innerText(),/No snow in the available forecast/);assert.equal(await page.locator('#prerelease-winter').isVisible(),false);assert.equal(report.externalRequests.filter(url=>url.includes('mapservices.weather.noaa.gov')).length,0);await page.locator('#close-winter').click();});
  for(const width of [320,360,390,430,1440])await check(`Phone canvas, navigation and header at ${width}px`,async()=>{
   await page.setViewportSize({width,height:844});await page.evaluate(()=>scrollTo(0,0));await page.waitForTimeout(180);await noOverflow(width);
   const controls=await page.locator('.weather-jump-card, #refresh, #locate').evaluateAll(nodes=>nodes.map(node=>{const r=node.getBoundingClientRect();return {text:node.textContent,w:r.width,h:r.height,font:parseFloat(getComputedStyle(node.querySelector('.jump-label')||node).fontSize)};}));
