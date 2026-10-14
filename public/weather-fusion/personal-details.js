@@ -1,6 +1,6 @@
 import {weatherState} from './weather-state.js';
 import {thermalRiskHTML} from './thermal-risk.js?v=weather-art-labels-v10';
-import {forecastGrossLevel} from './dewpoint-meter.js?v=feel-auto-v2';
+import {forecastGrossLevel} from './dewpoint-meter.js?v=feel-chart-v3';
 import {exposureScene,precipitationActivity,winterSceneExpected} from './exposure-scene.js?v=storm-scene-v5';
 import {outdoorExposure} from './outdoor-feels.js?v=weather-qa-v67';
 import {solarElevation} from './weather-math.js?v=weather-qa-v67';

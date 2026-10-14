@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Browser regression checks for the weather forecast's five interaction bugs.
+"""Browser regression checks for forecast interactions and responsive Feel Meter.
 
 Requires Python Playwright and Chromium. WEATHER_TEST_BASE defaults to the
 local app on port 3123; WEATHER_QA_DIR defaults to /tmp/weather-interaction-qc.
@@ -10,6 +10,7 @@ The default tests the deployed/browser app's real responses directly.
 WEATHER_QA_WIDTHS and WEATHER_QA_CITIES can narrow a troubleshooting run.
 """
 import json
+import math
 import os
 import re
 from datetime import datetime
@@ -70,12 +71,166 @@ def navigation_check(page):
     })''')
     check(len(data) == 8, 'All eight navigation tabs must be present', data)
     check(max(item['width'] for item in data) - min(item['width'] for item in data) < 1, 'Tabs must have equal widths', data)
-    check(all(abs(item['height'] - 40) < .5 for item in data), 'Tabs must be compact, 40 pixels high', data)
+    check(all(abs(item['height'] - 30) < .5 for item in data), 'Tabs must be compact, 30 pixels high', data)
     check(len(set(item['font'] for item in data)) == 1, 'Tab fonts must match', data)
     check(all(item['fits'] for item in data), 'Navigation text must fit inside each tab', data)
-    check(all(item['background'] == 'rgba(255, 255, 255, 0.07)' and 'blur' in item['blur'] for item in data),
+    check(all(item['background'].startswith('rgba(255, 255, 255, ') and
+              abs(float(item['background'].rsplit(', ', 1)[1].rstrip(')'))-.025) < .003 and 'blur(6px)' == item['blur'] for item in data),
           'Navigation must use transparent glass', data)
+    nav_width = page.locator('.weather-jump-nav').bounding_box()['width']
+    viewport = page.evaluate('innerWidth')
+    check(nav_width <= (320 if viewport <= 600 else 680) + .01,
+          'Navigation must retain the smaller 320px mobile/680px desktop footprint', {'viewport': viewport, 'navWidth': nav_width})
     return data
+
+
+def feel_meter_check(page, forecast, city, width):
+    """Open the initially hidden chart, then inspect actual SVG screen geometry.
+
+    Expected values come from the untouched recorded/live backend series,
+    independent of the chart module's point-selection helpers.
+    """
+    panel = page.locator('#dewpoint-gross-meter')
+    check(not panel.is_visible(), 'Feel Meter starts closed before its first click')
+    page.locator('#open-gross').click()
+    panel.wait_for(state='visible')
+    page.wait_for_function('''()=>{
+      const svg=document.querySelector('#dewpoint-gross-meter .gross-chart');
+      return svg&&Math.abs(svg.getBoundingClientRect().width-svg.viewBox.baseVal.width)<3;
+    }''')
+    initial = screenshot(page, '#dewpoint-gross-meter', f'{city.lower()}-feel-initial-48h-{width}.png')
+    facts = page.locator('.gross-facts>span').evaluate_all('''elements=>elements.map(element=>{
+      const cell=element.getBoundingClientRect();const texts=[...element.querySelectorAll('b,small')].map(text=>{
+        const range=document.createRange();range.selectNodeContents(text);const r=range.getBoundingClientRect();
+        return {text:text.textContent,left:r.left,right:r.right,top:r.top,bottom:r.bottom,
+          fits:r.left>=cell.left&&r.right<=cell.right&&r.top>=cell.top&&r.bottom<=cell.bottom};
+      });return {width:cell.width,texts};
+    })''')
+    check(len(facts) == 4 and all(text['fits'] for cell in facts for text in cell['texts']),
+          'Feel Meter facts must stay within their divider columns', facts)
+    samples = []
+    source = forecast.get('metricForecasts', {}).get('series', {}).get('dewpoint', [])
+    def inspect(hours):
+        page.wait_for_function('''hours=>{
+          const panel=document.querySelector('#dewpoint-gross-meter'),svg=panel?.querySelector('.gross-chart');
+          return panel?.dataset.hours===String(hours)&&svg&&Math.abs(svg.getBoundingClientRect().width-svg.viewBox.baseVal.width)<3;
+        }''', arg=hours)
+        now = page.evaluate('Date.now()')
+        start = ((int(now) + 3599999) // 3600000) * 3600000
+        by_time = {}
+        for point in source:
+            epoch = datetime.fromisoformat(point['time'].replace('Z', '+00:00')).timestamp() * 1000
+            if start <= epoch < start + hours * 3600000:
+                old = by_time.get(epoch)
+                if old is None or (not isinstance(old.get('value'), (int, float)) and isinstance(point.get('value'), (int, float))):
+                    by_time[epoch] = point
+        expected = [by_time[key] for key in sorted(by_time)]
+        slider = page.locator('#gross-scrubber')
+        maximum = int(slider.get_attribute('max'))
+        check(maximum == max(0, len(expected)-1), 'Feel Meter scrubber must include exact source hours',
+              {'hours': hours, 'sourcePoints': len(expected), 'sliderMax': maximum})
+        values = []
+        for index in sorted(set([0, maximum // 2, maximum])):
+            if not expected:
+                break
+            slider.evaluate('(input,index)=>{input.value=String(index);input.dispatchEvent(new Event("input",{bubbles:true}));}', index)
+            point = expected[index]
+            value = point.get('value')
+            expected_text = str(math.floor(value + .5)) + '°' if isinstance(value, (int, float)) else 'Unavailable'
+            actual = page.locator('.gross-selected-value').inner_text()
+            check(actual == expected_text, 'Feel Meter selection must match its exact backend dew point',
+                  {'hours': hours, 'index': index, 'time': point['time'], 'expected': expected_text, 'actual': actual})
+            aria = slider.get_attribute('aria-valuetext')
+            values.append({'index': index, 'time': point['time'], 'backendValue': value, 'displayedValue': actual, 'aria': aria})
+        # Check every hour against canonical source data in one browser call.
+        # This also verifies the time label, so repeated values cannot hide
+        # an off-by-one selection or a shifted timezone.
+        every_readout = slider.evaluate('''(input,args)=>{
+          const [points,zone]=args,day=new Intl.DateTimeFormat('en-US',{timeZone:zone,weekday:'short',month:'numeric',day:'numeric'}),
+            hour=new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',minute:'2-digit'});
+          return points.map((point,index)=>{
+            input.value=String(index);input.dispatchEvent(new Event('input',{bubbles:true}));
+            return {time:point.time,value:document.querySelector('.gross-selected-value').textContent,
+              displayedTime:document.querySelector('.gross-selected-time').textContent,
+              expectedTime:`${day.format(new Date(point.time))} · ${hour.format(new Date(point.time))} forecast`};
+          });
+        }''', [expected, forecast['location']['timeZone']])
+        for point, readout in zip(expected, every_readout):
+            value = point.get('value')
+            expected_text = str(math.floor(value + .5)) + '°' if isinstance(value, (int, float)) else 'Unavailable'
+            check(readout['value'] == expected_text and readout['displayedTime'] == readout['expectedTime'],
+                  'Every chart hour must show its canonical dew point and local timestamp', readout)
+        geometry = page.locator('#dewpoint-gross-meter .gross-chart').evaluate('''svg=>{
+          const r=svg.getBoundingClientRect(),matrix=svg.getScreenCTM(),v=svg.viewBox.baseVal;
+          const rect=element=>{const b=element.getBoundingClientRect();return {left:b.left,right:b.right,top:b.top,bottom:b.bottom,width:b.width,height:b.height};};
+          const texts=[...svg.querySelectorAll('.gross-x,.gross-y')].map(element=>({text:element.textContent,axis:element.classList.contains('gross-x')?'x':'y',...rect(element),font:parseFloat(getComputedStyle(element).fontSize)*matrix.a}));
+          const selected=svg.querySelector('.gross-selected'),cursor=svg.querySelector('.gross-cursor');
+          return {width:r.width,height:r.height,viewBoxWidth:v.width,viewBoxHeight:v.height,scaleX:matrix.a,scaleY:matrix.d,
+            bounds:{left:r.left,right:r.right,top:r.top,bottom:r.bottom},texts,selected:{visible:getComputedStyle(selected).display!=='none',...rect(selected)},
+            linePath:svg.querySelector('.gross-line').getAttribute('d'),cursorX:cursor.getAttribute('x1'),selectedX:selected.getAttribute('cx')};
+        }''')
+        check(abs(geometry['scaleX']-1) < .025 and abs(geometry['scaleY']-1) < .025,
+              'SVG coordinates must map to screen pixels without stretching', geometry)
+        check(abs(geometry['scaleX']-geometry['scaleY']) < .001,
+              'Chart must preserve circular markers and undistorted text', geometry)
+        check(all(11.5 <= text['font'] <= 12.5 for text in geometry['texts']),
+              'Feel Meter axis labels must remain readable 12px text', geometry['texts'])
+        bounds = geometry['bounds']
+        check(all(text['left'] >= bounds['left']-1 and text['right'] <= bounds['right']+1 and
+                  text['top'] >= bounds['top']-1 and text['bottom'] <= bounds['bottom']+1 for text in geometry['texts']),
+              'Every axis label must remain inside the chart', geometry['texts'])
+        labels = sorted((text for text in geometry['texts'] if text['axis'] == 'x'), key=lambda text: text['left'])
+        check(all(a['right']+3 <= b['left'] for a, b in zip(labels, labels[1:])),
+              'Feel Meter time labels must not overlap', labels)
+        marker = geometry['selected']
+        if marker['visible']:
+            check(abs(marker['width']-marker['height']) < .1, 'Selected dew-point marker must stay round', marker)
+            check(9.5 <= marker['width'] <= 10.5, 'Selected marker must retain its intended 10px diameter', marker)
+        drawn = re.findall(r'[ML](-?[\d.]+),(-?[\d.]+)', geometry['linePath'])
+        valid = [point for point in expected if isinstance(point.get('value'), (int, float))]
+        check(len(drawn) == len(valid), 'Chart must draw each available source value and no missing values',
+              {'hours': hours, 'drawnPoints': len(drawn), 'validSourcePoints': len(valid)})
+        expected_segments = 0
+        previous = None
+        for point in expected:
+            if not isinstance(point.get('value'), (int, float)):
+                previous = None
+                continue
+            epoch = datetime.fromisoformat(point['time'].replace('Z', '+00:00')).timestamp() * 1000
+            if previous is None or epoch-previous > 3600000*1.1:
+                expected_segments += 1
+            previous = epoch
+        check(geometry['linePath'].count('M') == expected_segments,
+              'Missing dew-point values must leave gaps in the line', {'hours': hours, 'segments': expected_segments})
+        return {'hours': hours, 'sourcePoints': len(expected), 'allHoursVerified': len(every_readout), 'selectedValues': values, 'geometry': geometry}
+    samples.append(inspect(48))
+    for hours in [24, 48, 168, 240]:
+        page.locator(f'[data-gross-hours="{hours}"]').click()
+        samples.append(inspect(hours))
+        screenshot(page, '#dewpoint-gross-meter', f'{city.lower()}-feel-{hours}h-{width}.png')
+    # Closing/opening must preserve the final scrubbed instant and correctly
+    # redraw a chart that was hidden with display:none.
+    selected = page.locator('#gross-scrubber').input_value()
+    selected_text = page.locator('.gross-selected-time').inner_text()
+    # This tab is open-only in the existing UX. Exercise the same hidden
+    # class state directly, then reopen through the real navigation button.
+    page.evaluate("document.documentElement.classList.remove('gross-open')")
+    check(not panel.is_visible(), 'Feel Meter becomes hidden when its open class is removed')
+    page.locator('#open-gross').click()
+    panel.wait_for(state='visible')
+    check(page.locator('#gross-scrubber').input_value() == selected and page.locator('.gross-selected-time').inner_text() == selected_text,
+          'Closing and opening the Feel Meter must retain the selected hour')
+    samples.append(inspect(240))
+    resize = []
+    for target in [412, 768, 412, width]:
+        page.set_viewport_size({'width': target, 'height': 915})
+        page.wait_for_timeout(250)
+        check(page.locator('.gross-selected-time').inner_text() == selected_text,
+              'Resize must preserve the selected forecast instant')
+        resize.append({'width': target, 'chart': inspect(240)})
+    screenshot(page, '#dewpoint-gross-meter', f'{city.lower()}-feel-resized-{width}.png')
+    page.evaluate("document.documentElement.classList.remove('gross-open')")
+    return {'initialScreenshot': initial, 'facts': facts, 'horizons': samples, 'resizes': resize}
 
 
 def car_wash_check(page):
@@ -206,8 +361,10 @@ def main():
         for city, latitude, longitude in scenarios:
             for width in WIDTHS:
                 report = {'base': BASE, 'city': city, 'width': width,
-                          'mode': 'recorded-backend-guidance' if SOURCE else 'direct-live-backend', 'sourceBase': SOURCE or BASE}
-                context = browser.new_context(viewport={'width': width, 'height': 915}, geolocation={'latitude': latitude, 'longitude': longitude}, permissions=['geolocation'])
+                          'mode': 'recorded-backend-guidance' if SOURCE else 'direct-live-backend', 'sourceBase': SOURCE or BASE,
+                          'deviceScaleFactor': 1.5, 'touch': width <= 412, 'mobile': width <= 412}
+                context = browser.new_context(viewport={'width': width, 'height': 915}, geolocation={'latitude': latitude, 'longitude': longitude}, permissions=['geolocation'],
+                                              is_mobile=width <= 412, has_touch=width <= 412, device_scale_factor=1.5)
                 page = context.new_page()
                 errors, failed_art = [], []
                 page.on('pageerror', lambda error: errors.append(str(error)))
@@ -233,6 +390,7 @@ def main():
                     (OUT / f'{city.lower()}-tested-backend-{width}.json').write_text(json.dumps(forecast, indent=2))
                     report['navigation'] = navigation_check(page)
                     screenshot(page, '.weather-jump-nav', f'{city.lower()}-navigation-{width}.png')
+                    report['feelMeter'] = feel_meter_check(page, forecast, city, width)
                     report['carWash'] = car_wash_check(page)
                     screenshot(page, '#car-wash-forecast', f'{city.lower()}-car-wash-{width}.png')
                     report['graph'] = graph_check(page, forecast)

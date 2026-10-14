@@ -1,7 +1,7 @@
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const HOUR=3600000;
-let horizon=48,selectedEpoch=null,latest=null,lastNow=0,resizeInstalled=false;
+let horizon=48,selectedEpoch=null,latest=null,lastNow=0,resizeInstalled=false,chartResizeObserver=null;
 export function dewpointFeelLevel(dewpoint,wind=0){
   if(!finite(dewpoint))return {key:'unknown',label:'Waiting on the dew point',note:'We need a dew-point reading before calling it.'};
   if(dewpoint<35)return {key:'parched',label:'So dry, your doorknob may zap you',note:'Low moisture in the air. Heating it indoors can lower relative humidity and bring dry skin and static shocks; outdoor humidity can still be high.'};
@@ -73,7 +73,7 @@ export function currentDewpointValue(forecast,now=Date.now()){
 }
 function styles(){
  if(document.getElementById('weather-nourie-dewpoint-meter-css'))return;
- const l=document.createElement('link');l.id='weather-nourie-dewpoint-meter-css';l.rel='stylesheet';l.href='/weather-fusion/dewpoint-meter.css?v=feel-auto-v2';
+ const l=document.createElement('link');l.id='weather-nourie-dewpoint-meter-css';l.rel='stylesheet';l.href='/weather-fusion/dewpoint-meter.css?v=feel-chart-v3';
  l.addEventListener('load',()=>{if(latest)renderDewpointMeter(latest,lastNow);},{once:true});document.head.append(l);
 }
 const hourText=(t,z)=>new Intl.DateTimeFormat('en-US',{timeZone:z,hour:'numeric',minute:'2-digit'}).format(new Date(t));
@@ -88,30 +88,38 @@ export function graphGeometry(points,hours,viewport=640,start=points[0]?.epoch??
  const first=start,last=first+Math.max(1,hours-1)*HOUR;
  return {W,height,L,R,T,B,min,max,first,last,x:t=>L+(t-first)/Math.max(HOUR,last-first)*(W-L-R),y:v=>T+(max-v)/Math.max(5,max-min)*(height-T-B)};
 }
+export function graphAxisTicks(g,hours,zone){
+ const compact=g.W<600,step=hours>48?24:6;
+ const formatter=new Intl.DateTimeFormat('en-US',{timeZone:zone,...(hours>48?(compact?{month:'numeric',day:'numeric'}:{weekday:'short',month:'numeric',day:'numeric'}):{hour:'numeric'})});
+ // Reserve each label's complete width, including both endpoint labels.
+ // The short hour labels keep the axis legible on the narrowest phones.
+ const tick=(epoch,anchor)=>{
+  const text=formatter.format(new Date(epoch)),x=g.x(epoch),width=text.length*7+6;
+  return {epoch,x,text,anchor,left:anchor==='start'?x:anchor==='end'?x-width:x-width/2,right:anchor==='start'?x+width:anchor==='end'?x:x+width/2};
+ };
+ const first=tick(g.first,'start'),last=tick(g.last,'end'),ticks=[first];let edge=first.right;
+ for(let epoch=g.first+HOUR;epoch<g.last;epoch+=HOUR){
+  const hour=Number(new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',hourCycle:'h23'}).format(new Date(epoch)));
+  if(hour%step!==0)continue;
+  const next=tick(epoch,'middle');if(next.left<edge+10||next.right>last.left-10)continue;
+  ticks.push(next);edge=next.right;
+ }
+ // A hidden panel may initially have no usable width. Its ResizeObserver
+ // redraws the axis when opened; even this temporary axis cannot overlap.
+ if(last.left>=edge+10)ticks.push(last);
+ return ticks;
+}
 function graph(points,hours,zone,width,start){
  const g=graphGeometry(points,hours,width,start),{W,height,L,R,T,B,min,max,x,y}=g;
  const bands=[[-Infinity,35,'dry-parched','PARCHED'],[35,50,'dry','DRY'],[50,60,'nice','NOT BAD'],[60,65,'humid','HUMID'],[65,70,'gross','STICKY'],[70,75,'nogo','MUGGY'],[75,Infinity,'nope','VERY MUGGY']];
  const rects=bands.filter(([a,b])=>a<max&&b>min).map(([a,b,c])=>`<rect class="gross-band band-${c}" x="${L}" y="${y(Math.min(max,b))}" width="${W-L-R}" height="${y(Math.max(min,a))-y(Math.min(max,b))}"/>`).join('');
  const ticks=[];for(let v=min;v<=max;v+=5)ticks.push(`<line class="gross-threshold" x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}"/><text class="gross-y" x="${L-8}" y="${y(v)+4}" text-anchor="end">${v}°</text>`);
- // Both ends are always labeled. Interior labels adapt to the screen width;
- // every hourly value still appears in the path and remains selectable.
- const axis=[],step=hours>48?24:6;
- const compact=hours>48&&W<600;
- const label=t=>hours>48?(compact?new Intl.DateTimeFormat('en-US',{timeZone:zone,month:'numeric',day:'numeric'}).format(new Date(t)):dayText(t,zone)):hourText(t,zone);
- const gap=compact?48:86;
- const tick=(t,anchor)=>{const xx=x(t);axis.push(`<line class="gross-day-line" x1="${xx}" x2="${xx}" y1="${T}" y2="${height-B}"/><text class="gross-x" x="${xx}" y="${height-12}" text-anchor="${anchor}">${esc(label(t))}</text>`);};
- tick(g.first,'start');let lastX=L;
- for(let t=g.first+HOUR;t<g.last;t+=HOUR){
-  const hour=Number(new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',hourCycle:'h23'}).format(new Date(t)));
-  const xx=x(t);if(hour%step!==0||xx-lastX<gap||W-R-xx<gap)continue;
-  tick(t,'middle');lastX=xx;
- }
- tick(g.last,'end');
+ const axis=graphAxisTicks(g,hours,zone).map(t=>`<line class="gross-day-line" x1="${t.x}" x2="${t.x}" y1="${T}" y2="${height-B}"/><text class="gross-x" x="${t.x}" y="${height-12}" text-anchor="${t.anchor}">${esc(t.text)}</text>`).join('');
  let d='',prev=null;
  for(const p of points){if(!finite(p.value)){prev=null;continue;}const continuous=prev&&p.epoch-prev.epoch<=HOUR*1.1;d+=`${continuous?'L':'M'}${x(p.epoch).toFixed(2)},${y(p.value).toFixed(2)} `;prev=p;}
  let dotX=-Infinity;
  const dots=points.filter(p=>{if(!finite(p.value)||x(p.epoch)-dotX<18)return false;dotX=x(p.epoch);return true;}).map(p=>`<circle class="gross-dot" cx="${x(p.epoch)}" cy="${y(p.value)}" r="2.4"/>`).join('');
- return {g,html:`<svg class="gross-chart" width="100%" height="${height}" viewBox="0 0 ${W} ${height}" preserveAspectRatio="none" style="width:100%;height:${height}px;max-width:100%" role="img" aria-label="${hours/24}-day dew-point forecast. Tap a point or use the slider for its value.">${rects}${ticks.join('')}${axis.join('')}<path class="gross-line-shadow" d="${d}"/><path class="gross-line" d="${d}"/>${dots}<line class="gross-cursor" y1="${T}" y2="${height-B}"/><circle class="gross-selected" r="5"/></svg>`};
+ return {g,html:`<svg class="gross-chart" width="100%" height="${height}" viewBox="0 0 ${W} ${height}" preserveAspectRatio="xMinYMin meet" style="width:100%;height:${height}px;max-width:100%" role="img" aria-label="${hours/24}-day dew-point forecast. Tap a point or use the slider for its value.">${rects}${ticks.join('')}${axis}<path class="gross-line-shadow" d="${d}"/><path class="gross-line" d="${d}"/>${dots}<line class="gross-cursor" y1="${T}" y2="${height-B}"/><circle class="gross-selected" r="5"/></svg>`};
 }
 export function renderDewpointMeter(forecast,now=Date.now()){
  latest=forecast;lastNow=now;styles();
@@ -123,9 +131,11 @@ export function renderDewpointMeter(forecast,now=Date.now()){
  const zone=forecast.location.timeZone||'America/New_York',dp=currentDewpointValue(forecast,now),level=dewpointFeelLevel(dp,forecast.current.wind),dryFocus=finite(dp)&&dp<50;
  const extreme=valid.reduce((best,p)=>!best||(dryFocus?p.value<best.value:p.value>best.value)?p:best,null),coverage=all.filter(p=>finite(p.value)).at(-1);
  const hoursAvailable=coverage?Math.max(0,Math.floor((coverage.epoch-now)/HOUR)):0;
- const box=window.getComputedStyle(panel);
- const width=panel.clientWidth-(parseFloat(box.paddingLeft)||0)-(parseFloat(box.paddingRight)||0)-2;
- const built=graph(pts,horizon,zone,width,Math.ceil(now/HOUR)*HOUR);
+ chartResizeObserver?.disconnect();chartResizeObserver=null;
+ const start=Math.ceil(now/HOUR)*HOUR;
+ // A closed Feel Meter is display:none. Do not use its zero-width panel
+ // as the coordinate system for the subsequently visible chart.
+ let built=graph(pts,horizon,zone,Math.max(240,Math.min(640,window.innerWidth-76)),start);
  const marker=finite(dp)?Math.max(0,Math.min(100,(dp-20)/60*100)):0;
  const pill=({'nice-breeze':'BREEZE HELPS',gross:'STICKY',nogo:'MUGGY',nope:'VERY MUGGY'})[level.key]||level.key.toUpperCase();
  const humidity=forecast.current.humidity,air=forecast.current.temperature,feels=forecast.comfort?.outdoors;
@@ -165,11 +175,25 @@ export function renderDewpointMeter(forecast,now=Date.now()){
  const ix=pts.findIndex(p=>p.epoch===selectedEpoch);select(Math.max(0,ix));
  panel.querySelectorAll('[data-gross-hours]').forEach(button=>button.addEventListener('click',()=>{horizon=Number(button.dataset.grossHours);selectedEpoch=null;renderDewpointMeter(latest,lastNow);}));
  panel.querySelector('#gross-scrubber').addEventListener('input',e=>select(Number(e.target.value)));
- const svg=panel.querySelector('.gross-chart');svg.addEventListener('click',e=>{
+ const scroll=panel.querySelector('.gross-scroll');
+ const redraw=()=>{
+  const width=scroll.clientWidth;if(width<=0)return;
+  built=graph(pts,horizon,zone,width,start);scroll.innerHTML=built.html;
+  select(Math.max(0,pts.findIndex(p=>p.epoch===selectedEpoch)));
+ };
+ // Measuring after insertion includes the mobile padding and the desktop
+ // readout column, keeping SVG coordinates and on-screen pixels in sync.
+ redraw();
+ scroll.addEventListener('click',e=>{
+  const svg=scroll.querySelector('.gross-chart');if(!svg||!pts.length)return;
   const rect=svg.getBoundingClientRect(),x=(e.clientX-rect.left)/Math.max(1,rect.width)*built.g.W;
   const i=pts.reduce((best,p,ix)=>Math.abs(built.g.x(p.epoch)-x)<Math.abs(built.g.x(pts[best].epoch)-x)?ix:best,0);select(i);
  });
+ if(typeof window.ResizeObserver==='function'){
+  chartResizeObserver=new window.ResizeObserver(()=>{if(scroll.clientWidth>0&&Math.abs(scroll.clientWidth-built.g.W)>=1)redraw();});
+  chartResizeObserver.observe(scroll);
+ }
  if(!resizeInstalled){resizeInstalled=true;let timer;window.addEventListener('resize',()=>{clearTimeout(timer);timer=setTimeout(()=>{if(latest)renderDewpointMeter(latest,lastNow);},150);});}
 }
-export function resetDewpointMeter(){latest=null;selectedEpoch=null;document.getElementById('dewpoint-gross-meter')?.remove();}
+export function resetDewpointMeter(){latest=null;selectedEpoch=null;chartResizeObserver?.disconnect();chartResizeObserver=null;document.getElementById('dewpoint-gross-meter')?.remove();}
 

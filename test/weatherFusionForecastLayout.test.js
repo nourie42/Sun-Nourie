@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {graphGeometry,dewpointPoints,currentDewpointValue} from '../public/weather-fusion/dewpoint-meter.js';
+import {graphGeometry,graphAxisTicks,dewpointPoints,currentDewpointValue} from '../public/weather-fusion/dewpoint-meter.js';
 const H=3600000,start=Date.parse('2026-09-06T11:00:00Z');
 const source=name=>readFileSync(new URL('../public/weather-fusion/'+name,import.meta.url),'utf8');
 for(const width of [240,280,310,375,600,768,1184]){
@@ -21,6 +21,22 @@ test('partial coverage leaves the uncovered end of the full ten-day window blank
  assert.equal(g.first,start);assert.equal(g.last,start+239*H);
  assert.ok(g.x(points[0].epoch)>g.L);assert.ok(g.x(points.at(-1).epoch)<g.W-g.R);
  assert.ok(Math.abs((g.x(points[2].epoch)-g.x(points[0].epoch))/(g.x(points[1].epoch)-g.x(points[0].epoch))-7)<1e-10);
+});
+test('Feel Meter axis labels reserve their complete width at every horizon and viewport',()=>{
+ for(const width of [120,180,208,240,280,310,375,600,768,1184])for(const hours of [24,48,168,240]){
+  const g=graphGeometry([],hours,width,start),ticks=graphAxisTicks(g,hours,'America/New_York');
+  for(let i=1;i<ticks.length;i++)assert.ok(ticks[i].left-ticks[i-1].right>=10,`${hours}h / ${width}px labels overlap`);
+  for(const tick of ticks)assert.ok(tick.left>=g.L&&tick.right<=g.W-g.R,`${hours}h / ${width}px label exceeds chart`);
+  if(width>=180){assert.equal(ticks[0].epoch,g.first);assert.equal(ticks.at(-1).epoch,g.last);}
+ }
+});
+test('Feel Meter redraws from the visible chart container without nonuniform SVG scaling',()=>{
+ const js=source('dewpoint-meter.js'),css=source('dewpoint-meter.css');
+ assert.doesNotMatch(js,/preserveAspectRatio="none"/);
+ assert.match(js,/preserveAspectRatio="xMinYMin meet"/);
+ assert.match(js,/const width=scroll\.clientWidth/);
+ assert.match(js,/chartResizeObserver\.observe\(scroll\)/);
+ assert.match(css,/\.gross-x,\.gross-y\{[^}]*font-size:12px/);
 });
 test('empty and missing dew-point values stay unavailable, not invented',()=>{
  const g=graphGeometry([],240,280,start);assert.ok(Number.isFinite(g.x(start)));assert.ok(g.max>g.min);

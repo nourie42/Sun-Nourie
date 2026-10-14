@@ -1,7 +1,7 @@
 import {dailyDisplay,finite,rainChanceValue} from './weather-math.js?v=full-day-rain-v1';
-import {weatherIcon} from './weather-display.js?v=interaction-qc-v8';
+import {weatherIcon} from './weather-display.js?v=feel-chart-tabs-v9';
 import {weatherState,conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
-import {forecastGrossLevel} from './dewpoint-meter.js?v=feel-auto-v2';
+import {forecastGrossLevel} from './dewpoint-meter.js?v=feel-chart-v3';
 
 export const CAR_WASH_RAIN_LIMIT = 25;
 const HOUR = 3600000;
