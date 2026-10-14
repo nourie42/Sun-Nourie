@@ -99,7 +99,7 @@
 @media(max-width:540px){#skin-values .sun-shade-comparison .exposure-person[data-reading="unavailable"]>figcaption>strong{font-size:clamp(10px,2.9vw,15px)}}
 @media(max-width:540px){
  #skin-values .sun-shade-comparison .exposure-person,
- #skin-values .sun-shade-comparison .exposure-person:has(.reference-scene){grid-template-rows:28px 40px 22px auto minmax(100px,auto);aspect-ratio:auto}
+ #skin-values .sun-shade-comparison .exposure-person:has(.reference-scene){grid-template-rows:28px minmax(40px,auto) minmax(28px,auto) auto minmax(100px,auto);aspect-ratio:auto}
  #skin-values .sun-shade-comparison .exposure-person>.exposure-alert-slot{top:auto;left:auto;right:auto;padding:0 2px}
  #skin-values .sun-shade-comparison .exposure-person>svg,
  #skin-values .sun-shade-comparison .pavement-person>.poodle-scene{grid-row:4}
@@ -118,8 +118,18 @@ body[data-sky="night"] #skin-values .reference-scene .reference-weather-tint{opa
 /* Give captions their own content-sized band so pet guidance stays visible. */
 @media(min-width:541px){
  #skin-values .sun-shade-comparison .exposure-person,
- #skin-values .sun-shade-comparison .exposure-person:has(.reference-scene){grid-template-rows:52px 60px 32px auto minmax(136px,auto);aspect-ratio:auto}
+ #skin-values .sun-shade-comparison .exposure-person:has(.reference-scene){grid-template-rows:52px minmax(60px,auto) minmax(28px,auto) auto minmax(136px,auto);aspect-ratio:auto}
  #skin-values .sun-shade-comparison .exposure-person>svg.reference-scene{height:auto!important;aspect-ratio:1}
+}
+
+/* Warning text has its own content-sized row; it cannot spill over the art. */
+#skin-values .sun-shade-comparison .exposure-person>.exposure-alert-slot{padding:3px 5px;box-sizing:border-box}
+#skin-values .sun-shade-comparison .exposure-person .thermal-risk,
+#skin-values .sun-shade-comparison .exposure-person .pavement-warning{box-sizing:border-box;max-width:100%;padding:3px 6px;font-size:10px;line-height:1.15;white-space:normal;text-align:center;box-shadow:0 2px 5px rgba(28,36,28,.12)}
+@media(max-width:540px){
+ #skin-values .sun-shade-comparison .exposure-person>.exposure-alert-slot{padding:3px 3px}
+ #skin-values .sun-shade-comparison .exposure-person .thermal-risk,
+ #skin-values .sun-shade-comparison .exposure-person .pavement-warning{padding:2px 4px;font-size:9px}
 }
 
 

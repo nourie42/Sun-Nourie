@@ -301,21 +301,21 @@ test('WAIT punctuation is after the word and the Corvette photo has no text over
   assert.doesNotMatch(html,/car-wash-overlay|Weather Nourie blend|Three-day rule applied/);
 });
 
-test('car-wash facts include the same Gross Meter scale used by the dew-point card',()=>{
+test('car-wash facts include the same Feel Meter scale used by the dew-point card',()=>{
   const summary=carWashSummary(fixture([5,5,5,5,5,5,5]),start),html=carWashHTML(summary);
-  assert.deepEqual(summary.facts.gross,{title:'68° · GROSS',detail:'Gross Meter at wash time',value:68,level:'gross'});
+  assert.deepEqual(summary.facts.gross,{title:'68° · GROSS',detail:'Feel Meter at wash time',value:68,level:'gross'});
   assert.match(html,/68° · GROSS/);
-  assert.match(html,/Gross Meter at wash time/);
+  assert.match(html,/Feel Meter at wash time/);
 });
 
 
-test('Gross Meter falls back to current dew point after the daytime wash window closes',()=>{
+test('Feel Meter falls back to current dew point after the daytime wash window closes',()=>{
   const forecast=fixture([5,5,5,5,5,5,5]);
   const now=Date.parse('2026-09-12T19:00:00Z');
   forecast.current={type:'guidance',condition:'Cloudy',time:new Date(now).toISOString(),dewpoint:70,wind:4};
   forecast.metricForecasts.series.dewpoint=[{time:'2026-09-12T20:00:00Z',value:68}];
   const summary=carWashSummary(forecast,now);
-  assert.deepEqual(summary.facts.gross,{title:'70° · NO-GO',detail:'Gross Meter now',value:70,level:'nogo'});
+  assert.deepEqual(summary.facts.gross,{title:'70° · NO-GO',detail:'Feel Meter now',value:70,level:'nogo'});
   assert.match(carWashHTML(summary),/70° · NO-GO/);
-  assert.doesNotMatch(carWashHTML(summary),/Unavailable<\/b><small>Gross Meter/);
+  assert.doesNotMatch(carWashHTML(summary),/Unavailable<\/b><small>Feel Meter/);
 });

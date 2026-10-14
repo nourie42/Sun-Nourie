@@ -1,5 +1,5 @@
 import {dailyDisplay,finite,rainChanceValue} from './weather-math.js?v=full-day-rain-v1';
-import {weatherIcon} from './weather-display.js?v=forecast-recovery-v7';
+import {weatherIcon} from './weather-display.js?v=interaction-qc-v8';
 import {weatherState,conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
 import {forecastGrossLevel} from './dewpoint-meter.js?v=feel-auto-v2';
 
@@ -221,8 +221,12 @@ export function carWashIconCondition(day = {}) {
 
 export function carWashHTML(summary) {
   const label = verdictLabel(summary.state), good = summary.canWash;
+  // Keep the full forecast period for assistive text while using the same
+  // compact day heading as the other four cards. The period still controls
+  // the rain chance and verdict; this only prevents a long heading spilling
+  // into the next card on phones.
   const cards = summary.days.map(day => `<article class="car-wash-day" data-car-wash-state="${day.state}">
-    <strong>${esc(day.label)}</strong><small>${esc(day.stamp)}</small>${weatherIcon(carWashIconCondition(day),day.isDay!==false,42)}
+    <strong title="${esc(day.label)}" aria-label="${esc(day.label)}">${esc(day.label === 'Remainder of Today' ? 'Today' : day.label)}</strong><small>${esc(day.stamp)}</small>${weatherIcon(carWashIconCondition(day),day.isDay!==false,42)}
     <span class="car-wash-temps">${finite(day.low)?Math.round(day.low)+'°':'—'} <i>|</i> ${finite(day.high)?Math.round(day.high)+'°':'—'}</span>
     <span class="car-wash-chance">💧 ${day.chance===null?'—':Math.round(day.chance)+'%'}</span><b class="car-wash-day-verdict">${verdictLabel(day.state)}</b>
   </article>`).join('');

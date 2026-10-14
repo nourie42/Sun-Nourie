@@ -1,9 +1,9 @@
 import {outdoorExposure} from './outdoor-feels.js?v=weather-qa-v67';
 import {finite,isTonightPeriod,localHour} from './weather-math.js?v=weather-qa-v67';
 import {timeAt,summarizeFeels} from './hourly-feels.js?v=continuous-feels-v2';
-import {forecastSample} from './weather-display.js?v=forecast-recovery-v7';
+import {forecastSample} from './weather-display.js?v=interaction-qc-v8';
 import {weatherState} from './weather-state.js';
-import {winterSceneExpected,selectedHourSnowPhase} from './exposure-scene.js?v=selected-hour-art-v4';
+import {winterSceneExpected,selectedHourSnowPhase} from './exposure-scene.js?v=storm-scene-v5';
 export function comfortMode(time,zone='America/New_York'){
  const hour=localHour(time,zone);return isTonightPeriod(time,zone)?'overnight':hour<5?'predawn':'day';
 }

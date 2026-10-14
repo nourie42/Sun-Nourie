@@ -1,16 +1,45 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {comfortArtworkContext,comfortNarrative} from '../public/weather-fusion/comfort-outlook.js';
-import {comfortSceneState,winterSceneExpected,clothingForFeels,selectedHourSnowPhase} from '../public/weather-fusion/exposure-scene.js';
+import {comfortSceneState,winterSceneExpected,clothingForFeels,selectedHourSnowPhase,referenceScene} from '../public/weather-fusion/exposure-scene.js';
 import {pavementEstimate,pavementHTML,coldPawGuidance} from '../public/weather-fusion/pavement.js';
 import {snowHourCondition,hourlySnowHTML,forecastSample} from '../public/weather-fusion/weather-display.js';
 import {thermalComfort} from '../public/weather-fusion/weather-math.js';
+import {sunShadeHTML} from '../public/weather-fusion/personal-details.js';
 
 const morning='2026-10-15T11:00:00Z',evening='2026-10-16T02:00:00Z';
 const forecast={location:{timeZone:'America/Denver',latitude:40,longitude:-105},hours:[
  {time:morning,temperature:51,condition:'Thunderstorms',snowfall:.04},
  {time:evening,temperature:28,condition:'Snow',snowfall:.2}
 ],snow:{possible:true,snowExpected:true,days:[{date:'2026-10-15',possible:true,snowExpected:true,best:4,nwsSnowfall:4,snowChance:90,periods:[{wording:'Thunderstorms then snow this evening'}]}]}};
+
+test('Cortland selected Friday 10AM storms at 38% rain chance retain rainy art in all three cards',()=>{
+ const time='2026-10-16T14:00:00Z',condition='Showers And Thunderstorms';
+ const data={...forecast,location:{latitude:42.60118,longitude:-76.18048,timeZone:'America/New_York'},hours:[{time,temperature:59,condition,snowfall:.04}]};
+ const sample={time,now:false,temperature:59,feels:45,condition,pop:38};
+ const context={...comfortArtworkContext(data,sample),condition,pop:38,forecast:true,compact:true};
+ assert.equal(context.snowExpected,false,'daily snow and coarse snowfall cannot replace a storm hour');
+ const pavement=pavementHTML({status:'estimated',daylight:true,concrete:{value:56},asphalt:{value:57}},sample.feels,context);
+ const html=sunShadeHTML({shade:44,outdoors:45,daylight:true,weatherKind:'storm',radiantCondition:condition},data.location,Date.parse(time),{...context,pavement});
+ assert.equal((html.match(/data-scene="rain"/g)||[]).length,3,'shade, outdoor and pets use the same selected-hour rainy scene');
+ assert.equal((html.match(/comfort-integrated-cool-rain\.webp/g)||[]).length,3,'the complete raincoat scenes match the chilly feels-like temperature');
+ assert.equal((html.match(/data-weather="storm"/g)||[]).length,5,'the weather state is retained through both human and pet illustration paths');
+ assert.doesNotMatch(html,/data-scene="(?:normal|hot|snow)"|comfort-integrated-cool-normal|snow-play-scene/);
+ assert.match(html,/Rain forecast/,'forecast rain is not described as an observation');
+ assert.doesNotMatch(html,/Rain occurring/);
+});
+
+test('low-probability chance wording keeps cloudy umbrella art rather than claiming rain or clear skies',()=>{
+ for(const condition of ['Chance Showers And Thunderstorms','Slight Chance Thunderstorms','Chance Rain']){
+  for(const panel of [0,1,2]){
+   const html=referenceScene(panel,true,condition,45,{pop:38});
+   assert.match(html,/data-scene="carry-umbrella"/);
+   assert.match(html,/comfort-integrated-cool-carry-umbrella\.webp/);
+   assert.match(html,/closed umbrella under a cloudy sky/);
+   assert.doesNotMatch(html,/data-scene="(?:normal|rain|snow)"/);
+  }
+ }
+});
 
 test('51-degree 5AM thunderstorms stay rain even when that day and coarse interval contain snow',()=>{
  const sample={time:morning,now:false,temperature:51,feels:33,condition:'Thunderstorms',pop:90};

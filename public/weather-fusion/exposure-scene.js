@@ -48,10 +48,16 @@ export function clothingForFeels(value,context={}){
 export function precipitationActivity(condition='',context={}){
  const weather=weatherState(condition),pop=context.pop;
  if(context.rainAround===true||context.radarThreat===true)return 'active';
+ // Rain probability expresses how likely the stated phase is, not whether
+ // its illustration can be replaced with clear skies. In particular, an
+ // ensemble probability below 50% must not erase an official hourly storm.
+ const liquidWeather=['rain','storm'].includes(weather.kind)||/freezing (?:rain|drizzle)/i.test(condition);
+ if(liquidWeather){
+  if(!weather.chance)return 'active';
+  return finite(pop)&&pop>=61?'active':'possible';
+ }
  if(finite(pop))return pop>=61?'active':pop>=50?'possible':'none';
- if(/freezing (?:rain|drizzle)/i.test(condition))return weather.chance?'possible':'active';
- if(!['rain','storm'].includes(weather.kind))return 'none';
- return weather.chance?'possible':'active';
+ return 'none';
 }
 const baseAssets={normal:'comfort-reference-scenes.webp',hot:'comfort-reference-scenes-hot.webp',rain:'comfort-reference-scenes-rain.webp','carry-umbrella':'comfort-reference-scenes-carry-umbrella.svg',fog:'comfort-reference-scenes-fog.webp',watch:'comfort-reference-scenes-watch.webp',dawn:'comfort-reference-scenes-dawn.webp'};
 const integratedKeys=['normal','watch','fog','dawn','rain','carry-umbrella'];

@@ -4,7 +4,7 @@
  * days[].high/low, rainTimeline, metricForecasts.series and precipitation.
  * Pure builders (model, series, chart layout, summaries) are exported for
  * tests; DOM wiring only runs in the browser. */
-import { weatherIcon, windDirectionLabel } from './weather-display.js?v=forecast-recovery-v7';
+import { weatherIcon, windDirectionLabel } from './weather-display.js?v=interaction-qc-v8';
 import { weatherState } from './weather-state.js?v=weather-qa-v67';
 import { finite, rainChanceValue } from './weather-math.js?v=weather-qa-v67';
 

@@ -4,7 +4,7 @@ import {currentComfortInputs} from './current-inputs.js?v=weather-qa-v67';
 import {weatherState,conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
 import {thermalComfort, finite, solarElevation,rainChanceValue} from './weather-math.js?v=weather-qa-v67';
 import {displayedFeelsAt,forecastValue,degrees} from './hourly-feels.js?v=continuous-feels-v2';
-import {winterSceneExpected,selectedHourSnowPhase} from './exposure-scene.js?v=selected-hour-art-v4';
+import {winterSceneExpected,selectedHourSnowPhase} from './exposure-scene.js?v=storm-scene-v5';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function weatherShapes(condition, isDay = true) {
   const weather = weatherState(condition);

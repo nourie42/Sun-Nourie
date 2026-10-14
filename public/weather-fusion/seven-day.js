@@ -2,7 +2,7 @@ import {dailyDisplay,finite} from './weather-math.js?v=full-day-rain-v1';
 import {displayedRainChance,rainAwareCondition} from './rain-display.js?v=rain-icon-v2';
 import {forecastPeriodSummary} from './forecast-story.js?v=weather-qa-v67';
 import {shortForecastCondition} from './today-card.js?v=mobile-repair-v1';
-import {weatherIcon,weatherMetricIcon} from './weather-display.js?v=forecast-recovery-v7';
+import {weatherIcon,weatherMetricIcon} from './weather-display.js?v=interaction-qc-v8';
 import {confidenceMeterPosition} from './forecast-confidence.js?v=category-meter-v1';
 
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

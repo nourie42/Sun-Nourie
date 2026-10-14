@@ -1,12 +1,12 @@
 import {confidenceNotice,todayForecastHTML} from './today-card.js?v=mobile-repair-v1';
 import {FORECAST_CONFIDENCE_VERSION,confidenceMeterPosition} from './forecast-confidence.js?v=category-meter-v1';
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
-import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=selected-hour-art-v4';
+import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=storm-scene-v5';
 import {weatherState} from './weather-state.js';
-import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=forecast-recovery-v7';
+import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=interaction-qc-v8';
 import {degrees,displayedFeelsAt,dailyFeels,forecastValue,timeAt,peakFeelsHTML,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=continuous-feels-v2';
-import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=forecast-recovery-v7';
-import {comfortMode,comfortWindow,comfortNarrative,warmestTodayWindow,comfortArtworkContext} from './comfort-outlook.js?v=forecast-recovery-v7';
+import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=interaction-qc-v8';
+import {comfortMode,comfortWindow,comfortNarrative,warmestTodayWindow,comfortArtworkContext} from './comfort-outlook.js?v=interaction-qc-v8';
 import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js?v=full-day-rain-v1';
 import {displayedRainChance,rainAwareCondition} from './rain-display.js?v=rain-icon-v2';
 import {resetDewpointMeter} from './dewpoint-meter.js?v=feel-auto-v2';
@@ -203,7 +203,7 @@ export function renderMetricTiles(forecast,smallIcon) {
  ];
  const aqiKey=aqValue===null?'unavailable':aqValue<=50?'good':aqValue<=100?'moderate':aqValue<=150?'sensitive':aqValue<=200?'unhealthy':aqValue<=300?'very-unhealthy':'hazardous';
  $('metrics').innerHTML=tiles.map(([key,ic,value,note])=>`<button type="button" class="glass metric metric-${key}" data-metric="${key}"${key==='pressure'?` data-pressure-trend="${esc(c.pressureTrend?.direction||'unknown')}"`:''} aria-haspopup="dialog" aria-label="${defs[key].title}: open forecast graph"><span class="metric-title">${smallIcon(ic)}${defs[key].title}</span><span class="metric-value">${value}</span><span class="metric-note">${esc(note)}</span>${sparkline(pointsFor(key,24))}<span class="tile-hint">${key==='solar'?'Tap for the week ahead':'Tap for forecast details'}</span></button>`).join('');
- $('metric-science').innerHTML=`<p>Current cards use a fresh nearby station when it is within 10 miles. When the nearest station is farther away, they use selected-location hourly guidance and identify it as an estimate. Tap a card for separate future forecast data. Daily forecasts share one hour-by-hour graph: temperature, feels-like and Feel Meter dew point use the left Fahrenheit scale; UV uses the right index scale. Slide or tap to read all four at the same hour. Gaps mean missing data, not zero. Feel Meter describes humidity through dew point, not a second feels-like temperature. The same UTCI/Tier-3 equivalent temperature appears in the hourly forecast and outdoor figure. Dew point is a moisture input, not a display floor; gusts do not switch the equation. All displayed pressures use millibars (mb). A pressure trend is shown only for a station observation; forecast pressure has no observed trend.</p>${Object.entries(data.metricForecasts?.notes||{}).map(([key,note])=>`<p><strong>${esc(key)}:</strong> ${esc(note)}</p>`).join('')}`;
+ $('metric-science').innerHTML=`<p>Current cards use a fresh nearby station when it is within 10 miles. When the nearest station is farther away, they use selected-location hourly guidance and identify it as an estimate. Tap a card for separate future forecast data. Daily forecasts share one hour-by-hour graph: temperature, feels-like and Feel Meter dew point use the left Fahrenheit scale; UV uses the right index scale; chance of rain has its own 0–100% scale below. Slide or tap to read all five at the same hour. Gaps mean missing data, not zero. Feel Meter describes humidity through dew point, not a second feels-like temperature. The same UTCI/Tier-3 equivalent temperature appears in the hourly forecast and outdoor figure. Dew point is a moisture input, not a display floor; gusts do not switch the equation. All displayed pressures use millibars (mb). A pressure trend is shown only for a station observation; forecast pressure has no observed trend.</p>${Object.entries(data.metricForecasts?.notes||{}).map(([key,note])=>`<p><strong>${esc(key)}:</strong> ${esc(note)}</p>`).join('')}`;
  if(active&&$('metric-dialog')?.open)drawChart();
 }
 function chartGrid(def,points) {
