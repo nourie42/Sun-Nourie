@@ -1,0 +1,118 @@
+/* v3: header blends into the page, one uniform see-through glass for every tile, equal spacing */
+:root{--tile-gap:16px;--hdr-c1:#01102e;--hdr-c2:#001437}
+html[data-hdr=clear]{--hdr-c1:#4996e9;--hdr-c2:#3b83da}
+html[data-hdr=cloudy]{--hdr-c1:#67768b;--hdr-c2:#5b6a7d}
+html[data-hdr=rain]{--hdr-c1:#333c4c;--hdr-c2:#2b3340}
+html[data-hdr=snow]{--hdr-c1:#93a2b7;--hdr-c2:#8493a8}
+/* page sky continues the header's sky, then fades into the existing scene */
+body::before{content:"";position:absolute;left:0;right:0;top:0;height:520px;z-index:1;pointer-events:none;
+  background:linear-gradient(180deg,var(--hdr-c1) 0%,var(--hdr-c2) 26%,color-mix(in srgb,var(--hdr-c2) 60%,transparent) 55%,transparent 100%);transition:background 1.2s ease}
+/* header: no box, edges fade into the page, baked-in tile edge cropped off the bottom */
+.topbar.sky-header{aspect-ratio:1440/240!important;border-radius:0!important;box-shadow:none!important;border:0!important;background-color:transparent!important;
+  background-size:100% auto!important;background-position:center top!important;
+  -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 10%,#000 55%,transparent 100%),linear-gradient(90deg,transparent 0,#000 6%,#000 94%,transparent 100%);
+  -webkit-mask-composite:source-in;mask-image:linear-gradient(180deg,transparent 0,#000 10%,#000 55%,transparent 100%),linear-gradient(90deg,transparent 0,#000 6%,#000 94%,transparent 100%);mask-composite:intersect;
+  margin:10px 0 4px!important}
+.sky-header #refresh{top:18.2%!important}
+.sky-header .brand{top:16%!important;height:76%!important}
+/* uniform tiles: same fill everywhere, more see-through */
+main .glass,.shell .glass,section.glass,.glass.aqi-dynamic,.experimental-week,.exposure-cards,.weather-change-banner,.forecast-window-banner,.wn-blend-compare{
+  background:linear-gradient(180deg,rgba(255,255,255,.06) 0%,rgba(255,255,255,0) 40%),rgba(255,255,255,.07)!important;
+  backdrop-filter:blur(18px) saturate(160%)!important;-webkit-backdrop-filter:blur(18px) saturate(160%)!important;
+  border:1px solid rgba(255,255,255,.22)!important;border-radius:20px!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 8px 24px rgba(0,0,0,.18)!important;
+  text-shadow:0 1px 3px rgba(0,0,0,.55)}
+/* inner panels that painted their own opaque tint (e.g. Dew Point "explore", facts) */
+.gross-explore,.gross-facts,.exposure-cards>*,.experimental-week>*{background:rgba(255,255,255,.04)!important}
+/* identical spacing between every tile */
+main .glass,.shell .glass,section.glass,.experimental-week,.exposure-cards,.weather-change-banner,.forecast-window-banners,.wn-blend-compare{margin:0 0 var(--tile-gap)!important}
+.forecast-window-banners .forecast-window-banner{margin:0!important}
+.metrics{gap:var(--tile-gap)!important;margin:12px 0 var(--tile-gap)!important}
+.metrics>.glass{margin:0!important}
+.forecast-grid{gap:var(--tile-gap)!important}
+.forecast-grid>.glass:last-child{margin-bottom:var(--tile-gap)!important}
+
+/* ---- v4: strict uniformity ---- */
+/* wrappers never add their own spacing; only tiles carry the 16px gap */
+main .hero,main .forecast-grid{margin-bottom:0!important;padding-bottom:0!important}
+main .hero>:last-child{margin-bottom:var(--tile-gap)!important}
+main .forecast-window-banners{display:flex;flex-direction:column;gap:var(--tile-gap)}
+main .forecast-window-banners>.forecast-window-banner{margin:0!important}
+/* hidden/toggled tiles take no space */
+main [hidden]{display:none!important}
+html:not(.gross-open) #dewpoint-gross-meter{display:none!important}
+/* outer tiles: identical glass (also car wash, whose own CSS painted it near-black) */
+html body main .glass,html body main section.glass,html body main .car-wash-forecast,html body main .dewpoint-gross-meter,html body main .experimental-week,html body main .exposure-cards,html body main .weather-change-banner,html body main .forecast-window-banner,html body main .wn-blend-compare,html body main .metric{
+  background:rgba(255,255,255,.07) linear-gradient(180deg,rgba(255,255,255,.06) 0%,rgba(255,255,255,0) 40%)!important;
+  backdrop-filter:blur(18px) saturate(160%)!important;-webkit-backdrop-filter:blur(18px) saturate(160%)!important;
+  border:1px solid rgba(255,255,255,.22)!important;border-radius:20px!important;
+}
+/* alerts/banners: same glass, coloured accent border */
+html body main .weather-change-banner{border-color:rgba(255,190,90,.85)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 0 0 1px rgba(255,190,90,.35),0 8px 24px rgba(0,0,0,.18)!important}
+html body main .forecast-window-banner{border-color:rgba(140,200,255,.8)!important}
+html body main .forecast-window-banner.forecast-window-rain{border-color:rgba(255,170,90,.85)!important}
+html body main .forecast-window-banner.forecast-window-sun,html body main .forecast-window-banner[class*=perfect]{border-color:rgba(255,215,110,.85)!important}
+html body main .urgent-alerts>*{border-color:rgba(255,90,90,.9)!important}
+/* nested inner cards: one consistent lighter glass */
+html body main :is(.seven-day-carousel.glass){background:transparent!important;border:0!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+html body main :is(.aqi-pollutants>span,.thermal-grid>div,.today-weather-card.today-weather-card.today-weather-card,.map-tabs,.evidence-panel details>div,.gross-summary>span,.today-metrics,.seven-day-card,.hour,.skin-exposure,.exposure-person,.comfort-later,.gross-pill,.gross-explore,.gross-facts,.gross-scroll,.day-row,.feed-chip,.map-stage,#afd-text,
+  .car-wash-hero,.car-wash-answer,.car-wash-checks,.car-wash-photo,.car-wash-days-wrap,.car-wash-days article,.car-wash-day,.car-wash-window,.car-wash-header,.car-wash-tip,.car-wash-fact,.metric-dialog-card){
+  background-color:rgba(255,255,255,.10)!important;background-image:none!important;
+  backdrop-filter:none!important;-webkit-backdrop-filter:none!important;border:1px solid rgba(255,255,255,.18)!important}
+/* "now"/selected states: same fill, highlighted with an outline instead */
+html body main :is(.hour.now,.seven-day-card.selected,.seven-day-card[aria-pressed=true],.day-row.selected){outline:2px solid rgba(127,212,255,.75);outline-offset:-2px}
+html body #today-forecast .today-weather-card.today-weather-card,html body #today-forecast .today-metrics.today-metrics{background-color:rgba(255,255,255,.10)!important;background-image:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;border:1px solid rgba(255,255,255,.18)!important}
+/* compact comparison chips (override global button sizing) */
+html body #wn-compare-chart .wn-chip{font-size:11px!important;line-height:1.4!important;padding:3px 8px!important;min-height:0!important;min-width:0!important;border-radius:999px!important}
+html body #wn-var-picker button{font-size:12px!important;padding:5px 11px!important;min-height:0!important}
+/* v7: readability over bright day skies — same glass, subtle dark tint + stronger blur/text shadow (all tiles alike) */
+html body:not([data-sky=night]) main :is(.glass,section.glass,.car-wash-forecast,.dewpoint-gross-meter,.experimental-week,.exposure-cards,.weather-change-banner,.forecast-window-banner,.wn-blend-compare,.metric){
+  background:rgba(15,25,45,.18) linear-gradient(180deg,rgba(255,255,255,.06) 0%,rgba(255,255,255,0) 40%)!important;
+  backdrop-filter:blur(24px) saturate(150%)!important;-webkit-backdrop-filter:blur(24px) saturate(150%)!important;
+  text-shadow:0 1px 4px rgba(0,0,0,.6),0 0 1px rgba(0,0,0,.5)}
+
+/* ---- v8 ---- */
+/* Local outlook tile removed from view */
+html body main section.glass.briefing{display:none!important}
+/* collapsible 7-day + Scientific stuff */
+.wn-collapsible:not(.is-open)>:not(.section-top){display:none!important}
+.wn-collapsible>.section-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.wn-collapsible .collapse-toggle{margin-left:auto;padding:5px 12px!important;border-radius:999px!important;border:1px solid rgba(255,255,255,.28)!important;background:rgba(255,255,255,.10)!important;color:#fff!important;font-size:12px!important;font-weight:700!important;cursor:pointer}
+/* alert colour rules (uniform glass fill; colour lives in the border) */
+html body .urgent-alert{border:1px solid rgba(255,70,70,.95)!important;box-shadow:0 0 0 1px rgba(255,70,70,.35)!important}
+html body .urgent-alert.urgent-alert-watch{border-color:rgba(255,150,40,.95)!important;box-shadow:0 0 0 1px rgba(255,150,40,.35)!important}
+html body main .bulletin-banner{border:1px solid rgba(255,215,70,.9)!important}
+html body main .bulletin-banner.bulletin-warning{border-color:rgba(255,70,70,.95)!important}
+html body main .bulletin-banner.bulletin-watch{border-color:rgba(255,150,40,.95)!important}
+html body main .risk-outlook-item{border:1px solid rgba(255,215,70,.9)!important}
+html body main .weather-change-banner{border-color:rgba(255,215,70,.9)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 8px 24px rgba(0,0,0,.18)!important}
+html body main .forecast-window-banner.forecast-window-perfect{border-color:rgba(190,130,255,.95)!important}
+html body main .forecast-window-banner.forecast-window-rain{border-color:rgba(255,110,110,.55)!important}
+html body main #air-quality:has(.aqi-summary[data-aqi=good]){border-color:rgba(80,220,120,.9)!important}
+html body main #air-quality:has(.aqi-summary[data-aqi=moderate]){border-color:rgba(255,215,70,.9)!important}
+html body main #air-quality:has(.aqi-summary[data-aqi=sensitive]){border-color:rgba(255,150,40,.95)!important}
+html body main #air-quality:is(:has(.aqi-summary[data-aqi=unhealthy]),:has(.aqi-summary[data-aqi=very-unhealthy]),:has(.aqi-summary[data-aqi=hazardous])){border-color:rgba(255,70,70,.95)!important}
+
+/* v9 */
+/* 7-day carousel: no second glass layer inside #experimental-week (was darker than other tiles) */
+html body main #experimental-week .seven-day-carousel.glass{background:transparent!important;background-image:none!important;border:0!important;box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+/* Collapsed 7-day preview row */
+html body .collapse-toggle .collapse-chevron{margin-left:6px;font-size:11px;opacity:.85}
+/* AQI day cards: border by category (also when the details are open) */
+html body #air-quality .aqi-week>[data-aqi]{border:1px solid rgba(255,255,255,.18)!important}
+html body #air-quality .aqi-week>[data-aqi="good"]{border-color:rgba(80,220,120,.9)!important}
+html body #air-quality .aqi-week>[data-aqi="moderate"]{border-color:rgba(255,215,70,.9)!important}
+html body #air-quality .aqi-week>[data-aqi="sensitive"]{border-color:rgba(255,150,40,.95)!important}
+html body #air-quality .aqi-week>[data-aqi="unhealthy"],html body #air-quality .aqi-week>[data-aqi="very-unhealthy"],html body #air-quality .aqi-week>[data-aqi="hazardous"]{border-color:rgba(255,70,70,.95)!important}
+html:not(.week-open) #daily-panel{display:none!important}
+
+/* v11 snow outlook: uniform glass, subtle icy blue border */
+html body main .forecast-window-banner.forecast-window-snow{border-color:rgba(170,215,255,.75)!important}
+html body .forecast-window-snow .forecast-window-icon svg{fill:none;stroke:#d8efff;stroke-width:2;stroke-linecap:round}
+.snow-outlook-banners{margin-top:12px}
+.snow-table small{display:block;font-size:10px;opacity:.7;font-weight:400}
+.snow-table td,.snow-table th{font-size:12px;vertical-align:top}
+.snow-wssi{font-size:13px;margin:8px 0}
+.snow-wssi a{color:#cfe8ff}
+.hour-snow{display:block;font-size:11px;color:#d8efff;margin-top:2px}
+.seven-day-snow{color:#d8efff;font-weight:700;font-size:12px}

@@ -43,8 +43,14 @@ export function validateCurrentConditions(current,hours=[],modelRows={},now=Date
  if(!close)reasons.push('the station is more than 10 miles away');
  if(!agrees)reasons.push('the station differs too much from selected-location guidance');
  const reason=`The station was not used because ${reasons.join(' and ')}.`;
+ // Observed sky beats forecast wording: if a fresh station within ~25 miles reports its sky cover
+ // (and good visibility), use it instead of e.g. "Patchy Fog" in the current-hour forecast.
+ const SKY={SKC:'Clear',CLR:'Clear',FEW:'Mostly Clear',SCT:'Partly Cloudy',BKN:'Mostly Cloudy',OVC:'Cloudy'};
+ const skyNear=fresh&&current.stationDistanceKm<=40&&SKY[current.skyCover]&&(!finite(current.visibility)||current.visibility>=5);
+ const forecastWet=/thunder|storm|rain|shower|drizzle|snow|sleet|flurr|ice|freezing/i.test(currentHour?.condition||'');
+ const observedSky=skyNear&&!forecastWet?SKY[current.skyCover]:null;
  const observedWeather=fresh&&close&&/thunder|\btstm\b|\bstorm\b|rain|shower|drizzle|snow|sleet|flurr|ice pellets|freezing rain/i.test(current.condition||'')?current.condition:null;
- return {type:'guidance',temperature:round(localTemperature),condition:observedWeather||currentHour?.condition||'Current conditions estimated',conditionSource:observedWeather?'Nearby station observation (weather); selected-location guidance (measurements)':'Selected-location current-hour forecast',time:iso(epoch),
+ return {type:'guidance',temperature:round(localTemperature),condition:observedWeather||observedSky||currentHour?.condition||'Current conditions estimated',conditionSource:observedWeather?'Nearby station observation (weather); selected-location guidance (measurements)':observedSky?`Nearby station sky observation (${current.station||'station'}); selected-location guidance (measurements)`:'Selected-location current-hour forecast',time:iso(epoch),
   station:null,stationName:null,stationDistanceKm:null,humidity:round(row.relative_humidity_2m),dewpoint:round(row.dew_point_2m),wind:round(row.wind_speed_10m),gust:round(row.wind_gusts_10m),windDirection:round(row.wind_direction_10m),
   visibility:round(row.visibility),pressure:round(row.pressure_msl,2),pressurePa:null,pressureTrend:{status:'unavailable',direction:'unknown'},apparent:round(row.apparent_temperature??current.apparent),apparentSource:finite(row.apparent_temperature)?`${source} selected-location estimate`:current.apparentSource,
   sourceValidation:{...checks,reason},localEstimate:{source,validAt:iso(epoch),reason,referenceStation:{station:current.station||null,stationName:current.stationName||null,distanceKm:current.stationDistanceKm,temperature:current.temperature,observedAt:current.time||null}}};

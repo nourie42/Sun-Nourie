@@ -26,6 +26,7 @@ export function renderRiskOutlooks(forecast,now=Date.now()){
  list.innerHTML=risks.map(riskOutlookButtonHTML).join('');
  list.querySelectorAll('[data-risk-kind]').forEach(button=>button.addEventListener('click',()=>{
   const risk=risks[Number(button.dataset.riskIndex)];
+  if(risk?.kind==='wssi'){window.open(risk.url,'_blank','noopener');return;}
   if(risk)void openRiskOutlook(risk,forecast);
  }));
  const take=document.getElementById('today-uncertainty');

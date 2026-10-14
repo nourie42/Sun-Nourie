@@ -1,3 +1,5 @@
+const WSSI_ROOT='https://mapservices.weather.noaa.gov/vector/rest/services/outlooks/wpc_wssi/MapServer/4/query';
+const WSSI_PAGE='https://www.wpc.ncep.noaa.gov/wwd/wssi/wssi.php';
 const SPC_ROOT='https://mapservices.weather.noaa.gov/vector/rest/services/outlooks/SPC_wx_outlks/MapServer/1/query';
 const WPC_URL='https://www.wpc.ncep.noaa.gov/exper/eromap/geojson/Day1_Latest.geojson';
 const WPC_DISCUSSION_URL='https://www.wpc.ncep.noaa.gov/discussions/hpcdiscussions.php?disc=qpferd&fmt=reg';
@@ -44,6 +46,16 @@ export function normalizeWpcRisk(feature,longitude,latitude,now=Date.now()){
  if(!level||!inGeoJson(longitude,latitude,feature.geometry)||!availableDayOneRisk(issue,start,end,now))return null;
  return {id:`wpc-day1-${level.toLowerCase()}`,kind:'wpc',level,rank:wpcRank[level.toLowerCase()]||0,title:`${level} risk of flooding rain today`,summary:level==='Marginal'?'Heavy rain could cause flooding in a few spots.':'Heavy rain could cause flooding. Keep away from flooded roads.',issuedAt:new Date(issue).toISOString(),validFrom:new Date(start).toISOString(),expires:new Date(end).toISOString(),url:'https://www.wpc.ncep.noaa.gov/qpf/excessive_rainfall_outlook_ero.php'};
 }
+const wssiRank={limited:1,minor:2,moderate:3,major:4,extreme:5};
+// WSSI times look like "08Z 10/13/26".
+function wssiStamp(v){const m=/^(\d{2})Z (\d{2})\/(\d{2})\/(\d{2})$/.exec(String(v||'').trim());return m?Date.UTC(2000+Number(m[4]),Number(m[2])-1,Number(m[3]),Number(m[1])):NaN;}
+export function normalizeWssiRisk(attributes,now=Date.now()){
+ const raw=String(attributes?.impact||'').trim().toLowerCase(),rank=wssiRank[raw];
+ const start=wssiStamp(attributes?.start_time),end=wssiStamp(attributes?.end_time);
+ if(!rank||!Number.isFinite(end)||end<=now)return null;
+ const level=raw[0].toUpperCase()+raw.slice(1);
+ return {id:`wssi-days1-3-${raw}`,kind:'wssi',level,rank,title:`${level} winter storm impacts possible (days 1-3)`,summary:'WPC Winter Storm Severity Index for this location. Check local NWS winter alerts.',issuedAt:Number.isFinite(start)?new Date(start).toISOString():null,validFrom:Number.isFinite(start)?new Date(start).toISOString():null,expires:new Date(end).toISOString(),url:WSSI_PAGE};
+}
 export function createRiskOutlookService({cached,now=Date.now}){
  return async location=>{
   const spcMeta={id:'spc-outlook',label:'SPC severe-weather outlook',status:'unavailable',fetchedAt:null,issuedAt:null,url:'https://www.spc.noaa.gov/products/outlook/day1otlk.html'};
@@ -61,7 +73,15 @@ export function createRiskOutlookService({cached,now=Date.now}){
    const value=features.map(f=>normalizeWpcRisk(f,location.longitude,location.latitude,now())).filter(Boolean).sort((a,b)=>b.rank-a.rank)[0]||null;
    return {value,meta:{...wpcMeta,status:'ready',fetchedAt:response.fetchedAt,issuedAt:value?.issuedAt||null}};
   }catch{return {value:null,meta:{...wpcMeta,message:'WPC outlook could not be checked.'}};}})();
-  const results=await Promise.all([spc,wpc]);
+  const wssiMeta={id:'wssi-outlook',label:'WPC Winter Storm Severity Index',status:'unavailable',fetchedAt:null,issuedAt:null,url:WSSI_PAGE};
+  const wssi=(async()=>{try{
+   const q=new URLSearchParams({f:'json',where:'1=1',geometry:`${location.longitude},${location.latitude}`,geometryType:'esriGeometryPoint',inSR:'4326',spatialRel:'esriSpatialRelIntersects',outFields:'impact,start_time,end_time,issue_time',returnGeometry:'false'});
+   const response=await cached(`${WSSI_ROOT}?${q}`,10*60000,{timeout:12000}),features=response.data?.features;
+   if(!Array.isArray(features)||response.data?.error)throw new Error('WSSI unavailable.');
+   const value=features.map(f=>normalizeWssiRisk(f.attributes,now())).filter(Boolean).sort((a,b)=>b.rank-a.rank)[0]||null;
+   return {value,meta:{...wssiMeta,status:'ready',fetchedAt:response.fetchedAt,issuedAt:value?.issuedAt||null}};
+  }catch{return {value:null,meta:{...wssiMeta,message:'Winter outlook could not be checked.'}};}})();
+  const results=await Promise.all([spc,wpc,wssi]);
   return {value:results.map(r=>r.value).filter(Boolean),meta:results.map(r=>r.meta)};
  };
 }

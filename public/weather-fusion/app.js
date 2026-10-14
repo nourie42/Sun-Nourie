@@ -6,7 +6,7 @@ import {weatherIcon,renderHourlyWeather,currentSample} from './weather-display.j
 import {dayGraphHTML,dayGraphPoints,installDayGraph} from './day-graph.js?v=feels-floor-wind-v1';
 import {degrees,feelsAt,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=dewpoint-floor-v1';
 import {createFramePlayer} from './frame-player.js';
-import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=category-meter-v1';
+import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=rain-icon-v2';
 import {dailyDisplay} from './weather-math.js?v=full-day-rain-v1';
 import {conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
 import {currentHero} from './current-temperature.js?v=rain-now-v71';
@@ -20,12 +20,13 @@ import {forecastOutlookDetails} from './outlook-details.js?v=full-day-rain-v1';
 import {isExperimentalWeatherPage,renderCarWashForecast,resetCarWashForecast} from './car-wash.js?v=click-main-v2';
 import {renderModelExplanation,resetModelExplanation} from './model-explanation.js?v=rain-support-v12';
 import {updateRainTrend} from './rain-trend.js?v=full-day-rain-v1';
-import {renderRiskOutlooks,resetRiskOutlooks} from './risk-outlooks.js?v=risk-outlooks-v4';
+import {renderRiskOutlooks,resetRiskOutlooks} from './risk-outlooks.js?v=risk-outlooks-v5';
 import {renderAirQuality} from './air-quality.js?v=mobile-repair-v1';
 import {displayedRainChance} from './rain-display.js?v=rain-observed-v1';
 import {weatherChangeMessages,WEATHER_CHANGE_TITLE} from './weather-changes.js?v=large-change-v3';
+import {renderSnowOutlook} from './snow-outlook.js?v=1';
 import {renderForecastWindowBanners,resetForecastWindowBanners} from './forecast-window-banners.js?v=sun-window-main-v4';
-import {createSevenDayCarousel} from './seven-day.js?v=main-week-v10';
+import {createSevenDayCarousel} from './seven-day.js?v=snow-v12';
 import {forecastSourceHealth} from './forecast-status.js?v=source-health-v1';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);
@@ -114,7 +115,17 @@ function smallIcon(type) {
     sun: 'M2 19h20M5 15a7 7 0 0 1 14 0M12 2v3M3 7l3 2M21 7l-3 2' };
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="${paths[type] || paths.temp}"/></svg>`;
 }
+// Single shared day/night state (sunrise/sunset). Header, background sky and page visuals all read body[data-sky].
+let lastHeroCondition = '';
+function syncSkyState() { if (!forecast) return; const day = isDaylight(), next = !day ? 'night' : /rain|storm|shower/i.test(lastHeroCondition) ? 'rain' : 'day'; if (document.body.dataset.sky !== next) document.body.dataset.sky = next; }
+setInterval(syncSkyState, 60000);
 function isDaylight() {
+  // Prefer the forecast's calculated sunrise/sunset for the selected location.
+  const rise = Date.parse(forecast?.solar?.sunrise), set = Date.parse(forecast?.solar?.sunset), now = Date.now();
+  if (Number.isFinite(rise) && Number.isFinite(set) && set > rise && set - rise < 86400000 && Math.abs(now - (rise + set) / 2) < 86400000) {
+    const day = 86400000, shift = Math.round(((rise + set) / 2 - now) / day) * day; // tolerate a stale solar date
+    return now >= rise - shift && now < set - shift;
+  }
   const h = Number(new Intl.DateTimeFormat('en-US', { timeZone: forecast?.location.timeZone || 'America/New_York', hour: 'numeric', hourCycle: 'h23' }).format(new Date()));
   return h >= 7 && h < 19;
 }
@@ -141,6 +152,7 @@ function render(data) {
   const c = data.current, d = data.days[0], day = isDaylight();
   const hero = currentHero(data, day);
   document.body.dataset.sky = !day ? 'night' : /rain|storm|shower/i.test(hero.condition) ? 'rain' : 'day';
+  lastHeroCondition = hero.condition;
   $('city-name').textContent = data.location.name || place?.name || 'Your location';
   if(place?.source?.startsWith('device'))setDeviceLocationLabel(`Device location · ${data.location.name||'current position'}`);
   $('hero-date').textContent = new Intl.DateTimeFormat('en-US', { timeZone: data.location.timeZone, weekday: 'long', month: 'long', day: 'numeric' }).format(new Date()).toUpperCase();
@@ -150,12 +162,17 @@ function render(data) {
   if($('hero-uv'))$('hero-uv').innerHTML=dailyUvHTML(data.days[0]?.uvMax,'Peak UV today');
   $('condition').textContent = hero.tonight ? `Tonight · ${hero.condition}` : hero.condition;
   $('high-low').textContent = hero.tonight ? 'Overnight low' : hero.range;
-  const sourceLabel=c.localEstimate?`Selected-location estimate · valid ${clock(c.time)}`:c.type==='observation'?`Nearby weather station · updated ${clock(c.time)}`:c.type==='unavailable'?'Current local reading unavailable':'Estimated current conditions';
+  const refObs=c.localEstimate?.referenceStation,sourceLabel=c.localEstimate?`Selected-location estimate · ${clock(c.time)} model hour${refObs?.observedAt?` · ${refObs.station||'station'} observed ${clock(refObs.observedAt)}`:''}`:c.type==='observation'?`Nearby weather station · updated ${clock(c.time)}`:c.type==='unavailable'?'Current local reading unavailable':'Estimated current conditions';
   const radarLabel=radarObservationLabel(c);
-  $('observation-label').textContent = `${sourceLabel}${radarLabel?` · ${radarLabel}`:''}`;
+  // No model/station provenance at the top; only a live radar note when there is one.
+  $('observation-label').textContent = radarLabel || '';
+  $('observation-label').title = sourceLabel;
+  $('observation-label').hidden = !radarLabel;
   $('hero-scene').innerHTML = icon(hero.condition, hero.isDay, 120);
   renderWeatherChanges(data);
   draw('forecast-window-banners','Upcoming weather windows',()=>renderForecastWindowBanners(data));
+  draw('snow-outlook-banner','Snow outlook',()=>renderSnowOutlook(data));
+  try{globalThis.__weatherNourieForecast=data;document.dispatchEvent(new CustomEvent('weather-nourie:forecast',{detail:data}));}catch{}
   draw('alerts', 'Official alerts', () => renderAlerts(data));
   draw('risk-outlook-list', 'Outlooks', () => renderRiskOutlooks(data));
   draw('hourly', 'Hourly forecast', () => renderHours(data));
@@ -178,7 +195,10 @@ function render(data) {
   const sourceHealth = forecastSourceHealth(data);
   const unavailable = sourceHealth.requiredIssues;
   const sourceNote = sourceHealth.note;
-  $('status').textContent = `Updated ${clock(data.assembledAt)}${sourceNote}${failedPanels.length ? ` · Display issue: ${failedPanels.join(', ')}. Other forecasts remain available; use Refresh to retry.` : ''}`;
+  // Top of page: just the update time. Source/feed health lives in Scientific Stuff (and the tooltip).
+  const statusDetail=`Updated ${clock(data.assembledAt)}${sourceNote}${failedPanels.length ? ` · Display issue: ${failedPanels.join(', ')}. Other forecasts remain available; use Refresh to retry.` : ''}`;
+  $('status').textContent = `Updated ${clock(data.assembledAt)}${unavailable.length||failedPanels.length?' · Some data is temporarily unavailable; use Refresh to retry.':''}`;
+  $('status').title = statusDetail;
   $('status').classList.toggle('error', unavailable.length > 0 || failedPanels.length > 0);
 }
 function renderAlerts(data) {
@@ -201,7 +221,7 @@ function renderEvidence(data) {
   }
   const important = ['nws', 'afd', 'hrrr', 'ecmwf', 'nbm', 'air-quality', 'alerts'];
   const labels = { nws: 'NWS', afd: 'Local discussion', hrrr: 'HRRR', ecmwf: 'ECMWF IFS', nbm: 'National Blend', 'air-quality':'Air quality', alerts: 'Alerts' };
-  const names = { ready: '✓ Working', unavailable: '✗ Unavailable', stale: '⚠ Stale — excluded', 'not-configured': 'Not configured', 'not-covered': 'Not collected for this location' };
+  const names = { ready: 'Available', unavailable: 'Unavailable', stale: 'Stale — excluded', 'not-configured': 'Not configured', 'not-covered': 'Not collected for this location' };
   const sourceIssues=data.feeds.filter(f=>['unavailable','stale','not-configured','not-covered'].includes(f.status));
   const sourceSummary=$('source-unavailable-summary');
   if(sourceSummary){
@@ -591,12 +611,15 @@ function startDeviceLocation({explicit=false}={}){
  );
 }
 $('locate').addEventListener('click', () => startDeviceLocation({explicit:true}));
-document.addEventListener('visibilitychange', () => { if (document.hidden) stopRadar(); else {void refreshAlerts();if (validPlace(place)&&!busy) void load();} });
+// Refetch on tab focus only if the data is older than 2 minutes.
+const forecastAgeMs=()=>forecast?.assembledAt?Date.now()-Date.parse(forecast.assembledAt):Infinity;
+document.addEventListener('visibilitychange', () => { if (document.hidden) stopRadar(); else {void refreshAlerts();if (validPlace(place)&&!busy&&forecastAgeMs()>2*60000) void load();} });
 window.addEventListener('online', () => { if(!document.hidden)void refreshAlerts();if (validPlace(place)&&!document.hidden&&!busy) void load(); });
 window.addEventListener('pageshow', (event) => { if(event.persisted&&!document.hidden)void refreshAlerts();if (event.persisted&&validPlace(place)&&!document.hidden&&!busy) void load(); });
 // The site refreshes while open; this is not a push-alert system or background task.
 setInterval(()=>{if(validPlace(place)&&!document.hidden){if(forecast)renderAlerts(forecast);else if(alertSnapshot)renderBulletins(alertSnapshot);void refreshAlerts();}},ALERT_REFRESH_MS);
-setInterval(() => { if (validPlace(place)&&!document.hidden&&!busy) void load(); }, 60000);
+// Forecast auto-refresh: every 10 minutes while visible (models update hourly; stations ~20-60 min).
+setInterval(() => { if (validPlace(place)&&!document.hidden&&!busy&&forecastAgeMs()>9*60000) void load(); }, 60000);
 installExperience();
 startDeviceLocation();
 
