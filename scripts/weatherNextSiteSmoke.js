@@ -25,7 +25,8 @@ try{
   await page.goto(base+'/weather-fusion/weathernext-site.html',{waitUntil:'networkidle'});
   await page.waitForSelector('#forecast:not([hidden])');
   assert.equal(await page.locator('#variable option').count(),21);
-  assert.equal(await page.locator('#hour').getAttribute('max'),'359');
+  assert.equal(await page.locator('#hour').getAttribute('max'),'347','Visible model hours start at the current 13:00Z hour; original run hours remain in downloads.');
+  assert.match(await page.locator('#valid-time').innerText(),/9:00 AM/);
   assert.equal(await page.locator('#source-cards article').count(),4);
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),`site overflow ${width}`);
   await page.screenshot({path:`${output}/weathernext-${width}.png`,fullPage:true});
@@ -43,8 +44,8 @@ try{
   assert.notEqual(await page.locator('#hour-label').innerText(),initial);
   await page.locator('#days button').nth(2).click();
   assert.ok(Number(await page.locator('#hour').getAttribute('max'))<=24);
-  await page.locator('#all-hours').click();assert.equal(await page.locator('#hour').getAttribute('max'),'359');
-  await page.selectOption('#run','interimSurface');assert.equal(await page.locator('#hour').getAttribute('max'),'47');
+  await page.locator('#all-hours').click();assert.equal(await page.locator('#hour').getAttribute('max'),'347');
+  await page.selectOption('#run','interimSurface');assert.equal(await page.locator('#hour').getAttribute('max'),'46');
   await page.selectOption('#location','greenville');assert.match(await page.locator('#location-title').innerText(),/Greenville/);
   await page.selectOption('#run','surface');
   const dl=page.waitForEvent('download');await page.locator('#download-csv').click();const downloaded=await dl;

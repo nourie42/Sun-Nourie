@@ -6,6 +6,7 @@ on:
       - scripts/weather_weathernext_site_collect.py
       - public/weather-fusion/weathernext-catalog.json
       - .github/workflows/weathernext-full-data.yml
+      - scripts/test_weathernext_collection.py
   schedule:
     # Main 00/06/12/18 UTC runs reach BigQuery about 8h10m later.
     # Leave publication margin; GitHub may delay scheduled jobs.
@@ -31,6 +32,8 @@ jobs:
           project_id: homeassist-470415
           workload_identity_provider: projects/269512183833/locations/global/workloadIdentityPools/github-actions/providers/sun-nourie
       - run: pip install 'google-cloud-bigquery>=3.25,<4'
+      - name: Check collector freshness and billing safeguards
+        run: python scripts/test_weathernext_collection.py
       - name: Open isolated forecast data worktree
         run: |
           DATA="$RUNNER_TEMP/weathernext-publish"

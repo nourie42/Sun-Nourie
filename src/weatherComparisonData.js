@@ -1,7 +1,8 @@
+import {weatherNextFreshness} from './weatherNextFreshness.js';
 /** Google-only, timestamp-preserving adapter. No other provider is a fallback. */
 export const HOUR=3600000;
 // Use the approved, active WeatherNext 3 feed published by GitHub Actions via
-// Workload Identity Federation. The separate full-surface feed is paused.
+// Workload Identity Federation. The separate explorer feed has its own collector.
 export const GOOGLE_FEED='https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/weathernext3.json';
 export const finite=v=>typeof v==='number'&&Number.isFinite(v);
 const n=v=>finite(v)?v:null;
@@ -25,14 +26,14 @@ export function selectGoogleForecast(feed,pointId,now=Date.now()){
  const point=googlePoints(feed).find(p=>p.id===pointId);
  if(!point)throw Object.assign(Error('NVIDIA has no published forecast for that location. Choose a listed comparison location.'),{status:404});
  if(feed.schema==='weather-nourie-weathernext3-v1'){
-  const input=feed.points.find(p=>p.id===pointId),init=Date.parse(feed.runAt);
+  const input=feed.points.find(p=>p.id===pointId),init=Date.parse(feed.runAt),freshness=weatherNextFreshness(feed,now);
   if(!Number.isFinite(init)||init>now||!Array.isArray(input?.hourly))throw Object.assign(Error('The published NVIDIA forecast is invalid.'),{status:503});
   const rows=input.hourly.flatMap(row=>{
    const epoch=Date.parse(row?.time);
    if(!Number.isFinite(epoch)||epoch<=init||epoch<now-72*HOUR||epoch>now+360*HOUR)return [];
    const temperature=n(row.temperatureF),dewpoint=n(row.dewpointF),precipitation=n(row.precipitationInches);
    const skyCover=n(row.skyCoverPercent),windDirection=n(row.windDirectionDegrees),pressure=n(row.pressureInHg),solar=n(row.solarWm2);
-   const meta={id:'weathernext3',runAt:feed.runAt,fetchedAt:feed.generatedAt||null,status:'ready',sourceTable:feed.sourceTable};
+   const meta={id:'weathernext3',runAt:feed.runAt,fetchedAt:feed.generatedAt||null,status:freshness.status,sourceTable:feed.sourceTable,runAgeHours:freshness.runAgeHours};
    return [{time:new Date(epoch).toISOString(),epoch,temperature,dewpoint,wind:n(row.windMph),windDirection,skyCover,
     pressure,solar,precipitation,precedingPrecipitation:precipitation,
     precipitationStart:new Date(epoch).toISOString(),precipitationEnd:new Date(epoch+HOUR).toISOString(),
@@ -41,15 +42,16 @@ export function selectGoogleForecast(feed,pointId,now=Date.now()){
     temperatureP10:n(row.temperatureP10F),temperatureP90:n(row.temperatureP90F),provenance:meta}];
   }).sort((a,b)=>a.epoch-b.epoch);
   if(!rows.some(row=>row.epoch>=Math.floor(now/HOUR)*HOUR))throw Object.assign(Error('No NVIDIA forecast covers the current or upcoming hours. Older data is not presented as current.'),{status:503});
-  const meta={id:'weathernext3',runAt:feed.runAt,fetchedAt:feed.generatedAt||null,status:'ready',sourceTable:feed.sourceTable};
+  const meta={id:'weathernext3',runAt:feed.runAt,fetchedAt:feed.generatedAt||null,status:freshness.status,sourceTable:feed.sourceTable,runAgeHours:freshness.runAgeHours};
   return {point,rows,runs:[meta],fetchedAt:feed.generatedAt||null};
  }
- const chosen=new Map(),stationMaps=new Map(),used=new Map();
+ const chosen=new Map(),stationMaps=new Map(),used=new Map(),freshnessBySource=new Map();
  for(const id of allowed){
   const source=feed.sources[id],init=Date.parse(source?.runAt),p=source?.points?.find(p=>p.id===pointId);
-  if(!source||!['ready','last-verified'].includes(source.status)||!finite(init)||init>now||!Array.isArray(p?.hourly))continue;
+  if(!source||!['ready','last-verified','stale'].includes(source.status)||!finite(init)||init>now||!Array.isArray(p?.hourly))continue;
+  freshnessBySource.set(id,weatherNextFreshness(source,now));
   const station=feed.sources[stationFor[id]],sp=station?.points?.find(p=>p.id===pointId);
-  const stationGood=['ready','last-verified'].includes(station?.status)&&Date.parse(station?.runAt)===init;
+  const stationGood=['ready','last-verified','stale'].includes(station?.status)&&Date.parse(station?.runAt)===init;
   stationMaps.set(id,stationGood?new Map((sp?.hourly||[]).filter(r=>validTime(r.time)).map(r=>[Date.parse(r.time),r])):new Map());
   for(const row of p.hourly){
    const time=Date.parse(row?.time);
@@ -74,7 +76,7 @@ export function selectGoogleForecast(feed,pointId,now=Date.now()){
   // An accumulation ending at t+1 belongs to [t,t+1), not [t-1,t).
   const precipitation=inches(at(next?.row,'total_precipitation_1hr'));
   const skyCover=finite(cloud)&&cloud>=0&&cloud<=1?cloud*100:null;
-  const meta={id:c.id,runAt:c.source.runAt,fetchedAt:c.source.fetchedAt,status:c.source.status,gridLatitude:c.point.gridLatitude,gridLongitude:c.point.gridLongitude};
+  const meta={id:c.id,runAt:c.source.runAt,fetchedAt:c.source.fetchedAt,status:freshnessBySource.get(c.id).status,runAgeHours:freshnessBySource.get(c.id).runAgeHours,gridLatitude:c.point.gridLatitude,gridLongitude:c.point.gridLongitude};
   used.set(c.id,meta);
   return {time:new Date(time).toISOString(),epoch:time,temperature,dewpoint,wind,windDirection,skyCover,
    pressure:finite(at(c.row,'mean_sea_level_pressure'))?at(c.row,'mean_sea_level_pressure')/3386.389:null,
