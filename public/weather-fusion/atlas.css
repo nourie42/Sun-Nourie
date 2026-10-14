@@ -1,0 +1,611 @@
+/* Atlas is an independent presentation of the main Weather Nourie forecast.
+   Scope every override to this page; the shared forecast and map contracts stay intact. */
+html[data-atlas] {
+  color-scheme: dark;
+  --atlas-bg: #0b1118;
+  --atlas-panel: #111b25;
+  --atlas-edge: rgba(178, 200, 221, .13);
+  --atlas-text: #edf3f7;
+  --atlas-muted: #93a5b6;
+  --atlas-sun: #efbd76;
+  --atlas-cyan: #83d6e0;
+  --text: var(--atlas-text);
+  --muted: var(--atlas-muted);
+  --faint: #8193a4;
+  --blue: var(--atlas-cyan);
+  --gold: var(--atlas-sun);
+  --tile-gap: 22px;
+  scroll-padding-top: 24px;
+}
+html body.atlas-page {
+  margin: 0;
+  background: #0b1118 !important;
+  color: #edf3f7;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+html body.atlas-page::before { display: none; }
+.atlas-page .atmosphere { background: radial-gradient(ellipse at 15% 0%, #24364738, transparent 46%); }
+.atlas-page .atmosphere::before { display: none; }
+.atlas-page .atmosphere > * { display: none !important; }
+.atlas-page .shell { width: 100%; max-width: 480px; padding: 0 20px; margin-inline: auto; }
+.atlas-page :is(button, input, select) { font-family: inherit; }
+.atlas-page :is(button, a, input, select, summary):focus-visible { outline: 2px solid var(--atlas-sun); outline-offset: 4px; }
+.atlas-page a, .atlas-page button { -webkit-tap-highlight-color: transparent; }
+.atlas-page [hidden] { display: none !important; }
+.atlas-page ::selection { background: #efbd7644; }
+.atlas-page .topbar.atlas-header {
+  display: flex; align-items: center; justify-content: space-between;
+  min-height: 89px; padding: 19px 0; margin: 0; gap: 36px;
+  border-bottom: 1px solid var(--atlas-edge);
+}
+.atlas-page .brand-premium { display: flex; align-items: center; gap: 12px; flex: none; }
+.atlas-page .brand-mark { display: grid; place-items: center; width: 40px; height: 40px; border: 1px solid #efbd7645; border-radius: 12px; background: #efbd7608; }
+.atlas-page .brand-mark svg { width: 32px; height: 32px; }
+.atlas-page .brand-word { display: flex; flex-direction: column; gap: 7px; }
+.atlas-page .brand-name { color: #f4f6f8; font-size: 27px; font-weight: 650; letter-spacing: -1.4px; line-height: .9; }
+.atlas-page .brand-kicker { color: #92a8b8; font-size: 8px; font-weight: 650; letter-spacing: 2px; line-height: 1; }
+.atlas-page .atlas-brand-dot { color: var(--atlas-sun); }
+.atlas-page .atlas-header-nav { gap: 30px; margin-right: auto; margin-left: 40px; }
+.atlas-page .atlas-header-nav a { position: relative; padding: 14px 0; font-size: 13px; color: #a3b1be; }
+.atlas-page .atlas-header-nav a:hover { color: #fff; }
+.atlas-page .atlas-header-nav a.atlas-nav-active { color: #f8f3e8; }
+.atlas-page .atlas-header-nav a.atlas-nav-active::after { content: ""; position: absolute; bottom: -22px; left: 0; right: 0; height: 2px; background: var(--atlas-sun); }
+.atlas-page .atlas-header-tools { gap: 20px; }
+.atlas-page .atlas-back-link { font-size: 12px; color: #9cafbe; }
+.atlas-page .atlas-back-link span { margin-left: 8px; color: var(--atlas-sun); }
+.atlas-page .icon-button { width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--atlas-edge); background: #ffffff04; color: #b5c5d3; font-size: 24px; }
+.atlas-page .icon-button:hover { background: #ffffff0c; }
+.atlas-page .location-bar { align-items: center; padding: 34px 0 28px; gap: 32px; }
+.atlas-page .atlas-eyebrow { color: var(--atlas-sun); font-size: 10px; font-weight: 650; letter-spacing: 2px; line-height: 1.5; }
+.atlas-page .atlas-intro p { font-size: clamp(27px, 2.75vw, 40px); font-weight: 440; line-height: 1.2; letter-spacing: -1.5px; margin: 7px 0 8px; }
+.atlas-page .atlas-intro p > span { color: var(--atlas-sun); }
+.atlas-page .atlas-intro-note { font-size: 13px; color: #91a1af; }
+.atlas-page .search-wrap { width: 310px; max-width: 100%; min-width: 0; flex-shrink: 0; border: 1px solid #a5bedc26; border-radius: 12px; background: #15202b; box-shadow: 0 6px 24px #00000012; }
+.atlas-page .search-wrap > span { padding-left: 14px; color: #94adbf; }
+.atlas-page .search-wrap input { min-height: 46px; padding: 12px 8px; font-size: 13px; }
+.atlas-page .search-wrap input::placeholder { color: #8a9eaf; }
+.atlas-page .search-wrap > button { min-width: 44px; min-height: 44px; color: var(--atlas-cyan); }
+.atlas-page .search-results { background: #14212e; top: 55px; width: 355px; border-radius: 12px; border-color: #8eb2ce44; box-shadow: 0 20px 60px #0008; }
+.atlas-page .search-results button { min-height: 48px; }
+.atlas-page .weather-jump-nav { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 0 0 20px; margin: 0; border-bottom: 1px solid var(--atlas-edge); }
+.atlas-page .weather-jump-card { flex: 0 0 auto; padding: 9px 15px; min-height: 35px; border: 1px solid #adc9de18; border-radius: 8px; background: #17232e69; color: #acbecb; font-size: 11px; font-weight: 550; }
+.atlas-page .weather-jump-card .jump-label { font-size: 11px; font-weight: 550; letter-spacing: .01em; }
+.atlas-page .weather-jump-card:first-child { border-color: #81d5df3b; background: #83d6e00b; color: #a5e1e9; }
+.atlas-page .weather-jump-card:hover { background: #203140; color: #f2f6f9; }
+.atlas-page .weather-jump-card[aria-expanded=true] { border-color: #efbd7666; color: #efbd76; }
+.atlas-page .atlas-status-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 22px 1px 14px; }
+.atlas-page .atlas-section-index { color: #7f94a6; font-size: 9px; font-weight: 650; letter-spacing: 1.8px; white-space: nowrap; }
+.atlas-page .atlas-status-details { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 4px 14px; }
+.atlas-page .atlas-freshness { font-size: 10px; color: #91b8be; }
+.atlas-page .status-line { padding: 0; min-height: 0; font-size: 10px; color: #8195a6; }
+.atlas-page .status-line.error { color: #efbd76; }
+.atlas-page .atlas-connection { margin: 12px 0; padding: 12px 16px; border: 1px solid #efbd7666; border-radius: 10px; background: #30281c; color: #f5d5a7; font-size: 13px; }
+.atlas-page main .hero { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.35fr); align-items: stretch; gap: 22px; min-height: 0; padding: 0 !important; text-align: left; }
+.atlas-page main .hero > * { min-width: 0; grid-column: 1 / -1; }
+.atlas-page main .hero > .atlas-current { grid-column: 1; grid-row: 1; }
+.atlas-page main .hero > .map-panel { grid-column: 2; grid-row: 1; }
+html body.atlas-page main :is(.glass, section.glass, .car-wash-forecast, .dewpoint-gross-meter, .experimental-week, .exposure-cards, .wn-blend-compare, .metric),
+html body.atlas-page .atlas-panel {
+  background: linear-gradient(130deg, #14212cd9, #101923ed) !important;
+  border: 1px solid var(--atlas-edge) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 6px 24px #00000010 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  text-shadow: none !important;
+  padding: 22px !important;
+  margin: 0 0 22px !important;
+}
+html body.atlas-page main .hero > :is(.glass, .atlas-panel, .exposure-cards, .experimental-week) { margin: 0 !important; }
+html body.atlas-page main .hero > .atlas-current {
+  position: relative; display: flex; flex-direction: column; min-height: 482px;
+  padding: 29px 32px 23px; border: 1px solid #d5c5ac2b; border-radius: 16px; overflow: hidden;
+  background: radial-gradient(ellipse at 110% 45%, #b58e4f22, transparent 64%), linear-gradient(135deg, #222b32, #171f27 70%);
+}
+.atlas-page .atlas-current > :not(.atlas-orbits) { position: relative; z-index: 1; }
+.atlas-page .atlas-current-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 27px; }
+.atlas-page .atlas-coordinate-mark { color: #b6b39d; font-size: 25px; font-weight: 300; line-height: 1; }
+.atlas-page .atlas-orbits { position: absolute; right: -195px; top: 83px; width: 380px; height: 380px; opacity: .68; pointer-events: none; }
+.atlas-page .atlas-orbits i { position: absolute; inset: 0; border: 1px solid #d8b88518; border-radius: 50%; }
+.atlas-page .atlas-orbits i:nth-child(2) { inset: 35px; }
+.atlas-page .atlas-orbits i:nth-child(3) { inset: 70px; }
+.atlas-page .atlas-orbits span { position: absolute; inset: 110px; border-radius: 50%; background: radial-gradient(circle at 20% 25%, #f9d998, #e8b766 40%, #af7b2e); opacity: .2; box-shadow: 0 0 90px 30px #cdaa5830; }
+.atlas-page .atlas-current .hero-scene { position: absolute; width: 90px; height: 90px; top: 204px; right: 35px; left: auto; opacity: .9; filter: drop-shadow(0 4px 25px #e4b46b28); }
+.atlas-page .atlas-current .hero-scene svg { width: 90px; height: 90px; }
+.atlas-page .atlas-current .eyebrow { margin: 0 0 9px; font-size: 10px; letter-spacing: 1.2px; color: #a2b1bb; font-weight: 550; }
+.atlas-page .atlas-current h1 { font-size: clamp(27px, 2.6vw, 37px); line-height: 1.15; font-weight: 480; letter-spacing: -1.2px; margin: 0 0 20px; max-width: 95%; }
+.atlas-page .atlas-current .current-temp-label { font-size: 11px; font-weight: 450; margin: 0; color: #a4b3bd; text-align: left; }
+.atlas-page .atlas-current .hero-temperature { font-size: clamp(90px, 8.8vw, 136px); line-height: 1.12; letter-spacing: -8px; font-weight: 250; margin: 0 0 4px -5px; width: max-content; max-width: 100%; color: #f7f0df; text-shadow: none; cursor: pointer; }
+.atlas-page .atlas-current .hero-temperature span { font-size: .58em; top: 12px; margin-left: 2px; }
+.atlas-page .atlas-current .hero-uv { display: inline-flex; align-self: flex-start; color: #d3ba90; background: #e8b66b0b; border: 1px solid #f0c0811a; border-radius: 6px; padding: 4px 9px; margin: 0 0 9px; font-size: 10px; font-weight: 500; }
+.atlas-page .atlas-current .hero-condition { font-size: 17px; margin: 4px 0; }
+.atlas-page .atlas-current .hero-range { font-size: 13px; margin: 0; }
+.atlas-page .atlas-current .observation-label { color: #8b9daa; font-size: 10px; line-height: 1.55; margin: 0 0 18px; max-width: 320px; }
+.atlas-page .atlas-current-bottom { display: flex; align-items: center; justify-content: space-between; gap: 16px; font-size: 9px; color: #82939f; border-top: 1px solid #c9d7e516; padding-top: 16px; margin-top: auto; }
+.atlas-page .atlas-current-bottom a { color: #d3ba94; white-space: nowrap; }
+.atlas-page .section-top { border-bottom: 1px solid #9cbed515; padding-bottom: 15px; gap: 12px; }
+.atlas-page .section-top h2 { color: #d5e1eb; font-size: 13px; font-weight: 560; letter-spacing: .1px; text-transform: none; }
+.atlas-page .section-top > span { font-size: 10px; color: #859bac; letter-spacing: 0; }
+.atlas-page .text-button { color: #b4d3df; font-size: 11px; }
+.atlas-page .atlas-live-dot { display: inline-block; width: 6px; height: 6px; margin-right: 7px; margin-bottom: 1px; border-radius: 50%; background: #81d3dc; box-shadow: 0 0 10px #81d3dc33; }
+html body.atlas-page main .map-panel { padding: 20px !important; }
+.atlas-page .map-panel .section-top { padding-bottom: 0; border: 0; }
+.atlas-page .map-panel .map-tabs { gap: 4px; padding: 0; margin: 17px 0 14px; background: transparent !important; border: 0 !important; scrollbar-width: thin; }
+.atlas-page .map-tabs button { border: 1px solid transparent; border-radius: 7px; padding: 7px 9px; min-height: 34px; background: transparent; color: #91a8b7; font-size: 10px; font-weight: 550; flex: 1 0 auto; }
+.atlas-page .map-tabs button.selected, .atlas-page .map-tabs button[aria-pressed=true] { background: #83d6e014; border-color: #83d6e044; color: #b4edf2; box-shadow: none; }
+.atlas-page .map-tabs button:hover { color: #d2f3f5; background: #83d6e010; }
+html body.atlas-page main .map-stage { height: 315px; background: #0b1620 !important; border: 1px solid #9bb9cc22 !important; border-radius: 10px; }
+.atlas-page #radar-map { background: #0b1620; }
+.atlas-page .map-panel .radar-controls { display: grid; grid-template-columns: 30px minmax(40px, 1fr) auto auto; gap: 10px; padding: 13px 0 7px; margin: 0; }
+.atlas-page .play-button { width: 30px; height: 30px; border-radius: 7px; border: 1px solid #91b5c833; background: #1c303d; color: #b6dbe5; font-size: 12px; }
+.atlas-page .radar-controls > span { font-size: 10px; color: #9eb8c7; white-space: nowrap; }
+.atlas-page .radar-controls select { max-width: 110px; border: 1px solid #91b5c829; background: #101d29; border-radius: 6px; padding: 5px 6px; font-size: 10px; }
+.atlas-page .radar-controls input { accent-color: #83d6e0; min-width: 0; }
+.atlas-page .map-caption { display: flex; align-items: flex-start; gap: 10px; justify-content: space-between; font-size: 9px; line-height: 1.5; color: #7f98a9; margin-top: 4px; }
+.atlas-page .map-caption a { color: #b4cedb; }
+.atlas-page .radar-legend { font-size: 9px; color: #7f98a9; margin-top: 8px; }
+.atlas-page #model-freshness { color: #adbfca; font-size: 11px; }
+.atlas-page .map-error { background: #142332f2; border-color: #efbd7666; color: #e9d5af; font-size: 12px; backdrop-filter: blur(8px); }
+.atlas-page .map-panel:fullscreen { display: flex; flex-direction: column; border-radius: 0 !important; }
+.atlas-page .map-panel:fullscreen .map-stage { flex: 1; min-height: 200px; }
+.atlas-page .leaflet-control-zoom { border: 1px solid #788eaa55 !important; overflow: hidden; }
+.atlas-page .leaflet-control-zoom a { color: #bbd1dc; background: #172331; border-color: #788eaa33; }
+.atlas-page .leaflet-control-attribution { font-size: 9px; }
+.atlas-page .atlas-section-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; padding: 16px 0 0; margin: 0 0 21px; text-align: left; }
+.atlas-page .hero > .atlas-section-heading { margin-bottom: -3px; padding-top: 16px; }
+.atlas-page .atlas-section-heading h2 { margin: 6px 0 0; font-size: 27px; line-height: 1.2; letter-spacing: -.8px; font-weight: 450; color: #e9eff3; }
+.atlas-page .atlas-section-heading p { color: #859bab; font-size: 11px; margin: 0 0 2px; max-width: 310px; text-align: right; }
+.atlas-page .atlas-empty { margin: 22px 0; padding: 22px; color: #8da2b3; background: #0b141c66; border: 1px dashed #91aec428; border-radius: 9px; font-size: 13px; }
+.atlas-page .atlas-trend-panel { overflow: hidden; }
+.atlas-page #atlas-trend { min-height: 160px; }
+.atlas-page #atlas-trend svg { width: 100%; height: auto; overflow: visible; }
+.atlas-page #atlas-trend text { font-family: inherit; }
+.atlas-page .atlas-models { margin-top: 28px; }
+.atlas-page .atlas-model-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+.atlas-page .atlas-model-grid > * { min-width: 0; }
+.atlas-page .atlas-stat { display: flex; flex-direction: column; gap: 4px; padding: 14px; background: #a4c5dc07; border: 1px solid var(--atlas-edge); border-radius: 9px; }
+.atlas-page .atlas-stat-label { font-size: 10px; color: #91a8b9; }
+.atlas-page .atlas-stat-value { font-size: 22px; font-weight: 500; color: #e8f0f6; }
+.atlas-page .atlas-source-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 13px 0; border-bottom: 1px solid #9cb9d117; }
+.atlas-page .atlas-source-row:last-child { border-bottom: 0; }
+.atlas-page .atlas-source-name { color: #dae5ed; font-size: 13px; }
+.atlas-page .atlas-source-status { color: #8ec7be; font-size: 11px; }
+.atlas-page .atlas-confidence-day { padding: 10px; border: 1px solid #9cb9d117; border-radius: 9px; }
+.atlas-page :is(#atlas-blend, #atlas-confidence) { margin-top: 14px; color: #b6c8d5; font-size: 13px; }
+.atlas-page :is(#atlas-blend, #atlas-confidence) p { color: #91a7b8; font-size: 12px; line-height: 1.7; }
+.atlas-page :is(#atlas-blend, #atlas-confidence) a { color: var(--atlas-cyan); }
+html body.atlas-page main :is(.aqi-pollutants>span, .thermal-grid>div, .gross-summary>span, .today-metrics, .seven-day-card, .hour, .skin-exposure, .exposure-person, .comfort-later, .gross-pill, .gross-explore, .gross-facts, .gross-scroll, .day-row, .feed-chip, .car-wash-answer, .car-wash-days article, .car-wash-day, .car-wash-window) {
+  background: #e5f1fb05 !important;
+  border: 1px solid #b9d4e715 !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+html body.atlas-page main .today-panel { display: grid; grid-template-columns: 1.4fr 1fr; gap: 24px; align-items: stretch; }
+.atlas-page #today-forecast { min-width: 0; }
+html body.atlas-page #today-forecast .today-weather-card.today-weather-card { margin: 0; min-height: 218px; border-radius: 12px; background-color: #142330 !important; border: 1px solid #d6e6f51a !important; overflow: hidden; }
+.atlas-page .hero .today-panel .today-uncertainty { text-align: left; border: 0; border-left: 1px solid #afc5da1c; padding: 12px 0 10px 24px; margin: 0; font-size: 14px; font-weight: 400; align-self: center; color: #b4c6d3; line-height: 1.8; }
+.atlas-page .hero .today-panel .today-uncertainty-label { color: var(--atlas-sun); font-size: 10px; letter-spacing: 1.6px; text-transform: uppercase; font-weight: 600; }
+.atlas-page .hero .today-panel .today-uncertainty p { margin-top: 10px; font-size: 13px; font-weight: 400; line-height: 1.85; }
+html body.atlas-page main #experimental-week .seven-day-carousel.glass { padding: 0 !important; margin: 0 !important; border: 0 !important; background: transparent !important; box-shadow: none !important; }
+.atlas-page #experimental-week .seven-day-heading { margin-bottom: 16px; }
+.atlas-page #experimental-week .seven-day-heading h2 { font-size: 13px; font-weight: 550; letter-spacing: .1px; color: #d6e4ec; }
+.atlas-page #experimental-week .seven-day-card { border-radius: 11px !important; }
+.atlas-page #experimental-week .seven-day-card:hover { background: #a7cce910 !important; }
+.atlas-page #experimental-week .seven-day-card[aria-pressed=true] { outline: 1px solid #83d6e08c; outline-offset: -1px; background: #83d6e009 !important; }
+.atlas-page #experimental-week .seven-day-name { font-weight: 600; }
+.atlas-page #experimental-week .seven-day-date { color: #869eaf; }
+.atlas-page .hourly-strip { gap: 9px; padding-top: 18px; padding-bottom: 5px; }
+html body.atlas-page main .hour { border-radius: 10px; padding: 13px 10px; min-width: 80px; }
+html body.atlas-page main .hour.now { outline: 1px solid #efbd7666 !important; background: #efbd7609 !important; }
+.atlas-page .hour > strong { font-weight: 500; }
+.atlas-page .hour > span { color: #9fb4c4; font-size: 11px; }
+html body.atlas-page main .exposure-cards { padding: 0 !important; overflow: hidden; }
+html body.atlas-page main .skin-exposure { border: 0 !important; border-radius: 0; padding: 24px; background: transparent !important; }
+.atlas-page .skin-kicker { font-size: 17px; font-weight: 500; letter-spacing: -.25px; }
+.atlas-page .science-link { font-size: 11px; color: #89b6cb; }
+html body.atlas-page main .bulletins-panel { padding: 16px 22px !important; }
+.atlas-page .bulletins-panel .section-top { padding-bottom: 8px; }
+.atlas-page .bulletins-panel .section-top h2 { font-size: 10px; color: #9fb5c5; letter-spacing: 1.4px; }
+.atlas-page .bulletin-time { color: #90a8b9; font-size: 12px; margin: 8px 0 0; }
+.atlas-page .bulletin-banner { border-radius: 10px; }
+.atlas-page .air-quality-panel { margin-top: 3px !important; }
+.atlas-page .aqi-reading > strong { font-size: 54px; font-weight: 400; }
+.atlas-page .aqi-reading > span { font-size: 10px; letter-spacing: 1.8px; color: #9bb4c4; }
+.atlas-page .aqi-copy p { font-size: 13px; font-weight: 400; color: #b5c9d7; }
+.atlas-page .metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px !important; }
+html body.atlas-page main .metrics > .metric { margin: 0 !important; padding: 21px !important; border-radius: 13px !important; transition: border-color .2s, transform .2s; }
+html body.atlas-page main .metrics > .metric:hover { border-color: #9ccfe24d !important; transform: translateY(-2px); }
+.atlas-page .metric-title { color: #a8bfce; font-size: 11px; font-weight: 550; letter-spacing: .3px; }
+.atlas-page .metric-value { font-size: 33px; font-weight: 450; letter-spacing: -1px; }
+.atlas-page .metric-note { color: #91a8ba; font-size: 11px; }
+.atlas-page .metric-note strong { font-weight: 600; }
+.atlas-page #scientific-stuff { margin-top: 28px !important; }
+.atlas-page #scientific-stuff .section-top { border-bottom: 0; padding-bottom: 0; }
+.atlas-page #scientific-stuff .collapse-toggle { border: 1px solid #9cbdd32e !important; background: #a0bfd00a !important; border-radius: 7px !important; font-size: 11px !important; font-weight: 500 !important; color: #a3c4d5 !important; }
+.atlas-page .evidence-detail { border-top-color: #a0bdd61a; }
+.atlas-page .evidence-detail summary { color: #b4c9d7; font-size: 13px; }
+.atlas-page .evidence-detail p { color: #a0b5c5; }
+.atlas-page .feed-chip { border-radius: 7px; }
+.atlas-page .feed-chip strong { font-weight: 550; }
+.atlas-page footer { display: flex; align-items: flex-start; justify-content: space-between; gap: 30px; padding: 34px 0 40px; margin-top: 12px; border-top: 1px solid #9cb8cb1c; }
+.atlas-page .footer-brand { font-size: 24px; letter-spacing: -1px; font-weight: 550; }
+.atlas-page .atlas-footer-atlas { display: inline-block; font-size: 8px; font-weight: 550; letter-spacing: 2px; color: #9db0be; margin-left: 8px; vertical-align: middle; }
+.atlas-page footer p { color: #718a9d; font-size: 10px; line-height: 1.8; }
+.atlas-page footer > p { max-width: 550px; text-align: right; }
+.atlas-page dialog { color: #edf3f7; background: linear-gradient(145deg, #192a39, #101a26); border: 1px solid #89a9c440; box-shadow: 0 30px 120px #0009; border-radius: 18px; }
+.atlas-page dialog::backdrop { background: #03080ed9; backdrop-filter: blur(7px); }
+.atlas-page .dialog-close { border: 1px solid #89a9c433; border-radius: 9px; background: #213648; color: #bcd2df; }
+.atlas-page .skip-link { z-index: 3000; background: #efbd76; color: #101820; }
+
+
+
+@media all /* Phone layout at every viewport width. */ {
+  html[data-atlas] { --tile-gap: 16px; }
+  .atlas-page .shell { padding: 0 20px; }
+  .atlas-page .topbar.atlas-header { min-height: 76px; padding: 17px 0; gap: 15px; }
+  .atlas-page .brand-name { font-size: 25px; }
+  .atlas-page .brand-mark { width: 36px; height: 36px; }
+  .atlas-page .brand-mark svg { width: 29px; height: 29px; }
+  .atlas-page .atlas-header-tools { gap: 15px; }
+  .atlas-page .atlas-back-link { font-size: 10px; }
+  .atlas-page .atlas-back-link span { margin-left: 2px; }
+  .atlas-page .location-bar { display: flex; flex-direction: column; align-items: stretch; padding: 26px 0 19px; gap: 22px; }
+  .atlas-page .atlas-intro p { font-size: 34px; letter-spacing: -1.3px; }
+  .atlas-page .atlas-intro-note { font-size: 12px; }
+  .atlas-page .search-wrap { width: 100%; max-width: 100%; }
+  .atlas-page .search-wrap input { min-height: 44px; }
+  .atlas-page .search-results { width: 100%; max-width: none; }
+  .atlas-page .weather-jump-nav { flex-wrap: nowrap; overflow-x: auto; gap: 7px; padding-bottom: 18px; scrollbar-width: none; }
+  .atlas-page .weather-jump-nav::-webkit-scrollbar { display: none; }
+  .atlas-page .weather-jump-card { padding: 8px 12px; font-size: 10px; }
+  .atlas-page .weather-jump-card .jump-label { font-size: 10px; }
+  .atlas-page .atlas-status-row { align-items: flex-start; padding: 19px 0 13px; gap: 10px; }
+  .atlas-page .atlas-status-details { display: block; max-width: 54%; text-align: right; line-height: 1.5; }
+  .atlas-page .atlas-section-index { font-size: 8px; letter-spacing: 1.2px; }
+  .atlas-page .atlas-freshness, .atlas-page .status-line { font-size: 9px; }
+  .atlas-page main .hero { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .atlas-page main .hero > .atlas-current, .atlas-page main .hero > .map-panel { grid-column: 1; grid-row: auto; }
+  html body.atlas-page main .hero > .atlas-current { min-height: 382px; padding: 24px; }
+  .atlas-page .atlas-current-top { margin-bottom: 22px; }
+  .atlas-page .atlas-current h1 { font-size: 33px; margin-bottom: 17px; }
+  .atlas-page .atlas-current .hero-temperature { font-size: 112px; }
+  .atlas-page .atlas-current .hero-scene { top: 164px; right: 38px; width: 100px; height: 100px; }
+  .atlas-page .atlas-current .hero-scene svg { width: 100px; height: 100px; }
+  .atlas-page .atlas-orbits { right: -136px; top: 45px; }
+  .atlas-page .atlas-current-bottom { flex-wrap: nowrap; padding-top: 16px; margin-top: 15px; }
+  .atlas-page .atlas-current .observation-label { margin-bottom: 0; }
+  html body.atlas-page main :is(.glass, section.glass, .car-wash-forecast, .dewpoint-gross-meter, .experimental-week, .exposure-cards, .wn-blend-compare, .metric), html body.atlas-page .atlas-panel { padding: 18px !important; border-radius: 13px !important; margin-bottom: 16px !important; }
+  html body.atlas-page main .map-panel { padding: 16px !important; }
+  .atlas-page .map-panel .map-tabs { margin-top: 16px; margin-bottom: 12px; }
+  .atlas-page .map-tabs button { font-size: 10px; padding: 7px 9px; }
+  html body.atlas-page main .map-stage { height: 340px; border-radius: 8px; }
+  .atlas-page .map-panel .radar-controls { grid-template-columns: 30px minmax(20px, 1fr) auto; }
+  .atlas-page .map-caption { font-size: 9px; }
+  .atlas-page .section-top h2 { font-size: 12px; }
+  .atlas-page .section-top > span { font-size: 9px; }
+  .atlas-page .atlas-section-heading { display: block; padding-top: 17px; margin-bottom: 17px; }
+  .atlas-page .atlas-section-heading h2 { font-size: 26px; }
+  .atlas-page .atlas-section-heading p { text-align: left; margin-top: 9px; font-size: 11px; max-width: none; }
+  .atlas-page .atlas-empty { margin: 17px 0; padding: 18px; font-size: 12px; }
+  .atlas-page .atlas-models { margin-top: 18px; }
+  .atlas-page #atlas-trend { min-height: 130px; }
+  .atlas-page .hero .today-panel .today-uncertainty p { font-size: 12px; line-height: 1.8; }
+  .atlas-page .hero .today-panel .today-uncertainty-label { font-size: 9px; }
+  html body.atlas-page main .hour { min-width: 72px; padding: 11px 9px; }
+  html body.atlas-page main .skin-exposure { padding: 17px; }
+  .atlas-page .skin-kicker { font-size: 15px; }
+  .atlas-page .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px !important; }
+  html body.atlas-page main .metrics > .metric { padding: 17px !important; }
+  .atlas-page .metric-value { font-size: 29px; }
+  .atlas-page .aqi-summary { gap: 14px; }
+  .atlas-page .aqi-reading > strong { font-size: 46px; }
+  .atlas-page footer { flex-direction: column; gap: 8px; padding: 28px 0; }
+  .atlas-page footer > p { text-align: left; font-size: 9px; margin-top: 0; }
+  .atlas-page dialog { max-width: calc(100vw - 24px); padding: 21px; border-radius: 14px; }
+}
+@media (max-width: 380px) {
+  .atlas-page .shell { padding: 0 14px; }
+  .atlas-page .atlas-intro p { font-size: 29px; }
+  .atlas-page .atlas-back-link { display: none; }
+  .atlas-page .atlas-current h1 { font-size: 29px; }
+  .atlas-page .atlas-current .hero-scene { right: 20px; width: 80px; height: 80px; }
+  .atlas-page .atlas-current .hero-scene svg { width: 80px; height: 80px; }
+  .atlas-page .metrics { gap: 10px !important; }
+  html body.atlas-page main .metrics > .metric { padding: 14px !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-atlas] { scroll-behavior: auto; }
+  .atlas-page *, .atlas-page *::before, .atlas-page *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
+
+/* Keep editorial typography above the legacy component-specific heading rules. */
+.atlas-page .hero .hourly-panel .section-top { margin: 0; padding-bottom: 15px; }
+.atlas-page .hero .hourly-panel .section-top h2 { font-size: 13px; font-weight: 550; letter-spacing: .1px; line-height: 1.5; }
+.atlas-page .hero .hourly-panel .section-top h2 > span { font-size: 14px; margin-right: 4px; color: #84cbd5; }
+.atlas-page .hero .hourly-panel .section-top > span { font-size: 10px; color: #859bac; }
+.atlas-page #hourly.hourly-strip { padding-top: 18px; gap: 9px; }
+.atlas-page #hourly button.hour { border-radius: 10px; }
+.atlas-page #hourly button.hour > span:first-child { font-size: 12px; font-weight: 550; color: #a8c0cf; }
+.atlas-page #hourly button.hour > strong { font-size: 28px; font-weight: 500; }
+.atlas-page #hourly .hour-feels { color: #91b4c7; }
+.atlas-page #hourly .hour-pop { color: #83d6e0; }
+.atlas-page .brand-name { background: none; -webkit-text-fill-color: initial; text-shadow: none; }
+.atlas-page .brand-mark { box-shadow: none; }
+@media all /* Phone component proportions at every viewport width. */ {
+  .atlas-page .hero .hourly-panel .section-top h2 { font-size: 12px; }
+  .atlas-page .hero .hourly-panel .section-top > span { font-size: 9px; }
+  .atlas-page #hourly button.hour > strong { font-size: 24px; }
+  .atlas-page #hourly button.hour > span:first-child { font-size: 11px; }
+}
+
+/* Data-driven Atlas panels. The original forecast supplies every value. */
+.atlas-page .atlas-freshness[data-state="checked"]::before { content: ""; display: inline-block; width: 4px; height: 4px; border-radius: 50%; margin-right: 6px; margin-bottom: 2px; background: #8fc8b9; }
+.atlas-page .atlas-freshness[data-state="stale"], .atlas-page .atlas-freshness[data-state="unknown"] { color: #c7ab7f; }
+.atlas-page .atlas-chart-tools { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin: 17px 0 10px; }
+.atlas-page .atlas-chart-tools > div { display: flex; align-items: center; gap: 4px; padding: 3px; border: 1px solid #a4bfd21b; background: #07121b3d; border-radius: 9px; }
+.atlas-page .atlas-chart-tools button { padding: 7px 14px; min-height: 34px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: #91a8b9; font-size: 11px; font-weight: 550; }
+.atlas-page .atlas-chart-tools button:hover { color: #e4edf5; background: #b7d8ed0a; }
+.atlas-page .atlas-chart-tools button[aria-pressed="true"] { color: #efcf9e; background: #efbd7610; border-color: #efbd762e; }
+.atlas-page .atlas-chart-tools button[data-atlas-metric="rain"][aria-pressed="true"] { color: #9fdee7; background: #83d6e014; border-color: #83d6e036; }
+.atlas-page .atlas-chart-tools button[data-atlas-metric="wind"][aria-pressed="true"] { color: #d5c5f2; background: #b5a2dd14; border-color: #b5a2dd36; }
+.atlas-page .atlas-chart-scroll { max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; scrollbar-color: #91b9d04d transparent; padding-bottom: 4px; }
+.atlas-page #atlas-trend .atlas-chart-scroll svg { display: block; min-width: 860px; width: 100%; max-width: none; height: auto; overflow: hidden; }
+.atlas-page #atlas-trend .atlas-chart-scroll svg text { font-size: 15px; }
+.atlas-page .atlas-hour-readout { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 25px; padding: 14px 18px; margin: 12px 0 14px; border: 1px solid #aac5d71c; background: #adc7e006; border-radius: 10px; }
+.atlas-page .atlas-hour-readout > strong { min-width: 100px; color: #e6c798; font-size: 13px; font-weight: 550; }
+.atlas-page .atlas-hour-readout > span { display: flex; align-items: baseline; gap: 10px; color: #8fa6b8; font-size: 11px; }
+.atlas-page .atlas-hour-readout b { font-size: 15px; font-weight: 550; color: #d7e5ee; }
+.atlas-page .atlas-scrub-label { display: block; color: #91a7b7; font-size: 10px; margin: 4px 0 1px; }
+.atlas-page .atlas-hour-slider { display: block; width: 100%; height: 25px; margin: 0; accent-color: #efbd76; cursor: pointer; }
+.atlas-page .atlas-chart-note { color: #7d97a9; font-size: 11px; line-height: 1.75; margin: 17px 0 0; max-width: 970px; }
+.atlas-page .atlas-data-detail { border-top: 1px solid #acc9df18; margin-top: 12px; padding-top: 12px; }
+.atlas-page .atlas-data-detail summary { color: #b2cbd9; font-size: 11px; cursor: pointer; padding: 3px 0; }
+.atlas-page .atlas-data-detail[open] summary { color: #e6c798; margin-bottom: 10px; }
+.atlas-page .atlas-table-wrap { max-width: 100%; overflow-x: auto; border: 1px solid #acc9df1c; border-radius: 9px; }
+.atlas-page .atlas-table-wrap table { width: 100%; min-width: 380px; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+.atlas-page .atlas-table-wrap caption { padding: 12px; text-align: left; caption-side: bottom; color: #86a0b3; font-size: 11px; line-height: 1.5; background: #07111a33; }
+.atlas-page .atlas-table-wrap th, .atlas-page .atlas-table-wrap td { padding: 10px 16px; text-align: right; border-bottom: 1px solid #acc9df13; color: #b9ccda; }
+.atlas-page .atlas-table-wrap th:first-child { text-align: left; }
+.atlas-page .atlas-table-wrap thead th { background: #acc9df09; color: #92aab9; font-weight: 550; font-size: 11px; }
+.atlas-page .atlas-table-wrap tbody th { font-weight: 450; color: #9eb9ca; }
+.atlas-page .atlas-table-wrap tbody tr:hover { background: #8ed6e007; }
+.atlas-page .atlas-blend-picker { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; font-size: 11px; color: #a5bdcd; margin-bottom: 16px; }
+.atlas-page .atlas-blend-picker select { border: 1px solid #a8c5db2d; border-radius: 7px; background: #0e1a25; color: #d7e7ef; padding: 8px 10px; min-height: 36px; max-width: 100%; font-size: 12px; }
+.atlas-page .atlas-blend-bar { display: flex; gap: 3px; width: 100%; height: 8px; border-radius: 4px; overflow: hidden; margin: 1px 0 13px; }
+.atlas-page .atlas-blend-bar > span { height: 100%; min-width: 0; opacity: .85; }
+.atlas-page .atlas-source-name { display: block; font-size: 12px; font-weight: 500; }
+.atlas-page .atlas-source-name > i { display: inline-block; width: 6px; height: 6px; border-radius: 2px; margin-right: 8px; margin-bottom: 1px; }
+.atlas-page .atlas-source-name > small { display: block; color: #7893a7; font-size: 10px; font-weight: 400; margin: 4px 0 0 14px; }
+.atlas-page .atlas-source-numbers { flex-shrink: 0; text-align: right; line-height: 1.3; }
+.atlas-page .atlas-source-numbers > strong { font-size: 15px; color: #e2ebf1; font-weight: 500; }
+.atlas-page .atlas-source-numbers > small { display: block; margin-top: 5px; color: #819fb1; font-size: 10px; }
+.atlas-page .atlas-inline-link { display: inline-flex; align-items: center; gap: 14px; margin-top: 4px; padding: 7px 0; font-size: 11px; color: #9fdae3; }
+.atlas-page .atlas-inline-link:hover { color: #c4f2f8; }
+.atlas-page .atlas-confidence-list { display: grid; gap: 6px; }
+.atlas-page .atlas-confidence-day { padding: 0; background: #0b141b33; border: 1px solid #b4ccde12; border-radius: 8px; }
+.atlas-page .atlas-confidence-day summary { list-style: none; display: grid; grid-template-columns: minmax(80px, .6fr) minmax(60px, 1fr) 58px 12px; gap: 15px; align-items: center; min-height: 43px; padding: 10px 13px; cursor: pointer; }
+.atlas-page .atlas-confidence-day summary::-webkit-details-marker { display: none; }
+.atlas-page .atlas-confidence-day summary::after { content: "+"; color: #688ca4; font-size: 14px; text-align: center; }
+.atlas-page .atlas-confidence-day[open] summary::after { content: "−"; }
+.atlas-page .atlas-confidence-day[open] { border-color: #85cad232; background: #83d6e006; }
+.atlas-page .atlas-confidence-day summary > span:first-child { color: #a9c0cf; font-size: 12px; font-weight: 450; }
+.atlas-page .atlas-confidence-track { height: 4px; border-radius: 5px; background: #a8c8dc0d; overflow: hidden; }
+.atlas-page .atlas-confidence-track > i { display: block; height: 100%; border-radius: 5px; background: #83d6e0; }
+.atlas-page .atlas-confidence-track > i[data-confidence="high"] { background: #91c9a8; }
+.atlas-page .atlas-confidence-track > i[data-confidence="moderate"] { background: #efbd76; }
+.atlas-page .atlas-confidence-track > i[data-confidence="low"] { background: #d69788; }
+.atlas-page .atlas-confidence-track > i[data-confidence="unknown"] { background: #8496a4; }
+.atlas-page .atlas-confidence-day summary > strong { font-size: 14px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; color: #cddce5; }
+.atlas-page .atlas-confidence-day summary > strong > small { font-size: 9px; color: #6d899c; font-weight: 400; margin-left: 3px; }
+.atlas-page .atlas-confidence-reasons { padding: 2px 14px 14px; border-top: 1px solid #acc9df0d; color: #8fabbc; font-size: 12px; line-height: 1.7; }
+.atlas-page .atlas-confidence-reasons ul { margin: 8px 0 0; padding-left: 16px; }
+.atlas-page .atlas-confidence-reasons li + li { margin-top: 5px; }
+@media all /* Phone component proportions at every viewport width. */ {
+  .atlas-page .atlas-chart-tools { gap: 10px; }
+  .atlas-page .atlas-chart-tools button { font-size: 11px; padding: 8px 10px; min-height: 38px; }
+  .atlas-page .atlas-chart-tools > div { padding: 2px; gap: 2px; }
+  .atlas-page #atlas-trend .atlas-chart-scroll svg text { font-size: 16px; }
+  .atlas-page .atlas-hour-readout { display: grid; grid-template-columns: 1fr; gap: 8px; padding: 14px; margin-top: 10px; }
+  .atlas-page .atlas-hour-readout > strong { font-size: 13px; margin-bottom: 3px; }
+  .atlas-page .atlas-hour-readout > span { justify-content: space-between; font-size: 12px; }
+  .atlas-page .atlas-hour-readout b { font-size: 15px; }
+  .atlas-page .atlas-scrub-label, .atlas-page .atlas-data-detail summary { font-size: 12px; }
+  .atlas-page .atlas-hour-slider { height: 34px; }
+  .atlas-page .atlas-chart-note { font-size: 12px; }
+  .atlas-page .atlas-data-detail summary { padding: 7px 0; }
+  .atlas-page .atlas-blend-picker { font-size: 12px; }
+  .atlas-page .atlas-blend-picker select { min-height: 40px; }
+  .atlas-page .atlas-source-row { gap: 10px; padding: 13px 0; }
+  .atlas-page .atlas-source-name { font-size: 13px; }
+  .atlas-page .atlas-source-name > small { font-size: 11px; margin-left: 0; max-width: 190px; }
+  .atlas-page .atlas-source-numbers > small { font-size: 11px; }
+  .atlas-page .atlas-inline-link { min-height: 40px; font-size: 12px; }
+  .atlas-page .atlas-confidence-day summary { grid-template-columns: minmax(68px, .8fr) minmax(35px, 1fr) 56px 12px; gap: 10px; padding: 12px; min-height: 46px; }
+  .atlas-page .atlas-confidence-day summary > strong > small { font-size: 10px; }
+  .atlas-page .atlas-confidence-reasons { font-size: 12px; }
+}
+@media(max-width:380px) {
+  .atlas-page .atlas-chart-tools button { padding: 8px; }
+  .atlas-page .atlas-source-name > small { max-width: 150px; }
+  .atlas-page .atlas-confidence-day summary { grid-template-columns: 72px minmax(28px,1fr) 48px 10px; gap: 7px; padding: 11px 9px; }
+}
+
+.atlas-page .atlas-confidence-label{display:block;color:#829caf;font-size:10px;line-height:1.5;margin-top:2px}
+.atlas-page .atlas-confidence-track > i[data-confidence="very-low"]{background:#db858c}
+.atlas-page .map-tabs button:disabled{opacity:.45;cursor:not-allowed}
+
+
+
+
+/* Atlas is phone-only. A wide monitor shows the same narrow, one-column canvas. */
+html body.atlas-page { overflow-x: clip; -webkit-text-size-adjust: 100%; }
+.atlas-page .shell { width: 100%; max-width: 480px; margin-inline: auto; padding-top: env(safe-area-inset-top, 0px); padding-bottom: max(20px, env(safe-area-inset-bottom, 0px)); }
+.atlas-page :is(main, section, .atlas-panel, .atlas-model-grid, .section-top, .hero) { min-width: 0; max-width: 100%; }
+.atlas-page .atlas-header-nav { display: none; }
+.atlas-page .atlas-header-tools { gap: 12px; }
+.atlas-page .atlas-back-link { display: inline-flex; align-items: center; min-height: 44px; }
+.atlas-page .atlas-model-grid { grid-template-columns: minmax(0, 1fr); gap: 0; }
+html body.atlas-page main .today-panel { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+.atlas-page .hero .today-panel .today-uncertainty { border-left: 0; border-top: 1px solid #afc5da1c; padding: 16px 0 0; }
+.atlas-page .weather-jump-nav { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; overflow: visible; }
+.atlas-page .weather-jump-card { width: 100%; padding: 9px 4px; white-space: normal; font-size: 11px; }
+.atlas-page .weather-jump-card .jump-label { font-size: 11px; line-height: 1.3; white-space: normal; }
+body.atlas-page :is(button, select, summary, a[role="button"]) { min-height: 44px !important; }
+.atlas-page .icon-button { width: 44px; height: 44px; }
+.atlas-page .search-wrap input { font-size: 16px; min-height: 48px; }
+.atlas-page .search-wrap > button { min-width: 48px; }
+.atlas-page .section-top { flex-wrap: wrap; }
+.atlas-page .atlas-current-bottom { flex-wrap: wrap; }
+.atlas-page .atlas-current-bottom a { display: inline-flex; align-items: center; min-height: 44px; }
+.atlas-page .atlas-freshness, .atlas-page .status-line { font-size: 11px; }
+.atlas-page .atlas-status-details { overflow-wrap: anywhere; }
+.atlas-page .map-panel .radar-controls { grid-template-columns: 44px minmax(0, 1fr); gap: 8px; }
+.atlas-page .play-button { width: 44px; height: 44px; }
+.atlas-page .radar-controls input { height: 44px; }
+.atlas-page .radar-controls > span { grid-column: 1 / -1; grid-row: 2; white-space: normal; font-size: 11px; }
+.atlas-page .radar-controls select { grid-column: 1 / -1; width: 100%; max-width: 100%; font-size: 16px; padding: 9px 12px; }
+.atlas-page .map-caption { display: block; font-size: 11px; }
+.atlas-page .map-caption > span { display: block; }
+.atlas-page .map-caption a { display: inline-flex; align-items: center; min-height: 44px; white-space: normal; }
+.atlas-page .leaflet-control-zoom a { width: 44px; height: 44px; line-height: 44px; }
+.atlas-page .atlas-chart-tools { gap: 8px; }
+.atlas-page .atlas-chart-tools button { padding-inline: 10px; }
+.atlas-page .atlas-hour-slider { height: 44px; }
+.atlas-page .atlas-blend-picker select { width: 100%; font-size: 16px; }
+.atlas-page .atlas-inline-link { min-height: 44px; }
+.atlas-page :is(.policy-grid, .thermal-grid, .briefing-detail, .graphcast-meta, .weathernext-day-grid, .model-selectors) { grid-template-columns: minmax(0, 1fr) !important; }
+.atlas-page :is(.source-item, .graphcast-head, .weathernext-subhead) { display: block; }
+.atlas-page .source-item span { display: block; text-align: left; }
+.atlas-page .source-item { overflow-wrap: anywhere; }
+.atlas-page .aqi-week { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.atlas-page .gross-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.atlas-page .gross-facts small { white-space: normal; }
+.atlas-page .metric-wind .compass, .atlas-page .sun-arc { display: none; }
+.atlas-page .metric-wind .metric-value { padding-right: 0; }
+.atlas-page .metric p { max-width: 100%; }
+.atlas-page dialog { width: calc(100% - 20px); max-width: 460px; max-height: calc(100dvh - 24px); padding: 60px 18px 24px; }
+.atlas-page .dialog-close { width: 44px; height: 44px; top: 10px; right: 12px; }
+.atlas-page .chart-top { flex-wrap: wrap; }
+.atlas-page .comparison { table-layout: fixed; }
+.atlas-page .comparison :is(td, th) { overflow-wrap: anywhere; }
+.atlas-page input[type="range"] { min-height: 44px; }
+
+/* Keep the featured forecast's phone geometry even above desktop breakpoints. */
+html body.atlas-page #today-forecast .today-weather-card.today-weather-card { grid-template-rows: minmax(205px, auto) 68px 36px; min-height: 309px; }
+html body.atlas-page #today-forecast .today-weather-card.today-remainder { grid-template-rows: minmax(225px, auto) 68px 36px; min-height: 329px; }
+.atlas-page #today-forecast .today-sky { inset-block: 0 104px; height: calc(100% - 104px); }
+.atlas-page #today-forecast .today-scene-shade { inset: 0 0 104px; }
+.atlas-page #today-forecast .today-copy { width: 60%; padding: 15px 0 14px 12px; }
+.atlas-page #today-forecast .day-name { font-size: 34px; line-height: 1; }
+.atlas-page #today-forecast .today-remainder .day-name { font-size: 25px; line-height: 1.08; }
+.atlas-page #today-forecast .today-condition { margin-top: 6px; font-size: 14px; line-height: 1.3; max-width: 18ch; }
+.atlas-page #today-forecast .today-temperatures { gap: 6px; margin-top: auto; }
+.atlas-page #today-forecast :is(.today-low, .today-high) > strong { font-size: 36px; }
+.atlas-page #today-forecast :is(.today-low, .today-high) > small { font-size: 11px; margin-top: 4px; }
+.atlas-page #today-forecast .today-temperatures > i { font-size: 21px; }
+.atlas-page #today-forecast .today-feels { font-size: 12px; margin-top: 6px; }
+.atlas-page #today-forecast .today-feels b { font-size: 21px; }
+.atlas-page #today-forecast .today-moon { top: 10px; left: 57%; width: 40px; }
+.atlas-page #today-forecast .today-symbol { top: 15px; right: 5px; grid-template-columns: 52px 30px; gap: 0 3px; }
+.atlas-page #today-forecast .today-symbol > svg { width: 30px; height: 30px; }
+.atlas-page #today-forecast .today-symbol > strong { font-size: 26px; }
+.atlas-page #today-forecast .today-symbol > small { font-size: 10px; max-width: 52px; }
+.atlas-page #today-forecast .today-symbol > em { font-size: 9px; white-space: normal; }
+.atlas-page #today-forecast .today-night .today-symbol { grid-template-columns: 52px 30px; }
+.atlas-page #today-forecast .today-night .today-symbol > svg { width: 30px; height: 30px; }
+.atlas-page #today-forecast .today-metrics { margin: 0 6px; padding: 4px 0; border-radius: 12px; }
+.atlas-page .today-panel #today-forecast .today-metric { flex-direction: column; gap: 2px; padding: 0 2px; text-align: center; }
+.atlas-page .today-panel #today-forecast .today-metric svg { width: 17px; height: 17px; }
+.atlas-page .today-panel #today-forecast .today-metric strong { font-size: 13px; white-space: normal; }
+.atlas-page .today-panel #today-forecast .today-metric small { font-size: 10px; margin: 0; }
+.atlas-page #today-forecast .today-more { margin: 4px 6px 0; font-size: 11px; }
+.atlas-page #today-forecast .today-more b { font-size: 18px; }
+.atlas-page #skin-values .sun-shade-comparison { grid-template-columns: minmax(0, 1fr); gap: 14px; max-width: 100%; }
+.atlas-page #skin-values .sun-shade-comparison .exposure-person,
+.atlas-page #skin-values .sun-shade-comparison .exposure-person:has(.reference-scene) { grid-template-rows: 30px 40px 24px 235px minmax(100px, auto); aspect-ratio: auto; border-radius: 16px; }
+.atlas-page #skin-values .sun-shade-comparison .exposure-person > figcaption > strong { font-size: 34px; }
+.atlas-page #skin-values .comfort-later { grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding: 14px; }
+.atlas-page #skin-values .comfort-later::before { display: none; }
+.atlas-page #skin-values .comfort-later > span:first-child, .atlas-page #skin-values .comfort-later > small { grid-column: 1; }
+.atlas-page #skin-values .comfort-later > .peak-reading { grid-column: 2; }
+.atlas-page #skin-values .comfort-later > span:first-child { font-size: 16px; }
+.atlas-page #skin-values .comfort-later > small { font-size: 12px; }
+.atlas-page #skin-values .comfort-later[data-comparison="no-direct-sun"] { grid-template-columns: minmax(0, 1fr); }
+
+/* Full day names and all readings fit without squeezing a six-column desktop row. */
+.atlas-page .daily-panel .day-row {
+  display: grid; grid-template-columns: 42px minmax(0, 1fr) minmax(0, 1fr) 42px;
+  grid-template-areas: "name name icon icon" "low track track high" "feels feels feels feels" "meta meta meta meta";
+  gap: 10px 8px; padding: 14px 12px; min-height: 0; margin: 10px 0;
+}
+.atlas-page .daily-panel .day-row > * { min-width: 0; }
+.atlas-page .daily-panel .day-name { font-size: 15px; line-height: 1.4; overflow-wrap: anywhere; }
+.atlas-page .daily-panel .day-name-full { display: inline; }
+.atlas-page .daily-panel .day-name-mobile { display: none; }
+.atlas-page .daily-panel .day-icon { display: flex; align-items: center; justify-content: flex-end; gap: 7px; }
+.atlas-page .daily-panel .day-icon svg { width: 32px; height: 32px; margin: 0; }
+.atlas-page .daily-panel .day-icon small { font-size: 11px !important; }
+.atlas-page .daily-panel .day-low, .atlas-page .daily-panel .day-high strong { font-size: 23px; }
+.atlas-page .daily-panel .day-low small, .atlas-page .daily-panel .day-high small { font-size: 10px !important; }
+.atlas-page .daily-panel .temp-track { height: 7px; }
+.atlas-page .daily-panel .high-marker { width: 11px; height: 11px; }
+.atlas-page .daily-panel .day-feels-summary { flex-direction: row; align-items: baseline; justify-content: flex-start; gap: 5px; }
+.atlas-page .daily-panel .day-feels-summary small, .atlas-page .daily-panel .day-feels-summary b { font-size: 11px !important; }
+.atlas-page .daily-panel .day-meta {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-areas: "confidence confidence confidence" "wind aqi uv";
+  width: 100%; gap: 9px 5px; padding-top: 10px; margin: 0; border-top: 1px solid #b8daf024;
+}
+.atlas-page .daily-panel .forecast-confidence {
+  grid-area: confidence !important; display: grid; grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "confidence-label confidence-level" "confidence-meter confidence-meter";
+  gap: 8px; width: 100%; text-align: left; margin: 0; font-size: 11px !important;
+}
+.atlas-page .daily-panel .forecast-confidence > span { grid-area: confidence-label; white-space: normal !important; font-size: 11px !important; }
+.atlas-page .daily-panel .forecast-confidence > b { grid-area: confidence-level; font-size: 11px !important; }
+.atlas-page .daily-panel .confidence-meter { grid-area: confidence-meter; width: calc(100% - 14px); height: 5px; margin-bottom: 5px; }
+.atlas-page .daily-panel .day-wind-chip { grid-area: wind; flex-wrap: wrap; white-space: normal; }
+.atlas-page .daily-panel .day-aqi-chip { grid-area: aqi; font-size: 10px; justify-content: center; white-space: normal; }
+.atlas-page .daily-panel .daily-uv { grid-area: uv; font-size: 10px; text-align: right; white-space: normal; }
+.atlas-page .daily-panel .forecast-confidence-notice { flex-wrap: wrap; padding: 10px; }
+.atlas-page #skin-exposure .skin-kicker { font-size: 20px; line-height: 1.3; margin: 0 0 16px; }
+.atlas-page #skin-values .sun-shade-comparison .exposure-person > .exposure-label { font-size: 22px; }
+.atlas-page #skin-values .sun-shade-comparison .exposure-person > .exposure-subtitle { font-size: 14px; }
+.atlas-page #skin-values .sun-shade-comparison .exposure-person > svg,
+.atlas-page #skin-values .sun-shade-comparison .pavement-person > .poodle-scene { height: 235px !important; aspect-ratio: auto !important; }
+.atlas-page #skin-values .sun-shade-comparison .exposure-person > figcaption > small { font-size: 12px; line-height: 1.4; }
+.atlas-page #skin-values .sun-shade-comparison .exposure-person > figcaption > .pavement-secondary { font-size: 14px; }
+.atlas-page #skin-values .sun-shade-comparison .exposure-person .thermal-risk,
+.atlas-page #skin-values .sun-shade-comparison .exposure-person .pavement-warning { font-size: 11px; white-space: normal; }
+.atlas-page #skin-values .sun-shade-comparison .exposure-person[data-reading="unavailable"] > figcaption > strong { font-size: 22px; }
+
+.atlas-page .aqi-summary { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.atlas-page .aqi-pollutants { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.atlas-page .aqi-pollutants > span { min-width: 0; padding: 10px; }
+.atlas-page .car-wash-hero { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.atlas-page .car-wash-checks { width: 100%; gap: 10px; padding: 12px; }
+.atlas-page .car-wash-fact { grid-template-columns: 24px minmax(0, 1fr); gap: 8px; }
+.atlas-page .car-wash-fact b { font-size: 14px; }
+.atlas-page .car-wash-fact small, .atlas-page .car-wash-answer p, .atlas-page .car-wash-header p { font-size: 12px; line-height: 1.5; }
+.atlas-page .car-wash-days { display: flex; overflow-x: auto; gap: 8px; padding-bottom: 8px; scroll-snap-type: x proximity; }
+.atlas-page .car-wash-day { flex: 0 0 92px; padding: 12px 6px; scroll-snap-align: start; border-radius: 12px; }
+.atlas-page .car-wash-day > strong, .atlas-page .car-wash-temps, .atlas-page .car-wash-chance { font-size: 12px; }
+.atlas-page .car-wash-day > small, .atlas-page .car-wash-day-verdict { font-size: 11px; }
+.atlas-page .car-wash-day svg { width: 32px; height: 32px; }
+.atlas-page .car-wash-window { grid-template-columns: 24px minmax(0, 1fr); }
+.atlas-page .car-wash-tip { display: none; }
+.atlas-page .car-wash-footer { font-size: 11px; line-height: 1.5; letter-spacing: 0; }
+
+/* The condition icon shares the header row, never the large numeric reading. */
+.atlas-page .atlas-current .hero-scene { top: 16px; right: 22px; width: 44px; height: 44px; }
+.atlas-page .atlas-current .hero-scene svg { width: 44px; height: 44px; }
+.atlas-page .atlas-coordinate-mark { visibility: hidden; }
+html body.atlas-page #wn-var-picker button, html body.atlas-page #wn-compare-chart .wn-chip { min-height: 44px !important; }
+@media (max-width: 359px) {
+  .atlas-page .atlas-back-link { display: none; }
+  .atlas-page .atlas-status-row { display: block; }
+  .atlas-page .atlas-status-details { max-width: 100%; text-align: left; margin-top: 8px; }
+}
