@@ -69,11 +69,11 @@ function rateLimit(req) {
 }
 
 function requireCouncilAccess(req, res, accessCode) {
-  if (!accessCode) {
+  if (!req.privatePageAuthenticated && !accessCode) {
     res.status(503).json({ ok: false, error: "AI Council is locked until AI_COUNCIL_ACCESS_CODE is configured on the server." });
     return false;
   }
-  if (cleanText(req.headers["x-ai-council-code"], 200) !== accessCode) {
+  if (!req.privatePageAuthenticated && cleanText(req.headers["x-ai-council-code"], 200) !== accessCode) {
     res.status(401).json({ ok: false, error: "Incorrect AI Council access code." });
     return false;
   }
