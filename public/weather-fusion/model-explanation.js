@@ -1,4 +1,4 @@
-import {isTonightPeriod,localHour} from './weather-math.js?v=weather-qa-v70';
+import {isTonightPeriod,localHour} from './weather-math.js?v=cold-feels-v1';
 const HOUR = 3600000;
 const WEATHERNEXT_FEED = 'https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/weathernext3.json';
 const WEATHERNEXT_SOURCE = 'https://developers.google.com/weathernext/guides/models';

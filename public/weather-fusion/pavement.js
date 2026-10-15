@@ -1,11 +1,11 @@
-import {finite,solarElevation,thermalHumidity} from './weather-math.js?v=weather-qa-v67';
+import {finite,solarElevation,thermalHumidity,wetBulb} from './weather-math.js?v=cold-feels-v1';
 import {clothingForFeels,referenceScene,precipitationActivity,winterSceneExpected} from './exposure-scene.js?v=true-night-v6';
 import {thermalRisk} from './thermal-risk.js?v=weather-art-labels-v10';
-import {weatherShapes} from './weather-display.js?v=feel-chart-tabs-v9';
+import {weatherShapes} from './weather-display.js?v=cold-feels-v1';
 import {weatherState} from './weather-state.js';
 const H=3600000,SIGMA=5.670374419e-8,clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 const c=f=>(f-32)/1.8,f=c=>c*1.8+32;
-export const PAVEMENT_VERSION='pavement-energy-balance-v1';
+export const PAVEMENT_VERSION='pavement-energy-balance-v2';
 export function solarRadiation(row,location,time){
  if(finite(row.solar)&&row.solar>=0)return row.solar;
  const elevation=solarElevation(time,location?.latitude,location?.longitude);
@@ -33,6 +33,10 @@ export function integrateSurface(rows,location,{albedo=.3,k=2,capacity=2.2e6,win
  const deep=rows.reduce((sum,r)=>sum+c(r.temperature),0)/rows.length;
  let ts=c(rows[0].temperature)+initialOffset,tb=deep+initialOffset*.5;
  const cs=capacity*.03,cb=capacity*.15,g=k/.09,gd=k/.25;
+ // A wet surface evaporates toward the wet-bulb temperature. Rain in the
+ // current or previous 3 hours keeps the surface wet; without this term the
+ // model held wet night pavement several degrees too warm.
+ const wetHour=rows.map((row,i)=>{for(let j=Math.max(0,i-3);j<=i;j++){const rain=rows[j].rain;if(finite(rain)&&rain>0.05)return true;}return false;});
  for(let i=1;i<rows.length;i++){
   const a=rows[i-1],b=rows[i],span=b.epoch-a.epoch;
   if(span<=0||span>1.51*H)return null;
@@ -42,7 +46,11 @@ export function integrateSurface(rows,location,{albedo=.3,k=2,capacity=2.2e6,win
    if(![r.temperature,r.wind,sw,lw].every(finite)||r.wind<0)return null;
    const v=r.wind*.44704*.7*windFactor,h=v<=5?5.6+4*v:7.3*v**.78;
    const conduction=g*(ts-tb);
-   const flux=(1-albedo)*sw*solarFactor+.95*(lw-SIGMA*(ts+273.15)**4)+h*(c(r.temperature)-ts)-conduction;
+   let flux=(1-albedo)*sw*solarFactor+.95*(lw-SIGMA*(ts+273.15)**4)+h*(c(r.temperature)-ts)-conduction;
+   if(wetHour[i]){
+    const twbF=wetBulb(r.temperature,thermalHumidity(r));
+    if(finite(twbF))flux+=h*(c(twbF)-ts);
+   }
    ts+=dt*flux/cs;tb+=dt*(conduction-gd*(tb-deep))/cb;
    if(!finite(ts)||ts< -100||ts>150)return null;
    time+=dt*1000;
@@ -85,7 +93,7 @@ export function pavementEstimate(forecast,current,now=Date.now(),{checkedAt=now,
  const activePrecipitation=precipitationActivity(condition,{pop,precipitation,rainAround,radarThreat})==='active';
  const wet=activePrecipitation||rows.slice(-4).some(r=>finite(r.rain)&&r.rain>0),frozen=current.temperature<=32;
  return {version:PAVEMENT_VERSION,status:'estimated',...results,historyHours:(now-rows[0].epoch)/H,wet,activePrecipitation,frozen,airTemperature:Math.round(last.temperature),skyCover:last.skyCover,time:new Date(now).toISOString(),daylight,
-  note:frozen?'Snow, ice and freezing change surface behavior; these dry-surface estimates are unreliable in these conditions.':wet?'Recent modeled rain may mean wet surfaces. These are dry-surface estimates; wet pavement can be cooler.':'Estimated dry, exposed surfaces. Shade, color and local shelter can change the actual temperature.',
+  note:frozen?'Snow, ice and freezing change surface behavior; these dry-surface estimates are unreliable in these conditions.':wet?'Recent modeled rain may mean wet surfaces. Wet-surface estimates include evaporative cooling toward the wet-bulb temperature.':'Estimated dry, exposed surfaces. Shade, color and local shelter can change the actual temperature.',
   advice:'Check the actual surface with the back of your hand. If it feels too hot, choose grass or a cooler route.'};
 }
 export function walkerOutfit(feels){

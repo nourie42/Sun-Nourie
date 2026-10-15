@@ -1,5 +1,5 @@
-import {finite,dailyRainPeriod} from './weather-math.js?v=weather-qa-v67';
-import {timeAt} from './hourly-feels.js?v=continuous-feels-v2';
+import {finite,dailyRainPeriod} from './weather-math.js?v=cold-feels-v1';
+import {timeAt} from './hourly-feels.js?v=cold-feels-v1';
 
 const HOUR = 3600000;
 const RAIN_TIMING_THRESHOLD = 25;

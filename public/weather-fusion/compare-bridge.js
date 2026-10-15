@@ -1,4 +1,4 @@
-import {displayedFeelsAt} from '/weather-fusion/hourly-feels.js?v=continuous-feels-v2';
+import {displayedFeelsAt} from '/weather-fusion/hourly-feels.js?v=cold-feels-v1';
 import {installWeatherNextAccess} from '/weather-fusion/weathernext-access.js?v=autolocation-load-v2';
 const sections=['city-name','today-forecast','hourly','skin-exposure','daily-panel','metrics','air-quality','map-panel','scientific-stuff'];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

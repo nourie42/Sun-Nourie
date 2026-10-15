@@ -1,8 +1,8 @@
 import {weatherState} from './weather-state.js';
-import {dailyDisplay,dailyRainPeriod,finite} from './weather-math.js?v=full-day-rain-v1';
-import {dailyFeels,degrees,timeAt} from './hourly-feels.js?v=continuous-feels-v2';
+import {dailyDisplay,dailyRainPeriod,finite} from './weather-math.js?v=cold-feels-v1';
+import {dailyFeels,degrees,timeAt} from './hourly-feels.js?v=cold-feels-v1';
 import {uvCategory} from './daily-uv.js?v=weather-art-labels-v10';
-import {weatherIcon,weatherMetricIcon} from './weather-display.js?v=feel-chart-tabs-v9';
+import {weatherIcon,weatherMetricIcon} from './weather-display.js?v=cold-feels-v1';
 import {displayedRainChance,observedRainLabel} from './rain-display.js?v=rain-observed-v1';
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const reading=(value,unit='')=>finite(value)?`${Math.round(value)}${unit}`:'—';

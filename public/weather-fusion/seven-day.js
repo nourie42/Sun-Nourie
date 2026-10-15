@@ -1,8 +1,8 @@
-import {dailyDisplay,finite} from './weather-math.js?v=full-day-rain-v1';
+import {dailyDisplay,finite} from './weather-math.js?v=cold-feels-v1';
 import {displayedRainChance,rainAwareCondition} from './rain-display.js?v=rain-icon-v2';
-import {forecastPeriodSummary} from './forecast-story.js?v=weather-qa-v67';
-import {shortForecastCondition} from './today-card.js?v=mobile-repair-v1';
-import {weatherIcon,weatherMetricIcon} from './weather-display.js?v=feel-chart-tabs-v9';
+import {forecastPeriodSummary} from './forecast-story.js?v=cold-feels-v1';
+import {shortForecastCondition} from './today-card.js?v=cold-feels-v1';
+import {weatherIcon,weatherMetricIcon} from './weather-display.js?v=cold-feels-v1';
 import {confidenceMeterPosition} from './forecast-confidence.js?v=category-meter-v1';
 
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

@@ -1,6 +1,6 @@
 import {plainDanWording,hasDanJargon,collectDanTakeEvidence,visibleDanTakeItems,danTakeText,discussionPeriod,sectionAnchor,explicitForecastUncertainty} from './dans-take.js?v=clear-weather-daygraph-v3';
 import {bulletinFacts} from './bulletin-facts.js?v=county-warnings-v1';
-import {isTonightPeriod} from './weather-math.js?v=weather-qa-v67';
+import {isTonightPeriod} from './weather-math.js?v=cold-feels-v1';
 const norm=v=>String(v||'').replace(/\s+/g,' ').trim();
 const dateKey=(time,zone)=>new Intl.DateTimeFormat('en-CA',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(time));
 function anchoredText(text,anchor,zone,now){

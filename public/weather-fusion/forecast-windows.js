@@ -1,6 +1,6 @@
-import {forecastSample} from './weather-display.js?v=feel-chart-tabs-v9';
-import {sunExposureTemperature} from './outdoor-feels.js?v=air-hero-v3';
-import {finite,rainChanceValue,solarElevation} from './weather-math.js?v=full-day-rain-v1';
+import {forecastSample} from './weather-display.js?v=cold-feels-v1';
+import {sunExposureTemperature} from './outdoor-feels.js?v=cold-feels-v1';
+import {finite,rainChanceValue,solarElevation} from './weather-math.js?v=cold-feels-v1';
 
 const HOUR = 3600000;
 const WINDOW_DAYS = 5;

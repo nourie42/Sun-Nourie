@@ -79,6 +79,22 @@ test('surface integrator converges at a half-sized step and rejects missing hour
  assert.ok(Math.abs(a-b)<.15);
  rows.splice(5,2);assert.equal(integrateSurface(rows,location),null);
 });
+test('wet night pavement cools toward the wet-bulb; dry night pavement is untouched',()=>{
+ // Warm sunny day, then a cold rainy night: stored slab heat keeps dry
+ // pavement above air temperature, but rain must cool the wet surface.
+ const base=exposureFixture().rows.map((r,i)=>{
+  const dayHour=new Date(Date.parse(r.time)).getUTCHours()-4;
+  const day=i<34, temp=day?73+17*Math.max(0,Math.sin((dayHour-6)/12*Math.PI)):36;
+  return {...r,epoch:Date.parse(r.time),temperature:temp,dewpoint:temp-4,humidity:day?55:92,wind:day?5:13,skyCover:day?10:95,solar:day?r.solar:0,rain:0};
+ });
+ const dry=integrateSurface(base,location,{albedo:.1,k:1.5});
+ const wetRows=base.map((r,i)=>({...r,rain:i>=base.length-6?1.5:0}));
+ const wet=integrateSurface(wetRows,location,{albedo:.1,k:1.5});
+ assert.ok(Number.isFinite(dry)&&Number.isFinite(wet));
+ assert.ok(dry>38,'stored daytime heat keeps dry night asphalt above the 36°F air');
+ assert.ok(wet<dry-1,'rain adds evaporative cooling toward the wet-bulb temperature');
+ assert.ok(wet>32&&wet<40,'wet night asphalt stays near the 36°F air, not several degrees above it');
+});
 test('wet/frozen context is disclosed and missing history is never assumed dry/zero',()=>{
  const f={assembledAt:new Date(now).toISOString(),location,exposureWeather:exposureFixture()};
  f.exposureWeather.rows.find(r=>Date.parse(r.time)===now).rain=2;

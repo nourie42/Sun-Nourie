@@ -161,14 +161,33 @@ function estimatedMrtDelta(current,elevation,exposure) {
   const direct=exposure==='outdoors'?130*sun*trans:0;
   return (diffuseLoad*sun+direct)/6.1;
 }
+/** NWS wind chill floor for cold feels-like. UTCI's 10 m wind term runs far
+ * colder than the U.S. standard index and lived experience in cold wind
+ * (about 8°F at 36°F air and 13 mph wind, where NWS wind chill is 27°F).
+ * In the cold regime the value is lifted toward the NWS figure: the full
+ * NWS wind chill applies at or below 40°F, fading linearly to pure UTCI by
+ * 60°F so warm conditions are untouched and no step appears at any
+ * boundary. The wind gate fades in from 2 to 4 mph (NWS validity is 3+
+ * mph). Solar-warmed UTCI values already above wind chill are never
+ * reduced. */
+function coldWindChillBlend(tF,windMph,utciValue){
+  if(!finite(tF)||!finite(windMph)||!finite(utciValue))return utciValue;
+  if(tF>=60||windMph<2)return utciValue;
+  const wT=Math.min(1,Math.max(0,(60-tF)/20)),wV=Math.min(1,Math.max(0,(windMph-2)/2));
+  if(wT<=0||wV<=0)return utciValue;
+  const p=Math.pow(windMph,.16),windChill=35.74+.6215*tF-35.75*p+.4275*tF*p;
+  return utciValue+wT*wV*Math.max(0,windChill-utciValue);
+}
 export function tier3FeelsLike(current,location,now,exposure='shade') {
   if(!finite(current?.temperature)||!finite(current?.wind)||current.wind<0)return {value:null,method:'UTCI inputs unavailable'};
   const rh=thermalHumidity(current);
   if(!finite(rh))return {value:null,method:'UTCI moisture unavailable'};
   const elevation=solarElevation(now,location?.latitude,location?.longitude),deltaC=estimatedMrtDelta(current,elevation,exposure);
-  const tr=current.temperature+deltaC*1.8,value=utciF(current.temperature,tr,current.wind,rh);
+  const tr=current.temperature+deltaC*1.8,rawValue=utciF(current.temperature,tr,current.wind,rh);
+  const value=coldWindChillBlend(current.temperature,current.wind,rawValue);
   return {value,method:finite(value)?'UTCI Tier-3 fallback with estimated mean radiant temperature':'UTCI outside supported range',rh,tr,deltaMrtC:deltaC,
-    windUsedMps:Math.max(.5,current.wind*.44704),warmerResultOverride:false};
+    windUsedMps:Math.max(.5,current.wind*.44704),warmerResultOverride:false,
+    windChillFloor:finite(value)&&finite(rawValue)&&value>rawValue+.001};
 }
 
 export function thermalComfort(current, location, now) {
@@ -193,5 +212,5 @@ export function thermalComfort(current, location, now) {
     method:shade.method,humidity:rh,wetBulb:wet,daylight,absorbedRadiation:finite(weather.cover)?(daylight?130*Math.max(0,Math.sin(elevation))**.72*(1-weather.cover/100):0):estimatedAbsorbedRadiation(weather.condition,elevation),
     solarAdjustment:finite(outdoorValue)&&finite(shadeValue)?outdoorValue-shadeValue:null,
     dewpointEffect:dewpointMessage(current.dewpoint),windEffect:windMessage(current.temperature,current.wind),microclimate:localContext,
-    note:`Tier-3 operational fallback from the attached Real-Feel Skin Temperature research: UTCI is the all-season base using air temperature, humidity/dew point and standard wind, with solar elevation and broad sky state used for a generic radiant estimate. No warmer-formula override or observation-to-forecast offset is used. Numeric hourly cloud cover is preferred over broad period descriptions. Calm wind uses the UTCI minimum 0.5 m/s; out-of-domain conditions stay unavailable. Cloud attenuation and MRT are estimates, not local radiometer measurements. This is a modeled equivalent temperature, not measured skin temperature or validated EPST. ${dewpointMessage(current.dewpoint)} ${windMessage(current.temperature,current.wind)} ${localContext} Wet bulb is diagnostic only and is not added again to the result.`};
+    note:`Tier-3 operational fallback from the attached Real-Feel Skin Temperature research: UTCI is the all-season base using air temperature, humidity/dew point and standard wind, with solar elevation and broad sky state used for a generic radiant estimate. No warmer-formula override or observation-to-forecast offset is used. In cold wind the value never falls below the NWS wind chill figure (full NWS wind chill at or below 40°F, fading to pure UTCI by 60°F); warmer conditions use UTCI unchanged. Numeric hourly cloud cover is preferred over broad period descriptions. Calm wind uses the UTCI minimum 0.5 m/s; out-of-domain conditions stay unavailable. Cloud attenuation and MRT are estimates, not local radiometer measurements. This is a modeled equivalent temperature, not measured skin temperature or validated EPST. ${dewpointMessage(current.dewpoint)} ${windMessage(current.temperature,current.wind)} ${localContext} Wet bulb is diagnostic only and is not added again to the result.`};
 }

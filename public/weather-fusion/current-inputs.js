@@ -1,4 +1,4 @@
-import {finite,thermalHumidity} from './weather-math.js?v=weather-qa-v67';
+import {finite,thermalHumidity} from './weather-math.js?v=cold-feels-v1';
 const H=3600000;
 /** Preserve the station air reading. Fill only absent wind/moisture from the
  * current forecast hour, and retain per-field provenance. Never borrow a future
