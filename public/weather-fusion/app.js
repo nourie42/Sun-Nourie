@@ -6,13 +6,13 @@ import {weatherIcon,renderHourlyWeather,currentSample} from './weather-display.j
 import {dayGraphHTML,dayGraphPoints,installDayGraph} from './day-graph.js?v=rain-chance-v7';
 import {degrees,feelsAt,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=continuous-feels-v2';
 import {createFramePlayer} from './frame-player.js';
-import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=feel-chart-tabs-v9';
+import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=true-night-v6';
 import {dailyDisplay} from './weather-math.js?v=full-day-rain-v1';
 import {conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
 import {currentHero} from './current-temperature.js?v=rain-now-v71';
 import {renderBulletins} from './bulletins.js?v=county-warnings-v1';
 import {withLiveAlerts,retainUnverifiedAlerts,alertLocationKey,ALERT_REFRESH_MS} from './live-alerts.js?v=county-warnings-v3';
-import {modelFreshnessText} from './personal-details.js?v=feel-chart-tabs-v9';
+import {modelFreshnessText} from './personal-details.js?v=true-night-v6';
 import {renderDewpointMeter} from './dewpoint-meter.js?v=feel-chart-v3';
 import {renderWeatherPanel} from './render-safety.js';
 import {forecastPeriodSummary} from './forecast-story.js?v=weather-qa-v67';
