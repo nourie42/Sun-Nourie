@@ -1,6 +1,6 @@
 import {weatherState} from './weather-state.js';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
-export const COMFORT_ART_VERSION='selected-hour-art-v4';
+export const COMFORT_ART_VERSION='true-night-art-v6';
 
 /** A precise NWS clock clause can rule out a coarse snow allocation before
  * the stated transition. Null means no timed phase evidence is available.
@@ -62,7 +62,9 @@ export function precipitationActivity(condition='',context={}){
 const baseAssets={normal:'comfort-reference-scenes.webp',hot:'comfort-reference-scenes-hot.webp',rain:'comfort-reference-scenes-rain.webp','carry-umbrella':'comfort-reference-scenes-carry-umbrella.svg',fog:'comfort-reference-scenes-fog.webp',watch:'comfort-reference-scenes-watch.webp',dawn:'comfort-reference-scenes-dawn.webp'};
 const integratedKeys=['normal','watch','fog','dawn','rain','carry-umbrella'];
 const integratedAsset=(outfit,key)=>`comfort-integrated-${outfit}-${key}.webp`;
-export const COMFORT_SCENE_ASSETS=[...Object.values(baseAssets),...['cold','cool'].flatMap(outfit=>integratedKeys.map(key=>integratedAsset(outfit,key))),...integratedKeys.filter(key=>key!=='rain').map(key=>integratedAsset('mild',key)),'comfort-integrated-snow-play.webp','comfort-integrated-snow-play-dawn.webp','comfort-integrated-rain-night.webp'];
+const nightAsset=(outfit,group)=>`comfort-night-${outfit}-${group}.webp`;
+const nightAssets=['cold','cool','mild','warm'].flatMap(outfit=>['dry-chance','rain-fog'].map(group=>nightAsset(outfit,group)));
+export const COMFORT_SCENE_ASSETS=[...Object.values(baseAssets),...['cold','cool'].flatMap(outfit=>integratedKeys.map(key=>integratedAsset(outfit,key))),...integratedKeys.filter(key=>key!=='rain').map(key=>integratedAsset('mild',key)),'comfort-integrated-snow-play.webp','comfort-integrated-snow-play-dawn.webp','comfort-integrated-rain-night.webp',...nightAssets];
 
 /** Each selected asset is a complete image with garments rendered into the
  * characters. The renderer never adds separate clothing geometry. */
@@ -71,13 +73,20 @@ export function comfortSceneState(daylight=true,condition='Clear',feels=null,con
  if(snow)return {key:'snow',asset:daylight?'comfort-integrated-snow-play.webp':'comfort-integrated-snow-play-dawn.webp'};
  const precipitation=precipitationActivity(condition,context);
  const outfit=clothingForFeels(feels,{...context,snowExpected:weather.kind==='snow'});
- const key=precipitation==='active'?'rain':precipitation==='possible'?'carry-umbrella':weather.kind==='fog'?'fog':!daylight?'dawn':['cloudy','snow'].includes(weather.kind)?'watch':outfit==='hot'&&['clear','partly-cloudy'].includes(weather.kind)?'hot':'normal';
+ if(!daylight){
+  // Every weather category needs its own actual night artwork. Rain chances
+  // must not bypass darkness or borrow active-rain scenes with open umbrellas.
+  const key=precipitation==='active'?'rain':precipitation==='possible'?'carry-umbrella':weather.kind==='fog'?'fog':'night';
+  const profile=['warm','hot'].includes(outfit)?'warm':outfit;
+  const group=['rain','fog'].includes(key)?'rain-fog':'dry-chance';
+  return {key,asset:nightAsset(profile,group),rows:2,row:['carry-umbrella','fog'].includes(key)?1:0};
+ }
+ const key=precipitation==='active'?'rain':precipitation==='possible'?'carry-umbrella':weather.kind==='fog'?'fog':['cloudy','snow'].includes(weather.kind)?'watch':outfit==='hot'&&['clear','partly-cloudy'].includes(weather.kind)?'hot':'normal';
  let asset=baseAssets[key];
  if(['cold','cool','mild'].includes(outfit)&&finite(finite(context.clothingFeels)?context.clothingFeels:feels)){
   // The integrated rain version includes full trousers as well as raincoats.
   asset=integratedAsset(outfit==='mild'&&key==='rain'?'cool':outfit,key==='hot'?'normal':key);
  }
- if(key==='rain'&&!daylight&&['cold','cool','mild'].includes(outfit))asset='comfort-integrated-rain-night.webp';
  return {key,asset};
 }
 const comfortSceneUrl=asset=>`/weather-fusion/${asset}?v=${COMFORT_ART_VERSION}`;
@@ -99,11 +108,12 @@ export function referenceScene(panel,daylight=true,condition='Clear',feels=null,
  const clothing=knownClothing?{hot:'light hot-weather clothing',warm:'light warm-weather clothing',mild:'a top and long pants',cool:'a light jacket and long pants',cold:'a heavy coat, scarf, warm hat, gloves and boots'}[outfit]:'everyday clothing';
  const subject=panel===0?'A boy sitting beneath a shade tree':panel===1?'A boy outdoors':'A woman walking a light brown toy poodle';
  const rainAction=panel===0?'sheltering beneath a leafy tree as steady rain falls nearby':'using rain gear and an umbrella in steady rain';
- const action={hot:'visibly reacting to extreme heat in light hot-weather clothing',rain:rainAction,'carry-umbrella':'carrying a closed umbrella under a cloudy sky because rain is possible but not likely enough to open it',fog:'clearly visible in diffuse fog with no direct sunlight',watch:'looking at a cloudy sky with no rain gear needed',dawn:'clearly visible outdoors before sunrise with no direct sunlight',normal:`outdoors in ${clothing}`}[scene.key];
+ const action={hot:'visibly reacting to extreme heat in light hot-weather clothing',rain:rainAction,'carry-umbrella':'carrying a closed umbrella under a cloudy sky because rain is possible but not likely enough to open it',fog:'clearly visible in diffuse fog with no direct sunlight',watch:'looking at a cloudy sky with no rain gear needed',night:'outdoors at night under a dark sky',normal:`outdoors in ${clothing}`}[scene.key];
  let label=panel===2&&scene.key==='rain'?'A woman in rain gear walking a light brown toy poodle as the dog shakes rainwater from its fur':`${subject}, ${action}; clothing: ${clothing}`;
  if(scene.key==='snow')label=(panel===0?'A child in a heavy coat, warm hat, scarf, mittens and boots building a snowman beneath a snowy tree':panel===1?'A person in a heavy coat, warm hat, scarf, mittens and boots playing with snowballs':'A woman in a heavy coat, warm hat, scarf, mittens and boots playing in the snow with a light brown poodle')+'; illustration of forecast snow';
+ if(!daylight)label+='; nighttime illustration with no daylight';
  const garment=outfit==='cold'?'heavy-coat-and-trousers':outfit==='cool'?'jacket-and-trousers':scene.key==='rain'?'rainwear-and-trousers':outfit==='mild'?'long-trousers':'light-clothing';
- return `<svg class="reference-scene${scene.key==='snow'?' snow-play-scene':''}${panel===2?' poodle-scene':''}" viewBox="0 0 300 300" preserveAspectRatio="xMidYMid slice" role="img" aria-label="${label}" data-scene="${scene.key}" data-outfit="${outfit}" data-visible-outfit="${outfit}" data-garment="${garment}" data-artwork="complete-image" data-daylight="${daylight}" data-weather="${scene.key==='snow'?'snow':weather.kind}"><image class="reference-art" href="${comfortSceneUrl(scene.asset)}" x="${-300*panel}" y="0" width="900" height="300" preserveAspectRatio="none"/></svg>`;
+ return `<svg class="reference-scene${scene.key==='snow'?' snow-play-scene':''}${panel===2?' poodle-scene':''}" viewBox="0 0 300 300" preserveAspectRatio="xMidYMid slice" role="img" aria-label="${label}" data-scene="${scene.key}" data-outfit="${outfit}" data-visible-outfit="${outfit}" data-garment="${garment}" data-artwork="complete-image" data-daylight="${daylight}" data-weather="${scene.key==='snow'?'snow':weather.kind}"><image class="reference-art" href="${comfortSceneUrl(scene.asset)}" x="${-300*panel}" y="${-300*(scene.row||0)}" width="900" height="${300*(scene.rows||1)}" preserveAspectRatio="none"/></svg>`;
 }
 export function exposureScene(sun,daylight=true,condition='Clear',feels=null,context={}){
  return referenceScene(sun?1:0,daylight,condition,feels,context);

@@ -18,7 +18,7 @@ test('weather/clothing matrix uses one complete existing asset per panel, with n
  }
 });
 test('compatibility wardrobe API cannot draw misaligned hats, mittens or trousers for any pose',()=>{
- for(const outfit of ['cold','cool','mild','warm','hot'])for(const scene of ['normal','watch','rain','fog','dawn','snow','carry-umbrella'])for(const panel of [0,1,2]){
+ for(const outfit of ['cold','cool','mild','warm','hot'])for(const scene of ['normal','watch','rain','fog','dawn','night','snow','carry-umbrella'])for(const panel of [0,1,2]){
   assert.equal(clothingArtwork(panel,scene,outfit,'/different-pose.webp'),'');
  }
 });

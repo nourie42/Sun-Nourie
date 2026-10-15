@@ -47,7 +47,7 @@ test('51-degree 5AM thunderstorms stay rain even when that day and coarse interv
  assert.equal(context.snowExpected,false);assert.equal(context.snowfall,null);assert.equal(context.snowChance,null);
  assert.equal(context.clothingFeels,33);
  assert.equal(comfortSceneState(false,sample.condition,sample.feels,context).key,'rain');
- assert.equal(comfortSceneState(false,sample.condition,sample.feels,context).asset,'comfort-integrated-rain-night.webp');
+ assert.equal(comfortSceneState(false,sample.condition,sample.feels,context).asset,'comfort-night-cold-rain-fog.webp');
  assert.equal(snowHourCondition(forecast,sample),null);
  assert.equal(hourlySnowHTML(forecast,sample),'');
  assert.equal(coldPawGuidance(sample.feels,context),null);

@@ -25,13 +25,13 @@ for(const [condition,daylight,pop] of scenarios){
   }
  });
 }
-test('mild weather selects complete long-pants art and warm weather uses the original light-clothing scenes',()=>{
+test('mild and warm nights use complete night art with the appropriate clothing',()=>{
  for(const panel of [0,1,2]){
   assert.match(referenceScene(panel,false,'Clear',68,{pop:0}),/data-garment="long-trousers"/);
-  assert.match(referenceScene(panel,false,'Clear',68,{pop:0}),/comfort-integrated-mild-dawn\.webp/);
+  assert.match(referenceScene(panel,false,'Clear',68,{pop:0}),/comfort-night-mild-dry-chance\.webp/);
   for(const t of [74,82,95]){
    const html=referenceScene(panel,false,'Clear',t,{pop:0});
-   assert.match(html,/comfort-reference-scenes-dawn\.webp/);
+   assert.match(html,/comfort-night-warm-dry-chance\.webp/);
    assert.doesNotMatch(html,/comfort-clothing|wardrobe-|<path\b/);
   }
  }

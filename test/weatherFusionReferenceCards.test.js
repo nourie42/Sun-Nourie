@@ -11,7 +11,7 @@ test('illustrated weather stays synchronized across outdoor and pet scenes',()=>
   assert.match(referenceScene(panel,true,'Clear',88),/data-scene="hot"/);
   assert.match(referenceScene(panel,true,'Clear',88),/comfort-reference-scenes-hot\.webp/);
   assert.doesNotMatch(referenceScene(panel,false,'Clear',88),/class="sky-sun"/);
-  assert.match(referenceScene(panel,false,'Clear',88),/comfort-reference-scenes-dawn\.webp/);
+  assert.match(referenceScene(panel,false,'Clear',88),/comfort-night-warm-dry-chance\.webp/);
   assert.match(referenceScene(panel,true,'Rain',88),/data-scene="rain"/);
   assert.match(referenceScene(panel,true,'Rain',88),/comfort-reference-scenes-rain\.webp/);
   assert.doesNotMatch(referenceScene(panel,true,'Rain',88),/class="sky-sun"/);
@@ -28,7 +28,7 @@ test('illustrated weather stays synchronized across outdoor and pet scenes',()=>
  assert.match(referenceScene(1,true,'Clear',30),/data-garment="heavy-coat-and-trousers"/);
  assert.deepEqual(comfortSceneState(true,'Clear',95),{key:'hot',asset:'comfort-reference-scenes-hot.webp'});
  assert.deepEqual(comfortSceneState(true,'Thunderstorms',95),{key:'rain',asset:'comfort-reference-scenes-rain.webp'},'observed rain without a probability takes precedence over heat');
- assert.deepEqual(comfortSceneState(false,'Clear',95),{key:'dawn',asset:'comfort-reference-scenes-dawn.webp'},'night uses visible pre-sunrise art, never a daytime heat-sun scene');
+ assert.deepEqual(comfortSceneState(false,'Clear',95),{key:'night',asset:'comfort-night-warm-dry-chance.webp',rows:2,row:0},'night uses a complete dark-sky illustration with light clothing, never a daytime heat-sun scene');
  const html=pavementHTML({status:'unavailable',daylight:false},88,{forecast:true,condition:'Rain'});
  assert.match(html,/at the selected forecast hour/);
  assert.match(html,/data-scene="rain"/);
@@ -64,7 +64,7 @@ test('scene policy distinguishes fog, low rain chance, active rain and pre-sunri
  assert.deepEqual(comfortSceneState(true,'Chance Thunderstorms',92,{pop:50}),{key:'carry-umbrella',asset:'comfort-reference-scenes-carry-umbrella.svg'});
  assert.deepEqual(comfortSceneState(true,'Slight Chance Thunderstorms',92,{pop:80}),{key:'rain',asset:'comfort-reference-scenes-rain.webp'});
  assert.deepEqual(comfortSceneState(true,'Slight Chance Thunderstorms',92,{pop:81}),{key:'rain',asset:'comfort-reference-scenes-rain.webp'});
- assert.deepEqual(comfortSceneState(false,'Clear',92,{pop:0}),{key:'dawn',asset:'comfort-reference-scenes-dawn.webp'});
+ assert.deepEqual(comfortSceneState(false,'Clear',92,{pop:0}),{key:'night',asset:'comfort-night-warm-dry-chance.webp',rows:2,row:0});
 });
 
 test('active rain pauses pavement heat warnings',()=>{
@@ -82,7 +82,7 @@ test('live radar threat forces rainy pet art and pauses pavement heat warnings',
 
 test('dry radar state never renders rain artwork or a wet-pavement claim',()=>{
  const scene=referenceScene(1,false,'Partly cloudy',82,{pop:0});
- assert.match(scene,/data-scene="dawn"/);
+ assert.match(scene,/data-scene="night"/);
  assert.doesNotMatch(scene,/comfort-reference-scenes-(rain|umbrella)\.webp/);
  const pavement=pavementHTML({status:'estimated',activePrecipitation:false,daylight:false,concrete:{value:82},asphalt:{value:84}},82,{condition:'Partly cloudy',pop:0});
  assert.doesNotMatch(pavement,/Wet pavement|Rain occurring|data-scene="rain"/);
