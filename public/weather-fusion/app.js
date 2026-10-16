@@ -1,5 +1,5 @@
 import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText,rebindDanTake} from './dans-take.js?v=weather-art-labels-v10';
-import {danCard,danTakeDisplay} from './dans-summary.js?v=discussion-summary-v3';
+import {danCard,danTakeDisplay} from './dans-summary.js?v=discussion-grammar-v4';
 import {fetchJsonWithDeadline} from './request-deadline.js?v=loading-recovery-v1';
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
 import {weatherIcon,renderHourlyWeather,currentSample} from './weather-display.js?v=cold-feels-v1';

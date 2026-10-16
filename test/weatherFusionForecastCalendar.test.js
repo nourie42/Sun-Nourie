@@ -94,3 +94,14 @@ test('Weather Take preserves a valid easy-language discussion summary when a num
  assert.equal(text,summary);
  assert.doesNotMatch(text,/Today:|%|high 81/);
 });
+
+ test('discussion excerpts read as complete standalone paragraphs',()=>{
+ const f=forecast();
+ f.discussion={id:'grammar-afd',office:'RAH',issuanceTime:iso(now-H),text:'.SYNOPSIS...\nRecord heat today will be swept offshore by a strong cold front and following sharply cooler and wet conditions that will develop tonight into Sat. There is still some potential for patchy frost Sun morning and again Mon morning.\n&&\n.LONG TERM /SATURDAY THROUGH MONDAY/...\nHowever, a good bit of uncertainty remains about this low and its impacts for central NC.\n'};
+ f.feeds.push({id:'afd',status:'ready'});
+ const text=danTakeDisplay(null,f,now);
+ assert.match(text,/cold front\. Much cooler, wet weather will follow/);
+ assert.match(text,/frost Sunday morning and again Monday morning/);
+ assert.match(text,/Some uncertainty remains about the low-pressure system and its effects on central NC/);
+ assert.doesNotMatch(text,/However|this low|and following/);
+ });

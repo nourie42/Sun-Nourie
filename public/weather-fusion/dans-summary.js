@@ -13,7 +13,7 @@ function anchoredText(text,anchor,zone,now){
  });
 }
 const brief=text=>{const sentences=norm(text).match(/[^.!?]+[.!?]+|[^.!?]+$/g)||[];let result='';for(const s of sentences.slice(0,2)){if(result.length+s.length>440)break;result+=s+' ';}return result.trim();};
-const plain=text=>norm(text).replace(/\bconvection\b/gi,'showers and storms').replace(/\bprecipitation\b/gi,'wet weather').replace(/\btemps\b/gi,'temperatures').replace(/\bPoPs\b/g,'rain chances').replace(/\bQPF\b/g,'rainfall amounts').replace(/\bwrt(?:\s+to)?\b/gi,'about');
+const plain=text=>norm(text).replace(/\s+and following sharply cooler and wet conditions that will develop\b/gi,'. Much cooler, wet weather will follow').replace(/\binto Sat\b/g,'into Saturday').replace(/\bfrost Sun morning\b/g,'frost Sunday morning').replace(/\bMon morning\b/g,'Monday morning').replace(/\bconvection\b/gi,'showers and storms').replace(/\bprecipitation\b/gi,'wet weather').replace(/\btemps\b/gi,'temperatures').replace(/\bPoPs\b/g,'rain chances').replace(/\bQPF\b/g,'rainfall amounts').replace(/\bwrt(?:\s+to)?\b/gi,'about');
 export function danOverview(briefing,forecast,now=Date.now()){
  if(!forecast)return {text:'Checking the latest forecast discussion…',source:'Updating'};
  const evidence=collectDanTakeEvidence(forecast,now);
@@ -48,7 +48,8 @@ export function danCard(briefing,forecast,now=Date.now()){
  const items=[],parts=[];
  const compact=value=>norm(value).replace(/^(?:dan\s*['’]?\s*s\s+take\b\s*[:\-—–.]?\s*)+/i,'');
  const append=(item,summary)=>{
-  const sentence=plainDanWording(compact(summary)),period=item.period.replace(/^This coming week — /,'');
+  const standalone=plain(compact(summary)).replace(/^However,?\s+/i,'').replace(/^a good bit of uncertainty remains\b/i,'Some uncertainty remains').replace(/\bthis low\b/gi,'the low-pressure system').replace(/\bits impacts for\b/gi,'its effects on');
+  const sentence=plainDanWording(standalone),period=item.period.replace(/^This coming week — /,'');
   if(hasDanJargon(sentence)||!sentence||sentence.length>200||sentence.split(/\s+/).length>28)return false;
   const part=`${period}: ${sentence}`,combined=[...parts,part].join(' ');
   if(combined.length>380||combined.split(/\s+/).length>55)return false;
