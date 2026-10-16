@@ -45,7 +45,7 @@ button,input{font:inherit}.topbar{position:sticky;top:0;z-index:100;background:r
  </div>
 </div>
 <div class="wrap">
- <div id="snapshotFreshness" class="note" role="status" style="border:1px solid #805b2d;border-radius:10px;padding:10px;color:var(--amber)"></div>
+ <div id="snapshotFreshness" class="note" role="status"></div>
  <div id="storageWarning" class="note" role="alert" hidden style="border:1px solid #805b2d;border-radius:10px;padding:10px;color:var(--amber)"></div>
  <section id="quick" class="view active">
   <div class="kpis">
@@ -513,8 +513,19 @@ function migrateHouseholdEdits(edits,anchor,periods){
  function renderSnapshotLabels(){
    const now=new Date(),calendarMonth=now.getFullYear()+'-'+pad2(now.getMonth()+1);
    const monthStale=calendarMonth!==actualMonth,calendarLabel=periods.label(calendarMonth,{month:'long',year:'numeric'}),refreshed=Date.parse(BASE.refreshedAt),freshnessTime=Number.isFinite(refreshed)?refreshed:Date.parse(snapshotDate()+'T00:00:00Z'),weeklyStale=Number.isFinite(freshnessTime)&&now.getTime()-freshnessTime>7*24*60*60*1000,stale=monthStale||weeklyStale;
-   const coverage=Array.isArray(BASE.coverageNotes)?BASE.coverageNotes.join(' '):String(BASE.coverageNotes||'');
-   document.getElementById('snapshotFreshness').textContent=(monthStale?calendarLabel+' data has not refreshed; showing the '+actualLabel+' snapshot. ':weeklyStale?'Weekly refresh overdue; showing the '+actualLabel+' snapshot; '+(Number.isFinite(refreshed)?'last refresh was more than 7 days ago. ':'latest available data is more than 7 days old. '):actualLabel+' snapshot. ')+'Actuals through '+snapshotDate()+'.'+(BASE.refreshedAt?' Refreshed '+String(BASE.refreshedAt)+'.':' Refresh time unavailable.')+(coverage?' Coverage: '+coverage:'')+' Save budgets saves your edits on this device; it does not fetch transactions.';
+   const coverageList=Array.isArray(BASE.coverageNotes)?BASE.coverageNotes:(BASE.coverageNotes?[String(BASE.coverageNotes)]:[]);
+   const coverage=coverageList.join(' ');
+   const coverageProblem=coverageList.some(function(note){return /missing|partial|incomplete|failed|unavailable|damaged|backup|error|could not|not refreshed/i.test(String(note))});
+   const freshnessEl=document.getElementById('snapshotFreshness');
+   if(monthStale||weeklyStale||coverageProblem){
+     freshnessEl.hidden=false;
+     freshnessEl.style.cssText='border:1px solid #805b2d;border-radius:10px;padding:10px;color:var(--amber)';
+     freshnessEl.textContent=(monthStale?calendarLabel+' data has not refreshed; showing the '+actualLabel+' snapshot. ':weeklyStale?'Weekly refresh overdue; showing the '+actualLabel+' snapshot. ':'')+'Actuals through '+snapshotDate()+'.'+(coverageProblem&&coverage?' '+coverage:'');
+   }else{
+     freshnessEl.hidden=false;
+     freshnessEl.style.cssText='color:var(--muted);padding:2px 2px 8px';
+     freshnessEl.textContent=actualLabel+' actuals through '+snapshotDate()+(BASE.refreshedAt?' · refreshed '+new Date(BASE.refreshedAt).toLocaleString():'');
+   }
    document.getElementById('incomeLabel').textContent=actualLabel+' Income';document.getElementById('expenseLabel').textContent=actualLabel+' Expenses';document.getElementById('netLabel').textContent=actualLabel+' Net P/L';
    document.getElementById('snapshotNote').textContent=actualLabel+' actuals and the matching budget. Details shows posted transactions from this snapshot. Forecasts cover '+monthLabels[0]+'–'+monthLabels[11]+'.';
    document.querySelector('[data-view="quick"]').textContent=stale?'Snapshot P&L':'This Month';document.querySelector('[data-view="last"]').textContent='Previous Snapshot';
