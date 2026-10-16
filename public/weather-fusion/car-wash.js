@@ -1,6 +1,6 @@
-import {forecastPeriodSummary,rainWindowPeak} from './forecast-story.js?v=tonight-timing-v1';
+import {forecastPeriodSummary,rainWindowPeak} from './forecast-story.js?v=tonight-timing-v2';
 import {dailyDisplay,finite,rainChanceValue} from './weather-math.js?v=cold-feels-v1';
-import {weatherIcon} from './weather-display.js?v=tonight-timing-v1';
+import {weatherIcon} from './weather-display.js?v=tonight-timing-v2';
 import {weatherState,conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
 import {forecastGrossLevel} from './dewpoint-meter.js?v=feel-chart-v3';
 

@@ -1,5 +1,5 @@
 /** Compare the published Weather Nourie forecast with individual model guidance. */
-import {dailyForecastReadings} from './seven-day.js?v=tonight-timing-v1';
+import {dailyForecastReadings} from './seven-day.js?v=tonight-timing-v2';
 const WN_FEED = 'https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/weathernext-full.json';
 const MS_PER_DAY = 86400000;
 
@@ -154,7 +154,7 @@ export function buildSeries(fx, wn, varId, now = Date.now()) {
   const readings = dailyForecastReadings(fx, now, 10);
   const days = (fx.days || []).slice(0, 10).map((d, i) => ({ date: d.date, dateKey: d.date, tonight: readings[i].isDay === false }));
   const windows = readings.map(day => day.windWindow);
-  const out = { days, perModel: true, wnVals: days.map(() => null), modelMaps: days.map(() => ({})), forecastValues: days.map(() => null), windows };
+  const out = { nwsFallback:varId==='pop'&&readings.some(day=>day.rainSourceFallback&&finite(day.pop)),days, perModel: true, wnVals: days.map(() => null), modelMaps: days.map(() => ({})), forecastValues: days.map(() => null), windows };
 
   if (varId === 'temp' || varId === 'rain') {
     out.forecastValues = readings.map(day => varId === 'temp' ? (day.isDay ? day.high : day.low) : day.amount);
@@ -226,6 +226,7 @@ const hiddenModels = new Set();
 const NAMES = { nourie: 'Weather Nourie blend', nws: 'NWS', hrrr: 'HRRR', nbm: 'NBM', ecmwf: 'ECMWF', wn: 'NVIDIA WeatherNext', gfs: 'GFS', single: '' };
 function renderChart(container, built, varDef, varId) {
   const { days } = built;
+  const displayName=id=>id==='nourie'&&built.nwsFallback?'Weather Nourie forecast':NAMES[id];
   // Size the SVG to its real pixel width so text stays legible on phones.
   const W = Math.max(240, Math.round(container.clientWidth || 900));
   const phone = W < 600;
@@ -281,10 +282,10 @@ function renderChart(container, built, varDef, varId) {
   const chip = (id) => { const off = hiddenModels.has(id);
     const tag = id === 'nourie' ? 'span' : 'button';
     return `<${tag}${tag === 'button' ? ` type="button" aria-pressed="${!off}"` : ''} class="wn-chip" data-model="${id}" style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:999px;border:1px solid ${off ? 'rgba(255,255,255,.12)' : COLORS[id] + '99'};background:${off ? 'transparent' : 'rgba(255,255,255,.10)'};font-family:inherit;font-size:11px;font-weight:600;line-height:1.4;color:${off ? '#7f8ca3' : '#e8eef8'};white-space:nowrap;cursor:${tag === 'button' ? 'pointer' : 'default'};${off ? 'text-decoration:line-through;' : ''}">`
-      + `<i style="width:12px;height:3px;border-radius:2px;background:${COLORS[id]};opacity:${off ? 0.3 : 1};display:inline-block"></i>${NAMES[id]}</${tag}>`; };
+      + `<i style="width:12px;height:3px;border-radius:2px;background:${COLORS[id]};opacity:${off ? 0.3 : 1};display:inline-block"></i>${displayName(id)}</${tag}>`; };
   const legend = built.perModel ? ids.map(chip).join('')
     : `<span style="font-size:11px;color:#d5deee">${varId === 'aqi' ? 'Daily max AQI (Open-Meteo / CAMS)' : varId === 'uv' ? 'Daily max UV index' : ''}</span>`;
-  const note = built.perModel ? `<p style="font-size:11px;color:#c4d9ed;margin:6px 0 0">Weather Nourie blend is the forecast shown on this page. Other lines show individual models. Tap a model to show/hide its line, or tap the graph for values.${varId === 'rain' ? ' Rain totals use the same local calendar dates as the daily tiles. Tonight includes the following morning.' : varId === 'wind' ? ' Wind shows the average over that forecast period.' : varId === 'dewpoint' ? ' Dew point shows the highest reading over that forecast period.' : varId === 'pop' ? ' Individual model rain signals are not calibrated probabilities.' : ''}</p>` : '';
+  const note = built.perModel ? `<p style="font-size:11px;color:#c4d9ed;margin:6px 0 0">${built.nwsFallback?'Official NWS rain chances are used where model data is unavailable.':'Weather Nourie blend is the forecast shown on this page.'} Other lines show individual models. Tap a model to show/hide its line, or tap the graph for values.${varId === 'rain' ? ' Rain totals use the same local calendar dates as the daily tiles. Tonight includes the following morning.' : varId === 'wind' ? ' Wind shows the average over that forecast period.' : varId === 'dewpoint' ? ' Dew point shows the highest reading over that forecast period.' : varId === 'pop' ? ' Individual model rain signals are not calibrated probabilities.' : ''}</p>` : '';
   container.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:4px;padding:2px 0 8px">${legend}</div>`
     + `<div class="wn-chart-wrap" style="position:relative;touch-action:pan-y">`
     + `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="width:100%;height:auto;display:block;cursor:crosshair" role="img" aria-label="${varDef.label} comparison chart">${ylabels}${labels}${lines}${dots}`
@@ -304,7 +305,7 @@ function renderChart(container, built, varDef, varId) {
     const rows = visible.map((id) => [id, series[id][i]]).filter(([id, value]) => id === 'nourie' || finite(value));
     cdots.innerHTML = rows.filter(([, value]) => finite(value)).map(([id, v]) => `<circle cx="${x}" cy="${Y(v).toFixed(1)}" r="5" fill="${COLORS[id]}" stroke="#0a1428" stroke-width="1.5"/>`).join('');
     tip.innerHTML = `<b style="display:block;margin-bottom:3px">${dayName(days[i], i, true)}</b>`
-      + (rows.length ? rows.map(([id, v]) => `<span data-tip-series="${id}" style="display:flex;justify-content:space-between;gap:10px"><span><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COLORS[id]};margin-right:5px"></i>${NAMES[id] || varDef.label}</span><b>${finite(v) ? varDef.fmt(v) : 'Unavailable'}</b></span>`).join('') : '<span>No model data</span>');
+      + (rows.length ? rows.map(([id, v]) => `<span data-tip-series="${id}" style="display:flex;justify-content:space-between;gap:10px"><span><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COLORS[id]};margin-right:5px"></i>${displayName(id) || varDef.label}</span><b>${finite(v) ? varDef.fmt(v) : 'Unavailable'}</b></span>`).join('') : '<span>No model data</span>');
     tip.style.display = 'block';
     const px = (x / W) * r.width, tw = tip.offsetWidth;
     tip.style.left = `${Math.max(0, Math.min(r.width - tw, px > r.width / 2 ? px - tw - 12 : px + 12))}px`;

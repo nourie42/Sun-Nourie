@@ -1,4 +1,4 @@
-import {forecastPeriodSummary,rainWindowPeak} from './forecast-story.js?v=tonight-timing-v1';
+import {forecastPeriodSummary,rainWindowPeak} from './forecast-story.js?v=tonight-timing-v2';
 import {timeAt} from './hourly-feels.js?v=cold-feels-v1';
 
 const finite=n=>typeof n==='number'&&Number.isFinite(n);
@@ -20,12 +20,15 @@ export function rainTiming(forecast,index=0,tonight=false,now=Date.now()){
  };
  const all=segment(start,end),following=new Date(Date.parse(day.date+'T12:00Z')+86400000).toISOString().slice(0,10),midnight=timeAt(following,0,zone);
  const split=tonight&&start<midnight&&end>midnight;
+ const nwsFallback=period.rows.some(row=>row.rainLikelihood?.mode==='nws-fallback'&&finite(row.rainLikelihood.value));
  const endClock=new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric'}).format(new Date(end));
- return {...all,value:period.chance,peakLabel:finite(period.chance)?all.peakLabel:'',split,afterMidnightLabel:`Midnight–${endClock}`,beforeMidnight:split?segment(start,midnight):null,afterMidnight:split?segment(midnight,end):null};
+ return {...all,value:period.chance,peakLabel:finite(period.chance)?all.peakLabel:'',split,nwsFallback,afterMidnightLabel:`Midnight–${endClock}`,beforeMidnight:split?segment(start,midnight):null,afterMidnight:split?segment(midnight,end):null};
 }
 
 export function rainTimingHTML(timing){
- if(!timing?.split)return '';
+ if(!timing)return '';
+ const note=timing.nwsFallback?'<p class="rain-source-note">Official NWS rain chances are shown while model data is unavailable.</p>':'';
+ if(!timing.split)return note;
  const part=(label,segment)=>`<span><small>${label}</small><strong>${finite(segment?.value)?`${Math.round(segment.value)}%`:'Unavailable'}</strong>${segment?.peakLabel?`<small>Peak ${esc(segment.peakLabel)}</small>`:''}</span>`;
- return `<div class="rain-period-timing" role="group" aria-label="Tonight rain chances before and after midnight">${part('Before midnight',timing.beforeMidnight)}${part(esc(timing.afterMidnightLabel||'After midnight'),timing.afterMidnight)}</div>`;
+ return note+`<div class="rain-period-timing" role="group" aria-label="Tonight rain chances before and after midnight">${part('Before midnight',timing.beforeMidnight)}${part(esc(timing.afterMidnightLabel||'After midnight'),timing.afterMidnight)}</div>`;
 }

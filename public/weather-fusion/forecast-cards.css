@@ -335,3 +335,5 @@ body[data-sky="night"] .evidence-panel{
 
 #today-forecast .today-symbol>.today-rain-peak{grid-column:1/3;grid-row:3;justify-self:end;font-size:12px;line-height:1.3;white-space:nowrap;color:#e2f7ff}
 #today-forecast .today-symbol:has(>.today-rain-peak)>em{grid-row:4}
+
+.rain-source-note{font-size:12px;line-height:1.5;margin:10px 0;color:#def1ff}

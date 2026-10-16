@@ -1,6 +1,6 @@
 import {dailyDisplay,finite} from './weather-math.js?v=cold-feels-v1';
 import {conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
-import {forecastPeriodSummary} from './forecast-story.js?v=tonight-timing-v1';
+import {forecastPeriodSummary} from './forecast-story.js?v=tonight-timing-v2';
 
 const HOUR = 3600000;
 const chanceOf = row => {

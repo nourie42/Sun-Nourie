@@ -46,6 +46,7 @@ export function hourlyRainHTML(sample){
   return `<span class="hour-rain" title="${esc(status.source)}"><small class="hour-pop">${weatherMetricIcon('drop')}${esc(status.label)}</small></span>`;
  }
  const blend=sample.rainLikelihood,value=sampleRainChance(sample);
+ if(blend?.mode==='nws-fallback')return `<span class="hour-rain" title="Official NWS hourly rain chance; model data is unavailable"><small class="hour-pop">${weatherMetricIcon('drop')}${finite(value)?Math.round(value)+'%':'—'}</small></span>`;
  const votes=blend?.sourceValues||{},awarded=blend?.sourcePoints||{},parts=[];
  const pointText=points=>String(Math.round(points*100)/100);
  const fullPoints={nws:40,hrrr:30,ecmwf:10,nbm:20};

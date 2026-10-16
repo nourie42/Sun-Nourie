@@ -1,4 +1,4 @@
-import {forecastPeriodSummary} from './forecast-story.js?v=tonight-timing-v1';
+import {forecastPeriodSummary} from './forecast-story.js?v=tonight-timing-v2';
 import {dailyDisplay,finite} from './weather-math.js?v=cold-feels-v1';
 
 const STORAGE_KEY='weather-nourie-rain-history-v1';
