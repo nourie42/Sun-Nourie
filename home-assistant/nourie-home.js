@@ -8,7 +8,7 @@
  * lists the options that pin specific entities.
  */
 
-export const VERSION = '3.0.0';
+export const VERSION = '4.0.0';
 
 const LEAFLET_JS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js';
 const FONTS_CSS = 'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Figtree:wght@400;500;600;700&display=swap';
@@ -428,7 +428,7 @@ export function buildModel(hass, config = {}, ext = {}, now = Date.now()) {
   model.score = buildAirScore(ctx, prefs, pm03Averages(ctx, ext.history?.pm03avg));
   model.spike = buildSpike(ctx, prefs, model.score, ext);
   model.controls = buildControls(ctx, prefs, ext.found || {});
-  model.health = buildHealth(ctx, prefs);
+  model.health = buildHealth(ctx, prefs, ext.history?.vitalsavg, now);
   model.dust = discoverDust(ctx, prefs);
   model.billing = buildBilling(ctx, prefs, ext.billing, now, model.water.volumeUnit);
   model.candidates = () => entityCandidates(ctx);
@@ -1312,13 +1312,121 @@ function durationText(st) {
   return `${Math.floor(minutes / 60)}h ${String(Math.round(minutes % 60)).padStart(2, '0')}m`;
 }
 
-export function buildHealth(ctx, prefs = {}) {
+// Oura's nightly vitals, found by name on the Oura device (or anywhere, if no device matches).
+const VITALS = [
+  ['temp', 'Temperature deviation', /temperature deviation$/i, /trend/i],
+  ['tempTrend', 'Temperature trend', /temperature trend deviation$/i],
+  ['rhr', 'Lowest sleep heart rate', /lowest sleep heart rate|(resting|lowest) heart rate$/i, /contributor|score/i],
+  ['hrv', 'Average sleep HRV', /\bhrv\b|heart rate variability/i, /balance|contributor|score/i],
+  ['resp', 'Breathing rate', /breathing rate|respiratory rate/i, /contributor|score|disturbance/i],
+  ['activity', 'Activity score', /activity score$/i, /delta/i],
+  ['steps', 'Steps', /\bsteps$/i],
+  ['stress', 'Stress high', /stress high duration$/i],
+  ['recovery', 'Recovery high', /recovery high duration$/i],
+  ['spo2', 'Blood oxygen', /spo2|sp02|oxygen saturation|blood oxygen/i, /breathing|contributor/i],
+  ['vo2', 'VO₂ max', /vo2 ?max|vo₂ ?max|cardio(respiratory)? capacity/i],
+  ['cvage', 'Cardiovascular age', /(cardio)?vascular age/i],
+];
+
+export function findVitals(ctx, prefs = {}) {
+  const p = prefs.oura || {};
+  const sensors = ctx.byDomain('sensor');
+  const oura = sensors.filter((st) => /oura|\bring\b/i.test(`${ctx.name(st.entity_id)} ${ctx.deviceName(st.entity_id)} ${ctx.platform(st.entity_id)}`));
+  const out = {};
+  for (const [key, label, re, not] of VITALS) {
+    if (p[key] === '') continue;
+    const chosen = p[key] && ctx.states[p[key]] ? ctx.states[p[key]] : null;
+    const test = (st) => re.test(ctx.name(st.entity_id)) && !(not && not.test(ctx.name(st.entity_id)));
+    const st = chosen || oura.filter(test).sort((a, b) => Number(live(b)) - Number(live(a)))[0] || sensors.filter(test).find((x) => /oura/i.test(ctx.platform(x.entity_id)));
+    if (!st) continue;
+    let value = live(st) ? toNum(st.state) : null;
+    const unit = st.attributes.unit_of_measurement || '';
+    // Temperature deviations are compared in °C, whatever the sensor reports.
+    if ((key === 'temp' || key === 'tempTrend') && value !== null && /F/.test(unit)) value /= 1.8;
+    out[key] = { key, label, id: st.entity_id, value, unit: key === 'temp' || key === 'tempTrend' ? '°C' : unit };
+  }
+  return out;
+}
+
+const SICK_INPUTS = [
+  { key: 'temp', label: 'Temperature deviation', weight: 30, steps: [[0, 0], [0.2, 15], [0.4, 45], [0.6, 70], [0.8, 85], [1, 100]], rule: '+0.2 °C = 15, +0.4 = 45, +0.6 = 70, +1.0 or more = 100; below normal = 0' },
+  { key: 'rhr', label: 'Resting heart rate above your two-week average', weight: 20, steps: [[0, 0], [2, 20], [4, 45], [6, 70], [8, 90], [10, 100]], rule: '+2 bpm = 20, +4 = 45, +6 = 70, +8 = 90, +10 = 100' },
+  { key: 'hrv', label: 'HRV below your two-week average', weight: 20, steps: [[0, 0], [10, 25], [20, 55], [30, 80], [40, 100]], rule: '10% lower = 25, 20% = 55, 30% = 80, 40% = 100' },
+  { key: 'resp', label: 'Respiratory rate above your two-week average', weight: 15, steps: [[0, 0], [0.5, 30], [1, 60], [1.5, 85], [2, 100]], rule: '+0.5 breaths/min = 30, +1 = 60, +1.5 = 85, +2 = 100' },
+  { key: 'readiness', label: 'Low readiness', weight: 15, steps: [[40, 100], [50, 80], [60, 55], [70, 30], [80, 10], [85, 0]], rule: 'readiness 85+ = 0, 70 = 30, 60 = 55, 50 = 80, 40 or less = 100' },
+];
+
+const HEART_INPUTS = [
+  { key: 'vo2', label: 'Cardiorespiratory fitness (VO₂ max)', weight: 25, steps: [[20, 10], [30, 40], [38, 65], [45, 82], [52, 95], [60, 100]], rule: 'VO₂ max 30 = 40, 38 = 65, 45 = 82, 52 = 95, 60 = 100' },
+  { key: 'rhr', label: 'Resting heart rate', weight: 20, steps: [[40, 100], [50, 95], [55, 85], [60, 75], [65, 62], [70, 50], [80, 25], [90, 5]], rule: '50 bpm = 95, 55 = 85, 60 = 75, 65 = 62, 70 = 50, 80 = 25' },
+  { key: 'hrv', label: 'HRV', weight: 20, steps: [[10, 10], [20, 35], [30, 55], [45, 75], [60, 88], [80, 100]], rule: '20 ms = 35, 30 = 55, 45 = 75, 60 = 88, 80+ = 100' },
+  { key: 'cvage', label: 'Vascular aging (cardiovascular age vs your age)', weight: 25, steps: [[-10, 100], [-5, 90], [0, 75], [5, 50], [10, 25], [15, 5]], rule: '10 years younger = 100, 5 younger = 90, same = 75, 5 older = 50, 10 older = 25' },
+  { key: 'sleep', label: 'Sleep score', weight: 10, steps: [[0, 0], [100, 100]], rule: 'the Oura sleep score as is' },
+];
+
+// Sick Score: an early-warning index, 0–100, higher means more signs of getting sick.
+// Heart Score: 0–100, higher is better. Both are weighted averages of the inputs that are
+// reporting, and both show every number that went into them.
+export function healthScores(vitals, metrics, averages = {}, age = null) {
+  const pct = (a, b) => (a === null || b === null || !b ? null : ((b - a) / b) * 100);
+  const v = (k) => vitals[k]?.value ?? null;
+  const sickRaw = {
+    temp: v('temp') === null ? null : Math.max(0, v('temp')),
+    rhr: v('rhr') === null || averages.rhr == null ? null : v('rhr') - averages.rhr,
+    hrv: v('hrv') === null || averages.hrv == null ? null : Math.max(0, pct(v('hrv'), averages.hrv)),
+    resp: v('resp') === null || averages.resp == null ? null : v('resp') - averages.resp,
+    readiness: metrics.readiness?.value ?? null,
+  };
+  const heartRaw = {
+    vo2: v('vo2'),
+    rhr: v('rhr'),
+    hrv: v('hrv'),
+    cvage: v('cvage') === null || !age ? null : v('cvage') - age,
+    sleep: metrics.sleep?.value ?? null,
+  };
+  const shown = {
+    temp: (x) => `${x >= 0 ? '+' : ''}${fmt(v('temp'), 2)} °C`,
+    rhr: (x, kind) => (kind === 'sick' ? `${fmt(v('rhr'))} bpm vs ${fmt(averages.rhr, 1)} avg` : `${fmt(v('rhr'))} bpm`),
+    hrv: (x, kind) => (kind === 'sick' ? `${fmt(v('hrv'))} ms vs ${fmt(averages.hrv)} avg` : `${fmt(v('hrv'))} ms`),
+    resp: () => `${fmt(v('resp'), 1)} vs ${fmt(averages.resp, 1)} avg`,
+    readiness: (x) => fmt(x),
+    vo2: (x) => fmt(x, 1),
+    cvage: () => `${fmt(v('cvage'))} vs age ${fmt(age)}`,
+    sleep: (x) => fmt(x),
+  };
+  const build = (inputs, raw, kind) => {
+    const parts = inputs.map((inp) => {
+      const x = raw[inp.key];
+      const points = x === null || x === undefined ? null : Math.round(interpolate(inp.steps, x));
+      return { ...inp, raw: x, shown: x === null || x === undefined ? null : shown[inp.key](x, kind), points };
+    });
+    const used = parts.filter((x) => x.points !== null);
+    const weight = sum(used.map((x) => x.weight));
+    const score = weight ? Math.round(sum(used.map((x) => x.points * x.weight)) / weight) : null;
+    return { score, parts, used: used.length, weightPct: Math.round(weight), total: inputs.length };
+  };
+  return { sick: build(SICK_INPUTS, sickRaw, 'sick'), heart: build(HEART_INPUTS, heartRaw, 'heart') };
+}
+
+// Two-week baselines for the Sick Score from hourly statistics, leaving out the last day so
+// tonight's reading is compared with the nights before it.
+export function vitalAverages(vitals, h, now = Date.now()) {
+  const out = {};
+  for (const key of ['rhr', 'hrv', 'resp']) {
+    const rows = h?.series?.[vitals[key]?.id] || [];
+    const vals = rows.filter(([t]) => t < now - 86400000).map(([, x]) => x).filter((x) => x !== null && Number.isFinite(x));
+    if (vals.length >= 24) out[key] = sum(vals) / vals.length;
+  }
+  return out;
+}
+
+export function buildHealth(ctx, prefs = {}, history = null, now = Date.now()) {
   const p = prefs.oura || {};
   const pick = (key, re, not) => (p[key] === '' ? null : p[key] && ctx.states[p[key]] ? p[key] : findSensor(ctx, re, not));
   const ids = {
-    readiness: pick('readiness', /readiness( score)?$/i, /contributor|temperature/i),
-    sleep: pick('sleep', /sleep score$|^(oura\s*(ring)?\s*)?sleep$/i, /contributor/i),
-    resilience: pick('resilience', /resilience/i, /contributor/i),
+    readiness: pick('readiness', /readiness( score)?$/i, /contributor|temperature|delta/i),
+    sleep: pick('sleep', /sleep score$|^(oura\s*(ring)?\s*)?sleep$/i, /contributor|delta/i),
+    resilience: pick('resilience', /resilience level$|^(oura\s*(ring)?\s*)?resilience$/i, /contributor/i) || pick('resilience', /resilience/i, /contributor|score/i),
     sick: pick('sick', /sick score/i),
     heart: pick('heart', /heart score/i),
     duration: pick('duration', /total sleep( duration| time)?$|sleep duration$/i),
@@ -1331,9 +1439,25 @@ export function buildHealth(ctx, prefs = {}) {
     sick: healthMetric(ctx, ids.sick, 'sick'),
     heart: healthMetric(ctx, ids.heart, 'heart'),
   };
+  const vitals = findVitals(ctx, prefs);
+  const averages = vitalAverages(vitals, history, now);
+  const age = toNum(p.age);
+  const computed = healthScores(vitals, metrics, averages, age);
+  // Sick and Heart scores come from sensors when they exist, otherwise they are worked out here.
+  const fromScore = (key, kind, c) => {
+    if (metrics[key] || c.score === null) return metrics[key];
+    const x = healthMetric({ states: { calc: { state: String(c.score), attributes: {}, last_changed: null } } }, 'calc', kind);
+    return { ...x, id: null, computed: c };
+  };
+  metrics.sick = fromScore('sick', 'sick', computed.sick);
+  metrics.heart = fromScore('heart', 'heart', computed.heart);
   const battery = ids.battery && live(ctx.states[ids.battery]) ? toNum(ctx.states[ids.battery].state) : null;
-  const updated = Object.values(metrics).filter(Boolean).map((x) => Date.parse(x.updated) || 0).reduce((a, b) => Math.max(a, b), 0);
+  const updated = Object.values(metrics).filter((x) => x?.updated).map((x) => Date.parse(x.updated) || 0).reduce((a, b) => Math.max(a, b), 0);
   return {
+    vitals,
+    computed,
+    averages,
+    age,
     has: Object.values(metrics).some(Boolean),
     ids,
     metrics,
@@ -1359,6 +1483,48 @@ function robotMapImage(ctx, id) {
   return st ? { id: st.entity_id, src: st.attributes.entity_picture } : null;
 }
 
+// A robot's own rooms, from the vacuum's attributes: Eufy (robovac_mqtt) lists [{id, name}],
+// Ecovacs maps names to ids, Dreame keys room objects by id.
+export function normalizeRooms(raw) {
+  let list = [];
+  if (Array.isArray(raw)) {
+    list = raw.filter((x) => x && typeof x === 'object').map((x) => ({ id: x.id ?? x.room_id ?? x.segment_id, name: x.name ?? x.room_name }));
+  } else if (raw && typeof raw === 'object') {
+    list = Object.entries(raw).map(([k, v]) => (v && typeof v === 'object' && !Array.isArray(v)
+      ? { id: v.room_id ?? v.id ?? k, name: v.name ?? k }
+      : { id: Array.isArray(v) ? v.join(',') : v, name: titleCase(String(k).replace(/_/g, ' ')) }));
+  }
+  const seen = new Set();
+  return list
+    .filter((x) => x.id !== undefined && x.id !== null && x.id !== '')
+    .map((x) => ({ id: String(x.id), name: String(x.name || `Room ${x.id}`) }))
+    .filter((x) => !seen.has(x.id) && seen.add(x.id));
+}
+
+// Everything the robot's integration shares about its maps: the map pictures, the setting
+// that switches the active map (a floor), its rooms, and how to clean a set of rooms.
+export function robotMaps(ctx, id) {
+  const st = ctx.states[id];
+  const platform = ctx.platform(id) || '';
+  const deviceId = ctx.entry(id)?.device_id;
+  const siblings = deviceId ? ctx.list.filter((s) => s.entity_id !== id && ctx.entry(s.entity_id)?.device_id === deviceId) : [];
+  const robotName = ctx.deviceName(id) || ctx.name(id);
+  const short = (s) => cleanName(ctx.name(s.entity_id)).replace(new RegExp(`^${String(robotName).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*`, 'i'), '') || 'Map';
+  const images = siblings
+    .filter((s) => ['image', 'camera'].includes(domainOf(s.entity_id)) && s.attributes.entity_picture && !/thumbnail|last ?clean|history/i.test(ctx.name(s.entity_id)))
+    .map((s) => ({ id: s.entity_id, name: short(s), src: s.attributes.entity_picture, live: live(s) }));
+  const sel = siblings.find((s) => domainOf(s.entity_id) === 'select' && /(switch|selected|active|current)[ _]?map|^map$/i.test(short(s)));
+  const mapSelect = sel ? {
+    id: sel.entity_id,
+    current: sel.state,
+    options: (sel.attributes.options || []).map((o) => ({ value: o, label: String(o).replace(/\s*\(ID:\s*[^)]*\)\s*$/i, '').trim() || String(o) })),
+  } : null;
+  let rooms = normalizeRooms(st?.attributes?.rooms ?? st?.attributes?.segments);
+  if (!rooms.length) for (const img of images) if (!rooms.length) rooms = normalizeRooms(ctx.states[img.id]?.attributes?.rooms);
+  const kind = /dreame/.test(platform) ? 'dreame' : platform === 'ecovacs' ? 'ecovacs' : rooms.length ? 'eufy' : null;
+  return { platform, images, mapSelect, rooms, kind, tapToPick: platform === 'robovac_mqtt' && !!ctx.hass.services?.robovac_mqtt?.room_at_point };
+}
+
 function floorOf(hass, areaId) {
   const floorId = hass.areas?.[areaId]?.floor_id;
   const floor = floorId ? hass.floors?.[floorId] : null;
@@ -1375,7 +1541,11 @@ function decorateRobots(ctx, robots, prefs, ext) {
       .filter((id) => ctx.hass.areas?.[id])
       .map((id) => ({ id, name: ctx.hass.areas[id].name, floor: floorOf(ctx.hass, id), icon: ctx.hass.areas[id].icon || '' }))
       .sort((a, b) => a.floor.level - b.floor.level || a.floor.name.localeCompare(b.floor.name) || a.name.localeCompare(b.name));
-    return { ...r, classic, canArea, areas, areaStatus: areaInfo?.status || (canArea ? 'loading' : 'unsupported'), map: robotMapImage(ctx, r.id) };
+    const maps = robotMaps(ctx, r.id);
+    // The robot's own room list wins; Home Assistant areas are the fallback.
+    const roomSource = maps.rooms.length ? 'robot' : canArea ? 'areas' : null;
+    const roomList = roomSource === 'robot' ? maps.rooms : areas.map((a) => ({ id: a.id, name: a.name }));
+    return { ...r, classic, canArea, areas, areaStatus: areaInfo?.status || (canArea ? 'loading' : 'unsupported'), map: robotMapImage(ctx, r.id), maps, roomSource, roomList };
   });
 }
 
@@ -1410,13 +1580,22 @@ export function mergePrefs(base, over) {
 
 // -------------------------------------------------------------- billing
 
+// Adds up hourly changes. Every statistic summed here is something used or paid for, which
+// never goes down, so a drop is a meter reset (a "today" counter going back to zero at
+// midnight, a plug rebooting) and is skipped rather than counted as negative use.
+// "Master TV Area Today's consumption" → "Master TV Area", "anaiya room" → "Anaiya room".
+export function circuitName(name) {
+  const n = cleanName(String(name || '')).replace(/(\s+(energy|power|consumption|usage|total|daily|today'?s?|this month|billing (cycle|period)|minute average))+$/i, '').trim() || String(name || '');
+  return n.charAt(0).toUpperCase() + n.slice(1);
+}
+
 export function sumChange(rows, from, to) {
   let total = 0;
   let seen = false;
   let last = null;
   for (const row of rows || []) {
     if (row.start >= from && row.start < to && Number.isFinite(row.change)) {
-      total += row.change;
+      total += Math.max(0, row.change);
       seen = true;
       last = Math.max(last ?? 0, row.end ?? row.start + 3600000);
     }
@@ -2408,27 +2587,55 @@ function robotActions(r) {
   return `${main}${b('vac', 'return_to_base', 'Dock', 'home', false)}`;
 }
 
-// The rooms of a robot that cleans by area, right on Home: tap rooms in order, then Clean.
-function robotRoomsInline(m, ui, r) {
-  if (r.classic || r.litter || !r.canArea) return '';
+// Map pictures change while the robot cleans; a new query string every 30 s makes the app
+// fetch the latest one. Inline (data:) pictures are left alone.
+function freshSrc(src, now) {
+  if (/^data:/.test(src)) return src;
+  return `${src}${src.includes('?') ? '&' : '?'}_nh=${Math.floor(now / 30000)}`;
+}
+
+// A robot's map, map picker and rooms. Tap rooms on the map (Eufy) or by name, in the order
+// they should be cleaned, then Clean. Used on Home and on the Robots tab.
+function robotMapPanel(m, ui, r, { compact = false } = {}) {
+  if (r.classic || r.litter) return '';
   const id = esc(r.id);
-  if (r.areaStatus === 'loading') return '<div class="rs-rooms"><small class="note">Loading rooms…</small></div>';
-  if (r.areaStatus === 'error' || !r.areas.length) {
-    return `<div class="rs-rooms"><small class="note">${esc(r.name)}'s rooms aren't matched to Home Assistant areas yet. Open it, tap <b>Cleaning → By area</b>, then the gear, and match each room once.</small><button class="chip" data-act="more" data-entity="${id}">${ic('map')}Open ${esc(r.name)}</button></div>`;
-  }
+  const maps = r.maps;
+  const shownMap = maps.images.find((x) => x.id === ui.mapView[r.id]) || maps.images.find((x) => x.live) || maps.images[0] || null;
   const sel = ui.roomSel[r.id] || [];
-  const tiles = r.areas.map((a) => {
-    const order = sel.indexOf(a.id);
-    return `<button class="rtile ${order >= 0 ? 'on' : ''}" data-act="room" data-vac="${id}" data-area="${esc(a.id)}" aria-pressed="${order >= 0}">${order >= 0 ? `<i class="rt-o">${order + 1}</i>` : ''}<span>${esc(a.name)}</span></button>`;
-  }).join('');
-  const last = ((m.prefs.lastRooms || {})[r.id] || []).map((aid) => r.areas.find((a) => a.id === aid)?.name).filter(Boolean);
-  return `<div class="rs-rooms">
-      ${r.map ? `<img class="rmap-img rs-map" src="${esc(r.map.src)}${r.map.src.includes('?') ? '&' : '?'}_nh=${Math.floor(m.now / 30000)}" alt="${esc(r.name)} map">` : ''}
-      <div class="rtiles compact">${tiles}</div>
-      ${sel.length
-        ? `<div class="rs-go"><button class="act primary" data-act="cleanrooms" data-vac="${id}">${ic('play')}Clean ${sel.length} ${sel.length === 1 ? 'room' : 'rooms'}</button><button class="act" data-act="roomsclear" data-vac="${id}">${ic('x')}Clear</button></div>`
-        : last.length ? `<button class="chip repeat" data-act="roomsrepeat" data-vac="${id}">${ic('spark')}Again: ${esc(last.join(', '))}</button>` : '<small class="note">Tap rooms in the order to clean them, or Start for the whole map.</small>'}
-    </div>`;
+  const pts = ui.roomPts[r.id] || {};
+  const picker = maps.mapSelect && maps.mapSelect.options.length > 1
+    ? `<div class="mapsel"><small>Map</small><div class="seg t-cyan">${maps.mapSelect.options.map((o) => `<button class="${o.value === maps.mapSelect.current ? 'on' : ''}" data-act="mapselect" data-entity="${esc(maps.mapSelect.id)}" data-option="${esc(o.value)}">${esc(o.label)}</button>`).join('')}</div></div>`
+    : maps.images.length > 1
+      ? `<div class="mapsel"><small>Map</small><div class="seg t-cyan">${maps.images.map((x) => `<button class="${x.id === shownMap?.id ? 'on' : ''}" data-act="mapview" data-vac="${id}" data-map="${esc(x.id)}">${esc(x.name)}</button>`).join('')}</div></div>`
+      : '';
+  const marks = sel.map((rid, i) => (pts[rid] ? `<i class="mark" style="left:${(pts[rid].x * 100).toFixed(2)}%;top:${(pts[rid].y * 100).toFixed(2)}%">${i + 1}</i>` : '')).join('');
+  const img = shownMap
+    ? `<div class="mapwrap ${maps.tapToPick ? 'tappable' : ''}" ${maps.tapToPick ? `data-act="maptap" data-vac="${id}"` : ''}><img class="rmap-img" src="${esc(freshSrc(shownMap.src, m.now))}" alt="${esc(r.name)} map" draggable="false">${marks}</div>${maps.tapToPick ? '<small class="note">Tap rooms on the map, or by name below.</small>' : ''}`
+    : '';
+  let rooms = '';
+  if (r.roomSource === 'robot' || (r.roomSource === 'areas' && r.areas.length)) {
+    rooms = `<div class="rtiles ${compact ? 'compact' : ''}">${r.roomList.map((a) => {
+      const order = sel.indexOf(a.id);
+      return `<button class="rtile ${order >= 0 ? 'on' : ''}" data-act="room" data-vac="${id}" data-area="${esc(a.id)}" aria-pressed="${order >= 0}">${order >= 0 ? `<i class="rt-o">${order + 1}</i>` : ''}<span>${esc(a.name)}</span></button>`;
+    }).join('')}</div>`;
+  } else if (r.roomSource === 'areas' && r.areaStatus === 'loading') {
+    rooms = '<small class="note">Loading rooms…</small>';
+  } else if (maps.kind || maps.platform === 'robovac_mqtt') {
+    rooms = `<small class="note">${esc(r.name)} hasn't shared rooms for this map yet. They appear after it finishes a full clean of the map.</small>`;
+  } else {
+    rooms = `<small class="note">${esc(r.name)}'s rooms aren't matched to Home Assistant areas yet. Open it, tap <b>Cleaning → By area</b>, then the gear, and match each room once.</small><button class="chip" data-act="more" data-entity="${id}">${ic('map')}Open ${esc(r.name)}</button>`;
+  }
+  const lastNames = ((m.prefs.lastRooms || {})[r.id] || []).map((rid) => r.roomList.find((a) => a.id === rid)?.name).filter(Boolean);
+  const actions = sel.length
+    ? `<div class="rs-go"><button class="act primary" data-act="cleanrooms" data-vac="${id}">${ic('play')}Clean ${sel.length} ${sel.length === 1 ? 'room' : 'rooms'}</button><button class="act" data-act="roomsclear" data-vac="${id}">${ic('x')}Clear</button></div>`
+    : r.roomList.length
+      ? `${lastNames.length ? `<button class="chip repeat" data-act="roomsrepeat" data-vac="${id}">${ic('spark')}Again: ${esc(lastNames.join(', '))}</button>` : ''}<small class="note">Rooms are cleaned in the order you pick them. Start cleans the whole map.</small>`
+      : '';
+  return `<div class="rs-rooms" data-key="rmap-${id}">${picker}${img}${rooms}${actions}</div>`;
+}
+
+function robotRoomsInline(m, ui, r) {
+  return robotMapPanel(m, ui, r, { compact: true });
 }
 
 function robotShortcuts(m, ui) {
@@ -2532,33 +2739,7 @@ function viewAirV2(m, ui) {
 }
 
 function roomsPicker(m, ui, r) {
-  if (!r.canArea) return `<div class="rmap-empty">${ic('map')}<span>${esc(r.name)} does not support cleaning by room in Home Assistant.</span></div>`;
-  if (r.areaStatus === 'loading') return '<div class="rmap-empty">Loading rooms…</div>';
-  if (r.areaStatus === 'error') return `<div class="rmap-empty">${ic('alert')}<span>The room list could not load. Home Assistant only shares it with admin accounts.</span><button class="chip" data-act="more" data-entity="${esc(r.id)}">Open ${esc(r.name)}</button></div>`;
-  if (!r.areas.length) return `<div class="rmap-empty">${ic('map')}<span>${esc(r.name)}'s rooms are not matched to your Home Assistant areas yet. Open the robot, tap <b>Cleaning → By area</b>, then the gear to match them.</span><button class="chip" data-act="more" data-entity="${esc(r.id)}">Open ${esc(r.name)}</button></div>`;
-  const sel = ui.roomSel[r.id] || [];
-  const floors = [];
-  for (const area of r.areas) {
-    let f = floors.find((x) => x.id === area.floor.id);
-    if (!f) floors.push((f = { id: area.floor.id, name: area.floor.name, areas: [] }));
-    f.areas.push(area);
-  }
-  const last = (m.prefs.lastRooms || {})[r.id] || [];
-  const lastNames = last.map((id) => m.robots.find((x) => x.id === r.id)?.areas.find((a) => a.id === id)?.name).filter(Boolean);
-  return `<div class="rmap" data-key="rmap-${esc(r.id)}">
-      ${r.map ? `<img class="rmap-img" src="${esc(r.map.src)}${r.map.src.includes('?') ? '&' : '?'}_nh=${Math.floor(m.now / 30000)}" alt="${esc(r.name)} map">` : ''}
-      ${floors.map((f) => `<div class="floor">${f.name ? `<small>${esc(f.name)}</small>` : ''}<div class="rtiles">${f.areas.map((a) => {
-        const order = sel.indexOf(a.id);
-        return `<button class="rtile ${order >= 0 ? 'on' : ''}" data-act="room" data-vac="${esc(r.id)}" data-area="${esc(a.id)}" aria-pressed="${order >= 0}">${order >= 0 ? `<i class="rt-o">${order + 1}</i>` : ''}<span>${esc(a.name)}</span></button>`;
-      }).join('')}</div></div>`).join('')}
-      <div class="rmap-acts">
-        <button class="act primary" data-act="cleanrooms" data-vac="${esc(r.id)}" ${sel.length ? '' : 'disabled'}>${ic('play')}${sel.length ? `Clean ${sel.length} ${sel.length === 1 ? 'room' : 'rooms'}` : 'Pick rooms'}</button>
-        <button class="act" data-act="roomsall" data-vac="${esc(r.id)}">${ic('check')}All</button>
-        <button class="act" data-act="roomsclear" data-vac="${esc(r.id)}" ${sel.length ? '' : 'disabled'}>${ic('x')}Clear</button>
-      </div>
-      ${lastNames.length && !sel.length ? `<button class="chip repeat" data-act="roomsrepeat" data-vac="${esc(r.id)}">${ic('spark')}Again: ${esc(lastNames.join(', '))}</button>` : ''}
-      <small class="note">Rooms are cleaned in the order you tap them.</small>
-    </div>`;
+  return robotMapPanel(m, ui, r);
 }
 
 function dustBlock(m, ui) {
@@ -2636,29 +2817,60 @@ function viewEnergyV2(m, ui) {
 function healthCard(m, key, label, icon, sub) {
   const x = m.health.metrics[key];
   if (!x) return '';
-  return `<button class="panel hcard t-${x.tone}" data-act="more" data-entity="${esc(x.id)}">
+  const word = !/\d/.test(x.shown);
+  const act = x.computed ? `data-act="healthmath" data-k="${key}"` : `data-act="more" data-entity="${esc(x.id)}"`;
+  return `<button class="panel hcard t-${x.tone}" ${act}>
       <span class="hcard-h">${ic(icon)}<b>${esc(label)}</b>${ic('chev')}</span>
-      <span class="ring">${ringSvg(x.value, x.tone, 112, 9)}<span class="ring-v"><b>${esc(x.shown)}</b><small>${esc(x.label)}</small></span></span>
+      <span class="ring ${word ? 'word' : ''}">${ringSvg(x.value, x.tone, 112, 9)}<span class="ring-v"><b>${esc(x.shown)}</b>${word ? '' : `<small>${esc(x.label)}</small>`}</span></span>
       <span class="hcard-s">${esc(sub)}</span>
     </button>`;
+}
+
+function healthMath(m, key) {
+  const c = m.health.computed[key];
+  const isSick = key === 'sick';
+  const rows = c.parts.map((p) => `<tr class="${p.points === null ? 'off' : ''}"><th scope="row">${esc(p.label)}<small>${esc(p.rule)}</small></th><td>${p.shown === null ? 'no data' : esc(p.shown)}</td><td>${p.points === null ? '—' : p.points}</td><td>${p.weight}%</td></tr>`).join('');
+  const used = c.parts.filter((p) => p.points !== null);
+  const formula = used.length ? `(${used.map((p) => `${p.points} × ${p.weight}`).join(' + ')}) ÷ ${c.weightPct} = <b>${fmt(c.score)}</b>` : 'No inputs are reporting yet.';
+  const missing = [];
+  if (isSick && ['rhr', 'hrv', 'resp'].some((k) => m.health.vitals[k] && m.health.averages[k] === undefined)) missing.push('Two-week averages appear once Home Assistant has a couple of days of history for these sensors.');
+  if (!isSick && !m.health.age) missing.push('Add your age in Customize to include vascular aging.');
+  return `<div class="hmath"><p>${isSick ? 'Higher means more signs that you may be getting sick. 0–29 Low, 30–59 Moderate, 60+ High.' : 'Higher is better. 75+ Good, 50–74 Fair, under 50 Low.'} Each input is turned into 0–100 points, then averaged by weight over the inputs that are reporting (${c.used} of ${c.total}, ${c.weightPct}% of the weight).</p>
+      <table><thead><tr><th scope="col">Input</th><th scope="col">Now</th><th scope="col">Points</th><th scope="col">Weight</th></tr></thead><tbody>${rows}</tbody></table>
+      <p>${formula}</p>${missing.map((t) => `<p class="note">${esc(t)}</p>`).join('')}</div>`;
+}
+
+function vitalText(x) {
+  if (x.value === null) return 'Offline';
+  if (x.key === 'temp' || x.key === 'tempTrend') return `${x.value >= 0 ? '+' : ''}${fmt(x.value, 2)} °C`;
+  if (x.key === 'stress' || x.key === 'recovery') return `${fmt(x.value)} min`;
+  if (x.key === 'steps') return fmt(x.value);
+  if (x.key === 'activity') return fmt(x.value);
+  return `${fmt(x.value, x.key === 'resp' ? 1 : 0)} ${x.unit}`.trim();
 }
 
 function viewHealth(m, ui) {
   const h = m.health;
   if (!h.has) return `${viewHead(ui, 'Oura', 'My health')}${emptyState('heart', 'No Oura scores found', 'Pick your readiness, sleep and resilience sensors in Customize.')}<button class="more" data-act="sheet" data-sheet="customize">Open Customize</button>`;
   const heart = h.metrics.heart;
+  const sick = h.metrics.sick;
+  const vitals = Object.values(h.vitals);
+  const avg = (k) => (h.averages[k] !== undefined ? ` · avg ${fmt(h.averages[k], k === 'resp' ? 1 : 0)}` : '');
   return `${viewHead(ui, 'Oura', 'My health')}
     <section class="panel hhead">
-      <div><b>Oura · Readiness · Sleep · Recovery</b><small>${h.updated ? `Updated ${esc(new Date(h.updated).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }))}` : ''}</small></div>
+      <div><b>Oura · Readiness · Sleep · Recovery · Health</b><small>${h.updated ? `Updated ${esc(new Date(h.updated).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }))}` : ''}</small></div>
       ${h.battery !== null ? `<button class="chip" data-act="more" data-entity="${esc(h.batteryId)}">${ic('battery')}Ring <b>${fmt(h.battery)}%</b></button>` : ''}
     </section>
     <div class="hgrid">
       ${healthCard(m, 'readiness', 'Readiness', 'leaf', 'Oura readiness score')}
       ${healthCard(m, 'sleep', 'Sleep', 'moon', h.sleepTime ? `${h.sleepTime} total sleep` : 'Oura sleep score')}
       ${healthCard(m, 'resilience', 'Resilience', 'shield', 'Oura stress resilience')}
-      ${healthCard(m, 'sick', 'Sick Score', 'alert', 'Early-warning index')}
+      ${healthCard(m, 'sick', 'Sick Score', 'alert', sick?.computed ? `Early-warning index · ${sick.computed.used} inputs · tap for the math` : 'Early-warning index')}
     </div>
-    ${heart ? `<button class="panel hwide t-${heart.tone}" data-act="more" data-entity="${esc(heart.id)}"><span class="ring">${ringSvg(heart.value, heart.tone, 112, 9)}<span class="ring-v"><b>${esc(heart.shown)}</b><small>${esc(heart.label)}</small></span></span><span class="hwide-t"><b>${ic('heart')}Heart Score</b><small>Tap for the readings behind it.</small></span></button>` : ''}`;
+    ${ui.healthMath === 'sick' && sick?.computed ? healthMath(m, 'sick') : ''}
+    ${heart ? `<button class="panel hwide t-${heart.tone}" ${heart.computed ? 'data-act="healthmath" data-k="heart"' : `data-act="more" data-entity="${esc(heart.id)}"`}><span class="ring">${ringSvg(heart.value, heart.tone, 112, 9)}<span class="ring-v"><b>${esc(heart.shown)}</b><small>${esc(heart.label)}</small></span></span><span class="hwide-t"><b>${ic('heart')}Heart Score</b>${heart.computed ? `<small>${heart.computed.used} inputs · ${heart.computed.weightPct}% of the weight available</small><small>Combines cardiorespiratory fitness, heart rate, HRV, vascular aging and sleep.</small><small class="hlink">Tap for every value, weight and point →</small>` : '<small>Tap for the readings behind it.</small>'}</span></button>` : ''}
+    ${ui.healthMath === 'heart' && heart?.computed ? healthMath(m, 'heart') : ''}
+    ${vitals.length ? `<section class="block">${secHead('chart', 'Last night', 'violet')}<div class="panel vitals">${vitals.map((x) => `<button class="vital" data-act="more" data-entity="${esc(x.id)}"><span>${esc(x.label)}</span><b>${esc(vitalText(x))}</b>${['rhr', 'hrv', 'resp'].includes(x.key) && h.averages[x.key] !== undefined ? `<small>${esc(avg(x.key).replace(' · ', ''))}</small>` : '<small></small>'}</button>`).join('')}</div></section>` : ''}`;
 }
 
 // Customize and billing sheets ------------------------------------------------
@@ -2736,7 +2948,10 @@ function customizeSheet(m) {
     <div class="field"><span>Dust score sensors</span><div class="checks">${c.numeric.filter((o) => dust.has(o.id) || /dust|dirt|dyson/i.test(o.name)).map((o) => `<label class="check"><input type="checkbox" data-pref="dust" value="${esc(o.id)}" ${dust.has(o.id) ? 'checked' : ''}><span>${esc(o.name)} <small>${esc(o.state)}</small></span></label>`).join('') || '<small class="note">No Dyson or dust sensors found.</small>'}</div></div>
 
     <h3>Oura</h3>
-    ${ouraSel('readiness', 'Readiness')}${ouraSel('sleep', 'Sleep score')}${ouraSel('resilience', 'Resilience')}${ouraSel('sick', 'Sick Score')}${ouraSel('heart', 'Heart Score')}${ouraSel('duration', 'Total sleep time')}${ouraSel('battery', 'Ring battery')}
+    ${ouraSel('readiness', 'Readiness')}${ouraSel('sleep', 'Sleep score')}${ouraSel('resilience', 'Resilience')}${ouraSel('duration', 'Total sleep time')}${ouraSel('battery', 'Ring battery')}
+    <label class="field"><span>Your age (for vascular aging in the Heart Score)</span><input type="number" inputmode="numeric" min="10" max="110" placeholder="e.g. 42" data-pref="oura.age" value="${esc(oura.age ?? '')}"></label>
+    <p class="note">Sick Score and Heart Score are worked out from the Oura readings below unless you pick a sensor for them.</p>
+    ${ouraSel('sick', 'Sick Score sensor (optional)')}${ouraSel('heart', 'Heart Score sensor (optional)')}
 
     <h3>Family map</h3>
     <label class="field"><span>People come from</span><select data-pref="people_source"><option value="life360" ${p.people_source !== 'person' ? 'selected' : ''}>Life360 members</option><option value="person" ${p.people_source === 'person' ? 'selected' : ''}>Home Assistant people</option></select></label>`;
@@ -3428,7 +3643,14 @@ img { max-width: 100%; }
 .rs-item:last-child { border-bottom: 0; }
 .rs { display: flex; align-items: center; gap: 10px; min-height: 60px; }
 .rs-rooms { display: grid; gap: 10px; padding: 2px 0 14px; }
-.rs-map { max-height: 200px; object-fit: contain; }
+.mapsel { display: grid; gap: 6px; }
+.mapsel > small { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--nh-faint); }
+.mapsel .seg { overflow-x: auto; }
+.mapsel .seg button { white-space: nowrap; }
+.mapwrap { position: relative; max-height: 440px; overflow-y: auto; border-radius: 14px; background: #07121f; }
+.mapwrap .rmap-img { display: block; width: 100%; height: auto; border: 0; border-radius: 0; }
+.mapwrap.tappable { cursor: crosshair; }
+.mark { position: absolute; width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%; display: grid; place-items: center; font: 700 12px var(--nh-body); font-style: normal; color: #06101c; background: var(--nh-cyan); box-shadow: 0 0 0 3px rgba(6, 16, 28, .7), 0 0 16px rgba(77, 227, 255, .6); pointer-events: none; }
 .rtiles.compact { grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); }
 .rtiles.compact .rtile { min-height: 50px; padding: 8px 8px 8px 30px; }
 .rtiles.compact .rtile:not(.on) { padding-left: 8px; }
@@ -3509,18 +3731,35 @@ input.mini { min-height: 36px; width: 120px; flex: none; font-size: 13px; }
 .bc-nums b.est { color: var(--tone); }
 .sheet-nums b { font-size: 26px; }
 .heat { display: grid; gap: 8px; }
-.heat-scroll { overflow-x: auto; margin: 0 -4px; }
-.heat table { width: 100%; border-collapse: separate; border-spacing: 4px; font-size: 13px; }
+.heat-scroll { margin: 0 -4px; }
+.heat table { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 3px; font-size: 12.5px; }
+.heat thead th:first-child { width: 36%; }
 .heat th { text-align: left; font-weight: 600; white-space: nowrap; padding: 6px 4px; }
 .heat thead th { font-size: 11.5px; font-weight: 500; color: var(--nh-dim); }
 .heat thead th:not(:first-child) { text-align: center; }
-.heat tbody th { max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
-.hn { display: inline-block; width: 22px; font-size: 11px; color: var(--nh-faint); font-variant-numeric: tabular-nums; }
-.heat td { min-width: 66px; padding: 9px 6px; border-radius: 8px; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; }
+.heat tbody th { overflow: hidden; text-overflow: ellipsis; }
+.hn { display: inline-block; width: 19px; font-size: 11px; color: var(--nh-faint); font-variant-numeric: tabular-nums; }
+.heat td { padding: 9px 2px; white-space: nowrap; border-radius: 8px; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; }
 .hhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .hhead > div { display: grid; gap: 2px; min-width: 0; }
 .hhead b { font-size: 14px; }
 .hhead small { font-size: 12px; color: var(--nh-dim); }
+.ring.word .ring-v b { font-size: 22px; letter-spacing: 0; }
+.hlink { color: var(--nh-cyan) !important; }
+.hmath { display: grid; gap: 10px; padding: 14px; border-radius: 18px; background: rgba(255, 255, 255, .03); border: 1px solid var(--nh-line); font-size: 13px; color: var(--nh-dim); }
+.hmath p { margin: 0; }
+.hmath b { color: var(--nh-ink); }
+.hmath table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 12px; }
+.hmath th, .hmath td { padding: 7px 4px; border-bottom: 1px solid var(--nh-line); text-align: right; vertical-align: top; }
+.hmath th:first-child { width: 46%; text-align: left; font-weight: 600; color: var(--nh-ink); }
+.hmath thead th { font-weight: 500; color: var(--nh-faint); }
+.hmath tbody th small { display: block; margin-top: 2px; font-weight: 400; font-size: 11px; color: var(--nh-faint); }
+.hmath tr.off td, .hmath tr.off th { opacity: .5; }
+.vitals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.vital { display: grid; gap: 2px; padding: 10px 12px; border-radius: 14px; text-align: left; background: rgba(255, 255, 255, .03); border: 1px solid var(--nh-line); }
+.vital span { font-size: 12px; color: var(--nh-dim); }
+.vital b { font: 600 18px var(--nh-display); font-variant-numeric: tabular-nums; }
+.vital small { font-size: 11px; color: var(--nh-faint); min-height: 13px; }
 .hgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .hcard { display: grid; justify-items: center; gap: 10px; text-align: center; }
 .hcard-h { display: flex; align-items: center; gap: 6px; justify-self: stretch; font-size: 14px; }
@@ -3625,7 +3864,10 @@ class NourieHome extends Base {
       mapError: false,
       charts: {},
       roomSel: {},
+      roomPts: {},
+      mapView: {},
       scoreMath: false,
+      healthMath: null,
       pmRange: readStore('pm-range') === '7d' ? '7d' : '24h',
     };
     this._loading = new Set();
@@ -3792,8 +4034,9 @@ class NourieHome extends Base {
       if (this._ui.pmRange === '7d') this._statsMean('pm03week', pmIds, 7 * 24);
     }
     if (tab === 'robots') this._history('dust', m.dust, 30 * 24);
+    if (tab === 'home' || tab === 'health') this._statsMean('vitalsavg', ['rhr', 'hrv', 'resp'].map((k) => m.health.vitals[k]?.id), 15 * 24);
     if (tab === 'home' || tab === 'energy' || String(this._ui.sheet).startsWith('bill-')) this._billingData(m);
-    const mapped = m.robots.filter((r) => !r.classic && !r.litter && r.canArea);
+    const mapped = m.robots.filter((r) => !r.classic && !r.litter && r.canArea && r.roomSource !== 'robot');
     if (tab === 'home' || tab === 'robots' || String(this._ui.sheet).startsWith('rooms:')) this._vacuumAreas(mapped);
     const pm = m.spike.pm;
     const h = this._ext.history.pm03;
@@ -3888,7 +4131,7 @@ class NourieHome extends Base {
         this._energyInfo = await this._hass.callWS({ type: 'energy/info' }).catch(() => ({ cost_sensors: {} }));
       }
       const ids = { electric: this._resolveSource('electric', this._energyPrefs, this._energyInfo, m), water: this._resolveSource('water', this._energyPrefs, this._energyInfo, m) };
-      let circuits = (this._energyPrefs?.device_consumption || []).filter((d) => d.stat_consumption).map((d) => ({ stat: d.stat_consumption, name: cleanName(d.name || m.states[d.stat_consumption]?.attributes?.friendly_name || d.stat_consumption).replace(/\s*energy( today| this month)?$/i, '') }));
+      let circuits = (this._energyPrefs?.device_consumption || []).filter((d) => d.stat_consumption).map((d) => ({ stat: d.stat_consumption, name: circuitName(d.name || m.states[d.stat_consumption]?.attributes?.friendly_name || d.stat_consumption) }));
       if (!circuits.length) circuits = m.energy.circuits.filter((c) => c.todayId).map((c) => ({ stat: c.todayId, name: c.name }));
       const tariffIds = (src) => (src ? src.tariffs || [src] : []).flatMap((t) => [t.usage, t.cost]);
       const statIds = [...new Set([...tariffIds(ids.electric), ...tariffIds(ids.water), ...circuits.map((c) => c.stat)].filter(Boolean))];
@@ -4277,6 +4520,11 @@ class NourieHome extends Base {
     this._press = null;
     const el = e.target.closest?.('[data-act]');
     if (!el) return;
+    if (el.dataset.act === 'maptap') {
+      const box = el.querySelector('img')?.getBoundingClientRect();
+      if (box && box.width) this._mapTap(el.dataset.vac, clamp((e.clientX - box.left) / box.width, 0, 1), clamp((e.clientY - box.top) / box.height, 0, 1));
+      return;
+    }
     this._act(el.dataset.act, el.dataset);
   }
 
@@ -4326,9 +4574,13 @@ class NourieHome extends Base {
         writeStore('pm-range', this._ui.pmRange);
         return this._schedule(true);
       case 'room': return this._toggleRoom(d.vac, d.area);
+      case 'mapselect': return this._call('select', 'select_option', { entity_id: d.entity, option: d.option });
+      case 'mapview':
+        this._ui.mapView[d.vac] = d.map;
+        return this._schedule(true);
       case 'roomsall': {
         const r = this._model?.robots.find((x) => x.id === d.vac);
-        this._ui.roomSel[d.vac] = r ? r.areas.map((a) => a.id) : [];
+        this._ui.roomSel[d.vac] = r ? r.roomList.map((a) => a.id) : [];
         return this._schedule(true);
       }
       case 'roomsclear':
@@ -4351,6 +4603,9 @@ class NourieHome extends Base {
         list.splice(Number(d.i), 1);
         return this._setPref('controls', list);
       }
+      case 'healthmath':
+        this._ui.healthMath = this._ui.healthMath === d.k ? null : d.k;
+        return this._schedule(true);
       case 'pref-reset': return this._setPref(d.key, undefined);
       case 'menu': return this.dispatchEvent(new CustomEvent('hass-toggle-menu', { bubbles: true, composed: true }));
       case 'nav': return this._navigate(d.path);
@@ -4506,15 +4761,49 @@ class NourieHome extends Base {
     this._schedule(true);
   }
 
+  // Asks the Eufy integration which room is under the tapped point of the map picture.
+  async _mapTap(vac, x, y) {
+    if (!this._hass?.callWS) return;
+    try {
+      const res = await this._hass.callWS({ type: 'call_service', domain: 'robovac_mqtt', service: 'room_at_point', service_data: { x, y }, target: { entity_id: vac }, return_response: true });
+      const resp = res?.response || {};
+      const hit = resp[vac] || resp;
+      if (hit?.room_id === undefined || hit?.room_id === null) {
+        this._haptic('failure');
+        return this._toast('No room there. Tap inside a room.', true);
+      }
+      const rid = String(hit.room_id);
+      this._ui.roomPts[vac] = { ...(this._ui.roomPts[vac] || {}), [rid]: { x, y } };
+      this._toggleRoom(vac, rid);
+      const sel = this._ui.roomSel[vac] || [];
+      if (sel.includes(rid) && hit.room_name) this._toast(`${hit.room_name} · ${sel.indexOf(rid) + 1} of ${sel.length}`);
+    } catch (err) {
+      this._toast(`Couldn't read the map: ${err?.message || err}`, true);
+    }
+    return null;
+  }
+
   async _cleanRooms(vac) {
     const sel = this._ui.roomSel[vac] || [];
     if (!sel.length) return;
     const r = this._model?.robots.find((x) => x.id === vac);
-    const names = sel.map((id) => r?.areas.find((a) => a.id === id)?.name).filter(Boolean);
-    if (!(await this._call('vacuum', 'clean_area', { entity_id: vac, cleaning_area_id: sel }))) return;
+    const names = sel.map((id) => r?.roomList.find((a) => a.id === id)?.name).filter(Boolean);
+    let ok;
+    if (r?.roomSource === 'robot' && r.maps.kind === 'dreame') {
+      ok = await this._call('dreame_vacuum', 'vacuum_clean_segment', { entity_id: vac, segments: sel.map(Number) });
+    } else if (r?.roomSource === 'robot' && r.maps.kind === 'ecovacs') {
+      ok = await this._call('vacuum', 'send_command', { entity_id: vac, command: 'spot_area', params: { rooms: sel.join(','), cleanings: 1 } });
+    } else if (r?.roomSource === 'robot') {
+      // Eufy (robovac_mqtt): room_clean with the robot's own room ids, in the order picked.
+      ok = await this._call('vacuum', 'send_command', { entity_id: vac, command: 'room_clean', params: { room_ids: sel.map(Number) } });
+    } else {
+      ok = await this._call('vacuum', 'clean_area', { entity_id: vac, cleaning_area_id: sel });
+    }
+    if (!ok) return;
     this._toast(`${r?.name || 'Robot'} is cleaning ${names.join(', ')}`);
     this._setPref('lastRooms', { ...(this._ext.prefs.lastRooms || {}), [vac]: sel });
     this._ui.roomSel[vac] = [];
+    this._ui.roomPts[vac] = {};
     if (String(this._ui.sheet).startsWith('rooms:')) this._ui.sheet = null;
     this._schedule(true);
   }

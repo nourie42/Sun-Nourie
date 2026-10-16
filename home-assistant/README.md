@@ -8,10 +8,10 @@ A phone-first dashboard for Home Assistant. It is one JavaScript file with no bu
 | --- | --- |
 | Home | Only what gets used most, in order: the air score, PM0.3 over the last 24 hours for each room, the Quiet / Winix Turbo / Master Fan on and off buttons, the robots (each non-Dyson robot shows its rooms right there: tap rooms, then Clean, or Start for the whole map), this billing cycle's electric and water bills in dollars, and the Oura scores |
 | Air | The air score and how it was worked out, PM0.3 over 24 hours or 7 days, the PM0.3 spike alert, purifier controls and every room's readings |
-| Robots | The Dyson Vis Nav cards as before, a chart of each Vis Nav's dust score, and a room picker for every other vacuum: tap the rooms in the order to clean them, then Clean. The litter box is last |
+| Robots | The Dyson Vis Nav cards as before, a chart of each Vis Nav's dust score, and for every other vacuum its map: pick the map (floor), tap rooms on the map or by name in the order to clean them, then Clean |
 | Energy | Electric and water: spent so far this billing cycle and the estimated bill at the end of it, with an hour-by-day heat map of electric use |
 | Family | Everyone's Life360 location on a dark map, or a radar view by distance and direction from home |
-| Health | Oura readiness, sleep, resilience, sick and heart scores, total sleep and ring battery |
+| Health | Oura readiness, sleep and resilience, a Sick Score and a Heart Score worked out from the Oura readings (tap either for every value, weight and point), total sleep, ring battery and last night's vitals |
 
 Tap a tile to toggle it. Press and hold any tile, person, robot or reading to open Home Assistant's own details for it. The gear button opens **Customize**, where every automatic choice below can be changed from the phone.
 
@@ -36,9 +36,20 @@ Electric dollars use the price per kWh that the circuit "Energy Cost This Month"
 
 Tap **Billing cycle** on either bill to set the first and last day of the cycle, the price per kWh or per gallon, and any fixed monthly charge. The amounts update straight away. After the last day, the next cycle of the same length starts on its own. Usage comes from Home Assistant's Energy dashboard (the grid consumption and water sources), so those need to be set up under **Settings → Dashboards → Energy**. Until you enter a price, the price or cost set in the Energy dashboard is used.
 
-### Room cleaning
+### Robot maps and rooms
 
-Room cleaning uses Home Assistant's **Clean area** feature. Each robot's rooms need to be matched to Home Assistant areas once: open the robot, choose **Cleaning → By area**, then tap the gear. Reading that list needs an admin account.
+For Eufy robots (the HACS *Eufy Robovac MQTT* integration) the dashboard uses the robot's own map picture (`camera.<robot>_map`), its map switcher (`select.<robot>_switch_map`) and its room list, so nothing has to be set up. Tapping the map asks the integration's `room_at_point` service which room was tapped. Cleaning sends `room_clean` with the room ids in the order picked. Ecovacs and Dreame rooms work the same way through their own services. Other robots use Home Assistant's **Clean area** feature, which needs each room matched to an area once: open the robot, choose **Cleaning → By area**, then tap the gear.
+
+### Sick Score and Heart Score
+
+Both come from the Oura Ring integration's sensors and are weighted averages of the inputs that are reporting:
+
+- **Sick Score** (higher means more warning signs): temperature deviation 30%, lowest sleep heart rate above its two-week average 20%, sleep HRV below its two-week average 20%, breathing rate above its two-week average 15%, low readiness 15%.
+- **Heart Score** (higher is better): VO₂ max 25%, lowest sleep heart rate 20%, sleep HRV 20%, cardiovascular age compared with your age 25% (add your age in Customize), sleep score 10%.
+
+### Room costs heat map
+
+Hourly drops in a circuit's energy statistics are meter resets (a "today" counter going back to zero), so they are skipped rather than counted as negative use.
 
 ## Install
 

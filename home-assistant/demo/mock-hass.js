@@ -63,6 +63,8 @@ export function createMockHass(data, onChange) {
         if (d === 'light' && on && !st.attributes.brightness) attrs.brightness = 204;
         set(id, on ? 'on' : 'off', attrs);
       }
+      if (domain === 'select' && service === 'select_option') set(id, payload.option);
+      if (domain === 'vacuum' && service === 'send_command') set(id, 'cleaning');
       if (domain === 'fan' && service === 'set_percentage') set(id, payload.percentage > 0 ? 'on' : 'off', { percentage: payload.percentage });
       if (domain === 'fan' && service === 'set_preset_mode') {
         // Home Assistant rejects a preset the fan does not list, as Winix fans without presets do.
@@ -137,6 +139,12 @@ export function createMockHass(data, onChange) {
         store[msg.key] = msg.value;
         return null;
       }
+      if (msg.type === 'call_service' && msg.domain === 'robovac_mqtt' && msg.service === 'room_at_point') {
+        const { x, y } = msg.service_data;
+        const room = (data.mapRooms || []).find((r) => x >= r.box[0] && x < r.box[2] && y >= r.box[1] && y < r.box[3]);
+        const id = msg.target?.entity_id;
+        return { context: {}, response: { [id]: room ? { room_id: room.id, room_name: room.name } : { room_id: null, room_name: null } } };
+      }
       throw new Error(`Unknown command ${msg.type}`);
     },
     connection: {
@@ -149,7 +157,7 @@ export function createMockHass(data, onChange) {
     },
     hassUrl: (path) => path,
     floors: data.floors || {},
-    services: { notify: Object.fromEntries((data.notify || []).map((n) => [n, {}])) },
+    services: { notify: Object.fromEntries((data.notify || []).map((n) => [n, {}])), robovac_mqtt: { room_at_point: {} }, select: { select_option: {} } },
     callApi: async (method, path, body) => {
       await new Promise((r) => setTimeout(r, 200));
       const m = /^config\/automation\/config\/(.+)$/.exec(path);
@@ -249,7 +257,10 @@ export function synthStatistics(id, from, to, types, st) {
     if (types.includes('change')) row.change = Math.round(change * 1000) / 1000;
     if (types.includes('mean')) {
       const cur = Number(st?.state) || 0;
-      row.mean = Math.max(0, cur * (0.6 + rnd() * 0.8) * (h >= 17 && h < 20 ? 1.8 : 1));
+      // Oura vitals sit near a steady baseline; last night's heart rate and breathing run a little high.
+      row.mean = /oura/.test(id)
+        ? cur * (/heart_rate|breathing/.test(id) ? 0.93 : /hrv/.test(id) ? 1.18 : 1) * (0.97 + rnd() * 0.06)
+        : Math.max(0, cur * (0.6 + rnd() * 0.8) * (h >= 17 && h < 20 ? 1.8 : 1));
     }
     rows.push(row);
   }

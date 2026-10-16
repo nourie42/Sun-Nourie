@@ -2,6 +2,19 @@
 import { synthHistory, synthStatistics } from './mock-hass.js';
 
 const HOME = { lat: 39.7392, lon: -104.9903 };
+
+// Eurethra's upstairs map: rooms as fractions of the picture, the way the Eufy integration's
+// room_at_point service reads a tap.
+export const EURETHRA_ROOMS = [
+  { id: 1, name: 'Master Bedroom', box: [0, 0, 0.45, 0.5] },
+  { id: 2, name: 'Master Bath', box: [0.45, 0, 0.7, 0.5] },
+  { id: 4, name: 'Loft', box: [0.7, 0, 1, 0.5] },
+  { id: 3, name: 'Hallway', box: [0, 0.5, 1, 0.62] },
+  { id: 5, name: 'Angel Room', box: [0, 0.62, 0.5, 1] },
+  { id: 6, name: 'Kish Room', box: [0.5, 0.62, 1, 1] },
+];
+const MAP_COLORS = ['#1d4f6e', '#2a5b52', '#4a3f6e', '#33424f', '#5a4632', '#3a5a2e'];
+const eurethraMap = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 200">${EURETHRA_ROOMS.map((r, i) => `<rect x="${r.box[0] * 300 + 2}" y="${r.box[1] * 200 + 2}" width="${(r.box[2] - r.box[0]) * 300 - 4}" height="${(r.box[3] - r.box[1]) * 200 - 4}" rx="6" fill="${MAP_COLORS[i]}" stroke="#7fd6ff" stroke-opacity=".35"/><text x="${((r.box[0] + r.box[2]) / 2) * 300}" y="${((r.box[1] + r.box[3]) / 2) * 200 + 4}" font-family="sans-serif" font-size="11" fill="#cfe9ff" text-anchor="middle">${r.name}</text>`).join('')}<circle cx="40" cy="30" r="6" fill="#44e6b0"/></svg>`)}`;
 const e = (id, name, state, attrs = {}, extra = {}) => ({ id, name, state, attrs, ...extra });
 
 const floors = {
@@ -29,6 +42,7 @@ const devices = {
   flume: { id: 'flume', name: 'Flume Sensor', model: 'Flume 2' },
   vac_up: { id: 'vac_up', name: 'Upstairs Vis Nav', area_id: 'primary', model: '360 Vis Nav', manufacturer: 'Dyson' },
   vac_down: { id: 'vac_down', name: 'Downstairs Vis Nav', area_id: 'living', model: '360 Vis Nav', manufacturer: 'Dyson' },
+  eurethra: { id: 'eurethra', name: 'Eurethra', area_id: 'primary', model: 'X10 Pro Omni', manufacturer: 'eufy' },
   rosie: { id: 'rosie', name: 'Rosie', area_id: 'kitchen', model: 'S8', manufacturer: 'Roborock' },
   amazon_aq: { id: 'amazon_aq', name: 'First Air Quality Monitor', model: 'Smart Air Quality Monitor', manufacturer: 'Amazon' },
   winix_primary: { id: 'winix_primary', name: 'Primary Purifier', area_id: 'primary', manufacturer: 'Winix' },
@@ -86,11 +100,24 @@ const entities = [
   e('fan.master_fan', 'Master Fan', 'on', { percentage: 60, supported_features: 49 }, { area: 'primary' }),
   e('sensor.oura_ring_readiness_score', 'Oura Ring Readiness Score', 42, {}, { device: 'oura' }),
   e('sensor.oura_ring_sleep_score', 'Oura Ring Sleep Score', 64, {}, { device: 'oura' }),
-  e('sensor.oura_ring_resilience', 'Oura Ring Resilience', 27, {}, { device: 'oura' }),
+  e('sensor.oura_ring_resilience_level', 'Oura Ring Resilience Level', 'solid', { device_class: 'enum', options: ['limited', 'adequate', 'solid', 'strong', 'exceptional'] }, { device: 'oura' }),
+  e('sensor.oura_ring_stress_resilience_score', 'Oura Ring Stress Resilience Score', 58, { state_class: 'measurement' }, { device: 'oura' }),
   e('sensor.oura_ring_total_sleep_duration', 'Oura Ring Total Sleep Duration', 4.75, { unit_of_measurement: 'h' }, { device: 'oura' }),
-  e('sensor.oura_ring_battery', 'Oura Ring Battery', 18, { device_class: 'battery', unit_of_measurement: '%' }, { device: 'oura' }),
-  e('sensor.sick_score', 'Sick Score', 67, {}),
-  e('sensor.heart_score', 'Heart Score', 57, {}),
+  e('sensor.oura_ring_ring_battery_level', 'Oura Ring Ring Battery Level', 18, { device_class: 'battery', unit_of_measurement: '%' }, { device: 'oura' }),
+  e('sensor.oura_ring_temperature_deviation', 'Oura Ring Temperature Deviation', 0.5, { device_class: 'temperature', unit_of_measurement: '°C', state_class: 'measurement' }, { device: 'oura' }),
+  e('sensor.oura_ring_temperature_trend_deviation', 'Oura Ring Temperature Trend Deviation', 0.2, { device_class: 'temperature', unit_of_measurement: '°C', state_class: 'measurement' }, { device: 'oura' }),
+  e('sensor.oura_ring_lowest_sleep_heart_rate', 'Oura Ring Lowest Sleep Heart Rate', 61, { unit_of_measurement: 'bpm', state_class: 'measurement' }, { device: 'oura' }),
+  e('sensor.oura_ring_resting_heart_rate_score', 'Oura Ring Resting Heart Rate Score', 48, { state_class: 'measurement' }, { device: 'oura' }),
+  e('sensor.oura_ring_average_sleep_hrv', 'Oura Ring Average Sleep HRV', 29, { unit_of_measurement: 'ms', state_class: 'measurement' }, { device: 'oura' }),
+  e('sensor.oura_ring_hrv_balance_score', 'Oura Ring HRV Balance Score', 52, { state_class: 'measurement' }, { device: 'oura' }),
+  e('sensor.oura_ring_average_breathing_rate', 'Oura Ring Average Breathing Rate', 15.4, { unit_of_measurement: 'breaths/min', state_class: 'measurement' }, { device: 'oura' }),
+  e('sensor.oura_ring_spo2_average', 'Oura Ring SpO2 Average', 96.4, { unit_of_measurement: '%', state_class: 'measurement' }, { device: 'oura' }),
+  e('sensor.oura_ring_vo2_max', 'Oura Ring VO2 Max', 36, { unit_of_measurement: 'ml/kg/min', state_class: 'measurement' }, { device: 'oura' }),
+  e('sensor.oura_ring_cardiovascular_age', 'Oura Ring Cardiovascular Age', 44, { unit_of_measurement: 'years', state_class: 'measurement' }, { device: 'oura' }),
+  e('sensor.oura_ring_activity_score', 'Oura Ring Activity Score', 77, { state_class: 'measurement' }, { device: 'oura' }),
+  e('sensor.oura_ring_steps', 'Oura Ring Steps', 6214, { unit_of_measurement: 'steps', state_class: 'total_increasing' }, { device: 'oura' }),
+  e('sensor.oura_ring_stress_high_duration', 'Oura Ring Stress High Duration', 95, { unit_of_measurement: 'min', state_class: 'total' }, { device: 'oura' }),
+  e('sensor.oura_ring_recovery_high_duration', 'Oura Ring Recovery High Duration', 40, { unit_of_measurement: 'min', state_class: 'total' }, { device: 'oura' }),
   e('fan.primary_ceiling_fan', 'Primary Ceiling Fan', 'on', { percentage: 100, supported_features: 49 }, { area: 'primary' }),
   e('light.kitchen', 'Kitchen Lights', 'on', { brightness: 204 }, { area: 'kitchen', ago: 40 }),
   e('light.living_room_lamps', 'Living Room Lamps', 'off', {}, { area: 'living', ago: 300 }),
@@ -142,6 +169,10 @@ const entities = [
   e('vacuum.downstairs_vis_nav', 'Downstairs Vis Nav', 'cleaning', { battery_level: 64, fan_speed: 'Boost', fan_speed_list: ['Quiet', 'Auto', 'Boost'], supported_features: 14204 }, { device: 'vac_down' }),
   e('sensor.downstairs_vis_nav_cleaned_area', 'Downstairs Vis Nav Cleaned area', 238, { unit_of_measurement: 'ft²' }, { device: 'vac_down' }),
   e('sensor.upstairs_vis_nav_dust_score', 'Upstairs Vis Nav Dust score', 34, { state_class: 'measurement' }, { device: 'vac_up' }),
+  e('vacuum.eurethra', 'Eurethra', 'docked', { battery_level: 76, fan_speed: 'Max', fan_speed_list: ['Quiet', 'Standard', 'Turbo', 'Max'], supported_features: 30588 | 16384, rooms: EURETHRA_ROOMS.map(({ id, name }) => ({ id, name })) }, { device: 'eurethra', platform: 'robovac_mqtt', area: 'primary' }),
+  e('camera.eurethra_map', 'Eurethra Map', 'idle', { entity_picture: eurethraMap }, { device: 'eurethra', platform: 'robovac_mqtt' }),
+  e('select.eurethra_switch_map', 'Eurethra Switch Map', 'Upstairs (ID: 2)', { options: ['Downstairs (ID: 1)', 'Upstairs (ID: 2)'] }, { device: 'eurethra', platform: 'robovac_mqtt' }),
+  e('switch.eurethra_find_robot', 'Eurethra Find Robot', 'off', {}, { device: 'eurethra', platform: 'robovac_mqtt' }),
   e('vacuum.rosie', 'Rosie', 'docked', { battery_level: 88, fan_speed: 'Balanced', fan_speed_list: ['Quiet', 'Balanced', 'Turbo', 'Max'], supported_features: 30588 }, { device: 'rosie' }),
   e('vacuum.litter_robot', 'Litter-Robot Litter box', 'docked', { status: 'Ready' }, { device: 'litter', platform: 'litterrobot' }),
   e('sensor.litter_robot_waste_drawer', 'Litter-Robot Waste drawer', 46, { unit_of_measurement: '%' }, { device: 'litter', platform: 'litterrobot' }),
@@ -167,6 +198,7 @@ const circuitNames = ['Air Conditioner', 'Kitchen', 'Office', 'Refrigerator', 'L
 export const demoHome = {
   floors,
   notify: ['mobile_app_alex_phone'],
+  mapRooms: EURETHRA_ROOMS,
   areaMapping: { 'vacuum.rosie': { living: ['1'], kitchen: ['2'], dining: ['3'], office: ['4'], primary: ['5'], kids: ['6'] } },
   energyPrefs: {
     energy_sources: [

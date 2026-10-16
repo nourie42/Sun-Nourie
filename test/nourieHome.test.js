@@ -74,7 +74,12 @@ test('the demo home builds every section of the dashboard', () => {
   assert.equal(model.water.flowUnit, 'gal/min');
   assert.equal(model.water.leak, false);
 
-  assert.equal(model.robots.length, 3, 'the litter box is left out');
+  assert.equal(model.robots.length, 4, 'the litter box is left out');
+  const eurethra = model.robots.find((r) => r.id === 'vacuum.eurethra');
+  assert.equal(eurethra.roomSource, 'robot', 'a Eufy robot uses its own rooms, no area matching needed');
+  assert.equal(eurethra.roomList.length, 6);
+  assert.equal(eurethra.maps.images[0].id, 'camera.eurethra_map');
+  assert.deepEqual(eurethra.maps.mapSelect.options.map((o) => o.label), ['Downstairs', 'Upstairs']);
   assert.equal(model.robots.find((r) => r.litter), undefined);
   assert.equal(buildModel(createMockHass(demoHome).hass, { show_litter: true }, {}, NOW).robots.find((r) => r.litter).name, 'Litter-Robot');
   assert.deepEqual(model.robots.find((r) => r.id === 'vacuum.downstairs_vis_nav').fanSpeeds, ['Quiet', 'Auto', 'Boost']);
@@ -274,4 +279,20 @@ test('Quiet On and Quiet Off are read from buttons on another dashboard', async 
   ] }] }] };
   assert.deepEqual(findCardAction(config, 'quiet on'), { service: 'script.turn_on', data: { entity_id: 'script.conference_quiet' } });
   assert.deepEqual(findCardAction(config, 'quiet off'), { entity: 'script.conference_normal' });
+});
+
+test('Sick Score and Heart Score are worked out from the Oura readings', async () => {
+  const { healthScores, sumChange, circuitName } = await import('../home-assistant/nourie-home.js');
+  const vitals = { temp: { value: 0.5 }, rhr: { value: 61 }, hrv: { value: 29 }, resp: { value: 15.4 }, vo2: { value: 36 }, cvage: { value: 44 } };
+  const metrics = { readiness: { value: 42 }, sleep: { value: 64 } };
+  const { sick, heart } = healthScores(vitals, metrics, { rhr: 57, hrv: 34, resp: 14.4 }, 40);
+  assert.equal(sick.used, 5);
+  assert.ok(sick.score >= 50 && sick.score <= 75, `elevated temperature, heart rate and breathing with low readiness (${sick.score})`);
+  assert.equal(heart.used, 5);
+  assert.equal(heart.parts.find((p) => p.key === 'cvage').raw, 4, 'cardiovascular age 44 at age 40 is 4 years older');
+  const noAge = healthScores(vitals, metrics, {}, null);
+  assert.equal(noAge.heart.used, 4, 'vascular aging waits for an age');
+  assert.equal(noAge.sick.used, 2, 'baseline inputs wait for two weeks of history');
+  assert.equal(sumChange([{ start: 0, change: 5 }, { start: 1, change: -30 }, { start: 2, change: 2 }], 0, 10).total, 7, 'a meter reset is not negative use');
+  assert.equal(circuitName("Master TV Area Today's consumption"), 'Master TV Area');
 });
