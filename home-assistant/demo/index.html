@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Nourie Home demo</title>
+  <style>
+    html, body { height: 100%; margin: 0; background: #050d18; }
+    nourie-home-panel { --nh-app-height: 100%; }
+    .card-host { min-height: 100%; }
+    .card-host header { position: sticky; top: 0; z-index: 2; height: 56px; display: flex; align-items: center; padding: 0 16px; color: #e9f5ff; font: 600 18px system-ui; background: #101e2c; }
+  </style>
+</head>
+<body>
+  <script type="module">
+    import '../nourie-home.js';
+    import { createMockHass } from './mock-hass.js';
+    import { demoHome } from './demo-data.js';
+
+    // ?card shows the dashboard the way a Lovelace panel view does, under Home Assistant's own toolbar.
+    const cardMode = new URLSearchParams(location.search).has('card');
+    const el = document.createElement(cardMode ? 'nourie-home-card' : 'nourie-home-panel');
+    el.setConfig({ preview: '<b>Demo home.</b> Every name and reading here is made up.' });
+    if (cardMode) {
+      const host = document.createElement('div');
+      host.className = 'card-host';
+      host.innerHTML = '<header>Home Assistant</header>';
+      host.appendChild(el);
+      document.body.appendChild(host);
+    } else {
+      document.body.appendChild(el);
+    }
+
+    const mock = createMockHass(demoHome, (hass) => { el.hass = hass; });
+    el.hass = mock.hass;
+    window.mock = mock;
+
+    // Keep the demo moving: power drifts, water runs now and then, robots clean and dock.
+    let tick = 0;
+    setInterval(() => {
+      tick += 1;
+      const s = mock.states;
+      const watts = Math.max(300, Number(s['sensor.emporia_vue_power_minute_average'].state) + (Math.random() - 0.5) * 220);
+      mock.set('sensor.emporia_vue_power_minute_average', Math.round(watts));
+      mock.set('sensor.air_conditioner_power_minute_average', Math.round(Math.max(0, watts - 720)));
+      const flow = tick % 12 < 3 ? 1.6 + Math.random() * 0.6 : 0;
+      mock.set('sensor.flume_sensor_current', flow.toFixed(2));
+      if (flow) mock.set('sensor.flume_sensor_current_day', (Number(s['sensor.flume_sensor_current_day'].state) + flow * 0.05).toFixed(1));
+      for (const id of ['vacuum.upstairs_vis_nav', 'vacuum.downstairs_vis_nav']) {
+        const st = s[id];
+        const battery = Number(st.attributes.battery_level);
+        if (st.state === 'cleaning') mock.set(id, battery <= 20 ? 'returning' : 'cleaning', { battery_level: Math.max(5, battery - 1) });
+        else if (st.state === 'returning' && tick % 3 === 0) mock.set(id, 'docked');
+        else if (st.state === 'docked' && battery < 100) mock.set(id, 'docked', { battery_level: Math.min(100, battery + 2) });
+      }
+      const jordan = s['device_tracker.life360_jordan'];
+      if (jordan.state !== 'home') {
+        const lat = jordan.attributes.latitude + (39.7392 - jordan.attributes.latitude) * 0.08;
+        const lon = jordan.attributes.longitude + (-104.9903 - jordan.attributes.longitude) * 0.08;
+        const arrived = Math.abs(lat - 39.7392) < 0.0015;
+        mock.set('device_tracker.life360_jordan', arrived ? 'home' : 'not_home', { latitude: lat, longitude: lon, driving: !arrived, speed: arrived ? 0 : 30 + Math.round(Math.random() * 12) });
+        mock.set('person.jordan', arrived ? 'home' : 'not_home', { latitude: lat, longitude: lon });
+      }
+      mock.commit();
+    }, 3000);
+  </script>
+</body>
+</html>
