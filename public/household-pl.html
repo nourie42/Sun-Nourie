@@ -46,6 +46,7 @@ button,input{font:inherit}.topbar{position:sticky;top:0;z-index:100;background:r
 </div>
 <div class="wrap">
  <div id="snapshotFreshness" class="note" role="status" style="border:1px solid #805b2d;border-radius:10px;padding:10px;color:var(--amber)"></div>
+ <div id="storageWarning" class="note" role="alert" hidden style="border:1px solid #805b2d;border-radius:10px;padding:10px;color:var(--amber)"></div>
  <section id="quick" class="view active">
   <div class="kpis">
    <div class="kpi"><b id="incomeLabel">Snapshot Income</b><strong id="ki">—</strong></div>
@@ -179,14 +180,60 @@ function migrateHouseholdEdits(edits,anchor,periods){
  }
  reconcilePostedSnapshot();
  const STORE='nourie-household-pl-v3',DEL='nourie-household-pl-deleted-v3';
- const saved=JSON.parse(localStorage.getItem(STORE)||'null')||{};
+ const blockedStorage=new Set(),storageWarnings=new Map();
+ function showStorageWarnings(){
+   const el=document.getElementById('storageWarning');
+   el.textContent=Array.from(storageWarnings.values()).join(' ');el.hidden=storageWarnings.size===0;
+ }
+ function storageWarning(key,message){storageWarnings.set(key,message);showStorageWarnings()}
+ function isRecord(value){return value!==null&&typeof value==='object'&&!Array.isArray(value)}
+ function isAmount(value){return (typeof value==='number'||typeof value==='string'&&value.trim()!=='')&&Number.isFinite(Number(value))}
+ function isMonth(value){return /^\d{4}-(0[1-9]|1[0-2])$/.test(String(value||''))}
+ function validManualRow(r){
+   return isRecord(r)&&Number.isSafeInteger(r.row)&&r.type==='line'&&typeof r.label==='string'&&
+     Array.isArray(r.vals)&&r.vals.length>=14&&r.vals.every(isAmount)&&
+     (r.keys==null||Array.isArray(r.keys))&&(r.budgetStartMonth==null||isMonth(r.budgetStartMonth))&&
+     (r.frequency==null||r.frequency==='monthly'||r.frequency==='one-time')&&
+     (r.monthlyAmount==null||isAmount(r.monthlyAmount));
+ }
+ function validSavedState(value){
+   return value===null||isRecord(value)&&
+     (value.monthEdits==null||isRecord(value.monthEdits)&&Object.values(value.monthEdits).every(isAmount))&&
+     (value.startingCash==null||isAmount(value.startingCash))&&
+     (value.manualRows==null||Array.isArray(value.manualRows)&&value.manualRows.every(validManualRow))&&
+     (value.budgetStartMonth==null||isMonth(value.budgetStartMonth));
+ }
+ function readStored(key,fallback,validate){
+   try {
+     const raw=localStorage.getItem(key);if(raw===null)return fallback;
+     const value=JSON.parse(raw);if(!validate(value))throw new Error('Invalid saved values');
+     return value===null?fallback:value;
+   }catch{
+     blockedStorage.add(key);
+     storageWarning(key,key===STORE?'Saved budgets could not be read. Showing the original P&L values. Saving is blocked to protect your saved budgets; Reset budgets removes those saved values.':'Saved row selections could not be read. Showing all rows. Changes to saved row selections are blocked until you use Restore deleted rows.');
+     return fallback;
+   }
+ }
+ function writeStored(key,value){
+   if(blockedStorage.has(key)){showStorageWarnings();return false}
+   try {
+     localStorage.setItem(key,JSON.stringify(value));storageWarnings.delete(key);showStorageWarnings();return true;
+   }catch{
+     storageWarning(key,key===STORE?'Your browser could not save your budget changes. They are only kept on this page until it is closed or reloaded.':'Your browser could not save the row selection. No rows were changed.');return false;
+   }
+ }
+ function removeStored(key){
+   try {localStorage.removeItem(key);blockedStorage.delete(key);storageWarnings.delete(key);showStorageWarnings();return true}
+   catch{storageWarning(key,'Your browser could not reset saved values. Your existing saved values were kept.');return false}
+ }
+ const saved=readStored(STORE,{},validSavedState);
  let monthEdits=migrateHouseholdEdits(saved.monthEdits,saved.budgetStartMonth||'2026-09',periods),startCash=Number(saved.startingCash==null?(BASE.startingCash==null?20000:BASE.startingCash):saved.startingCash),manualRows=saved.manualRows||[];
  manualRows.forEach(function(r){
    if(!r.budgetStartMonth)r.budgetStartMonth=saved.budgetStartMonth||'2026-09';
    if(!r.frequency)r.frequency=r.timing==='Expected monthly'?'monthly':'one-time';
    if(r.monthlyAmount==null&&r.frequency==='monthly')r.monthlyAmount=Number(r.vals&&r.vals[13]||0);
  });
- let deleted=new Set(JSON.parse(localStorage.getItem(DEL)||'[]'));
+ let deleted=new Set(readStored(DEL,[],function(value){return value===null||Array.isArray(value)&&value.every(Number.isSafeInteger)}));
  const rows=structuredClone(BASE.rows||[]).concat(manualRows);
  const txByKey={};(BASE.tx||[]).filter(function(t){return !t.s||String(t.s).toLowerCase()==='posted'}).forEach(function(t){if(!txByKey[t.k])txByKey[t.k]=[];txByKey[t.k].push(t)});
  const monthLabels=periods.months.map(function(m){return periods.label(m,{month:'short',year:'2-digit'})}),shortLabels=periods.months.map(function(m){return periods.label(m,{month:'short'})});
@@ -268,7 +315,7 @@ function migrateHouseholdEdits(edits,anchor,periods){
      card.querySelector('.detailsBtn').onclick=function(){card.classList.toggle('open')};
      card.querySelector('.name').onclick=function(){card.classList.toggle('open')};
      card.querySelector('.budget').onchange=function(e){setMonth(r,actualBudgetIndex,e.target.value);e.target.value=clean(e.target.value);markDirty()};
-     card.querySelector('.deleteBtn').onclick=function(){deleted.add(r.row);localStorage.setItem(DEL,JSON.stringify(Array.from(deleted)));renderAll()};
+     card.querySelector('.deleteBtn').onclick=function(){const next=new Set(deleted);next.add(r.row);if(writeStored(DEL,Array.from(next))){deleted=next;renderAll()}};
      card.querySelector('.setMonthlyBtn').onclick=function(){const v=card.querySelector('.setMonthlyInput').value;if(v==='')return;setMonthlyAll(r,v);markDirty();renderAll();const fresh=[...document.querySelectorAll('.row')].find(function(x){return x.querySelector('.name')&&x.querySelector('.name').textContent.startsWith(r.label)});if(fresh)fresh.classList.add('open')};
      card.querySelector('.setAnnualBtn').onclick=function(){const v=card.querySelector('.setAnnualInput').value;if(v==='')return;setAnnual(r,v);markDirty();renderAll();const fresh=[...document.querySelectorAll('.row')].find(function(x){return x.querySelector('.name')&&x.querySelector('.name').textContent.startsWith(r.label)});if(fresh)fresh.classList.add('open')};
      bindMonthInputs(card);
@@ -464,7 +511,8 @@ function migrateHouseholdEdits(edits,anchor,periods){
  }
  function renderGraphs(){drawFlow();drawNet();drawCash();renderExpenseBars();renderVariableBars();drawMix();drawVariableMonth();renderVarianceBars();renderSubscriptionBars();drawTopVariable();drawSavingsScenario();drawExpenseTrend();drawMatchedBudget();drawMatchedTrend();drawMatchedVariable();renderBudgetBurn();drawCumulativeVariable();renderYtdBars('ytdExpenseBars',isExpense);renderYtdBars('ytdVariableBars',isVariable);drawYtdTrend('ytdExpenseTrendChart',isExpense);drawYtdTrend('ytdVariableTrendChart',isVariable)}
  function renderSnapshotLabels(){
-   const monthStale=periods.calendarMonth!==actualMonth,calendarLabel=periods.label(periods.calendarMonth,{month:'long',year:'numeric'}),refreshed=Date.parse(BASE.refreshedAt),freshnessTime=Number.isFinite(refreshed)?refreshed:Date.parse(snapshotDate()+'T00:00:00Z'),weeklyStale=Number.isFinite(freshnessTime)&&new Date().getTime()-freshnessTime>7*24*60*60*1000,stale=monthStale||weeklyStale;
+   const now=new Date(),calendarMonth=now.getFullYear()+'-'+pad2(now.getMonth()+1);
+   const monthStale=calendarMonth!==actualMonth,calendarLabel=periods.label(calendarMonth,{month:'long',year:'numeric'}),refreshed=Date.parse(BASE.refreshedAt),freshnessTime=Number.isFinite(refreshed)?refreshed:Date.parse(snapshotDate()+'T00:00:00Z'),weeklyStale=Number.isFinite(freshnessTime)&&now.getTime()-freshnessTime>7*24*60*60*1000,stale=monthStale||weeklyStale;
    const coverage=Array.isArray(BASE.coverageNotes)?BASE.coverageNotes.join(' '):String(BASE.coverageNotes||'');
    document.getElementById('snapshotFreshness').textContent=(monthStale?calendarLabel+' data has not refreshed; showing the '+actualLabel+' snapshot. ':weeklyStale?'Weekly refresh overdue; showing the '+actualLabel+' snapshot; '+(Number.isFinite(refreshed)?'last refresh was more than 7 days ago. ':'latest available data is more than 7 days old. '):actualLabel+' snapshot. ')+'Actuals through '+snapshotDate()+'.'+(BASE.refreshedAt?' Refreshed '+String(BASE.refreshedAt)+'.':' Refresh time unavailable.')+(coverage?' Coverage: '+coverage:'')+' Save budgets saves your edits on this device; it does not fetch transactions.';
    document.getElementById('incomeLabel').textContent=actualLabel+' Income';document.getElementById('expenseLabel').textContent=actualLabel+' Expenses';document.getElementById('netLabel').textContent=actualLabel+' Net P/L';
@@ -476,13 +524,15 @@ function migrateHouseholdEdits(edits,anchor,periods){
    document.querySelectorAll('#graphs p').forEach(function(el){el.textContent=el.textContent.replace('through today','through '+snapshotDate()).replace('through the current month','through '+actualLabel).replace('current month','snapshot month').replace('current-month','snapshot-month')});
  }
  function renderAll(){renderSnapshotLabels();renderQuick();renderYear();renderLast();renderRecurring();renderVariable();document.getElementById('status').textContent='Transactions through '+lastTxDate();if(document.getElementById('graphs').classList.contains('active'))requestAnimationFrame(renderGraphs)}
- document.querySelectorAll('.nav button').forEach(function(btn){btn.onclick=function(){document.querySelectorAll('.nav button').forEach(function(b){b.classList.remove('active')});document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active')});btn.classList.add('active');document.getElementById(btn.dataset.view).classList.add('active');if(btn.dataset.view==='graphs')requestAnimationFrame(renderGraphs);window.scrollTo({top:0,behavior:'smooth'})}});
+ document.querySelectorAll('.nav button').forEach(function(btn){btn.onclick=function(){renderSnapshotLabels();document.querySelectorAll('.nav button').forEach(function(b){b.classList.remove('active')});document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active')});btn.classList.add('active');document.getElementById(btn.dataset.view).classList.add('active');if(btn.dataset.view==='graphs')requestAnimationFrame(renderGraphs);window.scrollTo({top:0,behavior:'smooth'})}});
  let dirty=false;
  function markDirty(){dirty=true;document.querySelectorAll('.updateStatus').forEach(function(el){el.textContent='Unsaved budget changes'})}
  function saveAndRender(){
    manualRows=rows.filter(function(r){return r.manual});
-   localStorage.setItem(STORE,JSON.stringify({monthEdits:monthEdits,startingCash:startCash,manualRows:manualRows,budgetStartMonth:periods.budgetStartMonth}));
-   dirty=false;renderAll();const txt='Budgets saved ✓ '+new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});document.querySelectorAll('.updateStatus').forEach(function(el){el.textContent=txt});setTimeout(function(){document.querySelectorAll('.updateStatus').forEach(function(el){if(!dirty)el.textContent=''})},5000)
+   if(!writeStored(STORE,{monthEdits:monthEdits,startingCash:startCash,manualRows:manualRows,budgetStartMonth:periods.budgetStartMonth})){
+     dirty=true;renderAll();document.querySelectorAll('.updateStatus').forEach(function(el){el.textContent='Budgets could not be saved'});return false;
+   }
+   dirty=false;renderAll();const txt='Budgets saved ✓ '+new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});document.querySelectorAll('.updateStatus').forEach(function(el){el.textContent=txt});setTimeout(function(){document.querySelectorAll('.updateStatus').forEach(function(el){if(!dirty)el.textContent=''})},5000);return true;
  }
  document.getElementById('startCash').onchange=function(e){startCash=num(e.target.value);markDirty()};
  document.getElementById('save').onclick=saveAndRender;
@@ -496,8 +546,9 @@ function migrateHouseholdEdits(edits,anchor,periods){
    rows.push({row:id,type:'line',label:name,timing:freq==='monthly'?'Expected monthly':'Expected one-time',vals:vals,keys:[],kind:kind,spendClass:spendClass,manual:true,budgetStartMonth:periods.budgetStartMonth,frequency:freq,monthlyAmount:amt});
    document.getElementById('newName').value='';document.getElementById('newAmount').value='';document.getElementById('addPanel').classList.remove('open');markDirty();renderAll()
  };
- document.getElementById('reset').onclick=function(){monthEdits={};localStorage.removeItem(STORE);renderAll()};
- document.getElementById('restore').onclick=function(){deleted.clear();localStorage.removeItem(DEL);renderAll()};
+ document.getElementById('reset').onclick=function(){if(removeStored(STORE)){monthEdits={};renderAll()}};
+ document.getElementById('restore').onclick=function(){if(removeStored(DEL)){deleted.clear();renderAll()}};
+ window.addEventListener('focus',renderSnapshotLabels);
  window.addEventListener('resize',function(){if(document.getElementById('graphs').classList.contains('active'))renderGraphs()});
  renderAll();
 })().catch(function(err){document.body.innerHTML='<div style="padding:20px;color:white;font-family:system-ui">P&L failed to load. Please refresh.<br><small>'+String(err)+'</small></div>';console.error(err)});

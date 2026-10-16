@@ -6,8 +6,15 @@ const html = fs.readFileSync(require('node:path').join(__dirname, '../public/hou
 const script = html.match(/<script>([\s\S]*)<\/script>/)[1];
 new vm.Script(script); // Parse the complete production script, including DOM rendering.
 
-function dashboard(base = {}, saved = {}, now = '2026-10-11T12:00:00Z') {
-  const nodes = new Map();
+function dashboard(base = {}, saved = {}, now = '2026-10-11T12:00:00Z', options = {}) {
+  const nodes = new Map(), clock = { now };
+  const stored = new Map([['nourie-household-pl-v3', options.rawSaved === undefined ? JSON.stringify(saved) : options.rawSaved]]);
+  if (options.rawDeleted !== undefined) stored.set('nourie-household-pl-deleted-v3', options.rawDeleted);
+  const storage = {
+    getItem(key) { if (options.denyRead) throw new Error('Storage read denied'); return stored.has(key) ? stored.get(key) : null; },
+    setItem(key, value) { if (options.denyWrite) throw new Error('Storage write denied'); stored.set(key, value); },
+    removeItem(key) { if (options.denyRemove) throw new Error('Storage removal denied'); stored.delete(key); },
+  };
   const makeNode = () => {
     const children = [], selectors = new Map();
     return {
@@ -24,16 +31,17 @@ function dashboard(base = {}, saved = {}, now = '2026-10-11T12:00:00Z') {
   const context = vm.createContext({
     __HOUSEHOLD_PL_DATA__: structuredClone(base), Intl, structuredClone,
     fetch() { throw new Error('Snapshot initialization must not fetch'); },
-    Date: class extends Date { constructor(...args) { super(...(args.length ? args : [now])); } },
-    document: { getElementById: node, createElement: makeNode, querySelector: node, querySelectorAll: () => [] },
-    localStorage: { getItem: key => key === 'nourie-household-pl-v3' ? JSON.stringify(saved) : null },
+    Date: class extends Date { constructor(...args) { super(...(args.length ? args : [clock.now])); } },
+    document: { getElementById: node, createElement: makeNode, querySelector: node, querySelectorAll: selector => selector === '.updateStatus' ? [node('updateStatus'), node('yearUpdateStatus')] : [] },
+    localStorage: storage,
+    setTimeout() { return 0; },
     window: { addEventListener() {} }, console,
   });
   const instrumented = script
-    .replace('\n renderAll();\n})', '\n renderAll();\n globalThis.result={BASE,periods,rows,monthEdits,monthVal,setMonth,setMonthlyAll,setAnnual,forecastAnnual,snapshotBudget,makeTxList,snapshotDate,completedWeeksInfo,txAmountBetweenRows,renderSnapshotLabels,startCash};\n})');
+    .replace('\n renderAll();\n})', '\n renderAll();\n globalThis.result={BASE,periods,rows,monthEdits,monthVal,setMonth,setMonthlyAll,setAnnual,forecastAnnual,snapshotBudget,makeTxList,snapshotDate,completedWeeksInfo,txAmountBetweenRows,renderSnapshotLabels,saveAndRender,startCash};\n})');
   vm.runInContext(instrumented, context);
   assert.ok(context.result, 'Dashboard initialization reached test seam');
-  return { ...context.result, nodes };
+  return { ...context.result, nodes, stored, setNow(value) { clock.now = value; } };
 }
 const line = (row = 1) => ({ row, type: 'line', label: 'Income', kind: 'income', vals: [20, 100, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120], keys: ['INCOME'] });
 
@@ -142,4 +150,89 @@ test('manual monthly amount changes remain the baseline after future rollover', 
   assert.equal(rolled.rows[0].monthlyAmount, 200);
   const rolledAgain = dashboard({ period: '2028-10', budgetStartMonth: '2028-10', rows: [], tx: [] }, { manualRows: rolled.rows, monthEdits: rolled.monthEdits, budgetStartMonth: '2027-10' });
   assert.equal(rolledAgain.monthVal(rolledAgain.rows[0], 0), 200);
+});
+
+
+test('malformed saved JSON renders defaults and cannot overwrite the unreadable saved values', () => {
+  const raw = '{broken saved budget';
+  const d = dashboard({ period: '2026-10', rows: [line()], tx: [] }, {}, undefined, { rawSaved: raw });
+  assert.equal(d.nodes.get('ki').textContent, '$100');
+  assert.equal(d.monthVal(d.rows[0], 0), 10);
+  assert.equal(d.nodes.get('storageWarning').hidden, false);
+  assert.match(d.nodes.get('storageWarning').textContent, /Saved budgets could not be read/);
+  assert.equal(d.saveAndRender(), false);
+  assert.equal(d.stored.get('nourie-household-pl-v3'), raw);
+  assert.equal(d.nodes.get('updateStatus').textContent, 'Budgets could not be saved');
+  // Reset is an explicit user action, so it may remove the unreadable saved values.
+  d.nodes.get('reset').onclick();
+  assert.equal(d.stored.has('nourie-household-pl-v3'), false);
+  assert.equal(d.saveAndRender(), true);
+});
+
+test('invalid saved shapes never prevent startup or replace the original saved values', () => {
+  const cases = [{ manualRows: {} }, { monthEdits: [] }, { monthEdits: { '1-0': {} } }, { startingCash: {} }, { budgetStartMonth: 'invalid' }, { manualRows: [{ ...line(10004), vals: null }] }];
+  for (const saved of cases) {
+    const raw = JSON.stringify(saved);
+    const d = dashboard({ period: '2026-10', rows: [line()], tx: [] }, saved);
+    assert.equal(d.nodes.get('ki').textContent, '$100');
+    assert.equal(d.saveAndRender(), false);
+    assert.equal(d.stored.get('nourie-household-pl-v3'), raw);
+    assert.match(d.nodes.get('storageWarning').textContent, /Saving is blocked/);
+  }
+});
+
+test('denied storage reads use defaults and every save or reset failure is visible', () => {
+  const d = dashboard({ period: '2026-10', startingCash: 0, rows: [line()], tx: [] }, { monthEdits: { '1-0': 99 } }, undefined, { denyRead: true, denyRemove: true });
+  assert.equal(d.startCash, 0);
+  assert.equal(d.monthVal(d.rows[0], 0), 10);
+  const original = d.stored.get('nourie-household-pl-v3');
+  assert.equal(d.saveAndRender(), false);
+  assert.doesNotThrow(() => d.nodes.get('reset').onclick());
+  assert.doesNotThrow(() => d.nodes.get('restore').onclick());
+  assert.equal(d.stored.get('nourie-household-pl-v3'), original);
+  assert.equal(d.nodes.get('storageWarning').hidden, false);
+  assert.match(d.nodes.get('storageWarning').textContent, /could not reset saved values/);
+});
+
+test('denied writes preserve valid saved budgets and never claim a successful save', () => {
+  const saved = { monthEdits: { '1-0': 99 }, startingCash: 0 };
+  const d = dashboard({ period: '2026-10', rows: [line()], tx: [] }, saved, undefined, { denyWrite: true });
+  assert.equal(d.monthVal(d.rows[0], 0), 99);
+  d.setMonth(d.rows[0], 0, 112);
+  assert.equal(d.saveAndRender(), false);
+  assert.equal(d.monthVal(d.rows[0], 0), 112);
+  assert.equal(d.stored.get('nourie-household-pl-v3'), JSON.stringify(saved));
+  assert.match(d.nodes.get('storageWarning').textContent, /could not save your budget changes/);
+  assert.doesNotMatch(d.nodes.get('updateStatus').textContent, /Budgets saved/);
+});
+
+test('invalid deleted-row state and denied deletion writes preserve rows', () => {
+  const d = dashboard({ period: '2026-10', rows: [line()], tx: [] }, {}, undefined, { rawDeleted: '{"invalid":true}' });
+  assert.equal(d.nodes.get('quickBody').children.length, 1);
+  d.nodes.get('quickBody').children[0].querySelector('.deleteBtn').onclick();
+  assert.equal(d.stored.get('nourie-household-pl-deleted-v3'), '{"invalid":true}');
+  assert.match(d.nodes.get('storageWarning').textContent, /Saved row selections could not be read/);
+  const denied = dashboard({ period: '2026-10', rows: [line()], tx: [] }, {}, undefined, { denyWrite: true });
+  assert.doesNotThrow(() => denied.nodes.get('quickBody').children[0].querySelector('.deleteBtn').onclick());
+  assert.equal(denied.stored.has('nourie-household-pl-deleted-v3'), false);
+  assert.match(denied.nodes.get('storageWarning').textContent, /No rows were changed/);
+});
+
+test('valid saved state remains editable and persists through the guarded writer', () => {
+  const d = dashboard({ period: '2026-10', rows: [line()], tx: [] }, { monthEdits: { '1-0': 99 }, startingCash: 0 });
+  d.setMonth(d.rows[0], 1, 123);
+  assert.equal(d.saveAndRender(), true);
+  const saved = JSON.parse(d.stored.get('nourie-household-pl-v3'));
+  assert.equal(saved.monthEdits['1-2026-09'], 99);
+  assert.equal(saved.monthEdits['1-2026-10'], 123);
+  assert.equal(saved.startingCash, 0);
+  assert.equal(d.nodes.get('storageWarning').textContent, '');
+});
+
+test('freshness rendering recomputes the calendar month for a tab left open across rollover', () => {
+  const d = dashboard({ period: '2026-09', asOf: '2026-09-30', rows: [line()], tx: [] }, {}, '2026-09-30T12:00:00Z');
+  assert.doesNotMatch(d.nodes.get('snapshotFreshness').textContent, /October/);
+  d.setNow('2026-10-16T12:00:00Z');
+  d.renderSnapshotLabels();
+  assert.match(d.nodes.get('snapshotFreshness').textContent, /October 2026 data has not refreshed/);
 });
