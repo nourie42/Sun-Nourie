@@ -6,7 +6,7 @@ A phone-first dashboard for Home Assistant. It is one JavaScript file with no bu
 
 | Tab | What it shows |
 | --- | --- |
-| Home | In order: alerts, the air score, PM0.3 over the last 24 hours for each room, the Quiet / Winix Turbo / Master Fan on and off buttons, a shortcut for each robot, this billing cycle's electric and water bills, and the Oura scores. Thermostats and most-used switches follow |
+| Home | Only what gets used most, in order: the air score, PM0.3 over the last 24 hours for each room, the Quiet / Winix Turbo / Master Fan on and off buttons, the robots (each non-Dyson robot shows its rooms right there: tap rooms, then Clean, or Start for the whole map), this billing cycle's electric and water bills in dollars, and the Oura scores |
 | Air | The air score and how it was worked out, PM0.3 over 24 hours or 7 days, the PM0.3 spike alert, purifier controls and every room's readings |
 | Robots | The Dyson Vis Nav cards as before, a chart of each Vis Nav's dust score, and a room picker for every other vacuum: tap the rooms in the order to clean them, then Clean. The litter box is last |
 | Energy | Electric and water: spent so far this billing cycle and the estimated bill at the end of it, with an hour-by-day heat map of electric use |
@@ -20,7 +20,7 @@ Tap a tile to toggle it. Press and hold any tile, person, robot or reading to op
 The score runs from 0 to 100 and is the average of these readings:
 
 - the outdoor AQI (an AQI of 0 scores 100, and 300 or more scores 0);
-- PM0.3 in the master bedroom, downstairs and Angel's room (under 100 particles per 0.1 L scores 100, and 20,000 or more scores 0);
+- PM0.3 in the master bedroom, downstairs and Angel's room, each scored against its own two-week average: at or below average scores 100, 1.5× average scores 65, 2× scores 45, 3× scores 20 and 4× or more scores 0 (outdoor PM0.3 sensors are left out);
 - the Winix purifiers' own air quality (good, fair, poor or very poor);
 - the Amazon air quality monitor.
 
@@ -31,6 +31,8 @@ The score runs from 0 to 100 and is the average of these readings:
 On the Air tab, choose a phone and tap **Turn on phone alerts**. The dashboard saves a Home Assistant automation called *Nourie Home: … PM0.3 spike*. It notifies the phone when the master bedroom's PM0.3 stays over the threshold for 2 minutes while the upstairs climate is heating, cooling or running its fan, then waits 30 minutes before alerting again. The suggested threshold is two and a half times the last day's typical reading. Saving automations needs an admin account.
 
 ### Billing cycles
+
+Electric dollars use the price per kWh that the circuit "Energy Cost This Month" sensors already use (about $0.18), and the cycle starts out as the Duke cycle of Oct 10 – Nov 7. Water uses Raleigh Water's July 2026 rates, which Knightdale pays: tiered water at $3.11, $5.41 and $6.97 per CCF (748 gallons), sewer at $5.31 and the watershed fee at $0.11 per CCF, plus $22.97 a month in base charges for a 5/8" meter. "Spent so far" includes the share of the base charges for the days gone by.
 
 Tap **Billing cycle** on either bill to set the first and last day of the cycle, the price per kWh or per gallon, and any fixed monthly charge. The amounts update straight away. After the last day, the next cycle of the same length starts on its own. Usage comes from Home Assistant's Energy dashboard (the grid consumption and water sources), so those need to be set up under **Settings → Dashboards → Energy**. Until you enter a price, the price or cost set in the Energy dashboard is used.
 
@@ -87,13 +89,13 @@ To keep the file inside Home Assistant instead, copy `nourie-home.js` to `/confi
 | --- | --- |
 | People | Life360 trackers, with their place, address, driving state, speed and battery. Set **People come from** in Customize (or `people_source: person`) to use Home Assistant `person` entities instead |
 | Air | Every sensor with a PM0.3, PM1, PM2.5, PM10, VOC, CO, NO₂, ozone or AQI reading, grouped by device, with that device's temperature and humidity. PM0.3 sensors are found by name ("PM0.3", "0.3 µm") |
-| Buttons | Scripts or scenes named like "Quiet on" and "Quiet off", the Winix fans (Turbo sets them to 100%, off returns them to Auto) and a fan or switch named "Master fan". Any pair can be changed or added in Customize |
+| Buttons | Quiet On and Quiet Off: scripts or scenes named that way (or "Conference on/off"), or else the action behind the Quiet On and Quiet Off buttons on another dashboard. Winix Turbo: Turbo remembers each purifier's speed and sets it to turbo; Off puts each one back (or to its lowest speed if it had none). Master Fan: the fan named "Master fan". Any pair can be changed or added in Customize |
 | Oura | Sensors named like readiness, sleep score, resilience, sick score, heart score, total sleep and battery |
 | Purifiers | Fans and switches named like purifiers (Winix, Levoit, Coway, "purifier", "ionizer") |
 | Bills | The Energy dashboard's grid and water sources, read from Home Assistant's long-term statistics |
 | Electric | Emporia Vue sensors (the HACS `emporia_vue` integration): `… Power Minute Average`, `… Energy Today`, `… Energy This Month`. A circuit named Mains, Total or Home is used as the whole-home total; otherwise the circuits are added up |
 | Water | The Flume integration's current flow, day, week and month sensors and its leak and high-flow sensors |
-| Robots | Every `vacuum` entity, which includes Dyson, Shark, Roborock and the Litter-Robot integration's litter box. Dyson robots and litter boxes keep the standard card; the others get the room picker. Dust score sensors are found by name |
+| Robots | Every `vacuum` entity. Dyson robots keep the standard card; the others get the room picker. Litter boxes are left out unless `show_litter: true` is set. Dust score sensors are found by name |
 | Most used | The lights, switches, fans and scenes people tapped most in the last five days, read from the logbook. Sirens, child locks and other settings switches are left out |
 
 ## Options
@@ -125,6 +127,7 @@ outdoor:                       # a weather station's own readings, if you have o
 cameras: [camera.front_door]
 lists: [todo.shopping_list]
 show_co2: false                # show CO₂ readings on the Air tab
+show_litter: false             # show litter boxes with the robots
 people_source: life360         # or "person"
 map:
   carto_key: YOUR_FREE_CARTO_KEY   # optional, see below

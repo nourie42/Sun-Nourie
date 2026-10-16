@@ -74,8 +74,9 @@ test('the demo home builds every section of the dashboard', () => {
   assert.equal(model.water.flowUnit, 'gal/min');
   assert.equal(model.water.leak, false);
 
-  assert.equal(model.robots.length, 4);
-  assert.equal(model.robots.find((r) => r.litter).name, 'Litter-Robot');
+  assert.equal(model.robots.length, 3, 'the litter box is left out');
+  assert.equal(model.robots.find((r) => r.litter), undefined);
+  assert.equal(buildModel(createMockHass(demoHome).hass, { show_litter: true }, {}, NOW).robots.find((r) => r.litter).name, 'Litter-Robot');
   assert.deepEqual(model.robots.find((r) => r.id === 'vacuum.downstairs_vis_nav').fanSpeeds, ['Quiet', 'Auto', 'Boost']);
 
   assert.equal(model.climate.length, 2);
@@ -136,7 +137,7 @@ test('robot names, errors and litter boxes are read the way they appear in the a
     { id: 'vacuum.rosie', name: 'Rosie', state: 'error', attrs: { error: 'brush_stuck' } },
     { id: 'vacuum.kitty_corner_litter_box', name: 'Kitty Corner Litter box', state: 'docked', attrs: {} },
   ]);
-  const model = buildModel(hass, {}, {}, NOW);
+  const model = buildModel(hass, { show_litter: true }, {}, NOW);
   const dyson = model.robots.find((r) => r.id === 'vacuum.dyson');
   assert.equal(dyson.name, 'Dyson ABC');
   assert.match(dyson.sub, /ABC-US-XYZ1234A/);
@@ -194,13 +195,13 @@ test('the bill estimate projects spend over the cycle and waits for enough data'
   const raw = { ids: { electric: { usage: 'grid', cost: null, price: null } }, rows: { grid: hourly('2026-10-01T00:00', 15 * 24, 1) } };
   const e = buildBilling(null, prefs, raw, local('2026-10-16T00:00')).electric;
   assert.equal(e.usage, 360);
-  assert.equal(Math.round(e.spent * 100), 7200);
+  assert.equal(Math.round(e.spent * 100), 7700, '$72 of usage plus half of the $10 fixed charge');
   assert.equal(Math.round(e.estimate * 100), 15400, '$72 over half the cycle is $144, plus the $10 fixed charge');
 
   const lagging = { ids: raw.ids, rows: { grid: hourly('2026-10-01T00:00', 1, 1) } };
   assert.equal(buildBilling(null, prefs, lagging, local('2026-10-02T10:00')).electric.estimate, null, 'one hour of late data is not projected over the month');
 
-  const noPrice = buildBilling(null, {}, raw, local('2026-10-16T00:00')).electric;
+  const noPrice = buildBilling(null, { billing: { electric: { start: '2026-10-01', end: '2026-10-31' } } }, raw, local('2026-10-16T00:00')).electric;
   assert.equal(noPrice.spent, null);
   assert.equal(noPrice.needsRate, true);
 });
@@ -210,7 +211,7 @@ test('time-of-use tariffs are added together', () => {
     ids: { electric: { usage: 'peak', tariffs: [{ usage: 'peak', cost: 'peak_cost', price: null }, { usage: 'off', cost: 'off_cost', price: null }] } },
     rows: { peak: hourly('2026-10-01T00:00', 24, 1), off: hourly('2026-10-01T00:00', 24, 0.5), peak_cost: hourly('2026-10-01T00:00', 24, 0.3), off_cost: hourly('2026-10-01T00:00', 24, 0.05) },
   };
-  const e = buildBilling(null, {}, raw, local('2026-10-02T00:00')).electric;
+  const e = buildBilling(null, { billing: { electric: { start: '2026-10-01', end: '2026-10-31' } } }, raw, local('2026-10-02T00:00')).electric;
   assert.equal(e.usage, 36);
   assert.equal(Math.round(e.spent * 100), 840);
 });
@@ -221,4 +222,56 @@ test("a non-admin's own settings sit on top of the shared ones, path by path", (
   assert.deepEqual(mergePrefs(shared, mine).billing, { electric: { rate: 0.2 }, water: { rate: 0.01 } });
   mine = setPath(mine, 'billing.electric.rate', undefined);
   assert.equal(mergePrefs(shared, mine).billing.electric.rate, 0.12);
+});
+
+test('PM0.3 scores against each room’s own two-week average', async () => {
+  const { buildAirScore, PM03_REL_STEPS } = await import('../home-assistant/nourie-home.js');
+  assert.ok(PM03_REL_STEPS.length);
+  const hass = hassFrom([
+    sensor('sensor.master_pm03', 'Bedroom Air Monitor PM0.3', 135, { unit_of_measurement: '/0.1L' }, { area: 'master' }),
+    sensor('sensor.angel_pm03', 'Angelroom PM0.3', 12, { unit_of_measurement: '/0.1L' }, { area: 'angel' }),
+    sensor('sensor.outside_pm03', 'Outside-F2Aaa4 Outside PM0.3', 900, { unit_of_measurement: '/0.1L' }, { area: 'outside' }),
+  ], { areas: { master: { area_id: 'master', name: 'Master' }, angel: { area_id: 'angel', name: 'Angel' }, outside: { area_id: 'outside', name: 'Outside' } } });
+  const ctx = { ...buildModel(hass, {}, {}, NOW) };
+  assert.ok(ctx.score.pm03.every((x) => x.id !== 'sensor.outside_pm03'), 'outdoor PM0.3 stays out of the score');
+  const model = buildModel(hass, {}, { history: { pm03avg: { series: {
+    'sensor.master_pm03': Array.from({ length: 48 }, (_, i) => [i, 56]),
+    'sensor.angel_pm03': Array.from({ length: 48 }, (_, i) => [i, 16]),
+  } } } }, NOW);
+  const master = model.score.parts.find((p) => p.entity === 'sensor.master_pm03');
+  const angel = model.score.parts.find((p) => p.entity === 'sensor.angel_pm03');
+  assert.equal(master.avg, 56);
+  assert.ok(master.score < 45 && master.score > 30, `135 is 2.4× its average of 56 (${master.score})`);
+  assert.equal(angel.score, 100, 'below its average scores 100');
+  assert.ok(typeof buildAirScore === 'function');
+});
+
+test('the electric price comes from the circuit cost sensors and water uses Raleigh rates', async () => {
+  const { deriveElectricRate, planUsageCost, WATER_PLANS } = await import('../home-assistant/nourie-home.js');
+  const hass = hassFrom([
+    sensor('sensor.dryer_cost', 'Dryer Energy Cost This Month', 10.08, { device_class: 'monetary', unit_of_measurement: '$' }),
+    sensor('sensor.dryer_cycle', 'Dryer Billing Cycle Energy', 56.04, { device_class: 'energy', unit_of_measurement: 'kWh' }),
+    sensor('sensor.dryer_month', 'dryer Energy This Month', 58.9, { device_class: 'energy', unit_of_measurement: 'kWh' }),
+    sensor('sensor.dish_cost', 'Dishwasher Energy Cost This Month', 4.37, { device_class: 'monetary', unit_of_measurement: '$' }),
+    sensor('sensor.dish_cycle', 'Dishwasher Billing Cycle Energy', 24.27, { device_class: 'energy', unit_of_measurement: 'kWh' }),
+    sensor('sensor.washer_cost', 'Washer Energy Cost This Month', 1.92, { device_class: 'monetary', unit_of_measurement: '$' }),
+    sensor('sensor.washer_cycle', 'Washer Billing Cycle Energy', 10.16, { device_class: 'energy', unit_of_measurement: 'kWh' }),
+  ]);
+  const ctx = (await import('../home-assistant/nourie-home.js')).buildModel(hass, {}, {}, NOW);
+  assert.ok(ctx);
+  const { rate } = deriveElectricRate({ byDomain: (d) => (d === 'sensor' ? Object.values(hass.states) : []), name: (id) => hass.states[id].attributes.friendly_name });
+  assert.ok(Math.abs(rate - 0.18) < 0.002, `about $0.18/kWh (${rate})`);
+  const ccf = 748.052;
+  assert.equal(Math.round(planUsageCost(WATER_PLANS.raleigh, 4 * ccf) * 100), Math.round((4 * 3.11 + 4 * (0.1122 + 5.31)) * 100));
+  assert.equal(Math.round(planUsageCost(WATER_PLANS.raleigh, 10 * ccf) * 100), Math.round((4 * 3.11 + 6 * 5.41 + 10 * (0.1122 + 5.31)) * 100));
+});
+
+test('Quiet On and Quiet Off are read from buttons on another dashboard', async () => {
+  const { findCardAction } = await import('../home-assistant/nourie-home.js');
+  const config = { views: [{ cards: [{ type: 'grid', cards: [
+    { type: 'custom:button-card', name: 'Quiet On', tap_action: { action: 'perform-action', perform_action: 'script.turn_on', target: { entity_id: 'script.conference_quiet' } } },
+    { type: 'tile', name: 'Quiet Off', entity: 'script.conference_normal' },
+  ] }] }] };
+  assert.deepEqual(findCardAction(config, 'quiet on'), { service: 'script.turn_on', data: { entity_id: 'script.conference_quiet' } });
+  assert.deepEqual(findCardAction(config, 'quiet off'), { entity: 'script.conference_normal' });
 });

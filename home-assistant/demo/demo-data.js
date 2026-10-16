@@ -73,7 +73,7 @@ const entities = [
   e('sensor.office_air_temperature', 'Office Air Temperature', 73.1, { device_class: 'temperature', unit_of_measurement: '°F' }, { device: 'aq_office' }),
 
   e('fan.primary_purifier', 'Primary Purifier', 'on', { percentage: 50, percentage_step: 25, preset_mode: 'Auto', preset_modes: ['Auto', 'Manual', 'Sleep'], supported_features: 57 }, { area: 'primary', platform: 'winix', device: 'winix_primary' }),
-  e('fan.kids_purifier', 'Kids Purifier', 'off', { percentage: 0, percentage_step: 25, preset_modes: ['Auto', 'Manual', 'Sleep'], supported_features: 57 }, { area: 'kids', platform: 'winix', device: 'winix_kids' }),
+  e('fan.kids_purifier', 'Kids Purifier', 'off', { percentage: 0, percentage_step: 25, preset_modes: [], supported_features: 49 }, { area: 'kids', platform: 'winix', device: 'winix_kids' }),
   e('sensor.primary_purifier_air_qvalue', 'Primary Purifier Air QValue', 41, { unit_of_measurement: 'qv', air_quality: 'good' }, { platform: 'winix', device: 'winix_primary' }),
   e('sensor.kids_purifier_air_qvalue', 'Kids Purifier Air QValue', 77, { unit_of_measurement: 'qv', air_quality: 'fair' }, { platform: 'winix', device: 'winix_kids' }),
   e('sensor.primary_bedroom_air_pm0_3', 'Primary Bedroom Air PM0.3', 420, { unit_of_measurement: '/dL', state_class: 'measurement' }, { device: 'aq_primary' }),

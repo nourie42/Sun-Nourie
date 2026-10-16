@@ -8,7 +8,7 @@
  * lists the options that pin specific entities.
  */
 
-export const VERSION = '2.0.0';
+export const VERSION = '3.0.0';
 
 const LEAFLET_JS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js';
 const FONTS_CSS = 'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Figtree:wght@400;500;600;700&display=swap';
@@ -412,7 +412,8 @@ export function buildModel(hass, config = {}, ext = {}, now = Date.now()) {
     air: buildAir(ctx),
     energy: buildEnergy(ctx),
     water: buildWater(ctx),
-    robots: decorateRobots(ctx, buildRobots(ctx), prefs, ext),
+    // Litter boxes are left out unless show_litter is set.
+    robots: decorateRobots(ctx, buildRobots(ctx), prefs, ext).filter((r) => !r.litter || config.show_litter),
     climate: buildClimate(ctx),
     weather: buildWeather(ctx, ext.forecast),
     favorites: buildFavorites(ctx, ext.learned),
@@ -424,12 +425,12 @@ export function buildModel(hass, config = {}, ext = {}, now = Date.now()) {
     isAdmin: !!hass.user?.is_admin,
     notifyTargets: Object.keys(hass.services?.notify || {}).filter((s) => s.startsWith('mobile_app_')).sort(),
   };
-  model.score = buildAirScore(ctx, prefs);
+  model.score = buildAirScore(ctx, prefs, pm03Averages(ctx, ext.history?.pm03avg));
   model.spike = buildSpike(ctx, prefs, model.score, ext);
-  model.controls = buildControls(ctx, prefs);
+  model.controls = buildControls(ctx, prefs, ext.found || {});
   model.health = buildHealth(ctx, prefs);
   model.dust = discoverDust(ctx, prefs);
-  model.billing = buildBilling(ctx, prefs, ext.billing, now);
+  model.billing = buildBilling(ctx, prefs, ext.billing, now, model.water.volumeUnit);
   model.candidates = () => entityCandidates(ctx);
   model.alerts = buildAlerts(ctx, model, now);
   model.offline = buildOffline(ctx, now);
@@ -981,6 +982,9 @@ export function interpolate(steps, value) {
 export const AQI_STEPS = [[0, 100], [50, 80], [100, 60], [150, 40], [200, 20], [300, 0]];
 // PM0.3 counts per 0.1 L: a filtered room sits in the low hundreds, outdoor air around 1,000 to 3,000,
 // cooking or smoke pushes past 10,000.
+// PM0.3 is scored against each room's own two-week average: at or below average is 100, and
+// the further above average it climbs, the lower the score.
+export const PM03_REL_STEPS = [[0, 100], [1, 100], [1.25, 80], [1.5, 65], [2, 45], [3, 20], [4, 0]];
 export const PM03_STEPS = [[0, 100], [100, 100], [500, 90], [1000, 75], [2500, 55], [5000, 35], [10000, 15], [20000, 0]];
 const WINIX_SCORES = { good: 100, fair: 65, poor: 35, very_poor: 10 };
 const OUTDOOR_AQI_PLATFORMS = new Set(['airnow', 'waqi', 'purpleair', 'google_air_quality', 'openweathermap', 'pirateweather', 'accuweather', 'airvisual', 'iqair', 'nws', 'ambee', 'luftdaten', 'sensor_community', 'openaq', 'world_air_quality_index']);
@@ -1008,6 +1012,8 @@ export function discoverPm03(ctx) {
   for (const st of ctx.byDomain('sensor')) {
     const name = ctx.name(st.entity_id);
     if (!PM03_RE.test(name) || isWinix(ctx, st.entity_id)) continue;
+    // The score is about the air inside; an outdoor PM0.3 sensor stays out unless picked in Customize.
+    if (/\b(outside|outdoors?|exterior|patio|porch|yard)\b/i.test(`${name} ${ctx.areaName(st.entity_id)} ${ctx.deviceName(st.entity_id)}`)) continue;
     const key = ctx.entry(st.entity_id)?.device_id || st.entity_id;
     const prev = byDevice.get(key);
     const rank = (s) => (/\braw\b/i.test(ctx.name(s.entity_id)) ? 2 : 0) + (live(s) ? 0 : 1);
@@ -1040,7 +1046,7 @@ function winixCategory(st) {
 }
 
 // The air score averages the inputs that are reporting. Each input becomes 0–100, higher is better.
-export function buildAirScore(ctx, prefs = {}) {
+export function buildAirScore(ctx, prefs = {}, averages = {}) {
   const p = prefs.air || {};
   const pm03 = Array.isArray(p.pm03) ? p.pm03.filter((x) => ctx.states[x.id]) : discoverPm03(ctx);
   const outdoorId = p.outdoor === '' ? null : p.outdoor || discoverOutdoorAqi(ctx);
@@ -1055,7 +1061,21 @@ export function buildAirScore(ctx, prefs = {}) {
   for (const item of pm03) {
     const st = ctx.states[item.id];
     const value = live(st) ? pm03PerDl(st.state, st.attributes.unit_of_measurement) : null;
-    parts.push({ key: `pm03:${item.id}`, label: `${item.label} PM0.3`, entity: item.id, value, raw: value === null ? 'Offline' : `${fmt(value)} per 0.1 L`, score: interpolate(PM03_STEPS, value), math: 'Particles per 0.1 L: 100 → 100, 500 → 90, 1,000 → 75, 2,500 → 55, 5,000 → 35, 10,000 → 15, 20,000 → 0', pm03: true, room: item.label });
+    const avg = toNum(averages[item.id]);
+    const part = { key: `pm03:${item.id}`, label: `${item.label} PM0.3`, entity: item.id, value, avg, pm03: true, room: item.label };
+    if (avg !== null && avg > 0) {
+      const ratio = value === null ? null : value / avg;
+      part.score = ratio === null ? null : interpolate(PM03_REL_STEPS, ratio);
+      part.raw = value === null ? 'Offline' : `${fmt(value)} · avg ${fmt(avg)}`;
+      part.math = ratio === null
+        ? `${item.label}: offline (two-week average ${fmt(avg)})`
+        : `${item.label}: ${fmt(value)} vs its two-week average of ${fmt(avg)} = ${fmt(ratio, 1)}× average → ${part.score}`;
+    } else {
+      part.score = interpolate(PM03_STEPS, value);
+      part.raw = value === null ? 'Offline' : `${fmt(value)} per 0.1 L`;
+      part.math = `${item.label}: no two-week average yet, so the fixed scale is used (100 → 100, 1,000 → 75, 5,000 → 35, 20,000 → 0)`;
+    }
+    parts.push(part);
   }
   if (winixIds.length) {
     const cats = winixIds.map((id) => ({ id, cat: winixCategory(ctx.states[id]) })).filter((x) => x.cat);
@@ -1071,6 +1091,17 @@ export function buildAirScore(ctx, prefs = {}) {
   const score = scored.length ? Math.round(sum(scored.map((x) => x.score)) / scored.length) : null;
   const worst = scored.reduce((w, x) => (!w || x.score < w.score ? x : w), null);
   return { parts, score, level: scoreLevel(score), worst, pm03, used: scored.length };
+}
+
+// Two-week average of each PM0.3 sensor from hourly long-term statistics, in particles per 0.1 L.
+export function pm03Averages(ctx, h) {
+  const out = {};
+  for (const [id, rows] of Object.entries(h?.series || {})) {
+    const unit = ctx.states[id]?.attributes?.unit_of_measurement;
+    const vals = rows.map(([, v]) => pm03PerDl(v, unit)).filter((v) => v !== null && Number.isFinite(v));
+    if (vals.length >= 24) out[id] = sum(vals) / vals.length;
+  }
+  return out;
 }
 
 export const SPIKE_AUTOMATION_ID = 'nourie_home_pm03_spike';
@@ -1121,15 +1152,52 @@ function findControl(ctx, re, domains) {
     .sort((a, b) => Number(live(b)) - Number(live(a)))[0]?.entity_id || null;
 }
 
-// The three pairs asked for by default: Quiet on/off, Winix turbo on/off and the master fan.
-export function defaultControls(ctx) {
+// Reads what a dashboard card labelled `label` runs when tapped, e.g. the "Quiet On" button on
+// another dashboard, so the same action can be offered here.
+export function findCardAction(config, label) {
+  const re = new RegExp(`^\\s*${label.replace(/\s+/g, '\\s*')}\\s*$`, 'i');
+  const textKeys = ['name', 'title', 'primary', 'label', 'heading', 'content', 'text'];
+  const actionOf = (o) => {
+    const t = o.tap_action;
+    const svc = t && (t.perform_action || t.service);
+    if (svc && (t.action === 'perform-action' || t.action === 'call-service')) {
+      return { service: svc, data: { ...(t.data || t.service_data || {}), ...(t.target || {}) } };
+    }
+    const entity = (t && t.entity) || o.entity;
+    if (typeof entity === 'string' && /^(script|scene|button|input_button|automation|input_boolean|switch)\./.test(entity)) return { entity };
+    return null;
+  };
+  const seen = new Set();
+  const walk = (o) => {
+    if (!o || typeof o !== 'object' || seen.has(o)) return null;
+    seen.add(o);
+    if (!Array.isArray(o) && textKeys.some((k) => typeof o[k] === 'string' && re.test(o[k]))) {
+      const found = actionOf(o);
+      if (found) return found;
+    }
+    for (const v of Object.values(o)) {
+      const found = walk(v);
+      if (found) return found;
+    }
+    return null;
+  };
+  return walk(config);
+}
+
+const QUIET_WORDS = '(?:quiet|silence|silent|conference|meeting|call)';
+
+// The three pairs asked for by default: Quiet on/off (the "Conference" buttons), Winix turbo
+// on/off and the master fan. `found` holds Quiet On / Quiet Off actions read from the other
+// dashboards, used when no script or scene is named that way.
+export function defaultControls(ctx, found = {}) {
   const pairs = [];
-  const quietOn = findControl(ctx, /\bquiet\b.*\bon\b/i, PRESS_DOMAINS);
-  const quietOff = findControl(ctx, /\bquiet\b.*\boff\b/i, PRESS_DOMAINS);
-  const quietToggle = findControl(ctx, /^quiet( mode)?$/i, ['input_boolean', 'switch']);
-  if (quietOn || quietOff || quietToggle) {
-    pairs.push({ key: 'quiet', label: 'Quiet', icon: 'quiet', on: quietOn ? { entity: quietOn } : quietToggle ? { entity: quietToggle } : null, off: quietOff ? { entity: quietOff } : quietToggle ? { entity: quietToggle } : null });
-  }
+  const quietOn = findControl(ctx, new RegExp(`\\b${QUIET_WORDS}\\b.*\\bon\\b`, 'i'), PRESS_DOMAINS);
+  const quietOff = findControl(ctx, new RegExp(`\\b${QUIET_WORDS}\\b.*\\boff\\b`, 'i'), PRESS_DOMAINS);
+  const quietToggle = findControl(ctx, new RegExp(`^${QUIET_WORDS}( mode)?$`, 'i'), ['input_boolean', 'switch']);
+  const on = quietOn ? { entity: quietOn } : found.quietOn || (quietToggle ? { entity: quietToggle } : null);
+  const off = quietOff ? { entity: quietOff } : found.quietOff || (quietToggle ? { entity: quietToggle } : null);
+  // Quiet always has a place in the row; until something is found it asks to be set up.
+  pairs.push({ key: 'quiet', label: 'Quiet', icon: 'quiet', on, off, setup: !on && !off });
   const turboOn = findControl(ctx, /winix.*turbo.*\bon\b|turbo.*winix.*\bon\b|^winix turbo$/i, PRESS_DOMAINS);
   const turboOff = findControl(ctx, /winix.*turbo.*\boff\b|turbo.*winix.*\boff\b/i, PRESS_DOMAINS);
   const winixFans = ctx.byDomain('fan').filter((st) => isWinix(ctx, st.entity_id)).map((st) => st.entity_id);
@@ -1138,8 +1206,8 @@ export function defaultControls(ctx) {
       key: 'turbo',
       label: 'Winix Turbo',
       icon: 'purifier',
-      on: turboOn ? { entity: turboOn } : winixFans.length ? { service: 'fan.set_percentage', data: { entity_id: winixFans, percentage: winixTurboPercent(ctx, winixFans) } } : null,
-      off: turboOff ? { entity: turboOff } : winixFans.length ? { service: 'fan.set_preset_mode', data: { entity_id: winixFans, preset_mode: 'Auto' } } : null,
+      on: turboOn ? { entity: turboOn } : winixFans.length ? { special: 'winix_turbo', fans: winixFans } : null,
+      off: turboOff ? { entity: turboOff } : winixFans.length ? { special: 'winix_restore', fans: winixFans } : null,
     });
   }
   const masterFan = findControl(ctx, /^master fan$/i, ['fan']) || findControl(ctx, /\bmaster\b.*\bfan\b/i, ['fan']);
@@ -1151,11 +1219,13 @@ export function defaultControls(ctx) {
 // "super", above turbo), so turbo is the fourth step rather than always 100%.
 export function winixTurboPercent(ctx, fans) {
   const step = toNum(ctx.states[[].concat(fans)[0]]?.attributes?.percentage_step);
-  return step && step > 0 ? Math.min(100, Math.round(step * 4)) : 100;
+  return step && step > 0 && step < 25 ? Math.min(100, Math.round(step * 4)) : 100;
 }
 
 function targetLabel(ctx, t) {
   if (!t) return '';
+  if (t.special === 'winix_turbo') return 'Winix purifiers → Turbo';
+  if (t.special === 'winix_restore') return 'Winix purifiers → back to before Turbo';
   if (t.entity) return cleanName(ctx.name(t.entity));
   const ids = [].concat(t.data?.entity_id || []);
   return `${t.service} · ${ids.length} ${ids.length === 1 ? 'device' : 'devices'}`;
@@ -1170,11 +1240,10 @@ function controlState(ctx, pair) {
     const s = st(on);
     return { active: live(s) ? (s.state === 'on' ? 'on' : 'off') : null, note: live(s) ? (s.state === 'on' ? `On${toNum(s.attributes.percentage) ? ` · ${fmt(s.attributes.percentage)}%` : ''}` : 'Off') : 'Offline' };
   }
-  if (on?.service === 'fan.set_percentage') {
-    const fans = [].concat(on.data?.entity_id || []).map((id) => ctx.states[id]).filter(live);
+  if (on?.special === 'winix_turbo' || on?.service === 'fan.set_percentage') {
+    const fans = [].concat(on.fans || on.data?.entity_id || []).map((id) => ctx.states[id]).filter(live);
     if (!fans.length) return { active: null, note: 'Offline' };
-    const target = toNum(on.data?.percentage) ?? 100;
-    const turbo = fans.filter((f) => f.state === 'on' && toNum(f.attributes.percentage) >= target - 1).length;
+    const turbo = fans.filter((f) => f.state === 'on' && toNum(f.attributes.percentage) >= (toNum(on.data?.percentage) ?? winixTurboPercent(ctx, f.entity_id)) - 1).length;
     return { active: turbo === fans.length ? 'on' : turbo ? null : 'off', note: turbo ? `${turbo} of ${fans.length} on turbo` : 'Not on turbo' };
   }
   const when = (t) => {
@@ -1191,10 +1260,10 @@ function controlState(ctx, pair) {
   return { active: tOn >= tOff ? 'on' : 'off', note: running ? 'Running' : `Last ${tOn >= tOff ? 'on' : 'off'} ${since(Math.max(tOn, tOff))}${/\d/.test(since(Math.max(tOn, tOff))) ? ' ago' : ''}` };
 }
 
-export function buildControls(ctx, prefs = {}) {
-  const pairs = Array.isArray(prefs.controls) ? prefs.controls : defaultControls(ctx);
+export function buildControls(ctx, prefs = {}, found = {}) {
+  const pairs = Array.isArray(prefs.controls) ? prefs.controls : defaultControls(ctx, found);
   return pairs
-    .filter((p) => p && (p.on || p.off))
+    .filter((p) => p && (p.on || p.off || p.setup))
     .map((p, i) => {
       // A side whose script or device no longer exists is shown disabled rather than failing on tap.
       const gone = (t) => !!t?.entity && !ctx.states[t.entity];
@@ -1355,61 +1424,147 @@ export function sumChange(rows, from, to) {
   return seen ? { total, last } : null;
 }
 
-function billingFor(kind, conf, raw, now) {
+// Raleigh Water's residential rates, effective July 1, 2026, which Knightdale also pays: inside
+// city limits with a 5/8" meter. Fixed: water base $8.14 + water IRC $1.50 + sewer base $8.83 +
+// sewer IRC $4.50. Per CCF (748 gallons): tiered water, plus the $0.1122 watershed fee and $5.31 sewer.
+export const WATER_PLANS = {
+  raleigh: {
+    name: 'Raleigh Water rates (July 2026)',
+    fixed: 22.97,
+    tiers: [[4, 3.11], [20, 5.41], [Infinity, 6.97]],
+    perCcf: 0.1122 + 5.31,
+  },
+};
+
+const GAL_PER_CCF = 748.052;
+
+export function planUsageCost(plan, gallons) {
+  const ccf = Math.max(0, gallons) / GAL_PER_CCF;
+  let left = ccf;
+  let prev = 0;
+  let cost = 0;
+  for (const [upTo, price] of plan.tiers) {
+    const inTier = Math.min(left, upTo - prev);
+    if (inTier <= 0) break;
+    cost += inTier * price;
+    left -= inTier;
+    prev = upTo;
+  }
+  return cost + ccf * plan.perCcf;
+}
+
+// The price per kWh that the circuit cost sensors already use: each "<name> Energy Cost This
+// Month" divided by the same circuit's billing-cycle energy, taking the median.
+export function deriveElectricRate(ctx) {
+  const sensors = ctx.byDomain('sensor');
+  const kwh = (st) => {
+    const v = toNum(st.state);
+    const u = st.attributes.unit_of_measurement;
+    return v === null ? null : u === 'Wh' ? v / 1000 : u === 'kWh' ? v : null;
+  };
+  const rates = [];
+  for (const st of sensors) {
+    if (st.attributes.device_class !== 'monetary' || !live(st)) continue;
+    const m = /^(.*?)\s+energy cost (this month|this cycle|billing cycle|billing period)$/i.exec(ctx.name(st.entity_id));
+    const cost = toNum(st.state);
+    if (!m || cost === null || cost <= 0) continue;
+    const prefix = m[1].toLowerCase();
+    const energy = sensors.filter((e) => live(e) && kwh(e) > 1 && ctx.name(e.entity_id).toLowerCase().startsWith(`${prefix} `));
+    const match = energy.find((e) => /billing (cycle|period) energy$/i.test(ctx.name(e.entity_id))) || energy.find((e) => /energy this month$/i.test(ctx.name(e.entity_id)));
+    if (match) rates.push(cost / kwh(match));
+  }
+  rates.sort((a, b) => a - b);
+  if (!rates.length) return null;
+  const mid = Math.floor(rates.length / 2);
+  const rate = rates.length % 2 ? rates[mid] : (rates[mid - 1] + rates[mid]) / 2;
+  return rate > 0.02 && rate < 2 ? { rate: Math.round(rate * 10000) / 10000, count: rates.length } : null;
+}
+
+function billingFor(kind, conf, raw, now, auto = {}) {
   const win = cycleWindow(conf, now);
   const src = raw?.ids?.[kind] || null;
   // A grid source can have several tariffs (peak and off-peak); each has its own meter, cost and price.
   const tariffs = src ? src.tariffs || [{ usage: src.usage, cost: src.cost, price: src.price }] : [];
   const sum = (id) => sumChange(raw?.rows?.[id], win.start, now + 1);
   const userRate = toNum(conf.rate);
-  const fixed = toNum(conf.fixed) ?? 0;
+  const plan = userRate === null && kind === 'water' && conf.plan !== '' ? WATER_PLANS[conf.plan || auto.plan] || null : null;
+  const autoRate = userRate === null && !plan ? auto.rate ?? null : null;
+  const fixed = toNum(conf.fixed) ?? plan?.fixed ?? 0;
   let usageTotal = null;
-  let spent = 0;
+  let usageCost = 0;
   let through = null;
   let costKnown = tariffs.length > 0;
+  let rateSource = userRate !== null ? 'your price' : plan ? plan.name : null;
   for (const t of tariffs) {
     const usage = sum(t.usage);
     const cost = t.cost ? sum(t.cost) : null;
     if (usage) usageTotal = (usageTotal ?? 0) + usage.total;
     const price = userRate ?? t.price ?? null;
-    const part = price !== null ? (usage ? usage.total * price : 0) : cost ? cost.total : null;
+    let part = null;
+    if (plan) part = 0;
+    else if (price !== null) part = usage ? usage.total * price : 0;
+    else if (cost) {
+      part = cost.total;
+      rateSource ||= 'Home Assistant cost tracking';
+    } else if (autoRate !== null) {
+      part = usage ? usage.total * autoRate : 0;
+      rateSource ||= auto.rateNote || 'an estimated price';
+    }
     if (part === null) costKnown = false;
-    else spent += part;
-    const last = (price !== null ? usage?.last : cost?.last ?? usage?.last) ?? null;
+    else usageCost += part;
+    const last = (price !== null || plan || autoRate !== null ? usage?.last : cost?.last ?? usage?.last) ?? null;
     if (last !== null) through = Math.max(through ?? 0, last);
   }
-  const rate = userRate ?? (tariffs.length === 1 ? tariffs[0].price ?? null : null);
+  const gallons = (v) => (auto.volumeUnit === 'L' ? v / 3.78541 : v);
+  if (plan && usageTotal !== null) usageCost = planUsageCost(plan, gallons(usageTotal));
+  const rate = userRate ?? (tariffs.length === 1 ? tariffs[0].price ?? null : null) ?? autoRate;
   const hasData = through !== null;
-  if (!costKnown || !hasData) spent = null;
+  const known = costKnown && hasData;
   // When the source lags (utility statistics often arrive days late), project from the span it covers.
   const lagging = hasData && through < now - 3 * 3600000;
   const coveredMs = lagging ? through - win.start : now - win.start;
   const covered = clamp(coveredMs / (win.end - win.start), 0, 1);
+  // So far: usage charges plus the share of the fixed charges for the days gone by.
+  const spent = known ? usageCost + fixed * win.fraction : null;
   // Wait for six hours of data so the first morning of a cycle does not swing the estimate wildly.
-  const estimate = spent === null || covered <= 0 || coveredMs < 6 * 3600000 ? null : spent / covered + fixed;
+  let estimate = null;
+  if (known && covered > 0 && coveredMs >= 6 * 3600000) {
+    estimate = plan ? planUsageCost(plan, gallons(usageTotal / covered)) + fixed : usageCost / covered + fixed;
+  }
   const cost = tariffs.every((t) => t.cost) ? tariffs.reduce((acc, t) => { const c = sum(t.cost); return c ? (acc ?? 0) + c.total : acc; }, null) : null;
   return {
     kind,
     win,
     rate,
+    plan,
+    rateSource,
     fixed,
     usage: usageTotal,
+    usageCost: known ? usageCost : null,
     spent,
     estimate,
     through: lagging ? through : null,
     source: src,
     loading: !raw,
     // Nothing turns usage into dollars: no price entered and no cost tracking in Home Assistant.
-    needsRate: !!raw && rate === null && !costKnown && !tariffs.some((t) => t.cost || t.price !== null && t.price !== undefined),
+    needsRate: !!raw && !known && hasData,
     error: raw?.error || null,
-    effRate: rate ?? (cost !== null && usageTotal > 0 ? cost / usageTotal : null),
+    effRate: plan && usageTotal > 0 ? usageCost / usageTotal : rate ?? (cost !== null && usageTotal > 0 ? cost / usageTotal : null),
   };
 }
 
-export function buildBilling(ctx, prefs = {}, raw = null, now = Date.now()) {
-  const b = prefs.billing || {};
-  const electric = billingFor('electric', b.electric || {}, raw, now);
-  const water = billingFor('water', b.water || {}, raw, now);
+// Defaults for this house until the dates are changed under Billing cycle: the Duke Energy
+// cycle that started Oct 10, 2026 and bills Nov 7, and Raleigh Water's rates for water.
+export const HOUSE_BILLING = {
+  electric: { start: '2026-10-10', end: '2026-11-07' },
+  water: {},
+};
+
+export function buildBilling(ctx, prefs = {}, raw = null, now = Date.now(), volumeUnit = 'gal') {
+  const b = mergePrefs(ctx?.config?.billing === false ? {} : HOUSE_BILLING, prefs.billing || {});
+  const derived = ctx ? deriveElectricRate(ctx) : null;
+  const electric = billingFor('electric', b.electric || {}, raw, now, derived ? { rate: derived.rate, rateNote: `$${derived.rate.toFixed(3)}/kWh, the price your circuit cost sensors use` } : {});
+  const water = billingFor('water', b.water || {}, raw, now, { plan: 'raleigh', volumeUnit });
   const dayStart = startOfDay(now);
   const rows = (raw?.circuits || []).map((c) => {
     const r = raw.rows?.[c.stat];
@@ -2186,7 +2341,7 @@ function airScoreCard(m, ui, { compact = false } = {}) {
   const tone = scoreTone(s.score);
   const parts = s.parts.map((p) => `<button class="part t-${scoreTone(p.score)}" data-act="more" data-entity="${esc(p.entity)}"><span class="part-l">${esc(p.label)}</span><span class="part-v">${esc(p.raw)}</span><span class="part-bar"><i style="width:${p.score ?? 0}%"></i></span><b class="part-s">${p.score === null ? '—' : p.score}</b></button>`).join('');
   const math = ui.scoreMath
-    ? `<div class="math"><p><b>Air score = the average of the inputs that are reporting.</b></p><p>${esc(s.parts.filter((p) => p.score !== null).map((p) => p.score).join(' + '))} = ${sum(s.parts.filter((p) => p.score !== null).map((p) => p.score))}, divided by ${s.used} = <b>${fmt(s.score)}</b></p>${[...new Map(s.parts.map((p) => [p.math, p])).values()].map((p) => `<p>${esc(p.math)}</p>`).join('')}</div>`
+    ? `<div class="math"><p><b>Air score = the average of the inputs that are reporting.</b></p><p>${esc(s.parts.filter((p) => p.score !== null).map((p) => p.score).join(' + '))} = ${sum(s.parts.filter((p) => p.score !== null).map((p) => p.score))}, divided by ${s.used} = <b>${fmt(s.score)}</b></p>${s.parts.some((p) => p.avg) ? '<p><b>PM0.3 is scored against each room’s own two-week average:</b> at or below average = 100, 1.25× = 80, 1.5× = 65, 2× = 45, 3× = 20, 4× or more = 0.</p>' : ''}${[...new Map(s.parts.map((p) => [p.math, p])).values()].map((p) => `<p>${esc(p.math)}</p>`).join('')}</div>`
     : '';
   return `<section class="panel score t-${tone}" data-key="score-${compact ? 'home' : 'air'}">
       <div class="score-top">
@@ -2230,13 +2385,16 @@ function controlsBlock(m) {
   if (!m.controls.length) {
     return `<section class="block">${secHead('power', 'Controls', 'cyan')}<div class="panel">${emptyState('power', 'No controls found', 'Pick what Quiet, Winix Turbo and the master fan should run in Customize.')}<button class="more" data-act="sheet" data-sheet="customize">Open Customize</button></div></section>`;
   }
-  const rows = m.controls.map((c) => `<div class="ctl t-${CONTROL_TONES[c.key] || 'cyan'}" data-key="ctl-${c.index}">
+  const rows = m.controls.map((c) => (c.setup ? `<div class="ctl t-${CONTROL_TONES[c.key] || 'cyan'}" data-key="ctl-${c.index}">
+      <div class="ctl-h">${ic(c.icon)}<b>${esc(c.label)}</b><small>Not set up</small></div>
+      <button class="act wide" data-act="sheet" data-sheet="customize">${ic('gear')}Pick what Quiet On and Quiet Off run</button>
+    </div>` : `<div class="ctl t-${CONTROL_TONES[c.key] || 'cyan'}" data-key="ctl-${c.index}">
       <div class="ctl-h">${ic(c.icon)}<b>${esc(c.label)}</b>${c.note ? `<small>${esc(c.note)}</small>` : ''}</div>
       <div class="ctl-b">
         <button class="ctl-btn ${c.active === 'on' ? 'on' : ''}" data-act="ctl" data-i="${c.index}" data-side="on" ${c.onOk ? '' : 'disabled'} aria-label="${esc(c.label)} on">${ic(c.icon)}<span>On</span></button>
         <button class="ctl-btn off ${c.active === 'off' ? 'on' : ''}" data-act="ctl" data-i="${c.index}" data-side="off" ${c.offOk ? '' : 'disabled'} aria-label="${esc(c.label)} off">${ic('power')}<span>Off</span></button>
       </div>
-    </div>`).join('');
+    </div>`)).join('');
   return `<section class="block">${secHead('power', 'Controls', 'cyan')}<div class="ctls">${rows}</div></section>`;
 }
 
@@ -2245,17 +2403,40 @@ function robotActions(r) {
   const b = (act, svc, label, icon, primary) => `<button class="rs-btn ${primary ? 'primary' : ''}" data-act="${act}" ${svc ? `data-svc="${svc}"` : ''} data-entity="${id}" data-vac="${id}">${ic(icon)}<span>${esc(label)}</span></button>`;
   if (r.litter) return b('vac', 'start', 'Clean', 'spark', true);
   const main = r.state === 'cleaning' ? b('vac', 'pause', 'Pause', 'pause', true)
-    : r.classic || !r.canArea ? b('vac', 'start', r.state === 'paused' ? 'Resume' : 'Clean', 'play', true)
-      : b('sheet-rooms', '', 'Rooms', 'map', true);
+    : r.classic ? b('vac', 'start', r.state === 'paused' ? 'Resume' : 'Clean', 'play', true)
+      : b('vac', 'start', r.state === 'paused' ? 'Resume' : 'Start', 'play', true);
   return `${main}${b('vac', 'return_to_base', 'Dock', 'home', false)}`;
 }
 
-function robotShortcuts(m) {
+// The rooms of a robot that cleans by area, right on Home: tap rooms in order, then Clean.
+function robotRoomsInline(m, ui, r) {
+  if (r.classic || r.litter || !r.canArea) return '';
+  const id = esc(r.id);
+  if (r.areaStatus === 'loading') return '<div class="rs-rooms"><small class="note">Loading rooms…</small></div>';
+  if (r.areaStatus === 'error' || !r.areas.length) {
+    return `<div class="rs-rooms"><small class="note">${esc(r.name)}'s rooms aren't matched to Home Assistant areas yet. Open it, tap <b>Cleaning → By area</b>, then the gear, and match each room once.</small><button class="chip" data-act="more" data-entity="${id}">${ic('map')}Open ${esc(r.name)}</button></div>`;
+  }
+  const sel = ui.roomSel[r.id] || [];
+  const tiles = r.areas.map((a) => {
+    const order = sel.indexOf(a.id);
+    return `<button class="rtile ${order >= 0 ? 'on' : ''}" data-act="room" data-vac="${id}" data-area="${esc(a.id)}" aria-pressed="${order >= 0}">${order >= 0 ? `<i class="rt-o">${order + 1}</i>` : ''}<span>${esc(a.name)}</span></button>`;
+  }).join('');
+  const last = ((m.prefs.lastRooms || {})[r.id] || []).map((aid) => r.areas.find((a) => a.id === aid)?.name).filter(Boolean);
+  return `<div class="rs-rooms">
+      ${r.map ? `<img class="rmap-img rs-map" src="${esc(r.map.src)}${r.map.src.includes('?') ? '&' : '?'}_nh=${Math.floor(m.now / 30000)}" alt="${esc(r.name)} map">` : ''}
+      <div class="rtiles compact">${tiles}</div>
+      ${sel.length
+        ? `<div class="rs-go"><button class="act primary" data-act="cleanrooms" data-vac="${id}">${ic('play')}Clean ${sel.length} ${sel.length === 1 ? 'room' : 'rooms'}</button><button class="act" data-act="roomsclear" data-vac="${id}">${ic('x')}Clear</button></div>`
+        : last.length ? `<button class="chip repeat" data-act="roomsrepeat" data-vac="${id}">${ic('spark')}Again: ${esc(last.join(', '))}</button>` : '<small class="note">Tap rooms in the order to clean them, or Start for the whole map.</small>'}
+    </div>`;
+}
+
+function robotShortcuts(m, ui) {
   if (!m.robots.length) return '';
-  return `<section class="block">${secHead('robot', 'Robots', 'mint', linkTo('robots', 'All'))}<div class="panel rs-list">${m.robots.map((r) => `<div class="rs t-${r.tone} ${esc(r.state)}" data-key="rs-${esc(r.id)}">
-      <button class="rs-main" data-act="tab" data-tab="robots" data-entity="${esc(r.id)}"><span class="rmini-ic">${ic(r.litter ? 'cat' : 'robot')}</span><span class="rmini-t"><b>${esc(r.name)}</b><small>${esc(r.statusText)}${r.battery !== null && !r.litter ? ` · ${fmt(r.battery)}%` : ''}</small></span></button>
+  return `<section class="block">${secHead('robot', 'Robots', 'mint', linkTo('robots', 'All'))}<div class="panel rs-list">${m.robots.map((r) => `<div class="rs-item" data-key="rs-${esc(r.id)}"><div class="rs t-${r.tone} ${esc(r.state)}">
+      <button class="rs-main" data-act="more" data-entity="${esc(r.id)}"><span class="rmini-ic">${ic(r.litter ? 'cat' : 'robot')}</span><span class="rmini-t"><b>${esc(r.name)}</b><small>${esc(r.statusText)}${r.battery !== null && !r.litter ? ` · ${fmt(r.battery)}%` : ''}</small></span></button>
       <div class="rs-acts">${robotActions(r)}</div>
-    </div>`).join('')}</div></section>`;
+    </div>${robotRoomsInline(m, ui, r)}</div>`).join('')}</div></section>`;
 }
 
 function money(v, currency = '$') {
@@ -2279,7 +2460,7 @@ function billTile(m, b, title, icon, tone) {
       <span class="bill-v">${b.loading ? '…' : missing ? (b.usage !== null ? `${fmt(b.usage, 1)} ${b.kind === 'water' ? m.water.volumeUnit : 'kWh'}` : '—') : esc(money(b.spent, cur))}</span>
       <span class="bill-k">Estimated bill</span>
       <span class="bill-e">${b.loading ? '…' : esc(money(b.estimate, cur))}</span>
-      <span class="bill-f">Day ${day} of ${b.win.days}${hint}</span>
+      <span class="bill-f">${b.usage !== null ? `${fmt(b.usage, b.usage < 100 ? 1 : 0)} ${b.kind === 'water' ? m.water.volumeUnit : 'kWh'} · ` : ''}day ${day} of ${b.win.days}${hint}</span>
     </button>`;
 }
 
@@ -2304,43 +2485,19 @@ function healthStrip(m) {
   }).join('')}</div></section>`;
 }
 
+// Home is only what gets used most, in order: PM0.3 score and graph, the buttons, the robots,
+// then the electric and water bills and the Oura scores.
 function viewHomeV2(m, ui) {
   const now = new Date(m.now);
-  const hour = now.getHours();
-  const greet = hour < 5 ? 'Good night' : hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : hour < 22 ? 'Good evening' : 'Good night';
-  const first = String(m.config.name || m.user?.name || '').split(' ')[0];
-  const clock = m.clock(now);
-  const urgent = m.alerts.filter((a) => a.level <= 1);
-  const statusTone = m.alerts.some((a) => a.level === 0) ? 'bad' : urgent.length ? 'poor' : 'good';
-  const status = urgent.length ? `<b>${urgent.length}</b> ${urgent.length === 1 ? 'thing needs' : 'things need'} attention` : 'All quiet at home';
   return `
     ${m.config.preview ? `<div class="preview t-violet">${ic('spark')}<span>${m.config.preview === true ? '<b>Preview.</b> Sample data.' : m.config.preview}</span></div>` : ''}
-    <header class="hello">
-      <div class="hello-row">
-        ${menuButton(ui)}
-        <div class="hello-text">
-          <div class="kicker">${esc(m.fmtDate(now))}</div>
-          <h1>${esc(greet)}${first ? `, ${esc(first)}` : ''}</h1>
-        </div>
-        <div class="clock" aria-label="Time"><b>${esc(clock.main)}</b>${clock.period ? `<small>${esc(clock.period)}</small>` : ''}</div>
-      </div>
-      <div class="status-row">
-        <button class="status t-${statusTone}" data-act="sheet" data-sheet="alerts"><i class="dot"></i><span>${status}</span>${m.alerts.length ? ic('chev') : ''}</button>
-        <button class="icon-btn sm" data-act="sheet" data-sheet="customize" aria-label="Customize the dashboard">${ic('gear')}</button>
-      </div>
-      ${weatherStrip(m)}
-    </header>
-    ${alertsBlock(m)}
+    <div class="home-top">${menuButton(ui)}<span class="home-top-t">${m.spike.active ? `<span class="pill t-bad">${ic('alert')}${esc(m.spike.pmLabel)} PM0.3 is spiking</span>` : ''}</span><button class="icon-btn sm" data-act="sheet" data-sheet="customize" aria-label="Customize the dashboard">${ic('gear')}</button></div>
     ${airScoreCard(m, ui, { compact: true })}
     ${pm03Block(m, ui, { id: 'pm03-home', range: '24h' })}
     ${controlsBlock(m)}
-    ${robotShortcuts(m)}
+    ${robotShortcuts(m, ui)}
     ${billingMini(m)}
     ${healthStrip(m)}
-    <div class="cols">
-      ${climateBlock(m, ui)}
-      ${favoritesBlock(m, ui)}
-    </div>
     <footer class="foot">Nourie Home ${VERSION} · updated ${esc(m.fmtTime(now))}</footer>`;
 }
 
@@ -2445,7 +2602,7 @@ function billCard(m, b, title, icon, tone, unit) {
         <div><small>Spent so far</small><b>${b.loading ? '…' : esc(missing ? '—' : money(b.spent, cur))}</b></div>
         <div><small>Estimated bill</small><b class="est">${b.loading ? '…' : esc(money(b.estimate, cur))}</b></div>
       </div>
-      <small class="note">${b.usage !== null ? `${fmt(b.usage, b.usage < 100 ? 1 : 0)} ${unit} so far` : 'No usage recorded yet'}${b.rate !== null ? ` · ${cur}${Number(b.rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })} per ${unit}` : ''}${b.fixed ? ` · ${money(b.fixed, cur)} fixed charge included in the estimate` : ''}${b.through ? ` · data through ${new Date(b.through).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : ''}</small>
+      <small class="note">${b.usage !== null ? `${fmt(b.usage, b.usage < 100 ? 1 : 0)} ${unit} so far` : 'No usage recorded yet'}${b.plan ? ` · ${esc(b.plan.name)}: tiered water + sewer per 748 gal, ${money(b.fixed, cur)} a month in base charges` : b.rate !== null ? ` · ${cur}${Number(b.rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })} per ${unit}${b.rateSource && b.rateSource !== 'your price' ? ` (${esc(b.rateSource.replace(/^\$[\d.]+\/kWh, /, ''))})` : ''}` : b.rateSource ? ` · ${esc(b.rateSource)}` : ''}${b.fixed && !b.plan ? ` · ${money(b.fixed, cur)} fixed charge` : ''}${b.through ? ` · data through ${new Date(b.through).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : ''}. Change it under Billing cycle.</small>
       ${b.error ? `<small class="note warn">Home Assistant's usage history could not load: ${esc(b.error)}</small>` : b.needsRate ? `<small class="note warn">Add your price per ${unit} under Billing cycle to see dollars.</small>` : ''}
       ${!b.source && !b.error ? `<small class="note warn">No ${b.kind === 'water' ? 'water meter' : 'grid meter'} found in Home Assistant's Energy settings. Pick one under Billing cycle.</small>` : ''}
     </section>`;
@@ -2534,8 +2691,8 @@ function options(list, selected, { auto = null, none = 'Don’t use' } = {}) {
 function targetValue(t) {
   if (!t) return '';
   if (t.entity) return t.entity;
-  if (t.service === 'fan.set_percentage') return '__winix_turbo__';
-  if (t.service === 'fan.set_preset_mode') return '__winix_auto__';
+  if (t.special === 'winix_turbo' || t.service === 'fan.set_percentage') return '__winix_turbo__';
+  if (t.special === 'winix_restore' || t.service === 'fan.set_preset_mode') return '__winix_auto__';
   return '';
 }
 
@@ -2604,11 +2761,11 @@ function billSheet(m, kind) {
     </div>
     ${err}
     <div class="field-row">
-      <label class="field"><span>Price per ${esc(unit)}</span><input type="number" inputmode="decimal" step="0.0001" min="0" placeholder="${src?.price ? esc(src.price) : 'e.g. 0.14'}" data-pref="billing.${kind}.rate" value="${esc(conf.rate ?? '')}"></label>
-      <label class="field"><span>Fixed monthly charge</span><input type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00" data-pref="billing.${kind}.fixed" value="${esc(conf.fixed ?? '')}"></label>
+      <label class="field"><span>Price per ${esc(unit)}</span><input type="number" inputmode="decimal" step="0.0001" min="0" placeholder="${b.rate !== null && !conf.rate ? esc(b.rate) : src?.price ? esc(src.price) : 'e.g. 0.14'}" data-pref="billing.${kind}.rate" value="${esc(conf.rate ?? '')}"></label>
+      <label class="field"><span>Fixed monthly charge</span><input type="number" inputmode="decimal" step="0.01" min="0" placeholder="${b.fixed ? esc(b.fixed.toFixed(2)) : '0.00'}" data-pref="billing.${kind}.fixed" value="${esc(conf.fixed ?? '')}"></label>
     </div>
     <label class="field"><span>Meter</span><select data-pref="billing.${kind}.stat">${`<option value="__auto__" ${conf.stat ? '' : 'selected'}>From Energy settings${src?.usage ? ` (${esc(src.label || src.usage)})` : ' (none found)'}</option>`}${c.numeric.filter((o) => (kind === 'water' ? /water|flume|gal|lit/i : /energy|kwh|grid|emporia|duke/i).test(`${o.id} ${o.name} ${o.state}`)).map((o) => `<option value="${esc(o.id)}" ${o.id === conf.stat ? 'selected' : ''}>${esc(o.name)} · ${esc(o.state)}</option>`).join('')}</select></label>
-    <p class="note">${src?.cost && !conf.rate ? 'Using Home Assistant’s cost tracking for dollars. Enter a price to override it.' : conf.rate ? 'Dollars use your price.' : 'Enter a price to turn usage into dollars.'}</p>
+    <p class="note">${conf.rate ? 'Dollars use your price.' : b.plan ? `Using ${esc(b.plan.name)} for 5/8" meters inside city limits: water $3.11 / $5.41 / $6.97 per CCF in tiers, sewer $5.31 and watershed $0.11 per CCF, and $22.97 a month in base charges. Enter a price per gallon to use a flat price instead.` : b.rateSource ? `Using ${esc(b.rateSource)}. Enter a price to override it.` : 'Enter a price to turn usage into dollars.'}</p>
     <div class="bc-nums sheet-nums"><div><small>Spent so far</small><b>${esc(money(b.spent, m.billing.currency))}</b></div><div><small>Estimated bill</small><b class="est">${esc(money(b.estimate, m.billing.currency))}</b></div></div>`;
 }
 
@@ -3264,7 +3421,20 @@ img { max-width: 100%; }
 .ctl-btn.off.on .ic { color: var(--nh-ink); }
 .ctl-btn[disabled] { opacity: .35; }
 .rs-list { display: grid; gap: 0; padding-block: 4px; }
-.rs { display: flex; align-items: center; gap: 10px; min-height: 60px; border-bottom: 1px solid var(--nh-line); }
+.home-top { display: flex; align-items: center; gap: 10px; min-height: 44px; margin-bottom: 4px; }
+.home-top-t { flex: 1; min-width: 0; }
+.home-top .pill { display: inline-flex; align-items: center; gap: 6px; }
+.rs-item { border-bottom: 1px solid var(--nh-line); }
+.rs-item:last-child { border-bottom: 0; }
+.rs { display: flex; align-items: center; gap: 10px; min-height: 60px; }
+.rs-rooms { display: grid; gap: 10px; padding: 2px 0 14px; }
+.rs-map { max-height: 200px; object-fit: contain; }
+.rtiles.compact { grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); }
+.rtiles.compact .rtile { min-height: 50px; padding: 8px 8px 8px 30px; }
+.rtiles.compact .rtile:not(.on) { padding-left: 8px; }
+.rtiles.compact .rt-o { top: 50%; left: 7px; transform: translateY(-50%); }
+.rs-go .act { grid-auto-flow: column; justify-content: center; align-items: center; gap: 6px; min-height: 48px; }
+.rs-go { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
 .rs:last-child { border-bottom: 0; }
 .rs-main { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
 .rs-main .rmini-t { min-width: 0; }
@@ -3587,9 +3757,9 @@ class NourieHome extends Base {
       if (b.dataset.tab === ui.tab) b.setAttribute('aria-current', 'page');
       else b.removeAttribute('aria-current');
     }
-    const urgent = m.alerts.filter((a) => a.level <= 1).length;
-    this._navDot.hidden = !urgent;
-    this._navDot.textContent = urgent ? String(urgent) : '';
+    // Only a PM0.3 spike earns a badge; the general alert list is not shown.
+    this._navDot.hidden = !m.spike.active;
+    this._navDot.textContent = m.spike.active ? '!' : '';
     this._main.hidden = onMap;
     this._mapview.hidden = !onMap;
     if (onMap) {
@@ -3609,10 +3779,14 @@ class NourieHome extends Base {
       this._learnStarted = true;
       this._learnFavorites();
     }
+    if (!this._foundStarted && !Array.isArray(this._ext.prefs.controls) && m.controls.some((c) => c.key === 'quiet' && c.setup)) this._findDashboardActions();
     if (m.weather.id && this._forecastFor !== m.weather.id) this._subscribeForecast(m.weather.id, m.weather.features);
     const tab = this._ui.tab;
     const pmIds = m.score.pm03.map((x) => x.id);
-    if (tab === 'home' || tab === 'air') this._history('pm03', pmIds, 24);
+    if (tab === 'home' || tab === 'air') {
+      this._history('pm03', pmIds, 24);
+      this._statsMean('pm03avg', pmIds, 14 * 24);
+    }
     if (tab === 'air') {
       this._history('air', m.air.rooms.map((r) => r.primary.id));
       if (this._ui.pmRange === '7d') this._statsMean('pm03week', pmIds, 7 * 24);
@@ -3631,6 +3805,24 @@ class NourieHome extends Base {
         this._schedule();
       }
     }
+  }
+
+  // Looks through the other dashboards once for buttons labelled Quiet On and Quiet Off.
+  async _findDashboardActions() {
+    this._foundStarted = true;
+    const hass = this._hass;
+    if (!hass?.callWS || this._config.preview) return;
+    const paths = [null, ...Object.values(hass.panels || {}).filter((p) => p.component_name === 'lovelace' && p.url_path && p.url_path !== 'lovelace').map((p) => p.url_path)];
+    const found = {};
+    for (const urlPath of paths) {
+      if (found.quietOn && found.quietOff) break;
+      const config = await hass.callWS({ type: 'lovelace/config', url_path: urlPath, force: false }).catch(() => null);
+      if (!config || typeof config !== 'object' || JSON.stringify(config).includes('nourie-home-card')) continue;
+      found.quietOn ||= findCardAction(config, 'quiet on');
+      found.quietOff ||= findCardAction(config, 'quiet off');
+    }
+    this._ext.found = found;
+    this._schedule(true);
   }
 
   // Hourly means from long-term statistics; lighter than raw history for a week of readings.
@@ -3830,8 +4022,8 @@ class NourieHome extends Base {
   _targetFromValue(v) {
     if (!v) return null;
     const fans = this._model?.candidates().winixFans || [];
-    if (v === '__winix_turbo__') return { service: 'fan.set_percentage', data: { entity_id: fans, percentage: winixTurboPercent(this._ctxFor(), fans) } };
-    if (v === '__winix_auto__') return { service: 'fan.set_preset_mode', data: { entity_id: fans, preset_mode: 'Auto' } };
+    if (v === '__winix_turbo__') return { special: 'winix_turbo', fans };
+    if (v === '__winix_auto__') return { special: 'winix_restore', fans };
     return { entity: v };
   }
 
@@ -4245,6 +4437,8 @@ class NourieHome extends Base {
     const c = this._model?.controls.find((x) => x.index === i);
     const t = c?.[side];
     if (!t) return null;
+    if (t.special === 'winix_turbo') return this._winixTurbo(t.fans);
+    if (t.special === 'winix_restore') return this._winixRestore(t.fans);
     if (t.service) {
       const [dom, svc] = t.service.split('.');
       return this._call(dom, svc, t.data || {});
@@ -4255,6 +4449,51 @@ class NourieHome extends Base {
     if (dom === 'button' || dom === 'input_button') return this._call(dom, 'press', { entity_id: id });
     if (dom === 'automation') return this._call('automation', 'trigger', { entity_id: id });
     return this._call('homeassistant', side === 'off' ? 'turn_off' : 'turn_on', { entity_id: id });
+  }
+
+  // Turbo remembers each purifier's speed or mode first, so Off can put it back. Winix fans
+  // without preset modes cannot be set to "Auto", which is why Off does not ask for it.
+  async _winixTurbo(fans) {
+    const states = this._hass?.states || {};
+    const ctx = this._ctxFor();
+    const ids = [].concat(fans || []).filter((id) => live(states[id]));
+    if (!ids.length) return this._toast('The Winix purifiers are offline', true);
+    const before = { ...(this._ext.prefs.winixBefore || {}) };
+    for (const id of ids) {
+      const a = states[id].attributes;
+      const pct = toNum(a.percentage);
+      // Do not overwrite the saved speed with turbo itself if Turbo is pressed twice.
+      if (pct !== null && pct >= winixTurboPercent(ctx, id) - 1 && before[id]) continue;
+      before[id] = { on: states[id].state === 'on', percentage: pct, preset: a.preset_mode || null };
+    }
+    this._setPref('winixBefore', before);
+    const results = await Promise.all(ids.map((id) => this._call('fan', 'set_percentage', { entity_id: id, percentage: winixTurboPercent(ctx, id) }, false)));
+    this._haptic('light');
+    if (results.every(Boolean)) this._toast(`Turbo on for ${ids.length} ${ids.length === 1 ? 'purifier' : 'purifiers'}`);
+    return null;
+  }
+
+  async _winixRestore(fans) {
+    const states = this._hass?.states || {};
+    const ids = [].concat(fans || []).filter((id) => live(states[id]));
+    if (!ids.length) return this._toast('The Winix purifiers are offline', true);
+    const before = this._ext.prefs.winixBefore || {};
+    const calls = ids.map((id) => {
+      const a = states[id].attributes;
+      const modes = Array.isArray(a.preset_modes) ? a.preset_modes : [];
+      const saved = before[id];
+      const step = toNum(a.percentage_step);
+      if (saved && !saved.on) return this._call('fan', 'turn_off', { entity_id: id }, false);
+      if (saved?.preset && modes.includes(saved.preset)) return this._call('fan', 'set_preset_mode', { entity_id: id, preset_mode: saved.preset }, false);
+      if (saved?.percentage) return this._call('fan', 'set_percentage', { entity_id: id, percentage: saved.percentage }, false);
+      const auto = modes.find((x) => /^auto/i.test(x));
+      if (auto) return this._call('fan', 'set_preset_mode', { entity_id: id, preset_mode: auto }, false);
+      return this._call('fan', 'set_percentage', { entity_id: id, percentage: step && step > 0 && step < 50 ? Math.round(step) : 25 }, false);
+    });
+    const results = await Promise.all(calls);
+    this._haptic('light');
+    if (results.every(Boolean)) this._toast('Turbo off · purifiers back to their earlier speed');
+    return null;
   }
 
   _toggleRoom(vac, area) {

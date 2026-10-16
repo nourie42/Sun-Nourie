@@ -64,7 +64,12 @@ export function createMockHass(data, onChange) {
         set(id, on ? 'on' : 'off', attrs);
       }
       if (domain === 'fan' && service === 'set_percentage') set(id, payload.percentage > 0 ? 'on' : 'off', { percentage: payload.percentage });
-      if (domain === 'fan' && service === 'set_preset_mode') set(id, 'on', { preset_mode: payload.preset_mode });
+      if (domain === 'fan' && service === 'set_preset_mode') {
+        // Home Assistant rejects a preset the fan does not list, as Winix fans without presets do.
+        const modes = st.attributes.preset_modes || [];
+        if (!modes.includes(payload.preset_mode)) throw new Error(`Validation error: Preset mode ${payload.preset_mode} is not valid, valid preset modes are: ${modes.join(', ')}.`);
+        set(id, 'on', { preset_mode: payload.preset_mode });
+      }
       if (domain === 'climate' && service === 'set_temperature') {
         const attrs = {};
         for (const k of ['temperature', 'target_temp_low', 'target_temp_high']) if (payload[k] !== undefined) attrs[k] = payload[k];
