@@ -3,6 +3,7 @@ import crypto from "crypto";
 import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
+import { decodeHouseholdPLSnapshot, serializeHouseholdPLSnapshot } from "./householdPLData.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -35,12 +36,25 @@ function loginPage(error = "") {
 export function registerHouseholdPLRoutes(app) {
   const password = process.env.HOUSEHOLD_PL_PASSWORD || "";
   const secret = process.env.HOUSEHOLD_PL_COOKIE_SECRET || "";
+  let snapshotJSON = "";
+  try {
+    const snapshot = decodeHouseholdPLSnapshot(process.env.HOUSEHOLD_PL_DATA_GZ || "");
+    snapshotJSON = serializeHouseholdPLSnapshot(snapshot);
+    console.info("Household P&L snapshot ready:", JSON.stringify({
+      period: snapshot.actualMonth || snapshot.period || "2026-09",
+      asOf: snapshot.asOf || null,
+      rows: snapshot.rows.length,
+      transactions: snapshot.tx.length,
+    }));
+  } catch (error) {
+    console.error("Household P&L snapshot unavailable:", error.code || "HOUSEHOLD_PL_DATA_INVALID", error.detail || "");
+  }
   const valid = (req) =>
     password &&
     secret &&
     safeEq(cookies(req).household_pl_auth, token(password, secret));
 
-  app.use("/household-pl", (req, res, next) => {
+  app.use(["/household-pl", "/household-pl.html"], (req, res, next) => {
     res.setHeader("X-Robots-Tag", "noindex, nofollow, noarchive");
     res.setHeader("Cache-Control", "no-store, private");
     next();
@@ -49,12 +63,11 @@ export function registerHouseholdPLRoutes(app) {
   app.get(["/household-pl", "/household-pl.html"], async (req, res) => {
     if (!valid(req)) return res.status(401).type("html").send(loginPage());
     try {
-      const data = process.env.HOUSEHOLD_PL_DATA_GZ || "";
-      if (!data) return res.status(503).send("Household P&L data is not configured.");
+      if (!snapshotJSON) return res.status(503).send("Household P&L data is unavailable. Please try again later.");
       const file = path.join(__dirname, "..", "public", "household-pl.html");
       const page = (await fs.readFile(file, "utf8")).replace(
         "__HOUSEHOLD_PL_DATA__",
-        JSON.stringify(data)
+        () => snapshotJSON
       );
       res.type("html").send(page);
     } catch (error) {
@@ -94,3 +107,4 @@ export function registerHouseholdPLRoutes(app) {
     res.redirect(303, "/household-pl");
   });
 }
+

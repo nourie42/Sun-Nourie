@@ -128,10 +128,13 @@ button,input{font:inherit}.topbar{position:sticky;top:0;z-index:100;background:r
 </div>
 <script>
 const Z=__HOUSEHOLD_PL_DATA__;
-async function loadBase(){
- const b=Uint8Array.from(atob(Z),function(c){return c.charCodeAt(0)});
- const s=new DecompressionStream('gzip');
- return JSON.parse(await new Response(new Blob([b]).stream().pipeThrough(s)).text());
+function loadBase(){
+ // The authenticated server decodes and validates the configured gzip snapshot.
+ // Read the embedded object directly so loading needs no browser gzip support or request.
+ if(!Z||typeof Z!=='object'||Array.isArray(Z)||!Array.isArray(Z.rows)||(Z.tx!=null&&!Array.isArray(Z.tx))){
+   throw new Error('Household P&L snapshot is unavailable. Please try again later.');
+ }
+ return Z;
 }
 // Snapshot vals: [previous-month actual, snapshot actual, 12 monthly budgets].
 function householdPeriods(base,now){
@@ -152,7 +155,7 @@ function migrateHouseholdEdits(edits,anchor,periods){
  });return out;
 }
 (async function(){
- const BASE=await loadBase(),periods=householdPeriods(BASE,new Date());
+ const BASE=loadBase(),periods=householdPeriods(BASE,new Date());
  const actualMonth=periods.actualMonth,actualBudgetIndex=periods.actualIndex;
  const actualLabel=periods.label(actualMonth,{month:'long',year:'numeric'}),previousLabel=periods.label(periods.previousMonth,{month:'long',year:'numeric'});
  function snapshotDate(){
@@ -211,10 +214,13 @@ function migrateHouseholdEdits(edits,anchor,periods){
  function snapshotBudget(r){return actualBudgetIndex>=0?monthVal(r,actualBudgetIndex):0}
  function setAnnual(r,total){
    total=round2(total);const per=total/12;
+   if(r.manual&&r.frequency==='monthly')r.monthlyAmount=round2(per);
    for(let i=0;i<12;i++)setMonth(r,i,per);
  }
  function setMonthlyAll(r,monthly){
-   monthly=round2(monthly);for(let i=0;i<12;i++)setMonth(r,i,monthly);
+   monthly=round2(monthly);
+   if(r.manual&&r.frequency==='monthly')r.monthlyAmount=monthly;
+   for(let i=0;i<12;i++)setMonth(r,i,monthly);
  }
  function totals(){
    const l=activeLines();let inc=0,exp=0; l.forEach(function(r){if(isIncome(r))inc+=forecastAnnual(r);if(isExpense(r))exp+=forecastAnnual(r)});
