@@ -1,18 +1,42 @@
 # Nourie Home
 
-A phone-first dashboard for Home Assistant, built around the things used most: air quality, a live family map from Life360, Emporia electric use, Flume water use and the Dyson robots. It is one JavaScript file with no build step and no HACS dependency.
+A phone-first dashboard for Home Assistant. It is one JavaScript file with no build step and no HACS dependency. Everything is on one dashboard: the first page has what gets used most, and the tabs at the bottom open the rest.
 
 **Tabs**
 
 | Tab | What it shows |
 | --- | --- |
-| Home | Greeting and clock, outdoor conditions and the hourly forecast, a live "home flow" of power, water, air and who is home, alerts, room air at a glance, family, robots, your most-used switches, thermostats, lists and cameras |
-| Air | An air score for the house, advice ("Open a window in the bedroom"), every room's CO₂ / PM2.5 / VOC with a 24-hour trend, and purifier controls |
-| Map | Everyone's location on a dark map with accuracy rings and zones, or a radar view by distance and direction from home. Each person's card shows place, time there, distance, speed while driving and phone battery |
-| Energy | Whole-home power right now and over 24 hours, today's and this month's kWh and cost, every Emporia circuit ranked by draw, Emporia smart plugs, then Flume flow, today / week / month gallons and a leak status |
-| Robots | Each vacuum with battery, status, Clean / Pause / Dock / Find, suction level and its extra sensors, plus the litter box. Start all and Dock all buttons |
+| Home | In order: alerts, the air score, PM0.3 over the last 24 hours for each room, the Quiet / Winix Turbo / Master Fan on and off buttons, a shortcut for each robot, this billing cycle's electric and water bills, and the Oura scores. Thermostats and most-used switches follow |
+| Air | The air score and how it was worked out, PM0.3 over 24 hours or 7 days, the PM0.3 spike alert, purifier controls and every room's readings |
+| Robots | The Dyson Vis Nav cards as before, a chart of each Vis Nav's dust score, and a room picker for every other vacuum: tap the rooms in the order to clean them, then Clean. The litter box is last |
+| Energy | Electric and water: spent so far this billing cycle and the estimated bill at the end of it, with an hour-by-day heat map of electric use |
+| Family | Everyone's Life360 location on a dark map, or a radar view by distance and direction from home |
+| Health | Oura readiness, sleep, resilience, sick and heart scores, total sleep and ring battery |
 
-Tap a tile to toggle it. Press and hold any tile, person, robot or reading to open Home Assistant's own details for it.
+Tap a tile to toggle it. Press and hold any tile, person, robot or reading to open Home Assistant's own details for it. The gear button opens **Customize**, where every automatic choice below can be changed from the phone.
+
+### Air score
+
+The score runs from 0 to 100 and is the average of these readings:
+
+- the outdoor AQI (an AQI of 0 scores 100, and 300 or more scores 0);
+- PM0.3 in the master bedroom, downstairs and Angel's room (under 100 particles per 0.1 L scores 100, and 20,000 or more scores 0);
+- the Winix purifiers' own air quality (good, fair, poor or very poor);
+- the Amazon air quality monitor.
+
+"Show the math" lists each reading and what it scored. CO₂ is not shown unless `show_co2: true` is set.
+
+### PM0.3 spike alert
+
+On the Air tab, choose a phone and tap **Turn on phone alerts**. The dashboard saves a Home Assistant automation called *Nourie Home: … PM0.3 spike*. It notifies the phone when the master bedroom's PM0.3 stays over the threshold for 2 minutes while the upstairs climate is heating, cooling or running its fan, then waits 30 minutes before alerting again. The suggested threshold is two and a half times the last day's typical reading. Saving automations needs an admin account.
+
+### Billing cycles
+
+Tap **Billing cycle** on either bill to set the first and last day of the cycle, the price per kWh or per gallon, and any fixed monthly charge. The amounts update straight away. After the last day, the next cycle of the same length starts on its own. Usage comes from Home Assistant's Energy dashboard (the grid consumption and water sources), so those need to be set up under **Settings → Dashboards → Energy**. Until you enter a price, the price or cost set in the Energy dashboard is used.
+
+### Room cleaning
+
+Room cleaning uses Home Assistant's **Clean area** feature. Each robot's rooms need to be matched to Home Assistant areas once: open the robot, choose **Cleaning → By area**, then tap the gear. Reading that list needs an admin account.
 
 ## Install
 
@@ -28,7 +52,7 @@ Replace `<commit>` with a commit hash from this repository (or `main` once this 
 
 1. Open your profile (bottom left in Home Assistant) and turn on **Advanced mode**. The Resources page only appears with it on.
 2. Go to **Settings → Dashboards**, open the **⋮** menu, choose **Resources**, then **Add resource**. Paste the link above and pick **JavaScript module**.
-3. Back in **Settings → Dashboards**, choose **Add dashboard → New dashboard from scratch**. Name it *Nourie Home*.
+3. Back in **Settings → Dashboards**, choose **Add dashboard → New dashboard from scratch**. Give it any name that is not already taken, for example *Home HUD*.
 4. Open the new dashboard, tap the pencil, open **⋮ → Raw configuration editor** and replace everything with:
 
    ```yaml
@@ -40,7 +64,7 @@ Replace `<commit>` with a commit hash from this repository (or `main` once this 
          - type: custom:nourie-home-card
    ```
 
-5. Save. To open it by default on your phone, go to your profile and set **Dashboard** to *Nourie Home*.
+5. Save. To open it by default on your phone, go to your profile and set **Dashboard** to the new dashboard.
 
 ### Option 2: a full-screen sidebar panel
 
@@ -61,17 +85,20 @@ To keep the file inside Home Assistant instead, copy `nourie-home.js` to `/confi
 
 | Section | Where the data comes from |
 | --- | --- |
-| People | `person` entities. When a person has a Life360 tracker, its place, address, driving state, speed and battery are used too. Without person entities it falls back to any GPS tracker |
-| Air | Every sensor with a CO₂, PM1, PM2.5, PM10, VOC, CO, NO₂, ozone or AQI device class, grouped by device, with that device's temperature and humidity |
+| People | Life360 trackers, with their place, address, driving state, speed and battery. Set **People come from** in Customize (or `people_source: person`) to use Home Assistant `person` entities instead |
+| Air | Every sensor with a PM0.3, PM1, PM2.5, PM10, VOC, CO, NO₂, ozone or AQI reading, grouped by device, with that device's temperature and humidity. PM0.3 sensors are found by name ("PM0.3", "0.3 µm") |
+| Buttons | Scripts or scenes named like "Quiet on" and "Quiet off", the Winix fans (Turbo sets them to 100%, off returns them to Auto) and a fan or switch named "Master fan". Any pair can be changed or added in Customize |
+| Oura | Sensors named like readiness, sleep score, resilience, sick score, heart score, total sleep and battery |
 | Purifiers | Fans and switches named like purifiers (Winix, Levoit, Coway, "purifier", "ionizer") |
+| Bills | The Energy dashboard's grid and water sources, read from Home Assistant's long-term statistics |
 | Electric | Emporia Vue sensors (the HACS `emporia_vue` integration): `… Power Minute Average`, `… Energy Today`, `… Energy This Month`. A circuit named Mains, Total or Home is used as the whole-home total; otherwise the circuits are added up |
 | Water | The Flume integration's current flow, day, week and month sensors and its leak and high-flow sensors |
-| Robots | Every `vacuum` entity, which includes Dyson, Shark, Roborock and the Litter-Robot integration's litter box |
+| Robots | Every `vacuum` entity, which includes Dyson, Shark, Roborock and the Litter-Robot integration's litter box. Dyson robots and litter boxes keep the standard card; the others get the room picker. Dust score sensors are found by name |
 | Most used | The lights, switches, fans and scenes people tapped most in the last five days, read from the logbook. Sirens, child locks and other settings switches are left out |
 
 ## Options
 
-Every option is optional. For a dashboard card, add them under `- type: custom:nourie-home-card`. For the panel, put them under a `config:` key.
+Most settings are easiest to change in Customize, which saves them in Home Assistant so every phone sees the same dashboard. Every option below is optional. For a dashboard card, add them under `- type: custom:nourie-home-card`. For the panel, put them under a `config:` key.
 
 ```yaml
 name: Alex                     # name in the greeting (defaults to your Home Assistant user)
@@ -97,6 +124,8 @@ outdoor:                       # a weather station's own readings, if you have o
   humidity: sensor.backyard_station_humidity
 cameras: [camera.front_door]
 lists: [todo.shopping_list]
+show_co2: false                # show CO₂ readings on the Air tab
+people_source: life360         # or "person"
 map:
   carto_key: YOUR_FREE_CARTO_KEY   # optional, see below
 ```

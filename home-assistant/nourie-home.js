@@ -8,7 +8,7 @@
  * lists the options that pin specific entities.
  */
 
-export const VERSION = '1.0.0';
+export const VERSION = '2.0.0';
 
 const LEAFLET_JS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js';
 const FONTS_CSS = 'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Figtree:wght@400;500;600;700&display=swap';
@@ -171,6 +171,18 @@ export function resample(points, start, end, n) {
   return out;
 }
 
+export function bucketMax(points, start, end, n) {
+  const out = new Array(n).fill(null);
+  if (!points?.length || end <= start) return out;
+  const width = (end - start) / n;
+  for (const [t, v] of points) {
+    if (t < start || t >= end) continue;
+    const b = Math.min(n - 1, Math.floor((t - start) / width));
+    out[b] = out[b] === null ? v : Math.max(out[b], v);
+  }
+  return out;
+}
+
 export function parseHistory(rows) {
   const out = [];
   for (const row of rows || []) {
@@ -189,9 +201,97 @@ function sumSeries(list) {
   });
 }
 
+// ---------------------------------------------------------- billing math
+
+const DAY = 86400000;
+
+function parseDay(value) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ''));
+  return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getTime() : null;
+}
+
+export function dayString(ms) {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function addDays(ms, days) {
+  const d = new Date(ms);
+  d.setDate(d.getDate() + days);
+  return d.getTime();
+}
+
+function startOfDay(ms) {
+  const d = new Date(ms);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+
+// A billing cycle runs from its start day up to its next bill day. Once today passes
+// the bill day it rolls forward by the same number of days, so the numbers keep up
+// on their own until the next time the bill dates are edited.
+export function cycleWindow(cycle = {}, now = Date.now()) {
+  let start = parseDay(cycle.start);
+  let end = parseDay(cycle.end);
+  if (start === null) {
+    // No dates set yet: the calendar month.
+    const d = new Date(now);
+    start = new Date(d.getFullYear(), d.getMonth(), 1).getTime();
+    end = new Date(d.getFullYear(), d.getMonth() + 1, 1).getTime();
+  } else if (end === null || end <= start) {
+    const d = new Date(start);
+    end = new Date(d.getFullYear(), d.getMonth() + 1, d.getDate()).getTime();
+  }
+  const length = Math.max(1, Math.round((end - start) / DAY));
+  let rolled = 0;
+  while (now >= end && rolled < 120) {
+    start = end;
+    end = addDays(end, length);
+    rolled += 1;
+  }
+  const elapsedDays = Math.max(0, (now - start) / DAY);
+  return {
+    start,
+    end,
+    days: length,
+    elapsedDays,
+    // Calendar day of the cycle, so a daylight-saving change does not skip or repeat a day.
+    day: clamp(Math.round((startOfDay(now) - start) / DAY) + 1, 1, length),
+    fraction: clamp((now - start) / (end - start), 0, 1),
+    rolled,
+    startDay: dayString(start),
+    endDay: dayString(end),
+  };
+}
+
+// Sequential heat for the cost table: one amber hue, stronger as the share of the column's max grows.
+export function heatStyle(value, max) {
+  const t = max > 0 && value > 0 ? clamp(value / max, 0, 1) : 0;
+  const alpha = 0.07 + 0.78 * t ** 0.85;
+  return { bg: `rgba(255, 181, 71, ${alpha.toFixed(3)})`, ink: alpha > 0.5 ? '#241405' : '#e9f5ff' };
+}
+
+// ---------------------------------------------------------- chart scale
+
+export function niceCeil(value) {
+  if (!(value > 0)) return 1;
+  const mag = 10 ** Math.floor(Math.log10(value));
+  for (const step of [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]) if (value <= step * mag) return step * mag;
+  return 10 * mag;
+}
+
+export function compactNum(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '—';
+  const a = Math.abs(n);
+  if (a >= 1e6) return `${(n / 1e6).toFixed(a >= 1e7 ? 0 : 1).replace(/\.0$/, '')}M`;
+  if (a >= 1e3) return `${(n / 1e3).toFixed(a >= 1e4 ? 0 : 1).replace(/\.0$/, '')}K`;
+  return n.toLocaleString(undefined, { maximumFractionDigits: a < 10 ? 1 : 0 });
+}
+
 // ------------------------------------------------------------- air quality
 
 export const AIR_METRICS = {
+  pm03: { label: 'PM0.3', unit: '/0.1L', steps: [500, 1000, 2500, 5000], digits: 0 },
   co2: { label: 'CO₂', unit: 'ppm', steps: [600, 1000, 1500, 2000], digits: 0 },
   pm25: { label: 'PM2.5', unit: 'µg/m³', steps: [5, 12, 35.4, 55.4], digits: 1 },
   pm10: { label: 'PM10', unit: 'µg/m³', steps: [20, 54, 154, 254], digits: 0 },
@@ -202,8 +302,12 @@ export const AIR_METRICS = {
   no2: { label: 'NO₂', unit: 'µg/m³', steps: [25, 50, 100, 200], digits: 0 },
   o3: { label: 'Ozone', unit: 'µg/m³', steps: [50, 100, 160, 240], digits: 0 },
   aqi: { label: 'AQI', unit: '', steps: [25, 50, 100, 150], digits: 0 },
+  // Amazon's indoor score runs the other way (100 is best), so it is rated on 100 minus the score.
+  iaq: { label: 'Air score', unit: 'of 100', steps: [10, 25, 45, 65], digits: 0, invert: true },
 };
-const PRIMARY_ORDER = ['co2', 'pm25', 'aqi', 'pm10', 'voc', 'vocug', 'pm1', 'co', 'no2', 'o3'];
+const PRIMARY_ORDER = ['pm03', 'pm25', 'iaq', 'aqi', 'pm10', 'pm1', 'voc', 'vocug', 'co', 'no2', 'o3', 'co2'];
+// PM0.3 particle counts (Plantower and similar) rarely carry a device class, so they are found by name.
+export const PM03_RE = /pm\s*0[.,_]?3(?!\d)|\b0[.,]3\s*(?:µ|u)?m\b|\bpm03\b/i;
 const DC_METRIC = {
   carbon_dioxide: 'co2', pm25: 'pm25', pm10: 'pm10', pm1: 'pm1', volatile_organic_compounds: 'vocug',
   volatile_organic_compounds_parts: 'voc', carbon_monoxide: 'co', nitrogen_dioxide: 'no2', ozone: 'o3', aqi: 'aqi',
@@ -218,6 +322,7 @@ const NAME_METRIC = [
 
 export function airMetricOf(st) {
   const a = st?.attributes || {};
+  if (PM03_RE.test(a.friendly_name || st?.entity_id || '') && (!a.device_class || a.device_class === 'pm1')) return 'pm03';
   if (DC_METRIC[a.device_class]) return DC_METRIC[a.device_class];
   if (a.device_class) return null;
   const unit = String(a.unit_of_measurement || '');
@@ -227,10 +332,23 @@ export function airMetricOf(st) {
   return null;
 }
 
+// Converts a PM0.3 count to particles per 0.1 L (the Plantower /dL convention).
+export function pm03PerDl(value, unit) {
+  const n = toNum(value);
+  if (n === null) return null;
+  const u = String(unit || '').toLowerCase().replace(/\s+/g, '');
+  if (/cm(3|³)/.test(u)) return n * 100;
+  if (/m(3|³)/.test(u)) return n / 10000;
+  if (/(dl|0\.1l|100ml)/.test(u)) return n;
+  if (/(^|\/|#|pcs|particles?)l$|perl$/.test(u)) return n / 10;
+  return n;
+}
+
 export function airLevel(metric, value) {
   const def = AIR_METRICS[metric];
-  const n = toNum(value);
-  if (!def || n === null) return null;
+  const raw = toNum(value);
+  if (!def || raw === null) return null;
+  const n = def.invert ? 100 - raw : raw;
   const i = def.steps.findIndex((s) => n <= s);
   return i === -1 ? 4 : i;
 }
@@ -238,8 +356,9 @@ export function airLevel(metric, value) {
 // 100 at zero, then 90 / 75 / 55 / 35 at each threshold, reaching 0 at twice the last one.
 export function airScore(metric, value) {
   const def = AIR_METRICS[metric];
-  const n = toNum(value);
-  if (!def || n === null) return null;
+  const raw = toNum(value);
+  if (!def || raw === null) return null;
+  const n = def.invert ? 100 - raw : raw;
   const xs = [0, ...def.steps, def.steps[3] * 2];
   const ys = [100, 90, 75, 55, 35, 0];
   if (n <= 0) return 100;
@@ -284,6 +403,7 @@ function makeCtx(hass, config) {
 
 export function buildModel(hass, config = {}, ext = {}, now = Date.now()) {
   const ctx = makeCtx(hass, config);
+  const prefs = ext.prefs || {};
   const home = homeLocation(ctx);
   const model = {
     now, config, units: ctx.units, user: hass.user || {}, states: ctx.states, home,
@@ -292,7 +412,7 @@ export function buildModel(hass, config = {}, ext = {}, now = Date.now()) {
     air: buildAir(ctx),
     energy: buildEnergy(ctx),
     water: buildWater(ctx),
-    robots: buildRobots(ctx),
+    robots: decorateRobots(ctx, buildRobots(ctx), prefs, ext),
     climate: buildClimate(ctx),
     weather: buildWeather(ctx, ext.forecast),
     favorites: buildFavorites(ctx, ext.learned),
@@ -300,7 +420,17 @@ export function buildModel(hass, config = {}, ext = {}, now = Date.now()) {
     lists: buildLists(ctx),
     lightsOn: ctx.list.filter((st) => st.state === 'on' && (domainOf(st.entity_id) === 'light' || (domainOf(st.entity_id) === 'switch' && /light|lamp/i.test(ctx.name(st.entity_id))))).length,
     history: ext.history || {},
+    prefs,
+    isAdmin: !!hass.user?.is_admin,
+    notifyTargets: Object.keys(hass.services?.notify || {}).filter((s) => s.startsWith('mobile_app_')).sort(),
   };
+  model.score = buildAirScore(ctx, prefs);
+  model.spike = buildSpike(ctx, prefs, model.score, ext);
+  model.controls = buildControls(ctx, prefs);
+  model.health = buildHealth(ctx, prefs);
+  model.dust = discoverDust(ctx, prefs);
+  model.billing = buildBilling(ctx, prefs, ext.billing, now);
+  model.candidates = () => entityCandidates(ctx);
   model.alerts = buildAlerts(ctx, model, now);
   model.offline = buildOffline(ctx, now);
   return model;
@@ -330,7 +460,9 @@ function buildZones(ctx) {
 // People come from person entities, enriched by their Life360 tracker when there is one.
 function buildPeople(ctx, home) {
   const configured = Array.isArray(ctx.config.people) ? ctx.config.people.filter((id) => ctx.states[id]) : null;
-  let list = configured ? configured.map((id) => ctx.states[id]) : ctx.byDomain('person');
+  // Life360 members come first: each one is its own tracker with place, driving state, speed and photo.
+  const life360 = ctx.byDomain('device_tracker').filter((st) => ctx.platform(st.entity_id) === 'life360' || /^device_tracker\.life360_/.test(st.entity_id));
+  let list = configured ? configured.map((id) => ctx.states[id]) : life360.length && ctx.config.people_source !== 'person' ? life360 : ctx.byDomain('person');
   if (!list.length) {
     list = ctx.byDomain('device_tracker').filter((st) => toNum(st.attributes.latitude) !== null
       && (ctx.platform(st.entity_id) === 'life360' || st.attributes.source_type === 'gps'));
@@ -403,9 +535,10 @@ const PURIFIER_PLATFORMS = new Set(['winix', 'vesync', 'levoit', 'coway', 'bluea
 
 function buildAir(ctx) {
   const explicit = Array.isArray(ctx.config.air_quality) ? ctx.config.air_quality : null;
+  const outdoor = (st) => OUTDOOR_AQI_PLATFORMS.has(ctx.platform(st.entity_id)) || /\b(outdoor|outside)\b/i.test(ctx.name(st.entity_id));
   const sensors = explicit
     ? explicit.map((id) => ctx.states[id]).filter(Boolean)
-    : ctx.byDomain('sensor').filter((st) => airMetricOf(st));
+    : ctx.byDomain('sensor').filter((st) => airMetricOf(st) && !outdoor(st));
   const groups = new Map();
   for (const st of sensors) {
     const key = groupKey(ctx, st.entity_id);
@@ -440,9 +573,11 @@ function buildRoom(ctx, key, list) {
   const rank = (st) => (/\b(raw|internal|chip|mhz-?19)\b/i.test(ctx.name(st.entity_id)) ? 1 : 0);
   const metrics = {};
   for (const st of list.filter(live).sort((a, b) => rank(a) - rank(b))) {
-    const metric = airMetricOf(st);
-    const value = toNum(st.state);
-    if (!metric || metrics[metric] || value === null) continue;
+    const base = airMetricOf(st);
+    const metric = base === 'aqi' && isAmazonMonitor(ctx, st.entity_id) ? 'iaq' : base;
+    const raw = toNum(st.state);
+    const value = metric === 'pm03' ? pm03PerDl(raw, st.attributes.unit_of_measurement) : raw;
+    if (!metric || metrics[metric] || value === null || (metric === 'co2' && !ctx.config.show_co2)) continue;
     metrics[metric] = { metric, id: st.entity_id, value, level: airLevel(metric, value), score: airScore(metric, value) };
   }
   const keys = Object.keys(metrics);
@@ -517,7 +652,7 @@ function airTips(rooms, purifiers) {
       const tone = LEVEL_TONES[w.level];
       if (w.metric === 'co2') {
         tips.push({ level: w.level, tone, icon: 'air', text: `Open a window in ${r.name}. CO₂ is ${value}.` });
-      } else if (['pm25', 'pm10', 'pm1'].includes(w.metric)) {
+      } else if (['pm03', 'pm25', 'pm10', 'pm1'].includes(w.metric)) {
         const p = purifiers.find((x) => x.live && !x.on && x.areaId && x.areaId === r.areaId);
         tips.push({
           level: w.level, tone, icon: 'purifier',
@@ -802,6 +937,9 @@ function buildAlerts(ctx, model, now) {
       if (level !== null && level <= 15) add(2, 'battery', `${name.replace(/\s*battery( level)?$/i, '')} battery low`, `${fmt(level)}% left`, { entity: id });
     }
   }
+  if (model.spike?.active) {
+    add(1, 'air', `${model.spike.pmLabel} PM0.3 is spiking`, `${fmt(model.spike.value)} per 0.1 L while ${model.spike.climateName} is ${String(model.spike.action).replace(/_/g, ' ')}`, { tab: 'air' });
+  }
   if (model.water.leak) add(0, 'drop', 'Flume detected a leak', 'Water has been running without a break', { tab: 'energy' });
   else if (model.water.high) add(1, 'drop', 'High water flow', `${fmt(model.water.flow, 1)} ${model.water.flowUnit} right now`, { tab: 'energy' });
   for (const r of model.air.rooms) {
@@ -822,6 +960,463 @@ function buildOffline(ctx, now) {
     .filter((st) => st.state === 'unavailable' && WATCHED_DOMAINS.has(domainOf(st.entity_id)) && !ctx.entry(st.entity_id)?.entity_category)
     .map((st) => ({ id: st.entity_id, name: cleanName(ctx.name(st.entity_id)), area: ctx.areaName(st.entity_id), since: since(st.last_changed, now) }))
     .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// ------------------------------------------------------- score inputs
+
+// Piecewise-linear lookup through [value, score] steps.
+export function interpolate(steps, value) {
+  const n = toNum(value);
+  if (n === null) return null;
+  if (n <= steps[0][0]) return steps[0][1];
+  for (let i = 1; i < steps.length; i += 1) {
+    const [x1, y1] = steps[i];
+    const [x0, y0] = steps[i - 1];
+    if (n <= x1) return Math.round(y0 + ((y1 - y0) * (n - x0)) / (x1 - x0 || 1));
+  }
+  return steps[steps.length - 1][1];
+}
+
+// US EPA AQI bands: 50 is the top of "Good", 100 of "Moderate", 150 of "Unhealthy for sensitive groups".
+export const AQI_STEPS = [[0, 100], [50, 80], [100, 60], [150, 40], [200, 20], [300, 0]];
+// PM0.3 counts per 0.1 L: a filtered room sits in the low hundreds, outdoor air around 1,000 to 3,000,
+// cooking or smoke pushes past 10,000.
+export const PM03_STEPS = [[0, 100], [100, 100], [500, 90], [1000, 75], [2500, 55], [5000, 35], [10000, 15], [20000, 0]];
+const WINIX_SCORES = { good: 100, fair: 65, poor: 35, very_poor: 10 };
+const OUTDOOR_AQI_PLATFORMS = new Set(['airnow', 'waqi', 'purpleair', 'google_air_quality', 'openweathermap', 'pirateweather', 'accuweather', 'airvisual', 'iqair', 'nws', 'ambee', 'luftdaten', 'sensor_community', 'openaq', 'world_air_quality_index']);
+
+export function roomLabel(ctx, id) {
+  const area = ctx.areaName(id);
+  const device = cleanName(ctx.deviceName(id));
+  const generic = /\b(bedroom|air|monitor|quality|sensor|node|purifier)\b/i;
+  let label = device && !(area && generic.test(device)) ? device : area || device || cleanName(ctx.name(id)).replace(PM03_RE, '').trim();
+  const room = label.match(/^([A-Za-z]{4,})room$/i);
+  if (room) label = room[1];
+  return label;
+}
+
+function isWinix(ctx, id) {
+  return ctx.platform(id) === 'winix' || /winix/i.test(`${ctx.name(id)} ${ctx.deviceName(id)}`);
+}
+
+function isAmazonMonitor(ctx, id) {
+  return ctx.platform(id) === 'alexa_media' || /air quality monitor/i.test(`${ctx.deviceName(id)} ${ctx.name(id)}`);
+}
+
+export function discoverPm03(ctx) {
+  const byDevice = new Map();
+  for (const st of ctx.byDomain('sensor')) {
+    const name = ctx.name(st.entity_id);
+    if (!PM03_RE.test(name) || isWinix(ctx, st.entity_id)) continue;
+    const key = ctx.entry(st.entity_id)?.device_id || st.entity_id;
+    const prev = byDevice.get(key);
+    const rank = (s) => (/\braw\b/i.test(ctx.name(s.entity_id)) ? 2 : 0) + (live(s) ? 0 : 1);
+    if (!prev || rank(st) < rank(prev)) byDevice.set(key, st);
+  }
+  return [...byDevice.values()]
+    .map((st) => ({ id: st.entity_id, label: roomLabel(ctx, st.entity_id) }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+}
+
+function discoverOutdoorAqi(ctx) {
+  const candidates = ctx.byDomain('sensor').filter((st) => st.attributes.device_class === 'aqi' && !isWinix(ctx, st.entity_id) && !isAmazonMonitor(ctx, st.entity_id));
+  const outdoor = candidates.find((st) => OUTDOOR_AQI_PLATFORMS.has(ctx.platform(st.entity_id)) || /outdoor|outside|\bus aqi\b|airnow|purpleair/i.test(ctx.name(st.entity_id)));
+  return outdoor?.entity_id || null;
+}
+
+function discoverWinixQuality(ctx) {
+  return ctx.byDomain('sensor')
+    .filter((st) => isWinix(ctx, st.entity_id) && (st.attributes.air_quality !== undefined || /air ?q ?value|air quality/i.test(ctx.name(st.entity_id))))
+    .map((st) => st.entity_id);
+}
+
+function discoverAmazon(ctx) {
+  return ctx.byDomain('sensor').find((st) => st.attributes.device_class === 'aqi' && isAmazonMonitor(ctx, st.entity_id))?.entity_id || null;
+}
+
+function winixCategory(st) {
+  const raw = String(st?.attributes?.air_quality ?? st?.state ?? '').toLowerCase().replace(/\s+/g, '_');
+  return WINIX_SCORES[raw] !== undefined ? raw : null;
+}
+
+// The air score averages the inputs that are reporting. Each input becomes 0–100, higher is better.
+export function buildAirScore(ctx, prefs = {}) {
+  const p = prefs.air || {};
+  const pm03 = Array.isArray(p.pm03) && p.pm03.length ? p.pm03.filter((x) => ctx.states[x.id]) : discoverPm03(ctx);
+  const outdoorId = p.outdoor === '' ? null : p.outdoor || discoverOutdoorAqi(ctx);
+  const winixIds = Array.isArray(p.winix) ? p.winix.filter((id) => ctx.states[id]) : discoverWinixQuality(ctx);
+  const amazonId = p.amazon === '' ? null : p.amazon || discoverAmazon(ctx);
+  const parts = [];
+  if (outdoorId && ctx.states[outdoorId]) {
+    const st = ctx.states[outdoorId];
+    const value = live(st) ? toNum(st.state) : null;
+    parts.push({ key: 'outdoor', label: 'Outside AQI', entity: outdoorId, value, raw: value === null ? 'Offline' : `${fmt(value)} AQI`, score: interpolate(AQI_STEPS, value), math: 'US AQI: 0 → 100, 50 → 80, 100 → 60, 150 → 40, 200 → 20, 300 → 0' });
+  }
+  for (const item of pm03) {
+    const st = ctx.states[item.id];
+    const value = live(st) ? pm03PerDl(st.state, st.attributes.unit_of_measurement) : null;
+    parts.push({ key: `pm03:${item.id}`, label: `${item.label} PM0.3`, entity: item.id, value, raw: value === null ? 'Offline' : `${fmt(value)} per 0.1 L`, score: interpolate(PM03_STEPS, value), math: 'Particles per 0.1 L: 100 → 100, 500 → 90, 1,000 → 75, 2,500 → 55, 5,000 → 35, 10,000 → 15, 20,000 → 0', pm03: true, room: item.label });
+  }
+  if (winixIds.length) {
+    const cats = winixIds.map((id) => ({ id, cat: winixCategory(ctx.states[id]) })).filter((x) => x.cat);
+    const score = cats.length ? Math.round(sum(cats.map((x) => WINIX_SCORES[x.cat])) / cats.length) : null;
+    parts.push({ key: 'winix', label: winixIds.length > 1 ? `Winix (${winixIds.length})` : 'Winix', entity: winixIds[0], value: score, raw: cats.length ? [...new Set(cats.map((x) => titleCase(x.cat.replace('_', ' '))))].join(' · ') : 'Offline', score, math: 'Winix air quality: Good → 100, Fair → 65, Poor → 35, Very poor → 10, averaged across purifiers' });
+  }
+  if (amazonId && ctx.states[amazonId]) {
+    const st = ctx.states[amazonId];
+    const value = live(st) ? clamp(toNum(st.state) ?? NaN, 0, 100) : null;
+    parts.push({ key: 'amazon', label: 'Amazon monitor', entity: amazonId, value: Number.isFinite(value) ? value : null, raw: Number.isFinite(value) && value !== null ? `${fmt(value)} of 100` : 'Offline', score: Number.isFinite(value) ? Math.round(value) : null, math: "Amazon's own indoor air score, already 0–100 with higher better" });
+  }
+  const scored = parts.filter((x) => x.score !== null);
+  const score = scored.length ? Math.round(sum(scored.map((x) => x.score)) / scored.length) : null;
+  const worst = scored.reduce((w, x) => (!w || x.score < w.score ? x : w), null);
+  return { parts, score, level: scoreLevel(score), worst, pm03, used: scored.length };
+}
+
+export const SPIKE_AUTOMATION_ID = 'nourie_home_pm03_spike';
+const HVAC_RUNNING = new Set(['heating', 'cooling', 'fan', 'drying', 'preheating', 'defrosting']);
+
+export function climateRunning(st) {
+  if (!live(st)) return false;
+  const action = st.attributes.hvac_action;
+  if (action) return HVAC_RUNNING.has(action);
+  return st.state !== 'off';
+}
+
+function buildSpike(ctx, prefs, score, ext) {
+  const sp = prefs.spike || {};
+  const pm = sp.pm03 && ctx.states[sp.pm03] ? sp.pm03 : (score.pm03.find((x) => /master|primary/i.test(x.label)) || score.pm03[0])?.id || null;
+  const climateId = sp.climate && ctx.states[sp.climate] ? sp.climate
+    : (ctx.byDomain('climate').find((st) => live(st) && /upstairs/i.test(`${ctx.name(st.entity_id)} ${ctx.areaName(st.entity_id)}`)) || null)?.entity_id || null;
+  const pmSt = pm ? ctx.states[pm] : null;
+  const value = live(pmSt) ? pm03PerDl(pmSt.state, pmSt.attributes.unit_of_measurement) : null;
+  const threshold = toNum(sp.threshold) ?? ext.spikeSuggest?.[pm] ?? 1500;
+  const climate = climateId ? ctx.states[climateId] : null;
+  const running = climateRunning(climate);
+  const automation = ctx.byDomain('automation').find((st) => st.attributes.id === SPIKE_AUTOMATION_ID) || null;
+  return {
+    pm,
+    pmLabel: pm ? roomLabel(ctx, pm) : '',
+    climateId,
+    climateName: climateId ? cleanName(ctx.name(climateId)) : '',
+    running,
+    action: climate?.attributes?.hvac_action || climate?.state || '',
+    value,
+    threshold,
+    custom: toNum(sp.threshold) !== null,
+    active: running && value !== null && value > threshold,
+    automation: automation ? { id: automation.entity_id, on: automation.state === 'on' } : null,
+    notify: sp.notify || '',
+  };
+}
+
+// ------------------------------------------------------------ controls
+
+const PRESS_DOMAINS = ['script', 'scene', 'button', 'input_button'];
+const TOGGLE_DOMAINS = ['switch', 'input_boolean', 'fan', 'light'];
+
+function findControl(ctx, re, domains) {
+  return ctx.list
+    .filter((st) => domains.includes(domainOf(st.entity_id)) && re.test(ctx.name(st.entity_id)))
+    .sort((a, b) => Number(live(b)) - Number(live(a)))[0]?.entity_id || null;
+}
+
+// The three pairs asked for by default: Quiet on/off, Winix turbo on/off and the master fan.
+export function defaultControls(ctx) {
+  const pairs = [];
+  const quietOn = findControl(ctx, /\bquiet\b.*\bon\b/i, PRESS_DOMAINS);
+  const quietOff = findControl(ctx, /\bquiet\b.*\boff\b/i, PRESS_DOMAINS);
+  const quietToggle = findControl(ctx, /^quiet( mode)?$/i, ['input_boolean', 'switch']);
+  if (quietOn || quietOff || quietToggle) {
+    pairs.push({ key: 'quiet', label: 'Quiet', icon: 'quiet', on: quietOn ? { entity: quietOn } : quietToggle ? { entity: quietToggle } : null, off: quietOff ? { entity: quietOff } : quietToggle ? { entity: quietToggle } : null });
+  }
+  const turboOn = findControl(ctx, /winix.*turbo.*\bon\b|turbo.*winix.*\bon\b|^winix turbo$/i, PRESS_DOMAINS);
+  const turboOff = findControl(ctx, /winix.*turbo.*\boff\b|turbo.*winix.*\boff\b/i, PRESS_DOMAINS);
+  const winixFans = ctx.byDomain('fan').filter((st) => isWinix(ctx, st.entity_id)).map((st) => st.entity_id);
+  if (turboOn || turboOff || winixFans.length) {
+    pairs.push({
+      key: 'turbo',
+      label: 'Winix Turbo',
+      icon: 'purifier',
+      on: turboOn ? { entity: turboOn } : winixFans.length ? { service: 'fan.set_percentage', data: { entity_id: winixFans, percentage: winixTurboPercent(ctx, winixFans) } } : null,
+      off: turboOff ? { entity: turboOff } : winixFans.length ? { service: 'fan.set_preset_mode', data: { entity_id: winixFans, preset_mode: 'Auto' } } : null,
+    });
+  }
+  const masterFan = findControl(ctx, /^master fan$/i, ['fan']) || findControl(ctx, /\bmaster\b.*\bfan\b/i, ['fan']);
+  if (masterFan) pairs.push({ key: 'master_fan', label: 'Master Fan', icon: 'fan', on: { entity: masterFan }, off: { entity: masterFan } });
+  return pairs;
+}
+
+// Winix purifiers name their speeds low, medium, high, turbo (and on some models a fifth,
+// "super", above turbo), so turbo is the fourth step rather than always 100%.
+export function winixTurboPercent(ctx, fans) {
+  const step = toNum(ctx.states[[].concat(fans)[0]]?.attributes?.percentage_step);
+  return step && step > 0 ? Math.min(100, Math.round(step * 4)) : 100;
+}
+
+function targetLabel(ctx, t) {
+  if (!t) return '';
+  if (t.entity) return cleanName(ctx.name(t.entity));
+  const ids = [].concat(t.data?.entity_id || []);
+  return `${t.service} · ${ids.length} ${ids.length === 1 ? 'device' : 'devices'}`;
+}
+
+// Works out which side of a pair is in effect so the active button can light up.
+function controlState(ctx, pair) {
+  const on = pair.on;
+  const off = pair.off;
+  const st = (t) => (t?.entity ? ctx.states[t.entity] : null);
+  if (on?.entity && on.entity === off?.entity && TOGGLE_DOMAINS.includes(domainOf(on.entity))) {
+    const s = st(on);
+    return { active: live(s) ? (s.state === 'on' ? 'on' : 'off') : null, note: live(s) ? (s.state === 'on' ? `On${toNum(s.attributes.percentage) ? ` · ${fmt(s.attributes.percentage)}%` : ''}` : 'Off') : 'Offline' };
+  }
+  if (on?.service === 'fan.set_percentage') {
+    const fans = [].concat(on.data?.entity_id || []).map((id) => ctx.states[id]).filter(live);
+    if (!fans.length) return { active: null, note: 'Offline' };
+    const target = toNum(on.data?.percentage) ?? 100;
+    const turbo = fans.filter((f) => f.state === 'on' && toNum(f.attributes.percentage) >= target - 1).length;
+    return { active: turbo === fans.length ? 'on' : turbo ? null : 'off', note: turbo ? `${turbo} of ${fans.length} on turbo` : 'Not on turbo' };
+  }
+  const when = (t) => {
+    const s = st(t);
+    if (!s) return 0;
+    const d = domainOf(s.entity_id);
+    const at = d === 'script' || d === 'automation' ? s.attributes.last_triggered : d === 'scene' || d === 'button' || d === 'input_button' ? s.state : s.last_changed;
+    return Date.parse(at) || 0;
+  };
+  const tOn = when(on);
+  const tOff = when(off);
+  const running = [st(on), st(off)].some((s) => domainOf(s?.entity_id || '') === 'script' && s.state === 'on');
+  if (!tOn && !tOff) return { active: null, note: running ? 'Running' : '' };
+  return { active: tOn >= tOff ? 'on' : 'off', note: running ? 'Running' : `Last ${tOn >= tOff ? 'on' : 'off'} ${since(Math.max(tOn, tOff))}${/\d/.test(since(Math.max(tOn, tOff))) ? ' ago' : ''}` };
+}
+
+export function buildControls(ctx, prefs = {}) {
+  const pairs = Array.isArray(prefs.controls) ? prefs.controls : defaultControls(ctx);
+  return pairs
+    .filter((p) => p && (p.on || p.off))
+    .map((p, i) => ({ ...p, index: i, icon: p.icon || 'power', onLabel: targetLabel(ctx, p.on), offLabel: targetLabel(ctx, p.off), ...controlState(ctx, p) }));
+}
+
+// -------------------------------------------------------------- health
+
+const OURA_LEVELS = { exceptional: 95, strong: 80, solid: 65, adequate: 50, limited: 30 };
+
+function findSensor(ctx, re, not) {
+  return ctx.byDomain('sensor').find((st) => re.test(ctx.name(st.entity_id)) && !(not && not.test(ctx.name(st.entity_id))))?.entity_id || null;
+}
+
+function healthMetric(ctx, id, kind) {
+  const st = id ? ctx.states[id] : null;
+  if (!st) return null;
+  const a = st.attributes || {};
+  const num = toNum(st.state);
+  const word = !live(st) ? null : num === null ? String(st.state).toLowerCase() : null;
+  const value = num ?? (word && OURA_LEVELS[word] !== undefined ? OURA_LEVELS[word] : null);
+  const own = a.level || a.status || a.rating || a.label || a.category;
+  let label;
+  let tone;
+  if (kind === 'sick') {
+    label = value === null ? '—' : value >= 60 ? 'High' : value >= 30 ? 'Moderate' : 'Low';
+    tone = value === null ? 'dim' : value >= 60 ? 'bad' : value >= 30 ? 'fair' : 'good';
+  } else if (kind === 'heart') {
+    label = value === null ? '—' : value >= 75 ? 'Good' : value >= 50 ? 'Fair' : 'Low';
+    tone = value === null ? 'dim' : value >= 75 ? 'good' : value >= 50 ? 'fair' : 'poor';
+  } else {
+    label = word ? titleCase(word) : value === null ? '—' : value >= 85 ? 'Optimal' : value >= 70 ? 'Good' : value >= 60 ? 'Fair' : 'Pay attention';
+    tone = value === null ? 'dim' : value >= 85 ? 'good' : value >= 70 ? 'lime' : value >= 60 ? 'fair' : 'poor';
+  }
+  return { id, value, shown: word ? titleCase(word) : num === null ? '—' : fmt(num), label: typeof own === 'string' && own ? titleCase(own) : label, tone, updated: st.last_changed };
+}
+
+function durationText(st) {
+  const n = toNum(st?.state);
+  if (n === null) return '';
+  const unit = String(st.attributes.unit_of_measurement || 'h').toLowerCase();
+  const minutes = unit.startsWith('s') ? n / 60 : unit.startsWith('min') || unit === 'm' ? n : n * 60;
+  return `${Math.floor(minutes / 60)}h ${String(Math.round(minutes % 60)).padStart(2, '0')}m`;
+}
+
+export function buildHealth(ctx, prefs = {}) {
+  const p = prefs.oura || {};
+  const pick = (key, re, not) => (p[key] === '' ? null : p[key] && ctx.states[p[key]] ? p[key] : findSensor(ctx, re, not));
+  const ids = {
+    readiness: pick('readiness', /readiness( score)?$/i, /contributor|temperature/i),
+    sleep: pick('sleep', /sleep score$|^(oura\s*(ring)?\s*)?sleep$/i, /contributor/i),
+    resilience: pick('resilience', /resilience/i, /contributor/i),
+    sick: pick('sick', /sick score/i),
+    heart: pick('heart', /heart score/i),
+    duration: pick('duration', /total sleep( duration| time)?$|sleep duration$/i),
+    battery: p.battery === '' ? null : p.battery && ctx.states[p.battery] ? p.battery : ctx.byDomain('sensor').find((st) => st.attributes.device_class === 'battery' && /oura|ring/i.test(`${ctx.name(st.entity_id)} ${ctx.deviceName(st.entity_id)}`))?.entity_id || null,
+  };
+  const metrics = {
+    readiness: healthMetric(ctx, ids.readiness, 'oura'),
+    sleep: healthMetric(ctx, ids.sleep, 'oura'),
+    resilience: healthMetric(ctx, ids.resilience, 'oura'),
+    sick: healthMetric(ctx, ids.sick, 'sick'),
+    heart: healthMetric(ctx, ids.heart, 'heart'),
+  };
+  const battery = ids.battery && live(ctx.states[ids.battery]) ? toNum(ctx.states[ids.battery].state) : null;
+  const updated = Object.values(metrics).filter(Boolean).map((x) => Date.parse(x.updated) || 0).reduce((a, b) => Math.max(a, b), 0);
+  return {
+    has: Object.values(metrics).some(Boolean),
+    ids,
+    metrics,
+    battery,
+    batteryId: ids.battery,
+    sleepTime: ids.duration ? durationText(ctx.states[ids.duration]) : '',
+    updated: updated || null,
+  };
+}
+
+// -------------------------------------------------------------- robots v2
+
+export function isClassicRobot(ctx, robot, prefs = {}) {
+  if (Array.isArray(prefs.robots?.classic)) return prefs.robots.classic.includes(robot.id);
+  const device = ctx.device(robot.id);
+  return robot.litter || /dyson/i.test(`${robot.id} ${ctx.name(robot.id)} ${device?.manufacturer || ''} ${device?.model || ''} ${ctx.platform(robot.id)}`);
+}
+
+function robotMapImage(ctx, id) {
+  const deviceId = ctx.entry(id)?.device_id;
+  if (!deviceId) return null;
+  const st = ctx.list.find((s) => ['image', 'camera'].includes(domainOf(s.entity_id)) && ctx.entry(s.entity_id)?.device_id === deviceId && live(s) && s.attributes.entity_picture);
+  return st ? { id: st.entity_id, src: st.attributes.entity_picture } : null;
+}
+
+function floorOf(hass, areaId) {
+  const floorId = hass.areas?.[areaId]?.floor_id;
+  const floor = floorId ? hass.floors?.[floorId] : null;
+  return floor ? { id: floor.floor_id || floorId, name: floor.name, level: toNum(floor.level) ?? 0 } : { id: '', name: '', level: 99 };
+}
+
+function decorateRobots(ctx, robots, prefs, ext) {
+  return robots.map((r) => {
+    const classic = isClassicRobot(ctx, r, prefs);
+    const features = toNum(ctx.states[r.id]?.attributes?.supported_features);
+    const canArea = features === null || (features & 16384) === 16384;
+    const areaInfo = ext.vacAreas?.[r.id];
+    const areas = (areaInfo?.areaIds || [])
+      .filter((id) => ctx.hass.areas?.[id])
+      .map((id) => ({ id, name: ctx.hass.areas[id].name, floor: floorOf(ctx.hass, id), icon: ctx.hass.areas[id].icon || '' }))
+      .sort((a, b) => a.floor.level - b.floor.level || a.floor.name.localeCompare(b.floor.name) || a.name.localeCompare(b.name));
+    return { ...r, classic, canArea, areas, areaStatus: areaInfo?.status || (canArea ? 'loading' : 'unsupported'), map: robotMapImage(ctx, r.id) };
+  });
+}
+
+function discoverDust(ctx, prefs = {}) {
+  if (Array.isArray(prefs.dust)) return prefs.dust.filter((id) => ctx.states[id]);
+  return ctx.byDomain('sensor')
+    .filter((st) => /\b(dust|dirt)\b/i.test(ctx.name(st.entity_id)) && !/pm\s?\d|particulate|filter/i.test(ctx.name(st.entity_id)) && toNum(st.state) !== null)
+    .map((st) => st.entity_id);
+}
+
+// ------------------------------------------------------------- settings
+
+const isPlain = (v) => v && typeof v === 'object' && !Array.isArray(v);
+
+// Returns a copy of prefs with the dotted path set, or removed when value is undefined.
+export function setPath(prefs, path, value) {
+  const keys = path.split('.');
+  const out = JSON.parse(JSON.stringify(prefs || {}));
+  let node = out;
+  for (const k of keys.slice(0, -1)) node = isPlain(node[k]) ? node[k] : (node[k] = {});
+  const last = keys[keys.length - 1];
+  if (value === undefined) delete node[last];
+  else node[last] = value;
+  return out;
+}
+
+export function mergePrefs(base, over) {
+  const out = { ...(base || {}) };
+  for (const [k, v] of Object.entries(over || {})) out[k] = isPlain(v) && isPlain(out[k]) ? mergePrefs(out[k], v) : v;
+  return out;
+}
+
+// -------------------------------------------------------------- billing
+
+export function sumChange(rows, from, to) {
+  let total = 0;
+  let seen = false;
+  let last = null;
+  for (const row of rows || []) {
+    if (row.start >= from && row.start < to && Number.isFinite(row.change)) {
+      total += row.change;
+      seen = true;
+      last = Math.max(last ?? 0, row.end ?? row.start + 3600000);
+    }
+  }
+  return seen ? { total, last } : null;
+}
+
+function billingFor(kind, conf, raw, now) {
+  const win = cycleWindow(conf, now);
+  const src = raw?.ids?.[kind] || null;
+  // A grid source can have several tariffs (peak and off-peak); each has its own meter, cost and price.
+  const tariffs = src ? src.tariffs || [{ usage: src.usage, cost: src.cost, price: src.price }] : [];
+  const sum = (id) => sumChange(raw?.rows?.[id], win.start, now + 1);
+  const userRate = toNum(conf.rate);
+  const fixed = toNum(conf.fixed) ?? 0;
+  let usageTotal = null;
+  let spent = 0;
+  let through = null;
+  let costKnown = tariffs.length > 0;
+  for (const t of tariffs) {
+    const usage = sum(t.usage);
+    const cost = t.cost ? sum(t.cost) : null;
+    if (usage) usageTotal = (usageTotal ?? 0) + usage.total;
+    const price = userRate ?? t.price ?? null;
+    const part = price !== null ? (usage ? usage.total * price : 0) : cost ? cost.total : null;
+    if (part === null) costKnown = false;
+    else spent += part;
+    const last = (price !== null ? usage?.last : cost?.last ?? usage?.last) ?? null;
+    if (last !== null) through = Math.max(through ?? 0, last);
+  }
+  const rate = userRate ?? (tariffs.length === 1 ? tariffs[0].price ?? null : null);
+  const hasData = through !== null;
+  if (!costKnown || !hasData) spent = null;
+  // When the source lags (utility statistics often arrive days late), project from the span it covers.
+  const lagging = hasData && through < now - 3 * 3600000;
+  const coveredMs = lagging ? through - win.start : now - win.start;
+  const covered = clamp(coveredMs / (win.end - win.start), 0, 1);
+  // Wait for six hours of data so the first morning of a cycle does not swing the estimate wildly.
+  const estimate = spent === null || covered <= 0 || coveredMs < 6 * 3600000 ? null : spent / covered + fixed;
+  const cost = tariffs.every((t) => t.cost) ? tariffs.reduce((acc, t) => { const c = sum(t.cost); return c ? (acc ?? 0) + c.total : acc; }, null) : null;
+  return {
+    kind,
+    win,
+    rate,
+    fixed,
+    usage: usageTotal,
+    spent,
+    estimate,
+    through: lagging ? through : null,
+    source: src,
+    loading: !raw,
+    // Nothing turns usage into dollars: no price entered and no cost tracking in Home Assistant.
+    needsRate: !!raw && rate === null && !costKnown && !tariffs.some((t) => t.cost || t.price !== null && t.price !== undefined),
+    error: raw?.error || null,
+    effRate: rate ?? (cost !== null && usageTotal > 0 ? cost / usageTotal : null),
+  };
+}
+
+export function buildBilling(ctx, prefs = {}, raw = null, now = Date.now()) {
+  const b = prefs.billing || {};
+  const electric = billingFor('electric', b.electric || {}, raw, now);
+  const water = billingFor('water', b.water || {}, raw, now);
+  const dayStart = startOfDay(now);
+  const rows = (raw?.circuits || []).map((c) => {
+    const r = raw.rows?.[c.stat];
+    const kwh = {
+      today: sumChange(r, dayStart, now + 1)?.total ?? null,
+      week: sumChange(r, addDays(dayStart, -6), now + 1)?.total ?? null,
+      cycle: sumChange(r, electric.win.start, now + 1)?.total ?? null,
+    };
+    const money = (v) => (v === null || electric.effRate === null ? null : v * electric.effRate);
+    return { name: c.name, stat: c.stat, kwh, cost: { today: money(kwh.today), week: money(kwh.week), cycle: money(kwh.cycle) } };
+  }).filter((r) => r.kwh.cycle !== null || r.kwh.week !== null)
+    .sort((a, b) => (b.kwh.cycle ?? b.kwh.week ?? 0) - (a.kwh.cycle ?? a.kwh.week ?? 0));
+  return { electric, water, heat: rows, money: electric.effRate !== null, currency: prefs.billing?.currency || '$' };
 }
 
 // ---------------------------------------------------------------- icons
@@ -876,6 +1471,12 @@ const ICONS = {
   purifier: '<rect x="6" y="3" width="12" height="18" rx="3"/><path d="M9.5 7h5M9.5 10.5h5M9.5 14h5"/><path d="M10.5 18h3"/>',
   speaker: '<rect x="6" y="3" width="12" height="18" rx="2"/><circle cx="12" cy="14" r="3"/><path d="M12 7h.01"/>',
   check: '<path d="m5 12.5 4.3 4.3L19 7"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 13.5a7.6 7.6 0 0 0 0-3l2-1.6-2-3.4-2.4 1a7.5 7.5 0 0 0-2.6-1.5L14 2.5h-4l-.4 2.5A7.5 7.5 0 0 0 7 6.5l-2.4-1-2 3.4 2 1.6a7.6 7.6 0 0 0 0 3l-2 1.6 2 3.4 2.4-1a7.5 7.5 0 0 0 2.6 1.5l.4 2.5h4l.4-2.5a7.5 7.5 0 0 0 2.6-1.5l2.4 1 2-3.4z"/>',
+  quiet: '<path d="M4.5 14.5v-2.5a7.5 7.5 0 0 1 15 0v2.5"/><path d="M4.5 14.5a2 2 0 0 1 2-2h1v6h-1a2 2 0 0 1-2-2z"/><path d="M19.5 14.5a2 2 0 0 0-2-2h-1v6h1a2 2 0 0 0 2-2z"/><path d="M16.5 18.5c0 1.4-1.6 2-4.5 2"/>',
+  heart: '<path d="M12 20s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 7.3 4.2 4.2 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10z"/><path d="M7.5 12.5h2.5l1.2-2.2 1.8 4.2 1.2-2h2.3"/>',
+  leaf: '<path d="M5.5 18.5C5.5 10 11 5 19.5 4.5c-.5 8.5-5.5 14-14 14z"/><path d="M5.5 18.5 13 11"/>',
+  chart: '<path d="M4 20.5h16"/><path d="M6.5 17v-5M10.5 17V8M14.5 17v-7M18.5 17V5"/>',
+  shield: '<path d="M12 3.5 5 6v5.5c0 4.2 3 7.8 7 9 4-1.2 7-4.8 7-9V6z"/>',
 };
 
 const ic = (name, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ICONS.power}</svg>`;
@@ -1226,7 +1827,9 @@ function camerasBlock(m) {
 // Air ----------------------------------------------------------------------
 
 function scaleStyle(metric, value) {
-  const s = AIR_METRICS[metric].steps;
+  const def = AIR_METRICS[metric];
+  const s = def.steps;
+  if (def.invert) value = 100 - value;
   const max = s[3] * 1.3;
   const p = (x) => `${((x / max) * 100).toFixed(1)}%`;
   return { style: `--s1:${p(s[0])};--s2:${p(s[1])};--s3:${p(s[2])};--s4:${p(s[3])}`, pos: `${clamp((value / max) * 100, 1.5, 98.5).toFixed(1)}%` };
@@ -1452,7 +2055,7 @@ function waterBlock(m) {
 
 // Robots -------------------------------------------------------------------
 
-function robotCard(r) {
+function robotCard(r, extra = '') {
   const circ = 2 * Math.PI * 35;
   const b = r.battery;
   const id = esc(r.id);
@@ -1482,6 +2085,7 @@ function robotCard(r) {
       ${acts.length ? `<div class="acts">${acts.join('')}</div>` : ''}
       ${r.fanSpeeds.length ? `<div class="rb-speed"><small>Suction</small><div class="seg t-mint">${r.fanSpeeds.map((s) => `<button class="${s === r.fanSpeed ? 'on' : ''}" data-act="vacspeed" data-entity="${id}" data-speed="${esc(s)}">${esc(titleCase(s))}</button>`).join('')}</div></div>` : ''}
       ${r.stats.length || r.controls.length ? `<div class="chips">${r.stats.map((s) => `<button class="chip" data-act="more" data-entity="${esc(s.id)}">${esc(s.label)} <b>${esc(s.value)}</b></button>`).join('')}${r.controls.map((c) => `<button class="chip ${c.on ? 'on' : ''}" data-act="${c.press ? 'press' : 'toggle'}" data-entity="${esc(c.id)}">${ic(/find|locate/i.test(c.label) ? 'locate' : c.press ? 'spark' : 'power')}${esc(c.label)}</button>`).join('')}</div>` : ''}
+      ${extra}
     </article>`;
 }
 
@@ -1495,6 +2099,518 @@ function viewRobots(m, ui) {
   return `${head(extra)}<div class="robots">${sorted.map(robotCard).join('')}</div>`;
 }
 
+// Dashboard v2 -------------------------------------------------------------
+
+// Series hues checked for colour-blind separation on the dark panel surface (fixed order, never cycled).
+const SERIES_COLORS = ['#159cbb', '#c4801c', '#9d6ff5', '#3f9e5c'];
+const CONTROL_TONES = { quiet: 'violet', turbo: 'mint', master_fan: 'cyan' };
+
+function lineChart(ui, id, series, { start, end, unit = '', height = 160 } = {}) {
+  const vals = series.flatMap((s) => s.values).filter((v) => v !== null && Number.isFinite(v));
+  if (vals.length < 2) return '<div class="chart empty-chart">No history yet</div>';
+  const top = niceCeil(Math.max(...vals) * 1.04);
+  const W = 300;
+  const H = 100;
+  const n = Math.max(...series.map((s) => s.values.length));
+  const x = (i) => (n <= 1 ? 0 : (i / (n - 1)) * W);
+  const y = (v) => H - (clamp(v, 0, top) / top) * H;
+  const paths = series.map((s) => {
+    let d = '';
+    let pen = false;
+    s.values.forEach((v, i) => {
+      if (v === null || !Number.isFinite(v)) {
+        pen = false;
+        return;
+      }
+      d += `${pen ? 'L' : 'M'}${x(i).toFixed(1)} ${y(v).toFixed(1)}`;
+      pen = true;
+    });
+    return d ? `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>` : '';
+  }).join('');
+  const dots = series.map((s) => {
+    let i = s.values.length - 1;
+    while (i >= 0 && (s.values[i] === null || !Number.isFinite(s.values[i]))) i -= 1;
+    return i < 0 ? '' : `<i class="lc-dot" style="left:${((x(i) / W) * 100).toFixed(2)}%;top:${((y(s.values[i]) / H) * 100).toFixed(2)}%;background:${s.color}"></i>`;
+  }).join('');
+  const grid = [0, 0.5, 1].map((f) => `<line x1="0" x2="${W}" y1="${(H * f).toFixed(1)}" y2="${(H * f).toFixed(1)}"/>`).join('');
+  ui.charts[id] = { series: series.map((s) => ({ label: s.label, color: s.color, values: s.values })), start, end, n, unit };
+  const hours = Math.round((end - start) / 3600000);
+  const span = hours >= 48 ? `${Math.round(hours / 24)} days ago` : `${hours}h ago`;
+  const mid = hours >= 48 ? `${Math.round(hours / 48)} days ago` : `${Math.round(hours / 2)}h ago`;
+  return `<div class="lchart" style="--h:${height}px">
+      <div class="lc-ticks" aria-hidden="true"><span style="top:0%">${compactNum(top)}</span><span style="top:50%">${compactNum(top / 2)}</span><span style="top:100%">0</span></div>
+      <div class="lc-plot" data-chart="${id}" role="img" aria-label="${esc(series.map((s) => s.label).join(', '))} over the last ${esc(span.replace(' ago', ''))}">
+        <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><g class="lc-grid">${grid}</g>${paths}</svg>
+        ${dots}
+        <div class="lc-hover" data-live></div>
+      </div>
+      <div class="lc-x" aria-hidden="true"><span>${span}</span><span>${mid}</span><span>Now</span></div>
+    </div>`;
+}
+
+function columnChart(ui, id, values, { start, end, label = '', height = 120, digits = 0 } = {}) {
+  const real = values.filter((v) => v !== null);
+  if (!real.length) return '<div class="chart empty-chart">No readings in this period</div>';
+  const top = niceCeil(Math.max(...real) * 1.04);
+  ui.charts[id] = { series: [{ label, color: TONES.mint, values }], start, end, n: values.length, unit: '', bars: true, digits };
+  return `<div class="cchart" style="--h:${height}px">
+      <div class="lc-ticks" aria-hidden="true"><span style="top:0%">${compactNum(top)}</span><span style="top:50%">${compactNum(top / 2)}</span><span style="top:100%">0</span></div>
+      <div class="lc-plot" data-chart="${id}" role="img" aria-label="${esc(label)}">
+        <div class="cc-bars">${values.map((v) => `<i style="height:${v === null ? 0 : Math.max(2, (v / top) * 100).toFixed(1)}%"></i>`).join('')}</div>
+        <div class="lc-hover" data-live></div>
+      </div>
+      <div class="lc-x" aria-hidden="true"><span>${esc(new Date(start).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }))}</span><span>Today</span></div>
+    </div>`;
+}
+
+function scoreTone(score) {
+  return score === null || score === undefined ? 'dim' : LEVEL_TONES[scoreLevel(score)];
+}
+
+function scoreHeadline(score) {
+  if (score === null) return 'Waiting for readings';
+  if (score >= 75) return 'The air is good';
+  if (score >= 55) return 'The air is fair';
+  return 'The air needs attention';
+}
+
+function airScoreCard(m, ui, { compact = false } = {}) {
+  const s = m.score;
+  if (!s.parts.length) return `<section class="panel score">${emptyState('air', 'Pick your air inputs', 'Choose the outside AQI, PM0.3 sensors, Winix and Amazon monitor in Customize.')}<button class="more" data-act="sheet" data-sheet="customize">Open Customize</button></section>`;
+  const tone = scoreTone(s.score);
+  const parts = s.parts.map((p) => `<button class="part t-${scoreTone(p.score)}" data-act="more" data-entity="${esc(p.entity)}"><span class="part-l">${esc(p.label)}</span><span class="part-v">${esc(p.raw)}</span><span class="part-bar"><i style="width:${p.score ?? 0}%"></i></span><b class="part-s">${p.score === null ? '—' : p.score}</b></button>`).join('');
+  const math = ui.scoreMath
+    ? `<div class="math"><p><b>Air score = the average of the inputs that are reporting.</b></p><p>${esc(s.parts.filter((p) => p.score !== null).map((p) => p.score).join(' + '))} = ${sum(s.parts.filter((p) => p.score !== null).map((p) => p.score))}, divided by ${s.used} = <b>${fmt(s.score)}</b></p>${[...new Map(s.parts.map((p) => [p.math, p])).values()].map((p) => `<p>${esc(p.math)}</p>`).join('')}</div>`
+    : '';
+  return `<section class="panel score t-${tone}" data-key="score-${compact ? 'home' : 'air'}">
+      <div class="score-top">
+        <button class="ring sm" data-act="tab" data-tab="air" aria-label="Air score ${fmt(s.score)}">${ringSvg(s.score, tone, 96, 8)}<span class="ring-v"><b>${fmt(s.score)}</b><small>AIR</small></span></button>
+        <div class="score-sum">
+          <span class="pill t-${tone}">${s.level === null ? 'No readings' : LEVEL_LABELS[s.level]}</span>
+          <h2>${esc(scoreHeadline(s.score))}</h2>
+          <p>${s.used} of ${s.parts.length} inputs reporting${s.worst && s.worst.score < 75 ? ` · lowest is ${esc(s.worst.label)}` : ''}</p>
+        </div>
+      </div>
+      <div class="parts">${parts}</div>
+      <button class="more" data-act="scoremath">${ui.scoreMath ? 'Hide the math' : 'Show the math'}</button>
+      ${math}
+    </section>`;
+}
+
+function pm03Series(m, range) {
+  const h = range === '7d' ? m.history.pm03week : m.history.pm03;
+  return m.score.pm03.map((x, i) => {
+    const st = m.states[x.id];
+    const unit = st?.attributes?.unit_of_measurement;
+    const values = h?.series ? resample(h.series[x.id] || [], h.start, h.end, range === '7d' ? 168 : 96).map((v) => (v === null ? null : pm03PerDl(v, unit))) : [];
+    return { id: x.id, label: x.label, color: SERIES_COLORS[i % SERIES_COLORS.length], values, now: live(st) ? pm03PerDl(st.state, unit) : null };
+  });
+}
+
+function pm03Block(m, ui, { id, range = '24h', toggle = false, height = 150 }) {
+  if (!m.score.pm03.length) return '';
+  const h = range === '7d' ? m.history.pm03week : m.history.pm03;
+  const series = pm03Series(m, range);
+  const chart = h?.series ? lineChart(ui, id, series, { start: h.start, end: h.end, unit: 'per 0.1 L', height }) : `<div class="chart loading" style="height:${height}px"></div>`;
+  const legend = series.map((s) => `<button class="lg" data-act="more" data-entity="${esc(s.id)}"><i style="background:${s.color}"></i><span>${esc(s.label)}</span><b>${fmt(s.now)}</b></button>`).join('');
+  const seg = toggle ? `<div class="seg t-cyan"><button class="${range === '24h' ? 'on' : ''}" data-act="pmrange" data-range="24h">24 hours</button><button class="${range === '7d' ? 'on' : ''}" data-act="pmrange" data-range="7d">7 days</button></div>` : '<small class="sec-note">Last 24 hours · per 0.1 L</small>';
+  return `<section class="block">
+      ${secHead('air', 'PM0.3', 'cyan', seg)}
+      <div class="panel pmchart">${chart}<div class="legend">${legend}</div><small class="note">Touch the chart to read any moment.</small></div>
+    </section>`;
+}
+
+function controlsBlock(m) {
+  if (!m.controls.length) {
+    return `<section class="block">${secHead('power', 'Controls', 'cyan')}<div class="panel">${emptyState('power', 'No controls found', 'Pick what Quiet, Winix Turbo and the master fan should run in Customize.')}<button class="more" data-act="sheet" data-sheet="customize">Open Customize</button></div></section>`;
+  }
+  const rows = m.controls.map((c) => `<div class="ctl t-${CONTROL_TONES[c.key] || 'cyan'}" data-key="ctl-${c.index}">
+      <div class="ctl-h">${ic(c.icon)}<b>${esc(c.label)}</b>${c.note ? `<small>${esc(c.note)}</small>` : ''}</div>
+      <div class="ctl-b">
+        <button class="ctl-btn ${c.active === 'on' ? 'on' : ''}" data-act="ctl" data-i="${c.index}" data-side="on" ${c.on ? '' : 'disabled'} aria-label="${esc(c.label)} on">${ic(c.icon)}<span>On</span></button>
+        <button class="ctl-btn off ${c.active === 'off' ? 'on' : ''}" data-act="ctl" data-i="${c.index}" data-side="off" ${c.off ? '' : 'disabled'} aria-label="${esc(c.label)} off">${ic('power')}<span>Off</span></button>
+      </div>
+    </div>`).join('');
+  return `<section class="block">${secHead('power', 'Controls', 'cyan')}<div class="ctls">${rows}</div></section>`;
+}
+
+function robotActions(r) {
+  const id = esc(r.id);
+  const b = (act, svc, label, icon, primary) => `<button class="rs-btn ${primary ? 'primary' : ''}" data-act="${act}" ${svc ? `data-svc="${svc}"` : ''} data-entity="${id}" data-vac="${id}">${ic(icon)}<span>${esc(label)}</span></button>`;
+  if (r.litter) return b('vac', 'start', 'Clean', 'spark', true);
+  const main = r.state === 'cleaning' ? b('vac', 'pause', 'Pause', 'pause', true)
+    : r.classic || !r.canArea ? b('vac', 'start', r.state === 'paused' ? 'Resume' : 'Clean', 'play', true)
+      : b('sheet-rooms', '', 'Rooms', 'map', true);
+  return `${main}${b('vac', 'return_to_base', 'Dock', 'home', false)}`;
+}
+
+function robotShortcuts(m) {
+  if (!m.robots.length) return '';
+  return `<section class="block">${secHead('robot', 'Robots', 'mint', linkTo('robots', 'All'))}<div class="panel rs-list">${m.robots.map((r) => `<div class="rs t-${r.tone} ${esc(r.state)}" data-key="rs-${esc(r.id)}">
+      <button class="rs-main" data-act="tab" data-tab="robots" data-entity="${esc(r.id)}"><span class="rmini-ic">${ic(r.litter ? 'cat' : 'robot')}</span><span class="rmini-t"><b>${esc(r.name)}</b><small>${esc(r.statusText)}${r.battery !== null && !r.litter ? ` · ${fmt(r.battery)}%` : ''}</small></span></button>
+      <div class="rs-acts">${robotActions(r)}</div>
+    </div>`).join('')}</div></section>`;
+}
+
+function money(v, currency = '$') {
+  if (v === null || v === undefined) return '—';
+  return `${currency}${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function cycleText(win) {
+  const f = (ms) => new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return `${f(win.start)} – ${f(win.end)}`;
+}
+
+function billTile(m, b, title, icon, tone) {
+  const cur = m.billing.currency;
+  const day = b.win.day;
+  const missing = b.spent === null && !b.loading;
+  const hint = b.loading ? '' : b.error ? ' · could not load' : b.needsRate ? ' · add a price' : '';
+  return `<button class="bill t-${tone}" data-act="tab" data-tab="energy">
+      <span class="bill-h">${ic(icon)}<b>${esc(title)}</b></span>
+      <span class="bill-k">So far</span>
+      <span class="bill-v">${b.loading ? '…' : missing ? (b.usage !== null ? `${fmt(b.usage, 1)} ${b.kind === 'water' ? m.water.volumeUnit : 'kWh'}` : '—') : esc(money(b.spent, cur))}</span>
+      <span class="bill-k">Estimated bill</span>
+      <span class="bill-e">${b.loading ? '…' : esc(money(b.estimate, cur))}</span>
+      <span class="bill-f">Day ${day} of ${b.win.days}${hint}</span>
+    </button>`;
+}
+
+function billingMini(m) {
+  return `<section class="block">${secHead('bolt', 'Energy & water', 'amber', linkTo('energy', 'Details'))}<div class="bills">${billTile(m, m.billing.electric, 'Energy', 'bolt', 'amber')}${billTile(m, m.billing.water, 'Water', 'drop', 'water')}</div></section>`;
+}
+
+const HEALTH_ORDER = [
+  ['readiness', 'Readiness', 'leaf'],
+  ['sleep', 'Sleep', 'moon'],
+  ['resilience', 'Resilience', 'shield'],
+  ['sick', 'Sick Score', 'alert'],
+  ['heart', 'Heart Score', 'heart'],
+];
+
+function healthStrip(m) {
+  const h = m.health;
+  if (!h.has) return '';
+  return `<section class="block">${secHead('heart', 'Health', 'violet', linkTo('health', 'Oura'))}<div class="hscroll">${HEALTH_ORDER.filter(([k]) => h.metrics[k]).map(([k, label]) => {
+    const x = h.metrics[k];
+    return `<button class="hmini t-${x.tone}" data-act="tab" data-tab="health" data-entity="${esc(x.id)}"><span class="ring xs">${ringSvg(x.value, x.tone, 54, 5)}<span class="ring-v"><b>${esc(x.shown)}</b></span></span><span class="hmini-t"><b>${esc(label)}</b><small>${esc(x.label)}</small></span></button>`;
+  }).join('')}</div></section>`;
+}
+
+function viewHomeV2(m, ui) {
+  const now = new Date(m.now);
+  const hour = now.getHours();
+  const greet = hour < 5 ? 'Good night' : hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : hour < 22 ? 'Good evening' : 'Good night';
+  const first = String(m.config.name || m.user?.name || '').split(' ')[0];
+  const clock = m.clock(now);
+  const urgent = m.alerts.filter((a) => a.level <= 1);
+  const statusTone = m.alerts.some((a) => a.level === 0) ? 'bad' : urgent.length ? 'poor' : 'good';
+  const status = urgent.length ? `<b>${urgent.length}</b> ${urgent.length === 1 ? 'thing needs' : 'things need'} attention` : 'All quiet at home';
+  return `
+    ${m.config.preview ? `<div class="preview t-violet">${ic('spark')}<span>${m.config.preview === true ? '<b>Preview.</b> Sample data.' : m.config.preview}</span></div>` : ''}
+    <header class="hello">
+      <div class="hello-row">
+        ${menuButton(ui)}
+        <div class="hello-text">
+          <div class="kicker">${esc(m.fmtDate(now))}</div>
+          <h1>${esc(greet)}${first ? `, ${esc(first)}` : ''}</h1>
+        </div>
+        <div class="clock" aria-label="Time"><b>${esc(clock.main)}</b>${clock.period ? `<small>${esc(clock.period)}</small>` : ''}</div>
+      </div>
+      <div class="status-row">
+        <button class="status t-${statusTone}" data-act="sheet" data-sheet="alerts"><i class="dot"></i><span>${status}</span>${m.alerts.length ? ic('chev') : ''}</button>
+        <button class="icon-btn sm" data-act="sheet" data-sheet="customize" aria-label="Customize the dashboard">${ic('gear')}</button>
+      </div>
+      ${weatherStrip(m)}
+    </header>
+    ${alertsBlock(m)}
+    ${airScoreCard(m, ui, { compact: true })}
+    ${pm03Block(m, ui, { id: 'pm03-home', range: '24h' })}
+    ${controlsBlock(m)}
+    ${robotShortcuts(m)}
+    ${billingMini(m)}
+    ${healthStrip(m)}
+    <div class="cols">
+      ${climateBlock(m, ui)}
+      ${favoritesBlock(m, ui)}
+    </div>
+    <footer class="foot">Nourie Home ${VERSION} · updated ${esc(m.fmtTime(now))}</footer>`;
+}
+
+function spikeCard(m, ui) {
+  const s = m.spike;
+  if (!s.pm) return '';
+  const auto = s.automation;
+  const state = s.active ? ['bad', 'Spiking now'] : s.running ? ['good', 'Watching'] : ['dim', 'Climate is off'];
+  const targets = m.notifyTargets;
+  return `<section class="block">${secHead('bell', 'PM0.3 spike alert', 'poor')}<div class="panel spike t-${state[0]}">
+      <div class="spike-top"><span class="pill t-${state[0]}">${esc(state[1])}</span><span class="spike-now">${esc(s.pmLabel)} <b>${fmt(s.value)}</b> per 0.1 L</span></div>
+      <p class="note">Alerts when ${esc(s.pmLabel)} PM0.3 goes over the threshold while ${esc(s.climateName || 'the upstairs climate')} is running${s.climateName ? ` (now ${esc(String(s.action).replace(/_/g, ' '))})` : ''}.</p>
+      <label class="field"><span>Threshold, particles per 0.1 L${s.custom ? '' : ' (suggested from the last day)'}</span><input id="nh-spike-threshold" type="number" inputmode="numeric" min="50" step="50" value="${esc(Math.round(s.threshold))}" data-pref="spike.threshold"></label>
+      <div class="field-row">
+        <label class="field"><span>Phone to notify</span><select id="nh-spike-notify" data-pref="spike.notify"><option value="">Choose a phone</option>${targets.map((t) => `<option value="${esc(t)}" ${t === s.notify ? 'selected' : ''}>${esc(titleCase(t.replace(/^mobile_app_/, '').replace(/_/g, ' ')))}</option>`).join('')}</select></label>
+      </div>
+      ${auto
+        ? `<div class="spike-auto"><span>${ic('check')}Phone alert is ${auto.on ? 'on' : 'off'}</span><button class="chip" data-act="spike-save">Update</button><button class="chip" data-act="spike-delete">Remove</button></div>`
+        : `<button class="act primary wide" data-act="spike-save" ${s.notify && m.isAdmin ? '' : 'disabled'}>${ic('bell')}Turn on phone alerts</button>${m.isAdmin ? '' : '<small class="note">Phone alerts are saved as a Home Assistant automation, which needs an admin account.</small>'}`}
+      <small class="note">The dashboard also shows this alert at the top of Home whenever it happens.</small>
+    </div></section>`;
+}
+
+function viewAirV2(m, ui) {
+  const a = m.air;
+  return `${viewHead(ui, 'Indoor air', 'Air quality', `<button class="icon-btn sm" data-act="sheet" data-sheet="customize" aria-label="Customize">${ic('gear')}</button>`)}
+    ${airScoreCard(m, ui)}
+    ${pm03Block(m, ui, { id: 'pm03-air', range: ui.pmRange, toggle: true, height: 190 })}
+    ${spikeCard(m, ui)}
+    ${a.purifiers.length ? `<section class="block">${secHead('purifier', 'Purifiers', 'mint')}<div class="purs">${a.purifiers.map(purifierCard).join('')}</div></section>` : ''}
+    ${a.rooms.length ? `<section class="block">${secHead('home', 'Rooms', 'cyan', '<small class="sec-note">Last 24 hours</small>')}<div class="rooms">${a.rooms.map((r) => roomCard(m, r)).join('')}</div></section>` : ''}`;
+}
+
+function roomsPicker(m, ui, r) {
+  if (!r.canArea) return `<div class="rmap-empty">${ic('map')}<span>${esc(r.name)} does not support cleaning by room in Home Assistant.</span></div>`;
+  if (r.areaStatus === 'loading') return '<div class="rmap-empty">Loading rooms…</div>';
+  if (r.areaStatus === 'error') return `<div class="rmap-empty">${ic('alert')}<span>The room list could not load. Home Assistant only shares it with admin accounts.</span><button class="chip" data-act="more" data-entity="${esc(r.id)}">Open ${esc(r.name)}</button></div>`;
+  if (!r.areas.length) return `<div class="rmap-empty">${ic('map')}<span>${esc(r.name)}'s rooms are not matched to your Home Assistant areas yet. Open the robot, tap <b>Cleaning → By area</b>, then the gear to match them.</span><button class="chip" data-act="more" data-entity="${esc(r.id)}">Open ${esc(r.name)}</button></div>`;
+  const sel = ui.roomSel[r.id] || [];
+  const floors = [];
+  for (const area of r.areas) {
+    let f = floors.find((x) => x.id === area.floor.id);
+    if (!f) floors.push((f = { id: area.floor.id, name: area.floor.name, areas: [] }));
+    f.areas.push(area);
+  }
+  const last = (m.prefs.lastRooms || {})[r.id] || [];
+  const lastNames = last.map((id) => m.robots.find((x) => x.id === r.id)?.areas.find((a) => a.id === id)?.name).filter(Boolean);
+  return `<div class="rmap" data-key="rmap-${esc(r.id)}">
+      ${r.map ? `<img class="rmap-img" src="${esc(r.map.src)}${r.map.src.includes('?') ? '&' : '?'}_nh=${Math.floor(m.now / 30000)}" alt="${esc(r.name)} map">` : ''}
+      ${floors.map((f) => `<div class="floor">${f.name ? `<small>${esc(f.name)}</small>` : ''}<div class="rtiles">${f.areas.map((a) => {
+        const order = sel.indexOf(a.id);
+        return `<button class="rtile ${order >= 0 ? 'on' : ''}" data-act="room" data-vac="${esc(r.id)}" data-area="${esc(a.id)}" aria-pressed="${order >= 0}">${order >= 0 ? `<i class="rt-o">${order + 1}</i>` : ''}<span>${esc(a.name)}</span></button>`;
+      }).join('')}</div></div>`).join('')}
+      <div class="rmap-acts">
+        <button class="act primary" data-act="cleanrooms" data-vac="${esc(r.id)}" ${sel.length ? '' : 'disabled'}>${ic('play')}${sel.length ? `Clean ${sel.length} ${sel.length === 1 ? 'room' : 'rooms'}` : 'Pick rooms'}</button>
+        <button class="act" data-act="roomsall" data-vac="${esc(r.id)}">${ic('check')}All</button>
+        <button class="act" data-act="roomsclear" data-vac="${esc(r.id)}" ${sel.length ? '' : 'disabled'}>${ic('x')}Clear</button>
+      </div>
+      ${lastNames.length && !sel.length ? `<button class="chip repeat" data-act="roomsrepeat" data-vac="${esc(r.id)}">${ic('spark')}Again: ${esc(lastNames.join(', '))}</button>` : ''}
+      <small class="note">Rooms are cleaned in the order you tap them.</small>
+    </div>`;
+}
+
+function dustBlock(m, ui) {
+  if (!m.robots.some((r) => r.classic && !r.litter)) return '';
+  const h = m.history.dust;
+  if (!m.dust.length) {
+    return `<section class="block">${secHead('chart', 'Dust scores', 'mint')}<div class="panel">${emptyState('chart', 'No dust sensor found', 'Pick the Dyson dust score sensor in Customize and its last 30 days will show here.')}<button class="more" data-act="sheet" data-sheet="customize">Open Customize</button></div></section>`;
+  }
+  const charts = m.dust.map((id) => {
+    const st = m.states[id];
+    const values = h?.series?.[id] ? bucketMax(h.series[id], h.start, h.end, 30) : null;
+    return `<div class="dust" data-key="dust-${esc(id)}"><div class="dust-h"><button class="lg" data-act="more" data-entity="${esc(id)}"><span>${esc(cleanName(st?.attributes?.friendly_name || id))}</span><b>${live(st) ? esc(statValue(st)) : 'Offline'}</b></button></div>${values ? columnChart(ui, `dust-${id}`, values, { start: h.start, end: h.end, label: 'Highest dust score each day' }) : '<div class="chart loading" style="height:120px"></div>'}</div>`;
+  }).join('');
+  return `<section class="block">${secHead('chart', 'Dust scores', 'mint', '<small class="sec-note">Highest each day · 30 days</small>')}<div class="panel dusts">${charts}</div></section>`;
+}
+
+function viewRobotsV2(m, ui) {
+  const head = (extra = '') => viewHead(ui, 'Robots', 'Cleaning crew', extra);
+  if (!m.robots.length) return `${head()}${emptyState('robot', 'No robots yet', 'Robot vacuums and litter boxes in Home Assistant show up here with start, dock and find buttons.')}`;
+  const cleaners = m.robots.filter((r) => !r.litter && r.state !== 'unavailable');
+  const extra = cleaners.length > 1 ? `<div class="vh-acts"><button class="chip" data-act="vacall" data-svc="start">${ic('play')}Start all</button><button class="chip" data-act="vacall" data-svc="return_to_base">${ic('home')}Dock all</button></div>` : '';
+  const classic = m.robots.filter((r) => r.classic && !r.litter);
+  const mapped = m.robots.filter((r) => !r.classic && !r.litter);
+  const litter = m.robots.filter((r) => r.litter);
+  return `${head(extra)}
+    ${classic.length ? `<div class="robots">${classic.map((r) => robotCard(r)).join('')}</div>` : ''}
+    ${dustBlock(m, ui)}
+    ${mapped.length ? `<section class="block">${secHead('map', 'Clean by room', 'cyan')}<div class="robots">${mapped.map((r) => robotCard(r, roomsPicker(m, ui, r))).join('')}</div></section>` : ''}
+    ${litter.length ? `<div class="robots">${litter.map((r) => robotCard(r)).join('')}</div>` : ''}`;
+}
+
+function billCard(m, b, title, icon, tone, unit) {
+  const cur = m.billing.currency;
+  const missing = b.spent === null && !b.loading;
+  const day = b.win.day;
+  return `<section class="panel billcard t-${tone}" id="nh-${b.kind}" data-key="bill-${b.kind}">
+      <div class="hero2-top"><h2 class="eyebrow t-${tone}">${ic(icon)}${esc(title)}</h2><button class="chip" data-act="sheet" data-sheet="bill-${b.kind}">${ic('gear')}Billing cycle</button></div>
+      <div class="bc-cycle">${esc(cycleText(b.win))} · day ${day} of ${b.win.days}</div>
+      <div class="bc-bar" aria-hidden="true"><i style="width:${(b.win.fraction * 100).toFixed(1)}%"></i></div>
+      <div class="bc-nums">
+        <div><small>Spent so far</small><b>${b.loading ? '…' : esc(missing ? '—' : money(b.spent, cur))}</b></div>
+        <div><small>Estimated bill</small><b class="est">${b.loading ? '…' : esc(money(b.estimate, cur))}</b></div>
+      </div>
+      <small class="note">${b.usage !== null ? `${fmt(b.usage, b.usage < 100 ? 1 : 0)} ${unit} so far` : 'No usage recorded yet'}${b.rate !== null ? ` · ${cur}${Number(b.rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })} per ${unit}` : ''}${b.fixed ? ` · ${money(b.fixed, cur)} fixed charge included in the estimate` : ''}${b.through ? ` · data through ${new Date(b.through).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : ''}</small>
+      ${b.error ? `<small class="note warn">Home Assistant's usage history could not load: ${esc(b.error)}</small>` : b.needsRate ? `<small class="note warn">Add your price per ${unit} under Billing cycle to see dollars.</small>` : ''}
+      ${!b.source && !b.error ? `<small class="note warn">No ${b.kind === 'water' ? 'water meter' : 'grid meter'} found in Home Assistant's Energy settings. Pick one under Billing cycle.</small>` : ''}
+    </section>`;
+}
+
+function heatTable(m) {
+  const rows = m.billing.heat;
+  if (!rows.length) return '';
+  const useMoney = m.billing.money;
+  const val = (r, k) => (useMoney ? r.cost[k] : r.kwh[k]);
+  const max = { today: Math.max(0, ...rows.map((r) => val(r, 'today') || 0)), week: Math.max(0, ...rows.map((r) => val(r, 'week') || 0)), cycle: Math.max(0, ...rows.map((r) => val(r, 'cycle') || 0)) };
+  const cell = (r, k) => {
+    const v = val(r, k);
+    const h = heatStyle(v || 0, max[k]);
+    return `<td style="background:${h.bg};color:${h.ink}">${v === null ? '—' : useMoney ? esc(money(v, m.billing.currency)) : `${fmt(v, 1)}`}</td>`;
+  };
+  return `<section class="block">${secHead('bolt', 'Room costs · heatmap', 'amber', '<small class="sec-note">Highest first</small>')}<div class="panel heat"><div class="heat-scroll"><table>
+      <thead><tr><th scope="col">Circuit</th><th scope="col">Today</th><th scope="col">7 days</th><th scope="col">Cycle</th></tr></thead>
+      <tbody>${rows.map((r, i) => `<tr><th scope="row"><span class="hn">${String(i + 1).padStart(2, '0')}</span>${esc(r.name)}</th>${cell(r, 'today')}${cell(r, 'week')}${cell(r, 'cycle')}</tr>`).join('')}</tbody>
+    </table></div><small class="note">${useMoney ? 'Dollars use your electric rate.' : 'Kilowatt-hours; add a rate to see dollars.'} Circuits can overlap, so they are not added to the home total.</small></div></section>`;
+}
+
+function viewEnergyV2(m, ui) {
+  const unitW = m.water.volumeUnit;
+  return `${viewHead(ui, 'Billing cycle', 'Energy &amp; water')}
+    ${billCard(m, m.billing.electric, 'Electric', 'bolt', 'amber', 'kWh')}
+    ${billCard(m, m.billing.water, 'Water', 'drop', 'water', unitW)}
+    ${heatTable(m)}`;
+}
+
+function healthCard(m, key, label, icon, sub) {
+  const x = m.health.metrics[key];
+  if (!x) return '';
+  return `<button class="panel hcard t-${x.tone}" data-act="more" data-entity="${esc(x.id)}">
+      <span class="hcard-h">${ic(icon)}<b>${esc(label)}</b>${ic('chev')}</span>
+      <span class="ring">${ringSvg(x.value, x.tone, 112, 9)}<span class="ring-v"><b>${esc(x.shown)}</b><small>${esc(x.label)}</small></span></span>
+      <span class="hcard-s">${esc(sub)}</span>
+    </button>`;
+}
+
+function viewHealth(m, ui) {
+  const h = m.health;
+  if (!h.has) return `${viewHead(ui, 'Oura', 'My health')}${emptyState('heart', 'No Oura scores found', 'Pick your readiness, sleep and resilience sensors in Customize.')}<button class="more" data-act="sheet" data-sheet="customize">Open Customize</button>`;
+  const heart = h.metrics.heart;
+  return `${viewHead(ui, 'Oura', 'My health')}
+    <section class="panel hhead">
+      <div><b>Oura · Readiness · Sleep · Recovery</b><small>${h.updated ? `Updated ${esc(new Date(h.updated).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }))}` : ''}</small></div>
+      ${h.battery !== null ? `<button class="chip" data-act="more" data-entity="${esc(h.batteryId)}">${ic('battery')}Ring <b>${fmt(h.battery)}%</b></button>` : ''}
+    </section>
+    <div class="hgrid">
+      ${healthCard(m, 'readiness', 'Readiness', 'leaf', 'Oura readiness score')}
+      ${healthCard(m, 'sleep', 'Sleep', 'moon', h.sleepTime ? `${h.sleepTime} total sleep` : 'Oura sleep score')}
+      ${healthCard(m, 'resilience', 'Resilience', 'shield', 'Oura stress resilience')}
+      ${healthCard(m, 'sick', 'Sick Score', 'alert', 'Early-warning index')}
+    </div>
+    ${heart ? `<button class="panel hwide t-${heart.tone}" data-act="more" data-entity="${esc(heart.id)}"><span class="ring">${ringSvg(heart.value, heart.tone, 112, 9)}<span class="ring-v"><b>${esc(heart.shown)}</b><small>${esc(heart.label)}</small></span></span><span class="hwide-t"><b>${ic('heart')}Heart Score</b><small>Tap for the readings behind it.</small></span></button>` : ''}`;
+}
+
+// Customize and billing sheets ------------------------------------------------
+
+function entityCandidates(ctx) {
+  const opt = (st) => ({ id: st.entity_id, name: cleanName(ctx.name(st.entity_id)), state: live(st) ? `${st.state}${st.attributes.unit_of_measurement ? ` ${st.attributes.unit_of_measurement}` : ''}` : 'offline' });
+  const byName = (a, b) => a.name.localeCompare(b.name);
+  const sensors = ctx.byDomain('sensor');
+  return {
+    aqi: sensors.filter((st) => st.attributes.device_class === 'aqi' || /\baqi\b|air quality/i.test(ctx.name(st.entity_id))).map(opt).sort(byName),
+    pm03: sensors.filter((st) => PM03_RE.test(ctx.name(st.entity_id)) || /particle|\bpm\s?\d/i.test(ctx.name(st.entity_id))).map(opt).sort(byName),
+    winix: sensors.filter((st) => isWinix(ctx, st.entity_id) || st.attributes.air_quality !== undefined).map(opt).sort(byName),
+    numeric: sensors.filter((st) => toNum(st.state) !== null || !live(st)).map(opt).sort(byName),
+    text: sensors.map(opt).sort(byName),
+    controls: ctx.list.filter((st) => [...PRESS_DOMAINS, ...TOGGLE_DOMAINS, 'automation'].includes(domainOf(st.entity_id))).map(opt).sort(byName),
+    climate: ctx.byDomain('climate').map(opt).sort(byName),
+    vacuums: ctx.byDomain('vacuum').map(opt).sort(byName),
+    winixFans: ctx.byDomain('fan').filter((st) => isWinix(ctx, st.entity_id)).map((st) => st.entity_id),
+  };
+}
+
+function options(list, selected, { auto = null, none = 'Don’t use' } = {}) {
+  const head = [
+    auto !== null ? `<option value="__auto__" ${selected === undefined ? 'selected' : ''}>Automatic${auto ? ` (${esc(auto)})` : ''}</option>` : '',
+    none ? `<option value="__none__" ${selected === '' ? 'selected' : ''}>${esc(none)}</option>` : '',
+  ].join('');
+  return head + list.map((o) => `<option value="${esc(o.id)}" ${o.id === selected ? 'selected' : ''}>${esc(o.name)} · ${esc(o.state)}</option>`).join('');
+}
+
+function targetValue(t) {
+  if (!t) return '';
+  if (t.entity) return t.entity;
+  if (t.service === 'fan.set_percentage') return '__winix_turbo__';
+  if (t.service === 'fan.set_preset_mode') return '__winix_auto__';
+  return '';
+}
+
+function customizeSheet(m) {
+  const c = m.candidates();
+  const p = m.prefs;
+  const air = p.air || {};
+  const name = (id) => cleanName(m.states[id]?.attributes?.friendly_name || id || '');
+  const pmChecked = new Set((Array.isArray(air.pm03) ? air.pm03 : m.score.pm03).map((x) => x.id));
+  const pmLabels = Object.fromEntries((Array.isArray(air.pm03) ? air.pm03 : m.score.pm03).map((x) => [x.id, x.label]));
+  const winixChecked = new Set(Array.isArray(air.winix) ? air.winix : discoverWinixFromParts(m));
+  const controls = Array.isArray(p.controls) ? p.controls : m.controls.map(({ key, label, icon, on, off }) => ({ key, label, icon, on, off }));
+  const ctlOptions = (t) => `<option value="">Nothing</option>${c.winixFans.length ? `<option value="__winix_turbo__" ${targetValue(t) === '__winix_turbo__' ? 'selected' : ''}>Winix purifiers → Turbo</option><option value="__winix_auto__" ${targetValue(t) === '__winix_auto__' ? 'selected' : ''}>Winix purifiers → Auto</option>` : ''}${c.controls.map((o) => `<option value="${esc(o.id)}" ${o.id === targetValue(t) ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}`;
+  const classic = new Set(m.robots.filter((r) => r.classic).map((r) => r.id));
+  const dust = new Set(m.dust);
+  const oura = p.oura || {};
+  const health = m.health.ids;
+  const ouraSel = (key, label) => `<label class="field"><span>${esc(label)}</span><select data-pref="oura.${key}">${options(c.numeric.concat(key === 'resilience' ? c.text.filter((o) => /resilience/i.test(o.name)) : []), oura[key], { auto: health[key] ? name(health[key]) : '' })}</select></label>`;
+  return `
+    <p class="note">${m.isAdmin ? 'Changes save in Home Assistant and apply to everyone who opens this dashboard.' : 'Changes save to your Home Assistant account.'}</p>
+    <h3>Air score inputs</h3>
+    <label class="field"><span>Outside AQI</span><select data-pref="air.outdoor">${options(c.aqi, air.outdoor, { auto: m.score.parts.find((x) => x.key === 'outdoor') ? name(m.score.parts.find((x) => x.key === 'outdoor').entity) : 'none found' })}</select></label>
+    <label class="field"><span>Amazon air monitor</span><select data-pref="air.amazon">${options(c.aqi, air.amazon, { auto: m.score.parts.find((x) => x.key === 'amazon') ? name(m.score.parts.find((x) => x.key === 'amazon').entity) : 'none found' })}</select></label>
+    <div class="field"><span>PM0.3 sensors</span><div class="checks">${c.pm03.map((o) => `<div class="check-row"><label class="check"><input type="checkbox" data-pref="air.pm03" value="${esc(o.id)}" ${pmChecked.has(o.id) ? 'checked' : ''}><span>${esc(o.name)} <small>${esc(o.state)}</small></span></label>${pmChecked.has(o.id) ? `<input class="mini" type="text" aria-label="Label for ${esc(o.name)}" data-pref="air.pm03label" data-id="${esc(o.id)}" value="${esc(pmLabels[o.id] || '')}">` : ''}</div>`).join('') || '<small class="note">No PM0.3 sensors found.</small>'}</div></div>
+    <div class="field"><span>Winix air quality</span><div class="checks">${c.winix.map((o) => `<label class="check"><input type="checkbox" data-pref="air.winix" value="${esc(o.id)}" ${winixChecked.has(o.id) ? 'checked' : ''}><span>${esc(o.name)} <small>${esc(o.state)}</small></span></label>`).join('') || '<small class="note">No Winix sensors found.</small>'}</div></div>
+    <button class="chip" data-act="pref-reset" data-key="air">Use automatic air inputs</button>
+
+    <h3>Control buttons</h3>
+    ${controls.map((x, i) => `<div class="ctl-edit" data-key="ce-${i}">
+        <label class="field"><span>Name</span><input type="text" data-pref="controls.label" data-i="${i}" value="${esc(x.label || '')}"></label>
+        <div class="field-row">
+          <label class="field"><span>On runs</span><select data-pref="controls.on" data-i="${i}">${ctlOptions(x.on)}</select></label>
+          <label class="field"><span>Off runs</span><select data-pref="controls.off" data-i="${i}">${ctlOptions(x.off)}</select></label>
+        </div>
+        <button class="chip" data-act="ctl-remove" data-i="${i}">${ic('x')}Remove</button>
+      </div>`).join('')}
+    <div class="chips"><button class="chip" data-act="ctl-add">${ic('plus')}Add a button pair</button><button class="chip" data-act="pref-reset" data-key="controls">Use automatic buttons</button></div>
+
+    <h3>Robots</h3>
+    <div class="checks">${c.vacuums.map((o) => `<label class="check"><input type="checkbox" data-pref="robots.classic" value="${esc(o.id)}" ${classic.has(o.id) ? 'checked' : ''}><span>${esc(o.name)} <small>keep the standard card, no room map</small></span></label>`).join('')}</div>
+    <div class="field"><span>Dust score sensors</span><div class="checks">${c.numeric.filter((o) => dust.has(o.id) || /dust|dirt|dyson/i.test(o.name)).map((o) => `<label class="check"><input type="checkbox" data-pref="dust" value="${esc(o.id)}" ${dust.has(o.id) ? 'checked' : ''}><span>${esc(o.name)} <small>${esc(o.state)}</small></span></label>`).join('') || '<small class="note">No Dyson or dust sensors found.</small>'}</div></div>
+
+    <h3>Oura</h3>
+    ${ouraSel('readiness', 'Readiness')}${ouraSel('sleep', 'Sleep score')}${ouraSel('resilience', 'Resilience')}${ouraSel('sick', 'Sick Score')}${ouraSel('heart', 'Heart Score')}${ouraSel('duration', 'Total sleep time')}${ouraSel('battery', 'Ring battery')}
+
+    <h3>Family map</h3>
+    <label class="field"><span>People come from</span><select data-pref="people_source"><option value="life360" ${p.people_source !== 'person' ? 'selected' : ''}>Life360 members</option><option value="person" ${p.people_source === 'person' ? 'selected' : ''}>Home Assistant people</option></select></label>`;
+}
+
+function discoverWinixFromParts(m) {
+  return Object.keys(m.states).filter((id) => id.startsWith('sensor.') && m.states[id].attributes.air_quality !== undefined && /winix/i.test(`${id} ${m.states[id].attributes.friendly_name || ''}`));
+}
+
+function billSheet(m, kind) {
+  const b = m.billing[kind];
+  const conf = (m.prefs.billing || {})[kind] || {};
+  const unit = kind === 'water' ? m.water.volumeUnit : 'kWh';
+  const c = m.candidates();
+  const src = b.source;
+  const err = conf.start && conf.end && conf.end <= conf.start ? '<small class="note warn">The next bill date has to be after the start date.</small>' : '';
+  return `
+    <p class="note">Change the dates whenever a new bill arrives. The dashboard rolls to the next cycle on its own after the bill date.</p>
+    <div class="field-row">
+      <label class="field"><span>Cycle started</span><input type="date" data-pref="billing.${kind}.start" value="${esc(conf.start || b.win.startDay)}"></label>
+      <label class="field"><span>Next bill date</span><input type="date" data-pref="billing.${kind}.end" value="${esc(conf.end || b.win.endDay)}"></label>
+    </div>
+    ${err}
+    <div class="field-row">
+      <label class="field"><span>Price per ${esc(unit)}</span><input type="number" inputmode="decimal" step="0.0001" min="0" placeholder="${src?.price ? esc(src.price) : 'e.g. 0.14'}" data-pref="billing.${kind}.rate" value="${esc(conf.rate ?? '')}"></label>
+      <label class="field"><span>Fixed monthly charge</span><input type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00" data-pref="billing.${kind}.fixed" value="${esc(conf.fixed ?? '')}"></label>
+    </div>
+    <label class="field"><span>Meter</span><select data-pref="billing.${kind}.stat">${`<option value="__auto__" ${conf.stat ? '' : 'selected'}>From Energy settings${src?.usage ? ` (${esc(src.label || src.usage)})` : ' (none found)'}</option>`}${c.numeric.filter((o) => (kind === 'water' ? /water|flume|gal|lit/i : /energy|kwh|grid|emporia|duke/i).test(`${o.id} ${o.name} ${o.state}`)).map((o) => `<option value="${esc(o.id)}" ${o.id === conf.stat ? 'selected' : ''}>${esc(o.name)} · ${esc(o.state)}</option>`).join('')}</select></label>
+    <p class="note">${src?.cost && !conf.rate ? 'Using Home Assistant’s cost tracking for dollars. Enter a price to override it.' : conf.rate ? 'Dollars use your price.' : 'Enter a price to turn usage into dollars.'}</p>
+    <div class="bc-nums sheet-nums"><div><small>Spent so far</small><b>${esc(money(b.spent, m.billing.currency))}</b></div><div><small>Estimated bill</small><b class="est">${esc(money(b.estimate, m.billing.currency))}</b></div></div>`;
+}
+
+function roomsSheet(m, ui, id) {
+  const r = m.robots.find((x) => x.id === id);
+  return r ? roomsPicker(m, ui, r) : '<div class="empty"><b>Robot not found</b></div>';
+}
+
 // Sheets -------------------------------------------------------------------
 
 function sheetHtml(m, ui) {
@@ -1506,6 +2622,17 @@ function sheetHtml(m, ui) {
     const rows = m.alerts.map((a, i) => alertRow(a, i)).join('');
     const offline = m.offline.length ? `<button class="alert t-dim" data-act="sheet" data-sheet="offline"><span class="al-ic">${ic('wifi')}</span><span class="al-t"><b>${m.offline.length} ${m.offline.length === 1 ? 'device is' : 'devices are'} offline</b><small>See which ones</small></span>${ic('chev')}</button>` : '';
     body = rows || offline ? `${rows}${offline}` : `<div class="empty">${ic('check')}<b>All clear</b><span>Doors are closed and nothing needs you.</span></div>`;
+  } else if (ui.sheet === 'customize') {
+    title = 'Customize';
+    body = customizeSheet(m);
+  } else if (ui.sheet === 'bill-electric' || ui.sheet === 'bill-water') {
+    const kind = ui.sheet.slice(5);
+    title = kind === 'water' ? 'Water billing cycle' : 'Electric billing cycle';
+    body = billSheet(m, kind);
+  } else if (String(ui.sheet).startsWith('rooms:')) {
+    const id = ui.sheet.slice(6);
+    title = `${m.robots.find((r) => r.id === id)?.name || 'Robot'} · rooms`;
+    body = roomsSheet(m, ui, id);
   } else if (ui.sheet === 'offline') {
     title = `Offline (${m.offline.length})`;
     body = m.offline.map((o) => `<button class="row" data-act="more" data-entity="${esc(o.id)}"><span>${esc(o.name)}</span><small>${esc([o.area, o.since && `for ${o.since}`].filter(Boolean).join(' · '))}</small></button>`).join('') || '<div class="empty"><b>Everything is online</b></div>';
@@ -1530,7 +2657,7 @@ function morph(parent, next) {
     if (!cur) {
       parent.appendChild(nxt);
     } else if (sameNode(cur, nxt)) {
-      if (cur.nodeType === 1) {
+      if (cur.nodeType === 1 && !cur.hasAttribute('data-live')) {
         syncAttributes(cur, nxt);
         morph(cur, nxt);
       } else if (cur.nodeValue !== nxt.nodeValue) {
@@ -1682,7 +2809,7 @@ img { max-width: 100%; }
 
 /* Tab bar */
 .nav { position: absolute; left: 0; right: 0; bottom: 0; z-index: 30; pointer-events: none; padding-block: 10px calc(10px + var(--nh-bottom)); padding-left: max(12px, env(safe-area-inset-left, 0px)); padding-right: max(12px, env(safe-area-inset-right, 0px)); }
-.nav-in { pointer-events: auto; max-width: 480px; margin: 0 auto; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; padding: 6px; border-radius: 24px; background: rgba(8, 20, 35, .95); border: 1px solid var(--nh-line-2); box-shadow: 0 18px 40px -10px rgba(0, 0, 0, .75), inset 0 1px 0 rgba(255, 255, 255, .05); -webkit-backdrop-filter: blur(18px) saturate(140%); backdrop-filter: blur(18px) saturate(140%); }
+.nav-in { pointer-events: auto; max-width: 480px; margin: 0 auto; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 2px; padding: 5px; border-radius: 24px; background: rgba(8, 20, 35, .95); border: 1px solid var(--nh-line-2); box-shadow: 0 18px 40px -10px rgba(0, 0, 0, .75), inset 0 1px 0 rgba(255, 255, 255, .05); -webkit-backdrop-filter: blur(18px) saturate(140%); backdrop-filter: blur(18px) saturate(140%); }
 .nav-b { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; min-height: 52px; border-radius: 18px; color: var(--nh-faint); font: 600 10.5px/1 var(--nh-body); letter-spacing: .03em; transition: color .2s, background .2s; }
 .nav-b .ic { font-size: 22px; transition: filter .2s; }
 .nav-b.on { color: var(--nh-ink); background: linear-gradient(180deg, rgba(77, 227, 255, .18), rgba(77, 227, 255, .04)); box-shadow: inset 0 0 0 1px rgba(77, 227, 255, .28); }
@@ -2050,6 +3177,176 @@ img { max-width: 100%; }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 .toast.bad { border-color: rgba(255, 84, 112, .5); color: #ffc2cc; }
 
+/* v2: score, PM0.3 chart, controls, robots, billing, health, settings */
+.nav-b { font-size: 10px; gap: 4px; min-height: 50px; }
+.nav-b .ic { font-size: 20px; }
+.status-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.icon-btn.sm { width: 36px; height: 36px; border-radius: 12px; font-size: 17px; }
+.score { display: grid; gap: 12px; }
+.score-top { display: flex; align-items: center; gap: 14px; }
+.ring.sm { width: 96px; height: 96px; }
+.ring.sm .ring-v b { font-size: 32px; }
+.ring.xs { width: 54px; height: 54px; }
+.ring.xs .ring-v b { font: 600 15px/1 var(--nh-display); }
+.score-sum { display: grid; gap: 6px; justify-items: start; min-width: 0; }
+.score-sum h2 { font: 600 19px/1.2 var(--nh-display); text-wrap: balance; }
+.score-sum p { font-size: 12.5px; color: var(--nh-dim); }
+.parts { display: grid; gap: 2px; }
+.part { display: grid; grid-template-columns: minmax(0, 1fr) auto 64px 28px; align-items: center; gap: 10px; min-height: 38px; padding: 4px 2px; border-bottom: 1px solid var(--nh-line); }
+.part:last-child { border-bottom: 0; }
+.part-l { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.part-v { font-size: 12px; color: var(--nh-dim); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.part-bar { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .06); overflow: hidden; }
+.part-bar i { display: block; height: 100%; border-radius: 3px; background: var(--tone); }
+.part-s { font: 600 14px var(--nh-display); text-align: right; font-variant-numeric: tabular-nums; }
+.math { display: grid; gap: 6px; padding: 10px 12px; border-radius: 14px; font-size: 12.5px; color: var(--nh-dim); background: rgba(4, 12, 22, .5); border: 1px solid var(--nh-line); }
+.math b { color: var(--nh-ink); }
+.pmchart { display: grid; gap: 10px; }
+.lchart, .cchart { position: relative; height: var(--h, 160px); padding: 6px 0 20px 36px; }
+.lc-ticks { position: absolute; left: 0; top: 6px; bottom: 20px; width: 32px; }
+.lc-ticks span { position: absolute; right: 4px; transform: translateY(-50%); font-size: 10.5px; color: var(--nh-faint); font-variant-numeric: tabular-nums; }
+.lc-plot { position: relative; height: 100%; touch-action: pan-y; cursor: crosshair; }
+.lc-plot svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.lc-grid line { stroke: rgba(124, 214, 255, .09); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.lc-dot { position: absolute; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%; box-shadow: 0 0 0 2px #0b1a2b; pointer-events: none; }
+.lc-x { position: absolute; left: 36px; right: 0; bottom: 0; display: flex; justify-content: space-between; font-size: 10.5px; color: var(--nh-faint); }
+.lc-hover { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .15s; }
+.lc-hover.show { opacity: 1; }
+.lc-cross { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(233, 245, 255, .45); }
+.lc-tip { position: absolute; top: 0; transform: translateX(10px); min-width: 120px; padding: 8px 10px; border-radius: 12px; background: #0e2236; border: 1px solid var(--nh-line-2); box-shadow: 0 10px 24px rgba(0, 0, 0, .5); display: grid; gap: 3px; z-index: 2; }
+.lc-tip.left { transform: translateX(calc(-100% - 10px)); }
+.lc-tip small { font-size: 11px; color: var(--nh-dim); }
+.tip-row { display: flex; align-items: center; gap: 7px; font-size: 12.5px; white-space: nowrap; }
+.tip-row i { width: 12px; height: 2px; border-radius: 1px; flex: none; }
+.tip-row b { font-variant-numeric: tabular-nums; }
+.tip-row span { color: var(--nh-dim); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.lg { display: inline-flex; align-items: center; gap: 7px; min-height: 30px; font-size: 13px; color: var(--nh-dim); }
+.lg i { width: 14px; height: 2px; border-radius: 1px; flex: none; }
+.lg b { color: var(--nh-ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.cc-bars { position: absolute; inset: 0; display: flex; align-items: flex-end; gap: 2px; }
+.cc-bars i { flex: 1; max-width: 24px; min-height: 0; border-radius: 4px 4px 0 0; background: var(--nh-mint); opacity: .85; }
+.ctls { display: grid; gap: 10px; }
+@media (min-width: 640px) { .ctls { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.ctl { display: grid; gap: 10px; padding: 12px; border-radius: 18px; background: linear-gradient(180deg, rgba(20, 44, 70, .5), rgba(9, 23, 39, .74)); border: 1px solid var(--nh-line); }
+.ctl-h { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ctl-h .ic { font-size: 18px; color: var(--tone); }
+.ctl-h b { font-size: 14.5px; font-weight: 600; }
+.ctl-h small { margin-left: auto; font-size: 11.5px; color: var(--nh-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ctl-b { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ctl-btn { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 52px; border-radius: 14px; font-size: 14px; font-weight: 600; background: rgba(255, 255, 255, .04); border: 1px solid var(--nh-line); transition: transform .12s, background .2s; }
+.ctl-btn .ic { font-size: 19px; color: var(--tone); }
+.ctl-btn.off .ic { color: var(--nh-dim); }
+.ctl-btn:active { transform: scale(.97); }
+.ctl-btn.on { color: #06101c; background: var(--tone); border-color: transparent; box-shadow: 0 0 18px rgba(var(--tone-rgb), .5); }
+.ctl-btn.on .ic { color: #06101c; }
+.ctl-btn.off.on { color: var(--nh-ink); background: rgba(255, 255, 255, .12); box-shadow: none; }
+.ctl-btn.off.on .ic { color: var(--nh-ink); }
+.ctl-btn[disabled] { opacity: .35; }
+.rs-list { display: grid; gap: 0; padding-block: 4px; }
+.rs { display: flex; align-items: center; gap: 10px; min-height: 60px; border-bottom: 1px solid var(--nh-line); }
+.rs:last-child { border-bottom: 0; }
+.rs-main { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+.rs-main .rmini-t { min-width: 0; }
+.rs-main .rmini-t b { overflow: hidden; text-overflow: ellipsis; }
+.rs.cleaning .rmini-ic .ic { animation: nh-spin 2.4s linear infinite; }
+.rs-acts { display: flex; gap: 6px; flex: none; }
+.rs-btn { display: inline-flex; align-items: center; gap: 5px; min-height: 40px; padding: 0 11px; border-radius: 12px; font-size: 12.5px; font-weight: 600; background: rgba(255, 255, 255, .05); border: 1px solid var(--nh-line); }
+.rs-btn .ic { font-size: 16px; color: var(--nh-cyan); }
+.rs-btn.primary { background: rgba(68, 230, 176, .16); border-color: rgba(68, 230, 176, .45); }
+.rs-btn.primary .ic { color: var(--nh-mint); }
+.bills { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.bill { display: grid; gap: 2px; align-content: start; padding: 12px; border-radius: 18px; background: linear-gradient(180deg, rgba(var(--tone-rgb), .12), rgba(9, 23, 39, .76) 70%); border: 1px solid rgba(var(--tone-rgb), .28); }
+.bill-h { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; font-size: 13px; }
+.bill-h .ic { color: var(--tone); font-size: 16px; }
+.bill-k { font-size: 11px; color: var(--nh-dim); }
+.bill-v { font: 600 24px/1.1 var(--nh-display); }
+.bill-e { font: 600 17px/1.2 var(--nh-display); color: var(--tone); margin-bottom: 4px; }
+.bill-f { font-size: 11px; color: var(--nh-faint); }
+.hmini { display: flex; align-items: center; gap: 10px; padding: 8px 14px 8px 8px; border-radius: 18px; background: var(--nh-glass); border: 1px solid var(--nh-line); }
+.hmini-t { display: grid; gap: 2px; }
+.hmini-t b { font-size: 13px; white-space: nowrap; }
+.hmini-t small { font-size: 11.5px; color: var(--tone); font-weight: 600; white-space: nowrap; }
+.spike { display: grid; gap: 10px; }
+.spike-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.spike-now { font-size: 13px; color: var(--nh-dim); }
+.spike-now b { color: var(--nh-ink); font: 600 16px var(--nh-display); }
+.spike-auto { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; }
+.spike-auto > span { display: inline-flex; align-items: center; gap: 6px; margin-right: auto; color: var(--nh-good); }
+.act.wide { grid-auto-flow: column; justify-content: center; align-items: center; min-height: 48px; font-size: 14px; }
+.act[disabled] { opacity: .4; }
+.note { font-size: 12px; color: var(--nh-faint); }
+.note.warn { color: var(--nh-fair); }
+.field { display: grid; grid-template-columns: minmax(0, 1fr); gap: 5px; min-width: 0; }
+.field > span { font-size: 12px; color: var(--nh-dim); }
+.field-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.field input, .field select, input.mini { width: 100%; min-height: 44px; padding: 0 12px; border-radius: 12px; font: 500 14px var(--nh-body); color: var(--nh-ink); background: #0c1f33; border: 1px solid var(--nh-line-2); }
+.field input:focus-visible, .field select:focus-visible, input.mini:focus-visible { outline: 2px solid var(--nh-cyan); outline-offset: 1px; }
+input.mini { min-height: 36px; width: 120px; flex: none; font-size: 13px; }
+.checks { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
+.check-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.check { display: flex; align-items: center; gap: 10px; min-height: 40px; flex: 1; min-width: 0; font-size: 13.5px; }
+.check input { width: 20px; height: 20px; accent-color: var(--nh-cyan); flex: none; }
+.check span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.check small { color: var(--nh-faint); }
+.sheet-b h3 { margin: 14px 0 0; font: 600 13px var(--nh-display); letter-spacing: .14em; text-transform: uppercase; color: var(--nh-cyan); }
+.ctl-edit { display: grid; gap: 8px; padding: 10px; border-radius: 14px; border: 1px solid var(--nh-line); justify-items: start; }
+.ctl-edit .field, .ctl-edit .field-row { width: 100%; }
+.rmap { display: grid; gap: 12px; padding-top: 4px; border-top: 1px solid var(--nh-line); }
+.rmap-img { width: 100%; border-radius: 14px; border: 1px solid var(--nh-line); background: #07121f; }
+.floor { display: grid; gap: 6px; }
+.floor > small { font: 600 10.5px var(--nh-display); letter-spacing: .14em; text-transform: uppercase; color: var(--nh-dim); }
+.rtiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.rtile { position: relative; display: grid; place-items: center; min-height: 64px; padding: 10px 8px; border-radius: 14px; text-align: center; font-size: 13px; font-weight: 600; color: var(--nh-dim);
+  background: repeating-linear-gradient(135deg, rgba(124, 214, 255, .04) 0 6px, transparent 6px 12px), rgba(4, 12, 22, .5); border: 1px dashed rgba(124, 214, 255, .3); transition: transform .12s, background .2s; }
+.rtile:active { transform: scale(.97); }
+.rtile.on { color: #06101c; background: var(--nh-cyan); border: 1px solid transparent; box-shadow: 0 0 18px rgba(77, 227, 255, .45); }
+.rt-o { position: absolute; top: 6px; left: 8px; min-width: 18px; height: 18px; border-radius: 9px; font: 700 11px/18px var(--nh-body); font-style: normal; color: var(--nh-cyan); background: #06101c; }
+.rmap-acts { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; }
+.rmap-empty { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px; padding: 12px; border-radius: 14px; font-size: 13px; color: var(--nh-dim); background: rgba(4, 12, 22, .45); border: 1px solid var(--nh-line); }
+.rmap-empty > .ic { font-size: 18px; color: var(--nh-cyan); flex: none; }
+.rmap-empty > span { flex: 1; min-width: 180px; }
+.chip.repeat { justify-self: start; color: var(--nh-ink); }
+.dusts { display: grid; gap: 16px; }
+.dust { display: grid; gap: 4px; }
+.billcard { display: grid; gap: 10px; scroll-margin-top: 16px; }
+.bc-cycle { font-size: 13px; color: var(--nh-dim); }
+.bc-bar { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .06); overflow: hidden; }
+.bc-bar i { display: block; height: 100%; background: var(--tone); border-radius: 3px; }
+.bc-nums { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.bc-nums small { display: block; font-size: 12px; color: var(--nh-dim); }
+.bc-nums b { font: 600 34px/1.05 var(--nh-display); }
+.bc-nums b.est { color: var(--tone); }
+.sheet-nums b { font-size: 26px; }
+.heat { display: grid; gap: 8px; }
+.heat-scroll { overflow-x: auto; margin: 0 -4px; }
+.heat table { width: 100%; border-collapse: separate; border-spacing: 4px; font-size: 13px; }
+.heat th { text-align: left; font-weight: 600; white-space: nowrap; padding: 6px 4px; }
+.heat thead th { font-size: 11.5px; font-weight: 500; color: var(--nh-dim); }
+.heat thead th:not(:first-child) { text-align: center; }
+.heat tbody th { max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+.hn { display: inline-block; width: 22px; font-size: 11px; color: var(--nh-faint); font-variant-numeric: tabular-nums; }
+.heat td { min-width: 66px; padding: 9px 6px; border-radius: 8px; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; }
+.hhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.hhead > div { display: grid; gap: 2px; min-width: 0; }
+.hhead b { font-size: 14px; }
+.hhead small { font-size: 12px; color: var(--nh-dim); }
+.hgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.hcard { display: grid; justify-items: center; gap: 10px; text-align: center; }
+.hcard-h { display: flex; align-items: center; gap: 6px; justify-self: stretch; font-size: 14px; }
+.hcard-h .ic:first-child { color: var(--tone); }
+.hcard-h .ic:last-child { margin-left: auto; color: var(--nh-faint); }
+.hcard .ring { width: 104px; height: 104px; }
+.hcard .ring-v b { font-size: 32px; }
+.hcard .ring-v small { font: 500 11.5px var(--nh-body); letter-spacing: 0; color: var(--nh-ink); }
+.hcard-s { font-size: 12px; color: var(--nh-dim); }
+.hwide { display: flex; align-items: center; gap: 16px; text-align: left; width: 100%; }
+.hwide-t { display: grid; gap: 6px; }
+.hwide-t b { display: inline-flex; align-items: center; gap: 8px; font: 600 18px var(--nh-display); }
+.hwide-t b .ic { color: var(--tone); }
+.hwide-t small { font-size: 12.5px; color: var(--nh-dim); }
+.hwide .ring-v small { font: 500 12px var(--nh-body); letter-spacing: 0; color: var(--tone); }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
@@ -2112,18 +3409,19 @@ const Base = globalThis.HTMLElement || class {};
 const TABS = [
   ['home', 'Home', 'home'],
   ['air', 'Air', 'air'],
-  ['map', 'Map', 'pin'],
-  ['energy', 'Energy', 'bolt'],
   ['robots', 'Robots', 'robot'],
+  ['energy', 'Energy', 'bolt'],
+  ['map', 'Family', 'pin'],
+  ['health', 'Health', 'heart'],
 ];
-const VIEWS = { home: viewHome, air: viewAir, energy: viewEnergy, robots: viewRobots };
+const VIEWS = { home: viewHomeV2, air: viewAirV2, energy: viewEnergyV2, robots: viewRobotsV2, health: viewHealth };
 
 class NourieHome extends Base {
   constructor() {
     super();
     this._mode = 'panel';
     this._config = {};
-    this._ext = { history: {}, forecast: null, learned: null };
+    this._ext = { history: {}, forecast: null, learned: null, prefs: readStore('prefs') || {}, vacAreas: {}, spikeSuggest: {}, billing: null };
     const tab = readStore('tab');
     this._ui = {
       tab: TABS.some(([t]) => t === tab) ? tab : 'home',
@@ -2135,6 +3433,10 @@ class NourieHome extends Base {
       allCircuits: false,
       menu: false,
       mapError: false,
+      charts: {},
+      roomSel: {},
+      scoreMath: false,
+      pmRange: readStore('pm-range') === '7d' ? '7d' : '24h',
     };
     this._loading = new Set();
     this._climTimers = {};
@@ -2192,6 +3494,10 @@ class NourieHome extends Base {
     this._navButtons = [...root.querySelectorAll('.nav-b')];
     this._navDot = root.querySelector('.nav-dot');
     root.addEventListener('click', (e) => this._onClick(e));
+    root.addEventListener('change', (e) => this._onChange(e));
+    root.addEventListener('pointerdown', (e) => this._onChartPointer(e), true);
+    root.addEventListener('pointermove', (e) => this._onChartPointer(e));
+    root.addEventListener('pointerleave', (e) => this._hideChartTip(e), true);
     root.addEventListener('pointerdown', (e) => this._onPointerDown(e));
     root.addEventListener('pointermove', (e) => this._onPointerMove(e));
     root.addEventListener('pointerup', () => this._cancelPress(false));
@@ -2247,7 +3553,11 @@ class NourieHome extends Base {
     if (!this._hass || !this._root) return;
     const ui = this._ui;
     ui.menu = this._mode === 'panel' && !!this._narrow && !this._config.preview;
-    const m = Object.assign(buildModel(this._hass, this._config, this._ext), this._formatters());
+    ui.charts = {};
+    if (!this._prefsLoaded) this._loadPrefs();
+    const prefs = this._ext.prefs || {};
+    const config = prefs.people_source ? { ...this._config, people_source: prefs.people_source } : this._config;
+    const m = Object.assign(buildModel(this._hass, config, this._ext), this._formatters());
     this._model = m;
     const tiles = this._config.map?.tiles !== false;
     const onMap = ui.tab === 'map';
@@ -2280,12 +3590,260 @@ class NourieHome extends Base {
       this._learnFavorites();
     }
     if (m.weather.id && this._forecastFor !== m.weather.id) this._subscribeForecast(m.weather.id, m.weather.features);
-    if (this._ui.tab === 'air') this._history('air', m.air.rooms.map((r) => r.primary.id));
-    if (this._ui.tab === 'energy') {
-      this._history('power', m.energy.chartIds);
-      if (m.water.flowId) this._history('water', [m.water.flowId]);
+    const tab = this._ui.tab;
+    const pmIds = m.score.pm03.map((x) => x.id);
+    if (tab === 'home' || tab === 'air') this._history('pm03', pmIds, 24);
+    if (tab === 'air') {
+      this._history('air', m.air.rooms.map((r) => r.primary.id));
+      if (this._ui.pmRange === '7d') this._statsMean('pm03week', pmIds, 7 * 24);
+    }
+    if (tab === 'robots') this._history('dust', m.dust, 30 * 24);
+    if (tab === 'home' || tab === 'energy' || String(this._ui.sheet).startsWith('bill-')) this._billingData(m);
+    const mapped = m.robots.filter((r) => !r.classic && !r.litter && r.canArea);
+    if (tab === 'home' || tab === 'robots' || String(this._ui.sheet).startsWith('rooms:')) this._vacuumAreas(mapped);
+    const pm = m.spike.pm;
+    const h = this._ext.history.pm03;
+    if (pm && h?.series?.[pm] && this._ext.spikeSuggest[pm] === undefined) {
+      const vals = h.series[pm].map(([, v]) => pm03PerDl(v, m.states[pm]?.attributes?.unit_of_measurement)).filter((v) => v !== null).sort((a, b) => a - b);
+      if (vals.length > 10) {
+        const median = vals[Math.floor(vals.length / 2)];
+        this._ext.spikeSuggest[pm] = Math.max(1000, Math.round((median * 2.5) / 100) * 100);
+        this._schedule();
+      }
     }
   }
+
+  // Hourly means from long-term statistics; lighter than raw history for a week of readings.
+  async _statsMean(key, ids, hours) {
+    const list = [...new Set(ids.filter(Boolean))];
+    if (!list.length || !this._hass?.callWS) return;
+    const sig = list.join(',');
+    const cached = this._ext.history[key];
+    if ((cached && cached.sig === sig && Date.now() - cached.t < 15 * 60000) || this._loading.has(key)) return;
+    this._loading.add(key);
+    const end = Date.now();
+    const start = end - hours * 3600000;
+    try {
+      const res = await this._hass.callWS({ type: 'recorder/statistics_during_period', start_time: new Date(start).toISOString(), end_time: new Date(end).toISOString(), statistic_ids: list, period: 'hour', types: ['mean'] });
+      const series = {};
+      for (const id of list) series[id] = (res?.[id] || []).map((r) => [r.start, toNum(r.mean)]).filter((r) => r[1] !== null);
+      this._ext.history[key] = { sig, t: Date.now(), start, end, series };
+    } catch {
+      this._ext.history[key] = { sig, t: Date.now(), start, end, series: null };
+    } finally {
+      this._loading.delete(key);
+      this._schedule(true);
+    }
+  }
+
+  _resolveSource(kind, ep, info, m) {
+    const conf = ((this._ext.prefs.billing || {})[kind]) || {};
+    if (conf.stat) return { usage: conf.stat, cost: null, price: null, label: cleanName(m.states[conf.stat]?.attributes?.friendly_name || conf.stat) };
+    const costSensors = info?.cost_sensors || {};
+    const tariffs = [];
+    let name = '';
+    for (const src of ep?.energy_sources || []) {
+      if (src.type !== (kind === 'water' ? 'water' : 'grid')) continue;
+      for (const flow of Array.isArray(src.flow_from) ? src.flow_from : [src]) {
+        const usage = flow?.stat_energy_from;
+        if (!usage || tariffs.some((t) => t.usage === usage)) continue;
+        tariffs.push({ usage, cost: flow.stat_cost || costSensors[usage] || null, price: toNum(flow.number_energy_price) });
+        name ||= src.name || '';
+      }
+    }
+    if (tariffs.length) {
+      const [first] = tariffs;
+      const label = cleanName(m.states[first.usage]?.attributes?.friendly_name || name || first.usage);
+      return { ...first, tariffs, label: tariffs.length > 1 ? `${label} + ${tariffs.length - 1} more` : label };
+    }
+    const fallback = kind === 'water' ? m.water.todayId : m.energy.mains?.todayId;
+    return fallback ? { usage: fallback, cost: null, price: null, label: cleanName(m.states[fallback]?.attributes?.friendly_name || fallback) } : null;
+  }
+
+  // Hourly usage and cost since the start of the earliest billing window, plus every circuit.
+  async _billingData(m) {
+    if (this._billingBusy || !this._hass?.callWS) return;
+    const now = Date.now();
+    const b = this._ext.prefs.billing || {};
+    const from = Math.min(cycleWindow(b.electric || {}, now).start, cycleWindow(b.water || {}, now).start, addDays(startOfDay(now), -6));
+    const sig = JSON.stringify([b.electric?.stat || '', b.water?.stat || '', from]);
+    const cached = this._ext.billing;
+    if (cached && cached.sig === sig && now - cached.t < 15 * 60000) return;
+    this._billingBusy = true;
+    try {
+      if (!this._energyPrefs) {
+        this._energyPrefs = await this._hass.callWS({ type: 'energy/get_prefs' }).catch(() => ({ energy_sources: [], device_consumption: [] }));
+        this._energyInfo = await this._hass.callWS({ type: 'energy/info' }).catch(() => ({ cost_sensors: {} }));
+      }
+      const ids = { electric: this._resolveSource('electric', this._energyPrefs, this._energyInfo, m), water: this._resolveSource('water', this._energyPrefs, this._energyInfo, m) };
+      let circuits = (this._energyPrefs?.device_consumption || []).filter((d) => d.stat_consumption).map((d) => ({ stat: d.stat_consumption, name: cleanName(d.name || m.states[d.stat_consumption]?.attributes?.friendly_name || d.stat_consumption).replace(/\s*energy( today| this month)?$/i, '') }));
+      if (!circuits.length) circuits = m.energy.circuits.filter((c) => c.todayId).map((c) => ({ stat: c.todayId, name: c.name }));
+      const tariffIds = (src) => (src ? src.tariffs || [src] : []).flatMap((t) => [t.usage, t.cost]);
+      const statIds = [...new Set([...tariffIds(ids.electric), ...tariffIds(ids.water), ...circuits.map((c) => c.stat)].filter(Boolean))];
+      let rows = {};
+      if (statIds.length) {
+        const res = await this._hass.callWS({
+          type: 'recorder/statistics_during_period',
+          start_time: new Date(from).toISOString(),
+          end_time: new Date(now).toISOString(),
+          statistic_ids: statIds,
+          period: 'hour',
+          types: ['change'],
+          units: { energy: 'kWh', volume: m.water.volumeUnit === 'L' ? 'L' : 'gal' },
+        });
+        rows = Object.fromEntries(statIds.map((id) => [id, (res?.[id] || []).map((r) => ({ start: r.start, end: r.end, change: toNum(r.change) }))]));
+      }
+      this._ext.billing = { sig, t: now, from, rows, ids: { electric: ids.electric ? { ...ids.electric } : null, water: ids.water ? { ...ids.water } : null }, circuits };
+    } catch (err) {
+      this._ext.billing = { sig, t: now, from, rows: {}, ids: {}, circuits: [], error: String(err?.message || err) };
+    } finally {
+      this._billingBusy = false;
+      this._schedule(true);
+    }
+  }
+
+  // Which Home Assistant areas each robot has been matched to (Cleaning → By area in the robot's dialog).
+  async _vacuumAreas(robots) {
+    if (!this._hass?.callWS) return;
+    for (const r of robots) {
+      const have = this._ext.vacAreas[r.id];
+      if (have && (have.status === 'busy' || Date.now() - have.t < 10 * 60000)) continue;
+      this._ext.vacAreas[r.id] = { ...(have || {}), status: have?.status === 'ok' ? 'ok' : 'busy', t: Date.now() };
+      this._hass.callWS({ type: 'config/entity_registry/get', entity_id: r.id })
+        .then((entry) => {
+          const mapping = entry?.options?.vacuum?.area_mapping || {};
+          this._ext.vacAreas[r.id] = { status: 'ok', t: Date.now(), areaIds: Object.keys(mapping).filter((id) => (mapping[id] || []).length) };
+        })
+        .catch(() => {
+          this._ext.vacAreas[r.id] = { status: 'error', t: Date.now(), areaIds: [] };
+        })
+        .finally(() => this._schedule(true));
+    }
+  }
+
+  // ------------------------------------------------------------ prefs
+
+  async _loadPrefs() {
+    this._prefsLoaded = true;
+    const hass = this._hass;
+    if (!hass?.callWS || this._config.preview) return;
+    try {
+      const system = await hass.callWS({ type: 'frontend/get_system_data', key: 'nourie_home' }).then((r) => r?.value || {}).catch(() => ({}));
+      const user = hass.user?.is_admin ? {} : await hass.callWS({ type: 'frontend/get_user_data', key: 'nourie_home' }).then((r) => r?.value || {}).catch(() => ({}));
+      // A non-admin's own changes sit on top of the shared settings, path by path, so later
+      // changes an admin makes still reach them.
+      this._userPrefs = user;
+      this._ext.prefs = mergePrefs(system, user);
+      writeStore('prefs', this._ext.prefs);
+      this._ext.billing = null;
+    } catch {
+      // Keep the cached copy.
+    }
+    this._schedule(true);
+  }
+
+  _savePrefs() {
+    writeStore('prefs', this._ext.prefs);
+    clearTimeout(this._prefsTimer);
+    this._prefsTimer = setTimeout(async () => {
+      const hass = this._hass;
+      if (!hass?.callWS || this._config.preview) return;
+      const type = hass.user?.is_admin ? 'frontend/set_system_data' : 'frontend/set_user_data';
+      try {
+        await hass.callWS({ type, key: 'nourie_home', value: hass.user?.is_admin ? this._ext.prefs : this._userPrefs || {} });
+      } catch (err) {
+        this._toast(`Could not save: ${err?.message || err}`, true);
+      }
+    }, 500);
+  }
+
+  _setPref(path, value) {
+    this._ext.prefs = setPath(this._ext.prefs, path, value);
+    if (!this._hass?.user?.is_admin) this._userPrefs = setPath(this._userPrefs, path, value);
+    if (path.startsWith('billing')) this._ext.billing = this._ext.billing ? { ...this._ext.billing, t: 0 } : null;
+    this._savePrefs();
+    this._schedule(true);
+  }
+
+  _onChange(e) {
+    const el = e.target;
+    const path = el?.dataset?.pref;
+    if (!path) return;
+    const m = this._model;
+    const sheet = this._sheetHost;
+    const checkedValues = () => [...sheet.querySelectorAll(`input[type="checkbox"][data-pref="${path}"]`)].filter((x) => x.checked).map((x) => x.value);
+    if (path === 'air.pm03') {
+      const labels = Object.fromEntries((Array.isArray(this._ext.prefs.air?.pm03) ? this._ext.prefs.air.pm03 : m.score.pm03).map((x) => [x.id, x.label]));
+      const ctx = this._ctxFor();
+      return this._setPref('air.pm03', checkedValues().map((id) => ({ id, label: labels[id] || roomLabel(ctx, id) })));
+    }
+    if (path === 'air.pm03label') {
+      const list = (Array.isArray(this._ext.prefs.air?.pm03) ? this._ext.prefs.air.pm03 : m.score.pm03).map((x) => (x.id === el.dataset.id ? { ...x, label: el.value.trim() || x.label } : x));
+      return this._setPref('air.pm03', list);
+    }
+    if (path === 'air.winix' || path === 'robots.classic' || path === 'dust') return this._setPref(path, checkedValues());
+    if (path.startsWith('controls.')) {
+      const field = path.split('.')[1];
+      const list = (Array.isArray(this._ext.prefs.controls) ? this._ext.prefs.controls : m.controls.map(({ key, label, icon, on, off }) => ({ key, label, icon, on, off }))).map((x) => ({ ...x }));
+      const i = Number(el.dataset.i);
+      if (!list[i]) return null;
+      if (field === 'label') list[i].label = el.value.trim();
+      else list[i][field] = this._targetFromValue(el.value);
+      return this._setPref('controls', list);
+    }
+    if (el.tagName === 'SELECT') {
+      const v = el.value;
+      return this._setPref(path, v === '__auto__' ? undefined : v === '__none__' ? '' : v);
+    }
+    if (el.type === 'number') {
+      const v = el.value.trim();
+      return this._setPref(path, v === '' ? undefined : Number(v));
+    }
+    if (el.type === 'date') return this._setPref(path, el.value || undefined);
+    return this._setPref(path, el.value);
+  }
+
+  _ctxFor() {
+    return makeCtx(this._hass, this._config);
+  }
+
+  _targetFromValue(v) {
+    if (!v) return null;
+    const fans = this._model?.candidates().winixFans || [];
+    if (v === '__winix_turbo__') return { service: 'fan.set_percentage', data: { entity_id: fans, percentage: winixTurboPercent(this._ctxFor(), fans) } };
+    if (v === '__winix_auto__') return { service: 'fan.set_preset_mode', data: { entity_id: fans, preset_mode: 'Auto' } };
+    return { entity: v };
+  }
+
+  // ------------------------------------------------------- chart readout
+
+  _onChartPointer(e) {
+    const plot = e.target.closest?.('[data-chart]');
+    if (!plot) return;
+    const chart = this._ui.charts[plot.dataset.chart];
+    const hover = plot.querySelector('.lc-hover');
+    if (!chart || !hover) return;
+    const rect = plot.getBoundingClientRect();
+    const frac = clamp((e.clientX - rect.left) / rect.width, 0, 1);
+    const i = Math.round(frac * (chart.n - 1));
+    const bucket = (chart.end - chart.start) / chart.n;
+    const t = chart.start + (i + 0.5) * bucket;
+    const when = chart.bars
+      ? new Date(t).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+      : new Date(t).toLocaleString(undefined, chart.end - chart.start > 2 * 86400000 ? { weekday: 'short', hour: 'numeric' } : { hour: 'numeric', minute: '2-digit' });
+    const x = chart.n <= 1 ? 0 : (i / (chart.n - 1)) * 100;
+    const rows = chart.series.map((s) => `<div class="tip-row"><i style="background:${s.color}"></i><b>${s.values[i] === null || s.values[i] === undefined ? '—' : esc(fmt(s.values[i], chart.digits || 0))}</b><span>${esc(s.label)}</span></div>`).join('');
+    hover.innerHTML = `<span class="lc-cross" style="left:${x.toFixed(2)}%"></span><div class="lc-tip ${x > 60 ? 'left' : ''}" style="left:${x.toFixed(2)}%"><small>${esc(when)}</small>${rows}</div>`;
+    hover.classList.add('show');
+    clearTimeout(this._tipTimer);
+    if (e.pointerType !== 'mouse') this._tipTimer = setTimeout(() => hover.classList.remove('show'), 2600);
+  }
+
+  _hideChartTip(e) {
+    const plot = e.target?.closest?.('[data-chart]');
+    if (plot && e.pointerType === 'mouse') plot.querySelector('.lc-hover')?.classList.remove('show');
+  }
+
 
   async _history(key, ids, hours = 24) {
     const list = [...new Set(ids.filter(Boolean))];
@@ -2547,6 +4105,41 @@ class NourieHome extends Base {
         const target = this._root.getElementById(`nh-${d.to}`);
         return target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
+      case 'ctl': return this._runControl(Number(d.i), d.side);
+      case 'scoremath':
+        this._ui.scoreMath = !this._ui.scoreMath;
+        return this._schedule(true);
+      case 'pmrange':
+        this._ui.pmRange = d.range === '7d' ? '7d' : '24h';
+        writeStore('pm-range', this._ui.pmRange);
+        return this._schedule(true);
+      case 'room': return this._toggleRoom(d.vac, d.area);
+      case 'roomsall': {
+        const r = this._model?.robots.find((x) => x.id === d.vac);
+        this._ui.roomSel[d.vac] = r ? r.areas.map((a) => a.id) : [];
+        return this._schedule(true);
+      }
+      case 'roomsclear':
+        this._ui.roomSel[d.vac] = [];
+        return this._schedule(true);
+      case 'roomsrepeat':
+        this._ui.roomSel[d.vac] = [...((this._ext.prefs.lastRooms || {})[d.vac] || [])];
+        return this._cleanRooms(d.vac);
+      case 'cleanrooms': return this._cleanRooms(d.vac);
+      case 'sheet-rooms': return this._setSheet(`rooms:${d.vac}`);
+      case 'spike-save': return this._saveSpikeAutomation();
+      case 'spike-delete': return this._deleteSpikeAutomation();
+      case 'ctl-add': {
+        const list = Array.isArray(this._ext.prefs.controls) ? [...this._ext.prefs.controls] : (this._model?.controls || []).map(({ key, label, icon, on, off }) => ({ key, label, icon, on, off }));
+        list.push({ key: `custom_${list.length + 1}`, label: 'New button', icon: 'power', on: null, off: null });
+        return this._setPref('controls', list);
+      }
+      case 'ctl-remove': {
+        const list = Array.isArray(this._ext.prefs.controls) ? [...this._ext.prefs.controls] : (this._model?.controls || []).map(({ key, label, icon, on, off }) => ({ key, label, icon, on, off }));
+        list.splice(Number(d.i), 1);
+        return this._setPref('controls', list);
+      }
+      case 'pref-reset': return this._setPref(d.key, undefined);
       case 'menu': return this.dispatchEvent(new CustomEvent('hass-toggle-menu', { bubbles: true, composed: true }));
       case 'nav': return this._navigate(d.path);
       default: return null;
@@ -2626,6 +4219,87 @@ class NourieHome extends Base {
         this._schedule(true);
       }, 2500);
     }, 900);
+  }
+
+  _runControl(i, side) {
+    const c = this._model?.controls.find((x) => x.index === i);
+    const t = c?.[side];
+    if (!t) return null;
+    if (t.service) {
+      const [dom, svc] = t.service.split('.');
+      return this._call(dom, svc, t.data || {});
+    }
+    const id = t.entity;
+    const dom = domainOf(id);
+    if (dom === 'script' || dom === 'scene') return this._call(dom, 'turn_on', { entity_id: id });
+    if (dom === 'button' || dom === 'input_button') return this._call(dom, 'press', { entity_id: id });
+    if (dom === 'automation') return this._call('automation', 'trigger', { entity_id: id });
+    return this._call('homeassistant', side === 'off' ? 'turn_off' : 'turn_on', { entity_id: id });
+  }
+
+  _toggleRoom(vac, area) {
+    const sel = [...(this._ui.roomSel[vac] || [])];
+    const at = sel.indexOf(area);
+    if (at >= 0) sel.splice(at, 1);
+    else sel.push(area);
+    this._ui.roomSel[vac] = sel;
+    this._haptic('selection');
+    this._schedule(true);
+  }
+
+  async _cleanRooms(vac) {
+    const sel = this._ui.roomSel[vac] || [];
+    if (!sel.length) return;
+    const r = this._model?.robots.find((x) => x.id === vac);
+    const names = sel.map((id) => r?.areas.find((a) => a.id === id)?.name).filter(Boolean);
+    await this._call('vacuum', 'clean_area', { entity_id: vac, cleaning_area_id: sel });
+    this._toast(`${r?.name || 'Robot'} is cleaning ${names.join(', ')}`);
+    this._setPref('lastRooms', { ...(this._ext.prefs.lastRooms || {}), [vac]: sel });
+    this._ui.roomSel[vac] = [];
+    if (String(this._ui.sheet).startsWith('rooms:')) this._ui.sheet = null;
+    this._schedule(true);
+  }
+
+  async _saveSpikeAutomation() {
+    const m = this._model;
+    const s = m?.spike;
+    if (!s?.pm) return;
+    if (!m.isAdmin) return this._toast('Phone alerts need an admin account', true);
+    if (!s.notify) return this._toast('Choose a phone first', true);
+    if (!s.climateId) return this._toast('No upstairs climate found. Pick one in Customize.', true);
+    const unit = m.states[s.pm]?.attributes?.unit_of_measurement;
+    const factor = pm03PerDl(1, unit) || 1;
+    const above = Math.round(s.threshold / factor);
+    const cid = s.climateId;
+    const path = globalThis.location?.pathname || '/';
+    const config = {
+      id: SPIKE_AUTOMATION_ID,
+      alias: `Nourie Home: ${s.pmLabel} PM0.3 spike`,
+      description: `Created by the Nourie Home dashboard. Notifies when ${s.pmLabel} PM0.3 stays over ${fmt(s.threshold)} per 0.1 L for 2 minutes while ${s.climateName} is running, then waits 30 minutes before alerting again.`,
+      mode: 'single',
+      max_exceeded: 'silent',
+      triggers: [{ trigger: 'numeric_state', entity_id: s.pm, above, for: { minutes: 2 } }],
+      conditions: [{ condition: 'template', value_template: `{% set a = state_attr('${cid}', 'hvac_action') %}{{ a in ['heating', 'cooling', 'fan', 'drying', 'preheating', 'defrosting'] or (a is none and not is_state('${cid}', 'off')) }}` }],
+      actions: [
+        { action: `notify.${s.notify}`, data: { title: `${s.pmLabel} PM0.3 spike`, message: `${s.pmLabel} PM0.3 is {{ states('${s.pm}') }} while ${s.climateName} is running.`, data: { tag: 'nourie-home-pm03', url: path, clickAction: path } } },
+        { delay: { minutes: 30 } },
+      ],
+    };
+    try {
+      await this._hass.callApi('POST', `config/automation/config/${SPIKE_AUTOMATION_ID}`, config);
+      this._toast(s.automation ? 'Phone alert updated' : 'Phone alert is on');
+    } catch (err) {
+      this._toast(`Could not save the alert: ${err?.message || err}`, true);
+    }
+  }
+
+  async _deleteSpikeAutomation() {
+    try {
+      await this._hass.callApi('DELETE', `config/automation/config/${SPIKE_AUTOMATION_ID}`);
+      this._toast('Phone alert removed');
+    } catch (err) {
+      this._toast(`Could not remove the alert: ${err?.message || err}`, true);
+    }
   }
 
   _vacuumAll(service) {

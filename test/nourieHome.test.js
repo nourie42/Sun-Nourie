@@ -3,7 +3,11 @@ import assert from 'node:assert/strict';
 import {
   airLevel,
   airScore,
+  buildBilling,
   buildModel,
+  cycleWindow,
+  mergePrefs,
+  setPath,
   personStatus,
   resample,
   spreadMarks,
@@ -51,10 +55,10 @@ test('the demo home builds every section of the dashboard', () => {
   assert.equal(personStatus(jordan, model.units, true), 'Driving');
   assert.equal(model.people.find((p) => p.first === 'Sam').battery, 12);
 
-  assert.equal(model.air.rooms.length, 4);
+  assert.equal(model.air.rooms.length, 5, 'four rooms plus the Amazon monitor; the outdoor AQI is not a room');
   const kids = model.air.rooms.find((r) => r.name === 'Kids Room Air');
   assert.equal(kids.level, 2, 'PM2.5 16.4 makes the room fair even though CO2 is excellent');
-  assert.equal(kids.primary.metric, 'pm25', 'the reading that sets the rating leads the card');
+  assert.equal(kids.primary.metric, 'pm03', 'PM0.3 leads the card when a room has it');
   assert.equal(kids.hum.value, 63);
   assert.ok(model.air.tips.some((t) => t.action?.entity === 'fan.kids_purifier'), 'offers to turn on the purifier in the same room');
 
@@ -70,7 +74,7 @@ test('the demo home builds every section of the dashboard', () => {
   assert.equal(model.water.flowUnit, 'gal/min');
   assert.equal(model.water.leak, false);
 
-  assert.equal(model.robots.length, 3);
+  assert.equal(model.robots.length, 4);
   assert.equal(model.robots.find((r) => r.litter).name, 'Litter-Robot');
   assert.deepEqual(model.robots.find((r) => r.id === 'vacuum.downstairs_vis_nav').fanSpeeds, ['Quiet', 'Auto', 'Boost']);
 
@@ -103,9 +107,10 @@ test('a device air index never outvotes its own particle readings', () => {
   const model = buildModel(hass, {}, {}, NOW);
   const hall = model.air.rooms.find((r) => r.name === 'Hallway Air Quality Monitor');
   assert.equal(hall.level, 0);
-  const bedroom = model.air.rooms.find((r) => r.name === 'Bedroom');
-  assert.equal(bedroom.level, 4);
-  assert.ok(model.alerts.some((a) => a.title === 'Bedroom: CO₂ 4,200 ppm' && a.tab === 'air'));
+  assert.equal(model.air.rooms.find((r) => r.name === 'Bedroom'), undefined, 'CO2 is left out unless show_co2 is set');
+  const withCo2 = buildModel(hass, { show_co2: true }, {}, NOW);
+  assert.equal(withCo2.air.rooms.find((r) => r.name === 'Bedroom').level, 4);
+  assert.ok(withCo2.alerts.some((a) => a.title === 'Bedroom: CO₂ 4,200 ppm' && a.tab === 'air'));
 });
 
 test('Emporia circuits without a mains channel add up to an estimated total', () => {
@@ -170,4 +175,50 @@ test('the map uses keyless tiles unless a CARTO key or custom URL is set', () =>
   assert.match(carto[0].url, /rastertiles\/dark_all\/.*\?key=abc%20123$/);
   const custom = tileLayers({ tile_url: 'https://tiles.example.com/{z}/{x}/{y}.png', attribution: 'Example' });
   assert.deepEqual(custom.map((l) => [l.url, l.options.attribution]), [['https://tiles.example.com/{z}/{x}/{y}.png', 'Example']]);
+});
+
+const local = (s) => new Date(s).getTime();
+const hourly = (from, hours, change) => Array.from({ length: hours }, (_, i) => ({ start: local(from) + i * 3600000, end: local(from) + (i + 1) * 3600000, change }));
+
+test('billing cycles default to the calendar month and roll forward after the bill date', () => {
+  const jan = cycleWindow({}, local('2026-01-31T12:00'));
+  assert.deepEqual([jan.startDay, jan.endDay, jan.day, jan.days], ['2026-01-01', '2026-02-01', 31, 31]);
+  const feb = cycleWindow({}, local('2027-02-28T12:00'));
+  assert.deepEqual([feb.endDay, feb.days], ['2027-03-01', 28]);
+  const rolled = cycleWindow({ start: '2026-09-10', end: '2026-10-10' }, local('2026-10-16T12:00'));
+  assert.deepEqual([rolled.startDay, rolled.endDay, rolled.day, rolled.rolled], ['2026-10-10', '2026-11-09', 7, 1]);
+});
+
+test('the bill estimate projects spend over the cycle and waits for enough data', () => {
+  const prefs = { billing: { electric: { start: '2026-10-01', end: '2026-10-31', rate: 0.2, fixed: 10 } } };
+  const raw = { ids: { electric: { usage: 'grid', cost: null, price: null } }, rows: { grid: hourly('2026-10-01T00:00', 15 * 24, 1) } };
+  const e = buildBilling(null, prefs, raw, local('2026-10-16T00:00')).electric;
+  assert.equal(e.usage, 360);
+  assert.equal(Math.round(e.spent * 100), 7200);
+  assert.equal(Math.round(e.estimate * 100), 15400, '$72 over half the cycle is $144, plus the $10 fixed charge');
+
+  const lagging = { ids: raw.ids, rows: { grid: hourly('2026-10-01T00:00', 1, 1) } };
+  assert.equal(buildBilling(null, prefs, lagging, local('2026-10-02T10:00')).electric.estimate, null, 'one hour of late data is not projected over the month');
+
+  const noPrice = buildBilling(null, {}, raw, local('2026-10-16T00:00')).electric;
+  assert.equal(noPrice.spent, null);
+  assert.equal(noPrice.needsRate, true);
+});
+
+test('time-of-use tariffs are added together', () => {
+  const raw = {
+    ids: { electric: { usage: 'peak', tariffs: [{ usage: 'peak', cost: 'peak_cost', price: null }, { usage: 'off', cost: 'off_cost', price: null }] } },
+    rows: { peak: hourly('2026-10-01T00:00', 24, 1), off: hourly('2026-10-01T00:00', 24, 0.5), peak_cost: hourly('2026-10-01T00:00', 24, 0.3), off_cost: hourly('2026-10-01T00:00', 24, 0.05) },
+  };
+  const e = buildBilling(null, {}, raw, local('2026-10-02T00:00')).electric;
+  assert.equal(e.usage, 36);
+  assert.equal(Math.round(e.spent * 100), 840);
+});
+
+test("a non-admin's own settings sit on top of the shared ones, path by path", () => {
+  const shared = { billing: { electric: { rate: 0.12 }, water: { rate: 0.01 } } };
+  let mine = setPath({}, 'billing.electric.rate', 0.2);
+  assert.deepEqual(mergePrefs(shared, mine).billing, { electric: { rate: 0.2 }, water: { rate: 0.01 } });
+  mine = setPath(mine, 'billing.electric.rate', undefined);
+  assert.equal(mergePrefs(shared, mine).billing.electric.rate, 0.12);
 });

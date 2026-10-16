@@ -27,6 +27,8 @@ export function createMockHass(data, onChange) {
   }
 
   let hass;
+  const store = {};
+  const automations = {};
   const commit = () => {
     hass = { ...hass, states: { ...states } };
     onChange?.(hass);
@@ -90,7 +92,7 @@ export function createMockHass(data, onChange) {
     entities,
     devices: data.devices || {},
     areas: data.areas || {},
-    user: data.user || { name: 'Alex' },
+    user: data.user || { name: 'Alex', is_admin: true },
     config: { unit_system: { temperature: '°F', length: 'mi' }, version: '2026.10.0', ...(data.config || {}) },
     locale: { language: 'en', time_format: 'language' },
     themes: { darkMode: true },
@@ -113,6 +115,23 @@ export function createMockHass(data, onChange) {
         return out;
       }
       if (msg.type === 'logbook/get_events') return data.logbook?.() || [];
+      if (msg.type === 'recorder/statistics_during_period') {
+        const from = Date.parse(msg.start_time);
+        const to = Date.parse(msg.end_time || new Date().toISOString());
+        const out = {};
+        for (const id of msg.statistic_ids) out[id] = data.statistics?.(id, from, to, msg.types || [], states[id]) || [];
+        return out;
+      }
+      if (msg.type === 'energy/get_prefs') return data.energyPrefs || { energy_sources: [], device_consumption: [] };
+      if (msg.type === 'energy/info') return { cost_sensors: data.costSensors || {}, solar_forecast_domains: [] };
+      if (msg.type === 'config/entity_registry/get') {
+        return { ...entities[msg.entity_id], options: { vacuum: { area_mapping: data.areaMapping?.[msg.entity_id] || {} } } };
+      }
+      if (msg.type === 'frontend/get_system_data' || msg.type === 'frontend/get_user_data') return { value: store[msg.key] ?? null };
+      if (msg.type === 'frontend/set_system_data' || msg.type === 'frontend/set_user_data') {
+        store[msg.key] = msg.value;
+        return null;
+      }
       throw new Error(`Unknown command ${msg.type}`);
     },
     connection: {
@@ -124,12 +143,29 @@ export function createMockHass(data, onChange) {
       },
     },
     hassUrl: (path) => path,
+    floors: data.floors || {},
+    services: { notify: Object.fromEntries((data.notify || []).map((n) => [n, {}])) },
+    callApi: async (method, path, body) => {
+      await new Promise((r) => setTimeout(r, 200));
+      const m = /^config\/automation\/config\/(.+)$/.exec(path);
+      if (!m) throw new Error(`Unknown API ${path}`);
+      const id = `automation.${m[1]}`;
+      if (method === 'DELETE') delete states[id];
+      else {
+        states[id] = { entity_id: id, state: 'on', attributes: { id: m[1], friendly_name: body.alias }, last_changed: new Date().toISOString(), last_updated: new Date().toISOString(), context: {} };
+        automations[m[1]] = body;
+      }
+      commit();
+      return { result: 'ok' };
+    },
   };
 
   return {
     get hass() {
       return hass;
     },
+    store,
+    automations,
     states,
     set,
     commit,
@@ -154,7 +190,10 @@ export function synthHistory(st, from, to) {
     const d = new Date(t);
     const h = d.getHours() + d.getMinutes() / 60;
     let v;
-    if (dc === 'carbon_dioxide') {
+    if (/pm0_3|pm03/.test(st.entity_id)) {
+      const cooking = (h > 7 && h < 8.3) || (h > 18 && h < 19.5) ? 3.2 : 1;
+      v = cur * 0.55 * cooking * (0.8 + rnd() * 0.4);
+    } else if (dc === 'carbon_dioxide') {
       const night = h >= 22 || h < 7 ? 1 : 0;
       v = 470 + night * 520 * Math.sin(((h + 2) % 24) / 9 * Math.PI) ** 2 + rnd() * 60;
     } else if (dc === 'pm25' || dc === 'pm10' || dc === 'pm1') {
@@ -178,4 +217,36 @@ export function synthHistory(st, from, to) {
   }
   out.push([to - 60000, cur]);
   return out;
+}
+
+// Hourly statistics rows: energy and water as hourly change, anything else as an hourly mean.
+export function synthStatistics(id, from, to, types, st) {
+  let seed = 0;
+  for (const c of id) seed = (seed * 31 + c.charCodeAt(0)) >>> 0;
+  const rnd = () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 4294967296;
+  };
+  const hour = 3600000;
+  const rows = [];
+  const unit = String(st?.attributes?.unit_of_measurement || '');
+  const cost = /cost/i.test(id) || unit === '$';
+  const water = /flume|gal/i.test(`${id} ${unit}`);
+  const share = /air_conditioner|ac\b/.test(id) ? 0.4 : /dryer/.test(id) ? 0.14 : /water_heater/.test(id) ? 0.12 : /ev_charger/.test(id) ? 0.1 : /kitchen/.test(id) ? 0.06 : /refrigerator/.test(id) ? 0.05 : /office/.test(id) ? 0.04 : /lighting/.test(id) ? 0.03 : /washer/.test(id) ? 0.02 : 1;
+  for (let t = Math.floor(from / hour) * hour; t < to; t += hour) {
+    const h = new Date(t).getHours();
+    const base = (h >= 7 && h < 9 ? 1.6 : h >= 17 && h < 22 ? 2.4 : h < 6 ? 0.5 : 1.0) * (0.75 + rnd() * 0.5);
+    let change;
+    if (water) change = (h === 6 || h === 7 ? 18 : h === 20 || h === 21 ? 12 : rnd() < 0.3 ? 4 * rnd() : 0) * (0.8 + rnd() * 0.4);
+    else change = base * share * 1.15;
+    if (cost) change *= 0.14;
+    const row = { start: t, end: t + hour };
+    if (types.includes('change')) row.change = Math.round(change * 1000) / 1000;
+    if (types.includes('mean')) {
+      const cur = Number(st?.state) || 0;
+      row.mean = Math.max(0, cur * (0.6 + rnd() * 0.8) * (h >= 17 && h < 20 ? 1.8 : 1));
+    }
+    rows.push(row);
+  }
+  return rows;
 }

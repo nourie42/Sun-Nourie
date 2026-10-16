@@ -1,16 +1,22 @@
 // A made-up home for trying the dashboard. Every name, place and reading here is fictional.
-import { synthHistory } from './mock-hass.js';
+import { synthHistory, synthStatistics } from './mock-hass.js';
 
 const HOME = { lat: 39.7392, lon: -104.9903 };
 const e = (id, name, state, attrs = {}, extra = {}) => ({ id, name, state, attrs, ...extra });
 
+const floors = {
+  main: { floor_id: 'main', name: 'Main floor', level: 0 },
+  upstairs: { floor_id: 'upstairs', name: 'Upstairs', level: 1 },
+};
+
 const areas = {
-  living: { area_id: 'living', name: 'Living Room' },
-  kitchen: { area_id: 'kitchen', name: 'Kitchen' },
-  primary: { area_id: 'primary', name: 'Primary Bedroom' },
-  kids: { area_id: 'kids', name: 'Kids Room' },
-  office: { area_id: 'office', name: 'Office' },
-  garage: { area_id: 'garage', name: 'Garage' },
+  living: { area_id: 'living', name: 'Living Room', floor_id: 'main' },
+  kitchen: { area_id: 'kitchen', name: 'Kitchen', floor_id: 'main' },
+  dining: { area_id: 'dining', name: 'Dining Room', floor_id: 'main' },
+  primary: { area_id: 'primary', name: 'Primary Bedroom', floor_id: 'upstairs' },
+  kids: { area_id: 'kids', name: 'Kids Room', floor_id: 'upstairs' },
+  office: { area_id: 'office', name: 'Office', floor_id: 'upstairs' },
+  garage: { area_id: 'garage', name: 'Garage', floor_id: 'main' },
   basement: { area_id: 'basement', name: 'Basement' },
 };
 
@@ -21,8 +27,13 @@ const devices = {
   aq_office: { id: 'aq_office', name: 'Office Air', area_id: 'office', model: 'Air monitor' },
   vue: { id: 'vue', name: 'Emporia Vue', model: 'Vue 3' },
   flume: { id: 'flume', name: 'Flume Sensor', model: 'Flume 2' },
-  vac_up: { id: 'vac_up', name: 'Upstairs Vis Nav', area_id: 'primary', model: '360 Vis Nav' },
-  vac_down: { id: 'vac_down', name: 'Downstairs Vis Nav', area_id: 'living', model: '360 Vis Nav' },
+  vac_up: { id: 'vac_up', name: 'Upstairs Vis Nav', area_id: 'primary', model: '360 Vis Nav', manufacturer: 'Dyson' },
+  vac_down: { id: 'vac_down', name: 'Downstairs Vis Nav', area_id: 'living', model: '360 Vis Nav', manufacturer: 'Dyson' },
+  rosie: { id: 'rosie', name: 'Rosie', area_id: 'kitchen', model: 'S8', manufacturer: 'Roborock' },
+  amazon_aq: { id: 'amazon_aq', name: 'First Air Quality Monitor', model: 'Smart Air Quality Monitor', manufacturer: 'Amazon' },
+  winix_primary: { id: 'winix_primary', name: 'Primary Purifier', area_id: 'primary', manufacturer: 'Winix' },
+  winix_kids: { id: 'winix_kids', name: 'Kids Purifier', area_id: 'kids', manufacturer: 'Winix' },
+  oura: { id: 'oura', name: 'Oura Ring', manufacturer: 'Oura' },
   litter: { id: 'litter', name: 'Litter-Robot', area_id: 'basement', model: 'Litter-Robot 4' },
 };
 
@@ -61,8 +72,25 @@ const entities = [
   e('sensor.office_air_pm25', 'Office Air PM2.5', 6.8, { device_class: 'pm25', unit_of_measurement: 'µg/m³' }, { device: 'aq_office' }),
   e('sensor.office_air_temperature', 'Office Air Temperature', 73.1, { device_class: 'temperature', unit_of_measurement: '°F' }, { device: 'aq_office' }),
 
-  e('fan.primary_purifier', 'Primary Purifier', 'on', { percentage: 50, percentage_step: 25, preset_mode: 'Auto', preset_modes: ['Auto', 'Manual', 'Sleep'], supported_features: 57 }, { area: 'primary', platform: 'winix' }),
-  e('fan.kids_purifier', 'Kids Purifier', 'off', { percentage: 0, percentage_step: 25, preset_modes: ['Auto', 'Manual', 'Sleep'], supported_features: 57 }, { area: 'kids', platform: 'winix' }),
+  e('fan.primary_purifier', 'Primary Purifier', 'on', { percentage: 50, percentage_step: 25, preset_mode: 'Auto', preset_modes: ['Auto', 'Manual', 'Sleep'], supported_features: 57 }, { area: 'primary', platform: 'winix', device: 'winix_primary' }),
+  e('fan.kids_purifier', 'Kids Purifier', 'off', { percentage: 0, percentage_step: 25, preset_modes: ['Auto', 'Manual', 'Sleep'], supported_features: 57 }, { area: 'kids', platform: 'winix', device: 'winix_kids' }),
+  e('sensor.primary_purifier_air_qvalue', 'Primary Purifier Air QValue', 41, { unit_of_measurement: 'qv', air_quality: 'good' }, { platform: 'winix', device: 'winix_primary' }),
+  e('sensor.kids_purifier_air_qvalue', 'Kids Purifier Air QValue', 77, { unit_of_measurement: 'qv', air_quality: 'fair' }, { platform: 'winix', device: 'winix_kids' }),
+  e('sensor.primary_bedroom_air_pm0_3', 'Primary Bedroom Air PM0.3', 420, { unit_of_measurement: '/dL', state_class: 'measurement' }, { device: 'aq_primary' }),
+  e('sensor.kids_room_air_pm0_3', 'Kids Room Air PM0.3', 1840, { unit_of_measurement: '/dL', state_class: 'measurement' }, { device: 'aq_kids' }),
+  e('sensor.living_room_air_pm0_3', 'Living Room Air PM0.3', 610, { unit_of_measurement: '/dL', state_class: 'measurement' }, { device: 'aq_living' }),
+  e('sensor.first_air_quality_monitor_air_quality_index', 'First Air Quality Monitor Air quality index', 92, { device_class: 'aqi' }, { platform: 'alexa_media', device: 'amazon_aq' }),
+  e('sensor.airnow_aqi', 'AirNow AQI', 38, { device_class: 'aqi' }, { platform: 'airnow' }),
+  e('script.quiet_on', 'Quiet On', 'off', { last_triggered: new Date(Date.now() - 40 * 60000).toISOString() }),
+  e('script.quiet_off', 'Quiet Off', 'off', { last_triggered: new Date(Date.now() - 200 * 60000).toISOString() }),
+  e('fan.master_fan', 'Master Fan', 'on', { percentage: 60, supported_features: 49 }, { area: 'primary' }),
+  e('sensor.oura_ring_readiness_score', 'Oura Ring Readiness Score', 42, {}, { device: 'oura' }),
+  e('sensor.oura_ring_sleep_score', 'Oura Ring Sleep Score', 64, {}, { device: 'oura' }),
+  e('sensor.oura_ring_resilience', 'Oura Ring Resilience', 27, {}, { device: 'oura' }),
+  e('sensor.oura_ring_total_sleep_duration', 'Oura Ring Total Sleep Duration', 4.75, { unit_of_measurement: 'h' }, { device: 'oura' }),
+  e('sensor.oura_ring_battery', 'Oura Ring Battery', 18, { device_class: 'battery', unit_of_measurement: '%' }, { device: 'oura' }),
+  e('sensor.sick_score', 'Sick Score', 67, {}),
+  e('sensor.heart_score', 'Heart Score', 57, {}),
   e('fan.primary_ceiling_fan', 'Primary Ceiling Fan', 'on', { percentage: 100, supported_features: 49 }, { area: 'primary' }),
   e('light.kitchen', 'Kitchen Lights', 'on', { brightness: 204 }, { area: 'kitchen', ago: 40 }),
   e('light.living_room_lamps', 'Living Room Lamps', 'off', {}, { area: 'living', ago: 300 }),
@@ -74,7 +102,7 @@ const entities = [
   e('scene.movie_night', 'Movie Night', '2026-10-15T20:10:00Z', {}),
 
   e('climate.living_room', 'Living Room', 'cool', { current_temperature: 75.5, temperature: 74, hvac_action: 'cooling', hvac_modes: ['off', 'heat', 'cool', 'heat_cool'], min_temp: 50, max_temp: 90, target_temp_step: 1, current_humidity: 46 }, { area: 'living' }),
-  e('climate.upstairs', 'Upstairs', 'heat_cool', { current_temperature: 71, target_temp_low: 68, target_temp_high: 75, hvac_action: 'idle', hvac_modes: ['off', 'heat', 'cool', 'heat_cool'], min_temp: 50, max_temp: 90 }, { area: 'primary' }),
+  e('climate.upstairs', 'Upstairs', 'heat_cool', { current_temperature: 71, target_temp_low: 68, target_temp_high: 75, hvac_action: 'cooling', hvac_modes: ['off', 'heat', 'cool', 'heat_cool'], min_temp: 50, max_temp: 90 }, { area: 'primary' }),
 
   e('binary_sensor.front_door', 'Front Door', 'off', { device_class: 'door' }, { ago: 35 }),
   e('binary_sensor.back_door', 'Back Door', 'off', { device_class: 'door' }, { ago: 180 }),
@@ -113,6 +141,8 @@ const entities = [
   e('sensor.upstairs_vis_nav_last_clean', 'Upstairs Vis Nav Last clean area', 612, { unit_of_measurement: 'ft²' }, { device: 'vac_up' }),
   e('vacuum.downstairs_vis_nav', 'Downstairs Vis Nav', 'cleaning', { battery_level: 64, fan_speed: 'Boost', fan_speed_list: ['Quiet', 'Auto', 'Boost'], supported_features: 14204 }, { device: 'vac_down' }),
   e('sensor.downstairs_vis_nav_cleaned_area', 'Downstairs Vis Nav Cleaned area', 238, { unit_of_measurement: 'ft²' }, { device: 'vac_down' }),
+  e('sensor.upstairs_vis_nav_dust_score', 'Upstairs Vis Nav Dust score', 34, { state_class: 'measurement' }, { device: 'vac_up' }),
+  e('vacuum.rosie', 'Rosie', 'docked', { battery_level: 88, fan_speed: 'Balanced', fan_speed_list: ['Quiet', 'Balanced', 'Turbo', 'Max'], supported_features: 30588 }, { device: 'rosie' }),
   e('vacuum.litter_robot', 'Litter-Robot Litter box', 'docked', { status: 'Ready' }, { device: 'litter', platform: 'litterrobot' }),
   e('sensor.litter_robot_waste_drawer', 'Litter-Robot Waste drawer', 46, { unit_of_measurement: '%' }, { device: 'litter', platform: 'litterrobot' }),
 
@@ -132,11 +162,24 @@ const forecast = (type) => {
   }));
 };
 
+const circuitNames = ['Air Conditioner', 'Kitchen', 'Office', 'Refrigerator', 'Lighting', 'Dryer', 'Washer', 'Water Heater', 'EV Charger'];
+
 export const demoHome = {
+  floors,
+  notify: ['mobile_app_alex_phone'],
+  areaMapping: { 'vacuum.rosie': { living: ['1'], kitchen: ['2'], dining: ['3'], office: ['4'], primary: ['5'], kids: ['6'] } },
+  energyPrefs: {
+    energy_sources: [
+      { type: 'grid', stat_energy_from: 'sensor.emporia_vue_energy_today', stat_energy_to: null, stat_cost: null, entity_energy_price: null, number_energy_price: 0.14, cost_adjustment_day: 0 },
+      { type: 'water', stat_energy_from: 'sensor.flume_sensor_current_day', stat_cost: null, entity_energy_price: null, number_energy_price: 0.006 },
+    ],
+    device_consumption: circuitNames.map((name) => ({ stat_consumption: `sensor.${name.toLowerCase().replace(/ /g, '_')}_energy_today`, name })),
+  },
+  statistics: synthStatistics,
   areas,
   devices,
   entities,
-  user: { name: 'Alex Rivera' },
+  user: { name: 'Alex Rivera', is_admin: true },
   config: { latitude: HOME.lat, longitude: HOME.lon, unit_system: { temperature: '°F', length: 'mi' } },
   forecast,
   history: synthHistory,
