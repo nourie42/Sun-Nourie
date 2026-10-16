@@ -785,7 +785,8 @@ function buildAlerts(ctx, model, now) {
     const d = domainOf(id);
     const dc = st.attributes.device_class;
     const name = cleanName(ctx.name(id));
-    const open = `for ${since(st.last_changed, now)}`;
+    const ago = since(st.last_changed, now);
+    const open = ago === 'just now' ? 'Just opened' : `Open for ${ago}`;
     if (d === 'binary_sensor' && st.state === 'on') {
       if (dc === 'moisture') add(0, 'drop', `Water detected: ${name}`, 'Check for a leak', { entity: id });
       else if (['smoke', 'carbon_monoxide', 'gas', 'safety'].includes(dc)) add(0, 'alert', name, titleCase(String(dc).replace(/_/g, ' ')), { entity: id });
@@ -803,13 +804,13 @@ function buildAlerts(ctx, model, now) {
   }
   if (model.water.leak) add(0, 'drop', 'Flume detected a leak', 'Water has been running without a break', { tab: 'energy' });
   else if (model.water.high) add(1, 'drop', 'High water flow', `${fmt(model.water.flow, 1)} ${model.water.flowUnit} right now`, { tab: 'energy' });
-  for (const r of model.robots) if (r.state === 'error') add(1, r.litter ? 'cat' : 'robot', `${r.name} needs help`, r.error || 'Stopped with an error', { tab: 'robots' });
   for (const r of model.air.rooms) {
     if (r.level >= 3 && r.worst) {
       const def = AIR_METRICS[r.worst.metric];
       add(r.level >= 4 ? 1 : 2, 'air', `${r.name}: ${def.label} ${fmt(r.worst.value, def.digits)} ${def.unit}`.trim(), `${LEVEL_LABELS[r.level]} air`, { tab: 'air' });
     }
   }
+  for (const r of model.robots) if (r.state === 'error') add(1, r.litter ? 'cat' : 'robot', `${r.name} needs help`, r.error || 'Stopped with an error', { tab: 'robots' });
   for (const p of model.people) if (p.battery !== null && p.battery <= 15 && !p.charging) add(2, 'battery', `${p.first}'s phone is at ${fmt(p.battery)}%`, 'Location updates may stop', { tab: 'map' });
   return alerts.sort((a, b) => a.level - b.level);
 }
@@ -1241,9 +1242,12 @@ function roomCard(m, r) {
     if (chart) spark = `${chart.svg}${chart.dot}`;
   }
   const scale = scaleStyle(r.primary.metric, r.primary.value);
+  const rated = (x) => x.metric !== 'aqi' || Object.keys(r.metrics).length === 1;
   const others = Object.values(r.metrics).filter((x) => x !== r.primary).map((x) => {
     const d = AIR_METRICS[x.metric];
-    return `<span class="chip t-${LEVEL_TONES[x.level]}"><i class="dot"></i>${esc(d.label)} <b>${fmt(x.value, d.digits)}</b></span>`;
+    return rated(x)
+      ? `<span class="chip t-${LEVEL_TONES[x.level]}"><i class="dot"></i>${esc(d.label)} <b>${fmt(x.value, d.digits)}</b></span>`
+      : `<span class="chip">${esc(d.label)} <b>${fmt(x.value, d.digits)}</b></span>`;
   });
   if (r.temp) others.push(`<span class="chip">${ic('thermo')}<b>${fmt(r.temp.value, 1)}°</b></span>`);
   if (r.hum) others.push(`<span class="chip">${ic('drop')}<b>${fmt(r.hum.value)}%</b></span>`);
@@ -1477,7 +1481,7 @@ function robotCard(r) {
       ${r.error ? `<div class="rb-err">${ic('alert')}<span>${esc(r.error)}</span></div>` : ''}
       ${acts.length ? `<div class="acts">${acts.join('')}</div>` : ''}
       ${r.fanSpeeds.length ? `<div class="rb-speed"><small>Suction</small><div class="seg t-mint">${r.fanSpeeds.map((s) => `<button class="${s === r.fanSpeed ? 'on' : ''}" data-act="vacspeed" data-entity="${id}" data-speed="${esc(s)}">${esc(titleCase(s))}</button>`).join('')}</div></div>` : ''}
-      ${r.stats.length || r.controls.length ? `<div class="chips">${r.stats.map((s) => `<button class="chip" data-act="more" data-entity="${esc(s.id)}">${esc(s.label)} <b>${esc(s.value)}</b></button>`).join('')}${r.controls.map((c) => `<button class="chip ${c.on ? 'on' : ''}" data-act="${c.press ? 'press' : 'toggle'}" data-entity="${esc(c.id)}">${ic(c.press ? 'spark' : 'power')}${esc(c.label)}</button>`).join('')}</div>` : ''}
+      ${r.stats.length || r.controls.length ? `<div class="chips">${r.stats.map((s) => `<button class="chip" data-act="more" data-entity="${esc(s.id)}">${esc(s.label)} <b>${esc(s.value)}</b></button>`).join('')}${r.controls.map((c) => `<button class="chip ${c.on ? 'on' : ''}" data-act="${c.press ? 'press' : 'toggle'}" data-entity="${esc(c.id)}">${ic(/find|locate/i.test(c.label) ? 'locate' : c.press ? 'spark' : 'power')}${esc(c.label)}</button>`).join('')}</div>` : ''}
     </article>`;
 }
 
@@ -1723,7 +1727,7 @@ img { max-width: 100%; }
 .foot { text-align: center; font-size: 11.5px; color: var(--nh-faint); }
 .vh { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .vh > .icon-btn { align-self: center; }
-.vh-t { flex: 1; min-width: 0; }
+.vh-t { flex: 1 1 200px; min-width: 0; }
 .vh h1 { font: 600 26px/1.1 var(--nh-display); letter-spacing: .01em; margin-top: 6px; }
 .vh-acts { display: flex; gap: 6px; }
 .seg { display: inline-flex; gap: 4px; padding: 4px; border-radius: 14px; background: rgba(4, 12, 22, .55); border: 1px solid var(--nh-line); }
@@ -1926,7 +1930,7 @@ img { max-width: 100%; }
 .batt { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; font-size: 12px; font-weight: 600; color: var(--nh-dim); white-space: nowrap; }
 .batt .ic { font-size: 15px; }
 .batt.low { color: var(--nh-bad); }
-.radar { position: absolute; inset: 0; display: grid; place-items: center; padding: calc(78px + var(--nh-top)) 18px calc(var(--nh-nav-h) + 128px); }
+.radar { position: absolute; inset: 0; overflow: hidden; display: grid; place-items: center; padding: calc(78px + var(--nh-top)) 18px calc(var(--nh-nav-h) + 128px); }
 .radar-box { position: relative; width: min(90vw, 430px); height: min(90vw, 430px); }
 @supports (width: 1cqh) {
   .radar { container-type: size; }
