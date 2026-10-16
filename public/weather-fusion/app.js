@@ -1,12 +1,13 @@
+import {rainTiming,rainTimingHTML} from './rain-timing.js?v=tonight-timing-v1';
 import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText,rebindDanTake} from './dans-take.js?v=weather-art-labels-v10';
 import {danCard,danTakeDisplay} from './dans-summary.js?v=air-moisture-v1';
 import {fetchJsonWithDeadline} from './request-deadline.js?v=loading-recovery-v1';
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
-import {weatherIcon,renderHourlyWeather,currentSample} from './weather-display.js?v=cold-feels-v1';
+import {weatherIcon,renderHourlyWeather,currentSample} from './weather-display.js?v=tonight-timing-v1';
 import {dayGraphHTML,dayGraphPoints,installDayGraph} from './day-graph.js?v=calendar-surface-v2';
 import {degrees,feelsAt,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=cold-feels-v1';
 import {createFramePlayer} from './frame-player.js';
-import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=air-moisture-v1';
+import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=tonight-timing-v1';
 import {dailyDisplay} from './weather-math.js?v=cold-feels-v1';
 import {conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
 import {currentHero} from './current-temperature.js?v=rain-now-v71';
@@ -15,18 +16,18 @@ import {withLiveAlerts,retainUnverifiedAlerts,alertLocationKey,ALERT_REFRESH_MS}
 import {modelFreshnessText} from './personal-details.js?v=cold-feels-v1';
 import {renderDewpointMeter} from './dewpoint-meter.js?v=air-moisture-v1';
 import {renderWeatherPanel} from './render-safety.js';
-import {forecastPeriodSummary} from './forecast-story.js?v=cold-feels-v1';
-import {forecastOutlookDetails} from './outlook-details.js?v=calendar-surface-v2';
-import {isExperimentalWeatherPage,renderCarWashForecast,resetCarWashForecast} from './car-wash.js?v=air-moisture-v1';
+import {forecastPeriodSummary} from './forecast-story.js?v=tonight-timing-v1';
+import {forecastOutlookDetails} from './outlook-details.js?v=tonight-timing-v1';
+import {isExperimentalWeatherPage,renderCarWashForecast,resetCarWashForecast} from './car-wash.js?v=tonight-timing-v1';
 import {renderModelExplanation,resetModelExplanation} from './model-explanation.js?v=calendar-surface-v2';
-import {updateRainTrend} from './rain-trend.js?v=cold-feels-v1';
+import {updateRainTrend} from './rain-trend.js?v=tonight-timing-v1';
 import {renderRiskOutlooks,resetRiskOutlooks} from './risk-outlooks.js?v=risk-outlooks-v5';
 import {renderAirQuality} from './air-quality.js?v=mobile-repair-v1';
 import {displayedRainChance} from './rain-display.js?v=rain-observed-v1';
 import {weatherChangeMessages,WEATHER_CHANGE_TITLE} from './weather-changes.js?v=air-moisture-v1';
 import {renderSnowOutlook,resetSnowOutlook} from './snow-outlook.js?v=snow-readable-v1';
 import {renderForecastWindowBanners,resetForecastWindowBanners} from './forecast-window-banners.js?v=cold-feels-v1';
-import {createSevenDayCarousel} from './seven-day.js?v=snow-readable-v1';
+import {createSevenDayCarousel} from './seven-day.js?v=tonight-timing-v1';
 import {forecastSourceHealth} from './forecast-status.js?v=source-health-v1';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);
@@ -392,7 +393,7 @@ function showDay(index, { preserve = false } = {}) {
   const focusedId=focused?.id,focusedSummary=focused?.matches('.dialog-confidence > summary');
   const story=forecastPeriodSummary(forecast,index,phase,now),storyRain=displayedRainChance(forecast,story.chance,{dayIndex:index,now}),overnight=!p.tonight?forecastPeriodSummary(forecast,index,'overnight',now):null;
   const condition=phase==='overall'?`Day: ${d.condition||'forecast unavailable'} · Night: ${d.nightCondition||'forecast unavailable'}`:p.condition;
-  root.innerHTML=`<div class="dialog-eyebrow">WEATHER NOURIE</div><h2 id="day-title" class="dialog-title">${esc(p.label)}</h2><p class="dialog-condition">${esc(condition)}</p><div class="dialog-temps">${temperature(p.primary)}<span>${p.primaryLabel.toLowerCase()}${!p.tonight&&finite(p.secondary)?` · ${temperature(p.secondary)} low`:''}</span></div>${!p.tonight?'<p class="dialog-prose">Daytime high · following-night low. The graph also includes early-morning hours.</p>':''}${dayGraphHTML(forecast,index,p.tonight,now)}<div class="dialog-stats"><div><strong>${percent(storyRain.value)}</strong><small>${storyRain.observed?'Rain observed now · later hours remain forecasts':p.tonight?'Rain chance tonight':phase==='overall'?'Peak hourly rain chance on this date':'Rain chance today'}</small></div><div><strong>${inches(story.amount)}</strong><small>${p.tonight?'Forecast rain through morning':phase==='overall'?'Total precipitation on this date':'Expected rain today'}</small></div></div><p class="dialog-prose">${esc(story.summary)}</p>${overnight?`<h3 class="dialog-subtitle">Overnight · ${percent(overnight.chance)} rain chance</h3><p class="dialog-prose">${esc(overnight.summary)}</p>`:''}${dailyConfidenceNoticeHTML(d.confidence,true)}${d.confidence?`<details class="dialog-confidence" data-confidence="${esc(d.confidence.key)}"><summary>Forecast confidence: ${esc(d.confidence.label)} · ${d.confidence.sourceCount??'?'} source${d.confidence.sourceCount===1?'':'s'}</summary><p>${esc(d.confidence.factors.join(' · '))}</p><small>${esc(d.confidence.note)}</small></details>`:''}<a href="#scientific-stuff" class="science-link" id="day-science-link">Scientific stuff ↓</a>`;
+  root.innerHTML=`<div class="dialog-eyebrow">WEATHER NOURIE</div><h2 id="day-title" class="dialog-title">${esc(p.label)}</h2><p class="dialog-condition">${esc(condition)}</p><div class="dialog-temps">${temperature(p.primary)}<span>${p.primaryLabel.toLowerCase()}${!p.tonight&&finite(p.secondary)?` · ${temperature(p.secondary)} low`:''}</span></div>${!p.tonight?'<p class="dialog-prose">Daytime high · following-night low. The graph also includes early-morning hours.</p>':''}${p.tonight?rainTimingHTML(rainTiming(forecast,index,true,now)):''}${dayGraphHTML(forecast,index,p.tonight,now)}<div class="dialog-stats"><div><strong>${percent(storyRain.value)}</strong><small>${storyRain.observed?'Rain observed now · later hours remain forecasts':p.tonight?'Rain chance tonight':phase==='overall'?'Peak hourly rain chance on this date':'Rain chance today'}</small></div><div><strong>${inches(story.amount)}</strong><small>${p.tonight?'Forecast rain through morning':phase==='overall'?'Total precipitation on this date':'Expected rain today'}</small></div></div><p class="dialog-prose">${esc(story.summary)}</p>${overnight?`<h3 class="dialog-subtitle">Overnight · ${percent(overnight.chance)} rain chance</h3><p class="dialog-prose">${esc(overnight.summary)}</p>`:''}${dailyConfidenceNoticeHTML(d.confidence,true)}${d.confidence?`<details class="dialog-confidence" data-confidence="${esc(d.confidence.key)}"><summary>Forecast confidence: ${esc(d.confidence.label)} · ${d.confidence.sourceCount??'?'} source${d.confidence.sourceCount===1?'':'s'}</summary><p>${esc(d.confidence.factors.join(' · '))}</p><small>${esc(d.confidence.note)}</small></details>`:''}<a href="#scientific-stuff" class="science-link" id="day-science-link">Scientific stuff ↓</a>`;
   installDayGraph(root,forecast,index,p.tonight,now);
   const graphTimes=dayGraphPoints(forecast,index,p.tonight,now).map(point=>point.time),input=root.querySelector('#day-graph-hour');
   if (selectedTime && input) { input.value=String(Math.max(0,graphTimes.indexOf(selectedTime))); input.dispatchEvent(new Event('input')); }

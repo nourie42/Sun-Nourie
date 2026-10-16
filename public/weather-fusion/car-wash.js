@@ -1,5 +1,6 @@
+import {forecastPeriodSummary,rainWindowPeak} from './forecast-story.js?v=tonight-timing-v1';
 import {dailyDisplay,finite,rainChanceValue} from './weather-math.js?v=cold-feels-v1';
-import {weatherIcon} from './weather-display.js?v=cold-feels-v1';
+import {weatherIcon} from './weather-display.js?v=tonight-timing-v1';
 import {weatherState,conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
 import {forecastGrossLevel} from './dewpoint-meter.js?v=feel-chart-v3';
 
@@ -154,7 +155,13 @@ function grossMeterFact(forecast, targetIndex, window, now = Date.now()) {
 }
 
 export function carWashSummary(forecast, now = Date.now()) {
-  const days = forecast?.days || [], zone = forecast?.location?.timeZone || 'America/New_York';
+  const days = [...(forecast?.days || [])], zone = forecast?.location?.timeZone || 'America/New_York';
+  if(days[0]?.rainLikelihood?.aggregation==='maximum-hourly'){
+    const remaining=forecastPeriodSummary(forecast,0,'overall',now),peak=rainWindowPeak(remaining.rows,remaining.window);
+    days[0]={...days[0],qpf:remaining.amount,rainLikelihood:{...days[0].rainLikelihood,value:remaining.chance,
+      coverage:{...days[0].rainLikelihood.coverage,complete:finite(remaining.chance)},
+      peakTime:finite(peak.time)?new Date(peak.time).toISOString():null}};
+  }
   const displayedPeriod = days[0] ? dailyDisplay(days[0],0,now,zone) : null;
   const decisions = Array.from({length:Math.min(5,days.length)},(_,index) => carWashDayDecision(days,index));
   for(const decision of decisions){
@@ -195,7 +202,7 @@ export function carWashSummary(forecast, now = Date.now()) {
   // Today/Tonight period as the featured forecast. The wash decision remains
   // conservative and can still use the whole-day value, including overnight
   // rain after a daytime wash.
-  const visibleChance = displayedPeriod?.pop ?? null;
+  const visibleChance = displayedPeriod ? forecastPeriodSummary(forecast,0,displayedPeriod.phase,now).chance : null;
   facts.gross=grossMeterFact(forecast,firstWash?.index??0,window,now);
   return {state:primary.state,canWash:primary.canWash,chance:visibleChance,reason:primary.reason,lowRainDays,decisions,window,best,facts,
     days:decisions.map((decision,index) => ({...decision,

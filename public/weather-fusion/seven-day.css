@@ -52,3 +52,7 @@ body[data-sky="night"] .seven-day-carousel{background:radial-gradient(ellipse at
 html[data-weather-page="experimental"] .hero .today-panel #today-uncertainty,html[data-weather-page="experimental"] .hero .today-panel #today-uncertainty p{font-weight:400}
 html[data-weather-page="experimental"] .hero .today-panel #today-uncertainty .today-uncertainty-label{font-weight:600}
 #experimental-week .seven-day-weather svg *{animation:none;transition:none}
+
+#experimental-week .seven-day-metric .seven-day-rain-peak{font-size:9px;line-height:1;margin-left:2px;white-space:nowrap;color:#d5f0ff}
+
+#experimental-week .seven-day-metric:has(.seven-day-rain-peak)>svg{display:none}

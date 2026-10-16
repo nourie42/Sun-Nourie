@@ -189,7 +189,7 @@ test('at 3:01 PM a rainy 4 PM remains Remainder of Today and still means WAIT',(
   forecast.days[0].rainLikelihood={value:80,aggregation:'maximum-hourly',coverage:{complete:true},window:{start:new Date(now).toISOString(),end:'2026-09-13T07:00:00Z'},peakTime:'2026-09-12T16:00:00Z'};
   forecast.days[0].popDayLikelihood={value:80,aggregation:'maximum-hourly',coverage:{complete:true}};
   forecast.days[0].popNightLikelihood={value:0,aggregation:'maximum-hourly',coverage:{complete:true}};
-  forecast.hours.push({time:'2026-09-12T16:00:00Z',isDay:true,temperature:80,rainLikelihood:{value:80}});
+  forecast.hours=Array.from({length:16},(_,i)=>({time:new Date(Date.parse('2026-09-12T15:00:00Z')+i*HOUR).toISOString(),isDay:i<4,temperature:80,rainLikelihood:{value:i===1?80:0}}));
   const summary=carWashSummary(forecast,now);
   assert.equal(summary.state,'wait');
   assert.equal(summary.canWash,false);

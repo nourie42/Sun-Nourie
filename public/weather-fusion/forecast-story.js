@@ -52,6 +52,21 @@ function rowsFor(forecast, window) {
   }).map(hour=>[Date.parse(hour.time),hour])).values()].sort((a,b) => Date.parse(a.time)-Date.parse(b.time));
 }
 
+/** A period peak is supported only by complete, matching hourly coverage. */
+export function rainWindowPeak(rows,window){
+ if(!Number.isFinite(window.start)||!Number.isFinite(window.end)||window.end<=window.start)return {value:null,time:null};
+ let cursor=window.start,peak=null;
+ for(const row of rows){
+  const start=Date.parse(row.time),end=Date.parse(row.end||row.endTime||new Date(start+HOUR).toISOString());
+  if(start>=window.end||end<=window.start)continue;
+  const value=validChance(row.rainLikelihood?.value);
+  if(start>cursor||value===null||end<=start)return {value:null,time:null};
+  cursor=Math.max(cursor,Math.min(end,window.end));
+  if(!peak||value>peak.value)peak={value,time:start};
+ }
+ return cursor>=window.end&&peak?peak:{value:null,time:null};
+}
+
 function rainGroups(rows) {
   const groups = [];
   for (const row of rows) {
@@ -111,7 +126,9 @@ function timingSentence(chance, rows, groups, zone) {
 
 export function forecastPeriodSummary(forecast, index = 0, phase = 'overall', now = Date.now()) {
   const day = forecast?.days?.[index] || {}, zone = forecast?.location?.timeZone || 'America/New_York';
-  const rain=dailyRainPeriod(day,phase),window = periodWindow(day,phase,now,zone,rain), rows = rowsFor(forecast,window), chance = rain.value, groups = rainGroups(rows);
+  const rain=dailyRainPeriod(day,phase),window = periodWindow(day,phase,now,zone,rain);
+  if(index===0&&rain.canonical&&Number.isFinite(window.start))window.start=Math.max(window.start,Math.floor(now/HOUR)*HOUR);
+  const rows=rowsFor(forecast,window),peak=rain.canonical?rainWindowPeak(rows,window):null,chance=peak?(rain.value===null?null:peak.value):rain.value,groups=rainGroups(rows);
   const timing = timingSentence(chance,rows,groups,zone), temperatures = rain.canonical&&rows.some(row=>!finite(row.temperature))?'':temperatureSentence(rows);
   const intro = chance === null ? 'The rain chance is not available yet.' : rain.canonical?`Rain chance peaks at ${Math.round(chance)}%.`:`The Weather Nourie rain chance for this period is ${Math.round(chance)}%.`;
   const hourlyAmount = amountFor(rows,window,rain.canonical);
