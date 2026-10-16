@@ -58,13 +58,14 @@ test('period rain amount is reported only with sufficiently complete matching ho
   assert.equal(forecastPeriodSummary(forecast,0,'daytime',base-HOUR).amount,null);
 });
 
-test('future overall story uses its own all-day blend and exact hourly window',()=>{
+test('overall story uses the calendar date and does not pretend a half-day amount covers the full date',()=>{
   const story = forecastPeriodSummary(fixture(),0,'overall',base-HOUR);
   assert.equal(story.chance,31);
   assert.equal(story.rows.length,12);
   assert.match(story.summary,/rain chance for this period is 31%/);
   assert.match(story.summary,/2 PM–4 PM/);
-  assert.ok(Math.abs(story.amount-.12)<1e-12);
+  assert.deepEqual(story.window,{start:Date.parse('2026-09-12T00:00Z'),end:Date.parse('2026-09-13T00:00Z')});
+  assert.equal(story.amount,null);
 });
 
 test('NWS-only forecasts get deterministic 7 AM–7 PM day and 7 PM–7 AM night windows',()=>{
@@ -138,7 +139,7 @@ test('canonical day and overnight text, card values and peaks use the identical 
   }
   assert.equal(dailyDisplay(f.days[0],0,now,'UTC').pop,55);
   assert.equal(dailyDisplay(f.days[0],0,base+4*HOUR,'UTC').pop,55);
-  assert.equal(dailyDisplay(f.days[0],0,base+6*HOUR,'UTC').pop,9);
+  assert.equal(dailyDisplay(f.days[0],0,base+6*HOUR,'UTC').pop,55,'6 PM does not switch the displayed day to an overnight period');
   assert.equal(dailyDisplay(f.days[0],1,now,'UTC').pop,55);
 });
 

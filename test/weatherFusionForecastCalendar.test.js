@@ -9,6 +9,8 @@ import {forecastPeriodSummary} from '../public/weather-fusion/forecast-story.js'
 import {forecastProseConflict} from '../public/weather-fusion/forecast-consistency.js';
 import {danTakeDisplay} from '../public/weather-fusion/dans-summary.js';
 import {modelExplanationView} from '../public/weather-fusion/model-explanation.js';
+import {dailyDisplay} from '../public/weather-fusion/weather-math.js';
+import {calendarDayWindow,calendarDayTemperatures,timeAt} from '../public/weather-fusion/calendar-day.js';
 const H=3600000,zone='America/New_York',now=testInputs.now,iso=t=>new Date(t).toISOString();
 function forecast(){
  const input=structuredClone(testInputs),tomorrow=nextDate(dateKey(now,zone)),target=localTime(tomorrow,5,zone);
@@ -46,17 +48,53 @@ test('the daily precipitation amount is the sum of matching calendar hours, not 
   assert.ok(Math.abs(dailyForecastReadings(f,now)[i].amount-total)<1e-10);
  }
 });
-test('Tonight can explicitly include the next morning, while the labeled day stays separate',()=>{
+test('an evening graph cannot include tomorrow even when called with the legacy Tonight flag',()=>{
  const f=forecast(),day=f.days[0];
  assert.equal(day.popNightLikelihood.value,93);
  const points=dayGraphPoints(f,0,true,now);
- assert.equal(Math.max(...points.map(p=>p.rainChance)),93);
- assert.ok(points.some(p=>dateKey(Date.parse(p.time),zone)!==day.date));
+ assert.equal(Math.max(...points.map(p=>p.rainChance)),32);
+ assert.ok(points.every(p=>dateKey(Date.parse(p.time),zone)===day.date));
+ assert.equal(Math.max(...dayGraphPoints(f,1,true,now).map(p=>p.rainChance)),93);
 });
 test('ongoing peak hour remains in the graph when forecast assembly is between hours',()=>{
  const f=forecast(),minuteNow=now+19*60000;
  f.days[0].rainLikelihood.window.start=iso(minuteNow);
  assert.equal(dayGraphPoints(f,0,false,minuteNow)[0].time,iso(now));
+});
+test('17:59, 18:00 and 23:30 retain the same date while tomorrow’s 5 AM peak stays tomorrow',()=>{
+ const date='2026-10-16',next=nextDate(date);
+ for(const timeZone of ['America/New_York','America/Chicago','America/Los_Angeles','UTC']){
+  const start=timeAt(date,0,timeZone),midnight=timeAt(next,0,timeZone),end=timeAt(nextDate(next),0,timeZone);
+  const timeline=Array.from({length:(end-start)/H},(_,i)=>{const time=start+i*H;return {time:iso(time),end:iso(time+H),rainLikelihood:{value:time<midnight?16:time===timeAt(next,5,timeZone)?95:30},precipitation:time<midnight?.01:.02};});
+  const likelihood=(value,start,end)=>({aggregation:'maximum-hourly',value,window:{start:iso(start),end:iso(end)},coverage:{complete:true}});
+  const f={location:{timeZone},current:{},rainTimeline:timeline,hours:timeline.map(row=>({...row,temperature:Date.parse(row.time)<midnight?70:40,condition:'Cloudy'})),days:[
+   {date,label:'Today',condition:'Cloudy',rainLikelihood:likelihood(16,start,midnight),popNightLikelihood:likelihood(95,timeAt(date,18,timeZone),timeAt(next,6,timeZone))},
+   {date:next,label:'Sat',condition:'Rain',rainLikelihood:likelihood(95,midnight,end)},
+  ]};
+  for(const [hour,minutes] of [[17,59],[18,0],[23,30]]){
+   const clock=timeAt(date,hour,timeZone)+minutes*60000,display=dailyDisplay(f.days[0],0,clock,timeZone,f);
+   const rows=dailyForecastReadings(f,clock),points=dayGraphPoints(f,0,true,clock);
+   assert.equal(display.phase,'overall',`${timeZone} ${hour}:${minutes}`);assert.equal(display.tonight,false);
+   assert.equal(display.night,hour>=18);assert.equal(rows[0].pop,16);assert.equal(rows[1].pop,95);
+   assert.ok(points.length);assert.ok(points.every(point=>dateKey(Date.parse(point.time),timeZone)===date));
+   assert.equal(Math.max(...points.map(point=>point.rainChance)),16);
+   assert.ok(Math.abs(rows[0].amount-points.length*.01)<1e-12);
+   assert.equal(rows[0].high,70);assert.equal(rows[0].low,70);
+  }
+ }
+});
+test('local midnight boundaries retain 23-hour and 25-hour dates across DST',()=>{
+ for(const timeZone of ['America/New_York','America/Chicago','America/Los_Angeles']){
+  for(const [date,hours] of [['2026-03-08',23],['2026-11-01',25]]){
+   const window=calendarDayWindow({date},1,now,timeZone);
+   assert.equal((window.end-window.start)/H,hours);
+   assert.equal(dateKey(window.start,timeZone),date);assert.equal(dateKey(window.end,timeZone),nextDate(date));
+   const f={location:{timeZone},days:[{}, {date,rainLikelihood:{aggregation:'maximum-hourly'}}],hours:Array.from({length:hours+1},(_,i)=>({time:iso(window.start+i*H),temperature:i===hours?-99:i}))};
+   const temperatures=calendarDayTemperatures(f,1,now),points=dayGraphPoints(f,1,true,now);
+   assert.equal(temperatures.low,0);assert.equal(temperatures.high,hours-1);assert.equal(points.length,hours);
+   assert.ok(points.every(point=>dateKey(Date.parse(point.time),timeZone)===date));
+  }
+ }
 });
 function weekend(){
  const base=Date.parse('2026-10-16T08:19:00Z');

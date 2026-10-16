@@ -1,5 +1,6 @@
 /** Compare the published Weather Nourie forecast with individual model guidance. */
-import {dailyForecastReadings} from './seven-day.js?v=tonight-timing-v2';
+import {dailyForecastReadings} from './seven-day.js?v=calendar-days-v1';
+import {calendarDayWindow} from './calendar-day.js?v=calendar-days-v1';
 const WN_FEED = 'https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/weathernext-full.json';
 const MS_PER_DAY = 86400000;
 
@@ -94,6 +95,25 @@ function dailySources(series, windows, method) {
   });
 }
 
+function calendarRainSources(rows,window){
+  const points=(rows||[]).filter(point=>{
+    const start=Date.parse(point.time),end=Date.parse(point.end)||start+3600000;
+    return finite(start)&&start<window.end&&end>window.start;
+  }).sort((a,b)=>Date.parse(a.time)-Date.parse(b.time));
+  const ids=new Set(points.flatMap(point=>Object.keys(point.precipitationBlend?.sourceValues||{}))),out={};
+  for(const id of ids){
+    let cursor=window.start,total=0,complete=true;
+    for(const point of points){
+      const start=Date.parse(point.time),end=Date.parse(point.end)||start+3600000;
+      const value=point.precipitationBlend?.sourceValues?.[id],left=Math.max(window.start,start),right=Math.min(window.end,end);
+      if(left>cursor||!finite(value)||value<0||end<=start){complete=false;break;}
+      total+=value*Math.max(0,right-Math.max(cursor,left))/(end-start);cursor=Math.max(cursor,right);
+    }
+    if(complete&&cursor>=window.end)out[id]=total;
+  }
+  return out;
+}
+
 // Aggregate WN hourly to daily
 function wnDaily(wnHourly, varKey, agg, days, tz, convert, windows) {
   if (!wnHourly) return days.map(() => null);
@@ -152,45 +172,43 @@ function aqiDaily(aqHours, days, tz) {
 export function buildSeries(fx, wn, varId, now = Date.now()) {
   const tz = fx.location?.timeZone || 'America/New_York';
   const readings = dailyForecastReadings(fx, now, 10);
-  const days = (fx.days || []).slice(0, 10).map((d, i) => ({ date: d.date, dateKey: d.date, tonight: readings[i].isDay === false }));
-  const windows = readings.map(day => day.windWindow);
+  const days = (fx.days || []).slice(0, 10).map(d => ({ date: d.date, dateKey: d.date, tonight: false }));
+  const windows = days.map((day,index)=>{
+    const calendar=calendarDayWindow(day,index,now,tz),published=readings[index]?.windWindow;
+    return {start:varId!=='temp'&&finite(published?.start)?Math.max(calendar.start,published.start):calendar.start,
+      end:finite(published?.end)?Math.min(calendar.end,published.end):calendar.end};
+  });
   const out = { nwsFallback:varId==='pop'&&readings.some(day=>day.rainSourceFallback&&finite(day.pop)),days, perModel: true, wnVals: days.map(() => null), modelMaps: days.map(() => ({})), forecastValues: days.map(() => null), windows };
 
   if (varId === 'temp' || varId === 'rain') {
-    out.forecastValues = readings.map(day => varId === 'temp' ? (day.isDay ? day.high : day.low) : day.amount);
+    out.forecastValues = readings.map(day => varId === 'temp' ? day.high : day.amount);
     days.forEach((d, i) => {
-      const day = fx.days[i] || {}, key = varId === 'temp' ? (readings[i].isDay ? 'highBlend' : 'lowBlend') : 'qpfBlend';
+      const day = fx.days[i] || {}, key = varId === 'temp' ? 'highBlend' : 'qpfBlend';
       const blend = day[key] || {}, src = {};
       for (const source of blend.sources || []) {
         // A partial model accumulation is not a complete daily rain total.
         const value = varId === 'rain' && blend.sourceValues && Object.hasOwn(blend.sourceValues, source.id) ? blend.sourceValues[source.id] : source.value;
         if (finite(value)) src[source.id] = value;
       }
-      if (varId === 'rain' && readings[i].isDay === false) {
-        const points = seriesInWindow(fx.rainTimeline, windows[i]), bySource = {};
-        for (const point of points) for (const [id, value] of Object.entries(point.precipitationBlend?.sourceValues || {})) {
-          if (finite(value)) (bySource[id] ||= []).push(value);
-        }
-        const expected = Math.round((windows[i].end - windows[i].start) / 3600000);
-        for (const id of Object.keys(src)) delete src[id];
-        for (const [id, values] of Object.entries(bySource)) if (values.length === expected) src[id] = values.reduce((sum, value) => sum + value, 0);
-      }
-      out.modelMaps[i] = src;
+      out.modelMaps[i] = varId==='rain'&&Array.isArray(fx.rainTimeline)?calendarRainSources(fx.rainTimeline,windows[i]):src;
     });
-    const sourceWindows = varId === 'rain' ? windows : days.map((d, i) => {
-      const day = fx.days[i] || {}, window = readings[i].isDay ? day.highWindow : day.lowWindow;
-      const start = Date.parse(window?.start), end = Date.parse(window?.end);
-      return finite(start) && finite(end) ? {start, end} : windows[i];
-    });
+    if(varId==='temp'){
+      const temperatureSeries=fx.metricForecasts?.series?.temperature||fx.hours?.map(hour=>({time:hour.time,sources:hour.temperatureBlend?.sources}))||[];
+      out.modelMaps=dailySources(temperatureSeries,windows,'max');
+    }
     out.wnVals = wnDaily(fx.google?.contributes ? null : wn?.hourly, varId === 'temp' ? 'temperature_2m' : 'total_precipitation_1hr',
-      varId === 'temp' ? 'max' : 'sum', days, tz, varId === 'temp' ? K2F : M2IN, sourceWindows);
-    if (varId === 'temp' && readings[0]?.isDay === false) out.wnVals[0] = wnDaily(fx.google?.contributes ? null : wn?.hourly, 'temperature_2m', 'min', [days[0]], tz, K2F, [sourceWindows[0]])[0];
+      varId === 'temp' ? 'max' : 'sum', days, tz, varId === 'temp' ? K2F : M2IN, windows);
   } else if (varId === 'pop') {
     // Per-model rain chance at each day's peak hour (from the server's rain-likelihood blend).
     // NWS is a true probability; HRRR/NBM/ECMWF are each model's wet/dry rain signal. WeatherNext has no PoP field.
     days.forEach((d, i) => {
-      const day = fx.days[i] || {}, likelihood = readings[i].isDay ? day.rainLikelihood : day.popNightLikelihood;
-      const sv = likelihood?.peak?.sourceValues || {};
+      const day = fx.days[i] || {}, likelihood = day.rainLikelihood;
+      const peak=(fx.rainTimeline||[]).filter(row=>{
+        const start=Date.parse(row.time),end=Date.parse(row.end)||start+3600000;
+        return start<windows[i].end&&end>windows[i].start&&finite(row.rainLikelihood?.value);
+      })
+        .reduce((best,row)=>!best||row.rainLikelihood.value>best.rainLikelihood.value?row:best,null);
+      const sv = peak?.rainLikelihood?.sourceValues || likelihood?.peak?.sourceValues || {};
       const src = {}; for (const [id, v] of Object.entries(sv)) if (finite(v)) src[id] = v;
       out.modelMaps[i] = src;
     });
@@ -285,7 +303,7 @@ function renderChart(container, built, varDef, varId) {
       + `<i style="width:12px;height:3px;border-radius:2px;background:${COLORS[id]};opacity:${off ? 0.3 : 1};display:inline-block"></i>${displayName(id)}</${tag}>`; };
   const legend = built.perModel ? ids.map(chip).join('')
     : `<span style="font-size:11px;color:#d5deee">${varId === 'aqi' ? 'Daily max AQI (Open-Meteo / CAMS)' : varId === 'uv' ? 'Daily max UV index' : ''}</span>`;
-  const note = built.perModel ? `<p style="font-size:11px;color:#c4d9ed;margin:6px 0 0">${built.nwsFallback?'Official NWS rain chances are used where model data is unavailable.':'Weather Nourie blend is the forecast shown on this page.'} Other lines show individual models. Tap a model to show/hide its line, or tap the graph for values.${varId === 'rain' ? ' Rain totals use the same local calendar dates as the daily tiles. Tonight includes the following morning.' : varId === 'wind' ? ' Wind shows the average over that forecast period.' : varId === 'dewpoint' ? ' Dew point shows the highest reading over that forecast period.' : varId === 'pop' ? ' Individual model rain signals are not calibrated probabilities.' : ''}</p>` : '';
+  const note = built.perModel ? `<p style="font-size:11px;color:#c4d9ed;margin:6px 0 0">${built.nwsFallback?'Official NWS rain chances are used where model data is unavailable.':'Weather Nourie blend is the forecast shown on this page.'} Other lines show individual models. Tap a model to show/hide its line, or tap the graph for values.${varId === 'rain' ? ' Rain totals use the same local calendar dates as the daily tiles, ending at midnight.' : varId === 'wind' ? ' Wind shows the average over that forecast period.' : varId === 'dewpoint' ? ' Dew point shows the highest reading over that forecast period.' : varId === 'pop' ? ' Individual model rain signals are not calibrated probabilities.' : ''}</p>` : '';
   container.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:4px;padding:2px 0 8px">${legend}</div>`
     + `<div class="wn-chart-wrap" style="position:relative;touch-action:pan-y">`
     + `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="width:100%;height:auto;display:block;cursor:crosshair" role="img" aria-label="${varDef.label} comparison chart">${ylabels}${labels}${lines}${dots}`

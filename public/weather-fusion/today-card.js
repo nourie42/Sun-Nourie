@@ -1,20 +1,18 @@
-import {rainTiming,rainTimingHTML} from './rain-timing.js?v=tonight-timing-v2';
+import {calendarDayWindow} from './calendar-day.js?v=calendar-days-v1';
+import {rainTiming,rainTimingHTML} from './rain-timing.js?v=calendar-days-v1';
 import {weatherState} from './weather-state.js';
-import {dailyDisplay,dailyRainPeriod,finite} from './weather-math.js?v=cold-feels-v1';
-import {dailyFeels,degrees,timeAt} from './hourly-feels.js?v=cold-feels-v1';
+import {dailyDisplay,dailyRainPeriod,finite} from './weather-math.js?v=calendar-days-v1';
+import {dailyFeels,degrees,timeAt} from './hourly-feels.js?v=calendar-days-v1';
 import {uvCategory} from './daily-uv.js?v=weather-art-labels-v10';
-import {weatherIcon,weatherMetricIcon} from './weather-display.js?v=tonight-timing-v2';
-import {displayedRainChance,observedRainLabel} from './rain-display.js?v=rain-observed-v1';
+import {weatherIcon,weatherMetricIcon} from './weather-display.js?v=calendar-days-v1';
+import {displayedRainChance,observedRainLabel,rainAwareCondition,dailySkyCover} from './rain-display.js?v=calendar-days-v1';
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const reading=(value,unit='')=>finite(value)?`${Math.round(value)}${unit}`:'—';
 export function periodWeatherStats(forecast,now=Date.now()){
  const day=forecast.days?.[0];if(!day)return {wind:null,humidity:null};
  if(!/^\d{4}-\d{2}-\d{2}$/.test(day.date||''))return {wind:null,humidity:null};
- const p=dailyDisplay(day,0,now,forecast.location.timeZone),zone=forecast.location.timeZone||'America/New_York';
- const next=new Date(Date.parse(day.date+'T12:00:00Z')+86400000).toISOString().slice(0,10);
- const window=day[p.tonight?'lowWindow':'highWindow'];
- const start=Math.max(now,Date.parse(window?.start)||timeAt(day.date,p.tonight?19:7,zone));
- const end=Date.parse(window?.end)||timeAt(p.tonight?next:day.date,p.tonight?7:19,zone);
+ const zone=forecast.location.timeZone||'America/New_York';
+ const {start,end}=calendarDayWindow(day,0,now,zone);
  const mean=key=>{const values=(forecast.metricForecasts?.series?.[key]||[]).filter(x=>Date.parse(x.time)>=start&&Date.parse(x.time)<end&&finite(x.value)&&x.value>=0&&(key!=='humidity'||x.value<=100)).map(x=>x.value);return values.length?values.reduce((a,b)=>a+b,0)/values.length:null;};
  return {wind:mean('wind'),humidity:mean('humidity')};
 }
@@ -58,15 +56,13 @@ function skySceneFromKind(kind){
  * not an earlier broad daily phrase. Current sky plus the next several hourly forecasts
  * are authoritative for Remainder of Today. */
 export function todaySkyProfileForForecast(forecast={},day={},display={},now=Date.now()){
- const base=todaySkyProfile(day,display.tonight===true);
+ const base=todaySkyProfile({...day,condition:display.condition,popDayLikelihood:{value:display.pop}},false);
+ base.night=display.night===true;
  if(['storm','overcast-rain'].includes(base.scene))return base;
  const zone=forecast?.location?.timeZone||'America/New_York';
- const window=day?.[display.tonight?'lowWindow':'highWindow'];
- const next=new Date(Date.parse(day?.date+'T12:00:00Z')+86400000).toISOString().slice(0,10);
- const fallbackEnd=timeAt(display.tonight?next:day?.date,display.tonight?7:19,zone);
- const end=Date.parse(window?.end)||fallbackEnd;
+ const {end}=calendarDayWindow(day,0,now,zone);
  const samples=[];
- if(!display.tonight){
+ if(!display.night){
    const current=forecast?.current||{};
    const currentTime=Date.parse(current.time||forecast?.assembledAt);
    if(!finite(currentTime)||Math.abs(now-currentTime)<=3*3600000){
@@ -131,12 +127,12 @@ export function todaySkySceneHTML(profile,epoch=Date.now()){
 }
 export function todayForecastHTML(forecast,now=Date.now()){
  const day=forecast.days?.[0];if(!day)return '<p class="muted">Daily forecast is unavailable.</p>';
- const p=dailyDisplay(day,0,now,forecast.location.timeZone),feel=dailyFeels(forecast,0,now),stats=periodWeatherStats(forecast,now);
+ const p=dailyDisplay(day,0,now,forecast.location.timeZone,forecast),feel=dailyFeels(forecast,0,now),stats=periodWeatherStats(forecast,now);
  const timing=rainTiming(forecast,0,p.tonight,now);
- const rain=displayedRainChance(forecast,timing?timing.value:p.pop,{now}),shownPop=rain.value,shownCondition=rain.observed?'Rain now':p.condition;
+ const rain=displayedRainChance(forecast,timing?timing.value:p.pop,{now}),shownPop=rain.value,shownCondition=rain.observed?'Rain now':rainAwareCondition(p.condition,shownPop,day,false,dailySkyCover(forecast,day,0,now));
  const uv=uvCategory(day.uvMax),confidence=day.confidence?.label||'Unavailable',aqi=forecast.airQuality?.aqi;
  const metric=(kind,value,label,note)=>`<span class="today-metric" title="${esc(note)}">${weatherMetricIcon(kind)}<span><strong>${value}</strong><small>${label}</small></span></span>`;
- const baseProfile=todaySkyProfileForForecast(forecast,day,{...p,pop:shownPop},now),profile=rain.observed?{...baseProfile,scene:'overcast-rain',state:'rain'}:baseProfile,feelValue=p.tonight?feel.low?.low?.value:feel.high?.high?.value;
+ const baseProfile=todaySkyProfileForForecast(forecast,day,{...p,pop:shownPop,condition:shownCondition},now),profile=rain.observed?{...baseProfile,scene:'overcast-rain',state:'rain'}:baseProfile,feelValue=feel.high?.high?.value;
  const rt=forecast.rainTrend;
  const peakNote=timing?.peakLabel?`Peak ${timing.peakLabel}`:p.peakNote;
  const rainLabel=timing?.nwsFallback?'NWS rain chance':'Rain chance';
@@ -149,9 +145,9 @@ export function todayForecastHTML(forecast,now=Date.now()){
     ? '<em data-rain-trend>↔ 0 pts · unchanged</em>'
     : `<em data-rain-trend>${rt.direction==='up'?'↑ +':'↓ −'}${Math.round(rt.change)} pts · was ${Math.round(rt.from)}%</em>`;
  const banner=confidenceBannerHTML(day);
- return `${banner}<button type="button" class="today-weather-card ${p.tonight?'today-night':p.remainder?'today-remainder':''}" data-today-forecast aria-haspopup="dialog" aria-label="${esc(p.label)}, ${esc(shownCondition)}, ${p.primaryLabel} ${reading(p.primary)} degrees${finite(p.secondary)?`, low ${reading(p.secondary)} degrees`:''}. ${rain.observed?'Rain is observed now at this location.':finite(shownPop)?`Rain chance ${reading(shownPop)} percent.`:'Rain chance unavailable.'} Forecast confidence ${esc(confidence)}. Open details.">
+ return `${banner}<button type="button" class="today-weather-card ${p.night?'today-night':p.remainder?'today-remainder':''}" data-today-forecast aria-haspopup="dialog" aria-label="${esc(p.label)}, ${esc(shownCondition)}, ${p.primaryLabel} ${reading(p.primary)} degrees${finite(p.secondary)?`, low ${reading(p.secondary)} degrees`:''}. ${rain.observed?'Rain is observed now at this location.':finite(shownPop)?`Rain chance ${reading(shownPop)} percent.`:'Rain chance unavailable.'} Forecast confidence ${esc(confidence)}. Open details.">
  ${todaySkySceneHTML(profile,now)}<span class="today-scene-shade"></span><span class="today-copy"><span class="day-name">${esc(p.label)}</span><span class="today-condition" title="${esc(shownCondition)}">${esc(shortForecastCondition(shownCondition))}</span><span class="today-temperatures">${p.tonight?'':`<span class="today-low"><strong>${degrees(p.secondary)}</strong><small>Low</small></span><i>—</i>`}<span class="today-high"><strong>${degrees(p.primary)}</strong><small>${p.primaryLabel}</small></span></span><span class="today-feels">Feels like <b>${degrees(feelValue)}</b></span></span>
- <span class="today-symbol">${weatherIcon(shownCondition,!p.tonight,80)}<strong>${reading(shownPop,'%')}</strong><small>${rain.observed?esc(observedRainLabel(rain)):!peakTime&&peakNote?`${rainLabel} · ${esc(peakNote)}`:rainLabel}</small>${rain.observed?'':peakTime}${trend}</span>
+ <span class="today-symbol">${weatherIcon(shownCondition,!p.night,80)}<strong>${reading(shownPop,'%')}</strong><small>${rain.observed?esc(observedRainLabel(rain)):!peakTime&&peakNote?`${rainLabel} · ${esc(peakNote)}`:rainLabel}</small>${rain.observed?'':peakTime}${trend}</span>
  <span class="today-metrics">${metric('wind',reading(stats.wind,' mph'),'Wind','Average available wind forecast for this period')}${metric('eye',reading(aqi),'AQI',finite(aqi)?'Current local air quality index.':'Air-quality data is unavailable.')}${metric('sun',`${uv.value===null?'—':uv.index}`,'Peak UV','Peak UV forecast today')}</span><span class="today-more">Tap for more details</span></button>${rainTimingHTML(timing)}`;
 }
 

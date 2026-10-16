@@ -12,7 +12,7 @@ test('seven day cards share the existing daily timing, rain, totals and confiden
   const days=sevenDayForecast(preview,now);
   assert.equal(days.length,7);
   days.forEach((day,index)=>{
-    const display=dailyDisplay(preview.days[index],index,now,preview.location.timeZone);
+    const display=dailyDisplay(preview.days[index],index,now,preview.location.timeZone,preview);
     assert.equal(day.high,display.tonight?null:display.primary);
     assert.equal(day.low,display.tonight?display.primary:display.secondary);
     assert.equal(day.pop,displayedRainChance(preview,display.pop,{dayIndex:index,now}).value);
@@ -21,12 +21,13 @@ test('seven day cards share the existing daily timing, rain, totals and confiden
   });
 });
 
-test('tonight switches the first card to the matching overnight forecast',()=>{
+test('evening changes the artwork without switching the card to tomorrow’s forecast',()=>{
   const evening=now+8*H,first=sevenDayForecast(preview,evening)[0];
-  const display=dailyDisplay(preview.days[0],0,evening,preview.location.timeZone);
-  assert.equal(first.label,'Tonight');assert.equal(first.high,null);assert.equal(first.low,display.primary);
+  const display=dailyDisplay(preview.days[0],0,evening,preview.location.timeZone,preview);
+  assert.equal(first.label,'Today');assert.equal(first.high,display.primary);assert.equal(first.low,display.secondary);
   assert.equal(first.isDay,false);
-  assert.equal(first.amount,forecastPeriodSummary(preview,0,'overnight',evening).amount);
+  assert.equal(first.amount,forecastPeriodSummary(preview,0,'overall',evening).amount);
+  assert.equal(first.pop,forecastPeriodSummary(preview,0,'overall',evening).chance);
 });
 
 test('real zeros remain zero and missing inputs are never fabricated',()=>{

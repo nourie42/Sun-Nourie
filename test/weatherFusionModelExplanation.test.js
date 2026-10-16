@@ -31,12 +31,12 @@ function fixture() {
     feeds:[{id:'nws',status:'ready',issuedAt:at(-1),fetchedAt:at(0)},{id:'hrrr',status:'ready'},{id:'ecmwf',status:'ready'},{id:'nbm',status:'ready'}]};
 }
 
-test('model explanation defaults to the same Today/ Tonight period as the main card',()=>{
+test('model explanation stays on the calendar day after sunset',()=>{
   const forecast=fixture();
   assert.equal(modelExplanationView(forecast,{now}).phase,'overall');
   assert.equal(modelExplanationView(forecast,{now:Date.parse('2026-09-12T15:59:59Z')}).phase,'overall');
   assert.equal(modelExplanationView(forecast,{now:Date.parse('2026-09-12T16:00:00Z')}).phase,'overall','after local noon the explanation matches Remainder of Today');
-  assert.equal(modelExplanationView(forecast,{now:Date.parse('2026-09-12T22:00:00Z')}).phase,'overnight');
+  assert.equal(modelExplanationView(forecast,{now:Date.parse('2026-09-12T22:00:00Z')}).phase,'overall');
   assert.equal(modelExplanationView(forecast,{index:1,now}).phase,'overall');
   assert.equal(modelExplanationView(forecast,{index:0,phase:'overall',now}).phase,'overall');
 });
@@ -46,12 +46,12 @@ test('every daily estimate is tied to its canonical peak hour including beyond t
   assert.equal(view.value,42);
   assert.equal(view.maximum,42);
   assert.equal(view.peakTime,at(58));
-  assert.equal(view.rows.length,24);
+  assert.equal(view.rows.length,17);
   assert.equal(view.mismatch,false);
   assert.equal(view.peak,forecast.rainTimeline[58].rainLikelihood);
   assert.ok(!forecast.hours.some(row=>row.time===view.peakTime));
   const html=modelExplanationHTML(forecast,{index:2,now});
-  assert.match(html,/All 24 forecast hours in this period/);
+  assert.match(html,/All 17 forecast hours in this period/);
   assert.match(html,/Mon, Sep 14, 5 PM/);
   assert.match(html,/data-peak="true"/);
 });
@@ -225,7 +225,7 @@ test('experimental rendering stays off the main page and reset clears previous-l
   }finally{globalThis.document=oldDocument;globalThis.location=oldLocation;}
 });
 
-test('refresh preserves open hourly calculations and focused details while auto phase follows Today/Tonight',()=>{
+test('refresh preserves open calculations and focus without switching into tomorrow morning',()=>{
   const oldDocument=globalThis.document,oldLocation=globalThis.location;
   let details=[],focused=null;
   function makeDetail(key){
@@ -252,7 +252,7 @@ test('refresh preserves open hourly calculations and focused details while auto 
     assert.equal(details.find(detail=>detail.dataset.modelDetail===key).open,true);
     assert.equal(details.find(detail=>detail.dataset.modelDetail==='hours').open,true);
     assert.equal(focused,key);
-    assert.equal(renderModelExplanation(fixture(),Date.parse('2026-09-12T22:00:00Z')).phase,'overnight');
+    assert.equal(renderModelExplanation(fixture(),Date.parse('2026-09-12T22:00:00Z')).phase,'overall');
     resetModelExplanation();
   }finally{globalThis.document=oldDocument;globalThis.location=oldLocation;}
 });

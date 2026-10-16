@@ -1,7 +1,7 @@
-import {outdoorExposure} from './outdoor-feels.js?v=cold-feels-v1';
-import {finite,isTonightPeriod,localHour} from './weather-math.js?v=cold-feels-v1';
-import {timeAt,summarizeFeels} from './hourly-feels.js?v=cold-feels-v1';
-import {forecastSample} from './weather-display.js?v=cold-feels-v1';
+import {outdoorExposure} from './outdoor-feels.js?v=calendar-days-v1';
+import {finite,isTonightPeriod,localHour} from './weather-math.js?v=calendar-days-v1';
+import {timeAt,summarizeFeels} from './hourly-feels.js?v=calendar-days-v1';
+import {forecastSample} from './weather-display.js?v=calendar-days-v1';
 import {weatherState} from './weather-state.js';
 import {winterSceneExpected,selectedHourSnowPhase} from './exposure-scene.js?v=storm-scene-v5';
 export function comfortMode(time,zone='America/New_York'){

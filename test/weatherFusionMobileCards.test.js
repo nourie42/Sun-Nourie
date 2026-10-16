@@ -9,15 +9,17 @@ function fixture(){
 }
 test('Today metrics use their forecast period and never substitute current conditions',()=>{
  const f=fixture();f.current={wind:99,humidity:99};
- assert.deepEqual(periodWeatherStats(f,now),{wind:6,humidity:68});
+ f.metricForecasts.series.wind.push({time:'2026-09-12T04:00:00Z',value:999});
+ f.metricForecasts.series.humidity.push({time:'2026-09-12T04:00:00Z',value:999});
+ assert.deepEqual(periodWeatherStats(f,now),{wind:29.5,humidity:76});
  const html=todayForecastHTML(f,now);
- for(const value of ['Today','95°','74°','103°','23%','6 mph','Peak UV','Tap for more details'])assert.ok(html.includes(value),value);
+ for(const value of ['Today','95°','74°','103°','23%','30 mph','Peak UV','Tap for more details'])assert.ok(html.includes(value),value);
  assert.match(html,/Rain chance/);assert.doesNotMatch(html,/NWS chance/);
  assert.match(html,/aria-label="[^"]*Rain chance 23 percent\./);
  assert.doesNotMatch(html,/>Humidity<|>Precipitation</);
  assert.match(html,/data-today-forecast/);assert.doesNotMatch(html,/99 mph|99%|Sunrise|Sunset/);
 });
-test('main card says Remainder of Today from local noon until the Tonight switch',()=>{
+test('main card says Remainder of Today from local noon through midnight',()=>{
  const noon=Date.parse('2026-09-11T16:00:00Z'),f=fixture();
  f.days[0].popDayLikelihood={value:30};
  f.days[0].popNightLikelihood={value:60};
@@ -25,7 +27,7 @@ test('main card says Remainder of Today from local noon until the Tonight switch
  const html=todayForecastHTML(f,noon);
  assert.match(html,/class="today-weather-card today-remainder"/);
  assert.match(html,/>Remainder of Today<\/span>/);
- assert.match(html,/>60%<\/strong><small>Rain chance/,'the remainder tile includes the higher chance later tonight');
+ assert.match(html,/>60%<\/strong><small>Rain chance/,'the remainder tile keeps the published calendar-day chance');
  assert.doesNotMatch(html,/class="today-weather-card today-remainder"[\s\S]*>Tonight<\/span>/);
 });
 test('Remainder of Today uses current and remaining hourly cloudiness instead of an earlier sunny daily phrase',()=>{
@@ -81,9 +83,9 @@ test('Tonight moon follows the astronomical phase for the displayed date',()=>{
  assert.match(todaySkySceneHTML(todaySkyProfile({condition:'Clear'},true),Date.parse(phases[1][0])),/First quarter/);
  assert.doesNotMatch(todaySkySceneHTML(todaySkyProfile({condition:'Clear'},false),Date.parse(phases[1][0])),/today-moon/);
 });
-test('Tonight keeps the overnight low and never repeats the daytime high',()=>{
+test('evening keeps the calendar card instead of borrowing the following-night forecast',()=>{
  const html=todayForecastHTML(fixture(),Date.parse('2026-09-11T23:00:00Z'));
- assert.match(html,/Tonight/);assert.match(html,/74°/);assert.doesNotMatch(html,/95°/);assert.match(html,/10%/);
+ assert.match(html,/Remainder of Today/);assert.match(html,/74°/);assert.match(html,/95°/);assert.match(html,/23%/);assert.doesNotMatch(html,/>Tonight<|>10%</);
 });
 test('missing metrics remain blank while real zero wind and humidity are retained',()=>{
  const f=fixture();f.metricForecasts.series.wind=[];f.metricForecasts.series.humidity=[];
@@ -94,11 +96,13 @@ test('missing metrics remain blank while real zero wind and humidity are retaine
  assert.match(hourlyWindHTML({inputs:{wind:0},windDirection:230}),/0 mph/);assert.match(hourlyWindHTML({inputs:{wind:0},windDirection:230}),/Calm/);
  assert.match(hourlyWindHTML({inputs:{wind:null}}),/— mph/);assert.match(hourlyWindHTML({inputs:{wind:7.7},windDirection:201.4}),/8 mph/);
 });
-test('compact descriptions preserve uncertainty and the complete forecast is accessible',()=>{
+test('low-probability daily artwork does not turn coarse storm wording into a storm icon',()=>{
  assert.equal(shortForecastCondition('Mostly Sunny then Slight Chance Showers And Thunderstorms'),'Mostly sunny, then storms possible');
- assert.match(todayForecastHTML(fixture(),now),/title="Slight Chance Showers And Thunderstorms"/);
- assert.match(todayForecastHTML(fixture(),now),/data-weather-kind="storm"|sky-lightning/);
- const f=fixture();f.days[0].condition='<script>alert(1)</script>';assert.doesNotMatch(todayForecastHTML(f,now),/<script>/);
+ const f=fixture(),html=todayForecastHTML(f,now);
+ assert.match(html,/title="Cloudy"/);assert.match(html,/data-weather-kind="cloudy"/);
+ assert.doesNotMatch(html,/data-weather-kind="storm"|sky-lightning/);
+ assert.equal(f.days[0].condition,'Slight Chance Showers And Thunderstorms','the detailed source forecast is preserved');
+ f.days[0].condition='<script>alert(1)</script>';assert.doesNotMatch(todayForecastHTML(f,now),/<script>/);
 });
 test('hourly card shows the Weather Nourie consensus rather than relabeling NWS as the blend',()=>{
  assert.match(hourlyRainHTML({pop:21,rainLikelihood:{value:48,sourceValues:{nws:21,hrrr:100,ecmwf:0}}}),/>48%</);
@@ -124,10 +128,10 @@ test('Now labels the observed precipitation state instead of a whole-hour foreca
  assert.match(hourlyRainHTML(dry),/>Dry now</);assert.doesNotMatch(hourlyRainHTML(dry),/28%/);
  assert.match(hourlyRainHTML({now:true,currentPrecipitation:{active:true,label:'Rain now',source:'Current station reports precipitation.'}}),/>Rain now</);
 });
-test('Today and Tonight prefer their matching blended rain likelihood',()=>{
+test('Today retains its calendar blend after 6 PM instead of selecting an overnight chance',()=>{
  const f=fixture();f.days[0].popDayLikelihood={value:8};f.days[0].popNightLikelihood={value:3};f.days[0].rainLikelihood={value:12};
  assert.match(todayForecastHTML(f,now),/>12%<\/strong><small>Rain chance/);
- assert.match(todayForecastHTML(f,Date.parse('2026-09-11T23:00:00Z')),/>3%<\/strong><small>Rain chance/);
+ assert.match(todayForecastHTML(f,Date.parse('2026-09-11T23:00:00Z')),/>12%<\/strong><small>Rain chance/);
 });
 test('Today tile shows the full-day rain high, not the daytime-only peak',()=>{
  const f=fixture();

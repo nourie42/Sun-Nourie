@@ -8,7 +8,7 @@
     if (/\/weather-fusion\/(experimental-weather\.html)?\/?$/.test(p)) return true;
     return document.documentElement?.dataset?.weatherPage === 'experimental';
   }
-  // app.js sets data-weather-page after this module loads; refresh() re-checks
+  // app.js?v=calendar-days-v1 sets data-weather-page after this module loads; refresh() re-checks
   // each run so late activation still picks up the sky.
 
   function sunDown(solar, nowMs, h) {

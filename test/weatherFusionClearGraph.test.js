@@ -19,10 +19,11 @@ test('confidence uses all four actual same-day contributors',()=>{
 });
 test('combined graph aligns UTC instants, keeps zero UV, gaps and date windows',()=>{
  const time='2026-09-05T16:00:00Z',f={location:{timeZone:'America/New_York'},days:[{date:'2026-09-05'}],metricForecasts:{series:{temperature:[{time,value:90}],feels:[{time,value:96}],dewpoint:[{time,value:72}]}},uv:{hourly:[{time,value:0}]}};
- const p=dayGraphPoints(f,0,false,now);assert.equal(p.length,19);assert.deepEqual([p[0].temperature,p[0].feels,p[0].dewpoint,p[0].uv],[90,96,72,0]);assert.equal(p[1].uv,null);assert.equal(p[1].feels,null);
- assert.equal(dayGraphPoints(f,0,true,now)[0].time,'2026-09-05T23:00:00.000Z');assert.match(dayGraphHTML(f,0,false,now),/data-series="uv"/);assert.doesNotMatch(dayGraphHTML(f,0,false,now),/NaN|undefined/);
- f.days[0].date='2026-03-07';assert.equal(dayGraphPoints(f,0,false,Date.parse('2026-03-07T00:00Z')).length,23);
- f.days[0].date='2026-10-31';assert.equal(dayGraphPoints(f,0,false,Date.parse('2026-10-31T00:00Z')).length,25);
+ const p=dayGraphPoints(f,0,false,now);assert.equal(p.length,12);assert.deepEqual([p[0].temperature,p[0].feels,p[0].dewpoint,p[0].uv],[90,96,72,0]);assert.equal(p[1].uv,null);assert.equal(p[1].feels,null);
+ assert.deepEqual(dayGraphPoints(f,0,true,now),p);assert.match(dayGraphHTML(f,0,false,now),/data-series="uv"/);assert.doesNotMatch(dayGraphHTML(f,0,false,now),/NaN|undefined/);
+ for(const [date,count] of [['2026-03-07',24],['2026-03-08',23],['2026-10-31',24],['2026-11-01',25]]){
+  f.days[0].date=date;assert.equal(dayGraphPoints(f,0,false,Date.parse(date+'T00:00Z')).length,count,date);
+ }
 });
 test('dog outfits follow human feels-like thresholds, not pavement',()=>{
  for(const [feels,asset] of [[104,'hot'],[88,'hot'],[74,'hot'],[65,'mild'],[58,'cool'],[42,'cool'],[30,'cold']])assert.equal(walkerOutfit(feels).asset,asset==='cool'?'poodle-walk.png':`poodle-walk-${asset}.png`);

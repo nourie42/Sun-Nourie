@@ -42,12 +42,13 @@ test('local outlook explains today in plain language instead of only reporting p
   assert.doesNotMatch(details.summary,/Every available hourly rain chance|Air temperatures run/);
 });
 
-test('Tonight & tomorrow names tomorrow and gives the overnight rain window with day names',()=>{
+test('today ends at midnight and tomorrow rain remains under its own date',()=>{
   const details=forecastOutlookDetails(fixture(),Date.parse('2026-09-17T12:00:00Z'));
-  assert.match(details.nearTerm,/Tonight:/);
+  assert.match(details.nearTerm,/Today, through midnight:/);
   assert.match(details.nearTerm,/Friday:/);
   assert.match(details.nearTerm,/Rain chance: 55%/);
-  assert.match(details.nearTerm,/Friday 8 PM to Saturday 4 AM/);
+  assert.match(details.nearTerm,/Friday:.*Best window: 8 PM to 12 AM/);
+  assert.doesNotMatch(details.nearTerm,/Tonight:|Saturday 4 AM/);
 });
 
 test('week ahead is truly multi-day and says which day each forecast belongs to',()=>{

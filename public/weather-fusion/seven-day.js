@@ -1,9 +1,9 @@
-import {rainTiming} from './rain-timing.js?v=tonight-timing-v2';
-import {dailyDisplay,finite} from './weather-math.js?v=cold-feels-v1';
-import {displayedRainChance,rainAwareCondition} from './rain-display.js?v=rain-icon-v2';
-import {forecastPeriodSummary} from './forecast-story.js?v=tonight-timing-v2';
-import {shortForecastCondition} from './today-card.js?v=tonight-timing-v2';
-import {weatherIcon,weatherMetricIcon} from './weather-display.js?v=tonight-timing-v2';
+import {rainTiming} from './rain-timing.js?v=calendar-days-v1';
+import {dailyDisplay,finite} from './weather-math.js?v=calendar-days-v1';
+import {displayedRainChance,rainAwareCondition,dailySkyCover} from './rain-display.js?v=calendar-days-v1';
+import {forecastPeriodSummary} from './forecast-story.js?v=calendar-days-v1';
+import {shortForecastCondition} from './today-card.js?v=calendar-days-v1';
+import {weatherIcon,weatherMetricIcon} from './weather-display.js?v=calendar-days-v1';
 import {confidenceMeterPosition} from './forecast-confidence.js?v=category-meter-v1';
 import {winterAmountText,winterDayAmount} from './snow-outlook.js?v=snow-readable-v1';
 
@@ -14,7 +14,7 @@ const chevron=direction=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentCo
 export function dailyForecastReadings(forecast,now=Date.now(),limit=10) {
   const zone=forecast?.location?.timeZone||'America/New_York';
   return (forecast?.days||[]).slice(0,limit).map((day,index)=>{
-    const display=dailyDisplay(day,index,now,zone),story=forecastPeriodSummary(forecast,index,display.phase,now);
+    const display=dailyDisplay(day,index,now,zone,forecast),story=forecastPeriodSummary(forecast,index,display.phase,now);
     const rain=displayedRainChance(forecast,story.chance,{dayIndex:index,now});
     const winds=(forecast.metricForecasts?.series?.wind||[]).filter(point=>{
       const time=Date.parse(point.time);
@@ -23,12 +23,12 @@ export function dailyForecastReadings(forecast,now=Date.now(),limit=10) {
     const date=Date.parse(`${day.date}T12:00:00Z`);
     const weekday=finite(date)?new Intl.DateTimeFormat('en-US',{timeZone:'UTC',weekday:'short'}).format(date):day.label;
     const dateLabel=finite(date)?new Intl.DateTimeFormat('en-US',{timeZone:'UTC',month:'short',day:'numeric'}).format(date):'';
-    const condition=rain.observed?'Rain now':rainAwareCondition(display.condition,rain.value,day,display.tonight);
+    const condition=rain.observed?'Rain now':rainAwareCondition(display.condition,rain.value,day,false,dailySkyCover(forecast,day,index,now));
     const winterDay=forecast.snow?.days?.find(row=>row.date===day.date),snowAmount=winterDay?winterDayAmount(winterDay):null;
     return {index,date:day.date,dateLabel,label:index===0?(display.tonight?'Tonight':'Today'):weekday,
       high:display.tonight?null:display.primary,low:display.tonight?display.primary:display.secondary,
-      condition,shortCondition:shortForecastCondition(condition),isDay:!display.tonight,
-      rainSourceFallback:story.rows.some(row=>row.rainLikelihood?.mode==='nws-fallback'&&finite(row.rainLikelihood.value)),pop:rain.value,observed:rain.observed,amount:story.amount,rainPeak:display.tonight?rainTiming(forecast,index,true,now)?.peakLabel||'':'',
+      condition,shortCondition:shortForecastCondition(condition),isDay:!display.night,
+      rainSourceFallback:story.rows.some(row=>row.rainLikelihood?.mode==='nws-fallback'&&finite(row.rainLikelihood.value)),pop:rain.value,observed:rain.observed,amount:story.amount,rainPeak:'',
       wind:winds.length?winds.reduce((sum,value)=>sum+value,0)/winds.length:null,
       snowfall:snowAmount?snowAmount.value:day.snowfall??null,snowRange:snowAmount?snowAmount.range:day.snowRange||null,snowAmountSource:snowAmount?.source||'',snowPossible:!!day.snowPossible,windWindow:story.window,confidence:day.confidence||null,detail:display.detail||story.summary};
   });

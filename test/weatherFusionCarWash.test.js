@@ -165,7 +165,7 @@ test('the conservative three-day chances still drive the inclusive 25% count and
   assert.match(html,/Rain chance ≤25%/);
 });
 
-test('at 6 PM the visible card switches from the daytime chance to the overnight chance',()=>{
+test('at 6 PM the visible card keeps the current calendar day chance instead of the overnight period',()=>{
   const forecast=fixture([70,8,8,8,8,8,8]);
   forecast.days[0].popNightLikelihood={value:8};
   forecast.days[0].nightCondition='Clear';
@@ -175,11 +175,11 @@ test('at 6 PM the visible card switches from the daytime chance to the overnight
   assert.equal(before.days[0].label,'Remainder of Today');
   const after=carWashSummary(forecast,Date.parse('2026-09-12T18:00:00Z'));
   assert.equal(after.state,'wait');
-  assert.equal(after.chance,8);
-  assert.equal(after.days[0].label,'Tonight');
+  assert.equal(after.chance,70);
+  assert.equal(after.days[0].label,'Remainder of Today');
   assert.equal(after.days[0].isDay,false);
   assert.equal(after.days[1].isDay,true);
-  assert.match(carWashHTML(after).match(/<article class="car-wash-day"[\s\S]*?<\/article>/)?.[0]||'',/sky-moon/);
+  assert.doesNotMatch(carWashHTML(after).match(/<article class="car-wash-day"[\s\S]*?<\/article>/)?.[0]||'',/sky-sun/);
   assert.deepEqual(after.decisions[0].chances,[70,8,8]);
 });
 
@@ -200,14 +200,14 @@ test('at 3:01 PM a rainy 4 PM remains Remainder of Today and still means WAIT',(
   assert.equal(bestWashWindow(forecast,0,now),null);
 });
 
-test('car-wash thunder icons follow thunder wording, not rain percentage',()=>{
+test('a small thunder chance stays in the percentage without making the daily car-wash icon stormy',()=>{
   const forecast=fixture([5,5,5,5,5,5,5]);
   forecast.days[0].condition='Slight Chance Thunderstorms';
   const summary=carWashSummary(forecast,start);
-  assert.equal(summary.days[0].condition,'Slight Chance Thunderstorms');
+  assert.equal(summary.days[0].condition,'Cloudy');
   const firstCard=carWashHTML(summary).match(/<article class="car-wash-day"[\s\S]*?<\/article>/)?.[0]||'';
-  assert.match(firstCard,/data-weather-kind="storm"/);
-  assert.match(firstCard,/sky-lightning/);
+  assert.match(firstCard,/data-weather-kind="cloudy"/);
+  assert.doesNotMatch(firstCard,/sky-lightning/);
 });
 
 test('rain-dominant car-wash cards never keep sunny-only artwork',()=>{
@@ -226,9 +226,9 @@ test('a car-wash card displayed as 0% keeps dry artwork even when full text has 
   forecast.days[0].condition='Slight Chance Thunderstorms';
   const summary=carWashSummary(forecast,start);
   assert.equal(Math.round(summary.days[0].chance),0);
-  assert.equal(summary.days[0].condition,'Slight Chance Thunderstorms');
+  assert.equal(summary.days[0].condition,'Cloudy');
   const firstCard=carWashHTML(summary).match(/<article class="car-wash-day"[\s\S]*?<\/article>/)?.[0]||'';
-  assert.match(firstCard,/data-weather-kind="partly-cloudy"/);
+  assert.match(firstCard,/data-weather-kind="cloudy"/);
   assert.doesNotMatch(firstCard,/sky-(?:rain|lightning|snow)/);
 });
 

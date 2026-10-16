@@ -1,9 +1,9 @@
 import {hourlyUvValue,hourlyUvHTML} from './daily-uv.js?v=clear-weather-daygraph-v3';
-import {outdoorExposure} from './outdoor-feels.js?v=cold-feels-v1';
-import {currentComfortInputs} from './current-inputs.js?v=cold-feels-v1';
+import {outdoorExposure} from './outdoor-feels.js?v=calendar-days-v1';
+import {currentComfortInputs} from './current-inputs.js?v=calendar-days-v1';
 import {weatherState,conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
-import {thermalComfort, finite, solarElevation,rainChanceValue} from './weather-math.js?v=cold-feels-v1';
-import {displayedFeelsAt,forecastValue,degrees} from './hourly-feels.js?v=cold-feels-v1';
+import {thermalComfort, finite, solarElevation,rainChanceValue} from './weather-math.js?v=calendar-days-v1';
+import {displayedFeelsAt,forecastValue,degrees} from './hourly-feels.js?v=calendar-days-v1';
 import {winterSceneExpected,selectedHourSnowPhase} from './exposure-scene.js?v=storm-scene-v5';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function weatherShapes(condition, isDay = true) {

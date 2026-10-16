@@ -56,10 +56,11 @@ test('UTC offset aliases match one instant; no index-based temperature pairing',
  assert.equal(forecastValue(f,'temperature',f.hours[1].time),85);
  assert.equal(new Set(f.metricForecasts.series.feels.map(p=>Date.parse(p.time))).size,241);
 });
-test('future-day and overnight ranges honor local time and the autumn DST change',()=>{
- const start=timeAt('2026-10-31',19,location.timeZone),end=timeAt('2026-11-01',7,location.timeZone);assert.equal((end-start)/H,13);
- const f={location,days:[{}, {date:'2026-10-31'}],metricForecasts:{series:{feels:series(Array(13).fill(60),start)}}};
- const s=dailyFeels(f,1,now).low;assert.equal(s.available,13);assert.equal(s.expected,13);assert.equal(s.partial,false);
+test('calendar-day feels-like ranges honor local midnight and the autumn DST change',()=>{
+ const start=timeAt('2026-11-01',0,location.timeZone),end=timeAt('2026-11-02',0,location.timeZone);assert.equal((end-start)/H,25);
+ const f={location,days:[{}, {date:'2026-11-01'}],metricForecasts:{series:{feels:series(Array(25).fill(60),start)}}};
+ const summary=dailyFeels(f,1,now);
+ for(const s of [summary.high,summary.low]){assert.equal(s.available,25);assert.equal(s.expected,25);assert.equal(s.partial,false);assert.ok(s.points.every(p=>Date.parse(p.time)>=start&&Date.parse(p.time)<end));}
 });
 test('the production forecast builder serves the new hourly contract without altering raw air-temperature weights',()=>{
  const f=buildForecast({...testInputs,models:{}});assert.equal(f.thermalVersion,'weather-nourie-hourly-feels-v2');

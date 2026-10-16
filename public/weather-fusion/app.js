@@ -1,33 +1,33 @@
-import {rainTiming,rainTimingHTML} from './rain-timing.js?v=tonight-timing-v2';
+import {rainTiming,rainTimingHTML} from './rain-timing.js?v=calendar-days-v1';
 import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText,rebindDanTake} from './dans-take.js?v=weather-art-labels-v10';
-import {danCard,danTakeDisplay} from './dans-summary.js?v=air-moisture-v1';
+import {danCard,danTakeDisplay} from './dans-summary.js?v=calendar-days-v1';
 import {fetchJsonWithDeadline} from './request-deadline.js?v=loading-recovery-v1';
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
-import {weatherIcon,renderHourlyWeather,currentSample} from './weather-display.js?v=tonight-timing-v2';
-import {dayGraphHTML,dayGraphPoints,installDayGraph} from './day-graph.js?v=calendar-surface-v2';
-import {degrees,feelsAt,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=cold-feels-v1';
+import {weatherIcon,renderHourlyWeather,currentSample} from './weather-display.js?v=calendar-days-v1';
+import {dayGraphHTML,dayGraphPoints,installDayGraph} from './day-graph.js?v=calendar-days-v1';
+import {degrees,feelsAt,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=calendar-days-v1';
 import {createFramePlayer} from './frame-player.js';
-import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=tonight-timing-v2';
-import {dailyDisplay} from './weather-math.js?v=cold-feels-v1';
+import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=calendar-days-v1';
+import {dailyDisplay} from './weather-math.js?v=calendar-days-v1';
 import {conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
 import {currentHero} from './current-temperature.js?v=rain-now-v71';
 import {renderBulletins} from './bulletins.js?v=county-warnings-v1';
 import {withLiveAlerts,retainUnverifiedAlerts,alertLocationKey,ALERT_REFRESH_MS} from './live-alerts.js?v=county-warnings-v3';
-import {modelFreshnessText} from './personal-details.js?v=cold-feels-v1';
+import {modelFreshnessText} from './personal-details.js?v=calendar-days-v1';
 import {renderDewpointMeter} from './dewpoint-meter.js?v=air-moisture-v1';
 import {renderWeatherPanel} from './render-safety.js';
-import {forecastPeriodSummary} from './forecast-story.js?v=tonight-timing-v2';
-import {forecastOutlookDetails} from './outlook-details.js?v=tonight-timing-v2';
-import {isExperimentalWeatherPage,renderCarWashForecast,resetCarWashForecast} from './car-wash.js?v=tonight-timing-v2';
-import {renderModelExplanation,resetModelExplanation} from './model-explanation.js?v=calendar-surface-v2';
-import {updateRainTrend} from './rain-trend.js?v=tonight-timing-v2';
+import {forecastPeriodSummary} from './forecast-story.js?v=calendar-days-v1';
+import {forecastOutlookDetails} from './outlook-details.js?v=calendar-days-v1';
+import {isExperimentalWeatherPage,renderCarWashForecast,resetCarWashForecast} from './car-wash.js?v=calendar-days-v1';
+import {renderModelExplanation,resetModelExplanation} from './model-explanation.js?v=calendar-days-v1';
+import {updateRainTrend} from './rain-trend.js?v=calendar-days-v1';
 import {renderRiskOutlooks,resetRiskOutlooks} from './risk-outlooks.js?v=risk-outlooks-v5';
 import {renderAirQuality} from './air-quality.js?v=mobile-repair-v1';
-import {displayedRainChance} from './rain-display.js?v=rain-observed-v1';
-import {weatherChangeMessages,WEATHER_CHANGE_TITLE} from './weather-changes.js?v=air-moisture-v1';
+import {displayedRainChance,rainAwareCondition,dailySkyCover} from './rain-display.js?v=calendar-days-v1';
+import {weatherChangeMessages,WEATHER_CHANGE_TITLE} from './weather-changes.js?v=calendar-days-v1';
 import {renderSnowOutlook,resetSnowOutlook} from './snow-outlook.js?v=snow-readable-v1';
-import {renderForecastWindowBanners,resetForecastWindowBanners} from './forecast-window-banners.js?v=cold-feels-v1';
-import {createSevenDayCarousel} from './seven-day.js?v=tonight-timing-v2';
+import {renderForecastWindowBanners,resetForecastWindowBanners} from './forecast-window-banners.js?v=calendar-days-v1';
+import {createSevenDayCarousel} from './seven-day.js?v=calendar-days-v1';
 import {forecastSourceHealth} from './forecast-status.js?v=source-health-v1';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);
@@ -157,7 +157,7 @@ function render(data) {
   $('city-name').textContent = data.location.name || place?.name || 'Your location';
   if(place?.source?.startsWith('device'))setDeviceLocationLabel(`Device location · ${data.location.name||'current position'}`);
   $('hero-date').textContent = new Intl.DateTimeFormat('en-US', { timeZone: data.location.timeZone, weekday: 'long', month: 'long', day: 'numeric' }).format(new Date()).toUpperCase();
-  const currentDay = dailyDisplay(d, 0, Date.now(), data.location.timeZone);
+  const currentDay = dailyDisplay(d, 0, Date.now(), data.location.timeZone,data);
   $('temperature').innerHTML = `${number(hero.temperature)}<span>°</span>`;
   document.querySelector('.current-temp-label').textContent='Current temperature';
   if($('hero-uv'))$('hero-uv').innerHTML=dailyUvHTML(data.days[0]?.uvMax,'Peak UV today');
@@ -252,7 +252,7 @@ function renderBriefing(data) {
   const card=danCard(data,forecast,Date.now());
   const takeItems=card.items||[];
   const takeDisplay=danTakeDisplay(data,forecast,Date.now());
-  const displayedDay=forecast?.days?.[0]?dailyDisplay(forecast.days[0],0,Date.now(),forecast.location?.timeZone||'America/New_York'):null;
+  const displayedDay=forecast?.days?.[0]?dailyDisplay(forecast.days[0],0,Date.now(),forecast.location?.timeZone||'America/New_York',forecast):null;
   const displayedRain=displayedRainChance(forecast,displayedDay?.pop,{now:Date.now()});
   const localDetails=data.mode!=='ai'&&forecast?.days?.length>1&&(forecast?.hours?.length||forecast?.rainTimeline?.length)?forecastOutlookDetails(forecast,Date.now()):null;
   const summary=localDetails?.summary||data.summary||'The source forecast is currently unavailable.';
@@ -385,15 +385,15 @@ function refreshOpenDay() {
 }
 function showDay(index, { preserve = false } = {}) {
   const d=forecast?.days[index]; if(!d) return;
-  const now=Date.now(),p=dailyDisplay(d,index,now,forecast.location.timeZone),phase=p.phase;
+  const now=Date.now(),p=dailyDisplay(d,index,now,forecast.location.timeZone,forecast),phase=p.phase;
   const root=$('day-content'),dialog=$('day-dialog'),oldInput=root.querySelector('#day-graph-hour');
   const selectedTime=preserve&&oldInput?activeDayDetail?.graphTimes[Number(oldInput.value)]:null;
   const scrollTop=preserve?dialog.scrollTop:0,confidenceOpen=preserve&&root.querySelector('.dialog-confidence')?.open;
   const focused=preserve&&root.contains(document.activeElement)?document.activeElement:null;
   const focusedId=focused?.id,focusedSummary=focused?.matches('.dialog-confidence > summary');
-  const story=forecastPeriodSummary(forecast,index,phase,now),storyRain=displayedRainChance(forecast,story.chance,{dayIndex:index,now}),overnight=!p.tonight?forecastPeriodSummary(forecast,index,'overnight',now):null;
-  const condition=phase==='overall'?`Day: ${d.condition||'forecast unavailable'} · Night: ${d.nightCondition||'forecast unavailable'}`:p.condition;
-  root.innerHTML=`<div class="dialog-eyebrow">WEATHER NOURIE</div><h2 id="day-title" class="dialog-title">${esc(p.label)}</h2><p class="dialog-condition">${esc(condition)}</p><div class="dialog-temps">${temperature(p.primary)}<span>${p.primaryLabel.toLowerCase()}${!p.tonight&&finite(p.secondary)?` · ${temperature(p.secondary)} low`:''}</span></div>${!p.tonight?'<p class="dialog-prose">Daytime high · following-night low. The graph also includes early-morning hours.</p>':''}${p.tonight?rainTimingHTML(rainTiming(forecast,index,true,now)):''}${dayGraphHTML(forecast,index,p.tonight,now)}<div class="dialog-stats"><div><strong>${percent(storyRain.value)}</strong><small>${storyRain.observed?'Rain observed now · later hours remain forecasts':p.tonight?'Rain chance tonight':phase==='overall'?'Peak hourly rain chance on this date':'Rain chance today'}</small></div><div><strong>${inches(story.amount)}</strong><small>${p.tonight?'Forecast rain through morning':phase==='overall'?'Total precipitation on this date':'Expected rain today'}</small></div></div><p class="dialog-prose">${esc(story.summary)}</p>${overnight?`<h3 class="dialog-subtitle">Overnight · ${percent(overnight.chance)} rain chance</h3><p class="dialog-prose">${esc(overnight.summary)}</p>`:''}${dailyConfidenceNoticeHTML(d.confidence,true)}${d.confidence?`<details class="dialog-confidence" data-confidence="${esc(d.confidence.key)}"><summary>Forecast confidence: ${esc(d.confidence.label)} · ${d.confidence.sourceCount??'?'} source${d.confidence.sourceCount===1?'':'s'}</summary><p>${esc(d.confidence.factors.join(' · '))}</p><small>${esc(d.confidence.note)}</small></details>`:''}<a href="#scientific-stuff" class="science-link" id="day-science-link">Scientific stuff ↓</a>`;
+  const story=forecastPeriodSummary(forecast,index,phase,now),storyRain=displayedRainChance(forecast,story.chance,{dayIndex:index,now});
+  const condition=rainAwareCondition(p.condition,storyRain.value,d,false,dailySkyCover(forecast,d,index,now));
+  root.innerHTML=`<div class="dialog-eyebrow">WEATHER NOURIE</div><h2 id="day-title" class="dialog-title">${esc(p.label)}</h2><p class="dialog-condition">${esc(condition)}</p><div class="dialog-temps">${temperature(p.primary)}<span>${p.primaryLabel.toLowerCase()}${!p.tonight&&finite(p.secondary)?` · ${temperature(p.secondary)} low`:''}</span></div><p class="dialog-prose">${index===0?'Remaining forecast today':'Forecast for this date'} · ends at local midnight.</p>${rainTimingHTML(rainTiming(forecast,index,false,now))}${dayGraphHTML(forecast,index,p.tonight,now)}<div class="dialog-stats"><div><strong>${percent(storyRain.value)}</strong><small>${storyRain.observed?'Rain observed now · later hours remain forecasts':p.tonight?'Rain chance tonight':phase==='overall'?'Peak hourly rain chance on this date':'Rain chance today'}</small></div><div><strong>${inches(story.amount)}</strong><small>${index===0?'Remaining precipitation before midnight':'Total precipitation on this date'}</small></div></div><p class="dialog-prose">${esc(story.summary)}</p>${dailyConfidenceNoticeHTML(d.confidence,true)}${d.confidence?`<details class="dialog-confidence" data-confidence="${esc(d.confidence.key)}"><summary>Forecast confidence: ${esc(d.confidence.label)} · ${d.confidence.sourceCount??'?'} source${d.confidence.sourceCount===1?'':'s'}</summary><p>${esc(d.confidence.factors.join(' · '))}</p><small>${esc(d.confidence.note)}</small></details>`:''}<a href="#scientific-stuff" class="science-link" id="day-science-link">Scientific stuff ↓</a>`;
   installDayGraph(root,forecast,index,p.tonight,now);
   const graphTimes=dayGraphPoints(forecast,index,p.tonight,now).map(point=>point.time),input=root.querySelector('#day-graph-hour');
   if (selectedTime && input) { input.value=String(Math.max(0,graphTimes.indexOf(selectedTime))); input.dispatchEvent(new Event('input')); }
@@ -624,8 +624,8 @@ window.addEventListener('online', () => { if(!document.hidden)void refreshAlerts
 window.addEventListener('pageshow', (event) => { if(event.persisted&&!document.hidden)void refreshAlerts();if (event.persisted&&validPlace(place)&&!document.hidden&&!busy) void load(); });
 // The site refreshes while open; this is not a push-alert system or background task.
 setInterval(()=>{if(validPlace(place)&&!document.hidden){if(forecast)renderAlerts(forecast);else if(alertSnapshot)renderBulletins(alertSnapshot);void refreshAlerts();}},ALERT_REFRESH_MS);
-// Forecast auto-refresh: every 10 minutes while visible (models update hourly; stations ~20-60 min).
-setInterval(() => { if (validPlace(place)&&!document.hidden&&!busy&&forecastAgeMs()>9*60000) void load(); }, 60000);
+// Refresh when the location's calendar date changes, as well as for aging data.
+setInterval(() => { if (validPlace(place)&&!document.hidden&&!busy&&(forecastAgeMs()>9*60000||forecast?.days?.[0]?.date!==new Intl.DateTimeFormat('en-CA',{timeZone:forecast.location.timeZone,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()))) void load(); }, 60000);
 installExperience();
 startDeviceLocation();
 

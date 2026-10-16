@@ -1,7 +1,8 @@
-import {timeAt,forecastValue,displayedFeelsAt,degrees} from './hourly-feels.js?v=cold-feels-v1';
+import {calendarDayWindow} from './calendar-day.js?v=calendar-days-v1';
+import {timeAt,forecastValue,displayedFeelsAt,degrees} from './hourly-feels.js?v=calendar-days-v1';
 import {hourlyUvValue,uvCategory} from './daily-uv.js?v=clear-weather-daygraph-v3';
 import {forecastGrossLevel} from './dewpoint-meter.js?v=feel-chart-v3';
-import {dailyRainPeriod,rainChanceValue} from './weather-math.js?v=cold-feels-v1';
+import {dailyRainPeriod,rainChanceValue} from './weather-math.js?v=calendar-days-v1';
 const H=3600000,finite=Number.isFinite;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function rainAt(f,time){
@@ -18,10 +19,7 @@ function rainAt(f,time){
 }
 export function dayGraphPoints(f,index,tonight=false,now=Date.now()){
  const d=f?.days?.[index];if(!d?.date)return [];
- const zone=f.location?.timeZone||'America/New_York',next=new Date(Date.parse(d.date+'T12:00Z')+24*H).toISOString().slice(0,10);
- const rain=dailyRainPeriod(d,tonight?'overnight':'overall');
- const a=Date.parse(rain.canonical?rain.window?.start:d[tonight?'lowWindow':'highWindow']?.start),b=Date.parse(rain.canonical?rain.window?.end:d.lowWindow?.end);
- const start=Math.max(finite(a)?a:timeAt(d.date,tonight?19:7,zone),index===0?now:-Infinity),end=finite(b)?b:timeAt(next,7,zone),points=[];
+ const rain=dailyRainPeriod(d,'overall'),window=calendarDayWindow(d,index,now,f.location?.timeZone),start=window.start,end=window.end,points=[];
  for(let t=(rain.canonical?Math.floor(start/H):Math.ceil(start/H))*H;t<end&&points.length<30;t+=H){const time=new Date(t).toISOString(),rain=rainAt(f,time);points.push({time,temperature:forecastValue(f,'temperature',time),feels:displayedFeelsAt(f,time),dewpoint:forecastValue(f,'dewpoint',time),wind:forecastValue(f,'wind',time),uv:hourlyUvValue(f,t),rainChance:rain.value,rainChanceSource:rain.source});}
  return points;
 }

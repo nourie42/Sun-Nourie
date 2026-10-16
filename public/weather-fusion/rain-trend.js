@@ -1,5 +1,5 @@
-import {forecastPeriodSummary} from './forecast-story.js?v=tonight-timing-v2';
-import {dailyDisplay,finite} from './weather-math.js?v=cold-feels-v1';
+import {forecastPeriodSummary} from './forecast-story.js?v=calendar-days-v1';
+import {dailyDisplay,finite} from './weather-math.js?v=calendar-days-v1';
 
 const STORAGE_KEY='weather-nourie-rain-history-v1';
 const MAX_SAMPLES=12;
@@ -11,12 +11,12 @@ function locationKey(forecast) {
 
 export function rainTrendSample(forecast,now=Date.now()) {
   const day=forecast?.days?.[0];if(!day)return null;
-  const display=dailyDisplay(day,0,now,forecast.location?.timeZone||'America/New_York');
+  const display=dailyDisplay(day,0,now,forecast.location?.timeZone||'America/New_York',forecast);
   const chance=forecastPeriodSummary(forecast,0,display.phase,now).chance;
   if(!finite(chance))return null;
   const runAt=forecast.assembledAt;
   if(!Number.isFinite(Date.parse(runAt)))return null;
-  return {key:`${locationKey(forecast)}|${day.date}|${display.tonight?'night':'day'}`,runAt,chance:Math.round(chance)};
+  return {key:`${locationKey(forecast)}|${day.date}|calendar-v2`,runAt,chance:Math.round(chance)};
 }
 
 export function updateRainTrend(forecast,now=Date.now(),storage=globalThis.localStorage) {

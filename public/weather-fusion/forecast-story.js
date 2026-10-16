@@ -1,5 +1,6 @@
-import {finite,dailyRainPeriod} from './weather-math.js?v=cold-feels-v1';
-import {timeAt} from './hourly-feels.js?v=cold-feels-v1';
+import {calendarDayWindow,rainWindowPeak} from './calendar-day.js?v=calendar-days-v1';
+import {finite,dailyRainPeriod} from './weather-math.js?v=calendar-days-v1';
+import {timeAt} from './hourly-feels.js?v=calendar-days-v1';
 
 const HOUR = 3600000;
 const RAIN_TIMING_THRESHOLD = 25;
@@ -11,6 +12,12 @@ function nextDate(date) {
 }
 
 function periodWindow(day, phase, now, zone, rain) {
+  if(phase==='overall'){
+    const window=calendarDayWindow(day,1,now,zone);
+    const published=Date.parse(rain.window?.start);
+    if(rain.canonical&&Number.isFinite(published))window.start=Math.max(window.start,published);
+    return window;
+  }
   if(rain.canonical){
     const start=Date.parse(rain.window?.start),end=Date.parse(rain.window?.end);
     return Number.isFinite(start)&&Number.isFinite(end)&&end>start?{start,end}:{start:null,end:null};
@@ -52,20 +59,7 @@ function rowsFor(forecast, window) {
   }).map(hour=>[Date.parse(hour.time),hour])).values()].sort((a,b) => Date.parse(a.time)-Date.parse(b.time));
 }
 
-/** A period peak is supported only by complete, matching hourly coverage. */
-export function rainWindowPeak(rows,window){
- if(!Number.isFinite(window.start)||!Number.isFinite(window.end)||window.end<=window.start)return {value:null,time:null};
- let cursor=window.start,peak=null;
- for(const row of rows){
-  const start=Date.parse(row.time),end=Date.parse(row.end||row.endTime||new Date(start+HOUR).toISOString());
-  if(start>=window.end||end<=window.start)continue;
-  const value=validChance(row.rainLikelihood?.value);
-  if(start>cursor||value===null||end<=start)return {value:null,time:null};
-  cursor=Math.max(cursor,Math.min(end,window.end));
-  if(!peak||value>peak.value)peak={value,time:start};
- }
- return cursor>=window.end&&peak?peak:{value:null,time:null};
-}
+export {rainWindowPeak} from './calendar-day.js?v=calendar-days-v1';
 
 function rainGroups(rows) {
   const groups = [];

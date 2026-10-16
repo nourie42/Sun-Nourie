@@ -1,7 +1,7 @@
-import {finite,solarElevation,thermalHumidity,wetBulb} from './weather-math.js?v=cold-feels-v1';
+import {finite,solarElevation,thermalHumidity,wetBulb} from './weather-math.js?v=calendar-days-v1';
 import {clothingForFeels,referenceScene,precipitationActivity,winterSceneExpected} from './exposure-scene.js?v=true-night-v6';
 import {thermalRisk} from './thermal-risk.js?v=weather-art-labels-v10';
-import {weatherShapes} from './weather-display.js?v=cold-feels-v1';
+import {weatherShapes} from './weather-display.js?v=calendar-days-v1';
 import {weatherState} from './weather-state.js';
 const H=3600000,SIGMA=5.670374419e-8,clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 const c=f=>(f-32)/1.8,f=c=>c*1.8+32;

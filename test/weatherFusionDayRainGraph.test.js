@@ -11,8 +11,9 @@ test('day rain graph uses the same published hourly likelihood as the hourly car
  const f=fixture();
  f.hours=[{time:time(0),pop:80,rainLikelihood:{value:38,source:'NWS and model guidance'}},{time:time(1),pop:70,rainLikelihood:{value:0}},{time:time(2),pop:58}];
  const points=dayGraphPoints(f,0,false,now);
- assert.deepEqual(points.map(p=>p.rainChance),[38,0,58]);
- for(let i=0;i<points.length;i++)assert.match(hourlyRainHTML(f.hours[i]),new RegExp(`>${points[i].rainChance}%<`));
+ assert.equal(points.length,12);assert.deepEqual(points.map(p=>p.rainChance),[38,0,58,...Array(9).fill(null)]);
+ for(let i=0;i<f.hours.length;i++)assert.match(hourlyRainHTML(f.hours[i]),new RegExp(`>${points[i].rainChance}%<`));
+ assert.equal(points.at(-1).time,'2026-10-15T03:00:00.000Z');
  assert.equal(points[0].rainChanceSource,'NWS and model guidance');
  assert.equal(points[2].rainChanceSource,'NWS hourly forecast');
 });
@@ -20,7 +21,7 @@ test('day rain graph uses the same published hourly likelihood as the hourly car
 test('rain stays missing for explicit blend gaps, invalid probabilities and deterministic-only amounts',()=>{
  const f=fixture();f.days[0].lowWindow.end=time(6);f.days[0].pop=90;
  f.hours=[{time:time(0),pop:80,rainLikelihood:{value:null}},{time:time(1),pop:85,precipitation:1,rainLikelihood:{value:101}},{time:time(2),pop:NaN},{time:time(3),precipitation:1},{time:time(5),rainLikelihood:{value:60},end:time(7)}];
- assert.deepEqual(dayGraphPoints(f,0,false,now).map(p=>p.rainChance),[null,null,null,null,null,null]);
+ assert.deepEqual(dayGraphPoints(f,0,false,now).map(p=>p.rainChance),Array(12).fill(null));
  const html=dayGraphHTML(f,0,false,now);
  assert.match(html,/data-series="rainChance" d="\s*"/);
  assert.doesNotMatch(html,/NaN|undefined/);
@@ -31,8 +32,10 @@ test('extended rain timeline supplies matching local-day hours beyond the 48-hou
  f.hours=[{time:time(67),pop:99}];
  f.rainTimeline=[{time:'2026-10-17T07:00:00-04:00',end:time(68),rainLikelihood:{value:29}},{time:time(68),end:time(69),pop:90,rainLikelihood:{value:null}},{time:time(70),end:time(71),rainLikelihood:{value:100}}];
  const points=dayGraphPoints(f,1,false,now);
- assert.deepEqual(points.map(p=>p.time),[time(67),time(68),time(69)]);
- assert.deepEqual(points.map(p=>p.rainChance),[29,null,null]);
+ assert.equal(points.length,24);
+ assert.equal(points[0].time,'2026-10-17T04:00:00.000Z');assert.equal(points.at(-1).time,'2026-10-18T03:00:00.000Z');
+ assert.deepEqual(points.slice(7,11).map(p=>p.time),[time(67),time(68),time(69),time(70)]);
+ assert.deepEqual(points.slice(7,11).map(p=>p.rainChance),[29,null,null,100]);
  f.rainTimeline=[];
  assert.equal(dayGraphPoints(f,1,false,now)[0].rainChance,null,'an empty canonical timeline never falls back to a conflicting raw probability');
 });
@@ -41,7 +44,7 @@ test('rain graph uses a separate percent scale and leaves gaps between missing h
  const f=fixture();f.hours=[{time:time(0),pop:0},{time:time(2),pop:100}];
  const html=dayGraphHTML(f,0,false,now);
  assert.match(html,/Rain chance uses its own zero to 100 percent scale below/);
- assert.match(html,/data-series="rainChance" d="M40\.0,265\.0  M460\.0,215\.0"/);
+ assert.match(html,/data-series="rainChance" d="M40\.0,265\.0\s+M116\.4,215\.0\s*"/);
  assert.match(html,/all five graph values/);
 });
 
@@ -57,7 +60,8 @@ test('scrubbing updates rain percentage, missing state, time and shared cursor a
  input.value='1';events.get('input')();
  assert.match(readout.innerHTML,/data-readout="rainChance"><span>Chance of rain<\/span><strong>—<\/strong><small>Unavailable<\/small>/);
  assert.equal(stamp.textContent,'Wed 1:00 PM');
- assert.equal(cursor.attrs.d,'M250 25 V275');
+ const cursorX=Number(cursor.attrs.d.match(/^M([\d.]+) 25 V275$/)[1]);
+ assert.ok(Math.abs(cursorX-(40+420/11))<1e-10,'the cursor uses all 12 remaining date hours, including gaps');
  assert.equal(input.attrs['aria-valuetext'],stamp.textContent);
  input.value='2';events.get('input')();
  assert.match(readout.innerHTML,/data-readout="rainChance" title="NWS hourly forecast"><span>Chance of rain<\/span><strong>58%<\/strong>/);
