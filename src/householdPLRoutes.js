@@ -73,6 +73,29 @@ export function registerHouseholdPLRoutes(app) {
     next();
   });
 
+  app.get("/household-pl/status", (_req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    if (!snapshotJSON) {
+      return res.status(503).json({ ready: false, code: "HOUSEHOLD_PL_SNAPSHOT_UNAVAILABLE" });
+    }
+    try {
+      const snapshot = JSON.parse(snapshotJSON);
+      return res.json({
+        ready: true,
+        actualMonth: snapshot.actualMonth || snapshot.period || null,
+        previousMonth: snapshot.previousMonth || null,
+        budgetStartMonth: snapshot.budgetStartMonth || null,
+        asOf: snapshot.asOf || null,
+        refreshedAt: snapshot.refreshedAt || null,
+        rows: Array.isArray(snapshot.rows) ? snapshot.rows.length : null,
+        transactions: Array.isArray(snapshot.tx) ? snapshot.tx.length : null,
+        coverageNotes: Array.isArray(snapshot.coverageNotes) ? snapshot.coverageNotes : snapshot.coverageNotes ? [snapshot.coverageNotes] : []
+      });
+    } catch {
+      return res.status(503).json({ ready: false, code: "HOUSEHOLD_PL_STATUS_PARSE_FAILED" });
+    }
+  });
+
   app.get(["/household-pl", "/household-pl.html"], async (req, res) => {
     if (!valid(req)) return res.status(401).type("html").send(loginPage());
     try {
