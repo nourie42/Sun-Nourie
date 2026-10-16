@@ -67,7 +67,7 @@ export function registerHouseholdPLRoutes(app) {
     secret &&
     safeEq(cookies(req).household_pl_auth, token(password, secret));
 
-  app.use(["/household-pl", "/household-pl.html"], (req, res, next) => {
+  app.use(["/household-pl", "/household-pl.html", "/household-pl-insights.js"], (req, res, next) => {
     res.setHeader("X-Robots-Tag", "noindex, nofollow, noarchive");
     res.setHeader("Cache-Control", "no-store, private");
     next();
@@ -96,15 +96,24 @@ export function registerHouseholdPLRoutes(app) {
     }
   });
 
+  app.get("/household-pl-insights.js", (req, res) => {
+    if (!valid(req)) return res.status(401).type("text/plain").send("Unauthorized");
+    res.setHeader("Cache-Control", "no-store, private");
+    res.type("application/javascript");
+    res.sendFile(path.join(__dirname, "..", "public", "household-pl-insights.js"));
+  });
+
   app.get(["/household-pl", "/household-pl.html"], async (req, res) => {
     if (!valid(req)) return res.status(401).type("html").send(loginPage());
     try {
       if (!snapshotJSON) return res.status(503).send("Household P&L data is unavailable. Please try again later.");
       const file = path.join(__dirname, "..", "public", "household-pl.html");
-      const page = (await fs.readFile(file, "utf8")).replace(
+      let page = (await fs.readFile(file, "utf8")).replace(
         "__HOUSEHOLD_PL_DATA__",
         () => snapshotJSON
       );
+      const insights = '<script>window.__HPL_SNAPSHOT__=typeof Z!=="undefined"?Z:null;</script><script src="/household-pl-insights.js?v=20261016-1"></script>';
+      page = page.includes("</body>") ? page.replace("</body>", `${insights}</body>`) : `${page}${insights}`;
       res.type("html").send(page);
     } catch (error) {
       console.error("Household P&L load failed:", error);
@@ -143,4 +152,3 @@ export function registerHouseholdPLRoutes(app) {
     res.redirect(303, "/household-pl");
   });
 }
-
