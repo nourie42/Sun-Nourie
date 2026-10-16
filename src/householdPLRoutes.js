@@ -37,17 +37,30 @@ export function registerHouseholdPLRoutes(app) {
   const password = process.env.HOUSEHOLD_PL_PASSWORD || "";
   const secret = process.env.HOUSEHOLD_PL_COOKIE_SECRET || "";
   let snapshotJSON = "";
-  try {
-    const snapshot = decodeHouseholdPLSnapshot(process.env.HOUSEHOLD_PL_DATA_GZ || "");
-    snapshotJSON = serializeHouseholdPLSnapshot(snapshot);
-    console.info("Household P&L snapshot ready:", JSON.stringify({
-      period: snapshot.actualMonth || snapshot.period || "2026-09",
-      asOf: snapshot.asOf || null,
-      rows: snapshot.rows.length,
-      transactions: snapshot.tx.length,
-    }));
-  } catch (error) {
-    console.error("Household P&L snapshot unavailable:", error.code || "HOUSEHOLD_PL_DATA_INVALID", error.detail || "");
+  for (const [source, variable] of [
+    ["primary", "HOUSEHOLD_PL_DATA_GZ"],
+    ["backup", "HOUSEHOLD_PL_LAST_GOOD_DATA_GZ"],
+  ]) {
+    try {
+      const snapshot = decodeHouseholdPLSnapshot(process.env[variable] || "");
+      if (source === "backup") {
+        const note = "Latest dataset could not be read; showing last verified backup.";
+        const notes = Array.isArray(snapshot.coverageNotes) ? [...snapshot.coverageNotes] : snapshot.coverageNotes ? [snapshot.coverageNotes] : [];
+        if (!notes.includes(note)) notes.push(note);
+        snapshot.coverageNotes = notes;
+      }
+      snapshotJSON = serializeHouseholdPLSnapshot(snapshot);
+      console.info("Household P&L snapshot ready:", JSON.stringify({
+        source,
+        period: snapshot.actualMonth || snapshot.period || "2026-09",
+        asOf: snapshot.asOf || null,
+        rows: snapshot.rows.length,
+        transactions: snapshot.tx.length,
+      }));
+      break;
+    } catch (error) {
+      console.error("Household P&L snapshot unavailable:", source, error.code || "HOUSEHOLD_PL_DATA_INVALID", error.detail || "");
+    }
   }
   const valid = (req) =>
     password &&

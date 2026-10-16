@@ -9,7 +9,7 @@ import { gzipSync } from 'node:zlib';
 
 // Exercise the actual route module without installing Express: only its URL-encoded
 // middleware factory is stubbed; the auth, filesystem, decoding and HTML injection run.
-async function routes(encoded) {
+async function routes(encoded, backup = '') {
   const directory = await mkdtemp(join(tmpdir(), 'household-pl-routes-'));
   await Promise.all(['src', 'public', 'node_modules/express'].map(part => mkdir(join(directory, part), { recursive: true })));
   await Promise.all([
@@ -20,13 +20,14 @@ async function routes(encoded) {
     writeFile(join(directory, 'node_modules/express/package.json'), '{"type":"module","exports":"./index.js"}'),
     writeFile(join(directory, 'node_modules/express/index.js'), 'export default {urlencoded(){return (_req,_res,next)=>next()}};'),
   ]);
-  const previous = Object.fromEntries(['HOUSEHOLD_PL_PASSWORD', 'HOUSEHOLD_PL_COOKIE_SECRET', 'HOUSEHOLD_PL_DATA_GZ'].map(key => [key, process.env[key]]));
+  const previous = Object.fromEntries(['HOUSEHOLD_PL_PASSWORD', 'HOUSEHOLD_PL_COOKIE_SECRET', 'HOUSEHOLD_PL_DATA_GZ', 'HOUSEHOLD_PL_LAST_GOOD_DATA_GZ'].map(key => [key, process.env[key]]));
   const logs = [], originalInfo = console.info, originalError = console.error;
   const mounted = [], gets = new Map();
   try {
     process.env.HOUSEHOLD_PL_PASSWORD = 'test-password';
     process.env.HOUSEHOLD_PL_COOKIE_SECRET = 'test-cookie-secret';
     process.env.HOUSEHOLD_PL_DATA_GZ = encoded;
+    process.env.HOUSEHOLD_PL_LAST_GOOD_DATA_GZ = backup;
     console.info = (...args) => logs.push(args.join(' '));
     console.error = (...args) => logs.push(args.join(' '));
     const { registerHouseholdPLRoutes } = await import(pathToFileURL(join(directory, 'src/householdPLRoutes.js')));
@@ -94,5 +95,52 @@ test('invalid configured gzip returns a controlled response without exposing fin
     assert.doesNotMatch(result.body, /PRIVATE-SYNTHETIC|Failed to fetch/);
     assert.ok(app.logs.some(line => line.includes('HOUSEHOLD_PL_BAD_GZIP')));
     assert.ok(app.logs.every(line => !line.includes('PRIVATE-SYNTHETIC')));
+  } finally { await app.close(); }
+});
+
+
+test('a verified backup preserves its original dates and adds visible fallback coverage', async () => {
+  const backup = { ...snapshot, actualMonth: '2026-09', asOf: '2026-09-24', refreshedAt: '2026-09-25T00:00:00Z', coverageNotes: 'Checking account only.' };
+  const app = await routes('invalid!', gzipSync(JSON.stringify(backup)).toString('base64'));
+  try {
+    const locked = await app.request('/household-pl', false);
+    assert.equal(locked.statusCode, 401);
+    assert.doesNotMatch(locked.body, /PRIVATE-SYNTHETIC/);
+    const loaded = await app.request('/household-pl', true);
+    assert.equal(loaded.statusCode, 200);
+    const data = JSON.parse(loaded.body.match(/const Z=(.*);/)[1]);
+    assert.equal(data.actualMonth, '2026-09');
+    assert.equal(data.asOf, '2026-09-24');
+    assert.equal(data.refreshedAt, backup.refreshedAt);
+    assert.deepEqual(data.rows, backup.rows);
+    assert.deepEqual(data.coverageNotes, ['Checking account only.', 'Latest dataset could not be read; showing last verified backup.']);
+    assert.ok(app.logs.some(line => line.includes('snapshot ready:') && line.includes('"source":"backup"')));
+    assert.ok(app.logs.every(line => !line.includes('PRIVATE-SYNTHETIC')));
+  } finally { await app.close(); }
+});
+
+test('valid primary data takes precedence over a valid older backup', async () => {
+  const backup = { ...snapshot, actualMonth: '2026-09', asOf: '2026-09-24' };
+  const app = await routes(gzipSync(JSON.stringify(snapshot)).toString('base64'), gzipSync(JSON.stringify(backup)).toString('base64'));
+  try {
+    const loaded = await app.request('/household-pl', true);
+    assert.deepEqual(JSON.parse(loaded.body.match(/const Z=(.*);/)[1]), snapshot);
+    assert.ok(app.logs.some(line => line.includes('"source":"primary"')));
+    assert.ok(app.logs.every(line => !line.includes('"source":"backup"')));
+  } finally { await app.close(); }
+});
+
+test('invalid primary and invalid backup remain private and return controlled unavailability', async () => {
+  const app = await routes('invalid!', 'invalid-backup!');
+  try {
+    const locked = await app.request('/household-pl.html', false);
+    assert.equal(locked.statusCode, 401);
+    assert.equal(locked.headers['Cache-Control'], 'no-store, private');
+    const loaded = await app.request('/household-pl', true);
+    assert.equal(loaded.statusCode, 503);
+    assert.match(loaded.body, /data is unavailable/);
+    assert.ok(app.logs.some(line => line.includes('primary HOUSEHOLD_PL_BAD_BASE64')));
+    assert.ok(app.logs.some(line => line.includes('backup HOUSEHOLD_PL_BAD_BASE64')));
+    assert.ok(app.logs.every(line => !line.includes('snapshot ready:')));
   } finally { await app.close(); }
 });
