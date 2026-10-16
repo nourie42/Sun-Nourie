@@ -8,20 +8,29 @@ new vm.Script(script); // Parse the complete production script, including DOM re
 
 function dashboard(base = {}, saved = {}, now = '2026-10-11T12:00:00Z') {
   const nodes = new Map();
+  const makeNode = () => {
+    const children = [], selectors = new Map();
+    return {
+      innerHTML: '', textContent: '', value: '', children,
+      classList: { contains: () => false }, querySelectorAll: () => [],
+      querySelector(selector) { if (!selectors.has(selector)) selectors.set(selector, makeNode()); return selectors.get(selector); },
+      appendChild(child) { children.push(child); },
+    };
+  };
   const node = id => {
-    if (!nodes.has(id)) nodes.set(id, { innerHTML: '', textContent: '', value: '', classList: { contains: () => false }, querySelectorAll: () => [] });
+    if (!nodes.has(id)) nodes.set(id, makeNode());
     return nodes.get(id);
   };
   const context = vm.createContext({
-    __HOUSEHOLD_PL_DATA__: '', TEST_BASE: structuredClone(base), Intl, structuredClone,
+    __HOUSEHOLD_PL_DATA__: structuredClone(base), Intl, structuredClone,
+    fetch() { throw new Error('Snapshot initialization must not fetch'); },
     Date: class extends Date { constructor(...args) { super(...(args.length ? args : [now])); } },
-    document: { getElementById: node, querySelector: node, querySelectorAll: () => [] },
+    document: { getElementById: node, createElement: makeNode, querySelector: node, querySelectorAll: () => [] },
     localStorage: { getItem: key => key === 'nourie-household-pl-v3' ? JSON.stringify(saved) : null },
     window: { addEventListener() {} }, console,
   });
   const instrumented = script
-    .replace('const BASE=await loadBase(),periods=', 'const BASE=TEST_BASE,periods=')
-    .replace('\n renderAll();\n})', '\n globalThis.result={BASE,periods,rows,monthEdits,monthVal,setMonth,forecastAnnual,snapshotBudget,makeTxList,snapshotDate,completedWeeksInfo,txAmountBetweenRows,renderSnapshotLabels,startCash};\n})');
+    .replace('\n renderAll();\n})', '\n renderAll();\n globalThis.result={BASE,periods,rows,monthEdits,monthVal,setMonth,setMonthlyAll,setAnnual,forecastAnnual,snapshotBudget,makeTxList,snapshotDate,completedWeeksInfo,txAmountBetweenRows,renderSnapshotLabels,startCash};\n})');
   vm.runInContext(instrumented, context);
   assert.ok(context.result, 'Dashboard initialization reached test seam');
   return { ...context.result, nodes };
@@ -98,4 +107,39 @@ test('explicit September source metadata prevents legacy transaction injections'
   const d = dashboard({ period: '2026-09', asOf: '2026-09-10', rows: [line(37)], tx: [] });
   assert.equal(d.BASE.rows[0].vals[1], 100);
   assert.equal(d.BASE.tx.length, 0);
+});
+
+
+test('the real loader initializes snapshot data without fetch or browser gzip APIs', () => {
+  const d = dashboard({ actualMonth: '2026-10', asOf: '2026-10-15', startingCash: 0, rows: [line()], tx: [{ d: '2026-10-15', s: 'Posted', k: 'INCOME', v: 123, m: 'Posted income' }] });
+  assert.equal(d.BASE.rows[0].vals[1], 100);
+  assert.equal(d.nodes.get('ki').textContent, '$100');
+  assert.ok(d.nodes.get('quickBody').children.length > 0);
+  assert.match(d.nodes.get('yearHead').innerHTML, /Oct 26/);
+  assert.equal(d.snapshotDate(), '2026-10-15');
+  assert.match(d.makeTxList(d.rows[0]), /Posted income/);
+  assert.equal(d.startCash, 0);
+});
+
+test('the loader rejects compressed strings and malformed snapshot objects explicitly', () => {
+  const prefix = script.slice(0, script.indexOf('// Snapshot vals:'));
+  for (const invalid of ['H4sI...', null, [], {}, { rows: [], tx: {} }]) {
+    const context = vm.createContext({ __HOUSEHOLD_PL_DATA__: invalid });
+    vm.runInContext(prefix + '\nglobalThis.loadSnapshot=loadBase;', context);
+    assert.throws(() => context.loadSnapshot(), /snapshot is unavailable/);
+  }
+});
+
+
+test('manual monthly amount changes remain the baseline after future rollover', () => {
+  const manual = { ...line(10003), manual: true, timing: 'Expected monthly', vals: [0, 0, ...Array(12).fill(75)] };
+  const d = dashboard({ period: '2026-10', budgetStartMonth: '2026-10', rows: [], tx: [] }, { manualRows: [manual] });
+  d.setMonthlyAll(d.rows[0], 120);
+  assert.equal(d.rows[0].monthlyAmount, 120);
+  const rolled = dashboard({ period: '2027-10', budgetStartMonth: '2027-10', rows: [], tx: [] }, { manualRows: d.rows, monthEdits: d.monthEdits, budgetStartMonth: '2026-10' });
+  assert.equal(rolled.monthVal(rolled.rows[0], 0), 120);
+  rolled.setAnnual(rolled.rows[0], 2400);
+  assert.equal(rolled.rows[0].monthlyAmount, 200);
+  const rolledAgain = dashboard({ period: '2028-10', budgetStartMonth: '2028-10', rows: [], tx: [] }, { manualRows: rolled.rows, monthEdits: rolled.monthEdits, budgetStartMonth: '2027-10' });
+  assert.equal(rolledAgain.monthVal(rolledAgain.rows[0], 0), 200);
 });

@@ -54,6 +54,11 @@ jobs:
           node --check public/distributor-branding-ui.js
           node --check scripts/testFuelAtlasCompanyLookup.js
           node --check scripts/testFuelAtlasLocationCompanyBridge.js
+      - name: Validate household P&L startup
+        run: |
+          node test/householdPLData.test.js
+          node test/householdPLRoutes.test.js
+          node test/household-pl.test.cjs
       - name: Validate Fuel Atlas
         run: |
           node scripts/validateFuelAtlas.js
@@ -69,3 +74,4 @@ jobs:
         run: node scripts/validateSiteAnalyzerLayout.js
       - name: Validate Site Research reliability
         run: node scripts/validateSiteResearchReliability.js
+
