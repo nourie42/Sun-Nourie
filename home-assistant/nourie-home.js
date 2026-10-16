@@ -1042,7 +1042,7 @@ function winixCategory(st) {
 // The air score averages the inputs that are reporting. Each input becomes 0–100, higher is better.
 export function buildAirScore(ctx, prefs = {}) {
   const p = prefs.air || {};
-  const pm03 = Array.isArray(p.pm03) && p.pm03.length ? p.pm03.filter((x) => ctx.states[x.id]) : discoverPm03(ctx);
+  const pm03 = Array.isArray(p.pm03) ? p.pm03.filter((x) => ctx.states[x.id]) : discoverPm03(ctx);
   const outdoorId = p.outdoor === '' ? null : p.outdoor || discoverOutdoorAqi(ctx);
   const winixIds = Array.isArray(p.winix) ? p.winix.filter((id) => ctx.states[id]) : discoverWinixQuality(ctx);
   const amazonId = p.amazon === '' ? null : p.amazon || discoverAmazon(ctx);
@@ -1195,7 +1195,13 @@ export function buildControls(ctx, prefs = {}) {
   const pairs = Array.isArray(prefs.controls) ? prefs.controls : defaultControls(ctx);
   return pairs
     .filter((p) => p && (p.on || p.off))
-    .map((p, i) => ({ ...p, index: i, icon: p.icon || 'power', onLabel: targetLabel(ctx, p.on), offLabel: targetLabel(ctx, p.off), ...controlState(ctx, p) }));
+    .map((p, i) => {
+      // A side whose script or device no longer exists is shown disabled rather than failing on tap.
+      const gone = (t) => !!t?.entity && !ctx.states[t.entity];
+      const state = controlState(ctx, p);
+      const missing = gone(p.on) && gone(p.off) ? 'Missing' : gone(p.on) || gone(p.off) ? `${gone(p.on) ? 'On' : 'Off'} is missing` : '';
+      return { ...p, index: i, icon: p.icon || 'power', onLabel: targetLabel(ctx, p.on), offLabel: targetLabel(ctx, p.off), ...state, onOk: !!p.on && !gone(p.on), offOk: !!p.off && !gone(p.off), note: missing || state.note };
+    });
 }
 
 // -------------------------------------------------------------- health
@@ -2227,8 +2233,8 @@ function controlsBlock(m) {
   const rows = m.controls.map((c) => `<div class="ctl t-${CONTROL_TONES[c.key] || 'cyan'}" data-key="ctl-${c.index}">
       <div class="ctl-h">${ic(c.icon)}<b>${esc(c.label)}</b>${c.note ? `<small>${esc(c.note)}</small>` : ''}</div>
       <div class="ctl-b">
-        <button class="ctl-btn ${c.active === 'on' ? 'on' : ''}" data-act="ctl" data-i="${c.index}" data-side="on" ${c.on ? '' : 'disabled'} aria-label="${esc(c.label)} on">${ic(c.icon)}<span>On</span></button>
-        <button class="ctl-btn off ${c.active === 'off' ? 'on' : ''}" data-act="ctl" data-i="${c.index}" data-side="off" ${c.off ? '' : 'disabled'} aria-label="${esc(c.label)} off">${ic('power')}<span>Off</span></button>
+        <button class="ctl-btn ${c.active === 'on' ? 'on' : ''}" data-act="ctl" data-i="${c.index}" data-side="on" ${c.onOk ? '' : 'disabled'} aria-label="${esc(c.label)} on">${ic(c.icon)}<span>On</span></button>
+        <button class="ctl-btn off ${c.active === 'off' ? 'on' : ''}" data-act="ctl" data-i="${c.index}" data-side="off" ${c.offOk ? '' : 'disabled'} aria-label="${esc(c.label)} off">${ic('power')}<span>Off</span></button>
       </div>
     </div>`).join('');
   return `<section class="block">${secHead('power', 'Controls', 'cyan')}<div class="ctls">${rows}</div></section>`;
@@ -2660,6 +2666,7 @@ function morph(parent, next) {
       if (cur.nodeType === 1 && !cur.hasAttribute('data-live')) {
         syncAttributes(cur, nxt);
         morph(cur, nxt);
+        syncLive(cur, nxt);
       } else if (cur.nodeValue !== nxt.nodeValue) {
         cur.nodeValue = nxt.nodeValue;
       }
@@ -2687,6 +2694,19 @@ function sameNode(a, b) {
 function syncAttributes(a, b) {
   for (const { name } of Array.from(a.attributes)) if (!b.hasAttribute(name)) a.removeAttribute(name);
   for (const { name, value } of Array.from(b.attributes)) if (a.getAttribute(name) !== value) a.setAttribute(name, value);
+}
+
+function syncLive(a, b) {
+  // Once a field has been touched its attributes no longer drive what it shows, so copy the live
+  // state too, leaving alone the field someone is typing in.
+  if (a.tagName === 'INPUT' && (a.type === 'checkbox' || a.type === 'radio')) a.checked = b.hasAttribute('checked');
+  else if ((a.tagName === 'INPUT' || a.tagName === 'TEXTAREA') && a !== a.getRootNode().activeElement) {
+    const v = b.getAttribute('value') ?? '';
+    if (a.value !== v) a.value = v;
+  } else if (a.tagName === 'SELECT' && a !== a.getRootNode().activeElement) {
+    const chosen = b.querySelector('option[selected]');
+    if (chosen && a.value !== chosen.value) a.value = chosen.value;
+  }
 }
 
 function patch(el, html) {
@@ -4252,7 +4272,7 @@ class NourieHome extends Base {
     if (!sel.length) return;
     const r = this._model?.robots.find((x) => x.id === vac);
     const names = sel.map((id) => r?.areas.find((a) => a.id === id)?.name).filter(Boolean);
-    await this._call('vacuum', 'clean_area', { entity_id: vac, cleaning_area_id: sel });
+    if (!(await this._call('vacuum', 'clean_area', { entity_id: vac, cleaning_area_id: sel }))) return;
     this._toast(`${r?.name || 'Robot'} is cleaning ${names.join(', ')}`);
     this._setPref('lastRooms', { ...(this._ext.prefs.lastRooms || {}), [vac]: sel });
     this._ui.roomSel[vac] = [];
@@ -4311,15 +4331,17 @@ class NourieHome extends Base {
   }
 
   async _call(domain, service, data, buzz = true) {
-    if (!this._hass?.callService) return;
+    if (!this._hass?.callService) return false;
     if (buzz) this._haptic('light');
     try {
       await this._hass.callService(domain, service, data);
+      return true;
     } catch (err) {
       this._haptic('failure');
       this._toast(`That didn't work: ${err?.message || err}`, true);
       if (data?.entity_id && typeof data.entity_id === 'string') delete this._ui.pending[data.entity_id];
       this._schedule(true);
+      return false;
     }
   }
 
