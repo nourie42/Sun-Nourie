@@ -1,5 +1,5 @@
 import {discussionPeriod} from './dans-take.js?v=clear-weather-daygraph-v3';
-import {dailyDisplay,finite} from './weather-math.js?v=cold-feels-v1';
+import {finite} from './weather-math.js?v=cold-feels-v1';
 
 const HOUR=3600000;
 /** Verify rain wording against the actual local hours it describes. Regional
@@ -30,17 +30,4 @@ export function forecastProseConflict(text,forecast,now=Date.now(),anchor=now){
   }
  }
  return null;
-}
-
-/** Safe fallback uses the same displayed day readings, never a second forecast. */
-export function pointForecastOverview(forecast,now=Date.now()){
- const zone=forecast?.location?.timeZone||'America/New_York';
- if(!(forecast?.days||[]).some((day,index)=>finite(dailyDisplay(day,index,now,zone).pop)))return '';
- return (forecast?.days||[]).slice(0,3).map((day,index)=>{
-  const display=dailyDisplay(day,index,now,zone),pop=display.pop;
-  const label=index===0?display.label:new Intl.DateTimeFormat('en-US',{timeZone:'UTC',weekday:'long'}).format(new Date(day.date+'T12:00Z'));
-  if(!finite(pop))return `${label}: rain chance is unavailable.`;
-  const weather=pop>=60?'rain likely':pop>=25?'rain possible':pop>0?'a low rain chance':'no rain signal in the forecast';
-  return `${label}: ${weather} (${Math.round(pop)}% peak hourly chance)${finite(display.primary)?`; ${display.primaryLabel.toLowerCase()} ${Math.round(display.primary)}°`:''}.`;
- }).join(' ');
 }

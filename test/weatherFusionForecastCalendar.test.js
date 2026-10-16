@@ -6,7 +6,7 @@ import {testInputs,snapshot} from './weatherFusion.fixtures.js';
 import {dayGraphPoints} from '../public/weather-fusion/day-graph.js';
 import {dailyForecastReadings} from '../public/weather-fusion/seven-day.js';
 import {forecastPeriodSummary} from '../public/weather-fusion/forecast-story.js';
-import {forecastProseConflict,pointForecastOverview} from '../public/weather-fusion/forecast-consistency.js';
+import {forecastProseConflict} from '../public/weather-fusion/forecast-consistency.js';
 import {danTakeDisplay} from '../public/weather-fusion/dans-summary.js';
 import {modelExplanationView} from '../public/weather-fusion/model-explanation.js';
 const H=3600000,zone='America/New_York',now=testInputs.now,iso=t=>new Date(t).toISOString();
@@ -76,20 +76,21 @@ test('dry-weekend prose is rejected when the actual Saturday forecast is wet',()
 test('one rainy day cannot be rewritten as rain throughout the entire weekend',()=>{
  assert.equal(forecastProseConflict('Rain throughout the weekend.',weekend(),friday)?.kind,'rain-throughout-dry-period');
 });
-test('a conflicting summary is replaced with the same point rain chances used by the tiles',()=>{
- const f=weekend(),briefing={signature:f.signature,danSummary:'The weekend will be dry.'};
- const text=danTakeDisplay(briefing,f,friday);
- assert.match(text,/Saturday: rain likely \(93% peak hourly chance\)/);
- assert.match(text,/Sunday: a low rain chance \(10% peak hourly chance\)/);
- assert.doesNotMatch(text,/weekend will be dry/);
- assert.equal(text,pointForecastOverview(f,friday));
-});
-
-test('public Weather Take always describes the current point blend rather than regional or AI generalizations',()=>{
+function discussionForecast(){
  const f={...weekend(),rainPeriodVersion:'local-calendar-v1'};
- f.days[0].high=81;
- const text=danTakeDisplay({signature:f.signature,danSummary:'Record heat today. A pleasant weekend is ahead.'},f,friday);
- assert.match(text,/high 81°/);
- assert.match(text,/Saturday: rain likely/);
- assert.doesNotMatch(text,/Record heat|pleasant weekend/);
+ f.location={...f.location,office:'RAH',latitude:35.787,longitude:-78.4806};
+ f.discussion={id:'test-discussion',office:'RAH',issuanceTime:'2026-10-16T07:29:00Z',text:'.SYNOPSIS...\nRain will arrive Saturday with much colder air. Sunday will be cooler with fewer showers.\n&&'};
+ f.feeds=[{id:'afd',status:'ready'}];return f;
+}
+test('a conflicting dry-weekend AI summary falls back to the discussion, without a numerical forecast list',()=>{
+ const f=discussionForecast(),briefing={signature:f.signature,danSummary:'The weekend will be dry.'};
+ const text=danTakeDisplay(briefing,f,friday);
+ assert.match(text,/Rain will arrive Saturday with much colder air/);
+ assert.doesNotMatch(text,/weekend will be dry|%|peak hourly|Today:/);
+});
+test('Weather Take preserves a valid easy-language discussion summary when a numeric blend is present',()=>{
+ const f=discussionForecast(),summary='Rain will arrive Saturday. Much cooler air follows.';
+ const text=danTakeDisplay({signature:f.signature,mode:'ai',danSummary:summary},f,friday);
+ assert.equal(text,summary);
+ assert.doesNotMatch(text,/Today:|%|high 81/);
 });
