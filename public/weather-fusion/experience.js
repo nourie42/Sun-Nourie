@@ -9,7 +9,7 @@ import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './per
 import {comfortMode,comfortWindow,comfortNarrative,warmestTodayWindow,comfortArtworkContext} from './comfort-outlook.js?v=cold-feels-v1';
 import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js?v=cold-feels-v1';
 import {displayedRainChance,rainAwareCondition} from './rain-display.js?v=rain-icon-v2';
-import {resetDewpointMeter} from './dewpoint-meter.js?v=feel-chart-v3';
+import {resetDewpointMeter} from './dewpoint-meter.js?v=air-moisture-v1';
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const number=(n,d=0)=>finite(n)?n.toFixed(d):'—';
@@ -23,7 +23,7 @@ const defs={
  pop:{title:'Rain chance',unit:'%',field:'pop',note:'The chance of rain during each forecast hour.',color:'#adcbff',zero:true,max:100},
  visibility:{title:'Visibility',unit:' mi',field:'visibility',note:'How far you may be able to see clearly.',color:'#c5dcf1',digits:1,zero:true},
  pressure:{title:'Pressure',unit:' mb',field:'pressure',note:'How sea-level pressure is expected to change.',color:'#c6bafa',digits:1},
- solar:{title:'Sunset',unit:'',field:'solar',note:'When the sun is expected to set over the next week.',color:'#ffdc9b',solar:true},
+ solar:{title:'Sunset',unit:'',field:'solar',note:'Forecast sunset times in this location’s time zone.',color:'#ffdc9b',solar:true},
 };
 let comfortPreview=null;
 let data=null, active=null, horizon=24, selected=0, graphPoints=[], graphGeometry=null;
@@ -207,11 +207,16 @@ export function renderMetricTiles(forecast,smallIcon) {
  if(active&&$('metric-dialog')?.open)drawChart();
 }
 function chartGrid(def,points) {
- const W=window.innerWidth<600?360:660,H=268,L=48,R=16,T=22,B=34;
+ // Clock labels are wider than numeric axes. Keep their leading hour inside
+ // the SVG so a clipped 6:38 PM cannot appear to be a different sunset time.
+ const W=window.innerWidth<600?360:660,H=268,L=def.solar?72:48,R=16,T=22,B=34;
  const vals=points.map(p=>p.value).filter(finite);
  let low=vals.length?Math.min(...vals):0,high=vals.length?Math.max(...vals):1;
  const delta=Math.max(def.digits?0.01:1,(high-low)*.18);
  low=def.zero?0:low-delta;high=def.max??high+delta;
+ // Four inch ticks need at least three hundredths of range when labels use
+ // two decimal places, including dry periods with all-zero hourly amounts.
+ if(def.unit===' in')high=Math.max(high,.03);
  if(high<=low)high=low+1;
  const a=points.length?Date.parse(points[0].time):0,b=points.length?Date.parse(points.at(-1).time):1;
  const x=i=>L+(Date.parse(points[i].time)-a)/Math.max(1,b-a)*(W-L-R),y=v=>T+(high-v)/(high-low)*(H-T-B);
@@ -250,6 +255,7 @@ function drawChart() {
  $('chart-location').textContent=data.location.name;
  $('chart-periods').hidden=!!def.solar;
  $('chart-week-label').hidden=!def.solar;
+ if(def.solar)$('chart-week-label').textContent=`${graphPoints.length} ${graphPoints.length===1?'day':'days'}`;
  document.querySelectorAll('[data-hours]').forEach(b=>{const chosen=Number(b.dataset.hours)===horizon;b.setAttribute('aria-pressed',String(chosen));b.classList.toggle('selected',chosen);});
  $('chart-content').innerHTML=chartGrid(def,graphPoints);
  $('chart-empty').hidden=valid.length>=2;

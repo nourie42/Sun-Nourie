@@ -13,7 +13,7 @@ function anchoredText(text,anchor,zone,now){
  });
 }
 const brief=text=>{const sentences=norm(text).match(/[^.!?]+[.!?]+|[^.!?]+$/g)||[];let result='';for(const s of sentences.slice(0,2)){if(result.length+s.length>440)break;result+=s+' ';}return result.trim();};
-const plain=text=>norm(text).replace(/\s+and following sharply cooler and wet conditions that will develop\b/gi,'. Much cooler, wet weather will follow').replace(/\binto Sat\b/g,'into Saturday').replace(/\bfrost Sun morning\b/g,'frost Sunday morning').replace(/\bMon morning\b/g,'Monday morning').replace(/\bconvection\b/gi,'showers and storms').replace(/\bprecipitation\b/gi,'wet weather').replace(/\btemps\b/gi,'temperatures').replace(/\bPoPs\b/g,'rain chances').replace(/\bQPF\b/g,'rainfall amounts').replace(/\bwrt(?:\s+to)?\b/gi,'about');
+const plain=text=>norm(text).replace(/\btemperatures expected\b/gi,'temperatures are expected').replace(/\s+and following sharply cooler and wet conditions that will develop\b/gi,'. Much cooler, wet weather will follow').replace(/\binto Sat\b/g,'into Saturday').replace(/\bfrost Sun morning\b/g,'frost Sunday morning').replace(/\bMon morning\b/g,'Monday morning').replace(/\bconvection\b/gi,'showers and storms').replace(/\bprecipitation\b/gi,'wet weather').replace(/\btemps\b/gi,'temperatures').replace(/\bPoPs\b/g,'rain chances').replace(/\bQPF\b/g,'rainfall amounts').replace(/\bwrt(?:\s+to)?\b/gi,'about');
 export function danOverview(briefing,forecast,now=Date.now()){
  if(!forecast)return {text:'Checking the latest forecast discussion…',source:'Updating'};
  const evidence=collectDanTakeEvidence(forecast,now);

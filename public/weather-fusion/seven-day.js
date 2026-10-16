@@ -4,6 +4,7 @@ import {forecastPeriodSummary} from './forecast-story.js?v=cold-feels-v1';
 import {shortForecastCondition} from './today-card.js?v=cold-feels-v1';
 import {weatherIcon,weatherMetricIcon} from './weather-display.js?v=cold-feels-v1';
 import {confidenceMeterPosition} from './forecast-confidence.js?v=category-meter-v1';
+import {winterAmountText,winterDayAmount} from './snow-outlook.js?v=snow-readable-v1';
 
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const reading=(value,unit='',digits=0)=>finite(value)?`${value.toFixed(digits)}${unit}`:'\u2014';
@@ -22,12 +23,13 @@ export function dailyForecastReadings(forecast,now=Date.now(),limit=10) {
     const weekday=finite(date)?new Intl.DateTimeFormat('en-US',{timeZone:'UTC',weekday:'short'}).format(date):day.label;
     const dateLabel=finite(date)?new Intl.DateTimeFormat('en-US',{timeZone:'UTC',month:'short',day:'numeric'}).format(date):'';
     const condition=rain.observed?'Rain now':rainAwareCondition(display.condition,rain.value,day,display.tonight);
+    const winterDay=forecast.snow?.days?.find(row=>row.date===day.date),snowAmount=winterDay?winterDayAmount(winterDay):null;
     return {index,date:day.date,dateLabel,label:index===0?(display.tonight?'Tonight':'Today'):weekday,
       high:display.tonight?null:display.primary,low:display.tonight?display.primary:display.secondary,
       condition,shortCondition:shortForecastCondition(condition),isDay:!display.tonight,
       pop:rain.value,observed:rain.observed,amount:story.amount,
       wind:winds.length?winds.reduce((sum,value)=>sum+value,0)/winds.length:null,
-      snowfall:day.snowfall??null,snowRange:day.snowRange||null,snowPossible:!!day.snowPossible,windWindow:story.window,confidence:day.confidence||null,detail:display.detail||story.summary};
+      snowfall:snowAmount?snowAmount.value:day.snowfall??null,snowRange:snowAmount?snowAmount.range:day.snowRange||null,snowAmountSource:snowAmount?.source||'',snowPossible:!!day.snowPossible,windWindow:story.window,confidence:day.confidence||null,detail:display.detail||story.summary};
   });
 }
 
@@ -50,7 +52,8 @@ export function sevenDayCardHTML(day,selected=false) {
   const description=`${day.label}, ${day.dateLabel}, ${day.condition}. High ${reading(day.high)} degrees, low ${reading(day.low)} degrees. Rain chance ${reading(day.pop,'%')}. Total precipitation ${reading(day.amount,' inches',2)}. Wind ${reading(day.wind,' mph')}. Forecast confidence ${day.confidence?.label||'unavailable'}.`;
   const metric=(kind,label,value,compact=false)=>`<span class="seven-day-metric" title="${esc(label)}: ${esc(value)}">${weatherMetricIcon(kind)}<span>${label}</span><strong${compact?' style="font-size:10px"':''}>${value}</strong></span>`;
   const temp=value=>`<strong style="--narrow-temp-size:${finite(value)&&(value<0||value>=100)?14:17}px">${reading(value,'\u00b0')}</strong>`;
-  return `<button type="button" class="seven-day-card" data-week-day="${day.index}" data-date="${esc(day.date)}" aria-pressed="${selected}" aria-controls="day-dialog" aria-haspopup="dialog" aria-label="${esc(description)}"><span class="seven-day-card-heading"><span class="seven-day-name">${esc(day.label)}</span><span class="seven-day-date">${esc(day.dateLabel)}</span></span><span class="seven-day-weather" title="${esc(day.condition)}">${artHTML(day)}<span class="seven-day-condition">${esc(day.shortCondition)}</span></span><span class="seven-day-temperatures"><span>${temp(day.high)}<span class="seven-day-temperature-label">High</span></span><span>${temp(day.low)}<span class="seven-day-temperature-label">Low</span></span></span><span class="seven-day-metrics">${metric('drop',day.observed?'Rain now':'Rain chance',reading(day.pop,'%'))}${metric('drop','Total precip',reading(day.amount,' in',2),day.amount>=10)}${metric('wind','Wind',reading(day.wind,' mph'),day.wind>=100)}${day.snowPossible?`<span class="seven-day-metric seven-day-snow" title="Snowfall forecast (NWS gridpoint; model range when they disagree)">❄ ${day.snowRange?`${day.snowRange[0]}–${day.snowRange[1]}"`:finite(day.snowfall)&&day.snowfall>=0.05?`${day.snowfall.toFixed(1)}"`:'Snow possible'}</span>`:''}</span>${confidenceHTML(day.confidence)}</button>`;
+  const snowText=finite(day.snowfall)&&day.snowfall>0||day.snowRange?winterAmountText(day.snowfall,day.snowRange):'Snow possible';
+  return `<button type="button" class="seven-day-card" data-week-day="${day.index}" data-date="${esc(day.date)}" aria-pressed="${selected}" aria-controls="day-dialog" aria-haspopup="dialog" aria-label="${esc(description)}"><span class="seven-day-card-heading"><span class="seven-day-name">${esc(day.label)}</span><span class="seven-day-date">${esc(day.dateLabel)}</span></span><span class="seven-day-weather" title="${esc(day.condition)}">${artHTML(day)}<span class="seven-day-condition">${esc(day.shortCondition)}</span></span><span class="seven-day-temperatures"><span>${temp(day.high)}<span class="seven-day-temperature-label">High</span></span><span>${temp(day.low)}<span class="seven-day-temperature-label">Low</span></span></span><span class="seven-day-metrics">${metric('drop',day.observed?'Rain now':'Rain chance',reading(day.pop,'%'))}${metric('drop','Total precip',reading(day.amount,' in',2),day.amount>=10)}${metric('wind','Wind',reading(day.wind,' mph'),day.wind>=100)}${day.snowPossible?`<span class="seven-day-metric seven-day-snow" title="${esc(day.snowAmountSource||'Snowfall forecast')}">${snowText==='Snow possible'?'':'❄ '}${esc(snowText)}</span>`:''}</span>${confidenceHTML(day.confidence)}</button>`;
 }
 
 export function createSevenDayCarousel({onOpenDay=()=>{}}={}) {
@@ -58,7 +61,7 @@ export function createSevenDayCarousel({onOpenDay=()=>{}}={}) {
   const anchor=document.querySelector('.hero .today-panel');if(!anchor)return null;
   for(const [id,name] of [['experimental-week-styles','seven-day.css']]) {
     if(document.getElementById(id))continue;
-    const link=document.createElement('link');link.id=id;link.rel='stylesheet';link.href=`/weather-fusion/${name}?v=main-week-v10`;document.head.append(link);
+    const link=document.createElement('link');link.id=id;link.rel='stylesheet';link.href=`/weather-fusion/${name}?v=snow-readable-v1`;document.head.append(link);
   }
   const root=document.createElement('section');root.id='experimental-week';root.className='experimental-week';root.hidden=true;root.setAttribute('aria-labelledby','seven-day-title');
   root.innerHTML=`<div class="seven-day-carousel glass"><div class="seven-day-heading"><h2 id="seven-day-title">7-Day Forecast</h2><div class="seven-day-controls"><button type="button" data-week-step="-1" aria-label="Previous forecast days" title="Previous forecast days" aria-controls="seven-day-rail" disabled>${chevron('left')}</button><button type="button" data-week-step="1" aria-label="Next forecast days" title="Next forecast days" aria-controls="seven-day-rail" disabled>${chevron('right')}</button></div></div><div id="seven-day-rail" class="seven-day-rail" tabindex="0" aria-label="Seven-day forecast"></div><input type="range" class="seven-day-scroll" min="0" max="1000" value="0" aria-label="Scroll seven-day forecast" aria-controls="seven-day-rail" disabled></div>`;

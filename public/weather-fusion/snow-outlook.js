@@ -2,6 +2,7 @@
 const finite=n=>typeof n==='number'&&Number.isFinite(n);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const inch=n=>finite(n)&&n>=0?n>0&&n<.05?'<0.1″':`${n.toFixed(1)}″`:'Unavailable';
+const noMeasurableAmount=a=>a?.value===0&&(!Array.isArray(a.range)||a.range[1]===0);
 const officialWinterUrl='https://www.wpc.ncep.noaa.gov/pwpf/wwd_accum_probs.php';
 const labels={wpc:'WPC winter',ecmwf:'ECMWF',weathernext:'Google WeatherNext',gfs:'GFS',hrrr:'HRRR',nam:'NAM'};
 const windowTitle=w=>w.label||(finite(w.snowfall?.sources?.find(s=>s.id==='wpc')?.value)?'WPC 24-hour snowfall blend':w.mode==='nearTerm'?'Next 24 forecast hours':w.mode==='extended'?'Later snowfall':'Winter blend');
@@ -131,10 +132,11 @@ function probabilitySourceHTML(r,zone){
 }
 function sourceHTML(b){
  const all=['ready','complete'].includes(b?.status),missing=b?.status==='unavailable'||b?.coverage===0;
- return `<p class="winter-weights">Requested: ${esc(weightsText(b?.weights))}</p><p class="winter-coverage">${finite(b?.coverage)?`${Math.round(b.coverage)}% of requested weight has compatible data. `:''}${all?'All requested sources available.':missing?'No requested source has compatible accumulation data.':'Partial blend: only compatible available sources contribute.'}</p>${!all&&!missing&&b?.actualWeights?`<p class="winter-weights">Contributing weights: ${esc(weightsText(b.actualWeights))}</p>`:''}${b?.precision?`<p class="winter-coverage">${esc(b.precision)}</p>`:''}`;
+ const requested=weightsText(b?.weights);
+ return `${requested?`<p class="winter-weights">Requested: ${esc(requested)}</p>`:''}<p class="winter-coverage">${finite(b?.coverage)?`${Math.round(b.coverage)}% of requested weight has compatible data. `:''}${all?'All requested sources available.':missing?'No requested source has compatible accumulation data.':'Partial blend: only compatible available sources contribute.'}</p>${!all&&!missing&&b?.actualWeights?`<p class="winter-weights">Contributing weights: ${esc(weightsText(b.actualWeights))}</p>`:''}${b?.precision?`<p class="winter-coverage">${esc(b.precision)}</p>`:''}`;
 }
 function winterTechnicalHTML(s,zone){
- const days=(s.days||[]).filter(dayActive).map(r=>`<article class="winter-day"><h3>${esc(dayName(r))}<small>${esc(r.date)}</small></h3><div class="winter-type-grid">${[['snow','Snow'],['freezingRain','Freezing rain'],['sleet','Sleet']].map(([key,label])=>`<div><span>${label}</span><strong>${signal(r,key)}</strong></div>`).join('')}</div>${probabilitySourceHTML(r,zone)}<p class="winter-amount">Snow amount <strong>${Array.isArray(r.range)&&r.range.length===2&&r.range.every(finite)?`${r.range[0]}–${r.range[1]}″`:esc(inch(r.best))}</strong></p><p class="winter-coverage">Local calendar-day guidance; WPC uses the separate 24-hour periods below.</p>${r.periods?.length?`<p>${r.periods.map(p=>`${esc(p.name)}: ${esc(p.wording)}`).join(' · ')}</p>`:''}${r.blend?sourceHTML(r.blend):''}</article>`).join('');
+ const days=(s.days||[]).filter(dayActive).map(r=>`<article class="winter-day"><h3>${esc(dayName(r))}<small>${esc(r.date)}</small></h3><div class="winter-type-grid">${[['snow','Snow'],['freezingRain','Freezing rain'],['sleet','Sleet']].map(([key,label])=>`<div><span>${label}</span><strong>${signal(r,key)}</strong></div>`).join('')}</div>${probabilitySourceHTML(r,zone)}<p class="winter-amount">Snow amount <strong>${Array.isArray(r.range)&&r.range.length===2&&r.range.every(finite)?`${r.range[0]}–${r.range[1]}″`:esc(inch(r.best))}</strong></p>${r.amountSource?`<p class="winter-coverage">Amount source: ${esc(r.amountSource)}.</p>`:''}<p class="winter-coverage">Local calendar-day guidance; WPC uses the separate 24-hour periods below.</p>${r.periods?.length?`<p>${r.periods.map(p=>`${esc(p.name)}: ${esc(p.wording)}`).join(' · ')}</p>`:''}${r.blend?sourceHTML(r.blend):''}</article>`).join('');
  const windows=(s.blendWindows||[]).map(w=>{
   const b=w.snowfall||w,raw=b.sources||w.sources;
   const sources=Array.isArray(raw)?raw:Object.entries(raw||{}).map(([id,s])=>({id,...(typeof s==='object'?s:{value:s})}));
@@ -165,7 +167,8 @@ export function snowDetailHTML(s,place,zone='America/New_York',selectedDate){
  const wording=events.length?`Snow possible ${stamp(events[0].start,zone)}–${stamp(events.at(-1).end,zone)}`:'';
  const estimated=amount.status==='partial'&&finite(amount.value)&&amount.value>0&&!amount.range;
  const source=amount.source==='Available model guidance'?'Model estimate':amount.source;
- return head+`<div class="winter-primary">${controls}<article class="winter-snow-summary" data-snow-day="${esc(selected.date)}"><h3>${esc(dayName(selected))}<small>${esc(shortDate(selected))}</small></h3><p class="winter-snow-amount"><strong>${estimated?'About ':''}${esc(winterAmountText(amount.value,amount.range))}</strong><span>of snow${amount.remainingDay?' for the rest of today':''}</span></p>${wording?`<p class="winter-snow-wording">${esc(wording)}</p>`:''}<p class="winter-snow-source">${finite(amount.value)?esc(source||'Forecast guidance'):'Snowfall amount is not available yet.'}</p></article>${mapPanelHTML(descriptor)}</div>${technical}`;
+ const noAccumulation=noMeasurableAmount(amount);
+ return head+`<div class="winter-primary">${controls}<article class="winter-snow-summary" data-snow-day="${esc(selected.date)}"><h3>${esc(dayName(selected))}<small>${esc(shortDate(selected))}</small></h3><p class="winter-snow-amount"><strong${noAccumulation?' class="winter-no-accumulation"':''}>${noAccumulation?'No measurable accumulation':`${estimated?'About ':''}${esc(winterAmountText(amount.value,amount.range))}`}</strong>${!noAccumulation||amount.remainingDay?`<span>${noAccumulation?'':'of snow'}${amount.remainingDay?' for the rest of today':''}</span>`:''}</p>${wording?`<p class="winter-snow-wording">${esc(wording)}</p>`:''}<p class="winter-snow-source">${finite(amount.value)?esc(source||'Forecast guidance'):'Snowfall amount is not available yet.'}</p></article>${mapPanelHTML(descriptor)}</div>${technical}`;
 }
 export function winterMapsHTML(s,place){
  const maps=winterMapDescriptors(s),selected=maps.find(d=>d.id===selectedLayerId)||maps[0];
@@ -189,7 +192,7 @@ function ensureInteractiveMap(){
  map=L.map('winter-map',{scrollWheelZoom:false,preferCanvas:true}).setView([finite(lat)?lat:39,finite(lon)?lon:-96],finite(lat)?6:4);
  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>',maxZoom:10}).addTo(map);
  const day=(latest?.snow?.days||[]).find(r=>r.date===selectedSnowDate),amount=winterDayAmount(day),name=latest?.location?.name||'Your location';
- const pointText=snowView==='forecast'&&finite(amount.value)?`${name} · ${winterAmountText(amount.value,amount.range)}`:name;
+ const pointText=snowView==='forecast'&&finite(amount.value)?`${name} · ${noMeasurableAmount(amount)?'0″ expected':winterAmountText(amount.value,amount.range)}`:name;
  if(finite(lat)&&finite(lon))L.circleMarker([lat,lon],{pane:'markerPane',radius:5,color:'#fff',fillColor:'#87ccff',fillOpacity:1}).addTo(map).bindTooltip(esc(pointText),{permanent:true,direction:'top'}).bindPopup(esc(pointText));
  requestAnimationFrame(()=>map?.invalidateSize());return true;
 }
@@ -324,7 +327,7 @@ function install(){
  });
  if(content&&typeof MutationObserver!=='undefined')new MutationObserver(()=>{if(opened&&!content.querySelector('[data-winter-outlook]'))releaseSnowView();}).observe(content,{childList:true});
  window.addEventListener('weather-map-library-ready',initializeMap);
- const link=document.createElement('link');link.rel='stylesheet';link.href='/weather-fusion/winter-outlook.css?v=snow-simple-v5';document.head.append(link);
+ const link=document.createElement('link');link.rel='stylesheet';link.href='/weather-fusion/winter-outlook.css?v=snow-readable-v1';document.head.append(link);
 }
 export function renderSnowOutlook(data){
  latest=data;install();let root=document.getElementById('snow-outlook-banner');

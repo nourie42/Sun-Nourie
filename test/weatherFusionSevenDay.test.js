@@ -163,3 +163,21 @@ test('narrow cards retain large and negative readings with their original units'
   assert.match(html,/--narrow-temp-size:14px/);
   assert.match(html,/font-size:10px/);
 });
+
+test('snow cards use the same daily amount and source as the primary snow forecast',()=>{
+  const forecast=structuredClone(preview),date=forecast.days[1].date;
+  forecast.days[1].snowPossible=true;forecast.days[1].snowfall=.1;
+  forecast.snow={days:[{date,best:.1,displaySnowfall:{value:0,range:null,source:'NWS point forecast',status:'ready'}}]};
+  let day=sevenDayForecast(forecast,now)[1];
+  assert.equal(day.snowfall,0);assert.equal(day.snowAmountSource,'NWS point forecast');
+  let html=sevenDayCardHTML(day);
+  assert.match(html,/seven-day-snow" title="NWS point forecast">Snow possible/);
+  assert.doesNotMatch(html,/❄ 0\.1|0\.0″/);
+  assert.equal(forecast.days[1].snowfall,.1,'the underlying requested blend remains unchanged');
+  forecast.snow.days[0].displaySnowfall.value=.02;
+  day=sevenDayForecast(forecast,now)[1];html=sevenDayCardHTML(day);
+  assert.equal(day.snowfall,.02);assert.match(html,/❄ &lt;0\.1″/);
+  forecast.snow.days[0].displaySnowfall.value=null;
+  day=sevenDayForecast(forecast,now)[1];assert.equal(day.snowfall,null);
+  assert.match(sevenDayCardHTML(day),/Snow possible/);
+});

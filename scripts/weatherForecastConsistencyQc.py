@@ -124,10 +124,21 @@ with sync_playwright() as p:
       check(int(slider.get_attribute('max'))==len(points)-1,'Metric chart retains exact source hours',key)
       actual=slider.evaluate("""(input,arg)=>arg.points.map((point,i)=>{input.value=String(i);input.dispatchEvent(new Event('input',{bubbles:true}));let v=point.value;if(arg.key==='pressure'&&typeof v==='number')v*=33.86389;return {actual:document.querySelector('#chart-value').textContent,expected:typeof v==='number'&&Number.isFinite(v)?v.toFixed(arg.digits)+arg.unit:'Not available'};})""",{'points':points,'key':key,'digits':digits,'unit':unit})
       check(all(p['actual']==p['expected'] for p in actual),'Every metric chart reading matches its own hourly source',{'metric':key,'mismatches':[p for p in actual if p['actual']!=p['expected']][:3]})
+     if key=='precipitation':
+      labels=page.locator('#forecast-graph text').all_text_contents()[:4]
+      check(len(set(labels))==len(labels),'Precipitation axis labels distinguish all four levels even during dry periods',labels)
      metrics.append({'metric':key,'hours':len(points),'allValuesMatch':True})
      page.locator('#close-metric').click()
     page.locator('[data-metric="solar"]').click();page.wait_for_selector('#metric-dialog[open]')
     check('Sunset' in page.locator('#chart-title').inner_text(),'Sunset graph opens')
+    solar=page.locator('#forecast-graph').evaluate('''svg=>({labels:[...svg.querySelectorAll('text')].map(e=>{const b=e.getBBox();return {text:e.textContent,left:b.x,right:b.x+b.width};}),width:svg.viewBox.baseVal.width})''')
+    check(all(label['left']>=0 and label['right']<=solar['width'] for label in solar['labels']),'Sunset clock labels remain fully visible inside the graph',solar)
+    sunsets=f.get('metricForecasts',{}).get('solar',[])
+    check(page.locator('#chart-week-label').inner_text()==str(len(sunsets))+(' day' if len(sunsets)==1 else ' days'),'Sunset period label matches the actual plotted days')
+    if sunsets:
+     expected=datetime.fromtimestamp(epoch(sunsets[0]['sunset'])/1000,zone).strftime('%I:%M %p').lstrip('0')
+     check(page.locator('#chart-value').inner_text()==expected,'Sunset graph readout uses the location clock',{'expected':expected})
+    report['sunsetGraph']=solar
     page.locator('#close-metric').click();report['metricGraphs']=metrics
     aq=f.get('airQuality') or {}
     if finite(aq.get('aqi')):check(page.locator('.aqi-reading>strong').inner_text()==shown(aq['aqi'],''),'AQI headline matches actual location data')

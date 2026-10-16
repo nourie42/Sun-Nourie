@@ -180,3 +180,19 @@ test('known zero NWS accumulation with only a weak NBM signal stays out of prima
  const trace={...row,displaySnowfall:{...row.displaySnowfall,value:.02}};assert.equal(winterSnowDays({...s,days:[trace]}).length,1);assert.match(snowDetailHTML({...s,days:[trace]},'Test town'),/&lt;0\.1″/);
  const unknown={...row,displaySnowfall:{...row.displaySnowfall,value:null,status:'unavailable'}};assert.equal(winterSnowDays({...s,days:[unknown]}).length,1);assert.match(snowDetailHTML({...s,days:[unknown]},'Test town'),/Snowfall amount is not available yet/);
 });
+
+test('snow showers with zero NWS accumulation explain the amount without claiming a positive trace',()=>{
+ const row={date:'2026-10-17',label:'Sat',snowExpected:true,snowPossible:true,possible:true,best:.1,amountSource:'Experimental requested winter amount blend',blend:{mode:'split',coverage:30,status:'partial'},periods:[{wording:'Chance Rain And Snow Showers',snowWording:true}],displaySnowfall:{value:0,range:null,source:'NWS point forecast',status:'ready'},snowEventWindows:[{start:'2026-10-17T10:00:00Z',end:'2026-10-17T17:00:00Z'}]};
+ const s={status:'partial',possible:true,days:[row]};
+ const html=snowDetailHTML(s,'Cortland, NY','America/New_York'),primary=html.split('<details')[0];
+ assert.match(primary,/No measurable accumulation/);
+ assert.match(primary,/Snow possible Sat 6:00 AM–Sat 1:00 PM/);
+ assert.match(primary,/NWS point forecast/);
+ assert.doesNotMatch(primary,/0\.0″|&lt;0\.1″|of snow/);
+ assert.match(html.split('<details')[1],/Snow amount <strong>0\.1″/);
+ assert.match(html.split('<details')[1],/Amount source: Experimental requested winter amount blend\./);
+ assert.doesNotMatch(html,/<p class="winter-weights">Requested: <\/p>/);
+ assert.equal(row.best,.1);assert.equal(row.displaySnowfall.value,0);
+ const trace=snowDetailHTML({...s,days:[{...row,displaySnowfall:{...row.displaySnowfall,value:.02}}]},'Cortland, NY').split('<details')[0];
+ assert.match(trace,/&lt;0\.1″/);assert.doesNotMatch(trace,/No measurable accumulation|0\.0″/);
+});

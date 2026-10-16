@@ -162,7 +162,7 @@ test('the conservative three-day chances still drive the inclusive 25% count and
   assert.equal(summary.reason,'Three days at or below 25% are lined up.');
   const html=carWashHTML(summary);
   assert.match(html,/3 of 3 days/);
-  assert.match(html,/25% or less rain/);
+  assert.match(html,/Rain chance ≤25%/);
 });
 
 test('at 6 PM the visible card switches from the daytime chance to the overnight chance',()=>{
@@ -341,4 +341,14 @@ test('Feel Meter falls back to current dew point after the daytime wash window c
   assert.deepEqual(summary.facts.gross,{title:'70° · NO-GO',detail:'Feel Meter now',value:70,level:'nogo'});
   assert.match(carWashHTML(summary),/70° · NO-GO/);
   assert.doesNotMatch(carWashHTML(summary),/Unavailable<\/b><small>Feel Meter/);
+});
+
+test('a future wash-day dew point is labeled with its day rather than looking current',()=>{
+ const f=fixture([90,90,10,10,10,10,10]);
+ const time=Date.parse(dates[2]+'T12:00:00Z');
+ f.metricForecasts.series.dewpoint.push({time:new Date(time).toISOString(),value:41});
+ f.metricForecasts.series.wind.push({time:new Date(time).toISOString(),value:4});
+ const fact=carWashSummary(f,start).facts.gross;
+ assert.equal(fact.title,'41° · DRY AIR');
+ assert.equal(fact.detail,'Feel Meter · next wash day');
 });

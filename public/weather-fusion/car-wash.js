@@ -149,8 +149,8 @@ function grossMeterFact(forecast, targetIndex, window, now = Date.now()) {
   if(!peak)return {title:'Unavailable',detail:'Feel Meter'};
   const wind=peak.current&&finite(forecast.current?.wind)?forecast.current.wind:seriesValue(forecast,'wind',peak.time);
   const level=forecastGrossLevel(peak.value,wind);
-  const score={parched:'VERY DRY',crisp:'DRY',dry:'DRY',nice:'NOT BAD','nice-breeze':'NOT BAD',humid:'HUMID',gross:'GROSS',nogo:'NO-GO',nope:'NOPE'}[level.key]||'UNAVAILABLE';
-  return {title:`${Math.round(peak.value)}° · ${score}`,detail:peak.current?'Feel Meter now':'Feel Meter at wash time',value:peak.value,level:level.key};
+  const score={parched:'VERY DRY AIR',crisp:'DRY AIR',dry:'DRY AIR',nice:'NOT BAD','nice-breeze':'NOT BAD',humid:'HUMID',gross:'GROSS',nogo:'NO-GO',nope:'NOPE'}[level.key]||'UNAVAILABLE';
+  return {title:`${Math.round(peak.value)}° · ${score}`,detail:peak.current?'Feel Meter now':targetIndex>0?'Feel Meter · next wash day':'Feel Meter at wash time',value:peak.value,level:level.key};
 }
 
 export function carWashSummary(forecast, now = Date.now()) {
@@ -188,9 +188,9 @@ export function carWashSummary(forecast, now = Date.now()) {
   const facts = supportingFacts(forecast,0,null);
   const lowRainDays = primary.chances.filter(value => value !== null && value <= CAR_WASH_RAIN_LIMIT).length;
   const best = primary.canWash
-    ? window ? {title:window.label,note:`${window.hours} forecast hours at or below ${CAR_WASH_RAIN_LIMIT}% rain chance.`} : {title:'No reliable hourly window yet',note:'The three-day outlook is dry enough, but hourly timing is incomplete.'}
+    ? window ? {title:window.label,note:`${window.hours} forecast hours at or below ${CAR_WASH_RAIN_LIMIT}% rain chance.`} : {title:'No reliable hourly window yet',note:'The next three days have low rain risk, but hourly timing is incomplete.'}
     : firstWash ? {title:`Try ${dayName(days[firstWash.index].date,zone,true)}`,note:window?`${window.label} looks best.`:'Hourly timing will appear closer to that day.'}
-      : {title:'Wait for a three-day dry stretch',note:primary.reason};
+      : {title:'Wait for three days with low rain risk',note:primary.reason};
   // The visible percentage and first forecast card describe the same active
   // Today/Tonight period as the featured forecast. The wash decision remains
   // conservative and can still use the whole-day value, including overnight
@@ -238,7 +238,7 @@ export function carWashHTML(summary) {
   </article>`).join('');
   return `<header class="car-wash-header"><span class="car-wash-logo" aria-hidden="true">💧🚙</span><span><h2 id="car-wash-title">Car Wash Forecast</h2><p>Plan for three days of low rain risk</p></span><em>Clean rides.<br>Brighter days.</em></header>
     <div class="car-wash-hero"><div class="car-wash-answer"><h3>Can I Wash<br>My Car Today?</h3><strong class="car-wash-verdict ${summary.state}" role="status" aria-live="polite" aria-atomic="true">${good?'<span aria-hidden="true">✓</span> ':''}${label}</strong><p>${esc(summary.reason)}</p></div>
-      <div class="car-wash-checks">${fact('💧',summary.chance===null?'—':`${Math.round(summary.chance)}%`,'Rain chance',summary.chance!==null&&summary.chance<=CAR_WASH_RAIN_LIMIT)}${fact('☀',`${summary.lowRainDays} of 3 days`,`${CAR_WASH_RAIN_LIMIT}% or less rain`,summary.lowRainDays===3)}${fact('≋',summary.facts.wind,'Wind')}${fact('♨',summary.facts.temperature,'Low / high')}${fact('💦',summary.facts.gross.title,summary.facts.gross.detail)}</div>
+      <div class="car-wash-checks">${fact('💧',summary.chance===null?'—':`${Math.round(summary.chance)}%`,'Rain chance',summary.chance!==null&&summary.chance<=CAR_WASH_RAIN_LIMIT)}${fact('☀',`${summary.lowRainDays} of 3 days`,`Rain chance ≤${CAR_WASH_RAIN_LIMIT}%`,summary.lowRainDays===3)}${fact('≋',summary.facts.wind,'Wind')}${fact('♨',summary.facts.temperature,'Low / high')}${fact('💦',summary.facts.gross.title,summary.facts.gross.detail)}</div>
     </div>
     <div class="car-wash-photo"><img class="car-wash-art" src="/weather-fusion/car-wash-corvette-hood.webp" alt="Cherry-red Corvette C8 with a black carbon-fiber hood graphic, fully visible on a driveway" loading="lazy" decoding="async"></div>
     <div class="car-wash-days-wrap"><h3>Next 5 Days</h3><div class="car-wash-days">${cards}</div></div>

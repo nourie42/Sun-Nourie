@@ -1,5 +1,5 @@
 /** Compare the published Weather Nourie forecast with individual model guidance. */
-import {dailyForecastReadings} from './seven-day.js?v=cold-feels-v1';
+import {dailyForecastReadings} from './seven-day.js?v=snow-readable-v1';
 const WN_FEED = 'https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/weathernext-full.json';
 const MS_PER_DAY = 86400000;
 
@@ -253,7 +253,7 @@ function renderChart(container, built, varDef, varId) {
   }
   let lo = allV.length ? Math.min(...allV) : 0, hi = allV.length ? Math.max(...allV) : 1;
   // Zoom the y-axis to the data range with a little padding
-  const pad = Math.max(varDef.unit === 'in' ? 0.02 : 0.5, (hi - lo) * 0.1);
+  const pad = Math.max(varId === 'snow' ? 0.4 : varDef.unit === 'in' ? 0.04 : 0.5, (hi - lo) * 0.1);
   lo = varDef.unit === '%' || varDef.unit === '' || varDef.unit === 'in' ? Math.max(0, lo - pad) : lo - pad;
   hi += pad;
   if (varDef.unit === '%') hi = Math.min(100, hi);
@@ -284,7 +284,7 @@ function renderChart(container, built, varDef, varId) {
       + `<i style="width:12px;height:3px;border-radius:2px;background:${COLORS[id]};opacity:${off ? 0.3 : 1};display:inline-block"></i>${NAMES[id]}</${tag}>`; };
   const legend = built.perModel ? ids.map(chip).join('')
     : `<span style="font-size:11px;color:#d5deee">${varId === 'aqi' ? 'Daily max AQI (Open-Meteo / CAMS)' : varId === 'uv' ? 'Daily max UV index' : ''}</span>`;
-  const note = built.perModel ? `<p style="font-size:11px;color:#c4d9ed;margin:6px 0 0">Weather Nourie blend is the forecast shown on this page. Other lines show individual models. Tap a model to show/hide its line, or tap the graph for values.${varId === 'rain' ? ' Rain totals use the same forecast period as the daily tiles, through 7 AM the next morning.' : varId === 'wind' ? ' Wind shows the average over that forecast period.' : varId === 'dewpoint' ? ' Dew point shows the highest reading over that forecast period.' : varId === 'pop' ? ' Individual model rain signals are not calibrated probabilities.' : ''}</p>` : '';
+  const note = built.perModel ? `<p style="font-size:11px;color:#c4d9ed;margin:6px 0 0">Weather Nourie blend is the forecast shown on this page. Other lines show individual models. Tap a model to show/hide its line, or tap the graph for values.${varId === 'rain' ? ' Rain totals use the same local calendar dates as the daily tiles. Tonight includes the following morning.' : varId === 'wind' ? ' Wind shows the average over that forecast period.' : varId === 'dewpoint' ? ' Dew point shows the highest reading over that forecast period.' : varId === 'pop' ? ' Individual model rain signals are not calibrated probabilities.' : ''}</p>` : '';
   container.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:4px;padding:2px 0 8px">${legend}</div>`
     + `<div class="wn-chart-wrap" style="position:relative;touch-action:pan-y">`
     + `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="width:100%;height:auto;display:block;cursor:crosshair" role="img" aria-label="${varDef.label} comparison chart">${ylabels}${labels}${lines}${dots}`

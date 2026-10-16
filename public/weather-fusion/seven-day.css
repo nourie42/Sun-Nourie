@@ -10,7 +10,8 @@
 .seven-day-rail{display:flex;flex:1;gap:var(--week-gap);min-width:0;min-height:0;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x proximity;scrollbar-width:none;touch-action:pan-x pan-y;cursor:grab;padding:2px 1px 4px}
 .seven-day-rail::-webkit-scrollbar{display:none}
 .seven-day-rail.is-dragging{scroll-snap-type:none;cursor:grabbing}
-.seven-day-card{display:grid;grid-template-rows:32px minmax(44px,1fr) 40px 60px 40px;flex:0 0 var(--week-card);min-width:0;box-sizing:border-box;gap:3px;margin:0;padding:7px 5px;scroll-snap-align:start;border:1px solid #168cd645;border-radius:20px;background:linear-gradient(160deg,#06477775,#07375777);color:#a0daf7;font:inherit;letter-spacing:0;text-align:center;user-select:none}
+.seven-day-card{display:grid;grid-template-rows:32px minmax(44px,1fr) 40px var(--week-metrics-height,60px) 40px;flex:0 0 var(--week-card);min-width:0;box-sizing:border-box;gap:3px;margin:0;padding:7px 5px;scroll-snap-align:start;border:1px solid #168cd645;border-radius:20px;background:linear-gradient(160deg,#06477775,#07375777);color:#a0daf7;font:inherit;letter-spacing:0;text-align:center;user-select:none}
+.seven-day-rail:has(.seven-day-snow){--week-metrics-height:76px}
 .seven-day-card[aria-pressed="true"]{border-color:#31bcffa6;background:linear-gradient(155deg,#087bc3,#084878 72%);box-shadow:inset 0 0 15px #29b9ff18}
 .seven-day-card:focus-visible{outline:2px solid #fff;outline-offset:-4px}
 .seven-day-card-heading{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:0}
@@ -27,11 +28,12 @@
 .seven-day-temperatures strong{order:1;font-size:20px;font-weight:600;line-height:1;color:#fff;white-space:nowrap}
 .seven-day-temperatures>span+span strong{color:var(--week-cyan)}
 .seven-day-temperature-label{font-size:10px;font-weight:500;color:var(--week-muted);line-height:1}
-.seven-day-metrics{display:grid;gap:2px;padding:5px 0;border-top:1px solid #d6e6ff16;border-bottom:1px solid #d6e6ff16}
+.seven-day-metrics{display:grid;grid-auto-rows:14px;align-content:start;gap:2px;padding:5px 0;border-top:1px solid #d6e6ff16;border-bottom:1px solid #d6e6ff16}
 .seven-day-metric{position:relative;display:flex;align-items:center;justify-content:center;gap:1px;min-height:14px;min-width:0;color:#71d7ff}
 .seven-day-metric:last-child{color:#97ddfa}
 .seven-day-metric svg{display:block;flex:none;width:10px;height:14px;color:inherit}
 .seven-day-metric strong{font-size:12px;font-weight:400;line-height:1.2;white-space:nowrap}
+#experimental-week .seven-day-snow{font-size:10px;line-height:14px;white-space:nowrap}
 .seven-day-confidence{display:block;margin:0;text-align:center;min-width:0}
 .seven-day-confidence-label{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;min-height:22px;line-height:1.1;font-weight:400;color:#b9cce3}
 .seven-day-confidence-label>span{font-size:9px;line-height:1.1;white-space:nowrap}
@@ -42,8 +44,8 @@
 .seven-day-scroll{display:block;flex:none;appearance:none;-webkit-appearance:none;width:100%;height:5px;margin:4px 0 0;border:0;border-radius:6px;background:#082f50;cursor:pointer;touch-action:pan-y}
 .seven-day-scroll::-webkit-slider-thumb{appearance:none;width:35%;height:5px;border:0;border-radius:6px;background:#70c2e288}
 .seven-day-scroll::-moz-range-thumb{width:35%;height:5px;border:0;border-radius:6px;background:#70c2e288}
-@media(max-width:760px){.experimental-week{--week-card:78px;--week-gap:5px;height:var(--week-height,286px)}.seven-day-carousel{padding:6px 9px;border-radius:20px}.seven-day-heading h2{font-size:16px}.seven-day-controls button{width:28px;height:28px;padding:4px}.seven-day-controls svg{width:18px;height:18px}.seven-day-card{grid-template-rows:28px minmax(31px,1fr) 36px 51px 36px;gap:1px;padding:3px 4px;border-radius:13px}.seven-day-name{font-size:13px}.seven-day-date{font-size:10px}.seven-day-art,.seven-day-weather>svg{width:31px;height:31px}.seven-day-temperatures strong{font-size:var(--narrow-temp-size,17px)}.seven-day-metrics{padding:3px 0;gap:1px}.seven-day-meter{margin-top:5px}.seven-day-confidence-label>span{font-size:8px}.seven-day-confidence-label strong{font-size:10px}}
-@media(max-width:359px){.seven-day-heading h2{font-size:15px}}
+@media(max-width:760px){.experimental-week{--week-card:78px;--week-gap:5px;height:var(--week-height,286px)}.seven-day-carousel{padding:6px 9px;border-radius:20px}.seven-day-heading h2{font-size:16px}.seven-day-controls button{width:28px;height:28px;padding:4px}.seven-day-controls svg{width:18px;height:18px}.seven-day-card{grid-template-rows:28px minmax(31px,1fr) 36px var(--week-metrics-height,51px) 36px;gap:1px;padding:3px 4px;border-radius:13px}.seven-day-rail:has(.seven-day-snow){--week-metrics-height:67px}.seven-day-name{font-size:13px}.seven-day-date{font-size:10px}.seven-day-art,.seven-day-weather>svg{width:31px;height:31px}.seven-day-temperatures strong{font-size:var(--narrow-temp-size,17px)}.seven-day-metrics{padding:3px 0;gap:1px}.seven-day-meter{margin-top:5px}.seven-day-confidence-label>span{font-size:8px}.seven-day-confidence-label strong{font-size:10px}}
+@media(max-width:359px){.seven-day-heading h2{font-size:15px}.seven-day-rail:has(.seven-day-snow){--week-metrics-height:75px}#experimental-week .seven-day-snow{white-space:normal;min-height:22px;line-height:11px}}
 @media(prefers-reduced-motion:reduce){.seven-day-rail{scroll-behavior:auto}}
 body[data-sky="night"] .seven-day-carousel{background:radial-gradient(ellipse at 25% 0,#174b762b,transparent 68%),linear-gradient(145deg,#072b4a,#051d36 62%,#04172c);border-color:#5ba8d052;box-shadow:inset 0 1px 1px #b0e9ff12,0 12px 30px #02091455}
 
