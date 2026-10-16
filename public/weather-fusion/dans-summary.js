@@ -1,3 +1,4 @@
+import {forecastProseConflict,pointForecastOverview} from './forecast-consistency.js?v=calendar-surface-v2';
 import {plainDanWording,hasDanJargon,collectDanTakeEvidence,visibleDanTakeItems,danTakeText,discussionPeriod,sectionAnchor,explicitForecastUncertainty} from './dans-take.js?v=clear-weather-daygraph-v3';
 import {bulletinFacts} from './bulletin-facts.js?v=county-warnings-v1';
 import {isTonightPeriod} from './weather-math.js?v=cold-feels-v1';
@@ -19,7 +20,7 @@ export function danOverview(briefing,forecast,now=Date.now()){
  const zone=forecast.location?.timeZone||'America/New_York';
  const generated=Date.parse(briefing?.generatedAt||evidence.source?.issuedAt);
  const sameSource=briefing?.mode==='ai'&&briefing.signature===forecast.signature&&evidence.source&&Number.isFinite(generated)&&dateKey(generated,zone)===dateKey(now,zone)&&JSON.stringify(briefing.danTakeSource)===JSON.stringify(evidence.source);
- if(sameSource&&brief(briefing.summary))return {text:brief(briefing.summary),source:'From the local NWS discussion'};
+ if(sameSource&&brief(briefing.summary)&&!forecastProseConflict(briefing.summary,forecast,now))return {text:brief(briefing.summary),source:'From the local NWS discussion'};
  if(evidence.source){
   // SYNOPSIS is the NWS's own current overview; no historical section is recycled.
   const body=forecast.discussion.text.match(/^\.(?:SYNOPSIS|KEY MESSAGES)[^\n]*\n([\s\S]*?)(?=^\.[A-Z]|^&&|\$\$|(?![\s\S]))/m)?.[1]||'';
@@ -27,16 +28,24 @@ export function danOverview(briefing,forecast,now=Date.now()){
   const anchor=sectionAnchor(body,issued,zone);
   const synopsis=Number.isFinite(anchor)&&issued-anchor<=86400000?body.replace(/^\s*(?:As of|Issued at)[^\n]*(?:\n|$)/gmi,'').replace(/^\s*(?:\d+[).]|[-*])\s*/gm,''):'';
   const currentSentences=(norm(synopsis).match(/[^.!?]+[.!?]+|[^.!?]+$/g)||[]).filter(s=>{const period=discussionPeriod(s,anchor,zone);return !period||period.end>now;}).join(' ');
-  if(brief(currentSentences))return {text:plain(anchoredText(brief(currentSentences),anchor,zone,now)),source:'Local NWS discussion summary'};
+  if(brief(currentSentences)){
+   const text=plain(anchoredText(brief(currentSentences),anchor,zone,now));
+   return forecastProseConflict(text,forecast,now)?{text:pointForecastOverview(forecast,now),source:'Current Weather Nourie point forecast'}:{text,source:'Local NWS discussion summary'};
+  }
  }
  const day=forecast.days?.[0],text=brief((isTonightPeriod(now,zone)?day?.nightDetail:day?.detail)||day?.detail||'');
- return {text:text||'The local forecast is temporarily unavailable. Please check the National Weather Service for the latest weather.',source:'NWS forecast · discussion summary unavailable'};
+ return {text:pointForecastOverview(forecast,now)||text||'The local forecast is temporarily unavailable. Please check the National Weather Service for the latest weather.',source:'NWS forecast · discussion summary unavailable'};
 }
 export function danTakeDisplay(briefing,forecast,now=Date.now()){
  if(forecast?.comparison?.source==='google')return 'Nourie Weather Take summarizes the NWS discussion on the regular weather page. This page shows the experimental model forecast.';
  const card=danCard(briefing,forecast,now);
+ // The public take describes the same point blend as the cards. Regional
+ // discussion and AI prose cannot replace this location's day-by-day facts.
+ const point=forecast?.rainPeriodVersion==='local-calendar-v1'?pointForecastOverview(forecast,now):'';
+ if(point)return point+(card.text?'\n\n'+card.text:'');
  const summary=briefing?.signature===forecast?.signature&&typeof briefing?.danSummary==='string'?briefing.danSummary.trim():'';
- if(summary)return summary+(card.text?'\n\n'+card.text:'');
+ if(summary&&!forecastProseConflict(summary,forecast,now))return summary+(card.text?'\n\n'+card.text:'');
+ if(summary)return pointForecastOverview(forecast,now)+(card.text?'\n\n'+card.text:'');
  const overview=danOverview(null,forecast,now);
  return overview.text+(card.text?'\n\n'+card.text:'');
 }

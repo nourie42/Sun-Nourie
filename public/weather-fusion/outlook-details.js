@@ -116,7 +116,7 @@ export function forecastOutlookDetails(forecast,now=Date.now()) {
   if (!days.length) return {summary:'',nearTerm:'',extended:''};
   const zone = forecast?.location?.timeZone || 'America/New_York';
   const display = dailyDisplay(days[0],0,now,zone);
-  const summaryPhase = display.tonight ? 'overnight' : 'daytime';
+  const summaryPhase = display.tonight ? 'overnight' : 'overall';
   const summary = periodText(forecast,0,summaryPhase,now);
 
   const tonight = periodText(forecast,0,'overnight',now);

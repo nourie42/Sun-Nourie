@@ -125,17 +125,17 @@ test('Gross Meter heading stays centered and bold without changing chart geometr
  assert.match(css,/#gross-title\{text-align:center;font-weight:800\}/);assert.match(meterCss,/\.gross-eyebrow\{width:calc\(100% \+ 86px\);[^}]*text-align:center/);assert.match(meterCss,/@media\(max-width:760px\)[\s\S]*\.gross-eyebrow\{width:calc\(100% \+ 62px\)\}/);assert.ok(!/\.gross-(scroll|chart)\s*\{/.test(css));
 });
 test('changed assets are cache-busted and late briefing responses stay guarded',()=>{
- assert.match(html,/style\.css\?v=brand-v3/);assert.match(html,/forecast-layout\.css\?v=weather-qa-v67/);assert.match(html,/personal-details\.css\?v=wpc-mpd-v12/);assert.match(html,/app\.js\?v=cold-feels-v1/);assert.match(html,/weather-polish\.css\?v=aqi-bg-v2/);assert.match(html,/car-wash\.css\?v=compact-days-v42/);assert.match(html,/forecast-cards\.css\?v=real-clouds-v2/);assert.match(html,/scenario-layout\.css\?v=feel-auto-v6/);assert.match(html,/risk-outlooks\.css\?v=risk-outlooks-v4/);
+ assert.match(html,/style\.css\?v=brand-v3/);assert.match(html,/forecast-layout\.css\?v=weather-qa-v67/);assert.match(html,/personal-details\.css\?v=wpc-mpd-v12/);assert.match(html,/app\.js\?v=calendar-surface-v2/);assert.match(html,/weather-polish\.css\?v=aqi-bg-v2/);assert.match(html,/car-wash\.css\?v=compact-days-v42/);assert.match(html,/forecast-cards\.css\?v=real-clouds-v2/);assert.match(html,/scenario-layout\.css\?v=feel-auto-v6/);assert.match(html,/risk-outlooks\.css\?v=risk-outlooks-v4/);
  assert.match(app,/dans-take\.js\?v=weather-art-labels-v10/);
  assert.match(app,/bulletins\.js\?v=county-warnings-v1/);
- assert.match(app,/experience\.js\?v=cold-feels-v1/);
+ assert.match(app,/experience\.js\?v=calendar-surface-v2/);
  assert.match(app,/personal-details\.js\?v=cold-feels-v1/);
  assert.match(app,/forecast-story\.js\?v=cold-feels-v1/);
  assert.match(app,/weather-display\.js\?v=cold-feels-v1/);assert.match(app,/current-temperature\.js\?v=rain-now-v71/);assert.match(app,/car-wash\.js\?v=cold-feels-v1/);
- assert.match(app,/model-explanation\.js\?v=cold-feels-v1/);
- assert.match(app,/outlook-details\.js\?v=cold-feels-v1/);
+ assert.match(app,/model-explanation\.js\?v=calendar-surface-v2/);
+ assert.match(app,/outlook-details\.js\?v=calendar-surface-v2/);
  for(const module of ['dewpoint-meter'])assert.match(app,new RegExp(`${module}\\.js\\?v=feel-chart-v3`));
- assert.match(app,/day-graph\.js\?v=cold-feels-v1/);assert.match(app,/hourly-feels\.js\?v=cold-feels-v1/);
+ assert.match(app,/day-graph\.js\?v=calendar-surface-v2/);assert.match(app,/hourly-feels\.js\?v=cold-feels-v1/);
  assert.match(app,/weather-math\.js\?v=cold-feels-v1/);assert.match(app,/rain-trend\.js\?v=cold-feels-v1/);assert.match(app,/risk-outlooks\.js\?v=risk-outlooks-v5/);
  assert.doesNotMatch(app,/updateAlertBanners/);
  assert.match(app,/if \(id === generation && briefing\.signature === forecast\?\.signature\) renderBriefing\(briefing\)/);

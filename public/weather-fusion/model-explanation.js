@@ -32,7 +32,7 @@ function percent(value) { return chance(value) === null ? '—' : `${Math.round(
 function defaultPhase(index, now, zone) {
   if (index !== 0) return 'overall';
   if (isTonightPeriod(now,zone)) return 'overnight';
-  return localHour(now,zone) >= 12 ? 'overall' : 'daytime';
+  return 'overall';
 }
 function periodFor(day, phase) {
   return (phase === 'daytime' ? day?.popDayLikelihood : phase === 'overnight' ? day?.popNightLikelihood : day?.rainLikelihood) || {};
