@@ -4,6 +4,7 @@ import {createPointModels} from './weatherFusionPointModels.js';
 import {SAME_DAY_WEIGHTS,EXTENDED_RAIN_WEIGHTS,EXTENDED_QPF_WEIGHTS,WEATHERNEXT_WEIGHT,weatherNextPolicy,temperaturePolicy as tempPolicy,precipitationPolicy,precipitationAmountPolicy,forecastDayIndex,eveningPeriod,REPAIR_VERSION} from './weatherFusionPolicy.js';
 import {shadeFeelsLike} from '../public/weather-fusion/weather-math.js';
 import {forecastConfidence} from '../public/weather-fusion/forecast-confidence.js';
+import {calendarDayWindow} from '../public/weather-fusion/calendar-day.js';
 export const DATA_ROOT = 'https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/';
 export const DIRECT_SCHEMA = 'weather-fusion-direct-v2';
 const H = 3600000;
@@ -239,6 +240,61 @@ function sample(payload, time, field) {
   const h = payload?.hourly, i = h?.time?.indexOf(time/1000);
   return i >= 0 && finite(h[field]?.[i]) ? h[field][i] : null;
 }
+/** Rebuild confidence after the final hourly temperature series exists.
+ * Daily cards use calendar-date extrema, so their confidence must compare
+ * those same hours, including the current partial hour, never tomorrow's low.
+ * Count partial sources for disclosure, but only complete sources establish
+ * period agreement. The score is a relative index, not a calibrated chance.
+ */
+export function refreshCalendarConfidence(out,{now=Date.now()}={}) {
+  const temperatures=new Map((out.metricForecasts?.series?.temperature||[]).map(row=>[Date.parse(row.time),row]));
+  for(const [index,day] of (out.days||[]).entries()) {
+    const window=calendarDayWindow(day,index,now,out.location?.timeZone),expectedHours=(window.end-window.start)/H;
+    if(!(expectedHours>0))continue;
+    const samples={},weights={},counts={},runs={};let availableHours=0,maximumHourlySpread=null;
+    for(let time=window.start;time<window.end;time+=H) {
+      const row=temperatures.get(time);
+      if(finite(row?.value))availableHours++;
+      const sources=(row?.sources||[]).filter(source=>source.weight>0&&finite(source.value));
+      for(const source of sources) {
+        (samples[source.id]||=[]).push(source.value);
+        weights[source.id]=(weights[source.id]||0)+source.weight;
+        counts[source.id]=(counts[source.id]||0)+1;
+        if(source.runAt)(runs[source.id]||=new Set()).add(source.runAt);
+      }
+      // Equal daily highs cannot hide different cold-front arrival times.
+      const values=sources.map(source=>source.value);
+      if(values.length>1)maximumHourlySpread=Math.max(maximumHourlySpread??0,Math.max(...values)-Math.min(...values));
+    }
+    const sourceOrder=['nws','hrrr','ecmwf','nbm','wn'];
+    const contributors=kind=>sourceOrder.filter(id=>samples[id]?.length).map(id=>({id,value:round(kind==='high'?Math.max(...samples[id]):Math.min(...samples[id]),1),weight:round(weights[id]/expectedHours,6),coverageHours:counts[id],complete:counts[id]===expectedHours,
+      runAt:runs[id]?.size===1?[...runs[id]][0]:runs[id]?.size?null:(out.feeds?.find(feed=>feed.id===(id==='nws'?'hourly':id))?.issuedAt||null),...(runs[id]?.size>1?{runAts:[...runs[id]]}:{})}));
+    const high=contributors('high'),low=contributors('low');
+    const completeTemperature=high.filter(source=>source.complete);
+    const spread=values=>values.length>1?Math.max(...values)-Math.min(...values):null;
+    day.highSpread=round(spread(completeTemperature.map(source=>source.value)),1);
+    day.lowSpread=round(spread(low.filter(source=>source.complete).map(source=>source.value)),1);
+    const temperatureSpread=round(maximumHourlySpread,1);
+    const rain=(day.qpfBlend?.sources||[]).filter(source=>source.weight>0&&finite(source.value)).map(source=>({...source,complete:finite(day.qpfBlend?.sourceValues?.[source.id])}));
+    const completeRain=rain.filter(source=>source.complete);
+    day.qpfSpread=round(spread(completeRain.map(source=>day.qpfBlend.sourceValues[source.id])),2);
+    day.agreement=temperatureSpread===null?'Limited guidance':temperatureSpread<=3?'Close agreement':temperatureSpread<=6?'Some disagreement':'Wide disagreement';
+    const sourceIds=sourceOrder.filter(id=>high.some(source=>source.id===id)||rain.some(source=>source.id===id));
+    const rainRows=(out.rainTimeline||[]).filter(row=>Date.parse(row.time)<window.end&&Date.parse(row.end)>window.start);
+    const rainFallback=rainRows.some(row=>row.rainLikelihood?.mode==='nws-fallback');
+    const temperatureCoverage=availableHours===expectedHours;
+    const rainCoverage=day.rainLikelihood?.coverage?.complete===true&&finite(day.qpf);
+    day.confidence=forecastConfidence({dayIndex:index,highSpread:temperatureSpread,qpfSpread:day.qpfSpread,
+      guidanceCount:Math.min(completeTemperature.length,completeRain.length),sourceIds,
+      officialCoverage:(counts.nws||0)/expectedHours,temperatureCoverage,rainCoverage,
+      temperatureSourceCount:completeTemperature.length,rainSourceCount:completeRain.length,rainFallback});
+    day.confidence.window={start:iso(window.start),end:iso(window.end)};
+    day.confidence.temperatureSpread=temperatureSpread;
+    day.confidence.coverage={temperature:{expectedHours,availableHours,complete:temperatureCoverage,completeSources:completeTemperature.map(source=>source.id)},rain:{...day.rainLikelihood?.coverage,complete:rainCoverage,completeSources:completeRain.map(source=>source.id),officialFallback:rainFallback}};
+    day.confidence.contributions={high,low,rain};
+  }
+  return out;
+}
 /** Astronomical sunrise/sunset, independent of model availability. */
 export function solarTimes(date, latitude, longitude) {
   if (!finite(latitude) || !finite(longitude)) return { sunrise:null,sunset:null };
@@ -389,18 +445,9 @@ export function enhanceForecast(out, { models, grid, periods = [], hourlyPeriods
     d.popDayLikelihood=summarizeRainTimeline(out.rainTimeline,dayWindow.start,dayWindow.end);
     d.popNightLikelihood=summarizeRainTimeline(out.rainTimeline,nightWindow.start,nightWindow.end);
     for(const [id,value] of Object.entries(rain.sourceValues)) if(id!=='nws') {d.guidance[id] ||= {};d.guidance[id].qpf=value;}
-    // Confidence must describe the final period-aligned blend, not the earlier
-    // calendar-day completeness check. Only positive-weight contributors count.
+    // Keep period-specific blend evidence. Calendar-card confidence is rebuilt
+    // after addExperience constructs the final hourly source series.
     for(const [kind,period] of [['high',day],['low',night]])if(!d[`${kind}Blend`]&&finite(period?.temperature))d[`${kind}Blend`]={value:d[kind],sources:[{id:'nws',weight:1,value:d[kind]}]};
-    const contributors=[...(d.highBlend?.sources||[]),...(d.lowBlend?.sources||[]),...(d.qpfBlend?.sources||[])].filter(s=>s.weight>0&&finite(s.value));
-    const sourceIds=['nws',...active].filter(id=>contributors.some(s=>s.id===id));
-    const highs=(d.highBlend?.sources||[]).filter(s=>s.weight>0).map(s=>s.value).filter(finite);
-    const spread=highs.length>1?Math.max(...highs)-Math.min(...highs):null;
-    d.highSpread=round(spread,1);d.agreement=spread===null?'Limited guidance':spread<=3?'Close agreement':spread<=6?'Some disagreement':'Wide disagreement';
-    const rainValues=(d.qpfBlend?.sources||[]).filter(s=>s.weight>0).map(s=>d.qpfBlend.sourceValues[s.id]).filter(finite);
-    d.qpfSpread=rainValues.length>1?round(Math.max(...rainValues)-Math.min(...rainValues),2):null;
-    d.confidence=forecastConfidence({dayIndex:index,highSpread:d.highSpread,qpfSpread:d.qpfSpread,guidanceCount:sourceIds.length,sourceIds,officialDay:!!day,officialNight:!!night});
-    d.confidence.contributions={high:d.highBlend?.sources||[],low:d.lowBlend?.sources||[],rain:d.qpfBlend?.sources||[]};
   }
   const from=now;
   out.precipitation=qpf(from,from+24*H);
@@ -409,7 +456,9 @@ export function enhanceForecast(out, { models, grid, periods = [], hourlyPeriods
     const time=Date.parse(hour.time),values={nws:hour.forecastSource==='model-guidance'?null:hour.temperature};
     for(const [id,m] of Object.entries(sourceModels)) values[id]=sample(m,time,'temperature_2m');
     hour.officialTemperature=values.nws;
-    if(active.length){hour.temperatureBlend=weighted(values,tempPolicy(forecastDayIndex(time,now,out.location.timeZone),finite(values.wn)));hour.temperature=round(hour.temperatureBlend.value,0);}
+    hour.temperatureBlend=weighted(values,tempPolicy(forecastDayIndex(time,now,out.location.timeZone),finite(values.wn)));
+    hour.temperatureBlend.sources=hour.temperatureBlend.sources.map(source=>({...source,runAt:sourceRun(source.id,time)}));
+    hour.temperature=round(hour.temperatureBlend.value,0);
     const row=timelineByTime.get(time),rain=row?.precipitationBlend;
     hour.precipitation=row?.precipitation??null;hour.precipitationSource=rain?.source||'Unavailable';hour.precipitationBlend=rain;
     hour.officialPop=row?.officialPop??null;

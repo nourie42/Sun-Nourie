@@ -1,6 +1,6 @@
 /** Shared perfect-hour and storm-level rules for the tracker and weather banners. */
 import { weatherState } from './weather-state.js';
-import { finite, rainChanceValue } from './weather-math.js?v=calendar-days-v1';
+import { finite, rainChanceValue } from './weather-math.js?v=audit-20261017-v1';
 
 export const PERFECT_TEMP_IDEAL_F = 72;
 export const PERFECT_TEMP_BAND_F = Object.freeze({ min: 70, max: 74 });

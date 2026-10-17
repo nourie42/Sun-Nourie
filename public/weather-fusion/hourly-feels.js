@@ -1,5 +1,5 @@
 import {timeAt,calendarDayWindow} from './calendar-day.js?v=calendar-days-v1';
-import {finite} from './weather-math.js?v=calendar-days-v1';
+import {finite} from './weather-math.js?v=audit-20261017-v1';
 const H=3600000;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export const degrees=v=>finite(v)?`${Math.round(v)}°`:'—';

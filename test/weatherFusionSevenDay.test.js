@@ -60,7 +60,7 @@ test('the shared carousel is safe to import without a browser document',()=>{
 
 test('main and experimental pages share an ungated carousel below the weather take',()=>{
   const app=readFileSync(new URL('../public/weather-fusion/app.js',import.meta.url),'utf8');
-  assert.match(app,/const sevenDayCarousel=createSevenDayCarousel\(\{onOpenDay:index=>showDay\(index\)\}\)/);
+  assert.match(app,/const sevenDayCarousel=createSevenDayCarousel\(\{onOpenDay:showDay\}\)/,'the day handler receives both the selected index and confidence-focus options');
   const anchors=[];
   globalThis.document={querySelector:selector=>{anchors.push(selector);return null;}};
   try {
@@ -77,12 +77,12 @@ test('day cards open the existing details dialog without an inline details row',
   assert.match(html,/aria-controls="day-dialog" aria-haspopup="dialog"/);
   assert.doesNotMatch(module,/seven-day-detail|seven-day-open|detailHTML/);
   assert.doesNotMatch(css,/seven-day-detail|seven-day-open/);
-  assert.match(module,/if\(button\)\{const index=Number\(button\.dataset\.weekDay\);select\(index\);onOpenDay\(index\);\}/);
+  assert.match(module,/if\(button\).*select\(index\);onOpenDay\(index,\{focusConfidence:[^;]+;\}/);
   assert.match(module,/if\(suppressClick\)\{event\.preventDefault\(\);suppressClick=false;return;\}/);
   assert.match(module,/rail\.addEventListener\('keydown',[\s\S]*?\{focus:true\}/);
 });
 
-test('compact cards retain every forecast reading and the absolute confidence score',()=>{
+test('compact cards retain the source index and make the meter match the labeled category',()=>{
   for(const [key,label,score] of [['high','High',95],['moderate','Moderate',75],['low','Low',60],['very-low','Very low',35]]){
     const day={...sevenDayForecast(preview,now)[0],confidence:{key,label,score,factors:[],note:'Relative index'}};
     const html=sevenDayCardHTML(day);
@@ -91,7 +91,7 @@ test('compact cards retain every forecast reading and the absolute confidence sc
     assert.match(html,/Total precip/);
     assert.match(html,/Wind/);
     assert.ok(html.includes(`data-confidence="${key}"`));
-    assert.ok(html.includes(`aria-valuenow="${score}"`));
+    assert.ok(html.includes(`data-confidence-score="${score}"`) && html.includes(`aria-valuenow="${confidenceMeterPosition(day.confidence)}"`));
     assert.ok(html.includes(`--confidence:${confidenceMeterPosition(day.confidence)}%`));
   }
 });
@@ -127,11 +127,11 @@ test('confidence dots stay in their label color range, including category bounda
       assert.equal(confidence.score,score);
     }
   }
-  assert.equal(confidenceMeterPosition({key:'low',score:65}),27.86);
-  assert.equal(confidenceMeterPosition({key:'moderate',score:75}),46.67);
-  assert.equal(confidenceMeterPosition({key:'high',score:95}),90);
-  assert.equal(confidenceMeterPosition({key:'high',score:75}),70,'alternate model labels remain authoritative');
-  assert.equal(confidenceMeterPosition({key:'moderate',score:50}),40);
+  assert.equal(confidenceMeterPosition({key:'low',score:65}),0);
+  assert.equal(confidenceMeterPosition({key:'moderate',score:75}),50);
+  assert.equal(confidenceMeterPosition({key:'high',score:95}),100);
+  assert.equal(confidenceMeterPosition({key:'high',score:75}),100,'alternate model labels remain authoritative');
+  assert.equal(confidenceMeterPosition({key:'moderate',score:50}),50);
   assert.equal(confidenceMeterPosition({key:'high',score:150}),100);
   assert.equal(confidenceMeterPosition({key:'low',score:-1}),0);
   for(const confidence of [null,{}, {key:'unavailable',score:70},{key:'low',score:null},{key:'high',score:NaN}])assert.equal(confidenceMeterPosition(confidence),null);

@@ -1,4 +1,4 @@
-import {buildForecastWindows} from './forecast-windows.js?v=calendar-days-v1';
+import {buildForecastWindows} from './forecast-windows.js?v=audit-20261017-v1';
 
 const finite = n => typeof n === 'number' && Number.isFinite(n);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

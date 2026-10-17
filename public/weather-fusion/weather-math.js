@@ -126,7 +126,8 @@ function windMessage(temp,wind) {
   return 'The breeze provides some moving-air cooling.';
 }
 
-/** One continuous UTCI calculation. No warmer-of-two-index selection.
+/** UTCI is the base for the displayed thermal estimate. The existing cold-wind
+ * adjustment below gradually lifts cold results toward NWS wind chill.
  * MRT is explicitly a Tier-3 estimate, not measured radiation or skin temperature. */
 export function thermalHumidity(current) {
   const derived=humidityFromDewpoint(current?.temperature,current?.dewpoint);
@@ -208,5 +209,5 @@ export function thermalComfort(current, location, now) {
     method:shade.method,humidity:rh,wetBulb:wet,daylight,absorbedRadiation:finite(weather.cover)?(daylight?130*Math.max(0,Math.sin(elevation))**.72*(1-weather.cover/100):0):estimatedAbsorbedRadiation(weather.condition,elevation),
     solarAdjustment:finite(outdoorValue)&&finite(shadeValue)?outdoorValue-shadeValue:null,
     dewpointEffect:dewpointMessage(current.dewpoint),windEffect:windMessage(current.temperature,current.wind),microclimate:localContext,
-    note:`Tier-3 operational fallback from the attached Real-Feel Skin Temperature research: UTCI is the all-season base using air temperature, humidity/dew point and standard wind, with solar elevation and broad sky state used for a generic radiant estimate. No warmer-formula override or observation-to-forecast offset is used. In cold wind the value never falls below the NWS wind chill figure (full NWS wind chill at or below 40°F, fading to pure UTCI by 60°F); warmer conditions use UTCI unchanged. Numeric hourly cloud cover is preferred over broad period descriptions. Calm wind uses the UTCI minimum 0.5 m/s; out-of-domain conditions stay unavailable. Cloud attenuation and MRT are estimates, not local radiometer measurements. This is a modeled equivalent temperature, not measured skin temperature or validated EPST. ${dewpointMessage(current.dewpoint)} ${windMessage(current.temperature,current.wind)} ${localContext} Wet bulb is diagnostic only and is not added again to the result.`};
+    note:`Tier-3 operational fallback from the attached Real-Feel Skin Temperature research: UTCI is the all-season base using air temperature, humidity/dew point and standard wind, with solar elevation and broad sky state used for a generic radiant estimate. The displayed estimate includes a gradual cold-wind adjustment toward NWS wind chill when that figure is warmer than UTCI. The temperature adjustment is full at or below 40°F and fades to zero at 60°F; the wind adjustment fades in from 2 to 4 mph. Warmer conditions use UTCI unchanged. No observation-to-forecast offset is used. Numeric hourly cloud cover is preferred over broad period descriptions. Calm wind uses the UTCI minimum 0.5 m/s; out-of-domain conditions stay unavailable. Cloud attenuation and MRT are estimates, not local radiometer measurements. This is a modeled equivalent temperature, not measured skin temperature or validated EPST. ${dewpointMessage(current.dewpoint)} ${windMessage(current.temperature,current.wind)} ${localContext} Wet bulb is diagnostic only and is not added again to the result.`};
 }

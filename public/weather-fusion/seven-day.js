@@ -1,10 +1,10 @@
-import {rainTiming} from './rain-timing.js?v=calendar-days-v1';
-import {dailyDisplay,finite} from './weather-math.js?v=calendar-days-v1';
+import {rainTiming} from './rain-timing.js?v=audit-20261017-v1';
+import {dailyDisplay,finite} from './weather-math.js?v=audit-20261017-v1';
 import {displayedRainChance,rainAwareCondition,dailySkyCover} from './rain-display.js?v=calendar-days-v1';
-import {forecastPeriodSummary} from './forecast-story.js?v=calendar-days-v1';
-import {shortForecastCondition} from './today-card.js?v=calendar-days-v1';
-import {weatherIcon,weatherMetricIcon} from './weather-display.js?v=calendar-days-v1';
-import {confidenceMeterPosition} from './forecast-confidence.js?v=category-meter-v1';
+import {forecastPeriodSummary} from './forecast-story.js?v=audit-20261017-v1';
+import {shortForecastCondition} from './today-card.js?v=audit-20261017-v1';
+import {weatherIcon,weatherMetricIcon} from './weather-display.js?v=audit-20261017-v1';
+import {confidenceMeterPosition} from './forecast-confidence.js?v=audit-20261017-v1';
 import {winterAmountText,winterDayAmount} from './snow-outlook.js?v=snow-readable-v1';
 
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -45,8 +45,8 @@ function artHTML(day) {
 function confidenceHTML(confidence) {
   const score=finite(confidence?.score)?Math.max(0,Math.min(100,confidence.score)):null;
   const position=confidenceMeterPosition(confidence);
-  const title=[...(confidence?.factors||[]),confidence?.note].filter(Boolean).join(' \u00b7 ');
-  return `<span class="seven-day-confidence" data-confidence="${esc(confidence?.key||'unavailable')}" title="${esc(title)}"><span class="seven-day-confidence-label"><span>Confidence</span><strong>${esc(confidence?.label||'Unavailable')}</strong></span>${position===null?'<span class="seven-day-confidence-missing">\u2014</span>':`<span class="seven-day-meter" role="meter" aria-label="Relative forecast confidence" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${score}" aria-valuetext="${esc(confidence.label)}"><span style="--confidence:${position}%"></span></span>`}</span>`;
+  const title=[confidence?.summary,...(confidence?.factors||[]),confidence?.note].filter(Boolean).join(' \u00b7 ');
+  return `<span class="seven-day-confidence" data-confidence="${esc(confidence?.key||'unavailable')}" title="${esc(title)}"><span class="seven-day-confidence-label"><span>Confidence</span><strong>${esc(confidence?.label||'Unavailable')}</strong></span>${position===null?'<span class="seven-day-confidence-missing">\u2014</span>':`<span class="seven-day-meter" data-confidence-score="${score}" role="meter" aria-label="Forecast confidence category" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${position}" aria-valuetext="${esc(confidence.label)}"><span style="--confidence:${position}%"></span></span>`}</span>`;
 }
 
 export function sevenDayCardHTML(day,selected=false) {
@@ -97,7 +97,7 @@ export function createSevenDayCarousel({onOpenDay=()=>{}}={}) {
   rail.addEventListener('click',event=>{
     if(suppressClick){event.preventDefault();suppressClick=false;return;}
     const button=event.target.closest('[data-week-day]');
-    if(button){const index=Number(button.dataset.weekDay);select(index);onOpenDay(index);}
+    if(button){const index=Number(button.dataset.weekDay);select(index);onOpenDay(index,{focusConfidence:!!event.target.closest('.seven-day-confidence')});}
   });
   rail.addEventListener('keydown',event=>{
     if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)||!days.length)return;

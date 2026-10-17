@@ -1,6 +1,6 @@
 import {calendarDayWindow,rainWindowPeak} from './calendar-day.js?v=calendar-days-v1';
-import {finite,dailyRainPeriod} from './weather-math.js?v=calendar-days-v1';
-import {timeAt} from './hourly-feels.js?v=calendar-days-v1';
+import {finite,dailyRainPeriod} from './weather-math.js?v=audit-20261017-v1';
+import {timeAt} from './hourly-feels.js?v=audit-20261017-v1';
 
 const HOUR = 3600000;
 const RAIN_TIMING_THRESHOLD = 25;

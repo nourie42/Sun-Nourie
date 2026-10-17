@@ -66,11 +66,14 @@ with sync_playwright() as p:
     cards=page.locator('.seven-day-card').evaluate_all('es=>es.map(e=>({date:e.dataset.date,index:Number(e.dataset.weekDay),pop:e.querySelectorAll(".seven-day-metric strong")[0].textContent,amount:e.querySelectorAll(".seven-day-metric strong")[1].textContent}))')
     graphs=[]
     for card in cards:
-     index=card['index'];d=f['days'][index];night=index==0 and datetime.fromtimestamp(now/1000,zone).hour>=18
-     r=d['popNightLikelihood' if night else 'rainLikelihood'];a,b=epoch(r['window']['start']),epoch(r['window']['end'])
+     index=card['index'];d=f['days'][index]
+     r=d['rainLikelihood'];a,b=epoch(r['window']['start']),epoch(r['window']['end'])
+     if index==0:a=max(a,math.floor(now/3600000)*3600000)
      rows=rain_rows(f,a,b);amount=total(rows,a,b)
      observed=index==0 and card['pop']=='100%' and 'Rain now' in page.locator('.seven-day-card').nth(index).inner_text()
-     if not observed:check(card['pop']==shown(r['value'],'%'),'Seven-day chance matches the displayed period',card)
+     values=[row.get('rainLikelihood',{}).get('value') for row in rows]
+     peak=max(values) if values and all(finite(value) for value in values) and r.get('value') is not None else None
+     if not observed:check(card['pop']==shown(peak,'%'),'Seven-day chance matches the displayed calendar date',card)
      expected_amount=f'{amount:.2f} in' if finite(amount) else '—'
      check(card['amount']==expected_amount,'Seven-day amount matches its hourly sum',{'card':card,'expected':expected_amount})
      page.locator('.seven-day-card').nth(index).click()
@@ -86,6 +89,7 @@ with sync_playwright() as p:
       for t,display in zip(times,actual):
        for field,key in [('temperature','temperature'),('feels','feels'),('dewpoint','dewpoint')]:check(display[field]==shown(series.get(key,{}).get(t)),'Graph thermal value matches exact source hour',{'date':d['date'],'time':t,'field':field})
        check(display['rainChance']==shown(rain.get(t),'%'),'Graph chance matches the identical hourly source',{'date':d['date'],'time':t})
+      check(all(datetime.fromtimestamp(t/1000,zone).strftime('%Y-%m-%d')==d['date'] for t in times),'Every day-graph hour belongs to its clicked calendar date',d['date'])
       graphs.append({'date':d['date'],'hours':len(times),'allValuesMatch':True})
      if index in [0,1,2]:page.locator('#day-dialog').screenshot(path=str(OUT/f'{city.lower()}-day-{index}-{width}.png'))
      page.locator('#close-day').click()

@@ -1,5 +1,5 @@
 /** Compare the published Weather Nourie forecast with individual model guidance. */
-import {dailyForecastReadings} from './seven-day.js?v=calendar-days-v1';
+import {dailyForecastReadings} from './seven-day.js?v=audit-20261017-v1';
 import {calendarDayWindow} from './calendar-day.js?v=calendar-days-v1';
 const WN_FEED = 'https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/weathernext-full.json';
 const MS_PER_DAY = 86400000;
@@ -320,7 +320,7 @@ function renderChart(container, built, varDef, varId) {
     const x = X(i);
     svg.querySelectorAll('[data-point-label]').forEach(label => { label.style.visibility = Number(label.dataset.pointLabel) === i ? 'hidden' : ''; });
     cross.setAttribute('x1', x); cross.setAttribute('x2', x); cross.setAttribute('opacity', '0.8');
-    const rows = visible.map((id) => [id, series[id][i]]).filter(([id, value]) => id === 'nourie' || finite(value));
+    const rows = visible.map((id) => [id, series[id][i]]).filter(([id, value]) => id === primaryId || finite(value));
     cdots.innerHTML = rows.filter(([, value]) => finite(value)).map(([id, v]) => `<circle cx="${x}" cy="${Y(v).toFixed(1)}" r="5" fill="${COLORS[id]}" stroke="#0a1428" stroke-width="1.5"/>`).join('');
     tip.innerHTML = `<b style="display:block;margin-bottom:3px">${dayName(days[i], i, true)}</b>`
       + (rows.length ? rows.map(([id, v]) => `<span data-tip-series="${id}" style="display:flex;justify-content:space-between;gap:10px"><span><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COLORS[id]};margin-right:5px"></i>${displayName(id) || varDef.label}</span><b>${finite(v) ? varDef.fmt(v) : 'Unavailable'}</b></span>`).join('') : '<span>No model data</span>');

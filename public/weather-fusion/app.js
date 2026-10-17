@@ -1,33 +1,33 @@
-import {rainTiming,rainTimingHTML} from './rain-timing.js?v=calendar-days-v1';
-import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText,rebindDanTake} from './dans-take.js?v=weather-art-labels-v10';
-import {danCard,danTakeDisplay} from './dans-summary.js?v=calendar-days-v1';
+import {rainTiming,rainTimingHTML} from './rain-timing.js?v=audit-20261017-v1';
+import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText,rebindDanTake} from './dans-take.js?v=audit-20261017-v1';
+import {danCard,danTakeDisplay} from './dans-summary.js?v=audit-20261017-v1';
 import {fetchJsonWithDeadline} from './request-deadline.js?v=loading-recovery-v1';
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
-import {weatherIcon,renderHourlyWeather,currentSample} from './weather-display.js?v=calendar-days-v1';
-import {dayGraphHTML,dayGraphPoints,installDayGraph} from './day-graph.js?v=calendar-days-v1';
-import {degrees,feelsAt,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=calendar-days-v1';
+import {weatherIcon,renderHourlyWeather,currentSample} from './weather-display.js?v=audit-20261017-v1';
+import {dayGraphHTML,dayGraphPoints,installDayGraph} from './day-graph.js?v=audit-20261017-v1';
+import {degrees,feelsAt,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=audit-20261017-v1';
 import {createFramePlayer} from './frame-player.js';
-import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=calendar-days-v1';
-import {dailyDisplay} from './weather-math.js?v=calendar-days-v1';
+import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=audit-20261017-v1';
+import {dailyDisplay} from './weather-math.js?v=audit-20261017-v1';
 import {conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
 import {currentHero} from './current-temperature.js?v=rain-now-v71';
 import {renderBulletins} from './bulletins.js?v=county-warnings-v1';
 import {withLiveAlerts,retainUnverifiedAlerts,alertLocationKey,ALERT_REFRESH_MS} from './live-alerts.js?v=county-warnings-v3';
-import {modelFreshnessText} from './personal-details.js?v=calendar-days-v1';
+import {modelFreshnessText} from './personal-details.js?v=audit-20261017-v1';
 import {renderDewpointMeter} from './dewpoint-meter.js?v=air-moisture-v1';
 import {renderWeatherPanel} from './render-safety.js';
-import {forecastPeriodSummary} from './forecast-story.js?v=calendar-days-v1';
-import {forecastOutlookDetails} from './outlook-details.js?v=calendar-days-v1';
-import {isExperimentalWeatherPage,renderCarWashForecast,resetCarWashForecast} from './car-wash.js?v=calendar-days-v1';
-import {renderModelExplanation,resetModelExplanation} from './model-explanation.js?v=calendar-days-v1';
-import {updateRainTrend} from './rain-trend.js?v=calendar-days-v1';
+import {forecastPeriodSummary} from './forecast-story.js?v=audit-20261017-v1';
+import {forecastOutlookDetails} from './outlook-details.js?v=audit-20261017-v1';
+import {isExperimentalWeatherPage,renderCarWashForecast,resetCarWashForecast} from './car-wash.js?v=audit-20261017-v1';
+import {renderModelExplanation,resetModelExplanation} from './model-explanation.js?v=audit-20261017-v1';
+import {updateRainTrend} from './rain-trend.js?v=audit-20261017-v1';
 import {renderRiskOutlooks,resetRiskOutlooks} from './risk-outlooks.js?v=risk-outlooks-v5';
 import {renderAirQuality} from './air-quality.js?v=mobile-repair-v1';
 import {displayedRainChance,rainAwareCondition,dailySkyCover} from './rain-display.js?v=calendar-days-v1';
-import {weatherChangeMessages,WEATHER_CHANGE_TITLE} from './weather-changes.js?v=calendar-days-v1';
+import {weatherChangeMessages,WEATHER_CHANGE_TITLE} from './weather-changes.js?v=audit-20261017-v1';
 import {renderSnowOutlook,resetSnowOutlook} from './snow-outlook.js?v=snow-readable-v1';
-import {renderForecastWindowBanners,resetForecastWindowBanners} from './forecast-window-banners.js?v=calendar-days-v1';
-import {createSevenDayCarousel} from './seven-day.js?v=calendar-days-v1';
+import {renderForecastWindowBanners,resetForecastWindowBanners} from './forecast-window-banners.js?v=audit-20261017-v1';
+import {createSevenDayCarousel} from './seven-day.js?v=audit-20261017-v1';
 import {forecastSourceHealth} from './forecast-status.js?v=source-health-v1';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);
@@ -70,7 +70,7 @@ function configurePageMode() {
   const experimentBanner=document.querySelector('.experimental-page-banner');if(experimentBanner)experimentBanner.hidden=!experimentalPage;
 }
 configurePageMode();
-const sevenDayCarousel=createSevenDayCarousel({onOpenDay:index=>showDay(index)});
+const sevenDayCarousel=createSevenDayCarousel({onOpenDay:showDay});
 function clock(value, options = {}) {
   const t = new Date(value);
   return Number.isFinite(t.getTime()) ? new Intl.DateTimeFormat('en-US', { timeZone: forecast?.location.timeZone || 'America/New_York', hour: 'numeric', minute: '2-digit', ...options }).format(t) : 'Unavailable';
@@ -383,7 +383,7 @@ function refreshOpenDay() {
   if (index < 0) { $('day-dialog').close(); activeDayDetail = null; return; }
   showDay(index, { preserve: true });
 }
-function showDay(index, { preserve = false } = {}) {
+function showDay(index, { preserve = false, focusConfidence = false } = {}) {
   const d=forecast?.days[index]; if(!d) return;
   const now=Date.now(),p=dailyDisplay(d,index,now,forecast.location.timeZone,forecast),phase=p.phase;
   const root=$('day-content'),dialog=$('day-dialog'),oldInput=root.querySelector('#day-graph-hour');
@@ -393,7 +393,7 @@ function showDay(index, { preserve = false } = {}) {
   const focusedId=focused?.id,focusedSummary=focused?.matches('.dialog-confidence > summary');
   const story=forecastPeriodSummary(forecast,index,phase,now),storyRain=displayedRainChance(forecast,story.chance,{dayIndex:index,now});
   const condition=rainAwareCondition(p.condition,storyRain.value,d,false,dailySkyCover(forecast,d,index,now));
-  root.innerHTML=`<div class="dialog-eyebrow">WEATHER NOURIE</div><h2 id="day-title" class="dialog-title">${esc(p.label)}</h2><p class="dialog-condition">${esc(condition)}</p><div class="dialog-temps">${temperature(p.primary)}<span>${p.primaryLabel.toLowerCase()}${!p.tonight&&finite(p.secondary)?` · ${temperature(p.secondary)} low`:''}</span></div><p class="dialog-prose">${index===0?'Remaining forecast today':'Forecast for this date'} · ends at local midnight.</p>${rainTimingHTML(rainTiming(forecast,index,false,now))}${dayGraphHTML(forecast,index,p.tonight,now)}<div class="dialog-stats"><div><strong>${percent(storyRain.value)}</strong><small>${storyRain.observed?'Rain observed now · later hours remain forecasts':p.tonight?'Rain chance tonight':phase==='overall'?'Peak hourly rain chance on this date':'Rain chance today'}</small></div><div><strong>${inches(story.amount)}</strong><small>${index===0?'Remaining precipitation before midnight':'Total precipitation on this date'}</small></div></div><p class="dialog-prose">${esc(story.summary)}</p>${dailyConfidenceNoticeHTML(d.confidence,true)}${d.confidence?`<details class="dialog-confidence" data-confidence="${esc(d.confidence.key)}"><summary>Forecast confidence: ${esc(d.confidence.label)} · ${d.confidence.sourceCount??'?'} source${d.confidence.sourceCount===1?'':'s'}</summary><p>${esc(d.confidence.factors.join(' · '))}</p><small>${esc(d.confidence.note)}</small></details>`:''}<a href="#scientific-stuff" class="science-link" id="day-science-link">Scientific stuff ↓</a>`;
+  root.innerHTML=`<div class="dialog-eyebrow">WEATHER NOURIE</div><h2 id="day-title" class="dialog-title">${esc(p.label)}</h2><p class="dialog-condition">${esc(condition)}</p><div class="dialog-temps">${temperature(p.primary)}<span>${p.primaryLabel.toLowerCase()}${!p.tonight&&finite(p.secondary)?` · ${temperature(p.secondary)} low`:''}</span></div><p class="dialog-prose">${index===0?'Remaining forecast today':'Forecast for this date'} · ends at local midnight.</p>${rainTimingHTML(rainTiming(forecast,index,false,now))}${dayGraphHTML(forecast,index,p.tonight,now)}<div class="dialog-stats"><div><strong>${percent(storyRain.value)}</strong><small>${storyRain.observed?'Rain observed now · later hours remain forecasts':p.tonight?'Rain chance tonight':phase==='overall'?'Peak hourly rain chance on this date':'Rain chance today'}</small></div><div><strong>${inches(story.amount)}</strong><small>${index===0?'Remaining precipitation before midnight':'Total precipitation on this date'}</small></div></div><p class="dialog-prose">${esc(story.summary)}</p>${dailyConfidenceNoticeHTML(d.confidence,true)}${d.confidence?`<details class="dialog-confidence" data-confidence="${esc(d.confidence.key)}"><summary>Forecast confidence: ${esc(d.confidence.label)} · ${d.confidence.sourceCount??'?'} source${d.confidence.sourceCount===1?'':'s'}</summary>${d.confidence.summary?`<p>${esc(d.confidence.summary)}</p>`:''}<p>${esc(d.confidence.factors.join(' · '))}</p><small>${esc(d.confidence.note)}</small></details>`:''}<a href="#scientific-stuff" class="science-link" id="day-science-link">Scientific stuff ↓</a>`;
   installDayGraph(root,forecast,index,p.tonight,now);
   const graphTimes=dayGraphPoints(forecast,index,p.tonight,now).map(point=>point.time),input=root.querySelector('#day-graph-hour');
   if (selectedTime && input) { input.value=String(Math.max(0,graphTimes.indexOf(selectedTime))); input.dispatchEvent(new Event('input')); }
@@ -403,6 +403,7 @@ function showDay(index, { preserve = false } = {}) {
   const focusTarget=focusedId?$(focusedId):focusedSummary?root.querySelector('.dialog-confidence > summary'):null;
   if(focusTarget&&root.contains(focusTarget))focusTarget.focus({preventScroll:true});
   dialog.scrollTop=scrollTop;
+  if(focusConfidence){const details=root.querySelector('.dialog-confidence');if(details){details.open=true;details.scrollIntoView({block:'start'});}}
   $('day-science-link').addEventListener('click',()=>$('day-dialog').close());
 }
 

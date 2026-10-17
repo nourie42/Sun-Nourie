@@ -1,9 +1,9 @@
 import {hourlyUvValue,hourlyUvHTML} from './daily-uv.js?v=clear-weather-daygraph-v3';
-import {outdoorExposure} from './outdoor-feels.js?v=calendar-days-v1';
-import {currentComfortInputs} from './current-inputs.js?v=calendar-days-v1';
+import {outdoorExposure} from './outdoor-feels.js?v=audit-20261017-v1';
+import {currentComfortInputs} from './current-inputs.js?v=audit-20261017-v1';
 import {weatherState,conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
-import {thermalComfort, finite, solarElevation,rainChanceValue} from './weather-math.js?v=calendar-days-v1';
-import {displayedFeelsAt,forecastValue,degrees} from './hourly-feels.js?v=calendar-days-v1';
+import {thermalComfort, finite, solarElevation,rainChanceValue} from './weather-math.js?v=audit-20261017-v1';
+import {displayedFeelsAt,forecastValue,degrees} from './hourly-feels.js?v=audit-20261017-v1';
 import {winterSceneExpected,selectedHourSnowPhase} from './exposure-scene.js?v=storm-scene-v5';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function weatherShapes(condition, isDay = true) {
@@ -151,7 +151,7 @@ export function renderHourlyWeather(forecast, now = Date.now()) {
   const scroll = root.scrollLeft, zone = forecast.location.timeZone || 'America/New_York';
   const date=time=>new Intl.DateTimeFormat('en-US',{timeZone:zone,weekday:'short'}).format(new Date(time));
   const hour = time => new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric'}).format(new Date(time)).replace(' ','');
-  root.innerHTML = hourlyDisplaySamples(forecast,now).map(raw => { const mix=snowHourCondition(forecast,raw), sample=mix?{...raw,condition:mix}:raw, iconCondition=mix?'Snow':sample.condition; return `<button type="button" class="hour ${sample.now ? 'now hour-current' : 'forecast-hour'}" data-comfort-time="${esc(sample.id)}" data-time="${esc(sample.time)}" title="${esc(sample.condition)} · ${esc(sample.source)}" aria-label="${sample.now ? 'Now' : esc(hour(sample.time))}, ${esc(sample.condition)}, air ${degrees(sample.temperature)}, feels like ${degrees(sample.feels)} ${esc(sample.exposure.label.toLowerCase())}. Preview this weather."><span>${sample.now ? 'Now' : esc(hour(sample.time))}</span><small class="hour-date">${esc(date(sample.time))}</small>${weatherIcon(iconCondition,sample.isDay)}<strong>${degrees(sample.temperature)}</strong><span class="hour-feels">Feels <b>${degrees(sample.feels)}</b><em class="hour-exposure sr-only">${esc(sample.exposure.shortLabel)}</em></span>${hourlyRainHTML(sample)}${hourlySnowHTML(forecast,sample)}${hourlyUvHTML(sample.uvIndex)}${hourlyWindHTML(sample)}</button>`; }).join('');
+  root.innerHTML = hourlyDisplaySamples(forecast,now).map(raw => { const mix=snowHourCondition(forecast,raw), sample=mix?{...raw,condition:mix}:raw, iconCondition=mix?'Snow':sample.condition; return `<button type="button" class="hour ${sample.now ? 'now hour-current' : 'forecast-hour'}" data-comfort-time="${esc(sample.id)}" data-time="${esc(sample.time)}" title="${esc(sample.condition)} · ${esc(sample.source)}" aria-label="${sample.now ? 'Now' : esc(hour(sample.time))}, ${esc(sample.condition)}, air ${degrees(sample.temperature)}, feels like ${degrees(sample.feels)} ${esc(sample.exposure.label.toLowerCase())}. Preview this weather."><span>${sample.now ? 'Now' : esc(hour(sample.time))}</span><small class="hour-date">${esc(date(sample.now?now:sample.time))}</small>${weatherIcon(iconCondition,sample.isDay)}<strong>${degrees(sample.temperature)}</strong><span class="hour-feels">Feels <b>${degrees(sample.feels)}</b><em class="hour-exposure sr-only">${esc(sample.exposure.shortLabel)}</em></span>${hourlyRainHTML(sample)}${hourlySnowHTML(forecast,sample)}${hourlyUvHTML(sample.uvIndex)}${hourlyWindHTML(sample)}</button>`; }).join('');
   root.scrollLeft = scroll;
 }
 export function peakComparison(summary, currentSun) {

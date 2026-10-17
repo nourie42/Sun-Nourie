@@ -1,10 +1,10 @@
 import {calendarDayWindow} from './calendar-day.js?v=calendar-days-v1';
-import {rainTiming,rainTimingHTML} from './rain-timing.js?v=calendar-days-v1';
+import {rainTiming,rainTimingHTML} from './rain-timing.js?v=audit-20261017-v1';
 import {weatherState} from './weather-state.js';
-import {dailyDisplay,dailyRainPeriod,finite} from './weather-math.js?v=calendar-days-v1';
-import {dailyFeels,degrees,timeAt} from './hourly-feels.js?v=calendar-days-v1';
+import {dailyDisplay,dailyRainPeriod,finite} from './weather-math.js?v=audit-20261017-v1';
+import {dailyFeels,degrees,timeAt} from './hourly-feels.js?v=audit-20261017-v1';
 import {uvCategory} from './daily-uv.js?v=weather-art-labels-v10';
-import {weatherIcon,weatherMetricIcon} from './weather-display.js?v=calendar-days-v1';
+import {weatherIcon,weatherMetricIcon} from './weather-display.js?v=audit-20261017-v1';
 import {displayedRainChance,observedRainLabel,rainAwareCondition,dailySkyCover} from './rain-display.js?v=calendar-days-v1';
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const reading=(value,unit='')=>finite(value)?`${Math.round(value)}${unit}`:'—';
@@ -162,9 +162,10 @@ export function confidenceNotice(confidence,subject='forecast'){
  if(!c||!['low','very-low'].includes(c.key))return null;
  const factors=Array.isArray(c.factors)?c.factors.join(' '):'';
  const reasons=[];
- if(/spread|disagreement|rainfall/i.test(factors))reasons.push('the forecast sources do not line up cleanly');
+ const temperatureSpread=Number(factors.match(/([\d.]+)°F (?:high-)?temperature spread/i)?.[1]),rainSpread=Number(factors.match(/([\d.]+) in rainfall-guidance spread/i)?.[1]);
+ if(temperatureSpread>4||rainSpread>.15||/disagreement/i.test(factors))reasons.push('the forecast sources do not line up cleanly');
  if(/limited|unavailable|1 usable|0 usable|one NWS/i.test(factors))reasons.push('some usual forecast inputs are missing or limited');
  if(!reasons.length)reasons.push(`${subject==='today'?'today':'this forecast'} has more uncertainty than normal`);
  const title=c.key==='very-low'?`Very low confidence ${subject}`:`Lower confidence ${subject}`;
- return {title,text:`${reasons.slice(0,2).join(', ')}. Click for details.`};
+ return {title,text:c.summary?`${c.summary} Click for details.`:`${reasons.slice(0,2).join(', ')}. Click for details.`};
 }

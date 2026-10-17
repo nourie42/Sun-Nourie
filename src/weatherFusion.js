@@ -24,7 +24,7 @@ import {bannerStateFromNwsPeriods} from '../public/weather-fusion/alert-banners.
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { createDirectModels, enhanceForecast } from './weatherFusionDirect.js';
+import { createDirectModels, enhanceForecast, refreshCalendarConfidence } from './weatherFusionDirect.js';
 import {createWeatherNextBlendSource} from './weatherFusionWeatherNext.js';
 import {validateCurrentConditions} from './weatherFusionCurrent.js';
 import {applyObservedSky} from './weatherFusionObservedSky.js';
@@ -393,6 +393,7 @@ export function buildForecast({ location, point, forecast, hourly, grid, discuss
   Object.assign(output.current,resolveCurrentWeather(output.current,output.hours,now,gridSample(grid,'skyCover',now,'percent')));
   applyObservedSky(output,observation?.skyObservations,now);
   addExperience(output, {models, grid, periods:forecast?.periods || [], now, solarTimes, nextDate});
+  refreshCalendarConfidence(output,{now});
   addExposureWeather(output,exposureWeather);
   addAirQuality(output,airQuality);
   try{addSnowOutlook(output,{grid,periods:forecast?.periods||[],snowModels,winterModels,wpcWinter,now});}catch{output.snow={version:'snow-outlook-v2',possible:false,status:'unavailable',coverageStatus:'unavailable',days:[],error:'Snow outlook could not be built.'};}

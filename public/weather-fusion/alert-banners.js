@@ -1,5 +1,5 @@
 /** Purple perfect-weather and red storm banners from the same rules as /whats-up. */
-import { classifyHour, normalizeNwsHour } from './whats-up-classify.js?v=calendar-days-v1';
+import { classifyHour, normalizeNwsHour } from './whats-up-classify.js?v=audit-20261017-v1';
 
 const HOUR = 3600000;
 
