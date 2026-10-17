@@ -16,8 +16,8 @@
 .sky-header .hdr-clouds{opacity:.45;background:
   radial-gradient(18% 34% at 86% 92%,rgba(150,175,220,.42),transparent 70%),radial-gradient(14% 30% at 76% 100%,rgba(140,165,215,.36),transparent 70%),radial-gradient(16% 28% at 95% 78%,rgba(150,175,220,.3),transparent 70%)}
 .sky-header .hdr-sun{opacity:0;background:radial-gradient(circle at 74% 22%,#fff6d6 0 18px,rgba(255,220,130,.75) 26px,rgba(255,200,90,.28) 60px,transparent 120px)}
-.sky-header .hdr-rain{opacity:0;background-image:repeating-linear-gradient(105deg,rgba(200,220,255,.0) 0 9px,rgba(200,220,255,.28) 9px 10px,transparent 10px 22px);background-size:220px 220px;animation:hdr-rain .6s linear infinite}
-@keyframes hdr-rain{to{background-position:-40px 220px}}
+/* The photographic rain scene already supplies rainfall; keep the brand banner free of a second striped overlay. */
+.sky-header .hdr-rain{display:none}
 .sky-header .hdr-snow{opacity:0;background-image:radial-gradient(2px 2px at 10% 20%,#fff,transparent),radial-gradient(2.5px 2.5px at 30% 60%,#fff,transparent),radial-gradient(2px 2px at 55% 35%,#fff,transparent),radial-gradient(2.5px 2.5px at 75% 75%,#fff,transparent),radial-gradient(2px 2px at 90% 25%,#fff,transparent);background-size:180px 120px;animation:hdr-snow 6s linear infinite}
 @keyframes hdr-snow{to{background-position:30px 120px}}
 /* Logo badge + refresh as glass circles */
@@ -43,7 +43,6 @@
 .sky-header[data-hdr=cloudy] .hdr-clouds{opacity:1;filter:brightness(1.5);background:radial-gradient(22% 45% at 18% 40%,rgba(210,220,235,.35),transparent 70%),radial-gradient(25% 50% at 60% 30%,rgba(200,212,230,.3),transparent 70%),radial-gradient(20% 40% at 88% 80%,rgba(200,212,230,.4),transparent 70%)}
 .sky-header[data-hdr=cloudy] .hdr-horizon{opacity:.25}
 .sky-header[data-hdr=rain]{background:linear-gradient(170deg,#36404f 0%,#252e3b 60%,#1a2029 100%)}
-.sky-header[data-hdr=rain] .hdr-rain{opacity:1}
 .sky-header[data-hdr=rain] .hdr-clouds{opacity:.8}
 .sky-header[data-hdr=rain] .hdr-horizon{opacity:.15}
 .sky-header[data-hdr=snow]{background:linear-gradient(170deg,#7d8ea6 0%,#5e6f88 60%,#46546b 100%)}
