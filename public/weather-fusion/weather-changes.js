@@ -1,4 +1,4 @@
-import {timeAt} from './hourly-feels.js?v=current-rain-20261017-v1';
+import {timeAt} from './hourly-feels.js?v=current-rain-20261017-v2';
 const finite=n=>typeof n==='number'&&Number.isFinite(n);
 export const WEATHER_CHANGE_TITLE='Large weather change alert';
 export function weatherChangeMessages(data,now=Date.now()){

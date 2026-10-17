@@ -1,7 +1,7 @@
-import {forecastProseConflict} from './forecast-consistency.js?v=current-rain-20261017-v1';
+import {forecastProseConflict} from './forecast-consistency.js?v=current-rain-20261017-v2';
 import {plainDanWording,hasDanJargon,collectDanTakeEvidence,visibleDanTakeItems,danTakeText,discussionPeriod,sectionAnchor,explicitForecastUncertainty} from './dans-take.js?v=audit-20261017-v1';
 import {bulletinFacts} from './bulletin-facts.js?v=county-warnings-v1';
-import {isTonightPeriod} from './weather-math.js?v=current-rain-20261017-v1';
+import {isTonightPeriod} from './weather-math.js?v=current-rain-20261017-v2';
 const norm=v=>String(v||'').replace(/\s+/g,' ').trim();
 const dateKey=(time,zone)=>new Intl.DateTimeFormat('en-CA',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(time));
 function anchoredText(text,anchor,zone,now){

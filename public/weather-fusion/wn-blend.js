@@ -1,5 +1,5 @@
 /** Compare the published Weather Nourie forecast with individual model guidance. */
-import {dailyForecastReadings} from './seven-day.js?v=current-rain-20261017-v1';
+import {dailyForecastReadings} from './seven-day.js?v=current-rain-20261017-v2';
 import {calendarDayWindow} from './calendar-day.js?v=calendar-days-v1';
 const WN_FEED = 'https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/weathernext-full.json';
 const MS_PER_DAY = 86400000;

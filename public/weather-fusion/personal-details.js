@@ -1,9 +1,9 @@
-import {weatherState} from './weather-state.js?v=current-rain-20261017-v1';
+import {weatherState} from './weather-state.js?v=current-rain-20261017-v2';
 import {thermalRiskHTML} from './thermal-risk.js?v=weather-art-labels-v10';
 import {forecastGrossLevel} from './dewpoint-meter.js?v=feel-chart-v3';
-import {exposureScene,precipitationActivity,winterSceneExpected} from './exposure-scene.js?v=current-rain-20261017-v1';
-import {outdoorExposure} from './outdoor-feels.js?v=current-rain-20261017-v1';
-import {solarElevation} from './weather-math.js?v=current-rain-20261017-v1';
+import {exposureScene,precipitationActivity,winterSceneExpected} from './exposure-scene.js?v=current-rain-20261017-v2';
+import {outdoorExposure} from './outdoor-feels.js?v=current-rain-20261017-v2';
+import {solarElevation} from './weather-math.js?v=current-rain-20261017-v2';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
 const HOUR=3600000;

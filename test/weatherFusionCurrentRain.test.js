@@ -69,3 +69,13 @@ test('reported or detected rain always uses umbrellas even if the forecast is dr
   assert.equal(comfortSceneState(false,s.condition,s.feels,s).key,'rain');
  }
 });
+
+// The API rounds nearestRainMiles for display. Its explicit close flag uses the
+// actual distance, so 5 displayed miles can still be outside the 5-mile radius.
+test('rounded nearby radar distance cannot override the point forecast probability',()=>{
+ const f=knightdale();f.current.radarPrecipitation.nearestRainMiles=5;
+ const s=currentSample(f,now);assert.equal(s.radarThreat,false);assert.equal(s.pop,54);
+ assert.equal(s.condition,'Chance Rain');assert.equal(s.rainExpected,true);
+ f.current.radarPrecipitation.close=true;
+ assert.equal(currentSample(f,now).currentPrecipitation.label,'Rain Around');
+});

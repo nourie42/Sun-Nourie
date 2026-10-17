@@ -1,4 +1,4 @@
-import {isTonightPeriod,solarElevation} from './weather-math.js?v=current-rain-20261017-v1';
+import {isTonightPeriod,solarElevation} from './weather-math.js?v=current-rain-20261017-v2';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 export function localHour(time=Date.now(),zone='America/New_York'){
   return Number(new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',hourCycle:'h23'}).format(new Date(time)));

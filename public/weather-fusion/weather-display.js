@@ -1,11 +1,11 @@
-import {currentWeatherDisplay} from './current-weather.js?v=current-rain-20261017-v1';
+import {currentWeatherDisplay} from './current-weather.js?v=current-rain-20261017-v2';
 import {hourlyUvValue,hourlyUvHTML} from './daily-uv.js?v=clear-weather-daygraph-v3';
-import {outdoorExposure} from './outdoor-feels.js?v=current-rain-20261017-v1';
-import {currentComfortInputs} from './current-inputs.js?v=current-rain-20261017-v1';
-import {weatherState,conditionForRainChance} from './weather-state.js?v=current-rain-20261017-v1';
-import {thermalComfort, finite, solarElevation,rainChanceValue} from './weather-math.js?v=current-rain-20261017-v1';
-import {displayedFeelsAt,forecastValue,degrees} from './hourly-feels.js?v=current-rain-20261017-v1';
-import {winterSceneExpected,selectedHourSnowPhase} from './exposure-scene.js?v=current-rain-20261017-v1';
+import {outdoorExposure} from './outdoor-feels.js?v=current-rain-20261017-v2';
+import {currentComfortInputs} from './current-inputs.js?v=current-rain-20261017-v2';
+import {weatherState,conditionForRainChance} from './weather-state.js?v=current-rain-20261017-v2';
+import {thermalComfort, finite, solarElevation,rainChanceValue} from './weather-math.js?v=current-rain-20261017-v2';
+import {displayedFeelsAt,forecastValue,degrees} from './hourly-feels.js?v=current-rain-20261017-v2';
+import {winterSceneExpected,selectedHourSnowPhase} from './exposure-scene.js?v=current-rain-20261017-v2';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function weatherShapes(condition, isDay = true) {
   const weather = weatherState(condition);

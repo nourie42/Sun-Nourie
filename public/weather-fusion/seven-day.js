@@ -1,9 +1,9 @@
-import {rainTiming} from './rain-timing.js?v=current-rain-20261017-v1';
-import {dailyDisplay,finite} from './weather-math.js?v=current-rain-20261017-v1';
-import {displayedRainChance,rainAwareCondition,dailySkyCover} from './rain-display.js?v=current-rain-20261017-v1';
-import {forecastPeriodSummary} from './forecast-story.js?v=current-rain-20261017-v1';
-import {shortForecastCondition} from './today-card.js?v=current-rain-20261017-v1';
-import {weatherIcon,weatherMetricIcon} from './weather-display.js?v=current-rain-20261017-v1';
+import {rainTiming} from './rain-timing.js?v=current-rain-20261017-v2';
+import {dailyDisplay,finite} from './weather-math.js?v=current-rain-20261017-v2';
+import {displayedRainChance,rainAwareCondition,dailySkyCover} from './rain-display.js?v=current-rain-20261017-v2';
+import {forecastPeriodSummary} from './forecast-story.js?v=current-rain-20261017-v2';
+import {shortForecastCondition} from './today-card.js?v=current-rain-20261017-v2';
+import {weatherIcon,weatherMetricIcon} from './weather-display.js?v=current-rain-20261017-v2';
 import {confidenceMeterPosition} from './forecast-confidence.js?v=audit-20261017-v1';
 import {winterAmountText,winterDayAmount} from './snow-outlook.js?v=snow-readable-v1';
 

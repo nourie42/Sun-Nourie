@@ -1,4 +1,4 @@
-import {weatherState} from './weather-state.js?v=current-rain-20261017-v1';
+import {weatherState} from './weather-state.js?v=current-rain-20261017-v2';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 const liquid=condition=>['rain','storm'].includes(weatherState(condition).kind);
 
@@ -12,7 +12,7 @@ export function currentWeatherDisplay(forecast,now=Date.now()){
  const activePrecipitation=stationCondition&&['rain','storm','snow'].includes(kind);
  const radar=current.radarPrecipitation,radarReady=radar?.status==='ready';
  const radarHere=radarReady&&radar.atLocation===true;
- const radarClose=radarReady&&(radar.close===true||(finite(radar.nearestRainMiles)&&radar.nearestRainMiles<=5));
+ const radarClose=radarReady&&(radar.close===true||(radar.close==null&&finite(radar.nearestRainMiles)&&radar.nearestRainMiles<=5));
  const radarThreat=radarHere||radarClose||(radarReady&&radar.approaching===true);
  const radarNearby=radarReady&&radar.nearby===true,radarArea=radarReady&&radar.inArea===true;
  const hourlyChance=currentHour?.rainLikelihood&&Object.hasOwn(currentHour.rainLikelihood,'value')?currentHour.rainLikelihood.value:currentHour?.pop;

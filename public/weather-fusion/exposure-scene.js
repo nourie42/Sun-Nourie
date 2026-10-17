@@ -1,4 +1,4 @@
-import {weatherState} from './weather-state.js?v=current-rain-20261017-v1';
+import {weatherState} from './weather-state.js?v=current-rain-20261017-v2';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 export const COMFORT_ART_VERSION='true-night-art-v6';
 

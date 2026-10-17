@@ -1,5 +1,5 @@
 import {calendarDayTemperatures,calendarDayWindow,rainWindowPeak} from './calendar-day.js?v=calendar-days-v1';
-import {weatherState,weatherTransmission,conditionForRainChance} from './weather-state.js?v=current-rain-20261017-v1';
+import {weatherState,weatherTransmission,conditionForRainChance} from './weather-state.js?v=current-rain-20261017-v2';
 import {utciF} from './utci.js?v=clear-weather-daygraph-v3';
 /* Pure presentation math shared by the weather API, browser and tests. */
 export const EXPERIENCE_VERSION = 'weather-nourie-friendly-v1';
