@@ -1,3 +1,4 @@
+import {hideLowRainChance} from './rain-display.js?v=low-rain-display-v1';
 import {currentWeatherDisplay} from './current-weather.js?v=current-rain-20261017-v3';
 import {hourlyUvValue,hourlyUvHTML} from './daily-uv.js?v=clear-weather-daygraph-v3';
 import {outdoorExposure} from './outdoor-feels.js?v=current-rain-20261017-v3';
@@ -44,10 +45,12 @@ export function hrrrRainAmount(row){
 export function hourlyRainHTML(sample){
  if(sample?.now&&sample.currentPrecipitation){
   const status=sample.currentPrecipitation;
+  if(status.forecast&&hideLowRainChance(sample.pop))return '<span class="hour-rain" aria-hidden="true"></span>';
   const label=status.forecast&&finite(sample.pop)?`${Math.round(sample.pop)}%`:status.label;
   return `<span class="hour-rain" title="${esc(status.source)}"><small class="hour-pop">${weatherMetricIcon('drop')}${esc(label)}</small></span>`;
  }
  const blend=sample.rainLikelihood,value=sampleRainChance(sample);
+ if(hideLowRainChance(value))return '<span class="hour-rain" aria-hidden="true"></span>';
  if(blend?.mode==='nws-fallback')return `<span class="hour-rain" title="Official NWS hourly rain chance; model data is unavailable"><small class="hour-pop">${weatherMetricIcon('drop')}${finite(value)?Math.round(value)+'%':'—'}</small></span>`;
  const votes=blend?.sourceValues||{},awarded=blend?.sourcePoints||{},parts=[];
  const pointText=points=>String(Math.round(points*100)/100);

@@ -1,8 +1,8 @@
 import {dailyDisplay,finite} from './weather-math.js?v=current-rain-20261017-v3';
 import {conditionForRainChance} from './weather-state.js?v=current-rain-20261017-v3';
-import {forecastPeriodSummary} from './forecast-story.js?v=current-rain-20261017-v3';
+import {forecastPeriodSummary} from './forecast-story.js?v=low-rain-display-v1';
 import {calendarDayTemperatures} from './calendar-day.js?v=calendar-days-v1';
-import {rainAwareCondition,dailySkyCover} from './rain-display.js?v=current-rain-20261017-v3';
+import {rainAwareCondition,dailySkyCover} from './rain-display.js?v=low-rain-display-v1';
 
 const HOUR = 3600000;
 const chanceOf = row => {

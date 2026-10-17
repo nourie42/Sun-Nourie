@@ -3,6 +3,11 @@ import {weatherState} from './weather-state.js?v=current-rain-20261017-v3';
 const finite=value=>typeof value==='number'&&Number.isFinite(value);
 const validCover=value=>finite(value)&&value>=0&&value<=100;
 
+// Presentation only: retain the actual forecast for calculations and evidence.
+export function hideLowRainChance(value){
+ return finite(value)&&value>=0&&value<5;
+}
+
 /** Cloud cover for this calendar date only. A later night's clouds must not
  * supply today's sky icon. Prefer the hourly sky input, then its metric input. */
 export function dailySkyCover(forecast={},day={},index=0,now=Date.now()){
@@ -48,7 +53,7 @@ export function displayedRainChance(forecast,forecastChance,{dayIndex=0,now=Date
 
 export function observedRainLabel(display){
  if(!display?.observed)return '';
- return finite(display.forecastValue)
+ return finite(display.forecastValue)&&!hideLowRainChance(display.forecastValue)
   ? `Rain now · remaining forecast peak ${Math.round(display.forecastValue)}%`
   : 'Rain now · observed radar';
 }

@@ -1,10 +1,10 @@
-import {forecastPeriodSummary,rainWindowPeak} from './forecast-story.js?v=current-rain-20261017-v3';
+import {forecastPeriodSummary,rainWindowPeak} from './forecast-story.js?v=low-rain-display-v1';
 import {dailyDisplay,finite,rainChanceValue} from './weather-math.js?v=current-rain-20261017-v3';
-import {weatherIcon} from './weather-display.js?v=current-rain-20261017-v3';
+import {weatherIcon} from './weather-display.js?v=low-rain-display-v1';
 import {weatherState,conditionForRainChance} from './weather-state.js?v=current-rain-20261017-v3';
 import {forecastGrossLevel} from './dewpoint-meter.js?v=feel-chart-v3';
 import {calendarDayTemperatures,calendarDayWindow} from './calendar-day.js?v=calendar-days-v1';
-import {rainAwareCondition,dailySkyCover} from './rain-display.js?v=current-rain-20261017-v3';
+import {hideLowRainChance,rainAwareCondition,dailySkyCover} from './rain-display.js?v=low-rain-display-v1';
 
 export const CAR_WASH_RAIN_LIMIT = 25;
 const HOUR = 3600000;
@@ -247,11 +247,11 @@ export function carWashHTML(summary) {
   const cards = summary.days.map(day => `<article class="car-wash-day" data-car-wash-state="${day.state}">
     <strong title="${esc(day.label)}" aria-label="${esc(day.label)}">${esc(day.label === 'Remainder of Today' ? 'Today' : day.label)}</strong><small>${esc(day.stamp)}</small>${weatherIcon(carWashIconCondition(day),day.isDay!==false,42)}
     <span class="car-wash-temps">${finite(day.low)?Math.round(day.low)+'°':'—'} <i>|</i> ${finite(day.high)?Math.round(day.high)+'°':'—'}</span>
-    <span class="car-wash-chance">💧 ${day.chance===null?'—':Math.round(day.chance)+'%'}</span><b class="car-wash-day-verdict">${verdictLabel(day.state)}</b>
+    ${hideLowRainChance(day.chance)?'<span class="car-wash-chance" aria-hidden="true"></span>':`<span class="car-wash-chance">💧 ${day.chance===null?'—':Math.round(day.chance)+'%'}</span>`}<b class="car-wash-day-verdict">${verdictLabel(day.state)}</b>
   </article>`).join('');
   return `<header class="car-wash-header"><span class="car-wash-logo" aria-hidden="true">💧🚙</span><span><h2 id="car-wash-title">Car Wash Forecast</h2><p>Plan for three days of low rain risk</p></span><em>Clean rides.<br>Brighter days.</em></header>
     <div class="car-wash-hero"><div class="car-wash-answer"><h3>Can I Wash<br>My Car Today?</h3><strong class="car-wash-verdict ${summary.state}" role="status" aria-live="polite" aria-atomic="true">${good?'<span aria-hidden="true">✓</span> ':''}${label}</strong><p>${esc(summary.reason)}</p></div>
-      <div class="car-wash-checks">${fact('💧',summary.chance===null?'—':`${Math.round(summary.chance)}%`,'Rain chance',summary.chance!==null&&summary.chance<=CAR_WASH_RAIN_LIMIT)}${fact('☀',`${summary.lowRainDays} of 3 days`,`Rain chance ≤${CAR_WASH_RAIN_LIMIT}%`,summary.lowRainDays===3)}${fact('≋',summary.facts.wind,'Wind')}${fact('♨',summary.facts.temperature,'Low / high')}${fact('💦',summary.facts.gross.title,summary.facts.gross.detail)}</div>
+      <div class="car-wash-checks">${hideLowRainChance(summary.chance)?'':fact('💧',summary.chance===null?'—':`${Math.round(summary.chance)}%`,'Rain chance',summary.chance!==null&&summary.chance<=CAR_WASH_RAIN_LIMIT)}${fact('☀',`${summary.lowRainDays} of 3 days`,`Rain chance ≤${CAR_WASH_RAIN_LIMIT}%`,summary.lowRainDays===3)}${fact('≋',summary.facts.wind,'Wind')}${fact('♨',summary.facts.temperature,'Low / high')}${fact('💦',summary.facts.gross.title,summary.facts.gross.detail)}</div>
     </div>
     <div class="car-wash-photo"><img class="car-wash-art" src="/weather-fusion/car-wash-corvette-hood.webp" alt="Cherry-red Corvette C8 with a black carbon-fiber hood graphic, fully visible on a driveway" loading="lazy" decoding="async"></div>
     <div class="car-wash-days-wrap"><h3>Next 5 Days</h3><div class="car-wash-days">${cards}</div></div>

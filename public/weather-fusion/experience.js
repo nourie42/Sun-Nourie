@@ -1,17 +1,17 @@
-import {confidenceNotice,todayForecastHTML} from './today-card.js?v=current-rain-20261017-v3';
+import {confidenceNotice,todayForecastHTML} from './today-card.js?v=low-rain-display-v1';
 import {FORECAST_CONFIDENCE_VERSION,confidenceMeterPosition} from './forecast-confidence.js?v=audit-20261017-v1';
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
 import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=current-rain-20261017-v3';
 import {weatherState} from './weather-state.js?v=current-rain-20261017-v3';
-import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=current-rain-20261017-v3';
+import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=low-rain-display-v1';
 import {degrees,displayedFeelsAt,dailyFeels,forecastValue,peakFeelsHTML,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=current-rain-20261017-v3';
 import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=current-rain-20261017-v3';
 import {comfortMode,comfortWindow,comfortNarrative,warmestTodayWindow,comfortArtworkContext} from './comfort-outlook.js?v=current-rain-20261017-v3';
 import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js?v=current-rain-20261017-v3';
-import {displayedRainChance,rainAwareCondition,dailySkyCover} from './rain-display.js?v=current-rain-20261017-v3';
+import {hideLowRainChance,displayedRainChance,rainAwareCondition,dailySkyCover} from './rain-display.js?v=low-rain-display-v1';
 import {resetDewpointMeter} from './dewpoint-meter.js?v=air-moisture-v1';
 import {calendarDayWindow} from './calendar-day.js?v=calendar-days-v1';
-import {forecastPeriodSummary} from './forecast-story.js?v=current-rain-20261017-v3';
+import {forecastPeriodSummary} from './forecast-story.js?v=low-rain-display-v1';
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const number=(n,d=0)=>finite(n)?n.toFixed(d):'—';
@@ -32,7 +32,7 @@ let data=null, active=null, horizon=24, selected=0, graphPoints=[], graphGeometr
 const formatTime=(v,options={})=>new Intl.DateTimeFormat('en-US',{timeZone:data?.location.timeZone||'America/New_York',hour:'numeric',minute:'2-digit',...options}).format(new Date(v));
 const localMinutes=v=>{const p=new Intl.DateTimeFormat('en-US',{timeZone:data?.location.timeZone||'America/New_York',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date(v));return Number(p.find(x=>x.type==='hour').value)*60+Number(p.find(x=>x.type==='minute').value);};
 const clockMinutes=n=>{const h=Math.floor(n/60)%24,m=Math.round(n%60);return `${h%12||12}:${String(m).padStart(2,'0')} ${h>=12?'PM':'AM'}`;};
-const displayValue=(v,def)=>!finite(v)?'Not available':def.solar?clockMinutes(v):`${number(v,def.digits||0)}${def.unit}`;
+const displayValue=(v,def)=>def.field==='pop'&&hideLowRainChance(v)?'':!finite(v)?'Not available':def.solar?clockMinutes(v):`${number(v,def.digits||0)}${def.unit}`;
 function locationClock(time,zone='America/New_York'){
  const parts=new Intl.DateTimeFormat('en-US',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date(time));
  const get=type=>parts.find(p=>p.type===type)?.value;
@@ -149,9 +149,9 @@ export function renderDailyRows(forecast,icon) {
   const dayAqi=aqRows.length?Math.max(...aqRows.map(r=>r.aqi)):null;
   const windSpeed=wind.text.replace(/^Wind\s*/,'');
   const confidenceAria=plainConfidenceNotice?` ${plainConfidenceNotice.title}. ${plainConfidenceNotice.text}`:'';
-  return `<button class="day-row ${p.tonight?'tonight-row':''}" data-day="${i}" aria-label="${esc(p.label)}, ${esc(rain.observed?'Rain now':p.condition)}. ${rain.observed?'Rain is observed now at this location.':finite(shownPop)?`Rain chance ${number(shownPop)} percent.`:'Rain chance unavailable.'} ${p.primaryLabel} ${number(p.primary)} degrees${finite(p.secondary)?`, low ${number(p.secondary)} degrees`:''}. ${esc(wind.text)}${gusty?`, gust ${wind.gust} mph`:''}. Forecast confidence ${esc(confidence.label)}.${esc(confidenceAria)} Open details.">
+  return `<button class="day-row ${p.tonight?'tonight-row':''}" data-day="${i}" aria-label="${esc(p.label)}, ${esc(rain.observed?'Rain now':p.condition)}. ${rain.observed?'Rain is observed now at this location.':hideLowRainChance(shownPop)?'':finite(shownPop)?`Rain chance ${number(shownPop)} percent.`:'Rain chance unavailable.'} ${p.primaryLabel} ${number(p.primary)} degrees${finite(p.secondary)?`, low ${number(p.secondary)} degrees`:''}. ${esc(wind.text)}${gusty?`, gust ${wind.gust} mph`:''}. Forecast confidence ${esc(confidence.label)}.${esc(confidenceAria)} Open details.">
    <span class="day-name" title="${esc(p.label)}"><span class="day-name-full">${esc(p.label)}</span><span class="day-name-mobile">${esc(p.remainder?'Today':p.label)}</span></span>
-   <span class="day-icon">${icon(rain.observed?'Rain':p.condition,!p.night)}<small title="${finite(shownPop)?'Rain chance':'Rain probability is not published by this forecast feed'}">${finite(shownPop)?`${number(shownPop)}%`:'Rain —'}</small></span>
+   <span class="day-icon">${icon(rain.observed?'Rain':p.condition,!p.night)}${hideLowRainChance(shownPop)?'':`<small title="${finite(shownPop)?'Rain chance':'Rain probability is not published by this forecast feed'}">${finite(shownPop)?`${number(shownPop)}%`:'Rain —'}</small>`}</span>
    <span class="day-low">${temp(low)}<small>Low</small></span>
    <span class="temp-track" aria-hidden="true">${bar===null?'':`<span class="temp-fill" style="left:0;width:${bar}%"></span><i class="high-marker" style="left:clamp(4px,${bar}%,calc(100% - 4px))"></i>`}</span>
    <span class="day-high">${finite(high)?`<strong>${temp(high)}</strong><small>High</small>`:''}</span>
@@ -199,7 +199,7 @@ export function renderMetricTiles(forecast,smallIcon) {
   ['solar','sun',data.solar.sunset?esc(formatTime(data.solar.sunset)):'—',data.solar.sunrise?`Sunrise ${formatTime(data.solar.sunrise)}.`:'Daylight through the week.'],
  ];
  const aqiKey=aqValue===null?'unavailable':aqValue<=50?'good':aqValue<=100?'moderate':aqValue<=150?'sensitive':aqValue<=200?'unhealthy':aqValue<=300?'very-unhealthy':'hazardous';
- $('metrics').innerHTML=tiles.map(([key,ic,value,note])=>`<button type="button" class="glass metric metric-${key}" data-metric="${key}"${key==='pressure'?` data-pressure-trend="${esc(c.pressureTrend?.direction||'unknown')}"`:''} aria-haspopup="dialog" aria-label="${defs[key].title}: open forecast graph"><span class="metric-title">${smallIcon(ic)}${defs[key].title}</span><span class="metric-value">${value}</span><span class="metric-note">${esc(note)}</span>${sparkline(pointsFor(key,24))}<span class="tile-hint">${key==='solar'?'Tap for the week ahead':'Tap for forecast details'}</span></button>`).join('');
+ $('metrics').innerHTML=tiles.filter(([key])=>key!=='pop'||!hideLowRainChance(rain.value)).map(([key,ic,value,note])=>`<button type="button" class="glass metric metric-${key}" data-metric="${key}"${key==='pressure'?` data-pressure-trend="${esc(c.pressureTrend?.direction||'unknown')}"`:''} aria-haspopup="dialog" aria-label="${defs[key].title}: open forecast graph"><span class="metric-title">${smallIcon(ic)}${defs[key].title}</span><span class="metric-value">${value}</span><span class="metric-note">${esc(note)}</span>${sparkline(pointsFor(key,24))}<span class="tile-hint">${key==='solar'?'Tap for the week ahead':'Tap for forecast details'}</span></button>`).join('');
  $('metric-science').innerHTML=`<p>Current cards use a fresh nearby station when it is within 10 miles. When the nearest station is farther away, they use selected-location hourly guidance and identify it as an estimate. Tap a card for separate future forecast data. Daily forecasts share one hour-by-hour graph: temperature, feels-like and Feel Meter dew point use the left Fahrenheit scale; UV uses the right index scale; chance of rain has its own 0–100% scale below. Slide or tap to read all five at the same hour. Gaps mean missing data, not zero. Feel Meter describes humidity through dew point, not a second feels-like temperature. The same UTCI/Tier-3 equivalent temperature appears in the hourly forecast and outdoor figure. Dew point is a moisture input, not a display floor; gusts do not switch the equation. All displayed pressures use millibars (mb). A pressure trend is shown only for a station observation; forecast pressure has no observed trend.</p>${Object.entries(data.metricForecasts?.notes||{}).map(([key,note])=>`<p><strong>${esc(key)}:</strong> ${esc(note)}</p>`).join('')}`;
  if(active&&$('metric-dialog')?.open)drawChart();
 }

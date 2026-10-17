@@ -12,7 +12,10 @@ test('day rain graph uses the same published hourly likelihood as the hourly car
  f.hours=[{time:time(0),pop:80,rainLikelihood:{value:38,source:'NWS and model guidance'}},{time:time(1),pop:70,rainLikelihood:{value:0}},{time:time(2),pop:58}];
  const points=dayGraphPoints(f,0,false,now);
  assert.equal(points.length,12);assert.deepEqual(points.map(p=>p.rainChance),[38,0,58,...Array(9).fill(null)]);
- for(let i=0;i<f.hours.length;i++)assert.match(hourlyRainHTML(f.hours[i]),new RegExp(`>${points[i].rainChance}%<`));
+ for(let i=0;i<f.hours.length;i++){
+  if(points[i].rainChance>=5)assert.match(hourlyRainHTML(f.hours[i]),new RegExp(`>${points[i].rainChance}%<`));
+  else assert.doesNotMatch(hourlyRainHTML(f.hours[i]),/hour-pop|0%/);
+ }
  assert.equal(points.at(-1).time,'2026-10-15T03:00:00.000Z');
  assert.equal(points[0].rainChanceSource,'NWS and model guidance');
  assert.equal(points[2].rainChanceSource,'NWS hourly forecast');

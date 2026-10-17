@@ -1,5 +1,6 @@
+import {hideLowRainChance} from './rain-display.js?v=low-rain-display-v1';
 /** Compare the published Weather Nourie forecast with individual model guidance. */
-import {dailyForecastReadings} from './seven-day.js?v=current-rain-20261017-v3';
+import {dailyForecastReadings} from './seven-day.js?v=low-rain-display-v1';
 import {calendarDayWindow} from './calendar-day.js?v=calendar-days-v1';
 const WN_FEED = 'https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/weathernext-full.json';
 const MS_PER_DAY = 86400000;
@@ -308,7 +309,7 @@ function renderChart(container, built, varDef, varId) {
   const primaryId = visible.includes('nourie') ? 'nourie' : visible.includes('single') ? 'single' : visible[0];
   const dots = primaryId ? series[primaryId].map((v, i) => v == null ? '' :
     `<circle data-series="${primaryId}" data-date="${days[i].date}" data-index="${i}" data-value="${v}" cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="4" fill="${COLORS[primaryId]}"/>`
-    + ((phone && i % 2) ? '' : `<text data-point-label="${i}" x="${X(i).toFixed(0)}" y="${(Y(v) - 11).toFixed(0)}" text-anchor="middle" font-size="${FS}" fill="#fff" font-weight="700" paint-order="stroke" stroke="rgba(0,0,0,.45)" stroke-width="3">${varDef.fmt(v)}</text>`)).join('') : '';
+    + ((phone && i % 2)||varId==='pop'&&hideLowRainChance(v) ? '' : `<text data-point-label="${i}" x="${X(i).toFixed(0)}" y="${(Y(v) - 11).toFixed(0)}" text-anchor="middle" font-size="${FS}" fill="#fff" font-weight="700" paint-order="stroke" stroke="rgba(0,0,0,.45)" stroke-width="3">${varDef.fmt(v)}</text>`)).join('') : '';
   const chip = (id) => { const off = hiddenModels.has(id);
     const tag = id === 'nourie' ? 'span' : 'button';
     return `<${tag}${tag === 'button' ? ` type="button" aria-pressed="${!off}"` : ''} class="wn-chip" data-model="${id}" style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:999px;border:1px solid ${off ? 'rgba(255,255,255,.12)' : COLORS[id] + '99'};background:${off ? 'transparent' : 'rgba(255,255,255,.10)'};font-family:inherit;font-size:11px;font-weight:600;line-height:1.4;color:${off ? '#7f8ca3' : '#e8eef8'};white-space:nowrap;cursor:${tag === 'button' ? 'pointer' : 'default'};${off ? 'text-decoration:line-through;' : ''}">`
@@ -332,10 +333,10 @@ function renderChart(container, built, varDef, varId) {
     const x = X(i);
     svg.querySelectorAll('[data-point-label]').forEach(label => { label.style.visibility = Number(label.dataset.pointLabel) === i ? 'hidden' : ''; });
     cross.setAttribute('x1', x); cross.setAttribute('x2', x); cross.setAttribute('opacity', '0.8');
-    const rows = visible.map((id) => [id, series[id][i]]).filter(([id, value]) => varId === 'temp' || id === primaryId || finite(value));
+    const rows = visible.map((id) => [id, series[id][i]]).filter(([id, value]) => (varId === 'temp' || id === primaryId || finite(value))&&!(varId==='pop'&&hideLowRainChance(value)));
     cdots.innerHTML = rows.filter(([, value]) => finite(value)).map(([id, v]) => `<circle cx="${x}" cy="${Y(v).toFixed(1)}" r="5" fill="${COLORS[id]}" stroke="#0a1428" stroke-width="1.5"/>`).join('');
     tip.innerHTML = `<b style="display:block;margin-bottom:3px">${dayName(days[i], i, true)}</b>`
-      + (rows.length ? rows.map(([id, v]) => `<span data-tip-series="${id}" style="display:flex;justify-content:space-between;gap:10px"><span><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COLORS[id]};margin-right:5px"></i>${displayName(id) || varDef.label}</span><b>${finite(v) ? varDef.fmt(v) : 'Unavailable'}</b></span>`).join('') : '<span>No model data</span>');
+      + (rows.length ? rows.map(([id, v]) => `<span data-tip-series="${id}" style="display:flex;justify-content:space-between;gap:10px"><span><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COLORS[id]};margin-right:5px"></i>${displayName(id) || varDef.label}</span><b>${finite(v) ? varDef.fmt(v) : 'Unavailable'}</b></span>`).join('') : varId==='pop'?'<span>No rain chances of 5% or higher</span>':'<span>No model data</span>');
     tip.style.display = 'block';
     const px = (x / W) * r.width, tw = tip.offsetWidth;
     tip.style.left = `${Math.max(0, Math.min(r.width - tw, px > r.width / 2 ? px - tw - 12 : px + 12))}px`;

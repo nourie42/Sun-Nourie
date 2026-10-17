@@ -1,3 +1,4 @@
+import {hideLowRainChance} from './rain-display.js?v=low-rain-display-v1';
 import {calendarDayWindow,rainWindowPeak} from './calendar-day.js?v=calendar-days-v1';
 import {finite,dailyRainPeriod} from './weather-math.js?v=current-rain-20261017-v3';
 import {timeAt} from './hourly-feels.js?v=current-rain-20261017-v3';
@@ -109,6 +110,7 @@ function timingSentence(chance, rows, groups, zone) {
   const available = rows.map(row => ({row,chance:hourlyChance(row)})).filter(item => item.chance !== null);
   if (!available.length) return 'Hourly rain timing is not available for this period yet.';
   const peak = available.reduce((best,item) => !best || item.chance > best.chance ? item : best,null);
+  if(hideLowRainChance(peak.chance))return '';
   if (!groups.length) {
     if (chance !== null && chance >= RAIN_TIMING_THRESHOLD) return `The period chance is ${Math.round(chance)}%, but no available hourly reading reaches ${RAIN_TIMING_THRESHOLD}%. The highest available hour is ${Math.round(peak.chance)}% at ${timeLabel(peak.row.time,zone)}.`;
     return `Every available hourly rain chance stays below ${RAIN_TIMING_THRESHOLD}%; the highest is ${Math.round(peak.chance)}% at ${timeLabel(peak.row.time,zone)}.`;
@@ -124,7 +126,7 @@ export function forecastPeriodSummary(forecast, index = 0, phase = 'overall', no
   if(index===0&&rain.canonical&&Number.isFinite(window.start))window.start=Math.max(window.start,Math.floor(now/HOUR)*HOUR);
   const rows=rowsFor(forecast,window),peak=rain.canonical?rainWindowPeak(rows,window):null,chance=peak?(rain.value===null?null:peak.value):rain.value,groups=rainGroups(rows);
   const timing = timingSentence(chance,rows,groups,zone), temperatures = rain.canonical&&rows.some(row=>!finite(row.temperature))?'':temperatureSentence(rows);
-  const intro = chance === null ? 'The rain chance is not available yet.' : rain.canonical?`Rain chance peaks at ${Math.round(chance)}%.`:`The Weather Nourie rain chance for this period is ${Math.round(chance)}%.`;
+  const intro = hideLowRainChance(chance)?'':chance === null ? 'The rain chance is not available yet.' : rain.canonical?`Rain chance peaks at ${Math.round(chance)}%.`:`The Weather Nourie rain chance for this period is ${Math.round(chance)}%.`;
   const hourlyAmount = amountFor(rows,window,rain.canonical);
   const amount = hourlyAmount ?? (!rain.canonical && phase === 'overall' && finite(day.qpf) && day.qpf >= 0 ? day.qpf : null);
   return {phase,chance,amount,window,rows,groups,
