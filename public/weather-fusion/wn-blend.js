@@ -85,13 +85,24 @@ function aggregate(values, method = 'max') {
   return method === 'mean' ? available.reduce((sum, value) => sum + value, 0) / available.length
     : method === 'min' ? Math.min(...available) : Math.max(...available);
 }
-function dailySources(series, windows, method) {
+function completeHourlyCoverage(times, window) {
+  if (!window || !finite(window.start) || !finite(window.end) || window.end <= window.start) return false;
+  for (let time = window.start; time < window.end; time += 3600000) if (!times.has(time)) return false;
+  return true;
+}
+function dailySources(series, windows, method, requireComplete = false) {
   return windows.map(window => {
-    const sources = {};
+    const sources = {}, coverage = {};
     for (const point of seriesInWindow(series, window)) for (const source of point.sources || []) {
-      if (finite(source.value)) (sources[source.id] ||= []).push(source.value);
+      if (finite(source.value)) {
+        (sources[source.id] ||= []).push(source.value);
+        (coverage[source.id] ||= new Set()).add(Date.parse(point.time));
+      }
     }
-    return Object.fromEntries(Object.entries(sources).map(([id, values]) => [id, aggregate(values, method)]));
+    // An overnight tail at a model's range limit is not a forecast daily high.
+    return Object.fromEntries(Object.entries(sources)
+      .filter(([id]) => !requireComplete || completeHourlyCoverage(coverage[id], window))
+      .map(([id, values]) => [id, aggregate(values, method)]));
   });
 }
 
@@ -148,6 +159,7 @@ function wnDaily(wnHourly, varKey, agg, days, tz, convert, windows) {
       }
       return covered >= w.end ? total : null;
     }
+    if (w && varKey === 'temperature_2m' && !completeHourlyCoverage(new Set(selected.map(([time]) => time)), w)) return null;
     if (!vals?.length) return null;
     return accumulation ? vals.reduce((a, b) => a + b, 0) : aggregate(vals, agg);
   });
@@ -176,7 +188,7 @@ export function buildSeries(fx, wn, varId, now = Date.now()) {
   const windows = days.map((day,index)=>{
     const calendar=calendarDayWindow(day,index,now,tz),published=readings[index]?.windWindow;
     return {start:varId!=='temp'&&finite(published?.start)?Math.max(calendar.start,published.start):calendar.start,
-      end:finite(published?.end)?Math.min(calendar.end,published.end):calendar.end};
+      end:varId==='temp'?calendar.end:finite(published?.end)?Math.min(calendar.end,published.end):calendar.end};
   });
   const out = { nwsFallback:varId==='pop'&&readings.some(day=>day.rainSourceFallback&&finite(day.pop)),days, perModel: true, wnVals: days.map(() => null), modelMaps: days.map(() => ({})), forecastValues: days.map(() => null), windows };
 
@@ -194,7 +206,7 @@ export function buildSeries(fx, wn, varId, now = Date.now()) {
     });
     if(varId==='temp'){
       const temperatureSeries=fx.metricForecasts?.series?.temperature||fx.hours?.map(hour=>({time:hour.time,sources:hour.temperatureBlend?.sources}))||[];
-      out.modelMaps=dailySources(temperatureSeries,windows,'max');
+      out.modelMaps=dailySources(temperatureSeries,windows,'max',true);
     }
     out.wnVals = wnDaily(fx.google?.contributes ? null : wn?.hourly, varId === 'temp' ? 'temperature_2m' : 'total_precipitation_1hr',
       varId === 'temp' ? 'max' : 'sum', days, tz, varId === 'temp' ? K2F : M2IN, windows);
@@ -303,7 +315,7 @@ function renderChart(container, built, varDef, varId) {
       + `<i style="width:12px;height:3px;border-radius:2px;background:${COLORS[id]};opacity:${off ? 0.3 : 1};display:inline-block"></i>${displayName(id)}</${tag}>`; };
   const legend = built.perModel ? ids.map(chip).join('')
     : `<span style="font-size:11px;color:#d5deee">${varId === 'aqi' ? 'Daily max AQI (Open-Meteo / CAMS)' : varId === 'uv' ? 'Daily max UV index' : ''}</span>`;
-  const note = built.perModel ? `<p style="font-size:11px;color:#c4d9ed;margin:6px 0 0">${built.nwsFallback?'Official NWS rain chances are used where model data is unavailable.':'Weather Nourie blend is the forecast shown on this page.'} Other lines show individual models. Tap a model to show/hide its line, or tap the graph for values.${varId === 'rain' ? ' Rain totals use the same local calendar dates as the daily tiles, ending at midnight.' : varId === 'wind' ? ' Wind shows the average over that forecast period.' : varId === 'dewpoint' ? ' Dew point shows the highest reading over that forecast period.' : varId === 'pop' ? ' Individual model rain signals are not calibrated probabilities.' : ''}</p>` : '';
+  const note = built.perModel ? `<p style="font-size:11px;color:#c4d9ed;margin:6px 0 0">${built.nwsFallback?'Official NWS rain chances are used where model data is unavailable.':'Weather Nourie blend is the forecast shown on this page.'} Other lines show individual models. Tap a model to show/hide its line, or tap the graph for values.${varId === 'temp' ? ' Daily highs require every forecast hour in the displayed day. Incomplete model days are unavailable.' : varId === 'rain' ? ' Rain totals use the same local calendar dates as the daily tiles, ending at midnight.' : varId === 'wind' ? ' Wind shows the average over that forecast period.' : varId === 'dewpoint' ? ' Dew point shows the highest reading over that forecast period.' : varId === 'pop' ? ' Individual model rain signals are not calibrated probabilities.' : ''}</p>` : '';
   container.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:4px;padding:2px 0 8px">${legend}</div>`
     + `<div class="wn-chart-wrap" style="position:relative;touch-action:pan-y">`
     + `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="width:100%;height:auto;display:block;cursor:crosshair" role="img" aria-label="${varDef.label} comparison chart">${ylabels}${labels}${lines}${dots}`
@@ -320,7 +332,7 @@ function renderChart(container, built, varDef, varId) {
     const x = X(i);
     svg.querySelectorAll('[data-point-label]').forEach(label => { label.style.visibility = Number(label.dataset.pointLabel) === i ? 'hidden' : ''; });
     cross.setAttribute('x1', x); cross.setAttribute('x2', x); cross.setAttribute('opacity', '0.8');
-    const rows = visible.map((id) => [id, series[id][i]]).filter(([id, value]) => id === primaryId || finite(value));
+    const rows = visible.map((id) => [id, series[id][i]]).filter(([id, value]) => varId === 'temp' || id === primaryId || finite(value));
     cdots.innerHTML = rows.filter(([, value]) => finite(value)).map(([id, v]) => `<circle cx="${x}" cy="${Y(v).toFixed(1)}" r="5" fill="${COLORS[id]}" stroke="#0a1428" stroke-width="1.5"/>`).join('');
     tip.innerHTML = `<b style="display:block;margin-bottom:3px">${dayName(days[i], i, true)}</b>`
       + (rows.length ? rows.map(([id, v]) => `<span data-tip-series="${id}" style="display:flex;justify-content:space-between;gap:10px"><span><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COLORS[id]};margin-right:5px"></i>${displayName(id) || varDef.label}</span><b>${finite(v) ? varDef.fmt(v) : 'Unavailable'}</b></span>`).join('') : '<span>No model data</span>');

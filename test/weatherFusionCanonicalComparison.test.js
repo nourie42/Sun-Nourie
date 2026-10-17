@@ -164,7 +164,7 @@ test('evening temperatures use the calendar high and WeatherNext maximum without
   const wn={hourly:[...overnight,...samples(saturdayStart,saturdayStart+12*H,65,80)]};
   const built=buildSeries(fx,wn,'temp',evening);
   assert.deepEqual(built.forecastValues,[70,64]);
-  close(built.wnVals[0],70);close(built.wnVals[1],80);
+  close(built.wnVals[0],70);assert.equal(built.wnVals[1],null,'a half-day WeatherNext forecast cannot supply a whole-day high');
   assert.equal(built.windows[0].end,midnight);
   assert.equal(built.days[0].tonight,false);assert.equal(built.days[1].tonight,false);
 });
