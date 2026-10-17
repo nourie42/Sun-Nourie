@@ -22,10 +22,7 @@
   <link rel="stylesheet" href="/weather-fusion/risk-outlooks.css?v=risk-outlooks-v4">
   <link rel="stylesheet" href="/weather-fusion/weather-polish.css?v=aqi-bg-v2">
   <link rel="stylesheet" href="/weather-fusion/forecast-window-banners.css?v=sun-window-main-v2">
-  <link rel="stylesheet" href="/weather-fusion/weather-playback.css?v=forecast-studio-v1">
-  <link rel="stylesheet" href="/weather-fusion/forecast-explorer.css?v=forecast-studio-v1">
-  <link rel="stylesheet" href="/weather-fusion/custom-forecast.css?v=forecast-studio-v1">
-  <script type="module" src="/weather-fusion/app.js?v=forecast-studio-v2"></script>
+  <script type="module" src="/weather-fusion/app.js?v=low-rain-display-v1"></script>
   <script type="module" src="/weather-fusion/experimental-sky.js?v=audit-20261017-v1"></script>
   <script type="module" src="/weather-fusion/wn-blend.js?v=snow-model-lines-v2"></script>
 
@@ -109,7 +106,7 @@
   </style>
 
   <link rel="stylesheet" href="/weather-fusion/header-sky.css?v=photo-rain-header-v1">
-  <link rel="stylesheet" href="/weather-fusion/page-unify.css?v=forecast-studio-v1">
+  <link rel="stylesheet" href="/weather-fusion/page-unify.css?v=hour-selection-v1">
   <script type="module" src="/weather-fusion/gross-toggle.js?v=feel-v1"></script>
   <script type="module" src="/weather-fusion/week-toggle.js?v=1"></script>
   <script type="module" src="/weather-fusion/collapse.js?v=3"></script>
@@ -159,11 +156,9 @@
       </a>
       <button class="weather-jump-card jump-snow" id="open-snow" type="button" aria-haspopup="dialog" aria-controls="forecast-window-dialog"><span class="jump-label">Snow</span></button>
       <button class="weather-jump-card jump-compare" id="open-compare" type="button" aria-expanded="false" aria-controls="wn-compare-section"><span class="jump-label">Compare</span></button>
-      <button class="weather-jump-card jump-custom-forecast" id="open-custom-forecast" type="button" aria-expanded="false" aria-controls="custom-forecast-panel"><span class="jump-label">Make your own forecast</span></button>
     </nav>
     <div class="experimental-page-banner" role="status" hidden>EXPERIMENTAL</div>
     <main id="forecast">
-      <section class="glass" id="custom-forecast-panel" aria-label="Make your own forecast" hidden></section>
       <div id="status" class="status-line" role="status" aria-live="polite">Connecting to weather sources…</div>
       <section id="weather-change-banner" class="weather-change-banner" role="status" hidden></section>
       <section id="forecast-window-banners" class="forecast-window-banners" aria-label="Upcoming weather windows" hidden></section>
@@ -193,7 +188,6 @@
           </div>
         </section>
         <section class="glass hourly-panel" aria-labelledby="hourly-title"><div class="section-top"><h2 id="hourly-title"><span aria-hidden="true">◷</span> Hourly Forecast</h2><span>Your next 48 hours</span></div><div id="hourly" class="hourly-strip" tabindex="0" aria-label="Current observation followed by future hourly forecasts; select an hour to preview"><p class="muted">Hourly data is loading.</p></div></section>
-        <section class="glass" id="weather-playback-panel" aria-label="Weather preview"></section>
         <div class="exposure-cards">
         <div class="skin-exposure" id="skin-exposure" aria-live="polite">
           <h2 class="skin-kicker" id="skin-kicker">How it actually feels right now</h2>
@@ -202,7 +196,6 @@
         </div>
         </div>
       </section>
-      <section class="glass" id="forecast-explorer-panel" aria-label="Explore the hourly forecast"></section>
       <section class="glass car-wash-forecast" id="car-wash-forecast" aria-labelledby="car-wash-title" hidden></section>
       <section class="glass briefing" aria-labelledby="briefing-title" hidden>
         <div class="section-top"><h2><span class="sparkle" aria-hidden="true">✦</span> LOCAL OUTLOOK</h2><span id="ai-label" class="pill">YOUR LOCAL OUTLOOK</span></div>
