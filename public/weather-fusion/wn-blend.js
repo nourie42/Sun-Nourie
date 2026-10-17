@@ -19,7 +19,7 @@ let curVar = 'temp';
 
 const COLORS = {
   nourie: '#ffffff',
-  nws: '#7fd4ff', hrrr: '#ffb47d', nbm: '#7de8a8', ecmwf: '#b48cff', wn: '#ffd479', gfs: '#ff8fc8',
+  nws: '#7fd4ff', hrrr: '#ffb47d', nam: '#68e5dc', nbm: '#7de8a8', ecmwf: '#b48cff', wn: '#ffd479', gfs: '#ff8fc8',
   single: '#7fd4ff',
 };
 const K2F = (k) => (k - 273.15) * 9 / 5 + 32;
@@ -237,7 +237,8 @@ export function buildSeries(fx, wn, varId, now = Date.now()) {
     out.forecastValues = readings.map(day => finite(day.snowfall) ? day.snowfall : null);
     days.forEach((d, i) => {
       const r = (fx.snow?.days || []).find((x) => x.date === d.date), src = {};
-      if (r && finite(r.nwsSnowfall)) src.nws = r.nwsSnowfall;
+      if (r?.nwsCovered === true && r.displaySnowfall?.source === 'NWS point forecast' && finite(r.displaySnowfall.value)) src.nws = r.displaySnowfall.value;
+      for (const id of ['hrrr', 'nam']) if (finite(r?.nearTermModels?.[id])) src[id] = r.nearTermModels[id];
       if (r && finite(r.models?.ecmwf)) src.ecmwf = r.models.ecmwf;
       if (r && finite(r.models?.gfs)) src.gfs = r.models.gfs;
       out.modelMaps[i] = src;
@@ -254,7 +255,7 @@ export function buildSeries(fx, wn, varId, now = Date.now()) {
 }
 
 const hiddenModels = new Set();
-const NAMES = { nourie: 'Weather Nourie blend', nws: 'NWS', hrrr: 'HRRR', nbm: 'NBM', ecmwf: 'ECMWF', wn: 'NVIDIA WeatherNext', gfs: 'GFS', single: '' };
+const NAMES = { nourie: 'Weather Nourie blend', nws: 'NWS', hrrr: 'HRRR', nam: 'NAM', nbm: 'NBM', ecmwf: 'ECMWF', wn: 'NVIDIA WeatherNext', gfs: 'GFS', single: '' };
 function renderChart(container, built, varDef, varId) {
   const { days } = built;
   const displayName=id=>id==='nourie'&&built.nwsFallback?'Weather Nourie forecast':NAMES[id];
@@ -263,20 +264,20 @@ function renderChart(container, built, varDef, varId) {
   const phone = W < 600;
   const H = phone ? 340 : 380, PL = phone ? 38 : 52, PR = phone ? 10 : 18, PT = 30, PB = 34;
   const FS = phone ? 11 : 14;
-  const series = { nourie: [], nws: [], hrrr: [], nbm: [], ecmwf: [], wn: [], gfs: [], single: [] };
+  const series = { nourie: [], nws: [], hrrr: [], nam: [], nbm: [], ecmwf: [], wn: [], gfs: [], single: [] };
   if (built.perModel) {
     days.forEach((d, i) => {
       const src = { ...built.modelMaps[i] };
       if(!Object.hasOwn(src,'wn'))src.wn=built.wnVals[i];
       series.nourie.push(finite(built.forecastValues[i]) ? built.forecastValues[i] : null);
-      for (const id of ['nws', 'hrrr', 'nbm', 'ecmwf']) series[id].push(finite(src[id]) ? src[id] : null);
+      for (const id of ['nws', 'hrrr', 'nam', 'nbm', 'ecmwf']) series[id].push(finite(src[id]) ? src[id] : null);
       series.wn.push(finite(src.wn) ? src.wn : null);
       series.gfs.push(finite(src.gfs) ? src.gfs : null);
     });
   } else {
     days.forEach((d, i) => series.single.push(built.single[i] ?? null));
   }
-  const ids = built.perModel ? ['nourie', ...['nws', 'hrrr', 'nbm', 'ecmwf', 'wn', 'gfs'].filter((id) => series[id].some(finite))] : ['single'];
+  const ids = built.perModel ? ['nourie', ...['nws', 'hrrr', 'nam', 'nbm', 'ecmwf', 'wn', 'gfs'].filter((id) => series[id].some(finite))] : ['single'];
   const visible = ids.filter((id) => id === 'nourie' || !hiddenModels.has(id));
   const allV = visible.flatMap((id) => series[id]).filter((v) => v != null);
   if (!ids.some(id => series[id].some(finite))) {
@@ -303,8 +304,8 @@ function renderChart(container, built, varDef, varId) {
   const ylabels = ticks.map((v) =>
     `<line x1="${PL}" x2="${W - PR}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}" stroke="rgba(255,255,255,.14)" stroke-width="1"/>`
     + `<text x="${PL - 6}" y="${(Y(v) + 4).toFixed(0)}" text-anchor="end" font-size="${FS}" fill="#d5e1f2">${varDef.fmt(v)}</text>`).join('');
-  const style = { wn: { w: 2.5, dash: '6,4', op: 0.9 }, nws: { w: 2.5, op: 0.85 }, hrrr: { w: 2.5, op: 0.85 }, nbm: { w: 2.5, op: 0.85 }, ecmwf: { w: 2.5, op: 0.85 }, gfs: { w: 2.5, op: 0.85 }, nourie: { w: 4, op: 1 }, single: { w: 4, op: 1 } };
-  const drawOrder = ['wn', 'nws', 'hrrr', 'nbm', 'ecmwf', 'gfs', 'nourie', 'single'].filter((id) => visible.includes(id));
+  const style = { wn: { w: 2.5, dash: '6,4', op: 0.9 }, nws: { w: 2.5, op: 0.85 }, hrrr: { w: 2.5, op: 0.85 }, nam: { w: 2.5, op: 0.85 }, nbm: { w: 2.5, op: 0.85 }, ecmwf: { w: 2.5, op: 0.85 }, gfs: { w: 2.5, op: 0.85 }, nourie: { w: 4, op: 1 }, single: { w: 4, op: 1 } };
+  const drawOrder = ['wn', 'nws', 'hrrr', 'nam', 'nbm', 'ecmwf', 'gfs', 'nourie', 'single'].filter((id) => visible.includes(id));
   const lines = drawOrder.map((id) => { const s = style[id], d = path(series[id]); return d ? `<path data-series="${id}" d="${d}" fill="none" stroke="${COLORS[id]}" stroke-width="${s.w}"${s.dash ? ` stroke-dasharray="${s.dash}"` : ''} opacity="${s.op}" stroke-linecap="round" stroke-linejoin="round"/>` : ''; }).join('');
   const primaryId = visible.includes('nourie') ? 'nourie' : visible.includes('single') ? 'single' : visible[0];
   const dots = primaryId ? series[primaryId].map((v, i) => v == null ? '' :
@@ -316,7 +317,7 @@ function renderChart(container, built, varDef, varId) {
       + `<i style="width:12px;height:3px;border-radius:2px;background:${COLORS[id]};opacity:${off ? 0.3 : 1};display:inline-block"></i>${displayName(id)}</${tag}>`; };
   const legend = built.perModel ? ids.map(chip).join('')
     : `<span style="font-size:11px;color:#d5deee">${varId === 'aqi' ? 'Daily max AQI (Open-Meteo / CAMS)' : varId === 'uv' ? 'Daily max UV index' : ''}</span>`;
-  const note = built.perModel ? `<p style="font-size:11px;color:#c4d9ed;margin:6px 0 0">${built.nwsFallback?'Official NWS rain chances are used where model data is unavailable.':'Weather Nourie blend is the forecast shown on this page.'} Other lines show individual models. Tap a model to show/hide its line, or tap the graph for values.${varId === 'temp' ? ' Daily highs require every forecast hour in the displayed day. Incomplete model days are unavailable.' : varId === 'rain' ? ' Rain totals use the same local calendar dates as the daily tiles, ending at midnight.' : varId === 'wind' ? ' Wind shows the average over that forecast period.' : varId === 'dewpoint' ? ' Dew point shows the highest reading over that forecast period.' : varId === 'pop' ? ' Individual model rain signals are not calibrated probabilities.' : ''}</p>` : '';
+  const note = built.perModel ? `<p style="font-size:11px;color:#c4d9ed;margin:6px 0 0">${built.nwsFallback?'Official NWS rain chances are used where model data is unavailable.':'Weather Nourie blend is the forecast shown on this page.'} Other lines show individual models. Tap a model to show/hide its line, or tap the graph for values.${varId === 'temp' ? ' Daily highs require every forecast hour in the displayed day. Incomplete model days are unavailable.' : varId === 'rain' ? ' Rain totals use the same local calendar dates as the daily tiles, ending at midnight.' : varId === 'wind' ? ' Wind shows the average over that forecast period.' : varId === 'dewpoint' ? ' Dew point shows the highest reading over that forecast period.' : varId === 'pop' ? ' Individual model rain signals are not calibrated probabilities.' : varId === 'snow' ? ' Snow totals are inches for the same local calendar date. HRRR and NAM stop at their published forecast range; missing coverage is Unavailable. Overlapping zero lines mean the models forecast no snow. WPC uses different accumulation periods, and WeatherNext does not publish snowfall depth, so neither is substituted into these daily model lines.' : ''}</p>` : '';
   container.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:4px;padding:2px 0 8px">${legend}</div>`
     + `<div class="wn-chart-wrap" style="position:relative;touch-action:pan-y">`
     + `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="width:100%;height:auto;display:block;cursor:crosshair" role="img" aria-label="${varDef.label} comparison chart">${ylabels}${labels}${lines}${dots}`
@@ -333,7 +334,7 @@ function renderChart(container, built, varDef, varId) {
     const x = X(i);
     svg.querySelectorAll('[data-point-label]').forEach(label => { label.style.visibility = Number(label.dataset.pointLabel) === i ? 'hidden' : ''; });
     cross.setAttribute('x1', x); cross.setAttribute('x2', x); cross.setAttribute('opacity', '0.8');
-    const rows = visible.map((id) => [id, series[id][i]]).filter(([id, value]) => (varId === 'temp' || id === primaryId || finite(value))&&!(varId==='pop'&&hideLowRainChance(value)));
+    const rows = visible.map((id) => [id, series[id][i]]).filter(([id, value]) => (varId === 'temp' || varId === 'snow' || id === primaryId || finite(value))&&!(varId==='pop'&&hideLowRainChance(value)));
     cdots.innerHTML = rows.filter(([, value]) => finite(value)).map(([id, v]) => `<circle cx="${x}" cy="${Y(v).toFixed(1)}" r="5" fill="${COLORS[id]}" stroke="#0a1428" stroke-width="1.5"/>`).join('');
     tip.innerHTML = `<b style="display:block;margin-bottom:3px">${dayName(days[i], i, true)}</b>`
       + (rows.length ? rows.map(([id, v]) => `<span data-tip-series="${id}" style="display:flex;justify-content:space-between;gap:10px"><span><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COLORS[id]};margin-right:5px"></i>${displayName(id) || varDef.label}</span><b>${finite(v) ? varDef.fmt(v) : 'Unavailable'}</b></span>`).join('') : varId==='pop'?'<span>No rain chances of 5% or higher</span>':'<span>No model data</span>');
