@@ -29,6 +29,7 @@ import {renderSnowOutlook,resetSnowOutlook} from './snow-outlook.js?v=snow-reada
 import {renderForecastWindowBanners,resetForecastWindowBanners} from './forecast-window-banners.js?v=current-rain-20261017-v3';
 import {createSevenDayCarousel} from './seven-day.js?v=current-rain-20261017-v3';
 import {forecastSourceHealth} from './forecast-status.js?v=source-health-v1';
+import {forecastRefreshDue} from './forecast-refresh.js?v=model-recovery-v1';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);
 const experimentalPage = isExperimentalWeatherPage();
@@ -625,8 +626,8 @@ window.addEventListener('online', () => { if(!document.hidden)void refreshAlerts
 window.addEventListener('pageshow', (event) => { if(event.persisted&&!document.hidden)void refreshAlerts();if (event.persisted&&validPlace(place)&&!document.hidden&&!busy) void load(); });
 // The site refreshes while open; this is not a push-alert system or background task.
 setInterval(()=>{if(validPlace(place)&&!document.hidden){if(forecast)renderAlerts(forecast);else if(alertSnapshot)renderBulletins(alertSnapshot);void refreshAlerts();}},ALERT_REFRESH_MS);
-// Refresh when the location's calendar date changes, as well as for aging data.
-setInterval(() => { if (validPlace(place)&&!document.hidden&&!busy&&(forecastAgeMs()>9*60000||forecast?.days?.[0]?.date!==new Intl.DateTimeFormat('en-CA',{timeZone:forecast.location.timeZone,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()))) void load(); }, 60000);
+// Missing model inputs retry sooner; healthy snapshots keep their normal cadence.
+setInterval(() => { if (validPlace(place)&&!document.hidden&&!busy&&forecastRefreshDue(forecast)) void load(); }, 60000);
 installExperience();
 startDeviceLocation();
 
