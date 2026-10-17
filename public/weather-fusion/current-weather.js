@@ -1,4 +1,4 @@
-import {weatherState} from './weather-state.js?v=current-rain-20261017-v2';
+import {weatherState} from './weather-state.js?v=current-rain-20261017-v3';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 const liquid=condition=>['rain','storm'].includes(weatherState(condition).kind);
 

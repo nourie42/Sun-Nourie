@@ -1,4 +1,4 @@
-import {weatherState} from './weather-state.js?v=current-rain-20261017-v2';
+import {weatherState} from './weather-state.js?v=current-rain-20261017-v3';
 
 const finite=value=>typeof value==='number'&&Number.isFinite(value);
 const validCover=value=>finite(value)&&value>=0&&value<=100;

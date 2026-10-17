@@ -1,5 +1,5 @@
 import {discussionPeriod} from './dans-take.js?v=audit-20261017-v1';
-import {finite} from './weather-math.js?v=current-rain-20261017-v2';
+import {finite} from './weather-math.js?v=current-rain-20261017-v3';
 
 const HOUR=3600000;
 /** Verify rain wording against the actual local hours it describes. Regional

@@ -1,9 +1,9 @@
-import {outdoorExposure} from './outdoor-feels.js?v=current-rain-20261017-v2';
-import {finite,isTonightPeriod,localHour} from './weather-math.js?v=current-rain-20261017-v2';
-import {timeAt,summarizeFeels} from './hourly-feels.js?v=current-rain-20261017-v2';
-import {forecastSample} from './weather-display.js?v=current-rain-20261017-v2';
-import {weatherState} from './weather-state.js?v=current-rain-20261017-v2';
-import {winterSceneExpected,selectedHourSnowPhase} from './exposure-scene.js?v=current-rain-20261017-v2';
+import {outdoorExposure} from './outdoor-feels.js?v=current-rain-20261017-v3';
+import {finite,isTonightPeriod,localHour} from './weather-math.js?v=current-rain-20261017-v3';
+import {timeAt,summarizeFeels} from './hourly-feels.js?v=current-rain-20261017-v3';
+import {forecastSample} from './weather-display.js?v=current-rain-20261017-v3';
+import {weatherState} from './weather-state.js?v=current-rain-20261017-v3';
+import {winterSceneExpected,selectedHourSnowPhase} from './exposure-scene.js?v=current-rain-20261017-v3';
 export function comfortMode(time,zone='America/New_York'){
  const hour=localHour(time,zone);return isTonightPeriod(time,zone)?'overnight':hour<5?'predawn':'day';
 }

@@ -1,8 +1,8 @@
 import {calendarDayWindow} from './calendar-day.js?v=calendar-days-v1';
-import {timeAt,forecastValue,displayedFeelsAt,degrees} from './hourly-feels.js?v=current-rain-20261017-v2';
+import {timeAt,forecastValue,displayedFeelsAt,degrees} from './hourly-feels.js?v=current-rain-20261017-v3';
 import {hourlyUvValue,uvCategory} from './daily-uv.js?v=clear-weather-daygraph-v3';
 import {forecastGrossLevel} from './dewpoint-meter.js?v=feel-chart-v3';
-import {dailyRainPeriod,rainChanceValue} from './weather-math.js?v=current-rain-20261017-v2';
+import {dailyRainPeriod,rainChanceValue} from './weather-math.js?v=current-rain-20261017-v3';
 const H=3600000,finite=Number.isFinite;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function rainAt(f,time){

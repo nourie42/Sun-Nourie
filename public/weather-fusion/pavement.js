@@ -1,8 +1,8 @@
-import {finite,solarElevation,thermalHumidity,wetBulb} from './weather-math.js?v=current-rain-20261017-v2';
-import {clothingForFeels,referenceScene,precipitationActivity,winterSceneExpected} from './exposure-scene.js?v=current-rain-20261017-v2';
+import {finite,solarElevation,thermalHumidity,wetBulb} from './weather-math.js?v=current-rain-20261017-v3';
+import {clothingForFeels,referenceScene,precipitationActivity,winterSceneExpected} from './exposure-scene.js?v=current-rain-20261017-v3';
 import {thermalRisk} from './thermal-risk.js?v=weather-art-labels-v10';
-import {weatherShapes} from './weather-display.js?v=current-rain-20261017-v2';
-import {weatherState} from './weather-state.js?v=current-rain-20261017-v2';
+import {weatherShapes} from './weather-display.js?v=current-rain-20261017-v3';
+import {weatherState} from './weather-state.js?v=current-rain-20261017-v3';
 const H=3600000,SIGMA=5.670374419e-8,clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 const c=f=>(f-32)/1.8,f=c=>c*1.8+32;
 export const PAVEMENT_VERSION='pavement-energy-balance-v2';

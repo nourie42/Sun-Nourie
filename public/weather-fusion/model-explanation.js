@@ -1,4 +1,4 @@
-import {forecastPeriodSummary,rainWindowPeak} from './forecast-story.js?v=current-rain-20261017-v2';
+import {forecastPeriodSummary,rainWindowPeak} from './forecast-story.js?v=current-rain-20261017-v3';
 const HOUR = 3600000;
 const WEATHERNEXT_FEED = 'https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/weathernext3.json';
 const WEATHERNEXT_SOURCE = 'https://developers.google.com/weathernext/guides/models';

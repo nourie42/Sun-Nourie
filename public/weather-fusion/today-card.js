@@ -1,11 +1,11 @@
 import {calendarDayWindow} from './calendar-day.js?v=calendar-days-v1';
-import {rainTiming,rainTimingHTML} from './rain-timing.js?v=current-rain-20261017-v2';
-import {weatherState} from './weather-state.js?v=current-rain-20261017-v2';
-import {dailyDisplay,dailyRainPeriod,finite} from './weather-math.js?v=current-rain-20261017-v2';
-import {dailyFeels,degrees,timeAt} from './hourly-feels.js?v=current-rain-20261017-v2';
+import {rainTiming,rainTimingHTML} from './rain-timing.js?v=current-rain-20261017-v3';
+import {weatherState} from './weather-state.js?v=current-rain-20261017-v3';
+import {dailyDisplay,dailyRainPeriod,finite} from './weather-math.js?v=current-rain-20261017-v3';
+import {dailyFeels,degrees,timeAt} from './hourly-feels.js?v=current-rain-20261017-v3';
 import {uvCategory} from './daily-uv.js?v=weather-art-labels-v10';
-import {weatherIcon,weatherMetricIcon} from './weather-display.js?v=current-rain-20261017-v2';
-import {displayedRainChance,observedRainLabel,rainAwareCondition,dailySkyCover} from './rain-display.js?v=current-rain-20261017-v2';
+import {weatherIcon,weatherMetricIcon} from './weather-display.js?v=current-rain-20261017-v3';
+import {displayedRainChance,observedRainLabel,rainAwareCondition,dailySkyCover} from './rain-display.js?v=current-rain-20261017-v3';
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const reading=(value,unit='')=>finite(value)?`${Math.round(value)}${unit}`:'—';
 export function periodWeatherStats(forecast,now=Date.now()){

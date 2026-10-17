@@ -4,9 +4,9 @@
  * days[].high/low, rainTimeline, metricForecasts.series and precipitation.
  * Pure builders (model, series, chart layout, summaries) are exported for
  * tests; DOM wiring only runs in the browser. */
-import { weatherIcon, windDirectionLabel } from './weather-display.js?v=current-rain-20261017-v2';
-import { weatherState } from './weather-state.js?v=current-rain-20261017-v2';
-import { finite, rainChanceValue } from './weather-math.js?v=current-rain-20261017-v2';
+import { weatherIcon, windDirectionLabel } from './weather-display.js?v=current-rain-20261017-v3';
+import { weatherState } from './weather-state.js?v=current-rain-20261017-v3';
+import { finite, rainChanceValue } from './weather-math.js?v=current-rain-20261017-v3';
 
 export const H = 3600000;
 const round = (n) => (finite(n) ? Math.round(n) : null);

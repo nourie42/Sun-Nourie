@@ -25,7 +25,7 @@ test('Knightdale current-hour rain survives radar gaps without becoming a fabric
  assert.equal(s.currentPrecipitation.active,false);assert.equal(s.currentPrecipitation.forecast,true);
  assert.equal(s.currentPrecipitation.label,'54% this hour');assert.equal(s.rainExpected,true);
  assert.equal(s.comfort.weatherKind,'rain');assert.equal(s.isDay,false);
- assert.match(hourlyRainHTML(s),/54% this hour/);assert.doesNotMatch(hourlyRainHTML(s),/Dry now|Rain now/);
+ assert.match(hourlyRainHTML(s),/54%<\/small>/);assert.match(hourlyRainHTML(s),/forecast for the current hour/);assert.doesNotMatch(hourlyRainHTML(s),/Dry now|Rain now/);
 });
 
 test('all three current panels show night rain gear and forecast-qualified captions',()=>{
