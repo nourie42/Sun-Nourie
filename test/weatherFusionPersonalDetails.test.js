@@ -17,11 +17,11 @@ test('hero stays current in daylight and at night, independently of daily low',(
  for(const day of [true,false]){const v=currentHero(f,day);assert.equal(v.temperature,75);assert.equal(v.tonight,false);assert.equal(v.condition,'Cloudy');}
  assert.equal(currentHero({current:{temperature:null}}).temperature,null);
 });
-test('dry observed radar removes forecast rain from the current hero',()=>{
- const f={current:{temperature:79,type:'guidance',condition:'Chance Showers And Thunderstorms',conditionSource:'Selected-location current-hour forecast',radarPrecipitation:{status:'ready',atLocation:false,nearby:false}},hours:[{skyCover:58}]};
- assert.equal(currentHero(f,false).condition,'Partly cloudy');
+test('dry radar uses current-hour sky when wet wording has no supporting point forecast',()=>{
+ const f={current:{temperature:79,type:'guidance',condition:'Chance Showers And Thunderstorms',conditionSource:'Selected-location current-hour forecast',radarPrecipitation:{status:'ready',atLocation:false,nearby:false}},hours:[{time:new Date(now).toISOString(),skyCover:58}]};
+ assert.equal(currentHero(f,false,now).condition,'Partly cloudy');
  f.current.radarPrecipitation.atLocation=true;
- assert.equal(currentHero(f,false).condition,'Rain now');
+ assert.equal(currentHero(f,false,now).condition,'Rain now');
 });
 test('pressure is converted once; raw Pa avoids loss from rounded inches',()=>{
  assert.equal(stationPressureMb({pressurePa:101300,pressure:29.91}),1013);
@@ -97,7 +97,7 @@ test('production integration and cache-busting cover every new component',()=>{
  const app=read('public/weather-fusion/app.js'),html=read('public/weather-fusion/index.html'),server=read('src/weatherFusion.js');
  assert.match(app,/const hero = currentHero\(data, day\)/);assert.match(app,/dayGraphHTML\(forecast,index,p\.tonight,now\)/);assert.match(app,/api\('bulletins'/);
  assert.match(html,/Nourie Weather Take/);assert.match(html,/Current temperature/);assert.doesNotMatch(html,/Because Apple, Google and Samsung weather suck/);assert.match(html,/personal-details\.css\?v=wpc-mpd-v12/);assert.match(html,/id="bulletin-dialog"/);assert.equal((html.match(/id="city-search"/g)||[]).length,1);
- assert.match(app,/weather-display\.js\?v=cold-feels-v1/);
+ assert.match(app,/weather-display\.js\?v=current-rain-20261017-v1/);
  assert.ok(html.indexOf('id="nws-bulletins"')<html.indexOf('class="glass today-panel"'));assert.ok(html.indexOf('id="nws-bulletins"')<html.indexOf('id="hourly-title"'));
  assert.equal((html.match(/id="alerts"/g)||[]).length,1);assert.match(server,/\/api\/weather-fusion\/bulletins/);assert.match(server,/pressureTrendFromObservations/);
 });

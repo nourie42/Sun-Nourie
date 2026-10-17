@@ -1,4 +1,4 @@
-import {forecastPeriodSummary,rainWindowPeak} from './forecast-story.js?v=audit-20261017-v1';
+import {forecastPeriodSummary,rainWindowPeak} from './forecast-story.js?v=current-rain-20261017-v1';
 
 const finite=n=>typeof n==='number'&&Number.isFinite(n);
 

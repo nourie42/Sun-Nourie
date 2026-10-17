@@ -1,17 +1,17 @@
-import {confidenceNotice,todayForecastHTML} from './today-card.js?v=audit-20261017-v1';
+import {confidenceNotice,todayForecastHTML} from './today-card.js?v=current-rain-20261017-v1';
 import {FORECAST_CONFIDENCE_VERSION,confidenceMeterPosition} from './forecast-confidence.js?v=audit-20261017-v1';
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
-import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=audit-20261017-v1';
-import {weatherState} from './weather-state.js';
-import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=audit-20261017-v1';
-import {degrees,displayedFeelsAt,dailyFeels,forecastValue,peakFeelsHTML,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=audit-20261017-v1';
-import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=audit-20261017-v1';
-import {comfortMode,comfortWindow,comfortNarrative,warmestTodayWindow,comfortArtworkContext} from './comfort-outlook.js?v=audit-20261017-v1';
-import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js?v=audit-20261017-v1';
-import {displayedRainChance,rainAwareCondition,dailySkyCover} from './rain-display.js?v=calendar-days-v1';
+import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=current-rain-20261017-v1';
+import {weatherState} from './weather-state.js?v=current-rain-20261017-v1';
+import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=current-rain-20261017-v1';
+import {degrees,displayedFeelsAt,dailyFeels,forecastValue,peakFeelsHTML,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=current-rain-20261017-v1';
+import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=current-rain-20261017-v1';
+import {comfortMode,comfortWindow,comfortNarrative,warmestTodayWindow,comfortArtworkContext} from './comfort-outlook.js?v=current-rain-20261017-v1';
+import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js?v=current-rain-20261017-v1';
+import {displayedRainChance,rainAwareCondition,dailySkyCover} from './rain-display.js?v=current-rain-20261017-v1';
 import {resetDewpointMeter} from './dewpoint-meter.js?v=air-moisture-v1';
 import {calendarDayWindow} from './calendar-day.js?v=calendar-days-v1';
-import {forecastPeriodSummary} from './forecast-story.js?v=audit-20261017-v1';
+import {forecastPeriodSummary} from './forecast-story.js?v=current-rain-20261017-v1';
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const number=(n,d=0)=>finite(n)?n.toFixed(d):'—';
@@ -106,8 +106,8 @@ export function renderComfort(forecast) {
  const sample=comfortPreview?forecastSample(forecast,comfortPreview):current;
  if(!sample){comfortPreview=null;return renderComfort(forecast);}
  const c=sample.comfort,zone=forecast.location.timeZone,summary=comfortWindow(forecast,now+1);
- const precipitation=forecastValue(forecast,'precipitation',sample.time);
- const sceneContext={...comfortArtworkContext(forecast,sample,now),forecast:!sample.now,condition:sample.condition,pop:sample.pop,precipitation,rainAround:sample.rainAround===true,radarThreat:sample.radarThreat===true};
+ const precipitation=sample.now?sample.precipitation:forecastValue(forecast,'precipitation',sample.time);
+ const sceneContext={...comfortArtworkContext(forecast,sample,now),forecast:!sample.now,condition:sample.condition,pop:sample.pop,precipitation,rainExpected:sample.rainExpected===true,rainAround:sample.rainAround===true,radarThreat:sample.radarThreat===true};
  const pavement=pavementEstimate(forecast,sample.inputs,sample.now?now:Date.parse(sample.time),{checkedAt:now,...sceneContext});
  const kicker=$('skin-kicker');if(kicker)kicker.textContent=sample.now?'How it feels outside right now':`How will it feel outside ${formatTime(sample.time,{weekday:'short'})}?`;
  const preview=sample.now?'':'<div class="comfort-preview-heading"><button type="button" data-comfort-reset>Back to now</button></div>';

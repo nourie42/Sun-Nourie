@@ -1,10 +1,10 @@
-import {forecastPeriodSummary,rainWindowPeak} from './forecast-story.js?v=audit-20261017-v1';
-import {dailyDisplay,finite,rainChanceValue} from './weather-math.js?v=audit-20261017-v1';
-import {weatherIcon} from './weather-display.js?v=audit-20261017-v1';
-import {weatherState,conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
+import {forecastPeriodSummary,rainWindowPeak} from './forecast-story.js?v=current-rain-20261017-v1';
+import {dailyDisplay,finite,rainChanceValue} from './weather-math.js?v=current-rain-20261017-v1';
+import {weatherIcon} from './weather-display.js?v=current-rain-20261017-v1';
+import {weatherState,conditionForRainChance} from './weather-state.js?v=current-rain-20261017-v1';
 import {forecastGrossLevel} from './dewpoint-meter.js?v=feel-chart-v3';
 import {calendarDayTemperatures,calendarDayWindow} from './calendar-day.js?v=calendar-days-v1';
-import {rainAwareCondition,dailySkyCover} from './rain-display.js?v=calendar-days-v1';
+import {rainAwareCondition,dailySkyCover} from './rain-display.js?v=current-rain-20261017-v1';
 
 export const CAR_WASH_RAIN_LIMIT = 25;
 const HOUR = 3600000;
