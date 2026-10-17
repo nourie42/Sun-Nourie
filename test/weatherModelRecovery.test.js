@@ -31,3 +31,30 @@ test('a recovered source returns to the healthy interval without changing confid
 test('local midnight still refreshes immediately even for a newly fetched healthy forecast',()=>{
  const f=fixture();f.assembledAt='2026-10-18T03:59:30Z';assert.equal(forecastRefreshDue(f,Date.parse('2026-10-18T04:00:00Z')),true);
 });
+
+test('incomplete Today temperature or rainfall coverage retries after two minutes even when feeds report ready',()=>{
+ for(const metric of ['temperature','rain']){
+  const f=fixture();f.days[0].confidence={key:'low',score:65,coverage:{[metric]:{complete:false}}};
+  const before=structuredClone(f);
+  assert.equal(forecastRefreshDue(f,now+119999),false);
+  assert.equal(forecastRefreshDue(f,now+2*M),true,metric);
+  assert.deepEqual(f,before,'retry scheduling must not change the confidence rating or weather data');
+ }
+});
+test('complete low-confidence guidance keeps the normal cadence when sources actually disagree',()=>{
+ const f=fixture();f.days[0].confidence={key:'low',score:65,coverage:{temperature:{complete:true},rain:{complete:true}}};
+ assert.equal(forecastNeedsModelRetry(f,now),false);
+ assert.equal(forecastRefreshDue(f,now+2*M),false);
+ assert.equal(forecastRefreshDue(f,now+9*M),true);
+});
+test('incomplete coverage on a later date does not accelerate a complete Today forecast',()=>{
+ const f=fixture();f.days.push({date:'2026-10-18',confidence:{key:'low',coverage:{temperature:{complete:false},rain:{complete:false}}}});
+ assert.equal(forecastNeedsModelRetry(f,now),false);
+});
+test('once hourly coverage recovers the normal interval resumes without forcing High',()=>{
+ const f=fixture();f.days[0].confidence={key:'low',coverage:{temperature:{complete:false},rain:{complete:true}}};
+ assert.equal(forecastRefreshDue(f,now+2*M),true);
+ f.days[0].confidence={key:'moderate',coverage:{temperature:{complete:true},rain:{complete:true}}};
+ f.assembledAt=new Date(now+2*M).toISOString();const before=structuredClone(f);
+ assert.equal(forecastRefreshDue(f,now+4*M),false);assert.deepEqual(f,before);
+});

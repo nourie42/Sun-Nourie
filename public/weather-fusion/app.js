@@ -29,7 +29,7 @@ import {renderSnowOutlook,resetSnowOutlook} from './snow-outlook.js?v=snow-reada
 import {renderForecastWindowBanners,resetForecastWindowBanners} from './forecast-window-banners.js?v=current-rain-20261017-v3';
 import {createSevenDayCarousel} from './seven-day.js?v=low-rain-display-v1';
 import {forecastSourceHealth} from './forecast-status.js?v=source-health-v1';
-import {forecastRefreshDue} from './forecast-refresh.js?v=model-recovery-v1';
+import {forecastRefreshDue} from './forecast-refresh.js?v=coverage-recovery-v2';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);
 const experimentalPage = isExperimentalWeatherPage();

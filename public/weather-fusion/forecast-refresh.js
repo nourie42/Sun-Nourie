@@ -1,8 +1,10 @@
 const MINUTE=60000;
 const retryStatuses=new Set(['unavailable','stale']);
-/** Retry a temporarily incomplete model forecast sooner than a healthy one.
- * A Moderate rating alone never implies a failed or stale model feed. */
+/** Retry missing hourly inputs as well as unavailable model feeds.
+ * A confidence label alone never implies missing or stale forecast data. */
 export function forecastNeedsModelRetry(forecast,now=Date.now()){
+ const coverage=forecast?.days?.[0]?.confidence?.coverage;
+ if(coverage?.temperature?.complete===false||coverage?.rain?.complete===false)return true;
  if((forecast?.feeds||[]).some(feed=>['hrrr','ecmwf','nbm'].includes(feed.id)&&(retryStatuses.has(feed.status)||feed.retrievalStatus==='last-verified')))return true;
  if(forecast?.days?.[0]?.confidence?.coverage?.rain?.officialFallback===true)return true;
  return (forecast?.rainTimeline||[]).some(row=>{
