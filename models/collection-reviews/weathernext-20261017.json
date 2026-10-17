@@ -1,0 +1,23 @@
+{
+  "reviewedAt": "2026-10-17T14:46:59.848213+00:00",
+  "originalStop": {
+    "pausedAt": "2026-10-17T12:30:56.714010Z",
+    "job": "76e0078a-b52a-4db3-8793-0e88d8867661",
+    "billedBytes": 256901120,
+    "runBilledBytes": 5832179712,
+    "reason": "Actual query billing exceeded the automatic collection safety threshold."
+  },
+  "decision": "Resume with unchanged billing safety limits after reducing data scanned.",
+  "collectorCommit": "77b037270a123d0c16ab1dafa07852d0e32989c3",
+  "mitigations": [
+    "Avoid the large geography_polygon column; retain native-grid center and cell bounds.",
+    "Limit point batches to three statistical columns.",
+    "Publish verified main runs before optional grids.",
+    "Share actual billing across collection phases."
+  ],
+  "limits": {
+    "actualBytesPerQuery": 250000000,
+    "actualBytesPerWorkflow": 50000000000
+  },
+  "verification": "Twelve credential-free regression tests passed; the existing saved-stop and actual-billing guards remain enforced."
+}

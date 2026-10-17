@@ -1,1 +1,0 @@
-{"pausedAt": "2026-10-17T12:30:56.714010Z", "job": "76e0078a-b52a-4db3-8793-0e88d8867661", "billedBytes": 256901120, "runBilledBytes": 5832179712, "reason": "Actual query billing exceeded the automatic collection safety threshold."}
