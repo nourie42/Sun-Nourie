@@ -141,7 +141,7 @@ test('changed assets are cache-busted and late briefing responses stay guarded',
  assert.match(app,/if \(id === generation && briefing\.signature === forecast\?\.signature\) renderBriefing\(briefing\)/);
 });
 test('Weather Nourie title quietly opens the shared experimental weather app',()=>{
- assert.match(html,/class="brand" href="\/weather-fusion\/experimental-weather\.html"/);
+ assert.match(html,/class="brand(?: brand-premium)?" href="\/weather-fusion\/experimental-weather\.html"/);
  assert.match(app,/document\.documentElement\.dataset\.weatherPage=experimentalPage\?'experimental':'main'/);
  assert.match(app,/if\(experimentalPage\)document\.title='Experimental Weather · Weather Nourie'/);
  assert.match(app,/if\(!experimentalPage&&!\$\('car-wash-forecast'\)\.hidden\)draw\('car-wash-forecast'/);

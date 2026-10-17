@@ -67,7 +67,7 @@ test('the production forecast builder serves the new hourly contract without alt
  for(const h of f.hours){const p=f.metricForecasts.series.feels.find(p=>Date.parse(p.time)===Date.parse(h.time));assert.equal(p.inputs.temperature,h.temperature);assert.equal(p.value,h.feelsLike);}
 });
 for(const dp of [40,55,62,66,72,78])test(`Gross Meter ${dp} uses future grammar only in forecast readings`,()=>{
- assert.match(forecastGrossLevel(dp,8).label,/will|should/);assert.ok(!/gettin|it’s|I’m/.test(forecastGrossLevel(dp,8).label));
+ assert.match(forecastGrossLevel(dp,8).label,/will|should|ahead/);assert.ok(!/gettin|it’s|I’m/.test(forecastGrossLevel(dp,8).label));
  if(dp===66)assert.match(dewpointGrossLevel(dp).label,/gettin/);
 });
 test('routine forecast discussion is never listed as a special discussion',()=>{
@@ -118,9 +118,11 @@ test('WPC precipitation-discussion feed distinguishes a clear result from an out
  const failure=createPrecipitationDiscussionService({now:()=>now,cached:async()=>{throw new Error('offline');}});assert.equal((await failure(location)).meta.status,'unavailable');
  const bulletins=readFileSync(new URL('../public/weather-fusion/bulletins.js',import.meta.url),'utf8');assert.match(bulletins,/item\.plainSummary/);assert.match(bulletins,/Show full official discussion/);
 });
-test('waving figures have faces and honor reduced-motion preferences',()=>{
+test('complete clothing artwork keeps accessible descriptions and honors reduced-motion preferences',()=>{
  const read=p=>readFileSync(new URL('../public/weather-fusion/'+p,import.meta.url),'utf8');
  const scene=read('exposure-scene.js'),css=read('hourly-feels.css');
- assert.match(scene,/person-eyes/);assert.match(scene,/person-smile/);assert.match(scene,/friendly-raised-arm/);assert.match(scene,/friendly-wave/);assert.ok(scene.indexOf('friendly-raised-arm')<scene.indexOf('<g class=\"friendly-wave\">'));
+ assert.match(scene,/aria-label="\$\{label\}/);assert.match(scene,/data-artwork="complete-image"/);
+ assert.match(scene,/data-visible-outfit="\$\{outfit\}/);assert.match(scene,/class="reference-art"/);
+ assert.doesNotMatch(scene,/class="friendly-wave"|class="comfort-clothing"/);
  assert.match(css,/\.friendly-wave\{animation:none;transform:none\}/);assert.match(css,/prefers-reduced-motion:reduce/);
 });

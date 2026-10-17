@@ -8,7 +8,7 @@ import {withLiveAlerts,retainUnverifiedAlerts,alertHealth,alertLocationKey} from
 import {danCard} from '../public/weather-fusion/dans-summary.js';
 const now=Date.parse('2026-10-11T17:38:00Z');
 const location={latitude:35.787,longitude:-78.4806};
-const point={county:'https://api.weather.gov/zones/county/NCC183',timeZone:'America/New_York'};
+const point={forecast:'https://api.weather.gov/gridpoints/RAH/73,57/forecast',forecastHourly:'https://api.weather.gov/gridpoints/RAH/73,57/forecast/hourly',forecastGridData:'https://api.weather.gov/gridpoints/RAH/73,57',county:'https://api.weather.gov/zones/county/NCC183',timeZone:'America/New_York'};
 const feature=(id='tornado',extra={})=>({id:`https://api.weather.gov/alerts/${id}`,geometry:null,properties:{id:`urn:${id}`,status:'Actual',messageType:'Alert',event:'Tornado Warning',sent:'2026-10-11T17:29:00Z',expires:'2026-10-11T18:00:00Z',areaDesc:'Johnston, NC; Wake, NC',instruction:'TAKE COVER NOW! Move to an interior room on the lowest floor.',parameters:{tornadoDetection:['OBSERVED']},...extra}});
 const county={id:'NCC183'};
 const service=(request,t=()=>now)=>createAlertService({request,cache:new Cache(20,t),now:t});

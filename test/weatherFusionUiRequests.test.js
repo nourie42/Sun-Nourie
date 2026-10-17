@@ -33,7 +33,9 @@ test('clothing follows the figure feels-like temperature from hot to cold',()=>{
  for(const [v,outfit] of [[95,'hot'],[82,'warm'],[66,'mild'],[48,'cool'],[30,'cold']]){
   const svg=exposureScene(true,true,'Clear',v);assert.match(svg,new RegExp(`data-outfit="${outfit}"`));
  }
- assert.match(exposureScene(true,true,'Clear',30),/coat, scarf and warm hat/);
+ const cold=exposureScene(true,true,'Clear',30);
+ assert.match(cold,/aria-label="[^"]*coat[^"]*scarf[^"]*warm hat/);
+ assert.match(cold,/data-garment="heavy-coat-and-trousers"/);
  assert.match(exposureScene(true,true,'Clear',95),/light hot-weather clothing/);
 });
 

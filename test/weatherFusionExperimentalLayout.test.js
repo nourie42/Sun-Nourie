@@ -86,7 +86,9 @@ test('generated car background is a real lightweight WebP served as a static ass
 test('the explicit server allowlist covers the weather shell dependency closure',()=>{
   const routeList = serverSource.match(/for \(const name of \[([\s\S]*?)\]\) app\.get\(`\/weather-fusion\/\$\{name\}`/);
   assert.ok(routeList,'weather assets must use an auditable explicit route list');
-  const allowed = new Set([...routeList[1].matchAll(/'([^']+)'/g)].map(match=>match[1]));
+  const routes=[];
+  registerWeatherFusionRoutes({get:paths=>routes.push(...(Array.isArray(paths)?paths:[paths]))},{env:{},fetchImpl:async()=>{throw new Error('not called');}});
+  const allowed = new Set(routes.filter(route=>route.startsWith('/weather-fusion/')).map(route=>route.slice('/weather-fusion/'.length)));
   const required = new Set();
   const pending = [];
   const supported = /\.(?:js|css|png|webp|jpe?g|svg)$/i;

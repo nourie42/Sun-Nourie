@@ -75,7 +75,7 @@ test('gross meter uses a fitted SVG and never instructs or forces horizontal scr
 test('today summary keeps the daily timing policy and existing detail handler',()=>{
  const js=source('experience.js');
  assert.match(js,/today\.innerHTML=todayForecastHTML\(forecast\)/);
- assert.match(source('today-card.js'),/dailyDisplay\(day,0,now,forecast.location.timeZone\)/);
+ assert.match(source('today-card.js'),/dailyDisplay\(day,0,now,forecast.location.timeZone,forecast\)/);
  assert.match(js,/\$\('daily'\)\?\.querySelector\('\[data-day="0"\]'\)\?\.click\(\)/);
  assert.match(js,/\$\('daily'\)\.innerHTML=rows\.join\(''\)/);
 });

@@ -11,15 +11,19 @@ test('shade has no banner even at extreme UTCI; outdoor warning remains',()=>{
  assert.doesNotMatch(shade,/thermal-risk|Heat stress/);
  assert.match(html,/<span class="exposure-label">Day<\/span>/);assert.match(html,/Extreme heat/);
 });
-test('compact outdoor card is always titled Night after dark',()=>{
+test('compact storm card keeps its weather title and nighttime artwork after dark',()=>{
  const html=sunShadeHTML({shade:83,outdoors:83,daylight:false,weatherKind:'storm',radiantCondition:'Chance Showers And Thunderstorms',inputEvidence:{temperature:83}},{latitude:35,longitude:-78},Date.parse('2026-09-12T00:00:00Z'),{compact:true,pop:20});
  const outdoor=html.slice(html.indexOf('sun-person'),html.indexOf('</figure>',html.indexOf('sun-person')));
- assert.match(outdoor,/<span class="exposure-label">Night<\/span>/);
+ assert.match(outdoor,/<span class="exposure-label">Storms<\/span>/);
+ assert.match(outdoor,/data-daylight="false"/);
+ assert.match(outdoor,/comfort-night-/);
  assert.doesNotMatch(outdoor,/Storms possible/);
 });
-test('compact outdoor card is always titled Day while the sun is up',()=>{
+test('compact storm card keeps its weather title and daytime artwork while the sun is up',()=>{
  const html=sunShadeHTML({shade:88,outdoors:89,daylight:true,weatherKind:'storm',radiantCondition:'Chance Showers And Thunderstorms',inputEvidence:{temperature:88}},{latitude:35,longitude:-78},Date.parse('2026-09-11T19:00:00Z'),{compact:true,pop:20});
  const outdoor=html.slice(html.indexOf('sun-person'),html.indexOf('</figure>',html.indexOf('sun-person')));
- assert.match(outdoor,/<span class="exposure-label">Day<\/span>/);
+ assert.match(outdoor,/<span class="exposure-label">Storms<\/span>/);
+ assert.match(outdoor,/data-daylight="true"/);
+ assert.doesNotMatch(outdoor,/comfort-night-/);
  assert.doesNotMatch(outdoor,/Storms possible/);
 });

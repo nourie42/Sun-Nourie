@@ -43,10 +43,10 @@ test('regular and experimental weather share device-location, jump-nav, AQI and 
  assert.doesNotMatch(html,/data-place="knightdale"|data-place="greenville"|Knightdale \/ Raleigh|Greenville, NC/);
  assert.match(html,/id="device-location-label"/);
  assert.match(html,/class="weather-jump-card jump-map"[^>]*href="#map-panel"/);
- assert.match(html,/class="weather-jump-card jump-gross"[^>]*href="#dewpoint-gross-meter"[\s\S]*Gross Meter/);
+ assert.match(html,/class="weather-jump-card jump-gross"[^>]*href="#dewpoint-gross-meter"[\s\S]*Feel Meter/);
  assert.match(html,/class="weather-jump-card jump-day"[^>]*href="#your-day"[\s\S]*Your Day/);
  assert.match(html,/class="weather-jump-card jump-week"[^>]*href="#daily-panel"[\s\S]*7-Day/);
- assert.match(html,/class="weather-jump-card jump-air"[^>]*href="#air-quality"[\s\S]*Air Quality/);
+ assert.match(html,/class="weather-jump-card jump-air"[^>]*href="#air-quality"[\s\S]*AQI/);
  assert.match(html,/id="air-quality"/);
  assert.match(app,/startDeviceLocation\(\);/);
  assert.match(app,/navigator\.geolocation\.getCurrentPosition/);
@@ -54,7 +54,7 @@ test('regular and experimental weather share device-location, jump-nav, AQI and 
  assert.doesNotMatch(app,/presets\.knightdale|weather-fusion-place/);
  assert.match(css,/font-size:12px!important/);
  assert.match(css,/gross-number/);
- assert.match(css,/\.weather-jump-nav\{display:grid;grid-template-columns:repeat\(5,minmax\(0,1fr\)\)/);
+ assert.match(css,/\.weather-jump-nav\{display:grid;grid-template-columns:repeat\(7,minmax\(0,1fr\)\)/);
  assert.match(css,/\.weather-jump-card\{[^}]*border:0;[^}]*background:rgba\(8,64,99/);
  assert.match(css,/\.weather-jump-card:nth-child\(n\)\{grid-column:auto\}/);
  assert.ok(html.indexOf('id="air-quality"')<html.indexOf('id="your-day"'),'Air quality stays above the Your Day tile grid');

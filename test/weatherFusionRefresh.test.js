@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
+import {hideLowRainChance,rainAwareCondition,dailySkyCover} from '../public/weather-fusion/rain-display.js';
+import {rainTiming,rainTimingHTML} from '../public/weather-fusion/rain-timing.js';
 
 const app=readFileSync(new URL('../public/weather-fusion/app.js',import.meta.url),'utf8');
 const section=app.slice(app.indexOf('function refreshOpenDay()'),app.indexOf('\nfunction setBasemap()'));
@@ -28,6 +30,7 @@ function harness() {
     dailyConfidenceNoticeHTML:()=>'',
     forecastPeriodSummary:(f,index)=>({chance:f.days[index].chance,amount:.1,summary:`Updated chance ${f.days[index].chance}%.`}),
     displayedRainChance:(_forecast,chance)=>({value:chance,forecastValue:chance,observed:false}),
+    hideLowRainChance,rainAwareCondition,dailySkyCover,rainTiming,rainTimingHTML,
     dayGraphHTML:()=>'<section></section>',installDayGraph(){},
     dayGraphPoints:(f,index)=>[7,8,9].map(hour=>({time:`${f.days[index].date}T0${hour}:00:00Z`})),
   };
@@ -42,7 +45,7 @@ test('the forecast API bypasses browser cache without changing source timestamps
 });
 
 test('both page modes refresh every 10 minutes, on return (if older than 2 min), restored page, and reconnect',()=>{
-  assert.match(app,/setInterval\(\(\) => \{ if \(validPlace\(place\)&&!document\.hidden&&!busy&&forecastAgeMs\(\)>9\*60000\) void load\(\); \}, 60000\)/);
+  assert.match(app,/setInterval\(\(\) => \{ if \(validPlace\(place\)&&!document\.hidden&&!busy&&forecastRefreshDue\(forecast\)\) void load\(\); \}, 60000\)/);
   assert.match(app,/visibilitychange[\s\S]*?void refreshAlerts\(\);if \(validPlace\(place\)&&!busy&&forecastAgeMs\(\)>2\*60000\) void load\(\)/);
   assert.match(app,/window\.addEventListener\('online',[^\n]*void refreshAlerts\(\);if \(validPlace\(place\)&&!document\.hidden&&!busy\) void load\(\)/);
   assert.match(app,/window\.addEventListener\('pageshow',[^\n]*void refreshAlerts\(\);if \(event\.persisted&&validPlace\(place\)&&!document\.hidden&&!busy\) void load\(\)/);

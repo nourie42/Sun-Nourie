@@ -748,6 +748,10 @@ export function registerWeatherFusionRoutes(app, options = {}) {
   });
   for (const name of [
     ...COMFORT_SCENE_ASSETS,
+    'calendar-day.js','collapse.js','current-weather.js','gross-toggle.js','rain-timing.js','week-toggle.js','wn-blend.js',
+    'header-sky.css','header-sky.js','logo.svg','page-unify.css',
+    'header-cloudy.jpg','header-cloudy.webp','header-day.jpg','header-day.webp','header-night.jpg','header-night.webp',
+    'header-rain.jpg','header-rain.webp','header-snow.jpg','header-snow.webp',
     'forecast-windows.js','forecast-window-banners.js','forecast-window-banners.css','forecast-status.js','forecast-refresh.js','live-alerts.js','urgent-alerts.css',
     'seven-day.js','seven-day.css','seven-day-art.css',
     'request-deadline.js','weather-changes.js','air-quality.js','alert-banners.js','app.js','bulletin-facts.js','bulletins.js','car-wash.js','car-wash.css','car-wash-background.webp','car-wash-corvette-hood.webp',

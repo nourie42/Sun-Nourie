@@ -124,13 +124,14 @@ test('no embedded model webpages or cosmetic feed-health replacements remain',()
 test('Weather Nourie keeps thermal qualifications at the bottom, without a fetch interceptor',()=>{
  const html=fs.readFileSync(new URL('../public/weather-fusion/index.html',import.meta.url),'utf8');
  const math=fs.readFileSync(new URL('../public/weather-fusion/weather-math.js',import.meta.url),'utf8');
- assert.match(html,/Weather <b>Nourie<\/b>/);
+ assert.match(html,/class="brand-kicker">WEATHER<\/span>/);assert.match(html,/class="brand-name">Nourie<\/span>/);
  assert.ok(!html.includes('Back to Sun-Nourie'));assert.ok(!html.includes('Weather Fusion'));
  assert.ok(!html.includes('originalFetch'));
  assert.match(html,/How it actually feels right now/);
  assert.ok(html.indexOf('id="scientific-stuff"')>html.indexOf('id="metrics"'));
  assert.match(html,/not measured sunlight/);assert.match(html,/not a claim that a person/);
- assert.ok(!math.includes('NWS wind chill'));assert.ok(!math.includes('NWS heat index'));
+ assert.match(math,/NWS wind chill floor for cold feels-like/);assert.ok(!math.includes('NWS heat index'));
+ assert.match(html,/Below 60°F[\s\S]*NWS wind-chill/);
  assert.match(math,/UTCI Tier-3 fallback/);assert.match(math,/tier3FeelsLike/);
  assert.match(html,/One all-season fallback/);assert.match(html,/Stull approximation/);
 });
