@@ -1,12 +1,43 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {precipitationLikelihood,validateSnapshot} from '../src/weatherFusionDirect.js';
-import {EXTENDED_RAIN_WEIGHTS} from '../src/weatherFusionPolicy.js';
+import {precipitationLikelihood,publishedPrecipitationLikelihood,deterministicRainSignal,MIN_RAIN_SIGNAL_INCHES,validateSnapshot} from '../src/weatherFusionDirect.js';
+import {EXTENDED_RAIN_WEIGHTS,precipitationPolicy} from '../src/weatherFusionPolicy.js';
 import {buildForecast} from '../src/weatherFusion.js';
 import {modelExplanationHTML} from '../public/weather-fusion/model-explanation.js';
 import {snapshot,testInputs} from './weatherFusion.fixtures.js';
 
 const extended=(pop,amounts)=>precipitationLikelihood(pop,{sourceValues:amounts},EXTENDED_RAIN_WEIGHTS);
+
+test('the reported tiny WeatherNext amounts do not create a repeated 3.33-point rain floor',()=>{
+ const policy=precipitationPolicy(1,true);
+ for(const amount of [.00000214,.00001069,.00000316,.00099999]){
+  const score=publishedPrecipitationLikelihood(2,{sourceValues:{hrrr:0,ecmwf:0,nbm:0,wn:amount}},policy);
+  assert.equal(score.sourcePoints.wn,0);
+  assert.equal(score.value,0);
+  assert.equal(score.officialProbability,2);
+  assert.equal(score.sourceAmounts.wn,amount,'retain the actual published model amount');
+  assert.equal(score.sources.find(s=>s.id==='wn').weight,.1);
+  assert.equal(score.reductionReasons.wn,'below-minimum');
+  assert.ok(score.negligibleSources.includes('wn'));
+  assert.ok(!score.drySources.includes('wn'),'do not mislabel a tiny positive amount as a published zero');
+ }
+});
+
+test('the hourly signal floor preserves resolved light rain, zero and unavailable inputs',()=>{
+ assert.equal(MIN_RAIN_SIGNAL_INCHES,.001);
+ assert.equal(deterministicRainSignal(null),null);
+ assert.equal(deterministicRainSignal(0),0);
+ assert.equal(deterministicRainSignal(.00099999),0);
+ for(const amount of [.001,.00306636,.010])assert.ok(Math.abs(deterministicRainSignal(amount)-100/3)<1e-8);
+ assert.equal(deterministicRainSignal(.010001),100);
+ for(const id of ['hrrr','ecmwf','nbm']){
+  const score=precipitationLikelihood(0,{sourceValues:{hrrr:0,ecmwf:0,nbm:0,[id]:.00000214}});
+  assert.equal(score.sourcePoints[id],0);
+  assert.equal(score.reductionReasons[id],'below-minimum');
+ }
+ const missing=publishedPrecipitationLikelihood(40,{sourceValues:{hrrr:0,ecmwf:0,nbm:null}});
+ assert.equal(missing.value,40);assert.equal(missing.mode,'nws-fallback');
+});
 
 test('the reported 0.055-inch ECMWF blip adds 20 points rather than 60',()=>{
   const score=extended(8,{hrrr:0,ecmwf:.055,nbm:0});

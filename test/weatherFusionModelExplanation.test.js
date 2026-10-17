@@ -63,7 +63,8 @@ test('rain inputs scale the NWS share and explain full and reduced model points'
   assert.doesNotMatch(html,/QPF support|NWS-anchored input/);
   assert.match(html,/NWS hourly probability fills its 40-point share proportionally/);
   assert.match(html,/40% NWS chance contributes 16 points/);
-  assert.match(html,/positive model amount through 0\.010 in gets exactly one-third/);
+  assert.match(html,/below 0\.001 in\/hour add zero rain-signal points; the original amounts are retained/);
+  assert.match(html,/From 0\.001 through 0\.010 in\/hour, a model gets one-third/);
   assert.match(html,/above 0\.010 in gets full points only if NWS is at least 20%/);
   assert.match(html,/result is capped at 100%/);
   assert.match(html,/uncalibrated estimate, not a proven model-accuracy ranking/);
@@ -112,6 +113,14 @@ test('a reduced wet vote keeps its exact points without hiding a low score',()=>
   assert.match(html,/Rounded: <b>7%<\/b>\. Shown: <b>7%/);
   assert.doesNotMatch(html,/fewer than two available sources|below 25%/);
   assert.doesNotMatch(html,/Data mismatch/);
+});
+
+test('a tiny positive WeatherNext amount is disclosed with zero signal points, not called dry or a light-rain vote',()=>{
+ const forecast=fixture(),score=precipitationLikelihood(2,{sourceValues:{hrrr:0,ecmwf:0,nbm:0,wn:.00000214}},{nws:.36,hrrr:.27,ecmwf:.09,nbm:.18,wn:.1});
+ for(const row of forecast.rainTimeline)row.rainLikelihood=score;
+ Object.assign(forecast.days[0].rainLikelihood,{value:score.value,peak:score});
+ const html=modelExplanationHTML(forecast,{now});
+ assert.match(html,/<th scope="row">NVIDIA WeatherNext<\/th><td>0\.00000214 in<small>Below 0\.001 in\/hour: zero rain-signal points; amount retained<\/small><\/td><td>0<small>of 10 max<\/small>/);
 });
 
 test('missing hourly data remains unavailable instead of becoming a zero or a reassuring match',()=>{

@@ -19,7 +19,7 @@ import {renderWeatherPanel} from './render-safety.js';
 import {forecastPeriodSummary} from './forecast-story.js?v=current-rain-20261017-v3';
 import {forecastOutlookDetails} from './outlook-details.js?v=current-rain-20261017-v3';
 import {isExperimentalWeatherPage,renderCarWashForecast,resetCarWashForecast} from './car-wash.js?v=current-rain-20261017-v3';
-import {renderModelExplanation,resetModelExplanation} from './model-explanation.js?v=current-rain-20261017-v3';
+import {renderModelExplanation,resetModelExplanation} from './model-explanation.js?v=rain-signal-floor-v1';
 import {updateRainTrend} from './rain-trend.js?v=current-rain-20261017-v3';
 import {renderRiskOutlooks,resetRiskOutlooks} from './risk-outlooks.js?v=risk-outlooks-v5';
 import {renderAirQuality} from './air-quality.js?v=mobile-repair-v1';
