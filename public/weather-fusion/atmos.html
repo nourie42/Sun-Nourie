@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0D1714">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="Weather Nourie Atmos: the next 48 hours drawn as a living sky from the Weather Nourie forecast blend, with the science behind every number.">
+  <title>Atmos · Weather Nourie</title>
+  <link rel="icon" href="/weather-fusion/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="/weather-fusion/archivo-latin-wdth-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/weather-fusion/atmos.css?v=atmos-v1">
+  <script type="module" src="/weather-fusion/atmos.js?v=atmos-v1"></script>
+</head>
+<body>
+  <a class="skip" href="#instruments">Skip to the forecast details</a>
+
+  <header class="hero" id="hero">
+    <canvas class="sky" id="sky" aria-hidden="true"></canvas>
+    <div class="topbar">
+      <a class="home" href="/weather-fusion/" aria-label="Weather Nourie main forecast">
+        <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="20" cy="11" r="5.5"/><path d="M5 22h22M8 26.5h16"/></svg>
+        <span><span class="brand-long">Weather Nourie </span><b>Atmos</b></span>
+      </a>
+      <div class="tools">
+        <button class="place-button" id="place-button" type="button" aria-haspopup="dialog" aria-controls="place-dialog">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>
+          <span id="place-button-label">Change place</span>
+        </button>
+        <button class="icon-button" id="refresh" type="button" aria-label="Refresh the forecast">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4.5v4.2h-4.2"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <section class="alerts" id="alerts" aria-label="Official weather alerts" hidden></section>
+
+    <div class="sky-window" id="sky-window">
+      <p class="sky-note" id="sky-note"></p>
+    </div>
+
+    <section class="panel" id="panel" aria-labelledby="place-name">
+      <div class="panel-main">
+        <h1 class="place"><span id="place-name">Finding your forecast</span> <span class="when" id="when"></span></h1>
+        <div class="reading">
+          <p class="temp"><span id="temp-value">––</span><span class="degree" aria-hidden="true">°</span><span class="sr-only" id="temp-label"></span></p>
+          <div class="reading-copy">
+            <p class="condition" id="condition">Loading the forecast</p>
+            <p class="feels" id="feels"></p>
+          </div>
+        </div>
+        <p class="take" id="take" hidden></p>
+      </div>
+      <dl class="readouts" id="readouts">
+        <div><dt>Rain</dt><dd id="read-rain">–</dd><small id="read-rain-note"></small></div>
+        <div><dt>Wind</dt><dd id="read-wind">–</dd><small id="read-wind-note"></small></div>
+        <div><dt>Dew point</dt><dd id="read-dew">–</dd><small id="read-dew-note"></small></div>
+        <div><dt>Humidity</dt><dd id="read-humidity">–</dd><small id="read-humidity-note"></small></div>
+      </dl>
+    </section>
+
+    <div class="clock" id="clock" hidden>
+      <button class="play" id="play" type="button" aria-label="Play the next 48 hours as a time-lapse" aria-pressed="false">
+        <svg class="icon-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>
+        <svg class="icon-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13M16 5.5v13"/></svg>
+      </button>
+      <div class="strip" id="strip">
+        <svg id="strip-svg" role="presentation" aria-hidden="true"></svg>
+        <label class="sr-only" for="hour">Forecast hour</label>
+        <input class="hour-input" id="hour" type="range" min="0" max="0" step="1" value="0">
+      </div>
+      <p class="clock-caption"><span id="clock-time">Now</span><button class="now-button" id="now-button" type="button" hidden>Back to now</button></p>
+    </div>
+    <p class="status" id="status" role="status" aria-live="polite"></p>
+  </header>
+
+  <div class="ticker" id="ticker" aria-label="Selected forecast hour" role="group">
+    <button class="tick-button" id="tick-prev" type="button" aria-label="Previous hour"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 6-6 6 6 6"/></svg></button>
+    <p class="tick-label"><strong id="tick-time">Now</strong> <span id="tick-summary"></span></p>
+    <button class="tick-button" id="tick-next" type="button" aria-label="Next hour"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg></button>
+    <button class="tick-button tick-play" id="tick-play" type="button" aria-label="Play the next 48 hours as a time-lapse" aria-pressed="false">
+      <svg class="icon-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>
+      <svg class="icon-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13M16 5.5v13"/></svg>
+    </button>
+  </div>
+
+  <main id="instruments" hidden>
+    <section class="instrument" id="blend" aria-labelledby="blend-title">
+      <h2 id="blend-title">The forecasts, blended into one number</h2>
+      <p class="dek" id="blend-dek">Weather Nourie starts from the National Weather Service forecast and blends in computer models, each with a fixed share. The shaded band is how far apart they are. The white line is the blend you see everywhere on this site.</p>
+      <div class="split">
+        <div>
+          <figure class="chart" id="blend-chart" aria-label="Temperature forecast from each source and the blend over the next 48 hours"></figure>
+          <p class="keys" id="blend-keys"></p>
+        </div>
+        <div class="hour-card" id="blend-hour"></div>
+      </div>
+    </section>
+
+    <section class="instrument" id="feel" aria-labelledby="feel-title">
+      <h2 id="feel-title">How it’s really gonna feel</h2>
+      <p class="dek">Feels-like is the site’s outdoor UTCI estimate: air temperature, moisture, wind and an estimated sun load working together, with the NWS wind chill as a floor in cold wind. It describes the air around you, not your skin.</p>
+      <div class="split">
+        <div id="feel-ladder"></div>
+        <div id="feel-dew"></div>
+      </div>
+    </section>
+
+    <section class="instrument" id="rain" aria-labelledby="rain-title">
+      <h2 id="rain-title">How the rain chance adds up</h2>
+      <p class="dek" id="rain-dek">The rain chance here is a score. The NWS chance fills its share, and each model adds points only for the rain it actually forecasts: all of its points for real rain that something else backs up, a third for a trace.</p>
+      <figure class="chart" id="rain-chart" aria-label="Rain score for each of the next 48 hours, split by source"></figure>
+      <p class="keys" id="rain-keys"></p>
+      <div class="rain-detail" id="rain-detail"></div>
+    </section>
+
+    <section class="instrument" id="golden" aria-labelledby="golden-title">
+      <h2 id="golden-title">Best hours to be outside</h2>
+      <p class="dek" id="golden-dek"></p>
+      <div class="grid-wrap" id="golden-grid"></div>
+      <div class="legend" id="golden-legend"></div>
+      <div class="windows" id="golden-windows"></div>
+    </section>
+
+    <section class="instrument" id="days" aria-labelledby="days-title">
+      <h2 id="days-title">The next ten days, spread included</h2>
+      <p class="dek">Each bar runs from the blended low to the blended high. The thin lines past each end show how far the individual forecasts reach for that same day, so you can see when they disagree.</p>
+      <ol class="day-list" id="day-list"></ol>
+    </section>
+
+    <section class="instrument" id="street" aria-labelledby="street-title">
+      <h2 id="street-title">Down at street level</h2>
+      <p class="dek">What the ground, the sun and the air are doing where you actually walk.</p>
+      <div class="street-grid">
+        <article class="street-block" id="street-pavement" aria-labelledby="pavement-title"></article>
+        <article class="street-block" id="street-sun" aria-labelledby="sun-title"></article>
+        <article class="street-block" id="street-air" aria-labelledby="air-title"></article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="sources" id="sources">
+    <h2>Where these numbers come from</h2>
+    <div class="source-copy" id="source-copy"></div>
+    <p class="official">Weather Nourie is not an official National Weather Service product. Always follow official warnings from <a href="https://www.weather.gov/">weather.gov</a> and local emergency managers.</p>
+    <p class="other-views"><a href="/weather-fusion/">Main forecast</a><a href="/weather-fusion/experimental-weather.html">Experimental</a><a href="/weather-fusion/halo.html">Halo</a><a href="/weather-fusion/ultimate.html">Ultimate</a></p>
+  </footer>
+
+  <div class="tip" id="tip" role="tooltip" hidden></div>
+
+  <dialog class="place-dialog" id="place-dialog" aria-labelledby="place-dialog-title">
+    <form method="dialog" class="place-form" id="place-form">
+      <h2 id="place-dialog-title">Choose a place</h2>
+      <label class="search"><span class="sr-only">Search a U.S. city or ZIP code</span>
+        <input id="place-search" type="search" placeholder="Search a U.S. city or ZIP" autocomplete="off" maxlength="80">
+      </label>
+      <button class="locate" id="locate" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"/><path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4"/></svg>
+        Use my location
+      </button>
+      <p class="place-hint" id="place-hint">Saved places</p>
+      <ul class="place-list" id="place-list"></ul>
+      <button class="close" value="close" type="submit">Close</button>
+    </form>
+  </dialog>
+  <noscript><p class="noscript">Atmos needs JavaScript. Visit <a href="https://www.weather.gov/">weather.gov</a> for official forecasts and warnings.</p></noscript>
+</body>
+</html>
