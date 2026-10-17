@@ -64,8 +64,19 @@ with sync_playwright() as p:
    q.locator('#open-compare').click();q.wait_for_function('!!document.querySelector("#wn-compare-chart")?._wnShow');q.wait_for_timeout(300)
    f=q.evaluate('window.__weatherNourieForecast');now=q.evaluate('Date.now()');r['assembledAt']=f['assembledAt'];(OUT/f'{city.lower()}-{width}-backend.json').write_text(json.dumps(f,indent=2))
    for key in ['temp','rain','pop','wind','dewpoint','snow','uv','aqi']:
-    q.locator('#wn-var-picker [data-var="'+key+'"]').click();q.wait_for_function('!!document.querySelector("#wn-compare-chart")?._wnShow')
+    q.locator('#wn-var-picker [data-var="'+key+'"]').click()
+    q.wait_for_function('''()=>{const chart=document.querySelector('#wn-compare-chart');return !!chart&&
+      ((!!chart.querySelector('svg')&&!!chart._wnShow)||chart.textContent.trim()==='No data for this variable.');}''')
     want=expected(f,now,key)
+    # A completely missing series has no graph or tooltip. Verify the visible
+    # unavailable state against every expected date instead of invoking a stale
+    # tooltip callback left on the chart container by the previous variable.
+    if not q.locator('#wn-compare-chart svg').count():
+     assert want and all(v is None for v in want),(city,width,key,'Missing chart despite available source data',want)
+     unavailable=q.locator('#wn-compare-chart').inner_text().strip()
+     assert unavailable=='No data for this variable.',(city,width,key,'Expected a clear unavailable state',unavailable)
+     r['metrics'][key]={'dates':len(want),'values':['Unavailable']*len(want),'unavailableDates':len(want),'state':'unavailable','displayText':unavailable,'allMatch':True}
+     continue
     actual=q.locator('#wn-compare-chart').evaluate('''(e,count)=>{let out=[];for(let i=0;i<count;i++){let svg=e.querySelector('svg'),r=svg.getBoundingClientRect(),w=svg.viewBox.baseVal.width,pl=w<600?38:52,pr=w<600?10:18,x=pl+i/Math.max(1,count-1)*(w-pl-pr);e._wnShow(r.left+x/w*r.width);let tip=e.querySelector('.wn-tip'),row=tip.querySelector('[data-tip-series="nourie"]')||tip.querySelector('[data-tip-series="single"]');out.push({date:tip.querySelector('b').textContent,value:row?.querySelector('b')?.textContent})}return out;}''',len(want))
     for i,(got,v) in enumerate(zip(actual,want)):
      assert got['value']==fmt(v,key),(city,width,key,f['days'][i]['date'],got,fmt(v,key),v)
