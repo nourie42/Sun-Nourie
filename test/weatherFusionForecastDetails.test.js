@@ -132,7 +132,7 @@ test('changed assets are cache-busted and late briefing responses stay guarded',
  assert.match(app,/personal-details\.js\?v=current-rain-20261017-v3/);
  assert.match(app,/forecast-story\.js\?v=current-rain-20261017-v3/);
  assert.match(app,/weather-display\.js\?v=current-rain-20261017-v3/);assert.match(app,/current-temperature\.js\?v=current-rain-20261017-v3/);assert.match(app,/car-wash\.js\?v=current-rain-20261017-v3/);
- assert.match(app,/model-explanation\.js\?v=current-rain-20261017-v3/);
+ assert.match(app,/model-explanation\.js\?v=rain-signal-floor-v1/);
  assert.match(app,/outlook-details\.js\?v=current-rain-20261017-v3/);
  for(const module of ['dewpoint-meter'])assert.match(app,new RegExp(`${module}\\.js\\?v=air-moisture-v1`));
  assert.match(app,/day-graph\.js\?v=current-rain-20261017-v3/);assert.match(app,/hourly-feels\.js\?v=current-rain-20261017-v3/);
