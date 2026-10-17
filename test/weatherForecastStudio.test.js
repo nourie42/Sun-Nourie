@@ -29,7 +29,7 @@ test('playback, graphs and main page share one experience module instance and ne
  const imports=consumers.map(name=>[...read(name).matchAll(/from ['"]\.\/(experience\.js[^'"]*)['"]/g)].map(m=>m[1]));
  assert.ok(imports.every(items=>items.length===1));
  assert.deepEqual([...new Set(imports.flat())],['experience.js?v=forecast-studio-v1']);
- assert.match(html,/app\.js\?v=forecast-studio-v1/);
+ assert.match(html,/app\.js\?v=forecast-studio-v2/);
  for(const file of ['weather-playback','forecast-explorer','custom-forecast'])assert.match(html,new RegExp(`${file}\\.css\\?v=forecast-studio-v1`));
  assert.match(html,/id="open-custom-forecast"[^>]*aria-controls="custom-forecast-panel"/);
  assert.match(html,/id="custom-forecast-panel"[^>]*hidden/);

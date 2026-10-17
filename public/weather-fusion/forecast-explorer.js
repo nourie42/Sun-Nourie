@@ -93,6 +93,7 @@ export function installForecastExplorer(){
  }
  function draw(){
   const def=EXPLORER_METRICS[metric],rows=data.rows;
+  slider.disabled=!rows.length;
   panel.style.setProperty('--explorer-color',def.color);
   panel.style.setProperty('--explorer-line',metric==='temperature'&&showModels?'#f5f9ff':def.color);
   find('.explorer-note').textContent=def.note;
@@ -157,7 +158,10 @@ export function installForecastExplorer(){
  }
  document.addEventListener('weather-nourie:forecast',event=>update(event.detail));
  document.addEventListener('weather-nourie:hour',event=>{selectedTime=event.detail?.time||'now';matchSelection();renderSelection();});
- document.addEventListener('weather-nourie:reset',()=>{selectedTime='now';index=0;renderSelection();});
+ document.addEventListener('weather-nourie:reset',()=>{
+  data={rows:[],sources:[],zone:data.zone};selectedTime='now';index=0;geometry=null;
+  find('.explorer-selected-label').textContent='Waiting for this location’s forecast';find('.explorer-reading').textContent='';find('.explorer-condition').textContent='';find('.explorer-when').textContent='';find('.explorer-legend').innerHTML='';find('.explorer-model-readings').hidden=true;slider.value='0';slider.max='0';renderTabs();draw();
+ });
  window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(draw,120);});
  if(globalThis.__weatherNourieForecast)update(globalThis.__weatherNourieForecast);else{renderTabs();draw();}
 }

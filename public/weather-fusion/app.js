@@ -1,5 +1,5 @@
 import {installWeatherPlayback} from './weather-playback.js?v=forecast-studio-v1';
-import {installForecastExplorer} from './forecast-explorer.js?v=forecast-studio-v1';
+import {installForecastExplorer} from './forecast-explorer.js?v=forecast-studio-v2';
 import {installCustomForecast} from './custom-forecast.js?v=forecast-studio-v1';
 import {rainTiming,rainTimingHTML} from './rain-timing.js?v=current-rain-20261017-v3';
 import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText,rebindDanTake} from './dans-take.js?v=audit-20261017-v1';
