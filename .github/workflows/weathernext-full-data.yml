@@ -7,6 +7,7 @@ on:
       - public/weather-fusion/weathernext-catalog.json
       - .github/workflows/weathernext-full-data.yml
       - scripts/test_weathernext_collection.py
+      - scripts/publish_weathernext_data.sh
   schedule:
     # Main 00/06/12/18 UTC runs reach BigQuery about 8h10m later.
     # Leave publication margin; GitHub may delay scheduled jobs.
@@ -42,22 +43,17 @@ jobs:
           git -C "$DATA" config user.name 'github-actions[bot]'
           git -C "$DATA" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           echo "WEATHER_DATA_DIR=$DATA" >> "$GITHUB_ENV"
-      - name: Collect bounded field batches and measure actual billing
+      - name: Collect the latest main surface run in smaller bounded batches
+        id: surface
         run: |
-          python -u scripts/weather_weathernext_site_collect.py --table homeassist-470415.weathernext_3.weathernext_3_0_0_0p1deg --output "$WEATHER_DATA_DIR/models/weathernext-full.json" --max-bytes-per-query 700000000000
+          python -u scripts/weather_weathernext_site_collect.py --table homeassist-470415.weathernext_3.weathernext_3_0_0_0p1deg --output "$WEATHER_DATA_DIR/models/weathernext-full.json" --max-bytes-per-query 700000000000 --profile surface --billing-state "$RUNNER_TEMP/weathernext-billing.json"
+      - name: Publish verified main forecast before optional collection
+        if: always() && env.WEATHER_DATA_DIR != ''
+        run: bash scripts/publish_weathernext_data.sh
+      - name: Collect optional station and interim runs within the same billing budget
+        if: steps.surface.outcome == 'success'
+        run: |
+          python -u scripts/weather_weathernext_site_collect.py --table homeassist-470415.weathernext_3.weathernext_3_0_0_0p1deg --output "$WEATHER_DATA_DIR/models/weathernext-full.json" --max-bytes-per-query 700000000000 --profile all --billing-state "$RUNNER_TEMP/weathernext-billing.json"
       - name: Preserve verified feed or cost-stop marker even after a failed collection
         if: always() && env.WEATHER_DATA_DIR != ''
-        run: |
-          cd "$WEATHER_DATA_DIR"
-          for FILE in models/weathernext-full.json models/weathernext-full-cost-stop.json; do
-            if test -f "$FILE"; then git add -- "$FILE"; fi
-          done
-          git diff --cached --quiet && exit 0
-          git commit -m 'Update standalone WeatherNext feed and billing safety status'
-          for attempt in 1 2 3 4 5; do
-            git fetch origin weather-fusion-data
-            git rebase FETCH_HEAD
-            if git push origin HEAD:weather-fusion-data; then exit 0; fi
-            sleep 3
-          done
-          exit 1
+        run: bash scripts/publish_weathernext_data.sh

@@ -66,4 +66,65 @@ class CollectorTests(unittest.TestCase):
   with tempfile.TemporaryDirectory() as folder:
    path=Path(folder)/'stop.json';path.write_text('{}')
    with self.assertRaises(collector.CostStop):collector.Queries(None,path,700000000000)
+ def test_smaller_point_batches_preserve_every_requested_statistic(self):
+  import sys,types
+  fields=['temperature_2m_'+stat for stat in collector.STATS]+['dewpoint_temperature_2m_mean']
+  queries=[]
+  class Row(dict):
+   __getattr__=dict.__getitem__
+  class Query:
+   def run(self,sql,params):
+    columns=collector.re.findall(r'f\.`([^`]+)` AS',sql);queries.append(columns)
+    self_params=dict((p[0],p[2]) for p in params)
+    if self_params['cell_half_width']!=.05 or self_params['radius_meters']!=8000:raise AssertionError('Wrong native surface cell geometry')
+    if 'geography_polygon' in sql:raise AssertionError('Point collection must not scan the large polygon column')
+    if 'ST_X(t.geography) BETWEEN' not in sql or 'ST_Y(t.geography) BETWEEN' not in sql:raise AssertionError('The selected point must stay within its native grid cell')
+    return [Row(valid_time=datetime(2026,10,14,1,tzinfo=timezone.utc),lead_hours=1,grid_lat=35.8,grid_lon=-78.5,**{c:290 for c in columns})]
+  fake=types.SimpleNamespace(ScalarQueryParameter=lambda *args:args)
+  with patch.dict(sys.modules,{'google.cloud.bigquery':fake,'google.cloud':types.SimpleNamespace(bigquery=fake)}):
+   point=collector.query_point(Query(),TABLE,datetime(2026,10,14,tzinfo=timezone.utc),collector.POINTS[0],fields)
+  self.assertTrue(all(len(batch)<=3 for batch in queries));self.assertEqual(sum(queries,[]),fields)
+  self.assertEqual(set(point['hourly'][0]['values']['temperature_2m']),set(collector.STATS))
+  self.assertEqual(point['hourly'][0]['values']['dewpoint_temperature_2m']['mean'],290)
+ def test_verified_main_run_survives_optional_collection_cost_stop(self):
+  run=datetime(2026,10,14,tzinfo=timezone.utc);published=[];calls=[]
+  surface={'runAt':collector.iso(run),'status':'ready','points':[{'id':'knightdale','hourly':[{'time':NOW}]}]}
+  def collect(query,table,initialization,grid,*args):
+   calls.append(grid)
+   if grid=='station':raise collector.CostStop('budget')
+   return copy.deepcopy(surface)
+  with patch.object(collector,'collect',collect):
+   with self.assertRaises(collector.CostStop):
+    collector.refresh_sources(None,TABLE,run,run,{'fields':[]},{},NOW,lambda s,w:published.append(copy.deepcopy(s)))
+  self.assertEqual(calls,['surface','station']);self.assertGreaterEqual(len(published),1)
+  self.assertEqual(published[-1]['surface'],surface)
+ def test_surface_phase_does_not_wait_for_optional_grids(self):
+  run=datetime(2026,10,14,tzinfo=timezone.utc);calls=[]
+  def collect(*args):calls.append(args[3]);return {'runAt':collector.iso(run),'status':'ready'}
+  with patch.object(collector,'collect',collect):
+   collector.refresh_sources(None,TABLE,run,run,{'fields':[]},{},NOW,lambda *args:None,profile='surface')
+  self.assertEqual(calls,['surface'])
+ def test_billing_ledger_carries_actual_usage_across_both_workflow_phases(self):
+  import tempfile,sys,types,json
+  class Client:
+   def query(self,sql,job_config,location):
+    return types.SimpleNamespace(total_bytes_processed=100,total_bytes_billed=150_000_000,job_id='test',cache_hit=False,result=lambda **kw:[])
+  fake=types.SimpleNamespace(QueryJobConfig=lambda **kw:types.SimpleNamespace(**kw))
+  with tempfile.TemporaryDirectory() as folder,patch.dict(sys.modules,{'google.cloud.bigquery':fake,'google.cloud':types.SimpleNamespace(bigquery=fake)}):
+   stop=Path(folder)/'stop.json';ledger=Path(folder)/'billing.json'
+   collector.Queries(Client(),stop,700000000000,ledger).run('test')
+   second=collector.Queries(Client(),stop,700000000000,ledger);second.run('test')
+   self.assertEqual(second.billed,300_000_000);self.assertEqual(json.loads(ledger.read_text())['runBilledBytes'],300_000_000)
+   self.assertFalse(stop.exists(),'the original per-query cap still applies separately to each small query')
+ def test_original_actual_billing_stop_limits_remain_enforced(self):
+  import tempfile,sys,types,json
+  class Client:
+   def query(self,sql,job_config,location):
+    return types.SimpleNamespace(total_bytes_processed=100,total_bytes_billed=256_901_120,job_id='test',cache_hit=False,result=lambda **kw:[])
+  fake=types.SimpleNamespace(QueryJobConfig=lambda **kw:types.SimpleNamespace(**kw))
+  with tempfile.TemporaryDirectory() as folder,patch.dict(sys.modules,{'google.cloud.bigquery':fake,'google.cloud':types.SimpleNamespace(bigquery=fake)}):
+   stop=Path(folder)/'stop.json';ledger=Path(folder)/'billing.json'
+   with self.assertRaises(collector.CostStop):collector.Queries(Client(),stop,700000000000,ledger).run('test')
+   self.assertEqual(json.loads(stop.read_text())['billedBytes'],256_901_120)
+   with self.assertRaises(collector.CostStop):collector.Queries(None,stop,700000000000,ledger)
 if __name__=='__main__':unittest.main()

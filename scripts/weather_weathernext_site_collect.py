@@ -9,6 +9,9 @@ from datetime import datetime,timezone
 from pathlib import Path
 STATS=('mean','p10','p25','p50','p75','p90')
 SCHEMA='weather-nourie-weathernext-site-v1'
+POINT_COLUMN_BATCH_SIZE=3
+QUERY_BILLING_LIMIT_BYTES=250_000_000
+RUN_BILLING_LIMIT_BYTES=50_000_000_000
 POINTS=[{'id':'knightdale','name':'Knightdale / Raleigh, NC','latitude':35.787,'longitude':-78.4806,'timeZone':'America/New_York'},{'id':'greenville','name':'Greenville, NC','latitude':35.6127,'longitude':-77.3664,'timeZone':'America/New_York'},{'id':'hazen','name':'Hazen, ND','latitude':47.2944,'longitude':-101.6227,'timeZone':'America/North_Dakota/Beulah'}]
 class CostStop(RuntimeError):pass
 class EstimateCeiling(RuntimeError):pass
@@ -31,9 +34,11 @@ def available_columns(schema):
  return {x.name for x in f.fields}
 
 class Queries:
- def __init__(self,client,stop_path,estimate_cap):
-  self.client=client;self.stop_path=stop_path;self.estimate_cap=estimate_cap;self.billed=0
+ def __init__(self,client,stop_path,estimate_cap,billing_state=None):
+  self.client=client;self.stop_path=stop_path;self.estimate_cap=estimate_cap;self.billing_state=Path(billing_state) if billing_state else None
+  self.billed=json.loads(self.billing_state.read_text())['runBilledBytes'] if self.billing_state and self.billing_state.exists() else 0
   if stop_path.exists():raise CostStop('Automatic collection paused by the saved cost-stop record; review it before resuming.')
+  if not isinstance(self.billed,int) or self.billed<0 or self.billed>RUN_BILLING_LIMIT_BYTES:raise CostStop('Shared collection billing ledger is invalid or already exceeds the run limit.')
  def run(self,sql,params=(),discovery=False):
   from google.cloud import bigquery
   cfg=bigquery.QueryJobConfig(query_parameters=list(params),dry_run=True,use_query_cache=True)
@@ -44,10 +49,13 @@ class Queries:
   cfg.dry_run=False;cfg.maximum_bytes_billed=cap
   job=self.client.query(sql,job_config=cfg,location='US');rows=list(job.result(timeout=180))
   billed=job.total_bytes_billed or 0;self.billed+=billed
+  if self.billing_state:
+   self.billing_state.parent.mkdir(parents=True,exist_ok=True)
+   tmp=self.billing_state.with_suffix('.tmp');tmp.write_text(json.dumps({'runBilledBytes':self.billed})+'\n');tmp.replace(self.billing_state)
   print(json.dumps({'job':job.job_id,'estimatedBytes':estimate,'billedBytes':billed,'runBilledBytes':self.billed,'rows':len(rows),'cacheHit':job.cache_hit}),flush=True)
   # Spatial clustering's pre-execution estimate is an upper bound. Stop further
   # requests if actual billing disproves the expected small geographic scan.
-  if (not discovery and billed>250_000_000) or self.billed>50_000_000_000:
+  if (not discovery and billed>QUERY_BILLING_LIMIT_BYTES) or self.billed>RUN_BILLING_LIMIT_BYTES:
    self.stop_path.parent.mkdir(parents=True,exist_ok=True)
    self.stop_path.write_text(json.dumps({'pausedAt':iso(datetime.now(timezone.utc)),'job':job.job_id,'billedBytes':billed,'runBilledBytes':self.billed,'reason':'Actual query billing exceeded the automatic collection safety threshold.'})+'\n')
    raise CostStop('Actual billing exceeded safety threshold. Further automatic collection has been paused.')
@@ -65,16 +73,18 @@ def latest_runs(q,table):
 
 def query_point(q,table,run,point,columns):
  from google.cloud import bigquery
- params=[bigquery.ScalarQueryParameter('init_time','TIMESTAMP',run),bigquery.ScalarQueryParameter('longitude','FLOAT64',point['longitude']),bigquery.ScalarQueryParameter('latitude','FLOAT64',point['latitude'])]
+ half_width=.025 if table.endswith('_0p05deg') else .05
+ params=[bigquery.ScalarQueryParameter('init_time','TIMESTAMP',run),bigquery.ScalarQueryParameter('longitude','FLOAT64',point['longitude']),bigquery.ScalarQueryParameter('latitude','FLOAT64',point['latitude']),bigquery.ScalarQueryParameter('cell_half_width','FLOAT64',half_width),bigquery.ScalarQueryParameter('radius_meters','FLOAT64',4000 if half_width==.025 else 8000)]
  merged={};grid=None
- batches=[columns[i:i+6] for i in range(0,len(columns),6)]
+ batches=[columns[i:i+POINT_COLUMN_BATCH_SIZE] for i in range(0,len(columns),POINT_COLUMN_BATCH_SIZE)]
  while batches:
   batch=batches.pop(0);selected=','.join(f'f.`{c}` AS `{c}`' for c in batch)
   sql=f'''SELECT f.time AS valid_time,f.hours AS lead_hours,ST_X(t.geography) AS grid_lon,ST_Y(t.geography) AS grid_lat,{selected}
  FROM `{validate_table(table)}` AS t,UNNEST(t.forecast) AS f
  WHERE t.init_time=@init_time
- AND ST_DWITHIN(t.geography,ST_GEOGPOINT(@longitude,@latitude),15000)
- AND ST_INTERSECTS(t.geography_polygon,ST_GEOGPOINT(@longitude,@latitude))
+ AND ST_DWITHIN(t.geography,ST_GEOGPOINT(@longitude,@latitude),@radius_meters)
+ AND ST_X(t.geography) BETWEEN @longitude-@cell_half_width AND @longitude+@cell_half_width
+ AND ST_Y(t.geography) BETWEEN @latitude-@cell_half_width AND @latitude+@cell_half_width
  AND f.hours BETWEEN 1 AND 360
  QUALIFY ROW_NUMBER() OVER(PARTITION BY f.time ORDER BY ST_DISTANCE(t.geography,ST_GEOGPOINT(@longitude,@latitude)))=1
  ORDER BY f.time'''
@@ -130,31 +140,46 @@ def collect(q,table,run,grid,fields,previous,now):
  points=[query_point(q,table,run,p,cols) for p in POINTS]
  return mark_freshness({'status':'ready','runAt':iso(run),'fetchedAt':now,'checkedAt':now,'sourceTable':table,'gridResolutionDegrees':.05 if grid=='station' else .1,'fields':present,'missingFields':[n for n in expected if n not in present],'statisticColumns':cols,'horizonHours':max(r['forecastHour'] for p in points for r in p['hourly']),'points':points},now)
 
+def refresh_sources(q,table,run,newest,catalog,previous,now,checkpoint,profile='all'):
+ prev=previous.get('sources',{});station=table.replace('_0p1deg','_0p05deg')
+ sources={key:copy.deepcopy(value) for key,value in prev.items() if key in ('station','interimSurface','interimStation')}
+ sources['surface']=collect(q,table,run,'surface',catalog['fields'],prev.get('surface'),now)
+ if prev.get('surface',{}).get('runAt') and prev['surface']['runAt']!=iso(run):sources['previousSurface']=copy.deepcopy(prev['surface'])
+ elif prev.get('previousSurface'):sources['previousSurface']=copy.deepcopy(prev['previousSurface'])
+ warnings=[]
+ # Preserve a fully verified main run before optional grids or interim runs.
+ checkpoint(sources,warnings)
+ if profile=='surface':return sources,warnings
+ for id,t,grid,r in [('station',station,'station',run),('interimSurface',table,'surface',newest),('interimStation',station,'station',newest)]:
+  try:
+   if id.startswith('interim') and newest<=run:sources[id]={'status':'not-newer','message':'Main is also the newest initialization.'}
+   else:sources[id]=collect(q,t,r,grid,catalog['fields'],prev.get(id),now)
+  except CostStop:
+   checkpoint(sources,warnings+['Optional collection paused at the billing safety limit; the verified main forecast is preserved.'])
+   raise
+  except Exception as e:
+   msg=type(e).__name__+': '+str(e)[:300];warnings.append(id+': '+msg)
+   sources[id]={**prev[id],'status':'last-verified','refreshWarning':msg,'checkedAt':now} if prev.get(id,{}).get('points') else {'status':'unavailable','message':msg,'checkedAt':now}
+  checkpoint(sources,warnings)
+ return sources,warnings
+
 def main():
  from google.cloud import bigquery
  ap=argparse.ArgumentParser();ap.add_argument('--table',required=True);ap.add_argument('--output',required=True)
- ap.add_argument('--max-bytes-per-query',type=int,default=400_000_000_000,help='Pessimistic pre-execution ceiling for each six-column batch; actual-billing safety stops also apply.')
+ ap.add_argument('--max-bytes-per-query',type=int,default=400_000_000_000,help='Pessimistic pre-execution ceiling for each small column batch; actual-billing safety stops also apply.')
+ ap.add_argument('--profile',choices=('surface','all'),default='all')
+ ap.add_argument('--billing-state',help='Shared local billing ledger for all collection phases in this workflow run.')
  a=ap.parse_args();table=validate_table(a.table);station=table.replace('_0p1deg','_0p05deg');out=Path(a.output)
  catalog=json.loads((Path(__file__).resolve().parents[1]/'public/weather-fusion/weathernext-catalog.json').read_text());previous={}
  if out.exists():
   try:previous=json.loads(out.read_text())
   except (ValueError,OSError):pass
- prev=previous.get('sources',{});now=iso(datetime.now(timezone.utc));q=Queries(bigquery.Client(),out.with_name('weathernext-full-cost-stop.json'),a.max_bytes_per_query)
+ now=iso(datetime.now(timezone.utc));q=Queries(bigquery.Client(),out.with_name('weathernext-full-cost-stop.json'),a.max_bytes_per_query,a.billing_state)
  run,newest=latest_runs(q,table)
- sources={'surface':collect(q,table,run,'surface',catalog['fields'],prev.get('surface'),now)}
- if prev.get('surface',{}).get('runAt') and prev['surface']['runAt']!=iso(run):sources['previousSurface']=prev['surface']
- elif prev.get('previousSurface'):sources['previousSurface']=prev['previousSurface']
- warnings=[]
- for id,t,grid,r in [('station',station,'station',run),('interimSurface',table,'surface',newest),('interimStation',station,'station',newest)]:
-  try:
-   if id.startswith('interim') and newest<=run:sources[id]={'status':'not-newer','message':'Main is also the newest initialization.'};continue
-   sources[id]=collect(q,t,r,grid,catalog['fields'],prev.get(id),now)
-  except CostStop:raise
-  except Exception as e:
-   msg=type(e).__name__+': '+str(e)[:300];warnings.append(id+': '+msg)
-   sources[id]={**prev[id],'status':'last-verified','refreshWarning':msg,'checkedAt':now} if prev.get(id,{}).get('points') else {'status':'unavailable','message':msg,'checkedAt':now}
- for source in sources.values():mark_freshness(source,now)
- payload={'schema':SCHEMA,'model':'Google WeatherNext 3','generatedAt':now,'latestPublishedMainRun':iso(run),'latestPublishedRun':iso(newest),'ensembleMembers':64,'comparisonOnly':True,'timeStepHours':1,'points':POINTS,'sources':sources,'warnings':warnings,'sourceDocumentation':catalog['source'],'scope':'All available BigQuery surface statistics for published locations. Raw trajectories, upper-air and native six-hour products require the separate Google Cloud Storage feed.','rawUnits':{'temperature':'K','wind':'m/s','precipitation':'m per preceding hour','cloud':'fraction','pressure':'Pa','solar':'J/m² per preceding hour'},'collectionBytesBilled':q.billed}
- out.parent.mkdir(parents=True,exist_ok=True);tmp=out.with_suffix('.tmp');tmp.write_text(json.dumps(payload,separators=(',',':'),allow_nan=False)+'\n');tmp.replace(out)
+ def checkpoint(sources,warnings):
+  for source in sources.values():mark_freshness(source,now)
+  payload={'schema':SCHEMA,'model':'Google WeatherNext 3','generatedAt':now,'latestPublishedMainRun':iso(run),'latestPublishedRun':iso(newest),'ensembleMembers':64,'comparisonOnly':True,'timeStepHours':1,'points':POINTS,'sources':sources,'warnings':warnings,'sourceDocumentation':catalog['source'],'scope':'All available BigQuery surface statistics for published locations. Raw trajectories, upper-air and native six-hour products require the separate Google Cloud Storage feed.','rawUnits':{'temperature':'K','wind':'m/s','precipitation':'m per preceding hour','cloud':'fraction','pressure':'Pa','solar':'J/m² per preceding hour'},'collectionBytesBilled':q.billed}
+  out.parent.mkdir(parents=True,exist_ok=True);tmp=out.with_suffix('.tmp');tmp.write_text(json.dumps(payload,separators=(',',':'),allow_nan=False)+'\n');tmp.replace(out)
+ sources,warnings=refresh_sources(q,table,run,newest,catalog,previous,now,checkpoint,a.profile)
  print(json.dumps({'published':str(out),'bytesBilled':q.billed,'sources':{k:{'status':v['status'],'fields':len(v.get('fields',[])),'hours':v.get('horizonHours')} for k,v in sources.items()},'warnings':warnings}))
 if __name__=='__main__':main()
