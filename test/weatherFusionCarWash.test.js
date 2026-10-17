@@ -136,17 +136,17 @@ test('visible car-wash chance matches Remainder of Today including overnight rai
 });
 
 test('visible car-wash chance uses the full-day high rather than the daytime-only peak',()=>{
-  const forecast=fixture([2,0,0,0,0,0,0]);
+  const forecast=fixture([6,0,0,0,0,0,0]);
   forecast.days[0].popDayLikelihood={value:1};
-  forecast.days[0].popNightLikelihood={value:2};
+  forecast.days[0].popNightLikelihood={value:6};
   const summary=carWashSummary(forecast,Date.parse('2026-09-12T08:00:00Z'));
   const html=carWashHTML(summary);
   const firstCard=html.match(/<article class="car-wash-day"[\s\S]*?<\/article>/)?.[0]||'';
-  assert.equal(summary.chance,2);
-  assert.equal(summary.days[0].chance,2);
-  assert.equal(summary.decisions[0].chance,2);
-  assert.match(html,/class="car-wash-fact good"[\s\S]*?<b>2%<\/b><small>Rain chance<\/small>/);
-  assert.match(firstCard,/class="car-wash-chance">💧 2%<\/span>/);
+  assert.equal(summary.chance,6);
+  assert.equal(summary.days[0].chance,6);
+  assert.equal(summary.decisions[0].chance,6);
+  assert.match(html,/class="car-wash-fact good"[\s\S]*?<b>6%<\/b><small>Rain chance<\/small>/);
+  assert.match(firstCard,/class="car-wash-chance">💧 6%<\/span>/);
   assert.doesNotMatch(firstCard,/💧 1%/);
 });
 

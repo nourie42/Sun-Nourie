@@ -162,5 +162,6 @@ test('unavailable canonical rain never silently changes to the NWS percentage or
  assert.equal(todaySkyProfile(f.days[0]).pop,null);assert.equal(todaySkyProfile(f.days[0],true).pop,null);
  assert.doesNotMatch(hourlyRainHTML({pop:80,rainLikelihood:{value:null}}),/>80%</);
  assert.match(hourlyRainHTML({pop:80,rainLikelihood:{value:null}}),/>—<\/small>/);
- assert.match(hourlyRainHTML({pop:80,rainLikelihood:{value:0}}),/>0%</);
+ assert.match(hourlyRainHTML({pop:80,rainLikelihood:{value:0}}),/aria-hidden="true"/);
+ assert.doesNotMatch(hourlyRainHTML({pop:80,rainLikelihood:{value:0}}),/0%|80%/);
 });
