@@ -117,6 +117,7 @@ export function renderComfort(forecast) {
  const tile=$('skin-exposure');tile.dataset.preview=sample.now?'current':'forecast';tile.dataset.weather=weatherState(sample.condition).kind;
  tile.querySelector('.comfort-weather-art')?.remove();
  document.querySelectorAll('#hourly [data-comfort-time]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.comfortTime===(sample.now?'now':sample.id))));
+ document.dispatchEvent(new CustomEvent('weather-nourie:hour',{detail:{time:sample.now?'now':sample.id}}));
  if($('comfort-extra-science'))$('comfort-extra-science').innerHTML=`<p>${esc(sampleCaption(sample,zone))}</p><p>Shade and outdoors are modeled feels-like temperatures from the same weather inputs. The outdoor reading matches this hour in the hourly forecast; shade excludes the direct-sun estimate. The sidewalk and asphalt readings are estimated surface temperatures, not air temperature or human feels-like. Clothing uses this selected hour's outdoor feels-like estimate. Snow scenes require snow at the selected hour; a snow chance later in the day does not change the current scene. Cold paw guidance applies to snow or cold conditions at this hour.</p>`;
  if($('pavement-current-science'))$('pavement-current-science').innerHTML=pavementDetailsHTML(pavement);
  $('skin-science').textContent=`${c.method}. ${sampleCaption(sample,zone)}. Air ${degrees(sample.temperature)}; dew point ${degrees(sample.inputs.dewpoint)}; wind ${number(sample.inputs.wind)} mph${finite(sample.inputs.gust)?`; gust ${number(sample.inputs.gust)} mph`:''}. ${c.note} Current observations and future forecasts are different sources; the Now card uses exactly the same observation as the hero. The modeled equivalent temperature can be below the air temperature or dew point. Sustained wind is used; gusts do not switch the calculation or impose a display floor.`;
@@ -278,6 +279,7 @@ export function openMetric(key) {
 }
 export function resetExperience() {
   data=null;active=null;comfortPreview=null;
+  document.dispatchEvent(new CustomEvent('weather-nourie:reset'));
   if($('pavement-current-science'))$('pavement-current-science').textContent='Waiting for this location’s surface estimate.';
   if($('comfort-extra-science'))$('comfort-extra-science').textContent='Waiting for this location’s weather.';
  if($('today-forecast'))$('today-forecast').innerHTML='<p class="muted">Daily data is loading.</p>';

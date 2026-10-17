@@ -126,3 +126,6 @@ html body .weather-jump-nav>.weather-jump-card .jump-label{display:block;font-fa
 html body .weather-jump-nav>.weather-jump-card:focus-visible{outline:2px solid #b8dfff;outline-offset:3px}
 @media(max-width:800px){html body .weather-jump-nav{grid-template-columns:repeat(4,minmax(0,1fr))!important;max-width:320px}}
 @media(max-width:359px){html body .weather-jump-nav>.weather-jump-card{font-size:11px!important}}
+
+/* The forecast builder is a compact full-label tab below the existing tools. */
+html body .weather-jump-nav>.jump-custom-forecast{grid-column:1 / -1;justify-self:center;width:max-content;max-width:100%;padding-inline:16px}

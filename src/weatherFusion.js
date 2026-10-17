@@ -761,6 +761,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     'ultimate.html','ultimate.css','ultimate.js',
     'atmos.html','atmos.css','atmos.js','atmos-model.js','atmos-sky.js','archivo-latin-wdth-normal.woff2',
     'experimental-sky.js',
+    'weather-playback.js','weather-playback.css','forecast-explorer.js','forecast-explorer.css','custom-forecast.js','custom-forecast.css',
     'comfort-cinematic.css','comfort-effects.css','comfort-outlook.js','current-inputs.js','current-temperature.js',
     'daily-uv.js','dans-summary.js','dans-take.js','day-graph.js','dewpoint-meter.js','dewpoint-meter.css',
     'experience.js','exposure-scene.js','comfort-clothing.js','snow-outlook.js','winter-outlook.css','forecast-cards.css','forecast-confidence.js','forecast-layout.css','forecast-story.js','outlook-details.js',

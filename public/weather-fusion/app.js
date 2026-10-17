@@ -1,3 +1,6 @@
+import {installWeatherPlayback} from './weather-playback.js?v=forecast-studio-v1';
+import {installForecastExplorer} from './forecast-explorer.js?v=forecast-studio-v1';
+import {installCustomForecast} from './custom-forecast.js?v=forecast-studio-v1';
 import {rainTiming,rainTimingHTML} from './rain-timing.js?v=current-rain-20261017-v3';
 import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText,rebindDanTake} from './dans-take.js?v=audit-20261017-v1';
 import {danCard,danTakeDisplay} from './dans-summary.js?v=current-rain-20261017-v3';
@@ -7,7 +10,7 @@ import {weatherIcon,renderHourlyWeather,currentSample} from './weather-display.j
 import {dayGraphHTML,dayGraphPoints,installDayGraph} from './day-graph.js?v=low-rain-display-v1';
 import {degrees,feelsAt,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=current-rain-20261017-v3';
 import {createFramePlayer} from './frame-player.js';
-import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=low-rain-display-v1';
+import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=forecast-studio-v1';
 import {dailyDisplay} from './weather-math.js?v=current-rain-20261017-v3';
 import {conditionForRainChance} from './weather-state.js?v=current-rain-20261017-v3';
 import {currentHero} from './current-temperature.js?v=current-rain-20261017-v3';
@@ -630,6 +633,9 @@ setInterval(()=>{if(validPlace(place)&&!document.hidden){if(forecast)renderAlert
 setInterval(() => { if (validPlace(place)&&!document.hidden&&!busy&&forecastRefreshDue(forecast)) void load(); }, 60000);
 installExperience();
 startDeviceLocation();
+installWeatherPlayback();
+installForecastExplorer();
+installCustomForecast();
 
 // Expire passed discussion periods even while this page remains open.
 setInterval(()=>{if(currentBriefing&&forecast)renderBriefing(currentBriefing);},30000);
