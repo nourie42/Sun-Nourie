@@ -3,3 +3,5 @@
 .native-player-jump{gap:8px;flex-wrap:wrap}.native-player-jump :is(a,button){min-height:38px}
 
 .native-player-jump button{font-family:inherit;cursor:pointer}.native-player-jump button[aria-expanded=true]{background:#b1e9ff21;border-color:#b1ecff}
+
+#nourie-player.native-player-panel[hidden]{display:none}

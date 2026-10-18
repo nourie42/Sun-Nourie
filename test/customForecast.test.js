@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {customForecastInput,normalizeCustomWeights,changeCustomWeight,toggleCustomModel,customPresetWeights,blendCustomForecast,publishedForecastPreview,customForecastSummary,customCalendarComparison,customForecastNarrative} from '../public/weather-fusion/custom-forecast-model.js';
+import {customForecastInput,normalizeCustomWeights,changeCustomWeight,toggleCustomModel,customPresetWeights,blendCustomForecast,publishedForecastPreview,customForecastSummary,customCalendarComparison,customForecastNarrative,singleModelComparison} from '../public/weather-fusion/custom-forecast-model.js';
+import {modelComparisonPath,modelComparisonScale} from '../public/weather-fusion/custom-forecast.js';
 import {calendarDayWindow} from '../public/weather-fusion/calendar-day.js';
 
 const HOUR = 3600000;
@@ -281,4 +282,43 @@ test('Weather Nourie mode preserves actual published days even when static model
   for(const day of narrative.days){assert.equal(day.high.value,day.high.baseline);assert.equal(day.amount.value,day.amount.baseline);}
   assert.equal(published.hours[0].custom.amount.value,published.hours[0].baseline.amount);
   assert.equal(JSON.stringify(forecast),before,'the canonical page data remains untouched');
+});
+
+test('single-model selection compares one real source with exact published seven-calendar-day highs',()=>{
+  const {forecast,now}=calendarFixture();
+  const before=JSON.stringify(forecast),input=customForecastInput(forecast,now);
+  const initial=singleModelComparison(input);
+  assert.equal(initial.selectedId,null);
+  assert.equal(initial.selected.length,0);
+  assert.deepEqual(initial.baseline,input.calendarDays.map(day=>day.baseline.high));
+  const hrrr=singleModelComparison(input,'hrrr');
+  assert.deepEqual(hrrr.built.weights,{hrrr:100});
+  assert.equal(hrrr.baseline[1],70);
+  assert.equal(hrrr.selected[1],68);
+  assert.equal(hrrr.selected[2],null,'three cold overnight hours are not a daily high');
+  assert.equal(hrrr.days.length,7);
+  assert.match(hrrr.coverageNote,/Tuesday/);
+  assert.deepEqual(singleModelComparison(input,'gfs').selected,[],'an unavailable model does not invent a line');
+  assert.equal(JSON.stringify(forecast),before);
+});
+
+test('model graph keeps the published line visible independently of model coverage gaps',()=>{
+  const {forecast,now}=calendarFixture();
+  const input=customForecastInput(forecast,now),hrrr=singleModelComparison(input,'hrrr');
+  assert.equal(hrrr.baseline.at(-1),70);
+  assert.equal(hrrr.selected.at(-1),null);
+  assert.equal(modelComparisonPath([68,null,70],index=>index*10,value=>value),'M0.00,68.00M20.00,70.00');
+  const scale=modelComparisonScale([0,-4,0]);
+  assert.ok(scale.min< -4&&scale.max>0,'zero and negative high temperatures remain visible');
+});
+
+test('NVIDIA selection uses its own published source values and rainfall without inventing probabilities',()=>{
+  const {forecast,now}=calendarFixture();
+  for(const row of forecast.hours){row.temperatureBlend.sources.push({id:'wn',value:row.temperature+4});row.precipitationBlend.sourceValues.wn=.01;}
+  const result=singleModelComparison(customForecastInput(forecast,now),'wn');
+  assert.equal(result.label,'NVIDIA WeatherNext');
+  assert.equal(result.selected[1],74);
+  almost(result.days[1].amount.value,.24);
+  assert.equal(result.days[1].rain.value,null);
+  assert.match(result.narrative.highlights.map(change=>change.text).join(' '),/rainfall/);
 });

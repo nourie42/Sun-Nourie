@@ -1,123 +1,106 @@
-import {customForecastInput,customPresetWeights,blendCustomForecast,publishedForecastPreview,changeCustomWeight,toggleCustomModel,normalizeCustomWeights,customForecastNarrative} from './custom-forecast-model.js?v=pick-weather-simple-v2';
+import {customForecastInput,singleModelComparison} from './custom-forecast-model.js?v=pick-model-v3';
 
 const finite=value=>typeof value==='number'&&Number.isFinite(value);
 const esc=value=>String(value??'').replace(/[&<>"']/g,character=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
+const degrees=value=>finite(value)?`${Math.round(value)}°`:'Not covered';
+
+export function modelComparisonPath(values,x,y){
+  let result='',pen=false;
+  values.forEach((value,index)=>{if(!finite(value)){pen=false;return;}result+=`${pen?'L':'M'}${x(index).toFixed(2)},${y(value).toFixed(2)}`;pen=true;});
+  return result;
+}
+
+export function modelComparisonScale(values){
+  const known=values.filter(finite);
+  if(!known.length)return {min:0,max:100};
+  const low=Math.min(...known),high=Math.max(...known),pad=Math.max(3,(high-low)*.12);
+  return {min:Math.floor(low-pad),max:Math.ceil(high+pad)};
+}
 
 function panelHTML(){
-  return `<div class="cf-heading"><h2>Make your own forecast</h2><span>Your weights, your forecast</span></div>
-    <p class="cf-intro">Choose how much each model counts. We’ll explain what changes over the next seven days compared with Weather Nourie.</p>
-    <p class="cf-location"></p>
-    <p class="cf-loading" role="status">Choose a location to load its available models.</p>
+  return `<div class="cf-heading"><h2>Make your own weather</h2><p>Pick a model to compare its next seven days with Weather Nourie.</p></div>
+    <p class="cf-location"></p><p class="cf-loading" role="status">Choose a location to load its available models.</p>
     <div class="cf-content" hidden>
-      <fieldset class="cf-presets"><legend>Start from</legend><div>
-        <button type="button" class="cf-preset" data-preset="nourie">Weather Nourie</button>
-        <button type="button" class="cf-preset" data-preset="nws">Just the NWS</button>
-        <button type="button" class="cf-preset" data-preset="models">Models only</button>
-        <button type="button" class="cf-preset" data-preset="european">Lean on the European</button>
-        <button type="button" class="cf-preset" data-preset="ai">Lean on the AI</button>
-      </div></fieldset>
-      <div class="cf-model-head"><h3>Your model shares</h3><span class="cf-weight-total">100% total</span></div>
-      <div class="cf-models"></div>
-      <p class="cf-selection-note">Changing one share adjusts the others to total 100%.</p>
-      <div class="cf-result" aria-live="polite" aria-atomic="true"><p class="cf-result-summary"></p><ul class="cf-highlights"></ul></div>
-      <details class="cf-days"><summary>See all seven days</summary><div class="cf-day-results"></div></details>
-      <p class="cf-method">If a model runs out, its share moves to your other selected models. A daily high or rainfall total needs every hour of that period. Today ends at midnight.</p>
-      <p class="cf-probability-note">Rain chance comes from NWS when selected; the other models change temperature and rainfall amounts.</p>
+      <div class="cf-model-buttons" role="group" aria-label="Choose a forecast model"></div>
+      <div class="cf-chart-panel"><h3>Daily high temperature</h3><div class="cf-legend"></div><div class="cf-chart"></div></div>
+      <div class="cf-result" aria-live="polite" aria-atomic="true"><p class="cf-result-summary"></p><ul class="cf-highlights"></ul><p class="cf-coverage-note"></p></div>
+      <p class="cf-method">Today shows the remaining hours through midnight. A model needs every hour of a date to show a daily high or rainfall total.</p>
     </div>`;
 }
 
-/** Receives the page's existing snapshot. Your selection changes only this preview. */
+/** This view only reads the existing snapshot; selecting a model never changes it. */
 export function createCustomForecast({root,now=Date.now}={}){
   if(!root)return {render(){},reset(){},destroy(){}};
-  let input=null,built=null,weights={},locationKey='',preset='nourie';
+  let input=null,comparison=null,selectedId=null,locationKey='';
   root.innerHTML=panelHTML();
   const $=selector=>root.querySelector(selector);
 
-  function renderModels(){
-    $('.cf-models').innerHTML=input.models.filter(model=>model.available).map(model=>{
-      const value=weights[model.id]||0,on=value>0;
-      return `<div class="cf-model" data-model-row="${model.id}"><label class="cf-model-name" title="${esc(model.description)}"><input type="checkbox" class="cf-model-toggle" data-model="${model.id}" ${on?'checked':''}><span>${esc(model.label)}</span></label><input class="cf-weight-range" data-model="${model.id}" type="range" min="0" max="100" step="1" value="${value}" aria-label="${esc(model.label)} percentage" ${on?'':'disabled'}><label class="cf-weight-number-label"><input class="cf-weight-number" data-model="${model.id}" type="number" inputmode="numeric" min="0" max="100" step="1" value="${value}" aria-label="${esc(model.label)} percentage, numeric" ${on?'':'disabled'}><span>%</span></label></div>`;
-    }).join('');
-    const available=new Set(input.models.filter(model=>model.available).map(model=>model.id));
-    $('.cf-preset[data-preset="nws"]').hidden=!available.has('nws');
-    $('.cf-preset[data-preset="models"]').hidden=![...available].some(id=>id!=='nws');
-    $('.cf-preset[data-preset="european"]').hidden=!available.has('ecmwf');
-    $('.cf-preset[data-preset="ai"]').hidden=!available.has('wn');
-    syncControls();
+  function renderButtons(){
+    const button=(id,label,color)=>`<button type="button" class="cf-model-button" data-model="${id}" aria-pressed="${String((selectedId||'nourie')===id)}" style="--cf-model-color:${color}">${esc(label)}</button>`;
+    $('.cf-model-buttons').innerHTML=button('nourie','Weather Nourie','#ffffff')+input.models.filter(model=>model.available).map(model=>button(model.id,model.label,model.color)).join('');
   }
 
-  function syncControls(except=null){
-    for(const model of input.models.filter(model=>model.available)){
-      const value=weights[model.id]||0;
-      for(const control of root.querySelectorAll(`[data-model="${model.id}"]`)){
-        if(control.classList.contains('cf-model-toggle'))control.checked=value>0;
-        else{control.disabled=value<=0;if(control!==except)control.value=value;}
-      }
+  function chartHTML(){
+    const {days,baseline,selected}=comparison;
+    const W=Math.max(260,Math.min(680,$('.cf-chart').clientWidth||root.clientWidth-40||680)),H=245,left=35,right=20,top=24,bottom=48;
+    const x=index=>left+(W-left-right)*index/Math.max(1,days.length-1);
+    const scale=modelComparisonScale([...baseline,...selected]);
+    const y=value=>H-bottom-(H-top-bottom)*(value-scale.min)/(scale.max-scale.min);
+    const descriptions=days.map((day,index)=>`${day.today?'Remaining today':day.label}: Weather Nourie ${degrees(baseline[index])}${comparison.selectedId?`, ${comparison.label} ${degrees(selected[index])}`:''}.`).join(' ');
+    let content=`<title>Seven-day high temperature comparison</title><desc>${esc(descriptions)} Missing full-day model coverage appears as a gap.</desc>`;
+    for(let index=0;index<=4;index++){
+      const value=scale.min+(scale.max-scale.min)*index/4;
+      content+=`<line x1="${left}" y1="${y(value)}" x2="${W-right}" y2="${y(value)}" class="cf-grid"/><text x="${left-7}" y="${y(value)+4}" text-anchor="end">${Math.round(value)}°</text>`;
     }
-    const total=Object.values(weights).reduce((sum,value)=>sum+value,0);
-    $('.cf-weight-total').textContent=total?`${total}% total`:'Choose a model';
-    $('.cf-selection-note').textContent=total?'Changing one share adjusts the others to total 100%.':'Select at least one available model.';
-    for(const button of root.querySelectorAll('.cf-preset'))button.setAttribute('aria-pressed',String(button.dataset.preset===preset));
+    content+=`<text x="${left}" y="12">°F</text><path d="${modelComparisonPath(baseline,x,y)}" class="cf-line cf-line-nourie"/>`;
+    if(comparison.selectedId)content+=`<path d="${modelComparisonPath(selected,x,y)}" class="cf-line cf-line-model" style="stroke:${comparison.color}"/>`;
+    days.forEach((day,index)=>{
+      const date=new Date(`${day.date}T12:00:00Z`),weekday=day.today?'Today':new Intl.DateTimeFormat('en-US',{timeZone:'UTC',weekday:'short'}).format(date);
+      const dateLabel=new Intl.DateTimeFormat('en-US',{timeZone:'UTC',month:'numeric',day:'numeric'}).format(date);
+      const anchor='middle';
+      content+=`<g class="cf-day-point" data-date="${day.date}" data-baseline="${finite(baseline[index])?baseline[index]:''}" data-model-value="${finite(selected[index])?selected[index]:''}"><title>${esc(descriptions.split('. ')[index]||`${day.label}: ${degrees(baseline[index])}`)}</title>`;
+      if(finite(baseline[index]))content+=`<circle cx="${x(index)}" cy="${y(baseline[index])}" r="3.5" class="cf-dot cf-dot-nourie"/>`;
+      if(finite(selected[index]))content+=`<circle cx="${x(index)}" cy="${y(selected[index])}" r="4.5" class="cf-dot cf-dot-model" style="fill:${comparison.color}"/>`;
+      content+=`<text x="${x(index)}" y="${H-24}" text-anchor="${anchor}">${weekday}</text><text x="${x(index)}" y="${H-8}" text-anchor="${anchor}">${dateLabel}</text></g>`;
+    });
+    return `<svg class="cf-plot" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(comparison.selectedId?`${comparison.label} compared with Weather Nourie`:'Published Weather Nourie forecast')}: high temperatures for seven local dates">${content}</svg>${[...baseline,...selected].some(finite)?'':'<p class="cf-chart-empty">No complete-day temperature values are available yet.</p>'}`;
   }
 
   function renderResults(){
-    built=preset==='nourie'?publishedForecastPreview(input,weights):blendCustomForecast(input,weights);
-    const narrative=customForecastNarrative(built);
-    $('.cf-result-summary').textContent=narrative.summary;
-    $('.cf-highlights').innerHTML=narrative.highlights.map(change=>`<li>${esc(change.text)}</li>`).join('');
-    $('.cf-highlights').hidden=!narrative.highlights.length;
-    $('.cf-days').hidden=!Object.keys(weights).length;
-    $('.cf-day-results').innerHTML=narrative.days.map(day=>{
-      const date=new Intl.DateTimeFormat('en-US',{timeZone:'UTC',month:'short',day:'numeric'}).format(new Date(`${day.date}T12:00:00Z`));
-      const body=day.sentences.map(sentence=>{
-        if(sentence.startsWith(`On ${day.label}, `))return sentence.replace(`On ${day.label}, the `,'The ');
-        if(sentence.startsWith('For the rest of today, '))return sentence.replace('For the rest of today, the ','The ');
-        return sentence;
-      }).join(' ');
-      return `<div class="cf-day" data-date="${esc(day.date)}"><h4>${esc(day.label)} <span>${esc(date)}</span></h4><p>${esc(body)}</p></div>`;
-    }).join('');
-    $('.cf-method').hidden=!Object.keys(weights).length;
-    $('.cf-probability-note').hidden=!Object.keys(weights).length;
+    comparison=singleModelComparison(input,selectedId);
+    selectedId=comparison.selectedId;
+    $('.cf-legend').innerHTML=`<span><i class="cf-key cf-key-nourie"></i>Weather Nourie</span>${selectedId?`<span><i class="cf-key" style="background:${comparison.color}"></i>${esc(comparison.label)}</span>`:''}`;
+    $('.cf-chart').innerHTML=chartHTML();
+    $('.cf-result-summary').textContent=comparison.summary;
+    $('.cf-highlights').innerHTML=comparison.narrative.highlights.map(change=>`<li>${esc(change.text)}</li>`).join('');
+    $('.cf-highlights').hidden=!selectedId||!comparison.narrative.highlights.length;
+    $('.cf-coverage-note').textContent=comparison.coverageNote;
+    $('.cf-coverage-note').hidden=!comparison.coverageNote;
+    for(const button of root.querySelectorAll('.cf-model-button'))button.setAttribute('aria-pressed',String((selectedId||'nourie')===button.dataset.model));
   }
 
-  function onInput(event){
-    const target=event.target;
-    if(!input||!target.matches('.cf-weight-range,.cf-weight-number'))return;
-    if(target.value===''||!finite(target.valueAsNumber))return;
-    weights=changeCustomWeight(weights,target.dataset.model,target.valueAsNumber);
-    if(target.valueAsNumber!==(weights[target.dataset.model]||0))target.value=weights[target.dataset.model]||0;
-    preset='';syncControls(target);renderResults();
-  }
-  function onChange(event){
-    if(!input)return;
-    const target=event.target;
-    if(target.matches('.cf-model-toggle')){weights=toggleCustomModel(weights,target.dataset.model,target.checked);preset='';syncControls();renderResults();}
-    else if(target.matches('.cf-weight-number'))syncControls();
-  }
   function onClick(event){
-    const button=event.target.closest('.cf-preset');
+    const button=event.target.closest('.cf-model-button');
     if(!button||!root.contains(button)||!input)return;
-    preset=button.dataset.preset;weights=customPresetWeights(input,preset);syncControls();renderResults();
+    const next=button.dataset.model;
+    selectedId=next==='nourie'?null:input.models.find(model=>model.id===next&&model.available)?.id||null;
+    renderResults();
   }
-  root.addEventListener('input',onInput);root.addEventListener('change',onChange);root.addEventListener('click',onClick);
-
-  function reset(){
-    input=null;built=null;weights={};locationKey='';
-    $('.cf-content').hidden=true;$('.cf-loading').hidden=false;$('.cf-loading').textContent='Loading the selected location’s models…';$('.cf-location').textContent='';
-  }
+  root.addEventListener('click',onClick);
+  const onResize=()=>{if(comparison&&!$('.cf-content').hidden)$('.cf-chart').innerHTML=chartHTML();};
+  globalThis.addEventListener?.('resize',onResize);
+  function reset(){input=null;comparison=null;selectedId=null;locationKey='';$('.cf-content').hidden=true;$('.cf-loading').hidden=false;$('.cf-loading').textContent='Loading the selected location’s models…';$('.cf-location').textContent='';}
   function render(forecast){
     const next=customForecastInput(forecast,now()),sameLocation=!!locationKey&&locationKey===next.locationKey;
     input=next;
-    const available=new Set(input.models.filter(model=>model.available).map(model=>model.id));
-    if(!sameLocation||preset==='nourie'){weights=customPresetWeights(input,'nourie');preset='nourie';}
-    else weights=normalizeCustomWeights(Object.fromEntries(Object.entries(weights).filter(([id])=>available.has(id))));
+    if(!sameLocation||!input.models.some(model=>model.id===selectedId&&model.available))selectedId=null;
     locationKey=next.locationKey;
     $('.cf-location').textContent=next.location.name||'Selected location';
-    $('.cf-loading').hidden=available.size>0;
-    if(!available.size)$('.cf-loading').textContent='No matching model forecasts are available for this location yet. Refresh to retry.';
-    $('.cf-content').hidden=!available.size;
-    renderModels();renderResults();
+    $('.cf-loading').hidden=next.models.some(model=>model.available);
+    if(!$('.cf-loading').hidden)$('.cf-loading').textContent='Model forecasts are unavailable for this location. Refresh to retry.';
+    $('.cf-content').hidden=!next.models.some(model=>model.available)&&!next.calendarDays.some(day=>finite(day.baseline.high));
+    renderButtons();renderResults();
   }
-  function destroy(){root.removeEventListener('input',onInput);root.removeEventListener('change',onChange);root.removeEventListener('click',onClick);}
-  return {render,reset,destroy,get state(){return {weights:{...weights},built,narrative:built?customForecastNarrative(built):null};}};
+  function destroy(){root.removeEventListener('click',onClick);globalThis.removeEventListener?.('resize',onResize);}
+  return {render,reset,destroy,get state(){return {selectedModel:selectedId,comparison,built:comparison?.built,narrative:comparison?.narrative};}};
 }

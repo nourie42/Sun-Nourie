@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {nativeFrameForSample,buildNativePlayerFrames,createNativePlaybackBridge} from '../public/weather-fusion/native-player.js';
+import {nativeFrameForSample,buildNativePlayerFrames,createNativePlaybackBridge,installNativePlayer} from '../public/weather-fusion/native-player.js';
 import {hourlyDisplaySamples} from '../public/weather-fusion/weather-display.js?v=low-rain-display-v1';
 import {rebuildHourlyFeels} from '../src/weatherFusionHourlyFeels.js';
 import {selectPhotoScene} from '../public/weather-fusion/player/photo-scene.js';
@@ -157,4 +157,47 @@ test('night descriptions use clear skies rather than sunshine without altering t
   assert.equal(weatherDescription({...frame,nativeCondition:'Partly Sunny'}),'Partly cloudy');
   assert.equal(weatherDescription({...frame,isDay:true}),'Mostly Sunny');
   assert.equal(weatherDescription({...frame,nativeCondition:'Rain Showers'}),'Rain Showers');
+});
+
+
+test('the weather tab loads only on demand and detaches its renderer while preserving the chosen person and hour',async()=>{
+  class Node extends EventTarget {
+    constructor(){super();this.children=[];this.attributes=new Map();this.classList={add(){},remove(){}};this.hidden=false;}
+    setAttribute(key,value){this.attributes.set(key,value);}getAttribute(key){return this.attributes.get(key);}
+    replaceChildren(...children){for(const child of this.children)child.parentNode=null;this.children=children;children.forEach(child=>child.parentNode=this);}
+    contains(child){return this.children.includes(child);}
+    scrollIntoView(){}
+  }
+  class Player extends TestPlayer {
+    remove(){if(this.parentNode){this.parentNode.children=this.parentNode.children.filter(child=>child!==this);this.parentNode=null;this.disconnections=(this.disconnections||0)+1;}}
+  }
+  const priorDocument=globalThis.document,priorSnapshot=globalThis.__weatherNourieForecast;
+  const host=new Node(),button=new Node(),hourly=new Node(),doc=new EventTarget();
+  doc.getElementById=id=>({'nourie-player':host,'open-native-player':button,hourly}[id]||null);
+  doc.createElement=tag=>tag==='weather-sky-player'?new Player():new Node();
+  globalThis.document=doc;delete globalThis.__weatherNourieForecast;
+  let imports=0,resolveModule;
+  const loaded=new Promise(resolve=>{resolveModule=resolve;});
+  const controller=installNativePlayer({selectComfortHour(){},loadPlayer(){imports++;return loaded;}});
+  const point=Math.floor(Date.now()/HOUR)*HOUR,series=values=>values.map((value,i)=>({time:new Date(point+i*HOUR).toISOString(),value}));
+  const snapshot={location,current:{temperature:60,dewpoint:48,wind:6,time:new Date(point).toISOString()},assembledAt:new Date(point).toISOString(),hours:[60,62,64].map((temperature,i)=>({time:new Date(point+i*HOUR).toISOString(),temperature,condition:'Partly Cloudy'})),days:[],metricForecasts:{series:{temperature:series([60,62,64]),dewpoint:series([48,48,48]),wind:series([6,6,6])},notes:{}}};
+  rebuildHourlyFeels(snapshot,{now:point,temperatureAt:()=>({value:null}),humidityAt:()=>null});
+  const flush=async()=>{await Promise.resolve();await Promise.resolve();};
+  try{
+    controller.setForecast(snapshot);await flush();assert.equal(imports,0);assert.equal(host.hidden,true);assert.equal(controller.player,null);assert.equal(controller.ready,null);assert.equal(button.getAttribute('aria-expanded'),'false');
+    const first=controller.open();assert.equal(imports,1);controller.close();const second=controller.open();resolveModule();await Promise.all([first,second]);await flush();
+    const player=controller.player;assert.ok(player);assert.equal(controller.isOpen,true);assert.equal(host.hidden,false);assert.equal(button.getAttribute('aria-expanded'),'true');assert.equal(host.children.filter(child=>child===player).length,1);assert.ok(player.forecast.length>=2);
+    player.character='black';player.setFrame(1);const selected=player.currentFrame.nativeSampleId;player.play();
+    controller.close();assert.equal(player.playing,false);assert.equal(player.parentNode,null);assert.equal(player.disconnections,1);assert.equal(host.hidden,true);assert.equal(button.getAttribute('aria-expanded'),'false');
+    await controller.open();await flush();assert.equal(controller.player,player);assert.equal(player.character,'black');assert.equal(player.currentFrame.nativeSampleId,selected);assert.equal(player.playing,false);assert.equal(imports,1);
+    controller.close();
+    const hourlySelection=new Node();hourlySelection.dataset={comfortTime:player.forecast[2].nativeSampleId};hourlySelection.closest=()=>hourlySelection;hourly.replaceChildren(hourlySelection);
+    const selectEvent=new Event('click');Object.defineProperty(selectEvent,'target',{value:hourlySelection});hourly.dispatchEvent(selectEvent);
+    controller.setForecast(snapshot);await controller.open();await flush();assert.equal(player.currentFrame.nativeSampleId,hourlySelection.dataset.comfortTime,'an hour chosen while closed is applied to the latest forecast');
+    controller.close();
+    const next={...snapshot,location:{...location,name:'Boston',latitude:42.36,longitude:-71.06}};
+    const change=new Event('weather-nourie:location-changing');change.detail={location:next.location};doc.dispatchEvent(change);
+    controller.setForecast(next);await flush();assert.equal(player.forecast.length,0,'a closed scene clears the previous location');
+    await controller.open();await flush();assert.equal(player.locationName,'Boston');assert.equal(player.currentFrame.nativeSampleId,'now');
+  }finally{controller.dispose();globalThis.document=priorDocument;if(priorSnapshot===undefined)delete globalThis.__weatherNourieForecast;else globalThis.__weatherNourieForecast=priorSnapshot;}
 });

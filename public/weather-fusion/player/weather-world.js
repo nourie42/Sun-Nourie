@@ -1,6 +1,6 @@
 import * as THREE from './vendor/three.module.js';
-import { selectPhotoScene, createLatestRequestGate } from './photo-scene.js?v=integrated-scenes-v2';
-import { normalizeCharacter, getCharacterScene, computeIntegratedSceneLayout } from './character-scene.js?v=integrated-scenes-v2';
+import { selectPhotoScene, createLatestRequestGate } from './photo-scene.js?v=named-scenes-v3';
+import { normalizeCharacter, getCharacterScene, computeIntegratedSceneLayout } from './character-scene.js?v=named-scenes-v3';
 
 // Every selected person is photographed together with their clothing, ground,
 // contact shadow and landscape. Optical motion never replaces that photograph.
@@ -90,20 +90,21 @@ export async function createWeatherWorld(container, { onError, initialFrame = {}
     if (fallback) return;
     canvas?.remove();
     const layer = document.createElement('div'), from = document.createElement('div'), to = document.createElement('div');
-    const clouds = document.createElement('div'), precip = document.createElement('div');
+    const clouds = document.createElement('div'), cornerClouds = document.createElement('div'), precip = document.createElement('div');
     Object.assign(layer.style, { position: 'absolute', inset: '0', overflow: 'hidden', background: '#243d4c' });
     for (const slot of [from, to]) { Object.assign(slot.style, { position: 'absolute', inset: '0', overflow: 'hidden' }); layer.append(slot); }
-    clouds.className = 'weather-photograph-clouds'; precip.className = 'weather-photograph-precip';
+    clouds.className = cornerClouds.className = 'weather-photograph-clouds'; precip.className = 'weather-photograph-precip';
     Object.assign(clouds.style, { position: 'absolute', inset: '0 0 auto', height: '30%', pointerEvents: 'none' });
+    Object.assign(cornerClouds.style, { position: 'absolute', pointerEvents: 'none', backgroundSize: '300% 300%' });
     Object.assign(precip.style, { position: 'absolute', inset: '0', pointerEvents: 'none' });
-    layer.append(clouds, precip); container.append(layer); fallback = { layer, from, to, clouds, precip };
+    layer.append(clouds, cornerClouds, precip); container.append(layer); fallback = { layer, from, to, clouds, cornerClouds, precip };
     container.dataset.renderMode = 'photographic-preview'; renderFallback();
   }
   function paintFallback(slot, state) {
     if (!state) return;
     const layout = layoutFor(state), rect = state.spec.rect;
     const photo = document.createElement('canvas'), backdrop = document.createElement('canvas');
-    for (const target of [photo, backdrop]) {
+    for (const target of state.spec.closePortrait ? [photo] : [photo, backdrop]) {
       target.width = Math.max(1, Math.round(layout.cellWidth)); target.height = Math.max(1, Math.round(layout.cellHeight));
       target.getContext('2d')?.drawImage(state.image, rect[0] * state.image.naturalWidth, rect[1] * state.image.naturalHeight,
         rect[2] * state.image.naturalWidth, rect[3] * state.image.naturalHeight, 0, 0, target.width, target.height);
@@ -111,7 +112,8 @@ export async function createWeatherWorld(container, { onError, initialFrame = {}
     Object.assign(backdrop.style, { position: 'absolute', inset: '-12px', width: 'calc(100% + 24px)', height: 'calc(100% + 24px)', objectFit: 'cover', filter: 'blur(12px)', opacity: '.75' });
     Object.assign(photo.style, { position: 'absolute', left: `${layout.left}px`, top: `${layout.top}px`, width: `${layout.imageWidth}px`, height: `${layout.imageHeight}px`, maskImage: 'linear-gradient(to right,transparent,black 2%,black 98%,transparent)' });
     slot.style.filter = state.spec.gradeNight ? 'brightness(.23) saturate(.42) hue-rotate(8deg)' : state.spec.overcast && !state.spec.precipitation ? 'brightness(.81) saturate(.8)' : 'none';
-    slot.replaceChildren(backdrop, photo);
+    if (state.spec.closePortrait) { photo.style.maskImage = 'none'; slot.replaceChildren(photo); }
+    else slot.replaceChildren(backdrop, photo);
   }
   function renderFallback() {
     if (!fallback || !active) return;
@@ -122,8 +124,12 @@ export async function createWeatherWorld(container, { onError, initialFrame = {}
     fallback.clouds.style.maskImage = 'linear-gradient(to right,transparent 18%,black 32%),linear-gradient(to bottom,black,transparent)';
     fallback.clouds.style.maskComposite = 'intersect';
     fallback.clouds.style.opacity = String(active.spec.cloudCover * (active.spec.night ? .06 : .20));
+    const actor = active.spec.bodyBounds || active.spec.personBounds;
+    const cornerVisible = active.spec.closePortrait === true && !active.spec.umbrella;
+    Object.assign(fallback.cornerClouds.style, { display: cornerVisible ? 'block' : 'none', left: `${layout.left + layout.imageWidth * .86}px`, top: `${layout.top}px`, width: `${layout.imageWidth * .14}px`, height: `${layout.imageHeight * .28}px`, opacity: fallback.clouds.style.opacity,
+      maskImage: 'linear-gradient(to right,transparent,black 29%,black 78%,transparent),linear-gradient(to bottom,black 82%,transparent)', maskComposite: 'intersect' });
     fallback.precip.dataset.weather = active.spec.precipitation || '';
-    fallback.clouds.style.animationPlayState = fallback.precip.style.animationPlayState = reducedMotion?.matches ? 'paused' : 'running';
+    fallback.clouds.style.animationPlayState = fallback.cornerClouds.style.animationPlayState = fallback.precip.style.animationPlayState = reducedMotion?.matches ? 'paused' : 'running';
   }
   try {
     renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false, powerPreference: 'low-power' });
@@ -142,7 +148,7 @@ export async function createWeatherWorld(container, { onError, initialFrame = {}
     uniform float uFromUmbrella,uToUmbrella,uFromNight,uToNight,uFromGrade,uToGrade,uFromCloud,uToCloud,uFromShade,uToShade,uTime,uMotion,uBlend,uRain,uSnow,uFog,uWind,uAspect;
     float ellipse(vec2 uv,vec2 center,vec2 radius){vec2 d=(uv-center)/max(radius,vec2(.001));return 1.-smoothstep(.62,1.,dot(d,d));}
     vec3 cellPixel(sampler2D image,vec2 p,vec4 rect){vec2 q=p;float outside=max(step(p.x,0.),step(1.,p.x));if(p.x<0.)q.x=.20*(1.-abs(mod(p.x/.20,2.)-1.));if(p.x>1.)q.x=1.-.20*(1.-abs(mod((p.x-1.)/.20,2.)-1.));q=clamp(q,.002,.998);vec2 sampleUV=vec2(rect.x+q.x*rect.z,1.-rect.y-q.y*rect.w);vec3 c=texture2D(image,sampleUV).rgb;if(outside>.5){vec2 d=vec2(.009*rect.z,.009*rect.w);c=(c*2.+texture2D(image,clamp(sampleUV+d,vec2(rect.x+.002*rect.z,1.-rect.y-.998*rect.w),vec2(rect.x+.998*rect.z,1.-rect.y-.002*rect.w))).rgb+texture2D(image,clamp(sampleUV-d,vec2(rect.x+.002*rect.z,1.-rect.y-.998*rect.w),vec2(rect.x+.998*rect.z,1.-rect.y-.002*rect.w))).rgb)/4.;}return c;}
-    vec3 photograph(sampler2D image,vec2 scale,vec2 offset,vec4 rect,vec4 body,vec4 actor,vec4 flag,float umbrella,float night,float grade,float cloud,float shade){vec2 uv=vec2(vUV.x,1.-vUV.y)*scale+offset;vec2 p=uv;float center=(actor.x+actor.z)*.5;float bodyHeight=actor.w-actor.y;float torso=ellipse(uv,vec2(center,actor.y+bodyHeight*.40),vec2((actor.z-actor.x)*.37,bodyHeight*.23));float hair=ellipse(uv,vec2(center+.012,actor.y+bodyHeight*.10),vec2((actor.z-actor.x)*.22,bodyHeight*.13));float breath=sin(uTime*1.42);p.x+=(uv.x-center)*breath*.009*torso*uMotion;p.y+=breath*.0007*torso*uMotion;p.x+=sin(uTime*1.8)*.0011*hair*uMotion*(.3+uWind);vec3 c=cellPixel(image,p,rect);float protect=1.-smoothstep(.0,.025,max(max(body.x-uv.x,uv.x-body.z),max(body.y-uv.y,uv.y-body.w)));float flagGuard=1.-smoothstep(0.,.008,max(max(flag.x-uv.x,uv.x-flag.z),max(flag.y-uv.y,uv.y-flag.w)));protect=max(protect,flagGuard);float skyEnd=min(.47,min(body.y,flag.y)-.02);float sky=(1.-smoothstep(max(0.,skyEnd-.06),max(.001,skyEnd),uv.y))*smoothstep(.18,.30,uv.x);vec2 cloudUV=vec2(uv.x*.72+uTime*.016*(.35+uWind),.10+uv.y*.7+sin(uTime*.021)*.010);cloudUV=vec2(1.-abs(mod(cloudUV.x,2.)-1.),1.-abs(mod(cloudUV.y,2.)-1.));vec3 cloudPhoto=texture2D(uClouds,vec2(cloudUV.x,1.-cloudUV.y)).rgb;float light=pow(max(.001,dot(cloudPhoto,vec3(.2126,.7152,.0722))),.4545);float cloudAlpha=smoothstep(.14,.60,light)*cloud*.38*sky*(1.-protect);vec3 cloudColour=mix(vec3(.42,.50,.60),vec3(.95,.97,1.),smoothstep(.18,.72,light));if(night>.5&&grade<.5)cloudColour*=vec3(.035,.055,.095);c=mix(c,cloudColour,cloudAlpha);if(shade>.5)c*=vec3(.72,.77,.83);if(grade>.5){float luminance=dot(c,vec3(.2126,.7152,.0722));c=mix(c,vec3(luminance),.58)*vec3(.035,.055,.10)+vec3(.001,.002,.004);}return c;}
+    vec3 photograph(sampler2D image,vec2 scale,vec2 offset,vec4 rect,vec4 body,vec4 actor,vec4 flag,float umbrella,float night,float grade,float cloud,float shade){vec2 uv=vec2(vUV.x,1.-vUV.y)*scale+offset;vec2 p=uv;float center=(actor.x+actor.z)*.5;float bodyHeight=actor.w-actor.y;float torso=ellipse(uv,vec2(center,actor.y+bodyHeight*.40),vec2((actor.z-actor.x)*.37,bodyHeight*.23));float hair=ellipse(uv,vec2(center+.012,actor.y+bodyHeight*.10),vec2((actor.z-actor.x)*.22,bodyHeight*.13));float breath=sin(uTime*1.42);p.x+=(uv.x-center)*breath*.009*torso*uMotion;p.y+=breath*.0007*torso*uMotion;p.x+=sin(uTime*1.8)*.0011*hair*uMotion*(.3+uWind);float closer=step(.5,actor.z-actor.x);vec3 c=cellPixel(image,p,rect);float protect=1.-smoothstep(.0,.025,max(max(body.x-uv.x,uv.x-body.z),max(body.y-uv.y,uv.y-body.w)));float flagGuard=1.-smoothstep(0.,.008,max(max(flag.x-uv.x,uv.x-flag.z),max(flag.y-uv.y,uv.y-flag.w)));protect=max(protect,flagGuard);float skyEnd=min(.47,min(body.y,flag.y)-.02);float sky=(1.-smoothstep(max(0.,skyEnd-.06),max(.001,skyEnd),uv.y))*smoothstep(.18,.30,uv.x);float corner=smoothstep(.86,.90,uv.x)*(1.-smoothstep(.97,1.,uv.x))*(1.-smoothstep(.23,.28,uv.y));sky=max(sky,corner*closer*(1.-step(.5,umbrella)));vec2 cloudUV=vec2(uv.x*.72+uTime*.016*(.35+uWind),.10+uv.y*.7+sin(uTime*.021)*.010);cloudUV=vec2(1.-abs(mod(cloudUV.x,2.)-1.),1.-abs(mod(cloudUV.y,2.)-1.));vec3 cloudPhoto=texture2D(uClouds,vec2(cloudUV.x,1.-cloudUV.y)).rgb;float light=pow(max(.001,dot(cloudPhoto,vec3(.2126,.7152,.0722))),.4545);float cloudAlpha=smoothstep(.14,.60,light)*cloud*.38*sky*(1.-protect);vec3 cloudColour=mix(vec3(.42,.50,.60),vec3(.95,.97,1.),smoothstep(.18,.72,light));if(night>.5&&grade<.5)cloudColour*=vec3(.035,.055,.095);c=mix(c,cloudColour,cloudAlpha);if(shade>.5)c*=vec3(.72,.77,.83);if(grade>.5){float luminance=dot(c,vec3(.2126,.7152,.0722));c=mix(c,vec3(luminance),.58)*vec3(.035,.055,.10)+vec3(.001,.002,.004);}return c;}
     float hash(float p){return fract(sin(p*127.1)*43758.5453);}
     void main(){vec3 a=photograph(uFrom,uFromScale,uFromOffset,uFromRect,uFromSubject,uFromBody,uFromFlag,uFromUmbrella,uFromNight,uFromGrade,uFromCloud,uFromShade);vec3 b=photograph(uTo,uToScale,uToOffset,uToRect,uToSubject,uToBody,uToFlag,uToUmbrella,uToNight,uToGrade,uToCloud,uToShade);vec3 c=mix(a,b,smoothstep(0.,1.,uBlend));float rain=0.;for(int i=0;i<3;i++){float fi=float(i);vec2 p=vec2(vUV.x*uAspect*(80.+fi*37.)+vUV.y*(6.+uWind*8.),vUV.y*(31.+fi*13.)+uTime*(16.+fi*7.));float id=floor(p.x),phase=fract(p.y+hash(id+fi*53.));rain+=(1.-smoothstep(.025,.075,abs(fract(p.x)-.5)))*(1.-smoothstep(.03,.30,phase))*step(.18+fi*.12,hash(id*1.7))*(.15+fi*.06);}c=mix(c,vec3(.68,.78,.87),clamp(rain*uRain,0.,.3));float snow=0.;for(int i=0;i<3;i++){float fi=float(i);vec2 p=vec2(vUV.x*uAspect*(18.+fi*9.)+sin(uTime*.37+vUV.y*5.+fi)*.28,vUV.y*(19.+fi*7.)+uTime*(.62+fi*.25));vec2 id=floor(p),q=fract(p)-.5;q.x+=sin(uTime*.8+id.y+fi)*.15;snow+=(1.-smoothstep(.025+fi*.008,.05+fi*.008,length(q)))*step(.44,hash(id.x+id.y*19.+fi*23.))*(.55+fi*.12);}c=mix(c,vec3(.91,.96,1.),clamp(snow*uSnow,0.,.9));c=mix(c,vec3(.52,.60,.65),uFog*(.12+.12*(1.-vUV.y)));gl_FragColor=vec4(c,1.);#include <colorspace_fragment>
     }`

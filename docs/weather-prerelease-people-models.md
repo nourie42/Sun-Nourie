@@ -4,10 +4,11 @@ The prerelease adds a compact model chooser and a photographic forecast player.
 
 ## Pick your weather
 
-The screen has starting presets, available model choices, percentage shares and
-plain-language changes across seven local calendar dates. It shows up to three
-largest changes first; “See all seven days” expands dated text. There are no
-custom forecast graphs, hour scrubbers, metric selectors or source tables.
+The screen has a row of available models. Clicking one plots its daily high
+temperatures beside the published Weather Nourie line for seven local calendar
+dates, with up to three supported differences explained below. Weather Nourie
+is the initial selection and restores the published forecast. There are no
+percentage controls, presets, hourly scrubbers, ranges or source tables.
 
 Temperature and rainfall use source values for the same location and timestamp
 in the existing forecast response. Missing selected inputs are excluded per
@@ -16,11 +17,18 @@ coverage, including 23- and 25-hour daylight-saving dates. A short-range model's
 last overnight hours cannot become a false daily high. Today ends at local
 midnight; remaining rainfall uses the same remaining interval as its comparison.
 
-Rain probability uses genuine NWS probabilities, with no conversion of
-rainfall amounts into a probability. The preview never changes the published
-Weather Nourie forecast. The Nourie preset displays the actual published
-forecast unchanged. Its controls start from current source weights; editing
-models or shares switches to a separately calculated personal preview.
+The selected model uses only its own actual source values. Missing full-day
+coverage leaves a graph gap instead of extending a short model's last hours.
+Rainfall differences use genuine amounts, with no conversion into a probability.
+Selecting a model never changes the published Weather Nourie forecast.
+
+## Play your weather
+
+The player is a tab and starts closed, even with a player hash in the URL. Its
+module, scene photographs and renderer load only after the user clicks it.
+Closing pauses playback and disposes the renderer. Reopening keeps the chosen
+person and hour and applies any location or forecast updates received while
+closed.
 
 ## Choose your person
 
@@ -29,9 +37,14 @@ and preserves the forecast hour. Alex retains her pride flag in the artwork.
 
 The player uses complete photographic scenes in which each person, clothing,
 ground, reflections and contact shadows were generated together. It does not
-paste transparent people onto an empty landscape. Emma uses the original
-complete photographs; Maya, Mei and Alex use integrated scene atlases, including
-separate winter scenes and complete clear-sky cool/cold alternatives. Clear and
+paste transparent people onto an empty landscape. Maya follows the supplied
+reference and Emma has vivid blue eyes. Both are portrayed as younger adults
+with closer, intentionally knees-up source portraits in nine complete scenes covering
+warm, cool, cold, rain, clear and snowy weather. Mei and Alex retain their
+existing artwork. New portraits fill the player with a natural top-aligned
+cover crop, keeping faces visible while wider screens crop the lower body.
+Every displayed pixel comes from the photograph, without extended image edges.
+Clear and
 cloudier weather select different complete photographs; runtime sky replacement
 does not key around hair, flags or trees. Clothing follows the existing native selected-hour
 policy. Night grading covers the whole scene; thunderstorms show shelter
@@ -52,7 +65,7 @@ public runtime bundle. Exact atlas crops exclude generated grid seams.
 
 Tests cover native weather alignment, full-scene asset selection, calendar
 boundaries, missing hours, daylight-saving dates and model arithmetic. Browser
-review checks mobile/desktop layout, complete feet/umbrellas, natural contact
+review checks mobile/desktop layout, deliberate portrait crops/umbrellas, natural contact
 shadows, names-only accessible controls, paused ambient motion, scene blending,
 reduced motion and GPU fallback.
 

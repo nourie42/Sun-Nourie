@@ -762,6 +762,8 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     'player-alex-scenes.webp',
     'player-winter-scenes.webp',
     'player-clear-cool-cold-scenes.webp',
+    'player-maya-reference-scenes.webp',
+    'player-emma-blue-eyes-scenes.webp',
     'player/character-scene.js',
     'calendar-day.js',
     'collapse.js',

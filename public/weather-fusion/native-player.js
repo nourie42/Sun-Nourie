@@ -110,37 +110,80 @@ export function createNativePlaybackBridge({player,selectComfortHour,samplesForF
   return {setForecast,handleNativeSelection,reset,dispose,get frames(){return frames.map(frame=>({...frame}));},get forecast(){return snapshot;}};
 }
 
-export function installNativePlayer({selectComfortHour}={}){
+/** Keep the scene opt-in: a closed tab neither loads the player nor owns a renderer. */
+export function installNativePlayer({selectComfortHour,loadPlayer=()=>import('./player/sky-player.js?v=named-scenes-v3')}={}){
   if(typeof document==='undefined')return null;
   const host=document.getElementById('nourie-player');if(!host)return null;
   if(host[INSTALL_KEY])return host[INSTALL_KEY];
   if(typeof selectComfortHour!=='function')throw new TypeError('Pass the app’s existing selectComfortHour binding.');
-  let disposed=false,pending=globalThis.__weatherNourieForecast||null,bridge=null,player=null;
-  const loading=document.createElement('p');loading.className='native-player-loading';loading.setAttribute('role','status');loading.textContent='Preparing your weather scene…';host.replaceChildren(loading);
-  const onForecast=event=>{pending=event.detail;if(bridge)bridge.setForecast(pending);};
-  document.addEventListener('weather-nourie:forecast',onForecast);
-  const onLocationChanging=event=>{pending=null;bridge?.reset(event.detail?.location||event.detail||null);};
+  const button=document.getElementById('open-native-player');
+  let disposed=false,isOpen=false,pending=globalThis.__weatherNourieForecast||null,bridge=null,player=null,modulePromise=null,pendingSelection=null,syncVersion=0;
+  const loading=document.createElement('p');loading.className='native-player-loading';loading.setAttribute('role','status');
+  const note=document.createElement('p');note.className='native-player-note';note.textContent='Pause to update the Shade, Sun and For Pets cards below.';
+  const status=document.createElement('p');status.className='native-player-status';status.hidden=true;status.setAttribute('role','status');
+  // A bookmark or a remembered scroll position must never open the scene.
+  host.hidden=true;host.replaceChildren();button?.setAttribute('aria-expanded','false');
+  function applyPending(){
+    if(!bridge||!pending)return;
+    const request=++syncVersion;bridge.setForecast(pending);
+    const selection=pendingSelection;
+    if(selection)queueMicrotask(()=>{if(!disposed&&isOpen&&request===syncVersion&&pendingSelection===selection){bridge.handleNativeSelection(selection);pendingSelection=null;}});
+  }
+  const onForecast=event=>{pending=event.detail;if(isOpen)applyPending();};
+  const onLocationChanging=event=>{++syncVersion;pending=null;pendingSelection=null;bridge?.reset(event.detail?.location||event.detail||null);};
   const onVisibility=()=>{if(document.hidden)player?.pause();};
-  document.addEventListener('weather-nourie:location-changing',onLocationChanging);document.addEventListener('visibilitychange',onVisibility);
+  document.addEventListener('weather-nourie:forecast',onForecast);document.addEventListener('weather-nourie:location-changing',onLocationChanging);document.addEventListener('visibilitychange',onVisibility);
   const hourly=document.getElementById('hourly');
-  const onHourlyClick=event=>{const button=event.target?.closest?.('[data-comfort-time]');if(button&&hourly?.contains(button))bridge?.handleNativeSelection(button.dataset.comfortTime);};
-  hourly?.addEventListener('click',onHourlyClick,true);
-  const controller={
-    ready:null,get player(){return player;},get frames(){return bridge?.frames||[];},
-    setForecast(forecast){pending=forecast;bridge?.setForecast(forecast);},
-    reset(location=null){pending=null;bridge?.reset(location);},
-    dispose(){if(disposed)return;disposed=true;document.removeEventListener('weather-nourie:forecast',onForecast);document.removeEventListener('weather-nourie:location-changing',onLocationChanging);document.removeEventListener('visibilitychange',onVisibility);hourly?.removeEventListener('click',onHourlyClick,true);bridge?.dispose();player?.remove();if(host[INSTALL_KEY]===controller)delete host[INSTALL_KEY];}
+  const onHourlyClick=event=>{
+    const selected=event.target?.closest?.('[data-comfort-time]');
+    if(!selected||!hourly?.contains(selected))return;
+    if(isOpen&&bridge)bridge.handleNativeSelection(selected.dataset.comfortTime);
+    else pendingSelection=selected.dataset.comfortTime;
   };
-  host[INSTALL_KEY]=controller;
-  controller.ready=import('./player/sky-player.js?v=integrated-scenes-v2').then(()=>{
-    if(disposed)return null;
-    player=document.createElement('weather-sky-player');player.setAttribute('data-native','');player.setAttribute('data-mode','live');
-    const note=document.createElement('p');note.className='native-player-note';note.textContent='Pause to update the Shade, Sun and For Pets cards below.';
-    const status=document.createElement('p');status.className='native-player-status';status.hidden=true;status.setAttribute('role','status');
-    host.replaceChildren(player,note,status);
-    bridge=createNativePlaybackBridge({player,selectComfortHour,onUnavailable:message=>{status.hidden=!message;status.textContent=message;}});
-    if(pending)bridge.setForecast(pending);
-    return player;
-  }).catch(error=>{if(!disposed){loading.textContent='The weather player could not load. The forecast and comfort cards remain available.';loading.classList.add('is-error');}console.error('Weather player could not load',error);return null;});
+  hourly?.addEventListener('click',onHourlyClick,true);
+  async function ensurePlayer(){
+    try{
+      if(!player){
+        modulePromise??=loadPlayer();await modulePromise;
+        if(disposed||!isOpen)return null;
+        if(!player){
+          player=document.createElement('weather-sky-player');player.setAttribute('data-native','');player.setAttribute('data-mode','live');
+          bridge=createNativePlaybackBridge({player,selectComfortHour,onUnavailable:message=>{status.hidden=!message;status.textContent=message;}});
+        }
+      }
+      if(disposed||!isOpen)return null;
+      // Reattach the same element, retaining the selected person and hour. Its
+      // connected callback creates a fresh world after close disposed the GPU.
+      host.replaceChildren(player,note,status);applyPending();return player;
+    }catch(error){
+      modulePromise=null;
+      if(!disposed&&isOpen){loading.textContent='The weather player could not load. Close and reopen this tab to retry.';loading.classList.add('is-error');}
+      console.error('Weather player could not load',error);return null;
+    }
+  }
+  const onToggle=()=>{void controller.toggle();};
+  const controller={
+    ready:null,get isOpen(){return isOpen;},get player(){return player;},get frames(){return bridge?.frames||[];},
+    open(){
+      if(disposed)return Promise.resolve(null);
+      isOpen=true;host.hidden=false;button?.setAttribute('aria-expanded','true');
+      if(!player){loading.classList.remove('is-error');loading.textContent='Preparing your weather scene…';host.replaceChildren(loading);}
+      controller.ready=ensurePlayer();
+      host.scrollIntoView?.({behavior:globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'});
+      return controller.ready;
+    },
+    close(){
+      if(disposed)return;
+      ++syncVersion;isOpen=false;host.hidden=true;button?.setAttribute('aria-expanded','false');
+      // Detaching calls disconnectedCallback, stopping ambient animation and
+      // disposing textures/renderers as well as pausing forecast playback.
+      player?.pause();player?.remove();
+    },
+    toggle(){if(isOpen){controller.close();return Promise.resolve(null);}return controller.open();},
+    setForecast(forecast){pending=forecast;if(isOpen)applyPending();},
+    reset(location=null){++syncVersion;pending=null;pendingSelection=null;bridge?.reset(location);},
+    dispose(){if(disposed)return;controller.close();disposed=true;document.removeEventListener('weather-nourie:forecast',onForecast);document.removeEventListener('weather-nourie:location-changing',onLocationChanging);document.removeEventListener('visibilitychange',onVisibility);hourly?.removeEventListener('click',onHourlyClick,true);button?.removeEventListener('click',onToggle);bridge?.dispose();player?.remove();if(host[INSTALL_KEY]===controller)delete host[INSTALL_KEY];}
+  };
+  button?.addEventListener('click',onToggle);host[INSTALL_KEY]=controller;
   return controller;
 }

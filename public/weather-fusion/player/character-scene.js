@@ -1,5 +1,5 @@
 /** Select complete photographic scenes: person, clothing and landscape together. */
-import { computePhotoLayout } from './photo-scene.js';
+import { computePhotoLayout } from './photo-scene.js?v=named-scenes-v3';
 
 export const CHARACTERS = Object.freeze([
   { id: 'white', name: 'Emma' },
@@ -9,12 +9,13 @@ export const CHARACTERS = Object.freeze([
 ].map(character => Object.freeze(character)));
 export const CHARACTER_POSES = Object.freeze(['hot', 'mild', 'cool', 'cold', 'rain', 'rain-hood']);
 export const CHARACTER_SCENE_ATLASES = Object.freeze({
-  black: Object.freeze({ file: '../player-maya-scenes.webp', columns: 3, rows: 2 }),
+  white: Object.freeze({ file: '../player-emma-blue-eyes-scenes.webp', columns: 3, rows: 3, cellSize: 418, namedPoses: true }),
+  black: Object.freeze({ file: '../player-maya-reference-scenes.webp', columns: 3, rows: 3, cellSize: 418, namedPoses: true }),
   asian: Object.freeze({ file: '../player-mei-scenes.webp', columns: 3, rows: 2 }),
   pride: Object.freeze({ file: '../player-alex-scenes.webp', columns: 3, rows: 2 })
 });
 const winterFile = '../player-winter-scenes.webp';
-const sceneCell = index => [((index % 3) * 512 + 2) / 1536, (Math.floor(index / 3) * 512 + 2) / 1024, 508 / 1536, 508 / 1024];
+const sceneCell = (index, rows = 2, cellSize = 512) => [((index % 3) * cellSize + 2) / (cellSize * 3), (Math.floor(index / 3) * cellSize + 2) / (cellSize * rows), (cellSize - 4) / (cellSize * 3), (cellSize - 4) / (cellSize * rows)];
 
 
 export function normalizeCharacter(id) {
@@ -25,10 +26,9 @@ export function normalizeCharacter(id) {
  * rect is [left, top, right, bottom]; face is relative to that selected cell.
  */
 export function getCharacterPortrait(id) {
-  const character = normalizeCharacter(id);
-  return character === 'white'
-    ? { file: './assets/photo-mild.webp', rect: [0, 0, 1, 1], face: [.505, .45], cellAspect: 1.5 }
-    : { file: CHARACTER_SCENE_ATLASES[character].file, rect: [514 / 1536, 2 / 1024, 1022 / 1536, 510 / 1024], face: [.5, character === 'asian' ? .30 : .27], cellAspect: 1 };
+  const character = normalizeCharacter(id), atlas = CHARACTER_SCENE_ATLASES[character], rect = sceneCell(1, atlas.rows, atlas.cellSize);
+  return { file: atlas.file, rect: [rect[0], rect[1], rect[0] + rect[2], rect[1] + rect[3]],
+    face: character === 'white' ? [.5,.23] : character === 'black' ? [.54,.22] : [.5,character === 'asian' ? .30 : .27], cellAspect: 1 };
 }
 
 /** Reuse the native outfit policy without estimating weather a second time. */
@@ -46,11 +46,21 @@ export function getCharacterScene(characterId, scene = {}, frame = {}) {
   const code = frame.weatherCode === null || frame.weatherCode === undefined ? -1 : Number(frame.weatherCode);
   const cloudCover = knownCloudCover ? Math.max(0,Math.min(1,Number(frame.cloudCover) / 100)) : scene.precipitation || [3,45,48,95,96,97,99].includes(code) ? .95 : code === 2 ? .65 : code === 1 ? .20 : 0;
   const common = { ...scene, character, pose, cloudCover, key: `${character}:${scene.key || pose}:${scene.night ? 'night' : 'day'}` };
-  if (!pose || character === 'white') {
+  if (!pose) {
     return { ...common, file: scene.asset.file, rect: [0, 0, 1, 1], personBounds: scene.asset.personBounds,
       personX: scene.asset.personX, integrated: true, gradeNight: scene.gradeNight === true };
   }
   const snowy = scene.precipitation === 'snow', atlas = CHARACTER_SCENE_ATLASES[character];
+  if (atlas.namedPoses) {
+    const clear = cloudCover < .45;
+    const index = snowy ? 8 : pose === 'rain' ? 4 : pose === 'rain-hood' ? 5
+      : pose === 'cool' ? clear ? 6 : 2 : pose === 'cold' ? clear ? 7 : 3 : pose === 'hot' ? 0 : 1;
+    const headY = character === 'black' ? [.075,.075,.075,.025,.12,.075,.075,.035,.065][index] : [.10,.10,.10,.08,.11,.075,.09,.06,.06][index];
+    const bodyBounds = [.20, headY, .82, .99];
+    const personBounds = scene.umbrella ? [.03, 0, .97, .99] : bodyBounds;
+    return { ...common, key: `${common.key}:named-${index}`, file: atlas.file, rect: sceneCell(index, atlas.rows, atlas.cellSize),
+      personBounds, bodyBounds, flagBounds: null, personX: .5, closePortrait: true, integrated: true, gradeNight: scene.night === true };
+  }
   const index = snowy ? ['black', 'asian', 'pride'].indexOf(character) : Math.max(0, CHARACTER_POSES.indexOf(pose));
   const clearCoat = !snowy && ['cool','cold'].includes(pose) && cloudCover < .45;
   const clearIndex = ['black','asian','pride'].indexOf(character) + (pose === 'cold' ? 3 : 0);
@@ -63,10 +73,18 @@ export function getCharacterScene(characterId, scene = {}, frame = {}) {
     integrated: true, gradeNight: scene.night === true };
 }
 
-/** Keep full people and umbrellas at their original photographic proportions. */
+/** Preserve each scene’s intended framing and complete umbrellas without stretching. */
 export function computeIntegratedSceneLayout({ viewportWidth, viewportHeight, sourceWidth, sourceHeight, scene } = {}) {
   const rect = scene.rect || [0, 0, 1, 1];
   const cellWidth = sourceWidth * rect[2], cellHeight = sourceHeight * rect[3];
+  if (scene.closePortrait) {
+    const width = Math.max(1, Number(viewportWidth) || 1), height = Math.max(1, Number(viewportHeight) || 1);
+    const scale = Math.max(width / cellWidth, height / cellHeight), imageWidth = cellWidth * scale, imageHeight = cellHeight * scale;
+    const left = (width - imageWidth) / 2, bounds = scene.personBounds;
+    return { scale, imageWidth, imageHeight, left, top: 0, cellWidth, cellHeight,
+      uvScale: [width / imageWidth, height / imageHeight], uvOffset: [-left / imageWidth, 0],
+      subject: { left: left + bounds[0] * imageWidth, top: bounds[1] * imageHeight, right: left + bounds[2] * imageWidth, bottom: bounds[3] * imageHeight } };
+  }
   return { ...computePhotoLayout({ viewportWidth, viewportHeight, sourceWidth: cellWidth, sourceHeight: cellHeight,
     personX: scene.personX, subjectBounds: scene.personBounds }), cellWidth, cellHeight };
 }

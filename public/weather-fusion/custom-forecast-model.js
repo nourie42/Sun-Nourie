@@ -240,7 +240,7 @@ export function customCalendarComparison(built) {
       high:{...high,value:day.baseline.high,baseline:day.baseline.high,complete:finite(day.baseline.high)},
       amount:{...amount,value:day.baseline.amount,baseline:day.baseline.amount,complete:finite(day.baseline.amount)},
       rain:{...rain,value:day.baseline.rain,baseline:day.baseline.rain,complete:finite(day.baseline.rain)}};
-    return {...day,high:{...high,baseline:baselineHigh.complete?day.baseline.high:null},
+    return {...day,high:{...high,baseline:built.comparePublishedHigh?day.baseline.high:baselineHigh.complete?day.baseline.high:null},
       amount:{...amount,baseline:baselineAmount.complete?(day.pairedRemainingAmount?baselineAmount.value:day.baseline.amount):null},
       rain:{...rain,baseline:baselineRain.complete?day.baseline.rain:null}};
   });
@@ -286,4 +286,23 @@ export function customForecastNarrative(built) {
     :completeDays?'Your forecast is ready below. The published forecast is missing matching values, so we can’t compare changes yet.'
     :'The selected models do not cover a whole day yet. Add another available model to extend the forecast.';
   return {days,highlights,summary,completeDays,comparedDays};
+}
+
+/** One real model against the exact published forecast, with seven local dates. */
+export function singleModelComparison(input,selectedId=null){
+  const model=input.models.find(item=>item.id===selectedId&&item.available)||null;
+  const built=model?{...blendCustomForecast(input,{[model.id]:100}),comparePublishedHigh:true}:publishedForecastPreview(input);
+  const narrative=customForecastNarrative(built);
+  const baseline=input.calendarDays.map(day=>finite(day.baseline.high)?day.baseline.high:null);
+  const selected=model?narrative.days.map(day=>finite(day.high.value)?day.high.value:null):[];
+  const covered=model?selected.filter(finite).length:baseline.filter(finite).length;
+  const label=model?.label||'Weather Nourie';
+  const missing=model?narrative.days.filter(day=>!finite(day.high.value)):[];
+  const coverageNote=missing.length?`${label} is missing hourly coverage for ${missing[0].today?'the rest of today':missing[0].label}${missing.length>1?` and ${missing.length-1} other ${missing.length===2?'date':'dates'}`:''}. Those daily highs stay blank.`:'';
+  const summary=!model?'Choose a model to see how its forecast differs from Weather Nourie.'
+    :narrative.highlights.length?`${label} compared with Weather Nourie:`
+    :narrative.comparedDays?`${label} matches Weather Nourie to the displayed precision on the days we can compare.`
+    :covered?`${label} is shown above. Weather Nourie is missing matching values for a comparison.`
+    :`${label} does not cover a complete calendar day yet. Choose another model to compare daily highs.`;
+  return {selectedId:model?.id||null,label,color:model?.color||'#ffffff',days:narrative.days,baseline,selected,covered,coverageNote,summary,narrative,built};
 }
