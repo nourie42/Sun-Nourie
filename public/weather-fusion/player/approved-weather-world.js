@@ -1,8 +1,8 @@
 /** The user's approved complete photographs, not the retired character atlases.
  * Forecast values remain owned by native-player.js. No weather is fetched here. */
-import {selectWeatherPortrait} from './approved-portrait-selection.js?v=approved-her-prerelease-v2';
+import {selectWeatherPortrait,WINTER_CLOTHING_BELOW_F} from './approved-portrait-selection.js?v=approved-her-cold-v4';
 import {solarElevation} from '../weather-math.js?v=current-rain-20261017-v3';
-export const APPROVED_PLAYER_VERSION='approved-her-prerelease-v3';
+export const APPROVED_PLAYER_VERSION='approved-her-cold-v4';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 const WMO={0:'Clear',1:'Mostly clear',2:'Partly cloudy',3:'Overcast',45:'Fog',48:'Fog',51:'Drizzle',53:'Drizzle',55:'Drizzle',56:'Freezing drizzle',57:'Freezing drizzle',61:'Rain',63:'Rain',65:'Heavy rain',66:'Freezing rain',67:'Freezing rain',71:'Snow',73:'Snow',75:'Heavy snow',77:'Snow',80:'Rain showers',81:'Rain showers',82:'Heavy rain',85:'Snow showers',86:'Heavy snow',95:'Thunderstorms',96:'Thunderstorms with hail',99:'Thunderstorms with hail'};
 export function approvedState(frame={}){
@@ -22,11 +22,12 @@ export function approvedOutfit(frame={}){
  const state=approvedState(frame),weather=state.weather;
  const snow=['snow','heavy-snow'].includes(weather),storm=['storm','hail'].includes(weather);
  const rain=['rain','drizzle','heavy-rain','freezing-rain','sleet'].includes(weather);
- const cold=state.band==='below-32f',cool=['32-59f','below-60f','32-49f'].includes(state.band),hot=state.band==='75f-plus';
- const label=!state.available?'Outfit unavailable':cold?'Warm parka, long pants, hat, scarf and boots':snow||['sleet','freezing-rain'].includes(weather)?'Winter layers, long pants and weather boots':rain||storm?cool?'Rain jacket and long pants':'Light rainwear':cool?'Jacket and long pants':hot?'Light athletic top and shorts':'Light top and long pants';
+ const cold=state.available&&finite(state.value)&&state.value<WINTER_CLOTHING_BELOW_F,cool=!cold&&['32-59f','below-60f','32-49f'].includes(state.band),hot=state.band==='75f-plus';
+ const label=!state.available?'Outfit unavailable':cold?rain||storm?'Insulated winter raincoat, long pants, hat, gloves and boots':'Winter coat, long pants, hat, gloves and boots':snow||['sleet','freezing-rain'].includes(weather)?'Winter layers, long pants and weather boots':rain||storm?cool?'Rain jacket and long pants':'Light rainwear':cool?'Jacket and long pants':hot?'Light athletic top and shorts':'Light top and long pants';
  const basis=state.available?`${state.basis} ${Math.round(state.value)}°F`:state.reason;
  const safety=storm?'Thunder or hail: seek shelter indoors. ':'';
- return {temperature:state.value??null,garment:!state.available?'unknown':rain?'rain':cold?'cold':cool?'cool':hot?'hot':'mild',top:label,bottom:hot?'shorts':'long pants',hat:cold,scarf:cold,boots:cold||snow||rain,gloves:cold,sunglasses:false,umbrella:false,snow,rain,storm,possibleRain:frame.nativePrecipitationActivity==='possible',windy:finite(frame.windSpeed)&&frame.windSpeed>=18,hot,cold,cool,extras:[],label,advice:`${safety}${basis}. AI-generated weather and clothing illustration, not a live photograph.`,portrait:state};
+ const layers=cold?'Wear an insulated coat over warm layers, with a hat, scarf, gloves and warm boots. ':'';
+ return {temperature:state.value??null,garment:!state.available?'unknown':rain?'rain':cold?'cold':cool?'cool':hot?'hot':'mild',top:label,bottom:hot?'shorts':'long pants',hat:cold,scarf:cold,boots:cold||snow||rain,gloves:cold,sunglasses:false,umbrella:false,snow,rain,storm,possibleRain:frame.nativePrecipitationActivity==='possible',windy:finite(frame.windSpeed)&&frame.windSpeed>=18,hot,cold,cool,extras:[],label,advice:`${safety}${basis}. ${layers}AI-generated weather and clothing illustration, not a live photograph.`,portrait:state};
 }
 const path=file=>`/weather-fusion/${file}?v=${APPROVED_PLAYER_VERSION}`;
 const cache=new Map();

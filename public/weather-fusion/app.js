@@ -30,7 +30,7 @@ import {renderForecastWindowBanners,resetForecastWindowBanners} from './forecast
 import {createSevenDayCarousel} from './seven-day.js?v=low-rain-display-v1';
 import {forecastSourceHealth} from './forecast-status.js?v=source-health-v1';
 import {forecastRefreshDue} from './forecast-refresh.js?v=coverage-recovery-v2';
-import {installNativePlayer} from './native-player.js?v=approved-her-prerelease-v3';
+import {installNativePlayer} from './native-player.js?v=approved-her-cold-v4';
 import {createCustomForecast} from './custom-forecast.js?v=metrics-v4';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);

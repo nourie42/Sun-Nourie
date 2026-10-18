@@ -1,11 +1,14 @@
 /** Approved single-person weather photographs. This presentation layer never
  * changes a forecast number or infers precipitation type from temperature. */
-export const WEATHER_PORTRAITS_VERSION='weather-portraits-v1';
+export const WEATHER_PORTRAITS_VERSION='weather-portraits-cold-v2';
+// Match the native comfort cards: the 30s require winter layers. Image names
+// are legacy artwork identifiers, not the thresholds for clothing advice.
+export const WINTER_CLOTHING_BELOW_F=42;
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 const stamp=v=>typeof v==='number'?v:Date.parse(v);
 const four=['below-32f','32-59f','60-74f','75f-plus'];
 const three=['below-32f','32-59f','60f-plus'];
-const wet=['below-60f','60f-plus'];
+const wet=['below-42f','below-60f','60f-plus'];
 const winter=['below-32f','32-49f'];
 export const PORTRAIT_BANDS=Object.freeze({clear:four,cloudy:four,'partly-cloudy':four,drizzle:wet,rain:wet,'heavy-rain':wet,storm:wet,hail:wet,fog:three,haze:three,dust:three,wind:three,snow:winter,'heavy-snow':winter,sleet:winter,'freezing-rain':winter,dawn:three,dusk:three});
 export const PORTRAIT_FILES=Object.entries(PORTRAIT_BANDS).flatMap(([condition,bands])=>['dawn','dusk'].includes(condition)?bands.map(b=>`weather-her-${condition}-feels-${b}.webp`):['day','night'].flatMap(light=>bands.map(b=>`weather-her-${condition}-${light}-feels-${b}.webp`)));
@@ -48,8 +51,12 @@ export function selectWeatherPortrait(row={},options={}){
   }
  }
  const bands=PORTRAIT_BANDS[family];
- const band=bands===wet?(value<60?'below-60f':'60f-plus'):bands===winter?(value<32?'below-32f':'32-49f'):value<32?'below-32f':value<60?'32-59f':bands===four?(value<75?'60-74f':'75f-plus'):'60f-plus';
+ const cold=value<WINTER_CLOTHING_BELOW_F;
+ const band=bands===wet?(cold?'below-42f':value<60?'below-60f':'60f-plus'):bands===winter?(cold?'below-32f':'32-49f'):cold?'below-32f':value<60?'32-59f':bands===four?(value<75?'60-74f':'75f-plus'):'60f-plus';
  const file=`weather-her-${family}${['dawn','dusk'].includes(family)?'':'-'+light}-feels-${band}.webp`;
  if(!allowed.has(file))throw new Error('Unrecognized approved weather portrait');
- return {available:true,file,background:file.replace('weather-her-','weather-her-bg-'),weather,light,band,value,basis,air,feels,condition:String(row.condition||weather),illustrative:true};
+ // Cold rain edits retain their matching liquid-rain park background. Never
+ // substitute freezing rain or snow artwork because the person needs a coat.
+ const background=file.replace('weather-her-','weather-her-bg-').replace('feels-below-42f','feels-below-60f');
+ return {available:true,file,background,weather,light,band,value,basis,air,feels,cold,condition:String(row.condition||weather),illustrative:true};
 }
