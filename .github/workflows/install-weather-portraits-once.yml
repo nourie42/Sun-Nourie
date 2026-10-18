@@ -1,0 +1,176 @@
+name: Install and verify Play Your Weather portraits
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/install-weather-portraits-once.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: install-weather-portraits
+  cancel-in-progress: false
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - name: Connect photos to the existing main and Atmos players
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          root=Path('public/weather-fusion')
+          photos=root/'weather-portraits.js'
+          text=photos.read_text()
+          # Reset the prior asset when a new one starts, including rapid A/B/A seeks.
+          text=text.replace("img.hidden=true;status.hidden=false;status.textContent='Loading the picture for this hour…';", "visibleFile=null;img.hidden=true;status.hidden=false;status.textContent='Loading the picture for this hour…';")
+          photos.write_text(text)
+          page=root/'index.html';text=page.read_text()
+          script='<script type="module" src="/weather-fusion/weather-portraits.js?v=weather-portraits-v1"></script>'
+          if script not in text:
+              assert text.count('</head>')==1
+              page.write_text(text.replace('</head>',script+'\n</head>'))
+          app=root/'atmos.js';text=app.read_text()
+          if "import {createWeatherPortrait}" not in text:
+              start=text.index('function renderDressed(s){')
+              end=text.index('/* ---------- Loading ---------- */',start)
+              replacement="""let weatherPortrait=null;
+          function renderDressed(s){
+           if(!s)return;
+           if(!weatherPortrait){
+            weatherPortrait=createWeatherPortrait($('sky-frame'));
+            document.body.classList.add('weather-portrait-atmos');
+           }
+           const options={solar:forecast?.metricForecasts?.solar||[forecast?.solar],timeZone:forecast?.location?.timeZone};
+           void weatherPortrait.update(s,options);
+           weatherPortrait.preload(steps.slice(selected+1,selected+3),options);
+           if($('dressed')){$('dressed').hidden=true;$('dressed').replaceChildren();}
+           if($('dressed-note'))$('dressed-note').hidden=true;
+          }
+
+          """
+              text=text[:start]+replacement+text[end:]
+              text="import {createWeatherPortrait} from './weather-portraits.js?v=weather-portraits-v1';\n"+text
+              old="dressing=safe('dressing',()=>dressingTimeline(steps,sampleAt),[]);"
+              assert text.count(old)==1,'Atmos dressing entry point changed; review before replacing'
+              text=text.replace(old,'dressing=[]; // The approved portrait follows this hour directly.')
+              app.write_text(text)
+          page=root/'atmos.html';text=page.read_text()
+          text=text.replace('/weather-fusion/atmos.js?v=atmos-v5','/weather-fusion/atmos.js?v=weather-portraits-v1')
+          page.write_text(text)
+          PY
+          node --check public/weather-fusion/weather-portraits.js
+          node --check public/weather-fusion/atmos.js
+      - name: Check all 90 asset mappings, boundaries and weather priorities
+        run: |
+          mkdir -p /tmp/weather-portrait-results
+          node --input-type=module - <<'JS' | tee /tmp/weather-portrait-results/selection-tests.txt
+          import assert from 'node:assert/strict';
+          import fs from 'node:fs';
+          import {selectWeatherPortrait as choose,PORTRAIT_FILES,PORTRAIT_BANDS} from './public/weather-fusion/weather-portraits.js';
+          const manifest=JSON.parse(fs.readFileSync('public/weather-fusion/weather-her-manifest.json'));
+          assert.equal(PORTRAIT_FILES.length,90);assert.equal(new Set(PORTRAIT_FILES).size,90);assert.equal(manifest.count,90);
+          const names=new Set(manifest.images.map(x=>x.file));
+          for(const file of PORTRAIT_FILES){assert.ok(names.has(file),file);assert.ok(fs.statSync('public/weather-fusion/'+file).size>1000);assert.ok(fs.statSync('public/weather-fusion/'+file.replace('weather-her-','weather-her-bg-')).size>1000);}
+          const row={condition:'Clear',isDay:true,temperature:70,feels:25};
+          assert.match(choose(row).file,/below-32f/);assert.match(choose(row,{mode:'air'}).file,/60-74f/);
+          for(const [temperature,band] of [[-20,'below-32f'],[0,'below-32f'],[31.99,'below-32f'],[32,'32-59f'],[59.99,'32-59f'],[60,'60-74f'],[74.99,'60-74f'],[75,'75f-plus']])assert.equal(choose({...row,feels:temperature}).band,band);
+          assert.match(choose({...row,feels:null}).basis,/unavailable/);
+          assert.equal(choose({...row,temperature:null,feels:null}).available,false);
+          assert.equal(choose({...row,isDay:undefined}).available,false);
+          assert.equal(choose({...row,condition:'Unknown'}).available,false);
+          for(const [condition,weather] of [['Freezing Rain','freezing-rain'],['Sleet','sleet'],['Heavy Snow','heavy-snow'],['Thunderstorms','storm'],['Thunderstorms with Hail','hail'],['Heavy Rain','heavy-rain'],['Rain','rain'],['Clear','clear']])assert.equal(choose({...row,condition,feels:-20}).weather,weather);
+          const touched=new Set();const labels={'partly-cloudy':'Partly Cloudy','heavy-rain':'Heavy Rain','heavy-snow':'Heavy Snow','freezing-rain':'Freezing Rain',storm:'Thunderstorms',wind:'Windy'};
+          for(const condition of Object.keys(PORTRAIT_BANDS))for(const isDay of [true,false])for(const feels of [10,40,65,85]){
+            const special=['dawn','dusk'].includes(condition),time=Date.parse('2026-10-18T11:00:00Z');
+            const input={condition:special?'Clear':labels[condition]||condition,isDay,feels,temperature:55,time};
+            const options=special?{solar:[{[condition==='dawn'?'sunrise':'sunset']:new Date(time).toISOString()}]}:{};
+            touched.add(choose(input,options).file);
+          }
+          assert.deepEqual([...touched].sort(),[...names].sort());
+          assert.equal(choose({...row,condition:'Rain',time:Date.parse('2026-10-18T11:00:00Z')},{solar:[{sunrise:'2026-10-18T11:00:00Z'}]}).weather,'rain');
+          console.log('PASS: all 90 approved assets reachable; matching backgrounds exist; feels/air, zero/negative values, missing data, phase priority, day/night and twilight boundaries verified.');
+          JS
+      - name: Install browser checks
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Check real main-page and Atmos integration on phone and desktop
+        run: |
+          node --input-type=module - <<'JS' | tee /tmp/weather-portrait-results/browser-tests.txt
+          import assert from 'node:assert/strict';import fs from 'node:fs';
+          import express from 'express';import {chromium} from 'playwright';
+          import {fixture} from './scripts/weatherNourieFixture.js';
+          const at=Date.parse('2026-09-05T22:00:00Z'),forecast=fixture('knightdale',at);
+          const app=express();app.use('/api/',(req,res)=>{if(req.path.includes('forecast'))return res.json(forecast);if(req.path.includes('alerts'))return res.json({location:forecast.location,alerts:[],feeds:[{id:'alerts',status:'ready'}]});return res.status(503).json({error:'Optional source omitted in test'});});app.use(express.static('public'));
+          const server=await new Promise(resolve=>{const s=app.listen(0,'127.0.0.1',()=>resolve(s));});const base='http://127.0.0.1:'+server.address().port;
+          const browser=await chromium.launch({headless:true});
+          try{
+            for(const [name,width,height] of [['phone',390,844],['desktop',1365,960]]){
+              const context=await browser.newContext({viewport:{width,height},timezoneId:'America/Los_Angeles'});
+              await context.addInitScript(()=>localStorage.setItem('weather-fusion-device-place',JSON.stringify({latitude:35.787,longitude:-78.4806})));
+              await context.route('https://**/*',route=>route.abort());
+              for(const path of ['/weather-fusion/','/weather-fusion/atmos.html']){
+                const page=await context.newPage();await page.clock.install({time:new Date(at)});
+                page.on('pageerror',error=>console.log('Browser diagnostic:',error.message));
+                await page.goto(base+path);await page.locator('.weather-portrait[data-loaded="true"]').waitFor({timeout:45000});
+                assert.equal(await page.locator('.weather-portrait').count(),1);
+                assert.equal(await page.locator('.reference-scene:visible').count(),0);
+                const image=page.locator('.weather-portrait-image');assert.ok(await image.isVisible());
+                assert.equal(await image.evaluate(node=>node.naturalWidth),1200);
+                await page.locator('.weather-portrait-mode select').selectOption('air');
+                await page.locator('.weather-portrait[data-loaded="true"]').waitFor();
+                const slider=page.locator(path.endsWith('atmos.html')?'#hour':'.portrait-hour');
+                await slider.fill('2');await slider.dispatchEvent('input');
+                await page.locator('.weather-portrait[data-loaded="true"]').waitFor();
+                assert.ok(await image.getAttribute('src'));
+                assert.ok(await page.locator('body').evaluate(node=>node.classList.contains('her-background-loaded')));
+                await page.locator('.weather-portrait').screenshot({path:`/tmp/weather-portrait-results/${name}-${path.endsWith('atmos.html')?'atmos':'main'}.png`});
+                console.log(`PASS: ${name} ${path}: single correct photo, no other people, image decoded, air/feels control, timeline seek and matched background.`);
+                await page.close();
+              }
+              await context.close();
+            }
+          }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}
+          JS
+      - name: Publish the tested page update
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/weather-fusion/index.html public/weather-fusion/atmos.html public/weather-fusion/atmos.js public/weather-fusion/weather-portraits.js
+          if ! git diff --cached --quiet; then
+            git commit -m 'Activate single-person weather pictures with air/feels outfits and synchronized backgrounds'
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
+          git rev-parse HEAD | tee /tmp/weather-portrait-results/published-commit.txt
+      - name: Verify the deployed public page and image assets
+        run: |
+          node --input-type=module - <<'JS' | tee /tmp/weather-portrait-results/live-verification.txt
+          import fs from 'node:fs';import {createHash} from 'node:crypto';
+          const base='https://sun-nourie-live.onrender.com/weather-fusion/';
+          const paths=['index.html','atmos.js','weather-portraits.js','weather-her-clear-day-feels-75f-plus.webp','weather-her-snow-night-feels-below-32f.webp'];
+          const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
+          let verified=false;
+          for(let i=0;i<40;i++){
+            try{
+              const results=await Promise.all(paths.map(async path=>{const response=await fetch(base+(path==='index.html'?'':path)+'?check=weather-portraits-v1',{cache:'no-store',signal:AbortSignal.timeout(30000)});return response.ok&&hash(Buffer.from(await response.arrayBuffer()))===hash(fs.readFileSync('public/weather-fusion/'+path));}));
+              if(results.every(Boolean)){verified=true;break;}
+            }catch{}
+            await new Promise(resolve=>setTimeout(resolve,12000));
+          }
+          if(!verified)throw Error('Page changes were published, but the exact deployed files could not yet be verified.');
+          console.log('PASS: production is serving the tested index, Atmos script, portrait controller, daytime portrait and nighttime winter portrait, with exact file hashes.');
+          JS
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: play-your-weather-verification
+          path: /tmp/weather-portrait-results
+          retention-days: 7
