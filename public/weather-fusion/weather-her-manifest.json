@@ -1,0 +1,636 @@
+{
+  "version": "weather-her-v1",
+  "count": 90,
+  "images": [
+    {
+      "file": "weather-her-clear-day-feels-32-59f.webp",
+      "background": "weather-her-bg-clear-day-feels-32-59f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "60d6e80990e65b3d10c63ef262223b50279b729de48efa5821a76c1ca2216d8d"
+    },
+    {
+      "file": "weather-her-clear-day-feels-60-74f.webp",
+      "background": "weather-her-bg-clear-day-feels-60-74f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "ed67f82385ab7b81b24369d921b5252d9e80899bef6a2969c88a7e6044077c6b"
+    },
+    {
+      "file": "weather-her-clear-day-feels-75f-plus.webp",
+      "background": "weather-her-bg-clear-day-feels-75f-plus.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "4bcca84fa3820a575799340a48ffa9af189f756295cb0edb36e1c726f540a3d4"
+    },
+    {
+      "file": "weather-her-clear-day-feels-below-32f.webp",
+      "background": "weather-her-bg-clear-day-feels-below-32f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "4da778929ba2eff3ea49c4453e71702013ad9853bccf76279c1ef0c9b15b2ce6"
+    },
+    {
+      "file": "weather-her-clear-night-feels-32-59f.webp",
+      "background": "weather-her-bg-clear-night-feels-32-59f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "7ae420ad74e4390c2ddaeb8698d0e9ba0f1ac14f34e92518ba4c36a3c1c1d43f"
+    },
+    {
+      "file": "weather-her-clear-night-feels-60-74f.webp",
+      "background": "weather-her-bg-clear-night-feels-60-74f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "3f960e95b787ed8c3b09aff5e789fb4883e2a5ee418d8388977a45b19d6a3e1f"
+    },
+    {
+      "file": "weather-her-clear-night-feels-75f-plus.webp",
+      "background": "weather-her-bg-clear-night-feels-75f-plus.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "5d0858b7cad5c88b2fe47b210e1ae434458135e0d5ebb65cd2575875d6d8e6a5"
+    },
+    {
+      "file": "weather-her-clear-night-feels-below-32f.webp",
+      "background": "weather-her-bg-clear-night-feels-below-32f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "3be68f86d380716947bd21ec2867e7da04d2998437316fd1c7d94b637ce4da59"
+    },
+    {
+      "file": "weather-her-cloudy-day-feels-32-59f.webp",
+      "background": "weather-her-bg-cloudy-day-feels-32-59f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "408b9189ac3e04ae5dbc5878fdbdfab6a07c5b2f3fc2a62c7c33fb2f8e8c823c"
+    },
+    {
+      "file": "weather-her-cloudy-day-feels-60-74f.webp",
+      "background": "weather-her-bg-cloudy-day-feels-60-74f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "55d7d58066cce2d9b93eb07015f4a51871ed973d831f777fc451b732f9858fbb"
+    },
+    {
+      "file": "weather-her-cloudy-day-feels-75f-plus.webp",
+      "background": "weather-her-bg-cloudy-day-feels-75f-plus.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "bad8cf81d683f0f9072515276d154d08e1cab5a926f090b776e9d5666f6fe173"
+    },
+    {
+      "file": "weather-her-cloudy-day-feels-below-32f.webp",
+      "background": "weather-her-bg-cloudy-day-feels-below-32f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "33415cf635a996d0b79ad291f3e88cb6ac6a0418a4e9dbcf33004517bfb2d199"
+    },
+    {
+      "file": "weather-her-cloudy-night-feels-32-59f.webp",
+      "background": "weather-her-bg-cloudy-night-feels-32-59f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "c8911e5b92a277873a4f69249ead640003c63979f66036e45c9d6f3a55f95f0e"
+    },
+    {
+      "file": "weather-her-cloudy-night-feels-60-74f.webp",
+      "background": "weather-her-bg-cloudy-night-feels-60-74f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "0ada1760fc196e123f8ab5134a654a0af5fcaa994093ffff015f4100d455a99a"
+    },
+    {
+      "file": "weather-her-cloudy-night-feels-75f-plus.webp",
+      "background": "weather-her-bg-cloudy-night-feels-75f-plus.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "df568aede00637bf28231f9cb75c5b84b5bc47214d6d8d76e25afd10501a2e14"
+    },
+    {
+      "file": "weather-her-cloudy-night-feels-below-32f.webp",
+      "background": "weather-her-bg-cloudy-night-feels-below-32f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "d6d427dcc7e9d40250af578ebd0acdad385b9aaab139cb6eebb8bb24806af3b5"
+    },
+    {
+      "file": "weather-her-dawn-feels-32-59f.webp",
+      "background": "weather-her-bg-dawn-feels-32-59f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "1f3028123a33d80308384de713008d61a2e168b55d31a526a212c0e7eb02431e"
+    },
+    {
+      "file": "weather-her-dawn-feels-60f-plus.webp",
+      "background": "weather-her-bg-dawn-feels-60f-plus.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "eac66c494fab128129fc9be0423be45540304887ce942c1d91320a546b25d44d"
+    },
+    {
+      "file": "weather-her-dawn-feels-below-32f.webp",
+      "background": "weather-her-bg-dawn-feels-below-32f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "bf233657325b1c9f0099e249f7e59f692dee2f05821459f14e9a4fa25f7954f8"
+    },
+    {
+      "file": "weather-her-drizzle-day-feels-60f-plus.webp",
+      "background": "weather-her-bg-drizzle-day-feels-60f-plus.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "7e8d220b491ce7c164a195f1dcbb7a8316c1e209325e067dc14224f9781c2311"
+    },
+    {
+      "file": "weather-her-drizzle-day-feels-below-60f.webp",
+      "background": "weather-her-bg-drizzle-day-feels-below-60f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "82d699242bf94658db00a9a615c37b2b2fd74e1dbfe0fd7beaa54e5cb17aeb7f"
+    },
+    {
+      "file": "weather-her-drizzle-night-feels-60f-plus.webp",
+      "background": "weather-her-bg-drizzle-night-feels-60f-plus.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "afdb2b446d2adbe4e466a30520c7f0b370160f9a65e1740931a78f28f31e8c09"
+    },
+    {
+      "file": "weather-her-drizzle-night-feels-below-60f.webp",
+      "background": "weather-her-bg-drizzle-night-feels-below-60f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "0a191757d9da007d292bf4a64ea0de02e1acaf3018a26bab12b401731725e3fc"
+    },
+    {
+      "file": "weather-her-dusk-feels-32-59f.webp",
+      "background": "weather-her-bg-dusk-feels-32-59f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "cc02debf1b3583bef73d8f6ada306ef431f9e74988388e971e198feacc234d46"
+    },
+    {
+      "file": "weather-her-dusk-feels-60f-plus.webp",
+      "background": "weather-her-bg-dusk-feels-60f-plus.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "1f9a52744d022e18df37949214333630aed5475aa5c5ba8fd72838857dc27a65"
+    },
+    {
+      "file": "weather-her-dusk-feels-below-32f.webp",
+      "background": "weather-her-bg-dusk-feels-below-32f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "472308638e8e6fd576f7452b50bd6f4f847a9347251e297ef219abba324af11f"
+    },
+    {
+      "file": "weather-her-dust-day-feels-32-59f.webp",
+      "background": "weather-her-bg-dust-day-feels-32-59f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "5b1e69d24cfa97f776a0357e816ea74052349dc60c27d6ff3eb3d79fd46c01ee"
+    },
+    {
+      "file": "weather-her-dust-day-feels-60f-plus.webp",
+      "background": "weather-her-bg-dust-day-feels-60f-plus.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "fb767bbfad8cb3ae6eb6859de17c1642d5b4da473edffceab2142623e3168ddd"
+    },
+    {
+      "file": "weather-her-dust-day-feels-below-32f.webp",
+      "background": "weather-her-bg-dust-day-feels-below-32f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "b8b5b7ce2c30a6090fe81dea8c68e3753d2d96bf2cc00141ab771e95e1ca8307"
+    },
+    {
+      "file": "weather-her-dust-night-feels-32-59f.webp",
+      "background": "weather-her-bg-dust-night-feels-32-59f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "6efd5abacd417e4f0ebdc4f19a56790eaa7bbe9dada13cdc57c8cfdf30548dc1"
+    },
+    {
+      "file": "weather-her-dust-night-feels-60f-plus.webp",
+      "background": "weather-her-bg-dust-night-feels-60f-plus.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "e87fc748dc4b7fd63f330f6bd1020bc1e7d9e64480f0d57a4693e6adff189b20"
+    },
+    {
+      "file": "weather-her-dust-night-feels-below-32f.webp",
+      "background": "weather-her-bg-dust-night-feels-below-32f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "4408c4427e3ac334d6e1355c12c4fca88305cea9fb4022960af98abc2ae037bb"
+    },
+    {
+      "file": "weather-her-fog-day-feels-32-59f.webp",
+      "background": "weather-her-bg-fog-day-feels-32-59f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "98af88db7b7e19beee2bddbb10411a38fd4d09f381e97f71018cd8a66b1eb5c8"
+    },
+    {
+      "file": "weather-her-fog-day-feels-60f-plus.webp",
+      "background": "weather-her-bg-fog-day-feels-60f-plus.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "25536a928e3a3365e48295ba0f49d9427698cec2bda1e8161a65c81b1d82c9fa"
+    },
+    {
+      "file": "weather-her-fog-day-feels-below-32f.webp",
+      "background": "weather-her-bg-fog-day-feels-below-32f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "21c21b5cc95303e0cfdb8aab3f1af0e52239034e030d505ab642b330f4fa2c58"
+    },
+    {
+      "file": "weather-her-fog-night-feels-32-59f.webp",
+      "background": "weather-her-bg-fog-night-feels-32-59f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "6948c22a818e551269fa34d2c56911dfc70c1ab967cfcc197d5eaf10b51922c7"
+    },
+    {
+      "file": "weather-her-fog-night-feels-60f-plus.webp",
+      "background": "weather-her-bg-fog-night-feels-60f-plus.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "8433f5b7476ad70f414bd22da8d1595410266985e6387c21bfa8cb386841ecf4"
+    },
+    {
+      "file": "weather-her-fog-night-feels-below-32f.webp",
+      "background": "weather-her-bg-fog-night-feels-below-32f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "c20c061e924ae6c4aac44023d2016117cdfaba863280619a72100e342333e9a7"
+    },
+    {
+      "file": "weather-her-freezing-rain-day-feels-32-49f.webp",
+      "background": "weather-her-bg-freezing-rain-day-feels-32-49f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "1dadfa1fb2d22ead6e9296a1df58414e597835682c27287ea7ee76b32ad08576"
+    },
+    {
+      "file": "weather-her-freezing-rain-day-feels-below-32f.webp",
+      "background": "weather-her-bg-freezing-rain-day-feels-below-32f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "d5da40344a05c44cfdc40a8636f43a113f7100bd995b69e1b4c1fb03ba1b0078"
+    },
+    {
+      "file": "weather-her-freezing-rain-night-feels-32-49f.webp",
+      "background": "weather-her-bg-freezing-rain-night-feels-32-49f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "06d0c95dcc2a17a2721501ddd312beb51f5232974923f9f0065b43ea1c5e794c"
+    },
+    {
+      "file": "weather-her-freezing-rain-night-feels-below-32f.webp",
+      "background": "weather-her-bg-freezing-rain-night-feels-below-32f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "805dccd4a8fc508c25948fdb8211bde5b78ec720b6a0c172f981150355fd13d9"
+    },
+    {
+      "file": "weather-her-hail-day-feels-60f-plus.webp",
+      "background": "weather-her-bg-hail-day-feels-60f-plus.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "c26146fbbc90bd16556179438e49bd08ba6d06c3b5184d1352673a53ad64a36c"
+    },
+    {
+      "file": "weather-her-hail-day-feels-below-60f.webp",
+      "background": "weather-her-bg-hail-day-feels-below-60f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "a75ff1f3f8e3b6a99591df4b67a50642d3e66167fbe7c309ed64af4597f9a4fc"
+    },
+    {
+      "file": "weather-her-hail-night-feels-60f-plus.webp",
+      "background": "weather-her-bg-hail-night-feels-60f-plus.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "44a1d66104391c9b0c5b661e87d6456dd46e92914ab67a00c00f21c22030c69f"
+    },
+    {
+      "file": "weather-her-hail-night-feels-below-60f.webp",
+      "background": "weather-her-bg-hail-night-feels-below-60f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "07ab34bfab4c3fac5cb2fdd80e6e7c39670fac274d5c51e9d199e72d726e1505"
+    },
+    {
+      "file": "weather-her-haze-day-feels-32-59f.webp",
+      "background": "weather-her-bg-haze-day-feels-32-59f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "c9ff6d4a5cdd79fbd93285473f5d5947c1afc7b1348d1b1c1272df5756a31c8b"
+    },
+    {
+      "file": "weather-her-haze-day-feels-60f-plus.webp",
+      "background": "weather-her-bg-haze-day-feels-60f-plus.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "97cc18c12ce60949fe0b5d06b6a269ba2606f2bd451343d152822651fc2f947b"
+    },
+    {
+      "file": "weather-her-haze-day-feels-below-32f.webp",
+      "background": "weather-her-bg-haze-day-feels-below-32f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "1b955bf033a22b23e2397850b6d35ceccfef42fa33b0a043aeffb2983b36e52b"
+    },
+    {
+      "file": "weather-her-haze-night-feels-32-59f.webp",
+      "background": "weather-her-bg-haze-night-feels-32-59f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "a770ec5efd8f5bf8e49ba4083555d01a24587a0326ec72ed5ee78ac30f2eda25"
+    },
+    {
+      "file": "weather-her-haze-night-feels-60f-plus.webp",
+      "background": "weather-her-bg-haze-night-feels-60f-plus.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "329205bb44c8af1179c389c95e0bf5ef36b541ddd1ca01c911732dc16e63e554"
+    },
+    {
+      "file": "weather-her-haze-night-feels-below-32f.webp",
+      "background": "weather-her-bg-haze-night-feels-below-32f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "84e7369a653a0782367faef4afb84b9a301cb81c8165f37ab1e638e99a9257ba"
+    },
+    {
+      "file": "weather-her-heavy-rain-day-feels-60f-plus.webp",
+      "background": "weather-her-bg-heavy-rain-day-feels-60f-plus.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "66f5eb9928ab46f5f37ebdf268956a835754b6a08ae302cc2635d18bb8602b7b"
+    },
+    {
+      "file": "weather-her-heavy-rain-day-feels-below-60f.webp",
+      "background": "weather-her-bg-heavy-rain-day-feels-below-60f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "b0503e74d0ce4b91c1f4f1f4c73122bdc61fb028ce311ca4d2d759907092887d"
+    },
+    {
+      "file": "weather-her-heavy-rain-night-feels-60f-plus.webp",
+      "background": "weather-her-bg-heavy-rain-night-feels-60f-plus.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "531bb1c36f59331a741c42defc4cf017c83c73237e3fe2176724634a7556dec2"
+    },
+    {
+      "file": "weather-her-heavy-rain-night-feels-below-60f.webp",
+      "background": "weather-her-bg-heavy-rain-night-feels-below-60f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "4357777e3740d81e083875a9e54574800a1052989b753a167b185622350074b9"
+    },
+    {
+      "file": "weather-her-heavy-snow-day-feels-32-49f.webp",
+      "background": "weather-her-bg-heavy-snow-day-feels-32-49f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "d5d43d12999f206a5504dcda9a09d008db29803a3d0036e18d98025afffb408a"
+    },
+    {
+      "file": "weather-her-heavy-snow-day-feels-below-32f.webp",
+      "background": "weather-her-bg-heavy-snow-day-feels-below-32f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "933584a1850be14377c4642509c7f2954848abadf2fdbceea8a98eb0a977de1e"
+    },
+    {
+      "file": "weather-her-heavy-snow-night-feels-32-49f.webp",
+      "background": "weather-her-bg-heavy-snow-night-feels-32-49f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "c5d7049ee14f0e3e0cc469289f353d19d35634b39c0045ca09309ca62ea6fa64"
+    },
+    {
+      "file": "weather-her-heavy-snow-night-feels-below-32f.webp",
+      "background": "weather-her-bg-heavy-snow-night-feels-below-32f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "a4622514d688649587f864859d578ce85b2d3789dc098dce4fcab4165b31b519"
+    },
+    {
+      "file": "weather-her-partly-cloudy-day-feels-32-59f.webp",
+      "background": "weather-her-bg-partly-cloudy-day-feels-32-59f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "32296640e11db58a194b9e151124ab472d28163b56878280cb1f38d11f437043"
+    },
+    {
+      "file": "weather-her-partly-cloudy-day-feels-60-74f.webp",
+      "background": "weather-her-bg-partly-cloudy-day-feels-60-74f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "10f3f28141ff538d764bac1ae29c113051087860acdd464a1dc5fba8c0aa2d05"
+    },
+    {
+      "file": "weather-her-partly-cloudy-day-feels-75f-plus.webp",
+      "background": "weather-her-bg-partly-cloudy-day-feels-75f-plus.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "253de965d1f22b282dcb0915f9a6e6aaf834e0420dcae5c4ed99021d17c26da9"
+    },
+    {
+      "file": "weather-her-partly-cloudy-day-feels-below-32f.webp",
+      "background": "weather-her-bg-partly-cloudy-day-feels-below-32f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "c2158ab5887d6dd666c9a3b76ea03b5a9454d5f80d0b8d248b732fcfd39fb827"
+    },
+    {
+      "file": "weather-her-partly-cloudy-night-feels-32-59f.webp",
+      "background": "weather-her-bg-partly-cloudy-night-feels-32-59f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "7b28d6705252603dc7605836e3ea0fad92cf45d9276ee036c12a60712cd90b6d"
+    },
+    {
+      "file": "weather-her-partly-cloudy-night-feels-60-74f.webp",
+      "background": "weather-her-bg-partly-cloudy-night-feels-60-74f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "709bfe9eb6f8688be378f3bad4a28d418292082bf076877ebaa1f0b063bfe5b2"
+    },
+    {
+      "file": "weather-her-partly-cloudy-night-feels-75f-plus.webp",
+      "background": "weather-her-bg-partly-cloudy-night-feels-75f-plus.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "d5fb684c2ca0ea62068a9c005c0a8c4e673b18b85a26df80a3a647cd085b6531"
+    },
+    {
+      "file": "weather-her-partly-cloudy-night-feels-below-32f.webp",
+      "background": "weather-her-bg-partly-cloudy-night-feels-below-32f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "8d220793537ea40a5a62a0cc5feffb8e4d1fe972e5a82f1318293293b8e99432"
+    },
+    {
+      "file": "weather-her-rain-day-feels-60f-plus.webp",
+      "background": "weather-her-bg-rain-day-feels-60f-plus.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "bb5aa558ae1763468c902ca0b14afcf29f27857c3ce39529c68d3f8726ffe713"
+    },
+    {
+      "file": "weather-her-rain-day-feels-below-60f.webp",
+      "background": "weather-her-bg-rain-day-feels-below-60f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "239c0d6cd98defcfd3f8c7676d39a4424fdffdc37bff34bd661afcb0a7c915c6"
+    },
+    {
+      "file": "weather-her-rain-night-feels-60f-plus.webp",
+      "background": "weather-her-bg-rain-night-feels-60f-plus.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "8145a2c8d4004c4fbea423cf786428aea4d550ae0beef50089f04f4b73e71720"
+    },
+    {
+      "file": "weather-her-rain-night-feels-below-60f.webp",
+      "background": "weather-her-bg-rain-night-feels-below-60f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "29306ca9d40f55756f52e7fb5f92fcab497f62290529106c1d66db22e8f8cb9a"
+    },
+    {
+      "file": "weather-her-sleet-day-feels-32-49f.webp",
+      "background": "weather-her-bg-sleet-day-feels-32-49f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "59df3c7246726c8028b31c8dc4a2c86aed2664b906089119b61925a04e553056"
+    },
+    {
+      "file": "weather-her-sleet-day-feels-below-32f.webp",
+      "background": "weather-her-bg-sleet-day-feels-below-32f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "a29572aa893f3bc48a335dedd65b2e16e68e7cb9f3fe89a2ba468ab41930b97b"
+    },
+    {
+      "file": "weather-her-sleet-night-feels-32-49f.webp",
+      "background": "weather-her-bg-sleet-night-feels-32-49f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "db30cc4cb2a0216ced567bc548ecaaa1eb280bb846b74d8efd579e801f38a04a"
+    },
+    {
+      "file": "weather-her-sleet-night-feels-below-32f.webp",
+      "background": "weather-her-bg-sleet-night-feels-below-32f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "5e7b17005be8d2b5254a745d96c488704681f0b6f5ea93bf9702edfcb1930ec5"
+    },
+    {
+      "file": "weather-her-snow-day-feels-32-49f.webp",
+      "background": "weather-her-bg-snow-day-feels-32-49f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "d56e66d13a4b1e2557c162471a33dec01ca5e48cfb5822f4485c678658098349"
+    },
+    {
+      "file": "weather-her-snow-day-feels-below-32f.webp",
+      "background": "weather-her-bg-snow-day-feels-below-32f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "af9879d94c32d34ee86cb15d67570ed580c06ba9740c579b6ce499bd2cccd986"
+    },
+    {
+      "file": "weather-her-snow-night-feels-32-49f.webp",
+      "background": "weather-her-bg-snow-night-feels-32-49f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "a0ca190d9da89839fb3cbfb6020e186a08914f860aef648c6c09a0a871875e72"
+    },
+    {
+      "file": "weather-her-snow-night-feels-below-32f.webp",
+      "background": "weather-her-bg-snow-night-feels-below-32f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "6f497682135392719be86d170c4a3f57b5942936fa6c096004e4c259b7950490"
+    },
+    {
+      "file": "weather-her-storm-day-feels-60f-plus.webp",
+      "background": "weather-her-bg-storm-day-feels-60f-plus.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "9fa18f3ad4a02bfd604e33c6f7d968ac50362fd46132e5ab482fec8e7e94a06d"
+    },
+    {
+      "file": "weather-her-storm-day-feels-below-60f.webp",
+      "background": "weather-her-bg-storm-day-feels-below-60f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "534d2739f93c4725cc0053e96b94c545c272e2e225d37ec87ca6aa50c4ad27c2"
+    },
+    {
+      "file": "weather-her-storm-night-feels-60f-plus.webp",
+      "background": "weather-her-bg-storm-night-feels-60f-plus.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "1ae926f8fa11b2580d90ac75709bf0361b5faca06edc0cb9969a8cfa4145da19"
+    },
+    {
+      "file": "weather-her-storm-night-feels-below-60f.webp",
+      "background": "weather-her-bg-storm-night-feels-below-60f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "ccfaaeba18aa0874575c10c0050b382f7e3e1fdb86977ce581433c768370ebaa"
+    },
+    {
+      "file": "weather-her-wind-day-feels-32-59f.webp",
+      "background": "weather-her-bg-wind-day-feels-32-59f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "435384583a6b6bce353fa273504b5906194539310d4d18f61df6df4b1c8136b7"
+    },
+    {
+      "file": "weather-her-wind-day-feels-60f-plus.webp",
+      "background": "weather-her-bg-wind-day-feels-60f-plus.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "3b06fe2ab41a5126f7ea92eaa75414a925312f17aa62c58e80d9d6353e19b8b5"
+    },
+    {
+      "file": "weather-her-wind-day-feels-below-32f.webp",
+      "background": "weather-her-bg-wind-day-feels-below-32f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "ce69ad2b99ddee9d4697f6755a4ca24d693b33972158c6fdfd75a007d001f20f"
+    },
+    {
+      "file": "weather-her-wind-night-feels-32-59f.webp",
+      "background": "weather-her-bg-wind-night-feels-32-59f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "41baeac126cea7187ab2ee2eaf5036eb7a8250d03248b72de949ee935b1c2628"
+    },
+    {
+      "file": "weather-her-wind-night-feels-60f-plus.webp",
+      "background": "weather-her-bg-wind-night-feels-60f-plus.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "0206352e489fcfef69d14ab14329fa7f952ab81d756e9d33c253796cd0c2f0ad"
+    },
+    {
+      "file": "weather-her-wind-night-feels-below-32f.webp",
+      "background": "weather-her-bg-wind-night-feels-below-32f.webp",
+      "width": 1200,
+      "height": 675,
+      "sha256": "1df8baec6068930a6996090fcefa1d9a356569f64c184f5aac17c4bf62320cf2"
+    }
+  ]
+}
