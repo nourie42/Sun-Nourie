@@ -127,7 +127,7 @@ export function createNativePlaybackBridge({player,selectComfortHour,samplesForF
 }
 
 /** Keep the scene opt-in: a closed tab neither loads the player nor owns a renderer. */
-export function installNativePlayer({selectComfortHour,loadPlayer=()=>import('./player/sky-player.js?v=actual-world-v4')}={}){
+export function installNativePlayer({selectComfortHour,loadPlayer=()=>import('./player/sky-player.js?v=approved-her-prerelease-v2')}={}){
   if(typeof document==='undefined')return null;
   const host=document.getElementById('nourie-player');if(!host)return null;
   if(host[INSTALL_KEY])return host[INSTALL_KEY];
