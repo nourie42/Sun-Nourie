@@ -1,4 +1,4 @@
-import {weatherState} from './weather-state.js';
+import {weatherState} from './weather-state.js?v=current-rain-20261017-v3';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 export const COMFORT_ART_VERSION='true-night-art-v6';
 
@@ -47,7 +47,7 @@ export function clothingForFeels(value,context={}){
 }
 export function precipitationActivity(condition='',context={}){
  const weather=weatherState(condition),pop=context.pop;
- if(context.rainAround===true||context.radarThreat===true)return 'active';
+ if(context.rainAround===true||context.radarThreat===true||context.rainExpected===true)return 'active';
  // Rain probability expresses how likely the stated phase is, not whether
  // its illustration can be replaced with clear skies. In particular, an
  // ensemble probability below 50% must not erase an official hourly storm.

@@ -160,6 +160,29 @@ test('a published zero NVIDIA rainfall amount stays a genuine zero contributor',
   assert.equal(rain.precipitationBlend.sources.find(source=>source.id==='wn').weight,.1);
 });
 
+test('sub-minimum NVIDIA rain keeps its raw amount and forecast share without lifting every hourly chance',()=>{
+ const input=sourceInputs({patchNvidia:wn=>{
+  wn.precipitationIntervals.forEach(row=>{row.value=.00000214;});wn.hourly.precipitation.fill(.00000214);
+ }});
+ for(const id of ['hrrr','ecmwf','nbm'])input.models[id].precipitationIntervals.forEach(row=>{row.value=0;});
+ input.grid.quantitativePrecipitation.values.forEach(row=>{row.value=0;});
+ input.hourly.periods.forEach(row=>{row.probabilityOfPrecipitation={value:2};});
+ const forecast=buildForecast(input),cards=sevenDayForecast(forecast,now),chances=buildSeries(forecast,null,'pop',now);
+ for(const epoch of [now+H,now+30*H]){
+  const row=at(forecast.rainTimeline,epoch);
+  assert.equal(row.rainLikelihood.sourceAmounts.wn,.00000214);
+  assert.equal(row.rainLikelihood.sourcePoints.wn,0);
+  assert.equal(row.rainLikelihood.reductionReasons.wn,'below-minimum');
+  assert.equal(row.precipitationBlend.sources.find(s=>s.id==='wn').weight,.1);
+  assert.ok(row.precipitation>0,'raw rainfall amount still contributes separately');
+  assert.ok(row.rainLikelihood.value<=1);
+ }
+ for(const [index,card] of cards.entries())assert.equal(card.pop,chances.forecastValues[index]);
+ const day=forecast.days[1],rows=forecast.rainTimeline.filter(r=>Date.parse(r.time)>=Date.parse(day.rainLikelihood.window.start)&&Date.parse(r.time)<Date.parse(day.rainLikelihood.window.end));
+ assert.equal(day.rainLikelihood.value,Math.max(...rows.map(r=>r.rainLikelihood.value)));
+ assert.equal(forecast.google.requestedWeight,.1);assert.equal(forecast.google.contributes,true);
+});
+
 test('daily confidence includes actual NVIDIA temperature and precipitation contributions',()=>{
   const forecast=buildForecast(sourceInputs()),day=forecast.days[0];
   assert.ok(day.confidence.sourceIds.includes('wn'));assert.equal(day.confidence.sourceCount,5);

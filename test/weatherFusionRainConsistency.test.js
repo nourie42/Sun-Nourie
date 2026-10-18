@@ -76,16 +76,19 @@ test('adjacent later-day meaningful model rain uses the same extended points as 
   assert.ok(rows.every(row=>row.rainLikelihood.sourcePoints.ecmwf===60&&row.rainLikelihood.sourcePoints.nbm===25));
 });
 
-test('extended rain policy changes at local midnight and missing models never restore full NWS probability',()=>{
+test('missing models use a labeled official NWS fallback instead of lowering its probability',()=>{
   const data=inputs({chance:80,amount:.02});
   data.models={};
   const forecast=buildForecast(data),midnight=localTime(nextDate('2026-09-05'),0,zone);
   const before=forecast.rainTimeline.find(row=>Date.parse(row.time)===midnight-H);
   const after=forecast.rainTimeline.find(row=>Date.parse(row.time)===midnight);
-  assert.equal(before.rainLikelihood.value,32);
-  assert.equal(after.rainLikelihood.value,12);
-  assert.deepEqual(before.rainLikelihood.sources.map(source=>[source.id,source.weight]),[['nws',.4]]);
-  assert.deepEqual(after.rainLikelihood.sources.map(source=>[source.id,source.weight]),[['nws',.15]]);
+  assert.equal(before.rainLikelihood.value,80);
+  assert.equal(after.rainLikelihood.value,80);
+  assert.deepEqual(before.rainLikelihood.sources.map(source=>[source.id,source.weight]),[['nws',1]]);
+  assert.deepEqual(after.rainLikelihood.sources.map(source=>[source.id,source.weight]),[['nws',1]]);
+  assert.equal(after.rainLikelihood.mode,'nws-fallback');
+  assert.equal(before.rainLikelihood.partialBlend.value,32);
+  assert.equal(after.rainLikelihood.partialBlend.value,12);
   assert.equal(after.rainLikelihood.sourcePoints.ecmwf,null);
   assert.equal(after.rainLikelihood.sourcePoints.nbm,null);
 });
@@ -249,10 +252,10 @@ test('an in-progress rainy hour stays in Today at 12:01 and its remaining amount
   data.models={};
   data.hourly.periods[0].probabilityOfPrecipitation.value=80;
   const initial=buildForecast(data),minuteLater=buildForecast({...data,now:now+60000});
-  assert.equal(initial.days[0].popDayLikelihood.value,32);
-  assert.equal(minuteLater.hours[0].rainLikelihood.value,32);
-  assert.equal(minuteLater.days[0].popDayLikelihood.value,32);
-  assert.equal(minuteLater.days[0].rainLikelihood.value,32);
+  assert.equal(initial.days[0].popDayLikelihood.value,80);
+  assert.equal(minuteLater.hours[0].rainLikelihood.value,80);
+  assert.equal(minuteLater.days[0].popDayLikelihood.value,80);
+  assert.equal(minuteLater.days[0].rainLikelihood.value,80);
   assert.equal(minuteLater.days[0].popDayLikelihood.window.start,iso(now+60000));
   assert.equal(minuteLater.days[0].popDayLikelihood.coverage.complete,true);
   assert.equal(minuteLater.days[0].qpfWindow.start,iso(now+60000));

@@ -1,6 +1,8 @@
-import {dailyDisplay,finite} from './weather-math.js?v=full-day-rain-v1';
-import {conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
-import {forecastPeriodSummary} from './forecast-story.js?v=weather-qa-v67';
+import {dailyDisplay,finite} from './weather-math.js?v=current-rain-20261017-v3';
+import {conditionForRainChance} from './weather-state.js?v=current-rain-20261017-v3';
+import {forecastPeriodSummary} from './forecast-story.js?v=verified-dry-20261018';
+import {calendarDayTemperatures} from './calendar-day.js?v=calendar-days-v1';
+import {rainAwareCondition,dailySkyCover} from './rain-display.js?v=low-rain-display-v1';
 
 const HOUR = 3600000;
 const chanceOf = row => {
@@ -77,59 +79,48 @@ function rainText(story,zone) {
   return text;
 }
 
-function tempText(day,phase) {
-  if (phase === 'overnight') return finite(day?.low) ? `Low around ${Math.round(day.low)}°.` : '';
-  if (phase === 'daytime') return finite(day?.high) ? `High near ${Math.round(day.high)}°.` : '';
+function tempText(day) {
   if (finite(day?.high) && finite(day?.low)) return `High near ${Math.round(day.high)}°, low around ${Math.round(day.low)}°.`;
   if (finite(day?.high)) return `High near ${Math.round(day.high)}°.`;
   if (finite(day?.low)) return `Low around ${Math.round(day.low)}°.`;
   return '';
 }
 
-function conditionsText(forecast,index,phase,now) {
+function conditionsText(forecast,index,story,now) {
   const day = forecast?.days?.[index] || {};
-  if (phase === 'daytime') {
-    const chance = forecastPeriodSummary(forecast,index,'daytime',now).chance;
-    return `${friendlyCondition(conditionForRainChance(day.condition || '',chance))}.`;
-  }
-  if (phase === 'overnight') {
-    const chance = forecastPeriodSummary(forecast,index,'overnight',now).chance;
-    return `${friendlyCondition(conditionForRainChance(day.nightCondition || day.condition || '',chance))}.`;
-  }
-  const dayChance = forecastPeriodSummary(forecast,index,'daytime',now).chance;
-  const nightChance = forecastPeriodSummary(forecast,index,'overnight',now).chance;
-  const daytime = friendlyCondition(conditionForRainChance(day.condition || '',dayChance));
-  const nighttime = friendlyCondition(conditionForRainChance(day.nightCondition || day.condition || '',nightChance));
-  if (daytime.toLowerCase() === nighttime.toLowerCase()) return `${daytime}.`;
-  return `${daytime} during the day, then ${nighttime.toLowerCase()} at night.`;
+  // Use an hour on this date, rather than the broad NWS night period that
+  // continues into the next morning. Prefer this date's peak-rain hour.
+  const rows=story.rows.filter(row=>typeof row.condition==='string'&&row.condition.trim());
+  const peak=rows.reduce((best,row)=>!best||(chanceOf(row)??-1)>(chanceOf(best)??-1)?row:best,null);
+  const zone=forecast?.location?.timeZone||'America/New_York';
+  const display=dailyDisplay(day,index,now,zone,forecast);
+  const condition=peak?.condition||display.condition||day.condition||'';
+  const sky=peak?.skyCover??dailySkyCover(forecast,day,index,now);
+  return `${friendlyCondition(rainAwareCondition(conditionForRainChance(condition,story.chance,sky),story.chance,day,display.night,sky))}.`;
 }
 
-function periodText(forecast,index,phase,now) {
-  const day = forecast?.days?.[index] || {};
-  const story = forecastPeriodSummary(forecast,index,phase,now);
+function periodText(forecast,index,now) {
+  const story = forecastPeriodSummary(forecast,index,'overall',now);
   const zone = forecast?.location?.timeZone || 'America/New_York';
-  return [conditionsText(forecast,index,phase,now),tempText(day,phase),rainText(story,zone)].filter(Boolean).join(' ');
+  return [conditionsText(forecast,index,story,now),tempText(calendarDayTemperatures(forecast,index,now)),rainText(story,zone)].filter(Boolean).join(' ');
 }
 
 export function forecastOutlookDetails(forecast,now=Date.now()) {
   const days = forecast?.days || [];
   if (!days.length) return {summary:'',nearTerm:'',extended:''};
   const zone = forecast?.location?.timeZone || 'America/New_York';
-  const display = dailyDisplay(days[0],0,now,zone);
-  const summaryPhase = display.tonight ? 'overnight' : 'daytime';
-  const summary = periodText(forecast,0,summaryPhase,now);
+  const summary = periodText(forecast,0,now);
 
-  const tonight = periodText(forecast,0,'overnight',now);
-  const tomorrow = days[1] ? periodText(forecast,1,'overall',now) : '';
+  const tomorrow = days[1] ? periodText(forecast,1,now) : '';
   const tomorrowLabel = days[1] ? dayName(days[1],1,zone) : 'Tomorrow';
   const nearTerm = [
-    tonight ? `Tonight: ${tonight}` : '',
+    summary ? `Today, through midnight: ${summary}` : '',
     tomorrow ? `${tomorrowLabel}: ${tomorrow}` : '',
   ].filter(Boolean).join('\n');
 
   const extended = days.slice(1,7).map((day,offset) => {
     const index = offset + 1;
-    return `${dayName(day,index,zone)}: ${periodText(forecast,index,'overall',now)}`;
+    return `${dayName(day,index,zone)}: ${periodText(forecast,index,now)}`;
   }).join('\n');
 
   return {summary,nearTerm,extended};

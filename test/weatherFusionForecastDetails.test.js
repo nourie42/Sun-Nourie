@@ -125,23 +125,26 @@ test('Gross Meter heading stays centered and bold without changing chart geometr
  assert.match(css,/#gross-title\{text-align:center;font-weight:800\}/);assert.match(meterCss,/\.gross-eyebrow\{width:calc\(100% \+ 86px\);[^}]*text-align:center/);assert.match(meterCss,/@media\(max-width:760px\)[\s\S]*\.gross-eyebrow\{width:calc\(100% \+ 62px\)\}/);assert.ok(!/\.gross-(scroll|chart)\s*\{/.test(css));
 });
 test('changed assets are cache-busted and late briefing responses stay guarded',()=>{
- assert.match(html,/style\.css\?v=dashboard-v2/);assert.match(html,/forecast-layout\.css\?v=weather-qa-v67/);assert.match(html,/personal-details\.css\?v=wpc-mpd-v12/);assert.match(html,/app\.js\?v=county-warnings-v14/);assert.match(html,/weather-polish\.css\?v=category-meter-v1/);assert.match(html,/car-wash\.css\?v=rain-consensus-v41/);assert.match(html,/forecast-cards\.css\?v=real-clouds-v2/);assert.match(html,/scenario-layout\.css\?v=gust-safe-daily-v1/);assert.match(html,/risk-outlooks\.css\?v=risk-outlooks-v4/);
- assert.match(app,/dans-take\.js\?v=weather-art-labels-v10/);
+ assert.match(html,/style\.css\?v=brand-v3/);assert.match(html,/forecast-layout\.css\?v=weather-qa-v67/);assert.match(html,/personal-details\.css\?v=wpc-mpd-v12/);assert.match(html,/<script\b[^>]*\bsrc="\/weather-fusion\/app\.js\?v=[^"\s]+"/);assert.match(html,/weather-polish\.css\?v=aqi-bg-v2/);assert.match(html,/car-wash\.css\?v=center-answer-v43/);assert.match(html,/forecast-cards\.css\?v=tonight-timing-v2/);assert.match(html,/scenario-layout\.css\?v=feel-auto-v6/);assert.match(html,/risk-outlooks\.css\?v=risk-outlooks-v4/);
+ assert.match(app,/dans-take\.js\?v=audit-20261017-v1/);
  assert.match(app,/bulletins\.js\?v=county-warnings-v1/);
- assert.match(app,/experience\.js\?v=category-meter-v1/);
- assert.match(app,/personal-details\.js\?v=wardrobe-v1/);
- assert.match(app,/forecast-story\.js\?v=weather-qa-v67/);
- assert.match(app,/weather-display\.js\?v=restore-hourly-v7/);assert.match(app,/current-temperature\.js\?v=rain-now-v71/);assert.match(app,/car-wash\.js\?v=click-main-v2/);
- assert.match(app,/model-explanation\.js\?v=rain-support-v12/);
- assert.match(app,/outlook-details\.js\?v=full-day-rain-v1/);
- for(const module of ['dewpoint-meter'])assert.match(app,new RegExp(`${module}\\.js\\?v=weather-qa-v67`));
- assert.match(app,/day-graph\.js\?v=feels-floor-wind-v1/);assert.match(app,/hourly-feels\.js\?v=dewpoint-floor-v1/);
- assert.match(app,/weather-math\.js\?v=full-day-rain-v1/);assert.match(app,/rain-trend\.js\?v=full-day-rain-v1/);assert.match(app,/risk-outlooks\.js\?v=risk-outlooks-v4/);
+ assert.match(app,/experience\.js\?v=low-rain-display-v1/);
+ assert.match(app,/personal-details\.js\?v=current-rain-20261017-v3/);
+ assert.match(app,/forecast-story\.js\?v=[^'"\s]+/);
+ assert.match(app,/weather-display\.js\?v=low-rain-display-v1/);assert.match(app,/current-temperature\.js\?v=current-rain-20261017-v3/);assert.match(app,/car-wash\.js\?v=low-rain-display-v1/);
+ assert.match(app,/model-explanation\.js\?v=rain-signal-floor-v1/);
+ assert.match(app,/outlook-details\.js\?v=current-rain-20261017-v3/);
+ for(const module of ['dewpoint-meter'])assert.match(app,new RegExp(`${module}\\.js\\?v=air-moisture-v1`));
+ assert.match(app,/day-graph\.js\?v=low-rain-display-v1/);assert.match(app,/hourly-feels\.js\?v=current-rain-20261017-v3/);
+ assert.match(app,/weather-math\.js\?v=current-rain-20261017-v3/);assert.match(app,/rain-trend\.js\?v=current-rain-20261017-v3/);assert.match(app,/risk-outlooks\.js\?v=risk-outlooks-v5/);
  assert.doesNotMatch(app,/updateAlertBanners/);
  assert.match(app,/if \(id === generation && briefing\.signature === forecast\?\.signature\) renderBriefing\(briefing\)/);
 });
 test('Weather Nourie title quietly opens the shared experimental weather app',()=>{
- assert.match(html,/class="brand" href="\/weather-fusion\/experimental-weather\.html"/);
+ const brand=html.match(/<a\b[^>]*class="[^"]*\bbrand\b[^"]*"[^>]*>/)?.[0];
+ assert.ok(brand,'the weather brand remains an accessible navigation link');
+ assert.match(brand,/href="\/weather-fusion\/experimental-weather\.html"/);
+ assert.match(brand,/aria-label="[^"]*Experimental Weather[^"]*"/);
  assert.match(app,/document\.documentElement\.dataset\.weatherPage=experimentalPage\?'experimental':'main'/);
  assert.match(app,/if\(experimentalPage\)document\.title='Experimental Weather · Weather Nourie'/);
  assert.match(app,/if\(!experimentalPage&&!\$\('car-wash-forecast'\)\.hidden\)draw\('car-wash-forecast'/);

@@ -1,5 +1,5 @@
 /** Purple perfect-weather and red storm banners from the same rules as /whats-up. */
-import { classifyHour, normalizeNwsHour } from './whats-up-classify.js';
+import { classifyHour, normalizeNwsHour } from './whats-up-classify.js?v=current-rain-20261017-v3';
 
 const HOUR = 3600000;
 

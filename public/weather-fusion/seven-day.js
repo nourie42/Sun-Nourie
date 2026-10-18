@@ -1,9 +1,11 @@
-import {dailyDisplay,finite} from './weather-math.js?v=full-day-rain-v1';
-import {displayedRainChance,rainAwareCondition} from './rain-display.js?v=rain-icon-v2';
-import {forecastPeriodSummary} from './forecast-story.js?v=weather-qa-v67';
-import {shortForecastCondition} from './today-card.js?v=mobile-repair-v1';
-import {weatherIcon,weatherMetricIcon} from './weather-display.js?v=feel-chart-tabs-v9';
-import {confidenceMeterPosition} from './forecast-confidence.js?v=category-meter-v1';
+import {rainTiming} from './rain-timing.js?v=current-rain-20261017-v3';
+import {dailyDisplay,finite} from './weather-math.js?v=current-rain-20261017-v3';
+import {hideLowRainChance,displayedRainChance,rainAwareCondition,dailySkyCover} from './rain-display.js?v=low-rain-display-v1';
+import {forecastPeriodSummary} from './forecast-story.js?v=verified-dry-20261018';
+import {shortForecastCondition} from './today-card.js?v=low-rain-display-v1';
+import {weatherIcon,weatherMetricIcon} from './weather-display.js?v=low-rain-display-v1';
+import {confidenceMeterPosition} from './forecast-confidence.js?v=audit-20261017-v1';
+import {winterAmountText,winterDayAmount} from './snow-outlook.js?v=snow-readable-v1';
 
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const reading=(value,unit='',digits=0)=>finite(value)?`${value.toFixed(digits)}${unit}`:'\u2014';
@@ -12,8 +14,8 @@ const chevron=direction=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentCo
 export function dailyForecastReadings(forecast,now=Date.now(),limit=10) {
   const zone=forecast?.location?.timeZone||'America/New_York';
   return (forecast?.days||[]).slice(0,limit).map((day,index)=>{
-    const display=dailyDisplay(day,index,now,zone),rain=displayedRainChance(forecast,display.pop,{dayIndex:index,now});
-    const story=forecastPeriodSummary(forecast,index,display.phase,now);
+    const display=dailyDisplay(day,index,now,zone,forecast),story=forecastPeriodSummary(forecast,index,display.phase,now);
+    const rain=displayedRainChance(forecast,story.chance,{dayIndex:index,now});
     const winds=(forecast.metricForecasts?.series?.wind||[]).filter(point=>{
       const time=Date.parse(point.time);
       return time>=story.window.start&&time<story.window.end&&finite(point.value)&&point.value>=0;
@@ -21,13 +23,14 @@ export function dailyForecastReadings(forecast,now=Date.now(),limit=10) {
     const date=Date.parse(`${day.date}T12:00:00Z`);
     const weekday=finite(date)?new Intl.DateTimeFormat('en-US',{timeZone:'UTC',weekday:'short'}).format(date):day.label;
     const dateLabel=finite(date)?new Intl.DateTimeFormat('en-US',{timeZone:'UTC',month:'short',day:'numeric'}).format(date):'';
-    const condition=rain.observed?'Rain now':rainAwareCondition(display.condition,rain.value,day,display.tonight);
+    const condition=rain.observed?'Rain now':rainAwareCondition(display.condition,rain.value,day,false,dailySkyCover(forecast,day,index,now));
+    const winterDay=forecast.snow?.days?.find(row=>row.date===day.date),snowAmount=winterDay?winterDayAmount(winterDay):null;
     return {index,date:day.date,dateLabel,label:index===0?(display.tonight?'Tonight':'Today'):weekday,
       high:display.tonight?null:display.primary,low:display.tonight?display.primary:display.secondary,
-      condition,shortCondition:shortForecastCondition(condition),isDay:!display.tonight,
-      pop:rain.value,observed:rain.observed,amount:story.amount,
+      condition,shortCondition:shortForecastCondition(condition),isDay:!display.night,
+      rainSourceFallback:story.rows.some(row=>row.rainLikelihood?.mode==='nws-fallback'&&finite(row.rainLikelihood.value)),pop:rain.value,observed:rain.observed,amount:story.amount,rainPeak:'',
       wind:winds.length?winds.reduce((sum,value)=>sum+value,0)/winds.length:null,
-      snowfall:day.snowfall??null,snowRange:day.snowRange||null,snowPossible:!!day.snowPossible,windWindow:story.window,confidence:day.confidence||null,detail:display.detail||story.summary};
+      snowfall:snowAmount?snowAmount.value:day.snowfall??null,snowRange:snowAmount?snowAmount.range:day.snowRange||null,snowAmountSource:snowAmount?.source||'',snowPossible:!!day.snowPossible,windWindow:story.window,confidence:day.confidence||null,detail:display.detail||story.summary};
   });
 }
 
@@ -42,15 +45,16 @@ function artHTML(day) {
 function confidenceHTML(confidence) {
   const score=finite(confidence?.score)?Math.max(0,Math.min(100,confidence.score)):null;
   const position=confidenceMeterPosition(confidence);
-  const title=[...(confidence?.factors||[]),confidence?.note].filter(Boolean).join(' \u00b7 ');
-  return `<span class="seven-day-confidence" data-confidence="${esc(confidence?.key||'unavailable')}" title="${esc(title)}"><span class="seven-day-confidence-label"><span>Confidence</span><strong>${esc(confidence?.label||'Unavailable')}</strong></span>${position===null?'<span class="seven-day-confidence-missing">\u2014</span>':`<span class="seven-day-meter" role="meter" aria-label="Relative forecast confidence" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${score}" aria-valuetext="${esc(confidence.label)}"><span style="--confidence:${position}%"></span></span>`}</span>`;
+  const title=[confidence?.summary,...(confidence?.factors||[]),confidence?.note].filter(Boolean).join(' \u00b7 ');
+  return `<span class="seven-day-confidence" data-confidence="${esc(confidence?.key||'unavailable')}" title="${esc(title)}"><span class="seven-day-confidence-label"><span>Confidence</span><strong>${esc(confidence?.label||'Unavailable')}</strong></span>${position===null?'<span class="seven-day-confidence-missing">\u2014</span>':`<span class="seven-day-meter" data-confidence-score="${score}" role="meter" aria-label="Forecast confidence category" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${position}" aria-valuetext="${esc(confidence.label)}"><span style="--confidence:${position}%"></span></span>`}</span>`;
 }
 
 export function sevenDayCardHTML(day,selected=false) {
-  const description=`${day.label}, ${day.dateLabel}, ${day.condition}. High ${reading(day.high)} degrees, low ${reading(day.low)} degrees. Rain chance ${reading(day.pop,'%')}. Total precipitation ${reading(day.amount,' inches',2)}. Wind ${reading(day.wind,' mph')}. Forecast confidence ${day.confidence?.label||'unavailable'}.`;
-  const metric=(kind,label,value,compact=false)=>`<span class="seven-day-metric" title="${esc(label)}: ${esc(value)}">${weatherMetricIcon(kind)}<span>${label}</span><strong${compact?' style="font-size:10px"':''}>${value}</strong></span>`;
+  const description=`${day.label}, ${day.dateLabel}, ${day.condition}. High ${reading(day.high)} degrees, low ${reading(day.low)} degrees. ${hideLowRainChance(day.pop)?'':`Rain chance ${reading(day.pop,'%')}.`} Total precipitation ${reading(day.amount,' inches',2)}. Wind ${reading(day.wind,' mph')}. Forecast confidence ${day.confidence?.label||'unavailable'}.`;
+  const metric=(kind,label,value,compact=false,suffix='')=>`<span class="seven-day-metric" title="${esc(label)}: ${esc(value)}">${weatherMetricIcon(kind)}<span>${label}</span><strong${compact?' style="font-size:10px"':''}>${value}</strong>${suffix?`<small class="seven-day-rain-peak" title="Peak ${esc(suffix)}">${esc(suffix.replace(/^\w{3}\s+/,'').replace(/\s+/g,''))}</small>`:''}</span>`;
   const temp=value=>`<strong style="--narrow-temp-size:${finite(value)&&(value<0||value>=100)?14:17}px">${reading(value,'\u00b0')}</strong>`;
-  return `<button type="button" class="seven-day-card" data-week-day="${day.index}" data-date="${esc(day.date)}" aria-pressed="${selected}" aria-controls="day-dialog" aria-haspopup="dialog" aria-label="${esc(description)}"><span class="seven-day-card-heading"><span class="seven-day-name">${esc(day.label)}</span><span class="seven-day-date">${esc(day.dateLabel)}</span></span><span class="seven-day-weather" title="${esc(day.condition)}">${artHTML(day)}<span class="seven-day-condition">${esc(day.shortCondition)}</span></span><span class="seven-day-temperatures"><span>${temp(day.high)}<span class="seven-day-temperature-label">High</span></span><span>${temp(day.low)}<span class="seven-day-temperature-label">Low</span></span></span><span class="seven-day-metrics">${metric('drop',day.observed?'Rain now':'Rain chance',reading(day.pop,'%'))}${metric('drop','Total precip',reading(day.amount,' in',2),day.amount>=10)}${metric('wind','Wind',reading(day.wind,' mph'),day.wind>=100)}${day.snowPossible?`<span class="seven-day-metric seven-day-snow" title="Snowfall forecast (NWS gridpoint; model range when they disagree)">❄ ${day.snowRange?`${day.snowRange[0]}–${day.snowRange[1]}"`:finite(day.snowfall)&&day.snowfall>=0.05?`${day.snowfall.toFixed(1)}"`:'Snow possible'}</span>`:''}</span>${confidenceHTML(day.confidence)}</button>`;
+  const snowText=finite(day.snowfall)&&day.snowfall>0||day.snowRange?winterAmountText(day.snowfall,day.snowRange):'Snow possible';
+  return `<button type="button" class="seven-day-card" data-week-day="${day.index}" data-date="${esc(day.date)}" aria-pressed="${selected}" aria-controls="day-dialog" aria-haspopup="dialog" aria-label="${esc(description)}"><span class="seven-day-card-heading"><span class="seven-day-name">${esc(day.label)}</span><span class="seven-day-date">${esc(day.dateLabel)}</span></span><span class="seven-day-weather" title="${esc(day.condition)}">${artHTML(day)}<span class="seven-day-condition">${esc(day.shortCondition)}</span></span><span class="seven-day-temperatures"><span>${temp(day.high)}<span class="seven-day-temperature-label">High</span></span><span>${temp(day.low)}<span class="seven-day-temperature-label">Low</span></span></span><span class="seven-day-metrics">${hideLowRainChance(day.pop)?'<span class="seven-day-metric" data-rain-chance-hidden aria-hidden="true"></span>':metric('drop',day.observed?'Rain now':'Rain chance',reading(day.pop,'%'),false,day.rainSourceFallback?'NWS':day.rainPeak)}${metric('drop','Total precip',reading(day.amount,' in',2),day.amount>=10)}${metric('wind','Wind',reading(day.wind,' mph'),day.wind>=100)}${day.snowPossible?`<span class="seven-day-metric seven-day-snow" title="${esc(day.snowAmountSource||'Snowfall forecast')}">${snowText==='Snow possible'?'':'❄ '}${esc(snowText)}</span>`:''}</span>${confidenceHTML(day.confidence)}</button>`;
 }
 
 export function createSevenDayCarousel({onOpenDay=()=>{}}={}) {
@@ -58,7 +62,7 @@ export function createSevenDayCarousel({onOpenDay=()=>{}}={}) {
   const anchor=document.querySelector('.hero .today-panel');if(!anchor)return null;
   for(const [id,name] of [['experimental-week-styles','seven-day.css']]) {
     if(document.getElementById(id))continue;
-    const link=document.createElement('link');link.id=id;link.rel='stylesheet';link.href=`/weather-fusion/${name}?v=main-week-v10`;document.head.append(link);
+    const link=document.createElement('link');link.id=id;link.rel='stylesheet';link.href=`/weather-fusion/${name}?v=snow-readable-v1`;document.head.append(link);
   }
   const root=document.createElement('section');root.id='experimental-week';root.className='experimental-week';root.hidden=true;root.setAttribute('aria-labelledby','seven-day-title');
   root.innerHTML=`<div class="seven-day-carousel glass"><div class="seven-day-heading"><h2 id="seven-day-title">7-Day Forecast</h2><div class="seven-day-controls"><button type="button" data-week-step="-1" aria-label="Previous forecast days" title="Previous forecast days" aria-controls="seven-day-rail" disabled>${chevron('left')}</button><button type="button" data-week-step="1" aria-label="Next forecast days" title="Next forecast days" aria-controls="seven-day-rail" disabled>${chevron('right')}</button></div></div><div id="seven-day-rail" class="seven-day-rail" tabindex="0" aria-label="Seven-day forecast"></div><input type="range" class="seven-day-scroll" min="0" max="1000" value="0" aria-label="Scroll seven-day forecast" aria-controls="seven-day-rail" disabled></div>`;
@@ -93,7 +97,7 @@ export function createSevenDayCarousel({onOpenDay=()=>{}}={}) {
   rail.addEventListener('click',event=>{
     if(suppressClick){event.preventDefault();suppressClick=false;return;}
     const button=event.target.closest('[data-week-day]');
-    if(button){const index=Number(button.dataset.weekDay);select(index);onOpenDay(index);}
+    if(button){const index=Number(button.dataset.weekDay);select(index);onOpenDay(index,{focusConfidence:!!event.target.closest('.seven-day-confidence')});}
   });
   rail.addEventListener('keydown',event=>{
     if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)||!days.length)return;

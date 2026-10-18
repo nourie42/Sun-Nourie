@@ -31,12 +31,12 @@ function fixture() {
     feeds:[{id:'nws',status:'ready',issuedAt:at(-1),fetchedAt:at(0)},{id:'hrrr',status:'ready'},{id:'ecmwf',status:'ready'},{id:'nbm',status:'ready'}]};
 }
 
-test('model explanation defaults to the same Today/ Tonight period as the main card',()=>{
+test('model explanation stays on the calendar day after sunset',()=>{
   const forecast=fixture();
-  assert.equal(modelExplanationView(forecast,{now}).phase,'daytime');
-  assert.equal(modelExplanationView(forecast,{now:Date.parse('2026-09-12T15:59:59Z')}).phase,'daytime');
+  assert.equal(modelExplanationView(forecast,{now}).phase,'overall');
+  assert.equal(modelExplanationView(forecast,{now:Date.parse('2026-09-12T15:59:59Z')}).phase,'overall');
   assert.equal(modelExplanationView(forecast,{now:Date.parse('2026-09-12T16:00:00Z')}).phase,'overall','after local noon the explanation matches Remainder of Today');
-  assert.equal(modelExplanationView(forecast,{now:Date.parse('2026-09-12T22:00:00Z')}).phase,'overnight');
+  assert.equal(modelExplanationView(forecast,{now:Date.parse('2026-09-12T22:00:00Z')}).phase,'overall');
   assert.equal(modelExplanationView(forecast,{index:1,now}).phase,'overall');
   assert.equal(modelExplanationView(forecast,{index:0,phase:'overall',now}).phase,'overall');
 });
@@ -46,12 +46,12 @@ test('every daily estimate is tied to its canonical peak hour including beyond t
   assert.equal(view.value,42);
   assert.equal(view.maximum,42);
   assert.equal(view.peakTime,at(58));
-  assert.equal(view.rows.length,24);
+  assert.equal(view.rows.length,17);
   assert.equal(view.mismatch,false);
   assert.equal(view.peak,forecast.rainTimeline[58].rainLikelihood);
   assert.ok(!forecast.hours.some(row=>row.time===view.peakTime));
   const html=modelExplanationHTML(forecast,{index:2,now});
-  assert.match(html,/All 24 forecast hours in this period/);
+  assert.match(html,/All 17 forecast hours in this period/);
   assert.match(html,/Mon, Sep 14, 5 PM/);
   assert.match(html,/data-peak="true"/);
 });
@@ -63,7 +63,8 @@ test('rain inputs scale the NWS share and explain full and reduced model points'
   assert.doesNotMatch(html,/QPF support|NWS-anchored input/);
   assert.match(html,/NWS hourly probability fills its 40-point share proportionally/);
   assert.match(html,/40% NWS chance contributes 16 points/);
-  assert.match(html,/positive model amount through 0\.010 in gets exactly one-third/);
+  assert.match(html,/below 0\.001 in\/hour add zero rain-signal points; the original amounts are retained/);
+  assert.match(html,/From 0\.001 through 0\.010 in\/hour, a model gets one-third/);
   assert.match(html,/above 0\.010 in gets full points only if NWS is at least 20%/);
   assert.match(html,/result is capped at 100%/);
   assert.match(html,/uncalibrated estimate, not a proven model-accuracy ranking/);
@@ -72,7 +73,7 @@ test('rain inputs scale the NWS share and explain full and reduced model points'
     sourceValues:{nws:53,hrrr:100,ecmwf:100,nbm:100},sourcePoints:{nws:21.2,hrrr:30,ecmwf:10,nbm:20},sourceAmounts:{nws:.02,hrrr:.157,ecmwf:.016,nbm:.012},
     sources:[{id:'nws',value:53,weight:.4,points:21.2},{id:'hrrr',value:100,weight:.3,points:30},{id:'ecmwf',value:100,weight:.1,points:10},{id:'nbm',value:100,weight:.2,points:20}],drySources:[],wetSources:['hrrr','ecmwf','nbm'],reducedSources:[]});
   forecast.rainTimeline[0].rainLikelihood=allWet;
-  Object.assign(forecast.days[0].popDayLikelihood,{value:81,peak:allWet,peakTime:at(0)});
+  Object.assign(forecast.days[0].rainLikelihood,{value:81,peak:allWet,peakTime:at(0)});
   const unanimous=modelExplanationHTML(forecast,{now});
   assert.match(unanimous,/53% probability<\/td><td>21\.2<small>of 40 max<\/small><\/td>/);
   assert.match(unanimous,/0\.157 in<small>Rain forecast: Yes<\/small><\/td><td>30<small>of 30 max<\/small><\/td>/);
@@ -85,7 +86,7 @@ test('rain inputs scale the NWS share and explain full and reduced model points'
     sourceValues:{nws:7,hrrr:0,ecmwf:100/3,nbm:100/3},sourcePoints:{nws:2.8,hrrr:0,ecmwf:3.33333333,nbm:6.66666667},sourceAmounts:{nws:0,hrrr:0,ecmwf:.004,nbm:.010},
     sources:[{id:'nws',value:7,weight:.4,points:2.8},{id:'hrrr',value:0,weight:.3,points:0},{id:'ecmwf',value:100/3,weight:.1,points:3.33333333},{id:'nbm',value:100/3,weight:.2,points:6.66666667}],drySources:['hrrr'],wetSources:['ecmwf','nbm'],reducedSources:['ecmwf','nbm']});
   forecast.rainTimeline[0].rainLikelihood=trace;
-  Object.assign(forecast.days[0].popDayLikelihood,{value:13,peak:trace,peakTime:at(0)});
+  Object.assign(forecast.days[0].rainLikelihood,{value:13,peak:trace,peakTime:at(0)});
   const traceHtml=modelExplanationHTML(forecast,{now});
   assert.match(traceHtml,/0\.004 in<small>Light rain forecast: one-third of model points<\/small><\/td><td>3\.333333<small>of 10 max<\/small><\/td>/);
   assert.match(traceHtml,/0\.01 in<small>Light rain forecast: one-third of model points<\/small><\/td><td>6\.666667<small>of 20 max<\/small><\/td>/);
@@ -97,7 +98,7 @@ test('missing models do not renormalize the NWS base or remaining model points',
   const forecast=fixture();
   const value=likelihood(18,{officialProbability:20,weightedValue:18,rawTotal:18,rawValue:18,sourceValues:{nws:20,hrrr:null,ecmwf:100,nbm:null},sourcePoints:{nws:8,hrrr:null,ecmwf:10,nbm:null},sourceAmounts:{nws:.01,hrrr:null,ecmwf:.02,nbm:null},sources:[{id:'nws',value:20,weight:.4,points:8},{id:'ecmwf',value:100,weight:.1,points:10}],drySources:[]});
   forecast.rainTimeline[0].rainLikelihood=value;
-  Object.assign(forecast.days[0].popDayLikelihood,{value:18,peak:value,peakTime:at(0)});
+  Object.assign(forecast.days[0].rainLikelihood,{value:18,peak:value,peakTime:at(0)});
   const html=modelExplanationHTML(forecast,{now});
   assert.match(html,/8 \+ 10 = 18/);
   assert.match(html,/Rounded: <b>18%<\/b>\. Shown: <b>18%/);
@@ -107,16 +108,24 @@ test('missing models do not renormalize the NWS base or remaining model points',
 test('a reduced wet vote keeps its exact points without hiding a low score',()=>{
   const forecast=fixture(),single=precipitationLikelihood(0,{sourceValues:{hrrr:0,ecmwf:0,nbm:.02}});
   for(const row of forecast.rainTimeline)row.rainLikelihood=single;
-  Object.assign(forecast.days[0].popDayLikelihood,{value:7,peak:single});
+  Object.assign(forecast.days[0].rainLikelihood,{value:7,peak:single});
   const html=modelExplanationHTML(forecast,{now});
   assert.match(html,/Rounded: <b>7%<\/b>\. Shown: <b>7%/);
   assert.doesNotMatch(html,/fewer than two available sources|below 25%/);
   assert.doesNotMatch(html,/Data mismatch/);
 });
 
+test('a tiny positive WeatherNext amount is disclosed with zero signal points, not called dry or a light-rain vote',()=>{
+ const forecast=fixture(),score=precipitationLikelihood(2,{sourceValues:{hrrr:0,ecmwf:0,nbm:0,wn:.00000214}},{nws:.36,hrrr:.27,ecmwf:.09,nbm:.18,wn:.1});
+ for(const row of forecast.rainTimeline)row.rainLikelihood=score;
+ Object.assign(forecast.days[0].rainLikelihood,{value:score.value,peak:score});
+ const html=modelExplanationHTML(forecast,{now});
+ assert.match(html,/<th scope="row">NVIDIA WeatherNext<\/th><td>0\.00000214 in<small>Below 0\.001 in\/hour: zero rain-signal points; amount retained<\/small><\/td><td>0<small>of 10 max<\/small>/);
+});
+
 test('missing hourly data remains unavailable instead of becoming a zero or a reassuring match',()=>{
   const forecast=fixture();
-  forecast.days[0].popDayLikelihood={value:null,window:{start:at(0),end:at(12)},coverage:{expectedHours:12,availableHours:4,complete:false}};
+  forecast.days[0].rainLikelihood={value:null,window:{start:at(0),end:at(12)},coverage:{expectedHours:12,availableHours:4,complete:false}};
   forecast.rainTimeline=forecast.rainTimeline.slice(0,4);
   const view=modelExplanationView(forecast,{now}),html=modelExplanationHTML(forecast,{now});
   assert.equal(view.value,null);
@@ -129,7 +138,7 @@ test('missing hourly data remains unavailable instead of becoming a zero or a re
 
 test('a real period/hour mismatch is flagged rather than hidden by the explanation',()=>{
   const forecast=fixture();
-  forecast.days[0].popDayLikelihood.value=59;
+  forecast.days[0].rainLikelihood.value=59;
   const view=modelExplanationView(forecast,{now});
   assert.equal(view.mismatch,true);
   assert.match(modelExplanationHTML(forecast,{now}),/Data mismatch: the period shows 59%, but the highest supplied hour is 12%/);
@@ -177,7 +186,7 @@ test('temperatures disclose only the recorded source values and applied weights'
 test('NVIDIA participation and evidence reflect recorded backend contribution, not a separately connected feed',()=>{
   const forecast=fixture();
   forecast.google={status:'ready',contributes:true,label:'NVIDIA WeatherNext',requestedWeight:.1,runAt:at(-4)};
-  const peak=forecast.days[0].popDayLikelihood.peak;
+  const peak=forecast.days[0].rainLikelihood.peak;
   peak.sources.push({id:'wn',value:100,weight:.1,points:10,runAt:at(-4)});
   peak.sourceValues.wn=100;peak.sourceAmounts.wn=.04;peak.sourcePoints.wn=10;
   forecast.days[0].highBlend.sources.push({id:'wn',value:82,weight:.1});
@@ -225,7 +234,7 @@ test('experimental rendering stays off the main page and reset clears previous-l
   }finally{globalThis.document=oldDocument;globalThis.location=oldLocation;}
 });
 
-test('refresh preserves open hourly calculations and focused details while auto phase follows Today/Tonight',()=>{
+test('refresh preserves open calculations and focus without switching into tomorrow morning',()=>{
   const oldDocument=globalThis.document,oldLocation=globalThis.location;
   let details=[],focused=null;
   function makeDetail(key){
@@ -244,7 +253,7 @@ test('refresh preserves open hourly calculations and focused details while auto 
   globalThis.location={pathname:'/weather-fusion/experimental-weather.html'};
   try{
     resetModelExplanation();
-    assert.equal(renderModelExplanation(fixture(),now).phase,'daytime');
+    assert.equal(renderModelExplanation(fixture(),now).phase,'overall');
     const key=`hour-${at(1)}`,hour=details.find(detail=>detail.dataset.modelDetail===key);
     hour.open=true;details.find(detail=>detail.dataset.modelDetail==='hours').open=true;
     globalThis.document.activeElement=hour.summary;
@@ -252,7 +261,7 @@ test('refresh preserves open hourly calculations and focused details while auto 
     assert.equal(details.find(detail=>detail.dataset.modelDetail===key).open,true);
     assert.equal(details.find(detail=>detail.dataset.modelDetail==='hours').open,true);
     assert.equal(focused,key);
-    assert.equal(renderModelExplanation(fixture(),Date.parse('2026-09-12T22:00:00Z')).phase,'overnight');
+    assert.equal(renderModelExplanation(fixture(),Date.parse('2026-09-12T22:00:00Z')).phase,'overall');
     resetModelExplanation();
   }finally{globalThis.document=oldDocument;globalThis.location=oldLocation;}
 });

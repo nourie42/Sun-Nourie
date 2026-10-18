@@ -1,10 +1,12 @@
+import {hideLowRainChance} from './rain-display.js?v=low-rain-display-v1';
+import {currentWeatherDisplay} from './current-weather.js?v=current-rain-20261017-v3';
 import {hourlyUvValue,hourlyUvHTML} from './daily-uv.js?v=clear-weather-daygraph-v3';
-import {outdoorExposure} from './outdoor-feels.js?v=weather-qa-v67';
-import {currentComfortInputs} from './current-inputs.js?v=weather-qa-v67';
-import {weatherState,conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
-import {thermalComfort, finite, solarElevation,rainChanceValue} from './weather-math.js?v=weather-qa-v67';
-import {displayedFeelsAt,forecastValue,degrees} from './hourly-feels.js?v=continuous-feels-v2';
-import {winterSceneExpected,selectedHourSnowPhase} from './exposure-scene.js?v=storm-scene-v5';
+import {outdoorExposure} from './outdoor-feels.js?v=current-rain-20261017-v3';
+import {currentComfortInputs} from './current-inputs.js?v=current-rain-20261017-v3';
+import {weatherState,conditionForRainChance} from './weather-state.js?v=current-rain-20261017-v3';
+import {thermalComfort, finite, solarElevation,rainChanceValue} from './weather-math.js?v=current-rain-20261017-v3';
+import {displayedFeelsAt,forecastValue,degrees} from './hourly-feels.js?v=current-rain-20261017-v3';
+import {winterSceneExpected,selectedHourSnowPhase} from './exposure-scene.js?v=current-rain-20261017-v3';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function weatherShapes(condition, isDay = true) {
   const weather = weatherState(condition);
@@ -43,9 +45,13 @@ export function hrrrRainAmount(row){
 export function hourlyRainHTML(sample){
  if(sample?.now&&sample.currentPrecipitation){
   const status=sample.currentPrecipitation;
-  return `<span class="hour-rain" title="${esc(status.source)}"><small class="hour-pop">${weatherMetricIcon('drop')}${esc(status.label)}</small></span>`;
+  if(status.forecast&&hideLowRainChance(sample.pop))return '<span class="hour-rain" aria-hidden="true"></span>';
+  const label=status.forecast&&finite(sample.pop)?`${Math.round(sample.pop)}%`:status.label;
+  return `<span class="hour-rain" title="${esc(status.source)}"><small class="hour-pop">${weatherMetricIcon('drop')}${esc(label)}</small></span>`;
  }
  const blend=sample.rainLikelihood,value=sampleRainChance(sample);
+ if(hideLowRainChance(value))return '<span class="hour-rain" aria-hidden="true"></span>';
+ if(blend?.mode==='nws-fallback')return `<span class="hour-rain" title="Official NWS hourly rain chance; model data is unavailable"><small class="hour-pop">${weatherMetricIcon('drop')}${finite(value)?Math.round(value)+'%':'—'}</small></span>`;
  const votes=blend?.sourceValues||{},awarded=blend?.sourcePoints||{},parts=[];
  const pointText=points=>String(Math.round(points*100)/100);
  const fullPoints={nws:40,hrrr:30,ecmwf:10,nbm:20};
@@ -66,41 +72,13 @@ export function currentSample(forecast, now = Date.now()) {
   const comfort = thermalComfort(current, forecast.location, finite(assembled) ? assembled : now);
   comfort.inputEvidence.estimatedFields=current.comfortEstimatedFields;
   comfort.inputEvidence.fallbackSources=current.comfortInputSources;
-  const currentHour=forecast?.hours?.find(h=>Date.parse(h.time)<=now&&now<Date.parse(h.time)+3600000);
-  const kind=weatherState(current.condition).kind,stationCondition=(current.type==='observation'||(/observation/i.test(current.conditionSource||'')&&!/forecast \(sky only\)/i.test(current.conditionSource||'')))&&kind!=='unknown';
-  const activePrecipitation=stationCondition&&['rain','storm','snow'].includes(kind);
-  const radar=current.radarPrecipitation,radarReady=radar?.status==='ready';
-  const radarHere=radarReady&&radar.atLocation===true,radarClose=radarReady&&(radar.close===true||(finite(radar.nearestRainMiles)&&radar.nearestRainMiles<=5)),radarApproaching=radarReady&&radar.approaching===true,radarThreat=radarHere||radarClose||radarApproaching,radarNearby=radarReady&&radar.nearby===true,radarArea=radarReady&&radar.inArea===true;
-  const direction={N:'north',NE:'northeast',E:'east',SE:'southeast',S:'south',SW:'southwest',W:'west',NW:'northwest'}[radar?.nearestRainDirection];
-  const areaDistance=finite(radar?.nearestRainMiles)?` about ${Math.round(radar.nearestRainMiles)} miles${direction?` ${direction}`:''}`:'';
-  const currentPrecipitation=activePrecipitation
-    ? {active:true,label:kind==='snow'?'Snow now':'Rain now',source:'Current station reports precipitation.'}
-    : radarHere
-      ? {active:true,nearby:false,label:'Rain now',source:'NOAA observed radar shows precipitation over the selected location.'}
-      : radarThreat
-        ? {active:true,nearby:true,label:'Rain Around',source:radarClose?'NOAA observed radar shows rain within 5 miles of the selected location.':'NOAA observed radar shows rain moving toward the selected location.'}
-      : radarNearby
-        ? {active:false,nearby:true,label:'Rain nearby',source:'NOAA observed radar shows precipitation near the selected location.'}
-        : radarArea
-          ? {active:false,inArea:true,label:'Rain in area',source:`NOAA observed radar shows precipitation${areaDistance} of the selected location.`}
-          : radarReady
-            ? {active:false,label:'Dry now',source:'NOAA observed radar shows no precipitation at or near the selected location.'}
-        : stationCondition
-          ? {active:false,label:'Dry at station',source:'The nearby station reports no precipitation; radar is checked separately.'}
-          : radar
-            ? {active:false,label:'Radar unavailable',source:'Current precipitation could not be confirmed.'}
-            : {active:false,label:'Checking radar',source:'Waiting for the latest NOAA observed radar.'};
-  const currentLikelihood=activePrecipitation||radarThreat?{value:100,source:activePrecipitation?'Current station observation':'NOAA observed radar'}:stationCondition?{value:0,source:'Current station observation'}:radarReady?{value:0,source:'NOAA observed radar'}:{value:null,source:'Current precipitation not yet confirmed'};
-  const dryRadarSky=radarReady&&!radarThreat&&!stationCondition&&['rain','storm','snow'].includes(kind)
-    ? weatherState('',currentHour?.skyCover).label
-    : current.condition;
-  const displayCondition=radarHere&&!activePrecipitation?'Rain':radarThreat&&!activePrecipitation?'Rain Around':dryRadarSky;
-  const displayComfort=radarThreat
-    ? {...comfort,weatherKind:weatherState(displayCondition).kind,radiantCondition:displayCondition,condition:displayCondition}
-    : comfort;
+  const state=currentWeatherDisplay(forecast,now);
+  const {currentHour,currentLikelihood,currentPrecipitation,rainExpected,radarThreat,rainAround}=state;
+  const displayCondition=state.condition;
+  const displayComfort={...comfort,weatherKind:weatherState(displayCondition).kind,radiantCondition:displayCondition,condition:displayCondition};
   const currentGust=finite(current.gust)?current.gust:(currentHour?forecastValue(forecast,'gust',currentHour.time):null);
   const exposure=outdoorExposure(displayComfort),shownInputs={...current,gust:currentGust};
-  return {windDirection:current.windDirection,pop:rainChanceValue(currentLikelihood),officialPop:currentHour?.officialPop??currentHour?.pop,rainLikelihood:currentLikelihood,currentPrecipitation,rainAround:radarThreat,radarThreat,precipitationBlend:currentHour?.precipitationBlend,uvIndex:hourlyUvValue(forecast,now),id:'now', now:true, time:current.time, temperature:finite(current.temperature) ? current.temperature : null,
+  return {windDirection:current.windDirection,pop:rainChanceValue(currentLikelihood),officialPop:currentHour?.officialPop??currentHour?.pop,rainLikelihood:currentLikelihood,currentPrecipitation,rainExpected,rainAround,radarThreat,precipitation:state.precipitation,precipitationBlend:currentHour?.precipitationBlend,uvIndex:hourlyUvValue(forecast,now),id:'now', now:true, time:current.time, temperature:finite(current.temperature) ? current.temperature : null,
     feels:exposure.value, exposure, comfort:displayComfort, condition:displayCondition || 'Sky conditions unavailable',
     isDay:comfort.daylight ?? (solarElevation(now,forecast.location.latitude,forecast.location.longitude) > 0),
     source:current.type === 'observation' ? 'Station observation' : 'Current estimate', inputs:shownInputs};
@@ -148,8 +126,9 @@ export function hourlySnowHTML(forecast,sample){
 export function renderHourlyWeather(forecast, now = Date.now()) {
   const root = document.getElementById('hourly'); if (!root) return;
   const scroll = root.scrollLeft, zone = forecast.location.timeZone || 'America/New_York';
+  const date=time=>new Intl.DateTimeFormat('en-US',{timeZone:zone,weekday:'short'}).format(new Date(time));
   const hour = time => new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric'}).format(new Date(time)).replace(' ','');
-  root.innerHTML = hourlyDisplaySamples(forecast,now).map(raw => { const mix=snowHourCondition(forecast,raw), sample=mix?{...raw,condition:mix}:raw, iconCondition=mix?'Snow':sample.condition; return `<button type="button" class="hour ${sample.now ? 'now hour-current' : 'forecast-hour'}" data-comfort-time="${esc(sample.id)}" data-time="${esc(sample.time)}" title="${esc(sample.condition)} · ${esc(sample.source)}" aria-label="${sample.now ? 'Now' : esc(hour(sample.time))}, ${esc(sample.condition)}, air ${degrees(sample.temperature)}, feels like ${degrees(sample.feels)} ${esc(sample.exposure.label.toLowerCase())}. Preview this weather."><span>${sample.now ? 'Now' : esc(hour(sample.time))}</span>${weatherIcon(iconCondition,sample.isDay)}<strong>${degrees(sample.temperature)}</strong><span class="hour-feels">Feels <b>${degrees(sample.feels)}</b><em class="hour-exposure sr-only">${esc(sample.exposure.shortLabel)}</em></span>${hourlyRainHTML(sample)}${hourlySnowHTML(forecast,sample)}${hourlyUvHTML(sample.uvIndex)}${hourlyWindHTML(sample)}</button>`; }).join('');
+  root.innerHTML = hourlyDisplaySamples(forecast,now).map(raw => { const mix=snowHourCondition(forecast,raw), sample=mix?{...raw,condition:mix}:raw, iconCondition=mix?'Snow':sample.condition; return `<button type="button" class="hour ${sample.now ? 'now hour-current' : 'forecast-hour'}" data-comfort-time="${esc(sample.id)}" data-time="${esc(sample.time)}" title="${esc(sample.condition)} · ${esc(sample.source)}" aria-label="${sample.now ? 'Now' : esc(hour(sample.time))}, ${esc(sample.condition)}, air ${degrees(sample.temperature)}, feels like ${degrees(sample.feels)} ${esc(sample.exposure.label.toLowerCase())}. Preview this weather."><span>${sample.now ? 'Now' : esc(hour(sample.time))}</span><small class="hour-date">${esc(date(sample.now?now:sample.time))}</small>${weatherIcon(iconCondition,sample.isDay)}<strong>${degrees(sample.temperature)}</strong><span class="hour-feels">Feels <b>${degrees(sample.feels)}</b><em class="hour-exposure sr-only">${esc(sample.exposure.shortLabel)}</em></span>${hourlyRainHTML(sample)}${hourlySnowHTML(forecast,sample)}${hourlyUvHTML(sample.uvIndex)}${hourlyWindHTML(sample)}</button>`; }).join('');
   root.scrollLeft = scroll;
 }
 export function peakComparison(summary, currentSun) {

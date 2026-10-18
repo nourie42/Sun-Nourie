@@ -1,5 +1,6 @@
+import {forecastProseConflict} from '../public/weather-fusion/forecast-consistency.js';
 import {createDiscussionSource,DISCUSSION_SOURCE_VERSION} from './weatherFusionDiscussionSource.js';
-import {exposureWeatherUrl,normalizeExposureWeather,addExposureWeather} from './weatherFusionExposure.js';
+import {createExposureWeatherService,addExposureWeather} from './weatherFusionExposure.js';
 import {airQualityUrl,normalizeAirQuality,addAirQuality} from './weatherFusionAirQuality.js';
 import {FORECAST_CONFIDENCE_VERSION,forecastConfidence} from '../public/weather-fusion/forecast-confidence.js';
 import {DAN_TAKE_VERSION,collectDanTakeEvidence,approveDanTake,visibleDanTakeItems,danTakeText,rebindDanTake} from '../public/weather-fusion/dans-take.js';
@@ -23,7 +24,7 @@ import {bannerStateFromNwsPeriods} from '../public/weather-fusion/alert-banners.
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { createDirectModels, enhanceForecast } from './weatherFusionDirect.js';
+import { createDirectModels, enhanceForecast, refreshCalendarConfidence } from './weatherFusionDirect.js';
 import {createWeatherNextBlendSource} from './weatherFusionWeatherNext.js';
 import {validateCurrentConditions} from './weatherFusionCurrent.js';
 import {applyObservedSky} from './weatherFusionObservedSky.js';
@@ -392,6 +393,7 @@ export function buildForecast({ location, point, forecast, hourly, grid, discuss
   Object.assign(output.current,resolveCurrentWeather(output.current,output.hours,now,gridSample(grid,'skyCover',now,'percent')));
   applyObservedSky(output,observation?.skyObservations,now);
   addExperience(output, {models, grid, periods:forecast?.periods || [], now, solarTimes, nextDate});
+  refreshCalendarConfidence(output,{now});
   addExposureWeather(output,exposureWeather);
   addAirQuality(output,airQuality);
   try{addSnowOutlook(output,{grid,periods:forecast?.periods||[],snowModels,winterModels,wpcWinter,now});}catch{output.snow={version:'snow-outlook-v2',possible:false,status:'unavailable',coverageStatus:'unavailable',days:[],error:'Snow outlook could not be built.'};}
@@ -410,7 +412,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
   const failureCooldown = new Map();
   const approvedTakes = new Map();
   const approvedSummaries=new Map();
-  const summaryKey=data=>hash({location:data.location,discussion:data.discussion,date:dateKey(now(),data.location.timeZone)});
+  const summaryKey=data=>hash({location:data.location,discussion:data.discussion,signature:data.signature,date:dateKey(now(),data.location.timeZone)});
   function retainedSummary(data){const saved=approvedSummaries.get(summaryKey(data));return saved&&now()-Date.parse(saved.danSummaryGeneratedAt)<6*HOUR?saved:{};}
   const takeKey=data=>`${data?.location?.latitude},${data?.location?.longitude}`;
   function retainedTake(data){return rebindDanTake(approvedTakes.get(takeKey(data)),data,now());}
@@ -448,6 +450,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
       return {...saved,recovered:true,recoveryReason:clean(error.message,160)};
     },
   });
+  const loadExposureWeather=createExposureWeatherService({request,now});
   const loadWpcWinter = createWpcWinterService({ cached, now, fetchImpl });
   const loadWinterModels = createWinterModelService({ cached, now });
   const loadModelSnowMap = createModelSnowMapService({ cached, now });
@@ -485,7 +488,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
         forecast: get('nws', 'NWS forecast', point?.forecast, 2 * MINUTE, (d) => d.properties?.periods?.length ? d.properties : null),
         hourly: get('hourly', 'NWS hourly', point?.forecastHourly, 2 * MINUTE, (d) => d.properties?.periods?.length ? d.properties : null),
         grid: get('grid', 'NWS precipitation grid', point?.forecastGridData, 2 * MINUTE, (d) => d.properties),
-        exposureWeather: feed('exposure','UV and surface-weather forecast',exposureWeatherUrl(location,point?.timeZone||'auto'),30*MINUTE,normalizeExposureWeather),
+        exposureWeather: loadExposureWeather(location,point?.timeZone||'auto'),
         winterModels: loadWinterModels(location),
         wpcWinter: loadWpcWinter(location),
         airQuality: feed('air-quality','Air quality (U.S. AQI)',airQualityUrl(location),30*MINUTE,normalizeAirQuality),
@@ -550,7 +553,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
   }
   function fallback(data, reason) {
     const evening = isTonightPeriod(now(),data.location.timeZone);
-    const currentStory=forecastPeriodSummary(data,0,evening?'overnight':'daytime',now());
+    const currentStory=forecastPeriodSummary(data,0,evening?'overnight':'overall',now());
     return { mode: 'nws-summary', signature: data.signature, generatedAt: iso(now()), reason,
       headline: evening ? 'Your evening outlook' : data.days[0]?.condition || 'Forecast update', summary: currentStory.summary,
       nearTerm: forecastPeriodSummary(data,0,'overnight',now()).summary, extended: forecastPeriodSummary(data,1,'overall',now()).summary,
@@ -565,7 +568,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
     const previousFailure = failureCooldown.get(key);
     if (previousFailure?.until > now()) return { ...fallback(data, 'AI is cooling down after an unavailable response; official guidance is shown.'), diagnostic: previousFailure.diagnostic, retryAfter: iso(previousFailure.until) };
     const takeEvidence=collectDanTakeEvidence(data,now());
-    const briefingKey=`dan-visible-v1:${DAN_TAKE_VERSION}:${data.signature}:${dateKey(now(),data.location.timeZone)}`;
+    const briefingKey=`calendar-rain-v1:${DAN_TAKE_VERSION}:${data.signature}:${dateKey(now(),data.location.timeZone)}`;
     const briefing = await aiCache.get(briefingKey, 30 * MINUTE, async () => {
       const day = new Date(now()).toISOString().slice(0, 10);
       if (aiBudget.day !== day) aiBudget = { day, count: 0 };
@@ -595,6 +598,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
         if (fields.some((k) => typeof content[k] !== 'string' || !content[k].trim() || content[k].length > 1600)) throw Object.assign(new Error('AI prose structure failed validation.'), { aiDiagnostic: 'AI_PROSE_STRUCTURE' });
         if (fields.some((k) => hasUngroundedNumbers(content[k], facts))) throw Object.assign(new Error('AI numerical prose failed validation.'), { aiDiagnostic: 'AI_PROSE_CONTAINS_NONCLOCK_DIGITS' });
         if (fields.some(k=>/\b(deterministic|HRRR|ECMWF|NBM|CAPE|QPF|synoptic|advection|guidance|Weather Fusion)\b/i.test(content[k]))) throw Object.assign(new Error('Outlook needs plain language.'),{aiDiagnostic:'AI_PROSE_JARGON'});
+        if(fields.some(k=>forecastProseConflict(content[k],data,now())))throw Object.assign(new Error('Outlook contradicts the point rain forecast.'),{aiDiagnostic:'AI_PROSE_FORECAST_CONFLICT'});
         if(/\b(aviation|TAFs?|VFR|MVFR|IFR|LIFR|pilots?|runways?|flight conditions)\b/i.test(content.danSummary))throw Object.assign(new Error('Dan summary must exclude aviation.'),{aiDiagnostic:'AI_PROSE_AVIATION'});
         if (!Array.isArray(content.sources) || !['nws', 'afd', ...data.modelContributions.map(m=>m.id)].every((id) => content.sources.includes(id)) || content.sources.some((id) => !data.feeds.some((f) => f.id === id && f.status === 'ready'))) throw Object.assign(new Error('AI source attribution failed validation.'), { aiDiagnostic: 'AI_SOURCE_ATTRIBUTION' });
         if (/\b(all clear|no (?:active )?(?:warnings|severe weather)|guaranteed|perfectly safe)\b/i.test(fields.map((k) => content[k]).join(' '))) throw Object.assign(new Error('AI safety wording failed validation.'), { aiDiagnostic: 'AI_SAFETY_WORDING' });
@@ -744,7 +748,56 @@ export function registerWeatherFusionRoutes(app, options = {}) {
   });
   for (const name of [
     ...COMFORT_SCENE_ASSETS,
-    'forecast-windows.js','forecast-window-banners.js','forecast-window-banners.css','forecast-status.js','live-alerts.js','urgent-alerts.css',
+    // Complete native shell and photographic player dependencies.
+    'calendar-day.js',
+    'collapse.js',
+    'comfort-integrated-rain-night.webp',
+    'comfort-integrated-snow-play-dawn.webp',
+    'comfort-integrated-snow-play.webp',
+    'current-weather.js',
+    'gross-toggle.js',
+    'header-cloudy.jpg',
+    'header-cloudy.webp',
+    'header-day.jpg',
+    'header-day.webp',
+    'header-night.jpg',
+    'header-night.webp',
+    'header-rain.jpg',
+    'header-rain.webp',
+    'header-sky.css',
+    'header-sky.js',
+    'header-snow.jpg',
+    'header-snow.webp',
+    'logo.svg',
+    'native-player.css',
+    'native-player.js',
+    'page-unify.css',
+    'player/assets/photo-cold-scarf.webp',
+    'player/assets/photo-cold.webp',
+    'player/assets/photo-cool.webp',
+    'player/assets/photo-hot-poses-alpha.png',
+    'player/assets/photo-hot.webp',
+    'player/assets/photo-mild.webp',
+    'player/assets/photo-night-cool.webp',
+    'player/assets/photo-night-hot.webp',
+    'player/assets/photo-night-mild.webp',
+    'player/assets/photo-night.webp',
+    'player/assets/photo-park-empty.webp',
+    'player/assets/photo-rain.webp',
+    'player/assets/photo-snow.webp',
+    'player/assets/photo-storm.webp',
+    'player/assets/photo-wet.webp',
+    'player/assets/sky-storm.webp',
+    'player/photo-scene.js',
+    'player/sky-player.css',
+    'player/sky-player.js',
+    'player/vendor/three.module.js',
+    'player/weather-world.js',
+    'rain-timing.js',
+    'week-toggle.js',
+    'wn-blend.js',
+    'wn-compare.js',
+    'forecast-windows.js','forecast-window-banners.js','forecast-window-banners.css','forecast-status.js','forecast-refresh.js','live-alerts.js','urgent-alerts.css',
     'seven-day.js','seven-day.css','seven-day-art.css',
     'request-deadline.js','weather-changes.js','air-quality.js','alert-banners.js','app.js','bulletin-facts.js','bulletins.js','car-wash.js','car-wash.css','car-wash-background.webp','car-wash-corvette-hood.webp',
     'model-explanation.js','model-explanation.css','weathernext-site.html','weathernext-site.css','weathernext-site.js','weathernext-data.js','weathernext-catalog.json',
@@ -760,7 +813,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     'experience.js','exposure-scene.js','comfort-clothing.js','snow-outlook.js','winter-outlook.css','forecast-cards.css','forecast-confidence.js','forecast-layout.css','forecast-story.js','outlook-details.js',
     'frame-player.js','hero-mode.js','hourly-feels.js','hourly-feels.css','nav.js','outdoor-feels.js','pavement.js',
     'personal-details.js','personal-details.css','render-safety.js','risk-outlooks.js','risk-outlooks.css','scenario-layout.css','style.css','thermal-risk.js',
-    'today-card.js','rain-display.js','rain-trend.js','utci.js','weather-display.js','weather-math.js','weather-polish.css','weather-repair.css','weather-state.js','whats-up-classify.js',
+    'forecast-consistency.js','today-card.js','rain-display.js','rain-trend.js','utci.js','weather-display.js','weather-math.js','weather-polish.css','weather-repair.css','weather-state.js','whats-up-classify.js',
     'comfort-reference-scenes.png','comfort-reference-scenes.webp','comfort-reference-scenes-cold.webp',
     'comfort-reference-scenes-carry-umbrella.svg',
     'comfort-reference-scenes-dawn.webp','comfort-reference-scenes-fog.webp','comfort-reference-scenes-hot.webp',

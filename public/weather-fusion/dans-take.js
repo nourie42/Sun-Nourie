@@ -8,7 +8,7 @@ export const plainDanWording=text=>String(text||'').replace(/than (?:some |the )
 // Dan's Take is an outcome-first explanation for a ten-year-old, not a lightly
 // edited forecast discussion. Keep this list broad so scientific mechanisms can
 // never leak into the public card when the AI merely copies the source.
-export const hasDanJargon=text=>/\b(?:convergence|divergence|troughs?|troughing|ridges?|ridging|subsidence|mid[ -]levels?|upper[ -]levels?|aloft|instability|shear|vorticity|shortwaves?|isentropic|baroclinic|cyclogenesis|anticyclones?|dewpoint|PWAT|HRRR|ECMWF|NBM|CAPE|QPF|synoptic|advection|deterministic|convection|guidance|ensembles?|runs|forcing(?: for ascent)?|airmass)\b|\bsinking air\b|\b(?:inland|coastal)\s+(?:feature|plain)\b|\bweather (?:feature|setup|pattern)\b/i.test(text);
+export const hasDanJargon=text=>/\b(?:convergence|divergence|troughs?|troughing|ridges?|ridging|subsidence|mid[ -]levels?|upper[ -]levels?|aloft|instability|shear|vorticity|shortwaves?|isentropic|baroclinic|cyclogenesis|anticyclones?|dewpoint|PWAT|HRRR|ECMWF|NBM|CAPE|QPF|synoptic|advection|deterministic|convection|guidance|ensembles?|runs|forcing(?: for ascent)?|airmass|decoupl(?:e|ed|es|ing)|radiational)\b|\bpressure gradient\b|\bsinking air\b|\b(?:inland|coastal)\s+(?:feature|plain)\b|\bweather (?:feature|setup|pattern)\b/i.test(text);
 const H = 3600000, DAY = 24 * H, MAX_SOURCE_AGE = 12 * H;
 const norm = v => String(v || '').replace(/\s+/g, ' ').trim();
 const finite = Number.isFinite;
@@ -50,10 +50,14 @@ export function explicitForecastUncertainty(text) {
 export function discussionPeriod(text, anchor, zone) {
   const s=norm(text);if(!s||past(s))return null;
   const base=localParts(anchor,zone),found=[];
-  const re=new RegExp(`\\b(${dayPattern}|today|tomorrow|tonight|overnight|this morning|this afternoon|this evening)(?:\\s+(morning|afternoon|evening|night))?\\b`,'gi');
+  const re=new RegExp(`\\b(overnight\\s+(?:${dayPattern})|${dayPattern}|today|tomorrow|tonight|overnight|this morning|this afternoon|this evening)(?:\\s+(morning|afternoon|evening|night))?\\b`,'gi');
   for(const m of s.matchAll(re)){
     const word=m[1].toLowerCase();let date=base.date,part=m[2]?.toLowerCase()||'';
-    if(word==='tomorrow')date=addDays(date,1);
+    if(word.startsWith('overnight ')){
+      const dow=dayNames.findIndex(d=>d.toLowerCase().startsWith(word.slice(10,13)));
+      date=addDays(date,(dow-weekday(date)+7)%7);part='night';
+    }
+    else if(word==='tomorrow')date=addDays(date,1);
     else if(word==='tonight')part='night';
     else if(word==='overnight'){part='night';if(base.hour<6)date=addDays(date,-1);}
     else if(word.startsWith('this '))part=word.slice(5);

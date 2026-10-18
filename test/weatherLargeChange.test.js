@@ -20,10 +20,25 @@ test('dry days must be consecutive and immediately before rain',()=>{const d=inp
 test('20F exactly does not alert; rises and falls greater than 20F do',()=>{
  assert.deepEqual(weatherChangeMessages(input([60,60,60,60,80]),now),[]);
  assert.equal(weatherChangeMessages(input([60,60,60,60,81]),now).length,2);
- const cold=weatherChangeMessages(input([60,60,60,60,39]),now).join(' ');assert.match(cold,/colder/);assert.match(cold,/drier conditions/);
+ const cold=weatherChangeMessages(input([60,60,60,60,39]),now).join(' ');assert.match(cold,/colder/);assert.match(cold,/less humid/);
 });
 test('changes between later days count but sixth day does not',()=>{
  assert.equal(weatherChangeMessages(input([60,50,60,71,60]),now).length,2);
  assert.deepEqual(weatherChangeMessages(input([60,60,60,60,60,90]),now),[]);
 });
 test('missing hourly data cannot produce a temperature or dewpoint alert',()=>{const d=input([60,60,60,60,90]);d.metricForecasts.series={};assert.deepEqual(weatherChangeMessages(d,now),[]);});
+
+test('falling dew points with three rainy days cannot imply rain-free weather',()=>{
+ const d=input([65,44,43,43,43]);
+ d.days.slice(0,3).forEach(day=>Object.assign(day,{pop:90,qpf:.4}));
+ const text=weatherChangeMessages(d,now).find(s=>s.includes('humid'));
+ assert.match(text,/air will feel less humid/);
+ assert.match(text,/Rain is still possible during that period/);
+ assert.doesNotMatch(text,/drier conditions|dry weather|dry stretch/);
+});
+test('a rise in dew point describes a relative change without claiming high humidity',()=>{
+ const d=input([10,32,32,32,32]);
+ const text=weatherChangeMessages(d,now).find(s=>s.includes('humid'));
+ assert.match(text,/more humid/);
+ assert.doesNotMatch(text,/high humidity|Rain is still/);
+});

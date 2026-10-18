@@ -59,8 +59,8 @@ html body main :is(.aqi-pollutants>span,.thermal-grid>div,.today-weather-card.to
   .car-wash-hero,.car-wash-answer,.car-wash-checks,.car-wash-photo,.car-wash-days-wrap,.car-wash-days article,.car-wash-day,.car-wash-window,.car-wash-header,.car-wash-tip,.car-wash-fact,.metric-dialog-card){
   background-color:rgba(255,255,255,.10)!important;background-image:none!important;
   backdrop-filter:none!important;-webkit-backdrop-filter:none!important;border:1px solid rgba(255,255,255,.18)!important}
-/* "now"/selected states: same fill, highlighted with an outline instead */
-html body main :is(.hour.now,.seven-day-card.selected,.seven-day-card[aria-pressed=true],.day-row.selected){outline:2px solid rgba(127,212,255,.75);outline-offset:-2px}
+/* Selected states: same fill, highlighted with an outline instead. */
+html body main :is(.hour[aria-pressed=true],.seven-day-card.selected,.seven-day-card[aria-pressed=true],.day-row.selected){outline:2px solid rgba(127,212,255,.75);outline-offset:-2px}
 html body #today-forecast .today-weather-card.today-weather-card,html body #today-forecast .today-metrics.today-metrics{background-color:rgba(255,255,255,.10)!important;background-image:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;border:1px solid rgba(255,255,255,.18)!important}
 /* compact comparison chips (override global button sizing) */
 html body #wn-compare-chart .wn-chip{font-size:11px!important;line-height:1.4!important;padding:3px 8px!important;min-height:0!important;min-width:0!important;border-radius:999px!important}

@@ -1,4 +1,4 @@
-import {isTonightPeriod,localHour} from './weather-math.js?v=weather-qa-v70';
+import {forecastPeriodSummary,rainWindowPeak} from './forecast-story.js?v=verified-dry-20261018';
 const HOUR = 3600000;
 const WEATHERNEXT_FEED = 'https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/weathernext3.json';
 const WEATHERNEXT_SOURCE = 'https://developers.google.com/weathernext/guides/models';
@@ -8,7 +8,7 @@ const chance = value => finite(value) && value >= 0 && value <= 100 ? value : nu
 const esc = value => String(value ?? '').replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
 const names = {nws:'NWS',hrrr:'HRRR',ecmwf:'ECMWF',nbm:'NBM',wn:'NVIDIA WeatherNext'};
 const sourceIds = ['nws','hrrr','ecmwf','nbm','wn'];
-const phaseNames = {overall:'Full day',daytime:'Daytime',overnight:'Overnight'};
+const phaseNames = {overall:'Calendar day',daytime:'NWS daytime',overnight:'NWS overnight (includes next morning)'};
 let latest = null, latestNow = 0, selectedDate = null, selectedPhase = null;
 let weatherNextState = {key:null,status:'idle',point:null,runAt:null,generatedAt:null,checkedAt:0,message:''};
 
@@ -29,29 +29,33 @@ function dayLabel(date, index) {
 }
 function number(value, precision = 4) { return finite(value) ? Number(value.toFixed(precision)).toString() : '—'; }
 function percent(value) { return chance(value) === null ? '—' : `${Math.round(value)}%`; }
-function defaultPhase(index, now, zone) {
-  if (index !== 0) return 'overall';
-  if (isTonightPeriod(now,zone)) return 'overnight';
-  return localHour(now,zone) >= 12 ? 'overall' : 'daytime';
-}
 function periodFor(day, phase) {
   return (phase === 'daytime' ? day?.popDayLikelihood : phase === 'overnight' ? day?.popNightLikelihood : day?.rainLikelihood) || {};
 }
 
 export function modelExplanationView(forecast, {index = 0,phase = null,now = Date.now()} = {}) {
   const days = forecast?.days || [], safeIndex = Math.max(0,Math.min(days.length-1,index)), day = days[safeIndex] || {};
-  const zone = zoneFor(forecast), selected = Object.hasOwn(phaseNames,phase) ? phase : defaultPhase(safeIndex,now,zone);
-  const period = periodFor(day,selected), start = Date.parse(period.window?.start), end = Date.parse(period.window?.end);
-  const rows = (forecast?.rainTimeline || []).filter(row => {
+  const zone = zoneFor(forecast), selected = Object.hasOwn(phaseNames,phase) ? phase : 'overall';
+  const published = periodFor(day,selected);
+  const summary=selected==='overall'&&published.aggregation==='maximum-hourly'?forecastPeriodSummary(forecast,safeIndex,'overall',now):null;
+  const start=summary?.window.start??Date.parse(published.window?.start),end=summary?.window.end??Date.parse(published.window?.end);
+  const rows = (summary?.rows||forecast?.rainTimeline || []).filter(row => {
     const time = Date.parse(row.time), stop = Date.parse(row.end) || time+HOUR;
     return finite(start) && finite(end) && finite(time) && time < end && stop > start;
   }).sort((a,b) => Date.parse(a.time)-Date.parse(b.time));
   const available = rows.filter(row => chance(row.rainLikelihood?.value) !== null);
   const maximum = available.length ? Math.max(...available.map(row=>row.rainLikelihood.value)) : null;
-  const peakRow = available.find(row => row.time === period.peakTime && row.rainLikelihood.value === maximum) || available.find(row => row.rainLikelihood.value === maximum) || null;
-  const value = chance(period.value), complete = period.coverage?.complete === true;
-  const mismatch = value !== null && maximum !== null && (value !== maximum || (period.peakTime && !available.some(row=>row.time===period.peakTime && row.rainLikelihood.value===value)));
+  const peakRow = available.find(row => row.time === published.peakTime && row.rainLikelihood.value === maximum) || available.find(row => row.rainLikelihood.value === maximum) || null;
+  const value = chance(summary?summary.chance:published.value), complete = published.coverage?.complete === true&&(!summary||value!==null);
+  const changedWindow=summary&&(start!==Date.parse(published.window?.start)||end!==Date.parse(published.window?.end));
+  const period=summary?{...published,value,window:{start:finite(start)?new Date(start).toISOString():null,end:finite(end)?new Date(end).toISOString():null},
+    coverage:{...published.coverage,complete},peak:peakRow?.rainLikelihood||null,peakTime:peakRow?.time||null,peakEnd:peakRow?.end||null}:published;
+  const originalPeak=rainWindowPeak(forecast?.rainTimeline||[],{start:Date.parse(published.window?.start),end:Date.parse(published.window?.end)});
+  const sourceMismatch=originalPeak.value!==null&&chance(published.value)!==null&&originalPeak.value!==chance(published.value);
+  const mismatch = sourceMismatch||value !== null && maximum !== null && (value !== maximum || (!changedWindow&&published.peakTime&&!available.some(row=>row.time===published.peakTime && row.rainLikelihood.value===chance(published.value))));
+  const mismatchValue=sourceMismatch?chance(published.value):value;
   return {index:safeIndex,day,zone,phase:selected,period,start,end,rows,maximum,peakRow,value,complete,mismatch,
+    mismatchValue,
     peak:peakRow?.rainLikelihood || period.peak || null,peakTime:peakRow?.time || period.peakTime || null,
     peakEnd:peakRow?.end || period.peakEnd || (peakRow ? new Date(Date.parse(peakRow.time)+HOUR).toISOString() : null)};
 }
@@ -74,6 +78,7 @@ function sourceTable(likelihood, caption = 'Inputs for the highest hour') {
       : source.amount === null ? 'Unavailable' : `${number(source.amount,8)} in`;
     const reducedThreshold=finite(likelihood?.reducedQpfThresholdInches)?likelihood.reducedQpfThresholdInches:.010;
     const signal = source.id==='nws'||source.value === null ? ''
+      : source.reductionReason==='below-minimum' ? '<small>Below 0.001 in/hour: zero rain-signal points; amount retained</small>'
       : source.reductionReason==='uncorroborated' ? '<small>Uncorroborated rain: one-third of model points</small>'
         : source.amount>0&&source.amount<=reducedThreshold ? '<small>Light rain forecast: one-third of model points</small>'
         : `<small>Rain forecast: ${source.value>0?'Yes':'No'}</small>`;
@@ -252,7 +257,7 @@ function nvidiaRainMethod(forecast, peak) {
   const participation = weatherNextParticipation(forecast);
   if (participation.requestedWeight === null) return null;
   const shares = sourceRows(peak).filter(source => source.weight !== null).map(source => `${names[source.id]} ${number(source.weight * 100,4)} points`).join(', ');
-  return `<details class="model-method" data-model-detail="method"><summary>How the inputs are used</summary><p>${esc(participation.copy)}${shares ? ` The selected highest hour uses these recorded shares: ${esc(shares)}.` : ''} The NWS hourly probability fills its recorded share proportionally. Each model's hourly precipitation amount supplies its own rain signal.</p><p>A positive model amount through 0.010 in gets exactly one-third of that model's points. An amount above 0.010 in gets full points only if NWS is at least 20% or another included model also exceeds 0.010 in. An uncorroborated signal gets one-third. Repeated hours from one model do not count as corroboration. Zero rain gets zero points. The points are added and the result is capped at 100%. Rainfall amount is calculated separately. An unavailable model adds no points. This is an uncalibrated estimate, not a proven model-accuracy ranking.</p></details>`;
+  return `<details class="model-method" data-model-detail="method"><summary>How the inputs are used</summary><p>${esc(participation.copy)}${shares ? ` The selected highest hour uses these recorded shares: ${esc(shares)}.` : ''} The NWS hourly probability fills its recorded share proportionally. Each model's hourly precipitation amount supplies its own rain signal.</p><p>Model amounts below 0.001 in/hour add zero rain-signal points; the original amounts are retained. From 0.001 through 0.010 in/hour, a model gets one-third of its points. An amount above 0.010 in gets full points only if NWS is at least 20% or another included model also exceeds 0.010 in. An uncorroborated signal gets one-third. Repeated hours from one model do not count as corroboration. Zero rain gets zero points. The points are added and the result is capped at 100%. Rainfall amount is calculated separately. An unavailable model adds no points. This is an uncalibrated estimate, not a proven model-accuracy ranking.</p></details>`;
 }
 
 export function modelExplanationHTML(forecast, options = {}) {
@@ -265,11 +270,11 @@ export function modelExplanationHTML(forecast, options = {}) {
   return `<div class="model-explanation-heading"><h2 id="model-explanation-title">Why this forecast</h2><div class="model-selectors"><label>Day<select aria-label="Day" data-model-day>${choices}</select></label><label>Period<select aria-label="Period" data-model-phase>${phaseOptions}</select></label></div></div>
     <div class="model-period"><strong>${percent(view.value)}</strong><span>${phaseNames[phase]} · highest hourly blended estimate<small>${esc(stamp(period.window?.start,zone))} – ${esc(stamp(period.window?.end,zone))}</small></span></div>
     <p class="model-definition">This number is the highest hourly estimate in this period, not a separate probability of rain at any time during the whole period.</p>
-    ${view.mismatch?`<p class="model-data-warning">Data mismatch: the period shows ${percent(view.value)}, but the highest supplied hour is ${percent(view.maximum)}.</p>`:''}
+    ${view.mismatch?`<p class="model-data-warning">Data mismatch: the period shows ${percent(view.mismatchValue)}, but the highest supplied hour is ${percent(view.maximum)}.</p>`:''}
     ${!view.complete?`<p class="model-data-warning">Incomplete coverage: ${number(period.coverage?.availableHours)} of ${number(period.coverage?.expectedHours)} hours. The period estimate stays unavailable.${view.maximum===null?'':` Highest available hour: ${percent(view.maximum)}.`}</p>`:''}
     ${view.peakTime?`<h3>Highest hour: ${esc(stamp(view.peakTime,zone))}–${esc(stamp(view.peakEnd,zone,false))}</h3>`:''}
     ${sourceTable(peak)}${arithmetic(peak)}
-    ${nvidiaMethod || `<details class="model-method" data-model-detail="method"><summary>How the inputs are used</summary><p>For today at the selected location, the NWS hourly probability fills its 40-point share proportionally. A 40% NWS chance contributes 16 points. HRRR is worth 30 points, ECMWF 10, and NBM 20. For later days, NWS fills a 15-point share, ECMWF 60, and NBM 25; HRRR is excluded. A positive model amount through 0.010 in gets exactly one-third of that model's points. An amount above 0.010 in gets full points only if NWS is at least 20% or another included model also exceeds 0.010 in. Otherwise it gets one-third: an unsupported ECMWF signal on a later day adds 20 points, not 60. Repeated hours from the same model do not count as corroboration. Zero rain gets zero points.</p><p>The points are added and the result is capped at 100%. For example, using today's shares, NWS 7% contributes 2.8 points; ECMWF at 0.004 in contributes 3.3333 points; and NBM at 0.010 in contributes 6.6667 points. The total is 12.8%, shown as 13%. Rainfall amount is calculated separately. An unavailable model adds no points. This is an uncalibrated estimate, not a proven model-accuracy ranking.</p></details>`}
+    ${nvidiaMethod || `<details class="model-method" data-model-detail="method"><summary>How the inputs are used</summary><p>For today at the selected location, the NWS hourly probability fills its 40-point share proportionally. A 40% NWS chance contributes 16 points. HRRR is worth 30 points, ECMWF 10, and NBM 20. For later days, NWS fills a 15-point share, ECMWF 60, and NBM 25; HRRR is excluded. Model amounts below 0.001 in/hour add zero rain-signal points; the original amounts are retained. From 0.001 through 0.010 in/hour, a model gets one-third of its points. An amount above 0.010 in gets full points only if NWS is at least 20% or another included model also exceeds 0.010 in. Otherwise it gets one-third: an unsupported ECMWF signal on a later day adds 20 points, not 60. Repeated hours from the same model do not count as corroboration. Zero rain gets zero points.</p><p>The points are added and the result is capped at 100%. For example, using today's shares, NWS 7% contributes 2.8 points; ECMWF at 0.004 in contributes 3.3333 points; and NBM at 0.010 in contributes 6.6667 points. The total is 12.8%, shown as 13%. Rainfall amount is calculated separately. An unavailable model adds no points. This is an uncalibrated estimate, not a proven model-accuracy ranking.</p></details>`}
     <details class="model-hourly-list" data-model-detail="hours"><summary>All ${rows.length} forecast hours in this period</summary>${audit||'<p>No hourly calculation data was supplied.</p>'}</details>
     ${temperatures?`<details class="model-temperature-list" data-model-detail="temperatures"><summary>Temperature calculations</summary>${temperatures}</details>`:''}
     <details class="model-source-list" data-model-detail="sources"><summary>Source runs and availability</summary>${sourceStatus(forecast,view)}</details>`;

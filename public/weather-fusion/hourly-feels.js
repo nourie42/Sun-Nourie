@@ -1,18 +1,9 @@
-import {finite} from './weather-math.js?v=weather-qa-v67';
+import {timeAt,calendarDayWindow} from './calendar-day.js?v=calendar-days-v1';
+import {finite} from './weather-math.js?v=current-rain-20261017-v3';
 const H=3600000;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export const degrees=v=>finite(v)?`${Math.round(v)}°`:'—';
-export function timeAt(date,hour,zone='America/New_York'){
- const target=Date.parse(`${date}T${String(hour).padStart(2,'0')}:00:00Z`);let guess=target;
- if(!finite(target))return NaN;
- for(let i=0;i<4;i++){
-  const p=new Intl.DateTimeFormat('en-US',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).formatToParts(new Date(guess));
-  const get=k=>p.find(x=>x.type===k)?.value;
-  const delta=target-Date.parse(`${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}:${get('second')}Z`);
-  guess+=delta;if(!delta)break;
- }
- return guess;
-}
+export {timeAt} from './calendar-day.js?v=calendar-days-v1';
 export function forecastValue(f,key,time){
  const epoch=Date.parse(time);if(!finite(epoch))return null;
  // Match instants, not array indexes, local date strings or the current observation.
@@ -38,12 +29,8 @@ export function summarizeFeels(f,start,end,now=-Infinity){
 }
 export function dailyFeels(f,index,now=Date.now()){
  const d=f?.days?.[index];if(!/^\d{4}-\d{2}-\d{2}$/.test(d?.date||''))return {high:null,low:null};
- const zone=f.location?.timeZone||'America/New_York',next=new Date(Date.parse(d.date+'T12:00:00Z')+24*H).toISOString().slice(0,10);
- const window=(name,start,end)=>{
-  const a=Date.parse(d[name+'Window']?.start),b=Date.parse(d[name+'Window']?.end);
-  return summarizeFeels(f,finite(a)?a:start,finite(b)?b:end,index===0?now:-Infinity);
- };
- return {high:window('high',timeAt(d.date,7,zone),timeAt(d.date,19,zone)),low:window('low',timeAt(d.date,19,zone),timeAt(next,7,zone))};
+ const window=calendarDayWindow(d,index,now,f.location?.timeZone),summary=summarizeFeels(f,window.start,window.end);
+ return {high:summary,low:summary};
 }
 export function dayFeelsHTML(f,index,tonight=false,now=Date.now()){
  const s=dailyFeels(f,index,now),z=f.location?.timeZone||'America/New_York';
@@ -53,7 +40,7 @@ export function dayFeelsHTML(f,index,tonight=false,now=Date.now()){
   if(!p)return `<div><small>${label}</small><strong>Unavailable</strong><span>Hourly inputs are missing.</span></div>`;
   return `<div><small>${label}${summary.partial?' · partial data':''}</small><strong>${degrees(p.value)}</strong><span>${esc(clock(p.time))} · air ${degrees(forecastValue(f,'temperature',p.time))}</span></div>`;
  };
- return `<section class="day-feels" aria-label="Hourly feels-like forecast"><h3>How it’s forecast to feel</h3><div class="day-feels-grid">${tonight?'':card(s.high,'high','Feels-like high')}${card(s.low,'low','Feels-like overnight low')}</div><p>Outdoor estimates from each hour’s temperature, dew point, wind and sky/sun exposure; the same values appear in the hourly forecast and outdoor figure. The feels-like peak and air-temperature high can occur at different hours.</p></section>`;
+ return `<section class="day-feels" aria-label="Hourly feels-like forecast"><h3>How it’s forecast to feel</h3><div class="day-feels-grid">${tonight?'':card(s.high,'high','Feels-like high')}${card(s.low,'low','Feels-like low on this date')}</div><p>Outdoor estimates from each hour’s temperature, dew point, wind and sky/sun exposure; the same values appear in the hourly forecast and outdoor figure. The feels-like peak and air-temperature high can occur at different hours.</p></section>`;
 }
 export function peakFeelsHTML(summary,zone='America/New_York'){
  if(!summary)return '<p class="comfort-later">Hourly feels-like outlook unavailable. Missing readings stay blank.</p>';

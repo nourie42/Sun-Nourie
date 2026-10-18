@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#EEF3F8">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="Weather Nourie Atmos: the next 48 hours drawn as a living sky, the best hours to be outside, and a forecast lab where you decide how much each forecast counts.">
+  <title>Atmos · Weather Nourie</title>
+  <link rel="icon" href="/weather-fusion/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="/weather-fusion/archivo-latin-wdth-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/weather-fusion/atmos.css?v=atmos-v2">
+  <script type="module" src="/weather-fusion/atmos.js?v=atmos-v2"></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to the forecast details</a>
+
+  <header class="hero" id="hero">
+    <div class="sky-frame" id="sky-frame">
+      <canvas class="sky" id="sky" aria-hidden="true"></canvas>
+      <div class="sky-top">
+        <div class="topbar">
+          <a class="home" href="/weather-fusion/" aria-label="Weather Nourie main forecast">
+            <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="20" cy="11" r="5.5"/><path d="M5 22h22M8 26.5h16"/></svg>
+            <span><span class="brand-long">Weather Nourie </span><b>Atmos</b></span>
+          </a>
+          <div class="tools">
+            <button class="pill place-button" id="place-button" type="button" aria-haspopup="dialog" aria-controls="place-dialog">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg>
+              <span id="place-button-label">Change place</span>
+            </button>
+            <button class="pill icon-button" id="refresh" type="button" aria-label="Refresh the forecast">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4.5v4.2h-4.2"/></svg>
+            </button>
+          </div>
+        </div>
+        <section class="alerts" id="alerts" aria-label="Official weather alerts" hidden></section>
+        <p class="sky-note" id="sky-note"></p>
+      </div>
+    </div>
+
+    <section class="now" id="panel" aria-labelledby="place-name">
+      <div class="now-head">
+        <h1 class="place" id="place-name">Finding your forecast</h1>
+        <p class="when"><span id="when"></span><button class="now-button" id="now-button" type="button" hidden>Back to now</button></p>
+      </div>
+      <div class="reading">
+        <p class="temp"><span id="temp-value">––</span><span class="degree" aria-hidden="true">°</span><span class="sr-only" id="temp-label"></span></p>
+        <div class="reading-copy">
+          <p class="condition" id="condition">Loading the forecast</p>
+          <p class="feels" id="feels"></p>
+        </div>
+      </div>
+      <div class="clock" id="clock" hidden>
+        <button class="play" id="play" type="button" aria-pressed="false" aria-label="Play the next 48 hours in the sky">
+          <svg class="icon-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>
+          <svg class="icon-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13M16 5.5v13"/></svg>
+          <span class="play-text" id="play-text">Play</span>
+        </button>
+        <div class="strip" id="strip">
+          <svg id="strip-svg" role="presentation" aria-hidden="true"></svg>
+          <label class="sr-only" for="hour">Forecast hour</label>
+          <input class="hour-input" id="hour" type="range" min="0" max="0" step="1" value="0">
+        </div>
+        <p class="clock-caption" id="clock-caption">Press Play to watch the next 48 hours happen in the sky, or drag along the timeline to any hour.</p>
+      </div>
+      <p class="headline" id="headline"></p>
+      <dl class="readouts" id="readouts">
+        <div><dt>Rain</dt><dd id="read-rain">–</dd><small id="read-rain-note"></small></div>
+        <div><dt>Wind</dt><dd id="read-wind">–</dd><small id="read-wind-note"></small></div>
+        <div><dt>Dew point</dt><dd id="read-dew">–</dd><small id="read-dew-note"></small></div>
+        <div><dt>Humidity</dt><dd id="read-humidity">–</dd><small id="read-humidity-note"></small></div>
+      </dl>
+      <p class="take" id="take" hidden></p>
+      <p class="status" id="status" role="status" aria-live="polite"></p>
+    </section>
+
+    <nav class="jump" id="jump" aria-label="Page sections" hidden>
+      <a href="#golden">Best times outside</a>
+      <a href="#days">10 days</a>
+      <a class="lab-link" href="#lab">Make your own forecast</a>
+      <a href="#blend">Forecast mix</a>
+      <a href="#rain">Rain</a>
+      <a href="#feel">Feels like</a>
+      <a href="#street">Street level</a>
+    </nav>
+  </header>
+
+  <div class="ticker" id="ticker" aria-label="Selected forecast hour" role="group">
+    <button class="tick-button" id="tick-prev" type="button" aria-label="Previous hour"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 6-6 6 6 6"/></svg></button>
+    <p class="tick-label"><strong id="tick-time">Now</strong> <span id="tick-summary"></span></p>
+    <button class="tick-button" id="tick-next" type="button" aria-label="Next hour"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg></button>
+    <button class="tick-button tick-play" id="tick-play" type="button" aria-label="Play the next 48 hours in the sky" aria-pressed="false">
+      <svg class="icon-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>
+      <svg class="icon-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13M16 5.5v13"/></svg>
+    </button>
+  </div>
+
+  <main id="main" hidden>
+    <section class="card" id="golden" aria-labelledby="golden-title">
+      <div class="card-head">
+        <h2 id="golden-title">Best times to be outside</h2>
+        <p class="lead">Every square is one hour of the coming week, colored by how it will feel outdoors. Gold squares are the near-perfect hours. Tap a square to see that hour.</p>
+      </div>
+      <div class="grid-wrap" id="golden-grid"></div>
+      <div class="legend" id="golden-legend"></div>
+      <div class="windows" id="golden-windows"></div>
+      <details class="science"><summary>What makes an hour perfect</summary><div class="science-body" id="golden-science"></div></details>
+    </section>
+
+    <section class="card" id="days" aria-labelledby="days-title">
+      <div class="card-head">
+        <h2 id="days-title">Next 10 days</h2>
+        <p class="lead">Each bar runs from the day’s low to its high. The thin whiskers show how far the separate forecasts reach, so you can spot the days they disagree about. Tap a day for more.</p>
+      </div>
+      <ol class="day-list" id="day-list"></ol>
+    </section>
+
+    <section class="card lab" id="lab" aria-labelledby="lab-title">
+      <div class="card-head">
+        <h2 id="lab-title">Make your own forecast</h2>
+        <p class="lead">Weather Nourie mixes several forecasts into one. Here you decide how much each one counts. Pick a starting point or move the sliders, and your forecast is rebuilt next to Weather Nourie’s, hour by hour.</p>
+      </div>
+      <div class="lab-grid">
+        <div class="lab-start">
+          <p class="lab-label" id="lab-presets-label">Start from</p>
+          <div class="presets" id="lab-presets" role="group" aria-labelledby="lab-presets-label"></div>
+        </div>
+        <div class="lab-results">
+          <p class="lab-summary" id="lab-summary" aria-live="polite"></p>
+          <div class="tabs" role="tablist" aria-label="What to chart">
+            <button type="button" role="tab" id="lab-tab-temp" aria-selected="true" aria-controls="lab-chart">Temperature</button>
+            <button type="button" role="tab" id="lab-tab-rain" aria-selected="false" aria-controls="lab-chart" tabindex="-1">Rain chance</button>
+          </div>
+          <figure class="chart" id="lab-chart" role="tabpanel" aria-labelledby="lab-tab-temp"></figure>
+          <p class="keys" id="lab-keys"></p>
+        </div>
+        <div class="lab-controls">
+          <p class="lab-label">How much each forecast counts</p>
+          <ul class="sliders" id="lab-sliders"></ul>
+          <details class="meet" id="lab-meet"><summary>Meet the forecasts</summary><dl class="meet-list" id="lab-meet-list"></dl></details>
+          <div class="mix" id="lab-mix"></div>
+          <button class="reset" id="lab-reset" type="button">Reset to Weather Nourie</button>
+        </div>
+        <div class="lab-days">
+          <div class="table-wrap"><table class="lab-table" id="lab-table"></table></div>
+        </div>
+      </div>
+      <details class="science"><summary>How your forecast is made</summary><div class="science-body" id="lab-science"></div></details>
+    </section>
+
+    <section class="card" id="blend" aria-labelledby="blend-title">
+      <div class="card-head">
+        <h2 id="blend-title">Several forecasts, one temperature</h2>
+        <p class="lead" id="blend-lead">Each thin colored line is one forecast. The dark line is the blend Weather Nourie shows everywhere, and the gray band is how far apart the forecasts are. Tap the chart to pick an hour.</p>
+      </div>
+      <div class="split">
+        <div>
+          <figure class="chart" id="blend-chart" aria-label="Temperature forecast from each source and the blend over the next 48 hours"></figure>
+          <p class="keys" id="blend-keys"></p>
+        </div>
+        <div class="hour-card" id="blend-hour"></div>
+      </div>
+      <details class="science"><summary>How the blend works</summary><div class="science-body" id="blend-science"></div></details>
+    </section>
+
+    <section class="card" id="rain" aria-labelledby="rain-title">
+      <div class="card-head">
+        <h2 id="rain-title">Where the rain chance comes from</h2>
+        <p class="lead" id="rain-lead">Each bar is one hour’s chance of rain, and the colors show which forecasts add to it. Tap a bar to see the math for that hour.</p>
+      </div>
+      <figure class="chart" id="rain-chart" aria-label="Rain chance for each of the next 48 hours, split by source"></figure>
+      <p class="keys" id="rain-keys"></p>
+      <div class="rain-detail" id="rain-detail"></div>
+      <details class="science"><summary>How the rain chance is scored</summary><div class="science-body" id="rain-science"></div></details>
+    </section>
+
+    <section class="card" id="feel" aria-labelledby="feel-title">
+      <div class="card-head">
+        <h2 id="feel-title">How it really feels</h2>
+        <p class="lead">The thermometer is only part of the story. Sunshine, wind and moisture change how warm or cold it feels when you are out in it.</p>
+      </div>
+      <div class="split">
+        <div id="feel-ladder"></div>
+        <div id="feel-dew"></div>
+      </div>
+      <details class="science"><summary>The science of feels-like</summary><div class="science-body">
+        <p><strong>Feels-like</strong> is the site’s outdoor estimate of the Universal Thermal Climate Index (UTCI). It combines air temperature, moisture, wind and an estimated sun load, with the NWS wind chill as a floor in cold wind. “In the shade” takes the sun out.</p>
+        <p><strong>Dew point</strong> is the temperature at which the air would be saturated. It measures the actual moisture in the air, which is why it tracks how sticky it feels better than relative humidity does. Wet bulb uses Stull’s approximation.</p>
+        <p>The heat categories (warm, hot, very hot) follow the UTCI heat-stress limits of 78.8°, 89.6° and 100.4°F. They are estimates, not official heat alerts.</p>
+      </div></details>
+    </section>
+
+    <section class="card" id="street" aria-labelledby="street-title">
+      <div class="card-head">
+        <h2 id="street-title">Out on the street</h2>
+        <p class="lead">What the pavement, the sun and the air are doing where you actually walk.</p>
+      </div>
+      <div class="street-grid">
+        <article class="street-block" id="street-pavement" aria-labelledby="pavement-title"></article>
+        <article class="street-block" id="street-sun" aria-labelledby="sun-title"></article>
+        <article class="street-block" id="street-air" aria-labelledby="air-title"></article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="sources" id="sources">
+    <h2>Where these numbers come from</h2>
+    <div class="source-copy" id="source-copy"></div>
+    <p class="official">Weather Nourie is not an official National Weather Service product. Always follow official warnings from <a href="https://www.weather.gov/">weather.gov</a> and local emergency managers.</p>
+    <p class="other-views"><a href="/weather-fusion/">Main forecast</a><a href="/weather-fusion/experimental-weather.html">Experimental</a><a href="/weather-fusion/halo.html">Halo</a><a href="/weather-fusion/ultimate.html">Ultimate</a></p>
+  </footer>
+
+  <div class="tip" id="tip" role="tooltip" hidden></div>
+
+  <dialog class="place-dialog" id="place-dialog" aria-labelledby="place-dialog-title">
+    <form method="dialog" class="place-form" id="place-form">
+      <h2 id="place-dialog-title">Choose a place</h2>
+      <label class="search"><span class="sr-only">Search a U.S. city or ZIP code</span>
+        <input id="place-search" type="search" placeholder="Search a U.S. city or ZIP" autocomplete="off" maxlength="80">
+      </label>
+      <button class="locate" id="locate" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"/><path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4"/></svg>
+        Use my location
+      </button>
+      <p class="place-hint" id="place-hint">Saved places</p>
+      <ul class="place-list" id="place-list"></ul>
+      <button class="close" value="close" type="submit">Close</button>
+    </form>
+  </dialog>
+  <noscript><p class="noscript">Atmos needs JavaScript. Visit <a href="https://www.weather.gov/">weather.gov</a> for official forecasts and warnings.</p></noscript>
+</body>
+</html>

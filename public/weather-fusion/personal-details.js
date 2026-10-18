@@ -1,9 +1,9 @@
-import {weatherState} from './weather-state.js';
+import {weatherState} from './weather-state.js?v=current-rain-20261017-v3';
 import {thermalRiskHTML} from './thermal-risk.js?v=weather-art-labels-v10';
 import {forecastGrossLevel} from './dewpoint-meter.js?v=feel-chart-v3';
-import {exposureScene,precipitationActivity,winterSceneExpected} from './exposure-scene.js?v=true-night-v6';
-import {outdoorExposure} from './outdoor-feels.js?v=weather-qa-v67';
-import {solarElevation} from './weather-math.js?v=weather-qa-v67';
+import {exposureScene,precipitationActivity,winterSceneExpected} from './exposure-scene.js?v=current-rain-20261017-v3';
+import {outdoorExposure} from './outdoor-feels.js?v=current-rain-20261017-v3';
+import {solarElevation} from './weather-math.js?v=current-rain-20261017-v3';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
 const HOUR=3600000;
@@ -100,6 +100,7 @@ export function sunShadeHTML(comfort,location,now=Date.now(),context={}){
   precipitation:context.precipitation,
   forecast:context.forecast,
   rainAround:context.rainAround===true,
+  rainExpected:context.rainExpected===true,
   radarThreat:context.radarThreat===true,
   snowExpected:context.snowExpected===true,
   snowForecastOnly:context.snowForecastOnly===true,
@@ -111,8 +112,8 @@ export function sunShadeHTML(comfort,location,now=Date.now(),context={}){
  const snow=winterSceneExpected(condition,sceneContext);
  const activeRain=precipitationActivity(condition,sceneContext)==='active';
  const compactSunTitle=snow?'Snow':kind==='storm'?'Storms':activeRain?'Rain':!daylight?'Night':kind==='clear'?'Sun':kind==='partly-cloudy'?'Sun breaks':'Day';
- const shadeSubtitle=snow?'Snow · bundle up':activeRain?'Rain · sheltered':comfortSubtitle(shadeDisplay);
- const outdoorSubtitle=snow?'Snow · dress warmly':kind==='storm'?(context.forecast?'Thunderstorms forecast':'Stormy conditions'):activeRain?(context.forecast?'Rain forecast':'Rain outside'):sunSubtitle(outdoorValue,kind,daylight);
+ const shadeSubtitle=snow?'Snow · bundle up':activeRain?(context.rainExpected?'Rain forecast · sheltered':'Rain · sheltered'):comfortSubtitle(shadeDisplay);
+ const outdoorSubtitle=snow?'Snow · dress warmly':kind==='storm'?(context.forecast?'Thunderstorms forecast':'Stormy conditions'):activeRain?(context.rainExpected?'Rain forecast · take an umbrella':context.forecast?'Rain forecast':'Rain outside'):sunSubtitle(outdoorValue,kind,daylight);
  return `<div class="sun-shade-comparison" role="group" aria-label="Shade, outdoor and pet temperatures"><figure class="exposure-person shade-person" data-reading="${finite(shadeDisplay)?'available':'unavailable'}" data-temperature="${finite(shadeDisplay)?Math.round(shadeDisplay):''}" data-weather="${esc(kind)}">${context.compact?`<span class="exposure-label">Shade</span><span class="exposure-subtitle">${esc(shadeSubtitle)}</span><span class="exposure-alert-slot"></span>`:''}${exposureScene(false,daylight,condition,shadeDisplay,sceneContext)}<figcaption><strong>${shade}</strong><span class="shade-reading-label">Feels like in shade</span>${context.compact?'':`<span>Modeled shade feels-like · ${period}</span>`}</figcaption></figure><figure class="exposure-person sun-person" data-reading="${finite(outdoorValue)?'available':'unavailable'}" data-weather="${esc(kind)}">${context.compact?`<span class="exposure-label">${esc(compactSunTitle)}</span><span class="exposure-subtitle">${esc(outdoorSubtitle)}</span><span class="exposure-alert-slot">${thermalRiskHTML(rawRiskValue,true)}</span>`:''}${exposureScene(true,daylight,condition,outdoorValue,sceneContext)}<figcaption>${context.compact?'':thermalRiskHTML(rawRiskValue,true)}<strong>${outside}</strong>${context.compact?'':`<span>${esc(exposure.label)} · ${period}</span>`}</figcaption></figure>${context.pavement||''}</div>${context.compact?'':`<small class="exposure-estimate">Estimated feels-like temperatures. · °F${note}${basis}${shadeBasis}</small>`}`;
 }
 export function modelFreshnessText(layer,checkedAt,zone='America/New_York',now=Date.now()){

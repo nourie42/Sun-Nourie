@@ -70,7 +70,10 @@ export function comparisonApp(original,config){
  s=replaceOnce(s,'data.rainTrend=updateRainTrend(data,Date.now());',"data.rainTrend=COMPARE.source==='google'?null:updateRainTrend(data,Date.now());");
  s=replaceOnce(s,"$('status').classList.add('error');","if(COMPARE.source==='google'&&e.status===404)$('status').textContent='WeatherNext is not yet connected for this location. Use the main weather page for your local forecast.';\n    $('status').classList.add('error');");
  s=replaceOnce(s,"$('status').classList.toggle('error', unavailable.length > 0 || failedPanels.length > 0);","$('status').classList.toggle('error', unavailable.length > 0 || failedPanels.length > 0);\n  compareBridge.rendered(data);");
- s=replaceOnce(s,'installExperience();\nstartDeviceLocation();',"const compareBridge=installComparisonPane(COMPARE,{selectHour:selectComfortHour,showDay,refresh:()=>load(),getForecast:()=>forecast});\ninstallExperience();\nif(COMPARE.explicitLocation)chooseLocation({...COMPARE.point,source:'comparison'});else startDeviceLocation();");
+ // Startup extensions (including the native sky player) may sit between these
+ // calls. Adapt the two stable entry points independently and preserve them.
+ s=replaceOnce(s,'\ninstallExperience();',"\nconst compareBridge=installComparisonPane(COMPARE,{selectHour:selectComfortHour,showDay,refresh:()=>load(),getForecast:()=>forecast});\ninstallExperience();");
+ s=replaceOnce(s,'\nstartDeviceLocation();',"\nif(COMPARE.explicitLocation)chooseLocation({...COMPARE.point,source:'comparison'});else startDeviceLocation();");
  return s;
 }
 export function registerWeatherComparisonRoutes(app,{fetchImpl=globalThis.fetch,now=Date.now,feedProvider,companionProvider,accessOptions={},locationProvider}={}){

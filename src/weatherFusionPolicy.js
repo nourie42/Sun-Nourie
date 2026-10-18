@@ -7,7 +7,7 @@ export const WEATHERNEXT_WEIGHT = .10;
 export function weatherNextPolicy(policy, available = false) {
   return available ? {...Object.fromEntries(Object.entries(policy).map(([id, weight])=>[id, Number((weight * (1-WEATHERNEXT_WEIGHT)).toFixed(8))])), wn:WEATHERNEXT_WEIGHT} : policy;
 }
-export const REPAIR_VERSION = 'weather-nourie-nvidia-blend-v13';
+export const REPAIR_VERSION = 'weather-nourie-nvidia-blend-v15';
 export function calendarDate(time, zone = 'America/New_York') {
   return new Intl.DateTimeFormat('en-CA', {timeZone: zone, year:'numeric', month:'2-digit', day:'2-digit'}).format(new Date(time));
 }

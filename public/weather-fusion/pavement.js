@@ -1,11 +1,11 @@
-import {finite,solarElevation,thermalHumidity} from './weather-math.js?v=weather-qa-v67';
-import {clothingForFeels,referenceScene,precipitationActivity,winterSceneExpected} from './exposure-scene.js?v=true-night-v6';
+import {finite,solarElevation,thermalHumidity,wetBulb} from './weather-math.js?v=current-rain-20261017-v3';
+import {clothingForFeels,referenceScene,precipitationActivity,winterSceneExpected} from './exposure-scene.js?v=current-rain-20261017-v3';
 import {thermalRisk} from './thermal-risk.js?v=weather-art-labels-v10';
-import {weatherShapes} from './weather-display.js?v=feel-chart-tabs-v9';
-import {weatherState} from './weather-state.js';
+import {weatherShapes} from './weather-display.js?v=low-rain-display-v1';
+import {weatherState} from './weather-state.js?v=current-rain-20261017-v3';
 const H=3600000,SIGMA=5.670374419e-8,clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 const c=f=>(f-32)/1.8,f=c=>c*1.8+32;
-export const PAVEMENT_VERSION='pavement-energy-balance-v1';
+export const PAVEMENT_VERSION='pavement-energy-balance-v2';
 export function solarRadiation(row,location,time){
  if(finite(row.solar)&&row.solar>=0)return row.solar;
  const elevation=solarElevation(time,location?.latitude,location?.longitude);
@@ -33,6 +33,10 @@ export function integrateSurface(rows,location,{albedo=.3,k=2,capacity=2.2e6,win
  const deep=rows.reduce((sum,r)=>sum+c(r.temperature),0)/rows.length;
  let ts=c(rows[0].temperature)+initialOffset,tb=deep+initialOffset*.5;
  const cs=capacity*.03,cb=capacity*.15,g=k/.09,gd=k/.25;
+ // A wet surface evaporates toward the wet-bulb temperature. Rain in the
+ // current or previous 3 hours keeps the surface wet; without this term the
+ // model held wet night pavement several degrees too warm.
+ const wetHour=rows.map((row,i)=>{for(let j=Math.max(0,i-3);j<=i;j++){const rain=rows[j].rain;if(finite(rain)&&rain>0.05)return true;}return false;});
  for(let i=1;i<rows.length;i++){
   const a=rows[i-1],b=rows[i],span=b.epoch-a.epoch;
   if(span<=0||span>1.51*H)return null;
@@ -42,7 +46,11 @@ export function integrateSurface(rows,location,{albedo=.3,k=2,capacity=2.2e6,win
    if(![r.temperature,r.wind,sw,lw].every(finite)||r.wind<0)return null;
    const v=r.wind*.44704*.7*windFactor,h=v<=5?5.6+4*v:7.3*v**.78;
    const conduction=g*(ts-tb);
-   const flux=(1-albedo)*sw*solarFactor+.95*(lw-SIGMA*(ts+273.15)**4)+h*(c(r.temperature)-ts)-conduction;
+   let flux=(1-albedo)*sw*solarFactor+.95*(lw-SIGMA*(ts+273.15)**4)+h*(c(r.temperature)-ts)-conduction;
+   if(wetHour[i]){
+    const twbF=wetBulb(r.temperature,thermalHumidity(r));
+    if(finite(twbF))flux+=h*(c(twbF)-ts);
+   }
    ts+=dt*flux/cs;tb+=dt*(conduction-gd*(tb-deep))/cb;
    if(!finite(ts)||ts< -100||ts>150)return null;
    time+=dt*1000;
@@ -85,7 +93,7 @@ export function pavementEstimate(forecast,current,now=Date.now(),{checkedAt=now,
  const activePrecipitation=precipitationActivity(condition,{pop,precipitation,rainAround,radarThreat})==='active';
  const wet=activePrecipitation||rows.slice(-4).some(r=>finite(r.rain)&&r.rain>0),frozen=current.temperature<=32;
  return {version:PAVEMENT_VERSION,status:'estimated',...results,historyHours:(now-rows[0].epoch)/H,wet,activePrecipitation,frozen,airTemperature:Math.round(last.temperature),skyCover:last.skyCover,time:new Date(now).toISOString(),daylight,
-  note:frozen?'Snow, ice and freezing change surface behavior; these dry-surface estimates are unreliable in these conditions.':wet?'Recent modeled rain may mean wet surfaces. These are dry-surface estimates; wet pavement can be cooler.':'Estimated dry, exposed surfaces. Shade, color and local shelter can change the actual temperature.',
+  note:frozen?'Snow, ice and freezing change surface behavior; these dry-surface estimates are unreliable in these conditions.':wet?'Recent modeled rain may mean wet surfaces. Wet-surface estimates include evaporative cooling toward the wet-bulb temperature.':'Estimated dry, exposed surfaces. Shade, color and local shelter can change the actual temperature.',
   advice:'Check the actual surface with the back of your hand. If it feels too hot, choose grass or a cooler route.'};
 }
 export function walkerOutfit(feels){
@@ -99,8 +107,8 @@ function petWeatherWarning(feels){
 }
 export function petSurfaceSubtitle(result){
  if(result?.status==='winter')return result.snowForecastOnly?'Snow forecast · protect paws':'Snow & ice · protect paws';
- if(result?.status!=='estimated')return 'Check the actual pavement';
- if(result.activePrecipitation)return 'Wet pavement · heat warning paused';
+ if(result?.status!=='estimated')return 'Surface estimate unavailable';
+ if(result.activePrecipitation)return 'Wet pavement estimate';
  const hottest=Math.max(result.concrete?.value??-Infinity,result.asphalt?.value??-Infinity);
  if(!finite(hottest))return 'Surface temperature unavailable';
  if(hottest>=135)return 'Dangerously hot pavement';
@@ -128,8 +136,8 @@ export function pavementHTML(result,feels,context={}){
  if(context.condition&&weatherState(context.condition).kind!=='clear')sky=`<rect width="300" height="360" fill="url(#pet-${night?'night':'day'}-sky)"/><g transform="translate(205 35) scale(1.6)">${weatherShapes(context.condition,!night)}</g>`;
  const illustrated=referenceScene(2,!night,context.condition||'Clear',feels,context);
  const horizon=night?'#173d4c':'#2d9b5d';
- const subtitle=winter?(context.snowForecastOnly||result?.snowForecastOnly?'Snow forecast · protect paws':'Snow & ice · protect paws'):activelyWet?'Wet pavement · heat warning paused':petSurfaceSubtitle(result);
- const reading=winter?'<strong class="winter-paw-reading">Cold paws</strong><small>Snow / ice · keep outings short</small><small>Check toes · rinse off deicer</small>':activelyWet?`<strong class="wet-pavement-reading">WET</strong><small>${context.forecast?'Rain forecast':'Rain occurring'}</small><small>Dry-surface estimate paused</small>`:`<strong>${value(result.concrete)}</strong><small class="pavement-secondary">Asphalt ${value(result.asphalt)}</small><small>Est. surface temp · °F</small>`;
+ const subtitle=context.rainExpected&&result?.status==='estimated'?'Rain forecast · check pavement':winter?(context.snowForecastOnly||result?.snowForecastOnly?'Snow forecast · protect paws':'Snow & ice · protect paws'):activelyWet&&result?.status==='estimated'?'Wet pavement estimate':petSurfaceSubtitle(result);
+ const reading=winter?'<strong class="winter-paw-reading">Cold paws</strong><small>Snow / ice · keep outings short</small><small>Check toes · rinse off deicer</small>':`<strong>${value(result.concrete)}</strong><small class="pavement-secondary">Asphalt ${value(result.asphalt)}</small><small>${activelyWet&&result?.status==='estimated'?'Est. wet surface temp':result?.status==='estimated'?'Est. surface temp':'Estimate unavailable'} · °F</small>${activelyWet?`<small>${context.forecast?'Rain forecast':'Wet conditions'}</small>`:''}`;
  return `<figure class="exposure-person pavement-person" id="pavement-content" data-status="${winter?'winter':result.status}" data-daylight="${night?'false':'true'}" aria-label="${winter?'Winter paw care for dogs':'Estimated hard-surface temperature for dogs'} ${context.forecast?'at the selected forecast hour':'right now'}"><span class="exposure-label">For Pets</span><span class="exposure-subtitle">${subtitle}</span><span class="exposure-alert-slot">${warning?`<span class="pavement-warning${warning.source==='weather'?' pet-weather-warning':''}" data-risk="${warning.level}" role="status">${warning.label}</span>`:''}</span>${illustrated||`<svg class="poodle-scene" viewBox="0 0 300 360" preserveAspectRatio="xMidYMid slice" role="img" aria-label="A person walking a light brown toy poodle"><defs><linearGradient id="pet-road" x1="0" y1="0" x2="0" y2="1"><stop stop-color="${night?'#4f6170':'#7f929d'}"/><stop offset="1" stop-color="${night?'#293b49':'#405463'}"/></linearGradient><linearGradient id="pet-day-sky" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#078fe0"/><stop offset=".68" stop-color="#61d1fb"/><stop offset="1" stop-color="#9bdcf0"/></linearGradient><linearGradient id="pet-night-sky" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#071c46"/><stop offset=".58" stop-color="#123c69"/><stop offset="1" stop-color="#285e7b"/></linearGradient></defs>${sky}<g class="pet-horizon" fill="${horizon}" opacity=".92"><circle cx="22" cy="242" r="34"/><circle cx="61" cy="235" r="29"/><circle cx="248" cy="238" r="37"/><circle cx="288" cy="246" r="32"/></g><path d="M0 272Q77 257 153 271Q226 252 300 270V360H0Z" fill="url(#pet-road)"/><image class="poodle-walk" data-outfit="${walker.outfit}" href="/weather-fusion/${walker.asset}" x="-22" y="96" width="344" height="229.333" preserveAspectRatio="xMidYMid meet"/></svg>`}<figcaption>${reading}</figcaption></figure>`;
 }
 export function pavementWarning(result){

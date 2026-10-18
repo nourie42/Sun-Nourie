@@ -6,24 +6,24 @@ import {gridSample,parseWind,PLAIN_OUTLOOK_INSTRUCTIONS} from '../src/weatherFus
 import {buildForecast} from '../src/weatherFusion.js';
 import {testInputs} from './weatherFusion.fixtures.js';
 const day={label:'Today',high:86,low:68,pop:60,popNight:30,condition:'Sunny',nightCondition:'Chance Showers',nightDetail:'A few showers overnight.'};
-test('first row becomes Remainder of Today at noon and Tonight at 6 PM in the LOCATION timezone',()=>{
+test('first row remains the same calendar day after 6 PM in the location timezone',()=>{
  assert.equal(dailyDisplay(day,0,Date.parse('2026-09-05T15:59:59Z'),'America/New_York').label,'Today');
  assert.equal(dailyDisplay(day,0,Date.parse('2026-09-05T16:00:00Z'),'America/New_York').label,'Remainder of Today');
  assert.equal(dailyDisplay(day,0,Date.parse('2026-09-05T21:59:59Z'),'America/New_York').label,'Remainder of Today');
  const p=dailyDisplay(day,0,Date.parse('2026-09-05T22:00:00Z'),'America/New_York');
- assert.equal(p.label,'Tonight');assert.equal(p.primary,68);assert.equal(p.secondary,null);assert.equal(p.pop,30);assert.equal(p.condition,'Chance Showers');
+ assert.equal(p.label,'Remainder of Today');assert.equal(p.primary,86);assert.equal(p.secondary,68);assert.equal(p.pop,60);assert.equal(p.phase,'overall');assert.equal(p.tonight,false);assert.equal(p.night,true);
  assert.equal(dailyDisplay(day,0,Date.parse('2026-09-05T22:00:00Z'),'America/Los_Angeles').label,'Remainder of Today');
  assert.equal(dailyDisplay(day,1,Date.parse('2026-09-05T23:00:00Z'),'America/New_York').primary,86);
 });
 test('daily display consistently prefers the blended rain likelihood',()=>{
  const blended={...day,popDay:60,popDayLikelihood:{value:24},popNightLikelihood:{value:12},rainLikelihood:{value:32}};
  assert.equal(dailyDisplay(blended,0,Date.parse('2026-09-05T15:59:00Z'),'America/New_York').pop,32,'Today uses the full-day maximum, not the daytime-only peak');
- assert.equal(dailyDisplay(blended,0,Date.parse('2026-09-05T18:00:00Z'),'America/New_York').pop,32,'Remainder of Today uses the full remaining window including tonight');
- assert.equal(dailyDisplay(blended,0,Date.parse('2026-09-05T22:00:00Z'),'America/New_York').pop,12);
+ assert.equal(dailyDisplay(blended,0,Date.parse('2026-09-05T18:00:00Z'),'America/New_York').pop,32,'Remainder of Today keeps the calendar-day probability');
+ assert.equal(dailyDisplay(blended,0,Date.parse('2026-09-05T22:00:00Z'),'America/New_York').pop,32,'6 PM does not select the following-night probability');
  assert.equal(dailyDisplay(blended,1,Date.parse('2026-09-05T20:00:00Z'),'America/New_York').pop,32);
 });
-test('Today card rain chance is the full-day high when the peak is overnight',()=>{
- const evening={...day,popDayLikelihood:{value:57},popNightLikelihood:{value:88},rainLikelihood:{value:88,peakTime:'2026-09-05T23:00:00Z'}};
+test('Today card can include an evening peak before local midnight',()=>{
+ const evening={...day,date:'2026-09-05',popDayLikelihood:{value:57},popNightLikelihood:{value:88},rainLikelihood:{value:88,peakTime:'2026-09-05T23:00:00Z'}};
  const morning=dailyDisplay(evening,0,Date.parse('2026-09-05T14:00:00Z'),'America/New_York');
  assert.equal(morning.label,'Today');
  assert.equal(morning.phase,'overall');
@@ -31,8 +31,8 @@ test('Today card rain chance is the full-day high when the peak is overnight',()
  assert.equal(morning.peakNote,'Peak this evening');
  assert.equal(dailyDisplay(evening,0,Date.parse('2026-09-05T22:00:00Z'),'America/New_York').pop,88);
 });
-test('Tonight never invents or relabels a missing high',()=>{
- const p=dailyDisplay({...day,high:null},0,Date.parse('2026-09-05T23:00:00Z'),'America/New_York');assert.equal(p.primary,68);assert.equal(p.primaryLabel,'Low');
+test('the evening calendar card never relabels a following-night low as today’s high',()=>{
+ const p=dailyDisplay({...day,high:null},0,Date.parse('2026-09-05T23:00:00Z'),'America/New_York');assert.equal(p.primary,null);assert.equal(p.primaryLabel,'High');assert.equal(p.secondary,68);
 });
 test('day temperature bars end at the high, increase with the high and preserve zero',()=>{
  assert.equal(temperatureBar(80,60,100),50);assert.ok(temperatureBar(95,60,100)>temperatureBar(80,60,100));assert.equal(temperatureBar(0,-10,10),50);assert.equal(temperatureBar(null,60,100),null);
@@ -55,7 +55,7 @@ test('extended paired graph data comes from forecasts and does not hold current 
  assert.ok(Math.abs(output.metricForecasts.series.humidity[0].value-58.2)<.1);
  assert.equal(output.metricForecasts.series.wind[0].value,10);
  assert.ok(output.metricForecasts.series.feels.some(p=>Number.isFinite(p.value)));
- assert.equal(output.metricForecasts.solar.length,7);
+ assert.equal(output.metricForecasts.solar.length,10);
 });
 test('lower dew point makes the same mild weather feel cooler',()=>{
  const humid=shadeFeelsLike(78,null,5,70),dry=shadeFeelsLike(78,null,5,45);

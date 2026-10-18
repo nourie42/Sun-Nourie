@@ -1,0 +1,55 @@
+NOURIE WEATHER — PHOTOGRAPHIC ARTWORK
+
+Generated with the built-in image-generation tool, October 2026.
+Adult identity and hair refined October18, 2026 for a naturally beautiful,
+photographic outdoor lifestyle appearance. All twelve person scenes and the
+six-pose atlas share the refined identity. Clothing and park composition remain
+matched to the weather. Beauty source PNGs are archived in the source project's
+artwork-source/beauty-refinement/ directory outside the public runtime bundle.
+These are weather illustrations, not photographs of a live location.
+Web-ready assets are stored beside this file. Opaque photos are WebP at
+quality94. Original generated PNGs remain in the source repository artwork-source/;
+the transparent pose atlas remains lossless PNG.
+
+Shared master brief:
+Photorealistic natural DSLR-style photograph of one adult brunette woman in a
+leafy North Carolina-style lakeside park. Natural human proportions, skin,
+hair strands, fabric weave, foliage and cloud detail. Low camera angle with
+broad overhead sky. Full body centered, head around40% and feet around91% of
+the image height. Preserve camera, identity, path, scale and matching shadows
+across weather edits. No cartoon, illustration, plastic skin, 3D-render look,
+text, logo or watermark.
+
+Scene edit briefs:
+photo-cool.webp: teal lightweight jacket, navy trousers, white sneakers.
+photo-mild.webp: teal short-sleeve T-shirt, navy trousers, white sneakers.
+photo-hot.webp: coral tee, tan shorts, white sneakers; hand dabbing forehead.
+photo-cold.webp: blue quilted puffer, navy beanie, gloves and long navy trousers.
+photo-cold-scarf.webp: cold outfit with a visible grey wool scarf.
+photo-snow.webp: winter scarf and boots, snow-covered park and grey winter sky.
+photo-rain.webp: yellow raincoat, navy trousers, dark rain boots, open navy
+  umbrella; wet pavement, overcast sky and natural rain illumination.
+photo-wet.webp: windy rain, yellow raincoat with hood up, no umbrella.
+photo-night.webp: cold clothing, real dark night exposure with moon/park lights.
+photo-night-cool/mild/hot.webp: same nighttime park with the corresponding
+  jacket / tee and trousers / tee and shorts, preserving natural proportions.
+photo-storm.webp: empty park in heavy rain, layered cumulonimbus, wet pavement.
+photo-park-empty.webp: remove only the person from the master; retain camera
+  and photographic park for a stable animated pose background.
+photo-hot-poses-alpha.png: six successive photographic forehead-dabbing
+  poses, same woman and clothing, a3-by2 atlas, transparent background;
+  preserve skin/fabric and natural anatomy. Runtime matte filtering removes
+  saturated extraction fringes before compositing on the matching park.
+
+Comfort atlas briefs:
+comfort-hot/mild/cool/cold/rain.webp: three distinct natural photographic park
+  views of the same woman in the corresponding wardrobe: tree shade, open
+  park path, and walking a real golden retriever. Coherent sunlight/shade or
+  rain illumination, actual fabric, natural dog fur and ground contact.
+  No text, borders, cartoons or artificial human proportions.
+
+sky-day/night/storm.webp: original photographic landscape sky artwork retained
+  for the page backdrop/current-condition card; no cartoon cloud geometry.
+
+comfort-night-hot/mild/cool/cold.webp: matched3-view photographic night scenes,
+moonlight and soft park lamps, appropriate clothing, and a real dog.

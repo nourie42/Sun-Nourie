@@ -1,0 +1,52 @@
+Nourie native forecast player
+
+The main app installs the player once using its existing experience module binding:
+  installNativePlayer({selectComfortHour});
+
+The host is #nourie-player. Native-page styling lives in ../native-player.css.
+Do not import a second experience.js instance with a different cache query: its
+private comfort-selection state must remain the same instance used by app.js.
+
+Data comes exclusively from the page's weather-nourie:forecast event and initial
+__weatherNourieForecast snapshot. No player module fetches a weather service.
+The adapter uses hourlyDisplaySamples and preserves the native feels-like,
+selected-hour snow evidence, rain activity and clothing ranges. Missing values
+remain unavailable. A probability is not used as a precipitation amount.
+
+The player emits framechange and playbackchange. During playback it does not
+change the Shade, Sun or For Pets cards. Pause, or seek while paused, commits
+the selected native hour through selectComfortHour. Existing native hourly
+buttons seek/pause the player; the original app handler owns their card update.
+The Feel Meter, Car Wash and other forecast panels are not rendered or edited
+by this integration.
+
+Before changing location, clear __weatherNourieForecast and dispatch:
+  document.dispatchEvent(new CustomEvent('weather-nourie:location-changing',
+    {detail:{location:place}}));
+This cancels queued snapshots, stops playback and clears selection. Hidden tabs
+also pause. The returned controller exposes ready, player, frames, setForecast,
+reset and dispose. Repeated install calls on the same host return one controller.
+
+The weather-sky-player API remains forecast, locationName, timezone, speed,
+currentFrame, playing, setFrame(index), seekFrame(index), skipDays(days), play()
+and pause(). Manual seeks and day skips stop playback on the selected hour;
+setFrame itself remains the non-pausing operation used by the playback timer.
+Speeds 1,2,4,8,16,32 use 2000/speed milliseconds per forecast hour, with 4 as
+the default. The chosen speed persists locally. Physical scene motion continues
+at real-time pace independently of forecast sampling.
+
+Runtime files: sky-player.js/css, weather-world.js, photo-scene.js, vendor/
+three.module.js and the image files listed by PHOTO_SCENES. Three.js is bundled
+locally under its MIT license in vendor/THREE-LICENSE.txt. Scene artwork credits
+are in assets/ARTWORK.txt. There are no external fonts or runtime CDN requests.
+Keep this folder structure so dynamic imports and relative artwork URLs resolve.
+
+The scenes are photographic weather illustrations. The hot scene uses a short
+registered pose sequence; other scenes animate local atmosphere and idle detail.
+They illustrate the selected forecast rather than displaying a live camera.
+WebGL errors keep the forecast controls available and expose a scene retry.
+
+Tests: node --test test/nativePlayer.test.mjs
+These verify actual native data policies and controller event sequencing, not
+browser rendering. Visual checks should also cover a narrow phone, a desktop,
+rain, snow, cold, hot, night, location reset and reduced motion.

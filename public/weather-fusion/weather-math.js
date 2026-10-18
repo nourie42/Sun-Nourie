@@ -1,4 +1,5 @@
-import {weatherState,weatherTransmission,conditionForRainChance} from './weather-state.js?v=weather-qa-v67';
+import {calendarDayTemperatures,calendarDayWindow,rainWindowPeak} from './calendar-day.js?v=calendar-days-v1';
+import {weatherState,weatherTransmission,conditionForRainChance} from './weather-state.js?v=current-rain-20261017-v3';
 import {utciF} from './utci.js?v=clear-weather-daygraph-v3';
 /* Pure presentation math shared by the weather API, browser and tests. */
 export const EXPERIENCE_VERSION = 'weather-nourie-friendly-v1';
@@ -25,28 +26,23 @@ export function dailyRainPeriod(day, phase = 'overall') {
   const fallback=phase==='daytime'?(day?.popDay??rainChanceValue(day?.rainLikelihood,day?.pop)):phase==='overnight'?day?.popNight:day?.pop;
   return {phase,likelihood,canonical,value:rainChanceValue(likelihood,fallback),window:canonical?likelihood.window:null};
 }
-export function rainPeakCaption(day, zone, tonight=false) {
-  if(tonight)return '';
-  const overall=dailyRainPeriod(day,'overall'),daytime=dailyRainPeriod(day,'daytime'),overnight=dailyRainPeriod(day,'overnight');
-  if(!finite(overall.value)||!finite(overnight.value)||overnight.value<overall.value)return '';
-  if(finite(daytime.value)&&daytime.value>=overnight.value)return '';
+export function rainPeakCaption(day, zone) {
   const peak=Date.parse(day?.rainLikelihood?.peakTime);
-  if(finite(peak)){
-    const hour=localHour(peak,zone);
-    if(hour>=21||hour<5)return 'Peak tonight';
-  }
-  return 'Peak this evening';
+  if(!finite(peak))return '';
+  const date=new Intl.DateTimeFormat('en-CA',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(peak));
+  if(day.date&&date!==day.date)return '';
+  return localHour(peak,zone)>=18?'Peak this evening':'';
 }
-export function dailyDisplay(day, index, now, zone) {
-  const hour=localHour(now,zone),tonight=index===0&&isTonightPeriod(now,zone),remainder=index===0&&hour>=12&&!tonight;
-  const phase=tonight?'overnight':'overall';
-  const rain=dailyRainPeriod(day,phase);
-  const rawCondition=tonight?(day.nightCondition||day.condition):day.condition;
-  return {tonight,remainder,phase,label:tonight?'Tonight':remainder?'Remainder of Today':index===0?'Today':day.label,
-    primary:tonight?day.low:day.high, secondary:tonight?null:day.low,
-    primaryLabel:tonight?'Low':'High', condition:conditionForRainChance(rawCondition,rain.value),
-    detail:tonight?(day.nightDetail||day.detail):day.detail,
-    pop:rain.value,rainWindow:rain.window,peakNote:rainPeakCaption(day,zone,tonight)};
+export function dailyDisplay(day, index, now, zone, forecast=null) {
+  const night=index===0&&isTonightPeriod(now,zone),remainder=index===0&&localHour(now,zone)>=12;
+  const rain=dailyRainPeriod(day,'overall'),temperatures=forecast?calendarDayTemperatures(forecast,index,now):{high:day.high,low:day.low};
+  const window=temperatures.window;
+  const chance=forecast&&rain.canonical?(rain.value===null?null:rainWindowPeak(forecast.rainTimeline||forecast.hours||[],calendarDayWindow(day,index,now,zone)).value):rain.value;
+  const hours=night&&forecast?(forecast.hours||[]).filter(row=>Date.parse(row.time)>=window.start&&Date.parse(row.time)<window.end):[];
+  const rawCondition=hours.length?hours.reduce((best,row)=>(row.rainLikelihood?.value??row.pop??0)>(best.rainLikelihood?.value??best.pop??0)?row:best).condition||'Cloudy':day.condition;
+  return {tonight:false,night,remainder,phase:'overall',label:remainder?'Remainder of Today':index===0?'Today':day.label,
+    primary:temperatures.high,secondary:temperatures.low,primaryLabel:'High',condition:conditionForRainChance(rawCondition,chance),
+    detail:day.detail,pop:chance,rainWindow:rain.window,peakNote:rainPeakCaption(day,zone)};
 }
 export function temperatureBar(value, floor, ceiling) {
   if (![value,floor,ceiling].every(finite)) return null;
@@ -130,7 +126,8 @@ function windMessage(temp,wind) {
   return 'The breeze provides some moving-air cooling.';
 }
 
-/** One continuous UTCI calculation. No warmer-of-two-index selection.
+/** UTCI is the base for the displayed thermal estimate. The existing cold-wind
+ * adjustment below gradually lifts cold results toward NWS wind chill.
  * MRT is explicitly a Tier-3 estimate, not measured radiation or skin temperature. */
 export function thermalHumidity(current) {
   const derived=humidityFromDewpoint(current?.temperature,current?.dewpoint);
@@ -161,14 +158,33 @@ function estimatedMrtDelta(current,elevation,exposure) {
   const direct=exposure==='outdoors'?130*sun*trans:0;
   return (diffuseLoad*sun+direct)/6.1;
 }
+/** NWS wind chill floor for cold feels-like. UTCI's 10 m wind term runs far
+ * colder than the U.S. standard index and lived experience in cold wind
+ * (about 8°F at 36°F air and 13 mph wind, where NWS wind chill is 27°F).
+ * In the cold regime the value is lifted toward the NWS figure: the full
+ * NWS wind chill applies at or below 40°F, fading linearly to pure UTCI by
+ * 60°F so warm conditions are untouched and no step appears at any
+ * boundary. The wind gate fades in from 2 to 4 mph (NWS validity is 3+
+ * mph). Solar-warmed UTCI values already above wind chill are never
+ * reduced. */
+function coldWindChillBlend(tF,windMph,utciValue){
+  if(!finite(tF)||!finite(windMph)||!finite(utciValue))return utciValue;
+  if(tF>=60||windMph<2)return utciValue;
+  const wT=Math.min(1,Math.max(0,(60-tF)/20)),wV=Math.min(1,Math.max(0,(windMph-2)/2));
+  if(wT<=0||wV<=0)return utciValue;
+  const p=Math.pow(windMph,.16),windChill=35.74+.6215*tF-35.75*p+.4275*tF*p;
+  return utciValue+wT*wV*Math.max(0,windChill-utciValue);
+}
 export function tier3FeelsLike(current,location,now,exposure='shade') {
   if(!finite(current?.temperature)||!finite(current?.wind)||current.wind<0)return {value:null,method:'UTCI inputs unavailable'};
   const rh=thermalHumidity(current);
   if(!finite(rh))return {value:null,method:'UTCI moisture unavailable'};
   const elevation=solarElevation(now,location?.latitude,location?.longitude),deltaC=estimatedMrtDelta(current,elevation,exposure);
-  const tr=current.temperature+deltaC*1.8,value=utciF(current.temperature,tr,current.wind,rh);
+  const tr=current.temperature+deltaC*1.8,rawValue=utciF(current.temperature,tr,current.wind,rh);
+  const value=coldWindChillBlend(current.temperature,current.wind,rawValue);
   return {value,method:finite(value)?'UTCI Tier-3 fallback with estimated mean radiant temperature':'UTCI outside supported range',rh,tr,deltaMrtC:deltaC,
-    windUsedMps:Math.max(.5,current.wind*.44704),warmerResultOverride:false};
+    windUsedMps:Math.max(.5,current.wind*.44704),warmerResultOverride:false,
+    windChillFloor:finite(value)&&finite(rawValue)&&value>rawValue+.001};
 }
 
 export function thermalComfort(current, location, now) {
@@ -193,5 +209,5 @@ export function thermalComfort(current, location, now) {
     method:shade.method,humidity:rh,wetBulb:wet,daylight,absorbedRadiation:finite(weather.cover)?(daylight?130*Math.max(0,Math.sin(elevation))**.72*(1-weather.cover/100):0):estimatedAbsorbedRadiation(weather.condition,elevation),
     solarAdjustment:finite(outdoorValue)&&finite(shadeValue)?outdoorValue-shadeValue:null,
     dewpointEffect:dewpointMessage(current.dewpoint),windEffect:windMessage(current.temperature,current.wind),microclimate:localContext,
-    note:`Tier-3 operational fallback from the attached Real-Feel Skin Temperature research: UTCI is the all-season base using air temperature, humidity/dew point and standard wind, with solar elevation and broad sky state used for a generic radiant estimate. No warmer-formula override or observation-to-forecast offset is used. Numeric hourly cloud cover is preferred over broad period descriptions. Calm wind uses the UTCI minimum 0.5 m/s; out-of-domain conditions stay unavailable. Cloud attenuation and MRT are estimates, not local radiometer measurements. This is a modeled equivalent temperature, not measured skin temperature or validated EPST. ${dewpointMessage(current.dewpoint)} ${windMessage(current.temperature,current.wind)} ${localContext} Wet bulb is diagnostic only and is not added again to the result.`};
+    note:`Tier-3 operational fallback from the attached Real-Feel Skin Temperature research: UTCI is the all-season base using air temperature, humidity/dew point and standard wind, with solar elevation and broad sky state used for a generic radiant estimate. The displayed estimate includes a gradual cold-wind adjustment toward NWS wind chill when that figure is warmer than UTCI. The temperature adjustment is full at or below 40°F and fades to zero at 60°F; the wind adjustment fades in from 2 to 4 mph. Warmer conditions use UTCI unchanged. No observation-to-forecast offset is used. Numeric hourly cloud cover is preferred over broad period descriptions. Calm wind uses the UTCI minimum 0.5 m/s; out-of-domain conditions stay unavailable. Cloud attenuation and MRT are estimates, not local radiometer measurements. This is a modeled equivalent temperature, not measured skin temperature or validated EPST. ${dewpointMessage(current.dewpoint)} ${windMessage(current.temperature,current.wind)} ${localContext} Wet bulb is diagnostic only and is not added again to the result.`};
 }

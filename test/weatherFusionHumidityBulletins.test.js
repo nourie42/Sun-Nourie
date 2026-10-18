@@ -10,7 +10,9 @@ test('humidity raises the same UTCI cloudy estimate without selecting a warmer u
  const current={temperature:88,dewpoint:72,humidity:null,wind:5,condition:'Cloudy',type:'observation'};
  const moist=thermalComfort(current,location,now),dry=thermalComfort({...current,dewpoint:50},location,now);
  assert.ok(moist.rawOutdoors>dry.rawOutdoors);assert.equal(moist.sun,null);assert.equal(moist.outdoors,moist.shade);
- assert.match(moist.note,/No warmer-formula override/);
+ assert.match(moist.note,/UTCI is the all-season base/);
+ assert.match(moist.note,/gradual cold-wind adjustment toward NWS wind chill/);
+ assert.match(moist.note,/Warmer conditions use UTCI unchanged/);
 });
 
 test('bulletin card stays hidden when there is no actual message, even if a source is stale',()=>{

@@ -12,7 +12,7 @@ test('seven day cards share the existing daily timing, rain, totals and confiden
   const days=sevenDayForecast(preview,now);
   assert.equal(days.length,7);
   days.forEach((day,index)=>{
-    const display=dailyDisplay(preview.days[index],index,now,preview.location.timeZone);
+    const display=dailyDisplay(preview.days[index],index,now,preview.location.timeZone,preview);
     assert.equal(day.high,display.tonight?null:display.primary);
     assert.equal(day.low,display.tonight?display.primary:display.secondary);
     assert.equal(day.pop,displayedRainChance(preview,display.pop,{dayIndex:index,now}).value);
@@ -21,12 +21,13 @@ test('seven day cards share the existing daily timing, rain, totals and confiden
   });
 });
 
-test('tonight switches the first card to the matching overnight forecast',()=>{
+test('evening changes the artwork without switching the card to tomorrow’s forecast',()=>{
   const evening=now+8*H,first=sevenDayForecast(preview,evening)[0];
-  const display=dailyDisplay(preview.days[0],0,evening,preview.location.timeZone);
-  assert.equal(first.label,'Tonight');assert.equal(first.high,null);assert.equal(first.low,display.primary);
+  const display=dailyDisplay(preview.days[0],0,evening,preview.location.timeZone,preview);
+  assert.equal(first.label,'Today');assert.equal(first.high,display.primary);assert.equal(first.low,display.secondary);
   assert.equal(first.isDay,false);
-  assert.equal(first.amount,forecastPeriodSummary(preview,0,'overnight',evening).amount);
+  assert.equal(first.amount,forecastPeriodSummary(preview,0,'overall',evening).amount);
+  assert.equal(first.pop,forecastPeriodSummary(preview,0,'overall',evening).chance);
 });
 
 test('real zeros remain zero and missing inputs are never fabricated',()=>{
@@ -59,7 +60,7 @@ test('the shared carousel is safe to import without a browser document',()=>{
 
 test('main and experimental pages share an ungated carousel below the weather take',()=>{
   const app=readFileSync(new URL('../public/weather-fusion/app.js',import.meta.url),'utf8');
-  assert.match(app,/const sevenDayCarousel=createSevenDayCarousel\(\{onOpenDay:index=>showDay\(index\)\}\)/);
+  assert.match(app,/const sevenDayCarousel=createSevenDayCarousel\(\{onOpenDay:showDay\}\)/,'the day handler receives both the selected index and confidence-focus options');
   const anchors=[];
   globalThis.document={querySelector:selector=>{anchors.push(selector);return null;}};
   try {
@@ -76,12 +77,12 @@ test('day cards open the existing details dialog without an inline details row',
   assert.match(html,/aria-controls="day-dialog" aria-haspopup="dialog"/);
   assert.doesNotMatch(module,/seven-day-detail|seven-day-open|detailHTML/);
   assert.doesNotMatch(css,/seven-day-detail|seven-day-open/);
-  assert.match(module,/if\(button\)\{const index=Number\(button\.dataset\.weekDay\);select\(index\);onOpenDay\(index\);\}/);
+  assert.match(module,/if\(button\).*select\(index\);onOpenDay\(index,\{focusConfidence:[^;]+;\}/);
   assert.match(module,/if\(suppressClick\)\{event\.preventDefault\(\);suppressClick=false;return;\}/);
   assert.match(module,/rail\.addEventListener\('keydown',[\s\S]*?\{focus:true\}/);
 });
 
-test('compact cards retain every forecast reading and the absolute confidence score',()=>{
+test('compact cards retain the source index and make the meter match the labeled category',()=>{
   for(const [key,label,score] of [['high','High',95],['moderate','Moderate',75],['low','Low',60],['very-low','Very low',35]]){
     const day={...sevenDayForecast(preview,now)[0],confidence:{key,label,score,factors:[],note:'Relative index'}};
     const html=sevenDayCardHTML(day);
@@ -90,7 +91,7 @@ test('compact cards retain every forecast reading and the absolute confidence sc
     assert.match(html,/Total precip/);
     assert.match(html,/Wind/);
     assert.ok(html.includes(`data-confidence="${key}"`));
-    assert.ok(html.includes(`aria-valuenow="${score}"`));
+    assert.ok(html.includes(`data-confidence-score="${score}"`) && html.includes(`aria-valuenow="${confidenceMeterPosition(day.confidence)}"`));
     assert.ok(html.includes(`--confidence:${confidenceMeterPosition(day.confidence)}%`));
   }
 });
@@ -126,11 +127,11 @@ test('confidence dots stay in their label color range, including category bounda
       assert.equal(confidence.score,score);
     }
   }
-  assert.equal(confidenceMeterPosition({key:'low',score:65}),27.86);
-  assert.equal(confidenceMeterPosition({key:'moderate',score:75}),46.67);
-  assert.equal(confidenceMeterPosition({key:'high',score:95}),90);
-  assert.equal(confidenceMeterPosition({key:'high',score:75}),70,'alternate model labels remain authoritative');
-  assert.equal(confidenceMeterPosition({key:'moderate',score:50}),40);
+  assert.equal(confidenceMeterPosition({key:'low',score:65}),0);
+  assert.equal(confidenceMeterPosition({key:'moderate',score:75}),50);
+  assert.equal(confidenceMeterPosition({key:'high',score:95}),100);
+  assert.equal(confidenceMeterPosition({key:'high',score:75}),100,'alternate model labels remain authoritative');
+  assert.equal(confidenceMeterPosition({key:'moderate',score:50}),50);
   assert.equal(confidenceMeterPosition({key:'high',score:150}),100);
   assert.equal(confidenceMeterPosition({key:'low',score:-1}),0);
   for(const confidence of [null,{}, {key:'unavailable',score:70},{key:'low',score:null},{key:'high',score:NaN}])assert.equal(confidenceMeterPosition(confidence),null);
@@ -162,4 +163,22 @@ test('narrow cards retain large and negative readings with their original units'
   assert.match(html,/12\.34 in/);assert.match(html,/150 mph/);
   assert.match(html,/--narrow-temp-size:14px/);
   assert.match(html,/font-size:10px/);
+});
+
+test('snow cards use the same daily amount and source as the primary snow forecast',()=>{
+  const forecast=structuredClone(preview),date=forecast.days[1].date;
+  forecast.days[1].snowPossible=true;forecast.days[1].snowfall=.1;
+  forecast.snow={days:[{date,best:.1,displaySnowfall:{value:0,range:null,source:'NWS point forecast',status:'ready'}}]};
+  let day=sevenDayForecast(forecast,now)[1];
+  assert.equal(day.snowfall,0);assert.equal(day.snowAmountSource,'NWS point forecast');
+  let html=sevenDayCardHTML(day);
+  assert.match(html,/seven-day-snow" title="NWS point forecast">Snow possible/);
+  assert.doesNotMatch(html,/❄ 0\.1|0\.0″/);
+  assert.equal(forecast.days[1].snowfall,.1,'the underlying requested blend remains unchanged');
+  forecast.snow.days[0].displaySnowfall.value=.02;
+  day=sevenDayForecast(forecast,now)[1];html=sevenDayCardHTML(day);
+  assert.equal(day.snowfall,.02);assert.match(html,/❄ &lt;0\.1″/);
+  forecast.snow.days[0].displaySnowfall.value=null;
+  day=sevenDayForecast(forecast,now)[1];assert.equal(day.snowfall,null);
+  assert.match(sevenDayCardHTML(day),/Snow possible/);
 });

@@ -1,5 +1,7 @@
-import {finite,dailyRainPeriod} from './weather-math.js?v=weather-qa-v67';
-import {timeAt} from './hourly-feels.js?v=continuous-feels-v2';
+import {hideLowRainChance} from './rain-display.js?v=low-rain-display-v1';
+import {calendarDayWindow,rainWindowPeak} from './calendar-day.js?v=calendar-days-v1';
+import {finite,dailyRainPeriod} from './weather-math.js?v=current-rain-20261017-v3';
+import {timeAt} from './hourly-feels.js?v=current-rain-20261017-v3';
 
 const HOUR = 3600000;
 const RAIN_TIMING_THRESHOLD = 25;
@@ -11,6 +13,12 @@ function nextDate(date) {
 }
 
 function periodWindow(day, phase, now, zone, rain) {
+  if(phase==='overall'){
+    const window=calendarDayWindow(day,1,now,zone);
+    const published=Date.parse(rain.window?.start);
+    if(rain.canonical&&Number.isFinite(published))window.start=Math.max(window.start,published);
+    return window;
+  }
   if(rain.canonical){
     const start=Date.parse(rain.window?.start),end=Date.parse(rain.window?.end);
     return Number.isFinite(start)&&Number.isFinite(end)&&end>start?{start,end}:{start:null,end:null};
@@ -51,6 +59,8 @@ function rowsFor(forecast, window) {
     return Number.isFinite(time) && time < window.end && end > window.start;
   }).map(hour=>[Date.parse(hour.time),hour])).values()].sort((a,b) => Date.parse(a.time)-Date.parse(b.time));
 }
+
+export {rainWindowPeak} from './calendar-day.js?v=calendar-days-v1';
 
 function rainGroups(rows) {
   const groups = [];
@@ -96,24 +106,35 @@ function temperatureSentence(rows) {
   return low === high ? `Air temperature stays near ${low}°.` : `Air temperatures run from about ${low}° to ${high}°.`;
 }
 
-function timingSentence(chance, rows, groups, zone) {
+function precipitationWord(rows){
+  const wet=rows.map(row=>String(row.condition||row.shortForecast||'')).filter(text=>/rain|shower|drizzle|thunder|snow|sleet|flurr|ice pellets|freezing/i.test(text));
+  const frozen=wet.filter(text=>/snow|sleet|flurr|ice pellets|freezing/i.test(text));
+  if(!frozen.length)return 'rain';
+  if(frozen.length!==wet.length||frozen.some(text=>/\brain\b/i.test(text)&&!/freezing rain/i.test(text)))return 'precipitation';
+  return frozen.every(text=>/snow|flurr/i.test(text)&&!/sleet|ice pellets|freezing/i.test(text))?'snow':'wintry precipitation';
+}
+
+function timingSentence(chance, rows, groups, zone, word='rain') {
   const available = rows.map(row => ({row,chance:hourlyChance(row)})).filter(item => item.chance !== null);
-  if (!available.length) return 'Hourly rain timing is not available for this period yet.';
+  if (!available.length) return `Hourly ${word} timing is not available for this period yet.`;
   const peak = available.reduce((best,item) => !best || item.chance > best.chance ? item : best,null);
+  if(hideLowRainChance(peak.chance))return '';
   if (!groups.length) {
     if (chance !== null && chance >= RAIN_TIMING_THRESHOLD) return `The period chance is ${Math.round(chance)}%, but no available hourly reading reaches ${RAIN_TIMING_THRESHOLD}%. The highest available hour is ${Math.round(peak.chance)}% at ${timeLabel(peak.row.time,zone)}.`;
-    return `Every available hourly rain chance stays below ${RAIN_TIMING_THRESHOLD}%; the highest is ${Math.round(peak.chance)}% at ${timeLabel(peak.row.time,zone)}.`;
+    return `Every available hourly ${word} chance stays below ${RAIN_TIMING_THRESHOLD}%; the highest is ${Math.round(peak.chance)}% at ${timeLabel(peak.row.time,zone)}.`;
   }
   const ranked = [...groups].sort((a,b) => Math.max(...b.map(hourlyChance))-Math.max(...a.map(hourlyChance)) || b.length-a.length || Date.parse(a[0].time)-Date.parse(b[0].time));
   const focus = ranked[0], groupPeak = Math.max(...focus.map(hourlyChance));
-  return `The hourly forecast shows the best chance for rain from ${rangeLabel(focus,zone)}, peaking near ${Math.round(groupPeak)}%.`;
+  return `The hourly forecast shows the best chance for ${word} from ${rangeLabel(focus,zone)}, peaking near ${Math.round(groupPeak)}%.`;
 }
 
 export function forecastPeriodSummary(forecast, index = 0, phase = 'overall', now = Date.now()) {
   const day = forecast?.days?.[index] || {}, zone = forecast?.location?.timeZone || 'America/New_York';
-  const rain=dailyRainPeriod(day,phase),window = periodWindow(day,phase,now,zone,rain), rows = rowsFor(forecast,window), chance = rain.value, groups = rainGroups(rows);
-  const timing = timingSentence(chance,rows,groups,zone), temperatures = rain.canonical&&rows.some(row=>!finite(row.temperature))?'':temperatureSentence(rows);
-  const intro = chance === null ? 'The rain chance is not available yet.' : rain.canonical?`Rain chance peaks at ${Math.round(chance)}%.`:`The Weather Nourie rain chance for this period is ${Math.round(chance)}%.`;
+  const rain=dailyRainPeriod(day,phase),window = periodWindow(day,phase,now,zone,rain);
+  if(index===0&&rain.canonical&&Number.isFinite(window.start))window.start=Math.max(window.start,Math.floor(now/HOUR)*HOUR);
+  const rows=rowsFor(forecast,window),peak=rain.canonical?rainWindowPeak(rows,window):null,chance=peak?(rain.value===null?null:peak.value):rain.value,groups=rainGroups(rows);
+  const word=precipitationWord(rows),timing = timingSentence(chance,rows,groups,zone,word), temperatures = rain.canonical&&rows.some(row=>!finite(row.temperature))?'':temperatureSentence(rows);
+  const intro = hideLowRainChance(chance)?'':chance === null ? `The ${word} chance is not available yet.` : rain.canonical?`${word[0].toUpperCase()+word.slice(1)} chance peaks at ${Math.round(chance)}%.`:`The Weather Nourie ${word} chance for this period is ${Math.round(chance)}%.`;
   const hourlyAmount = amountFor(rows,window,rain.canonical);
   const amount = hourlyAmount ?? (!rain.canonical && phase === 'overall' && finite(day.qpf) && day.qpf >= 0 ? day.qpf : null);
   return {phase,chance,amount,window,rows,groups,

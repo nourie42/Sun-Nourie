@@ -1,15 +1,14 @@
-import {outdoorExposure} from './outdoor-feels.js?v=weather-qa-v67';
-import {finite,isTonightPeriod,localHour} from './weather-math.js?v=weather-qa-v67';
-import {timeAt,summarizeFeels} from './hourly-feels.js?v=continuous-feels-v2';
-import {forecastSample} from './weather-display.js?v=feel-chart-tabs-v9';
-import {weatherState} from './weather-state.js';
-import {winterSceneExpected,selectedHourSnowPhase} from './exposure-scene.js?v=storm-scene-v5';
+import {outdoorExposure} from './outdoor-feels.js?v=current-rain-20261017-v3';
+import {finite,isTonightPeriod,localHour} from './weather-math.js?v=current-rain-20261017-v3';
+import {timeAt,summarizeFeels} from './hourly-feels.js?v=current-rain-20261017-v3';
+import {forecastSample} from './weather-display.js?v=low-rain-display-v1';
+import {weatherState} from './weather-state.js?v=current-rain-20261017-v3';
+import {winterSceneExpected,selectedHourSnowPhase} from './exposure-scene.js?v=current-rain-20261017-v3';
 export function comfortMode(time,zone='America/New_York'){
  const hour=localHour(time,zone);return isTonightPeriod(time,zone)?'overnight':hour<5?'predawn':'day';
 }
 const dateAt=(t,z)=>new Intl.DateTimeFormat('en-CA',{timeZone:z,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(t));
-/** The requested warmest card remains a same-day high after the daily row has
- * switched to Tonight. Keep the overnight narrative separate from this card. */
+/** The warmest card uses only the hours remaining before local midnight. */
 export function warmestTodayWindow(forecast,now=Date.now()){
  const zone=forecast?.location?.timeZone||'America/New_York',today=dateAt(now,zone);
  const tomorrow=new Date(Date.parse(today+'T12:00:00Z')+86400000).toISOString().slice(0,10);
@@ -27,11 +26,11 @@ export function warmestTodayWindow(forecast,now=Date.now()){
 }
 export function comfortWindow(forecast,now=Date.now()){
  const zone=forecast?.location?.timeZone||'America/New_York',mode=comfortMode(now,zone),today=dateAt(now,zone),tomorrow=new Date(Date.parse(today+'T12:00:00Z')+86400000).toISOString().slice(0,10);
- const start=mode==='overnight'?timeAt(today,18,zone):timeAt(today,0,zone),end=mode==='day'?timeAt(today,19,zone):mode==='predawn'?timeAt(today,8,zone):timeAt(tomorrow,8,zone);
+ const start=mode==='overnight'?timeAt(today,18,zone):timeAt(today,0,zone),end=mode==='predawn'?timeAt(today,8,zone):timeAt(tomorrow,0,zone);
  const summary=summarizeFeels(forecast,start,end,now+1);if(!summary)return null;
  const chosen=mode==='day'?summary.high:summary.low;
  return {...summary,mode,chosen,low:summary.low.value,high:summary.high.value,lowTime:summary.low.time,highTime:summary.high.time,
-  label:mode==='day'?'Forecast feels-like peak ahead':mode==='predawn'?'Forecast feels-like low before morning':'Forecast feels-like low tonight',end:summary.points.at(-1).time};
+  label:mode==='day'?'Forecast feels-like peak ahead':mode==='predawn'?'Forecast feels-like low before morning':'Forecast feels-like low before midnight',end:summary.points.at(-1).time};
 }
 /** Scene evidence belongs to the selected hour. Daily snow totals and later
  * feels-like lows never change current artwork or current paw guidance. */
@@ -52,7 +51,7 @@ export function comfortNarrative(current,comfort,summary,zone='America/New_York'
  if(finite(wind)&&wind>=8)sentences.push(`The ${Math.round(wind)} mph breeze is helping it feel ${finite(t)&&t<55?'colder':'cooler'}.`);
  if(summary){
   const clock=new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',minute:'2-digit'}).format(new Date(summary.chosen.time));
-  const p=summary.chosen,inputs=p.inputs||{},period=summary.mode==='day'?'The highest remaining hourly outdoor estimate':summary.mode==='predawn'?'The lowest hourly outdoor estimate before morning':'The lowest hourly outdoor estimate tonight';
+  const p=summary.chosen,inputs=p.inputs||{},period=summary.mode==='day'?'The highest remaining hourly outdoor estimate':summary.mode==='predawn'?'The lowest hourly outdoor estimate before morning':'The lowest remaining hourly outdoor estimate before midnight';
   if(summary.mode==='day'&&finite(outdoor)&&Math.round(outdoor)>=Math.round(p.value)) sentences.push(`Right now is the warmest outdoor estimate from now on at ${Math.round(outdoor)}°. The highest later hourly forecast is ${Math.round(p.value)}° at ${clock}${finite(inputs.temperature)?`, with an air temperature of ${Math.round(inputs.temperature)}°`:''}.`);
   else sentences.push(`${period} is ${Math.round(p.value)}° at ${clock}${finite(inputs.temperature)?`, with an air temperature of ${Math.round(inputs.temperature)}°`:''}.`);
   if(p.value<outdoor&&summary.mode==='day')sentences.push('Changing humidity, wind and sky conditions can make later hours feel cooler even if the air temperature rises.');

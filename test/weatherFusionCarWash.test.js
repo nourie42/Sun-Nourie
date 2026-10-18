@@ -136,17 +136,17 @@ test('visible car-wash chance matches Remainder of Today including overnight rai
 });
 
 test('visible car-wash chance uses the full-day high rather than the daytime-only peak',()=>{
-  const forecast=fixture([2,0,0,0,0,0,0]);
+  const forecast=fixture([6,0,0,0,0,0,0]);
   forecast.days[0].popDayLikelihood={value:1};
-  forecast.days[0].popNightLikelihood={value:2};
+  forecast.days[0].popNightLikelihood={value:6};
   const summary=carWashSummary(forecast,Date.parse('2026-09-12T08:00:00Z'));
   const html=carWashHTML(summary);
   const firstCard=html.match(/<article class="car-wash-day"[\s\S]*?<\/article>/)?.[0]||'';
-  assert.equal(summary.chance,2);
-  assert.equal(summary.days[0].chance,2);
-  assert.equal(summary.decisions[0].chance,2);
-  assert.match(html,/class="car-wash-fact good"[\s\S]*?<b>2%<\/b><small>Rain chance<\/small>/);
-  assert.match(firstCard,/class="car-wash-chance">💧 2%<\/span>/);
+  assert.equal(summary.chance,6);
+  assert.equal(summary.days[0].chance,6);
+  assert.equal(summary.decisions[0].chance,6);
+  assert.match(html,/class="car-wash-fact good"[\s\S]*?<b>6%<\/b><small>Rain chance<\/small>/);
+  assert.match(firstCard,/class="car-wash-chance">💧 6%<\/span>/);
   assert.doesNotMatch(firstCard,/💧 1%/);
 });
 
@@ -162,10 +162,10 @@ test('the conservative three-day chances still drive the inclusive 25% count and
   assert.equal(summary.reason,'Three days at or below 25% are lined up.');
   const html=carWashHTML(summary);
   assert.match(html,/3 of 3 days/);
-  assert.match(html,/25% or less rain/);
+  assert.match(html,/Rain chance ≤25%/);
 });
 
-test('at 6 PM the visible card switches from the daytime chance to the overnight chance',()=>{
+test('at 6 PM the visible card keeps the current calendar day chance instead of the overnight period',()=>{
   const forecast=fixture([70,8,8,8,8,8,8]);
   forecast.days[0].popNightLikelihood={value:8};
   forecast.days[0].nightCondition='Clear';
@@ -175,11 +175,11 @@ test('at 6 PM the visible card switches from the daytime chance to the overnight
   assert.equal(before.days[0].label,'Remainder of Today');
   const after=carWashSummary(forecast,Date.parse('2026-09-12T18:00:00Z'));
   assert.equal(after.state,'wait');
-  assert.equal(after.chance,8);
-  assert.equal(after.days[0].label,'Tonight');
+  assert.equal(after.chance,70);
+  assert.equal(after.days[0].label,'Remainder of Today');
   assert.equal(after.days[0].isDay,false);
   assert.equal(after.days[1].isDay,true);
-  assert.match(carWashHTML(after).match(/<article class="car-wash-day"[\s\S]*?<\/article>/)?.[0]||'',/sky-moon/);
+  assert.doesNotMatch(carWashHTML(after).match(/<article class="car-wash-day"[\s\S]*?<\/article>/)?.[0]||'',/sky-sun/);
   assert.deepEqual(after.decisions[0].chances,[70,8,8]);
 });
 
@@ -189,7 +189,7 @@ test('at 3:01 PM a rainy 4 PM remains Remainder of Today and still means WAIT',(
   forecast.days[0].rainLikelihood={value:80,aggregation:'maximum-hourly',coverage:{complete:true},window:{start:new Date(now).toISOString(),end:'2026-09-13T07:00:00Z'},peakTime:'2026-09-12T16:00:00Z'};
   forecast.days[0].popDayLikelihood={value:80,aggregation:'maximum-hourly',coverage:{complete:true}};
   forecast.days[0].popNightLikelihood={value:0,aggregation:'maximum-hourly',coverage:{complete:true}};
-  forecast.hours.push({time:'2026-09-12T16:00:00Z',isDay:true,temperature:80,rainLikelihood:{value:80}});
+  forecast.hours=Array.from({length:16},(_,i)=>({time:new Date(Date.parse('2026-09-12T15:00:00Z')+i*HOUR).toISOString(),isDay:i<4,temperature:80,rainLikelihood:{value:i===1?80:0}}));
   const summary=carWashSummary(forecast,now);
   assert.equal(summary.state,'wait');
   assert.equal(summary.canWash,false);
@@ -200,14 +200,14 @@ test('at 3:01 PM a rainy 4 PM remains Remainder of Today and still means WAIT',(
   assert.equal(bestWashWindow(forecast,0,now),null);
 });
 
-test('car-wash thunder icons follow thunder wording, not rain percentage',()=>{
+test('a small thunder chance stays in the percentage without making the daily car-wash icon stormy',()=>{
   const forecast=fixture([5,5,5,5,5,5,5]);
   forecast.days[0].condition='Slight Chance Thunderstorms';
   const summary=carWashSummary(forecast,start);
-  assert.equal(summary.days[0].condition,'Slight Chance Thunderstorms');
+  assert.equal(summary.days[0].condition,'Cloudy');
   const firstCard=carWashHTML(summary).match(/<article class="car-wash-day"[\s\S]*?<\/article>/)?.[0]||'';
-  assert.match(firstCard,/data-weather-kind="storm"/);
-  assert.match(firstCard,/sky-lightning/);
+  assert.match(firstCard,/data-weather-kind="cloudy"/);
+  assert.doesNotMatch(firstCard,/sky-lightning/);
 });
 
 test('rain-dominant car-wash cards never keep sunny-only artwork',()=>{
@@ -226,9 +226,9 @@ test('a car-wash card displayed as 0% keeps dry artwork even when full text has 
   forecast.days[0].condition='Slight Chance Thunderstorms';
   const summary=carWashSummary(forecast,start);
   assert.equal(Math.round(summary.days[0].chance),0);
-  assert.equal(summary.days[0].condition,'Slight Chance Thunderstorms');
+  assert.equal(summary.days[0].condition,'Cloudy');
   const firstCard=carWashHTML(summary).match(/<article class="car-wash-day"[\s\S]*?<\/article>/)?.[0]||'';
-  assert.match(firstCard,/data-weather-kind="partly-cloudy"/);
+  assert.match(firstCard,/data-weather-kind="cloudy"/);
   assert.doesNotMatch(firstCard,/sky-(?:rain|lightning|snow)/);
 });
 
@@ -341,4 +341,14 @@ test('Feel Meter falls back to current dew point after the daytime wash window c
   assert.deepEqual(summary.facts.gross,{title:'70° · NO-GO',detail:'Feel Meter now',value:70,level:'nogo'});
   assert.match(carWashHTML(summary),/70° · NO-GO/);
   assert.doesNotMatch(carWashHTML(summary),/Unavailable<\/b><small>Feel Meter/);
+});
+
+test('a future wash-day dew point is labeled with its day rather than looking current',()=>{
+ const f=fixture([90,90,10,10,10,10,10]);
+ const time=Date.parse(dates[2]+'T12:00:00Z');
+ f.metricForecasts.series.dewpoint.push({time:new Date(time).toISOString(),value:41});
+ f.metricForecasts.series.wind.push({time:new Date(time).toISOString(),value:4});
+ const fact=carWashSummary(f,start).facts.gross;
+ assert.equal(fact.title,'41° · DRY AIR');
+ assert.equal(fact.detail,'Feel Meter · next wash day');
 });
