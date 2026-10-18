@@ -1,0 +1,57 @@
+name: Enable approved public weather picture scripts
+on:
+  push:
+    branches: [prerelease]
+    paths: ['.github/workflows/prerelease-portrait-static-access.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  static-dependencies:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: prerelease
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - name: Add the exact public visual dependencies, without opening other routes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('src/weatherSiteAccess.js');s=p.read_text()
+          anchor='const PUBLIC_PLAYER_ASSETS = new Set(['
+          assert s.count(anchor)==1
+          new=['/weather-fusion/player/approved-weather-world.js','/weather-fusion/player/approved-portrait-selection.js']
+          for name in new:
+            if repr(name) not in s:s=s.replace(anchor,anchor+repr(name)+', ',1)
+          p.write_text(s)
+          PY
+          node --input-type=module - <<'JS'
+          import assert from 'node:assert/strict';import express from 'express';
+          import {isPublicWeatherPath,registerWeatherSiteAccess} from './src/weatherSiteAccess.js';
+          const files=['/weather-fusion/player/approved-weather-world.js','/weather-fusion/player/approved-portrait-selection.js'];
+          for(const f of files){assert.equal(isPublicWeatherPath(f),true);assert.equal(isPublicWeatherPath(f,'POST'),false);}
+          for(const p of ['/weather-fusion/player/private.js','/weather-fusion/atmos.html','/deal-intelligence/','/api/deal-intelligence/'])assert.equal(isPublicWeatherPath(p),false);
+          const app=express();registerWeatherSiteAccess(app,{env:{},publicMain:true});app.use(express.static('public'));
+          const server=await new Promise(resolve=>{const s=app.listen(0,'127.0.0.1',()=>resolve(s));});
+          try{
+            const root='http://127.0.0.1:'+server.address().port;
+            for(const file of files){const r=await fetch(root+file);assert.equal(r.status,200);assert.match(r.headers.get('content-type'),/javascript/);}
+            assert.equal((await fetch(root+'/weather-fusion/atmos.html')).status,401);
+            assert.equal((await fetch(root+'/api/deal-intelligence/')).status,401);
+            console.log('PASS: the exact two new static JavaScript dependencies load publicly; private pages/APIs and writes remain restricted.');
+          }finally{await new Promise(resolve=>server.close(resolve));}
+          JS
+      - name: Publish the tested static-asset gate update
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/weatherSiteAccess.js
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Serve the approved prerelease portrait modules as exact public static dependencies'
+          git pull --rebase origin prerelease
+          git push origin HEAD:prerelease
