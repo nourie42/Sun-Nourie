@@ -8,8 +8,8 @@
 import {buildTimeline,skyScene,mixScene,consensus,agreementLabel,presentSources,rainBreakdown,comfortGrid,perfectWindows,dailyOutlook,
  sunDay,COMFORT_BINS,comfortBin,SOURCES,SOURCE_ORDER,SOURCE_ABOUT,sourceLabel,countWord,compass,hourLabel,clockLabel,longDayLabel,weekdayLabel,localParts,
  PRESETS,validPlace,placeFromQuery,PERFECT_RULES,H,TRUST_STOPS,TRUST_LABELS,NORMAL_STOP,LAB_PRESETS,normalTrust,isNourieTrust,matchingPreset,
- recipeShares,sourceCoverage,customForecast,labDifferences,rainOutlook,relativeHour,dressingTimeline} from './atmos-model.js?v=atmos-v5';
-import {createSky,moonIllumination,moonPhaseName,moonPosition,sunPosition,directionWord} from './atmos-sky.js?v=atmos-v5';
+ recipeShares,sourceCoverage,customForecast,labDifferences,rainOutlook,relativeHour,dressingTimeline} from './atmos-model.js?v=atmos-v6';
+import {createSky,moonIllumination,moonPhaseName,moonPosition,sunPosition,directionWord} from './atmos-sky.js?v=atmos-v6';
 import {fetchJsonWithDeadline} from './request-deadline.js?v=loading-recovery-v1';
 import {withLiveAlerts,retainUnverifiedAlerts,alertLocationKey,alertHealth,ALERT_REFRESH_MS} from './live-alerts.js?v=county-warnings-v3';
 import {pavementEstimate,petSurfaceSubtitle} from './pavement.js?v=current-rain-20261017-v3';

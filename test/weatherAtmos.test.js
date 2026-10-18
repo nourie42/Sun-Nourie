@@ -6,6 +6,7 @@ import {buildTimeline,skyScene,mixScene,cloudCover,consensus,rainBreakdown,comfo
   TRUST_STOPS,LAB_PRESETS,normalTrust,isNourieTrust,matchingPreset,mixValue,rainScoreMix,recipeShares,sourceCoverage,customForecast,labDifferences,rainOutlook,relativeHour,dressedPeople,wearText,dressingTimeline} from '../public/weather-fusion/atmos-model.js';
 import {sunPosition,moonIllumination,moonPhaseName} from '../public/weather-fusion/atmos-sky.js';
 import {skyColours,skyPaint,cloudField,coverShare,CLOUD_W,CLOUD_H} from '../public/weather-fusion/atmos-sky-paint.js';
+import {cloudRanks,CLOUD_TILE} from '../public/weather-fusion/atmos-sky-gl.js';
 import {hourlyDisplaySamples} from '../public/weather-fusion/weather-display.js';
 import {forecastValue,displayedFeelsAt} from '../public/weather-fusion/hourly-feels.js';
 import {dailyForecastReadings} from '../public/weather-fusion/seven-day.js';
@@ -174,11 +175,11 @@ test('sun and moon positions follow the shared solar formula',()=>{
 test('the sun and moon are drawn where the astronomy puts them, and the words beside the sky name the same place',()=>{
   const sky=read('atmos-sky.js'),paint=read('atmos-sky-paint.js'),page=read('atmos.js');
   assert.match(sky,/sunPosition\(t,latitude,longitude\)/,'the picture uses the same solar formula as the words');
-  assert.match(sky,/drawSun\(ctx,sunX,sunY/,'the sun is drawn at its computed height and direction');
-  assert.match(sky,/drawMoon\(ctx,moonX,moonY/,'the moon is drawn at its computed position');
+  assert.match(sky,/sunPx:\[xOfAzimuth\(sun\.azimuth\)\*width,yOfAltitude\(sun\.altitude,horizonY\)\]/,'the sun is drawn at its computed height and direction');
+  assert.match(sky,/moonPx:\[xOfAzimuth\(moon\.azimuth\)\*width,yOfAltitude\(moon\.altitude,horizonY\)\]/,'the moon is drawn at its computed position');
   assert.match(paint,/export function drawMoon[\s\S]*destination-out/,'the moon shows its real phase by cutting away the unlit part');
   assert.match(page,/renderSkyNote|sky-note/,'the sun and moon positions are written beside the sky');
-  assert.doesNotMatch(sky+paint,/today-sky|PHOTOS/,'the sky is painted from the forecast, not drawn from photographs');
+  assert.doesNotMatch(sky+paint+read('atmos-sky-gl.js'),/today-sky|PHOTOS/,'the sky is drawn from the forecast, not from photographs');
 });
 
 test('the sky is painted from the forecast: a cover fraction fills that share of the sky, and the colours follow the sun',()=>{
@@ -236,6 +237,19 @@ test('places come from presets or validated U.S. coordinates only',()=>{
   assert.equal(placeFromQuery(''),null);
 });
 
+test('the graphics-chip sky fills the cloud share it is given, thick cloud hides the sun, and it is one shader pass',()=>{
+  const ranks=cloudRanks(7,CLOUD_TILE);
+  assert.equal(ranks.length,CLOUD_TILE*CLOUD_TILE);
+  for(const cover of [.1,.3,.6,.9]){
+    const share=ranks.filter(r=>r/255>=1-cover).length/ranks.length;
+    assert.ok(Math.abs(share-cover)<.01,`${cover*100}% cover fills ${(share*100).toFixed(1)}% of the cloud tile`);
+  }
+  const gl=read('atmos-sky-gl.js');
+  assert.match(gl,/smoothstep\(thr - 0\.06, thr \+ 0\.06, r\)/,'the cloud edge is centred on the cover threshold, so the cover is the share it is given');
+  assert.match(gl,/float veil = \(1\.0 - sunCloud\) \* \(1\.0 - sunCloud\)/,'thick cloud hides the sun disc');
+  assert.match(gl,/gl_FragColor/,'the sky is written in one fragment pass');
+});
+
 test('Atmos uses the main page’s own look: shared stylesheets, header band',()=>{
   const html=read('atmos.html'),sky=read('atmos-sky.js');
   for(const sheet of ['style.css','forecast-layout.css','weather-polish.css','page-unify.css','header-sky.css'])
@@ -243,7 +257,7 @@ test('Atmos uses the main page’s own look: shared stylesheets, header band',()
   assert.match(html,/class="topbar sky-header"/);
   assert.match(html,/src="\/weather-fusion\/header-sky\.js\?v=/);
   assert.match(read('atmos-sky-paint.js'),/function pinePath[\s\S]*function oakPath/,'the treeline mixes pines and broadleaf trees');
-  assert.doesNotMatch(sky+read('atmos-sky-paint.js'),/lollipop|LEAVES|cartoon/i,'no cartoon sprites or lollipop trees');
+  assert.doesNotMatch(sky+read('atmos-sky-paint.js')+read('atmos-sky-gl.js'),/lollipop|LEAVES|cartoon/i,'no cartoon sprites or lollipop trees');
   assert.ok(existsSync(new URL('../public/weather-fusion/atmos-sky-paint.js',import.meta.url)),'the painter ships with the page');
   assert.doesNotMatch(read('atmos.css')+html,/Archivo|woff2/,'the page uses the same system type stack as the main page');
   assert.doesNotMatch(html,/class="card"/,'sections are the main page’s glass tiles');

@@ -48,17 +48,22 @@ Each section opens with a plain explanation; the exact rules sit in a
 
 ## What drives the sky
 
-The sky is painted from the forecast for the hour shown (`atmos-sky.js`, with
-the painting in `atmos-sky-paint.js`). No photographs are used.
+The sky is drawn on the graphics chip from the forecast for the hour shown
+(`atmos-sky-gl.js`; `atmos-sky.js` supplies the numbers and the timing). Where the
+browser has no WebGL, the painted sky in `atmos-sky-paint.js` is drawn instead.
+No photographs are used.
 
 - **Cloud cover is a share of the sky.** A fixed cloud field, a smooth noise
   tiled across the sky, is cut at the level that gives the forecast's sky cover,
-  so 30% cover covers 30% of the sky and 98% covers nearly all of it. Clear hours
-  show no clouds at all. The shapes drift with the wind, and their sunward edges
-  are lit.
-- **Colour follows the sun's altitude.** Blue by day, a warm band at sunset and
-  sunrise, the blue hour, then night. Cloud greys the blue, a storm darkens it,
-  fog pales it, and humid air (a high dew point) whitens the horizon.
+  so 30% cover covers 30% of the sky and overcast covers all of it. Clear hours
+  show no clouds at all. The edges are ragged, the shapes drift with the wind,
+  their sunward sides are lit and their undersides shaded.
+- **Colour follows the sun's altitude.** The graphics chip works out the air the
+  sunlight crosses. Thin air scatters blue across the whole sky, so the day is
+  blue; a low sun crosses more air, so the horizon turns warm. Ozone absorbs some
+  of the yellow and red light that reaches the high air, which keeps the sky blue
+  as the sun sinks, before it darkens to the night. Cloud greys the blue, a storm
+  darkens it, fog pales it, and humid air (a high dew point) whitens the horizon.
 - **The sun and moon** are placed by the same solar and lunar formulas the words
   beside the sky quote, so the picture and the words agree. The sun sits under
   any cloud, so thin cloud veils it and thick cloud hides it. The moon shows its
@@ -69,11 +74,12 @@ the painting in `atmos-sky-paint.js`). No photographs are used.
   forecast. Chance or "nearby" wording draws lighter, scattered rain. Fog lies on
   the ground and thins toward the top of the sky.
 - **Wind** sets the drift of the clouds and the lean of the rain and snow.
-- **The treeline** is pines and broadleaf trees, a paler far row and a near row,
-  green by day and near black after dark.
+- **The treeline** is a far row and a near row whose heights vary along the
+  horizon, green by day and near black after dark.
 
 With `prefers-reduced-motion`, the sky renders still frames, with no drift,
-falling rain or lightning.
+falling rain or lightning. The sky is one shader pass per frame: about 30 frames
+a second at rest and the full rate during the time-lapse.
 
 ## What to wear
 
@@ -159,9 +165,12 @@ be verified.
 - `atmos.js` — the page: loading, the clock, the sections and the lab.
 - `atmos-model.js` — pure builders for the timeline, the sky's scene, the blend,
   the comfort grid, the lab, the illustrated people and their settled clothes.
-- `atmos-sky.js` — the sky window (drawing order, drift, weather) and the solar
-  and lunar astronomy behind the words beside the sky.
-- `atmos-sky-paint.js` — the painting: sky colour, the cloud field and its
+- `atmos-sky.js` — the sky window: it draws with WebGL when the browser has it and
+  falls back to the painted sky; it also holds the solar and lunar astronomy
+  behind the words beside the sky, and the time, drift and weather.
+- `atmos-sky-gl.js` — the graphics-chip sky: the atmosphere's colour, the cloud
+  field, the sun and moon, the stars, the treeline, fog, rain, snow and thunder.
+- `atmos-sky-paint.js` — the painted fallback: sky colour, the cloud field and its
   texture, the sun, the moon's phase, the treeline and the stars.
 - Shared with the main page: `style.css`, `forecast-layout.css`,
   `weather-polish.css`, `page-unify.css`, `header-sky.css`, `header-sky.js`, and
@@ -176,7 +185,8 @@ node --test test/weatherAtmos.test.js
 The tests check that Atmos needs no server change and stays behind the password,
 the import closure, that Atmos links the main page's stylesheets, that the clock,
 daily list and blend use the main page's values, the sky's weather-wording rules,
-that cloud cover fills its share of the sky and the sky colours follow the sun,
+that cloud cover fills its share of the sky (painted and graphics-chip), that thick
+cloud hides the sun, and that the sky colours follow the sun,
 that the sun and moon use the same calculations as the words beside them, the
 rain-score breakdown, comfort classes, perfect-hour windows, daily spreads, the
 clothes settling rules, and the forecast lab: that Normal reproduces Weather

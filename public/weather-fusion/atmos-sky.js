@@ -4,7 +4,8 @@
  * rain, snow, fog and thunder come from the displayed condition, and the wind
  * drifts the clouds and leans the rain. */
 
-import {RAD,clamp,smooth,css,mix,rng,skyPaint,cloudField,cloudTexture,treeSpecs,treePalette,drawTreeline,starField,drawSun,drawMoon,xOfAzimuth,yOfAltitude,CLOUD_W,CLOUD_H} from './atmos-sky-paint.js?v=atmos-v5';
+import {RAD,clamp,smooth,css,mix,rng,skyPaint,cloudField,cloudTexture,treeSpecs,treePalette,drawTreeline,starField,drawSun,drawMoon,xOfAzimuth,yOfAltitude,CLOUD_W,CLOUD_H} from './atmos-sky-paint.js?v=atmos-v6';
+import {createGlPainter} from './atmos-sky-gl.js?v=atmos-v6';
 
 const DAY=86400000,J1970=2440588,J2000=2451545,OBLIQUITY=RAD*23.4397;
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
@@ -56,8 +57,80 @@ export function moonPhaseName(phase){
 }
 export function directionWord(azimuth){return ['north','northeast','east','southeast','south','southwest','west','northwest'][Math.round((((azimuth%360)+360)%360)/45)%8];}
 
-/* ---------- Renderer ---------- */
-export function createSky(canvas,{reducedMotion=false}={}){
+/* ---------- Sky: WebGL when the browser has it, the painted canvas otherwise ---------- */
+export function createSky(canvas,options={}){
+ const painter=createGlPainter(canvas);
+ return painter?createGlSky(canvas,painter,options):createPaintedSky(canvas,options);
+}
+const direction=body=>{const a=RAD*body.azimuth,h=RAD*body.altitude;return [Math.sin(a)*Math.cos(h),Math.sin(h),Math.cos(a)*Math.cos(h)];};
+/* The graphics chip works out every pixel from the sun's and moon's real positions
+ * and the displayed condition; this module supplies those numbers and the timing. */
+function createGlSky(canvas,painter,{reducedMotion=false}={}){
+ let width=0,height=0,horizonY=0,running=false,frame=0,last=0,visible=true,timeScale=1,windX=0,windZ=0,flash=null,nextFlash=0;
+ let location={latitude:35.787,longitude:-78.4806};
+ let state={time:Date.now(),scene:{cover:.3,rain:0,snow:0,fog:0,haze:0,dark:0,storm:false,wind:5,windDir:270}};
+ function resize(){
+  const rect=canvas.getBoundingClientRect();
+  width=Math.max(1,Math.round(rect.width));height=Math.max(1,Math.round(rect.height));
+  horizonY=Math.round(height*.72);
+  painter.resize(width,height,Math.min(window.devicePixelRatio||1,1.5),horizonY);
+  render(0);
+ }
+ function setLocation(latitude,longitude){
+  if(!finite(latitude)||!finite(longitude))return;
+  location={latitude,longitude};
+  if(!running)render(0);
+ }
+ function setState(next){
+  state={time:finite(next?.time)?next.time:state.time,scene:{...state.scene,...(next?.scene||{})}};
+  if(!running)render(0);
+ }
+ // A brief flash only for thunder or storm wording, never for a plain rain forecast.
+ function flashAt(storm,time){
+  if(!storm||reducedMotion)return{level:0,at:[0,0]};
+  if(!flash&&time>nextFlash)flash={start:time,x:width*(.15+Math.random()*.7),y:height*(.08+Math.random()*.3),double:Math.random()<.5};
+  if(!flash)return{level:0,at:[0,0]};
+  const age=time-flash.start;
+  if(age>700){flash=null;nextFlash=time+3500+Math.random()*6000;return{level:0,at:[0,0]};}
+  const pulse=Math.max(0,1-age/260)+(flash.double&&age>320?Math.max(0,1-(age-320)/200)*.7:0);
+  return{level:Math.min(1,pulse),at:[flash.x,flash.y]};
+ }
+ function render(dt,time=performance.now()){
+  if(!width||!height)return;
+  const s=state.scene,t=state.time,{latitude,longitude}=location;
+  const sun=sunPosition(t,latitude,longitude),moon=moonPosition(t,latitude,longitude),lunar=moonIllumination(t);
+  const cover=clamp(finite(s.cover)?s.cover:.3),storm=!!s.storm,windDir=s.windDir??270,wind=Math.max(0,s.wind??4);
+  // Wind from the west carries the clouds east, which is to the left as the page faces south.
+  if(!reducedMotion){const k=wind*.0029*Math.min(timeScale,6)*dt/1000;windX+=-Math.sin(windDir*RAD)*k;windZ+=-Math.cos(windDir*RAD)*k;}
+  const r=Math.max(7,Math.min(width,height)*.03),fl=flashAt(storm,time);
+  painter.draw({
+   sunDir:direction(sun),sunAlt:sun.altitude,sunPx:[xOfAzimuth(sun.azimuth)*width,yOfAltitude(sun.altitude,horizonY)],sunR:r,sunShow:sun.altitude>-1?1:0,
+   moonDir:direction(moon),moonPx:[xOfAzimuth(moon.azimuth)*width,yOfAltitude(moon.altitude,horizonY)],moonShow:moon.altitude>-1?1:0,
+   moonFrac:lunar.fraction,moonWaxing:lunar.phase<.5?1:0,
+   cover,rain:clamp(s.rain??0),snow:clamp(s.snow??0),fog:clamp(s.fog??0),haze:clamp(s.haze??0),dark:clamp(s.dark??0),storm:storm?1:0,
+   wind:[windX,windZ],lean:Math.sin(windDir*RAD)*clamp(wind/30,0,.6),time:reducedMotion?0:time/1000,flash:fl.level,flashPx:fl.at
+  });
+ }
+ function loop(time){
+  if(!running)return;
+  frame=requestAnimationFrame(loop);
+  if(!visible)return;
+  const dt=last?Math.min(80,time-last):16;
+  if(timeScale===1&&dt<30&&last)return; // about 30 fps at rest, full rate during a time-lapse
+  last=time;render(dt,time);
+ }
+ function start(){
+  if(reducedMotion){render(0);return;}
+  if(running)return;running=true;last=0;frame=requestAnimationFrame(loop);
+ }
+ function stop(){running=false;cancelAnimationFrame(frame);}
+ function setVisible(value){visible=value;if(visible&&!running&&!reducedMotion)start();}
+ return{resize,setLocation,setState,setTimeScale:value=>{timeScale=finite(value)&&value>0?value:1;},start,stop,setVisible,render:()=>render(0),
+  get reducedMotion(){return reducedMotion;},set reducedMotion(value){reducedMotion=!!value;if(reducedMotion)stop();else start();render(0);}};
+}
+
+/* ---------- Painted fallback (no WebGL) ---------- */
+function createPaintedSky(canvas,{reducedMotion=false}={}){
  const ctx=canvas.getContext('2d',{alpha:false}),clouds=cloudTexture(cloudField(7));
  let width=0,height=0,horizonY=0,dpr=1,running=false,frame=0,last=0,visible=true,timeScale=1,offset=0,flash=null,nextFlash=0;
  let location={latitude:35.787,longitude:-78.4806};
