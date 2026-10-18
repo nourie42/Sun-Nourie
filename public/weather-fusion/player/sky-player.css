@@ -52,3 +52,12 @@
 .outfit-bubble{position:relative;inset:auto;grid-area:5/1;height:auto;min-height:90px;width:100%;max-width:none;padding:16px 18px;background:#25485c;border-top:1px solid #cce5f333;border-radius:0}
 .outfit-summary{font-size:13px;line-height:1.6}.player-footer p{font-size:12px}
 @media(max-width:600px){.world-stage{aspect-ratio:4/5}.frame-hour{font-size:25px}.scene-status{font-size:9px;letter-spacing:.5px}.frame-day{font-size:11px}.outfit-basis{margin:0 10px 14px;padding:10px;font-size:12px}.scene-weather{column-gap:12px}.frame-condition{font-size:14px}.frame-feels{font-size:11px}.frame-temp{font-size:58px}.temperature-line{height:58px}}
+
+/* Keep the previous decoded photograph opaque while the next outfit dissolves
+   over it. Do not fade both layers or animate the person's shape or camera. */
+.approved-weather-photo-current{z-index:0;opacity:1}
+.approved-weather-photo-incoming{z-index:1;opacity:0;transition:opacity 320ms cubic-bezier(.22,.61,.36,1);will-change:opacity}
+.approved-weather-photo-incoming.is-revealing{opacity:1}
+.approved-photo-message{z-index:2}
+@media(prefers-reduced-motion:reduce){.approved-weather-photo-incoming{transition:none}}
+.approved-photo-message.is-updating{inset:12px auto auto 12px;display:block;max-width:calc(100% - 24px);padding:7px 10px;border:1px solid #ffffff45;border-radius:9px;background:#122d42cc;font-size:12px;line-height:1.4;pointer-events:none}

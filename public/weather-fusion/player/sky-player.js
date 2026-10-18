@@ -1,5 +1,5 @@
 /** Nourie Weather · animated forecast scene player. All supplied text uses textContent. */
-import {approvedOutfit} from './approved-weather-world.js?v=approved-her-cold-v4';
+import {approvedOutfit} from './approved-weather-world.js?v=approved-her-motion-v5';
 const number = (v, fallback = 0) => v !== null && v !== '' && Number.isFinite(Number(v)) ? Number(v) : fallback;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const optionalNumber = v => v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v)) ? Number(v) : null;
@@ -68,14 +68,14 @@ export function createScenarioForecast(name, start = new Date(), hours = 24) {
   let stamp=new Date(start).getTime();if(!Number.isFinite(stamp))stamp=Date.now();stamp=Math.floor(stamp/3600000)*3600000;
   return Array.from({length:clamp(Math.floor(number(hours,24)),1,336)},(_,i)=>({...preset,time:new Date(stamp+i*3600000).toISOString()}));
 }
-const cssURL = new URL('./sky-player.css?v=approved-her-cold-v4',import.meta.url).href;
+const cssURL = new URL('./sky-player.css?v=approved-her-motion-v5',import.meta.url).href;
 const compactSeconds = seconds => seconds>=60?`${Math.floor(seconds/60)}m ${Math.round(seconds%60)}s`:`${Number(seconds.toFixed(seconds<1?3:1))}s`;
 
 class WeatherSkyPlayer extends HTMLElement {
   static get observedAttributes(){return ['data-mode','location-name','timezone','playback-speed','character'];}
   constructor(){
     super();this.attachShadow({mode:'open'});
-    this._forecast=[];this._index=0;this._playing=false;this._timer=null;this._speed=4;
+    this._forecast=[];this._index=0;this._playing=false;this._timer=null;this._speed=4;this._playbackEpoch=0;this._sceneTask=null;
     this._character='approved';this._clothingMode='feels';
     try{this._speed=playbackTiming(globalThis.localStorage?.getItem(SPEED_STORAGE_KEY)??4).speed;}catch{}
     this._locationName='Your forecast';this._timezone='';this._world=null;this._worldPromise=null;this._worldEpoch=0;this._worldFailed=false;this._inView=false;this._connected=false;
@@ -138,15 +138,37 @@ class WeatherSkyPlayer extends HTMLElement {
     this._index=((Math.trunc(number(index))%this._forecast.length)+this._forecast.length)%this._forecast.length;
     this._render();
     this.dispatchEvent(new CustomEvent('framechange',{detail:{index:this._index,frame:{...this.currentFrame,outfitBasis:this._clothingMode},outfit:this._outfitFor(this.currentFrame)},bubbles:true,composed:true}));
+    return this._sceneTask;
   }
   seekFrame(index){this.setFrame(index);this.pause();}
   skipDays(days){if(!this.currentFrame)return;const target=Date.parse(this.currentFrame.time)+number(days)*86400000;let nearest=0;let distance=Infinity;this._forecast.forEach((frame,index)=>{const delta=Math.abs(Date.parse(frame.time)-target);if(delta<distance){distance=delta;nearest=index;}});this.seekFrame(nearest);}
   play(){if(!this._forecast.length)return;const wasPlaying=this._playing;this._playing=true;this.$('.player').classList.add('playing');this.$('.play').setAttribute('aria-label','Pause forecast animation');this.$('.play-word').textContent='Pause forecast';this._ensureWorld();this._world?.setPlaying(true);this._startTimer();if(!wasPlaying)this.dispatchEvent(new CustomEvent('playbackchange',{detail:{playing:true},bubbles:true,composed:true}));}
-  pause(){const wasPlaying=this._playing;this._playing=false;clearInterval(this._timer);this._timer=null;if(this.$){this.$('.player').classList.remove('playing');this.$('.play').setAttribute('aria-label','Play forecast animation');this.$('.play-word').textContent='Play forecast';}this._world?.setPlaying(false);if(wasPlaying)this.dispatchEvent(new CustomEvent('playbackchange',{detail:{playing:false},bubbles:true,composed:true}));}
-  _startTimer(){clearInterval(this._timer);this._timer=setInterval(()=>{if(this._playing&&this._forecast.length)this.setFrame(this._index+1);},playbackTiming(this._speed).millisecondsPerHour);}
+  pause(){const wasPlaying=this._playing;this._playing=false;this._playbackEpoch=(this._playbackEpoch||0)+1;clearTimeout(this._timer);this._timer=null;if(this.$){this.$('.player').classList.remove('playing');this.$('.play').setAttribute('aria-label','Play forecast animation');this.$('.play-word').textContent='Play forecast';}this._world?.setPlaying(false);if(wasPlaying)this.dispatchEvent(new CustomEvent('playbackchange',{detail:{playing:false},bubbles:true,composed:true}));}
+  async _awaitScene(){
+    if(this._worldPromise)await this._worldPromise;
+    let pending;
+    do{pending=this._sceneTask;if(pending)await pending;}while(pending!==this._sceneTask);
+  }
+  _startTimer(){
+    clearTimeout(this._timer);this._timer=null;
+    const epoch=this._playbackEpoch=(this._playbackEpoch||0)+1;
+    const active=()=>this._playing&&epoch===this._playbackEpoch&&this._forecast.length>0;
+    const schedule=async()=>{
+      // Photo loading and outfit motion use real time. Even the fastest
+      // forecast speed must let the selected scene finish before advancing.
+      await this._awaitScene();
+      if(!active())return;
+      this._timer=setTimeout(async()=>{
+        this._timer=null;if(!active())return;
+        await this._awaitScene();if(!active())return;
+        this.setFrame(this._index+1);void schedule();
+      },playbackTiming(this._speed).millisecondsPerHour);
+    };
+    void schedule();
+  }
   _format(time,options){return new Intl.DateTimeFormat('en-US',{...options,...(this._timezone?{timeZone:this._timezone}:{})}).format(new Date(time));}
   _renderMode(){const mode=this.getAttribute('data-mode');this.$('.mode-label').textContent=mode==='demo'||mode==='sample'?'Sample weather':mode==='live'?'Live forecast':'Forecast preview';this.$('.mode-badge').classList.toggle('is-sample',mode==='demo'||mode==='sample');}
-  _renderTiming(){const timing=playbackTiming(this._speed,this._forecast.length);this.$('.playback-timing').textContent=`${compactSeconds(timing.secondsPerHour)} / forecast hour · ${compactSeconds(timing.sweepSeconds)} full sweep`;}
+  _renderTiming(){const timing=playbackTiming(this._speed,this._forecast.length);this.$('.playback-timing').textContent=`${compactSeconds(timing.secondsPerHour)} / hour + scene transitions`;}
   _renderTimeline(){
     if(!this.$)return;const frames=this._forecast;this._renderTiming();const markers=this.$('.outfit-markers');markers.replaceChildren();
     if(!frames.length){this.$('.outfit-changes-note').textContent='';return;}
@@ -173,12 +195,12 @@ class WeatherSkyPlayer extends HTMLElement {
     if(!this._playing)this.$('.announcement').textContent=`${this._format(frame.time,{hour:'numeric'})}. ${description}, ${Math.round(frame.temperature)} degrees. ${outfit.label}.`;
     this._syncWorld();if(this._inView&&this._connected)this._ensureWorld();
   }
-  _syncWorld(){if(this._world&&this.currentFrame){try{const frame={...this.currentFrame,outfitBasis:this._clothingMode};if(this._timezone){const parts=new Intl.DateTimeFormat('en-US',{timeZone:this._timezone,hour:'numeric',minute:'numeric',hourCycle:'h23'}).formatToParts(new Date(frame.time));frame.localHour=Number(parts.find(p=>p.type==='hour')?.value||0)+Number(parts.find(p=>p.type==='minute')?.value||0)/60;}this._world.setFrame(frame,this._outfitFor(frame));this._world.preload?.(this._forecast.slice(this._index+1,this._index+3).map(f=>({...f,outfitBasis:this._clothingMode})));}catch(error){this._handleWorldError(error);}}}
+  _syncWorld(){if(this._world&&this.currentFrame){try{const frame={...this.currentFrame,outfitBasis:this._clothingMode};if(this._timezone){const parts=new Intl.DateTimeFormat('en-US',{timeZone:this._timezone,hour:'numeric',minute:'numeric',hourCycle:'h23'}).formatToParts(new Date(frame.time));frame.localHour=Number(parts.find(p=>p.type==='hour')?.value||0)+Number(parts.find(p=>p.type==='minute')?.value||0)/60;}this._sceneTask=Promise.resolve(this._world.setFrame(frame,this._outfitFor(frame))).catch(error=>{this._handleWorldError(error);return false;});this._world.preload?.(this._forecast.slice(this._index+1).map(f=>({...f,outfitBasis:this._clothingMode})));}catch(error){this._handleWorldError(error);}}}
   async _ensureWorld(){
     if(!this._connected||this._world||this._worldPromise||this._worldFailed)return;
     const epoch=++this._worldEpoch;this.$('.world-status').hidden=false;this.$('.world-status').classList.remove('has-error');this.$('.world-status-title').textContent='Preparing your forecast scene…';this.$('.world-status-note').textContent='Weather, sky, and what to wear.';this.$('.world-retry').hidden=true;
     this._worldPromise=(async()=>{
-      const {createWeatherWorld}=await import('./approved-weather-world.js?v=approved-her-cold-v4');
+      const {createWeatherWorld}=await import('./approved-weather-world.js?v=approved-her-motion-v5');
       if(!this._connected||epoch!==this._worldEpoch)return;
       const world=await createWeatherWorld(this.$('.world-stage'),{initialFrame:this.currentFrame?{...this.currentFrame,outfitBasis:this._clothingMode}:{},initialOutfit:this._outfitFor(this.currentFrame||{}),initialCharacter:this._character,onError:error=>{if(epoch===this._worldEpoch)this._handleWorldError(error);}});
       if(!this._connected||epoch!==this._worldEpoch||this._worldFailed){world?.dispose?.();return;}
@@ -191,7 +213,7 @@ class WeatherSkyPlayer extends HTMLElement {
     this._worldFailed=true;this._world?.dispose?.();this._world=null;this.$('.world-status').hidden=false;this.$('.world-status').classList.add('has-error');this.$('.world-status-title').textContent='The forecast scene could not load.';this.$('.world-status-note').textContent='The forecast still works. Try loading the scene again.';this.$('.world-retry').hidden=false;
     this.dispatchEvent(new CustomEvent('worlderror',{detail:{message:error?.message||'Forecast scene unavailable'},bubbles:true,composed:true}));
   }
-  _disposeWorld(){this._worldEpoch++;this._worldPromise=null;this._world?.dispose?.();this._world=null;this.$('.world-stage').replaceChildren();}
+  _disposeWorld(){this._worldEpoch++;this._worldPromise=null;this._world?.dispose?.();this._world=null;this._sceneTask=null;this.$('.world-stage').replaceChildren();}
 }
 if(!customElements.get('weather-sky-player'))customElements.define('weather-sky-player',WeatherSkyPlayer);
 export {WeatherSkyPlayer};

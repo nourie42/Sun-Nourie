@@ -1,8 +1,8 @@
 /** The user's approved complete photographs, not the retired character atlases.
  * Forecast values remain owned by native-player.js. No weather is fetched here. */
-import {selectWeatherPortrait,WINTER_CLOTHING_BELOW_F} from './approved-portrait-selection.js?v=approved-her-cold-v4';
+import {selectWeatherPortrait,WINTER_CLOTHING_BELOW_F} from './approved-portrait-selection.js?v=approved-her-motion-v5';
 import {solarElevation} from '../weather-math.js?v=current-rain-20261017-v3';
-export const APPROVED_PLAYER_VERSION='approved-her-cold-v4';
+export const APPROVED_PLAYER_VERSION='approved-her-motion-v5';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 const WMO={0:'Clear',1:'Mostly clear',2:'Partly cloudy',3:'Overcast',45:'Fog',48:'Fog',51:'Drizzle',53:'Drizzle',55:'Drizzle',56:'Freezing drizzle',57:'Freezing drizzle',61:'Rain',63:'Rain',65:'Heavy rain',66:'Freezing rain',67:'Freezing rain',71:'Snow',73:'Snow',75:'Heavy snow',77:'Snow',80:'Rain showers',81:'Rain showers',82:'Heavy rain',85:'Snow showers',86:'Heavy snow',95:'Thunderstorms',96:'Thunderstorms with hail',99:'Thunderstorms with hail'};
 export function approvedState(frame={}){
@@ -30,17 +30,18 @@ export function approvedOutfit(frame={}){
  return {temperature:state.value??null,garment:!state.available?'unknown':rain?'rain':cold?'cold':cool?'cool':hot?'hot':'mild',top:label,bottom:hot?'shorts':'long pants',hat:cold,scarf:cold,boots:cold||snow||rain,gloves:cold,sunglasses:false,umbrella:false,snow,rain,storm,possibleRain:frame.nativePrecipitationActivity==='possible',windy:finite(frame.windSpeed)&&frame.windSpeed>=18,hot,cold,cool,extras:[],label,advice:`${safety}${basis}. ${layers}AI-generated weather and clothing illustration, not a live photograph.`,portrait:state};
 }
 const path=file=>`/weather-fusion/${file}?v=${APPROVED_PLAYER_VERSION}`;
-const cache=new Map();
+const cache=new Map(),CACHE_LIMIT=24,PHOTO_TRANSITION_MS=320;
 function load(file){
- if(cache.has(file))return cache.get(file);
+ if(cache.has(file)){const hit=cache.get(file);cache.delete(file);cache.set(file,hit);return hit;}
  const task=new Promise((resolve,reject)=>{
   const img=new Image();img.decoding='async';
-  const timer=setTimeout(()=>{img.onload=img.onerror=null;cache.delete(file);reject(new Error('Weather photo timed out'));},15000);
+  const forget=()=>{if(cache.get(file)===task)cache.delete(file);};
+  const timer=setTimeout(()=>{img.onload=img.onerror=null;forget();reject(new Error('Weather photo timed out'));},15000);
   img.onload=()=>{clearTimeout(timer);resolve(img);};
-  img.onerror=()=>{clearTimeout(timer);cache.delete(file);reject(new Error('Weather photo unavailable'));};
+  img.onerror=()=>{clearTimeout(timer);forget();reject(new Error('Weather photo unavailable'));};
   img.src=path(file);
  });
- cache.set(file,task);if(cache.size>24)cache.delete(cache.keys().next().value);return task;
+ cache.set(file,task);if(cache.size>CACHE_LIMIT)cache.delete(cache.keys().next().value);return task;
 }
 function backgroundStyles(){
  if(document.getElementById('approved-player-background-style'))return;
@@ -50,33 +51,103 @@ function backgroundStyles(){
 const backgroundOwner=Symbol.for('nourie.approved-weather-background-owner');
 export async function createWeatherWorld(host,{initialFrame={}}={}){
  if(!host)throw new TypeError('Weather scene host is required');
- backgroundStyles();const owner={};let generation=0,disposed=false,visible='',lastFrame=initialFrame;
- const image=document.createElement('img');image.className='approved-weather-photo';image.width=1200;image.height=675;image.decoding='async';image.hidden=true;image.alt='';
- const message=document.createElement('div');message.className='approved-photo-message';message.textContent='Loading this hour’s weather picture…';
- host.replaceChildren(image,message);host.dataset.renderer=APPROVED_PLAYER_VERSION;
+ backgroundStyles();const owner={};let generation=0,disposed=false,current=null,pending=null,lastFrame=initialFrame;
+ const message=document.createElement('div');message.className='approved-photo-message';message.setAttribute('role','status');message.setAttribute('aria-live','polite');message.textContent='Loading this hour’s weather picture…';
+ host.replaceChildren(message);host.dataset.renderer=APPROVED_PLAYER_VERSION;host.dataset.transitioning='false';
  function clearBackground(){if(document.body[backgroundOwner]===owner){document.body.classList.remove('approved-player-background');document.body.style.removeProperty('--approved-weather-background');delete document.body[backgroundOwner];}}
- async function update(frame){
-  if(disposed)return false;lastFrame=frame;const token=++generation,state=approvedState(frame);
-  host.dataset.frameTime=frame.time||'';
-  if(!state.available){visible='';image.hidden=true;message.hidden=false;message.textContent=state.reason;host.dataset.loaded='false';clearBackground();return false;}
-  if(visible===state.file){host.dataset.loaded='true';return true;}
-  visible='';image.hidden=true;message.hidden=false;message.textContent='Loading this hour’s weather picture…';host.dataset.loaded='false';clearBackground();
-  try{
-   await Promise.all([load(state.file),load(state.background)]);
-   if(disposed||token!==generation)return false;
-   image.src=path(state.file);image.alt=`The selected woman, ${state.condition}, ${state.light}, clothing based on ${state.basis.toLowerCase()} ${Math.round(state.value)} degrees Fahrenheit.`;
-   // The visible element can need its own decode even when its preloader is ready.
-   // Do not mark it loaded or change the background while the actual image is blank.
-   await image.decode();
-   if(disposed||token!==generation)return false;
-   image.hidden=false;message.hidden=true;visible=state.file;
-   host.dataset.loaded='true';host.dataset.asset=state.file;host.dataset.background=state.background;host.dataset.band=state.band;host.dataset.light=state.light;
-   document.body[backgroundOwner]=owner;document.body.style.setProperty('--approved-weather-background',`url("${path(state.background)}")`);document.body.classList.add('approved-player-background');return true;
-  }catch{
-   if(disposed||token!==generation)return false;
-   message.hidden=false;message.textContent='The picture for this hour could not load. Choose another hour or reopen the player to retry.';image.hidden=true;clearBackground();return false;
+ function clearMetadata(){host.dataset.loaded='false';for(const key of ['asset','background','band','light'])delete host.dataset[key];}
+ function photoAlt(state){return `The selected woman, ${state.condition}, ${state.light}, clothing based on ${state.basis.toLowerCase()} ${Math.round(state.value)} degrees Fahrenheit.`;}
+ function markComplete(state){
+  current.state=state;current.image.alt=photoAlt(state);message.hidden=true;message.classList.remove('is-updating');host.setAttribute('aria-busy','false');
+  host.dataset.loaded='true';host.dataset.loading='false';host.dataset.transitioning='false';host.dataset.asset=state.file;host.dataset.background=state.background;host.dataset.band=state.band;host.dataset.light=state.light;
+  document.body[backgroundOwner]=owner;document.body.style.setProperty('--approved-weather-background',`url("${path(state.background)}")`);document.body.classList.add('approved-player-background');
+ }
+ function cleanup(work){
+  clearTimeout(work.decodeTimer);clearTimeout(work.transitionTimer);clearTimeout(work.statusTimer);
+  if(work.raf!=null)cancelAnimationFrame(work.raf);
+  if(work.onTransition)work.image.removeEventListener('transitionend',work.onTransition);
+ }
+ function settle(work,result){
+  if(work.done)return;work.done=true;cleanup(work);
+  if(pending===work)pending=null;
+  work.resolve(result);
+ }
+ function cancelPending(){
+  if(!pending)return;
+  const work=pending;work.cancelLoad();work.image.remove();settle(work,false);host.dataset.transitioning='false';
+ }
+ function hideScene(text){
+  if(current)current.image.remove();current=null;
+  clearMetadata();host.dataset.loading='false';host.dataset.transitioning='false';host.setAttribute('aria-busy','false');message.classList.remove('is-updating');message.hidden=false;message.textContent=text;clearBackground();
+ }
+ function update(frame){
+  if(disposed)return Promise.resolve(false);
+  lastFrame=frame;const state=approvedState(frame);host.dataset.frameTime=frame.time||'';
+  if(!state.available){++generation;cancelPending();hideScene(state.reason);return Promise.resolve(false);}
+  // Repeated hours can share one photograph. Reuse the in-flight handoff rather
+  // than restarting its decode or making an already visible person disappear.
+  if(pending?.file===state.file){pending.state=state;return pending.promise;}
+  ++generation;cancelPending();
+  if(current?.file===state.file){markComplete(state);return Promise.resolve(true);}
+  clearMetadata();host.dataset.loading='true';host.dataset.transitioning='false';host.setAttribute('aria-busy','true');
+  message.classList.remove('is-updating');message.hidden=!!current;message.textContent='Loading this hour’s weather picture…';
+  const image=document.createElement('img');image.className='approved-weather-photo approved-weather-photo-incoming';image.width=1200;image.height=675;image.decoding='async';image.hidden=true;image.alt='';
+  let resolve,cancelLoad;
+  const promise=new Promise(done=>{resolve=done;}),cancelled=new Promise(done=>{cancelLoad=done;});
+  const work={file:state.file,state,image,token:generation,promise,resolve,cancelLoad,done:false,raf:null};pending=work;host.insertBefore(image,message);
+  const latest=()=>!disposed&&!work.done&&pending===work&&work.token===generation;
+  if(current)work.statusTimer=setTimeout(()=>{if(latest()){message.classList.add('is-updating');message.textContent='Updating scene…';message.hidden=false;}},150);
+  function complete(){
+   if(!latest())return;
+   const old=current;image.classList.remove('approved-weather-photo-incoming','is-revealing');image.classList.add('approved-weather-photo-current');
+   current={file:work.file,image,state:work.state};if(old)old.image.remove();markComplete(work.state);settle(work,true);
   }
+  void(async()=>{
+   try{
+    await Promise.race([Promise.all([load(state.file),load(state.background)]),cancelled]);
+    if(!latest())return;
+    image.src=path(state.file);image.alt=photoAlt(work.state);
+    // Decode the actual display element. A ready preloader alone does not
+    // guarantee that this element has a paintable image, especially on mobile.
+    await Promise.race([image.decode(),cancelled,new Promise((_,reject)=>{work.decodeTimer=setTimeout(()=>reject(new Error('Weather photo decode timed out')),15000);})]);
+    clearTimeout(work.decodeTimer);if(!latest())return;
+    clearTimeout(work.statusTimer);image.hidden=false;message.hidden=true;message.classList.remove('is-updating');
+    if(!current||globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches){complete();return;}
+    // Only the incoming photo fades. The old image stays fully opaque beneath
+    // it so there is no dark flash, zoom, blur or simulated body movement.
+    host.dataset.transitioning='true';
+    work.onTransition=event=>{if(event.target===image&&event.propertyName==='opacity')complete();};image.addEventListener('transitionend',work.onTransition);
+    image.getBoundingClientRect();
+    // The timeout starts before requestAnimationFrame, which can be suspended
+    // in background tabs. Cancellation also settles the request immediately.
+    work.transitionTimer=setTimeout(complete,PHOTO_TRANSITION_MS+80);
+    work.raf=requestAnimationFrame(()=>{
+     if(!latest())return;
+     image.classList.add('is-revealing');
+    });
+   }catch{
+    if(!latest())return;
+    image.remove();hideScene('The picture for this hour could not load. Choose another hour or reopen the player to retry.');settle(work,false);
+   }
+  })();
+  return promise;
  }
  await update(initialFrame);
- return {setFrame(frame){return update(frame);},setCharacter(){/* One approved person only; old saved selections are deliberately ignored. */},setPlaying(value){host.dataset.playing=String(!!value);},resize(){},preload(frames=[]){for(const frame of frames.slice(0,2)){const state=approvedState(frame);if(state.available){void load(state.file).catch(()=>{});void load(state.background).catch(()=>{});}}},dispose(){disposed=true;++generation;clearBackground();host.replaceChildren();host.dataset.loaded='false';},get currentFrame(){return lastFrame;}};
+ return {
+  setFrame(frame){return update(frame);},
+  setCharacter(){/* One approved person only; old saved selections are deliberately ignored. */},
+  setPlaying(value){host.dataset.playing=String(!!value);},resize(){},
+  preload(frames=[]){
+   if(disposed)return;
+   const distinct=new Set([current?.file,pending?.file]);let queued=0;
+   // Several consecutive hours often use the same photo. Look ahead to the
+   // next distinct scenes instead of repeatedly preloading the same two hours.
+   for(const frame of frames){
+    const state=approvedState(frame);if(!state.available||distinct.has(state.file))continue;
+    distinct.add(state.file);void load(state.file).catch(()=>{});void load(state.background).catch(()=>{});if(++queued>=2)break;
+   }
+  },
+  dispose(){disposed=true;++generation;cancelPending();clearBackground();current=null;host.replaceChildren();clearMetadata();host.dataset.loading='false';host.dataset.transitioning='false';host.setAttribute('aria-busy','false');},
+  get currentFrame(){return lastFrame;}
+ };
 }
