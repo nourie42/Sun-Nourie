@@ -10,6 +10,7 @@ import {finite,thermalHumidity,wetBulb,solarElevation} from './weather-math.js?v
 import {hideLowRainChance} from './rain-display.js?v=low-rain-display-v1';
 import {classifyHour,PERFECT_TEMP_IDEAL_F,PERFECT_TEMP_BAND_F,RULE_B_TEMP_F,CALM_WIND_MAX_MPH,BREEZY_WIND_F,DEWPOINT_MAX_EXCLUSIVE_F} from './whats-up-classify.js?v=current-rain-20261017-v3';
 import {thermalRisk} from './thermal-risk.js?v=weather-art-labels-v10';
+import {referenceScene,clothingForFeels,comfortSceneState} from './exposure-scene.js?v=current-rain-20261017-v3';
 import {calendarDayWindow} from './calendar-day.js?v=calendar-days-v1';
 import {dailyForecastReadings} from './seven-day.js?v=low-rain-display-v1';
 
@@ -518,4 +519,35 @@ export function relativeHour(time,now,zone='America/New_York'){
  if(days===1&&b.hour<6)return `overnight, around ${hour}`;
  if(days===1)return `tomorrow around ${hour}`;
  return `${longDayLabel(time,zone)} around ${hour}`;
+}
+
+/* ---------- Dressed for the hour ---------- */
+/** The main page's three illustrated people, in its order: shade, outdoors and a dog walk. Each is one
+ * panel of the same artwork, and the clothes are drawn into it for the feels-like value and the sky of
+ * the hour shown, so they change as the time-lapse plays. */
+export const DRESSED_PEOPLE=[
+ {panel:0,label:'In the shade',feel:step=>step.shade??step.temperature},
+ {panel:1,label:'Outdoors',feel:step=>step.feels??step.temperature},
+ {panel:2,label:'Walking the dog',feel:step=>step.feels??step.temperature},
+];
+const WEAR_CLOTHES={hot:'Light, hot-weather clothing',warm:'Light warm-weather clothing',mild:'A top and long pants',cool:'A light jacket and long pants',cold:'A heavy coat, scarf, hat and boots'};
+/** What the illustrated person wears, in the words the picture shows. */
+export function wearText(sceneKey,outfit){
+ const clothes=WEAR_CLOTHES[outfit]||'Everyday clothing';
+ if(sceneKey==='snow')return 'A heavy coat, hat, scarf and mittens';
+ if(sceneKey==='rain')return 'Rain gear and an umbrella';
+ if(sceneKey==='carry-umbrella')return `${clothes}, with an umbrella ready`;
+ return clothes;
+}
+/** The three people for one forecast hour. The sample supplies the radar and rain-chance flags the main
+ * page uses, so each picture matches the one the main page draws for the same hour. */
+export function dressedPeople(step,sample={}){
+ if(!step)return [];
+ const context={pop:finite(sample?.pop)?sample.pop:step.rain,rainExpected:sample?.rainExpected===true,rainAround:sample?.rainAround===true,radarThreat:sample?.radarThreat===true,snowExpected:false};
+ const daylight=step.isDay!==false;
+ return DRESSED_PEOPLE.map(person=>{
+  const feel=person.feel(step),scene=comfortSceneState(daylight,step.condition,feel,context);
+  const outfit=clothingForFeels(feel,{...context,snowExpected:scene.key==='snow'});
+  return {label:person.label,feel,daylight,scene:scene.key,outfit,text:wearText(scene.key,outfit),art:referenceScene(person.panel,daylight,step.condition,feel,context)};
+ });
 }

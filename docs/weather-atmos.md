@@ -60,10 +60,11 @@ along the bottom edge are the photographed trees, green in every season.
   photograph fades in as the sun goes below the horizon.
 - **Navy veil.** A translucent navy layer over the photographs keeps the sky in
   the page's dark glass tone, deepening with night, cloud, rain and storm.
-- **Sun and moon** are placed from solar and lunar position at the selected
-  point and time. Sun altitude uses the same formula as `weather-math.js`
-  `solarElevation`. The moon's phase and illuminated fraction are calculated and
-  drawn with the lit limb on the correct side.
+- **Sun and moon** are not painted over the photographs, which already carry the
+  light, so there is no second sun and no moon crossing the sky. The line beside
+  the picture gives the sun's height and direction, or the moon's phase, lit
+  fraction and position, from the same solar and lunar formulas. Sun altitude uses
+  the same formula as `weather-math.js` `solarElevation`.
 - **Rain, snow, fog and thunder** are drawn only from the displayed condition.
   Lightning appears only for thunder or storm wording, never for a plain rain
   forecast. Chance or "nearby" wording draws lighter, scattered rain. Fog lies on
@@ -74,6 +75,15 @@ along the bottom edge are the photographed trees, green in every season.
 
 With `prefers-reduced-motion`, the sky renders still frames, with no drift,
 falling rain or lightning.
+
+## What to wear
+
+Under the sky sit the main page's illustrated people: one in the shade, one
+outdoors and one walking a dog. Each is one panel of the same comfort artwork the
+main page uses. The clothes come from the hour's feels-like temperature and the
+sky, chosen the same way the main page chooses them (`exposure-scene.js`, through
+`dressedPeople` in `atmos-model.js`). They follow the selected hour, so the
+clothes change as the time-lapse plays.
 
 ## Make your own forecast
 
@@ -137,9 +147,9 @@ be verified.
   heat grid, charts, lab, day rows, street blocks, place dialog).
 - `atmos.js` — the page: loading, the clock, the sections and the lab.
 - `atmos-model.js` — pure builders for the timeline, the scene, the blend, the
-  comfort grid and the lab.
-- `atmos-sky.js` — the sky renderer (photographs, veil, sun, moon, weather) and
-  the astronomy.
+  comfort grid, the lab and the illustrated people.
+- `atmos-sky.js` — the sky renderer (photographs, veil, haze, weather) and the
+  solar and lunar astronomy behind the words beside the sky.
 - Shared with the main page: `style.css`, `forecast-layout.css`,
   `weather-polish.css`, `page-unify.css`, `header-sky.css`, `header-sky.js`, and
   the `today-sky-*.webp` photographs.

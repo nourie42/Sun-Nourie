@@ -3,10 +3,11 @@
  * the trees along its bottom edge look the same on both pages. The forecast
  * decides which photograph shows and how it is lit: sky cover blends clear and
  * cloudy skies, a rain or storm photograph takes over when the displayed
- * condition says so, and night swaps in the night sky. Sun and moon come from
- * solar and lunar geometry at the selected point and time, humid air adds haze
- * along the horizon, and the wind drifts the picture sideways. Rain, snow, fog
- * and lightning are drawn only when the displayed condition calls for them. */
+ * condition says so, and night swaps in the night sky. The photographs already
+ * carry the light, so no sun or moon disc is painted over them: their height and
+ * direction are written beside the sky. Humid air adds haze along the horizon,
+ * and the wind drifts the picture sideways. Rain, snow, fog and lightning are
+ * drawn only when the displayed condition calls for them. */
 
 const RAD=Math.PI/180,DAY=86400000,J1970=2440588,J2000=2451545,OBLIQUITY=RAD*23.4397;
 const clamp=(v,a=0,b=1)=>Math.min(b,Math.max(a,v));
@@ -159,43 +160,6 @@ export function createSky(canvas,{reducedMotion=false}={}){
   g.addColorStop(0,css([255,150,92],0));g.addColorStop(1,css([255,138,88],.3*w));
   ctx.fillStyle=g;ctx.fillRect(0,height*.45,width,height*.55);
  }
- // The sun is drawn where the geometry puts it: east is left, west is right, and
- // altitude sets the height. It fades under cloud, rain and storm.
- function drawSun(p){
-  const visible=clamp(smooth(-2,4,p.alt)*(1-p.cloudy*.7)*(1-p.rain)*(1-p.storm));
-  if(visible<.02)return;
-  const x=clamp((p.sun.azimuth-75)/210)*width,y=height*(.66-clamp(p.alt/72,-.1,.9)*.52);
-  const warm=1-smooth(4,22,p.alt),core=mix([255,246,222],[255,186,122],warm),halo=mix([255,236,190],[255,150,88],warm);
-  const reach=Math.max(140,height*1.1);
-  const g=ctx.createRadialGradient(x,y,0,x,y,reach);
-  g.addColorStop(0,css(halo,.42*visible));g.addColorStop(.14,css(halo,.16*visible));g.addColorStop(.5,css(halo,.04*visible));g.addColorStop(1,css(halo,0));
-  ctx.fillStyle=g;ctx.fillRect(x-reach,y-reach,reach*2,reach*2);
-  const d=Math.max(7,height*.03),disc=ctx.createRadialGradient(x,y,0,x,y,d*2.4);
-  disc.addColorStop(0,css(core,.95*visible));disc.addColorStop(.42,css(core,.62*visible));disc.addColorStop(1,css(core,0));
-  ctx.fillStyle=disc;ctx.fillRect(x-d*2.4,y-d*2.4,d*4.8,d*4.8);
- }
- // The moon's phase is drawn from its illuminated fraction, and it shows only
- // after dark and through a gap in the cloud.
- function drawMoon(p){
-  const moon=moonPosition(state.time,location.latitude,location.longitude);
-  if(moon.altitude<-1)return;
-  const {fraction,phase}=moonIllumination(state.time),s=state.scene;
-  const x=clamp((moon.azimuth-75)/210)*width,y=height*(.66-clamp(moon.altitude/72,-.1,.9)*.52);
-  const visibility=clamp(p.night*(1-Math.pow(p.cloudy,2)*.85)*(1-s.fog*.6)*(1-p.rain)*(1-p.storm));
-  if(visibility<.03)return;
-  const r=Math.max(6,height*.03);
-  const glow=ctx.createRadialGradient(x,y,r*.8,x,y,r*7);
-  glow.addColorStop(0,css([200,214,240],.22*fraction*visibility));glow.addColorStop(1,css([200,214,240],0));
-  ctx.fillStyle=glow;ctx.fillRect(x-r*7,y-r*7,r*14,r*14);
-  ctx.save();ctx.globalAlpha=visibility;
-  ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fillStyle='rgba(34,44,70,.7)';ctx.fill();
-  const waxing=phase<.5,k=Math.cos(2*Math.PI*phase),rx=r*Math.abs(k);
-  ctx.beginPath();
-  if(waxing){ctx.arc(x,y,r,-Math.PI/2,Math.PI/2,false);if(k>0)ctx.ellipse(x,y,rx,r,0,Math.PI/2,-Math.PI/2,true);else ctx.ellipse(x,y,rx,r,0,Math.PI/2,Math.PI*1.5,false);}
-  else{ctx.arc(x,y,r,-Math.PI/2,Math.PI/2,true);if(k>0)ctx.ellipse(x,y,rx,r,0,Math.PI/2,Math.PI*1.5,false);else ctx.ellipse(x,y,rx,r,0,Math.PI/2,-Math.PI/2,true);}
-  ctx.closePath();ctx.fillStyle=css([240,242,236]);ctx.fill();
-  ctx.restore();
- }
  // Humid air hazes the horizon, most at dawn and dusk.
  function drawHaze(p){
   const s=state.scene;if(s.haze<.02)return;
@@ -253,7 +217,7 @@ export function createSky(canvas,{reducedMotion=false}={}){
  function render(dt,time=performance.now()){
   if(!width||!height)return;
   const p=palette();
-  drawPhotos(p,dt);drawVeil(p);drawDusk(p);drawSun(p);drawMoon(p);drawHaze(p);drawLightning(p,time);drawFog(p);drawPrecipitation(p,dt);
+  drawPhotos(p,dt);drawVeil(p);drawDusk(p);drawHaze(p);drawLightning(p,time);drawFog(p);drawPrecipitation(p,dt);
  }
  function loop(time){
   if(!running)return;

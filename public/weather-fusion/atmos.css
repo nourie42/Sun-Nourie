@@ -77,6 +77,26 @@ main section.glass.sky-panel{padding:0 0 18px!important}
 .take{max-width:62ch;margin-top:12px;padding:10px 14px;border-radius:14px;background:var(--card-2);border:1px solid var(--line);font-size:15px;line-height:1.45;color:var(--ink-2)}
 .take b{display:block;margin-bottom:2px;font-size:12.5px;font-weight:650;color:var(--ink-3)}
 .take q{quotes:none;color:var(--ink)}
+/* What to wear this hour: the main page's illustrated people, one panel of the same artwork each. */
+.dressed{margin-top:14px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.dressed[hidden]{display:none}
+.dressed-note{grid-column:1/-1;margin:0;font-size:13.5px;line-height:1.4;color:var(--ink-2)}
+.wear{margin:0;min-width:0;display:grid;grid-template-columns:minmax(0,112px) minmax(0,1fr);align-items:center;gap:12px;padding:8px;border-radius:16px;background:var(--card-2);border:1px solid var(--line);overflow:hidden}
+.wear svg{display:block;width:100%;height:auto;border-radius:11px;background:#258eeb}
+.wear[data-daylight="false"] svg{background:#102d57}
+.wear figcaption{display:grid;gap:2px;min-width:0}
+.wear-label{font-size:12.5px;font-weight:650;color:var(--ink-3)}
+.wear strong{font-size:28px;line-height:1.05;font-weight:650;color:var(--ink)}
+.wear small{font-size:13px;line-height:1.35;color:var(--ink-2)}
+@media (max-width:720px){
+ .dressed{gap:8px}
+ .wear{grid-template-columns:minmax(0,1fr);justify-items:center;align-items:start;align-content:start;gap:6px;padding:8px 6px 10px;text-align:center}
+ .wear svg{max-width:150px}
+ .wear figcaption{justify-items:center}
+ .wear strong{font-size:23px}
+ .wear small,.wear-label{font-size:11.5px}
+ .wear-label{line-height:1.3;min-height:2.6em}
+}
 .status{margin:12px 0 0;font-size:13.5px;color:var(--ink-2)}
 .status:empty{display:none}
 

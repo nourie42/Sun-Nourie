@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync,existsSync} from 'node:fs';
 import {fixture} from '../scripts/weatherNourieFixture.js';
 import {buildTimeline,skyScene,mixScene,cloudCover,consensus,rainBreakdown,comfortBin,comfortGrid,perfectWindows,sourceSpread,seriesIndex,dailyOutlook,sunDay,placeFromQuery,PRESETS,H,
-  TRUST_STOPS,LAB_PRESETS,normalTrust,isNourieTrust,matchingPreset,mixValue,rainScoreMix,recipeShares,sourceCoverage,customForecast,labDifferences,rainOutlook,relativeHour} from '../public/weather-fusion/atmos-model.js';
+  TRUST_STOPS,LAB_PRESETS,normalTrust,isNourieTrust,matchingPreset,mixValue,rainScoreMix,recipeShares,sourceCoverage,customForecast,labDifferences,rainOutlook,relativeHour,dressedPeople,wearText} from '../public/weather-fusion/atmos-model.js';
 import {sunPosition,moonIllumination,moonPhaseName} from '../public/weather-fusion/atmos-sky.js';
 import {hourlyDisplaySamples} from '../public/weather-fusion/weather-display.js';
 import {forecastValue,displayedFeelsAt} from '../public/weather-fusion/hourly-feels.js';
@@ -168,6 +168,31 @@ test('sun and moon positions follow the shared solar formula',()=>{
   assert.equal(day.sunrise,Date.parse(forecast.solar.sunrise),'the published sunrise wins');
   assert.equal(day.sunset,Date.parse(forecast.solar.sunset));
   assert.ok(day.sunrise<day.noon&&day.noon<day.goldenEveningStart&&day.goldenEveningStart<day.sunset);
+});
+
+test('the sky paints no sun or moon disc over the photographs; their height and direction are written beside it',()=>{
+  const sky=read('atmos-sky.js'),page=read('atmos.js');
+  assert.doesNotMatch(sky,/drawSun|drawMoon/,'the photographs already carry the light, so no painted disc moves across them');
+  assert.match(page,/renderSkyNote|sky-note/,'the sun and moon positions are written beside the sky');
+});
+
+test('the illustrated people are the main page’s artwork, dressed for the hour shown and placed under the sky',()=>{
+  const day={isDay:true,isNow:false,time:Date.parse('2026-01-15T17:00:00Z'),condition:'Clear',temperature:33,shade:28,feels:30,rain:0};
+  const cold=dressedPeople(day);
+  assert.deepEqual(cold.map(p=>p.label),['In the shade','Outdoors','Walking the dog']);
+  assert.equal(cold[1].outfit,'cold');
+  assert.equal(cold[1].text,'A heavy coat, scarf, hat and boots');
+  assert.match(cold[0].art,/comfort-integrated-cold-normal\.webp/,'the cold-weather artwork for a clear hour');
+  assert.match(cold[2].art,/viewBox="0 0 300 300"/,'each person is one 300-unit panel of the artwork');
+  const wet=dressedPeople({...day,condition:'Rain',temperature:70,shade:68,feels:70,rain:85},{pop:85,rainExpected:false});
+  assert.equal(wet[1].scene,'rain');assert.equal(wet[1].text,'Rain gear and an umbrella');
+  assert.match(wet[1].art,/comfort-integrated-cool-rain\.webp/,'a mild day in rain uses the rain-gear artwork');
+  assert.match(dressedPeople({...day,isDay:false,temperature:80,shade:78,feels:80})[1].art,/comfort-night-warm-dry-chance\.webp/,'after dark the night artwork is used');
+  assert.equal(wearText('carry-umbrella','mild'),'A top and long pants, with an umbrella ready');
+  assert.deepEqual(dressedPeople(null),[]);
+  const html=read('atmos.html'),page=read('atmos.js');
+  assert.match(html,/<div class="dressed" id="dressed" role="group"/,'the figures sit in their own group under the sky');
+  assert.match(page,/section\('dressed',\(\)=>renderDressed\(step\(\)\)\)/,'they follow the selected hour, so they change as the time-lapse plays');
 });
 
 test('places come from presets or validated U.S. coordinates only',()=>{

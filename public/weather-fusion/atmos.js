@@ -8,8 +8,8 @@
 import {buildTimeline,skyScene,mixScene,consensus,agreementLabel,presentSources,rainBreakdown,comfortGrid,perfectWindows,dailyOutlook,
  sunDay,COMFORT_BINS,comfortBin,SOURCES,SOURCE_ORDER,SOURCE_ABOUT,sourceLabel,countWord,compass,hourLabel,clockLabel,longDayLabel,weekdayLabel,localParts,
  PRESETS,validPlace,placeFromQuery,PERFECT_RULES,H,TRUST_STOPS,TRUST_LABELS,NORMAL_STOP,LAB_PRESETS,normalTrust,isNourieTrust,matchingPreset,
- recipeShares,sourceCoverage,customForecast,labDifferences,rainOutlook,relativeHour} from './atmos-model.js?v=atmos-v2';
-import {createSky,moonIllumination,moonPhaseName,moonPosition,sunPosition,directionWord} from './atmos-sky.js?v=atmos-v2';
+ recipeShares,sourceCoverage,customForecast,labDifferences,rainOutlook,relativeHour,dressedPeople} from './atmos-model.js?v=atmos-v3';
+import {createSky,moonIllumination,moonPhaseName,moonPosition,sunPosition,directionWord} from './atmos-sky.js?v=atmos-v3';
 import {fetchJsonWithDeadline} from './request-deadline.js?v=loading-recovery-v1';
 import {withLiveAlerts,retainUnverifiedAlerts,alertLocationKey,alertHealth,ALERT_REFRESH_MS} from './live-alerts.js?v=county-warnings-v3';
 import {pavementEstimate,petSurfaceSubtitle} from './pavement.js?v=current-rain-20261017-v3';
@@ -68,6 +68,22 @@ function renderSkyNote(time){
  if(sun.altitude>-0.833){note.textContent=`Sun ${Math.max(0,Math.round(sun.altitude))}° above the horizon`;return;}
  const moon=moonPosition(time,latitude,longitude),light=moonIllumination(time);
  note.textContent=`${moonPhaseName(light.phase)}, ${Math.round(light.fraction*100)}% lit, ${moon.altitude<0?'below the horizon':`${Math.round(moon.altitude)}° up in the ${directionWord(moon.azimuth)}`}`;
+}
+
+/* ---------- Dressed for the hour ---------- */
+// The illustrated people sit under the sky, as on the main page. Only the figures whose picture
+// changed are replaced, so the artwork does not flicker while the time-lapse runs.
+let dressedParts=[];
+function renderDressed(s){
+ const el=$('dressed');if(!el||!s||!forecast)return;
+ const sample=s.isNow?currentSample(forecast,Date.now()):forecastSample(forecast,new Date(s.time).toISOString());
+ const parts=dressedPeople(s,sample).map(person=>`<figure class="wear" data-scene="${esc(person.scene)}" data-outfit="${esc(person.outfit)}" data-daylight="${person.daylight}">${person.art}<figcaption><span class="wear-label">${esc(person.label)}</span><strong>${deg(person.feel)}</strong><small>${esc(person.text)}</small></figcaption></figure>`);
+ if(!parts.length)return;
+ el.hidden=false;
+ const figures=el.querySelectorAll('.wear');
+ if(figures.length!==parts.length)el.innerHTML=`<p class="dressed-note">What to wear at this hour. The clothes change as the time-lapse plays.</p>${parts.join('')}`;
+ else parts.forEach((html,i)=>{if(html!==dressedParts[i])figures[i].outerHTML=html;});
+ dressedParts=parts;
 }
 
 /* ---------- Loading ---------- */
@@ -204,6 +220,7 @@ function select(index,{instant=false,fromPlay=false}={}){
  highlightCharts();
  section('street-pavement',renderPavement);
  section('street-sun',renderSun);
+ section('dressed',()=>renderDressed(step()));
 }
 function hourText(s){
  if(!s)return '';
