@@ -1,0 +1,456 @@
+{
+  "version": "pwy-photo-v1",
+  "count": 90,
+  "images": [
+    {
+      "file": "pwy-clear-day-feels-32-59f.webp",
+      "bytes": 394742,
+      "sha256": "bdcd4f9ef98bc8aa8dff592918fe52b687e6f2a49533332c55f0cfa623aa78ae"
+    },
+    {
+      "file": "pwy-clear-day-feels-60-74f.webp",
+      "bytes": 402872,
+      "sha256": "b5ca6b08f0a8aaa52db35e3c508a205e9e53d0a2c6a2b3e65980dcc959fde6c7"
+    },
+    {
+      "file": "pwy-clear-day-feels-75f-plus.webp",
+      "bytes": 426618,
+      "sha256": "e915b820171ca8ce5bc362a30cdf05f5fa5b1abb363fd1041c9129111b63afe7"
+    },
+    {
+      "file": "pwy-clear-day-feels-below-32f.webp",
+      "bytes": 418612,
+      "sha256": "c53f4f4f0d2ae9563092b4888e43491ed67c797248cb560f2c0fee024b6e7732"
+    },
+    {
+      "file": "pwy-clear-night-feels-32-59f.webp",
+      "bytes": 307982,
+      "sha256": "c7172896edc0118d64daf4a54fb99dc6d3b14b927bc0351ee861b584ccff2ba6"
+    },
+    {
+      "file": "pwy-clear-night-feels-60-74f.webp",
+      "bytes": 317254,
+      "sha256": "1dfe11fc54f468e8b7fcd429750310b24ac615b505549193975007ed35fc5466"
+    },
+    {
+      "file": "pwy-clear-night-feels-75f-plus.webp",
+      "bytes": 319964,
+      "sha256": "6a2730523e54efd94df614eec6b940a067d52394128c1206094b9fcf991fbe67"
+    },
+    {
+      "file": "pwy-clear-night-feels-below-32f.webp",
+      "bytes": 317298,
+      "sha256": "f58ca51a73970ee1b73fe5a658805a58ec44bc74b7eb03b2f441f803bf1bbbfd"
+    },
+    {
+      "file": "pwy-cloudy-day-feels-32-59f.webp",
+      "bytes": 372642,
+      "sha256": "b54410b6b66082e14282dc50fb34296d5843f2cb19ab7f6765dfc9b7a0ada8d2"
+    },
+    {
+      "file": "pwy-cloudy-day-feels-60-74f.webp",
+      "bytes": 368398,
+      "sha256": "a3005b6d1f37437b86ee69045a8d66c286af34aff04426d025edb12031b8e881"
+    },
+    {
+      "file": "pwy-cloudy-day-feels-75f-plus.webp",
+      "bytes": 384582,
+      "sha256": "5e7d188796025c51ab6c1cf12817671d09a824f18383e843e2e2d9cba88d7dc4"
+    },
+    {
+      "file": "pwy-cloudy-day-feels-below-32f.webp",
+      "bytes": 395230,
+      "sha256": "a92e44bd5ebd0fe154b214db804c87e948f170c403bc0d1382f03134f9485582"
+    },
+    {
+      "file": "pwy-cloudy-night-feels-32-59f.webp",
+      "bytes": 229956,
+      "sha256": "bae4210d133ca499c8966d53da363209164a744d80c4346d91efe1900ff649e4"
+    },
+    {
+      "file": "pwy-cloudy-night-feels-60-74f.webp",
+      "bytes": 217606,
+      "sha256": "f1e4a2663114104dc177c7f70823764c7e5e4b3bfcb547301697e5d609c6bd84"
+    },
+    {
+      "file": "pwy-cloudy-night-feels-75f-plus.webp",
+      "bytes": 223170,
+      "sha256": "4ab630b5d14edce174cf3a94e04ccd4ef7dc6c2fb9d44da7ac365fa38e991a22"
+    },
+    {
+      "file": "pwy-cloudy-night-feels-below-32f.webp",
+      "bytes": 254562,
+      "sha256": "066a5cc5c3df352315a1511e6b360afb11dbc565b34c7559f898b8d04d41d2fa"
+    },
+    {
+      "file": "pwy-dawn-feels-32-59f.webp",
+      "bytes": 393380,
+      "sha256": "0f67934243f363310795a043f6e949644218cd1c9b5fc9e35520142facb91598"
+    },
+    {
+      "file": "pwy-dawn-feels-60f-plus.webp",
+      "bytes": 397554,
+      "sha256": "a9a29e0b35ef0d42c5a990f9908b66c1bb8d8ca8afe83a7fe71b20d6bd1a6f19"
+    },
+    {
+      "file": "pwy-dawn-feels-below-32f.webp",
+      "bytes": 412926,
+      "sha256": "93ec08dec99b81ed75c4eec588ea08779b2ebdfa664a939ad6a9882944ee571f"
+    },
+    {
+      "file": "pwy-drizzle-day-feels-60f-plus.webp",
+      "bytes": 429166,
+      "sha256": "04ee85fd4e45fd83168c0f6e10e5dd72c65cc4d78dc059272537947608b3b599"
+    },
+    {
+      "file": "pwy-drizzle-day-feels-below-60f.webp",
+      "bytes": 426858,
+      "sha256": "3cc60dfa664ed839ab94ede69416bd7e1e174fdc4acc869250ed9fbfae9a9398"
+    },
+    {
+      "file": "pwy-drizzle-night-feels-60f-plus.webp",
+      "bytes": 373032,
+      "sha256": "24abbc61948817aaaff0dda1fdd366e0556a3da4a8809cf38b641d36ca972739"
+    },
+    {
+      "file": "pwy-drizzle-night-feels-below-60f.webp",
+      "bytes": 388238,
+      "sha256": "6ad81b52d106a0df966e7b8d175f5b5410430755876b2b79a54e302ed743d1f9"
+    },
+    {
+      "file": "pwy-dusk-feels-32-59f.webp",
+      "bytes": 318294,
+      "sha256": "0a94ae1cb071a16ebd4dce2d8ddf60f2e13da81e234b4c28078e733bae201cba"
+    },
+    {
+      "file": "pwy-dusk-feels-60f-plus.webp",
+      "bytes": 317526,
+      "sha256": "6958067cf641b1de6fe6c2d96462198302a1b2be7d64f94b6dd40173d37ebd98"
+    },
+    {
+      "file": "pwy-dusk-feels-below-32f.webp",
+      "bytes": 325668,
+      "sha256": "b022d5144377fb8e96b76c5861e4f026d8d9e87bf9c2cf32aa7ec344e28bb366"
+    },
+    {
+      "file": "pwy-dust-day-feels-32-59f.webp",
+      "bytes": 343442,
+      "sha256": "993fe7114b98ec1830af62a467964213c33cb04996c4232ce500e8079efe69f7"
+    },
+    {
+      "file": "pwy-dust-day-feels-60f-plus.webp",
+      "bytes": 339520,
+      "sha256": "f24f40618ae6df2c8938311aea1dcd1d1bf994befb1f813e5db2f744281ddd72"
+    },
+    {
+      "file": "pwy-dust-day-feels-below-32f.webp",
+      "bytes": 361686,
+      "sha256": "602e2b18af8e7ba1c53c5c401b623a056b69ac492f4ab3e7aed886527db1436b"
+    },
+    {
+      "file": "pwy-dust-night-feels-32-59f.webp",
+      "bytes": 230704,
+      "sha256": "1b15c8e7350f0fb652591e36e9c876dffd38e430ac2e96ddd5045f5d7ddaae9d"
+    },
+    {
+      "file": "pwy-dust-night-feels-60f-plus.webp",
+      "bytes": 227468,
+      "sha256": "d29ec89b09d3e2f3e22bb1c2108dc09576c81e609ff927936c5f91916b6b5e04"
+    },
+    {
+      "file": "pwy-dust-night-feels-below-32f.webp",
+      "bytes": 245880,
+      "sha256": "777aa08aee1bf415e27032d29214a3d46150ea22467186e020d16f7a96e1bab3"
+    },
+    {
+      "file": "pwy-fog-day-feels-32-59f.webp",
+      "bytes": 317180,
+      "sha256": "ec0c745c0b0e1112d5ed9d99140deee8cd3ac889115e97325115f15d5516d902"
+    },
+    {
+      "file": "pwy-fog-day-feels-60f-plus.webp",
+      "bytes": 326136,
+      "sha256": "1ff5bfee7dcdc17b951e0f8489ee2ad4e464eda096d73be08f5d2dbc23a2304e"
+    },
+    {
+      "file": "pwy-fog-day-feels-below-32f.webp",
+      "bytes": 318336,
+      "sha256": "f6f1bfacaac9ca32f01df33e59e52d1327c9e1b4d3aa239c4d77c47c3aec3cba"
+    },
+    {
+      "file": "pwy-fog-night-feels-32-59f.webp",
+      "bytes": 265294,
+      "sha256": "20625a9692aecb087941cb6213df946f9e9028ef28fbf6053d43c265e763f32e"
+    },
+    {
+      "file": "pwy-fog-night-feels-60f-plus.webp",
+      "bytes": 265886,
+      "sha256": "0e375baed642b919029d4c22b0836b8dc428e5d3319a9662252c193f0a0df340"
+    },
+    {
+      "file": "pwy-fog-night-feels-below-32f.webp",
+      "bytes": 266414,
+      "sha256": "4900a449040c4b214808c985e9fb7a29a9f895fe52ba71784332b4590305942d"
+    },
+    {
+      "file": "pwy-freezing-rain-day-feels-32-49f.webp",
+      "bytes": 484316,
+      "sha256": "e3a257a9541725bbdf55036254db3cc6e76e780c581cb6c502c95d122ed57533"
+    },
+    {
+      "file": "pwy-freezing-rain-day-feels-below-32f.webp",
+      "bytes": 493128,
+      "sha256": "3af1109a783a15afa3d93cba971fac05fa73e5a428d2340161bd7953013d89e6"
+    },
+    {
+      "file": "pwy-freezing-rain-night-feels-32-49f.webp",
+      "bytes": 487444,
+      "sha256": "8aee6b39cb5afd57bea8a252b2bd974a53c0577cb7d84b158f42f987cac4f6d3"
+    },
+    {
+      "file": "pwy-freezing-rain-night-feels-below-32f.webp",
+      "bytes": 483626,
+      "sha256": "4fc93803ab620e1d1b7714c143831c2899d53763d3370c3aaf5f935fbf1e48eb"
+    },
+    {
+      "file": "pwy-hail-day-feels-60f-plus.webp",
+      "bytes": 521020,
+      "sha256": "165cde6ae0f42464f5cea3decbb92dd5d0377719b1c3604b2c306284a5f81bfc"
+    },
+    {
+      "file": "pwy-hail-day-feels-below-60f.webp",
+      "bytes": 503650,
+      "sha256": "5d560a85db66a570c88e8e02efc605f15f7df4f66f130fb001161144cfe5a989"
+    },
+    {
+      "file": "pwy-hail-night-feels-60f-plus.webp",
+      "bytes": 447138,
+      "sha256": "419a20d553d66eeb3a5101c01e68a9b66a7d9566b5ad72c2735df678554701c4"
+    },
+    {
+      "file": "pwy-hail-night-feels-below-60f.webp",
+      "bytes": 436296,
+      "sha256": "13c2a3dd177b677e18c161594492ca495eb301961e16e0b05489d6b28f5fc3a4"
+    },
+    {
+      "file": "pwy-haze-day-feels-32-59f.webp",
+      "bytes": 347944,
+      "sha256": "97297b9429e3f02c11f4cbfcc66d608755d50280f2fc06be4a31c99b73e16129"
+    },
+    {
+      "file": "pwy-haze-day-feels-60f-plus.webp",
+      "bytes": 344368,
+      "sha256": "281342ae77ab9ce41307c8aa791069db8936e85641de113fd4ac3bba536e2836"
+    },
+    {
+      "file": "pwy-haze-day-feels-below-32f.webp",
+      "bytes": 352352,
+      "sha256": "de71565b8d1a929bd7c383fc0b72304ca33c50b95e3ee1c4e3a70b476fb89875"
+    },
+    {
+      "file": "pwy-haze-night-feels-32-59f.webp",
+      "bytes": 243214,
+      "sha256": "3c297e82ee4a63a43a692d1e443e7a476e9e0a8b1569fb031621481afec9a24f"
+    },
+    {
+      "file": "pwy-haze-night-feels-60f-plus.webp",
+      "bytes": 236756,
+      "sha256": "2f1cf541767aef8902d816386d891135a283bb97e029c133daee3b45166fb4b5"
+    },
+    {
+      "file": "pwy-haze-night-feels-below-32f.webp",
+      "bytes": 246754,
+      "sha256": "bdb45129d3bbcf88d5063ab154314d02865a2a5fc354c9f93584e451a9feb6da"
+    },
+    {
+      "file": "pwy-heavy-rain-day-feels-60f-plus.webp",
+      "bytes": 493088,
+      "sha256": "19d545c2cdaccd54d48a4ba8f517eb547cc875262a34ce32d5fa66340e7a3056"
+    },
+    {
+      "file": "pwy-heavy-rain-day-feels-below-60f.webp",
+      "bytes": 480276,
+      "sha256": "f4fde5744c5a2749cbacb5c9bced9e3a71528a43305bfed996333b725c7e9815"
+    },
+    {
+      "file": "pwy-heavy-rain-night-feels-60f-plus.webp",
+      "bytes": 480712,
+      "sha256": "b6b93880bb8718b639db2fd356b16a6c11757eb6055c6aec7ad56f31a33f85da"
+    },
+    {
+      "file": "pwy-heavy-rain-night-feels-below-60f.webp",
+      "bytes": 478826,
+      "sha256": "96df0b9078132d58098e7fc433d0ba8996f25da3822d103f38086b825c876781"
+    },
+    {
+      "file": "pwy-heavy-snow-day-feels-32-49f.webp",
+      "bytes": 325812,
+      "sha256": "aff8a9e7095b4e75d9fa8d6944b43fe22c3d61f49a17510e2a48585466036043"
+    },
+    {
+      "file": "pwy-heavy-snow-day-feels-below-32f.webp",
+      "bytes": 338394,
+      "sha256": "841afc724440e8e100728159ac3204e8e7b65c51f6ae75991b7ddfb1fe441db9"
+    },
+    {
+      "file": "pwy-heavy-snow-night-feels-32-49f.webp",
+      "bytes": 335834,
+      "sha256": "533fe020bc908ad9475b9f8807bbe9c52261f5b4a216adaf284bf2db06091b6d"
+    },
+    {
+      "file": "pwy-heavy-snow-night-feels-below-32f.webp",
+      "bytes": 353180,
+      "sha256": "12bddf9ab9e77d27050b843ae093b240599b3c726511baf7ebd07d285d330606"
+    },
+    {
+      "file": "pwy-partly-cloudy-day-feels-32-59f.webp",
+      "bytes": 425742,
+      "sha256": "c9bd08dfbe5c09e4eb353a8ff44c83eb2854d348a8bdb35196e84ae6cf1d97cb"
+    },
+    {
+      "file": "pwy-partly-cloudy-day-feels-60-74f.webp",
+      "bytes": 435106,
+      "sha256": "45b6a635f490883c578d02b418724ebf1d2e549ef3eba8abdb4c2717798338e0"
+    },
+    {
+      "file": "pwy-partly-cloudy-day-feels-75f-plus.webp",
+      "bytes": 447338,
+      "sha256": "eaccf96c3345ffbde2613da1cd173b82d509aa3e4865b59fdd8f2605523428b9"
+    },
+    {
+      "file": "pwy-partly-cloudy-day-feels-below-32f.webp",
+      "bytes": 441260,
+      "sha256": "39d7f1565e62c7673c5c61f6ac75c2b15da58fe60a95f2b5b3ebc78b941dbcab"
+    },
+    {
+      "file": "pwy-partly-cloudy-night-feels-32-59f.webp",
+      "bytes": 329888,
+      "sha256": "f11231e39ad8d9a77fc63e20ea8f329bf7b314d9d27f84a08cb6cd0408e3bf4c"
+    },
+    {
+      "file": "pwy-partly-cloudy-night-feels-60-74f.webp",
+      "bytes": 323804,
+      "sha256": "bd6e1f769877b71eefcbc318d64b648681b80759d456b2d98358c9274da8a386"
+    },
+    {
+      "file": "pwy-partly-cloudy-night-feels-75f-plus.webp",
+      "bytes": 341724,
+      "sha256": "0b732e7907b086e03272c58e27fd24f6f00cea71d77e849ea356318298e7a786"
+    },
+    {
+      "file": "pwy-partly-cloudy-night-feels-below-32f.webp",
+      "bytes": 333898,
+      "sha256": "daf8edc414d95e3133e69814ad79e1012030ef640ab7959b04cd7bcd32574967"
+    },
+    {
+      "file": "pwy-rain-day-feels-60f-plus.webp",
+      "bytes": 446120,
+      "sha256": "2168ed61d230500c11285ac0e2b31c4afe09aa92cd8262f9e3fa46096a38899b"
+    },
+    {
+      "file": "pwy-rain-day-feels-below-60f.webp",
+      "bytes": 441512,
+      "sha256": "cfd22cb6781f6537878adb4c9712f2f6a1668a7f3030e1f4b8de6bb0240db662"
+    },
+    {
+      "file": "pwy-rain-night-feels-60f-plus.webp",
+      "bytes": 509396,
+      "sha256": "9a600ca95f8dfe6606a34483f3e259e2f6c8633d5f1846e2dd783a4a90d430e5"
+    },
+    {
+      "file": "pwy-rain-night-feels-below-60f.webp",
+      "bytes": 490724,
+      "sha256": "87fec6d0aa0146ee1fd8b3ac3ccdf21778b842736794e85d9ae07b1bd4d39d8c"
+    },
+    {
+      "file": "pwy-sleet-day-feels-32-49f.webp",
+      "bytes": 482988,
+      "sha256": "3dbfcbbae7ec738deabb7a2c1b7df414a96183dcd6172c6a1474e73a38a1a517"
+    },
+    {
+      "file": "pwy-sleet-day-feels-below-32f.webp",
+      "bytes": 499036,
+      "sha256": "ea69a1f803f4c30ac8eab70922bafae8326a47f8708b2e5e4b2c363b273fffdf"
+    },
+    {
+      "file": "pwy-sleet-night-feels-32-49f.webp",
+      "bytes": 484140,
+      "sha256": "599096e6206ea292d6f2917b4c4df24b5d1bd6167c188da732587bcdb93e386a"
+    },
+    {
+      "file": "pwy-sleet-night-feels-below-32f.webp",
+      "bytes": 470784,
+      "sha256": "433479c5437a15d4ab89460613cef2362ee5c2a0edd33d1ecd0a2deb3c5558ba"
+    },
+    {
+      "file": "pwy-snow-day-feels-32-49f.webp",
+      "bytes": 446466,
+      "sha256": "e4d6e6374b3e344895b6944522c7c6f115a4055849227c06d092df832aa70de5"
+    },
+    {
+      "file": "pwy-snow-day-feels-below-32f.webp",
+      "bytes": 457102,
+      "sha256": "f1c3d6999e9df68b080f975cef1ba29d206a8e52071ede89e1d56ed0b7deb48b"
+    },
+    {
+      "file": "pwy-snow-night-feels-32-49f.webp",
+      "bytes": 395796,
+      "sha256": "33dbc2add58c261bb6be3206f09f98959be1f4687c01526f1997eeb0d2b5ee4f"
+    },
+    {
+      "file": "pwy-snow-night-feels-below-32f.webp",
+      "bytes": 391620,
+      "sha256": "8d6be76909c60c446154f7ab71b668d0fc252ad5b0a4a322f1a32dbd0ab0500d"
+    },
+    {
+      "file": "pwy-storm-day-feels-60f-plus.webp",
+      "bytes": 485014,
+      "sha256": "5b41118b9ef562029d6ae3122ed3e77b41b0edaee3b8d221b91062dfb6c99594"
+    },
+    {
+      "file": "pwy-storm-day-feels-below-60f.webp",
+      "bytes": 493392,
+      "sha256": "9df517b93ecd0ab3cc92a70233c4ca493b3be1aabe932fe885d934fbd92aeb72"
+    },
+    {
+      "file": "pwy-storm-night-feels-60f-plus.webp",
+      "bytes": 442886,
+      "sha256": "d182180c6dc3cc5b0979e18e2a83f59932034a0e9a5c8e141bc05f55f97e1a94"
+    },
+    {
+      "file": "pwy-storm-night-feels-below-60f.webp",
+      "bytes": 456054,
+      "sha256": "7e81023f11c07aa807df4b53e987a48ced801fdfecd85d1cc2ca33688bc2798b"
+    },
+    {
+      "file": "pwy-wind-day-feels-32-59f.webp",
+      "bytes": 481666,
+      "sha256": "6b21a7584250e7ad900eed7f3fe8bbfa8df62f268f38d74a11416a5ac1f6932d"
+    },
+    {
+      "file": "pwy-wind-day-feels-60f-plus.webp",
+      "bytes": 495730,
+      "sha256": "fa95fa90d46aa52970299420c8926b0b2f52a30c79ac8e1724029858ece0c04a"
+    },
+    {
+      "file": "pwy-wind-day-feels-below-32f.webp",
+      "bytes": 491638,
+      "sha256": "c48c1cf6c1c6665cc301a254029eab817ec2e394e98c1a1647cbf22fe2c29e2a"
+    },
+    {
+      "file": "pwy-wind-night-feels-32-59f.webp",
+      "bytes": 380972,
+      "sha256": "320896badbb6d48a82978cf6ce104b7e0837037e1cfce7e3c9d9769dc1b856a9"
+    },
+    {
+      "file": "pwy-wind-night-feels-60f-plus.webp",
+      "bytes": 383570,
+      "sha256": "9ed22f318e0f43eaa2f9ca185ba8b426176a74bf62652e810f3da55971ed9d76"
+    },
+    {
+      "file": "pwy-wind-night-feels-below-32f.webp",
+      "bytes": 394930,
+      "sha256": "3b1c627b1d0627518ae7a3346eee532b8226d0c8d7e3324d5aa1c710e4fb3fea"
+    }
+  ]
+}
