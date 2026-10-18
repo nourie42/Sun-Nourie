@@ -35,6 +35,16 @@ Speeds 1,2,4,8,16,32 use 2000/speed milliseconds per forecast hour, with 4 as
 the default. The chosen speed persists locally. Physical scene motion continues
 at real-time pace independently of forecast sampling.
 
+Weather and outfit changes dissolve into the next photograph (approved-weather-
+world.js photoDissolveMs): 1200 ms at 1x to 560 ms at 32x, 900 ms at 4x, and
+420 ms when stepping while paused, eased at both ends. The player passes its speed
+to the scene with setSpeed(speed). Each hour lasts its forecast time from the
+moment it appears, with the dissolve inside it, and a changed photograph stays
+at least 700 ms after its dissolve midpoint (sky-player.js playbackAdvanceDelay).
+A photograph caught mid-dissolve by a newer hour is held, not removed. Reduced
+motion swaps photographs at once. Photo URLs use PHOTO_ASSET_VERSION, which
+changes only when the artwork does.
+
 Runtime files: sky-player.js/css, weather-world.js, photo-scene.js, vendor/
 three.module.js and the image files listed by PHOTO_SCENES. Three.js is bundled
 locally under its MIT license in vendor/THREE-LICENSE.txt. Scene artwork credits

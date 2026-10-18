@@ -48,9 +48,16 @@ direction. The foreground is photographic, not a fully relightable 3D model.
 The person uses medium-distance framing with visible surroundings. Proportions
 are preserved and the full foreground occupies the bottom 75% of the stage.
 Explicit atlas rectangles exclude grid seams. Paired day and night artwork is
-preloaded before playback; wardrobe changes use cached crops and short crossfades
-so clothing remains aligned with the selected-hour text. Storms use an empty
-scene with shelter instructions.
+preloaded before playback. A change of weather or clothes dissolves into the next
+photograph, eased at both ends: 0.9 seconds at the default 4× speed, 1.2 seconds at
+1× and 0.56 seconds at 32×, and 0.42 seconds when stepping while paused. The
+weather and outfit words fade in with it, so clothing remains aligned with the
+selected-hour text. The dissolve runs inside the hour's forecast time, and a
+changed photograph stays at least 0.7 seconds after it becomes the main picture.
+When a newer hour arrives part-way through a dissolve, the partly visible
+photograph is held where it is rather than removed, so dragging the timeline never
+flickers. Reduced motion swaps photographs at once. Storms use an empty scene with
+shelter instructions.
 
 Reduced motion disables ambient animation; offscreen and hidden scenes stop
 drawing. A single visible 2D canvas composites the sky, transparent foreground,

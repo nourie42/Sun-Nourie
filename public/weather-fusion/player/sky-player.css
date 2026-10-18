@@ -51,10 +51,12 @@
 @media(max-width:600px){.world-stage{aspect-ratio:4/5}.frame-hour{font-size:25px}.scene-status{font-size:9px;letter-spacing:.5px}.frame-day{font-size:11px}.scene-weather{column-gap:12px}.frame-condition{font-size:14px}.frame-feels{font-size:11px}.frame-temp{font-size:58px}.temperature-line{height:58px}}
 
 /* Keep the previous decoded photograph opaque while the next outfit dissolves
-   over it. Do not fade both layers or animate the person's shape or camera. */
+   over it. Do not fade both layers or animate the person's shape or camera.
+   approved-weather-world.js times the dissolve (longer during playback, eased at
+   both ends). A photograph caught mid-dissolve by a newer hour is "held" at the
+   opacity it reached until the newer one covers it, so nothing on screen jumps. */
 .approved-weather-photo-current{z-index:0;opacity:1}
-.approved-weather-photo-incoming{z-index:1;opacity:0;transition:opacity 320ms cubic-bezier(.22,.61,.36,1);will-change:opacity}
-.approved-weather-photo-incoming.is-revealing{opacity:1}
+.approved-weather-photo-incoming,.approved-weather-photo-held{z-index:1;will-change:opacity}
+.approved-weather-photo-incoming{opacity:0}
 .approved-photo-message{z-index:2}
-@media(prefers-reduced-motion:reduce){.approved-weather-photo-incoming{transition:none}}
 .approved-photo-message.is-updating{inset:12px auto auto 12px;display:block;max-width:calc(100% - 24px);padding:7px 10px;border:1px solid #ffffff45;border-radius:9px;background:#122d42cc;font-size:12px;line-height:1.4;pointer-events:none}

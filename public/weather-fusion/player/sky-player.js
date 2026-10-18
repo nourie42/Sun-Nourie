@@ -1,5 +1,5 @@
 /** Nourie Weather · animated forecast scene player. All supplied text uses textContent. */
-import {approvedOutfit} from './approved-weather-world.js?v=approved-her-consistent-v6';
+import {approvedOutfit} from './approved-weather-world.js?v=approved-her-smooth-v7';
 const number = (v, fallback = 0) => v !== null && v !== '' && Number.isFinite(Number(v)) ? Number(v) : fallback;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const optionalNumber = v => v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v)) ? Number(v) : null;
@@ -29,6 +29,19 @@ export function playbackFrameDelay(speed=4,settledAt=null,now=globalThis.perform
   const base=playbackTiming(speed).millisecondsPerHour;
   if(typeof settledAt!=='number'||!Number.isFinite(settledAt)||typeof now!=='number'||!Number.isFinite(now))return base;
   return Math.max(base,700-Math.max(0,now-settledAt));
+}
+
+/** How long playback waits before the next hour. An hour lasts its normal
+ * forecast time from the moment it appears, and its photo dissolve happens inside
+ * that time rather than after it, so slow speeds never stall at a change. A
+ * changed photograph still stays at least 700 ms after it became the main picture. */
+export function playbackAdvanceDelay(speed=4,{frameShownAt=null,settledAt=null,now=globalThis.performance?.now()??Date.now()}={}){
+  const base=playbackTiming(speed).millisecondsPerHour;
+  const known=value=>typeof value==='number'&&Number.isFinite(value);
+  if(!known(now))return base;
+  const dwell=known(frameShownAt)?Math.max(0,base-Math.max(0,now-frameShownAt)):base;
+  const readable=known(settledAt)?Math.max(0,700-Math.max(0,now-settledAt)):0;
+  return Math.max(dwell,readable);
 }
 
 export function outfitForFrame(frame = {}) {return approvedOutfit(frame);}
@@ -76,7 +89,7 @@ export function createScenarioForecast(name, start = new Date(), hours = 24) {
   let stamp=new Date(start).getTime();if(!Number.isFinite(stamp))stamp=Date.now();stamp=Math.floor(stamp/3600000)*3600000;
   return Array.from({length:clamp(Math.floor(number(hours,24)),1,336)},(_,i)=>({...preset,time:new Date(stamp+i*3600000).toISOString()}));
 }
-const cssURL = new URL('./sky-player.css?v=approved-her-consistent-v6',import.meta.url).href;
+const cssURL = new URL('./sky-player.css?v=approved-her-smooth-v7',import.meta.url).href;
 const compactSeconds = seconds => seconds>=60?`${Math.floor(seconds/60)}m ${Math.round(seconds%60)}s`:`${Number(seconds.toFixed(seconds<1?3:1))}s`;
 
 class WeatherSkyPlayer extends HTMLElement {
@@ -136,7 +149,7 @@ class WeatherSkyPlayer extends HTMLElement {
   get timezone(){return this._timezone;}
   set timezone(value){try{new Intl.DateTimeFormat('en-US',{timeZone:String(value)}).format();this._timezone=String(value);}catch{this._timezone='';}if(this.$){this._renderTimeline();this._render();}}
   get speed(){return this._speed;}
-  set speed(value){this._speed=playbackTiming(value).speed;try{globalThis.localStorage?.setItem(SPEED_STORAGE_KEY,String(this._speed));}catch{}if(this.$){this.$('.speed').value=String(this._speed);this._renderTiming();}if(this._playing)this._startTimer();}
+  set speed(value){this._speed=playbackTiming(value).speed;try{globalThis.localStorage?.setItem(SPEED_STORAGE_KEY,String(this._speed));}catch{}this._world?.setSpeed?.(this._speed);if(this.$){this.$('.speed').value=String(this._speed);this._renderTiming();}if(this._playing)this._startTimer();}
   get currentFrame(){return this._forecast[this._index]||null;}
   get playing(){return this._playing;}
   setFrame(index){
@@ -159,16 +172,19 @@ class WeatherSkyPlayer extends HTMLElement {
     clearTimeout(this._timer);this._timer=null;
     const epoch=this._playbackEpoch=(this._playbackEpoch||0)+1;
     const active=()=>this._playing&&epoch===this._playbackEpoch&&this._forecast.length>0;
+    const clock=()=>globalThis.performance?.now()??Date.now();
     const schedule=async()=>{
-      // Photo loading and outfit motion use real time. Even the fastest
-      // forecast speed must let the selected scene finish before advancing.
+      // The hour's forecast time starts when it appears, so its photo dissolve
+      // runs inside the hour. Even the fastest forecast speed still lets the
+      // selected scene finish before advancing.
+      const frameShownAt=clock();
       await this._awaitScene();
       if(!active())return;
       this._timer=setTimeout(async()=>{
         this._timer=null;if(!active())return;
         await this._awaitScene();if(!active())return;
         this.setFrame(this._index+1);void schedule();
-      },playbackFrameDelay(this._speed,this._world?.lastPhotoSettledAt));
+      },playbackAdvanceDelay(this._speed,{frameShownAt,settledAt:this._world?.lastPhotoSettledAt,now:clock()}));
     };
     void schedule();
   }
@@ -191,9 +207,9 @@ class WeatherSkyPlayer extends HTMLElement {
     scene.dataset.garment=outfit.garment;scene.classList.toggle('is-storm',outfit.storm);
     scene.setAttribute('aria-label',`${this._locationName}, ${this._format(frame.time,{weekday:'long',hour:'numeric',minute:'2-digit'})}. ${Math.round(frame.temperature)} degrees Fahrenheit, ${description.toLowerCase()}. ${outfit.advice}`);
     this.$('.frame-day').textContent=this._format(frame.time,{weekday:'short',month:'short',day:'numeric'});this.$('.frame-hour').textContent=this._format(frame.time,{hour:'numeric',minute:'2-digit'});
-    this.$('.frame-temp').textContent=String(Math.round(frame.temperature));this.$('.frame-condition').textContent=description;
+    this.$('.frame-temp').textContent=String(Math.round(frame.temperature));this._swapText('.frame-condition',description);
     this.$('.frame-feels').textContent=`${frame.feelsLike===null?'Feels like unavailable':`Feels like ${Math.round(frame.feelsLike)}°`} · ${frame.windSpeed===null?'Wind unavailable':`${Math.round(frame.windSpeed)} mph wind`}`;
-    this.$('.outfit-kicker').textContent=frame.feelsLike===null?'TEMPERATURE-BASED OUTFIT':'WHAT TO WEAR';this.$('.outfit-summary').textContent=outfit.storm?'Stay indoors until the storm passes.':outfit.label;this.$('.outfit-advice').textContent=outfit.advice;
+    this.$('.outfit-kicker').textContent=frame.feelsLike===null?'TEMPERATURE-BASED OUTFIT':'WHAT TO WEAR';this._swapText('.outfit-summary',outfit.storm?'Stay indoors until the storm passes.':outfit.label);this.$('.outfit-advice').textContent=outfit.advice;
     this.$('.scene-status').textContent=outfit.storm?'SEEK SHELTER':frame.isDay===null?'LIGHTING UNAVAILABLE':frame.isDay===false?'AFTER DARK':'DAYLIGHT';
     const range=this.$('.scrubber');range.max=String(frames.length-1);range.value=String(this._index);range.style.setProperty('--progress',`${frames.length>1?this._index/(frames.length-1)*100:0}%`);range.setAttribute('aria-valuetext',`${this._format(frame.time,{weekday:'short',hour:'numeric',minute:'2-digit'})}, ${Math.round(frame.temperature)} degrees, ${description}`);
     this.$('.start-label').textContent=this._format(frames[0].time,{weekday:'short',hour:'numeric'});this.$('.middle-label').textContent=frames.length>2?this._format(frames[Math.floor((frames.length-1)/2)].time,{weekday:'short',hour:'numeric'}):'';this.$('.end-label').textContent=frames.length>1?this._format(frames[frames.length-1].time,{weekday:'short',hour:'numeric'}):'';
@@ -201,16 +217,25 @@ class WeatherSkyPlayer extends HTMLElement {
     if(!this._playing)this.$('.announcement').textContent=`${this._format(frame.time,{hour:'numeric'})}. ${description}, ${Math.round(frame.temperature)} degrees. ${outfit.label}.`;
     this._syncWorld();if(this._inView&&this._connected)this._ensureWorld();
   }
+  /** Weather and outfit words fade in with the photograph instead of snapping. */
+  _swapText(selector,text){
+    const element=this.$(selector);if(!element)return;
+    const value=String(text);if(element.textContent===value)return;
+    element.textContent=value;
+    if(typeof element.animate==='function'&&!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches){
+      element.animate([{opacity:.15},{opacity:1}],{duration:480,easing:'cubic-bezier(.37,0,.63,1)'});
+    }
+  }
   _syncWorld(){if(this._world&&this.currentFrame){try{const frame={...this.currentFrame};if(this._timezone){const parts=new Intl.DateTimeFormat('en-US',{timeZone:this._timezone,hour:'numeric',minute:'numeric',hourCycle:'h23'}).formatToParts(new Date(frame.time));frame.localHour=Number(parts.find(p=>p.type==='hour')?.value||0)+Number(parts.find(p=>p.type==='minute')?.value||0)/60;}this._sceneTask=Promise.resolve(this._world.setFrame(frame,this._outfitFor(frame))).catch(error=>{this._handleWorldError(error);return false;});this._world.preload?.(this._forecast.slice(this._index+1));}catch(error){this._handleWorldError(error);}}}
   async _ensureWorld(){
     if(!this._connected||this._world||this._worldPromise||this._worldFailed)return;
     const epoch=++this._worldEpoch;this.$('.world-status').hidden=false;this.$('.world-status').classList.remove('has-error');this.$('.world-status-title').textContent='Preparing your forecast scene…';this.$('.world-status-note').textContent='Weather, sky, and what to wear.';this.$('.world-retry').hidden=true;
     this._worldPromise=(async()=>{
-      const {createWeatherWorld}=await import('./approved-weather-world.js?v=approved-her-consistent-v6');
+      const {createWeatherWorld}=await import('./approved-weather-world.js?v=approved-her-smooth-v7');
       if(!this._connected||epoch!==this._worldEpoch)return;
       const world=await createWeatherWorld(this.$('.world-stage'),{initialFrame:this.currentFrame||{},initialOutfit:this._outfitFor(this.currentFrame||{}),initialCharacter:this._character,onError:error=>{if(epoch===this._worldEpoch)this._handleWorldError(error);}});
       if(!this._connected||epoch!==this._worldEpoch||this._worldFailed){world?.dispose?.();return;}
-      this._world=world;world.setCharacter?.(this._character);this._syncWorld();if(this._worldFailed)return;world.setPlaying(this._playing);world.resize?.();this.$('.world-status').hidden=true;
+      this._world=world;world.setCharacter?.(this._character);world.setSpeed?.(this._speed);this._syncWorld();if(this._worldFailed)return;world.setPlaying(this._playing);world.resize?.();this.$('.world-status').hidden=true;
       this.dispatchEvent(new CustomEvent('worldready',{bubbles:true,composed:true}));
     })().catch(error=>{if(epoch===this._worldEpoch)this._handleWorldError(error);}).finally(()=>{if(epoch===this._worldEpoch)this._worldPromise=null;});
     return this._worldPromise;
