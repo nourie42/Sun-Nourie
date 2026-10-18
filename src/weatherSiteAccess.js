@@ -18,12 +18,14 @@ const SESSION_MS = 12 * 60 * 60 * 1000;
 // compare tools) still needs the password. Set WEATHER_FUSION_PUBLIC=0 to re-lock.
 const PUBLIC_PAGES = new Set(['/weather-fusion', '/weather-fusion/', '/weather-fusion/index.html']);
 const PUBLIC_ASSET = /^\/weather-fusion\/[a-z0-9][a-z0-9._-]*\.(?:js|css|webp|png|jpe?g|svg|json|ico)$/;
+// Exact static dependencies of the public forecast player; private pages remain gated.
+const PUBLIC_PLAYER_ASSETS = new Set(['/weather-fusion/player/sky-player.js', '/weather-fusion/player/sky-player.css', '/weather-fusion/player/weather-world.js', '/weather-fusion/player/photo-scene.js', '/weather-fusion/player/vendor/three.module.js', '/weather-fusion/player/assets/photo-night-mild.webp', '/weather-fusion/player/assets/photo-night-hot.webp', '/weather-fusion/player/assets/photo-rain.webp', '/weather-fusion/player/assets/sky-storm.webp', '/weather-fusion/player/assets/photo-park-empty.webp', '/weather-fusion/player/assets/photo-cold-scarf.webp', '/weather-fusion/player/assets/photo-snow.webp', '/weather-fusion/player/assets/photo-hot.webp', '/weather-fusion/player/assets/photo-cool.webp', '/weather-fusion/player/assets/photo-mild.webp', '/weather-fusion/player/assets/photo-wet.webp', '/weather-fusion/player/assets/photo-hot-poses-alpha.png', '/weather-fusion/player/assets/photo-night.webp', '/weather-fusion/player/assets/photo-night-cool.webp', '/weather-fusion/player/assets/photo-storm.webp', '/weather-fusion/player/assets/photo-cold.webp']);
 const PUBLIC_APIS = new Set(['forecast', 'alerts', 'briefing', 'bulletins', 'outlook', 'search', 'radar', 'models', 'winter-map'].map(name => `/api/weather-fusion/${name}`));
 export function isPublicWeatherPath(url, method = 'GET') {
   if (!['GET', 'HEAD'].includes(String(method).toUpperCase())) return false;
   let pathname;
   try { pathname = canonicalPath(url); } catch { return false; }
-  return PUBLIC_PAGES.has(pathname) || PUBLIC_ASSET.test(pathname) || PUBLIC_APIS.has(pathname);
+  return PUBLIC_PAGES.has(pathname) || PUBLIC_ASSET.test(pathname) || PUBLIC_PLAYER_ASSETS.has(pathname) || PUBLIC_APIS.has(pathname);
 }
 const PREFIXES = ['/weather', '/weather-fusion', '/weathernext', '/api/weather-fusion', '/whats-up', '/whatsup', '/api/whats-up', '/deal-intelligence', '/api/deal-intelligence'];
 

@@ -172,3 +172,15 @@ test('only the main weather page, its assets and read-only APIs are public', asy
   assert.equal(isPublicWeatherPath('/WEATHER-FUSION/', 'GET'), true);
   assert.equal(isPublicWeatherPath('/weather-fusion/', 'DELETE'), false);
 });
+
+
+test('public player dependencies load without opening private player paths', async t => {
+  const {request} = await fixture(t, {publicMain: true});
+  for (const route of ['/weather-fusion/player/sky-player.js?v=native-20261018-1','/weather-fusion/player/vendor/three.module.js','/weather-fusion/player/assets/photo-hot.webp']) {
+    assert.equal((await request(route)).status, 200, route);
+    assert.equal((await request(route, {method: 'POST'})).status, 401, route);
+  }
+  for (const route of ['/weather-fusion/player/private.html','/weather-fusion/player/unlisted.js','/weather-fusion/compare']) {
+    assert.equal((await request(route)).status, 401, route);
+  }
+});
