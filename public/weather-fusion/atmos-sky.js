@@ -75,17 +75,17 @@ const table=rows=>rows.map(([a,...c])=>[a,...c.map(hex)]);
 // Sun altitude → zenith, mid-sky and horizon colours: Rayleigh blue by day,
 // the blue hour and the orange horizon band through twilight.
 const SKY=table([
- [-18,'#03060f','#060a18','#0a1022'],[-12,'#050a1b','#0a132c','#151d3d'],[-8,'#0a1230','#18214a','#2f2f5a'],
+ [-18,'#0a1430','#122042','#1d2c55'],[-12,'#0c1736','#15244a','#24315e'],[-8,'#0f1c40','#1f2b58','#3a3a6a'],
  [-5,'#121d46','#2f3466','#7d5677'],[-2,'#1b2c5c','#4d4d82','#d07a63'],[0.5,'#24407a','#6a6f9f','#f19a63'],
  [3,'#2d5594','#8189b0','#f5b878'],[7,'#3363aa','#83a5d2','#f0d2a6'],[14,'#2e6cc6','#77ade4','#cbe2f3'],
  [30,'#2a6cd3','#68a6ea','#bddcf6'],[60,'#2565d5','#5c9fee','#b2d8f7'],
 ]);
-const OVERCAST=table([[-12,'#0b0f19','#11151f','#191b22'],[-4,'#1f2433','#2b2e3c','#463c41'],[2,'#5b6272','#737886','#9a8d88'],[10,'#848e9c','#9aa3ae','#b8bec6'],[40,'#8f9aa8','#a8b1bc','#c4cad1']]);
-const STORM=table([[-12,'#07090f','#0b0e15','#11131a'],[0,'#2d3240','#3a3f4c','#4a4a52'],[15,'#4b5462','#5d6672','#727a84'],[40,'#525c6a','#646d79','#7b838c']]);
+const OVERCAST=table([[-12,'#151b2a','#1b2132','#24283a'],[-4,'#1f2433','#2b2e3c','#463c41'],[2,'#5b6272','#737886','#9a8d88'],[10,'#848e9c','#9aa3ae','#b8bec6'],[40,'#8f9aa8','#a8b1bc','#c4cad1']]);
+const STORM=table([[-12,'#10141f','#151a26','#1c202c'],[0,'#2d3240','#3a3f4c','#4a4a52'],[15,'#4b5462','#5d6672','#727a84'],[40,'#525c6a','#646d79','#7b838c']]);
 // Cloud tops (lit) and bases (shade) by sun altitude: white by day, peach and
 // rose at sunset, slate after dark.
-const CLOUD=table([[-14,'#202a40','#111727'],[-7,'#454563','#1d2138'],[-2.5,'#d99482','#4c4262'],[0.5,'#ffbf92','#76607a'],[4,'#ffdcb8','#9c909f'],[10,'#fff9f0','#b7c1cd'],[40,'#ffffff','#bcc6d2']]);
-const CLOUD_DARK=table([[-10,'#141924','#0a0d15'],[0,'#4f5463','#272b36'],[12,'#7e8794','#4c5462'],[40,'#89929e','#58616e']]);
+const CLOUD=table([[-14,'#2c3754','#1a2238'],[-7,'#454563','#1d2138'],[-2.5,'#d99482','#4c4262'],[0.5,'#ffbf92','#76607a'],[4,'#ffdcb8','#9c909f'],[10,'#fff9f0','#b7c1cd'],[40,'#ffffff','#bcc6d2']]);
+const CLOUD_DARK=table([[-10,'#1d2331','#121722'],[0,'#4f5463','#272b36'],[12,'#7e8794','#4c5462'],[40,'#89929e','#58616e']]);
 
 /* ---------- Seeded randomness & noise ---------- */
 function rng(seed){let a=seed>>>0;return ()=>{a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return ((t^t>>>14)>>>0)/4294967296;};}
@@ -162,78 +162,154 @@ function deckTexture(width,height,seed){
  return canvas;
 }
 
-/* ---------- Treeline ---------- */
-function circle(path,x,y,r){path.moveTo(x+r,y);path.arc(x,y,r,0,Math.PI*2);}
-function blob(path,x,y,rx,ry){path.moveTo(x+rx,y);path.ellipse(x,y,rx,ry,0,0,Math.PI*2);}
-// Loblolly pine: a tall straight trunk carrying one clumpy, oval crown.
-function loblolly(path,x,base,h,random){
- const lean=(random()-.5)*h*.05,top=base-h,trunk=Math.max(1.1,h*.024);
- const rx=h*(.1+random()*.05),ry=h*(.075+random()*.035),cy=top+ry*1.05,cx=x+lean;
- path.moveTo(x-trunk,base);path.lineTo(cx-trunk*.6,cy);path.lineTo(cx+trunk*.6,cy);path.lineTo(x+trunk,base);path.closePath();
- blob(path,cx,cy,rx,ry);
- const lumps=4+Math.floor(random()*4);
- for(let i=0;i<lumps;i++){
-  const a=Math.PI*(1.05+random()*.9),d=.55+random()*.35;
-  blob(path,cx+Math.cos(a)*rx*d,cy+Math.sin(a)*ry*d*.9,rx*(.35+random()*.25),ry*(.4+random()*.25));
+/* ---------- Landscape ---------- */
+// Leaf colours follow the season at the location: fresh green in spring, deep
+// green in summer, Piedmont fall colour in October and November, bare branches
+// in winter. Evergreens stay green all year.
+const LEAVES={
+ winter:null,
+ early:['#9cbf6b','#a9c77a','#8fb766','#b7c98a'],
+ spring:['#7fbf5a','#6fb04f','#8ccb63','#5fa347'],
+ summer:['#4f8f3a','#5b9a42','#447f35','#66a54c'],
+ late:['#5f9a3e','#7da443','#9aa83f','#c0a13a'],
+ fall:['#6f9a45','#7f9b3d','#5f8f3e','#8aa346','#d9a334','#cf7a2c','#b8452e','#e4b847','#c96a2d'],
+ bare:['#b07a3a','#9a5a2c','#b98d3d','#8a6a45'],
+};
+const EVERGREEN=['#2f5e3d','#386b45','#2a5537','#3d7349'];
+function season(month){return month===12||month<=2?'winter':month===3?'early':month<=5?'spring':month<=8?'summer':month===9?'late':month===10?'fall':'bare';}
+const mixHex=(a,b,t)=>css(mix(hex(a),hex(b),t));
+const shadeHex=(a,k)=>css(hex(a).map(v=>Math.max(0,Math.min(255,v*k))));
+function deciduous(g,x,base,h,leafSet,random){
+ const trunkW=Math.max(1.6,h*.065),crownR=h*(.32+random()*.08),cy=base-h+crownR*1.02,cx=x+(random()-.5)*h*.04;
+ const bark='#5d4433';
+ g.fillStyle=bark;g.beginPath();
+ g.moveTo(x-trunkW*.6,base);g.lineTo(cx-trunkW*.35,cy+crownR*.3);g.lineTo(cx+trunkW*.35,cy+crownR*.3);g.lineTo(x+trunkW*.6,base);g.closePath();g.fill();
+ if(!leafSet){bareTree(g,cx,cy+crownR*.35,h*.62,bark,random);return;}
+ const leaf=leafSet[Math.floor(random()*leafSet.length)];
+ const crown=new Path2D(),blobs=6+Math.floor(random()*4);
+ for(let i=0;i<blobs;i++){
+  const a=random()*Math.PI*2,d=crownR*(.25+random()*.4),r=crownR*(.42+random()*.22);
+  const bx=cx+Math.cos(a)*d*1.05,by=cy+Math.sin(a)*d*.78-crownR*.08;
+  crown.moveTo(bx+r,by);crown.arc(bx,by,r,0,Math.PI*2);
  }
- if(random()<.55){const side=random()<.5?-1:1,by=cy+ry*(1.1+random()*.6);blob(path,cx+side*rx*(.75+random()*.3),by,rx*.42,ry*.38);path.moveTo(cx,by+1);path.lineTo(cx+side*rx*.7,by-1);path.lineTo(cx+side*rx*.7,by+.6);path.lineTo(cx,by+2.2);path.closePath();}
+ crown.moveTo(cx+crownR*.62,cy);crown.arc(cx,cy,crownR*.62,0,Math.PI*2);
+ g.fillStyle=leaf;g.fill(crown);
+ g.save();g.clip(crown);
+ // Sunlit from the upper left, shaded underneath.
+ const light=g.createLinearGradient(cx-crownR,cy-crownR,cx+crownR*.9,cy+crownR*1.1);
+ light.addColorStop(0,mixHex(leaf,'#fff6d8',.3));light.addColorStop(.5,'rgba(0,0,0,0)');light.addColorStop(1,shadeHex(leaf,.6));
+ g.globalAlpha=.9;g.fillStyle=light;g.fillRect(cx-crownR*1.6,cy-crownR*1.6,crownR*3.2,crownR*3.2);
+ // Small leaf clumps break up the outline into foliage texture.
+ const dark=shadeHex(leaf,.78),bright=mixHex(leaf,'#fffbe6',.22);
+ for(let i=0;i<34;i++){
+  const a=random()*Math.PI*2,d=crownR*Math.sqrt(random())*.95,r=crownR*(.06+random()*.08);
+  const px=cx+Math.cos(a)*d,py=cy+Math.sin(a)*d*.85,upper=py<cy-crownR*.1&&px<cx+crownR*.2;
+  g.globalAlpha=upper?.28:.22;g.fillStyle=upper&&random()<.7?bright:dark;
+  g.beginPath();g.arc(px,py,r,0,Math.PI*2);g.fill();
+ }
+ g.restore();g.globalAlpha=1;
 }
-// Eastern red cedar: a dense, narrow cone.
-function cedar(path,x,base,h,random){
- const w=h*(.12+random()*.06),steps=10;
- path.moveTo(x-w,base);
- for(let i=1;i<=steps;i++){const t=i/steps;path.lineTo(x-w*(1-t)*(1+(i%2?.14:-.06)),base-h*t);}
- for(let i=steps-1;i>=0;i--){const t=i/steps;path.lineTo(x+w*(1-t)*(1+(i%2?.14:-.06)),base-h*t);}
- path.closePath();
+// Winter hardwood: a trunk that splits into thinner and thinner branches.
+function bareTree(g,x,y,length,color,random){
+ g.strokeStyle=color;g.lineCap='round';
+ const branch=(bx,by,angle,len,width,depth)=>{
+  const ex=bx+Math.cos(angle)*len,ey=by-Math.sin(angle)*len;
+  g.lineWidth=width;g.beginPath();g.moveTo(bx,by);g.lineTo(ex,ey);g.stroke();
+  if(depth<=0||len<3)return;
+  const count=2+(random()<.35?1:0);
+  for(let i=0;i<count;i++)branch(ex,ey,angle+(i-(count-1)/2)*(.5+random()*.35),len*(.62+random()*.12),Math.max(.6,width*.66),depth-1);
+ };
+ branch(x,y,Math.PI/2+(random()-.5)*.15,length*.38,Math.max(1.2,length*.05),5);
 }
-// Mixed hardwood canopy: a rolling, leafy forest edge.
-function canopy(path,width,base,height,seed,{low=.42,swing=.34}={}){
- const n=noise1(seed),random=rng(seed+7);
- const heightAt=x=>height*(low+swing*(n(x/110,3)-.35)+.16*(n(x/28+40,2)-.5));
- path.moveTo(-30,base+4);
- for(let x=-30;x<=width+30;x+=5)path.lineTo(x,base-heightAt(x));
- path.lineTo(width+30,base+4);path.closePath();
- for(let x=-24;x<=width+24;x+=3+random()*6){const r=height*(.045+random()*.07);circle(path,x,base-heightAt(x)+r*.4,r);}
- return heightAt;
-}
-function treeline(width,base,maxHeight,seed,kind,layer){
- const random=rng(seed),path=new Path2D(),far=layer==='far';
- path.rect(-30,base,width+60,4000);
- if(kind==='prairie'){
-  // Open Plains horizon: a long, low swell with occasional shelterbelts.
-  const n=noise1(seed);
-  path.moveTo(-30,base+2);
-  for(let x=-30;x<=width+30;x+=10)path.lineTo(x,base-(far?5:2)-n(x/140,3)*(far?6:3));
-  path.lineTo(width+30,base+2);path.closePath();
-  let x=random()*width*.4;
-  while(x<width+20){
-   const run=(far?50:30)+random()*(far?110:70);
-   for(let t=0;t<run;t+=far?3.5:5)circle(path,x+t,base-maxHeight*(far?.2:.24)*(.6+random()*.4),maxHeight*(far?.09:.12)*(.7+random()*.4));
-   x+=run+140+random()*300;
+// A pine: drooping, slightly ragged tiers that narrow to a point.
+function evergreen(g,x,base,h,random){
+ const w=h*(.19+random()*.06),tiers=5+Math.floor(random()*2),green=EVERGREEN[Math.floor(random()*EVERGREEN.length)];
+ g.fillStyle='#5a4130';g.fillRect(x-Math.max(1,h*.028),base-h*.16,Math.max(2,h*.056),h*.16);
+ const shape=new Path2D(),top=base-h;
+ for(let k=0;k<tiers;k++){
+  const f=k/(tiers-1),yBottom=base-h*.1-(h*.86)*f*.9,yTop=k===tiers-1?top:yBottom-h*(.3-.08*f);
+  const half=w*(1-f*.8)*(.92+random()*.16),sag=h*.035,lean=(random()-.5)*w*.08;
+  shape.moveTo(x+lean*.3,yTop);
+  shape.quadraticCurveTo(x+half*.45,yBottom-h*.08,x+half,yBottom+sag*.4);
+  const teeth=3+Math.floor(random()*2);
+  for(let t=1;t<=teeth;t++){
+   const px=x+half-(2*half)*t/teeth,py=yBottom+(t%2?-sag*.35:sag*.25);
+   shape.lineTo(px+half/teeth,yBottom-sag*.55);shape.lineTo(px,py);
   }
-  return path;
+  shape.quadraticCurveTo(x-half*.45,yBottom-h*.08,x+lean*.3,yTop);shape.closePath();
  }
- const ridge=canopy(path,width,base,maxHeight,seed,far?{low:.34,swing:.22}:{low:.44,swing:.34});
- let x=-16+random()*16;
- while(x<width+20){
-  const pick=random(),under=ridge(x);
-  if(pick<.66){const h=maxHeight*(far?.62+random()*.2:.8+random()*.2);if(h>under*1.15)loblolly(path,x,base-under*.6,h-under*.6,random);}
-  else if(pick<.86){const h=maxHeight*(far?.48+random()*.14:.6+random()*.24);if(h>under)cedar(path,x,base,h,random);}
-  x+=(far?11:16)+random()*(far?22:30);
+ g.fillStyle=green;g.fill(shape);
+ g.save();g.clip(shape);
+ g.globalAlpha=.36;g.fillStyle=shadeHex(green,.55);g.fillRect(x+w*.05,top,w*1.3,h);
+ g.globalAlpha=.2;g.fillStyle=mixHex(green,'#f4f0c8',.35);g.fillRect(x-w*1.3,top,w*.75,h);
+ g.restore();g.globalAlpha=1;
+}
+function hills(g,width,base,height,seed,color){
+ const n=noise1(seed);
+ g.fillStyle=color;g.beginPath();g.moveTo(-10,base+2);
+ for(let x=-10;x<=width+10;x+=6)g.lineTo(x,base-height*(.35+.65*n(x/220,3)));
+ g.lineTo(width+10,base+2);g.closePath();g.fill();
+}
+// The edge of a distant forest: one soft, hazy band of crowns and spires.
+function forestEdge(g,width,base,height,random,color,spires=true){
+ const n=noise1(97),edge=new Path2D();
+ for(let x=-12;x<width+12;x+=4+random()*5){
+  const r=height*(.22+random()*.2),y=base-height*(.35+.5*n(x/90,2))-r*.2;
+  edge.moveTo(x+r,y);edge.arc(x,y,r,0,Math.PI*2);
+  if(spires&&random()<.12){const tall=height*(.55+random()*.45);edge.moveTo(x-r*.55,y);edge.lineTo(x,y-tall);edge.lineTo(x+r*.55,y);edge.closePath();}
  }
- return path;
+ edge.rect(-12,base-height*.35,width+24,height*.35+2);
+ g.fillStyle=color;g.fill(edge);
+}
+/** Paint the whole landscape once in daylight colours; lighting is applied per frame. */
+function paintLandscape(width,height,horizon,maxTree,month,terrain,scale){
+ const canvas=document.createElement('canvas'),top=Math.max(0,Math.floor(horizon-maxTree*1.12));
+ canvas.width=Math.max(1,Math.round(width*scale));canvas.height=Math.max(1,Math.round((height-top)*scale));
+ const g=canvas.getContext('2d');g.setTransform(scale,0,0,scale,0,-top*scale);
+ const random=rng(2026),kind=season(month),leaves=LEAVES[kind],prairie=terrain==='prairie';
+ // Distant hills and forest, softened by the air between you and them.
+ hills(g,width,horizon,maxTree*(prairie?.18:.42),11,'#a9c2c9');
+ hills(g,width,horizon,maxTree*(prairie?.1:.26),23,'#97b6ae');
+ if(!prairie){
+  forestEdge(g,width,horizon+1,maxTree*.36,random,kind==='winter'?'#9aa9a8':kind==='fall'||kind==='bare'?'#93a88a':'#86a68c');
+  forestEdge(g,width,horizon+1,maxTree*.22,random,kind==='winter'?'#8a9a96':kind==='fall'||kind==='bare'?'#7f9a74':'#6f9877',false);
+ }
+ // The field.
+ const grassTop=kind==='winter'?'#a3a67a':kind==='bare'?'#9ba95f':kind==='fall'?'#8fae55':kind==='early'?'#93b860':'#7db457';
+ const field=g.createLinearGradient(0,horizon,0,height);
+ field.addColorStop(0,shadeHex(grassTop,.9));field.addColorStop(.18,grassTop);field.addColorStop(1,shadeHex(grassTop,.72));
+ g.fillStyle=field;g.fillRect(0,horizon,width,height-horizon);
+ g.strokeStyle=shadeHex(grassTop,.8);g.lineWidth=1;g.globalAlpha=.5;g.beginPath();
+ for(let x=0;x<width;x+=3+random()*3){const y=horizon+4+random()*(height-horizon)*.9,l=2+random()*4;g.moveTo(x,y);g.lineTo(x+(random()-.5)*2,y-l);}
+ g.stroke();g.globalAlpha=1;
+ // Groves and single trees standing in the field, back to front.
+ const groves=prairie?Math.max(2,Math.round(width/420)):Math.max(3,Math.round(width/230)+1);
+ const spots=Array.from({length:groves},(_,i)=>({center:(i+.15+random()*.7)/groves*width,span:(prairie?60:70)+random()*(prairie?120:170)}));
+ const trees=[];
+ for(const spot of spots){
+  for(let x=spot.center-spot.span/2;x<spot.center+spot.span/2;x+=prairie?9+random()*6:12+random()*16){
+   const h=maxTree*(prairie?.45+random()*.25:.58+random()*.42);
+   trees.push({x,h,base:horizon+2+random()*(maxTree*.08),conifer:!prairie&&random()<.34});
+  }
+ }
+ if(!prairie)for(let k=0;k<Math.round(width/300);k++)trees.push({x:random()*width,h:maxTree*(.5+random()*.35),base:horizon+3+random()*maxTree*.1,conifer:random()<.4});
+ trees.sort((a,b)=>a.base-b.base);
+ for(const t of trees){
+  g.fillStyle='rgba(28,52,22,.22)';g.beginPath();g.ellipse(t.x+t.h*.06,t.base+1,t.h*(t.conifer?.2:.32),Math.max(1.5,t.h*.035),0,0,Math.PI*2);g.fill();
+  if(t.conifer)evergreen(g,t.x,t.base,t.h,random);else deciduous(g,t.x,t.base,t.h,leaves,random);
+ }
+ return {canvas,top};
 }
 
 /* ---------- Renderer ---------- */
-export function createSky(canvas,{reducedMotion=false,ground='#0D1714'}={}){
+export function createSky(canvas,{reducedMotion=false}={}){
  const ctx=canvas.getContext('2d',{alpha:false});
- const groundColor=hex(ground);
- let width=0,height=0,dpr=1,horizon=0,running=false,frame=0,last=0,visible=true,timeScale=1;
+ let width=0,height=0,dpr=1,running=false,frame=0,last=0,visible=true,timeScale=1;
  let location={latitude:35.787,longitude:-78.4806,terrain:'piedmont'};
  let state={time:Date.now(),scene:{cover:.3,rain:0,snow:0,fog:0,haze:0,dark:0,storm:false,wind:5,windDir:270}};
- let stars=[],drops=[],flakes=[],trees=null,flash=null,nextFlash=0,deckOffset=0;
- const layerA=document.createElement('canvas'),layerB=document.createElement('canvas');
- const a=layerA.getContext('2d'),b=layerB.getContext('2d');
+ let stars=[],drops=[],flakes=[],land=null,flash=null,nextFlash=0,deckOffset=0;
+ const layerA=document.createElement('canvas'),layerB=document.createElement('canvas'),landLayer=document.createElement('canvas');
+ const a=layerA.getContext('2d'),b=layerB.getContext('2d'),l=landLayer.getContext('2d');
  let clouds=null,deck=null;
  // Three parallax bands: distant small clouds along the horizon, a middle
  // band, and large near clouds overhead.
@@ -254,6 +330,9 @@ export function createSky(canvas,{reducedMotion=false,ground='#0D1714'}={}){
   });
   deck=deckTexture(384,96,77);
  }
+ const grass=()=>Math.round(Math.min(64,Math.max(30,height*.11)));
+ const skyBottom=()=>Math.max(60,height-grass());
+ const maxTree=()=>Math.round(Math.min(132,Math.max(54,height*.22)));
  function resize(){
   const rect=canvas.getBoundingClientRect();
   width=Math.max(1,Math.round(rect.width));height=Math.max(1,Math.round(rect.height));
@@ -267,14 +346,13 @@ export function createSky(canvas,{reducedMotion=false,ground='#0D1714'}={}){
   stars=Array.from({length:Math.round(width*bottom/1700)},()=>({x:random()*width,y:random(),size:.5+random()*random()*1.4,phase:random()*6.3,rate:.6+random()*1.8,bright:.35+random()*.65}));
   drops=Array.from({length:Math.round(Math.min(420,width*1.1))},()=>({x:random(),y:random(),speed:.75+random()*.5,length:.6+random()*.7}));
   flakes=Array.from({length:Math.round(Math.min(260,width*.6))},()=>({x:random(),y:random(),speed:.5+random()*.8,size:.6+random()*random()*1.6,sway:random()*6.3}));
-  trees=null;
+  land=null;
   render(0);
  }
- function setHorizon(px){const next=Math.round(px);if(next!==horizon){horizon=next;resize();}}
  function setLocation(latitude,longitude){
   if(!finite(latitude)||!finite(longitude))return;
   const terrain=longitude<-96.5?'prairie':'piedmont';
-  if(terrain!==location.terrain)trees=null;
+  if(terrain!==location.terrain)land=null;
   location={latitude,longitude,terrain};
   if(!running)render(0);
  }
@@ -282,8 +360,6 @@ export function createSky(canvas,{reducedMotion=false,ground='#0D1714'}={}){
   state={time:finite(next?.time)?next.time:state.time,scene:{...state.scene,...(next?.scene||{})}};
   if(!running)render(0);
  }
- const skyBottom=()=>Math.max(80,horizon||height*.6);
- const treeHeight=()=>Math.round(Math.min(84,Math.max(42,skyBottom()*.16)));
  function project(azimuth,altitude){
   const bottom=skyBottom();
   return {x:(azimuth-75)/210*width,y:bottom-clamp(altitude/78,-.2,1.08)*(bottom-36)};
@@ -305,25 +381,22 @@ export function createSky(canvas,{reducedMotion=false,ground='#0D1714'}={}){
   g.addColorStop(0,css(zenith));g.addColorStop(.58,css(middle));g.addColorStop(1,css(low));
   ctx.fillStyle=g;ctx.fillRect(0,0,width,bottom+2);
   const alt=p.sun.altitude,pos=project(p.sun.azimuth,Math.max(alt,0));
-  // Twilight glow concentrated around the sun's azimuth.
   const glow=smooth(-11,-1,alt)*(1-smooth(4,16,alt))*(1-p.overcast*.75);
   if(glow>.01){
    const r=ctx.createRadialGradient(pos.x,bottom,0,pos.x,bottom,width*.85);
    r.addColorStop(0,css([255,170,110],.55*glow));r.addColorStop(.35,css([240,120,110],.22*glow));r.addColorStop(1,css([120,80,140],0));
    ctx.fillStyle=r;ctx.fillRect(0,0,width,bottom);
   }
-  // Belt of Venus: the pink anti-twilight arch opposite the sun.
   const belt=smooth(-6,-1.5,alt)*(1-smooth(1,4,alt))*(1-p.overcast);
   if(belt>.01){
    const anti=width-pos.x,v=ctx.createRadialGradient(anti,bottom,0,anti,bottom,width*.7);
    v.addColorStop(0,css([232,160,178],.28*belt));v.addColorStop(1,css([232,160,178],0));
    ctx.fillStyle=v;ctx.fillRect(0,0,width,bottom);
   }
-  // Low overcast at night picks up a faint glow from town lights.
   const town=smooth(-2,-10,alt)*smooth(.55,.95,state.scene.cover);
   if(town>.01){
    const c=ctx.createLinearGradient(0,bottom*.5,0,bottom);
-   c.addColorStop(0,'rgba(70,52,46,0)');c.addColorStop(1,css([92,66,52],.45*town));
+   c.addColorStop(0,'rgba(70,52,46,0)');c.addColorStop(1,css([92,66,52],.4*town));
    ctx.fillStyle=c;ctx.fillRect(0,bottom*.5,width,bottom*.5);
   }
  }
@@ -332,7 +405,7 @@ export function createSky(canvas,{reducedMotion=false,ground='#0D1714'}={}){
   const alpha=smooth(-5,-14,alt)*Math.pow(1-clamp(s.cover),1.6)*(1-s.fog);
   if(alpha<.02)return;
   const bottom=skyBottom();
-  ctx.fillStyle='#e9f0ff';
+  ctx.fillStyle='#eef3ff';
   for(const star of stars){
    const twinkle=reducedMotion?1:.75+.25*Math.sin(time/1000*star.rate+star.phase);
    ctx.globalAlpha=alpha*star.bright*twinkle*(1-smooth(.7,1,star.y));
@@ -381,7 +454,6 @@ export function createSky(canvas,{reducedMotion=false,ground='#0D1714'}={}){
   // Viewer faces south: east is screen-left. Wind blows from windDir.
   const drift=Math.sin(s.windDir*RAD)*(4+s.wind*.6)*timeScale;
   a.clearRect(0,0,width,bottom);
-  // Overcast: a stratus deck fills the gaps between cumulus.
   const deckAlpha=smooth(.55,.95,cover);
   if(deckAlpha>.01){
    if(!reducedMotion)deckOffset=(deckOffset+drift*.4*dt/1000)%(width*1.2);
@@ -396,8 +468,6 @@ export function createSky(canvas,{reducedMotion=false,ground='#0D1714'}={}){
     const alpha=smooth(cloud.threshold-.08,cloud.threshold+.04,visibleShare)*(1-deckAlpha*.62);
     if(alpha<.01)continue;
     if(!reducedMotion)cloud.x=((cloud.x+drift*band.speed*dt/1000/width/2)%1+1)%1;
-    // Size against the wider of the view and the sky's height, so tall phone
-    // skies get properly sized clouds.
     const reference=Math.max(width,bottom*1.7),sprite=cloud.sprite;
     const grow=.8+cover*.55,w=reference*cloud.size*grow*cloud.stretch,h=w*sprite.height/sprite.width*band.squash;
     const span=width+w*2,x=cloud.x*span-w,y=cloud.y*bottom-h*sprite.base/sprite.height;
@@ -406,8 +476,6 @@ export function createSky(canvas,{reducedMotion=false,ground='#0D1714'}={}){
    }
   });
   a.globalAlpha=1;
-  // Light the greyscale clouds: tint with the lit colour, then shade the bases
-  // and let distant clouds take on the horizon colour.
   b.globalCompositeOperation='source-over';b.clearRect(0,0,width,bottom);
   b.fillStyle=css(p.cloudLit);b.fillRect(0,0,width,bottom);
   b.globalCompositeOperation='destination-in';b.drawImage(layerA,0,0,width,bottom);
@@ -435,60 +503,68 @@ export function createSky(canvas,{reducedMotion=false,ground='#0D1714'}={}){
     else if(pulse>0){const g=ctx.createRadialGradient(flash.x,flash.y,0,flash.x,flash.y,width*.45);g.addColorStop(0,`rgba(225,225,255,${.42*pulse})`);g.addColorStop(1,'rgba(225,225,255,0)');ctx.fillStyle=g;ctx.fillRect(0,0,width,bottom);}
    }
   }
-  // Screen-x drift of the wind for slanted rain and snow.
+ }
+ function drawPrecipitation(p,dt){
+  const s=state.scene,alt=p.sun.altitude,low=height;
   const lean=Math.sin(s.windDir*RAD)*clamp(s.wind/30,0,.6);
   if(s.rain>.01){
    const count=Math.round(drops.length*clamp(s.rain)),day=smooth(-6,8,alt);
-   ctx.strokeStyle=css(mix([120,138,170],[214,224,238],day),.2+.32*s.rain);ctx.lineWidth=1;ctx.beginPath();
+   ctx.strokeStyle=css(mix([150,166,196],[226,234,244],day),.22+.34*s.rain);ctx.lineWidth=1;ctx.beginPath();
    const fall=dt/1000*1.6*(timeScale>1?1.4:1);
    for(let i=0;i<count;i++){
     const drop=drops[i];
     if(!reducedMotion){drop.y+=fall*drop.speed;if(drop.y>1.05){drop.y-=1.1;drop.x=(drop.x+.37)%1;}}
-    const x=drop.x*width,y=drop.y*bottom,length=(10+14*s.rain)*drop.length;
+    const x=drop.x*width,y=drop.y*low,length=(10+14*s.rain)*drop.length;
     ctx.moveTo(x,y);ctx.lineTo(x+lean*length,y+length);
    }
    ctx.stroke();
-   ctx.fillStyle=css(mix([20,28,44],[190,200,214],day),.1*s.rain);ctx.fillRect(0,0,width,bottom);
   }
   if(s.snow>.01){
    const count=Math.round(flakes.length*clamp(s.snow));
-   ctx.fillStyle='rgba(245,248,255,.85)';
+   ctx.fillStyle='rgba(250,252,255,.9)';
    for(let i=0;i<count;i++){
     const f=flakes[i];
     if(!reducedMotion){f.y+=dt/1000*.09*f.speed*(timeScale>1?2:1);f.sway+=dt/1000*1.2;if(f.y>1.03){f.y-=1.06;f.x=(f.x+.29)%1;}}
-    const x=f.x*width+Math.sin(f.sway)*6+lean*f.y*30,y=f.y*bottom;
+    const x=f.x*width+Math.sin(f.sway)*6+lean*f.y*30,y=f.y*low;
     ctx.beginPath();ctx.arc(x,y,f.size,0,Math.PI*2);ctx.fill();
    }
   }
  }
  function drawLand(p){
-  const bottom=skyBottom(),s=state.scene,maxH=treeHeight();
-  if(!trees||trees.width!==width||trees.base!==bottom||trees.terrain!==location.terrain){
-   trees={width,base:bottom,terrain:location.terrain,far:treeline(width,bottom-3,maxH*.78,7,location.terrain,'far'),near:treeline(width,bottom+1,maxH,3,location.terrain,'near')};
+  const horizon=skyBottom(),s=state.scene,alt=p.sun.altitude;
+  const month=new Date(state.time).getUTCMonth()+1,scale=Math.min(2,dpr);
+  if(!land||land.width!==width||land.height!==height||land.month!==month||land.terrain!==location.terrain){
+   land={width,height,month,terrain:location.terrain,...paintLandscape(width,height,horizon,maxTree(),month,location.terrain,scale)};
+   landLayer.width=land.canvas.width;landLayer.height=land.canvas.height;
   }
-  // Aerial perspective: distant trees take on the horizon colour.
-  const day=smooth(-8,10,p.sun.altitude),low=p.sky[2];
-  ctx.fillStyle=css(mix(groundColor,low,.2+.16*day+.2*s.haze));ctx.fill(trees.far);
-  const veil=mix(p.cloudShade,p.cloudLit,.6),grey=(veil[0]*.3+veil[1]*.59+veil[2]*.11);
-  const fogColor=mix([grey,grey,grey+4],low,.18);
-  if(s.fog>.02){
-   // Fog flattens the whole view, then thickens toward the ground.
-   ctx.fillStyle=css(fogColor,.18+.62*s.fog*s.fog);ctx.fillRect(0,0,width,bottom);
-   const g=ctx.createLinearGradient(0,bottom*.3,0,bottom+6);
-   g.addColorStop(0,css(fogColor,0));g.addColorStop(1,css(fogColor,.9*s.fog));
-   ctx.fillStyle=g;ctx.fillRect(0,bottom*.3,width,bottom*.7+6);
-  }
-  ctx.fillStyle=css(groundColor);ctx.fill(trees.near);
-  if(s.fog>.02){
-   const g=ctx.createLinearGradient(0,bottom-maxH*1.1,0,bottom+2);
-   g.addColorStop(0,css(fogColor,.55*s.fog));g.addColorStop(.75,css(fogColor,.18*s.fog));g.addColorStop(1,css(fogColor,0));
-   ctx.save();ctx.clip(trees.near);ctx.fillStyle=g;ctx.fillRect(0,bottom-maxH*1.1,width,maxH*1.1+2);ctx.restore();
-  }
+  // Light the landscape: daylight as painted, warm at sunrise and sunset,
+  // greyer under heavy cloud, deep blue at night, washed out in fog.
+  l.globalCompositeOperation='source-over';l.clearRect(0,0,landLayer.width,landLayer.height);
+  l.drawImage(land.canvas,0,0);
+  l.globalCompositeOperation='source-atop';
+  const day=smooth(-7,8,alt),warm=smooth(-3,1,alt)*(1-smooth(6,15,alt)),gloom=clamp(.34*s.dark+.16*smooth(.6,1,s.cover));
+  const tints=[[[14,24,52],.8*(1-day)],[[255,150,74],.2*warm],[[74,84,98],gloom*day],[mix(p.cloudShade,p.cloudLit,.6),.55*s.fog]];
+  for(const [color,alpha] of tints)if(alpha>.01){l.fillStyle=css(color,alpha);l.fillRect(0,0,landLayer.width,landLayer.height);}
+  if(s.snow>.3){l.fillStyle=css([248,250,255],.45*smooth(.3,.8,s.snow));l.fillRect(0,Math.round((horizon-land.top)*scale),landLayer.width,landLayer.height);}
+  l.globalCompositeOperation='source-over';
+  ctx.drawImage(landLayer,0,land.top,width,height-land.top);
+ }
+ // Fog sits on the ground: thickest at the horizon, thinning toward the zenith.
+ function drawFog(p){
+  const s=state.scene;if(s.fog<.02)return;
+  const horizon=skyBottom(),day=smooth(-6,6,p.sun.altitude);
+  const tint=mix(mix([70,80,100],[214,220,226],day),p.cloudLit,.35),strong=.18+.62*s.fog*s.fog;
+  const g=ctx.createLinearGradient(0,0,0,height);
+  g.addColorStop(0,css(tint,strong*.35));
+  g.addColorStop(clamp((horizon-maxTree()*1.4)/height),css(tint,strong*.7));
+  g.addColorStop(clamp(horizon/height),css(tint,strong));
+  g.addColorStop(1,css(tint,strong*.75));
+  ctx.fillStyle=g;ctx.fillRect(0,0,width,height);
  }
  function render(dt,time=performance.now()){
   if(!width||!height)return;
   const p=palette();
-  drawSky(p);drawStars(p,time);drawMoon(p);drawSun(p);drawClouds(p,dt);drawWeather(p,dt,time);drawLand(p);
+  drawSky(p);drawStars(p,time);drawMoon(p);drawSun(p);drawClouds(p,dt);drawWeather(p,dt,time);drawLand(p);drawFog(p);drawPrecipitation(p,dt);
  }
  function loop(time){
   if(!running)return;
@@ -504,7 +580,7 @@ export function createSky(canvas,{reducedMotion=false,ground='#0D1714'}={}){
  }
  function stop(){running=false;cancelAnimationFrame(frame);}
  function setVisible(value){visible=value;if(visible&&!running&&!reducedMotion)start();}
- return {resize,setHorizon,setLocation,setState,setTimeScale:value=>{timeScale=finite(value)&&value>0?value:1;},start,stop,setVisible,render:()=>render(0),
-  get treeHeight(){return treeHeight();},
+ return {resize,setLocation,setState,setTimeScale:value=>{timeScale=finite(value)&&value>0?value:1;},start,stop,setVisible,render:()=>render(0),
+  get treeHeight(){return maxTree();},get groundHeight(){return grass();},
   get reducedMotion(){return reducedMotion;},set reducedMotion(value){reducedMotion=!!value;if(reducedMotion)stop();else start();render(0);}};
 }

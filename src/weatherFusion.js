@@ -732,7 +732,6 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
   });
   app.get(['/weather-fusion/halo', '/weather-fusion/halo/'], (_req, res) => res.redirect(302, '/weather-fusion/halo.html'));
-  app.get(['/weather-fusion/atmos', '/weather-fusion/atmos/'], (_req, res) => res.redirect(302, '/weather-fusion/atmos.html'));
   app.get('/weather-fusion/weathernext-site.html', (req,res) => {
     // The standalone data explorer lives at its explicit file route. The public
     // /weathernext dashboard is owned by weatherComparison.js so it can reuse
@@ -759,7 +758,6 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     'today.html','today.css','today.js',
     'wn.html','wn.css','wn.js',
     'ultimate.html','ultimate.css','ultimate.js',
-    'atmos.html','atmos.css','atmos.js','atmos-model.js','atmos-sky.js','archivo-latin-wdth-normal.woff2',
     'experimental-sky.js',
     'comfort-cinematic.css','comfort-effects.css','comfort-outlook.js','current-inputs.js','current-temperature.js',
     'daily-uv.js','dans-summary.js','dans-take.js','day-graph.js','dewpoint-meter.js','dewpoint-meter.css',

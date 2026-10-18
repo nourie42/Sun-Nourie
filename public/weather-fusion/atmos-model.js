@@ -13,7 +13,7 @@ import {thermalRisk} from './thermal-risk.js?v=weather-art-labels-v10';
 import {calendarDayWindow} from './calendar-day.js?v=calendar-days-v1';
 import {dailyForecastReadings} from './seven-day.js?v=low-rain-display-v1';
 
-export const ATMOS_VERSION='atmos-v1';
+export const ATMOS_VERSION='atmos-v2';
 export const H=3600000;
 export const PERFECT_RULES={ideal:PERFECT_TEMP_IDEAL_F,band:PERFECT_TEMP_BAND_F,breezyBand:RULE_B_TEMP_F,calm:CALM_WIND_MAX_MPH,breeze:BREEZY_WIND_F,dewpoint:DEWPOINT_MAX_EXCLUSIVE_F};
 export const SOURCE_ORDER=['nws','hrrr','ecmwf','nbm','wn'];
@@ -23,6 +23,14 @@ export const SOURCES={
  ecmwf:{label:'ECMWF',name:'ECMWF IFS, the European model'},
  nbm:{label:'NBM',name:'NOAA National Blend of Models'},
  wn:{label:'WeatherNext',name:'WeatherNext AI forecast'},
+};
+/* Plain-language descriptions for the forecast lab. */
+export const SOURCE_ABOUT={
+ nws:'The official forecast from your local National Weather Service office.',
+ hrrr:'NOAA’s high-resolution model, rerun every hour. Built for the next day or two.',
+ ecmwf:'The European global model, widely used for the days ahead.',
+ nbm:'NOAA’s National Blend of Models: many computer models combined and bias-corrected.',
+ wn:'An AI weather model trained on decades of past weather data.',
 };
 export const sourceLabel=id=>SOURCES[id]?.label||String(id||'').toUpperCase();
 const sourceRank=id=>{const i=SOURCE_ORDER.indexOf(id);return i<0?SOURCE_ORDER.length:i;};
@@ -343,4 +351,171 @@ export function placeFromQuery(search){
  const latitude=Number(params.get('lat')),longitude=Number(params.get('lon'));
  const place={id:'query',name:String(params.get('name')||'').slice(0,80)||'Selected location',latitude,longitude};
  return params.has('lat')&&params.has('lon')&&validPlace(place)?place:null;
+}
+
+/* ---------- Make your own forecast ----------
+ * The lab never invents a forecast value. Each hour it re-weights the source
+ * values the server already published for that hour. A slider multiplies a
+ * source's Weather Nourie share (Off, a fraction, Normal, or up to 4×); the
+ * shares are then rescaled to add up to 100% over the sources that cover that
+ * hour, exactly as the server does when a source is missing. With every slider
+ * at Normal the lab shows the canonical values themselves. */
+export const TRUST_STOPS=[0,.25,.5,.75,1,1.5,2,3,4];
+export const TRUST_LABELS=['Off','¼×','½×','¾×','Normal','1½×','2×','3×','4×'];
+export const NORMAL_STOP=TRUST_STOPS.indexOf(1);
+export const LAB_PRESETS=[
+ {id:'nourie',label:'Weather Nourie',trust:{nws:1,hrrr:1,ecmwf:1,nbm:1,wn:1}},
+ {id:'nws',label:'Just the NWS',trust:{nws:1,hrrr:0,ecmwf:0,nbm:0,wn:0}},
+ {id:'models',label:'Models only',trust:{nws:0,hrrr:1,ecmwf:1,nbm:1,wn:1}},
+ {id:'hrrr',label:'Lean on HRRR',trust:{nws:1,hrrr:4,ecmwf:1,nbm:1,wn:1}},
+ {id:'ecmwf',label:'Lean on the European',trust:{nws:1,hrrr:1,ecmwf:4,nbm:1,wn:1}},
+ {id:'wn',label:'Lean on the AI',trust:{nws:1,hrrr:1,ecmwf:1,nbm:1,wn:4}},
+];
+/** Only the listed stops are accepted; anything else reads as Normal. */
+export function normalTrust(trust){
+ const out={};
+ for(const id of SOURCE_ORDER){const value=trust?.[id];out[id]=typeof value==='number'&&TRUST_STOPS.includes(value)?value:1;}
+ return out;
+}
+export const isNourieTrust=trust=>{const t=normalTrust(trust);return SOURCE_ORDER.every(id=>t[id]===1);};
+export function matchingPreset(trust){
+ const t=normalTrust(trust);
+ return LAB_PRESETS.find(preset=>SOURCE_ORDER.every(id=>t[id]===preset.trust[id]))?.id||null;
+}
+/** Weighted mean of one hour's published source values with the user's multipliers. */
+export function mixValue(sources,trust){
+ const t=normalTrust(trust);let sum=0,total=0;
+ for(const source of sources||[]){
+  if(!source?.id||!finite(source.value)||!finite(source.weight)||source.weight<=0)continue;
+  const weight=source.weight*(t[source.id]??1);
+  if(!(weight>0))continue;
+  sum+=weight*source.value;total+=weight;
+ }
+ return total>0?sum/total:null;
+}
+/** The rain score is a sum of points, not an average. Each listed source keeps
+ * its points; a share the user turns off drops out. Past the end of the NWS
+ * hourly forecast its share adds no points, as on the main page. When the
+ * server fell back to the NWS chance because a model was missing, the models
+ * that are present split the score instead, so missing data never reads as dry. */
+export function rainScoreMix(likelihood,trust){
+ const t=normalTrust(trust),fallback=likelihood?.mode==='nws-fallback';
+ const list=(fallback?likelihood?.partialBlend?.sources:likelihood?.sources)||[];
+ let points=0,total=0,listed=0,official=false;
+ for(const source of list){
+  if(!source?.id||!finite(source.value)||!finite(source.weight)||source.weight<=0)continue;
+  listed+=source.weight;if(source.id==='nws')official=true;
+  const weight=source.weight*(t[source.id]??1);
+  if(!(weight>0))continue;
+  points+=weight*source.value;total+=weight;
+ }
+ if(!(total>0))return null;
+ const missing=!fallback&&!official?Math.max(0,1-listed)*t.nws:0;
+ return Math.min(100,Math.max(0,points/(total+missing)));
+}
+const FALLBACK_POLICY={sameDay:{nws:.36,hrrr:.27,ecmwf:.09,nbm:.18,wn:.1},extendedRain:{nws:.135,ecmwf:.54,nbm:.225,wn:.1}};
+/** Each source's share of the two Weather Nourie recipes after the user's multipliers. */
+export function recipeShares(forecast,trust){
+ const t=normalTrust(trust),policy=forecast?.blendPolicy||{};
+ const shares=weights=>{
+  const rows=SOURCE_ORDER.filter(id=>finite(weights?.[id])&&weights[id]>0).map(id=>({id,base:weights[id],weight:weights[id]*t[id]}));
+  const base=rows.reduce((n,r)=>n+r.base,0),total=rows.reduce((n,r)=>n+r.weight,0);
+  return rows.map(r=>({id:r.id,base:base>0?r.base/base:0,share:total>0?r.weight/total:0}));
+ };
+ return {today:shares(policy.sameDay||FALLBACK_POLICY.sameDay),later:shares(policy.extendedRain||FALLBACK_POLICY.extendedRain)};
+}
+/** The first and last forecast hour each source publishes a temperature for. */
+export function sourceCoverage(forecast,now=Date.now()){
+ const out={},current=Math.floor(now/H)*H;
+ for(const [time,row] of seriesIndex(forecast).temperature){
+  if(time<current)continue;
+  for(const source of row.sources||[]){
+   if(!source?.id||!finite(source.value))continue;
+   const entry=out[source.id]||={first:time,last:time,hours:0};
+   entry.first=Math.min(entry.first,time);entry.last=Math.max(entry.last,time);entry.hours+=1;
+  }
+ }
+ return out;
+}
+/** Hour-by-hour and day-by-day forecast for a set of multipliers, next to Weather Nourie's own. */
+export function customForecast(forecast,trust,now=Date.now(),dayCount=10){
+ const t=normalTrust(trust),exact=isNourieTrust(t),zone=forecast?.location?.timeZone||'America/New_York';
+ const current=Math.floor(now/H)*H,index=seriesIndex(forecast);
+ const temperature=[...index.temperature].filter(([time])=>time>=current).sort((a,b)=>a[0]-b[0]).map(([time,row])=>{
+  const base=finite(row.value)?row.value:null;
+  return {time,base,mine:exact?base:mixValue(row.sources,t)};
+ });
+ const rainRows=new Map();
+ for(const row of forecast?.rainTimeline||[]){
+  const time=Date.parse(row?.time);if(!finite(time)||time<current||rainRows.has(time))continue;
+  const likelihood=row.rainLikelihood||{};
+  const base=finite(likelihood.value)&&likelihood.value>=0&&likelihood.value<=100?likelihood.value:null;
+  const raw=exact?base:rainScoreMix(likelihood,t);
+  const amountBase=finite(row.precipitation)&&row.precipitation>=0?row.precipitation:null;
+  const amount=exact?amountBase:mixValue(row.precipitationBlend?.sources,t);
+  rainRows.set(time,{time,base,mine:finite(raw)?Math.min(100,Math.max(0,Math.round(raw))):null,amountBase,amountMine:finite(amount)?Math.max(0,amount):null});
+ }
+ const rain=[...rainRows.values()].sort((a,b)=>a.time-b.time);
+ const temps=new Map(temperature.map(row=>[row.time,row]));
+ const days=(forecast?.days||[]).filter(day=>/^\d{4}-\d{2}-\d{2}$/.test(day?.date||'')).slice(0,dayCount).map((day,i)=>{
+  const window=calendarDayWindow(day,i,now,zone),noon=Date.parse(`${day.date}T12:00:00Z`);
+  const pick=(map,key)=>{
+   const values=[];
+   if(!(window.end>window.start))return null;
+   for(let time=window.start;time<window.end;time+=H){const value=map.get(time)?.[key];if(!finite(value))return null;values.push(value);}
+   return values;
+  };
+  const side=(tempKey,rainKey,amountKey)=>{
+   const tv=pick(temps,tempKey),rv=pick(rainRows,rainKey),av=pick(rainRows,amountKey);
+   return {high:tv?Math.round(Math.max(...tv)):null,low:tv?Math.round(Math.min(...tv)):null,
+    rain:rv?Math.max(...rv):null,amount:av?av.reduce((n,v)=>n+v,0):null};
+  };
+  return {date:day.date,index:i,label:i===0?'Today':new Intl.DateTimeFormat('en-US',{timeZone:'UTC',weekday:'short'}).format(noon),
+   longLabel:i===0?'today':new Intl.DateTimeFormat('en-US',{timeZone:'UTC',weekday:'long'}).format(noon),
+   dateLabel:new Intl.DateTimeFormat('en-US',{timeZone:'UTC',month:'short',day:'numeric'}).format(noon),
+   window,base:side('base','base','amountBase'),mine:side('mine','mine','amountMine')};
+ });
+ return {exact,trust:t,temperature,rain,days};
+}
+/** The largest changes a recipe makes, for the plain-language summary. */
+export function labDifferences(result){
+ let temperature=null,rain=null,amount=null;const highs=[];
+ for(const day of result?.days||[]){
+  for(const kind of ['high','low']){
+   const base=day.base[kind],mine=day.mine[kind];
+   if(!finite(base)||!finite(mine))continue;
+   if(kind==='high')highs.push(mine-base);
+   if(!temperature||Math.abs(mine-base)>Math.abs(temperature.delta))temperature={day,kind,base,mine,delta:mine-base};
+  }
+  if(finite(day.base.rain)&&finite(day.mine.rain)&&(!rain||Math.abs(day.mine.rain-day.base.rain)>Math.abs(rain.delta)))rain={day,base:day.base.rain,mine:day.mine.rain,delta:day.mine.rain-day.base.rain};
+  if(finite(day.base.amount)&&finite(day.mine.amount)&&(!amount||Math.abs(day.mine.amount-day.base.amount)>Math.abs(amount.delta)))amount={day,base:day.base.amount,mine:day.mine.amount,delta:day.mine.amount-day.base.amount};
+ }
+ return {temperature,rain,amount,meanHigh:highs.length?highs.reduce((n,v)=>n+v,0)/highs.length:null,days:highs.length};
+}
+
+/* ---------- Plain-language outlook for the top of the page ---------- */
+/** When rain shows up in the next 48 hours, from the same hourly chances the clock shows. */
+export function rainOutlook(steps){
+ if(!steps?.length)return {kind:'unknown'};
+ if(steps[0].rainNow)return {kind:'now'};
+ const future=steps.filter(step=>!step.isNow),shown=step=>step.rainShown??0;
+ const storm=future.find(step=>step.kind==='storm'&&shown(step)>=30);
+ const likely=future.find(step=>shown(step)>=50);
+ const chance=future.find(step=>shown(step)>=30);
+ const values=future.map(step=>step.rain).filter(finite);
+ if(storm&&(!likely||storm.time<=likely.time))return {kind:'storm',step:storm};
+ if(likely)return {kind:'likely',step:likely};
+ if(chance)return {kind:'chance',step:chance};
+ if(values.length<future.length*.8)return {kind:'unknown'};
+ const peak=Math.max(0,...values);
+ return {kind:peak<10?'dry':'slight',peak};
+}
+/** "around 9 PM", "tomorrow around 3 PM", "overnight, around 2 AM", "Monday around 3 PM". */
+export function relativeHour(time,now,zone='America/New_York'){
+ const a=localParts(now,zone),b=localParts(time,zone),hour=hourLabel(time,zone);
+ const days=Math.round((Date.parse(`${b.date}T12:00:00Z`)-Date.parse(`${a.date}T12:00:00Z`))/86400000);
+ if(days<=0)return `around ${hour}`;
+ if(days===1&&b.hour<6)return `overnight, around ${hour}`;
+ if(days===1)return `tomorrow around ${hour}`;
+ return `${longDayLabel(time,zone)} around ${hour}`;
 }

@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync,existsSync} from 'node:fs';
 import {fixture} from '../scripts/weatherNourieFixture.js';
-import {buildTimeline,skyScene,mixScene,cloudCover,consensus,rainBreakdown,comfortBin,comfortGrid,perfectWindows,sourceSpread,seriesIndex,dailyOutlook,sunDay,placeFromQuery,PRESETS,H} from '../public/weather-fusion/atmos-model.js';
+import {buildTimeline,skyScene,mixScene,cloudCover,consensus,rainBreakdown,comfortBin,comfortGrid,perfectWindows,sourceSpread,seriesIndex,dailyOutlook,sunDay,placeFromQuery,PRESETS,H,
+  TRUST_STOPS,LAB_PRESETS,normalTrust,isNourieTrust,matchingPreset,mixValue,rainScoreMix,recipeShares,sourceCoverage,customForecast,labDifferences,rainOutlook,relativeHour} from '../public/weather-fusion/atmos-model.js';
 import {sunPosition,moonIllumination,moonPhaseName} from '../public/weather-fusion/atmos-sky.js';
 import {hourlyDisplaySamples} from '../public/weather-fusion/weather-display.js';
 import {forecastValue,displayedFeelsAt} from '../public/weather-fusion/hourly-feels.js';
@@ -11,19 +12,15 @@ import {solarElevation} from '../public/weather-fusion/weather-math.js';
 import {isPublicWeatherPath,isProtectedWeatherPath} from '../src/weatherSiteAccess.js';
 
 const read=name=>readFileSync(new URL(`../public/weather-fusion/${name}`,import.meta.url),'utf8');
-const serverSource=readFileSync(new URL('../src/weatherFusion.js',import.meta.url),'utf8');
+const legacySource=readFileSync(new URL('../legacy-server.js',import.meta.url),'utf8');
 const forecast=fixture('knightdale');
 const now=Date.parse(forecast.assembledAt)+5*60000;
 
-test('Atmos files are served by the explicit weather routes and stay behind the weather password',()=>{
-  const list=serverSource.match(/for \(const name of \[([\s\S]*?)\]\) app\.get\(`\/weather-fusion\/\$\{name\}`/);
-  assert.ok(list,'weather assets use an auditable explicit route list');
-  const allowed=new Set([...list[1].matchAll(/'([^']+)'/g)].map(match=>match[1]));
+test('Atmos is self-contained: the existing static server publishes it and the weather password protects it',()=>{
   for(const name of ['atmos.html','atmos.css','atmos.js','atmos-model.js','atmos-sky.js','archivo-latin-wdth-normal.woff2']){
-    assert.ok(allowed.has(name),`${name} is routed`);
     assert.ok(existsSync(new URL(`../public/weather-fusion/${name}`,import.meta.url)),`${name} exists`);
   }
-  assert.match(serverSource,/\/weather-fusion\/atmos', '\/weather-fusion\/atmos\/'\], \(_req, res\) => res\.redirect\(302, '\/weather-fusion\/atmos\.html'\)/);
+  assert.match(legacySource,/express\.static\(path\.join\(__dirname, "public"\)/,'public/ is served as-is, so no route had to change');
   assert.equal(isProtectedWeatherPath('/weather-fusion/atmos.html'),true);
   assert.equal(isPublicWeatherPath('/weather-fusion/atmos.html'),false,'like the other alternate views, the page needs the weather password');
   assert.equal(isPublicWeatherPath('/weather-fusion/atmos.js'),true);
@@ -43,7 +40,7 @@ test('every module Atmos imports exists, so the page cannot load a missing file'
   assert.match(html,/<script type="module" src="\/weather-fusion\/atmos\.js\?v=/);
   assert.match(html,/not an official National Weather Service product/);
   assert.match(html,/<noscript>[\s\S]*weather\.gov/);
-  assert.match(read('index.html'),/id="atmos-link" href="\/weather-fusion\/atmos\.html"/);
+  assert.match(html,/id="lab"[\s\S]*Make your own forecast/);
 });
 
 test('the 48-hour clock shows exactly the main page hourly samples',()=>{
@@ -179,4 +176,104 @@ test('places come from presets or validated U.S. coordinates only',()=>{
   assert.equal(placeFromQuery('?lat=51.5&lon=-0.1'),null);
   assert.equal(placeFromQuery('?lat=abc&lon=-78'),null);
   assert.equal(placeFromQuery(''),null);
+});
+
+/* ---------- Make your own forecast ---------- */
+test('at Normal the forecast lab shows Weather Nourie’s own values, hour by hour and day by day',()=>{
+  const result=customForecast(forecast,{},now);
+  assert.equal(result.exact,true);
+  assert.ok(result.temperature.length>100&&result.rain.length>100);
+  assert.ok(result.temperature.every(row=>row.mine===row.base));
+  assert.ok(result.rain.every(row=>row.mine===row.base&&row.amountMine===row.amountBase));
+  const main=dailyForecastReadings(forecast,now,10);
+  result.days.forEach((day,i)=>{
+    assert.deepEqual(day.mine,day.base);
+    assert.equal(day.base.high,main[i].high,`${day.date} high matches the main page`);
+    assert.equal(day.base.low,main[i].low,`${day.date} low matches the main page`);
+    if(!main[i].observed)assert.equal(day.base.rain,main[i].pop,`${day.date} rain chance matches the main page`);
+    if(Number.isFinite(main[i].amount))assert.ok(Math.abs(day.base.amount-main[i].amount)<1e-6,`${day.date} rain total matches the main page`);
+  });
+});
+
+test('the lab reproduces the server blend arithmetic before any slider moves',()=>{
+  const index=seriesIndex(forecast);let temps=0,rains=0,amounts=0;
+  for(const hour of forecast.hours){
+    const time=Date.parse(hour.time);
+    if(hour.temperatureBlend?.sources?.length){temps++;assert.ok(Math.abs(mixValue(hour.temperatureBlend.sources,{})-hour.temperatureBlend.value)<1e-3);}
+    const row=index.temperature.get(time);
+    if(row?.sources?.length)assert.ok(Math.abs(mixValue(row.sources,{})-row.value)<=.5,'the published hourly value is the rounded blend');
+  }
+  for(const row of forecast.rainTimeline){
+    const likelihood=row.rainLikelihood;
+    if(likelihood?.sources?.length&&likelihood.mode!=='nws-fallback'){rains++;assert.ok(Math.abs(rainScoreMix(likelihood,{})-likelihood.rawTotal)<1e-6,'the rain score is the same sum of points');}
+    if(row.precipitationBlend?.sources?.length&&Number.isFinite(row.precipitation)){amounts++;assert.ok(Math.abs(mixValue(row.precipitationBlend.sources,{})-row.precipitation)<1e-6);}
+  }
+  assert.ok(temps>20&&rains>100&&amounts>100);
+});
+
+test('turning forecasts off or up re-weights only the values each source published',()=>{
+  const nwsOnly=customForecast(forecast,LAB_PRESETS.find(p=>p.id==='nws').trust,now);
+  const index=seriesIndex(forecast);
+  for(const row of nwsOnly.temperature){
+    const nws=index.temperature.get(row.time)?.sources?.find(s=>s.id==='nws');
+    if(nws)assert.ok(Math.abs(row.mine-nws.value)<1e-9,'just the NWS means the NWS value');
+    else assert.equal(row.mine,null,'an hour the NWS does not cover is left blank, not filled in');
+  }
+  const noHrrr=customForecast(forecast,{hrrr:0},now);
+  const hour=forecast.hours.find(h=>h.temperatureBlend?.sources?.some(s=>s.id==='hrrr')&&h.temperatureBlend.sources.length>2);
+  const others=hour.temperatureBlend.sources.filter(s=>s.id!=='hrrr'),weight=others.reduce((n,s)=>n+s.weight,0);
+  const expected=others.reduce((n,s)=>n+s.weight*s.value,0)/weight;
+  assert.ok(Math.abs(noHrrr.temperature.find(r=>r.time===Date.parse(hour.time)).mine-expected)<1e-9,'the remaining shares are rescaled to 100%');
+  const doubled=mixValue([{id:'nws',weight:.4,value:70},{id:'ecmwf',weight:.1,value:80}],{ecmwf:4});
+  assert.ok(Math.abs(doubled-(.4*70+.4*80)/.8)<1e-9,'4× multiplies a share before rescaling');
+});
+
+test('the rain score keeps its point rules when the mix changes',()=>{
+  const sources=[{id:'nws',value:40,weight:.4},{id:'hrrr',value:100,weight:.3},{id:'ecmwf',value:0,weight:.1},{id:'nbm',value:100/3,weight:.2}];
+  assert.ok(Math.abs(rainScoreMix({sources},{})-(16+30+0+6.666666666666667))<1e-9);
+  assert.ok(Math.abs(rainScoreMix({sources},{nws:1,hrrr:0,ecmwf:0,nbm:0})-40)<1e-9,'just the NWS is the official chance');
+  const laterDay=[{id:'ecmwf',value:100,weight:.6},{id:'nbm',value:0,weight:.25}];
+  assert.ok(Math.abs(rainScoreMix({sources:laterDay},{})-60)<1e-9,'past the NWS hourly forecast its 15% share adds no points, as on the main page');
+  assert.equal(rainScoreMix({sources:laterDay},{nws:1,ecmwf:0,nbm:0}),null,'no kept forecast covers the hour, so it is blank');
+  const fallback={mode:'nws-fallback',sources:[{id:'nws',value:30,weight:1}],partialBlend:{sources:[{id:'nws',value:30,weight:.4},{id:'ecmwf',value:100,weight:.1}]}};
+  assert.ok(Math.abs(rainScoreMix(fallback,{hrrr:2})-(.4*30+.1*100)/.5)<1e-9,'with a model missing, the present sources split the score instead of counting it as dry');
+});
+
+test('recipes accept only the slider stops, and the shares add up',()=>{
+  assert.deepEqual(normalTrust({nws:'4',hrrr:7,ecmwf:-1,nbm:null}),{nws:1,hrrr:1,ecmwf:1,nbm:1,wn:1},'anything off the slider reads as Normal');
+  assert.deepEqual(normalTrust({nws:0,hrrr:4}),{nws:0,hrrr:4,ecmwf:1,nbm:1,wn:1});
+  assert.ok(TRUST_STOPS.includes(1)&&TRUST_STOPS[0]===0&&TRUST_STOPS.at(-1)===4);
+  assert.equal(isNourieTrust({}),true);assert.equal(isNourieTrust({wn:2}),false);
+  assert.equal(matchingPreset({nws:1,hrrr:0,ecmwf:0,nbm:0,wn:0}),'nws');assert.equal(matchingPreset({ecmwf:2}),null);
+  const data={blendPolicy:{sameDay:{nws:.36,hrrr:.27,ecmwf:.09,nbm:.18,wn:.1},extendedRain:{nws:.135,ecmwf:.54,nbm:.225,wn:.1}}};
+  const shares=recipeShares(data,{ecmwf:4});
+  for(const list of [shares.today,shares.later])assert.ok(Math.abs(list.reduce((n,r)=>n+r.share,0)-1)<1e-9);
+  assert.ok(Math.abs(shares.today.find(r=>r.id==='ecmwf').share-.36/1.27)<1e-9);
+  assert.equal(shares.later.some(r=>r.id==='hrrr'),false,'HRRR is not part of the later-day rain recipe');
+  const coverage=sourceCoverage(forecast,now);
+  assert.ok(coverage.ecmwf.last>coverage.hrrr.last,'the coverage note shows HRRR stops sooner than ECMWF');
+});
+
+test('the lab summary finds the biggest change',()=>{
+  const day=(index,mine,base)=>({index,label:'Mon',longLabel:'Monday',mine,base});
+  const diffs=labDifferences({days:[day(0,{high:80,low:60,rain:20,amount:.1},{high:81,low:60,rain:20,amount:.1}),day(1,{high:75,low:58,rain:55,amount:.4},{high:79,low:58,rain:30,amount:.2})]});
+  assert.equal(diffs.temperature.delta,-4);assert.equal(diffs.temperature.kind,'high');
+  assert.equal(diffs.rain.delta,25);assert.equal(diffs.days,2);
+});
+
+test('the plain-language outlook reads the same hourly chances the clock shows',()=>{
+  const base=Date.parse('2026-09-05T22:00:00Z');
+  const hour=(i,rain,kind='cloudy')=>({isNow:i===0,time:base+i*H,rain,rainShown:rain>=5?rain:null,kind});
+  assert.equal(rainOutlook([hour(0,0),hour(1,2),hour(2,3)]).kind,'dry');
+  assert.equal(rainOutlook([hour(0,0),hour(1,20),hour(2,3)]).kind,'slight');
+  assert.equal(rainOutlook([hour(0,0),hour(1,35),hour(2,20)]).kind,'chance');
+  assert.equal(rainOutlook([hour(0,0),hour(1,35),hour(2,60)]).step.rainShown,60,'likely rain is the headline over an earlier small chance');
+  assert.equal(rainOutlook([hour(0,0),hour(1,10),hour(2,60)]).kind,'likely');
+  assert.equal(rainOutlook([hour(0,0),hour(1,40,'storm'),hour(2,70)]).kind,'storm');
+  assert.equal(rainOutlook([{...hour(0,0),rainNow:true},hour(1,0)]).kind,'now');
+  const zone='America/New_York';
+  assert.equal(relativeHour(base+3*H,base,zone),'around 9 PM');
+  assert.equal(relativeHour(base+9*H,base,zone),'overnight, around 3 AM');
+  assert.equal(relativeHour(base+20*H,base,zone),'tomorrow around 2 PM');
+  assert.match(relativeHour(base+50*H,base,zone),/^Monday around/);
 });
