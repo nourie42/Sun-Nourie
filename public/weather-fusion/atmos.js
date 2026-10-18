@@ -49,9 +49,17 @@ function sceneAt(position){
 function paintSky(position){
  skyIndex=position;
  const state=sceneAt(position);
- if(state)sky.setState(state);
+ if(state){sky.setState(state);setBodySky(state);}
  renderSkyNote(state?.time);
  drawStripCursor(position);
+}
+/* The page's header band and background follow the sky shown: night, rain, sunset or day. */
+let bodySky='';
+function setBodySky(state){
+ const loc=forecast?.location||place;if(!loc||!finite(state.time))return;
+ const alt=sunPosition(state.time,loc.latitude,loc.longitude).altitude,s=state.scene;
+ const next=alt<-4?'night':(s.storm||s.rain>.12)?'rain':(alt<8?'sunset':'day');
+ if(next!==bodySky){bodySky=next;document.body.dataset.sky=next;}
 }
 function renderSkyNote(time){
  const note=$('sky-note');
@@ -171,7 +179,7 @@ function section(id,fn){
   console.error(`Atmos ${id} failed`,error);
   const node=$(id),message='<p class="lead section-error">This part of the forecast could not be drawn. The rest of the page is unaffected.</p>';
   if(!node)return;
-  if(node.classList.contains('card')){if(!node.querySelector('.section-error'))node.insertAdjacentHTML('beforeend',message);}
+  if(node.classList.contains('glass')){if(!node.querySelector('.section-error'))node.insertAdjacentHTML('beforeend',message);}
   else node.innerHTML=message;
  }
 }
@@ -304,8 +312,9 @@ function renderHero(){
  const s=step();if(!s)return;
  const z=zone();
  $('when').textContent=s.isNow?`Now, ${longDayLabel(s.time,z)} ${clockLabel(s.time,z)}`:`${longDayLabel(s.time,z)} at ${hourLabel(s.time,z)}`;
- $('temp-value').textContent=finite(s.temperature)?String(Math.round(s.temperature)):'––';
+ $('temp-value').innerHTML=`${finite(s.temperature)?Math.round(s.temperature):'––'}<span>°</span>`;
  $('temp-label').textContent=finite(s.temperature)?`${Math.round(s.temperature)} degrees`:'Temperature unavailable';
+ renderDayLine(s);
  const condition=s.rainNow?'Rain now':s.condition;
  $('condition').textContent=condition;$('condition').classList.toggle('long',condition.length>22);
  const feels=$('feels');
@@ -324,6 +333,14 @@ function renderHero(){
  $('read-humidity-note').textContent=finite(s.wetBulb)?`wet bulb ${deg(s.wetBulb)}`:'relative humidity';
  $('now-button').hidden=s.isNow;
  renderCaption();
+}
+/** The day's high and low under the temperature, and that day's peak UV, for the hour picked. */
+function renderDayLine(s){
+ const z=zone(),date=localParts(s.time,z).date,day=days.find(d=>d.date===date)||null,range=$('high-low');
+ range.innerHTML=day&&finite(day.high)&&finite(day.low)?`High ${deg(day.high)}<span>Low ${deg(day.low)}</span>`:'';
+ range.hidden=!range.innerHTML;
+ const uvDay=forecast.days?.find(d=>d.date===date)??forecast.days?.[0],uv=uvDay&&finite(uvDay.uvMax)?uvCategory(uvDay.uvMax):null;
+ $('hero-uv').textContent=uv?`Peak UV ${Math.round(uvDay.uvMax)}, ${uv.label.toLowerCase()}`:'';
 }
 function renderCaption(){
  const s=step(),node=$('clock-caption');if(!node)return;
@@ -347,7 +364,7 @@ function renderTicker(){
 }
 function alertLevel(event=''){return /warning/i.test(event)?'warning':/watch/i.test(event)?'watch':'advisory';}
 function renderAlerts(){
- const root=$('alerts');if(!forecast){root.hidden=true;return;}
+ const root=$('alerts');if(!forecast){root.hidden=true;$('alerts-panel').hidden=true;return;}
  const list=(forecast.alerts||[]).slice().sort((a,b)=>['warning','watch','advisory'].indexOf(alertLevel(a.event))-['warning','watch','advisory'].indexOf(alertLevel(b.event)));
  const health=alertHealth(forecast);
  const official=`https://forecast.weather.gov/MapClick.php?lat=${forecast.location.latitude}&lon=${forecast.location.longitude}`;
@@ -355,6 +372,7 @@ function renderAlerts(){
  root.innerHTML=list.map(alert=>`<a class="alert" data-level="${alertLevel(alert.event)}" href="${esc(official)}" rel="noopener">${icon}<div><strong>${esc(alert.event||'Weather alert')}</strong><span>${esc(alert.headline||alert.areaDesc||'Open the official NWS alert for details.')}</span></div></a>`).join('')
   +(health.verified?'':`<p class="alert-check">${esc(health.message)} <a href="${esc(official)}" rel="noopener">Official NWS forecast</a></p>`);
  root.hidden=!list.length&&health.verified;
+ $('alerts-panel').hidden=root.hidden;
 }
 
 /* ---------- 48-hour strip ---------- */
@@ -429,7 +447,7 @@ function renderBlendChart(){
   const ids=presentSources(blendRows),values=blendRows.flatMap(r=>[r.min,r.max,r.blend]).filter(finite);
   $('blend-title').textContent=ids.length>1?`${countWord(ids.length)} forecasts, one temperature`:'The forecast behind the number';
   if(!values.length){el.innerHTML='<p class="lead">Source-by-source temperatures are not available for this place. The blend still uses every source that is.</p>';$('blend-keys').innerHTML='';return;}
-  const left=34,right=10,top=12,bottom=26,plot=height-top-bottom;
+  const left=44,right=10,top=12,bottom=26,plot=height-top-bottom;
   const ticks=niceTicks(Math.min(...values)-1,Math.max(...values)+1,4),lo=ticks[0],hi=ticks.at(-1);
   const y=v=>top+(1-(v-lo)/(hi-lo||1))*plot,scale=slotScale(blendRows.length,left,right,width);
   let band='',segment=[];
@@ -588,9 +606,9 @@ function labSummary(){
 function renderLabChart(){
  const el=$('lab-chart');if(!el||!lab)return;
  const rows=chartRows();
- const {width,height}=chartFrame(el,el.clientWidth<600?200:250);
+ const {width,height}=chartFrame(el,el.clientWidth<600?200:360);
  if(rows.length<2){el.innerHTML='<p class="lead">There is not enough hourly data to chart this yet.</p>';$('lab-keys').innerHTML='';return;}
- const left=36,right=10,top=12,bottom=26,plot=height-top-bottom,t0=rows[0].time,t1=rows.at(-1).time;
+ const left=44,right=10,top=12,bottom=26,plot=height-top-bottom,t0=rows[0].time,t1=rows.at(-1).time;
  const x=t=>left+(t-t0)/(t1-t0||1)*(width-left-right);
  let lo,hi,ticks;
  if(labView==='rain'){lo=0;hi=100;ticks=[0,25,50,75,100];}
@@ -669,7 +687,7 @@ function renderLabScience(){
 }
 
 /* ---------- Feel ---------- */
-function binColor(bin){return bin?`var(--${bin.key})`:'#E8EDF3';}
+function binColor(bin){return bin?`var(--${bin.key})`:'var(--none)';}
 const MARKS={air:'<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.5" fill="#fff" stroke="var(--ink)" stroke-width="2.2"/></svg>',
  shade:'<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="var(--ink-3)" stroke="#fff" stroke-width="1.5"/></svg>',
  out:'<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="var(--ink)" stroke="#fff" stroke-width="1.5"/></svg>'};
@@ -697,7 +715,7 @@ function renderFeel(){
  }
  const level=(s.isNow?dewpointFeelLevel:forecastFeelLevel)(s.dewpoint,s.wind);
  const width=Math.max(240,dew.clientWidth||300),dx=v=>9+(clamp(v,20,80)-20)/60*(width-18);
- const bands=[[20,50,'#D9ECF7'],[50,60,'#CBE6D3'],[60,70,'#F8D9A8'],[70,80,'#EF9D72']].map(([a,b,c])=>`<rect x="${dx(a).toFixed(1)}" y="8" width="${(dx(b)-dx(a)-2).toFixed(1)}" height="12" rx="3" fill="${c}"/>`).join('');
+ const bands=[[20,50,'var(--dew-dry)'],[50,60,'var(--dew-nice)'],[60,70,'var(--dew-sticky)'],[70,80,'var(--dew-muggy)']].map(([a,b,c])=>`<rect x="${dx(a).toFixed(1)}" y="8" width="${(dx(b)-dx(a)-2).toFixed(1)}" height="12" rx="3" fill="${c}"/>`).join('');
  const labels=[[20,'Dry'],[50,'Nice'],[60,'Sticky'],[70,'Muggy']].map(([v,l])=>`<text x="${dx(v).toFixed(1)}" y="40">${l}</text>`).join('');
  const marker=finite(s.dewpoint)?`<circle cx="${dx(s.dewpoint).toFixed(1)}" cy="14" r="8" fill="var(--ink)" stroke="#fff" stroke-width="2.5"/>`:'';
  dew.innerHTML=`<div class="dew-card"><h3>How sticky it feels</h3><p class="sub">The dew point measures the moisture in the air, which relative humidity hides.</p>
@@ -710,7 +728,7 @@ function renderFeel(){
 function renderRainChart(){
  section('rain-chart',()=>{
   const el=$('rain-chart'),{width,height}=chartFrame(el,el.clientWidth<600?176:210);
-  const left=34,right=10,top=12,bottom=26,plot=height-top-bottom,scale=slotScale(steps.length,left,right,width);
+  const left=44,right=10,top=12,bottom=26,plot=height-top-bottom,scale=slotScale(steps.length,left,right,width);
   const y=v=>top+(1-v/100)*plot,barW=Math.max(2,Math.min(18,scale.step-2));
   const ids=new Set();
   const cols=steps.map((s,i)=>{
@@ -774,7 +792,7 @@ function renderGrid(){
    const y=headerH+ri*(rowH+gap);
    const cells=row.cells.map((cell,h)=>{
     const x=label+h*cellW;
-    if(!cell)return `<rect x="${(x+1.5).toFixed(1)}" y="${y+1.5}" width="${Math.max(1,cellW-3).toFixed(1)}" height="${rowH-3}" rx="3" fill="none" stroke="#E1E7EE" stroke-width="1"/>`;
+    if(!cell)return `<rect x="${(x+1.5).toFixed(1)}" y="${y+1.5}" width="${Math.max(1,cellW-3).toFixed(1)}" height="${rowH-3}" rx="3" fill="none" stroke="var(--line-2)" stroke-width="1"/>`;
     const fill=cell.perfect?'var(--gold)':binColor(cell.bin);
     const light=!cell.perfect&&DARK_BINS.has(cell.bin?.key);
     const dot=finite(cell.rain)&&cell.rain>=50?`<circle cx="${(x+cellW/2).toFixed(1)}" cy="${y+rowH/2}" r="${cell.rain>=75?3.2:2.4}" fill="${light?'#fff':'var(--ink)'}" pointer-events="none"/>`:'';
@@ -918,7 +936,7 @@ function renderSun(){
  const day=forecast.days?.find(d=>d.date===date),uv=finite(day?.uvMax)?uvCategory(day.uvMax):null;
  const length=finite(sun.dayLength)?`${Math.floor(sun.dayLength/H)} h ${Math.round(sun.dayLength%H/60000)} m`:'–';
  el.innerHTML=`<h3 id="sun-title">Sun and UV</h3><p class="sub">${esc(longDayLabel(start+12*H,z))}${finite(sun.peakElevation)?`, the sun peaks ${Math.round(sun.peakElevation)}° high`:''}</p>
-  <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="The sun’s path across the day"><line class="horizon-line" x1="0" x2="${width}" y1="${horizon}" y2="${horizon}"/><path class="sun-arc-night" d="${below}"/><path class="sun-arc" d="${above}"/>${marker}
+  <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="The sun’s path across the day"><line class="horizon-line" x1="0" x2="${width}" y1="${horizon}" y2="${horizon}"/><path class="sun-arc-night" d="${below}"/><path class="sun-path" d="${above}"/>${marker}
   ${finite(sun.sunrise)?`<text x="${x(sun.sunrise)}" y="${horizon+28}" text-anchor="middle">${esc(clockLabel(sun.sunrise,z))}</text>`:''}${finite(sun.sunset)?`<text x="${x(sun.sunset)}" y="${horizon+28}" text-anchor="middle">${esc(clockLabel(sun.sunset,z))}</text>`:''}</svg>
   <ul class="facts"><li><b>${length}</b>of daylight</li><li><b>${finite(sun.noon)?esc(clockLabel(sun.noon,z)):'–'}</b>sun highest</li><li><b>${finite(sun.goldenEveningStart)?esc(clockLabel(sun.goldenEveningStart,z)):'–'}</b>golden hour begins</li><li><b>${uv?`${uv.index}, ${esc(uv.label.toLowerCase())}`:'–'}</b>peak UV${finite(s.uv)?`, ${Math.round(s.uv)} this hour`:''}</li></ul>
   <p class="note">Sunrise and sunset are calculated astronomical times. Golden hour starts when the sun drops below 6°. ${uv&&uv.index>=3?'Sun protection is recommended at UV 3 and above.':''}</p>`;
@@ -926,7 +944,7 @@ function renderSun(){
 function renderAir(){
  const el=$('street-air'),aq=forecast?.airQuality;
  if(!aq||!finite(aq.aqi)){el.innerHTML='<h3 id="air-title">Air quality</h3><p class="note">Current air-quality data is unavailable for this place. The weather forecast is unaffected.</p>';return;}
- const band=aqiBand(aq.aqi),color={good:'#CDEFD6',moderate:'#FBEBB5',sensitive:'#F9D2B8',unhealthy:'#F6C1C1','very-unhealthy':'#E2C6EE',hazardous:'#E8C4C4'}[band.key]||'#E8EDF3';
+ const band=aqiBand(aq.aqi),color={good:'var(--aqi-good)',moderate:'var(--aqi-moderate)',sensitive:'var(--aqi-sensitive)',unhealthy:'var(--aqi-unhealthy)','very-unhealthy':'var(--aqi-very-unhealthy)',hazardous:'var(--aqi-hazardous)'}[band.key]||'var(--none)';
  const parts=[finite(aq.pm25)?`<li><b>${aq.pm25.toFixed(1)}</b>PM2.5, µg/m³</li>`:'',finite(aq.ozone)?`<li><b>${Math.round(aq.ozone)}</b>ozone, µg/m³</li>`:'',finite(aq.next24HourPeak)?`<li><b>${Math.round(aq.next24HourPeak)}</b>next 24 h peak</li>`:''].join('');
  el.innerHTML=`<h3 id="air-title">Air quality</h3><p class="sub">U.S. AQI from ${esc(aq.source||'Open-Meteo / CAMS')}</p><div class="aqi-ring"><strong>${Math.round(aq.aqi)}</strong><span class="aqi-pill" style="--aqi:${color}">${esc(band.label)}</span></div><p class="note">${esc(band.summary)}</p>${parts?`<ul class="facts">${parts}</ul>`:''}`;
 }

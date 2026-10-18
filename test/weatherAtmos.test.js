@@ -16,8 +16,8 @@ const legacySource=readFileSync(new URL('../legacy-server.js',import.meta.url),'
 const forecast=fixture('knightdale');
 const now=Date.parse(forecast.assembledAt)+5*60000;
 
-test('Atmos is self-contained: the existing static server publishes it and the weather password protects it',()=>{
-  for(const name of ['atmos.html','atmos.css','atmos.js','atmos-model.js','atmos-sky.js','archivo-latin-wdth-normal.woff2']){
+test('Atmos is served by the existing static server and the weather password protects it',()=>{
+  for(const name of ['atmos.html','atmos.css','atmos.js','atmos-model.js','atmos-sky.js']){
     assert.ok(existsSync(new URL(`../public/weather-fusion/${name}`,import.meta.url)),`${name} exists`);
   }
   assert.match(legacySource,/express\.static\(path\.join\(__dirname, "public"\)/,'public/ is served as-is, so no route had to change');
@@ -176,6 +176,21 @@ test('places come from presets or validated U.S. coordinates only',()=>{
   assert.equal(placeFromQuery('?lat=51.5&lon=-0.1'),null);
   assert.equal(placeFromQuery('?lat=abc&lon=-78'),null);
   assert.equal(placeFromQuery(''),null);
+});
+
+test('Atmos uses the main page’s own look: shared stylesheets, header band and the same sky photographs',()=>{
+  const html=read('atmos.html'),sky=read('atmos-sky.js');
+  for(const sheet of ['style.css','forecast-layout.css','weather-polish.css','page-unify.css','header-sky.css'])
+    assert.match(html,new RegExp(`href="/weather-fusion/${sheet.replace('.','\\.')}`),`${sheet} is shared with the main page`);
+  assert.match(html,/class="topbar sky-header"/);
+  assert.match(html,/src="\/weather-fusion\/header-sky\.js\?v=/);
+  for(const name of ['clear','clouds','rain','storm','night-v2']){
+    assert.match(sky,new RegExp(`today-sky-${name}\\.webp`),`the sky draws the main page's today-sky-${name} photograph`);
+    assert.ok(existsSync(new URL(`../public/weather-fusion/today-sky-${name}.webp`,import.meta.url)),`today-sky-${name}.webp exists`);
+  }
+  assert.doesNotMatch(sky,/cumulus|paintLandscape|deciduous|evergreen|LEAVES|season/i,'no painted cartoon sprites, lollipop trees or seasonal leaves');
+  assert.doesNotMatch(read('atmos.css')+html,/Archivo|woff2/,'the page uses the same system type stack as the main page');
+  assert.doesNotMatch(html,/class="card"/,'sections are the main page’s glass tiles');
 });
 
 /* ---------- Make your own forecast ---------- */
