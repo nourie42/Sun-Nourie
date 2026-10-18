@@ -1,5 +1,5 @@
 /** Nourie Weather · animated forecast scene player. All supplied text uses textContent. */
-import {approvedOutfit} from './approved-weather-world.js?v=approved-her-prerelease-v2';
+import {approvedOutfit} from './approved-weather-world.js?v=approved-her-prerelease-v3';
 const number = (v, fallback = 0) => v !== null && v !== '' && Number.isFinite(Number(v)) ? Number(v) : fallback;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const optionalNumber = v => v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v)) ? Number(v) : null;
@@ -68,7 +68,7 @@ export function createScenarioForecast(name, start = new Date(), hours = 24) {
   let stamp=new Date(start).getTime();if(!Number.isFinite(stamp))stamp=Date.now();stamp=Math.floor(stamp/3600000)*3600000;
   return Array.from({length:clamp(Math.floor(number(hours,24)),1,336)},(_,i)=>({...preset,time:new Date(stamp+i*3600000).toISOString()}));
 }
-const cssURL = new URL('./sky-player.css?v=approved-her-prerelease-v2',import.meta.url).href;
+const cssURL = new URL('./sky-player.css?v=approved-her-prerelease-v3',import.meta.url).href;
 const compactSeconds = seconds => seconds>=60?`${Math.floor(seconds/60)}m ${Math.round(seconds%60)}s`:`${Number(seconds.toFixed(seconds<1?3:1))}s`;
 
 class WeatherSkyPlayer extends HTMLElement {
@@ -178,7 +178,7 @@ class WeatherSkyPlayer extends HTMLElement {
     if(!this._connected||this._world||this._worldPromise||this._worldFailed)return;
     const epoch=++this._worldEpoch;this.$('.world-status').hidden=false;this.$('.world-status').classList.remove('has-error');this.$('.world-status-title').textContent='Preparing your forecast scene…';this.$('.world-status-note').textContent='Weather, sky, and what to wear.';this.$('.world-retry').hidden=true;
     this._worldPromise=(async()=>{
-      const {createWeatherWorld}=await import('./approved-weather-world.js?v=approved-her-prerelease-v2');
+      const {createWeatherWorld}=await import('./approved-weather-world.js?v=approved-her-prerelease-v3');
       if(!this._connected||epoch!==this._worldEpoch)return;
       const world=await createWeatherWorld(this.$('.world-stage'),{initialFrame:this.currentFrame?{...this.currentFrame,outfitBasis:this._clothingMode}:{},initialOutfit:this._outfitFor(this.currentFrame||{}),initialCharacter:this._character,onError:error=>{if(epoch===this._worldEpoch)this._handleWorldError(error);}});
       if(!this._connected||epoch!==this._worldEpoch||this._worldFailed){world?.dispose?.();return;}

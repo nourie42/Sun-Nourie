@@ -2,7 +2,7 @@
  * Forecast values remain owned by native-player.js. No weather is fetched here. */
 import {selectWeatherPortrait} from './approved-portrait-selection.js?v=approved-her-prerelease-v2';
 import {solarElevation} from '../weather-math.js?v=current-rain-20261017-v3';
-export const APPROVED_PLAYER_VERSION='approved-her-prerelease-v2';
+export const APPROVED_PLAYER_VERSION='approved-her-prerelease-v3';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 const WMO={0:'Clear',1:'Mostly clear',2:'Partly cloudy',3:'Overcast',45:'Fog',48:'Fog',51:'Drizzle',53:'Drizzle',55:'Drizzle',56:'Freezing drizzle',57:'Freezing drizzle',61:'Rain',63:'Rain',65:'Heavy rain',66:'Freezing rain',67:'Freezing rain',71:'Snow',73:'Snow',75:'Heavy snow',77:'Snow',80:'Rain showers',81:'Rain showers',82:'Heavy rain',85:'Snow showers',86:'Heavy snow',95:'Thunderstorms',96:'Thunderstorms with hail',99:'Thunderstorms with hail'};
 export function approvedState(frame={}){
@@ -13,7 +13,8 @@ export function approvedState(frame={}){
  const t=Date.parse(frame.time);
  if(finite(t)&&finite(frame.latitude)&&finite(frame.longitude)){
   const e=solarElevation(t,frame.latitude,frame.longitude),later=solarElevation(t+15*60000,frame.latitude,frame.longitude);
-  if(finite(e)&&finite(later)&&Math.abs(e)<=4.5)options.solar=[{[later>e?'sunrise':'sunset']:frame.time}];
+  // solarElevation returns radians; twilight spans 4.5 degrees from the horizon.
+  if(finite(e)&&finite(later)&&Math.abs(e)<=4.5*Math.PI/180)options.solar=[{[later>e?'sunrise':'sunset']:frame.time}];
  }
  return selectWeatherPortrait(row,options);
 }
