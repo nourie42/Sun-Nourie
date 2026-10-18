@@ -1,6 +1,7 @@
 /** Approved single-person weather photographs. This presentation layer never
  * changes a forecast number or infers precipitation type from temperature. */
-export const WEATHER_PORTRAITS_VERSION='weather-portraits-cold-v2';
+import {clothingForFeels} from '../exposure-scene.js?v=current-rain-20261017-v3';
+export const WEATHER_PORTRAITS_VERSION='weather-portraits-consistent-v3';
 // Match the native comfort cards: the 30s require winter layers. Image names
 // are legacy artwork identifiers, not the thresholds for clothing advice.
 export const WINTER_CLOTHING_BELOW_F=42;
@@ -37,9 +38,10 @@ export function portraitWeather(row={}){
 }
 export function selectWeatherPortrait(row={},options={}){
  const weather=portraitWeather(row),air=finite(row.temperature)?row.temperature:null,feels=finite(row.feels)?row.feels:null;
- const mode=options.mode==='air'?'air':'feels';
- const value=mode==='air'?air:feels??air;
- const basis=mode==='air'?'Air temperature':feels!==null?'Feels like':air!==null?'Air temperature (feels like unavailable)':'Temperature unavailable';
+ // Match the comfort cards for the same selected hour. Old saved AIR-mode
+ // values must not silently put this person in different clothes.
+ const value=feels??air;
+ const basis=feels!==null?'Feels like':air!==null?'Air temperature (feels like unavailable)':'Temperature unavailable';
  if(!weather||value===null||typeof row.isDay!=='boolean')return {available:false,reason:!weather?'Weather condition unavailable':value===null?'Temperature unavailable':'Day/night information unavailable',air,feels,basis};
  let family=weather,light=row.isDay?'day':'night';
  const time=stamp(row.time);
@@ -51,12 +53,16 @@ export function selectWeatherPortrait(row={},options={}){
   }
  }
  const bands=PORTRAIT_BANDS[family];
- const cold=value<WINTER_CLOTHING_BELOW_F;
- const band=bands===wet?(cold?'below-42f':value<60?'below-60f':'60f-plus'):bands===winter?(cold?'below-32f':'32-49f'):cold?'below-32f':value<60?'32-59f':bands===four?(value<75?'60-74f':'75f-plus'):'60f-plus';
+ const clothing=clothingForFeels(value,{snowExpected:row.snowExpected===true||['snow','heavy-snow'].includes(weather)});
+ const cold=clothing==='cold',cool=clothing==='cool';
+ // Filenames identify existing artwork, not the current decision thresholds.
+ // Warm and hot intentionally share the same approved light-clothes photo.
+ const band=bands===wet?(cold?'below-42f':cool?'below-60f':'60f-plus'):bands===winter?(cold?'below-32f':'32-49f'):cold?'below-32f':cool?'32-59f':bands===four?(clothing==='mild'?'60-74f':'75f-plus'):'60f-plus';
+ const wardrobe=bands===wet?`rainwear-${band}`:bands===winter?`winter-${band}`:bands===four?`dry-${band}`:`dry-${cold?'below-32f':cool?'32-59f':'60f-plus'}`;
  const file=`weather-her-${family}${['dawn','dusk'].includes(family)?'':'-'+light}-feels-${band}.webp`;
  if(!allowed.has(file))throw new Error('Unrecognized approved weather portrait');
  // Cold rain edits retain their matching liquid-rain park background. Never
  // substitute freezing rain or snow artwork because the person needs a coat.
  const background=file.replace('weather-her-','weather-her-bg-').replace('feels-below-42f','feels-below-60f');
- return {available:true,file,background,weather,light,band,value,basis,air,feels,cold,condition:String(row.condition||weather),illustrative:true};
+ return {available:true,file,background,weather,light,band,value,basis,air,feels,cold,clothing,wardrobe,condition:String(row.condition||weather),illustrative:true};
 }

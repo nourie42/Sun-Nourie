@@ -1,5 +1,5 @@
 /** Nourie Weather · animated forecast scene player. All supplied text uses textContent. */
-import {approvedOutfit} from './approved-weather-world.js?v=approved-her-motion-v5';
+import {approvedOutfit} from './approved-weather-world.js?v=approved-her-consistent-v6';
 const number = (v, fallback = 0) => v !== null && v !== '' && Number.isFinite(Number(v)) ? Number(v) : fallback;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const optionalNumber = v => v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v)) ? Number(v) : null;
@@ -21,6 +21,14 @@ export function playbackTiming(speed = 4, frameCount = 0) {
   const millisecondsPerHour = 2000 / normalizedSpeed;
   const hours = Math.max(0,Math.floor(number(frameCount)));
   return {speed:normalizedSpeed,millisecondsPerHour,secondsPerHour:millisecondsPerHour/1000,sweepSeconds:hours*millisecondsPerHour/1000,frameCount:hours};
+}
+
+/** A newly changed outfit gets a readable pause even at fast forecast speeds.
+ * Repeated hours sharing its settled photograph do not reset this clock. */
+export function playbackFrameDelay(speed=4,settledAt=null,now=globalThis.performance?.now()??Date.now()){
+  const base=playbackTiming(speed).millisecondsPerHour;
+  if(typeof settledAt!=='number'||!Number.isFinite(settledAt)||typeof now!=='number'||!Number.isFinite(now))return base;
+  return Math.max(base,700-Math.max(0,now-settledAt));
 }
 
 export function outfitForFrame(frame = {}) {return approvedOutfit(frame);}
@@ -49,7 +57,7 @@ export const weatherDescription = (f,o=outfitForFrame(f)) => {
   if([0,1].includes(code)||cloud!==null)return f.isDay===false?'Mostly clear night':f.isDay===true?'Mostly sunny':'Mostly clear';
   return 'Conditions unavailable';
 };
-const outfitKey = o => [o.garment,o.bottom,o.hat,o.scarf,o.boots,o.gloves,o.sunglasses,o.umbrella].join('|');
+const outfitKey = o => o.portrait?.available?o.portrait.wardrobe:'unavailable';
 /** Actual clothing/accessory changes only, without inventing changes on stable days. */
 export function outfitTransitions(frames = []) {
   const changes=[];let previous='';
@@ -68,7 +76,7 @@ export function createScenarioForecast(name, start = new Date(), hours = 24) {
   let stamp=new Date(start).getTime();if(!Number.isFinite(stamp))stamp=Date.now();stamp=Math.floor(stamp/3600000)*3600000;
   return Array.from({length:clamp(Math.floor(number(hours,24)),1,336)},(_,i)=>({...preset,time:new Date(stamp+i*3600000).toISOString()}));
 }
-const cssURL = new URL('./sky-player.css?v=approved-her-motion-v5',import.meta.url).href;
+const cssURL = new URL('./sky-player.css?v=approved-her-consistent-v6',import.meta.url).href;
 const compactSeconds = seconds => seconds>=60?`${Math.floor(seconds/60)}m ${Math.round(seconds%60)}s`:`${Number(seconds.toFixed(seconds<1?3:1))}s`;
 
 class WeatherSkyPlayer extends HTMLElement {
@@ -76,13 +84,12 @@ class WeatherSkyPlayer extends HTMLElement {
   constructor(){
     super();this.attachShadow({mode:'open'});
     this._forecast=[];this._index=0;this._playing=false;this._timer=null;this._speed=4;this._playbackEpoch=0;this._sceneTask=null;
-    this._character='approved';this._clothingMode='feels';
+    this._character='approved';
     try{this._speed=playbackTiming(globalThis.localStorage?.getItem(SPEED_STORAGE_KEY)??4).speed;}catch{}
     this._locationName='Your forecast';this._timezone='';this._world=null;this._worldPromise=null;this._worldEpoch=0;this._worldFailed=false;this._inView=false;this._connected=false;
     this.shadowRoot.innerHTML=`<link rel="stylesheet" href="${cssURL}">
     <section class="player" aria-label="Animated weather illustration and outfit forecast">
       <header class="player-heading"><div class="heading-left"><span class="mini-play" aria-hidden="true">▶</span><h2>Play your weather</h2><span class="heading-detail">Your forecast, in motion</span></div><span class="mode-badge"><span></span><span class="mode-label">Forecast preview</span></span></header>
-      <label class="outfit-basis"><span>Clothing based on</span><select class="outfit-basis-select" aria-label="Clothing temperature basis"><option value="feels">Feels like</option><option value="air">Air temperature</option></select></label>
       <div class="scene" role="group" aria-label="Forecast scene awaiting weather data">
         <div class="world-stage" aria-hidden="true"></div><div class="overlay-shade" aria-hidden="true"></div>
         <div class="world-status"><span class="world-status-title">Preparing your forecast scene…</span><span class="world-status-note">Weather, sky, and what to wear.</span><button class="world-retry" type="button" hidden>Retry forecast scene</button></div>
@@ -105,7 +112,6 @@ class WeatherSkyPlayer extends HTMLElement {
     this.$('.speed').addEventListener('change',event=>{this.speed=Number(event.target.value);});
     this.$('.world-retry').addEventListener('click',()=>{this._worldFailed=false;this._disposeWorld();this._ensureWorld();});
     this.$('.speed').value=String(this._speed);
-    this.$('.outfit-basis-select').addEventListener('change',event=>{this.pause();this._clothingMode=event.target.value==='air'?'air':'feels';this._renderTimeline();this._render();});
     this._renderPeople();
   }
   connectedCallback(){
@@ -122,7 +128,7 @@ class WeatherSkyPlayer extends HTMLElement {
   get character(){return 'approved';}
   set character(value){this._character='approved';}
   _renderPeople(){}
-  _outfitFor(frame){return outfitForFrame({...frame,outfitBasis:this._clothingMode});}
+  _outfitFor(frame){return outfitForFrame(frame);}
   get forecast(){return this._forecast.map(frame=>({...frame}));}
   set forecast(value){this._forecast=normalizeForecast(value);this._index=clamp(this._index,0,Math.max(0,this._forecast.length-1));if(!this._forecast.length)this.pause();this._renderTimeline();this._render();}
   get locationName(){return this._locationName;}
@@ -137,7 +143,7 @@ class WeatherSkyPlayer extends HTMLElement {
     if(!this._forecast.length)return;
     this._index=((Math.trunc(number(index))%this._forecast.length)+this._forecast.length)%this._forecast.length;
     this._render();
-    this.dispatchEvent(new CustomEvent('framechange',{detail:{index:this._index,frame:{...this.currentFrame,outfitBasis:this._clothingMode},outfit:this._outfitFor(this.currentFrame)},bubbles:true,composed:true}));
+    this.dispatchEvent(new CustomEvent('framechange',{detail:{index:this._index,frame:{...this.currentFrame},outfit:this._outfitFor(this.currentFrame)},bubbles:true,composed:true}));
     return this._sceneTask;
   }
   seekFrame(index){this.setFrame(index);this.pause();}
@@ -162,7 +168,7 @@ class WeatherSkyPlayer extends HTMLElement {
         this._timer=null;if(!active())return;
         await this._awaitScene();if(!active())return;
         this.setFrame(this._index+1);void schedule();
-      },playbackTiming(this._speed).millisecondsPerHour);
+      },playbackFrameDelay(this._speed,this._world?.lastPhotoSettledAt));
     };
     void schedule();
   }
@@ -172,7 +178,7 @@ class WeatherSkyPlayer extends HTMLElement {
   _renderTimeline(){
     if(!this.$)return;const frames=this._forecast;this._renderTiming();const markers=this.$('.outfit-markers');markers.replaceChildren();
     if(!frames.length){this.$('.outfit-changes-note').textContent='';return;}
-    const changes=outfitTransitions(frames.map(frame=>({...frame,outfitBasis:this._clothingMode})));
+    const changes=outfitTransitions(frames);
     this.$('.outfit-changes-note').textContent=changes.length?`${changes.length} outfit ${changes.length===1?'change':'changes'} · tap a marker to jump`:'Same attire throughout this forecast — conditions stay within one clothing range.';
     changes.forEach((change,index)=>{if(index>=64)return;const marker=document.createElement('button');marker.type='button';marker.className='outfit-marker';marker.style.left=`${change.index/Math.max(1,frames.length-1)*100}%`;const label=`${this._format(change.time,{weekday:'short',hour:'numeric'})}: ${change.outfit.label}`;marker.title=label;marker.setAttribute('aria-label',`Outfit changes at ${label}`);marker.addEventListener('click',()=>this.seekFrame(change.index));markers.append(marker);});
   }
@@ -195,14 +201,14 @@ class WeatherSkyPlayer extends HTMLElement {
     if(!this._playing)this.$('.announcement').textContent=`${this._format(frame.time,{hour:'numeric'})}. ${description}, ${Math.round(frame.temperature)} degrees. ${outfit.label}.`;
     this._syncWorld();if(this._inView&&this._connected)this._ensureWorld();
   }
-  _syncWorld(){if(this._world&&this.currentFrame){try{const frame={...this.currentFrame,outfitBasis:this._clothingMode};if(this._timezone){const parts=new Intl.DateTimeFormat('en-US',{timeZone:this._timezone,hour:'numeric',minute:'numeric',hourCycle:'h23'}).formatToParts(new Date(frame.time));frame.localHour=Number(parts.find(p=>p.type==='hour')?.value||0)+Number(parts.find(p=>p.type==='minute')?.value||0)/60;}this._sceneTask=Promise.resolve(this._world.setFrame(frame,this._outfitFor(frame))).catch(error=>{this._handleWorldError(error);return false;});this._world.preload?.(this._forecast.slice(this._index+1).map(f=>({...f,outfitBasis:this._clothingMode})));}catch(error){this._handleWorldError(error);}}}
+  _syncWorld(){if(this._world&&this.currentFrame){try{const frame={...this.currentFrame};if(this._timezone){const parts=new Intl.DateTimeFormat('en-US',{timeZone:this._timezone,hour:'numeric',minute:'numeric',hourCycle:'h23'}).formatToParts(new Date(frame.time));frame.localHour=Number(parts.find(p=>p.type==='hour')?.value||0)+Number(parts.find(p=>p.type==='minute')?.value||0)/60;}this._sceneTask=Promise.resolve(this._world.setFrame(frame,this._outfitFor(frame))).catch(error=>{this._handleWorldError(error);return false;});this._world.preload?.(this._forecast.slice(this._index+1));}catch(error){this._handleWorldError(error);}}}
   async _ensureWorld(){
     if(!this._connected||this._world||this._worldPromise||this._worldFailed)return;
     const epoch=++this._worldEpoch;this.$('.world-status').hidden=false;this.$('.world-status').classList.remove('has-error');this.$('.world-status-title').textContent='Preparing your forecast scene…';this.$('.world-status-note').textContent='Weather, sky, and what to wear.';this.$('.world-retry').hidden=true;
     this._worldPromise=(async()=>{
-      const {createWeatherWorld}=await import('./approved-weather-world.js?v=approved-her-motion-v5');
+      const {createWeatherWorld}=await import('./approved-weather-world.js?v=approved-her-consistent-v6');
       if(!this._connected||epoch!==this._worldEpoch)return;
-      const world=await createWeatherWorld(this.$('.world-stage'),{initialFrame:this.currentFrame?{...this.currentFrame,outfitBasis:this._clothingMode}:{},initialOutfit:this._outfitFor(this.currentFrame||{}),initialCharacter:this._character,onError:error=>{if(epoch===this._worldEpoch)this._handleWorldError(error);}});
+      const world=await createWeatherWorld(this.$('.world-stage'),{initialFrame:this.currentFrame||{},initialOutfit:this._outfitFor(this.currentFrame||{}),initialCharacter:this._character,onError:error=>{if(epoch===this._worldEpoch)this._handleWorldError(error);}});
       if(!this._connected||epoch!==this._worldEpoch||this._worldFailed){world?.dispose?.();return;}
       this._world=world;world.setCharacter?.(this._character);this._syncWorld();if(this._worldFailed)return;world.setPlaying(this._playing);world.resize?.();this.$('.world-status').hidden=true;
       this.dispatchEvent(new CustomEvent('worldready',{bubbles:true,composed:true}));

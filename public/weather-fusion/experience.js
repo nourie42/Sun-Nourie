@@ -96,8 +96,8 @@ export function selectComfortHour(time){
 /** Plain air/weather context accompanies the equivalent-temperature figure. */
 export function comfortInputsHTML(sample) {
  const wind=sample?.inputs?.wind;
- const thermalNote=finite(sample?.temperature)&&finite(sample?.feels)&&Math.abs(sample.temperature-sample.feels)>=10
-   ? '<small>Feels like is an estimated thermal comfort temperature.</small>' : '';
+ const thermalNote=finite(sample?.temperature)&&finite(sample?.feels)
+   ? '<small>Comfort estimate includes sun, wind and humidity.</small>' : '';
  return `<p class="comfort-hour-context"><span>Air ${degrees(sample?.temperature)} · ${esc(sample?.condition||'Conditions unavailable')} · Wind ${finite(wind)&&wind>=0?`${Math.round(wind)} mph`:'unavailable'}</span>${thermalNote}</p>`;
 }
 export function renderComfort(forecast) {

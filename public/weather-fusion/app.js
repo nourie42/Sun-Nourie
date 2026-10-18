@@ -7,7 +7,7 @@ import {weatherIcon,renderHourlyWeather,currentSample} from './weather-display.j
 import {dayGraphHTML,dayGraphPoints,installDayGraph} from './day-graph.js?v=low-rain-display-v1';
 import {degrees,feelsAt,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=current-rain-20261017-v3';
 import {createFramePlayer} from './frame-player.js';
-import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=low-rain-display-v1';
+import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=comfort-consistency-v1';
 import {dailyDisplay} from './weather-math.js?v=current-rain-20261017-v3';
 import {conditionForRainChance} from './weather-state.js?v=current-rain-20261017-v3';
 import {currentHero} from './current-temperature.js?v=current-rain-20261017-v3';
@@ -30,8 +30,8 @@ import {renderForecastWindowBanners,resetForecastWindowBanners} from './forecast
 import {createSevenDayCarousel} from './seven-day.js?v=low-rain-display-v1';
 import {forecastSourceHealth} from './forecast-status.js?v=source-health-v1';
 import {forecastRefreshDue} from './forecast-refresh.js?v=coverage-recovery-v2';
-import {installNativePlayer} from './native-player.js?v=approved-her-motion-v5';
-import {createCustomForecast} from './custom-forecast.js?v=metrics-v4';
+import {installNativePlayer} from './native-player.js?v=approved-her-consistent-v6';
+import {createCustomForecast} from './custom-forecast.js?v=ui-simple-v5';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);
 const customForecast=createCustomForecast({root:$('custom-forecast')});

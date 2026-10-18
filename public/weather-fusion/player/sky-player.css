@@ -35,9 +35,6 @@
 @media(min-width:901px){.location-tag{top:86px}.scene-weather{top:125px}}
 
 /* APPROVED SINGLE-PERSON PRERELEASE: captions never cover her head or feet. */
-.outfit-basis{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 18px 16px;padding:12px 15px;border:1px solid #ffffff38;border-radius:14px;background:#ffffff0c;font-size:13px}
-.outfit-basis-select{min-height:44px;max-width:60%;padding:8px 12px;border:1px solid #c5e6ff66;border-radius:10px;background:#123756;color:#fff;font:inherit}
-.outfit-basis-select option{background:#123756;color:#fff}
 .scene{display:grid;grid-template-columns:minmax(0,1fr);height:auto;min-height:0;aspect-ratio:auto;background:#12364b;overflow:hidden}
 .scene-top{position:relative;inset:auto;grid-area:1/1;margin:18px 18px 0}
 .location-tag{position:relative;inset:auto;grid-area:2/1;margin:8px 18px 0;max-width:none;font-size:12px}
@@ -51,7 +48,7 @@
 .scene .overlay-shade{display:none}
 .outfit-bubble{position:relative;inset:auto;grid-area:5/1;height:auto;min-height:90px;width:100%;max-width:none;padding:16px 18px;background:#25485c;border-top:1px solid #cce5f333;border-radius:0}
 .outfit-summary{font-size:13px;line-height:1.6}.player-footer p{font-size:12px}
-@media(max-width:600px){.world-stage{aspect-ratio:4/5}.frame-hour{font-size:25px}.scene-status{font-size:9px;letter-spacing:.5px}.frame-day{font-size:11px}.outfit-basis{margin:0 10px 14px;padding:10px;font-size:12px}.scene-weather{column-gap:12px}.frame-condition{font-size:14px}.frame-feels{font-size:11px}.frame-temp{font-size:58px}.temperature-line{height:58px}}
+@media(max-width:600px){.world-stage{aspect-ratio:4/5}.frame-hour{font-size:25px}.scene-status{font-size:9px;letter-spacing:.5px}.frame-day{font-size:11px}.scene-weather{column-gap:12px}.frame-condition{font-size:14px}.frame-feels{font-size:11px}.frame-temp{font-size:58px}.temperature-line{height:58px}}
 
 /* Keep the previous decoded photograph opaque while the next outfit dissolves
    over it. Do not fade both layers or animate the person's shape or camera. */

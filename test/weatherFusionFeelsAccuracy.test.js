@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {thermalComfort,tier3FeelsLike} from '../public/weather-fusion/weather-math.js';
+import {thermalComfort,tier3FeelsLike,solarElevation} from '../public/weather-fusion/weather-math.js';
 import {rebuildHourlyFeels} from '../src/weatherFusionHourlyFeels.js';
 import {forecastSample,renderHourlyWeather} from '../public/weather-fusion/weather-display.js';
 import {comfortInputsHTML} from '../public/weather-fusion/experience.js';
@@ -10,6 +10,53 @@ const location={latitude:47.2944,longitude:-101.6227,timeZone:'America/North_Dak
 const night=Date.parse('2026-10-16T10:00:00Z');
 
 import {utciF} from '../public/weather-fusion/utci.js';
+
+test('the reported sunny 65 F afternoon uses the correct hour, wind units and independent UTCI values',()=>{
+ const place={latitude:35.787,longitude:-78.4806,timeZone:'America/New_York'};
+ const time=Date.parse('2026-10-19T19:00:00Z'); // Monday 3 PM EDT, not UTC 3 PM.
+ const input={temperature:65,dewpoint:43.8,wind:12,skyCover:10.6716,condition:'Sunny'};
+ const before=structuredClone(input);
+ const shade=tier3FeelsLike(input,place,time,'shade');
+ const outdoor=tier3FeelsLike(input,place,time,'outdoors');
+ // Independent pythermalcomfort 3.8.0, round_output=False. These pins verify
+ // the UTCI calculation at the model's estimated MRT; they do not validate
+ // that unmeasured radiant environment or a particular person's comfort.
+ const reference={shade:51.21991736056883,outdoor:58.30233341527084};
+ assert.ok(Math.abs(solarElevation(time,place.latitude,place.longitude)*180/Math.PI-36.0633)<.001);
+ for(const estimate of [shade,outdoor]){
+  assert.ok(Math.abs(estimate.rh-46.11676183545536)<1e-10);
+  assert.equal(estimate.windUsedMps,5.36448,'12 mph is standard 10 m wind, converted once');
+  assert.equal(estimate.windChillFloor,false,'NWS wind chill is not extrapolated into this 65 F case');
+ }
+ assert.ok(Math.abs(shade.value-reference.shade)<1e-8);
+ assert.ok(Math.abs(outdoor.value-reference.outdoor)<1e-8);
+ assert.ok(outdoor.tr>shade.tr,'direct sunlight increases the estimated radiant temperature');
+ assert.ok(outdoor.value>shade.value+7,'sunlight is included rather than silently using shade');
+ assert.ok(tier3FeelsLike({...input,wind:6},place,time,'outdoors').value>65,'a lighter breeze can feel warmer than air');
+ assert.match(comfortInputsHTML({temperature:65,feels:58.3,condition:'Sunny',inputs:{wind:12}}),/Comfort estimate includes sun, wind and humidity\./,'even a sub-10 F difference is identified as modeled comfort');
+ assert.deepEqual(input,before,'thermal estimation cannot rewrite the source forecast');
+});
+
+for(const temperature of [35,65,85])test(`${temperature} F: clouds, solar position and wind affect the same outdoor estimate`,()=>{
+ const place={latitude:35.787,longitude:-78.4806,timeZone:'America/New_York'};
+ const highSun=Date.parse('2026-10-19T17:00:00Z'),nightTime=Date.parse('2026-10-20T03:00:00Z');
+ const input={temperature,humidity:50,wind:12,skyCover:0,condition:'Sunny'};
+ const sun=thermalComfort(input,place,highSun);
+ const cloud=thermalComfort({...input,skyCover:100,condition:'Overcast'},place,highSun);
+ const dark=thermalComfort({...input,condition:'Clear'},place,nightTime);
+ const lighterWind=thermalComfort({...input,wind:6},place,highSun);
+ assert.equal(sun.daylight,true);assert.equal(dark.daylight,false);
+ assert.ok(sun.inputEvidence.meanRadiantTemperatureF>cloud.inputEvidence.meanRadiantTemperatureF);
+ assert.equal(cloud.rawShade,cloud.rawOutdoors,'overcast has no direct-beam addition');
+ assert.equal(dark.inputEvidence.meanRadiantTemperatureF,temperature,'no invented sun load at night');
+ assert.equal(dark.rawShade,dark.rawOutdoors);
+ assert.ok(sun.rawOutdoors>=cloud.rawOutdoors);
+ assert.ok(sun.rawOutdoors>=dark.rawOutdoors);
+ assert.ok(lighterWind.rawOutdoors>sun.rawOutdoors,'a stronger breeze increases cooling');
+ if(temperature>=65)assert.ok(sun.rawOutdoors>cloud.rawOutdoors+5,'mild and hot sunshine visibly raises equivalent temperature');
+ // At 35 F the existing NWS cold-wind floor can equalize sun and shade.
+ // It must not make adding sunshine lower the estimate.
+});
 
 // Above 60°F the NWS wind chill blend is inactive, so the value must match
 // the independent pythermalcomfort 4.4.2 UTCI polynomial exactly.
@@ -100,7 +147,7 @@ test('selected storm hours, hourly tiles and outdoor figure read the same timest
   assert.doesNotMatch(figure,/data-scene="snow-play"/);
   const caption=comfortInputsHTML(sample);
   assert.match(caption,new RegExp(`Air ${hour.temperature}° · Thunderstorms · Wind ${Math.round(sample.inputs.wind)} mph`));
-  if(Math.abs(sample.temperature-sample.feels)>=10)assert.match(caption,/estimated thermal comfort temperature/);
+  assert.match(caption,/Comfort estimate includes sun, wind and humidity\./);
  }
 });
 
@@ -108,4 +155,5 @@ test('visible selected-hour context escapes provider wording and does not label 
  const html=comfortInputsHTML({temperature:null,feels:null,condition:'<img src=x>',inputs:{wind:null}});
  assert.match(html,/Air —/);assert.match(html,/Wind unavailable/);assert.match(html,/&lt;img src=x&gt;/);
  assert.doesNotMatch(html,/<img|Air 0/);
+ assert.doesNotMatch(html,/Comfort estimate includes/,'missing feels-like is not presented as an available estimate');
 });

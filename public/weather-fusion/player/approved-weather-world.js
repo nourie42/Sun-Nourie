@@ -1,14 +1,14 @@
 /** The user's approved complete photographs, not the retired character atlases.
  * Forecast values remain owned by native-player.js. No weather is fetched here. */
-import {selectWeatherPortrait,WINTER_CLOTHING_BELOW_F} from './approved-portrait-selection.js?v=approved-her-motion-v5';
+import {selectWeatherPortrait} from './approved-portrait-selection.js?v=approved-her-consistent-v6';
 import {solarElevation} from '../weather-math.js?v=current-rain-20261017-v3';
-export const APPROVED_PLAYER_VERSION='approved-her-motion-v5';
+export const APPROVED_PLAYER_VERSION='approved-her-consistent-v6';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 const WMO={0:'Clear',1:'Mostly clear',2:'Partly cloudy',3:'Overcast',45:'Fog',48:'Fog',51:'Drizzle',53:'Drizzle',55:'Drizzle',56:'Freezing drizzle',57:'Freezing drizzle',61:'Rain',63:'Rain',65:'Heavy rain',66:'Freezing rain',67:'Freezing rain',71:'Snow',73:'Snow',75:'Heavy snow',77:'Snow',80:'Rain showers',81:'Rain showers',82:'Heavy rain',85:'Snow showers',86:'Heavy snow',95:'Thunderstorms',96:'Thunderstorms with hail',99:'Thunderstorms with hail'};
 export function approvedState(frame={}){
  const condition=frame.nativePolicy===true?frame.nativeCondition||'Conditions unavailable':WMO[frame.weatherCode]||frame.condition||'Conditions unavailable';
- const row={condition,temperature:frame.temperature,feels:frame.feelsLike,isDay:frame.isDay,time:frame.time,skyCover:frame.cloudCover};
- const options={mode:frame.outfitBasis==='air'?'air':'feels'};
+ const row={condition,temperature:frame.temperature,feels:frame.feelsLike,isDay:frame.isDay,time:frame.time,skyCover:frame.cloudCover,snowExpected:frame.nativeSnowExpected===true};
+ const options={};
  // Use the selected location and forecast instant, never the phone's clock.
  const t=Date.parse(frame.time);
  if(finite(t)&&finite(frame.latitude)&&finite(frame.longitude)){
@@ -22,12 +22,12 @@ export function approvedOutfit(frame={}){
  const state=approvedState(frame),weather=state.weather;
  const snow=['snow','heavy-snow'].includes(weather),storm=['storm','hail'].includes(weather);
  const rain=['rain','drizzle','heavy-rain','freezing-rain','sleet'].includes(weather);
- const cold=state.available&&finite(state.value)&&state.value<WINTER_CLOTHING_BELOW_F,cool=!cold&&['32-59f','below-60f','32-49f'].includes(state.band),hot=state.band==='75f-plus';
- const label=!state.available?'Outfit unavailable':cold?rain||storm?'Insulated winter raincoat, long pants, hat, gloves and boots':'Winter coat, long pants, hat, gloves and boots':snow||['sleet','freezing-rain'].includes(weather)?'Winter layers, long pants and weather boots':rain||storm?cool?'Rain jacket and long pants':'Light rainwear':cool?'Jacket and long pants':hot?'Light athletic top and shorts':'Light top and long pants';
+ const cold=state.available&&state.clothing==='cold',cool=state.clothing==='cool',warm=state.clothing==='warm',hot=state.clothing==='hot';
+ const label=!state.available?'Outfit unavailable':cold?rain||storm?'Insulated winter raincoat, long pants, hat, gloves and boots':'Winter coat, long pants, hat, gloves and boots':snow||['sleet','freezing-rain'].includes(weather)?'Winter layers, long pants and weather boots':rain||storm?cool?'Rain jacket and long pants':'Light rainwear':cool?'Jacket and long pants':hot?'Light athletic top and shorts':warm?'Light top and shorts':'Light top and long pants';
  const basis=state.available?`${state.basis} ${Math.round(state.value)}°F`:state.reason;
  const safety=storm?'Thunder or hail: seek shelter indoors. ':'';
  const layers=cold?'Wear an insulated coat over warm layers, with a hat, scarf, gloves and warm boots. ':'';
- return {temperature:state.value??null,garment:!state.available?'unknown':rain?'rain':cold?'cold':cool?'cool':hot?'hot':'mild',top:label,bottom:hot?'shorts':'long pants',hat:cold,scarf:cold,boots:cold||snow||rain,gloves:cold,sunglasses:false,umbrella:false,snow,rain,storm,possibleRain:frame.nativePrecipitationActivity==='possible',windy:finite(frame.windSpeed)&&frame.windSpeed>=18,hot,cold,cool,extras:[],label,advice:`${safety}${basis}. ${layers}AI-generated weather and clothing illustration, not a live photograph.`,portrait:state};
+ return {temperature:state.value??null,garment:state.available?state.clothing:'unknown',top:label,bottom:warm||hot?'shorts':'long pants',hat:cold,scarf:cold,boots:cold||snow||rain,gloves:cold,sunglasses:false,umbrella:false,snow,rain,storm,possibleRain:frame.nativePrecipitationActivity==='possible',windy:finite(frame.windSpeed)&&frame.windSpeed>=18,hot,warm,cold,cool,extras:[],label,advice:`${safety}${basis}. ${layers}AI-generated weather and clothing illustration, not a live photograph.`,portrait:state};
 }
 const path=file=>`/weather-fusion/${file}?v=${APPROVED_PLAYER_VERSION}`;
 const cache=new Map(),CACHE_LIMIT=24,PHOTO_TRANSITION_MS=320;
@@ -43,24 +43,16 @@ function load(file){
  });
  cache.set(file,task);if(cache.size>CACHE_LIMIT)cache.delete(cache.keys().next().value);return task;
 }
-function backgroundStyles(){
- if(document.getElementById('approved-player-background-style'))return;
- const style=document.createElement('style');style.id='approved-player-background-style';
- style.textContent='body.approved-player-background .atmosphere{background-image:linear-gradient(180deg,rgba(6,18,34,.28),rgba(6,18,34,.8)),var(--approved-weather-background)!important;background-size:cover!important;background-position:center!important}body.approved-player-background .atmosphere:before,body.approved-player-background .atmosphere>*{display:none!important}';document.head.append(style);
-}
-const backgroundOwner=Symbol.for('nourie.approved-weather-background-owner');
 export async function createWeatherWorld(host,{initialFrame={}}={}){
  if(!host)throw new TypeError('Weather scene host is required');
- backgroundStyles();const owner={};let generation=0,disposed=false,current=null,pending=null,lastFrame=initialFrame;
+ let generation=0,disposed=false,current=null,pending=null,lastFrame=initialFrame,lastPhotoSettledAt=null;
  const message=document.createElement('div');message.className='approved-photo-message';message.setAttribute('role','status');message.setAttribute('aria-live','polite');message.textContent='Loading this hour’s weather picture…';
  host.replaceChildren(message);host.dataset.renderer=APPROVED_PLAYER_VERSION;host.dataset.transitioning='false';
- function clearBackground(){if(document.body[backgroundOwner]===owner){document.body.classList.remove('approved-player-background');document.body.style.removeProperty('--approved-weather-background');delete document.body[backgroundOwner];}}
  function clearMetadata(){host.dataset.loaded='false';for(const key of ['asset','background','band','light'])delete host.dataset[key];}
  function photoAlt(state){return `The selected woman, ${state.condition}, ${state.light}, clothing based on ${state.basis.toLowerCase()} ${Math.round(state.value)} degrees Fahrenheit.`;}
  function markComplete(state){
   current.state=state;current.image.alt=photoAlt(state);message.hidden=true;message.classList.remove('is-updating');host.setAttribute('aria-busy','false');
-  host.dataset.loaded='true';host.dataset.loading='false';host.dataset.transitioning='false';host.dataset.asset=state.file;host.dataset.background=state.background;host.dataset.band=state.band;host.dataset.light=state.light;
-  document.body[backgroundOwner]=owner;document.body.style.setProperty('--approved-weather-background',`url("${path(state.background)}")`);document.body.classList.add('approved-player-background');
+  host.dataset.loaded='true';host.dataset.loading='false';host.dataset.transitioning='false';host.dataset.asset=state.file;host.dataset.band=state.band;host.dataset.light=state.light;
  }
  function cleanup(work){
   clearTimeout(work.decodeTimer);clearTimeout(work.transitionTimer);clearTimeout(work.statusTimer);
@@ -78,7 +70,7 @@ export async function createWeatherWorld(host,{initialFrame={}}={}){
  }
  function hideScene(text){
   if(current)current.image.remove();current=null;
-  clearMetadata();host.dataset.loading='false';host.dataset.transitioning='false';host.setAttribute('aria-busy','false');message.classList.remove('is-updating');message.hidden=false;message.textContent=text;clearBackground();
+  clearMetadata();host.dataset.loading='false';host.dataset.transitioning='false';host.setAttribute('aria-busy','false');message.classList.remove('is-updating');message.hidden=false;message.textContent=text;
  }
  function update(frame){
   if(disposed)return Promise.resolve(false);
@@ -100,11 +92,11 @@ export async function createWeatherWorld(host,{initialFrame={}}={}){
   function complete(){
    if(!latest())return;
    const old=current;image.classList.remove('approved-weather-photo-incoming','is-revealing');image.classList.add('approved-weather-photo-current');
-   current={file:work.file,image,state:work.state};if(old)old.image.remove();markComplete(work.state);settle(work,true);
+   current={file:work.file,image,state:work.state};lastPhotoSettledAt=globalThis.performance?.now()??Date.now();if(old)old.image.remove();markComplete(work.state);settle(work,true);
   }
   void(async()=>{
    try{
-    await Promise.race([Promise.all([load(state.file),load(state.background)]),cancelled]);
+    await Promise.race([load(state.file),cancelled]);
     if(!latest())return;
     image.src=path(state.file);image.alt=photoAlt(work.state);
     // Decode the actual display element. A ready preloader alone does not
@@ -144,10 +136,11 @@ export async function createWeatherWorld(host,{initialFrame={}}={}){
    // next distinct scenes instead of repeatedly preloading the same two hours.
    for(const frame of frames){
     const state=approvedState(frame);if(!state.available||distinct.has(state.file))continue;
-    distinct.add(state.file);void load(state.file).catch(()=>{});void load(state.background).catch(()=>{});if(++queued>=2)break;
+    distinct.add(state.file);void load(state.file).catch(()=>{});if(++queued>=2)break;
    }
   },
-  dispose(){disposed=true;++generation;cancelPending();clearBackground();current=null;host.replaceChildren();clearMetadata();host.dataset.loading='false';host.dataset.transitioning='false';host.setAttribute('aria-busy','false');},
-  get currentFrame(){return lastFrame;}
+  dispose(){disposed=true;++generation;cancelPending();current=null;host.replaceChildren();clearMetadata();host.dataset.loading='false';host.dataset.transitioning='false';host.setAttribute('aria-busy','false');},
+  get currentFrame(){return lastFrame;},
+  get lastPhotoSettledAt(){return lastPhotoSettledAt;}
  };
 }
