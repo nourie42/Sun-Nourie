@@ -64,6 +64,10 @@ export async function createWeatherWorld(host,{initialFrame={}}={}){
    await Promise.all([load(state.file),load(state.background)]);
    if(disposed||token!==generation)return false;
    image.src=path(state.file);image.alt=`The selected woman, ${state.condition}, ${state.light}, clothing based on ${state.basis.toLowerCase()} ${Math.round(state.value)} degrees Fahrenheit.`;
+   // The visible element can need its own decode even when its preloader is ready.
+   // Do not mark it loaded or change the background while the actual image is blank.
+   await image.decode();
+   if(disposed||token!==generation)return false;
    image.hidden=false;message.hidden=true;visible=state.file;
    host.dataset.loaded='true';host.dataset.asset=state.file;host.dataset.background=state.background;host.dataset.band=state.band;host.dataset.light=state.light;
    document.body[backgroundOwner]=owner;document.body.style.setProperty('--approved-weather-background',`url("${path(state.background)}")`);document.body.classList.add('approved-player-background');return true;
