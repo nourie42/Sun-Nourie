@@ -6,13 +6,13 @@ const bounds = {
   cold: [.415, .385, .575, .925], 'cold-scarf': [.415, .385, .575, .925], rain: [.365, .30, .585, .925], wet: [.415, .385, .58, .925],
   snow: [.415, .385, .58, .925], night: [.415, .385, .58, .925],
   'night-cool': [.415, .385, .58, .925], 'night-mild': [.415, .385, .58, .925], 'night-hot': [.405, .38, .60, .925],
-  storm: [.42, .4, .58, .92], clouds: [0, 0, 1, 1], 'park-empty': [0, 0, 1, 1], 'hot-poses-alpha': [0, 0, 1, 1]
+  storm: [.42, .4, .58, .92], clouds: [0, 0, 1, 1], 'park-empty': [0, 0, 1, 1], 'hot-poses-alpha': [0, 0, 1, 1], 'snow-empty': [0, 0, 1, 1]
 };
 export const PHOTO_SCENES = Object.freeze(Object.fromEntries(Object.entries(bounds).map(([id, personBounds]) => [id, Object.freeze({
-  id, file: id === 'clouds' ? './assets/sky-storm.webp' : id === 'hot-poses-alpha' ? './assets/photo-hot-poses-alpha.png' : `./assets/photo-${id}.webp`, sourceWidth: id === 'clouds' ? 1672 : id === 'hot-poses-alpha' ? 1881 : 1536, sourceHeight: id === 'clouds' ? 940 : id === 'hot-poses-alpha' ? 836 : 1024,
+  id, file: id === 'snow-empty' ? '../player-snow-empty.png' : id === 'clouds' ? './assets/sky-storm.webp' : id === 'hot-poses-alpha' ? './assets/photo-hot-poses-alpha.png' : `./assets/photo-${id}.webp`, sourceWidth: id === 'clouds' ? 1672 : id === 'hot-poses-alpha' ? 1881 : 1536, sourceHeight: id === 'clouds' ? 940 : id === 'hot-poses-alpha' ? 836 : 1024,
   personX: .50, personBounds: Object.freeze(personBounds),
   garment: id === 'night' || id === 'cold-scarf' ? 'cold' : id.startsWith('night-') ? id.slice(6) : id === 'wet' ? 'rain' : id,
-  showPerson: !['storm','clouds','park-empty'].includes(id), hasUmbrella: id === 'rain', photographicNight: id === 'night' || id.startsWith('night-'), auxiliary: ['clouds','park-empty','hot-poses-alpha'].includes(id),
+  showPerson: !['storm','clouds','park-empty','snow-empty'].includes(id), hasUmbrella: id === 'rain', photographicNight: id === 'night' || id.startsWith('night-'), auxiliary: ['clouds','park-empty','hot-poses-alpha','snow-empty'].includes(id),
   skyShiftX: id === 'night' ? .16 : 0,
   torso: Object.freeze([.505, .575, .060, .105]), hair: Object.freeze([.536, .466, .014, .042])
 })])));

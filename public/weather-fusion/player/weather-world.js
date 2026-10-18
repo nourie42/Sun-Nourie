@@ -1,34 +1,92 @@
 import * as THREE from './vendor/three.module.js';
-import { PHOTO_SCENES, PHOTO_HOT_ATLAS, selectPhotoScene, computePhotoLayout, createLatestRequestGate } from './photo-scene.js';
+import { PHOTO_SCENES, selectPhotoScene, createLatestRequestGate } from './photo-scene.js?v=people-v1';
+import { CHARACTERS, normalizeCharacter, selectCharacterPose, computeCharacterLayout } from './character-scene.js?v=people-v1';
 
-// Integrated photographic cinemagraph: the person and landscape come from the
-// same photograph. Only local optical motion is added; feet and camera stay put.
+// Empty photographic landscapes and selectable transparent outfit atlases.
+// Weather, clothing and lighting all follow the selected native forecast hour.
 const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
 const lerp = (a, b, t) => a + (b - a) * t;
 const assetURL = key => new URL(PHOTO_SCENES[key].file, import.meta.url).href;
-const PHOTO_KEYS = Object.keys(PHOTO_SCENES);
+const PHOTO_KEYS = ['park-empty', 'storm', 'clouds', 'snow-empty'].filter(key => PHOTO_SCENES[key]);
+
+function emptySceneFor(spec) {
+  const key = spec.precipitation === 'snow' && PHOTO_SCENES['snow-empty'] ? 'snow-empty' : spec.precipitation === 'rain' || !spec.showPerson ? 'storm' : 'park-empty';
+  return { ...spec, sceneKey: spec.key, key, asset: PHOTO_SCENES[key], gradeNight: spec.night, skyKey: key === 'park-empty' ? spec.skyKey : null };
+}
 const MAX_GPU_TEXTURES = 8;
 
-export async function createWeatherWorld(container, { onError, initialFrame = {}, initialOutfit = {} } = {}) {
+export async function createWeatherWorld(container, { onError, initialFrame = {}, initialOutfit = {}, initialCharacter = 'white' } = {}) {
   if (!container?.appendChild) throw new TypeError('A photographic weather container is required.');
-  const gate = createLatestRequestGate(), images = new Map(), textures = new Map(), loads = new Map();
+  const gate = createLatestRequestGate(), characterGate = createLatestRequestGate(), images = new Map(), textures = new Map(), loads = new Map();
   let disposed = false, renderer = null, canvas = null, fallback = null;
-  let selected = selectPhotoScene(initialFrame, initialOutfit), active = null, previous = null;
+  let selected = emptySceneFor(selectPhotoScene(initialFrame, initialOutfit)), active = null, previous = null;
+  let character = normalizeCharacter(initialCharacter), actorImage = null;
   let width = 1, height = 1, playing = false, visible = true, raf = 0, last = 0, time = 0;
   let blendStart = 0, blendDuration = 280, lastChange = 0, blend = 1;
   const reducedMotion = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)');
   const uniforms = {
-    uFrom: { value: null }, uTo: { value: null }, uSky: { value: null }, uActorAtlas: { value: null },
-    uFromSun: { value: 0 }, uToSun: { value: 0 }, uFromAtlas: { value: 0 }, uToAtlas: { value: 0 }, uPose: { value: 0 },
-    uPoseBounds: { value: PHOTO_HOT_ATLAS.bounds.map(b => new THREE.Vector4(...b)) }, uFootX: { value: [...PHOTO_HOT_ATLAS.footX] },
+    uFrom: { value: null }, uTo: { value: null }, uSky: { value: null },
+    uFromSun: { value: 0 }, uToSun: { value: 0 },
     uBlend: { value: 1 }, uTime: { value: 0 }, uMotion: { value: reducedMotion?.matches ? 0 : 1 },
     uFromScale: { value: new THREE.Vector2(1, 1) }, uFromOffset: { value: new THREE.Vector2() },
     uToScale: { value: new THREE.Vector2(1, 1) }, uToOffset: { value: new THREE.Vector2() },
     uFromNight: { value: 0 }, uToNight: { value: 0 }, uFromShade: { value: 0 }, uToShade: { value: 0 },
-    uFromStyle: { value: 0 }, uToStyle: { value: 0 }, uFromSkyShift: { value: 0 }, uToSkyShift: { value: 0 },
-    uSkyMix: { value: 0 }, uSkyNight: { value: 0 }, uRain: { value: 0 }, uSnow: { value: 0 },
-    uWind: { value: .2 }, uFog: { value: 0 }, uAspect: { value: 1 }, uPerson: { value: 1 }
+    uFromSkyShift: { value: 0 }, uToSkyShift: { value: 0 },
+    uSkyMix: { value: 0 }, uRain: { value: 0 }, uSnow: { value: 0 },
+    uWind: { value: .2 }, uFog: { value: 0 }, uAspect: { value: 1 }
   };
+
+  const actorLayer = document.createElement('div'), actor = document.createElement('img');
+  const actorShadow = document.createElement('div'), fallbackWeather = document.createElement('div');
+  const actorStyle = document.createElement('style'), actorLoads = new Map();
+  actorLayer.className = 'weather-world-character';
+  Object.assign(actorLayer.style, { position: 'absolute', overflow: 'hidden', pointerEvents: 'none', zIndex: '2', visibility: 'hidden', transformOrigin: '50% 100%' });
+  Object.assign(actor.style, { position: 'absolute', maxWidth: 'none', maxHeight: 'none', objectFit: 'fill' });
+  actor.alt = ''; actor.setAttribute('aria-hidden', 'true'); actor.decoding = 'async'; actorLayer.append(actor);
+  Object.assign(actorShadow.style, { position: 'absolute', pointerEvents: 'none', zIndex: '1', borderRadius: '50%', background: 'radial-gradient(ellipse,rgba(16,26,29,.32),transparent 70%)', visibility: 'hidden' });
+  fallbackWeather.className = 'weather-world-fallback-weather';
+  Object.assign(fallbackWeather.style, { position: 'absolute', inset: '0', pointerEvents: 'none', zIndex: '3', display: 'none' });
+  actorStyle.textContent = `.weather-world-fallback-weather[data-weather="rain"]{background-image:repeating-linear-gradient(108deg,transparent 0 28px,rgba(210,230,244,.13) 29px,transparent 30px 62px);background-size:100% 170%;animation:weather-world-rain .9s linear infinite}.weather-world-fallback-weather[data-weather="snow"]{background-image:radial-gradient(circle,rgba(247,252,255,.8) 1px,transparent 2px),radial-gradient(circle,rgba(247,252,255,.5) 1px,transparent 2px);background-size:37px 57px,71px 43px;animation:weather-world-snow 6s linear infinite}@keyframes weather-world-rain{to{background-position:-24px 110px}}@keyframes weather-world-snow{to{background-position:17px 57px,-13px 43px}}@media(prefers-reduced-motion:reduce){.weather-world-fallback-weather{animation:none!important}}`;
+  container.append(actorStyle, actorShadow, actorLayer, fallbackWeather);
+
+  function renderActor() {
+    const pose = selectCharacterPose(selected), shown = Boolean(pose && actorImage && !disposed);
+    actorLayer.style.visibility = actorShadow.style.visibility = shown ? 'visible' : 'hidden';
+    container.dataset.character = character; container.dataset.characterPose = pose || 'shelter';
+    fallbackWeather.dataset.weather = selected.precipitation || '';
+    fallbackWeather.style.display = fallback && selected.precipitation ? 'block' : 'none';
+    fallbackWeather.style.animationPlayState = playing && !reducedMotion?.matches ? 'running' : 'paused';
+    if (!shown) return;
+    const layout = computeCharacterLayout({ viewportWidth: width, viewportHeight: height, sourceWidth: actorImage.naturalWidth, sourceHeight: actorImage.naturalHeight, character, pose });
+    Object.assign(actorLayer.style, { left: `${layout.left}px`, top: `${layout.top}px`, width: `${layout.width}px`, height: `${layout.height}px`, filter: selected.night ? 'brightness(.40) saturate(.70) hue-rotate(8deg)' : selected.overcast || selected.precipitation ? 'brightness(.80) saturate(.84)' : 'none' });
+    Object.assign(actor.style, { left: `${layout.imageLeft}px`, top: `${layout.imageTop}px`, width: `${layout.imageWidth}px`, height: `${layout.imageHeight}px` });
+    Object.assign(actorShadow.style, { left: `${layout.feetX - Math.max(10, width * .044)}px`, top: `${layout.feetY - 4}px`, width: `${Math.max(20, width * .088)}px`, height: '8px', opacity: selected.night ? '.5' : '1' });
+  }
+
+  async function setCharacter(value) {
+    if (disposed) return;
+    const next = normalizeCharacter(value);
+    if (next === character && actorImage) return;
+    const token = characterGate.next();
+    character = next; actorImage = null; container.dataset.characterReady = 'false'; renderActor();
+    try {
+      if (!actorLoads.has(next)) {
+        const pending = new Promise((resolve, reject) => {
+          const image = new Image(); image.decoding = 'async'; image.fetchPriority = 'high';
+          image.onload = async () => { try { await image.decode?.(); } catch { /* Loaded pixels remain usable. */ } resolve(image); };
+          image.onerror = () => reject(new Error('The selected weather character could not be loaded.'));
+          image.src = new URL(CHARACTERS.find(person => person.id === next).file, import.meta.url).href;
+        });
+        actorLoads.set(next, pending);
+        pending.catch(() => { if (actorLoads.get(next) === pending) actorLoads.delete(next); });
+      }
+      const image = await actorLoads.get(next);
+      if (!characterGate.isCurrent(token) || disposed) return;
+      actorImage = image; actor.src = image.src; container.dataset.characterReady = 'true'; renderActor();
+    } catch (error) {
+      if (characterGate.isCurrent(token) && !disposed) onError?.(error);
+    }
+  }
 
   function imageFor(key, priority = 'low') {
     if (images.has(key)) return images.get(key);
@@ -42,7 +100,7 @@ export async function createWeatherWorld(container, { onError, initialFrame = {}
     promise.catch(() => { if (images.get(key) === promise) images.delete(key); });
     return promise;
   }
-  function protectedKeys() { const keys = new Set([active?.spec.key, previous?.spec.key, selected.key, selected.skyKey].filter(Boolean)); if (active?.atlas || previous?.atlas || selected.key === 'hot') { keys.add('park-empty'); keys.add('hot-poses-alpha'); } return keys; }
+  function protectedKeys() { return new Set([active?.spec.key, previous?.spec.key, selected.key, selected.skyKey].filter(Boolean)); }
   function trimTextures() {
     const keep = protectedKeys();
     for (const [key, texture] of textures) {
@@ -63,9 +121,11 @@ export async function createWeatherWorld(container, { onError, initialFrame = {}
     loads.set(key, promise); return promise;
   }
   function layoutFor(spec, img) {
-    return computePhotoLayout({ viewportWidth: width, viewportHeight: height,
-      sourceWidth: img?.naturalWidth || spec.asset.sourceWidth, sourceHeight: img?.naturalHeight || spec.asset.sourceHeight,
-      personX: spec.asset.personX, subjectBounds: spec.asset.personBounds });
+    const sourceWidth = img?.naturalWidth || spec.asset.sourceWidth, sourceHeight = img?.naturalHeight || spec.asset.sourceHeight;
+    const scale = Math.max(width / sourceWidth, height / sourceHeight);
+    const imageWidth = sourceWidth * scale, imageHeight = sourceHeight * scale;
+    const left = (width - imageWidth) / 2, top = height - imageHeight;
+    return { imageWidth, imageHeight, left, top, uvScale: [width / imageWidth, height / imageHeight], uvOffset: [-left / imageWidth, -top / imageHeight] };
   }
   function applyLayout(slot, state) {
     if (!state) return;
@@ -74,14 +134,11 @@ export async function createWeatherWorld(container, { onError, initialFrame = {}
     uniforms[`u${slot}Offset`].value.set(...state.layout.uvOffset);
     uniforms[`u${slot}Night`].value = state.spec.gradeNight ? 1 : 0;
     uniforms[`u${slot}Shade`].value = state.spec.overcast ? 1 : 0;
-    uniforms[`u${slot}Style`].value = state.spec.key === 'rain' ? 1 : state.spec.asset.garment === 'hot' ? 2 : 0;
     uniforms[`u${slot}SkyShift`].value = state.spec.asset.skyShiftX || 0;
-    uniforms[`u${slot}Atlas`].value = state.atlas ? 1 : 0;
     uniforms[`u${slot}Sun`].value = state.spec.showSun ? 1 : 0;
   }
 
-  // A complete photograph is the fallback too; unsupported GPUs never get a
-  // cartoon, a blank sky, or a person pasted onto a different background.
+  // Unsupported GPUs use the same empty landscape and character layer.
   function makeFallback() {
     if (fallback) return;
     canvas?.remove();
@@ -90,15 +147,15 @@ export async function createWeatherWorld(container, { onError, initialFrame = {}
     Object.assign(backdrop.style, { position: 'absolute', inset: '-12px', backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(9px)', transform: 'scale(1.04)' });
     Object.assign(photo.style, { position: 'absolute', maxWidth: 'none', objectFit: 'fill', transition: reducedMotion?.matches ? 'none' : 'opacity .22s ease', maskImage: 'linear-gradient(to right,transparent,black 2%,black 98%,transparent)' });
     photo.alt = ''; photo.setAttribute('aria-hidden', 'true'); layer.append(backdrop, photo); container.append(layer);
-    fallback = { layer, backdrop, photo }; container.dataset.renderMode = 'photographic-preview';
+    fallback = { layer, backdrop, photo }; container.dataset.renderMode = 'photographic-preview'; renderActor();
   }
   function renderFallback() {
     if (!active || !fallback) return;
     const layout = layoutFor(active.spec, active.image);
     fallback.photo.src = active.image.src;
-    Object.assign(fallback.photo.style, { left: `${layout.left}px`, top: `${layout.top}px`, width: `${layout.imageWidth}px`, height: `${layout.imageHeight}px`, filter: active.spec.gradeNight ? 'brightness(.43) saturate(.72) hue-rotate(8deg)' : active.spec.overcast ? 'brightness(.78) saturate(.76)' : 'none' });
+    Object.assign(fallback.photo.style, { left: `${layout.left}px`, top: `${layout.top}px`, width: `${layout.imageWidth}px`, height: `${layout.imageHeight}px`, filter: active.spec.gradeNight ? 'brightness(.21) saturate(.40) hue-rotate(8deg)' : active.spec.overcast ? 'brightness(.78) saturate(.76)' : 'none' });
     fallback.backdrop.style.backgroundImage = `url("${active.image.src}")`;
-    fallback.backdrop.style.filter = `blur(9px) ${active.spec.gradeNight ? 'brightness(.43)' : active.spec.overcast ? 'brightness(.78)' : ''}`;
+    fallback.backdrop.style.filter = `blur(9px) ${active.spec.gradeNight ? 'brightness(.21) saturate(.40)' : active.spec.overcast ? 'brightness(.78)' : ''}`;
   }
 
   const initialSpec = selected;
@@ -118,18 +175,14 @@ export async function createWeatherWorld(container, { onError, initialFrame = {}
   const material = new THREE.ShaderMaterial({ uniforms, depthTest: false, depthWrite: false, toneMapped: false,
     vertexShader: 'varying vec2 vUV; void main(){vUV=uv;gl_Position=vec4(position.xy,0.,1.);}',
     fragmentShader: `precision highp float;
-      varying vec2 vUV; uniform sampler2D uFrom,uTo,uSky,uActorAtlas; uniform float uFromAtlas,uToAtlas,uPose,uFromSun,uToSun; uniform vec4 uPoseBounds[6]; uniform float uFootX[6];
+      varying vec2 vUV; uniform sampler2D uFrom,uTo,uSky; uniform float uFromSun,uToSun;
       uniform vec2 uFromScale,uFromOffset,uToScale,uToOffset;
-      uniform float uBlend,uTime,uMotion,uFromNight,uToNight,uFromShade,uToShade,uFromStyle,uToStyle,uFromSkyShift,uToSkyShift,uSkyMix,uSkyNight,uRain,uSnow,uWind,uFog,uAspect,uPerson;
+      uniform float uBlend,uTime,uMotion,uFromNight,uToNight,uFromShade,uToShade,uFromSkyShift,uToSkyShift,uSkyMix,uRain,uSnow,uWind,uFog,uAspect;
       float ellipse(vec2 uv,vec2 center,vec2 radius){vec2 d=(uv-center)/radius;return 1.-smoothstep(.62,1.,dot(d,d));}
-      float personMask(vec2 p){float head=ellipse(p,vec2(.508,.444),vec2(.041,.055));float torso=ellipse(p,vec2(.508,.575),vec2(.069,.118));return max(head,torso);}
       vec4 photo(sampler2D image,vec2 p){vec2 m=vec2(1.-abs(mod(p.x,2.)-1.),1.-abs(mod(p.y,2.)-1.));vec4 c=texture2D(image,vec2(m.x,1.-m.y));float outside=step(p.x,0.)+step(1.,p.x)+step(p.y,0.)+step(1.,p.y);if(outside>.5){vec2 q=vec2(m.x,1.-m.y);c=(c*2.+texture2D(image,clamp(q+vec2(.012,.004),.001,.999))+texture2D(image,clamp(q-vec2(.012,.004),.001,.999))+texture2D(image,clamp(q+vec2(.003,-.012),.001,.999))+texture2D(image,clamp(q+vec2(-.003,.012),.001,.999)))/6.;}return c;}
-      vec2 localMotion(vec2 uv,float style,float atlas){float t=uTime*uMotion;vec2 p=uv;float torso=ellipse(uv,vec2(.505,.575),vec2(.067,.107))*(1.-atlas);float breath=sin(t*1.36);p.x+=(uv.x-.505)*breath*.012*torso;p.y+=breath*.00065*torso;float hair=ellipse(uv,vec2(.536,.466),vec2(.018,.044))*(1.-atlas);p.x+=sin(t*2.1)*.0010*hair*(.4+uWind);p.y+=sin(t*1.7)*.0004*hair;float protect=personMask(uv);float sky=(1.-smoothstep(.56,.65,uv.y))*(1.-protect)*smoothstep(.16,.27,uv.x);p.x+=sin(t*.095+uv.y*3.)*.0055*sky;p.y+=sin(t*.07+uv.x*5.)*.0010*sky;if(style>.5&&style<1.5){float canopy=ellipse(uv,vec2(.475,.365),vec2(.12,.08))*(1.-personMask(uv));vec2 relative=uv-vec2(.47,.50);float sway=sin(t*.83)*.005*(.3+uWind);p+=vec2(-relative.y,relative.x)*sway*canopy;}float cloth=torso*(.5+.5*sin(uv.y*95.+t*1.1));p.x+=sin(t*1.3+uv.y*33.)*.00032*cloth*uWind;return mix(uv,p,uMotion);}
-      float cleanAlpha(vec4 p,vec2 q){vec2 edge=vec2(4./1881.,4./836.);float outside=min(min(texture2D(uActorAtlas,q+vec2(edge.x,0.)).a,texture2D(uActorAtlas,q-vec2(edge.x,0.)).a),min(texture2D(uActorAtlas,q+vec2(0.,edge.y)).a,texture2D(uActorAtlas,q-vec2(0.,edge.y)).a));float boundary=1.-step(.15,outside);float red=step(.94,p.r)*(1.-step(.012,p.g))*(1.-step(.012,p.b));float yellow=step(.94,p.r)*step(.94,p.g)*(1.-step(.015,p.b));return p.a*(1.-max(red,yellow)*boundary);}
-      vec4 actorPixel(vec2 uv){int pose=int(uPose+.5);vec4 b=uPoseBounds[pose];float h=b.w-b.y;float scale=.51/h;vec2 pixel=vec2((uv.x-.486)/(scale*(1024./1536.))+uFootX[pose],(uv.y-.906)/scale+b.w);if(pixel.x<0.||pixel.x>627.||pixel.y<0.||pixel.y>418.)return vec4(0.);float row=floor(float(pose)/3.);float col=mod(float(pose),3.);vec2 q=vec2((col*627.+pixel.x)/1881.,1.-(row*418.+pixel.y)/836.);vec4 a=texture2D(uActorAtlas,q);vec2 px=vec2(1./1881.,1./836.);float alpha=min(cleanAlpha(a,q),min(min(cleanAlpha(texture2D(uActorAtlas,q+vec2(px.x,0.)),q+vec2(px.x,0.)),cleanAlpha(texture2D(uActorAtlas,q-vec2(px.x,0.)),q-vec2(px.x,0.))),min(cleanAlpha(texture2D(uActorAtlas,q+vec2(0.,px.y)),q+vec2(0.,px.y)),cleanAlpha(texture2D(uActorAtlas,q-vec2(0.,px.y)),q-vec2(0.,px.y)))));float edge=1.-smoothstep(.72,.98,alpha);float spill=max(0.,a.r-max(a.g,a.b)-.045);a.r-=spill*edge*.95;a.a=smoothstep(.30,.95,alpha);return a;}
-      vec3 sampleScene(sampler2D image,vec2 scale,vec2 offset,float night,float shade,float style,float skyShift,float atlas,float sun){vec2 uv=vec2(vUV.x,1.-vUV.y)*scale+offset;vec2 p=localMotion(uv,style,atlas);vec3 c=photo(image,p).rgb;float mask=personMask(uv);if(abs(skyShift)>.001){float sky=1.-smoothstep(.32,.395,uv.y);c=mix(c,photo(image,p+vec2(skyShift,0.)).rgb,sky);}if(uSkyMix>.001){float sky=(1.-smoothstep(.57,.655,uv.y))*(1.-mask)*smoothstep(.17,.26,uv.x);vec3 cloudy=photo(uSky,p).rgb;if(uSkyNight>.5)cloudy=cloudy*vec3(.20,.29,.46)+vec3(.003,.005,.011);c=mix(c,cloudy,sky*uSkyMix);}if(atlas>.5){float contact=ellipse(uv,vec2(.486,.908),vec2(.044,.006));c*=1.-contact*.18;vec4 actor=actorPixel(uv);c=mix(c,actor.rgb,actor.a);}if(shade>.5)c=mix(c,c*vec3(.66,.73,.80),.72);if(night>.5){vec3 dark=c*vec3(.22,.30,.48)+vec3(.003,.006,.012);c=mix(dark,c*vec3(.41,.46,.59),mask*.6);}if(sun>.5){vec2 d=(uv-vec2(.58,.14))*vec2(1.5,1.);float r=length(d);float corona=exp(-r*r/.00042)*.065+exp(-r*r/.000025)*.17;float core=1.-smoothstep(.0043,.007,r);c+=vec3(1.,.83,.56)*corona;c=mix(c,vec3(1.25,1.18,1.02),core*.95);}return c;}
+      vec3 sampleScene(sampler2D image,vec2 scale,vec2 offset,float night,float shade,float skyShift,float sun){vec2 uv=vec2(vUV.x,1.-vUV.y)*scale+offset;vec2 p=uv;float sky=1.-smoothstep(.56,.65,uv.y);p.x+=sin(uTime*.095+uv.y*3.)*.0055*sky*uMotion;p.y+=sin(uTime*.07+uv.x*5.)*.001*sky*uMotion;vec3 c=photo(image,p).rgb;if(abs(skyShift)>.001)c=mix(c,photo(image,p+vec2(skyShift,0.)).rgb,1.-smoothstep(.32,.395,uv.y));if(uSkyMix>.001){vec3 cloudy=photo(uSky,p).rgb;c=mix(c,cloudy,sky*uSkyMix);}if(shade>.5)c=mix(c,c*vec3(.66,.73,.80),.72);if(night>.5){float luminance=dot(c,vec3(.2126,.7152,.0722));c=mix(c,vec3(luminance),.58)*vec3(.035,.055,.10)+vec3(.001,.002,.004);}if(sun>.5){vec2 d=(uv-vec2(.58,.14))*vec2(1.5,1.);float r=length(d);float corona=exp(-r*r/.00042)*.065+exp(-r*r/.000025)*.17;float core=1.-smoothstep(.0043,.007,r);c+=vec3(1.,.83,.56)*corona;c=mix(c,vec3(1.25,1.18,1.02),core*.95);}return c;}
       float hash(float p){return fract(sin(p*127.1)*43758.5453);}
-      void main(){vec3 a=sampleScene(uFrom,uFromScale,uFromOffset,uFromNight,uFromShade,uFromStyle,uFromSkyShift,uFromAtlas,uFromSun);vec3 b=sampleScene(uTo,uToScale,uToOffset,uToNight,uToShade,uToStyle,uToSkyShift,uToAtlas,uToSun);vec3 c=mix(a,b,smoothstep(0.,1.,uBlend));float t=uTime;float rain=0.;for(int i=0;i<3;i++){float fi=float(i),density=80.+fi*37.;vec2 p=vec2(vUV.x*uAspect*density+vUV.y*(6.+uWind*8.),vUV.y*(31.+fi*13.)+t*(16.+fi*7.));float id=floor(p.x),phase=fract(p.y+hash(id+fi*53.));float streak=(1.-smoothstep(.025,.075,abs(fract(p.x)-.5)))*(1.-smoothstep(.03,.30,phase))*step(.18+fi*.12,hash(id*1.7));rain+=streak*(.15+fi*.06);}c=mix(c,vec3(.68,.78,.87),clamp(rain*uRain,0.,.3));float snow=0.;for(int i=0;i<3;i++){float fi=float(i);vec2 p=vec2(vUV.x*uAspect*(18.+fi*9.)+sin(t*.37+vUV.y*5.+fi)*.28,vUV.y*(19.+fi*7.)+t*(.62+fi*.25));vec2 id=floor(p);vec2 q=fract(p)-.5;q.x+=sin(t*.8+id.y+fi)*.15;float dotSize=.025+fi*.008;snow+=(1.-smoothstep(dotSize,dotSize+.025,length(q)))*step(.44,hash(id.x+id.y*19.+fi*23.))*(.55+fi*.12);}c=mix(c,vec3(.91,.96,1.),clamp(snow*uSnow,0.,.9));float mist=uFog*(.12+.12*(1.-vUV.y));c=mix(c,vec3(.52,.60,.65),mist);gl_FragColor=vec4(c,1.);
+      void main(){vec3 a=sampleScene(uFrom,uFromScale,uFromOffset,uFromNight,uFromShade,uFromSkyShift,uFromSun);vec3 b=sampleScene(uTo,uToScale,uToOffset,uToNight,uToShade,uToSkyShift,uToSun);vec3 c=mix(a,b,smoothstep(0.,1.,uBlend));float t=uTime;float rain=0.;for(int i=0;i<3;i++){float fi=float(i),density=80.+fi*37.;vec2 p=vec2(vUV.x*uAspect*density+vUV.y*(6.+uWind*8.),vUV.y*(31.+fi*13.)+t*(16.+fi*7.));float id=floor(p.x),phase=fract(p.y+hash(id+fi*53.));float streak=(1.-smoothstep(.025,.075,abs(fract(p.x)-.5)))*(1.-smoothstep(.03,.30,phase))*step(.18+fi*.12,hash(id*1.7));rain+=streak*(.15+fi*.06);}c=mix(c,vec3(.68,.78,.87),clamp(rain*uRain,0.,.3));float snow=0.;for(int i=0;i<3;i++){float fi=float(i);vec2 p=vec2(vUV.x*uAspect*(18.+fi*9.)+sin(t*.37+vUV.y*5.+fi)*.28,vUV.y*(19.+fi*7.)+t*(.62+fi*.25));vec2 id=floor(p);vec2 q=fract(p)-.5;q.x+=sin(t*.8+id.y+fi)*.15;float dotSize=.025+fi*.008;snow+=(1.-smoothstep(dotSize,dotSize+.025,length(q)))*step(.44,hash(id.x+id.y*19.+fi*23.))*(.55+fi*.12);}c=mix(c,vec3(.91,.96,1.),clamp(snow*uSnow,0.,.9));float mist=uFog*(.12+.12*(1.-vUV.y));c=mix(c,vec3(.52,.60,.65),mist);gl_FragColor=vec4(c,1.);
       #include <colorspace_fragment>
       }`
   });
@@ -146,9 +199,10 @@ export async function createWeatherWorld(container, { onError, initialFrame = {}
     const motion = playing && !reducedMotion?.matches;
     if (motion) time += delta;
     blend = reducedMotion?.matches ? 1 : clamp((now - blendStart) / blendDuration, 0, 1);
-    const poseStep = Math.floor(time * PHOTO_HOT_ATLAS.framesPerSecond) % 10; uniforms.uPose.value = poseStep < 6 ? poseStep : 10 - poseStep;
     uniforms.uBlend.value = blend; uniforms.uTime.value = time; uniforms.uMotion.value = reducedMotion?.matches ? 0 : 1;
-    const approach = 1 - Math.exp(-delta * 7);
+    // A paused or reduced-motion scene has no next animation frame to finish
+    // easing. Apply its selected-hour atmosphere completely on this render.
+    const approach = motion ? 1 - Math.exp(-delta * 7) : 1;
     uniforms.uRain.value = lerp(uniforms.uRain.value, selected.precipitation === 'rain' ? .85 : 0, approach);
     uniforms.uSnow.value = lerp(uniforms.uSnow.value, selected.precipitation === 'snow' ? 1 : 0, approach);
     uniforms.uWind.value = lerp(uniforms.uWind.value, selected.wind, approach);
@@ -165,30 +219,26 @@ export async function createWeatherWorld(container, { onError, initialFrame = {}
     const rect = container.getBoundingClientRect(); width = Math.max(1, rect.width); height = Math.max(1, rect.height);
     uniforms.uAspect.value = width / height;
     if (renderer) { renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio || 1, 1.6)); renderer.setSize(width, height, false); }
-    applyLayout('From', previous || active); applyLayout('To', active); renderFallback(); requestRender();
+    applyLayout('From', previous || active); applyLayout('To', active); renderFallback(); renderActor(); requestRender();
   }
   async function install(spec, token, first = false) {
     try {
       const image = await imageFor(spec.key, first ? 'high' : 'auto');
       let [texture, skyTexture] = renderer ? await Promise.all([textureFor(spec.key, first ? 'high' : 'auto'), spec.skyKey ? textureFor(spec.skyKey) : Promise.resolve(null)]) : [null, null];
-      let atlas = false;
-      if (renderer && spec.key === 'hot') {
-        try { const [park, actor] = await Promise.all([textureFor('park-empty'), textureFor('hot-poses-alpha')]); if (park && actor) { texture = park; uniforms.uActorAtlas.value = actor; atlas = true; } } catch { /* The coherent hot photograph remains the complete fallback. */ }
-      }
       if (!gate.isCurrent(token) || disposed) return;
       const same = active?.spec.key === spec.key;
       if (!same) {
-        previous = active || { spec, image, texture, atlas };
-        active = { spec, image, texture, atlas }; blendStart = performance.now();
+        previous = active || { spec, image, texture };
+        active = { spec, image, texture }; blendStart = performance.now();
         blendDuration = first || reducedMotion?.matches ? 1 : performance.now() - lastChange < 190 ? 85 : 280;
         lastChange = performance.now(); blend = first ? 1 : 0;
-      } else { active = { ...active, spec, image, texture, atlas }; if (blend >= 1) previous = active; }
+      } else { active = { ...active, spec, image, texture }; if (blend >= 1) previous = active; }
       uniforms.uFrom.value = previous.texture || texture; uniforms.uTo.value = texture;
-      uniforms.uSky.value = skyTexture || texture; uniforms.uSkyMix.value = skyTexture ? 1 : 0; uniforms.uSkyNight.value = spec.night ? 1 : 0;
+      uniforms.uSky.value = skyTexture || texture; uniforms.uSkyMix.value = skyTexture ? 1 : 0;
       applyLayout('From', previous); applyLayout('To', active);
-      container.dataset.photoScene = spec.key; container.dataset.photoReady = 'true';
+      container.dataset.photoScene = spec.sceneKey; container.dataset.backgroundScene = spec.key; container.dataset.photoReady = 'true';
       if (canvas) canvas.style.visibility = 'visible'; if (fallback) fallback.layer.style.visibility = 'visible';
-      renderFallback(); requestRender(); trimTextures();
+      renderFallback(); renderActor(); requestRender(); trimTextures();
     } catch (error) {
       if (!gate.isCurrent(token) || disposed) return;
       container.dataset.photoReady = 'false'; if (canvas) canvas.style.visibility = 'hidden'; if (fallback) fallback.layer.style.visibility = 'hidden';
@@ -197,12 +247,13 @@ export async function createWeatherWorld(container, { onError, initialFrame = {}
   }
   function setFrame(frame = {}, outfit = {}) {
     if (disposed) return;
-    selected = selectPhotoScene(frame, outfit);
+    selected = emptySceneFor(selectPhotoScene(frame, outfit));
+    renderActor();
     const token = gate.next(); void install(selected, token);
   }
-  function setPlaying(value) { playing = Boolean(value); if (!playing) stop(); requestRender(); }
+  function setPlaying(value) { playing = Boolean(value); if (!playing) stop(); renderActor(); requestRender(); }
   function onVisibility() { if (document.hidden) stop(); else requestRender(); }
-  function onMotion() { stop(); requestRender(); }
+  function onMotion() { stop(); renderActor(); requestRender(); }
   function onContextLost(event) { event.preventDefault(); stop(); renderer?.dispose(); renderer = null; makeFallback(); renderFallback(); }
   if (renderer) {
     renderer.debug.onShaderError = () => { stop(); renderer?.dispose(); renderer = null; makeFallback(); renderFallback(); };
@@ -213,14 +264,14 @@ export async function createWeatherWorld(container, { onError, initialFrame = {}
   const intersection = globalThis.IntersectionObserver ? new IntersectionObserver(entries => { visible = entries[0]?.isIntersecting !== false; if (visible) requestRender(); else stop(); }, { rootMargin: '100px' }) : null;
   intersection?.observe(container); document.addEventListener('visibilitychange', onVisibility); reducedMotion?.addEventListener?.('change', onMotion);
   function dispose() {
-    if (disposed) return; disposed = true; gate.dispose(); stop(); observer?.disconnect(); intersection?.disconnect();
+    if (disposed) return; disposed = true; gate.dispose(); characterGate.dispose(); stop(); observer?.disconnect(); intersection?.disconnect();
     document.removeEventListener('visibilitychange', onVisibility); reducedMotion?.removeEventListener?.('change', onMotion); globalThis.removeEventListener('resize', resize);
     canvas?.removeEventListener('webglcontextlost', onContextLost); textures.forEach(texture => texture.dispose()); textures.clear();
-    geometry.dispose(); material.dispose(); renderer?.dispose(); canvas?.remove(); fallback?.layer.remove(); images.clear(); loads.clear();
+    geometry.dispose(); material.dispose(); renderer?.dispose(); canvas?.remove(); fallback?.layer.remove(); actorLayer.remove(); actorShadow.remove(); fallbackWeather.remove(); actorStyle.remove(); images.clear(); loads.clear(); actorLoads.clear();
   }
   resize();
-  const token = gate.next(); await install(initialSpec, token, true);
+  const token = gate.next(); await Promise.all([install(initialSpec, token, true), setCharacter(character)]);
   // Decode likely future scenes without allocating all of them on the GPU.
   for (const key of PHOTO_KEYS) if (key !== initialSpec.key) void imageFor(key).catch(() => {});
-  return { setFrame, setPlaying, resize, dispose };
+  return { setFrame, setCharacter, setPlaying, resize, dispose };
 }

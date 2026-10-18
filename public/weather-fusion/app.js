@@ -30,9 +30,22 @@ import {renderForecastWindowBanners,resetForecastWindowBanners} from './forecast
 import {createSevenDayCarousel} from './seven-day.js?v=low-rain-display-v1';
 import {forecastSourceHealth} from './forecast-status.js?v=source-health-v1';
 import {forecastRefreshDue} from './forecast-refresh.js?v=coverage-recovery-v2';
-import {installNativePlayer} from './native-player.js?v=photographic-v1';
+import {installNativePlayer} from './native-player.js?v=people-models-v1';
+import {createCustomForecast} from './custom-forecast.js?v=pick-weather-v1';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);
+const customForecast=createCustomForecast({root:$('custom-forecast')});
+let customForecastOpen=location.hash==='#custom-forecast';
+const customForecastButton=$('open-custom-forecast');
+if(customForecastButton){
+  customForecastButton.setAttribute('aria-expanded',String(customForecastOpen));
+  customForecastButton.addEventListener('click',()=>{
+    customForecastOpen=!customForecastOpen;
+    customForecastButton.setAttribute('aria-expanded',String(customForecastOpen));
+    const root=$('custom-forecast');root.hidden=!customForecastOpen;
+    if(customForecastOpen){if(forecast)customForecast.render(forecast);root.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'});}
+  });
+}
 const experimentalPage = isExperimentalWeatherPage();
 const finite = (n) => typeof n === 'number' && Number.isFinite(n);
 const DEVICE_LOCATION_KEY='weather-fusion-device-place';
@@ -176,6 +189,7 @@ function render(data) {
   draw('forecast-window-banners','Upcoming weather windows',()=>renderForecastWindowBanners(data));
   draw('snow-outlook-banner','Snow outlook',()=>renderSnowOutlook(data));
   try{globalThis.__weatherNourieForecast=data;document.dispatchEvent(new CustomEvent('weather-nourie:forecast',{detail:data}));}catch{}
+  draw('custom-forecast','Your forecast preview',()=>{customForecast.render(data);$('custom-forecast').hidden=!customForecastOpen;});
   draw('alerts', 'Official alerts', () => renderAlerts(data));
   draw('risk-outlook-list', 'Outlooks', () => renderRiskOutlooks(data));
   draw('hourly', 'Hourly forecast', () => renderHours(data));
@@ -343,6 +357,7 @@ function chooseLocation(value,{rememberDevice=false}={}) {
   stopRadar();framePlayer?.clear();++modelFrameToken;++mapSelectionToken;++radarGeneration;lastRadarFetch=0;
   currentBriefing = null;
   resetExperience();
+  customForecast?.reset();
   resetSnowOutlook();
   resetForecastWindowBanners();
   if ($('day-dialog').open) $('day-dialog').close();

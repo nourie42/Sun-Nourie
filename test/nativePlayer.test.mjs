@@ -8,7 +8,7 @@ import {selectPhotoScene} from '../public/weather-fusion/player/photo-scene.js';
 // Only pure exports are used below. No browser or rendering assertions are made.
 globalThis.HTMLElement??=class {};
 globalThis.customElements??={get(){return true;},define(){}};
-const {normalizeForecast,outfitForFrame,playbackTiming,WeatherSkyPlayer}=await import('../public/weather-fusion/player/sky-player.js');
+const {normalizeForecast,outfitForFrame,playbackTiming,weatherDescription,WeatherSkyPlayer}=await import('../public/weather-fusion/player/sky-player.js');
 const HOUR=3600000,now=Date.parse('2026-10-18T14:00:00Z');
 const iso=i=>new Date(now+i*HOUR).toISOString();
 const location={name:'Raleigh',latitude:35.78,longitude:-78.64,timeZone:'America/New_York'};
@@ -148,4 +148,13 @@ test('actual manual-seek and day-skip methods stop on the chosen hour and commit
   player._playing=true;player.skipDays(1);assert.equal(player.playing,false);assert.equal(player.currentFrame.nativeSampleId,iso(27));assert.deepEqual(commits,[iso(3),iso(27)]);
   player._playing=true;player.setFrame(28);assert.equal(player.playing,true);assert.deepEqual(commits,[iso(3),iso(27)],'timer frames continue playing without card commits');
   bridge.dispose();
+});
+
+test('night descriptions use clear skies rather than sunshine without altering the forecast',()=>{
+  const frame={nativePolicy:true,nativeCondition:'Mostly Sunny',isDay:false};
+  assert.equal(weatherDescription(frame),'Mostly clear');
+  assert.equal(frame.nativeCondition,'Mostly Sunny');
+  assert.equal(weatherDescription({...frame,nativeCondition:'Partly Sunny'}),'Partly cloudy');
+  assert.equal(weatherDescription({...frame,isDay:true}),'Mostly Sunny');
+  assert.equal(weatherDescription({...frame,nativeCondition:'Rain Showers'}),'Rain Showers');
 });

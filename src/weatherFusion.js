@@ -749,6 +749,15 @@ export function registerWeatherFusionRoutes(app, options = {}) {
   for (const name of [
     ...COMFORT_SCENE_ASSETS,
     // Complete native shell and photographic player dependencies.
+    'custom-forecast-model.js',
+    'custom-forecast.js',
+    'custom-forecast.css',
+    'person-white.png',
+    'person-black.png',
+    'person-asian.png',
+    'person-pride.png',
+    'player-snow-empty.png',
+    'player/character-scene.js',
     'calendar-day.js',
     'collapse.js',
     'comfort-integrated-rain-night.webp',

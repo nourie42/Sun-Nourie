@@ -176,7 +176,7 @@ test('only the main weather page, its assets and read-only APIs are public', asy
 
 test('public player dependencies load without opening private player paths', async t => {
   const {request} = await fixture(t, {publicMain: true});
-  for (const route of ['/weather-fusion/player/sky-player.js?v=native-20261018-1','/weather-fusion/player/vendor/three.module.js','/weather-fusion/player/assets/photo-hot.webp']) {
+  for (const route of ['/weather-fusion/player/sky-player.js?v=people-v1','/weather-fusion/player/character-scene.js?v=people-v1','/weather-fusion/player/vendor/three.module.js','/weather-fusion/player/assets/photo-hot.webp','/weather-fusion/custom-forecast.js','/weather-fusion/custom-forecast-model.js','/weather-fusion/custom-forecast.css','/weather-fusion/person-white.png','/weather-fusion/person-black.png','/weather-fusion/person-asian.png','/weather-fusion/person-pride.png','/weather-fusion/player-snow-empty.png']) {
     assert.equal((await request(route)).status, 200, route);
     assert.equal((await request(route, {method: 'POST'})).status, 401, route);
   }

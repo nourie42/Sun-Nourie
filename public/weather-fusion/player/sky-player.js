@@ -1,10 +1,14 @@
 /** Nourie Weather · animated forecast scene player. All supplied text uses textContent. */
+import {CHARACTERS, normalizeCharacter} from './character-scene.js?v=people-v1';
 const number = (v, fallback = 0) => v !== null && v !== '' && Number.isFinite(Number(v)) ? Number(v) : fallback;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const optionalNumber = v => v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v)) ? Number(v) : null;
 const boundedNumber = (v, min, max = Infinity) => { const n = optionalNumber(v); return n === null ? null : clamp(n,min,max); };
 export const PLAYBACK_SPEEDS = Object.freeze([1,2,4,8,16,32]);
 const SPEED_STORAGE_KEY = 'nourie-weather-playback-speed';
+const CHARACTER_STORAGE_KEY = 'nourie-weather-person';
+const FILTER_STORAGE_KEY = 'nourie-weather-person-filter';
+const PERSON_FILTERS = ['White','Black','All','Asian'];
 
 /** Speed changes forecast sampling only. Scene animation uses real time. */
 export function playbackTiming(speed = 4, frameCount = 0) {
@@ -53,7 +57,7 @@ export function normalizeForecast(frames) {
   }));
 }
 export const weatherDescription = (f,o=outfitForFrame(f)) => {
-  if(f.nativePolicy===true&&f.nativeCondition)return f.nativeCondition;
+  if(f.nativePolicy===true&&f.nativeCondition)return f.isDay===false?f.nativeCondition.replace(/partly sunny/gi,'Partly cloudy').replace(/mostly sunny/gi,'Mostly clear').replace(/sunny/gi,'Clear'):f.nativeCondition;
   if(o.storm)return 'Thunderstorms';if(o.snow)return 'Snow';if(o.rain)return 'Rain';
   const code=optionalNumber(f.weatherCode),cloud=optionalNumber(f.cloudCover);
   if([45,48].includes(code))return 'Fog';
@@ -81,19 +85,22 @@ export function createScenarioForecast(name, start = new Date(), hours = 24) {
   let stamp=new Date(start).getTime();if(!Number.isFinite(stamp))stamp=Date.now();stamp=Math.floor(stamp/3600000)*3600000;
   return Array.from({length:clamp(Math.floor(number(hours,24)),1,336)},(_,i)=>({...preset,time:new Date(stamp+i*3600000).toISOString()}));
 }
-const cssURL = new URL('./sky-player.css?v=native-20261018-1',import.meta.url).href;
+const cssURL = new URL('./sky-player.css?v=people-v1',import.meta.url).href;
 const compactSeconds = seconds => seconds>=60?`${Math.floor(seconds/60)}m ${Math.round(seconds%60)}s`:`${Number(seconds.toFixed(seconds<1?3:1))}s`;
 
 class WeatherSkyPlayer extends HTMLElement {
-  static get observedAttributes(){return ['data-mode','location-name','timezone','playback-speed'];}
+  static get observedAttributes(){return ['data-mode','location-name','timezone','playback-speed','character'];}
   constructor(){
     super();this.attachShadow({mode:'open'});
     this._forecast=[];this._index=0;this._playing=false;this._timer=null;this._speed=4;
+    this._character='white';this._personFilter='All';
     try{this._speed=playbackTiming(globalThis.localStorage?.getItem(SPEED_STORAGE_KEY)??4).speed;}catch{}
+    try{this._character=normalizeCharacter(globalThis.localStorage?.getItem(CHARACTER_STORAGE_KEY));const filter=globalThis.localStorage?.getItem(FILTER_STORAGE_KEY);if(PERSON_FILTERS.includes(filter))this._personFilter=filter;}catch{}
     this._locationName='Your forecast';this._timezone='';this._world=null;this._worldPromise=null;this._worldEpoch=0;this._worldFailed=false;this._inView=false;this._connected=false;
     this.shadowRoot.innerHTML=`<link rel="stylesheet" href="${cssURL}">
     <section class="player" aria-label="Animated weather illustration and outfit forecast">
       <header class="player-heading"><div class="heading-left"><span class="mini-play" aria-hidden="true">▶</span><h2>Play your day</h2><span class="heading-detail">Your forecast, in motion</span></div><span class="mode-badge"><span></span><span class="mode-label">Forecast preview</span></span></header>
+      <div class="person-picker" role="group" aria-labelledby="person-picker-title"><div class="person-picker-heading"><div><h3 id="person-picker-title">Choose your person</h3><p>Their outfit follows your forecast.</p></div><label class="person-filter-label"><span>Show</span><select class="person-filter" aria-label="Filter people">${PERSON_FILTERS.map(filter=>`<option value="${filter}">${filter}</option>`).join('')}</select></label></div><div class="person-options"></div><p class="person-selection sr-only" role="status" aria-live="polite"></p></div>
       <div class="scene" role="group" aria-label="Forecast scene awaiting weather data">
         <div class="world-stage" aria-hidden="true"></div><div class="overlay-shade" aria-hidden="true"></div>
         <div class="world-status"><span class="world-status-title">Preparing your forecast scene…</span><span class="world-status-note">Weather, sky, and what to wear.</span><button class="world-retry" type="button" hidden>Retry forecast scene</button></div>
@@ -116,6 +123,10 @@ class WeatherSkyPlayer extends HTMLElement {
     this.$('.speed').addEventListener('change',event=>{this.speed=Number(event.target.value);});
     this.$('.world-retry').addEventListener('click',()=>{this._worldFailed=false;this._disposeWorld();this._ensureWorld();});
     this.$('.speed').value=String(this._speed);
+    this.$('.person-filter').value=this._personFilter;
+    this.$('.person-filter').addEventListener('change',event=>{this._personFilter=event.target.value;try{globalThis.localStorage?.setItem(FILTER_STORAGE_KEY,this._personFilter);}catch{}const people=this._filteredPeople();if(!people.some(person=>person.id===this._character))this.character=people[0]?.id;else this._renderPeople();});
+    this.$('.person-options').addEventListener('click',event=>{const button=event.target.closest?.('[data-person]');if(button)this.character=button.dataset.person;});
+    this._renderPeople();
   }
   connectedCallback(){
     this._connected=true;this._worldFailed=false;this._locationName=this.getAttribute('location-name')||this._locationName;this.timezone=this.getAttribute('timezone')||this._timezone;
@@ -127,7 +138,11 @@ class WeatherSkyPlayer extends HTMLElement {
     if(typeof ResizeObserver==='function'){this._resizeObserver?.disconnect();this._resizeObserver=new ResizeObserver(()=>{this._world?.resize?.();});this._resizeObserver.observe(this.$('.world-stage'));}
   }
   disconnectedCallback(){this._connected=false;this.pause();this._intersection?.disconnect();this._intersection=null;this._resizeObserver?.disconnect();this._resizeObserver=null;this._disposeWorld();}
-  attributeChangedCallback(name,oldValue,newValue){if(oldValue===newValue||!this.$)return;if(name==='location-name')this.locationName=newValue;if(name==='timezone')this.timezone=newValue;if(name==='data-mode')this._renderMode();if(name==='playback-speed')this.speed=newValue;}
+  attributeChangedCallback(name,oldValue,newValue){if(oldValue===newValue||!this.$)return;if(name==='location-name')this.locationName=newValue;if(name==='timezone')this.timezone=newValue;if(name==='data-mode')this._renderMode();if(name==='playback-speed')this.speed=newValue;if(name==='character')this.character=newValue;}
+  get character(){return this._character;}
+  set character(value){this._character=normalizeCharacter(value);const person=CHARACTERS.find(person=>person.id===this._character);if(this._personFilter!=='All'&&person?.group!==this._personFilter){this._personFilter='All';if(this.$)this.$('.person-filter').value='All';}try{globalThis.localStorage?.setItem(CHARACTER_STORAGE_KEY,this._character);globalThis.localStorage?.setItem(FILTER_STORAGE_KEY,this._personFilter);}catch{}if(this.$){this._renderPeople();this.$('.person-selection').textContent=`${person?.name||'Your person'} selected. The forecast and time stay the same.`;}this._world?.setCharacter?.(this._character);this.dispatchEvent(new CustomEvent('characterchange',{detail:{character:this._character},bubbles:true,composed:true}));}
+  _filteredPeople(){return CHARACTERS.filter(person=>this._personFilter==='All'||person.group===this._personFilter);}
+  _renderPeople(){if(!this.$)return;const root=this.$('.person-options');root.replaceChildren();for(const person of this._filteredPeople()){const button=document.createElement('button');button.type='button';button.className='person-option';button.dataset.person=person.id;button.setAttribute('aria-pressed',String(person.id===this._character));const title=person.id==='pride'?'Trans pride':person.group;button.setAttribute('aria-label',`${person.name}, ${title}`);const thumb=document.createElement('span');thumb.className='person-thumb';thumb.setAttribute('aria-hidden','true');thumb.style.backgroundImage=`url("${new URL(`../person-${person.id}.png`,import.meta.url).href}")`;const name=document.createElement('strong');name.textContent=person.name;const detail=document.createElement('small');detail.textContent=title;button.append(thumb,name,detail);root.append(button);}}
   get forecast(){return this._forecast.map(frame=>({...frame}));}
   set forecast(value){this._forecast=normalizeForecast(value);this._index=clamp(this._index,0,Math.max(0,this._forecast.length-1));if(!this._forecast.length)this.pause();this._renderTimeline();this._render();}
   get locationName(){return this._locationName;}
@@ -183,11 +198,11 @@ class WeatherSkyPlayer extends HTMLElement {
     if(!this._connected||this._world||this._worldPromise||this._worldFailed)return;
     const epoch=++this._worldEpoch;this.$('.world-status').hidden=false;this.$('.world-status').classList.remove('has-error');this.$('.world-status-title').textContent='Preparing your forecast scene…';this.$('.world-status-note').textContent='Weather, sky, and what to wear.';this.$('.world-retry').hidden=true;
     this._worldPromise=(async()=>{
-      const {createWeatherWorld}=await import('./weather-world.js?v=native-20261018-1');
+      const {createWeatherWorld}=await import('./weather-world.js?v=people-v1');
       if(!this._connected||epoch!==this._worldEpoch)return;
-      const world=await createWeatherWorld(this.$('.world-stage'),{initialFrame:this.currentFrame?{...this.currentFrame}:{},initialOutfit:outfitForFrame(this.currentFrame||{}),onError:error=>{if(epoch===this._worldEpoch)this._handleWorldError(error);}});
+      const world=await createWeatherWorld(this.$('.world-stage'),{initialFrame:this.currentFrame?{...this.currentFrame}:{},initialOutfit:outfitForFrame(this.currentFrame||{}),initialCharacter:this._character,onError:error=>{if(epoch===this._worldEpoch)this._handleWorldError(error);}});
       if(!this._connected||epoch!==this._worldEpoch||this._worldFailed){world?.dispose?.();return;}
-      this._world=world;this._syncWorld();if(this._worldFailed)return;world.setPlaying(this._playing);world.resize?.();this.$('.world-status').hidden=true;
+      this._world=world;world.setCharacter?.(this._character);this._syncWorld();if(this._worldFailed)return;world.setPlaying(this._playing);world.resize?.();this.$('.world-status').hidden=true;
       this.dispatchEvent(new CustomEvent('worldready',{bubbles:true,composed:true}));
     })().catch(error=>{if(epoch===this._worldEpoch)this._handleWorldError(error);}).finally(()=>{if(epoch===this._worldEpoch)this._worldPromise=null;});
     return this._worldPromise;
