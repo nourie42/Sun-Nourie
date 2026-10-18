@@ -1,10 +1,9 @@
 # Weather Nourie Atmos
 
-`/weather-fusion/atmos.html` draws the next 48 hours over the same sky
-photographs as the main page, explains the science behind the numbers in plain
-language, and lets visitors make their own forecast by choosing how much each
-forecast counts. Like the other alternate views it is behind the weather
-password.
+`/weather-fusion/atmos.html` shows the next 48 hours as the sky the forecast
+describes, explains the science behind the numbers in plain language, and lets
+visitors make their own forecast by choosing how much each source counts. Like
+the other alternate views it is behind the weather password.
 
 Atmos adds only its own files. The main page, the weather server, its routes,
 its API and its QA contract are unchanged. The existing static server publishes
@@ -18,9 +17,8 @@ match the main page.
 Atmos uses the main page's own stylesheets (`style.css`, `forecast-layout.css`,
 `weather-polish.css`, `page-unify.css`, `header-sky.css`) and the same header
 band, location bar, eight-pill section bar and uniform glass tiles. Its own
-rules (`atmos.css`) add only the Atmos components, in a dark palette, so the page
-is neither the bright white of the earlier design nor a second dark theme. The
-Play button is a plain glass control, not a colored one.
+rules (`atmos.css`) add only the Atmos components, in a dark palette. The Play
+button is a plain glass control, not a colored one.
 
 The body background and header band follow the sky shown: night, rain, sunset or
 day, as the main page does with its condition.
@@ -32,6 +30,8 @@ day, as the main page does with its condition.
   3.2 hours per second); dragging the timeline, tapping a chart or the arrow keys
   pick one hour that every section follows. A compact clock follows you down the
   page.
+- **What to wear.** The three illustrated people for the selected hour, large,
+  with the feels-like temperature and the clothes that go with it.
 - **Best times to be outside.** Seven days by 24 hours, colored by feels-like,
   with perfect hours in gold.
 - **Next 10 days.** Low-to-high bars with whiskers for how far the separate
@@ -48,42 +48,51 @@ Each section opens with a plain explanation; the exact rules sit in a
 
 ## What drives the sky
 
-The sky is the main page's sky photographs, lit and weathered by the forecast
-(`atmos-sky.js`). The photographs are `today-sky-clear`, `-clouds`, `-rain`,
-`-storm` and `-night-v2`, the same files behind the main page's Today card. They
-replace the earlier computed cumulus sprites and painted landscape, so the trees
-along the bottom edge are the photographed trees, green in every season.
+The sky is painted from the forecast for the hour shown (`atmos-sky.js`, with
+the painting in `atmos-sky-paint.js`). No photographs are used.
 
-- **Which photograph shows.** Sky cover blends the clear and cloudy photographs.
-  Rain takes over the rain photograph once the displayed condition is rainy, and
-  thunder or storm wording takes over the storm photograph. After dark the night
-  photograph fades in as the sun goes below the horizon.
-- **Navy veil.** A translucent navy layer over the photographs keeps the sky in
-  the page's dark glass tone, deepening with night, cloud, rain and storm.
-- **Sun and moon** are not painted over the photographs, which already carry the
-  light, so there is no second sun and no moon crossing the sky. The line beside
-  the picture gives the sun's height and direction, or the moon's phase, lit
-  fraction and position, from the same solar and lunar formulas. Sun altitude uses
-  the same formula as `weather-math.js` `solarElevation`.
+- **Cloud cover is a share of the sky.** A fixed cloud field, a smooth noise
+  tiled across the sky, is cut at the level that gives the forecast's sky cover,
+  so 30% cover covers 30% of the sky and 98% covers nearly all of it. Clear hours
+  show no clouds at all. The shapes drift with the wind, and their sunward edges
+  are lit.
+- **Colour follows the sun's altitude.** Blue by day, a warm band at sunset and
+  sunrise, the blue hour, then night. Cloud greys the blue, a storm darkens it,
+  fog pales it, and humid air (a high dew point) whitens the horizon.
+- **The sun and moon** are placed by the same solar and lunar formulas the words
+  beside the sky quote, so the picture and the words agree. The sun sits under
+  any cloud, so thin cloud veils it and thick cloud hides it. The moon shows its
+  real phase: the lit side is on the right when waxing and on the left when
+  waning, seen from the south. Stars show after dark, fewer under cloud.
 - **Rain, snow, fog and thunder** are drawn only from the displayed condition.
   Lightning appears only for thunder or storm wording, never for a plain rain
   forecast. Chance or "nearby" wording draws lighter, scattered rain. Fog lies on
   the ground and thins toward the top of the sky.
-- **Haze** thickens with dew point. **Wind** sets the direction and a slow drift
-  of the picture, and the rain and snow lean with it.
-- **Low sun** warms the lower sky and the trees.
+- **Wind** sets the drift of the clouds and the lean of the rain and snow.
+- **The treeline** is pines and broadleaf trees, a paler far row and a near row,
+  green by day and near black after dark.
 
 With `prefers-reduced-motion`, the sky renders still frames, with no drift,
 falling rain or lightning.
 
 ## What to wear
 
-Under the sky sit the main page's illustrated people: one in the shade, one
-outdoors and one walking a dog. Each is one panel of the same comfort artwork the
-main page uses. The clothes come from the hour's feels-like temperature and the
-sky, chosen the same way the main page chooses them (`exposure-scene.js`, through
-`dressedPeople` in `atmos-model.js`). They follow the selected hour, so the
-clothes change as the time-lapse plays.
+Three illustrated people sit under the sky: one in the shade, one outdoors and
+one walking a dog. Each is one panel of the same artwork the main page uses,
+shown unaltered. Their clothes come from the hour's feels-like temperature and
+the sky, chosen the same way the main page chooses them (`exposure-scene.js`,
+through `dressedPeople` in `atmos-model.js`).
+
+The clothes settle so they do not flicker during the time-lapse
+(`dressingTimeline` in `atmos-model.js`):
+
+- A change of clothes shows only after it has lasted four hours. Rain gear shows
+  after two, so a shower is not missed. A one-hour blip never changes the
+  picture.
+- Short runs are absorbed backward only, so the current hour always shows its own
+  clothes.
+- The feels-like number on each figure is the hour's own, so it updates every
+  hour even when the clothes hold.
 
 ## Make your own forecast
 
@@ -119,6 +128,7 @@ The recipe affects only the lab. It is saved in the visitor's browser
 | Section | Source in the forecast response | Shared helper |
 |---|---|---|
 | Sky and clock | hourly display samples, `hours[]` | `weather-display.js` `hourlyDisplaySamples` |
+| What to wear | hourly feels, shade, sky and rain flags | `exposure-scene.js` `comfortSceneState`, `clothingForFeels` |
 | Best times to be outside | metric series and `rainTimeline` | `whats-up-classify.js` `classifyHour` |
 | Next 10 days | `days[]` | `seven-day.js` `dailyForecastReadings` |
 | Make your own forecast | `metricForecasts.series.temperature[].sources`, `rainTimeline[].rainLikelihood`, `rainTimeline[].precipitationBlend`, `blendPolicy` | `calendar-day.js` windows |
@@ -144,19 +154,18 @@ be verified.
 - `atmos.html` — the page markup, built on the main page's header, location bar,
   jump bar and glass tiles.
 - `atmos.css` — the Atmos components (sky window, Play control, timeline strip,
-  heat grid, charts, lab, day rows, street blocks, place dialog).
+  the what-to-wear cards, heat grid, charts, lab, day rows, street blocks, place
+  dialog).
 - `atmos.js` — the page: loading, the clock, the sections and the lab.
-- `atmos-model.js` — pure builders for the timeline, the scene, the blend, the
-  comfort grid, the lab and the illustrated people.
-- `atmos-sky.js` — the sky renderer (photographs, veil, haze, weather) and the
-  solar and lunar astronomy behind the words beside the sky.
+- `atmos-model.js` — pure builders for the timeline, the sky's scene, the blend,
+  the comfort grid, the lab, the illustrated people and their settled clothes.
+- `atmos-sky.js` — the sky window (drawing order, drift, weather) and the solar
+  and lunar astronomy behind the words beside the sky.
+- `atmos-sky-paint.js` — the painting: sky colour, the cloud field and its
+  texture, the sun, the moon's phase, the treeline and the stars.
 - Shared with the main page: `style.css`, `forecast-layout.css`,
   `weather-polish.css`, `page-unify.css`, `header-sky.css`, `header-sky.js`, and
-  the `today-sky-*.webp` photographs.
-
-Atmos no longer uses its own font. The earlier Archivo face and its license file
-were removed with the light design, since the page now uses the main page's
-system type stack.
+  the comfort artwork the what-to-wear cards draw.
 
 ## Tests
 
@@ -165,10 +174,11 @@ node --test test/weatherAtmos.test.js
 ```
 
 The tests check that Atmos needs no server change and stays behind the password,
-the import closure, that Atmos links the main page's stylesheets and sky
-photographs, that the clock, daily list and blend use the main page's values, the
-sky's weather-wording rules, the rain-score breakdown, comfort classes,
-perfect-hour windows, daily spreads, the sun and moon calculations, and the
-forecast lab: that Normal reproduces Weather Nourie exactly, that the
-re-weighting matches the server's arithmetic, that Off and 4× re-weight only
-published values, and that the rain score keeps its rules.
+the import closure, that Atmos links the main page's stylesheets, that the clock,
+daily list and blend use the main page's values, the sky's weather-wording rules,
+that cloud cover fills its share of the sky and the sky colours follow the sun,
+that the sun and moon use the same calculations as the words beside them, the
+rain-score breakdown, comfort classes, perfect-hour windows, daily spreads, the
+clothes settling rules, and the forecast lab: that Normal reproduces Weather
+Nourie exactly, that the re-weighting matches the server's arithmetic, that Off
+and 4× re-weight only published values, and that the rain score keeps its rules.

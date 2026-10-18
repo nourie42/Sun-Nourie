@@ -1,18 +1,12 @@
-/* Atmos sky — the forecast drawn over the main page's own sky photographs.
- * The photographs are the ones behind the main page's Today card, so the sky and
- * the trees along its bottom edge look the same on both pages. The forecast
- * decides which photograph shows and how it is lit: sky cover blends clear and
- * cloudy skies, a rain or storm photograph takes over when the displayed
- * condition says so, and night swaps in the night sky. The photographs already
- * carry the light, so no sun or moon disc is painted over them: their height and
- * direction are written beside the sky. Humid air adds haze along the horizon,
- * and the wind drifts the picture sideways. Rain, snow, fog and lightning are
- * drawn only when the displayed condition calls for them. */
+/* Atmos sky: the forecast drawn as the sky (the painting is in atmos-sky-paint.js).
+ * The sun and moon are placed by the solar and lunar formulas below, the same ones
+ * the words beside the sky quote, so the picture and the words agree. Cloud cover,
+ * rain, snow, fog and thunder come from the displayed condition, and the wind
+ * drifts the clouds and leans the rain. */
 
-const RAD=Math.PI/180,DAY=86400000,J1970=2440588,J2000=2451545,OBLIQUITY=RAD*23.4397;
-const clamp=(v,a=0,b=1)=>Math.min(b,Math.max(a,v));
-const lerp=(a,b,t)=>a+(b-a)*t;
-const smooth=(a,b,v)=>{const t=clamp((v-a)/(b-a));return t*t*(3-2*t);};
+import {RAD,clamp,smooth,css,mix,rng,skyPaint,cloudField,cloudTexture,treeSpecs,treePalette,drawTreeline,starField,drawSun,drawMoon,xOfAzimuth,yOfAltitude,CLOUD_W,CLOUD_H} from './atmos-sky-paint.js?v=atmos-v5';
+
+const DAY=86400000,J1970=2440588,J2000=2451545,OBLIQUITY=RAD*23.4397;
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 
 /* ---------- Astronomy ---------- */
@@ -62,43 +56,25 @@ export function moonPhaseName(phase){
 }
 export function directionWord(azimuth){return ['north','northeast','east','southeast','south','southwest','west','northwest'][Math.round((((azimuth%360)+360)%360)/45)%8];}
 
-/* ---------- Colour and noise ---------- */
-const mix=(a,b,t)=>[lerp(a[0],b[0],t),lerp(a[1],b[1],t),lerp(a[2],b[2],t)];
-const css=(c,a=1)=>`rgba(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])},${clamp(a).toFixed(3)})`;
-function rng(seed){let a=seed>>>0;return ()=>{a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return ((t^t>>>14)>>>0)/4294967296;};}
-
-// The main page's own sky photographs (the Today card). Each is 1200 x 800.
-const PHOTOS={
- clear:'/weather-fusion/today-sky-clear.webp',
- clouds:'/weather-fusion/today-sky-clouds.webp',
- rain:'/weather-fusion/today-sky-rain.webp',
- storm:'/weather-fusion/today-sky-storm.webp',
- night:'/weather-fusion/today-sky-night-v2.webp',
-};
-
 /* ---------- Renderer ---------- */
 export function createSky(canvas,{reducedMotion=false}={}){
- const ctx=canvas.getContext('2d',{alpha:false});
- let width=0,height=0,dpr=1,running=false,frame=0,last=0,visible=true,timeScale=1,offset=0;
+ const ctx=canvas.getContext('2d',{alpha:false}),clouds=cloudTexture(cloudField(7));
+ let width=0,height=0,horizonY=0,dpr=1,running=false,frame=0,last=0,visible=true,timeScale=1,offset=0,flash=null,nextFlash=0;
  let location={latitude:35.787,longitude:-78.4806};
  let state={time:Date.now(),scene:{cover:.3,rain:0,snow:0,fog:0,haze:0,dark:0,storm:false,wind:5,windDir:270}};
- let drops=[],flakes=[],flash=null,nextFlash=0;
- const photos={};
- for(const [key,src] of Object.entries(PHOTOS)){
-  const image=new Image();
-  image.decoding='async';
-  image.onload=()=>{photos[key]=image;if(!running)render(0);};
-  image.src=src;
- }
+ let drops=[],flakes=[],stars=[],trees=[];
  function resize(){
   const rect=canvas.getBoundingClientRect();
   width=Math.max(1,Math.round(rect.width));height=Math.max(1,Math.round(rect.height));
   dpr=Math.min(window.devicePixelRatio||1,width>900?1.5:2);
   canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);
   ctx.setTransform(dpr,0,0,dpr,0,0);
+  horizonY=Math.round(height*.72);
   const random=rng(91);
   drops=Array.from({length:Math.round(Math.min(420,width*1.1))},()=>({x:random(),y:random(),speed:.75+random()*.5,length:.6+random()*.7}));
   flakes=Array.from({length:Math.round(Math.min(260,width*.6))},()=>({x:random(),y:random(),speed:.5+random()*.8,size:.6+random()*random()*1.6,sway:random()*6.3}));
+  stars=starField(width,height);
+  trees=treeSpecs(width,height,horizonY);
   render(0);
  }
  function setLocation(latitude,longitude){
@@ -110,90 +86,40 @@ export function createSky(canvas,{reducedMotion=false}={}){
   state={time:finite(next?.time)?next.time:state.time,scene:{...state.scene,...(next?.scene||{})}};
   if(!running)render(0);
  }
- /** Everything the picture needs for this moment: light, which photographs, and how much weather. */
- function palette(){
-  const s=state.scene,sun=sunPosition(state.time,location.latitude,location.longitude),alt=sun.altitude;
-  const night=1-smooth(-9,-3,alt),dusk=smooth(-9,-3,alt)*(1-smooth(4,12,alt));
-  const cloudy=smooth(.2,.75,s.cover),storm=s.storm?1:0,rain=smooth(.12,.5,s.rain)*(1-storm);
-  const others=(1-rain)*(1-storm);
-  return {sun,alt,night,dusk,cloudy,storm,rain,weights:{clear:others*(1-cloudy),clouds:others*cloudy,rain,storm}};
+ /** Where the sun and moon are, and the moon's phase, for the moment shown. */
+ function sunAndMoon(){
+  const t=state.time,{latitude,longitude}=location;
+  const sun=sunPosition(t,latitude,longitude),moon=moonPosition(t,latitude,longitude);
+  return {sun,moon,alt:sun.altitude,phase:moonIllumination(t).phase};
  }
- // Photographs are cover-fitted to the window and aligned to the bottom, so the
- // trees along their lower edge stay in view. The wind moves them sideways; a
- // mirrored copy continues each picture past its edge with no seam.
- function drawPhotos(p,dt){
-  const s=state.scene,w=width,h=height;
-  // The picture moves the way the air does: wind from the west carries it east, which is to the left.
-  if(!reducedMotion)offset-=Math.sin((s.windDir??270)*RAD)*Math.max(0,s.wind??4)*.45*Math.min(timeScale,6)*dt/1000;
-  ctx.fillStyle='#17294a';ctx.fillRect(0,0,w,h);
-  const layer=(image,alpha)=>{
-   const a=clamp(alpha);if(!image||a<.003)return;
-   const scale=Math.max(w/image.naturalWidth,h/image.naturalHeight),pw=image.naturalWidth*scale,ph=image.naturalHeight*scale,top=h-ph;
-   const x0=-(((offset%pw)+pw)%pw);
-   ctx.globalAlpha=a;
-   ctx.drawImage(image,x0,top,pw,ph);
-   ctx.save();ctx.translate(x0+2*pw,0);ctx.scale(-1,1);ctx.drawImage(image,0,top,pw,ph);ctx.restore();
-   ctx.globalAlpha=1;
-  };
-  const day=1-p.night,weights=p.weights;
-  // Each photograph goes over the ones before it with its share of the weight so far, so the
-  // picture is exactly the weighted mix of the photographs that have loaded.
-  let total=0;
-  for(const [image,share] of [[photos.clear,weights.clear*day],[photos.clouds,weights.clouds*day],[photos.rain,weights.rain*day],[photos.storm,weights.storm*day],[photos.night,p.night]]){
-   if(!image||!(share>0))continue;
-   total+=share;
-   layer(image,share/total);
+ function drawStars(alpha,time){
+  if(alpha<.02)return;
+  for(const star of stars){
+   const twinkle=reducedMotion?.85:.65+.35*Math.sin(star.phase+time/1000*star.rate);
+   ctx.fillStyle=css([226,234,248],alpha*twinkle*(.45+.55*star.size/1.4));
+   ctx.beginPath();ctx.arc(star.x*width,star.y*horizonY,star.size,0,Math.PI*2);ctx.fill();
   }
  }
- // A navy veil keeps the sky in the same dark glass tone as the page, and deepens
- // with night, cloud, rain and storm; snow adds a pale wash.
- function drawVeil(p){
-  const s=state.scene;
-  ctx.fillStyle=css([9,20,42],clamp(.22+.26*p.night+.16*p.cloudy+.1*p.rain+.1*p.storm,0,.8));
-  ctx.fillRect(0,0,width,height);
-  if(s.snow>.02){ctx.fillStyle=css([236,244,255],.22*clamp(s.snow));ctx.fillRect(0,0,width,height);}
+ // The clouds are tiled at the texture's own proportions, so their shapes keep their size as the window changes.
+ function drawClouds(p,s,cover){
+  const toward=p.alt>-6?{x:(p.sun.azimuth-180)/120,y:p.alt/45}:{x:(p.moon.azimuth-180)/120,y:p.moon.altitude/45};
+  const image=clouds.update(cover,{x:clamp(toward.x,-1,1),y:clamp(toward.y,0,1)},p.alt,!!s.storm);
+  if(!image)return;
+  const scale=horizonY/CLOUD_H,tile=CLOUD_W*scale,start=-(((offset%tile)+tile)%tile);
+  for(let x=start;x<width;x+=tile)ctx.drawImage(image,x,0,tile,horizonY);
  }
- // Low sun warms the lower sky and the trees.
- function drawDusk(p){
-  const w=p.dusk*(1-p.cloudy*.5)*(1-p.storm);if(w<.02)return;
-  const g=ctx.createLinearGradient(0,height*.45,0,height);
-  g.addColorStop(0,css([255,150,92],0));g.addColorStop(1,css([255,138,88],.3*w));
-  ctx.fillStyle=g;ctx.fillRect(0,height*.45,width,height*.55);
- }
- // Humid air hazes the horizon, most at dawn and dusk.
- function drawHaze(p){
-  const s=state.scene;if(s.haze<.02)return;
-  const tint=mix([222,232,242],[255,200,160],1-smooth(4,20,p.alt));
-  const g=ctx.createLinearGradient(0,height*.5,0,height);
-  g.addColorStop(0,css(tint,0));g.addColorStop(1,css(tint,.3*s.haze*(1-p.cloudy*.4)));
-  ctx.fillStyle=g;ctx.fillRect(0,height*.5,width,height*.5);
- }
- // Lightning only for thunder or storm wording, never for a plain rain forecast.
- function drawLightning(p,time){
-  if(!p.storm||reducedMotion)return;
-  if(!flash&&time>nextFlash)flash={start:time,x:width*(.15+Math.random()*.7),y:height*(.1+Math.random()*.3),double:Math.random()<.5};
-  if(!flash)return;
-  const age=time-flash.start,pulse=Math.max(0,1-age/260)+(flash.double&&age>320?Math.max(0,1-(age-320)/200)*.7:0);
-  if(age>700){flash=null;nextFlash=time+3500+Math.random()*6000;return;}
-  if(pulse<=0)return;
-  const g=ctx.createRadialGradient(flash.x,flash.y,0,flash.x,flash.y,width*.45);
-  g.addColorStop(0,css([225,225,255],.42*pulse));g.addColorStop(1,css([225,225,255],0));
-  ctx.fillStyle=g;ctx.fillRect(0,0,width,height);
- }
- // Fog sits on the ground: thickest near the horizon, thinning toward the top.
- function drawFog(p){
-  const s=state.scene;if(s.fog<.02)return;
-  const day=smooth(-6,6,p.alt),strong=.18+.62*s.fog*s.fog;
-  const tint=mix([70,82,104],[206,214,224],day);
+ function drawFog(p,s){
+  if(!(s.fog>.02))return;
+  const day=smooth(-6,6,p.alt),strong=.18+.62*s.fog*s.fog,tint=mix([70,82,104],[206,214,224],day);
   const g=ctx.createLinearGradient(0,0,0,height);
   g.addColorStop(0,css(tint,strong*.3));g.addColorStop(.6,css(tint,strong*.7));g.addColorStop(1,css(tint,strong*.85));
   ctx.fillStyle=g;ctx.fillRect(0,0,width,height);
  }
- function drawPrecipitation(p,dt){
-  const s=state.scene,lean=Math.sin((s.windDir??270)*RAD)*clamp((s.wind??4)/30,0,.6);
+ function drawPrecipitation(p,s,dt){
+  const lean=Math.sin((s.windDir??270)*RAD)*clamp((s.wind??4)/30,0,.6);
   if(s.rain>.01){
    const count=Math.round(drops.length*clamp(s.rain)),day=smooth(-6,8,p.alt);
-   ctx.strokeStyle=css(mix([150,166,196],[226,234,244],day),.22+.34*s.rain);ctx.lineWidth=1;ctx.beginPath();
+   ctx.strokeStyle=css(mix([150,166,196],[226,234,244],day),.2+.32*s.rain);ctx.lineWidth=1;ctx.beginPath();
    const fall=dt/1000*1.6*(timeScale>1?1.4:1);
    for(let i=0;i<count;i++){
     const drop=drops[i];
@@ -214,10 +140,47 @@ export function createSky(canvas,{reducedMotion=false}={}){
    }
   }
  }
+ // Lightning only for thunder or storm wording, never for a plain rain forecast.
+ function drawLightning(storm,time){
+  if(!storm||reducedMotion)return;
+  if(!flash&&time>nextFlash)flash={start:time,x:width*(.15+Math.random()*.7),y:height*(.08+Math.random()*.3),double:Math.random()<.5};
+  if(!flash)return;
+  const age=time-flash.start;
+  if(age>700){flash=null;nextFlash=time+3500+Math.random()*6000;return;}
+  const pulse=Math.max(0,1-age/260)+(flash.double&&age>320?Math.max(0,1-(age-320)/200)*.7:0);
+  if(pulse<=0)return;
+  const g=ctx.createRadialGradient(flash.x,flash.y,0,flash.x,flash.y,width*.45);
+  g.addColorStop(0,css([225,225,255],.42*pulse));g.addColorStop(1,css([225,225,255],0));
+  ctx.fillStyle=g;ctx.fillRect(0,0,width,height);
+ }
  function render(dt,time=performance.now()){
   if(!width||!height)return;
-  const p=palette();
-  drawPhotos(p,dt);drawVeil(p);drawDusk(p);drawHaze(p);drawLightning(p,time);drawFog(p);drawPrecipitation(p,dt);
+  const s=state.scene,p=sunAndMoon(),cover=clamp(finite(s.cover)?s.cover:.3),storm=!!s.storm;
+  // The clouds move the way the air does: wind from the west carries them east, which is to the left.
+  if(!reducedMotion)offset-=Math.sin((s.windDir??270)*RAD)*Math.max(0,s.wind??4)*.45*Math.min(timeScale,6)*dt/1000;
+  const paint=skyPaint({alt:p.alt,cover,storm,fog:s.fog??0,haze:s.haze??0,dark:s.dark??0});
+  const sky=ctx.createLinearGradient(0,0,0,horizonY);
+  sky.addColorStop(0,css(paint.zenith));sky.addColorStop(1,css(paint.horizon));
+  ctx.fillStyle=sky;ctx.fillRect(0,0,width,height);
+  const night=1-smooth(-9,-3,p.alt),r=Math.max(7,Math.min(width,height)*.03);
+  drawStars(night*(1-smooth(.25,.9,cover)),time);
+  // The sun and moon sit under the cloud: thin cloud veils them and thick cloud hides them.
+  const sunX=xOfAzimuth(p.sun.azimuth)*width,sunY=yOfAltitude(p.alt,horizonY);
+  if(p.alt>-1&&sunX>-4*r&&sunX<width+4*r)drawSun(ctx,sunX,sunY,r,{alt:p.alt,veil:smooth(.45,.95,cover)});
+  const moonX=xOfAzimuth(p.moon.azimuth)*width,moonY=yOfAltitude(p.moon.altitude,horizonY);
+  if(p.moon.altitude>-1&&moonX>-4*r&&moonX<width+4*r)
+   drawMoon(ctx,moonX,moonY,r*.85,{phase:p.phase,alpha:(1-.75*smooth(-8,2,p.alt))*(1-.9*smooth(.45,.95,cover))});
+  drawClouds(p,s,cover);
+  drawTreeline(ctx,trees,{width,height,horizonY,colours:treePalette(p.alt,paint.horizon,s.fog??0)});
+  if(s.haze>.02){
+   const top=horizonY-height*.16,bottom=horizonY+height*.04,haze=ctx.createLinearGradient(0,top,0,bottom);
+   haze.addColorStop(0,css(paint.horizon,0));haze.addColorStop(1,css(paint.horizon,.32*clamp(s.haze)));
+   ctx.fillStyle=haze;ctx.fillRect(0,top,width,bottom-top);
+  }
+  if(s.snow>.02){ctx.fillStyle=css([236,244,255],.18*clamp(s.snow));ctx.fillRect(0,0,width,height);}
+  drawFog(p,s);
+  drawPrecipitation(p,s,dt);
+  drawLightning(storm,time);
  }
  function loop(time){
   if(!running)return;

@@ -51,9 +51,9 @@
   </style>
   <link rel="stylesheet" href="/weather-fusion/header-sky.css?v=photo-rain-header-v1">
   <link rel="stylesheet" href="/weather-fusion/page-unify.css?v=hour-selection-v1">
-  <link rel="stylesheet" href="/weather-fusion/atmos.css?v=atmos-v4">
+  <link rel="stylesheet" href="/weather-fusion/atmos.css?v=atmos-v5">
   <script type="module" src="/weather-fusion/header-sky.js?v=3"></script>
-  <script type="module" src="/weather-fusion/atmos.js?v=atmos-v4"></script>
+  <script type="module" src="/weather-fusion/atmos.js?v=atmos-v5"></script>
 </head>
 <body data-sky="day">
   <a class="skip-link" href="#main">Skip to the forecast details</a>
@@ -105,6 +105,7 @@
           <canvas class="sky" id="sky" aria-hidden="true"></canvas>
           <p class="sky-note" id="sky-note"></p>
         </div>
+        <p class="dressed-note" id="dressed-note" hidden>What to wear at this hour. Clothes change only when the weather really does, so they hold steady while the time-lapse plays.</p>
         <div class="dressed" id="dressed" role="group" aria-label="What to wear at this hour" hidden></div>
         <div class="clock" id="clock" hidden>
           <button class="play" id="play" type="button" aria-pressed="false" aria-label="Play the next 48 hours in the sky">

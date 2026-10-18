@@ -551,3 +551,43 @@ export function dressedPeople(step,sample={}){
   return {label:person.label,feel,daylight,scene:scene.key,outfit,text:wearText(scene.key,outfit),art:referenceScene(person.panel,daylight,step.condition,feel,context)};
  });
 }
+/* Clothes settle: a change of clothes shows only after it has lasted four hours, and rain gear after two, so a
+ * one-hour blip never changes the picture and a shower is not missed. Hours without data are left alone. */
+const WET_SCENES=['rain','snow','carry-umbrella'];
+function settleRuns(keys,minRun){
+ const runs=[];
+ keys.forEach((key,i)=>{const last=runs[runs.length-1];if(last&&last.key===key)last.end=i;else runs.push({key,start:i,end:i,src:i});});
+ const needed=run=>WET_SCENES.includes(run.key.split('|')[0])?2:minRun;
+ for(let changed=true;changed&&runs.length>1;){
+  changed=false;
+  for(let r=0;r<runs.length;r++){
+   const run=runs[r],prev=runs[r-1];
+   if(run.key===''||run.end-run.start+1>=needed(run))continue;
+   // Short runs are absorbed backward only, so the current hour always shows its own clothes.
+   if(!prev||prev.key==='')continue;
+   prev.end=run.end;
+   runs.splice(r,1);changed=true;break;
+  }
+ }
+ const merged=[];
+ for(const run of runs){const last=merged[merged.length-1];if(last&&last.key===run.key)last.end=run.end;else merged.push({...run});}
+ return merged;
+}
+/** The three people for every forecast hour, with the clothes settled. The feels-like value is the hour's own;
+ * the scene, outfit, daylight, words and picture come from the hour the settled run was built on (its src). */
+export function dressingTimeline(steps,sampleAt=()=>({})){
+ const hours=steps.map(step=>step?dressedPeople(step,sampleAt(step)):[]);
+ const timeline=steps.map(()=>DRESSED_PEOPLE.map(()=>null));
+ DRESSED_PEOPLE.forEach((_,p)=>{
+  const keys=hours.map(people=>people[p]?`${people[p].scene}|${people[p].outfit}|${people[p].daylight}`:'');
+  for(const run of settleRuns(keys,4)){
+   if(run.key==='')continue;
+   const source=hours[run.src][p];
+   for(let i=run.start;i<=run.end;i++){
+    const live=hours[i][p];
+    if(live)timeline[i][p]={label:source.label,feel:live.feel,daylight:source.daylight,scene:source.scene,outfit:source.outfit,text:source.text,art:source.art};
+   }
+  }
+ });
+ return timeline;
+}

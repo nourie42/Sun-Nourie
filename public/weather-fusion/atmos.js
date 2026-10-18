@@ -8,8 +8,8 @@
 import {buildTimeline,skyScene,mixScene,consensus,agreementLabel,presentSources,rainBreakdown,comfortGrid,perfectWindows,dailyOutlook,
  sunDay,COMFORT_BINS,comfortBin,SOURCES,SOURCE_ORDER,SOURCE_ABOUT,sourceLabel,countWord,compass,hourLabel,clockLabel,longDayLabel,weekdayLabel,localParts,
  PRESETS,validPlace,placeFromQuery,PERFECT_RULES,H,TRUST_STOPS,TRUST_LABELS,NORMAL_STOP,LAB_PRESETS,normalTrust,isNourieTrust,matchingPreset,
- recipeShares,sourceCoverage,customForecast,labDifferences,rainOutlook,relativeHour,dressedPeople} from './atmos-model.js?v=atmos-v3';
-import {createSky,moonIllumination,moonPhaseName,moonPosition,sunPosition,directionWord} from './atmos-sky.js?v=atmos-v3';
+ recipeShares,sourceCoverage,customForecast,labDifferences,rainOutlook,relativeHour,dressingTimeline} from './atmos-model.js?v=atmos-v5';
+import {createSky,moonIllumination,moonPhaseName,moonPosition,sunPosition,directionWord} from './atmos-sky.js?v=atmos-v5';
 import {fetchJsonWithDeadline} from './request-deadline.js?v=loading-recovery-v1';
 import {withLiveAlerts,retainUnverifiedAlerts,alertLocationKey,alertHealth,ALERT_REFRESH_MS} from './live-alerts.js?v=county-warnings-v3';
 import {pavementEstimate,petSurfaceSubtitle} from './pavement.js?v=current-rain-20261017-v3';
@@ -71,19 +71,26 @@ function renderSkyNote(time){
 }
 
 /* ---------- Dressed for the hour ---------- */
-// The illustrated people sit under the sky, as on the main page. Only the figures whose picture
-// changed are replaced, so the artwork does not flicker while the time-lapse runs.
-let dressedParts=[];
+// The illustrated people sit under the sky. A figure keeps its picture until its clothes really change (the
+// model settles them), and only the feels-like numbers are rewritten each hour, so nothing flickers while the
+// time-lapse runs.
+let dressing=[];
+const sampleAt=s=>s?.isNow?currentSample(forecast,Date.now()):forecastSample(forecast,new Date(s.time).toISOString());
+const wearKey=person=>`${person.scene}|${person.outfit}|${person.daylight}`;
+function wearHTML(person){
+ return `<figure class="wear" data-key="${esc(wearKey(person))}" data-daylight="${person.daylight}">${person.art}<figcaption><span class="wear-label">${esc(person.label)}</span><strong class="wear-feel">${deg(person.feel)}</strong><small class="wear-text">${esc(person.text)}</small></figcaption></figure>`;
+}
 function renderDressed(s){
- const el=$('dressed');if(!el||!s||!forecast)return;
- const sample=s.isNow?currentSample(forecast,Date.now()):forecastSample(forecast,new Date(s.time).toISOString());
- const parts=dressedPeople(s,sample).map(person=>`<figure class="wear" data-scene="${esc(person.scene)}" data-outfit="${esc(person.outfit)}" data-daylight="${person.daylight}">${person.art}<figcaption><span class="wear-label">${esc(person.label)}</span><strong>${deg(person.feel)}</strong><small>${esc(person.text)}</small></figcaption></figure>`);
- if(!parts.length)return;
- el.hidden=false;
- const figures=el.querySelectorAll('.wear');
- if(figures.length!==parts.length)el.innerHTML=`<p class="dressed-note">What to wear at this hour. The clothes change as the time-lapse plays.</p>${parts.join('')}`;
- else parts.forEach((html,i)=>{if(html!==dressedParts[i])figures[i].outerHTML=html;});
- dressedParts=parts;
+ const el=$('dressed'),note=$('dressed-note'),people=(dressing[selected]||[]).filter(Boolean);
+ if(!el||!s||!people.length)return;
+ el.hidden=false;if(note)note.hidden=false;
+ const figures=[...el.querySelectorAll('.wear')];
+ if(figures.length!==people.length){el.innerHTML=people.map(wearHTML).join('');return;}
+ people.forEach((person,i)=>{
+  if(figures[i].dataset.key!==wearKey(person)){figures[i].outerHTML=wearHTML(person);return;}
+  figures[i].querySelector('.wear-feel').textContent=deg(person.feel);
+  figures[i].querySelector('.wear-text').textContent=person.text;
+ });
 }
 
 /* ---------- Loading ---------- */
@@ -173,6 +180,7 @@ function rebuild(keepTime=null,{quiet=false}={}){
  const built=safe('timeline',()=>buildTimeline(forecast,now),[]);
  if(!built.length){status('The hourly forecast is missing from this update.',true);return;}
  steps=built;
+ dressing=safe('dressing',()=>dressingTimeline(steps,sampleAt),[]);
  blendRows=safe('blend',()=>consensus(steps),[]);
  grid=safe('grid',()=>comfortGrid(forecast,now),[]);
  days=safe('days',()=>dailyOutlook(forecast,now),[]);

@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import {readFileSync,existsSync} from 'node:fs';
 import {fixture} from '../scripts/weatherNourieFixture.js';
 import {buildTimeline,skyScene,mixScene,cloudCover,consensus,rainBreakdown,comfortBin,comfortGrid,perfectWindows,sourceSpread,seriesIndex,dailyOutlook,sunDay,placeFromQuery,PRESETS,H,
-  TRUST_STOPS,LAB_PRESETS,normalTrust,isNourieTrust,matchingPreset,mixValue,rainScoreMix,recipeShares,sourceCoverage,customForecast,labDifferences,rainOutlook,relativeHour,dressedPeople,wearText} from '../public/weather-fusion/atmos-model.js';
+  TRUST_STOPS,LAB_PRESETS,normalTrust,isNourieTrust,matchingPreset,mixValue,rainScoreMix,recipeShares,sourceCoverage,customForecast,labDifferences,rainOutlook,relativeHour,dressedPeople,wearText,dressingTimeline} from '../public/weather-fusion/atmos-model.js';
 import {sunPosition,moonIllumination,moonPhaseName} from '../public/weather-fusion/atmos-sky.js';
+import {skyColours,skyPaint,cloudField,coverShare,CLOUD_W,CLOUD_H} from '../public/weather-fusion/atmos-sky-paint.js';
 import {hourlyDisplaySamples} from '../public/weather-fusion/weather-display.js';
 import {forecastValue,displayedFeelsAt} from '../public/weather-fusion/hourly-feels.js';
 import {dailyForecastReadings} from '../public/weather-fusion/seven-day.js';
@@ -170,11 +171,43 @@ test('sun and moon positions follow the shared solar formula',()=>{
   assert.ok(day.sunrise<day.noon&&day.noon<day.goldenEveningStart&&day.goldenEveningStart<day.sunset);
 });
 
-test('the sky paints no sun or moon disc over the photographs; their height and direction are written beside it',()=>{
-  const sky=read('atmos-sky.js'),page=read('atmos.js');
-  assert.doesNotMatch(sky,/drawSun|drawMoon/,'the photographs already carry the light, so no painted disc moves across them');
+test('the sun and moon are drawn where the astronomy puts them, and the words beside the sky name the same place',()=>{
+  const sky=read('atmos-sky.js'),paint=read('atmos-sky-paint.js'),page=read('atmos.js');
+  assert.match(sky,/sunPosition\(t,latitude,longitude\)/,'the picture uses the same solar formula as the words');
+  assert.match(sky,/drawSun\(ctx,sunX,sunY/,'the sun is drawn at its computed height and direction');
+  assert.match(sky,/drawMoon\(ctx,moonX,moonY/,'the moon is drawn at its computed position');
+  assert.match(paint,/export function drawMoon[\s\S]*destination-out/,'the moon shows its real phase by cutting away the unlit part');
   assert.match(page,/renderSkyNote|sky-note/,'the sun and moon positions are written beside the sky');
+  assert.doesNotMatch(sky+paint,/today-sky|PHOTOS/,'the sky is painted from the forecast, not drawn from photographs');
 });
+
+test('the sky is painted from the forecast: a cover fraction fills that share of the sky, and the colours follow the sun',()=>{
+  const rank=cloudField(7);
+  assert.equal(rank.length,CLOUD_W*CLOUD_H);
+  for(const cover of [.1,.3,.6,.9])assert.ok(Math.abs(coverShare(rank,cover)-cover)<.01,`${cover*100}% cover fills ${cover*100}% of the sky`);
+  const chroma=c=>Math.max(...c)-Math.min(...c),luma=c=>c[0]*.3+c[1]*.59+c[2]*.11;
+  const clear=skyPaint({alt:55,cover:.05}),overcast=skyPaint({alt:55,cover:1});
+  assert.ok(chroma(clear.zenith)>chroma(overcast.zenith)+40,'a clear blue sky is far more saturated than an overcast one');
+  const night=skyPaint({alt:-18,cover:0});
+  assert.ok(luma(night.zenith)<40&&luma(skyPaint({alt:55,cover:0}).zenith)>luma(night.zenith)*3,'night is dark and day is bright');
+  const dusk=skyColours(0).horizon;
+  assert.ok(dusk[0]>dusk[2],'the horizon glows warm at sunset');
+  assert.ok(skyPaint({alt:20,cover:.3,fog:.9}).horizon.every((v,i)=>Math.abs(v-skyPaint({alt:20,cover:.3}).horizon[i])>0),'fog changes the horizon colour');
+});
+
+test('the clothes settle: a one-hour blip leaves them alone, a lasting change shows, and the feels-like numbers stay live',()=>{
+  const start=Date.parse('2026-07-15T12:00:00Z');
+  const hour=(i,temp,extra={})=>({time:start+i*H,hourStart:start+i*H,isNow:false,condition:'Clear',temperature:temp,shade:temp-2,feels:temp,isDay:true,rain:0,...extra});
+  const blip=dressingTimeline(Array.from({length:24},(_,i)=>hour(i,i===10?96:70)));
+  assert.ok(blip.every(p=>p[1].outfit===blip[0][1].outfit),'a one-hour spike does not change the clothes');
+  assert.equal(blip[10][1].feel,96,'the feels-like value is still the hour’s own');
+  const spell=dressingTimeline(Array.from({length:30},(_,i)=>hour(i,i>=10&&i<16?88:70)));
+  assert.equal(spell.slice(1).filter((p,i)=>p[1].outfit!==spell[i][1].outfit).length,2,'six warm hours change the clothes twice, there and back');
+  assert.notEqual(spell[12][1].outfit,spell[0][1].outfit);
+  const shower=dressingTimeline(Array.from({length:12},(_,i)=>hour(i,70,i>=4&&i<6?{condition:'Rain',rain:90}:{})));
+  assert.equal(shower[5][1].scene,'rain','a two-hour shower still gets rain gear');
+});
+
 
 test('the illustrated people are the main page’s artwork, dressed for the hour shown and placed under the sky',()=>{
   const day={isDay:true,isNow:false,time:Date.parse('2026-01-15T17:00:00Z'),condition:'Clear',temperature:33,shade:28,feels:30,rain:0};
@@ -203,17 +236,15 @@ test('places come from presets or validated U.S. coordinates only',()=>{
   assert.equal(placeFromQuery(''),null);
 });
 
-test('Atmos uses the main page’s own look: shared stylesheets, header band and the same sky photographs',()=>{
+test('Atmos uses the main page’s own look: shared stylesheets, header band',()=>{
   const html=read('atmos.html'),sky=read('atmos-sky.js');
   for(const sheet of ['style.css','forecast-layout.css','weather-polish.css','page-unify.css','header-sky.css'])
     assert.match(html,new RegExp(`href="/weather-fusion/${sheet.replace('.','\\.')}`),`${sheet} is shared with the main page`);
   assert.match(html,/class="topbar sky-header"/);
   assert.match(html,/src="\/weather-fusion\/header-sky\.js\?v=/);
-  for(const name of ['clear','clouds','rain','storm','night-v2']){
-    assert.match(sky,new RegExp(`today-sky-${name}\\.webp`),`the sky draws the main page's today-sky-${name} photograph`);
-    assert.ok(existsSync(new URL(`../public/weather-fusion/today-sky-${name}.webp`,import.meta.url)),`today-sky-${name}.webp exists`);
-  }
-  assert.doesNotMatch(sky,/cumulus|paintLandscape|deciduous|evergreen|LEAVES|season/i,'no painted cartoon sprites, lollipop trees or seasonal leaves');
+  assert.match(read('atmos-sky-paint.js'),/function pinePath[\s\S]*function oakPath/,'the treeline mixes pines and broadleaf trees');
+  assert.doesNotMatch(sky+read('atmos-sky-paint.js'),/lollipop|LEAVES|cartoon/i,'no cartoon sprites or lollipop trees');
+  assert.ok(existsSync(new URL('../public/weather-fusion/atmos-sky-paint.js',import.meta.url)),'the painter ships with the page');
   assert.doesNotMatch(read('atmos.css')+html,/Archivo|woff2/,'the page uses the same system type stack as the main page');
   assert.doesNotMatch(html,/class="card"/,'sections are the main page’s glass tiles');
 });
