@@ -132,7 +132,7 @@ export function installNativePlayer({selectComfortHour}={}){
     dispose(){if(disposed)return;disposed=true;document.removeEventListener('weather-nourie:forecast',onForecast);document.removeEventListener('weather-nourie:location-changing',onLocationChanging);document.removeEventListener('visibilitychange',onVisibility);hourly?.removeEventListener('click',onHourlyClick,true);bridge?.dispose();player?.remove();if(host[INSTALL_KEY]===controller)delete host[INSTALL_KEY];}
   };
   host[INSTALL_KEY]=controller;
-  controller.ready=import('./player/sky-player.js?v=people-v1').then(()=>{
+  controller.ready=import('./player/sky-player.js?v=integrated-scenes-v2').then(()=>{
     if(disposed)return null;
     player=document.createElement('weather-sky-player');player.setAttribute('data-native','');player.setAttribute('data-mode','live');
     const note=document.createElement('p');note.className='native-player-note';note.textContent='Pause to update the Shade, Sun and For Pets cards below.';

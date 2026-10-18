@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {customForecastInput,normalizeCustomWeights,changeCustomWeight,toggleCustomModel,customPresetWeights,blendCustomForecast,customForecastSummary} from '../public/weather-fusion/custom-forecast-model.js';
-import {customForecastPath,customForecastScale,customRainChanceLabel} from '../public/weather-fusion/custom-forecast.js';
+import {customForecastInput,normalizeCustomWeights,changeCustomWeight,toggleCustomModel,customPresetWeights,blendCustomForecast,publishedForecastPreview,customForecastSummary,customCalendarComparison,customForecastNarrative} from '../public/weather-fusion/custom-forecast-model.js';
+import {calendarDayWindow} from '../public/weather-fusion/calendar-day.js';
 
 const HOUR = 3600000;
 const NOW = Date.parse('2026-10-18T03:30:00Z'); // Saturday 11:30 PM in Knightdale.
@@ -42,7 +42,6 @@ test('same-instant offsets align, with explicit missing clock-hour gaps',()=>{
   assert.equal(result.hours[1].custom.temperature.value,null);
   assert.equal(result.hours[1].custom.rain.value,null);
   assert.equal(result.hours[2].custom.temperature.value,70);
-  assert.equal(customForecastPath([68,null,70],index=>index*10,value=>value),'M0.00,68.00M20.00,70.00');
 });
 
 test('metric temperature evidence extends the custom timeline without repeating a daily high',()=>{
@@ -171,20 +170,115 @@ test('empty selection leaves custom values unavailable while retaining the Nouri
   assert.equal(result.hours[0].baseline.temperature,70);
 });
 
-test('probability chart scale is fixed and temperature scale handles constant values',()=>{
-  assert.deepEqual(customForecastScale([3,4,5],'rain'),{min:0,max:100});
-  const temperature = customForecastScale([67,67],'temperature');
-  assert.ok(temperature.min<67 && temperature.max>67);
-  assert.equal(customForecastScale([0,0],'amount').max,.04);
+function calendarFixture(now=Date.parse('2026-10-19T02:30:00Z'),date='2026-10-18'){
+  const days=Array.from({length:7},(_,index)=>{
+    const key=new Date(Date.parse(`${date}T12:00:00Z`)+index*24*HOUR).toISOString().slice(0,10);
+    const window=calendarDayWindow({date:key},index,now,'America/New_York');
+    return {date:key,label:key,high:99,low:40,condition:'Partly cloudy',rainLikelihood:{aggregation:'maximum-hourly',value:10,coverage:{complete:true},window:{start:new Date(index===0?now:window.start).toISOString(),end:new Date(window.end).toISOString()}},qpfWindow:{start:new Date(index===0?now:window.start).toISOString(),end:new Date(window.end).toISOString()}};
+  });
+  const start=Math.floor(now/HOUR)*HOUR,end=calendarDayWindow(days[6],6,now,'America/New_York').end;
+  const hourly=[];
+  for(let time=start;time<end;time+=HOUR){
+    const localHour=Number(new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',hour:'numeric',hourCycle:'h23'}).format(new Date(time)));
+    const value=localHour===14?70:52;
+    const hrrr=time<Date.parse(days[2].date+'T07:00:00Z')?(localHour===14?68:45):null;
+    hourly.push({time:new Date(time).toISOString(),end:new Date(time+HOUR).toISOString(),temperature:value,officialTemperature:value,temperatureBlend:{sources:[{id:'nws',value},{id:'ecmwf',value:value+2},...(hrrr===null?[]:[{id:'hrrr',value:hrrr}])]},officialPop:10,rainLikelihood:{value:10,officialProbability:10},precipitation:0,precipitationBlend:{sourceValues:{nws:0,ecmwf:0,...(hrrr===null?{}:{hrrr:0})}}});
+  }
+  return {now,forecast:{location:{name:'Knightdale',latitude:35.787,longitude:-78.48,timeZone:'America/New_York'},assembledAt:new Date(now).toISOString(),days,hours:hourly,rainTimeline:hourly,blendPolicy:{sameDay:{nws:40,hrrr:30,ecmwf:30}}}};
+}
+
+test('calendar narrative uses the published displayed high, not the raw period high',()=>{
+  const {forecast,now}=calendarFixture();
+  const narrative=customForecastNarrative(blendCustomForecast(customForecastInput(forecast,now),{hrrr:100}));
+  assert.equal(narrative.days[1].high.baseline,70);
+  assert.equal(forecast.days[1].high,99,'raw daytime period high differs from the calendar card');
+  assert.equal(narrative.days[1].high.value,68);
+  assert.match(narrative.highlights.map(item=>item.text).join(' '),/Monday, the high becomes 68° instead of 70°/);
+  assert.equal(narrative.days.length,7);
+  assert.equal(narrative.days.at(-1).date,'2026-10-24');
 });
 
-test('rain chance follows the existing low-chance presentation without altering the source number',()=>{
-  assert.equal(customRainChanceLabel(0),'Low');
-  assert.equal(customRainChanceLabel(4.9),'Low');
-  assert.equal(customRainChanceLabel(5),'5%');
-  assert.equal(customRainChanceLabel(null),'Unavailable');
-  const source = fixture(); source.rainTimeline[0].officialPop=3;
-  const result = blendCustomForecast(customForecastInput(source,NOW),{nws:100});
-  assert.equal(result.hours[0].custom.rain.value,3);
-  assert.equal(customRainChanceLabel(result.hours[0].custom.rain.value),'Low');
+test('today ends at local midnight and cannot borrow Monday morning rain',()=>{
+  const {forecast,now}=calendarFixture();
+  const wet=forecast.rainTimeline.find(row=>row.time==='2026-10-19T05:00:00.000Z');
+  wet.precipitation=1;wet.precipitationBlend.sourceValues.nws=1;
+  const result=customCalendarComparison(blendCustomForecast(customForecastInput(forecast,now),{nws:100}));
+  assert.equal(result[0].label,'Remaining today');
+  assert.equal(result[0].amount.value,0);
+  assert.equal(result[0].temperatureWindow.end,Date.parse('2026-10-19T04:00:00Z'));
+  assert.equal(result[1].amount.value,1);
+});
+
+test('an older midnight rain window is narrowed to the remaining day with a matching hourly baseline',()=>{
+  const {forecast,now}=calendarFixture();
+  const midnight=calendarDayWindow(forecast.days[0],1,now,'America/New_York').start;
+  forecast.days[0].rainLikelihood.window.start=new Date(midnight).toISOString();
+  forecast.hours[0].precipitation=.02;
+  forecast.hours[0].precipitationBlend.sourceValues.nws=.04;
+  const result=customCalendarComparison(blendCustomForecast(customForecastInput(forecast,now),{nws:100}));
+  assert.equal(result[0].rainWindow.start,now);
+  almost(result[0].amount.value,.02);
+  almost(result[0].amount.baseline,.01);
+});
+
+test('a model overnight tail cannot become Tuesday’s daily high',()=>{
+  const {forecast,now}=calendarFixture();
+  const input=customForecastInput(forecast,now),narrative=customForecastNarrative(blendCustomForecast(input,{hrrr:100}));
+  assert.equal(narrative.days[2].high.value,null);
+  assert.equal(narrative.days[2].high.availableHours,3);
+  assert.equal(narrative.days[2].high.expectedHours,24);
+  assert.doesNotMatch(narrative.days[2].sentences.join(' '),/45°/);
+  const mixed=customCalendarComparison(blendCustomForecast(input,{hrrr:50,ecmwf:50}));
+  assert.equal(mixed[2].high.value,72,'other selected models cover the missing afternoon hours');
+});
+
+test('a missing internal hour prevents a false daily high or rainfall total',()=>{
+  const {forecast,now}=calendarFixture();
+  forecast.hours=forecast.hours.filter(row=>row.time!=='2026-10-19T18:00:00.000Z');
+  forecast.rainTimeline=forecast.rainTimeline.filter(row=>row.time!=='2026-10-19T18:00:00.000Z');
+  const result=customCalendarComparison(blendCustomForecast(customForecastInput(forecast,now),{nws:100}));
+  assert.equal(result[1].high.value,null);assert.equal(result[1].amount.value,null);
+});
+
+test('the fall DST day needs all 25 distinct clock hours',()=>{
+  const {forecast,now}=calendarFixture(Date.parse('2026-11-01T02:30:00Z'),'2026-10-31');
+  const result=customCalendarComparison(blendCustomForecast(customForecastInput(forecast,now),{nws:100}));
+  assert.equal(result[1].date,'2026-11-01');
+  assert.equal(result[1].high.expectedHours,25);
+  assert.equal(result[1].high.complete,true);
+});
+
+test('missing published comparison values cannot be described as a match',()=>{
+  const {forecast,now}=calendarFixture();
+  forecast.days=[];
+  const narrative=customForecastNarrative(blendCustomForecast(customForecastInput(forecast,now),{nws:100}));
+  assert.equal(narrative.completeDays,7);assert.equal(narrative.comparedDays,0);
+  assert.doesNotMatch(narrative.summary,/match Weather Nourie/);
+  assert.match(narrative.summary,/can’t compare/);
+});
+
+test('European and AI presets emphasize available models without inventing feeds',()=>{
+  const input=customForecastInput(fixture(),NOW);
+  const european=customPresetWeights(input,'european');
+  assert.equal(european.ecmwf,60);
+  assert.equal(Object.values(european).reduce((sum,value)=>sum+value,0),100);
+  assert.equal(Object.hasOwn(customPresetWeights(input,'ai'),'wn'),false);
+});
+
+test('Weather Nourie mode preserves actual published days even when static model shares produce changes',()=>{
+  const {forecast,now}=calendarFixture();
+  forecast.blendPolicy.sameDay={hrrr:1}; // An obsolete policy is not the current published mix.
+  const current=forecast.hours[0];
+  current.temperatureBlend.sources=[{id:'nws',value:52,weight:.5},{id:'hrrr',value:45,weight:.2},{id:'ecmwf',value:54,weight:.2},{id:'wn',value:62,weight:.1}];
+  for(const row of forecast.rainTimeline){row.precipitation=.01;row.precipitationBlend.sourceValues.ecmwf=.1;}
+  const before=JSON.stringify(forecast),input=customForecastInput(forecast,now);
+  assert.deepEqual(input.defaultWeights,{nws:50,hrrr:20,ecmwf:20,wn:10},'editing starts from actual current temperature source shares, including NVIDIA');
+  const edited=customForecastNarrative(blendCustomForecast(input,input.defaultWeights));
+  assert.ok(edited.highlights.length>0,'the static custom mix differs from adaptive published rainfall');
+  const published=publishedForecastPreview(input),narrative=customForecastNarrative(published);
+  assert.equal(narrative.highlights.length,0);
+  assert.match(narrative.summary,/shown unchanged/);
+  for(const day of narrative.days){assert.equal(day.high.value,day.high.baseline);assert.equal(day.amount.value,day.amount.baseline);}
+  assert.equal(published.hours[0].custom.amount.value,published.hours[0].baseline.amount);
+  assert.equal(JSON.stringify(forecast),before,'the canonical page data remains untouched');
 });

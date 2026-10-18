@@ -1,5 +1,7 @@
 /** Personal experiments use only the selected location's existing hourly evidence.
  * This module never fetches a model, fills a gap, or writes the published forecast. */
+import {calendarDayWindow} from './calendar-day.js?v=calendar-days-v1';
+import {dailyForecastReadings} from './seven-day.js?v=low-rain-display-v1';
 const HOUR = 3600000;
 const finite = value => typeof value === 'number' && Number.isFinite(value);
 const epoch = value => { const time = Date.parse(value); return finite(time) ? time : null; };
@@ -65,10 +67,35 @@ export function toggleCustomModel(weights, id, enabled) {
 
 export function customForecastInput(forecast, now = Date.now()) {
   const location = forecast?.location || {};
+  const timeZone = location.timeZone || 'America/New_York';
+  const parts = new Intl.DateTimeFormat('en-US',{timeZone,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(now));
+  const get = key => parts.find(part=>part.type===key).value;
+  const today = `${get('year')}-${get('month')}-${get('day')}`;
+  const publishedDays = dailyForecastReadings(forecast || {},now,14);
+  const calendarDays = Array.from({length:7},(_,index)=>{
+    const date = new Date(Date.parse(`${today}T12:00:00Z`)+index*24*HOUR).toISOString().slice(0,10);
+    const temperatureWindow = calendarDayWindow({date},index,now,timeZone);
+    const published = publishedDays.find(day=>day.date===date);
+    const sourceDay = (forecast?.days || []).find(day=>day.date===date);
+    const sourceIndex = (forecast?.days || []).indexOf(sourceDay);
+    const publishedTemperatureWindow = sourceDay ? calendarDayWindow(sourceDay,sourceIndex,now,timeZone) : null;
+    const sameTemperatureWindow = publishedTemperatureWindow?.start===temperatureWindow.start && publishedTemperatureWindow?.end===temperatureWindow.end;
+    const rainWindow = published?.windWindow && published.windWindow.start>=calendarDayWindow({date},1,now,timeZone).start && published.windWindow.end===temperatureWindow.end
+      ? {...published.windWindow} : {...temperatureWindow,start:index===0?Math.max(temperatureWindow.start,now):temperatureWindow.start};
+    if(index===0)rainWindow.start=Math.max(now,rainWindow.start);
+    const sameRainWindow=!!published?.windWindow&&published.windWindow.start===rainWindow.start&&published.windWindow.end===rainWindow.end;
+    const label = index===0 ? 'Remaining today' : new Intl.DateTimeFormat('en-US',{timeZone:'UTC',weekday:'long'}).format(new Date(`${date}T12:00:00Z`));
+    return {date,label,today:index===0,temperatureWindow,rainWindow,pairedRemainingAmount:!!published&&!sameRainWindow,
+      observed:published?.observed===true,
+      baseline:{high:sameTemperatureWindow&&finite(published?.high)?published.high:null,amount:finite(published?.amount)?published.amount:null,rain:valid(published?.pop,'rain')?published.pop:null},
+    };
+  });
+  const earliest = Math.min(now,...calendarDays.map(day=>day.rainWindow.start).filter(finite));
+  const horizon = calendarDays.at(-1).temperatureWindow.end;
   const rows = new Map();
   const accept = row => {
     const time = epoch(row?.time);
-    return time !== null && time + HOUR > now && time < now + 7 * 24 * HOUR ? time : null;
+    return time !== null && time + HOUR > earliest && time < horizon ? time : null;
   };
   for (const row of forecast?.rainTimeline || []) {
     const time = accept(row);
@@ -114,10 +141,13 @@ export function customForecastInput(forecast, now = Date.now()) {
     return { ...model, coverage, available: Object.values(coverage).some(Boolean), runAt: run?.runAt || (model.id === 'nws' ? (forecast?.feeds || []).find(feed => feed.id === 'hourly')?.issuedAt : null) || null };
   });
   const available = new Set(models.filter(model => model.available).map(model => model.id));
-  const requested = forecast?.blendPolicy?.sameDay || { nws: 40, hrrr: 30, ecmwf: 10, nbm: 20 };
+  const currentEvidence=rows.get(Math.floor(now/HOUR)*HOUR);
+  const actualShares=Object.fromEntries([...(currentEvidence?.hour?.temperatureBlend?.sources||[]),...(currentEvidence?.temperature?.sources||[])]
+    .filter(source=>allowed.has(source.id)&&valid(source.value,'temperature')&&finite(source.weight)&&source.weight>0).map(source=>[source.id,source.weight]));
+  const requested = Object.keys(actualShares).length?actualShares:forecast?.blendPolicy?.sameDay || { nws: 40, hrrr: 30, ecmwf: 10, nbm: 20 };
   let defaultWeights = normalizeCustomWeights(Object.fromEntries(Object.entries(requested).filter(([id]) => available.has(id))));
   if (!Object.keys(defaultWeights).length) defaultWeights = normalizeCustomWeights(Object.fromEntries([...available].map(id => [id, 1])));
-  return { locationKey: `${location.latitude}|${location.longitude}|${location.timeZone || ''}`, location: { ...location }, timeZone: location.timeZone || 'America/New_York', assembledAt: forecast?.assembledAt || null, hours, models, defaultWeights };
+  return { locationKey: `${location.latitude}|${location.longitude}|${location.timeZone || ''}`, location: { ...location }, timeZone, assembledAt: forecast?.assembledAt || null, now, calendarDays, hours, models, defaultWeights };
 }
 
 export function customPresetWeights(input, preset = 'nourie') {
@@ -125,6 +155,12 @@ export function customPresetWeights(input, preset = 'nourie') {
   if (preset === 'nws') return available.includes('nws') ? { nws: 100 } : {};
   if (preset === 'equal') return normalizeCustomWeights(Object.fromEntries(available.map(id => [id, 1])));
   if (preset === 'models') return normalizeCustomWeights(Object.fromEntries(available.filter(id => id !== 'nws').map(id => [id, 1])));
+  if(preset==='european'||preset==='ai'){
+    const preferred=preset==='european'?'ecmwf':'wn';
+    if(!available.includes(preferred))return {...input.defaultWeights};
+    const others=available.filter(id=>id!==preferred);
+    return others.length?{[preferred]:60,...allocate(others.map(id=>[id,input.defaultWeights[id]||1]),40)}:{[preferred]:100};
+  }
   return { ...input.defaultWeights };
 }
 
@@ -153,6 +189,13 @@ export function blendCustomForecast(input, requestedWeights) {
   return { ...input, weights, hours };
 }
 
+/** The Nourie preset is the published forecast itself. Its visible shares are
+ * only the starting point for edits; date-specific official fallbacks stay intact. */
+export function publishedForecastPreview(input,requestedWeights=input.defaultWeights){
+  const built=blendCustomForecast(input,requestedWeights);
+  return {...built,previewMode:'published',hours:built.hours.map(row=>({...row,custom:Object.fromEntries(['temperature','rain','amount'].map(metric=>[metric,{value:row.baseline[metric],weights:{},values:{},missing:[]}]))}))};
+}
+
 export function customForecastSummary(hours, metric) {
   const custom = hours.map(row => row.custom[metric].value), baseline = hours.map(row => row.baseline[metric]);
   const completeCustom = hours.length > 0 && custom.every(finite), completeBaseline = hours.length > 0 && baseline.every(finite);
@@ -164,4 +207,83 @@ export function customForecastSummary(hours, metric) {
   const paired = hours.filter(row => finite(row.custom[metric].value) && finite(row.baseline[metric]));
   const biggest = paired.reduce((result, row) => !result || Math.abs(row.custom[metric].value - row.baseline[metric]) > Math.abs(result.custom[metric].value - result.baseline[metric]) ? row : result, null);
   return { custom: aggregate(custom, completeCustom), baseline: aggregate(baseline, completeBaseline), completeCustom, completeBaseline, customHours: custom.filter(finite).length, baselineHours: baseline.filter(finite).length, hours: hours.length, biggest };
+}
+
+/** Require every real clock hour, including the 23/25-hour DST dates.
+ * Today uses the remaining local date. Rainfall prorates the boundary hour. */
+function calendarMetric(hourMap,window,metric,side) {
+  const readings=[];
+  let expectedHours=0,availableHours=0,total=0;
+  for(let time=Math.floor(window.start/HOUR)*HOUR;time<window.end;time+=HOUR){
+    const left=Math.max(time,window.start),right=Math.min(time+HOUR,window.end);
+    if(right<=left)continue;
+    expectedHours++;
+    const row=hourMap.get(time),value=side==='custom'?row?.custom?.[metric]?.value:row?.baseline?.[metric];
+    if(!valid(value,metric))continue;
+    availableHours++;readings.push(value);
+    if(metric==='amount')total+=value*(right-left)/HOUR;
+  }
+  const complete=expectedHours>0&&availableHours===expectedHours;
+  return {value:complete?(metric==='amount'?total:Math.max(...readings)):null,complete,expectedHours,availableHours};
+}
+
+export function customCalendarComparison(built) {
+  const hourMap=new Map((built.hours||[]).map(row=>[row.timestamp,row]));
+  return (built.calendarDays||[]).map(day=>{
+    const high=calendarMetric(hourMap,day.temperatureWindow,'temperature','custom');
+    const baselineHigh=calendarMetric(hourMap,day.temperatureWindow,'temperature','baseline');
+    const amount=calendarMetric(hourMap,day.rainWindow,'amount','custom');
+    const baselineAmount=calendarMetric(hourMap,day.rainWindow,'amount','baseline');
+    const rain=calendarMetric(hourMap,day.rainWindow,'rain','custom');
+    const baselineRain=calendarMetric(hourMap,day.rainWindow,'rain','baseline');
+    if(built.previewMode==='published')return {...day,
+      high:{...high,value:day.baseline.high,baseline:day.baseline.high,complete:finite(day.baseline.high)},
+      amount:{...amount,value:day.baseline.amount,baseline:day.baseline.amount,complete:finite(day.baseline.amount)},
+      rain:{...rain,value:day.baseline.rain,baseline:day.baseline.rain,complete:finite(day.baseline.rain)}};
+    return {...day,high:{...high,baseline:baselineHigh.complete?day.baseline.high:null},
+      amount:{...amount,baseline:baselineAmount.complete?(day.pairedRemainingAmount?baselineAmount.value:day.baseline.amount):null},
+      rain:{...rain,baseline:baselineRain.complete?day.baseline.rain:null}};
+  });
+}
+
+const tempText=value=>`${Math.round(value)}°`;
+const rainText=value=>`${value.toFixed(2)} inches`;
+const sentenceStart=day=>day.today?'For the rest of today':`On ${day.label}`;
+
+/** Plain wording is built from complete calendar periods, never a model's overnight tail. */
+export function customForecastNarrative(built) {
+  const days=customCalendarComparison(built),changes=[];
+  for(const day of days){
+    day.sentences=[];
+    const {high,amount,rain}=day;
+    if(finite(high.value)){
+      const changed=finite(high.baseline)&&Math.round(high.value)!==Math.round(high.baseline);
+      const sentence=changed?`${sentenceStart(day)}, the high becomes ${tempText(high.value)} instead of ${tempText(high.baseline)}.`
+        :`${sentenceStart(day)}, the high ${finite(high.baseline)?'stays near':'is around'} ${tempText(high.value)}.`;
+      day.sentences.push(sentence);
+      if(changed)changes.push({date:day.date,metric:'temperature',score:Math.abs(Math.round(high.value)-Math.round(high.baseline)),text:sentence});
+    }
+    if(finite(amount.value)){
+      const own=Number(amount.value.toFixed(2)),base=finite(amount.baseline)?Number(amount.baseline.toFixed(2)):null;
+      if(base!==null&&own!==base){
+        const sentence=`${day.today?'Rainfall for the rest of today':`${day.label}’s forecast rainfall`} ${own>base?'increases':'decreases'} to ${rainText(amount.value)} from ${rainText(amount.baseline)}.`;
+        day.sentences.push(sentence);changes.push({date:day.date,metric:'amount',score:Math.abs(own-base)*25,text:sentence});
+      } else if(own>0)day.sentences.push(`Forecast rainfall is ${finite(amount.baseline)?'unchanged at':'around'} ${rainText(amount.value)}.`);
+      else day.sentences.push('Forecast rainfall is below 0.01 inches.');
+    }
+    if(built.previewMode==='published'&&day.observed)day.sentences.push('Rain is being observed now.');
+    else if(finite(rain.value)&&rain.value>=5)day.sentences.push(`${built.previewMode==='published'?'Weather Nourie’s':'The NWS'} peak hourly rain chance is ${Math.round(rain.value)}%.`);
+    if(!finite(high.value)&&!finite(amount.value))day.sentences.unshift(built.previewMode==='published'?'A complete published forecast is not available for this day yet.':'No full-day coverage from the chosen models yet.');
+  }
+  const highlights=changes.sort((a,b)=>b.score-a.score||a.date.localeCompare(b.date)).slice(0,3);
+  const selected=Object.keys(built.weights||{}).filter(id=>built.weights[id]>0);
+  const completeDays=days.filter(day=>finite(day.high.value)||finite(day.amount.value)).length;
+  const comparedDays=days.filter(day=>(finite(day.high.value)&&finite(day.high.baseline))||(finite(day.amount.value)&&finite(day.amount.baseline))).length;
+  const summary=built.previewMode==='published'?'Weather Nourie’s forecast is shown unchanged.'
+    :!selected.length?'Select a model to see how your forecast changes.'
+    :highlights.length?'The biggest changes from Weather Nourie:'
+    :comparedDays?'The values we can compare match Weather Nourie to the displayed precision.'
+    :completeDays?'Your forecast is ready below. The published forecast is missing matching values, so we can’t compare changes yet.'
+    :'The selected models do not cover a whole day yet. Add another available model to extend the forecast.';
+  return {days,highlights,summary,completeDays,comparedDays};
 }
