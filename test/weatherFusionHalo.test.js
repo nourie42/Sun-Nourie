@@ -88,7 +88,7 @@ test('Halo page and assets are served by the password-protected weather routes',
   const src = await readFile(new URL('../src/weatherFusion.js', import.meta.url), 'utf8');
   assert.match(src, /'halo\.html','halo\.css','halo\.js'/);
   const html = await readFile(new URL('../public/weather-fusion/halo.html', import.meta.url), 'utf8');
-  assert.match(html, /src="\/weather-fusion\/halo\.js"/);
+  assert.match(html, /src="\/weather-fusion\/halo\.js(?:\?v=[^"]+)?"/);
   assert.match(html, /id="sheet"/);
   const index = await readFile(new URL('../public/weather-fusion/index.html', import.meta.url), 'utf8');
   assert.match(index, /href="\/weather-fusion\/halo\.html"/);

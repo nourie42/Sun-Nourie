@@ -98,11 +98,19 @@ test('every day and night percentage is the peak of identical canonical hourly e
   for(const day of data.days)for(const name of ['rainLikelihood','popDayLikelihood','popNightLikelihood']) {
     const summary=day[name],rows=matchingRows(data,summary);
     assert.equal(summary.aggregation,'maximum-hourly');
-    assert.equal(summary.coverage.complete,true,`${day.date} ${name}`);
-    assert.equal(summary.value,Math.max(...rows.map(row=>row.rainLikelihood.value)));
-    const peak=data.rainTimeline.find(row=>row.time===summary.peakTime);
-    assert.deepEqual(summary.peak,peak.rainLikelihood);
-    assert.deepEqual(summary.sources,peak.rainLikelihood.sources);
+    const available=rows.filter(row=>Number.isFinite(row.rainLikelihood.value));
+    const peakValue=available.length?Math.max(...available.map(row=>row.rainLikelihood.value)):null;
+    assert.equal(summary.coverage.complete,available.length===summary.coverage.expectedHours,`${day.date} ${name}`);
+    assert.equal(summary.value,summary.coverage.complete?peakValue:null);
+    assert.equal(summary.availablePeak,peakValue);
+    if(available.length){
+      const peak=data.rainTimeline.find(row=>row.time===summary.peakTime);
+      assert.deepEqual(summary.peak,peak.rainLikelihood);
+      assert.deepEqual(summary.sources,peak.rainLikelihood.sources);
+    }else{
+      assert.equal(summary.peakTime,null);
+      assert.deepEqual(summary.sources,[]);
+    }
   }
   for(const hour of data.hours) {
     const row=data.rainTimeline.find(row=>Date.parse(row.time)===Date.parse(hour.time));
@@ -191,7 +199,10 @@ test('daily and next-24-hour amounts sum the same canonical hourly graph values'
   const data=inputs({chance:50,amount:.0111});
   data.models.ecmwf.precipitationIntervals.forEach(row=>{row.value=.0222;});
   const forecast=buildForecast(data);
-  const total=(start,end)=>Number(forecast.rainTimeline.filter(row=>Date.parse(row.time)>=Date.parse(start)&&Date.parse(row.end)<=Date.parse(end)).reduce((sum,row)=>sum+row.precipitation,0).toFixed(4));
+  const total=(start,end)=>{
+    const rows=forecast.rainTimeline.filter(row=>Date.parse(row.time)>=Date.parse(start)&&Date.parse(row.end)<=Date.parse(end));
+    return rows.length&&rows.every(row=>Number.isFinite(row.precipitation))?Number(rows.reduce((sum,row)=>sum+row.precipitation,0).toFixed(4)):null;
+  };
   for(const day of forecast.days)assert.equal(day.qpf,total(day.qpfWindow.start,day.qpfWindow.end));
   assert.equal(forecast.precipitation.value,total(forecast.precipitation.start,forecast.precipitation.end));
 });

@@ -33,13 +33,17 @@ test('Shade stays unavailable when the modeled shade value is unavailable',()=>{
   assert.equal(shade,'Unavailable','Do not silently substitute air temperature for a missing modeled shade feels-like');
 });
 
-test('sun figure uses the air-plus-radiant estimate rather than the air reading',()=>{
+test('sun figure uses the modeled outdoor feels-like rather than air or a solar-only estimate',()=>{
   const sample={temperature:68,comfort:{daylight:true,weatherKind:'clear',rawShade:58,rawOutdoors:67,shade:58,outdoors:67,sun:67}};
   const display=sunExposureTemperature(sample);
   assert.deepEqual(display,{active:true,value:77,solarLift:9});
   const html=sunShadeHTML(sample.comfort,location,now,{compact:true,sunExposure:display.value});
-  assert.match(html,/sun-person[\s\S]*?<figcaption><strong>77°<\/strong>/);
+  assert.match(html,/sun-person[\s\S]*?<figcaption><strong>67°<\/strong>/);
+  assert.doesNotMatch(html,/<strong>(?:68|77)°<\/strong>/);
   assert.match(html,/shade-person[\s\S]*?<figcaption><strong>58°<\/strong>/);
+  const selected=sunShadeHTML(sample.comfort,location,now,{compact:true,primaryFeels:75});
+  assert.match(selected,/sun-person[\s\S]*?data-outfit="warm"[\s\S]*?<figcaption><strong>75°<\/strong>/);
+  assert.match(selected,/shade-person[\s\S]*?<figcaption><strong>58°<\/strong>/);
 });
 
 test('night and cloud cover do not invent a sun-exposure temperature',()=>{
