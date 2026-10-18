@@ -1,0 +1,228 @@
+name: Correct prerelease Play your weather pictures
+on:
+  push:
+    branches: [prerelease]
+    paths: ['.github/workflows/fix-prerelease-weather-pictures.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: fix-prerelease-weather-pictures
+  cancel-in-progress: false
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: prerelease
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - name: Install only the approved images and the native prerelease renderer
+        run: |
+          python - <<'PY'
+          import subprocess, pathlib, re, json, hashlib
+          root=pathlib.Path('public/weather-fusion'); source='2991e92288dc07552b4559f9042ce004310bc7c3'
+          subprocess.run(['git','fetch','origin',source],check=True)
+          names=subprocess.check_output(['git','ls-tree','-r','--name-only',source,'public/weather-fusion/'],text=True).splitlines()
+          assets=[n for n in names if n.startswith('public/weather-fusion/weather-her-')]
+          assert len(assets)==181, f'Expected 90 portraits, 90 backgrounds and manifest; found {len(assets)}'
+          subprocess.run(['git','restore','--source='+source,'--',*assets],check=True)
+          manifest=json.loads((root/'weather-her-manifest.json').read_text())
+          assert manifest['count']==90
+          for item in manifest['images']:
+            p=root/item['file'];assert hashlib.sha256(p.read_bytes()).hexdigest()==item['sha256'],str(p)
+            assert (root/item['background']).stat().st_size>500
+          original=subprocess.check_output(['git','show',source+':public/weather-fusion/weather-portraits.js'],text=True)
+          selector=original.split('const url=file=>',1)[0]
+          assert 'export function selectWeatherPortrait' in selector and 'document.' not in selector
+          (root/'player/approved-portrait-selection.js').write_text(selector)
+          path=root/'player/sky-player.js';text=path.read_text()
+          if 'approved-weather-world.js' not in text:
+            old="import {CHARACTERS, normalizeCharacter, getCharacterPortrait} from './character-scene.js?v=actual-world-v4';"
+            assert text.count(old)==1,'Character import changed; refusing a broad rewrite'
+            text=text.replace(old,"import {approvedOutfit} from './approved-weather-world.js?v=approved-her-prerelease-v2';")
+            a=text.index('export function outfitForFrame(frame = {}) {'); b=text.index('\nexport function normalizeForecast',a)
+            text=text[:a]+'export function outfitForFrame(frame = {}) {return approvedOutfit(frame);}\n'+text[b:]
+            text=text.replace("const CHARACTER_STORAGE_KEY = 'nourie-weather-person';\n",'')
+            text=text.replace("this._character='white';","this._character='approved';this._clothingMode='feels';")
+            text,n=re.subn(r'^    try\{this\._character=normalizeCharacter.*\n','',text,flags=re.M);assert n==1
+            picker='<label class="outfit-basis"><span>Clothing based on</span><select class="outfit-basis-select" aria-label="Clothing temperature basis"><option value="feels">Feels like</option><option value="air">Air temperature</option></select></label>'
+            text,n=re.subn(r'<div class="person-picker"[\s\S]*?\n      <div class="scene"',picker+'\n      <div class="scene"',text,count=1);assert n==1
+            text,n=re.subn(r'^    this\.\$\(\x27\.person-options\x27\)\.addEventListener.*\n',"    this.$('.outfit-basis-select').addEventListener('change',event=>{this.pause();this._clothingMode=event.target.value==='air'?'air':'feels';this._renderTimeline();this._render();});\n",text,flags=re.M);assert n==1
+            a=text.index('  get character(){');b=text.index('  get forecast(){',a)
+            text=text[:a]+"  get character(){return 'approved';}\n  set character(value){this._character='approved';}\n  _renderPeople(){}\n"+text[b:]
+            a=text.index('class WeatherSkyPlayer');head,body=text[:a],text[a:]
+            body=body.replace('outfitForFrame(', 'this._outfitFor(')
+            body=body.replace('  get forecast(){','  _outfitFor(frame){return outfitForFrame({...frame,outfitBasis:this._clothingMode});}\n  get forecast(){',1)
+            body=body.replace('const changes=outfitTransitions(frames);','const changes=outfitTransitions(frames.map(frame=>({...frame,outfitBasis:this._clothingMode})));')
+            body=body.replace('{...this.currentFrame}', '{...this.currentFrame,outfitBasis:this._clothingMode}')
+            old='this._world.setFrame(frame,this._outfitFor(frame));'
+            assert body.count(old)==1
+            body=body.replace(old,old+"this._world.preload?.(this._forecast.slice(this._index+1,this._index+3).map(f=>({...f,outfitBasis:this._clothingMode})));")
+            body=body.replace("if(empty){this.$('.frame-count')","if(empty){this._world?.setFrame({});this.$('.frame-count')")
+            body=body.replace("./weather-world.js?v=actual-world-v4","./approved-weather-world.js?v=approved-her-prerelease-v2")
+            text=head+body
+            assert 'Choose your person' not in text and 'character-scene.js' not in text and 'normalizeCharacter' not in text
+            path.write_text(text)
+          # Bust every link in the native prerelease import chain, not the Atmos page.
+          for p in [root/'index.html',root/'app.js',root/'native-player.js',root/'player/sky-player.js']:
+            text=p.read_text();text=text.replace('actual-world-v4','approved-her-prerelease-v2');p.write_text(text)
+          css=root/'player/sky-player.css';text=css.read_text()
+          if 'APPROVED SINGLE-PERSON PRERELEASE' not in text:
+            text+='''
+          /* APPROVED SINGLE-PERSON PRERELEASE: captions never cover her head or feet. */
+          .outfit-basis{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 18px 16px;padding:12px 15px;border:1px solid #ffffff38;border-radius:14px;background:#ffffff0c;font-size:13px}
+          .outfit-basis-select{min-height:44px;max-width:60%;padding:8px 12px;border:1px solid #c5e6ff66;border-radius:10px;background:#123756;color:#fff;font:inherit}
+          .outfit-basis-select option{background:#123756;color:#fff}
+          .scene{display:grid;grid-template-columns:minmax(0,1fr);height:auto;min-height:0;aspect-ratio:auto;background:#12364b;overflow:hidden}
+          .scene-top{position:relative;inset:auto;grid-area:1/1;margin:18px 18px 0}
+          .location-tag{position:relative;inset:auto;grid-area:2/1;margin:8px 18px 0;max-width:none;font-size:12px}
+          .scene-weather{position:relative;inset:auto;grid-area:3/1;display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;column-gap:15px;row-gap:4px;max-width:none;margin:12px 18px 18px}
+          .temperature-line{grid-row:1/span 2;height:65px;align-self:center}.frame-temp{font-size:65px;letter-spacing:-3px}.temperature-line>span{font-size:32px}
+          .frame-condition{grid-column:2;margin:0;max-width:none;font-size:15px;line-height:1.4;align-self:end}.frame-feels{grid-column:2;font-size:12px;line-height:1.5;max-width:none;align-self:start}
+          .world-stage{position:relative;inset:auto;grid-area:4/1;width:100%;height:auto;min-height:0;aspect-ratio:16/9;overflow:hidden;background:#182d3b}
+          .approved-weather-photo{display:block;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:55% center}
+          .approved-weather-photo[hidden],.approved-photo-message[hidden]{display:none}
+          .approved-photo-message{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:24px;font-size:14px;background:#182d3b;color:#e6f2fb}
+          .scene .overlay-shade{display:none}
+          .outfit-bubble{position:relative;inset:auto;grid-area:5/1;height:auto;min-height:90px;width:100%;max-width:none;padding:16px 18px;background:#25485c;border-top:1px solid #cce5f333;border-radius:0}
+          .outfit-summary{font-size:13px;line-height:1.6}.player-footer p{font-size:12px}
+          @media(max-width:600px){.world-stage{aspect-ratio:4/5}.frame-hour{font-size:25px}.scene-status{font-size:9px;letter-spacing:.5px}.frame-day{font-size:11px}.outfit-basis{margin:0 10px 14px;padding:10px;font-size:12px}.scene-weather{column-gap:12px}.frame-condition{font-size:14px}.frame-feels{font-size:11px}.frame-temp{font-size:58px}.temperature-line{height:58px}}
+          '''
+            css.write_text(text)
+          print('Prepared the separate prerelease native player; 90 original portraits and 90 matching backgrounds verified.')
+          PY
+          node --check public/weather-fusion/player/sky-player.js
+          node --check public/weather-fusion/player/approved-weather-world.js
+          node --check public/weather-fusion/native-player.js
+      - name: Verify complete image coverage and temperature selection
+        run: |
+          mkdir -p /tmp/prerelease-picture-proof
+          node --input-type=module - <<'JS' | tee /tmp/prerelease-picture-proof/selection.txt
+          import fs from 'node:fs';import assert from 'node:assert/strict';
+          import {PORTRAIT_FILES,selectWeatherPortrait as choose} from './public/weather-fusion/player/approved-portrait-selection.js';
+          import {approvedState,approvedOutfit} from './public/weather-fusion/player/approved-weather-world.js';
+          assert.equal(PORTRAIT_FILES.length,90);
+          for(const name of PORTRAIT_FILES){assert.ok(fs.statSync('public/weather-fusion/'+name).size>500);assert.ok(fs.statSync('public/weather-fusion/'+name.replace('weather-her-','weather-her-bg-')).size>500);}
+          const f={time:'2026-10-18T18:00:00Z',temperature:62,feelsLike:55,isDay:true,nativePolicy:true,nativeCondition:'Mostly Sunny'};
+          assert.equal(approvedState(f).file,'weather-her-clear-day-feels-32-59f.webp');
+          assert.equal(approvedState({...f,outfitBasis:'air'}).file,'weather-her-clear-day-feels-60-74f.webp');
+          for(const [value,band] of [[-20,'below-32f'],[0,'below-32f'],[31.99,'below-32f'],[32,'32-59f'],[59.99,'32-59f'],[60,'60-74f'],[74.99,'60-74f'],[75,'75f-plus']])assert.equal(approvedState({...f,feelsLike:value}).band,band);
+          for(const [condition,weather] of [['Freezing rain','freezing-rain'],['Sleet','sleet'],['Thunderstorms with hail','hail'],['Heavy snow','heavy-snow'],['Rain','rain'],['Fog','fog']])assert.equal(approvedState({...f,nativeCondition:condition}).weather,weather);
+          assert.equal(approvedState({...f,nativeCondition:'Clear',feelsLike:-20}).weather,'clear');
+          assert.equal(approvedState({...f,isDay:false}).light,'night');
+          assert.equal(approvedState({...f,temperature:null,feelsLike:null}).available,false);
+          assert.equal(approvedState({...f,isDay:null}).available,false);
+          assert.match(approvedOutfit(f).label,/Jacket/);
+          assert.match(approvedOutfit({...f,outfitBasis:'air'}).label,/Light top/);
+          assert.match(approvedState({...f,feelsLike:null}).basis,/unavailable/);
+          console.log('PASS: all 90 portrait/background pairs; screenshot example 62F air and 55F feels; air/feels mode; negative and zero temperatures; exact boundaries; day/night; distinct rain, sleet, ice, hail and snow; missing-data fallback.');
+          JS
+      - name: Install browser verification
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Test the actual native player, including a previously saved Alex selection
+        run: |
+          node --input-type=module - <<'JS' | tee /tmp/prerelease-picture-proof/browser.txt
+          import express from 'express';import assert from 'node:assert/strict';import {chromium} from 'playwright';
+          import {fixture} from './scripts/weatherNourieFixture.js';
+          const at=Date.parse('2026-09-05T22:00:00Z'),forecast=fixture('knightdale',at);
+          const app=express();app.use('/api/',(req,res)=>req.path.includes('forecast')?res.json(forecast):req.path.includes('alerts')?res.json({location:forecast.location,alerts:[],feeds:[{id:'alerts',status:'ready'}]}):res.status(503).json({error:'Optional data not used in this test'}));app.use(express.static('public'));
+          const server=await new Promise(resolve=>{const s=app.listen(0,'127.0.0.1',()=>resolve(s));});const base='http://127.0.0.1:'+server.address().port;
+          const browser=await chromium.launch({headless:true});
+          try{
+            for(const [name,width,height] of [['phone',390,844],['desktop',1365,960]]){
+              const context=await browser.newContext({viewport:{width,height},timezoneId:'America/Los_Angeles'});
+              await context.addInitScript(()=>{localStorage.setItem('weather-fusion-device-place',JSON.stringify({latitude:35.787,longitude:-78.4806}));localStorage.setItem('nourie-weather-person','trans');});
+              const page=await context.newPage();await page.clock.install({time:new Date(at)});
+              const oldRequests=[];page.on('request',r=>{if(/\/player\/(?:character-scene|weather-world)\.js/.test(r.url()))oldRequests.push(r.url());});
+              await context.route('https://**/*',r=>r.abort());
+              await page.goto(base+'/weather-fusion/');
+              assert.equal(await page.locator('weather-sky-player').count(),0,'Player remains opt-in');
+              await page.locator('#open-native-player').click();
+              const player=page.locator('weather-sky-player');const stage=player.locator('.world-stage');
+              await player.locator('.world-stage[data-loaded="true"]').waitFor({timeout:45000});
+              assert.equal(await player.locator('.person-picker,[data-person]').count(),0,'No four-person chooser');
+              assert.equal(await player.evaluate(p=>p.character),'approved','A saved old person cannot return');
+              assert.equal(await player.locator('.approved-weather-photo').evaluate(i=>i.naturalWidth),1200);
+              const top=await player.locator('.scene-weather').boundingBox(),photo=await stage.boundingBox();assert.ok(top.y+top.height<=photo.y+1,'Readings never cover her head');
+              const frames=await player.evaluate(p=>p.forecast);assert.ok(frames.length>2);
+              await player.locator('.next').click();await player.locator('.world-stage[data-loaded="true"]').waitFor();
+              assert.equal(await player.evaluate(p=>p._index),1);
+              const row={time:'2026-10-18T18:00:00Z',temperature:62,feelsLike:55,isDay:true,nativePolicy:true,nativeSampleId:'2026-10-18T18:00:00Z',nativeCondition:'Mostly Sunny',nativeWeatherKind:'clear',nativePrecipitationActivity:'none',nativeSnowExpected:false,nativeClothing:'cool'};
+              await player.evaluate((p,row)=>{p.pause();p.forecast=[row,{...row,time:'2026-10-18T19:00:00Z',nativeSampleId:'2026-10-18T19:00:00Z',feelsLike:80}];p.setFrame(0);},row);
+              const asset=async expected=>page.waitForFunction(expected=>{const p=document.querySelector('weather-sky-player'),s=p?.shadowRoot?.querySelector('.world-stage');return s?.dataset.loaded==='true'&&s.dataset.asset===expected;},expected,{timeout:30000});
+              await asset('weather-her-clear-day-feels-32-59f.webp');
+              await player.locator('.outfit-basis-select').selectOption('air');await asset('weather-her-clear-day-feels-60-74f.webp');
+              await player.locator('.outfit-basis-select').selectOption('feels');await asset('weather-her-clear-day-feels-32-59f.webp');
+              await player.locator('.speed').selectOption('1');await player.locator('.play').click();await page.clock.runFor(2100);
+              await asset('weather-her-clear-day-feels-75f-plus.webp');await player.locator('.play').click();
+              await player.screenshot({path:`/tmp/prerelease-picture-proof/${name}-tested-player.png`});
+              assert.equal(oldRequests.length,0,'Old person renderer never loaded');
+              assert.ok(await page.locator('body').evaluate(b=>b.classList.contains('approved-player-background')));
+              await page.locator('#open-native-player').click();assert.equal(await player.count(),0);assert.ok(!await page.locator('body').evaluate(b=>b.classList.contains('approved-player-background')),'Closing restores background');
+              await page.locator('#open-native-player').click();await player.locator('.world-stage[data-loaded="true"]').waitFor({timeout:30000});assert.equal(await player.locator('.person-picker,[data-person]').count(),0);
+              console.log(`PASS ${name}: actual prerelease native feature; old saved choice ignored; only approved person; 1200px photo decoded; readouts above photo; hour seek; air/feels switch changes photo; Play advances photo; synchronized background; close/reopen works; old renderer not requested.`);
+              await context.close();
+            }
+          }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}
+          JS
+      - name: Publish only the tested prerelease changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/weather-fusion/weather-her-* public/weather-fusion/player/approved-portrait-selection.js public/weather-fusion/player/sky-player.js public/weather-fusion/player/sky-player.css public/weather-fusion/index.html public/weather-fusion/app.js public/weather-fusion/native-player.js
+          if ! git diff --cached --quiet; then
+            git commit -m 'Fix prerelease Play your weather: approved woman only, weather outfits and matched backgrounds'
+            git pull --rebase origin prerelease
+            git push origin HEAD:prerelease
+          fi
+          git rev-parse HEAD | tee /tmp/prerelease-picture-proof/published-commit.txt
+      - name: Verify deployment on the exact prerelease address, not live or Atmos
+        run: |
+          node --input-type=module - <<'JS' | tee /tmp/prerelease-picture-proof/deployed.txt
+          import fs from 'node:fs';import {createHash} from 'node:crypto';
+          const base='https://sun-nourie-prerelease.onrender.com/weather-fusion/';
+          const paths=['index.html','app.js','native-player.js','player/sky-player.js','player/sky-player.css','player/approved-weather-world.js','player/approved-portrait-selection.js','weather-her-clear-day-feels-32-59f.webp','weather-her-clear-day-feels-75f-plus.webp','weather-her-snow-night-feels-below-32f.webp'];
+          const hash=b=>createHash('sha256').update(b).digest('hex');let verified=false;
+          for(let i=0;i<35;i++){
+            try{const checks=await Promise.all(paths.map(async p=>{const r=await fetch(base+(p==='index.html'?'':p)+'?verify=approved-her-prerelease-v2',{signal:AbortSignal.timeout(20000),cache:'no-store'});return r.ok&&hash(Buffer.from(await r.arrayBuffer()))===hash(fs.readFileSync('public/weather-fusion/'+p));}));if(checks.every(Boolean)){verified=true;break;}}
+            catch{}await new Promise(resolve=>setTimeout(resolve,10000));
+          }
+          if(!verified)throw Error('Prerelease published, but exact deployed files are not yet confirmed.');
+          console.log('PASS: exact prerelease host serves the tested HTML, app, native bridge, native player, stylesheet, selection logic and approved day/night pictures.');
+          JS
+      - name: Capture proof from the deployed prerelease page using its real forecast
+        run: |
+          node --input-type=module - <<'JS' | tee /tmp/prerelease-picture-proof/actual-site.txt
+          import {chromium} from 'playwright';import assert from 'node:assert/strict';import fs from 'node:fs';
+          const browser=await chromium.launch({headless:true});const base='https://sun-nourie-prerelease.onrender.com/weather-fusion/';
+          try{
+            const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,timezoneId:'America/New_York'});
+            await context.addInitScript(()=>{localStorage.setItem('weather-fusion-device-place',JSON.stringify({latitude:35.787,longitude:-78.4806}));localStorage.setItem('nourie-weather-person','trans');});
+            const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+            await page.goto(base+'?v=approved-her-prerelease-v2',{waitUntil:'domcontentloaded',timeout:60000});
+            assert.equal(new URL(page.url()).hostname,'sun-nourie-prerelease.onrender.com');
+            await page.locator('#open-native-player').click();
+            const player=page.locator('weather-sky-player');await player.locator('.world-stage[data-loaded="true"]').waitFor({timeout:120000});
+            assert.equal(await player.locator('.person-picker,[data-person]').count(),0);
+            assert.equal(await player.evaluate(p=>p.character),'approved');
+            const image=player.locator('.approved-weather-photo');assert.equal(await image.evaluate(i=>i.naturalWidth),1200);
+            await player.screenshot({path:'/tmp/prerelease-picture-proof/prerelease-actual-phone.png'});
+            await page.screenshot({path:'/tmp/prerelease-picture-proof/prerelease-actual-viewport.png'});
+            fs.writeFileSync('/tmp/prerelease-picture-proof/actual-state.json',JSON.stringify({url:page.url(),verifiedAt:new Date().toISOString(),character:await player.evaluate(p=>p.character),image:await image.getAttribute('src'),frame:await player.evaluate(p=>p.currentFrame),errors},null,2));
+            console.log('PASS: opened the real prerelease page on a phone viewport, with the previously saved old choice. Only the approved woman appears; chooser absent; image decoded and real forecast shown. Actual site screenshot saved.');
+            await context.close();
+          }finally{await browser.close();}
+          JS
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: corrected-prerelease-weather-proof
+          path: /tmp/prerelease-picture-proof
+          retention-days: 7
