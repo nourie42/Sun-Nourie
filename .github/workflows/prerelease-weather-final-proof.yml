@@ -1,0 +1,92 @@
+name: Final proof of corrected prerelease weather player
+on:
+  push:
+    branches: [prerelease]
+    paths: ['.github/workflows/prerelease-weather-final-proof.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+defaults:
+  run:
+    shell: bash
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: prerelease
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          npm ci
+          npm install --no-save --package-lock=false playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Check the actual committed image selection
+        run: |
+          mkdir -p /tmp/final-weather-proof
+          node --input-type=module - <<'JS' | tee /tmp/final-weather-proof/selection.txt
+          import assert from 'node:assert/strict';import fs from 'node:fs';
+          import {approvedState} from './public/weather-fusion/player/approved-weather-world.js';
+          import {PORTRAIT_FILES} from './public/weather-fusion/player/approved-portrait-selection.js';
+          const f={time:'2026-10-18T18:00:00Z',latitude:35.787,longitude:-78.4806,temperature:62.5,feelsLike:54,isDay:true,nativePolicy:true,nativeCondition:'Mostly Sunny'};
+          assert.equal(approvedState(f).file,'weather-her-clear-day-feels-32-59f.webp');
+          assert.equal(approvedState({...f,outfitBasis:'air'}).file,'weather-her-clear-day-feels-60-74f.webp');
+          assert.equal(approvedState({...f,time:'2026-10-19T04:00:00Z',isDay:false}).file,'weather-her-clear-night-feels-32-59f.webp');
+          assert.equal(PORTRAIT_FILES.length,90);for(const file of PORTRAIT_FILES){assert.ok(fs.statSync('public/weather-fusion/'+file).size>500);assert.ok(fs.statSync('public/weather-fusion/'+file.replace('weather-her-','weather-her-bg-')).size>500);}
+          console.log('PASS: committed midday/day and midnight/night selection; correct air/feels bands; all 90 approved portraits and matching backgrounds.');
+          JS
+      - name: Verify exact deployed native-player files
+        run: |
+          node --input-type=module - <<'JS' | tee /tmp/final-weather-proof/deployment.txt
+          import fs from 'node:fs';import {createHash} from 'node:crypto';
+          const base='https://sun-nourie-prerelease.onrender.com/weather-fusion/',paths=['index.html','app.js','native-player.js','player/sky-player.js','player/sky-player.css','player/approved-weather-world.js','player/approved-portrait-selection.js'];const hash=b=>createHash('sha256').update(b).digest('hex');let ok=false;
+          for(let i=0;i<30;i++){try{const checks=await Promise.all(paths.map(async p=>{const r=await fetch(base+(p==='index.html'?'':p)+'?proof=approved-her-final',{cache:'no-store',signal:AbortSignal.timeout(20000)});return r.ok&&hash(Buffer.from(await r.arrayBuffer()))===hash(fs.readFileSync('public/weather-fusion/'+p));}));if(checks.every(Boolean)){ok=true;break;}}catch{}await new Promise(r=>setTimeout(r,10000));}
+          if(!ok)throw Error('The exact prerelease files are not deployed yet.');
+          console.log('PASS: exact committed files verified on the actual prerelease hostname, not live or Atmos.');
+          JS
+      - name: Test and capture the real prerelease player on phone and desktop
+        run: |
+          node --input-type=module - <<'JS' | tee /tmp/final-weather-proof/actual-site.txt
+          import {chromium} from 'playwright';import assert from 'node:assert/strict';import fs from 'node:fs';import {approvedState} from './public/weather-fusion/player/approved-weather-world.js';
+          const browser=await chromium.launch({headless:true});
+          try{
+            for(const [name,width,height] of [['phone',390,844],['desktop',1365,960]]){
+              const context=await browser.newContext({viewport:{width,height},deviceScaleFactor:name==='phone'?2:1,timezoneId:'America/New_York',reducedMotion:'reduce'});
+              await context.addInitScript(()=>{localStorage.setItem('weather-fusion-device-place',JSON.stringify({latitude:35.787,longitude:-78.4806}));localStorage.setItem('nourie-weather-person','trans');});
+              const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
+              await page.goto('https://sun-nourie-prerelease.onrender.com/weather-fusion/?v=approved-her-prerelease-v3',{waitUntil:'domcontentloaded',timeout:60000});
+              const toggle=page.locator('#open-native-player');await toggle.click();const player=page.locator('weather-sky-player');await player.scrollIntoViewIfNeeded();
+              await player.locator('.world-stage[data-loaded="true"]').waitFor({timeout:120000});
+              assert.equal(await player.locator('.person-picker,[data-person]').count(),0);assert.equal(await player.evaluate(p=>p.character),'approved');
+              async function verify(mode='feels'){
+                const frame=await player.evaluate(p=>p.currentFrame),expected=approvedState({...frame,outfitBasis:mode});
+                await page.waitForFunction(file=>{const s=document.querySelector('weather-sky-player')?.shadowRoot?.querySelector('.world-stage');return s?.dataset.loaded==='true'&&s.dataset.asset===file;},expected.file,{timeout:30000});
+                assert.equal(await player.locator('.approved-weather-photo').evaluate(i=>i.naturalWidth),1200);
+                assert.ok(await page.locator('body').evaluate(b=>b.classList.contains('approved-player-background')));return {frame,expected};
+              }
+              await verify();await player.locator('.outfit-basis-select').selectOption('air');await verify('air');await player.locator('.outfit-basis-select').selectOption('feels');await verify();
+              await player.locator('.next').click();await verify();assert.equal(await player.evaluate(p=>p._index),1);
+              await toggle.click();assert.equal(await player.count(),0);assert.ok(!await page.locator('body').evaluate(b=>b.classList.contains('approved-player-background')));
+              await toggle.click();await player.scrollIntoViewIfNeeded();await player.locator('.world-stage[data-loaded="true"]').waitFor({timeout:45000});await verify();
+              await player.evaluate(p=>{p.pause();p.setFrame(0);});await verify();
+              const before=await player.evaluate(p=>p._index);await player.locator('.speed').selectOption('1');await player.locator('.play').click();
+              await page.waitForFunction(i=>document.querySelector('weather-sky-player')._index!==i,before,{timeout:8000});await player.locator('.play').click();await verify();
+              await player.evaluate(p=>{p.pause();p.setFrame(0);});const state=await verify();
+              const readings=await player.locator('.scene-weather').boundingBox(),picture=await player.locator('.world-stage').boundingBox();assert.ok(readings.y+readings.height<=picture.y+1);
+              await player.screenshot({path:`/tmp/final-weather-proof/actual-prerelease-${name}.png`});
+              await page.screenshot({path:`/tmp/final-weather-proof/actual-prerelease-${name}-viewport.png`});
+              fs.writeFileSync(`/tmp/final-weather-proof/${name}-state.json`,JSON.stringify({url:page.url(),verifiedAt:new Date().toISOString(),character:'approved',...state,errors},null,2));
+              console.log(`PASS ${name}: actual prerelease site; real forecast; chooser absent; old selection ignored; approved picture decoded; ${state.expected.light} lighting correct; Air/Feels switch; next hour; Play; background synchronization; close/reopen; readings above photo. No weather mocked.`);
+              await context.close();
+            }
+          }finally{await browser.close();}
+          JS
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: actual-prerelease-final-proof
+          path: /tmp/final-weather-proof
+          retention-days: 7
