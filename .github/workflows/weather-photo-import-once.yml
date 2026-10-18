@@ -19,60 +19,60 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install Pillow==11.3.0
-      - name: Recover the exact approved images from temporary image sheets
+      - name: Recover full-resolution approved images
         run: |
           python - <<'PY'
           import concurrent.futures, hashlib, io, json, pathlib, urllib.request
           from PIL import Image
-          # These image-specific links expose only the nine sheets of the 90
-          # user-approved weather portraits. No other document content is used.
           sources = [
-          ('https://docs.google.com/docs-images-rt/ALKuztbpFVfqcFCDx5SacioztNHdLo7rl1GP0T--eKZPYqyMQfgDVIzz-QIqKL3Dyoc9qbBtI4A8tLJCx3r_kc9oqm4atwb7dfgg3z4k6cZ9uG69LOUjX1xZ6kNbWh_hcWHzaAB6ZVoYAG95LRcOZR9y-NwQnXFYUJn6JlG2saP8FuG6zKLCv9Q=s0?key=ew1flWCUXATjaflKeC1stw'),
-          ('https://docs.google.com/docs-images-rt/ALKuztbru0Km6tRqyt6oY93fNrOl4R5GqtWbxm22lqyNCIcTTN-D-1yn2eB2pK9-DC0GEpek-CNfMGjzLLolnokO_mC0H2DrTVqz6RR4lk9B4tVcixqnjIaDMdLR89alTgBLecQUVAMqtno2hkvv8CGvdIosAGnUKPpV_HXnXz-NQpbTML1S=s0?key=ew1flWCUXATjaflKeC1stw'),
-          ('https://docs.google.com/docs-images-rt/ALKuztZrefhJ-gc4HXcTbOQej7zk2NJb5t-nDHheNfSUFXUZK3HwM34rVSttQF4Nij1lxspvokVmki3YQ0mB0i99s1_DnuB1ADVR8QLVpJY9KHa3uzrGSzmheMvoegS1snru6pTfTGVPJCzVIWr9rksiF_U8a0lDyMErzp5Ia9AHQdrZlFsY=s0?key=ew1flWCUXATjaflKeC1stw'),
-          ('https://docs.google.com/docs-images-rt/ALKuztasBVl1tzi04L5bPphgAzeak4jWs8-2HZe8Ygistjk3DgRPGAbBkT_giKx3hE3G1Ia3MP1Q0njioXfjmJH0MYZK4jCjzOXtHMW4VktRl6sIHl-TbkvbLAAEEmUPadX8oJiOrl96P6Ffo2rpgyeO7l5YmWslwOWgfmXTga7e-dhNBwK8=s0?key=ew1flWCUXATjaflKeC1stw'),
-          ('https://docs.google.com/docs-images-rt/ALKuztaZnRR_DU36Ihh135Dz1wlSDegx80OsWmnvr-tD3x-9waS_7d222fYDkugFWp5Njoc1UJzXTQilNxNt74qsENyUdZwe0UAPMLOqyFpJU8j--gZfQgw1eSo7gWOTK0NwmMJfNShFDwOW1p0mMimFPUTGPhj2KCfGnUsqLlMmDMIF5cjP=s0?key=ew1flWCUXATjaflKeC1stw'),
-          ('https://docs.google.com/docs-images-rt/ALKuztYeL0iQepVh70O_tuOQSsP6_XrKnRtoKeHSG8wfrExikvQZIaIeub08IJJ8nvNH1dY4JhHcri_7hxlDF_glbpSgZMyClTgwhd6rmSMPZCb_IyINiBiWgH_cGIKET-cAiPxq_-MBc-32R_iy1n0TlezdY7jF71e_uHhHM_XvX6XC7cece44=s0?key=ew1flWCUXATjaflKeC1stw'),
-          ('https://docs.google.com/docs-images-rt/ALKuztbSx3if91Lx80gJNgyMMMjfbhD3BECVeqs7OJ52fuNMlyzY3y4WaWcDuq9FPyCIwxqKJWlArBuqkw0nUZ7r29dLvFz7coC123HdyT9Gs5wP1uDTswc_X7joYnPHNgFpmDxvY7G_H8NebvIAaHu3rZBPDz50L4RMutc3oWqQIddy2q1Axwk=s0?key=ew1flWCUXATjaflKeC1stw'),
-          ('https://docs.google.com/docs-images-rt/ALKuztbuZNSs_Qp1IAwAU3cidmz0Hb_3n4mVTqfI4Sm5OHdgpahKOoTIi8omEkjz5m2-Qv3Rrd990ik8c2UtB0wrxAUvecMoenqqrMWEk2G3sINaVPjrLHuty_N_Pr-2KdJAh8qHib-qORPYy21ahViVUfjGeH36Stl0hCsDlz3L6lWd8Ztj=s0?key=ew1flWCUXATjaflKeC1stw'),
-          ('https://docs.google.com/docs-images-rt/ALKuztb3gd1P7U_xdPEnr7_Mlusc6zPWtkQxJZPUDZ-cQDo3VB62JkRSSIQzumgfj-fkEFWK2jzjQcy70JU-jg27bodt6tjVozEPk_Z-loPmjSl0a-866a7GmfZstTwCUlPjbdF6-_wCjc1RKS5M5mDVWs-iJYkW7q8sbhRsKp3jdEI2ujK5=s0?key=ew1flWCUXATjaflKeC1stw')]
+          'ALKuztbTJBHbmqRr4MonE4EHK0G4oSjPpQGvJFCa91cubOORUKWtJ9zjjrBMD6L5DPQSwrm0HzZ8oPScJtqzXuAp_apxVcqHDQGp5PNNDVuBLFYRr7SMj6vGv0LJVK0sEH01qxbkGUXaXQ-0hE24Jiz35Esl6kRjtJCcC08WPFg4NlSMF0D2',
+          'ALKuztY4yW9XW06rU0WcgJP3YiB7a_W8S0D8QgsnVm-W7E78ljOH8Cx3FsAEG19I0aqFsP4q2f0J-Is_qrnn1tnQNSdzY_WXXAMa0DPY5sxvQPABKej_w8CcPAWK9cmD3c7x7QbtwPVJUy_GHVXSyoEfC8oKEpYxEvbWQLPNOT_oqEVYJd5T',
+          'ALKuztboOqSEgCGKZJe7_-yS9JxfBKhW_RxqQLuPlOzD_ZK-kYZweGmkHiQpu0EpiJ6UEu-0NhYtZjuOa_Z4UMxrp72Qn6qa3BnuWvtCNp6ukImgWF_Rr7W-5fLeRobDH974_cer7nvznpTPWD5XuvGzWtrAj-FPVBQAj5dFaUS274fTTQ8bg5c',
+          'ALKuztZoxV9zy3zZ4sG9O2caa6M01_E3FfHK3kYhSC-mb65exGu3XQW8apbVZSkZuFtNFyHLXr7nwfjhJDzv2ss_F3PZsoY2UmQt1BglaWXiKgz5JQyl81nhPG0AE4FULzzETZGpuZfDRH3PGd3Cj8mdGXNjv6vmZMAnbfWqVSxA2oyiLWT8thY',
+          'ALKuztabgqInivtQk86UABzu2iKOL-5-IZiQ8YYcDisATUkTjLyIPVvB-bmxLWrTuTdshWeNnc2VLnA-0WYVYKwGeaTlKIs2XqGF-IBVH1N2CXVZ5Rentpc9OtKBRmvSKmsBLdmDMTWrrgiuYqUn76b9rM3S0KEIHQmQDL9sy2vyzNYdquBm',
+          'ALKuztb4QxPxaIPEWoZ6rMxYnG9BTn6WqvZm_Gq2JnmOlFOJit5zUc6K2-HsU0TQn0WHFn14a810pu062TlvYTxOLZwn5ScKSTeZNb3N3hKI0tGNz3jpKtGcYW-uCojRYOeY7LAHyJ35-EakoGhUNoVfFYwSqrTS31boqTBicGf2KaLdGKyWypA',
+          'ALKuztaYsect-2n_YF0P-ecpo39TMpWkr4tVmJjQ51FsnKMduYDIQu8huZL8aRoHCYm_cPxHIKA7RgcagurKGJ4rv1c9c7mJlmvbUtjGvzjHsOLtiGS36UUH93E5_O3b6S_wnbQwqOS7idurwxrP-hyeaR1cl_Yb-dkcJ3ndriJXnSjNjdVc75M',
+          'ALKuztYdP7zMS5Be74MEqFKQb5ha08g_4o8c3idnEFCL5vkGLpErKC5I3mzIBqi5fST8YdWMEaVKBDoPbWF0FKINb4Fh9k6fHkjVHPiZisFL3zLMqYfsgN0-w-eMm7aj-I_9Fj1Ue3MZDQC3CWnkm6-O7of_FyDO0RmYfaQ7P1bxmXiBL16i8JU',
+          'ALKuztazAA7VwcNQK0dla09PhSWMi7LXNWWOvpzRK-9inkOd2W0AYxGOyZAlJbxP_4P19p2N7F1sbl37OSAO1ALeTzWvIGXg51YCNK3LgW5SDvFpFvC9DYI0s3oYozf_9qj6cCrHOqPUcC2x1P6IswnHOkiDUo_7oZm4RvUR6mCxCzgZQMXS2VA']
           families = {
-            'clear':['32-59f','60-74f','75f-plus','below-32f'],
-            'cloudy':['32-59f','60-74f','75f-plus','below-32f'],
-            'partly-cloudy':['32-59f','60-74f','75f-plus','below-32f'],
-            'drizzle':['60f-plus','below-60f'], 'rain':['60f-plus','below-60f'],
-            'heavy-rain':['60f-plus','below-60f'], 'storm':['60f-plus','below-60f'], 'hail':['60f-plus','below-60f'],
-            'fog':['32-59f','60f-plus','below-32f'], 'haze':['32-59f','60f-plus','below-32f'],
-            'dust':['32-59f','60f-plus','below-32f'], 'wind':['32-59f','60f-plus','below-32f'],
-            'snow':['32-49f','below-32f'], 'heavy-snow':['32-49f','below-32f'],
-            'sleet':['32-49f','below-32f'], 'freezing-rain':['32-49f','below-32f']}
+          'clear':['32-59f','60-74f','75f-plus','below-32f'], 'cloudy':['32-59f','60-74f','75f-plus','below-32f'], 'partly-cloudy':['32-59f','60-74f','75f-plus','below-32f'],
+          'drizzle':['60f-plus','below-60f'], 'rain':['60f-plus','below-60f'], 'heavy-rain':['60f-plus','below-60f'], 'storm':['60f-plus','below-60f'], 'hail':['60f-plus','below-60f'],
+          'fog':['32-59f','60f-plus','below-32f'], 'haze':['32-59f','60f-plus','below-32f'], 'dust':['32-59f','60f-plus','below-32f'], 'wind':['32-59f','60f-plus','below-32f'],
+          'snow':['32-49f','below-32f'], 'heavy-snow':['32-49f','below-32f'], 'sleet':['32-49f','below-32f'], 'freezing-rain':['32-49f','below-32f']}
           names = sorted([f'weather-her-{weather}-{light}-feels-{band}.webp' for weather,bands in families.items() for light in ['day','night'] for band in bands] + [f'weather-her-{light}-feels-{band}.webp' for light in ['dawn','dusk'] for band in ['32-59f','60f-plus','below-32f']])
-          assert len(names)==90 and len(set(names))==90
-          root=pathlib.Path('public/weather-fusion'); output=[]
+          assert len(names)==90
+          root=pathlib.Path('public/weather-fusion')
           def download(pair):
-            index,url=pair
+            index,key=pair
+            url='https://docs.google.com/docs-images-rt/'+key+'=s0?key=ew1flWCUXATjaflKeC1stw'
             with urllib.request.urlopen(url,timeout=90) as r: raw=r.read(30*1024*1024+1)
             assert len(raw)<=30*1024*1024
             image=Image.open(io.BytesIO(raw)).convert('RGB')
-            assert image.size==(1200,6760),f'Image sheet {index+1} was resized; refusing misaligned crops: {image.size}'
-            rows=[]
+            assert image.size==(2400,3380),f'Image sheet {index+1} dimensions changed: {image.size}'
+            result=[]
             for i,name in enumerate(names[index*10:index*10+10]):
-              p=root/name
-              image.crop((0,i*676,1200,i*676+675)).save(p,'WEBP',quality=84,method=6)
-              rows.append({'file':name,'width':1200,'height':675,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()})
-            return rows
+              x=i%2*1200;y=i//2*676
+              frame=image.crop((x,y,x+1200,y+675));p=root/name
+              frame.save(p,'WEBP',quality=84,method=6)
+              # Use scenery at the far left, not another copy of the person,
+              # as the matching page background behind the forecast cards.
+              bg=name.replace('weather-her-','weather-her-bg-')
+              frame.crop((0,0,360,675)).save(root/bg,'WEBP',quality=82,method=6)
+              result.append({'file':name,'background':bg,'width':1200,'height':675,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()})
+            return result
+          result=[]
           with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
-            for rows in pool.map(download,enumerate(sources)): output.extend(rows)
-          assert len(output)==90
-          (root/'weather-her-manifest.json').write_text(json.dumps({'version':'weather-her-v1','count':90,'images':sorted(output,key=lambda x:x['file'])},indent=2)+'\n')
-          print('Verified and saved all 90 approved weather portraits.')
+            for rows in pool.map(download,enumerate(sources)):result.extend(rows)
+          assert len(result)==90
+          (root/'weather-her-manifest.json').write_text(json.dumps({'version':'weather-her-v1','count':90,'images':sorted(result,key=lambda x:x['file'])},indent=2)+'\n')
+          print('Verified 90 full-resolution portraits and matching scenic backgrounds.')
           PY
-      - name: Publish only the approved image assets
+      - name: Publish approved assets
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add public/weather-fusion/weather-her-*.webp public/weather-fusion/weather-her-manifest.json
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m 'Add 90 approved weather and feels-like portraits'
+          git commit -m 'Add 90 weather outfits and matching scenic backgrounds'
           git pull --rebase origin main
           git push origin HEAD:main
