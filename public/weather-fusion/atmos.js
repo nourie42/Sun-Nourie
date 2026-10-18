@@ -1,3 +1,4 @@
+import {createWeatherPortrait} from './weather-portraits.js?v=weather-portraits-v1';
 /* Atmos — Weather Nourie drawn as a living sky.
  * One forecast request (/api/weather-fusion/forecast) drives the page. The sky,
  * the 48-hour clock and every section below read the same canonical values the
@@ -80,17 +81,18 @@ const wearKey=person=>`${person.scene}|${person.outfit}|${person.daylight}`;
 function wearHTML(person){
  return `<figure class="wear" data-key="${esc(wearKey(person))}" data-daylight="${person.daylight}">${person.art}<figcaption><span class="wear-label">${esc(person.label)}</span><strong class="wear-feel">${deg(person.feel)}</strong><small class="wear-text">${esc(person.text)}</small></figcaption></figure>`;
 }
+let weatherPortrait=null;
 function renderDressed(s){
- const el=$('dressed'),note=$('dressed-note'),people=(dressing[selected]||[]).filter(Boolean);
- if(!el||!s||!people.length)return;
- el.hidden=false;if(note)note.hidden=false;
- const figures=[...el.querySelectorAll('.wear')];
- if(figures.length!==people.length){el.innerHTML=people.map(wearHTML).join('');return;}
- people.forEach((person,i)=>{
-  if(figures[i].dataset.key!==wearKey(person)){figures[i].outerHTML=wearHTML(person);return;}
-  figures[i].querySelector('.wear-feel').textContent=deg(person.feel);
-  figures[i].querySelector('.wear-text').textContent=person.text;
- });
+ if(!s)return;
+ if(!weatherPortrait){
+  weatherPortrait=createWeatherPortrait($('sky-frame'));
+  document.body.classList.add('weather-portrait-atmos');
+ }
+ const options={solar:forecast?.metricForecasts?.solar||[forecast?.solar],timeZone:forecast?.location?.timeZone};
+ void weatherPortrait.update(s,options);
+ weatherPortrait.preload(steps.slice(selected+1,selected+3),options);
+ if($('dressed')){$('dressed').hidden=true;$('dressed').replaceChildren();}
+ if($('dressed-note'))$('dressed-note').hidden=true;
 }
 
 /* ---------- Loading ---------- */
@@ -180,7 +182,7 @@ function rebuild(keepTime=null,{quiet=false}={}){
  const built=safe('timeline',()=>buildTimeline(forecast,now),[]);
  if(!built.length){status('The hourly forecast is missing from this update.',true);return;}
  steps=built;
- dressing=safe('dressing',()=>dressingTimeline(steps,sampleAt),[]);
+ dressing=[]; // The approved portrait follows this hour directly.
  blendRows=safe('blend',()=>consensus(steps),[]);
  grid=safe('grid',()=>comfortGrid(forecast,now),[]);
  days=safe('days',()=>dailyOutlook(forecast,now),[]);

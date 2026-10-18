@@ -122,7 +122,7 @@ export function createWeatherPortrait(host,{onModeChange}={}){
   figure.querySelector('.portrait-basis').textContent=state.available?`${state.basis}: ${degree(state.value)} · ${state.light}. Rain, snow and other scenes follow the stated condition; forecast chances are not a claim that precipitation is certain.`:state.reason;
   if(!state.available){img.hidden=true;visibleFile=null;figure.dataset.loaded='false';status.hidden=false;status.textContent=state.reason;clearBackground();return false;}
   if(visibleFile===state.file){figure.dataset.loaded='true';return true;}
-  img.hidden=true;status.hidden=false;status.textContent='Loading the picture for this hour…';figure.dataset.loaded='false';clearBackground();
+  visibleFile=null;img.hidden=true;status.hidden=false;status.textContent='Loading the picture for this hour…';figure.dataset.loaded='false';clearBackground();
   try{
    await Promise.all([loadPicture(state.file),loadPicture(state.background)]);
    if(token!==generation)return false;
