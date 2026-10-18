@@ -1,9 +1,17 @@
 /** Nourie Weather · animated forecast scene player. All supplied text uses textContent. */
-import {CHARACTERS, normalizeCharacter, getCharacterPortrait} from './character-scene.js?v=named-scenes-v3';
+import {CHARACTERS, normalizeCharacter, getCharacterPortrait} from './character-scene.js?v=actual-world-v4';
 const number = (v, fallback = 0) => v !== null && v !== '' && Number.isFinite(Number(v)) ? Number(v) : fallback;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const optionalNumber = v => v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v)) ? Number(v) : null;
 const boundedNumber = (v, min, max = Infinity) => { const n = optionalNumber(v); return n === null ? null : clamp(n,min,max); };
+const coordinate = (value,limit) => typeof value==='number'&&Number.isFinite(value)&&Math.abs(value)<=limit?value:null;
+const compassPoints = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+const windDegrees = value => {
+  if(value===null||value===undefined||value==='')return null;
+  if(typeof value==='string'){if(!value.trim()||!value.trim().replace(/°$/,'').trim())return null;const compass=compassPoints.indexOf(value.trim().toUpperCase());if(compass>=0)return compass*22.5;}
+  const degrees=typeof value==='number'?value:Number(String(value).trim().replace(/°$/,''));
+  return Number.isFinite(degrees)?((degrees%360)+360)%360:null;
+};
 export const PLAYBACK_SPEEDS = Object.freeze([1,2,4,8,16,32]);
 const SPEED_STORAGE_KEY = 'nourie-weather-playback-speed';
 const CHARACTER_STORAGE_KEY = 'nourie-weather-person';
@@ -45,9 +53,11 @@ export function outfitForFrame(frame = {}) {
 export function normalizeForecast(frames) {
   if(!Array.isArray(frames))return [];
   return frames.slice(0,336).filter(f=>f&&typeof f==='object'&&typeof f.time==='string'&&!Number.isNaN(Date.parse(f.time))&&f.temperature!==null&&f.temperature!==''&&Number.isFinite(Number(f.temperature))).map(f=>({
-    time:f.time,temperature:number(f.temperature,65),feelsLike:optionalNumber(f.feelsLike),
+    time:new Date(f.time).toISOString(),sourceTime:typeof f.sourceTime==='string'&&!Number.isNaN(Date.parse(f.sourceTime))?new Date(f.sourceTime).toISOString():null,
+    latitude:coordinate(f.latitude,90),longitude:coordinate(f.longitude,180),
+    temperature:number(f.temperature,65),feelsLike:optionalNumber(f.feelsLike),dewpoint:optionalNumber(f.dewpoint??f.dewPoint),
     precipitationProbability:boundedNumber(f.precipitationProbability,0,100),precipitation:boundedNumber(f.precipitation,0),cloudCover:boundedNumber(f.cloudCover,0,100),
-    windSpeed:boundedNumber(f.windSpeed,0),windGust:boundedNumber(f.windGust,0),weatherCode:optionalNumber(f.weatherCode),isDay:typeof f.isDay==='boolean'?f.isDay:null,
+    windSpeed:boundedNumber(f.windSpeed,0),windGust:boundedNumber(f.windGust,0),windDirection:windDegrees(f.windDirection),weatherCode:optionalNumber(f.weatherCode),isDay:typeof f.isDay==='boolean'?f.isDay:null,
     ...(f.nativePolicy===true?{nativePolicy:true,nativeSampleId:f.nativeSampleId==='now'?'now':typeof f.nativeSampleId==='string'&&!Number.isNaN(Date.parse(f.nativeSampleId))?new Date(f.nativeSampleId).toISOString():null,
       nativeCondition:typeof f.nativeCondition==='string'?f.nativeCondition.slice(0,240):'',nativeWeatherKind:['clear','partly-cloudy','cloudy','rain','storm','snow','fog','unknown'].includes(f.nativeWeatherKind)?f.nativeWeatherKind:'unknown',
       nativePrecipitationActivity:['none','possible','active'].includes(f.nativePrecipitationActivity)?f.nativePrecipitationActivity:'none',nativeSnowExpected:f.nativeSnowExpected===true,
@@ -83,7 +93,7 @@ export function createScenarioForecast(name, start = new Date(), hours = 24) {
   let stamp=new Date(start).getTime();if(!Number.isFinite(stamp))stamp=Date.now();stamp=Math.floor(stamp/3600000)*3600000;
   return Array.from({length:clamp(Math.floor(number(hours,24)),1,336)},(_,i)=>({...preset,time:new Date(stamp+i*3600000).toISOString()}));
 }
-const cssURL = new URL('./sky-player.css?v=named-scenes-v3',import.meta.url).href;
+const cssURL = new URL('./sky-player.css?v=actual-world-v4',import.meta.url).href;
 const compactSeconds = seconds => seconds>=60?`${Math.floor(seconds/60)}m ${Math.round(seconds%60)}s`:`${Number(seconds.toFixed(seconds<1?3:1))}s`;
 
 class WeatherSkyPlayer extends HTMLElement {
@@ -137,7 +147,24 @@ class WeatherSkyPlayer extends HTMLElement {
   attributeChangedCallback(name,oldValue,newValue){if(oldValue===newValue||!this.$)return;if(name==='location-name')this.locationName=newValue;if(name==='timezone')this.timezone=newValue;if(name==='data-mode')this._renderMode();if(name==='playback-speed')this.speed=newValue;if(name==='character')this.character=newValue;}
   get character(){return this._character;}
   set character(value){this._character=normalizeCharacter(value);const person=CHARACTERS.find(person=>person.id===this._character);try{globalThis.localStorage?.setItem(CHARACTER_STORAGE_KEY,this._character);}catch{}if(this.$){this._renderPeople();this.$('.person-selection').textContent=`${person?.name||'Your person'} selected.`;}this._world?.setCharacter?.(this._character);this.dispatchEvent(new CustomEvent('characterchange',{detail:{character:this._character},bubbles:true,composed:true}));}
-  _renderPeople(){if(!this.$)return;const root=this.$('.person-options');root.replaceChildren();for(const person of CHARACTERS){const button=document.createElement('button');button.type='button';button.className='person-option';button.dataset.person=person.id;button.setAttribute('aria-pressed',String(person.id===this._character));button.setAttribute('aria-label',person.name);const thumb=document.createElement('span');thumb.className='person-thumb';thumb.setAttribute('aria-hidden','true');const portrait=getCharacterPortrait(person.id),r=portrait.rect,faceX=r[0]+portrait.face[0]*(r[2]-r[0]),faceY=r[1]+portrait.face[1]*(r[3]-r[1]),scaleY=1/((r[3]-r[1])*(['white','black'].includes(person.id)?.28:.22)),sourceAspect=portrait.cellAspect*(r[3]-r[1])/(r[2]-r[0]),scaleX=scaleY*sourceAspect/(57/64);thumb.style.backgroundImage=`url("${new URL(portrait.file,import.meta.url).href}")`;thumb.style.backgroundSize=`${scaleX*100}% ${scaleY*100}%`;thumb.style.backgroundPosition=`${(faceX*scaleX-.5)/(scaleX-1)*100}% ${(faceY*scaleY-(['white','black'].includes(person.id)?.5:.32))/(scaleY-1)*100}%`;const name=document.createElement('strong');name.textContent=person.name;button.append(thumb,name);root.append(button);}}
+  _renderPeople(){
+    if(!this.$)return;
+    const root=this.$('.person-options');root.replaceChildren();
+    for(const person of CHARACTERS){
+      const button=document.createElement('button');button.type='button';button.className='person-option';button.dataset.person=person.id;
+      button.setAttribute('aria-pressed',String(person.id===this._character));button.setAttribute('aria-label',person.name);
+      const thumb=document.createElement('span');thumb.className='person-thumb';thumb.setAttribute('aria-hidden','true');
+      const portrait=getCharacterPortrait(person.id),r=portrait.rect,cellHeight=r[3]-r[1],cellWidth=r[2]-r[0];
+      // Each atlas now supplies a dedicated headshot. Use its whole height;
+      // only its wide sides are cropped to the gallery's portrait shape.
+      const scaleY=1/cellHeight,sourceAspect=portrait.cellAspect*cellHeight/cellWidth,scaleX=scaleY*sourceAspect/(57/64);
+      const faceX=r[0]+portrait.face[0]*cellWidth;
+      thumb.style.backgroundImage=`url("${new URL(portrait.file,import.meta.url).href}")`;
+      thumb.style.backgroundSize=`${scaleX*100}% ${scaleY*100}%`;
+      thumb.style.backgroundPosition=`${(faceX*scaleX-.5)/(scaleX-1)*100}% ${r[1]*scaleY/(scaleY-1)*100}%`;
+      const name=document.createElement('strong');name.textContent=person.name;button.append(thumb,name);root.append(button);
+    }
+  }
   get forecast(){return this._forecast.map(frame=>({...frame}));}
   set forecast(value){this._forecast=normalizeForecast(value);this._index=clamp(this._index,0,Math.max(0,this._forecast.length-1));if(!this._forecast.length)this.pause();this._renderTimeline();this._render();}
   get locationName(){return this._locationName;}
@@ -193,7 +220,7 @@ class WeatherSkyPlayer extends HTMLElement {
     if(!this._connected||this._world||this._worldPromise||this._worldFailed)return;
     const epoch=++this._worldEpoch;this.$('.world-status').hidden=false;this.$('.world-status').classList.remove('has-error');this.$('.world-status-title').textContent='Preparing your forecast scene…';this.$('.world-status-note').textContent='Weather, sky, and what to wear.';this.$('.world-retry').hidden=true;
     this._worldPromise=(async()=>{
-      const {createWeatherWorld}=await import('./weather-world.js?v=named-scenes-v3');
+      const {createWeatherWorld}=await import('./weather-world.js?v=actual-world-v4');
       if(!this._connected||epoch!==this._worldEpoch)return;
       const world=await createWeatherWorld(this.$('.world-stage'),{initialFrame:this.currentFrame?{...this.currentFrame}:{},initialOutfit:outfitForFrame(this.currentFrame||{}),initialCharacter:this._character,onError:error=>{if(epoch===this._worldEpoch)this._handleWorldError(error);}});
       if(!this._connected||epoch!==this._worldEpoch||this._worldFailed){world?.dispose?.();return;}

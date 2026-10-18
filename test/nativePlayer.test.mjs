@@ -26,6 +26,36 @@ test('native samples preserve canonical feels, actual zeroes and missing inputs 
   assert.equal(nativeFrameForSample(source,sample({temperature:null}),now),null);
 });
 
+test('selected scene inputs retain validated coordinates, dew point and the selected timestamp through normalization',()=>{
+  const source=forecast(),selected=sample({time:'2026-10-18T12:35:00-04:00',id:'2026-10-18T12:35:00-04:00',inputs:{dewpoint:48,wind:0,gust:0,skyCover:20},windDirection:'WNW'});
+  const [frame]=normalizeForecast([nativeFrameForSample(source,selected,now)]);
+  assert.equal(frame.latitude,location.latitude);assert.equal(frame.longitude,location.longitude);assert.equal(frame.dewpoint,48);assert.equal(frame.windDirection,292.5);assert.equal(frame.cloudCover,20);
+  assert.equal(frame.time,'2026-10-18T16:35:00.000Z');assert.equal(frame.sourceTime,frame.time);assert.equal(frame.nativeSampleId,frame.time);
+  const invalid=nativeFrameForSample(forecast({location:{...location,latitude:91,longitude:-181}}),selected,now);
+  assert.equal(invalid.latitude,null);assert.equal(invalid.longitude,null);
+  const [bad]=normalizeForecast([{...frame,latitude:true,longitude:'',dewpoint:null,sourceTime:'invalid'}]);
+  assert.equal(bad.latitude,null);assert.equal(bad.longitude,null);assert.equal(bad.dewpoint,null);assert.equal(bad.sourceTime,null);
+  const [origin]=normalizeForecast([{...frame,latitude:0,longitude:0,dewpoint:0}]);assert.equal(origin.latitude,0);assert.equal(origin.longitude,0);assert.equal(origin.dewpoint,0);
+});
+
+test('Now uses the current instant for astronomy while retaining the original weather source time',()=>{
+  const source=forecast({hours:[{time:iso(0),windDirectionDegrees:180},{time:iso(1),windDirectionDegrees:90}]}),selectedNow=now+37*60000,observed=now-25*60000;
+  const [frame]=normalizeForecast([nativeFrameForSample(source,sample({id:'now',now:true,time:new Date(observed).toISOString()}),selectedNow)]);
+  assert.equal(frame.time,new Date(selectedNow).toISOString());assert.equal(frame.sourceTime,new Date(observed).toISOString());assert.equal(frame.nativeSampleId,'now');
+  assert.equal(frame.windDirection,180,'only the interval containing Now supplies an absent direction');
+  const futureOnly=nativeFrameForSample(forecast({hours:[{time:iso(1),windDirectionDegrees:90}]}),sample({id:'now',now:true,time:new Date(observed).toISOString()}),selectedNow);
+  assert.equal(futureOnly.windDirection,null,'a future hour never supplies current wind direction');
+});
+
+test('numeric and compass wind directions normalize without creating a direction from missing or variable wind',()=>{
+  for(const [input,expected] of [[0,0],[360,0],[-90,270],['225°',225],[' nne ',22.5],['SW',225],['VRB',null],[null,null],['',null],['  ',null],['°',null]]){
+    const adapted=nativeFrameForSample(forecast({hours:[]}),sample({windDirection:input}),now);
+    assert.equal(adapted.windDirection,expected,String(input));
+    const [standalone]=normalizeForecast([{time:iso(1),temperature:60,windDirection:input}]);
+    assert.equal(standalone.windDirection,expected,`standalone ${input}`);
+  }
+});
+
 test('native garment thresholds match the existing comfort cards rather than the old fork thresholds',()=>{
   for(const [feels,expected] of [[41.9,'cold'],[42,'cool'],[64.9,'cool'],[65,'mild'],[73.9,'mild'],[74,'mild'],[87.9,'mild'],[88,'hot']]){
     const frame=nativeFrameForSample(forecast(),sample({feels}),now),outfit=outfitForFrame(frame);
@@ -198,6 +228,6 @@ test('the weather tab loads only on demand and detaches its renderer while prese
     const next={...snapshot,location:{...location,name:'Boston',latitude:42.36,longitude:-71.06}};
     const change=new Event('weather-nourie:location-changing');change.detail={location:next.location};doc.dispatchEvent(change);
     controller.setForecast(next);await flush();assert.equal(player.forecast.length,0,'a closed scene clears the previous location');
-    await controller.open();await flush();assert.equal(player.locationName,'Boston');assert.equal(player.currentFrame.nativeSampleId,'now');
+    await controller.open();await flush();assert.equal(player.locationName,'Boston');assert.equal(player.currentFrame.nativeSampleId,'now');assert.equal(player.currentFrame.latitude,42.36);assert.equal(player.currentFrame.longitude,-71.06);
   }finally{controller.dispose();globalThis.document=priorDocument;if(priorSnapshot===undefined)delete globalThis.__weatherNourieForecast;else globalThis.__weatherNourieForecast=priorSnapshot;}
 });

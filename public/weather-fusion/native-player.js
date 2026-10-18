@@ -13,12 +13,23 @@ const kinds=new Set(['clear','partly-cloudy','cloudy','rain','storm','snow','fog
 const wmoForKind={clear:0,'partly-cloudy':2,cloudy:3,rain:61,storm:95,snow:71,fog:45,unknown:null};
 const epoch=value=>{const t=Date.parse(value);return Number.isFinite(t)?t:null;};
 const normalizedId=value=>value==='now'?'now':epoch(value)!==null?new Date(epoch(value)).toISOString():null;
+const validCoordinate=(value,limit)=>finite(value)&&Math.abs(value)<=limit?value:null;
+const compassPoints=['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+const windDegrees=value=>{
+  if(value===null||value===undefined||value==='')return null;
+  if(typeof value==='string'){
+    if(!value.trim()||!value.trim().replace(/°$/,'').trim())return null;
+    const compass=compassPoints.indexOf(value.trim().toUpperCase());if(compass>=0)return compass*22.5;
+  }
+  const degrees=typeof value==='number'?value:Number(String(value).trim().replace(/°$/,''));
+  return Number.isFinite(degrees)?((degrees%360)+360)%360:null;
+};
 
 /** Adapts an already validated native sample, keeping probability and amount separate. */
 export function nativeFrameForSample(forecast,sample,now=Date.now()){
   if(!sample||!finite(sample.temperature)||epoch(sample.time)===null)return null;
   const context=comfortArtworkContext(forecast,sample,now);
-  const selectedTime=sample.now?now:epoch(sample.time);
+  const selectedTime=sample.now&&finite(now)?now:epoch(sample.time);
   const hour=(forecast?.hours||[]).find(row=>{const start=epoch(row.time);return start!==null&&start<=selectedTime&&selectedTime<start+HOUR;});
   const condition=String(sample.condition||'Sky conditions unavailable');
   const weather=weatherState(condition,sample.inputs?.skyCover);
@@ -32,9 +43,14 @@ export function nativeFrameForSample(forecast,sample,now=Date.now()){
   const nativeSampleId=normalizedId(sample.id??(sample.now?'now':sample.time));
   if(!nativeSampleId)return null;
   return {
-    time:new Date(epoch(sample.time)).toISOString(),temperature:sample.temperature,feelsLike:known(sample.feels),
+    // 'Now' follows the current instant for the sun/moon. Keep the weather
+    // source timestamp separately; a station or model hour can be older.
+    time:new Date(selectedTime).toISOString(),sourceTime:new Date(epoch(sample.time)).toISOString(),
+    latitude:validCoordinate(forecast?.location?.latitude,90),longitude:validCoordinate(forecast?.location?.longitude,180),
+    temperature:sample.temperature,feelsLike:known(sample.feels),dewpoint:known(sample.inputs?.dewpoint),
     precipitationProbability:known(sample.pop),precipitation:amount,cloudCover:sky,
-    windSpeed:known(sample.inputs?.wind),windGust:known(sample.inputs?.gust),weatherCode:wmoForKind[kind]??null,
+    windSpeed:known(sample.inputs?.wind),windGust:known(sample.inputs?.gust),
+    windDirection:windDegrees(sample.windDirection??sample.inputs?.windDirection??hour?.windDirectionDegrees??hour?.windDirection),weatherCode:wmoForKind[kind]??null,
     isDay:typeof sample.isDay==='boolean'?sample.isDay:null,
     nativePolicy:true,nativeSampleId,nativeCondition:condition,nativeWeatherKind:kinds.has(kind)?kind:'unknown',
     nativePrecipitationActivity:activity,nativeSnowExpected:snow,
@@ -111,7 +127,7 @@ export function createNativePlaybackBridge({player,selectComfortHour,samplesForF
 }
 
 /** Keep the scene opt-in: a closed tab neither loads the player nor owns a renderer. */
-export function installNativePlayer({selectComfortHour,loadPlayer=()=>import('./player/sky-player.js?v=named-scenes-v3')}={}){
+export function installNativePlayer({selectComfortHour,loadPlayer=()=>import('./player/sky-player.js?v=actual-world-v4')}={}){
   if(typeof document==='undefined')return null;
   const host=document.getElementById('nourie-player');if(!host)return null;
   if(host[INSTALL_KEY])return host[INSTALL_KEY];

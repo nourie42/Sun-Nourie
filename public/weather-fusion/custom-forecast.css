@@ -11,6 +11,10 @@
 #custom-forecast .cf-model-button:focus-visible{outline:2px solid #adeaff;outline-offset:4px}
 #custom-forecast .cf-chart-panel{border:1px solid #d4edff2b;border-radius:13px;padding:14px 12px 7px;background:#10253b24;min-width:0}
 #custom-forecast .cf-chart-panel h3{font-size:13px;line-height:1.5;font-weight:600;margin:0 0 10px;text-align:left}
+#custom-forecast .cf-metric-label{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:7px;font-size:11px;line-height:1.5;color:#d2e9fa;margin-bottom:13px}
+#custom-forecast .cf-metric-label select{display:block;max-width:100%;min-width:0;font:inherit;font-size:12px;line-height:1.5;color:#f0f8ff;background:#142d478c;border:1px solid #d5edff47;border-radius:8px;padding:8px 27px 8px 10px;min-height:36px;flex:1}
+#custom-forecast .cf-metric-label option{background:#17324c;color:#f0f8ff}
+#custom-forecast .cf-metric-label select:focus-visible{outline:2px solid #adeaff;outline-offset:4px}
 #custom-forecast .cf-legend{display:flex;align-items:center;flex-wrap:wrap;gap:14px;font-size:11px;color:#dcebf7;margin-bottom:10px}
 #custom-forecast .cf-legend>span{display:inline-flex;align-items:center;gap:6px}
 #custom-forecast .cf-key{display:block;width:20px;height:3px;background:#99e4ef;border-radius:2px}
@@ -32,5 +36,6 @@
 #custom-forecast .cf-highlights li+li{margin-top:6px}
 #custom-forecast .cf-coverage-note{font-size:11px;line-height:1.7;margin:11px 0 0;color:#c4dced;text-align:left}
 #custom-forecast .cf-method{margin:16px 0 0;border-top:1px solid #d5ecff24;padding-top:12px;color:#bbd2e5;font-size:10px;line-height:1.7;text-align:left}
+#custom-forecast .cf-source-note{margin:12px 0 0;color:#bfd8e9;font-size:11px;line-height:1.7;text-align:left}
 #custom-forecast .cf-loading{font-size:12px;line-height:1.7;color:#c8deef;margin:12px 0;text-align:left}
 @media(max-width:450px){#custom-forecast .cf-model-button{font-size:11px;padding:8px 11px}#custom-forecast .cf-chart-panel{padding:12px 8px 6px}#custom-forecast .cf-plot text{font-size:10px}#custom-forecast .cf-legend{gap:10px;font-size:10px}}

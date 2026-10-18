@@ -162,6 +162,48 @@ function deckTexture(width,height,seed){
  return canvas;
 }
 
+/* Opt-in textured cloud volumes for the photographic park. The density edge
+ * has several noise scales; it is not the old row of clipped white circles.
+ * These sprites are built once, then the normal wind/parallax renderer moves
+ * them without running a per-pixel simulation on every animation frame. */
+function volumeNoise(seed){
+ const random=rng(seed),size=128,values=Float32Array.from({length:size*size},()=>random());
+ const at=(x,y)=>{const ix=Math.floor(x),iy=Math.floor(y),fx=x-ix,fy=y-iy,u=fx*fx*(3-2*fx),v=fy*fy*(3-2*fy),sample=(i,j)=>values[(j&127)*size+(i&127)];return lerp(lerp(sample(ix,iy),sample(ix+1,iy),u),lerp(sample(ix,iy+1),sample(ix+1,iy+1),u),v);};
+ return (x,y)=>{let sum=0,amplitude=.55,normal=0;for(let octave=0;octave<4;octave++){sum+=at(x,y)*amplitude;normal+=amplitude;x=x*2.03+11.7;y=y*2.01+7.9;amplitude*=.48;}return sum/normal;};
+}
+function volumeCloudSprite(seed,targetWidth){
+ const random=rng(seed),noise=volumeNoise(seed+17),width=Math.round(targetWidth),height=Math.round(width*.56),puffs=[];
+ for(let index=0;index<9;index++){
+  const u=(index+.3+random()*.4)/9,profile=Math.sin(Math.PI*u);
+  const x=.10+u*.80,y=.60-profile*.19+(random()-.5)*.065,rx=.105+profile*.06,ry=.16+profile*.16;
+  puffs.push({x,y,xx:1/(rx*rx),yy:1/(ry*ry)});
+  if(index>0&&index<8){const sx=x+(random()-.5)*.06,sy=y-ry*.72,srx=rx*(.34+random()*.25),sry=ry*(.34+random()*.25);puffs.push({x:sx,y:sy,xx:1/(srx*srx),yy:1/(sry*sry)});}
+ }
+ const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
+ const g=canvas.getContext('2d'),pixels=g.createImageData(width,height);
+ for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+  const u=x/width,v=y/height;let density=-2;
+  for(const puff of puffs){const dx=u-puff.x,dy=v-puff.y;density=Math.max(density,1-dx*dx*puff.xx-dy*dy*puff.yy);}
+  if(density<-.22)continue;
+  const texture=noise(u*12,v*9),detail=noise(u*31+9,v*24+3),depth=density+(texture-.5)*.62+(detail-.5)*.12;
+  const opacity=smooth(-.08,.38,depth);if(opacity<.004)continue;
+  const roundedTop=smooth(.62,.16,v),wisps=smooth(.38,.72,texture),shade=clamp(.20+roundedTop*.55+wisps*.18+detail*.14);
+  const light=clamp(139+shade*111+(texture-.5)*23,126,255),i=(y*width+x)*4;
+  pixels.data[i]=pixels.data[i+1]=pixels.data[i+2]=Math.round(light);pixels.data[i+3]=Math.round(opacity*255);
+ }
+ g.putImageData(pixels,0,0);return {canvas,width,height,base:height*.82};
+}
+function volumeDeckTexture(width,height,seed){
+ const noise=volumeNoise(seed),canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
+ const g=canvas.getContext('2d'),pixels=g.createImageData(width,height);
+ for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+  const u=x/width,v=y/height,warp=noise(u*3,v*2),mass=noise(u*5+warp*2,v*3+warp),fine=noise(u*19+7,v*12+3);
+  const billow=smooth(.25,.78,mass),light=clamp(136+billow*105+(fine-.5)*33+(1-v)*13,120,255),i=(y*width+x)*4;
+  pixels.data[i]=pixels.data[i+1]=pixels.data[i+2]=Math.round(light);pixels.data[i+3]=255;
+ }
+ g.putImageData(pixels,0,0);return canvas;
+}
+
 /* ---------- Landscape ---------- */
 // Leaf colours follow the season at the location: fresh green in spring, deep
 // green in summer, Piedmont fall colour in October and November, bare branches
@@ -302,15 +344,21 @@ function paintLandscape(width,height,horizon,maxTree,month,terrain,scale){
 }
 
 /* ---------- Renderer ---------- */
-export function createSky(canvas,{reducedMotion=false}={}){
+export function createSky(canvas,{reducedMotion=false,landscape=true,precipitation=true,horizon=null,externalAnimation=false,cloudDepthMotion=false,detailedClouds=false}={}){
  const ctx=canvas.getContext('2d',{alpha:false});
  let width=0,height=0,dpr=1,running=false,frame=0,last=0,visible=true,timeScale=1;
  let location={latitude:35.787,longitude:-78.4806,terrain:'piedmont'};
  let state={time:Date.now(),scene:{cover:.3,rain:0,snow:0,fog:0,haze:0,dark:0,storm:false,wind:5,windDir:270}};
- let stars=[],drops=[],flakes=[],land=null,flash=null,nextFlash=0,deckOffset=0;
+ let stars=[],drops=[],flakes=[],land=null,flash=null,nextFlash=0,deckOffset=0,deckDepthOffset=0,celestialVisible=true;
  const layerA=document.createElement('canvas'),layerB=document.createElement('canvas'),landLayer=document.createElement('canvas');
  const a=layerA.getContext('2d'),b=layerB.getContext('2d'),l=landLayer.getContext('2d');
- let clouds=null,deck=null;
+ let clouds=null,deck=null,cloudAtlas=null;
+ function artworkSprite(rect){
+  const image=cloudAtlas.image,sx=rect[0]*image.naturalWidth,sy=rect[1]*image.naturalHeight,sw=rect[2]*image.naturalWidth,sh=rect[3]*image.naturalHeight;
+  const sprite=document.createElement('canvas');sprite.width=Math.max(1,Math.round(sw));sprite.height=Math.max(1,Math.round(sh));
+  sprite.getContext('2d').drawImage(image,sx,sy,sw,sh,0,0,sprite.width,sprite.height);
+  return {canvas:sprite,width:sprite.width,height:sprite.height,base:sprite.height*.82};
+ }
  // Three parallax bands: distant small clouds along the horizon, a middle
  // band, and large near clouds overhead.
  const BANDS=[
@@ -320,18 +368,20 @@ export function createSky(canvas,{reducedMotion=false}={}){
  ];
  function buildClouds(){
   if(clouds)return;
+  const volumeSprites=new Map();
+  const photographicSprite=index=>{const key=`art-${index}`;if(!volumeSprites.has(key))volumeSprites.set(key,artworkSprite(cloudAtlas.rects[index]));return volumeSprites.get(key);};
   clouds=BANDS.map((band,bi)=>{
    const random=rng(101+bi*31);
    return Array.from({length:band.count},(_,k)=>({
-    sprite:cumulusSprite(1000+bi*100+k,band.sprite,{flat:bi===0?.6:.35,puffs:9+Math.floor(random()*7)}),
+    sprite:cloudAtlas?photographicSprite((bi*3+k)%cloudAtlas.rects.length):detailedClouds?(()=>{const key=bi*3+k%3;if(!volumeSprites.has(key))volumeSprites.set(key,volumeCloudSprite(1000+key*137,band.sprite));return volumeSprites.get(key);})():cumulusSprite(1000+bi*100+k,band.sprite,{flat:bi===0?.6:.35,puffs:9+Math.floor(random()*7)}),
     x:(k+random()*.8)/band.count,y:band.top+(band.bottom-band.top)*random(),size:band.size[0]+(band.size[1]-band.size[0])*random(),
-    threshold:random(),stretch:.85+random()*.4,
+    threshold:random(),stretch:.85+random()*.4,depth:cloudDepthMotion?random():.5,
    }));
   });
-  deck=deckTexture(384,96,77);
+  deck=cloudAtlas?.deckRect?artworkSprite(cloudAtlas.deckRect).canvas:detailedClouds?volumeDeckTexture(448,192,77):deckTexture(384,96,77);
  }
  const grass=()=>Math.round(Math.min(64,Math.max(30,height*.11)));
- const skyBottom=()=>Math.max(60,height-grass());
+ const skyBottom=()=>finite(horizon)?Math.max(1,height*clamp(horizon,.2,.95)):Math.max(60,height-grass());
  const maxTree=()=>Math.round(Math.min(132,Math.max(54,height*.22)));
  function resize(){
   const rect=canvas.getBoundingClientRect();
@@ -339,7 +389,7 @@ export function createSky(canvas,{reducedMotion=false}={}){
   dpr=Math.min(window.devicePixelRatio||1,width>900?1.5:2);
   canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);
   ctx.setTransform(dpr,0,0,dpr,0,0);
-  const bottom=skyBottom(),scale=Math.min(1.5,dpr);
+  const bottom=landscape?skyBottom():height,scale=Math.min(1.5,dpr);
   layerA.width=layerB.width=Math.round(width*scale);layerA.height=layerB.height=Math.round(bottom*scale);
   a.setTransform(scale,0,0,scale,0,0);b.setTransform(scale,0,0,scale,0,0);
   const random=rng(91);
@@ -354,18 +404,18 @@ export function createSky(canvas,{reducedMotion=false}={}){
   const terrain=longitude<-96.5?'prairie':'piedmont';
   if(terrain!==location.terrain)land=null;
   location={latitude,longitude,terrain};
-  if(!running)render(0);
+  if(!running&&!externalAnimation)render(0);
  }
  function setState(next){
   state={time:finite(next?.time)?next.time:state.time,scene:{...state.scene,...(next?.scene||{})}};
-  if(!running)render(0);
+  if(!running&&!externalAnimation)render(0);
  }
  function project(azimuth,altitude){
   const bottom=skyBottom();
   return {x:(azimuth-75)/210*width,y:bottom-clamp(altitude/78,-.2,1.08)*(bottom-36)};
  }
  function palette(){
-  const sun=sunPosition(state.time,location.latitude,location.longitude);
+  const sun=celestialVisible?sunPosition(state.time,location.latitude,location.longitude):{altitude:finite(state.scene.sunAltitude)?state.scene.sunAltitude:-6,azimuth:180};
   const s=state.scene,alt=sun.altitude;
   const clear=keyframes(SKY,alt),grey=keyframes(OVERCAST,alt),storm=keyframes(STORM,alt);
   const overcast=clamp(smooth(.45,1,s.cover)*.95+s.fog*.4);
@@ -379,7 +429,7 @@ export function createSky(canvas,{reducedMotion=false}={}){
   const bottom=skyBottom(),[zenith,middle,low]=p.sky;
   const g=ctx.createLinearGradient(0,0,0,bottom);
   g.addColorStop(0,css(zenith));g.addColorStop(.58,css(middle));g.addColorStop(1,css(low));
-  ctx.fillStyle=g;ctx.fillRect(0,0,width,bottom+2);
+  ctx.fillStyle=g;ctx.fillRect(0,0,width,landscape?bottom+2:height);
   const alt=p.sun.altitude,pos=project(p.sun.azimuth,Math.max(alt,0));
   const glow=smooth(-11,-1,alt)*(1-smooth(4,16,alt))*(1-p.overcast*.75);
   if(glow>.01){
@@ -414,6 +464,7 @@ export function createSky(canvas,{reducedMotion=false}={}){
   ctx.globalAlpha=1;
  }
  function drawMoon(p){
+  if(!celestialVisible)return;
   const moon=moonPosition(state.time,location.latitude,location.longitude);
   if(moon.altitude<-1)return;
   const {fraction,phase}=moonIllumination(state.time),pos=project(moon.azimuth,moon.altitude);
@@ -433,6 +484,7 @@ export function createSky(canvas,{reducedMotion=false}={}){
   ctx.closePath();ctx.fillStyle=css(mix([244,240,226],[255,255,255],day));ctx.fill();ctx.restore();
  }
  function drawSun(p){
+  if(!celestialVisible)return;
   const alt=p.sun.altitude;
   if(alt<-3)return;
   const pos=project(p.sun.azimuth,alt),low=1-smooth(2,18,alt);
@@ -448,30 +500,43 @@ export function createSky(canvas,{reducedMotion=false}={}){
   }
  }
  function drawClouds(p,dt){
-  const s=state.scene,bottom=skyBottom(),cover=clamp(s.cover);
+  // The photographic foreground is the final terrain mask. Its genuine alpha
+  // holes can extend below the astronomical horizon, so cloud colour must not
+  // stop along an arbitrary horizontal line inside those holes.
+  const s=state.scene,bottom=landscape?skyBottom():height,cover=clamp(s.cover);
   if(cover<.015)return;
   buildClouds();
   // Viewer faces south: east is screen-left. Wind blows from windDir.
   const drift=Math.sin(s.windDir*RAD)*(4+s.wind*.6)*timeScale;
+  // In the opt-in park view north/south winds move clouds through depth. Their
+  // screen motion must not vanish merely because lateral drift is zero.
+  const depthDrift=cloudDepthMotion?Math.cos(s.windDir*RAD)*(3+s.wind*.45)*timeScale:0;
   a.clearRect(0,0,width,bottom);
   const deckAlpha=smooth(.55,.95,cover);
   if(deckAlpha>.01){
    if(!reducedMotion)deckOffset=(deckOffset+drift*.4*dt/1000)%(width*1.2);
+   if(!reducedMotion)deckDepthOffset+=depthDrift*.35*dt/1000;
    a.globalAlpha=deckAlpha;
    const tile=Math.max(width*1.2,400);
-   for(let x=(deckOffset%tile+tile)%tile-tile;x<width;x+=tile)a.drawImage(deck,x,0,tile,bottom);
+   const depthY=cloudDepthMotion?Math.sin(deckDepthOffset/Math.max(1,bottom)*Math.PI)*bottom*.12:0;
+   for(let x=(deckOffset%tile+tile)%tile-tile;x<width;x+=tile)a.drawImage(deck,x,cloudDepthMotion?-bottom*.16+depthY:0,tile,cloudDepthMotion?bottom*1.32:bottom);
    a.globalAlpha=1;
   }
   const visibleShare=clamp(cover*1.25);
   BANDS.forEach((band,bi)=>{
    for(const cloud of clouds[bi]){
-    const alpha=smooth(cloud.threshold-.08,cloud.threshold+.04,visibleShare)*(1-deckAlpha*.62);
+    const alpha=smooth(cloud.threshold-.08,cloud.threshold+.04,visibleShare)*(1-deckAlpha*(detailedClouds?.97:.62));
     if(alpha<.01)continue;
     if(!reducedMotion)cloud.x=((cloud.x+drift*band.speed*dt/1000/width/2)%1+1)%1;
+    if(cloudDepthMotion&&!reducedMotion)cloud.depth=((cloud.depth+depthDrift*band.speed*dt/1000/Math.max(1,bottom))%1+1)%1;
     const reference=Math.max(width,bottom*1.7),sprite=cloud.sprite;
-    const grow=.8+cover*.55,w=reference*cloud.size*grow*cloud.stretch,h=w*sprite.height/sprite.width*band.squash;
-    const span=width+w*2,x=cloud.x*span-w,y=cloud.y*bottom-h*sprite.base/sprite.height;
-    a.globalAlpha=alpha*(bi===0?.92:1);
+    const depthScale=cloudDepthMotion?1.12-cloud.depth*.30:1;
+    const cloudSquash=detailedClouds?[.65,.88,1.02][bi]:band.squash;
+    const grow=.8+cover*.55,w=reference*cloud.size*grow*cloud.stretch*depthScale,h=w*sprite.height/sprite.width*cloudSquash;
+    const cloudY=cloudDepthMotion?lerp(band.top,band.bottom,cloud.depth):cloud.y;
+    const span=width+w*2,x=cloud.x*span-w,y=cloudY*bottom-h*sprite.base/sprite.height;
+    const depthFade=cloudDepthMotion?smooth(0,.08,cloud.depth)*(1-smooth(.92,1,cloud.depth)):1;
+    a.globalAlpha=alpha*(bi===0?.92:1)*depthFade;
     a.drawImage(sprite.canvas,x,y,w,h);
    }
   });
@@ -564,7 +629,10 @@ export function createSky(canvas,{reducedMotion=false}={}){
  function render(dt,time=performance.now()){
   if(!width||!height)return;
   const p=palette();
-  drawSky(p);drawStars(p,time);drawMoon(p);drawSun(p);drawClouds(p,dt);drawWeather(p,dt,time);drawLand(p);drawFog(p);drawPrecipitation(p,dt);
+  drawSky(p);drawStars(p,time);drawMoon(p);drawSun(p);drawClouds(p,dt);drawWeather(p,dt,time);
+  if(landscape)drawLand(p);
+  drawFog(p);
+  if(precipitation)drawPrecipitation(p,dt);
  }
  function loop(time){
   if(!running)return;
@@ -575,12 +643,16 @@ export function createSky(canvas,{reducedMotion=false}={}){
   last=time;render(dt,time);
  }
  function start(){
+  if(externalAnimation){render(0);return;}
   if(reducedMotion){render(0);return;}
   if(running)return;running=true;last=0;frame=requestAnimationFrame(loop);
  }
  function stop(){running=false;cancelAnimationFrame(frame);}
- function setVisible(value){visible=value;if(visible&&!running&&!reducedMotion)start();}
+ function setVisible(value){visible=value;if(visible&&!running&&!reducedMotion&&!externalAnimation)start();}
  return {resize,setLocation,setState,setTimeScale:value=>{timeScale=finite(value)&&value>0?value:1;},start,stop,setVisible,render:()=>render(0),
+  renderFrame:(dt=0,time=performance.now())=>{if(visible)render(reducedMotion?0:dt,reducedMotion?0:time);},
+  setCelestialVisible:value=>{celestialVisible=!!value;if(!running&&!externalAnimation)render(0);},
+  setCloudAtlas:value=>{if(!value?.image||!Array.isArray(value.rects)||!value.rects.length)return;cloudAtlas=value;clouds=null;deck=null;if(!running&&!externalAnimation)render(0);},
   get treeHeight(){return maxTree();},get groundHeight(){return grass();},
-  get reducedMotion(){return reducedMotion;},set reducedMotion(value){reducedMotion=!!value;if(reducedMotion)stop();else start();render(0);}};
+  get reducedMotion(){return reducedMotion;},set reducedMotion(value){reducedMotion=!!value;if(reducedMotion)stop();else if(!externalAnimation)start();render(0);}};
 }

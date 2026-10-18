@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {customForecastInput,normalizeCustomWeights,changeCustomWeight,toggleCustomModel,customPresetWeights,blendCustomForecast,publishedForecastPreview,customForecastSummary,customCalendarComparison,customForecastNarrative,singleModelComparison} from '../public/weather-fusion/custom-forecast-model.js';
+import {customForecastInput,normalizeCustomWeights,changeCustomWeight,toggleCustomModel,customPresetWeights,blendCustomForecast,publishedForecastPreview,customForecastSummary,customCalendarComparison,customForecastNarrative,singleModelComparison,CUSTOM_FORECAST_METRICS,formatModelMetric} from '../public/weather-fusion/custom-forecast-model.js';
 import {modelComparisonPath,modelComparisonScale} from '../public/weather-fusion/custom-forecast.js';
 import {calendarDayWindow} from '../public/weather-fusion/calendar-day.js';
+import {humidityFromDewpoint,tier3FeelsLike,solarElevation} from '../public/weather-fusion/weather-math.js';
 
 const HOUR = 3600000;
 const NOW = Date.parse('2026-10-18T03:30:00Z'); // Saturday 11:30 PM in Knightdale.
@@ -321,4 +322,146 @@ test('NVIDIA selection uses its own published source values and rainfall without
   almost(result.days[1].amount.value,.24);
   assert.equal(result.days[1].rain.value,null);
   assert.match(result.narrative.highlights.map(change=>change.text).join(' '),/rainfall/);
+});
+
+function allMetricsFixture(now=Date.parse('2026-10-19T02:30:00Z'),date='2026-10-18'){
+  const source=calendarFixture(now,date),forecast=source.forecast;
+  const definitions={wind:[10,5,15],gust:[30,25,35],dewpoint:[45,40,50],cloud:[30,20,40],pressure:[30.1,30,30.2],visibility:[8,7,9]};
+  const series={};
+  for(const [field,[baseline,nws,hrrr]]of Object.entries(definitions))series[field]=forecast.hours.map(row=>({time:row.time,value:baseline,sources:[{id:'nws',value:nws},{id:'hrrr',value:hrrr}]}));
+  series.humidity=forecast.hours.map(row=>({time:row.time,value:60}));
+  series.feels=forecast.hours.map(row=>({time:row.time,value:80,inputs:{skyCover:30}}));
+  series.feelsShade=forecast.hours.map(row=>({time:row.time,value:70}));
+  series.feelsSun=forecast.hours.map(row=>{
+    const daylight=solarElevation(Date.parse(row.time),forecast.location.latitude,forecast.location.longitude)>0;
+    return {time:row.time,value:daylight?90:null,daylight};
+  });
+  forecast.metricForecasts={series};
+  forecast.uv={hourly:forecast.hours.map(row=>({time:row.time,value:row.temperature===70?8:0}))};
+  forecast.airQuality={hours:forecast.hours.map(row=>({time:row.time,aqi:row.temperature===70?50:25}))};
+  forecast.snow={days:forecast.days.map((day,index)=>{
+    const calendar=calendarDayWindow(day,index,now,forecast.location.timeZone),start=index===0?Math.ceil(now/HOUR)*HOUR:calendar.start,end=calendar.end;
+    return {date:day.date,amountWindow:{start:new Date(start).toISOString(),end:new Date(end).toISOString()},displaySnowfall:{start:new Date(start).toISOString(),end:new Date(end).toISOString(),value:.2,source:'NWS point forecast',status:'ready',unit:'in'},nwsCovered:true,nearTermModels:{hrrr:0,nam:0},models:{ecmwf:.3,gfs:.4}};
+  })};
+  return source;
+}
+
+test('every offered metric has a stated unit and aggregation; model selection stays a single real source',()=>{
+  const {forecast,now}=allMetricsFixture(),input=customForecastInput(forecast,now);
+  assert.equal(CUSTOM_FORECAST_METRICS.length,18);
+  for(const metric of CUSTOM_FORECAST_METRICS){
+    assert.ok(metric.unit&&['min','max','mean','sum'].includes(metric.aggregation));
+    const result=singleModelComparison(input,'nws',metric.id);
+    assert.equal(result.selectedId,'nws');assert.equal(result.metricId,metric.id);
+    assert.equal(result.baseline.length,7);assert.equal(result.selected.length,7);
+    assert.deepEqual(result.built.weights,{nws:100});
+  }
+});
+
+test('high, low, peak, mean and total measurements aggregate matching calendar hours with correct units',()=>{
+  const {forecast,now}=allMetricsFixture(),input=customForecastInput(forecast,now);
+  const expected={high:70,low:52,wind:5,gust:25,dewpoint:40,cloud:20,pressure:30,visibility:7,uv:null,aqi:null,rain:10,amount:0,snow:.2};
+  for(const [metric,value]of Object.entries(expected)){
+    const result=singleModelComparison(input,'nws',metric);
+    assert.equal(result.selected[1],value,metric);
+  }
+  assert.equal(singleModelComparison(input,null,'uv').baseline[1],8);
+  assert.equal(singleModelComparison(input,null,'aqi').baseline[1],50);
+  assert.equal(formatModelMetric(30,'pressure'),'30.000 inHg');
+  assert.equal(formatModelMetric(.2,'snow'),'0.2 in');
+  assert.equal(formatModelMetric(4,'rain'),'Low');
+  assert.equal(formatModelMetric(5,'rain'),'5%');
+  assert.deepEqual(modelComparisonScale([3,4],'humidity'),{min:0,max:100});
+  assert.ok(modelComparisonScale([0,0],'snow').max>0);
+});
+
+test('humidity and feels-like use only the selected model’s exact matching inputs and the existing formula',()=>{
+  const {forecast,now}=allMetricsFixture(),input=customForecastInput(forecast,now);
+  const monday=input.hours.filter(row=>row.timestamp>=input.calendarDays[1].temperatureWindow.start&&row.timestamp<input.calendarDays[1].temperatureWindow.end);
+  const humidity=monday.reduce((sum,row)=>sum+humidityFromDewpoint(row.sources.temperature.nws,40),0)/24;
+  almost(singleModelComparison(input,'nws','humidity').selected[1],humidity);
+  const feelValues=monday.map(row=>tier3FeelsLike({temperature:row.sources.temperature.nws,dewpoint:40,wind:5,skyCover:20},forecast.location,row.timestamp,'outdoors').value);
+  almost(singleModelComparison(input,'nws','feels').selected[1],Math.max(...feelValues.map(value=>Number(value.toFixed(1)))));
+  assert.notEqual(singleModelComparison(input,'nws','humidity').selected[1],60,'published blended humidity must not become the NWS estimate');
+  forecast.metricForecasts.series.cloud.find(row=>row.time==='2026-10-19T18:00:00.000Z').sources=[];
+  const missing=customForecastInput(forecast,now);
+  assert.equal(singleModelComparison(missing,'nws','feels').selected[1],null,'missing own cloud cannot borrow the published sky input');
+  assert.equal(singleModelComparison(missing,null,'feels').baseline[1],80,'the actual published series stays visible');
+});
+
+test('direct-sun peaks exclude physically inapplicable night hours instead of treating them as missing or zero',()=>{
+  const {forecast,now}=allMetricsFixture(),input=customForecastInput(forecast,now);
+  const result=singleModelComparison(input,'nws','feelsSun');
+  assert.ok(result.days[1].metric.expectedHours>0&&result.days[1].metric.expectedHours<24);
+  assert.equal(result.days[1].metric.complete,true);
+  assert.ok(Number.isFinite(result.selected[1]));
+  assert.equal(result.selected[0],null,'all remaining hours today are at night');
+});
+
+test('thermal and wind comparisons explain the actual statistic in natural wording',()=>{
+  const {forecast,now}=allMetricsFixture(),input=customForecastInput(forecast,now);
+  const phrases={feels:['it could feel as warm as','outdoors'],feelsLow:['it could feel as cool as','outdoors'],feelsShade:['it could feel as warm as','in the shade'],feelsSun:['it could feel as warm as','in direct sunlight'],gust:['gusts could reach',''],wind:['wind could average','']};
+  for(const [metric,[phrase,setting]]of Object.entries(phrases)){
+    const result=singleModelComparison(input,'nws',metric),change=result.narrative.highlights[0];
+    assert.ok(change,`${metric} has a real difference to describe`);
+    const day=result.days.find(item=>item.date===change.date);
+    assert.ok(change.text.includes(`${phrase} ${formatModelMetric(day.metric.value,metric)}${setting?` ${setting}`:''}`),metric);
+    assert.ok(change.text.includes(`compared with ${formatModelMetric(day.metric.baseline,metric)} in Weather Nourie’s forecast.`),metric);
+    assert.doesNotMatch(change.text,/highest estimated.*feels like is/i);
+  }
+});
+
+test('direct-sun applicability follows the exact thermal cloud input, not a rounded display threshold',()=>{
+  const {forecast,now}=allMetricsFixture(),time='2026-10-19T16:00:00.000Z';
+  forecast.metricForecasts.series.cloud.find(row=>row.time===time).value=62;
+  forecast.metricForecasts.series.feels.find(row=>row.time===time).inputs.skyCover=62.04;
+  forecast.metricForecasts.series.feelsSun.find(row=>row.time===time).value=null;
+  const result=singleModelComparison(customForecastInput(forecast,now),'nws','feelsSun');
+  assert.equal(result.baseline[1],90,'the cloudy hour is physically inapplicable, not an invented missing sun hour');
+});
+
+test('independent UV/AQI products and deterministic rain amounts never become selected-model probabilities',()=>{
+  const {forecast,now}=allMetricsFixture();
+  for(const row of forecast.rainTimeline){row.rainLikelihood.sourceValues={nws:10,hrrr:100};row.precipitationBlend.sourceValues.hrrr=.2;}
+  const input=customForecastInput(forecast,now);
+  for(const metric of ['uv','aqi','rain']){
+    const result=singleModelComparison(input,'hrrr',metric);
+    assert.ok(result.baseline.some(value=>Number.isFinite(value)));
+    assert.ok(result.selected.every(value=>value===null));
+    assert.match(result.coverageNote,/does not supply/);
+  }
+});
+
+test('one missing model hour invalidates means, peaks and derived values without hiding the published line',()=>{
+  const {forecast,now}=allMetricsFixture();
+  for(const field of ['wind','gust','dewpoint','cloud','pressure','visibility'])forecast.metricForecasts.series[field].find(row=>row.time==='2026-10-19T18:00:00.000Z').sources=[];
+  const input=customForecastInput(forecast,now);
+  for(const metric of ['wind','gust','dewpoint','humidity','cloud','pressure','visibility','feels']){
+    const result=singleModelComparison(input,'nws',metric);
+    assert.equal(result.selected[1],null,metric);assert.ok(Number.isFinite(result.baseline[1]),metric);
+  }
+});
+
+test('snow keeps valid calendar zeros while rejecting a full-day fallback for partial today or mismatched periods',()=>{
+  const {forecast,now}=allMetricsFixture(),input=customForecastInput(forecast,now);
+  const hrrr=singleModelComparison(input,'hrrr','snow');assert.equal(hrrr.selected[1],0);
+  const ecmwf=singleModelComparison(input,'ecmwf','snow');assert.equal(ecmwf.selected[0],null);assert.equal(ecmwf.selected[1],.3);
+  assert.equal(singleModelComparison(input,'nam','snow').selected[1],0,'a snowfall-only model stays selectable');
+  forecast.snow.days[1].amountWindow.end='2026-10-20T12:00:00.000Z';
+  const mismatched=singleModelComparison(customForecastInput(forecast,now),'hrrr','snow');
+  assert.equal(mismatched.baseline[1],null);assert.equal(mismatched.selected[1],null);
+});
+
+test('snow’s next-full-hour policy cannot create a forecast from a zero-length period just before midnight',()=>{
+  const {forecast,now}=allMetricsFixture(Date.parse('2026-10-19T03:30:00Z'));
+  const result=singleModelComparison(customForecastInput(forecast,now),'nws','snow');
+  assert.equal(result.baseline[0],null);assert.equal(result.selected[0],null);
+});
+
+test('all hourly metric aggregates require the full 25-hour DST date',()=>{
+  const {forecast,now}=allMetricsFixture(Date.parse('2026-11-01T02:30:00Z'),'2026-10-31');
+  const complete=singleModelComparison(customForecastInput(forecast,now),'nws','wind');
+  assert.equal(complete.days[1].metric.expectedHours,25);assert.equal(complete.selected[1],5);
+  forecast.metricForecasts.series.wind.find(row=>row.time==='2026-11-01T06:00:00.000Z').sources=[];
+  const missing=singleModelComparison(customForecastInput(forecast,now),'nws','wind');assert.equal(missing.selected[1],null);
 });
