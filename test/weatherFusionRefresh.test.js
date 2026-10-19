@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
+import {confidenceTemperatureEvidenceHTML} from '../public/weather-fusion/forecast-confidence.js';
 
 const app=readFileSync(new URL('../public/weather-fusion/app.js',import.meta.url),'utf8');
 const section=app.slice(app.indexOf('function refreshOpenDay()'),app.indexOf('\nfunction setBasemap()'));
@@ -25,7 +26,8 @@ function harness() {
     $:id=>id==='day-graph-hour'?root.input:elements[id],document:{activeElement:null},forecast:{location:{timeZone:'UTC'},days:[day('2026-09-12'),day('2026-09-13')]},activeDayDetail:null,
     Date,Event:class {constructor(type){this.type=type;}},finite:Number.isFinite,esc:String,temperature:value=>`${value}°`,percent:value=>`${value}%`,inches:value=>`${value} in`,
     dailyDisplay:d=>({label:d.label,condition:d.condition,tonight:false,primary:d.high,secondary:d.low,primaryLabel:'High'}),
-    dailyConfidenceNoticeHTML:()=>'',
+    dailyConfidenceNoticeHTML:()=>'',confidenceTemperatureEvidenceHTML,
+    rainAwareCondition:condition=>condition,dailySkyCover:()=>null,hideLowRainChance:()=>false,rainTiming:()=>({}),rainTimingHTML:()=>'',
     forecastPeriodSummary:(f,index)=>({chance:f.days[index].chance,amount:.1,summary:`Updated chance ${f.days[index].chance}%.`}),
     displayedRainChance:(_forecast,chance)=>({value:chance,forecastValue:chance,observed:false}),
     dayGraphHTML:()=>'<section></section>',installDayGraph(){},
@@ -41,8 +43,8 @@ test('the forecast API bypasses browser cache without changing source timestamps
   assert.doesNotMatch(api,/assembledAt\s*=|issuedAt\s*=|runAt\s*=/);
 });
 
-test('both page modes refresh every 10 minutes, on return (if older than 2 min), restored page, and reconnect',()=>{
-  assert.match(app,/setInterval\(\(\) => \{ if \(validPlace\(place\)&&!document\.hidden&&!busy&&forecastAgeMs\(\)>9\*60000\) void load\(\); \}, 60000\)/);
+test('both page modes use the shared refresh policy, on return, restored page, and reconnect',()=>{
+  assert.match(app,/setInterval\(\(\) => \{ if \(validPlace\(place\)&&!document\.hidden&&!busy&&forecastRefreshDue\(forecast\)\) void load\(\); \}, 60000\)/);
   assert.match(app,/visibilitychange[\s\S]*?void refreshAlerts\(\);if \(validPlace\(place\)&&!busy&&forecastAgeMs\(\)>2\*60000\) void load\(\)/);
   assert.match(app,/window\.addEventListener\('online',[^\n]*void refreshAlerts\(\);if \(validPlace\(place\)&&!document\.hidden&&!busy\) void load\(\)/);
   assert.match(app,/window\.addEventListener\('pageshow',[^\n]*void refreshAlerts\(\);if \(event\.persisted&&validPlace\(place\)&&!document\.hidden&&!busy\) void load\(\)/);

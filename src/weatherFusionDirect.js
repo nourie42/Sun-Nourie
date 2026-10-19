@@ -275,7 +275,7 @@ export function refreshCalendarConfidence(out,{now=Date.now()}={}) {
   for(const [index,day] of (out.days||[]).entries()) {
     const window=calendarDayWindow(day,index,now,out.location?.timeZone),expectedHours=(window.end-window.start)/H;
     if(!(expectedHours>0))continue;
-    const samples={},weights={},counts={},runs={};let availableHours=0,maximumHourlySpread=null;
+    const samples={},weights={},counts={},runs={};let availableHours=0,maximumHourlySpread=null,worstHour=null;
     for(let time=window.start;time<window.end;time+=H) {
       const row=temperatures.get(time);
       if(finite(row?.value))availableHours++;
@@ -288,7 +288,15 @@ export function refreshCalendarConfidence(out,{now=Date.now()}={}) {
       }
       // Equal daily highs cannot hide different cold-front arrival times.
       const values=sources.map(source=>source.value);
-      if(values.length>1)maximumHourlySpread=Math.max(maximumHourlySpread??0,Math.max(...values)-Math.min(...values));
+      if(values.length>1){
+        const spread=Math.max(...values)-Math.min(...values);
+        if(maximumHourlySpread===null||spread>maximumHourlySpread){
+          maximumHourlySpread=spread;
+          const low=sources.reduce((a,b)=>a.value<=b.value?a:b),high=sources.reduce((a,b)=>a.value>=b.value?a:b);
+          worstHour={time:iso(time),spread:round(spread,1),low:{id:low.id,value:low.value},high:{id:high.id,value:high.value},
+            sources:sources.map(source=>({id:source.id,value:source.value,weight:source.weight,runAt:source.runAt||null}))};
+        }
+      }
     }
     const sourceOrder=['nws','hrrr','ecmwf','nbm','wn'];
     const contributors=kind=>sourceOrder.filter(id=>samples[id]?.length).map(id=>({id,value:round(kind==='high'?Math.max(...samples[id]):Math.min(...samples[id]),1),weight:round(weights[id]/expectedHours,6),coverageHours:counts[id],complete:counts[id]===expectedHours,
@@ -296,7 +304,12 @@ export function refreshCalendarConfidence(out,{now=Date.now()}={}) {
     const high=contributors('high'),low=contributors('low');
     const completeTemperature=high.filter(source=>source.complete);
     const spread=values=>values.length>1?Math.max(...values)-Math.min(...values):null;
-    day.highSpread=round(spread(completeTemperature.map(source=>source.value)),1);
+    const completeHigh=completeTemperature.map(source=>({...source,value:Math.max(...samples[source.id])}));
+    const dailyHigh=completeHigh.length?(()=>{
+      const low=completeHigh.reduce((a,b)=>a.value<=b.value?a:b),high=completeHigh.reduce((a,b)=>a.value>=b.value?a:b);
+      return {spread:completeHigh.length>1?round(high.value-low.value,1):null,low:{id:low.id,value:low.value},high:{id:high.id,value:high.value},sources:completeHigh};
+    })():null;
+    day.highSpread=dailyHigh?.spread??null;
     day.lowSpread=round(spread(low.filter(source=>source.complete).map(source=>source.value)),1);
     const temperatureSpread=round(maximumHourlySpread,1);
     const rain=(day.qpfBlend?.sources||[]).filter(source=>source.weight>0&&finite(source.value)).map(source=>({...source,complete:finite(day.qpfBlend?.sourceValues?.[source.id])}));
@@ -308,12 +321,13 @@ export function refreshCalendarConfidence(out,{now=Date.now()}={}) {
     const rainFallback=rainRows.some(row=>row.rainLikelihood?.mode==='nws-fallback');
     const temperatureCoverage=availableHours===expectedHours;
     const rainCoverage=day.rainLikelihood?.coverage?.complete===true&&finite(day.qpf);
-    day.confidence=forecastConfidence({dayIndex:index,highSpread:temperatureSpread,qpfSpread:day.qpfSpread,
+    day.confidence=forecastConfidence({dayIndex:index,highSpread:temperatureSpread,temperatureSpreadBasis:'same-hour',qpfSpread:day.qpfSpread,
       guidanceCount:Math.min(completeTemperature.length,completeRain.length),sourceIds,
       officialCoverage:(counts.nws||0)/expectedHours,temperatureCoverage,rainCoverage,
       temperatureSourceCount:completeTemperature.length,rainSourceCount:completeRain.length,rainFallback});
     day.confidence.window={start:iso(window.start),end:iso(window.end)};
     day.confidence.temperatureSpread=temperatureSpread;
+    day.confidence.temperatureComparison={basis:'maximum-same-hour-spread',worstHour,dailyHigh,window:{start:iso(window.start),end:iso(window.end)}};
     day.confidence.coverage={temperature:{expectedHours,availableHours,complete:temperatureCoverage,completeSources:completeTemperature.map(source=>source.id)},rain:{...day.rainLikelihood?.coverage,complete:rainCoverage,completeSources:completeRain.map(source=>source.id),officialFallback:rainFallback}};
     day.confidence.contributions={high,low,rain};
   }
