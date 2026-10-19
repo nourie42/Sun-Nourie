@@ -51,3 +51,5 @@
 .confidence-temperature-evidence th:first-child{text-align:left;max-width:108px;font-weight:500}
 .confidence-temperature-evidence thead th{font-weight:500;white-space:nowrap}
 @media(max-width:360px){.confidence-temperature-evidence table{font-size:11px}.confidence-temperature-evidence th,.confidence-temperature-evidence td{padding:7px 3px}}
+
+.confidence-temperature-weight{white-space:nowrap}.confidence-temperature-evidence .confidence-temperature-weight small{font-size:10px}.confidence-rating-values summary{font-size:12px;cursor:pointer}.confidence-temperature-evidence[data-temperature-basis="peer-consensus"] th:first-child{max-width:92px}.confidence-temperature-evidence[data-temperature-basis="peer-consensus"] thead th{white-space:normal}

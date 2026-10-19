@@ -5,6 +5,7 @@ import {SAME_DAY_WEIGHTS,EXTENDED_RAIN_WEIGHTS,EXTENDED_QPF_WEIGHTS,WEATHERNEXT_
 import {shadeFeelsLike} from '../public/weather-fusion/weather-math.js';
 import {forecastConfidence} from '../public/weather-fusion/forecast-confidence.js';
 import {calendarDayWindow} from '../public/weather-fusion/calendar-day.js';
+import {adjustTemperaturePolicy,TEMPERATURE_OUTLIER_VERSION} from './weatherFusionTemperatureOutliers.js';
 export const DATA_ROOT = 'https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/';
 export const DIRECT_SCHEMA = 'weather-fusion-direct-v2';
 const H = 3600000;
@@ -145,6 +146,15 @@ export function weighted(values, policy) {
   return { value: sum ? round(sources.reduce((n,s) => n+s.value*s.weight,0)/sum,4) : null,
     sources: sources.map((s) => ({ ...s, weight: round(s.weight/sum,6) })), calibrated: false };
 }
+/** Temperature-only policy; moisture, wind and rain retain their own weights. */
+export function weightedTemperature(values,index){
+ const {policy,temperatureAdjustment}=adjustTemperaturePolicy(values,tempPolicy(index,finite(values.wn)),index);
+ const blend=weighted(values,policy);
+ if(temperatureAdjustment)blend.sources=blend.sources.map(source=>source.id===temperatureAdjustment.sourceId
+  ?{...source,temperatureOutlier:true,baseWeight:temperatureAdjustment.baseWeight}
+  :source.id==='ecmwf'?{...source,receivedTemperatureWeight:temperatureAdjustment.transferredWeight}:source);
+ return {...blend,temperatureAdjustment};
+}
 export const TRACE_QPF_THRESHOLD_INCHES = .010;
 export const TRACE_QPF_POINT_FRACTION = 1/3;
 export const RAIN_SUPPORT_NWS_THRESHOLD = 20;
@@ -275,7 +285,8 @@ export function refreshCalendarConfidence(out,{now=Date.now()}={}) {
   for(const [index,day] of (out.days||[]).entries()) {
     const window=calendarDayWindow(day,index,now,out.location?.timeZone),expectedHours=(window.end-window.start)/H;
     if(!(expectedHours>0))continue;
-    const samples={},weights={},counts={},runs={};let availableHours=0,maximumHourlySpread=null,worstHour=null;
+    const localDayIndex=forecastDayIndex(window.start,now,out.location?.timeZone);
+    const samples={},weights={},counts={},runs={};let availableHours=0,maximumHourlySpread=null,worstHour=null,maximumConfidenceSpread=null,confidenceHour=null;const temperatureAdjustments=[];
     for(let time=window.start;time<window.end;time+=H) {
       const row=temperatures.get(time);
       if(finite(row?.value))availableHours++;
@@ -294,7 +305,30 @@ export function refreshCalendarConfidence(out,{now=Date.now()}={}) {
           maximumHourlySpread=spread;
           const low=sources.reduce((a,b)=>a.value<=b.value?a:b),high=sources.reduce((a,b)=>a.value>=b.value?a:b);
           worstHour={time:iso(time),spread:round(spread,1),low:{id:low.id,value:low.value},high:{id:high.id,value:high.value},
-            sources:sources.map(source=>({id:source.id,value:source.value,weight:source.weight,runAt:source.runAt||null}))};
+            sources:sources.map(source=>({...source,runAt:source.runAt||null})),...(row?.temperatureAdjustment?{temperatureAdjustment:row.temperatureAdjustment}:{})};
+        }
+      }
+      // Only the exact isolated source identified by the temperature policy is
+      // omitted from the confidence gap. Its raw forecast remains in evidence
+      // and retains its reduced share of the actual temperature blend.
+      const adjustment=row?.temperatureAdjustment;
+      const verified=adjustment?.applied===true&&adjustment.version===TEMPERATURE_OUTLIER_VERSION&&adjustment.recipientId==='ecmwf'
+        ?adjustTemperaturePolicy(Object.fromEntries(sources.map(source=>[source.id,source.value])),Object.fromEntries(sources.map(source=>[source.id,source.weight])),localDayIndex).temperatureAdjustment:null;
+      const isolated=verified&&verified.sourceId===adjustment.sourceId
+        ?sources.find(source=>source.id===adjustment.sourceId&&source.temperatureOutlier===true&&finite(source.baseWeight)&&source.baseWeight>0&&source.baseWeight<=1
+          &&Math.abs(source.weight-source.baseWeight*.1)<=0.000001&&Math.abs(adjustment.baseWeight-source.baseWeight)<=0.000001
+          &&Math.abs(adjustment.transferredWeight-source.baseWeight*.9)<=0.000001):null;
+      const peers=isolated?sources.filter(source=>source.id!==isolated.id):sources;
+      const usePeers=!!isolated&&peers.length>=3&&peers.some(source=>source.id==='ecmwf');
+      const confidenceSources=usePeers?peers:sources;
+      if(usePeers)temperatureAdjustments.push({time:iso(time),...adjustment});
+      if(confidenceSources.length>1){
+        const lo=confidenceSources.reduce((a,b)=>a.value<=b.value?a:b),hi=confidenceSources.reduce((a,b)=>a.value>=b.value?a:b),gap=hi.value-lo.value;
+        if(maximumConfidenceSpread===null||gap>maximumConfidenceSpread){
+          maximumConfidenceSpread=gap;
+          confidenceHour={time:iso(time),spread:round(gap,1),low:{id:lo.id,value:lo.value},high:{id:hi.id,value:hi.value},
+            sources:confidenceSources.map(source=>({...source,runAt:source.runAt||null})),allSources:sources.map(source=>({...source,runAt:source.runAt||null})),
+            temperatureAdjustment:usePeers?adjustment:null};
         }
       }
     }
@@ -311,7 +345,7 @@ export function refreshCalendarConfidence(out,{now=Date.now()}={}) {
     })():null;
     day.highSpread=dailyHigh?.spread??null;
     day.lowSpread=round(spread(low.filter(source=>source.complete).map(source=>source.value)),1);
-    const temperatureSpread=round(maximumHourlySpread,1);
+    const rawTemperatureSpread=round(maximumHourlySpread,1),temperatureSpread=round(maximumConfidenceSpread,1);
     const rain=(day.qpfBlend?.sources||[]).filter(source=>source.weight>0&&finite(source.value)).map(source=>({...source,complete:finite(day.qpfBlend?.sourceValues?.[source.id])}));
     const completeRain=rain.filter(source=>source.complete);
     day.qpfSpread=round(spread(completeRain.map(source=>day.qpfBlend.sourceValues[source.id])),2);
@@ -321,13 +355,14 @@ export function refreshCalendarConfidence(out,{now=Date.now()}={}) {
     const rainFallback=rainRows.some(row=>row.rainLikelihood?.mode==='nws-fallback');
     const temperatureCoverage=availableHours===expectedHours;
     const rainCoverage=day.rainLikelihood?.coverage?.complete===true&&finite(day.qpf);
-    day.confidence=forecastConfidence({dayIndex:index,highSpread:temperatureSpread,temperatureSpreadBasis:'same-hour',qpfSpread:day.qpfSpread,
+    day.confidence=forecastConfidence({dayIndex:index,highSpread:temperatureSpread,temperatureSpreadBasis:temperatureAdjustments.length?'peer-consensus':'same-hour',temperatureOutlierHours:temperatureAdjustments.length,qpfSpread:day.qpfSpread,
       guidanceCount:Math.min(completeTemperature.length,completeRain.length),sourceIds,
       officialCoverage:(counts.nws||0)/expectedHours,temperatureCoverage,rainCoverage,
       temperatureSourceCount:completeTemperature.length,rainSourceCount:completeRain.length,rainFallback});
     day.confidence.window={start:iso(window.start),end:iso(window.end)};
     day.confidence.temperatureSpread=temperatureSpread;
-    day.confidence.temperatureComparison={basis:'maximum-same-hour-spread',worstHour,dailyHigh,window:{start:iso(window.start),end:iso(window.end)}};
+    day.confidence.rawTemperatureSpread=rawTemperatureSpread;
+    day.confidence.temperatureComparison={basis:'maximum-same-hour-spread',worstHour,dailyHigh,confidenceHour,confidenceSpread:temperatureSpread,confidenceBasis:temperatureAdjustments.length?'isolated-outlier-peers':'all-contributing-sources',adjustments:temperatureAdjustments,window:{start:iso(window.start),end:iso(window.end)}};
     day.confidence.coverage={temperature:{expectedHours,availableHours,complete:temperatureCoverage,completeSources:completeTemperature.map(source=>source.id)},rain:{...day.rainLikelihood?.coverage,complete:rainCoverage,completeSources:completeRain.map(source=>source.id),officialFallback:rainFallback}};
     day.confidence.contributions={high,low,rain};
   }
@@ -453,7 +488,7 @@ export function enhanceForecast(out, { models, grid, periods = [], hourlyPeriods
           d.guidance[id] ||= {};
           d.guidance[id][kind]=round(values[id],1);
         }
-        const blend=weighted(values,tempPolicy(index,finite(values.wn)));
+        const blend=weightedTemperature(values,index);
         d[kind]=round(blend.value,0); d[`${kind}Blend`]=blend;
         d[`${kind}Window`]={start:iso(start),end:iso(end)};
       }
@@ -494,7 +529,7 @@ export function enhanceForecast(out, { models, grid, periods = [], hourlyPeriods
     const time=Date.parse(hour.time),values={nws:hour.forecastSource==='model-guidance'?null:hour.temperature};
     for(const [id,m] of Object.entries(sourceModels)) values[id]=sample(m,time,'temperature_2m');
     hour.officialTemperature=values.nws;
-    hour.temperatureBlend=weighted(values,tempPolicy(forecastDayIndex(time,now,out.location.timeZone),finite(values.wn)));
+    hour.temperatureBlend=weightedTemperature(values,forecastDayIndex(time,now,out.location.timeZone));
     hour.temperatureBlend.sources=hour.temperatureBlend.sources.map(source=>({...source,runAt:sourceRun(source.id,time)}));
     hour.temperature=round(hour.temperatureBlend.value,0);
     const row=timelineByTime.get(time),rain=row?.precipitationBlend;
@@ -516,6 +551,7 @@ export function enhanceForecast(out, { models, grid, periods = [], hourlyPeriods
   out.repairVersion=REPAIR_VERSION;
   out.rainPeriodVersion='local-calendar-v1';
   out.blendPolicy={sameDay:SAME_DAY_WEIGHTS,extendedRain:EXTENDED_RAIN_WEIGHTS,extendedAmount:EXTENDED_QPF_WEIGHTS,precipitation:'Rainfall amount is calculated separately in inches from the hourly source amounts. HRRR contributes only on the selected location\'s current local calendar day.',probability:'On the current local day, the NWS hourly probability fills its 40-point share proportionally; HRRR is worth 30 points, ECMWF 10 and NBM 20. After the current local day, NWS fills a 15-point share proportionally; ECMWF is worth 60 points and NBM 25, with no HRRR contribution. Each deterministic model adds zero rain-signal points below 0.001 inch/hour, and one-third of its points from 0.001 through 0.010 inch/hour. Original rainfall amounts remain unchanged. Above 0.010 inch, full points require NWS at least 20% or another included model above 0.010 inch; otherwise the model gets one-third. Repeated interpolated hours from one model do not establish corroboration.',periodProbability:'Highest canonical hourly score within the explicit period window, not an independently estimated all-day event probability',partialCoverage:'When a required model is unavailable, show the official NWS hourly probability with an explicit fallback label. Preserve the incomplete model score separately; missing data is not dry weather.'};
+  out.blendPolicy.temperatureOutliers={version:TEMPERATURE_OUTLIER_VERSION,days:[1,2],retainedWeightFraction:.1,recipient:'ecmwf',minimumSources:4,maximumPeerSpreadF:3,minimumMedianDeviationF:4,minimumOutsidePeerRangeF:3};
   out.methodology='Numeric Weather Nourie blend: On the selected location\'s current local calendar day, the official NWS hourly probability fills its 40-point share proportionally, HRRR is worth 30 points, ECMWF 10 points and NBM 20 points. After that local date ends, the NWS hourly probability fills its 15-point share proportionally, ECMWF is worth 60 points and NBM 25 points; HRRR does not contribute to rain chance. A model amount below 0.001 inch/hour contributes zero rain-signal points while retaining its original rainfall amount. From 0.001 through 0.010 inch/hour, it contributes exactly one-third of that model\'s points. Above 0.010 inch, full points require NWS at least 20% or another included model above 0.010 inch; an uncorroborated signal contributes one-third. Each hour uses its own available inputs; repeated interpolated hours from one model do not establish corroboration. The total is capped at 100%. Rainfall amount is calculated separately in inches. Unavailable deterministic inputs remain missing. If a required model is unavailable, the published rain chance uses the official NWS hourly probability and is explicitly labeled as a fallback; the incomplete weighted score is retained separately. This is a transparent, uncalibrated estimate, not a proven accuracy ranking. Official warnings are never altered. Explicit HRRR, ECMWF IFS 0.25° and NBM point feeds cover the selected coordinates through Open-Meteo, with native extracts as a fallback. Point feeds can combine successive runs of the same named model; their initialization metadata refers to the latest published run. Temperature, dew point, wind, gust and cloud cover use their separate requested weighted-average policy; humidity and feels-like are derived consistently. Pressure and visibility include only published fields. Station observations, UV and official text retain separate provenance. Coarser precipitation intervals are prorated at boundaries; interpolated hourly amounts do not establish storm arrival times. Daily rain chance and amount cover the labeled local calendar date, excluding elapsed hours today; Tonight is a separately labeled overnight period; the main precipitation metric covers the next 24 hours.';
   if(nvidia) {
     out.blendPolicy.sameDay=weatherNextPolicy(SAME_DAY_WEIGHTS,true);
@@ -526,5 +562,6 @@ export function enhanceForecast(out, { models, grid, periods = [], hourlyPeriods
     out.methodology='Weather Nourie includes verified NVIDIA WeatherNext at the established 10% starting share. Temperature and other matching numeric weather inputs start at NWS 36%, HRRR 27%, ECMWF 9%, NBM 18%, NVIDIA 10%; unavailable inputs are excluded. Rain uses those shares on the current local date. Later dates preserve the existing extended proportions: NWS 13.5%, ECMWF 54%, NBM 22.5%, NVIDIA 10%, without HRRR. Each field and hour must have a fresh, matching NVIDIA input; otherwise the existing available-model policy applies. NVIDIA initialization age is checked independently of collection time, with a 36-hour maximum; only the selected location’s published grid is used. Rainfall amount is calculated separately in inches from timestamp-matched intervals. NWS supplies official probabilities; deterministic models supply uncalibrated rain signals under the existing trace and corroboration rules, never invented model probabilities. An amount below 0.001 inch/hour adds zero rain-signal points without changing the rainfall amount. From 0.001 through 0.010 inch/hour it contributes one-third of that model’s points. Larger amounts get full points only with NWS at least 20% or another included model above 0.010 inch. Daily chance is the highest canonical hourly score in the same period. The daily tiles, hour-by-hour views and comparison graph share these published calculations. Station observations, UV, air quality, official conditions and warnings retain their own sources. NVIDIA does not supply gusts, visibility, snowfall depth or winter precipitation-type probabilities; those fields keep their available sources. Today covers the remaining local calendar date; future days cover midnight to midnight. Tonight is a separately labeled overnight period, and the main rain metric covers the next 24 hours. When required rain-model inputs are missing, the published hourly chance is the explicitly identified official NWS fallback.';
   }
   out.methodology=out.methodology.replace('The hourly rain likelihood','Each hourly rain likelihood')+' Daily, daytime and overnight rain percentages are the highest canonical hourly score inside their stated windows, not independently calculated full-period probabilities. The same complete hourly timeline supplies daily cards, forecast details, the hourly display, car-wash decisions and experimental source evidence. A missing hourly score leaves its period unavailable. Expected rainfall amounts are summed from that same timeline.';
+  out.methodology+=' For tomorrow and the following local calendar day, one isolated temperature source retains one tenth of its normalized share and transfers the remainder to ECMWF only when at least three other sources, including ECMWF, agree within 3°F, the isolated value differs from their median by at least 4°F, and it lies at least 3°F beyond their range. Raw model temperatures remain visible. This selected policy does not change wind, moisture or rainfall weighting.';
   return out;
 }

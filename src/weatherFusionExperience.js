@@ -1,6 +1,6 @@
 import {rebuildHourlyFeels} from './weatherFusionHourlyFeels.js';
 import {temperaturePolicy,forecastDayIndex,eveningPeriod} from './weatherFusionPolicy.js';
-import {weighted} from './weatherFusionDirect.js';
+import {weighted,weightedTemperature} from './weatherFusionDirect.js';
 import {alignComfortHours} from './weatherFusionNowcast.js';
 /** Actual forecast series for the tap-to-explore cards. No invented or held-flat data. */
 import {EXPERIENCE_VERSION, TONIGHT_START_HOUR, finite, thermalComfort, shadeFeelsLike, humidityFromDewpoint, rainChanceValue} from '../public/weather-fusion/weather-math.js';
@@ -52,7 +52,8 @@ export function addExperience(out,{models={},grid,periods=[],now,solarTimes,next
  const mix=(official,time,field)=>{
    const values={nws:official};
    for(const id of modelIds)values[id]=modelSample(models,time,field,[id]).value;
-   const result=weighted(values,temperaturePolicy(forecastDayIndex(time,now,zone),finite(values.wn)));
+   const index=forecastDayIndex(time,now,zone);
+   const result=field==='temperature_2m'?weightedTemperature(values,index):weighted(values,temperaturePolicy(index,finite(values.wn)));
    result.sources=result.sources.map(item=>item.id==='wn'?{...item,runAt:modelSample(models,time,field,['wn']).runAt}:item);
    return {...result,source:result.sources.map(s=>`${s.id.toUpperCase()} ${Math.round(s.weight*100)}%`).join(' / ')||null};
  };
@@ -74,7 +75,7 @@ export function addExperience(out,{models={},grid,periods=[],now,solarTimes,next
    h.officialWindDirection=h.windDirection;h.windDirectionBlend=mixWindDirection(directions,temperaturePolicy(forecastDayIndex(epoch,now,zone),finite(directions.wn)));
    h.windDirectionDegrees=round(h.windDirectionBlend.value);h.windDirection=finite(h.windDirectionDegrees)?COMPASS[Math.round(h.windDirectionDegrees/22.5)%16]:null;
    raw.push({epoch,time,temperature:h.temperature,dewpoint:dewpoint.value,humidity,wind:wind.value});
-   fieldsByTime.set(epoch,{temperature:{...source(h.temperature,'Forecast blend'),sources:h.temperatureBlend?.sources},dewpoint,wind,humidity:source(humidity,'Consistent forecast temperature + dew point'),gust,visibility,pressure,cloud,
+   fieldsByTime.set(epoch,{temperature:{...source(h.temperature,'Forecast blend'),sources:h.temperatureBlend?.sources,temperatureAdjustment:h.temperatureBlend?.temperatureAdjustment??null},dewpoint,wind,humidity:source(humidity,'Consistent forecast temperature + dew point'),gust,visibility,pressure,cloud,
      precipitation:source(h.precipitation,h.precipitationSource),pop:source(rainChanceValue(h.rainLikelihood,h.pop),h.rainLikelihood?.source||'NWS hourly')});
  }
  const aligned=alignComfortHours(raw,out.current,now);
@@ -84,7 +85,7 @@ export function addExperience(out,{models={},grid,periods=[],now,solarTimes,next
    for(const [key,v] of Object.entries(fields)) {
      const digits=key==='precipitation'?4:key==='pressure'?3:1;
      series[key].push({time:r.time,value:round(v.value,digits),source:v.source,
-       ...(v.sources?{sources:v.sources}:{}),...(v.runAt?{runAt:v.runAt}:{}),
+       ...(v.sources?{sources:v.sources}:{}),...(v.runAt?{runAt:v.runAt}:{}),...(key==='temperature'?{temperatureAdjustment:v.temperatureAdjustment??null}:{}),
        ...(key==='feels'?{inputs:{temperature:round(r.temperature),dewpoint:round(r.dewpoint),wind:round(r.wind),humidity:round(r.humidity)},rawInputs:r.rawInputs,alignmentFactor:r.alignmentFactor}:{}),
        ...(key==='precipitation'?{end:new Date(r.epoch+H).toISOString()}: {})});
    }
