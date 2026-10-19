@@ -165,7 +165,7 @@ export function confidenceNotice(confidence,subject='forecast'){
  if(!c||!['low','very-low'].includes(c.key))return null;
  const factors=Array.isArray(c.factors)?c.factors.join(' '):'';
  const reasons=[];
- const temperatureSpread=Number(factors.match(/([\d.]+)°F (?:high-)?temperature spread/i)?.[1]),rainSpread=Number(factors.match(/([\d.]+) in rainfall-guidance spread/i)?.[1]);
+ const temperatureSpread=finite(c.temperatureSpread)?c.temperatureSpread:Number(factors.match(/([\d.]+)°F (?:maximum same-hour temperature gap|(?:high-|daily-high )?temperature spread)/i)?.[1]),rainSpread=Number(factors.match(/([\d.]+) in rainfall-guidance spread/i)?.[1]);
  if(temperatureSpread>4||rainSpread>.15||/disagreement/i.test(factors))reasons.push('the forecast sources do not line up cleanly');
  if(/limited|unavailable|1 usable|0 usable|one NWS/i.test(factors))reasons.push('some usual forecast inputs are missing or limited');
  if(!reasons.length)reasons.push(`${subject==='today'?'today':'this forecast'} has more uncertainty than normal`);

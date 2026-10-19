@@ -40,3 +40,14 @@
 #today-forecast .today-night .today-sky[data-scene="overcast-rain"],#today-forecast .today-night .today-sky[data-scene="storm"]{filter:brightness(.38) saturate(.72) contrast(1.15) hue-rotate(8deg)}
 #today-forecast .today-night .today-sky[data-scene="overcast-rain"]+.today-scene-shade,#today-forecast .today-night .today-sky[data-scene="storm"]+.today-scene-shade{background:linear-gradient(90deg,rgba(0,15,46,.9),rgba(3,31,67,.62) 45%,rgba(1,12,35,.48)),linear-gradient(0deg,rgba(0,9,29,.62),transparent 55%)}
 @media(max-width:600px){.forecast-confidence{grid-template-columns:auto auto 52px;gap:5px;font-size:8px}.forecast-confidence>b{font-size:9px}.today-panel .forecast-confidence{font-size:8px}.today-panel .forecast-confidence>b{font-size:9px}.dialog-confidence-notice{padding:9px 11px}.dialog-confidence-notice strong{font-size:11px}.dialog-confidence-notice span{font-size:10px}}
+
+.confidence-temperature-evidence{margin:14px 0;padding:12px 0;border-top:1px solid #d8e8ff30;border-bottom:1px solid #d8e8ff30}
+.confidence-temperature-evidence h3{margin:0 0 8px;font-size:14px;color:#fff}
+.dialog-confidence .confidence-temperature-evidence p{font-size:12px;line-height:1.5}
+.confidence-temperature-scroll{max-width:100%;overflow-x:auto;margin:10px 0}
+.confidence-temperature-evidence table{width:100%;border-collapse:collapse;font-size:12px;text-align:right;color:#e8f3ff}
+.confidence-temperature-evidence caption{text-align:left;font-size:11px;line-height:1.5;margin:0 0 5px;color:#c8d9eb}
+.confidence-temperature-evidence th,.confidence-temperature-evidence td{padding:7px 5px;border-bottom:1px solid #d8e8ff20}
+.confidence-temperature-evidence th:first-child{text-align:left;max-width:108px;font-weight:500}
+.confidence-temperature-evidence thead th{font-weight:500;white-space:nowrap}
+@media(max-width:360px){.confidence-temperature-evidence table{font-size:11px}.confidence-temperature-evidence th,.confidence-temperature-evidence td{padding:7px 3px}}

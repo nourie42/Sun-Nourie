@@ -1,4 +1,4 @@
-export const FORECAST_CONFIDENCE_VERSION='weather-nourie-confidence-calendar-inputs-v3';
+export const FORECAST_CONFIDENCE_VERSION='weather-nourie-confidence-hourly-evidence-v4';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const MODERATE_SCORE=70,HIGH_SCORE=85;
@@ -11,7 +11,7 @@ export function confidenceMeterPosition(confidence){
  * Inputs are scientific forecast-quality signals already available in the app:
  * lead time, simultaneous temperature spread, liquid-precipitation spread,
  * source coverage and availability of matching official NWS temperatures. */
-export function forecastConfidence({dayIndex=0,highSpread=null,qpfSpread=null,guidanceCount=0,sourceIds=null,officialDay=false,officialNight=false,officialCoverage=null,temperatureCoverage=null,rainCoverage=null,temperatureSourceCount=null,rainSourceCount=null,rainFallback=false}={}){
+export function forecastConfidence({dayIndex=0,highSpread=null,temperatureSpreadBasis='daily-high',qpfSpread=null,guidanceCount=0,sourceIds=null,officialDay=false,officialNight=false,officialCoverage=null,temperatureCoverage=null,rainCoverage=null,temperatureSourceCount=null,rainSourceCount=null,rainFallback=false}={}){
  const leadPenalty=clamp(dayIndex,0,6)*5;
  const temperaturePenalty=!finite(highSpread)?12:highSpread<=2?0:highSpread<=4?5:highSpread<=7?12:22;
  const precipitationPenalty=!finite(qpfSpread)?5:qpfSpread<=.05?0:qpfSpread<=.15?3:qpfSpread<=.35?7:12;
@@ -28,7 +28,7 @@ export function forecastConfidence({dayIndex=0,highSpread=null,qpfSpread=null,gu
  const key=label.toLowerCase().replace(/\s+/g,'-');
  const factors=[];
  factors.push(dayIndex===0?'same-day lead time':`${dayIndex}-day lead time`);
- factors.push(finite(highSpread)?`${highSpread.toFixed(1)}°F temperature spread for the displayed hours`:'limited temperature comparison');
+ factors.push(finite(highSpread)?`${highSpread.toFixed(1)}°F ${temperatureSpreadBasis==='same-hour'?'maximum same-hour temperature gap':'daily-high temperature spread'}`:'limited temperature comparison');
  factors.push(finite(qpfSpread)?`${qpfSpread.toFixed(2)} in rainfall-guidance spread`:'limited rainfall comparison');
  factors.push(sourceIds?`${sourceIds.length} forecast source${sourceIds.length===1?'':'s'}: ${sourceIds.map(id=>id.toUpperCase()).join(', ')}`:`${guidanceCount} usable model source${guidanceCount===1?'':'s'}`);
  if(finite(temperatureSourceCount)&&finite(rainSourceCount))factors.push(`${temperatureSourceCount} temperature sources and ${rainSourceCount} rainfall sources cover all of these hours`);
@@ -39,7 +39,7 @@ export function forecastConfidence({dayIndex=0,highSpread=null,qpfSpread=null,gu
  if(rainFallback)reasons.push('Rain-model inputs are missing, so rain chances use the official NWS forecast.');
  if(finite(temperatureSourceCount)&&temperatureSourceCount<2)reasons.push('Fewer than two temperature sources cover all of these hours.');
  if(finite(rainSourceCount)&&rainSourceCount<2)reasons.push('Fewer than two rainfall sources cover all of these hours.');
- if(temperaturePenalty>0&&finite(highSpread))reasons.push(`Temperature guidance differs by up to ${highSpread.toFixed(1)}°F.`);
+ if(temperaturePenalty>0&&finite(highSpread))reasons.push(temperatureSpreadBasis==='same-hour'?`Hourly temperature forecasts differ by up to ${highSpread.toFixed(1)}°F, including overnight hours.`:`Forecast daily highs differ by ${highSpread.toFixed(1)}°F.`);
  if(precipitationPenalty>0&&finite(qpfSpread))reasons.push(`Rainfall guidance differs by ${qpfSpread.toFixed(2)} inches.`);
  if(!finite(highSpread)&&temperatureCoverage!==false)reasons.push('Temperature agreement cannot be compared.');
  if(!finite(qpfSpread)&&rainCoverage!==false)reasons.push('Rainfall agreement cannot be compared.');
@@ -48,6 +48,34 @@ export function forecastConfidence({dayIndex=0,highSpread=null,qpfSpread=null,gu
  if(rainFallback)factors.push('Official NWS rain fallback; unavailable models do not establish agreement');
  if(temperatureCoverage===false||rainCoverage===false)factors.push('Incomplete hourly coverage');
  const summary=reasons.length?reasons.join(' '):'Forecast sources agree closely for these hours.';
- return {version:FORECAST_CONFIDENCE_VERSION,score,label,key,factors,reasons,summary,sourceIds,sourceCount:sourceIds?.length??guidanceCount,
-   note:'Relative confidence index, not a probability or a measured accuracy percentage. It compares the sources for the same forecast hours and accounts for lead time and missing inputs.'};
+ return {version:FORECAST_CONFIDENCE_VERSION,score,label,key,factors,reasons,summary,temperatureSpreadBasis,sourceIds,sourceCount:sourceIds?.length??guidanceCount,
+   note:'Relative confidence index, not a probability or a measured accuracy percentage. It considers temperature agreement, rainfall agreement, lead time and missing inputs. A daily-high range and a same-hour temperature gap describe different comparisons.'};
+}
+
+const evidenceNames={nws:'NWS',hrrr:'HRRR',ecmwf:'ECMWF',nbm:'NBM',wn:'NVIDIA WeatherNext'};
+const escapeEvidence=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function evidenceTime(value,timeZone){
+ const epoch=Date.parse(value);if(!finite(epoch))return null;
+ try{return new Intl.DateTimeFormat('en-US',{timeZone,weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZoneName:'short'}).format(new Date(epoch));}catch{return null;}
+}
+// Show enough precision that rounding cannot create an apparent gap mismatch.
+export function temperatureRangePrecision(range){
+ const target=Number(range.spread.toFixed(1));
+ for(let p=1;p<5;p++)if(Number((Number(range.high.value.toFixed(p))-Number(range.low.value.toFixed(p))).toFixed(1))===target)return p;
+ return 5;
+}
+function validEvidenceRange(range){return range&&finite(range.spread)&&range.spread>=0&&finite(range.low?.value)&&finite(range.high?.value)&&range.high.value>=range.low.value&&Math.abs(Number((range.high.value-range.low.value).toFixed(1))-range.spread)<0.00001;}
+/** The confidence gap and the chart's daily highs share this forecast snapshot. */
+export function confidenceTemperatureEvidenceHTML(confidence,{timeZone='America/New_York',assembledAt=null}={}){
+ const comparison=confidence?.temperatureComparison;if(comparison?.basis!=='maximum-same-hour-spread')return '';
+ const worst=comparison.worstHour,daily=comparison.dailyHigh;
+ const stamp=worst&&evidenceTime(worst.time,timeZone),updated=evidenceTime(assembledAt,timeZone);
+ const hasHour=validEvidenceRange(worst)&&stamp,hasHigh=validEvidenceRange(daily);
+ if(!hasHour&&!hasHigh&&!(daily?.sources||[]).some(row=>finite(row.value)))return '<section class="confidence-temperature-evidence"><p>Temperature comparison evidence is unavailable for this update.</p></section>';
+ const hourPrecision=hasHour?temperatureRangePrecision(worst):1,highPrecision=hasHigh?temperatureRangePrecision(daily):1;
+ const describe=(range,p)=>`${range.low.value.toFixed(p)}–${range.high.value.toFixed(p)}°F`;
+ const dailyRows=new Map((daily?.sources||[]).map(row=>[row.id,row])),hourRows=new Map((worst?.sources||[]).map(row=>[row.id,row]));
+ const ids=[...new Set([...dailyRows.keys(),...hourRows.keys()])];
+ const rows=ids.map(id=>{const a=dailyRows.get(id),b=hourRows.get(id);return `<tr data-confidence-source="${escapeEvidence(id)}"><th scope="row">${escapeEvidence(evidenceNames[id]||id)}</th><td>${finite(a?.value)?`${a.value.toFixed(highPrecision)}°`:'Unavailable'}</td><td>${finite(b?.value)?`${b.value.toFixed(hourPrecision)}°`:'Unavailable'}</td></tr>`;}).join('');
+ return `<section class="confidence-temperature-evidence" data-temperature-basis="same-hour"><h3>Temperature agreement</h3><p data-confidence-daily-high>${hasHigh?`Daily highs from included sources: <strong>${describe(daily,highPrecision)}</strong> · ${daily.spread.toFixed(1)}°F apart.`:'Daily-high comparison is unavailable.'}</p><p data-confidence-hourly-gap>${hasHour?`Largest same-hour gap: <strong>${worst.spread.toFixed(1)}°F</strong> at <strong>${escapeEvidence(stamp)}</strong> (${describe(worst,hourPrecision)}).`:'Same-hour comparison is unavailable.'}</p><p>Confidence checks hourly differences, including overnight. The model chart compares daily highs.</p>${rows?`<div class="confidence-temperature-scroll"><table><caption>${hasHour?`Model readings at ${escapeEvidence(stamp)}`:'Model daily highs'}</caption><thead><tr><th scope="col">Source</th><th scope="col">Daily high</th><th scope="col">${hasHour?'At that hour':'Hourly'}</th></tr></thead><tbody>${rows}</tbody></table></div>`:''}${updated?`<small>Forecast updated ${escapeEvidence(updated)}.</small>`:''}</section>`;
 }

@@ -1,3 +1,4 @@
+import {temperatureRangePrecision} from './forecast-confidence.js?v=confidence-evidence-v4';
 import {hideLowRainChance} from './rain-display.js?v=low-rain-display-v1';
 /** Compare the published Weather Nourie forecast with individual model guidance. */
 import {dailyForecastReadings} from './seven-day.js?v=low-rain-display-v1';
@@ -6,7 +7,7 @@ const WN_FEED = 'https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-f
 const MS_PER_DAY = 86400000;
 
 const VARIABLES = {
-  temp:     { label: 'Temperature',   unit: '°F',  fmt: (v) => `${Math.round(v)}°` },
+  temp:     { label: 'Daily high temperature', unit: '°F', fmt: (v) => `${Math.round(v)}°` },
   rain:     { label: 'Precipitation', unit: 'in',  fmt: (v) => `${v.toFixed(2)}"` },
   wind:     { label: 'Wind',          unit: 'mph', fmt: (v) => `${Math.round(v)}` },
   dewpoint: { label: 'Dewpoint',      unit: '°F',  fmt: (v) => `${Math.round(v)}°` },
@@ -189,10 +190,13 @@ export function buildSeries(fx, wn, varId, now = Date.now()) {
   const days = (fx.days || []).slice(0, 10).map(d => ({ date: d.date, dateKey: d.date, tonight: false }));
   const windows = days.map((day,index)=>{
     const calendar=calendarDayWindow(day,index,now,tz),published=readings[index]?.windWindow;
+    const confidence=fx.days[index]?.confidence?.window;
+    const confidenceStart=Date.parse(confidence?.start),confidenceEnd=Date.parse(confidence?.end);
+    if(varId==='temp'&&finite(confidenceStart)&&finite(confidenceEnd)&&confidenceEnd>confidenceStart)return {start:confidenceStart,end:confidenceEnd};
     return {start:varId!=='temp'&&finite(published?.start)?Math.max(calendar.start,published.start):calendar.start,
       end:varId==='temp'?calendar.end:finite(published?.end)?Math.min(calendar.end,published.end):calendar.end};
   });
-  const out = { nwsFallback:varId==='pop'&&readings.some(day=>day.rainSourceFallback&&finite(day.pop)),days, perModel: true, wnVals: days.map(() => null), modelMaps: days.map(() => ({})), forecastValues: days.map(() => null), windows };
+  const out = { nwsFallback:varId==='pop'&&readings.some(day=>day.rainSourceFallback&&finite(day.pop)),days, perModel: true, wnVals: days.map(() => null), modelMaps: days.map(() => ({})), forecastValues: days.map(() => null), windows,assembledAt:fx.assembledAt,timeZone:tz };
 
   if (varId === 'temp' || varId === 'rain') {
     out.forecastValues = readings.map(day => varId === 'temp' ? day.high : day.amount);
@@ -209,6 +213,13 @@ export function buildSeries(fx, wn, varId, now = Date.now()) {
     if(varId==='temp'){
       const temperatureSeries=fx.metricForecasts?.series?.temperature||fx.hours?.map(hour=>({time:hour.time,sources:hour.temperatureBlend?.sources}))||[];
       out.modelMaps=dailySources(temperatureSeries,windows,'max',true);
+      // Confidence and this chart must compare the same snapshot's hours.
+      out.forecastValues=windows.map(window=>{
+        const points=seriesInWindow(temperatureSeries,window).filter(point=>finite(point.value));
+        return completeHourlyCoverage(new Set(points.map(point=>Date.parse(point.time))),window)?aggregate(points.map(point=>point.value)):null;
+      });
+      const contributing=temperatureSeries.map(point=>({...point,sources:(point.sources||[]).filter(source=>source.weight>0)}));
+      out.contributingHighs=dailySources(contributing,windows,'max',true);
     }
     out.wnVals = wnDaily(fx.google?.contributes ? null : wn?.hourly, varId === 'temp' ? 'temperature_2m' : 'total_precipitation_1hr',
       varId === 'temp' ? 'max' : 'sum', days, tz, varId === 'temp' ? K2F : M2IN, windows);
@@ -257,6 +268,17 @@ export function buildSeries(fx, wn, varId, now = Date.now()) {
 
 const hiddenModels = new Set();
 const NAMES = { nourie: 'Weather Nourie blend', nws: 'NWS', hrrr: 'HRRR', nam: 'NAM', nbm: 'NBM', ecmwf: 'ECMWF', wn: 'NVIDIA WeatherNext', gfs: 'GFS', single: '' };
+export function dailyHighComparison(built,index){
+  const published={...built.modelMaps[index]};
+  if(!Object.hasOwn(published,'wn')&&finite(built.wnVals[index]))published.wn=built.wnVals[index];
+  const summarize=values=>{
+    const sources=Object.entries(values||{}).filter(([id,value])=>id!=='nourie'&&finite(value)).map(([id,value])=>({id,value}));
+    if(sources.length<2)return {sources,low:null,high:null,spread:null};
+    const low=sources.reduce((a,b)=>a.value<=b.value?a:b),high=sources.reduce((a,b)=>a.value>=b.value?a:b);
+    return {sources,low,high,spread:high.value-low.value};
+  };
+  return {published:summarize(published),contributing:summarize(built.contributingHighs?.[index])};
+}
 function renderChart(container, built, varDef, varId) {
   const { days } = built;
   const displayName=id=>id==='nourie'&&built.nwsFallback?'Weather Nourie forecast':NAMES[id];
@@ -318,10 +340,11 @@ function renderChart(container, built, varDef, varId) {
       + `<i style="width:12px;height:3px;border-radius:2px;background:${COLORS[id]};opacity:${off ? 0.3 : 1};display:inline-block"></i>${displayName(id)}</${tag}>`; };
   const legend = built.perModel ? ids.map(chip).join('')
     : `<span style="font-size:11px;color:#d5deee">${varId === 'aqi' ? 'Daily max AQI (Open-Meteo / CAMS)' : varId === 'uv' ? 'Daily max UV index' : ''}</span>`;
-  const note = built.perModel ? `<p style="font-size:11px;color:#c4d9ed;margin:6px 0 0">${built.nwsFallback?'Official NWS rain chances are used where model data is unavailable.':'Weather Nourie blend is the forecast shown on this page.'} Other lines show individual models. Tap a model to show/hide its line, or tap the graph for values.${varId === 'temp' ? ' Daily highs require every forecast hour in the displayed day. Incomplete model days are unavailable.' : varId === 'rain' ? ' Rain totals use the same local calendar dates as the daily tiles, ending at midnight.' : varId === 'wind' ? ' Wind shows the average over that forecast period.' : varId === 'dewpoint' ? ' Dew point shows the highest reading over that forecast period.' : varId === 'pop' ? ' Individual model rain signals are not calibrated probabilities.' : varId === 'snow' ? ' Snow totals are inches for the same local calendar date. HRRR and NAM stop at their published forecast range; missing coverage is Unavailable. Overlapping zero lines mean the models forecast no snow. WPC uses different accumulation periods, and WeatherNext does not publish snowfall depth, so neither is substituted into these daily model lines.' : ''}</p>` : '';
+  const snapshot=Date.parse(built.assembledAt),stamp=finite(snapshot)?new Intl.DateTimeFormat('en-US',{timeZone:built.timeZone,month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZoneName:'short'}).format(new Date(snapshot)):null;
+  const note = built.perModel ? `<p style="font-size:11px;color:#c4d9ed;margin:6px 0 0">${built.nwsFallback?'Official NWS rain chances are used where model data is unavailable.':'Weather Nourie blend is the forecast shown on this page.'} Other lines show individual models. Tap a model to show/hide its line, or tap the graph for values.${varId === 'temp' ? ' Daily highs require every forecast hour in the displayed day. Incomplete model days are unavailable. The daily-high range includes all published model highs, including hidden lines, and excludes the blended forecast. Comparison-only models are labeled separately from contributing models. Confidence also checks same-hour disagreements, including overnight; that is a separate comparison from the daily-high range.'+(stamp?' Forecast updated '+stamp+'.':'') : varId === 'rain' ? ' Rain totals use the same local calendar dates as the daily tiles, ending at midnight.' : varId === 'wind' ? ' Wind shows the average over that forecast period.' : varId === 'dewpoint' ? ' Dew point shows the highest reading over that forecast period.' : varId === 'pop' ? ' Individual model rain signals are not calibrated probabilities.' : varId === 'snow' ? ' Snow totals are inches for the same local calendar date. HRRR and NAM stop at their published forecast range; missing coverage is Unavailable. Overlapping zero lines mean the models forecast no snow. WPC uses different accumulation periods, and WeatherNext does not publish snowfall depth, so neither is substituted into these daily model lines.' : ''}</p>` : '';
   container.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:4px;padding:2px 0 8px">${legend}</div>`
     + `<div class="wn-chart-wrap" style="position:relative;touch-action:pan-y">`
-    + `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="width:100%;height:auto;display:block;cursor:crosshair" role="img" aria-label="${varDef.label} comparison chart">${ylabels}${labels}${lines}${dots}`
+    + `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="width:100%;height:auto;display:block;cursor:crosshair" role="img" aria-label="${varId==='temp'?'Daily high temperature':varDef.label} comparison chart">${ylabels}${labels}${lines}${dots}`
     + `<line class="wn-cross" x1="0" x2="0" y1="${PT - 10}" y2="${H - PB}" stroke="#fff" stroke-width="1.5" stroke-dasharray="3,3" opacity="0"/><g class="wn-cross-dots"></g></svg>`
     + `<div class="wn-tip" role="status" aria-live="polite" style="position:absolute;top:4px;display:none;min-width:130px;padding:8px 10px;border-radius:12px;background:rgba(10,20,40,.88);border:1px solid rgba(255,255,255,.22);color:#fff;font-size:12px;line-height:1.45;pointer-events:none;box-shadow:0 6px 18px rgba(0,0,0,.35)"></div></div>${note}`;
   container.querySelectorAll('button.wn-chip').forEach((b) => b.addEventListener('click', () => {
@@ -337,8 +360,13 @@ function renderChart(container, built, varDef, varId) {
     cross.setAttribute('x1', x); cross.setAttribute('x2', x); cross.setAttribute('opacity', '0.8');
     const rows = visible.map((id) => [id, series[id][i]]).filter(([id, value]) => (varId === 'temp' || varId === 'snow' || id === primaryId || finite(value))&&!(varId==='pop'&&hideLowRainChance(value)));
     cdots.innerHTML = rows.filter(([, value]) => finite(value)).map(([id, v]) => `<circle cx="${x}" cy="${Y(v).toFixed(1)}" r="5" fill="${COLORS[id]}" stroke="#0a1428" stroke-width="1.5"/>`).join('');
-    tip.innerHTML = `<b style="display:block;margin-bottom:3px">${dayName(days[i], i, true)}</b>`
-      + (rows.length ? rows.map(([id, v]) => `<span data-tip-series="${id}" style="display:flex;justify-content:space-between;gap:10px"><span><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COLORS[id]};margin-right:5px"></i>${displayName(id) || varDef.label}</span><b>${finite(v) ? varDef.fmt(v) : 'Unavailable'}</b></span>`).join('') : varId==='pop'?'<span>No rain chances of 5% or higher</span>':'<span>No model data</span>');
+    const comparison=varId==='temp'?dailyHighComparison(built,i):null;
+    const precision=comparison?Math.max(...[comparison.published,comparison.contributing].map(range=>finite(range?.spread)?temperatureRangePrecision(range):1)):1;
+    const range=(summary,label)=>finite(summary?.spread)?`<span style="display:block;margin-top:5px">${label}: <b>${summary.low.value.toFixed(precision)}–${summary.high.value.toFixed(precision)}°F</b> · ${summary.spread.toFixed(1)}°F spread</span>`:'';
+    const hasComparisonOnly=comparison?.published.sources.some(source=>!Object.hasOwn(built.contributingHighs?.[i]||{},source.id));
+    tip.innerHTML = `<b style="display:block;margin-bottom:3px">${dayName(days[i], i, true)}</b>${varId==='temp'?'<b style="display:block;margin-bottom:3px">Daily highs (°F)</b>':''}`
+      + (rows.length ? rows.map(([id, v]) => `<span data-tip-series="${id}" style="display:flex;justify-content:space-between;gap:10px"><span><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COLORS[id]};margin-right:5px"></i>${displayName(id) || varDef.label}${varId==='temp'&&id!=='nourie'&&finite(v)&&!Object.hasOwn(built.contributingHighs?.[i]||{},id)?' (comparison only)':''}</span><b>${finite(v) ? varId==='temp'?v.toFixed(precision)+'°':varDef.fmt(v) : 'Unavailable'}</b></span>`).join('') : varId==='pop'?'<span>No rain chances of 5% or higher</span>':'<span>No model data</span>')
+      +(comparison?range(comparison.published,'All published model highs')+(hasComparisonOnly?range(comparison.contributing,'Contributing model highs'):'')+'<small style="display:block">Ranges exclude the blended forecast and include hidden models.</small>':'');
     tip.style.display = 'block';
     const px = (x / W) * r.width, tw = tip.offsetWidth;
     tip.style.left = `${Math.max(0, Math.min(r.width - tw, px > r.width / 2 ? px - tw - 12 : px + 12))}px`;
